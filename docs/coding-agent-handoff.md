@@ -2,13 +2,13 @@
 
 > 面向接手实现的 Coding Agent  
 > 最近更新：2026-08-08  
-> 当前状态：产品、Agent、UI 功能交互与品牌基线完成；Onboarding/Permissions、Overview、Quick Scan、Scan Results、Deep Dive、Review、Cleanup Result、History 与独立 Settings 主构图已批准，跨流程失败/降级状态仍在收敛；等待执行 Epic 0–1 技术计划
+> 当前状态：产品、Agent、UI 功能交互与品牌基线完成；核心页面、独立 Settings 及跨流程失败/降级状态均已批准，UI/UX 设计基线完成；等待执行 Epic 0–1 技术计划
 
 ## 1. 任务目标
 
 构建一个原生 Swift macOS App，将确定性开发者磁盘扫描与受约束 Codex 深度调查结合起来。产品必须在没有 Codex 和外部工具时完成 Quick Scan，并在 Deep Dive 中让 Codex 通过受控本地桥接调用 Probe Broker 调查未知空间。所有写操作由 Swift Policy Gate 与 Executor 控制。
 
-Coding Agent 可以实现已批准的导航、状态模型和原生组件骨架，但不得把任一视觉概念图当作逐像素终稿。Onboarding 使用 A 的三步单焦点结构 + C 的紧凑 Full/Limited 后果说明，并具有 Welcome、FDA、Connect Codex 的 Dark/Light 配对；Overview 的 A+B 融合构图及 Dark/Light 配对方向已经批准；Quick Scan 的 E 主体 + A 阶段 rail 已批准；Scan Results 的 A 默认表格 + D Inspector 已批准；Deep Dive 的 B 默认页 + C Inspector + A Probe 轨迹已经批准；Review 的 A 默认表格 + C Inspector + B 分组解释已经批准；Cleanup Result 使用 B 的可恢复优先层级 + A 计量契约，E 是 partial/error 状态，C/D 分别下沉为 Accounting Details 与 Manifest；History 使用 E master-detail + A 日期分组，C 是按需 Storage Trend；Settings 使用 A 的独立原生侧栏外壳 + C 的 General 状态汇总 + E 的结构化 Local Knowledge，并具有 General、Codex & Deep Dive、Local Knowledge 的 Dark/Light 配对。跨流程辅助状态族仍需收敛。圆环只作为功能性存储图，不得实现星座/星图装饰。发现 Codex 不等于验证安全边界；在技术 Spike 和运行时 safety check 通过前 Deep Dive 必须保持 paused。
+Coding Agent 可以实现已批准的导航、状态模型和原生组件骨架，但不得把任一视觉概念图当作逐像素终稿。Onboarding 使用 A 的三步单焦点结构 + C 的紧凑 Full/Limited 后果说明，并具有 Welcome、FDA、Connect Codex 的 Dark/Light 配对；Overview 的 A+B 融合构图及 Dark/Light 配对方向已经批准；Quick Scan 的 E 主体 + A 阶段 rail 已批准；Scan Results 的 A 默认表格 + D Inspector 已批准；Deep Dive 的 B 默认页 + C Inspector + A Probe 轨迹已经批准；Review 的 A 默认表格 + C Inspector + B 分组解释已经批准；Cleanup Result 使用 B 的可恢复优先层级 + A 计量契约，E 是 partial/error 状态，C/D 分别下沉为 Accounting Details 与 Manifest；History 使用 E master-detail + A 日期分组，C 是按需 Storage Trend；Settings 使用 A 的独立原生侧栏外壳 + C 的 General 状态汇总 + E 的结构化 Local Knowledge，并具有 General、Codex & Deep Dive、Local Knowledge 的 Dark/Light 配对。跨流程状态统一采用“保留有效结果 → 标出受影响范围 → 只提供安全恢复 → 技术细节按需展开”，五组 Light/Dark canonical 覆盖 limited coverage、Deep Dive safety blocked、stale plan、partial investigation 与 expired evidence/corrupt history。圆环只作为功能性存储图，不得实现星座/星图装饰。发现 Codex 不等于验证安全边界；在技术 Spike 和运行时 safety check 通过前 Deep Dive 必须保持 paused。
 
 正式产品名为 `Stornaut`：App/Swift 类型使用该大小写，仓库、CLI 和配置前缀使用 `stornaut`。项目采用 MIT License；首发仅面向开发时最新稳定版 macOS 与 Apple Silicon，不为 Intel 或旧系统牺牲实现简洁度。
 
@@ -25,10 +25,11 @@ Coding Agent 可以实现已批准的导航、状态模型和原生组件骨架�
 2. [技术架构](architecture.md)
 3. [批准的设计规格](superpowers/specs/2026-08-06-stornaut-agent-disk-governance-design.md)
 4. [UI/UX 设计规格](superpowers/specs/2026-08-07-stornaut-ui-ux-design.md)
-5. [已批准的 Epic 0–1 实施计划](superpowers/plans/2026-08-07-stornaut-epic-0-1-foundation-spikes.md)
-6. [上游参考矩阵](upstream-reference-matrix.md)
-7. [竞品报告](competitive-analysis-2026-08-06.md)
-8. [真实案例](case-study-2026-08-06.md)
+5. [跨流程恢复状态与概念图](assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md)
+6. [已批准的 Epic 0–1 实施计划](superpowers/plans/2026-08-07-stornaut-epic-0-1-foundation-spikes.md)
+7. [上游参考矩阵](upstream-reference-matrix.md)
+8. [竞品报告](competitive-analysis-2026-08-06.md)
+9. [真实案例](case-study-2026-08-06.md)
 
 规范优先级：用户明确批准的 v1 约束 → PRD 2.3 与两份批准规格 → architecture 2.2 → Epic 0–1 实施计划 → 研究/案例/视觉概念。发现冲突时先报告并提出精确修正文案；未经用户批准不得降低安全边界、扩大权限或修改已批准产品范围。
 
@@ -53,6 +54,10 @@ Coding Agent 可以实现已批准的导航、状态模型和原生组件骨架�
 17. Agent-only 规则 miss 不能进入默认选中的 Ready to Reclaim。
 18. Local Knowledge 只能保存经确认的结构化事实，不能降低 denylist/veto/Policy Gate。
 19. `ReclaimDisposition` 只有 Ready to Reclaim、Review Recommended、Protected、Unknown；风险与置信度独立建模。
+20. 权限缺口不得显示为 `0 B`；已经完成且仍有效的结果不得被局部失败抹掉。
+21. stale preflight 没有 `Proceed Anyway`；刷新受影响项之前不得执行任何动作。
+22. safety check 阻断时不得显示尚未发生的 explained gain、finding count 或阶段进度。
+23. linked Evidence 到期不得提前删除最小 Cleanup Manifest；损坏记录只隔离自身。
 
 ## 4. 开发方法
 

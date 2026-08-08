@@ -434,6 +434,11 @@ priority = expectedReclaimableBytes × uncertainty × relevance / investigationC
 | 执行前目录变化 | 拒绝执行并要求重新确认 |
 | Registered Action 失败 | 停止该动作，保留日志和恢复建议 |
 | Trash 失败 | 不回退到永久删除 |
+| Cleanup Manifest 持久化失败 | 与执行结果分开报告；在成功重试保存或导出前不得显示正常完成 |
+| linked Evidence 到期 | 保留最小 Cleanup Manifest；证据区明确标记过期，不猜测重建 |
+| 单条 History 损坏 | 只隔离该记录，其他历史仍可查看、导出和删除 |
+
+所有降级界面遵循同一恢复契约：保留仍然有效的结果，精确标记受影响范围，说明当前影响，只提供安全恢复动作，并将技术细节按需展开。局部权限失败不得写成 `0 B`；Deep Dive safety check 阻断时不得保留虚假的 investigation 成功指标；执行前 stale 没有 bypass，刷新前不执行任何动作。完整状态矩阵与 Light/Dark 参考见 [Resilience States](assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md)。
 
 ## 11. 成功指标与发布门槛
 

@@ -2,7 +2,7 @@
 
 Generated with the built-in `imagegen` tool on 2026-08-07. These are visual exploration assets, not implementation specifications.
 
-Current selection status: functional UX and brand rules are approved. Onboarding/permissions, Overview, Quick Scan progress, Scan Results, Deep Dive, Review, Cleanup Result, History, and Settings now have approved compositions. Remaining cross-flow failure-state compositions are still in progress.
+Current selection status: the functional UX, brand rules, all core pages, Settings, and cross-flow resilience states have approved compositions. The UI/UX design baseline is complete for implementation; generated assets remain non-pixel-accurate references.
 
 ## Shared direction
 
@@ -200,3 +200,16 @@ Internal selection result, approved 2026-08-08: A is the Settings shell, C contr
 - `settings-general-canonical-dark.png` / `settings-general-canonical-light.png` — General, appearance/language, setup status, and explicit on-demand behavior.
 - `settings-codex-deep-dive-canonical-dark.png` / `settings-codex-deep-dive-canonical-light.png` — independent Codex installation and Deep Dive safety states plus default budget presets.
 - `settings-local-knowledge-canonical-dark.png` / `settings-local-knowledge-canonical-light.png` — structured confirmed facts, provenance, review, and forgetting.
+
+## Resilience states — cross-flow draw
+
+See [round notes and behavior matrix](RESILIENCE-STATES-ROUND-1.md).
+
+- `resilience-limited-coverage-canonical-dark.png` / `resilience-limited-coverage-canonical-light.png` — measured Quick Scan results remain useful while inaccessible scope is explicitly unmeasurable.
+- `resilience-deep-dive-safety-blocked-canonical-dark.png` / `resilience-deep-dive-safety-blocked-canonical-light.png` — Deep Dive remains paused when isolation fails; Quick Scan remains available and no bypass exists.
+- `resilience-stale-plan-canonical-dark.png` / `resilience-stale-plan-canonical-light.png` — execution preflight blocks a changed plan and requires affected items to be refreshed.
+- `resilience-partial-investigation-canonical-dark.png` / `resilience-partial-investigation-canonical-light.png` — verified partial evidence is preserved when the budget ends; unresolved targets remain Unknown.
+- `resilience-history-expired-canonical-dark.png` / `resilience-history-expired-canonical-light.png` — expired linked evidence does not erase the minimum Cleanup Manifest; corrupt history is isolated by row.
+- `resilience-deep-dive-safety-blocked-draft-dark.png` — rejected audit draft because stale success metrics contradicted a not-started investigation.
+
+Selection result, approved 2026-08-08: use one page-preserving recovery grammar across all flows—preserve valid results, label the affected scope, offer only safe recovery, and disclose technical detail on demand. Red is reserved for concrete failures; limited, stale, and budget states use neutral/amber semantics.

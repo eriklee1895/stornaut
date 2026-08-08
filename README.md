@@ -21,7 +21,7 @@
 
 ## 状态
 
-🚧 产品、Agent、UI 功能交互与品牌基线已批准；Onboarding/Permissions、Overview、Quick Scan、Scan Results、Deep Dive、Review、Cleanup Result、History 与独立 Settings 视觉已定稿，跨流程失败/降级状态继续收敛。工程下一阶段仍是执行 Epic 0–1 骨架与技术 Spike。见文档：
+🚧 产品、Agent、UI 功能交互与品牌基线已批准；核心页面、独立 Settings 及跨流程失败/降级状态均已定稿，UI/UX 设计基线完成。工程下一阶段是执行 Epic 0–1 骨架与技术 Spike。见文档：
 
 | 文档 | 内容 |
 |---|---|
@@ -33,6 +33,7 @@
 | [docs/coding-agent-handoff.md](docs/coding-agent-handoff.md) | 面向 Coding Agent 的实施顺序、硬约束和 handoff prompt |
 | [docs/superpowers/specs/2026-08-06-stornaut-agent-disk-governance-design.md](docs/superpowers/specs/2026-08-06-stornaut-agent-disk-governance-design.md) | 用户批准的最终设计基线 |
 | [docs/superpowers/specs/2026-08-07-stornaut-ui-ux-design.md](docs/superpowers/specs/2026-08-07-stornaut-ui-ux-design.md) | 单窗口信息架构、核心流程、Agent 表达、Light/Dark 与品牌规范 |
+| [docs/assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md](docs/assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md) | 权限受限、安全阻断、部分结果、stale preflight 与历史保留的恢复状态契约 |
 | [docs/superpowers/plans/2026-08-07-stornaut-epic-0-1-foundation-spikes.md](docs/superpowers/plans/2026-08-07-stornaut-epic-0-1-foundation-spikes.md) | 第一阶段工程骨架与高风险技术 Spike 实施计划 |
 
 ## 项目约束

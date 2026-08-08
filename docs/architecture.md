@@ -405,6 +405,11 @@ Executor → Manifest: append results
 - 所有失败都有用户可理解的下一步，不展示未经处理的 Agent 文本。
 - Agent 或 Adapter 异常永远不能把 `Unknown` 变为 `Ready to Reclaim`。
 - 进程取消必须终止子进程树并关闭 pipes，避免孤儿进程继续扫描。
+- UI 消费类型化恢复状态，而不是原始错误字符串：`limited(scope)`、`blocked(reason)`、`partial(completed, unresolved)`、`stale(affected)`、`failed(operation)`、`expired(recordPart)` 与 `corrupt(recordID)`。
+- 恢复 reducer 必须保留仍有效的 snapshot/evidence/manifest，只有依赖失败证据的结论与动作失效；任何局部失败都不能清空整个页面状态。
+- stale execution preflight 只能产生 refresh/cancel transition，不能产生 bypass transition。Safety check 阻断不能进入 investigation started 状态。
+- Manifest 写入失败与 Cleanup Action 失败是两个独立事件；前者不得伪装成正常完成。Linked Evidence expiry 不级联删除仍在保留期内的最小 Manifest。
+- 视觉与交互契约见 [Resilience States](assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md)。
 
 ## 7. 性能与资源预算
 

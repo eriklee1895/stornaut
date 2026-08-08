@@ -484,6 +484,10 @@ Stornaut 需要本地结构化知识，但不需要会自由联想的 Agent Memo
 
 每个主要页面必须设计：empty、loading、partial、success、cancelled、permission-limited、Codex-unavailable、Adapter-degraded、stale、error。
 
+所有页面采用统一的 **page-preserving recovery**：保留已完成且仍有效的结果，精确标记未完成/不可测/阻断/stale 范围，用一句短文案说明影响，只给出安全恢复动作，技术细节放在 disclosure 或 Inspector。除 stale execution preflight 这类必须阻断写操作的决策外，不用全屏 modal 或独立 Recovery Center 替换原页面。
+
+状态语义：limited、partial、budget exhausted 与 stale 使用 neutral/amber；只有具体操作失败才局部使用 red；Policy/safety 阻断使用 lock/shield 与 neutral/indigo。图标、状态词与影响说明必须同时存在，不能只依赖颜色。不可测量范围显示 `Unknown` 或 em dash，绝不显示 `0 B`。
+
 特别要求：
 
 - Codex 缺失时 Deep Dive 显示诊断与修复入口，Quick Scan 不受影响。
@@ -492,6 +496,14 @@ Stornaut 需要本地结构化知识，但不需要会自由联想的 Agent Memo
 - Agent Schema 错误使项目保持 Unknown。
 - 执行前 stale 使 checkbox 失效并要求重新验证。
 - Trash 失败显示原文件仍在原处，绝不提供自动永久删除 fallback。
+- Deep Dive safety check 失败时四个调查阶段保持 `Not started`，不得显示 explained gain、finding count 或 Ready 结论；只提供检查诊断和 Quick Scan fallback，不提供 bypass。
+- Quick Scan 停止后保存带覆盖率与 unfinished roots 的 partial snapshot；Deep Dive 停止/预算耗尽后保存 verified partial report，未完成目标保持 Unknown。
+- stale preflight 使用原生 sheet 冻结 Review context，只列变化项；`Refresh Affected Items` 或 `Cancel`，没有 `Proceed Anyway`。Cancel 后计划仍为 stale 且不可执行。
+- Cleanup Result 的行级失败保留成功行与恢复信息。Manifest 持久化失败必须与 action 失败分开报告，成功保存/导出前不能显示普通完成态。
+- linked Evidence 过期后保留最小 Cleanup Manifest；单条损坏 History 只隔离自身，不阻断其他记录。
+- Cleanup 只允许在动作开始前或类型化动作之间取消；单个动作开始后显示 `Stop After Current Action`，具体原子性以 Trash/Action lifecycle Spike 与 ADR 为准。
+
+五组批准的 Dark/Light 状态构图、行为矩阵、取消与无障碍契约见 [Resilience States — Cross-flow Round 1](../../assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md)。
 
 ## 18. 组件清单
 
@@ -550,6 +562,8 @@ UI 概念图位于 `docs/assets/ui-concepts/`，包括 Onboarding、Overview（�
 
 `settings-round1-a-sidebar-privacy-dark.png` 至 `settings-round1-e-local-knowledge-dark.png` 是独立 Settings 的五张内部抽卡稿。已批准 A 作为原生六项 Settings 侧栏外壳、C 的 Setup Status 进入 General、E 的结构化列表用于 Local Knowledge；B 的工具栏仅作为 Permissions 内容参考，D 单页折叠结构不采用。`settings-general-canonical-*`、`settings-codex-deep-dive-canonical-*` 与 `settings-local-knowledge-canonical-*` 是三组暗/亮主题参考。生成图中的路径、版本、日期、数量和 finding 都是 fixture；尤其不得把 `Codex Installed` 当作安全验证，也不得从概念图推导通用目录“safe to remove”。
 
+`resilience-*-canonical-dark.png` 与 `resilience-*-canonical-light.png` 是跨流程恢复状态的五组主题配对参考，覆盖 limited coverage、Deep Dive safety blocked、stale plan、partial investigation 与 expired evidence/corrupt history。它们共同定义 page-preserving recovery。`resilience-deep-dive-safety-blocked-draft-dark.png` 是明确拒绝的审计稿：它把 stale 成功指标留在未开始的调查上，不得实现。完整选择依据和状态矩阵见 [Resilience States](../../assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md)。
+
 它们不用于：
 
 - 直接逐像素照抄；
@@ -571,6 +585,8 @@ UI 概念图位于 `docs/assets/ui-concepts/`，包括 Onboarding、Overview（�
 10. 空间数字不混淆候选、处理、Trash、永久释放和 free-space delta。
 11. Light/Dark、English/`zh-Hans`、VoiceOver、键盘和 Reduce Motion 均可用。
 12. 所有取消、失败与 stale 状态 fail closed，不产生隐式写操作。
+13. 局部失败保留仍有效的结果；不可测量范围不显示为零，stale 与 safety-blocked 状态没有 bypass。
+14. Evidence 过期与单条 History 损坏不破坏仍在保留期内的最小 Manifest 或健康记录。
 
 ## 21. 明确不做
 
