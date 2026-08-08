@@ -1,0 +1,61 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+*.xccheckout
+*.xcscmblueprint
+xcuserdata/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+timeline.xctimeline
+playground.xcworkspace
+
+# Swift Package Manager
+.build/
+.swiftpm/configuration/registries.json
+.swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
+Packages/
+Package.pins
+Package.resolved
+*.xcodeproj
+!Package.swift
+
+# SwiftPM / tooling caches
+.index-build/
+.derivedData/
+
+# IDEs / editors
+.idea/
+.vscode/
+*.swp
+*~
+.cursor/
+
+# Secrets / local env
+.env
+.env.*
+!.env.example
+*.pem
+credentials.json
+
+# Benchmarks / local artifacts
+Benchmarks/.cache/
+*.profraw
+*.profdata
+coverage/
+*.lcov
+
+# Logs / temp
+*.log
+tmp/
+temp/
+.temp/
