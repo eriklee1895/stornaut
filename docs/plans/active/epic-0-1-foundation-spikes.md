@@ -270,9 +270,18 @@ env -u GITHUB_TOKEN -u GH_TOKEN git push origin main
 - Produces: `CodexCapabilityReport` containing executable URL, version string, parsed flag support, and an evidence-bearing verdict (`supported`, `unsupported`, or `unverified(reason:)`) for structured JSONL, output Schema, ephemeral mode, read-only sandbox, strict/ignored user configuration, rule/instruction isolation, local Probe transport, and Broker-only tool-surface enforcement. A parsed CLI flag alone cannot mark an isolation property as supported.
 - Produces: injectable `ProcessRunning` protocol so tests never depend on a real Codex login.
 
-- [ ] **Step 1: Complete the Codex Runtime Upstream Study Gate**
+- [x] **Step 1: Complete the Codex Runtime Upstream Study Gate**
 
 Read the current official Codex CLI implementation/docs for `exec`, configuration loading, JSONL events, schemas, sandbox, local tool/MCP exposure, built-in Shell/filesystem tools, AGENTS/project instruction discovery, plugins, Hooks, tool-surface restriction, and cancellation. This one study explicitly covers Tasks 3–5. Re-probe and record the execution-time Codex path, version, `codex exec --help`, relevant feature/config diagnostics, and the difference between ignoring `config.toml`/rules and suppressing all unrelated instruction or tool sources; `/Users/eriklee/.npm-global/bin/codex` and `0.146.0` are historical planning evidence only.
+
+Execution evidence on 2026-08-09:
+
+- Installed Codex is `0.147.0`; the npm launcher resolves to a signed OpenAI arm64 runtime binary.
+- `exec --help` exposes JSONL, output Schema, ephemeral, read-only sandbox, strict config, ignore-user-config and ignore-rules flags.
+- Official `rust-v0.147.0` source confirms that ignore-user-config, ignore-rules, project-doc suppression, Skills, Plugins, Hooks, Shell and MCP are separate controls.
+- A no-model `debug prompt-input` diagnostic proved that explicit overrides can suppress project docs and optional prompt catalogs, but it does not prove the real `exec` tool registry.
+- There is no single public `--only-tool ProbeBroker` control. Broker-only and direct-read isolation remain unverified; Deep Dive stays paused.
+- See [Epic 1 Codex Runtime Upstream Study](../../upstream-studies/epic-1-codex-runtime.md).
 
 - [ ] **Step 2: Write failing locator tests**
 

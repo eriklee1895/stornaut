@@ -52,6 +52,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | 导航、文案、品牌、Light/Dark | [docs/design/ui-ux.md](docs/design/ui-ux.md) |
 | 跨 Epic 交付顺序与 Gate | [docs/plans/roadmap.md](docs/plans/roadmap.md) |
 | Epic 0–1 逐 Task 执行 | [docs/plans/active/epic-0-1-foundation-spikes.md](docs/plans/active/epic-0-1-foundation-spikes.md) |
+| Codex discovery/进程/隔离研究 Gate | [docs/upstream-studies/epic-1-codex-runtime.md](docs/upstream-studies/epic-1-codex-runtime.md) |
 | 上游学习与许可证边界 | [docs/research/upstream-reference-matrix.md](docs/research/upstream-reference-matrix.md) |
 | 竞品与可借鉴点 | [docs/research/competitive-analysis-2026-08-06.md](docs/research/competitive-analysis-2026-08-06.md) |
 | 真实清理案例上下文 | [docs/research/case-study-2026-08-06.md](docs/research/case-study-2026-08-06.md) |
