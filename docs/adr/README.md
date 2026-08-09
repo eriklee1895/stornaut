@@ -9,5 +9,6 @@
 5. [`0005-swift-surveyor-performance.md`](0005-swift-surveyor-performance.md) — Accepted Task 6; Swift meets measured performance/memory/cancellation goals
 6. [`0006-trash-and-registered-actions.md`](0006-trash-and-registered-actions.md) — Accepted Task 7; constrained Trash and fake registered-action lifecycle validated
 7. [`0007-domain-persistence-boundary.md`](0007-domain-persistence-boundary.md) — Accepted; dual-store SQLite boundary verified in Task 11
+8. [`0008-production-quick-scan-lifecycle.md`](0008-production-quick-scan-lifecycle.md) — Accepted; production Surveyor and persisted lifecycle validated in Task 12
 
 每份 ADR 至少记录 Status、Context、Evidence、Decision、Consequences、Residual Risks 和 Validation。安全假设没有测量证据时不得标记 Accepted。

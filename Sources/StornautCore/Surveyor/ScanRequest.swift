@@ -4,12 +4,21 @@ public struct ScanRequest: Sendable {
     public static let defaultMaximumWorkers = 4
     public static let defaultMaximumPendingDirectories = 4_096
     public static let defaultStreamBufferCapacity = 1_024
+    public static let defaultLifecycleEventBufferCapacity = 1_024
+    public static let defaultPersistenceBatchSize = 64
+    public static let maximumWorkersLimit = 64
+    public static let maximumPendingDirectoriesLimit = 65_536
+    public static let maximumStreamBufferCapacity = 16_384
+    public static let maximumLifecycleEventBufferCapacity = 16_384
+    public static let maximumPersistenceBatchSize = 100
 
     public let rootURL: URL
     public let maximumWorkers: Int
     public let maximumPendingDirectories: Int
     public let stayOnRootDevice: Bool
     public let streamBufferCapacity: Int
+    public let lifecycleEventBufferCapacity: Int
+    public let persistenceBatchSize: Int
     public let sessionID: ScanSessionID
     public let scopeID: ScanScopeID
     let onCompletion: @Sendable () -> Void
@@ -21,6 +30,9 @@ public struct ScanRequest: Sendable {
         maximumPendingDirectories: Int = defaultMaximumPendingDirectories,
         stayOnRootDevice: Bool = true,
         streamBufferCapacity: Int = defaultStreamBufferCapacity,
+        lifecycleEventBufferCapacity: Int =
+            defaultLifecycleEventBufferCapacity,
+        persistenceBatchSize: Int = defaultPersistenceBatchSize,
         sessionID: ScanSessionID = ScanSessionID(),
         scopeID: ScanScopeID = ScanScopeID(),
         onCompletion: @escaping @Sendable () -> Void = {}
@@ -31,6 +43,8 @@ public struct ScanRequest: Sendable {
             maximumPendingDirectories: maximumPendingDirectories,
             stayOnRootDevice: stayOnRootDevice,
             streamBufferCapacity: streamBufferCapacity,
+            lifecycleEventBufferCapacity: lifecycleEventBufferCapacity,
+            persistenceBatchSize: persistenceBatchSize,
             sessionID: sessionID,
             scopeID: scopeID,
             onCompletion: onCompletion,
@@ -44,6 +58,9 @@ public struct ScanRequest: Sendable {
         maximumPendingDirectories: Int = defaultMaximumPendingDirectories,
         stayOnRootDevice: Bool = true,
         streamBufferCapacity: Int = defaultStreamBufferCapacity,
+        lifecycleEventBufferCapacity: Int =
+            defaultLifecycleEventBufferCapacity,
+        persistenceBatchSize: Int = defaultPersistenceBatchSize,
         sessionID: ScanSessionID = ScanSessionID(),
         scopeID: ScanScopeID = ScanScopeID(),
         onCompletion: @escaping @Sendable () -> Void = {},
@@ -54,6 +71,8 @@ public struct ScanRequest: Sendable {
         self.maximumPendingDirectories = maximumPendingDirectories
         self.stayOnRootDevice = stayOnRootDevice
         self.streamBufferCapacity = streamBufferCapacity
+        self.lifecycleEventBufferCapacity = lifecycleEventBufferCapacity
+        self.persistenceBatchSize = persistenceBatchSize
         self.sessionID = sessionID
         self.scopeID = scopeID
         self.onCompletion = onCompletion

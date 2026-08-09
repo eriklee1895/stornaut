@@ -27,7 +27,7 @@ struct EvidenceStoreTestHooks: Sendable {
 }
 
 public actor EvidenceStore {
-    private static let schemaVersion = 1
+    private static let schemaVersion = 2
     private static let sevenDaysMilliseconds: Int64 = 7 * 86_400 * 1_000
     private static let ninetyDaysMilliseconds: Int64 = 90 * 86_400 * 1_000
 
@@ -135,6 +135,29 @@ public actor EvidenceStore {
                 .text(payload),
             ],
             operation: "scanSession.save"
+        )
+    }
+
+    public func beginScanSession(_ session: ScanSession) throws {
+        let payload = try encodeStorePayload(session)
+        let expiresAt = addingStoreMilliseconds(
+            Self.sevenDaysMilliseconds,
+            to: storeMilliseconds(session.finishedAt)
+        )
+        try connection.execute(
+            """
+            INSERT INTO scan_sessions
+            (id, started_at_ms, finished_at_ms, expires_at_ms, payload)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            bindings: [
+                .text(session.id.rawValue),
+                .integer(storeMilliseconds(session.startedAt)),
+                .integer(storeMilliseconds(session.finishedAt)),
+                .integer(expiresAt),
+                .text(payload),
+            ],
+            operation: "scanSession.begin"
         )
     }
 
@@ -375,6 +398,58 @@ public actor EvidenceStore {
             payload: DomainJSON.encode(accounting),
             operation: "accounting.save"
         )
+    }
+
+    public func saveVolumeBaseline(_ baseline: VolumeBaseline) throws {
+        try connection.execute(
+            """
+            INSERT INTO volume_baselines
+            (session_id, scope_id, sampled_at_ms, payload)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(session_id, scope_id) DO UPDATE SET
+                sampled_at_ms=excluded.sampled_at_ms,
+                payload=excluded.payload
+            """,
+            bindings: [
+                .text(baseline.sessionID.rawValue),
+                .text(baseline.scopeID.rawValue),
+                .integer(storeMilliseconds(baseline.source.sampledAt)),
+                .text(try encodeStorePayload(baseline)),
+            ],
+            operation: "volumeBaseline.save"
+        )
+    }
+
+    public func volumeBaseline(
+        sessionID: ScanSessionID,
+        scopeID: ScanScopeID
+    ) throws -> VolumeBaseline? {
+        let records = try connection.query(
+            """
+            SELECT payload, session_id, scope_id, sampled_at_ms
+            FROM volume_baselines
+            WHERE scope_id = ? AND session_id = ?
+            """,
+            bindings: [
+                .text(scopeID.rawValue),
+                .text(sessionID.rawValue),
+            ],
+            operation: "volumeBaseline.load"
+        ) { statement -> VolumeBaseline in
+            let baseline = try DomainJSON.decode(
+                VolumeBaseline.self,
+                from: Data(columnText(statement, 0).utf8)
+            )
+            guard columnText(statement, 1) == baseline.sessionID.rawValue,
+                  columnText(statement, 2) == baseline.scopeID.rawValue,
+                  sqlite3_column_int64(statement, 3)
+                    == storeMilliseconds(baseline.source.sampledAt)
+            else {
+                throw EvidenceStoreError.recordIdentityMismatch
+            }
+            return baseline
+        }
+        return records.first
     }
 
     public func spaceAccounting(
@@ -847,6 +922,15 @@ public actor EvidenceStore {
             }
             return
         }
+        if version == 1 {
+            let expected = try SQLiteConnection(path: ":memory:")
+            try configureConnection(expected)
+            try createSchemaV1(expected)
+            guard try schemaSignature(connection) == schemaSignature(expected) else {
+                throw EvidenceStoreError.schemaMismatch
+            }
+            return
+        }
         guard version == schemaVersion else {
             throw EvidenceStoreError.schemaMismatch
         }
@@ -914,50 +998,82 @@ public actor EvidenceStore {
         guard version < schemaVersion else {
             return
         }
-        do {
-            try connection.transaction(operation: "migration.v1") {
-                try claimRole(connection)
-                if try connection.scalarInt(
-                    """
-                    SELECT count(*) FROM sqlite_master
-                    WHERE type='table' AND name='legacy_scan_sessions'
-                    """,
-                    operation: "migration.legacyExists"
-                ) > 0 {
-                    try createSchema(connection)
-                    try connection.execute(
+        if version == 0 {
+            do {
+                try connection.transaction(operation: "migration.v1") {
+                    try claimRole(connection)
+                    if try connection.scalarInt(
                         """
-                        INSERT INTO scan_sessions
-                        (id, started_at_ms, finished_at_ms, expires_at_ms, payload)
-                        SELECT id, started_at_ms, finished_at_ms, expires_at_ms, payload
-                        FROM legacy_scan_sessions
+                        SELECT count(*) FROM sqlite_master
+                        WHERE type='table' AND name='legacy_scan_sessions'
                         """,
-                        operation: "migration.copyLegacySessions"
-                    )
+                        operation: "migration.legacyExists"
+                    ) > 0 {
+                        try createSchemaV1(connection)
+                        try connection.execute(
+                            """
+                            INSERT INTO scan_sessions
+                            (id, started_at_ms, finished_at_ms, expires_at_ms, payload)
+                            SELECT id, started_at_ms, finished_at_ms, expires_at_ms, payload
+                            FROM legacy_scan_sessions
+                            """,
+                            operation: "migration.copyLegacySessions"
+                        )
+                        try connection.execute(
+                            "DROP TABLE legacy_scan_sessions",
+                            operation: "migration.dropLegacy"
+                        )
+                    } else {
+                        try createSchemaV1(connection)
+                    }
+                    if testHooks.failMigrationToVersion == 1 {
+                        throw EvidenceStoreError.migrationFailed(version: 1)
+                    }
                     try connection.execute(
-                        "DROP TABLE legacy_scan_sessions",
-                        operation: "migration.dropLegacy"
+                        "PRAGMA user_version=1",
+                        operation: "migration.setVersion1"
                     )
-                } else {
-                    try createSchema(connection)
                 }
-                if testHooks.failMigrationToVersion == 1 {
-                    throw EvidenceStoreError.migrationFailed(version: 1)
+            } catch {
+                throw EvidenceStoreError.migrationFailed(version: 1)
+            }
+        }
+        do {
+            try connection.transaction(operation: "migration.v2") {
+                try claimRole(connection)
+                try createSchemaV2(connection)
+                if testHooks.failMigrationToVersion == 2 {
+                    throw EvidenceStoreError.migrationFailed(version: 2)
                 }
                 try connection.execute(
-                    "PRAGMA user_version=1",
-                    operation: "migration.setVersion"
+                    "PRAGMA user_version=2",
+                    operation: "migration.setVersion2"
                 )
             }
         } catch {
-            throw EvidenceStoreError.migrationFailed(version: 1)
+            throw EvidenceStoreError.migrationFailed(version: 2)
         }
     }
 
     private static func createSchema(
         _ connection: SQLiteConnection
     ) throws {
-        for (operation, sql) in evidenceSchemaStatements {
+        try createSchemaV1(connection)
+        try createSchemaV2(connection)
+    }
+
+    private static func createSchemaV1(
+        _ connection: SQLiteConnection
+    ) throws {
+        for (operation, sql) in evidenceSchemaV1Statements {
+            try connection.execute(sql, operation: operation)
+        }
+    }
+
+    private static func createSchemaV2(
+        _ connection: SQLiteConnection
+    ) throws {
+        for (operation, sql) in evidenceSchemaV2Statements {
             try connection.execute(sql, operation: operation)
         }
     }
@@ -1188,7 +1304,7 @@ private enum StoreDecodedRow<Record> {
     case corrupt(String)
 }
 
-private let evidenceSchemaStatements: [(String, String)] = [
+private let evidenceSchemaV1Statements: [(String, String)] = [
     (
         "schema.scanSessions",
         """
@@ -1311,6 +1427,25 @@ private let evidenceSchemaStatements: [(String, String)] = [
     (
         "schema.manifestRetentionIndex",
         "CREATE INDEX IF NOT EXISTS idx_cleanup_manifests_expiry ON cleanup_manifests(expires_at_ms)"
+    ),
+]
+
+private let evidenceSchemaV2Statements: [(String, String)] = [
+    (
+        "schema.volumeBaselines",
+        """
+        CREATE TABLE IF NOT EXISTS volume_baselines (
+            session_id TEXT NOT NULL REFERENCES scan_sessions(id) ON DELETE CASCADE,
+            scope_id TEXT NOT NULL,
+            sampled_at_ms INTEGER NOT NULL,
+            payload TEXT NOT NULL,
+            PRIMARY KEY (session_id, scope_id)
+        ) STRICT
+        """
+    ),
+    (
+        "schema.volumeBaselineIndex",
+        "CREATE INDEX IF NOT EXISTS idx_volume_baselines_session_scope ON volume_baselines(session_id, scope_id)"
     ),
 ]
 

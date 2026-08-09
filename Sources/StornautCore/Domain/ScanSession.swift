@@ -8,6 +8,7 @@ public enum ScanTerminalState: String, Codable, Sendable, CaseIterable {
 }
 
 public enum ScanScopeCompletionReason: String, Codable, Sendable {
+    case interrupted
     case cancelled
     case permissionDenied
     case mountBoundary

@@ -234,3 +234,35 @@ with stronger partial-error semantics, durable session identity and a
 source-bearing volume ledger. Unlike the compared tools, it makes "measured",
 "classified", "reclaimable" and "free" separate facts and proves Quick Scan has
 no model or cleanup call path.
+
+## 10. Task 12 Production Delta
+
+Task 12 uses the studied APIs without upstream drift and makes these concrete
+changes from the Epic 1 benchmark:
+
+- rename the spike façade to production `Surveyor` while preserving its fixed
+  GCD worker pool, bounded queue, no-follow POSIX traversal, same-device default
+  and fail-on-stream-overflow behavior;
+- keep one low-level `ScanRequest` equal to one root/scope. Multi-root product
+  orchestration remains Task 20 so Task 12 does not invent classifier or
+  Activity behavior before Tasks 14–19;
+- add a `ScanSessionWriter` that consumes Surveyor observations, writes bounded
+  batches and emits the five approved product stages in monotonic order;
+- persist a fail-safe provisional partial session before child facts, then
+  replace it with completed/partial/cancelled/failed terminal truth. A crash can
+  therefore leave an unfinished partial record, never false success;
+- add a closed `VolumeBaseline` value and explicit Evidence schema v1-to-v2
+  migration. Capacity/free variants retain their Foundation source and sample
+  time; root identity is captured independently from path sums;
+- persist localized permission/mount/race issues through their typed
+  `PathSnapshot` measurement status. Progress and current-scope labels remain
+  transient;
+- use bounded database batches and a bounded event stream. Consumer overflow
+  fails the run and preserves committed partial data instead of silently losing
+  facts;
+- represent normal user cancellation as a persisted cancelled terminal session,
+  not an empty result or a thrown scanner failure.
+
+No upstream code, package or license notice is added by this delta. The initial
+production benchmark continues to use synthetic fixtures; the real-machine
+Phase B rerun remains Task 26.

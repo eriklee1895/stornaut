@@ -1,6 +1,6 @@
 # Stornaut Epic 2–4 Deterministic Product Core Implementation Plan
 
-> **Status:** Approved — Tasks 9–11 complete; Task 12 next
+> **Status:** Approved — Tasks 9–12 complete; Task 13 next
 >
 > **Roadmap phase:** Phase B — Deterministic Product Core
 >
@@ -579,12 +579,12 @@ Suggested commit subject: `feat: persist local scan evidence`
 - Persists facts incrementally without retaining a complete object graph.
 - Returns a terminal completed, partial, cancelled or failed session record.
 
-- [ ] **Step 1: Complete the Task 12 study gate**
+- [x] **Step 1: Complete the Task 12 study gate**
 
 Confirm the Epic 3 study covers the concrete APIs and production changes used
 here. Record any differences from the Epic 1 benchmark implementation.
 
-- [ ] **Step 2: Write lifecycle tests first**
+- [x] **Step 2: Write lifecycle tests first**
 
 Cover:
 
@@ -598,33 +598,57 @@ Cover:
 - root replacement/identity changes failing closed;
 - store failure stopping the session without rewriting it as success.
 
-- [ ] **Step 3: Replace the spike façade**
+- [x] **Step 3: Replace the spike façade**
 
 Rename or retire `SurveyorSpike`. Preserve the validated POSIX safety behavior
 while exposing production domain events. A normal user cancellation is a
 partial terminal result, not an error that discards prior observations.
 
-- [ ] **Step 4: Add volume and root baselines**
+- [x] **Step 4: Add volume and root baselines**
 
 Capture source and sample time for capacity/free-space observations and root
 identity. Do not derive volume free space from path sums.
 
-- [ ] **Step 5: Persist incrementally**
+- [x] **Step 5: Persist incrementally**
 
 Use bounded batches/transactions. Progress events may be transient; final
 session, facts, issues and unfinished scopes must survive App navigation or
 restart. Do not persist current-file log spam.
 
-- [ ] **Step 6: Refresh synthetic benchmark**
+- [x] **Step 6: Refresh synthetic benchmark**
 
 Update the fixture generator/benchmark for the production event and store
 path. Assert deterministic counts, bounded memory and cancellation completion.
 Real-machine Phase B benchmarking remains Task 26.
 
-- [ ] **Step 7: Verify and record ADR 0008**
+- [x] **Step 7: Verify and record ADR 0008**
 
 Run focused Surveyor/lifecycle tests, the synthetic benchmark and
 `scripts/verify`.
+
+
+Execution evidence:
+
+- The Epic 3 study now records the concrete Task 12 production delta and no
+  upstream/code/license drift.
+- `SurveyorSpike` is retired in favor of production `Surveyor`; accepted POSIX,
+  no-follow, same-device, bounded GCD and cancellation behavior remains covered.
+- `ScanSessionWriter` owns one active root/scope, five monotonic stages, explicit
+  user cancellation, consumer-independent producer lifetime, a fail-safe
+  provisional partial record and bounded 64-default/100-maximum batches.
+- Evidence schema v2 adds source-bearing `VolumeBaseline` with exact v1-to-v2
+  validation/rollback; real SQLite reopen preserves session, baseline and facts.
+- Review fixed cancellation misclassification, delayed first result, navigation
+  cancellation, duplicate session overwrite, provisional reason drift, missing
+  scope/path progress, unbounded config, integer overflow, baseline identity,
+  schema collision/signature and non-enforcing benchmark gates. See Task 12
+  review report; post-fix review has no open P0-P2 finding.
+- Focused verification passes 62 tests. Three self-validating production-path
+  synthetic runs keep exact 1,356-entry counts, first durable result at
+  16.12–29.75 ms, elapsed 96.77–107.66 ms, peak RSS below 17 MB and store near
+  1.46 MiB. Cancellation persists `cancelled` in 21.70 ms.
+- Final `scripts/verify` passes 169 SwiftPM tests, Xcode App tests, 2/2 XCUITest,
+  four screenshots, App bundle/signing, localization and docs.
 
 Suggested commit subject: `feat: productionize deterministic surveyor`
 

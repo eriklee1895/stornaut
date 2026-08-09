@@ -24,7 +24,7 @@ func surveyorStreamsFilesDirectoriesSparseFilesAndSymlinksWithoutFollowingLinks(
     )
 
     let snapshots = try await collectSnapshots(
-        SurveyorSpike().scan(
+        Surveyor().scan(
             ScanRequest(rootURL: fixture.rootURL, maximumWorkers: 3)
         )
     )
@@ -74,7 +74,7 @@ func surveyorPrunesInjectedMountBoundariesAndKeepsTheBoundarySnapshot() async th
         )
     )
 
-    let snapshots = try await collectSnapshots(SurveyorSpike().scan(request))
+    let snapshots = try await collectSnapshots(Surveyor().scan(request))
     let byPath = Dictionary(
         uniqueKeysWithValues: snapshots.map { ($0.relativePath, $0) }
     )
@@ -112,7 +112,7 @@ func surveyorEmitsPartialErrorsWithoutErasingValidResults() async throws {
         )
     )
 
-    let snapshots = try await collectSnapshots(SurveyorSpike().scan(request))
+    let snapshots = try await collectSnapshots(Surveyor().scan(request))
     let byPath = Dictionary(
         uniqueKeysWithValues: snapshots.map { ($0.relativePath, $0) }
     )
@@ -152,7 +152,7 @@ func surveyorTreatsDirectoryReplacementAsAPartialError() async throws {
         )
     )
 
-    let snapshots = try await collectSnapshots(SurveyorSpike().scan(request))
+    let snapshots = try await collectSnapshots(Surveyor().scan(request))
     let byPath = Dictionary(
         uniqueKeysWithValues: snapshots.map { ($0.relativePath, $0) }
     )
@@ -184,7 +184,7 @@ func surveyorNeverExceedsTheConfiguredWorkerCount() async throws {
         )
     )
 
-    _ = try await collectSnapshots(SurveyorSpike().scan(request))
+    _ = try await collectSnapshots(Surveyor().scan(request))
 
     #expect(tracker.maximumActive <= 3)
     #expect(tracker.maximumActive >= 1)
@@ -211,7 +211,7 @@ func surveyorBoundsTheSharedDirectoryQueueWithoutDroppingWork() async throws {
         )
     )
 
-    let snapshots = try await collectSnapshots(SurveyorSpike().scan(request))
+    let snapshots = try await collectSnapshots(Surveyor().scan(request))
 
     #expect(tracker.maximumDepth <= 4)
     #expect(
@@ -230,7 +230,7 @@ func surveyorFailsInsteadOfSilentlyDroppingWhenTheStreamBufferOverflows() async 
         )
     }
     let completion = ScanCompletionTracker()
-    let stream = SurveyorSpike().scan(
+    let stream = Surveyor().scan(
         ScanRequest(
             rootURL: fixture.rootURL,
             maximumWorkers: 2,
@@ -256,7 +256,7 @@ func surveyorCancellationStopsSyntheticTraversalWithinOneSecond() async throws {
         )
     }
     let tracker = WorkerTracker()
-    let stream = SurveyorSpike().scan(
+    let stream = Surveyor().scan(
         ScanRequest(
             rootURL: fixture.rootURL,
             maximumWorkers: 4,
@@ -302,21 +302,21 @@ func surveyorRejectsInvalidRequestsBeforeTraversal() async throws {
 
     await #expect(throws: SurveyorError.invalidWorkerCount) {
         _ = try await collectSnapshots(
-            SurveyorSpike().scan(
+            Surveyor().scan(
                 ScanRequest(rootURL: fixture.rootURL, maximumWorkers: 0)
             )
         )
     }
     await #expect(throws: SurveyorError.invalidRoot) {
         _ = try await collectSnapshots(
-            SurveyorSpike().scan(
+            Surveyor().scan(
                 ScanRequest(rootURL: fileURL, maximumWorkers: 1)
             )
         )
     }
     await #expect(throws: SurveyorError.invalidQueueCapacity) {
         _ = try await collectSnapshots(
-            SurveyorSpike().scan(
+            Surveyor().scan(
                 ScanRequest(
                     rootURL: fixture.rootURL,
                     maximumWorkers: 1,
@@ -325,9 +325,20 @@ func surveyorRejectsInvalidRequestsBeforeTraversal() async throws {
             )
         )
     }
+    await #expect(throws: SurveyorError.invalidQueueCapacity) {
+        _ = try await collectSnapshots(
+            Surveyor().scan(
+                ScanRequest(
+                    rootURL: fixture.rootURL,
+                    maximumPendingDirectories:
+                        ScanRequest.maximumPendingDirectoriesLimit + 1
+                )
+            )
+        )
+    }
     await #expect(throws: SurveyorError.invalidStreamBufferCapacity) {
         _ = try await collectSnapshots(
-            SurveyorSpike().scan(
+            Surveyor().scan(
                 ScanRequest(
                     rootURL: fixture.rootURL,
                     maximumWorkers: 1,
@@ -336,9 +347,20 @@ func surveyorRejectsInvalidRequestsBeforeTraversal() async throws {
             )
         )
     }
+    await #expect(throws: SurveyorError.invalidStreamBufferCapacity) {
+        _ = try await collectSnapshots(
+            Surveyor().scan(
+                ScanRequest(
+                    rootURL: fixture.rootURL,
+                    streamBufferCapacity:
+                        ScanRequest.maximumStreamBufferCapacity + 1
+                )
+            )
+        )
+    }
     await #expect(throws: SurveyorError.invalidRoot) {
         _ = try await collectSnapshots(
-            SurveyorSpike().scan(
+            Surveyor().scan(
                 ScanRequest(
                     rootURL: fixture.rootURL,
                     maximumWorkers: 1,
@@ -351,7 +373,7 @@ func surveyorRejectsInvalidRequestsBeforeTraversal() async throws {
     }
     await #expect(throws: SurveyorError.invalidRoot) {
         _ = try await collectSnapshots(
-            SurveyorSpike().scan(
+            Surveyor().scan(
                 ScanRequest(
                     rootURL: URL(string: "../relative")!,
                     maximumWorkers: 1
@@ -378,7 +400,7 @@ func surveyorCountsHardLinkedFileBytesOnlyOnceInProgress() async throws {
     try FileManager.default.linkItem(at: originalURL, to: linkedURL)
 
     let snapshots = try await collectSnapshots(
-        SurveyorSpike().scan(
+        Surveyor().scan(
             ScanRequest(rootURL: fixture.rootURL, maximumWorkers: 2)
         )
     )

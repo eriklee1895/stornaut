@@ -2,16 +2,21 @@ import Darwin
 import Foundation
 import Synchronization
 
-public struct SurveyorSpike: Sendable {
+public struct Surveyor: Sendable {
     public init() {}
 
     public func scan(
         _ request: ScanRequest
     ) -> AsyncThrowingStream<SurveyorObservation, Error> {
         let state = SurveyState(request: request)
+        let bufferCapacity = request.streamBufferCapacity > 0
+            && request.streamBufferCapacity
+                <= ScanRequest.maximumStreamBufferCapacity
+            ? request.streamBufferCapacity
+            : 1
         let stream = AsyncThrowingStream<SurveyorObservation, Error>(
             bufferingPolicy: .bufferingOldest(
-                max(1, request.streamBufferCapacity)
+                bufferCapacity
             )
         ) { continuation in
             continuation.onTermination = { @Sendable termination in
@@ -47,13 +52,21 @@ private func runSurvey(
     else {
         throw SurveyorError.invalidRoot
     }
-    guard request.maximumWorkers > 0, request.maximumWorkers <= 64 else {
+    guard request.maximumWorkers > 0,
+          request.maximumWorkers <= ScanRequest.maximumWorkersLimit
+    else {
         throw SurveyorError.invalidWorkerCount
     }
-    guard request.maximumPendingDirectories > 0 else {
+    guard request.maximumPendingDirectories > 0,
+          request.maximumPendingDirectories
+            <= ScanRequest.maximumPendingDirectoriesLimit
+    else {
         throw SurveyorError.invalidQueueCapacity
     }
-    guard request.streamBufferCapacity > 0 else {
+    guard request.streamBufferCapacity > 0,
+          request.streamBufferCapacity
+            <= ScanRequest.maximumStreamBufferCapacity
+    else {
         throw SurveyorError.invalidStreamBufferCapacity
     }
 
@@ -223,7 +236,7 @@ private func processDirectory(
     else {
         close(descriptor)
         if job.relativePath == "." {
-            throw SurveyorError.invalidRoot
+            throw SurveyorError.rootIdentityChanged
         }
         try emitInaccessibleDirectory(
             job,
@@ -660,8 +673,14 @@ private final class SurveyState: @unchecked Sendable {
                         shouldCount = true
                     }
                     if shouldCount {
-                        logicalBytes += metadata.logicalBytes
-                        allocatedBytes += metadata.allocatedBytes
+                        logicalBytes = saturatingAdd(
+                            logicalBytes,
+                            metadata.logicalBytes
+                        )
+                        allocatedBytes = saturatingAdd(
+                            allocatedBytes,
+                            metadata.allocatedBytes
+                        )
                     }
                 }
             case .directory:
@@ -739,4 +758,9 @@ private final class SurveyState: @unchecked Sendable {
 private struct HardLinkIdentity: Hashable {
     let device: UInt64
     let inode: UInt64
+}
+
+private func saturatingAdd(_ lhs: Int64, _ rhs: Int64) -> Int64 {
+    let result = lhs.addingReportingOverflow(rhs)
+    return result.overflow ? .max : result.partialValue
 }

@@ -304,6 +304,7 @@ public struct SurveyorObservation: Sendable, Equatable {
 
 public enum SurveyorError: Error, Sendable, Equatable {
     case invalidRoot
+    case rootIdentityChanged
     case invalidWorkerCount
     case invalidQueueCapacity
     case invalidStreamBufferCapacity

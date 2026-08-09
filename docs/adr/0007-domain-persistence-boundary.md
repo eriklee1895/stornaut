@@ -110,7 +110,8 @@ covering checkpoints, backup and sidecar behavior.
 
 ### Migrations and downgrade
 
-- `PRAGMA user_version` is the schema version.
+- `PRAGMA user_version` is the schema version. Task 12 advances Evidence to v2
+  with the closed `volume_baselines` table; Local Knowledge remains v1.
 - A zero `application_id` is claimable only when the exact known empty/legacy
   schema fingerprint matches; arbitrary SQLite files are never adopted.
 - Every checked-in migration declares exact input/output versions.
@@ -284,3 +285,8 @@ Task 11 accepts this ADR with the following implementation evidence:
     active plan evidence);
 16. `swift package show-dependencies` remains dependency-free and no App-bundle
     framework was introduced.
+
+Task 12 later exercised this accepted migration mechanism with a checked-in,
+exact-schema v1 fixture and transactional v1-to-v2 rollback. ADR 0008 owns the
+new Quick Scan lifecycle and volume-baseline semantics; it does not change the
+storage boundary accepted here.
