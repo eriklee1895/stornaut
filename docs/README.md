@@ -19,10 +19,12 @@
 | 上游学习与许可证门禁 | [Upstream Reference Matrix](research/upstream-reference-matrix.md) |
 | 当前 Codex Runtime 研究 Gate | [Epic 1 Codex Runtime Study](upstream-studies/epic-1-codex-runtime.md) |
 | 当前 Swift Surveyor 研究 Gate | [Epic 1 Swift Surveyor Study](upstream-studies/epic-1-surveyor.md) |
+| 当前 Trash / Registered Actions 研究 Gate | [Epic 1 Actions Study](upstream-studies/epic-1-actions.md) |
 | Codex discovery/capability 决策 | [ADR 0002](adr/0002-codex-discovery-and-capabilities.md) |
 | Codex structured process 决策 | [ADR 0003](adr/0003-codex-process-protocol.md) |
 | Probe Broker 与 Codex 隔离决策 | [ADR 0004](adr/0004-codex-file-read-isolation.md) |
 | Swift Surveyor 性能决策 | [ADR 0005](adr/0005-swift-surveyor-performance.md) |
+| Trash 与 Registered Action 决策 | [ADR 0006](adr/0006-trash-and-registered-actions.md) |
 
 任意实现任务默认读取顺序：
 

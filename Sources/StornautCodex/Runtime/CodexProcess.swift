@@ -1,6 +1,5 @@
 import Darwin
 import Foundation
-import Synchronization
 
 public struct CodexRunRequest: Sendable, Equatable {
     public let executableURL: URL
@@ -372,15 +371,11 @@ private struct SpawnedCodexProcess {
     let standardError: Int32
 }
 
-private let codexSpawnMutex = Mutex<Void>(())
-
 private func spawn(_ request: CodexRunRequest) throws -> SpawnedCodexProcess {
-    try codexSpawnMutex.withLock { _ in
-        try spawnWhileHoldingFileDescriptorLock(request)
-    }
+    try spawnWithoutInheritingUnmappedDescriptors(request)
 }
 
-private func spawnWhileHoldingFileDescriptorLock(
+private func spawnWithoutInheritingUnmappedDescriptors(
     _ request: CodexRunRequest
 ) throws -> SpawnedCodexProcess {
     let stdinPipe = try createPipe()
@@ -424,7 +419,10 @@ private func spawnWhileHoldingFileDescriptorLock(
         guard
             posix_spawnattr_setflags(
                 &attributes,
-                Int16(POSIX_SPAWN_SETPGROUP)
+                Int16(
+                    POSIX_SPAWN_SETPGROUP
+                        | POSIX_SPAWN_CLOEXEC_DEFAULT
+                )
             ) == 0,
             posix_spawnattr_setpgroup(&attributes, 0) == 0
         else {

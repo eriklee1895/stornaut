@@ -130,7 +130,7 @@ scripts/check-doc-links
 
 Configure a dormant, manual-only CI workflow (`workflow_dispatch` only; no `push`, `pull_request`, `schedule`, or `workflow_run` trigger) for the newest available macOS runner matching the execution-time deployment target. If no matching arm64 runner exists, record that fact and keep CI disabled rather than lowering the target silently. Because the repository is already public, committing this file locally still does not authorize a push or GitHub-hosted run; local `scripts/verify` remains the Epic 0 acceptance gate until the user explicitly requests that external action.
 
-- [x] **Step 7: Verify and commit**
+- [ ] **Step 7: Verify and commit**
 
 Run: `scripts/verify`
 
@@ -586,31 +586,60 @@ env -u GITHUB_TOKEN -u GH_TOKEN git push origin main
 - Produces: `ActionExecutor.preflight`, `execute`, and `postflight` lifecycle with typed results.
 - Produces: `TrashMoving.trashItem(at:) async throws -> TrashedItemReceipt` backed by `FileManager.trashItem`.
 
-- [ ] **Step 1: Complete the Actions Upstream Study Gate**
+- [x] **Step 1: Complete the Actions Upstream Study Gate**
 
 Study PureMac, ClearDisk, devklean, Pearcleaner, and Apple documentation for FDA, Trash, undo/receipts, process protection, and error handling. Observe Pearcleaner under its source-available license; do not copy restricted code.
 
-- [ ] **Step 2: Write Policy Gate rejection tests**
+Study evidence completed on 2026-08-09. Current commits, licenses, source
+fingerprints, the Xcode 26.6 Foundation Trash contract and Stornaut's
+independent lifecycle brief are recorded in
+[Epic 1 Trash and Registered Actions Upstream Study](../../upstream-studies/epic-1-actions.md).
+No upstream code or dependency is introduced.
+
+- [x] **Step 2: Write Policy Gate rejection tests**
 
 Reject root, home, mount roots, symlinks, denylisted paths, changed inode/mtime/size, active paths, unregistered action IDs, and arguments not produced by a registered template. Include adversarial replacement between preflight and execution; revalidation must bind the action to the expected file identity and fail closed if the path is swapped. Assert Agent text cannot introduce executable or argument values.
 
-- [ ] **Step 3: Write Trash lifecycle tests**
+- [x] **Step 3: Write Trash lifecycle tests**
 
 Use only uniquely named temporary fixtures. Cover successful move, name collision, missing item, permission error, cancellation before execution, and revalidation failure. Assert failure leaves the original item in place and never invokes a permanent-delete function.
 
-- [ ] **Step 4: Implement Trash through an injectable adapter**
+- [x] **Step 4: Implement Trash through an injectable adapter**
 
 Production uses `FileManager.trashItem`; tests use a fake adapter where platform Trash is unsuitable. Return original identity, resulting Trash URL when available, timestamps, and measured bytes without claiming free space was released.
 
-- [ ] **Step 5: Write and implement one fake registered action**
+- [x] **Step 5: Write and implement one fake registered action**
 
 Register only a test action with fixed executable `Tests/Fixtures/Actions/fake-cleaner.sh` and enum-controlled mode arguments. Exercise preflight, dry-run, execute, timeout, postflight measurement, and partial failure. Do not register a real Homebrew/uv/pnpm destructive action in Epic 1.
 
-- [ ] **Step 6: Perform platform behavior probes**
+- [x] **Step 6: Perform platform behavior probes**
 
 Using disposable temporary files only, observe same-volume Trash, a mounted disposable volume if available, large directory cancellation semantics, and permission denial. Record the process identity and launch context for every result. CLI/test-binary observations prove API behavior only; any claim about FDA/TCC, entitlements, or packaged-App behavior must be repeated with the locally signed App harness established for Task 5 or explicitly recorded as residual risk. Record what can and cannot be undone in ADR 0006.
 
-- [ ] **Step 7: Verify and commit**
+Task 7 evidence on 2026-08-09:
+
+- Eighteen deterministic tests cover path/registry policy, fresh activity and
+  identity revalidation, Trash receipts/failure/no-fallback, fixed dry-run and
+  process execution, bounded typed postflight, partial failure, timeout, and
+  verified parent/child process-group exit.
+- Full parallel verification exposed and fixed cross-runtime pipe inheritance
+  and cooperative-executor starvation. Codex and Registered Action spawn now
+  use `POSIX_SPAWN_CLOEXEC_DEFAULT`; a mixed concurrent-spawn regression passes
+  and repeated 113-test SwiftPM runs complete without residue.
+- The real opt-in Foundation probe ran as the SwiftPM test CLI with uniquely
+  named disposable fixtures. Same-volume Trash returned a destination, renamed
+  collisions, preserved identity and completed a 2,000-file synchronous move;
+  cancellation could only be observed after the API call returned.
+- A controlled non-writable parent produced permission denial. A temporary
+  32 MiB APFS image proved a volume-specific `.Trashes` destination; the item
+  was restored, the image detached and all temporary data removed.
+- The public Trash API exposes no permanent-delete fallback, and receipts carry
+  moved logical/allocated bytes rather than `freedBytes`.
+- These are CLI/API observations. Signed-App FDA/TCC behavior remains an
+  explicit residual risk; no system permission was changed. See
+  [ADR 0006](../../adr/0006-trash-and-registered-actions.md).
+
+- [x] **Step 7: Verify and commit**
 
 Run action/safety tests and `scripts/verify`, then:
 

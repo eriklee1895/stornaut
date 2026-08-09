@@ -1,6 +1,7 @@
 import Darwin
 import Foundation
 import Testing
+@testable import StornautCore
 @testable import StornautCodex
 
 @Test
@@ -73,7 +74,7 @@ func successfulFakeProcessUsesFixedProtocolArgumentsAndSeparatesStderr() async t
 
 @Test
 func concurrentSpawnsDoNotInheritSiblingPipes() async throws {
-    let fixtures = try (0..<8).map { _ in
+    let fixtures = try (0..<7).map { _ in
         try CodexProcessFixture(mode: "success")
     }
     defer {
@@ -82,7 +83,27 @@ func concurrentSpawnsDoNotInheritSiblingPipes() async throws {
         }
     }
 
-    let results = try await withThrowingTaskGroup(
+    let actionURL = URL(filePath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .appending(path: "Tests/Fixtures/Actions/fake-cleaner.sh")
+    let invocation = RegisteredActionInvocation(
+        id: "fixture.fake-cleaner",
+        mode: .success,
+        executableURL: actionURL,
+        arguments: ["success"],
+        environment: [
+            "LANG": "C",
+            "LC_ALL": "C",
+            "PATH": "/usr/bin:/bin",
+        ],
+        timeout: .seconds(2),
+        standardOutputLimit: 16_384,
+        standardErrorLimit: 4_096
+    )
+
+    async let codexResults = withThrowingTaskGroup(
         of: [CodexProcessEvent].self
     ) { group in
         for fixture in fixtures {
@@ -101,7 +122,9 @@ func concurrentSpawnsDoNotInheritSiblingPipes() async throws {
         }
         return collected
     }
+    async let actionOutput = FoundationRegisteredActionRunner().run(invocation)
 
+    let (results, output) = try await (codexResults, actionOutput)
     #expect(results.count == fixtures.count)
     #expect(results.allSatisfy {
         $0.contains(.completed(
@@ -112,6 +135,7 @@ func concurrentSpawnsDoNotInheritSiblingPipes() async throws {
             )
         ))
     })
+    #expect(output.exitStatus == 0)
 }
 
 @Test
