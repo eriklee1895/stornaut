@@ -130,12 +130,16 @@ became reproducible under the larger parallel suite:
 - macOS could return transient `EPERM` while a group leader changed to a
   waitable exit during asynchronous output-limit cleanup.
 
-The pipe-create-through-spawn critical section is now process-local mutex
-protected. The terminator retries only while `EPERM` remains, then uses the
-existing fallback only after `waitid(WNOWAIT)` proves leader exit and
-`proc_listpids(PROC_PGRP_ONLY)` enumerates remaining members. Five rounds of
-concurrent/output-limit/descendant stress passed with no surviving fixture
-process.
+The initial fix serialized pipe creation and spawn with a process-local mutex.
+Task 7 later added a second process runtime, so the final implementation uses
+macOS `POSIX_SPAWN_CLOEXEC_DEFAULT` plus explicit standard-descriptor mappings
+in both runtimes. The existing eight-way spawn regression now mixes seven fake
+Codex processes with one fake Registered Action, avoiding cross-runtime pipe
+inheritance without serializing all spawns. The terminator retries only while
+`EPERM` remains, then uses the existing fallback only after `waitid(WNOWAIT)`
+proves leader exit and `proc_listpids(PROC_PGRP_ONLY)` enumerates remaining
+members. Repeated full suites and focused stress passed with no surviving
+fixture process.
 
 ### App-context canary experiment
 

@@ -666,7 +666,7 @@ env -u GITHUB_TOKEN -u GH_TOKEN git push origin main
 - Consumes: ADRs 0001–0006, all tests, real benchmark outputs, and the current approved specifications.
 - Produces: a go/conditional-go/no-go decision for Epic 2–3 without silently changing safety claims.
 
-- [ ] **Step 1: Run the full verification suite from a clean build**
+- [x] **Step 1: Run the full verification suite from a clean build**
 
 Run:
 
@@ -678,19 +678,19 @@ git status --short
 
 Expected: build/tests pass, benchmark emits machine-readable results, and only the intended report/doc changes remain.
 
-- [ ] **Step 2: Audit the six spike decisions**
+- [x] **Step 2: Audit the six spike decisions**
 
 The report must contain a table with assumption, evidence, result, residual risk, owner module, and release gate for: App shell, Codex discovery, Codex process lifecycle, file-read isolation, Swift Surveyor performance, and Action lifecycle.
 
-- [ ] **Step 3: Reconcile documentation with measured facts**
+- [x] **Step 3: Reconcile documentation with measured facts**
 
 First write measured findings and exact proposed corrections in the validation report. If a correction weakens any security, permission, privacy, or Agent-tool boundary, stop and obtain explicit user approval before modifying PRD, architecture, or approved specifications. After approval, apply only the approved wording. Purely factual updates that do not change an approved boundary may proceed.
 
-- [ ] **Step 4: Perform plan self-review**
+- [x] **Step 4: Perform plan self-review**
 
 Confirm every Global Constraint has a test, ADR, or explicitly deferred Epic. Search for accidental MenuBarExtra, arbitrary shell execution, raw JSONL persistence, denylist override, real destructive registered action, Rust dependency, telemetry, unapproved push/workflow triggers, and remote reconfiguration.
 
-- [ ] **Step 5: Commit the validation gate**
+- [x] **Step 5: Commit the validation gate**
 
 Commit only the validation report and non-normative factual updates until all required design decisions are approved. Commit approved specification changes separately after approval:
 

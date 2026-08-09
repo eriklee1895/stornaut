@@ -10,7 +10,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 
 - 先读 handoff，再按任务读取最小必要文档；不要从 UI 概念图推断规格外功能，也不要把概念图当逐像素终稿。
 - 遵守全部产品不变量（见 handoff §3）。尤其：Quick Scan 不调模型；Codex 无写权限；磁盘调查只能走 Probe Broker；Executor 只接受 `MoveToTrash` 或 Registered Action；Trash 失败绝不永久删除；失败保持 `Unknown`。
-- 当前实现范围默认是 Epic 0–1。按已批准计划逐 Task 执行；开始每个技术主题前完成 Upstream Study Gate。不得另起替代大计划或提前实现完整产品。
+- Epic 0–1 已完成；当前没有可直接执行的 active plan。下一轮 coding 前先按 roadmap 与验证报告拟定并取得用户批准的 Epic 2–4 deterministic plan；开始每个技术主题前完成 Upstream Study Gate，不得从 completed plan 推断新任务。
 - Spike / safety check 通过前，Deep Dive 必须保持 paused；发现 Codex ≠ 验证安全边界。
 - 权限、隔离、许可证、性能主张必须有本机证据（`--help`、测试、Benchmark、ADR）。不确定时先 Spike/ADR，不用大段代码掩盖。
 - 保留现有 MIT `LICENSE`；新增依赖前记录许可证与理由。不要复制 Mole GPL 代码。
@@ -51,7 +51,8 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Agent / 双模式 / 安全基线 | [docs/design/agent-disk-governance.md](docs/design/agent-disk-governance.md) |
 | 导航、文案、品牌、Light/Dark | [docs/design/ui-ux.md](docs/design/ui-ux.md) |
 | 跨 Epic 交付顺序与 Gate | [docs/plans/roadmap.md](docs/plans/roadmap.md) |
-| Epic 0–1 逐 Task 执行 | [docs/plans/active/epic-0-1-foundation-spikes.md](docs/plans/active/epic-0-1-foundation-spikes.md) |
+| Epic 0–1 历史计划与证据 | [docs/plans/completed/epic-0-1-foundation-spikes.md](docs/plans/completed/epic-0-1-foundation-spikes.md) |
+| Epic 0–1 最终 Gate | [docs/reports/epic-0-1-validation-report.md](docs/reports/epic-0-1-validation-report.md) |
 | Codex discovery/进程/隔离研究 Gate | [docs/upstream-studies/epic-1-codex-runtime.md](docs/upstream-studies/epic-1-codex-runtime.md) |
 | 上游学习与许可证边界 | [docs/research/upstream-reference-matrix.md](docs/research/upstream-reference-matrix.md) |
 | 竞品与可借鉴点 | [docs/research/competitive-analysis-2026-08-06.md](docs/research/competitive-analysis-2026-08-06.md) |
@@ -59,13 +60,13 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | UI 概念图（氛围/构图参考） | [docs/assets/ui-concepts/](docs/assets/ui-concepts/) |
 | 品牌概念图 | [docs/assets/brand-concepts/](docs/assets/brand-concepts/) |
 
-规范优先级：用户明确批准的 v1 约束 → PRD 与两份批准规格 → architecture → Epic 0–1 计划 → 研究/案例/视觉概念。
+规范优先级：用户明确批准的 v1 约束 → PRD 与两份批准规格 → architecture → roadmap 与获批 active plan → 已接受 ADR/report → 研究/案例/视觉概念。
 
 ## Current milestone
 
-Epic 0–1：仓库与验证骨架 + 高风险技术 Spike（Codex 发现/协议/取消、FDA 与读取隔离、Probe Broker 桥接、Swift 扫描 Benchmark、Trash / Registered Action 生命周期）。每项写 ADR；假设不成立则暂停并更新设计。
+Epic 0–1 evidence gate 已完成：deterministic path conditional go，Deep Dive 因 Broker-only 未被技术性证明而 no-go/paused。下一里程碑是为 Epic 2–4 deterministic subset 对齐并批准新的 active plan；release signing/notarization 仍未评估。
 
-计划中的包布局（尚未全部落地）：
+当前已验证的包布局：
 
 ```text
 Sources/StornautCore/    领域类型与安全接口
@@ -87,7 +88,7 @@ scripts/check-doc-links  文档本地链接检查
 
 App host 拓扑已由 [`docs/upstream-studies/epic-0-foundation.md`](docs/upstream-studies/epic-0-foundation.md) 选定，bundle identifier 已确认为 `com.eriklee.stornaut`；ADR 0001 记录最终 build/signing 证据。
 
-宏观交付顺序以 [`docs/plans/roadmap.md`](docs/plans/roadmap.md) 为准。Epic 编号表示能力归属，不要求严格按数字顺序交付；当前只执行 Epic 0–1 active plan。
+宏观交付顺序以 [`docs/plans/roadmap.md`](docs/plans/roadmap.md) 为准。Epic 编号表示能力归属，不要求严格按数字顺序交付；没有获批 active plan 时只做规划、文档、验证和低风险修正，不开始新的产品实现。
 
 ## Working loop
 

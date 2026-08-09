@@ -10,12 +10,14 @@
 | 本地构建、运行与 UI 自动化 | [Development Automation](agent/development-tooling.md) |
 | UI 测试、截图契约与排障 | [UI Testing Guide](agent/ui-testing-guide.md) |
 | 当前开发自动化验证证据 | [Development Automation Validation](reports/development-automation-2026-08-09.md) |
+| Epic 0–1 evidence gate | [Epic 0–1 Validation Report](reports/epic-0-1-validation-report.md) |
 | 产品范围、术语、验收 | [PRD](product/PRD.md) |
 | 进程边界、模块与安全架构 | [System Architecture](architecture/system-architecture.md) |
 | Agent、双模式与治理设计 | [Agent Disk Governance](design/agent-disk-governance.md) |
 | UI、品牌、状态与交互 | [UI/UX](design/ui-ux.md) |
 | 宏观交付顺序与阶段 Gate | [Delivery Roadmap](plans/roadmap.md) |
-| 当前执行计划 | [Epic 0–1 Foundation Spikes](plans/active/epic-0-1-foundation-spikes.md) |
+| 当前执行计划 | [Active Plans](plans/active/) — 当前为空，下一轮先对齐 Epic 2–4 plan |
+| 已完成计划 | [Epic 0–1 Foundation Spikes](plans/completed/epic-0-1-foundation-spikes.md) |
 | 上游学习与许可证门禁 | [Upstream Reference Matrix](research/upstream-reference-matrix.md) |
 | 当前 Codex Runtime 研究 Gate | [Epic 1 Codex Runtime Study](upstream-studies/epic-1-codex-runtime.md) |
 | 当前 Swift Surveyor 研究 Gate | [Epic 1 Swift Surveyor Study](upstream-studies/epic-1-surveyor.md) |

@@ -1,10 +1,10 @@
 # Stornaut 技术架构
 
-> 版本：2.2  
-> 状态：与 PRD 2.3 设计基线同步  
-> 初版：2026-08-06；最近更新：2026-08-08
+> 版本：2.2
+> 状态：与 PRD 2.3 设计基线同步；Epic 0–1 deterministic path conditional go，Deep Dive no-go/paused
+> 初版：2026-08-06；最近更新：2026-08-09
 
-配套文档：[PRD](../product/PRD.md)、[Agent 设计规格](../design/agent-disk-governance.md)、[UI/UX 设计规格](../design/ui-ux.md)、[上游参考矩阵](../research/upstream-reference-matrix.md)、[Coding Agent Handoff](../agent/coding-agent-handoff.md)。
+配套文档：[PRD](../product/PRD.md)、[Agent 设计规格](../design/agent-disk-governance.md)、[UI/UX 设计规格](../design/ui-ux.md)、[上游参考矩阵](../research/upstream-reference-matrix.md)、[Coding Agent Handoff](../agent/coding-agent-handoff.md)、[Epic 0–1 验证报告](../reports/epic-0-1-validation-report.md)。
 
 ## 1. 架构目标
 
@@ -76,6 +76,9 @@ codex exec
 - 不默认加载目标目录的 `AGENTS.md`、项目指令、Hooks 或无关插件。
 - stdout 仅按 JSONL 解析；stderr 单独收集并限制大小。
 - 支持取消、超时、进程树终止和异常退出恢复。
+- 使用 `posix_spawn` 原子创建独立进程组；`POSIX_SPAWN_CLOEXEC_DEFAULT`
+  默认关闭未显式映射的描述符，避免与 Registered Action 并发 spawn 时
+  互相继承 pipe。
 - 最终输出必须通过 JSON Schema；失败保持 `Unknown` disposition。
 
 ### 3.3 隔离技术 Spike

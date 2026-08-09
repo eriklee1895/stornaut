@@ -80,6 +80,9 @@ This mirrors the two filenames read by Codex `0.147.0`'s
 Use `posix_spawn`, not `Process` followed by `setpgid`:
 
 - `POSIX_SPAWN_SETPGROUP` creates a new process group atomically;
+- `POSIX_SPAWN_CLOEXEC_DEFAULT` closes every descriptor not explicitly mapped
+  by spawn file actions, including descriptors from concurrently starting
+  Registered Actions;
 - `posix_spawn_file_actions_addchdir` selects the isolated cwd;
 - stdin/stdout/stderr are explicit pipes;
 - all pipe descriptors use `FD_CLOEXEC`;
@@ -179,9 +182,11 @@ Task 4 coverage includes:
 - no live child PID after the bounded observation window;
 - rejection of non-empty global Codex instructions.
 
-One early parallel run exposed cross-test pipe descriptor inheritance. Marking
-all parent pipe descriptors `FD_CLOEXEC` removed the deadlock and is retained as
-a regression contract.
+One early parallel run exposed cross-test pipe descriptor inheritance. Parent
+descriptors use `FD_CLOEXEC`; after Task 7 introduced another process runtime,
+both runtimes also adopted `POSIX_SPAWN_CLOEXEC_DEFAULT`. The eight-way spawn
+regression now mixes seven fake Codex processes and one fake Registered Action
+without increasing the original process load.
 
 A later stress run exposed a process-group lifecycle race: reaping the leader
 before checking descendants allowed the PGID to become reusable. The wrapper

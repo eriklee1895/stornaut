@@ -1,9 +1,9 @@
 # Stornaut 产品需求文档
 
-> 版本：2.3  
-> 状态：设计基线与 Epic 0–1 实施计划已批准，可开始执行技术 Spike  
-> 初版日期：2026-08-06  
-> 最近更新：2026-08-08
+> 版本：2.3
+> 状态：设计基线已批准；Epic 0–1 risk spikes 完成，deterministic path conditional go，Deep Dive no-go/paused
+> 初版日期：2026-08-06
+> 最近更新：2026-08-09
 > 产品策略：个人自用优先，GitHub Public 开源，不以付费独立产品为目标
 
 配套文档：
@@ -15,7 +15,8 @@
 - [Coding Agent Handoff](../agent/coding-agent-handoff.md)
 - [批准的 Agent 设计规格](../design/agent-disk-governance.md)
 - [UI/UX 设计规格](../design/ui-ux.md)
-- [Epic 0–1 实施计划](../plans/active/epic-0-1-foundation-spikes.md)
+- [Epic 0–1 实施计划](../plans/completed/epic-0-1-foundation-spikes.md)
+- [Epic 0–1 验证报告](../reports/epic-0-1-validation-report.md)
 
 ## 0. 品牌与项目边界
 
@@ -573,7 +574,7 @@ Coding Agent 开始开发前必须按顺序阅读：
 2. [技术架构](../architecture/system-architecture.md)
 3. [批准的 Agent 设计规格](../design/agent-disk-governance.md)
 4. [UI/UX 设计规格](../design/ui-ux.md)
-5. [Epic 0–1 实施计划](../plans/active/epic-0-1-foundation-spikes.md)
+5. [Epic 0–1 实施计划](../plans/completed/epic-0-1-foundation-spikes.md)
 6. [上游参考矩阵](../research/upstream-reference-matrix.md)
 7. [Coding Agent Handoff](../agent/coding-agent-handoff.md)
 8. [竞品报告](../research/competitive-analysis-2026-08-06.md)

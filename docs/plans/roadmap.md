@@ -187,8 +187,8 @@ Epic 0–1
 
 ## 6. 当前状态
 
-- 当前阶段：Phase A — Foundation & Risk Gates。
-- 当前 active plan：[`active/epic-0-1-foundation-spikes.md`](active/epic-0-1-foundation-spikes.md)。
+- 当前阶段：Phase A evidence gate 已完成；下一阶段为 deterministic Epic 2–4 planning。
+- 当前 active plan：无；Epic 0–1 历史计划已移入 [`completed/`](completed/)。
 - Epic 0 Foundation Upstream Study：已完成，选择 checked-in Xcode App/Test host + local Swift packages。
 - Epic 0 Task 1：SwiftPM Core/Codex、smoke tests、`scripts/verify`、manual-only CI 与 ThirdPartyNotices 骨架已完成。
 - Bundle identifier：已确认 `com.eriklee.stornaut`。
@@ -200,4 +200,5 @@ Epic 0–1
 - Epic 1 Task 5：四个 bounded read-only Probe、canonical path/immutable denylist、budget/redacted audit、fake Codex typed Bridge 与 signed App-context canary 已完成；installed `0.147.0` 无完整 tool allowlist，因此结论为 protocol-only/no-go，Deep Dive 继续 paused，见 [ADR 0004](../adr/0004-codex-file-read-isolation.md)。
 - Epic 1 Task 6：bounded Swift/POSIX Surveyor、no-follow/same-device、logical/allocated bytes、partial errors、synthetic/real benchmark 已完成；460GiB-class root 中位约 96.2s、peak RSS <28MB、producer cancellation <1ms，继续 Swift、不评估 Rust，见 [ADR 0005](../adr/0005-swift-surveyor-performance.md)。
 - Epic 1 Task 7：identity/activity revalidation、Foundation Trash、无 permanent-delete fallback、fixed fake Registered Action、process-group timeout 与真实 CLI/APFS Trash probes 已完成；App-context FDA/TCC 仍为 residual risk，见 [ADR 0006](../adr/0006-trash-and-registered-actions.md)。
-- 下一项执行：Epic 1 Task 8 Epic 0–1 evidence gate 与 handoff。
+- Epic 1 Task 8：六项 spike evidence gate 与约束审计已完成；Epic 2–3 deterministic development conditional go，Deep Dive 继续 no-go/paused，见 [Epic 0–1 Validation Report](../reports/epic-0-1-validation-report.md)。
+- 下一项执行：为 Epic 2–4 deterministic subset 创建新的 active plan；不得把 Deep Dive 或真实 destructive Registered Action 混入该计划。

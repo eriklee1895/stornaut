@@ -1,5 +1,8 @@
 # Active Plans
 
-- [Epic 0–1 Foundation & Risk Spikes](epic-0-1-foundation-spikes.md)：当前唯一实施计划，覆盖工程骨架、Codex/隔离、Surveyor、Trash 与 Registered Action 高风险 Spike。
+当前没有可直接执行的 active plan。
 
-执行时保持 Task/checkbox 状态准确。完成 Epic 0–1 evidence gate 后，将该计划移入 `../completed/`。
+Epic 0–1 evidence gate 已完成，历史计划见
+[`../completed/epic-0-1-foundation-spikes.md`](../completed/epic-0-1-foundation-spikes.md)。
+下一轮 coding 前，先依据 roadmap 与验证报告创建并取得用户批准的 Epic 2–4
+deterministic active plan；不得从 completed plan 继续推断新任务。

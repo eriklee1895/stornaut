@@ -2,7 +2,7 @@
 
 > 面向接手实现的 Coding Agent  
 > 最近更新：2026-08-09
-> 当前状态：产品、Agent、UI 功能交互与品牌基线完成；Epic 0 与 Epic 1 Task 3–7 已完成；Task 5 证明 Broker 协议但未证明 Codex Broker-only 工具面，Deep Dive 明确 no-go/paused；Task 6 证明 Swift Surveyor 在 460GiB-class Mac 上满足性能/内存/取消目标；Task 7 证明受约束 Trash / fake Registered Action lifecycle；下一项是 Task 8 Epic 0–1 evidence gate
+> 当前状态：产品、Agent、UI 功能交互与品牌基线完成；Epic 0–1 evidence gate 已完成，Epic 2–3 deterministic development conditional go；Task 5 证明 Broker 协议但未证明 Codex Broker-only 工具面，Deep Dive 明确 no-go/paused；release signing/notarization 未评估
 
 ## 1. 任务目标
 
@@ -27,7 +27,7 @@ Coding Agent 可以实现已批准的导航、状态模型和原生组件骨架�
 4. [批准的 Agent 设计规格](../design/agent-disk-governance.md)
 5. [UI/UX 设计规格](../design/ui-ux.md)
 6. [跨流程恢复状态与概念图](../assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md)
-7. [已批准的 Epic 0–1 实施计划](../plans/active/epic-0-1-foundation-spikes.md)
+7. [已批准的 Epic 0–1 实施计划](../plans/completed/epic-0-1-foundation-spikes.md)
 8. [上游参考矩阵](../research/upstream-reference-matrix.md)
 9. [竞品报告](../research/competitive-analysis-2026-08-06.md)
 10. [真实案例](../research/case-study-2026-08-06.md)
@@ -196,15 +196,15 @@ Epic 0–1
 
 ## 6. 第一份实施计划的范围
 
-第一份 coding plan 不应覆盖整个产品。只规划 Epic 0–1：工程骨架和高风险 Spikes。
+第一份 coding plan 只覆盖 Epic 0–1：工程骨架和高风险 Spikes，目前已经完成。
 
-已批准的执行输入：[Epic 0–1 Foundation & Risk Spikes Implementation Plan](../plans/active/epic-0-1-foundation-spikes.md)。Coding Agent 应按该计划逐 Task 执行，不得跳过 Upstream Study、失败测试、ADR 或最终 evidence gate。
+已完成的执行输入：[Epic 0–1 Foundation & Risk Spikes Implementation Plan](../plans/completed/epic-0-1-foundation-spikes.md)。它是历史证据，不再是当前执行授权。下一轮 coding 必须先根据 roadmap 与验证报告建立并取得用户批准的新 active plan。
 
-跨 Epic 的阶段依赖、no-go 分支和交付顺序由 [Delivery Roadmap](../plans/roadmap.md) 管理；active plan 不得另起一套宏观路线。
+跨 Epic 的阶段依赖、no-go 分支和交付顺序由 [Delivery Roadmap](../plans/roadmap.md) 管理；新 active plan 不得另起一套宏观路线。
 
 原因：Codex 隔离、FDA 继承、Probe Broker 和 Swift 扫描性能是架构成立的前提。在这些结果出来前批量实现 UI、规则或 Agent 流程会造成返工。
 
-第一里程碑 evidence gate：
+第一里程碑 evidence gate（已完成，见 [验证报告](../reports/epic-0-1-validation-report.md)）：
 
 - 真实、可本地签名的 `.app` host 能定位并启动用户 Codex；SwiftPM/CLI 进程不能替代 App-context 证据
 - Codex 通过受控本地桥接调用一个 fake/真实只读 Probe，并对任意 Shell、直接文件系统工具和未注册能力形成明确的 go/no-go 证据
@@ -267,7 +267,7 @@ Broker-only 若不能被技术性强制，Epic 0–1 仍可作为成功的风险
 ```text
 你正在实现 Stornaut。先从 docs/README.md 进入文档地图，再完整阅读 docs/agent/coding-agent-handoff.md 指定的文档，尤其是产品/Agent/UI 三份批准规格，遵守所有产品不变量和 Reference Study Gate。不要直接实现整个产品，也不要从概念图推断规格外功能。
 
-第一步仅针对 Epic 0–1：检查工作区状态，然后按已批准的 Epic 0–1 实施计划逐 Task 执行；开始每个技术主题前完成其映射的 Upstream Study Gate。不得另起替代计划或扩大范围。重点验证 Swift Scanner 性能、用户安装 Codex 的发现与结构化通信、进程取消、FDA/文件读取隔离、Codex↔Probe Broker 受控桥接、Trash 和 Registered Action 生命周期。
+Epic 0–1 evidence gate 已完成。先检查工作区、阅读验证报告与 roadmap，然后与用户对齐 Epic 2–4 deterministic active plan；获批前不要开始新的产品实现。新计划不得包含 Deep Dive、真实 destructive Registered Action、release/notarization 或任何安全边界放宽。开始每个技术主题前完成其映射的 Upstream Study Gate。
 
 任何权限、安全或许可证假设都必须有实际证据。设计或 PRD 如有冲突，先报告并修正文档，不得自行扩大 Agent 或 Executor 权限。
 ```
