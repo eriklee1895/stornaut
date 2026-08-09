@@ -1,0 +1,13 @@
+{
+  "disposition": "protected",
+  "evaluatedAt": 1786233730000,
+  "id": "decision-fixture-denied",
+  "itemID": "plan-item-fixture-trash",
+  "outcome": "denied",
+  "planID": "plan-fixture-v1",
+  "reasonKeys": [
+    "policy.activity.current",
+    "policy.evidence.incomplete"
+  ],
+  "schemaVersion": 1
+}

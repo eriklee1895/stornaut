@@ -188,7 +188,7 @@ Epic 0–1
 ## 6. 当前状态
 
 - 当前阶段：Phase A evidence gate 已完成；Phase B deterministic Epic 2–4
-  plan 已批准，Task 9 已完成，下一项为 Task 10。
+  plan 已批准，Tasks 9–10 已完成，下一项为 Task 11。
 - 当前 active plan：
   [`Epic 2–4 Deterministic Product Core`](active/epic-2-4-deterministic-product-core.md)
   为 `Approved`；Epic 0–1 历史计划已移入
@@ -208,5 +208,7 @@ Epic 0–1
 - Epic 1 最终 code review：denylist、secret redaction、signed device identity、bounded directory probes、Registered Action descendant cleanup 等 5 个确认缺陷已修复，统一验证通过，见 [review report](../reports/epic-1-code-review-2026-08-09.md)。
 - Phase B Task 9：四份 Upstream Study、SQLite feasibility、ADR 0007 与
   code review 已完成；两项 P1 设计问题已修复。
-- 下一项执行：Task 10 domain contracts 与 anonymous fixtures。Deep Dive
+- Phase B Task 10：domain contracts、anonymous fixtures、Surveyor transport
+  migration、code review 与 139-test unified verifier 已完成。
+- 下一项执行：Task 11 SQLite Evidence/Local Knowledge stores。Deep Dive
   与真实 destructive Registered Action 不在该计划内。

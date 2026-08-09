@@ -36,6 +36,9 @@ func surveyorStreamsFilesDirectoriesSparseFilesAndSymlinksWithoutFollowingLinks(
     #expect(byPath["regular.bin"]?.kind == .regularFile)
     #expect(byPath["regular.bin"]?.logicalBytes == 4_096)
     #expect(byPath["regular.bin"]?.allocatedBytes ?? 0 > 0)
+    #expect(
+        byPath["regular.bin"]?.snapshot.fileIdentity?.ownerUserID == getuid()
+    )
     let sparseSnapshot = try #require(byPath["sparse.bin"])
     #expect(sparseSnapshot.logicalBytes == Int64(16 * 1_024 * 1_024))
     #expect(
@@ -45,6 +48,7 @@ func surveyorStreamsFilesDirectoriesSparseFilesAndSymlinksWithoutFollowingLinks(
     #expect(byPath["Example.bundle"]?.kind == .directory)
     #expect(byPath["Example.bundle/Contents/data.bin"]?.kind == .regularFile)
     #expect(byPath["outside-link"]?.kind == .symbolicLink)
+    #expect(byPath["outside-link"]?.snapshot.symlinkTarget == outsideURL.path)
     #expect(!byPath.keys.contains(where: { $0.contains("secret.bin") }))
     #expect(snapshots.last?.progress.completedEntries == snapshots.count)
 }
@@ -457,11 +461,11 @@ func surveyorFixtureScriptRefusesUnsafeTargetsAndCleansOnlyMarkedFixtures() thro
 }
 
 private func collectSnapshots(
-    _ stream: AsyncThrowingStream<PathSnapshot, Error>
-) async throws -> [PathSnapshot] {
-    var snapshots: [PathSnapshot] = []
-    for try await snapshot in stream {
-        snapshots.append(snapshot)
+    _ stream: AsyncThrowingStream<SurveyorObservation, Error>
+) async throws -> [SurveyorObservation] {
+    var snapshots: [SurveyorObservation] = []
+    for try await observation in stream {
+        snapshots.append(observation)
     }
     return snapshots
 }

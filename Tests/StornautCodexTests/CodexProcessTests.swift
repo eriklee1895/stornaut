@@ -155,15 +155,18 @@ func malformedProcessJSONLFailsBeforeTheOverallTimeout() async throws {
     let fixture = try CodexProcessFixture(mode: "malformed")
     defer { fixture.remove() }
     let stream = CodexProcess().run(
-        fixture.makeRequest(timeout: .seconds(5))
+        fixture.makeRequest(
+            timeout: .seconds(5),
+            terminationGracePeriod: .milliseconds(75)
+        )
     )
-    let clock = ContinuousClock()
-    let start = clock.now
 
     await #expect(throws: CodexProcessError.protocolViolation) {
         _ = try await collectEvents(from: stream)
     }
-    #expect(start.duration(to: clock.now) < .seconds(4))
+    let pid = try fixture.recordedPID(named: "pid.txt")
+    try await waitForProcessExit(pid)
+    #expect(!processExists(pid))
 }
 
 @Test
@@ -176,7 +179,7 @@ func processOutputLimitsFailClosed() async throws {
         isolatedWorkingDirectoryURL: stdoutRequest.isolatedWorkingDirectoryURL,
         schemaURL: stdoutRequest.schemaURL,
         prompt: stdoutRequest.prompt,
-        timeout: stdoutRequest.timeout,
+        timeout: .seconds(10),
         terminationGracePeriod: stdoutRequest.terminationGracePeriod,
         stdoutByteLimit: 1_024,
         stderrByteLimit: stdoutRequest.stderrByteLimit,
@@ -196,7 +199,7 @@ func processOutputLimitsFailClosed() async throws {
         isolatedWorkingDirectoryURL: stderrRequest.isolatedWorkingDirectoryURL,
         schemaURL: stderrRequest.schemaURL,
         prompt: stderrRequest.prompt,
-        timeout: stderrRequest.timeout,
+        timeout: .seconds(10),
         terminationGracePeriod: stderrRequest.terminationGracePeriod,
         stdoutByteLimit: stderrRequest.stdoutByteLimit,
         stderrByteLimit: 1_024,

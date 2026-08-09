@@ -40,6 +40,9 @@ case "$mode" in
     malformed)
         printf '%s\n' '{"type":"thread.started","thread_id":"thread-fake"}'
         printf '%s\n' '{"type":"item.completed"'
+        while :; do
+            sleep 1
+        done
         ;;
     large-stdout)
         printf '%02048d' 0

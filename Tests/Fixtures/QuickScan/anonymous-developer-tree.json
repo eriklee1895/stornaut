@@ -1,0 +1,396 @@
+{
+  "accounting": {
+    "free": {
+      "bytes": 8589934592,
+      "explanationKey": "accounting.free.systemObservation",
+      "source": {
+        "identifier": "fixture.volume.available",
+        "kind": "volumeResourceValues",
+        "sampledAt": 1786233720000
+      },
+      "status": "measured"
+    },
+    "known": {
+      "bytes": 15728640,
+      "explanationKey": "accounting.known.classified",
+      "source": {
+        "identifier": "fixture.catalog.v1",
+        "kind": "classifier",
+        "sampledAt": 1786233710000
+      },
+      "status": "measured"
+    },
+    "schemaVersion": 1,
+    "sessionID": "scan-fixture-partial",
+    "unknown": {
+      "bytes": 4194304,
+      "explanationKey": "accounting.unknown.measuredResidual",
+      "source": {
+        "identifier": "fixture.surveyor.v1",
+        "kind": "surveyor",
+        "sampledAt": 1786233710000
+      },
+      "status": "measured"
+    },
+    "unmeasurable": {
+      "bytes": null,
+      "explanationKey": "accounting.unmeasurable.permission",
+      "source": {
+        "identifier": "fixture.permission.limited",
+        "kind": "permissionGap",
+        "sampledAt": 1786233710000
+      },
+      "status": "unmeasurable"
+    },
+    "volumeCapacity": {
+      "bytes": 107374182400,
+      "explanationKey": "accounting.volume.capacity",
+      "source": {
+        "identifier": "fixture.volume.capacity",
+        "kind": "volumeResourceValues",
+        "sampledAt": 1786233720000
+      },
+      "status": "measured"
+    }
+  },
+  "classifications": [
+    {
+      "catalogVersion": "fixture-catalog-v1",
+      "category": "rebuildableProjectArtifacts",
+      "classifiedAt": 1786233695000,
+      "confidence": "high",
+      "disposition": "reviewRecommended",
+      "id": "classification-fixture-nested-artifact",
+      "missingEvidenceKeys": [],
+      "producer": "Fixture package manager",
+      "recovery": {
+        "cost": "medium",
+        "methodKey": "recovery.fixture.restoreDependencies"
+      },
+      "requiredEvidenceKeys": [
+        "activity.git.clean",
+        "activity.process.inactive"
+      ],
+      "risk": "medium",
+      "ruleID": "fixture.project-artifact",
+      "schemaVersion": 1,
+      "snapshotID": "snapshot-fixture-project-artifact"
+    },
+    {
+      "catalogVersion": "fixture-catalog-v1",
+      "category": "packageAndBuildCaches",
+      "classifiedAt": 1786233695000,
+      "confidence": "high",
+      "disposition": "readyToReclaim",
+      "id": "classification-fixture-package-cache",
+      "missingEvidenceKeys": [],
+      "producer": "Fixture package cache",
+      "recovery": {
+        "cost": "low",
+        "methodKey": "recovery.fixture.redownload"
+      },
+      "requiredEvidenceKeys": [
+        "activity.process.inactive"
+      ],
+      "risk": "low",
+      "ruleID": "fixture.package-cache",
+      "schemaVersion": 1,
+      "snapshotID": "snapshot-fixture-package-cache"
+    },
+    {
+      "catalogVersion": "fixture-catalog-v1",
+      "category": "protected",
+      "classifiedAt": 1786233695000,
+      "confidence": "high",
+      "disposition": "protected",
+      "id": "classification-fixture-protected",
+      "missingEvidenceKeys": [],
+      "producer": "Fixture browser profile",
+      "recovery": null,
+      "requiredEvidenceKeys": [],
+      "risk": "critical",
+      "ruleID": "fixture.protected-browser-data",
+      "schemaVersion": 1,
+      "snapshotID": "snapshot-fixture-protected"
+    },
+    {
+      "catalogVersion": "fixture-catalog-v1",
+      "category": "unknownLargeConsumers",
+      "classifiedAt": 1786233695000,
+      "confidence": "low",
+      "disposition": "unknown",
+      "id": "classification-fixture-unknown",
+      "missingEvidenceKeys": [
+        "producer.identity",
+        "activity.process"
+      ],
+      "producer": null,
+      "recovery": null,
+      "requiredEvidenceKeys": [
+        "producer.identity",
+        "activity.process"
+      ],
+      "risk": "high",
+      "ruleID": null,
+      "schemaVersion": 1,
+      "snapshotID": "snapshot-fixture-unknown"
+    }
+  ],
+  "evidence": [
+    {
+      "freshness": "current",
+      "id": "evidence-fixture-active-project",
+      "kind": "git",
+      "observedAt": 1786233680000,
+      "schemaVersion": 1,
+      "source": {
+        "identifier": "fixture.git-status",
+        "kind": "activityProvider"
+      },
+      "summaryKey": "evidence.git.dirty",
+      "targetID": "snapshot-fixture-active-project"
+    },
+    {
+      "freshness": "current",
+      "id": "evidence-fixture-limited",
+      "kind": "permission",
+      "observedAt": 1786233680000,
+      "schemaVersion": 1,
+      "source": {
+        "identifier": "fixture.surveyor.permission",
+        "kind": "surveyor"
+      },
+      "summaryKey": "evidence.permission.unmeasurable",
+      "targetID": "snapshot-fixture-limited"
+    }
+  ],
+  "fixtureVersion": 1,
+  "session": {
+    "completedScopes": [
+      {
+        "completedAt": 1786233690000,
+        "id": "scope-fixture-projects",
+        "rootPath": "fixture-root/projects"
+      },
+      {
+        "completedAt": 1786233690000,
+        "id": "scope-fixture-caches",
+        "rootPath": "fixture-root/caches"
+      }
+    ],
+    "finishedAt": 1786233720000,
+    "id": "scan-fixture-partial",
+    "schemaVersion": 1,
+    "startedAt": 1786233600000,
+    "terminalState": "partial",
+    "unfinishedScopes": [
+      {
+        "id": "scope-fixture-limited",
+        "reason": "cancelled",
+        "rootPath": "fixture-root/limited"
+      }
+    ]
+  },
+  "shapes": [
+    "nestedProjectArtifacts",
+    "packageCache",
+    "dirtyActiveProject",
+    "unknownLargeConsumer",
+    "protectedSensitivePath",
+    "permissionLimitedSubtree",
+    "overlappingCandidates",
+    "partialCancelledSession"
+  ],
+  "snapshots": [
+    {
+      "allocatedByteCount": 7340032,
+      "fileIdentity": {
+        "allocatedBytes": 7340032,
+        "device": 100,
+        "inode": 1001,
+        "mode": 16877,
+        "modificationNanoseconds": 0,
+        "modificationSeconds": 1786233000,
+        "size": 8388608,
+        "ownerUserID": 501,
+        "ownerGroupID": 20
+      },
+      "id": "snapshot-fixture-project-artifact",
+      "kind": "directory",
+      "logicalByteCount": 8388608,
+      "measurementStatus": "measured",
+      "modifiedAt": 1786233000000,
+      "observedAt": 1786233660000,
+      "relativePath": "projects/sample-app/dependencies",
+      "schemaVersion": 1,
+      "scopeID": "scope-fixture-projects",
+      "sessionID": "scan-fixture-partial",
+      "symlinkTarget": null
+    },
+    {
+      "allocatedByteCount": 2097152,
+      "fileIdentity": {
+        "allocatedBytes": 2097152,
+        "device": 100,
+        "inode": 1002,
+        "mode": 16877,
+        "modificationNanoseconds": 0,
+        "modificationSeconds": 1786233000,
+        "size": 2097152,
+        "ownerUserID": 501,
+        "ownerGroupID": 20
+      },
+      "id": "snapshot-fixture-nested-build",
+      "kind": "directory",
+      "logicalByteCount": 2097152,
+      "measurementStatus": "measured",
+      "modifiedAt": 1786233000000,
+      "observedAt": 1786233660000,
+      "relativePath": "projects/sample-app/dependencies/generated",
+      "schemaVersion": 1,
+      "scopeID": "scope-fixture-projects",
+      "sessionID": "scan-fixture-partial",
+      "symlinkTarget": null
+    },
+    {
+      "allocatedByteCount": 10485760,
+      "fileIdentity": {
+        "allocatedBytes": 10485760,
+        "device": 100,
+        "inode": 1003,
+        "mode": 16877,
+        "modificationNanoseconds": 0,
+        "modificationSeconds": 1786232000,
+        "size": 10485760,
+        "ownerUserID": 501,
+        "ownerGroupID": 20
+      },
+      "id": "snapshot-fixture-package-cache",
+      "kind": "directory",
+      "logicalByteCount": 10485760,
+      "measurementStatus": "measured",
+      "modifiedAt": 1786232000000,
+      "observedAt": 1786233660000,
+      "relativePath": "caches/package-store",
+      "schemaVersion": 1,
+      "scopeID": "scope-fixture-caches",
+      "sessionID": "scan-fixture-partial",
+      "symlinkTarget": null
+    },
+    {
+      "allocatedByteCount": 4096,
+      "fileIdentity": {
+        "allocatedBytes": 4096,
+        "device": 100,
+        "inode": 1004,
+        "mode": 16877,
+        "modificationNanoseconds": 0,
+        "modificationSeconds": 1786233500,
+        "size": 4096,
+        "ownerUserID": 501,
+        "ownerGroupID": 20
+      },
+      "id": "snapshot-fixture-active-project",
+      "kind": "directory",
+      "logicalByteCount": 4096,
+      "measurementStatus": "measured",
+      "modifiedAt": 1786233500000,
+      "observedAt": 1786233660000,
+      "relativePath": "projects/active-work",
+      "schemaVersion": 1,
+      "scopeID": "scope-fixture-projects",
+      "sessionID": "scan-fixture-partial",
+      "symlinkTarget": null
+    },
+    {
+      "allocatedByteCount": 4194304,
+      "fileIdentity": {
+        "allocatedBytes": 4194304,
+        "device": 100,
+        "inode": 1005,
+        "mode": 16877,
+        "modificationNanoseconds": 0,
+        "modificationSeconds": 1786231000,
+        "size": 4194304,
+        "ownerUserID": 501,
+        "ownerGroupID": 20
+      },
+      "id": "snapshot-fixture-unknown",
+      "kind": "directory",
+      "logicalByteCount": 4194304,
+      "measurementStatus": "measured",
+      "modifiedAt": 1786231000000,
+      "observedAt": 1786233660000,
+      "relativePath": "runtime/unidentified-image",
+      "schemaVersion": 1,
+      "scopeID": "scope-fixture-caches",
+      "sessionID": "scan-fixture-partial",
+      "symlinkTarget": null
+    },
+    {
+      "allocatedByteCount": 3145728,
+      "fileIdentity": {
+        "allocatedBytes": 3145728,
+        "device": 100,
+        "inode": 1006,
+        "mode": 16877,
+        "modificationNanoseconds": 0,
+        "modificationSeconds": 1786233300,
+        "size": 3145728,
+        "ownerUserID": 501,
+        "ownerGroupID": 20
+      },
+      "id": "snapshot-fixture-protected",
+      "kind": "directory",
+      "logicalByteCount": 3145728,
+      "measurementStatus": "measured",
+      "modifiedAt": 1786233300000,
+      "observedAt": 1786233660000,
+      "relativePath": "protected/browser-profile",
+      "schemaVersion": 1,
+      "scopeID": "scope-fixture-projects",
+      "sessionID": "scan-fixture-partial",
+      "symlinkTarget": null
+    },
+    {
+      "allocatedByteCount": null,
+      "fileIdentity": null,
+      "id": "snapshot-fixture-limited",
+      "kind": "inaccessible",
+      "logicalByteCount": null,
+      "measurementStatus": "permissionDenied",
+      "modifiedAt": null,
+      "observedAt": 1786233660000,
+      "relativePath": "limited/unreadable-subtree",
+      "schemaVersion": 1,
+      "scopeID": "scope-fixture-limited",
+      "sessionID": "scan-fixture-partial",
+      "symlinkTarget": null
+    },
+    {
+      "allocatedByteCount": 12582912,
+      "fileIdentity": {
+        "allocatedBytes": 12582912,
+        "device": 100,
+        "inode": 1007,
+        "mode": 16877,
+        "modificationNanoseconds": 0,
+        "modificationSeconds": 1786231000,
+        "size": 12582912,
+        "ownerUserID": 501,
+        "ownerGroupID": 20
+      },
+      "id": "snapshot-fixture-overlap-parent",
+      "kind": "directory",
+      "logicalByteCount": 12582912,
+      "measurementStatus": "measured",
+      "modifiedAt": 1786231000000,
+      "observedAt": 1786233660000,
+      "relativePath": "projects/sample-app",
+      "schemaVersion": 1,
+      "scopeID": "scope-fixture-projects",
+      "sessionID": "scan-fixture-partial",
+      "symlinkTarget": null
+    }
+  ]
+}

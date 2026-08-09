@@ -1,6 +1,6 @@
 # Stornaut Epic 2–4 Deterministic Product Core Implementation Plan
 
-> **Status:** Approved — Task 9 complete; Task 10 next
+> **Status:** Approved — Tasks 9–10 complete; Task 11 next
 >
 > **Roadmap phase:** Phase B — Deterministic Product Core
 >
@@ -359,7 +359,7 @@ Suggested commit subject: `docs: define Phase B implementation gates`
   actions, manifests and accounting.
 - Does not produce persistence, UI, scanner processes or executable authority.
 
-- [ ] **Step 1: Write fixture decode and invariant tests first**
+- [x] **Step 1: Write fixture decode and invariant tests first**
 
 Tests must fail because the production domain contracts do not yet exist.
 Cover:
@@ -374,7 +374,7 @@ Cover:
 - byte values rejecting negative/overflow-prone representations;
 - IDs for different aggregate types not being interchangeable.
 
-- [ ] **Step 2: Separate scan events from final facts**
+- [x] **Step 2: Separate scan events from final facts**
 
 Migrate the Epic 1 `PathSnapshot`/`ScanProgress` spike shape so progress is a
 session event, not duplicated inside every persisted path snapshot. Preserve
@@ -383,7 +383,7 @@ the previously validated no-follow, identity and partial-error facts.
 Do not keep parallel “spike” and “production” domain types after migration
 unless an ADR names a bounded compatibility reason.
 
-- [ ] **Step 3: Add cleanup and manifest contracts without wiring execution**
+- [x] **Step 3: Add cleanup and manifest contracts without wiring execution**
 
 Reuse the narrow existing typed action vocabulary, but distinguish:
 
@@ -395,7 +395,7 @@ Reuse the narrow existing typed action vocabulary, but distinguish:
 No initializer in a persisted plan or manifest may invoke the existing
 `ActionExecutor`.
 
-- [ ] **Step 4: Add anonymous realistic fixtures**
+- [x] **Step 4: Add anonymous realistic fixtures**
 
 Represent the case-study shapes without usernames, private repository names,
 absolute home paths, secrets or copied upstream output:
@@ -408,10 +408,38 @@ absolute home paths, secrets or copied upstream output:
 - overlapping parent/child candidates;
 - a partial cancelled session.
 
-- [ ] **Step 5: Run focused and full verification**
+- [x] **Step 5: Run focused and full verification**
 
 Run the focused domain tests, `swift test`, `scripts/check-doc-links` and
 `git diff --check`, then the current `scripts/verify`.
+
+Execution evidence before the final verifier:
+
+- The accepted red run failed because `ScanSession`, `Classification`,
+  `EvidenceRecord`, `SpaceAccounting`, `CleanupPlan` and related contracts did
+  not exist. An earlier wrapper attempt used zsh's read-only `status` variable
+  and was discarded before the valid red run.
+- 20 domain contract tests now cover schema round-trip, typed IDs, SQLite-safe
+  bytes, disposition/risk/confidence separation, session partial state,
+  snapshot consistency, non-executable plans, minimal Manifest and anonymous
+  fixture privacy.
+- Surveyor now emits non-Codable `SurveyorObservation(snapshot, progress)`;
+  persisted `PathSnapshot` does not duplicate global progress.
+- `FileIdentity` is shared by Surveyor, Policy and Executor and includes
+  device/inode/mode/owner/size/allocated/mtime.
+- Review found and fixed 10 groups of P1 domain/data-boundary issues; see the
+  Task 10 review report.
+- Focused Surveyor, Policy and Trash regressions pass.
+- Three synthetic benchmark runs retain identical 1,356-entry and byte totals
+  with peak RSS below 10.7 MB.
+- Full-suite load exposed blocking Codex pipe I/O on the Swift cooperative
+  executor. A GCD bridge was measured and rejected; fixed per-runtime blocking
+  I/O now uses three dedicated short-lived utility Threads.
+- Three consecutive eight-scenario concurrency stress runs passed with no
+  surviving fixture process. The output-limit fixture now has an independent
+  test-local ceiling so it cannot race the separately tested overall timeout.
+- Final `scripts/verify` passed 139 SwiftPM tests, 2/2 XCUITest cases, four
+  Light/Dark screenshots, App bundle/signing, localization and docs.
 
 Suggested commit subject: `feat: define deterministic storage domain`
 

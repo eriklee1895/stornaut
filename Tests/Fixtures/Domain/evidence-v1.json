@@ -1,0 +1,13 @@
+{
+  "freshness": "current",
+  "id": "evidence-fixture-git-dirty",
+  "kind": "git",
+  "observedAt": 1786233680000,
+  "schemaVersion": 1,
+  "source": {
+    "identifier": "fixture.git-status",
+    "kind": "activityProvider"
+  },
+  "summaryKey": "evidence.git.dirty",
+  "targetID": "snapshot-fixture-project-artifact"
+}

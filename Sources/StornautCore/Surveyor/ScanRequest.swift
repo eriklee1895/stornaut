@@ -10,6 +10,8 @@ public struct ScanRequest: Sendable {
     public let maximumPendingDirectories: Int
     public let stayOnRootDevice: Bool
     public let streamBufferCapacity: Int
+    public let sessionID: ScanSessionID
+    public let scopeID: ScanScopeID
     let onCompletion: @Sendable () -> Void
     let testHooks: SurveyorTestHooks
 
@@ -19,6 +21,8 @@ public struct ScanRequest: Sendable {
         maximumPendingDirectories: Int = defaultMaximumPendingDirectories,
         stayOnRootDevice: Bool = true,
         streamBufferCapacity: Int = defaultStreamBufferCapacity,
+        sessionID: ScanSessionID = ScanSessionID(),
+        scopeID: ScanScopeID = ScanScopeID(),
         onCompletion: @escaping @Sendable () -> Void = {}
     ) {
         self.init(
@@ -27,6 +31,8 @@ public struct ScanRequest: Sendable {
             maximumPendingDirectories: maximumPendingDirectories,
             stayOnRootDevice: stayOnRootDevice,
             streamBufferCapacity: streamBufferCapacity,
+            sessionID: sessionID,
+            scopeID: scopeID,
             onCompletion: onCompletion,
             testHooks: SurveyorTestHooks()
         )
@@ -38,6 +44,8 @@ public struct ScanRequest: Sendable {
         maximumPendingDirectories: Int = defaultMaximumPendingDirectories,
         stayOnRootDevice: Bool = true,
         streamBufferCapacity: Int = defaultStreamBufferCapacity,
+        sessionID: ScanSessionID = ScanSessionID(),
+        scopeID: ScanScopeID = ScanScopeID(),
         onCompletion: @escaping @Sendable () -> Void = {},
         testHooks: SurveyorTestHooks
     ) {
@@ -46,6 +54,8 @@ public struct ScanRequest: Sendable {
         self.maximumPendingDirectories = maximumPendingDirectories
         self.stayOnRootDevice = stayOnRootDevice
         self.streamBufferCapacity = streamBufferCapacity
+        self.sessionID = sessionID
+        self.scopeID = scopeID
         self.onCompletion = onCompletion
         self.testHooks = testHooks
     }

@@ -1,0 +1,26 @@
+{
+  "completedScopes": [
+    {
+      "completedAt": 1786233660000,
+      "id": "scope-fixture-projects",
+      "rootPath": "fixture-root/projects"
+    },
+    {
+      "completedAt": 1786233690000,
+      "id": "scope-fixture-caches",
+      "rootPath": "fixture-root/caches"
+    }
+  ],
+  "finishedAt": 1786233720000,
+  "id": "scan-fixture-cancelled",
+  "schemaVersion": 1,
+  "startedAt": 1786233600000,
+  "terminalState": "cancelled",
+  "unfinishedScopes": [
+    {
+      "id": "scope-fixture-limited",
+      "reason": "cancelled",
+      "rootPath": "fixture-root/limited"
+    }
+  ]
+}

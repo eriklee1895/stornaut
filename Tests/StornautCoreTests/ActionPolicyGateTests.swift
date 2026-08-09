@@ -405,10 +405,12 @@ private struct ActionPolicyFixture {
 }
 
 private extension ActionFileIdentity {
-    static let placeholder = ActionFileIdentity(
+    static let placeholder = try! ActionFileIdentity(
         device: 0,
         inode: 0,
         mode: 0,
+        ownerUserID: 0,
+        ownerGroupID: 0,
         size: 0,
         allocatedBytes: 0,
         modificationSeconds: 0,
@@ -416,10 +418,12 @@ private extension ActionFileIdentity {
     )
 
     func with(size: Int64) -> ActionFileIdentity {
-        ActionFileIdentity(
+        try! ActionFileIdentity(
             device: device,
             inode: inode,
             mode: mode,
+            ownerUserID: ownerUserID,
+            ownerGroupID: ownerGroupID,
             size: size,
             allocatedBytes: allocatedBytes,
             modificationSeconds: modificationSeconds,

@@ -7,9 +7,9 @@ public struct SurveyorSpike: Sendable {
 
     public func scan(
         _ request: ScanRequest
-    ) -> AsyncThrowingStream<PathSnapshot, Error> {
+    ) -> AsyncThrowingStream<SurveyorObservation, Error> {
         let state = SurveyState(request: request)
-        let stream = AsyncThrowingStream<PathSnapshot, Error>(
+        let stream = AsyncThrowingStream<SurveyorObservation, Error>(
             bufferingPolicy: .bufferingOldest(
                 max(1, request.streamBufferCapacity)
             )
@@ -37,7 +37,7 @@ public struct SurveyorSpike: Sendable {
 private func runSurvey(
     _ request: ScanRequest,
     state: SurveyState,
-    continuation: AsyncThrowingStream<PathSnapshot, Error>.Continuation
+    continuation: AsyncThrowingStream<SurveyorObservation, Error>.Continuation
 ) async throws {
     let root = request.rootURL.standardizedFileURL
     guard root.isFileURL,
@@ -59,6 +59,8 @@ private func runSurvey(
 
     try emit(
         metadataSnapshot(
+            request: request,
+            url: root,
             relativePath: ".",
             metadata: rootMetadata,
             issue: nil,
@@ -146,7 +148,7 @@ private func processDirectory(
     rootDevice: UInt64,
     request: ScanRequest,
     state: SurveyState,
-    continuation: AsyncThrowingStream<PathSnapshot, Error>.Continuation,
+    continuation: AsyncThrowingStream<SurveyorObservation, Error>.Continuation,
     scheduleDirectory: (DirectoryJob) -> Void
 ) throws {
     request.testHooks.beforeDirectoryRead(job.url)
@@ -158,13 +160,12 @@ private func processDirectory(
         }
         if job.relativePath != "." {
             try emit(
-                PathSnapshot(
+                observation(
+                    request: request,
                     relativePath: job.relativePath,
                     kind: .inaccessible,
                     logicalBytes: nil,
                     allocatedBytes: nil,
-                    device: nil,
-                    inode: nil,
                     observedAt: Date(),
                     issue: injectedIssue,
                     progress: state.record(
@@ -193,13 +194,12 @@ private func processDirectory(
                 ? .permissionDenied
                 : .directoryReadFailed
             try emit(
-                PathSnapshot(
+                observation(
+                    request: request,
                     relativePath: job.relativePath,
                     kind: .inaccessible,
                     logicalBytes: nil,
                     allocatedBytes: nil,
-                    device: nil,
-                    inode: nil,
                     observedAt: Date(),
                     issue: issue,
                     progress: state.record(
@@ -238,6 +238,8 @@ private func processDirectory(
         let metadata = FileMetadata(directoryMetadata)
         try emit(
             metadataSnapshot(
+                request: request,
+                url: job.url,
                 relativePath: job.relativePath,
                 metadata: metadata,
                 issue: nil,
@@ -283,13 +285,12 @@ private func processDirectory(
                 ? .permissionDenied
                 : .metadataUnavailable
             try emit(
-                PathSnapshot(
+                observation(
+                    request: request,
                     relativePath: relativePath,
                     kind: .inaccessible,
                     logicalBytes: nil,
                     allocatedBytes: nil,
-                    device: nil,
-                    inode: nil,
                     observedAt: Date(),
                     issue: issue,
                     progress: state.record(
@@ -326,6 +327,8 @@ private func processDirectory(
         } else {
             try emit(
                 metadataSnapshot(
+                    request: request,
+                    url: childURL,
                     relativePath: relativePath,
                     metadata: metadata,
                     issue: issue,
@@ -346,16 +349,15 @@ private func emitInaccessibleDirectory(
     _ job: DirectoryJob,
     issue: ScanIssue,
     state: SurveyState,
-    continuation: AsyncThrowingStream<PathSnapshot, Error>.Continuation
+    continuation: AsyncThrowingStream<SurveyorObservation, Error>.Continuation
 ) throws {
     try emit(
-        PathSnapshot(
+        observation(
+            request: state.request,
             relativePath: job.relativePath,
             kind: .inaccessible,
             logicalBytes: nil,
             allocatedBytes: nil,
-            device: nil,
-            inode: nil,
             observedAt: Date(),
             issue: issue,
             progress: state.record(
@@ -378,11 +380,16 @@ private struct DirectoryJob: Sendable {
 
 struct FileMetadata {
     let kind: SnapshotKind
+    let mode: UInt16
+    let ownerUserID: UInt32
+    let ownerGroupID: UInt32
     let logicalBytes: Int64
     let allocatedBytes: Int64
     let device: UInt64
     let inode: UInt64
     let linkCount: UInt64
+    let modificationSeconds: Int64
+    let modificationNanoseconds: Int64
 
     init(_ info: stat) {
         switch info.st_mode & S_IFMT {
@@ -395,20 +402,35 @@ struct FileMetadata {
         default:
             kind = .other
         }
-        logicalBytes = Int64(info.st_size)
-        allocatedBytes = Int64(info.st_blocks) * 512
+        mode = UInt16(info.st_mode)
+        ownerUserID = info.st_uid
+        ownerGroupID = info.st_gid
+        logicalBytes = max(0, Int64(info.st_size))
+        let allocated = Int64(info.st_blocks).multipliedReportingOverflow(
+            by: 512
+        )
+        allocatedBytes = allocated.overflow
+            ? .max
+            : max(0, allocated.partialValue)
         device = UInt64(bitPattern: Int64(info.st_dev))
         inode = UInt64(info.st_ino)
         linkCount = UInt64(info.st_nlink)
+        modificationSeconds = Int64(info.st_mtimespec.tv_sec)
+        modificationNanoseconds = Int64(info.st_mtimespec.tv_nsec)
     }
 
     init(testingDevice: Int32, inode: UInt64 = 1) {
         kind = .regularFile
+        mode = UInt16(S_IFREG)
+        ownerUserID = 0
+        ownerGroupID = 0
         logicalBytes = 0
         allocatedBytes = 0
         device = UInt64(bitPattern: Int64(testingDevice))
         self.inode = inode
         linkCount = 1
+        modificationSeconds = 0
+        modificationNanoseconds = 0
     }
 }
 
@@ -421,20 +443,76 @@ private func metadata(at url: URL) -> FileMetadata? {
 }
 
 private func metadataSnapshot(
+    request: ScanRequest,
+    url: URL,
     relativePath: String,
     metadata: FileMetadata,
     issue: ScanIssue?,
     progress: ScanProgress
-) -> PathSnapshot {
-    PathSnapshot(
-        relativePath: relativePath,
-        kind: metadata.kind,
-        logicalBytes: metadata.logicalBytes,
-        allocatedBytes: metadata.allocatedBytes,
+) throws -> SurveyorObservation {
+    let identity = try FileIdentity(
         device: metadata.device,
         inode: metadata.inode,
-        observedAt: Date(),
-        issue: issue,
+        mode: metadata.mode,
+        ownerUserID: metadata.ownerUserID,
+        ownerGroupID: metadata.ownerGroupID,
+        size: metadata.logicalBytes,
+        allocatedBytes: metadata.allocatedBytes,
+        modificationSeconds: metadata.modificationSeconds,
+        modificationNanoseconds: metadata.modificationNanoseconds
+    )
+    return SurveyorObservation(
+        snapshot: try PathSnapshot(
+            id: SnapshotID(),
+            sessionID: request.sessionID,
+            scopeID: request.scopeID,
+            relativePath: relativePath,
+            kind: metadata.kind,
+            logicalByteCount: ByteCount(exactly: metadata.logicalBytes),
+            allocatedByteCount: ByteCount(exactly: metadata.allocatedBytes),
+            modifiedAt: Date(
+                timeIntervalSince1970: TimeInterval(
+                    metadata.modificationSeconds
+                ) + TimeInterval(metadata.modificationNanoseconds) / 1_000_000_000
+            ),
+            fileIdentity: identity,
+            symlinkTarget: metadata.kind == .symbolicLink
+                ? try? FileManager.default.destinationOfSymbolicLink(
+                    atPath: url.path
+                )
+                : nil,
+            measurementStatus: MeasurementStatus(issue: issue),
+            observedAt: Date()
+        ),
+        progress: progress
+    )
+}
+
+private func observation(
+    request: ScanRequest,
+    relativePath: String,
+    kind: PathKind,
+    logicalBytes: Int64?,
+    allocatedBytes: Int64?,
+    observedAt: Date,
+    issue: ScanIssue?,
+    progress: ScanProgress
+) throws -> SurveyorObservation {
+    SurveyorObservation(
+        snapshot: try PathSnapshot(
+            id: SnapshotID(),
+            sessionID: request.sessionID,
+            scopeID: request.scopeID,
+            relativePath: relativePath,
+            kind: kind,
+            logicalByteCount: logicalBytes.flatMap(ByteCount.init(exactly:)),
+            allocatedByteCount: allocatedBytes.flatMap(ByteCount.init(exactly:)),
+            modifiedAt: nil,
+            fileIdentity: nil,
+            symlinkTarget: nil,
+            measurementStatus: MeasurementStatus(issue: issue),
+            observedAt: observedAt
+        ),
         progress: progress
     )
 }
@@ -451,9 +529,9 @@ private func directoryEntryName(_ entry: UnsafeMutablePointer<dirent>) -> String
 }
 
 private func emit(
-    _ snapshot: PathSnapshot,
+    _ snapshot: SurveyorObservation,
     state: SurveyState,
-    continuation: AsyncThrowingStream<PathSnapshot, Error>.Continuation
+    continuation: AsyncThrowingStream<SurveyorObservation, Error>.Continuation
 ) throws {
     try state.checkCancellation()
     switch continuation.yield(snapshot) {
@@ -492,8 +570,10 @@ private final class SurveyState: @unchecked Sendable {
     private var recordedFailure: Error?
     private let maximumPendingDirectories: Int
     private let queueDepthDidChange: @Sendable (Int) -> Void
+    let request: ScanRequest
 
     init(request: ScanRequest) {
+        self.request = request
         maximumPendingDirectories = request.maximumPendingDirectories
         queueDepthDidChange = request.testHooks.queueDepthDidChange
     }

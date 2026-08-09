@@ -171,8 +171,8 @@ private func runBenchmark(
     let collector = Task {
         var aggregate = BenchmarkAggregate()
         do {
-            for try await snapshot in stream {
-                aggregate.consume(snapshot)
+            for try await observation in stream {
+                aggregate.consume(observation)
             }
             return (aggregate, Task.isCancelled)
         } catch is CancellationError {
@@ -239,7 +239,7 @@ private struct BenchmarkAggregate {
     var permissionFailureCount = 0
     var errorCount = 0
 
-    mutating func consume(_ snapshot: PathSnapshot) {
+    mutating func consume(_ snapshot: SurveyorObservation) {
         entryCount += 1
         regularFileCount = max(
             regularFileCount,

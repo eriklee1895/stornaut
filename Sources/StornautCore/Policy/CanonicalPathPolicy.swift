@@ -1,22 +1,4 @@
-import Darwin
 import Foundation
-
-public struct FileIdentity: Codable, Sendable, Equatable {
-    public let device: UInt64
-    public let inode: UInt64
-    public let mode: UInt16
-    public let size: Int64
-    public let modificationSeconds: Int64
-    public let modificationNanoseconds: Int64
-
-    public var isRegularFile: Bool {
-        mode_t(mode) & S_IFMT == S_IFREG
-    }
-
-    public var isDirectory: Bool {
-        mode_t(mode) & S_IFMT == S_IFDIR
-    }
-}
 
 public struct CanonicalPath: Codable, Sendable, Equatable {
     public let url: URL
@@ -147,18 +129,7 @@ public struct CanonicalPathPolicy: Sendable {
 }
 
 func fileIdentity(at url: URL) -> FileIdentity? {
-    var info = stat()
-    guard lstat(url.path, &info) == 0 else {
-        return nil
-    }
-    return FileIdentity(
-        device: unsignedDeviceIdentity(info.st_dev),
-        inode: UInt64(info.st_ino),
-        mode: UInt16(info.st_mode),
-        size: Int64(info.st_size),
-        modificationSeconds: Int64(info.st_mtimespec.tv_sec),
-        modificationNanoseconds: Int64(info.st_mtimespec.tv_nsec)
-    )
+    FileIdentity.read(at: url)
 }
 
 func unsignedDeviceIdentity(_ device: dev_t) -> UInt64 {

@@ -201,32 +201,38 @@ private func executeCodexProcess(
     try channel.send(.started)
     try channel.send(.lifecycle(.processGroupCreated))
 
-    let inputTask = Task.detached(priority: .utility) {
+    let inputTask = Task {
         do {
-            try writeAll(request.prompt, to: process.standardInput)
+            try await runBlockingProcessIO {
+                try writeAll(request.prompt, to: process.standardInput)
+            }
         } catch let error as CodexProcessError {
             control.recordAsynchronousError(error)
             throw error
         }
     }
-    let stdoutTask = Task.detached(priority: .utility) {
+    let stdoutTask = Task {
         do {
-            return try readStandardOutput(
-                from: process.standardOutput,
-                request: request,
-                channel: channel
-            )
+            return try await runBlockingProcessIO {
+                try readStandardOutput(
+                    from: process.standardOutput,
+                    request: request,
+                    channel: channel
+                )
+            }
         } catch let error as CodexProcessError {
             control.recordAsynchronousError(error)
             throw error
         }
     }
-    let stderrTask = Task.detached(priority: .utility) {
+    let stderrTask = Task {
         do {
-            return try readStandardError(
-                from: process.standardError,
-                limit: request.stderrByteLimit
-            )
+            return try await runBlockingProcessIO {
+                try readStandardError(
+                    from: process.standardError,
+                    limit: request.stderrByteLimit
+                )
+            }
         } catch let error as CodexProcessError {
             control.recordAsynchronousError(error)
             throw error
@@ -833,6 +839,23 @@ private func writeAll(_ data: Data, to descriptor: Int32) throws {
             }
             offset += written
         }
+    }
+}
+
+private func runBlockingProcessIO<T: Sendable>(
+    _ operation: @escaping @Sendable () throws -> T
+) async throws -> T {
+    try await withCheckedThrowingContinuation { continuation in
+        let thread = Thread {
+            do {
+                continuation.resume(returning: try operation())
+            } catch {
+                continuation.resume(throwing: error)
+            }
+        }
+        thread.name = "com.eriklee.stornaut.codex-io"
+        thread.qualityOfService = .utility
+        thread.start()
     }
 }
 

@@ -1,0 +1,40 @@
+{
+  "createdAt": 1786233800000,
+  "expiresAt": 1794009800000,
+  "id": "manifest-fixture-v1",
+  "planID": "plan-fixture-v1",
+  "records": [
+    {
+      "action": {
+        "moveToTrash": {}
+      },
+      "actionID": "action-fixture-001",
+      "allocatedBytesAfter": 0,
+      "allocatedBytesBefore": 7340032,
+      "allocatedBytesProcessed": 7340032,
+      "errorCode": null,
+      "finishedAt": 1786233795000,
+      "logicalBytesAfter": 0,
+      "logicalBytesBefore": 8388608,
+      "logicalBytesProcessed": 8388608,
+      "planItemID": "plan-item-fixture-trash",
+      "policyDisposition": "readyToReclaim",
+      "result": "succeeded",
+      "startedAt": 1786233780000
+    }
+  ],
+  "schemaVersion": 1,
+  "systemObservation": {
+    "freeBytesAfter": 8589938688,
+    "freeBytesBefore": 8589934592,
+    "freeSpaceDelta": {
+      "value": 4096
+    },
+    "sampledAfterAt": 1786233805000,
+    "sampledBeforeAt": 1786233775000,
+    "source": "fixture.volume.available",
+    "unexplainedDelta": {
+      "value": -4096
+    }
+  }
+}

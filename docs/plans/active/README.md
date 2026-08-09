@@ -3,7 +3,7 @@
 当前执行计划：
 
 - [Epic 2–4 Deterministic Product Core](epic-2-4-deterministic-product-core.md)
-  — `Approved`，Task 9 已完成；下一项为 Task 10。
+  — `Approved`，Tasks 9–10 已完成；下一项为 Task 11。
 
 按每 Task 独立研究、实现、code review、验证、commit、push 的契约执行。
 不得把后续 Task 提前混入当前 commit。

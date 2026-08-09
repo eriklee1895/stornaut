@@ -1,0 +1,31 @@
+{
+  "createdAt": 1786233720000,
+  "expiresAt": 1786838520000,
+  "id": "plan-fixture-v1",
+  "items": [
+    {
+      "allocatedBytes": 7340032,
+      "classificationID": "classification-fixture-stale-cache",
+      "id": "plan-item-fixture-trash",
+      "logicalBytes": 8388608,
+      "proposedAction": {
+        "moveToTrash": {}
+      },
+      "snapshotID": "snapshot-fixture-package-cache"
+    },
+    {
+      "allocatedBytes": 1048576,
+      "classificationID": "classification-fixture-runtime",
+      "id": "plan-item-fixture-registered",
+      "logicalBytes": 2097152,
+      "proposedAction": {
+        "registeredAction": {
+          "id": "fixture.unavailable-action"
+        }
+      },
+      "snapshotID": "snapshot-fixture-runtime"
+    }
+  ],
+  "scanSessionID": "scan-fixture-cancelled",
+  "schemaVersion": 1
+}
