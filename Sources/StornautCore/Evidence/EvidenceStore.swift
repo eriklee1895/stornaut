@@ -400,6 +400,17 @@ public actor EvidenceStore {
         )
     }
 
+    public func saveSpaceLedger(_ ledger: SpaceLedger) throws {
+        try saveSingleton(
+            table: "space_accounting",
+            id: ledger.sessionID.rawValue,
+            parentColumn: "session_id",
+            parentID: ledger.sessionID.rawValue,
+            payload: DomainJSON.encode(ledger),
+            operation: "spaceLedger.save"
+        )
+    }
+
     public func saveVolumeBaseline(_ baseline: VolumeBaseline) throws {
         try connection.execute(
             """
@@ -465,6 +476,22 @@ public actor EvidenceStore {
                 columnText(statement, 1) == accounting.sessionID.rawValue
             },
             operation: "accounting.load"
+        )
+    }
+
+    public func spaceLedger(
+        sessionID: ScanSessionID
+    ) throws -> SpaceLedger? {
+        try decodeOne(
+            table: "space_accounting",
+            id: sessionID.rawValue,
+            type: SpaceLedger.self,
+            recordID: \.sessionID.rawValue,
+            storageColumns: ", session_id",
+            validateStorage: { ledger, statement in
+                columnText(statement, 1) == ledger.sessionID.rawValue
+            },
+            operation: "spaceLedger.load"
         )
     }
 

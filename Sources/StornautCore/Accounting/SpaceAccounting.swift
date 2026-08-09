@@ -46,7 +46,7 @@ public struct AccountingMeasure: Codable, Sendable, Equatable {
         if (status == .measured || status == .estimated), bytes == nil {
             throw DomainContractError.invalidMeasurement
         }
-        if status == .unknown, bytes != nil {
+        if (status == .unknown || status == .unmeasurable), bytes != nil {
             throw DomainContractError.invalidMeasurement
         }
         self.status = status

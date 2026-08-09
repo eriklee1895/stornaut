@@ -266,3 +266,29 @@ changes from the Epic 1 benchmark:
 No upstream code, package or license notice is added by this delta. The initial
 production benchmark continues to use synthetic fixtures; the real-machine
 Phase B rerun remains Task 26.
+
+## 11. Task 13 Accounting Delta
+
+Task 13 uses the same accepted Apple/Mole/ClearDisk/kondo snapshots; no
+upstream drift or new dependency is introduced.
+
+The concrete accounting decision is:
+
+- use end-volume `total - general available` as Volume Used;
+- subtract only non-overlapping, hardlink-deduplicated, non-Unknown classified
+  owners to produce Unknown;
+- treat `unknownLargeConsumers` as Unknown even when a Classification exists;
+- use entry facts assigned to the nearest classified ancestor, never recursive
+  directory aggregate plus descendants;
+- represent permission/mount gaps as unavailable Unmeasurable coverage while
+  declaring that the Unknown residual already includes those bytes;
+- retain logical and allocated diagnostics separately; reconcile the volume
+  with allocated bytes only;
+- never derive purgeable, clone, compressed or reclaimable estimates;
+- attach source, sample time, formula key and explanation key to every displayed
+  measure;
+- expose free-space delta only as an unattributed start/end system observation.
+
+This improves on the compared tools by making the residual equation and
+double-count suppression explicit and fixture-verifiable. No upstream code is
+copied.

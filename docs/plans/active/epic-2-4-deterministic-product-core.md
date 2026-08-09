@@ -1,6 +1,6 @@
 # Stornaut Epic 2–4 Deterministic Product Core Implementation Plan
 
-> **Status:** Approved — Tasks 9–12 complete; Task 13 next
+> **Status:** Approved — Tasks 9–13 complete; Task 14 next
 >
 > **Roadmap phase:** Phase B — Deterministic Product Core
 >
@@ -669,7 +669,7 @@ Suggested commit subject: `feat: productionize deterministic surveyor`
 - Produces an immutable Space Ledger with sampled values, sources, formulas,
   coverage gaps and explanation strings/keys.
 
-- [ ] **Step 1: Write adversarial accounting tests first**
+- [x] **Step 1: Write adversarial accounting tests first**
 
 Cover:
 
@@ -683,29 +683,52 @@ Cover:
 - free-space change not attributed to a scan or candidate;
 - reclaim disposition not changing occupancy totals.
 
-- [ ] **Step 2: Define disjoint accounting units**
+- [x] **Step 2: Define disjoint accounting units**
 
 Document and implement how an item becomes an accounting owner and how child
 facts are suppressed from additive totals. Raw recursive directory plus child
 allocated-byte sums must never be presented as volume truth.
 
-- [ ] **Step 3: Define Known/Unknown/Unmeasurable/Free formulas**
+- [x] **Step 3: Define Known/Unknown/Unmeasurable/Free formulas**
 
 ADR 0009 must show examples and reconciliation equations. Every displayed
 number carries source and sample time. If a permission gap has no defensible
 byte estimate, represent it as unavailable and keep the residual explanation
 honest.
 
-- [ ] **Step 4: Add stable formatting inputs, not UI strings**
+- [x] **Step 4: Add stable formatting inputs, not UI strings**
 
 Core emits typed amounts/status/reasons. Localization and byte formatting stay
 in the App layer; Core does not bake English prose into persisted records.
 
-- [ ] **Step 5: Verify**
+- [x] **Step 5: Verify**
 
 Run focused accounting tests, synthetic benchmark regression and
 `scripts/verify`. Accept ADR 0009 only after fixtures reconcile without hidden
 double counting.
+
+
+Execution evidence:
+
+- ADR 0009 fixes `Used=End Capacity-End Free`, `Known=disjoint known-owner
+  allocated bytes`, `Unknown=Used-Known`, and `Free=End Free`; Unknown already
+  includes in-scope unavailable coverage, so UI must not add Unmeasurable.
+- Entry facts are assigned to the nearest classified ancestor. Nested owners are
+  disjoint; same-owner hardlinks deduplicate; cross-owner hardlinks move to the
+  unclassified residual; mount-boundary bytes stay outside the root volume.
+- `unknownLargeConsumers` remains Unknown and ReclaimDisposition never changes
+  occupancy. Logical/allocated measures, sources, sample times, formulas,
+  explanation keys, coverage gaps and APFS caveats are immutable typed fields.
+- Review fixed Unknown-formula decode drift, hardlink path-order ownership,
+  mount residual semantics, source/formula/status/Codable gaps, owner zero-byte
+  ambiguity, free-delta revalidation and classified-Unknown leakage. See Task 13
+  review report; post-fix review has no open P0-P2 finding.
+- 11 direct accounting and 60 focused integration tests pass. Closed ledger
+  persistence survives Evidence Store reopen.
+- Three self-validating benchmark regressions retain exact 1,356-entry counts,
+  first useful results in 17.46–29.53 ms and elapsed 107.51–130.07 ms.
+- Final `scripts/verify` passes 180 SwiftPM tests, Xcode App tests, 2/2 XCUITest,
+  four screenshots, App signing/bundle, localization and docs.
 
 Suggested commit subject: `feat: reconcile deterministic space ledger`
 
