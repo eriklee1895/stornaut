@@ -11,7 +11,22 @@ final class StornautAppUITests: XCTestCase {
             appearance: "light",
             screenshotSuffix: "light",
             openSettings: { app, settingsButton in
+                if !settingsButton.isHittable {
+                    app.activate()
+                }
+                XCTAssertTrue(waitUntil(timeout: 5) {
+                    settingsButton.isHittable
+                })
                 settingsButton.click()
+                let settingsContent = app.descendants(matching: .any)
+                    .matching(identifier: "settings.content")
+                    .firstMatch
+                if !settingsContent.waitForExistence(timeout: 2) {
+                    app.activate()
+                    XCTAssertTrue(settingsButton.waitForExistence(timeout: 2))
+                    XCTAssertTrue(settingsButton.isHittable)
+                    settingsButton.click()
+                }
             }
         )
     }
@@ -35,8 +50,11 @@ final class StornautAppUITests: XCTestCase {
     ) throws {
         let app = XCUIApplication()
         app.terminate()
+        XCTAssertTrue(app.wait(for: .notRunning, timeout: 5))
         addTeardownBlock {
+            self.closeResidualSettingsWindow(in: app)
             app.terminate()
+            _ = app.wait(for: .notRunning, timeout: 5)
         }
         app.launchArguments = [
             "-AppleLanguages", "(en)",
@@ -80,9 +98,16 @@ final class StornautAppUITests: XCTestCase {
 
         let settingsContent = element("settings.content", in: app)
         XCTAssertTrue(settingsContent.waitForExistence(timeout: 5))
+        let settingsAppearance = element("settings.appearance", in: app)
+        XCTAssertTrue(settingsAppearance.waitForExistence(timeout: 5))
+        XCTAssertEqual(settingsAppearance.label, appearance)
+        let settingsWindow = app.windows
+            .containing(.any, identifier: "settings.content")
+            .firstMatch
+        XCTAssertTrue(settingsWindow.waitForExistence(timeout: 5))
 
         addScreenshot(
-            settingsContent.screenshot(),
+            settingsWindow.screenshot(),
             named: "stornaut-settings-\(screenshotSuffix)"
         )
     }
@@ -105,5 +130,34 @@ final class StornautAppUITests: XCTestCase {
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+
+    @MainActor
+    private func waitUntil(
+        timeout: TimeInterval,
+        condition: () -> Bool
+    ) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if condition() {
+                return true
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+        return condition()
+    }
+
+    @MainActor
+    private func closeResidualSettingsWindow(in app: XCUIApplication) {
+        let settingsContent = element("settings.content", in: app)
+        guard settingsContent.exists else {
+            return
+        }
+        let settingsWindow = app.windows
+            .containing(.any, identifier: "settings.content")
+            .firstMatch
+        if settingsWindow.exists {
+            settingsWindow.typeKey("w", modifierFlags: .command)
+        }
     }
 }

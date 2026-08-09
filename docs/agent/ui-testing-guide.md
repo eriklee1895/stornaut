@@ -59,6 +59,10 @@ stornaut-settings-dark.png
 
 `scripts/export-ui-screenshots` 将它们导出到 ignored 的 `.derivedData/ui-screenshots/`，`scripts/verify-ui-screenshots` 检查文件、尺寸和主题差异。
 
+Settings 附件必须截取包含 `settings.content` 的独立 window，不能直接对
+`settings.content` accessibility element 截图。后者在 macOS 26 的透明
+Settings scene 中可能把材质合成到白色背景，无法可靠反映窗口主题。
+
 未来页面应在自己的 Task/ADR 中增加最小必要契约，不要把所有页面都塞进一个超长 smoke test。
 
 ## 4. Fast Iteration Loop
@@ -144,9 +148,10 @@ scripts/doctor-dev-tools
 
 ## 5. Light/Dark and Settings Rules
 
-- 受影响页面至少检查 System Light/Dark；若测试使用 Debug-only appearance override，Release/System 行为不得被修改。
+- 受影响页面至少检查 System Light/Dark；若测试使用 Debug-only appearance/window-background override，Release/System 行为不得被修改。
 - Settings 必须验证 Sidebar gear 与 `⌘,` 两条入口。
 - Settings 截图应只捕获 Settings 窗口，不把主窗口混入截图。
+- Debug-only appearance override 必须分别验证主窗口与按需新建的 Settings 窗口各自的 effective appearance。
 - 不允许通过 click/type/hotkey MCP 工具操作 UI；这些工具不在 Peekaboo 白名单中。
 - 需要自动交互的行为放在 XCUITest，通过 accessibility identifier 和 keyboard shortcut API 验证。
 - UI 元素增加或重命名时，同步更新 localization、identifier、测试和截图名称契约。

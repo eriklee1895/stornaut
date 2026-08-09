@@ -197,4 +197,5 @@ Epic 0–1
 - Epic 1 Codex Runtime Upstream Study Gate：已完成；确认 installed `0.147.0` 的 process flags 与 isolation 候选，同时保持 Broker-only、直接读取和 App-context 权限结论为 unverified；见 [study](../upstream-studies/epic-1-codex-runtime.md)。
 - Epic 1 Task 3：无 shell Codex discovery、bounded process seam、evidence-bearing capability report、generated fixtures 与 installed no-model diagnostic 已完成；所有 behavior/isolation verdict 仍为 unverified，见 [ADR 0002](../adr/0002-codex-discovery-and-capabilities.md)。
 - Epic 1 Task 4：固定参数 structured process、bounded JSONL、Swift final-envelope validation、原子 process-group 与 timeout/cancellation descendant cleanup 已完成；真实 `0.147.0` static-envelope probe 通过，但不构成 Broker-only/read isolation 证据，见 [ADR 0003](../adr/0003-codex-process-protocol.md)。
-- 下一项执行：Epic 1 Task 5 Probe Broker、Codex bridge、tool/instruction surface 与 App-context file-read/FDA isolation spike。
+- Epic 1 Task 5：四个 bounded read-only Probe、canonical path/immutable denylist、budget/redacted audit、fake Codex typed Bridge 与 signed App-context canary 已完成；installed `0.147.0` 无完整 tool allowlist，因此结论为 protocol-only/no-go，Deep Dive 继续 paused，见 [ADR 0004](../adr/0004-codex-file-read-isolation.md)。
+- 下一项执行：Epic 1 Task 6 Swift Surveyor performance/cancellation spike。

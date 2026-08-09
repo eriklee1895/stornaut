@@ -32,18 +32,13 @@ struct RootView: View {
             DestinationPlaceholder(destination: selection ?? .overview)
         }
         .frame(minWidth: 960, minHeight: 640)
-        .overlay(alignment: .topTrailing) {
-            Color.clear
-                .frame(width: 1, height: 1)
-                .accessibilityElement()
-                .accessibilityLabel(
-                    NSApplication.shared.effectiveAppearance
-                        .bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-                        ? "dark"
-                        : "light"
-                )
-                .accessibilityIdentifier("app.appearance")
+#if DEBUG
+        .background {
+            if let color = LaunchAppearanceOverride.backgroundColor {
+                color.ignoresSafeArea()
+            }
         }
+#endif
     }
 }
 

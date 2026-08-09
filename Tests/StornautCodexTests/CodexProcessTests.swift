@@ -72,6 +72,49 @@ func successfulFakeProcessUsesFixedProtocolArgumentsAndSeparatesStderr() async t
 }
 
 @Test
+func concurrentSpawnsDoNotInheritSiblingPipes() async throws {
+    let fixtures = try (0..<8).map { _ in
+        try CodexProcessFixture(mode: "success")
+    }
+    defer {
+        for fixture in fixtures {
+            fixture.remove()
+        }
+    }
+
+    let results = try await withThrowingTaskGroup(
+        of: [CodexProcessEvent].self
+    ) { group in
+        for fixture in fixtures {
+            group.addTask {
+                try await collectEvents(
+                    from: CodexProcess().run(
+                        fixture.makeRequest(timeout: .seconds(5))
+                    )
+                )
+            }
+        }
+
+        var collected: [[CodexProcessEvent]] = []
+        for try await events in group {
+            collected.append(events)
+        }
+        return collected
+    }
+
+    #expect(results.count == fixtures.count)
+    #expect(results.allSatisfy {
+        $0.contains(.completed(
+            InvestigationEnvelope(
+                summary: "Static fake result",
+                findings: [],
+                unresolvedTargetIDs: []
+            )
+        ))
+    })
+}
+
+@Test
 func invalidFinalEnvelopeFailsClosed() async throws {
     let fixture = try CodexProcessFixture(mode: "invalid-envelope")
     defer { fixture.remove() }

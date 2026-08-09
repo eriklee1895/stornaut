@@ -442,35 +442,47 @@ env -u GITHUB_TOKEN -u GH_TOKEN git push origin main
 - Produces: `CanonicalPathPolicy.evaluate(requestedURL:allowedRoots:) -> PathDecision` and immutable v1 denylist decisions.
 - Produces: `ProbeBridge` typed local transport through which Codex can invoke only allowlisted `ProbeBroker` capabilities.
 
-- [ ] **Step 1: Write fail-closed path-policy tests**
+- [x] **Step 1: Write fail-closed path-policy tests**
 
 Cover relative traversal, symlinks leaving allowed roots, mount/root/home protection, nonexistent path parents, `.ssh`, `.gnupg`, `.env`, browser profiles, Mail, Messages, Photos Library, and case/Unicode normalization. Expected default for ambiguity is denied or unknown.
 
-- [ ] **Step 2: Implement canonicalization and immutable denylist**
+- [x] **Step 2: Implement canonicalization and immutable denylist**
 
 Resolve file identity without following unsafe symlinks, compare canonical path components rather than prefixes, and return typed reasons. Define how each probe prevents check/use races: prefer descriptor-relative open/stat operations with no-follow semantics where platform APIs permit; otherwise revalidate identity immediately before and after access and fail closed on change. Do not add a settings override.
 
-- [ ] **Step 3: Write Broker budget and audit tests**
+- [x] **Step 3: Write Broker budget and audit tests**
 
 Assert capability allowlisting, root scope, per-call timeout, output bytes, session call count, L0/L1 read level, cancellation, redacted audit summaries, and symlink/path replacement between authorization and open. A README containing prompt injection text is data and cannot alter Broker policy.
 
-- [ ] **Step 4: Implement four in-process read-only probes**
+- [x] **Step 4: Implement four in-process read-only probes**
 
 Keep request/response schemas bounded and Codable. `safeTextSnippet` permits only approved filenames/types, reads a fixed maximum byte count, applies secret-pattern redaction, and returns no raw content to persistent audit records.
 
-- [ ] **Step 5: Implement and test the Codex-to-Broker bridge**
+- [x] **Step 5: Implement and test the Codex-to-Broker bridge**
 
 Expose only the four allowlisted Probe schemas through the locally isolated transport proven available by the Codex capability study. Prove end to end with fake Codex that a typed request reaches `ProbeBroker`, returns a bounded typed result, and rejects arbitrary Shell, direct filesystem requests, unregistered tools, malformed arguments, writes, and cleanup actions. Run the same test with real Codex only if the tool surface can be safely constrained; otherwise record a no-go rather than exposing the real disk.
 
-- [ ] **Step 6: Run the Codex isolation experiment**
+- [x] **Step 6: Run the Codex isolation experiment**
 
 Create three canary files: inside the isolated working directory, inside an allowed Broker fixture root, and outside both in a non-sensitive temporary sibling. Determine separately whether Codex can read each directly and whether macOS FDA/TCC privileges are inherited when launched from the App context. The App-context measurement must use an actual locally signed `.app` bundle launched through LaunchServices/Finder; a terminal process, test binary, or `swift run StornautApp` does not count as FDA/TCC inheritance evidence. The Codex Runtime upstream study and ADR 0001 must define the smallest suitable bundle harness; if no valid App-context harness exists, record this part as unmeasured and the current Deep Dive boundary remains a no-go. Do not use real private files as canaries. Do not grant, revoke, reset, or automate FDA/TCC permissions; record the current state, and run an alternate state only after explicit user approval and user-performed System Settings changes.
 
-- [ ] **Step 7: Write ADR 0004 with an explicit release outcome**
+- [x] **Step 7: Write ADR 0004 with an explicit release outcome**
 
 Record `Broker-only technically enforced`, `protocol-only but direct tools/read still possible`, or `unsafe for claimed v1 boundary`, with exact commands, OS/Codex versions, evidence, and required PRD wording. Only the first is a go under the current design. Either other result pauses Deep Dive; present evidence and design options to the user, and continue only after a separately approved boundary change or a stronger XPC/sandbox design is proven.
 
-- [ ] **Step 8: Verify and commit**
+- [x] **Step 8: Verify and commit**
+
+Task 5 execution evidence on 2026-08-09:
+
+- `CanonicalPathPolicy` and the immutable denylist cover traversal, component-safe root scope, symlink escape/replacement, filesystem/home/mount roots, device boundaries, case/Unicode behavior, `.ssh`, `.gnupg`, `.env`, Mail, Messages, Photos and browser profiles.
+- Four in-process probes use bounded Codable responses, descriptor-relative/no-follow reads where applicable, pre-access budgets, strict read levels, secret redaction and content-free audit records.
+- `ProbeBridge` exposes exactly four read-only schemas to a fake Codex client and rejects malformed/oversized requests, extra fields, Shell, direct filesystem, writes, Trash and registered actions.
+- The focused suite has 23 passing test entries plus parameterized cases. Full SwiftPM after descriptor-relative and process-spawn hardening discovered 83 entries: 81 passed and two opt-in diagnostics skipped.
+- Full verification exposed a concurrent pipe-inheritance window and a transient macOS process-group `EPERM` cleanup race. The spawn critical section is mutex protected; the `EPERM` fallback waits for `WNOWAIT` leader-exit proof and enumerates remaining group members. Five stress rounds passed without fixture residue.
+- XCUITest now verifies both the main and independent Settings window effective appearance, captures the Settings window rather than its transparent content element, and uses Debug-only deterministic backgrounds. The final full verifier passed two UI tests and Light/Dark screenshot checks; Release/System behavior is unchanged.
+- A signed `com.eriklee.stornaut` Debug App launched through LaunchServices read all three non-sensitive App canaries. Current App access to Mail was denied; no TCC state was changed and no private file was used.
+- One authenticated real Codex turn under the strict profile returned none of the three canary tokens and emitted no tool event. This is negative evidence for that turn only.
+- Codex `0.147.0` still lacks a complete tool allowlist, and MCP allowlists do not remove core tools. The release result is `protocol-only but direct tools/read still possible`; Deep Dive remains no-go/paused. See [ADR 0004](../../adr/0004-codex-file-read-isolation.md).
 
 Run safety tests and `scripts/verify`, then:
 

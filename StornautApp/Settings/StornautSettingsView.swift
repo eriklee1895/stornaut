@@ -14,6 +14,14 @@ struct StornautSettingsView: View {
             }
         }
         .formStyle(.grouped)
+#if DEBUG
+        .scrollContentBackground(.hidden)
+        .background {
+            if let color = LaunchAppearanceOverride.backgroundColor {
+                color.ignoresSafeArea()
+            }
+        }
+#endif
         .frame(width: 520, height: 260)
         .navigationTitle("settings.title")
         .accessibilityIdentifier("settings.content")

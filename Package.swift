@@ -23,6 +23,7 @@ let package = Package(
         ),
         .target(
             name: "StornautCodex",
+            dependencies: ["StornautCore"],
             resources: [
                 .copy("Schemas"),
             ]
@@ -33,7 +34,7 @@ let package = Package(
         ),
         .testTarget(
             name: "StornautCodexTests",
-            dependencies: ["StornautCodex"]
+            dependencies: ["StornautCodex", "StornautCore"]
         ),
     ],
     swiftLanguageModes: [.v6]

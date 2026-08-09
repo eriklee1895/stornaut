@@ -133,24 +133,37 @@ private func send(_ signal: Int32, to processGroup: pid_t) throws {
     if kill(-processGroup, signal) == 0 || errno == ESRCH {
         return
     }
-    if
-        errno == EPERM,
-        ProcessTreeTerminator.leaderHasWaitableExit(
-            ProcessGroupID(rawValue: processGroup)
-        ),
-        let members = ProcessTreeTerminator.processGroupMembers(
-            ProcessGroupID(rawValue: processGroup)
-        )
-    {
-        for member in members where member != processGroup {
-            if kill(member, signal) != 0 && errno != ESRCH {
-                throw ProcessTreeTerminationError.signalFailed(
-                    signal: signal,
-                    errno: errno
-                )
+    if errno == EPERM {
+        let group = ProcessGroupID(rawValue: processGroup)
+
+        // macOS can briefly report EPERM while a group leader transitions
+        // from live to a waitable exit. Keep the leader unreaped, wait for
+        // proof of that state, then use the existing enumerated-member
+        // fallback without ever signalling an unverified PID.
+        for _ in 0..<50 {
+            if
+                ProcessTreeTerminator.leaderHasWaitableExit(group),
+                let members = ProcessTreeTerminator.processGroupMembers(group)
+            {
+                for member in members where member != processGroup {
+                    if kill(member, signal) != 0 && errno != ESRCH {
+                        throw ProcessTreeTerminationError.signalFailed(
+                            signal: signal,
+                            errno: errno
+                        )
+                    }
+                }
+                return
+            }
+
+            usleep(1_000)
+            if kill(-processGroup, signal) == 0 || errno == ESRCH {
+                return
+            }
+            guard errno == EPERM else {
+                break
             }
         }
-        return
     }
     throw ProcessTreeTerminationError.signalFailed(
         signal: signal,
