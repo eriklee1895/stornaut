@@ -55,5 +55,6 @@ diff -u \
 rg -q 'SettingsLink' StornautApp/AppShell/RootView.swift
 rg -q '\.keyboardShortcut\(",", modifiers: \.command\)' StornautApp/StornautApp.swift
 
+scripts/verify-rule-compiler
 scripts/check-doc-links
 git diff --check

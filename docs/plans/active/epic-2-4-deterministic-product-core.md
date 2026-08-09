@@ -1,6 +1,6 @@
 # Stornaut Epic 2–4 Deterministic Product Core Implementation Plan
 
-> **Status:** Approved — Tasks 9–13 complete; Task 14 next
+> **Status:** Approved — Tasks 9–14 complete; Task 15 next
 >
 > **Roadmap phase:** Phase B — Deterministic Product Core
 >
@@ -752,12 +752,12 @@ Suggested commit subject: `feat: reconcile deterministic space ledger`
 - Produces a versioned immutable `RuleCatalog`.
 - Classifies metadata/facts only; it cannot execute an action.
 
-- [ ] **Step 1: Complete the Task 14 study and dependency gate**
+- [x] **Step 1: Complete the Task 14 study and dependency gate**
 
 Record exact upstream commits/licenses and whether rule YAML parsing introduces
 a package. Any new dependency must be reviewed before its code lands.
 
-- [ ] **Step 2: Write compiler rejection tests first**
+- [x] **Step 2: Write compiler rejection tests first**
 
 Reject:
 
@@ -770,25 +770,48 @@ Reject:
 - any rule proposing Shell, arbitrary executable/args or permanent deletion;
 - overlays that lower denylist, veto, required evidence, risk or disposition.
 
-- [ ] **Step 3: Implement compile-time catalog generation**
+- [x] **Step 3: Implement compile-time catalog generation**
 
 Validate YAML/source during build or an explicit checked verification step and
 ship a deterministic immutable catalog. Runtime scanning must not repeatedly
 parse arbitrary YAML from the scanned disk.
 
-- [ ] **Step 4: Implement monotonic local overlays**
+- [x] **Step 4: Implement monotonic local overlays**
 
 Overlays may narrow a scope, add exclusions, raise risk, require more evidence
 or make a disposition more conservative. They cannot create an executable,
 override a veto, weaken the permanent denylist or promote an item directly to
 `Ready to Reclaim`.
 
-- [ ] **Step 5: Verify compiler determinism**
+- [x] **Step 5: Verify compiler determinism**
 
 Compile a minimal test catalog twice and compare output hashes. Run all
 compiler/overlay/safety tests and `scripts/verify`.
 
 ADR 0010 remains proposed until Task 19 validates activity fusion.
+
+
+Execution evidence:
+
+- Task 14 revalidated Yams 6.2.2 (MIT, no package dependency, bundled CYaml)
+  and rejected adding it before a real YAML-only authoring need. Strict JSON
+  authoring is a YAML 1.2 subset and adds no dependency/notice/App parser surface.
+- `StornautCore` owns immutable rule contracts only. Host-only
+  `RuleCompilerKit`/CLI audit strict JSON size/depth/scalars/duplicate keys,
+  exact fields, provenance, paths, denylist intersection and rule invariants.
+- Ready requires high confidence, recovery, evidence/activity and MoveToTrash;
+  Unknown/Protected carry no action. Overlays can only add restrictions, raise
+  risk or move disposition toward Review/Unknown/Protected.
+- Review fixed parser exponent bounds, list limits, sensitive glob intersection,
+  Ready/Unknown action gaps, multi-overlay/Protected monotonicity, fixture
+  provenance collision, future dates, host dependency reachability and CLI
+  source/symlink overwrite. See Task 14 review; no open P0-P2 finding.
+- Focused compiler/domain/denylist verification passes 35 tests; direct compiler
+  tests pass 10/10. Two host compilations produce identical catalog/manifest/hash
+  `82bf6271f1b1f52be2b1270602dae32984e3aff28fcaf158695f428a70901a59`.
+- Final `scripts/verify` passes 190 SwiftPM tests, Xcode App tests, 2/2 XCUITest,
+  four screenshots, App signing/bundle, localization, compiler gate and docs.
+- ADR 0010 remains Proposed by design until Task 19 validates activity fusion.
 
 Suggested commit subject: `feat: enforce safe rule compilation`
 

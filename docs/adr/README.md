@@ -11,5 +11,6 @@
 7. [`0007-domain-persistence-boundary.md`](0007-domain-persistence-boundary.md) — Accepted; dual-store SQLite boundary verified in Task 11
 8. [`0008-production-quick-scan-lifecycle.md`](0008-production-quick-scan-lifecycle.md) — Accepted; production Surveyor and persisted lifecycle validated in Task 12
 9. [`0009-space-accounting-semantics.md`](0009-space-accounting-semantics.md) — Accepted; truthful Space Ledger reconciliation validated in Task 13
+10. [`0010-knowledge-activity-policy.md`](0010-knowledge-activity-policy.md) — Proposed; Task 14 compiler boundary validated, Task 19 activity acceptance pending
 
 每份 ADR 至少记录 Status、Context、Evidence、Decision、Consequences、Residual Risks 和 Validation。安全假设没有测量证据时不得标记 Accepted。

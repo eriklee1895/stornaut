@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "fixture-catalog-v1",
+  "rules": [
+    {
+      "id": "fixture-cache",
+      "match": {
+        "pathPattern": "**/.fixture-cache",
+        "expectedKind": "directory"
+      },
+      "producer": "Fixture package cache",
+      "category": "packageAndBuildCaches",
+      "disposition": "readyToReclaim",
+      "risk": "low",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "metadata.allocated"
+      ],
+      "requiredActivityKeys": [
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.fixture.redownload",
+        "cost": "low"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Fixture upstream",
+            "url": "https://example.invalid/fixture-cache",
+            "revision": "fixture-v1",
+            "license": "MIT",
+            "usage": "independentObservation"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "fixture-cache-positive",
+        "fixture-cache-protected"
+      ]
+    },
+    {
+      "id": "fixture-review",
+      "match": {
+        "pathPattern": "projects/*/derived",
+        "expectedKind": "directory"
+      },
+      "producer": "Fixture build system",
+      "category": "rebuildableProjectArtifacts",
+      "disposition": "reviewRecommended",
+      "risk": "medium",
+      "confidenceRequirement": "medium",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "metadata.allocated"
+      ],
+      "requiredActivityKeys": [
+        "activity.git.clean"
+      ],
+      "recovery": {
+        "methodKey": "recovery.fixture.rebuild",
+        "cost": "medium"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Fixture documentation",
+            "url": "https://example.invalid/fixture-derived",
+            "revision": "docs-v1",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "fixture-derived-positive",
+        "fixture-derived-active"
+      ]
+    }
+  ]
+}

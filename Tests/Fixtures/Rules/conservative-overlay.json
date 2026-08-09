@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "fixture-overlay-v1",
+  "overlays": [
+    {
+      "id": "overlay-fixture-strict",
+      "ruleID": "fixture-cache",
+      "addExclusions": [
+        "**/.fixture-cache/keep"
+      ],
+      "addRequiredEvidenceKeys": [
+        "user.confirmed.scope"
+      ],
+      "addRequiredActivityKeys": [
+        "activity.git.clean"
+      ],
+      "riskOverride": "high",
+      "dispositionOverride": "reviewRecommended",
+      "forceProtected": false
+    },
+    {
+      "id": "overlay-fixture-protect",
+      "ruleID": "fixture-review",
+      "addExclusions": [],
+      "addRequiredEvidenceKeys": [
+        "user.keep-decision"
+      ],
+      "addRequiredActivityKeys": [],
+      "riskOverride": "critical",
+      "dispositionOverride": "protected",
+      "forceProtected": true
+    }
+  ]
+}

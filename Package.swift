@@ -20,6 +20,10 @@ let package = Package(
             name: "SurveyorBenchmark",
             targets: ["SurveyorBenchmark"]
         ),
+        .executable(
+            name: "stornaut-rule-compiler",
+            targets: ["StornautRuleCompiler"]
+        ),
     ],
     targets: [
         .target(
@@ -40,6 +44,16 @@ let package = Package(
             dependencies: ["StornautCore"],
             path: "Benchmarks/SurveyorBenchmark"
         ),
+        .target(
+            name: "RuleCompilerKit",
+            dependencies: ["StornautCore"],
+            path: "Tools/RuleCompilerKit"
+        ),
+        .executableTarget(
+            name: "StornautRuleCompiler",
+            dependencies: ["RuleCompilerKit"],
+            path: "Tools/StornautRuleCompiler"
+        ),
         .testTarget(
             name: "StornautCoreTests",
             dependencies: ["StornautCore"]
@@ -47,6 +61,10 @@ let package = Package(
         .testTarget(
             name: "StornautCodexTests",
             dependencies: ["StornautCodex", "StornautCore"]
+        ),
+        .testTarget(
+            name: "RuleCompilerTests",
+            dependencies: ["RuleCompilerKit", "StornautCore"]
         ),
     ],
     swiftLanguageModes: [.v6]

@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stornaut.dev/schemas/rule-overlay-source-v1.json",
+  "title": "Stornaut Rule Overlay Source v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "catalogVersion",
+    "overlays"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "catalogVersion": {
+      "$ref": "#/$defs/token"
+    },
+    "overlays": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "$ref": "#/$defs/overlay"
+      }
+    }
+  },
+  "$defs": {
+    "token": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "ruleID": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 96,
+      "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+    },
+    "tokenList": {
+      "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/token"
+      }
+    },
+    "patternList": {
+      "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 512
+      }
+    },
+    "overlay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "ruleID",
+        "addExclusions",
+        "addRequiredEvidenceKeys",
+        "addRequiredActivityKeys",
+        "riskOverride",
+        "dispositionOverride",
+        "forceProtected"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/ruleID"
+        },
+        "ruleID": {
+          "$ref": "#/$defs/ruleID"
+        },
+        "addExclusions": {
+          "$ref": "#/$defs/patternList"
+        },
+        "addRequiredEvidenceKeys": {
+          "$ref": "#/$defs/tokenList"
+        },
+        "addRequiredActivityKeys": {
+          "$ref": "#/$defs/tokenList"
+        },
+        "riskOverride": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "critical",
+            null
+          ]
+        },
+        "dispositionOverride": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "reviewRecommended",
+            "unknown",
+            "protected",
+            null
+          ]
+        },
+        "forceProtected": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

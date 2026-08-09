@@ -270,3 +270,34 @@ Stornaut turns upstream path/taxonomy experience into a closed, provenance-
 checked data language; turns activity into independent fail-conservative
 evidence; and prevents user overlays or Local Knowledge from becoming a policy
 bypass.
+
+## 11. Task 14 Dependency Gate Update
+
+Task 14 revalidated Yams 6.2.2 at tag commit
+`a27b21e0c81c5bf42049b897a62aaf387e80f279`:
+
+- `Package.swift` declares no package dependencies, but the Yams product links
+  both `Yams` and bundled `CYaml`/LibYAML targets;
+- the MIT license is compatible and requires retaining the 2016 JP Simard
+  copyright/license notice if distributed;
+- current documentation confirms `YAMLDecoder.decode(_:from:)` and Yams `Node`,
+  but does not promise that Codable decoding rejects unknown keys, aliases or
+  tags; Stornaut would still need a separate Node-level strictness audit;
+- keeping the product reachable only from a host compiler would avoid App/Core
+  linking, but still adds a lockfile, C parser surface and supply-chain input.
+
+For Task 14's intentionally minimal compiler/schema/overlay foundation, that
+cost is not yet justified. Task 14 uses strict checked-in **JSON authoring
+source**, decoded by Foundation after an explicit unknown-key/type/depth/size
+audit. JSON is a YAML 1.2 subset, so a future approved Yams host compiler can
+consume the same source without changing the immutable runtime schema.
+
+This revises the earlier rejection of a private YAML subset: Stornaut is not
+claiming to parse YAML at all in Task 14. It deliberately accepts only JSON and
+fails every YAML-only construct. If Tasks 15-18 establish a real authoring need
+for comments, anchors or other YAML syntax, add Yams through a separate
+dependency ADR, notice and App-bundle reachability gate.
+
+No third-party dependency or notice is added in Task 14. Runtime still consumes
+only compiler-produced immutable catalog bytes; it never parses rule source
+from the scanned disk.

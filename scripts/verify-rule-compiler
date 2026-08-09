@@ -1,0 +1,91 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+cd "$repo_root"
+
+work_dir=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-rule-compiler.XXXXXX")
+trap 'rm -rf "$work_dir"' EXIT
+
+catalog="$repo_root/Tests/Fixtures/Rules/minimal-catalog.json"
+overlay="$repo_root/Tests/Fixtures/Rules/conservative-overlay.json"
+
+for run in 1 2; do
+    swift run stornaut-rule-compiler \
+        --catalog "$catalog" \
+        --overlay "$overlay" \
+        --output "$work_dir/catalog-$run.json" \
+        --manifest "$work_dir/manifest-$run.json" \
+        > "$work_dir/hash-$run.txt"
+done
+
+cmp "$work_dir/catalog-1.json" "$work_dir/catalog-2.json"
+cmp "$work_dir/manifest-1.json" "$work_dir/manifest-2.json"
+cmp "$work_dir/hash-1.txt" "$work_dir/hash-2.txt"
+
+python3 -m json.tool Rules/Schema/rule-catalog-source.schema.json >/dev/null
+python3 -m json.tool Rules/Schema/rule-overlay-source.schema.json >/dev/null
+python3 -m json.tool "$work_dir/catalog-1.json" >/dev/null
+python3 -m json.tool "$work_dir/manifest-1.json" >/dev/null
+
+swift package show-dependencies --format text \
+    | grep -Fx 'No external dependencies found' >/dev/null
+
+package_graph=$(swift package describe --type json)
+python3 - "$package_graph" <<'PY'
+import json
+import sys
+
+graph = json.loads(sys.argv[1])
+targets = {target["name"]: target for target in graph["targets"]}
+
+if targets["StornautCore"].get("target_dependencies"):
+    raise SystemExit("StornautCore must not depend on RuleCompilerKit")
+if "RuleCompilerKit" in targets["StornautCodex"].get("target_dependencies", []):
+    raise SystemExit("StornautCodex must not depend on RuleCompilerKit")
+allowed = {"StornautRuleCompiler", "RuleCompilerTests"}
+consumers = {
+    target["name"]
+    for target in graph["targets"]
+    if "RuleCompilerKit" in target.get("target_dependencies", [])
+}
+if consumers != allowed:
+    raise SystemExit(f"unexpected RuleCompilerKit consumers: {sorted(consumers)}")
+PY
+
+set +e
+swift run stornaut-rule-compiler \
+    --catalog "$catalog" \
+    --output "$catalog" \
+    --manifest "$work_dir/collision-manifest.json" \
+    > /dev/null 2>&1
+collision_status=$?
+set -e
+if (( collision_status == 0 )); then
+    echo "rule compiler accepted a source/output path collision" >&2
+    exit 1
+fi
+
+ln -s "$catalog" "$work_dir/catalog-link.json"
+set +e
+swift run stornaut-rule-compiler \
+    --catalog "$catalog" \
+    --output "$work_dir/catalog-link.json" \
+    --manifest "$work_dir/symlink-manifest.json" \
+    > /dev/null 2>&1
+symlink_status=$?
+set -e
+if (( symlink_status == 0 )); then
+    echo "rule compiler accepted a symlink source/output collision" >&2
+    exit 1
+fi
+
+if find .derivedData -path '*/Stornaut.app/*' \
+    \( -iname '*yams*' -o -iname '*yaml*' -o -iname '*rulecompiler*' \) \
+    -print -quit 2>/dev/null | grep -q .; then
+    echo "rule compiler or YAML dependency leaked into Stornaut.app" >&2
+    exit 1
+fi
+
+echo "Rule compiler verification passed: $(cat "$work_dir/hash-1.txt")"

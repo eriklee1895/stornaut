@@ -188,7 +188,7 @@ Epic 0–1
 ## 6. 当前状态
 
 - 当前阶段：Phase A evidence gate 已完成；Phase B deterministic Epic 2–4
-  plan 已批准，Tasks 9–13 已完成，下一项为 Task 14。
+  plan 已批准，Tasks 9–14 已完成，下一项为 Task 15。
 - 当前 active plan：
   [`Epic 2–4 Deterministic Product Core`](active/epic-2-4-deterministic-product-core.md)
   为 `Approved`；Epic 0–1 历史计划已移入
