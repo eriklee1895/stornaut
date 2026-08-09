@@ -66,6 +66,7 @@ Sources/StornautCodex/   Codex 发现、启动、JSONL/schema
 Stornaut.xcodeproj/      原生 macOS App/Test host
 StornautApp/             最小原生 .app shell
 StornautAppTests/        App contract tests
+StornautAppUITests/      Light/Dark、Settings 与截图验收
 Tests/                   XCTest / Swift Testing + fixtures
 docs/adr/                架构假设证据
 docs/upstream-studies/   Reference Study Gate 记录

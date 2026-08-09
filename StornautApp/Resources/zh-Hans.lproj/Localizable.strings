@@ -1,0 +1,12 @@
+"app.name" = "Stornaut";
+"destination.overview" = "概览";
+"destination.scan" = "扫描";
+"destination.investigations" = "调查";
+"destination.history" = "历史";
+"action.quickScan" = "快速扫描";
+"action.deepDive" = "深度调查";
+"placeholder.foundation" = "工程骨架——后续实现遵循已批准路线图。";
+"settings.title" = "设置";
+"settings.language" = "语言";
+"settings.appearance" = "外观";
+"settings.systemDefault" = "跟随系统";

@@ -213,6 +213,7 @@ StornautApp/
 ├── Info.plist
 └── StornautApp.entitlements
 StornautAppTests/
+StornautAppUITests/
 Package.swift
 Sources/
 ├── StornautCore/
@@ -234,6 +235,10 @@ Tests/
   - unit-test bundle
   - 依赖 `StornautApp`
   - 先验证 `AppDestination`、scene/command contract 和 localization resources
+- `StornautAppUITests`
+  - macOS UI-test bundle
+  - 验证四项导航、Sidebar Settings、`⌘,`、Light/Dark effective appearance
+  - 通过 `.xcresult` 输出窗口级截图附件
 
 ### 7.3 Signing modes
 

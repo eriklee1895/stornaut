@@ -1,0 +1,37 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+expected_app="$repo_root/.derivedData/app/Build/Products/Debug/Stornaut.app"
+app_path=${1:-$expected_app}
+app_path=${app_path:A}
+
+if [[ "$app_path" != "$expected_app" ]]; then
+    print -u2 "Refusing to sign unexpected path: $app_path"
+    exit 1
+fi
+
+if [[ ! -d "$app_path" ]]; then
+    print -u2 "App bundle not found: $app_path"
+    exit 1
+fi
+
+bundle_identifier=$(
+    plutil -extract CFBundleIdentifier raw "$app_path/Contents/Info.plist"
+)
+
+if [[ "$bundle_identifier" != "com.eriklee.stornaut" ]]; then
+    print -u2 "Unexpected bundle identifier: $bundle_identifier"
+    exit 1
+fi
+
+codesign \
+    --force \
+    --sign - \
+    --identifier "$bundle_identifier" \
+    --requirements "=designated => identifier \"$bundle_identifier\"" \
+    --entitlements "$repo_root/StornautApp/StornautApp.entitlements" \
+    "$app_path"
+
+codesign --verify --deep --strict --verbose=2 "$app_path"

@@ -2,7 +2,7 @@
 
 > 面向接手实现的 Coding Agent  
 > 最近更新：2026-08-08  
-> 当前状态：产品、Agent、UI 功能交互与品牌基线完成；Epic 0 Task 1 的 SwiftPM、测试与验证骨架已完成；下一项是 Task 2 原生 App/Test host
+> 当前状态：产品、Agent、UI 功能交互与品牌基线完成；Epic 0 App/Test/UI Test host、本地签名与 Light/Dark/Settings 截图验证已完成；下一项是 Epic 1 Codex discovery/capability Spike
 
 ## 1. 任务目标
 

@@ -475,6 +475,7 @@ stornaut/
 │   ├── DesignSystem/
 │   └── Settings/
 ├── StornautAppTests/
+├── StornautAppUITests/
 ├── Sources/
 │   ├── StornautCore/
 │   │   ├── Surveyor/

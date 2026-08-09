@@ -1,0 +1,12 @@
+"app.name" = "Stornaut";
+"destination.overview" = "Overview";
+"destination.scan" = "Scan";
+"destination.investigations" = "Investigations";
+"destination.history" = "History";
+"action.quickScan" = "Quick Scan";
+"action.deepDive" = "Deep Dive";
+"placeholder.foundation" = "Foundation shell — implementation follows the approved roadmap.";
+"settings.title" = "Settings";
+"settings.language" = "Language";
+"settings.appearance" = "Appearance";
+"settings.systemDefault" = "System Default";

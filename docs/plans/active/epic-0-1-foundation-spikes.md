@@ -173,7 +173,12 @@ env -u GITHUB_TOKEN -u GH_TOKEN git push origin main
 - Create: `StornautApp/Info.plist`
 - Create: `StornautApp/StornautApp.entitlements`
 - Create: `StornautAppTests/AppDestinationTests.swift`
+- Create: `StornautAppUITests/StornautAppUITests.swift`
 - Modify: `scripts/verify`
+- Create: `scripts/sign-local-app`
+- Create: `scripts/verify-app-bundle`
+- Create: `scripts/export-ui-screenshots`
+- Create: `scripts/verify-ui-screenshots`
 - Modify: `.github/workflows/ci.yml`
 - Create: `docs/adr/0001-package-first-native-shell.md`
 
@@ -181,7 +186,7 @@ env -u GITHUB_TOKEN -u GH_TOKEN git push origin main
 - Consumes: `StornautCore` module from Task 1.
 - Produces: `enum AppDestination: String, CaseIterable, Identifiable, Sendable` with exactly `.overview`, `.scan`, `.investigations`, `.history`.
 
-- [ ] **Step 1: Write the navigation contract test**
+- [x] **Step 1: Write the navigation contract test**
 
 Add the native `StornautApp` and `StornautAppTests` targets and the testable navigation seam, then assert the destination raw values are exactly:
 
@@ -191,21 +196,21 @@ Add the native `StornautApp` and `StornautAppTests` targets and the testable nav
 
 and that no settings/menu-bar destination exists.
 
-- [ ] **Step 2: Run the focused test and confirm failure**
+- [x] **Step 2: Run the focused test and confirm failure**
 
 Run the focused `xcodebuild` App-shell test command recorded by ADR 0001.
 
 Expected: FAIL because `AppDestination` does not exist.
 
-- [ ] **Step 3: Implement the minimal native shell**
+- [x] **Step 3: Implement the minimal native shell**
 
 Create a real macOS `.app` with a stable development bundle identifier and an `@main struct StornautApp: App`. It has one uniquely identified `Window("Stornaut", id: "main")` scene and one independent `Settings` scene. The App must not expose creation of additional main windows. `RootView` uses `NavigationSplitView`, four labeled SF Symbol sidebar items, and plain placeholder content. Do not add MenuBarExtra, timers, background tasks, scan simulation, visual branding, or Agent chat.
 
-- [ ] **Step 4: Add localization resources**
+- [x] **Step 4: Add localization resources**
 
 Provide English and `zh-Hans` values for the four destinations plus `Settings`, `Quick Scan`, and `Deep Dive`. Use localization keys from SwiftUI rather than user-visible literals in the view.
 
-- [ ] **Step 5: Build and manually inspect both appearances**
+- [x] **Step 5: Build and manually inspect both appearances**
 
 Build `Stornaut.xcodeproj`, inspect the produced `.app`, verify its bundle identifier and local code signature, and launch it through LaunchServices/Finder rather than `swift run`.
 
@@ -213,11 +218,24 @@ Expected: one native window, four sidebar destinations, Settings opened with `�
 
 This step proves the local App-host identity and shell behavior, not Developer ID distribution or notarization. A terminal-launched executable remains invalid evidence for packaged-App FDA/TCC inheritance.
 
-- [ ] **Step 6: Extend the verification entry point**
+Execution evidence on 2026-08-09:
+
+- The accepted red test failed only because `AppDestination` was missing.
+- App unit tests passed after implementing exactly four destinations.
+- The signed App launched through LaunchServices; repeated `open` reused the same PID.
+- Default and forced Dark launches each produced one `1180 × 760` layer-0 main window.
+- Bundle ID, architecture, minimum OS, localization resources, non-sandbox entitlement and explicit designated requirement passed automated audit.
+- Screenshot capture was unavailable because the current terminal lacks Screen Recording permission.
+- Settings UI automation was unavailable because `osascript` lacks Accessibility permission; no permission was changed automatically.
+- The user confirmed localized navigation labels and `⌘,` Settings.
+- XCUITest now verifies Light/Dark effective appearance, Sidebar-bottom Settings, `⌘,` Settings and exports four window-level screenshot attachments without terminal Screen Recording/Accessibility permission.
+- The screenshot export normalizes stable filenames under ignored `.derivedData/ui-screenshots/`; transparent shell materials use XCUITest appearance state while Settings screenshots also pass a luminance-difference gate.
+
+- [x] **Step 6: Extend the verification entry point**
 
 Update `scripts/verify` so it still builds/tests both Swift libraries and then invokes deterministic `xcodebuild` App-host build and App-shell tests. Update the manual-only CI workflow to run the same noninteractive verification path when an authorized operator triggers it. GUI launch inspection remains local/manual and is recorded in ADR 0001; CI must not claim it tested TCC/FDA interaction.
 
-- [ ] **Step 7: Run tests and commit**
+- [x] **Step 7: Run tests and commit**
 
 Run: `scripts/verify`
 

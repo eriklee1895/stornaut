@@ -1,0 +1,71 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+result_bundle=${1:-$repo_root/.derivedData/ui-tests.xcresult}
+output_dir=${2:-$repo_root/.derivedData/ui-screenshots}
+
+result_bundle=${result_bundle:A}
+output_dir=${output_dir:A}
+
+expected_result_bundle="$repo_root/.derivedData/ui-tests.xcresult"
+expected_output_dir="$repo_root/.derivedData/ui-screenshots"
+
+if [[ "$result_bundle" != "$expected_result_bundle" ]]; then
+    print -u2 "Refusing to read unexpected result bundle: $result_bundle"
+    exit 1
+fi
+
+if [[ "$output_dir" != "$expected_output_dir" ]]; then
+    print -u2 "Refusing to write unexpected screenshot directory: $output_dir"
+    exit 1
+fi
+
+rm -rf "$output_dir"
+
+xcrun xcresulttool export attachments \
+    --path "$result_bundle" \
+    --output-path "$output_dir"
+
+ruby -rjson -rfileutils - "$output_dir" <<'RUBY' || exit 1
+output_dir = ARGV.fetch(0)
+manifest_path = File.join(output_dir, "manifest.json")
+manifest = JSON.parse(File.read(manifest_path))
+
+attachments = manifest.flat_map { |entry| entry.fetch("attachments") }
+expected_names = %w[
+  stornaut-shell-light
+  stornaut-settings-light
+  stornaut-shell-dark
+  stornaut-settings-dark
+]
+
+expected_names.each do |expected_name|
+  attachment = attachments.find do |candidate|
+    candidate.fetch("suggestedHumanReadableName").start_with?(expected_name)
+  end
+  abort("Missing UI screenshot attachment: #{expected_name}") unless attachment
+
+  source = File.join(output_dir, attachment.fetch("exportedFileName"))
+  destination = File.join(output_dir, "#{expected_name}.png")
+  FileUtils.cp(source, destination)
+end
+RUBY
+
+for screenshot in \
+    stornaut-shell-light.png \
+    stornaut-settings-light.png \
+    stornaut-shell-dark.png \
+    stornaut-settings-dark.png; do
+    test -f "$output_dir/$screenshot"
+done
+
+for crash_report in "$output_dir"/*.ips(N); do
+    if head -1 "$crash_report" | rg -q '"app_name":"Stornaut"|"bundleID":"com\.eriklee\.stornaut"'; then
+        print -u2 "Stornaut crash attachment found: $crash_report"
+        exit 1
+    fi
+done
+
+print "UI screenshots exported to: $output_dir"

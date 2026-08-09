@@ -21,7 +21,7 @@
 
 ## 状态
 
-🚧 产品、Agent、UI 功能交互与品牌基线已批准；核心页面、独立 Settings 及跨流程失败/降级状态均已定稿。Epic 0 Task 1 的 SwiftPM、测试与本地验证骨架已完成，下一项是原生 App/Test host。见文档：
+🚧 产品、Agent、UI 功能交互与品牌基线已批准；Epic 0 的 SwiftPM、原生 App/Test/UI Test host、本地签名与 Light/Dark/Settings 截图验证已完成。下一阶段是 Epic 1 Codex discovery/capability Spike。见文档：
 
 | 文档 | 内容 |
 |---|---|

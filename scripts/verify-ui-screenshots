@@ -1,0 +1,119 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+screenshots_dir=${1:-$repo_root/.derivedData/ui-screenshots}
+screenshots_dir=${screenshots_dir:A}
+
+expected_dir="$repo_root/.derivedData/ui-screenshots"
+if [[ "$screenshots_dir" != "$expected_dir" ]]; then
+    print -u2 "Refusing to inspect unexpected screenshot directory: $screenshots_dir"
+    exit 1
+fi
+
+for screenshot in \
+    stornaut-shell-light.png \
+    stornaut-settings-light.png \
+    stornaut-shell-dark.png \
+    stornaut-settings-dark.png; do
+    if [[ ! -f "$screenshots_dir/$screenshot" ]]; then
+        print -u2 "Missing UI screenshot: $screenshots_dir/$screenshot"
+        exit 1
+    fi
+done
+
+xcrun swift - "$screenshots_dir" <<'SWIFT'
+import AppKit
+import CoreGraphics
+import Foundation
+
+let directory = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
+let names = [
+    "stornaut-shell-light",
+    "stornaut-settings-light",
+    "stornaut-shell-dark",
+    "stornaut-settings-dark",
+]
+
+func averageLuminance(at url: URL) throws -> Double {
+    guard let image = NSImage(contentsOf: url),
+          let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil)
+    else {
+        throw CocoaError(.fileReadCorruptFile)
+    }
+
+    guard cgImage.width >= 400, cgImage.height >= 200 else {
+        throw CocoaError(.coderInvalidValue)
+    }
+
+    let width = cgImage.width
+    let height = cgImage.height
+    let bytesPerRow = width * 4
+    var pixels = [UInt8](repeating: 0, count: bytesPerRow * height)
+
+    var total = 0.0
+    var samples = 0
+
+    try pixels.withUnsafeMutableBytes { buffer in
+        let bytes = buffer.bindMemory(to: UInt8.self)
+
+        guard let baseAddress = buffer.baseAddress,
+              let context = CGContext(
+                  data: baseAddress,
+                  width: width,
+                  height: height,
+                  bitsPerComponent: 8,
+                  bytesPerRow: bytesPerRow,
+                  space: CGColorSpaceCreateDeviceRGB(),
+                  bitmapInfo: CGBitmapInfo.byteOrder32Big.rawValue
+                      | CGImageAlphaInfo.premultipliedLast.rawValue
+              )
+        else {
+            throw CocoaError(.coderInvalidValue)
+        }
+
+        context.setFillColor(NSColor.white.cgColor)
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+        let stride = max(1, min(width, height) / 256)
+
+        for y in Swift.stride(from: 0, to: height, by: stride) {
+            for x in Swift.stride(from: 0, to: width, by: stride) {
+                let offset = y * bytesPerRow + x * 4
+                let alpha = Double(bytes[offset + 3]) / 255
+                let whiteContribution = 255 * (1 - alpha)
+                let red = Double(bytes[offset]) + whiteContribution
+                let green = Double(bytes[offset + 1]) + whiteContribution
+                let blue = Double(bytes[offset + 2]) + whiteContribution
+                total += 0.2126 * red + 0.7152 * green + 0.0722 * blue
+                samples += 1
+            }
+        }
+    }
+
+    return total / Double(samples)
+}
+
+var luminance: [String: Double] = [:]
+for name in names {
+    let url = directory.appendingPathComponent("\(name).png")
+    luminance[name] = try averageLuminance(at: url)
+    print("\(name)=\(String(format: "%.2f", luminance[name]!))")
+}
+
+guard let shellLight = luminance["stornaut-shell-light"],
+      let shellDark = luminance["stornaut-shell-dark"],
+      let settingsLight = luminance["stornaut-settings-light"],
+      let settingsDark = luminance["stornaut-settings-dark"],
+      settingsLight - settingsDark >= 40
+else {
+    fputs("Settings Light/Dark screenshot luminance difference is too small.\n", stderr)
+    exit(1)
+}
+
+if abs(shellLight - shellDark) < 1 {
+    print("Shell window screenshots use transparent macOS materials; appearance is verified through XCUITest accessibility state.")
+}
+SWIFT

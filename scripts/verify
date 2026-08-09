@@ -8,5 +8,52 @@ cd "$repo_root"
 swift package clean
 swift build
 swift test
+
+rm -rf .derivedData
+
+xcodebuild -quiet \
+    -project Stornaut.xcodeproj \
+    -scheme Stornaut \
+    -configuration Debug \
+    -destination 'platform=macOS,arch=arm64' \
+    -derivedDataPath .derivedData/tests \
+    -skip-testing:StornautAppUITests \
+    test
+
+xcodebuild -quiet \
+    -project Stornaut.xcodeproj \
+    -scheme Stornaut \
+    -configuration Debug \
+    -destination 'platform=macOS,arch=arm64' \
+    -derivedDataPath .derivedData/ui-tests \
+    -resultBundlePath .derivedData/ui-tests.xcresult \
+    -only-testing:StornautAppUITests \
+    test
+
+scripts/export-ui-screenshots
+scripts/verify-ui-screenshots
+
+xcodebuild -quiet \
+    -project Stornaut.xcodeproj \
+    -scheme Stornaut \
+    -configuration Debug \
+    -destination 'platform=macOS,arch=arm64' \
+    -derivedDataPath .derivedData/app \
+    build
+
+scripts/sign-local-app
+scripts/verify-app-bundle
+
+for localization in StornautApp/Resources/*.lproj/Localizable.strings; do
+    plutil -lint "$localization"
+done
+
+diff -u \
+    <(rg -o '^"[^"]+"' StornautApp/Resources/en.lproj/Localizable.strings | sort) \
+    <(rg -o '^"[^"]+"' StornautApp/Resources/zh-Hans.lproj/Localizable.strings | sort)
+
+rg -q 'SettingsLink' StornautApp/AppShell/RootView.swift
+rg -q '\.keyboardShortcut\(",", modifiers: \.command\)' StornautApp/StornautApp.swift
+
 scripts/check-doc-links
 git diff --check
