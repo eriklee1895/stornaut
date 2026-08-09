@@ -1,6 +1,6 @@
 # Stornaut Epic 2–4 Deterministic Product Core Implementation Plan
 
-> **Status:** Approved — Tasks 9–16 complete; Task 17 next
+> **Status:** Approved — Tasks 9–17 complete; Task 18 next
 >
 > **Roadmap phase:** Phase B — Deterministic Product Core
 >
@@ -964,28 +964,55 @@ Suggested commit subject: `feat: classify project artifacts safely`
 - Expand: `Tests/Fixtures/Rules/`
 - Update: `docs/upstream-studies/epic-4-knowledge-activity.md`
 
-- [ ] **Step 1: Add package/build cache families**
+- [x] **Step 1: Add package/build cache families**
 
 Cover npm, pnpm, Yarn, Bun, uv, pip, Conda, Cargo, Go, Gradle, Maven and
 Homebrew cache/build-store locations. Distinguish a cache from an installed
 runtime, environment, package source or user-owned configuration.
 
-- [ ] **Step 2: Add recovery, activity and ownership fixtures**
+- [x] **Step 2: Add recovery, activity and ownership fixtures**
 
 Each family includes a positive fixture, a protected/config lookalike, an
 active-use case and a recovery/rebuild contract. Global cache paths require
 explicit user-scope/ownership facts and may remain `Review Recommended`.
 
-- [ ] **Step 3: Compare behavior and provenance**
+- [x] **Step 3: Compare behavior and provenance**
 
 Record clean-room behavior comparisons with Mole/ClearDisk/kondo where
 applicable. A generated provenance manifest must make every source, license,
 verification date and usage mode reviewable.
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Check deterministic catalog hashes and benchmark cumulative matching over the
 anonymous fixture. Run rule/safety tests and `scripts/verify`.
+
+Execution evidence:
+
+- `package-build-caches-v1.json` adds 17 rules covering npm, pnpm, Yarn, Bun,
+  uv, pip, Conda, Cargo, Go, Gradle, Maven and Homebrew, including exact
+  Conda/pnpm path variants and Go build/module caches.
+- Every rule remains Review Recommended and requires current-user scope,
+  tool-owned layout, reclaimable cache evidence and inactive process. Conda,
+  pnpm, Maven and Homebrew carry stronger unreferenced/no-local-artifact gates.
+- 68 clean-room cases pair each rule with positive, active, configuration and
+  runtime/environment/source behavior. Five comparisons record intentionally
+  more conservative outcomes than documented Mole/ClearDisk/kondo behavior.
+- Review fixed Conda/pnpm path false negatives, missing reclaimability,
+  manifest schema drift, mixed Homebrew/pnpm content, missing Go module cache
+  and matcher benchmark headroom. Post-fix review has no open P0–P2 finding.
+- Generated manifest schema v2 makes every rule's source URL, revision,
+  license, usage, verification date, rationale and fixtures reviewable.
+- 16/16 official URLs pass live exact-revision audit. RuleCompiler 27/27 and
+  RuleCatalog 6/6 pass.
+- Terminal-literal prefiltering keeps the 55-rule fixed debug benchmark around
+  0.97–1.21 s under the 2 s gate.
+- Four-source cumulative hash is
+  `4dd2ed03f74d20d47ec0670310edb1ff1297c188b307c69a71e9c3f25ae54794`.
+  Full `scripts/verify` passes 213 SwiftPM tests, Xcode App tests, 2/2 XCUITest,
+  four screenshots, App signing/bundle, localization, manifest/compiler and
+  docs gates.
+- No dependency or copied upstream code was added. ADR 0010 remains Proposed.
 
 Suggested commit subject: `feat: classify developer caches safely`
 

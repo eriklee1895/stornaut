@@ -838,6 +838,225 @@ func projectArtifactBehaviorComparisonRemainsConservativeAndCleanRoom() throws {
     }
 }
 
+@Test
+func packageCacheCatalogCoversApprovedFamiliesWithOwnershipGates() throws {
+    let artifact = try RuleSourceCompiler().compile(
+        catalogSources: [
+            try builtInRuleFixture("protected-v1"),
+            try builtInRuleFixture("project-artifacts-v1"),
+            try builtInRuleFixture("package-build-caches-v1"),
+        ],
+        catalogVersion: try DomainToken(
+            validating: "builtin-package-build-caches-v1"
+        )
+    )
+    let cacheRules = artifact.catalog.rules.filter {
+        $0.category == .packageAndBuildCaches
+    }
+    let expectedIDs = [
+        "cache-bun-install",
+        "cache-cargo-registry",
+        "cache-conda-anaconda-packages",
+        "cache-conda-miniconda-packages",
+        "cache-conda-packages",
+        "cache-go-build",
+        "cache-go-modules",
+        "cache-gradle-modules",
+        "cache-homebrew-downloads",
+        "cache-maven-local-repository",
+        "cache-npm-content",
+        "cache-pip",
+        "cache-pnpm-home-store",
+        "cache-pnpm-store",
+        "cache-pnpm-xdg-store",
+        "cache-uv",
+        "cache-yarn-global",
+    ]
+
+    #expect(cacheRules.map(\.id.rawValue) == expectedIDs)
+    #expect(artifact.catalog.rules.count == 55)
+    #expect(artifact.manifest.sourceCatalogVersions == [
+        "package-build-caches-v1",
+        "project-artifacts-v1",
+        "protected-v1",
+    ])
+    for rule in cacheRules {
+        let evidence = Set(rule.requiredEvidenceKeys.map(\.rawValue))
+        #expect(rule.disposition == .reviewRecommended)
+        #expect(rule.confidenceRequirement == .high)
+        #expect(rule.recommendedAction == .moveToTrash)
+        #expect(rule.recovery != nil)
+        #expect(evidence.contains("evidence.cache.layout"))
+        #expect(evidence.contains("evidence.cache.reclaimable"))
+        #expect(evidence.contains("evidence.cache.tool-owned"))
+        #expect(evidence.contains("evidence.scope.user-owned"))
+        #expect(
+            rule.requiredActivityKeys.map(\.rawValue).contains(
+                "activity.process.inactive"
+            )
+        )
+        #expect(rule.fixtureIDs.count == 4)
+        #expect(rule.provenance.sources.count >= 2)
+    }
+}
+
+@Test
+func packageCacheFixturesExcludeRuntimeEnvironmentSourceAndConfiguration() throws {
+    let artifact = try RuleSourceCompiler().compile(
+        catalogData: try builtInRuleFixture("package-build-caches-v1")
+    )
+    let fixture = try packageCacheFixture()
+    let casesByRule = Dictionary(grouping: fixture.cases, by: \.ruleID)
+
+    for rule in artifact.catalog.rules {
+        let cases = try #require(casesByRule[rule.id.rawValue])
+        let positive = try #require(cases.first { $0.kind == "positive" })
+        let active = try #require(cases.first { $0.kind == "active" })
+        let lookalikes = cases.filter { $0.kind == "lookalike" }
+        let requirements = Set(
+            rule.requiredEvidenceKeys.map(\.rawValue)
+                + rule.requiredActivityKeys.map(\.rawValue)
+        )
+
+        #expect(lookalikes.count == 2)
+        #expect(rulePattern(rule.match, protects: positive.path))
+        #expect(rulePattern(rule.match, protects: active.path))
+        #expect(Set(positive.presentKeys) == requirements)
+        #expect(positive.missingKeys.isEmpty)
+        #expect(
+            Set(active.presentKeys).union(active.missingKeys) == requirements
+        )
+        #expect(Set(active.missingKeys) == ["activity.process.inactive"])
+        #expect(lookalikes.allSatisfy {
+            !rulePattern(rule.match, protects: $0.path)
+        })
+        #expect(
+            Set(lookalikes.map(\.lookalikeType)) == [
+                "configuration",
+                "runtimeEnvironmentOrSource",
+            ]
+        )
+    }
+}
+
+@Test
+func generatedManifestMakesEveryRuleProvenanceAndFixtureReviewable() throws {
+    let artifact = try RuleSourceCompiler().compile(
+        catalogSources: [
+            try builtInRuleFixture("protected-v1"),
+            try builtInRuleFixture("project-artifacts-v1"),
+            try builtInRuleFixture("package-build-caches-v1"),
+        ],
+        catalogVersion: try DomainToken(
+            validating: "builtin-package-build-caches-v1"
+        )
+    )
+
+    #expect(artifact.manifest.schemaVersion == 2)
+    #expect(artifact.manifest.rules.count == artifact.catalog.rules.count)
+    #expect(
+        artifact.manifest.rules.map(\.ruleID)
+            == artifact.catalog.rules.map(\.id)
+    )
+    #expect(
+        artifact.manifest.provenanceSourceCount
+            == artifact.manifest.rules.reduce(0) {
+                $0 + $1.provenance.sources.count
+            }
+    )
+    #expect(
+        artifact.manifest.fixtureCount
+            == Set(artifact.manifest.rules.flatMap(\.fixtureIDs)).count
+    )
+    for entry in artifact.manifest.rules {
+        #expect(!entry.provenance.sources.isEmpty)
+        #expect(entry.provenance.independentlyVerified)
+        #expect(entry.provenance.sources.allSatisfy {
+            $0.url.scheme == "https"
+                && !$0.revision.rawValue.isEmpty
+                && !$0.license.rawValue.isEmpty
+        })
+        #expect(!entry.fixtureIDs.isEmpty)
+        #expect(!entry.rationaleKey.rawValue.isEmpty)
+    }
+}
+
+@Test
+func packageCacheBehaviorComparisonRemainsConservativeAndCleanRoom() throws {
+    let artifact = try RuleSourceCompiler().compile(
+        catalogData: try builtInRuleFixture("package-build-caches-v1")
+    )
+    let data = try ruleFixture("package-cache-behavior-comparison")
+    let root = try #require(
+        JSONSerialization.jsonObject(with: data) as? [String: Any]
+    )
+    #expect(try #require(root["schemaVersion"] as? Int) == 1)
+    let sources = try #require(root["sources"] as? [[String: Any]])
+    let cases = try #require(root["cases"] as? [[String: Any]])
+    let sourceProjects = Set(try sources.map {
+        try #require($0["project"] as? String)
+    })
+    let rulesByID = Dictionary(
+        uniqueKeysWithValues: artifact.catalog.rules.map {
+            ($0.id.rawValue, $0)
+        }
+    )
+
+    #expect(sourceProjects == ["ClearDisk", "Mole", "kondo"])
+    for comparison in cases {
+        let ruleID = try #require(comparison["ruleID"] as? String)
+        let outcome = try #require(
+            comparison["stornautOutcome"] as? String
+        )
+        let missing = Set(try #require(
+            comparison["missingKeys"] as? [String]
+        ))
+        let rule = try #require(rulesByID[ruleID])
+        let requirements = Set(
+            rule.requiredEvidenceKeys.map(\.rawValue)
+                + rule.requiredActivityKeys.map(\.rawValue)
+        )
+
+        #expect(["noCandidate", "reviewBlocked"].contains(outcome))
+        #expect(missing.isSubset(of: requirements))
+        #expect(outcome == "noCandidate" || !missing.isEmpty)
+    }
+}
+
+@Test
+func completeCacheCatalogMatchingBenchmarkStaysBounded() throws {
+    let artifact = try RuleSourceCompiler().compile(
+        catalogSources: [
+            try builtInRuleFixture("protected-v1"),
+            try builtInRuleFixture("project-artifacts-v1"),
+            try builtInRuleFixture("package-build-caches-v1"),
+        ],
+        catalogVersion: try DomainToken(
+            validating: "builtin-package-build-caches-v1"
+        )
+    )
+    let matcher = RuleCatalogMatcher(catalog: artifact.catalog)
+    let paths = try packageCacheFixture().cases.map(\.path)
+        + projectArtifactFixture().cases.map(\.path)
+        + anonymousDeveloperTreePaths()
+    let clock = ContinuousClock()
+    var matchCount = 0
+
+    let duration = try clock.measure {
+        for _ in 0..<200 {
+            for path in paths {
+                matchCount += try matcher.matchingRules(
+                    relativePath: path,
+                    kind: .directory
+                ).count
+            }
+        }
+    }
+
+    #expect(matchCount > 0)
+    #expect(duration < .seconds(2))
+}
+
 private func ruleFixture(_ name: String) throws -> Data {
     try Data(
         contentsOf: repositoryRoot.appending(
@@ -934,6 +1153,31 @@ private struct ProjectArtifactFixtureCase: Decodable {
     let path: String
     let presentKeys: [String]
     let missingKeys: [String]
+}
+
+private struct PackageCacheFixture: Decodable {
+    let schemaVersion: Int
+    let cases: [PackageCacheFixtureCase]
+}
+
+private struct PackageCacheFixtureCase: Decodable {
+    let id: String
+    let ruleID: String
+    let kind: String
+    let lookalikeType: String?
+    let path: String
+    let presentKeys: [String]
+    let missingKeys: [String]
+}
+
+private func packageCacheFixture() throws -> PackageCacheFixture {
+    let fixture = try JSONDecoder().decode(
+        PackageCacheFixture.self,
+        from: ruleFixture("package-cache-cases")
+    )
+    #expect(fixture.schemaVersion == 1)
+    #expect(Set(fixture.cases.map(\.id)).count == fixture.cases.count)
+    return fixture
 }
 
 private func projectArtifactFixture() throws -> ProjectArtifactFixture {

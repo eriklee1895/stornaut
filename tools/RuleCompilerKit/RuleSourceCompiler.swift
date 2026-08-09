@@ -17,6 +17,20 @@ public enum RuleCompilerError: Error, Sendable, Equatable {
     case overlayNotConservative(String)
 }
 
+public struct RuleManifestEntry: Codable, Sendable, Equatable {
+    public let ruleID: RuleID
+    public let rationaleKey: DomainToken
+    public let provenance: RuleProvenance
+    public let fixtureIDs: [DomainToken]
+
+    public init(rule: CompiledRule) {
+        ruleID = rule.id
+        rationaleKey = rule.rationaleKey
+        provenance = rule.provenance
+        fixtureIDs = rule.fixtureIDs
+    }
+}
+
 public struct RuleCompileManifest: Codable, Sendable, Equatable {
     public let schemaVersion: Int
     public let catalogVersion: String
@@ -27,6 +41,7 @@ public struct RuleCompileManifest: Codable, Sendable, Equatable {
     public let fixtureCount: Int
     public let appliedOverlayCount: Int
     public let catalogSHA256: String
+    public let rules: [RuleManifestEntry]
 
     public init(
         catalogVersion: String,
@@ -36,9 +51,10 @@ public struct RuleCompileManifest: Codable, Sendable, Equatable {
         provenanceSourceCount: Int,
         fixtureCount: Int,
         appliedOverlayCount: Int,
-        catalogSHA256: String
+        catalogSHA256: String,
+        rules: [RuleManifestEntry]
     ) {
-        schemaVersion = 1
+        schemaVersion = 2
         self.catalogVersion = catalogVersion
         self.sourceCatalogVersions = sourceCatalogVersions
         self.ruleCount = ruleCount
@@ -47,6 +63,7 @@ public struct RuleCompileManifest: Codable, Sendable, Equatable {
         self.fixtureCount = fixtureCount
         self.appliedOverlayCount = appliedOverlayCount
         self.catalogSHA256 = catalogSHA256
+        self.rules = rules
     }
 }
 
@@ -197,7 +214,8 @@ public struct RuleSourceCompiler: Sendable {
                 catalog.rules.flatMap(\.fixtureIDs)
             ).count,
             appliedOverlayCount: overlays.count,
-            catalogSHA256: sha256
+            catalogSHA256: sha256,
+            rules: catalog.rules.map(RuleManifestEntry.init)
         )
         return CompiledRuleArtifact(
             catalog: catalog,

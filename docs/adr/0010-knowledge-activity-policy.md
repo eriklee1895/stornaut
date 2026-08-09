@@ -172,6 +172,18 @@ Task 16 evidence adds:
 - cumulative catalog hash
   `b9f631e9cced76e61842ac629af72b00fe20c8ebff41c89ed75908b90c577335`.
 
+Task 17 evidence adds:
+
+- 17 package/build cache rules with explicit runtime/environment/config
+  exclusions and 68 clean-room fixtures;
+- user ownership, tool layout, reclaimable and inactive-process requirements;
+- stronger unreferenced/no-local-artifact gates for mixed repositories;
+- schema-v2 generated manifests with per-rule provenance/rationale/fixture
+  entries;
+- terminal-literal matcher prefiltering and 55-rule benchmark evidence;
+- cumulative catalog hash
+  `4dd2ed03f74d20d47ec0670310edb1ff1297c188b307c69a71e9c3f25ae54794`.
+
 ## Consequences
 
 Positive:
@@ -193,8 +205,8 @@ Costs:
 
 ## Residual Risks
 
-- Tasks 15–16 provide Protected and project-artifact sources; cache/runtime/
-  residue family coverage remains Tasks 17–18.
+- Tasks 15–17 provide Protected, project-artifact and package/build-cache
+  sources; runtime/residue family coverage remains Task 18.
 - Candidate matching is measured, but evidence/activity fusion and final
   classification remain Tasks 19–20.
 - Activity providers and fail-conservative fusion are Task 19.

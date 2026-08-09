@@ -15,6 +15,14 @@ public struct RuleCatalogMatcher: Sendable {
                     rule.match.pathPattern.rawValue,
                     caseSensitive: false
                 ),
+                exactTerminalLiteral: terminalLiteral(
+                    rule.match.pathPattern.rawValue,
+                    caseSensitive: true
+                ),
+                insensitiveTerminalLiteral: terminalLiteral(
+                    rule.match.pathPattern.rawValue,
+                    caseSensitive: false
+                ),
                 exactExclusions: rule.excludedPatterns.map {
                     normalizedComponents(
                         $0.rawValue,
@@ -44,14 +52,24 @@ public struct RuleCatalogMatcher: Sendable {
             caseSensitive: caseSensitive
         )
         return entries.compactMap { entry in
+            guard entry.rule.match.expectedKind == kind else {
+                return nil
+            }
             let pattern = caseSensitive
                 ? entry.exactPattern
                 : entry.insensitivePattern
+            let terminalLiteral = caseSensitive
+                ? entry.exactTerminalLiteral
+                : entry.insensitiveTerminalLiteral
             let exclusions = caseSensitive
                 ? entry.exactExclusions
                 : entry.insensitiveExclusions
-            return entry.rule.match.expectedKind == kind
-                && glob(
+            if let terminalLiteral,
+               path.last != terminalLiteral
+            {
+                return nil
+            }
+            return glob(
                     pattern,
                     matches: path
                 )
@@ -68,6 +86,8 @@ private struct RuleMatcherEntry: Sendable {
     let rule: CompiledRule
     let exactPattern: [String]
     let insensitivePattern: [String]
+    let exactTerminalLiteral: String?
+    let insensitiveTerminalLiteral: String?
     let exactExclusions: [[String]]
     let insensitiveExclusions: [[String]]
 }
@@ -154,4 +174,20 @@ private func normalizedComponents(
                 locale: Locale(identifier: "en_US_POSIX")
             )
     }
+}
+
+private func terminalLiteral(
+    _ pattern: String,
+    caseSensitive: Bool
+) -> String? {
+    guard let last = normalizedComponents(
+        pattern,
+        caseSensitive: caseSensitive
+    ).last,
+          last != "*",
+          last != "**"
+    else {
+        return nil
+    }
+    return last
 }

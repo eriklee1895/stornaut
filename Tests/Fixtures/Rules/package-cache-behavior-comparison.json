@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "sources": [
+    {
+      "project": "Mole",
+      "revision": "e83f44f8ca56bb49f93c0479c82a984601b22d5d",
+      "license": "GPL-3.0",
+      "usage": "behaviorReferenceOnly"
+    },
+    {
+      "project": "ClearDisk",
+      "revision": "1aaec92b91c40fdc0c2fce92fef20df08b5f5c43",
+      "license": "MIT",
+      "usage": "behaviorReferenceOnly"
+    },
+    {
+      "project": "kondo",
+      "revision": "1d351ca80b3d3adfad9bbe7db872c27359190210",
+      "license": "MIT",
+      "usage": "behaviorReferenceOnly"
+    }
+  ],
+  "cases": [
+    {
+      "id": "comparison-cleardisk-static-cache-path",
+      "sourceProject": "ClearDisk",
+      "ruleID": "cache-npm-content",
+      "upstreamBehavior": "knownCachePathReceivesStaticRisk",
+      "stornautOutcome": "reviewBlocked",
+      "missingKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.tool-owned",
+        "evidence.scope.user-owned",
+        "activity.process.inactive"
+      ],
+      "relativeDifference": "pathAloneDoesNotProveOwnershipOrInactiveUse"
+    },
+    {
+      "id": "comparison-mole-running-tool-protection",
+      "sourceProject": "Mole",
+      "ruleID": "cache-gradle-modules",
+      "upstreamBehavior": "runningApplicationAddsProtection",
+      "stornautOutcome": "reviewBlocked",
+      "missingKeys": [
+        "activity.process.inactive"
+      ],
+      "relativeDifference": "typedToolActivityIsMandatory"
+    },
+    {
+      "id": "comparison-cleardisk-maven-cache-mixed-content",
+      "sourceProject": "ClearDisk",
+      "ruleID": "cache-maven-local-repository",
+      "upstreamBehavior": "localRepositoryIsADeveloperCache",
+      "stornautOutcome": "reviewBlocked",
+      "missingKeys": [
+        "evidence.cache.no-local-artifacts"
+      ],
+      "relativeDifference": "locallyPublishedArtifactsBlockReclaim"
+    },
+    {
+      "id": "comparison-kondo-artifact-taxonomy-not-runtime",
+      "sourceProject": "kondo",
+      "ruleID": "cache-cargo-registry",
+      "upstreamBehavior": "knownArtifactTaxonomyFindsGeneratedStorage",
+      "stornautOutcome": "noCandidate",
+      "missingKeys": [],
+      "relativeDifference": "cargoBinAndCredentialsAreNotCacheCandidates"
+    },
+    {
+      "id": "comparison-cleardisk-conda-package-cache",
+      "sourceProject": "ClearDisk",
+      "ruleID": "cache-conda-packages",
+      "upstreamBehavior": "packageCacheIsRebuildable",
+      "stornautOutcome": "reviewBlocked",
+      "missingKeys": [
+        "evidence.cache.unreferenced"
+      ],
+      "relativeDifference": "environmentReferencesMustBeProvenAbsent"
+    }
+  ]
+}

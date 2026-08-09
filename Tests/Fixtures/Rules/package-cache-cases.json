@@ -1,0 +1,854 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "cache-bun-install-active",
+      "ruleID": "cache-bun-install",
+      "kind": "active",
+      "lookalikeType": null,
+      "path": ".bun/install/cache",
+      "presentKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": [
+        "activity.process.inactive"
+      ]
+    },
+    {
+      "id": "cache-bun-install-config",
+      "ruleID": "cache-bun-install",
+      "kind": "lookalike",
+      "lookalikeType": "configuration",
+      "path": ".bunfig.toml",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-bun-install-other",
+      "ruleID": "cache-bun-install",
+      "kind": "lookalike",
+      "lookalikeType": "runtimeEnvironmentOrSource",
+      "path": ".bun/bin",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-bun-install-positive",
+      "ruleID": "cache-bun-install",
+      "kind": "positive",
+      "lookalikeType": null,
+      "path": ".bun/install/cache",
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-cargo-registry-active",
+      "ruleID": "cache-cargo-registry",
+      "kind": "active",
+      "lookalikeType": null,
+      "path": ".cargo/registry/cache",
+      "presentKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": [
+        "activity.process.inactive"
+      ]
+    },
+    {
+      "id": "cache-cargo-registry-config",
+      "ruleID": "cache-cargo-registry",
+      "kind": "lookalike",
+      "lookalikeType": "configuration",
+      "path": ".cargo/config.toml",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-cargo-registry-other",
+      "ruleID": "cache-cargo-registry",
+      "kind": "lookalike",
+      "lookalikeType": "runtimeEnvironmentOrSource",
+      "path": ".cargo/bin",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-cargo-registry-positive",
+      "ruleID": "cache-cargo-registry",
+      "kind": "positive",
+      "lookalikeType": null,
+      "path": ".cargo/registry/cache",
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-conda-anaconda-packages-active",
+      "ruleID": "cache-conda-anaconda-packages",
+      "kind": "active",
+      "lookalikeType": null,
+      "path": "anaconda3/pkgs",
+      "presentKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.cache.unreferenced",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": [
+        "activity.process.inactive"
+      ]
+    },
+    {
+      "id": "cache-conda-anaconda-packages-config",
+      "ruleID": "cache-conda-anaconda-packages",
+      "kind": "lookalike",
+      "lookalikeType": "configuration",
+      "path": "anaconda3/.condarc",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-conda-anaconda-packages-other",
+      "ruleID": "cache-conda-anaconda-packages",
+      "kind": "lookalike",
+      "lookalikeType": "runtimeEnvironmentOrSource",
+      "path": "anaconda3/envs/project",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-conda-anaconda-packages-positive",
+      "ruleID": "cache-conda-anaconda-packages",
+      "kind": "positive",
+      "lookalikeType": null,
+      "path": "anaconda3/pkgs",
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.cache.unreferenced",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-conda-miniconda-packages-active",
+      "ruleID": "cache-conda-miniconda-packages",
+      "kind": "active",
+      "lookalikeType": null,
+      "path": "miniconda3/pkgs",
+      "presentKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.cache.unreferenced",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": [
+        "activity.process.inactive"
+      ]
+    },
+    {
+      "id": "cache-conda-miniconda-packages-config",
+      "ruleID": "cache-conda-miniconda-packages",
+      "kind": "lookalike",
+      "lookalikeType": "configuration",
+      "path": "miniconda3/.condarc",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-conda-miniconda-packages-other",
+      "ruleID": "cache-conda-miniconda-packages",
+      "kind": "lookalike",
+      "lookalikeType": "runtimeEnvironmentOrSource",
+      "path": "miniconda3/envs/project",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-conda-miniconda-packages-positive",
+      "ruleID": "cache-conda-miniconda-packages",
+      "kind": "positive",
+      "lookalikeType": null,
+      "path": "miniconda3/pkgs",
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.cache.unreferenced",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-conda-packages-active",
+      "ruleID": "cache-conda-packages",
+      "kind": "active",
+      "lookalikeType": null,
+      "path": ".conda/pkgs",
+      "presentKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.cache.unreferenced",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": [
+        "activity.process.inactive"
+      ]
+    },
+    {
+      "id": "cache-conda-packages-config",
+      "ruleID": "cache-conda-packages",
+      "kind": "lookalike",
+      "lookalikeType": "configuration",
+      "path": ".condarc",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-conda-packages-other",
+      "ruleID": "cache-conda-packages",
+      "kind": "lookalike",
+      "lookalikeType": "runtimeEnvironmentOrSource",
+      "path": ".conda/envs/project",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-conda-packages-positive",
+      "ruleID": "cache-conda-packages",
+      "kind": "positive",
+      "lookalikeType": null,
+      "path": ".conda/pkgs",
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.cache.unreferenced",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-go-build-active",
+      "ruleID": "cache-go-build",
+      "kind": "active",
+      "lookalikeType": null,
+      "path": "Library/Caches/go-build",
+      "presentKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": [
+        "activity.process.inactive"
+      ]
+    },
+    {
+      "id": "cache-go-build-config",
+      "ruleID": "cache-go-build",
+      "kind": "lookalike",
+      "lookalikeType": "configuration",
+      "path": ".config/go/env",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-go-build-other",
+      "ruleID": "cache-go-build",
+      "kind": "lookalike",
+      "lookalikeType": "runtimeEnvironmentOrSource",
+      "path": "go/pkg/mod",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-go-build-positive",
+      "ruleID": "cache-go-build",
+      "kind": "positive",
+      "lookalikeType": null,
+      "path": "Library/Caches/go-build",
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-go-modules-active",
+      "ruleID": "cache-go-modules",
+      "kind": "active",
+      "lookalikeType": null,
+      "path": "go/pkg/mod",
+      "presentKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": [
+        "activity.process.inactive"
+      ]
+    },
+    {
+      "id": "cache-go-modules-config",
+      "ruleID": "cache-go-modules",
+      "kind": "lookalike",
+      "lookalikeType": "configuration",
+      "path": ".config/go/env",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-go-modules-other",
+      "ruleID": "cache-go-modules",
+      "kind": "lookalike",
+      "lookalikeType": "runtimeEnvironmentOrSource",
+      "path": "go/bin",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-go-modules-positive",
+      "ruleID": "cache-go-modules",
+      "kind": "positive",
+      "lookalikeType": null,
+      "path": "go/pkg/mod",
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-gradle-modules-active",
+      "ruleID": "cache-gradle-modules",
+      "kind": "active",
+      "lookalikeType": null,
+      "path": ".gradle/caches/modules-2",
+      "presentKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": [
+        "activity.process.inactive"
+      ]
+    },
+    {
+      "id": "cache-gradle-modules-config",
+      "ruleID": "cache-gradle-modules",
+      "kind": "lookalike",
+      "lookalikeType": "configuration",
+      "path": ".gradle/gradle.properties",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-gradle-modules-other",
+      "ruleID": "cache-gradle-modules",
+      "kind": "lookalike",
+      "lookalikeType": "runtimeEnvironmentOrSource",
+      "path": ".gradle/jdks",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-gradle-modules-positive",
+      "ruleID": "cache-gradle-modules",
+      "kind": "positive",
+      "lookalikeType": null,
+      "path": ".gradle/caches/modules-2",
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-homebrew-downloads-active",
+      "ruleID": "cache-homebrew-downloads",
+      "kind": "active",
+      "lookalikeType": null,
+      "path": "Library/Caches/Homebrew/downloads",
+      "presentKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.cache.unreferenced",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": [
+        "activity.process.inactive"
+      ]
+    },
+    {
+      "id": "cache-homebrew-downloads-config",
+      "ruleID": "cache-homebrew-downloads",
+      "kind": "lookalike",
+      "lookalikeType": "configuration",
+      "path": "Library/Preferences/Homebrew",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-homebrew-downloads-other",
+      "ruleID": "cache-homebrew-downloads",
+      "kind": "lookalike",
+      "lookalikeType": "runtimeEnvironmentOrSource",
+      "path": "opt/homebrew/Cellar",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-homebrew-downloads-positive",
+      "ruleID": "cache-homebrew-downloads",
+      "kind": "positive",
+      "lookalikeType": null,
+      "path": "Library/Caches/Homebrew/downloads",
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.cache.unreferenced",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-maven-local-repository-active",
+      "ruleID": "cache-maven-local-repository",
+      "kind": "active",
+      "lookalikeType": null,
+      "path": ".m2/repository",
+      "presentKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.no-local-artifacts",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": [
+        "activity.process.inactive"
+      ]
+    },
+    {
+      "id": "cache-maven-local-repository-config",
+      "ruleID": "cache-maven-local-repository",
+      "kind": "lookalike",
+      "lookalikeType": "configuration",
+      "path": ".m2/settings.xml",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-maven-local-repository-other",
+      "ruleID": "cache-maven-local-repository",
+      "kind": "lookalike",
+      "lookalikeType": "runtimeEnvironmentOrSource",
+      "path": "projects/local-library/src",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-maven-local-repository-positive",
+      "ruleID": "cache-maven-local-repository",
+      "kind": "positive",
+      "lookalikeType": null,
+      "path": ".m2/repository",
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.cache.layout",
+        "evidence.cache.no-local-artifacts",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-npm-content-active",
+      "ruleID": "cache-npm-content",
+      "kind": "active",
+      "lookalikeType": null,
+      "path": ".npm/_cacache",
+      "presentKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": [
+        "activity.process.inactive"
+      ]
+    },
+    {
+      "id": "cache-npm-content-config",
+      "ruleID": "cache-npm-content",
+      "kind": "lookalike",
+      "lookalikeType": "configuration",
+      "path": ".npmrc",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-npm-content-other",
+      "ruleID": "cache-npm-content",
+      "kind": "lookalike",
+      "lookalikeType": "runtimeEnvironmentOrSource",
+      "path": ".npm-global/lib",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-npm-content-positive",
+      "ruleID": "cache-npm-content",
+      "kind": "positive",
+      "lookalikeType": null,
+      "path": ".npm/_cacache",
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-pip-active",
+      "ruleID": "cache-pip",
+      "kind": "active",
+      "lookalikeType": null,
+      "path": "Library/Caches/pip",
+      "presentKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": [
+        "activity.process.inactive"
+      ]
+    },
+    {
+      "id": "cache-pip-config",
+      "ruleID": "cache-pip",
+      "kind": "lookalike",
+      "lookalikeType": "configuration",
+      "path": ".config/pip/pip.conf",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-pip-other",
+      "ruleID": "cache-pip",
+      "kind": "lookalike",
+      "lookalikeType": "runtimeEnvironmentOrSource",
+      "path": "projects/python-app/.venv",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-pip-positive",
+      "ruleID": "cache-pip",
+      "kind": "positive",
+      "lookalikeType": null,
+      "path": "Library/Caches/pip",
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-pnpm-home-store-active",
+      "ruleID": "cache-pnpm-home-store",
+      "kind": "active",
+      "lookalikeType": null,
+      "path": ".pnpm-store",
+      "presentKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.cache.unreferenced",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": [
+        "activity.process.inactive"
+      ]
+    },
+    {
+      "id": "cache-pnpm-home-store-config",
+      "ruleID": "cache-pnpm-home-store",
+      "kind": "lookalike",
+      "lookalikeType": "configuration",
+      "path": ".config/pnpm/rc",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-pnpm-home-store-other",
+      "ruleID": "cache-pnpm-home-store",
+      "kind": "lookalike",
+      "lookalikeType": "runtimeEnvironmentOrSource",
+      "path": ".pnpm-global",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-pnpm-home-store-positive",
+      "ruleID": "cache-pnpm-home-store",
+      "kind": "positive",
+      "lookalikeType": null,
+      "path": ".pnpm-store",
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.cache.unreferenced",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-pnpm-store-active",
+      "ruleID": "cache-pnpm-store",
+      "kind": "active",
+      "lookalikeType": null,
+      "path": "Library/pnpm/store",
+      "presentKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.cache.unreferenced",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": [
+        "activity.process.inactive"
+      ]
+    },
+    {
+      "id": "cache-pnpm-store-config",
+      "ruleID": "cache-pnpm-store",
+      "kind": "lookalike",
+      "lookalikeType": "configuration",
+      "path": ".config/pnpm/rc",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-pnpm-store-other",
+      "ruleID": "cache-pnpm-store",
+      "kind": "lookalike",
+      "lookalikeType": "runtimeEnvironmentOrSource",
+      "path": "Library/pnpm/global",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-pnpm-store-positive",
+      "ruleID": "cache-pnpm-store",
+      "kind": "positive",
+      "lookalikeType": null,
+      "path": "Library/pnpm/store",
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.cache.unreferenced",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-pnpm-xdg-store-active",
+      "ruleID": "cache-pnpm-xdg-store",
+      "kind": "active",
+      "lookalikeType": null,
+      "path": ".local/share/pnpm/store",
+      "presentKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.cache.unreferenced",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": [
+        "activity.process.inactive"
+      ]
+    },
+    {
+      "id": "cache-pnpm-xdg-store-config",
+      "ruleID": "cache-pnpm-xdg-store",
+      "kind": "lookalike",
+      "lookalikeType": "configuration",
+      "path": ".config/pnpm/rc",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-pnpm-xdg-store-other",
+      "ruleID": "cache-pnpm-xdg-store",
+      "kind": "lookalike",
+      "lookalikeType": "runtimeEnvironmentOrSource",
+      "path": ".local/share/pnpm/global",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-pnpm-xdg-store-positive",
+      "ruleID": "cache-pnpm-xdg-store",
+      "kind": "positive",
+      "lookalikeType": null,
+      "path": ".local/share/pnpm/store",
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.cache.unreferenced",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-uv-active",
+      "ruleID": "cache-uv",
+      "kind": "active",
+      "lookalikeType": null,
+      "path": ".cache/uv",
+      "presentKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": [
+        "activity.process.inactive"
+      ]
+    },
+    {
+      "id": "cache-uv-config",
+      "ruleID": "cache-uv",
+      "kind": "lookalike",
+      "lookalikeType": "configuration",
+      "path": ".config/uv/uv.toml",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-uv-other",
+      "ruleID": "cache-uv",
+      "kind": "lookalike",
+      "lookalikeType": "runtimeEnvironmentOrSource",
+      "path": ".local/bin/uv",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-uv-positive",
+      "ruleID": "cache-uv",
+      "kind": "positive",
+      "lookalikeType": null,
+      "path": ".cache/uv",
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-yarn-global-active",
+      "ruleID": "cache-yarn-global",
+      "kind": "active",
+      "lookalikeType": null,
+      "path": "Library/Caches/Yarn",
+      "presentKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": [
+        "activity.process.inactive"
+      ]
+    },
+    {
+      "id": "cache-yarn-global-config",
+      "ruleID": "cache-yarn-global",
+      "kind": "lookalike",
+      "lookalikeType": "configuration",
+      "path": ".yarnrc.yml",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-yarn-global-other",
+      "ruleID": "cache-yarn-global",
+      "kind": "lookalike",
+      "lookalikeType": "runtimeEnvironmentOrSource",
+      "path": "projects/node-app/.yarn/cache",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "cache-yarn-global-positive",
+      "ruleID": "cache-yarn-global",
+      "kind": "positive",
+      "lookalikeType": null,
+      "path": "Library/Caches/Yarn",
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": []
+    }
+  ]
+}

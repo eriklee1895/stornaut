@@ -444,3 +444,81 @@ developer-tree paths over 38 rules. Debug runs complete around 0.95–1.07 s for
 
 The reviewed cumulative catalog SHA-256 is
 `b9f631e9cced76e61842ac629af72b00fe20c8ebff41c89ed75908b90c577335`.
+
+## 14. Task 17 Package and Build Cache Catalog Update
+
+Task 17 adds
+[`../../Rules/BuiltIn/package-build-caches-v1.json`](../../Rules/BuiltIn/package-build-caches-v1.json)
+as the fourth independently versioned source.
+
+### Official source snapshot
+
+Exact official commits/documentation were verified for npm, pnpm, Yarn, Bun,
+uv, pip, Conda, Cargo, Go, Gradle, Maven and Homebrew. All 16 rule-source URLs
+returned content during post-fix review. The source records the relevant MIT,
+Apache-2.0, BSD-2/3-Clause, Artistic-2.0 and dual-license identifiers.
+
+No source code, constant table or fixture is copied. These materials establish
+cache lifecycle and path ownership only.
+
+### Cache/runtime/config boundary
+
+Seventeen rules cover the 12 PRD families with exact safe variants:
+
+- npm `_cacache`;
+- pnpm Library, legacy home and XDG stores;
+- Yarn global cache and Bun install cache;
+- uv and pip caches;
+- Conda `.conda`, Miniconda and Anaconda package roots;
+- Cargo registry cache;
+- Go build and module caches;
+- Gradle dependency modules;
+- Maven local repository;
+- Homebrew downloads.
+
+The rules intentionally do not match installed package-manager binaries,
+virtual environments, Conda envs, Cargo credentials or `bin`, project-owned
+Yarn offline caches, Homebrew Cellar, source trees or configuration files.
+
+Every rule requires tool-owned layout, current-user scope, reclaimable cache
+evidence and an inactive process. Mixed repositories add:
+
+- Conda/pnpm: unreferenced data;
+- Maven: no locally published artifacts;
+- Homebrew: unreferenced downloads.
+
+All remain Review Recommended.
+
+### Manifest v2
+
+Task 17 increments the generated compiler manifest to schema v2. In addition to
+aggregate counts/hash/source versions, it contains a sorted entry for every
+rule with:
+
+- rule ID and rationale;
+- complete HTTPS provenance, revision, license, usage and verification date;
+- fixture IDs.
+
+Aggregate provenance and fixture counts are verified against these entries.
+
+### Clean-room behavior comparison
+
+- ClearDisk's static cache taxonomy becomes only a candidate; path alone does
+  not establish ownership, inactivity or reclaimability.
+- Mole's running-App protection becomes a typed process prerequisite.
+- kondo-style artifact taxonomy does not make installed runtimes/configuration
+  candidates.
+- Maven local artifacts and Conda environment references block recommendation.
+
+Mole remains GPL behavior-only.
+
+### Matching performance
+
+The matcher now pre-filters by expected kind and terminal literal before
+component-glob evaluation. The 55-rule benchmark over cache, project and
+anonymous-developer-tree paths improved from about 1.95 s to 0.97–1.21 s for
+the fixed debug workload, preserving the 2 s gate for Task 18 growth.
+
+The cumulative catalog version is `builtin-package-build-caches-v1`, with
+reviewed SHA-256
+`4dd2ed03f74d20d47ec0670310edb1ff1297c188b307c69a71e9c3f25ae54794`.

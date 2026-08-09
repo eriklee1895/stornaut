@@ -1,0 +1,932 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "package-build-caches-v1",
+  "rules": [
+    {
+      "id": "cache-bun-install",
+      "match": {
+        "pathPattern": ".bun/install/cache",
+        "expectedKind": "directory"
+      },
+      "producer": "Bun",
+      "rationaleKey": "rationale.cache.bun-install",
+      "category": "packageAndBuildCaches",
+      "disposition": "reviewRecommended",
+      "risk": "medium",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.scope.user-owned"
+      ],
+      "requiredActivityKeys": [
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.cache.bun-redownload",
+        "cost": "low"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Bun",
+            "url": "https://github.com/oven-sh/bun/blob/cbc209f1c27bae0b08bfc923509c45e95e54fc2f/docs/pm/global-cache.mdx",
+            "revision": "cbc209f1c27bae0b08bfc923509c45e95e54fc2f",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/51046cef6303e5132e931acc6fcb7ef63c526a5a/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "51046cef6303e5132e931acc6fcb7ef63c526a5a",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "cache-bun-install-positive",
+        "cache-bun-install-active",
+        "cache-bun-install-config",
+        "cache-bun-install-other"
+      ]
+    },
+    {
+      "id": "cache-cargo-registry",
+      "match": {
+        "pathPattern": ".cargo/registry/cache",
+        "expectedKind": "directory"
+      },
+      "producer": "Cargo",
+      "rationaleKey": "rationale.cache.cargo-registry",
+      "category": "packageAndBuildCaches",
+      "disposition": "reviewRecommended",
+      "risk": "medium",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.scope.user-owned"
+      ],
+      "requiredActivityKeys": [
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.cache.cargo-redownload",
+        "cost": "medium"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Cargo",
+            "url": "https://github.com/rust-lang/cargo/blob/a07c49a989d565727725e5bb5a8038ff402006a8/doc/book/src/guide/cargo-home.md",
+            "revision": "a07c49a989d565727725e5bb5a8038ff402006a8",
+            "license": "Apache-2.0",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/51046cef6303e5132e931acc6fcb7ef63c526a5a/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "51046cef6303e5132e931acc6fcb7ef63c526a5a",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "cache-cargo-registry-positive",
+        "cache-cargo-registry-active",
+        "cache-cargo-registry-config",
+        "cache-cargo-registry-other"
+      ]
+    },
+    {
+      "id": "cache-conda-anaconda-packages",
+      "match": {
+        "pathPattern": "anaconda3/pkgs",
+        "expectedKind": "directory"
+      },
+      "producer": "Conda",
+      "rationaleKey": "rationale.cache.conda-packages",
+      "category": "packageAndBuildCaches",
+      "disposition": "reviewRecommended",
+      "risk": "high",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.cache.unreferenced",
+        "evidence.scope.user-owned"
+      ],
+      "requiredActivityKeys": [
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.cache.conda-redownload",
+        "cost": "high"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Conda",
+            "url": "https://github.com/conda/conda/blob/d2e2462cb2d2c5f71802c4981711ad1623d5833c/docs/source/commands/clean.rst",
+            "revision": "d2e2462cb2d2c5f71802c4981711ad1623d5833c",
+            "license": "BSD-3-Clause",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/51046cef6303e5132e931acc6fcb7ef63c526a5a/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "51046cef6303e5132e931acc6fcb7ef63c526a5a",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "cache-conda-anaconda-packages-positive",
+        "cache-conda-anaconda-packages-active",
+        "cache-conda-anaconda-packages-config",
+        "cache-conda-anaconda-packages-other"
+      ]
+    },
+    {
+      "id": "cache-conda-miniconda-packages",
+      "match": {
+        "pathPattern": "miniconda3/pkgs",
+        "expectedKind": "directory"
+      },
+      "producer": "Conda",
+      "rationaleKey": "rationale.cache.conda-packages",
+      "category": "packageAndBuildCaches",
+      "disposition": "reviewRecommended",
+      "risk": "high",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.cache.unreferenced",
+        "evidence.scope.user-owned"
+      ],
+      "requiredActivityKeys": [
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.cache.conda-redownload",
+        "cost": "high"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Conda",
+            "url": "https://github.com/conda/conda/blob/d2e2462cb2d2c5f71802c4981711ad1623d5833c/docs/source/commands/clean.rst",
+            "revision": "d2e2462cb2d2c5f71802c4981711ad1623d5833c",
+            "license": "BSD-3-Clause",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/51046cef6303e5132e931acc6fcb7ef63c526a5a/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "51046cef6303e5132e931acc6fcb7ef63c526a5a",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "cache-conda-miniconda-packages-positive",
+        "cache-conda-miniconda-packages-active",
+        "cache-conda-miniconda-packages-config",
+        "cache-conda-miniconda-packages-other"
+      ]
+    },
+    {
+      "id": "cache-conda-packages",
+      "match": {
+        "pathPattern": ".conda/pkgs",
+        "expectedKind": "directory"
+      },
+      "producer": "Conda",
+      "rationaleKey": "rationale.cache.conda-packages",
+      "category": "packageAndBuildCaches",
+      "disposition": "reviewRecommended",
+      "risk": "high",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.cache.unreferenced",
+        "evidence.scope.user-owned"
+      ],
+      "requiredActivityKeys": [
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.cache.conda-redownload",
+        "cost": "high"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Conda",
+            "url": "https://github.com/conda/conda/blob/d2e2462cb2d2c5f71802c4981711ad1623d5833c/docs/source/commands/clean.rst",
+            "revision": "d2e2462cb2d2c5f71802c4981711ad1623d5833c",
+            "license": "BSD-3-Clause",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/51046cef6303e5132e931acc6fcb7ef63c526a5a/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "51046cef6303e5132e931acc6fcb7ef63c526a5a",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "cache-conda-packages-positive",
+        "cache-conda-packages-active",
+        "cache-conda-packages-config",
+        "cache-conda-packages-other"
+      ]
+    },
+    {
+      "id": "cache-go-build",
+      "match": {
+        "pathPattern": "Library/Caches/go-build",
+        "expectedKind": "directory"
+      },
+      "producer": "Go command",
+      "rationaleKey": "rationale.cache.go-build",
+      "category": "packageAndBuildCaches",
+      "disposition": "reviewRecommended",
+      "risk": "medium",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.scope.user-owned"
+      ],
+      "requiredActivityKeys": [
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.cache.go-rebuild",
+        "cost": "medium"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Go command",
+            "url": "https://github.com/golang/go/blob/e5ec1263ca5e1428d233206b99dc21c38ea2a124/src/cmd/go/alldocs.go",
+            "revision": "e5ec1263ca5e1428d233206b99dc21c38ea2a124",
+            "license": "BSD-3-Clause",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/51046cef6303e5132e931acc6fcb7ef63c526a5a/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "51046cef6303e5132e931acc6fcb7ef63c526a5a",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "cache-go-build-positive",
+        "cache-go-build-active",
+        "cache-go-build-config",
+        "cache-go-build-other"
+      ]
+    },
+    {
+      "id": "cache-go-modules",
+      "match": {
+        "pathPattern": "go/pkg/mod",
+        "expectedKind": "directory"
+      },
+      "producer": "Go command",
+      "rationaleKey": "rationale.cache.go-modules",
+      "category": "packageAndBuildCaches",
+      "disposition": "reviewRecommended",
+      "risk": "medium",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.scope.user-owned"
+      ],
+      "requiredActivityKeys": [
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.cache.go-modules-redownload",
+        "cost": "high"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Go command",
+            "url": "https://github.com/golang/go/blob/e5ec1263ca5e1428d233206b99dc21c38ea2a124/src/cmd/go/alldocs.go",
+            "revision": "e5ec1263ca5e1428d233206b99dc21c38ea2a124",
+            "license": "BSD-3-Clause",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/51046cef6303e5132e931acc6fcb7ef63c526a5a/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "51046cef6303e5132e931acc6fcb7ef63c526a5a",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "cache-go-modules-positive",
+        "cache-go-modules-active",
+        "cache-go-modules-config",
+        "cache-go-modules-other"
+      ]
+    },
+    {
+      "id": "cache-gradle-modules",
+      "match": {
+        "pathPattern": ".gradle/caches/modules-2",
+        "expectedKind": "directory"
+      },
+      "producer": "Gradle",
+      "rationaleKey": "rationale.cache.gradle-modules",
+      "category": "packageAndBuildCaches",
+      "disposition": "reviewRecommended",
+      "risk": "medium",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.scope.user-owned"
+      ],
+      "requiredActivityKeys": [
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.cache.gradle-redownload",
+        "cost": "medium"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Gradle",
+            "url": "https://github.com/gradle/gradle/blob/f85ff712e07bb79dd122880d87b3b6f0e974a35a/platforms/documentation/docs/src/docs/userguide/reference/dependency-management/dependency-management/dependency_caching.adoc",
+            "revision": "f85ff712e07bb79dd122880d87b3b6f0e974a35a",
+            "license": "Apache-2.0",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/51046cef6303e5132e931acc6fcb7ef63c526a5a/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "51046cef6303e5132e931acc6fcb7ef63c526a5a",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "cache-gradle-modules-positive",
+        "cache-gradle-modules-active",
+        "cache-gradle-modules-config",
+        "cache-gradle-modules-other"
+      ]
+    },
+    {
+      "id": "cache-homebrew-downloads",
+      "match": {
+        "pathPattern": "Library/Caches/Homebrew/downloads",
+        "expectedKind": "directory"
+      },
+      "producer": "Homebrew",
+      "rationaleKey": "rationale.cache.homebrew-downloads",
+      "category": "packageAndBuildCaches",
+      "disposition": "reviewRecommended",
+      "risk": "medium",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.cache.unreferenced",
+        "evidence.scope.user-owned"
+      ],
+      "requiredActivityKeys": [
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.cache.homebrew-redownload",
+        "cost": "low"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Homebrew",
+            "url": "https://github.com/Homebrew/brew/blob/4e6619a37079f955f3662fc988344de2b0c5a0d2/Library/Homebrew/manpages/brew.1.md.erb",
+            "revision": "4e6619a37079f955f3662fc988344de2b0c5a0d2",
+            "license": "BSD-2-Clause",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/51046cef6303e5132e931acc6fcb7ef63c526a5a/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "51046cef6303e5132e931acc6fcb7ef63c526a5a",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "cache-homebrew-downloads-positive",
+        "cache-homebrew-downloads-active",
+        "cache-homebrew-downloads-config",
+        "cache-homebrew-downloads-other"
+      ]
+    },
+    {
+      "id": "cache-maven-local-repository",
+      "match": {
+        "pathPattern": ".m2/repository",
+        "expectedKind": "directory"
+      },
+      "producer": "Apache Maven",
+      "rationaleKey": "rationale.cache.maven-local-repository",
+      "category": "packageAndBuildCaches",
+      "disposition": "reviewRecommended",
+      "risk": "high",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.no-local-artifacts",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.scope.user-owned"
+      ],
+      "requiredActivityKeys": [
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.cache.maven-redownload",
+        "cost": "high"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Apache Maven",
+            "url": "https://github.com/apache/maven/blob/096d59ec94b557186383593a309ef656d36f8777/impl/maven-impl/src/main/java/org/apache/maven/impl/DefaultLocalRepository.java",
+            "revision": "096d59ec94b557186383593a309ef656d36f8777",
+            "license": "Apache-2.0",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/51046cef6303e5132e931acc6fcb7ef63c526a5a/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "51046cef6303e5132e931acc6fcb7ef63c526a5a",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "cache-maven-local-repository-positive",
+        "cache-maven-local-repository-active",
+        "cache-maven-local-repository-config",
+        "cache-maven-local-repository-other"
+      ]
+    },
+    {
+      "id": "cache-npm-content",
+      "match": {
+        "pathPattern": ".npm/_cacache",
+        "expectedKind": "directory"
+      },
+      "producer": "npm",
+      "rationaleKey": "rationale.cache.npm-content",
+      "category": "packageAndBuildCaches",
+      "disposition": "reviewRecommended",
+      "risk": "medium",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.scope.user-owned"
+      ],
+      "requiredActivityKeys": [
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.cache.npm-redownload",
+        "cost": "low"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "npm CLI",
+            "url": "https://github.com/npm/cli/blob/4cdcceac047f82571d0ec734e18b87d1d130e042/docs/lib/content/commands/npm-cache.md",
+            "revision": "4cdcceac047f82571d0ec734e18b87d1d130e042",
+            "license": "Artistic-2.0",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/51046cef6303e5132e931acc6fcb7ef63c526a5a/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "51046cef6303e5132e931acc6fcb7ef63c526a5a",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "cache-npm-content-positive",
+        "cache-npm-content-active",
+        "cache-npm-content-config",
+        "cache-npm-content-other"
+      ]
+    },
+    {
+      "id": "cache-pip",
+      "match": {
+        "pathPattern": "Library/Caches/pip",
+        "expectedKind": "directory"
+      },
+      "producer": "pip",
+      "rationaleKey": "rationale.cache.pip",
+      "category": "packageAndBuildCaches",
+      "disposition": "reviewRecommended",
+      "risk": "medium",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.scope.user-owned"
+      ],
+      "requiredActivityKeys": [
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.cache.pip-redownload",
+        "cost": "low"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "pip",
+            "url": "https://github.com/pypa/pip/blob/f399c3718970b1b0e2478dac5296eb62679a9b86/docs/html/topics/caching.md",
+            "revision": "f399c3718970b1b0e2478dac5296eb62679a9b86",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/51046cef6303e5132e931acc6fcb7ef63c526a5a/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "51046cef6303e5132e931acc6fcb7ef63c526a5a",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "cache-pip-positive",
+        "cache-pip-active",
+        "cache-pip-config",
+        "cache-pip-other"
+      ]
+    },
+    {
+      "id": "cache-pnpm-home-store",
+      "match": {
+        "pathPattern": ".pnpm-store",
+        "expectedKind": "directory"
+      },
+      "producer": "pnpm",
+      "rationaleKey": "rationale.cache.pnpm-store",
+      "category": "packageAndBuildCaches",
+      "disposition": "reviewRecommended",
+      "risk": "medium",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.cache.unreferenced",
+        "evidence.scope.user-owned"
+      ],
+      "requiredActivityKeys": [
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.cache.pnpm-redownload",
+        "cost": "medium"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "pnpm",
+            "url": "https://github.com/pnpm/pnpm/blob/86a7fcdd974e46f176625e40d10898bb79af4cd5/pnpm11/store/commands/src/store/storePrune.ts",
+            "revision": "86a7fcdd974e46f176625e40d10898bb79af4cd5",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/51046cef6303e5132e931acc6fcb7ef63c526a5a/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "51046cef6303e5132e931acc6fcb7ef63c526a5a",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "cache-pnpm-home-store-positive",
+        "cache-pnpm-home-store-active",
+        "cache-pnpm-home-store-config",
+        "cache-pnpm-home-store-other"
+      ]
+    },
+    {
+      "id": "cache-pnpm-store",
+      "match": {
+        "pathPattern": "Library/pnpm/store",
+        "expectedKind": "directory"
+      },
+      "producer": "pnpm",
+      "rationaleKey": "rationale.cache.pnpm-store",
+      "category": "packageAndBuildCaches",
+      "disposition": "reviewRecommended",
+      "risk": "medium",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.cache.unreferenced",
+        "evidence.scope.user-owned"
+      ],
+      "requiredActivityKeys": [
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.cache.pnpm-redownload",
+        "cost": "medium"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "pnpm",
+            "url": "https://github.com/pnpm/pnpm/blob/86a7fcdd974e46f176625e40d10898bb79af4cd5/pnpm11/store/commands/src/store/storePrune.ts",
+            "revision": "86a7fcdd974e46f176625e40d10898bb79af4cd5",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/51046cef6303e5132e931acc6fcb7ef63c526a5a/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "51046cef6303e5132e931acc6fcb7ef63c526a5a",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "cache-pnpm-store-positive",
+        "cache-pnpm-store-active",
+        "cache-pnpm-store-config",
+        "cache-pnpm-store-other"
+      ]
+    },
+    {
+      "id": "cache-pnpm-xdg-store",
+      "match": {
+        "pathPattern": ".local/share/pnpm/store",
+        "expectedKind": "directory"
+      },
+      "producer": "pnpm",
+      "rationaleKey": "rationale.cache.pnpm-store",
+      "category": "packageAndBuildCaches",
+      "disposition": "reviewRecommended",
+      "risk": "medium",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.cache.unreferenced",
+        "evidence.scope.user-owned"
+      ],
+      "requiredActivityKeys": [
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.cache.pnpm-redownload",
+        "cost": "medium"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "pnpm",
+            "url": "https://github.com/pnpm/pnpm/blob/86a7fcdd974e46f176625e40d10898bb79af4cd5/pnpm11/store/commands/src/store/storePrune.ts",
+            "revision": "86a7fcdd974e46f176625e40d10898bb79af4cd5",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/51046cef6303e5132e931acc6fcb7ef63c526a5a/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "51046cef6303e5132e931acc6fcb7ef63c526a5a",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "cache-pnpm-xdg-store-positive",
+        "cache-pnpm-xdg-store-active",
+        "cache-pnpm-xdg-store-config",
+        "cache-pnpm-xdg-store-other"
+      ]
+    },
+    {
+      "id": "cache-uv",
+      "match": {
+        "pathPattern": ".cache/uv",
+        "expectedKind": "directory"
+      },
+      "producer": "uv",
+      "rationaleKey": "rationale.cache.uv",
+      "category": "packageAndBuildCaches",
+      "disposition": "reviewRecommended",
+      "risk": "medium",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.scope.user-owned"
+      ],
+      "requiredActivityKeys": [
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.cache.uv-redownload",
+        "cost": "low"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "uv",
+            "url": "https://github.com/astral-sh/uv/blob/1881d30773386da77017f2ad5ceaf160535d65da/docs/concepts/cache.md",
+            "revision": "1881d30773386da77017f2ad5ceaf160535d65da",
+            "license": "Apache-2.0_OR_MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/51046cef6303e5132e931acc6fcb7ef63c526a5a/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "51046cef6303e5132e931acc6fcb7ef63c526a5a",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "cache-uv-positive",
+        "cache-uv-active",
+        "cache-uv-config",
+        "cache-uv-other"
+      ]
+    },
+    {
+      "id": "cache-yarn-global",
+      "match": {
+        "pathPattern": "Library/Caches/Yarn",
+        "expectedKind": "directory"
+      },
+      "producer": "Yarn",
+      "rationaleKey": "rationale.cache.yarn-global",
+      "category": "packageAndBuildCaches",
+      "disposition": "reviewRecommended",
+      "risk": "medium",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.cache.layout",
+        "evidence.cache.reclaimable",
+        "evidence.cache.tool-owned",
+        "evidence.scope.user-owned"
+      ],
+      "requiredActivityKeys": [
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.cache.yarn-redownload",
+        "cost": "low"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Yarn",
+            "url": "https://github.com/yarnpkg/berry/blob/57081c05a398f25c92df1dc78752f2053576cec0/packages/plugin-essentials/sources/commands/cache/clean.ts",
+            "revision": "57081c05a398f25c92df1dc78752f2053576cec0",
+            "license": "BSD-2-Clause",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/51046cef6303e5132e931acc6fcb7ef63c526a5a/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "51046cef6303e5132e931acc6fcb7ef63c526a5a",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "cache-yarn-global-positive",
+        "cache-yarn-global-active",
+        "cache-yarn-global-config",
+        "cache-yarn-global-other"
+      ]
+    }
+  ]
+}
