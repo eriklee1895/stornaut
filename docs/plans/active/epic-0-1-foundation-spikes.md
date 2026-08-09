@@ -261,7 +261,10 @@ env -u GITHUB_TOKEN -u GH_TOKEN git push origin main
 - Create: `Sources/StornautCodex/Runtime/ProcessRunning.swift`
 - Create: `Tests/StornautCodexTests/CodexLocatorTests.swift`
 - Create: `Tests/StornautCodexTests/CodexCapabilityTests.swift`
+- Create: `Tests/StornautCodexTests/InstalledCodexDiagnosticTests.swift`
 - Create: `Tests/Fixtures/Codex/codex-exec-help-0.146.0.txt`
+- Create: `Tests/Fixtures/Codex/codex-exec-help-0.147.0.txt`
+- Create: `Tests/Fixtures/Codex/codex-version-0.147.0.txt`
 - Create: `docs/upstream-studies/epic-1-codex-runtime.md`
 - Create: `docs/adr/0002-codex-discovery-and-capabilities.md`
 
@@ -283,27 +286,37 @@ Execution evidence on 2026-08-09:
 - There is no single public `--only-tool ProbeBroker` control. Broker-only and direct-read isolation remain unverified; Deep Dive stays paused.
 - See [Epic 1 Codex Runtime Upstream Study](../../upstream-studies/epic-1-codex-runtime.md).
 
-- [ ] **Step 2: Write failing locator tests**
+- [x] **Step 2: Write failing locator tests**
 
 Cover this precedence: explicit configured executable, direct Swift search of a sanitized GUI environment `PATH`, and bounded known user-local candidates. Do not launch a login shell or source user startup files. Reject directories and non-executable files; canonicalize every result. Tests use temporary fake executables and injected process output.
 
-- [ ] **Step 3: Implement discovery without invoking a shell**
+- [x] **Step 3: Implement discovery without invoking a shell**
 
 Use `FileManager.isExecutableFile(atPath:)` for explicit, PATH, and known candidates. Resolve aliases/symlinks to a canonical regular executable URL. Do not invoke any shell to discover Codex.
 
-- [ ] **Step 4: Write failing capability parser tests**
+- [x] **Step 4: Write failing capability parser tests**
 
 Parse checked-in historical and execution-time `--version`/`exec --help` fixtures. The `0.146.0` fixture documents one observed baseline only. Flag support derives from parsed output, never version equality. Isolation and tool-surface verdicts require behavioral evidence and remain `.unverified(reason:)` until Tasks 4–5 prove them; malformed output is `.unsupported(reason:)`, never an optimistic default.
 
-- [ ] **Step 5: Implement capability detection and cache only for the App session**
+- [x] **Step 5: Implement capability detection and cache only for the App session**
 
 Launch fixed arguments `--version` and `exec --help`, cap stdout/stderr, and return a typed report. Include `--strict-config` support where available so unknown isolation config fails instead of being silently ignored. Do not persist compatibility forever; a changed executable identity/version triggers a new probe.
 
-- [ ] **Step 6: Verify against fake and installed Codex**
+- [x] **Step 6: Verify against fake and installed Codex**
 
 Run unit tests, then a read-only local diagnostic executable/test that prints the typed report for the installed Codex. Do not start an Agent session. Record actual output and limitations in ADR 0002.
 
-- [ ] **Step 7: Commit**
+Task 3 execution evidence on 2026-08-09:
+
+- The accepted contract-first test failed because the planned discovery, process and capability APIs did not exist; no fixture or test-infrastructure error was present.
+- `CodexLocator` now searches explicit configuration, at most 64 absolute GUI `PATH` entries and four `HOME`-relative conventional candidates without launching a shell. It resolves Finder aliases without UI/mounting, resolves symlinks, and requires an executable regular file.
+- `FoundationProcessRunner` launches an executable URL directly, uses an explicit environment, drains bounded stdout/stderr, and applies a direct-process timeout. Descendant-tree cancellation remains Task 4 work.
+- `CodexCapabilityDetector` runs only `--version` and `exec --help`, allowlists environment keys, caps both streams at 64 KiB, revalidates executable identity, and caches only while canonical identity and version output remain unchanged.
+- Generated `0.146.0` and `0.147.0` fixtures prove option parsing does not depend on version equality. Malformed, contradictory, truncated or nonzero output fails closed.
+- The focused `StornautCodexTests` suite discovered 34 tests: 33 passed and the installed diagnostic was skipped by default. The opt-in diagnostic passed separately, selected the canonical npm launcher and reported `codex-cli 0.147.0`; all eight parsed CLI options were supported while all nine behavioral/isolation properties remained unverified.
+- The diagnostic did not start a model/Agent session. Deep Dive remains paused; see [ADR 0002](../../adr/0002-codex-discovery-and-capabilities.md).
+
+- [x] **Step 7: Commit**
 
 Run `scripts/verify`, then:
 
@@ -317,6 +330,13 @@ git commit -m "feat: detect user-installed Codex capabilities" \
   -m "Co-authored-by: TRAE CLI <noreply@bytedance.com>"
 env -u GITHUB_TOKEN -u GH_TOKEN git push origin main
 ```
+
+Final validation passed after the macOS graphical session was manually
+unlocked. The earlier two XCUITest attempts failed before UI assertions because
+the locked session left Stornaut in `Running Background`; no permission was
+changed or input synthesized. The unlocked full `scripts/verify` run passed
+both Light/Dark Settings flows, exported all four screenshot attachments, and
+completed build, signing, bundle, localization, documentation and diff checks.
 
 ### Task 4: Structured Codex process, JSONL, schema, and cancellation spike
 

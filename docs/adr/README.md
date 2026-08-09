@@ -3,7 +3,7 @@
 Epic 0–1 计划使用以下编号：
 
 1. `0001-package-first-native-shell.md`
-2. `0002-codex-discovery-and-capabilities.md`
+2. [`0002-codex-discovery-and-capabilities.md`](0002-codex-discovery-and-capabilities.md) — Accepted for Task 3 discovery; runtime isolation remains unverified
 3. `0003-codex-process-protocol.md`
 4. `0004-codex-file-read-isolation.md`
 5. `0005-swift-surveyor-performance.md`

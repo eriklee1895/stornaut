@@ -18,6 +18,7 @@
 | 当前执行计划 | [Epic 0–1 Foundation Spikes](plans/active/epic-0-1-foundation-spikes.md) |
 | 上游学习与许可证门禁 | [Upstream Reference Matrix](research/upstream-reference-matrix.md) |
 | 当前 Codex Runtime 研究 Gate | [Epic 1 Codex Runtime Study](upstream-studies/epic-1-codex-runtime.md) |
+| Codex discovery/capability 决策 | [ADR 0002](adr/0002-codex-discovery-and-capabilities.md) |
 
 任意实现任务默认读取顺序：
 
