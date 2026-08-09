@@ -87,12 +87,25 @@ Upstream Study
 
 没有完成 Gate，不进入编码。
 
-## 5. 推荐实施顺序
+## 5. Epic 能力地图与批准交付顺序
+
+Epic 编号用于能力归属，不再被解释为严格的时间顺序。批准的宏观交付顺序见 [Delivery Roadmap](../plans/roadmap.md)：
+
+```text
+Epic 0–1
+→ Epic 2–4
+→ Epic 8 deterministic subset
+→ Epic 5–6（仅在 Broker-only gate 允许时）
+→ Epic 7 + Epic 8 remaining
+→ Epic 9
+```
+
+这样先形成无 Codex 也可工作的 `Quick Scan → Review → Policy Gate → Trash → Manifest` 安全闭环，再条件接入 Deep Dive。以下各 Epic 保留其能力范围。
 
 ### Epic 0：仓库与验证骨架
 
-- 初始化本地 Git 仓库；确认并保留现有、已批准的 MIT `LICENSE`，不得重新选择许可证
-- 建立 Xcode workspace / Swift Packages
+- 验证现有 GitHub/`main`/`origin` 基线；确认并保留现有、已批准的 MIT `LICENSE`
+- 通过 Upstream Study 与 ADR 0001 决定真实 `.app` host 拓扑，并建立 Swift Packages
 - CI、SwiftLint/format、单元测试和 fixture 目录
 - ADR 与 ThirdPartyNotices 机制
 - 建立最小原生单窗口 shell：四个 placeholder workspace 与独立 Settings；不实现品牌化完整 UI
@@ -170,6 +183,8 @@ Upstream Study
 - Manifest 和 Cleanup Result UI
 - Review 默认选择策略、永久动作独立确认和 History 审计体验
 
+其中 Policy Gate、Review、MoveToTrash、Manifest 与基础结果计量在 Epic 2–4 后提前交付；真实 Registered Actions 与 Adapter 相关能力在 Epic 7 后补齐。
+
 ### Epic 9：真实机器验证与开源准备
 
 - 匿名案例端到端复现
@@ -182,6 +197,8 @@ Upstream Study
 第一份 coding plan 不应覆盖整个产品。只规划 Epic 0–1：工程骨架和高风险 Spikes。
 
 已批准的执行输入：[Epic 0–1 Foundation & Risk Spikes Implementation Plan](../plans/active/epic-0-1-foundation-spikes.md)。Coding Agent 应按该计划逐 Task 执行，不得跳过 Upstream Study、失败测试、ADR 或最终 evidence gate。
+
+跨 Epic 的阶段依赖、no-go 分支和交付顺序由 [Delivery Roadmap](../plans/roadmap.md) 管理；active plan 不得另起一套宏观路线。
 
 原因：Codex 隔离、FDA 继承、Probe Broker 和 Swift 扫描性能是架构成立的前提。在这些结果出来前批量实现 UI、规则或 Agent 流程会造成返工。
 

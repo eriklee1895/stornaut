@@ -10,11 +10,13 @@
 
 **Repository baseline, updated 2026-08-08:** Git is already initialized. The public GitHub repository uses `main` with remote `origin`, and `main` tracks `origin/main`. The approved docs, `.gitignore`, `AGENTS.md`, and MIT `LICENSE` are already committed. Revalidate this state at execution time; do not rerun repository initialization or recreate the remote.
 
+**Roadmap relationship:** This file is the detailed execution plan for Phase A only. Cross-Epic ordering, later delivery phases, and no-go branches are defined by [`../roadmap.md`](../roadmap.md); do not expand this plan into a competing full-product roadmap.
+
 ## Global Constraints
 
 - Product/App name is `Stornaut`; package and configuration prefixes use `stornaut`.
 - Target the latest stable macOS and Apple Silicon only; do not add Intel or legacy compatibility work.
-- Use the existing MIT `LICENSE` and existing `origin`; do not recreate/reconfigure remotes, push, force-push, or trigger GitHub-hosted workflows unless the user authorizes that external action.
+- Use the existing MIT `LICENSE` and existing `origin`; do not recreate/reconfigure remotes or force-push. The user has authorized timely push of each complete, verified iteration to `origin/main`; release, notarization, history rewrite, and external publication still require separate approval.
 - Quick Scan must never invoke Codex.
 - Codex is read-only investigation infrastructure: it receives no arbitrary Shell, direct filesystem tool, Adapter, or cleanup authority.
 - Probe Broker is Codex's only authorized disk-evidence interface. Production Deep Dive must technically enforce a Broker-only tool surface; a prompt or read-only filesystem sandbox is not that boundary.
@@ -141,6 +143,7 @@ git add .gitignore Package.swift \
 git diff --cached --check
 git commit -m "chore: establish Stornaut foundation" \
   -m "Co-authored-by: TRAE CLI <noreply@bytedance.com>"
+env -u GITHUB_TOKEN -u GH_TOKEN git push origin main
 ```
 
 ### Task 2: Minimal native App shell and localization seam
@@ -212,6 +215,7 @@ git add Package.swift Sources Tests scripts .github docs/adr/0001-package-first-
 git diff --cached --check
 git commit -m "feat: add native Stornaut app shell" \
   -m "Co-authored-by: TRAE CLI <noreply@bytedance.com>"
+env -u GITHUB_TOKEN -u GH_TOKEN git push origin main
 ```
 
 ### Task 3: Codex discovery and capability report
@@ -267,6 +271,7 @@ git add Sources/StornautCodex Tests/StornautCodexTests \
 git diff --cached --check
 git commit -m "feat: detect user-installed Codex capabilities" \
   -m "Co-authored-by: TRAE CLI <noreply@bytedance.com>"
+env -u GITHUB_TOKEN -u GH_TOKEN git push origin main
 ```
 
 ### Task 4: Structured Codex process, JSONL, schema, and cancellation spike
@@ -333,6 +338,7 @@ git add Sources/StornautCodex Tests/StornautCodexTests Tests/Fixtures/Codex docs
 git diff --cached --check
 git commit -m "feat: validate structured Codex process lifecycle" \
   -m "Co-authored-by: TRAE CLI <noreply@bytedance.com>"
+env -u GITHUB_TOKEN -u GH_TOKEN git push origin main
 ```
 
 ### Task 5: Probe Broker and file-read isolation spike
@@ -395,6 +401,7 @@ git add Sources/StornautCore Sources/StornautCodex Tests/StornautCoreTests Tests
 git diff --cached --check
 git commit -m "feat: prove Probe Broker policy boundaries" \
   -m "Co-authored-by: TRAE CLI <noreply@bytedance.com>"
+env -u GITHUB_TOKEN -u GH_TOKEN git push origin main
 ```
 
 ### Task 6: Swift Surveyor performance and cancellation spike
@@ -449,6 +456,7 @@ git add Sources/StornautCore Benchmarks Tests/StornautCoreTests \
 git diff --cached --check
 git commit -m "perf: validate Swift surveyor approach" \
   -m "Co-authored-by: TRAE CLI <noreply@bytedance.com>"
+env -u GITHUB_TOKEN -u GH_TOKEN git push origin main
 ```
 
 ### Task 7: Trash and registered-action lifecycle spike
@@ -506,6 +514,7 @@ git add Sources/StornautCore Tests/StornautCoreTests Tests/Fixtures/Actions \
 git diff --cached --check
 git commit -m "feat: validate safe cleanup action lifecycle" \
   -m "Co-authored-by: TRAE CLI <noreply@bytedance.com>"
+env -u GITHUB_TOKEN -u GH_TOKEN git push origin main
 ```
 
 ### Task 8: Epic 0–1 evidence gate and handoff
@@ -554,6 +563,7 @@ git add docs/reports/epic-0-1-validation-report.md README.md
 git diff --cached --check
 git commit -m "docs: record Epic 0 and 1 validation results" \
   -m "Co-authored-by: TRAE CLI <noreply@bytedance.com>"
+env -u GITHUB_TOKEN -u GH_TOKEN git push origin main
 ```
 
 Expected final state: intended local commits complete, worktree clean, no unapproved push or GitHub-hosted side effect, all tests passing, and a documented user decision requested for any failed architecture boundary.

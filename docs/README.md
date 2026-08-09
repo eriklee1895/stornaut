@@ -11,6 +11,7 @@
 | 进程边界、模块与安全架构 | [System Architecture](architecture/system-architecture.md) |
 | Agent、双模式与治理设计 | [Agent Disk Governance](design/agent-disk-governance.md) |
 | UI、品牌、状态与交互 | [UI/UX](design/ui-ux.md) |
+| 宏观交付顺序与阶段 Gate | [Delivery Roadmap](plans/roadmap.md) |
 | 当前执行计划 | [Epic 0–1 Foundation Spikes](plans/active/epic-0-1-foundation-spikes.md) |
 | 上游学习与许可证门禁 | [Upstream Reference Matrix](research/upstream-reference-matrix.md) |
 
@@ -19,8 +20,9 @@
 1. 本索引；
 2. [Coding Agent Handoff](agent/coding-agent-handoff.md)；
 3. 与任务直接相关的一份规范；
-4. 当前 active plan 中对应 Task；
-5. 对应 upstream study、ADR、report 或 fixture。
+4. 涉及跨 Epic 顺序或 gate 时读取 [Delivery Roadmap](plans/roadmap.md)；
+5. 当前 active plan 中对应 Task；
+6. 对应 upstream study、ADR、report 或 fixture。
 
 不要为了“了解全部背景”每次重读整个 `docs/`。研究和概念资产只在任务需要时读取。
 
@@ -31,7 +33,7 @@
 | [`product/`](product/) | 产品规范 | 稳定产品范围、术语、需求与验收；改变范围需用户批准 |
 | [`architecture/`](architecture/) | 技术架构 | 进程边界、模块责任、安全不变量与数据流 |
 | [`design/`](design/) | 已批准设计 | Agent 治理、UI/UX、品牌和交互规范 |
-| [`plans/`](plans/) | 可执行计划 | `active/` 是当前执行输入；完成后移入 `completed/` |
+| [`plans/`](plans/) | 路线图与可执行计划 | `roadmap.md` 管阶段；`active/` 管当前 Task；完成后移入 `completed/` |
 | [`agent/`](agent/) | Coding Agent 路由 | handoff、工作循环和最小阅读入口 |
 | [`research/`](research/) | 研究与时间切片 | 案例、竞品、上游矩阵；不能覆盖规范 |
 | [`upstream-studies/`](upstream-studies/) | 实施前研究证据 | 每个 Epic/技术主题的 Reference Study Gate |
@@ -46,7 +48,7 @@
 1. 用户明确批准的最新 v1 约束；
 2. [`product/PRD.md`](product/PRD.md) 与 [`design/`](design/) 中已批准规格；
 3. [`architecture/system-architecture.md`](architecture/system-architecture.md)；
-4. [`plans/active/`](plans/active/) 中当前计划；
+4. [`plans/roadmap.md`](plans/roadmap.md) 与 [`plans/active/`](plans/active/) 中当前计划；
 5. 已接受 ADR 和当前机器测量证据；
 6. upstream studies、research、案例和视觉概念。
 

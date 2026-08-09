@@ -504,6 +504,8 @@ Definition of Done：
 
 ## 14. MVP 范围与路线图
 
+v1 的宏观交付顺序与阶段 gate 见 [Delivery Roadmap](../plans/roadmap.md)。Epic 编号表示能力归属，不要求按数字严格顺序实现。已批准先在 Epic 2–4 后交付 Epic 8 的确定性安全执行子集，再仅在 Broker-only gate 允许时生产化 Epic 5–6 Deep Dive。
+
 ### v1
 
 - 原生 SwiftUI/AppKit macOS App
