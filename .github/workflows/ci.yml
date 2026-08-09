@@ -1,0 +1,33 @@
+name: Epic 0 Verification
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify on macOS 26 arm64
+    runs-on: macos-26
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Select the validated Xcode
+        run: |
+          test -d /Applications/Xcode_26.6.app
+          sudo xcode-select -s /Applications/Xcode_26.6.app/Contents/Developer
+
+      - name: Record toolchain
+        run: |
+          sw_vers
+          test "$(uname -m)" = "arm64"
+          uname -m
+          xcodebuild -version
+          swift --version
+
+      - name: Run verification
+        run: scripts/verify

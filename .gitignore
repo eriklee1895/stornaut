@@ -27,6 +27,8 @@ Packages/
 Package.pins
 Package.resolved
 *.xcodeproj
+!Stornaut.xcodeproj/
+!Stornaut.xcodeproj/**
 !Package.swift
 
 # SwiftPM / tooling caches

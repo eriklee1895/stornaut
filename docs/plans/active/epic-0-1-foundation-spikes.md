@@ -64,6 +64,7 @@ Every production Swift file must have one primary responsibility. UI Views consu
 - Create: `Tests/StornautCodexTests/StornautCodexSmokeTests.swift`
 - Create: `scripts/verify`
 - Create: `.github/workflows/ci.yml`
+- Create: `ThirdPartyNotices/README.md`
 - Create: `docs/upstream-studies/epic-0-foundation.md`
 
 **Interfaces:**
@@ -85,11 +86,11 @@ git log -1 --oneline --decorate
 
 Expected: `main` tracks `origin/main`, `origin` points to the Stornaut GitHub repository, the approved docs/LICENSE baseline is already committed, and the worktree has no unrelated changes. Do not run `git init`, recreate the remote, or rewrite existing history.
 
-- [ ] **Step 3: Create the minimal manifest and library targets**
+- [x] **Step 3: Create the minimal manifest and library targets**
 
 Define `StornautCore`, `StornautCodex`, and their two test targets so `swift test` can discover and compile tests. Do not declare an empty `StornautApp` executable target in Task 1; Task 2 adds that target together with its entry point and resources. Set the deployment target to the latest stable macOS observed at execution time; record that value in the Epic 0 study rather than treating `macOS 26` as permanent.
 
-- [ ] **Step 4: Write smoke tests and verify a behavioral failure**
+- [x] **Step 4: Write smoke tests and verify a behavioral failure**
 
 Create tests importing `StornautCore` and `StornautCodex`, each asserting its module marker equals its public name:
 
@@ -108,11 +109,11 @@ Run: `swift test`
 
 Expected: FAIL with an undefined or incorrect module marker, not because the manifest or test target is missing.
 
-- [ ] **Step 5: Add the minimal Swift package**
+- [x] **Step 5: Add the minimal Swift package**
 
 Add public marker enums matching the smoke tests and rerun `swift test`; expected: PASS. Keep package dependencies empty and Swift 6 language mode enabled.
 
-- [ ] **Step 6: Add one verification command and CI**
+- [x] **Step 6: Add one verification command and CI**
 
 Make `scripts/verify` run, in order:
 
@@ -127,11 +128,21 @@ scripts/check-doc-links
 
 Configure a dormant, manual-only CI workflow (`workflow_dispatch` only; no `push`, `pull_request`, `schedule`, or `workflow_run` trigger) for the newest available macOS runner matching the execution-time deployment target. If no matching arm64 runner exists, record that fact and keep CI disabled rather than lowering the target silently. Because the repository is already public, committing this file locally still does not authorize a push or GitHub-hosted run; local `scripts/verify` remains the Epic 0 acceptance gate until the user explicitly requests that external action.
 
-- [ ] **Step 7: Verify and commit**
+- [x] **Step 7: Verify and commit**
 
 Run: `scripts/verify`
 
 Expected: PASS with both smoke tests.
+
+Execution evidence on 2026-08-09:
+
+- The red test run failed only because `StornautCoreModule` and `StornautCodexModule` were undefined.
+- The green run passed both Swift Testing smoke tests.
+- `swift package dump-package` reports macOS `26.0`, Swift language mode `6`, and no package dependencies.
+- Verbose product compilation uses `arm64-apple-macosx26.0`; the separate macOS 14 invocation is the SwiftPM manifest host.
+- `scripts/verify` passes from a clean package build.
+- `.github/workflows/ci.yml` is manual-only on the GA `macos-26` arm64 runner and selects Xcode 26.6.
+- No GitHub-hosted workflow was triggered during Task 1.
 
 Commit:
 

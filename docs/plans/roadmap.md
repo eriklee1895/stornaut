@@ -190,5 +190,6 @@ Epic 0–1
 - 当前阶段：Phase A — Foundation & Risk Gates。
 - 当前 active plan：[`active/epic-0-1-foundation-spikes.md`](active/epic-0-1-foundation-spikes.md)。
 - Epic 0 Foundation Upstream Study：已完成，选择 checked-in Xcode App/Test host + local Swift packages。
-- 下一项执行：Epic 0 Task 1 的 SwiftPM/verify 骨架。
+- Epic 0 Task 1：SwiftPM Core/Codex、smoke tests、`scripts/verify`、manual-only CI 与 ThirdPartyNotices 骨架已完成。
+- 下一项执行：Epic 0 Task 2 原生 App/Test host。
 - Task 2 前置确认：provisional bundle identifier `com.eriklee.stornaut`。
