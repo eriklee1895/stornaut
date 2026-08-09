@@ -17,7 +17,7 @@
 | Agent、双模式与治理设计 | [Agent Disk Governance](design/agent-disk-governance.md) |
 | UI、品牌、状态与交互 | [UI/UX](design/ui-ux.md) |
 | 宏观交付顺序与阶段 Gate | [Delivery Roadmap](plans/roadmap.md) |
-| 当前执行计划 | [Epic 2–4 Deterministic Product Core](plans/active/epic-2-4-deterministic-product-core.md) — `Proposed`，待用户批准，不可执行 |
+| 当前执行计划 | [Epic 2–4 Deterministic Product Core](plans/active/epic-2-4-deterministic-product-core.md) — `Approved`，Task 9 complete / Task 10 next |
 | 已完成计划 | [Epic 0–1 Foundation Spikes](plans/completed/epic-0-1-foundation-spikes.md) |
 | 上游学习与许可证门禁 | [Upstream Reference Matrix](research/upstream-reference-matrix.md) |
 | 当前 Codex Runtime 研究 Gate | [Epic 1 Codex Runtime Study](upstream-studies/epic-1-codex-runtime.md) |
@@ -28,6 +28,7 @@
 | Probe Broker 与 Codex 隔离决策 | [ADR 0004](adr/0004-codex-file-read-isolation.md) |
 | Swift Surveyor 性能决策 | [ADR 0005](adr/0005-swift-surveyor-performance.md) |
 | Trash 与 Registered Action 决策 | [ADR 0006](adr/0006-trash-and-registered-actions.md) |
+| 领域持久化决策 | [ADR 0007](adr/0007-domain-persistence-boundary.md) — Proposed，Task 11 acceptance pending |
 
 任意实现任务默认读取顺序：
 

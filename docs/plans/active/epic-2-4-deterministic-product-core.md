@@ -1,15 +1,13 @@
 # Stornaut Epic 2–4 Deterministic Product Core Implementation Plan
 
-> **Status:** Proposed — awaiting explicit user approval; not yet executable
+> **Status:** Approved — Task 9 complete; Task 10 next
 >
 > **Roadmap phase:** Phase B — Deterministic Product Core
 >
 > **Plan date:** 2026-08-09
 >
-> **Execution rule:** After approval, implement this plan task-by-task, keep
-> checkbox state and evidence current, and create one verified commit per Task.
-> Before approval, this file is a review artifact only and does not authorize
-> product-code changes.
+> **Execution rule:** Implement this plan task-by-task, keep checkbox state and
+> evidence current, and create one reviewed, verified commit per Task.
 
 **Goal:** Turn the Epic 1 Swift Surveyor and safety seams into a useful,
 deterministic macOS scanning product that persists explainable snapshots,
@@ -31,8 +29,8 @@ not absorb Phase C merely because several Epic 8 contracts are shared with the
 domain model. After the Phase B evidence gate, create and obtain approval for a
 separate deterministic Epic 8 active plan.
 
-**Validated baseline:** Epic 0–1 ended at
-`a043188753d4777cfa3d26900b387312c863393f`. The current Swift Surveyor has
+**Validated baseline:** Task 9 started from
+`11b9b79e9ed9df3bf75b7f976c1aa7b43d44a5df`. The current Swift Surveyor has
 already demonstrated a full-root run below the five-minute target with bounded
 memory and sub-millisecond producer cancellation response. Those measurements
 justify continuing in Swift; they do not make raw entry sums valid APFS
@@ -258,13 +256,13 @@ dependency graph.
 **Purpose:** Complete the Reference Study Gate before choosing store APIs,
 schema compilation mechanics, production scan behavior or activity collection.
 
-- [ ] **Step 1: Revalidate the execution baseline**
+- [x] **Step 1: Revalidate the execution baseline**
 
 Record the current OS, Xcode, Swift, architecture, package dependency graph,
 Git HEAD and installed SQLite version. Confirm the worktree contains no
 unrelated changes and Deep Dive remains paused.
 
-- [ ] **Step 2: Study domain and persistence sources**
+- [x] **Step 2: Study domain and persistence sources**
 
 Read current SQLite transaction, WAL, foreign-key, `user_version`, corruption
 and backup documentation plus Apple guidance for Application Support, Caches,
@@ -281,7 +279,7 @@ ADR 0007 must decide:
 - corruption isolation and export/delete behavior;
 - why the selected approach needs no ORM by default.
 
-- [ ] **Step 3: Refresh Quick Scan upstream behavior**
+- [x] **Step 3: Refresh Quick Scan upstream behavior**
 
 Study the exact current commits/licenses and relevant files for Mole,
 ClearDisk and kondo plus Apple filesystem/volume APIs. Reuse the accepted Epic
@@ -289,7 +287,7 @@ ClearDisk and kondo plus Apple filesystem/volume APIs. Reuse the accepted Epic
 changed. Record scan progress, taxonomy, cancellation, permission and
 accounting ideas separately from non-reusable code.
 
-- [ ] **Step 4: Refresh Knowledge and Activity upstream behavior**
+- [x] **Step 4: Refresh Knowledge and Activity upstream behavior**
 
 Study Mole, ClearDisk, kondo and Cluttered for taxonomy, Git dirty/untracked/
 ahead protection, running App/IDE protection, path vetoes and fixtures. GPL or
@@ -298,13 +296,13 @@ restricted sources remain behavior-reference-only.
 The study must decide the build-time rule-source/compiler strategy before a
 YAML parser or code generator is added.
 
-- [ ] **Step 5: Reconcile approved UI inputs**
+- [x] **Step 5: Reconcile approved UI inputs**
 
 Review the approved Overview, Quick Scan, Scan Results, History, Settings and
 resilience canonical documents. The study records layout/state contracts only;
 it must not infer product behavior from generated example values.
 
-- [ ] **Step 6: Verify documentation and commit**
+- [x] **Step 6: Verify documentation, review, commit and push**
 
 Run:
 
@@ -317,6 +315,27 @@ Expected: all studies contain URL, commit/version, license, exact material
 read, adoption/rejection notes, fixture/benchmark plan and relative Stornaut
 improvement. ADR 0007 may be `Proposed` until Task 11 supplies implementation
 evidence.
+
+Execution evidence:
+
+- Baseline: macOS 26.5.1 (`25F80`), arm64, Xcode 26.6 (`17F113`),
+  Swift 6.3.3, system SQLite 3.51.0, no SwiftPM dependencies.
+- System SQLite direct Swift import/link probe passed.
+- Disposable SwiftPM migration probe passed `BEGIN IMMEDIATE`,
+  `user_version=1`, foreign-key rejection and rollback.
+- Current Mole/ClearDisk/kondo snapshots matched the accepted Epic 1 study;
+  Cluttered `v1.2.0` and persistence-wrapper comparison snapshots were added.
+- Four accepted implementation studies and Proposed ADR 0007 now record exact
+  sources, fingerprints, non-reuse boundaries and downstream tests.
+- Existing `$erik-gpt-image-2` canonical assets are sufficient for Phase B;
+  no new image or web asset was added.
+- `bits-code-guard` filtered Markdown as media, so the empty automatic result
+  was rejected; the seven-dimension manual fallback found two P1 design issues.
+- Review fixes require explicit WAL-to-DELETE transition and separate
+  Evidence/Local Knowledge databases with independent backup/corruption
+  boundaries; see the Task 9 review report.
+- `scripts/verify` passed 119 SwiftPM tests, 2/2 XCUITest cases, four
+  Light/Dark screenshots, App bundle/signing, localization and docs.
 
 Suggested commit subject: `docs: define Phase B implementation gates`
 

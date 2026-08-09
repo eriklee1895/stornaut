@@ -1,6 +1,6 @@
 # Architecture Decision Records
 
-Epic 0–1 计划使用以下编号：
+当前 ADR 编号：
 
 1. `0001-package-first-native-shell.md`
 2. [`0002-codex-discovery-and-capabilities.md`](0002-codex-discovery-and-capabilities.md) — Accepted for Task 3 discovery; runtime isolation remains unverified
@@ -8,5 +8,6 @@ Epic 0–1 计划使用以下编号：
 4. [`0004-codex-file-read-isolation.md`](0004-codex-file-read-isolation.md) — Accepted Task 5 no-go; Broker protocol proven, Broker-only runtime not enforced
 5. [`0005-swift-surveyor-performance.md`](0005-swift-surveyor-performance.md) — Accepted Task 6; Swift meets measured performance/memory/cancellation goals
 6. [`0006-trash-and-registered-actions.md`](0006-trash-and-registered-actions.md) — Accepted Task 7; constrained Trash and fake registered-action lifecycle validated
+7. [`0007-domain-persistence-boundary.md`](0007-domain-persistence-boundary.md) — Proposed; system SQLite feasibility proven in Task 9, Task 11 acceptance pending
 
 每份 ADR 至少记录 Status、Context、Evidence、Decision、Consequences、Residual Risks 和 Validation。安全假设没有测量证据时不得标记 Accepted。

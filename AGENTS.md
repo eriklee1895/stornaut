@@ -10,7 +10,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 
 - 先读 handoff，再按任务读取最小必要文档；不要从 UI 概念图推断规格外功能，也不要把概念图当逐像素终稿。
 - 遵守全部产品不变量（见 handoff §3）。尤其：Quick Scan 不调模型；Codex 无写权限；磁盘调查只能走 Probe Broker；Executor 只接受 `MoveToTrash` 或 Registered Action；Trash 失败绝不永久删除；失败保持 `Unknown`。
-- Epic 0–1 已完成；Epic 2–4 deterministic active plan 已起草但仍是 `Proposed`。用户明确批准前只能评审/修订，不能开始产品代码；获批后从 Task 9 开始，并在每个技术主题前完成 Upstream Study Gate。
+- Epic 0–1 已完成；Epic 2–4 deterministic active plan 已批准，Task 9 已完成，下一项为 Task 10。逐 Task 完成 Upstream Study、实现、code review、focused/full verify、独立 commit/push；不得把后续 Task 提前混入。
 - Spike / safety check 通过前，Deep Dive 必须保持 paused；发现 Codex ≠ 验证安全边界。
 - 权限、隔离、许可证、性能主张必须有本机证据（`--help`、测试、Benchmark、ADR）。不确定时先 Spike/ADR，不用大段代码掩盖。
 - 保留现有 MIT `LICENSE`；新增依赖前记录许可证与理由。不要复制 Mole GPL 代码。
@@ -51,7 +51,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Agent / 双模式 / 安全基线 | [docs/design/agent-disk-governance.md](docs/design/agent-disk-governance.md) |
 | 导航、文案、品牌、Light/Dark | [docs/design/ui-ux.md](docs/design/ui-ux.md) |
 | 跨 Epic 交付顺序与 Gate | [docs/plans/roadmap.md](docs/plans/roadmap.md) |
-| Epic 2–4 待批准计划 | [docs/plans/active/epic-2-4-deterministic-product-core.md](docs/plans/active/epic-2-4-deterministic-product-core.md) |
+| Epic 2–4 当前计划 | [docs/plans/active/epic-2-4-deterministic-product-core.md](docs/plans/active/epic-2-4-deterministic-product-core.md) |
 | Epic 0–1 历史计划与证据 | [docs/plans/completed/epic-0-1-foundation-spikes.md](docs/plans/completed/epic-0-1-foundation-spikes.md) |
 | Epic 0–1 最终 Gate | [docs/reports/epic-0-1-validation-report.md](docs/reports/epic-0-1-validation-report.md) |
 | Codex discovery/进程/隔离研究 Gate | [docs/upstream-studies/epic-1-codex-runtime.md](docs/upstream-studies/epic-1-codex-runtime.md) |
@@ -65,7 +65,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 
 ## Current milestone
 
-Epic 0–1 evidence gate 与最终跨模块 code review 已完成；5 个确认缺陷已修复并通过统一验证。deterministic path conditional go，Deep Dive 因 Broker-only 未被技术性证明而 no-go/paused。Epic 2–4 deterministic plan 已进入 `Proposed` 审阅状态，获批前不可执行；release signing/notarization 仍未评估。
+Epic 0–1 evidence gate 与最终跨模块 code review 已完成；5 个确认缺陷已修复并通过统一验证。deterministic path conditional go，Deep Dive 因 Broker-only 未被技术性证明而 no-go/paused。Epic 2–4 Task 9 已完成，下一项为 Task 10；release signing/notarization 仍未评估。
 
 当前已验证的包布局：
 
@@ -89,7 +89,7 @@ scripts/check-doc-links  文档本地链接检查
 
 App host 拓扑已由 [`docs/upstream-studies/epic-0-foundation.md`](docs/upstream-studies/epic-0-foundation.md) 选定，bundle identifier 已确认为 `com.eriklee.stornaut`；ADR 0001 记录最终 build/signing 证据。
 
-宏观交付顺序以 [`docs/plans/roadmap.md`](docs/plans/roadmap.md) 为准。Epic 编号表示能力归属，不要求严格按数字顺序交付；当前 proposed plan 取得用户明确批准前只做计划评审、文档、验证和低风险修正，不开始新的产品实现。
+宏观交付顺序以 [`docs/plans/roadmap.md`](docs/plans/roadmap.md) 为准。Epic 编号表示能力归属，不要求严格按数字顺序交付；当前按已批准 active plan 的 Task 9–26 顺序执行。
 
 ## Working loop
 
