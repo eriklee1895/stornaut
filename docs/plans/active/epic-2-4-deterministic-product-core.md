@@ -1,6 +1,6 @@
 # Stornaut Epic 2–4 Deterministic Product Core Implementation Plan
 
-> **Status:** Approved — Tasks 9–10 complete; Task 11 next
+> **Status:** Approved — Tasks 9–11 complete; Task 12 next
 >
 > **Roadmap phase:** Phase B — Deterministic Product Core
 >
@@ -465,7 +465,7 @@ Suggested commit subject: `feat: define deterministic storage domain`
 - Supports temporary/in-memory test stores and Application Support production
   location selection.
 
-- [ ] **Step 1: Write migration and transaction failures first**
+- [x] **Step 1: Write migration and transaction failures first**
 
 Cover:
 
@@ -477,7 +477,7 @@ Cover:
 - one malformed record being isolated rather than hiding healthy sessions;
 - cancelled writes not leaving a session falsely complete.
 
-- [ ] **Step 2: Implement typed repositories**
+- [x] **Step 2: Implement typed repositories**
 
 At minimum persist:
 
@@ -491,14 +491,14 @@ At minimum persist:
 Use prepared statements and bound values. No raw content/blob field may be a
 generic escape hatch.
 
-- [ ] **Step 3: Enforce local storage boundaries**
+- [x] **Step 3: Enforce local storage boundaries**
 
 Production path selection must use the App container-appropriate Application
 Support directory for durable data and Caches only for disposable derived
 artifacts. Do not create `~/.stornaut`. Test path selection without writing to
 the real user store.
 
-- [ ] **Step 4: Implement retention and manual clear**
+- [x] **Step 4: Implement retention and manual clear**
 
 Use an injected clock and transactionally verify:
 
@@ -509,18 +509,52 @@ Use an injected clock and transactionally verify:
 - Local Knowledge is not accidentally removed by evidence cleanup;
 - deleting local records never mutates scanned files or Trash.
 
-- [ ] **Step 5: Add bounded query and paging contracts**
+- [x] **Step 5: Add bounded query and paging contracts**
 
 History and Scan Results must load ordered pages/projections, not materialize
 the full filesystem tree. Add query plans/index assertions for session time,
 parent/path relationships, classification filters and retention expiry.
 
-- [ ] **Step 6: Validate and accept ADR 0007**
+- [x] **Step 6: Validate and accept ADR 0007**
 
 Run focused store/migration/retention tests, inspect the database fixture with
 the installed SQLite CLI when available, then run `scripts/verify`.
 
 ADR 0007 becomes `Accepted` only with migration, path and dependency evidence.
+
+
+Execution evidence:
+
+- System SQLite 3.51.0 is linked directly; no package dependency or App-bundle
+  framework was added. `Evidence.sqlite` and `LocalKnowledge.sqlite` are
+  independent actor-owned stores with distinct application IDs.
+- The v0 fixture migrates atomically to v1; injected failure rolls back schema,
+  role ID and version; future, wrong-role, unclaimed-foreign and damaged exact
+  schemas fail closed without reset or downgrade.
+- Both stores explicitly transition to/verify DELETE journal mode, enable foreign
+  keys and validate `quick_check`; Evidence additionally rejects persisted
+  foreign-key violations.
+- Typed repositories use prepared values and bounded closed JSON payloads. Paged
+  projections isolate malformed or primary-key-mismatched records while direct
+  lookups fail instead of returning misbound data.
+- Store paths are canonicalized through the deepest existing ancestor; private
+  directories/files are opened no-follow, current-user-owned and enforced at
+  `0700`/`0600`. Evidence is excluded from backup; Local Knowledge remains
+  backup eligible. No `~/.stornaut` or scanned-target write path exists.
+- Seven-day Evidence/Plan and 90-day Manifest ceilings are store-enforced; expiry
+  and manual evidence/manifest/knowledge clears remain independent.
+- Online export uses `sqlite3_backup_*` into an atomically created `0600` file and
+  replaces the coordinated destination with one rename; symlink destinations are
+  rejected.
+- Final `bits-code-guard` scope covered 11 implementation/test files (3,206
+  reviewed changed lines), no custom workflows. Seven-dimension review confirmed
+  and fixed all findings; see the Task 11 review report.
+- Focused store/migration/retention verification passes 18 tests with no
+  `:memory:`, journal, WAL or SHM residue.
+- Final `scripts/verify` passes 157 SwiftPM tests, Xcode App contract tests, 2/2
+  XCUITest cases, four Light/Dark screenshots, App bundle/signing, localization
+  and docs checks. Three preceding 157-test concurrency stress runs also passed
+  without fixture process residue.
 
 Suggested commit subject: `feat: persist local scan evidence`
 

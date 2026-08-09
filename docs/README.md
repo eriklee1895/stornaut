@@ -12,12 +12,13 @@
 | 当前开发自动化验证证据 | [Development Automation Validation](reports/development-automation-2026-08-09.md) |
 | Epic 0–1 evidence gate | [Epic 0–1 Validation Report](reports/epic-0-1-validation-report.md) |
 | Epic 1 最终代码审查 | [Epic 1 Final Code Review](reports/epic-1-code-review-2026-08-09.md) |
+| Epic 2–4 Task 11 persistence review | [Task 11 Code Review](reports/epic-2-4-task-11-review.md) |
 | 产品范围、术语、验收 | [PRD](product/PRD.md) |
 | 进程边界、模块与安全架构 | [System Architecture](architecture/system-architecture.md) |
 | Agent、双模式与治理设计 | [Agent Disk Governance](design/agent-disk-governance.md) |
 | UI、品牌、状态与交互 | [UI/UX](design/ui-ux.md) |
 | 宏观交付顺序与阶段 Gate | [Delivery Roadmap](plans/roadmap.md) |
-| 当前执行计划 | [Epic 2–4 Deterministic Product Core](plans/active/epic-2-4-deterministic-product-core.md) — `Approved`，Tasks 9–10 complete / Task 11 next |
+| 当前执行计划 | [Epic 2–4 Deterministic Product Core](plans/active/epic-2-4-deterministic-product-core.md) — `Approved`，Tasks 9–11 complete / Task 12 next |
 | 已完成计划 | [Epic 0–1 Foundation Spikes](plans/completed/epic-0-1-foundation-spikes.md) |
 | 上游学习与许可证门禁 | [Upstream Reference Matrix](research/upstream-reference-matrix.md) |
 | 当前 Codex Runtime 研究 Gate | [Epic 1 Codex Runtime Study](upstream-studies/epic-1-codex-runtime.md) |
@@ -28,7 +29,7 @@
 | Probe Broker 与 Codex 隔离决策 | [ADR 0004](adr/0004-codex-file-read-isolation.md) |
 | Swift Surveyor 性能决策 | [ADR 0005](adr/0005-swift-surveyor-performance.md) |
 | Trash 与 Registered Action 决策 | [ADR 0006](adr/0006-trash-and-registered-actions.md) |
-| 领域持久化决策 | [ADR 0007](adr/0007-domain-persistence-boundary.md) — Proposed，Task 11 acceptance pending |
+| 领域持久化决策 | [ADR 0007](adr/0007-domain-persistence-boundary.md) — Accepted，Task 11 verified |
 
 任意实现任务默认读取顺序：
 

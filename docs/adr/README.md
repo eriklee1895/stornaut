@@ -8,6 +8,6 @@
 4. [`0004-codex-file-read-isolation.md`](0004-codex-file-read-isolation.md) — Accepted Task 5 no-go; Broker protocol proven, Broker-only runtime not enforced
 5. [`0005-swift-surveyor-performance.md`](0005-swift-surveyor-performance.md) — Accepted Task 6; Swift meets measured performance/memory/cancellation goals
 6. [`0006-trash-and-registered-actions.md`](0006-trash-and-registered-actions.md) — Accepted Task 7; constrained Trash and fake registered-action lifecycle validated
-7. [`0007-domain-persistence-boundary.md`](0007-domain-persistence-boundary.md) — Proposed; system SQLite feasibility proven in Task 9, Task 11 acceptance pending
+7. [`0007-domain-persistence-boundary.md`](0007-domain-persistence-boundary.md) — Accepted; dual-store SQLite boundary verified in Task 11
 
 每份 ADR 至少记录 Status、Context、Evidence、Decision、Consequences、Residual Risks 和 Validation。安全假设没有测量证据时不得标记 Accepted。

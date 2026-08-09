@@ -1,6 +1,6 @@
 # ADR 0007: Domain Persistence Boundary
 
-> Status: Proposed; Task 9 feasibility proven, Task 11 acceptance pending
+> Status: Accepted; Task 11 implementation and verification complete
 >
 > Date: 2026-08-09
 >
@@ -111,6 +111,8 @@ covering checkpoints, backup and sidecar behavior.
 ### Migrations and downgrade
 
 - `PRAGMA user_version` is the schema version.
+- A zero `application_id` is claimable only when the exact known empty/legacy
+  schema fingerprint matches; arbitrary SQLite files are never adopted.
 - Every checked-in migration declares exact input/output versions.
 - Migrations execute in order inside `BEGIN IMMEDIATE`.
 - Any SQL, validation or foreign-key failure rolls back the whole step.
@@ -132,14 +134,19 @@ transient.
 
 ### Corruption, export and delete
 
-- Opening a store performs a bounded `quick_check`.
+- Opening a store performs a bounded `quick_check`; Evidence also performs
+  `foreign_key_check` before writes.
+- A claimed current-version database must match the exact expected table/index
+  fingerprint; missing or foreign objects fail closed without reset.
 - Explicit diagnostics may run `integrity_check`.
-- A single undecodable record is isolated in typed projections.
+- A single undecodable or primary-key-mismatched record is isolated in paged
+  typed projections; direct lookup fails rather than returning misbound data.
 - Database-level corruption blocks writes; it is not shown as empty history.
 - Corruption of Evidence does not make Local Knowledge unreadable, and the
   inverse is also true.
 - Live backup/export uses SQLite's backup API rather than copying database
-  files while open.
+  files while open. Its temporary snapshot is atomically created at `0600`
+  before SQLite writes and published with one coordinated rename.
 - Clear evidence and clear manifests are separate transactions.
 - Clearing local records never changes scan targets, Trash or existing cleanup
   effects.
@@ -234,8 +241,9 @@ Costs:
 
 ## Residual Risks
 
-- The selected wrapper is not yet implemented or fuzzed.
-- Task 11 must choose bounded transaction sizes and busy timeout empirically.
+- The narrow wrapper is implemented and adversarially tested but is not fuzzed.
+- The initial 2-second busy timeout is bounded but not throughput-tuned; Task 12
+  must measure it with production incremental scan batches before changing it.
 - `quick_check` may not find every latent corruption.
 - A single database file is still a failure domain; per-record decode
   isolation does not repair page-level corruption.
@@ -245,22 +253,34 @@ Costs:
 - File protection/encryption-at-rest behavior remains the user's macOS volume
   responsibility; Stornaut does not invent custom encryption in Phase B.
 
-## Acceptance Gate
+## Acceptance Evidence
 
-Change this ADR to `Accepted` only after Task 11 proves:
+Task 11 accepts this ADR with the following implementation evidence:
 
-1. fresh schema creation;
-2. every checked-in migration path;
-3. full rollback on injected migration failure;
-4. future-version refusal without mutation;
-5. distinct role/application IDs and foreign-key enforcement;
-6. explicit DELETE journal-mode transition/verification;
-7. statement binding/error redaction;
-8. per-record and role-separated database corruption behavior;
-9. seven/90-day retention and separate clear operations;
-10. Evidence backup exclusion and Local Knowledge backup eligibility;
-11. owner, no-symlink and `0700`/`0600` local storage checks;
-12. injected Application Support/Caches boundaries;
-13. paged query plans/indexes;
-14. full `scripts/verify`;
-15. no third-party package or App-bundle dependency was introduced.
+1. fresh v1 schema creation and checked-in v0-to-v1 fixture migration pass;
+2. injected migration failure rolls back schema, `user_version` and role ID;
+3. future, wrong-role, arbitrary zero-ID and damaged exact schemas fail closed;
+4. Evidence and Local Knowledge use distinct application IDs, actor-owned
+   connections and independent files;
+5. connections verify DELETE journal mode, full synchronization, foreign keys,
+   disabled trusted/writable schema and bounded busy behavior;
+6. `quick_check`, Evidence `foreign_key_check` and exact schema fingerprints
+   reject database-level damage without reset;
+7. bound values, closed typed payloads and 1 MiB limits prevent a generic raw
+   content channel; error operations contain no values or SQL text;
+8. paged projections isolate malformed/ID-mismatched rows while preserving
+   healthy records; role corruption remains independent;
+9. store-enforced seven/90-day ceilings and transactional expiry preserve a
+   Manifest after linked Evidence deletion; manual clears remain separate;
+10. injected Application Support/Caches routes, no-follow opens, current-user
+    ownership and `0700`/`0600` enforcement pass without touching user data;
+11. Evidence backup exclusion and Local Knowledge backup eligibility pass;
+12. session/path/classification/retention query-plan index assertions pass;
+13. `sqlite3_backup_*` export passes fresh and replacement snapshots and rejects
+    destination symlinks;
+14. focused migration/store/retention verification passes 18 tests without
+    worktree database or journal residue;
+15. full `scripts/verify` passes (recorded in the Task 11 review/report and
+    active plan evidence);
+16. `swift package show-dependencies` remains dependency-free and no App-bundle
+    framework was introduced.

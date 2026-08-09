@@ -11,6 +11,7 @@ func successfulFakeProcessUsesFixedProtocolArgumentsAndSeparatesStderr() async t
 
     let request = fixture.makeRequest(
         prompt: Data("Return only the static envelope.".utf8),
+        timeout: .seconds(10),
         environment: [
             "HOME": "/Users/example",
             "PATH": "/usr/bin:/bin",
@@ -143,7 +144,9 @@ func invalidFinalEnvelopeFailsClosed() async throws {
     let fixture = try CodexProcessFixture(mode: "invalid-envelope")
     defer { fixture.remove() }
 
-    let stream = CodexProcess().run(fixture.makeRequest())
+    let stream = CodexProcess().run(
+        fixture.makeRequest(timeout: .seconds(10))
+    )
 
     await #expect(throws: CodexProcessError.invalidFinalEnvelope) {
         _ = try await collectEvents(from: stream)

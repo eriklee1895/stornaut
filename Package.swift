@@ -23,7 +23,10 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "StornautCore"
+            name: "StornautCore",
+            linkerSettings: [
+                .linkedLibrary("sqlite3"),
+            ]
         ),
         .target(
             name: "StornautCodex",
