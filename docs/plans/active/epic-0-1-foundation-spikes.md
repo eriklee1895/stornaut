@@ -4,7 +4,7 @@
 
 **Goal:** Create the smallest native Stornaut foundation that builds and tests locally, then produce executable evidence for the Codex, isolation, scan-performance, Trash, and registered-action assumptions on which the full product depends.
 
-**Architecture:** Use Swift Package Manager for the platform-agnostic domain/core and Codex process/protocol libraries. A SwiftPM executable alone is not accepted as the macOS product host because it does not define the complete `.app` bundle, stable bundle identifier, Info.plist, entitlements, signing, and TCC identity contract needed by later Spikes. The Epic 0 study must select the smallest dependency-free App-host topology—an Xcode macOS App target referencing the local packages, or a reproducible locally signed bundle harness with an explicit migration path—and ADR 0001 must record the choice. Task 2 must produce a real launchable `.app`. Spikes must end in tests, benchmark output, and ADRs; they must not grow into the final scanner, Agent workflow, rule base, or branded UI.
+**Architecture:** Use Swift Package Manager for the platform-agnostic `StornautCore` and `StornautCodex` libraries. The accepted Epic 0 study selects a checked-in `Stornaut.xcodeproj` with native `StornautApp` and `StornautAppTests` targets that consume those local package products. Do not add xcodegen/Tuist or treat a SwiftPM executable as the product host. Task 2 must produce a real LaunchServices-started `.app`; local ad-hoc identity and production Developer ID identity remain explicitly separate. Spikes must end in tests, benchmark output, and ADRs; they must not grow into the final scanner, Agent workflow, rule base, or branded UI.
 
 **Observed baseline, non-normative:** At plan authoring time the machine reported macOS 26.5.1 arm64, Xcode 26.6, Swift 6.3.3, and user-installed `codex-cli 0.146.0`. At execution time, rediscover and record the installed OS, architecture, Xcode, Swift, Codex path/version, and supported flags. Pin observed values in ADR evidence, not as permanent product requirements. Use Swift 6 strict concurrency, SwiftUI/AppKit/Foundation, XCTest/Swift Testing; defer SQLite until Epic 2.
 
@@ -35,10 +35,11 @@
 Package.swift                                  SwiftPM products, targets, strict concurrency
 Sources/StornautCore/                          Shared domain types and spike-safe interfaces
 Sources/StornautCodex/                         Codex discovery, launch, JSONL and schemas
-StornautApp host selected by ADR 0001          Minimal native `.app` shell only
+Stornaut.xcodeproj/                             Native App/Test host
+StornautApp/                                   Minimal native `.app` shell only
+StornautAppTests/                              App-shell tests
 Tests/StornautCoreTests/                       Core and filesystem lifecycle tests
 Tests/StornautCodexTests/                      Process, parser, cancellation and fake-runtime tests
-App-shell tests selected by ADR 0001           Navigation and scene contract tests
 Tests/Fixtures/Codex/                          Checked-in JSONL/schema fixtures without private data
 Tests/Fixtures/Surveyor/                       Synthetic directory-tree generator inputs
 Benchmarks/SurveyorBenchmark/                  Repeatable scanner benchmark executable/support
@@ -68,11 +69,11 @@ Every production Swift file must have one primary responsibility. UI Views consu
 **Interfaces:**
 - Produces: importable `StornautCore` and `StornautCodex` modules and a `swift test` verification baseline.
 
-- [ ] **Step 1: Complete the Epic 0 Upstream Study Gate**
+- [x] **Step 1: Complete the Epic 0 Upstream Study Gate**
 
-Read the current ClearDisk and PureMac repository structure plus Apple Swift Package, Xcode macOS App, code-signing, bundle, and XCTest/Swift Testing documentation. Record exact URL, commit/version, license, files/docs read, reusable ideas, non-reusable code, and the decision to keep this spike dependency-free in `docs/upstream-studies/epic-0-foundation.md` using the template from `docs/research/upstream-reference-matrix.md`. Explicitly compare a SwiftPM-only executable, an Xcode App host over local packages, and a reproducible signed bundle harness; choose one topology for ADR 0001. The choice must support a stable bundle identifier and App-context TCC/FDA experiments without claiming that terminal `swift run` is equivalent.
+Read the current ClearDisk and PureMac repository structure plus Apple Swift Package, Xcode macOS App, code-signing, bundle, and XCTest/Swift Testing documentation. Record exact URL, commit/version, license, files/docs read, reusable ideas, non-reusable code, and the dependency-free host decision in `docs/upstream-studies/epic-0-foundation.md` using the template from `docs/research/upstream-reference-matrix.md`. The accepted study chooses a checked-in Xcode App/Test host over local Swift package products; Task 2 and ADR 0001 must validate the concrete project, bundle identity and signing behavior.
 
-- [ ] **Step 2: Verify the existing version-control baseline**
+- [x] **Step 2: Verify the existing version-control baseline**
 
 Run:
 
@@ -149,14 +150,16 @@ env -u GITHUB_TOKEN -u GH_TOKEN git push origin main
 ### Task 2: Minimal native App shell and localization seam
 
 **Files:**
-- Create: App-host project/bundle files selected by the Epic 0 study
-- Create: App source root selected by ADR 0001, containing `StornautApp.swift`
-- Create: App source root `AppShell/AppDestination.swift`
-- Create: App source root `AppShell/RootView.swift`
-- Create: App source root `Settings/StornautSettingsView.swift`
-- Create: App resources `en.lproj/Localizable.strings`
-- Create: App resources `zh-Hans.lproj/Localizable.strings`
-- Create: App-shell navigation contract tests in the topology selected by ADR 0001
+- Create: `Stornaut.xcodeproj/`
+- Create: `StornautApp/StornautApp.swift`
+- Create: `StornautApp/AppShell/AppDestination.swift`
+- Create: `StornautApp/AppShell/RootView.swift`
+- Create: `StornautApp/Settings/StornautSettingsView.swift`
+- Create: `StornautApp/Resources/en.lproj/Localizable.strings`
+- Create: `StornautApp/Resources/zh-Hans.lproj/Localizable.strings`
+- Create: `StornautApp/Info.plist`
+- Create: `StornautApp/StornautApp.entitlements`
+- Create: `StornautAppTests/AppDestinationTests.swift`
 - Modify: `scripts/verify`
 - Modify: `.github/workflows/ci.yml`
 - Create: `docs/adr/0001-package-first-native-shell.md`
@@ -167,7 +170,7 @@ env -u GITHUB_TOKEN -u GH_TOKEN git push origin main
 
 - [ ] **Step 1: Write the navigation contract test**
 
-Add the real macOS App host and its testable navigation seam using the topology selected by ADR 0001, then assert the destination raw values are exactly:
+Add the native `StornautApp` and `StornautAppTests` targets and the testable navigation seam, then assert the destination raw values are exactly:
 
 ```swift
 ["overview", "scan", "investigations", "history"]
@@ -177,7 +180,7 @@ and that no settings/menu-bar destination exists.
 
 - [ ] **Step 2: Run the focused test and confirm failure**
 
-Run the focused App-shell test command recorded by ADR 0001.
+Run the focused `xcodebuild` App-shell test command recorded by ADR 0001.
 
 Expected: FAIL because `AppDestination` does not exist.
 
@@ -191,7 +194,7 @@ Provide English and `zh-Hans` values for the four destinations plus `Settings`, 
 
 - [ ] **Step 5: Build and manually inspect both appearances**
 
-Build with the App-host command selected by ADR 0001, inspect the produced `.app`, verify its bundle identifier and local code signature, and launch it through LaunchServices/Finder rather than `swift run`.
+Build `Stornaut.xcodeproj`, inspect the produced `.app`, verify its bundle identifier and local code signature, and launch it through LaunchServices/Finder rather than `swift run`.
 
 Expected: one native window, four sidebar destinations, Settings opened with `⌘,`, no menu-bar icon, and readable System Light/Dark appearances. Reopening or activating Stornaut reuses the single main window; File → New Window or equivalent cannot create another workspace window. Record the exact build/launch commands, bundle metadata, signing identity, screenshots, and observed limitations in ADR 0001.
 
@@ -199,7 +202,7 @@ This step proves the local App-host identity and shell behavior, not Developer I
 
 - [ ] **Step 6: Extend the verification entry point**
 
-Update `scripts/verify` so it still builds/tests both Swift libraries and then invokes the deterministic App-host build and App-shell tests selected by ADR 0001. Update the manual-only CI workflow to run the same noninteractive verification path when an authorized operator triggers it. GUI launch inspection remains local/manual and is recorded in ADR 0001; CI must not claim it tested TCC/FDA interaction.
+Update `scripts/verify` so it still builds/tests both Swift libraries and then invokes deterministic `xcodebuild` App-host build and App-shell tests. Update the manual-only CI workflow to run the same noninteractive verification path when an authorized operator triggers it. GUI launch inspection remains local/manual and is recorded in ADR 0001; CI must not claim it tested TCC/FDA interaction.
 
 - [ ] **Step 7: Run tests and commit**
 
@@ -211,7 +214,7 @@ Commit:
 
 ```bash
 git add Package.swift Sources Tests scripts .github docs/adr/0001-package-first-native-shell.md
-# Also stage the exact App-host project/bundle paths recorded by ADR 0001.
+git add Stornaut.xcodeproj StornautApp StornautAppTests
 git diff --cached --check
 git commit -m "feat: add native Stornaut app shell" \
   -m "Co-authored-by: TRAE CLI <noreply@bytedance.com>"

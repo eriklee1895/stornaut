@@ -4,7 +4,7 @@
 
 Epic 0–1 计划预期：
 
-- `epic-0-foundation.md`
+- [Epic 0 Foundation](epic-0-foundation.md) — Accepted
 - `epic-1-codex-runtime.md`
 - `epic-1-surveyor.md`
 - `epic-1-actions.md`

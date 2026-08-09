@@ -105,7 +105,7 @@ Epic 0–1
 ### Epic 0：仓库与验证骨架
 
 - 验证现有 GitHub/`main`/`origin` 基线；确认并保留现有、已批准的 MIT `LICENSE`
-- 通过 Upstream Study 与 ADR 0001 决定真实 `.app` host 拓扑，并建立 Swift Packages
+- 按已接受的 Epic 0 Upstream Study 建立 checked-in Xcode App/Test host 与 Swift Packages；ADR 0001 固化最终 bundle/signing 证据
 - CI、SwiftLint/format、单元测试和 fixture 目录
 - ADR 与 ThirdPartyNotices 机制
 - 建立最小原生单窗口 shell：四个 placeholder workspace 与独立 Settings；不实现品牌化完整 UI

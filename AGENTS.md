@@ -62,13 +62,17 @@ Epic 0–1：仓库与验证骨架 + 高风险技术 Spike（Codex 发现/协议
 ```text
 Sources/StornautCore/    领域类型与安全接口
 Sources/StornautCodex/   Codex 发现、启动、JSONL/schema
-App host（ADR 0001）     真实可签名 .app shell；具体拓扑由 Epic 0 study 决定
+Stornaut.xcodeproj/      原生 macOS App/Test host
+StornautApp/             最小原生 .app shell
+StornautAppTests/        App contract tests
 Tests/                   XCTest / Swift Testing + fixtures
 docs/adr/                架构假设证据
 docs/upstream-studies/   Reference Study Gate 记录
 scripts/verify           本地验收入口
 scripts/check-doc-links  文档本地链接检查
 ```
+
+App host 拓扑已由 [`docs/upstream-studies/epic-0-foundation.md`](docs/upstream-studies/epic-0-foundation.md) 选定。Task 2 前仍需确认 provisional bundle identifier；ADR 0001 记录最终 build/signing 证据。
 
 宏观交付顺序以 [`docs/plans/roadmap.md`](docs/plans/roadmap.md) 为准。Epic 编号表示能力归属，不要求严格按数字顺序交付；当前只执行 Epic 0–1 active plan。
 

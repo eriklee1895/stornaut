@@ -464,7 +464,8 @@ Executor → Manifest: append results
 stornaut/
 ├── README.md
 ├── docs/
-├── <App host selected by ADR 0001>/
+├── Stornaut.xcodeproj/
+├── StornautApp/
 │   ├── AppShell/
 │   ├── Overview/
 │   ├── Scan/
@@ -473,6 +474,7 @@ stornaut/
 │   ├── History/
 │   ├── DesignSystem/
 │   └── Settings/
+├── StornautAppTests/
 ├── Sources/
 │   ├── StornautCore/
 │   │   ├── Surveyor/
@@ -499,7 +501,7 @@ stornaut/
 └── ThirdPartyNotices/
 ```
 
-上图表达逻辑模块，不提前锁定 App host 的具体工程目录。`StornautCore` 与 `StornautCodex` 使用 Swift Package Manager；真实 `.app` host、bundle identifier、签名和测试拓扑由 Epic 0 Upstream Study 与 ADR 0001 决定。规则、Policy 和 Probe 必须在不启动 GUI 时可测试。不要在 v1 为形式上的“微服务”拆多进程；Codex 隔离和必要的 XPC 技术 Spike 除外。
+`StornautCore` 与 `StornautCodex` 使用 Swift Package Manager；已接受的 Epic 0 Upstream Study 选择 checked-in `Stornaut.xcodeproj` 作为真实 App/Test host，并通过 local package products 接入两个库。最终 bundle identifier 与本地签名证据由 Task 2/ADR 0001 固化。规则、Policy 和 Probe 必须在不启动 GUI 时可测试。不要在 v1 为形式上的“微服务”拆多进程；Codex 隔离和必要的 XPC 技术 Spike 除外。
 
 ## 10. 实施前技术 Spike
 
