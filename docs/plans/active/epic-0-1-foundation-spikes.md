@@ -12,6 +12,8 @@
 
 **Roadmap relationship:** This file is the detailed execution plan for Phase A only. Cross-Epic ordering, later delivery phases, and no-go branches are defined by [`../roadmap.md`](../roadmap.md); do not expand this plan into a competing full-product roadmap.
 
+**App identity:** The user confirmed `com.eriklee.stornaut` as the bundle identifier on 2026-08-09. Task 2 and later TCC/FDA evidence use this identity; changing it requires an ADR and revalidation.
+
 ## Global Constraints
 
 - Product/App name is `Stornaut`; package and configuration prefixes use `stornaut`.

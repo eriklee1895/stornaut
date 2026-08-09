@@ -1,7 +1,7 @@
 # Stornaut Review Reclaim Plan — Round 2 Draw
 
 > Generated: 2026-08-08  
-> Tool: built-in `imagegen`  
+> Tool: `$erik-gpt-image-2` / OpenAI `gpt-image-2`
 > Status: selection approved; canonical Dark/Light references generated
 
 ## Fixed product and safety grammar

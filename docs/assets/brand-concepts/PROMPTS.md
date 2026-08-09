@@ -1,6 +1,6 @@
 # Stornaut Logo Concept Prompt Set
 
-Generated with the built-in `imagegen` tool on 2026-08-07. These are raster explorations of possible brand directions; the selected direction must be redrawn as a controlled vector and tested at macOS icon sizes.
+Generated with the `$erik-gpt-image-2` skill using OpenAI `gpt-image-2` on 2026-08-07. These are raster explorations of possible brand directions; the selected direction must be redrawn as a controlled vector and tested at macOS icon sizes.
 
 ## Shared constraints
 

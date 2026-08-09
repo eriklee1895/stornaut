@@ -1,6 +1,6 @@
 # Stornaut UI Concept Prompt Set
 
-Generated with the built-in `imagegen` tool on 2026-08-07. These are visual exploration assets, not implementation specifications.
+Generated with the `$erik-gpt-image-2` skill using OpenAI `gpt-image-2` on 2026-08-07. These are visual exploration assets, not implementation specifications.
 
 Current selection status: the functional UX, brand rules, all core pages, Settings, and cross-flow resilience states have approved compositions. The UI/UX design baseline is complete for implementation; generated assets remain non-pixel-accurate references.
 

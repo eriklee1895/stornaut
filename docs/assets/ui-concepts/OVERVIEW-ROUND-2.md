@@ -1,7 +1,7 @@
 # Stornaut Overview — Round 2 Composition Draw
 
 > Generated: 2026-08-07; canonical pair generated 2026-08-08  
-> Tool: built-in `imagegen`  
+> Tool: `$erik-gpt-image-2` / OpenAI `gpt-image-2`
 > Status: selection complete — A+B direction approved; images remain non-pixel-authoritative references
 
 ## Approved decision

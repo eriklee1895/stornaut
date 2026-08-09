@@ -1,7 +1,7 @@
 # Stornaut Onboarding and Permissions — Internal Draw
 
 > Generated: 2026-08-08  
-> Tool: built-in `imagegen`  
+> Tool: `$erik-gpt-image-2` / OpenAI `gpt-image-2`
 > Status: internally reviewed; A structure + C transparency approved without a user tie-break
 
 ## Fixed product grammar

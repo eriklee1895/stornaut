@@ -29,7 +29,7 @@ Package.swift
 - 不把 SwiftPM executable 或 `swift run` 当作 macOS App/TCC identity。
 - 不把 ClearDisk 式手工 bundle 脚本作为正式 App host；它仅证明 SwiftPM binary 可以被包装成 `.app`。
 - 当前机器没有有效 Apple Development/Developer ID code-signing identity。Epic 0 本地 Spike 使用 ad-hoc 签名和显式 designated requirement 建立可重复的本地身份；Developer ID、hardened runtime、notarization 和发布身份留到 Epic 9。
-- 推荐的 provisional bundle identifier 是 `com.eriklee.stornaut`。它必须在 Task 2 创建 App target 前由用户确认或替换；一旦用于 TCC/FDA 实验，后续不应随意更改。
+- bundle identifier 已由用户确认为 `com.eriklee.stornaut`。Task 2 起使用该 identity；一旦用于 TCC/FDA 实验，后续不得无 ADR 地更改。
 
 该结论是 Epic 0 的 Implementation Brief，也是 ADR 0001 的输入。Task 2 完成真实 App shell 与实测后，ADR 0001 再记录最终工程路径、build settings、签名结果和限制。
 
@@ -226,7 +226,7 @@ Tests/
 
 - `StornautApp`
   - product type：macOS application
-  - provisional bundle identifier：`com.eriklee.stornaut`；Task 2 前确认
+  - bundle identifier：`com.eriklee.stornaut`
   - shared scheme：`Stornaut`
   - source：仅 App shell/UI composition
   - package products：`StornautCore`、`StornautCodex`
@@ -325,6 +325,6 @@ Epic 0 foundation 应至少覆盖：
 - 本机当前没有有效 Apple Development/Developer ID identity。
 - 显式 ad-hoc designated requirement 是否被当前 macOS TCC 数据库稳定采用，需要 Task 5 App-context canary 实验确认。
 - Xcode project 的具体 object format、local package references 和 signing build settings 必须由 Task 2 生成后通过 `xcodebuild -showBuildSettings` 与产物检查验证。
-- Task 2 创建 App target 前必须确认最终 bundle identifier；Task 5 开始 TCC/FDA 实验后不得无 ADR 地更改。
+- bundle identifier 已确认为 `com.eriklee.stornaut`；Task 5 开始 TCC/FDA 实验后不得无 ADR 地更改。
 - Developer ID、hardened runtime、notarization 和 release export 保留到 Epic 9。
 - 下一 Gate：创建 Task 1 SwiftPM/verify 骨架；App host 在 Task 2 实现并写 ADR 0001。

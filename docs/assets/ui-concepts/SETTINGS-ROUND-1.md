@@ -1,7 +1,7 @@
 # Stornaut Settings — Internal Draw
 
 > Generated: 2026-08-08  
-> Tool: built-in `imagegen`  
+> Tool: `$erik-gpt-image-2` / OpenAI `gpt-image-2`
 > Status: internally reviewed; A shell + C status summary + E Local Knowledge approved without a user tie-break
 
 ## Fixed product grammar
@@ -117,7 +117,7 @@ The pairs establish shell geometry, density, theme parity, state separation, and
 
 ## Prompt set
 
-All images used the `ui-mockup` or `precise-object-edit` taxonomy through the built-in image generation tool. Shared prompt constraints were: shippable SwiftUI/AppKit macOS Settings, Native Observatory, system Light/Dark parity, readable English, native grouped rows, no main-app navigation, no dashboard, no background monitoring, no scheduling, no automatic cleanup, no denylist bypass, no chat/console/terminal, no sparkle decoration, no star map, and no watermark.
+All images used the `ui-mockup` or `precise-object-edit` taxonomy through `$erik-gpt-image-2`. Shared prompt constraints were: shippable SwiftUI/AppKit macOS Settings, Native Observatory, system Light/Dark parity, readable English, native grouped rows, no main-app navigation, no dashboard, no background monitoring, no scheduling, no automatic cleanup, no denylist bypass, no chat/console/terminal, no sparkle decoration, no star map, and no watermark.
 
 - A prompt: six-item native Settings sidebar with `Privacy & Data` selected; fixed 7/90-day retention and temporary JSONL lifecycle.
 - B prompt: classic six-tab toolbar with `Permissions` selected; FDA status, granted folders, and read-only protected locations.

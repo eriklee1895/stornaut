@@ -1,7 +1,7 @@
 # Stornaut Deep Dive — Round 2 Draw
 
 > Generated: 2026-08-08  
-> Tool: built-in `imagegen`  
+> Tool: `$erik-gpt-image-2` / OpenAI `gpt-image-2`
 > Status: selection complete — B default + C Inspector approved; borrow A's Probe trajectory
 
 ## Approved decision

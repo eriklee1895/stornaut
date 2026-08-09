@@ -192,4 +192,4 @@ Epic 0–1
 - Epic 0 Foundation Upstream Study：已完成，选择 checked-in Xcode App/Test host + local Swift packages。
 - Epic 0 Task 1：SwiftPM Core/Codex、smoke tests、`scripts/verify`、manual-only CI 与 ThirdPartyNotices 骨架已完成。
 - 下一项执行：Epic 0 Task 2 原生 App/Test host。
-- Task 2 前置确认：provisional bundle identifier `com.eriklee.stornaut`。
+- Bundle identifier：已确认 `com.eriklee.stornaut`。
