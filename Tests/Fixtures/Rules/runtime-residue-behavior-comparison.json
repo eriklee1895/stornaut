@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "sources": [
+    {
+      "project": "Mole",
+      "revision": "e83f44f8ca56bb49f93c0479c82a984601b22d5d",
+      "license": "GPL-3.0",
+      "usage": "behaviorReferenceOnly"
+    },
+    {
+      "project": "ClearDisk",
+      "revision": "1aaec92b91c40fdc0c2fce92fef20df08b5f5c43",
+      "license": "MIT",
+      "usage": "behaviorReferenceOnly"
+    },
+    {
+      "project": "Stornaut case study",
+      "revision": "8a7f6a61260e02d9c78cf9a337411de4cb8bfc20",
+      "license": "MIT",
+      "usage": "independentObservation"
+    }
+  ],
+  "cases": [
+    {
+      "id": "comparison-docker-disk-size-only",
+      "ruleID": "runtime-docker-desktop-disk",
+      "sourceProject": "Stornaut case study",
+      "upstreamBehavior": "sparseDiskLogicalSizeCanLookHuge",
+      "stornautOutcome": "unknown",
+      "missingKeys": [
+        "evidence.runtime.detached",
+        "evidence.runtime.no-user-data"
+      ],
+      "relativeDifference": "pathAndSizeNeverAuthorizeVmDeletion"
+    },
+    {
+      "id": "comparison-cleardisk-ide-cache",
+      "ruleID": "cache-jetbrains-system",
+      "sourceProject": "ClearDisk",
+      "upstreamBehavior": "knownIdeCacheGetsStaticRisk",
+      "stornautOutcome": "reviewBlocked",
+      "missingKeys": [
+        "activity.process.inactive"
+      ],
+      "relativeDifference": "runningIdeBlocksRecommendation"
+    },
+    {
+      "id": "comparison-mole-running-app",
+      "ruleID": "residue-electron-shipit-vscode",
+      "sourceProject": "Mole",
+      "upstreamBehavior": "runningApplicationAddsProtection",
+      "stornautOutcome": "reviewBlocked",
+      "missingKeys": [
+        "activity.process.inactive"
+      ],
+      "relativeDifference": "typedUpdaterActivityIsMandatory"
+    },
+    {
+      "id": "comparison-current-update",
+      "ruleID": "residue-lark-update-downloads",
+      "sourceProject": "Stornaut case study",
+      "upstreamBehavior": "oldUpdatePackagesMayBeResidue",
+      "stornautOutcome": "reviewBlocked",
+      "missingKeys": [
+        "evidence.update.not-current"
+      ],
+      "relativeDifference": "currentUpdateIsNeverResidue"
+    },
+    {
+      "id": "comparison-ai-runtime-user-data",
+      "ruleID": "runtime-ai-vm-bundles",
+      "sourceProject": "Stornaut case study",
+      "upstreamBehavior": "runtimeBundleCanBeRedownloaded",
+      "stornautOutcome": "unknown",
+      "missingKeys": [
+        "evidence.runtime.no-user-data"
+      ],
+      "relativeDifference": "unknownBundleContentCannotBeAssumedCache"
+    }
+  ]
+}

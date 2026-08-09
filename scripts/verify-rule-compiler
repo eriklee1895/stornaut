@@ -13,6 +13,8 @@ overlay="$repo_root/Tests/Fixtures/Rules/conservative-overlay.json"
 protected_catalog="$repo_root/Rules/BuiltIn/protected-v1.json"
 project_catalog="$repo_root/Rules/BuiltIn/project-artifacts-v1.json"
 cache_catalog="$repo_root/Rules/BuiltIn/package-build-caches-v1.json"
+runtime_catalog="$repo_root/Rules/BuiltIn/runtime-tool-residue-v1.json"
+coverage_source="$repo_root/Tests/Fixtures/Rules/fr2-coverage-v1.json"
 
 for run in 1 2; do
     swift run stornaut-rule-compiler \
@@ -41,6 +43,17 @@ for run in 1 2; do
         --output "$work_dir/cache-catalog-$run.json" \
         --manifest "$work_dir/cache-manifest-$run.json" \
         > "$work_dir/cache-hash-$run.txt"
+    swift run stornaut-rule-compiler \
+        --catalog "$protected_catalog" \
+        --catalog "$project_catalog" \
+        --catalog "$cache_catalog" \
+        --catalog "$runtime_catalog" \
+        --catalog-version builtin-runtime-tool-residue-v1 \
+        --coverage "$coverage_source" \
+        --output "$work_dir/complete-catalog-$run.json" \
+        --manifest "$work_dir/complete-manifest-$run.json" \
+        --coverage-manifest "$work_dir/complete-coverage-$run.json" \
+        > "$work_dir/complete-hash-$run.txt"
 done
 
 cmp "$work_dir/catalog-1.json" "$work_dir/catalog-2.json"
@@ -55,6 +68,10 @@ cmp "$work_dir/project-hash-1.txt" "$work_dir/project-hash-2.txt"
 cmp "$work_dir/cache-catalog-1.json" "$work_dir/cache-catalog-2.json"
 cmp "$work_dir/cache-manifest-1.json" "$work_dir/cache-manifest-2.json"
 cmp "$work_dir/cache-hash-1.txt" "$work_dir/cache-hash-2.txt"
+cmp "$work_dir/complete-catalog-1.json" "$work_dir/complete-catalog-2.json"
+cmp "$work_dir/complete-manifest-1.json" "$work_dir/complete-manifest-2.json"
+cmp "$work_dir/complete-coverage-1.json" "$work_dir/complete-coverage-2.json"
+cmp "$work_dir/complete-hash-1.txt" "$work_dir/complete-hash-2.txt"
 
 swift run stornaut-rule-compiler \
     --catalog "$project_catalog" \
@@ -78,6 +95,60 @@ swift run stornaut-rule-compiler \
 cmp "$work_dir/cache-catalog-1.json" "$work_dir/cache-catalog-reordered.json"
 cmp "$work_dir/cache-manifest-1.json" "$work_dir/cache-manifest-reordered.json"
 cmp "$work_dir/cache-hash-1.txt" "$work_dir/cache-hash-reordered.txt"
+
+swift run stornaut-rule-compiler \
+    --catalog "$runtime_catalog" \
+    --catalog "$cache_catalog" \
+    --catalog "$project_catalog" \
+    --catalog "$protected_catalog" \
+    --catalog-version builtin-runtime-tool-residue-v1 \
+    --coverage "$coverage_source" \
+    --output "$work_dir/complete-catalog-reordered.json" \
+    --manifest "$work_dir/complete-manifest-reordered.json" \
+    --coverage-manifest "$work_dir/complete-coverage-reordered.json" \
+    > "$work_dir/complete-hash-reordered.txt"
+cmp "$work_dir/complete-catalog-1.json" "$work_dir/complete-catalog-reordered.json"
+cmp "$work_dir/complete-manifest-1.json" "$work_dir/complete-manifest-reordered.json"
+cmp "$work_dir/complete-coverage-1.json" "$work_dir/complete-coverage-reordered.json"
+cmp "$work_dir/complete-hash-1.txt" "$work_dir/complete-hash-reordered.txt"
+
+python3 - "$coverage_source" "$work_dir/invalid-coverage.json" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as source:
+    coverage = json.load(source)
+coverage["families"][0]["requirementIDs"].append("fr2.missing")
+with open(sys.argv[2], "w", encoding="utf-8") as output:
+    json.dump(coverage, output, sort_keys=True)
+PY
+set +e
+swift run stornaut-rule-compiler \
+    --catalog "$protected_catalog" \
+    --catalog "$project_catalog" \
+    --catalog "$cache_catalog" \
+    --catalog "$runtime_catalog" \
+    --catalog-version builtin-runtime-tool-residue-v1 \
+    --coverage "$work_dir/invalid-coverage.json" \
+    --output "$work_dir/invalid-coverage-catalog.json" \
+    --manifest "$work_dir/invalid-coverage-manifest.json" \
+    --coverage-manifest "$work_dir/invalid-coverage-output.json" \
+    > /dev/null 2>&1
+invalid_coverage_status=$?
+set -e
+if (( invalid_coverage_status == 0 )); then
+    echo "coverage compiler accepted an unknown requirement" >&2
+    exit 1
+fi
+for unexpected in \
+    "$work_dir/invalid-coverage-catalog.json" \
+    "$work_dir/invalid-coverage-manifest.json" \
+    "$work_dir/invalid-coverage-output.json"; do
+    if [[ -e "$unexpected" ]]; then
+        echo "coverage failure left a partial output: $unexpected" >&2
+        exit 1
+    fi
+done
 
 set +e
 swift run stornaut-rule-compiler \
@@ -114,6 +185,7 @@ python3 -m json.tool Rules/Schema/rule-overlay-source.schema.json >/dev/null
 python3 -m json.tool Rules/BuiltIn/protected-v1.json >/dev/null
 python3 -m json.tool Rules/BuiltIn/project-artifacts-v1.json >/dev/null
 python3 -m json.tool Rules/BuiltIn/package-build-caches-v1.json >/dev/null
+python3 -m json.tool Rules/BuiltIn/runtime-tool-residue-v1.json >/dev/null
 python3 -m json.tool Tests/Fixtures/Rules/protected-path-cases.json >/dev/null
 python3 -m json.tool Tests/Fixtures/Rules/protected-downgrade-overlay.json >/dev/null
 python3 -m json.tool Tests/Fixtures/Rules/project-artifact-cases.json >/dev/null
@@ -122,6 +194,10 @@ python3 -m json.tool \
 python3 -m json.tool Tests/Fixtures/Rules/package-cache-cases.json >/dev/null
 python3 -m json.tool \
     Tests/Fixtures/Rules/package-cache-behavior-comparison.json >/dev/null
+python3 -m json.tool Tests/Fixtures/Rules/runtime-residue-cases.json >/dev/null
+python3 -m json.tool \
+    Tests/Fixtures/Rules/runtime-residue-behavior-comparison.json >/dev/null
+python3 -m json.tool Tests/Fixtures/Rules/fr2-coverage-v1.json >/dev/null
 python3 -m json.tool "$work_dir/catalog-1.json" >/dev/null
 python3 -m json.tool "$work_dir/manifest-1.json" >/dev/null
 python3 -m json.tool "$work_dir/protected-catalog-1.json" >/dev/null
@@ -130,6 +206,9 @@ python3 -m json.tool "$work_dir/project-catalog-1.json" >/dev/null
 python3 -m json.tool "$work_dir/project-manifest-1.json" >/dev/null
 python3 -m json.tool "$work_dir/cache-catalog-1.json" >/dev/null
 python3 -m json.tool "$work_dir/cache-manifest-1.json" >/dev/null
+python3 -m json.tool "$work_dir/complete-catalog-1.json" >/dev/null
+python3 -m json.tool "$work_dir/complete-manifest-1.json" >/dev/null
+python3 -m json.tool "$work_dir/complete-coverage-1.json" >/dev/null
 
 swift package show-dependencies --format text \
     | grep -Fx 'No external dependencies found' >/dev/null
@@ -194,3 +273,4 @@ echo "Rule compiler fixture verification passed: $(cat "$work_dir/hash-1.txt")"
 echo "Protected catalog verification passed: $(cat "$work_dir/protected-hash-1.txt")"
 echo "Project catalog verification passed: $(cat "$work_dir/project-hash-1.txt")"
 echo "Cache catalog verification passed: $(cat "$work_dir/cache-hash-1.txt")"
+echo "Complete catalog verification passed: $(cat "$work_dir/complete-hash-1.txt")"

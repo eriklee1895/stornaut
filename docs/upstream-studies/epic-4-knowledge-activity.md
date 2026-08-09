@@ -522,3 +522,77 @@ the fixed debug workload, preserving the 2 s gate for Task 18 growth.
 The cumulative catalog version is `builtin-package-build-caches-v1`, with
 reviewed SHA-256
 `4dd2ed03f74d20d47ec0670310edb1ff1297c188b307c69a71e9c3f25ae54794`.
+
+## 15. Task 18 Runtime, Tool and Residue Catalog Update
+
+Task 18 adds
+[`../../Rules/BuiltIn/runtime-tool-residue-v1.json`](../../Rules/BuiltIn/runtime-tool-residue-v1.json)
+as the fifth and final Phase B catalog source.
+
+### Runtime vs reclaimable residue
+
+Five runtime/image rules default to Unknown with no action:
+
+- Docker Desktop VM disk;
+- Colima and Lima instance disks;
+- Xcode simulator devices;
+- AI desktop VM bundles.
+
+Paths and logical size cannot prove detachment, lack of user data or safe
+reconstruction. These facts remain typed requirements for later activity/
+classification fusion, not an authorization to reclaim.
+
+Seven tool-cache/residue rules remain Review Recommended:
+
+- Codex runtime cache;
+- Cursor, JetBrains and VS Code caches;
+- Lark update downloads;
+- Codex abandoned temporary storage;
+- VS Code ShipIt residue.
+
+They require user/tool ownership, no user data, recovery inputs, inactive
+process and a specific reclaimable/not-current/abandoned fact.
+
+### Source provenance
+
+Official Docker, Colima, Lima, Apple Xcode, VS Code, Electron/Squirrel and
+OpenAI Codex sources are pinned to exact commits or explicit product-document
+versions. JetBrains and Cursor are versioned external documentation snapshots.
+Cursor CachedData layout is marked black-box verification rather than claimed
+as a documented path.
+
+All 12 first-party URLs were live-verified. No code, constants or fixtures are
+copied.
+
+### Complete FR-2 audit
+
+Task 18 adds the host-only `RuleCoverageCompiler`. Its strict JSON input maps:
+
+- five stable FR-2 families;
+- 36 named PRD subrequirements;
+- all 67 compiled rules exactly once;
+- four Swift policy keys covering filesystem root, HOME, mount roots and
+  system locations.
+
+The output joins every rule with category, disposition, risk, action, rationale,
+provenance and fixtures. Unknown, duplicate, missing, fractional-version or
+policy-incomplete inputs fail.
+
+The compiler CLI validates and encodes coverage before writing any output, so a
+coverage failure cannot leave a successful partial catalog/manifest.
+
+### Clean-room safety comparison
+
+- Sparse VM disks remain Unknown; apparent size is never reclaimability.
+- Static IDE cache taxonomy cannot override a running process.
+- ShipIt/update paths require a non-current update fact.
+- AI runtime bundles remain Unknown if content ownership is unclear.
+- user data, credentials, configs, mounted/attached images and current updates
+  stay blocked or do not match.
+
+### Complete benchmark
+
+The complete 67-rule catalog stays below the fixed 2 s debug matcher gate
+(about 1.25–1.30 s). The complete catalog version is
+`builtin-runtime-tool-residue-v1`, with reviewed SHA-256
+`133b3829816fa951f03cb87473e03454c3e561b421c83e6c8efaf8ad89849e99`.

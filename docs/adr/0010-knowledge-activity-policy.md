@@ -184,6 +184,17 @@ Task 17 evidence adds:
 - cumulative catalog hash
   `4dd2ed03f74d20d47ec0670310edb1ff1297c188b307c69a71e9c3f25ae54794`.
 
+Task 18 evidence adds:
+
+- the remaining runtime/image/tool/update/temp source with Unknown/no-action
+  defaults for VM/runtime state;
+- 48 active/mounted/current/user-data/destructive-lookalike fixtures;
+- host-only FR-2 coverage compilation over five families, 36 requirements,
+  67 rules and four Swift policy keys;
+- atomic CLI coverage validation/output and complete benchmark evidence;
+- complete catalog hash
+  `133b3829816fa951f03cb87473e03454c3e561b421c83e6c8efaf8ad89849e99`.
+
 ## Consequences
 
 Positive:
@@ -205,8 +216,8 @@ Costs:
 
 ## Residual Risks
 
-- Tasks 15–17 provide Protected, project-artifact and package/build-cache
-  sources; runtime/residue family coverage remains Task 18.
+- Tasks 15–18 provide all five planned catalog sources and the complete FR-2
+  coverage manifest.
 - Candidate matching is measured, but evidence/activity fusion and final
   classification remain Tasks 19–20.
 - Activity providers and fail-conservative fusion are Task 19.

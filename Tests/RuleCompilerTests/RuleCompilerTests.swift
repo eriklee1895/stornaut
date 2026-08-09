@@ -1057,6 +1057,309 @@ func completeCacheCatalogMatchingBenchmarkStaysBounded() throws {
     #expect(duration < .seconds(2))
 }
 
+@Test
+func runtimeToolResidueCatalogUsesConservativeActionsAndActivity() throws {
+    let artifact = try RuleSourceCompiler().compile(
+        catalogSources: [
+            try builtInRuleFixture("protected-v1"),
+            try builtInRuleFixture("project-artifacts-v1"),
+            try builtInRuleFixture("package-build-caches-v1"),
+            try builtInRuleFixture("runtime-tool-residue-v1"),
+        ],
+        catalogVersion: try DomainToken(
+            validating: "builtin-runtime-tool-residue-v1"
+        )
+    )
+    let runtimeRules = artifact.catalog.rules.filter {
+        $0.category == .toolRuntimesAndImages
+            || $0.category == .updatesAndTemporaryFiles
+    }
+    let unknownIDs = [
+        "runtime-ai-vm-bundles",
+        "runtime-colima-instance",
+        "runtime-docker-desktop-disk",
+        "runtime-lima-instance",
+        "runtime-xcode-simulator-devices",
+    ]
+
+    #expect(runtimeRules.count == 12)
+    #expect(artifact.catalog.rules.count == 67)
+    #expect(artifact.manifest.sourceCatalogVersions == [
+        "package-build-caches-v1",
+        "project-artifacts-v1",
+        "protected-v1",
+        "runtime-tool-residue-v1",
+    ])
+    for rule in runtimeRules {
+        if unknownIDs.contains(rule.id.rawValue) {
+            #expect(rule.disposition == .unknown)
+            #expect(rule.recommendedAction == .none)
+            #expect(rule.recovery == nil)
+        } else {
+            #expect(rule.disposition == .reviewRecommended)
+            #expect(rule.recommendedAction == .moveToTrash)
+            #expect(rule.recovery != nil)
+            #expect(
+                rule.requiredActivityKeys.map(\.rawValue).contains(
+                    "activity.process.inactive"
+                )
+            )
+        }
+        #expect(rule.provenance.sources.count >= 2)
+        #expect(rule.fixtureIDs.count == 4)
+    }
+}
+
+@Test
+func completeFR2CoverageMapReferencesEveryCompiledRuleFamily() throws {
+    let artifact = try RuleSourceCompiler().compile(
+        catalogSources: [
+            try builtInRuleFixture("protected-v1"),
+            try builtInRuleFixture("project-artifacts-v1"),
+            try builtInRuleFixture("package-build-caches-v1"),
+            try builtInRuleFixture("runtime-tool-residue-v1"),
+        ],
+        catalogVersion: try DomainToken(
+            validating: "builtin-runtime-tool-residue-v1"
+        )
+    )
+    let coverage = try RuleCoverageCompiler().compile(
+        coverageData: try ruleFixture("fr2-coverage-v1"),
+        catalog: artifact.catalog
+    )
+
+    #expect(coverage.schemaVersion == 1)
+    #expect(coverage.catalogVersion == "builtin-runtime-tool-residue-v1")
+    #expect(coverage.families.count == 5)
+    #expect(coverage.families.allSatisfy { !$0.ruleIDs.isEmpty })
+    #expect(
+        Set(coverage.families.flatMap(\.requirementIDs)).count == 36
+    )
+    #expect(
+        Set(coverage.families.flatMap(\.policyKeys)) == Set([
+            "policy.canonical.filesystem-root",
+            "policy.canonical.home",
+            "policy.canonical.mount-root",
+            "policy.sensitive.system-locations",
+        ].compactMap(DomainToken.init(rawValue:)))
+    )
+    #expect(
+        Set(coverage.families.flatMap(\.ruleIDs))
+            == Set(artifact.catalog.rules.map(\.id))
+    )
+
+    var invalid = try #require(
+        JSONSerialization.jsonObject(
+            with: try ruleFixture("fr2-coverage-v1")
+        ) as? [String: Any]
+    )
+    var families = try #require(
+        invalid["families"] as? [[String: Any]]
+    )
+    var ids = try #require(families[0]["ruleIDs"] as? [String])
+    ids.append("missing-rule")
+    families[0]["ruleIDs"] = ids
+    invalid["families"] = families
+    #expect(throws: RuleCatalogError.invalidCatalog) {
+        _ = try RuleCoverageCompiler().compile(
+            coverageData: JSONSerialization.data(
+                withJSONObject: invalid,
+                options: [.sortedKeys]
+            ),
+            catalog: artifact.catalog
+        )
+    }
+
+    invalid = try #require(
+        JSONSerialization.jsonObject(
+            with: try ruleFixture("fr2-coverage-v1")
+        ) as? [String: Any]
+    )
+    families = try #require(invalid["families"] as? [[String: Any]])
+    var requirements = try #require(
+        families[0]["requirementIDs"] as? [String]
+    )
+    requirements.removeLast()
+    families[0]["requirementIDs"] = requirements
+    invalid["families"] = families
+    #expect(throws: RuleCatalogError.invalidCatalog) {
+        _ = try RuleCoverageCompiler().compile(
+            coverageData: JSONSerialization.data(
+                withJSONObject: invalid,
+                options: [.sortedKeys]
+            ),
+            catalog: artifact.catalog
+        )
+    }
+
+    invalid = try #require(
+        JSONSerialization.jsonObject(
+            with: try ruleFixture("fr2-coverage-v1")
+        ) as? [String: Any]
+    )
+    families = try #require(invalid["families"] as? [[String: Any]])
+    let protectedIndex = try #require(
+        families.firstIndex {
+            $0["familyID"] as? String == "fr2.protected-veto"
+        }
+    )
+    var policyKeys = try #require(
+        families[protectedIndex]["policyKeys"] as? [String]
+    )
+    policyKeys.removeLast()
+    families[protectedIndex]["policyKeys"] = policyKeys
+    invalid["families"] = families
+    #expect(throws: RuleCatalogError.invalidCatalog) {
+        _ = try RuleCoverageCompiler().compile(
+            coverageData: JSONSerialization.data(
+                withJSONObject: invalid,
+                options: [.sortedKeys]
+            ),
+            catalog: artifact.catalog
+        )
+    }
+
+    invalid = try #require(
+        JSONSerialization.jsonObject(
+            with: try ruleFixture("fr2-coverage-v1")
+        ) as? [String: Any]
+    )
+    invalid["schemaVersion"] = 1.5
+    #expect(throws: RuleCatalogError.invalidCatalog) {
+        _ = try RuleCoverageCompiler().compile(
+            coverageData: JSONSerialization.data(
+                withJSONObject: invalid,
+                options: [.sortedKeys]
+            ),
+            catalog: artifact.catalog
+        )
+    }
+}
+
+@Test
+func runtimeToolResidueFixturesCoverActiveCurrentAndDestructiveStates() throws {
+    let artifact = try RuleSourceCompiler().compile(
+        catalogData: try builtInRuleFixture("runtime-tool-residue-v1")
+    )
+    let fixture = try runtimeResidueFixture()
+    let casesByRule = Dictionary(grouping: fixture.cases, by: \.ruleID)
+
+    for rule in artifact.catalog.rules {
+        let matcher = RuleCatalogMatcher(
+            catalog: try RuleCatalog(
+                catalogVersion: try DomainToken(
+                    validating: "fixture-runtime-rule"
+                ),
+                rules: [rule]
+            )
+        )
+        let cases = try #require(casesByRule[rule.id.rawValue])
+        let requirements = Set(
+            rule.requiredEvidenceKeys.map(\.rawValue)
+                + rule.requiredActivityKeys.map(\.rawValue)
+        )
+        #expect(cases.count == 4)
+        #expect(Set(cases.map(\.safetyType)).count == 4)
+        for fixtureCase in cases {
+            let kind = try #require(
+                RuleExpectedKind(rawValue: fixtureCase.expectedKind)
+            )
+            #expect(
+                try !matcher.matchingRules(
+                    relativePath: fixtureCase.path,
+                    kind: kind
+                ).isEmpty == fixtureCase.expectedMatch
+            )
+            if fixtureCase.expectedMatch {
+                let present = Set(fixtureCase.presentKeys)
+                let missing = Set(fixtureCase.missingKeys)
+                #expect(present.union(missing) == requirements)
+                #expect(present.isDisjoint(with: missing))
+                if fixtureCase.safetyType == "positive" {
+                    #expect(missing.isEmpty)
+                } else {
+                    #expect(!missing.isEmpty)
+                }
+            }
+        }
+    }
+}
+
+@Test
+func completeCatalogMatchingBenchmarkStaysBounded() throws {
+    let artifact = try RuleSourceCompiler().compile(
+        catalogSources: [
+            try builtInRuleFixture("protected-v1"),
+            try builtInRuleFixture("project-artifacts-v1"),
+            try builtInRuleFixture("package-build-caches-v1"),
+            try builtInRuleFixture("runtime-tool-residue-v1"),
+        ],
+        catalogVersion: try DomainToken(
+            validating: "builtin-runtime-tool-residue-v1"
+        )
+    )
+    let matcher = RuleCatalogMatcher(catalog: artifact.catalog)
+    let paths = try runtimeResidueFixture().cases.map(\.path)
+        + packageCacheFixture().cases.map(\.path)
+        + projectArtifactFixture().cases.map(\.path)
+        + anonymousDeveloperTreePaths()
+    let clock = ContinuousClock()
+    var matchCount = 0
+
+    let duration = try clock.measure {
+        for _ in 0..<125 {
+            for path in paths {
+                matchCount += try matcher.matchingRules(
+                    relativePath: path,
+                    kind: .directory
+                ).count
+            }
+        }
+    }
+
+    #expect(matchCount > 0)
+    #expect(duration < .seconds(2))
+}
+
+@Test
+func runtimeResidueBehaviorComparisonNeverPromotesFromStaticTaxonomy() throws {
+    let artifact = try RuleSourceCompiler().compile(
+        catalogData: try builtInRuleFixture("runtime-tool-residue-v1")
+    )
+    let data = try ruleFixture("runtime-residue-behavior-comparison")
+    let root = try #require(
+        JSONSerialization.jsonObject(with: data) as? [String: Any]
+    )
+    let cases = try #require(root["cases"] as? [[String: Any]])
+    let rulesByID = Dictionary(
+        uniqueKeysWithValues: artifact.catalog.rules.map {
+            ($0.id.rawValue, $0)
+        }
+    )
+
+    for comparison in cases {
+        let ruleID = try #require(comparison["ruleID"] as? String)
+        let outcome = try #require(
+            comparison["stornautOutcome"] as? String
+        )
+        let missing = Set(try #require(
+            comparison["missingKeys"] as? [String]
+        ))
+        let rule = try #require(rulesByID[ruleID])
+        let requirements = Set(
+            rule.requiredEvidenceKeys.map(\.rawValue)
+                + rule.requiredActivityKeys.map(\.rawValue)
+        )
+
+        #expect(["unknown", "reviewBlocked", "noCandidate"].contains(outcome))
+        #expect(missing.isSubset(of: requirements))
+        #expect(outcome == "noCandidate" || !missing.isEmpty)
+        if rule.disposition == .unknown {
+            #expect(rule.recommendedAction == .none)
+        }
+    }
+}
+
 private func ruleFixture(_ name: String) throws -> Data {
     try Data(
         contentsOf: repositoryRoot.appending(
@@ -1168,6 +1471,32 @@ private struct PackageCacheFixtureCase: Decodable {
     let path: String
     let presentKeys: [String]
     let missingKeys: [String]
+}
+
+private struct RuntimeResidueFixture: Decodable {
+    let schemaVersion: Int
+    let cases: [RuntimeResidueFixtureCase]
+}
+
+private struct RuntimeResidueFixtureCase: Decodable {
+    let id: String
+    let ruleID: String
+    let safetyType: String
+    let path: String
+    let expectedMatch: Bool
+    let expectedKind: String
+    let presentKeys: [String]
+    let missingKeys: [String]
+}
+
+private func runtimeResidueFixture() throws -> RuntimeResidueFixture {
+    let fixture = try JSONDecoder().decode(
+        RuntimeResidueFixture.self,
+        from: ruleFixture("runtime-residue-cases")
+    )
+    #expect(fixture.schemaVersion == 1)
+    #expect(Set(fixture.cases.map(\.id)).count == fixture.cases.count)
+    return fixture
 }
 
 private func packageCacheFixture() throws -> PackageCacheFixture {

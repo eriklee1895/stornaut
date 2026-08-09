@@ -1,6 +1,6 @@
 # Stornaut Epic 2–4 Deterministic Product Core Implementation Plan
 
-> **Status:** Approved — Tasks 9–17 complete; Task 18 next
+> **Status:** Approved — Tasks 9–18 complete; Task 19 next
 >
 > **Roadmap phase:** Phase B — Deterministic Product Core
 >
@@ -1028,32 +1028,57 @@ Suggested commit subject: `feat: classify developer caches safely`
 - Update: `docs/upstream-studies/epic-4-knowledge-activity.md`
 - Update if needed: `ThirdPartyNotices/README.md`
 
-- [ ] **Step 1: Add remaining FR-2 families**
+- [x] **Step 1: Add remaining FR-2 families**
 
 Cover Docker, Colima, Lima, Xcode, JetBrains, VS Code, Cursor, AI tool runtimes,
 Electron ShipIt/update residue and common temporary residue. Runtime images and
 tool state default conservatively because path size alone does not prove they
 are unused or safely reconstructable.
 
-- [ ] **Step 2: Add positive, active and destructive-lookalike fixtures**
+- [x] **Step 2: Add positive, active and destructive-lookalike fixtures**
 
 Each family has independent positive/safety fixtures, including running-tool,
 mounted/attached image, current update, user data and nested credential cases.
 No rule proposes external cleanup commands in Phase B.
 
-- [ ] **Step 3: Close the FR-2 catalog audit**
+- [x] **Step 3: Close the FR-2 catalog audit**
 
 Generate a coverage/provenance manifest showing every PRD FR-2 family, rule ID,
 source/version/license, verification date, fixture and conservative
 disposition. Missing families fail verification rather than disappearing from
 the report.
 
-- [ ] **Step 4: Benchmark and verify the complete catalog**
+- [x] **Step 4: Benchmark and verify the complete catalog**
 
 Compare selected clean-room behavior against documented upstream behavior,
 compile twice for identical hashes, and prove cumulative matching does not
 dominate the anonymous Quick Scan fixture. Run all rule/safety tests and
 `scripts/verify`.
+
+Execution evidence:
+
+- `runtime-tool-residue-v1.json` adds five Unknown/no-action runtime/image
+  rules plus seven Review Recommended tool-cache/update/temp rules. Docker,
+  Colima/Lima disks, simulator devices and AI VM bundles never gain action
+  metadata from path or size.
+- 48 fixtures cover positive, active, mounted/attached, current update and
+  user-data/credential lookalikes using the production matcher and file kinds.
+- Review narrowed instance roots to concrete disk files, replaced a generic
+  update wildcard with Lark-specific evidence, made coverage writes atomic,
+  rejected fractional schema versions and distinguished documentation from
+  black-box path verification. Post-fix review has no open P0–P2 finding.
+- FR-2 coverage manifest maps five families, 36 subrequirements, all 67 rules
+  exactly once and four Swift policy keys for root/HOME/mount/system protection.
+- 12/12 source URLs pass live version/commit audit. RuleCompiler 32/32 and
+  RuleCatalog 6/6 pass.
+- Complete 67-rule matcher remains below the 2 s gate at about 1.25–1.30 s.
+- Five-source complete catalog hash is
+  `133b3829816fa951f03cb87473e03454c3e561b421c83e6c8efaf8ad89849e99`.
+- Final `scripts/verify` passes 218 SwiftPM tests, 2/2 Xcode App contract tests,
+  2/2 XCUITest cases, four Light/Dark screenshots, App signing/bundle,
+  localization, deterministic compiler/catalog/coverage and docs gates.
+- No dependency or copied upstream code was added. ADR 0010 remains Proposed
+  until Task 19 activity fusion and later Phase B gates pass.
 
 Suggested commit subject: `feat: complete deterministic storage catalog`
 

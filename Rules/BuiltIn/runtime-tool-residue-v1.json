@@ -1,0 +1,646 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "runtime-tool-residue-v1",
+  "rules": [
+    {
+      "id": "cache-codex-runtimes",
+      "match": {
+        "pathPattern": ".cache/codex-runtimes/*",
+        "expectedKind": "directory"
+      },
+      "producer": "Codex runtime cache",
+      "rationaleKey": "rationale.tool.codex-runtime-cache",
+      "category": "toolRuntimesAndImages",
+      "disposition": "reviewRecommended",
+      "risk": "high",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.recovery.inputs-present",
+        "evidence.runtime.not-current",
+        "evidence.scope.user-owned",
+        "evidence.storage.no-user-data",
+        "evidence.storage.tool-owned"
+      ],
+      "requiredActivityKeys": [
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.tool.codex-runtime-redownload",
+        "cost": "high"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Stornaut disk case study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/8a7f6a61260e02d9c78cf9a337411de4cb8bfc20/docs/research/case-study-2026-08-06.md",
+            "revision": "8a7f6a61260e02d9c78cf9a337411de4cb8bfc20",
+            "license": "MIT",
+            "usage": "independentObservation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/8a7f6a61260e02d9c78cf9a337411de4cb8bfc20/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "8a7f6a61260e02d9c78cf9a337411de4cb8bfc20",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "cache-codex-runtimes-positive",
+        "cache-codex-runtimes-active",
+        "cache-codex-runtimes-current",
+        "cache-codex-runtimes-lookalike"
+      ]
+    },
+    {
+      "id": "cache-cursor-cached-data",
+      "match": {
+        "pathPattern": "Library/Application Support/Cursor/CachedData/*",
+        "expectedKind": "directory"
+      },
+      "producer": "Cursor",
+      "rationaleKey": "rationale.tool.cursor-cached-data",
+      "category": "toolRuntimesAndImages",
+      "disposition": "reviewRecommended",
+      "risk": "high",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.cache.reclaimable",
+        "evidence.recovery.inputs-present",
+        "evidence.scope.user-owned",
+        "evidence.storage.no-user-data",
+        "evidence.storage.tool-owned"
+      ],
+      "requiredActivityKeys": [
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.tool.cursor-rebuild-cache",
+        "cost": "medium"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Cursor documentation",
+            "url": "https://docs.cursor.com/",
+            "revision": "2026-08-10",
+            "license": "Cursor-Documentation",
+            "usage": "blackBoxVerification"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/8a7f6a61260e02d9c78cf9a337411de4cb8bfc20/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "8a7f6a61260e02d9c78cf9a337411de4cb8bfc20",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "cache-cursor-cached-data-positive",
+        "cache-cursor-cached-data-active",
+        "cache-cursor-cached-data-current",
+        "cache-cursor-cached-data-lookalike"
+      ]
+    },
+    {
+      "id": "cache-jetbrains-system",
+      "match": {
+        "pathPattern": "Library/Caches/JetBrains/*",
+        "expectedKind": "directory"
+      },
+      "producer": "JetBrains IDEs",
+      "rationaleKey": "rationale.tool.jetbrains-system-cache",
+      "category": "toolRuntimesAndImages",
+      "disposition": "reviewRecommended",
+      "risk": "high",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.cache.reclaimable",
+        "evidence.recovery.inputs-present",
+        "evidence.scope.user-owned",
+        "evidence.storage.no-user-data",
+        "evidence.storage.tool-owned"
+      ],
+      "requiredActivityKeys": [
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.tool.jetbrains-reindex",
+        "cost": "medium"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "JetBrains IDE documentation",
+            "url": "https://www.jetbrains.com/help/idea/tuning-the-ide.html",
+            "revision": "IDEA-2026.2",
+            "license": "JetBrains-Documentation",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/8a7f6a61260e02d9c78cf9a337411de4cb8bfc20/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "8a7f6a61260e02d9c78cf9a337411de4cb8bfc20",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "cache-jetbrains-system-positive",
+        "cache-jetbrains-system-active",
+        "cache-jetbrains-system-current",
+        "cache-jetbrains-system-lookalike"
+      ]
+    },
+    {
+      "id": "cache-vscode-cached-data",
+      "match": {
+        "pathPattern": "Library/Application Support/Code/CachedData/*",
+        "expectedKind": "directory"
+      },
+      "producer": "Visual Studio Code",
+      "rationaleKey": "rationale.tool.vscode-cached-data",
+      "category": "toolRuntimesAndImages",
+      "disposition": "reviewRecommended",
+      "risk": "high",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.cache.reclaimable",
+        "evidence.recovery.inputs-present",
+        "evidence.scope.user-owned",
+        "evidence.storage.no-user-data",
+        "evidence.storage.tool-owned"
+      ],
+      "requiredActivityKeys": [
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.tool.vscode-rebuild-cache",
+        "cost": "medium"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Visual Studio Code",
+            "url": "https://github.com/microsoft/vscode/blob/5ade39da794883d627d81e575dade92bde7468c8/README.md",
+            "revision": "5ade39da794883d627d81e575dade92bde7468c8",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/8a7f6a61260e02d9c78cf9a337411de4cb8bfc20/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "8a7f6a61260e02d9c78cf9a337411de4cb8bfc20",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "cache-vscode-cached-data-positive",
+        "cache-vscode-cached-data-active",
+        "cache-vscode-cached-data-current",
+        "cache-vscode-cached-data-lookalike"
+      ]
+    },
+    {
+      "id": "residue-lark-update-downloads",
+      "match": {
+        "pathPattern": "Library/Application Support/LarkShell/update",
+        "expectedKind": "directory"
+      },
+      "producer": "Lark desktop updater",
+      "rationaleKey": "rationale.residue.app-update-download",
+      "category": "updatesAndTemporaryFiles",
+      "disposition": "reviewRecommended",
+      "risk": "high",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.recovery.inputs-present",
+        "evidence.scope.user-owned",
+        "evidence.storage.no-user-data",
+        "evidence.storage.tool-owned",
+        "evidence.update.not-current"
+      ],
+      "requiredActivityKeys": [
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.residue.update-redownload",
+        "cost": "medium"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Electron updater documentation",
+            "url": "https://github.com/electron/electron/blob/a4f3adca945ee086e43affa95cbf0f2c6b4fcd2c/docs/tutorial/updates.md",
+            "revision": "a4f3adca945ee086e43affa95cbf0f2c6b4fcd2c",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/8a7f6a61260e02d9c78cf9a337411de4cb8bfc20/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "8a7f6a61260e02d9c78cf9a337411de4cb8bfc20",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "residue-lark-update-downloads-positive",
+        "residue-lark-update-downloads-active",
+        "residue-lark-update-downloads-current",
+        "residue-lark-update-downloads-lookalike"
+      ]
+    },
+    {
+      "id": "residue-codex-temp",
+      "match": {
+        "pathPattern": ".codex/.tmp",
+        "expectedKind": "directory"
+      },
+      "producer": "Codex",
+      "rationaleKey": "rationale.residue.codex-temp",
+      "category": "updatesAndTemporaryFiles",
+      "disposition": "reviewRecommended",
+      "risk": "high",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.recovery.inputs-present",
+        "evidence.scope.user-owned",
+        "evidence.storage.no-user-data",
+        "evidence.storage.tool-owned",
+        "evidence.temp.abandoned"
+      ],
+      "requiredActivityKeys": [
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.residue.codex-recreate-temp",
+        "cost": "medium"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "OpenAI Codex",
+            "url": "https://github.com/openai/codex/blob/50ef7395faee1d0e2d01730f9636aa06091c7be3/codex-rs/config.md",
+            "revision": "50ef7395faee1d0e2d01730f9636aa06091c7be3",
+            "license": "Apache-2.0",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/8a7f6a61260e02d9c78cf9a337411de4cb8bfc20/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "8a7f6a61260e02d9c78cf9a337411de4cb8bfc20",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "residue-codex-temp-positive",
+        "residue-codex-temp-active",
+        "residue-codex-temp-current",
+        "residue-codex-temp-lookalike"
+      ]
+    },
+    {
+      "id": "residue-electron-shipit-vscode",
+      "match": {
+        "pathPattern": "Library/Caches/com.microsoft.VSCode.ShipIt",
+        "expectedKind": "directory"
+      },
+      "producer": "Squirrel.Mac ShipIt",
+      "rationaleKey": "rationale.residue.electron-shipit",
+      "category": "updatesAndTemporaryFiles",
+      "disposition": "reviewRecommended",
+      "risk": "high",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.recovery.inputs-present",
+        "evidence.scope.user-owned",
+        "evidence.storage.no-user-data",
+        "evidence.storage.tool-owned",
+        "evidence.update.not-current"
+      ],
+      "requiredActivityKeys": [
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.residue.shipit-redownload",
+        "cost": "medium"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Squirrel.Mac",
+            "url": "https://github.com/Squirrel/Squirrel.Mac/blob/8d808803bc89ec0e2aa1450474856dfee3b00c6b/README.md",
+            "revision": "8d808803bc89ec0e2aa1450474856dfee3b00c6b",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/8a7f6a61260e02d9c78cf9a337411de4cb8bfc20/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "8a7f6a61260e02d9c78cf9a337411de4cb8bfc20",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "residue-electron-shipit-vscode-positive",
+        "residue-electron-shipit-vscode-active",
+        "residue-electron-shipit-vscode-current",
+        "residue-electron-shipit-vscode-lookalike"
+      ]
+    },
+    {
+      "id": "runtime-ai-vm-bundles",
+      "match": {
+        "pathPattern": "Library/Application Support/Claude/vm_bundles/*",
+        "expectedKind": "directory"
+      },
+      "producer": "AI desktop runtime",
+      "rationaleKey": "rationale.runtime.ai-vm-bundle",
+      "category": "toolRuntimesAndImages",
+      "disposition": "unknown",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.runtime.detached",
+        "evidence.runtime.layout",
+        "evidence.runtime.no-user-data",
+        "evidence.scope.user-owned"
+      ],
+      "requiredActivityKeys": [
+        "activity.process.inactive"
+      ],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Stornaut disk case study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/8a7f6a61260e02d9c78cf9a337411de4cb8bfc20/docs/research/case-study-2026-08-06.md",
+            "revision": "8a7f6a61260e02d9c78cf9a337411de4cb8bfc20",
+            "license": "MIT",
+            "usage": "independentObservation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/8a7f6a61260e02d9c78cf9a337411de4cb8bfc20/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "8a7f6a61260e02d9c78cf9a337411de4cb8bfc20",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "runtime-ai-vm-bundles-positive",
+        "runtime-ai-vm-bundles-active",
+        "runtime-ai-vm-bundles-mounted",
+        "runtime-ai-vm-bundles-lookalike"
+      ]
+    },
+    {
+      "id": "runtime-colima-instance",
+      "match": {
+        "pathPattern": ".colima/_lima/*/diffdisk",
+        "expectedKind": "regularFile"
+      },
+      "producer": "Colima",
+      "rationaleKey": "rationale.runtime.colima-instance",
+      "category": "toolRuntimesAndImages",
+      "disposition": "unknown",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.runtime.detached",
+        "evidence.runtime.layout",
+        "evidence.runtime.no-user-data",
+        "evidence.scope.user-owned"
+      ],
+      "requiredActivityKeys": [
+        "activity.process.inactive"
+      ],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Colima",
+            "url": "https://github.com/abiosoft/colima/blob/490420d9b98d2e6a558426bfefaea1bb37b67115/README.md",
+            "revision": "490420d9b98d2e6a558426bfefaea1bb37b67115",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/8a7f6a61260e02d9c78cf9a337411de4cb8bfc20/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "8a7f6a61260e02d9c78cf9a337411de4cb8bfc20",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "runtime-colima-instance-positive",
+        "runtime-colima-instance-active",
+        "runtime-colima-instance-mounted",
+        "runtime-colima-instance-lookalike"
+      ]
+    },
+    {
+      "id": "runtime-docker-desktop-disk",
+      "match": {
+        "pathPattern": "Library/Containers/com.docker.docker/Data/vms/*/data/Docker.raw",
+        "expectedKind": "regularFile"
+      },
+      "producer": "Docker Desktop",
+      "rationaleKey": "rationale.runtime.docker-desktop-disk",
+      "category": "toolRuntimesAndImages",
+      "disposition": "unknown",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.runtime.detached",
+        "evidence.runtime.layout",
+        "evidence.runtime.no-user-data",
+        "evidence.scope.user-owned"
+      ],
+      "requiredActivityKeys": [
+        "activity.process.inactive"
+      ],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Docker Desktop documentation",
+            "url": "https://github.com/docker/docs/blob/bf47d790ad86d7580b7058dea632c4f29d239d5f/content/manuals/desktop/settings-and-maintenance/settings.md",
+            "revision": "bf47d790ad86d7580b7058dea632c4f29d239d5f",
+            "license": "Apache-2.0",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/8a7f6a61260e02d9c78cf9a337411de4cb8bfc20/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "8a7f6a61260e02d9c78cf9a337411de4cb8bfc20",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "runtime-docker-desktop-disk-positive",
+        "runtime-docker-desktop-disk-active",
+        "runtime-docker-desktop-disk-mounted",
+        "runtime-docker-desktop-disk-lookalike"
+      ]
+    },
+    {
+      "id": "runtime-lima-instance",
+      "match": {
+        "pathPattern": ".lima/*/diffdisk",
+        "expectedKind": "regularFile"
+      },
+      "producer": "Lima",
+      "rationaleKey": "rationale.runtime.lima-instance",
+      "category": "toolRuntimesAndImages",
+      "disposition": "unknown",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.runtime.detached",
+        "evidence.runtime.layout",
+        "evidence.runtime.no-user-data",
+        "evidence.scope.user-owned"
+      ],
+      "requiredActivityKeys": [
+        "activity.process.inactive"
+      ],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Lima",
+            "url": "https://github.com/lima-vm/lima/blob/b8b365a0b98d2a2b5adf2849f9e3a4ee07014746/website/content/en/docs/config/disk.md",
+            "revision": "b8b365a0b98d2a2b5adf2849f9e3a4ee07014746",
+            "license": "Apache-2.0",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/8a7f6a61260e02d9c78cf9a337411de4cb8bfc20/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "8a7f6a61260e02d9c78cf9a337411de4cb8bfc20",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "runtime-lima-instance-positive",
+        "runtime-lima-instance-active",
+        "runtime-lima-instance-mounted",
+        "runtime-lima-instance-lookalike"
+      ]
+    },
+    {
+      "id": "runtime-xcode-simulator-devices",
+      "match": {
+        "pathPattern": "Library/Developer/CoreSimulator/Devices/*",
+        "expectedKind": "directory"
+      },
+      "producer": "Xcode CoreSimulator",
+      "rationaleKey": "rationale.runtime.xcode-simulator-device",
+      "category": "toolRuntimesAndImages",
+      "disposition": "unknown",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.runtime.detached",
+        "evidence.runtime.layout",
+        "evidence.runtime.no-user-data",
+        "evidence.scope.user-owned"
+      ],
+      "requiredActivityKeys": [
+        "activity.process.inactive"
+      ],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Apple Xcode documentation",
+            "url": "https://developer.apple.com/documentation/xcode/installing-additional-simulator-runtimes",
+            "revision": "Xcode-26.6",
+            "license": "Apple-Documentation",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/8a7f6a61260e02d9c78cf9a337411de4cb8bfc20/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "8a7f6a61260e02d9c78cf9a337411de4cb8bfc20",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "runtime-xcode-simulator-devices-positive",
+        "runtime-xcode-simulator-devices-active",
+        "runtime-xcode-simulator-devices-mounted",
+        "runtime-xcode-simulator-devices-lookalike"
+      ]
+    }
+  ]
+}

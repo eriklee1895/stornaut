@@ -29,9 +29,31 @@ struct StornautRuleCompilerCommand {
                     overlayData: overlay
                 )
             }
+            let coverageOutput: (data: Data, url: URL)?
+            if let coverageURL = options.coverageURL,
+               let coverageManifestURL = options.coverageManifestURL
+            {
+                let coverage = try Data(contentsOf: coverageURL)
+                let coverageManifest = try RuleCoverageCompiler().compile(
+                    coverageData: coverage,
+                    catalog: artifact.catalog
+                )
+                coverageOutput = (
+                    try JSONEncoder.sorted.encode(coverageManifest),
+                    coverageManifestURL
+                )
+            } else {
+                coverageOutput = nil
+            }
             try writeAtomically(artifact.data, to: options.outputURL)
             let manifest = try JSONEncoder.sorted.encode(artifact.manifest)
             try writeAtomically(manifest, to: options.manifestURL)
+            if let coverageOutput {
+                try writeAtomically(
+                    coverageOutput.data,
+                    to: coverageOutput.url
+                )
+            }
             FileHandle.standardOutput.write(
                 Data("\(artifact.sha256)\n".utf8)
             )
@@ -48,15 +70,19 @@ private struct CompilerOptions {
     let catalogURLs: [URL]
     let catalogVersion: String?
     let overlayURL: URL?
+    let coverageURL: URL?
     let outputURL: URL
     let manifestURL: URL
+    let coverageManifestURL: URL?
 
     static func parse(_ arguments: [String]) throws -> Self {
         var catalogURLs: [URL] = []
         var catalogVersion: String?
         var overlayURL: URL?
+        var coverageURL: URL?
         var outputURL: URL?
         var manifestURL: URL?
+        var coverageManifestURL: URL?
         var index = 1
         while index < arguments.count {
             let flag = arguments[index]
@@ -78,6 +104,11 @@ private struct CompilerOptions {
                     throw CompilerCommandError.invalidArguments
                 }
                 overlayURL = try absoluteURL(value)
+            case "--coverage":
+                guard coverageURL == nil else {
+                    throw CompilerCommandError.invalidArguments
+                }
+                coverageURL = try absoluteURL(value)
             case "--output":
                 guard outputURL == nil else {
                     throw CompilerCommandError.invalidArguments
@@ -88,6 +119,11 @@ private struct CompilerOptions {
                     throw CompilerCommandError.invalidArguments
                 }
                 manifestURL = try absoluteURL(value)
+            case "--coverage-manifest":
+                guard coverageManifestURL == nil else {
+                    throw CompilerCommandError.invalidArguments
+                }
+                coverageManifestURL = try absoluteURL(value)
             default:
                 throw CompilerCommandError.invalidArguments
             }
@@ -96,6 +132,7 @@ private struct CompilerOptions {
         guard !catalogURLs.isEmpty,
               catalogURLs.count <= RuleSourceCompiler.maximumSourceCount,
               catalogURLs.count == 1 || catalogVersion != nil,
+              (coverageURL == nil) == (coverageManifestURL == nil),
               let outputURL,
               let manifestURL
         else {
@@ -103,12 +140,14 @@ private struct CompilerOptions {
         }
         let sourcePaths = try [
             overlayURL,
+            coverageURL,
         ].compactMap { $0 }.map(canonicalExistingPath)
             + catalogURLs.map(canonicalExistingPath)
         let destinationPaths = [
             outputURL,
             manifestURL,
-        ].map(canonicalDestinationPath)
+            coverageManifestURL,
+        ].compactMap { $0 }.map(canonicalDestinationPath)
         guard Set(sourcePaths + destinationPaths).count
                 == sourcePaths.count + destinationPaths.count
         else {
@@ -118,8 +157,10 @@ private struct CompilerOptions {
             catalogURLs: catalogURLs,
             catalogVersion: catalogVersion,
             overlayURL: overlayURL,
+            coverageURL: coverageURL,
             outputURL: outputURL,
-            manifestURL: manifestURL
+            manifestURL: manifestURL,
+            coverageManifestURL: coverageManifestURL
         )
     }
 }

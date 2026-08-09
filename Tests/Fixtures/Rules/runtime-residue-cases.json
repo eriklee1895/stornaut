@@ -1,0 +1,746 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "cache-codex-runtimes-active",
+      "ruleID": "cache-codex-runtimes",
+      "safetyType": "active",
+      "path": ".cache/codex-runtimes/v1",
+      "expectedMatch": true,
+      "presentKeys": [
+        "evidence.recovery.inputs-present",
+        "evidence.runtime.not-current",
+        "evidence.scope.user-owned",
+        "evidence.storage.no-user-data",
+        "evidence.storage.tool-owned"
+      ],
+      "missingKeys": [
+        "activity.process.inactive"
+      ],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "cache-codex-runtimes-current",
+      "ruleID": "cache-codex-runtimes",
+      "safetyType": "currentVersionOrUpdate",
+      "path": ".cache/codex-runtimes/v1",
+      "expectedMatch": true,
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.recovery.inputs-present",
+        "evidence.scope.user-owned",
+        "evidence.storage.no-user-data",
+        "evidence.storage.tool-owned"
+      ],
+      "missingKeys": [
+        "evidence.runtime.not-current"
+      ],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "cache-codex-runtimes-lookalike",
+      "ruleID": "cache-codex-runtimes",
+      "safetyType": "userDataOrCredential",
+      "path": ".codex/sessions",
+      "expectedMatch": false,
+      "presentKeys": [],
+      "missingKeys": [],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "cache-codex-runtimes-positive",
+      "ruleID": "cache-codex-runtimes",
+      "safetyType": "positive",
+      "path": ".cache/codex-runtimes/v1",
+      "expectedMatch": true,
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.recovery.inputs-present",
+        "evidence.runtime.not-current",
+        "evidence.scope.user-owned",
+        "evidence.storage.no-user-data",
+        "evidence.storage.tool-owned"
+      ],
+      "missingKeys": [],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "cache-cursor-cached-data-active",
+      "ruleID": "cache-cursor-cached-data",
+      "safetyType": "active",
+      "path": "Library/Application Support/Cursor/CachedData/hash",
+      "expectedMatch": true,
+      "presentKeys": [
+        "evidence.cache.reclaimable",
+        "evidence.recovery.inputs-present",
+        "evidence.scope.user-owned",
+        "evidence.storage.no-user-data",
+        "evidence.storage.tool-owned"
+      ],
+      "missingKeys": [
+        "activity.process.inactive"
+      ],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "cache-cursor-cached-data-current",
+      "ruleID": "cache-cursor-cached-data",
+      "safetyType": "currentVersionOrUpdate",
+      "path": "Library/Application Support/Cursor/CachedData/hash",
+      "expectedMatch": true,
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.recovery.inputs-present",
+        "evidence.scope.user-owned",
+        "evidence.storage.no-user-data",
+        "evidence.storage.tool-owned"
+      ],
+      "missingKeys": [
+        "evidence.cache.reclaimable"
+      ],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "cache-cursor-cached-data-lookalike",
+      "ruleID": "cache-cursor-cached-data",
+      "safetyType": "userDataOrCredential",
+      "path": "Library/Application Support/Cursor/User",
+      "expectedMatch": false,
+      "presentKeys": [],
+      "missingKeys": [],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "cache-cursor-cached-data-positive",
+      "ruleID": "cache-cursor-cached-data",
+      "safetyType": "positive",
+      "path": "Library/Application Support/Cursor/CachedData/hash",
+      "expectedMatch": true,
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.cache.reclaimable",
+        "evidence.recovery.inputs-present",
+        "evidence.scope.user-owned",
+        "evidence.storage.no-user-data",
+        "evidence.storage.tool-owned"
+      ],
+      "missingKeys": [],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "cache-jetbrains-system-active",
+      "ruleID": "cache-jetbrains-system",
+      "safetyType": "active",
+      "path": "Library/Caches/JetBrains/IntelliJIdea2026.2",
+      "expectedMatch": true,
+      "presentKeys": [
+        "evidence.cache.reclaimable",
+        "evidence.recovery.inputs-present",
+        "evidence.scope.user-owned",
+        "evidence.storage.no-user-data",
+        "evidence.storage.tool-owned"
+      ],
+      "missingKeys": [
+        "activity.process.inactive"
+      ],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "cache-jetbrains-system-current",
+      "ruleID": "cache-jetbrains-system",
+      "safetyType": "currentVersionOrUpdate",
+      "path": "Library/Caches/JetBrains/IntelliJIdea2026.2",
+      "expectedMatch": true,
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.recovery.inputs-present",
+        "evidence.scope.user-owned",
+        "evidence.storage.no-user-data",
+        "evidence.storage.tool-owned"
+      ],
+      "missingKeys": [
+        "evidence.cache.reclaimable"
+      ],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "cache-jetbrains-system-lookalike",
+      "ruleID": "cache-jetbrains-system",
+      "safetyType": "userDataOrCredential",
+      "path": "Library/Application Support/JetBrains/plugins",
+      "expectedMatch": false,
+      "presentKeys": [],
+      "missingKeys": [],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "cache-jetbrains-system-positive",
+      "ruleID": "cache-jetbrains-system",
+      "safetyType": "positive",
+      "path": "Library/Caches/JetBrains/IntelliJIdea2026.2",
+      "expectedMatch": true,
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.cache.reclaimable",
+        "evidence.recovery.inputs-present",
+        "evidence.scope.user-owned",
+        "evidence.storage.no-user-data",
+        "evidence.storage.tool-owned"
+      ],
+      "missingKeys": [],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "cache-vscode-cached-data-active",
+      "ruleID": "cache-vscode-cached-data",
+      "safetyType": "active",
+      "path": "Library/Application Support/Code/CachedData/hash",
+      "expectedMatch": true,
+      "presentKeys": [
+        "evidence.cache.reclaimable",
+        "evidence.recovery.inputs-present",
+        "evidence.scope.user-owned",
+        "evidence.storage.no-user-data",
+        "evidence.storage.tool-owned"
+      ],
+      "missingKeys": [
+        "activity.process.inactive"
+      ],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "cache-vscode-cached-data-current",
+      "ruleID": "cache-vscode-cached-data",
+      "safetyType": "currentVersionOrUpdate",
+      "path": "Library/Application Support/Code/CachedData/hash",
+      "expectedMatch": true,
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.recovery.inputs-present",
+        "evidence.scope.user-owned",
+        "evidence.storage.no-user-data",
+        "evidence.storage.tool-owned"
+      ],
+      "missingKeys": [
+        "evidence.cache.reclaimable"
+      ],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "cache-vscode-cached-data-lookalike",
+      "ruleID": "cache-vscode-cached-data",
+      "safetyType": "userDataOrCredential",
+      "path": "Library/Application Support/Code/User",
+      "expectedMatch": false,
+      "presentKeys": [],
+      "missingKeys": [],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "cache-vscode-cached-data-positive",
+      "ruleID": "cache-vscode-cached-data",
+      "safetyType": "positive",
+      "path": "Library/Application Support/Code/CachedData/hash",
+      "expectedMatch": true,
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.cache.reclaimable",
+        "evidence.recovery.inputs-present",
+        "evidence.scope.user-owned",
+        "evidence.storage.no-user-data",
+        "evidence.storage.tool-owned"
+      ],
+      "missingKeys": [],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "residue-lark-update-downloads-active",
+      "ruleID": "residue-lark-update-downloads",
+      "safetyType": "active",
+      "path": "Library/Application Support/LarkShell/update",
+      "expectedMatch": true,
+      "presentKeys": [
+        "evidence.recovery.inputs-present",
+        "evidence.scope.user-owned",
+        "evidence.storage.no-user-data",
+        "evidence.storage.tool-owned",
+        "evidence.update.not-current"
+      ],
+      "missingKeys": [
+        "activity.process.inactive"
+      ],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "residue-lark-update-downloads-current",
+      "ruleID": "residue-lark-update-downloads",
+      "safetyType": "currentVersionOrUpdate",
+      "path": "Library/Application Support/LarkShell/update",
+      "expectedMatch": true,
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.recovery.inputs-present",
+        "evidence.scope.user-owned",
+        "evidence.storage.no-user-data",
+        "evidence.storage.tool-owned"
+      ],
+      "missingKeys": [
+        "evidence.update.not-current"
+      ],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "residue-lark-update-downloads-lookalike",
+      "ruleID": "residue-lark-update-downloads",
+      "safetyType": "userDataOrCredential",
+      "path": "Library/Application Support/ExampleApp/User Data",
+      "expectedMatch": false,
+      "presentKeys": [],
+      "missingKeys": [],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "residue-lark-update-downloads-positive",
+      "ruleID": "residue-lark-update-downloads",
+      "safetyType": "positive",
+      "path": "Library/Application Support/LarkShell/update",
+      "expectedMatch": true,
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.recovery.inputs-present",
+        "evidence.scope.user-owned",
+        "evidence.storage.no-user-data",
+        "evidence.storage.tool-owned",
+        "evidence.update.not-current"
+      ],
+      "missingKeys": [],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "residue-codex-temp-active",
+      "ruleID": "residue-codex-temp",
+      "safetyType": "active",
+      "path": ".codex/.tmp",
+      "expectedMatch": true,
+      "presentKeys": [
+        "evidence.recovery.inputs-present",
+        "evidence.scope.user-owned",
+        "evidence.storage.no-user-data",
+        "evidence.storage.tool-owned",
+        "evidence.temp.abandoned"
+      ],
+      "missingKeys": [
+        "activity.process.inactive"
+      ],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "residue-codex-temp-current",
+      "ruleID": "residue-codex-temp",
+      "safetyType": "currentVersionOrUpdate",
+      "path": ".codex/.tmp",
+      "expectedMatch": true,
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.recovery.inputs-present",
+        "evidence.scope.user-owned",
+        "evidence.storage.no-user-data",
+        "evidence.storage.tool-owned"
+      ],
+      "missingKeys": [
+        "evidence.temp.abandoned"
+      ],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "residue-codex-temp-lookalike",
+      "ruleID": "residue-codex-temp",
+      "safetyType": "userDataOrCredential",
+      "path": ".codex/sessions",
+      "expectedMatch": false,
+      "presentKeys": [],
+      "missingKeys": [],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "residue-codex-temp-positive",
+      "ruleID": "residue-codex-temp",
+      "safetyType": "positive",
+      "path": ".codex/.tmp",
+      "expectedMatch": true,
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.recovery.inputs-present",
+        "evidence.scope.user-owned",
+        "evidence.storage.no-user-data",
+        "evidence.storage.tool-owned",
+        "evidence.temp.abandoned"
+      ],
+      "missingKeys": [],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "residue-electron-shipit-vscode-active",
+      "ruleID": "residue-electron-shipit-vscode",
+      "safetyType": "active",
+      "path": "Library/Caches/com.microsoft.VSCode.ShipIt",
+      "expectedMatch": true,
+      "presentKeys": [
+        "evidence.recovery.inputs-present",
+        "evidence.scope.user-owned",
+        "evidence.storage.no-user-data",
+        "evidence.storage.tool-owned",
+        "evidence.update.not-current"
+      ],
+      "missingKeys": [
+        "activity.process.inactive"
+      ],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "residue-electron-shipit-vscode-current",
+      "ruleID": "residue-electron-shipit-vscode",
+      "safetyType": "currentVersionOrUpdate",
+      "path": "Library/Caches/com.microsoft.VSCode.ShipIt",
+      "expectedMatch": true,
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.recovery.inputs-present",
+        "evidence.scope.user-owned",
+        "evidence.storage.no-user-data",
+        "evidence.storage.tool-owned"
+      ],
+      "missingKeys": [
+        "evidence.update.not-current"
+      ],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "residue-electron-shipit-vscode-lookalike",
+      "ruleID": "residue-electron-shipit-vscode",
+      "safetyType": "userDataOrCredential",
+      "path": "Library/Application Support/Code/User",
+      "expectedMatch": false,
+      "presentKeys": [],
+      "missingKeys": [],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "residue-electron-shipit-vscode-positive",
+      "ruleID": "residue-electron-shipit-vscode",
+      "safetyType": "positive",
+      "path": "Library/Caches/com.microsoft.VSCode.ShipIt",
+      "expectedMatch": true,
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.recovery.inputs-present",
+        "evidence.scope.user-owned",
+        "evidence.storage.no-user-data",
+        "evidence.storage.tool-owned",
+        "evidence.update.not-current"
+      ],
+      "missingKeys": [],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "runtime-ai-vm-bundles-active",
+      "ruleID": "runtime-ai-vm-bundles",
+      "safetyType": "active",
+      "path": "Library/Application Support/Claude/vm_bundles/current",
+      "expectedMatch": true,
+      "presentKeys": [
+        "evidence.runtime.detached",
+        "evidence.runtime.layout",
+        "evidence.runtime.no-user-data",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": [
+        "activity.process.inactive"
+      ],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "runtime-ai-vm-bundles-lookalike",
+      "ruleID": "runtime-ai-vm-bundles",
+      "safetyType": "userDataOrCredential",
+      "path": "Library/Application Support/Claude/projects",
+      "expectedMatch": false,
+      "presentKeys": [],
+      "missingKeys": [],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "runtime-ai-vm-bundles-mounted",
+      "ruleID": "runtime-ai-vm-bundles",
+      "safetyType": "mountedOrAttached",
+      "path": "Library/Application Support/Claude/vm_bundles/current",
+      "expectedMatch": true,
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.runtime.layout",
+        "evidence.runtime.no-user-data",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": [
+        "evidence.runtime.detached"
+      ],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "runtime-ai-vm-bundles-positive",
+      "ruleID": "runtime-ai-vm-bundles",
+      "safetyType": "positive",
+      "path": "Library/Application Support/Claude/vm_bundles/current",
+      "expectedMatch": true,
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.runtime.detached",
+        "evidence.runtime.layout",
+        "evidence.runtime.no-user-data",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": [],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "runtime-colima-instance-active",
+      "ruleID": "runtime-colima-instance",
+      "safetyType": "active",
+      "path": ".colima/_lima/default/diffdisk",
+      "expectedMatch": true,
+      "presentKeys": [
+        "evidence.runtime.detached",
+        "evidence.runtime.layout",
+        "evidence.runtime.no-user-data",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": [
+        "activity.process.inactive"
+      ],
+      "expectedKind": "regularFile"
+    },
+    {
+      "id": "runtime-colima-instance-lookalike",
+      "ruleID": "runtime-colima-instance",
+      "safetyType": "userDataOrCredential",
+      "path": ".config/colima/default.yaml",
+      "expectedMatch": false,
+      "presentKeys": [],
+      "missingKeys": [],
+      "expectedKind": "regularFile"
+    },
+    {
+      "id": "runtime-colima-instance-mounted",
+      "ruleID": "runtime-colima-instance",
+      "safetyType": "mountedOrAttached",
+      "path": ".colima/_lima/default/diffdisk",
+      "expectedMatch": true,
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.runtime.layout",
+        "evidence.runtime.no-user-data",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": [
+        "evidence.runtime.detached"
+      ],
+      "expectedKind": "regularFile"
+    },
+    {
+      "id": "runtime-colima-instance-positive",
+      "ruleID": "runtime-colima-instance",
+      "safetyType": "positive",
+      "path": ".colima/_lima/default/diffdisk",
+      "expectedMatch": true,
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.runtime.detached",
+        "evidence.runtime.layout",
+        "evidence.runtime.no-user-data",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": [],
+      "expectedKind": "regularFile"
+    },
+    {
+      "id": "runtime-docker-desktop-disk-active",
+      "ruleID": "runtime-docker-desktop-disk",
+      "safetyType": "active",
+      "path": "Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw",
+      "expectedMatch": true,
+      "presentKeys": [
+        "evidence.runtime.detached",
+        "evidence.runtime.layout",
+        "evidence.runtime.no-user-data",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": [
+        "activity.process.inactive"
+      ],
+      "expectedKind": "regularFile"
+    },
+    {
+      "id": "runtime-docker-desktop-disk-lookalike",
+      "ruleID": "runtime-docker-desktop-disk",
+      "safetyType": "userDataOrCredential",
+      "path": "Library/Containers/com.docker.docker/Data/settings.json",
+      "expectedMatch": false,
+      "presentKeys": [],
+      "missingKeys": [],
+      "expectedKind": "regularFile"
+    },
+    {
+      "id": "runtime-docker-desktop-disk-mounted",
+      "ruleID": "runtime-docker-desktop-disk",
+      "safetyType": "mountedOrAttached",
+      "path": "Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw",
+      "expectedMatch": true,
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.runtime.layout",
+        "evidence.runtime.no-user-data",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": [
+        "evidence.runtime.detached"
+      ],
+      "expectedKind": "regularFile"
+    },
+    {
+      "id": "runtime-docker-desktop-disk-positive",
+      "ruleID": "runtime-docker-desktop-disk",
+      "safetyType": "positive",
+      "path": "Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw",
+      "expectedMatch": true,
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.runtime.detached",
+        "evidence.runtime.layout",
+        "evidence.runtime.no-user-data",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": [],
+      "expectedKind": "regularFile"
+    },
+    {
+      "id": "runtime-lima-instance-active",
+      "ruleID": "runtime-lima-instance",
+      "safetyType": "active",
+      "path": ".lima/default/diffdisk",
+      "expectedMatch": true,
+      "presentKeys": [
+        "evidence.runtime.detached",
+        "evidence.runtime.layout",
+        "evidence.runtime.no-user-data",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": [
+        "activity.process.inactive"
+      ],
+      "expectedKind": "regularFile"
+    },
+    {
+      "id": "runtime-lima-instance-lookalike",
+      "ruleID": "runtime-lima-instance",
+      "safetyType": "userDataOrCredential",
+      "path": ".config/lima/default.yaml",
+      "expectedMatch": false,
+      "presentKeys": [],
+      "missingKeys": [],
+      "expectedKind": "regularFile"
+    },
+    {
+      "id": "runtime-lima-instance-mounted",
+      "ruleID": "runtime-lima-instance",
+      "safetyType": "mountedOrAttached",
+      "path": ".lima/default/diffdisk",
+      "expectedMatch": true,
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.runtime.layout",
+        "evidence.runtime.no-user-data",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": [
+        "evidence.runtime.detached"
+      ],
+      "expectedKind": "regularFile"
+    },
+    {
+      "id": "runtime-lima-instance-positive",
+      "ruleID": "runtime-lima-instance",
+      "safetyType": "positive",
+      "path": ".lima/default/diffdisk",
+      "expectedMatch": true,
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.runtime.detached",
+        "evidence.runtime.layout",
+        "evidence.runtime.no-user-data",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": [],
+      "expectedKind": "regularFile"
+    },
+    {
+      "id": "runtime-xcode-simulator-devices-active",
+      "ruleID": "runtime-xcode-simulator-devices",
+      "safetyType": "active",
+      "path": "Library/Developer/CoreSimulator/Devices/fixture-uuid",
+      "expectedMatch": true,
+      "presentKeys": [
+        "evidence.runtime.detached",
+        "evidence.runtime.layout",
+        "evidence.runtime.no-user-data",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": [
+        "activity.process.inactive"
+      ],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "runtime-xcode-simulator-devices-lookalike",
+      "ruleID": "runtime-xcode-simulator-devices",
+      "safetyType": "userDataOrCredential",
+      "path": "Library/Developer/CoreSimulator/Profiles",
+      "expectedMatch": false,
+      "presentKeys": [],
+      "missingKeys": [],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "runtime-xcode-simulator-devices-mounted",
+      "ruleID": "runtime-xcode-simulator-devices",
+      "safetyType": "mountedOrAttached",
+      "path": "Library/Developer/CoreSimulator/Devices/fixture-uuid",
+      "expectedMatch": true,
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.runtime.layout",
+        "evidence.runtime.no-user-data",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": [
+        "evidence.runtime.detached"
+      ],
+      "expectedKind": "directory"
+    },
+    {
+      "id": "runtime-xcode-simulator-devices-positive",
+      "ruleID": "runtime-xcode-simulator-devices",
+      "safetyType": "positive",
+      "path": "Library/Developer/CoreSimulator/Devices/fixture-uuid",
+      "expectedMatch": true,
+      "presentKeys": [
+        "activity.process.inactive",
+        "evidence.runtime.detached",
+        "evidence.runtime.layout",
+        "evidence.runtime.no-user-data",
+        "evidence.scope.user-owned"
+      ],
+      "missingKeys": [],
+      "expectedKind": "directory"
+    }
+  ]
+}

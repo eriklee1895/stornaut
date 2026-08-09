@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "builtin-runtime-tool-residue-v1",
+  "families": [
+    {
+      "familyID": "fr2.package-build-caches",
+      "ruleIDs": [
+        "cache-bun-install",
+        "cache-cargo-registry",
+        "cache-conda-anaconda-packages",
+        "cache-conda-miniconda-packages",
+        "cache-conda-packages",
+        "cache-go-build",
+        "cache-go-modules",
+        "cache-gradle-modules",
+        "cache-homebrew-downloads",
+        "cache-maven-local-repository",
+        "cache-npm-content",
+        "cache-pip",
+        "cache-pnpm-home-store",
+        "cache-pnpm-store",
+        "cache-pnpm-xdg-store",
+        "cache-uv",
+        "cache-yarn-global"
+      ],
+      "requirementIDs": [
+        "fr2.cache.bun",
+        "fr2.cache.cargo",
+        "fr2.cache.conda",
+        "fr2.cache.go",
+        "fr2.cache.gradle",
+        "fr2.cache.homebrew",
+        "fr2.cache.maven",
+        "fr2.cache.npm",
+        "fr2.cache.pip",
+        "fr2.cache.pnpm",
+        "fr2.cache.uv",
+        "fr2.cache.yarn"
+      ],
+      "policyKeys": []
+    },
+    {
+      "familyID": "fr2.project-artifacts",
+      "ruleIDs": [
+        "project-flutter-build",
+        "project-go-vendor",
+        "project-java-gradle-build",
+        "project-java-maven-target",
+        "project-node-modules",
+        "project-php-composer-vendor",
+        "project-python-venv",
+        "project-ruby-bundle-vendor",
+        "project-rust-target",
+        "project-xcode-derived-data"
+      ],
+      "requirementIDs": [
+        "fr2.project.flutter",
+        "fr2.project.go",
+        "fr2.project.java",
+        "fr2.project.node",
+        "fr2.project.php",
+        "fr2.project.python",
+        "fr2.project.ruby",
+        "fr2.project.rust",
+        "fr2.project.xcode"
+      ],
+      "policyKeys": []
+    },
+    {
+      "familyID": "fr2.protected-veto",
+      "ruleIDs": [
+        "protected-browser-arc",
+        "protected-browser-brave",
+        "protected-browser-chrome",
+        "protected-browser-edge",
+        "protected-browser-firefox",
+        "protected-browser-safari",
+        "protected-credential-aws",
+        "protected-credential-azure",
+        "protected-credential-docker",
+        "protected-credential-gcloud",
+        "protected-credential-gh",
+        "protected-credential-gnupg",
+        "protected-credential-keychains",
+        "protected-credential-kubernetes",
+        "protected-credential-op",
+        "protected-credential-ssh",
+        "protected-password-1password-config",
+        "protected-password-1password-library",
+        "protected-password-bitwarden-config",
+        "protected-password-bitwarden-library",
+        "protected-password-lastpass",
+        "protected-personal-mail",
+        "protected-personal-messages",
+        "protected-personal-photos-container",
+        "protected-personal-photos-library",
+        "protected-secret-credentials-json",
+        "protected-secret-env",
+        "protected-secret-private-key"
+      ],
+      "requirementIDs": [
+        "fr2.protected.browser",
+        "fr2.protected.credentials",
+        "fr2.protected.personal-data",
+        "fr2.protected.system"
+      ],
+      "policyKeys": [
+        "policy.canonical.filesystem-root",
+        "policy.canonical.home",
+        "policy.canonical.mount-root",
+        "policy.sensitive.system-locations"
+      ]
+    },
+    {
+      "familyID": "fr2.tool-runtimes-images",
+      "ruleIDs": [
+        "cache-codex-runtimes",
+        "cache-cursor-cached-data",
+        "cache-jetbrains-system",
+        "cache-vscode-cached-data",
+        "runtime-ai-vm-bundles",
+        "runtime-colima-instance",
+        "runtime-docker-desktop-disk",
+        "runtime-lima-instance",
+        "runtime-xcode-simulator-devices"
+      ],
+      "requirementIDs": [
+        "fr2.runtime.ai",
+        "fr2.runtime.colima",
+        "fr2.runtime.cursor",
+        "fr2.runtime.docker",
+        "fr2.runtime.jetbrains",
+        "fr2.runtime.lima",
+        "fr2.runtime.vscode",
+        "fr2.runtime.xcode"
+      ],
+      "policyKeys": []
+    },
+    {
+      "familyID": "fr2.updates-temporary-residue",
+      "ruleIDs": [
+        "residue-lark-update-downloads",
+        "residue-codex-temp",
+        "residue-electron-shipit-vscode"
+      ],
+      "requirementIDs": [
+        "fr2.residue.shipit",
+        "fr2.residue.temporary",
+        "fr2.residue.update"
+      ],
+      "policyKeys": []
+    }
+  ]
+}
