@@ -23,6 +23,9 @@ public struct SensitivePathDenylist: Sendable {
 
     public func evaluate(_ url: URL) -> SensitivePathDecision {
         let canonicalURL = url.standardizedFileURL.resolvingSymlinksInPath()
+        if isProtectedSystemPath(canonicalURL) {
+            return .denied(.sensitiveDirectory)
+        }
         let globalComponents = canonicalURL.pathComponents.map(
             denylistComponent
         )
@@ -52,6 +55,38 @@ public struct SensitivePathDenylist: Sendable {
             return .denied(.secretFile)
         }
         return .allowed
+    }
+}
+
+private func isProtectedSystemPath(_ url: URL) -> Bool {
+    let components = url.standardizedFileURL.pathComponents.map(
+        denylistComponent
+    )
+    guard components.count > 1 else {
+        return false
+    }
+    let protectedPrefixes: [[String]] = [
+        ["/", "applications"],
+        ["/", "bin"],
+        ["/", "cores"],
+        ["/", "dev"],
+        ["/", "etc"],
+        ["/", "library"],
+        ["/", "opt"],
+        ["/", "sbin"],
+        ["/", "system"],
+        ["/", "usr"],
+        ["/", "private", "root"],
+        ["/", "var", "audit"],
+        ["/", "var", "db"],
+        ["/", "var", "log"],
+        ["/", "var", "root"],
+        ["/", "var", "run"],
+        ["/", "var", "vm"],
+    ]
+    return protectedPrefixes.contains { prefix in
+        components.count >= prefix.count
+            && zip(prefix, components).allSatisfy(==)
     }
 }
 

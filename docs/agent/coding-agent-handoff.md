@@ -2,7 +2,7 @@
 
 > 面向接手实现的 Coding Agent  
 > 最近更新：2026-08-09
-> 当前状态：产品、Agent、UI 功能交互与品牌基线完成；Epic 0–1 evidence gate 与最终 code review 已完成，5 个确认缺陷已修复；Epic 2–4 Tasks 9–14 已完成，下一项为 Task 15；Task 5 证明 Broker 协议但未证明 Codex Broker-only 工具面，Deep Dive 明确 no-go/paused；release signing/notarization 未评估
+> 当前状态：产品、Agent、UI 功能交互与品牌基线完成；Epic 0–1 evidence gate 与最终 code review 已完成，5 个确认缺陷已修复；Epic 2–4 Tasks 9–15 已完成，下一项为 Task 16；Task 5 证明 Broker 协议但未证明 Codex Broker-only 工具面，Deep Dive 明确 no-go/paused；release signing/notarization 未评估
 
 ## 1. 任务目标
 
@@ -267,7 +267,7 @@ Broker-only 若不能被技术性强制，Epic 0–1 仍可作为成功的风险
 ```text
 你正在实现 Stornaut。先从 docs/README.md 进入文档地图，再完整阅读 docs/agent/coding-agent-handoff.md 指定的文档，尤其是产品/Agent/UI 三份批准规格，遵守所有产品不变量和 Reference Study Gate。不要直接实现整个产品，也不要从概念图推断规格外功能。
 
-Epic 0–1 evidence gate 已完成。Epic 2–4 deterministic active plan 已批准，Tasks 9–14 已完成；下一项为 Task 15 Protected and Veto Rule Catalog。继续按 Task 独立 code review、验证、commit、push。该计划不包含 Deep Dive、真实 destructive Registered Action、release/notarization 或任何安全边界放宽。
+Epic 0–1 evidence gate 已完成。Epic 2–4 deterministic active plan 已批准，Tasks 9–15 已完成；下一项为 Task 16 Project Artifact Rule Catalog。继续按 Task 独立 code review、验证、commit、push。该计划不包含 Deep Dive、真实 destructive Registered Action、release/notarization 或任何安全边界放宽。
 
 任何权限、安全或许可证假设都必须有实际证据。设计或 PRD 如有冲突，先报告并修正文档，不得自行扩大 Agent 或 Executor 权限。
 ```

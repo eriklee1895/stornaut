@@ -79,6 +79,7 @@ Every rule requires:
 - stable lowercase ID;
 - bounded relative `*`/`**` path pattern with at least one literal component;
 - expected kind, producer, category, disposition, risk and confidence;
+- a stable rationale key;
 - veto, required evidence/activity, recovery, recommended action;
 - at least two unique fixture IDs;
 - exact HTTPS provenance source, revision, license, usage and non-future
@@ -95,7 +96,7 @@ Ready to Reclaim requires:
 - MoveToTrash recommendation;
 - no veto.
 
-Protected requires veto, critical policy after protection overlays and no
+Protected requires veto, critical risk in source and after protection overlays, and no
 recommended action. Unknown cannot recommend an action.
 
 Non-protected rules cannot intersect the permanent sensitive-path examples
@@ -148,6 +149,16 @@ Task 14 tests cover:
 - multiple overlays on one rule in stable order;
 - source/output and symlink collision refusal.
 
+Task 15 evidence adds:
+
+- a required rationale field in source and immutable output;
+- 28 built-in Protected/veto rules with exact dual-source provenance;
+- 70 clean-room positive/lookalike/case/Unicode/symlink/system fixtures;
+- independent `SensitivePathDenylist` coverage when the catalog is absent;
+- separate filesystem-root, HOME and volume-root `CanonicalPathPolicy` gates;
+- deterministic production catalog hash
+  `6c51931b3d0f7460edff658b6ad4137eba4396128581439c3d664a042d1ebe96`.
+
 ## Consequences
 
 Positive:
@@ -169,8 +180,10 @@ Costs:
 
 ## Residual Risks
 
-- Task 14 has only a minimal fixture catalog, not the production built-in rules.
-- Runtime matching performance and family coverage are Tasks 15–18.
+- Task 15 adds the first production built-in Protected catalog; reclaim/review
+  family coverage remains Tasks 16–18.
+- Runtime matching performance remains cumulative work for Tasks 16–18 and
+  orchestration in Task 20.
 - Activity providers and fail-conservative fusion are Task 19.
 - Local overlay file selection/UI is later work; Task 14 only defines compiled
   monotonic semantics.

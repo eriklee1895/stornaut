@@ -163,6 +163,7 @@
         "id",
         "match",
         "producer",
+        "rationaleKey",
         "category",
         "disposition",
         "risk",
@@ -186,6 +187,9 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 256
+        },
+        "rationaleKey": {
+          "$ref": "#/$defs/token"
         },
         "category": {
           "enum": [

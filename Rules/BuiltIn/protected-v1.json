@@ -1,0 +1,1182 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "protected-v1",
+  "rules": [
+    {
+      "id": "protected-browser-arc",
+      "match": {
+        "pathPattern": "Library/Application Support/Arc/User Data",
+        "expectedKind": "directory"
+      },
+      "producer": "Arc browser",
+      "rationaleKey": "rationale.protected.browser-profile",
+      "category": "protected",
+      "disposition": "protected",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": true,
+      "requiredEvidenceKeys": [],
+      "requiredActivityKeys": [],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Stornaut PRD",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/docs/product/PRD.md",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut permanent denylist",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/Sources/StornautCore/Policy/SensitivePathDenylist.swift",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "independentObservation"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "protected-browser-arc-positive",
+        "protected-browser-arc-lookalike"
+      ]
+    },
+    {
+      "id": "protected-browser-brave",
+      "match": {
+        "pathPattern": "Library/Application Support/BraveSoftware/Brave-Browser",
+        "expectedKind": "directory"
+      },
+      "producer": "Brave browser",
+      "rationaleKey": "rationale.protected.browser-profile",
+      "category": "protected",
+      "disposition": "protected",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": true,
+      "requiredEvidenceKeys": [],
+      "requiredActivityKeys": [],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Stornaut PRD",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/docs/product/PRD.md",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut permanent denylist",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/Sources/StornautCore/Policy/SensitivePathDenylist.swift",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "independentObservation"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "protected-browser-brave-positive",
+        "protected-browser-brave-lookalike"
+      ]
+    },
+    {
+      "id": "protected-browser-chrome",
+      "match": {
+        "pathPattern": "Library/Application Support/Google/Chrome",
+        "expectedKind": "directory"
+      },
+      "producer": "Google Chrome",
+      "rationaleKey": "rationale.protected.browser-profile",
+      "category": "protected",
+      "disposition": "protected",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": true,
+      "requiredEvidenceKeys": [],
+      "requiredActivityKeys": [],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Stornaut PRD",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/docs/product/PRD.md",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut permanent denylist",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/Sources/StornautCore/Policy/SensitivePathDenylist.swift",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "independentObservation"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "protected-browser-chrome-positive",
+        "protected-browser-chrome-lookalike"
+      ]
+    },
+    {
+      "id": "protected-browser-edge",
+      "match": {
+        "pathPattern": "Library/Application Support/Microsoft Edge",
+        "expectedKind": "directory"
+      },
+      "producer": "Microsoft Edge",
+      "rationaleKey": "rationale.protected.browser-profile",
+      "category": "protected",
+      "disposition": "protected",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": true,
+      "requiredEvidenceKeys": [],
+      "requiredActivityKeys": [],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Stornaut PRD",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/docs/product/PRD.md",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut permanent denylist",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/Sources/StornautCore/Policy/SensitivePathDenylist.swift",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "independentObservation"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "protected-browser-edge-positive",
+        "protected-browser-edge-lookalike"
+      ]
+    },
+    {
+      "id": "protected-browser-firefox",
+      "match": {
+        "pathPattern": "Library/Application Support/Firefox/Profiles",
+        "expectedKind": "directory"
+      },
+      "producer": "Mozilla Firefox",
+      "rationaleKey": "rationale.protected.browser-profile",
+      "category": "protected",
+      "disposition": "protected",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": true,
+      "requiredEvidenceKeys": [],
+      "requiredActivityKeys": [],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Stornaut PRD",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/docs/product/PRD.md",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut permanent denylist",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/Sources/StornautCore/Policy/SensitivePathDenylist.swift",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "independentObservation"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "protected-browser-firefox-positive",
+        "protected-browser-firefox-lookalike"
+      ]
+    },
+    {
+      "id": "protected-browser-safari",
+      "match": {
+        "pathPattern": "Library/Safari",
+        "expectedKind": "directory"
+      },
+      "producer": "Safari",
+      "rationaleKey": "rationale.protected.browser-profile",
+      "category": "protected",
+      "disposition": "protected",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": true,
+      "requiredEvidenceKeys": [],
+      "requiredActivityKeys": [],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Stornaut PRD",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/docs/product/PRD.md",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut permanent denylist",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/Sources/StornautCore/Policy/SensitivePathDenylist.swift",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "independentObservation"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "protected-browser-safari-positive",
+        "protected-browser-safari-lookalike"
+      ]
+    },
+    {
+      "id": "protected-credential-aws",
+      "match": {
+        "pathPattern": "**/.aws",
+        "expectedKind": "directory"
+      },
+      "producer": "AWS tools",
+      "rationaleKey": "rationale.protected.cloud-credentials",
+      "category": "protected",
+      "disposition": "protected",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": true,
+      "requiredEvidenceKeys": [],
+      "requiredActivityKeys": [],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Stornaut PRD",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/docs/product/PRD.md",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut permanent denylist",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/Sources/StornautCore/Policy/SensitivePathDenylist.swift",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "independentObservation"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "protected-credential-aws-positive",
+        "protected-credential-aws-lookalike"
+      ]
+    },
+    {
+      "id": "protected-credential-azure",
+      "match": {
+        "pathPattern": "**/.azure",
+        "expectedKind": "directory"
+      },
+      "producer": "Azure tools",
+      "rationaleKey": "rationale.protected.cloud-credentials",
+      "category": "protected",
+      "disposition": "protected",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": true,
+      "requiredEvidenceKeys": [],
+      "requiredActivityKeys": [],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Stornaut PRD",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/docs/product/PRD.md",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut permanent denylist",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/Sources/StornautCore/Policy/SensitivePathDenylist.swift",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "independentObservation"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "protected-credential-azure-positive",
+        "protected-credential-azure-lookalike"
+      ]
+    },
+    {
+      "id": "protected-credential-docker",
+      "match": {
+        "pathPattern": "**/.docker",
+        "expectedKind": "directory"
+      },
+      "producer": "Docker tools",
+      "rationaleKey": "rationale.protected.registry-credentials",
+      "category": "protected",
+      "disposition": "protected",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": true,
+      "requiredEvidenceKeys": [],
+      "requiredActivityKeys": [],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Stornaut PRD",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/docs/product/PRD.md",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut permanent denylist",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/Sources/StornautCore/Policy/SensitivePathDenylist.swift",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "independentObservation"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "protected-credential-docker-positive",
+        "protected-credential-docker-lookalike"
+      ]
+    },
+    {
+      "id": "protected-credential-gcloud",
+      "match": {
+        "pathPattern": "**/.config/gcloud",
+        "expectedKind": "directory"
+      },
+      "producer": "Google Cloud CLI",
+      "rationaleKey": "rationale.protected.cloud-credentials",
+      "category": "protected",
+      "disposition": "protected",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": true,
+      "requiredEvidenceKeys": [],
+      "requiredActivityKeys": [],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Stornaut PRD",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/docs/product/PRD.md",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut permanent denylist",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/Sources/StornautCore/Policy/SensitivePathDenylist.swift",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "independentObservation"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "protected-credential-gcloud-positive",
+        "protected-credential-gcloud-lookalike"
+      ]
+    },
+    {
+      "id": "protected-credential-gh",
+      "match": {
+        "pathPattern": "**/.config/gh",
+        "expectedKind": "directory"
+      },
+      "producer": "GitHub CLI",
+      "rationaleKey": "rationale.protected.service-credentials",
+      "category": "protected",
+      "disposition": "protected",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": true,
+      "requiredEvidenceKeys": [],
+      "requiredActivityKeys": [],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Stornaut PRD",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/docs/product/PRD.md",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut permanent denylist",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/Sources/StornautCore/Policy/SensitivePathDenylist.swift",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "independentObservation"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "protected-credential-gh-positive",
+        "protected-credential-gh-lookalike"
+      ]
+    },
+    {
+      "id": "protected-credential-gnupg",
+      "match": {
+        "pathPattern": "**/.gnupg",
+        "expectedKind": "directory"
+      },
+      "producer": "GnuPG",
+      "rationaleKey": "rationale.protected.private-keys",
+      "category": "protected",
+      "disposition": "protected",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": true,
+      "requiredEvidenceKeys": [],
+      "requiredActivityKeys": [],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Stornaut PRD",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/docs/product/PRD.md",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut permanent denylist",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/Sources/StornautCore/Policy/SensitivePathDenylist.swift",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "independentObservation"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "protected-credential-gnupg-positive",
+        "protected-credential-gnupg-lookalike"
+      ]
+    },
+    {
+      "id": "protected-credential-keychains",
+      "match": {
+        "pathPattern": "Library/Keychains",
+        "expectedKind": "directory"
+      },
+      "producer": "macOS Keychain",
+      "rationaleKey": "rationale.protected.keychain",
+      "category": "protected",
+      "disposition": "protected",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": true,
+      "requiredEvidenceKeys": [],
+      "requiredActivityKeys": [],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Stornaut PRD",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/docs/product/PRD.md",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut permanent denylist",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/Sources/StornautCore/Policy/SensitivePathDenylist.swift",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "independentObservation"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "protected-credential-keychains-positive",
+        "protected-credential-keychains-lookalike"
+      ]
+    },
+    {
+      "id": "protected-credential-kubernetes",
+      "match": {
+        "pathPattern": "**/.kube",
+        "expectedKind": "directory"
+      },
+      "producer": "Kubernetes tools",
+      "rationaleKey": "rationale.protected.cluster-credentials",
+      "category": "protected",
+      "disposition": "protected",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": true,
+      "requiredEvidenceKeys": [],
+      "requiredActivityKeys": [],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Stornaut PRD",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/docs/product/PRD.md",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut permanent denylist",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/Sources/StornautCore/Policy/SensitivePathDenylist.swift",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "independentObservation"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "protected-credential-kubernetes-positive",
+        "protected-credential-kubernetes-lookalike"
+      ]
+    },
+    {
+      "id": "protected-credential-op",
+      "match": {
+        "pathPattern": "**/.config/op",
+        "expectedKind": "directory"
+      },
+      "producer": "1Password CLI",
+      "rationaleKey": "rationale.protected.password-manager",
+      "category": "protected",
+      "disposition": "protected",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": true,
+      "requiredEvidenceKeys": [],
+      "requiredActivityKeys": [],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Stornaut PRD",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/docs/product/PRD.md",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut permanent denylist",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/Sources/StornautCore/Policy/SensitivePathDenylist.swift",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "independentObservation"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "protected-credential-op-positive",
+        "protected-credential-op-lookalike"
+      ]
+    },
+    {
+      "id": "protected-credential-ssh",
+      "match": {
+        "pathPattern": "**/.ssh",
+        "expectedKind": "directory"
+      },
+      "producer": "OpenSSH",
+      "rationaleKey": "rationale.protected.private-keys",
+      "category": "protected",
+      "disposition": "protected",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": true,
+      "requiredEvidenceKeys": [],
+      "requiredActivityKeys": [],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Stornaut PRD",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/docs/product/PRD.md",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut permanent denylist",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/Sources/StornautCore/Policy/SensitivePathDenylist.swift",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "independentObservation"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "protected-credential-ssh-positive",
+        "protected-credential-ssh-lookalike"
+      ]
+    },
+    {
+      "id": "protected-password-1password-config",
+      "match": {
+        "pathPattern": "**/.config/1Password",
+        "expectedKind": "directory"
+      },
+      "producer": "1Password",
+      "rationaleKey": "rationale.protected.password-manager",
+      "category": "protected",
+      "disposition": "protected",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": true,
+      "requiredEvidenceKeys": [],
+      "requiredActivityKeys": [],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Stornaut PRD",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/docs/product/PRD.md",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut permanent denylist",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/Sources/StornautCore/Policy/SensitivePathDenylist.swift",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "independentObservation"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "protected-password-1password-config-positive",
+        "protected-password-1password-config-lookalike"
+      ]
+    },
+    {
+      "id": "protected-password-1password-library",
+      "match": {
+        "pathPattern": "Library/Application Support/1Password",
+        "expectedKind": "directory"
+      },
+      "producer": "1Password",
+      "rationaleKey": "rationale.protected.password-manager",
+      "category": "protected",
+      "disposition": "protected",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": true,
+      "requiredEvidenceKeys": [],
+      "requiredActivityKeys": [],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Stornaut PRD",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/docs/product/PRD.md",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut permanent denylist",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/Sources/StornautCore/Policy/SensitivePathDenylist.swift",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "independentObservation"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "protected-password-1password-library-positive",
+        "protected-password-1password-library-lookalike"
+      ]
+    },
+    {
+      "id": "protected-password-bitwarden-config",
+      "match": {
+        "pathPattern": "**/.config/Bitwarden",
+        "expectedKind": "directory"
+      },
+      "producer": "Bitwarden",
+      "rationaleKey": "rationale.protected.password-manager",
+      "category": "protected",
+      "disposition": "protected",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": true,
+      "requiredEvidenceKeys": [],
+      "requiredActivityKeys": [],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Stornaut PRD",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/docs/product/PRD.md",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut permanent denylist",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/Sources/StornautCore/Policy/SensitivePathDenylist.swift",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "independentObservation"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "protected-password-bitwarden-config-positive",
+        "protected-password-bitwarden-config-lookalike"
+      ]
+    },
+    {
+      "id": "protected-password-bitwarden-library",
+      "match": {
+        "pathPattern": "Library/Application Support/Bitwarden",
+        "expectedKind": "directory"
+      },
+      "producer": "Bitwarden",
+      "rationaleKey": "rationale.protected.password-manager",
+      "category": "protected",
+      "disposition": "protected",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": true,
+      "requiredEvidenceKeys": [],
+      "requiredActivityKeys": [],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Stornaut PRD",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/docs/product/PRD.md",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut permanent denylist",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/Sources/StornautCore/Policy/SensitivePathDenylist.swift",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "independentObservation"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "protected-password-bitwarden-library-positive",
+        "protected-password-bitwarden-library-lookalike"
+      ]
+    },
+    {
+      "id": "protected-password-lastpass",
+      "match": {
+        "pathPattern": "Library/Application Support/LastPass",
+        "expectedKind": "directory"
+      },
+      "producer": "LastPass",
+      "rationaleKey": "rationale.protected.password-manager",
+      "category": "protected",
+      "disposition": "protected",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": true,
+      "requiredEvidenceKeys": [],
+      "requiredActivityKeys": [],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Stornaut PRD",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/docs/product/PRD.md",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut permanent denylist",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/Sources/StornautCore/Policy/SensitivePathDenylist.swift",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "independentObservation"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "protected-password-lastpass-positive",
+        "protected-password-lastpass-lookalike"
+      ]
+    },
+    {
+      "id": "protected-personal-mail",
+      "match": {
+        "pathPattern": "Library/Mail",
+        "expectedKind": "directory"
+      },
+      "producer": "Mail",
+      "rationaleKey": "rationale.protected.personal-communications",
+      "category": "protected",
+      "disposition": "protected",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": true,
+      "requiredEvidenceKeys": [],
+      "requiredActivityKeys": [],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Stornaut PRD",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/docs/product/PRD.md",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut permanent denylist",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/Sources/StornautCore/Policy/SensitivePathDenylist.swift",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "independentObservation"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "protected-personal-mail-positive",
+        "protected-personal-mail-lookalike"
+      ]
+    },
+    {
+      "id": "protected-personal-messages",
+      "match": {
+        "pathPattern": "Library/Messages",
+        "expectedKind": "directory"
+      },
+      "producer": "Messages",
+      "rationaleKey": "rationale.protected.personal-communications",
+      "category": "protected",
+      "disposition": "protected",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": true,
+      "requiredEvidenceKeys": [],
+      "requiredActivityKeys": [],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Stornaut PRD",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/docs/product/PRD.md",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut permanent denylist",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/Sources/StornautCore/Policy/SensitivePathDenylist.swift",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "independentObservation"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "protected-personal-messages-positive",
+        "protected-personal-messages-lookalike"
+      ]
+    },
+    {
+      "id": "protected-personal-photos-container",
+      "match": {
+        "pathPattern": "Library/Photos",
+        "expectedKind": "directory"
+      },
+      "producer": "Photos",
+      "rationaleKey": "rationale.protected.personal-photos",
+      "category": "protected",
+      "disposition": "protected",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": true,
+      "requiredEvidenceKeys": [],
+      "requiredActivityKeys": [],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Stornaut PRD",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/docs/product/PRD.md",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut permanent denylist",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/Sources/StornautCore/Policy/SensitivePathDenylist.swift",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "independentObservation"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "protected-personal-photos-container-positive",
+        "protected-personal-photos-container-lookalike"
+      ]
+    },
+    {
+      "id": "protected-personal-photos-library",
+      "match": {
+        "pathPattern": "Pictures/Photos Library.photoslibrary",
+        "expectedKind": "directory"
+      },
+      "producer": "Photos",
+      "rationaleKey": "rationale.protected.personal-photos",
+      "category": "protected",
+      "disposition": "protected",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": true,
+      "requiredEvidenceKeys": [],
+      "requiredActivityKeys": [],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Stornaut PRD",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/docs/product/PRD.md",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut permanent denylist",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/Sources/StornautCore/Policy/SensitivePathDenylist.swift",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "independentObservation"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "protected-personal-photos-library-positive",
+        "protected-personal-photos-library-lookalike"
+      ]
+    },
+    {
+      "id": "protected-secret-credentials-json",
+      "match": {
+        "pathPattern": "**/credentials.json",
+        "expectedKind": "regularFile"
+      },
+      "producer": "Developer tools",
+      "rationaleKey": "rationale.protected.secret-file",
+      "category": "protected",
+      "disposition": "protected",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": true,
+      "requiredEvidenceKeys": [],
+      "requiredActivityKeys": [],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Stornaut PRD",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/docs/product/PRD.md",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut permanent denylist",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/Sources/StornautCore/Policy/SensitivePathDenylist.swift",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "independentObservation"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "protected-secret-credentials-json-positive",
+        "protected-secret-credentials-json-lookalike"
+      ]
+    },
+    {
+      "id": "protected-secret-env",
+      "match": {
+        "pathPattern": "**/.env",
+        "expectedKind": "regularFile"
+      },
+      "producer": "Developer tools",
+      "rationaleKey": "rationale.protected.secret-file",
+      "category": "protected",
+      "disposition": "protected",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": true,
+      "requiredEvidenceKeys": [],
+      "requiredActivityKeys": [],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Stornaut PRD",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/docs/product/PRD.md",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut permanent denylist",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/Sources/StornautCore/Policy/SensitivePathDenylist.swift",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "independentObservation"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "protected-secret-env-positive",
+        "protected-secret-env-lookalike"
+      ]
+    },
+    {
+      "id": "protected-secret-private-key",
+      "match": {
+        "pathPattern": "**/private.key",
+        "expectedKind": "regularFile"
+      },
+      "producer": "Developer tools",
+      "rationaleKey": "rationale.protected.private-key-file",
+      "category": "protected",
+      "disposition": "protected",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": true,
+      "requiredEvidenceKeys": [],
+      "requiredActivityKeys": [],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Stornaut PRD",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/docs/product/PRD.md",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut permanent denylist",
+            "url": "https://github.com/eriklee1895/stornaut/blob/766d8e7d2b533f5393ea5fac81935f416fb0402b/Sources/StornautCore/Policy/SensitivePathDenylist.swift",
+            "revision": "766d8e7d2b533f5393ea5fac81935f416fb0402b",
+            "license": "MIT",
+            "usage": "independentObservation"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "protected-secret-private-key-positive",
+        "protected-secret-private-key-lookalike"
+      ]
+    }
+  ]
+}

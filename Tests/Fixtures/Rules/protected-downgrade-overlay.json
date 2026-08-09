@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "protected-downgrade-v1",
+  "overlays": [
+    {
+      "id": "overlay-protected-mail-downgrade",
+      "ruleID": "protected-personal-mail",
+      "addExclusions": [],
+      "addRequiredEvidenceKeys": [],
+      "addRequiredActivityKeys": [],
+      "riskOverride": "high",
+      "dispositionOverride": "reviewRecommended",
+      "forceProtected": false
+    }
+  ]
+}

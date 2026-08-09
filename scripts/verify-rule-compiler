@@ -10,6 +10,7 @@ trap 'rm -rf "$work_dir"' EXIT
 
 catalog="$repo_root/Tests/Fixtures/Rules/minimal-catalog.json"
 overlay="$repo_root/Tests/Fixtures/Rules/conservative-overlay.json"
+protected_catalog="$repo_root/Rules/BuiltIn/protected-v1.json"
 
 for run in 1 2; do
     swift run stornaut-rule-compiler \
@@ -18,16 +19,29 @@ for run in 1 2; do
         --output "$work_dir/catalog-$run.json" \
         --manifest "$work_dir/manifest-$run.json" \
         > "$work_dir/hash-$run.txt"
+    swift run stornaut-rule-compiler \
+        --catalog "$protected_catalog" \
+        --output "$work_dir/protected-catalog-$run.json" \
+        --manifest "$work_dir/protected-manifest-$run.json" \
+        > "$work_dir/protected-hash-$run.txt"
 done
 
 cmp "$work_dir/catalog-1.json" "$work_dir/catalog-2.json"
 cmp "$work_dir/manifest-1.json" "$work_dir/manifest-2.json"
 cmp "$work_dir/hash-1.txt" "$work_dir/hash-2.txt"
+cmp "$work_dir/protected-catalog-1.json" "$work_dir/protected-catalog-2.json"
+cmp "$work_dir/protected-manifest-1.json" "$work_dir/protected-manifest-2.json"
+cmp "$work_dir/protected-hash-1.txt" "$work_dir/protected-hash-2.txt"
 
 python3 -m json.tool Rules/Schema/rule-catalog-source.schema.json >/dev/null
 python3 -m json.tool Rules/Schema/rule-overlay-source.schema.json >/dev/null
+python3 -m json.tool Rules/BuiltIn/protected-v1.json >/dev/null
+python3 -m json.tool Tests/Fixtures/Rules/protected-path-cases.json >/dev/null
+python3 -m json.tool Tests/Fixtures/Rules/protected-downgrade-overlay.json >/dev/null
 python3 -m json.tool "$work_dir/catalog-1.json" >/dev/null
 python3 -m json.tool "$work_dir/manifest-1.json" >/dev/null
+python3 -m json.tool "$work_dir/protected-catalog-1.json" >/dev/null
+python3 -m json.tool "$work_dir/protected-manifest-1.json" >/dev/null
 
 swift package show-dependencies --format text \
     | grep -Fx 'No external dependencies found' >/dev/null
@@ -88,4 +102,5 @@ if find .derivedData -path '*/Stornaut.app/*' \
     exit 1
 fi
 
-echo "Rule compiler verification passed: $(cat "$work_dir/hash-1.txt")"
+echo "Rule compiler fixture verification passed: $(cat "$work_dir/hash-1.txt")"
+echo "Protected catalog verification passed: $(cat "$work_dir/protected-hash-1.txt")"

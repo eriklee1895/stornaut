@@ -12,7 +12,7 @@
 
 Stornaut's Knowledge Base will use:
 
-- checked-in YAML authoring files;
+- checked-in strict JSON authoring files (a YAML 1.2 subset);
 - a host-side build/verification compiler;
 - generated deterministic immutable Swift/JSON catalog input for runtime;
 - no runtime YAML parsing of scanned-disk files;
@@ -21,12 +21,9 @@ Stornaut's Knowledge Base will use:
 - separate typed activity providers and a fail-conservative reducer;
 - explicit user-confirmed structured Local Knowledge only.
 
-The candidate YAML parser is Yams `6.2.2` (MIT) used only by a host compiler
-target. It is not added in Task 9. Task 14 must repeat the package/product
-graph, notice and App-bundle audit before accepting the dependency. Writing a
-partial YAML parser in Stornaut is rejected because accepting YAML while
-implementing only a private subset creates a larger, less-tested parser safety
-surface.
+Task 14 revalidated and rejected adding Yams `6.2.2` before a demonstrated
+YAML-only authoring need. The host compiler accepts strict JSON only; it does
+not claim YAML support, and no parser dependency reaches Core or the App.
 
 ## 2. Upstream Snapshots
 
@@ -301,3 +298,67 @@ dependency ADR, notice and App-bundle reachability gate.
 No third-party dependency or notice is added in Task 14. Runtime still consumes
 only compiler-produced immutable catalog bytes; it never parses rule source
 from the scanned disk.
+
+## 12. Task 15 Protected Catalog Update
+
+Task 15 adds the first production built-in source:
+[`../../Rules/BuiltIn/protected-v1.json`](../../Rules/BuiltIn/protected-v1.json).
+
+### Catalog scope
+
+- 28 immutable Protected/veto rules;
+- browser profiles: Arc, Brave, Chrome, Edge, Firefox and Safari;
+- credential stores: AWS, Azure, Docker, gcloud, GitHub CLI, GnuPG,
+  Keychains, Kubernetes, 1Password CLI and OpenSSH;
+- 1Password, Bitwarden and LastPass data locations;
+- Mail, Messages and Photos data;
+- representative `.env`, `credentials.json` and private-key files.
+
+Every rule is critical, has no action/recovery surface, carries a rationale and
+has exactly one positive plus one component-lookalike fixture.
+
+### Provenance decision
+
+Each concrete rule has two exact repository-owned MIT sources at commit
+`766d8e7d2b533f5393ea5fac81935f416fb0402b`:
+
+1. the PRD permanent-denylist requirement, as official documentation;
+2. the already-implemented Swift permanent denylist, as independently observed
+   behavior.
+
+This is intentionally not a claim that an upstream cleaner owns these path
+facts. Mole remains behavior-only GPL research; no Mole path table, constant,
+code or fixture was copied. The fixtures are independently authored and contain
+no user data or secrets.
+
+### Independent policy coverage
+
+The catalog is defense in depth, not authority for sensitive paths:
+
+- `SensitivePathDenylist` rejects catalog families without loading the catalog;
+- its absolute system prefixes are canonical component sequences, not raw
+  string prefixes;
+- symlink-resolved sensitive targets, mixed case and Unicode variants reject;
+- lookalike components remain allowed;
+- filesystem root, HOME and volume roots remain separate
+  `CanonicalPathPolicy` decisions.
+
+No root/HOME/volume sentinel rule is created because relative rule patterns
+cannot truthfully represent those absolute boundaries.
+
+### Verification
+
+- 70 clean-room path cases cover positive/lookalike, nested, mixed-case,
+  Unicode, symlink and absolute-system behavior;
+- overlay downgrade attempts fail;
+- source schema now requires rationale and Core requires Protected risk to be
+  critical;
+- the rule-to-fixture test proves every pattern protects its positive path and
+  does not protect its lookalike;
+- two compiler runs produce identical catalog, manifest and SHA-256
+  `6c51931b3d0f7460edff658b6ad4137eba4396128581439c3d664a042d1ebe96`;
+- no dependency or ThirdPartyNotices change is required.
+
+Runtime classification orchestration and cumulative matching performance remain
+Tasks 20 and 16–18 respectively. ADR 0010 remains Proposed until Task 19 and
+the Phase B acceptance gate complete.

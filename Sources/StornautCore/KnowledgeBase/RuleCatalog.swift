@@ -325,6 +325,7 @@ public struct CompiledRule: Codable, Sendable, Equatable {
     public let match: RuleMatch
     public let excludedPatterns: [RulePathPattern]
     public let producer: DomainLabel
+    public let rationaleKey: DomainToken
     public let category: ArtifactCategory
     public let disposition: ReclaimDisposition
     public let risk: RiskLevel
@@ -343,6 +344,7 @@ public struct CompiledRule: Codable, Sendable, Equatable {
         match: RuleMatch,
         excludedPatterns: [RulePathPattern] = [],
         producer: DomainLabel,
+        rationaleKey: DomainToken,
         category: ArtifactCategory,
         disposition: ReclaimDisposition,
         risk: RiskLevel,
@@ -371,6 +373,7 @@ public struct CompiledRule: Codable, Sendable, Equatable {
               category != .protected || disposition == .protected,
               !veto || disposition == .protected,
               disposition != .protected || veto,
+              disposition != .protected || risk == .critical,
               (disposition != .protected && disposition != .unknown)
                 || recommendedAction == .none
         else {
@@ -391,6 +394,7 @@ public struct CompiledRule: Codable, Sendable, Equatable {
         self.match = match
         self.excludedPatterns = excludedPatterns.sorted()
         self.producer = producer
+        self.rationaleKey = rationaleKey
         self.category = category
         self.disposition = disposition
         self.risk = risk
@@ -421,6 +425,10 @@ public struct CompiledRule: Codable, Sendable, Equatable {
                 forKey: .excludedPatterns
             ),
             producer: container.decode(DomainLabel.self, forKey: .producer),
+            rationaleKey: container.decode(
+                DomainToken.self,
+                forKey: .rationaleKey
+            ),
             category: container.decode(ArtifactCategory.self, forKey: .category),
             disposition: container.decode(
                 ReclaimDisposition.self,

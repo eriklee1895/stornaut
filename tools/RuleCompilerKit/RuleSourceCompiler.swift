@@ -209,13 +209,13 @@ private extension RuleSourceCompiler {
         try requireExactKeys(
             object,
             allowed: [
-                "id", "match", "producer", "category", "disposition",
+                "id", "match", "producer", "rationaleKey", "category", "disposition",
                 "risk", "confidenceRequirement", "veto",
                 "requiredEvidenceKeys", "requiredActivityKeys", "recovery",
                 "recommendedAction", "provenance", "fixtureIDs",
             ],
             required: [
-                "id", "match", "producer", "category", "disposition",
+                "id", "match", "producer", "rationaleKey", "category", "disposition",
                 "risk", "confidenceRequirement", "veto",
                 "requiredEvidenceKeys", "requiredActivityKeys", "recovery",
                 "recommendedAction", "provenance", "fixtureIDs",
@@ -303,6 +303,7 @@ private extension RuleSourceCompiler {
                 id: id,
                 match: match,
                 producer: producer,
+                rationaleKey: try token(object, "rationaleKey"),
                 category: category,
                 disposition: disposition,
                 risk: try enumeration(
@@ -540,6 +541,7 @@ private extension RuleSourceCompiler {
                         overlay.addExclusions
                     ),
                     producer: rule.producer,
+                    rationaleKey: rule.rationaleKey,
                     category: protected ? .protected : rule.category,
                     disposition: protected ? .protected : disposition,
                     risk: protected ? .critical : risk,

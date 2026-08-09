@@ -9,6 +9,7 @@
         "expectedKind": "directory"
       },
       "producer": "Fixture package cache",
+      "rationaleKey": "rationale.fixture.cache",
       "category": "packageAndBuildCaches",
       "disposition": "readyToReclaim",
       "risk": "low",
@@ -50,6 +51,7 @@
         "expectedKind": "directory"
       },
       "producer": "Fixture build system",
+      "rationaleKey": "rationale.fixture.review",
       "category": "rebuildableProjectArtifacts",
       "disposition": "reviewRecommended",
       "risk": "medium",

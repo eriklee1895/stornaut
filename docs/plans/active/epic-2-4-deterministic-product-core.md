@@ -1,6 +1,6 @@
 # Stornaut Epic 2–4 Deterministic Product Core Implementation Plan
 
-> **Status:** Approved — Tasks 9–14 complete; Task 15 next
+> **Status:** Approved — Tasks 9–15 complete; Task 16 next
 >
 > **Roadmap phase:** Phase B — Deterministic Product Core
 >
@@ -166,7 +166,7 @@ Sources/StornautCore/
   LocalKnowledge/         Confirmed structured facts and stale invalidation
 
 Rules/
-  BuiltIn/                Provenance-bearing YAML source
+  BuiltIn/                Provenance-bearing strict JSON source
   Schema/                 Rule schema/version contract
 
 Tests/StornautCoreTests/
@@ -832,28 +832,54 @@ Suggested commit subject: `feat: enforce safe rule compilation`
 - Produces the first immutable built-in catalog consumed by later rule Tasks.
 - Does not produce an action invocation or runtime YAML loading surface.
 
-- [ ] **Step 1: Add protected/veto rules first**
+- [x] **Step 1: Add protected/veto rules first**
 
 Cover browser user data, credentials, Photos, Mail, Messages, system locations,
 HOME, volume roots and the permanent sensitive-path denylist. Rule-level vetoes
 may add defense in depth but cannot replace `SensitivePathDenylist` or lower its
 coverage.
 
-- [ ] **Step 2: Add collision and bypass fixtures**
+- [x] **Step 2: Add collision and bypass fixtures**
 
 Test nested protected paths, case/Unicode variations, symlink-resolved targets,
 lookalike directory names and overlay attempts to reduce protection.
 
-- [ ] **Step 3: Prove provenance and independent policy coverage**
+- [x] **Step 3: Prove provenance and independent policy coverage**
 
 Every rule includes source URL, exact commit/version, license, usage mode,
 independent verification date and rationale. Tests must prove the Swift
 denylist still rejects the same sensitive targets when the catalog is absent.
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Compile twice and compare output hashes. Run catalog/overlay/denylist safety
 tests and `scripts/verify`.
+
+Execution evidence:
+
+- `Rules/BuiltIn/protected-v1.json` contains 28 immutable browser, credential,
+  password-manager, Mail/Messages/Photos and secret-file rules. Every rule is
+  Protected/veto/critical/no-action, has a required rationale, two clean-room
+  fixtures and two exact repository-owned MIT provenance sources.
+- 70 path cases cover nested paths, component lookalikes, mixed case, Unicode,
+  real symlink resolution and absolute system locations. Every rule pattern is
+  linked to one positive and one lookalike case.
+- The catalog does not invent root/HOME/volume rules. Swift
+  `SensitivePathDenylist` and `CanonicalPathPolicy` independently deny
+  sensitive/system paths, filesystem root, HOME and volume roots with the
+  catalog absent.
+- Tests-first work confirmed and fixed two P1 contract gaps: optional rationale
+  and non-critical Protected rules. Code review fixed broad `/private`/`/var`
+  denial, pattern-unlinked fixtures and incomplete concrete provenance; the
+  post-fix review has no open P0–P2 finding.
+- RuleCatalog 5/5, compiler/overlay/catalog 15/15, CanonicalPathPolicy 7/7,
+  ActionPolicyGate 8/8 and parameterized denylist tests pass.
+- Two host compiler runs produce identical protected catalog/manifest/hash
+  `6c51931b3d0f7460edff658b6ad4137eba4396128581439c3d664a042d1ebe96`.
+  Full `scripts/verify` passes 200 SwiftPM tests, Xcode App tests, 2/2 XCUITest,
+  four screenshots, App signing/bundle, localization, compiler and docs gates.
+- No dependency, copied upstream code or ThirdPartyNotices change was added.
+  ADR 0010 remains Proposed until Task 19.
 
 Suggested commit subject: `feat: protect sensitive storage rules`
 
