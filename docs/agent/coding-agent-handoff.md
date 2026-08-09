@@ -2,7 +2,7 @@
 
 > 面向接手实现的 Coding Agent  
 > 最近更新：2026-08-09
-> 当前状态：产品、Agent、UI 功能交互与品牌基线完成；Epic 0–1 evidence gate 与最终 code review 已完成，5 个确认缺陷已修复；Epic 2–3 deterministic development conditional go；Task 5 证明 Broker 协议但未证明 Codex Broker-only 工具面，Deep Dive 明确 no-go/paused；release signing/notarization 未评估
+> 当前状态：产品、Agent、UI 功能交互与品牌基线完成；Epic 0–1 evidence gate 与最终 code review 已完成，5 个确认缺陷已修复；Epic 2–4 deterministic plan 已起草为 `Proposed`、待用户批准；Task 5 证明 Broker 协议但未证明 Codex Broker-only 工具面，Deep Dive 明确 no-go/paused；release signing/notarization 未评估
 
 ## 1. 任务目标
 
@@ -198,7 +198,7 @@ Epic 0–1
 
 第一份 coding plan 只覆盖 Epic 0–1：工程骨架和高风险 Spikes，目前已经完成。
 
-已完成的执行输入：[Epic 0–1 Foundation & Risk Spikes Implementation Plan](../plans/completed/epic-0-1-foundation-spikes.md)。它是历史证据，不再是当前执行授权。下一轮 coding 必须先根据 roadmap 与验证报告建立并取得用户批准的新 active plan。
+已完成的执行输入：[Epic 0–1 Foundation & Risk Spikes Implementation Plan](../plans/completed/epic-0-1-foundation-spikes.md)。它是历史证据，不再是当前执行授权。[Epic 2–4 Deterministic Product Core Plan](../plans/active/epic-2-4-deterministic-product-core.md) 已起草为 `Proposed`；用户明确批准前只能评审/修订，不得执行其中产品任务。
 
 跨 Epic 的阶段依赖、no-go 分支和交付顺序由 [Delivery Roadmap](../plans/roadmap.md) 管理；新 active plan 不得另起一套宏观路线。
 
@@ -267,7 +267,7 @@ Broker-only 若不能被技术性强制，Epic 0–1 仍可作为成功的风险
 ```text
 你正在实现 Stornaut。先从 docs/README.md 进入文档地图，再完整阅读 docs/agent/coding-agent-handoff.md 指定的文档，尤其是产品/Agent/UI 三份批准规格，遵守所有产品不变量和 Reference Study Gate。不要直接实现整个产品，也不要从概念图推断规格外功能。
 
-Epic 0–1 evidence gate 已完成。先检查工作区、阅读验证报告与 roadmap，然后与用户对齐 Epic 2–4 deterministic active plan；获批前不要开始新的产品实现。新计划不得包含 Deep Dive、真实 destructive Registered Action、release/notarization 或任何安全边界放宽。开始每个技术主题前完成其映射的 Upstream Study Gate。
+Epic 0–1 evidence gate 已完成。Epic 2–4 deterministic active plan 已起草并进入用户审阅；获批前不要开始新的产品实现。获批后从 Task 9 的 Upstream Study Gate 开始，按 Task 独立验证、commit、push。该计划不包含 Deep Dive、真实 destructive Registered Action、release/notarization 或任何安全边界放宽。
 
 任何权限、安全或许可证假设都必须有实际证据。设计或 PRD 如有冲突，先报告并修正文档，不得自行扩大 Agent 或 Executor 权限。
 ```

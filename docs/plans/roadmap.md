@@ -187,8 +187,12 @@ Epic 0–1
 
 ## 6. 当前状态
 
-- 当前阶段：Phase A evidence gate 已完成；下一阶段为 deterministic Epic 2–4 planning。
-- 当前 active plan：无；Epic 0–1 历史计划已移入 [`completed/`](completed/)。
+- 当前阶段：Phase A evidence gate 已完成；Phase B deterministic Epic 2–4
+  plan 已起草，等待用户批准。
+- 当前 active plan：
+  [`Epic 2–4 Deterministic Product Core`](active/epic-2-4-deterministic-product-core.md)
+  为 `Proposed`，尚不可执行；Epic 0–1 历史计划已移入
+  [`completed/`](completed/)。
 - Epic 0 Foundation Upstream Study：已完成，选择 checked-in Xcode App/Test host + local Swift packages。
 - Epic 0 Task 1：SwiftPM Core/Codex、smoke tests、`scripts/verify`、manual-only CI 与 ThirdPartyNotices 骨架已完成。
 - Bundle identifier：已确认 `com.eriklee.stornaut`。
@@ -202,4 +206,6 @@ Epic 0–1
 - Epic 1 Task 7：identity/activity revalidation、Foundation Trash、无 permanent-delete fallback、fixed fake Registered Action、process-group timeout 与真实 CLI/APFS Trash probes 已完成；App-context FDA/TCC 仍为 residual risk，见 [ADR 0006](../adr/0006-trash-and-registered-actions.md)。
 - Epic 1 Task 8：六项 spike evidence gate 与约束审计已完成；Epic 2–3 deterministic development conditional go，Deep Dive 继续 no-go/paused，见 [Epic 0–1 Validation Report](../reports/epic-0-1-validation-report.md)。
 - Epic 1 最终 code review：denylist、secret redaction、signed device identity、bounded directory probes、Registered Action descendant cleanup 等 5 个确认缺陷已修复，统一验证通过，见 [review report](../reports/epic-1-code-review-2026-08-09.md)。
-- 下一项执行：为 Epic 2–4 deterministic subset 创建新的 active plan；不得把 Deep Dive 或真实 destructive Registered Action 混入该计划。
+- 下一项执行：用户评审/批准 Epic 2–4 deterministic plan；获批后从 Task 9
+  Upstream Study Gate 开始。Deep Dive 与真实 destructive Registered Action
+  不在该计划内。

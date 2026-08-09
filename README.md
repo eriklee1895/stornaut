@@ -21,7 +21,7 @@
 
 ## 状态
 
-🚧 产品、Agent、UI 功能交互与品牌基线已批准；Epic 0–1 foundation 与 risk spikes 已完成。原生 App/Test/UI Test host、Codex discovery/process、Probe Broker、Swift Surveyor 与受约束 Trash/Action lifecycle 均有可执行证据。Epic 2–3 deterministic development 为 conditional go；Codex Broker-only 未被技术性证明，Deep Dive 继续 no-go/paused。见文档：
+🚧 产品、Agent、UI 功能交互与品牌基线已批准；Epic 0–1 foundation 与 risk spikes 已完成。原生 App/Test/UI Test host、Codex discovery/process、Probe Broker、Swift Surveyor 与受约束 Trash/Action lifecycle 均有可执行证据。Epic 2–4 deterministic plan 已起草并等待用户批准，获批前不开始产品实现；Codex Broker-only 未被技术性证明，Deep Dive 继续 no-go/paused。见文档：
 
 | 文档 | 内容 |
 |---|---|
@@ -33,6 +33,7 @@
 | [docs/design/agent-disk-governance.md](docs/design/agent-disk-governance.md) | 用户批准的 Agent、双模式与安全设计基线 |
 | [docs/design/ui-ux.md](docs/design/ui-ux.md) | 单窗口信息架构、核心流程、Agent 表达、Light/Dark 与品牌规范 |
 | [docs/assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md](docs/assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md) | 权限受限、安全阻断、部分结果、stale preflight 与历史保留的恢复状态契约 |
+| [docs/plans/active/epic-2-4-deterministic-product-core.md](docs/plans/active/epic-2-4-deterministic-product-core.md) | 待批准的 Phase B 领域、持久化、Quick Scan、Knowledge/Activity 与原生 UI 实施计划 |
 | [docs/plans/completed/epic-0-1-foundation-spikes.md](docs/plans/completed/epic-0-1-foundation-spikes.md) | 第一阶段工程骨架与高风险技术 Spike 实施计划 |
 | [docs/reports/epic-0-1-validation-report.md](docs/reports/epic-0-1-validation-report.md) | Epic 0–1 evidence gate、conditional-go/no-go 与残余风险 |
 | [docs/research/](docs/research/) | 真实案例、竞品时间切片、上游学习与许可证边界 |
