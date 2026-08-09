@@ -1,6 +1,6 @@
 # Stornaut Epic 2–4 Deterministic Product Core Implementation Plan
 
-> **Status:** Approved — Tasks 9–15 complete; Task 16 next
+> **Status:** Approved — Tasks 9–16 complete; Task 17 next
 >
 > **Roadmap phase:** Phase B — Deterministic Product Core
 >
@@ -894,31 +894,62 @@ Suggested commit subject: `feat: protect sensitive storage rules`
 - Expand: `Tests/Fixtures/Rules/`
 - Update: `docs/upstream-studies/epic-4-knowledge-activity.md`
 
-- [ ] **Step 1: Add project artifact families**
+- [x] **Step 1: Add project artifact families**
 
 Cover Node.js, Python, Rust, Go, Java, Ruby, PHP, Flutter and Xcode project
 artifacts. Each rule identifies producer, artifact lifecycle, recovery/rebuild
 method, cost and the activity evidence required before any reclaim
 recommendation.
 
-- [ ] **Step 2: Add positive and safety fixtures**
+- [x] **Step 2: Add positive and safety fixtures**
 
 For every family, include an independently constructed positive fixture plus an
 active, dirty, unpushed, ambiguous or lookalike safety fixture. A project root
 or source directory cannot become a reclaim candidate merely because it
 contains a known artifact name.
 
-- [ ] **Step 3: Compare behavior without copying implementation**
+- [x] **Step 3: Compare behavior without copying implementation**
 
 Use clean-room fixtures to compare selected artifact classifications against
 documented kondo, Mole and ClearDisk behavior. Record false positives, false
 negatives and intentionally more conservative Stornaut outcomes.
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Check provenance completeness and deterministic catalog hashes. Benchmark this
 catalog version over the anonymous project fixture, then run rule/safety tests
 and `scripts/verify`.
+
+Execution evidence:
+
+- `project-artifacts-v1.json` adds ten rules for Node, Python, Rust, Go,
+  Gradle, Maven, Ruby, PHP, Flutter and per-project Xcode DerivedData. Every
+  rule remains Review Recommended and requires marker, artifact layout,
+  not-versioned, recovery-input, Git-clean/upstream-synced and inactive-process
+  evidence.
+- `protected-v1` remains byte-identical. The bounded multi-source compiler and
+  repeatable CLI produce cumulative `builtin-project-artifacts-v1` independent
+  of source order, reject duplicate/missing versions and enforce 16-source /
+  1 MiB aggregate limits.
+- 40 clean-room cases cover positive, dirty/unpushed/active/ambiguous,
+  project-root and source-directory behavior. Five behavior comparisons record
+  intentionally more conservative outcomes than documented Mole, ClearDisk and
+  kondo behavior without copying implementation or fixtures.
+- Review fixed nonexistent provenance paths, case-sensitive volume semantics,
+  missing artifact-layout/recovery evidence, incomplete fixture partitions,
+  whole DerivedData matching, duplicate CLI flags and generic Maven
+  provenance. Post-fix review has no open P0–P2 finding.
+- RuleCompiler/cumulative/matcher 22/22 and RuleCatalog 6/6 pass. Ten official
+  source URLs pass live exact-revision audit.
+- Candidate matching over Task 16 plus anonymous developer-tree paths remains
+  below the 2 s debug gate (about 0.95–1.07 s for 250 iterations over 38 rules).
+- Cumulative compiler hash is
+  `b9f631e9cced76e61842ac629af72b00fe20c8ebff41c89ed75908b90c577335`.
+  Full `scripts/verify` passes 208 SwiftPM tests, Xcode App tests, 2/2 XCUITest,
+  four screenshots, App signing/bundle, localization, compiler and docs gates.
+- No dependency or copied upstream code was added. Third-party sources are
+  documentation/behavior provenance only and are not distributed in the App.
+  ADR 0010 remains Proposed until Task 19.
 
 Suggested commit subject: `feat: classify project artifacts safely`
 

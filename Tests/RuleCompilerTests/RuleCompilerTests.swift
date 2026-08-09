@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Testing
 @testable import RuleCompilerKit
@@ -452,6 +453,391 @@ func builtInProtectedCatalogRejectsDowngradeOverlay() throws {
     }
 }
 
+@Test
+func compilerMergesVersionedSourcesWithoutMutatingProtectedV1() throws {
+    let protectedSource = try builtInRuleFixture("protected-v1")
+    var projectSource = try catalogObject()
+    projectSource["catalogVersion"] = "project-artifacts-v1"
+    let projectData = try JSONSerialization.data(
+        withJSONObject: projectSource,
+        options: [.sortedKeys]
+    )
+
+    let first = try RuleSourceCompiler().compile(
+        catalogSources: [protectedSource, projectData],
+        catalogVersion: try DomainToken(
+            validating: "builtin-project-artifacts-v1"
+        )
+    )
+    let reordered = try RuleSourceCompiler().compile(
+        catalogSources: [projectData, protectedSource],
+        catalogVersion: try DomainToken(
+            validating: "builtin-project-artifacts-v1"
+        )
+    )
+
+    #expect(first.data == reordered.data)
+    #expect(first.sha256 == reordered.sha256)
+    #expect(first.manifest.sourceCatalogVersions == [
+        "project-artifacts-v1",
+        "protected-v1",
+    ])
+    #expect(first.manifest.ruleCount == 30)
+    #expect(
+        SHA256.hash(data: protectedSource).map {
+            String(format: "%02x", $0)
+        }.joined()
+            == "8ad3074f568959ea3b6ae65f90dbe389275a61c71cd68b4c84f2cce3b3a72033"
+    )
+}
+
+@Test
+func compilerRejectsDuplicateRulesAndUnboundedSourceSets() throws {
+    let source = try builtInRuleFixture("protected-v1")
+
+    #expect(throws: RuleCompilerError.self) {
+        _ = try RuleSourceCompiler().compile(
+            catalogSources: [source, source],
+            catalogVersion: try DomainToken(
+                validating: "duplicate-source-v1"
+            )
+        )
+    }
+    #expect(throws: RuleCompilerError.self) {
+        _ = try RuleSourceCompiler().compile(
+            catalogSources: Array(repeating: source, count: 17),
+            catalogVersion: try DomainToken(
+                validating: "too-many-sources-v1"
+            )
+        )
+    }
+    let padded = source + Data(
+        repeating: 0x20,
+        count: RuleSourceCompiler.maximumInputBytes / 2
+    )
+    #expect(throws: RuleCompilerError.self) {
+        _ = try RuleSourceCompiler().compile(
+            catalogSources: [padded, padded],
+            catalogVersion: try DomainToken(
+                validating: "oversized-sources-v1"
+            )
+        )
+    }
+}
+
+@Test
+func projectArtifactCatalogCoversApprovedFamiliesConservatively() throws {
+    let artifact = try RuleSourceCompiler().compile(
+        catalogSources: [
+            try builtInRuleFixture("protected-v1"),
+            try builtInRuleFixture("project-artifacts-v1"),
+        ],
+        catalogVersion: try DomainToken(
+            validating: "builtin-project-artifacts-v1"
+        )
+    )
+    let projectRules = artifact.catalog.rules.filter {
+        $0.category == .rebuildableProjectArtifacts
+    }
+    let expectedIDs = [
+        "project-flutter-build",
+        "project-go-vendor",
+        "project-java-gradle-build",
+        "project-java-maven-target",
+        "project-node-modules",
+        "project-php-composer-vendor",
+        "project-python-venv",
+        "project-ruby-bundle-vendor",
+        "project-rust-target",
+        "project-xcode-derived-data",
+    ]
+
+    #expect(projectRules.map(\.id.rawValue) == expectedIDs)
+    #expect(artifact.catalog.rules.count == 38)
+    #expect(artifact.manifest.sourceCatalogVersions == [
+        "project-artifacts-v1",
+        "protected-v1",
+    ])
+    for rule in projectRules {
+        #expect(rule.disposition == .reviewRecommended)
+        #expect(rule.confidenceRequirement == .high)
+        #expect(!rule.veto)
+        #expect(rule.recommendedAction == .moveToTrash)
+        #expect(rule.recovery != nil)
+        #expect(!rule.requiredEvidenceKeys.isEmpty)
+        #expect(!rule.requiredActivityKeys.isEmpty)
+        #expect(
+            rule.requiredEvidenceKeys.map(\.rawValue).contains(
+                "evidence.artifact.not-versioned"
+            )
+        )
+        #expect(
+            rule.requiredEvidenceKeys.map(\.rawValue).contains(
+                "evidence.recovery.inputs-present"
+            )
+        )
+        #expect(
+            rule.requiredActivityKeys.map(\.rawValue).contains(
+                "activity.git.clean"
+            )
+        )
+        #expect(
+            rule.requiredActivityKeys.map(\.rawValue).contains(
+                "activity.git.upstream-synced"
+            )
+        )
+        #expect(
+            rule.requiredActivityKeys.map(\.rawValue).contains(
+                "activity.process.inactive"
+            )
+        )
+        #expect(rule.provenance.sources.count >= 2)
+    }
+}
+
+@Test
+func projectArtifactFixturesBindPatternsMarkersAndSafetyBlocks() throws {
+    let projectArtifact = try RuleSourceCompiler().compile(
+        catalogData: try builtInRuleFixture("project-artifacts-v1")
+    )
+    let fixture = try projectArtifactFixture()
+    let casesByRule = Dictionary(grouping: fixture.cases, by: \.ruleID)
+
+    for rule in projectArtifact.catalog.rules {
+        let cases = try #require(casesByRule[rule.id.rawValue])
+        let positive = try #require(
+            cases.first { $0.kind == "positive" }
+        )
+        let safety = try #require(
+            cases.first { $0.kind == "safety" }
+        )
+        let projectRoot = try #require(
+            cases.first { $0.kind == "projectRoot" }
+        )
+        let sourceDirectory = try #require(
+            cases.first { $0.kind == "sourceDirectory" }
+        )
+        let requirements = Set(
+            rule.requiredEvidenceKeys.map(\.rawValue)
+                + rule.requiredActivityKeys.map(\.rawValue)
+        )
+        let positivePresent = Set(positive.presentKeys)
+        let safetyPresent = Set(safety.presentKeys)
+        let safetyMissing = Set(safety.missingKeys)
+
+        #expect(rulePattern(rule.match, protects: positive.path))
+        #expect(rulePattern(rule.match, protects: safety.path))
+        #expect(!rulePattern(rule.match, protects: projectRoot.path))
+        #expect(!rulePattern(rule.match, protects: sourceDirectory.path))
+        #expect(positivePresent == requirements)
+        #expect(positive.missingKeys.isEmpty)
+        #expect(safetyPresent.union(safetyMissing) == requirements)
+        #expect(safetyPresent.isDisjoint(with: safetyMissing))
+        #expect(!safetyMissing.isEmpty)
+    }
+}
+
+@Test
+func catalogMatcherReturnsStableExactCandidatesForCollidingPatterns() throws {
+    let artifact = try RuleSourceCompiler().compile(
+        catalogSources: [
+            try builtInRuleFixture("protected-v1"),
+            try builtInRuleFixture("project-artifacts-v1"),
+        ],
+        catalogVersion: try DomainToken(
+            validating: "builtin-project-artifacts-v1"
+        )
+    )
+    let matcher = RuleCatalogMatcher(catalog: artifact.catalog)
+
+    #expect(
+        try matcher.matchingRules(
+            relativePath: "projects/sample/build",
+            kind: .directory
+        ).map(\.id.rawValue) == [
+            "project-flutter-build",
+            "project-java-gradle-build",
+        ]
+    )
+    #expect(
+        try matcher.matchingRules(
+            relativePath: "projects/sample/target",
+            kind: .directory
+        ).map(\.id.rawValue) == [
+            "project-java-maven-target",
+            "project-rust-target",
+        ]
+    )
+    #expect(
+        try matcher.matchingRules(
+            relativePath: "projects/sample/vendor",
+            kind: .directory
+        ).map(\.id.rawValue) == [
+            "project-go-vendor",
+            "project-php-composer-vendor",
+        ]
+    )
+    #expect(try matcher.matchingRules(
+        relativePath: "projects/sample",
+        kind: .directory
+    ).isEmpty)
+    #expect(try matcher.matchingRules(
+        relativePath: "projects/sample/src",
+        kind: .directory
+    ).isEmpty)
+    #expect(try matcher.matchingRules(
+        relativePath: "projects/sample/Target",
+        kind: .directory
+    ).isEmpty)
+    #expect(try matcher.matchingRules(
+        relativePath: "projects/sample/Vendor",
+        kind: .directory
+    ).isEmpty)
+    #expect(try matcher.matchingRules(
+        relativePath: "projects/sample/Target",
+        kind: .directory,
+        caseSensitive: false
+    ).map(\.id.rawValue) == [
+        "project-java-maven-target",
+        "project-rust-target",
+    ])
+    #expect(throws: RuleCatalogError.invalidPattern) {
+        _ = try matcher.matchingRules(
+            relativePath: "../sample/target",
+            kind: .directory
+        )
+    }
+    #expect(throws: RuleCatalogError.invalidPattern) {
+        _ = try matcher.matchingRules(
+            relativePath: Array(repeating: "segment", count: 257)
+                .joined(separator: "/"),
+            kind: .directory
+        )
+    }
+
+    var exclusionSource = try catalogObject()
+    var exclusionRules = try rules(&exclusionSource)
+    var exclusionMatch = try #require(
+        exclusionRules[0]["match"] as? [String: Any]
+    )
+    exclusionMatch["pathPattern"] = "workspace/**"
+    exclusionRules[0]["match"] = exclusionMatch
+    exclusionSource["rules"] = exclusionRules
+    var exclusionOverlay = try overlayTestObject()
+    var exclusionEntries = try #require(
+        exclusionOverlay["overlays"] as? [[String: Any]]
+    )
+    exclusionEntries[0]["addExclusions"] = ["workspace/keep/**"]
+    exclusionOverlay["overlays"] = exclusionEntries
+    let overlaid = try RuleSourceCompiler().compile(
+        catalogData: JSONSerialization.data(
+            withJSONObject: exclusionSource,
+            options: [.sortedKeys]
+        ),
+        overlayData: JSONSerialization.data(
+            withJSONObject: exclusionOverlay,
+            options: [.sortedKeys]
+        )
+    )
+    let overlaidMatcher = RuleCatalogMatcher(catalog: overlaid.catalog)
+    #expect(try overlaidMatcher.matchingRules(
+        relativePath: "workspace/cache",
+        kind: .directory
+    ).map(\.id.rawValue) == ["fixture-cache"])
+    #expect(try overlaidMatcher.matchingRules(
+        relativePath: "workspace/keep/cache",
+        kind: .directory
+    ).isEmpty)
+}
+
+@Test
+func cumulativeCatalogMatchingBenchmarkStaysBounded() throws {
+    let artifact = try RuleSourceCompiler().compile(
+        catalogSources: [
+            try builtInRuleFixture("protected-v1"),
+            try builtInRuleFixture("project-artifacts-v1"),
+        ],
+        catalogVersion: try DomainToken(
+            validating: "builtin-project-artifacts-v1"
+        )
+    )
+    let matcher = RuleCatalogMatcher(catalog: artifact.catalog)
+    let projectPaths = try projectArtifactFixture().cases.map(\.path)
+    let anonymousPaths = try anonymousDeveloperTreePaths()
+    let paths = projectPaths + anonymousPaths
+    let clock = ContinuousClock()
+    var matchCount = 0
+
+    let duration = try clock.measure {
+        for _ in 0..<250 {
+            for path in paths {
+                matchCount += try matcher.matchingRules(
+                    relativePath: path,
+                    kind: .directory
+                ).count
+            }
+        }
+    }
+
+    #expect(matchCount > 0)
+    #expect(duration < .seconds(2))
+}
+
+@Test
+func projectArtifactBehaviorComparisonRemainsConservativeAndCleanRoom() throws {
+    let artifact = try RuleSourceCompiler().compile(
+        catalogData: try builtInRuleFixture("project-artifacts-v1")
+    )
+    let data = try ruleFixture("project-artifact-behavior-comparison")
+    let root = try #require(
+        JSONSerialization.jsonObject(with: data) as? [String: Any]
+    )
+    #expect(try #require(root["schemaVersion"] as? Int) == 1)
+    let sources = try #require(root["sources"] as? [[String: Any]])
+    let cases = try #require(root["cases"] as? [[String: Any]])
+    let sourceProjects = Set(try sources.map {
+        try #require($0["project"] as? String)
+    })
+    let rulesByID = Dictionary(
+        uniqueKeysWithValues: artifact.catalog.rules.map {
+            ($0.id.rawValue, $0)
+        }
+    )
+
+    #expect(sourceProjects == ["ClearDisk", "Mole", "kondo"])
+    #expect(try sources.allSatisfy {
+        try #require($0["usage"] as? String) == "behaviorReferenceOnly"
+            && !(try #require($0["revision"] as? String)).isEmpty
+            && !(try #require($0["license"] as? String)).isEmpty
+    })
+    for comparison in cases {
+        let sourceProject = try #require(
+            comparison["sourceProject"] as? String
+        )
+        let ruleID = try #require(comparison["ruleID"] as? String)
+        let outcome = try #require(
+            comparison["stornautOutcome"] as? String
+        )
+        let difference = try #require(
+            comparison["relativeDifference"] as? String
+        )
+        let missingKeys = Set(try #require(
+            comparison["missingKeys"] as? [String]
+        ))
+        let rule = try #require(rulesByID[ruleID])
+        let requirements = Set(
+            rule.requiredEvidenceKeys.map(\.rawValue)
+                + rule.requiredActivityKeys.map(\.rawValue)
+        )
+
+        #expect(sourceProjects.contains(sourceProject))
+        #expect(["noCandidate", "reviewBlocked"].contains(outcome))
+        #expect(!difference.isEmpty)
+        #expect(missingKeys.isSubset(of: requirements))
+        #expect(outcome == "noCandidate" || !missingKeys.isEmpty)
+    }
+}
+
 private func ruleFixture(_ name: String) throws -> Data {
     try Data(
         contentsOf: repositoryRoot.appending(
@@ -534,6 +920,45 @@ private func normalizedRuleComponents(_ path: String) -> [String] {
 private struct RuleFixtureGlobState: Hashable {
     let patternIndex: Int
     let pathIndex: Int
+}
+
+private struct ProjectArtifactFixture: Decodable {
+    let schemaVersion: Int
+    let cases: [ProjectArtifactFixtureCase]
+}
+
+private struct ProjectArtifactFixtureCase: Decodable {
+    let id: String
+    let ruleID: String
+    let kind: String
+    let path: String
+    let presentKeys: [String]
+    let missingKeys: [String]
+}
+
+private func projectArtifactFixture() throws -> ProjectArtifactFixture {
+    let fixture = try JSONDecoder().decode(
+        ProjectArtifactFixture.self,
+        from: ruleFixture("project-artifact-cases")
+    )
+    #expect(fixture.schemaVersion == 1)
+    #expect(Set(fixture.cases.map(\.id)).count == fixture.cases.count)
+    return fixture
+}
+
+private func anonymousDeveloperTreePaths() throws -> [String] {
+    let data = try Data(
+        contentsOf: repositoryRoot.appending(
+            path: "Tests/Fixtures/QuickScan/anonymous-developer-tree.json"
+        )
+    )
+    let root = try #require(
+        JSONSerialization.jsonObject(with: data) as? [String: Any]
+    )
+    let snapshots = try #require(root["snapshots"] as? [[String: Any]])
+    return try snapshots.map {
+        try #require($0["relativePath"] as? String)
+    }
 }
 
 private func catalogObject() throws -> [String: Any] {

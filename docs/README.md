@@ -17,12 +17,13 @@
 | Epic 2–4 Task 13 Space Ledger review | [Task 13 Code Review](reports/epic-2-4-task-13-review.md) |
 | Epic 2–4 Task 14 Rule Compiler review | [Task 14 Code Review](reports/epic-2-4-task-14-review.md) |
 | Epic 2–4 Task 15 Protected Catalog review | [Task 15 Code Review](reports/epic-2-4-task-15-review.md) |
+| Epic 2–4 Task 16 Project Artifact review | [Task 16 Code Review](reports/epic-2-4-task-16-review.md) |
 | 产品范围、术语、验收 | [PRD](product/PRD.md) |
 | 进程边界、模块与安全架构 | [System Architecture](architecture/system-architecture.md) |
 | Agent、双模式与治理设计 | [Agent Disk Governance](design/agent-disk-governance.md) |
 | UI、品牌、状态与交互 | [UI/UX](design/ui-ux.md) |
 | 宏观交付顺序与阶段 Gate | [Delivery Roadmap](plans/roadmap.md) |
-| 当前执行计划 | [Epic 2–4 Deterministic Product Core](plans/active/epic-2-4-deterministic-product-core.md) — `Approved`，Tasks 9–15 complete / Task 16 next |
+| 当前执行计划 | [Epic 2–4 Deterministic Product Core](plans/active/epic-2-4-deterministic-product-core.md) — `Approved`，Tasks 9–16 complete / Task 17 next |
 | 已完成计划 | [Epic 0–1 Foundation Spikes](plans/completed/epic-0-1-foundation-spikes.md) |
 | 上游学习与许可证门禁 | [Upstream Reference Matrix](research/upstream-reference-matrix.md) |
 | 当前 Codex Runtime 研究 Gate | [Epic 1 Codex Runtime Study](upstream-studies/epic-1-codex-runtime.md) |

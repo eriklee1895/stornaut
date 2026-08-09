@@ -115,6 +115,37 @@ func canonicalPolicyRejectsRootBoundariesWithoutRuleCatalog() {
     )
 }
 
+@Test
+func reclaimRecommendationRequiresRecoveryEvidenceAndActivity() throws {
+    let base = try makeReviewRule()
+
+    for missing in ["recovery", "evidence", "activity"] {
+        #expect(throws: RuleCatalogError.invalidRule) {
+            _ = try CompiledRule(
+                id: base.id,
+                match: base.match,
+                producer: base.producer,
+                rationaleKey: base.rationaleKey,
+                category: base.category,
+                disposition: base.disposition,
+                risk: base.risk,
+                confidenceRequirement: base.confidenceRequirement,
+                veto: base.veto,
+                requiredEvidenceKeys: missing == "evidence"
+                    ? []
+                    : base.requiredEvidenceKeys,
+                requiredActivityKeys: missing == "activity"
+                    ? []
+                    : base.requiredActivityKeys,
+                recovery: missing == "recovery" ? nil : base.recovery,
+                recommendedAction: .moveToTrash,
+                provenance: base.provenance,
+                fixtureIDs: base.fixtureIDs
+            )
+        }
+    }
+}
+
 private func makeProtectedRule(risk: RiskLevel) throws -> CompiledRule {
     let source = try RuleProvenanceSource(
         project: try #require(DomainLabel(rawValue: "Stornaut observation")),
@@ -159,6 +190,46 @@ private func makeProtectedRule(risk: RiskLevel) throws -> CompiledRule {
             try #require(
                 DomainToken(rawValue: "protected-credentials-lookalike")
             ),
+        ]
+    )
+}
+
+private func makeReviewRule() throws -> CompiledRule {
+    let protected = try makeProtectedRule(risk: .critical)
+    return try CompiledRule(
+        id: try RuleID(validating: "project-node-modules"),
+        match: RuleMatch(
+            pathPattern: try RulePathPattern(
+                validating: "**/node_modules"
+            ),
+            expectedKind: .directory
+        ),
+        producer: try DomainLabel(validating: "Node package managers"),
+        rationaleKey: try DomainToken(
+            validating: "rationale.project.node-dependencies"
+        ),
+        category: .rebuildableProjectArtifacts,
+        disposition: .reviewRecommended,
+        risk: .medium,
+        confidenceRequirement: .high,
+        veto: false,
+        requiredEvidenceKeys: [
+            try DomainToken(validating: "evidence.project.manifest"),
+        ],
+        requiredActivityKeys: [
+            try DomainToken(validating: "activity.git.clean"),
+        ],
+        recovery: RecoveryGuidance(
+            methodKey: try DomainToken(
+                validating: "recovery.project.package-install"
+            ),
+            cost: .medium
+        ),
+        recommendedAction: .moveToTrash,
+        provenance: protected.provenance,
+        fixtureIDs: [
+            try DomainToken(validating: "project-node-positive"),
+            try DomainToken(validating: "project-node-active"),
         ]
     )
 }

@@ -159,6 +159,19 @@ Task 15 evidence adds:
 - deterministic production catalog hash
   `6c51931b3d0f7460edff658b6ad4137eba4396128581439c3d664a042d1ebe96`.
 
+Task 16 evidence adds:
+
+- bounded, source-order-independent compilation of versioned catalog sources;
+- source catalog versions in the generated manifest;
+- immutable preservation of `protected-v1`;
+- ten conservative project artifact rules with official exact-revision
+  provenance and clean-room fixtures;
+- recovery, artifact-layout, not-versioned and activity requirements for every
+  MoveToTrash recommendation;
+- a pure bounded candidate matcher with explicit volume case-sensitivity;
+- cumulative catalog hash
+  `b9f631e9cced76e61842ac629af72b00fe20c8ebff41c89ed75908b90c577335`.
+
 ## Consequences
 
 Positive:
@@ -180,10 +193,10 @@ Costs:
 
 ## Residual Risks
 
-- Task 15 adds the first production built-in Protected catalog; reclaim/review
-  family coverage remains Tasks 16–18.
-- Runtime matching performance remains cumulative work for Tasks 16–18 and
-  orchestration in Task 20.
+- Tasks 15–16 provide Protected and project-artifact sources; cache/runtime/
+  residue family coverage remains Tasks 17–18.
+- Candidate matching is measured, but evidence/activity fusion and final
+  classification remain Tasks 19–20.
 - Activity providers and fail-conservative fusion are Task 19.
 - Local overlay file selection/UI is later work; Task 14 only defines compiled
   monotonic semantics.

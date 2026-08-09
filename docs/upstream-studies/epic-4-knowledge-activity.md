@@ -133,8 +133,8 @@ disposition independent.
 
 ### Authoring format
 
-Rules use versioned YAML because it is reviewable and matches the approved
-architecture. YAML is source, not runtime configuration from the scanned disk.
+Rules use versioned strict JSON, a YAML 1.2 subset. Source is checked in and
+host-compiled; it is never runtime configuration from the scanned disk.
 
 ### Compiler
 
@@ -362,3 +362,85 @@ cannot truthfully represent those absolute boundaries.
 Runtime classification orchestration and cumulative matching performance remain
 Tasks 20 and 16–18 respectively. ADR 0010 remains Proposed until Task 19 and
 the Phase B acceptance gate complete.
+
+## 13. Task 16 Project Artifact Catalog Update
+
+Task 16 adds
+[`../../Rules/BuiltIn/project-artifacts-v1.json`](../../Rules/BuiltIn/project-artifacts-v1.json)
+as an independent source instead of mutating Task 15's immutable
+`protected-v1.json`.
+
+### Official source snapshot
+
+| Ecosystem | Exact source | License | Verified behavior |
+| --- | --- | --- | --- |
+| Node.js/npm | npm CLI `4cdcceac047f82571d0ec734e18b87d1d130e042` | Artistic-2.0 | install-managed `node_modules` |
+| Python | CPython `5107fd700d70abf62762d09f766200532866e823` | Python-2.0 | venv is disposable and recreated from dependency inputs |
+| Rust | Cargo `a07c49a989d565727725e5bb5a8038ff402006a8` | Apache-2.0 | target contains generated artifacts; cargo clean removes them |
+| Go | Go `e5ec1263ca5e1428d233206b99dc21c38ea2a124` | BSD-3-Clause | module vendor generation/metadata |
+| Java/Gradle | Gradle `f85ff712e07bb79dd122880d87b3b6f0e974a35a` | Apache-2.0 | build-directory lifecycle |
+| Java/Maven | Maven Clean Plugin `d4e0c52c730bc88b579ac6fe503bdb96bcdccc76` | Apache-2.0 | clean lifecycle removes generated output |
+| Ruby | RubyGems/Bundler `236160535f659cc49b54b7da5e841fe8cafa3c06` | MIT | bundle install path behavior |
+| PHP | Composer `c435d285c9120efdca35696769c72ea9fdcc0466` | MIT | install from composer metadata |
+| Flutter | Flutter `28e6279c3580382dbd1ba599e19c681d3debcc70` | BSD-3-Clause | generated build output and clean behavior |
+| Xcode | Xcode 26.6 official documentation | Apple documentation terms | build/rebuild lifecycle |
+
+All ten official URLs were read at their exact revision during Task 16 review.
+No upstream code or fixture was copied.
+
+### Conservative rule policy
+
+Ten rules cover the nine PRD project families (Java has Gradle and Maven).
+Every rule remains Review Recommended and requires:
+
+- exact project marker;
+- artifact-specific layout signature;
+- artifact not tracked by version control;
+- recovery/lockfile inputs present;
+- Git clean and upstream synchronized;
+- inactive related process.
+
+An artifact basename never establishes recovery or safety. `build`, `target`
+and `vendor` intentionally return multiple candidate rules; later evidence
+selects a family. A project root or source directory never matches these
+artifact patterns.
+
+### Multi-source compiler
+
+The host compiler accepts one to 16 independently versioned sources with a
+1 MiB aggregate bound. It validates rule IDs and fixture ownership globally,
+sorts source versions in the manifest and emits source-order-independent bytes.
+The CLI accepts repeated `--catalog` only with an explicit cumulative
+`--catalog-version`; duplicate singleton flags fail.
+
+This preserves the Task 15 source hash while producing cumulative version
+`builtin-project-artifacts-v1`.
+
+### Candidate matcher
+
+`RuleCatalogMatcher` is a pure candidate matcher:
+
+- component-level `*`/`**`, exclusions and kind matching;
+- path byte/component bounds and traversal refusal;
+- precompiled exact/case-insensitive forms;
+- explicit volume case-sensitivity input;
+- no filesystem I/O, evidence reads, activity fusion or disposition promotion.
+
+It does not implement the Task 20 classifier.
+
+### Clean-room behavior comparison
+
+The comparison fixture records documented behavior, not copied implementation:
+
+- kondo known-name taxonomy becomes only a candidate in Stornaut;
+- ClearDisk risk/recovery guidance cannot override dirty/active state;
+- Mole running-App protection becomes a typed activity prerequisite;
+- missing marker/layout/recovery/Git/process evidence blocks recommendation;
+- roots and source directories remain non-candidates.
+
+The cumulative matcher benchmark runs the Task 16 cases plus the anonymous
+developer-tree paths over 38 rules. Debug runs complete around 0.95–1.07 s for
+250 iterations, below the 2 s regression gate.
+
+The reviewed cumulative catalog SHA-256 is
+`b9f631e9cced76e61842ac629af72b00fe20c8ebff41c89ed75908b90c577335`.

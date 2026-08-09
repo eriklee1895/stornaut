@@ -390,6 +390,14 @@ public struct CompiledRule: Codable, Sendable, Equatable {
                 throw RuleCatalogError.invalidRule
             }
         }
+        if recommendedAction == .moveToTrash {
+            guard recovery != nil,
+                  !requiredEvidenceKeys.isEmpty,
+                  !requiredActivityKeys.isEmpty
+            else {
+                throw RuleCatalogError.invalidRule
+            }
+        }
         self.id = id
         self.match = match
         self.excludedPatterns = excludedPatterns.sorted()

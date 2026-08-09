@@ -1,0 +1,495 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "project-flutter-build-positive",
+      "ruleID": "project-flutter-build",
+      "kind": "positive",
+      "path": "projects/flutter-app/build",
+      "presentKeys": [
+        "activity.git.clean",
+        "activity.git.upstream-synced",
+        "activity.process.inactive",
+        "evidence.artifact.layout.flutter-build",
+        "evidence.artifact.not-versioned",
+        "evidence.project.marker.pubspec",
+        "evidence.recovery.inputs-present"
+      ],
+      "missingKeys": []
+    },
+    {
+      "id": "project-flutter-build-active",
+      "ruleID": "project-flutter-build",
+      "kind": "safety",
+      "path": "projects/flutter-app/build",
+      "presentKeys": [
+        "activity.git.clean",
+        "activity.git.upstream-synced",
+        "evidence.artifact.layout.flutter-build",
+        "evidence.artifact.not-versioned",
+        "evidence.project.marker.pubspec",
+        "evidence.recovery.inputs-present"
+      ],
+      "missingKeys": [
+        "activity.process.inactive"
+      ]
+    },
+    {
+      "id": "project-flutter-build-root",
+      "ruleID": "project-flutter-build",
+      "kind": "projectRoot",
+      "path": "projects/flutter-app",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "project-flutter-build-source",
+      "ruleID": "project-flutter-build",
+      "kind": "sourceDirectory",
+      "path": "projects/flutter-app/lib",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "project-go-vendor-positive",
+      "ruleID": "project-go-vendor",
+      "kind": "positive",
+      "path": "projects/go-service/vendor",
+      "presentKeys": [
+        "activity.git.clean",
+        "activity.git.upstream-synced",
+        "activity.process.inactive",
+        "evidence.artifact.layout.go-vendor",
+        "evidence.artifact.not-versioned",
+        "evidence.project.marker.go-mod",
+        "evidence.recovery.inputs-present"
+      ],
+      "missingKeys": []
+    },
+    {
+      "id": "project-go-vendor-ambiguous",
+      "ruleID": "project-go-vendor",
+      "kind": "safety",
+      "path": "projects/static-site/vendor",
+      "presentKeys": [
+        "activity.git.clean",
+        "activity.git.upstream-synced",
+        "activity.process.inactive",
+        "evidence.artifact.layout.go-vendor",
+        "evidence.artifact.not-versioned",
+        "evidence.recovery.inputs-present"
+      ],
+      "missingKeys": [
+        "evidence.project.marker.go-mod"
+      ]
+    },
+    {
+      "id": "project-go-vendor-root",
+      "ruleID": "project-go-vendor",
+      "kind": "projectRoot",
+      "path": "projects/go-service",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "project-go-vendor-source",
+      "ruleID": "project-go-vendor",
+      "kind": "sourceDirectory",
+      "path": "projects/go-service/cmd",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "project-java-gradle-build-positive",
+      "ruleID": "project-java-gradle-build",
+      "kind": "positive",
+      "path": "projects/gradle-service/build",
+      "presentKeys": [
+        "activity.git.clean",
+        "activity.git.upstream-synced",
+        "activity.process.inactive",
+        "evidence.artifact.layout.gradle-build",
+        "evidence.artifact.not-versioned",
+        "evidence.project.marker.gradle",
+        "evidence.recovery.inputs-present"
+      ],
+      "missingKeys": []
+    },
+    {
+      "id": "project-java-gradle-build-active",
+      "ruleID": "project-java-gradle-build",
+      "kind": "safety",
+      "path": "projects/gradle-service/build",
+      "presentKeys": [
+        "activity.git.clean",
+        "activity.git.upstream-synced",
+        "evidence.artifact.layout.gradle-build",
+        "evidence.artifact.not-versioned",
+        "evidence.project.marker.gradle",
+        "evidence.recovery.inputs-present"
+      ],
+      "missingKeys": [
+        "activity.process.inactive"
+      ]
+    },
+    {
+      "id": "project-java-gradle-build-root",
+      "ruleID": "project-java-gradle-build",
+      "kind": "projectRoot",
+      "path": "projects/gradle-service",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "project-java-gradle-build-source",
+      "ruleID": "project-java-gradle-build",
+      "kind": "sourceDirectory",
+      "path": "projects/gradle-service/src",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "project-java-maven-target-positive",
+      "ruleID": "project-java-maven-target",
+      "kind": "positive",
+      "path": "projects/maven-service/target",
+      "presentKeys": [
+        "activity.git.clean",
+        "activity.git.upstream-synced",
+        "activity.process.inactive",
+        "evidence.artifact.layout.maven-target",
+        "evidence.artifact.not-versioned",
+        "evidence.project.marker.maven-pom",
+        "evidence.recovery.inputs-present"
+      ],
+      "missingKeys": []
+    },
+    {
+      "id": "project-java-maven-target-dirty",
+      "ruleID": "project-java-maven-target",
+      "kind": "safety",
+      "path": "projects/maven-service/target",
+      "presentKeys": [
+        "activity.git.upstream-synced",
+        "activity.process.inactive",
+        "evidence.artifact.layout.maven-target",
+        "evidence.artifact.not-versioned",
+        "evidence.project.marker.maven-pom",
+        "evidence.recovery.inputs-present"
+      ],
+      "missingKeys": [
+        "activity.git.clean"
+      ]
+    },
+    {
+      "id": "project-java-maven-target-root",
+      "ruleID": "project-java-maven-target",
+      "kind": "projectRoot",
+      "path": "projects/maven-service",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "project-java-maven-target-source",
+      "ruleID": "project-java-maven-target",
+      "kind": "sourceDirectory",
+      "path": "projects/maven-service/src",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "project-node-modules-positive",
+      "ruleID": "project-node-modules",
+      "kind": "positive",
+      "path": "projects/node-app/node_modules",
+      "presentKeys": [
+        "activity.git.clean",
+        "activity.git.upstream-synced",
+        "activity.process.inactive",
+        "evidence.artifact.layout.node-modules",
+        "evidence.artifact.not-versioned",
+        "evidence.project.marker.package-json",
+        "evidence.recovery.inputs-present"
+      ],
+      "missingKeys": []
+    },
+    {
+      "id": "project-node-modules-dirty",
+      "ruleID": "project-node-modules",
+      "kind": "safety",
+      "path": "projects/node-app/node_modules",
+      "presentKeys": [
+        "activity.git.upstream-synced",
+        "activity.process.inactive",
+        "evidence.artifact.layout.node-modules",
+        "evidence.artifact.not-versioned",
+        "evidence.project.marker.package-json",
+        "evidence.recovery.inputs-present"
+      ],
+      "missingKeys": [
+        "activity.git.clean"
+      ]
+    },
+    {
+      "id": "project-node-modules-root",
+      "ruleID": "project-node-modules",
+      "kind": "projectRoot",
+      "path": "projects/node-app",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "project-node-modules-source",
+      "ruleID": "project-node-modules",
+      "kind": "sourceDirectory",
+      "path": "projects/node-app/src",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "project-php-composer-vendor-positive",
+      "ruleID": "project-php-composer-vendor",
+      "kind": "positive",
+      "path": "projects/php-app/vendor",
+      "presentKeys": [
+        "activity.git.clean",
+        "activity.git.upstream-synced",
+        "activity.process.inactive",
+        "evidence.artifact.layout.composer-vendor",
+        "evidence.artifact.not-versioned",
+        "evidence.project.marker.composer-json",
+        "evidence.recovery.inputs-present"
+      ],
+      "missingKeys": []
+    },
+    {
+      "id": "project-php-composer-vendor-ambiguous",
+      "ruleID": "project-php-composer-vendor",
+      "kind": "safety",
+      "path": "projects/static-site/vendor",
+      "presentKeys": [
+        "activity.git.clean",
+        "activity.git.upstream-synced",
+        "activity.process.inactive",
+        "evidence.artifact.layout.composer-vendor",
+        "evidence.artifact.not-versioned",
+        "evidence.recovery.inputs-present"
+      ],
+      "missingKeys": [
+        "evidence.project.marker.composer-json"
+      ]
+    },
+    {
+      "id": "project-php-composer-vendor-root",
+      "ruleID": "project-php-composer-vendor",
+      "kind": "projectRoot",
+      "path": "projects/php-app",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "project-php-composer-vendor-source",
+      "ruleID": "project-php-composer-vendor",
+      "kind": "sourceDirectory",
+      "path": "projects/php-app/src",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "project-python-venv-positive",
+      "ruleID": "project-python-venv",
+      "kind": "positive",
+      "path": "projects/python-app/.venv",
+      "presentKeys": [
+        "activity.git.clean",
+        "activity.git.upstream-synced",
+        "activity.process.inactive",
+        "evidence.artifact.layout.python-venv",
+        "evidence.artifact.not-versioned",
+        "evidence.project.marker.python-dependencies",
+        "evidence.recovery.inputs-present"
+      ],
+      "missingKeys": []
+    },
+    {
+      "id": "project-python-venv-active",
+      "ruleID": "project-python-venv",
+      "kind": "safety",
+      "path": "projects/python-app/.venv",
+      "presentKeys": [
+        "activity.git.clean",
+        "activity.git.upstream-synced",
+        "evidence.artifact.layout.python-venv",
+        "evidence.artifact.not-versioned",
+        "evidence.project.marker.python-dependencies",
+        "evidence.recovery.inputs-present"
+      ],
+      "missingKeys": [
+        "activity.process.inactive"
+      ]
+    },
+    {
+      "id": "project-python-venv-root",
+      "ruleID": "project-python-venv",
+      "kind": "projectRoot",
+      "path": "projects/python-app",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "project-python-venv-source",
+      "ruleID": "project-python-venv",
+      "kind": "sourceDirectory",
+      "path": "projects/python-app/src",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "project-ruby-bundle-vendor-positive",
+      "ruleID": "project-ruby-bundle-vendor",
+      "kind": "positive",
+      "path": "projects/ruby-app/vendor/bundle",
+      "presentKeys": [
+        "activity.git.clean",
+        "activity.git.upstream-synced",
+        "activity.process.inactive",
+        "evidence.artifact.layout.bundler-vendor",
+        "evidence.artifact.not-versioned",
+        "evidence.project.marker.gemfile",
+        "evidence.recovery.inputs-present"
+      ],
+      "missingKeys": []
+    },
+    {
+      "id": "project-ruby-bundle-vendor-unpushed",
+      "ruleID": "project-ruby-bundle-vendor",
+      "kind": "safety",
+      "path": "projects/ruby-app/vendor/bundle",
+      "presentKeys": [
+        "activity.git.clean",
+        "activity.process.inactive",
+        "evidence.artifact.layout.bundler-vendor",
+        "evidence.artifact.not-versioned",
+        "evidence.project.marker.gemfile",
+        "evidence.recovery.inputs-present"
+      ],
+      "missingKeys": [
+        "activity.git.upstream-synced"
+      ]
+    },
+    {
+      "id": "project-ruby-bundle-vendor-root",
+      "ruleID": "project-ruby-bundle-vendor",
+      "kind": "projectRoot",
+      "path": "projects/ruby-app",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "project-ruby-bundle-vendor-source",
+      "ruleID": "project-ruby-bundle-vendor",
+      "kind": "sourceDirectory",
+      "path": "projects/ruby-app/lib",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "project-rust-target-positive",
+      "ruleID": "project-rust-target",
+      "kind": "positive",
+      "path": "projects/rust-app/target",
+      "presentKeys": [
+        "activity.git.clean",
+        "activity.git.upstream-synced",
+        "activity.process.inactive",
+        "evidence.artifact.layout.cargo-target",
+        "evidence.artifact.not-versioned",
+        "evidence.project.marker.cargo-toml",
+        "evidence.recovery.inputs-present"
+      ],
+      "missingKeys": []
+    },
+    {
+      "id": "project-rust-target-unpushed",
+      "ruleID": "project-rust-target",
+      "kind": "safety",
+      "path": "projects/rust-app/target",
+      "presentKeys": [
+        "activity.git.clean",
+        "activity.process.inactive",
+        "evidence.artifact.layout.cargo-target",
+        "evidence.artifact.not-versioned",
+        "evidence.project.marker.cargo-toml",
+        "evidence.recovery.inputs-present"
+      ],
+      "missingKeys": [
+        "activity.git.upstream-synced"
+      ]
+    },
+    {
+      "id": "project-rust-target-root",
+      "ruleID": "project-rust-target",
+      "kind": "projectRoot",
+      "path": "projects/rust-app",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "project-rust-target-source",
+      "ruleID": "project-rust-target",
+      "kind": "sourceDirectory",
+      "path": "projects/rust-app/src",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "project-xcode-derived-data-positive",
+      "ruleID": "project-xcode-derived-data",
+      "kind": "positive",
+      "path": "Library/Developer/Xcode/DerivedData/SwiftApp-abcdef",
+      "presentKeys": [
+        "activity.git.clean",
+        "activity.git.upstream-synced",
+        "activity.process.inactive",
+        "evidence.artifact.layout.xcode-derived-data",
+        "evidence.artifact.not-versioned",
+        "evidence.project.marker.xcode-project",
+        "evidence.recovery.inputs-present"
+      ],
+      "missingKeys": []
+    },
+    {
+      "id": "project-xcode-derived-data-active",
+      "ruleID": "project-xcode-derived-data",
+      "kind": "safety",
+      "path": "Library/Developer/Xcode/DerivedData/SwiftApp-abcdef",
+      "presentKeys": [
+        "activity.git.clean",
+        "activity.git.upstream-synced",
+        "evidence.artifact.layout.xcode-derived-data",
+        "evidence.artifact.not-versioned",
+        "evidence.project.marker.xcode-project",
+        "evidence.recovery.inputs-present"
+      ],
+      "missingKeys": [
+        "activity.process.inactive"
+      ]
+    },
+    {
+      "id": "project-xcode-derived-data-root",
+      "ruleID": "project-xcode-derived-data",
+      "kind": "projectRoot",
+      "path": "projects/swift-app",
+      "presentKeys": [],
+      "missingKeys": []
+    },
+    {
+      "id": "project-xcode-derived-data-source",
+      "ruleID": "project-xcode-derived-data",
+      "kind": "sourceDirectory",
+      "path": "projects/swift-app/Sources",
+      "presentKeys": [],
+      "missingKeys": []
+    }
+  ]
+}

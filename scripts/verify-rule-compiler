@@ -11,6 +11,7 @@ trap 'rm -rf "$work_dir"' EXIT
 catalog="$repo_root/Tests/Fixtures/Rules/minimal-catalog.json"
 overlay="$repo_root/Tests/Fixtures/Rules/conservative-overlay.json"
 protected_catalog="$repo_root/Rules/BuiltIn/protected-v1.json"
+project_catalog="$repo_root/Rules/BuiltIn/project-artifacts-v1.json"
 
 for run in 1 2; do
     swift run stornaut-rule-compiler \
@@ -24,6 +25,13 @@ for run in 1 2; do
         --output "$work_dir/protected-catalog-$run.json" \
         --manifest "$work_dir/protected-manifest-$run.json" \
         > "$work_dir/protected-hash-$run.txt"
+    swift run stornaut-rule-compiler \
+        --catalog "$protected_catalog" \
+        --catalog "$project_catalog" \
+        --catalog-version builtin-project-artifacts-v1 \
+        --output "$work_dir/project-catalog-$run.json" \
+        --manifest "$work_dir/project-manifest-$run.json" \
+        > "$work_dir/project-hash-$run.txt"
 done
 
 cmp "$work_dir/catalog-1.json" "$work_dir/catalog-2.json"
@@ -32,16 +40,66 @@ cmp "$work_dir/hash-1.txt" "$work_dir/hash-2.txt"
 cmp "$work_dir/protected-catalog-1.json" "$work_dir/protected-catalog-2.json"
 cmp "$work_dir/protected-manifest-1.json" "$work_dir/protected-manifest-2.json"
 cmp "$work_dir/protected-hash-1.txt" "$work_dir/protected-hash-2.txt"
+cmp "$work_dir/project-catalog-1.json" "$work_dir/project-catalog-2.json"
+cmp "$work_dir/project-manifest-1.json" "$work_dir/project-manifest-2.json"
+cmp "$work_dir/project-hash-1.txt" "$work_dir/project-hash-2.txt"
+
+swift run stornaut-rule-compiler \
+    --catalog "$project_catalog" \
+    --catalog "$protected_catalog" \
+    --catalog-version builtin-project-artifacts-v1 \
+    --output "$work_dir/project-catalog-reordered.json" \
+    --manifest "$work_dir/project-manifest-reordered.json" \
+    > "$work_dir/project-hash-reordered.txt"
+cmp "$work_dir/project-catalog-1.json" "$work_dir/project-catalog-reordered.json"
+cmp "$work_dir/project-manifest-1.json" "$work_dir/project-manifest-reordered.json"
+cmp "$work_dir/project-hash-1.txt" "$work_dir/project-hash-reordered.txt"
+
+set +e
+swift run stornaut-rule-compiler \
+    --catalog "$protected_catalog" \
+    --catalog "$project_catalog" \
+    --output "$work_dir/project-missing-version.json" \
+    --manifest "$work_dir/project-missing-version-manifest.json" \
+    > /dev/null 2>&1
+missing_version_status=$?
+set -e
+if (( missing_version_status == 0 )); then
+    echo "multi-source compiler accepted a missing catalog version" >&2
+    exit 1
+fi
+
+set +e
+swift run stornaut-rule-compiler \
+    --catalog "$protected_catalog" \
+    --catalog "$project_catalog" \
+    --catalog-version builtin-project-artifacts-v1 \
+    --catalog-version shadow-version \
+    --output "$work_dir/project-duplicate-version.json" \
+    --manifest "$work_dir/project-duplicate-version-manifest.json" \
+    > /dev/null 2>&1
+duplicate_version_status=$?
+set -e
+if (( duplicate_version_status == 0 )); then
+    echo "multi-source compiler accepted a duplicate catalog version flag" >&2
+    exit 1
+fi
 
 python3 -m json.tool Rules/Schema/rule-catalog-source.schema.json >/dev/null
 python3 -m json.tool Rules/Schema/rule-overlay-source.schema.json >/dev/null
 python3 -m json.tool Rules/BuiltIn/protected-v1.json >/dev/null
+python3 -m json.tool Rules/BuiltIn/project-artifacts-v1.json >/dev/null
 python3 -m json.tool Tests/Fixtures/Rules/protected-path-cases.json >/dev/null
 python3 -m json.tool Tests/Fixtures/Rules/protected-downgrade-overlay.json >/dev/null
+python3 -m json.tool Tests/Fixtures/Rules/project-artifact-cases.json >/dev/null
+python3 -m json.tool \
+    Tests/Fixtures/Rules/project-artifact-behavior-comparison.json >/dev/null
 python3 -m json.tool "$work_dir/catalog-1.json" >/dev/null
 python3 -m json.tool "$work_dir/manifest-1.json" >/dev/null
 python3 -m json.tool "$work_dir/protected-catalog-1.json" >/dev/null
 python3 -m json.tool "$work_dir/protected-manifest-1.json" >/dev/null
+python3 -m json.tool "$work_dir/project-catalog-1.json" >/dev/null
+python3 -m json.tool "$work_dir/project-manifest-1.json" >/dev/null
 
 swift package show-dependencies --format text \
     | grep -Fx 'No external dependencies found' >/dev/null
@@ -104,3 +162,4 @@ fi
 
 echo "Rule compiler fixture verification passed: $(cat "$work_dir/hash-1.txt")"
 echo "Protected catalog verification passed: $(cat "$work_dir/protected-hash-1.txt")"
+echo "Project catalog verification passed: $(cat "$work_dir/project-hash-1.txt")"

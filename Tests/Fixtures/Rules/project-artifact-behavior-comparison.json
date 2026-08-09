@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "sources": [
+    {
+      "project": "Mole",
+      "revision": "e83f44f8ca56bb49f93c0479c82a984601b22d5d",
+      "license": "GPL-3.0",
+      "usage": "behaviorReferenceOnly"
+    },
+    {
+      "project": "ClearDisk",
+      "revision": "1aaec92b91c40fdc0c2fce92fef20df08b5f5c43",
+      "license": "MIT",
+      "usage": "behaviorReferenceOnly"
+    },
+    {
+      "project": "kondo",
+      "revision": "1d351ca80b3d3adfad9bbe7db872c27359190210",
+      "license": "MIT",
+      "usage": "behaviorReferenceOnly"
+    }
+  ],
+  "cases": [
+    {
+      "id": "comparison-kondo-known-artifact-name",
+      "sourceProject": "kondo",
+      "ruleID": "project-rust-target",
+      "upstreamBehavior": "knownArtifactNameIsACandidate",
+      "stornautOutcome": "reviewBlocked",
+      "missingKeys": [
+        "evidence.artifact.layout.cargo-target",
+        "evidence.artifact.not-versioned",
+        "evidence.project.marker.cargo-toml",
+        "activity.git.clean",
+        "activity.git.upstream-synced",
+        "activity.process.inactive"
+      ],
+      "relativeDifference": "artifactNameAloneIsInsufficient"
+    },
+    {
+      "id": "comparison-cleardisk-rebuildable-project-artifact",
+      "sourceProject": "ClearDisk",
+      "ruleID": "project-python-venv",
+      "upstreamBehavior": "knownProjectArtifactHasStaticRecoveryGuidance",
+      "stornautOutcome": "reviewBlocked",
+      "missingKeys": [
+        "activity.process.inactive"
+      ],
+      "relativeDifference": "activeProjectCannotBecomeReclaimable"
+    },
+    {
+      "id": "comparison-mole-running-app-protection",
+      "sourceProject": "Mole",
+      "ruleID": "project-xcode-derived-data",
+      "upstreamBehavior": "runningApplicationAddsProtection",
+      "stornautOutcome": "reviewBlocked",
+      "missingKeys": [
+        "activity.process.inactive"
+      ],
+      "relativeDifference": "typedActivityEvidenceIsMandatory"
+    },
+    {
+      "id": "comparison-kondo-source-directory-lookalike",
+      "sourceProject": "kondo",
+      "ruleID": "project-node-modules",
+      "upstreamBehavior": "projectTraversalUsesKnownArtifactTaxonomy",
+      "stornautOutcome": "noCandidate",
+      "missingKeys": [],
+      "relativeDifference": "projectRootAndSourceDirectoriesNeverMatch"
+    },
+    {
+      "id": "comparison-cleardisk-dirty-project",
+      "sourceProject": "ClearDisk",
+      "ruleID": "project-java-gradle-build",
+      "upstreamBehavior": "projectArtifactReceivesRiskAndRecoveryMetadata",
+      "stornautOutcome": "reviewBlocked",
+      "missingKeys": [
+        "activity.git.clean"
+      ],
+      "relativeDifference": "dirtyStateCannotBeOverriddenByStaticTaxonomy"
+    }
+  ]
+}

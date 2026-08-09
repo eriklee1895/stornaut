@@ -20,6 +20,7 @@ public enum RuleCompilerError: Error, Sendable, Equatable {
 public struct RuleCompileManifest: Codable, Sendable, Equatable {
     public let schemaVersion: Int
     public let catalogVersion: String
+    public let sourceCatalogVersions: [String]
     public let ruleCount: Int
     public let ruleIDs: [RuleID]
     public let provenanceSourceCount: Int
@@ -29,6 +30,7 @@ public struct RuleCompileManifest: Codable, Sendable, Equatable {
 
     public init(
         catalogVersion: String,
+        sourceCatalogVersions: [String],
         ruleCount: Int,
         ruleIDs: [RuleID],
         provenanceSourceCount: Int,
@@ -38,6 +40,7 @@ public struct RuleCompileManifest: Codable, Sendable, Equatable {
     ) {
         schemaVersion = 1
         self.catalogVersion = catalogVersion
+        self.sourceCatalogVersions = sourceCatalogVersions
         self.ruleCount = ruleCount
         self.ruleIDs = ruleIDs
         self.provenanceSourceCount = provenanceSourceCount
@@ -68,6 +71,7 @@ public struct CompiledRuleArtifact: Sendable, Equatable {
 
 public struct RuleSourceCompiler: Sendable {
     public static let maximumInputBytes = 1_048_576
+    public static let maximumSourceCount = 16
     public static let maximumRuleCount = 4_096
     public static let maximumNestingDepth = 16
     public static let maximumScalarBytes = 16_384
@@ -85,9 +89,22 @@ public struct RuleSourceCompiler: Sendable {
         catalogData: Data,
         overlayData: Data? = nil
     ) throws -> CompiledRuleArtifact {
+        try compile(
+            catalogSources: [catalogData],
+            catalogVersion: try catalogVersion(catalogData),
+            overlayData: overlayData
+        )
+    }
+
+    public func compile(
+        catalogSources: [Data],
+        catalogVersion: DomainToken,
+        overlayData: Data? = nil
+    ) throws -> CompiledRuleArtifact {
         do {
             return try compileValidated(
-                catalogData: catalogData,
+                catalogSources: catalogSources,
+                catalogVersion: catalogVersion,
                 overlayData: overlayData
             )
         } catch let error as RuleCompilerError {
@@ -97,12 +114,53 @@ public struct RuleSourceCompiler: Sendable {
         }
     }
 
+    public func compile(
+        catalogSources: [Data],
+        catalogVersion: String,
+        overlayData: Data? = nil
+    ) throws -> CompiledRuleArtifact {
+        guard let version = DomainToken(rawValue: catalogVersion) else {
+            throw RuleCompilerError.invalidValue("catalogVersion")
+        }
+        return try compile(
+            catalogSources: catalogSources,
+            catalogVersion: version,
+            overlayData: overlayData
+        )
+    }
+
     private func compileValidated(
-        catalogData: Data,
+        catalogSources: [Data],
+        catalogVersion: DomainToken,
         overlayData: Data?
     ) throws -> CompiledRuleArtifact {
-        var rules = try decodeCatalog(catalogData)
-        let sourceCatalogVersion = try catalogVersion(catalogData)
+        guard !catalogSources.isEmpty,
+              catalogSources.count <= Self.maximumSourceCount,
+              catalogSources.reduce(0, { $0 + $1.count })
+                <= Self.maximumInputBytes
+        else {
+            throw RuleCompilerError.invalidValue("catalogSources")
+        }
+        let decodedSources = try catalogSources.map {
+            (version: try self.catalogVersion($0), rules: try decodeCatalog($0))
+        }
+        let sourceVersions = decodedSources.map(\.version).sorted {
+            $0.rawValue < $1.rawValue
+        }
+        guard Set(sourceVersions).count == sourceVersions.count else {
+            throw RuleCompilerError.invalidValue("catalogSources")
+        }
+        var ruleIDs = Set<RuleID>()
+        var rules: [CompiledRule] = []
+        for rule in decodedSources.flatMap(\.rules) {
+            guard ruleIDs.insert(rule.id).inserted else {
+                throw RuleCompilerError.duplicateRule(rule.id.rawValue)
+            }
+            rules.append(rule)
+        }
+        guard rules.count <= Self.maximumRuleCount else {
+            throw RuleCompilerError.invalidValue("catalog.rules")
+        }
         let overlayVersion: DomainToken?
         let overlays: [SourceOverlay]
         if let overlayData {
@@ -115,8 +173,8 @@ public struct RuleSourceCompiler: Sendable {
             overlays = []
         }
         let finalVersionValue = overlayVersion.map {
-            "\(sourceCatalogVersion.rawValue).\($0.rawValue)"
-        } ?? sourceCatalogVersion.rawValue
+            "\(catalogVersion.rawValue).\($0.rawValue)"
+        } ?? catalogVersion.rawValue
         guard let finalVersion = DomainToken(rawValue: finalVersionValue) else {
             throw RuleCompilerError.invalidValue("catalogVersion")
         }
@@ -129,6 +187,7 @@ public struct RuleSourceCompiler: Sendable {
         let sha256 = digest.map { String(format: "%02x", $0) }.joined()
         let manifest = RuleCompileManifest(
             catalogVersion: catalog.catalogVersion.rawValue,
+            sourceCatalogVersions: sourceVersions.map(\.rawValue),
             ruleCount: catalog.rules.count,
             ruleIDs: catalog.rules.map(\.id),
             provenanceSourceCount: catalog.rules.reduce(0) {

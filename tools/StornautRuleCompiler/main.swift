@@ -6,14 +6,29 @@ struct StornautRuleCompilerCommand {
     static func main() {
         do {
             let options = try CompilerOptions.parse(CommandLine.arguments)
-            let catalog = try Data(contentsOf: options.catalogURL)
+            let catalogs = try options.catalogURLs.map {
+                try Data(contentsOf: $0)
+            }
             let overlay = try options.overlayURL.map {
                 try Data(contentsOf: $0)
             }
-            let artifact = try RuleSourceCompiler().compile(
-                catalogData: catalog,
-                overlayData: overlay
-            )
+            let compiler = RuleSourceCompiler()
+            let artifact: CompiledRuleArtifact
+            if catalogs.count == 1, options.catalogVersion == nil {
+                artifact = try compiler.compile(
+                    catalogData: catalogs[0],
+                    overlayData: overlay
+                )
+            } else {
+                guard let catalogVersion = options.catalogVersion else {
+                    throw CompilerCommandError.invalidArguments
+                }
+                artifact = try compiler.compile(
+                    catalogSources: catalogs,
+                    catalogVersion: catalogVersion,
+                    overlayData: overlay
+                )
+            }
             try writeAtomically(artifact.data, to: options.outputURL)
             let manifest = try JSONEncoder.sorted.encode(artifact.manifest)
             try writeAtomically(manifest, to: options.manifestURL)
@@ -30,13 +45,15 @@ struct StornautRuleCompilerCommand {
 }
 
 private struct CompilerOptions {
-    let catalogURL: URL
+    let catalogURLs: [URL]
+    let catalogVersion: String?
     let overlayURL: URL?
     let outputURL: URL
     let manifestURL: URL
 
     static func parse(_ arguments: [String]) throws -> Self {
-        var catalogURL: URL?
+        var catalogURLs: [URL] = []
+        var catalogVersion: String?
         var overlayURL: URL?
         var outputURL: URL?
         var manifestURL: URL?
@@ -48,32 +65,46 @@ private struct CompilerOptions {
             }
             index += 1
             let value = arguments[index]
-            guard value.hasPrefix("/") else {
-                throw CompilerCommandError.invalidArguments
-            }
-            let url = URL(filePath: value)
             switch flag {
             case "--catalog":
-                catalogURL = url
+                catalogURLs.append(try absoluteURL(value))
+            case "--catalog-version":
+                guard catalogVersion == nil else {
+                    throw CompilerCommandError.invalidArguments
+                }
+                catalogVersion = value
             case "--overlay":
-                overlayURL = url
+                guard overlayURL == nil else {
+                    throw CompilerCommandError.invalidArguments
+                }
+                overlayURL = try absoluteURL(value)
             case "--output":
-                outputURL = url
+                guard outputURL == nil else {
+                    throw CompilerCommandError.invalidArguments
+                }
+                outputURL = try absoluteURL(value)
             case "--manifest":
-                manifestURL = url
+                guard manifestURL == nil else {
+                    throw CompilerCommandError.invalidArguments
+                }
+                manifestURL = try absoluteURL(value)
             default:
                 throw CompilerCommandError.invalidArguments
             }
             index += 1
         }
-        guard let catalogURL, let outputURL, let manifestURL
+        guard !catalogURLs.isEmpty,
+              catalogURLs.count <= RuleSourceCompiler.maximumSourceCount,
+              catalogURLs.count == 1 || catalogVersion != nil,
+              let outputURL,
+              let manifestURL
         else {
             throw CompilerCommandError.invalidArguments
         }
         let sourcePaths = try [
-            catalogURL,
             overlayURL,
         ].compactMap { $0 }.map(canonicalExistingPath)
+            + catalogURLs.map(canonicalExistingPath)
         let destinationPaths = [
             outputURL,
             manifestURL,
@@ -84,12 +115,20 @@ private struct CompilerOptions {
             throw CompilerCommandError.invalidArguments
         }
         return Self(
-            catalogURL: catalogURL,
+            catalogURLs: catalogURLs,
+            catalogVersion: catalogVersion,
             overlayURL: overlayURL,
             outputURL: outputURL,
             manifestURL: manifestURL
         )
     }
+}
+
+private func absoluteURL(_ value: String) throws -> URL {
+    guard value.hasPrefix("/") else {
+        throw CompilerCommandError.invalidArguments
+    }
+    return URL(filePath: value)
 }
 
 private func writeAtomically(_ data: Data, to url: URL) throws {
