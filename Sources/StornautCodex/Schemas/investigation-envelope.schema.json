@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Stornaut Investigation Envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "summary",
+    "findings",
+    "unresolvedTargetIDs"
+  ],
+  "properties": {
+    "summary": {
+      "type": "string",
+      "maxLength": 4096
+    },
+    "findings": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "targetID",
+          "summary"
+        ],
+        "properties": {
+          "targetID": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        }
+      }
+    },
+    "unresolvedTargetIDs": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 512
+      }
+    }
+  }
+}

@@ -349,6 +349,7 @@ completed build, signing, bundle, localization, documentation and diff checks.
 - Create: `Sources/StornautCodex/Schemas/investigation-envelope.schema.json`
 - Create: `Tests/StornautCodexTests/JSONLDecoderTests.swift`
 - Create: `Tests/StornautCodexTests/CodexProcessTests.swift`
+- Create: `Tests/StornautCodexTests/RealCodexProcessDiagnosticTests.swift`
 - Create: `Tests/Fixtures/Codex/success.jsonl`
 - Create: `Tests/Fixtures/Codex/malformed.jsonl`
 - Create: `Tests/Fixtures/Codex/fake-codex.sh`
@@ -359,19 +360,19 @@ completed build, signing, bundle, localization, documentation and diff checks.
 - Produces: `CodexRunRequest` with executable, isolated working directory, schema URL, prompt data, timeout, stdout/stderr byte limits, and environment allowlist.
 - Produces: `InvestigationEnvelope` with `summary`, `findings`, `unresolvedTargetIDs`, and no executable command field.
 
-- [ ] **Step 1: Write JSONL fixture tests**
+- [x] **Step 1: Write JSONL fixture tests**
 
 Verify fragmented lines, multiple events per chunk, UTF-8 boundary splits, unknown event preservation, malformed JSON failure, output limit failure, and final envelope decoding. No test may call the network or real Codex.
 
-- [ ] **Step 2: Implement an incremental bounded JSONL decoder**
+- [x] **Step 2: Implement an incremental bounded JSONL decoder**
 
 Buffer only the unfinished line, enforce per-line and session byte limits, and keep unknown events as bounded metadata. Never forward unbounded raw model text to UI state.
 
-- [ ] **Step 3: Write process lifecycle tests with fake Codex**
+- [x] **Step 3: Write process lifecycle tests with fake Codex**
 
 The fake executable must support: successful JSONL, stderr noise, invalid schema output, timeout, ignored SIGTERM, and one child process. Assert the launcher creates or otherwise proves an isolated process group before group signalling; never signal a group that could contain the Stornaut App or test runner. Cancellation must close pipes and leave no child PID after the escalation deadline.
 
-- [ ] **Step 4: Implement a protocol-only fixed-argument launch**
+- [x] **Step 4: Implement a protocol-only fixed-argument launch**
 
 Construct arguments as an array using supported capabilities:
 
@@ -383,15 +384,28 @@ exec --strict-config --ephemeral --json --output-schema <schema>
 
 Send the prompt through stdin. Use an allowlisted environment containing only required locale, temporary-directory, authentication/config location, and executable lookup values established by the spike. Never use `sh -c`, shell interpolation, `--dangerously-bypass-approvals-and-sandbox`, or inherited project instructions. `--sandbox read-only` is necessary but insufficient: it may still expose model-generated Shell and direct reads. This Task proves process/JSONL behavior only and must not be described as a production Deep Dive sandbox.
 
-- [ ] **Step 5: Implement cancellation escalation**
+- [x] **Step 5: Implement cancellation escalation**
 
 On task cancellation or timeout: close stdin, send interrupt/terminate to the process group, wait a bounded grace period, kill the process group if still alive, drain/close pipes, and return `.cancelled` or `.timedOut`. Record all transitions as typed audit events.
 
-- [ ] **Step 6: Run one minimal real Codex schema probe**
+- [x] **Step 6: Run one minimal real Codex schema probe**
 
 Use an isolated temporary directory and a prompt that only returns a static schema-valid envelope without reading target files or invoking tools. Confirm JSONL parsing, final schema validation, ephemeral behavior, timeout, and cancellation. Redact identifiers from the ADR and delete raw JSONL after the run. This disposable schema probe is not evidence of Broker-only isolation.
 
-- [ ] **Step 7: Verify and commit**
+Task 4 execution evidence on 2026-08-09:
+
+- Contract-first tests initially failed only because the planned protocol/process types did not exist. The final focused suite discovered 58 tests: 56 passed and the two installed/real diagnostics were skipped by default.
+- `JSONLDecoder` incrementally handles arbitrary chunk/UTF-8 boundaries, keeps only the unfinished line, applies line/session bounds, redacts raw agent text, and retains future events only as a bounded scalar metadata allowlist.
+- `InvestigationEnvelope` and its checked-in Schema allow exactly `summary`, `findings[{targetID, summary}]` and `unresolvedTargetIDs`; top-level or nested executable/action fields fail closed.
+- `CodexProcess` uses a fixed argv and allowlisted environment, sends prompt data through stdin, applies a 64-event fail-closed queue, and reports only typed/redacted events.
+- `posix_spawn` atomically creates a separate process group and cwd. `FD_CLOEXEC` prevents parallel pipe inheritance, `F_SETNOSIGPIPE` protects the App from early child exit, and timeout/cancellation/error/normal-leader-exit paths clean descendants.
+- Fake process tests cover malformed/oversized output, invalid envelope, nonzero/early exit, ignored signals, timeout, consumer cancellation and a leader that exits while a child remains.
+- An empty `CODEX_HOME` accepted every strict candidate key and entered `thread.started`/`turn.started`, then failed unauthenticated; it still created runtime state, proving ephemeral does not mean no local initialization.
+- Exactly one authenticated static-envelope turn on installed `0.147.0` passed production JSONL decoding and Swift envelope validation with an empty temporary workspace and no newly observed session/history path. It is protocol evidence only, not Broker-only/direct-read evidence.
+- The final full SwiftPM suite discovered 59 tests: 57 passed and two opt-in diagnostics were skipped. After recovering a stale current-user macOS AutomationModeUI session without changing system permissions, the full `scripts/verify` run passed both UI tests, screenshot export, build, signing, bundle, localization, docs and diff checks.
+- See [ADR 0003](../../adr/0003-codex-process-protocol.md). Deep Dive remains paused.
+
+- [x] **Step 7: Verify and commit**
 
 Run `scripts/verify`; expected: fake process tests pass and no orphan process remains.
 

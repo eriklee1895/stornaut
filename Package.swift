@@ -22,7 +22,10 @@ let package = Package(
             name: "StornautCore"
         ),
         .target(
-            name: "StornautCodex"
+            name: "StornautCodex",
+            resources: [
+                .copy("Schemas"),
+            ]
         ),
         .testTarget(
             name: "StornautCoreTests",

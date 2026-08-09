@@ -2,7 +2,7 @@
 
 > 面向接手实现的 Coding Agent  
 > 最近更新：2026-08-09
-> 当前状态：产品、Agent、UI 功能交互与品牌基线完成；Epic 0 App/Test/UI Test host、本地签名与 Light/Dark/Settings 截图验证，以及仓库固定的 XcodeBuildMCP + Peekaboo 只读开发 harness 已完成；Epic 1 Codex Runtime Study 与 Task 3 discovery/capability report 已完成，下一项是 Task 4 structured process/JSONL/Schema/cancellation spike；Deep Dive 仍 paused
+> 当前状态：产品、Agent、UI 功能交互与品牌基线完成；Epic 0 App/Test/UI Test host、本地签名与 Light/Dark/Settings 截图验证，以及仓库固定的 XcodeBuildMCP + Peekaboo 只读开发 harness 已完成；Epic 1 Codex Runtime Study、Task 3 discovery/capability 与 Task 4 structured process/JSONL/Schema/cancellation 已完成，下一项是 Task 5 Probe Broker 与 App-context file-read isolation spike；Deep Dive 仍 paused
 
 ## 1. 任务目标
 
