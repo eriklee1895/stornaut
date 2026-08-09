@@ -21,11 +21,13 @@
 
 ## 状态
 
-🚧 产品、Agent、UI 功能交互与品牌基线已批准；Epic 0 的 SwiftPM、原生 App/Test/UI Test host、本地签名与 Light/Dark/Settings 截图验证已完成。下一阶段是 Epic 1 Codex discovery/capability Spike。见文档：
+🚧 产品、Agent、UI 功能交互与品牌基线已批准；Epic 0 的 SwiftPM、原生 App/Test/UI Test host、本地签名与 Light/Dark/Settings 截图验证，以及仓库固定的 XcodeBuildMCP + Peekaboo 只读开发 harness 已完成。下一阶段是 Epic 1 Codex discovery/capability Spike。见文档：
 
 | 文档 | 内容 |
 |---|---|
 | [docs/README.md](docs/README.md) | 文档地图、规范优先级、生命周期和 Coding Agent 读取规则 |
+| [docs/agent/development-tooling.md](docs/agent/development-tooling.md) | 固定版本 XcodeBuildMCP、Peekaboo 只读边界与真实窗口 UI 验证循环 |
+| [docs/agent/ui-testing-guide.md](docs/agent/ui-testing-guide.md) | UI 分层测试、Light/Dark/Settings 截图契约与图形会话排障 |
 | [docs/product/PRD.md](docs/product/PRD.md) | 完整产品需求：双模式、Agent 调查、安全与验收标准 |
 | [docs/architecture/system-architecture.md](docs/architecture/system-architecture.md) | 原生 Swift 全栈 + Codex 子进程 + Probe Broker 技术架构 |
 | [docs/design/agent-disk-governance.md](docs/design/agent-disk-governance.md) | 用户批准的 Agent、双模式与安全设计基线 |

@@ -1,0 +1,186 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+cd "$repo_root"
+
+output_dir="$repo_root/.derivedData/peekaboo"
+build_result="$output_dir/build-run.json"
+apps_result="$output_dir/apps.json"
+capture_result="$output_dir/capture.json"
+screenshot="$output_dir/stornaut-window.png"
+process_id=""
+
+function stop_stornaut() {
+    if [[ -n "$process_id" ]]; then
+        scripts/xcodebuildmcp macos stop --process-id "$process_id" --output json >/dev/null 2>&1 \
+            || kill "$process_id" >/dev/null 2>&1 \
+            || true
+    fi
+}
+
+trap stop_stornaut EXIT
+
+scripts/doctor-dev-tools
+
+xcrun swift - <<'SWIFT'
+import CoreGraphics
+import Foundation
+
+var activeDisplayCount: UInt32 = 0
+let status = CGGetActiveDisplayList(0, nil, &activeDisplayCount)
+
+guard status == .success, activeDisplayCount > 0 else {
+    fputs("No active display. Wake and unlock the graphical session before runtime UI verification.\n", stderr)
+    exit(1)
+}
+
+guard CGPreflightScreenCaptureAccess() else {
+    fputs("Screen Recording is not granted for runtime UI verification.\n", stderr)
+    exit(1)
+}
+
+print("Active displays: \(activeDisplayCount)")
+SWIFT
+
+mkdir -p "$output_dir"
+rm -f "$build_result" "$apps_result" "$capture_result" "$screenshot"
+
+scripts/xcodebuildmcp macos build-and-run --output json > "$build_result"
+
+process_id=$(ruby -rjson - "$build_result" <<'RUBY'
+result = JSON.parse(File.read(ARGV.fetch(0)))
+abort("XcodeBuildMCP build-and-run failed: #{result["error"]}") if result.fetch("didError")
+
+request = result.fetch("data").fetch("request")
+artifacts = result.fetch("data").fetch("artifacts")
+
+abort("Unexpected scheme: #{request["scheme"]}") unless request.fetch("scheme") == "Stornaut"
+abort("Unexpected configuration: #{request["configuration"]}") unless request.fetch("configuration") == "Debug"
+abort("Unexpected architecture: #{request["arch"]}") unless request.fetch("arch") == "arm64"
+abort("Unexpected bundle ID: #{artifacts["bundleId"]}") unless artifacts.fetch("bundleId") == "com.eriklee.stornaut"
+
+process_id = Integer(artifacts.fetch("processId"))
+abort("Invalid process ID") unless process_id.positive?
+puts process_id
+RUBY
+)
+
+for _ in {1..20}; do
+    scripts/peekaboo-readonly list apps --json-output > "$apps_result"
+
+    if ruby -rjson - "$apps_result" "$process_id" <<'RUBY'
+payload = JSON.parse(File.read(ARGV.fetch(0)))
+process_id = Integer(ARGV.fetch(1))
+apps = payload.fetch("data").fetch("applications")
+app = apps.find { |candidate| candidate.fetch("processIdentifier") == process_id }
+exit 1 unless app
+exit 1 unless app.fetch("bundleIdentifier") == "com.eriklee.stornaut"
+exit 1 unless app.fetch("isFinishedLaunching")
+exit 1 unless app.fetch("windowCount").positive?
+RUBY
+    then
+        break
+    fi
+
+    sleep 0.5
+done
+
+if ! ruby -rjson - "$apps_result" "$process_id" <<'RUBY'
+payload = JSON.parse(File.read(ARGV.fetch(0)))
+process_id = Integer(ARGV.fetch(1))
+apps = payload.fetch("data").fetch("applications")
+app = apps.find { |candidate| candidate.fetch("processIdentifier") == process_id }
+abort("Stornaut did not finish launching with a window.") unless app &&
+  app.fetch("bundleIdentifier") == "com.eriklee.stornaut" &&
+  app.fetch("isFinishedLaunching") &&
+  app.fetch("windowCount").positive?
+RUBY
+then
+    exit 1
+fi
+
+for _ in {1..10}; do
+    if scripts/peekaboo-readonly image \
+        --pid "$process_id" \
+        --mode window \
+        --retina \
+        --path "$screenshot" \
+        --json-output > "$capture_result"; then
+        break
+    fi
+
+    sleep 0.5
+done
+
+ruby -rjson - "$capture_result" "$screenshot" <<'RUBY'
+payload = JSON.parse(File.read(ARGV.fetch(0)))
+screenshot = ARGV.fetch(1)
+abort("Peekaboo capture failed: #{payload["error"]}") unless payload.fetch("success")
+
+files = payload.fetch("data").fetch("files")
+abort("Expected one Stornaut window capture, got #{files.length}.") unless files.length == 1
+abort("Unexpected screenshot path.") unless File.expand_path(files.first.fetch("path")) == File.expand_path(screenshot)
+RUBY
+
+xcrun swift - "$screenshot" <<'SWIFT'
+import AppKit
+import Foundation
+
+let screenshot = URL(fileURLWithPath: CommandLine.arguments[1])
+let data = try Data(contentsOf: screenshot)
+
+guard data.count >= 20_000,
+      let bitmap = NSBitmapImageRep(data: data),
+      bitmap.pixelsWide >= 800,
+      bitmap.pixelsHigh >= 500
+else {
+    fputs("Runtime screenshot is missing, too small, or unreadable.\n", stderr)
+    exit(1)
+}
+
+var luminance: [Double] = []
+let stride = max(1, min(bitmap.pixelsWide, bitmap.pixelsHigh) / 100)
+
+for y in Swift.stride(from: 0, to: bitmap.pixelsHigh, by: stride) {
+    for x in Swift.stride(from: 0, to: bitmap.pixelsWide, by: stride) {
+        guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else {
+            continue
+        }
+
+        luminance.append(
+            (0.2126 * color.redComponent
+                + 0.7152 * color.greenComponent
+                + 0.0722 * color.blueComponent) * 255
+        )
+    }
+}
+
+guard !luminance.isEmpty else {
+    fputs("Runtime screenshot contains no readable pixels.\n", stderr)
+    exit(1)
+}
+
+let mean = luminance.reduce(0, +) / Double(luminance.count)
+let variance = luminance.reduce(0) { partial, value in
+    partial + (value - mean) * (value - mean)
+} / Double(luminance.count)
+let standardDeviation = sqrt(variance)
+
+guard let minimum = luminance.min(),
+      let maximum = luminance.max(),
+      maximum - minimum >= 40,
+      standardDeviation >= 3
+else {
+    fputs("Runtime screenshot appears blank or nearly uniform.\n", stderr)
+    exit(1)
+}
+
+print(
+    "Runtime screenshot: \(bitmap.pixelsWide)x\(bitmap.pixelsHigh), "
+        + "\(data.count) bytes, luminance stddev \(String(format: "%.2f", standardDeviation))"
+)
+SWIFT
+
+print "Runtime UI verification passed: $screenshot"

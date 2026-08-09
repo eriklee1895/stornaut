@@ -7,6 +7,9 @@
 | 目的 | 入口 |
 | --- | --- |
 | 接手实现、确认硬约束 | [Coding Agent Handoff](agent/coding-agent-handoff.md) |
+| 本地构建、运行与 UI 自动化 | [Development Automation](agent/development-tooling.md) |
+| UI 测试、截图契约与排障 | [UI Testing Guide](agent/ui-testing-guide.md) |
+| 当前开发自动化验证证据 | [Development Automation Validation](reports/development-automation-2026-08-09.md) |
 | 产品范围、术语、验收 | [PRD](product/PRD.md) |
 | 进程边界、模块与安全架构 | [System Architecture](architecture/system-architecture.md) |
 | Agent、双模式与治理设计 | [Agent Disk Governance](design/agent-disk-governance.md) |
@@ -25,6 +28,7 @@
 6. 对应 upstream study、ADR、report 或 fixture。
 
 不要为了“了解全部背景”每次重读整个 `docs/`。研究和概念资产只在任务需要时读取。
+涉及 App/UI 运行时验证时，读取 [Development Automation](agent/development-tooling.md) 和 [UI Testing Guide](agent/ui-testing-guide.md)；其中的 MCP 只属于 Coding Agent，不属于产品 Deep Dive。
 
 ## Structure
 

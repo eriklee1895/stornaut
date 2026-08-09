@@ -1,0 +1,110 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+cd "$repo_root"
+source "$repo_root/scripts/dev-tools-common"
+
+typeset -a expected_peekaboo_tools=(
+    image
+    inspect_ui
+    list
+    permissions
+    see
+)
+
+typeset -a expected_xcodebuildmcp_tools=(
+    build_macos
+    build_run_macos
+    clean
+    discover_projs
+    get_app_bundle_id
+    get_coverage_report
+    get_file_coverage
+    get_mac_app_path
+    get_mac_bundle_id
+    launch_mac_app
+    list_schemes
+    session_clear_defaults
+    session_set_defaults
+    session_show_defaults
+    session_use_defaults_profile
+    show_build_settings
+    stop_mac_app
+    swift_package_build
+    swift_package_clean
+    swift_package_list
+    swift_package_run
+    swift_package_stop
+    swift_package_test
+    test_macos
+)
+
+function json_array_lines() {
+    ruby -rjson -e 'JSON.parse(STDIN.read).each { |value| puts value }'
+}
+
+function assert_exact_catalog() {
+    local label=$1
+    local actual=$2
+    shift 2
+    local -a expected=("$@")
+
+    local expected_file actual_file
+    expected_file=$(mktemp)
+    actual_file=$(mktemp)
+
+    printf '%s\n' "${expected[@]}" | sort > "$expected_file"
+    print -r -- "$actual" | sort > "$actual_file"
+
+    if ! diff -u "$expected_file" "$actual_file"; then
+        rm -f "$expected_file" "$actual_file"
+        print -u2 "$label MCP tool catalog drifted."
+        return 1
+    fi
+
+    rm -f "$expected_file" "$actual_file"
+}
+
+ruby -rjson -e 'JSON.parse(File.read(ARGV.fetch(0)))' .trae/.mcp.json
+
+verify_xcodebuildmcp_install
+verify_peekaboo_install
+
+local_xcode_version=$(scripts/xcodebuildmcp --version)
+local_peekaboo_version=$(scripts/peekaboo-readonly --version)
+print "XcodeBuildMCP: $local_xcode_version"
+print "Peekaboo: $local_peekaboo_version"
+
+xcode_catalog_json=$(scripts/mcp-smoke-test.mjs scripts/xcodebuildmcp mcp)
+xcode_catalog=$(print -r -- "$xcode_catalog_json" | json_array_lines)
+assert_exact_catalog "XcodeBuildMCP" "$xcode_catalog" "${expected_xcodebuildmcp_tools[@]}"
+print "XcodeBuildMCP MCP catalog: ${#expected_xcodebuildmcp_tools[@]} expected tools"
+
+peekaboo_catalog_json=$(scripts/mcp-smoke-test.mjs scripts/peekaboo-readonly mcp)
+peekaboo_catalog=$(print -r -- "$peekaboo_catalog_json" | json_array_lines)
+assert_exact_catalog "Peekaboo" "$peekaboo_catalog" "${expected_peekaboo_tools[@]}"
+print "Peekaboo MCP catalog: ${#expected_peekaboo_tools[@]} read-only tools"
+
+permissions_json=$(scripts/peekaboo-readonly permissions status --json-output)
+print -r -- "$permissions_json" | ruby -rjson -e '
+  payload = JSON.parse(STDIN.read)
+  permissions = payload.fetch("data").fetch("permissions").to_h { |item| [item.fetch("name"), item.fetch("isGranted")] }
+  abort("Screen Recording is not granted.") unless permissions.fetch("Screen Recording", false)
+  puts "Peekaboo Screen Recording: granted"
+  puts "Peekaboo Accessibility: #{permissions.fetch("Accessibility", false) ? "granted" : "not granted (not required for read-only capture)"}"
+  puts "Peekaboo Event Synthesizing: #{permissions.fetch("Event Synthesizing", false) ? "granted" : "not granted (intentionally not required)"}"
+'
+
+if ! rg -q '^sentryDisabled: true$' .xcodebuildmcp/config.yaml; then
+    print -u2 "XcodeBuildMCP telemetry opt-out is missing."
+    exit 1
+fi
+
+if ! rg -q "^typeset -gr STORNAUT_PEEKABOO_TOOLS=\"${STORNAUT_PEEKABOO_TOOLS}\"$" scripts/dev-tools-common; then
+    print -u2 "Peekaboo read-only allowlist drifted."
+    exit 1
+fi
+
+print "Developer automation doctor passed."

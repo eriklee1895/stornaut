@@ -18,6 +18,10 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 - 不创建遥测、远程规则服务、MenuBarExtra、后台监控、定时扫描或登录启动项（v1）。
 - 目标平台：开发时最新稳定 macOS + Apple Silicon only。
 - 模块命名：App/类型用 `Stornaut*`；仓库、CLI、配置前缀用 `stornaut`。
+- 开发期 Xcode/App 自动化只使用仓库固定的 XcodeBuildMCP + Peekaboo harness（见 `docs/agent/development-tooling.md`）；UI 验收按 `docs/agent/ui-testing-guide.md`。它们是 Coding Agent 工具，不得链接、复制或暴露给产品内 Deep Dive Codex。
+- UI 变更必须形成 `build/test → 启动真实 .app → Peekaboo 截取实际窗口 → 检查截图/AX 结果 → 必要时补 XCUITest` 的闭环；不能只读 SwiftUI 源码就宣称 UI 正确。`scripts/verify` 与 XCUITest 仍是可重复验收真相，Peekaboo 只补充本机运行时视觉证据。
+- Peekaboo 默认只能暴露 `image`、`see`、`inspect_ui`、`list`、`permissions`；不得绕过 `scripts/peekaboo-readonly` 或扩大白名单。Screen Recording 可读权限足够时不要求 Accessibility/Event Synthesizing；不得自动申请、授予、重置或引导点击系统权限。
+- XcodeBuildMCP 必须从 `.xcodebuildmcp/config.yaml` 读取本项目、scheme、Debug 和 workflow 默认值，并保持 Sentry disabled。MCP 结果不能替代 `scripts/verify`，版本/目录升级先更新 checksum、doctor 与开发文档。
 - 推送 GitHub 前若环境存在失效 `GITHUB_TOKEN`，先 `unset GITHUB_TOKEN GH_TOKEN`，以免覆盖 keyring 登录。
 
 ## Never build
@@ -40,6 +44,8 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | --- | --- |
 | 文档地图与规范优先级 | [docs/README.md](docs/README.md) |
 | 任意实现任务的总入口 | [docs/agent/coding-agent-handoff.md](docs/agent/coding-agent-handoff.md) |
+| 本地构建与 UI 自动化工具 | [docs/agent/development-tooling.md](docs/agent/development-tooling.md) |
+| UI 测试、截图与故障判定 | [docs/agent/ui-testing-guide.md](docs/agent/ui-testing-guide.md) |
 | 产品需求与验收 | [docs/product/PRD.md](docs/product/PRD.md) |
 | 进程边界、模块、安全架构 | [docs/architecture/system-architecture.md](docs/architecture/system-architecture.md) |
 | Agent / 双模式 / 安全基线 | [docs/design/agent-disk-governance.md](docs/design/agent-disk-governance.md) |
@@ -71,6 +77,10 @@ Tests/                   XCTest / Swift Testing + fixtures
 docs/adr/                架构假设证据
 docs/upstream-studies/   Reference Study Gate 记录
 scripts/verify           本地验收入口
+scripts/bootstrap-dev-tools / doctor-dev-tools
+                         固定版本 XcodeBuildMCP + Peekaboo 开发 harness
+scripts/verify-ui-runtime
+                         awake 本机会话的真实 .app 窗口截图 smoke
 scripts/check-doc-links  文档本地链接检查
 ```
 
@@ -82,6 +92,12 @@ App host 拓扑已由 [`docs/upstream-studies/epic-0-foundation.md`](docs/upstre
 
 ```text
 Upstream Study → Implementation Brief → ADR → Tests/Fixtures first → Implement → Benchmark → Docs/provenance
+```
+
+涉及 App/UI 的小迭代，在 `Implement` 与最终验收之间执行实际窗口验证：
+
+```text
+Narrow build/test → Launch actual .app → Peekaboo read-only capture/inspect → XCUITest/verify
 ```
 
 每个完成且验证通过的小迭代都创建独立 commit 并及时 push `origin/main`。不得 push 已知失败、敏感数据或未完成的安全绕过；force-push、release、公证与许可证变更仍先确认。

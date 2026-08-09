@@ -230,6 +230,7 @@ Execution evidence on 2026-08-09:
 - The user confirmed localized navigation labels and `⌘,` Settings.
 - XCUITest now verifies Light/Dark effective appearance, Sidebar-bottom Settings, `⌘,` Settings and exports four window-level screenshot attachments without terminal Screen Recording/Accessibility permission.
 - The screenshot export normalizes stable filenames under ignored `.derivedData/ui-screenshots/`; transparent shell materials use XCUITest appearance state while Settings screenshots also pass a luminance-difference gate.
+- The repository now pins XcodeBuildMCP `2.7.0` and signed Peekaboo `3.10.0` as Coding Agent-only tools. The five-tool read-only Peekaboo MCP and PID-targeted real-window smoke passed without Accessibility or Event Synthesizing; see [Development Automation Validation](../../reports/development-automation-2026-08-09.md).
 
 - [x] **Step 6: Extend the verification entry point**
 

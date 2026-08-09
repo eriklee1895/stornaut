@@ -1,0 +1,10 @@
+{
+  "name": "stornaut-xcodebuildmcp-tooling",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Pinned development-only XcodeBuildMCP installation for Stornaut",
+  "license": "MIT",
+  "dependencies": {
+    "xcodebuildmcp": "2.7.0"
+  }
+}

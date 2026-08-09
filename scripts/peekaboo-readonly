@@ -1,0 +1,15 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+source "$repo_root/scripts/dev-tools-common"
+
+verify_peekaboo_install
+
+export PEEKABOO_ALLOW_TOOLS="$STORNAUT_PEEKABOO_TOOLS"
+export PEEKABOO_DISABLE_TOOLS="analyze,agent,mcp_agent,shell,capture,click,type,hotkey,press,paste,scroll,swipe,drag,move,set_value,perform_action,window,app,menu_click,dock_launch,space,dialog_click,dialog_input,clipboard"
+export PEEKABOO_AI_PROVIDERS=""
+export PEEKABOO_LOG_LEVEL="error"
+
+exec "$(stornaut_peekaboo_binary)" "$@"

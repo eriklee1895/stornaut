@@ -4,7 +4,14 @@ require "pathname"
 
 missing_links = []
 
-Dir.glob("**/*.md").sort.each do |file|
+ignored_roots = %w[
+  .build/
+  .derivedData/
+  .dev-tools/
+  tools/xcodebuildmcp/node_modules/
+]
+
+Dir.glob("**/*.md").sort.reject { |file| ignored_roots.any? { |root| file.start_with?(root) } }.each do |file|
   contents = File.read(file)
 
   contents.scan(/!?\[[^\]]*\]\(([^)]+)\)/).flatten.each do |raw_target|

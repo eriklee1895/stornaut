@@ -34,6 +34,8 @@ Package.resolved
 # SwiftPM / tooling caches
 .index-build/
 .derivedData/
+.dev-tools/
+tools/xcodebuildmcp/node_modules/
 
 # IDEs / editors
 .idea/

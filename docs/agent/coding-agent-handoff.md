@@ -1,8 +1,8 @@
 # Stornaut Coding Agent Handoff
 
 > 面向接手实现的 Coding Agent  
-> 最近更新：2026-08-08  
-> 当前状态：产品、Agent、UI 功能交互与品牌基线完成；Epic 0 App/Test/UI Test host、本地签名与 Light/Dark/Settings 截图验证已完成；下一项是 Epic 1 Codex discovery/capability Spike
+> 最近更新：2026-08-09
+> 当前状态：产品、Agent、UI 功能交互与品牌基线完成；Epic 0 App/Test/UI Test host、本地签名与 Light/Dark/Settings 截图验证，以及仓库固定的 XcodeBuildMCP + Peekaboo 只读开发 harness 已完成；下一项是 Epic 1 Codex discovery/capability Spike
 
 ## 1. 任务目标
 
@@ -33,6 +33,8 @@ Coding Agent 可以实现已批准的导航、状态模型和原生组件骨架�
 10. [真实案例](../research/case-study-2026-08-06.md)
 
 规范优先级：用户明确批准的 v1 约束 → PRD 2.3 与两份批准规格 → architecture 2.2 → Epic 0–1 实施计划 → 研究/案例/视觉概念。发现冲突时先报告并提出精确修正文案；未经用户批准不得降低安全边界、扩大权限或修改已批准产品范围。
+
+涉及 App build/run、UI 改动或实际截图验证时，额外读取 [Development Automation](development-tooling.md) 与 [UI Testing Guide](ui-testing-guide.md)。仓库 XcodeBuildMCP/Peekaboo 是 Coding Agent harness，不得进入产品 Deep Dive Codex 的配置或工具面。
 
 ## 3. 不可违反的产品不变量
 
@@ -246,6 +248,8 @@ Broker-only 若不能被技术性强制，Epic 0–1 仍可作为成功的风险
 
 - 不假设文档中的命令在当前 Codex 版本一定存在；运行 `--help` 验证。
 - 不假设 README 的安全声明等于真实执行路径；阅读代码和测试。
+- UI 改动不能只通过 SwiftUI 源码审查验收；必须构建并启动真实 `.app`，用仓库 `scripts/peekaboo-readonly` 截取/检查实际窗口，再以 XCUITest 和 `scripts/verify` 固化可重复契约。
+- 开发 MCP 必须通过 `scripts/bootstrap-dev-tools` / `scripts/doctor-dev-tools` 使用固定版本。Peekaboo 仅允许 `image`、`see`、`inspect_ui`、`list`、`permissions`，不得为自动化方便授予 Accessibility/Event Synthesizing 或扩大写能力。
 - 不把“可重建”写成“可恢复”。
 - 不把 Trash 大小写成已经释放空间。
 - 不把扫描权限失败写成零占用。
@@ -254,7 +258,7 @@ Broker-only 若不能被技术性强制，Epic 0–1 仍可作为成功的风险
 
 ## 10. 当前工作区注意事项
 
-截至 2026-08-08，仓库已经初始化并发布到 GitHub，默认分支为 `main`，远端为 `origin`，`main` 跟踪 `origin/main`。MIT `LICENSE` 已由用户批准并提交。Epic 0 不再执行 `git init`、创建远端或首次文档提交；开始 Task 1 前只需确认分支、远端和工作区状态。计划内本地 commit 可以按 Task 创建；push、force-push、发布和 CI 外部运行仍按用户授权执行。
+截至 2026-08-09，仓库已经初始化并发布到 GitHub，默认分支为 `main`，远端为 `origin`，`main` 跟踪 `origin/main`。MIT `LICENSE` 已由用户批准并提交。Epic 0 不再执行 `git init`、创建远端或首次文档提交。仓库开发 harness 由 `.trae/.mcp.json`、`.xcodebuildmcp/config.yaml`、`scripts/*dev-tools*`、`scripts/xcodebuildmcp` 和 `scripts/peekaboo-readonly` 管理；工具产物保持 ignored。每个完成且验证通过的小迭代创建独立 commit 并及时 push `origin/main`；force-push、发布、公证和 CI 外部运行仍需单独授权。
 
 ## 11. Handoff Prompt
 
