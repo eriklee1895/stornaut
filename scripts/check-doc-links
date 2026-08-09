@@ -1,0 +1,33 @@
+#!/usr/bin/env ruby
+
+require "pathname"
+
+missing_links = []
+
+Dir.glob("**/*.md").sort.each do |file|
+  contents = File.read(file)
+
+  contents.scan(/!?\[[^\]]*\]\(([^)]+)\)/).flatten.each do |raw_target|
+    target = raw_target.strip
+    next if target.empty?
+    next if target.start_with?("#", "mailto:")
+    next if target.match?(%r{\A[a-z][a-z0-9+.-]*://}i)
+
+    path = target.split("#", 2).first
+    next if path.empty?
+
+    resolved_path = Pathname.new(File.dirname(file)).join(path).cleanpath
+    missing_links << [file, target, resolved_path] unless resolved_path.exist?
+  end
+end
+
+if missing_links.empty?
+  puts "All local Markdown links resolve."
+  exit 0
+end
+
+missing_links.each do |file, target, resolved_path|
+  warn "#{file}: #{target} -> missing #{resolved_path}"
+end
+
+exit 1

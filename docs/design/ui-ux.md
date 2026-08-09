@@ -1,11 +1,12 @@
 # Stornaut UI/UX 设计规格
 
 > 日期：2026-08-07  
-> 状态：功能、交互、品牌与安全基线已批准；主流程与首次启动构图已批准，剩余辅助状态收敛中  
+> 最近更新：2026-08-08
+> 状态：功能、交互、品牌、安全、核心页面、Settings 与跨流程恢复状态均已批准；UI/UX 设计基线完成
 > 适用范围：Stornaut v1 原生 macOS App  
-> 上位约束：[PRD](../../PRD.md)、[Agent 磁盘治理设计](2026-08-06-stornaut-agent-disk-governance-design.md)、[技术架构](../../architecture.md)
+> 上位约束：[PRD](../product/PRD.md)、[Agent 磁盘治理设计](agent-disk-governance.md)、[技术架构](../architecture/system-architecture.md)
 
-本文件把产品讨论中确认的界面、交互、品牌和 Agent 表达方式固化为 Coding Agent 的实施输入。信息架构、状态、文案、安全规则和功能交互已经批准；最终页面构图仍通过概念图抽卡收敛。视觉概念图只用于表达氛围与布局；发生冲突时，以本规格为准。
+本文件把产品讨论中确认的界面、交互、品牌和 Agent 表达方式固化为 Coding Agent 的实施输入。信息架构、状态、文案、安全规则、功能交互和核心页面构图已经批准；概念图用于记录已选方向与主题关系。视觉概念图只用于表达氛围与布局，不是逐像素终稿；发生冲突时，以本规格为准。
 
 ## 1. 体验目标
 
@@ -107,7 +108,7 @@ Privacy & Data 以只读政策行展示 Evidence `7 days`、minimal Cleanup Mani
 
 Local Knowledge 使用结构化列表展示 finding、scope、provenance、updated/stale 状态；支持 Review、Forget 和经确认的 Forget All。禁止自由文本记忆编辑、聊天历史、未经确认的模型结论、直接 disposition 覆盖或任何 policy 降级。所有设置即时生效，不提供全局 Save 按钮。
 
-已批准候选评审、六个区域行为和 General/Codex/Local Knowledge 的 Dark/Light canonical 见 [Settings Internal Draw](../../assets/ui-concepts/SETTINGS-ROUND-1.md)。
+已批准候选评审、六个区域行为和 General/Codex/Local Knowledge 的 Dark/Light canonical 见 [Settings Internal Draw](../assets/ui-concepts/SETTINGS-ROUND-1.md)。
 
 ## 5. 首次启动与权限
 
@@ -127,7 +128,7 @@ FDA 采用强引导但可跳过：
 - L2 内容读取采用每次 Deep Dive 会话最多一次的聚合授权 sheet。
 - 永久敏感区 denylist 不提供 UI 绕过开关。
 
-首次启动 canonical 暗/亮参考及候选评审见 [Onboarding and Permissions Internal Draw](../../assets/ui-concepts/ONBOARDING-ROUND-1.md)。
+首次启动 canonical 暗/亮参考及候选评审见 [Onboarding and Permissions Internal Draw](../assets/ui-concepts/ONBOARDING-ROUND-1.md)。
 
 ## 6. Overview
 
@@ -371,7 +372,7 @@ Cleanup Result 是 `Scan` 工作流页面，保持 Sidebar 中 `Scan` 选中，�
 
 提供 `Open Trash`、`View Manifest`、`Done`。不要用彩带或夸张庆祝；完成态只使用一次 200–300 ms 的克制 opacity/scale 过渡，Reduce Motion 下直接更新。
 
-已批准候选评审、partial 状态与 Dark/Light canonical 见 [Cleanup Result Internal Draw](../../assets/ui-concepts/CLEANUP-RESULT-ROUND-1.md)。
+已批准候选评审、partial 状态与 Dark/Light canonical 见 [Cleanup Result Internal Draw](../assets/ui-concepts/CLEANUP-RESULT-ROUND-1.md)。
 
 History 按 session 展示 Quick Scan、Deep Dive、snapshot/report 和 Cleanup Manifest，采用原生 master-detail 构图：App Sidebar 继续选中 `History`；主区域左侧使用 350–400 pt session navigator，右侧显示所选记录详情。
 
@@ -395,7 +396,7 @@ Evidence、scan session、snapshot、investigation 与报告默认 7 天，Clean
 
 路径仅本机保存；导出时将 canonical home 前缀替换为 `~`，并提醒剩余项目名/子目录仍可能具有识别性。空 History 显示 `No history yet` 与单一 `Start Quick Scan`，不暗示后台会自动产生记录。
 
-已批准候选评审、Storage Trend、retention/degraded 状态与 Dark/Light canonical 见 [History Internal Draw](../../assets/ui-concepts/HISTORY-ROUND-1.md)。
+已批准候选评审、Storage Trend、retention/degraded 状态与 Dark/Light canonical 见 [History Internal Draw](../assets/ui-concepts/HISTORY-ROUND-1.md)。
 
 ## 11. Local Knowledge，而非自由记忆
 
@@ -451,7 +452,7 @@ Stornaut 需要本地结构化知识，但不需要会自由联想的 Agent Memo
 - 最终生产资产必须矢量重绘并测试 16–1024px。
 - G — Abyssal Beacon 可作为 Deep Dive 的功能插画语言，但不是第二个 Logo。
 
-概念资产与生产要求见 [Brand Concept Prompt Set](../../assets/brand-concepts/PROMPTS.md)。
+概念资产与生产要求见 [Brand Concept Prompt Set](../assets/brand-concepts/PROMPTS.md)。
 
 ## 14. Motion 与状态反馈
 
@@ -503,7 +504,7 @@ Stornaut 需要本地结构化知识，但不需要会自由联想的 Agent Memo
 - linked Evidence 过期后保留最小 Cleanup Manifest；单条损坏 History 只隔离自身，不阻断其他记录。
 - Cleanup 只允许在动作开始前或类型化动作之间取消；单个动作开始后显示 `Stop After Current Action`，具体原子性以 Trash/Action lifecycle Spike 与 ADR 为准。
 
-五组批准的 Dark/Light 状态构图、行为矩阵、取消与无障碍契约见 [Resilience States — Cross-flow Round 1](../../assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md)。
+五组批准的 Dark/Light 状态构图、行为矩阵、取消与无障碍契约见 [Resilience States — Cross-flow Round 1](../assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md)。
 
 ## 18. 组件清单
 
@@ -562,7 +563,7 @@ UI 概念图位于 `docs/assets/ui-concepts/`，包括 Onboarding、Overview（�
 
 `settings-round1-a-sidebar-privacy-dark.png` 至 `settings-round1-e-local-knowledge-dark.png` 是独立 Settings 的五张内部抽卡稿。已批准 A 作为原生六项 Settings 侧栏外壳、C 的 Setup Status 进入 General、E 的结构化列表用于 Local Knowledge；B 的工具栏仅作为 Permissions 内容参考，D 单页折叠结构不采用。`settings-general-canonical-*`、`settings-codex-deep-dive-canonical-*` 与 `settings-local-knowledge-canonical-*` 是三组暗/亮主题参考。生成图中的路径、版本、日期、数量和 finding 都是 fixture；尤其不得把 `Codex Installed` 当作安全验证，也不得从概念图推导通用目录“safe to remove”。
 
-`resilience-*-canonical-dark.png` 与 `resilience-*-canonical-light.png` 是跨流程恢复状态的五组主题配对参考，覆盖 limited coverage、Deep Dive safety blocked、stale plan、partial investigation 与 expired evidence/corrupt history。它们共同定义 page-preserving recovery。`resilience-deep-dive-safety-blocked-draft-dark.png` 是明确拒绝的审计稿：它把 stale 成功指标留在未开始的调查上，不得实现。完整选择依据和状态矩阵见 [Resilience States](../../assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md)。
+`resilience-*-canonical-dark.png` 与 `resilience-*-canonical-light.png` 是跨流程恢复状态的五组主题配对参考，覆盖 limited coverage、Deep Dive safety blocked、stale plan、partial investigation 与 expired evidence/corrupt history。它们共同定义 page-preserving recovery。`resilience-deep-dive-safety-blocked-draft-dark.png` 是明确拒绝的审计稿：它把 stale 成功指标留在未开始的调查上，不得实现。完整选择依据和状态矩阵见 [Resilience States](../assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md)。
 
 它们不用于：
 

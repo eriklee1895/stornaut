@@ -1,0 +1,12 @@
+# Architecture Decision Records
+
+Epic 0–1 计划使用以下编号：
+
+1. `0001-package-first-native-shell.md`
+2. `0002-codex-discovery-and-capabilities.md`
+3. `0003-codex-process-protocol.md`
+4. `0004-codex-file-read-isolation.md`
+5. `0005-swift-surveyor-performance.md`
+6. `0006-trash-and-registered-actions.md`
+
+每份 ADR 至少记录 Status、Context、Evidence、Decision、Consequences、Residual Risks 和 Validation。安全假设没有测量证据时不得标记 Accepted。

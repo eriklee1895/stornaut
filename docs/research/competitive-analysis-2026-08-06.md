@@ -2,9 +2,9 @@
 
 > 调研日期：2026-08-06  
 > 目标：为“个人自用、GitHub Public 开源”的 Stornaut 判断已有方案、可借鉴实现和仍然值得解决的问题。  
-> 配套文档：[PRD.md](PRD.md)、[architecture.md](architecture.md)、[case-study-2026-08-06.md](case-study-2026-08-06.md)
+> 配套文档：[PRD](../product/PRD.md)、[技术架构](../architecture/system-architecture.md)、[真实案例](case-study-2026-08-06.md)
 
-> **后续项目状态（2026-08-07）**：市场事实、Star、版本和第三方许可证保留为 2026-08-06 时间切片；项目建议已由后续批准设计收敛。Stornaut 采用 MIT License，当前目录已有 `LICENSE`，但尚不是 Git 仓库且没有 remote；GitHub Public 是发布目标，不表示已经发布。v1 是按需启动的原生 Swift 单窗口 App，不做 MenuBarExtra 或后台监控；Rust 仅在 Swift Surveyor Benchmark 不达标后评估；外部工具只作为可选只读 Adapter，不能执行清理。实现以 PRD 2.3 和批准规格为准。
+> **后续项目状态（更新于 2026-08-08）**：市场事实、Star、版本和第三方许可证保留为 2026-08-06 时间切片；项目建议已由后续批准设计收敛。Stornaut 采用 MIT License，仓库已经初始化并发布到个人 GitHub Public 仓库，默认分支 `main` 跟踪 `origin/main`。v1 是按需启动的原生 Swift 单窗口 App，不做 MenuBarExtra 或后台监控；Rust 仅在 Swift Surveyor Benchmark 不达标后评估；外部工具只作为可选只读 Adapter，不能执行清理。实现以 PRD 2.3 和批准规格为准。
 
 ## 1. 结论摘要
 
@@ -570,7 +570,7 @@ Claude Code disk cleanup、daymade macos-cleaner 等 Agent Skills 未放入此�
 4. 优先实现证据模型和安全不变量，再做漂亮 GUI。
 5. 用真实机器和匿名 fixture 与现有工具做持续 Benchmark。
 6. 将 Stornaut 定义为开源调查与策略引擎，而不是“免费版 CodeCleaner”。
-7. 首次 public push 前必须有明确开源许可证。后续项目决策已选择 MIT，当前目录现已包含 `LICENSE`；发布前仍需核对第三方 NOTICE 与复用记录。
+7. 项目已采用 MIT 并完成首次 public push；此后每次引入第三方代码或依赖仍须核对许可证、NOTICE 与复用记录。
 
 一句话总结：
 

@@ -2,7 +2,7 @@
 
 Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift 确定性扫描处理已知空间，用户已安装的 Codex 经 Probe Broker 调查未知空间，Swift Policy Gate / Executor 掌握全部写权限。
 
-本文件只保留高频规则与文档路由。完整实施约束以 [`docs/coding-agent-handoff.md`](docs/coding-agent-handoff.md) 为准。
+本文件只保留高频规则与文档路由。文档总入口为 [`docs/README.md`](docs/README.md)，完整实施约束以 [`docs/agent/coding-agent-handoff.md`](docs/agent/coding-agent-handoff.md) 为准。
 
 > 注意：本文件指导的是**实现 Stornaut 的 Coding Agent**。产品内 Deep Dive 启动的 Codex 子进程必须使用隔离配置，**不得**加载本仓库或目标磁盘上的 `AGENTS.md` / 项目指令。
 
@@ -37,15 +37,16 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 
 | 任务 | 先读 |
 | --- | --- |
-| 任意实现任务的总入口 | [docs/coding-agent-handoff.md](docs/coding-agent-handoff.md) |
-| 产品需求与验收 | [docs/PRD.md](docs/PRD.md) |
-| 进程边界、模块、安全架构 | [docs/architecture.md](docs/architecture.md) |
-| Agent / 双模式 / 安全基线 | [docs/superpowers/specs/2026-08-06-stornaut-agent-disk-governance-design.md](docs/superpowers/specs/2026-08-06-stornaut-agent-disk-governance-design.md) |
-| 导航、文案、品牌、Light/Dark | [docs/superpowers/specs/2026-08-07-stornaut-ui-ux-design.md](docs/superpowers/specs/2026-08-07-stornaut-ui-ux-design.md) |
-| Epic 0–1 逐 Task 执行 | [docs/superpowers/plans/2026-08-07-stornaut-epic-0-1-foundation-spikes.md](docs/superpowers/plans/2026-08-07-stornaut-epic-0-1-foundation-spikes.md) |
-| 上游学习与许可证边界 | [docs/upstream-reference-matrix.md](docs/upstream-reference-matrix.md) |
-| 竞品与可借鉴点 | [docs/competitive-analysis-2026-08-06.md](docs/competitive-analysis-2026-08-06.md) |
-| 真实清理案例上下文 | [docs/case-study-2026-08-06.md](docs/case-study-2026-08-06.md) |
+| 文档地图与规范优先级 | [docs/README.md](docs/README.md) |
+| 任意实现任务的总入口 | [docs/agent/coding-agent-handoff.md](docs/agent/coding-agent-handoff.md) |
+| 产品需求与验收 | [docs/product/PRD.md](docs/product/PRD.md) |
+| 进程边界、模块、安全架构 | [docs/architecture/system-architecture.md](docs/architecture/system-architecture.md) |
+| Agent / 双模式 / 安全基线 | [docs/design/agent-disk-governance.md](docs/design/agent-disk-governance.md) |
+| 导航、文案、品牌、Light/Dark | [docs/design/ui-ux.md](docs/design/ui-ux.md) |
+| Epic 0–1 逐 Task 执行 | [docs/plans/active/epic-0-1-foundation-spikes.md](docs/plans/active/epic-0-1-foundation-spikes.md) |
+| 上游学习与许可证边界 | [docs/research/upstream-reference-matrix.md](docs/research/upstream-reference-matrix.md) |
+| 竞品与可借鉴点 | [docs/research/competitive-analysis-2026-08-06.md](docs/research/competitive-analysis-2026-08-06.md) |
+| 真实清理案例上下文 | [docs/research/case-study-2026-08-06.md](docs/research/case-study-2026-08-06.md) |
 | UI 概念图（氛围/构图参考） | [docs/assets/ui-concepts/](docs/assets/ui-concepts/) |
 | 品牌概念图 | [docs/assets/brand-concepts/](docs/assets/brand-concepts/) |
 
@@ -58,13 +59,14 @@ Epic 0–1：仓库与验证骨架 + 高风险技术 Spike（Codex 发现/协议
 计划中的包布局（尚未全部落地）：
 
 ```text
-Sources/StornautApp/     最小原生 shell
 Sources/StornautCore/    领域类型与安全接口
 Sources/StornautCodex/   Codex 发现、启动、JSONL/schema
+App host（ADR 0001）     真实可签名 .app shell；具体拓扑由 Epic 0 study 决定
 Tests/                   XCTest / Swift Testing + fixtures
 docs/adr/                架构假设证据
 docs/upstream-studies/   Reference Study Gate 记录
 scripts/verify           本地验收入口
+scripts/check-doc-links  文档本地链接检查
 ```
 
 ## Working loop

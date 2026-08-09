@@ -17,7 +17,7 @@
 - 各包管理器缓存（uv/pnpm/bun/npm/go，~44 GB）
 - AI 工具的 VM 镜像、更新残留、旧版扩展……
 
-完整过程记录：[docs/case-study-2026-08-06.md](docs/case-study-2026-08-06.md)
+完整过程记录：[docs/research/case-study-2026-08-06.md](docs/research/case-study-2026-08-06.md)
 
 ## 状态
 
@@ -25,22 +25,20 @@
 
 | 文档 | 内容 |
 |---|---|
-| [docs/case-study-2026-08-06.md](docs/case-study-2026-08-06.md) | 催生本产品的真实案例：70GB 清理全记录 |
-| [docs/competitive-analysis-2026-08-06.md](docs/competitive-analysis-2026-08-06.md) | 竞品与开源生态：功能、许可证、差异化与可借鉴实现 |
-| [docs/PRD.md](docs/PRD.md) | 完整产品需求：双模式、Agent 调查、安全与验收标准 |
-| [docs/architecture.md](docs/architecture.md) | 原生 Swift 全栈 + Codex 子进程 + Probe Broker 技术架构 |
-| [docs/upstream-reference-matrix.md](docs/upstream-reference-matrix.md) | 上游项目学习矩阵、许可证边界和 Reference Study Gate |
-| [docs/coding-agent-handoff.md](docs/coding-agent-handoff.md) | 面向 Coding Agent 的实施顺序、硬约束和 handoff prompt |
-| [docs/superpowers/specs/2026-08-06-stornaut-agent-disk-governance-design.md](docs/superpowers/specs/2026-08-06-stornaut-agent-disk-governance-design.md) | 用户批准的最终设计基线 |
-| [docs/superpowers/specs/2026-08-07-stornaut-ui-ux-design.md](docs/superpowers/specs/2026-08-07-stornaut-ui-ux-design.md) | 单窗口信息架构、核心流程、Agent 表达、Light/Dark 与品牌规范 |
+| [docs/README.md](docs/README.md) | 文档地图、规范优先级、生命周期和 Coding Agent 读取规则 |
+| [docs/product/PRD.md](docs/product/PRD.md) | 完整产品需求：双模式、Agent 调查、安全与验收标准 |
+| [docs/architecture/system-architecture.md](docs/architecture/system-architecture.md) | 原生 Swift 全栈 + Codex 子进程 + Probe Broker 技术架构 |
+| [docs/design/agent-disk-governance.md](docs/design/agent-disk-governance.md) | 用户批准的 Agent、双模式与安全设计基线 |
+| [docs/design/ui-ux.md](docs/design/ui-ux.md) | 单窗口信息架构、核心流程、Agent 表达、Light/Dark 与品牌规范 |
 | [docs/assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md](docs/assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md) | 权限受限、安全阻断、部分结果、stale preflight 与历史保留的恢复状态契约 |
-| [docs/superpowers/plans/2026-08-07-stornaut-epic-0-1-foundation-spikes.md](docs/superpowers/plans/2026-08-07-stornaut-epic-0-1-foundation-spikes.md) | 第一阶段工程骨架与高风险技术 Spike 实施计划 |
+| [docs/plans/active/epic-0-1-foundation-spikes.md](docs/plans/active/epic-0-1-foundation-spikes.md) | 第一阶段工程骨架与高风险技术 Spike 实施计划 |
+| [docs/research/](docs/research/) | 真实案例、竞品时间切片、上游学习与许可证边界 |
 
 ## 项目约束
 
 - 原生 Swift/SwiftUI macOS App，v1 仅面向最新 macOS 与 Apple Silicon
 - 使用用户已安装的 Codex，不捆绑模型运行时
-- 采用现有 [MIT License](LICENSE)，计划发布到个人 GitHub Public 仓库；当前尚未创建 remote
+- 采用现有 [MIT License](LICENSE)，代码库已发布到个人 GitHub Public 仓库，`main` 跟踪 `origin/main`
 - App/项目名使用 `Stornaut`，CLI 与仓库名使用 `stornaut`
 - v1 为按需启动的单窗口 App，不做菜单栏伴侣、后台监控或自动清理
 

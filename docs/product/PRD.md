@@ -3,19 +3,19 @@
 > 版本：2.3  
 > 状态：设计基线与 Epic 0–1 实施计划已批准，可开始执行技术 Spike  
 > 初版日期：2026-08-06  
-> 最近更新：2026-08-07  
+> 最近更新：2026-08-08
 > 产品策略：个人自用优先，GitHub Public 开源，不以付费独立产品为目标
 
 配套文档：
 
-- [真实案例](case-study-2026-08-06.md)
-- [竞品与开源生态报告](competitive-analysis-2026-08-06.md)
-- [技术架构](architecture.md)
-- [上游参考矩阵](upstream-reference-matrix.md)
-- [Coding Agent Handoff](coding-agent-handoff.md)
-- [批准的设计规格](superpowers/specs/2026-08-06-stornaut-agent-disk-governance-design.md)
-- [UI/UX 设计规格](superpowers/specs/2026-08-07-stornaut-ui-ux-design.md)
-- [Epic 0–1 实施计划](superpowers/plans/2026-08-07-stornaut-epic-0-1-foundation-spikes.md)
+- [真实案例](../research/case-study-2026-08-06.md)
+- [竞品与开源生态报告](../research/competitive-analysis-2026-08-06.md)
+- [技术架构](../architecture/system-architecture.md)
+- [上游参考矩阵](../research/upstream-reference-matrix.md)
+- [Coding Agent Handoff](../agent/coding-agent-handoff.md)
+- [批准的 Agent 设计规格](../design/agent-disk-governance.md)
+- [UI/UX 设计规格](../design/ui-ux.md)
+- [Epic 0–1 实施计划](../plans/active/epic-0-1-foundation-spikes.md)
 
 ## 0. 品牌与项目边界
 
@@ -369,7 +369,7 @@ Settings 固定使用六个区域：General、Scanning、Permissions、Codex & D
 
 不得频繁逐文件弹出授权。L2 读取按会话聚合；Registered Action 按动作类型聚合，永久动作必须逐类明确确认。
 
-完整信息架构、状态、文案、品牌、accessibility 和 motion 规范见 [UI/UX 设计规格](superpowers/specs/2026-08-07-stornaut-ui-ux-design.md)。
+完整信息架构、状态、文案、品牌、accessibility 和 motion 规范见 [UI/UX 设计规格](../design/ui-ux.md)。
 
 ### FR-11 空间计量
 
@@ -438,7 +438,7 @@ priority = expectedReclaimableBytes × uncertainty × relevance / investigationC
 | linked Evidence 到期 | 保留最小 Cleanup Manifest；证据区明确标记过期，不猜测重建 |
 | 单条 History 损坏 | 只隔离该记录，其他历史仍可查看、导出和删除 |
 
-所有降级界面遵循同一恢复契约：保留仍然有效的结果，精确标记受影响范围，说明当前影响，只提供安全恢复动作，并将技术细节按需展开。局部权限失败不得写成 `0 B`；Deep Dive safety check 阻断时不得保留虚假的 investigation 成功指标；执行前 stale 没有 bypass，刷新前不执行任何动作。完整状态矩阵与 Light/Dark 参考见 [Resilience States](assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md)。
+所有降级界面遵循同一恢复契约：保留仍然有效的结果，精确标记受影响范围，说明当前影响，只提供安全恢复动作，并将技术细节按需展开。局部权限失败不得写成 `0 B`；Deep Dive safety check 阻断时不得保留虚假的 investigation 成功指标；执行前 stale 没有 bypass，刷新前不执行任何动作。完整状态矩阵与 Light/Dark 参考见 [Resilience States](../assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md)。
 
 ## 11. 成功指标与发布门槛
 
@@ -487,7 +487,7 @@ priority = expectedReclaimableBytes × uncertainty × relevance / investigationC
 
 Coding Agent 开始每个 Epic 前必须：
 
-1. 阅读 [上游参考矩阵](upstream-reference-matrix.md) 中对应项目。
+1. 阅读 [上游参考矩阵](../research/upstream-reference-matrix.md) 中对应项目。
 2. 获取上游当前 commit、许可证和相关源码/文档。
 3. 写简短 Implementation Brief：可借鉴点、反面案例、许可证边界、拟采用方案。
 4. 优先复用公开事实、协议和测试思想；复制代码必须满足许可证和 attribution。
@@ -568,13 +568,13 @@ Definition of Done：
 Coding Agent 开始开发前必须按顺序阅读：
 
 1. [本 PRD](PRD.md)
-2. [技术架构](architecture.md)
-3. [批准的设计规格](superpowers/specs/2026-08-06-stornaut-agent-disk-governance-design.md)
-4. [UI/UX 设计规格](superpowers/specs/2026-08-07-stornaut-ui-ux-design.md)
-5. [Epic 0–1 实施计划](superpowers/plans/2026-08-07-stornaut-epic-0-1-foundation-spikes.md)
-6. [上游参考矩阵](upstream-reference-matrix.md)
-7. [Coding Agent Handoff](coding-agent-handoff.md)
-8. [竞品报告](competitive-analysis-2026-08-06.md)
-9. [真实案例](case-study-2026-08-06.md)
+2. [技术架构](../architecture/system-architecture.md)
+3. [批准的 Agent 设计规格](../design/agent-disk-governance.md)
+4. [UI/UX 设计规格](../design/ui-ux.md)
+5. [Epic 0–1 实施计划](../plans/active/epic-0-1-foundation-spikes.md)
+6. [上游参考矩阵](../research/upstream-reference-matrix.md)
+7. [Coding Agent Handoff](../agent/coding-agent-handoff.md)
+8. [竞品报告](../research/competitive-analysis-2026-08-06.md)
+9. [真实案例](../research/case-study-2026-08-06.md)
 
 Coding Agent 不应重新发明计划或直接批量编码；第一步是按已批准的 Epic 0–1 计划逐 Task 执行技术风险 Spike。

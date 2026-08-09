@@ -1,18 +1,20 @@
 # Stornaut Epic 0–1 Foundation & Risk Spikes Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Execution rule:** Implement this plan task-by-task and keep the checkbox state accurate. An orchestration skill may be used when available, but no unavailable skill is a prerequisite for execution.
 
 **Goal:** Create the smallest native Stornaut foundation that builds and tests locally, then produce executable evidence for the Codex, isolation, scan-performance, Trash, and registered-action assumptions on which the full product depends.
 
-**Architecture:** Use a Swift Package workspace with three production targets—a native SwiftUI executable shell, a platform-agnostic domain/core library, and a Codex process/protocol library—plus two test targets. Spikes must end in tests, benchmark output, and ADRs; they must not grow into the final scanner, Agent workflow, rule base, or branded UI.
+**Architecture:** Use Swift Package Manager for the platform-agnostic domain/core and Codex process/protocol libraries. A SwiftPM executable alone is not accepted as the macOS product host because it does not define the complete `.app` bundle, stable bundle identifier, Info.plist, entitlements, signing, and TCC identity contract needed by later Spikes. The Epic 0 study must select the smallest dependency-free App-host topology—an Xcode macOS App target referencing the local packages, or a reproducible locally signed bundle harness with an explicit migration path—and ADR 0001 must record the choice. Task 2 must produce a real launchable `.app`. Spikes must end in tests, benchmark output, and ADRs; they must not grow into the final scanner, Agent workflow, rule base, or branded UI.
 
 **Observed baseline, non-normative:** At plan authoring time the machine reported macOS 26.5.1 arm64, Xcode 26.6, Swift 6.3.3, and user-installed `codex-cli 0.146.0`. At execution time, rediscover and record the installed OS, architecture, Xcode, Swift, Codex path/version, and supported flags. Pin observed values in ADR evidence, not as permanent product requirements. Use Swift 6 strict concurrency, SwiftUI/AppKit/Foundation, XCTest/Swift Testing; defer SQLite until Epic 2.
+
+**Repository baseline, updated 2026-08-08:** Git is already initialized. The public GitHub repository uses `main` with remote `origin`, and `main` tracks `origin/main`. The approved docs, `.gitignore`, `AGENTS.md`, and MIT `LICENSE` are already committed. Revalidate this state at execution time; do not rerun repository initialization or recreate the remote.
 
 ## Global Constraints
 
 - Product/App name is `Stornaut`; package and configuration prefixes use `stornaut`.
 - Target the latest stable macOS and Apple Silicon only; do not add Intel or legacy compatibility work.
-- Use the existing MIT `LICENSE`; do not create or publish a GitHub remote without user authorization.
+- Use the existing MIT `LICENSE` and existing `origin`; do not recreate/reconfigure remotes, push, force-push, or trigger GitHub-hosted workflows unless the user authorizes that external action.
 - Quick Scan must never invoke Codex.
 - Codex is read-only investigation infrastructure: it receives no arbitrary Shell, direct filesystem tool, Adapter, or cleanup authority.
 - Probe Broker is Codex's only authorized disk-evidence interface. Production Deep Dive must technically enforce a Broker-only tool surface; a prompt or read-only filesystem sandbox is not that boundary.
@@ -29,17 +31,19 @@
 
 ```text
 Package.swift                                  SwiftPM products, targets, strict concurrency
-Sources/StornautApp/                           Minimal native shell only
 Sources/StornautCore/                          Shared domain types and spike-safe interfaces
 Sources/StornautCodex/                         Codex discovery, launch, JSONL and schemas
+StornautApp host selected by ADR 0001          Minimal native `.app` shell only
 Tests/StornautCoreTests/                       Core and filesystem lifecycle tests
 Tests/StornautCodexTests/                      Process, parser, cancellation and fake-runtime tests
+App-shell tests selected by ADR 0001           Navigation and scene contract tests
 Tests/Fixtures/Codex/                          Checked-in JSONL/schema fixtures without private data
 Tests/Fixtures/Surveyor/                       Synthetic directory-tree generator inputs
 Benchmarks/SurveyorBenchmark/                  Repeatable scanner benchmark executable/support
 docs/adr/                                      One decision record per architecture assumption
 docs/upstream-studies/                         Reference Study Gate records
 scripts/verify                                 One local verification entry point
+scripts/check-doc-links                        Local Markdown link validation
 .github/workflows/ci.yml                       Build/test checks on an arm64-capable current macOS runner
 ```
 
@@ -48,7 +52,8 @@ Every production Swift file must have one primary responsibility. UI Views consu
 ### Task 1: Repository, package, and verification skeleton
 
 **Files:**
-- Create: `.gitignore`
+- Verify/Modify only if needed: `.gitignore`
+- Verify: `scripts/check-doc-links`
 - Create: `Package.swift`
 - Create: `Sources/StornautCore/StornautCore.swift`
 - Create: `Sources/StornautCodex/StornautCodex.swift`
@@ -63,23 +68,23 @@ Every production Swift file must have one primary responsibility. UI Views consu
 
 - [ ] **Step 1: Complete the Epic 0 Upstream Study Gate**
 
-Read the current ClearDisk and PureMac repository structure plus Apple Swift Package/XCTest documentation. Record exact URL, commit, license, files read, reusable ideas, non-reusable code, and the decision to keep this spike dependency-free in `docs/upstream-studies/epic-0-foundation.md` using the template from `docs/upstream-reference-matrix.md`.
+Read the current ClearDisk and PureMac repository structure plus Apple Swift Package, Xcode macOS App, code-signing, bundle, and XCTest/Swift Testing documentation. Record exact URL, commit/version, license, files/docs read, reusable ideas, non-reusable code, and the decision to keep this spike dependency-free in `docs/upstream-studies/epic-0-foundation.md` using the template from `docs/research/upstream-reference-matrix.md`. Explicitly compare a SwiftPM-only executable, an Xcode App host over local packages, and a reproducible signed bundle harness; choose one topology for ADR 0001. The choice must support a stable bundle identifier and App-context TCC/FDA experiments without claiming that terminal `swift run` is equivalent.
 
-- [ ] **Step 2: Initialize local version control without publishing**
+- [ ] **Step 2: Verify the existing version-control baseline**
 
 Run:
 
 ```bash
-git init
-git branch -M main
-git status --short
+git status --short --branch
+git remote -v
+git log -1 --oneline --decorate
 ```
 
-Expected: a local `main` branch, no remote, and the existing docs/LICENSE shown as untracked.
+Expected: `main` tracks `origin/main`, `origin` points to the Stornaut GitHub repository, the approved docs/LICENSE baseline is already committed, and the worktree has no unrelated changes. Do not run `git init`, recreate the remote, or rewrite existing history.
 
-- [ ] **Step 3: Create the minimal manifest and empty targets**
+- [ ] **Step 3: Create the minimal manifest and library targets**
 
-Define the three production targets and two test targets so `swift test` can discover and compile tests. Set the deployment target to the latest stable macOS observed at execution time; record that value in the Epic 0 study rather than treating `macOS 26` as permanent.
+Define `StornautCore`, `StornautCodex`, and their two test targets so `swift test` can discover and compile tests. Do not declare an empty `StornautApp` executable target in Task 1; Task 2 adds that target together with its entry point and resources. Set the deployment target to the latest stable macOS observed at execution time; record that value in the Epic 0 study rather than treating `macOS 26` as permanent.
 
 - [ ] **Step 4: Write smoke tests and verify a behavioral failure**
 
@@ -114,9 +119,10 @@ set -euo pipefail
 swift package clean
 swift build
 swift test
+scripts/check-doc-links
 ```
 
-Configure a dormant CI workflow for the newest available macOS runner matching the execution-time deployment target. If no matching arm64 runner exists, record that fact and keep CI manual/disabled rather than lowering the target silently. Creating this local workflow file does not authorize a remote, push, or GitHub-hosted run; local `scripts/verify` is the Epic 0 acceptance gate until the user explicitly authorizes publication.
+Configure a dormant, manual-only CI workflow (`workflow_dispatch` only; no `push`, `pull_request`, `schedule`, or `workflow_run` trigger) for the newest available macOS runner matching the execution-time deployment target. If no matching arm64 runner exists, record that fact and keep CI disabled rather than lowering the target silently. Because the repository is already public, committing this file locally still does not authorize a push or GitHub-hosted run; local `scripts/verify` remains the Epic 0 acceptance gate until the user explicitly requests that external action.
 
 - [ ] **Step 7: Verify and commit**
 
@@ -127,20 +133,29 @@ Expected: PASS with both smoke tests.
 Commit:
 
 ```bash
-git add .gitignore Package.swift Sources Tests scripts .github docs LICENSE README.md
-git commit -m "chore: establish Stornaut foundation"
+git add .gitignore Package.swift \
+  Sources/StornautCore Sources/StornautCodex \
+  Tests/StornautCoreTests Tests/StornautCodexTests \
+  scripts/verify scripts/check-doc-links .github/workflows/ci.yml \
+  docs/upstream-studies/epic-0-foundation.md
+git diff --cached --check
+git commit -m "chore: establish Stornaut foundation" \
+  -m "Co-authored-by: TRAE CLI <noreply@bytedance.com>"
 ```
 
 ### Task 2: Minimal native App shell and localization seam
 
 **Files:**
-- Create: `Sources/StornautApp/StornautApp.swift`
-- Create: `Sources/StornautApp/AppShell/AppDestination.swift`
-- Create: `Sources/StornautApp/AppShell/RootView.swift`
-- Create: `Sources/StornautApp/Settings/StornautSettingsView.swift`
-- Create: `Sources/StornautApp/Resources/en.lproj/Localizable.strings`
-- Create: `Sources/StornautApp/Resources/zh-Hans.lproj/Localizable.strings`
-- Create: `Tests/StornautCoreTests/AppDestinationTests.swift`
+- Create: App-host project/bundle files selected by the Epic 0 study
+- Create: App source root selected by ADR 0001, containing `StornautApp.swift`
+- Create: App source root `AppShell/AppDestination.swift`
+- Create: App source root `AppShell/RootView.swift`
+- Create: App source root `Settings/StornautSettingsView.swift`
+- Create: App resources `en.lproj/Localizable.strings`
+- Create: App resources `zh-Hans.lproj/Localizable.strings`
+- Create: App-shell navigation contract tests in the topology selected by ADR 0001
+- Modify: `scripts/verify`
+- Modify: `.github/workflows/ci.yml`
 - Create: `docs/adr/0001-package-first-native-shell.md`
 
 **Interfaces:**
@@ -149,7 +164,7 @@ git commit -m "chore: establish Stornaut foundation"
 
 - [ ] **Step 1: Write the navigation contract test**
 
-Assert the destination raw values are exactly:
+Add the real macOS App host and its testable navigation seam using the topology selected by ADR 0001, then assert the destination raw values are exactly:
 
 ```swift
 ["overview", "scan", "investigations", "history"]
@@ -159,13 +174,13 @@ and that no settings/menu-bar destination exists.
 
 - [ ] **Step 2: Run the focused test and confirm failure**
 
-Run: `swift test --filter AppDestinationTests`
+Run the focused App-shell test command recorded by ADR 0001.
 
 Expected: FAIL because `AppDestination` does not exist.
 
 - [ ] **Step 3: Implement the minimal native shell**
 
-Create `@main struct StornautApp: App` with one uniquely identified `Window("Stornaut", id: "main")` scene and one independent `Settings` scene. The App must not expose creation of additional main windows. `RootView` uses `NavigationSplitView`, four labeled SF Symbol sidebar items, and plain placeholder content. Do not add MenuBarExtra, timers, background tasks, scan simulation, visual branding, or Agent chat.
+Create a real macOS `.app` with a stable development bundle identifier and an `@main struct StornautApp: App`. It has one uniquely identified `Window("Stornaut", id: "main")` scene and one independent `Settings` scene. The App must not expose creation of additional main windows. `RootView` uses `NavigationSplitView`, four labeled SF Symbol sidebar items, and plain placeholder content. Do not add MenuBarExtra, timers, background tasks, scan simulation, visual branding, or Agent chat.
 
 - [ ] **Step 4: Add localization resources**
 
@@ -173,16 +188,17 @@ Provide English and `zh-Hans` values for the four destinations plus `Settings`, 
 
 - [ ] **Step 5: Build and manually inspect both appearances**
 
-Run:
+Build with the App-host command selected by ADR 0001, inspect the produced `.app`, verify its bundle identifier and local code signature, and launch it through LaunchServices/Finder rather than `swift run`.
 
-```bash
-swift build
-swift run StornautApp
-```
+Expected: one native window, four sidebar destinations, Settings opened with `⌘,`, no menu-bar icon, and readable System Light/Dark appearances. Reopening or activating Stornaut reuses the single main window; File → New Window or equivalent cannot create another workspace window. Record the exact build/launch commands, bundle metadata, signing identity, screenshots, and observed limitations in ADR 0001.
 
-Expected: one native window, four sidebar destinations, Settings opened with `⌘,`, no menu-bar icon, and readable System Light/Dark appearances. Reopening or activating Stornaut reuses the single main window; File → New Window or equivalent cannot create another workspace window. Record screenshots and observed limitations in ADR 0001.
+This step proves the local App-host identity and shell behavior, not Developer ID distribution or notarization. A terminal-launched executable remains invalid evidence for packaged-App FDA/TCC inheritance.
 
-- [ ] **Step 6: Run tests and commit**
+- [ ] **Step 6: Extend the verification entry point**
+
+Update `scripts/verify` so it still builds/tests both Swift libraries and then invokes the deterministic App-host build and App-shell tests selected by ADR 0001. Update the manual-only CI workflow to run the same noninteractive verification path when an authorized operator triggers it. GUI launch inspection remains local/manual and is recorded in ADR 0001; CI must not claim it tested TCC/FDA interaction.
+
+- [ ] **Step 7: Run tests and commit**
 
 Run: `scripts/verify`
 
@@ -191,8 +207,11 @@ Expected: PASS.
 Commit:
 
 ```bash
-git add Sources/StornautApp Tests/StornautCoreTests docs/adr/0001-package-first-native-shell.md Package.swift
-git commit -m "feat: add native Stornaut app shell"
+git add Package.swift Sources Tests scripts .github docs/adr/0001-package-first-native-shell.md
+# Also stage the exact App-host project/bundle paths recorded by ADR 0001.
+git diff --cached --check
+git commit -m "feat: add native Stornaut app shell" \
+  -m "Co-authored-by: TRAE CLI <noreply@bytedance.com>"
 ```
 
 ### Task 3: Codex discovery and capability report
@@ -209,12 +228,12 @@ git commit -m "feat: add native Stornaut app shell"
 
 **Interfaces:**
 - Produces: `CodexLocator.locate(configuredURL:environment:) async -> CodexAvailability`.
-- Produces: `CodexCapabilityReport` containing executable URL, version string, and booleans for `json`, `outputSchema`, `ephemeral`, `readOnlySandbox`, `ignoreUserConfig`, and `ignoreRules`.
+- Produces: `CodexCapabilityReport` containing executable URL, version string, parsed flag support, and an evidence-bearing verdict (`supported`, `unsupported`, or `unverified(reason:)`) for structured JSONL, output Schema, ephemeral mode, read-only sandbox, strict/ignored user configuration, rule/instruction isolation, local Probe transport, and Broker-only tool-surface enforcement. A parsed CLI flag alone cannot mark an isolation property as supported.
 - Produces: injectable `ProcessRunning` protocol so tests never depend on a real Codex login.
 
 - [ ] **Step 1: Complete the Codex Runtime Upstream Study Gate**
 
-Read the current official Codex CLI implementation/docs for `exec`, configuration loading, JSONL events, schemas, sandbox, local tool/MCP exposure, tool-surface restriction, and cancellation. This one study explicitly covers Tasks 3–5. Re-probe and record the execution-time Codex path, version, and `codex exec --help`; `/Users/eriklee/.npm-global/bin/codex` and `0.146.0` are historical planning evidence only.
+Read the current official Codex CLI implementation/docs for `exec`, configuration loading, JSONL events, schemas, sandbox, local tool/MCP exposure, built-in Shell/filesystem tools, AGENTS/project instruction discovery, plugins, Hooks, tool-surface restriction, and cancellation. This one study explicitly covers Tasks 3–5. Re-probe and record the execution-time Codex path, version, `codex exec --help`, relevant feature/config diagnostics, and the difference between ignoring `config.toml`/rules and suppressing all unrelated instruction or tool sources; `/Users/eriklee/.npm-global/bin/codex` and `0.146.0` are historical planning evidence only.
 
 - [ ] **Step 2: Write failing locator tests**
 
@@ -226,11 +245,11 @@ Use `FileManager.isExecutableFile(atPath:)` for explicit, PATH, and known candid
 
 - [ ] **Step 4: Write failing capability parser tests**
 
-Parse checked-in historical and execution-time `--version`/`exec --help` fixtures. The `0.146.0` fixture documents one observed baseline only. Capability decisions derive from parsed flags and proven behavior, never version equality; malformed/unknown output produces `.unsupported(reason:)` rather than optimistic defaults.
+Parse checked-in historical and execution-time `--version`/`exec --help` fixtures. The `0.146.0` fixture documents one observed baseline only. Flag support derives from parsed output, never version equality. Isolation and tool-surface verdicts require behavioral evidence and remain `.unverified(reason:)` until Tasks 4–5 prove them; malformed output is `.unsupported(reason:)`, never an optimistic default.
 
 - [ ] **Step 5: Implement capability detection and cache only for the App session**
 
-Launch fixed arguments `--version` and `exec --help`, cap stdout/stderr, and return a typed report. Do not persist compatibility forever; a changed executable identity/version triggers a new probe.
+Launch fixed arguments `--version` and `exec --help`, cap stdout/stderr, and return a typed report. Include `--strict-config` support where available so unknown isolation config fails instead of being silently ignored. Do not persist compatibility forever; a changed executable identity/version triggers a new probe.
 
 - [ ] **Step 6: Verify against fake and installed Codex**
 
@@ -241,8 +260,13 @@ Run unit tests, then a read-only local diagnostic executable/test that prints th
 Run `scripts/verify`, then:
 
 ```bash
-git add Sources/StornautCodex Tests/StornautCodexTests Tests/Fixtures/Codex docs
-git commit -m "feat: detect user-installed Codex capabilities"
+git add Sources/StornautCodex Tests/StornautCodexTests \
+  Tests/Fixtures/Codex/codex-exec-help-0.146.0.txt \
+  docs/upstream-studies/epic-1-codex-runtime.md \
+  docs/adr/0002-codex-discovery-and-capabilities.md
+git diff --cached --check
+git commit -m "feat: detect user-installed Codex capabilities" \
+  -m "Co-authored-by: TRAE CLI <noreply@bytedance.com>"
 ```
 
 ### Task 4: Structured Codex process, JSONL, schema, and cancellation spike
@@ -276,14 +300,14 @@ Buffer only the unfinished line, enforce per-line and session byte limits, and k
 
 - [ ] **Step 3: Write process lifecycle tests with fake Codex**
 
-The fake executable must support: successful JSONL, stderr noise, invalid schema output, timeout, ignored SIGTERM, and one child process. Assert cancellation closes pipes and no child PID remains after the escalation deadline.
+The fake executable must support: successful JSONL, stderr noise, invalid schema output, timeout, ignored SIGTERM, and one child process. Assert the launcher creates or otherwise proves an isolated process group before group signalling; never signal a group that could contain the Stornaut App or test runner. Cancellation must close pipes and leave no child PID after the escalation deadline.
 
 - [ ] **Step 4: Implement a protocol-only fixed-argument launch**
 
 Construct arguments as an array using supported capabilities:
 
 ```text
-exec --ephemeral --json --output-schema <schema>
+exec --strict-config --ephemeral --json --output-schema <schema>
 --sandbox read-only --ignore-user-config --ignore-rules
 --skip-git-repo-check -C <isolated-directory> -
 ```
@@ -306,7 +330,9 @@ Commit:
 
 ```bash
 git add Sources/StornautCodex Tests/StornautCodexTests Tests/Fixtures/Codex docs/adr/0003-codex-process-protocol.md
-git commit -m "feat: validate structured Codex process lifecycle"
+git diff --cached --check
+git commit -m "feat: validate structured Codex process lifecycle" \
+  -m "Co-authored-by: TRAE CLI <noreply@bytedance.com>"
 ```
 
 ### Task 5: Probe Broker and file-read isolation spike
@@ -338,11 +364,11 @@ Cover relative traversal, symlinks leaving allowed roots, mount/root/home protec
 
 - [ ] **Step 2: Implement canonicalization and immutable denylist**
 
-Resolve file identity without following unsafe symlinks, compare canonical path components rather than prefixes, and return typed reasons. Do not add a settings override.
+Resolve file identity without following unsafe symlinks, compare canonical path components rather than prefixes, and return typed reasons. Define how each probe prevents check/use races: prefer descriptor-relative open/stat operations with no-follow semantics where platform APIs permit; otherwise revalidate identity immediately before and after access and fail closed on change. Do not add a settings override.
 
 - [ ] **Step 3: Write Broker budget and audit tests**
 
-Assert capability allowlisting, root scope, per-call timeout, output bytes, session call count, L0/L1 read level, cancellation, and redacted audit summaries. A README containing prompt injection text is data and cannot alter Broker policy.
+Assert capability allowlisting, root scope, per-call timeout, output bytes, session call count, L0/L1 read level, cancellation, redacted audit summaries, and symlink/path replacement between authorization and open. A README containing prompt injection text is data and cannot alter Broker policy.
 
 - [ ] **Step 4: Implement four in-process read-only probes**
 
@@ -354,7 +380,7 @@ Expose only the four allowlisted Probe schemas through the locally isolated tran
 
 - [ ] **Step 6: Run the Codex isolation experiment**
 
-Create three canary files: inside the isolated working directory, inside an allowed Broker fixture root, and outside both in a non-sensitive temporary sibling. Determine separately whether Codex can read each directly and whether macOS FDA/TCC privileges are inherited when launched from the App context. Do not use real private files as canaries. Do not grant, revoke, reset, or automate FDA/TCC permissions; record the current state, and run an alternate state only after explicit user approval and user-performed System Settings changes.
+Create three canary files: inside the isolated working directory, inside an allowed Broker fixture root, and outside both in a non-sensitive temporary sibling. Determine separately whether Codex can read each directly and whether macOS FDA/TCC privileges are inherited when launched from the App context. The App-context measurement must use an actual locally signed `.app` bundle launched through LaunchServices/Finder; a terminal process, test binary, or `swift run StornautApp` does not count as FDA/TCC inheritance evidence. The Codex Runtime upstream study and ADR 0001 must define the smallest suitable bundle harness; if no valid App-context harness exists, record this part as unmeasured and the current Deep Dive boundary remains a no-go. Do not use real private files as canaries. Do not grant, revoke, reset, or automate FDA/TCC permissions; record the current state, and run an alternate state only after explicit user approval and user-performed System Settings changes.
 
 - [ ] **Step 7: Write ADR 0004 with an explicit release outcome**
 
@@ -366,7 +392,9 @@ Run safety tests and `scripts/verify`, then:
 
 ```bash
 git add Sources/StornautCore Sources/StornautCodex Tests/StornautCoreTests Tests/StornautCodexTests Tests/Fixtures/Codex docs/adr/0004-codex-file-read-isolation.md
-git commit -m "feat: prove Probe Broker policy boundaries"
+git diff --cached --check
+git commit -m "feat: prove Probe Broker policy boundaries" \
+  -m "Co-authored-by: TRAE CLI <noreply@bytedance.com>"
 ```
 
 ### Task 6: Swift Surveyor performance and cancellation spike
@@ -403,7 +431,7 @@ The fixture generator creates deterministic shallow, deep, and high-fanout trees
 
 - [ ] **Step 5: Benchmark the real Mac read-only**
 
-Run synthetic benchmarks three times, then run a cancellable full-scope read-only benchmark on the 460GB-class machine under the current FDA/TCC state. Capture median wall time, peak memory, permission gaps, and cancellation latency. Do not persist individual private paths in the ADR. Do not grant, revoke, reset, or automate FDA/TCC; an alternate permission-state run requires explicit user approval and user-performed System Settings changes.
+Run synthetic benchmarks three times, then run a cancellable full-scope read-only benchmark on the 460GB-class machine. Record whether each run used a CLI/test process or the signed App host. CLI runs can decide scanner throughput, memory, and cancellation but cannot establish packaged-App TCC/FDA coverage; any App coverage claim requires an App-host run or remains unmeasured. Capture median wall time, peak memory, permission gaps, and cancellation latency. Do not persist individual private paths in the ADR. Do not grant, revoke, reset, or automate FDA/TCC; an alternate permission-state run requires explicit user approval and user-performed System Settings changes.
 
 - [ ] **Step 6: Make the architecture decision**
 
@@ -414,8 +442,13 @@ ADR 0005 must choose one outcome: Swift meets the `<5 min`/memory/cancellation g
 Run unit tests, synthetic benchmark, and `scripts/verify`, then:
 
 ```bash
-git add Sources/StornautCore Benchmarks Tests/StornautCoreTests Tests/Fixtures/Surveyor docs
-git commit -m "perf: validate Swift surveyor approach"
+git add Sources/StornautCore Benchmarks Tests/StornautCoreTests \
+  Tests/Fixtures/Surveyor \
+  docs/upstream-studies/epic-1-surveyor.md \
+  docs/adr/0005-swift-surveyor-performance.md
+git diff --cached --check
+git commit -m "perf: validate Swift surveyor approach" \
+  -m "Co-authored-by: TRAE CLI <noreply@bytedance.com>"
 ```
 
 ### Task 7: Trash and registered-action lifecycle spike
@@ -444,7 +477,7 @@ Study PureMac, ClearDisk, devklean, Pearcleaner, and Apple documentation for FDA
 
 - [ ] **Step 2: Write Policy Gate rejection tests**
 
-Reject root, home, mount roots, symlinks, denylisted paths, changed inode/mtime/size, active paths, unregistered action IDs, and arguments not produced by a registered template. Assert Agent text cannot introduce executable or argument values.
+Reject root, home, mount roots, symlinks, denylisted paths, changed inode/mtime/size, active paths, unregistered action IDs, and arguments not produced by a registered template. Include adversarial replacement between preflight and execution; revalidation must bind the action to the expected file identity and fail closed if the path is swapped. Assert Agent text cannot introduce executable or argument values.
 
 - [ ] **Step 3: Write Trash lifecycle tests**
 
@@ -460,24 +493,28 @@ Register only a test action with fixed executable `Tests/Fixtures/Actions/fake-c
 
 - [ ] **Step 6: Perform platform behavior probes**
 
-Using disposable temporary files only, observe same-volume Trash, a mounted disposable volume if available, large directory cancellation semantics, and permission denial. Record what can and cannot be undone in ADR 0006.
+Using disposable temporary files only, observe same-volume Trash, a mounted disposable volume if available, large directory cancellation semantics, and permission denial. Record the process identity and launch context for every result. CLI/test-binary observations prove API behavior only; any claim about FDA/TCC, entitlements, or packaged-App behavior must be repeated with the locally signed App harness established for Task 5 or explicitly recorded as residual risk. Record what can and cannot be undone in ADR 0006.
 
 - [ ] **Step 7: Verify and commit**
 
 Run action/safety tests and `scripts/verify`, then:
 
 ```bash
-git add Sources/StornautCore Tests/StornautCoreTests Tests/Fixtures/Actions docs
-git commit -m "feat: validate safe cleanup action lifecycle"
+git add Sources/StornautCore Tests/StornautCoreTests Tests/Fixtures/Actions \
+  docs/upstream-studies/epic-1-actions.md \
+  docs/adr/0006-trash-and-registered-actions.md
+git diff --cached --check
+git commit -m "feat: validate safe cleanup action lifecycle" \
+  -m "Co-authored-by: TRAE CLI <noreply@bytedance.com>"
 ```
 
 ### Task 8: Epic 0–1 evidence gate and handoff
 
 **Files:**
 - Create: `docs/reports/epic-0-1-validation-report.md`
-- Modify: `docs/architecture.md`
-- Modify: `docs/PRD.md`
-- Modify: `docs/coding-agent-handoff.md`
+- Modify: `docs/architecture/system-architecture.md`
+- Modify: `docs/product/PRD.md`
+- Modify: `docs/agent/coding-agent-handoff.md`
 - Modify: `README.md`
 
 **Interfaces:**
@@ -506,18 +543,20 @@ First write measured findings and exact proposed corrections in the validation r
 
 - [ ] **Step 4: Perform plan self-review**
 
-Confirm every Global Constraint has a test, ADR, or explicitly deferred Epic. Search for accidental MenuBarExtra, arbitrary shell execution, raw JSONL persistence, denylist override, real destructive registered action, Rust dependency, telemetry, and remote publication.
+Confirm every Global Constraint has a test, ADR, or explicitly deferred Epic. Search for accidental MenuBarExtra, arbitrary shell execution, raw JSONL persistence, denylist override, real destructive registered action, Rust dependency, telemetry, unapproved push/workflow triggers, and remote reconfiguration.
 
 - [ ] **Step 5: Commit the validation gate**
 
 Commit only the validation report and non-normative factual updates until all required design decisions are approved. Commit approved specification changes separately after approval:
 
 ```bash
-git add docs/reports README.md
-git commit -m "docs: record Epic 0 and 1 validation results"
+git add docs/reports/epic-0-1-validation-report.md README.md
+git diff --cached --check
+git commit -m "docs: record Epic 0 and 1 validation results" \
+  -m "Co-authored-by: TRAE CLI <noreply@bytedance.com>"
 ```
 
-Expected final state: local commits only, no remote side effects, all tests passing, and a documented user decision requested for any failed architecture boundary.
+Expected final state: intended local commits complete, worktree clean, no unapproved push or GitHub-hosted side effect, all tests passing, and a documented user decision requested for any failed architecture boundary.
 
 ## Plan self-review result
 

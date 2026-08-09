@@ -21,15 +21,16 @@ Coding Agent 可以实现已批准的导航、状态模型和原生组件骨架�
 
 ## 2. 必读顺序
 
-1. [PRD](PRD.md)
-2. [技术架构](architecture.md)
-3. [批准的设计规格](superpowers/specs/2026-08-06-stornaut-agent-disk-governance-design.md)
-4. [UI/UX 设计规格](superpowers/specs/2026-08-07-stornaut-ui-ux-design.md)
-5. [跨流程恢复状态与概念图](assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md)
-6. [已批准的 Epic 0–1 实施计划](superpowers/plans/2026-08-07-stornaut-epic-0-1-foundation-spikes.md)
-7. [上游参考矩阵](upstream-reference-matrix.md)
-8. [竞品报告](competitive-analysis-2026-08-06.md)
-9. [真实案例](case-study-2026-08-06.md)
+1. [文档地图](../README.md)
+2. [PRD](../product/PRD.md)
+3. [技术架构](../architecture/system-architecture.md)
+4. [批准的 Agent 设计规格](../design/agent-disk-governance.md)
+5. [UI/UX 设计规格](../design/ui-ux.md)
+6. [跨流程恢复状态与概念图](../assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md)
+7. [已批准的 Epic 0–1 实施计划](../plans/active/epic-0-1-foundation-spikes.md)
+8. [上游参考矩阵](../research/upstream-reference-matrix.md)
+9. [竞品报告](../research/competitive-analysis-2026-08-06.md)
+10. [真实案例](../research/case-study-2026-08-06.md)
 
 规范优先级：用户明确批准的 v1 约束 → PRD 2.3 与两份批准规格 → architecture 2.2 → Epic 0–1 实施计划 → 研究/案例/视觉概念。发现冲突时先报告并提出精确修正文案；未经用户批准不得降低安全边界、扩大权限或修改已批准产品范围。
 
@@ -75,7 +76,7 @@ Upstream Study
 
 ### Upstream Study Gate
 
-开始编码前，从 [上游参考矩阵](upstream-reference-matrix.md) 选择必读项目，记录：
+开始编码前，从 [上游参考矩阵](../research/upstream-reference-matrix.md) 选择必读项目，记录：
 
 - URL、commit/version、license
 - 阅读的具体文件和文档
@@ -180,18 +181,20 @@ Upstream Study
 
 第一份 coding plan 不应覆盖整个产品。只规划 Epic 0–1：工程骨架和高风险 Spikes。
 
-已批准的执行输入：[Epic 0–1 Foundation & Risk Spikes Implementation Plan](superpowers/plans/2026-08-07-stornaut-epic-0-1-foundation-spikes.md)。Coding Agent 应按该计划逐 Task 执行，不得跳过 Upstream Study、失败测试、ADR 或最终 evidence gate。
+已批准的执行输入：[Epic 0–1 Foundation & Risk Spikes Implementation Plan](../plans/active/epic-0-1-foundation-spikes.md)。Coding Agent 应按该计划逐 Task 执行，不得跳过 Upstream Study、失败测试、ADR 或最终 evidence gate。
 
 原因：Codex 隔离、FDA 继承、Probe Broker 和 Swift 扫描性能是架构成立的前提。在这些结果出来前批量实现 UI、规则或 Agent 流程会造成返工。
 
-第一里程碑成功标准：
+第一里程碑 evidence gate：
 
-- 原生 App 能定位并启动用户 Codex
-- Codex 通过受控本地桥接调用一个 fake/真实只读 Probe，并证明不能调用任意 Shell、直接文件系统工具或未注册能力
+- 真实、可本地签名的 `.app` host 能定位并启动用户 Codex；SwiftPM/CLI 进程不能替代 App-context 证据
+- Codex 通过受控本地桥接调用一个 fake/真实只读 Probe，并对任意 Shell、直接文件系统工具和未注册能力形成明确的 go/no-go 证据
 - 可以取消并确认进程树退出
 - 已记录实际文件读取隔离边界
 - Swift Scanner 在受控目录上有可重复 Benchmark
 - `trashItem` 和一个 fake registered action 通过生命周期测试
+
+Broker-only 若不能被技术性强制，Epic 0–1 仍可作为成功的风险验证阶段结束，但结论必须是 Deep Dive no-go/paused；不得为了满足里程碑而弱化边界。
 
 ## 7. 测试优先级
 
@@ -234,14 +237,14 @@ Upstream Study
 
 ## 10. 当前工作区注意事项
 
-截至 handoff 时，当前目录尚不是 Git 仓库，但 MIT `LICENSE` 已经存在且由用户批准。Epic 0 可以初始化本地 Git 仓库和首次本地提交，但不得自行创建或发布 GitHub 远程仓库。
+截至 2026-08-08，仓库已经初始化并发布到 GitHub，默认分支为 `main`，远端为 `origin`，`main` 跟踪 `origin/main`。MIT `LICENSE` 已由用户批准并提交。Epic 0 不再执行 `git init`、创建远端或首次文档提交；开始 Task 1 前只需确认分支、远端和工作区状态。计划内本地 commit 可以按 Task 创建；push、force-push、发布和 CI 外部运行仍按用户授权执行。
 
 ## 11. Handoff Prompt
 
 可以把下面内容交给 Coding Agent：
 
 ```text
-你正在实现 Stornaut。先完整阅读 docs/coding-agent-handoff.md 指定的文档，尤其是产品/Agent/UI 三份批准规格，遵守所有产品不变量和 Reference Study Gate。不要直接实现整个产品，也不要从概念图推断规格外功能。
+你正在实现 Stornaut。先从 docs/README.md 进入文档地图，再完整阅读 docs/agent/coding-agent-handoff.md 指定的文档，尤其是产品/Agent/UI 三份批准规格，遵守所有产品不变量和 Reference Study Gate。不要直接实现整个产品，也不要从概念图推断规格外功能。
 
 第一步仅针对 Epic 0–1：检查工作区状态，然后按已批准的 Epic 0–1 实施计划逐 Task 执行；开始每个技术主题前完成其映射的 Upstream Study Gate。不得另起替代计划或扩大范围。重点验证 Swift Scanner 性能、用户安装 Codex 的发现与结构化通信、进程取消、FDA/文件读取隔离、Codex↔Probe Broker 受控桥接、Trash 和 Registered Action 生命周期。
 

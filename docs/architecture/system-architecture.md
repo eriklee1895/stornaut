@@ -2,9 +2,9 @@
 
 > 版本：2.2  
 > 状态：与 PRD 2.3 设计基线同步  
-> 初版：2026-08-06；最近更新：2026-08-07
+> 初版：2026-08-06；最近更新：2026-08-08
 
-配套文档：[PRD](PRD.md)、[Agent 设计规格](superpowers/specs/2026-08-06-stornaut-agent-disk-governance-design.md)、[UI/UX 设计规格](superpowers/specs/2026-08-07-stornaut-ui-ux-design.md)、[上游参考矩阵](upstream-reference-matrix.md)、[Coding Agent Handoff](coding-agent-handoff.md)。
+配套文档：[PRD](../product/PRD.md)、[Agent 设计规格](../design/agent-disk-governance.md)、[UI/UX 设计规格](../design/ui-ux.md)、[上游参考矩阵](../research/upstream-reference-matrix.md)、[Coding Agent Handoff](../agent/coding-agent-handoff.md)。
 
 ## 1. 架构目标
 
@@ -102,7 +102,7 @@ codex exec
 - SwiftUI 为主；系统能力不足处桥接 AppKit
 - UI 只消费 ViewModel/领域状态，不直接启动扫描、Codex 或 Executor
 
-所有导航、状态、文案、品牌、Light/Dark、本地化、accessibility 和 motion 约束见 [UI/UX 设计规格](superpowers/specs/2026-08-07-stornaut-ui-ux-design.md)。
+所有导航、状态、文案、品牌、Light/Dark、本地化、accessibility 和 motion 约束见 [UI/UX 设计规格](../design/ui-ux.md)。
 
 ### 4.2 Surveyor
 
@@ -409,7 +409,7 @@ Executor → Manifest: append results
 - 恢复 reducer 必须保留仍有效的 snapshot/evidence/manifest，只有依赖失败证据的结论与动作失效；任何局部失败都不能清空整个页面状态。
 - stale execution preflight 只能产生 refresh/cancel transition，不能产生 bypass transition。Safety check 阻断不能进入 investigation started 状态。
 - Manifest 写入失败与 Cleanup Action 失败是两个独立事件；前者不得伪装成正常完成。Linked Evidence expiry 不级联删除仍在保留期内的最小 Manifest。
-- 视觉与交互契约见 [Resilience States](assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md)。
+- 视觉与交互契约见 [Resilience States](../assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md)。
 
 ## 7. 性能与资源预算
 
@@ -458,13 +458,13 @@ Executor → Manifest: append results
 - 清理前后四种空间口径
 - Codex 不可用和 Adapter 全部缺失模式
 
-## 9. 建议目录结构
+## 9. 逻辑模块与物理布局
 
 ```text
 stornaut/
 ├── README.md
 ├── docs/
-├── StornautApp/
+├── <App host selected by ADR 0001>/
 │   ├── AppShell/
 │   ├── Overview/
 │   ├── Scan/
@@ -473,22 +473,23 @@ stornaut/
 │   ├── History/
 │   ├── DesignSystem/
 │   └── Settings/
-├── StornautCore/
-│   ├── Surveyor/
-│   ├── KnowledgeBase/
-│   ├── Activity/
-│   ├── Evidence/
-│   ├── LocalKnowledge/
-│   ├── Investigation/
-│   ├── ProbeBroker/
-│   ├── Adapters/
-│   ├── Policy/
-│   ├── Actions/
-│   └── Accounting/
-├── StornautCodex/
-│   ├── Runtime/
-│   ├── Protocol/
-│   └── Schemas/
+├── Sources/
+│   ├── StornautCore/
+│   │   ├── Surveyor/
+│   │   ├── KnowledgeBase/
+│   │   ├── Activity/
+│   │   ├── Evidence/
+│   │   ├── LocalKnowledge/
+│   │   ├── Investigation/
+│   │   ├── ProbeBroker/
+│   │   ├── Adapters/
+│   │   ├── Policy/
+│   │   ├── Actions/
+│   │   └── Accounting/
+│   └── StornautCodex/
+│       ├── Runtime/
+│       ├── Protocol/
+│       └── Schemas/
 ├── Rules/
 ├── Tests/
 │   ├── Fixtures/
@@ -498,7 +499,7 @@ stornaut/
 └── ThirdPartyNotices/
 ```
 
-建议先使用 Swift Package 划分 `StornautCore`，让规则、Policy 和 Probe 在不启动 GUI 时可测试。不要在 v1 为形式上的“微服务”拆多进程；Codex 隔离和必要的 XPC 技术 Spike除外。
+上图表达逻辑模块，不提前锁定 App host 的具体工程目录。`StornautCore` 与 `StornautCodex` 使用 Swift Package Manager；真实 `.app` host、bundle identifier、签名和测试拓扑由 Epic 0 Upstream Study 与 ADR 0001 决定。规则、Policy 和 Probe 必须在不启动 GUI 时可测试。不要在 v1 为形式上的“微服务”拆多进程；Codex 隔离和必要的 XPC 技术 Spike 除外。
 
 ## 10. 实施前技术 Spike
 
