@@ -198,4 +198,5 @@ Epic 0–1
 - Epic 1 Task 3：无 shell Codex discovery、bounded process seam、evidence-bearing capability report、generated fixtures 与 installed no-model diagnostic 已完成；所有 behavior/isolation verdict 仍为 unverified，见 [ADR 0002](../adr/0002-codex-discovery-and-capabilities.md)。
 - Epic 1 Task 4：固定参数 structured process、bounded JSONL、Swift final-envelope validation、原子 process-group 与 timeout/cancellation descendant cleanup 已完成；真实 `0.147.0` static-envelope probe 通过，但不构成 Broker-only/read isolation 证据，见 [ADR 0003](../adr/0003-codex-process-protocol.md)。
 - Epic 1 Task 5：四个 bounded read-only Probe、canonical path/immutable denylist、budget/redacted audit、fake Codex typed Bridge 与 signed App-context canary 已完成；installed `0.147.0` 无完整 tool allowlist，因此结论为 protocol-only/no-go，Deep Dive 继续 paused，见 [ADR 0004](../adr/0004-codex-file-read-isolation.md)。
-- 下一项执行：Epic 1 Task 6 Swift Surveyor performance/cancellation spike。
+- Epic 1 Task 6：bounded Swift/POSIX Surveyor、no-follow/same-device、logical/allocated bytes、partial errors、synthetic/real benchmark 已完成；460GiB-class root 中位约 96.2s、peak RSS <28MB、producer cancellation <1ms，继续 Swift、不评估 Rust，见 [ADR 0005](../adr/0005-swift-surveyor-performance.md)。
+- 下一项执行：Epic 1 Task 7 Trash 与 fake Registered Action lifecycle spike。

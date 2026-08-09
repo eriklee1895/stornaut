@@ -332,10 +332,22 @@ func consumerCancellationTerminatesTheProcessGroup() async throws {
     }
     let parentPID = try fixture.recordedPID(named: "pid.txt")
     let childPID = try fixture.recordedPID(named: "child-pid.txt")
-    try await waitForProcessExit(parentPID)
-    try await waitForProcessExit(childPID)
-    #expect(!processExists(parentPID))
-    #expect(!processExists(childPID))
+    let processGroup = ProcessGroupID(
+        rawValue: try fixture.recordedPID(named: "pgid.txt")
+    )
+    try await waitForProcessGroupExit(processGroup)
+    #expect(
+        !ProcessTreeTerminator.processGroupHasMembers(
+            processGroup,
+            excluding: 0
+        )
+    )
+    if processExists(parentPID) {
+        #expect(getpgid(parentPID) != processGroup.rawValue)
+    }
+    if processExists(childPID) {
+        #expect(getpgid(childPID) != processGroup.rawValue)
+    }
 }
 
 @Test
@@ -519,6 +531,25 @@ private func waitForProcessExit(_ pid: pid_t) async throws {
     throw CodexProcessTestError.processDidNotExit(pid)
 }
 
+private func waitForProcessGroupExit(
+    _ processGroup: ProcessGroupID
+) async throws {
+    let clock = ContinuousClock()
+    let deadline = clock.now.advanced(by: .seconds(5))
+    while clock.now < deadline {
+        if !ProcessTreeTerminator.processGroupHasMembers(
+            processGroup,
+            excluding: 0
+        ) {
+            return
+        }
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    throw CodexProcessTestError.processGroupDidNotExit(
+        processGroup.rawValue
+    )
+}
+
 private func processExists(_ pid: pid_t) -> Bool {
     kill(pid, 0) == 0 || errno == EPERM
 }
@@ -526,4 +557,5 @@ private func processExists(_ pid: pid_t) -> Bool {
 private enum CodexProcessTestError: Error {
     case fileDidNotAppear(URL)
     case processDidNotExit(pid_t)
+    case processGroupDidNotExit(pid_t)
 }

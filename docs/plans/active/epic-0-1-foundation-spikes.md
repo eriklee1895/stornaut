@@ -510,31 +510,48 @@ env -u GITHUB_TOKEN -u GH_TOKEN git push origin main
 - Produces: `SurveyorSpike.scan(_ request: ScanRequest) -> AsyncThrowingStream<PathSnapshot, Error>`.
 - Produces: benchmark JSON containing OS/hardware, root description, entry count, logical/allocated bytes, elapsed time, peak memory, cancellation latency, permission failures, and error count.
 
-- [ ] **Step 1: Complete the Surveyor Upstream Study Gate**
+- [x] **Step 1: Complete the Surveyor Upstream Study Gate**
 
 Study Mole, ClearDisk, kondo, and npkill for scan roots, pruning, progress, concurrency, and fixture ideas. Treat Mole as behavior-only GPL reference. Record exact snapshots and the independent Swift approach.
 
-- [ ] **Step 2: Write correctness and cancellation tests**
+Study evidence completed on 2026-08-09. Current official commits, licenses,
+source fingerprints and an independent POSIX/Swift implementation brief are
+recorded in [Epic 1 Swift Surveyor Upstream Study](../../upstream-studies/epic-1-surveyor.md).
+Mole remains behavior-only GPL reference; no upstream code or dependency is
+introduced.
+
+- [x] **Step 2: Write correctness and cancellation tests**
 
 Use temporary trees containing regular files, sparse files, symlinks, unreadable directories, package directories, and a nested mount-boundary simulation. Assert no symlink following, bounded concurrency, partial results, allocated/logical distinction, and cancellation completion within one second for the synthetic fixture.
 
-- [ ] **Step 3: Implement the narrow spike scanner**
+- [x] **Step 3: Implement the narrow spike scanner**
 
 Use Foundation/POSIX metadata APIs, an explicit work queue, cooperative cancellation, and streamed snapshots. Do not implement Knowledge Base classification, Git enrichment, Spotlight, SQLite, or production resume logic in this task.
 
-- [ ] **Step 4: Add a repeatable synthetic benchmark**
+- [x] **Step 4: Add a repeatable synthetic benchmark**
 
 The fixture generator creates deterministic shallow, deep, and high-fanout trees under a caller-provided temporary directory. It must refuse `/`, `$HOME`, a workspace root, or an existing non-fixture directory. Benchmark cleanup removes only its validated temporary fixture.
 
-- [ ] **Step 5: Benchmark the real Mac read-only**
+- [x] **Step 5: Benchmark the real Mac read-only**
 
 Run synthetic benchmarks three times, then run a cancellable full-scope read-only benchmark on the 460GB-class machine. Record whether each run used a CLI/test process or the signed App host. CLI runs can decide scanner throughput, memory, and cancellation but cannot establish packaged-App TCC/FDA coverage; any App coverage claim requires an App-host run or remains unmeasured. Capture median wall time, peak memory, permission gaps, and cancellation latency. Do not persist individual private paths in the ADR. Do not grant, revoke, reset, or automate FDA/TCC; an alternate permission-state run requires explicit user approval and user-performed System Settings changes.
 
-- [ ] **Step 6: Make the architecture decision**
+- [x] **Step 6: Make the architecture decision**
 
 ADR 0005 must choose one outcome: Swift meets the `<5 min`/memory/cancellation goal; Swift needs targeted optimization; or measured evidence justifies a separate Rust evaluation ADR. Do not introduce Rust inside this task.
 
-- [ ] **Step 7: Verify and commit**
+Task 6 execution evidence on 2026-08-09:
+
+- Eleven focused tests cover sparse/logical/allocated accounting, symlinks, mount pruning, partial permission errors, worker/queue/stream bounds, producer cancellation, signed APFS `dev_t` bit patterns, hardlink deduplication and fixture safety.
+- Three deterministic synthetic runs held 1,356 entries and identical byte totals with a median of about 45.69 ms and peak RSS near 10 MB.
+- Three full pre-hardlink-hardening root scans covered about 9.087M entries in 93.16–97.53s; median was about 96.20s and peak RSS stayed below 28 MB.
+- A post-hardlink-hardening root scan completed in 98.52s with 25.67 MB peak RSS. A 100ms cancelled root run waited for producer completion and measured about 0.136ms cancellation latency.
+- Current App/TCC state was not changed. CLI root scans recorded 982 permission failures instead of reporting them as zero. Individual private paths and raw benchmark output are not committed.
+- Raw APFS file-byte totals can exceed physical volume capacity even after hardlink deduplication, so they remain observations rather than reclaimable/free-space claims.
+- Full parallel tests exposed Swift cooperative-executor starvation when blocking POSIX workers ran inside a TaskGroup. Workers now use a fixed GCD utility pool; two consecutive 94-test SwiftPM runs passed with no fake-process residue.
+- Decision: Swift meets the Task 6 performance, memory and cancellation goals; do not evaluate or introduce Rust. See [ADR 0005](../../adr/0005-swift-surveyor-performance.md).
+
+- [x] **Step 7: Verify and commit**
 
 Run unit tests, synthetic benchmark, and `scripts/verify`, then:
 

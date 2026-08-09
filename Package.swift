@@ -16,6 +16,10 @@ let package = Package(
             name: "StornautCodex",
             targets: ["StornautCodex"]
         ),
+        .executable(
+            name: "SurveyorBenchmark",
+            targets: ["SurveyorBenchmark"]
+        ),
     ],
     targets: [
         .target(
@@ -27,6 +31,11 @@ let package = Package(
             resources: [
                 .copy("Schemas"),
             ]
+        ),
+        .executableTarget(
+            name: "SurveyorBenchmark",
+            dependencies: ["StornautCore"],
+            path: "Benchmarks/SurveyorBenchmark"
         ),
         .testTarget(
             name: "StornautCoreTests",

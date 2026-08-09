@@ -2,7 +2,7 @@
 
 > 面向接手实现的 Coding Agent  
 > 最近更新：2026-08-09
-> 当前状态：产品、Agent、UI 功能交互与品牌基线完成；Epic 0 App/Test/UI Test host、本地签名与 Light/Dark/Settings 截图验证，以及仓库固定的 XcodeBuildMCP + Peekaboo 只读开发 harness 已完成；Epic 1 Task 3–5 已完成，Task 5 证明 Broker 协议但未证明 Codex Broker-only 工具面，Deep Dive 明确 no-go/paused；下一项是 Task 6 Swift Surveyor performance/cancellation spike
+> 当前状态：产品、Agent、UI 功能交互与品牌基线完成；Epic 0 与 Epic 1 Task 3–6 已完成；Task 5 证明 Broker 协议但未证明 Codex Broker-only 工具面，Deep Dive 明确 no-go/paused；Task 6 证明 Swift Surveyor 在 460GiB-class Mac 上满足性能/内存/取消目标；下一项是 Task 7 Trash / Registered Action lifecycle spike
 
 ## 1. 任务目标
 
