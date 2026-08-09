@@ -273,6 +273,97 @@ func localKnowledgeRejectsFutureAndWrongRoleWithoutMutation() throws {
 }
 
 @Test
+func localKnowledgeMigratesV1AndIsolatesGenericLegacyFacts() async throws {
+    let root = try EvidenceStoreTestSupport.temporaryDirectory(
+        "knowledge-migration"
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    let configuration = try EvidenceStoreTestSupport.makeFileConfiguration(
+        root: root
+    )
+    try FileManager.default.createDirectory(
+        at: configuration.supportDirectoryURL,
+        withIntermediateDirectories: true
+    )
+    let legacyPayload = """
+    {"id":"knowledge-legacy","kind":"keepDecision","provenance":"user.confirmed","scope":"fixture-root/legacy","stale":false,"updatedAt":1000,"value":"Keep"}
+    """
+    _ = try EvidenceStoreTestSupport.runSQLite(
+        databaseURL: configuration.localKnowledgeDatabaseURL,
+        sql: """
+        PRAGMA application_id=\(StoreApplicationID.localKnowledge.rawValue);
+        PRAGMA user_version=1;
+        CREATE TABLE local_knowledge (
+            id TEXT PRIMARY KEY NOT NULL,
+            kind TEXT NOT NULL,
+            scope TEXT NOT NULL,
+            updated_at_ms INTEGER NOT NULL,
+            payload TEXT NOT NULL
+        ) STRICT;
+        CREATE INDEX idx_local_knowledge_scope
+        ON local_knowledge(scope, kind, id);
+        INSERT INTO local_knowledge
+        (id, kind, scope, updated_at_ms, payload)
+        VALUES (
+            'knowledge-legacy',
+            'keepDecision',
+            'fixture-root/legacy',
+            1000,
+            '\(legacyPayload)'
+        );
+        """
+    )
+
+    let store = try LocalKnowledgeStore(configuration: configuration)
+    let page = try await store.facts(limit: 10, offset: 0)
+
+    #expect(page.records.isEmpty)
+    #expect(page.corruptRecordIDs == ["knowledge-legacy"])
+    #expect(
+        try EvidenceStoreTestSupport.runSQLite(
+            databaseURL: configuration.localKnowledgeDatabaseURL,
+            sql: "PRAGMA user_version;"
+        ) == "2"
+    )
+}
+
+@Test
+func damagedLocalKnowledgeV1IsRejectedWithoutVersionMutation() throws {
+    let root = try EvidenceStoreTestSupport.temporaryDirectory(
+        "knowledge-damaged-v1"
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    let configuration = try EvidenceStoreTestSupport.makeFileConfiguration(
+        root: root
+    )
+    try FileManager.default.createDirectory(
+        at: configuration.supportDirectoryURL,
+        withIntermediateDirectories: true
+    )
+    _ = try EvidenceStoreTestSupport.runSQLite(
+        databaseURL: configuration.localKnowledgeDatabaseURL,
+        sql: """
+        PRAGMA application_id=\(StoreApplicationID.localKnowledge.rawValue);
+        PRAGMA user_version=1;
+        CREATE TABLE local_knowledge (
+            id TEXT PRIMARY KEY NOT NULL,
+            payload TEXT NOT NULL
+        ) STRICT;
+        """
+    )
+
+    #expect(throws: EvidenceStoreError.schemaMismatch) {
+        _ = try LocalKnowledgeStore(configuration: configuration)
+    }
+    #expect(
+        try EvidenceStoreTestSupport.runSQLite(
+            databaseURL: configuration.localKnowledgeDatabaseURL,
+            sql: "PRAGMA user_version;"
+        ) == "1"
+    )
+}
+
+@Test
 func storesRejectUnclaimedForeignSchemasAndDamagedOwnedSchemas() throws {
     let root = try EvidenceStoreTestSupport.temporaryDirectory("unclaimed")
     defer { try? FileManager.default.removeItem(at: root) }

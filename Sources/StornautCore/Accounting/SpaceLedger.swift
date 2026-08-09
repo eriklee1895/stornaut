@@ -121,7 +121,6 @@ public struct SpaceLedgerOwner: Codable, Sendable, Equatable {
               !sources.isEmpty,
               sources.contains(where: { $0.kind == .surveyor }),
               sources.contains(where: { $0.kind == .classifier }),
-              category == .protected || disposition != .protected,
               category != .protected || disposition == .protected
         else {
             throw DomainContractError.invalidMeasurement

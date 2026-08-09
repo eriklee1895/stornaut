@@ -386,11 +386,35 @@ func classificationDecodeRejectsMissingEvidenceOutsideRequirements() throws {
         object["missingEvidenceKeys"] = ["evidence.not-required"]
     }
     try expectMutatedJSONFails(Classification.self, data: data) { object in
-        object["disposition"] = "protected"
-    }
-    try expectMutatedJSONFails(Classification.self, data: data) { object in
         object["producer"] = "invalid\nproducer"
     }
+}
+
+@Test
+func activityProtectionPreservesTheOriginalArtifactCategory() throws {
+    let classification = try Classification(
+        id: ClassificationID(validating: "classification-active-cache"),
+        snapshotID: SnapshotID(validating: "snapshot-active-cache"),
+        ruleID: DomainToken(validating: "cache.fixture"),
+        producer: DomainLabel(validating: "Fixture cache"),
+        category: .packageAndBuildCaches,
+        disposition: .protected,
+        risk: .high,
+        confidence: .high,
+        recovery: RecoveryGuidance(
+            methodKey: DomainToken(validating: "recovery.fixture.cache"),
+            cost: .low
+        ),
+        requiredEvidenceKeys: [
+            DomainToken(validating: "activity.process.inactive"),
+        ],
+        missingEvidenceKeys: [],
+        catalogVersion: DomainToken(validating: "catalog-fixture-v1"),
+        classifiedAt: Date(timeIntervalSince1970: 1)
+    )
+
+    #expect(classification.category == .packageAndBuildCaches)
+    #expect(classification.disposition == .protected)
 }
 
 @Test

@@ -596,3 +596,73 @@ The complete 67-rule catalog stays below the fixed 2 s debug matcher gate
 (about 1.25–1.30 s). The complete catalog version is
 `builtin-runtime-tool-residue-v1`, with reviewed SHA-256
 `133b3829816fa951f03cb87473e03454c3e561b421c83e6c8efaf8ad89849e99`.
+
+## 16. Task 19 Activity and Local Knowledge Gate Refresh
+
+Task 19 revalidated the provider boundary on 2026-08-10 before writing
+production code.
+
+### Git provider
+
+The local target is Apple Git `2.50.1 (Apple Git-155)`. Its installed manual
+confirms:
+
+- porcelain status output is stable across versions and user configuration;
+- porcelain v2 exposes branch OID, branch, upstream and ahead/behind headers;
+- `--no-optional-locks` is equivalent to `GIT_OPTIONAL_LOCKS=0` and prevents
+  optional side effects such as index refresh;
+- `GIT_CONFIG_GLOBAL=/dev/null` and `GIT_CONFIG_SYSTEM=/dev/null` suppress
+  user/global configuration.
+
+The provider will launch only `/usr/bin/git` with fixed commands. It will add
+per-command `core.hooksPath=/dev/null`, `core.fsmonitor=false` and
+`core.untrackedCache=false`, use a minimal environment, bound both output
+streams and apply a fixed timeout. It will parse status and last-commit output
+as separate typed observations so loss of an informational timestamp does not
+erase valid dirty/untracked/ahead evidence.
+
+A temporary dirty repository probe showed that status plus last-commit reads
+left the complete `.git` file path/mtime/size digest unchanged. This is
+behavioral evidence, not a claim that arbitrary Git commands are read-only;
+the fixed executable, arguments and environment remain the enforceable
+boundary.
+
+### App and process providers
+
+The macOS 26.5 SDK headers confirm that
+`NSWorkspace.runningApplications` returns an atomic, thread-safe snapshot of
+all running applications. `NSRunningApplication` provides optional bundle ID,
+localized name and executable URL plus a process identifier; values can change
+after the snapshot and therefore remain observation-time evidence, not a
+durable assertion.
+
+Related non-App processes use bounded native current-user `libproc` enumeration
+through `proc_listpids(PROC_UID_ONLY)` and `proc_name`. Review rejected
+all-process enumeration because the local probe could not name 253 of 806 PIDs;
+silently dropping those rows could falsely prove inactivity. PID-list
+truncation, a still-live PID without a readable name, permission failure or
+collection failure therefore produces Unknown only for the dependent process-
+activity requirement. Task 19 does not inspect open files and does not invoke
+`lsof`, `ps`, Shell or an Adapter.
+
+### Fusion and structured knowledge
+
+- Git dirty, staged, untracked, missing upstream, ahead/behind, running App and
+  related process signals are independent typed observations.
+- A contradicted activity prerequisite protects the candidate; missing or
+  failed prerequisite data yields Unknown, including a same-key
+  satisfied/unavailable conflict. Satisfied evidence cannot promote a more
+  conservative base disposition.
+- Recent external activity can protect, stale time is informational only, and
+  Stornaut-caused timestamps never count as user activity.
+- Stable activity fingerprints exclude collection time and Stornaut-caused
+  timestamps, so re-observation alone does not invalidate Local Knowledge.
+- Local Knowledge replaces the earlier generic `kind/value/stale` skeleton
+  with closed user-confirmed payloads and applicability bindings. It stores no
+  disposition override or free-text Agent memory.
+- Scope, file identity, activity fingerprint or catalog-version changes mark a
+  retained fact stale with typed reasons rather than deleting or silently
+  applying it.
+
+No new dependency, entitlement, TCC permission, background monitor or target
+write is introduced.

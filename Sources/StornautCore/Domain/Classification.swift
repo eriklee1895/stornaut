@@ -84,7 +84,6 @@ public struct Classification: Codable, Sendable, Equatable {
         guard requiredEvidence.count == requiredEvidenceKeys.count,
               missingEvidence.count == missingEvidenceKeys.count,
               missingEvidence.isSubset(of: requiredEvidence),
-              category == .protected || disposition != .protected,
               category != .protected || disposition == .protected
         else {
             throw DomainContractError.invalidMeasurement

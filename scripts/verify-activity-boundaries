@@ -1,0 +1,48 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+cd "$repo_root"
+
+activity_root=Sources/StornautCore/Activity
+git_provider=$activity_root/GitActivityProvider.swift
+
+if rg -n \
+    'sh -c|/bin/(ba)?sh|lsof|/bin/ps|/usr/bin/ps|posix_spawn' \
+    "$activity_root"; then
+    echo "Activity providers contain a prohibited process surface" >&2
+    exit 1
+fi
+
+if rg -n \
+    'removeItem|moveItem|copyItem|createFile|FileHandle\(forWriting|Data\(.*\.write' \
+    "$activity_root"; then
+    echo "Activity providers contain a scanned-target write surface" >&2
+    exit 1
+fi
+
+process_files=("${(@f)$(rg -l 'Process\(\)' "$activity_root" || true)}")
+if (( ${#process_files} != 1 )) \
+    || [[ ${process_files[1]:-} != "$git_provider" ]]; then
+    echo "Only the bounded Git provider may launch a process" >&2
+    exit 1
+fi
+
+rg -q 'URL\(filePath: "/usr/bin/git"\)' "$git_provider"
+rg -q '"status"' "$git_provider"
+rg -q '"log"' "$git_provider"
+
+if rg -n \
+    '"(add|checkout|clean|commit|fetch|gc|merge|mv|pull|push|rebase|reset|restore|rm|switch)"' \
+    "$git_provider"; then
+    echo "Git activity provider contains a mutating or network command" >&2
+    exit 1
+fi
+
+if rg -n '^public (protocol|struct) GitCommand' "$git_provider"; then
+    echo "Git command runner escaped the internal test seam" >&2
+    exit 1
+fi
+
+echo "Activity boundary verification passed."

@@ -1,6 +1,6 @@
 # Stornaut Epic 2–4 Deterministic Product Core Implementation Plan
 
-> **Status:** Approved — Tasks 9–18 complete; Task 19 next
+> **Status:** Approved — Tasks 9–19 complete; Task 20 next
 >
 > **Roadmap phase:** Phase B — Deterministic Product Core
 >
@@ -1101,7 +1101,7 @@ Suggested commit subject: `feat: complete deterministic storage catalog`
 - Produces typed activity evidence and a conservative classification reduction.
 - Local Knowledge accepts only explicit user-confirmed structured facts.
 
-- [ ] **Step 1: Write conservative fusion tests first**
+- [x] **Step 1: Write conservative fusion tests first**
 
 Cover:
 
@@ -1113,7 +1113,7 @@ Cover:
 - veto/active evidence overriding a reclaim recommendation;
 - time alone never producing `readyToReclaim`.
 
-- [ ] **Step 2: Implement bounded providers**
+- [x] **Step 2: Implement bounded providers**
 
 Providers have fixed inputs, timeouts and output limits. If `/usr/bin/git` is
 used, use fixed read-only arguments/environment and tests proving no arbitrary
@@ -1122,13 +1122,13 @@ native APIs where practical and degrade locally when unavailable.
 
 Do not introduce generic Adapter execution in this Task.
 
-- [ ] **Step 3: Implement the activity reducer**
+- [x] **Step 3: Implement the activity reducer**
 
 Retain original signals and reasons. Conflicts choose the more conservative
 disposition/risk outcome; a provider error affects only its dependent
 classification.
 
-- [ ] **Step 4: Implement structured Local Knowledge**
+- [x] **Step 4: Implement structured Local Knowledge**
 
 Support user-confirmed:
 
@@ -1142,10 +1142,47 @@ File identity, activity change, catalog version change or scope change can mark
 a finding stale. Do not support free-text Agent memory or a direct disposition
 override.
 
-- [ ] **Step 5: Verify and accept ADR 0010**
+- [x] **Step 5: Verify and accept ADR 0010**
 
 Run focused activity/local-knowledge tests, source/audit checks for arbitrary
 Shell and target writes, then `scripts/verify`.
+
+Execution evidence:
+
+- Tests were written first. The initial focused run failed only because the new
+  Activity and typed Local Knowledge APIs did not exist.
+- Git uses fixed `/usr/bin/git status` and `log` requests with isolated config,
+  no optional locks, 2-second timeout and bounded output. A real anonymous
+  repository retains the exact path/type/identity/content state after
+  collection.
+- App evidence uses `NSWorkspace`; related process evidence uses bounded
+  current-user `libproc`. Incomplete PID/name coverage remains Unknown and
+  cannot prove inactivity.
+- Conservative fusion retains raw observations/reasons; contradictions protect,
+  missing/error/same-key unavailable conflicts produce Unknown only when
+  required, and time never promotes Ready to Reclaim.
+- Activity protection preserves the original artifact category. Sensitive
+  `protected` category still requires Protected, while an active cache or
+  project artifact can now carry Protected disposition without category drift.
+- Local Knowledge has four closed user-confirmed payloads and no generic text or
+  disposition override. Scope, identity, stable activity fingerprint and
+  catalog version changes yield typed stale reasons.
+- v1 Local Knowledge migrates to v2 only after exact schema validation. Generic
+  legacy payloads remain isolated; damaged v1 input is rejected without
+  version mutation.
+- `scripts/verify-activity-boundaries` rejects Shell, `lsof`, `ps`, target-write
+  APIs, a public generic command seam and Git commands beyond `status`/`log`.
+- Code review fixed six P1 findings: incomplete process coverage, invalid-time
+  crash, pre-validation schema mutation, the activity-Protected category
+  contract, same-key unavailable conflicts and unstable activity fingerprints.
+  Post-fix review has no open P0–P2 finding.
+- Focused post-fix checks pass 26/26 and the complete Swift suite passes
+  241/241. No dependency, entitlement, TCC permission or background monitor was
+  added.
+- Final `scripts/verify` passes 241 SwiftPM tests, the activity boundary gate,
+  2/2 Xcode App contract tests, 2/2 XCUITest cases, four Light/Dark screenshots,
+  App signing/bundle, localization, deterministic compiler/catalog and docs
+  gates. ADR 0010 is Accepted.
 
 Suggested commit subject: `feat: protect active developer storage`
 

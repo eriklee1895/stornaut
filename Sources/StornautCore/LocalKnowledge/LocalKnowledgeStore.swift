@@ -14,36 +14,230 @@ public enum LocalKnowledgeKind: String, Codable, Sendable, CaseIterable {
     case recoveryMethod
 }
 
-public struct LocalKnowledgeFact: Codable, Sendable, Equatable {
-    public let id: LocalKnowledgeID
-    public let kind: LocalKnowledgeKind
+public enum LocalKnowledgeProvenance: String, Codable, Sendable {
+    case userConfirmed
+}
+
+public struct ProducerMappingKnowledge: Codable, Sendable, Equatable {
+    public let producer: DomainLabel
+
+    public init(producer: DomainLabel) throws {
+        guard !localKnowledgeLooksLikeDisposition(producer.rawValue) else {
+            throw DomainContractError.invalidToken
+        }
+        self.producer = producer
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        try self.init(
+            producer: container.decode(DomainLabel.self, forKey: .producer)
+        )
+    }
+}
+
+public enum PathPreferenceKnowledge:
+    String,
+    Codable,
+    Sendable,
+    CaseIterable
+{
+    case include
+    case exclude
+}
+
+public struct VerifiedRecoveryKnowledge: Codable, Sendable, Equatable {
+    public let methodKey: DomainToken
+    public let cost: RebuildCost
+
+    public init(methodKey: DomainToken, cost: RebuildCost) {
+        self.methodKey = methodKey
+        self.cost = cost
+    }
+}
+
+public enum LocalKnowledgePayload: Codable, Sendable, Equatable {
+    case producerMapping(ProducerMappingKnowledge)
+    case pathPreference(PathPreferenceKnowledge)
+    case keepDecision
+    case recoveryMethod(VerifiedRecoveryKnowledge)
+
+    public var kind: LocalKnowledgeKind {
+        switch self {
+        case .producerMapping:
+            .producerMapping
+        case .pathPreference:
+            .pathPreference
+        case .keepDecision:
+            .keepDecision
+        case .recoveryMethod:
+            .recoveryMethod
+        }
+    }
+}
+
+public struct LocalKnowledgeBinding: Codable, Sendable, Equatable {
     public let scope: PersistedPath
-    public let value: DomainLabel
-    public let provenance: DomainToken
-    public let updatedAt: Date
-    public let stale: Bool
+    public let fileIdentity: FileIdentity
+    public let activityFingerprint: DomainToken
+    public let catalogVersion: DomainToken
 
     public init(
-        id: LocalKnowledgeID,
-        kind: LocalKnowledgeKind,
         scope: PersistedPath,
-        value: DomainLabel,
-        provenance: DomainToken,
-        updatedAt: Date,
-        stale: Bool
-    ) throws {
-        self.id = id
-        self.kind = kind
+        fileIdentity: FileIdentity,
+        activityFingerprint: DomainToken,
+        catalogVersion: DomainToken
+    ) {
         self.scope = scope
-        self.value = value
+        self.fileIdentity = fileIdentity
+        self.activityFingerprint = activityFingerprint
+        self.catalogVersion = catalogVersion
+    }
+}
+
+public struct LocalKnowledgeContext: Sendable, Equatable {
+    public let scope: PersistedPath
+    public let fileIdentity: FileIdentity
+    public let activityFingerprint: DomainToken
+    public let catalogVersion: DomainToken
+
+    public init(
+        scope: PersistedPath,
+        fileIdentity: FileIdentity,
+        activityFingerprint: DomainToken,
+        catalogVersion: DomainToken
+    ) {
+        self.scope = scope
+        self.fileIdentity = fileIdentity
+        self.activityFingerprint = activityFingerprint
+        self.catalogVersion = catalogVersion
+    }
+}
+
+public enum LocalKnowledgeStaleReason:
+    String,
+    Codable,
+    Sendable,
+    CaseIterable,
+    Comparable
+{
+    case scopeChanged
+    case fileIdentityChanged
+    case activityChanged
+    case catalogVersionChanged
+
+    public static func < (lhs: Self, rhs: Self) -> Bool {
+        lhs.rawValue < rhs.rawValue
+    }
+}
+
+public struct LocalKnowledgeAssessment: Sendable, Equatable {
+    public let fact: LocalKnowledgeFact
+    public let staleReasons: [LocalKnowledgeStaleReason]
+
+    public init(
+        fact: LocalKnowledgeFact,
+        staleReasons: [LocalKnowledgeStaleReason]
+    ) {
+        self.fact = fact
+        self.staleReasons = staleReasons
+    }
+}
+
+public enum LocalKnowledgeApplicability {
+    public static func evaluate(
+        _ fact: LocalKnowledgeFact,
+        in context: LocalKnowledgeContext
+    ) -> LocalKnowledgeAssessment {
+        var reasons: [LocalKnowledgeStaleReason] = []
+        if fact.binding.scope != context.scope {
+            reasons.append(.scopeChanged)
+        }
+        if fact.binding.fileIdentity != context.fileIdentity {
+            reasons.append(.fileIdentityChanged)
+        }
+        if fact.binding.activityFingerprint != context.activityFingerprint {
+            reasons.append(.activityChanged)
+        }
+        if fact.binding.catalogVersion != context.catalogVersion {
+            reasons.append(.catalogVersionChanged)
+        }
+        return LocalKnowledgeAssessment(
+            fact: fact,
+            staleReasons: reasons
+        )
+    }
+}
+
+public struct LocalKnowledgeFact: Codable, Sendable, Equatable {
+    public let schemaVersion: DomainSchemaVersion
+    public let id: LocalKnowledgeID
+    public let payload: LocalKnowledgePayload
+    public let binding: LocalKnowledgeBinding
+    public let provenance: LocalKnowledgeProvenance
+    public let observedAt: Date
+    public let updatedAt: Date
+
+    public var kind: LocalKnowledgeKind {
+        payload.kind
+    }
+
+    public var scope: PersistedPath {
+        binding.scope
+    }
+
+    public init(
+        schemaVersion: DomainSchemaVersion = .v1,
+        id: LocalKnowledgeID,
+        payload: LocalKnowledgePayload,
+        binding: LocalKnowledgeBinding,
+        provenance: LocalKnowledgeProvenance,
+        observedAt: Date,
+        updatedAt: Date
+    ) throws {
+        guard isValidActivityDate(observedAt),
+              isValidActivityDate(updatedAt),
+              observedAt <= updatedAt
+        else {
+            throw DomainContractError.invalidMeasurement
+        }
+        self.schemaVersion = schemaVersion
+        self.id = id
+        self.payload = payload
+        self.binding = binding
         self.provenance = provenance
+        self.observedAt = observedAt
         self.updatedAt = updatedAt
-        self.stale = stale
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        try self.init(
+            schemaVersion: container.decode(
+                DomainSchemaVersion.self,
+                forKey: .schemaVersion
+            ),
+            id: container.decode(LocalKnowledgeID.self, forKey: .id),
+            payload: container.decode(
+                LocalKnowledgePayload.self,
+                forKey: .payload
+            ),
+            binding: container.decode(
+                LocalKnowledgeBinding.self,
+                forKey: .binding
+            ),
+            provenance: container.decode(
+                LocalKnowledgeProvenance.self,
+                forKey: .provenance
+            ),
+            observedAt: container.decode(Date.self, forKey: .observedAt),
+            updatedAt: container.decode(Date.self, forKey: .updatedAt)
+        )
     }
 }
 
 public actor LocalKnowledgeStore {
-    private static let schemaVersion = 1
+    private static let schemaVersion = 2
     private let connection: SQLiteConnection
 
     public init(configuration: LocalStoreConfiguration) throws {
@@ -125,6 +319,16 @@ public actor LocalKnowledgeStore {
             return nil
         }
         return fact
+    }
+
+    public func assessment(
+        id: LocalKnowledgeID,
+        context: LocalKnowledgeContext
+    ) throws -> LocalKnowledgeAssessment? {
+        guard let fact = try fact(id: id) else {
+            return nil
+        }
+        return LocalKnowledgeApplicability.evaluate(fact, in: context)
     }
 
     public func forget(id: LocalKnowledgeID) throws {
@@ -339,7 +543,7 @@ public actor LocalKnowledgeStore {
                 actual: actual
             )
         }
-        guard version == schemaVersion else {
+        guard version >= 1, version <= schemaVersion else {
             throw EvidenceStoreError.schemaMismatch
         }
     }
@@ -355,17 +559,31 @@ public actor LocalKnowledgeStore {
         guard version < schemaVersion else {
             return
         }
+        if version == 0 {
+            do {
+                try connection.transaction(operation: "knowledge.migration.v2") {
+                    try claimRole(connection)
+                    try createSchema(connection)
+                    try connection.execute(
+                        "PRAGMA user_version=2",
+                        operation: "knowledge.setVersion"
+                    )
+                }
+            } catch {
+                throw EvidenceStoreError.migrationFailed(version: 2)
+            }
+            return
+        }
+        try verifySchema(connection)
         do {
-            try connection.transaction(operation: "knowledge.migration.v1") {
-                try claimRole(connection)
-                try createSchema(connection)
+            try connection.transaction(operation: "knowledge.migration.v2") {
                 try connection.execute(
-                    "PRAGMA user_version=1",
+                    "PRAGMA user_version=2",
                     operation: "knowledge.setVersion"
                 )
             }
         } catch {
-            throw EvidenceStoreError.migrationFailed(version: 1)
+            throw EvidenceStoreError.migrationFailed(version: 2)
         }
     }
 
@@ -403,4 +621,16 @@ public actor LocalKnowledgeStore {
 private enum KnowledgeDecodedRow {
     case record(LocalKnowledgeFact)
     case corrupt(String)
+}
+
+private func localKnowledgeLooksLikeDisposition(_ value: String) -> Bool {
+    let normalized = value
+        .lowercased()
+        .filter(\.isLetter)
+    return [
+        "readytoreclaim",
+        "reviewrecommended",
+        "protected",
+        "unknown",
+    ].contains(normalized)
 }

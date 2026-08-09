@@ -46,12 +46,15 @@ func clearEvidenceAndManifestsAreSeparateAndNeverClearKnowledge() async throws {
     )
     let fact = try LocalKnowledgeFact(
         id: LocalKnowledgeID(validating: "knowledge-fixture"),
-        kind: .producerMapping,
-        scope: PersistedPath(validating: "fixture-root/projects"),
-        value: DomainLabel(validating: "Fixture producer"),
-        provenance: DomainToken(validating: "user.confirmed"),
-        updatedAt: Date(timeIntervalSince1970: 1),
-        stale: false
+        payload: .producerMapping(
+            ProducerMappingKnowledge(
+                producer: DomainLabel(validating: "Fixture producer")
+            )
+        ),
+        binding: localKnowledgeBinding(scope: "fixture-root/projects"),
+        provenance: .userConfirmed,
+        observedAt: Date(timeIntervalSince1970: 1),
+        updatedAt: Date(timeIntervalSince1970: 1)
     )
     try await evidence.saveScanSession(session)
     try await evidence.saveCleanupManifest(manifest)
@@ -73,12 +76,18 @@ func malformedLocalKnowledgeRecordDoesNotHideHealthyFacts() async throws {
     let knowledge = try LocalKnowledgeStore(configuration: .memory)
     let fact = try LocalKnowledgeFact(
         id: LocalKnowledgeID(validating: "knowledge-healthy"),
-        kind: .recoveryMethod,
-        scope: PersistedPath(validating: "fixture-root/recovery"),
-        value: DomainLabel(validating: "Rebuild safely"),
-        provenance: DomainToken(validating: "user.confirmed"),
-        updatedAt: Date(timeIntervalSince1970: 3),
-        stale: false
+        payload: .recoveryMethod(
+            VerifiedRecoveryKnowledge(
+                methodKey: DomainToken(
+                    validating: "recovery.fixture.rebuild"
+                ),
+                cost: .low
+            )
+        ),
+        binding: localKnowledgeBinding(scope: "fixture-root/recovery"),
+        provenance: .userConfirmed,
+        observedAt: Date(timeIntervalSince1970: 3),
+        updatedAt: Date(timeIntervalSince1970: 3)
     )
     try await knowledge.save(fact)
     try await knowledge._testInsertMalformedFact(
@@ -152,12 +161,11 @@ func databaseCorruptionIsIsolatedByStoreRole() async throws {
     let knowledge = try LocalKnowledgeStore(configuration: configuration)
     let fact = try LocalKnowledgeFact(
         id: LocalKnowledgeID(validating: "knowledge-role-isolation"),
-        kind: .keepDecision,
-        scope: PersistedPath(validating: "fixture-root/keep"),
-        value: DomainLabel(validating: "Keep"),
-        provenance: DomainToken(validating: "user.confirmed"),
-        updatedAt: Date(timeIntervalSince1970: 2),
-        stale: false
+        payload: .keepDecision,
+        binding: localKnowledgeBinding(scope: "fixture-root/keep"),
+        provenance: .userConfirmed,
+        observedAt: Date(timeIntervalSince1970: 2),
+        updatedAt: Date(timeIntervalSince1970: 2)
     )
     try await knowledge.save(fact)
     try Data("corrupt-evidence".utf8).write(
@@ -265,4 +273,27 @@ private func fileMode(_ url: URL) throws -> mode_t {
         throw CocoaError(.fileReadUnknown)
     }
     return information.st_mode & 0o777
+}
+
+private func localKnowledgeBinding(
+    scope: String
+) throws -> LocalKnowledgeBinding {
+    LocalKnowledgeBinding(
+        scope: try PersistedPath(validating: scope),
+        fileIdentity: try FileIdentity(
+            device: 1,
+            inode: 2,
+            mode: 0o040755,
+            ownerUserID: 501,
+            ownerGroupID: 20,
+            size: 128,
+            allocatedBytes: 512,
+            modificationSeconds: 1,
+            modificationNanoseconds: 0
+        ),
+        activityFingerprint: try DomainToken(
+            validating: "activity.retention-fixture"
+        ),
+        catalogVersion: try DomainToken(validating: "catalog-fixture-v1")
+    )
 }
