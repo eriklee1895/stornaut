@@ -70,6 +70,16 @@ public struct ActionExecutor: Sendable {
                 throw ActionExecutionError.timedOut
             } catch let RegisteredActionRunnerError.launchFailed(reason) {
                 throw ActionExecutionError.launchFailed(reason)
+            } catch let RegisteredActionRunnerError.outputReadFailed(
+                stream,
+                reason
+            ) {
+                throw ActionExecutionError.outputReadFailed(
+                    stream: stream,
+                    reason: reason
+                )
+            } catch let RegisteredActionRunnerError.terminationFailed(error) {
+                throw ActionExecutionError.terminationFailed(error)
             }
         }
     }

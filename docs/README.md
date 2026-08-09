@@ -11,6 +11,7 @@
 | UI 测试、截图契约与排障 | [UI Testing Guide](agent/ui-testing-guide.md) |
 | 当前开发自动化验证证据 | [Development Automation Validation](reports/development-automation-2026-08-09.md) |
 | Epic 0–1 evidence gate | [Epic 0–1 Validation Report](reports/epic-0-1-validation-report.md) |
+| Epic 1 最终代码审查 | [Epic 1 Final Code Review](reports/epic-1-code-review-2026-08-09.md) |
 | 产品范围、术语、验收 | [PRD](product/PRD.md) |
 | 进程边界、模块与安全架构 | [System Architecture](architecture/system-architecture.md) |
 | Agent、双模式与治理设计 | [Agent Disk Governance](design/agent-disk-governance.md) |

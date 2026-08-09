@@ -200,3 +200,15 @@ After this report passed:
 - the active-plan index was intentionally left empty;
 - `AGENTS.md`, the handoff, roadmap and document map now require a newly
   approved Epic 2–4 deterministic plan before further product implementation.
+
+## 10. Post-Gate Code Review Correction
+
+The final Epic 1 cross-module review found and fixed five concrete issues:
+denylist coverage, structured-secret/private-key redaction, signed device
+identity conversion, bounded directory probes and normal-exit Registered
+Action descendant cleanup. Surveyor directory replacement now remains a
+partial failure. See
+[Epic 1 Final Code Review](epic-1-code-review-2026-08-09.md).
+
+These corrections strengthen existing boundaries. They do not change the
+conditional-go/no-go decision in this report.

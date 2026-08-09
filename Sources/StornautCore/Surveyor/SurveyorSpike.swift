@@ -222,7 +222,16 @@ private func processDirectory(
           UInt64(directoryMetadata.st_ino) == job.expectedInode
     else {
         close(descriptor)
-        throw SurveyorError.internalInvariant
+        if job.relativePath == "." {
+            throw SurveyorError.invalidRoot
+        }
+        try emitInaccessibleDirectory(
+            job,
+            issue: .metadataUnavailable,
+            state: state,
+            continuation: continuation
+        )
+        return
     }
 
     if job.relativePath != "." {
@@ -331,6 +340,33 @@ private func processDirectory(
             )
         }
     }
+}
+
+private func emitInaccessibleDirectory(
+    _ job: DirectoryJob,
+    issue: ScanIssue,
+    state: SurveyState,
+    continuation: AsyncThrowingStream<PathSnapshot, Error>.Continuation
+) throws {
+    try emit(
+        PathSnapshot(
+            relativePath: job.relativePath,
+            kind: .inaccessible,
+            logicalBytes: nil,
+            allocatedBytes: nil,
+            device: nil,
+            inode: nil,
+            observedAt: Date(),
+            issue: issue,
+            progress: state.record(
+                .inaccessible,
+                metadata: nil,
+                issue: issue
+            )
+        ),
+        state: state,
+        continuation: continuation
+    )
 }
 
 private struct DirectoryJob: Sendable {

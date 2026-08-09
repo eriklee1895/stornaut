@@ -295,6 +295,97 @@ func safeTextSnippetRejectsUnapprovedNamesBinaryDataAndOversizedRequests() async
     ) == .failure(.invalidRequest))
 }
 
+@Test
+func probeBrokerRedactsStructuredSecretsAndPrivateKeys() async throws {
+    let fixture = try ProbeBrokerFixture()
+    defer { fixture.remove() }
+    let manifestURL = fixture.rootURL.appending(path: "pyproject.toml")
+    try Data(
+        """
+        "token": "json-secret-value",
+        password = "toml-secret-value"
+        aws_secret_access_key = "aws-secret-value"
+        Authorization: Bearer bearer-secret-value
+        github_pat_1234567890abcdef
+        AKIAIOSFODNN7EXAMPLE
+        -----BEGIN PRIVATE KEY-----
+        private-key-material
+        """.utf8
+    ).write(to: manifestURL)
+
+    let result = await ProbeBroker().execute(
+        ProbeRequest(
+            capability: .safeTextSnippet,
+            targetURL: manifestURL,
+            byteLimit: 4_096
+        ),
+        in: fixture.makeContext()
+    )
+    guard case let .success(response) = result,
+          case let .safeTextSnippet(snippet) = response.payload
+    else {
+        Issue.record("Expected a redacted structured snippet")
+        return
+    }
+    #expect(!snippet.text.contains("json-secret-value"))
+    #expect(!snippet.text.contains("toml-secret-value"))
+    #expect(!snippet.text.contains("aws-secret-value"))
+    #expect(!snippet.text.contains("bearer-secret-value"))
+    #expect(!snippet.text.contains("private-key-material"))
+    #expect(!snippet.text.contains("github_pat_1234567890abcdef"))
+    #expect(!snippet.text.contains("AKIAIOSFODNN7EXAMPLE"))
+    #expect(snippet.text.contains("[REDACTED]"))
+}
+
+@Test
+func directoryProbesHideSensitiveChildrenAndStopAtBounds() async throws {
+    let fixture = try ProbeBrokerFixture()
+    defer { fixture.remove() }
+    try FileManager.default.createDirectory(
+        at: fixture.rootURL.appending(path: ".aws"),
+        withIntermediateDirectories: true
+    )
+    try Data("secret".utf8).write(
+        to: fixture.rootURL.appending(path: "private.pem")
+    )
+    for index in 0..<8 {
+        try Data([UInt8(index % 255)]).write(
+            to: fixture.rootURL.appending(path: "entry-\(index)")
+        )
+    }
+    let broker = ProbeBroker()
+    let context = fixture.makeContext()
+
+    let largest = await broker.execute(
+        ProbeRequest(
+            capability: .largestChildren,
+            targetURL: fixture.rootURL,
+            limit: 4
+        ),
+        in: context
+    )
+    guard case let .success(response) = largest,
+          case let .largestChildren(value) = response.payload
+    else {
+        Issue.record("Expected bounded largest children")
+        return
+    }
+    #expect(value.children.count == 4)
+    #expect(!value.children.contains { $0.name == ".aws" })
+    #expect(!value.children.contains { $0.name == "private.pem" })
+
+    #expect(
+        await broker.execute(
+            ProbeRequest(
+                capability: .directorySummary,
+                targetURL: fixture.rootURL,
+                limit: 4
+            ),
+            in: context
+        ) == .failure(.outputByteLimitExceeded)
+    )
+}
+
 private struct ProbeBrokerFixture {
     let parentURL: URL
     let rootURL: URL

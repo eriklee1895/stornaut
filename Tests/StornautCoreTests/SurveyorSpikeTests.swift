@@ -123,6 +123,43 @@ func surveyorEmitsPartialErrorsWithoutErasingValidResults() async throws {
 }
 
 @Test
+func surveyorTreatsDirectoryReplacementAsAPartialError() async throws {
+    let fixture = try SurveyorFixture()
+    defer { fixture.remove() }
+    let replacedURL = fixture.rootURL.appending(path: "replaced")
+    try fixture.write(
+        Data("nested".utf8),
+        to: replacedURL.appending(path: "nested.txt")
+    )
+    try fixture.write(
+        Data("visible".utf8),
+        to: fixture.rootURL.appending(path: "visible.txt")
+    )
+    let replacement = DirectoryReplacementHook(targetURL: replacedURL)
+    let request = ScanRequest(
+        rootURL: fixture.rootURL,
+        maximumWorkers: 1,
+        testHooks: SurveyorTestHooks(
+            beforeDirectoryRead: { url in
+                if url.standardizedFileURL == replacedURL.standardizedFileURL {
+                    replacement.replaceOnce()
+                }
+            }
+        )
+    )
+
+    let snapshots = try await collectSnapshots(SurveyorSpike().scan(request))
+    let byPath = Dictionary(
+        uniqueKeysWithValues: snapshots.map { ($0.relativePath, $0) }
+    )
+
+    #expect(byPath["replaced"]?.kind == .inaccessible)
+    #expect(byPath["replaced"]?.issue == .metadataUnavailable)
+    #expect(byPath["visible.txt"]?.kind == .regularFile)
+    #expect(!byPath.keys.contains("replaced/nested.txt"))
+}
+
+@Test
 func surveyorNeverExceedsTheConfiguredWorkerCount() async throws {
     let fixture = try SurveyorFixture()
     defer { fixture.remove() }
@@ -509,6 +546,30 @@ private final class QueueTracker: @unchecked Sendable {
     func record(_ depth: Int) {
         lock.withLock {
             storedMaximumDepth = max(storedMaximumDepth, depth)
+        }
+    }
+}
+
+private final class DirectoryReplacementHook: @unchecked Sendable {
+    private let lock = NSLock()
+    private let targetURL: URL
+    private var didReplace = false
+
+    init(targetURL: URL) {
+        self.targetURL = targetURL
+    }
+
+    func replaceOnce() {
+        lock.withLock {
+            guard !didReplace else {
+                return
+            }
+            didReplace = true
+            try? FileManager.default.removeItem(at: targetURL)
+            try? FileManager.default.createDirectory(
+                at: targetURL,
+                withIntermediateDirectories: true
+            )
         }
     }
 }

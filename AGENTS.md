@@ -64,7 +64,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 
 ## Current milestone
 
-Epic 0–1 evidence gate 已完成：deterministic path conditional go，Deep Dive 因 Broker-only 未被技术性证明而 no-go/paused。下一里程碑是为 Epic 2–4 deterministic subset 对齐并批准新的 active plan；release signing/notarization 仍未评估。
+Epic 0–1 evidence gate 与最终跨模块 code review 已完成；5 个确认缺陷已修复并通过统一验证。deterministic path conditional go，Deep Dive 因 Broker-only 未被技术性证明而 no-go/paused。下一里程碑是为 Epic 2–4 deterministic subset 对齐并批准新的 active plan；release signing/notarization 仍未评估。
 
 当前已验证的包布局：
 

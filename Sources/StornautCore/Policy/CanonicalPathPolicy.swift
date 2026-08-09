@@ -152,13 +152,17 @@ func fileIdentity(at url: URL) -> FileIdentity? {
         return nil
     }
     return FileIdentity(
-        device: UInt64(info.st_dev),
+        device: unsignedDeviceIdentity(info.st_dev),
         inode: UInt64(info.st_ino),
         mode: UInt16(info.st_mode),
         size: Int64(info.st_size),
         modificationSeconds: Int64(info.st_mtimespec.tv_sec),
         modificationNanoseconds: Int64(info.st_mtimespec.tv_nsec)
     )
+}
+
+func unsignedDeviceIdentity(_ device: dev_t) -> UInt64 {
+    UInt64(bitPattern: Int64(device))
 }
 
 private func contains(_ root: URL, _ candidate: URL) -> Bool {

@@ -104,6 +104,8 @@ preflight → revalidate with current context → dry-run or execute → postfli
 The default runner uses direct `posix_spawn`, never `sh -c`, and launches an
 isolated process group with `POSIX_SPAWN_CLOEXEC_DEFAULT` and bounded
 stdout/stderr. Timeout terminates the entire group and reaps the leader.
+Normal leader exit also checks for, terminates and verifies any surviving
+same-group descendants before reaping the leader.
 Postflight accepts only bounded fixture JSON whose status, exit code and
 counts agree:
 
@@ -209,6 +211,15 @@ restore while the destination still exists. It is not an undo guarantee:
 Task 7 therefore records a receipt but does not implement persistent Undo or
 claim guaranteed reversibility.
 
+### Post-gate code review
+
+The final Epic 1 review found that the first registered runner reaped a
+normally exiting leader before checking its process group. A child retaining
+stdout/stderr could therefore hang result collection. The shared
+`ProcessTreeTerminator` now lives in `StornautCore`; both Codex and Registered
+Actions observe leader exit with `WNOWAIT`, terminate remaining group members,
+and reap last. A normal-exit child regression proves the corrected lifecycle.
+
 ## Consequences
 
 Positive:
@@ -219,6 +230,7 @@ Positive:
 - dry-run cannot accidentally launch the fixture;
 - registered output and partial failure remain typed and bounded;
 - timeout does not leave the tested process tree alive;
+- a normally exiting registered leader cannot leave a pipe-holding child;
 - accounting distinguishes moved bytes from free-space delta;
 - no third-party package or shipped destructive action is added.
 

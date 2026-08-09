@@ -98,6 +98,55 @@ func registeredActionSuccessRunsFixtureAndReportsMeasuredEffects() async throws 
 }
 
 @Test
+func registeredActionNormalExitTerminatesSurvivingChild() async throws {
+    let fixtureURL = try fakeCleanerFixtureURL()
+    let pidFileURL = FileManager.default.temporaryDirectory.appending(
+        path: "stornaut-fake-cleaner-normal-exit-\(UUID().uuidString).pid"
+    )
+    defer { try? FileManager.default.removeItem(at: pidFileURL) }
+    let definition = RegisteredActionDefinition(
+        id: "fixture.fake-cleaner-normal-exit",
+        executableURL: fixtureURL,
+        environment: [
+            "LANG": "C",
+            "LC_ALL": "C",
+            "PATH": "/usr/bin:/bin",
+            "STORNAUT_FAKE_CLEANER_PID_FILE": pidFileURL.path,
+        ],
+        timeout: .seconds(2),
+        standardOutputLimit: 16_384,
+        standardErrorLimit: 4_096
+    ) { mode in
+        mode == .success ? ["success-with-child"] : nil
+    }
+    let gate = ActionPolicyGate(
+        registry: ActionRegistry(definitions: [definition])
+    )
+    let executor = ActionExecutor(policyGate: gate)
+    let token = try executor.preflight(
+        .runRegisteredAction(
+            RegisteredActionRequest(id: definition.id, mode: .success)
+        ),
+        context: .init(allowedRoots: [], activeURLs: [])
+    )
+
+    let execution = try await executor.execute(
+        token,
+        context: .init(allowedRoots: [], activeURLs: [])
+    )
+    let result = try executor.postflight(execution)
+
+    #expect(result.status == .succeeded)
+    let childPID = try #require(
+        pid_t(
+            String(contentsOf: pidFileURL, encoding: .utf8)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        )
+    )
+    try await waitUntilProcessExits(childPID)
+}
+
+@Test
 func registeredActionTimeoutTerminatesTheFixture() async throws {
     let harness = try RegisteredActionHarness(timeout: .milliseconds(100))
     let executor = ActionExecutor(policyGate: harness.gate)

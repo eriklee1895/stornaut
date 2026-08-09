@@ -41,15 +41,19 @@ All requests are bounded and Codable. `CanonicalPathPolicy`:
 - requires a target and its allowed root to remain on the same device;
 - applies the immutable sensitive-path denylist.
 
-`.ssh`, `.gnupg` and `.env`-style secret files are denied at every root. Mail,
-Messages, Photos libraries, Safari and common browser profiles are denied
+`.ssh`, `.gnupg`, cloud/CLI credential directories, Keychains/password-manager
+data, `.env`, private-key and common credential files are denied at every root.
+Mail, Messages, Photos libraries, Safari and common browser profiles are denied
 under the user's home. There is no settings override.
 
 Directory probes open an identity-checked directory descriptor and enumerate
 with `fdopendir`/`fstatat(AT_SYMLINK_NOFOLLOW)`. The text probe uses
 `open(O_NOFOLLOW)`, verifies the descriptor identity with `fstat`, reads at
 most `byteLimit + 1` bytes, restricts filenames, rejects binary/invalid UTF-8
-content and redacts secret patterns. Every probe revalidates the path identity
+content and redacts quoted JSON/TOML/YAML values, common token prefixes,
+Authorization values and complete/incomplete private-key blocks. Directory
+metadata probes filter denied children, stop summaries after `limit + 1`, and
+retain only a bounded top-N set. Every probe revalidates the path identity
 after access. Symlink replacement between authorization and open fails closed.
 
 Session call/read/output budgets are actor-isolated. Content-read budget is
@@ -208,7 +212,7 @@ Costs:
 - the current Bridge is an in-process protocol spike, not a production MCP/XPC
   deployment;
 - content-read reservations are conservative and are not refunded on failure;
-- directory probes report immediate-child metadata only;
+- directory probes report bounded immediate-child metadata only;
 - the sensitive-path catalog must be reviewed as macOS/browser layouts evolve.
 
 ## Residual Risks and Next Gate

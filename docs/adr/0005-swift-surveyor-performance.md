@@ -52,6 +52,10 @@ observed with `.mountBoundary` and pruned. Per-path permission/metadata/read
 failures emit `.inaccessible` snapshots; only invalid root/topology and internal
 invariants fail the whole stream.
 
+A directory replaced after scheduling but before descriptor verification is a
+per-path `.metadataUnavailable` result. It does not erase valid siblings or
+abort the whole scan.
+
 Logical bytes use `st_size`; allocated bytes use `st_blocks * 512`. Files with
 multiple hard links are counted once in progress byte totals using
 `(device,inode)` identity, while both directory entries remain observable.

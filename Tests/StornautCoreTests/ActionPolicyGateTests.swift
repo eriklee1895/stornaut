@@ -145,6 +145,39 @@ func actionPolicyGateRejectsRootHomeMountSymlinkDenylistAndActivePaths() throws 
     }
 }
 
+@Test(arguments: [
+    ".aws",
+    ".kube",
+    "Library/Keychains",
+    "private.pem",
+])
+func actionPolicyGateRejectsPermanentSensitivePaths(
+    _ relativePath: String
+) throws {
+    let fixture = try ActionPolicyFixture()
+    defer { fixture.remove() }
+    let targetURL = fixture.fakeHomeURL.appending(path: relativePath)
+    try fixture.write(Data("sensitive".utf8), to: targetURL)
+    let gate = fixture.makeGate()
+
+    #expect(throws: ActionPolicyError.sensitivePath) {
+        _ = try gate.preflight(
+            .moveToTrash(
+                PathAction(
+                    targetURL: targetURL,
+                    expectedIdentity: try #require(
+                        ActionFileIdentity.read(at: targetURL)
+                    )
+                )
+            ),
+            context: ActionPolicyContext(
+                allowedRoots: [fixture.fakeHomeURL],
+                activeURLs: []
+            )
+        )
+    }
+}
+
 @Test
 func actionPolicyGateRejectsMissingAndChangedIdentityFields() throws {
     let fixture = try ActionPolicyFixture()

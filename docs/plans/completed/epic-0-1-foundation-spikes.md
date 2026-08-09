@@ -342,7 +342,7 @@ completed build, signing, bundle, localization, documentation and diff checks.
 
 **Files:**
 - Create: `Sources/StornautCodex/Runtime/CodexProcess.swift`
-- Create: `Sources/StornautCodex/Runtime/ProcessTreeTerminator.swift`
+- Create: `Sources/StornautCore/Actions/ProcessTreeTerminator.swift`
 - Create: `Sources/StornautCodex/Protocol/CodexEvent.swift`
 - Create: `Sources/StornautCodex/Protocol/JSONLDecoder.swift`
 - Create: `Sources/StornautCodex/Protocol/InvestigationEnvelope.swift`
@@ -625,7 +625,7 @@ Task 7 evidence on 2026-08-09:
 - Full parallel verification exposed and fixed cross-runtime pipe inheritance
   and cooperative-executor starvation. Codex and Registered Action spawn now
   use `POSIX_SPAWN_CLOEXEC_DEFAULT`; a mixed concurrent-spawn regression passes
-  and repeated 113-test SwiftPM runs complete without residue.
+  and repeated SwiftPM runs complete without residue.
 - The real opt-in Foundation probe ran as the SwiftPM test CLI with uniquely
   named disposable fixtures. Same-volume Trash returned a destination, renamed
   collisions, preserved identity and completed a 2,000-file synchronous move;

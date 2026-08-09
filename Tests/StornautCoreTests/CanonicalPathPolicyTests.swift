@@ -170,6 +170,11 @@ func canonicalPathPolicyDoesNotTreatFilesystemOrHomeAsBroadAllowedRoots() throws
     ) == .denied(.protectedAllowedRoot))
 }
 
+@Test
+func canonicalPathPolicyPreservesSignedDeviceBitPatterns() {
+    #expect(unsignedDeviceIdentity(dev_t(-1)) == UInt64.max)
+}
+
 private struct PathPolicyFixture {
     let rootURL: URL
     let fakeHomeURL: URL

@@ -58,6 +58,8 @@ public enum ActionExecutionError: Error, Sendable, Equatable {
     case invalidPreflightToken
     case timedOut
     case launchFailed(String)
+    case outputReadFailed(stream: String, reason: String)
+    case terminationFailed(ProcessTreeTerminationError)
     case malformedOutput
     case unexpectedResult
     case outputTruncated

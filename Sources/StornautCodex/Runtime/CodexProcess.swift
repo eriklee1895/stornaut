@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import StornautCore
 
 public struct CodexRunRequest: Sendable, Equatable {
     public let executableURL: URL

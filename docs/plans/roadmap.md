@@ -201,4 +201,5 @@ Epic 0–1
 - Epic 1 Task 6：bounded Swift/POSIX Surveyor、no-follow/same-device、logical/allocated bytes、partial errors、synthetic/real benchmark 已完成；460GiB-class root 中位约 96.2s、peak RSS <28MB、producer cancellation <1ms，继续 Swift、不评估 Rust，见 [ADR 0005](../adr/0005-swift-surveyor-performance.md)。
 - Epic 1 Task 7：identity/activity revalidation、Foundation Trash、无 permanent-delete fallback、fixed fake Registered Action、process-group timeout 与真实 CLI/APFS Trash probes 已完成；App-context FDA/TCC 仍为 residual risk，见 [ADR 0006](../adr/0006-trash-and-registered-actions.md)。
 - Epic 1 Task 8：六项 spike evidence gate 与约束审计已完成；Epic 2–3 deterministic development conditional go，Deep Dive 继续 no-go/paused，见 [Epic 0–1 Validation Report](../reports/epic-0-1-validation-report.md)。
+- Epic 1 最终 code review：denylist、secret redaction、signed device identity、bounded directory probes、Registered Action descendant cleanup 等 5 个确认缺陷已修复，统一验证通过，见 [review report](../reports/epic-1-code-review-2026-08-09.md)。
 - 下一项执行：为 Epic 2–4 deterministic subset 创建新的 active plan；不得把 Deep Dive 或真实 destructive Registered Action 混入该计划。

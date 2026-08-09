@@ -26,9 +26,7 @@ public struct SensitivePathDenylist: Sendable {
         let globalComponents = canonicalURL.pathComponents.map(
             denylistComponent
         )
-        if globalComponents.contains(".ssh")
-            || globalComponents.contains(".gnupg")
-        {
+        if containsSensitiveGlobalDirectory(globalComponents) {
             return .denied(.sensitiveDirectory)
         }
         if let filename = globalComponents.last,
@@ -90,10 +88,14 @@ private func isSensitiveDirectory(_ components: [String]) -> Bool {
     }
 
     let sensitivePrefixes: [[String]] = [
+        ["library", "keychains"],
         ["library", "mail"],
         ["library", "messages"],
         ["library", "photos"],
         ["library", "safari"],
+        ["library", "application support", "1password"],
+        ["library", "application support", "bitwarden"],
+        ["library", "application support", "lastpass"],
         ["library", "application support", "google", "chrome"],
         ["library", "application support", "microsoft edge"],
         ["library", "application support", "bravesoftware", "brave-browser"],
@@ -107,10 +109,60 @@ private func isSensitiveDirectory(_ components: [String]) -> Bool {
     }
 }
 
+private func containsSensitiveGlobalDirectory(
+    _ components: [String]
+) -> Bool {
+    if components.contains(".ssh")
+        || components.contains(".gnupg")
+        || components.contains(".aws")
+        || components.contains(".kube")
+        || components.contains(".azure")
+    {
+        return true
+    }
+    let sensitiveSequences: [[String]] = [
+        ["library", "keychains"],
+        [".config", "gcloud"],
+        [".config", "gh"],
+        [".config", "op"],
+        [".config", "1password"],
+        [".config", "bitwarden"],
+        [".docker"],
+    ]
+    return sensitiveSequences.contains { sequence in
+        components.windows(ofCount: sequence.count).contains(sequence)
+    }
+}
+
 private func isSecretFilename(_ filename: String) -> Bool {
-    filename == ".env"
+    let exactNames: Set<String> = [
+        ".netrc",
+        ".npmrc",
+        ".pypirc",
+        ".vault-token",
+        "application_default_credentials.json",
+        "auth.json",
+        "credentials",
+        "credentials.json",
+        ".git-credentials",
+        "id_dsa",
+        "id_ecdsa",
+        "id_ed25519",
+        "id_rsa",
+        "kubeconfig",
+        "secret.json",
+        "secrets.json",
+        "service-account.json",
+        "credentials.tfrc.json",
+    ]
+    return exactNames.contains(filename)
+        || filename == ".env"
         || filename.hasPrefix(".env.")
         || filename.hasSuffix(".env")
+        || filename.hasSuffix(".key")
+        || filename.hasSuffix(".pem")
+        || filename.hasSuffix(".p12")
+        || filename.hasSuffix(".pfx")
 }
 
 private func containmentComponents(
@@ -135,4 +187,15 @@ private func denylistComponent(_ component: String) -> String {
     return String(String.UnicodeScalarView(scalars)).lowercased(
         with: Locale(identifier: "en_US_POSIX")
     )
+}
+
+private extension Array where Element: Equatable {
+    func windows(ofCount count: Int) -> [[Element]] {
+        guard count > 0, self.count >= count else {
+            return []
+        }
+        return (0...(self.count - count)).map {
+            Array(self[$0..<($0 + count)])
+        }
+    }
 }

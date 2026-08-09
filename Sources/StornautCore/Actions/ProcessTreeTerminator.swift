@@ -24,7 +24,7 @@ public enum ProcessTreeTerminationError: Error, Sendable, Equatable {
 public struct ProcessTreeTerminator: Sendable {
     public init() {}
 
-    static func processGroupHasMembers(
+    public static func processGroupHasMembers(
         _ processGroup: ProcessGroupID,
         excluding excludedPID: pid_t
     ) -> Bool {
@@ -62,7 +62,7 @@ public struct ProcessTreeTerminator: Sendable {
         return nil
     }
 
-    static func leaderHasWaitableExit(
+    public static func leaderHasWaitableExit(
         _ processGroup: ProcessGroupID
     ) -> Bool {
         var information = siginfo_t()
@@ -89,14 +89,28 @@ public struct ProcessTreeTerminator: Sendable {
         _ processGroup: ProcessGroupID,
         gracePeriod: Duration
     ) async throws -> [ProcessTreeTerminationTransition] {
-        try await Task.detached(priority: .utility) {
-            try terminateSynchronously(
-                processGroup,
-                gracePeriod: gracePeriod
-            )
-        }.value
+        try await withCheckedThrowingContinuation { continuation in
+            processTreeTerminationQueue.async {
+                do {
+                    continuation.resume(
+                        returning: try terminateSynchronously(
+                            processGroup,
+                            gracePeriod: gracePeriod
+                        )
+                    )
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
     }
 }
+
+private let processTreeTerminationQueue = DispatchQueue(
+    label: "com.eriklee.stornaut.process-tree-termination",
+    qos: .userInitiated,
+    attributes: .concurrent
+)
 
 private func terminateSynchronously(
     _ processGroup: ProcessGroupID,

@@ -142,7 +142,9 @@ public struct ProbeBroker: Sendable {
                     try Task.checkCancellation()
                     try await beforeAccess()
                     try Task.checkCancellation()
-                    return .operation(perform(request, at: path))
+                    return .operation(
+                        await runProbeOperation(request, at: path)
+                    )
                 } catch is CancellationError {
                     return .operation(.failure(.cancelled))
                 } catch {
@@ -173,9 +175,10 @@ public struct ProbeBroker: Sendable {
 
     private func perform(
         _ request: ProbeRequest,
-        at path: CanonicalPath
+        at path: CanonicalPath,
+        control: ProbeOperationControl
     ) -> ProbeResult {
-        guard !Task.isCancelled else {
+        guard !control.isCancelled else {
             return .failure(.cancelled)
         }
         guard fileIdentity(at: path.url) == path.identity else {
@@ -189,12 +192,14 @@ public struct ProbeBroker: Sendable {
         case .directorySummary:
             result = directorySummary(
                 at: path,
-                limit: request.limit ?? ProbeRequest.maximumChildLimit
+                limit: request.limit ?? ProbeRequest.maximumChildLimit,
+                control: control
             )
         case .largestChildren:
             result = largestChildren(
                 at: path,
-                limit: request.limit ?? 20
+                limit: request.limit ?? 20,
+                control: control
             )
         case .safeTextSnippet:
             result = safeTextSnippet(
@@ -203,10 +208,35 @@ public struct ProbeBroker: Sendable {
             )
         }
 
+        guard !control.isCancelled else {
+            return .failure(.cancelled)
+        }
         guard fileIdentity(at: path.url) == path.identity else {
             return .failure(.fileIdentityChanged)
         }
         return result
+    }
+
+    private func runProbeOperation(
+        _ request: ProbeRequest,
+        at path: CanonicalPath
+    ) async -> ProbeResult {
+        let control = ProbeOperationControl()
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                probeOperationQueue.async {
+                    continuation.resume(
+                        returning: perform(
+                            request,
+                            at: path,
+                            control: control
+                        )
+                    )
+                }
+            }
+        } onCancel: {
+            control.cancel()
+        }
     }
 
     private func finish(
@@ -242,6 +272,27 @@ public struct ProbeBroker: Sendable {
             )
         )
         return result
+    }
+}
+
+private let probeOperationQueue = DispatchQueue(
+    label: "com.eriklee.stornaut.probe-operation",
+    qos: .userInitiated,
+    attributes: .concurrent
+)
+
+private final class ProbeOperationControl: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancelled = false
+
+    var isCancelled: Bool {
+        lock.withLock { cancelled }
+    }
+
+    func cancel() {
+        lock.withLock {
+            cancelled = true
+        }
     }
 }
 
@@ -310,24 +361,34 @@ private func diskSnapshot(at path: CanonicalPath) -> ProbeResult {
 
 private func directorySummary(
     at path: CanonicalPath,
-    limit: Int
+    limit: Int,
+    control: ProbeOperationControl
 ) -> ProbeResult {
     guard path.identity.isDirectory else {
         return .failure(.invalidRequest)
     }
-    guard let entries = directoryEntries(at: path) else {
+    let summary: DirectorySummaryAccumulator
+    do {
+        summary = try summarizeDirectory(
+            at: path,
+            limit: limit,
+            control: control
+        )
+    } catch is CancellationError {
+        return .failure(.cancelled)
+    } catch {
         return .failure(.accessFailed)
     }
-    guard entries.count <= limit else {
+    guard !summary.exceededLimit else {
         return .failure(.outputByteLimitExceeded)
     }
     return .success(
         ProbeResponse(
             payload: .directorySummary(
                 DirectorySummary(
-                    entryCount: entries.count,
-                    logicalBytes: entries.reduce(0) { $0 + $1.logicalBytes },
-                    allocatedBytes: entries.reduce(0) { $0 + $1.allocatedBytes }
+                    entryCount: summary.entryCount,
+                    logicalBytes: summary.logicalBytes,
+                    allocatedBytes: summary.allocatedBytes
                 )
             ),
             readBytes: 0
@@ -337,12 +398,22 @@ private func directorySummary(
 
 private func largestChildren(
     at path: CanonicalPath,
-    limit: Int
+    limit: Int,
+    control: ProbeOperationControl
 ) -> ProbeResult {
     guard path.identity.isDirectory else {
         return .failure(.invalidRequest)
     }
-    guard let entries = directoryEntries(at: path) else {
+    let entries: [DirectoryEntryMetadata]
+    do {
+        entries = try largestDirectoryEntries(
+            at: path,
+            limit: limit,
+            control: control
+        )
+    } catch is CancellationError {
+        return .failure(.cancelled)
+    } catch {
         return .failure(.accessFailed)
     }
     let values = entries.map {
@@ -423,24 +494,90 @@ private struct DirectoryEntryMetadata {
     let isDirectory: Bool
 }
 
-private func directoryEntries(
-    at path: CanonicalPath
-) -> [DirectoryEntryMetadata]? {
+private struct DirectorySummaryAccumulator {
+    var entryCount = 0
+    var logicalBytes: Int64 = 0
+    var allocatedBytes: Int64 = 0
+    var exceededLimit = false
+}
+
+private func summarizeDirectory(
+    at path: CanonicalPath,
+    limit: Int,
+    control: ProbeOperationControl
+) throws -> DirectorySummaryAccumulator {
+    var summary = DirectorySummaryAccumulator()
+    try enumerateDirectory(at: path, control: control) { entry in
+        summary.entryCount += 1
+        if summary.entryCount > limit {
+            summary.exceededLimit = true
+            return false
+        }
+        guard
+            let logicalBytes = addingWithoutOverflow(
+                summary.logicalBytes,
+                entry.logicalBytes
+            ),
+            let allocatedBytes = addingWithoutOverflow(
+                summary.allocatedBytes,
+                entry.allocatedBytes
+            )
+        else {
+            throw DirectoryEnumerationError.accessFailed
+        }
+        summary.logicalBytes = logicalBytes
+        summary.allocatedBytes = allocatedBytes
+        return true
+    }
+    return summary
+}
+
+private func largestDirectoryEntries(
+    at path: CanonicalPath,
+    limit: Int,
+    control: ProbeOperationControl
+) throws -> [DirectoryEntryMetadata] {
+    var largest: [DirectoryEntryMetadata] = []
+    try enumerateDirectory(at: path, control: control) { entry in
+        largest.append(entry)
+        largest.sort(by: directoryEntryPrecedes)
+        if largest.count > limit {
+            largest.removeLast()
+        }
+        return true
+    }
+    return largest
+}
+
+private func enumerateDirectory(
+    at path: CanonicalPath,
+    control: ProbeOperationControl,
+    visit: (DirectoryEntryMetadata) throws -> Bool
+) throws {
     guard let descriptor = openVerifiedDescriptor(
         at: path,
         flags: O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC
     ) else {
-        return nil
+        throw DirectoryEnumerationError.accessFailed
     }
     guard let directory = fdopendir(descriptor) else {
         close(descriptor)
-        return nil
+        throw DirectoryEnumerationError.accessFailed
     }
     defer { closedir(directory) }
 
     let directoryDescriptor = dirfd(directory)
-    var entries: [DirectoryEntryMetadata] = []
-    while let entry = readdir(directory) {
+    while true {
+        guard !control.isCancelled else {
+            throw CancellationError()
+        }
+        errno = 0
+        guard let entry = readdir(directory) else {
+            guard errno == 0 else {
+                throw DirectoryEnumerationError.accessFailed
+            }
+            return
+        }
         let name = withUnsafePointer(to: entry.pointee.d_name) {
             $0.withMemoryRebound(
                 to: CChar.self,
@@ -450,6 +587,10 @@ private func directoryEntries(
             }
         }
         if name == "." || name == ".." {
+            continue
+        }
+        let childURL = path.url.appending(path: name)
+        guard case .allowed = SensitivePathDenylist().evaluate(childURL) else {
             continue
         }
 
@@ -463,18 +604,80 @@ private func directoryEntries(
             )
         }
         guard result == 0 else {
-            continue
+            throw DirectoryEnumerationError.accessFailed
         }
-        entries.append(
+        let allocated = Int64(information.st_blocks)
+            .multipliedReportingOverflow(by: 512)
+        guard !allocated.overflow else {
+            throw DirectoryEnumerationError.accessFailed
+        }
+        guard try visit(
             DirectoryEntryMetadata(
                 name: name,
                 logicalBytes: Int64(information.st_size),
-                allocatedBytes: Int64(information.st_blocks) * 512,
+                allocatedBytes: allocated.partialValue,
                 isDirectory: information.st_mode & S_IFMT == S_IFDIR
             )
+        ) else {
+            return
+        }
+    }
+}
+
+private enum DirectoryEnumerationError: Error {
+    case accessFailed
+}
+
+private func directoryEntryPrecedes(
+    _ lhs: DirectoryEntryMetadata,
+    _ rhs: DirectoryEntryMetadata
+) -> Bool {
+    if lhs.logicalBytes == rhs.logicalBytes {
+        return lhs.name < rhs.name
+    }
+    return lhs.logicalBytes > rhs.logicalBytes
+}
+
+private func addingWithoutOverflow(
+    _ lhs: Int64,
+    _ rhs: Int64
+) -> Int64? {
+    let result = lhs.addingReportingOverflow(rhs)
+    return result.overflow ? nil : result.partialValue
+}
+
+private func redactSecrets(in text: String) -> String {
+    let patterns: [(pattern: String, template: String)] = [
+        (
+            #"(?im)(["']?(?:api[_-]?key|access[_-]?token|auth(?:orization)?|aws[_-]?(?:secret[_-]?access[_-]?key|session[_-]?token)|client[_-]?secret|password|passwd|private[_-]?key|secret|token)["']?\s*[:=]\s*)[^\r\n]*"#,
+            "$1[REDACTED]"
+        ),
+        (
+            #"(?i)\b(?:sk-[A-Za-z0-9_-]{8,}|gh[pousr]_[A-Za-z0-9_]{8,}|github_pat_[A-Za-z0-9_]{8,}|xox[baprs]-[A-Za-z0-9-]{8,}|AKIA[0-9A-Z]{16}|ya29\.[A-Za-z0-9_-]{8,})\b"#,
+            "[REDACTED]"
+        ),
+        (
+            #"(?im)\b(Bearer|Basic)\s+[A-Za-z0-9._~+/\-=]{8,}"#,
+            "$1 [REDACTED]"
+        ),
+        (
+            #"(?s)-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----.*?(?:-----END [A-Z0-9 ]*PRIVATE KEY-----|\z)"#,
+            "[REDACTED PRIVATE KEY]"
+        )
+    ]
+    return patterns.reduce(text) { partial, item in
+        guard let expression = try? NSRegularExpression(
+            pattern: item.pattern
+        ) else {
+            return partial
+        }
+        let range = NSRange(partial.startIndex..., in: partial)
+        return expression.stringByReplacingMatches(
+            in: partial,
+            range: range,
+            withTemplate: item.template
         )
     }
-    return entries
 }
 
 private func openVerifiedDescriptor(
@@ -487,8 +690,8 @@ private func openVerifiedDescriptor(
     }
     var information = stat()
     guard fstat(descriptor, &information) == 0,
-          information.st_dev == dev_t(path.identity.device),
-          information.st_ino == ino_t(path.identity.inode)
+          unsignedDeviceIdentity(information.st_dev) == path.identity.device,
+          UInt64(information.st_ino) == path.identity.inode
     else {
         close(descriptor)
         return nil
@@ -509,21 +712,3 @@ private let approvedTextFilenames: Set<String> = [
     "podfile",
     "cartfile",
 ]
-
-private func redactSecrets(in text: String) -> String {
-    let patterns = [
-        #"(?im)\b(api[_-]?key|token|password|secret)\s*[:=]\s*[^\s"'`]+"#,
-        #"(?i)\b(sk-[A-Za-z0-9_-]{8,})\b"#,
-    ]
-    return patterns.reduce(text) { partial, pattern in
-        guard let expression = try? NSRegularExpression(pattern: pattern) else {
-            return partial
-        }
-        let range = NSRange(partial.startIndex..., in: partial)
-        return expression.stringByReplacingMatches(
-            in: partial,
-            range: range,
-            withTemplate: "[REDACTED]"
-        )
-    }
-}

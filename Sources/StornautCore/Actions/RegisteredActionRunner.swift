@@ -33,6 +33,7 @@ public enum RegisteredActionRunnerError: Error, Sendable, Equatable {
     case launchFailed(String)
     case timedOut
     case outputReadFailed(stream: String, reason: String)
+    case terminationFailed(ProcessTreeTerminationError)
 }
 
 public struct FoundationRegisteredActionRunner: RegisteredActionRunning {
@@ -285,41 +286,77 @@ private func waitForRegisteredAction(
 ) async throws -> Int32 {
     let clock = ContinuousClock()
     let deadline = clock.now.advanced(by: timeout)
-    var status: Int32 = 0
     while clock.now < deadline {
-        let result = waitpid(pid, &status, WNOHANG)
-        if result == pid {
-            return status
+        if leaderHasWaitableExit(pid) {
+            if !ProcessTreeTerminator.processGroupHasMembers(
+                ProcessGroupID(rawValue: pid),
+                excluding: pid
+            ) {
+                try? await Task.sleep(for: .milliseconds(50))
+            }
+            try await terminateRemainingRegisteredActionMembers(pid)
+            return try reapRegisteredAction(pid)
         }
-        if result < 0, errno != EINTR {
+        try? await Task.sleep(for: .milliseconds(5))
+    }
+
+    do {
+        _ = try await ProcessTreeTerminator().terminateProcessGroup(
+            ProcessGroupID(rawValue: pid),
+            gracePeriod: .milliseconds(250)
+        )
+    } catch let error as ProcessTreeTerminationError {
+        throw RegisteredActionRunnerError.terminationFailed(error)
+    } catch {
+        throw RegisteredActionRunnerError.terminationFailed(.unexpected)
+    }
+    _ = try reapRegisteredAction(pid)
+    throw RegisteredActionRunnerError.timedOut
+}
+
+private func leaderHasWaitableExit(_ pid: pid_t) -> Bool {
+    var information = siginfo_t()
+    let result = waitid(
+        P_PID,
+        UInt32(pid),
+        &information,
+        WEXITED | WNOHANG | WNOWAIT
+    )
+    return result == 0 && information.si_pid == pid
+}
+
+private func terminateRemainingRegisteredActionMembers(
+    _ pid: pid_t
+) async throws {
+    let processGroup = ProcessGroupID(rawValue: pid)
+    guard ProcessTreeTerminator.processGroupHasMembers(
+        processGroup,
+        excluding: pid
+    ) else {
+        return
+    }
+    do {
+        _ = try await ProcessTreeTerminator().terminateProcessGroup(
+            processGroup,
+            gracePeriod: .milliseconds(250)
+        )
+    } catch let error as ProcessTreeTerminationError {
+        throw RegisteredActionRunnerError.terminationFailed(error)
+    } catch {
+        throw RegisteredActionRunnerError.terminationFailed(.unexpected)
+    }
+}
+
+private func reapRegisteredAction(_ pid: pid_t) throws -> Int32 {
+    var status: Int32 = 0
+    while waitpid(pid, &status, 0) < 0 {
+        if errno != EINTR {
             throw RegisteredActionRunnerError.launchFailed(
                 "waitpid failed: \(errno)"
             )
         }
-        try? await Task.sleep(for: .milliseconds(5))
     }
-
-    _ = kill(-pid, SIGTERM)
-    let terminationDeadline = clock.now.advanced(by: .milliseconds(250))
-    var leaderWasReaped = false
-    while clock.now < terminationDeadline {
-        let result = waitpid(pid, &status, WNOHANG)
-        if result == pid {
-            leaderWasReaped = true
-        } else if result < 0, errno != EINTR, errno != ECHILD {
-            break
-        }
-        if kill(-pid, 0) != 0, errno == ESRCH {
-            throw RegisteredActionRunnerError.timedOut
-        }
-        try? await Task.sleep(for: .milliseconds(5))
-    }
-
-    _ = kill(-pid, SIGKILL)
-    if !leaderWasReaped {
-        while waitpid(pid, &status, 0) < 0, errno == EINTR {}
-    }
-    throw RegisteredActionRunnerError.timedOut
+    return status
 }
 
 private func normalizeRegisteredActionStatus(_ waitStatus: Int32) -> Int32 {

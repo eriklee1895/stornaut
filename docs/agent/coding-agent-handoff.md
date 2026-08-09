@@ -2,7 +2,7 @@
 
 > 面向接手实现的 Coding Agent  
 > 最近更新：2026-08-09
-> 当前状态：产品、Agent、UI 功能交互与品牌基线完成；Epic 0–1 evidence gate 已完成，Epic 2–3 deterministic development conditional go；Task 5 证明 Broker 协议但未证明 Codex Broker-only 工具面，Deep Dive 明确 no-go/paused；release signing/notarization 未评估
+> 当前状态：产品、Agent、UI 功能交互与品牌基线完成；Epic 0–1 evidence gate 与最终 code review 已完成，5 个确认缺陷已修复；Epic 2–3 deterministic development conditional go；Task 5 证明 Broker 协议但未证明 Codex Broker-only 工具面，Deep Dive 明确 no-go/paused；release signing/notarization 未评估
 
 ## 1. 任务目标
 
