@@ -48,16 +48,23 @@ Epic 0 shell 当前必须保持：
 - System Light/Dark 均可读；
 - bundle identifier 为 `com.eriklee.stornaut`。
 
-现有 XCUITest 必须生成四个稳定附件：
+现有 XCUITest 必须生成六个稳定附件：
 
 ```text
 stornaut-shell-light.png
 stornaut-settings-light.png
 stornaut-shell-dark.png
 stornaut-settings-dark.png
+stornaut-overview-limited.png
+stornaut-overview-zh-Hans.png
 ```
 
 `scripts/export-ui-screenshots` 将它们导出到 ignored 的 `.derivedData/ui-screenshots/`，`scripts/verify-ui-screenshots` 检查文件、尺寸和主题差异。
+
+Task 22 起，shell Light/Dark 截图使用真实 `success` Overview fixture，不再
+使用 foundation placeholder。额外两张截图分别固定 permission-limited
+Overview 与 `zh-Hans` Overview；它们验证 Unknown/Unmeasurable 分离、安全暂停
+Deep Dive 和 localization 层级，不复制概念图示例数字。
 
 Settings 附件必须截取包含 `settings.content` 的独立 window，不能直接对
 `settings.content` accessibility element 截图。后者在 macOS 26 的透明

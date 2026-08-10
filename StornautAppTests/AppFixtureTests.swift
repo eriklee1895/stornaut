@@ -75,6 +75,21 @@ func debugFixturesCoverEveryApprovedPhaseDeterministically() throws {
             $0.projection != nil
         }.count
     )
+
+    let loadingComposition = try AppComposition.debugFixture(
+        selection: DebugAppFixtureSelection(arguments: [
+            "Stornaut",
+            "--stornaut-debug-fixture=loading",
+        ])!
+    )
+    let successComposition = try AppComposition.debugFixture(
+        selection: DebugAppFixtureSelection(arguments: [
+            "Stornaut",
+            "--stornaut-debug-fixture=success",
+        ])!
+    )
+    #expect(loadingComposition.model.scanActivity == .active)
+    #expect(successComposition.model.scanActivity == .idle)
 }
 
 @MainActor

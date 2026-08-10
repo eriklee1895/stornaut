@@ -1,6 +1,6 @@
 # Stornaut Epic 2–4 Deterministic Product Core Implementation Plan
 
-> **Status:** Approved — Tasks 9–21 complete; Task 22 next
+> **Status:** Approved — Tasks 9–22 complete; Task 23 next
 >
 > **Roadmap phase:** Phase B — Deterministic Product Core
 >
@@ -1410,30 +1410,62 @@ Suggested commit subject: `feat: establish deterministic app state`
 - Modify: localization resources
 - Create/modify: Overview unit/UI tests and screenshot checks
 
-- [ ] **Step 1: Write Overview state and contract tests first**
+- [x] **Step 1: Write Overview state and contract tests first**
 
 Cover no snapshot, current snapshot, stale snapshot, scan in progress, limited
 coverage and local store failure. Assert that Free, Explained and Ready to
 Reclaim are different fields and that Unknown/Unmeasurable do not collapse.
 
-- [ ] **Step 2: Implement snapshot-first Overview**
+- [x] **Step 2: Implement snapshot-first Overview**
 
 Render volume and latest-snapshot time, the three primary metrics, the Space
 Ledger, primary Quick Scan entry and at most three real top opportunities.
 Deep Dive remains visibly paused/blocked by the current safety gate and cannot
 start from this plan. No fake investigation metrics are shown.
 
-- [ ] **Step 3: Verify accessibility and themes**
+- [x] **Step 3: Verify accessibility and themes**
 
 Ledger segments expose label, exact byte amount when available, source/sample
 time and coverage status to VoiceOver. Verify Light/Dark and English/`zh-Hans`
 without relying on color alone.
 
-- [ ] **Step 4: Run the real App UI loop**
+- [x] **Step 4: Run the real App UI loop**
 
 Run focused tests, build/launch the actual `.app`, capture/inspect representative
 Overview states with read-only Peekaboo, update XCUITest/screenshot checks and
 run `scripts/verify`.
+
+Execution evidence:
+
+- `OverviewModel` projects the latest real `QuickScanProjection` and
+  `SpaceLedger`; checked metrics keep Free, Explained and Ready distinct and
+  fail closed on inconsistent or unmeasured inputs.
+- Known, Unknown, Unmeasurable and Free remain separate. Limited coverage never
+  guesses bytes or double-counts the Unknown residual.
+- Top Opportunities rejoin owner/classification truth, exclude
+  Protected/Unknown, sort deterministically and cap at three.
+- App-owned `AppScanActivity` separates saved-store loading from a real active
+  scan. Task 22 only navigates to Scan; it starts no coordinator.
+- The code-native Orbit, full Ledger, coverage badge and functional static
+  Nautilus Probe expose localized text plus synthetic VoiceOver children.
+  Exact accessibility byte values include actual bytes and each Ledger source
+  retains kind, identifier and sample time.
+- Deep Dive remains `Safety Paused` with no start callback, fake progress,
+  finding count, explained gain or bypass.
+- Grouped review fixed confirmed state, accounting, classification-join,
+  activity-freshness, accessibility and screenshot-evidence defects. Final
+  automatic review has no open P0–P2 finding.
+- Final `scripts/verify` passed: SwiftPM 263/263, App tests 33/33, XCUITest
+  4/4, six screenshot contracts, App/state/Overview/Release gates, signed
+  bundle, 67-rule catalog, localization, docs links and `git diff --check`.
+- The final screenshot gate measures Light/Dark separation and content
+  variance; read-only Peekaboo PID captures verified English/Chinese success
+  and limited states without other-app content.
+- macOS required standard Automation Mode authentication. The user approved it;
+  no no-authentication policy, root daemon, TCC/SIP or other system permission
+  was modified.
+- No Scan results/progress, History, full Settings, Deep Dive enablement,
+  cleanup UI, dependency, entitlement, telemetry or background task was added.
 
 Suggested commit subject: `feat: render snapshot-first overview`
 

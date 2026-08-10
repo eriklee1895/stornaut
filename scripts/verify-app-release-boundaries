@@ -36,8 +36,10 @@ app_contains() {
     return 1
 }
 
-fixture_markers=(
+debug_markers=(
     '--stornaut-debug-fixture='
+    '--stornaut-ui-test-appearance='
+    'app.appearance.requested'
     'scan-fixture-'
     'scope-fixture-'
     'snapshot-fixture-'
@@ -47,7 +49,7 @@ fixture_markers=(
     '/tmp/stornaut-fixture'
 )
 
-for marker in "${fixture_markers[@]}"; do
+for marker in "${debug_markers[@]}"; do
     if ! app_contains "$debug_app" "$marker"; then
         print -u2 "Release gate positive control missed DEBUG marker: $marker"
         exit 1

@@ -29,12 +29,22 @@ struct StornautByteFormatter: Sendable {
         guard let bytes else {
             return localizedUnknown()
         }
+        guard bytes.value != 0 else {
+            return Int64(0).formatted(
+                .byteCount(
+                    style: .file,
+                    allowedUnits: .bytes,
+                    spellsOutZero: false,
+                    includesActualByteCount: false
+                ).locale(locale)
+            )
+        }
         return Int64(bytes.value).formatted(
             ByteCountFormatStyle(
                 style: .file,
                 allowedUnits: .all,
                 spellsOutZero: false,
-                includesActualByteCount: false
+                includesActualByteCount: true
             ).locale(locale)
         )
     }

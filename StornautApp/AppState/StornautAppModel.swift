@@ -6,6 +6,7 @@ import StornautCore
 @Observable
 final class StornautAppModel {
     private(set) var pageState: AppPageState
+    private(set) var scanActivity: AppScanActivity
 
     private let dependencies: AppDependencies
     private let reducer: AppPageReducer
@@ -16,12 +17,14 @@ final class StornautAppModel {
     init(
         dependencies: AppDependencies,
         initialState: AppPageState = .empty,
+        initialScanActivity: AppScanActivity = .idle,
         reducer: AppPageReducer = AppPageReducer(),
         now: @escaping @Sendable () -> Date = Date.init,
         refreshesServices: Bool = true
     ) {
         self.dependencies = dependencies
         pageState = initialState
+        scanActivity = initialScanActivity
         self.reducer = reducer
         self.now = now
         self.refreshesServices = refreshesServices

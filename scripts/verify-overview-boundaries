@@ -1,0 +1,55 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+cd "$repo_root"
+
+required_files=(
+    StornautApp/Overview/OverviewModel.swift
+    StornautApp/Overview/OverviewView.swift
+    StornautApp/Overview/StorageOrbitView.swift
+    StornautApp/Overview/SpaceLedgerView.swift
+    StornautApp/Overview/OverviewOpportunityRow.swift
+)
+
+for file in "${required_files[@]}"; do
+    if [[ ! -f "$file" ]]; then
+        print -u2 "Missing Task 22 Overview file: $file"
+        exit 1
+    fi
+done
+
+if rg -n \
+    'EvidenceStore|QuickScanCoordinator|Surveyor|SQLite|StornautCodex|CodexProcess|Probe(Broker|Bridge)|ActionPolicyGate|ActionExecutor|TrashMoving|RegisteredAction|FileManager|Process\(|posix_spawn|\.start\(' \
+    StornautApp/Overview; then
+    print -u2 "Overview references a prohibited service or start API."
+    exit 1
+fi
+
+rg -q 'OverviewView' StornautApp/AppShell/RootView.swift
+rg -q 'Canvas' StornautApp/Overview/StorageOrbitView.swift
+rg -q 'accessibilityChildren' StornautApp/Overview/StorageOrbitView.swift
+rg -q 'unknownIncludesUnmeasurable' StornautApp/Overview/OverviewModel.swift
+rg -q 'readyToReclaim' StornautApp/Overview/OverviewModel.swift
+rg -q --fixed-strings 'prefix(3)' StornautApp/Overview/OverviewModel.swift
+rg -q 'AppScanActivity' StornautApp/AppState/AppPageState.swift
+rg -q 'appModel.scanActivity' StornautApp/AppShell/RootView.swift
+rg -q 'CoverageBadge' StornautApp/Overview/OverviewView.swift
+rg -q 'overview.probe.paused' StornautApp/Overview/StorageOrbitView.swift
+
+if rg -n \
+    '125 GB|87%|23\.4 GB|#07152E|#3F469A|#6573E6|#32D6F4|#FFB547|#EAFBFF|Constellation|star(field| map)' \
+    StornautApp/Overview; then
+    print -u2 "Concept-image fixture or rejected visual language leaked into Overview."
+    exit 1
+fi
+
+if rg -n \
+    '#[0-9A-Fa-f]{6}|Color\(red:|NSColor\(calibrated' \
+    StornautApp/Overview; then
+    print -u2 "Overview contains raw concept color values."
+    exit 1
+fi
+
+echo "Overview boundary verification passed."

@@ -54,6 +54,7 @@ final class StornautAppUITests: XCTestCase {
         app.launchArguments = [
             "-AppleLanguages", "(en)",
             "-AppleLocale", "en_US",
+            "--stornaut-ui-test-appearance=light",
             "--stornaut-debug-fixture=limited-permission",
         ]
 
@@ -64,10 +65,80 @@ final class StornautAppUITests: XCTestCase {
         let phase = element("app.state.phase", in: app)
         XCTAssertTrue(phase.waitForExistence(timeout: 5))
         XCTAssertEqual(phase.label, "limitedPermission")
-        XCTAssertTrue(app.staticTexts["Overview"].exists)
-        XCTAssertTrue(app.staticTexts[
+        let appearanceElement = element("app.appearance", in: app)
+        XCTAssertTrue(appearanceElement.waitForExistence(timeout: 5))
+        XCTAssertEqual(appearanceElement.label, "light")
+        XCTAssertEqual(
+            element("app.appearance.requested", in: app).label,
+            "light"
+        )
+        XCTAssertTrue(
+            element("overview.status.limitedPermission", in: app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(element("overview.coverage", in: app).exists)
+        XCTAssertTrue(element("overview.ledger", in: app).exists)
+        XCTAssertTrue(app.descendants(matching: .any)["Unmeasurable"].exists)
+        XCTAssertFalse(app.staticTexts[
             "Foundation shell — implementation follows the approved roadmap."
         ].exists)
+
+        focus(shellWindow, in: app)
+        addScreenshot(
+            shellWindow.screenshot(),
+            named: "stornaut-overview-limited"
+        )
+
+        let quickScan = element("overview.action.quickScan", in: app)
+        XCTAssertTrue(quickScan.waitForExistence(timeout: 5))
+        quickScan.click()
+        XCTAssertTrue(app.staticTexts[
+            "Foundation shell — implementation follows the approved roadmap."
+        ].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Scan"].exists)
+    }
+
+    @MainActor
+    func testChineseOverviewLocalization() throws {
+        let app = XCUIApplication()
+        app.terminate()
+        XCTAssertTrue(app.wait(for: .notRunning, timeout: 5))
+        addTeardownBlock {
+            app.terminate()
+            _ = app.wait(for: .notRunning, timeout: 5)
+        }
+        app.launchArguments = [
+            "-AppleLanguages", "(zh-Hans)",
+            "-AppleLocale", "zh_CN",
+            "--stornaut-ui-test-appearance=light",
+            "--stornaut-debug-fixture=success",
+        ]
+
+        app.launch()
+
+        let shellWindow = app.windows["main"]
+        XCTAssertTrue(shellWindow.waitForExistence(timeout: 10))
+        XCTAssertTrue(
+            element("overview.metric.free", in: app)
+                .waitForExistence(timeout: 5)
+        )
+        let appearanceElement = element("app.appearance", in: app)
+        XCTAssertTrue(appearanceElement.waitForExistence(timeout: 5))
+        XCTAssertEqual(appearanceElement.label, "light")
+        XCTAssertEqual(
+            element("app.appearance.requested", in: app).label,
+            "light"
+        )
+        XCTAssertTrue(app.staticTexts["空间账本"].exists)
+        XCTAssertTrue(app.staticTexts["安全暂停"].exists)
+        XCTAssertTrue(app.buttons["快速扫描"].exists)
+        XCTAssertFalse(app.staticTexts["Space Ledger"].exists)
+
+        focus(shellWindow, in: app)
+        addScreenshot(
+            shellWindow.screenshot(),
+            named: "stornaut-overview-zh-Hans"
+        )
     }
 
     @MainActor
@@ -88,7 +159,7 @@ final class StornautAppUITests: XCTestCase {
             "-AppleLanguages", "(en)",
             "-AppleLocale", "en_US",
             "--stornaut-ui-test-appearance=\(appearance)",
-            "--stornaut-debug-fixture=empty",
+            "--stornaut-debug-fixture=success",
         ]
 
         app.launch()
@@ -114,10 +185,26 @@ final class StornautAppUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Investigations"].exists)
         XCTAssertTrue(app.staticTexts["History"].exists)
         XCTAssertFalse(app.staticTexts["destination.overview"].exists)
+        XCTAssertTrue(
+            element("overview.metric.free", in: app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(element("overview.metric.free", in: app).exists)
+        XCTAssertTrue(element("overview.metric.explained", in: app).exists)
+        XCTAssertTrue(element("overview.metric.ready", in: app).exists)
+        XCTAssertTrue(element("overview.coverage", in: app).exists)
+        XCTAssertTrue(element("overview.ledger", in: app).exists)
+        XCTAssertTrue(element("overview.probe.paused", in: app).exists)
+        XCTAssertTrue(element("overview.deepDive.paused", in: app).exists)
+        XCTAssertTrue(element("overview.action.quickScan", in: app).exists)
+        XCTAssertFalse(app.staticTexts[
+            "Foundation shell — implementation follows the approved roadmap."
+        ].exists)
 
         let settingsButton = element("sidebar.settings", in: app)
         XCTAssertTrue(settingsButton.waitForExistence(timeout: 5))
 
+        focus(shellWindow, in: app)
         addScreenshot(
             shellWindow.screenshot(),
             named: "stornaut-shell-\(screenshotSuffix)"
@@ -136,7 +223,10 @@ final class StornautAppUITests: XCTestCase {
         XCTAssertTrue(settingsWindow.waitForExistence(timeout: 5))
         if !settingsContent.isHittable || !settingsWindow.isHittable {
             app.activate()
-            settingsContent.click()
+            XCTAssertTrue(waitUntil(timeout: 5) {
+                settingsButton.isHittable
+            })
+            settingsButton.click()
         }
         XCTAssertTrue(waitUntil(timeout: 5) {
             settingsContent.isHittable && settingsWindow.isHittable
@@ -181,6 +271,22 @@ final class StornautAppUITests: XCTestCase {
             RunLoop.current.run(until: Date().addingTimeInterval(0.1))
         } while Date() < deadline
         return condition()
+    }
+
+    @MainActor
+    private func focus(
+        _ window: XCUIElement,
+        in app: XCUIApplication
+    ) {
+        app.activate()
+        let overviewItem = element("sidebar.overview", in: app)
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            overviewItem.isHittable
+        })
+        overviewItem.click()
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            window.isHittable
+        })
     }
 
     @MainActor

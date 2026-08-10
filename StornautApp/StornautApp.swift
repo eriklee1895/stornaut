@@ -26,6 +26,12 @@ struct StornautApp: App {
                     WindowAppearanceProbe(identifier: "app.appearance")
                         .frame(width: 1, height: 1)
                 }
+#if DEBUG
+                .overlay(alignment: .topLeading) {
+                    DebugLaunchAppearanceProbe()
+                        .frame(width: 1, height: 1)
+                }
+#endif
         }
         .defaultSize(width: 1_180, height: 760)
         .windowResizability(.contentMinSize)
@@ -163,7 +169,47 @@ enum LaunchAppearanceOverride {
             .first { $0.hasPrefix(prefix) }?
             .dropFirst(prefix.count)
     }
+
+#if DEBUG
+    static var requestedValue: String {
+        value.map(String.init) ?? "system"
+    }
+#endif
 }
+
+#if DEBUG
+struct DebugLaunchAppearanceProbe: NSViewRepresentable {
+    func makeNSView(context: Context) -> DebugLaunchAppearanceProbeView {
+        DebugLaunchAppearanceProbeView()
+    }
+
+    func updateNSView(
+        _ nsView: DebugLaunchAppearanceProbeView,
+        context: Context
+    ) {
+        nsView.apply()
+    }
+}
+
+final class DebugLaunchAppearanceProbeView: NSView {
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        setAccessibilityElement(true)
+        setAccessibilityIdentifier("app.appearance.requested")
+        setAccessibilityRole(.staticText)
+        apply()
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func apply() {
+        setAccessibilityLabel(LaunchAppearanceOverride.requestedValue)
+    }
+}
+#endif
 
 struct WindowAppearanceProbe: NSViewRepresentable {
     let identifier: String

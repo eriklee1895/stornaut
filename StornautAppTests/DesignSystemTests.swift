@@ -15,6 +15,10 @@ func byteFormattingDistinguishesUnknownMeasuredZeroAndValues() {
     #expect(formatter.accessibilityString(for: ByteCount(0)) == "0 bytes")
     #expect(formatter.string(for: ByteCount(1_500)) == "2 kB")
     #expect(
+        formatter.accessibilityString(for: ByteCount(1_500))
+            == "2 kB (1,500 bytes)"
+    )
+    #expect(
         StornautByteFormatter(
             locale: Locale(identifier: "fr_FR")
         ).accessibilityString(for: nil) == "Unknown"

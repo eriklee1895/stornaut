@@ -129,6 +129,9 @@ extension AppComposition {
             model: StornautAppModel(
                 dependencies: AppDependencies { nil },
                 initialState: state,
+                initialScanActivity: selection.fixture == .loading
+                    ? .active
+                    : .idle,
                 now: { DebugProjectionFactory.now },
                 refreshesServices: false
             )
@@ -224,23 +227,58 @@ private enum DebugProjectionFactory {
             inode: 1,
             mode: UInt16(S_IFDIR | 0o755)
         )
-        let root = try PathSnapshot(
-            id: SnapshotID(
-                rawValue: "snapshot-fixture-\(slug)-root"
-            )!,
+        let root = try measuredSnapshot(
+            slug: slug,
+            suffix: "root",
             sessionID: sessionID,
             scopeID: scopeID,
             relativePath: ".",
-            kind: .directory,
-            logicalByteCount: ByteCount(0),
-            allocatedByteCount: ByteCount(0),
-            modifiedAt: now,
-            fileIdentity: rootIdentity,
-            symlinkTarget: nil,
-            measurementStatus: .measured,
-            observedAt: now
+            allocatedBytes: 0,
+            inode: 1
         )
         var snapshots = [root]
+        if includesClassification {
+            snapshots.append(
+                contentsOf: try [
+                    measuredSnapshot(
+                        slug: slug,
+                        suffix: "build-cache",
+                        sessionID: sessionID,
+                        scopeID: scopeID,
+                        relativePath: "Library/Caches/build",
+                        allocatedBytes: 180_000,
+                        inode: 2
+                    ),
+                    measuredSnapshot(
+                        slug: slug,
+                        suffix: "derived-data",
+                        sessionID: sessionID,
+                        scopeID: scopeID,
+                        relativePath: "Projects/App/DerivedData",
+                        allocatedBytes: 120_000,
+                        inode: 3
+                    ),
+                    measuredSnapshot(
+                        slug: slug,
+                        suffix: "updater",
+                        sessionID: sessionID,
+                        scopeID: scopeID,
+                        relativePath: "Library/Caches/updater",
+                        allocatedBytes: 50_000,
+                        inode: 4
+                    ),
+                    measuredSnapshot(
+                        slug: slug,
+                        suffix: "protected",
+                        sessionID: sessionID,
+                        scopeID: scopeID,
+                        relativePath: ".ssh",
+                        allocatedBytes: 10_000,
+                        inode: 5
+                    ),
+                ]
+            )
+        }
         if includesPermissionGap {
             snapshots.append(
                 try PathSnapshot(
@@ -262,24 +300,60 @@ private enum DebugProjectionFactory {
                 )
             )
         }
-        let classification = try Classification(
-            id: ClassificationID(
-                rawValue: "classification-fixture-\(slug)"
-            )!,
-            snapshotID: root.id,
-            ruleID: nil,
-            producer: nil,
-            category: .unknownLargeConsumers,
-            disposition: .unknown,
-            risk: .high,
-            confidence: .low,
-            recovery: nil,
-            requiredEvidenceKeys: [],
-            missingEvidenceKeys: [],
-            catalogVersion: DomainToken(rawValue: "fixture-catalog-v1")!,
-            classifiedAt: now
-        )
-        let classifications = includesClassification ? [classification] : []
+        let classifications = includesClassification
+            ? try [
+                classification(
+                    slug: slug,
+                    suffix: "root",
+                    snapshot: snapshots[0],
+                    producer: nil,
+                    category: .unknownLargeConsumers,
+                    disposition: .unknown,
+                    recoveryCost: nil,
+                    missingActivity: false
+                ),
+                classification(
+                    slug: slug,
+                    suffix: "build-cache",
+                    snapshot: snapshots[1],
+                    producer: "Build cache",
+                    category: .packageAndBuildCaches,
+                    disposition: .readyToReclaim,
+                    recoveryCost: .low,
+                    missingActivity: false
+                ),
+                classification(
+                    slug: slug,
+                    suffix: "derived-data",
+                    snapshot: snapshots[2],
+                    producer: "Xcode",
+                    category: .rebuildableProjectArtifacts,
+                    disposition: .readyToReclaim,
+                    recoveryCost: .medium,
+                    missingActivity: false
+                ),
+                classification(
+                    slug: slug,
+                    suffix: "updater",
+                    snapshot: snapshots[3],
+                    producer: "Updater",
+                    category: .updatesAndTemporaryFiles,
+                    disposition: .reviewRecommended,
+                    recoveryCost: .medium,
+                    missingActivity: true
+                ),
+                classification(
+                    slug: slug,
+                    suffix: "protected",
+                    snapshot: snapshots[4],
+                    producer: "Developer credentials",
+                    category: .protected,
+                    disposition: .protected,
+                    recoveryCost: nil,
+                    missingActivity: false
+                ),
+            ]
+            : []
         let session = try ScanSession(
             id: sessionID,
             startedAt: now.addingTimeInterval(-10),
@@ -318,10 +392,122 @@ private enum DebugProjectionFactory {
             session: session,
             snapshots: snapshots,
             classifications: classifications,
-            evidence: [],
+            evidence: includesClassification
+                ? [
+                    activityEvidence(
+                        slug: slug,
+                        suffix: "build-cache",
+                        snapshotID: snapshots[1].id
+                    ),
+                    activityEvidence(
+                        slug: slug,
+                        suffix: "derived-data",
+                        snapshotID: snapshots[2].id
+                    ),
+                ]
+                : [],
             ledger: ledger,
             issues: [],
             corruptRecordIDs: []
+        )
+    }
+
+    private static func measuredSnapshot(
+        slug: String,
+        suffix: String,
+        sessionID: ScanSessionID,
+        scopeID: ScanScopeID,
+        relativePath: String,
+        allocatedBytes: UInt64,
+        inode: UInt64
+    ) throws -> PathSnapshot {
+        try PathSnapshot(
+            id: SnapshotID(
+                rawValue: "snapshot-fixture-\(slug)-\(suffix)"
+            )!,
+            sessionID: sessionID,
+            scopeID: scopeID,
+            relativePath: relativePath,
+            kind: .directory,
+            logicalByteCount: ByteCount(allocatedBytes),
+            allocatedByteCount: ByteCount(allocatedBytes),
+            modifiedAt: now,
+            fileIdentity: try identity(
+                inode: inode,
+                mode: UInt16(S_IFDIR | 0o755),
+                bytes: Int64(allocatedBytes)
+            ),
+            symlinkTarget: nil,
+            measurementStatus: .measured,
+            observedAt: now
+        )
+    }
+
+    private static func classification(
+        slug: String,
+        suffix: String,
+        snapshot: PathSnapshot,
+        producer: String?,
+        category: ArtifactCategory,
+        disposition: ReclaimDisposition,
+        recoveryCost: RebuildCost?,
+        missingActivity: Bool
+    ) throws -> Classification {
+        let activity = DomainToken(
+            rawValue: "activity.process.inactive"
+        )!
+        return try Classification(
+            id: ClassificationID(
+                rawValue: "classification-fixture-\(slug)-\(suffix)"
+            )!,
+            snapshotID: snapshot.id,
+            ruleID: disposition == .unknown
+                ? nil
+                : DomainToken(
+                    rawValue: "rule-fixture-\(slug)-\(suffix)"
+                ),
+            producer: producer.flatMap(DomainLabel.init(rawValue:)),
+            category: category,
+            disposition: disposition,
+            risk: disposition == .protected ? .critical : .medium,
+            confidence: disposition == .unknown ? .low : .high,
+            recovery: recoveryCost.map {
+                RecoveryGuidance(
+                    methodKey: DomainToken(
+                        rawValue: "recovery-fixture-\(slug)-\(suffix)"
+                    )!,
+                    cost: $0
+                )
+            },
+            requiredEvidenceKeys: recoveryCost == nil ? [] : [activity],
+            missingEvidenceKeys: missingActivity ? [activity] : [],
+            catalogVersion: DomainToken(rawValue: "fixture-catalog-v1")!,
+            classifiedAt: now
+        )
+    }
+
+    private static func activityEvidence(
+        slug: String,
+        suffix: String,
+        snapshotID: SnapshotID
+    ) -> EvidenceRecord {
+        EvidenceRecord(
+            id: EvidenceID(
+                rawValue: "evidence-fixture-\(slug)-\(suffix)"
+            )!,
+            targetID: snapshotID,
+            kind: .activity,
+            source: EvidenceSource(
+                kind: .activityProvider,
+                identifier: DomainToken(
+                    rawValue: "fixture-activity-provider"
+                )!
+            ),
+            summaryKey: DomainToken(
+                rawValue: "activity.process.inactive"
+            )!,
+            observedAt: now,
+            freshness: .current
         )
     }
 
@@ -387,7 +573,8 @@ private enum DebugProjectionFactory {
 
     private static func identity(
         inode: UInt64,
-        mode: UInt16
+        mode: UInt16,
+        bytes: Int64 = 0
     ) throws -> FileIdentity {
         try FileIdentity(
             device: 1,
@@ -395,8 +582,8 @@ private enum DebugProjectionFactory {
             mode: mode,
             ownerUserID: getuid(),
             ownerGroupID: getgid(),
-            size: 0,
-            allocatedBytes: 0,
+            size: bytes,
+            allocatedBytes: bytes,
             modificationSeconds: Int64(now.timeIntervalSince1970),
             modificationNanoseconds: 0
         )

@@ -12,6 +12,11 @@ enum AppPagePhase: String, CaseIterable, Sendable {
     case error
 }
 
+enum AppScanActivity: String, Sendable, Equatable {
+    case idle
+    case active
+}
+
 enum SafeRecoveryIntent:
     String,
     CaseIterable,

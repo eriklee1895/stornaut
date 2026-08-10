@@ -30,7 +30,7 @@ struct RootView: View {
             .navigationTitle("app.name")
             .navigationSplitViewColumnWidth(min: 210, ideal: 224, max: 240)
         } detail: {
-            DestinationPlaceholder(destination: selection ?? .overview)
+            destinationContent(selection ?? .overview)
         }
         .frame(minWidth: 960, minHeight: 640)
         .task {
@@ -47,6 +47,31 @@ struct RootView: View {
             }
         }
 #endif
+    }
+
+    @ViewBuilder
+    private func destinationContent(
+        _ destination: AppDestination
+    ) -> some View {
+        switch destination {
+        case .overview:
+            OverviewView(
+                model: OverviewModel(
+                    pageState: appModel.pageState,
+                    scanActivity: appModel.scanActivity
+                ),
+                openScan: {
+                    selection = .scan
+                },
+                retryLatestSnapshot: {
+                    Task {
+                        await appModel.refresh()
+                    }
+                }
+            )
+        case .scan, .investigations, .history:
+            DestinationPlaceholder(destination: destination)
+        }
     }
 }
 

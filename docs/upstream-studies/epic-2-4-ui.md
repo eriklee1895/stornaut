@@ -286,3 +286,91 @@ Task 21 must add:
 - a source/dependency gate proving View and DesignSystem files do not reference
   Surveyor, SQLite, Codex, Policy, Executor or action APIs;
 - real App build, XCUITest/screenshot regression and read-only runtime capture.
+
+## 12. Task 22 Snapshot-First Overview Refresh
+
+Task 22 revalidated the Overview contract on 2026-08-10 before adding the first
+real destination page.
+
+### Current Apple accessibility sources
+
+The current Apple SwiftUI documentation index was resolved as
+`/websites/developer_apple_swiftui`. The first documentation request failed at
+the provider, and the retry succeeded. The focused sources are:
+
+- [accessibilityElement(children:)](https://developer.apple.com/documentation/swiftui/view/accessibilityelement%28children%3A%29);
+- [accessibilityChildren(children:)](https://developer.apple.com/documentation/swiftui/view/accessibilitychildren%28children%3A%29);
+- [AccessibilityChildBehavior](https://developer.apple.com/documentation/swiftui/accessibilitychildbehavior);
+- [Color.primary](https://developer.apple.com/documentation/swiftui/color/primary).
+
+Apple's current custom-Canvas example gives a visual graph an overall label and
+adds synthetic accessible child shapes for each datum. Stornaut follows that
+pattern for the code-native storage orbit: the Canvas is decorative to sighted
+layout, while every real segment remains a separate VoiceOver child with a
+localized label and exact formatted value. System semantic colors, text and
+icons carry state together.
+
+No Charts package, third-party visualization dependency or raster asset is
+needed. The installed Xcode 26.6 / macOS 26.5 SDK and the existing SwiftUI App
+target remain the implementation baseline.
+
+### Domain-to-Overview mapping
+
+Overview renders only `QuickScanProjection` and `SpaceLedger` facts:
+
+```text
+Free bytes             = ledger.free
+Used bytes             = ledger.volumeCapacity - ledger.free
+Explained bytes        = ledger.known
+Explained ratio        = known / used, only when both are measured and used > 0
+Ready to Reclaim bytes = sum(ledger.owners allocated bytes
+                             where disposition == readyToReclaim)
+Unknown                = ledger.unknown
+Unmeasurable           = ledger.unmeasurable + coverage gap count
+```
+
+`Unknown` and `Unmeasurable` never collapse. When
+`unknownIncludesUnmeasurable` is true, the measured Unknown residual remains the
+only bar segment for those bytes and the unmeasurable row is explicitly
+unquantified; the UI never double-counts or invents a byte estimate.
+
+Orbit categories are deterministic aggregates of real ledger owners plus
+Unknown and Free. Top Opportunities are the stable first three real
+Ready/Review owners after joining their classification, ordered by disposition,
+allocated bytes and path. Protected and Unknown owners are not opportunities.
+Activity text is conservative: it says checked only when bounded activity/git
+evidence exists, unavailable when an activity requirement is missing, and
+Unknown otherwise.
+
+The snapshot timestamp comes from the scan session. Measure source and sample
+time come from each `SpaceLedgerMeasure.sources` entry. The scope label comes
+from the completed or unfinished scan scope; no filesystem query occurs in a
+View.
+
+### State and action boundary
+
+- no projection renders the code-native empty state and one `Run Quick Scan`
+  action;
+- a retained projection remains visible for partial, cancelled,
+  permission-limited, stale and local-store failure states;
+- `.loading` with retained projection is the reserved scan-in-progress
+  presentation seam for Task 23 and claims no fabricated stage/count;
+- stale is driven by typed App state, not an undocumented age threshold;
+- `Quick Scan` and `Scan Again` only navigate to the Scan workspace in Task 22;
+  Task 23 owns scan start/stop/progress;
+- Deep Dive is visible as safety paused and has no executable action;
+- no fake finding count, explained gain or investigation progress is shown.
+
+### Upstream/concept boundary
+
+The approved A+B Overview composition remains the source of information
+hierarchy only. ClearDisk `v1.9.0` and PureMac
+`e586b50bb30f68d0afff173e7d8389a50020095e` remain the reviewed MIT snapshots
+from this study; Task 22 copies no code, fixture, color, path or numeric sample.
+It rejects their direct scan/clean calls and wide App-state patterns.
+
+The canonical image's sample `125 GB`, `87%` and `23.4 GB`, raw palette,
+generated paths and decorative Probe do not enter production defaults.
+Stornaut implements a medium functional orbit, full Space Ledger, one primary
+action and calm native surfaces using real typed data. No new image generation
+or web asset is required.
