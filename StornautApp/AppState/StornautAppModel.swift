@@ -8,6 +8,7 @@ final class StornautAppModel {
     private(set) var pageState: AppPageState
     private(set) var scanActivity: AppScanActivity
     private(set) var scanState: ScanFlowState
+    private(set) var historyState: HistoryState
 
     private let dependencies: AppDependencies
     private let reducer: AppPageReducer
@@ -19,12 +20,16 @@ final class StornautAppModel {
     private var elapsedTask: Task<Void, Never>?
     private var cancellationTask: Task<Void, Never>?
     private var scanGeneration: UInt64 = 0
+    private var historyRefreshGeneration: UInt64?
+    private var historyDeleteIsActive = false
+    private var historyGeneration: UInt64 = 0
 
     init(
         dependencies: AppDependencies,
         initialState: AppPageState = .empty,
         initialScanActivity: AppScanActivity = .idle,
         initialScanState: ScanFlowState? = nil,
+        initialHistoryState: HistoryState = .idle,
         reducer: AppPageReducer = AppPageReducer(),
         scanReducer: ScanFlowReducer = ScanFlowReducer(),
         now: @escaping @Sendable () -> Date = Date.init,
@@ -36,6 +41,7 @@ final class StornautAppModel {
         scanState = initialScanState
             ?? initialState.projection.map(ScanFlowState.retained)
             ?? .idle
+        historyState = initialHistoryState
         self.reducer = reducer
         self.scanReducer = scanReducer
         self.now = now
@@ -93,11 +99,17 @@ final class StornautAppModel {
     func startQuickScan() {
         guard !scanState.isActive,
               scanTask == nil,
-              cancellationTask == nil
+              cancellationTask == nil,
+              !historyDeleteIsActive
         else {
             return
         }
         scanGeneration &+= 1
+        historyGeneration &+= 1
+        if historyRefreshGeneration != nil {
+            historyState = historyState.page.map(HistoryState.loaded) ?? .idle
+            historyRefreshGeneration = nil
+        }
         scanState = scanReducer.started(
             previous: scanState,
             at: now(),
@@ -123,6 +135,130 @@ final class StornautAppModel {
             }
             _ = await self.dependencies.cancelQuickScan()
             self.cancellationTask = nil
+        }
+    }
+
+    func refreshHistoryIfNeeded() async {
+        guard historyState.phase == .idle else {
+            return
+        }
+        await refreshHistory()
+    }
+
+    func refreshHistory() async {
+        guard historyRefreshGeneration == nil,
+              !historyDeleteIsActive
+        else {
+            return
+        }
+        guard !scanState.isActive else {
+            historyState = .failed(
+                page: historyState.page,
+                reasonKey: token("history.error.scanActiveRead")
+            )
+            return
+        }
+        let retained = historyState.page
+        let generation = historyGeneration
+        historyRefreshGeneration = generation
+        historyState = .loading(retained)
+        defer {
+            if historyRefreshGeneration == generation {
+                historyRefreshGeneration = nil
+            }
+        }
+        do {
+            let page = try await dependencies.loadScanHistory()
+            guard generation == historyGeneration else {
+                return
+            }
+            historyState = .loaded(page)
+        } catch is CancellationError {
+            if generation == historyGeneration {
+                historyState = retained.map(HistoryState.loaded) ?? .idle
+            }
+        } catch {
+            guard generation == historyGeneration else {
+                return
+            }
+            historyState = .failed(
+                page: retained,
+                reasonKey: token("history.error.storeUnavailable")
+            )
+        }
+    }
+
+    func deleteHistorySession(
+        _ sessionID: ScanSessionID
+    ) async {
+        guard !historyDeleteIsActive,
+              historyRefreshGeneration == nil,
+              let page = historyState.page
+        else {
+            return
+        }
+        guard !scanState.isActive else {
+            historyState = .failed(
+                page: page,
+                reasonKey: token("history.error.scanActive")
+            )
+            return
+        }
+        historyDeleteIsActive = true
+        historyGeneration &+= 1
+        historyState = .deleting(sessionID, page: page)
+        defer { historyDeleteIsActive = false }
+        do {
+            try await dependencies.deleteScanHistory(sessionID)
+        } catch {
+            historyState = .failed(
+                page: page,
+                reasonKey: token("history.error.deleteFailed")
+            )
+            return
+        }
+        let localPage = HistoryPage(
+            records: page.records.filter {
+                $0.session.id != sessionID
+            },
+            corruptSessionIDs: page.corruptSessionIDs,
+            corruptLedgerSessionIDs: page.corruptLedgerSessionIDs.filter {
+                $0 != sessionID.rawValue
+            }
+        )
+        historyState = .loaded(localPage)
+        do {
+            historyState = .loaded(
+                try await dependencies.loadScanHistory()
+            )
+        } catch {
+            historyState = .failed(
+                page: localPage,
+                reasonKey: token("history.error.storeUnavailable")
+            )
+        }
+        do {
+            let projection = try await dependencies.loadLatestQuickScan()
+            pageState = reducer.loaded(
+                projection,
+                previous: pageState,
+                now: now()
+            )
+            if !scanState.isActive {
+                scanState = projection.map(ScanFlowState.retained) ?? .idle
+            }
+        } catch {
+            guard pageState.projection?.session.id == sessionID else {
+                return
+            }
+            pageState = try! AppPageState(
+                phase: .error,
+                projection: nil,
+                reasonKey: token("app.state.store-unavailable"),
+                recoveryIntent: .retryLatestSnapshot,
+                refreshedAt: now()
+            )
+            scanState = .idle
         }
     }
 
@@ -155,6 +291,8 @@ final class StornautAppModel {
                         previous: pageState,
                         now: now()
                     )
+                    historyGeneration &+= 1
+                    historyState = .idle
                     break
                 }
             }
@@ -164,6 +302,7 @@ final class StornautAppModel {
                     reasonKey: token("scan.error.stream")
                 )
                 pageState = scanFailurePageState()
+                invalidateHistoryAfterScanAttempt()
             }
         } catch {
             if !terminalObserved {
@@ -176,8 +315,17 @@ final class StornautAppModel {
                     )
                 )
                 pageState = scanFailurePageState()
+                if streamStarted {
+                    invalidateHistoryAfterScanAttempt()
+                }
             }
         }
+    }
+
+    private func invalidateHistoryAfterScanAttempt() {
+        historyGeneration &+= 1
+        historyRefreshGeneration = nil
+        historyState = .idle
     }
 
     private func startElapsedUpdates() {

@@ -106,6 +106,32 @@ struct DebugAppFixtureSelection: Sendable, Equatable {
     }
 }
 
+enum DebugHistoryFixture: String, CaseIterable, Sendable {
+    case empty
+    case populated
+    case expired
+    case corrupt
+    case trend
+}
+
+struct DebugHistoryFixtureSelection: Sendable, Equatable {
+    let fixture: DebugHistoryFixture
+
+    init?(arguments: [String]) {
+        let prefix = "--stornaut-debug-history="
+        let matches = arguments.filter { $0.hasPrefix(prefix) }
+        guard matches.count == 1,
+              matches[0].count > prefix.count,
+              let fixture = DebugHistoryFixture(
+                  rawValue: String(matches[0].dropFirst(prefix.count))
+              )
+        else {
+            return nil
+        }
+        self.fixture = fixture
+    }
+}
+
 enum DebugInitialDestination {
     static func selection(
         arguments: [String]
@@ -123,6 +149,26 @@ enum DebugInitialDestination {
     }
 }
 
+enum DebugHistoryInitialPresentation: String {
+    case detail
+    case trend
+
+    static func selection(
+        arguments: [String]
+    ) -> DebugHistoryInitialPresentation {
+        let prefix = "--stornaut-debug-history-presentation="
+        let matches = arguments.filter { $0.hasPrefix(prefix) }
+        guard matches.count == 1,
+              let presentation = DebugHistoryInitialPresentation(
+                  rawValue: String(matches[0].dropFirst(prefix.count))
+              )
+        else {
+            return .detail
+        }
+        return presentation
+    }
+}
+
 extension AppComposition {
     static func debugFixture(
         arguments: [String]
@@ -132,11 +178,17 @@ extension AppComposition {
         ) else {
             return nil
         }
-        return try debugFixture(selection: selection)
+        return try debugFixture(
+            selection: selection,
+            historySelection: DebugHistoryFixtureSelection(
+                arguments: arguments
+            )
+        )
     }
 
     static func debugFixture(
         selection: DebugAppFixtureSelection,
+        historySelection: DebugHistoryFixtureSelection? = nil,
         makeState: @MainActor (DebugAppFixture) throws -> AppPageState = {
             try $0.makeState()
         }
@@ -145,17 +197,163 @@ extension AppComposition {
         let scanState = try selection.fixture.makeScanState(
             pageState: state
         )
+        let initialHistory = try historySelection?.fixture.makeState()
+            ?? .idle
+        let historyStore = DebugHistoryStore(
+            page: initialHistory.page ?? .empty
+        )
         return AppComposition(
             model: StornautAppModel(
-                dependencies: AppDependencies { nil },
+                dependencies: AppDependencies(
+                    loadLatestQuickScan: { nil },
+                    loadScanHistory: {
+                        await historyStore.load()
+                    },
+                    deleteScanHistory: {
+                        await historyStore.delete($0)
+                    }
+                ),
                 initialState: state,
                 initialScanActivity: scanState.isActive
                     ? .active
                     : .idle,
                 initialScanState: scanState,
+                initialHistoryState: initialHistory,
                 now: { DebugProjectionFactory.now },
                 refreshesServices: false
             )
+        )
+    }
+}
+
+private extension DebugHistoryFixture {
+    func makeState() throws -> HistoryState {
+        switch self {
+        case .empty:
+            return .loaded(.empty)
+        case .populated:
+            return .loaded(
+                try DebugHistoryFactory.page(
+                    slugs: ["current", "yesterday", "partial"]
+                )
+            )
+        case .expired:
+            return .loaded(
+                try DebugHistoryFactory.page(
+                    slugs: ["expired"],
+                    expired: true
+                )
+            )
+        case .corrupt:
+            var page = try DebugHistoryFactory.page(
+                slugs: ["healthy", "ledger-corrupt"]
+            )
+            page = HistoryPage(
+                records: page.records,
+                corruptSessionIDs: ["scan-fixture-unreadable"],
+                corruptLedgerSessionIDs: [
+                    page.records[1].session.id.rawValue,
+                ]
+            )
+            return .loaded(page)
+        case .trend:
+            return .loaded(
+                try DebugHistoryFactory.page(
+                    slugs: ["trend-0", "trend-1", "trend-2", "trend-3"]
+                )
+            )
+        }
+    }
+}
+
+private enum DebugHistoryFactory {
+    static func page(
+        slugs: [String],
+        expired: Bool = false
+    ) throws -> HistoryPage {
+        let records = try slugs.enumerated().map { index, slug in
+            let terminal: ScanTerminalState = slug == "partial"
+                ? .partial
+                : .completed
+            let projection = terminal == .partial
+                ? try DebugProjectionFactory.partial(
+                    slug: "history-\(slug)"
+                )
+                : try DebugProjectionFactory.success(
+                    slug: "history-\(slug)"
+                )
+            let offset: TimeInterval
+            if expired {
+                offset = -8 * 86_400
+            } else if slug == "yesterday" {
+                offset = -26 * 3_600
+            } else {
+                offset = -TimeInterval(index) * 86_400
+            }
+            let finishedAt = DebugProjectionFactory.now
+                .addingTimeInterval(offset)
+            let session = try ScanSession(
+                id: projection.session.id,
+                startedAt: finishedAt.addingTimeInterval(-10),
+                finishedAt: finishedAt,
+                terminalState: terminal,
+                completedScopes: terminal == .completed
+                    ? projection.session.completedScopes.map {
+                        ScanScope(
+                            id: $0.id,
+                            rootPath: $0.rootPath,
+                            completedAt: finishedAt
+                        )
+                    }
+                    : [],
+                unfinishedScopes: terminal == .completed
+                    ? []
+                    : projection.session.unfinishedScopes
+            )
+            let ledger = try projection.ledger.map {
+                try relabel($0, sessionID: session.id)
+            }
+            return HistoryRecord(session: session, ledger: ledger)
+        }
+        return HistoryPage(records: records)
+    }
+
+    private static func relabel(
+        _ ledger: SpaceLedger,
+        sessionID: ScanSessionID
+    ) throws -> SpaceLedger {
+        var object = try JSONSerialization.jsonObject(
+            with: DomainJSON.encode(ledger)
+        ) as! [String: Any]
+        object["sessionID"] = sessionID.rawValue
+        return try DomainJSON.decode(
+            SpaceLedger.self,
+            from: JSONSerialization.data(withJSONObject: object)
+        )
+    }
+}
+
+private actor DebugHistoryStore {
+    private var page: HistoryPage
+
+    init(page: HistoryPage) {
+        self.page = page
+    }
+
+    func load() -> HistoryPage {
+        page
+    }
+
+    func delete(_ sessionID: ScanSessionID) {
+        page = HistoryPage(
+            records: page.records.filter {
+                $0.session.id != sessionID
+            },
+            corruptSessionIDs: page.corruptSessionIDs,
+            corruptLedgerSessionIDs:
+                page.corruptLedgerSessionIDs.filter {
+                    $0 != sessionID.rawValue
+                }
         )
     }
 }
@@ -289,6 +487,41 @@ final class DebugScanStateProbeView: NSView {
         super.init(frame: .zero)
         setAccessibilityElement(true)
         setAccessibilityIdentifier("scan.state.phase")
+        setAccessibilityRole(.staticText)
+        setAccessibilityLabel(phase.rawValue)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+}
+
+struct DebugHistoryStateProbe: NSViewRepresentable {
+    let phase: HistoryPhase
+
+    func makeNSView(context: Context) -> DebugHistoryStateProbeView {
+        DebugHistoryStateProbeView(phase: phase)
+    }
+
+    func updateNSView(
+        _ nsView: DebugHistoryStateProbeView,
+        context: Context
+    ) {
+        nsView.phase = phase
+    }
+}
+
+final class DebugHistoryStateProbeView: NSView {
+    var phase: HistoryPhase {
+        didSet { setAccessibilityLabel(phase.rawValue) }
+    }
+
+    init(phase: HistoryPhase) {
+        self.phase = phase
+        super.init(frame: .zero)
+        setAccessibilityElement(true)
+        setAccessibilityIdentifier("history.state.phase")
         setAccessibilityRole(.staticText)
         setAccessibilityLabel(phase.rawValue)
     }

@@ -295,6 +295,185 @@ final class StornautAppUITests: XCTestCase {
     }
 
     @MainActor
+    func testHistoryPopulatedExpiredAndCorruptStates() throws {
+        let populated = launchHistoryFixture(
+            fixture: "populated",
+            appearance: "light"
+        )
+        defer {
+            populated.app.terminate()
+            _ = populated.app.wait(for: .notRunning, timeout: 5)
+        }
+        XCTAssertTrue(
+            element("history.state.phase", in: populated.app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            element("history.navigator", in: populated.app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            element("history.detail", in: populated.app)
+                .waitForExistence(timeout: 5)
+        )
+        let knownMetric = element(
+            "history.ledger.metric.known",
+            in: populated.app
+        )
+        XCTAssertTrue(knownMetric.waitForExistence(timeout: 5))
+        XCTAssertEqual(knownMetric.label, "Known")
+        XCTAssertTrue(
+            element("history.action.delete", in: populated.app).exists
+        )
+        XCTAssertFalse(populated.app.staticTexts["Cleanup Manifest"].exists)
+        focusHistory(populated.window, in: populated.app)
+        addScreenshot(
+            populated.window.screenshot(),
+            named: "stornaut-history-populated-light"
+        )
+
+        populated.app.terminate()
+        XCTAssertTrue(populated.app.wait(for: .notRunning, timeout: 5))
+
+        let expired = launchHistoryFixture(
+            fixture: "expired",
+            appearance: "dark"
+        )
+        defer {
+            expired.app.terminate()
+            _ = expired.app.wait(for: .notRunning, timeout: 5)
+        }
+        XCTAssertTrue(
+            element("history.state.phase", in: expired.app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(expired.app.staticTexts["Expired"].exists)
+        XCTAssertTrue(
+            element("history.detail", in: expired.app)
+                .waitForExistence(timeout: 5)
+        )
+        focusHistory(expired.window, in: expired.app)
+        addScreenshot(
+            expired.window.screenshot(),
+            named: "stornaut-history-expired-dark"
+        )
+
+        expired.app.terminate()
+        XCTAssertTrue(expired.app.wait(for: .notRunning, timeout: 5))
+
+        let corrupt = launchHistoryFixture(
+            fixture: "corrupt",
+            appearance: "light"
+        )
+        defer {
+            corrupt.app.terminate()
+            _ = corrupt.app.wait(for: .notRunning, timeout: 5)
+        }
+        XCTAssertTrue(
+            element("history.state.phase", in: corrupt.app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            element(
+                "history.corrupt.scan-fixture-unreadable",
+                in: corrupt.app
+            ).exists
+        )
+        XCTAssertTrue(
+            element("history.detail", in: corrupt.app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            corrupt.app.staticTexts["Quick Scan"].exists
+        )
+        focusHistory(corrupt.window, in: corrupt.app)
+        addScreenshot(
+            corrupt.window.screenshot(),
+            named: "stornaut-history-corrupt-light"
+        )
+    }
+
+    @MainActor
+    func testHistoryDeleteConfirmationAndStorageTrend() throws {
+        let deletion = launchHistoryFixture(
+            fixture: "populated",
+            appearance: "light"
+        )
+        defer {
+            deletion.app.terminate()
+            _ = deletion.app.wait(for: .notRunning, timeout: 5)
+        }
+        let deleteButton = element(
+            "history.action.delete",
+            in: deletion.app
+        )
+        XCTAssertTrue(deleteButton.waitForExistence(timeout: 5))
+        let recordCountBefore = deletion.app.descendants(matching: .any)
+            .matching(
+                NSPredicate(
+                    format: "identifier BEGINSWITH 'history.record.'"
+                )
+            ).count
+        deleteButton.click()
+        XCTAssertTrue(
+            deletion.app.buttons["Delete Record"].waitForExistence(
+                timeout: 5
+            )
+        )
+        let confirmationMessage = deletion.app.staticTexts.matching(
+            NSPredicate(
+                format:
+                    "label CONTAINS[c] 'Files, Trash' OR value CONTAINS[c] 'Files, Trash'"
+            )
+        ).firstMatch
+        XCTAssertTrue(confirmationMessage.waitForExistence(timeout: 5))
+        let confirmationSheet = deletion.app.sheets.firstMatch
+        XCTAssertTrue(confirmationSheet.waitForExistence(timeout: 5))
+        confirmationSheet.buttons["Delete Record"].click()
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            deletion.app.descendants(matching: .any)
+                .matching(
+                    NSPredicate(
+                        format: "identifier BEGINSWITH 'history.record.'"
+                    )
+                ).count == recordCountBefore - 1
+        })
+        XCTAssertTrue(element("history.detail", in: deletion.app).exists)
+
+        deletion.app.terminate()
+        XCTAssertTrue(deletion.app.wait(for: .notRunning, timeout: 5))
+
+        let trend = launchHistoryFixture(
+            fixture: "trend",
+            appearance: "dark"
+        )
+        defer {
+            trend.app.terminate()
+            _ = trend.app.wait(for: .notRunning, timeout: 5)
+        }
+        let trendButton = element("history.action.trend", in: trend.app)
+        XCTAssertTrue(trendButton.waitForExistence(timeout: 5))
+        trendButton.click()
+        XCTAssertTrue(
+            element("history.trend", in: trend.app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            trend.app.staticTexts[
+                "Events mark when records were created. They do not prove what caused a storage change."
+            ].exists
+        )
+        XCTAssertTrue(
+            element("history.trend.dataTable", in: trend.app).exists
+        )
+        focusHistory(trend.window, in: trend.app)
+        addScreenshot(
+            trend.window.screenshot(),
+            named: "stornaut-history-trend-dark"
+        )
+    }
+
+    @MainActor
     private func verifyShellAndSettings(
         appearance: String,
         screenshotSuffix: String,
@@ -419,6 +598,35 @@ final class StornautAppUITests: XCTestCase {
     }
 
     @MainActor
+    private func launchHistoryFixture(
+        fixture: String,
+        appearance: String
+    ) -> (app: XCUIApplication, window: XCUIElement) {
+        let app = XCUIApplication()
+        app.terminate()
+        XCTAssertTrue(app.wait(for: .notRunning, timeout: 5))
+        app.launchArguments = [
+            "-AppleLanguages", "(en)",
+            "-AppleLocale", "en_US",
+            "--stornaut-ui-test-appearance=\(appearance)",
+            "--stornaut-debug-fixture=success",
+            "--stornaut-debug-history=\(fixture)",
+            "--stornaut-debug-destination=history",
+        ]
+        app.launch()
+        let window = app.windows["main"]
+        XCTAssertTrue(window.waitForExistence(timeout: 10))
+        let historyItem = element("sidebar.history", in: app)
+        XCTAssertTrue(historyItem.waitForExistence(timeout: 5))
+        app.activate()
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            historyItem.isHittable
+        })
+        historyItem.click()
+        return (app, window)
+    }
+
+    @MainActor
     private func element(
         _ identifier: String,
         in app: XCUIApplication
@@ -480,6 +688,22 @@ final class StornautAppUITests: XCTestCase {
             scanItem.isHittable
         })
         scanItem.click()
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            window.isHittable
+        })
+    }
+
+    @MainActor
+    private func focusHistory(
+        _ window: XCUIElement,
+        in app: XCUIApplication
+    ) {
+        app.activate()
+        let historyItem = element("sidebar.history", in: app)
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            historyItem.isHittable
+        })
+        historyItem.click()
         XCTAssertTrue(waitUntil(timeout: 5) {
             window.isHittable
         })

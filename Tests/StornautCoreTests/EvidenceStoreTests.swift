@@ -134,6 +134,142 @@ func cascadeAndCancellationNeverLeaveFalseCompleteData() async throws {
 }
 
 @Test
+func historyDeletionNeverTouchesTargetTrashOrLocalKnowledge() async throws {
+    let root = try EvidenceStoreTestSupport.temporaryDirectory(
+        "history-delete-audit"
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    let configuration = try EvidenceStoreTestSupport.makeFileConfiguration(
+        root: root
+    )
+    let evidence = try EvidenceStore(configuration: configuration)
+    let knowledge = try LocalKnowledgeStore(configuration: configuration)
+    let record = try historyRecord(
+        slug: "history-delete-audit",
+        finishedAt: Date(timeIntervalSince1970: 1_786_320_200)
+    )
+    let target = root.appending(path: "target/value.txt")
+    let trashMarker = root.appending(path: "trash-marker.txt")
+    try FileManager.default.createDirectory(
+        at: target.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+    )
+    try Data("target".utf8).write(to: target)
+    try Data("trash".utf8).write(to: trashMarker)
+    let fact = try LocalKnowledgeFact(
+        id: LocalKnowledgeID(rawValue: "knowledge-history-delete-audit")!,
+        payload: .keepDecision,
+        binding: LocalKnowledgeBinding(
+            scope: PersistedPath(rawValue: "/tmp/history-delete-audit")!,
+            fileIdentity: try FileIdentity(
+                device: 1,
+                inode: 2,
+                mode: UInt16(S_IFDIR | 0o755),
+                ownerUserID: getuid(),
+                ownerGroupID: getgid(),
+                size: 0,
+                allocatedBytes: 0,
+                modificationSeconds: 1,
+                modificationNanoseconds: 0
+            ),
+            activityFingerprint: DomainToken(
+                rawValue: "activity.history-delete-audit"
+            )!,
+            catalogVersion: DomainToken(
+                rawValue: "catalog-history-delete-audit"
+            )!
+        ),
+        provenance: .userConfirmed,
+        observedAt: record.session.finishedAt,
+        updatedAt: record.session.finishedAt
+    )
+    try await evidence.saveScanSession(record.session)
+    try await evidence.saveSpaceLedger(record.ledger)
+    try await knowledge.save(fact)
+    let targetBefore = try Data(contentsOf: target)
+    let trashBefore = try Data(contentsOf: trashMarker)
+
+    try await evidence.deleteScanSession(id: record.session.id)
+
+    #expect(try await evidence.scanSession(id: record.session.id) == nil)
+    #expect(try Data(contentsOf: target) == targetBefore)
+    #expect(try Data(contentsOf: trashMarker) == trashBefore)
+    #expect(try await knowledge.fact(id: fact.id) == fact)
+}
+
+@Test
+func scanHistoryBatchesLedgersAndIsolatesCorruptPayloads() async throws {
+    let store = try EvidenceStore(configuration: .memory)
+    let first = try historyRecord(
+        slug: "history-first",
+        finishedAt: Date(timeIntervalSince1970: 1_786_320_100)
+    )
+    let second = try historyRecord(
+        slug: "history-second",
+        finishedAt: Date(timeIntervalSince1970: 1_786_320_200)
+    )
+    try await store.saveScanSession(first.session)
+    try await store.saveSpaceLedger(first.ledger)
+    try await store.saveScanSession(second.session)
+    try await store.saveSpaceLedger(second.ledger)
+    try await store._testCorruptSpaceLedger(
+        sessionID: second.session.id,
+        payload: "{not-json"
+    )
+    try await store._testInsertMalformedScanSession(
+        id: "scan-history-corrupt",
+        payload: "{not-json"
+    )
+
+    let page = try await store.scanHistory(limit: 10, offset: 0)
+
+    #expect(page.sessions == [second.session, first.session])
+    #expect(page.ledgersBySessionID == [
+        first.session.id: first.ledger,
+    ])
+    #expect(page.corruptSessionIDs == ["scan-history-corrupt"])
+    #expect(page.corruptLedgerSessionIDs == [second.session.id.rawValue])
+    await #expect(throws: EvidenceStoreError.invalidPage) {
+        _ = try await store.scanHistory(limit: 101, offset: 0)
+    }
+}
+
+@Test
+func coordinatorSweepsExpiredEvidenceBeforeHistoryOrLatestProjection()
+    async throws
+{
+    let now = Date(timeIntervalSince1970: 1_786_449_600)
+    let store = try EvidenceStore(configuration: .memory)
+    let record = try historyRecord(
+        slug: "history-expired-sweep",
+        finishedAt: now.addingTimeInterval(-8 * 86_400)
+    )
+    try await store.saveScanSession(record.session)
+    try await store.saveSpaceLedger(record.ledger)
+    let coordinator = QuickScanCoordinator(
+        store: store,
+        historyStore: store,
+        catalog: try BuiltInRuleCatalog.load(),
+        now: { now }
+    )
+
+    let history = try await coordinator.loadHistory()
+
+    #expect(history.sessions.isEmpty)
+    #expect(
+        try await store.scanSession(id: record.session.id) == nil
+    )
+
+    try await store.saveScanSession(record.session)
+    try await store.saveSpaceLedger(record.ledger)
+
+    #expect(try await coordinator.loadLatest() == nil)
+    #expect(
+        try await store.scanSession(id: record.session.id) == nil
+    )
+}
+
+@Test
 func malformedRecordIsIsolatedAndDatabaseCorruptionFailsClosed() async throws {
     let store = try EvidenceStore(configuration: .memory)
     let session: ScanSession = try EvidenceStoreTestSupport.fixture(
@@ -287,4 +423,98 @@ private struct StoredDeveloperTreeFixture: Decodable {
     let classifications: [Classification]
     let evidence: [EvidenceRecord]
     let accounting: SpaceAccounting
+}
+
+private struct HistoryStoreRecord {
+    let session: ScanSession
+    let ledger: SpaceLedger
+}
+
+private func historyRecord(
+    slug: String,
+    finishedAt: Date
+) throws -> HistoryStoreRecord {
+    let sessionID = ScanSessionID(rawValue: "scan-\(slug)")!
+    let scopeID = ScanScopeID(rawValue: "scope-\(slug)")!
+    let rootPath = PersistedPath(rawValue: "/tmp/\(slug)")!
+    let rootIdentity = try FileIdentity(
+        device: 1,
+        inode: 1,
+        mode: UInt16(S_IFDIR | 0o755),
+        ownerUserID: getuid(),
+        ownerGroupID: getgid(),
+        size: 0,
+        allocatedBytes: 0,
+        modificationSeconds: Int64(finishedAt.timeIntervalSince1970),
+        modificationNanoseconds: 0
+    )
+    let session = try ScanSession(
+        id: sessionID,
+        startedAt: finishedAt.addingTimeInterval(-60),
+        finishedAt: finishedAt,
+        terminalState: .completed,
+        completedScopes: [
+            ScanScope(
+                id: scopeID,
+                rootPath: rootPath,
+                completedAt: finishedAt
+            ),
+        ],
+        unfinishedScopes: []
+    )
+    let start = try VolumeBaseline(
+        sessionID: sessionID,
+        scopeID: scopeID,
+        rootPath: rootPath,
+        rootIdentity: rootIdentity,
+        totalCapacity: ByteCount(1_000),
+        availableCapacity: ByteCount(400),
+        availableCapacityForImportantUsage: nil,
+        availableCapacityForOpportunisticUsage: nil,
+        volumeIsReadOnly: false,
+        source: AccountingSource(
+            kind: .volumeResourceValues,
+            identifier: DomainToken(rawValue: "history.fixture.start")!,
+            sampledAt: finishedAt.addingTimeInterval(-60)
+        )
+    )
+    let end = try VolumeBaseline(
+        sessionID: sessionID,
+        scopeID: scopeID,
+        rootPath: rootPath,
+        rootIdentity: rootIdentity,
+        totalCapacity: ByteCount(1_000),
+        availableCapacity: ByteCount(450),
+        availableCapacityForImportantUsage: nil,
+        availableCapacityForOpportunisticUsage: nil,
+        volumeIsReadOnly: false,
+        source: AccountingSource(
+            kind: .volumeResourceValues,
+            identifier: DomainToken(rawValue: "history.fixture.end")!,
+            sampledAt: finishedAt
+        )
+    )
+    let rootSnapshot = try PathSnapshot(
+        id: SnapshotID(rawValue: "snapshot-\(slug)-root")!,
+        sessionID: sessionID,
+        scopeID: scopeID,
+        relativePath: ".",
+        kind: .directory,
+        logicalByteCount: ByteCount(0),
+        allocatedByteCount: ByteCount(0),
+        modifiedAt: finishedAt,
+        fileIdentity: rootIdentity,
+        symlinkTarget: nil,
+        measurementStatus: .measured,
+        observedAt: finishedAt
+    )
+    let ledger = try SpaceLedgerReconciler().reconcile(
+        SpaceLedgerInput(
+            startBaseline: start,
+            endBaseline: end,
+            snapshots: [rootSnapshot],
+            classifications: []
+        )
+    )
+    return HistoryStoreRecord(session: session, ledger: ledger)
 }

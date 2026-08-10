@@ -500,3 +500,133 @@ Task 23 adds:
 - deterministic DEBUG in-progress, partial and completed fixtures;
 - real App XCUITest, Light/Dark screenshots and read-only Peekaboo inspection
   of all three representative states.
+
+## 14. Task 24 Scan-Only History Refresh
+
+Task 24 revalidated the Phase B UI and persistence gates on 2026-08-10 before
+replacing the History placeholder.
+
+### Current Apple and design-system sources
+
+The current Apple SwiftUI documentation index remains
+`/websites/developer_apple_swiftui`. Focused sources were reviewed for:
+
+- selection-driven
+  [`NavigationSplitView`](https://developer.apple.com/documentation/swiftui/navigationsplitview);
+- macOS
+  [`List(selection:content:)`](https://developer.apple.com/documentation/swiftui/list/init%28selection%3Acontent%3A%29);
+- [`searchable`](https://developer.apple.com/documentation/swiftui/view/searchable%28text%3Aplacement%3Aprompt%3A%29);
+- [`confirmationDialog`](https://developer.apple.com/documentation/swiftui/view/confirmationdialog%28_%3Aispresented%3Atitlevisibility%3Aactions%3Amessage%3A%29);
+- selected-state accessibility traits.
+
+The App already owns the outer four-workspace `NavigationSplitView`. History
+therefore uses a native `HSplitView` for its 350–400 pt record navigator and
+detail pane rather than nesting another app-style sidebar. Selection remains a
+stable binding and keyboard navigation changes no file state.
+
+The `ui-ux-pro-max` History searches reinforced:
+
+- every destructive record deletion needs explicit confirmation;
+- successful deletion needs an accessible result/focus transition;
+- status and corruption require icon plus text, never color alone;
+- system type and semantic native controls are preferred;
+- no decorative motion is needed, so Reduce Motion never hides state.
+
+The approved History E+A+C composition remains the information source. No
+raster asset, generated path/date/size, raw palette or pixel constant is copied
+and no new image generation is needed.
+
+### Persistence and query boundary
+
+Task 24 reuses ADR 0007's accepted actor-owned `EvidenceStore` and fixed
+seven-day scan retention. The App dependency runtime resolves the same store
+instance used by `QuickScanCoordinator`; it does not open a second production
+connection or expose SQLite to a View.
+
+History loads:
+
+- paged `ScanSession` records in store order;
+- corrupt scan-session IDs isolated by the existing typed page contract;
+- matching `SpaceLedger` values in bounded batches of at most 100 session IDs;
+- corrupt/missing ledger detail as a per-record issue, never an empty healthy
+  record.
+
+The batch ledger API avoids one SQLite query per session while retaining exact
+payload/row identity validation. Session expiry is derived from the
+store-validated `finishedAt + 7 days` contract. The coordinator now invokes the
+accepted Evidence sweep before inactive latest/History reads, so a newly loaded
+page cannot reuse expired truth. An already open fixture/page can still render
+the explicit Expired presentation until refresh.
+
+Quick Scan and History also share one coordinator-owned concurrency boundary.
+Existing read projections may finish before a pending Scan starts; the pending
+intent prevents new History reads from overtaking it. Active Scan rejects
+History read/delete, while History delete is exclusive. This closes the actor
+reentrancy window without discarding an explicit user Scan intent.
+
+Deletion is a typed session-ID operation inside the Evidence actor. SQLite
+foreign-key cascade removes only that session's Evidence-role descendants.
+Tests prove deletion does not address the scan target, Trash or the independent
+Local Knowledge database.
+
+### Scan-only information architecture
+
+Phase B History contains only real Quick Scan records. It does not synthesize
+Deep Dive, report or Cleanup Manifest rows. Because a Type filter with one
+value would be misleading and redundant, Task 24 uses:
+
+- local search over session ID and scope;
+- terminal-status filter: All, Complete, Partial, Stopped, Failed;
+- date range: All Retained, Today, Last 7 Days.
+
+The navigator groups records as Today, Yesterday and Earlier. Valid rows show
+Quick Scan, finished time, terminal status, one ledger-backed metric when
+available and exact retention/relative countdown. Corrupt rows show only
+`Couldn't read this record`; missing metadata is not guessed.
+
+Detail is an immutable projection of the selected record:
+
+- terminal state and exact start/finish/duration;
+- completed/unfinished scopes and coverage status;
+- Known, Unknown, Unmeasurable and Free measures without collapsing them;
+- ledger source/sample time and caveats;
+- lineage wording that states relationship only and never causality;
+- exact expiry and confirmed record deletion.
+
+### Storage Trend and action boundary
+
+Every production Quick Scan is user initiated in Phase B: entering Scan never
+starts work and no scheduler/background monitor exists. `Storage Trend` is
+therefore available only when at least four completed sessions have comparable
+measured volume capacity/free ledgers at four distinct timestamps.
+
+The optional substate shows exact Used and Free samples with direct labels,
+different line styles plus semantic colors, keyboard/VoiceOver-accessible data
+rows and the fixed non-causality caption. With fewer than four comparable
+snapshots, the action is absent rather than showing a fake chart.
+
+The broader UI specification includes `Export Record…`. The active Task 24
+plan does not authorize a save-panel/export lifecycle, and path redaction is a
+separate privacy contract. Task 24 neither implements nor displays a dead
+export action. A future typed exporter must separately cover canonical-home
+redaction, identifying residual segments, atomic destination writes and user
+confirmation.
+
+### Verification additions
+
+Task 24 adds:
+
+- pure projection tests for empty/current/partial/expired/corrupt states,
+  grouping, status/date/search filters, retention and trend eligibility;
+- Evidence Store batch-ledger and delete/isolation tests;
+- App model tests for load, stale completion, confirmed delete and predictable
+  next selection;
+- deterministic DEBUG populated, expired, corrupt and trend fixtures;
+- View/source gates proving History has no Surveyor, SQLite, Codex, Policy,
+  Executor, Trash or Local Knowledge mutation reference;
+- real App XCUITest, thirteen stable Light/Dark screenshot contracts and
+  read-only Peekaboo inspection of populated, expired, corrupt and trend
+  representative states.
+
+Final implementation/review evidence is recorded in
+[Task 24 Code Review](../reports/epic-2-4-task-24-review.md).

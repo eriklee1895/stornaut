@@ -65,6 +65,52 @@ func debugInitialDestinationAcceptsOnlyOneExactKnownArgument() {
     )
 }
 
+@Test
+func debugHistorySelectorAcceptsOnlyOneExactKnownArgument() {
+    #expect(
+        DebugHistoryFixtureSelection(arguments: [
+            "Stornaut",
+            "--stornaut-debug-history=populated",
+        ])?.fixture == .populated
+    )
+    #expect(
+        DebugHistoryFixtureSelection(arguments: [
+            "Stornaut",
+            "--stornaut-debug-history=unknown",
+        ]) == nil
+    )
+    #expect(
+        DebugHistoryFixtureSelection(arguments: [
+            "Stornaut",
+            "--stornaut-debug-history=populated",
+            "--stornaut-debug-history=expired",
+        ]) == nil
+    )
+}
+
+@Test
+func debugHistoryPresentationAcceptsOnlyOneExactKnownArgument() {
+    #expect(
+        DebugHistoryInitialPresentation.selection(arguments: [
+            "Stornaut",
+            "--stornaut-debug-history-presentation=trend",
+        ]) == .trend
+    )
+    #expect(
+        DebugHistoryInitialPresentation.selection(arguments: [
+            "Stornaut",
+            "--stornaut-debug-history-presentation=unknown",
+        ]) == .detail
+    )
+    #expect(
+        DebugHistoryInitialPresentation.selection(arguments: [
+            "Stornaut",
+            "--stornaut-debug-history-presentation=trend",
+            "--stornaut-debug-history-presentation=detail",
+        ]) == .detail
+    )
+}
+
 @MainActor
 @Test
 func debugFixturesCoverEveryApprovedPhaseDeterministically() throws {
@@ -121,6 +167,21 @@ func debugFixturesCoverEveryApprovedPhaseDeterministically() throws {
     #expect(loadingComposition.model.scanState.scopeScanned == 128)
     #expect(successComposition.model.scanActivity == .idle)
     #expect(successComposition.model.scanState.phase == .completed)
+
+    for fixture in DebugHistoryFixture.allCases {
+        let selection = DebugHistoryFixtureSelection(arguments: [
+            "Stornaut",
+            "--stornaut-debug-history=\(fixture.rawValue)",
+        ])!
+        let composition = try AppComposition.debugFixture(
+            selection: DebugAppFixtureSelection(arguments: [
+                "Stornaut",
+                "--stornaut-debug-fixture=success",
+            ])!,
+            historySelection: selection
+        )
+        #expect(composition.model.historyState.phase == .loaded)
+    }
 }
 
 @MainActor

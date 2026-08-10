@@ -184,6 +184,7 @@ func appModelStartFailurePreservesLatestProjection() async throws {
             cancelQuickScan: { false }
         ),
         initialState: initial,
+        initialHistoryState: .loaded(.empty),
         now: { OverviewTestProjectionFactory.now },
         refreshesServices: false
     )
@@ -197,6 +198,33 @@ func appModelStartFailurePreservesLatestProjection() async throws {
     #expect(model.pageState.projection == retained)
     #expect(model.scanActivity == .idle)
     #expect(model.scanState.reasonKey?.rawValue == "scan.error.start")
+    #expect(model.historyState.phase == .loaded)
+}
+
+@MainActor
+@Test
+func appModelStreamFailureInvalidatesHistoryForStoreReload() async throws {
+    let stream = AsyncThrowingStream<QuickScanProductEvent, Error> {
+        continuation in
+        continuation.finish(throwing: AppTestScanError.startFailed)
+    }
+    let model = StornautAppModel(
+        dependencies: AppDependencies(
+            loadLatestQuickScan: { nil },
+            startQuickScan: { stream },
+            cancelQuickScan: { false }
+        ),
+        initialHistoryState: .loaded(.empty),
+        now: { OverviewTestProjectionFactory.now },
+        refreshesServices: false
+    )
+
+    model.startQuickScan()
+    await waitUntil {
+        model.scanState.phase == .failed
+    }
+
+    #expect(model.historyState.phase == .idle)
 }
 
 private actor AppTestScanDriver {

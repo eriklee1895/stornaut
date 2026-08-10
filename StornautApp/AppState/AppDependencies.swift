@@ -15,6 +15,8 @@ struct AppDependencies: Sendable {
     let startQuickScan: @Sendable () async throws -> QuickScanStream
     let cancelQuickScan: @Sendable () async -> Bool
     let quickScanRootPath: PersistedPath?
+    let loadScanHistory: @Sendable () async throws -> HistoryPage
+    let deleteScanHistory: @Sendable (ScanSessionID) async throws -> Void
 
     init(
         loadLatestQuickScan: @escaping @Sendable () async throws
@@ -26,12 +28,23 @@ struct AppDependencies: Sendable {
         cancelQuickScan: @escaping @Sendable () async -> Bool = {
             false
         },
-        quickScanRootPath: PersistedPath? = nil
+        quickScanRootPath: PersistedPath? = nil,
+        loadScanHistory: @escaping @Sendable () async throws
+            -> HistoryPage = {
+                throw AppDependencyError.historyUnavailable
+            },
+        deleteScanHistory: @escaping @Sendable (
+            ScanSessionID
+        ) async throws -> Void = { _ in
+            throw AppDependencyError.historyUnavailable
+        }
     ) {
         self.loadLatestQuickScan = loadLatestQuickScan
         self.startQuickScan = startQuickScan
         self.cancelQuickScan = cancelQuickScan
         self.quickScanRootPath = quickScanRootPath
+        self.loadScanHistory = loadScanHistory
+        self.deleteScanHistory = deleteScanHistory
     }
 
     static func live(
@@ -61,7 +74,13 @@ struct AppDependencies: Sendable {
             },
             quickScanRootPath: PersistedPath(
                 rawValue: standardizedRoot.path
-            )
+            ),
+            loadScanHistory: {
+                try await runtime.loadHistory()
+            },
+            deleteScanHistory: {
+                try await runtime.deleteHistory(id: $0)
+            }
         )
     }
 
@@ -87,7 +106,13 @@ struct AppDependencies: Sendable {
             cancelQuickScan: {
                 await runtime.cancel()
             },
-            quickScanRootPath: PersistedPath(rawValue: rootURL.path)
+            quickScanRootPath: PersistedPath(rawValue: rootURL.path),
+            loadScanHistory: {
+                try await runtime.loadHistory()
+            },
+            deleteScanHistory: {
+                try await runtime.deleteHistory(id: $0)
+            }
         )
     }
 }
@@ -133,6 +158,26 @@ private actor AppQuickScanRuntime {
         return await coordinator.cancel()
     }
 
+    func loadHistory() async throws -> HistoryPage {
+        let coordinator = try await resolvedCoordinator()
+        let page = try await coordinator.loadHistory()
+        return HistoryPage(
+            records: page.sessions.map {
+                HistoryRecord(
+                    session: $0,
+                    ledger: page.ledgersBySessionID[$0.id]
+                )
+            },
+            corruptSessionIDs: page.corruptSessionIDs,
+            corruptLedgerSessionIDs: page.corruptLedgerSessionIDs
+        )
+    }
+
+    func deleteHistory(id: ScanSessionID) async throws {
+        let coordinator = try await resolvedCoordinator()
+        try await coordinator.deleteHistorySession(id: id)
+    }
+
     private func resolvedCoordinator() async throws -> QuickScanCoordinator {
         if let coordinator {
             return coordinator
@@ -170,6 +215,7 @@ private actor AppQuickScanRuntime {
 
 private enum AppDependencyError: Error {
     case quickScanUnavailable
+    case historyUnavailable
 }
 
 @MainActor

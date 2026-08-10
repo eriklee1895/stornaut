@@ -18,6 +18,25 @@ public struct StorePage<Record: Sendable>: Sendable {
     }
 }
 
+public struct ScanHistoryPage: Sendable, Equatable {
+    public let sessions: [ScanSession]
+    public let ledgersBySessionID: [ScanSessionID: SpaceLedger]
+    public let corruptSessionIDs: [String]
+    public let corruptLedgerSessionIDs: [String]
+
+    public init(
+        sessions: [ScanSession],
+        ledgersBySessionID: [ScanSessionID: SpaceLedger],
+        corruptSessionIDs: [String],
+        corruptLedgerSessionIDs: [String]
+    ) {
+        self.sessions = sessions
+        self.ledgersBySessionID = ledgersBySessionID
+        self.corruptSessionIDs = corruptSessionIDs
+        self.corruptLedgerSessionIDs = corruptLedgerSessionIDs
+    }
+}
+
 struct EvidenceStoreTestHooks: Sendable {
     let failMigrationToVersion: Int?
 
@@ -210,6 +229,73 @@ public actor EvidenceStore {
                     )
             },
             operation: "scanSession.page"
+        )
+    }
+
+    public func scanHistory(
+        limit: Int,
+        offset: Int
+    ) throws -> ScanHistoryPage {
+        let sessions = try scanSessions(limit: limit, offset: offset)
+        guard !sessions.records.isEmpty else {
+            return ScanHistoryPage(
+                sessions: [],
+                ledgersBySessionID: [:],
+                corruptSessionIDs: sessions.corruptRecordIDs,
+                corruptLedgerSessionIDs: []
+            )
+        }
+        let sessionIDs = sessions.records.map(\.id)
+        let placeholders = Array(
+            repeating: "?",
+            count: sessionIDs.count
+        ).joined(separator: ", ")
+        let rows = try connection.query(
+            """
+            SELECT id, payload, session_id
+            FROM space_accounting
+            WHERE session_id IN (\(placeholders))
+            ORDER BY session_id ASC
+            """,
+            bindings: sessionIDs.map {
+                .text($0.rawValue)
+            },
+            operation: "history.ledgers"
+        ) { statement -> StoreDecodedRow<SpaceLedger> in
+            let id = columnText(statement, 0)
+            let payload = columnText(statement, 1)
+            let parentID = columnText(statement, 2)
+            do {
+                let ledger = try DomainJSON.decode(
+                    SpaceLedger.self,
+                    from: Data(payload.utf8)
+                )
+                guard id == parentID,
+                      ledger.sessionID.rawValue == id,
+                      sessionIDs.contains(ledger.sessionID)
+                else {
+                    throw EvidenceStoreError.recordIdentityMismatch
+                }
+                return .record(ledger)
+            } catch {
+                return .corrupt(parentID)
+            }
+        }
+        var ledgers: [ScanSessionID: SpaceLedger] = [:]
+        var corruptLedgerIDs: [String] = []
+        for row in rows {
+            switch row {
+            case let .record(ledger):
+                ledgers[ledger.sessionID] = ledger
+            case let .corrupt(id):
+                corruptLedgerIDs.append(id)
+            }
+        }
+        return ScanHistoryPage(
+            sessions: sessions.records,
+            ledgersBySessionID: ledgers,
+            corruptSessionIDs: sessions.corruptRecordIDs.sorted(),
+            corruptLedgerSessionIDs: Array(Set(corruptLedgerIDs)).sorted()
         )
     }
 
@@ -708,6 +794,20 @@ public actor EvidenceStore {
                 .text(id.rawValue),
             ],
             operation: "test.changeCleanupPlanExpiry"
+        )
+    }
+
+    func _testCorruptSpaceLedger(
+        sessionID: ScanSessionID,
+        payload: String
+    ) throws {
+        try connection.execute(
+            "UPDATE space_accounting SET payload = ? WHERE session_id = ?",
+            bindings: [
+                .text(payload),
+                .text(sessionID.rawValue),
+            ],
+            operation: "test.corruptSpaceLedger"
         )
     }
 

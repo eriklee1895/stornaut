@@ -1,6 +1,6 @@
 # Stornaut Epic 2–4 Deterministic Product Core Implementation Plan
 
-> **Status:** Approved — Tasks 9–23 complete; Task 24 next
+> **Status:** Approved — Tasks 9–24 complete; Task 25 next
 >
 > **Roadmap phase:** Phase B — Deterministic Product Core
 >
@@ -1569,13 +1569,13 @@ Suggested commit subject: `feat: deliver quick scan results`
 - Modify: localization resources
 - Create/modify: History unit/UI tests and screenshot checks
 
-- [ ] **Step 1: Write History projection tests first**
+- [x] **Step 1: Write History projection tests first**
 
 Cover empty, current, partial, expired evidence, single corrupt record,
 retention countdown, filters and confirmed deletion. Deleting a record does not
 touch target files, Trash or Local Knowledge.
 
-- [ ] **Step 2: Implement master-detail History**
+- [x] **Step 2: Implement master-detail History**
 
 Use the approved date-grouped navigator and typed detail projection for real
 Quick Scan sessions/snapshots. Show terminal state, coverage, lineage and
@@ -1586,16 +1586,41 @@ on-demand History substate and appears only after at least four real,
 user-initiated snapshots exist. It must label Used/Free samples and event
 markers without implying background collection or causal attribution.
 
-- [ ] **Step 3: Verify accessibility and themes**
+- [x] **Step 3: Verify accessibility and themes**
 
 Keyboard selection, search/filter, record status, retention and errors are
 accessible and not color-only.
 
-- [ ] **Step 4: Run the real App UI loop**
+- [x] **Step 4: Run the real App UI loop**
 
 Run focused tests, build/launch the actual `.app`, inspect populated, expired
 and corrupt-record states with read-only Peekaboo, update XCUITest/Light/Dark
 screenshots and run `scripts/verify`.
+
+Execution evidence:
+
+- `ScanHistoryPage` loads ordered bounded sessions and one batched ledger
+  query; malformed session/ledger rows isolate only themselves.
+- The same coordinator/store sweeps seven-day Evidence before inactive latest
+  or History reads. Active Quick Scan rejects History access; pending Scan
+  intent waits for existing readers and prevents new readers from overtaking.
+- App History state uses generation-scoped refresh flights, preserves valid
+  pages on load/delete failure and invalidates stale state after a started
+  stream terminal/failure.
+- Projection tests cover no-results versus no-history, optional scope,
+  corrupt-filter truth, exact retention and measured/distinct-timestamp trend
+  eligibility.
+- Confirmed deletion cascades only the selected Evidence session graph; target
+  files, Trash markers and Local Knowledge remain byte-for-byte unchanged.
+- Grouped review fixed all confirmed findings; the final report has no open
+  P0–P2 finding. See
+  [Task 24 Code Review](../../reports/epic-2-4-task-24-review.md).
+- Final `scripts/verify` passed: SwiftPM 267/267, App tests 79/79, XCUITest
+  7/7, thirteen screenshot contracts, signed App, Release fixture isolation,
+  67-rule catalog, localization, docs links and `git diff --check`.
+- Read-only Peekaboo inspected four separately launched signed real-App
+  History windows (populated, expired, corrupt and trend), all `2360 × 1520`,
+  with no raw localization key in AX output.
 
 Suggested commit subject: `feat: add scan history workspace`
 

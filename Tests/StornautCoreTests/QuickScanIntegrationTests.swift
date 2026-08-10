@@ -80,6 +80,7 @@ func quickScanCoordinatorRunsTheRealDeterministicPipeline() async throws {
     let store = try EvidenceStore(configuration: fixture.storeConfiguration)
     let coordinator = QuickScanCoordinator(
         store: store,
+        historyStore: store,
         catalog: try task20Catalog(),
         activityProvider: FixtureQuickScanActivityProvider(),
         volumeSampler: Task20VolumeSampler(),
@@ -627,6 +628,9 @@ func quickScanCancellationAndConcurrentIntentRemainControlled() async throws {
             ScanRequest(rootURL: fixture.targetURL)
         )
     }
+    await #expect(throws: QuickScanLifecycleError.scanAlreadyRunning) {
+        _ = try await coordinator.loadHistory()
+    }
     await coordinator.cancel()
     await coordinator.cancel()
     let events = try await collector.value
@@ -640,6 +644,41 @@ func quickScanCancellationAndConcurrentIntentRemainControlled() async throws {
         try await store.scanSession(id: request.sessionID)?
             .terminalState == .cancelled
     )
+}
+
+@Test
+func quickScanWaitsForInFlightHistoryAccessBeforeStarting() async throws {
+    let fixture = try Task20Fixture()
+    defer { fixture.remove() }
+    let store = try EvidenceStore(configuration: fixture.storeConfiguration)
+    let historyStore = BlockingHistoryStore(backing: store)
+    let coordinator = QuickScanCoordinator(
+        store: store,
+        historyStore: historyStore,
+        catalog: try task20Catalog(),
+        activityProvider: FixtureQuickScanActivityProvider(),
+        volumeSampler: Task20VolumeSampler()
+    )
+    let history = Task {
+        try await coordinator.loadHistory()
+    }
+    try await historyStore.waitUntilBlocked()
+
+    let start = Task {
+        try await coordinator.start(
+            ScanRequest(rootURL: fixture.targetURL)
+        )
+    }
+    try await Task.sleep(for: .milliseconds(25))
+    #expect(await coordinator.hasActiveScan == false)
+
+    await historyStore.release()
+    _ = try await history.value
+    let stream = try await start.value
+    #expect(await coordinator.hasActiveScan)
+    await coordinator.cancel()
+    _ = try await collectProductEvents(stream)
+    #expect(await coordinator.hasActiveScan == false)
 }
 
 @Test
@@ -1422,6 +1461,50 @@ private actor BlockingCommitProductStore:
         while !blockedSaveReleased {
             try await Task.sleep(for: .milliseconds(10))
         }
+    }
+}
+
+private actor BlockingHistoryStore: QuickScanHistoryPersisting {
+    private let backing: EvidenceStore
+    private var blocked = false
+    private var released = false
+
+    init(backing: EvidenceStore) {
+        self.backing = backing
+    }
+
+    func expireRecords(now: Date) async throws {
+        blocked = true
+        while !released {
+            await Task.yield()
+        }
+        try await backing.expireRecords(now: now)
+    }
+
+    func scanHistory(
+        limit: Int,
+        offset: Int
+    ) async throws -> ScanHistoryPage {
+        try await backing.scanHistory(limit: limit, offset: offset)
+    }
+
+    func deleteScanSession(id: ScanSessionID) async throws {
+        try await backing.deleteScanSession(id: id)
+    }
+
+    func waitUntilBlocked() async throws {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .seconds(5))
+        while !blocked {
+            guard clock.now < deadline else {
+                throw Task20TestError.timedOut
+            }
+            await Task.yield()
+        }
+    }
+
+    func release() {
+        released = true
     }
 }
 

@@ -48,7 +48,7 @@ Epic 0 shell 当前必须保持：
 - System Light/Dark 均可读；
 - bundle identifier 为 `com.eriklee.stornaut`。
 
-现有 XCUITest 必须生成九个稳定附件：
+现有 XCUITest 必须生成十三个稳定附件：
 
 ```text
 stornaut-shell-light.png
@@ -60,6 +60,10 @@ stornaut-overview-zh-Hans.png
 stornaut-scan-progress-dark.png
 stornaut-scan-partial-light.png
 stornaut-scan-results-inspector-light.png
+stornaut-history-populated-light.png
+stornaut-history-expired-dark.png
+stornaut-history-corrupt-light.png
+stornaut-history-trend-dark.png
 ```
 
 `scripts/export-ui-screenshots` 将它们导出到 ignored 的 `.derivedData/ui-screenshots/`，`scripts/verify-ui-screenshots` 检查文件、尺寸和主题差异。
@@ -74,6 +78,12 @@ home：Dark active 验证五阶段 rail、四种独立进度单位和渐进结�
 partial 验证 page-preserving partial truth；Light completed + Inspector
 验证 grouped lifecycle table 和只读证据详情。截图中不得出现 enabled Review、
 Trash、Registered Action 或 Codex action。
+
+Task 24 的四张 History 截图固定 typed DEBUG Evidence fixture：Light populated
+验证日期分组 master-detail 与真实 ledger measures；Dark expired 验证 retention
+语义；Light corrupt 验证单条 session/ledger 隔离；Dark trend 验证至少四个
+measured、可比较、不同时间戳样本的 Used/Free 直标与非因果文案。它们不得
+显示 Deep Dive、Cleanup Manifest、export 或暗示后台采集。
 
 Settings 附件必须截取包含 `settings.content` 的独立 window，不能直接对
 `settings.content` accessibility element 截图。后者在 macOS 26 的透明

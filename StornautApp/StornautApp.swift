@@ -66,7 +66,10 @@ struct StornautApp: App {
         ) {
             do {
                 return try AppComposition.debugFixture(
-                    selection: selection
+                    selection: selection,
+                    historySelection: DebugHistoryFixtureSelection(
+                        arguments: CommandLine.arguments
+                    )
                 )
             } catch {
                 return failedComposition(error)

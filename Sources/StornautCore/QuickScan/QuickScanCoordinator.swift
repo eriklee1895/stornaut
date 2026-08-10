@@ -36,6 +36,17 @@ protocol QuickScanProductPersisting: ScanSessionPersisting {
 
 extension EvidenceStore: QuickScanProductPersisting {}
 
+protocol QuickScanHistoryPersisting: Sendable {
+    func expireRecords(now: Date) async throws
+    func scanHistory(
+        limit: Int,
+        offset: Int
+    ) async throws -> ScanHistoryPage
+    func deleteScanSession(id: ScanSessionID) async throws
+}
+
+extension EvidenceStore: QuickScanHistoryPersisting {}
+
 protocol QuickScanActivityProviding: Sendable {
     func observations(
         for snapshot: PathSnapshot,
@@ -169,6 +180,7 @@ public actor QuickScanCoordinator {
     ) -> EvidenceID
 
     private let store: any QuickScanProductPersisting
+    private let historyStore: (any QuickScanHistoryPersisting)?
     private let catalog: RuleCatalog
     private let matcher: RuleCatalogMatcher
     private let activityProvider: any QuickScanActivityProviding
@@ -180,6 +192,9 @@ public actor QuickScanCoordinator {
     private var activeControl: QuickScanProductRunControl?
     private var activeWriter: ScanSessionWriter?
     private var scanIsActive = false
+    private var scanStartIsPending = false
+    private var historyReadCount = 0
+    private var historyMutationIsActive = false
 
     private struct ProcessingFailure: Error {
         let issue: QuickScanProductIssue
@@ -188,6 +203,7 @@ public actor QuickScanCoordinator {
 
     init(
         store: any QuickScanProductPersisting,
+        historyStore: (any QuickScanHistoryPersisting)? = nil,
         catalog: RuleCatalog,
         activityProvider: any QuickScanActivityProviding =
             NativeQuickScanActivityProvider(),
@@ -203,6 +219,7 @@ public actor QuickScanCoordinator {
         }
     ) {
         self.store = store
+        self.historyStore = historyStore
         self.catalog = catalog
         matcher = RuleCatalogMatcher(catalog: catalog)
         self.activityProvider = activityProvider
@@ -218,6 +235,7 @@ public actor QuickScanCoordinator {
     ) throws {
         try self.init(
             store: store,
+            historyStore: store,
             catalog: BuiltInRuleCatalog.load()
         )
     }
@@ -228,8 +246,19 @@ public actor QuickScanCoordinator {
 
     public func start(
         _ request: ScanRequest
-    ) throws -> AsyncThrowingStream<QuickScanProductEvent, Error> {
-        guard !scanIsActive else {
+    ) async throws -> AsyncThrowingStream<QuickScanProductEvent, Error> {
+        guard !scanIsActive,
+              !scanStartIsPending,
+              !historyMutationIsActive
+        else {
+            throw QuickScanLifecycleError.scanAlreadyRunning
+        }
+        scanStartIsPending = true
+        defer { scanStartIsPending = false }
+        while historyReadCount > 0 {
+            try await Task.sleep(for: .milliseconds(1))
+        }
+        guard !scanIsActive, !historyMutationIsActive else {
             throw QuickScanLifecycleError.scanAlreadyRunning
         }
         scanIsActive = true
@@ -260,6 +289,9 @@ public actor QuickScanCoordinator {
     }
 
     public func loadLatest() async throws -> QuickScanProjection? {
+        try beginHistoryRead()
+        defer { historyReadCount -= 1 }
+        try await historyStore?.expireRecords(now: now())
         guard let session = try await loadLatestValidSession() else {
             return nil
         }
@@ -357,6 +389,54 @@ public actor QuickScanCoordinator {
             issues: issues,
             corruptRecordIDs: corrupt
         )
+    }
+
+    public func loadHistory(
+        limit: Int = 100,
+        offset: Int = 0
+    ) async throws -> ScanHistoryPage {
+        try beginHistoryRead()
+        defer { historyReadCount -= 1 }
+        guard let historyStore else {
+            throw EvidenceStoreError.schemaMismatch
+        }
+        try await historyStore.expireRecords(now: now())
+        return try await historyStore.scanHistory(
+            limit: limit,
+            offset: offset
+        )
+    }
+
+    public func deleteHistorySession(
+        id: ScanSessionID
+    ) async throws {
+        try beginHistoryMutation()
+        defer { historyMutationIsActive = false }
+        guard let historyStore else {
+            throw EvidenceStoreError.schemaMismatch
+        }
+        try await historyStore.deleteScanSession(id: id)
+    }
+
+    private func beginHistoryRead() throws {
+        guard !scanIsActive,
+              !scanStartIsPending,
+              !historyMutationIsActive
+        else {
+            throw QuickScanLifecycleError.scanAlreadyRunning
+        }
+        historyReadCount += 1
+    }
+
+    private func beginHistoryMutation() throws {
+        guard !scanIsActive,
+              !scanStartIsPending,
+              historyReadCount == 0,
+              !historyMutationIsActive
+        else {
+            throw QuickScanLifecycleError.scanAlreadyRunning
+        }
+        historyMutationIsActive = true
     }
 
     private func execute(

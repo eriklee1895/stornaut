@@ -58,6 +58,10 @@ struct RootView: View {
                     .frame(width: 1, height: 1)
                 DebugScanStateProbe(phase: appModel.scanState.phase)
                     .frame(width: 1, height: 1)
+                DebugHistoryStateProbe(
+                    phase: appModel.historyState.phase
+                )
+                .frame(width: 1, height: 1)
             }
         }
 #endif
@@ -85,7 +89,11 @@ struct RootView: View {
             )
         case .scan:
             ScanView()
-        case .investigations, .history:
+        case .history:
+            HistoryView {
+                selection = .scan
+            }
+        case .investigations:
             DestinationPlaceholder(destination: destination)
         }
     }
