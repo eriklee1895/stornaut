@@ -238,7 +238,9 @@ func nonzeroExitDoesNotExposeRawStderrAsTheError() async throws {
     let fixture = try CodexProcessFixture(mode: "nonzero")
     defer { fixture.remove() }
 
-    let stream = CodexProcess().run(fixture.makeRequest())
+    let stream = CodexProcess().run(
+        fixture.makeRequest(timeout: .seconds(5))
+    )
 
     await #expect(throws: CodexProcessError.nonzeroExit(status: 7)) {
         _ = try await collectEvents(from: stream)

@@ -13,6 +13,7 @@ public struct ScanRequest: Sendable {
     public static let maximumPersistenceBatchSize = 100
 
     public let rootURL: URL
+    public let exclusions: [ScanExclusion]
     public let maximumWorkers: Int
     public let maximumPendingDirectories: Int
     public let stayOnRootDevice: Bool
@@ -26,6 +27,7 @@ public struct ScanRequest: Sendable {
 
     public init(
         rootURL: URL,
+        exclusions: [ScanExclusion] = [],
         maximumWorkers: Int = defaultMaximumWorkers,
         maximumPendingDirectories: Int = defaultMaximumPendingDirectories,
         stayOnRootDevice: Bool = true,
@@ -39,6 +41,7 @@ public struct ScanRequest: Sendable {
     ) {
         self.init(
             rootURL: rootURL,
+            exclusions: exclusions,
             maximumWorkers: maximumWorkers,
             maximumPendingDirectories: maximumPendingDirectories,
             stayOnRootDevice: stayOnRootDevice,
@@ -54,6 +57,7 @@ public struct ScanRequest: Sendable {
 
     init(
         rootURL: URL,
+        exclusions: [ScanExclusion] = [],
         maximumWorkers: Int = defaultMaximumWorkers,
         maximumPendingDirectories: Int = defaultMaximumPendingDirectories,
         stayOnRootDevice: Bool = true,
@@ -67,6 +71,7 @@ public struct ScanRequest: Sendable {
         testHooks: SurveyorTestHooks
     ) {
         self.rootURL = rootURL
+        self.exclusions = exclusions
         self.maximumWorkers = maximumWorkers
         self.maximumPendingDirectories = maximumPendingDirectories
         self.stayOnRootDevice = stayOnRootDevice

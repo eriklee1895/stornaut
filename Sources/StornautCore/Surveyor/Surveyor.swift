@@ -69,6 +69,11 @@ private func runSurvey(
     else {
         throw SurveyorError.invalidStreamBufferCapacity
     }
+    let rootIsCaseSensitive = (
+        try? root.resourceValues(
+            forKeys: [.volumeSupportsCaseSensitiveNamesKey]
+        ).volumeSupportsCaseSensitiveNames
+    ) ?? true
 
     try emit(
         metadataSnapshot(
@@ -87,7 +92,8 @@ private func runSurvey(
             url: root,
             relativePath: ".",
             expectedDevice: rootMetadata.device,
-            expectedInode: rootMetadata.inode
+            expectedInode: rootMetadata.inode,
+            rootIsCaseSensitive: rootIsCaseSensitive
         )
     ) else {
         throw SurveyorError.internalInvariant
@@ -319,6 +325,13 @@ private func processDirectory(
         }
 
         let metadata = FileMetadata(info)
+        let isExcluded = metadata.kind == .directory
+            && request.exclusions.contains {
+                $0.contains(
+                    relativePath,
+                    caseSensitive: job.rootIsCaseSensitive
+                )
+            }
         let isBoundary = metadata.kind == .directory
             && (
                 request.testHooks.isMountBoundary(childURL)
@@ -327,14 +340,17 @@ private func processDirectory(
                             && metadata.device != rootDevice
                     )
             )
-        let issue: ScanIssue? = isBoundary ? .mountBoundary : nil
-        if metadata.kind == .directory, !isBoundary {
+        let issue: ScanIssue? = isExcluded
+            ? .userExcluded
+            : isBoundary ? .mountBoundary : nil
+        if metadata.kind == .directory, !isBoundary, !isExcluded {
             scheduleDirectory(
                 DirectoryJob(
                     url: childURL,
                     relativePath: relativePath,
                     expectedDevice: metadata.device,
-                    expectedInode: metadata.inode
+                    expectedInode: metadata.inode,
+                    rootIsCaseSensitive: job.rootIsCaseSensitive
                 )
             )
         } else {
@@ -389,6 +405,7 @@ private struct DirectoryJob: Sendable {
     let relativePath: String
     let expectedDevice: UInt64
     let expectedInode: UInt64
+    let rootIsCaseSensitive: Bool
 }
 
 struct FileMetadata {

@@ -21,7 +21,10 @@ struct StornautApp: App {
         Window("app.name", id: "main") {
             RootView()
                 .environment(appModel)
-                .preferredColorScheme(launchColorScheme)
+                .environment(\.locale, preferredLocale)
+                .preferredColorScheme(
+                    launchColorScheme ?? preferredColorScheme
+                )
                 .background {
                     WindowAppearanceProbe(identifier: "app.appearance")
                         .frame(width: 1, height: 1)
@@ -49,13 +52,40 @@ struct StornautApp: App {
                 StornautSettingsView()
             }
             .environment(appModel)
-            .preferredColorScheme(launchColorScheme)
+            .environment(\.locale, preferredLocale)
+            .preferredColorScheme(
+                launchColorScheme ?? preferredColorScheme
+            )
             .background {
                 WindowAppearanceProbe(identifier: "settings.appearance")
                     .frame(width: 1, height: 1)
             }
         }
         .keyboardShortcut(",", modifiers: .command)
+    }
+
+    private var preferredColorScheme: ColorScheme? {
+        switch appModel.settingsState.snapshot?
+            .preferences.appearance ?? .system
+        {
+        case .system:
+            nil
+        case .light:
+            .light
+        case .dark:
+            .dark
+        }
+    }
+
+    private var preferredLocale: Locale {
+        switch appModel.settingsState.snapshot?
+            .preferences.language ?? .english
+        {
+        case .english:
+            Locale(identifier: "en")
+        case .simplifiedChinese:
+            Locale(identifier: "zh-Hans")
+        }
     }
 
     @MainActor
@@ -68,6 +98,12 @@ struct StornautApp: App {
                 return try AppComposition.debugFixture(
                     selection: selection,
                     historySelection: DebugHistoryFixtureSelection(
+                        arguments: CommandLine.arguments
+                    ),
+                    settingsSelection: DebugSettingsFixtureSelection(
+                        arguments: CommandLine.arguments
+                    ),
+                    settingsLanguage: DebugSettingsLanguage.selection(
                         arguments: CommandLine.arguments
                     )
                 )
@@ -246,6 +282,11 @@ final class WindowAppearanceView: NSView {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        apply()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
         apply()
     }
 

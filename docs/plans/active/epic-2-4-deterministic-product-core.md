@@ -1,6 +1,6 @@
 # Stornaut Epic 2–4 Deterministic Product Core Implementation Plan
 
-> **Status:** Approved — Tasks 9–24 complete; Task 25 next
+> **Status:** Approved — Tasks 9–25 complete; Task 26 next
 >
 > **Roadmap phase:** Phase B — Deterministic Product Core
 >
@@ -1634,13 +1634,13 @@ Suggested commit subject: `feat: add scan history workspace`
 - Modify: localization resources
 - Create/modify: Settings unit/UI tests and screenshot checks
 
-- [ ] **Step 1: Write Settings behavior tests first**
+- [x] **Step 1: Write Settings behavior tests first**
 
 Cover appearance/language, scan roots/exclusions, separate evidence/manifest
 clear confirmations, Local Knowledge review/forget and read-only permission/
 Deep Dive policy facts.
 
-- [ ] **Step 2: Implement the approved six-section shell**
+- [x] **Step 2: Implement the approved six-section shell**
 
 Fully wire the Phase B parts:
 
@@ -1653,12 +1653,12 @@ Permissions and Codex & Deep Dive show only existing evidence-backed status and
 safe repair/check actions. They expose no permission, denylist or safety
 bypass. Unimplemented Adapter or investigation controls are not fabricated.
 
-- [ ] **Step 3: Verify localization and accessibility**
+- [x] **Step 3: Verify localization and accessibility**
 
 Keep English/`zh-Hans` keys in parity. Verify keyboard navigation, native
 Settings sizing, status semantics, confirmation sheets and Light/Dark.
 
-- [ ] **Step 4: Run the real App UI loop**
+- [x] **Step 4: Run the real App UI loop**
 
 Run focused tests, build/launch the actual `.app`, inspect representative
 General, Scanning, Privacy & Data and Local Knowledge states with read-only
@@ -1666,6 +1666,39 @@ Peekaboo, update XCUITest/screenshots and run `scripts/verify`.
 
 Record any AutomationMode initialization delay as runner evidence; do not
 change TCC, Accessibility, Event Synthesizing or Screen Recording.
+
+Execution evidence:
+
+- A versioned, size-bounded, owner-only Settings JSON store now persists closed
+  language, appearance, one Primary Scan Root bookmark, at most 64 normalized
+  exclusions and one investigation-budget preset. Unknown/future/unsafe
+  payloads fail closed.
+- Bookmark inspection does not acquire security-scoped access. A Scan acquires
+  access immediately before start and retains its lease through stream
+  termination. No configured bookmark uses Home; a configured stale or
+  unavailable bookmark blocks Scan instead of broadening scope.
+- Surveyor persists `.userExcluded` directory boundaries, does not traverse
+  descendants and uses volume-aware case comparison. Ledger/session truth stays
+  partial/unmeasurable, and excluded snapshots never become candidates or
+  owners.
+- General changes app-local English/`zh-Hans` and System/Light/Dark immediately
+  in both windows. Permissions exposes current root/status and conservative FDA
+  evidence. Codex installation/syntax remains independent from safety
+  `Paused · Required`.
+- Evidence and Manifest clear operations remain separate; confirmed single/all
+  Local Knowledge forgetting preserves total counts beyond the first bounded
+  page. Active Scan rejects every Settings mutation.
+- Five-group review fixed all confirmed findings; the post-fix report has no
+  open P0–P2 finding. See
+  [Task 25 Code Review](../../reports/epic-2-4-task-25-review.md).
+- Final `scripts/verify` passed in one run: SwiftPM 269/269 functional/security
+  tests plus three independent `< 2 s` matcher Benchmarks, App tests 95/95,
+  XCUITest 9/9, seventeen screenshot contracts, signed App, Release fixture
+  isolation, 67-rule catalog, localization, docs links and
+  `git diff --check`.
+- Final read-only Peekaboo inspected signed Scanning Light and Local Knowledge
+  Dark windows at `900 × 648`, each with 234 AX elements and no raw
+  localization key in visible AX fields. No input/mutation tool was used.
 
 Suggested commit subject: `feat: add deterministic scan settings`
 

@@ -474,6 +474,222 @@ final class StornautAppUITests: XCTestCase {
     }
 
     @MainActor
+    func testSettingsSixSectionsAndRepresentativeStates() throws {
+        let light = launchSettingsFixture(
+            fixture: "populated",
+            appearance: "light",
+            section: "general"
+        )
+        defer {
+            closeResidualSettingsWindow(in: light.app)
+            light.app.terminate()
+            _ = light.app.wait(for: .notRunning, timeout: 5)
+        }
+        for identifier in [
+            "settings.sidebar.general",
+            "settings.sidebar.scanning",
+            "settings.sidebar.permissions",
+            "settings.sidebar.codexAndDeepDive",
+            "settings.sidebar.privacyAndData",
+            "settings.sidebar.localKnowledge",
+        ] {
+            XCTAssertTrue(
+                element(identifier, in: light.app)
+                    .waitForExistence(timeout: 5)
+            )
+        }
+        XCTAssertTrue(
+            element("settings.page.general", in: light.app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertFalse(light.app.staticTexts["Background Monitoring"].exists)
+        XCTAssertFalse(light.app.buttons["Run Safety Check"].exists)
+
+        selectSettings(.scanning, in: light.app)
+        XCTAssertTrue(
+            element("settings.page.scanning", in: light.app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            element("settings.scanning.primaryRoot", in: light.app).exists
+        )
+        addScreenshot(
+            light.window.screenshot(),
+            named: "stornaut-settings-scanning-light"
+        )
+
+        selectSettings(.privacyAndData, in: light.app)
+        XCTAssertTrue(
+            element("settings.page.privacyAndData", in: light.app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            element("settings.action.clearEvidence", in: light.app).exists
+        )
+        XCTAssertTrue(
+            element("settings.action.clearManifests", in: light.app).exists
+        )
+        XCTAssertFalse(light.app.steppers["Evidence"].exists)
+        addScreenshot(
+            light.window.screenshot(),
+            named: "stornaut-settings-privacy-light"
+        )
+
+        light.app.terminate()
+        XCTAssertTrue(light.app.wait(for: .notRunning, timeout: 5))
+
+        let dark = launchSettingsFixture(
+            fixture: "populated",
+            appearance: "dark",
+            section: "codexAndDeepDive"
+        )
+        defer {
+            closeResidualSettingsWindow(in: dark.app)
+            dark.app.terminate()
+            _ = dark.app.wait(for: .notRunning, timeout: 5)
+        }
+        XCTAssertTrue(
+            element("settings.page.codexAndDeepDive", in: dark.app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            dark.app.staticTexts.matching(
+                NSPredicate(
+                    format:
+                        "label CONTAINS[c] 'Paused · Required' OR "
+                        + "value CONTAINS[c] 'Paused · Required'"
+                )
+            ).firstMatch.exists
+        )
+        XCTAssertFalse(dark.app.buttons["Start Deep Dive"].exists)
+        XCTAssertFalse(dark.app.buttons["Trust Codex"].exists)
+        addScreenshot(
+            dark.window.screenshot(),
+            named: "stornaut-settings-codex-dark"
+        )
+
+        selectSettings(.localKnowledge, in: dark.app)
+        XCTAssertTrue(
+            element("settings.page.localKnowledge", in: dark.app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            dark.app.descendants(matching: .any)
+                .matching(
+                    NSPredicate(
+                        format:
+                            "identifier BEGINSWITH 'settings.knowledge.knowledge-'"
+                    )
+                ).firstMatch.waitForExistence(timeout: 5)
+        )
+        XCTAssertFalse(dark.app.textFields["Agent Memory"].exists)
+        addScreenshot(
+            dark.window.screenshot(),
+            named: "stornaut-settings-knowledge-dark"
+        )
+    }
+
+    @MainActor
+    func testSettingsImmediatePreferencesAndConfirmedDeletion() throws {
+        let launched = launchSettingsFixture(
+            fixture: "populated",
+            appearance: "system",
+            section: "general"
+        )
+        defer {
+            closeResidualSettingsWindow(in: launched.app)
+            launched.app.terminate()
+            _ = launched.app.wait(for: .notRunning, timeout: 5)
+        }
+
+        let language = element("settings.general.language", in: launched.app)
+        XCTAssertTrue(language.waitForExistence(timeout: 5))
+        launched.app.activate()
+        XCTAssertTrue(waitUntil(timeout: 5) { language.isHittable })
+        language.click()
+        let simplifiedChinese = launched.app.menuItems[
+            "Simplified Chinese"
+        ]
+        XCTAssertTrue(
+            simplifiedChinese.waitForExistence(timeout: 5)
+        )
+        simplifiedChinese.click()
+        XCTAssertTrue(
+            launched.app.staticTexts["通用"].waitForExistence(timeout: 5)
+        )
+
+        let appearance = element(
+            "settings.general.appearance",
+            in: launched.app
+        )
+        XCTAssertTrue(appearance.waitForExistence(timeout: 5))
+        let darkOption = element(
+            "settings.general.appearance.dark",
+            in: launched.app
+        )
+        XCTAssertTrue(darkOption.waitForExistence(timeout: 5))
+        darkOption.click()
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            element("settings.appearance", in: launched.app).label == "dark"
+        })
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            element("app.appearance", in: launched.app).label == "dark"
+        })
+
+        selectSettings(.privacyAndData, in: launched.app)
+        let clear = element("settings.action.clearEvidence", in: launched.app)
+        XCTAssertTrue(clear.waitForExistence(timeout: 5))
+        clear.click()
+        let clearSheet = launched.app.sheets.firstMatch
+        XCTAssertTrue(clearSheet.waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            clearSheet.staticTexts.matching(
+                NSPredicate(
+                    format:
+                        "label CONTAINS[c] '用户文件' OR value CONTAINS[c] '用户文件'"
+                )
+            ).firstMatch.exists
+        )
+        element(
+            "settings.confirm.clearEvidence.action",
+            in: launched.app
+        ).click()
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            !element(
+                "settings.action.clearEvidence",
+                in: launched.app
+            ).isEnabled
+        })
+
+        selectSettings(.localKnowledge, in: launched.app)
+        let rows = launched.app.descendants(matching: .any)
+            .matching(
+                NSPredicate(
+                    format:
+                        "identifier BEGINSWITH 'settings.knowledge.knowledge-'"
+                )
+            )
+        let countBefore = rows.count
+        XCTAssertGreaterThan(countBefore, 0)
+        let forget = element(
+            "settings.action.forgetKnowledge",
+            in: launched.app
+        )
+        XCTAssertTrue(forget.waitForExistence(timeout: 5))
+        XCTAssertTrue(forget.isEnabled)
+        forget.click()
+        let forgetSheet = launched.app.sheets.firstMatch
+        XCTAssertTrue(forgetSheet.waitForExistence(timeout: 5))
+        element(
+            "settings.confirm.forgetKnowledge.action",
+            in: launched.app
+        ).click()
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            rows.count == countBefore - 1
+        })
+    }
+
+    @MainActor
     private func verifyShellAndSettings(
         appearance: String,
         screenshotSuffix: String,
@@ -553,15 +769,13 @@ final class StornautAppUITests: XCTestCase {
             .containing(.any, identifier: "settings.content")
             .firstMatch
         XCTAssertTrue(settingsWindow.waitForExistence(timeout: 5))
-        if !settingsContent.isHittable || !settingsWindow.isHittable {
+        if !settingsWindow.isHittable {
             app.activate()
-            XCTAssertTrue(waitUntil(timeout: 5) {
-                settingsButton.isHittable
-            })
-            settingsButton.click()
         }
+        let settingsSidebar = element("settings.sidebar.general", in: app)
+        XCTAssertTrue(settingsSidebar.waitForExistence(timeout: 5))
         XCTAssertTrue(waitUntil(timeout: 5) {
-            settingsContent.isHittable && settingsWindow.isHittable
+            settingsWindow.isHittable && settingsSidebar.isHittable
         })
 
         addScreenshot(
@@ -589,11 +803,11 @@ final class StornautAppUITests: XCTestCase {
         XCTAssertTrue(window.waitForExistence(timeout: 10))
         let scanItem = element("sidebar.scan", in: app)
         XCTAssertTrue(scanItem.waitForExistence(timeout: 5))
-        app.activate()
-        XCTAssertTrue(waitUntil(timeout: 5) {
-            scanItem.isHittable
-        })
-        scanItem.click()
+        navigate(
+            item: scanItem,
+            pageMarker: element("scan.results.table", in: app),
+            in: app
+        )
         return (app, window)
     }
 
@@ -618,12 +832,74 @@ final class StornautAppUITests: XCTestCase {
         XCTAssertTrue(window.waitForExistence(timeout: 10))
         let historyItem = element("sidebar.history", in: app)
         XCTAssertTrue(historyItem.waitForExistence(timeout: 5))
-        app.activate()
-        XCTAssertTrue(waitUntil(timeout: 5) {
-            historyItem.isHittable
-        })
-        historyItem.click()
+        navigate(
+            item: historyItem,
+            pageMarker: element("history.navigator", in: app),
+            in: app
+        )
         return (app, window)
+    }
+
+    @MainActor
+    private func launchSettingsFixture(
+        fixture: String,
+        appearance: String,
+        section: String
+    ) -> (app: XCUIApplication, window: XCUIElement) {
+        let app = XCUIApplication()
+        app.terminate()
+        XCTAssertTrue(app.wait(for: .notRunning, timeout: 5))
+        app.launchArguments = [
+            "-AppleLanguages", "(en)",
+            "-AppleLocale", "en_US",
+            "--stornaut-ui-test-appearance=\(appearance)",
+            "--stornaut-debug-fixture=success",
+            "--stornaut-debug-settings=\(fixture)",
+            "--stornaut-debug-settings-section=\(section)",
+        ]
+        app.launch()
+        XCTAssertTrue(app.windows["main"].waitForExistence(timeout: 10))
+        app.typeKey(",", modifierFlags: .command)
+        let content = element("settings.content", in: app)
+        XCTAssertTrue(content.waitForExistence(timeout: 10))
+        let window = app.windows
+            .containing(.any, identifier: "settings.content")
+            .firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 5))
+        if !window.isHittable {
+            app.activate()
+        }
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            window.isHittable
+        })
+        if let requestedSection = SettingsTestSection(rawValue: section) {
+            selectSettings(requestedSection, in: app)
+        } else {
+            XCTFail("Unknown Settings section: \(section)")
+        }
+        return (app, window)
+    }
+
+    @MainActor
+    private func selectSettings(
+        _ section: SettingsTestSection,
+        in app: XCUIApplication
+    ) {
+        app.activate()
+        if element(section.pageIdentifier, in: app).exists {
+            return
+        }
+        let item = element(
+            "settings.sidebar.\(section.rawValue)",
+            in: app
+        )
+        XCTAssertTrue(item.waitForExistence(timeout: 5))
+        XCTAssertTrue(waitUntil(timeout: 5) { item.isHittable })
+        item.click()
+        XCTAssertTrue(
+            element(section.pageIdentifier, in: app)
+                .waitForExistence(timeout: 5)
+        )
     }
 
     @MainActor
@@ -666,12 +942,12 @@ final class StornautAppUITests: XCTestCase {
         _ window: XCUIElement,
         in app: XCUIApplication
     ) {
-        app.activate()
         let overviewItem = element("sidebar.overview", in: app)
-        XCTAssertTrue(waitUntil(timeout: 5) {
-            overviewItem.isHittable
-        })
-        overviewItem.click()
+        navigate(
+            item: overviewItem,
+            pageMarker: element("overview.ledger", in: app),
+            in: app
+        )
         XCTAssertTrue(waitUntil(timeout: 5) {
             window.isHittable
         })
@@ -682,12 +958,12 @@ final class StornautAppUITests: XCTestCase {
         _ window: XCUIElement,
         in app: XCUIApplication
     ) {
-        app.activate()
         let scanItem = element("sidebar.scan", in: app)
-        XCTAssertTrue(waitUntil(timeout: 5) {
-            scanItem.isHittable
-        })
-        scanItem.click()
+        navigate(
+            item: scanItem,
+            pageMarker: element("scan.results.table", in: app),
+            in: app
+        )
         XCTAssertTrue(waitUntil(timeout: 5) {
             window.isHittable
         })
@@ -698,15 +974,32 @@ final class StornautAppUITests: XCTestCase {
         _ window: XCUIElement,
         in app: XCUIApplication
     ) {
-        app.activate()
         let historyItem = element("sidebar.history", in: app)
-        XCTAssertTrue(waitUntil(timeout: 5) {
-            historyItem.isHittable
-        })
-        historyItem.click()
+        navigate(
+            item: historyItem,
+            pageMarker: element("history.navigator", in: app),
+            in: app
+        )
         XCTAssertTrue(waitUntil(timeout: 5) {
             window.isHittable
         })
+    }
+
+    @MainActor
+    private func navigate(
+        item: XCUIElement,
+        pageMarker: XCUIElement,
+        in app: XCUIApplication
+    ) {
+        app.activate()
+        if pageMarker.exists {
+            return
+        }
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            item.isHittable
+        })
+        item.click()
+        XCTAssertTrue(pageMarker.waitForExistence(timeout: 5))
     }
 
     @MainActor
@@ -721,5 +1014,18 @@ final class StornautAppUITests: XCTestCase {
         if settingsWindow.exists {
             settingsWindow.typeKey("w", modifierFlags: .command)
         }
+    }
+}
+
+private enum SettingsTestSection: String {
+    case general
+    case scanning
+    case permissions
+    case codexAndDeepDive
+    case privacyAndData
+    case localKnowledge
+
+    var pageIdentifier: String {
+        "settings.page.\(rawValue)"
     }
 }

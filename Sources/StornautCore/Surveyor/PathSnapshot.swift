@@ -13,6 +13,7 @@ public typealias SnapshotKind = PathKind
 public enum ScanIssue: String, Codable, Sendable, Equatable {
     case permissionDenied
     case mountBoundary
+    case userExcluded
     case metadataUnavailable
     case directoryReadFailed
 }
@@ -21,6 +22,7 @@ public enum MeasurementStatus: String, Codable, Sendable, Equatable {
     case measured
     case permissionDenied
     case mountBoundary
+    case userExcluded
     case metadataUnavailable
     case directoryReadFailed
 
@@ -32,6 +34,8 @@ public enum MeasurementStatus: String, Codable, Sendable, Equatable {
             self = .permissionDenied
         case .mountBoundary:
             self = .mountBoundary
+        case .userExcluded:
+            self = .userExcluded
         case .metadataUnavailable:
             self = .metadataUnavailable
         case .directoryReadFailed:
@@ -47,6 +51,8 @@ public enum MeasurementStatus: String, Codable, Sendable, Equatable {
             .permissionDenied
         case .mountBoundary:
             .mountBoundary
+        case .userExcluded:
+            .userExcluded
         case .metadataUnavailable:
             .metadataUnavailable
         case .directoryReadFailed:
@@ -156,6 +162,8 @@ public struct PathSnapshot: Codable, Sendable, Equatable {
                 && allocatedByteCount == nil
                 && fileIdentity == nil
         case (.directory, .mountBoundary):
+            valid = hasCompleteMetadata
+        case (.directory, .userExcluded):
             valid = hasCompleteMetadata
         case (.regularFile, .measured),
              (.directory, .measured),

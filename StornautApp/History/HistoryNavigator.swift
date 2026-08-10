@@ -2,7 +2,7 @@ import StornautCore
 import SwiftUI
 
 private func historyLocalized(_ key: String) -> String {
-    String(localized: String.LocalizationValue(key))
+    StornautLocalization.string(key)
 }
 
 struct HistoryNavigator: View {

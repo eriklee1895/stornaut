@@ -37,6 +37,16 @@ public struct ScanHistoryPage: Sendable, Equatable {
     }
 }
 
+public struct EvidenceRecordCounts: Sendable, Equatable {
+    public let evidenceSessions: Int
+    public let manifests: Int
+
+    public init(evidenceSessions: Int, manifests: Int) {
+        self.evidenceSessions = evidenceSessions
+        self.manifests = manifests
+    }
+}
+
 struct EvidenceStoreTestHooks: Sendable {
     let failMigrationToVersion: Int?
 
@@ -740,6 +750,28 @@ public actor EvidenceStore {
         try connection.execute(
             "DELETE FROM cleanup_manifests",
             operation: "clear.manifests"
+        )
+    }
+
+    public func recordCounts() throws -> EvidenceRecordCounts {
+        let evidence = try connection.scalarInt(
+            "SELECT count(*) FROM scan_sessions",
+            operation: "counts.evidence"
+        )
+        let manifests = try connection.scalarInt(
+            "SELECT count(*) FROM cleanup_manifests",
+            operation: "counts.manifests"
+        )
+        guard let evidenceCount = Int(exactly: evidence),
+              let manifestCount = Int(exactly: manifests),
+              evidenceCount >= 0,
+              manifestCount >= 0
+        else {
+            throw EvidenceStoreError.recordIdentityMismatch
+        }
+        return EvidenceRecordCounts(
+            evidenceSessions: evidenceCount,
+            manifests: manifestCount
         )
     }
 

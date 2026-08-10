@@ -12,6 +12,7 @@ public enum ScanScopeCompletionReason: String, Codable, Sendable {
     case cancelled
     case permissionDenied
     case mountBoundary
+    case userExcluded
     case metadataChanged
     case storeFailure
     case scannerFailure

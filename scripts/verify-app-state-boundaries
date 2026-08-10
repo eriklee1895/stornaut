@@ -35,7 +35,7 @@ view_sources=(
 )
 
 if rg -n \
-    'Surveyor|ScanSessionWriter|EvidenceStore|SQLite|StornautCodex|Codex|Probe(Broker|Bridge)|ActionPolicyGate|ActionExecutor|TrashMoving|RegisteredAction|FileManager|Process\(|posix_spawn' \
+    'Surveyor|ScanSessionWriter|EvidenceStore|SQLite|StornautCodex|Codex(Locator|CapabilityDetector|Process)|Probe(Broker|Bridge)|ActionPolicyGate|ActionExecutor|TrashMoving|RegisteredAction|FileManager|Process\(|posix_spawn' \
     "${view_sources[@]}"; then
     print -u2 "A SwiftUI View or DesignSystem file references a prohibited service." >&2
     exit 1

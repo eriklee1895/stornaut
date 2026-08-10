@@ -4,8 +4,8 @@ import StornautCore
 struct StornautByteFormatter: Sendable {
     private let locale: Locale
 
-    init(locale: Locale = .autoupdatingCurrent) {
-        self.locale = locale
+    init(locale: Locale? = nil) {
+        self.locale = locale ?? StornautLocalization.locale
     }
 
     func string(for bytes: ByteCount?) -> String {

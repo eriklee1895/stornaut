@@ -7,7 +7,14 @@ cd "$repo_root"
 
 swift package clean
 swift build
-swift test
+matcher_benchmarks='(cumulativeCatalogMatchingBenchmarkStaysBounded|completeCacheCatalogMatchingBenchmarkStaysBounded|completeCatalogMatchingBenchmarkStaysBounded)'
+swift test --skip "$matcher_benchmarks"
+for benchmark in \
+    cumulativeCatalogMatchingBenchmarkStaysBounded \
+    completeCacheCatalogMatchingBenchmarkStaysBounded \
+    completeCatalogMatchingBenchmarkStaysBounded; do
+    swift test --filter "$benchmark"
+done
 
 scripts/verify-activity-boundaries
 scripts/verify-quick-scan-boundaries
@@ -15,6 +22,7 @@ scripts/verify-app-state-boundaries
 scripts/verify-overview-boundaries
 scripts/verify-scan-boundaries
 scripts/verify-history-boundaries
+scripts/verify-settings-boundaries
 
 rm -rf .derivedData
 

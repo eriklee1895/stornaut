@@ -25,7 +25,11 @@ for screenshot in \
     stornaut-history-populated-light.png \
     stornaut-history-expired-dark.png \
     stornaut-history-corrupt-light.png \
-    stornaut-history-trend-dark.png; do
+    stornaut-history-trend-dark.png \
+    stornaut-settings-scanning-light.png \
+    stornaut-settings-privacy-light.png \
+    stornaut-settings-codex-dark.png \
+    stornaut-settings-knowledge-dark.png; do
     if [[ ! -f "$screenshots_dir/$screenshot" ]]; then
         print -u2 "Missing UI screenshot: $screenshots_dir/$screenshot"
         exit 1
@@ -52,6 +56,10 @@ let names = [
     "stornaut-history-expired-dark",
     "stornaut-history-corrupt-light",
     "stornaut-history-trend-dark",
+    "stornaut-settings-scanning-light",
+    "stornaut-settings-privacy-light",
+    "stornaut-settings-codex-dark",
+    "stornaut-settings-knowledge-dark",
 ]
 
 struct ImageStatistics {
@@ -161,6 +169,14 @@ guard let shellLight = statistics["stornaut-shell-light"],
         statistics["stornaut-history-corrupt-light"],
       let historyTrendDark =
         statistics["stornaut-history-trend-dark"],
+      let settingsScanningLight =
+        statistics["stornaut-settings-scanning-light"],
+      let settingsPrivacyLight =
+        statistics["stornaut-settings-privacy-light"],
+      let settingsCodexDark =
+        statistics["stornaut-settings-codex-dark"],
+      let settingsKnowledgeDark =
+        statistics["stornaut-settings-knowledge-dark"],
       settingsLight.meanLuminance - settingsDark.meanLuminance >= 40,
       shellLight.meanLuminance - shellDark.meanLuminance >= 40,
       scanPartialLight.meanLuminance
@@ -184,7 +200,19 @@ guard let shellLight = statistics["stornaut-shell-light"],
       historyExpiredDark.luminanceStandardDeviation >= 20,
       historyCorruptLight.luminanceStandardDeviation >= 20,
       historyTrendDark.meanLuminance <= 120,
-      historyTrendDark.luminanceStandardDeviation >= 20
+      historyTrendDark.luminanceStandardDeviation >= 20,
+      settingsScanningLight.meanLuminance
+        - settingsCodexDark.meanLuminance >= 40,
+      settingsPrivacyLight.meanLuminance
+        - settingsKnowledgeDark.meanLuminance >= 40,
+      (160...250).contains(settingsScanningLight.meanLuminance),
+      (160...250).contains(settingsPrivacyLight.meanLuminance),
+      settingsCodexDark.meanLuminance <= 120,
+      settingsKnowledgeDark.meanLuminance <= 120,
+      settingsScanningLight.luminanceStandardDeviation >= 8,
+      settingsPrivacyLight.luminanceStandardDeviation >= 8,
+      settingsCodexDark.luminanceStandardDeviation >= 8,
+      settingsKnowledgeDark.luminanceStandardDeviation >= 8
 else {
     fputs(
         "Overview/Scan/History/Settings screenshot theme contract failed.\n",

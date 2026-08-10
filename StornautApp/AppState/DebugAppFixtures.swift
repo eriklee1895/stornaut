@@ -114,6 +114,57 @@ enum DebugHistoryFixture: String, CaseIterable, Sendable {
     case trend
 }
 
+enum DebugSettingsFixture: String, CaseIterable, Sendable {
+    case populated
+    case empty
+    case corrupt
+}
+
+struct DebugSettingsFixtureSelection: Sendable, Equatable {
+    let fixture: DebugSettingsFixture
+
+    init?(arguments: [String]) {
+        let prefix = "--stornaut-debug-settings="
+        let matches = arguments.filter { $0.hasPrefix(prefix) }
+        guard matches.count == 1,
+              let fixture = DebugSettingsFixture(
+                  rawValue: String(matches[0].dropFirst(prefix.count))
+              )
+        else {
+            return nil
+        }
+        self.fixture = fixture
+    }
+}
+
+enum DebugSettingsInitialSection {
+    static func selection(arguments: [String]) -> SettingsSection {
+        let prefix = "--stornaut-debug-settings-section="
+        let matches = arguments.filter { $0.hasPrefix(prefix) }
+        guard matches.count == 1,
+              let section = SettingsSection(
+                  rawValue: String(matches[0].dropFirst(prefix.count))
+              )
+        else {
+            return .general
+        }
+        return section
+    }
+}
+
+enum DebugSettingsLanguage {
+    static func selection(arguments: [String]) -> SettingsLanguage {
+        guard let index = arguments.firstIndex(of: "-AppleLanguages"),
+              arguments.indices.contains(index + 1)
+        else {
+            return .english
+        }
+        return arguments[index + 1].contains("zh-Hans")
+            ? .simplifiedChinese
+            : .english
+    }
+}
+
 struct DebugHistoryFixtureSelection: Sendable, Equatable {
     let fixture: DebugHistoryFixture
 
@@ -182,6 +233,12 @@ extension AppComposition {
             selection: selection,
             historySelection: DebugHistoryFixtureSelection(
                 arguments: arguments
+            ),
+            settingsSelection: DebugSettingsFixtureSelection(
+                arguments: arguments
+            ),
+            settingsLanguage: DebugSettingsLanguage.selection(
+                arguments: arguments
             )
         )
     }
@@ -189,6 +246,8 @@ extension AppComposition {
     static func debugFixture(
         selection: DebugAppFixtureSelection,
         historySelection: DebugHistoryFixtureSelection? = nil,
+        settingsSelection: DebugSettingsFixtureSelection? = nil,
+        settingsLanguage: SettingsLanguage = .english,
         makeState: @MainActor (DebugAppFixture) throws -> AppPageState = {
             try $0.makeState()
         }
@@ -202,6 +261,10 @@ extension AppComposition {
         let historyStore = DebugHistoryStore(
             page: initialHistory.page ?? .empty
         )
+        let initialSettings = try (
+            settingsSelection?.fixture ?? .populated
+        ).makeSnapshot(language: settingsLanguage)
+        let settingsStore = DebugSettingsStore(snapshot: initialSettings)
         return AppComposition(
             model: StornautAppModel(
                 dependencies: AppDependencies(
@@ -211,6 +274,24 @@ extension AppComposition {
                     },
                     deleteScanHistory: {
                         await historyStore.delete($0)
+                    },
+                    loadSettings: {
+                        await settingsStore.load()
+                    },
+                    saveSettingsPreferences: {
+                        await settingsStore.save($0)
+                    },
+                    clearSettingsEvidence: {
+                        await settingsStore.clearEvidence()
+                    },
+                    clearSettingsManifests: {
+                        await settingsStore.clearManifests()
+                    },
+                    forgetSettingsKnowledge: {
+                        await settingsStore.forget($0)
+                    },
+                    forgetAllSettingsKnowledge: {
+                        await settingsStore.forgetAll()
                     }
                 ),
                 initialState: state,
@@ -219,9 +300,197 @@ extension AppComposition {
                     : .idle,
                 initialScanState: scanState,
                 initialHistoryState: initialHistory,
+                initialSettingsState: .loaded(initialSettings),
                 now: { DebugProjectionFactory.now },
                 refreshesServices: false
             )
+        )
+    }
+}
+
+private extension DebugSettingsFixture {
+    func makeSnapshot(
+        language: SettingsLanguage
+    ) throws -> SettingsSnapshot {
+        let knowledge: [LocalKnowledgeFact]
+        let corrupt: [String]
+        switch self {
+        case .populated:
+            knowledge = try [
+                DebugSettingsFactory.fact(
+                    slug: "keep-derived-data",
+                    scope: "/tmp/stornaut-settings-fixture/Projects/App/DerivedData",
+                    payload: .keepDecision,
+                    updatedOffset: -600
+                ),
+                DebugSettingsFactory.fact(
+                    slug: "producer-cache",
+                    scope: "/tmp/stornaut-settings-fixture/Library/Caches/build",
+                    payload: .producerMapping(
+                        ProducerMappingKnowledge(
+                            producer: DomainLabel(rawValue: "Fixture Builder")!
+                        )
+                    ),
+                    updatedOffset: -1_200
+                ),
+            ]
+            corrupt = []
+        case .empty:
+            knowledge = []
+            corrupt = []
+        case .corrupt:
+            knowledge = try [
+                DebugSettingsFactory.fact(
+                    slug: "healthy",
+                    scope: "/tmp/stornaut-settings-fixture/Cache",
+                    payload: .keepDecision,
+                    updatedOffset: -600
+                ),
+            ]
+            corrupt = ["knowledge-fixture-unreadable"]
+        }
+        let exclusions = try [
+            ScanExclusion(validating: "Library/Caches/npm"),
+            ScanExclusion(validating: "Projects/Archived"),
+        ]
+        return SettingsSnapshot(
+            preferences: try SettingsPreferences(
+                language: language,
+                exclusions: exclusions,
+                investigationBudget: .balanced
+            ),
+            primaryRoot: SettingsPrimaryRootStatus(
+                path: PersistedPath(
+                    rawValue: "/tmp/stornaut-settings-fixture"
+                )!,
+                availability: .available
+            ),
+            diskAccess: .limited,
+            codex: SettingsCodexStatus(
+                availability: .installed,
+                executablePath: PersistedPath(
+                    rawValue: "/tmp/stornaut-settings-fixture/bin/codex"
+                ),
+                version: "codex-cli fixture",
+                syntaxStatus: .supported
+            ),
+            counts: SettingsRecordCounts(
+                evidence: 4,
+                manifests: 2,
+                localKnowledge: knowledge.count
+            ),
+            knowledge: knowledge,
+            corruptKnowledgeIDs: corrupt,
+            currentCatalogVersion: DomainToken(
+                rawValue: "builtin-runtime-tool-residue-v1"
+            )!,
+            refreshedAt: DebugProjectionFactory.now
+        )
+    }
+}
+
+private enum DebugSettingsFactory {
+    static func fact(
+        slug: String,
+        scope: String,
+        payload: LocalKnowledgePayload,
+        updatedOffset: TimeInterval
+    ) throws -> LocalKnowledgeFact {
+        let updatedAt = DebugProjectionFactory.now.addingTimeInterval(
+            updatedOffset
+        )
+        return try LocalKnowledgeFact(
+            id: LocalKnowledgeID(
+                rawValue: "knowledge-settings-\(slug)"
+            )!,
+            payload: payload,
+            binding: LocalKnowledgeBinding(
+                scope: PersistedPath(rawValue: scope)!,
+                fileIdentity: FileIdentity(
+                    device: 1,
+                    inode: UInt64(
+                        slug.utf8.reduce(1) {
+                            ($0 &* 31) &+ UInt64($1)
+                        }
+                    ),
+                    mode: UInt16(S_IFDIR | 0o755),
+                    ownerUserID: getuid(),
+                    ownerGroupID: getgid(),
+                    size: 0,
+                    allocatedBytes: 0,
+                    modificationSeconds: Int64(updatedAt.timeIntervalSince1970),
+                    modificationNanoseconds: 0
+                ),
+                activityFingerprint: DomainToken(
+                    rawValue: "activity.settings-fixture"
+                )!,
+                catalogVersion: DomainToken(
+                    rawValue: "builtin-runtime-tool-residue-v1"
+                )!
+            ),
+            provenance: .userConfirmed,
+            observedAt: updatedAt,
+            updatedAt: updatedAt
+        )
+    }
+}
+
+private actor DebugSettingsStore {
+    private var snapshot: SettingsSnapshot
+
+    init(snapshot: SettingsSnapshot) {
+        self.snapshot = snapshot
+    }
+
+    func load() -> SettingsSnapshot {
+        snapshot
+    }
+
+    func save(_ preferences: SettingsPreferences) {
+        snapshot = snapshot.replacing(preferences: preferences)
+    }
+
+    func clearEvidence() {
+        snapshot = snapshot.replacing(
+            counts: SettingsRecordCounts(
+                evidence: 0,
+                manifests: snapshot.counts.manifests,
+                localKnowledge: snapshot.counts.localKnowledge
+            )
+        )
+    }
+
+    func clearManifests() {
+        snapshot = snapshot.replacing(
+            counts: SettingsRecordCounts(
+                evidence: snapshot.counts.evidence,
+                manifests: 0,
+                localKnowledge: snapshot.counts.localKnowledge
+            )
+        )
+    }
+
+    func forget(_ id: LocalKnowledgeID) {
+        let knowledge = snapshot.knowledge.filter { $0.id != id }
+        snapshot = snapshot.replacing(
+            counts: SettingsRecordCounts(
+                evidence: snapshot.counts.evidence,
+                manifests: snapshot.counts.manifests,
+                localKnowledge: knowledge.count
+            ),
+            knowledge: knowledge
+        )
+    }
+
+    func forgetAll() {
+        snapshot = snapshot.replacing(
+            counts: SettingsRecordCounts(
+                evidence: snapshot.counts.evidence,
+                manifests: snapshot.counts.manifests,
+                localKnowledge: 0
+            ),
+            knowledge: [],
+            corruptKnowledgeIDs: []
         )
     }
 }

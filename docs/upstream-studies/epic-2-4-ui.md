@@ -630,3 +630,128 @@ Task 24 adds:
 
 Final implementation/review evidence is recorded in
 [Task 24 Code Review](../reports/epic-2-4-task-24-review.md).
+
+## 15. Task 25 Phase B Settings Refresh
+
+Task 25 revalidated the Settings, persistence, permission and scan-configuration
+boundaries on 2026-08-10 before replacing the foundation Settings form.
+
+### Current upstream snapshots
+
+| Source | Revision | License | Files/documents read |
+| --- | --- | --- | --- |
+| Apple SwiftUI/Foundation documentation | current `/websites/developer_apple_swiftui` index; Xcode 26.6 / Swift 6.3.3 | Apple documentation | `Settings`, `openSettings`, `AppStorage`, `Form`, `confirmationDialog`, file-dialog security-scoped URL guidance |
+| [ClearDisk](https://github.com/bysiber/cleardisk) | tag `v1.9.0`, `1aaec92b91c40fdc0c2fce92fef20df08b5f5c43` | MIT | previously reviewed `ClearDiskApp.swift`, `MainView.swift`, `LICENSE`; revision rechecked |
+| [PureMac](https://github.com/momenbasel/PureMac) | `e586b50bb30f68d0afff173e7d8389a50020095e` | MIT | previously reviewed `PureMacApp.swift`, `ViewModels/AppState.swift`, App-state tests, `LICENSE`; revision rechecked |
+| [Pearcleaner](https://github.com/alienator88/Pearcleaner) | `7724df7111bff82ae243301cf701992ef05ecf19` | Apache-2.0 + Commons Clause / source-available | product/FDA/bookmark behavior reference only; no code copied |
+| Stornaut Epic 1/Task 11 evidence | repository current | MIT/project evidence | ADRs 0002–0004, 0007–0009; Codex locator/capability code; Evidence/Local Knowledge stores |
+
+No upstream code, fixture, visual constant, path list or permission trick is
+copied. Pearcleaner remains behavior-reference-only.
+
+### Apple and UI decisions
+
+Apple's current model keeps Settings as an independent `Settings` scene and
+persists ordinary preferences through a typed storage owner. Standard `Form`,
+`List`/selection and `confirmationDialog` controls provide keyboard,
+localization and accessibility behavior. File dialogs provide security-scoped
+URLs; bookmark creation/resolution must pair with
+`startAccessingSecurityScopedResource` /
+`stopAccessingSecurityScopedResource`.
+
+A local temporary-directory probe on this machine produced and resolved a
+security-scoped bookmark (`616` bytes, `stale=false`, exact canonical path,
+access start succeeded). No user directory was selected or inspected.
+
+The `ui-ux-pro-max` refresh reinforces:
+
+- `Form` for grouped preferences and standard selection controls;
+- visible labels, keyboard focus and status text/icon rather than color only;
+- progress for operations longer than 300 ms;
+- explicit destructive confirmations and post-action feedback;
+- ViewModels/services own behavior; Views only present typed state/intents;
+- no decorative Settings motion.
+
+### Plan corrections required by live architecture
+
+The normative architecture describes `roots: [URL]` and exclusions, but the
+accepted Phase B implementation currently has one `ScanRequest.rootURL`, one
+scope and one reconciled `SpaceLedger`. A six-section Settings page must not
+pretend that several configured roots are all scanned.
+
+Task 25 therefore implements the exact current capability:
+
+- one replaceable **Primary Scan Root** backed by a security-scoped bookmark;
+- zero or more user exclusions inside that root;
+- home as the explicit default only when no bookmark is configured;
+- every new Quick Scan resolves this configuration immediately before start;
+- a configured stale/unavailable root blocks Scan and is exposed as degraded
+  state instead of silently broadening scope to Home.
+
+Multi-root/multi-ledger orchestration is not silently implemented inside a UI
+Task. Task 26 must explicitly report the remaining architecture/spec drift and
+decide whether it blocks Phase B closure or belongs to a separately approved
+multi-scope plan.
+
+User exclusions also cannot be a silent traversal skip, because that would
+claim complete coverage. Task 25 adds an explicit excluded coverage status:
+the excluded directory is observed as an unmeasurable boundary, its descendants
+are not traversed, and accounting keeps the bytes in Unknown rather than
+reporting zero or complete coverage.
+
+### Permission and Codex truth boundary
+
+The current public macOS SDK exposes no supported general API that returns the
+Full Disk Access toggle state. Stornaut has only measured current App-context
+Mail access as denied and defers packaged-App full-scope coverage to Task 26.
+Task 25 therefore reports `Limited / not fully verified`, provides the official
+System Settings repair route, and derives coverage facts from real scan gaps.
+It does not read the TCC database, manufacture a canary or expose an in-App FDA
+toggle.
+
+Codex discovery/capability probes are fixed, shell-free `--version` and
+`exec --help` calls. Installation/version/syntax can be displayed, but all
+behavior remains unverified and Broker-only remains failed/no-go. The Settings
+safety row is always `Paused / Required`; no `Run Safety Check` button is shown
+until a real approved runtime safety service exists.
+
+### Preference and data-lifecycle boundary
+
+Task 25 persists only closed preferences:
+
+- language: English or `zh-Hans`;
+- appearance: System, Light or Dark;
+- primary-root bookmark and bounded exclusions;
+- Deep Dive budget preset: Focused, Balanced or Thorough.
+
+Language and appearance update both main and Settings scenes without a global
+Save button. No model provider, arbitrary CLI flags, background option,
+retention override or policy bypass is persisted.
+
+Evidence `7 days` and minimal Manifest `90 days` remain read-only facts.
+`Clear Evidence` and `Clear Manifests` stay separate typed store operations.
+The implemented Codex wrapper keeps raw JSONL bounded in memory and never writes
+it to disk; Task 25 states that verified fact instead of repeating the concept
+image's unimplemented `crash remnant up to 24 hours` claim.
+
+Local Knowledge loads a bounded typed page, isolates corrupt rows and supports
+confirmed single/all deletion. Its displayed staleness is conservative:
+missing live context cannot be rendered as Current. No free-text editor,
+disposition override or Agent-inferred fact creation is added.
+
+### Verification additions
+
+Task 25 must add:
+
+- preference codec/default/bounds and bookmark-resolution tests;
+- exclusion traversal/accounting truth tests;
+- typed Evidence/Manifest clear and Local Knowledge load/forget tests;
+- App state tests for stale async completions and active-scan mutation refusal;
+- six-section projection, localization and safety-policy tests;
+- DEBUG-only representative Settings fixtures with Release-negative markers;
+- View/source gates excluding direct store, Surveyor, TCC and process access;
+- real Settings window XCUITest and read-only Peekaboo captures for General,
+  Scanning, Privacy & Data, Codex safety and Local Knowledge in Light/Dark.
+
+Final implementation/review evidence is recorded in
+[Task 25 Code Review](../reports/epic-2-4-task-25-review.md).

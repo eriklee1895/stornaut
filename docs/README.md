@@ -25,12 +25,13 @@
 | Epic 2–4 Task 22 Snapshot-first Overview review | [Task 22 Code Review](reports/epic-2-4-task-22-review.md) |
 | Epic 2–4 Task 23 Quick Scan UI review | [Task 23 Code Review](reports/epic-2-4-task-23-review.md) |
 | Epic 2–4 Task 24 Scan-only History review | [Task 24 Code Review](reports/epic-2-4-task-24-review.md) |
+| Epic 2–4 Task 25 Phase B Settings review | [Task 25 Code Review](reports/epic-2-4-task-25-review.md) |
 | 产品范围、术语、验收 | [PRD](product/PRD.md) |
 | 进程边界、模块与安全架构 | [System Architecture](architecture/system-architecture.md) |
 | Agent、双模式与治理设计 | [Agent Disk Governance](design/agent-disk-governance.md) |
 | UI、品牌、状态与交互 | [UI/UX](design/ui-ux.md) |
 | 宏观交付顺序与阶段 Gate | [Delivery Roadmap](plans/roadmap.md) |
-| 当前执行计划 | [Epic 2–4 Deterministic Product Core](plans/active/epic-2-4-deterministic-product-core.md) — `Approved`，Tasks 9–24 complete / Task 25 next |
+| 当前执行计划 | [Epic 2–4 Deterministic Product Core](plans/active/epic-2-4-deterministic-product-core.md) — `Approved`，Tasks 9–25 complete / Task 26 next |
 | 已完成计划 | [Epic 0–1 Foundation Spikes](plans/completed/epic-0-1-foundation-spikes.md) |
 | 上游学习与许可证门禁 | [Upstream Reference Matrix](research/upstream-reference-matrix.md) |
 | 当前 Codex Runtime 研究 Gate | [Epic 1 Codex Runtime Study](upstream-studies/epic-1-codex-runtime.md) |

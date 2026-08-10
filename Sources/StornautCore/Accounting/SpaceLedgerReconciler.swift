@@ -364,13 +364,11 @@ private extension SpaceLedgerReconciler {
                             snapshot.measurementStatus != .mountBoundary
                     )
                 )
+                continue
             }
             guard let logical = snapshot.logicalByteCount?.value,
                   let allocated = snapshot.allocatedByteCount?.value
             else {
-                continue
-            }
-            if snapshot.measurementStatus == .mountBoundary {
                 continue
             }
             if let identity = snapshot.fileIdentity,

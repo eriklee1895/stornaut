@@ -346,6 +346,17 @@ public actor LocalKnowledgeStore {
         )
     }
 
+    public func recordCount() throws -> Int {
+        let value = try connection.scalarInt(
+            "SELECT count(*) FROM local_knowledge",
+            operation: "knowledge.count"
+        )
+        guard let count = Int(exactly: value), count >= 0 else {
+            throw EvidenceStoreError.recordIdentityMismatch
+        }
+        return count
+    }
+
     public func facts(
         limit: Int,
         offset: Int

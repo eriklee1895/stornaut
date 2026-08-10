@@ -38,6 +38,12 @@ app_contains() {
 
 debug_markers=(
     '--stornaut-debug-fixture='
+    '--stornaut-debug-history='
+    '--stornaut-debug-history-presentation='
+    '--stornaut-debug-destination='
+    '--stornaut-debug-settings='
+    '--stornaut-debug-settings-section='
+    '--stornaut-debug-open-settings'
     '--stornaut-ui-test-appearance='
     'app.appearance.requested'
     'scan-fixture-'
@@ -47,6 +53,7 @@ debug_markers=(
     'fixture-catalog-v1'
     'fixture.volume'
     '/tmp/stornaut-fixture'
+    '/tmp/stornaut-settings-fixture'
 )
 
 for marker in "${debug_markers[@]}"; do

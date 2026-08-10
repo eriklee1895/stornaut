@@ -215,6 +215,16 @@ struct ScanFlowReducer: Sendable {
         )
     }
 
+    func configuredRoot(
+        state: ScanFlowState,
+        rootPath: PersistedPath
+    ) -> ScanFlowState {
+        guard state.isActive else {
+            return state
+        }
+        return replacing(state, rootPath: rootPath)
+    }
+
     func elapsed(
         state: ScanFlowState,
         at date: Date
@@ -400,6 +410,7 @@ struct ScanFlowReducer: Sendable {
         candidatesFound: Int? = nil,
         measuredBytes: ByteCount? = nil,
         elapsed: TimeInterval? = nil,
+        rootPath: PersistedPath?? = nil,
         stopWasRequested: Bool? = nil,
         snapshots: [PathSnapshot]? = nil,
         classifications: [Classification]? = nil,
@@ -421,7 +432,7 @@ struct ScanFlowReducer: Sendable {
             measuredBytes: measuredBytes ?? state.measuredBytes,
             elapsed: elapsed ?? state.elapsed,
             startedAt: state.startedAt,
-            rootPath: state.rootPath,
+            rootPath: rootPath ?? state.rootPath,
             stopWasRequested:
                 stopWasRequested ?? state.stopWasRequested,
             snapshots: snapshots ?? state.snapshots,

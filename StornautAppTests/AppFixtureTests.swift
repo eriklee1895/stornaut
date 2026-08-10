@@ -111,6 +111,47 @@ func debugHistoryPresentationAcceptsOnlyOneExactKnownArgument() {
     )
 }
 
+@Test
+func debugSettingsSelectorsAcceptOnlyExactSingleArguments() {
+    #expect(
+        DebugSettingsFixtureSelection(arguments: [
+            "Stornaut",
+            "--stornaut-debug-settings=populated",
+        ])?.fixture == .populated
+    )
+    #expect(
+        DebugSettingsFixtureSelection(arguments: [
+            "Stornaut",
+            "--stornaut-debug-settings=unknown",
+        ]) == nil
+    )
+    #expect(
+        DebugSettingsFixtureSelection(arguments: [
+            "Stornaut",
+            "--stornaut-debug-settings=populated",
+            "--stornaut-debug-settings=empty",
+        ]) == nil
+    )
+    #expect(
+        DebugSettingsInitialSection.selection(arguments: [
+            "Stornaut",
+            "--stornaut-debug-settings-section=privacyAndData",
+        ]) == .privacyAndData
+    )
+    #expect(
+        DebugSettingsInitialSection.selection(arguments: [
+            "Stornaut",
+            "--stornaut-debug-settings-section=unknown",
+        ]) == .general
+    )
+    #expect(
+        DebugSettingsLanguage.selection(arguments: [
+            "Stornaut",
+            "-AppleLanguages", "(zh-Hans)",
+        ]) == .simplifiedChinese
+    )
+}
+
 @MainActor
 @Test
 func debugFixturesCoverEveryApprovedPhaseDeterministically() throws {
@@ -181,6 +222,20 @@ func debugFixturesCoverEveryApprovedPhaseDeterministically() throws {
             historySelection: selection
         )
         #expect(composition.model.historyState.phase == .loaded)
+    }
+
+    for fixture in DebugSettingsFixture.allCases {
+        let composition = try AppComposition.debugFixture(
+            selection: DebugAppFixtureSelection(arguments: [
+                "Stornaut",
+                "--stornaut-debug-fixture=success",
+            ])!,
+            settingsSelection: DebugSettingsFixtureSelection(arguments: [
+                "Stornaut",
+                "--stornaut-debug-settings=\(fixture.rawValue)",
+            ])!
+        )
+        #expect(composition.model.settingsState.phase == .loaded)
     }
 }
 
@@ -266,6 +321,138 @@ func liveDependenciesRunOnlyTheExplicitTemporaryRoot() async throws {
     )
     #expect(dependencies.quickScanRootPath?.rawValue
         == rootURL.standardizedFileURL.path)
+}
+
+@Test
+func liveDependenciesUsePersistedPrimaryRootAndExclusions() async throws {
+    let storageRoot = try appTestTemporaryDirectory(
+        "settings-storage"
+    )
+    let fallbackRoot = try appTestTemporaryDirectory(
+        "settings-fallback"
+    )
+    let selectedRoot = try appTestTemporaryDirectory(
+        "settings-selected"
+    )
+    defer {
+        try? FileManager.default.removeItem(at: storageRoot)
+        try? FileManager.default.removeItem(at: fallbackRoot)
+        try? FileManager.default.removeItem(at: selectedRoot)
+    }
+    let excluded = selectedRoot.appending(
+        path: "Excluded",
+        directoryHint: .isDirectory
+    )
+    try FileManager.default.createDirectory(
+        at: excluded,
+        withIntermediateDirectories: true
+    )
+    try Data("hidden".utf8).write(
+        to: excluded.appending(path: "hidden.bin")
+    )
+    try Data("visible".utf8).write(
+        to: selectedRoot.appending(path: "visible.bin")
+    )
+    let configuration = try LocalStoreConfiguration(
+        applicationSupportBaseURL: storageRoot.appending(
+            path: "Application Support",
+            directoryHint: .isDirectory
+        ),
+        cachesBaseURL: storageRoot.appending(
+            path: "Caches",
+            directoryHint: .isDirectory
+        )
+    )
+    let preferences = try SettingsPreferences(
+        primaryRoot: SettingsPrimaryRoot.bookmark(for: selectedRoot),
+        exclusions: [
+            ScanExclusion(rawValue: "Excluded")!,
+        ]
+    )
+    try await SettingsPreferencesStore(
+        configuration: configuration
+    ).save(preferences)
+    let dependencies = AppDependencies.live(
+        configuration: configuration,
+        rootURL: fallbackRoot
+    )
+
+    let stream = try await dependencies.startQuickScan()
+    var terminal: QuickScanProjection?
+    for try await event in stream {
+        if case let .terminal(projection) = event {
+            terminal = projection
+        }
+    }
+    let projection = try #require(terminal)
+
+    #expect(
+        projection.session.unfinishedScopes.map(\.rootPath.rawValue)
+            == [selectedRoot.standardizedFileURL.path]
+    )
+    #expect(
+        projection.snapshots.contains {
+            $0.relativePath == "Excluded"
+                && $0.measurementStatus == .userExcluded
+        }
+    )
+    #expect(
+        projection.snapshots.contains {
+            $0.relativePath == "Excluded/hidden.bin"
+        } == false
+    )
+    #expect(
+        projection.snapshots.contains {
+            $0.relativePath == "visible.bin"
+        }
+    )
+}
+
+@Test
+func unavailableConfiguredRootNeverFallsBackToBroaderScope() async throws {
+    let storageRoot = try appTestTemporaryDirectory(
+        "settings-unavailable-storage"
+    )
+    let fallbackRoot = try appTestTemporaryDirectory(
+        "settings-unavailable-fallback"
+    )
+    let selectedRoot = try appTestTemporaryDirectory(
+        "settings-unavailable-selected"
+    )
+    defer {
+        try? FileManager.default.removeItem(at: storageRoot)
+        try? FileManager.default.removeItem(at: fallbackRoot)
+        try? FileManager.default.removeItem(at: selectedRoot)
+    }
+    try Data("must-not-scan".utf8).write(
+        to: fallbackRoot.appending(path: "fallback-marker.bin")
+    )
+    let configuration = try LocalStoreConfiguration(
+        applicationSupportBaseURL: storageRoot.appending(
+            path: "Application Support",
+            directoryHint: .isDirectory
+        ),
+        cachesBaseURL: storageRoot.appending(
+            path: "Caches",
+            directoryHint: .isDirectory
+        )
+    )
+    let preferences = try SettingsPreferences(
+        primaryRoot: SettingsPrimaryRoot.bookmark(for: selectedRoot)
+    )
+    try await SettingsPreferencesStore(
+        configuration: configuration
+    ).save(preferences)
+    try FileManager.default.removeItem(at: selectedRoot)
+    let dependencies = AppDependencies.live(
+        configuration: configuration,
+        rootURL: fallbackRoot
+    )
+
+    await #expect(throws: (any Error).self) {
+        _ = try await dependencies.startQuickScan()
+    }
+    #expect(try await dependencies.loadLatestQuickScan() == nil)
 }
 
 @MainActor
@@ -374,4 +561,18 @@ private actor AppTestRetryingDependencyFactory {
 private enum AppTestLoaderError: Error {
     case coordinatorCreationFailed
     case fixtureConstructionFailed
+}
+
+private func appTestTemporaryDirectory(
+    _ suffix: String
+) throws -> URL {
+    let url = FileManager.default.temporaryDirectory.appending(
+        path: "stornaut-app-\(suffix)-\(UUID().uuidString)",
+        directoryHint: .isDirectory
+    )
+    try FileManager.default.createDirectory(
+        at: url,
+        withIntermediateDirectories: false
+    )
+    return url
 }

@@ -125,5 +125,5 @@ extension RebuildCost {
 }
 
 private func scanLocalized(_ key: String) -> String {
-    String(localized: String.LocalizationValue(key))
+    localized(key)
 }

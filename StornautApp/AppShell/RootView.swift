@@ -3,6 +3,9 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(StornautAppModel.self) private var appModel
+#if DEBUG
+    @Environment(\.openSettings) private var openSettings
+#endif
     @State private var selection: AppDestination?
 
     init() {
@@ -46,7 +49,16 @@ struct RootView: View {
         }
         .frame(minWidth: 960, minHeight: 640)
         .task {
-            await appModel.refreshIfNeeded()
+            async let page: Void = appModel.refreshIfNeeded()
+            async let settings: Void = appModel.refreshSettingsIfNeeded()
+            _ = await (page, settings)
+#if DEBUG
+            if CommandLine.arguments.contains(
+                "--stornaut-debug-open-settings"
+            ) {
+                openSettings()
+            }
+#endif
         }
 #if DEBUG
         .background {

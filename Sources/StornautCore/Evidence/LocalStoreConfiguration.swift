@@ -72,6 +72,12 @@ public struct LocalStoreConfiguration: Sendable, Equatable {
             : supportDirectoryURL.appending(path: "LocalKnowledge.sqlite")
     }
 
+    public var settingsPreferencesURL: URL {
+        isMemory
+            ? URL(filePath: ":memory:")
+            : supportDirectoryURL.appending(path: "Settings.json")
+    }
+
     public static func production() throws -> Self {
         try Self(
             applicationSupportBaseURL: .applicationSupportDirectory,
@@ -106,6 +112,24 @@ func canonicalizingExistingAncestor(_ url: URL) throws -> URL {
 }
 
 enum LocalStorePathPolicy {
+    static func preparePrivateFile(
+        configuration: LocalStoreConfiguration,
+        fileURL: URL,
+        excludeFromBackup: Bool
+    ) throws {
+        guard !configuration.isMemory else {
+            return
+        }
+        try ensureBaseDirectory(configuration.applicationSupportBaseURL!)
+        try ensurePrivateDirectory(configuration.supportDirectoryURL)
+        try ensurePrivateDatabaseFile(fileURL)
+        try ensureSafeItem(fileURL, requiredKind: S_IFREG, mode: 0o600)
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = excludeFromBackup
+        var mutableURL = fileURL
+        try mutableURL.setResourceValues(values)
+    }
+
     static func prepare(
         configuration: LocalStoreConfiguration,
         databaseURL: URL

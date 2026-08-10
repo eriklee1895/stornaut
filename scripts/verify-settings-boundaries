@@ -1,0 +1,64 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+cd "$repo_root"
+
+settings_views=(
+    StornautApp/Settings/StornautSettingsView.swift
+    StornautApp/Settings/SettingsComponents.swift
+    StornautApp/Settings/GeneralSettingsView.swift
+    StornautApp/Settings/ScanningSettingsView.swift
+    StornautApp/Settings/PermissionsSettingsView.swift
+    StornautApp/Settings/CodexSettingsView.swift
+    StornautApp/Settings/PrivacyDataSettingsView.swift
+    StornautApp/Settings/LocalKnowledgeSettingsView.swift
+)
+
+for source in "${settings_views[@]}"; do
+    test -f "$source"
+done
+
+for forbidden in \
+    EvidenceStore \
+    LocalKnowledgeStore \
+    SettingsPreferencesStore \
+    Surveyor \
+    QuickScanCoordinator \
+    CodexLocator \
+    CodexCapabilityDetector \
+    CodexProcess \
+    ProbeBridge \
+    NSOpenPanel \
+    NSWorkspace \
+    UserDefaults \
+    'Process\(' \
+    TCC \
+    tccutil \
+    '\.clearEvidence\(' \
+    '\.clearManifests\(' \
+    '\.forgetAll\('; do
+    if rg -n "$forbidden" "${settings_views[@]}"; then
+        print -u2 "Settings View boundary violation: $forbidden"
+        exit 1
+    fi
+done
+
+if rg -n 'Start Deep Dive|Trust Codex|Proceed Anyway|Adjust Retention' \
+    "${settings_views[@]}"; then
+    print -u2 "Deferred or unsafe Settings action leaked into Task 25 Views."
+    exit 1
+fi
+
+rg -q 'loadSettings' StornautApp/AppState/AppDependencies.swift
+rg -q 'saveSettingsPreferences' StornautApp/AppState/AppDependencies.swift
+rg -q 'clearSettingsEvidence' StornautApp/AppState/AppDependencies.swift
+rg -q 'forgetSettingsKnowledge' StornautApp/AppState/AppDependencies.swift
+rg -q 'refreshSettings' StornautApp/AppState/StornautAppModel.swift
+rg -q 'SettingsPrimaryRoot' \
+    Sources/StornautCore/Settings/SettingsPreferences.swift
+rg -q 'case userExcluded' \
+    Sources/StornautCore/Surveyor/PathSnapshot.swift
+
+print "Settings UI/service boundaries verified."

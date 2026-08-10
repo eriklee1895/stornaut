@@ -1481,6 +1481,18 @@ private actor BlockingHistoryStore: QuickScanHistoryPersisting {
         try await backing.expireRecords(now: now)
     }
 
+    func recordCounts() async throws -> EvidenceRecordCounts {
+        try await backing.recordCounts()
+    }
+
+    func clearEvidence() async throws {
+        try await backing.clearEvidence()
+    }
+
+    func clearManifests() async throws {
+        try await backing.clearManifests()
+    }
+
     func scanHistory(
         limit: Int,
         offset: Int

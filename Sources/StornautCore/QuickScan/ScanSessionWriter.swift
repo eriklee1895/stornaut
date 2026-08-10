@@ -542,6 +542,8 @@ private struct QuickScanSummary {
             reason = .permissionDenied
         case .mountBoundary:
             reason = .mountBoundary
+        case .userExcluded:
+            reason = .userExcluded
         case .metadataUnavailable, .directoryReadFailed:
             reason = .metadataChanged
         }

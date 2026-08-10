@@ -48,7 +48,7 @@ Epic 0 shell 当前必须保持：
 - System Light/Dark 均可读；
 - bundle identifier 为 `com.eriklee.stornaut`。
 
-现有 XCUITest 必须生成十三个稳定附件：
+现有 XCUITest 必须生成十七个稳定附件：
 
 ```text
 stornaut-shell-light.png
@@ -64,6 +64,10 @@ stornaut-history-populated-light.png
 stornaut-history-expired-dark.png
 stornaut-history-corrupt-light.png
 stornaut-history-trend-dark.png
+stornaut-settings-scanning-light.png
+stornaut-settings-privacy-light.png
+stornaut-settings-codex-dark.png
+stornaut-settings-knowledge-dark.png
 ```
 
 `scripts/export-ui-screenshots` 将它们导出到 ignored 的 `.derivedData/ui-screenshots/`，`scripts/verify-ui-screenshots` 检查文件、尺寸和主题差异。
@@ -85,13 +89,23 @@ Task 24 的四张 History 截图固定 typed DEBUG Evidence fixture：Light popu
 measured、可比较、不同时间戳样本的 Used/Free 直标与非因果文案。它们不得
 显示 Deep Dive、Cleanup Manifest、export 或暗示后台采集。
 
+Task 25 的四张新增 Settings 截图固定 closed typed fixture：Light Scanning
+验证单一真实 Primary Root、明确 exclusions 与永久保护；Light Privacy & Data
+验证固定 7/90 天政策与分离 clear actions；Dark Codex 验证 installation、
+syntax 与 safety paused 三者分离；Dark Local Knowledge 验证结构化事实、
+provenance、context unavailable/stale 与 destructive hierarchy。不得出现
+FDA toggle、Run Safety Check 假动作、provider/Shell、retention override、
+free-text memory 或策略绕过。
+
 Settings 附件必须截取包含 `settings.content` 的独立 window，不能直接对
 `settings.content` accessibility element 截图。后者在 macOS 26 的透明
 Settings scene 中可能把材质合成到白色背景，无法可靠反映窗口主题。
-截图前还必须确认 `settings.content` 与所属 window 都 hittable；若 Settings
-被主窗口遮挡，只激活 App 并点击现有 Settings 内容将该 window 置前，不要
-重复发送 `⌘,`。重复快捷键可能切换窗口状态，而对被遮挡 window 执行
-`screenshot()` 会捕获遮挡后的屏幕矩形，产生看似主题漂移的假回归。
+`settings.content` 是只读的全内容区 AX probe，必须存在但刻意不参与
+hit-testing。截图前确认所属 window 和当前 section 的 Sidebar 控件 hittable；
+若 Settings 被主窗口遮挡，只激活 App，并在目标页尚未出现时点击现有
+Settings Sidebar 控件将该 window 置前，不要重复发送 `⌘,`。重复快捷键可能
+切换窗口状态，而对被遮挡 window 执行 `screenshot()` 会捕获遮挡后的屏幕
+矩形，产生看似主题漂移的假回归。
 
 未来页面应在自己的 Task/ADR 中增加最小必要契约，不要把所有页面都塞进一个超长 smoke test。
 

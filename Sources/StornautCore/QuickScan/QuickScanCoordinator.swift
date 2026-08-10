@@ -38,6 +38,9 @@ extension EvidenceStore: QuickScanProductPersisting {}
 
 protocol QuickScanHistoryPersisting: Sendable {
     func expireRecords(now: Date) async throws
+    func recordCounts() async throws -> EvidenceRecordCounts
+    func clearEvidence() async throws
+    func clearManifests() async throws
     func scanHistory(
         limit: Int,
         offset: Int
@@ -416,6 +419,34 @@ public actor QuickScanCoordinator {
             throw EvidenceStoreError.schemaMismatch
         }
         try await historyStore.deleteScanSession(id: id)
+    }
+
+    public func loadRecordCounts() async throws -> EvidenceRecordCounts {
+        try beginHistoryRead()
+        defer { historyReadCount -= 1 }
+        guard let historyStore else {
+            throw EvidenceStoreError.schemaMismatch
+        }
+        try await historyStore.expireRecords(now: now())
+        return try await historyStore.recordCounts()
+    }
+
+    public func clearEvidenceRecords() async throws {
+        try beginHistoryMutation()
+        defer { historyMutationIsActive = false }
+        guard let historyStore else {
+            throw EvidenceStoreError.schemaMismatch
+        }
+        try await historyStore.clearEvidence()
+    }
+
+    public func clearManifestRecords() async throws {
+        try beginHistoryMutation()
+        defer { historyMutationIsActive = false }
+        guard let historyStore else {
+            throw EvidenceStoreError.schemaMismatch
+        }
+        try await historyStore.clearManifests()
     }
 
     private func beginHistoryRead() throws {
@@ -1191,7 +1222,8 @@ public actor QuickScanCoordinator {
     ) throws -> [SnapshotID: [CompiledRule]] {
         var result: [SnapshotID: [CompiledRule]] = [:]
         for snapshot in snapshots {
-            guard snapshot.relativePath != ".",
+            guard snapshot.measurementStatus == .measured,
+                  snapshot.relativePath != ".",
                   let kind = ruleKind(snapshot.kind)
             else {
                 result[snapshot.id] = []
@@ -1224,6 +1256,9 @@ public actor QuickScanCoordinator {
         candidates: [SnapshotID: [CompiledRule]]
     ) -> Set<SnapshotID> {
         return Set(snapshots.compactMap { snapshot in
+            guard snapshot.measurementStatus == .measured else {
+                return nil
+            }
             let rules = candidates[snapshot.id, default: []]
             let isRootOrTopLevelDirectory = snapshot.kind == .directory
                 && (
