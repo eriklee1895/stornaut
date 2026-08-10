@@ -1,0 +1,61 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+cd "$repo_root"
+
+derived_data="$repo_root/.derivedData/app-release-boundaries"
+rm -rf "$derived_data"
+
+for configuration in Debug Release; do
+    xcodebuild -quiet \
+        -project Stornaut.xcodeproj \
+        -scheme Stornaut \
+        -configuration "$configuration" \
+        -destination 'platform=macOS,arch=arm64' \
+        -derivedDataPath "$derived_data" \
+        build
+done
+
+debug_app="$derived_data/Build/Products/Debug/Stornaut.app"
+release_app="$derived_data/Build/Products/Release/Stornaut.app"
+test -x "$debug_app/Contents/MacOS/Stornaut"
+test -x "$release_app/Contents/MacOS/Stornaut"
+
+app_contains() {
+    local app=$1
+    local marker=$2
+    local file
+
+    while IFS= read -r -d '' file; do
+        if rg -a -q --fixed-strings -- "$marker" "$file"; then
+            return 0
+        fi
+    done < <(find "$app" -type f -print0)
+    return 1
+}
+
+fixture_markers=(
+    '--stornaut-debug-fixture='
+    'scan-fixture-'
+    'scope-fixture-'
+    'snapshot-fixture-'
+    'classification-fixture-'
+    'fixture-catalog-v1'
+    'fixture.volume'
+    '/tmp/stornaut-fixture'
+)
+
+for marker in "${fixture_markers[@]}"; do
+    if ! app_contains "$debug_app" "$marker"; then
+        print -u2 "Release gate positive control missed DEBUG marker: $marker"
+        exit 1
+    fi
+    if app_contains "$release_app" "$marker"; then
+        print -u2 "DEBUG fixture marker leaked into the Release App: $marker"
+        exit 1
+    fi
+done
+
+print "Release App fixture boundary verification passed."

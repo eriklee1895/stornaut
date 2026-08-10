@@ -1,6 +1,6 @@
 # Stornaut Epic 2–4 Deterministic Product Core Implementation Plan
 
-> **Status:** Approved — Tasks 9–20 complete; Task 21 next
+> **Status:** Approved — Tasks 9–21 complete; Task 22 next
 >
 > **Roadmap phase:** Phase B — Deterministic Product Core
 >
@@ -1335,35 +1335,67 @@ Suggested commit subject: `feat: orchestrate model-free quick scan`
 - Consumes Quick Scan/store projections through ViewModels.
 - Does not call Surveyor, SQLite, Codex or action APIs from SwiftUI Views.
 
-- [ ] **Step 1: Complete the UI study gate**
+- [x] **Step 1: Complete the UI study gate**
 
 Use the approved UI specification and canonical references. Create deterministic
 DEBUG-only fixture injection for UI tests; sample values must not leak into
 production defaults.
 
-- [ ] **Step 2: Define page-preserving App state**
+- [x] **Step 2: Define page-preserving App state**
 
 ViewModel/reducer tests cover empty, loading, partial, cancelled, success,
 limited-permission, stale and error states before visual implementation.
 State preserves valid results when one dependency fails.
 
-- [ ] **Step 3: Add dependency injection and DEBUG fixtures**
+- [x] **Step 3: Add dependency injection and DEBUG fixtures**
 
 Production composition uses real Phase B services. XCUITest may select
 checked-in deterministic fixtures only through a DEBUG launch argument. Unknown
 arguments and release builds must not activate fixture data.
 
-- [ ] **Step 4: Establish reusable semantic components**
+- [x] **Step 4: Establish reusable semantic components**
 
 Create the smallest shared tokens/components needed by the planned pages:
 metrics, disposition labels, coverage/retention badges, empty/recovery states
 and accessible byte/status formatting. Do not build a generic design framework
 or transcribe raw image-model colors/layouts.
 
-- [ ] **Step 5: Verify App architecture**
+- [x] **Step 5: Verify App architecture**
 
 Run reducer/composition tests, build the real App shell and run
 `scripts/verify`. This Task does not replace the placeholder destination pages.
+
+Execution evidence:
+
+- Current Apple Observation guidance selected one App-owned `@Observable`
+  model held by `@State` and injected into both scenes; no third-party state
+  framework or dependency was added.
+- Production composition exposes only `loadLatestQuickScan()`. Store and
+  coordinator creation is deferred off App initialization and protected by an
+  actor-owned, retry-safe single-flight.
+- All eight closed page phases preserve projection/timestamp truth. Cancellation
+  restores the previous page; local failures never erase a valid projection.
+- DEBUG fixtures use real Core constructors, closed selectors and unique IDs.
+  Known fixture construction failure is closed; malformed/unknown/duplicate
+  selectors do not activate fixture data.
+- The release gate requires eight fixture markers as a Debug positive control
+  across the whole Xcode 26 App bundle, then proves all are absent from the
+  Release App.
+- The semantic DesignSystem contains only metrics, disposition/phase,
+  coverage/retention, empty/recovery and accessible formatting primitives.
+  It uses localized text, SF Symbols and system colors; destination pages
+  remain placeholders.
+- Grouped review fixed ten P1 and four P2 findings. The final report at
+  `/tmp/stornaut_task21_final_review_1786332053/report.html` has no open
+  P0–P2 finding.
+- Final `scripts/verify` passed: SwiftPM 263/263, App tests 22/22, XCUITest
+  3/3, four Light/Dark screenshots, App/state and Debug/Release gates, signed
+  App bundle, 67-rule catalog, localization, compiler/catalog fixtures,
+  documentation links and `git diff --check`.
+- Two non-failure UI attachments belonged to Google Chrome 151, not Stornaut;
+  no Chrome process or system permission was modified.
+- No Overview/Scan/History/full Settings page, Deep Dive enablement,
+  entitlement, telemetry, background task or product asset was added.
 
 Suggested commit subject: `feat: establish deterministic app state`
 

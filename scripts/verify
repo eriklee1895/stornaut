@@ -11,6 +11,7 @@ swift test
 
 scripts/verify-activity-boundaries
 scripts/verify-quick-scan-boundaries
+scripts/verify-app-state-boundaries
 
 rm -rf .derivedData
 
@@ -46,6 +47,7 @@ xcodebuild -quiet \
 
 scripts/sign-local-app
 scripts/verify-app-bundle
+scripts/verify-app-release-boundaries
 
 for localization in StornautApp/Resources/*.lproj/Localizable.strings; do
     plutil -lint "$localization"

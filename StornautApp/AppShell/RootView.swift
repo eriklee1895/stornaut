@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 
 struct RootView: View {
+    @Environment(StornautAppModel.self) private var appModel
     @State private var selection: AppDestination? = .overview
 
     var body: some View {
@@ -32,10 +33,17 @@ struct RootView: View {
             DestinationPlaceholder(destination: selection ?? .overview)
         }
         .frame(minWidth: 960, minHeight: 640)
+        .task {
+            await appModel.refreshIfNeeded()
+        }
 #if DEBUG
         .background {
-            if let color = LaunchAppearanceOverride.backgroundColor {
-                color.ignoresSafeArea()
+            ZStack {
+                if let color = LaunchAppearanceOverride.backgroundColor {
+                    color.ignoresSafeArea()
+                }
+                DebugAppStateProbe(phase: appModel.pageState.phase)
+                    .frame(width: 1, height: 1)
             }
         }
 #endif

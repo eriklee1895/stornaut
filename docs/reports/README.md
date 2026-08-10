@@ -7,5 +7,6 @@
 - [Epic 1 Final Code Review — 2026-08-09](epic-1-code-review-2026-08-09.md)：跨模块安全/并发/健壮性审查、确认缺陷与修复证据。
 - [Epic 2–4 Task 9 Code Review — 2026-08-09](epic-2-4-task-9-review.md)：Phase B implementation studies、ADR 0007 与文档路由的审查和修复证据。
 - [Epic 2–4 Task 10 Code Review — 2026-08-10](epic-2-4-task-10-review.md)：领域契约、匿名 fixtures、Surveyor transport 迁移与 10 组确认缺陷的修复证据。
+- [Epic 2–4 Task 21 Code Review — 2026-08-10](epic-2-4-task-21-review.md)：App-owned state、DEBUG fixtures、semantic DesignSystem、Release 隔离与统一验证证据。
 
 报告记录测量事实；若事实要求降低安全、权限或隐私边界，必须先请求用户决策，不能直接改写批准规格。

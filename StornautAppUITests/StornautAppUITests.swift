@@ -43,6 +43,34 @@ final class StornautAppUITests: XCTestCase {
     }
 
     @MainActor
+    func testDebugFixtureSelection() throws {
+        let app = XCUIApplication()
+        app.terminate()
+        XCTAssertTrue(app.wait(for: .notRunning, timeout: 5))
+        addTeardownBlock {
+            app.terminate()
+            _ = app.wait(for: .notRunning, timeout: 5)
+        }
+        app.launchArguments = [
+            "-AppleLanguages", "(en)",
+            "-AppleLocale", "en_US",
+            "--stornaut-debug-fixture=limited-permission",
+        ]
+
+        app.launch()
+
+        let shellWindow = app.windows["main"]
+        XCTAssertTrue(shellWindow.waitForExistence(timeout: 10))
+        let phase = element("app.state.phase", in: app)
+        XCTAssertTrue(phase.waitForExistence(timeout: 5))
+        XCTAssertEqual(phase.label, "limitedPermission")
+        XCTAssertTrue(app.staticTexts["Overview"].exists)
+        XCTAssertTrue(app.staticTexts[
+            "Foundation shell — implementation follows the approved roadmap."
+        ].exists)
+    }
+
+    @MainActor
     private func verifyShellAndSettings(
         appearance: String,
         screenshotSuffix: String,
@@ -60,6 +88,7 @@ final class StornautAppUITests: XCTestCase {
             "-AppleLanguages", "(en)",
             "-AppleLocale", "en_US",
             "--stornaut-ui-test-appearance=\(appearance)",
+            "--stornaut-debug-fixture=empty",
         ]
 
         app.launch()

@@ -1,0 +1,76 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+cd "$repo_root"
+
+required_files=(
+    StornautApp/AppState/AppDependencies.swift
+    StornautApp/AppState/AppPageState.swift
+    StornautApp/AppState/StornautAppModel.swift
+    StornautApp/AppState/DebugAppFixtures.swift
+    StornautApp/DesignSystem/StornautFormatters.swift
+    StornautApp/DesignSystem/SemanticStatus.swift
+    StornautApp/DesignSystem/AppPhaseStatus.swift
+    StornautApp/DesignSystem/EmptyStateView.swift
+    StornautApp/DesignSystem/MetricTile.swift
+    StornautApp/DesignSystem/ReclaimDispositionLabel.swift
+    StornautApp/DesignSystem/CoverageBadge.swift
+    StornautApp/DesignSystem/RetentionBadge.swift
+    StornautApp/DesignSystem/RecoveryStateView.swift
+)
+
+for file in "${required_files[@]}"; do
+    if [[ ! -f "$file" ]]; then
+        print -u2 "Missing Task 21 App-state file: $file"
+        exit 1
+    fi
+done
+
+view_sources=(
+    StornautApp/AppShell
+    StornautApp/DesignSystem
+    StornautApp/Settings
+)
+
+if rg -n \
+    'Surveyor|ScanSessionWriter|EvidenceStore|SQLite|StornautCodex|Codex|Probe(Broker|Bridge)|ActionPolicyGate|ActionExecutor|TrashMoving|RegisteredAction|FileManager|Process\(|posix_spawn' \
+    "${view_sources[@]}"; then
+    print -u2 "A SwiftUI View or DesignSystem file references a prohibited service." >&2
+    exit 1
+fi
+
+rg -q 'LocalStoreConfiguration\.production\(\)' \
+    StornautApp/AppState/AppDependencies.swift
+rg -q 'EvidenceStore' StornautApp/AppState/AppDependencies.swift
+rg -q 'QuickScanCoordinator' StornautApp/AppState/AppDependencies.swift
+rg -q '@Observable' StornautApp/AppState/StornautAppModel.swift
+rg -q '\.environment\(appModel\)' StornautApp/StornautApp.swift
+rg -q 'placeholder\.foundation' StornautApp/AppShell/RootView.swift
+
+fixture_marker='--stornaut-debug-fixture='
+fixture_occurrences=$(
+    rg -l --fixed-strings -- "$fixture_marker" StornautApp \
+        | sort
+)
+[[ "$fixture_occurrences" == "StornautApp/AppState/DebugAppFixtures.swift" ]]
+rg -q '^#if DEBUG$' StornautApp/AppState/DebugAppFixtures.swift
+
+if rg -n \
+    '1_786_320_000|fixture-success|fixture-partial|limited-permission' \
+    StornautApp \
+    -g '*.swift' \
+    -g '!**/DebugAppFixtures.swift'; then
+    print -u2 "DEBUG fixture values escaped the fixture source." >&2
+    exit 1
+fi
+
+if rg -n \
+    '#[0-9A-Fa-f]{6}|Color\(red:|NSColor\(calibrated' \
+    StornautApp/DesignSystem; then
+    print -u2 "DesignSystem contains raw image-model color values." >&2
+    exit 1
+fi
+
+echo "App-state boundary verification passed."

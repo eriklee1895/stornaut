@@ -1,12 +1,17 @@
 import AppKit
+import StornautCore
 import SwiftUI
 
 @main
 struct StornautApp: App {
     private let launchColorScheme = LaunchAppearanceOverride.colorScheme
+    @State private var appModel: StornautAppModel
 
     init() {
         LaunchAppearanceOverride.apply()
+        _appModel = State(
+            initialValue: Self.makeComposition().model
+        )
 #if DEBUG
         IsolationProbeHarness.startIfRequested()
 #endif
@@ -15,6 +20,7 @@ struct StornautApp: App {
     var body: some Scene {
         Window("app.name", id: "main") {
             RootView()
+                .environment(appModel)
                 .preferredColorScheme(launchColorScheme)
                 .background {
                     WindowAppearanceProbe(identifier: "app.appearance")
@@ -36,6 +42,7 @@ struct StornautApp: App {
 #endif
                 StornautSettingsView()
             }
+            .environment(appModel)
             .preferredColorScheme(launchColorScheme)
             .background {
                 WindowAppearanceProbe(identifier: "settings.appearance")
@@ -43,6 +50,48 @@ struct StornautApp: App {
             }
         }
         .keyboardShortcut(",", modifiers: .command)
+    }
+
+    @MainActor
+    private static func makeComposition() -> AppComposition {
+#if DEBUG
+        if let selection = DebugAppFixtureSelection(
+            arguments: CommandLine.arguments
+        ) {
+            do {
+                return try AppComposition.debugFixture(
+                    selection: selection
+                )
+            } catch {
+                return failedComposition(error)
+            }
+        }
+#endif
+        return AppComposition.production()
+    }
+
+    @MainActor
+    private static func failedComposition(
+        _ error: any Error
+    ) -> AppComposition {
+        let reason = DomainToken(
+            rawValue: "app.state.store-unavailable"
+        )!
+        let state = try! AppPageState(
+            phase: .error,
+            projection: nil,
+            reasonKey: reason,
+            recoveryIntent: .retryLatestSnapshot,
+            refreshedAt: Date()
+        )
+        return AppComposition(
+            model: StornautAppModel(
+                dependencies: AppDependencies {
+                    throw error
+                },
+                initialState: state
+            )
+        )
     }
 }
 

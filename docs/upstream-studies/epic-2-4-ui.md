@@ -204,3 +204,85 @@ snapshot test alone is not visual acceptance.
 The approved concepts provide a consistent Native Observatory visual language,
 while typed production state and accessibility own the actual UI. This avoids
 both generic placeholder SwiftUI and brittle pixel-copy implementation.
+
+## 11. Task 21 App-State Composition Refresh
+
+Task 21 revalidated the Phase B UI gate on 2026-08-10 before changing App
+state or shared components.
+
+### Current upstream snapshots
+
+| Source | Revision | License | Files/documents read |
+| --- | --- | --- | --- |
+| Apple SwiftUI documentation | Xcode 26.6 / Swift 6.3.3 installed documentation and current developer.apple.com pages | Apple documentation | `Managing model data in your app`, `Scene.environment(_:)`, `Environment`, macOS `Settings` scene |
+| [ClearDisk](https://github.com/bysiber/cleardisk) | tag `v1.9.0`, `1aaec92b91c40fdc0c2fce92fef20df08b5f5c43` | MIT | `ClearDiskApp.swift`, `MainView.swift`, `LICENSE` |
+| [PureMac](https://github.com/momenbasel/PureMac) | `e586b50bb30f68d0afff173e7d8389a50020095e` | MIT | `PureMacApp.swift`, `ViewModels/AppState.swift`, `PureMacTests/AppStateTests.swift`, `LICENSE` |
+
+The two repository revisions are unchanged from the accepted Phase A studies.
+Reviewed file SHA-256 values:
+
+```text
+ClearDisk ClearDiskApp.swift 86e4c1fd1d877a6976fb261a6df72e49806236436dbc0252f53d856241f8037b
+ClearDisk MainView.swift      9314b5dce074d52cbbd87c3102e92a9344b196443c7167f4c3cdae877999b82f
+PureMac PureMacApp.swift      f5a8494930d92038ee131d4005a6f8d50fe52c23a30179debfeb37c2f1b6ff08
+PureMac AppState.swift        79c08df2f97a29bd2410c2d72afbb8695d4e0a6fe1ac60f9d9664450d4841d2d
+PureMac AppStateTests.swift   beb5797032f1a72c402007de87116654352ccd7ba694d812d6eabd51521b178f
+```
+
+No upstream code, fixture, color value or layout constant is copied.
+
+### Apple model-data decision
+
+Current Apple guidance uses `@State` at the `App`/Scene ownership boundary for
+an `@Observable` model and injects that model with `.environment(model)`.
+Descendant Views read the model from the environment instead of constructing
+services. Stornaut uses this current Observation path rather than adding
+Combine-era `ObservableObject`, a global singleton or a third-party dependency
+container.
+
+### Upstream lessons and rejected patterns
+
+PureMac demonstrates that App-owned model lifetime, environment injection and
+state tests are useful. Its `AppState`, however, also owns a wide collection of
+scan, clean, scheduler, menu-bar, permission and uninstall services. Views call
+those mutation methods directly. Stornaut must keep the App model narrower and
+must route filesystem work through typed dependencies and intents.
+
+ClearDisk provides a useful macOS focus lesson: a visible but inactive window
+can render washed-out material until explicitly made key. It also places many
+presentation flags and direct scan/clean calls in one `MainView`. Stornaut
+borrows the focus/test lesson only; it rejects the MenuBar lifecycle, timer,
+login-item preference, direct cleaning calls and monolithic View state.
+
+### Stornaut Task 21 composition
+
+- `StornautApp` owns one `@MainActor @Observable StornautAppModel` in `@State`
+  and injects it into the main and Settings scenes.
+- `AppDependencies` exposes typed async operations to the model. Production
+  composition creates `LocalStoreConfiguration.production()`,
+  `EvidenceStore` and `QuickScanCoordinator`; SwiftUI Views never construct or
+  call those types.
+- A pure reducer maps latest `QuickScanProjection` values into empty, loading,
+  partial, cancelled, success, limited-permission, stale and error phases.
+  Loading, stale and error transitions preserve an existing valid projection.
+- DEBUG fixture selection is a closed exact launch-argument enum. Unknown,
+  malformed or duplicate selectors fall back to production composition. All
+  sample projections and values compile only under `#if DEBUG`.
+- Shared UI code is intentionally small: metric, disposition,
+  coverage/retention badge, empty/recovery state and byte/status formatting
+  primitives. It uses system/semantic colors, SF Symbols, system type and
+  localized keys; it does not reproduce canonical image pixels.
+- Task 21 leaves the four destination placeholders in place. Overview, Scan and
+  History rendering remain Tasks 22–24.
+
+### Verification additions
+
+Task 21 must add:
+
+- reducer tests for all eight phases and page-preserving transitions;
+- production-live dependency composition against an in-memory store;
+- closed DEBUG fixture selector and deterministic fixture tests;
+- byte/status formatting and semantic mapping tests;
+- a source/dependency gate proving View and DesignSystem files do not reference
+  Surveyor, SQLite, Codex, Policy, Executor or action APIs;
+- real App build, XCUITest/screenshot regression and read-only runtime capture.
