@@ -9,5 +9,6 @@
 - [Epic 2–4 Task 10 Code Review — 2026-08-10](epic-2-4-task-10-review.md)：领域契约、匿名 fixtures、Surveyor transport 迁移与 10 组确认缺陷的修复证据。
 - [Epic 2–4 Task 21 Code Review — 2026-08-10](epic-2-4-task-21-review.md)：App-owned state、DEBUG fixtures、semantic DesignSystem、Release 隔离与统一验证证据。
 - [Epic 2–4 Task 22 Code Review — 2026-08-10](epic-2-4-task-22-review.md)：snapshot-first Overview、Space Ledger/Orbit、Top Opportunities、可访问性、Light/Dark 与六图验证证据。
+- [Epic 2–4 Task 23 Code Review — 2026-08-10](epic-2-4-task-23-review.md)：App-owned Quick Scan、五阶段进度、ledger-owned 结果、只读 Evidence Inspector、三态 Peekaboo 与九图验证证据。
 
 报告记录测量事实；若事实要求降低安全、权限或隐私边界，必须先请求用户决策，不能直接改写批准规格。

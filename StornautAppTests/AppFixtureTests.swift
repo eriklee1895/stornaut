@@ -1,4 +1,5 @@
 import Darwin
+import Foundation
 import StornautCore
 import Testing
 @testable import StornautApp
@@ -38,6 +39,29 @@ func debugFixtureSelectorAcceptsOnlyOneExactKnownArgument() throws {
             "--stornaut-debug-fixture",
             "success",
         ]) == nil
+    )
+}
+
+@Test
+func debugInitialDestinationAcceptsOnlyOneExactKnownArgument() {
+    #expect(
+        DebugInitialDestination.selection(arguments: [
+            "Stornaut",
+            "--stornaut-debug-destination=scan",
+        ]) == .scan
+    )
+    #expect(
+        DebugInitialDestination.selection(arguments: [
+            "Stornaut",
+            "--stornaut-debug-destination=unknown",
+        ]) == .overview
+    )
+    #expect(
+        DebugInitialDestination.selection(arguments: [
+            "Stornaut",
+            "--stornaut-debug-destination=scan",
+            "--stornaut-debug-destination=history",
+        ]) == .overview
     )
 }
 
@@ -89,7 +113,14 @@ func debugFixturesCoverEveryApprovedPhaseDeterministically() throws {
         ])!
     )
     #expect(loadingComposition.model.scanActivity == .active)
+    #expect(loadingComposition.model.scanState.phase == .active)
+    #expect(
+        loadingComposition.model.scanState.currentStage
+            == .classifyArtifacts
+    )
+    #expect(loadingComposition.model.scanState.scopeScanned == 128)
     #expect(successComposition.model.scanActivity == .idle)
+    #expect(successComposition.model.scanState.phase == .completed)
 }
 
 @MainActor
@@ -137,6 +168,43 @@ func liveDependenciesCanLoadAnEmptyInMemoryStore() async throws {
     let dependencies = AppDependencies.live(configuration: .memory)
 
     #expect(try await dependencies.loadLatestQuickScan() == nil)
+}
+
+@Test
+func liveDependenciesRunOnlyTheExplicitTemporaryRoot() async throws {
+    let rootURL = FileManager.default.temporaryDirectory.appending(
+        path: "stornaut-app-live-\(UUID().uuidString)",
+        directoryHint: .isDirectory
+    )
+    try FileManager.default.createDirectory(
+        at: rootURL,
+        withIntermediateDirectories: false
+    )
+    defer { try? FileManager.default.removeItem(at: rootURL) }
+    try Data("fixture".utf8).write(
+        to: rootURL.appending(path: "value.bin")
+    )
+    let dependencies = AppDependencies.live(
+        configuration: .memory,
+        rootURL: rootURL
+    )
+
+    let stream = try await dependencies.startQuickScan()
+    var terminal: QuickScanProjection?
+    for try await event in stream {
+        if case let .terminal(projection) = event {
+            terminal = projection
+        }
+    }
+
+    let projection = try #require(terminal)
+    #expect(projection.session.terminalState == .completed)
+    #expect(
+        projection.session.completedScopes.map(\.rootPath.rawValue)
+            == [rootURL.standardizedFileURL.path]
+    )
+    #expect(dependencies.quickScanRootPath?.rawValue
+        == rootURL.standardizedFileURL.path)
 }
 
 @MainActor

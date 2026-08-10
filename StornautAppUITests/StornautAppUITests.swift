@@ -92,10 +92,16 @@ final class StornautAppUITests: XCTestCase {
         let quickScan = element("overview.action.quickScan", in: app)
         XCTAssertTrue(quickScan.waitForExistence(timeout: 5))
         quickScan.click()
-        XCTAssertTrue(app.staticTexts[
+        XCTAssertTrue(
+            element("scan.state.phase", in: app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertEqual(element("scan.state.phase", in: app).label, "limitedPermission")
+        XCTAssertTrue(element("scan.results.table", in: app).exists)
+        XCTAssertTrue(element("scan.review.unavailable", in: app).exists)
+        XCTAssertFalse(app.staticTexts[
             "Foundation shell — implementation follows the approved roadmap."
-        ].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Scan"].exists)
+        ].exists)
     }
 
     @MainActor
@@ -138,6 +144,153 @@ final class StornautAppUITests: XCTestCase {
         addScreenshot(
             shellWindow.screenshot(),
             named: "stornaut-overview-zh-Hans"
+        )
+    }
+
+    @MainActor
+    func testQuickScanProgressResultsAndInspector() throws {
+        let progress = launchScanFixture(
+            fixture: "loading",
+            appearance: "dark"
+        )
+        defer {
+            progress.app.terminate()
+            _ = progress.app.wait(for: .notRunning, timeout: 5)
+        }
+
+        XCTAssertTrue(
+            element("scan.state.phase", in: progress.app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertEqual(element("scan.state.phase", in: progress.app).label, "active")
+        XCTAssertTrue(
+            element("scan.action.stop", in: progress.app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            element("scan.currentScope", in: progress.app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            element("scan.stage.classifyArtifacts", in: progress.app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            element("scan.metric.scope", in: progress.app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            element("scan.metric.candidates", in: progress.app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            element("scan.metric.measured", in: progress.app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            element("scan.metric.elapsed", in: progress.app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            element("scan.results.table", in: progress.app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertFalse(progress.app.buttons["Trash"].exists)
+        XCTAssertFalse(progress.app.buttons["Investigate with Codex"].exists)
+        focusScan(progress.window, in: progress.app)
+        addScreenshot(
+            progress.window.screenshot(),
+            named: "stornaut-scan-progress-dark"
+        )
+
+        progress.app.terminate()
+        XCTAssertTrue(progress.app.wait(for: .notRunning, timeout: 5))
+
+        let partial = launchScanFixture(
+            fixture: "partial",
+            appearance: "light"
+        )
+        defer {
+            partial.app.terminate()
+            _ = partial.app.wait(for: .notRunning, timeout: 5)
+        }
+        XCTAssertTrue(
+            element("scan.state.phase", in: partial.app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertEqual(element("scan.state.phase", in: partial.app).label, "partial")
+        XCTAssertTrue(
+            element("scan.terminalStatus", in: partial.app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            element("scan.results.table", in: partial.app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            element("scan.action.start", in: partial.app)
+                .waitForExistence(timeout: 5)
+        )
+        focusScan(partial.window, in: partial.app)
+        addScreenshot(
+            partial.window.screenshot(),
+            named: "stornaut-scan-partial-light"
+        )
+
+        partial.app.terminate()
+        XCTAssertTrue(partial.app.wait(for: .notRunning, timeout: 5))
+
+        let completed = launchScanFixture(
+            fixture: "success",
+            appearance: "light"
+        )
+        defer {
+            completed.app.terminate()
+            _ = completed.app.wait(for: .notRunning, timeout: 5)
+        }
+        XCTAssertTrue(
+            element("scan.state.phase", in: completed.app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertEqual(element("scan.state.phase", in: completed.app).label, "completed")
+        XCTAssertTrue(
+            element("scan.results.table", in: completed.app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            element("scan.summary", in: completed.app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            element("scan.review.unavailable", in: completed.app)
+                .waitForExistence(timeout: 5)
+        )
+
+        let buildRow = completed.app.descendants(matching: .any)
+            .matching(
+                NSPredicate(
+                    format: "identifier BEGINSWITH 'scan.row.'"
+                )
+            )
+            .firstMatch
+        XCTAssertTrue(buildRow.waitForExistence(timeout: 5))
+        buildRow.click()
+        XCTAssertTrue(
+            element("scan.inspector", in: completed.app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            completed.app.staticTexts["Library/Caches/build"].exists
+        )
+        XCTAssertTrue(
+            element("scan.inspector.deepDivePaused", in: completed.app).exists
+        )
+        XCTAssertFalse(completed.app.buttons["Move to Trash"].exists)
+        completed.app.activate()
+        XCTAssertTrue(completed.window.waitForExistence(timeout: 5))
+        addScreenshot(
+            completed.window.screenshot(),
+            named: "stornaut-scan-results-inspector-light"
         )
     }
 
@@ -239,6 +392,33 @@ final class StornautAppUITests: XCTestCase {
     }
 
     @MainActor
+    private func launchScanFixture(
+        fixture: String,
+        appearance: String
+    ) -> (app: XCUIApplication, window: XCUIElement) {
+        let app = XCUIApplication()
+        app.terminate()
+        XCTAssertTrue(app.wait(for: .notRunning, timeout: 5))
+        app.launchArguments = [
+            "-AppleLanguages", "(en)",
+            "-AppleLocale", "en_US",
+            "--stornaut-ui-test-appearance=\(appearance)",
+            "--stornaut-debug-fixture=\(fixture)",
+        ]
+        app.launch()
+        let window = app.windows["main"]
+        XCTAssertTrue(window.waitForExistence(timeout: 10))
+        let scanItem = element("sidebar.scan", in: app)
+        XCTAssertTrue(scanItem.waitForExistence(timeout: 5))
+        app.activate()
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            scanItem.isHittable
+        })
+        scanItem.click()
+        return (app, window)
+    }
+
+    @MainActor
     private func element(
         _ identifier: String,
         in app: XCUIApplication
@@ -284,6 +464,22 @@ final class StornautAppUITests: XCTestCase {
             overviewItem.isHittable
         })
         overviewItem.click()
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            window.isHittable
+        })
+    }
+
+    @MainActor
+    private func focusScan(
+        _ window: XCUIElement,
+        in app: XCUIApplication
+    ) {
+        app.activate()
+        let scanItem = element("sidebar.scan", in: app)
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            scanItem.isHittable
+        })
+        scanItem.click()
         XCTAssertTrue(waitUntil(timeout: 5) {
             window.isHittable
         })

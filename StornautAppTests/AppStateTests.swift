@@ -173,10 +173,14 @@ func appModelLoadsThroughInjectedDependencyAndPreservesOnFailure() async throws 
     await model.refresh()
     #expect(model.pageState.phase == .success)
     #expect(model.pageState.projection == projection)
+    #expect(model.scanState.phase == .completed)
+    #expect(model.scanState.projection == projection)
 
     await model.refresh()
     #expect(model.pageState.phase == .error)
     #expect(model.pageState.projection == projection)
+    #expect(model.scanState.phase == .completed)
+    #expect(model.scanState.projection == projection)
     #expect(await loader.callCount == 2)
 }
 
@@ -201,6 +205,67 @@ func appModelCancellationRestoresThePreviousPage() async throws {
     #expect(model.pageState == initial)
 }
 
+@MainActor
+@Test
+func appRefreshNeverOverwritesAnActiveScanFlow() async throws {
+    let projection = try AppTestProjectionFactory.success()
+    let stream = AsyncThrowingStream<QuickScanProductEvent, Error> {
+        _ in
+    }
+    let model = StornautAppModel(
+        dependencies: AppDependencies(
+            loadLatestQuickScan: { projection },
+            startQuickScan: { stream },
+            cancelQuickScan: { false }
+        ),
+        now: { AppTestProjectionFactory.now }
+    )
+
+    model.startQuickScan()
+    await Task.yield()
+    let activeStartedAt = model.scanState.startedAt
+    await model.refresh()
+
+    #expect(model.pageState.projection == projection)
+    #expect(model.scanState.phase == .active)
+    #expect(model.scanState.startedAt == activeStartedAt)
+}
+
+@MainActor
+@Test
+func staleRefreshCompletionCannotOverwriteANewerScanTerminal()
+    async throws
+{
+    let stale = try AppTestProjectionFactory.success()
+    let fresh = try OverviewTestProjectionFactory.projection(
+        slug: "scan-newer-than-refresh"
+    )
+    let loader = AppTestSuspendedProjectionLoader(projection: stale)
+    let streamDriver = AppTestPageStateScanDriver()
+    let model = StornautAppModel(
+        dependencies: AppDependencies(
+            loadLatestQuickScan: loader.load,
+            startQuickScan: { await streamDriver.start() },
+            cancelQuickScan: { false }
+        ),
+        now: { AppTestProjectionFactory.now }
+    )
+
+    let refresh = Task { @MainActor in
+        await model.refresh()
+    }
+    await loader.waitUntilStarted()
+    model.startQuickScan()
+    await streamDriver.waitUntilStarted()
+    await streamDriver.emit(.terminal(fresh))
+    await streamDriver.finish()
+    await loader.resume()
+    await refresh.value
+
+    #expect(model.pageState.projection == fresh)
+    #expect(model.scanState.projection == fresh)
+}
+
 private actor AppTestLatestProjectionLoader {
     private var results: [
         Result<QuickScanProjection?, any Error>
@@ -217,6 +282,60 @@ private actor AppTestLatestProjectionLoader {
             return nil
         }
         return try results.removeFirst().get()
+    }
+}
+
+private actor AppTestSuspendedProjectionLoader {
+    private let projection: QuickScanProjection
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var started = false
+
+    init(projection: QuickScanProjection) {
+        self.projection = projection
+    }
+
+    func load() async -> QuickScanProjection {
+        started = true
+        await withCheckedContinuation {
+            continuation = $0
+        }
+        return projection
+    }
+
+    func waitUntilStarted() async {
+        while !started {
+            await Task.yield()
+        }
+    }
+
+    func resume() {
+        continuation?.resume()
+        continuation = nil
+    }
+}
+
+private actor AppTestPageStateScanDriver {
+    typealias Stream = AsyncThrowingStream<QuickScanProductEvent, Error>
+    private var continuation: Stream.Continuation?
+
+    func start() -> Stream {
+        Stream { continuation in
+            self.continuation = continuation
+        }
+    }
+
+    func waitUntilStarted() async {
+        while continuation == nil {
+            await Task.yield()
+        }
+    }
+
+    func emit(_ event: QuickScanProductEvent) {
+        continuation?.yield(event)
+    }
+
+    func finish() {
+        continuation?.finish()
     }
 }
 

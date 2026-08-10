@@ -402,12 +402,8 @@ public actor QuickScanCoordinator {
                         to: continuation,
                         limit: request.lifecycleEventBufferCapacity
                     )
-                case let .factObserved(.pathSnapshot(snapshot)):
-                    try emit(
-                        .snapshotObserved(snapshot),
-                        to: continuation,
-                        limit: request.lifecycleEventBufferCapacity
-                    )
+                case .factObserved(.pathSnapshot):
+                    break
                 case let .issueObserved(issue):
                     try emit(
                         .issueObserved(issue),
@@ -568,7 +564,10 @@ public actor QuickScanCoordinator {
                 }
                 classifications.append(classification)
                 try emit(
-                    .classificationObserved(classification),
+                    .classifiedSnapshotObserved(
+                        snapshot,
+                        classification
+                    ),
                     to: continuation,
                     limit: request.lifecycleEventBufferCapacity
                 )

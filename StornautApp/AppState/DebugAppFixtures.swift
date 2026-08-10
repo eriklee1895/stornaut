@@ -106,6 +106,23 @@ struct DebugAppFixtureSelection: Sendable, Equatable {
     }
 }
 
+enum DebugInitialDestination {
+    static func selection(
+        arguments: [String]
+    ) -> AppDestination {
+        let prefix = "--stornaut-debug-destination="
+        let matches = arguments.filter { $0.hasPrefix(prefix) }
+        guard matches.count == 1,
+              let destination = AppDestination(
+                  rawValue: String(matches[0].dropFirst(prefix.count))
+              )
+        else {
+            return .overview
+        }
+        return destination
+    }
+}
+
 extension AppComposition {
     static func debugFixture(
         arguments: [String]
@@ -125,16 +142,89 @@ extension AppComposition {
         }
     ) throws -> AppComposition {
         let state = try makeState(selection.fixture)
+        let scanState = try selection.fixture.makeScanState(
+            pageState: state
+        )
         return AppComposition(
             model: StornautAppModel(
                 dependencies: AppDependencies { nil },
                 initialState: state,
-                initialScanActivity: selection.fixture == .loading
+                initialScanActivity: scanState.isActive
                     ? .active
                     : .idle,
+                initialScanState: scanState,
                 now: { DebugProjectionFactory.now },
                 refreshesServices: false
             )
+        )
+    }
+}
+
+private extension DebugAppFixture {
+    func makeScanState(
+        pageState: AppPageState
+    ) throws -> ScanFlowState {
+        guard self == .loading else {
+            return pageState.projection.map(ScanFlowState.retained) ?? .idle
+        }
+        let projection = try DebugProjectionFactory.success(slug: rawValue)
+        let reducer = ScanFlowReducer()
+        var state = reducer.started(
+            previous: .retained(projection),
+            at: DebugProjectionFactory.now.addingTimeInterval(-8)
+        )
+        state = reducer.reduce(
+            .stageChanged(.indexVolumes),
+            state: state
+        )
+        state = reducer.reduce(
+            .stageChanged(.mapProjects),
+            state: state
+        )
+        state = reducer.reduce(
+            .stageChanged(.classifyArtifacts),
+            state: state
+        )
+        state = reducer.reduce(
+            .progress(
+                QuickScanProgress(
+                    scopeID: projection.snapshots[0].scopeID,
+                    currentRelativePath: PersistedPath(
+                        rawValue: "Projects/App/DerivedData"
+                    )!,
+                    counters: ScanProgress(
+                        completedEntries: 128,
+                        regularFileCount: 83,
+                        directoryCount: 41,
+                        symlinkCount: 4,
+                        errorCount: 0,
+                        logicalFileBytes: 350_000,
+                        allocatedFileBytes: 300_000
+                    )
+                )
+            ),
+            state: state
+        )
+        for classification in projection.classifications.prefix(3) {
+            guard let snapshot = projection.snapshots.first(
+                where: { $0.id == classification.snapshotID }
+            ) else {
+                continue
+            }
+            state = reducer.reduce(
+                .classifiedSnapshotObserved(snapshot, classification),
+                state: state
+            )
+        }
+        for evidence in projection.evidence {
+            state = reducer.reduce(
+                .evidenceObserved(evidence),
+                state: state
+            )
+        }
+        return reducer.elapsed(
+            state: state,
+            at: DebugProjectionFactory.now
         )
     }
 }
@@ -164,6 +254,41 @@ final class DebugAppStateProbeView: NSView {
         super.init(frame: .zero)
         setAccessibilityElement(true)
         setAccessibilityIdentifier("app.state.phase")
+        setAccessibilityRole(.staticText)
+        setAccessibilityLabel(phase.rawValue)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+}
+
+struct DebugScanStateProbe: NSViewRepresentable {
+    let phase: ScanFlowPhase
+
+    func makeNSView(context: Context) -> DebugScanStateProbeView {
+        DebugScanStateProbeView(phase: phase)
+    }
+
+    func updateNSView(
+        _ nsView: DebugScanStateProbeView,
+        context: Context
+    ) {
+        nsView.phase = phase
+    }
+}
+
+final class DebugScanStateProbeView: NSView {
+    var phase: ScanFlowPhase {
+        didSet { setAccessibilityLabel(phase.rawValue) }
+    }
+
+    init(phase: ScanFlowPhase) {
+        self.phase = phase
+        super.init(frame: .zero)
+        setAccessibilityElement(true)
+        setAccessibilityIdentifier("scan.state.phase")
         setAccessibilityRole(.staticText)
         setAccessibilityLabel(phase.rawValue)
     }

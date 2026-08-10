@@ -3,7 +3,19 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(StornautAppModel.self) private var appModel
-    @State private var selection: AppDestination? = .overview
+    @State private var selection: AppDestination?
+
+    init() {
+#if DEBUG
+        _selection = State(
+            initialValue: DebugInitialDestination.selection(
+                arguments: CommandLine.arguments
+            )
+        )
+#else
+        _selection = State(initialValue: .overview)
+#endif
+    }
 
     var body: some View {
         NavigationSplitView {
@@ -44,6 +56,8 @@ struct RootView: View {
                 }
                 DebugAppStateProbe(phase: appModel.pageState.phase)
                     .frame(width: 1, height: 1)
+                DebugScanStateProbe(phase: appModel.scanState.phase)
+                    .frame(width: 1, height: 1)
             }
         }
 #endif
@@ -69,7 +83,9 @@ struct RootView: View {
                     }
                 }
             )
-        case .scan, .investigations, .history:
+        case .scan:
+            ScanView()
+        case .investigations, .history:
             DestinationPlaceholder(destination: destination)
         }
     }

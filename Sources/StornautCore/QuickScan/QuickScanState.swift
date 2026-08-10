@@ -137,9 +137,8 @@ public struct QuickScanProjection: Codable, Sendable, Equatable {
 public enum QuickScanProductEvent: Sendable, Equatable {
     case stageChanged(QuickScanStage)
     case progress(QuickScanProgress)
-    case snapshotObserved(PathSnapshot)
     case issueObserved(QuickScanIssueObservation)
-    case classificationObserved(Classification)
+    case classifiedSnapshotObserved(PathSnapshot, Classification)
     case evidenceObserved(EvidenceRecord)
     case productIssueObserved(QuickScanProductIssue)
     case ledgerUpdated(SpaceLedger)

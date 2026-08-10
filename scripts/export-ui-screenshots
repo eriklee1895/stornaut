@@ -41,6 +41,9 @@ expected_names = %w[
   stornaut-settings-dark
   stornaut-overview-limited
   stornaut-overview-zh-Hans
+  stornaut-scan-progress-dark
+  stornaut-scan-partial-light
+  stornaut-scan-results-inspector-light
 ]
 
 expected_names.each do |expected_name|
@@ -61,7 +64,10 @@ for screenshot in \
     stornaut-shell-dark.png \
     stornaut-settings-dark.png \
     stornaut-overview-limited.png \
-    stornaut-overview-zh-Hans.png; do
+    stornaut-overview-zh-Hans.png \
+    stornaut-scan-progress-dark.png \
+    stornaut-scan-partial-light.png \
+    stornaut-scan-results-inspector-light.png; do
     test -f "$output_dir/$screenshot"
 done
 

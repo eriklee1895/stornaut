@@ -107,6 +107,17 @@ func quickScanCoordinatorRunsTheRealDeterministicPipeline() async throws {
     #expect(events.compactMap(\.ledger).count == 1)
     #expect(events.compactMap(\.classification).count
         == projection.classifications.count)
+    #expect(
+        Dictionary(
+            uniqueKeysWithValues: events.compactMap {
+                $0.classifiedPair
+            }
+        ) == Dictionary(
+            uniqueKeysWithValues: projection.classifications.map {
+                ($0.snapshotID, $0)
+            }
+        )
+    )
     #expect(projection.session.terminalState == .completed)
     #expect(projection.snapshots.count >= 8)
     #expect(
@@ -1824,10 +1835,20 @@ private extension QuickScanProductEvent {
     }
 
     var classification: Classification? {
-        guard case let .classificationObserved(value) = self else {
+        guard case let .classifiedSnapshotObserved(_, value) = self else {
             return nil
         }
         return value
+    }
+
+    var classifiedPair: (SnapshotID, Classification)? {
+        guard case let .classifiedSnapshotObserved(snapshot, classification)
+            = self,
+              snapshot.id == classification.snapshotID
+        else {
+            return nil
+        }
+        return (snapshot.id, classification)
     }
 
     var ledger: SpaceLedger? {

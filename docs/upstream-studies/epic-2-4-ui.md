@@ -374,3 +374,129 @@ generated paths and decorative Probe do not enter production defaults.
 Stornaut implements a medium functional orbit, full Space Ledger, one primary
 action and calm native surfaces using real typed data. No new image generation
 or web asset is required.
+
+## 13. Task 23 Quick Scan Progress and Results Refresh
+
+Task 23 revalidated the Phase B UI gate on 2026-08-10 before connecting the
+real `QuickScanCoordinator` stream to the Scan workspace.
+
+### Current Apple and design-system sources
+
+The current Apple SwiftUI documentation index remains
+`/websites/developer_apple_swiftui`. Focused documentation and installed SDK
+interfaces were reviewed for:
+
+- [`ProgressView`](https://developer.apple.com/documentation/swiftui/progressview);
+- [`Table`](https://developer.apple.com/documentation/swiftui/table);
+- [`TableColumnCustomization`](https://developer.apple.com/documentation/swiftui/tablecolumncustomization);
+- [`inspector(isPresented:content:)`](https://developer.apple.com/documentation/swiftui/view/inspector%28ispresented%3Acontent%3A%29);
+- [`inspectorColumnWidth(min:ideal:max:)`](https://developer.apple.com/documentation/swiftui/view/inspectorcolumnwidth%28min%3Aideal%3Amax%3A%29);
+- [`accessibilityInputLabels(_:)`](https://developer.apple.com/documentation/swiftui/view/accessibilityinputlabels%28_%3A%29-9q3yf);
+- [`accessibilityHint(_:)`](https://developer.apple.com/documentation/swiftui/view/accessibilityhint%28_%3A%29-3rdgs).
+
+Current SwiftUI supports native macOS table selection, customizable columns
+and a trailing Inspector with a bounded column width. Task 23 uses those
+platform idioms where they preserve accessibility and keyboard behavior. It
+does not add a custom floating panel, a web-style grid library or a third-party
+View inspection dependency.
+
+The `ui-ux-pro-max` SwiftUI and UX searches reinforced these applicable
+constraints:
+
+- long-running multi-step work needs an explicit stage indicator and loading
+  feedback;
+- collection rows need stable identifiers rather than array offsets;
+- long paths require a deterministic truncation/full-detail path;
+- state and errors require text/icon semantics rather than color alone;
+- the stable results surface should not disappear during loading or recovery.
+
+The approved Quick Scan E+A and Scan Results A+D canonical assets remain the
+composition source. No image generation or external visual asset is required.
+No pixel, generated sample value, path, palette or layout constant is copied.
+
+### App-owned scan flow
+
+`StornautAppModel`, not the Scan View, owns the producer task and a closed scan
+flow state. Navigation away and back therefore cannot cancel or duplicate a
+scan. `AppDependencies` exposes only typed start/cancel/load operations:
+SwiftUI never constructs a `Surveyor`, store or coordinator.
+
+Production composition creates one actor-owned coordinator and creates a
+`ScanRequest` for the current user's home directory. This is an explicit Phase
+B default until Task 25 owns configurable roots and exclusions. The root is
+not discovered by a View. DEBUG and UI-test compositions use deterministic
+event streams and never scan the real home directory.
+
+The reducer consumes the existing closed `QuickScanProductEvent` stream:
+
+- `stageChanged` advances only through the five fixed stages;
+- `progress` updates scanned-entry count, measured allocated bytes and current
+  summarized path without treating either as a percentage;
+- classification/evidence/ledger events progressively fill typed results;
+- `terminal` is authoritative for completed, partial, cancelled,
+  permission-limited and store-failure outcomes;
+- thrown start/stream errors preserve the last valid projection and expose a
+  safe retry state.
+
+Elapsed time is derived from the injected scan start clock. Candidates Found
+counts distinct classified candidate snapshots. Scope Scanned remains an entry
+count. Measured remains allocated bytes. These units are never added together
+or presented as a fabricated percent complete.
+
+### Stable progress/results surface
+
+The Scan workspace keeps one structural surface through idle, active and
+terminal states:
+
+1. title, local/no-Codex explanation and safe primary/secondary action;
+2. four metrics: Scope Scanned, Candidates Found, Measured and Elapsed;
+3. five-stage rail with icon, label and explicit Complete/Current/Pending text;
+4. one-line current-scope strip;
+5. search/filter controls and the grouped lifecycle result outline;
+6. separate Ready, Review, Unknown and Protected summary values.
+
+Completed groups retain stable rows, the active group can grow, and empty
+groups remain explicitly pending/empty without invented bytes. Stop Scan is a
+neutral secondary action with text that a partial snapshot is retained.
+Stopping never means deletion and never changes a result disposition.
+
+The result rows use the approved independent fields: Item/Path Summary, Last
+Active, Producer, Recovery, Allocated Size and Disposition. Missing or
+unmeasurable values render an em dash with a reason; they never become `0 B`.
+Known-rule rows have no AI decoration.
+
+### Read-only Inspector and Phase B action boundary
+
+Selection opens a native trailing read-only Inspector containing exact path,
+producer, lifecycle, activity, recovery, supporting evidence, missing evidence
+and disposition. Selection and disclosure do not mutate classification.
+
+The broader UI specification describes Reveal, Copy, View Evidence,
+Investigate and a filled Review CTA. The active Phase B plan is narrower and is
+authoritative for Task 23:
+
+- no Review, Trash, Registered Action or cleanup execution is enabled;
+- no Codex process can start, including from Unknown rows;
+- Deep Dive/Investigate is shown only as Safety Paused explanatory state;
+- Reveal/Copy are not faked if no typed intent is implemented;
+- the future Review affordance, if visible, is disabled and explicitly marked
+  as unavailable in this phase.
+
+This resolves the specification conflict without silently widening the safety
+or write boundary. Phase C must separately approve any enabled Review or local
+workspace action.
+
+### Verification additions
+
+Task 23 adds:
+
+- reducer tests for idle, five stages, progressive facts, explicit stop,
+  cancelled, partial, permission-limited, store failure and completion;
+- model tests proving one active producer and navigation-independent lifetime;
+- production-composition tests that use a temporary root, plus a source gate
+  proving Views cannot reference scanner/store/Codex/policy/executor APIs;
+- result projection tests for grouping, filtering, ordering, missing values,
+  recovery/disposition separation and read-only Inspector evidence;
+- deterministic DEBUG in-progress, partial and completed fixtures;
+- real App XCUITest, Light/Dark screenshots and read-only Peekaboo inspection
+  of all three representative states.

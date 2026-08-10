@@ -1,6 +1,6 @@
 # Stornaut Epic 2–4 Deterministic Product Core Implementation Plan
 
-> **Status:** Approved — Tasks 9–22 complete; Task 23 next
+> **Status:** Approved — Tasks 9–23 complete; Task 24 next
 >
 > **Roadmap phase:** Phase B — Deterministic Product Core
 >
@@ -1479,19 +1479,19 @@ Suggested commit subject: `feat: render snapshot-first overview`
 - Modify: localization resources
 - Create/modify: Scan unit/UI tests and screenshot checks
 
-- [ ] **Step 1: Write scan-flow reducer tests first**
+- [x] **Step 1: Write scan-flow reducer tests first**
 
 Cover idle, five stages, partial results, explicit stop, cancellation,
 permission-limited, store failure and completed results. Navigation away and
 back preserves the active session.
 
-- [ ] **Step 2: Implement Quick Scan progress**
+- [x] **Step 2: Implement Quick Scan progress**
 
 Use the approved five-stage rail and stable results outline. Show scope,
 candidates, measured amount and elapsed time without mixing units. `Stop Scan`
 is neutral and explains that a partial snapshot is retained.
 
-- [ ] **Step 3: Implement read-only Scan Results**
+- [x] **Step 3: Implement read-only Scan Results**
 
 Use approved lifecycle groups, filters, columns and the read-only Evidence
 Inspector. Known-rule rows have no AI decoration. Unknown items may explain
@@ -1499,17 +1499,63 @@ that Deep Dive is paused, but no Codex process starts.
 
 Do not add an enabled Review/Trash action in Phase B.
 
-- [ ] **Step 4: Verify accessibility and themes**
+- [x] **Step 4: Verify accessibility and themes**
 
 Stages, filters, results, disclosure and partial/limited states are keyboard and
 VoiceOver usable. Missing measurements use an em dash and explanation, not
 zero.
 
-- [ ] **Step 5: Run the real App UI loop**
+- [x] **Step 5: Run the real App UI loop**
 
 Run focused tests, build/launch the actual `.app`, inspect in-progress, partial
 and completed states with read-only Peekaboo, update XCUITest/Light/Dark
 screenshots and run `scripts/verify`.
+
+Execution evidence:
+
+- `StornautAppModel` owns one product stream independently of destination View
+  lifetime. Typed dependencies resolve one coordinator, start a Phase B
+  home-root request and cancel without exposing Surveyor/store APIs to Views.
+- Generation and cancellation guards prevent stale initial loads, duplicate
+  starts, immediate-stop loss and a late cancel from reaching a newer session.
+- `ScanFlowReducer` separates scope entries, classified candidates,
+  hardlink-deduplicated measured file bytes and elapsed time; it never presents
+  a percentage without a total-work denominator.
+- The product event stream pairs only classified snapshots with their
+  classifications for progressive UI. Full traversal facts remain bounded in
+  Core persistence rather than accumulating in App memory.
+- Terminal allocated sizes come only from classification-consistent
+  `SpaceLedgerOwner` values. Before final accounting, result rows show an em
+  dash plus Pending Final Accounting instead of a directory inode size.
+- The native grouped Table keeps the seven lifecycle categories and separate
+  Item/Path, Last Active, Producer, Recovery, Allocated Size and Disposition
+  fields. Search and All/Ready/Review/Unknown/Protected filters are read-only.
+- The trailing Inspector exposes full root-qualified path, relative path,
+  producer, lifecycle, filesystem activity time, recovery method/cost,
+  supporting/missing evidence and disposition. It cannot mutate classification
+  or execute an action.
+- Review is an explicitly disabled Phase B affordance. No checkbox, Trash,
+  Registered Action, Reveal/Copy shell integration, Codex launch or Deep Dive
+  bypass exists.
+- Grouped review fixed confirmed accounting, unbounded App-memory,
+  immediate-cancel, stale-refresh, failure-state, stage-history, localization,
+  root-path and accessibility defects. Final automatic review has no open
+  P0–P2 finding.
+- Final `scripts/verify` passed: SwiftPM 263/263, App tests 57/57, XCUITest 5/5,
+  nine screenshot contracts, App/state/Overview/Scan/Release gates, signed
+  bundle, 67-rule catalog, localization, docs links and `git diff --check`.
+- Read-only Peekaboo captured three separately launched real App PIDs with
+  distinct final window IDs `37082`, `37107` and `37123`: active Dark, partial Light
+  and completed Light Inspector. Required AX labels were present and Move to
+  Trash / Investigate with Codex were absent.
+- Xcode emitted non-blocking LLDB VersionStore warnings during some UI runner
+  launches; every test method still executed and the final result was 5/5.
+  No Automation Mode policy, root daemon, TCC/SIP, Accessibility, Event
+  Synthesizing or other system permission was modified.
+- One post-documentation full run hit a known Codex process timing fixture
+  before App/UI stages because `pid.txt` was not yet present. Its focused rerun
+  passed, and the following complete `scripts/verify` passed every gate; the
+  transient failed run is not counted as acceptance.
 
 Suggested commit subject: `feat: deliver quick scan results`
 

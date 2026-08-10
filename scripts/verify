@@ -13,6 +13,7 @@ scripts/verify-activity-boundaries
 scripts/verify-quick-scan-boundaries
 scripts/verify-app-state-boundaries
 scripts/verify-overview-boundaries
+scripts/verify-scan-boundaries
 
 rm -rf .derivedData
 

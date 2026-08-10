@@ -1,0 +1,57 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+cd "$repo_root"
+
+scan_views=(
+    StornautApp/Scan/ScanView.swift
+    StornautApp/Scan/ScanStageRail.swift
+    StornautApp/Scan/ScanResultsTable.swift
+    StornautApp/Scan/ScanEvidenceInspector.swift
+)
+
+for source in "${scan_views[@]}"; do
+    test -f "$source"
+done
+
+for forbidden in \
+    Surveyor \
+    ScanRequest \
+    QuickScanCoordinator \
+    EvidenceStore \
+    SQLite \
+    StornautCodex \
+    Codex \
+    ProbeBridge \
+    PolicyGate \
+    Executor \
+    MoveToTrash \
+    RegisteredAction \
+    'FileManager\.' \
+    'Process\(' \
+    'shell'; do
+    if rg -n "$forbidden" "${scan_views[@]}"; then
+        print -u2 "Scan View boundary violation: $forbidden"
+        exit 1
+    fi
+done
+
+if rg -n \
+    'Button\([^)]*(Trash|Review Reclaim Plan|Investigate with Codex)' \
+    "${scan_views[@]}"; then
+    print -u2 "Enabled Phase C action leaked into Task 23 Scan Views."
+    exit 1
+fi
+
+rg -q 'startQuickScan' StornautApp/AppState/StornautAppModel.swift
+rg -q 'cancelQuickScan' StornautApp/AppState/StornautAppModel.swift
+rg -q 'QuickScanCoordinator' StornautApp/AppState/AppDependencies.swift
+rg -q 'FileManager.default.homeDirectoryForCurrentUser' \
+    StornautApp/AppState/AppDependencies.swift
+rg -q 'scan.review.unavailable' StornautApp/Scan/ScanView.swift
+rg -q 'Deep Dive Safety Paused' \
+    StornautApp/Resources/en.lproj/Localizable.strings
+
+print "Scan UI/service boundaries verified."
