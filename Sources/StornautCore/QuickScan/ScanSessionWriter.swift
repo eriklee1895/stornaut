@@ -13,6 +13,9 @@ public actor ScanSessionWriter {
     private let store: any ScanSessionPersisting
     private let volumeSampler: any VolumeBaselineSampling
     private let now: @Sendable () -> Date
+    private let snapshotID: @Sendable (String) -> SnapshotID
+    private let snapshotObservedAt: (@Sendable (String) -> Date)?
+    private let defersProductFinalization: Bool
     private var scanIsActive = false
     private var activeControl: QuickScanRunControl?
 
@@ -20,11 +23,19 @@ public actor ScanSessionWriter {
         store: any ScanSessionPersisting,
         volumeSampler: any VolumeBaselineSampling =
             FoundationVolumeBaselineSampler(),
-        now: @escaping @Sendable () -> Date = Date.init
+        now: @escaping @Sendable () -> Date = Date.init,
+        snapshotID: @escaping @Sendable (String) -> SnapshotID = {
+            _ in SnapshotID()
+        },
+        snapshotObservedAt: (@Sendable (String) -> Date)? = nil,
+        defersProductFinalization: Bool = false
     ) {
         self.store = store
         self.volumeSampler = volumeSampler
         self.now = now
+        self.snapshotID = snapshotID
+        self.snapshotObservedAt = snapshotObservedAt
+        self.defersProductFinalization = defersProductFinalization
     }
 
     public var hasActiveScan: Bool {
@@ -151,22 +162,40 @@ public actor ScanSessionWriter {
             )
             try Task.checkCancellation()
 
-            for stage in [
-                QuickScanStage.classifyArtifacts,
-                .checkActivity,
-                .finalizeSnapshot,
-            ] {
-                try yield(
-                    .stageChanged(stage),
-                    continuation: continuation,
-                    request: request
-                )
+            if !defersProductFinalization {
+                for stage in [
+                    QuickScanStage.classifyArtifacts,
+                    .checkActivity,
+                    .finalizeSnapshot,
+                ] {
+                    try yield(
+                        .stageChanged(stage),
+                        continuation: continuation,
+                        request: request
+                    )
+                }
             }
 
             let finishedAt = now()
             let session: ScanSession
             let scopeResult: QuickScanScopeResult
-            if let reason = summary.partialReason {
+            if defersProductFinalization {
+                session = try ScanSession(
+                    id: request.sessionID,
+                    startedAt: startedAt,
+                    finishedAt: finishedAt,
+                    terminalState: .partial,
+                    completedScopes: [],
+                    unfinishedScopes: [
+                        UnfinishedScanScope(
+                            id: request.scopeID,
+                            rootPath: rootPath,
+                            reason: summary.partialReason ?? .interrupted
+                        ),
+                    ]
+                )
+                scopeResult = .unfinished(session.unfinishedScopes[0])
+            } else if let reason = summary.partialReason {
                 session = try ScanSession(
                     id: request.sessionID,
                     startedAt: startedAt,
@@ -280,6 +309,7 @@ public actor ScanSessionWriter {
         do {
             for try await observation in Surveyor().scan(request) {
                 try Task.checkCancellation()
+                let observation = try normalizedObservation(observation)
                 if observation.relativePath == ".",
                    !stableIdentity(
                        observation.snapshot.fileIdentity,
@@ -318,6 +348,30 @@ public actor ScanSessionWriter {
         } catch {
             throw error
         }
+    }
+
+    private func normalizedObservation(
+        _ observation: SurveyorObservation
+    ) throws -> SurveyorObservation {
+        let source = observation.snapshot
+        return SurveyorObservation(
+            snapshot: try PathSnapshot(
+                id: snapshotID(source.relativePath),
+                sessionID: source.sessionID,
+                scopeID: source.scopeID,
+                relativePath: source.relativePath,
+                kind: source.kind,
+                logicalByteCount: source.logicalByteCount,
+                allocatedByteCount: source.allocatedByteCount,
+                modifiedAt: source.modifiedAt,
+                fileIdentity: source.fileIdentity,
+                symlinkTarget: source.symlinkTarget,
+                measurementStatus: source.measurementStatus,
+                observedAt: snapshotObservedAt?(source.relativePath)
+                    ?? source.observedAt
+            ),
+            progress: observation.progress
+        )
     }
 
     private func persistAndEmit(

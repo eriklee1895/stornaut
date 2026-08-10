@@ -36,6 +36,17 @@ test "$(/usr/libexec/PlistBuddy -c 'Print :com.apple.security.app-sandbox' "$ent
 
 test -f "$app_path/Contents/Resources/en.lproj/Localizable.strings"
 test -f "$app_path/Contents/Resources/zh-Hans.lproj/Localizable.strings"
+runtime_catalog=$(
+    find "$app_path/Contents/Resources" \
+        -type f \
+        -name BuiltInRuleCatalog.json \
+        -print -quit
+)
+test -n "$runtime_catalog"
+test "$(
+    shasum -a 256 "$runtime_catalog" | awk '{print $1}'
+)" = "133b3829816fa951f03cb87473e03454c3e561b421c83e6c8efaf8ad89849e99"
+test "$(jq '.rules | length' "$runtime_catalog")" = "67"
 test ! -d "$app_path/Contents/PlugIns"
 
 print "App bundle verification passed: $app_path"

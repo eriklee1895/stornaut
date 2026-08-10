@@ -284,8 +284,8 @@ Costs:
 
 ## Residual Risks
 
-- Tasks 15–18 provide all five planned catalog sources and the complete FR-2
-  coverage manifest.
+- Tasks 15–18 provide all four planned catalog sources plus the separately
+  versioned authoring schema and complete FR-2 coverage manifest.
 - Candidate matching and activity fusion are measured/tested, but final Quick
   Scan orchestration and classification remain Task 20.
 - Local overlay file selection/UI is later work; Task 14 only defines compiled

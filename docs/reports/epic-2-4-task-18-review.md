@@ -15,7 +15,7 @@
 - five Unknown/no-action runtime/image rules;
 - seven Review Recommended cache/update/temp residue rules;
 - five FR-2 families, 36 subrequirements and four Swift policy keys;
-- 67-rule cumulative matching and five-source deterministic compilation;
+- 67-rule cumulative matching and four-source deterministic compilation;
 - no repository custom review workflow.
 
 The post-fix automatic report is retained at
@@ -110,7 +110,8 @@ Final post-review `scripts/verify` passed on 2026-08-10:
 - 2/2 XCUITest cases and four exported Light/Dark screenshots;
 - App build, local signing and bundle verification;
 - English and Simplified Chinese localization parity;
-- deterministic rule compiler, five-source catalog, manifest and coverage gates;
+- deterministic rule compiler, four-source catalog, manifest and coverage
+  gates;
 - complete catalog SHA-256
   `133b3829816fa951f03cb87473e03454c3e561b421c83e6c8efaf8ad89849e99`;
 - local Markdown links and `git diff --check`.

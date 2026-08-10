@@ -1,6 +1,6 @@
 # Stornaut Epic 2–4 Deterministic Product Core Implementation Plan
 
-> **Status:** Approved — Tasks 9–19 complete; Task 20 next
+> **Status:** Approved — Tasks 9–20 complete; Task 21 next
 >
 > **Roadmap phase:** Phase B — Deterministic Product Core
 >
@@ -1072,7 +1072,7 @@ Execution evidence:
 - 12/12 source URLs pass live version/commit audit. RuleCompiler 32/32 and
   RuleCatalog 6/6 pass.
 - Complete 67-rule matcher remains below the 2 s gate at about 1.25–1.30 s.
-- Five-source complete catalog hash is
+- Four-source complete catalog hash is
   `133b3829816fa951f03cb87473e03454c3e561b421c83e6c8efaf8ad89849e99`.
 - Final `scripts/verify` passes 218 SwiftPM tests, 2/2 Xcode App contract tests,
   2/2 XCUITest cases, four Light/Dark screenshots, App signing/bundle,
@@ -1205,7 +1205,7 @@ Suggested commit subject: `feat: protect active developer storage`
   activity protection → accounting.
 - Emits page-preserving typed state for App ViewModels.
 
-- [ ] **Step 1: Write end-to-end fixture tests first**
+- [x] **Step 1: Write end-to-end fixture tests first**
 
 Run an anonymous temporary tree through the real coordinator and verify:
 
@@ -1216,7 +1216,7 @@ Run an anonymous temporary tree through the real coordinator and verify:
 - restart can load the latest valid snapshot;
 - all output is reproducible under an injected clock/identity source.
 
-- [ ] **Step 2: Enforce zero Codex invocation**
+- [x] **Step 2: Enforce zero Codex invocation**
 
 The Quick Scan implementation lives in `StornautCore` and has no
 `StornautCodex` dependency. Add a fake Codex executable that would create a
@@ -1224,7 +1224,7 @@ marker if launched; a complete Quick Scan must leave the marker absent.
 Boundary verification also rejects imports or bridge/runtime references from
 Quick Scan, Overview and Scan product paths.
 
-- [ ] **Step 3: Enforce zero scanned-target writes**
+- [x] **Step 3: Enforce zero scanned-target writes**
 
 Before and after a Quick Scan fixture, compare path set, type, identity,
 content hash, size and modification time. Run against a read-only target where
@@ -1235,23 +1235,86 @@ Do not claim syscall-level proof from this test; combine behavioral evidence
 with source review showing Surveyor opens target descriptors read-only and
 Quick Scan exposes no mutation dependency.
 
-- [ ] **Step 4: Add restart and concurrent-intent policy**
+- [x] **Step 4: Add restart and concurrent-intent policy**
 
 Only one Quick Scan may own a session at a time. Navigation does not cancel it.
 User cancellation is explicit and idempotent. A second start request must
 reuse, reject or explicitly replace according to one documented state
 transition; it must not create two uncontrolled full-disk scans.
 
-- [ ] **Step 5: Integrate the verification script**
+- [x] **Step 5: Integrate the verification script**
 
 `scripts/verify-quick-scan-boundaries` must be local, deterministic and
 non-privileged. Add it to `scripts/verify` after Swift tests and before UI
 tests.
 
-- [ ] **Step 6: Verify**
+- [x] **Step 6: Verify**
 
 Run focused end-to-end/boundary tests, the full Swift suite and
 `scripts/verify`.
+
+Execution evidence:
+
+- Tests were written first and failed only on missing Task 20 APIs.
+- `QuickScanCoordinator` now executes the real baseline → Surveyor → store →
+  candidate match → conservative classification/activity → Space Ledger path.
+  Task 12 placeholder tail stages are suppressed; Completed is persisted only
+  after classifications, structured activity evidence and ledger are durable.
+- The checked-in 67-rule Core resource regenerates byte-identically from the
+  four authoring catalog sources at SHA-256
+  `133b3829816fa951f03cb87473e03454c3e561b421c83e6c8efaf8ad89849e99`.
+- Path-only candidates, multiple candidates, missing evidence/activity and
+  unproven process inactivity remain Unknown. Protected veto remains
+  authoritative.
+- Owner-granularity classifications preserve matched parent descendant bytes
+  without changing Task 13 hard-link/nearest-owner semantics.
+- Structured activity observations and reasons are persisted and restored; no
+  raw Git/process output is stored.
+- Cancellation is idempotent before scanning and during activity, concurrent
+  start is rejected, navigation does not own producer lifetime and product
+  backpressure fails closed.
+- Provider/store/classification/ledger failure preserves healthy pages as typed
+  Partial state; restart chooses the latest valid session and isolates corrupt
+  records/dependent ledger.
+- A read-only target retains the exact path/type/identity/size/mtime/content
+  state; a fake `codex` marker remains absent.
+- Quick Scan has no Codex/Bridge/Adapter/Policy/Action/cleanup or target-write
+  dependency. Injection seams remain internal; public production composition
+  accepts `EvidenceStore`.
+- Initial grouped review found and fixed ten P1 lifecycle/classification/
+  persistence/evidence issues. Post-fix review has no open P0–P2 finding.
+- Final grouped review fixed one additional P1 cancellation race by defining an
+  atomic product-finalization commit point: cancellation accepted before it
+  persists Cancelled, while cancellation after it is explicitly rejected
+  rather than falsely promising to overturn committed final facts.
+- The same review fixed end-baseline/final-terminal failure paths that escaped
+  as raw errors: both now produce typed Partial projections, and a durable
+  ledger is retained only when its snapshot/classification dependencies remain
+  complete and uncorrupted.
+- Final review also restores typed issues after restart using existing bounded
+  session/evidence/completeness facts, keeps legal macOS names containing glob
+  metacharacters unmatched/Unknown instead of failing the scan, and collects
+  all required Git keys from one repository snapshot to avoid cross-time fact
+  fusion.
+- Final focused Quick Scan/accounting checks pass 45/45; the complete Swift
+  suite passes 263/263; activity and Quick Scan boundary scripts pass.
+- No external dependency, entitlement, background monitor or permission was
+  added.
+- The App contract tests and every post-UI verifier stage also pass when run
+  independently: signed App-bundle validation finds the 67-rule catalog at the
+  reviewed hash; localization parity, rule compiler fixtures, documentation
+  links and `git diff --check` pass.
+- After the user approved macOS `Enable UI Automation`, final unified
+  `scripts/verify` passed: 263/263 SwiftPM tests, 2/2 App contract tests, 2/2
+  XCUITest methods, four exported Light/Dark screenshots, activity/Quick Scan
+  boundary gates, signed App bundle and runtime catalog, localization,
+  deterministic compiler/catalog/coverage, documentation links and
+  `git diff --check`.
+- The final Settings screenshot contract verifies the owning window is
+  frontmost before capture. Settings Light/Dark luminance is 244.58/29.98;
+  transparent shell material remains behaviorally verified by the XCUITest
+  effective-appearance probe.
+- No TCC/SIP setting, root daemon or no-authentication policy was changed.
 
 Suggested commit subject: `feat: orchestrate model-free quick scan`
 

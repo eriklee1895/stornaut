@@ -1,0 +1,74 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+cd "$repo_root"
+
+quick_scan_root=Sources/StornautCore/QuickScan
+surveyor_root=Sources/StornautCore/Surveyor
+runtime_catalog=Sources/StornautCore/Resources/BuiltInRuleCatalog.json
+work_dir=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-quick-scan.XXXXXX")
+trap 'rm -rf "$work_dir"' EXIT
+
+if rg -n \
+    'StornautCodex|CodexProcess|ProbeBridge|Adapter|ActionPolicyGate|ActionExecutor|TrashMoving|RegisteredAction|Process\(|posix_spawn' \
+    "$quick_scan_root"; then
+    echo "Quick Scan contains a prohibited runtime dependency" >&2
+    exit 1
+fi
+
+if rg -n \
+    'removeItem|moveItem|copyItem|createFile|forWritingTo|O_WRONLY|O_RDWR|unlink\(|rename\(' \
+    "$quick_scan_root" "$surveyor_root"; then
+    echo "Quick Scan or Surveyor contains a scanned-target write surface" >&2
+    exit 1
+fi
+
+rg -q 'O_RDONLY \| O_DIRECTORY \| O_NOFOLLOW \| O_CLOEXEC' \
+    Sources/StornautCore/Surveyor/Surveyor.swift
+
+if rg -n \
+    '^public protocol QuickScan(ProductPersisting|ActivityProviding)' \
+    Sources/StornautCore/QuickScan/QuickScanCoordinator.swift; then
+    echo "A generic Quick Scan injection seam escaped StornautCore" >&2
+    exit 1
+fi
+
+package_graph=$(swift package describe --type json)
+python3 - "$package_graph" <<'PY'
+import json
+import sys
+
+package = json.loads(sys.argv[1])
+targets = {target["name"]: target for target in package["targets"]}
+core = targets["StornautCore"]
+dependencies = set(core.get("target_dependencies", []))
+if dependencies & {"StornautCodex", "RuleCompilerKit"}:
+    raise SystemExit("StornautCore depends on Codex or the host compiler")
+resources = {
+    resource["path"].removeprefix(core["path"] + "/")
+    for resource in core.get("resources", [])
+}
+if not any(path.endswith("/Resources/BuiltInRuleCatalog.json") for path in resources):
+    raise SystemExit("compiled runtime catalog is not a Core resource")
+PY
+
+swift run stornaut-rule-compiler \
+    --catalog "$repo_root/Rules/BuiltIn/protected-v1.json" \
+    --catalog "$repo_root/Rules/BuiltIn/project-artifacts-v1.json" \
+    --catalog "$repo_root/Rules/BuiltIn/package-build-caches-v1.json" \
+    --catalog "$repo_root/Rules/BuiltIn/runtime-tool-residue-v1.json" \
+    --catalog-version builtin-runtime-tool-residue-v1 \
+    --output "$work_dir/catalog.json" \
+    --manifest "$work_dir/manifest.json" \
+    > "$work_dir/hash.txt"
+
+cmp "$runtime_catalog" "$work_dir/catalog.json"
+expected_hash=133b3829816fa951f03cb87473e03454c3e561b421c83e6c8efaf8ad89849e99
+actual_hash=$(tr -d '\n' < "$work_dir/hash.txt")
+[[ "$actual_hash" == "$expected_hash" ]]
+[[ "$(shasum -a 256 "$runtime_catalog" | awk '{print $1}')" == "$expected_hash" ]]
+[[ "$(jq '.rules | length' "$runtime_catalog")" == "67" ]]
+
+echo "Quick Scan boundary verification passed: $actual_hash"

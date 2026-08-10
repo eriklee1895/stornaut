@@ -188,7 +188,7 @@ Epic 0–1
 ## 6. 当前状态
 
 - 当前阶段：Phase A evidence gate 已完成；Phase B deterministic Epic 2–4
-  plan 已批准，Tasks 9–19 已完成，下一项为 Task 20。
+  plan 已批准，Tasks 9–20 已完成，下一项为 Task 21。
 - 当前 active plan：
   [`Epic 2–4 Deterministic Product Core`](active/epic-2-4-deterministic-product-core.md)
   为 `Approved`；Epic 0–1 历史计划已移入
@@ -210,5 +210,5 @@ Epic 0–1
   code review 已完成；两项 P1 设计问题已修复。
 - Phase B Task 10：domain contracts、anonymous fixtures、Surveyor transport
   migration、code review 与 139-test unified verifier 已完成。
-- 下一项执行：Task 20 Deterministic Quick Scan Orchestration and Safety Audit。Deep Dive
+- 下一项执行：Task 21 App State, Fixture Injection and Design System。Deep Dive
   与真实 destructive Registered Action 不在该计划内。

@@ -105,6 +105,13 @@ final class StornautAppUITests: XCTestCase {
             .containing(.any, identifier: "settings.content")
             .firstMatch
         XCTAssertTrue(settingsWindow.waitForExistence(timeout: 5))
+        if !settingsContent.isHittable || !settingsWindow.isHittable {
+            app.activate()
+            settingsContent.click()
+        }
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            settingsContent.isHittable && settingsWindow.isHittable
+        })
 
         addScreenshot(
             settingsWindow.screenshot(),

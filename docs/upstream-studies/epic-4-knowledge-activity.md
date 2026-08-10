@@ -449,7 +449,8 @@ The reviewed cumulative catalog SHA-256 is
 
 Task 17 adds
 [`../../Rules/BuiltIn/package-build-caches-v1.json`](../../Rules/BuiltIn/package-build-caches-v1.json)
-as the fourth independently versioned source.
+as the third independently versioned catalog source. The shared authoring
+schema is versioned separately and is not itself a source catalog.
 
 ### Official source snapshot
 
@@ -527,7 +528,7 @@ reviewed SHA-256
 
 Task 18 adds
 [`../../Rules/BuiltIn/runtime-tool-residue-v1.json`](../../Rules/BuiltIn/runtime-tool-residue-v1.json)
-as the fifth and final Phase B catalog source.
+as the fourth and final Phase B catalog source.
 
 ### Runtime vs reclaimable residue
 

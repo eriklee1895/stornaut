@@ -179,6 +179,13 @@ Costs:
 - Task 20 must feed final rule/activity classifications before the product
   ledger is complete; Task 13 only establishes the deterministic formula.
 
+Task 20 now supplies final deterministic owner classifications. To preserve the
+Task 13 nearest-owner contract, the Coordinator creates classifications for all
+rule matches plus root/top-level Unknown owners; it does not create an Unknown
+owner for every unmatched nested file/directory. This lets matched parent
+artifacts own descendants while preserving explicit top-level unknown space.
+The existing hard-link ambiguity and non-overlap tests remain unchanged.
+
 ## Acceptance Evidence
 
 Task 13 accepts this ADR because:
@@ -192,3 +199,8 @@ Task 13 accepts this ADR because:
 5. full `scripts/verify` passes 180 SwiftPM tests, App tests, 2/2 XCUITest,
    screenshots, signing, localization and docs;
 6. the closed ledger payload persists and reopens through Evidence Store.
+
+Task 20 extends this evidence with a real coordinator fixture covering known,
+unknown, protected and permission-limited ownership, plus a read-only target
+audit and restart persistence. Permission gaps remain
+`unmeasurable(bytes=nil)` and are declared inside the Unknown residual.

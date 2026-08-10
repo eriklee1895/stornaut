@@ -174,3 +174,59 @@ Task 12 accepts this ADR because:
    screenshots, signing, localization and docs;
 7. static dependency review confirms no Quick Scan reference to StornautCodex,
    Adapters, Policy Gate or Executor.
+
+## Task 20 Product Composition Delta
+
+Task 20 adds `QuickScanCoordinator` above the accepted writer:
+
+- suppresses Task 12's compatibility-only classification/activity/finalization
+  milestones and emits them only when real deterministic work runs;
+- keeps the writer's provisional partial session authoritative until
+  classifications, activity evidence and the Space Ledger are durable;
+- rejects a second start intent while any writer remains active;
+- replays immediate cancellation after the writer stream exists, revalidates
+  cancellation at post-scan commit points and persists cancelled truth;
+- defines an atomic product-finalization commit point before ledger/session
+  persistence: cancellation accepted before it wins and persists Cancelled;
+  cancellation requested after it returns `false` instead of falsely promising
+  to overturn committed final facts;
+- fails product-stream backpressure without silently dropping facts;
+- preserves healthy snapshots/evidence/classifications when a dependent stage
+  fails and emits typed partial issues;
+- treats end-volume sampling and final terminal persistence as dependent product
+  stages: failures preserve healthy facts as Partial, and a durable ledger is
+  reloaded only when every classification/corruption dependency remains valid;
+- restores typed product issues from bounded evidence, unfinished-scope reasons
+  and durable completeness checks after restart without storing raw provider
+  output or adding a schema migration;
+- treats scanned names outside the matcher grammar as no candidate/Unknown
+  rather than failing the session, while keeping catalog errors fail-closed;
+- collects all Git requirements for one rule from one repository snapshot;
+- pages the latest valid restart projection while isolating corrupt rows.
+
+The public production initializer accepts only `EvidenceStore`. Store/activity,
+clock and identity injection seams remain internal for tests, so App/UI code
+cannot introduce a new scan-target mutation dependency through composition.
+
+The Coordinator consumes the checked-in immutable 67-rule runtime catalog,
+performs candidate matching, conservative evidence/activity reduction and
+Space Ledger reconciliation. Protected vetoes remain Protected; rule misses and
+unproven prerequisites remain Unknown. It never calls Codex, Probe Bridge,
+Adapter, Policy Gate, Executor or cleanup code.
+
+Activity observations used by classification are persisted as bounded typed
+`EvidenceRecord` values containing only key/source/reason/time/freshness. No raw
+Git output, process list, content or command text is stored.
+
+Task 20 evidence adds:
+
+- a read-only target E2E audit over path/type/identity/size/mtime/content;
+- an inert fake Codex executable whose external marker remains absent;
+- deterministic output under injected clocks and stable snapshot,
+  classification and evidence identities;
+- cancellation during traversal and activity, concurrent-start rejection,
+  product backpressure and partial store failure;
+- restart loading with corrupt-newer-session isolation;
+- permission gaps retained as Unmeasurable with `bytes=nil`;
+- machine regeneration of the runtime catalog and source/dependency boundary
+  checks.

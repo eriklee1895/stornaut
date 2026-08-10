@@ -28,6 +28,9 @@ let package = Package(
     targets: [
         .target(
             name: "StornautCore",
+            resources: [
+                .copy("Resources/BuiltInRuleCatalog.json"),
+            ],
             linkerSettings: [
                 .linkedLibrary("sqlite3"),
             ]

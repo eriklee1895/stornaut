@@ -1,0 +1,131 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "task20-fixture-catalog-v1",
+  "rules": [
+    {
+      "id": "fixture-cache",
+      "match": {
+        "pathPattern": ".fixture-cache",
+        "expectedKind": "directory"
+      },
+      "excludedPatterns": [],
+      "producer": "Fixture package cache",
+      "rationaleKey": "rationale.fixture.cache",
+      "category": "packageAndBuildCaches",
+      "disposition": "readyToReclaim",
+      "risk": "low",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "metadata.allocated"
+      ],
+      "requiredActivityKeys": [
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.fixture.redownload",
+        "cost": "low"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Task 20 fixture",
+            "url": "https://example.invalid/task20-cache",
+            "revision": "fixture-v1",
+            "license": "MIT",
+            "usage": "independentObservation"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-10"
+      },
+      "fixtureIDs": [
+        "task20-cache-positive",
+        "task20-cache-active"
+      ],
+      "appliedOverlayIDs": []
+    },
+    {
+      "id": "fixture-protected",
+      "match": {
+        "pathPattern": "**/.ssh",
+        "expectedKind": "directory"
+      },
+      "excludedPatterns": [],
+      "producer": "Fixture credentials",
+      "rationaleKey": "rationale.fixture.protected",
+      "category": "protected",
+      "disposition": "protected",
+      "risk": "critical",
+      "confidenceRequirement": "high",
+      "veto": true,
+      "requiredEvidenceKeys": [],
+      "requiredActivityKeys": [],
+      "recovery": null,
+      "recommendedAction": "none",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Task 20 fixture",
+            "url": "https://example.invalid/task20-protected",
+            "revision": "fixture-v1",
+            "license": "MIT",
+            "usage": "independentObservation"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-10"
+      },
+      "fixtureIDs": [
+        "task20-protected-positive",
+        "task20-protected-lookalike"
+      ],
+      "appliedOverlayIDs": []
+    },
+    {
+      "id": "fixture-review",
+      "match": {
+        "pathPattern": "projects/*/derived",
+        "expectedKind": "directory"
+      },
+      "excludedPatterns": [],
+      "producer": "Fixture build system",
+      "rationaleKey": "rationale.fixture.review",
+      "category": "rebuildableProjectArtifacts",
+      "disposition": "reviewRecommended",
+      "risk": "medium",
+      "confidenceRequirement": "medium",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "metadata.allocated"
+      ],
+      "requiredActivityKeys": [
+        "activity.git.clean"
+      ],
+      "recovery": {
+        "methodKey": "recovery.fixture.rebuild",
+        "cost": "medium"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Task 20 fixture",
+            "url": "https://example.invalid/task20-review",
+            "revision": "fixture-v1",
+            "license": "MIT",
+            "usage": "independentObservation"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-10"
+      },
+      "fixtureIDs": [
+        "task20-review-positive",
+        "task20-review-active"
+      ],
+      "appliedOverlayIDs": []
+    }
+  ]
+}

@@ -10,7 +10,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 
 - 先读 handoff，再按任务读取最小必要文档；不要从 UI 概念图推断规格外功能，也不要把概念图当逐像素终稿。
 - 遵守全部产品不变量（见 handoff §3）。尤其：Quick Scan 不调模型；Codex 无写权限；磁盘调查只能走 Probe Broker；Executor 只接受 `MoveToTrash` 或 Registered Action；Trash 失败绝不永久删除；失败保持 `Unknown`。
-- Epic 0–1 已完成；Epic 2–4 deterministic active plan 已批准，Tasks 9–19 已完成，下一项为 Task 20。逐 Task 完成 Upstream Study、实现、code review、focused/full verify、独立 commit/push；不得把后续 Task 提前混入。
+- Epic 0–1 已完成；Epic 2–4 deterministic active plan 已批准，Tasks 9–20 已完成，下一项为 Task 21。逐 Task 完成 Upstream Study、实现、code review、focused/full verify、独立 commit/push；不得把后续 Task 提前混入。
 - Spike / safety check 通过前，Deep Dive 必须保持 paused；发现 Codex ≠ 验证安全边界。
 - 权限、隔离、许可证、性能主张必须有本机证据（`--help`、测试、Benchmark、ADR）。不确定时先 Spike/ADR，不用大段代码掩盖。
 - 保留现有 MIT `LICENSE`；新增依赖前记录许可证与理由。不要复制 Mole GPL 代码。
@@ -65,7 +65,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 
 ## Current milestone
 
-Epic 0–1 evidence gate 与最终跨模块 code review 已完成；5 个确认缺陷已修复并通过统一验证。deterministic path conditional go，Deep Dive 因 Broker-only 未被技术性证明而 no-go/paused。Epic 2–4 Tasks 9–19 已完成，下一项为 Task 20；release signing/notarization 仍未评估。
+Epic 0–1 evidence gate 与最终跨模块 code review 已完成；5 个确认缺陷已修复并通过统一验证。deterministic path conditional go，Deep Dive 因 Broker-only 未被技术性证明而 no-go/paused。Epic 2–4 Tasks 9–20 已完成，下一项为 Task 21；release signing/notarization 仍未评估。
 
 当前已验证的包布局：
 

@@ -2,7 +2,7 @@
 
 > 状态：Active
 >
-> 最近更新：2026-08-09
+> 最近更新：2026-08-10
 >
 > 适用范围：Stornaut 原生 macOS App 的 UI 实现、回归与运行时视觉验收
 
@@ -62,6 +62,10 @@ stornaut-settings-dark.png
 Settings 附件必须截取包含 `settings.content` 的独立 window，不能直接对
 `settings.content` accessibility element 截图。后者在 macOS 26 的透明
 Settings scene 中可能把材质合成到白色背景，无法可靠反映窗口主题。
+截图前还必须确认 `settings.content` 与所属 window 都 hittable；若 Settings
+被主窗口遮挡，只激活 App 并点击现有 Settings 内容将该 window 置前，不要
+重复发送 `⌘,`。重复快捷键可能切换窗口状态，而对被遮挡 window 执行
+`screenshot()` 会捕获遮挡后的屏幕矩形，产生看似主题漂移的假回归。
 
 未来页面应在自己的 Task/ADR 中增加最小必要契约，不要把所有页面都塞进一个超长 smoke test。
 
@@ -184,6 +188,42 @@ scripts/peekaboo-readonly permissions status --json-output
 3. 允许 unit/App tests 继续，但不能宣称 Peekaboo screenshot 或 XCUITest 已通过；
 4. 用户回到 awake/unlocked session 后，重跑受影响的 capture/XCUITest；
 5. CI 只依赖 XCUITest 等受控环境，不声明 Peekaboo/TCC 证据。
+
+### XCTest waits for `Enable UI Automation`
+
+症状：
+
+- `StornautAppUITests-Runner` 在任何 test method 启动前失败；
+- `.xcresult` 显示 `Timed out while enabling automation mode`;
+- `automationmodetool` 报告 Automation Mode disabled，并要求 user
+  authentication；
+- LocalAuthentication UIAgent 显示 `Enable UI Automation` 的 Touch ID 或登录
+  密码认证。
+
+这是 XCTest 的 Automation Mode 安全认证，不等于 Screen Recording、
+Accessibility 或 Event Synthesizing 缺失。先运行只读状态检查：
+
+```sh
+automationmodetool
+xcrun xcresulttool get test-results summary \
+  --path .derivedData/ui-tests.xcresult
+```
+
+普通开发机的处理：
+
+1. 确保用户位于 awake/unlocked 图形会话；
+2. 重新启动 UI-only test；
+3. 用户本人在超时前批准 `Enable UI Automation`；
+4. 确认 UI test methods 实际执行，而不只是 runner 初始化成功；
+5. 再运行完整 `scripts/verify`。
+
+系统 `automationmodetool(1)` 另提供
+`enable-automationmode-without-authentication`，用于经管理员明确配置的 CI
+或实验室机器。它会改变整台机器的 UI automation 认证策略，不是普通本地
+排障命令。Coding Agent 不得自行执行该命令、输入用户凭据、创建
+`/var/db/com.apple.dt.automationmode/` 状态文件、重启 root writer daemon，
+或修改 TCC/SIP。若项目未来需要 unattended macOS UI CI，必须先由用户批准
+独立的主机安全方案；恢复命令以本机 `man automationmodetool` 为准。
 
 ### Window found by app inventory but capture says `WINDOW_NOT_FOUND`
 
