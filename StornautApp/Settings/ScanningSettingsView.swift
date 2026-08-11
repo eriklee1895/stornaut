@@ -13,7 +13,7 @@ struct ScanningSettingsView: View {
             SettingsPageHeader(
                 titleKey: "settings.section.scanning",
                 messageKey: "settings.scanning.subtitle",
-                systemImage: "externaldrive.badge.magnifyingglass"
+                systemImage: StornautSystemImage.quickScan
             )
 
             Section("settings.scanning.primaryRoot") {

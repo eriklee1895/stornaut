@@ -74,7 +74,7 @@ private struct HistoryNavigatorRow: View {
             HStack(spacing: 7) {
                 Label(
                     "history.record.quickScan",
-                    systemImage: "externaldrive.badge.magnifyingglass"
+                    systemImage: StornautSystemImage.quickScan
                 )
                 .font(.callout.weight(.medium))
 

@@ -39,7 +39,7 @@ enum AppDestination: String, CaseIterable, Identifiable, Sendable {
         case .overview:
             "chart.pie"
         case .scan:
-            "externaldrive.badge.magnifyingglass"
+            StornautSystemImage.quickScan
         case .investigations:
             "scope"
         case .history:

@@ -21,7 +21,8 @@ UI 小迭代完成必须同时满足：
 5. 在 awake/unlocked 本地图形会话中，用 Peekaboo 截取实际目标窗口并检查；
 6. Light/Dark 或 Settings 受影响时，更新对应截图证据；
 7. 最后运行 `scripts/verify`；
-8. 不提交本机截图、私有路径、TCC 状态或 `.xcresult` 原始产物，除非它们是已脱敏、明确批准的文档资产。
+8. 受影响组件的 view snapshot golden 通过，或经复核后重新录制；
+9. 不提交本机截图、私有路径、TCC 状态或 `.xcresult` 原始产物，除非它们是已脱敏、明确批准的文档资产。第 8 项的 golden 不在此列——它们渲染的是合成 component/page fixture；只允许固定的合成路径，不得读取宿主文件系统或包含用户私有数据，必须提交，见 [ADR 0014](../adr/0014-view-snapshot-regression.md)。
 
 只读源码、成功编译或 SwiftUI Preview 都不能单独证明 UI 正确。
 
@@ -30,8 +31,9 @@ UI 小迭代完成必须同时满足：
 | 层级 | 工具 | 负责证明 | 不负责证明 |
 | --- | --- | --- | --- |
 | Domain | Swift Testing / XCTest | 导航枚举、状态模型、localization key 等稳定契约 | 实际窗口布局 |
+| View snapshot | `SnapshotHarness` + committed golden | 组件/页面级布局、换行、截断、间距、语义色、Light/Dark 与 en/zh-Hans 实际渲染 | 窗口 chrome、导航、真实数据与生命周期 |
 | App contract | XCUITest | 启动、四项 workspace、Sidebar Settings、`⌘,`、Light/Dark effective appearance | 所有真实桌面/TCC 条件 |
-| Screenshot regression | XCUITest attachment + `.xcresult` | 稳定命名的 shell/Settings Light/Dark 证据 | 当前用户桌面上肉眼看到的最终结果 |
+| Screenshot regression | XCUITest attachment + `.xcresult` | 稳定命名的 shell/Settings Light/Dark 证据；窗口非空白、主题未反 | 布局、截断、重叠、错误数值等一切统计量看不见的回归 |
 | Runtime visual | XcodeBuildMCP + Peekaboo | 当前构建的真实 `.app`、实际窗口、裁切/溢出/材质/层级 | CI 可移植性和行为断言 |
 | Human review | Coding Agent + user | 视觉质量、是否符合设计意图 | 自动回归 |
 
@@ -108,6 +110,41 @@ Settings Sidebar 控件将该 window 置前，不要重复发送 `⌘,`。重复
 矩形，产生看似主题漂移的假回归。
 
 未来页面应在自己的 Task/ADR 中增加最小必要契约，不要把所有页面都塞进一个超长 smoke test。
+
+## 3.1 View Snapshots
+
+上面这十七张属于 window 级证据，只能证明窗口没空白、主题没反。组件/页面级的布局、
+换行、截断、间距和语义色由 `StornautAppTests/SnapshotHarness.swift` 的 view
+snapshot 负责，golden 提交在 `Tests/Fixtures/Snapshots/`。理由与容差依据见
+[ADR 0014](../adr/0014-view-snapshot-regression.md)。
+
+快照在自由 `NSHostingView` 上离屏渲染，固定 1x 位图，不经过 `NSWindow`，因此
+不占用显示器、不需要 Automation Mode，也不需要任何 TCC 授权。宿主是
+`StornautAppTests`，`Bundle.main` 即真实产品 bundle，所以 `en` 与 `zh-Hans`
+渲染的是真实产品文案。
+
+日常验证：
+
+```bash
+xcodebuild -project Stornaut.xcodeproj -scheme Stornaut \
+    -configuration Debug -destination 'platform=macOS,arch=arm64' \
+    -derivedDataPath .derivedData/snapshots \
+    -only-testing:StornautAppTests/SnapshotHarnessTests \
+    -only-testing:StornautAppTests/DesignSystemSnapshotTests \
+    -only-testing:StornautAppTests/OverviewSnapshotTests test
+```
+
+改动是预期内的时候重新录制：
+
+```bash
+TEST_RUNNER_STORNAUT_RECORD_SNAPSHOTS=1 xcodebuild … test
+```
+
+`TEST_RUNNER_` 前缀是必需的，`xcodebuild test` 不会把当前 shell 环境传给测试
+进程。失败时 golden、actual 与 difference 三张图会作为 Swift Testing 附件写入
+`.xcresult`，用 `xcrun xcresulttool export attachments` 取出查看。
+
+重新录制的 golden 必须人工过目再提交。没人看过的参考图不构成任何断言。
 
 ## 4. Fast Iteration Loop
 
@@ -235,7 +272,9 @@ scripts/peekaboo-readonly permissions status \
 2. 记录本轮为 host graphical-session blocked，而不是产品失败；
 3. 允许 unit/App tests 继续，但不能宣称 Peekaboo screenshot 或 XCUITest 已通过；
 4. 用户回到 awake/unlocked session 后，重跑受影响的 capture/XCUITest；
-5. CI 只依赖 XCUITest 等受控环境，不声明 Peekaboo/TCC 证据。
+5. 普通 GitHub-hosted CI 不依赖 XCUITest、Peekaboo 或 TCC；离屏 view
+   snapshot 与 App tests 可进入 headless gate。只有专用、受控的 macOS lab
+   runner 才适合另设 XCUITest job。
 
 ### XCTest waits for `Enable UI Automation`
 
