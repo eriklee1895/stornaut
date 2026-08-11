@@ -35,6 +35,7 @@
 | 宏观交付顺序与阶段 Gate | [Delivery Roadmap](plans/roadmap.md) |
 | 当前计划状态 | [Active Plans](plans/active/README.md) — Runtime R1 conditional-go；R2 等待 dedicated loopback proxy 决策 |
 | Capability-first Codex Runtime Gate | [Runtime Evidence Gate](plans/active/capability-first-codex-runtime-gate.md) — R1 complete；R2 blocked |
+| R2 tests-first brief | [R2 Implementation Brief](plans/active/task-r2-implementation-brief.md) — prepared only；awaiting ADR 0013 decision |
 | Phase C Epic 8 获批计划 | [Safe Execution Vertical Slice](plans/active/epic-8-safe-execution-vertical-slice.md) |
 | Epic 2–4 历史计划 | [Deterministic Product Core](plans/completed/epic-2-4-deterministic-product-core.md) — Tasks 9–26 已完成并归档 |
 | 已完成计划 | [Completed Plans](plans/completed/README.md) — Epic 0–1 |

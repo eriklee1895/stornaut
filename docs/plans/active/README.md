@@ -43,6 +43,9 @@ Proposed，等待用户明确批准或拒绝这个唯一的内部 transport 例�
 ```
 
 批准后才可启动 R2；若拒绝，当前 Codex `0.147.0` candidate 为 no-go。
+R2 的 tests-first implementation brief 已预先收敛在
+[`task-r2-implementation-brief.md`](task-r2-implementation-brief.md)，但它只
+是 decision-support 文档，不构成实现授权。
 
 即使计划获批，正常 App 也必须保持真实 Trash 依赖关闭，直到 Task 35 的
 signed-App disposable Trash diagnostic 与最终 gate 通过。Task 32 的 Review

@@ -170,7 +170,8 @@ Current R1 evidence:
 
 ```text
 scripts/probe-codex-sandbox-containment
-/tmp/stornaut-r1-containment-probe-v2.log
+/tmp/stornaut-r1-containment-probe-final-2.log
+SHA-256 2c5625b6f94164cc4c238fcd24a3b53d9104b84a340a0e2a9c0a161fb1c3c857
 ```
 
 R2 may start only after the pending decision. R3 must then add:
