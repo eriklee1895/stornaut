@@ -76,21 +76,32 @@ Doctor 或 capture 后短暂出现 `.dev-tools/.../peekaboo daemon run` 属于�
 
 `scripts/verify-ui-runtime` 是 awake/unlocked 本机会话的端到端 smoke：先运行 doctor，再通过 XcodeBuildMCP 构建/启动真实 Debug App，以 PID 精确捕获一个 Stornaut 窗口，并检查 PNG 尺寸、文件大小和像素方差，最后终止该 App。它仍不替代 XCUITest 或 `scripts/verify`。
 
-macOS TCC 按**责任进程**授权，也就是发起进程链的宿主 App，而不是按命令或终端授权。同一条 Peekaboo 命令在不同宿主下可以得到不同的权限结论，因此本节记录按宿主测量的状态，不存在单一全局状态。
+macOS TCC 按实际责任进程授予，不按 `peekaboo` 这个命令名保存一份全局状态。
+还要区分**调用宿主**与**执行 runtime**：仓库固定的 Peekaboo `3.10.0`
+默认可以选择同一用户会话里的 support daemon，此时 JSON 的
+`selectedSource` 是 `bridge`；传入 `--no-remote` 后才是进程内的 `local`
+runtime。判断权限时必须同时保留调用宿主与 selected runtime source，不能只写
+“Terminal/Cursor 已授权”。使用下面的只读命令一次查看两侧：
 
-Measured on 2026-08-11, host: Cursor-spawned shell.
-
-```text
-Screen Recording: not granted to this host
-Accessibility: granted
-Event Synthesizing: granted
+```sh
+scripts/peekaboo-readonly permissions status \
+  --all-sources \
+  --json-output
 ```
 
-同日在该宿主上实测的能力边界：
+2026-08-11 的 Cursor-spawned shell spike 在当次 selected source 上观察到
+Screen Recording 未授权、Accessibility 与 Event Synthesizing 已授权；原始记录
+没有保留 `selectedSource`，因此它只证明当次命令行为，不能升级成机器全局状态或
+特定 runtime 的长期权限事实。该次 spike 还观察到：
 
-- `inspect_ui` 与 `list` 只依赖 Accessibility。Screen Recording 未授权时它们仍返回完整 AX 文本，因此 AX 文本检查是一条不依赖录屏权限的确定性证据路径。
-- `image` 与 `see` 需要该宿主自身的 Screen Recording 授权。Peekaboo 会明确提示授权 CLI 或终端不改变宿主结论。
-- Event Synthesizing 已在系统层授予。只读边界因此不再依赖系统未授权这一事实，而完全由 `scripts/peekaboo-readonly` 的五工具白名单与 deny list 维持。
+- `inspect_ui` 与当次实际执行的 `list` 子命令在缺少 Screen Recording 时仍可用；
+  `list` 是包含 `apps`、`windows`、`screens`、`menubar` 等操作的命令族，必须按
+  具体子命令记录结果，不能把一次成功概括为整个 `list` 只依赖 Accessibility；
+- `image` 与 `see` 在当次 selected source 缺少 Screen Recording 时不可用；给
+  另一个调用宿主或 runtime 授权不会自动改变该 source 的结论；
+- Event Synthesizing 只是在当次 selected source 上报告 granted。无论 TCC 当时
+  granted 与否，仓库只读边界始终由 `scripts/peekaboo-readonly` 的五工具白名单
+  与 deny list 维持，不把“尚未授权”当作安全控制。
 
 Missing Screen Recording is a local capability failure, not permission to open or automate System Settings.
 Peekaboo capture also requires an awake, unlocked graphical session. If `CGGetActiveDisplayList` reports zero displays or native `screencapture` also fails, do not synthesize input to wake the machine; use XCUITest screenshot evidence for the unattended run and repeat Peekaboo capture after the user returns.
