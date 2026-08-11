@@ -8,6 +8,9 @@
 >
 > Supersedes nothing. Amends the evidence standard in
 > [`../agent/ui-testing-guide.md`](../agent/ui-testing-guide.md).
+> Ordinary CI execution scope is amended by
+> [ADR 0015](0015-headless-ci-verification.md): golden comparisons run in the
+> full local verifier, not the portable headless gate.
 
 ## Context
 
@@ -128,6 +131,10 @@ and raw `.xcresult` bundles remain uncommitted.
   eight representative Overview page variants across Light/Dark and
   `en`/`zh-Hans`. The two suites execute in under six seconds on the measured
   development host.
+- The two pixel-comparison suites run in `scripts/verify --full`. Ordinary CI
+  still runs the eight harness algorithm/state tests and all other App-host
+  contracts, but skips the visual suites because their raster output changed
+  across the observed macOS patch boundary.
 - The luminance contract in `scripts/verify-ui-screenshots` is retained as a
   cheap window-level sanity check. It is no longer the only mechanised visual
   evidence, and should not be extended to carry weight it cannot bear.
@@ -142,8 +149,10 @@ and raw `.xcresult` bundles remain uncommitted.
 ## Residual Risks
 
 - Determinism has been demonstrated on the recorded Apple Silicon host, not
-  across every macOS or Xcode patch release. A CI host must pin its image and
-  Xcode version; the first real hosted run is evidence, not a presumed pass.
+  across machines or macOS patches. GitHub Actions run 31512656250 used macOS
+  26.5.2 (25F84) and the same Xcode 26.6 as the macOS 26.5.1 (25F80)
+  development baseline; all 24 goldens drifted. Fixing scale, windowlessness
+  and Xcode version therefore does not establish cross-host pixel identity.
 - Font rasterisation or SwiftUI renderer changes can cause legitimate broad
   drift. Such a change requires visual review and an explicit golden update;
   weakening the tolerance to absorb it is not an acceptable default.
@@ -174,6 +183,9 @@ The accepted implementation was checked on the spike host with:
 - a real `Stornaut.app` build-and-run plus read-only Peekaboo capture, followed
   by visual review of the fixed navigation and Quick Scan icons. The host
   screenshot remains ignored because it contains a real user path.
+- a real GitHub-hosted macOS run proving the non-visual contracts pass while
+  the same-Xcode, next-patch macOS raster output is not portable; ADR 0015 keeps
+  those goldens in the full local evidence loop rather than weakening them.
 
 A fresh uninterrupted `scripts/verify` completed after all review fixes with
 exit 0 in 1,019.48 seconds. Its UI result bundle reports 9/9 XCUITest methods

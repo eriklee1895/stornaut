@@ -40,7 +40,9 @@ UI 小迭代完成必须同时满足：
 
 这些层级互补，不互相替代。Peekaboo 是本地视觉补充；XCUITest 是依赖 live
 macOS host 的可重复交互契约，不是普通 GitHub-hosted CI 的前置条件。headless CI
-使用 App tests 与 committed view snapshots 形成基础回归网。
+使用 SwiftPM 与非 golden App contracts 形成基础回归网；view snapshot golden
+留在本机 full gate。真实 hosted run 已证明同一 Xcode 26.6 下 macOS 26.5.1 与
+26.5.2 的离屏像素仍会整体漂移，不能把“无需显示器”误当成“跨机器确定性”。
 
 ## 3. Current UI Contracts
 
@@ -148,6 +150,9 @@ TEST_RUNNER_STORNAUT_RECORD_SNAPSHOTS=1 xcodebuild … test
 `.xcresult`，用 `xcrun xcresulttool export attachments` 取出查看。
 
 重新录制的 golden 必须人工过目再提交。没人看过的参考图不构成任何断言。
+这两个 pixel-comparison suite 只属于 `scripts/verify --full`；普通 headless CI
+仍运行 `SnapshotHarnessTests` 的 8 个算法/状态合同，但显式跳过
+`DesignSystemSnapshotTests` 与 `OverviewSnapshotTests`。
 
 ## 4. Fast Iteration Loop
 
@@ -228,10 +233,10 @@ scripts/verify --full
 scripts/verify --headless
 ```
 
-headless mode 运行 SwiftPM/App tests、view snapshots、边界检查、规则编译器、
-localization、bundle/signing 与 Debug/Release build fixture，但明确不运行
-XCUITest、window screenshot、Automation Mode readiness、Peekaboo/TCC 或性能
-benchmark。两种模式都会把逐步耗时写入
+headless mode 运行 SwiftPM tests、106 个非 golden App contracts、边界检查、
+规则编译器、localization、bundle/signing 与 Debug/Release build fixture，但
+明确不运行两个 view snapshot pixel suite、XCUITest、window screenshot、
+Automation Mode readiness、Peekaboo/TCC 或性能 benchmark。两种模式都会把逐步耗时写入
 `.derivedData/verification/<mode>-timings.tsv`；具体职责见
 [ADR 0015](../adr/0015-headless-ci-verification.md)。headless Swift Testing
 用例之间显式串行，避免低资源 hosted runner 同时争抢大量进程与 pipe；各测试
@@ -290,9 +295,9 @@ scripts/peekaboo-readonly permissions status \
 2. 记录本轮为 host graphical-session blocked，而不是产品失败；
 3. 允许 unit/App tests 继续，但不能宣称 Peekaboo screenshot 或 XCUITest 已通过；
 4. 用户回到 awake/unlocked session 后，重跑受影响的 capture/XCUITest；
-5. 普通 GitHub-hosted CI 不依赖 XCUITest、Peekaboo 或 TCC；离屏 view
-   snapshot 与 App tests 可进入 headless gate。只有专用、受控的 macOS lab
-   runner 才适合另设 XCUITest job。
+5. 普通 GitHub-hosted CI 不依赖 XCUITest、Peekaboo、TCC 或 pixel golden；
+   非 golden App contracts 可进入 headless gate。只有专用、受控且固定 baseline
+   的 macOS lab runner 才适合另设 visual/XCUITest job。
 
 ### XCTest waits for `Enable UI Automation`
 

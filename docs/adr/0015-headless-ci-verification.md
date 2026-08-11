@@ -39,7 +39,9 @@ UI lab.
   `verify-ui-automation-mode --allow-auth-prompt`, then XCUITest and `.xcresult`
   screenshot export.
 - The accepted view snapshot harness renders in `StornautAppTests` without an
-  `NSWindow`, display, Automation Mode or TCC grant; see [ADR 0014](0014-view-snapshot-regression.md).
+  `NSWindow`, display, Automation Mode or TCC grant. That removes graphical
+  session dependencies but does not by itself make pixel output portable
+  across macOS patch releases; see [ADR 0014](0014-view-snapshot-regression.md).
 - GitHub's macOS 26 arm64 hosted image documents the `macos-26` label and
   `/Applications/Xcode_26.6.app`, matching the repository's validated Xcode
   generation: <https://github.com/actions/runner-images/blob/main/images/macos/macos-26-arm64-Readme.md>.
@@ -73,6 +75,14 @@ UI lab.
   hosted image did not provide `rg`, which the seven boundary scripts,
   verifier contract and documentation checks use. The workflow now installs
   ripgrep only when absent and records `rg --version` before verification.
+- A fourth hosted run, [GitHub Actions run 31512656250](https://github.com/eriklee1895/stornaut/actions/runs/31512656250),
+  passed all 303 Swift tests and all seven boundaries, then failed all 24
+  Design System/Overview golden comparisons. The development baseline was
+  recorded on macOS 26.5.1 (25F80); the runner used macOS 26.5.2 (25F84) with
+  the same Xcode 26.6. This proves that off-screen rendering is session-free
+  but not a portable cross-machine pixel contract. Per the approved CI scope,
+  ordinary CI skips the two visual suites rather than re-recording references
+  on the runner or weakening their tolerance.
 
 ## Decision
 
@@ -85,19 +95,22 @@ UI lab.
   lower-resource hosted runner;
 - all seven current source-boundary checks and the Automation Mode parser's
   pure self-test;
-- App-host tests, including committed Design System and Overview snapshots;
+- 106 non-golden App-host contracts, including the eight snapshot-harness
+  algorithm/state tests, while explicitly skipping the Design System and
+  Overview pixel-comparison suites;
 - Debug App build, local signing/bundle checks and the Debug/Release fixture
   boundary build;
 - localization, rule compiler, verifier-contract and documentation/diff checks.
 
-It does not run XCUITest, window screenshot export, Automation Mode readiness,
-Peekaboo/TCC checks, strict matcher benchmarks or Phase B product/cancellation
-performance evidence.
+It does not run XCUITest, window screenshot export, Design System/Overview
+golden comparisons, Automation Mode readiness, Peekaboo/TCC checks, strict
+matcher benchmarks or Phase B product/cancellation performance evidence.
 
-`scripts/verify --full` adds those XCUITest/window and performance gates and
-retains Swift Testing's default cross-test parallelism as local concurrency
-stress. Bare `scripts/verify` remains an alias for full mode so the existing
-repository completion contract fails safe rather than silently becoming weaker.
+`scripts/verify --full` adds the visual golden suites, XCUITest/window and
+performance gates and retains Swift Testing's default cross-test parallelism as
+local concurrency stress. Bare `scripts/verify` remains an alias for full mode
+so the existing repository completion contract fails safe rather than silently
+becoming weaker.
 
 ### One owner for each repeated check
 
@@ -132,8 +145,9 @@ security, session lifecycle and evidence policy.
 
 - Every pull request receives an automatic compile/test/safety baseline without
   pretending a hosted worker is a trusted live desktop.
-- View snapshots make meaningful visual regressions part of that baseline while
-  window interaction and runtime inspection stay local.
+- App/view-model and snapshot-harness contracts are part of the portable
+  baseline. Pixel goldens, window interaction and runtime inspection stay in
+  the full local UI evidence loop.
 - Local task completion still requires full verification under the repository
   working loop; a green headless job is necessary but not sufficient for a UI
   change.
@@ -144,9 +158,10 @@ security, session lifecycle and evidence policy.
 
 ## Residual Risks
 
-- The first hosted run may expose snapshot rasterization or signing behavior
-  that differs from the development host despite the pinned OS/Xcode image.
-  Such a failure is evidence to diagnose, not a reason to disable the suite.
+- Pixel goldens are sensitive even to the observed macOS 26.5.1-to-26.5.2 patch
+  change. They remain useful local regression evidence, but a future dedicated
+  visual lab must own an exact baseline host rather than treating ordinary
+  hosted CI as portable.
 - GitHub can update a runner image behind a stable label. The explicit Xcode
   path and recorded toolchain fail or expose drift, but do not make the image
   immutable.
@@ -171,9 +186,10 @@ confirmed:
 - `scripts/verify-contract` passes, including negative CLI argument checks and
   the workflow prohibition on host/UI-only gates;
 - a fresh `scripts/verify --headless` exits zero with fourteen unique timing
-  rows in 229.308 seconds. Its serialized SwiftPM step ran all 303
-  non-benchmark tests in 47.332 seconds, with the test run itself completing in
-  34.684 seconds;
+  rows in 233.265 seconds. Its serialized SwiftPM step ran all 303
+  non-benchmark tests in 47.239 seconds, with the test run itself completing in
+  34.568 seconds; its App contract step passed 106 tests while excluding the
+  two visual suites;
 - a fresh `scripts/verify --full` exits zero with nineteen unique timing rows in
   479.597 seconds, including 9/9 XCUITest methods, all seventeen window
   attachments, the three matcher benchmarks and the 7.568-second deduplicated
@@ -185,12 +201,13 @@ confirmed:
   above passed. This is direct evidence for keeping live-desktop UI work out of
   ordinary hosted CI.
 
-The first three hosted runs were intentionally retained as evidence: the first
+The first four hosted runs were intentionally retained as evidence: the first
 reached the thirty-minute timeout inside the parallel SwiftPM test step; the
 second proved serialization removed that hang and isolated the heavyweight
 Python fixture; the third proved the portable test suite passes and exposed the
-missing static-analysis dependency. Final hosted timing and outcome are
-recorded by the replacement pull-request run.
+missing static-analysis dependency; the fourth proved the pixel goldens are
+macOS-patch-sensitive even without a graphical session. Final hosted timing and
+outcome are recorded by the replacement pull-request run.
 
 Final acceptance also requires the pull request's real `Stornaut CI` run to
 exit zero on GitHub's hosted `macos-26` arm64 runner.

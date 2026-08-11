@@ -61,7 +61,7 @@ typeset -a headless_steps=(
     swiftpm-tests-serialized
     source-boundaries
     automation-parser-self-test
-    app-tests-and-snapshots
+    app-contract-tests
     debug-app-build
     debug-app-sign
     app-bundle
@@ -212,6 +212,19 @@ function test_app_and_snapshots() {
         test
 }
 
+function test_app_contracts() {
+    xcodebuild -quiet \
+        -project Stornaut.xcodeproj \
+        -scheme Stornaut \
+        -configuration Debug \
+        -destination 'platform=macOS,arch=arm64' \
+        -derivedDataPath .derivedData/tests \
+        -skip-testing:StornautAppUITests \
+        -skip-testing:StornautAppTests/DesignSystemSnapshotTests \
+        -skip-testing:StornautAppTests/OverviewSnapshotTests \
+        test
+}
+
 function build_debug_app() {
     xcodebuild -quiet \
         -project Stornaut.xcodeproj \
@@ -280,6 +293,9 @@ function execute_step() {
             ;;
         app-tests-and-snapshots)
             run_step "$step_name" test_app_and_snapshots
+            ;;
+        app-contract-tests)
+            run_step "$step_name" test_app_contracts
             ;;
         debug-app-build)
             run_step "$step_name" build_debug_app

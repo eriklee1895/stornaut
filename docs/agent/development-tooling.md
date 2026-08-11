@@ -186,7 +186,8 @@ CLI syntax can change between versions; use `scripts/xcodebuildmcp <workflow> --
 | Evidence | What it proves | What it does not prove |
 | --- | --- | --- |
 | XCTest / Swift Testing | domain and view-model contracts | rendered macOS window quality |
-| App tests + committed view snapshots | deterministic contracts and component/page rendering on the pinned toolchain | window chrome, navigation or live desktop state |
+| App tests | deterministic App/view-model and snapshot-harness algorithm contracts | pixel-stable component/page rendering or live window quality |
+| Committed view snapshots (full local) | component/page rendering on the recorded baseline host | cross-machine/macOS-patch portability, window chrome or navigation |
 | XCUITest + `.xcresult` screenshots | repeatable interaction and Light/Dark window sanity on a live local host | headless CI portability or every desktop/TCC condition |
 | Peekaboo real-window capture | what the currently launched App actually renders | CI portability or behavior assertions |
 | source inspection | implementation intent | runtime visual correctness |
@@ -194,8 +195,10 @@ CLI syntax can change between versions; use `scripts/xcodebuildmcp <workflow> --
 Peekaboo and XCUITest are local/full-verifier evidence because Screen Recording,
 Automation Mode and the active desktop are host state. Ordinary GitHub-hosted CI
 must not claim it ran either layer. Its portable contract is
-`scripts/verify --headless`: SwiftPM/App tests, committed view snapshots, boundary
-checks and Debug/Release builds on the pinned macOS/Xcode runner. Its Swift
+`scripts/verify --headless`: SwiftPM tests, non-golden App contracts, boundary
+checks and Debug/Release builds on the pinned macOS/Xcode runner. The committed
+pixel goldens remain in `scripts/verify --full`: a real hosted run found broad
+drift between macOS 26.5.1 and 26.5.2 despite the same Xcode 26.6. Headless Swift
 Testing functions run with `--no-parallel` because many cases independently
 exercise processes, pipes, cancellation and workers; the full local verifier
 retains parallel execution as concurrency stress. A future dedicated UI lab is

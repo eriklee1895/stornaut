@@ -48,7 +48,7 @@ full_steps=$(scripts/verify --full --list-steps)
 for expected in \
     swiftpm-tests-serialized \
     source-boundaries \
-    app-tests-and-snapshots \
+    app-contract-tests \
     debug-release-fixture-boundary; do
     if [[ "$headless_steps" != *"$expected"* ]]; then
         fail_contract "Headless verifier omitted $expected"
@@ -61,20 +61,29 @@ fi
 if [[ "$full_steps" == *"swiftpm-tests-serialized"* ]]; then
     fail_contract "Full verifier unexpectedly serialized SwiftPM tests"
 fi
+if [[ "$full_steps" == *"app-contract-tests"* ]]; then
+    fail_contract "Full verifier unexpectedly omitted visual snapshot suites"
+fi
 
 for forbidden in \
     ui-automation-readiness \
     xcuitest \
     ui-screenshot-contract \
+    app-tests-and-snapshots \
     matcher-benchmarks \
     phase-b-product; do
     if [[ "$headless_steps" == *"$forbidden"* ]]; then
-        fail_contract "Headless verifier included host/performance step $forbidden"
+        fail_contract "Headless verifier included host/visual/performance step $forbidden"
     fi
     if [[ "$full_steps" != *"$forbidden"* ]]; then
         fail_contract "Full verifier omitted $forbidden"
     fi
 done
+
+require_fixed_text scripts/verify \
+    '-skip-testing:StornautAppTests/DesignSystemSnapshotTests'
+require_fixed_text scripts/verify \
+    '-skip-testing:StornautAppTests/OverviewSnapshotTests'
 
 require_fixed_text .github/workflows/ci.yml 'name: Stornaut CI'
 require_fixed_text .github/workflows/ci.yml '  pull_request:'
