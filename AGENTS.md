@@ -14,8 +14,8 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   单次 exit 0，计划与 Task 21–26 briefs 已归档；
   Phase C deterministic Epic 8 详尽 plan 已于 2026-08-11 获用户批准，
   Tasks 27–28 已完成并通过 unified verifier。ADR 0004 回顾后，用户已批准在
-  Task 29 前插入 capability-first Runtime R1–R6 evidence gate；详尽 plan
-  当前等待 review，R1 与 Task 29 均未启动。逐 Task 完成 Upstream Study、
+  Task 29 前插入 capability-first Runtime R1–R6 evidence gate；R1 已完成并
+  得出 conditional-go，R2 与 Task 29 均未启动。逐 Task 完成 Upstream Study、
   实现、code review、focused/full verify、独立 commit/push；不得提前混入
   生产 Deep Dive、Adapter、真实 Registered Action 或 release 工作。
 - 新的 capability-first runtime/safety check 通过前，Deep Dive 必须保持
@@ -62,6 +62,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | 跨 Epic 交付顺序与 Gate | [docs/plans/roadmap.md](docs/plans/roadmap.md) |
 | 当前 active plan 状态 | [docs/plans/active/README.md](docs/plans/active/README.md) |
 | Capability-first Codex Runtime Gate | [docs/plans/active/capability-first-codex-runtime-gate.md](docs/plans/active/capability-first-codex-runtime-gate.md) |
+| R1 Runtime Study / conditional decision | [docs/upstream-studies/epic-5-capability-first-runtime.md](docs/upstream-studies/epic-5-capability-first-runtime.md) / [ADR 0013](docs/adr/0013-capability-first-runtime-containment.md) |
 | Phase C Epic 8 获批计划 | [docs/plans/active/epic-8-safe-execution-vertical-slice.md](docs/plans/active/epic-8-safe-execution-vertical-slice.md) |
 | Epic 2–4 历史计划 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) |
 | Epic 2–4 最终 Gate | [docs/reports/epic-2-4-validation-report.md](docs/reports/epic-2-4-validation-report.md) |
@@ -84,7 +85,10 @@ domain/persistence、product Quick Scan、Space Ledger、Knowledge/Activity
 已获批准；Tasks 27–28 已完成。ADR 0004 回顾确认当前 `CodexProcess`、
 capability report、Investigation Envelope 与 UI copy 仍漂移在旧 Broker-only
 模型；用户已批准在 Task 29 前插入 capability-first Runtime R1–R6 gate，
-当前等待详尽 plan review。R1–R6 与 Task 29 均未启动。
+R1 已完成并证明 read-only writes 隔离与 managed proxy 候选；R2 等待用户决定
+是否允许 Codex descendants 仅连接 same-session、父进程拥有、随机端口的
+loopback managed proxy，同时继续阻断其他 localhost/private/link-local 和所有
+Unix sockets。Task 29 仍未启动。
 Deep Dive 的旧 Broker-only no-go 已被 ADR 0004 的 capability-first 边界取代；
 当前仍 paused 的原因是新运行时实现/evidence gate 尚未交付，而非 Codex 工具
 能力过强。release signing/notarization 仍未评估。Overview、Scan、Scan-only

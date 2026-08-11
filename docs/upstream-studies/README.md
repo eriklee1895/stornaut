@@ -21,4 +21,10 @@ Phase C：
 - [Epic 8 Safe Execution](epic-8-safe-execution.md) — Accepted for Tasks
   28–35; npm/pip Ready, Go Review, uv non-executable
 
+Capability-first Runtime interlock：
+
+- [Epic 5 Capability-First Runtime](epic-5-capability-first-runtime.md) —
+  Accepted for R1 evidence; conditional managed-proxy candidate, explicit
+  dedicated loopback transport decision required before R2
+
 研究记录必须包含精确 commit/version、license、阅读文件、可借鉴行为、不可复用代码、Stornaut 独立方案和 Benchmark/fixture。

@@ -22,5 +22,6 @@
 - [Epic 2–4 Task 26 Code Review — 2026-08-11](epic-2-4-task-26-review.md)：product scaling、typed aggregate、bounded candidate projection、App terminal metrics 与 Phase B scope 的审查、确认缺陷和修复证据。
 - [Epic 8 Task 27 Code and Design Review — 2026-08-11](epic-8-task-27-review.md)：Safe Execution study、profile 收窄、authorization/journal ADR 与四项确认设计问题修复。
 - [Epic 8 Task 28 Code Review — 2026-08-11](epic-8-task-28-review.md)：cleanup domain v2、Evidence Store v3、path-free journal、atomic migration、immutable writes 与十三项确认问题修复。
+- [Capability-First Runtime R1 Review — 2026-08-11](capability-first-runtime-r1-review.md)：Codex `0.147.0` permission profiles、Seatbelt、managed network proxy、private Runtime Home 与 instruction/auth/browser 边界审查；R1 conditional-go，R2 等待 dedicated loopback proxy 决策。
 
 报告记录测量事实；若事实要求降低安全、权限或隐私边界，必须先请求用户决策，不能直接改写批准规格。

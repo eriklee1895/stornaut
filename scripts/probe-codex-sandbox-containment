@@ -1,0 +1,345 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+codex_executable=${CODEX_EXECUTABLE:-$(command -v codex 2>/dev/null || true)}
+if [[ -z "$codex_executable" || ! -x "$codex_executable" ]]; then
+    print -u2 "Codex executable is unavailable."
+    exit 1
+fi
+
+probe_root=$(mktemp -d /tmp/stornaut-codex-containment.XXXXXX)
+http_server_pid=
+private_server_pid=
+unix_server_pid=
+
+cleanup() {
+    if [[ -n "$http_server_pid" ]]; then
+        kill "$http_server_pid" 2>/dev/null || true
+        wait "$http_server_pid" 2>/dev/null || true
+    fi
+    if [[ -n "$private_server_pid" ]]; then
+        kill "$private_server_pid" 2>/dev/null || true
+        wait "$private_server_pid" 2>/dev/null || true
+    fi
+    if [[ -n "$unix_server_pid" ]]; then
+        kill "$unix_server_pid" 2>/dev/null || true
+        wait "$unix_server_pid" 2>/dev/null || true
+    fi
+    rm -rf "$probe_root"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+codex_homes_root="$probe_root/codex-homes"
+working_directory="$probe_root/work"
+target_directory="$probe_root/target"
+mkdir -m 700 "$codex_homes_root" "$working_directory" "$target_directory"
+
+write_profile() {
+    local profile_name=$1
+    local profile_contents=$2
+    local codex_home="$codex_homes_root/$profile_name"
+
+    mkdir -m 700 "$codex_home"
+    print -r -- "$profile_contents" > "$codex_home/config.toml"
+    chmod 600 "$codex_home/config.toml"
+    print -r -- "$codex_home"
+}
+
+run_sandbox() {
+    local codex_home=$1
+    shift
+    CODEX_HOME="$codex_home" "$codex_executable" sandbox \
+        -P stornaut \
+        -C "$working_directory" \
+        -- "$@"
+}
+
+expect_line() {
+    local output=$1
+    local expected=$2
+
+    if ! grep -Fqx -- "$expected" "$output"; then
+        print -u2 "Missing expected probe result: $expected"
+        print -u2 "Observed output:"
+        cat "$output" >&2
+        exit 1
+    fi
+}
+
+read_only_profile=$'default_permissions = "stornaut"\n\n[permissions.stornaut]\nextends = ":read-only"\n\n[permissions.stornaut.network]\nenabled = false'
+network_open_profile=$'default_permissions = "stornaut"\n\n[permissions.stornaut]\nextends = ":read-only"\n\n[permissions.stornaut.network]\nenabled = true'
+managed_network_profile=$'default_permissions = "stornaut"\n\n[permissions.stornaut]\nextends = ":read-only"\n\n[permissions.stornaut.network]\nenabled = true\nmode = "full"\nallow_local_binding = false\n\n[features.network_proxy]\nenabled = true\nmode = "full"\nallow_local_binding = false\n\n[features.network_proxy.domains]\n"*" = "allow"'
+
+read_only_home=$(write_profile read-only "$read_only_profile")
+network_open_home=$(write_profile network-open "$network_open_profile")
+managed_network_home=$(write_profile managed-network "$managed_network_profile")
+
+print -r -- "codex.version=$("$codex_executable" --version)"
+print -r -- "host.architecture=$(uname -m)"
+
+print -r -- "synthetic-read" > "$target_directory/read.txt"
+print -r -- "append-original" > "$target_directory/append.txt"
+print -r -- "truncate-original" > "$target_directory/truncate.txt"
+print -r -- "rename-original" > "$target_directory/rename-source.txt"
+print -r -- "unlink-original" > "$target_directory/unlink.txt"
+print -r -- "chmod-original" > "$target_directory/chmod.txt"
+print -r -- "xattr-original" > "$target_directory/xattr.txt"
+print -r -- "timestamp-original" > "$target_directory/timestamp.txt"
+print -r -- "hardlink-original" > "$target_directory/hardlink-source.txt"
+chmod 644 "$target_directory/chmod.txt"
+touch -t 202401010101 "$target_directory/timestamp.txt"
+ln -s "$target_directory" "$working_directory/target-link"
+
+append_hash_before=$(shasum -a 256 "$target_directory/append.txt" | awk '{print $1}')
+truncate_hash_before=$(shasum -a 256 "$target_directory/truncate.txt" | awk '{print $1}')
+chmod_mode_before=$(stat -f '%Lp' "$target_directory/chmod.txt")
+timestamp_before=$(stat -f '%m' "$target_directory/timestamp.txt")
+
+filesystem_probe="$probe_root/filesystem-probe.zsh"
+cat > "$filesystem_probe" <<'EOF'
+probe_operation() {
+    local label=$1
+    shift
+    if "$@" >/dev/null 2>&1; then
+        print -r -- "filesystem.${label}=allowed"
+    else
+        local operation_exit=$?
+        print -r -- "filesystem.${label}=blocked:${operation_exit}"
+    fi
+}
+
+probe_operation read /bin/cat "$STORNAUT_TARGET/read.txt"
+probe_operation create /bin/zsh -c 'print -r -- created > "$1"' probe "$STORNAUT_TARGET/create.txt"
+probe_operation append /bin/zsh -c 'print -r -- appended >> "$1"' probe "$STORNAUT_TARGET/append.txt"
+probe_operation truncate /bin/zsh -c ': > "$1"' probe "$STORNAUT_TARGET/truncate.txt"
+probe_operation rename /bin/mv "$STORNAUT_TARGET/rename-source.txt" "$STORNAUT_TARGET/rename-destination.txt"
+probe_operation unlink /bin/rm "$STORNAUT_TARGET/unlink.txt"
+probe_operation mkdir /bin/mkdir "$STORNAUT_TARGET/new-directory"
+probe_operation chmod /bin/chmod 600 "$STORNAUT_TARGET/chmod.txt"
+probe_operation xattr /usr/bin/xattr -w com.stornaut.synthetic blocked "$STORNAUT_TARGET/xattr.txt"
+probe_operation timestamp /usr/bin/touch -t 202501010101 "$STORNAUT_TARGET/timestamp.txt"
+probe_operation hardlink /bin/ln "$STORNAUT_TARGET/hardlink-source.txt" "$STORNAUT_TARGET/hardlink-created.txt"
+probe_operation symlink /bin/ln -s "$STORNAUT_TARGET/read.txt" "$STORNAUT_TARGET/symlink-created.txt"
+probe_operation symlink_escape /bin/zsh -c 'print -r -- escaped > "$1"' probe "$STORNAUT_LINK/escaped.txt"
+probe_operation descendant /bin/zsh -c '/bin/zsh -c '\''print -r -- descendant > "$1"'\'' nested "$1"' parent "$STORNAUT_TARGET/descendant.txt"
+EOF
+chmod 500 "$filesystem_probe"
+
+filesystem_output="$probe_root/filesystem-output.txt"
+STORNAUT_TARGET="$target_directory" \
+STORNAUT_LINK="$working_directory/target-link" \
+    run_sandbox "$read_only_home" /bin/zsh "$filesystem_probe" | tee "$filesystem_output"
+
+expect_line "$filesystem_output" "filesystem.read=allowed"
+for operation in \
+    create append truncate rename unlink mkdir chmod xattr timestamp hardlink \
+    symlink symlink_escape descendant
+do
+    if ! grep -Eq "^filesystem\\.${operation}=blocked:[1-9][0-9]*$" "$filesystem_output"; then
+        print -u2 "Filesystem operation was not blocked: $operation"
+        exit 1
+    fi
+done
+
+[[ ! -e "$target_directory/create.txt" ]]
+[[ "$(shasum -a 256 "$target_directory/append.txt" | awk '{print $1}')" == "$append_hash_before" ]]
+[[ "$(shasum -a 256 "$target_directory/truncate.txt" | awk '{print $1}')" == "$truncate_hash_before" ]]
+[[ -e "$target_directory/rename-source.txt" && ! -e "$target_directory/rename-destination.txt" ]]
+[[ -e "$target_directory/unlink.txt" && ! -e "$target_directory/new-directory" ]]
+[[ "$(stat -f '%Lp' "$target_directory/chmod.txt")" == "$chmod_mode_before" ]]
+if /usr/bin/xattr -p com.stornaut.synthetic "$target_directory/xattr.txt" >/dev/null 2>&1; then
+    print -u2 "Synthetic xattr was unexpectedly written."
+    exit 1
+fi
+[[ "$(stat -f '%m' "$target_directory/timestamp.txt")" == "$timestamp_before" ]]
+[[ ! -e "$target_directory/hardlink-created.txt" ]]
+[[ ! -e "$target_directory/symlink-created.txt" ]]
+[[ ! -e "$target_directory/escaped.txt" ]]
+[[ ! -e "$target_directory/descendant.txt" ]]
+print -r -- "filesystem.verdict=contained"
+
+loopback_port_file="$probe_root/loopback-port"
+private_port_file="$probe_root/private-port"
+unix_socket_path="$probe_root/synthetic.sock"
+
+private_address=$(ipconfig getifaddr en0 2>/dev/null || true)
+if [[ -z "$private_address" ]]; then
+    private_address=$(ipconfig getifaddr en1 2>/dev/null || true)
+fi
+
+http_server_script="$probe_root/http-server.py"
+cat > "$http_server_script" <<'PY'
+import http.server
+import socketserver
+import sys
+
+class Handler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        body = b"stornaut-loopback-canary\n"
+        self.send_response(200)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *_):
+        pass
+
+with socketserver.TCPServer((sys.argv[2], 0), Handler) as server:
+    with open(sys.argv[1], "w", encoding="utf-8") as stream:
+        stream.write(str(server.server_address[1]))
+    server.serve_forever()
+PY
+chmod 500 "$http_server_script"
+
+python3 "$http_server_script" "$loopback_port_file" 127.0.0.1 &
+http_server_pid=$!
+
+if [[ -n "$private_address" ]]; then
+    python3 "$http_server_script" "$private_port_file" "$private_address" &
+    private_server_pid=$!
+fi
+
+python3 - "$unix_socket_path" <<'PY' &
+import os
+import socket
+import sys
+
+path = sys.argv[1]
+try:
+    os.unlink(path)
+except FileNotFoundError:
+    pass
+
+server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+server.bind(path)
+server.listen()
+while True:
+    connection, _ = server.accept()
+    with connection:
+        connection.recv(4096)
+        body = b"stornaut-unix-canary\n"
+        connection.sendall(
+            b"HTTP/1.1 200 OK\r\nContent-Length: %d\r\n\r\n" % len(body) + body
+        )
+PY
+unix_server_pid=$!
+
+for _ in {1..100}; do
+    if [[ -s "$loopback_port_file" && -S "$unix_socket_path" ]] && \
+        { [[ -z "$private_address" ]] || [[ -s "$private_port_file" ]]; }
+    then
+        break
+    fi
+    sleep 0.05
+done
+[[ -s "$loopback_port_file" && -S "$unix_socket_path" ]]
+if [[ -n "$private_address" ]]; then
+    [[ -s "$private_port_file" ]]
+fi
+
+loopback_port=$(cat "$loopback_port_file")
+private_port=
+if [[ -n "$private_address" ]]; then
+    private_port=$(cat "$private_port_file")
+fi
+
+network_probe="$probe_root/network-probe.zsh"
+cat > "$network_probe" <<EOF
+probe_endpoint() {
+    local label=\$1
+    shift
+    if "\$@" >/dev/null 2>&1; then
+        print -r -- "network.\${label}=reachable"
+    else
+        local endpoint_exit=\$?
+        print -r -- "network.\${label}=blocked_or_failed:\${endpoint_exit}"
+    fi
+}
+
+if [[ "\${HTTP_PROXY:-}" == http://127.0.0.1:* ]]; then
+    print -r -- "network.loopback_proxy=present"
+else
+    print -r -- "network.loopback_proxy=absent"
+fi
+probe_endpoint public /usr/bin/curl -fsS --max-time 8 https://example.com/
+probe_endpoint loopback /usr/bin/curl -fsS --max-time 2 http://127.0.0.1:${loopback_port}/
+probe_endpoint public_direct /usr/bin/curl --noproxy '*' -fsS --max-time 8 https://example.com/
+probe_endpoint loopback_direct /usr/bin/curl --noproxy '*' -fsS --max-time 2 http://127.0.0.1:${loopback_port}/
+EOF
+if [[ -n "$private_address" ]]; then
+    print -r -- "probe_endpoint private /usr/bin/curl -fsS --max-time 2 http://${private_address}:${private_port}/" >> "$network_probe"
+    print -r -- "probe_endpoint private_direct /usr/bin/curl --noproxy '*' -fsS --max-time 2 http://${private_address}:${private_port}/" >> "$network_probe"
+else
+    print -r -- 'print -r -- "network.private=unavailable"' >> "$network_probe"
+    print -r -- 'print -r -- "network.private_direct=unavailable"' >> "$network_probe"
+fi
+cat >> "$network_probe" <<EOF
+probe_endpoint unix /usr/bin/curl -fsS --max-time 2 --unix-socket ${unix_socket_path:q} http://localhost/
+EOF
+chmod 500 "$network_probe"
+
+run_network_case() {
+    local case_name=$1
+    local codex_home=$2
+    local output="$probe_root/network-${case_name}.txt"
+
+    print -r -- "network.case=$case_name"
+    run_sandbox "$codex_home" /bin/zsh "$network_probe" | tee "$output"
+}
+
+run_network_case restricted "$read_only_home"
+run_network_case open "$network_open_home"
+run_network_case managed "$managed_network_home"
+
+restricted_output="$probe_root/network-restricted.txt"
+expect_line "$restricted_output" "network.loopback_proxy=absent"
+for endpoint in public loopback public_direct loopback_direct unix; do
+    if ! grep -Eq "^network\\.${endpoint}=blocked_or_failed:[1-9][0-9]*$" "$restricted_output"; then
+        print -u2 "Restricted network unexpectedly reached: $endpoint"
+        exit 1
+    fi
+done
+if [[ -n "$private_address" ]] && \
+    { ! grep -Eq '^network\.private=blocked_or_failed:[1-9][0-9]*$' "$restricted_output" || \
+      ! grep -Eq '^network\.private_direct=blocked_or_failed:[1-9][0-9]*$' "$restricted_output"; }
+then
+    print -u2 "Restricted network unexpectedly reached the private canary."
+    exit 1
+fi
+
+open_output="$probe_root/network-open.txt"
+expect_line "$open_output" "network.loopback_proxy=absent"
+expect_line "$open_output" "network.public=reachable"
+expect_line "$open_output" "network.loopback=reachable"
+expect_line "$open_output" "network.public_direct=reachable"
+expect_line "$open_output" "network.loopback_direct=reachable"
+expect_line "$open_output" "network.unix=reachable"
+if [[ -n "$private_address" ]]; then
+    expect_line "$open_output" "network.private=reachable"
+    expect_line "$open_output" "network.private_direct=reachable"
+fi
+
+managed_output="$probe_root/network-managed.txt"
+expect_line "$managed_output" "network.loopback_proxy=present"
+expect_line "$managed_output" "network.public=reachable"
+for endpoint in public_direct loopback loopback_direct unix; do
+    if ! grep -Eq "^network\\.${endpoint}=blocked_or_failed:[1-9][0-9]*$" "$managed_output"; then
+        print -u2 "Managed network unexpectedly reached: $endpoint"
+        exit 1
+    fi
+done
+if [[ -n "$private_address" ]] && \
+    { ! grep -Eq '^network\.private=blocked_or_failed:[1-9][0-9]*$' "$managed_output" || \
+      ! grep -Eq '^network\.private_direct=blocked_or_failed:[1-9][0-9]*$' "$managed_output"; }
+then
+    print -u2 "Managed network unexpectedly reached the private canary."
+    exit 1
+fi
+
+print -r -- "network.restricted=contained_no_public_egress"
+print -r -- "network.open=public_and_local_egress"
+print -r -- "network.managed=public_egress_with_local_targets_blocked"
+print -r -- "probe.verdict=passed"

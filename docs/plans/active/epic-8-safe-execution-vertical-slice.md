@@ -691,7 +691,8 @@ Task 29 is not active. The ADR 0004 review is complete and confirmed that the
 current Runtime still implements the obsolete Broker-only profile. The user
 approved inserting
 [Runtime R1–R6](capability-first-codex-runtime-gate.md) before Task 29; its
-detailed plan currently awaits review and no Runtime implementation has begun.
+detailed plan is approved. R1 is complete with a conditional-go outcome; R2 is
+blocked for the exact ADR 0013 dedicated loopback proxy decision.
 
 ## Task 27: Safe Execution Upstream Study and Architecture Decisions
 

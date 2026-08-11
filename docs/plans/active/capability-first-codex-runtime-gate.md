@@ -1,7 +1,7 @@
 # Capability-First Codex Runtime Evidence Gate
 
-> Status: Detailed execution plan for user review — macro interlock approved,
-> implementation not started
+> Status: Approved — R1 complete with conditional-go evidence; R2 blocked for
+> the ADR 0013 dedicated loopback managed-proxy decision
 >
 > Planned: 2026-08-11
 >
