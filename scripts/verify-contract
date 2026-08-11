@@ -81,6 +81,8 @@ require_fixed_text .github/workflows/ci.yml '  pull_request:'
 require_fixed_text .github/workflows/ci.yml '  push:'
 require_fixed_text .github/workflows/ci.yml '  workflow_dispatch:'
 require_fixed_text .github/workflows/ci.yml 'run: scripts/verify --headless'
+require_fixed_text .github/workflows/ci.yml 'uses: actions/checkout@v6'
+require_fixed_text .github/workflows/ci.yml 'uses: actions/upload-artifact@v7'
 
 if rg -qi 'XCUITest|verify-ui|peekaboo|Automation Mode|TCC' \
     .github/workflows/ci.yml; then

@@ -56,6 +56,18 @@ UI lab.
   <https://developer.apple.com/documentation/Testing/Parallelization>.
   The same 303 non-benchmark tests passed locally and sequentially in 34.75
   seconds.
+- The serialized replacement, [GitHub Actions run 31510609858](https://github.com/eriklee1895/stornaut/actions/runs/31510609858),
+  completed all 303 tests in 39.988 seconds rather than hanging. One test still
+  failed because it used the Xcode-provided `/usr/bin/python3` process merely
+  to emit eight stderr bytes, and that interpreter's cold start exceeded the
+  test's two-second timeout. The fixture now launches `/bin/ls` directly
+  against a unique nonexistent path, preserving the stderr truncation and
+  timeout contract without measuring interpreter startup.
+- The replacement run also surfaced a Node.js 20 deprecation warning from
+  `actions/upload-artifact@v4`. The workflow uses the current Node.js 24 action
+  majors, `actions/checkout@v6` and `actions/upload-artifact@v7`; upstream usage
+  is documented at <https://github.com/actions/checkout> and
+  <https://github.com/actions/upload-artifact>.
 
 ## Decision
 
@@ -148,11 +160,12 @@ confirmed:
 - `scripts/verify-contract` passes, including negative CLI argument checks and
   the workflow prohibition on host/UI-only gates;
 - a fresh `scripts/verify --headless` exits zero with fourteen unique timing
-  rows in 197.758 seconds. Its serialized SwiftPM step ran all 303
-  non-benchmark tests in 44.150 seconds;
+  rows in 229.308 seconds. Its serialized SwiftPM step ran all 303
+  non-benchmark tests in 47.332 seconds, with the test run itself completing in
+  34.684 seconds;
 - a fresh `scripts/verify --full` exits zero with nineteen unique timing rows in
-  480.998 seconds, including 9/9 XCUITest methods, all seventeen window
-  attachments, the three matcher benchmarks and the 9.200-second deduplicated
+  479.597 seconds, including 9/9 XCUITest methods, all seventeen window
+  attachments, the three matcher benchmarks and the 7.568-second deduplicated
   Phase B product/cancellation step;
 - a prior full attempt failed two UI methods while its `.xcresult` recorded
   unrelated foreground windows obstructing the target and one transient
@@ -161,10 +174,11 @@ confirmed:
   above passed. This is direct evidence for keeping live-desktop UI work out of
   ordinary hosted CI.
 
-The first hosted run was intentionally retained as evidence after it reached
-the thirty-minute timeout inside the parallel SwiftPM test step. The accepted
-headless command now serializes test functions; final hosted timing and outcome
-are recorded by the replacement pull-request run.
+The first two hosted runs were intentionally retained as evidence: the first
+reached the thirty-minute timeout inside the parallel SwiftPM test step; the
+second proved serialization removed that hang and isolated the heavyweight
+Python fixture. Final hosted timing and outcome are recorded by the replacement
+pull-request run.
 
 Final acceptance also requires the pull request's real `Stornaut CI` run to
 exit zero on GitHub's hosted `macos-26` arm64 runner.
