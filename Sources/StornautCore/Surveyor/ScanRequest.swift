@@ -5,12 +5,12 @@ public struct ScanRequest: Sendable {
     public static let defaultMaximumPendingDirectories = 4_096
     public static let defaultStreamBufferCapacity = 1_024
     public static let defaultLifecycleEventBufferCapacity = 1_024
-    public static let defaultPersistenceBatchSize = 64
+    public static let defaultPersistenceBatchSize = 4_096
     public static let maximumWorkersLimit = 64
     public static let maximumPendingDirectoriesLimit = 65_536
     public static let maximumStreamBufferCapacity = 16_384
     public static let maximumLifecycleEventBufferCapacity = 16_384
-    public static let maximumPersistenceBatchSize = 100
+    public static let maximumPersistenceBatchSize = 8_192
 
     public let rootURL: URL
     public let exclusions: [ScanExclusion]
@@ -92,6 +92,7 @@ struct SurveyorTestHooks: Sendable {
     let workerDidFinish: @Sendable () -> Void
     let queueDepthDidChange: @Sendable (Int) -> Void
     let beforeDirectoryRead: @Sendable (URL) -> Void
+    let directoryReadError: @Sendable (URL, Int) -> Int32?
 
     init(
         isMountBoundary: @escaping @Sendable (URL) -> Bool = { _ in false },
@@ -101,7 +102,10 @@ struct SurveyorTestHooks: Sendable {
         workerDidStart: @escaping @Sendable () -> Void = {},
         workerDidFinish: @escaping @Sendable () -> Void = {},
         queueDepthDidChange: @escaping @Sendable (Int) -> Void = { _ in },
-        beforeDirectoryRead: @escaping @Sendable (URL) -> Void = { _ in }
+        beforeDirectoryRead: @escaping @Sendable (URL) -> Void = { _ in },
+        directoryReadError: @escaping @Sendable (URL, Int) -> Int32? = {
+            _, _ in nil
+        }
     ) {
         self.isMountBoundary = isMountBoundary
         self.issueBeforeDirectoryRead = issueBeforeDirectoryRead
@@ -109,5 +113,6 @@ struct SurveyorTestHooks: Sendable {
         self.workerDidFinish = workerDidFinish
         self.queueDepthDidChange = queueDepthDidChange
         self.beforeDirectoryRead = beforeDirectoryRead
+        self.directoryReadError = directoryReadError
     }
 }

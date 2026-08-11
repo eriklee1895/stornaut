@@ -70,6 +70,41 @@ func quickScanEmitsMonotonicStagesAndPersistsBoundedBatches() async throws {
 }
 
 @Test
+func quickScanDefaultBatchKeepsFirstFactDurableThenUsesBoundedBulkWrites()
+    async throws
+{
+    let fixture = try QuickScanFixture(fileCount: 4_200)
+    defer { fixture.remove() }
+    let store = RecordingScanStore()
+    let writer = ScanSessionWriter(
+        store: store,
+        volumeSampler: StaticVolumeSampler(),
+        now: IncrementingDateSource().now,
+        defersProductFinalization: true
+    )
+    let request = ScanRequest(
+        rootURL: fixture.rootURL,
+        maximumWorkers: 2
+    )
+
+    _ = try await collectQuickScanEvents(
+        try await writer.run(request)
+    )
+
+    #expect(await store.snapshotBatchSizes.first == 1)
+    #expect(
+        await store.snapshotBatchSizes.dropFirst().contains {
+            $0 > 100
+        }
+    )
+    #expect(
+        await store.maximumSnapshotBatchSize
+            <= ScanRequest.maximumPersistenceBatchSize
+    )
+    #expect(await store.savedSnapshotCount == 4_202)
+}
+
+@Test
 func quickScanPersistsLocalizedIssuesAsPartialTruth() async throws {
     let fixture = try QuickScanFixture(fileCount: 1)
     defer { fixture.remove() }
@@ -131,6 +166,41 @@ func quickScanPersistsLocalizedIssuesAsPartialTruth() async throws {
                 && $0.measurementStatus == .permissionDenied
         }
     )
+}
+
+@Test
+func quickScanDirectoryReadFailureCannotPersistCompleted() async throws {
+    let fixture = try QuickScanFixture(fileCount: 1)
+    defer { fixture.remove() }
+    let store = RecordingScanStore()
+    let request = ScanRequest(
+        rootURL: fixture.rootURL,
+        maximumWorkers: 1,
+        testHooks: SurveyorTestHooks(
+            directoryReadError: { url, readCount in
+                url.standardizedFileURL == fixture.rootURL.standardizedFileURL
+                    && readCount == 1
+                    ? EIO
+                    : nil
+            }
+        )
+    )
+    let writer = ScanSessionWriter(
+        store: store,
+        volumeSampler: StaticVolumeSampler(),
+        now: IncrementingDateSource().now
+    )
+
+    let events = try await collectQuickScanEvents(
+        try await writer.run(request)
+    )
+    let terminal = try #require(events.compactMap(\.terminalSession).last)
+
+    #expect(terminal.terminalState == .failed)
+    #expect(terminal.unfinishedScopes.map(\.reason) == [.scannerFailure])
+    #expect(await store.savedSessions.allSatisfy {
+        $0.terminalState != .completed
+    })
 }
 
 @Test
@@ -418,7 +488,8 @@ func quickScanRejectsInvalidLifecycleBoundsBeforeStarting() async throws {
         _ = try await writer.run(
             ScanRequest(
                 rootURL: fixture.rootURL,
-                persistenceBatchSize: 101
+                    persistenceBatchSize:
+                        ScanRequest.maximumPersistenceBatchSize + 1
             )
         )
     }
@@ -607,6 +678,7 @@ private actor RecordingScanStore: ScanSessionPersisting {
     private(set) var savedSnapshots: [PathSnapshot] = []
     private(set) var savedBaselines: [VolumeBaseline] = []
     private(set) var maximumSnapshotBatchSize = 0
+    private(set) var snapshotBatchSizes: [Int] = []
     private var snapshotBatchCount = 0
     private let failSnapshotBatch: Int?
     private let cancelSnapshotBatch: Int?
@@ -648,6 +720,7 @@ private actor RecordingScanStore: ScanSessionPersisting {
             maximumSnapshotBatchSize,
             snapshots.count
         )
+        snapshotBatchSizes.append(snapshots.count)
         savedSnapshots.append(contentsOf: snapshots)
     }
 

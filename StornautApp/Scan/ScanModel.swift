@@ -241,20 +241,47 @@ struct ScanModel: Sendable, Equatable {
             )
         }.sorted(by: rowSort)
 
-        summary = ScanResultSummary(
-            readyCount: allRows.count {
-                $0.disposition == ReclaimDisposition.readyToReclaim
-            },
-            reviewCount: allRows.count {
-                $0.disposition == ReclaimDisposition.reviewRecommended
-            },
-            unknownCount: allRows.count {
-                $0.disposition == ReclaimDisposition.unknown
-            },
-            protectedCount: allRows.count {
-                $0.disposition == ReclaimDisposition.protected
-            }
-        )
+        let usesTerminalProjectionCounts = !flowState.isActive
+            && projection.map {
+                sourceSnapshots == $0.snapshots
+                    && sourceClassifications == $0.classifications
+            } == true
+        if usesTerminalProjectionCounts,
+           let counts = projection?.dispositionCounts
+        {
+            let rootDisposition = sourceClassifications.first {
+                classification in
+                sourceSnapshots.contains {
+                    $0.id == classification.snapshotID
+                        && $0.relativePath == "."
+                }
+            }?.disposition
+            summary = ScanResultSummary(
+                readyCount: counts.readyToReclaim
+                    - (rootDisposition == .readyToReclaim ? 1 : 0),
+                reviewCount: counts.reviewRecommended
+                    - (rootDisposition == .reviewRecommended ? 1 : 0),
+                unknownCount: counts.unknown
+                    - (rootDisposition == .unknown ? 1 : 0),
+                protectedCount: counts.protected
+                    - (rootDisposition == .protected ? 1 : 0)
+            )
+        } else {
+            summary = ScanResultSummary(
+                readyCount: allRows.count {
+                    $0.disposition == ReclaimDisposition.readyToReclaim
+                },
+                reviewCount: allRows.count {
+                    $0.disposition == ReclaimDisposition.reviewRecommended
+                },
+                unknownCount: allRows.count {
+                    $0.disposition == ReclaimDisposition.unknown
+                },
+                protectedCount: allRows.count {
+                    $0.disposition == ReclaimDisposition.protected
+                }
+            )
+        }
 
         let normalizedQuery = query.trimmingCharacters(
             in: .whitespacesAndNewlines

@@ -149,6 +149,114 @@ func quickScanStateRejectsFalseCompletedProjection() throws {
             corruptRecordIDs: []
         )
     }
+
+    let aggregate = try ScanAggregate(
+        entries: ScanEntryCounts(
+            total: 2,
+            regularFiles: 0,
+            directories: 2,
+            symbolicLinks: 0,
+            inaccessible: 0,
+            other: 0
+        ),
+        issues: ScanIssueCounts(
+            permissionDenied: 0,
+            mountBoundary: 0,
+            userExcluded: 0,
+            metadataUnavailable: 0,
+            directoryReadFailed: 0
+        ),
+        logicalFileBytes: 0,
+        allocatedFileBytes: 0
+    )
+    #expect(throws: DomainContractError.invalidMeasurement) {
+        _ = try QuickScanProjection(
+            session: try ScanSession(
+                id: snapshot.sessionID,
+                startedAt: Date(timeIntervalSince1970: 1),
+                finishedAt: Date(timeIntervalSince1970: 2),
+                terminalState: .partial,
+                completedScopes: [],
+                unfinishedScopes: [
+                    UnfinishedScanScope(
+                        id: snapshot.scopeID,
+                        rootPath: PersistedPath(rawValue: "/tmp/task20")!,
+                        reason: .metadataChanged
+                    ),
+                ],
+                aggregate: aggregate
+            ),
+            snapshots: [snapshot],
+            classifications: [first],
+            evidence: [],
+            ledger: nil,
+            issues: [],
+            corruptRecordIDs: [],
+            snapshotCount: 1
+        )
+    }
+    #expect(throws: DomainContractError.invalidMeasurement) {
+        _ = try QuickScanProjection(
+            session: try ScanSession(
+                id: snapshot.sessionID,
+                startedAt: Date(timeIntervalSince1970: 1),
+                finishedAt: Date(timeIntervalSince1970: 2),
+                terminalState: .partial,
+                completedScopes: [],
+                unfinishedScopes: [
+                    UnfinishedScanScope(
+                        id: snapshot.scopeID,
+                        rootPath: PersistedPath(rawValue: "/tmp/task20")!,
+                        reason: .metadataChanged
+                    ),
+                ]
+            ),
+            snapshots: [snapshot],
+            classifications: [first],
+            evidence: [],
+            ledger: nil,
+            issues: [],
+            corruptRecordIDs: [],
+            dispositionCounts: QuickScanDispositionCounts(
+                readyToReclaim: 1,
+                reviewRecommended: 0,
+                protected: 0,
+                unknown: 0
+            )
+        )
+    }
+    #expect(throws: DomainContractError.invalidMeasurement) {
+        _ = try QuickScanProjection(
+            session: try ScanSession(
+                id: snapshot.sessionID,
+                startedAt: Date(timeIntervalSince1970: 1),
+                finishedAt: Date(timeIntervalSince1970: 2),
+                terminalState: .partial,
+                completedScopes: [],
+                unfinishedScopes: [
+                    UnfinishedScanScope(
+                        id: snapshot.scopeID,
+                        rootPath: PersistedPath(rawValue: "/tmp/task20")!,
+                        reason: .metadataChanged
+                    ),
+                ]
+            ),
+            snapshots: [snapshot],
+            classifications: [first],
+            evidence: [],
+            ledger: nil,
+            issues: [],
+            corruptRecordIDs: [],
+            snapshotCount: 1,
+            classificationCount: 2,
+            dispositionCounts: QuickScanDispositionCounts(
+                readyToReclaim: 0,
+                reviewRecommended: 0,
+                protected: 0,
+                unknown: 2
+            )
+        )
+    }
 }
 
 @Test

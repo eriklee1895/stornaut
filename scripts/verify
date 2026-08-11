@@ -5,6 +5,25 @@ set -euo pipefail
 repo_root=${0:A:h:h}
 cd "$repo_root"
 
+scripts/verify-ui-automation-mode --allow-auth-prompt
+
+rm -rf .derivedData
+
+xcodebuild -quiet \
+    -project Stornaut.xcodeproj \
+    -scheme Stornaut \
+    -configuration Debug \
+    -destination 'platform=macOS,arch=arm64' \
+    -derivedDataPath .derivedData/ui-tests \
+    -resultBundlePath .derivedData/ui-tests.xcresult \
+    -only-testing:StornautAppUITests \
+    test
+
+scripts/export-ui-screenshots
+scripts/verify-ui-screenshots
+
+scripts/verify-phase-b-gate
+
 swift package clean
 swift build
 matcher_benchmarks='(cumulativeCatalogMatchingBenchmarkStaysBounded|completeCacheCatalogMatchingBenchmarkStaysBounded|completeCatalogMatchingBenchmarkStaysBounded)'
@@ -24,8 +43,6 @@ scripts/verify-scan-boundaries
 scripts/verify-history-boundaries
 scripts/verify-settings-boundaries
 
-rm -rf .derivedData
-
 xcodebuild -quiet \
     -project Stornaut.xcodeproj \
     -scheme Stornaut \
@@ -34,19 +51,6 @@ xcodebuild -quiet \
     -derivedDataPath .derivedData/tests \
     -skip-testing:StornautAppUITests \
     test
-
-xcodebuild -quiet \
-    -project Stornaut.xcodeproj \
-    -scheme Stornaut \
-    -configuration Debug \
-    -destination 'platform=macOS,arch=arm64' \
-    -derivedDataPath .derivedData/ui-tests \
-    -resultBundlePath .derivedData/ui-tests.xcresult \
-    -only-testing:StornautAppUITests \
-    test
-
-scripts/export-ui-screenshots
-scripts/verify-ui-screenshots
 
 xcodebuild -quiet \
     -project Stornaut.xcodeproj \

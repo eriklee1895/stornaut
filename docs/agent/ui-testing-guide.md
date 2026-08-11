@@ -244,18 +244,59 @@ scripts/peekaboo-readonly permissions status --json-output
 Accessibility 或 Event Synthesizing 缺失。先运行只读状态检查：
 
 ```sh
-automationmodetool
+scripts/verify-ui-automation-mode
 xcrun xcresulttool get test-results summary \
   --path .derivedData/ui-tests.xcresult
 ```
 
+`scripts/verify` 在任何 build/test 前运行只读
+`scripts/verify-ui-automation-mode --allow-auth-prompt`，并把 XCUITest 作为
+紧接其后的第一项外部命令。该 gate 只解析 `automationmodetool` 的状态输出：
+
+- Automation Mode 已启用时通过；
+- 经管理员明确配置为无需用户认证的 CI/lab 主机可继续，由 XCTest 按需启用；
+- 普通开发机处于精确的
+  `disabled + requires user authentication` 时，只允许 unified verifier
+  继续到紧随其后的 XCUITest，让用户在 live runner 的标准系统窗口内批准。
+- 未知、矛盾、trailing output 或其他 disabled 状态仍 fail closed。
+
+它不会调用 enable/disable 子命令，也不会改变 TCC、Accessibility、Event
+Synthesizing、SIP、daemon 或凭据。
+
 普通开发机的处理：
 
 1. 确保用户位于 awake/unlocked 图形会话；
-2. 重新启动 UI-only test；
-3. 用户本人在超时前批准 `Enable UI Automation`；
+2. 运行 `scripts/verify`；它会立即启动 UI-only test，不先执行耗时 gate；
+3. 用户本人在 live runner 超时前批准 `Enable UI Automation`；
 4. 确认 UI test methods 实际执行，而不只是 runner 初始化成功；
-5. 再运行完整 `scripts/verify`。
+5. 同一次 `scripts/verify` 才继续 Phase B、SwiftPM、App 与 bundle gates。
+
+普通用户认证的 Automation Mode 不是供长流程预先开启的持久 host toggle。
+实机证据显示：一个旧 runner 的认证窗口可以在 runner 退出后残留，而认证成功
+后的状态也会在没有活跃 UI-test 请求时重新变为 disabled。因此不能“先认证，
+再跑若干分钟非 UI gate，最后才启动 XCUITest”；认证请求必须属于当前 unified
+verifier 的 live XCUITest。
+
+若认证未在 XCTest 的等待窗口内完成，`StornautAppUITests-Runner` 可能先以
+`The test runner hung before establishing connection` 或 control-session
+timeout 退出，而 `com.apple.LocalAuthentication.UIAgent` 的 `XCTest` 窗口仍
+停留在屏幕上。此时必须把 **runner 生命周期** 与 **认证窗口生命周期** 分开
+判断：
+
+1. 用 `.xcresult` 确认是否有任何 test method 实际执行；只有 runner-level
+   failure、`passedTests == 0` 且没有方法级结果时，归类为 host-blocked
+   initialization，不归类为 App assertion failure；
+2. 用只读进程/窗口检查确认已无 `xcodebuild` 或
+   `StornautAppUITests-Runner`，不要因为窗口仍可见就声称测试还在运行；
+3. 不向残留窗口发送点击、按键或凭据，不终止带可见窗口的
+   LocalAuthentication UIAgent，也不重启 root writer daemon；
+4. 由用户本人批准或取消残留窗口；窗口消失后如 Automation Mode 仍 disabled，
+   才重新启动一个 UI-only test 产生新的认证请求；
+5. 删除该认证探针的临时 DerivedData/失败 `.xcresult`，但不要把它计作产品
+   verifier，也不要让它替代之后一次完整的 `scripts/verify`。
+
+不要在一个残留认证窗口尚存在时叠加第二个 UI test 请求。旧窗口可能已经与
+超时 runner 脱钩；重复请求既不能证明认证成功，也会让故障归因失真。
 
 系统 `automationmodetool(1)` 另提供
 `enable-automationmode-without-authentication`，用于经管理员明确配置的 CI

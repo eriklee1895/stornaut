@@ -317,6 +317,7 @@ public enum SurveyorError: Error, Sendable, Equatable {
     case invalidQueueCapacity
     case invalidStreamBufferCapacity
     case streamBufferExceeded
+    case directoryReadFailed
     case cancelled
     case internalInvariant
 }

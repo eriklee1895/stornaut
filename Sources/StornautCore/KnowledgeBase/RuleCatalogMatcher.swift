@@ -1,11 +1,16 @@
 import Foundation
 
 public struct RuleCatalogMatcher: Sendable {
-    private let entries: [RuleMatcherEntry]
+    private let exactLiteralEntries: [RuleMatcherKey: [RuleMatcherEntry]]
+    private let insensitiveLiteralEntries: [RuleMatcherKey: [RuleMatcherEntry]]
+    private let wildcardEntries: [RuleExpectedKind: [RuleMatcherEntry]]
 
     public init(catalog: RuleCatalog) {
-        entries = catalog.rules.map { rule in
-            return RuleMatcherEntry(
+        var exact: [RuleMatcherKey: [RuleMatcherEntry]] = [:]
+        var insensitive: [RuleMatcherKey: [RuleMatcherEntry]] = [:]
+        var wildcard: [RuleExpectedKind: [RuleMatcherEntry]] = [:]
+        for rule in catalog.rules {
+            let entry = RuleMatcherEntry(
                 rule: rule,
                 exactPattern: normalizedComponents(
                     rule.match.pathPattern.rawValue,
@@ -36,7 +41,31 @@ public struct RuleCatalogMatcher: Sendable {
                     )
                 }
             )
+            if let literal = entry.exactTerminalLiteral,
+               let insensitiveLiteral = entry.insensitiveTerminalLiteral
+            {
+                exact[
+                    RuleMatcherKey(
+                        kind: rule.match.expectedKind,
+                        terminalLiteral: literal
+                    ),
+                    default: []
+                ].append(entry)
+                insensitive[
+                    RuleMatcherKey(
+                        kind: rule.match.expectedKind,
+                        terminalLiteral: insensitiveLiteral
+                    ),
+                    default: []
+                ].append(entry)
+            } else {
+                wildcard[rule.match.expectedKind, default: []]
+                    .append(entry)
+            }
         }
+        exactLiteralEntries = exact
+        insensitiveLiteralEntries = insensitive
+        wildcardEntries = wildcard
     }
 
     public func matchingRules(
@@ -47,14 +76,27 @@ public struct RuleCatalogMatcher: Sendable {
         guard isValidCandidatePath(relativePath) else {
             throw RuleCatalogError.invalidPattern
         }
+        let terminal = normalizedTerminalComponent(
+            relativePath,
+            caseSensitive: caseSensitive
+        )
+        let key = RuleMatcherKey(
+            kind: kind,
+            terminalLiteral: terminal
+        )
+        let literalEntries = caseSensitive
+            ? exactLiteralEntries[key, default: []]
+            : insensitiveLiteralEntries[key, default: []]
+        let candidates = literalEntries
+            + wildcardEntries[kind, default: []]
+        guard !candidates.isEmpty else {
+            return []
+        }
         let path = normalizedComponents(
             relativePath,
             caseSensitive: caseSensitive
         )
-        return entries.compactMap { entry in
-            guard entry.rule.match.expectedKind == kind else {
-                return nil
-            }
+        return candidates.compactMap { entry in
             let pattern = caseSensitive
                 ? entry.exactPattern
                 : entry.insensitivePattern
@@ -80,6 +122,11 @@ public struct RuleCatalogMatcher: Sendable {
                 : nil
         }
     }
+}
+
+private struct RuleMatcherKey: Hashable, Sendable {
+    let kind: RuleExpectedKind
+    let terminalLiteral: String
 }
 
 private struct RuleMatcherEntry: Sendable {
@@ -174,6 +221,24 @@ private func normalizedComponents(
                 locale: Locale(identifier: "en_US_POSIX")
             )
     }
+}
+
+private func normalizedTerminalComponent(
+    _ path: String,
+    caseSensitive: Bool
+) -> String {
+    let start = path.lastIndex(of: "/").map {
+        path.index(after: $0)
+    } ?? path.startIndex
+    let component = path[start...]
+    let normalized = String(component)
+        .precomposedStringWithCanonicalMapping
+    return caseSensitive
+        ? normalized
+        : normalized.folding(
+            options: [.caseInsensitive, .diacriticInsensitive],
+            locale: Locale(identifier: "en_US_POSIX")
+        )
 }
 
 private func terminalLiteral(

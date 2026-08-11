@@ -1,6 +1,6 @@
 # Stornaut Epic 2–4 Deterministic Product Core Implementation Plan
 
-> **Status:** Approved — Tasks 9–25 complete; Task 26 next
+> **Status:** Completed — Tasks 9–26 reviewed, verified and archived
 >
 > **Roadmap phase:** Phase B — Deterministic Product Core
 >
@@ -635,7 +635,10 @@ Execution evidence:
   no-follow, same-device, bounded GCD and cancellation behavior remains covered.
 - `ScanSessionWriter` owns one active root/scope, five monotonic stages, explicit
   user cancellation, consumer-independent producer lifetime, a fail-safe
-  provisional partial record and bounded 64-default/100-maximum batches.
+  provisional partial record and the Task 12 historical
+  64-default/100-maximum batches. Task 26 production evidence later raised the
+  product default/max to 4,096/8,192 while preserving a separately durable
+  first fact and bounded cancellation.
 - Evidence schema v2 adds source-bearing `VolumeBaseline` with exact v1-to-v2
   validation/rollback; real SQLite reopen preserves session, baseline and facts.
 - Review fixed cancellation misclassification, delayed first result, navigation
@@ -1708,23 +1711,33 @@ Suggested commit subject: `feat: add deterministic scan settings`
 
 **Files:**
 
+- Create: `docs/plans/active/task-26-implementation-brief.md`
 - Create: `docs/reports/epic-2-4-validation-report.md`
+- Create: `docs/reports/epic-2-4-task-26-review.md`
+- Create: `scripts/verify-phase-b-gate`
+- Create: `scripts/verify-ui-automation-mode`
+- Update: `Benchmarks/SurveyorBenchmark/main.swift` and the measured
+  Surveyor/persistence/accounting/projection/App paths enumerated by the Task
+  26 brief
 - Update: ADRs 0007–0010 with final evidence/status
 - Update: `README.md`, `AGENTS.md`, `docs/README.md`
 - Update: `docs/agent/coding-agent-handoff.md`
+- Update: `docs/agent/ui-testing-guide.md`, `scripts/verify`
 - Update: `docs/plans/roadmap.md`
 - Move after completion:
   `docs/plans/active/epic-2-4-deterministic-product-core.md` to
   `docs/plans/completed/`
+- Move after completion: Task 21–26 implementation briefs to
+  `docs/plans/completed/`
 - Update: `docs/plans/active/README.md`
 
-- [ ] **Step 1: Run anonymous fixture and safety regression suites**
+- [x] **Step 1: Run anonymous fixture and safety regression suites**
 
 Report domain, migration, retention, Surveyor, accounting, rule, activity,
 Local Knowledge, no-Codex and no-target-write evidence. Include skipped or
 environment-dependent tests explicitly.
 
-- [ ] **Step 2: Run a real-machine Quick Scan benchmark**
+- [x] **Step 2: Run a real-machine Quick Scan benchmark**
 
 On the current Apple Silicon development machine, record:
 
@@ -1741,13 +1754,13 @@ The goal remains under five minutes on the 460 GiB-class machine. A slower
 result or unexplained accounting does not authorize Rust or false totals; it
 requires a measured ADR/plan correction.
 
-- [ ] **Step 3: Run App and UI acceptance**
+- [x] **Step 3: Run App and UI acceptance**
 
 Run the unified verifier and actual-window Light/Dark/English/`zh-Hans`
 inspection. Confirm Quick Scan remains useful with Codex unavailable and with
 limited access.
 
-- [ ] **Step 4: Audit Phase B scope**
+- [x] **Step 4: Audit Phase B scope**
 
 Search product sources and the App bundle for:
 
@@ -1759,7 +1772,7 @@ Search product sources and the App bundle for:
 - telemetry/network/remote-rule/background/MenuBar/login-item additions;
 - unreviewed dependencies or copied upstream code.
 
-- [ ] **Step 5: Write the gate decision**
+- [x] **Step 5: Write the gate decision**
 
 The report must separately decide:
 
@@ -1772,17 +1785,37 @@ The report must separately decide:
   it;
 - release, which remains not evaluated.
 
-- [ ] **Step 6: Close the plan lifecycle**
+- [x] **Step 6: Close the plan lifecycle**
 
 Only after every accepted Task and the final verifier pass:
 
-1. move this plan to `completed/`;
+1. move this plan and Task 21–26 implementation briefs to `completed/`;
 2. leave `active/` without executable work;
 3. update the handoff and roadmap current state;
 4. commit and push the Phase B report/lifecycle change;
 5. propose a separate Phase C deterministic Epic 8 active plan.
 
 Suggested commit subject: `docs: close deterministic product core gate`
+
+Execution evidence:
+
+- The final current-source `scripts/verify` completed in one uninterrupted run
+  with exit code `0`.
+- XCUITest passed 9/9 methods and exported/validated all 17 canonical
+  screenshots. The complete suite was rerun after fixing Settings scene
+  restoration and an external-window interruption that could swallow a
+  pre-confirmation click.
+- `scripts/verify-phase-b-gate` passed inside the unified verifier, including
+  synthetic product/cancel contracts, a 279-test functional/security pool,
+  source boundaries, the 67-rule catalog and Automation Mode parser self-test.
+- The unified verifier then passed a second 279-test pool, all three isolated
+  matcher benchmarks, Xcode App contracts, signed App/bundle/release fixture
+  boundaries, localization parity, rule compiler, docs links and diff hygiene.
+- The Epic plan and Task 21–26 implementation briefs are archived together in
+  `plans/completed/`; `plans/active/` contains no executable work.
+- Phase C implementation is not implied by this closure. A detailed
+  deterministic Epic 8 plan will be proposed for user review and must be
+  explicitly approved before coding starts.
 
 ## 7. Verification Matrix
 

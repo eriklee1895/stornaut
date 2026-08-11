@@ -11,6 +11,7 @@
 | UI 测试、截图契约与排障 | [UI Testing Guide](agent/ui-testing-guide.md) |
 | 当前开发自动化验证证据 | [Development Automation Validation](reports/development-automation-2026-08-09.md) |
 | Epic 0–1 evidence gate | [Epic 0–1 Validation Report](reports/epic-0-1-validation-report.md) |
+| Epic 2–4 gate evidence（待最终 verifier） | [Epic 2–4 Validation Report](reports/epic-2-4-validation-report.md) |
 | Epic 1 最终代码审查 | [Epic 1 Final Code Review](reports/epic-1-code-review-2026-08-09.md) |
 | Epic 2–4 Task 11 persistence review | [Task 11 Code Review](reports/epic-2-4-task-11-review.md) |
 | Epic 2–4 Task 12 Quick Scan lifecycle review | [Task 12 Code Review](reports/epic-2-4-task-12-review.md) |
@@ -26,13 +27,15 @@
 | Epic 2–4 Task 23 Quick Scan UI review | [Task 23 Code Review](reports/epic-2-4-task-23-review.md) |
 | Epic 2–4 Task 24 Scan-only History review | [Task 24 Code Review](reports/epic-2-4-task-24-review.md) |
 | Epic 2–4 Task 25 Phase B Settings review | [Task 25 Code Review](reports/epic-2-4-task-25-review.md) |
+| Epic 2–4 Task 26 Phase B gate review | [Task 26 Code Review](reports/epic-2-4-task-26-review.md) |
 | 产品范围、术语、验收 | [PRD](product/PRD.md) |
 | 进程边界、模块与安全架构 | [System Architecture](architecture/system-architecture.md) |
 | Agent、双模式与治理设计 | [Agent Disk Governance](design/agent-disk-governance.md) |
 | UI、品牌、状态与交互 | [UI/UX](design/ui-ux.md) |
 | 宏观交付顺序与阶段 Gate | [Delivery Roadmap](plans/roadmap.md) |
-| 当前执行计划 | [Epic 2–4 Deterministic Product Core](plans/active/epic-2-4-deterministic-product-core.md) — `Approved`，Tasks 9–25 complete / Task 26 next |
-| 已完成计划 | [Epic 0–1 Foundation Spikes](plans/completed/epic-0-1-foundation-spikes.md) |
+| 当前计划状态 | [Active Plans](plans/active/README.md) — 当前无获批 executable plan；Phase C Epic 8 详尽计划待用户 review |
+| Epic 2–4 历史计划 | [Deterministic Product Core](plans/completed/epic-2-4-deterministic-product-core.md) — Tasks 9–26 已完成并归档 |
+| 已完成计划 | [Completed Plans](plans/completed/README.md) — Epic 0–1 |
 | 上游学习与许可证门禁 | [Upstream Reference Matrix](research/upstream-reference-matrix.md) |
 | 当前 Codex Runtime 研究 Gate | [Epic 1 Codex Runtime Study](upstream-studies/epic-1-codex-runtime.md) |
 | 当前 Swift Surveyor 研究 Gate | [Epic 1 Swift Surveyor Study](upstream-studies/epic-1-surveyor.md) |

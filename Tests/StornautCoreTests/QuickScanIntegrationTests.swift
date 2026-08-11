@@ -203,6 +203,73 @@ func quickScanCoordinatorRunsTheRealDeterministicPipeline() async throws {
 }
 
 @Test
+func quickScanTerminalProjectionStaysBoundedForLargeStores() async throws {
+    let fixture = try Task20Fixture(extraFileCount: 220)
+    defer { fixture.remove() }
+    let store = try EvidenceStore(configuration: fixture.storeConfiguration)
+    let coordinator = QuickScanCoordinator(
+        store: store,
+        historyStore: store,
+        catalog: try task20Catalog(),
+        activityProvider: FixtureQuickScanActivityProvider(),
+        volumeSampler: Task20VolumeSampler(),
+        now: Task20DateSource().now,
+        snapshotID: task20SnapshotID,
+        classificationID: task20ClassificationID,
+        evidenceID: task20EvidenceID
+    )
+    let request = ScanRequest(
+        rootURL: fixture.targetURL,
+        maximumWorkers: 2,
+        sessionID: try ScanSessionID(
+            validating: "scan-task20-bounded-projection"
+        ),
+        scopeID: try ScanScopeID(
+            validating: "scope-task20-bounded-projection"
+        )
+    )
+
+    let projection = try #require(
+        try await collectProductEvents(
+            try await coordinator.start(request)
+        ).compactMap(\.terminal).last
+    )
+
+    #expect(projection.session.terminalState == .completed)
+    #expect(projection.snapshotCount > 600)
+    #expect(projection.snapshots.count <= 256)
+    #expect(projection.snapshotCount > projection.snapshots.count)
+    #expect(
+        Set(projection.classifications.map(\.snapshotID))
+            .isSubset(of: Set(projection.snapshots.map(\.id)))
+    )
+    #expect(
+        projection.snapshots.contains {
+            $0.relativePath == "projects/sample/derived"
+        }
+    )
+    #expect(
+        projection.snapshots.contains {
+            $0.relativePath == "projects/sample/.ssh"
+        }
+    )
+    let persistedSummary = try await store.quickScanSummary(
+        sessionID: request.sessionID
+    )
+    #expect(persistedSummary.snapshotCount == projection.snapshotCount)
+    #expect(
+        persistedSummary.retainedSnapshotCount
+            < projection.snapshotCount / 4
+    )
+    #expect(
+        persistedSummary.classificationCount
+            == projection.classificationCount
+    )
+    #expect(projection.ledger != nil)
+    #expect(projection.issues.isEmpty)
+}
+
+@Test
 func quickScanActivityFailureInvalidatesOnlyDependentCandidates() async throws {
     let fixture = try Task20Fixture()
     defer { fixture.remove() }
@@ -1255,6 +1322,18 @@ private actor FailingClassificationProductStore:
         )
     }
 
+    func pathSnapshots(
+        sessionID: ScanSessionID,
+        after cursor: PathSnapshotCursor?,
+        limit: Int
+    ) async throws -> PathSnapshotCursorPage {
+        try await backing.pathSnapshots(
+            sessionID: sessionID,
+            after: cursor,
+            limit: limit
+        )
+    }
+
     func saveClassifications(
         _ classifications: [Classification]
     ) async throws {
@@ -1309,6 +1388,12 @@ private actor FailingClassificationProductStore:
         sessionID: ScanSessionID
     ) async throws -> SpaceLedger? {
         try await backing.spaceLedger(sessionID: sessionID)
+    }
+
+    func quickScanSummary(
+        sessionID: ScanSessionID
+    ) async throws -> QuickScanStoreSummary {
+        try await backing.quickScanSummary(sessionID: sessionID)
     }
 }
 
@@ -1383,6 +1468,18 @@ private actor BlockingCommitProductStore:
         )
     }
 
+    func pathSnapshots(
+        sessionID: ScanSessionID,
+        after cursor: PathSnapshotCursor?,
+        limit: Int
+    ) async throws -> PathSnapshotCursorPage {
+        try await backing.pathSnapshots(
+            sessionID: sessionID,
+            after: cursor,
+            limit: limit
+        )
+    }
+
     func saveClassifications(
         _ classifications: [Classification]
     ) async throws {
@@ -1440,6 +1537,12 @@ private actor BlockingCommitProductStore:
         sessionID: ScanSessionID
     ) async throws -> SpaceLedger? {
         try await backing.spaceLedger(sessionID: sessionID)
+    }
+
+    func quickScanSummary(
+        sessionID: ScanSessionID
+    ) async throws -> QuickScanStoreSummary {
+        try await backing.quickScanSummary(sessionID: sessionID)
     }
 
     func waitUntilBlockedSaveStarts() async throws {

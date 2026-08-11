@@ -2,47 +2,82 @@ import Darwin
 import Foundation
 import Synchronization
 
+public final class SurveyorObservationStream:
+    AsyncSequence,
+    @unchecked Sendable
+{
+    public typealias Element = SurveyorObservation
+
+    public final class AsyncIterator: AsyncIteratorProtocol {
+        private let stream: SurveyorObservationStream
+
+        fileprivate init(stream: SurveyorObservationStream) {
+            self.stream = stream
+        }
+
+        deinit {
+            stream.channel.cancelConsumption()
+        }
+
+        public func next() async throws -> SurveyorObservation? {
+            try await stream.channel.next()
+        }
+    }
+
+    fileprivate let channel: SurveyorObservationChannel
+
+    fileprivate init(channel: SurveyorObservationChannel) {
+        self.channel = channel
+    }
+
+    deinit {
+        channel.cancelConsumption()
+    }
+
+    public func makeAsyncIterator() -> AsyncIterator {
+        AsyncIterator(stream: self)
+    }
+}
+
 public struct Surveyor: Sendable {
     public init() {}
 
     public func scan(
         _ request: ScanRequest
-    ) -> AsyncThrowingStream<SurveyorObservation, Error> {
+    ) -> SurveyorObservationStream {
         let state = SurveyState(request: request)
-        let bufferCapacity = request.streamBufferCapacity > 0
+        let capacity = request.streamBufferCapacity > 0
             && request.streamBufferCapacity
                 <= ScanRequest.maximumStreamBufferCapacity
             ? request.streamBufferCapacity
             : 1
-        let stream = AsyncThrowingStream<SurveyorObservation, Error>(
-            bufferingPolicy: .bufferingOldest(
-                bufferCapacity
-            )
-        ) { continuation in
-            continuation.onTermination = { @Sendable termination in
-                if case .cancelled = termination {
-                    state.cancel()
-                }
-            }
-            Task.detached(priority: .utility) {
-                defer { request.onCompletion() }
-                do {
-                    try await runSurvey(request, state: state, continuation: continuation)
-                    continuation.finish()
-                } catch {
-                    state.cancel()
-                    continuation.finish(throwing: error)
-                }
+        let channel = SurveyorObservationChannel(
+            capacity: capacity,
+            onCancel: state.cancel,
+            isProducerCancelled: { state.isCancelled }
+        )
+        Task.detached(priority: .utility) {
+            defer { request.onCompletion() }
+            do {
+                try await runSurvey(
+                    request,
+                    state: state,
+                    channel: channel
+                )
+                channel.finish()
+            } catch {
+                state.cancel()
+                channel.finish(throwing: error)
             }
         }
-        return stream
+        return SurveyorObservationStream(channel: channel)
     }
 }
 
 private func runSurvey(
     _ request: ScanRequest,
     state: SurveyState,
-    continuation: AsyncThrowingStream<SurveyorObservation, Error>.Continuation
+    channel: SurveyorObservationChannel
 ) async throws {
     let root = request.rootURL.standardizedFileURL
     guard root.isFileURL,
@@ -85,7 +120,7 @@ private func runSurvey(
             progress: state.record(rootMetadata.kind, metadata: rootMetadata, issue: nil)
         ),
         state: state,
-        continuation: continuation
+        channel: channel
     )
     guard state.tryEnqueue(
         DirectoryJob(
@@ -119,7 +154,7 @@ private func runSurvey(
                                 rootDevice: rootMetadata.device,
                                 request: request,
                                 state: state,
-                                continuation: continuation,
+                                channel: channel,
                                 scheduleDirectory: { child in
                                     if !state.tryEnqueue(child) {
                                         localStack.append(child)
@@ -167,7 +202,7 @@ private func processDirectory(
     rootDevice: UInt64,
     request: ScanRequest,
     state: SurveyState,
-    continuation: AsyncThrowingStream<SurveyorObservation, Error>.Continuation,
+    channel: SurveyorObservationChannel,
     scheduleDirectory: (DirectoryJob) -> Void
 ) throws {
     request.testHooks.beforeDirectoryRead(job.url)
@@ -194,7 +229,7 @@ private func processDirectory(
                     )
                 ),
                 state: state,
-                continuation: continuation
+                channel: channel
             )
         }
         return
@@ -228,7 +263,7 @@ private func processDirectory(
                     )
                 ),
                 state: state,
-                continuation: continuation
+                channel: channel
             )
         }
         return
@@ -248,7 +283,7 @@ private func processDirectory(
             job,
             issue: .metadataUnavailable,
             state: state,
-            continuation: continuation
+            channel: channel
         )
         return
     }
@@ -269,7 +304,7 @@ private func processDirectory(
                 )
             ),
             state: state,
-            continuation: continuation
+            channel: channel
         )
     }
 
@@ -280,9 +315,33 @@ private func processDirectory(
     defer { closedir(directory) }
 
     let directoryDescriptor = dirfd(directory)
-    while let entry = readdir(directory) {
+    var directoryReadCount = 0
+    while true {
         try state.checkCancellation()
-        let name = directoryEntryName(entry)
+        errno = 0
+        let entry: UnsafeMutablePointer<dirent>?
+        if let injectedError = request.testHooks.directoryReadError(
+            job.url,
+            directoryReadCount
+        ) {
+            errno = injectedError
+            entry = nil
+        } else {
+            entry = readdir(directory)
+        }
+        guard let entry else {
+            guard errno == 0 else {
+                throw SurveyorError.directoryReadFailed
+            }
+            break
+        }
+        directoryReadCount += 1
+        let name: String
+        do {
+            name = try decodeDirectoryEntryName(entry)
+        } catch {
+            throw SurveyorError.directoryReadFailed
+        }
         if name == "." || name == ".." {
             continue
         }
@@ -319,7 +378,7 @@ private func processDirectory(
                     )
                 ),
                 state: state,
-                continuation: continuation
+                channel: channel
             )
             continue
         }
@@ -368,7 +427,7 @@ private func processDirectory(
                     )
                 ),
                 state: state,
-                continuation: continuation
+                channel: channel
             )
         }
     }
@@ -378,7 +437,7 @@ private func emitInaccessibleDirectory(
     _ job: DirectoryJob,
     issue: ScanIssue,
     state: SurveyState,
-    continuation: AsyncThrowingStream<SurveyorObservation, Error>.Continuation
+    channel: SurveyorObservationChannel
 ) throws {
     try emit(
         observation(
@@ -396,7 +455,7 @@ private func emitInaccessibleDirectory(
             )
         ),
         state: state,
-        continuation: continuation
+        channel: channel
     )
 }
 
@@ -486,6 +545,7 @@ private func metadataSnapshot(
         mode: metadata.mode,
         ownerUserID: metadata.ownerUserID,
         ownerGroupID: metadata.ownerGroupID,
+        linkCount: metadata.linkCount,
         size: metadata.logicalBytes,
         allocatedBytes: metadata.allocatedBytes,
         modificationSeconds: metadata.modificationSeconds,
@@ -547,33 +607,171 @@ private func observation(
     )
 }
 
-private func directoryEntryName(_ entry: UnsafeMutablePointer<dirent>) -> String {
-    withUnsafePointer(to: entry.pointee.d_name) {
-        $0.withMemoryRebound(
-            to: CChar.self,
-            capacity: Int(MAXNAMLEN) + 1
-        ) {
-            String(cString: $0)
-        }
-    }
-}
-
 private func emit(
     _ snapshot: SurveyorObservation,
     state: SurveyState,
-    continuation: AsyncThrowingStream<SurveyorObservation, Error>.Continuation
+    channel: SurveyorObservationChannel
 ) throws {
     try state.checkCancellation()
-    switch continuation.yield(snapshot) {
-    case .enqueued:
-        break
-    case .dropped:
-        throw SurveyorError.streamBufferExceeded
-    case .terminated:
-        state.cancel()
-        throw SurveyorError.cancelled
-    @unknown default:
-        throw SurveyorError.internalInvariant
+    try channel.send(snapshot)
+}
+
+private final class SurveyorObservationChannel: @unchecked Sendable {
+    private enum State {
+        case open
+        case finished
+        case failed(Error)
+    }
+
+    private let condition = NSCondition()
+    private let capacity: Int
+    private let onCancel: @Sendable () -> Void
+    private let isProducerCancelled: @Sendable () -> Bool
+    private var state: State = .open
+    private var queuedObservations: [SurveyorObservation] = []
+    private var queueOffset = 0
+    private var waitingConsumer:
+        CheckedContinuation<SurveyorObservation?, Error>?
+    private var consumerCancelled = false
+
+    init(
+        capacity: Int,
+        onCancel: @escaping @Sendable () -> Void,
+        isProducerCancelled: @escaping @Sendable () -> Bool = { false }
+    ) {
+        self.capacity = max(1, capacity)
+        self.onCancel = onCancel
+        self.isProducerCancelled = isProducerCancelled
+    }
+
+    func send(_ observation: SurveyorObservation) throws {
+        condition.lock()
+        while true {
+            if consumerCancelled || isProducerCancelled() {
+                condition.unlock()
+                throw SurveyorError.cancelled
+            }
+            guard case .open = state else {
+                condition.unlock()
+                throw SurveyorError.cancelled
+            }
+            if let consumer = waitingConsumer {
+                waitingConsumer = nil
+                condition.unlock()
+                consumer.resume(returning: observation)
+                return
+            }
+            if queuedCount < capacity {
+                queuedObservations.append(observation)
+                condition.unlock()
+                return
+            }
+            condition.wait(until: Date(timeIntervalSinceNow: 0.01))
+        }
+    }
+
+    func finish(throwing error: Error? = nil) {
+        condition.lock()
+        guard case .open = state else {
+            condition.unlock()
+            return
+        }
+        state = error.map(State.failed) ?? .finished
+        let consumer = waitingConsumer
+        waitingConsumer = nil
+        condition.broadcast()
+        condition.unlock()
+        if let error {
+            consumer?.resume(throwing: error)
+        } else {
+            consumer?.resume(returning: nil)
+        }
+    }
+
+    func next() async throws -> SurveyorObservation? {
+        try await withTaskCancellationHandler {
+            if Task.isCancelled {
+                cancelConsumption()
+            }
+            return try await withCheckedThrowingContinuation {
+                continuation in
+                let immediate: (
+                    observation: SurveyorObservation?,
+                    error: Error?,
+                    shouldResume: Bool
+                )
+                condition.lock()
+                if consumerCancelled {
+                    immediate = (nil, SurveyorError.cancelled, true)
+                } else if queuedCount > 0 {
+                    let observation = queuedObservations[queueOffset]
+                    queueOffset += 1
+                    compactQueueIfNeeded()
+                    condition.broadcast()
+                    immediate = (observation, nil, true)
+                } else {
+                    switch state {
+                    case .open where waitingConsumer == nil:
+                        waitingConsumer = continuation
+                        immediate = (nil, nil, false)
+                    case .open:
+                        immediate = (
+                            nil,
+                            SurveyorError.internalInvariant,
+                            true
+                        )
+                    case .finished:
+                        immediate = (nil, nil, true)
+                    case let .failed(error):
+                        immediate = (nil, error, true)
+                    }
+                }
+                condition.unlock()
+                guard immediate.shouldResume else {
+                    return
+                }
+                if let error = immediate.error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(
+                        returning: immediate.observation
+                    )
+                }
+            }
+        } onCancel: {
+            cancelConsumption()
+        }
+    }
+
+    func cancelConsumption() {
+        condition.lock()
+        guard case .open = state, !consumerCancelled else {
+            condition.unlock()
+            return
+        }
+        consumerCancelled = true
+        state = .failed(SurveyorError.cancelled)
+        queuedObservations.removeAll()
+        queueOffset = 0
+        let consumer = waitingConsumer
+        waitingConsumer = nil
+        condition.broadcast()
+        condition.unlock()
+        onCancel()
+        consumer?.resume(throwing: SurveyorError.cancelled)
+    }
+
+    private var queuedCount: Int {
+        queuedObservations.count - queueOffset
+    }
+
+    private func compactQueueIfNeeded() {
+        if queueOffset >= 1_024,
+           queueOffset * 2 >= queuedObservations.count
+        {
+            queuedObservations.removeFirst(queueOffset)
+            queueOffset = 0
+        }
     }
 }
 
@@ -739,6 +937,10 @@ private final class SurveyState: @unchecked Sendable {
         if isCancelled {
             throw SurveyorError.cancelled
         }
+    }
+
+    var isCancelled: Bool {
+        condition.withLock { state.cancelled }
     }
 
     func cancel() {

@@ -1,6 +1,6 @@
 # ADR 0009: Space Accounting Semantics
 
-> Status: Accepted; Task 13 reconciliation validated
+> Status: Accepted; Phase B product reconciliation validated
 >
 > Date: 2026-08-10
 >
@@ -204,3 +204,37 @@ Task 20 extends this evidence with a real coordinator fixture covering known,
 unknown, protected and permission-limited ownership, plus a read-only target
 audit and restart persistence. Permission gaps remain
 `unmeasurable(bytes=nil)` and are declared inside the Unknown residual.
+
+## Phase B Gate Evidence
+
+Task 26 replaced the reference whole-array projection with an incremental
+ledger accumulator while preserving the Task 13 formulas and adversarial
+fixtures:
+
+- owner inputs remain classifications for matched/top-level facts;
+- nearest-owner logical/allocated byte totals are reduced during traversal;
+- regular files with one known link bypass the hard-link map; multi-link or
+  legacy-unknown link counts retain `(device,inode)` grouping;
+- sparse, hard-link deduplication and cross-owner ambiguity caveats survive the
+  streaming reduction;
+- gaps remain typed retained facts and never acquire an invented byte value;
+- the old `SpaceLedgerReconciler` fixtures now run through the same incremental
+  implementation, preventing a benchmark-only accounting fork.
+
+The final 460.43 GiB volume sample produced:
+
+```text
+Known        =  58,006,814,720 bytes
+Unknown      = 384,262,414,336 bytes
+Unmeasurable = unavailable (132 typed coverage gaps)
+Free         =  52,115,566,592 bytes
+```
+
+The ledger is Partial, has
+`unknownIncludesUnmeasurable=true`, and retains all four stable
+formula/explanation contracts. The observed-unclassified 10,575,872 bytes are a
+diagnostic inside the Unknown residual, not an additive fifth occupancy slice.
+
+The run also reported the expected clone/compression, purgeable, sparse,
+hard-link and live-volume caveats. Meeting the benchmark gate does not make
+those APFS semantics attributable or authorize a false exact partition.

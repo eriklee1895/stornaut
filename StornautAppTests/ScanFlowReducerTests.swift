@@ -262,6 +262,70 @@ func retainedPartialSnapshotDoesNotInventStageHistory() throws {
 }
 
 @Test
+func retainedProjectionUsesFullAggregateForAnalyzedBytes() throws {
+    let bounded = try OverviewTestProjectionFactory.projection(
+        slug: "scan-retained-full-aggregate"
+    )
+    let aggregate = try ScanAggregate(
+        entries: ScanEntryCounts(
+            total: 10_000,
+            regularFiles: 8_000,
+            directories: 1_500,
+            symbolicLinks: 400,
+            inaccessible: 50,
+            other: 50
+        ),
+        issues: ScanIssueCounts(
+            permissionDenied: 25,
+            mountBoundary: 10,
+            userExcluded: 5,
+            metadataUnavailable: 5,
+            directoryReadFailed: 5
+        ),
+        logicalFileBytes: 987_654_321,
+        allocatedFileBytes: 123_456_789
+    )
+    let session = try ScanSession(
+        id: bounded.session.id,
+        startedAt: bounded.session.startedAt,
+        finishedAt: bounded.session.finishedAt,
+        terminalState: bounded.session.terminalState,
+        completedScopes: bounded.session.completedScopes,
+        unfinishedScopes: bounded.session.unfinishedScopes,
+        aggregate: aggregate
+    )
+    let projection = try QuickScanProjection(
+        session: session,
+        snapshots: bounded.snapshots,
+        classifications: bounded.classifications,
+        evidence: bounded.evidence,
+        ledger: bounded.ledger,
+        issues: bounded.issues,
+        corruptRecordIDs: bounded.corruptRecordIDs,
+        snapshotCount: aggregate.entries.total,
+        classificationCount: bounded.classificationCount,
+        candidateCount: bounded.candidateCount,
+        evidenceCount: bounded.evidenceCount,
+        dispositionCounts: bounded.dispositionCounts
+    )
+
+    let retained = ScanFlowState.retained(projection)
+    let active = ScanFlowReducer().started(
+        previous: .idle,
+        at: projection.session.startedAt
+    )
+    let terminal = ScanFlowReducer().reduce(
+        .terminal(projection),
+        state: active
+    )
+
+    #expect(retained.scopeScanned == 10_000)
+    #expect(retained.measuredBytes == ByteCount(123_456_789))
+    #expect(terminal.scopeScanned == 10_000)
+    #expect(terminal.measuredBytes == ByteCount(123_456_789))
+}
+
+@Test
 func scanFlowFailurePreservesProgressiveAndRetainedResults() throws {
     let reducer = ScanFlowReducer()
     let retained = try OverviewTestProjectionFactory.projection(
@@ -300,4 +364,8 @@ func scanFlowFailurePreservesProgressiveAndRetainedResults() throws {
         pageState: pageState
     )
     #expect(model.rows.map(\.id) == [snapshot.id])
+    #expect(model.summary.readyCount == 1)
+    #expect(model.summary.reviewCount == 0)
+    #expect(model.summary.protectedCount == 0)
+    #expect(model.summary.unknownCount == 0)
 }

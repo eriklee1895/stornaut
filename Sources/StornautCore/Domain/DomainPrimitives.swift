@@ -41,9 +41,6 @@ public struct PersistedPath: RawRepresentable, Codable, Sendable, Hashable {
         !value.isEmpty
             && value.utf8.count <= 16_384
             && !value.contains("\0")
-            && !value.unicodeScalars.contains {
-                CharacterSet.newlines.contains($0)
-            }
     }
 }
 

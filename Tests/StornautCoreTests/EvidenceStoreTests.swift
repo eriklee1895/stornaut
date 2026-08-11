@@ -364,6 +364,67 @@ func boundedPagingUsesIndexes() async throws {
 }
 
 @Test
+func storePayloadBoundsKeepLedgerAllowanceRoleSpecific() throws {
+    let overGenericLimit = Data(
+        repeating: 0x61,
+        count: maximumStorePayloadBytes + 1
+    )
+    #expect(throws: EvidenceStoreError.payloadTooLarge(
+        limit: maximumStorePayloadBytes
+    )) {
+        _ = try boundedStorePayloadString(overGenericLimit)
+    }
+    #expect(
+        try boundedStorePayloadString(
+            overGenericLimit,
+            limit: maximumSpaceLedgerPayloadBytes
+        ).utf8.count == overGenericLimit.count
+    )
+    let overLedgerLimit = Data(
+        repeating: 0x61,
+        count: maximumSpaceLedgerPayloadBytes + 1
+    )
+    #expect(throws: EvidenceStoreError.payloadTooLarge(
+        limit: maximumSpaceLedgerPayloadBytes
+    )) {
+        _ = try boundedStorePayloadString(
+            overLedgerLimit,
+            limit: maximumSpaceLedgerPayloadBytes
+        )
+    }
+}
+
+@Test
+func snapshotCursorPagingDoesNotSkipOrDuplicateRows() async throws {
+    let fixture = try QuickScanStoreFixture(snapshotCount: 250)
+    let store = try EvidenceStore(configuration: .memory)
+    try await store.saveScanSession(fixture.session)
+    try await store.savePathSnapshots(fixture.snapshots)
+    var records: [PathSnapshot] = []
+    var cursor: PathSnapshotCursor?
+
+    while true {
+        let page = try await store.pathSnapshots(
+            sessionID: fixture.session.id,
+            after: cursor,
+            limit: 37
+        )
+        records.append(contentsOf: page.page.records)
+        if page.rowCount < 37 {
+            break
+        }
+        let next = try #require(page.nextCursor)
+        #expect(next != cursor)
+        cursor = next
+    }
+
+    #expect(records.map(\.id) == fixture.snapshots.sorted {
+        $0.relativePath < $1.relativePath
+    }.map(\.id))
+    #expect(Set(records.map(\.id)).count == 250)
+}
+
+@Test
 func onlineBackupExportsAConsistentPrivateSnapshot() async throws {
     let root = try EvidenceStoreTestSupport.temporaryDirectory("backup")
     defer { try? FileManager.default.removeItem(at: root) }
@@ -423,6 +484,72 @@ private struct StoredDeveloperTreeFixture: Decodable {
     let classifications: [Classification]
     let evidence: [EvidenceRecord]
     let accounting: SpaceAccounting
+}
+
+private struct QuickScanStoreFixture {
+    let session: ScanSession
+    let snapshots: [PathSnapshot]
+
+    init(snapshotCount: Int) throws {
+        let sessionID = try ScanSessionID(
+            validating: "scan-cursor-fixture"
+        )
+        let scopeID = try ScanScopeID(
+            validating: "scope-cursor-fixture"
+        )
+        let observedAt = Date(timeIntervalSince1970: 1_786_320_000)
+        session = try ScanSession(
+            id: sessionID,
+            startedAt: observedAt,
+            finishedAt: observedAt.addingTimeInterval(1),
+            terminalState: .completed,
+            completedScopes: [
+                ScanScope(
+                    id: scopeID,
+                    rootPath: PersistedPath(rawValue: "/tmp/cursor-fixture")!,
+                    completedAt: observedAt.addingTimeInterval(1)
+                ),
+            ],
+            unfinishedScopes: []
+        )
+        snapshots = try (0..<snapshotCount).reversed().map { index in
+            let size = Int64(index + 1)
+            return try PathSnapshot(
+                id: SnapshotID(
+                    rawValue: String(
+                        format: "snapshot-cursor-%04d",
+                        index
+                    )
+                )!,
+                sessionID: sessionID,
+                scopeID: scopeID,
+                relativePath: String(
+                    format: "files/%04d.bin",
+                    index
+                ),
+                kind: .regularFile,
+                logicalByteCount: ByteCount(UInt64(size)),
+                allocatedByteCount: ByteCount(UInt64(size)),
+                modifiedAt: observedAt,
+                fileIdentity: FileIdentity(
+                    device: 1,
+                    inode: UInt64(index + 1),
+                    mode: UInt16(S_IFREG | 0o600),
+                    ownerUserID: getuid(),
+                    ownerGroupID: getgid(),
+                    size: size,
+                    allocatedBytes: size,
+                    modificationSeconds: Int64(
+                        observedAt.timeIntervalSince1970
+                    ),
+                    modificationNanoseconds: 0
+                ),
+                symlinkTarget: nil,
+                measurementStatus: .measured,
+                observedAt: observedAt
+            )
+        }
+    }
 }
 
 private struct HistoryStoreRecord {

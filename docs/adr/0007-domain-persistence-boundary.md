@@ -1,6 +1,6 @@
 # ADR 0007: Domain Persistence Boundary
 
-> Status: Accepted; Task 11 implementation and verification complete
+> Status: Accepted; Phase B evidence gate validated
 >
 > Date: 2026-08-09
 >
@@ -49,7 +49,10 @@ clear and migration boundaries.
 - Callers use typed repository methods; no raw SQL or SQLite pointer escapes.
 - The connection opens with read/write/create and full-mutex flags.
 - Prepared statements use bound values only.
-- Bounded write batches observe cancellation between transactions.
+- Bounded write batches observe cancellation between rows and transactions.
+- High-volume snapshot batches reuse one prepared statement. The production
+  default is 4,096 rows and the hard maximum is 8,192; the first useful fact
+  is committed separately before bulk batching begins.
 
 ### Storage locations
 
@@ -157,7 +160,10 @@ transient.
 The Evidence Store has typed columns/records for approved domain data. It does
 not expose a generic raw blob, arbitrary JSON payload or content snippet table.
 Structured JSON is permitted only for a versioned closed value with bounded
-size and strict decoding.
+size and strict decoding. Generic records remain capped at 1 MiB. The closed
+`SpaceLedger` role alone has a 16 MiB ceiling because a real scan can contain
+thousands of typed owners and coverage gaps; that larger limit is not exposed
+as a generic payload escape hatch.
 
 ### File coordination
 
@@ -243,8 +249,9 @@ Costs:
 ## Residual Risks
 
 - The narrow wrapper is implemented and adversarially tested but is not fuzzed.
-- The initial 2-second busy timeout is bounded but not throughput-tuned; Task 12
-  must measure it with production incremental scan batches before changing it.
+- The 2-second busy timeout remained sufficient during the Phase B real-machine
+  product benchmark. It is still a bounded policy rather than a general
+  concurrency guarantee.
 - `quick_check` may not find every latent corruption.
 - A single database file is still a failure domain; per-record decode
   isolation does not repair page-level corruption.
@@ -290,3 +297,28 @@ Task 12 later exercised this accepted migration mechanism with a checked-in,
 exact-schema v1 fixture and transactional v1-to-v2 rollback. ADR 0008 owns the
 new Quick Scan lifecycle and volume-baseline semantics; it does not change the
 storage boundary accepted here.
+
+## Phase B Gate Evidence
+
+Task 26 keeps this ADR Accepted with additional production-path evidence:
+
+1. `EvidenceStore` reuses prepared statements for bounded snapshot batches and
+   keyset-pages retained facts without loading a whole scan into memory.
+2. The product persists candidate/owner/coverage-gap facts plus a closed full
+   `ScanAggregate`; arbitrary non-candidate paths outside the bounded display
+   sample are not retained merely to reconstruct counts.
+3. Full snapshot, classification, disposition and evidence counts remain
+   separate from the bounded 100-record App projection.
+4. Generic payloads still fail above 1 MiB, while a dedicated test proves only
+   `SpaceLedger` may use the 16 MiB role-specific allowance.
+5. The final-source current-machine Home product run retained
+   3,107,607-entry aggregate truth, 4,261 classifications, 9,463 evidence
+   records and a typed ledger in a 20,795,392-byte DELETE-journal database.
+6. Migration, rollback, future-schema, wrong-role, corruption, seven/90-day
+   retention, separate clear and 250-row keyset paging regressions passed in
+   the Phase B focused gate.
+7. No external package, generic raw-content table, WAL sidecar or target-root
+   store was introduced.
+
+The Phase B gate does not change the one-file failure domain, release privacy
+documentation requirement or encryption-at-rest residual risks above.

@@ -1,6 +1,6 @@
 # ADR 0010: Knowledge Compiler and Activity Policy
 
-> Status: Accepted; Tasks 14–19 compiler, catalog, activity and structured
+> Status: Accepted; Phase B compiler, catalog, activity and structured
 > knowledge gates validated
 >
 > Date: 2026-08-10
@@ -287,7 +287,7 @@ Costs:
 - Tasks 15–18 provide all four planned catalog sources plus the separately
   versioned authoring schema and complete FR-2 coverage manifest.
 - Candidate matching and activity fusion are measured/tested, but final Quick
-  Scan orchestration and classification remain Task 20.
+  Scan orchestration now consumes them; Deep Dive investigation does not.
 - Local overlay file selection/UI is later work; Task 14 only defines compiled
   monotonic semantics.
 - `RulePathPattern` supports component literals plus whole-component `*`/`**`,
@@ -305,3 +305,30 @@ Accepted after the final post-review unified verifier proved:
 4. activity/veto conflicts choose the conservative result;
 5. Local Knowledge cannot lower denylist/veto/Policy;
 6. full Phase B verification passes.
+
+## Phase B Gate Evidence
+
+Task 26 keeps this ADR Accepted with final product-path evidence:
+
+- the immutable runtime artifact still contains 67 rules and regenerates to
+  SHA-256
+  `133b3829816fa951f03cb87473e03454c3e561b421c83e6c8efaf8ad89849e99`;
+- `RuleCatalogMatcher` indexes candidates by expected kind and normalized
+  terminal literal, with a kind-specific wildcard bucket; every match still
+  executes the accepted component glob and exclusion checks;
+- the three independent complete-catalog benchmarks remain separate verifier
+  tests rather than being hidden inside the general parallel suite;
+- the final-source Home product run classified 4,261 candidate/top-level owners and
+  persisted 9,463 typed Activity evidence records without raw Git/process
+  output;
+- no candidate became Ready to Reclaim on path or time alone: the measured run
+  produced 1,223 Protected and 3,038 Unknown classifications, with zero Ready
+  and zero Review;
+- provider failure, dirty/unpushed/running signals, veto, denylist and stale
+  Local Knowledge tests continue to choose the conservative result;
+- the package graph remains dependency-free and the App bundle contains the
+  immutable runtime catalog, not the host compiler or source parser.
+
+Phase B does not enable free-text Local Knowledge, remote rules, Agent-authored
+facts, a policy downgrade or a Deep Dive path. The Broker-only gate remains
+no-go/paused.

@@ -639,9 +639,16 @@ final class StornautAppUITests: XCTestCase {
         selectSettings(.privacyAndData, in: launched.app)
         let clear = element("settings.action.clearEvidence", in: launched.app)
         XCTAssertTrue(clear.waitForExistence(timeout: 5))
-        clear.click()
+        XCTAssertTrue(
+            presentConfirmation(
+                actionIdentifier: "settings.action.clearEvidence",
+                confirmationIdentifier:
+                    "settings.confirm.clearEvidence.action",
+                in: launched.app
+            )
+        )
         let clearSheet = launched.app.sheets.firstMatch
-        XCTAssertTrue(clearSheet.waitForExistence(timeout: 5))
+        XCTAssertTrue(clearSheet.exists)
         XCTAssertTrue(
             clearSheet.staticTexts.matching(
                 NSPredicate(
@@ -677,9 +684,16 @@ final class StornautAppUITests: XCTestCase {
         )
         XCTAssertTrue(forget.waitForExistence(timeout: 5))
         XCTAssertTrue(forget.isEnabled)
-        forget.click()
+        XCTAssertTrue(
+            presentConfirmation(
+                actionIdentifier: "settings.action.forgetKnowledge",
+                confirmationIdentifier:
+                    "settings.confirm.forgetKnowledge.action",
+                in: launched.app
+            )
+        )
         let forgetSheet = launched.app.sheets.firstMatch
-        XCTAssertTrue(forgetSheet.waitForExistence(timeout: 5))
+        XCTAssertTrue(forgetSheet.exists)
         element(
             "settings.confirm.forgetKnowledge.action",
             in: launched.app
@@ -886,20 +900,56 @@ final class StornautAppUITests: XCTestCase {
         in app: XCUIApplication
     ) {
         app.activate()
-        if element(section.pageIdentifier, in: app).exists {
+        let items = app.descendants(matching: .any).matching(
+            identifier: "settings.sidebar.\(section.rawValue)"
+        )
+        XCTAssertTrue(waitUntil(timeout: 5) { items.count > 0 })
+        var item: XCUIElement?
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            item = items.allElementsBoundByIndex.first(where: \.isHittable)
+            return item != nil
+        })
+        guard let item else {
             return
         }
-        let item = element(
-            "settings.sidebar.\(section.rawValue)",
-            in: app
-        )
-        XCTAssertTrue(item.waitForExistence(timeout: 5))
-        XCTAssertTrue(waitUntil(timeout: 5) { item.isHittable })
         item.click()
         XCTAssertTrue(
             element(section.pageIdentifier, in: app)
                 .waitForExistence(timeout: 5)
         )
+    }
+
+    @MainActor
+    private func presentConfirmation(
+        actionIdentifier: String,
+        confirmationIdentifier: String,
+        in app: XCUIApplication
+    ) -> Bool {
+        for _ in 0..<2 {
+            app.activate()
+            if element(confirmationIdentifier, in: app).exists {
+                return true
+            }
+            let actions = app.descendants(matching: .any).matching(
+                identifier: actionIdentifier
+            )
+            var action: XCUIElement?
+            guard waitUntil(timeout: 5, condition: {
+                action = actions.allElementsBoundByIndex.first(
+                    where: \.isHittable
+                )
+                return action != nil
+            }), let action else {
+                continue
+            }
+            action.click()
+            if element(confirmationIdentifier, in: app)
+                .waitForExistence(timeout: 5)
+            {
+                return true
+            }
+        }
+        return element(confirmationIdentifier, in: app).exists
     }
 
     @MainActor

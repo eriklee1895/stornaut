@@ -1,0 +1,159 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+cd "$repo_root"
+
+work_dir=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-phase-b-gate.XXXXXX")
+trap 'rm -rf "$work_dir"' EXIT
+
+marker="$work_dir/codex-was-launched"
+mkdir -p "$work_dir/bin"
+cat > "$work_dir/bin/codex" <<EOF
+#!/bin/sh
+printf launched > "$marker"
+EOF
+chmod 700 "$work_dir/bin/codex"
+
+swift build --product SurveyorBenchmark
+benchmark="$repo_root/.build/debug/SurveyorBenchmark"
+
+matcher_benchmarks='(cumulativeCatalogMatchingBenchmarkStaysBounded|completeCacheCatalogMatchingBenchmarkStaysBounded|completeCatalogMatchingBenchmarkStaysBounded)'
+swift test --skip "$matcher_benchmarks"
+
+PATH="$work_dir/bin:$PATH" "$benchmark" \
+    --pipeline product \
+    --fixture synthetic \
+    --repeat 1 \
+    --codex-marker "$marker" \
+    > "$work_dir/product.jsonl"
+
+PATH="$work_dir/bin:$PATH" "$benchmark" \
+    --pipeline product \
+    --fixture synthetic \
+    --repeat 1 \
+    --cancel-after-ms 20 \
+    --codex-marker "$marker" \
+    > "$work_dir/cancelled.jsonl"
+
+python3 - "$work_dir/product.jsonl" "$work_dir/cancelled.jsonl" <<'PY'
+import json
+import pathlib
+import sys
+
+
+def one_report(path: str) -> dict:
+    lines = [
+        line
+        for line in pathlib.Path(path).read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    if len(lines) != 1:
+        raise SystemExit(f"expected one benchmark report in {path}, got {len(lines)}")
+    return json.loads(lines[0])
+
+
+product = one_report(sys.argv[1])
+cancelled = one_report(sys.argv[2])
+
+if product.get("schemaVersion") != 3 or product.get("pipeline") != "product":
+    raise SystemExit("product benchmark schema/pipeline mismatch")
+if product.get("fixture") != "synthetic":
+    raise SystemExit("product benchmark did not use the anonymous synthetic fixture")
+if product.get("terminalState") != "completed":
+    raise SystemExit("product benchmark did not complete")
+if product.get("snapshotCount") != 1356:
+    raise SystemExit("product benchmark changed the synthetic entry contract")
+if product.get("pathKindCounts") != {
+    "regularFile": 804,
+    "directory": 551,
+    "symbolicLink": 1,
+    "inaccessible": 0,
+    "other": 0,
+}:
+    raise SystemExit("product benchmark did not report full typed entry counts")
+if product.get("measurementStatusCounts") != {
+    "measured": 1356,
+    "permissionDenied": 0,
+    "mountBoundary": 0,
+    "userExcluded": 0,
+    "metadataUnavailable": 0,
+    "directoryReadFailed": 0,
+}:
+    raise SystemExit("product benchmark did not report full measurement counts")
+if product.get("logicalFileBytes") != 68_167_269:
+    raise SystemExit("product benchmark did not report full logical bytes")
+if product.get("allocatedFileBytes", 0) <= 0:
+    raise SystemExit("product benchmark did not report allocated bytes")
+if not 0 < product.get("classificationCount", 0) <= product["snapshotCount"]:
+    raise SystemExit("product benchmark classification count is invalid")
+if set(product.get("dispositionCounts", {})) != {
+    "readyToReclaim",
+    "reviewRecommended",
+    "protected",
+    "unknown",
+}:
+    raise SystemExit("product benchmark omitted a closed disposition count")
+if product.get("storeBytes", 0) <= 0:
+    raise SystemExit("product benchmark did not persist its Evidence Store")
+if product.get("elapsedMilliseconds", 300_000) >= 300_000:
+    raise SystemExit("product benchmark exceeded the five-minute gate")
+if product.get("peakResidentMemoryBytes", 256 * 1024 * 1024 + 1) > 256 * 1024 * 1024:
+    raise SystemExit("product benchmark exceeded the 256 MiB gate")
+if product.get("firstUsefulResultMilliseconds") is None:
+    raise SystemExit("product benchmark did not stream a useful result")
+if product.get("codexMarkerConfigured") is not True:
+    raise SystemExit("product benchmark did not configure the fake Codex marker")
+if product.get("codexMarkerObserved") is not False:
+    raise SystemExit("Quick Scan invoked the fake Codex executable")
+if product.get("productIssueCount") != 0 or product.get("corruptRecordCount") != 0:
+    raise SystemExit("completed product benchmark contains issues or corrupt records")
+if product.get("completedScopeCount") != 1 or product.get("unfinishedScopeCount") != 0:
+    raise SystemExit("completed product benchmark has incorrect scope truth")
+
+ledger = product.get("ledger")
+if not isinstance(ledger, dict):
+    raise SystemExit("completed product benchmark has no Space Ledger")
+for name in ("known", "unknown", "unmeasurable", "free"):
+    measure = ledger.get(name)
+    if not isinstance(measure, dict):
+        raise SystemExit(f"Space Ledger omitted {name}")
+    if not measure.get("formulaKey") or not measure.get("explanationKey"):
+        raise SystemExit(f"Space Ledger {name} omitted explainability keys")
+unmeasurable = ledger.get("unmeasurable", {})
+if unmeasurable.get("status") == "unmeasurable":
+    if unmeasurable.get("bytes") is not None:
+        raise SystemExit("Unmeasurable invented a byte value")
+elif unmeasurable.get("status") == "measured":
+    if unmeasurable.get("bytes") != 0:
+        raise SystemExit("complete coverage must measure Unmeasurable as zero")
+else:
+    raise SystemExit("Unmeasurable has an invalid status")
+
+if cancelled.get("schemaVersion") != 3 or cancelled.get("pipeline") != "product":
+    raise SystemExit("cancel benchmark schema/pipeline mismatch")
+if cancelled.get("terminalState") != "cancelled" or cancelled.get("cancelled") is not True:
+    raise SystemExit("product cancellation did not persist Cancelled")
+latency = cancelled.get("cancellationLatencyMilliseconds")
+if latency is None or latency >= 1000:
+    raise SystemExit("product cancellation exceeded one second")
+if cancelled.get("ledger") is not None:
+    raise SystemExit("cancelled product benchmark emitted a final ledger")
+if cancelled.get("codexMarkerObserved") is not False:
+    raise SystemExit("cancelled Quick Scan invoked the fake Codex executable")
+PY
+
+[[ ! -e "$marker" ]]
+
+scripts/verify-activity-boundaries
+scripts/verify-quick-scan-boundaries
+scripts/verify-app-state-boundaries
+scripts/verify-overview-boundaries
+scripts/verify-scan-boundaries
+scripts/verify-history-boundaries
+scripts/verify-settings-boundaries
+scripts/verify-rule-compiler
+scripts/verify-ui-automation-mode --self-test
+
+echo "Phase B evidence gate verification passed"

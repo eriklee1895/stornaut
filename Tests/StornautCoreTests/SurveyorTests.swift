@@ -4,6 +4,79 @@ import Testing
 @testable import StornautCore
 
 @Test
+func directoryEntryDecoderReadsOnlyTheVariableLengthRecord() throws {
+    let name = "line\nCafé.txt"
+    try withDirectoryEntryRecord(nameBytes: Array(name.utf8)) { entry in
+        let decoded = try decodeDirectoryEntryName(entry)
+        #expect(decoded == name)
+    }
+
+    let maximumName = String(repeating: "a", count: 1_023)
+    try withDirectoryEntryRecord(
+        nameBytes: Array(maximumName.utf8)
+    ) { entry in
+        let decoded = try decodeDirectoryEntryName(entry)
+        #expect(decoded == maximumName)
+    }
+}
+
+@Test
+func directoryEntryDecoderRejectsMalformedRecordBoundsAndTermination() throws {
+    try withDirectoryEntryRecord(nameBytes: Array("bounded".utf8)) { entry in
+        let raw = UnsafeMutableRawPointer(entry)
+        let nameLengthOffset = try #require(
+            MemoryLayout<dirent>.offset(of: \.d_namlen)
+        )
+        let recordLengthOffset = try #require(
+            MemoryLayout<dirent>.offset(of: \.d_reclen)
+        )
+        raw.storeBytes(
+            of: raw.load(
+                fromByteOffset: recordLengthOffset,
+                as: UInt16.self
+            ),
+            toByteOffset: nameLengthOffset,
+            as: UInt16.self
+        )
+        #expect(throws: DirectoryEntryDecodingError.invalidRecord) {
+            _ = try decodeDirectoryEntryName(entry)
+        }
+    }
+
+    try withDirectoryEntryRecord(
+        nameBytes: Array("unterminated".utf8)
+    ) { entry in
+        let raw = UnsafeMutableRawPointer(entry)
+        let nameOffset = try #require(
+            MemoryLayout<dirent>.offset(of: \.d_name)
+        )
+        let nameLengthOffset = try #require(
+            MemoryLayout<dirent>.offset(of: \.d_namlen)
+        )
+        let nameLength = Int(
+            raw.load(
+                fromByteOffset: nameLengthOffset,
+                as: UInt16.self
+            )
+        )
+        raw.storeBytes(
+            of: UInt8(ascii: "x"),
+            toByteOffset: nameOffset + nameLength,
+            as: UInt8.self
+        )
+        #expect(throws: DirectoryEntryDecodingError.invalidRecord) {
+            _ = try decodeDirectoryEntryName(entry)
+        }
+    }
+
+    try withDirectoryEntryRecord(nameBytes: [0xFF]) { entry in
+        #expect(throws: DirectoryEntryDecodingError.invalidRecord) {
+            _ = try decodeDirectoryEntryName(entry)
+        }
+    }
+}
+
+@Test
 func surveyorStreamsFilesDirectoriesSparseFilesAndSymlinksWithoutFollowingLinks() async throws {
     let fixture = try SurveyorFixture()
     defer { fixture.remove() }
@@ -51,6 +124,46 @@ func surveyorStreamsFilesDirectoriesSparseFilesAndSymlinksWithoutFollowingLinks(
     #expect(byPath["outside-link"]?.snapshot.symlinkTarget == outsideURL.path)
     #expect(!byPath.keys.contains(where: { $0.contains("secret.bin") }))
     #expect(snapshots.last?.progress.completedEntries == snapshots.count)
+}
+
+private func withDirectoryEntryRecord(
+    nameBytes: [UInt8],
+    operation: (UnsafeMutablePointer<dirent>) throws -> Void
+) throws {
+    let recordLengthOffset = try #require(
+        MemoryLayout<dirent>.offset(of: \.d_reclen)
+    )
+    let nameLengthOffset = try #require(
+        MemoryLayout<dirent>.offset(of: \.d_namlen)
+    )
+    let nameOffset = try #require(
+        MemoryLayout<dirent>.offset(of: \.d_name)
+    )
+    let unalignedLength = nameOffset + nameBytes.count + 1
+    let recordLength = (unalignedLength + 3) & ~3
+    let raw = UnsafeMutableRawPointer.allocate(
+        byteCount: recordLength,
+        alignment: MemoryLayout<UInt64>.alignment
+    )
+    defer { raw.deallocate() }
+    raw.initializeMemory(as: UInt8.self, repeating: 0, count: recordLength)
+    raw.storeBytes(
+        of: UInt16(recordLength),
+        toByteOffset: recordLengthOffset,
+        as: UInt16.self
+    )
+    raw.storeBytes(
+        of: UInt16(nameBytes.count),
+        toByteOffset: nameLengthOffset,
+        as: UInt16.self
+    )
+    nameBytes.withUnsafeBytes {
+        raw.advanced(by: nameOffset).copyMemory(
+            from: $0.baseAddress!,
+            byteCount: nameBytes.count
+        )
+    }
+    try operation(raw.assumingMemoryBound(to: dirent.self))
 }
 
 @Test
@@ -124,6 +237,32 @@ func surveyorEmitsPartialErrorsWithoutErasingValidResults() async throws {
     #expect(byPath["visible.txt"]?.kind == .regularFile)
     #expect(!byPath.keys.contains("blocked/nested.txt"))
     #expect(snapshots.last?.progress.errorCount == 1)
+}
+
+@Test
+func surveyorDoesNotTreatDirectoryReadFailureAsEndOfDirectory() async throws {
+    let fixture = try SurveyorFixture()
+    defer { fixture.remove() }
+    try fixture.write(
+        Data("visible".utf8),
+        to: fixture.rootURL.appending(path: "visible.txt")
+    )
+    let request = ScanRequest(
+        rootURL: fixture.rootURL,
+        maximumWorkers: 1,
+        testHooks: SurveyorTestHooks(
+            directoryReadError: { url, readCount in
+                url.standardizedFileURL == fixture.rootURL.standardizedFileURL
+                    && readCount == 1
+                    ? EIO
+                    : nil
+            }
+        )
+    )
+
+    await #expect(throws: SurveyorError.directoryReadFailed) {
+        _ = try await collectSnapshots(Surveyor().scan(request))
+    }
 }
 
 @Test
@@ -220,7 +359,7 @@ func surveyorBoundsTheSharedDirectoryQueueWithoutDroppingWork() async throws {
 }
 
 @Test
-func surveyorFailsInsteadOfSilentlyDroppingWhenTheStreamBufferOverflows() async throws {
+func surveyorBackpressuresWithoutDroppingWhenTheStreamBufferIsFull() async throws {
     let fixture = try SurveyorFixture()
     defer { fixture.remove() }
     for index in 0..<32 {
@@ -238,11 +377,48 @@ func surveyorFailsInsteadOfSilentlyDroppingWhenTheStreamBufferOverflows() async 
             onCompletion: { completion.complete() }
         )
     )
-    try await completion.wait(timeout: .seconds(10))
+    try await Task.sleep(for: .milliseconds(50))
 
-    await #expect(throws: SurveyorError.streamBufferExceeded) {
-        _ = try await collectSnapshots(stream)
+    #expect(!completion.isComplete)
+    let snapshots = try await collectSnapshots(stream)
+
+    #expect(snapshots.count == 34)
+    #expect(Set(snapshots.map(\.relativePath)).count == 34)
+    try await completion.wait(timeout: .seconds(10))
+}
+
+@Test
+func surveyorAbandonedBackpressuredStreamStopsWorkers() async throws {
+    let fixture = try SurveyorFixture()
+    defer { fixture.remove() }
+    for index in 0..<64 {
+        try fixture.write(
+            Data([UInt8(index)]),
+            to: fixture.rootURL.appending(path: "files/\(index).bin")
+        )
     }
+    let completion = ScanCompletionTracker()
+    let workers = WorkerTracker()
+    var stream: SurveyorObservationStream? = Surveyor().scan(
+        ScanRequest(
+            rootURL: fixture.rootURL,
+            maximumWorkers: 2,
+            streamBufferCapacity: 1,
+            onCompletion: { completion.complete() },
+            testHooks: SurveyorTestHooks(
+                workerDidStart: { workers.started() },
+                workerDidFinish: { workers.finished() }
+            )
+        )
+    )
+    try await Task.sleep(for: .milliseconds(50))
+
+    #expect(!completion.isComplete)
+    stream = nil
+    try await completion.wait(timeout: .seconds(1))
+
+    #expect(stream == nil)
+    #expect(workers.active == 0)
 }
 
 @Test
@@ -483,7 +659,7 @@ func surveyorFixtureScriptRefusesUnsafeTargetsAndCleansOnlyMarkedFixtures() thro
 }
 
 private func collectSnapshots(
-    _ stream: AsyncThrowingStream<SurveyorObservation, Error>
+    _ stream: SurveyorObservationStream
 ) async throws -> [SurveyorObservation] {
     var snapshots: [SurveyorObservation] = []
     for try await observation in stream {
@@ -603,6 +779,10 @@ private final class DirectoryReplacementHook: @unchecked Sendable {
 private final class ScanCompletionTracker: @unchecked Sendable {
     private let condition = NSCondition()
     private var completed = false
+
+    var isComplete: Bool {
+        condition.withLock { completed }
+    }
 
     func complete() {
         condition.withLock {

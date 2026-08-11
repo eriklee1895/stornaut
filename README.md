@@ -21,7 +21,14 @@
 
 ## 状态
 
-🚧 产品、Agent、UI 功能交互与品牌基线已批准；Epic 0–1 foundation 与 risk spikes 已完成。原生 App/Test/UI Test host、Codex discovery/process、Probe Broker、Swift Surveyor 与受约束 Trash/Action lifecycle 均有可执行证据。Epic 2–4 deterministic plan 已批准并从 Task 9 开始执行；Codex Broker-only 未被技术性证明，Deep Dive 继续 no-go/paused。见文档：
+🚧 产品、Agent、UI 功能交互与品牌基线已批准；Epic 0–1 foundation/risk
+spikes 已完成。Epic 2–4 deterministic product core 的实现、focused gate 与
+真实机器证据已完成；用户已完成标准 Automation Mode 认证，首次 strengthened
+verifier 暴露的负载敏感测试、认证编排和 UI-runner 竞态已修复；最终统一
+verifier 单次 exit 0，Phase B 已关闭。当前 Quick Scan 在 460 GiB-class 本机 Home
+范围内用 Swift product path 于 5 分钟内完成，保持 bounded memory、
+Partial/Unmeasurable truth、零 Codex 与零目标写入。Codex Broker-only 仍未被
+技术性证明，Deep Dive 继续 no-go/paused，release 仍未评估。见文档：
 
 | 文档 | 内容 |
 |---|---|
@@ -33,7 +40,9 @@
 | [docs/design/agent-disk-governance.md](docs/design/agent-disk-governance.md) | 用户批准的 Agent、双模式与安全设计基线 |
 | [docs/design/ui-ux.md](docs/design/ui-ux.md) | 单窗口信息架构、核心流程、Agent 表达、Light/Dark 与品牌规范 |
 | [docs/assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md](docs/assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md) | 权限受限、安全阻断、部分结果、stale preflight 与历史保留的恢复状态契约 |
-| [docs/plans/active/epic-2-4-deterministic-product-core.md](docs/plans/active/epic-2-4-deterministic-product-core.md) | 已批准的 Phase B 领域、持久化、Quick Scan、Knowledge/Activity 与原生 UI 实施计划 |
+| [docs/reports/epic-2-4-validation-report.md](docs/reports/epic-2-4-validation-report.md) | Phase B domain/persistence、真实 Quick Scan benchmark、accounting、UI 与 scope gate |
+| [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) | 已归档的 Phase B Tasks 9–26 计划与逐 Task 证据 |
+| [docs/plans/active/README.md](docs/plans/active/README.md) | 当前无获批 executable plan；Phase C 计划待 review |
 | [docs/plans/completed/epic-0-1-foundation-spikes.md](docs/plans/completed/epic-0-1-foundation-spikes.md) | 第一阶段工程骨架与高风险技术 Spike 实施计划 |
 | [docs/reports/epic-0-1-validation-report.md](docs/reports/epic-0-1-validation-report.md) | Epic 0–1 evidence gate、conditional-go/no-go 与残余风险 |
 | [docs/research/](docs/research/) | 真实案例、竞品时间切片、上游学习与许可证边界 |

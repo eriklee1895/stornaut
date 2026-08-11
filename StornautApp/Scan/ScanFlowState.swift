@@ -81,12 +81,9 @@ struct ScanFlowState: Sendable, Equatable {
             currentStage: nil,
             currentScopeID: nil,
             currentRelativePath: nil,
-            scopeScanned: projection.snapshots.count,
-            candidatesFound: candidateCount(
-                classifications: projection.classifications,
-                snapshots: projection.snapshots
-            ),
-            measuredBytes: measuredBytes(in: projection.snapshots),
+            scopeScanned: projection.snapshotCount,
+            candidatesFound: projection.candidateCount,
+            measuredBytes: measuredBytes(in: projection),
             elapsed: max(
                 0,
                 projection.session.finishedAt.timeIntervalSince(
@@ -141,12 +138,17 @@ struct ScanFlowState: Sendable, Equatable {
         }
     }
 
-    private static func measuredBytes(
-        in snapshots: [PathSnapshot]
+    fileprivate static func measuredBytes(
+        in projection: QuickScanProjection
     ) -> ByteCount {
+        if let allocated = projection.session.aggregate?
+            .allocatedFileBytes
+        {
+            return ByteCount(UInt64(allocated))!
+        }
         var total: UInt64 = 0
         var countedHardLinks = Set<ScanHardLinkIdentity>()
-        for snapshot in snapshots {
+        for snapshot in projection.snapshots {
             guard snapshot.kind == .regularFile,
                   let bytes = snapshot.allocatedByteCount
             else {
@@ -383,12 +385,10 @@ struct ScanFlowReducer: Sendable {
             currentStage: .some(nil),
             scopeScanned: max(
                 state.scopeScanned,
-                projection.snapshots.count
+                projection.snapshotCount
             ),
-            candidatesFound: candidateCount(
-                classifications: projection.classifications,
-                snapshots: projection.snapshots
-            ),
+            candidatesFound: projection.candidateCount,
+            measuredBytes: ScanFlowState.measuredBytes(in: projection),
             snapshots: projection.snapshots,
             classifications: projection.classifications,
             evidence: projection.evidence,

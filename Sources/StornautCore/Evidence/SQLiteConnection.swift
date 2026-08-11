@@ -68,6 +68,28 @@ final class SQLiteConnection: @unchecked Sendable {
         }
     }
 
+    func executeBatch(
+        _ sql: String,
+        bindings rows: [[SQLiteValue]],
+        operation: String
+    ) throws {
+        let statement = try prepare(sql, operation: operation)
+        defer { sqlite3_finalize(statement) }
+        for bindings in rows {
+            try Task.checkCancellation()
+            guard sqlite3_reset(statement) == SQLITE_OK,
+                  sqlite3_clear_bindings(statement) == SQLITE_OK
+            else {
+                throw error(operation: operation, code: SQLITE_MISUSE)
+            }
+            try bind(bindings, to: statement, operation: operation)
+            let code = sqlite3_step(statement)
+            guard code == SQLITE_DONE else {
+                throw error(operation: operation, code: code)
+            }
+        }
+    }
+
     func query<T>(
         _ sql: String,
         bindings: [SQLiteValue] = [],
@@ -227,6 +249,7 @@ func columnText(_ statement: OpaquePointer, _ index: Int32) -> String {
 }
 
 let maximumStorePayloadBytes = 1_048_576
+let maximumSpaceLedgerPayloadBytes = 16 * 1_048_576
 let maximumStorePageSize = 100
 
 func encodeStorePayload<T: Encodable>(_ value: T) throws -> String {
@@ -235,6 +258,16 @@ func encodeStorePayload<T: Encodable>(_ value: T) throws -> String {
         throw EvidenceStoreError.payloadTooLarge(
             limit: maximumStorePayloadBytes
         )
+    }
+    return String(decoding: data, as: UTF8.self)
+}
+
+func boundedStorePayloadString(
+    _ data: Data,
+    limit: Int = maximumStorePayloadBytes
+) throws -> String {
+    guard data.count <= limit else {
+        throw EvidenceStoreError.payloadTooLarge(limit: limit)
     }
     return String(decoding: data, as: UTF8.self)
 }

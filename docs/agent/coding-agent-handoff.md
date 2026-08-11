@@ -1,8 +1,13 @@
 # Stornaut Coding Agent Handoff
 
 > 面向接手实现的 Coding Agent  
-> 最近更新：2026-08-10
-> 当前状态：产品、Agent、UI 功能交互与品牌基线完成；Epic 0–1 evidence gate 与最终 code review 已完成，5 个确认缺陷已修复；Epic 2–4 Tasks 9–25 已完成，下一项为 Task 26；Task 5 证明 Broker 协议但未证明 Codex Broker-only 工具面，Deep Dive 明确 no-go/paused；release signing/notarization 未评估
+> 最近更新：2026-08-11
+> 当前状态：产品、Agent、UI 功能交互与品牌基线完成；Epic 0–1 evidence
+> gate 已完成；Epic 2–4 Tasks 9–26 通过最终 unified verifier 并归档；
+> 当前无获批 executable active plan，下一步只编写 Phase C deterministic
+> Epic 8 详尽计划并交用户 review，批准前不得实现；Task 5 证明 Broker
+> 协议但未证明 Codex Broker-only 工具面，Deep Dive 明确 no-go/paused；
+> release signing/notarization 未评估
 
 ## 1. 任务目标
 
@@ -198,7 +203,10 @@ Epic 0–1
 
 第一份 coding plan 只覆盖 Epic 0–1：工程骨架和高风险 Spikes，目前已经完成。
 
-已完成的执行输入：[Epic 0–1 Foundation & Risk Spikes Implementation Plan](../plans/completed/epic-0-1-foundation-spikes.md)。它是历史证据，不再是当前执行授权。[Epic 2–4 Deterministic Product Core Plan](../plans/active/epic-2-4-deterministic-product-core.md) 已批准，是当前 Task 9–26 的执行授权。
+已完成的历史输入：[Epic 0–1 Foundation & Risk Spikes Implementation Plan](../plans/completed/epic-0-1-foundation-spikes.md)。
+[Epic 2–4 Deterministic Product Core Plan](../plans/completed/epic-2-4-deterministic-product-core.md)
+已完成并归档，不再构成当前执行授权。Phase B 最终证据见
+[Epic 2–4 Validation Report](../reports/epic-2-4-validation-report.md)。
 
 跨 Epic 的阶段依赖、no-go 分支和交付顺序由 [Delivery Roadmap](../plans/roadmap.md) 管理；新 active plan 不得另起一套宏观路线。
 
@@ -267,7 +275,20 @@ Broker-only 若不能被技术性强制，Epic 0–1 仍可作为成功的风险
 ```text
 你正在实现 Stornaut。先从 docs/README.md 进入文档地图，再完整阅读 docs/agent/coding-agent-handoff.md 指定的文档，尤其是产品/Agent/UI 三份批准规格，遵守所有产品不变量和 Reference Study Gate。不要直接实现整个产品，也不要从概念图推断规格外功能。
 
-Epic 0–1 evidence gate 已完成。Epic 2–4 deterministic active plan 已批准，Tasks 9–25 已完成；下一项为 Task 26 Phase B Evidence Gate and Handoff。Task 21 已建立 App-owned state、DEBUG fixture injection 与最小 semantic DesignSystem；Task 22 已实现真实 snapshot-first Overview；Task 23 已实现用户显式启动、App-owned 生命周期、五阶段进度、grouped read-only results 与 Evidence Inspector；Task 24 已实现带 seven-day sweep、损坏隔离、确认删除和 measured Storage Trend 的真实 Quick Scan History；Task 25 已实现 closed typed preferences、一个 fail-closed Primary Scan Root、显式 exclusions、分离 Evidence/Manifest clear、结构化 Local Knowledge 与六区原生 Settings。Investigations 仍是 placeholder。继续按 Task 独立 code review、验证、commit、push。该计划不包含 Deep Dive、真实 destructive Registered Action、release/notarization 或任何安全边界放宽。
+Epic 0–1 evidence gate 已完成。Phase B 已实现 closed domain/persistence、
+bounded product Quick Scan、incremental Space Ledger、67-rule
+Knowledge/Activity、structured Local Knowledge、snapshot-first Overview、Scan、
+Scan-only History 与六区 Settings。Task 26 的 focused gate、真实 Home
+benchmark、scope audit、actual-window inspection、review 和最终 unified
+verifier 均通过；Epic 2–4 计划与 Task 21–26 briefs 已归档。
+
+当前没有获批 executable active plan。下一项只编写独立 Phase C
+deterministic Epic 8 详尽计划：候选范围从 Quick Scan terminal projection
+形成 Review Reclaim Plan，经 pure Policy Gate、fresh revalidation、用户确认
+与默认 MoveToTrash，最后写 immutable Cleanup Manifest 和 truthful Cleanup
+Result/History。计划必须交用户 review 并获得明确批准后才可实现。该阶段不
+包含 Deep Dive、Adapter、真实 destructive Registered Action、
+release/notarization 或任何安全边界放宽。
 
 任何权限、安全或许可证假设都必须有实际证据。设计或 PRD 如有冲突，先报告并修正文档，不得自行扩大 Agent 或 Executor 权限。
 ```

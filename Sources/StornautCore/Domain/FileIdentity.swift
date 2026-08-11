@@ -7,6 +7,7 @@ public struct FileIdentity: Codable, Sendable, Equatable {
     public let mode: UInt16
     public let ownerUserID: UInt32
     public let ownerGroupID: UInt32
+    public let linkCount: UInt64
     public let size: Int64
     public let allocatedBytes: Int64
     public let modificationSeconds: Int64
@@ -18,6 +19,7 @@ public struct FileIdentity: Codable, Sendable, Equatable {
         mode: UInt16,
         ownerUserID: UInt32,
         ownerGroupID: UInt32,
+        linkCount: UInt64 = 1,
         size: Int64,
         allocatedBytes: Int64,
         modificationSeconds: Int64,
@@ -35,6 +37,7 @@ public struct FileIdentity: Codable, Sendable, Equatable {
         self.mode = mode
         self.ownerUserID = ownerUserID
         self.ownerGroupID = ownerGroupID
+        self.linkCount = linkCount
         self.size = size
         self.allocatedBytes = allocatedBytes
         self.modificationSeconds = modificationSeconds
@@ -66,6 +69,7 @@ public struct FileIdentity: Codable, Sendable, Equatable {
             mode: UInt16(information.st_mode),
             ownerUserID: information.st_uid,
             ownerGroupID: information.st_gid,
+            linkCount: UInt64(information.st_nlink),
             size: max(0, Int64(information.st_size)),
             allocatedBytes: allocated.overflow
                 ? .max
@@ -96,6 +100,10 @@ public struct FileIdentity: Codable, Sendable, Equatable {
             mode: container.decode(UInt16.self, forKey: .mode),
             ownerUserID: container.decode(UInt32.self, forKey: .ownerUserID),
             ownerGroupID: container.decode(UInt32.self, forKey: .ownerGroupID),
+            linkCount: try container.decodeIfPresent(
+                UInt64.self,
+                forKey: .linkCount
+            ) ?? 0,
             size: size,
             allocatedBytes: allocatedBytes,
             modificationSeconds: container.decode(

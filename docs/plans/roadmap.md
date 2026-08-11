@@ -187,12 +187,12 @@ Epic 0–1
 
 ## 6. 当前状态
 
-- 当前阶段：Phase A evidence gate 已完成；Phase B deterministic Epic 2–4
-  plan 已批准，Tasks 9–20 已完成，下一项为 Task 21。
-- 当前 active plan：
-  [`Epic 2–4 Deterministic Product Core`](active/epic-2-4-deterministic-product-core.md)
-  为 `Approved`；Epic 0–1 历史计划已移入
-  [`completed/`](completed/)。
+- 当前阶段：Phase A 与 Phase B evidence gates 已完成。Epic 2–4 Tasks
+  9–26 通过最终统一 verifier 并归档至
+  [`completed/`](completed/epic-2-4-deterministic-product-core.md)。
+- 当前没有获批的 executable active plan。下一步只编写 Phase C
+  deterministic Epic 8 safe-execution 详尽计划并交用户 review；明确批准前
+  不开始实现。
 - Epic 0 Foundation Upstream Study：已完成，选择 checked-in Xcode App/Test host + local Swift packages。
 - Epic 0 Task 1：SwiftPM Core/Codex、smoke tests、`scripts/verify`、manual-only CI 与 ThirdPartyNotices 骨架已完成。
 - Bundle identifier：已确认 `com.eriklee.stornaut`。
@@ -210,5 +210,14 @@ Epic 0–1
   code review 已完成；两项 P1 设计问题已修复。
 - Phase B Task 10：domain contracts、anonymous fixtures、Surveyor transport
   migration、code review 与 139-test unified verifier 已完成。
-- 下一项执行：Task 21 App State, Fixture Injection and Design System。Deep Dive
-  与真实 destructive Registered Action 不在该计划内。
+- Phase B Tasks 11–25：SQLite/retention、production Surveyor、Space Ledger、
+  67-rule Knowledge catalog、Activity/Local Knowledge、deterministic
+  orchestration、Overview、Scan、History 与 Settings 已完成逐 Task gate。
+- Phase B Task 26：最终源码 product path 在 3,107,607-entry Home 范围内
+  247.24 秒完成，peak RSS 73,220,096 bytes，132 个 permission gaps 保持
+  Partial/Unmeasurable；Codex marker absent。完整结论见
+  [Epic 2–4 Validation Report](../reports/epic-2-4-validation-report.md)。
+- 下一项规划：Phase C deterministic Epic 8 safe-execution slice，候选闭环为
+  Review → Policy → fresh revalidation → MoveToTrash → Manifest。计划必须
+  明确测试、freshness、确认、partial/undo、计量和 UI gates，经用户批准后
+  才可进入实现。Deep Dive 与真实 destructive Registered Action 仍不在该阶段。

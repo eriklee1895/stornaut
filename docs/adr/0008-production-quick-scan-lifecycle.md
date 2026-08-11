@@ -1,6 +1,6 @@
 # ADR 0008: Production Quick Scan Lifecycle
 
-> Status: Accepted; Task 12 production lifecycle validated
+> Status: Accepted; Phase B product path validated
 >
 > Date: 2026-08-10
 >
@@ -31,22 +31,25 @@ Activity or cleanup dependencies.
 
 `Surveyor` is the production low-level scanner. It retains the accepted fixed
 GCD worker pool, bounded shared directory queue, worker-local overflow stack,
-bounded `AsyncThrowingStream`, POSIX descriptor traversal and typed path
-observations.
+POSIX descriptor traversal and typed path observations. Its producer/consumer
+channel is bounded and applies cancellable backpressure: a slow consumer does
+not silently drop facts or fail merely because the buffer fills, and abandoning
+the sequence wakes blocked producers and stops workers.
 
 `ScanSessionWriter` is an actor-owned lifecycle orchestrator:
 
 - permits one active scan per writer;
 - captures a typed `VolumeBaseline`;
 - persists a fail-safe provisional partial session before child facts;
-- writes path facts in batches of at most 100, with a default of 64;
+- commits the first retained path fact separately, then writes bounded batches
+  with a default of 4,096 and maximum of 8,192;
 - emits bounded typed lifecycle events;
 - owns explicit `cancelActiveScan()` independently of UI consumer lifetime;
 - replaces provisional state with completed, partial, cancelled or failed truth.
 
-One Task 12 `ScanRequest` still means one root/scope. Task 20 will compose
-multiple roots after rules and Activity exist; Task 12 does not fabricate those
-later stages' product results.
+One `ScanRequest` still means one root/scope/ledger. Task 20 composed rules and
+Activity over that one real root; Phase B did not implement or claim multi-root
+or multi-ledger support.
 
 ### Event contract
 
@@ -142,10 +145,10 @@ Costs:
 - the writer currently models one root/scope;
 - product stages for classification/activity are milestones until later Tasks
   provide their deterministic engines;
-- each successful scan writes each path payload once and then streams its typed
-  event, increasing synthetic runtime relative to the scanner-only spike;
-- the initial two-second SQLite busy timeout still needs Task 12/26 benchmark
-  evidence before tuning.
+- reference writer mode still persists each path for lifecycle regression;
+  product mode instead persists candidate/owner/gap facts plus a typed full
+  aggregate to avoid a multi-million-row product database;
+- the two-second SQLite busy timeout remains intentionally bounded.
 
 ## Residual Risks
 
@@ -156,8 +159,9 @@ Costs:
   non-success state is the authoritative result.
 - Volume resource values can drift during a scan. Task 13 owns reconciliation,
   not Task 12.
-- Real packaged-App FDA coverage and real-machine production-path benchmarking
-  remain Task 26.
+- Real packaged-App FDA state still has no supported general query. Task 26
+  measured CLI/product coverage and actual App rendering without claiming an
+  FDA verdict.
 - Deep Dive remains no-go/paused.
 
 ## Acceptance Evidence
@@ -230,3 +234,45 @@ Task 20 evidence adds:
 - permission gaps retained as Unmeasurable with `bytes=nil`;
 - machine regeneration of the runtime catalog and source/dependency boundary
   checks.
+
+## Phase B Product Gate Delta
+
+Task 26 keeps this ADR Accepted and records the production scaling decisions:
+
+- `ProductScanAccumulator` matches rules and reduces owner/unclassified bytes,
+  coverage gaps, hard links, typed entry/issue counts and logical/allocated
+  file totals while Surveyor streams.
+- Product persistence retains rule candidates, top-level owners, coverage gaps
+  and at most 100 auxiliary display facts. It does not persist every ordinary
+  path merely for UI count reconstruction.
+- `ScanSession.aggregate` preserves full typed counts for completed, partial and
+  cancelled truth; terminal App metrics consume the aggregate rather than the
+  bounded display page.
+- Classification and ledger finalization use 4,096-row keyset pages. Terminal
+  and restart projections are candidate-first, bounded to 100 records, and
+  fill remaining slots with auxiliary display facts.
+- `QuickScanProjection` separately carries full snapshot/classification/
+  candidate/evidence/disposition counts and bounded records.
+- Darwin directory entries are variable-length records. Surveyor and Probe
+  Broker share a raw-pointer decoder that validates `d_reclen`, `d_namlen`,
+  NUL termination and UTF-8 without loading Swift's fixed 1,024-byte `d_name`
+  tuple. ASan covers minimal, maximum-length and malformed records.
+- Surveyor clears and checks `errno` around every `readdir` call. EIO or a
+  malformed record becomes `directoryReadFailed`; Quick Scan persists
+  `failed/scannerFailure` and cannot convert it to normal EOF/Completed.
+- The machine-readable benchmark has explicit `writer` and `product` modes.
+  Product mode runs the public coordinator and emits schema version 3.
+
+The final-source current-machine Home product run processed 3,107,607 entries
+in 247.24 seconds at 12,568.95 entries/s. First useful progress arrived in
+26.42 ms, peak RSS was 73,220,096 bytes and the store was 20,795,392 bytes.
+The run correctly ended Partial for 132 permission gaps, emitted no product or
+corrupt-record or directory-read issue and did not launch the inert fake Codex
+marker.
+
+A separate sample persisted Cancelled after 1,256 entries in 110.20 ms, with
+1.82 ms measured cancellation response, no ledger and no Codex marker.
+
+These results meet the `< 5 min` and `<= 256 MiB` gates. They do not prove
+multi-root support, packaged-App FDA coverage, syscall-level target-write
+absence or release readiness.

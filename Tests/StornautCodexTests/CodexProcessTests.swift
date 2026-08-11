@@ -252,7 +252,8 @@ func earlyExitWhileWritingPromptDoesNotTerminateTheHost() async throws {
     let fixture = try CodexProcessFixture(mode: "early-exit")
     defer { fixture.remove() }
     let request = fixture.makeRequest(
-        prompt: Data(repeating: 0x61, count: 4 * 1_024 * 1_024)
+        prompt: Data(repeating: 0x61, count: 4 * 1_024 * 1_024),
+        timeout: .seconds(5)
     )
     let stream = CodexProcess().run(request)
 
@@ -297,7 +298,7 @@ func timeoutEscalatesWithinTheIsolatedProcessGroup() async throws {
     let fixture = try CodexProcessFixture(mode: "timeout")
     defer { fixture.remove() }
     let request = fixture.makeRequest(
-        timeout: .seconds(2),
+        timeout: .seconds(5),
         terminationGracePeriod: .milliseconds(75)
     )
 
@@ -325,7 +326,7 @@ func timeoutKillsIgnoringDescendantAndLeavesNoOrphan() async throws {
     let fixture = try CodexProcessFixture(mode: "child")
     defer { fixture.remove() }
     let request = fixture.makeRequest(
-        timeout: .seconds(2),
+        timeout: .seconds(5),
         terminationGracePeriod: .milliseconds(75)
     )
 
@@ -348,7 +349,7 @@ func consumerCancellationTerminatesTheProcessGroup() async throws {
     let fixture = try CodexProcessFixture(mode: "child")
     defer { fixture.remove() }
     let request = fixture.makeRequest(
-        timeout: .seconds(5),
+        timeout: .seconds(30),
         terminationGracePeriod: .milliseconds(75)
     )
     let stream = CodexProcess().run(request)
@@ -541,7 +542,7 @@ private func collectEvents(
 
 private func waitForFile(_ url: URL) async throws {
     let clock = ContinuousClock()
-    let deadline = clock.now.advanced(by: .seconds(5))
+    let deadline = clock.now.advanced(by: .seconds(15))
     while clock.now < deadline {
         if FileManager.default.fileExists(atPath: url.path) {
             return

@@ -162,6 +162,75 @@ func scanModelFiltersWithoutChangingUnderlyingRows() throws {
 }
 
 @Test
+func scanModelUsesFullDispositionCountsWithBoundedRows() throws {
+    let bounded = try OverviewTestProjectionFactory.projection(
+        slug: "scan-full-dispositions"
+    )
+    let fullCounts = try QuickScanDispositionCounts(
+        readyToReclaim: 101,
+        reviewRecommended: 202,
+        protected: 303,
+        unknown: 394
+    )
+    let rootSnapshot = try #require(
+        bounded.snapshots.first { $0.relativePath == "." }
+    )
+    let rootClassification = try Classification(
+        id: ClassificationID(
+            rawValue: "classification-scan-full-dispositions-root"
+        )!,
+        snapshotID: rootSnapshot.id,
+        ruleID: nil,
+        producer: nil,
+        category: .unknownLargeConsumers,
+        disposition: .unknown,
+        risk: .high,
+        confidence: .low,
+        recovery: nil,
+        requiredEvidenceKeys: [],
+        missingEvidenceKeys: [],
+        catalogVersion: DomainToken(
+            rawValue: "catalog-scan-full-dispositions"
+        )!,
+        classifiedAt: bounded.session.finishedAt
+    )
+    let projection = try QuickScanProjection(
+        session: bounded.session,
+        snapshots: bounded.snapshots,
+        classifications: bounded.classifications + [rootClassification],
+        evidence: bounded.evidence,
+        ledger: bounded.ledger,
+        issues: bounded.issues,
+        corruptRecordIDs: bounded.corruptRecordIDs,
+        snapshotCount: 10_000,
+        classificationCount: fullCounts.total,
+        candidateCount: fullCounts.total - 1,
+        evidenceCount: bounded.evidenceCount,
+        dispositionCounts: fullCounts
+    )
+    let model = ScanModel(
+        flowState: .retained(projection),
+        pageState: try .success(
+            projection: projection,
+            refreshedAt: OverviewTestProjectionFactory.now
+        )
+    )
+
+    #expect(model.rows.count == bounded.classifications.count)
+    #expect(model.summary.readyCount == 101)
+    #expect(model.summary.reviewCount == 202)
+    #expect(model.summary.protectedCount == 303)
+    #expect(model.summary.unknownCount == 393)
+    #expect(
+        model.summary.readyCount
+            + model.summary.reviewCount
+            + model.summary.protectedCount
+            + model.summary.unknownCount
+            == model.metrics.candidatesFound
+    )
+}
+
+@Test
 func scanInspectorIsReadOnlyAndJoinsEvidenceTruth() throws {
     let projection = try OverviewTestProjectionFactory.projection(
         slug: "scan-inspector"

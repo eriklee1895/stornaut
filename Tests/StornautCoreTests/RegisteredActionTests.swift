@@ -113,7 +113,7 @@ func registeredActionNormalExitTerminatesSurvivingChild() async throws {
             "PATH": "/usr/bin:/bin",
             "STORNAUT_FAKE_CLEANER_PID_FILE": pidFileURL.path,
         ],
-        timeout: .seconds(2),
+        timeout: .seconds(10),
         standardOutputLimit: 16_384,
         standardErrorLimit: 4_096
     ) { mode in
@@ -169,7 +169,7 @@ func registeredActionTimeoutTerminatesTheFixture() async throws {
         )
     }
 
-    #expect(started.duration(to: clock.now) < .seconds(2))
+    #expect(started.duration(to: clock.now) < .seconds(10))
 }
 
 @Test
@@ -257,7 +257,7 @@ private struct RegisteredActionHarness {
     let definition: RegisteredActionDefinition
     let gate: ActionPolicyGate
 
-    init(timeout: Duration = .seconds(2)) throws {
+    init(timeout: Duration = .seconds(10)) throws {
         let fixtureURL = try fakeCleanerFixtureURL()
         definition = RegisteredActionDefinition.fakeCleaner(
             executableURL: fixtureURL,

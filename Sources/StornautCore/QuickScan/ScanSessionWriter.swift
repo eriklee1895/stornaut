@@ -16,6 +16,7 @@ public actor ScanSessionWriter {
     private let snapshotID: @Sendable (String) -> SnapshotID
     private let snapshotObservedAt: (@Sendable (String) -> Date)?
     private let defersProductFinalization: Bool
+    private let productAccumulator: ProductScanAccumulator?
     private var scanIsActive = false
     private var activeControl: QuickScanRunControl?
 
@@ -30,12 +31,36 @@ public actor ScanSessionWriter {
         snapshotObservedAt: (@Sendable (String) -> Date)? = nil,
         defersProductFinalization: Bool = false
     ) {
+        self.init(
+            store: store,
+            volumeSampler: volumeSampler,
+            now: now,
+            snapshotID: snapshotID,
+            snapshotObservedAt: snapshotObservedAt,
+            defersProductFinalization: defersProductFinalization,
+            productAccumulator: nil
+        )
+    }
+
+    init(
+        store: any ScanSessionPersisting,
+        volumeSampler: any VolumeBaselineSampling =
+            FoundationVolumeBaselineSampler(),
+        now: @escaping @Sendable () -> Date = Date.init,
+        snapshotID: @escaping @Sendable (String) -> SnapshotID = {
+            _ in SnapshotID()
+        },
+        snapshotObservedAt: (@Sendable (String) -> Date)? = nil,
+        defersProductFinalization: Bool,
+        productAccumulator: ProductScanAccumulator?
+    ) {
         self.store = store
         self.volumeSampler = volumeSampler
         self.now = now
         self.snapshotID = snapshotID
         self.snapshotObservedAt = snapshotObservedAt
         self.defersProductFinalization = defersProductFinalization
+        self.productAccumulator = productAccumulator
     }
 
     public var hasActiveScan: Bool {
@@ -177,6 +202,7 @@ public actor ScanSessionWriter {
             }
 
             let finishedAt = now()
+            let aggregate = try productAccumulator?.reduction().aggregate
             let session: ScanSession
             let scopeResult: QuickScanScopeResult
             if defersProductFinalization {
@@ -192,7 +218,8 @@ public actor ScanSessionWriter {
                             rootPath: rootPath,
                             reason: summary.partialReason ?? .interrupted
                         ),
-                    ]
+                    ],
+                    aggregate: aggregate
                 )
                 scopeResult = .unfinished(session.unfinishedScopes[0])
             } else if let reason = summary.partialReason {
@@ -208,7 +235,8 @@ public actor ScanSessionWriter {
                             rootPath: rootPath,
                             reason: reason
                         ),
-                    ]
+                    ],
+                    aggregate: aggregate
                 )
                 scopeResult = .unfinished(session.unfinishedScopes[0])
             } else {
@@ -223,7 +251,8 @@ public actor ScanSessionWriter {
                     finishedAt: finishedAt,
                     terminalState: .completed,
                     completedScopes: [scope],
-                    unfinishedScopes: []
+                    unfinishedScopes: [],
+                    aggregate: aggregate
                 )
                 scopeResult = .completed(scope)
             }
@@ -318,7 +347,17 @@ public actor ScanSessionWriter {
                 {
                     throw SurveyorError.rootIdentityChanged
                 }
-                batch.append(observation)
+                let shouldPersist: Bool
+                if let productAccumulator {
+                    shouldPersist = try productAccumulator.consume(
+                        observation
+                    )
+                } else {
+                    shouldPersist = true
+                }
+                if shouldPersist {
+                    batch.append(observation)
+                }
                 summary.record(observation)
                 let batchLimit = emittedFirstFact
                     ? request.persistenceBatchSize
@@ -331,6 +370,17 @@ public actor ScanSessionWriter {
                     )
                     emittedFirstFact = true
                     batch.removeAll(keepingCapacity: true)
+                }
+                if productAccumulator != nil,
+                   !shouldPersist,
+                   observation.progress.completedEntries
+                    % request.persistenceBatchSize == 0
+                {
+                    try emitProductProgress(
+                        observation,
+                        request: request,
+                        continuation: continuation
+                    )
                 }
             }
             if !batch.isEmpty {
@@ -388,33 +438,81 @@ public actor ScanSessionWriter {
         } catch {
             throw QuickScanPersistenceError.store
         }
+        if defersProductFinalization {
+            if let progressObservation = observations.reversed().first(
+                where: {
+                    PersistedPath(rawValue: $0.relativePath) != nil
+                }
+            ), let currentPath = PersistedPath(
+                rawValue: progressObservation.relativePath
+            ) {
+                try yield(
+                    .progress(
+                        QuickScanProgress(
+                            scopeID: request.scopeID,
+                            currentRelativePath: currentPath,
+                            counters: progressObservation.progress
+                        )
+                    ),
+                    continuation: continuation,
+                    request: request
+                )
+            }
+            for observation in observations {
+                guard let issue = observation.issue,
+                      let issuePath = PersistedPath(
+                          rawValue: observation.relativePath
+                      )
+                else {
+                    continue
+                }
+                try yield(
+                    .issueObserved(
+                        QuickScanIssueObservation(
+                            scopeID: request.scopeID,
+                            relativePath: issuePath,
+                            issue: issue,
+                            observedAt: observation.observedAt
+                        )
+                    ),
+                    continuation: continuation,
+                    request: request
+                )
+            }
+            return
+        }
         for observation in observations {
             try yield(
                 .factObserved(.pathSnapshot(observation.snapshot)),
                 continuation: continuation,
                 request: request
             )
-            try yield(
-                .progress(
-                    QuickScanProgress(
-                        scopeID: request.scopeID,
-                        currentRelativePath: try PersistedPath(
-                            validating: observation.relativePath
-                        ),
-                        counters: observation.progress
-                    )
-                ),
-                continuation: continuation,
-                request: request
-            )
+            if let currentPath = PersistedPath(
+                rawValue: observation.relativePath
+            ) {
+                try yield(
+                    .progress(
+                        QuickScanProgress(
+                            scopeID: request.scopeID,
+                            currentRelativePath: currentPath,
+                            counters: observation.progress
+                        )
+                    ),
+                    continuation: continuation,
+                    request: request
+                )
+            }
             if let issue = observation.issue {
+                guard let issuePath = PersistedPath(
+                    rawValue: observation.relativePath
+                ) else {
+                    continue
+                }
                 try yield(
                     .issueObserved(
                         QuickScanIssueObservation(
                             scopeID: request.scopeID,
-                            relativePath: try PersistedPath(
-                                validating: observation.relativePath
-                            ),
+                            relativePath: issuePath,
                             issue: issue,
                             observedAt: observation.observedAt
                         )
@@ -424,6 +522,32 @@ public actor ScanSessionWriter {
                 )
             }
         }
+    }
+
+    private func emitProductProgress(
+        _ observation: SurveyorObservation,
+        request: ScanRequest,
+        continuation: AsyncThrowingStream<
+            QuickScanEvent,
+            Error
+        >.Continuation
+    ) throws {
+        guard let currentPath = PersistedPath(
+            rawValue: observation.relativePath
+        ) else {
+            return
+        }
+        try yield(
+            .progress(
+                QuickScanProgress(
+                    scopeID: request.scopeID,
+                    currentRelativePath: currentPath,
+                    counters: observation.progress
+                )
+            ),
+            continuation: continuation,
+            request: request
+        )
     }
 
     private func finishAbnormally(
@@ -436,12 +560,14 @@ public actor ScanSessionWriter {
         continuation: AsyncThrowingStream<QuickScanEvent, Error>.Continuation
     ) async {
         do {
+            let aggregate = try productAccumulator?.reduction().aggregate
             let session = try makeTerminalSession(
                 request: request,
                 rootPath: rootPath,
                 startedAt: startedAt,
                 terminalState: state,
-                reason: reason
+                reason: reason,
+                aggregate: aggregate
             )
             try await store.saveScanSession(session)
             if streamError == nil {
@@ -477,7 +603,8 @@ public actor ScanSessionWriter {
         rootPath: PersistedPath,
         startedAt: Date,
         terminalState: ScanTerminalState,
-        reason: ScanScopeCompletionReason
+        reason: ScanScopeCompletionReason,
+        aggregate: ScanAggregate? = nil
     ) throws -> ScanSession {
         try ScanSession(
             id: request.sessionID,
@@ -491,7 +618,8 @@ public actor ScanSessionWriter {
                     rootPath: rootPath,
                     reason: reason
                 ),
-            ]
+            ],
+            aggregate: aggregate
         )
     }
 

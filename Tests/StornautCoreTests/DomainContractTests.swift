@@ -199,7 +199,6 @@ func domainLabelsRejectControlsAndUnboundedValues() {
 func persistedPathsRejectControlsAndUnboundedValues() {
     for value in [
         "",
-        "line\nbreak",
         "nul\0path",
         String(repeating: "a", count: 16_385),
     ] {
@@ -210,6 +209,7 @@ func persistedPathsRejectControlsAndUnboundedValues() {
             )
         }
     }
+    #expect(PersistedPath(rawValue: "legal\nmacOS-name") != nil)
 }
 
 @Test
@@ -223,6 +223,86 @@ func scanSessionDecodeRejectsInvalidTimelineAndCompletedGaps() throws {
     }
     try expectMutatedJSONFails(ScanSession.self, data: valid) { object in
         object["terminalState"] = "completed"
+    }
+}
+
+@Test
+func scanAggregateCountsRejectOverflow() {
+    #expect(throws: DomainContractError.invalidMeasurement) {
+        _ = try ScanEntryCounts(
+            total: Int.max,
+            regularFiles: Int.max,
+            directories: Int.max,
+            symbolicLinks: 0,
+            inaccessible: 0,
+            other: 0
+        )
+    }
+    #expect(throws: DomainContractError.invalidMeasurement) {
+        _ = try ScanIssueCounts(
+            permissionDenied: Int.max,
+            mountBoundary: Int.max,
+            userExcluded: 0,
+            metadataUnavailable: 0,
+            directoryReadFailed: 0
+        )
+    }
+    #expect(throws: DomainContractError.invalidMeasurement) {
+        _ = try QuickScanDispositionCounts(
+            readyToReclaim: Int.max,
+            reviewRecommended: Int.max,
+            protected: 0,
+            unknown: 0
+        )
+    }
+    #expect(throws: (any Error).self) {
+        _ = try DomainJSON.decode(
+            ScanEntryCounts.self,
+            from: Data(
+                """
+                {"total":1,"regularFiles":1,"directories":1,\
+                "symbolicLinks":0,"inaccessible":0,"other":0}
+                """.utf8
+            )
+        )
+    }
+    #expect(throws: (any Error).self) {
+        _ = try DomainJSON.decode(
+            ScanIssueCounts.self,
+            from: Data(
+                """
+                {"permissionDenied":-1,"mountBoundary":0,\
+                "userExcluded":0,"metadataUnavailable":0,\
+                "directoryReadFailed":0}
+                """.utf8
+            )
+        )
+    }
+    #expect(throws: (any Error).self) {
+        _ = try DomainJSON.decode(
+            QuickScanDispositionCounts.self,
+            from: Data(
+                """
+                {"readyToReclaim":-1,"reviewRecommended":1,\
+                "protected":0,"unknown":0}
+                """.utf8
+            )
+        )
+    }
+    #expect(throws: (any Error).self) {
+        _ = try DomainJSON.decode(
+            ScanAggregate.self,
+            from: Data(
+                """
+                {"entries":{"total":1,"regularFiles":1,"directories":0,\
+                "symbolicLinks":0,"inaccessible":0,"other":0},\
+                "issues":{"permissionDenied":1,"mountBoundary":1,\
+                "userExcluded":0,"metadataUnavailable":0,\
+                "directoryReadFailed":0},"logicalFileBytes":0,\
+                "allocatedFileBytes":0}
+                """.utf8
+            )
+        )
     }
 }
 

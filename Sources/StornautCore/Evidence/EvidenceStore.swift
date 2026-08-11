@@ -18,6 +18,17 @@ public struct StorePage<Record: Sendable>: Sendable {
     }
 }
 
+struct PathSnapshotCursor: Sendable, Equatable {
+    let relativePath: String
+    let id: String
+}
+
+struct PathSnapshotCursorPage: Sendable {
+    let page: StorePage<PathSnapshot>
+    let nextCursor: PathSnapshotCursor?
+    let rowCount: Int
+}
+
 public struct ScanHistoryPage: Sendable, Equatable {
     public let sessions: [ScanSession]
     public let ledgersBySessionID: [ScanSessionID: SpaceLedger]
@@ -44,6 +55,39 @@ public struct EvidenceRecordCounts: Sendable, Equatable {
     public init(evidenceSessions: Int, manifests: Int) {
         self.evidenceSessions = evidenceSessions
         self.manifests = manifests
+    }
+}
+
+public struct QuickScanStoreSummary: Sendable, Equatable {
+    public let snapshotCount: Int
+    public let retainedSnapshotCount: Int
+    public let classificationCount: Int
+    public let evidenceCount: Int
+    public let dispositionCounts: QuickScanDispositionCounts
+
+    public init(
+        snapshotCount: Int,
+        retainedSnapshotCount: Int? = nil,
+        classificationCount: Int,
+        evidenceCount: Int,
+        dispositionCounts: QuickScanDispositionCounts
+    ) throws {
+        let retainedSnapshotCount =
+            retainedSnapshotCount ?? snapshotCount
+        guard snapshotCount >= 0,
+              retainedSnapshotCount >= 0,
+              retainedSnapshotCount <= snapshotCount,
+              classificationCount >= 0,
+              evidenceCount >= 0,
+              dispositionCounts.total == classificationCount
+        else {
+            throw DomainContractError.invalidMeasurement
+        }
+        self.snapshotCount = snapshotCount
+        self.retainedSnapshotCount = retainedSnapshotCount
+        self.classificationCount = classificationCount
+        self.evidenceCount = evidenceCount
+        self.dispositionCounts = dispositionCounts
     }
 }
 
@@ -309,33 +353,125 @@ public actor EvidenceStore {
         )
     }
 
+    public func quickScanSummary(
+        sessionID: ScanSessionID
+    ) throws -> QuickScanStoreSummary {
+        let persistedSnapshotCount = try connection.query(
+            """
+            SELECT COUNT(*)
+            FROM path_snapshots
+            WHERE session_id = ?
+            """,
+            bindings: [.text(sessionID.rawValue)],
+            operation: "summary.snapshots"
+        ) {
+            sqlite3_column_int64($0, 0)
+        }.first
+        let classificationCount = try connection.query(
+            """
+            SELECT COUNT(*)
+            FROM classifications c
+            JOIN path_snapshots s ON s.id = c.snapshot_id
+            WHERE s.session_id = ?
+            """,
+            bindings: [.text(sessionID.rawValue)],
+            operation: "summary.classifications"
+        ) {
+            sqlite3_column_int64($0, 0)
+        }.first
+        let evidenceCount = try connection.query(
+            """
+            SELECT COUNT(*)
+            FROM evidence e
+            JOIN path_snapshots s ON s.id = e.snapshot_id
+            WHERE s.session_id = ?
+            """,
+            bindings: [.text(sessionID.rawValue)],
+            operation: "summary.evidence"
+        ) {
+            sqlite3_column_int64($0, 0)
+        }.first
+        let dispositionRows = try connection.query(
+            """
+            SELECT c.disposition, COUNT(*)
+            FROM classifications c
+            JOIN path_snapshots s ON s.id = c.snapshot_id
+            WHERE s.session_id = ?
+            GROUP BY c.disposition
+            """,
+            bindings: [.text(sessionID.rawValue)],
+            operation: "summary.dispositions"
+        ) { statement in
+            (
+                columnText(statement, 0),
+                sqlite3_column_int64(statement, 1)
+            )
+        }
+        var dispositionCounts = Dictionary(
+            uniqueKeysWithValues: ReclaimDisposition.allCases.map {
+                ($0, 0)
+            }
+        )
+        for (rawDisposition, count) in dispositionRows {
+            guard let disposition = ReclaimDisposition(
+                rawValue: rawDisposition
+            ), let count = Int(exactly: count), count >= 0 else {
+                throw EvidenceStoreError.schemaMismatch
+            }
+            dispositionCounts[disposition] = count
+        }
+        guard let rawSnapshotCount = persistedSnapshotCount,
+              let rawClassificationCount = classificationCount,
+              let rawEvidenceCount = evidenceCount,
+              let snapshotCount = Int(exactly: rawSnapshotCount),
+              let classificationCount = Int(exactly: rawClassificationCount),
+              let evidenceCount = Int(exactly: rawEvidenceCount)
+        else {
+            throw EvidenceStoreError.schemaMismatch
+        }
+        return try QuickScanStoreSummary(
+            snapshotCount: try scanSession(id: sessionID)?
+                .aggregate?.entries.total ?? snapshotCount,
+            retainedSnapshotCount: snapshotCount,
+            classificationCount: classificationCount,
+            evidenceCount: evidenceCount,
+            dispositionCounts: QuickScanDispositionCounts(
+                readyToReclaim:
+                    dispositionCounts[.readyToReclaim, default: 0],
+                reviewRecommended:
+                    dispositionCounts[.reviewRecommended, default: 0],
+                protected: dispositionCounts[.protected, default: 0],
+                unknown: dispositionCounts[.unknown, default: 0]
+            )
+        )
+    }
+
     public func savePathSnapshots(_ snapshots: [PathSnapshot]) throws {
         try Task.checkCancellation()
+        let rows = try snapshots.map { snapshot in
+            [
+                SQLiteValue.text(snapshot.id.rawValue),
+                .text(snapshot.sessionID.rawValue),
+                .text(snapshot.relativePath),
+                .integer(storeMilliseconds(snapshot.observedAt)),
+                .text(try encodeStorePayload(snapshot)),
+            ]
+        }
         try connection.transaction(operation: "snapshot.batch") {
-            for snapshot in snapshots {
-                try Task.checkCancellation()
-                let payload = try encodeStorePayload(snapshot)
-                try connection.execute(
-                    """
-                    INSERT INTO path_snapshots
-                    (id, session_id, relative_path, observed_at_ms, payload)
-                    VALUES (?, ?, ?, ?, ?)
-                    ON CONFLICT(id) DO UPDATE SET
-                        session_id=excluded.session_id,
-                        relative_path=excluded.relative_path,
-                        observed_at_ms=excluded.observed_at_ms,
-                        payload=excluded.payload
-                    """,
-                    bindings: [
-                        .text(snapshot.id.rawValue),
-                        .text(snapshot.sessionID.rawValue),
-                        .text(snapshot.relativePath),
-                        .integer(storeMilliseconds(snapshot.observedAt)),
-                        .text(payload),
-                    ],
-                    operation: "snapshot.save"
-                )
-            }
+            try connection.executeBatch(
+                """
+                INSERT INTO path_snapshots
+                (id, session_id, relative_path, observed_at_ms, payload)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    session_id=excluded.session_id,
+                    relative_path=excluded.relative_path,
+                    observed_at_ms=excluded.observed_at_ms,
+                    payload=excluded.payload
+                """,
+                bindings: rows,
+                operation: "snapshot.save"
+            )
         }
     }
 
@@ -367,6 +503,93 @@ public actor EvidenceStore {
                     == storeMilliseconds(snapshot.observedAt)
             },
             operation: "snapshot.page"
+        )
+    }
+
+    func pathSnapshots(
+        sessionID: ScanSessionID,
+        after cursor: PathSnapshotCursor?,
+        limit: Int
+    ) throws -> PathSnapshotCursorPage {
+        guard limit > 0,
+              limit <= ScanRequest.maximumPersistenceBatchSize
+        else {
+            throw EvidenceStoreError.invalidPage
+        }
+        let cursorClause = cursor == nil
+            ? ""
+            : """
+              AND (
+                relative_path > ?
+                OR (relative_path = ? AND id > ?)
+              )
+              """
+        var bindings: [SQLiteValue] = [.text(sessionID.rawValue)]
+        if let cursor {
+            bindings.append(.text(cursor.relativePath))
+            bindings.append(.text(cursor.relativePath))
+            bindings.append(.text(cursor.id))
+        }
+        bindings.append(.integer(Int64(limit)))
+        let rows = try connection.query(
+            """
+            SELECT id, payload, session_id, relative_path, observed_at_ms
+            FROM path_snapshots
+            WHERE session_id = ?
+            \(cursorClause)
+            ORDER BY relative_path ASC, id ASC
+            LIMIT ?
+            """,
+            bindings: bindings,
+            operation: "snapshot.cursorPage"
+        ) { statement -> (
+            decoded: StoreDecodedRow<PathSnapshot>,
+            cursor: PathSnapshotCursor
+        ) in
+            let id = columnText(statement, 0)
+            let payload = columnText(statement, 1)
+            let parentID = columnText(statement, 2)
+            let relativePath = columnText(statement, 3)
+            let observedAt = sqlite3_column_int64(statement, 4)
+            let decoded: StoreDecodedRow<PathSnapshot>
+            do {
+                let snapshot = try DomainJSON.decode(
+                    PathSnapshot.self,
+                    from: Data(payload.utf8)
+                )
+                guard snapshot.id.rawValue == id,
+                      snapshot.sessionID.rawValue == parentID,
+                      snapshot.relativePath == relativePath,
+                      storeMilliseconds(snapshot.observedAt) == observedAt
+                else {
+                    throw EvidenceStoreError.recordIdentityMismatch
+                }
+                decoded = .record(snapshot)
+            } catch {
+                decoded = .corrupt(id)
+            }
+            return (
+                decoded,
+                PathSnapshotCursor(relativePath: relativePath, id: id)
+            )
+        }
+        var records: [PathSnapshot] = []
+        var corrupt: [String] = []
+        for row in rows {
+            switch row.decoded {
+            case let .record(record):
+                records.append(record)
+            case let .corrupt(id):
+                corrupt.append(id)
+            }
+        }
+        return PathSnapshotCursorPage(
+            page: StorePage(
+                records: records,
+                corruptRecordIDs: corrupt
+            ),
+            nextCursor: rows.last?.cursor,
+            rowCount: rows.count
         )
     }
 
@@ -503,6 +726,7 @@ public actor EvidenceStore {
             parentColumn: "session_id",
             parentID: ledger.sessionID.rawValue,
             payload: DomainJSON.encode(ledger),
+            payloadLimit: maximumSpaceLedgerPayloadBytes,
             operation: "spaceLedger.save"
         )
     }
@@ -1297,6 +1521,7 @@ public actor EvidenceStore {
         parentColumn: String,
         parentID: String,
         payload: Data,
+        payloadLimit: Int = maximumStorePayloadBytes,
         operation: String
     ) throws {
         try connection.execute(
@@ -1310,7 +1535,12 @@ public actor EvidenceStore {
             bindings: [
                 .text(id),
                 .text(parentID),
-                .text(try boundedPayloadString(payload)),
+                .text(
+                    try boundedStorePayloadString(
+                        payload,
+                        limit: payloadLimit
+                    )
+                ),
             ],
             operation: operation
         )
@@ -1440,12 +1670,7 @@ public actor EvidenceStore {
     }
 
     private func boundedPayloadString(_ data: Data) throws -> String {
-        guard data.count <= maximumStorePayloadBytes else {
-            throw EvidenceStoreError.payloadTooLarge(
-                limit: maximumStorePayloadBytes
-            )
-        }
-        return String(decoding: data, as: UTF8.self)
+        try boundedStorePayloadString(data)
     }
 
     private func timestampColumn(for table: String) -> String {

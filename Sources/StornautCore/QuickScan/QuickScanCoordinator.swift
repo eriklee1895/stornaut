@@ -11,6 +11,11 @@ protocol QuickScanProductPersisting: ScanSessionPersisting {
         limit: Int,
         offset: Int
     ) async throws -> StorePage<PathSnapshot>
+    func pathSnapshots(
+        sessionID: ScanSessionID,
+        after cursor: PathSnapshotCursor?,
+        limit: Int
+    ) async throws -> PathSnapshotCursorPage
     func saveClassifications(
         _ classifications: [Classification]
     ) async throws
@@ -32,6 +37,9 @@ protocol QuickScanProductPersisting: ScanSessionPersisting {
         scopeID: ScanScopeID
     ) async throws -> VolumeBaseline?
     func spaceLedger(sessionID: ScanSessionID) async throws -> SpaceLedger?
+    func quickScanSummary(
+        sessionID: ScanSessionID
+    ) async throws -> QuickScanStoreSummary
 }
 
 extension EvidenceStore: QuickScanProductPersisting {}
@@ -173,6 +181,10 @@ struct NativeQuickScanActivityProvider:
 }
 
 public actor QuickScanCoordinator {
+    private static let pageSize = 100
+    private static let snapshotPageSize = 4_096
+    private static let projectionRecordLimit = 100
+
     public typealias SnapshotIDSource = @Sendable (String) -> SnapshotID
     public typealias ClassificationIDSource = @Sendable (
         SnapshotID
@@ -202,6 +214,52 @@ public actor QuickScanCoordinator {
     private struct ProcessingFailure: Error {
         let issue: QuickScanProductIssue
         let underlying: any Error
+    }
+
+    private struct ProductClassificationResult {
+        var snapshotCount = 0
+        var classificationCount = 0
+        var candidateCount = 0
+        var evidenceCount = 0
+        var dispositionCounts: [ReclaimDisposition: Int] =
+            Dictionary(
+                uniqueKeysWithValues: ReclaimDisposition.allCases.map {
+                    ($0, 0)
+                }
+            )
+        var ownerInputs: [SpaceLedgerOwnerInput] = []
+        var projectedSnapshots: [PathSnapshot] = []
+        var projectedSnapshotIDs = Set<SnapshotID>()
+        var fallbackProjectedSnapshots: [PathSnapshot] = []
+        var projectedClassifications: [Classification] = []
+        var projectedEvidence: [EvidenceRecord] = []
+        var issues: [QuickScanProductIssue] = []
+        var corruptRecordIDs: [String] = []
+
+        var closedDispositionCounts: QuickScanDispositionCounts {
+            get throws {
+                try QuickScanDispositionCounts(
+                    readyToReclaim:
+                        dispositionCounts[.readyToReclaim, default: 0],
+                    reviewRecommended:
+                        dispositionCounts[.reviewRecommended, default: 0],
+                    protected: dispositionCounts[.protected, default: 0],
+                    unknown: dispositionCounts[.unknown, default: 0]
+                )
+            }
+        }
+    }
+
+    private struct BoundedProjectionLoad {
+        var snapshots: [PathSnapshot] = []
+        var classifications: [Classification] = []
+        var evidence: [EvidenceRecord] = []
+        var corruptRecordIDs: [String] = []
+        var expectedClassificationCount = 0
+        var observedClassificationCount = 0
+        var candidateCount = 0
+        var recoveredActivityIssues: [QuickScanProductIssue] = []
+        var fallbackSnapshots: [PathSnapshot] = []
     }
 
     init(
@@ -298,16 +356,12 @@ public actor QuickScanCoordinator {
         guard let session = try await loadLatestValidSession() else {
             return nil
         }
-        let snapshots = try await loadAllSnapshots(sessionID: session.id)
-        let classifications = try await loadAllClassifications(
+        let summary = try await store.quickScanSummary(sessionID: session.id)
+        let bounded = try await loadBoundedProjection(
             sessionID: session.id
         )
-        let evidence = try await loadAllEvidence(sessionID: session.id)
         let ledger = try await store.spaceLedger(sessionID: session.id)
-        var corrupt = snapshots.corruptRecordIDs
-            + classifications.corruptRecordIDs
-            + evidence.corruptRecordIDs
-        corrupt = Array(Set(corrupt)).sorted()
+        let corrupt = bounded.corruptRecordIDs
         var issues: [QuickScanProductIssue] = []
         if !corrupt.isEmpty {
             issues.append(
@@ -321,7 +375,7 @@ public actor QuickScanCoordinator {
             )
         }
         issues.append(
-            contentsOf: recoveredActivityIssues(from: evidence.records)
+            contentsOf: bounded.recoveredActivityIssues
         )
         let hasStoreFailure = session.unfinishedScopes.contains {
             $0.reason == .storeFailure
@@ -335,14 +389,11 @@ public actor QuickScanCoordinator {
                 )
             )
         }
-        let expectedClassificationTargets = try classificationTargetIDs(
-            snapshots: snapshots.records
-        )
         let classificationIsComplete =
-            Set(classifications.records.map(\.snapshotID))
-                == expectedClassificationTargets
-                && classifications.records.count
-                    == expectedClassificationTargets.count
+            bounded.expectedClassificationCount
+                == summary.classificationCount
+                && bounded.observedClassificationCount
+                    == summary.classificationCount
         let hasProductPartial = session.terminalState == .partial
             && !session.unfinishedScopes.contains {
                 $0.reason == .interrupted
@@ -385,12 +436,17 @@ public actor QuickScanCoordinator {
         )
         return try QuickScanProjection(
             session: projectedSession,
-            snapshots: snapshots.records,
-            classifications: classifications.records,
-            evidence: evidence.records,
+            snapshots: bounded.snapshots,
+            classifications: bounded.classifications,
+            evidence: bounded.evidence,
             ledger: ledgerIsUsable ? ledger : nil,
             issues: issues,
-            corruptRecordIDs: corrupt
+            corruptRecordIDs: corrupt,
+            snapshotCount: summary.snapshotCount,
+            classificationCount: summary.classificationCount,
+            candidateCount: bounded.candidateCount,
+            evidenceCount: summary.evidenceCount,
+            dispositionCounts: summary.dispositionCounts
         )
     }
 
@@ -483,13 +539,18 @@ public actor QuickScanCoordinator {
             activeControl = nil
         }
         let observationTime = now()
+        let productAccumulator = ProductScanAccumulator(
+            matcher: matcher,
+            displayFactLimit: Self.projectionRecordLimit
+        )
         let writer = ScanSessionWriter(
             store: store,
             volumeSampler: volumeSampler,
             now: now,
             snapshotID: snapshotID,
             snapshotObservedAt: { _ in observationTime },
-            defersProductFinalization: true
+            defersProductFinalization: true,
+            productAccumulator: productAccumulator
         )
         activeWriter = writer
         do {
@@ -550,172 +611,26 @@ public actor QuickScanCoordinator {
                 to: continuation,
                 limit: request.lifecycleEventBufferCapacity
             )
-            let snapshotPage = try await loadAllSnapshots(
-                sessionID: request.sessionID
-            )
-            var issues: [QuickScanProductIssue] = []
-            if !snapshotPage.corruptRecordIDs.isEmpty {
-                issues.append(
-                    productIssue(
-                        .corruptRecords,
-                        snapshotID: nil,
-                        reason: "quick-scan.snapshot.corrupt"
-                    )
-                )
-            }
-            let candidates: [SnapshotID: [CompiledRule]]
-            do {
-                candidates = try candidateMap(
-                    snapshots: snapshotPage.records
-                )
-            } catch {
-                throw ProcessingFailure(
-                    issue: productIssue(
-                        .classificationUnavailable,
-                        snapshotID: nil,
-                        reason: "quick-scan.classification.unavailable"
-                    ),
-                    underlying: error
-                )
-            }
             try emit(
                 .stageChanged(.checkActivity),
                 to: continuation,
                 limit: request.lifecycleEventBufferCapacity
             )
             let classifiedAt = now()
-            var classifications: [Classification] = []
-            var evidenceRecords: [EvidenceRecord] = []
-            let targetIDs = classificationTargetIDs(
-                snapshots: snapshotPage.records,
-                candidates: candidates
+            var product = try await classifyPersistedSnapshots(
+                request: request,
+                classifiedAt: classifiedAt,
+                continuation: continuation
             )
-            for snapshot in snapshotPage.records {
-                try checkProductCancellation()
-                let rules = candidates[snapshot.id, default: []]
-                guard targetIDs.contains(snapshot.id) else {
-                    continue
-                }
-                var observations: [ActivityObservation] = []
-                if rules.count == 1,
-                   let rule = rules.first,
-                   !rule.veto,
-                   !rule.requiredActivityKeys.isEmpty
-                {
-                    do {
-                        observations = try await activityProvider.observations(
-                            for: snapshot,
-                            rule: rule,
-                            rootURL: request.rootURL,
-                            observedAt: classifiedAt
-                        )
-                        evidenceRecords.append(
-                            contentsOf: observations.map {
-                                evidenceRecord(
-                                    snapshotID: snapshot.id,
-                                    observation: $0
-                                )
-                            }
-                        )
-                    } catch {
-                        do {
-                            observations = try providerFailureObservations(
-                                for: rule,
-                                observedAt: classifiedAt
-                            )
-                            evidenceRecords.append(
-                                contentsOf: observations.map {
-                                    evidenceRecord(
-                                        snapshotID: snapshot.id,
-                                        observation: $0
-                                    )
-                                }
-                            )
-                        } catch {
-                            throw ProcessingFailure(
-                                issue: productIssue(
-                                    .activityUnavailable,
-                                    snapshotID: snapshot.id,
-                                    reason:
-                                        "quick-scan.activity.provider-failure"
-                                ),
-                                underlying: error
-                            )
-                        }
-                        issues.append(
-                            productIssue(
-                                .activityUnavailable,
-                                snapshotID: snapshot.id,
-                                reason:
-                                    "quick-scan.activity.provider-failure"
-                            )
-                        )
-                    }
-                }
-                let classification: Classification
-                do {
-                    classification = try DeterministicClassifier().classify(
-                        snapshot: snapshot,
-                        candidates: rules,
-                        satisfiedEvidenceKeys: satisfiedEvidence(for: snapshot),
-                        activityObservations: observations,
-                        classifiedAt: classifiedAt,
-                        classificationID: classificationID(snapshot.id),
-                        catalogVersion: catalog.catalogVersion
-                    )
-                } catch {
-                    throw ProcessingFailure(
-                        issue: productIssue(
-                            .classificationUnavailable,
-                            snapshotID: snapshot.id,
-                            reason: "quick-scan.classification.unavailable"
-                        ),
-                        underlying: error
-                    )
-                }
-                classifications.append(classification)
-                try emit(
-                    .classifiedSnapshotObserved(
-                        snapshot,
-                        classification
-                    ),
-                    to: continuation,
-                    limit: request.lifecycleEventBufferCapacity
-                )
-            }
-            try checkProductCancellation()
-            do {
-                try await store.saveEvidence(evidenceRecords)
-            } catch {
-                throw ProcessingFailure(
-                    issue: productIssue(
-                        .persistenceUnavailable,
+            let scanReduction = try productAccumulator.reduction()
+            product.snapshotCount = scanReduction.aggregate.entries.total
+            if !product.corruptRecordIDs.isEmpty {
+                product.issues.append(
+                    productIssue(
+                        .corruptRecords,
                         snapshotID: nil,
-                        reason:
-                            "quick-scan.evidence.persistence-unavailable"
-                    ),
-                    underlying: error
-                )
-            }
-            for evidence in evidenceRecords {
-                try emit(
-                    .evidenceObserved(evidence),
-                    to: continuation,
-                    limit: request.lifecycleEventBufferCapacity
-                )
-            }
-            try checkProductCancellation()
-            do {
-                try await store.saveClassifications(classifications)
-            } catch {
-                throw ProcessingFailure(
-                    issue: productIssue(
-                        .persistenceUnavailable,
-                        snapshotID: nil,
-                        reason:
-                            "quick-scan.classification.persistence-unavailable"
-                    ),
-                    underlying: error
+                        reason: "quick-scan.snapshot.corrupt"
+                    )
                 )
             }
             try checkProductCancellation()
@@ -762,14 +677,14 @@ public actor QuickScanCoordinator {
             }
             let ledger: SpaceLedger
             do {
-                ledger = try SpaceLedgerReconciler().reconcile(
-                    SpaceLedgerInput(
-                        startBaseline: startBaseline,
-                        endBaseline: endBaseline,
-                        snapshots: snapshotPage.records,
-                        classifications: classifications
-                    )
+                ledger = try reconcileScanReduction(
+                    scanReduction,
+                    startBaseline: startBaseline,
+                    endBaseline: endBaseline,
+                    ownerInputs: product.ownerInputs
                 )
+            } catch is CancellationError {
+                throw CancellationError()
             } catch {
                 throw ProcessingFailure(
                     issue: productIssue(
@@ -800,7 +715,7 @@ public actor QuickScanCoordinator {
                 to: continuation,
                 limit: request.lifecycleEventBufferCapacity
             )
-            for issue in issues {
+            for issue in product.issues {
                 try emit(
                     .productIssueObserved(issue),
                     to: continuation,
@@ -810,7 +725,7 @@ public actor QuickScanCoordinator {
             let terminal = try finalSession(
                 scanTerminal: scanTerminal,
                 request: request,
-                issues: issues
+                issues: product.issues
             )
             do {
                 try await store.saveScanSession(terminal)
@@ -827,12 +742,17 @@ public actor QuickScanCoordinator {
             }
             let projection = try QuickScanProjection(
                 session: terminal,
-                snapshots: snapshotPage.records,
-                classifications: classifications,
-                evidence: evidenceRecords,
+                snapshots: product.projectedSnapshots,
+                classifications: product.projectedClassifications,
+                evidence: product.projectedEvidence,
                 ledger: ledger,
-                issues: issues,
-                corruptRecordIDs: snapshotPage.corruptRecordIDs
+                issues: product.issues,
+                corruptRecordIDs: product.corruptRecordIDs,
+                snapshotCount: product.snapshotCount,
+                classificationCount: product.classificationCount,
+                candidateCount: product.candidateCount,
+                evidenceCount: product.evidenceCount,
+                dispositionCounts: try product.closedDispositionCounts
             )
             try emit(
                 .terminal(projection),
@@ -903,7 +823,8 @@ public actor QuickScanCoordinator {
                         rootPath: rootPath,
                         reason: partialReason(for: issue)
                     ),
-                ]
+                ],
+                aggregate: current.aggregate
             )
             do {
                 try await store.saveScanSession(partial)
@@ -911,20 +832,22 @@ public actor QuickScanCoordinator {
                 continuation.finish(throwing: error)
                 return
             }
-            let snapshots = try await loadAllSnapshots(
-                sessionID: request.sessionID
-            )
             var projectionIssues = [issue]
-            let classifications: StorePage<Classification>
+            let summary: QuickScanStoreSummary
             do {
-                classifications = try await loadAllClassifications(
+                summary = try await store.quickScanSummary(
                     sessionID: request.sessionID
                 )
             } catch {
-                classifications = StorePage(
-                    records: [],
-                    corruptRecordIDs: []
+                continuation.finish(throwing: error)
+                return
+            }
+            let bounded: BoundedProjectionLoad
+            do {
+                bounded = try await loadBoundedProjection(
+                    sessionID: request.sessionID
                 )
+            } catch {
                 projectionIssues.append(
                     productIssue(
                         .persistenceUnavailable,
@@ -933,20 +856,20 @@ public actor QuickScanCoordinator {
                             "quick-scan.classification.reload-unavailable"
                     )
                 )
-            }
-            let evidence: StorePage<EvidenceRecord>
-            do {
-                evidence = try await loadAllEvidence(
-                    sessionID: request.sessionID
+                let snapshots = try await store.pathSnapshots(
+                    sessionID: request.sessionID,
+                    limit: Self.projectionRecordLimit,
+                    offset: 0
                 )
-            } catch {
-                evidence = StorePage(records: [], corruptRecordIDs: [])
-                projectionIssues.append(
-                    productIssue(
-                        .persistenceUnavailable,
-                        snapshotID: nil,
-                        reason: "quick-scan.evidence.reload-unavailable"
-                    )
+                bounded = BoundedProjectionLoad(
+                    snapshots: snapshots.records,
+                    classifications: [],
+                    evidence: [],
+                    corruptRecordIDs: snapshots.corruptRecordIDs,
+                    expectedClassificationCount: 0,
+                    observedClassificationCount: 0,
+                    candidateCount: 0,
+                    recoveredActivityIssues: []
                 )
             }
             let storedLedger: SpaceLedger?
@@ -964,43 +887,25 @@ public actor QuickScanCoordinator {
                     )
                 )
             }
-            let expectedTargets: Set<SnapshotID>
-            do {
-                expectedTargets = try classificationTargetIDs(
-                    snapshots: snapshots.records
-                )
-            } catch {
-                expectedTargets = []
-                projectionIssues.append(
-                    productIssue(
-                        .classificationUnavailable,
-                        snapshotID: nil,
-                        reason:
-                            "quick-scan.classification.reload-unavailable"
-                    )
-                )
-            }
-            let classificationTargets = Set(
-                classifications.records.map(\.snapshotID)
-            )
             let ledgerIsUsable = storedLedger != nil
-                && expectedTargets == classificationTargets
-                && classifications.records.count == expectedTargets.count
-                && snapshots.corruptRecordIDs.isEmpty
-                && classifications.corruptRecordIDs.isEmpty
-                && evidence.corruptRecordIDs.isEmpty
+                && bounded.expectedClassificationCount
+                    == summary.classificationCount
+                && bounded.observedClassificationCount
+                    == summary.classificationCount
+                && bounded.corruptRecordIDs.isEmpty
             let projection = try QuickScanProjection(
                 session: partial,
-                snapshots: snapshots.records,
-                classifications: classifications.records,
-                evidence: evidence.records,
+                snapshots: bounded.snapshots,
+                classifications: bounded.classifications,
+                evidence: bounded.evidence,
                 ledger: ledgerIsUsable ? storedLedger : nil,
                 issues: projectionIssues,
-                corruptRecordIDs: Array(Set(
-                    snapshots.corruptRecordIDs
-                        + classifications.corruptRecordIDs
-                        + evidence.corruptRecordIDs
-                ))
+                corruptRecordIDs: bounded.corruptRecordIDs,
+                snapshotCount: summary.snapshotCount,
+                classificationCount: summary.classificationCount,
+                candidateCount: bounded.candidateCount,
+                evidenceCount: summary.evidenceCount,
+                dispositionCounts: summary.dispositionCounts
             )
             for issue in projectionIssues {
                 try emit(
@@ -1077,7 +982,8 @@ public actor QuickScanCoordinator {
                             rootPath: rootPath,
                             reason: .cancelled
                         ),
-                    ]
+                    ],
+                    aggregate: observed.aggregate
                 )
                 try await store.saveScanSession(session)
             }
@@ -1117,7 +1023,14 @@ public actor QuickScanCoordinator {
     private func incompleteProjection(
         session: ScanSession
     ) async throws -> QuickScanProjection {
-        let snapshots = try await loadAllSnapshots(sessionID: session.id)
+        let summary = try await store.quickScanSummary(
+            sessionID: session.id
+        )
+        let snapshots = try await store.pathSnapshots(
+            sessionID: session.id,
+            limit: Self.projectionRecordLimit,
+            offset: 0
+        )
         return try QuickScanProjection(
             session: session,
             snapshots: snapshots.records,
@@ -1125,8 +1038,385 @@ public actor QuickScanCoordinator {
             evidence: [],
             ledger: nil,
             issues: [],
-            corruptRecordIDs: snapshots.corruptRecordIDs
+            corruptRecordIDs: snapshots.corruptRecordIDs,
+            snapshotCount: summary.snapshotCount,
+            classificationCount: summary.classificationCount,
+            candidateCount: 0,
+            evidenceCount: summary.evidenceCount,
+            dispositionCounts: summary.dispositionCounts
         )
+    }
+
+    private func classifyPersistedSnapshots(
+        request: ScanRequest,
+        classifiedAt: Date,
+        continuation: AsyncThrowingStream<
+            QuickScanProductEvent,
+            Error
+        >.Continuation
+    ) async throws -> ProductClassificationResult {
+        var result = ProductClassificationResult()
+        var cursor: PathSnapshotCursor?
+        while true {
+            try checkProductCancellation()
+            let cursorPage = try await store.pathSnapshots(
+                sessionID: request.sessionID,
+                after: cursor,
+                limit: Self.snapshotPageSize
+            )
+            let page = cursorPage.page
+            result.snapshotCount += page.records.count
+            result.corruptRecordIDs.append(
+                contentsOf: page.corruptRecordIDs
+            )
+            let candidates: [SnapshotID: [CompiledRule]]
+            do {
+                candidates = try candidateMap(snapshots: page.records)
+            } catch {
+                throw ProcessingFailure(
+                    issue: productIssue(
+                        .classificationUnavailable,
+                        snapshotID: nil,
+                        reason: "quick-scan.classification.unavailable"
+                    ),
+                    underlying: error
+                )
+            }
+            let targetIDs = classificationTargetIDs(
+                snapshots: page.records,
+                candidates: candidates
+            )
+            if result.fallbackProjectedSnapshots.count
+                < Self.projectionRecordLimit
+            {
+                for snapshot in page.records
+                where !targetIDs.contains(snapshot.id)
+                    && result.fallbackProjectedSnapshots.count
+                        < Self.projectionRecordLimit
+                {
+                    result.fallbackProjectedSnapshots.append(snapshot)
+                }
+            }
+            var classificationBatch: [Classification] = []
+            var evidenceBatch: [EvidenceRecord] = []
+            var projectedPairs: [(PathSnapshot, Classification)] = []
+            for snapshot in page.records where targetIDs.contains(snapshot.id) {
+                try checkProductCancellation()
+                let rules = candidates[snapshot.id, default: []]
+                if result.projectedSnapshots.count
+                    < Self.projectionRecordLimit
+                {
+                    result.projectedSnapshots.append(snapshot)
+                    result.projectedSnapshotIDs.insert(snapshot.id)
+                }
+                var observations: [ActivityObservation] = []
+                if rules.count == 1,
+                   let rule = rules.first,
+                   !rule.veto,
+                   !rule.requiredActivityKeys.isEmpty
+                {
+                    do {
+                        observations = try await activityProvider.observations(
+                            for: snapshot,
+                            rule: rule,
+                            rootURL: request.rootURL,
+                            observedAt: classifiedAt
+                        )
+                    } catch {
+                        do {
+                            observations = try providerFailureObservations(
+                                for: rule,
+                                observedAt: classifiedAt
+                            )
+                        } catch {
+                            throw ProcessingFailure(
+                                issue: productIssue(
+                                    .activityUnavailable,
+                                    snapshotID: snapshot.id,
+                                    reason:
+                                        "quick-scan.activity.provider-failure"
+                                ),
+                                underlying: error
+                            )
+                        }
+                        result.issues.append(
+                            productIssue(
+                                .activityUnavailable,
+                                snapshotID: snapshot.id,
+                                reason:
+                                    "quick-scan.activity.provider-failure"
+                            )
+                        )
+                    }
+                }
+                let evidence = observations.map {
+                    evidenceRecord(
+                        snapshotID: snapshot.id,
+                        observation: $0
+                    )
+                }
+                let classification: Classification
+                do {
+                    classification = try DeterministicClassifier().classify(
+                        snapshot: snapshot,
+                        candidates: rules,
+                        satisfiedEvidenceKeys: satisfiedEvidence(for: snapshot),
+                        activityObservations: observations,
+                        classifiedAt: classifiedAt,
+                        classificationID: classificationID(snapshot.id),
+                        catalogVersion: catalog.catalogVersion
+                    )
+                } catch {
+                    throw ProcessingFailure(
+                        issue: productIssue(
+                            .classificationUnavailable,
+                            snapshotID: snapshot.id,
+                            reason: "quick-scan.classification.unavailable"
+                        ),
+                        underlying: error
+                    )
+                }
+                result.classificationCount += 1
+                if snapshot.relativePath != "." {
+                    result.candidateCount += 1
+                }
+                result.evidenceCount += evidence.count
+                result.dispositionCounts[
+                    classification.disposition,
+                    default: 0
+                ] += 1
+                result.ownerInputs.append(
+                    SpaceLedgerOwnerInput(
+                        snapshot: snapshot,
+                        classification: classification
+                    )
+                )
+                classificationBatch.append(classification)
+                evidenceBatch.append(contentsOf: evidence)
+                if result.projectedSnapshotIDs.contains(snapshot.id) {
+                    result.projectedClassifications.append(classification)
+                    result.projectedEvidence.append(contentsOf: evidence)
+                    projectedPairs.append((snapshot, classification))
+                }
+            }
+            try checkProductCancellation()
+            do {
+                try await store.saveEvidence(evidenceBatch)
+                try await store.saveClassifications(classificationBatch)
+            } catch {
+                throw ProcessingFailure(
+                    issue: productIssue(
+                        .persistenceUnavailable,
+                        snapshotID: nil,
+                        reason:
+                            "quick-scan.classification.persistence-unavailable"
+                    ),
+                    underlying: error
+                )
+            }
+            for (snapshot, classification) in projectedPairs {
+                try emit(
+                    .classifiedSnapshotObserved(
+                        snapshot,
+                        classification
+                    ),
+                    to: continuation,
+                    limit: request.lifecycleEventBufferCapacity
+                )
+            }
+            let projectedIDs = Set(
+                projectedPairs.map { $0.0.id }
+            )
+            for evidence in evidenceBatch
+            where projectedIDs.contains(evidence.targetID)
+            {
+                try emit(
+                    .evidenceObserved(evidence),
+                    to: continuation,
+                    limit: request.lifecycleEventBufferCapacity
+                )
+            }
+            if cursorPage.rowCount < Self.snapshotPageSize {
+                break
+            }
+            guard let next = cursorPage.nextCursor, next != cursor else {
+                throw DomainContractError.invalidMeasurement
+            }
+            cursor = next
+        }
+        for snapshot in result.fallbackProjectedSnapshots
+        where result.projectedSnapshots.count < Self.projectionRecordLimit
+        {
+            result.projectedSnapshots.append(snapshot)
+            result.projectedSnapshotIDs.insert(snapshot.id)
+        }
+        result.issues = normalizedProductIssues(result.issues)
+        result.corruptRecordIDs = Array(
+            Set(result.corruptRecordIDs)
+        ).sorted()
+        return result
+    }
+
+    private func reconcileScanReduction(
+        _ reduction: ProductScanReduction,
+        startBaseline: VolumeBaseline,
+        endBaseline: VolumeBaseline,
+        ownerInputs: [SpaceLedgerOwnerInput]
+    ) throws -> SpaceLedger {
+        var accumulator = try IncrementalSpaceLedger(
+            startBaseline: startBaseline,
+            endBaseline: endBaseline,
+            ownerInputs: ownerInputs
+        )
+        for owner in reduction.ownerBytes {
+            try accumulator.consumePreaggregated(
+                ownerID: owner.snapshotID,
+                logical: owner.logicalBytes,
+                allocated: owner.allocatedBytes,
+                observedAt: owner.observedAt
+            )
+        }
+        for gap in reduction.gaps {
+            try accumulator.consumePreaggregatedGap(gap)
+        }
+        accumulator.recordPreaggregatedCaveats(
+            sparse: reduction.sparseObserved,
+            hardLinkDeduplicated: reduction.hardLinkDeduplicated,
+            hardLinkOwnershipAmbiguous:
+                reduction.hardLinkOwnershipAmbiguous
+        )
+        return try accumulator.finish()
+    }
+
+    private func loadBoundedProjection(
+        sessionID: ScanSessionID
+    ) async throws -> BoundedProjectionLoad {
+        var result = BoundedProjectionLoad()
+        var projectedIDs = Set<SnapshotID>()
+        var snapshotCursor: PathSnapshotCursor?
+        while true {
+            let cursorPage = try await store.pathSnapshots(
+                sessionID: sessionID,
+                after: snapshotCursor,
+                limit: Self.snapshotPageSize
+            )
+            let page = cursorPage.page
+            result.corruptRecordIDs.append(
+                contentsOf: page.corruptRecordIDs
+            )
+            let pageTargetIDs = try classificationTargetIDs(
+                snapshots: page.records
+            )
+            result.expectedClassificationCount += pageTargetIDs.count
+            if result.fallbackSnapshots.count < Self.projectionRecordLimit {
+                for snapshot in page.records
+                where !pageTargetIDs.contains(snapshot.id)
+                    && result.fallbackSnapshots.count
+                        < Self.projectionRecordLimit
+                {
+                    result.fallbackSnapshots.append(snapshot)
+                }
+            }
+            if result.snapshots.count < Self.projectionRecordLimit {
+                for snapshot in page.records
+                where pageTargetIDs.contains(snapshot.id)
+                    && result.snapshots.count
+                        < Self.projectionRecordLimit
+                {
+                    result.snapshots.append(snapshot)
+                    projectedIDs.insert(snapshot.id)
+                }
+            }
+            if cursorPage.rowCount < Self.snapshotPageSize {
+                break
+            }
+            guard let next = cursorPage.nextCursor,
+                  next != snapshotCursor
+            else {
+                throw DomainContractError.invalidMeasurement
+            }
+            snapshotCursor = next
+        }
+        for snapshot in result.fallbackSnapshots
+        where result.snapshots.count < Self.projectionRecordLimit
+        {
+            result.snapshots.append(snapshot)
+            projectedIDs.insert(snapshot.id)
+        }
+
+        var classificationOffset = 0
+        while true {
+            let page = try await store.classifications(
+                sessionID: sessionID,
+                limit: Self.pageSize,
+                offset: classificationOffset,
+                disposition: nil
+            )
+            result.observedClassificationCount += page.records.count
+            result.corruptRecordIDs.append(
+                contentsOf: page.corruptRecordIDs
+            )
+            result.classifications.append(
+                contentsOf: page.records.filter {
+                    projectedIDs.contains($0.snapshotID)
+                }
+            )
+            let consumed = page.records.count
+                + page.corruptRecordIDs.count
+            if consumed < Self.pageSize {
+                break
+            }
+            classificationOffset += consumed
+        }
+        let projectedPathByID = Dictionary(
+            uniqueKeysWithValues: result.snapshots.map {
+                ($0.id, $0.relativePath)
+            }
+        )
+        let rootClassificationCount = result.classifications.count {
+            projectedPathByID[$0.snapshotID] == "."
+        }
+        result.candidateCount = max(
+            0,
+            result.observedClassificationCount - rootClassificationCount
+        )
+
+        var evidenceOffset = 0
+        var allActivityFailures: [EvidenceRecord] = []
+        while true {
+            let page = try await store.evidence(
+                sessionID: sessionID,
+                limit: Self.pageSize,
+                offset: evidenceOffset
+            )
+            result.corruptRecordIDs.append(
+                contentsOf: page.corruptRecordIDs
+            )
+            for record in page.records {
+                if projectedIDs.contains(record.targetID) {
+                    result.evidence.append(record)
+                }
+                if record.source.kind == .activityProvider,
+                   record.summaryKey.rawValue
+                    == "quick-scan.activity.provider-failure"
+                {
+                    allActivityFailures.append(record)
+                }
+            }
+            let consumed = page.records.count
+                + page.corruptRecordIDs.count
+            if consumed < Self.pageSize {
+                break
+            }
+            evidenceOffset += consumed
+        }
+        result.recoveredActivityIssues = recoveredActivityIssues(
+            from: allActivityFailures
+        )
+        result.corruptRecordIDs = Array(
+            Set(result.corruptRecordIDs)
+        ).sorted()
+        return result
     }
 
     private func loadAllSnapshots(
@@ -1380,7 +1670,8 @@ public actor QuickScanCoordinator {
                         completedAt: finishedAt
                     ),
                 ],
-                unfinishedScopes: []
+                unfinishedScopes: [],
+                aggregate: scanTerminal.aggregate
             )
         }
         return try ScanSession(
@@ -1397,7 +1688,8 @@ public actor QuickScanCoordinator {
                         ? .metadataChanged
                         : scanReason ?? .interrupted
                 ),
-            ]
+            ],
+            aggregate: scanTerminal.aggregate
         )
     }
 
@@ -1423,7 +1715,8 @@ public actor QuickScanCoordinator {
                     rootPath: scope.rootPath,
                     reason: .metadataChanged
                 ),
-            ]
+            ],
+            aggregate: session.aggregate
         )
     }
 
