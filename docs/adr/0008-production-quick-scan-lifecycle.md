@@ -9,6 +9,11 @@
 > Related study:
 > [`../upstream-studies/epic-3-quick-scan.md`](../upstream-studies/epic-3-quick-scan.md)
 
+> **2026-08-11 policy amendment:** Quick Scan evidence below remains current.
+> Any Deep Dive Broker-only/no-go statement is historical and has been
+> superseded by the capability-first
+> [ADR 0004](0004-codex-file-read-isolation.md).
+
 ## Context
 
 Epic 1 proved that the Swift/POSIX Surveyor can traverse a 460 GiB-class Mac

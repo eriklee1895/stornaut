@@ -1,5 +1,10 @@
 # Task 25 Implementation Brief — Phase B Settings
 
+> **Historical-brief notice (2026-08-11):** Deep Dive paused/no-go wording
+> below records the completed Phase B Settings state, not current Codex policy.
+> See capability-first
+> [ADR 0004](../../adr/0004-codex-file-read-isolation.md).
+
 > 状态：Completed
 >
 > 日期：2026-08-10

@@ -27,8 +27,10 @@ spikes 已完成。Epic 2–4 deterministic product core 的实现、focused gat
 verifier 暴露的负载敏感测试、认证编排和 UI-runner 竞态已修复；最终统一
 verifier 单次 exit 0，Phase B 已关闭。当前 Quick Scan 在 460 GiB-class 本机 Home
 范围内用 Swift product path 于 5 分钟内完成，保持 bounded memory、
-Partial/Unmeasurable truth、零 Codex 与零目标写入。Codex Broker-only 仍未被
-技术性证明，Deep Dive 继续 no-go/paused，release 仍未评估。见文档：
+Partial/Unmeasurable truth、零 Codex 与零目标写入。Deep Dive 的旧
+Broker-only 前提已由 ADR 0004 修订为能力优先边界：Codex 可直接只读调查、
+live search 与访问公共互联网，但仍无本地写入或清理执行权。生产实现尚待新的
+运行时 evidence gate，release 仍未评估。见文档：
 
 | 文档 | 内容 |
 |---|---|
@@ -59,12 +61,12 @@ Partial/Unmeasurable truth、零 Codex 与零目标写入。Codex Broker-only �
 
 ```text
 Quick Scan：Swift 全盘快照 → 已知规则 → 活动保护 → 即时报告
-Deep Dive：Codex 指挥官 → 受控本地桥接 → Probe Broker 只读探针 → 证据链 → CleanupPlan
+Deep Dive：Codex 指挥官 → 直接只读 Agent 工具 + Probe Broker + live public internet → 证据链 → CleanupPlan
 Execution：Swift Policy Gate → 用户批准 → Trash / 审核过的官方动作
 ```
 
 - **站在前人肩膀上**：系统学习 Mole、ClearDisk、kondo、devklean、Cluttered 等项目
 - **Agent 轨迹动态、方法固定**：观察、假设、验证、反证、量化、结论
 - **Agent 没有删除权**：所有动作经过不可绕过的 Swift Policy Gate
-- **渐进读取**：元数据优先、会话级扩展读取、永久敏感区 denylist
+- **能力优先调查**：首次启用时聚合披露模型上下文与公共联网；调查中不逐文件/逐命令批准，清理 protected-path policy 仍由 Swift 强制
 - **可解释计量**：区分候选大小、实际处理、Trash、永久释放和可用空间变化

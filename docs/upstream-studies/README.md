@@ -5,7 +5,7 @@
 Epic 0–1 计划预期：
 
 - [Epic 0 Foundation](epic-0-foundation.md) — Accepted
-- [Epic 1 Codex Runtime](epic-1-codex-runtime.md) — Accepted for Tasks 3–5 study gate
+- [Epic 1 Codex Runtime](epic-1-codex-runtime.md) — Accepted for Tasks 3–5 historical study gate; its Broker-only no-go is superseded as product policy by amended [ADR 0004](../adr/0004-codex-file-read-isolation.md)
 - [Epic 1 Swift Surveyor](epic-1-surveyor.md) — Accepted for Task 6 study gate
 - [Epic 1 Trash and Registered Actions](epic-1-actions.md) — Accepted for Task 7 study gate
 

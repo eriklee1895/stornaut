@@ -1,8 +1,8 @@
 # Stornaut 技术架构
 
 > 版本：2.2
-> 状态：与 PRD 2.3 设计基线同步；Epic 0–1 deterministic path conditional go，Deep Dive no-go/paused
-> 初版：2026-08-06；最近更新：2026-08-09
+> 状态：与 PRD 2.3 / ADR 0004 capability-first 设计基线同步；Deep Dive 等待新运行时 evidence gate
+> 初版：2026-08-06；最近更新：2026-08-11
 
 配套文档：[PRD](../product/PRD.md)、[Agent 设计规格](../design/agent-disk-governance.md)、[UI/UX 设计规格](../design/ui-ux.md)、[上游参考矩阵](../research/upstream-reference-matrix.md)、[Coding Agent Handoff](../agent/coding-agent-handoff.md)、[Epic 0–1 验证报告](../reports/epic-0-1-validation-report.md)。
 
@@ -10,7 +10,7 @@
 
 1. 使用原生 SwiftUI/AppKit 获得最佳 macOS 权限、Trash、单窗口交互和分发体验。
 2. 快速扫描完全确定性化，不依赖模型或外部清理工具。
-3. Codex 作为深度调查指挥官，自主选择只读探针，但不拥有写权限。
+3. Codex 作为深度调查指挥官，自主使用完整只读 Agent 工具与公共互联网，但不拥有写入或清理执行权限。
 4. 所有证据、授权和执行通过类型化接口，可审计、可测试、可降级。
 5. 系统化借鉴上游经验，同时保持许可证边界和核心独立性。
 
@@ -29,16 +29,19 @@
 │                  │ JSONL / JSON Schema  │ typed read-only calls │
 │          ┌───────▼────────┐       ┌─────▼──────────────────┐    │
 │          │ Codex subprocess│       │ Optional Adapters      │    │
-│          │ investigation   │       │ Mole/kondo/brew/docker │    │
-│          └─────────────────┘       └────────────────────────┘    │
+│          │ direct read +   │       │ Mole/kondo/brew/docker │    │
+│          │ shell/web/agent │       └────────────────────────┘    │
+│          └─────────────────┘                                     │
 │                                                                │
 └────────────────────────────────────────────────────────────────┘
 ```
 
 关键边界：
 
-- Swift App 掌握磁盘扫描、规则、权限、证据、Policy 和所有写操作。
-- Codex 只接收调查上下文并调用受控只读工具。
+- Swift App 掌握确定性扫描、规则、权限、Policy 和所有写/清理操作。
+- Codex 可直接读取授权扫描范围，使用 shell/unified exec、live search、
+  browser/direct fetch、image、skills/subagents、公共互联网和 Probe Broker；
+  所有这些工具共享外层不可写、no-Executor 边界。
 - 外部工具是可选探针，不是核心依赖，也不能直接清理。
 - Executor 不接受自然语言或任意 Shell，只接受已验证的类型化动作。
 
@@ -50,7 +53,7 @@
 
 - SwiftUI/AppKit UI
 - Full Disk Access 检测与用户引导
-- Surveyor 和所有磁盘读写
+- Surveyor 确定性读取和所有磁盘写入
 - Probe Broker 与内容过滤
 - Evidence Store、Policy Gate 和 Executor
 
@@ -73,7 +76,13 @@ codex exec
 要求：
 
 - 复用用户认证，但使用 Stornaut 生成的隔离配置。
-- 不默认加载目标目录的 `AGENTS.md`、项目指令、Hooks 或无关插件。
+- 目标目录的 `AGENTS.md`/项目指令只作为调查数据读取，不加载为 Agent
+  指令；不继承会产生外部副作用的用户 Hooks/Apps。
+- 显式启用 shell/unified exec、`web_search = "live"` high context、
+  browser/direct fetch、image inspection 与运行时支持的 skills/subagents。
+- 命令、子进程与 browser/direct fetch 可访问公共互联网，不设置
+  Bash/executable/public destination-domain allowlist 或逐命令批准；cached/indexed search
+  只能作为显式 degraded coverage。
 - stdout 仅按 JSONL 解析；stderr 单独收集并限制大小。
 - 支持取消、超时、进程树终止和异常退出恢复。
 - 使用 `posix_spawn` 原子创建独立进程组；`POSIX_SPAWN_CLOEXEC_DEFAULT`
@@ -81,16 +90,24 @@ codex exec
   互相继承 pipe。
 - 最终输出必须通过 JSON Schema；失败保持 `Unknown` disposition。
 
-### 3.3 隔离技术 Spike
+### 3.3 Capability-first 隔离技术 Gate
 
-`--sandbox read-only` 只能证明禁止写入，不能在未经验证时声称禁止读取所有敏感路径。实施前必须验证：
+ADR 0004 明确把读取/联网能力与写入/执行权分开。实施前必须验证：
 
-1. Codex 子进程是否继承 Stornaut 的 FDA/TCC 权限。
-2. 是否能把 Codex 的直接文件访问限制在临时工作区。
-3. 是否可以只通过本地 MCP/Probe Broker 提供目标磁盘证据。
-4. 子进程、Shell 子进程和 Adapter 是否都受同一限制。
+1. Codex 子进程继承哪些 Stornaut FDA/TCC 读取权限，并如实展示覆盖率。
+2. Codex、Shell 子进程、skills/subagents 与调查 Adapter 能直接读取授权
+   扫描范围，但不能创建、修改、移动、重命名或删除用户数据。
+3. built-in search 确实运行在 live/high-context 模式，公共命令网络与
+   browser/direct fetch 可用，且没有 public destination-domain allowlist。
+4. localhost、link-local/private network 与任意 Unix socket 保持隔离。
+5. Codex 输出、命令与工具调用均不存在直达 Trash、Registered Action、
+   Policy Gate bypass 或 Executor 的路径。
 
-`--sandbox read-only` 只限制写入，仍可能允许模型生成 Shell 和直接读取，因此不能单独证明 Broker-only。若无法技术性限制 Codex 只暴露受控本地 Probe Broker 工具面，Deep Dive 必须暂停；先记录测量结果与可选设计，再由用户明确批准任何边界变化。不得用提示词或 UI 披露替代尚未实现的安全边界。
+`--sandbox read-only` 是候选写边界，不是完整结论；installed Codex 若不能在
+自身 sandbox 中同时提供公共联网与不可写，必须增加外层 OS containment。
+不得使用 `danger-full-access`，也不得通过关闭 shell/browser/search/skills 来
+伪造 gate 通过。Deep Dive 在这组运行时证据完成前保持 paused，原因是实现尚未
+交付，而不是 Broker-only 未成立。
 
 ## 4. 模块设计
 
@@ -100,7 +117,7 @@ codex exec
 - 主窗口四个 workspace：Overview、Scan、Investigations、History
 - Review 和 Cleanup Result 作为工作流页面，不进入顶层 Sidebar
 - Settings 使用独立 macOS Settings scene，分为 General、Scanning、Permissions、Codex & Deep Dive、Privacy & Data、Local Knowledge；语言为 `English (default) | zh-Hans`，外观为 `System (default) | Light | Dark`
-- Settings 将可编辑偏好、实时状态/修复入口和只读安全策略分开；denylist、Policy Gate、固定数据生命周期和 Agent 权限边界不提供绕过开关
+- Settings 将可编辑偏好、实时状态/修复入口和只读安全策略分开；清理 protected-path policy、Policy Gate、固定数据生命周期和 Agent 写/执行边界不提供绕过开关
 - Inspector 承载 Evidence 和 Investigation Details；主视图默认不展示 chat、console 或原始 JSONL
 - SwiftUI 为主；系统能力不足处桥接 AppKit
 - UI 只消费 ViewModel/领域状态，不直接启动扫描、Codex 或 Executor
@@ -190,7 +207,7 @@ provenance:
   verifiedAt: 2026-08-06
 ```
 
-编译阶段把 YAML 转为内部不可变结构并校验：重复 ID、非法 glob、覆盖 denylist、未知动作和缺少 provenance 都应失败。
+编译阶段把 YAML 转为内部不可变结构并校验：重复 ID、非法 glob、覆盖清理 protected-path policy、未知动作和缺少 provenance 都应失败。
 
 ### 4.4 Staleness 与 Activity
 
@@ -237,7 +254,7 @@ Store 保存事实和可展示摘要，不保存模型隐藏思维链。
 
 默认 TTL：`scan_sessions`、snapshot、classification/disposition、evidence、probe call、investigation target、CleanupPlan 和报告保留 7 天并支持立即手动删除；受控读取片段只存在内存。原始 Codex JSONL 正常结束即删除，崩溃残留最长 24 小时。90 天 Cleanup Manifest 只保留 Action ID、Policy disposition、计量、结果和错误，不保留 Evidence payload、probe 记录或内容派生摘要。
 
-应用另设结构化 `LocalKnowledgeStore`，保存用户确认的 producer 映射、路径范围偏好、保留决定和已验证恢复方式。持久化数据只位于应用拥有的 Application Support 目录；Caches 只保存可丢弃衍生物，不创建 `~/.stornaut` workspace。它不能保存原始受控读取片段、自由文本 Agent 记忆，也不能降低 denylist、veto 或 Policy Gate。
+应用另设结构化 `LocalKnowledgeStore`，保存用户确认的 producer 映射、路径范围偏好、保留决定和已验证恢复方式。持久化数据只位于应用拥有的 Application Support 目录；Caches 只保存可丢弃衍生物，不创建 `~/.stornaut` workspace。它不能保存原始读取片段、自由文本 Agent 记忆，也不能降低清理 protected-path policy、veto 或 Policy Gate。
 
 ### 4.6 Investigation Planner
 
@@ -255,11 +272,15 @@ Swift 先从 Quick Scan 结果构造候选集合：
 expectedBytes × uncertainty × userRelevance / estimatedProbeCost
 ```
 
-Codex 根据候选、预算和已有证据，通过受控本地桥接返回下一批类型化 Probe 请求。每轮后 Swift 更新 Evidence Store，再把压缩后的状态提供给 Codex。Codex 不直接启动内置探针、Adapter、Shell 或文件系统工具。
+Codex 根据候选、预算和已有证据，自主选择直接只读文件/元数据调查、shell
+命令、live web、browser/direct fetch、受支持的 Agent 能力或 Broker 类型化
+Probe。Swift 将可信结构化结果写入 Evidence Store，再把压缩状态提供给 Codex；
+直接工具结果始终作为不受 Broker 审计保证的 advisory evidence 标记来源。
 
 ### 4.7 Probe Broker
 
-Broker 是 Agent 与磁盘之间的策略执行层。
+Broker 是 Agent 获取稳定、类型化、可预算磁盘证据的优先策略层，不是 Agent
+与磁盘之间的唯一接口。
 
 ```swift
 protocol ReadOnlyProbe: Sendable {
@@ -276,7 +297,7 @@ protocol ReadOnlyProbe: Sendable {
 2. canonical path 解析
 3. root scope 检查
 4. symlink/mount 检查
-5. denylist 与读取等级检查
+5. Broker 自身的敏感路径、限字节与内容策略检查
 6. 单次和会话预算检查
 7. 执行、限时、限输出
 8. 脱敏与证据落盘
@@ -285,11 +306,11 @@ protocol ReadOnlyProbe: Sendable {
 
 ### 4.8 内容读取策略
 
-- L0 元数据自动允许。
-- L1 仅允许审核过的文件类型和最大字节；读取前运行 secret/path policy，输出再脱敏。
-- L2 把多个目标聚合成一次 UI 授权，权限仅在当前 investigation session 有效。
-- 永久 denylist 在 v1 无例外。
-- 任何内容读取都记录目标、字节数和用途摘要。
+- 首次启用 Deep Dive 时一次性披露模型上下文、直接读取和公共联网的数据边界。
+- 在用户选择的扫描范围内，Codex 可自主读取理解未知目录所需的文件类型和片段；不做逐文件/逐命令授权，也不设置 Agent 读取路径 denylist。
+- Codex 不主动采集凭据或绕过 TCC；偶然遇到的 secret value 不进入持久化证据、Local Knowledge 或报告。
+- Probe Broker 仍对自己的调用执行路径策略、限字节、脱敏和审计，但这些控制不伪装成 Codex 全工具面的限制。
+- direct/shell/web/browser 证据记录来源和覆盖率摘要，不持久化原始内容或原始 Codex JSONL。
 
 ### 4.9 Adapters
 
@@ -318,7 +339,7 @@ Policy Gate 是纯函数式判定核心，输入 CleanupPlan、最新 PathSnapsh
 
 关键不变量：
 
-- denylist 永远拒绝
+- 清理 protected-path policy 永远拒绝
 - rule veto 永远优先于 Agent
 - 规则 miss 且只有 Agent 建议时保持 `reviewRecommended`；只有规则支持、Policy 允许且默认 MoveToTrash 的项目才可为 `readyToReclaim`
 - inode/mtime/size/activity 变化导致计划失效
@@ -382,8 +403,9 @@ User → App: Start Deep Dive
 App → Evidence Store: load Quick Scan snapshot
 App → Planner: build targets and budgets
 App → Codex: investigation context
-Codex → Probe Broker: typed read-only request
-Probe Broker → Evidence Store: audited evidence
+Codex → Files/Shell/Web/Browser: direct read-only investigation
+Codex ↔ Probe Broker: optional typed read-only requests
+Probe Broker/Normalizer → Evidence Store: typed evidence + source labels
 Evidence Store → Codex: compressed updated state
 Codex → App: EvidenceReport + CleanupPlan
 App → Policy Gate: validate
@@ -430,7 +452,7 @@ Executor → Manifest: append results
 
 ### 单元测试
 
-- path canonicalization、symlink、mount、denylist
+- path canonicalization、symlink、mount、清理 protected-path policy
 - rule compiler 和 overlay
 - staleness/activity 融合
 - priority 和停止条件

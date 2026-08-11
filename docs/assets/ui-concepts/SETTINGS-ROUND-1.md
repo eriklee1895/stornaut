@@ -9,7 +9,7 @@
 - Settings is a separate standard macOS Settings scene opened with `⌘,`; it is not a fifth main-app workspace.
 - Settings has six sections: `General`, `Scanning`, `Permissions`, `Codex & Deep Dive`, `Privacy & Data`, and `Local Knowledge`.
 - A setting is editable only when the user is choosing a preference or an allowed scope. Runtime facts and safety gates are shown as status plus a repair/check action.
-- Permanent sensitive-location denylist, Policy Gate, executor restrictions, evidence retention, and Cleanup Manifest retention are policy facts. Settings may explain them but cannot weaken or bypass them.
+- Cleanup protected-path policy, Policy Gate, executor restrictions, evidence retention, and Cleanup Manifest retention are policy facts. Settings may explain them but cannot weaken or bypass them. Protected cleanup locations are not an Agent read-path denylist.
 - v1 has no background monitoring, scheduled scan, automatic cleanup, account, telemetry, cloud sync, or model-provider selector.
 - Quick Scan remains available when Full Disk Access is limited, Codex is unavailable, or the Deep Dive safety check has not passed.
 - `Codex Installed` and `Deep Dive safety` are independent states. A discovered executable is not evidence that Probe Broker isolation works.

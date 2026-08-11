@@ -1,5 +1,11 @@
 # Stornaut Epic 0–1 Foundation & Risk Spikes Implementation Plan
 
+> **Historical-plan notice (2026-08-11):** This completed plan intentionally
+> retains the original Broker-only requirements and no-go evidence. They were
+> later superseded as product policy by the capability-first
+> [ADR 0004](../../adr/0004-codex-file-read-isolation.md); do not reuse those
+> restrictions in new implementation plans.
+
 > **Execution rule:** Implement this plan task-by-task and keep the checkbox state accurate. An orchestration skill may be used when available, but no unavailable skill is a prerequisite for execution.
 
 **Goal:** Create the smallest native Stornaut foundation that builds and tests locally, then produce executable evidence for the Codex, isolation, scan-performance, Trash, and registered-action assumptions on which the full product depends.

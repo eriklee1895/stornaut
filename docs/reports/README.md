@@ -2,9 +2,15 @@
 
 本目录保存阶段验证、Benchmark 汇总和 release gate，不保存原始敏感路径、受控读取内容或未脱敏 Codex JSONL。
 
+> 2026-08-11 状态说明：报告中的 Broker-only/no-go/paused 是对应阶段的
+> 历史测量结论。当前产品已通过修订后的
+> [ADR 0004](../adr/0004-codex-file-read-isolation.md) 采用 capability-first
+> direct read/Agent tools/live public internet；Deep Dive 当前只等待新的
+> “完整调查能力 + 进程树不可写 + no-Executor”实现证据。
+
 - [Development Automation Validation — 2026-08-09](development-automation-2026-08-09.md)：XcodeBuildMCP、Peekaboo 只读目录、真实 App build/run 与 PID 窗口截图证据。
-- [Epic 0–1 Validation Report](epic-0-1-validation-report.md)：foundation、Codex、Surveyor、Action lifecycle 的 evidence gate，deterministic conditional go 与 Deep Dive no-go。
-- [Epic 2–4 Validation Report](epic-2-4-validation-report.md)：domain/persistence、真实 product Quick Scan、Space Ledger、Knowledge/Activity、App/UI 与 scope evidence；最终统一 verifier 已通过，Deep Dive 继续 no-go/paused。
+- [Epic 0–1 Validation Report](epic-0-1-validation-report.md)：foundation、Codex、Surveyor、Action lifecycle 的历史 evidence gate；Broker-only no-go 已由 ADR 0004 修订。
+- [Epic 2–4 Validation Report](epic-2-4-validation-report.md)：domain/persistence、真实 product Quick Scan、Space Ledger、Knowledge/Activity、App/UI 与 scope evidence；Deep Dive 不在 Phase B 范围。
 - [Epic 1 Final Code Review — 2026-08-09](epic-1-code-review-2026-08-09.md)：跨模块安全/并发/健壮性审查、确认缺陷与修复证据。
 - [Epic 2–4 Task 9 Code Review — 2026-08-09](epic-2-4-task-9-review.md)：Phase B implementation studies、ADR 0007 与文档路由的审查和修复证据。
 - [Epic 2–4 Task 10 Code Review — 2026-08-10](epic-2-4-task-10-review.md)：领域契约、匿名 fixtures、Surveyor transport 迁移与 10 组确认缺陷的修复证据。

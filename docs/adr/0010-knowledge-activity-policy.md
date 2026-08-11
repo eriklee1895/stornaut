@@ -10,6 +10,11 @@
 > Related study:
 > [`../upstream-studies/epic-4-knowledge-activity.md`](../upstream-studies/epic-4-knowledge-activity.md)
 
+> **2026-08-11 policy amendment:** Knowledge/Activity evidence below remains
+> current. Any Deep Dive Broker-only/no-go statement is historical and has been
+> superseded by the capability-first
+> [ADR 0004](0004-codex-file-read-isolation.md).
+
 ## Context
 
 The Knowledge Base needs reviewable authoring source, exact provenance,
@@ -99,7 +104,7 @@ Ready to Reclaim requires:
 Protected requires veto, critical risk in source and after protection overlays, and no
 recommended action. Unknown cannot recommend an action.
 
-Non-protected rules cannot intersect the permanent sensitive-path examples
+Non-protected cleanup rules cannot intersect the permanent protected-path examples
 using the compiler's component-aware `*`/`**` glob matcher. This is defense in
 depth; runtime `SensitivePathDenylist` remains independently authoritative.
 

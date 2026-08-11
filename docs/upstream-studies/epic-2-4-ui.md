@@ -8,6 +8,11 @@
 >
 > 目标模块：App state composition、Overview、Quick Scan/Results、History、Settings、resilience
 
+> **2026-08-11 product-policy note:** Broker-only/no-go references below record
+> the Phase B UI state. Current Deep Dive policy is capability-first under
+> [ADR 0004](../adr/0004-codex-file-read-isolation.md); the UI now gates on full
+> investigation capabilities plus write/no-Executor containment.
+
 ## 1. Executive Conclusion
 
 Phase B UI should use the repository's already approved canonical concepts and

@@ -39,7 +39,8 @@ latest valid Quick Scan
 
 The slice must run without Codex, without external tools and without a
 Registered Action. It must preserve the Phase B one-Primary-Scan-Root contract,
-keep Deep Dive `no-go/paused`, and make `FileManager.trashItem` the only
+keep Deep Dive outside this deterministic slice with its capability-first
+runtime gate still pending, and make `FileManager.trashItem` the only
 production write primitive that mutates a selected target path. Stornaut-owned
 SQLite, preferences and diagnostic fixture writes remain separate,
 scope-bounded infrastructure.
@@ -316,7 +317,8 @@ Therefore:
 
 - Preserve every invariant in `AGENTS.md`, the PRD, architecture, approved
   Agent/UI specifications and ADRs 0004/0006–0010.
-- Deep Dive remains `no-go/paused`; Phase C imports no `StornautCodex`,
+- Deep Dive remains outside Phase C and awaits its ADR 0004 capability-first
+  runtime gate; Phase C imports no `StornautCodex`,
   `ProbeBridge`, Adapter or model dependency.
 - No arbitrary Shell, `Process`, executable URL or argument array reaches
   Review, plan, Policy, authorization or Manifest APIs.
@@ -354,7 +356,7 @@ Therefore:
 
 This plan does not implement:
 
-- Deep Dive, Candidate Planner, Codex-driven Cleanup Plans or L2 reading;
+- Deep Dive, Candidate Planner, Codex-driven Cleanup Plans or any Codex investigation/read path;
 - any real Registered Action;
 - Homebrew, npm, pnpm, uv, Docker, Mole, kondo or system-tool execution;
 - permanent deletion or Trash emptying;
@@ -1503,7 +1505,7 @@ History supports:
 - corrupt scan row;
 - corrupt Manifest row.
 
-No Deep Dive record is fabricated while Deep Dive remains paused.
+No Deep Dive record is fabricated while Deep Dive remains unavailable in this slice.
 
 ### Step 2: Add Manifest paging and deletion
 
@@ -1709,7 +1711,7 @@ The report decides:
 6. journal/Manifest durability;
 7. accounting truth;
 8. Review/Result/History UI;
-9. Deep Dive — remains no-go/paused;
+9. Deep Dive — outside Phase C; capability-first runtime gate pending;
 10. Registered Actions — remain deferred;
 11. release/distribution — remains not evaluated.
 
@@ -1758,7 +1760,7 @@ docs: close safe execution vertical slice
 | Evidence expiry preserves audit | 7/90-day retention fixtures |
 | History isolates corruption | corrupt scan/manifest row tests |
 | Views cannot write | source boundary scripts |
-| Deep Dive remains paused | source/package/bundle audit |
+| Deep Dive remains outside Phase C | source/package/bundle audit |
 | Registered Actions remain deferred | empty production registry and Release bundle audit |
 | App context is measured | signed-App disposable real Trash diagnostic |
 | UI is native and accessible | App tests, XCUITest, screenshots, Peekaboo, keyboard/VoiceOver/Reduce Motion checks |

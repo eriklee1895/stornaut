@@ -1,5 +1,12 @@
 # Epic 0–1 Validation Report
 
+> **Historical-evidence notice (2026-08-11):** The Broker-only/no-go decision
+> below remains valid evidence for the original gate but no longer constrains
+> the product. Current policy is the capability-first
+> [ADR 0004](../adr/0004-codex-file-read-isolation.md): direct read, Agent tools
+> and live public internet are allowed; OS write denial and Swift-only execution
+> remain mandatory.
+
 > 状态：Passed with conditional go for deterministic development
 >
 > 日期：2026-08-09

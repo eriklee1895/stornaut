@@ -11,7 +11,7 @@
 - Full Disk Access is optional. Limited mode remains useful and reports restricted locations as `Unmeasurable` rather than `0 B` or failure.
 - Stornaut asks once during setup, provides a Settings repair path, and does not repeatedly prompt during normal scans.
 - Connecting Codex is optional. Missing or skipped Codex affects Deep Dive only.
-- Installing/finding Codex and verifying the Deep Dive safety boundary are separate states. Until the controlled bridge passes the technical Spike and runtime check, Deep Dive stays paused.
+- Installing/finding Codex and verifying the Deep Dive capability-first runtime boundary are separate states. Until direct read/Agent tools/public web and process-tree write denial/no-Executor pass the runtime check together, Deep Dive stays paused.
 - Setup never cleans files, and permission never enables automatic cleanup.
 
 ## Candidate draw
@@ -74,7 +74,7 @@ Use A's dedicated three-step structure, with C's Full/Limited consequences compr
 ### Step 3 — Connect Codex
 
 - Detect the user-installed Codex and present installation status separately from Deep Dive safety status.
-- `Found` does not mean `Verified`. The controlled bridge must pass the technical Spike and runtime safety check before Deep Dive becomes available.
+- `Found` does not mean `Verified`. The capability-first profile must prove strong investigation tools plus write/no-Executor isolation before Deep Dive becomes available.
 - If Codex is absent, incompatible, or the safety check fails, Quick Scan remains fully available and Deep Dive remains paused with a repair action.
 - Actions: `Back`, `Continue without Codex`, `Finish Setup`; `Check Again` belongs to the installation status card.
 

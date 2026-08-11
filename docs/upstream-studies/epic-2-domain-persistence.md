@@ -8,6 +8,10 @@
 >
 > 目标模块：领域契约、SQLite Evidence Store、migration、retention、本地数据边界
 
+> **2026-08-11 product-policy note:** Any Deep Dive no-go/paused statement below
+> is Phase B historical state. Current capability policy is defined by amended
+> [ADR 0004](../adr/0004-codex-file-read-isolation.md).
+
 ## 1. Executive Conclusion
 
 Epic 2 使用 Apple 平台自带的 SQLite，通过仓库自有的窄 Swift/C 边界访问：

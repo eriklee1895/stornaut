@@ -94,15 +94,15 @@ Settings 必须视觉上区分三类内容：
 
 - **Editable preference**：语言、外观、允许的扫描根/排除项、规则 overlay、可选 Adapter 和默认 Deep Dive 预算。
 - **Runtime status + repair**：Full Disk Access、已授权目录、Codex 路径/版本/能力和 Deep Dive safety check；使用明确状态和 `Review`、`Open System Settings`、`Check Again`、`Run Safety Check` 等恢复动作，不伪装成普通 toggle。
-- **Read-only policy fact**：永久敏感区 denylist、Policy Gate、执行边界、7 天 Evidence、90 天最小 Cleanup Manifest、JSONL 生命周期和本地存储边界。可解释、可立即清除对应本地记录，但不可延长或绕过。
+- **Read-only policy fact**：清理 protected-path policy、Policy Gate、执行边界、7 天 Evidence、90 天最小 Cleanup Manifest、JSONL 生命周期和本地存储边界。可解释、可立即清除对应本地记录，但不可延长或绕过。
 
 General 只保留 `Language`、`Appearance` 和三行紧凑 `Setup Status`：Disk access、Codex installation、Deep Dive safety。`Codex Installed` 与 `Deep Dive safety Required/Verified` 独立显示；前者不得隐含后者。底部使用非交互信息行说明 `Runs only when you open Stornaut`，不得提供后台监控、定时扫描或自动清理开关。
 
-Scanning 将用户可编辑的 scan roots/bookmarks 与 exclusions 分开，并把永久 protected locations 作为只读策略展示。工具生态使用动态规则/facet，不建立 Node、Python、Rust、Go、Xcode、Android、Next.js 或 Homebrew 的固定完整清单。规则 overlay 与 Adapter 只在实现和 provenance 可用时显示，缺失时给出局部降级说明。
+Scanning 将用户可编辑的 scan roots/bookmarks 与 exclusions 分开，并把永久 cleanup-protected locations 作为只读执行策略展示；这些位置不是 Codex 读取路径 denylist。工具生态使用动态规则/facet，不建立 Node、Python、Rust、Go、Xcode、Android、Next.js 或 Homebrew 的固定完整清单。规则 overlay 与 Adapter 只在实现和 provenance 可用时显示，缺失时给出局部降级说明。
 
-Permissions 中 FDA 只显示 `Full`、`Limited` 或检查失败状态，不实现应用内权限 toggle。`Open System Settings` 后允许 `Check Again`；有限访问必须说明覆盖率影响和 Quick Scan 仍可用。用户选择的安全作用域目录可添加/移除；永久敏感区没有例外按钮。
+Permissions 中 FDA 只显示 `Full`、`Limited` 或检查失败状态，不实现应用内权限 toggle。`Open System Settings` 后允许 `Check Again`；有限访问必须说明覆盖率影响和 Quick Scan 仍可用。用户选择的安全作用域目录可添加/移除；清理 protected-path policy 没有例外按钮，但不作为 Codex 调查读取开关。
 
-Codex & Deep Dive 中默认预算使用 `10 min · Focused`、`30 min · Balanced`、`60 min · Thorough` 三个产品级预设，Balanced 默认。高级墙钟、轮次、Probe、字节和并发限制进入折叠 disclosure；v1 不提供模型供应商、任意 CLI flag、Shell、隔离绕过或“信任 Codex”开关。
+Codex & Deep Dive 中默认预算使用 `10 min · Focused`、`30 min · Balanced`、`60 min · Thorough` 三个产品级预设，Balanced 默认。高级墙钟、轮次、Probe、字节和并发限制进入折叠 disclosure；shell/unified exec、live high-context search、browser/direct fetch、image、skills/subagents 与公共联网属于固定 capability-first profile，不做逐项关闭开关。v1 不提供模型供应商、任意 CLI flag、写隔离绕过或“信任 Codex”开关。
 
 Privacy & Data 以只读政策行展示 Evidence `7 days`、minimal Cleanup Manifest `90 days`、normal-end JSONL deletion 与 crash remnant `up to 24 hours`。`Clear Evidence Now…` 与 `Clear Manifests Now…` 分开确认，并明确只删除 Stornaut 本地记录，不删除用户文件、不改变 Trash、不撤销既有清理。
 
@@ -116,17 +116,17 @@ Local Knowledge 使用结构化列表展示 finding、scope、provenance、updat
 
 1. `Map your storage`：说明 Quick Scan 在本机执行且不调用 Codex，建立 `Local first`、`Evidence before action`、`Always reversible` 三项承诺；操作为 `Skip Setup` 与主操作 `Continue`。
 2. `Full Disk Access`：解释 FDA 只改变可测量覆盖率，不开启自动清理；以一张收益卡配一条紧凑 `Limited Access` 后果说明，允许 `Continue with Limited Access`。
-3. `Connect Codex`：分别检测用户已安装 Codex 与 Deep Dive safety check；缺失、版本不兼容或安全检查失败时 Quick Scan 仍完整可用，Deep Dive 保持 paused。
+3. `Connect Codex`：分别检测用户已安装 Codex 与 Deep Dive capability check；缺失、版本不兼容或 capability/write-isolation 检查失败时 Quick Scan 仍完整可用，Deep Dive 保持 paused。
 
-`Codex installation` 与 `Deep Dive safety check` 是两个独立状态。发现可执行文件不等于安全边界已验证。目标产品边界是 Codex 不能修改或直接浏览扫描根，只能通过 Stornaut 的受控本地桥接请求经过审计的只读 Probe Broker；该边界在技术 Spike 与运行时检查通过前必须显示为 `Required`/`Paused`，不得显示 `Verified`。若无法强制成立，暂停 Deep Dive 而不是用提示词或文案代替。
+`Codex installation` 与 `Deep Dive capability check` 是两个独立状态。发现可执行文件不等于运行时边界已验证。目标 profile 必须同时证明两面：Codex 可以直接浏览授权扫描范围并使用 shell/unified exec、live search、browser/direct fetch、image、skills/subagents、公共互联网和 Probe Broker；Codex 与所有后代进程又不能写用户数据或调用 Executor。该边界在技术 Spike 与运行时检查通过前显示为 `Required`/`Paused`，不得显示 `Verified`。失败时暂停 Deep Dive，但不得把关闭强调查能力或 `danger-full-access` 当作修复。
 
 FDA 采用强引导但可跳过：
 
 - 永远显示当前覆盖范围与不可测量空间，不把权限拒绝显示为 `0 B`。
 - 初始操作提供 `Open System Settings`；从系统设置返回后提供 `Check Again`，检查失败仍允许有限模式，不形成授权循环。
 - 不在普通扫描中反复弹出系统授权提示。
-- L2 内容读取采用每次 Deep Dive 会话最多一次的聚合授权 sheet。
-- 永久敏感区 denylist 不提供 UI 绕过开关。
+- 首次启用 Deep Dive 时聚合说明直接读取、模型上下文和公共联网的数据边界；不逐文件、逐命令或逐域名弹窗。
+- 清理 protected-path policy 不提供 UI 绕过开关；Codex 调查读取不提供逐路径 allow/deny 开关。
 
 首次启动 canonical 暗/亮参考及候选评审见 [Onboarding and Permissions Internal Draw](../assets/ui-concepts/ONBOARDING-ROUND-1.md)。
 
@@ -406,7 +406,7 @@ Stornaut 需要本地结构化知识，但不需要会自由联想的 Agent Memo
 - 可保存：用户确认的 producer 映射、路径范围偏好、保留决定、忽略规则、已验证恢复方法和 provenance。
 - 不保存：模型思维链、原始敏感片段、聊天人格记忆、未经用户确认的永久 `Ready to Reclaim` 结论。
 - 新文件事实、活动变化和规则版本更新必须使旧结论 stale。
-- `Remember This Finding` 默认只创建保守映射；不能降低 denylist/veto 或跳过 Policy Gate。
+- `Remember This Finding` 默认只创建保守映射；不能降低清理 protected-path policy/veto 或跳过 Policy Gate。
 
 ## 12. 视觉系统：Native Observatory
 
@@ -497,7 +497,7 @@ Stornaut 需要本地结构化知识，但不需要会自由联想的 Agent Memo
 - Agent Schema 错误使项目保持 Unknown。
 - 执行前 stale 使 checkbox 失效并要求重新验证。
 - Trash 失败显示原文件仍在原处，绝不提供自动永久删除 fallback。
-- Deep Dive safety check 失败时四个调查阶段保持 `Not started`，不得显示 explained gain、finding count 或 Ready 结论；只提供检查诊断和 Quick Scan fallback，不提供 bypass。
+- Deep Dive capability check 失败时四个调查阶段保持 `Not started`，不得显示 explained gain、finding count 或 Ready 结论；诊断必须区分 live/public-network/Agent-tool 缺失与 write/no-Executor 隔离失败，只提供修复和 Quick Scan fallback，不提供写隔离 bypass。
 - Quick Scan 停止后保存带覆盖率与 unfinished roots 的 partial snapshot；Deep Dive 停止/预算耗尽后保存 verified partial report，未完成目标保持 Unknown。
 - stale preflight 使用原生 sheet 冻结 Review context，只列变化项；`Refresh Affected Items` 或 `Cancel`，没有 `Proceed Anyway`。Cancel 后计划仍为 stale 且不可执行。
 - Cleanup Result 的行级失败保留成功行与恢复信息。Manifest 持久化失败必须与 action 失败分开报告，成功保存/导出前不能显示普通完成态。

@@ -8,6 +8,13 @@
 >
 > 目标模块：Codex discovery、capability report、structured process、cancellation、instruction/tool isolation、Probe Broker transport
 
+> **2026-08-11 product-policy note:** This study preserves the measured
+> Broker-only failure and strict-profile evidence. It no longer defines the
+> product restriction. The amended
+> [ADR 0004](../adr/0004-codex-file-read-isolation.md) deliberately allows
+> direct read, Agent tools and live public internet, with OS write denial and
+> Swift-only execution as the hard boundary.
+
 ## 1. Executive Conclusion
 
 The installed Codex CLI `0.147.0` exposes the process and output primitives

@@ -6,15 +6,16 @@
 > gate 已完成；Epic 2–4 Tasks 9–26 通过最终 unified verifier 并归档；
 > Phase C deterministic Epic 8 详尽 plan 已于 2026-08-11 获用户批准，
 > Task 27 Upstream Study/ADR/profile gate 已完成，当前唯一 active Task 为
-> Task 28 domain v2 / Evidence Store v3 / journal contracts；Task 5 证明 Broker
-> 协议但未证明 Codex Broker-only 工具面，Deep Dive 明确 no-go/paused；
+> Task 28 domain v2 / Evidence Store v3 / journal contracts；Task 5 的历史
+> Broker-only no-go 已由 ADR 0004 capability-first 决策修订，Deep Dive 因
+> 新运行时实现/evidence gate 尚未交付而 paused；
 > release signing/notarization 未评估
 
 ## 1. 任务目标
 
-构建一个原生 Swift macOS App，将确定性开发者磁盘扫描与受约束 Codex 深度调查结合起来。产品必须在没有 Codex 和外部工具时完成 Quick Scan，并在 Deep Dive 中让 Codex 通过受控本地桥接调用 Probe Broker 调查未知空间。所有写操作由 Swift Policy Gate 与 Executor 控制。
+构建一个原生 Swift macOS App，将确定性开发者磁盘扫描与 capability-first Codex 深度调查结合起来。产品必须在没有 Codex 和外部工具时完成 Quick Scan；Deep Dive 允许 Codex 使用直接只读 Agent 工具、Probe Broker 与公共互联网调查未知空间。所有写操作由 Swift Policy Gate 与 Executor 控制。
 
-Coding Agent 可以实现已批准的导航、状态模型和原生组件骨架，但不得把任一视觉概念图当作逐像素终稿。Onboarding 使用 A 的三步单焦点结构 + C 的紧凑 Full/Limited 后果说明，并具有 Welcome、FDA、Connect Codex 的 Dark/Light 配对；Overview 的 A+B 融合构图及 Dark/Light 配对方向已经批准；Quick Scan 的 E 主体 + A 阶段 rail 已批准；Scan Results 的 A 默认表格 + D Inspector 已批准；Deep Dive 的 B 默认页 + C Inspector + A Probe 轨迹已经批准；Review 的 A 默认表格 + C Inspector + B 分组解释已经批准；Cleanup Result 使用 B 的可恢复优先层级 + A 计量契约，E 是 partial/error 状态，C/D 分别下沉为 Accounting Details 与 Manifest；History 使用 E master-detail + A 日期分组，C 是按需 Storage Trend；Settings 使用 A 的独立原生侧栏外壳 + C 的 General 状态汇总 + E 的结构化 Local Knowledge，并具有 General、Codex & Deep Dive、Local Knowledge 的 Dark/Light 配对。跨流程状态统一采用“保留有效结果 → 标出受影响范围 → 只提供安全恢复 → 技术细节按需展开”，五组 Light/Dark canonical 覆盖 limited coverage、Deep Dive safety blocked、stale plan、partial investigation 与 expired evidence/corrupt history。圆环只作为功能性存储图，不得实现星座/星图装饰。发现 Codex 不等于验证安全边界；在技术 Spike 和运行时 safety check 通过前 Deep Dive 必须保持 paused。
+Coding Agent 可以实现已批准的导航、状态模型和原生组件骨架，但不得把任一视觉概念图当作逐像素终稿。Onboarding 使用 A 的三步单焦点结构 + C 的紧凑 Full/Limited 后果说明，并具有 Welcome、FDA、Connect Codex 的 Dark/Light 配对；Overview 的 A+B 融合构图及 Dark/Light 配对方向已经批准；Quick Scan 的 E 主体 + A 阶段 rail 已批准；Scan Results 的 A 默认表格 + D Inspector 已批准；Deep Dive 的 B 默认页 + C Inspector + A Probe 轨迹已经批准；Review 的 A 默认表格 + C Inspector + B 分组解释已经批准；Cleanup Result 使用 B 的可恢复优先层级 + A 计量契约，E 是 partial/error 状态，C/D 分别下沉为 Accounting Details 与 Manifest；History 使用 E master-detail + A 日期分组，C 是按需 Storage Trend；Settings 使用 A 的独立原生侧栏外壳 + C 的 General 状态汇总 + E 的结构化 Local Knowledge，并具有 General、Codex & Deep Dive、Local Knowledge 的 Dark/Light 配对。跨流程状态统一采用“保留有效结果 → 标出受影响范围 → 只提供安全恢复 → 技术细节按需展开”，五组 Light/Dark canonical 覆盖 limited coverage、Deep Dive safety blocked、stale plan、partial investigation 与 expired evidence/corrupt history。圆环只作为功能性存储图，不得实现星座/星图装饰。发现 Codex 不等于验证 capability-first runtime boundary；在“完整调查能力 + 公共联网 + 进程树不可写 + no-Executor”运行时检查通过前 Deep Dive 必须保持 paused。
 
 正式产品名为 `Stornaut`：App/Swift 类型使用该大小写，仓库、CLI 和配置前缀使用 `stornaut`。项目采用 MIT License；首发仅面向开发时最新稳定版 macOS 与 Apple Silicon，不为 Intel 或旧系统牺牲实现简洁度。
 
@@ -46,9 +47,9 @@ Coding Agent 可以实现已批准的导航、状态模型和原生组件骨架�
 
 1. Quick Scan 不调用模型。
 2. Codex 只有调查和建议权。
-3. Agent 不得提交或执行任意 Shell 命令；磁盘调查只能调用 Probe Broker 暴露的类型化只读能力。
-4. Probe Broker 是 Agent 磁盘调查的唯一授权入口。
-5. 永久敏感区 denylist 不可被提示词或普通设置绕过。
+3. Codex 可直接读取授权扫描范围，并使用 shell/unified exec、live high-context search、browser/direct fetch、image、skills/subagents 与公共互联网；不得设置 Bash/executable/public destination-domain allowlist 或逐命令批准来削弱调查质量。
+4. Probe Broker 是优先的类型化、可预算、可审计证据接口，不是 Agent 磁盘调查的唯一入口。
+5. Codex 与所有后代进程不可写用户数据、不可访问 localhost/私网/任意 Unix socket、不可调用清理链；不得以 `danger-full-access` 换取联网。
 6. Policy Gate 可以否决 Agent，不能反向被 Agent 覆盖。
 7. Executor 只接受 `MoveToTrash` 或 Action Registry 中的类型化动作。
 8. Trash 失败绝不回退为永久删除。
@@ -61,7 +62,7 @@ Coding Agent 可以实现已批准的导航、状态模型和原生组件骨架�
 15. 顶层导航固定为 Overview、Scan、Investigations、History；Settings 独立。
 16. UI 默认不展示 chat、console、原始 JSONL 或模型思维链。
 17. Agent-only 规则 miss 不能进入默认选中的 Ready to Reclaim。
-18. Local Knowledge 只能保存经确认的结构化事实，不能降低 denylist/veto/Policy Gate。
+18. Local Knowledge 只能保存经确认的结构化事实，不能降低清理 protected-path policy、veto 或 Policy Gate。
 19. `ReclaimDisposition` 只有 Ready to Reclaim、Review Recommended、Protected、Unknown；风险与置信度独立建模。
 20. 权限缺口不得显示为 `0 B`；已经完成且仍有效的结果不得被局部失败抹掉。
 21. stale preflight 没有 `Proceed Anyway`；刷新受影响项之前不得执行任何动作。
@@ -103,7 +104,7 @@ Epic 编号用于能力归属，不再被解释为严格的时间顺序。批准
 Epic 0–1
 → Epic 2–4
 → Epic 8 deterministic subset
-→ Epic 5–6（仅在 Broker-only gate 允许时）
+→ Epic 5–6（仅在 ADR 0004 capability-first runtime gate 允许时）
 → Epic 7 + Epic 8 remaining
 → Epic 9
 ```
@@ -127,8 +128,8 @@ Epic 0–1
 1. GUI App 如何可靠发现用户 Codex。
 2. `codex exec --json --output-schema --ephemeral` 的协议。
 3. 超时、取消和子进程树终止。
-4. Codex 是否继承 FDA，以及如何限制直接文件读取。
-5. 本地 MCP/Probe Broker 或等价桥接。
+4. Codex 是否继承 FDA，以及 direct read/shell/live web/browser 可用时如何强制整个进程树不可写。
+5. 本地 MCP/Probe Broker 或等价桥接作为优先结构化证据接口。
 6. Swift 扫描真实性能。
 7. Trash 和 Registered Action 生命周期。
 
@@ -155,16 +156,17 @@ Epic 0–1
 - YAML compiler、provenance、overlay
 - 首批 developer cache 和 artifact 规则
 - Git/IDE/process 信号
-- denylist 与 veto
+- 清理 protected-path policy 与 veto
 - 与 Mole/ClearDisk/kondo 的 fixture 对照
 
 ### Epic 5：Codex Runtime 与 Probe Broker
 
 - Codex detection/capability check
 - JSONL event parser 和 output Schema
+- direct read、shell/unified exec、live search、browser/direct fetch、image、skills/subagents 与公共网络 profile
 - Broker 工具、预算、审计和内容过滤
 - fake Codex integration tests
-- Prompt injection 与敏感读取测试
+- Prompt injection、写入尝试与凭据非持久化测试
 
 ### Epic 6：Deep Dive
 
@@ -172,7 +174,7 @@ Epic 0–1
 - 科学调查状态机和停止条件
 - Evidence Report
 - Deep Dive UI、覆盖率和预算
-- 会话级 L2 聚合授权
+- 首次启用时聚合披露 direct read/model context/public network 数据边界
 - Agent 调查 affordance、Investigation Details Inspector 和 `Discovered by Codex` 证据摘要
 
 ### Epic 7：Adapters
@@ -214,7 +216,7 @@ Phase C 详尽候选计划见
 
 跨 Epic 的阶段依赖、no-go 分支和交付顺序由 [Delivery Roadmap](../plans/roadmap.md) 管理；新 active plan 不得另起一套宏观路线。
 
-原因：Codex 隔离、FDA 继承、Probe Broker 和 Swift 扫描性能是架构成立的前提。在这些结果出来前批量实现 UI、规则或 Agent 流程会造成返工。
+原因：Codex capability-first 写隔离、FDA 继承、公共联网、Probe Broker 和 Swift 扫描性能是架构成立的前提。在这些结果出来前批量实现 UI、规则或 Agent 流程会造成返工。
 
 第一里程碑 evidence gate（已完成，见 [验证报告](../reports/epic-0-1-validation-report.md)）：
 
@@ -225,17 +227,17 @@ Phase C 详尽候选计划见
 - Swift Scanner 在受控目录上有可重复 Benchmark
 - `trashItem` 和一个 fake registered action 通过生命周期测试
 
-Broker-only 若不能被技术性强制，Epic 0–1 仍可作为成功的风险验证阶段结束，但结论必须是 Deep Dive no-go/paused；不得为了满足里程碑而弱化边界。
+以上是 Epic 0–1 的历史验收口径。ADR 0004 已接受 Broker-only 无法成立并改为 capability-first；历史 no-go 证据保留，但不再作为当前产品限制。新的 Deep Dive gate 验证完整调查能力与公共联网可用时，进程树仍不可写且没有 Executor 路径。
 
 ## 7. 测试优先级
 
 最高优先：
 
-- denylist
+- 清理 protected-path policy
 - path canonicalization、symlink、mount/root protection
 - Agent 建议 Ready to Reclaim vs rule veto
 - 执行前 stale evidence
-- 任意 Shell 注入
+- Shell/skills/subagents 尝试写入、调用清理链或访问本机私网/Unix socket
 - prompt injection in README/path
 - Codex/Adapter 崩溃和取消
 
@@ -295,5 +297,5 @@ Manifest 和 truthful Cleanup Result/History。Task 27 已完成，当前从 Tas
 Task 不得越序。该阶段不包含 Deep Dive、Adapter、真实 destructive Registered
 Action、release/notarization 或任何安全边界放宽。
 
-任何权限、安全或许可证假设都必须有实际证据。设计或 PRD 如有冲突，先报告并修正文档，不得自行扩大 Agent 或 Executor 权限。
+任何权限、安全或许可证假设都必须有实际证据。设计或 PRD 如有冲突，先报告并修正文档。ADR 0004 已批准的直接只读 Agent 工具与公共联网无需再次缩减或请求授权；不得自行扩大本地写入、私网或 Executor 权限。
 ```

@@ -1,5 +1,9 @@
 # Epic 2–4 Task 19 Code Review — 2026-08-10
 
+> **Historical-scope notice (2026-08-11):** Deep Dive paused/no-go references
+> record the reviewed Phase B scope, not current Codex policy. See capability-first
+> [ADR 0004](../adr/0004-codex-file-read-isolation.md).
+
 > 状态：All confirmed findings fixed; post-fix review has no open P0–P2
 > finding
 >

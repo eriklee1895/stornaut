@@ -6,6 +6,12 @@
 > Related study: [`../upstream-studies/epic-1-codex-runtime.md`](../upstream-studies/epic-1-codex-runtime.md)
 > Prerequisite: [`0002-codex-discovery-and-capabilities.md`](0002-codex-discovery-and-capabilities.md)
 
+> **2026-08-11 policy amendment:** Broker-only/no-go language below is retained
+> as Task 4 historical evidence. Current product policy is the capability-first
+> [ADR 0004](0004-codex-file-read-isolation.md), which permits direct read,
+> Agent tools and live public internet while preserving OS write denial and
+> Swift-only execution.
+
 ## Context
 
 Task 3 established shell-free Codex discovery and syntax-level capability

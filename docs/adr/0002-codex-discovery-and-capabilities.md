@@ -5,6 +5,12 @@
 > Decision owners: Stornaut maintainers
 > Related study: [`../upstream-studies/epic-1-codex-runtime.md`](../upstream-studies/epic-1-codex-runtime.md)
 
+> **2026-08-11 policy amendment:** Broker-only/no-go language below records the
+> Task 3 historical gate. Current product policy is the capability-first
+> [ADR 0004](0004-codex-file-read-isolation.md): direct read, Agent tools and
+> live public internet are allowed; OS write denial and Swift-only execution
+> remain mandatory.
+
 ## Context
 
 Stornaut must discover a user-installed Codex from a GUI App environment

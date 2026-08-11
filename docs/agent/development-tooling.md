@@ -16,7 +16,7 @@ Coding Agent
   └─ Peekaboo read-only → capture / observe current macOS UI
 
 Stornaut.app
-  └─ future isolated Codex → Probe Broker only
+  └─ future capability-first Codex → direct read/Agent tools/public web + Probe Broker; no writes/Executor
 ```
 
 - XcodeBuildMCP、Peekaboo、`.trae/.mcp.json` 和 `.dev-tools/` 都是仓库开发工具，不得成为 Swift package、App bundle、产品配置或 Deep Dive Codex 的依赖。

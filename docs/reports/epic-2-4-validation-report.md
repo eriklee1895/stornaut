@@ -1,5 +1,11 @@
 # Epic 2–4 Deterministic Product Core Validation Report
 
+> **Historical-scope notice (2026-08-11):** Deep Dive no-go/paused references
+> below record what Phase B did not ship. Current Codex policy is the
+> capability-first
+> [ADR 0004](../adr/0004-codex-file-read-isolation.md); production Deep Dive now
+> waits for that profile's runtime evidence rather than Broker-only enforcement.
+
 > 状态：Passed — final unified verifier exited 0 and Phase B gates are closed
 >
 > 日期：2026-08-11

@@ -1,6 +1,6 @@
 # Stornaut Agent 磁盘治理设计规格
 
-> 初版：2026-08-06；最近更新：2026-08-08
+> 初版：2026-08-06；最近更新：2026-08-11
 > 状态：用户已批准  
 > 目的：记录产品头脑风暴中确认的设计基线；详细需求见 [PRD](../product/PRD.md)，实现边界见 [技术架构](../architecture/system-architecture.md)，完整界面规范见 [UI/UX 设计规格](ui-ux.md)。
 
@@ -52,16 +52,15 @@
 采用“内置核心 + 可选工具 Adapter”：
 
 - 核心扫描、规则、安全和执行不依赖 Mole/kondo 等工具
-- Agent 只能请求 Probe Broker 暴露的类型化只读能力；Probe Broker 可以调用已安装工具的 Adapter 进行交叉验证
+- Agent 可使用直接只读文件系统、shell/unified exec、live search、browser/direct fetch、image、skills/subagents 与公共互联网；Probe Broker 继续提供类型化、可预算、可审计的优先证据能力
 - 外部工具不能直接执行清理
-- Codex 不得直接获得扫描根、任意 Shell、文件系统工具或 Adapter；受控本地 Broker 桥接及其强制边界是 Epic 1 必验项，失败时暂停 Deep Dive 并请求用户决策
+- Stornaut 不设置 Bash/executable/public destination-domain allowlist，也不因无法形成完整 Codex tool allowlist 而关闭调查能力；强制边界只约束本地写入、私网/Unix socket 和清理执行权
 
 ### 2.5 安全与隐私
 
 - 元数据优先
-- README/manifest/lockfile 等安全文本受控自动读取
-- 调查受阻时，每会话最多一次聚合扩展读取授权
-- 永久敏感区 denylist
+- Codex 可直接读取调查所需的 README/manifest/lockfile 等文件；文件内容可能进入模型上下文，UI 明确披露这一点
+- 主动采集凭据、绕过 TCC、访问 localhost/私网或任意 Unix socket 仍不属于调查范围
 - Agent 只生成结构化 CleanupPlan
 - Swift Policy Gate 可以否决任何 Agent 结论
 - Executor 仅接受 Trash 或 Action Registry 中审核过的 Registered Action
@@ -104,6 +103,7 @@ Quick Scan
 
 Deep Dive
   Evidence Store → Candidate Planner → Codex Commander
+  Codex Commander ↔ Direct Read / Shell / Live Web / Browser / Agent Tools
   Codex Commander ↔ Probe Broker ↔ Built-in Probes / Optional Adapters
   Codex Commander → EvidenceReport + CleanupPlan
 
@@ -122,7 +122,7 @@ Quick 和 Deep 共用同一 Snapshot、Evidence Store、分类 Schema、Policy G
 - 不提供聊天式主界面或默认调查控制台
 - 不展示模型隐藏思维链，只展示可复核证据摘要
 - Agent 只在未知候选、当前调查和新发现中可见；known-rule 项目不显示 AI 装饰
-- 内容扩展读取按会话聚合确认，不逐文件弹窗
+- 直接只读调查不逐文件弹窗；启动 Deep Dive 时一次性说明模型上下文与公共联网的数据边界
 - Ready to Reclaim / Review Recommended / Protected / Unknown 清晰区分；风险与置信度独立表达
 - 同时展示逻辑大小、实际处理、Trash、永久释放和 free-space delta
 - Codex 或 Adapter 缺失时说明降级，不阻断 Quick Scan
@@ -136,24 +136,28 @@ Quick 和 Deep 共用同一 Snapshot、Evidence Store、分类 Schema、Policy G
 - Trash 失败不回退永久删除
 - Agent 输出格式错误不自动修正为 Ready to Reclaim
 - 执行前变化使 CleanupPlan 失效
-- denylist、veto 和 Action Registry 不能被用户提示词或 Agent 绕过
-- 所有外部进程固定 executable/args、限时、限输出、可取消
-- 所有调查和执行写审计记录
+- 清理 protected-path policy、veto 和 Action Registry 不能被用户提示词或 Agent 绕过
+- Stornaut Executor/Registered Action 保持固定 executable/args；Codex 调查 shell 不做命令 allowlist，但整个进程树限时、限输出、可取消且不可写
+- Broker 调用与所有执行写审计记录；direct/web 证据标记来源和覆盖率，不冒充 Broker 审计
 
 ## 7. 验证策略
 
 1. 匿名化真实案例作为端到端 fixture。
 2. 对 Mole、ClearDisk、kondo 做覆盖和行为 Benchmark。
 3. 对 devklean/Cluttered 的安全与活动保护场景做回归测试。
-4. 对 Agent 进行 prompt injection、敏感读取和 Ready-to-Reclaim/veto 对抗测试。
+4. 对 Agent 进行 prompt injection、写入尝试、凭据非持久化和 Ready-to-Reclaim/veto 对抗测试。
 5. 在真实 460GB Mac 上测量扫描性能、内存和取消。
-6. 验证 Codex 子进程是否能被强制限制在 Broker 协议内。
+6. 验证 Codex 完整调查工具与公共联网可用时，整个进程树仍不可写且没有 Executor 路径。
 
 ## 8. 主要取舍
 
-### 为什么不让 Agent 直接全盘 Shell
+### 为什么允许 Agent 直接只读 Shell 与公共互联网
 
-它能提供最强自由度，但无法建立可靠的审计、隐私、预算和执行边界。Probe Broker 保留动态决策能力，同时把每个动作类型化。
+未知目录、长尾工程类型和动态工具链无法由固定 Probe schema 或域名白名单
+充分覆盖。个人自用场景将调查质量置于数据保密之上，因此保留 Codex 的完整
+Agent 工具面；风险控制放在 OS 强制不可写、no-Executor、Swift Policy Gate 与
+人工选择，而不是削弱读取、搜索和推理能力。Probe Broker 仍用于需要稳定
+结构、预算和审计的证据。
 
 ### 为什么不只做固定规则
 
@@ -170,7 +174,7 @@ Swift 足以先验证需求和 macOS 集成。只有真实性能 Benchmark 失�
 ## 9. 实施前置条件
 
 - 完成 Codex 路径、版本、JSONL 和 Schema Spike
-- 完成 Codex/FDA/文件读取隔离 Spike
+- 完成 capability-first runtime Spike：direct read/shell/live web/browser 可用，进程树不可写且无 Executor 路径
 - 完成 Swift Surveyor 性能 Spike
 - 完成 Probe Broker 协议 Spike
 - 完成 Trash 和首个 Registered Action Spike
@@ -188,11 +192,12 @@ Swift 足以先验证需求和 macOS 集成。只有真实性能 Benchmark 失�
 - 仅支持 Codex
 - 原生 Swift 全栈 + Codex 子进程
 - 使用用户已安装 Codex
+- Codex capability-first：完整只读 Agent 工具与公共联网，Swift 独占所有写与清理执行权
 - Trash + Action Registry 中审核过的 Registered Action
-- 标准调查 + 会话级扩展读取 + 永久 denylist
+- capability-first 直接只读调查 + 首次数据边界披露 + 清理 protected-path policy
 - 每个 Epic 强制学习上游项目
 - 按需启动的原生单窗口 App，v1 无菜单栏伴侣或后台检测
 - 四 workspace 信息架构、English + `zh-Hans`、System/Light/Dark 和 evidence-on-demand UI
 - 结构化 Local Knowledge，不使用自由文本 Agent Memory
 
-本规格构成 Coding Agent 的设计边界。任何改变 Agent 权限、denylist、Executor 动作范围或双模式产品结构的实施方案，都必须先更新 PRD/ADR 并获得用户确认。
+本规格构成 Coding Agent 的设计边界。ADR 0004 已批准的直接只读与公共联网能力不得被实现计划重新缩减；任何扩大 Agent 写入/执行权、本机私网访问、清理 protected-path policy、Executor 动作范围或双模式产品结构的实施方案，都必须先更新 PRD/ADR 并获得用户确认。

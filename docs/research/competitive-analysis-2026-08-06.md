@@ -4,7 +4,7 @@
 > 目标：为“个人自用、GitHub Public 开源”的 Stornaut 判断已有方案、可借鉴实现和仍然值得解决的问题。  
 > 配套文档：[PRD](../product/PRD.md)、[技术架构](../architecture/system-architecture.md)、[真实案例](case-study-2026-08-06.md)
 
-> **后续项目状态（更新于 2026-08-08）**：市场事实、Star、版本和第三方许可证保留为 2026-08-06 时间切片；项目建议已由后续批准设计收敛。Stornaut 采用 MIT License，仓库已经初始化并发布到个人 GitHub Public 仓库，默认分支 `main` 跟踪 `origin/main`。v1 是按需启动的原生 Swift 单窗口 App，不做 MenuBarExtra 或后台监控；Rust 仅在 Swift Surveyor Benchmark 不达标后评估；外部工具只作为可选只读 Adapter，不能执行清理。实现以 PRD 2.3 和批准规格为准。
+> **后续项目状态（更新于 2026-08-11）**：市场事实、Star、版本和第三方许可证保留为 2026-08-06 时间切片；项目建议已由后续批准设计收敛。Stornaut 采用 MIT License，仓库已经初始化并发布到个人 GitHub Public 仓库，默认分支 `main` 跟踪 `origin/main`。v1 是按需启动的原生 Swift 单窗口 App，不做 MenuBarExtra 或后台监控；Rust 仅在 Swift Surveyor Benchmark 不达标后评估；外部工具只作为可选只读 Adapter，不能执行清理。Codex 按 [ADR 0004](../adr/0004-codex-file-read-isolation.md) 使用 capability-first direct read/Agent tools/live public internet，Swift 独占全部写与清理执行权。实现以 PRD 2.3 和批准规格为准。
 
 ## 1. 结论摘要
 
@@ -456,7 +456,7 @@ Claude Code disk cleanup、daymade macos-cleaner 等 Agent Skills 未放入此�
 
 已有 AI cleaner 容易把“模型参与判断”当卖点。Stornaut 应把约束本身作为卖点：
 
-- Agent 只能经 Probe Broker 调用类型化只读调查工具
+- Agent 可使用直接只读工具、公共互联网与 Probe Broker；不设置 Bash/executable/public destination-domain allowlist
 - 规则未命中且只有 Agent 证据时，处置最高只能是 `Review Recommended`
 - `Ready to Reclaim` 必须同时得到已审核规则与 Policy Gate 支持，并默认使用 Trash
 - Agent 输出置信度不能绕过 veto

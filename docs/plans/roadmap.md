@@ -10,7 +10,7 @@
 - 每个阶段优先形成可运行、可验证的纵向切片，不长期堆积无法验收的基础设施。
 - 安全、权限、隔离、性能和许可证主张必须由 ADR、测试、Benchmark 或本机证据支持。
 - Quick Scan 与确定性安全执行链不依赖 Codex、Adapter 或 Deep Dive 成功。
-- Deep Dive 是条件交付能力。Broker-only 边界未被技术性证明前始终保持 paused。
+- Deep Dive 是条件交付能力。ADR 0004 capability-first runtime gate 必须证明完整只读 Agent 工具与公共联网可用，同时进程树不可写且无 Executor 路径；旧 Broker-only 前提已废止。
 - 任何 no-go 都可以作为成功的风险验证结果结束当前 Spike；不得为了维持原计划而降低产品不变量。
 - 本 Roadmap 不取代 PRD、设计规格、architecture 或 active plan。
 
@@ -46,7 +46,7 @@ Epic 0–1
 
 - 建立真实、可本地签名的 macOS `.app` host 和可测试 Swift 模块；
 - 验证 Codex 发现、结构化协议、取消与进程树终止；
-- 对 Broker-only 工具面、直接读取和 FDA/TCC 继承给出明确 go/no-go；
+- 测量 Broker-only 工具面、直接读取和 FDA/TCC 继承，并为后续用户边界决策提供证据；
 - 验证 Swift Surveyor 性能、取消和部分结果；
 - 验证 Trash 与 fake Registered Action 生命周期。
 
@@ -57,10 +57,14 @@ Epic 0–1
 - Epic 0–1 validation report；
 - Deep Dive gate 为 `go`、`conditional go` 或 `no-go`，不得保持模糊。
 
-**分支：**
+**历史分支（已由 ADR 0004 修订）：**
 
 - Broker-only 通过：允许后续进入生产级 Epic 5–6。
 - Broker-only 未通过：Deep Dive 继续 paused；可以继续确定性产品阶段，但不得声称完整 v1 已满足，也不得静默修改 Agent 权限边界。
+
+2026-08-11 用户明确选择 capability-first：接受 direct read/model/public
+internet 的保密风险，不再要求 Broker-only；当前 gate 改为强调查能力可用且
+Codex 进程树不可写、no-Executor。
 
 ### Phase B — Deterministic Product Core
 
@@ -71,7 +75,7 @@ Epic 0–1
 - 建立 Snapshot、Classification、Evidence、CleanupPlan、PolicyDecision、Manifest 和 Accounting 领域模型；
 - 建立 SQLite schema、migration、TTL 与本地数据边界；
 - 实现不调用模型的 Quick Scan、取消、流式部分结果和真实空间账本；
-- 建立 Knowledge Base、provenance、overlay、Activity 与 denylist/veto；
+- 建立 Knowledge Base、provenance、overlay、Activity 与清理 protected-path policy/veto；
 - 形成无 Codex、无 Adapter 也可独立使用的扫描产品。
 
 **退出证据：**
@@ -103,30 +107,31 @@ Epic 0–1
 **为什么提前：**
 
 - 它是 Quick Scan 与 Deep Dive 共用的安全基础；
-- Deep Dive no-go 时产品仍有完整、可用的确定性价值；
+- Deep Dive runtime gate 未完成时产品仍有完整、可用的确定性价值；
 - 后续 Agent 只能接入已经成熟的 CleanupPlan/Policy/Executor 契约。
 
 ### Phase D — Conditional Deep Dive
 
-**范围：** Epic 5–6；仅在 Phase A 的 Broker-only gate 允许时进入。
+**范围：** Epic 5–6；仅在 ADR 0004 capability-first runtime gate 允许时进入。
 
 **目标：**
 
-- 将 Codex Runtime 和 Probe Broker Spike 收敛为生产实现；
+- 将 Codex Runtime、完整只读 Agent 工具、公共联网和 Probe Broker Spike 收敛为生产实现；
 - 实现 Candidate Planner、科学调查状态机、预算和停止条件；
 - 生成 Evidence Report 与不可执行 CleanupPlan；
-- 实现会话级 L2 授权、partial report 和 Investigation Details。
+- 实现首次 capability/data disclosure、partial report 和 Investigation Details。
 
 **退出证据：**
 
-- Codex 只能使用审核过的 Broker 能力；
+- shell/unified exec、live high-context search、browser/direct fetch、image、skills/subagents 与公共互联网均可用，无 Bash/executable/public destination-domain allowlist；
+- Codex 与所有后代进程不可写、不可访问 localhost/私网/任意 Unix socket，且无 Trash/Policy bypass/Executor 路径；
 - prompt injection、Schema 错误、预算耗尽和取消均 fail closed；
 - Agent-only rule miss 最高为 `Review Recommended`；
 - Deep Dive 输出复用 Phase C 的 Policy Gate 和 Executor，不创建第二条执行路径。
 
 **No-go 分支：**
 
-若隔离仍不能成立，继续推进确定性产品与研究更强的 App Sandbox/XPC 方案；是否调整 v1 范围必须由用户另行批准。
+若“完整调查能力 + 公共联网 + 不可写/no-Executor”组合仍不能成立，继续推进确定性产品并研究外层 App Sandbox/XPC/seatbelt 方案；不得以 `danger-full-access` 或关闭调查工具绕过 gate。
 
 ### Phase E — Adapters & Registered Actions
 
@@ -169,7 +174,7 @@ Epic 0–1
 | --- | --- | --- |
 | App host identity | App-context FDA/TCC、签名和分发结论 | Core/Codex 库测试 |
 | Swift Surveyor performance | 完整 Quick Scan 架构定型 | 领域模型与 fixture |
-| Broker-only isolation | 生产级 Deep Dive | Quick Scan、Policy、Trash、History |
+| Capability-first Codex containment | 生产级 Deep Dive | Quick Scan、Policy、Trash、History |
 | Policy/Executor safety | 任何真实清理能力 | 只读扫描与调查 |
 | License/provenance | 第三方代码、依赖、规则或 Adapter 合入 | 独立 fixture/Spike |
 | Release readiness | 公共 release、签名和公证 | 本地开发迭代 |
@@ -197,13 +202,13 @@ Epic 0–1
 - Bundle identifier：已确认 `com.eriklee.stornaut`。
 - Epic 0 Task 2：原生 App/Test/UI Test host、Sidebar 左下 Settings、Light/Dark/Settings 窗口截图、本地签名、LaunchServices 和 bundle 审计已完成；见 ADR 0001。
 - 开发自动化：仓库固定的 XcodeBuildMCP `2.7.0`、Peekaboo `3.10.0` 五工具只读 MCP、UI Testing Guide 与真实 App PID 窗口截图 smoke 已完成；见 [Development Automation Validation](../reports/development-automation-2026-08-09.md)。
-- Epic 1 Codex Runtime Upstream Study Gate：已完成；确认 installed `0.147.0` 的 process flags 与 isolation 候选，同时保持 Broker-only、直接读取和 App-context 权限结论为 unverified；见 [study](../upstream-studies/epic-1-codex-runtime.md)。
+- Epic 1 Codex Runtime Upstream Study Gate：已完成；历史研究确认 installed `0.147.0` 的 process flags 与 Broker-only 不可证明，后由 ADR 0004 接受 direct read 与公共联网并改用 capability-first gate；见 [study](../upstream-studies/epic-1-codex-runtime.md)。
 - Epic 1 Task 3：无 shell Codex discovery、bounded process seam、evidence-bearing capability report、generated fixtures 与 installed no-model diagnostic 已完成；所有 behavior/isolation verdict 仍为 unverified，见 [ADR 0002](../adr/0002-codex-discovery-and-capabilities.md)。
-- Epic 1 Task 4：固定参数 structured process、bounded JSONL、Swift final-envelope validation、原子 process-group 与 timeout/cancellation descendant cleanup 已完成；真实 `0.147.0` static-envelope probe 通过，但不构成 Broker-only/read isolation 证据，见 [ADR 0003](../adr/0003-codex-process-protocol.md)。
-- Epic 1 Task 5：四个 bounded read-only Probe、canonical path/immutable denylist、budget/redacted audit、fake Codex typed Bridge 与 signed App-context canary 已完成；installed `0.147.0` 无完整 tool allowlist，因此结论为 protocol-only/no-go，Deep Dive 继续 paused，见 [ADR 0004](../adr/0004-codex-file-read-isolation.md)。
+- Epic 1 Task 4：固定参数 structured process、bounded JSONL、Swift final-envelope validation、原子 process-group 与 timeout/cancellation descendant cleanup 已完成；真实 `0.147.0` static-envelope probe 通过；当时的 Broker-only/read isolation 结论是历史证据，不是当前能力限制，见 [ADR 0003](../adr/0003-codex-process-protocol.md)。
+- Epic 1 Task 5：四个 bounded read-only Probe、canonical path/immutable denylist、budget/redacted audit、fake Codex typed Bridge 与 signed App-context canary 已完成；历史结论为 protocol-only/no-go。ADR 0004 已在 2026-08-11 修订为 capability-first，Deep Dive 现在因新实现/evidence gate 未交付而 paused。
 - Epic 1 Task 6：bounded Swift/POSIX Surveyor、no-follow/same-device、logical/allocated bytes、partial errors、synthetic/real benchmark 已完成；460GiB-class root 中位约 96.2s、peak RSS <28MB、producer cancellation <1ms，继续 Swift、不评估 Rust，见 [ADR 0005](../adr/0005-swift-surveyor-performance.md)。
 - Epic 1 Task 7：identity/activity revalidation、Foundation Trash、无 permanent-delete fallback、fixed fake Registered Action、process-group timeout 与真实 CLI/APFS Trash probes 已完成；App-context FDA/TCC 仍为 residual risk，见 [ADR 0006](../adr/0006-trash-and-registered-actions.md)。
-- Epic 1 Task 8：六项 spike evidence gate 与约束审计已完成；Epic 2–3 deterministic development conditional go，Deep Dive 继续 no-go/paused，见 [Epic 0–1 Validation Report](../reports/epic-0-1-validation-report.md)。
+- Epic 1 Task 8：六项 spike evidence gate 与约束审计已完成；报告中的 Deep Dive no-go/paused 是当时 Broker-only 口径，已由 ADR 0004 修订；历史证据见 [Epic 0–1 Validation Report](../reports/epic-0-1-validation-report.md)。
 - Epic 1 最终 code review：denylist、secret redaction、signed device identity、bounded directory probes、Registered Action descendant cleanup 等 5 个确认缺陷已修复，统一验证通过，见 [review report](../reports/epic-1-code-review-2026-08-09.md)。
 - Phase B Task 9：四份 Upstream Study、SQLite feasibility、ADR 0007 与
   code review 已完成；两项 P1 设计问题已修复。

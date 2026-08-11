@@ -43,7 +43,7 @@
 | 当前 Trash / Registered Actions 研究 Gate | [Epic 1 Actions Study](upstream-studies/epic-1-actions.md) |
 | Codex discovery/capability 决策 | [ADR 0002](adr/0002-codex-discovery-and-capabilities.md) |
 | Codex structured process 决策 | [ADR 0003](adr/0003-codex-process-protocol.md) |
-| Probe Broker 与 Codex 隔离决策 | [ADR 0004](adr/0004-codex-file-read-isolation.md) |
+| Codex 能力优先调查与 Swift 执行边界 | [ADR 0004](adr/0004-codex-file-read-isolation.md) — direct read、live search、公共联网；无写入/Executor 权限 |
 | Swift Surveyor 性能决策 | [ADR 0005](adr/0005-swift-surveyor-performance.md) |
 | Trash 与 Registered Action 决策 | [ADR 0006](adr/0006-trash-and-registered-actions.md) |
 | 领域持久化决策 | [ADR 0007](adr/0007-domain-persistence-boundary.md) — Accepted，Task 11 verified |
@@ -90,7 +90,7 @@
 5. 已接受 ADR 和当前机器测量证据；
 6. upstream studies、research、案例和视觉概念。
 
-历史研究中的命令、旧术语和当时判断仅作证据上下文。它们不是当前执行授权，也不能绕过 Policy Gate、denylist 或 Executor。
+历史研究中的命令、旧术语和当时判断仅作证据上下文。它们不是当前执行授权，也不能绕过 Policy Gate、清理 protected-path policy 或 Executor。
 
 ## Lifecycle
 

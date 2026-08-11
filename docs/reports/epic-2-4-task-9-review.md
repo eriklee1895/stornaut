@@ -1,5 +1,9 @@
 # Epic 2–4 Task 9 Code Review — 2026-08-09
 
+> **Historical-scope notice (2026-08-11):** Deep Dive paused/no-go references
+> record the reviewed Phase B scope, not current Codex policy. See capability-first
+> [ADR 0004](../adr/0004-codex-file-read-isolation.md).
+
 > 状态：Two confirmed design findings fixed; no open P0–P2 finding
 >
 > 范围：Task 9 Phase B studies、ADR 0007、active-plan/routing updates

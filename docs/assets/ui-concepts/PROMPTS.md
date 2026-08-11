@@ -206,7 +206,7 @@ Internal selection result, approved 2026-08-08: A is the Settings shell, C contr
 See [round notes and behavior matrix](RESILIENCE-STATES-ROUND-1.md).
 
 - `resilience-limited-coverage-canonical-dark.png` / `resilience-limited-coverage-canonical-light.png` — measured Quick Scan results remain useful while inaccessible scope is explicitly unmeasurable.
-- `resilience-deep-dive-safety-blocked-canonical-dark.png` / `resilience-deep-dive-safety-blocked-canonical-light.png` — Deep Dive remains paused when isolation fails; Quick Scan remains available and no bypass exists.
+- `resilience-deep-dive-safety-blocked-canonical-dark.png` / `resilience-deep-dive-safety-blocked-canonical-light.png` — Deep Dive remains paused when full investigation capabilities are unavailable or write/no-Executor isolation fails; Quick Scan remains available and no write bypass exists.
 - `resilience-stale-plan-canonical-dark.png` / `resilience-stale-plan-canonical-light.png` — execution preflight blocks a changed plan and requires affected items to be refreshed.
 - `resilience-partial-investigation-canonical-dark.png` / `resilience-partial-investigation-canonical-light.png` — verified partial evidence is preserved when the budget ends; unresolved targets remain Unknown.
 - `resilience-history-expired-canonical-dark.png` / `resilience-history-expired-canonical-light.png` — expired linked evidence does not erase the minimum Cleanup Manifest; corrupt history is isolated by row.

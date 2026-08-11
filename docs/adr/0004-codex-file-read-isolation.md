@@ -64,8 +64,9 @@ it with an integrity-first boundary:
   acceptable silent fallback; an unavailable live-search capability must be
   reported as degraded coverage.
 - Commands, subprocesses, browser tools and direct-fetch tools may access the
-  public internet for investigation. Stornaut does not maintain a public-domain
-  allowlist or require per-command approval for those read/investigation flows.
+  public internet for investigation. Stornaut does not maintain a public
+  destination-domain allowlist or require per-command approval for those
+  read/investigation flows.
 - Localhost, link-local/private-network destinations and arbitrary Unix sockets
   remain blocked by default. They do not materially improve public artifact
   identification and could turn a disk investigation into control of unrelated
@@ -78,6 +79,10 @@ it with an integrity-first boundary:
   outer write-denial and no-Executor boundary.
 - Probe Broker remains a preferred structured, bounded and auditable evidence
   source, but it is no longer Codex's exclusive investigation interface.
+- Deep Dive presents one aggregate data-boundary disclosure before first use;
+  after acceptance, Stornaut does not add per-file, per-command, per-tool or
+  per-domain approvals and does not impose an Agent read-path denylist inside
+  the user-selected scan scope.
 - Codex output is advisory evidence and candidate proposals only. It cannot
   invoke `MoveToTrash`, a Registered Action, Policy Gate or Executor.
 - Swift canonicalizes every proposed path, applies protected-path and activity
@@ -92,7 +97,9 @@ represented in model context; live search, browser, direct-fetch and networked
 command traffic are processed by external services. Stornaut no longer claims
 that Deep Dive exposes only Broker-filtered or Broker-redacted evidence to
 Codex. It still must not intentionally collect credentials, bypass TCC, persist
-raw model streams, or turn investigation content into cleanup authority.
+raw model streams or encountered secret values, or turn investigation content
+into cleanup authority. Protected-path denial remains an execution/cleanup
+policy, not a restriction on Codex's read-only investigation surface.
 
 The current OpenAI documentation supports separating these controls: local
 Codex sandboxing governs filesystem and command-network permissions, while the

@@ -4,8 +4,8 @@
 
 1. `0001-package-first-native-shell.md`
 2. [`0002-codex-discovery-and-capabilities.md`](0002-codex-discovery-and-capabilities.md) — Accepted for Task 3 discovery; runtime isolation remains unverified
-3. [`0003-codex-process-protocol.md`](0003-codex-process-protocol.md) — Accepted for Task 4 process/protocol; Broker-only isolation remains unverified
-4. [`0004-codex-file-read-isolation.md`](0004-codex-file-read-isolation.md) — Accepted Task 5 no-go; Broker protocol proven, Broker-only runtime not enforced
+3. [`0003-codex-process-protocol.md`](0003-codex-process-protocol.md) — Accepted for Task 4 process/protocol; historical Broker-only evidence retained
+4. [`0004-codex-file-read-isolation.md`](0004-codex-file-read-isolation.md) — Amended and accepted 2026-08-11; capability-first direct read/Agent tools/live public internet with OS write denial and Swift-only execution
 5. [`0005-swift-surveyor-performance.md`](0005-swift-surveyor-performance.md) — Accepted Task 6; Swift meets measured performance/memory/cancellation goals
 6. [`0006-trash-and-registered-actions.md`](0006-trash-and-registered-actions.md) — Accepted Task 7; constrained Trash and fake registered-action lifecycle validated
 7. [`0007-domain-persistence-boundary.md`](0007-domain-persistence-boundary.md) — Accepted; dual-store SQLite boundary verified in Task 11
@@ -16,3 +16,6 @@
 12. [`0012-cleanup-execution-journal.md`](0012-cleanup-execution-journal.md) — Accepted for Phase C; write-ahead recovery and insert-only Manifest semantics
 
 每份 ADR 至少记录 Status、Context、Evidence、Decision、Consequences、Residual Risks 和 Validation。安全假设没有测量证据时不得标记 Accepted。
+
+ADR 0002/0003/0006 等早期文件中的 Broker-only/no-go 表述记录当时的
+Spike 结论，不再定义当前产品权限；当前 Codex 边界以修订后的 ADR 0004 为准。

@@ -39,7 +39,7 @@ The page keeps measured results usable and labels the unmeasurable portion separ
 
 ![Deep Dive safety blocked light](resilience-deep-dive-safety-blocked-canonical-light.png)
 
-Codex discovery and Probe Broker availability are shown as separate facts from isolation verification. If isolation fails, all investigation stages remain `Not started`, no finding count or explained-space gain is claimed, and Deep Dive stays paused. `Review Safety Check` is the primary action; `Run Quick Scan` is the safe fallback. There is no “continue anyway” control.
+Codex discovery, full investigation capability and Probe Broker availability are shown as separate facts from write/no-Executor isolation. If live/public-network/Agent tools are missing or write isolation fails, all investigation stages remain `Not started`, no finding count or explained-space gain is claimed, and Deep Dive stays paused. `Review Capability Check` is the primary action; `Run Quick Scan` is the fallback. There is no write-isolation “continue anyway” control.
 
 The rejected draft below retained stale success metrics while saying the investigation had not started. It is preserved only as a design-audit example and must not be implemented.
 
@@ -111,7 +111,7 @@ After linked Evidence expires, the minimum Cleanup Manifest still shows action i
 Shared direction: high-fidelity native macOS Stornaut UI; identical Light/Dark hierarchy; four-item sidebar; calm Native Observatory visual language; restrained indigo/cyan with semantic amber/red; preserve valid page content; concise English; no chat, terminal, paywall, constellation, generic alert takeover, unsafe bypass, or cleanup action outside Review.
 
 - **Limited coverage:** Quick Scan results with measured and unmeasurable space separated, useful measured findings preserved, permission recovery inline.
-- **Safety blocked:** Deep Dive paused before any stage starts; Codex installed, Broker available, isolation failed; no success metrics or bypass.
+- **Capability blocked:** Deep Dive paused before any stage starts; diagnostics distinguish missing live/public-network/Agent tools from write/no-Executor isolation failure; no success metrics or write bypass.
 - **Stale preflight:** frozen Review context with a native blocking sheet, affected-item diff, refresh/cancel only.
 - **Partial investigation:** budget exhausted with verified partial evidence, unresolved Unknown targets, continue/review/done actions.
 - **Expired evidence:** History master-detail with retained minimum Manifest, explicit expired-evidence placeholder, and one isolated corrupt record.

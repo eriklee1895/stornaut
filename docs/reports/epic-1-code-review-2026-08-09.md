@@ -1,5 +1,10 @@
 # Epic 1 Final Code Review — 2026-08-09
 
+> **Historical-evidence notice (2026-08-11):** Broker-only/no-go references
+> below describe the reviewed 2026-08-09 boundary. Current product policy is
+> the capability-first
+> [ADR 0004](../adr/0004-codex-file-read-isolation.md).
+
 > 状态：All confirmed findings fixed and verified
 >
 > 范围：`dfbd034..cb89ee0`，Epic 1 Tasks 3–8

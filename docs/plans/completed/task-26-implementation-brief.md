@@ -1,5 +1,10 @@
 # Task 26 Implementation Brief — Phase B Evidence Gate and Handoff
 
+> **Historical-brief notice (2026-08-11):** Deep Dive paused/no-go wording
+> below records the Phase B gate at closure. Current Codex policy is the
+> capability-first
+> [ADR 0004](../../adr/0004-codex-file-read-isolation.md).
+
 > 状态：Completed — product evidence、Automation Mode orchestration、UI
 > stability fixes and the final unified verifier all passed
 >

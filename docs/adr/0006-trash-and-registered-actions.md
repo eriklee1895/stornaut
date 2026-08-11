@@ -5,6 +5,11 @@
 > Decision owners: Stornaut maintainers
 > Related study: [`../upstream-studies/epic-1-actions.md`](../upstream-studies/epic-1-actions.md)
 
+> **2026-08-11 policy amendment:** This ADR's Executor restrictions remain
+> normative. Its references to ADR 0004 Broker-only/no-go are historical;
+> current Codex investigation policy is the capability-first
+> [amended ADR 0004](0004-codex-file-read-isolation.md).
+
 ## Context
 
 Stornaut must eventually close the deterministic path from a reviewed cleanup

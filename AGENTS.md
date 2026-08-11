@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift 确定性扫描处理已知空间，用户已安装的 Codex 经 Probe Broker 调查未知空间，Swift Policy Gate / Executor 掌握全部写权限。
+Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift 确定性扫描处理已知空间，用户已安装的 Codex 使用直接只读 Agent 工具、Probe Broker 与公共互联网调查未知空间，Swift Policy Gate / Executor 掌握全部写权限。
 
 本文件只保留高频规则与文档路由。文档总入口为 [`docs/README.md`](docs/README.md)，完整实施约束以 [`docs/agent/coding-agent-handoff.md`](docs/agent/coding-agent-handoff.md) 为准。
 
@@ -9,7 +9,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 ## Always
 
 - 先读 handoff，再按任务读取最小必要文档；不要从 UI 概念图推断规格外功能，也不要把概念图当逐像素终稿。
-- 遵守全部产品不变量（见 handoff §3）。尤其：Quick Scan 不调模型；Codex 无写权限；磁盘调查只能走 Probe Broker；Executor 只接受 `MoveToTrash` 或 Registered Action；Trash 失败绝不永久删除；失败保持 `Unknown`。
+- 遵守全部产品不变量（见 handoff §3）。尤其：Quick Scan 不调模型；Codex 可直接读取并使用 shell/unified exec、live search、browser/direct fetch、image、skills/subagents 与公共互联网，但无写权限或清理执行权；Probe Broker 是优先结构化证据源而非唯一接口；Executor 只接受 `MoveToTrash` 或 Registered Action；Trash 失败绝不永久删除；失败保持 `Unknown`。
 - Epic 0–1 与 Epic 2–4 Tasks 9–26 已完成；Phase B 最终 unified verifier
   单次 exit 0，计划与 Task 21–26 briefs 已归档；
   Phase C deterministic Epic 8 详尽 plan 已于 2026-08-11 获用户批准，
@@ -17,7 +17,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   Upstream Study、实现、code review、
   focused/full verify、独立 commit/push；不得提前混入 Deep Dive、Adapter、
   真实 Registered Action 或 release 工作。
-- Spike / safety check 通过前，Deep Dive 必须保持 paused；发现 Codex ≠ 验证安全边界。
+- 新的 capability-first runtime/safety check 通过前，Deep Dive 必须保持 paused；发现 Codex ≠ 已证明“公共联网 + 完整调查能力 + 进程树不可写 + no-Executor”边界。
 - 权限、隔离、许可证、性能主张必须有本机证据（`--help`、测试、Benchmark、ADR）。不确定时先 Spike/ADR，不用大段代码掩盖。
 - 保留现有 MIT `LICENSE`；新增依赖前记录许可证与理由。不要复制 Mole GPL 代码。
 - 视觉素材可通过 Web 搜索或 `$erik-gpt-image-2` 生成。Web 素材必须记录来源 URL、作者/版权、许可证和允许用途；AI 生成素材必须保留 prompt/metadata，不提交凭据。现有 UI/UX 与品牌概念图由 `$erik-gpt-image-2` 生成，仍只作非逐像素参考。
@@ -41,7 +41,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 ## Decision Autonomy
 
 - 可逆、低风险工作可主动推进：文档修正建议、测试、fixture、本地 verify、ADR 草稿、计划内 Task。
-- 先向用户确认：扩大安全/权限边界、改产品范围、新增付费/远程服务、force-push、改许可证、发布/公证流程、把 Deep Dive 从 paused 放开。
+- 先向用户确认：扩大 Codex 本地写入/执行权、开放本机私网或 Unix socket、改产品范围、新增付费/远程服务、force-push、改许可证、发布/公证流程、把未经 runtime gate 的 Deep Dive 从 paused 放开。ADR 0004 已批准的直接只读工具与公共互联网能力不再重复请求授权。
 - 设计/PRD/architecture 冲突时先报告并提出精确修正文案，不得自行放宽边界。
 
 ## Docs Router
@@ -79,9 +79,10 @@ domain/persistence、product Quick Scan、Space Ledger、Knowledge/Activity
 与 App/UI 产品证据通过最终统一验证。Phase C deterministic Epic 8 plan
 已获批准；Task 27 已完成，当前 Task 28 只实现 domain v2、Store v3 与
 execution journal contracts。
-Deep Dive 因 Broker-only 未被技术性证明而 no-go/paused，release
-signing/notarization 仍未评估。Overview、Scan、Scan-only History 与六区
-Settings 已是真实 typed projection/生命周期，Investigations 仍是 placeholder，
+Deep Dive 的旧 Broker-only no-go 已被 ADR 0004 的 capability-first 边界取代；
+当前仍 paused 的原因是新运行时实现/evidence gate 尚未交付，而非 Codex 工具
+能力过强。release signing/notarization 仍未评估。Overview、Scan、Scan-only
+History 与六区 Settings 已是真实 typed projection/生命周期，Investigations 仍是 placeholder，
 Review/Trash 仍未启用。
 
 当前已验证的包布局：

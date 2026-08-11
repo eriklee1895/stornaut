@@ -1,5 +1,10 @@
 # Stornaut Epic 2–4 Deterministic Product Core Implementation Plan
 
+> **Historical-plan notice (2026-08-11):** Deep Dive paused/no-go language in
+> this completed Phase B plan records the UI state at delivery time. Current
+> capability policy is the capability-first
+> [ADR 0004](../../adr/0004-codex-file-read-isolation.md).
+
 > **Status:** Completed — Tasks 9–26 reviewed, verified and archived
 >
 > **Roadmap phase:** Phase B — Deterministic Product Core
