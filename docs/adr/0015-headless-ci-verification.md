@@ -200,6 +200,12 @@ confirmed:
   or test-code change was added, and the fresh uninterrupted full invocation
   above passed. This is direct evidence for keeping live-desktop UI work out of
   ordinary hosted CI.
+- the final pull-request [GitHub Actions run 31513874516](https://github.com/eriklee1895/stornaut/actions/runs/31513874516)
+  exited zero in 7 minutes 10 seconds. Its uploaded fourteen-row timing record
+  totals 404.784 seconds: 303 serialized Swift tests took 78.316 seconds, 106
+  App contracts took 67.256 seconds, and the Debug/Release fixture boundary
+  took 150.367 seconds. No XCUITest, pixel golden, Automation Mode,
+  Peekaboo/TCC or performance benchmark ran.
 
 The first four hosted runs were intentionally retained as evidence: the first
 reached the thirty-minute timeout inside the parallel SwiftPM test step; the
@@ -209,5 +215,5 @@ missing static-analysis dependency; the fourth proved the pixel goldens are
 macOS-patch-sensitive even without a graphical session. Final hosted timing and
 outcome are recorded by the replacement pull-request run.
 
-Final acceptance also requires the pull request's real `Stornaut CI` run to
-exit zero on GitHub's hosted `macos-26` arm64 runner.
+Final acceptance is satisfied by the successful real `Stornaut CI` run above
+on GitHub's hosted `macos-26` arm64 runner.
