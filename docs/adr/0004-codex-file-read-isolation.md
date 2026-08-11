@@ -31,10 +31,12 @@ personal-use tool:
    priority;
 2. Codex must be able to inspect unfamiliar directory and project types with
    direct read-only shell tools;
-3. Codex must be able to use live web search when local evidence is
-   insufficient;
-4. lower investigation-data confidentiality is accepted;
-5. Codex still has no cleanup authority, and every write remains behind Swift
+3. Codex must use unrestricted live web search rather than a cached/indexed
+   substitute when local evidence is insufficient;
+4. Codex may use public-internet shell, browser and direct-fetch workflows when
+   search results alone are insufficient;
+5. lower investigation-data confidentiality is accepted;
+6. Codex still has no cleanup authority, and every write remains behind Swift
    validation, explicit user selection and the typed Executor.
 
 This amendment changes the normative product boundary. It does not rewrite the
@@ -47,15 +49,33 @@ historical Task 5 measurements below.
 The Broker-only requirement is no longer a prerequisite for Deep Dive. Replace
 it with an integrity-first boundary:
 
-- Codex may use direct filesystem reads and local shell commands for
-  investigation.
+- Codex may use direct filesystem reads and the normal local shell/unified-exec
+  toolchain for investigation. Stornaut must not impose a Bash or executable
+  allowlist merely to reduce Codex's Agent surface.
 - Codex runs under an OS-enforced read-only sandbox. It must not create,
   modify, move, rename or delete user data.
-- Codex may use built-in live web search when it encounters an unfamiliar
-  directory, artifact, toolchain or project type.
-- Built-in web search is distinct from arbitrary command/subprocess network
-  access. Command network remains disabled by default; enabling it would be a
-  separate future decision with its own evidence.
+- Stornaut must not use `danger-full-access` as a shortcut for public network
+  access. If the installed Codex sandbox cannot combine public egress with
+  effective write denial, an outer OS containment boundary must provide that
+  combination before Deep Dive ships.
+- Codex uses built-in `web_search = "live"`, with high search context and no
+  destination-domain allowlist, when it encounters an unfamiliar directory,
+  artifact, toolchain or project type. Cached or indexed search is not an
+  acceptable silent fallback; an unavailable live-search capability must be
+  reported as degraded coverage.
+- Commands, subprocesses, browser tools and direct-fetch tools may access the
+  public internet for investigation. Stornaut does not maintain a public-domain
+  allowlist or require per-command approval for those read/investigation flows.
+- Localhost, link-local/private-network destinations and arbitrary Unix sockets
+  remain blocked by default. They do not materially improve public artifact
+  identification and could turn a disk investigation into control of unrelated
+  local services. A future explicit local-service investigation mode would be
+  a separate product decision.
+- Investigation capabilities relevant to scan quality, including shell,
+  unified exec, live search, browser/direct fetch, image inspection and
+  supported Agent skills or subagents, must not be disabled solely because a
+  complete Codex tool allowlist is unavailable. Each still inherits the same
+  outer write-denial and no-Executor boundary.
 - Probe Broker remains a preferred structured, bounded and auditable evidence
   source, but it is no longer Codex's exclusive investigation interface.
 - Codex output is advisory evidence and candidate proposals only. It cannot
@@ -68,17 +88,20 @@ it with an integrity-first boundary:
   deletion.
 
 The accepted confidentiality trade-off is explicit: files read by Codex may be
-represented in model context, and live search queries/results are processed by
-external services. Stornaut no longer claims that Deep Dive exposes only
-Broker-filtered or Broker-redacted evidence to Codex. It still must not
-intentionally collect credentials, bypass TCC, persist raw model streams, or
-turn investigation content into cleanup authority.
+represented in model context; live search, browser, direct-fetch and networked
+command traffic are processed by external services. Stornaut no longer claims
+that Deep Dive exposes only Broker-filtered or Broker-redacted evidence to
+Codex. It still must not intentionally collect credentials, bypass TCC, persist
+raw model streams, or turn investigation content into cleanup authority.
 
 The current OpenAI documentation supports separating these controls: local
-Codex sandboxing governs filesystem writes and command network access, while
-the built-in web-search mode can be configured independently. It also warns
-that web content is untrusted and that arbitrary Agent internet access adds
-prompt-injection, exfiltration, malware and licensing risks:
+Codex sandboxing governs filesystem and command-network permissions, while the
+built-in web-search mode can be configured independently as cached, indexed or
+live. This decision explicitly selects live search and public command network
+for quality, without selecting unrestricted filesystem writes. The same
+documentation warns that web content is untrusted and that arbitrary Agent
+internet access adds prompt-injection, exfiltration, malware and licensing
+risks:
 
 - [Agent approvals and security](https://developers.openai.com/codex/agent-approvals-security)
 - [Agent internet access](https://developers.openai.com/codex/cloud/internet-access)
@@ -274,9 +297,10 @@ Positive:
 - failure of the Codex gate does not block Quick Scan, Surveyor, Policy or
   Action lifecycle work;
 - Deep Dive may now be planned around Codex's direct read-only Agent tools and
-  live web search instead of waiting for a complete Broker-only allowlist;
+  unrestricted public-internet investigation instead of waiting for a complete
+  Broker-only, command or destination allowlist;
 - unfamiliar artifacts can be investigated adaptively instead of being limited
-  to the four initial Probe schemas;
+  to the four initial Probe schemas or a search-result cache;
 - cleanup integrity remains owned by Swift Policy Gate, user selection and the
   typed Executor.
 
@@ -289,8 +313,9 @@ Costs:
 - the sensitive-path catalog must be reviewed as macOS/browser layouts evolve;
 - direct Codex reads are not covered by Probe Broker redaction, byte budgets or
   path audit records;
-- model context and live web search create accepted confidentiality,
-  prompt-injection, third-party processing and licensing exposure;
+- model context, live web search, browser/direct fetch and networked commands
+  create accepted confidentiality, prompt-injection, third-party processing,
+  remote-content and licensing exposure;
 - human cleanup confirmation does not mitigate investigation-time disclosure,
   so UI and privacy documentation must describe this trade-off honestly.
 
@@ -307,16 +332,19 @@ blocker has been removed. A separately approved implementation plan must prove:
 2. no callable path from Codex events, shell commands or output fields to
    Trash, Registered Actions, Policy Gate bypass or Executor;
 3. bounded timeout, cancellation, output and process-tree cleanup remain intact
-   when shell and live search are enabled;
-4. live search works without granting arbitrary command/subprocess network
-   access;
-5. all candidates are treated as untrusted advisory input and are
+   when shell, browser, live search and public command network are enabled;
+4. live search is explicitly live, high-context and unrestricted by public
+   destination domains; cached/indexed degradation is detected and surfaced;
+5. public command/subprocess network and browser/direct-fetch workflows work
+   without weakening the filesystem write boundary or granting local/private
+   network and Unix-socket access;
+6. all candidates are treated as untrusted advisory input and are
    canonicalized, classified, revalidated and displayed for explicit selection;
-6. malformed, injected, stale, active, protected or out-of-scope candidates
+7. malformed, injected, stale, active, protected or out-of-scope candidates
    fail closed as `Unknown` or rejected;
-7. the UI and privacy documentation disclose that direct reads and live search
-   are not Broker-redacted confidentiality boundaries;
-8. no raw Codex JSONL or uncontrolled content payload is retained beyond the
+8. the UI and privacy documentation disclose that direct reads and public
+   internet investigation are not Broker-redacted confidentiality boundaries;
+9. no raw Codex JSONL or uncontrolled content payload is retained beyond the
    approved evidence lifecycle.
 
 Until that implementation and evidence gate passes, current production UI may
@@ -331,7 +359,9 @@ gate with:
 
 - adversarial read-only sandbox tests covering the Codex process tree;
 - direct-read and shell investigation fixtures for unfamiliar artifact types;
-- live-search behavior and provenance tests with command network disabled;
+- live-search freshness/context/provenance tests plus public-network
+  shell/browser/direct-fetch fixtures;
+- negative local/private-network and Unix-socket access tests;
 - prompt-injection and candidate-forgery fixtures;
 - proof that Codex output cannot encode or trigger an executable cleanup path;
 - focused protocol, Policy Gate and revalidation suites;
