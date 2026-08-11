@@ -76,13 +76,21 @@ Doctor 或 capture 后短暂出现 `.dev-tools/.../peekaboo daemon run` 属于�
 
 `scripts/verify-ui-runtime` 是 awake/unlocked 本机会话的端到端 smoke：先运行 doctor，再通过 XcodeBuildMCP 构建/启动真实 Debug App，以 PID 精确捕获一个 Stornaut 窗口，并检查 PNG 尺寸、文件大小和像素方差，最后终止该 App。它仍不替代 XCUITest 或 `scripts/verify`。
 
-Expected Peekaboo state on the current machine:
+macOS TCC 按**责任进程**授权，也就是发起进程链的宿主 App，而不是按命令或终端授权。同一条 Peekaboo 命令在不同宿主下可以得到不同的权限结论，因此本节记录按宿主测量的状态，不存在单一全局状态。
+
+Measured on 2026-08-11, host: Cursor-spawned shell.
 
 ```text
-Screen Recording: granted
-Accessibility: not required for the default read-only loop
-Event Synthesizing: not required and intentionally not granted
+Screen Recording: not granted to this host
+Accessibility: granted
+Event Synthesizing: granted
 ```
+
+同日在该宿主上实测的能力边界：
+
+- `inspect_ui` 与 `list` 只依赖 Accessibility。Screen Recording 未授权时它们仍返回完整 AX 文本，因此 AX 文本检查是一条不依赖录屏权限的确定性证据路径。
+- `image` 与 `see` 需要该宿主自身的 Screen Recording 授权。Peekaboo 会明确提示授权 CLI 或终端不改变宿主结论。
+- Event Synthesizing 已在系统层授予。只读边界因此不再依赖系统未授权这一事实，而完全由 `scripts/peekaboo-readonly` 的五工具白名单与 deny list 维持。
 
 Missing Screen Recording is a local capability failure, not permission to open or automate System Settings.
 Peekaboo capture also requires an awake, unlocked graphical session. If `CGGetActiveDisplayList` reports zero displays or native `screencapture` also fails, do not synthesize input to wake the machine; use XCUITest screenshot evidence for the unattended run and repeat Peekaboo capture after the user returns.

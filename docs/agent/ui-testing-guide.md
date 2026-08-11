@@ -210,7 +210,9 @@ scripts/peekaboo-readonly permissions status --json-output
 
 - `Screen Recording: granted` 才能执行 Peekaboo screenshot；
 - 缺失时停止本地视觉验收，不能自动打开、点击或重置 System Settings；
-- Accessibility / Event Synthesizing 缺失不阻止默认 image-only loop。
+- Accessibility / Event Synthesizing 缺失不阻止默认 image-only loop；
+- 反之 `inspect_ui` 与 `list` 只依赖 Accessibility，Screen Recording 缺失时仍可用，可作为该宿主下的降级证据路径；
+- 权限按责任宿主进程授予，换一个宿主运行同一命令可能得到不同结论，状态检查必须在实际运行 Peekaboo 的宿主里做。
 
 ### Displays asleep or session locked
 
