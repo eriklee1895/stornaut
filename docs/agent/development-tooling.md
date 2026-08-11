@@ -195,8 +195,11 @@ Peekaboo and XCUITest are local/full-verifier evidence because Screen Recording,
 Automation Mode and the active desktop are host state. Ordinary GitHub-hosted CI
 must not claim it ran either layer. Its portable contract is
 `scripts/verify --headless`: SwiftPM/App tests, committed view snapshots, boundary
-checks and Debug/Release builds on the pinned macOS/Xcode runner. A future dedicated
-UI lab is a separate security and operations decision; see
+checks and Debug/Release builds on the pinned macOS/Xcode runner. Its Swift
+Testing functions run with `--no-parallel` because many cases independently
+exercise processes, pipes, cancellation and workers; the full local verifier
+retains parallel execution as concurrency stress. A future dedicated UI lab is
+a separate security and operations decision; see
 [ADR 0015](../adr/0015-headless-ci-verification.md).
 
 ## 6. Upgrades and Failure Policy

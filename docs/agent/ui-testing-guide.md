@@ -233,7 +233,9 @@ localization、bundle/signing 与 Debug/Release build fixture，但明确不运�
 XCUITest、window screenshot、Automation Mode readiness、Peekaboo/TCC 或性能
 benchmark。两种模式都会把逐步耗时写入
 `.derivedData/verification/<mode>-timings.tsv`；具体职责见
-[ADR 0015](../adr/0015-headless-ci-verification.md)。
+[ADR 0015](../adr/0015-headless-ci-verification.md)。headless Swift Testing
+用例之间显式串行，避免低资源 hosted runner 同时争抢大量进程与 pipe；各测试
+内部的 actor、worker、取消与进程树并发仍正常执行，full mode 仍保留用例间并行。
 
 开发 MCP/TCC 的独立验收：
 

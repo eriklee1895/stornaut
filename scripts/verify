@@ -58,7 +58,7 @@ done
 typeset -a headless_steps=(
     clean-derived-data
     swiftpm-build
-    swiftpm-tests
+    swiftpm-tests-serialized
     source-boundaries
     automation-parser-self-test
     app-tests-and-snapshots
@@ -114,7 +114,6 @@ print -r -- $'mode\tstep\tseconds\tstatus' > "$timing_temp"
 function persist_timings() {
     mkdir -p "${timing_file:h}"
     cp "$timing_temp" "$timing_file"
-    print "Verification timings: $timing_file"
 }
 
 function run_step() {
@@ -133,6 +132,7 @@ function run_step() {
     if (( step_status == 0 )); then
         print -r -- "$mode"$'\t'"$step_name"$'\t'"$elapsed_seconds"$'\tpass' \
             >> "$timing_temp"
+        persist_timings
         print "[verify][$mode] PASS  $step_name (${elapsed_seconds}s)"
         return 0
     fi
@@ -141,6 +141,7 @@ function run_step() {
         >> "$timing_temp"
     print -u2 "[verify][$mode] FAIL  $step_name (${elapsed_seconds}s, exit $step_status)"
     persist_timings
+    print "Verification timings: $timing_file"
     return "$step_status"
 }
 
@@ -173,6 +174,11 @@ function build_swift_package() {
 function test_swift_package() {
     local matcher_benchmarks='(cumulativeCatalogMatchingBenchmarkStaysBounded|completeCacheCatalogMatchingBenchmarkStaysBounded|completeCatalogMatchingBenchmarkStaysBounded)'
     swift test --skip "$matcher_benchmarks"
+}
+
+function test_swift_package_serialized() {
+    local matcher_benchmarks='(cumulativeCatalogMatchingBenchmarkStaysBounded|completeCacheCatalogMatchingBenchmarkStaysBounded|completeCatalogMatchingBenchmarkStaysBounded)'
+    swift test --no-parallel --skip "$matcher_benchmarks"
 }
 
 function run_matcher_benchmarks() {
@@ -257,6 +263,9 @@ function execute_step() {
         swiftpm-tests)
             run_step "$step_name" test_swift_package
             ;;
+        swiftpm-tests-serialized)
+            run_step "$step_name" test_swift_package_serialized
+            ;;
         matcher-benchmarks)
             run_step "$step_name" run_matcher_benchmarks
             ;;
@@ -308,4 +317,5 @@ for verification_step in "${selected_steps[@]}"; do
 done
 
 persist_timings
+print "Verification timings: $timing_file"
 print "Verification passed in $mode mode."

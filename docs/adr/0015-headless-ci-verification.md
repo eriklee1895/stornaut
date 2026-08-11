@@ -45,6 +45,17 @@ UI lab.
   generation: <https://github.com/actions/runner-images/blob/main/images/macos/macos-26-arm64-Readme.md>.
 - A verifier contract test executes the CLI help/list/error paths and statically
   prevents the ordinary CI workflow from referencing UI/host-only gates.
+- The first real hosted run, [GitHub Actions run 31506014347](https://github.com/eriklee1895/stornaut/actions/runs/31506014347),
+  built the package in 49.082 seconds, then launched the Swift Testing cases in
+  parallel. A process-runner test timed out under contention and many unrelated
+  process/cancellation/scan tests remained unfinished until the thirty-minute
+  job limit cancelled the run. This was test-level resource contention, not a
+  slow compile or UI dependency.
+- Apple documents that Swift Testing runs tests in parallel by default and that
+  `swift test --no-parallel` disables this globally:
+  <https://developer.apple.com/documentation/Testing/Parallelization>.
+  The same 303 non-benchmark tests passed locally and sequentially in 34.75
+  seconds.
 
 ## Decision
 
@@ -52,7 +63,9 @@ UI lab.
 
 `scripts/verify --headless` is the ordinary CI contract. It runs:
 
-- SwiftPM build and the non-benchmark SwiftPM tests;
+- SwiftPM build and the non-benchmark SwiftPM tests, with test functions
+  serialized via `--no-parallel` to avoid process/pipe exhaustion on the
+  lower-resource hosted runner;
 - all seven current source-boundary checks and the Automation Mode parser's
   pure self-test;
 - App-host tests, including committed Design System and Overview snapshots;
@@ -64,9 +77,10 @@ It does not run XCUITest, window screenshot export, Automation Mode readiness,
 Peekaboo/TCC checks, strict matcher benchmarks or Phase B product/cancellation
 performance evidence.
 
-`scripts/verify --full` adds those XCUITest/window and performance gates. Bare
-`scripts/verify` remains an alias for full mode so the existing repository
-completion contract fails safe rather than silently becoming weaker.
+`scripts/verify --full` adds those XCUITest/window and performance gates and
+retains Swift Testing's default cross-test parallelism as local concurrency
+stress. Bare `scripts/verify` remains an alias for full mode so the existing
+repository completion contract fails safe rather than silently becoming weaker.
 
 ### One owner for each repeated check
 
@@ -78,9 +92,11 @@ gate's no-argument behavior remains available for historical or focused use.
 ### Persist step timings
 
 Every verifier step prints start/pass/fail plus elapsed seconds and writes a TSV
-record to `.derivedData/verification/<mode>-timings.tsv`, including the failing
-step when verification stops. CI uploads the headless record even after a
-failure. This makes later timeout or parallelization changes evidence-driven.
+record to `.derivedData/verification/<mode>-timings.tsv`. The file is persisted
+after every completed step and includes an ordinary failing step when
+verification stops. CI attempts to upload the headless record even after a
+failure or cancellation. This makes later timeout or parallelization changes
+evidence-driven.
 
 ### Conventional GitHub Actions baseline
 
@@ -117,6 +133,10 @@ security, session lifecycle and evidence policy.
   immutable.
 - The headless suite is still serial and includes multiple Xcode builds. The
   initial timing artifact must be collected before adding caching or parallelism.
+- Serializing test functions in headless CI reduces cross-test race stress.
+  Full local verification remains parallel; individual concurrency tests still
+  exercise their own workers, actors, cancellation and process trees in both
+  modes.
 - The full verifier still depends on an awake, unlocked local session and user-
   authorized UI Automation. CI does not close that host-specific evidence gap.
 
@@ -128,10 +148,11 @@ confirmed:
 - `scripts/verify-contract` passes, including negative CLI argument checks and
   the workflow prohibition on host/UI-only gates;
 - a fresh `scripts/verify --headless` exits zero with fourteen unique timing
-  rows in 279.039 seconds;
+  rows in 197.758 seconds. Its serialized SwiftPM step ran all 303
+  non-benchmark tests in 44.150 seconds;
 - a fresh `scripts/verify --full` exits zero with nineteen unique timing rows in
-  487.317 seconds, including 9/9 XCUITest methods, all seventeen window
-  attachments, the three matcher benchmarks and the eight-second deduplicated
+  480.998 seconds, including 9/9 XCUITest methods, all seventeen window
+  attachments, the three matcher benchmarks and the 9.200-second deduplicated
   Phase B product/cancellation step;
 - a prior full attempt failed two UI methods while its `.xcresult` recorded
   unrelated foreground windows obstructing the target and one transient
@@ -139,6 +160,11 @@ confirmed:
   or test-code change was added, and the fresh uninterrupted full invocation
   above passed. This is direct evidence for keeping live-desktop UI work out of
   ordinary hosted CI.
+
+The first hosted run was intentionally retained as evidence after it reached
+the thirty-minute timeout inside the parallel SwiftPM test step. The accepted
+headless command now serializes test functions; final hosted timing and outcome
+are recorded by the replacement pull-request run.
 
 Final acceptance also requires the pull request's real `Stornaut CI` run to
 exit zero on GitHub's hosted `macos-26` arm64 runner.

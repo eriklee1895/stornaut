@@ -25,6 +25,7 @@ require_fixed_text scripts/verify '--headless'
 require_fixed_text scripts/verify '--full'
 require_fixed_text scripts/verify '--list-steps'
 require_fixed_text scripts/verify '.derivedData/verification'
+require_fixed_text scripts/verify 'swift test --no-parallel'
 require_fixed_text scripts/verify-phase-b-gate '--product-only'
 
 help_output=$(scripts/verify --help)
@@ -45,7 +46,7 @@ headless_steps=$(scripts/verify --headless --list-steps)
 full_steps=$(scripts/verify --full --list-steps)
 
 for expected in \
-    swiftpm-tests \
+    swiftpm-tests-serialized \
     source-boundaries \
     app-tests-and-snapshots \
     debug-release-fixture-boundary; do
@@ -53,6 +54,13 @@ for expected in \
         fail_contract "Headless verifier omitted $expected"
     fi
 done
+
+if [[ "$full_steps" != *"swiftpm-tests"* ]]; then
+    fail_contract "Full verifier omitted parallel SwiftPM tests"
+fi
+if [[ "$full_steps" == *"swiftpm-tests-serialized"* ]]; then
+    fail_contract "Full verifier unexpectedly serialized SwiftPM tests"
+fi
 
 for forbidden in \
     ui-automation-readiness \
