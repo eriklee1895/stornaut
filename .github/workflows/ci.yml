@@ -1,16 +1,24 @@
-name: Epic 0 Verification
+name: Stornaut CI
 
 on:
+  pull_request:
+  push:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: stornaut-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
-    name: Verify on macOS 26 arm64
+    name: Headless build and tests (macOS 26 arm64)
     runs-on: macos-26
-    timeout-minutes: 15
+    timeout-minutes: 30
 
     steps:
       - name: Check out repository
@@ -29,5 +37,14 @@ jobs:
           xcodebuild -version
           swift --version
 
-      - name: Run verification
-        run: scripts/verify
+      - name: Run headless verification
+        run: scripts/verify --headless
+
+      - name: Publish verification timings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: headless-verification-timings
+          path: .derivedData/verification/headless-timings.tsv
+          if-no-files-found: warn
+          include-hidden-files: true

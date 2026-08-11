@@ -2,11 +2,11 @@
 
 > 状态：Active
 >
-> 最近更新：2026-08-09
+> 最近更新：2026-08-11
 >
 > 适用范围：实现 Stornaut 的本地 Coding Agent；不属于产品运行时
 
-本仓库使用 XcodeBuildMCP 负责原生构建、测试、启动和工程查询，使用 Peekaboo 负责真实 macOS 窗口的只读截图与辅助可访问性检查。两者只增强本地开发反馈；`scripts/verify`、XCTest/XCUITest、产物检查和人工判断仍是验收真相。`scripts/doctor-dev-tools` 是独立的本机工具验收，不接入通用/CI `scripts/verify`，因为安装状态与 TCC 都是 host-local。
+本仓库使用 XcodeBuildMCP 负责原生构建、测试、启动和工程查询，使用 Peekaboo 负责真实 macOS 窗口的只读截图与辅助可访问性检查。两者只增强本地开发反馈；`scripts/verify --full`、XCTest/XCUITest、产物检查和人工判断仍是本机验收真相。普通 GitHub Actions 使用 `scripts/verify --headless`，只承担不依赖图形会话的构建与回归保护。`scripts/doctor-dev-tools` 是独立的本机工具验收，不接入 headless CI，因为安装状态与 TCC 都是 host-local。
 
 ## 1. Trust Boundary
 
@@ -167,7 +167,8 @@ For every App/UI change, use the smallest trustworthy loop:
 6. use `see` or `inspect_ui` only when read-only accessibility structure adds useful evidence;
 7. inspect the returned screenshot for layout, clipping, state, theme and requested interaction result;
 8. add or update XCUITest assertions and screenshot attachments for behavior that must remain deterministic;
-9. finish with `scripts/verify`.
+9. finish the local task with `scripts/verify --full` (bare `scripts/verify`
+   remains an alias for compatibility).
 
 Example local CLI checks:
 
@@ -185,11 +186,18 @@ CLI syntax can change between versions; use `scripts/xcodebuildmcp <workflow> --
 | Evidence | What it proves | What it does not prove |
 | --- | --- | --- |
 | XCTest / Swift Testing | domain and view-model contracts | rendered macOS window quality |
-| XCUITest + `.xcresult` screenshots | repeatable interaction and Light/Dark regression | every live desktop/TCC condition |
+| App tests + committed view snapshots | deterministic contracts and component/page rendering on the pinned toolchain | window chrome, navigation or live desktop state |
+| XCUITest + `.xcresult` screenshots | repeatable interaction and Light/Dark window sanity on a live local host | headless CI portability or every desktop/TCC condition |
 | Peekaboo real-window capture | what the currently launched App actually renders | CI portability or behavior assertions |
 | source inspection | implementation intent | runtime visual correctness |
 
-Peekaboo is local-only because macOS Screen Recording/TCC is host state. GitHub CI must not claim it ran the same visual inspection. XCUITest remains the portable automated contract.
+Peekaboo and XCUITest are local/full-verifier evidence because Screen Recording,
+Automation Mode and the active desktop are host state. Ordinary GitHub-hosted CI
+must not claim it ran either layer. Its portable contract is
+`scripts/verify --headless`: SwiftPM/App tests, committed view snapshots, boundary
+checks and Debug/Release builds on the pinned macOS/Xcode runner. A future dedicated
+UI lab is a separate security and operations decision; see
+[ADR 0015](../adr/0015-headless-ci-verification.md).
 
 ## 6. Upgrades and Failure Policy
 

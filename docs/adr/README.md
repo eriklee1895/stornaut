@@ -16,6 +16,7 @@
 12. [`0012-cleanup-execution-journal.md`](0012-cleanup-execution-journal.md) — Accepted for Phase C; write-ahead recovery and insert-only Manifest semantics
 13. [`0013-capability-first-runtime-containment.md`](0013-capability-first-runtime-containment.md) — Proposed conditional-go after R1; dedicated same-session loopback managed-proxy decision required before R2
 14. [`0014-view-snapshot-regression.md`](0014-view-snapshot-regression.md) — Accepted for the test architecture workstream; off-screen view goldens supplement window-level luminance sanity checks with component/page visual contracts
+15. [`0015-headless-ci-verification.md`](0015-headless-ci-verification.md) — Accepted; ordinary GitHub Actions run deterministic build/test gates while XCUITest, host UI evidence and performance remain in the local full verifier
 
 每份 ADR 至少记录 Status、Context、Evidence、Decision、Consequences、Residual Risks 和 Validation。安全假设没有测量证据时不得标记 Accepted。
 
