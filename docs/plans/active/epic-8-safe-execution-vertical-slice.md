@@ -1,7 +1,7 @@
 # Stornaut Phase C — Epic 8 Safe Execution Vertical Slice Plan
 
-> **Status:** In progress — approved on 2026-08-11; Task 27 completed and Task
-> 28 is active
+> **Status:** Paused by user after Task 28 — Tasks 27–28 completed; ADR 0004
+> capability-first review required before Task 29
 >
 > **Roadmap phase:** Phase C — Safe Execution Vertical Slice
 >
@@ -662,6 +662,33 @@ Final verifier evidence:
 - matcher benchmarks `0.231 s`, `0.375 s`, `0.504 s`;
 - Phase B evidence gate, App/state/UI boundaries, App contracts, signed bundle,
   Release fixture isolation, localization and docs all passed.
+
+### Task 28 completion evidence
+
+- [x] cleanup domain v2 with conservative v1 projections
+- [x] non-cleanup persisted domain records remain explicitly v1-only
+- [x] path-free bounded execution journal and closed transition graph
+- [x] Evidence Store schema v3 and atomic fresh/v0/v1/v2 migration
+- [x] immutable idempotent Plan/Policy/Manifest persistence
+- [x] seven-day Evidence versus 90-day audit retention/clear behavior
+- [x] corruption-isolating pages and multi-connection integrity tests
+- [x] code review with all confirmed findings fixed
+- [x] final uninterrupted `scripts/verify` exit `0`
+
+Final verifier evidence:
+
+- log SHA-256:
+  `25716afc4a7936e879dc86082c0c33177888b57a47d8e09cbce6bd611b5adca1`;
+- XCUITest `9/9` and 17 canonical screenshots;
+- Phase B gate `303/303`;
+- full SwiftPM `303/303` plus matcher benchmarks
+  `0.230 s`, `0.395 s`, `0.534 s`;
+- App tests/build/signing/bundle, Release fixture isolation, localization,
+  rule compiler, boundaries and docs passed.
+
+Task 29 is not active. The user requested a pause after Task 28 to review the
+updated ADR 0004 and ensure later Codex work maximizes capability for this
+personal-use product without weakening the Swift-only write/Executor boundary.
 
 ## Task 27: Safe Execution Upstream Study and Architecture Decisions
 

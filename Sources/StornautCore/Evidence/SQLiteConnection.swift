@@ -19,6 +19,9 @@ public enum EvidenceStoreError: Error, Sendable, Equatable {
     case invalidPage
     case retentionLimitExceeded
     case payloadTooLarge(limit: Int)
+    case legacyCleanupRecord
+    case immutableRecordConflict
+    case invalidJournalTransition
 }
 
 enum SQLiteValue: Sendable {

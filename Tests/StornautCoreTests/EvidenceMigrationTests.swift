@@ -12,7 +12,7 @@ func evidenceStoreCreatesAndMigratesSchemaAtomically() async throws {
 
     let fresh = try EvidenceStore(configuration: configuration)
     let freshDiagnostics = try await fresh.diagnostics()
-    #expect(freshDiagnostics.schemaVersion == 2)
+    #expect(freshDiagnostics.schemaVersion == 3)
     #expect(freshDiagnostics.applicationID == .evidence)
     #expect(freshDiagnostics.journalMode == "delete")
     #expect(freshDiagnostics.foreignKeysEnabled)
@@ -41,7 +41,7 @@ func evidenceStoreCreatesAndMigratesSchemaAtomically() async throws {
     let sessions = try await migrated.scanSessions(limit: 10, offset: 0)
     #expect(sessions.records.map(\.id.rawValue) == ["scan-legacy-v0"])
     #expect(sessions.corruptRecordIDs.isEmpty)
-    #expect(try await migrated.diagnostics().schemaVersion == 2)
+    #expect(try await migrated.diagnostics().schemaVersion == 3)
 
     let v1Root = try EvidenceStoreTestSupport.temporaryDirectory("v1")
     defer { try? FileManager.default.removeItem(at: v1Root) }
@@ -62,14 +62,45 @@ func evidenceStoreCreatesAndMigratesSchemaAtomically() async throws {
         databaseURL: v1Configuration.evidenceDatabaseURL,
         sql: v1SQL
     )
-    let v2 = try EvidenceStore(configuration: v1Configuration)
-    #expect(try await v2.diagnostics().schemaVersion == 2)
+    let v3FromV1 = try EvidenceStore(configuration: v1Configuration)
+    #expect(try await v3FromV1.diagnostics().schemaVersion == 3)
     #expect(
         try EvidenceStoreTestSupport.runSQLite(
             databaseURL: v1Configuration.evidenceDatabaseURL,
             sql: """
             SELECT count(*) FROM sqlite_master
             WHERE type='table' AND name='volume_baselines';
+            """
+        ) == "1"
+    )
+
+    let v2Root = try EvidenceStoreTestSupport.temporaryDirectory("v2")
+    defer { try? FileManager.default.removeItem(at: v2Root) }
+    let v2Configuration = try EvidenceStoreTestSupport.makeFileConfiguration(
+        root: v2Root
+    )
+    try FileManager.default.createDirectory(
+        at: v2Configuration.supportDirectoryURL,
+        withIntermediateDirectories: true
+    )
+    let v2SQL = try String(
+        contentsOf: EvidenceStoreTestSupport.repositoryRoot.appending(
+            path: "Tests/Fixtures/EvidenceStore/v2-evidence.sql"
+        ),
+        encoding: .utf8
+    )
+    _ = try EvidenceStoreTestSupport.runSQLite(
+        databaseURL: v2Configuration.evidenceDatabaseURL,
+        sql: v2SQL
+    )
+    let v3FromV2 = try EvidenceStore(configuration: v2Configuration)
+    #expect(try await v3FromV2.diagnostics().schemaVersion == 3)
+    #expect(
+        try EvidenceStoreTestSupport.runSQLite(
+            databaseURL: v2Configuration.evidenceDatabaseURL,
+            sql: """
+            SELECT count(*) FROM sqlite_master
+            WHERE type='table' AND name='cleanup_run_journals';
             """
         ) == "1"
     )
@@ -116,15 +147,57 @@ func migrationFailureRollsBackAndFutureSchemaIsNotMutated() async throws {
         ) == "0"
     )
 
-    do {
-        _ = try EvidenceStore(configuration: configuration)
-    }
+    try FileManager.default.removeItem(
+        at: configuration.evidenceDatabaseURL
+    )
     _ = try EvidenceStoreTestSupport.runSQLite(
         databaseURL: configuration.evidenceDatabaseURL,
-        sql: """
-        DROP TABLE volume_baselines;
-        PRAGMA user_version=1;
-        """
+        sql: "PRAGMA user_version=0;"
+    )
+    #expect(throws: EvidenceStoreError.migrationFailed(version: 3)) {
+        _ = try EvidenceStore(
+            configuration: configuration,
+            testHooks: .init(failMigrationToVersion: 3)
+        )
+    }
+    #expect(
+        try EvidenceStoreTestSupport.runSQLite(
+            databaseURL: configuration.evidenceDatabaseURL,
+            sql: "PRAGMA user_version;"
+        ) == "0"
+    )
+    #expect(
+        try EvidenceStoreTestSupport.runSQLite(
+            databaseURL: configuration.evidenceDatabaseURL,
+            sql: "PRAGMA application_id;"
+        ) == "0"
+    )
+    #expect(
+        try EvidenceStoreTestSupport.runSQLite(
+            databaseURL: configuration.evidenceDatabaseURL,
+            sql: """
+            SELECT count(*) FROM sqlite_master
+            WHERE name IN (
+                'scan_sessions',
+                'volume_baselines',
+                'cleanup_run_journals'
+            );
+            """
+        ) == "0"
+    )
+
+    try FileManager.default.removeItem(
+        at: configuration.evidenceDatabaseURL
+    )
+    let v1SQL = try String(
+        contentsOf: EvidenceStoreTestSupport.repositoryRoot.appending(
+            path: "Tests/Fixtures/EvidenceStore/v1-evidence.sql"
+        ),
+        encoding: .utf8
+    )
+    _ = try EvidenceStoreTestSupport.runSQLite(
+        databaseURL: configuration.evidenceDatabaseURL,
+        sql: v1SQL
     )
     #expect(throws: EvidenceStoreError.migrationFailed(version: 2)) {
         _ = try EvidenceStore(
@@ -144,6 +217,41 @@ func migrationFailureRollsBackAndFutureSchemaIsNotMutated() async throws {
             sql: """
             SELECT count(*) FROM sqlite_master
             WHERE name='volume_baselines';
+            """
+        ) == "0"
+    )
+
+    try FileManager.default.removeItem(
+        at: configuration.evidenceDatabaseURL
+    )
+    let v2SQL = try String(
+        contentsOf: EvidenceStoreTestSupport.repositoryRoot.appending(
+            path: "Tests/Fixtures/EvidenceStore/v2-evidence.sql"
+        ),
+        encoding: .utf8
+    )
+    _ = try EvidenceStoreTestSupport.runSQLite(
+        databaseURL: configuration.evidenceDatabaseURL,
+        sql: v2SQL
+    )
+    #expect(throws: EvidenceStoreError.migrationFailed(version: 3)) {
+        _ = try EvidenceStore(
+            configuration: configuration,
+            testHooks: .init(failMigrationToVersion: 3)
+        )
+    }
+    #expect(
+        try EvidenceStoreTestSupport.runSQLite(
+            databaseURL: configuration.evidenceDatabaseURL,
+            sql: "PRAGMA user_version;"
+        ) == "2"
+    )
+    #expect(
+        try EvidenceStoreTestSupport.runSQLite(
+            databaseURL: configuration.evidenceDatabaseURL,
+            sql: """
+            SELECT count(*) FROM sqlite_master
+            WHERE name='cleanup_run_journals';
             """
         ) == "0"
     )

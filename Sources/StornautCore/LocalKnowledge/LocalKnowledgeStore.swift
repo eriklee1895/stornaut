@@ -195,6 +195,7 @@ public struct LocalKnowledgeFact: Codable, Sendable, Equatable {
         observedAt: Date,
         updatedAt: Date
     ) throws {
+        try requireDomainSchemaVersion(schemaVersion, expected: .v1)
         guard isValidActivityDate(observedAt),
               isValidActivityDate(updatedAt),
               observedAt <= updatedAt

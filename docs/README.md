@@ -33,7 +33,7 @@
 | Agent、双模式与治理设计 | [Agent Disk Governance](design/agent-disk-governance.md) |
 | UI、品牌、状态与交互 | [UI/UX](design/ui-ux.md) |
 | 宏观交付顺序与阶段 Gate | [Delivery Roadmap](plans/roadmap.md) |
-| 当前计划状态 | [Active Plans](plans/active/README.md) — Phase C Task 28 active |
+| 当前计划状态 | [Active Plans](plans/active/README.md) — Tasks 27–28 complete；Phase C paused for ADR 0004 review |
 | Phase C Epic 8 获批计划 | [Safe Execution Vertical Slice](plans/active/epic-8-safe-execution-vertical-slice.md) |
 | Epic 2–4 历史计划 | [Deterministic Product Core](plans/completed/epic-2-4-deterministic-product-core.md) — Tasks 9–26 已完成并归档 |
 | 已完成计划 | [Completed Plans](plans/completed/README.md) — Epic 0–1 |
@@ -51,6 +51,7 @@
 | Review / Policy / Authorization 决策 | [ADR 0011](adr/0011-review-policy-authorization.md) |
 | Cleanup Journal / Manifest 决策 | [ADR 0012](adr/0012-cleanup-execution-journal.md) |
 | Epic 8 Task 27 Review | [Task 27 Code and Design Review](reports/epic-8-task-27-review.md) |
+| Epic 8 Task 28 Review | [Task 28 Code Review](reports/epic-8-task-28-review.md) |
 
 任意实现任务默认读取顺序：
 

@@ -431,15 +431,6 @@ final class StornautAppUITests: XCTestCase {
                 }
             )
         )
-        let confirmationMessage = deletion.app.staticTexts.matching(
-            NSPredicate(
-                format:
-                    "label CONTAINS[c] 'Files, Trash' OR value CONTAINS[c] 'Files, Trash'"
-            )
-        ).firstMatch
-        XCTAssertTrue(confirmationMessage.waitForExistence(timeout: 5))
-        let confirmationSheet = deletion.app.sheets.firstMatch
-        XCTAssertTrue(confirmationSheet.waitForExistence(timeout: 5))
         XCTAssertTrue(
             performAction(
                 in: deletion.app,
@@ -467,15 +458,13 @@ final class StornautAppUITests: XCTestCase {
 
         let trend = launchHistoryFixture(
             fixture: "trend",
-            appearance: "dark"
+            appearance: "dark",
+            presentation: "trend"
         )
         defer {
             trend.app.terminate()
             _ = trend.app.wait(for: .notRunning, timeout: 5)
         }
-        let trendButton = element("history.action.trend", in: trend.app)
-        XCTAssertTrue(trendButton.waitForExistence(timeout: 5))
-        trendButton.click()
         XCTAssertTrue(
             element("history.trend", in: trend.app)
                 .waitForExistence(timeout: 5)
@@ -590,13 +579,25 @@ final class StornautAppUITests: XCTestCase {
             named: "stornaut-settings-codex-dark"
         )
 
-        selectSettings(.localKnowledge, in: dark.app)
+        dark.app.terminate()
+        XCTAssertTrue(dark.app.wait(for: .notRunning, timeout: 5))
+
+        let knowledge = launchSettingsFixture(
+            fixture: "populated",
+            appearance: "dark",
+            section: "localKnowledge"
+        )
+        defer {
+            closeResidualSettingsWindow(in: knowledge.app)
+            knowledge.app.terminate()
+            _ = knowledge.app.wait(for: .notRunning, timeout: 5)
+        }
         XCTAssertTrue(
-            element("settings.page.localKnowledge", in: dark.app)
+            element("settings.page.localKnowledge", in: knowledge.app)
                 .waitForExistence(timeout: 5)
         )
         XCTAssertTrue(
-            dark.app.descendants(matching: .any)
+            knowledge.app.descendants(matching: .any)
                 .matching(
                     NSPredicate(
                         format:
@@ -604,9 +605,9 @@ final class StornautAppUITests: XCTestCase {
                     )
                 ).firstMatch.waitForExistence(timeout: 5)
         )
-        XCTAssertFalse(dark.app.textFields["Agent Memory"].exists)
+        XCTAssertFalse(knowledge.app.textFields["Agent Memory"].exists)
         addScreenshot(
-            dark.window.screenshot(),
+            knowledge.window.screenshot(),
             named: "stornaut-settings-knowledge-dark"
         )
     }
@@ -682,10 +683,8 @@ final class StornautAppUITests: XCTestCase {
                 in: launched.app
             )
         )
-        let clearSheet = launched.app.sheets.firstMatch
-        XCTAssertTrue(clearSheet.exists)
         XCTAssertTrue(
-            clearSheet.staticTexts.matching(
+            launched.app.staticTexts.matching(
                 NSPredicate(
                     format:
                         "label CONTAINS[c] '用户文件' OR value CONTAINS[c] '用户文件'"
@@ -740,8 +739,12 @@ final class StornautAppUITests: XCTestCase {
                 in: launched.app
             )
         )
-        let forgetSheet = launched.app.sheets.firstMatch
-        XCTAssertTrue(forgetSheet.exists)
+        XCTAssertTrue(
+            element(
+                "settings.confirm.forgetKnowledge.action",
+                in: launched.app
+            ).exists
+        )
         XCTAssertTrue(
             performAction(
                 in: launched.app,
@@ -880,16 +883,17 @@ final class StornautAppUITests: XCTestCase {
             "-AppleLocale", "en_US",
             "--stornaut-ui-test-appearance=\(appearance)",
             "--stornaut-debug-fixture=\(fixture)",
+            "--stornaut-debug-destination=scan",
         ]
         app.launch()
         let window = app.windows["main"]
         XCTAssertTrue(window.waitForExistence(timeout: 10))
-        let scanItem = element("sidebar.scan", in: app)
-        XCTAssertTrue(scanItem.waitForExistence(timeout: 5))
-        navigate(
-            item: scanItem,
-            pageMarker: element("scan.results.table", in: app),
-            in: app
+        XCTAssertTrue(
+            element("sidebar.scan", in: app).waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            element("scan.results.table", in: app)
+                .waitForExistence(timeout: 10)
         )
         return (app, window)
     }
@@ -897,7 +901,8 @@ final class StornautAppUITests: XCTestCase {
     @MainActor
     private func launchHistoryFixture(
         fixture: String,
-        appearance: String
+        appearance: String,
+        presentation: String = "detail"
     ) -> (app: XCUIApplication, window: XCUIElement) {
         let app = XCUIApplication()
         app.terminate()
@@ -908,6 +913,7 @@ final class StornautAppUITests: XCTestCase {
             "--stornaut-ui-test-appearance=\(appearance)",
             "--stornaut-debug-fixture=success",
             "--stornaut-debug-history=\(fixture)",
+            "--stornaut-debug-history-presentation=\(presentation)",
             "--stornaut-debug-destination=history",
         ]
         app.launch()

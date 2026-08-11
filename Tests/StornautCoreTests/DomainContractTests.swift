@@ -29,9 +29,12 @@ func domainFixturesRoundTripWithExplicitSchemaVersion() throws {
     #expect(session.schemaVersion == .v1)
     #expect(classification.schemaVersion == .v1)
     #expect(evidence.schemaVersion == .v1)
-    #expect(plan.schemaVersion == .v1)
-    #expect(decision.schemaVersion == .v1)
-    #expect(manifest.schemaVersion == .v1)
+    #expect(plan.schemaVersion == .v2)
+    #expect(plan.compatibility == .legacyV1)
+    #expect(decision.schemaVersion == .v2)
+    #expect(decision.compatibility == .legacyV1)
+    #expect(manifest.schemaVersion == .v2)
+    #expect(manifest.compatibility == .legacyV1)
     #expect(accounting.schemaVersion == .v1)
 }
 
@@ -417,6 +420,12 @@ func policyAllowsOnlyReadyOrExplicitReviewDisposition() throws {
         itemID: try CleanupPlanItemID(validating: "plan-item-ready"),
         outcome: .allowed,
         disposition: .readyToReclaim,
+        selectionGeneration: 1,
+        selectionOrigin: .defaultReady,
+        planFingerprint: DomainToken(validating: "plan.fixture.fingerprint"),
+        decisionFingerprint: DomainToken(
+            validating: "decision.ready.fingerprint"
+        ),
         reasonKeys: [token],
         evaluatedAt: Date(timeIntervalSince1970: 1)
     )
@@ -426,6 +435,12 @@ func policyAllowsOnlyReadyOrExplicitReviewDisposition() throws {
         itemID: try CleanupPlanItemID(validating: "plan-item-review"),
         outcome: .allowed,
         disposition: .reviewRecommended,
+        selectionGeneration: 1,
+        selectionOrigin: .explicitUser,
+        planFingerprint: DomainToken(validating: "plan.fixture.fingerprint"),
+        decisionFingerprint: DomainToken(
+            validating: "decision.review.fingerprint"
+        ),
         reasonKeys: [token],
         evaluatedAt: Date(timeIntervalSince1970: 1)
     )
@@ -439,6 +454,14 @@ func policyAllowsOnlyReadyOrExplicitReviewDisposition() throws {
             itemID: try CleanupPlanItemID(validating: "plan-item-protected"),
             outcome: .allowed,
             disposition: .protected,
+            selectionGeneration: 1,
+            selectionOrigin: .explicitUser,
+            planFingerprint: DomainToken(
+                validating: "plan.fixture.fingerprint"
+            ),
+            decisionFingerprint: DomainToken(
+                validating: "decision.protected.fingerprint"
+            ),
             reasonKeys: [token],
             evaluatedAt: Date(timeIntervalSince1970: 1)
         )
@@ -450,6 +473,14 @@ func policyAllowsOnlyReadyOrExplicitReviewDisposition() throws {
             itemID: try CleanupPlanItemID(validating: "plan-item-denied"),
             outcome: .denied,
             disposition: .unknown,
+            selectionGeneration: 1,
+            selectionOrigin: .explicitUser,
+            planFingerprint: DomainToken(
+                validating: "plan.fixture.fingerprint"
+            ),
+            decisionFingerprint: DomainToken(
+                validating: "decision.denied.fingerprint"
+            ),
             reasonKeys: [],
             evaluatedAt: Date(timeIntervalSince1970: 1)
         )

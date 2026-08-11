@@ -2,6 +2,7 @@ import Foundation
 
 public enum DomainSchemaVersion: Int, Codable, Sendable, Equatable {
     case v1 = 1
+    case v2 = 2
 }
 
 public enum DomainContractError: Error, Sendable, Equatable {
@@ -9,6 +10,10 @@ public enum DomainContractError: Error, Sendable, Equatable {
     case invalidPath
     case invalidToken
     case invalidMeasurement
+    case unsupportedSchemaVersion(
+        expected: DomainSchemaVersion,
+        actual: DomainSchemaVersion
+    )
 }
 
 public struct PersistedPath: RawRepresentable, Codable, Sendable, Hashable {
@@ -194,6 +199,10 @@ public enum CleanupActionIDTag: DomainIDTag {
     public static let prefix = "action-"
 }
 
+public enum CleanupRunIDTag: DomainIDTag {
+    public static let prefix = "run-"
+}
+
 public typealias ScanSessionID = DomainID<ScanSessionIDTag>
 public typealias ScanScopeID = DomainID<ScanScopeIDTag>
 public typealias SnapshotID = DomainID<SnapshotIDTag>
@@ -205,6 +214,53 @@ public typealias CleanupPlanItemID = DomainID<CleanupPlanItemIDTag>
 public typealias PolicyDecisionID = DomainID<PolicyDecisionIDTag>
 public typealias CleanupManifestID = DomainID<CleanupManifestIDTag>
 public typealias CleanupActionID = DomainID<CleanupActionIDTag>
+public typealias CleanupRunID = DomainID<CleanupRunIDTag>
+
+func requireDomainSchemaVersion(
+    _ actual: DomainSchemaVersion,
+    expected: DomainSchemaVersion
+) throws {
+    guard actual == expected else {
+        throw DomainContractError.unsupportedSchemaVersion(
+            expected: expected,
+            actual: actual
+        )
+    }
+}
+
+struct DomainAnyCodingKey: CodingKey {
+    let stringValue: String
+    let intValue: Int?
+
+    init?(stringValue: String) {
+        self.stringValue = stringValue
+        intValue = nil
+    }
+
+    init?(intValue: Int) {
+        stringValue = String(intValue)
+        self.intValue = intValue
+    }
+}
+
+func rejectUnknownCodingKeys(
+    _ decoder: Decoder,
+    allowedKeys: Set<String>
+) throws {
+    let container = try decoder.container(keyedBy: DomainAnyCodingKey.self)
+    let unknownKeys = container.allKeys
+        .map(\.stringValue)
+        .filter { !allowedKeys.contains($0) }
+    guard unknownKeys.isEmpty else {
+        throw DecodingError.dataCorrupted(
+            .init(
+                codingPath: decoder.codingPath,
+                debugDescription:
+                    "Unknown persisted keys: \(unknownKeys.sorted())"
+            )
+        )
+    }
+}
 
 private func isSafeDomainToken(_ rawValue: String) -> Bool {
     !rawValue.isEmpty
@@ -270,8 +326,21 @@ public struct SignedByteDelta: Codable, Sendable, Hashable, Comparable {
         self.value = value
     }
 
+    public init(from decoder: Decoder) throws {
+        try rejectUnknownCodingKeys(
+            decoder,
+            allowedKeys: Set(CodingKeys.allCases.map(\.stringValue))
+        )
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        value = try container.decode(Int64.self, forKey: .value)
+    }
+
     public static func < (lhs: Self, rhs: Self) -> Bool {
         lhs.value < rhs.value
+    }
+
+    private enum CodingKeys: String, CodingKey, CaseIterable {
+        case value
     }
 }
 

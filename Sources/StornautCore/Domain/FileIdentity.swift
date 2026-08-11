@@ -80,6 +80,10 @@ public struct FileIdentity: Codable, Sendable, Equatable {
     }
 
     public init(from decoder: Decoder) throws {
+        try rejectUnknownCodingKeys(
+            decoder,
+            allowedKeys: Set(CodingKeys.allCases.map(\.stringValue))
+        )
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let size = try container.decode(Int64.self, forKey: .size)
         let allocatedBytes = try container.decode(
@@ -115,6 +119,19 @@ public struct FileIdentity: Codable, Sendable, Equatable {
                 forKey: .modificationNanoseconds
             )
         )
+    }
+
+    private enum CodingKeys: String, CodingKey, CaseIterable {
+        case device
+        case inode
+        case mode
+        case ownerUserID
+        case ownerGroupID
+        case linkCount
+        case size
+        case allocatedBytes
+        case modificationSeconds
+        case modificationNanoseconds
     }
 }
 

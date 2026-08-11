@@ -16,6 +16,7 @@ printf launched > "$marker"
 EOF
 chmod 700 "$work_dir/bin/codex"
 
+swift package clean
 swift build --product SurveyorBenchmark
 benchmark="$repo_root/.build/debug/SurveyorBenchmark"
 

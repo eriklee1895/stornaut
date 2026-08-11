@@ -13,7 +13,8 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 - Epic 0–1 与 Epic 2–4 Tasks 9–26 已完成；Phase B 最终 unified verifier
   单次 exit 0，计划与 Task 21–26 briefs 已归档；
   Phase C deterministic Epic 8 详尽 plan 已于 2026-08-11 获用户批准，
-  Task 27 study/ADR/profile gate 已完成，当前从 Task 28 开始。逐 Task 完成
+  Tasks 27–28 已完成并通过 unified verifier；按用户要求 Phase C 暂停，
+  先回顾 capability-first ADR 0004，Task 29 尚未启动。逐 Task 完成
   Upstream Study、实现、code review、
   focused/full verify、独立 commit/push；不得提前混入 Deep Dive、Adapter、
   真实 Registered Action 或 release 工作。
@@ -77,8 +78,10 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 Epic 0–1 与 Epic 2–4 evidence gates 已完成。Phase B 的
 domain/persistence、product Quick Scan、Space Ledger、Knowledge/Activity
 与 App/UI 产品证据通过最终统一验证。Phase C deterministic Epic 8 plan
-已获批准；Task 27 已完成，当前 Task 28 只实现 domain v2、Store v3 与
-execution journal contracts。
+已获批准；Tasks 27–28 已完成。当前按用户要求暂停，不启动 Task 29，先回顾
+ADR 0004，确保后续个人工具尽可能发挥 Codex direct read、shell/unified exec、
+live search、browser/direct fetch、skills/subagents 与公共联网能力，同时继续
+由 Swift 独占用户数据写入与 Executor。
 Deep Dive 的旧 Broker-only no-go 已被 ADR 0004 的 capability-first 边界取代；
 当前仍 paused 的原因是新运行时实现/evidence gate 尚未交付，而非 Codex 工具
 能力过强。release signing/notarization 仍未评估。Overview、Scan、Scan-only

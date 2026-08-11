@@ -89,7 +89,8 @@ public struct SpaceAccounting: Codable, Sendable, Equatable {
         unknown: AccountingMeasure,
         unmeasurable: AccountingMeasure,
         free: AccountingMeasure
-    ) {
+    ) throws {
+        try requireDomainSchemaVersion(schemaVersion, expected: .v1)
         self.schemaVersion = schemaVersion
         self.sessionID = sessionID
         self.volumeCapacity = volumeCapacity
@@ -97,5 +98,30 @@ public struct SpaceAccounting: Codable, Sendable, Equatable {
         self.unknown = unknown
         self.unmeasurable = unmeasurable
         self.free = free
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        try self.init(
+            schemaVersion: container.decode(
+                DomainSchemaVersion.self,
+                forKey: .schemaVersion
+            ),
+            sessionID: container.decode(
+                ScanSessionID.self,
+                forKey: .sessionID
+            ),
+            volumeCapacity: container.decode(
+                AccountingMeasure.self,
+                forKey: .volumeCapacity
+            ),
+            known: container.decode(AccountingMeasure.self, forKey: .known),
+            unknown: container.decode(AccountingMeasure.self, forKey: .unknown),
+            unmeasurable: container.decode(
+                AccountingMeasure.self,
+                forKey: .unmeasurable
+            ),
+            free: container.decode(AccountingMeasure.self, forKey: .free)
+        )
     }
 }

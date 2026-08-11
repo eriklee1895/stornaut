@@ -264,6 +264,7 @@ public struct SpaceLedger: Codable, Sendable, Equatable {
         freeSpaceDeltaExplanationKey: DomainToken,
         caveats: [SpaceLedgerCaveat]
     ) throws {
+        try requireDomainSchemaVersion(schemaVersion, expected: .v1)
         let ownerAllocated = try Self.sumOwners(
             owners,
             keyPath: \.allocatedBytes

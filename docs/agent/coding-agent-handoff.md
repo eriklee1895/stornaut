@@ -5,8 +5,8 @@
 > 当前状态：产品、Agent、UI 功能交互与品牌基线完成；Epic 0–1 evidence
 > gate 已完成；Epic 2–4 Tasks 9–26 通过最终 unified verifier 并归档；
 > Phase C deterministic Epic 8 详尽 plan 已于 2026-08-11 获用户批准，
-> Task 27 Upstream Study/ADR/profile gate 已完成，当前唯一 active Task 为
-> Task 28 domain v2 / Evidence Store v3 / journal contracts；Task 5 的历史
+> Tasks 27–28 已完成；按用户要求 Phase C 暂停，当前无 active implementation
+> Task，必须先回顾更新后的 ADR 0004，Task 29 不得启动；Task 5 的历史
 > Broker-only no-go 已由 ADR 0004 capability-first 决策修订，Deep Dive 因
 > 新运行时实现/evidence gate 尚未交付而 paused；
 > release signing/notarization 未评估
@@ -292,10 +292,12 @@ Phase C deterministic Epic 8 plan 已于 2026-08-11 获批并位于
 docs/plans/active/epic-8-safe-execution-vertical-slice.md，候选范围从 Quick
 Scan terminal projection 形成 Review Reclaim Plan，经 pure Policy Gate、
 fresh revalidation、用户确认与默认 MoveToTrash，最后写 immutable Cleanup
-Manifest 和 truthful Cleanup Result/History。Task 27 已完成，当前从 Task 28
-开始，后续
-Task 不得越序。该阶段不包含 Deep Dive、Adapter、真实 destructive Registered
-Action、release/notarization 或任何安全边界放宽。
+Manifest 和 truthful Cleanup Result/History。Tasks 27–28 已完成。当前按用户
+要求暂停，先回顾 capability-first ADR 0004，确保后续 Codex 设计面向个人工具
+尽可能发挥 direct read、shell/unified exec、live search、browser/direct
+fetch、skills/subagents 与公共联网能力，同时保持 Swift-only 用户数据写入与
+Executor 边界。回顾与用户对齐前不得启动 Task 29。该阶段不包含 Adapter、真实
+destructive Registered Action、release/notarization 或任何写权限边界放宽。
 
 任何权限、安全或许可证假设都必须有实际证据。设计或 PRD 如有冲突，先报告并修正文档。ADR 0004 已批准的直接只读 Agent 工具与公共联网无需再次缩减或请求授权；不得自行扩大本地写入、私网或 Executor 权限。
 ```

@@ -9,10 +9,7 @@ func retentionExpiresEvidenceAtSevenDaysAndManifestAtNinety() async throws {
         ScanSession.self,
         name: "scan-session-v1"
     )
-    let manifest: CleanupManifest = try EvidenceStoreTestSupport.fixture(
-        CleanupManifest.self,
-        name: "cleanup-manifest-v1"
-    )
+    let manifest = try CleanupPersistenceTestSupport.manifest()
     try await store.saveScanSession(session)
     try await store.saveCleanupManifest(manifest)
 
@@ -33,6 +30,83 @@ func retentionExpiresEvidenceAtSevenDaysAndManifestAtNinety() async throws {
 }
 
 @Test
+func cleanupJournalRetentionUsesSevenAndNinetyDayClasses() async throws {
+    let store = try EvidenceStore(configuration: .memory)
+    let plan = try CleanupPersistenceTestSupport.plan()
+    let session: ScanSession = try EvidenceStoreTestSupport.fixture(
+        ScanSession.self,
+        name: "scan-session-v1"
+    )
+    let prepared = try CleanupPersistenceTestSupport.journal(plan: plan)
+    let started = try CleanupPersistenceTestSupport.journal(
+        plan: plan,
+        stage: .actionStarted,
+        entries: [
+            try CleanupPersistenceTestSupport.journalEntry(
+                item: plan.items[0],
+                state: .started
+            ),
+            try CleanupPersistenceTestSupport.journalEntry(
+                item: plan.items[1]
+            ),
+        ]
+    )
+    let audit = try CleanupRunJournal(
+        id: CleanupRunID(rawValue: "run-retention-audit")!,
+        planID: started.planID,
+        manifestID: CleanupManifestID(
+            rawValue: "manifest-retention-audit"
+        )!,
+        selectionGeneration: started.selectionGeneration,
+        selectionFingerprint: started.selectionFingerprint,
+        stage: started.stage,
+        retentionClass: started.retentionClass,
+        stopAfterCurrentRequested: started.stopAfterCurrentRequested,
+        entries: started.entries,
+        createdAt: started.createdAt,
+        updatedAt: started.updatedAt,
+        expiresAt: started.expiresAt
+    )
+    let auditPrepared = try CleanupRunJournal(
+        id: audit.id,
+        planID: audit.planID,
+        manifestID: audit.manifestID,
+        selectionGeneration: audit.selectionGeneration,
+        selectionFingerprint: audit.selectionFingerprint,
+        stage: .prepared,
+        retentionClass: .evidenceLinked,
+        stopAfterCurrentRequested: false,
+        entries: try plan.items.map {
+            try CleanupPersistenceTestSupport.journalEntry(item: $0)
+        },
+        createdAt: audit.createdAt,
+        updatedAt: CleanupPersistenceTestSupport.updatedAt,
+        expiresAt: audit.createdAt.addingTimeInterval(7 * 86_400)
+    )
+    try await store.saveScanSession(session)
+    try await store.saveCleanupPlan(plan)
+    for item in plan.items {
+        try await store.savePolicyDecision(
+            CleanupPersistenceTestSupport.decision(plan: plan, item: item)
+        )
+    }
+    try await store.saveCleanupRunJournal(prepared)
+    try await store.saveCleanupRunJournal(auditPrepared)
+    try await store.saveCleanupRunJournal(audit)
+
+    try await store.expireRecords(
+        now: prepared.createdAt.addingTimeInterval(7 * 86_400 + 1)
+    )
+    #expect(try await store.cleanupRunJournal(id: prepared.id) == nil)
+    #expect(try await store.cleanupRunJournal(id: audit.id) == audit)
+
+    try await store.expireRecords(
+        now: audit.createdAt.addingTimeInterval(90 * 86_400 + 1)
+    )
+    #expect(try await store.cleanupRunJournal(id: audit.id) == nil)
+}
+
+@Test
 func clearEvidenceAndManifestsAreSeparateAndNeverClearKnowledge() async throws {
     let evidence = try EvidenceStore(configuration: .memory)
     let knowledge = try LocalKnowledgeStore(configuration: .memory)
@@ -40,10 +114,7 @@ func clearEvidenceAndManifestsAreSeparateAndNeverClearKnowledge() async throws {
         ScanSession.self,
         name: "scan-session-v1"
     )
-    let manifest: CleanupManifest = try EvidenceStoreTestSupport.fixture(
-        CleanupManifest.self,
-        name: "cleanup-manifest-v1"
-    )
+    let manifest = try CleanupPersistenceTestSupport.manifest()
     let fact = try LocalKnowledgeFact(
         id: LocalKnowledgeID(validating: "knowledge-fixture"),
         payload: .producerMapping(
@@ -220,17 +291,20 @@ func fixedRetentionCapsRejectLongerPayloadExpiry() async throws {
         ScanSession.self,
         name: "scan-session-v1"
     )
-    let fixturePlan: CleanupPlan = try EvidenceStoreTestSupport.fixture(
-        CleanupPlan.self,
-        name: "cleanup-plan-v1"
-    )
-    let fixtureManifest: CleanupManifest = try EvidenceStoreTestSupport.fixture(
-        CleanupManifest.self,
-        name: "cleanup-manifest-v1"
+    let fixturePlan = try CleanupPersistenceTestSupport.plan()
+    let fixtureManifest = try CleanupPersistenceTestSupport.manifest(
+        plan: fixturePlan
     )
     let plan = try CleanupPlan(
         id: fixturePlan.id,
         scanSessionID: fixturePlan.scanSessionID,
+        scanScopeID: try #require(fixturePlan.scanScopeID),
+        primaryRootIdentity: try #require(fixturePlan.primaryRootIdentity),
+        catalogVersion: try #require(fixturePlan.catalogVersion),
+        executionProfileVersion: try #require(
+            fixturePlan.executionProfileVersion
+        ),
+        planFingerprint: try #require(fixturePlan.planFingerprint),
         createdAt: fixturePlan.createdAt,
         expiresAt: fixturePlan.createdAt.addingTimeInterval(365 * 86_400),
         items: fixturePlan.items
@@ -241,6 +315,7 @@ func fixedRetentionCapsRejectLongerPayloadExpiry() async throws {
         createdAt: fixtureManifest.createdAt,
         expiresAt: fixtureManifest.createdAt.addingTimeInterval(365 * 86_400),
         records: fixtureManifest.records,
+        summary: fixtureManifest.summary,
         systemObservation: fixtureManifest.systemObservation
     )
     try await store.saveScanSession(session)

@@ -267,6 +267,7 @@ public struct ScanSession: Codable, Sendable, Equatable {
         unfinishedScopes: [UnfinishedScanScope],
         aggregate: ScanAggregate? = nil
     ) throws {
+        try requireDomainSchemaVersion(schemaVersion, expected: .v1)
         guard finishedAt >= startedAt,
               terminalState != .completed || unfinishedScopes.isEmpty,
               Set(completedScopes.map(\.id)).count == completedScopes.count,

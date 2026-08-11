@@ -490,6 +490,7 @@ public struct RuleCatalog: Codable, Sendable, Equatable {
         catalogVersion: DomainToken,
         rules: [CompiledRule]
     ) throws {
+        try requireDomainSchemaVersion(schemaVersion, expected: .v1)
         let sorted = rules.sorted { $0.id < $1.id }
         let allFixtures = rules.flatMap(\.fixtureIDs)
         guard !rules.isEmpty,

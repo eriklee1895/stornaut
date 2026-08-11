@@ -16,18 +16,12 @@ func evidenceStoreRoundTripsEveryTypedRepository() async throws {
             name: "anonymous-developer-tree"
         )
     )
-    let plan: CleanupPlan = try EvidenceStoreTestSupport.fixture(
-        CleanupPlan.self,
-        name: "cleanup-plan-v1"
+    let plan = try CleanupPersistenceTestSupport.plan()
+    let decision = try CleanupPersistenceTestSupport.decision(
+        plan: plan,
+        item: plan.items[0]
     )
-    let decision: PolicyDecision = try EvidenceStoreTestSupport.fixture(
-        PolicyDecision.self,
-        name: "policy-decision-v1"
-    )
-    let manifest: CleanupManifest = try EvidenceStoreTestSupport.fixture(
-        CleanupManifest.self,
-        name: "cleanup-manifest-v1"
-    )
+    let manifest = try CleanupPersistenceTestSupport.manifest(plan: plan)
 
     try await store.saveScanSession(session)
     try await store.saveScanSession(developerTree.session)

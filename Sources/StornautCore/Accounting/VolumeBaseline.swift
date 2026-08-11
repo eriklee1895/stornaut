@@ -26,6 +26,7 @@ public struct VolumeBaseline: Codable, Sendable, Equatable {
         volumeIsReadOnly: Bool?,
         source: AccountingSource
     ) throws {
+        try requireDomainSchemaVersion(schemaVersion, expected: .v1)
         guard rootIdentity.isDirectory,
               source.kind == .volumeResourceValues
                 || source.kind == .fileSystemAttributes,

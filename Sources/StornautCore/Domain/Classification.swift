@@ -79,6 +79,7 @@ public struct Classification: Codable, Sendable, Equatable {
         catalogVersion: DomainToken,
         classifiedAt: Date
     ) throws {
+        try requireDomainSchemaVersion(schemaVersion, expected: .v1)
         let requiredEvidence = Set(requiredEvidenceKeys)
         let missingEvidence = Set(missingEvidenceKeys)
         guard requiredEvidence.count == requiredEvidenceKeys.count,

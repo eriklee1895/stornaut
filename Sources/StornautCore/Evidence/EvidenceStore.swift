@@ -100,7 +100,7 @@ struct EvidenceStoreTestHooks: Sendable {
 }
 
 public actor EvidenceStore {
-    private static let schemaVersion = 2
+    private static let schemaVersion = 3
     private static let sevenDaysMilliseconds: Int64 = 7 * 86_400 * 1_000
     private static let ninetyDaysMilliseconds: Int64 = 90 * 86_400 * 1_000
 
@@ -816,7 +816,16 @@ public actor EvidenceStore {
     }
 
     public func saveCleanupPlan(_ plan: CleanupPlan) throws {
-        try saveExpiringRecord(
+        guard plan.compatibility == .current else {
+            throw EvidenceStoreError.legacyCleanupRecord
+        }
+        guard let session = try scanSession(id: plan.scanSessionID),
+              let scopeID = plan.scanScopeID,
+              session.completedScopes.contains(where: { $0.id == scopeID })
+        else {
+            throw EvidenceStoreError.recordIdentityMismatch
+        }
+        try insertImmutableExpiringRecord(
             table: "cleanup_plans",
             id: plan.id.rawValue,
             parentID: plan.scanSessionID.rawValue,
@@ -848,8 +857,50 @@ public actor EvidenceStore {
         )
     }
 
+    public func cleanupPlans(
+        sessionID: ScanSessionID,
+        limit: Int,
+        offset: Int
+    ) throws -> StorePage<CleanupPlan> {
+        try validatePage(limit: limit, offset: offset)
+        return try decodePage(
+            sql: """
+            SELECT id, payload, session_id, created_at_ms, expires_at_ms
+            FROM cleanup_plans
+            WHERE session_id = ?
+            ORDER BY created_at_ms DESC, id ASC
+            LIMIT ? OFFSET ?
+            """,
+            bindings: [
+                .text(sessionID.rawValue),
+                .integer(Int64(limit)),
+                .integer(Int64(offset)),
+            ],
+            type: CleanupPlan.self,
+            recordID: \.id.rawValue,
+            validateStorage: { plan, statement in
+                columnText(statement, 2) == plan.scanSessionID.rawValue
+                    && sqlite3_column_int64(statement, 3)
+                    == storeMilliseconds(plan.createdAt)
+                    && sqlite3_column_int64(statement, 4)
+                    == storeMilliseconds(plan.expiresAt)
+            },
+            operation: "plan.page"
+        )
+    }
+
     public func savePolicyDecision(_ decision: PolicyDecision) throws {
-        try saveSingleton(
+        guard decision.compatibility == .current else {
+            throw EvidenceStoreError.legacyCleanupRecord
+        }
+        guard let plan = try cleanupPlan(id: decision.planID),
+              plan.compatibility == .current,
+              plan.items.contains(where: { $0.id == decision.itemID }),
+              plan.planFingerprint == decision.planFingerprint
+        else {
+            throw EvidenceStoreError.recordIdentityMismatch
+        }
+        try insertImmutableSingleton(
             table: "policy_decisions",
             id: decision.id.rawValue,
             parentColumn: "plan_id",
@@ -873,19 +924,232 @@ public actor EvidenceStore {
         )
     }
 
-    public func saveCleanupManifest(_ manifest: CleanupManifest) throws {
-        try saveExpiringRecord(
-            table: "cleanup_manifests",
-            id: manifest.id.rawValue,
-            parentID: manifest.planID.rawValue,
-            parentColumn: "plan_id",
-            timestampColumn: "created_at_ms",
-            timestamp: manifest.createdAt,
-            expiresAt: manifest.expiresAt,
-            maximumLifetimeMilliseconds: Self.ninetyDaysMilliseconds,
-            payload: DomainJSON.encode(manifest),
-            operation: "manifest.save"
+    public func policyDecisions(
+        planID: CleanupPlanID,
+        limit: Int,
+        offset: Int
+    ) throws -> StorePage<PolicyDecision> {
+        try validatePage(limit: limit, offset: offset)
+        return try decodePage(
+            sql: """
+            SELECT id, payload, plan_id
+            FROM policy_decisions
+            WHERE plan_id = ?
+            ORDER BY id ASC
+            LIMIT ? OFFSET ?
+            """,
+            bindings: [
+                .text(planID.rawValue),
+                .integer(Int64(limit)),
+                .integer(Int64(offset)),
+            ],
+            type: PolicyDecision.self,
+            recordID: \.id.rawValue,
+            validateStorage: { decision, statement in
+                columnText(statement, 2) == decision.planID.rawValue
+            },
+            operation: "decision.page"
         )
+    }
+
+    public func saveCleanupRunJournal(
+        _ journal: CleanupRunJournal
+    ) throws {
+        let payload = try encodeStorePayload(journal)
+        let maximumLifetime = journal.retentionClass == .evidenceLinked
+            ? Self.sevenDaysMilliseconds
+            : Self.ninetyDaysMilliseconds
+        let createdAt = storeMilliseconds(journal.createdAt)
+        let expiresAt = storeMilliseconds(journal.expiresAt)
+        guard expiresAt <= addingStoreMilliseconds(
+            maximumLifetime,
+            to: createdAt
+        ) else {
+            throw EvidenceStoreError.retentionLimitExceeded
+        }
+        try connection.transaction(operation: "journal.save") {
+            if let current = try cleanupRunJournal(id: journal.id) {
+                guard current.canTransition(to: journal) else {
+                    throw EvidenceStoreError.invalidJournalTransition
+                }
+            } else {
+                guard journal.stage == .prepared,
+                      let plan = try cleanupPlan(id: journal.planID),
+                      plan.compatibility == .current,
+                      journal.entries.count <= plan.items.count
+                else {
+                    throw EvidenceStoreError.invalidJournalTransition
+                }
+                let planItemsByID = Dictionary(
+                    uniqueKeysWithValues: plan.items.enumerated().map {
+                        ($0.element.id, (index: $0.offset, item: $0.element))
+                    }
+                )
+                var previousPlanIndex = -1
+                for entry in journal.entries {
+                    guard let indexedItem = planItemsByID[entry.planItemID],
+                          indexedItem.index > previousPlanIndex
+                    else {
+                        throw EvidenceStoreError.invalidJournalTransition
+                    }
+                    previousPlanIndex = indexedItem.index
+                    let item = indexedItem.item
+                    guard entry.planItemID == item.id,
+                          entry.action == item.proposedAction,
+                          entry.expectedIdentity == item.expectedIdentity,
+                          let decision = try policyDecision(
+                              id: entry.policyDecisionID
+                          ),
+                          decision.compatibility == .current,
+                          decision.planID == plan.id,
+                          decision.itemID == item.id,
+                          decision.outcome == .allowed,
+                          decision.disposition == entry.policyDisposition,
+                          decision.reasonKeys == entry.policyReasonKeys,
+                          decision.selectionGeneration
+                            == journal.selectionGeneration
+                    else {
+                        throw EvidenceStoreError.invalidJournalTransition
+                    }
+                }
+            }
+            try connection.execute(
+                """
+                INSERT INTO cleanup_run_journals
+                (id, plan_id, stage, retention_class, updated_at_ms, expires_at_ms, payload)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    plan_id=excluded.plan_id,
+                    stage=excluded.stage,
+                    retention_class=excluded.retention_class,
+                    updated_at_ms=excluded.updated_at_ms,
+                    expires_at_ms=excluded.expires_at_ms,
+                    payload=excluded.payload
+                """,
+                bindings: [
+                    .text(journal.id.rawValue),
+                    .text(journal.planID.rawValue),
+                    .text(journal.stage.rawValue),
+                    .text(journal.retentionClass.rawValue),
+                    .integer(storeMilliseconds(journal.updatedAt)),
+                    .integer(expiresAt),
+                    .text(payload),
+                ],
+                operation: "journal.save.record"
+            )
+        }
+    }
+
+    public func cleanupRunJournal(
+        id: CleanupRunID
+    ) throws -> CleanupRunJournal? {
+        try decodeOne(
+            table: "cleanup_run_journals",
+            id: id.rawValue,
+            type: CleanupRunJournal.self,
+            recordID: \.id.rawValue,
+            storageColumns:
+                ", plan_id, stage, retention_class, updated_at_ms, expires_at_ms",
+            validateStorage: { journal, statement in
+                columnText(statement, 1) == journal.planID.rawValue
+                    && columnText(statement, 2) == journal.stage.rawValue
+                    && columnText(statement, 3)
+                    == journal.retentionClass.rawValue
+                    && sqlite3_column_int64(statement, 4)
+                    == storeMilliseconds(journal.updatedAt)
+                    && sqlite3_column_int64(statement, 5)
+                    == storeMilliseconds(journal.expiresAt)
+            },
+            operation: "journal.load"
+        )
+    }
+
+    public func cleanupRunJournals(
+        limit: Int,
+        offset: Int
+    ) throws -> StorePage<CleanupRunJournal> {
+        try validatePage(limit: limit, offset: offset)
+        return try decodePage(
+            sql: """
+            SELECT id, payload, plan_id, stage, retention_class,
+                   updated_at_ms, expires_at_ms
+            FROM cleanup_run_journals
+            ORDER BY updated_at_ms DESC, id ASC
+            LIMIT ? OFFSET ?
+            """,
+            bindings: [.integer(Int64(limit)), .integer(Int64(offset))],
+            type: CleanupRunJournal.self,
+            recordID: \.id.rawValue,
+            validateStorage: { journal, statement in
+                columnText(statement, 2) == journal.planID.rawValue
+                    && columnText(statement, 3) == journal.stage.rawValue
+                    && columnText(statement, 4)
+                    == journal.retentionClass.rawValue
+                    && sqlite3_column_int64(statement, 5)
+                    == storeMilliseconds(journal.updatedAt)
+                    && sqlite3_column_int64(statement, 6)
+                    == storeMilliseconds(journal.expiresAt)
+            },
+            operation: "journal.page"
+        )
+    }
+
+    public func saveCleanupManifest(_ manifest: CleanupManifest) throws {
+        guard manifest.compatibility == .current else {
+            throw EvidenceStoreError.legacyCleanupRecord
+        }
+        let createdAt = storeMilliseconds(manifest.createdAt)
+        let expiresAt = storeMilliseconds(manifest.expiresAt)
+        guard expiresAt <= addingStoreMilliseconds(
+            Self.ninetyDaysMilliseconds,
+            to: createdAt
+        ) else {
+            throw EvidenceStoreError.retentionLimitExceeded
+        }
+        let payload = try encodeStorePayload(manifest)
+        try connection.transaction(operation: "manifest.insert") {
+            let existing = try connection.query(
+                """
+                SELECT plan_id, created_at_ms, expires_at_ms, payload
+                FROM cleanup_manifests
+                WHERE id = ?
+                """,
+                bindings: [.text(manifest.id.rawValue)],
+                operation: "manifest.identity"
+            ) { statement in
+                (
+                    planID: columnText(statement, 0),
+                    createdAt: sqlite3_column_int64(statement, 1),
+                    expiresAt: sqlite3_column_int64(statement, 2),
+                    payload: columnText(statement, 3)
+                )
+            }.first
+            if let existing {
+                guard existing.planID == manifest.planID.rawValue,
+                      existing.createdAt == createdAt,
+                      existing.expiresAt == expiresAt,
+                      existing.payload == payload
+                else {
+                    throw EvidenceStoreError.immutableRecordConflict
+                }
+                return
+            }
+            try connection.execute(
+                """
+                INSERT INTO cleanup_manifests
+                (id, plan_id, created_at_ms, expires_at_ms, payload)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                bindings: [
+                    .text(manifest.id.rawValue),
+                    .text(manifest.planID.rawValue),
+                    .integer(createdAt),
+                    .integer(expiresAt),
+                    .text(payload),
+                ],
+                operation: "manifest.insert.record"
+            )
+        }
     }
 
     public func cleanupManifest(
@@ -908,12 +1172,51 @@ public actor EvidenceStore {
         )
     }
 
-    public func deleteScanSession(id: ScanSessionID) throws {
-        try connection.execute(
-            "DELETE FROM scan_sessions WHERE id = ?",
-            bindings: [.text(id.rawValue)],
-            operation: "scanSession.delete"
+    public func cleanupManifests(
+        limit: Int,
+        offset: Int
+    ) throws -> StorePage<CleanupManifest> {
+        try validatePage(limit: limit, offset: offset)
+        return try decodePage(
+            sql: """
+            SELECT id, payload, plan_id, created_at_ms, expires_at_ms
+            FROM cleanup_manifests
+            ORDER BY created_at_ms DESC, id ASC
+            LIMIT ? OFFSET ?
+            """,
+            bindings: [.integer(Int64(limit)), .integer(Int64(offset))],
+            type: CleanupManifest.self,
+            recordID: \.id.rawValue,
+            validateStorage: { manifest, statement in
+                columnText(statement, 2) == manifest.planID.rawValue
+                    && sqlite3_column_int64(statement, 3)
+                    == storeMilliseconds(manifest.createdAt)
+                    && sqlite3_column_int64(statement, 4)
+                    == storeMilliseconds(manifest.expiresAt)
+            },
+            operation: "manifest.page"
         )
+    }
+
+    public func deleteScanSession(id: ScanSessionID) throws {
+        try connection.transaction(operation: "scanSession.delete") {
+            try connection.execute(
+                """
+                DELETE FROM cleanup_run_journals
+                WHERE retention_class = 'evidenceLinked'
+                  AND plan_id IN (
+                    SELECT id FROM cleanup_plans WHERE session_id = ?
+                  )
+                """,
+                bindings: [.text(id.rawValue)],
+                operation: "scanSession.deletePreparedJournals"
+            )
+            try connection.execute(
+                "DELETE FROM scan_sessions WHERE id = ?",
+                bindings: [.text(id.rawValue)],
+                operation: "scanSession.deleteEvidence"
+            )
+        }
     }
 
     public func expireRecords(now: Date) throws {
@@ -927,6 +1230,37 @@ public actor EvidenceStore {
             from: nowMilliseconds
         )
         try connection.transaction(operation: "retention.expire") {
+            try connection.execute(
+                """
+                DELETE FROM cleanup_run_journals
+                WHERE retention_class = 'evidenceLinked'
+                  AND (
+                    expires_at_ms <= ?
+                    OR updated_at_ms <= ?
+                  )
+                """,
+                bindings: [
+                    .integer(nowMilliseconds),
+                    .integer(evidenceCutoff),
+                ],
+                operation: "retention.evidenceLinkedJournals"
+            )
+            try connection.execute(
+                """
+                DELETE FROM cleanup_run_journals
+                WHERE retention_class = 'audit'
+                  AND stage != 'auditPending'
+                  AND (
+                    expires_at_ms <= ?
+                    OR updated_at_ms <= ?
+                  )
+                """,
+                bindings: [
+                    .integer(nowMilliseconds),
+                    .integer(manifestCutoff),
+                ],
+                operation: "retention.auditJournals"
+            )
             try connection.execute(
                 """
                 DELETE FROM cleanup_plans
@@ -951,6 +1285,17 @@ public actor EvidenceStore {
             )
             try connection.execute(
                 """
+                DELETE FROM cleanup_run_journals
+                WHERE retention_class = 'evidenceLinked'
+                  AND NOT EXISTS (
+                    SELECT 1 FROM cleanup_plans
+                    WHERE cleanup_plans.id = cleanup_run_journals.plan_id
+                  )
+                """,
+                operation: "retention.orphanedEvidenceLinkedJournals"
+            )
+            try connection.execute(
+                """
                 DELETE FROM cleanup_manifests
                 WHERE expires_at_ms <= ? OR created_at_ms <= ?
                 """,
@@ -964,17 +1309,32 @@ public actor EvidenceStore {
     }
 
     public func clearEvidence() throws {
-        try connection.execute(
-            "DELETE FROM scan_sessions",
-            operation: "clear.evidence"
-        )
+        try connection.transaction(operation: "clear.evidence") {
+            try connection.execute(
+                """
+                DELETE FROM cleanup_run_journals
+                WHERE retention_class = 'evidenceLinked'
+                """,
+                operation: "clear.evidenceLinkedJournals"
+            )
+            try connection.execute(
+                "DELETE FROM scan_sessions",
+                operation: "clear.evidenceRecords"
+            )
+        }
     }
 
     public func clearManifests() throws {
-        try connection.execute(
-            "DELETE FROM cleanup_manifests",
-            operation: "clear.manifests"
-        )
+        try connection.transaction(operation: "clear.manifests") {
+            try connection.execute(
+                "DELETE FROM cleanup_run_journals",
+                operation: "clear.journals"
+            )
+            try connection.execute(
+                "DELETE FROM cleanup_manifests",
+                operation: "clear.manifestRecords"
+            )
+        }
     }
 
     public func recordCounts() throws -> EvidenceRecordCounts {
@@ -1050,6 +1410,76 @@ public actor EvidenceStore {
                 .text(id.rawValue),
             ],
             operation: "test.changeCleanupPlanExpiry"
+        )
+    }
+
+    func _testInsertMalformedCleanupJournal(
+        id: String,
+        payload: String
+    ) throws {
+        try connection.execute(
+            """
+            INSERT INTO cleanup_run_journals
+            (id, plan_id, stage, retention_class, updated_at_ms, expires_at_ms, payload)
+            VALUES (?, 'plan-corrupt', 'prepared', 'evidenceLinked', 0, 1, ?)
+            """,
+            bindings: [.text(id), .text(payload)],
+            operation: "test.malformedJournal"
+        )
+    }
+
+    func _testInsertMalformedCleanupPlan(
+        id: String,
+        sessionID: ScanSessionID,
+        payload: String
+    ) throws {
+        try connection.execute(
+            """
+            INSERT INTO cleanup_plans
+            (id, session_id, created_at_ms, expires_at_ms, payload)
+            VALUES (?, ?, 0, 1, ?)
+            """,
+            bindings: [
+                .text(id),
+                .text(sessionID.rawValue),
+                .text(payload),
+            ],
+            operation: "test.malformedPlan"
+        )
+    }
+
+    func _testInsertMalformedPolicyDecision(
+        id: String,
+        planID: CleanupPlanID,
+        payload: String
+    ) throws {
+        try connection.execute(
+            """
+            INSERT INTO policy_decisions
+            (id, plan_id, payload)
+            VALUES (?, ?, ?)
+            """,
+            bindings: [
+                .text(id),
+                .text(planID.rawValue),
+                .text(payload),
+            ],
+            operation: "test.malformedDecision"
+        )
+    }
+
+    func _testInsertMalformedCleanupManifest(
+        id: String,
+        payload: String
+    ) throws {
+        try connection.execute(
+            """
+            INSERT INTO cleanup_manifests
+            (id, plan_id, created_at_ms, expires_at_ms, payload)
+            VALUES (?, 'plan-corrupt', 0, 1, ?)
+            """,
+            bindings: [.text(id), .text(payload)],
+            operation: "test.malformedManifest"
         )
     }
 
@@ -1314,6 +1744,16 @@ public actor EvidenceStore {
             }
             return
         }
+        if version == 2 {
+            let expected = try SQLiteConnection(path: ":memory:")
+            try configureConnection(expected)
+            try createSchemaV1(expected)
+            try createSchemaV2(expected)
+            guard try schemaSignature(connection) == schemaSignature(expected) else {
+                throw EvidenceStoreError.schemaMismatch
+            }
+            return
+        }
         guard version == schemaVersion else {
             throw EvidenceStoreError.schemaMismatch
         }
@@ -1371,19 +1811,24 @@ public actor EvidenceStore {
         _ connection: SQLiteConnection,
         testHooks: EvidenceStoreTestHooks
     ) throws {
-        let version = Int(try connection.scalarInt(
+        let originalVersion = Int(try connection.scalarInt(
             "PRAGMA user_version",
             operation: "migration.version"
         ))
-        guard version <= schemaVersion else {
-            throw EvidenceStoreError.unsupportedFutureSchema(version: version)
+        guard originalVersion <= schemaVersion else {
+            throw EvidenceStoreError.unsupportedFutureSchema(
+                version: originalVersion
+            )
         }
-        guard version < schemaVersion else {
+        guard originalVersion < schemaVersion else {
             return
         }
-        if version == 0 {
-            do {
-                try connection.transaction(operation: "migration.v1") {
+        var targetVersion = originalVersion + 1
+        do {
+            try connection.transaction(operation: "migration.toV3") {
+                var version = originalVersion
+                if version == 0 {
+                    targetVersion = 1
                     try claimRole(connection)
                     if try connection.scalarInt(
                         """
@@ -1416,25 +1861,36 @@ public actor EvidenceStore {
                         "PRAGMA user_version=1",
                         operation: "migration.setVersion1"
                     )
+                    version = 1
                 }
-            } catch {
-                throw EvidenceStoreError.migrationFailed(version: 1)
-            }
-        }
-        do {
-            try connection.transaction(operation: "migration.v2") {
-                try claimRole(connection)
-                try createSchemaV2(connection)
-                if testHooks.failMigrationToVersion == 2 {
-                    throw EvidenceStoreError.migrationFailed(version: 2)
+                if version < 2 {
+                    targetVersion = 2
+                    try claimRole(connection)
+                    try createSchemaV2(connection)
+                    if testHooks.failMigrationToVersion == 2 {
+                        throw EvidenceStoreError.migrationFailed(version: 2)
+                    }
+                    try connection.execute(
+                        "PRAGMA user_version=2",
+                        operation: "migration.setVersion2"
+                    )
+                    version = 2
                 }
-                try connection.execute(
-                    "PRAGMA user_version=2",
-                    operation: "migration.setVersion2"
-                )
+                if version < 3 {
+                    targetVersion = 3
+                    try claimRole(connection)
+                    try createSchemaV3(connection)
+                    if testHooks.failMigrationToVersion == 3 {
+                        throw EvidenceStoreError.migrationFailed(version: 3)
+                    }
+                    try connection.execute(
+                        "PRAGMA user_version=3",
+                        operation: "migration.setVersion3"
+                    )
+                }
             }
         } catch {
-            throw EvidenceStoreError.migrationFailed(version: 2)
+            throw EvidenceStoreError.migrationFailed(version: targetVersion)
         }
     }
 
@@ -1443,6 +1899,7 @@ public actor EvidenceStore {
     ) throws {
         try createSchemaV1(connection)
         try createSchemaV2(connection)
+        try createSchemaV3(connection)
     }
 
     private static func createSchemaV1(
@@ -1457,6 +1914,14 @@ public actor EvidenceStore {
         _ connection: SQLiteConnection
     ) throws {
         for (operation, sql) in evidenceSchemaV2Statements {
+            try connection.execute(sql, operation: operation)
+        }
+    }
+
+    private static func createSchemaV3(
+        _ connection: SQLiteConnection
+    ) throws {
+        for (operation, sql) in evidenceSchemaV3Statements {
             try connection.execute(sql, operation: operation)
         }
     }
@@ -1587,6 +2052,115 @@ public actor EvidenceStore {
             ],
             operation: operation
         )
+    }
+
+    private func insertImmutableSingleton(
+        table: String,
+        id: String,
+        parentColumn: String,
+        parentID: String,
+        payload: Data,
+        operation: String
+    ) throws {
+        let payload = try boundedStorePayloadString(payload)
+        try connection.transaction(operation: operation) {
+            let existing = try connection.query(
+                """
+                SELECT \(parentColumn), payload
+                FROM \(table)
+                WHERE id = ?
+                """,
+                bindings: [.text(id)],
+                operation: "\(operation).identity"
+            ) {
+                (
+                    parentID: columnText($0, 0),
+                    payload: columnText($0, 1)
+                )
+            }.first
+            if let existing {
+                guard existing.parentID == parentID,
+                      existing.payload == payload
+                else {
+                    throw EvidenceStoreError.immutableRecordConflict
+                }
+                return
+            }
+            try connection.execute(
+                """
+                INSERT INTO \(table) (id, \(parentColumn), payload)
+                VALUES (?, ?, ?)
+                """,
+                bindings: [.text(id), .text(parentID), .text(payload)],
+                operation: "\(operation).record"
+            )
+        }
+    }
+
+    private func insertImmutableExpiringRecord(
+        table: String,
+        id: String,
+        parentID: String,
+        parentColumn: String,
+        timestampColumn: String,
+        timestamp: Date,
+        expiresAt: Date,
+        maximumLifetimeMilliseconds: Int64,
+        payload: Data,
+        operation: String
+    ) throws {
+        let timestampMilliseconds = storeMilliseconds(timestamp)
+        let requestedExpiry = storeMilliseconds(expiresAt)
+        guard requestedExpiry <= addingStoreMilliseconds(
+            maximumLifetimeMilliseconds,
+            to: timestampMilliseconds
+        ) else {
+            throw EvidenceStoreError.retentionLimitExceeded
+        }
+        let payload = try boundedStorePayloadString(payload)
+        try connection.transaction(operation: operation) {
+            let existing = try connection.query(
+                """
+                SELECT \(parentColumn), \(timestampColumn), expires_at_ms, payload
+                FROM \(table)
+                WHERE id = ?
+                """,
+                bindings: [.text(id)],
+                operation: "\(operation).identity"
+            ) {
+                (
+                    parentID: columnText($0, 0),
+                    timestamp: sqlite3_column_int64($0, 1),
+                    expiresAt: sqlite3_column_int64($0, 2),
+                    payload: columnText($0, 3)
+                )
+            }.first
+            if let existing {
+                guard existing.parentID == parentID,
+                      existing.timestamp == timestampMilliseconds,
+                      existing.expiresAt == requestedExpiry,
+                      existing.payload == payload
+                else {
+                    throw EvidenceStoreError.immutableRecordConflict
+                }
+                return
+            }
+            try connection.execute(
+                """
+                INSERT INTO \(table)
+                (id, \(parentColumn), \(timestampColumn), expires_at_ms, payload)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                bindings: [
+                    .text(id),
+                    .text(parentID),
+                    .integer(timestampMilliseconds),
+                    .integer(requestedExpiry),
+                    .text(payload),
+                ],
+                operation: "\(operation).record"
+            )
+        }
     }
 
     private func decodeOne<T: Decodable>(
@@ -1830,6 +2404,42 @@ private let evidenceSchemaV2Statements: [(String, String)] = [
     (
         "schema.volumeBaselineIndex",
         "CREATE INDEX IF NOT EXISTS idx_volume_baselines_session_scope ON volume_baselines(session_id, scope_id)"
+    ),
+]
+
+private let evidenceSchemaV3Statements: [(String, String)] = [
+    (
+        "schema.cleanupRunJournals",
+        """
+        CREATE TABLE IF NOT EXISTS cleanup_run_journals (
+            id TEXT PRIMARY KEY NOT NULL,
+            plan_id TEXT NOT NULL,
+            stage TEXT NOT NULL
+                CHECK (
+                    stage IN (
+                        'prepared',
+                        'actionStarted',
+                        'actionOutcomeRecorded',
+                        'manifestPending',
+                        'auditPending',
+                        'finalized'
+                    )
+                ),
+            retention_class TEXT NOT NULL
+                CHECK (retention_class IN ('evidenceLinked', 'audit')),
+            updated_at_ms INTEGER NOT NULL,
+            expires_at_ms INTEGER NOT NULL,
+            payload TEXT NOT NULL
+        ) STRICT
+        """
+    ),
+    (
+        "schema.cleanupRunJournalExpiryIndex",
+        "CREATE INDEX IF NOT EXISTS idx_cleanup_run_journals_expiry ON cleanup_run_journals(retention_class, expires_at_ms, id)"
+    ),
+    (
+        "schema.cleanupRunJournalStageIndex",
+        "CREATE INDEX IF NOT EXISTS idx_cleanup_run_journals_stage ON cleanup_run_journals(stage, updated_at_ms DESC, id)"
     ),
 ]
 

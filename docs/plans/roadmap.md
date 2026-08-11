@@ -196,7 +196,8 @@ Codex 进程树不可写、no-Executor。
   9–26 通过最终统一 verifier 并归档至
   [`completed/`](completed/epic-2-4-deterministic-product-core.md)。
 - Phase C deterministic Epic 8 safe-execution 详尽 plan 已于 2026-08-11
-  获用户批准；Task 27 已完成，当前从 Task 28 开始并按 Task 28–35 顺序执行。
+  获用户批准；Tasks 27–28 已完成。当前按用户要求暂停，先回顾 ADR 0004，
+  Task 29 尚未启动。
 - Epic 0 Foundation Upstream Study：已完成，选择 checked-in Xcode App/Test host + local Swift packages。
 - Epic 0 Task 1：SwiftPM Core/Codex、smoke tests、`scripts/verify`、manual-only CI 与 ThirdPartyNotices 骨架已完成。
 - Bundle identifier：已确认 `com.eriklee.stornaut`。
@@ -221,7 +222,7 @@ Codex 进程树不可写、no-Executor。
   247.24 秒完成，peak RSS 73,220,096 bytes，132 个 permission gaps 保持
   Partial/Unmeasurable；Codex marker absent。完整结论见
   [Epic 2–4 Validation Report](../reports/epic-2-4-validation-report.md)。
-- 下一项规划：Phase C deterministic Epic 8 safe-execution slice，候选闭环为
-  Review → Policy → fresh revalidation → MoveToTrash → Manifest。计划必须
-  明确测试、freshness、确认、partial/undo、计量和 UI gates，经用户批准后
-  才可进入实现。Deep Dive 与真实 destructive Registered Action 仍不在该阶段。
+- 下一项对齐：回顾更新后的 capability-first ADR 0004，确认个人工具应尽可能
+  发挥 Codex direct read、shell/unified exec、live search、browser/direct
+  fetch、skills/subagents 与公共联网能力，同时保持 Swift-only 用户数据写入
+  和 Executor 边界。完成回顾前不启动 Phase C Task 29。

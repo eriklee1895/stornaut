@@ -119,6 +119,7 @@ public struct PathSnapshot: Codable, Sendable, Equatable {
         measurementStatus: MeasurementStatus,
         observedAt: Date
     ) throws {
+        try requireDomainSchemaVersion(schemaVersion, expected: .v1)
         let hasCompleteMetadata = logicalByteCount != nil
             && allocatedByteCount != nil
             && modifiedAt != nil

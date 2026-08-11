@@ -48,7 +48,6 @@ public struct EvidenceRecord: Codable, Sendable, Equatable {
     public let freshness: EvidenceFreshness
 
     public init(
-        schemaVersion: DomainSchemaVersion = .v1,
         id: EvidenceID,
         targetID: SnapshotID,
         kind: EvidenceKind,
@@ -57,7 +56,7 @@ public struct EvidenceRecord: Codable, Sendable, Equatable {
         observedAt: Date,
         freshness: EvidenceFreshness
     ) {
-        self.schemaVersion = schemaVersion
+        schemaVersion = .v1
         self.id = id
         self.targetID = targetID
         self.kind = kind
@@ -65,6 +64,29 @@ public struct EvidenceRecord: Codable, Sendable, Equatable {
         self.summaryKey = summaryKey
         self.observedAt = observedAt
         self.freshness = freshness
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let schemaVersion = try container.decode(
+            DomainSchemaVersion.self,
+            forKey: .schemaVersion
+        )
+        try requireDomainSchemaVersion(schemaVersion, expected: .v1)
+        self.schemaVersion = schemaVersion
+        id = try container.decode(EvidenceID.self, forKey: .id)
+        targetID = try container.decode(SnapshotID.self, forKey: .targetID)
+        kind = try container.decode(EvidenceKind.self, forKey: .kind)
+        source = try container.decode(EvidenceSource.self, forKey: .source)
+        summaryKey = try container.decode(
+            DomainToken.self,
+            forKey: .summaryKey
+        )
+        observedAt = try container.decode(Date.self, forKey: .observedAt)
+        freshness = try container.decode(
+            EvidenceFreshness.self,
+            forKey: .freshness
+        )
     }
 }
 
@@ -77,18 +99,35 @@ public struct InvestigationTarget: Codable, Sendable, Equatable {
     public let createdAt: Date
 
     public init(
-        schemaVersion: DomainSchemaVersion = .v1,
         id: InvestigationTargetID,
         snapshotID: SnapshotID,
         expectedBytes: ByteCount?,
         reasonKey: DomainToken,
         createdAt: Date
     ) {
-        self.schemaVersion = schemaVersion
+        schemaVersion = .v1
         self.id = id
         self.snapshotID = snapshotID
         self.expectedBytes = expectedBytes
         self.reasonKey = reasonKey
         self.createdAt = createdAt
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let schemaVersion = try container.decode(
+            DomainSchemaVersion.self,
+            forKey: .schemaVersion
+        )
+        try requireDomainSchemaVersion(schemaVersion, expected: .v1)
+        self.schemaVersion = schemaVersion
+        id = try container.decode(InvestigationTargetID.self, forKey: .id)
+        snapshotID = try container.decode(SnapshotID.self, forKey: .snapshotID)
+        expectedBytes = try container.decodeIfPresent(
+            ByteCount.self,
+            forKey: .expectedBytes
+        )
+        reasonKey = try container.decode(DomainToken.self, forKey: .reasonKey)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
     }
 }
