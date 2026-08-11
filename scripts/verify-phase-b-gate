@@ -5,6 +5,28 @@ set -euo pipefail
 repo_root=${0:A:h:h}
 cd "$repo_root"
 
+gate_mode=full
+case ${1:-} in
+    "")
+        ;;
+    --product-only)
+        gate_mode=product-only
+        ;;
+    --help|-h)
+        print "Usage: scripts/verify-phase-b-gate [--product-only]"
+        exit 0
+        ;;
+    *)
+        print -u2 "Usage: scripts/verify-phase-b-gate [--product-only]"
+        exit 64
+        ;;
+esac
+
+if (( $# > 1 )); then
+    print -u2 "Usage: scripts/verify-phase-b-gate [--product-only]"
+    exit 64
+fi
+
 work_dir=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-phase-b-gate.XXXXXX")
 trap 'rm -rf "$work_dir"' EXIT
 
@@ -16,12 +38,16 @@ printf launched > "$marker"
 EOF
 chmod 700 "$work_dir/bin/codex"
 
-swift package clean
+if [[ "$gate_mode" == full ]]; then
+    swift package clean
+fi
 swift build --product SurveyorBenchmark
 benchmark="$repo_root/.build/debug/SurveyorBenchmark"
 
 matcher_benchmarks='(cumulativeCatalogMatchingBenchmarkStaysBounded|completeCacheCatalogMatchingBenchmarkStaysBounded|completeCatalogMatchingBenchmarkStaysBounded)'
-swift test --skip "$matcher_benchmarks"
+if [[ "$gate_mode" == full ]]; then
+    swift test --skip "$matcher_benchmarks"
+fi
 
 PATH="$work_dir/bin:$PATH" "$benchmark" \
     --pipeline product \
@@ -147,14 +173,20 @@ PY
 
 [[ ! -e "$marker" ]]
 
-scripts/verify-activity-boundaries
-scripts/verify-quick-scan-boundaries
-scripts/verify-app-state-boundaries
-scripts/verify-overview-boundaries
-scripts/verify-scan-boundaries
-scripts/verify-history-boundaries
-scripts/verify-settings-boundaries
-scripts/verify-rule-compiler
-scripts/verify-ui-automation-mode --self-test
+if [[ "$gate_mode" == full ]]; then
+    scripts/verify-activity-boundaries
+    scripts/verify-quick-scan-boundaries
+    scripts/verify-app-state-boundaries
+    scripts/verify-overview-boundaries
+    scripts/verify-scan-boundaries
+    scripts/verify-history-boundaries
+    scripts/verify-settings-boundaries
+    scripts/verify-rule-compiler
+    scripts/verify-ui-automation-mode --self-test
+fi
 
-echo "Phase B evidence gate verification passed"
+if [[ "$gate_mode" == product-only ]]; then
+    print "Phase B product/cancellation evidence verification passed."
+else
+    print "Phase B evidence gate verification passed."
+fi

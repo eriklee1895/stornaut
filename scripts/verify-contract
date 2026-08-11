@@ -1,0 +1,102 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+cd "$repo_root"
+
+function fail_contract() {
+    print -u2 -- "$1"
+    exit 1
+}
+
+function require_fixed_text() {
+    local target_file=$1
+    local expected=$2
+
+    if ! rg -q --fixed-strings -- "$expected" "$target_file"; then
+        fail_contract "$target_file is missing verifier contract: $expected"
+    fi
+}
+
+# Keep these source checks first. On a pre-refactor checkout they fail before
+# invoking the old verifier, whose unknown arguments were ignored.
+require_fixed_text scripts/verify '--headless'
+require_fixed_text scripts/verify '--full'
+require_fixed_text scripts/verify '--list-steps'
+require_fixed_text scripts/verify '.derivedData/verification'
+require_fixed_text scripts/verify 'swift test --no-parallel'
+require_fixed_text scripts/verify-phase-b-gate '--product-only'
+
+help_output=$(scripts/verify --help)
+for expected in '--headless' '--full' '--list-steps'; do
+    if [[ "$help_output" != *"$expected"* ]]; then
+        fail_contract "Verifier help omitted $expected"
+    fi
+done
+
+unknown_output=$(mktemp)
+trap 'rm -f "$unknown_output"' EXIT
+if scripts/verify --unknown-mode >"$unknown_output" 2>&1; then
+    fail_contract "Verifier accepted an unknown mode"
+fi
+require_fixed_text "$unknown_output" 'Usage:'
+
+headless_steps=$(scripts/verify --headless --list-steps)
+full_steps=$(scripts/verify --full --list-steps)
+
+for expected in \
+    swiftpm-tests-serialized \
+    source-boundaries \
+    app-contract-tests \
+    debug-release-fixture-boundary; do
+    if [[ "$headless_steps" != *"$expected"* ]]; then
+        fail_contract "Headless verifier omitted $expected"
+    fi
+done
+
+if [[ "$full_steps" != *"swiftpm-tests"* ]]; then
+    fail_contract "Full verifier omitted parallel SwiftPM tests"
+fi
+if [[ "$full_steps" == *"swiftpm-tests-serialized"* ]]; then
+    fail_contract "Full verifier unexpectedly serialized SwiftPM tests"
+fi
+if [[ "$full_steps" == *"app-contract-tests"* ]]; then
+    fail_contract "Full verifier unexpectedly omitted visual snapshot suites"
+fi
+
+for forbidden in \
+    ui-automation-readiness \
+    xcuitest \
+    ui-screenshot-contract \
+    app-tests-and-snapshots \
+    matcher-benchmarks \
+    phase-b-product; do
+    if [[ "$headless_steps" == *"$forbidden"* ]]; then
+        fail_contract "Headless verifier included host/visual/performance step $forbidden"
+    fi
+    if [[ "$full_steps" != *"$forbidden"* ]]; then
+        fail_contract "Full verifier omitted $forbidden"
+    fi
+done
+
+require_fixed_text scripts/verify \
+    '-skip-testing:StornautAppTests/DesignSystemSnapshotTests'
+require_fixed_text scripts/verify \
+    '-skip-testing:StornautAppTests/OverviewSnapshotTests'
+
+require_fixed_text .github/workflows/ci.yml 'name: Stornaut CI'
+require_fixed_text .github/workflows/ci.yml '  pull_request:'
+require_fixed_text .github/workflows/ci.yml '  push:'
+require_fixed_text .github/workflows/ci.yml '  workflow_dispatch:'
+require_fixed_text .github/workflows/ci.yml 'run: scripts/verify --headless'
+require_fixed_text .github/workflows/ci.yml 'uses: actions/checkout@v6'
+require_fixed_text .github/workflows/ci.yml 'uses: actions/upload-artifact@v7'
+require_fixed_text .github/workflows/ci.yml 'brew install ripgrep'
+
+if rg -qi 'XCUITest|verify-ui|peekaboo|Automation Mode|TCC' \
+    .github/workflows/ci.yml; then
+    fail_contract "Headless CI workflow references a host/UI-only gate"
+fi
+
+print "Verifier mode and CI contract verification passed."

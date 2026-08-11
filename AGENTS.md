@@ -109,7 +109,7 @@ StornautAppUITests/      Light/Dark、Settings 与截图验收
 Tests/                   XCTest / Swift Testing + fixtures
 docs/adr/                架构假设证据
 docs/upstream-studies/   Reference Study Gate 记录
-scripts/verify           本地验收入口
+scripts/verify           默认/full 本机验收；--headless 为普通 CI 构建测试入口
 scripts/verify-ui-automation-mode
                          完整 verifier 的只读 Automation Mode fail-fast gate
 scripts/bootstrap-dev-tools / doctor-dev-tools

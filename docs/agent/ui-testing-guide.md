@@ -20,7 +20,8 @@ UI 小迭代完成必须同时满足：
 4. 构建并启动真实 `Stornaut.app`，不是只看 SwiftUI Preview；
 5. 在 awake/unlocked 本地图形会话中，用 Peekaboo 截取实际目标窗口并检查；
 6. Light/Dark 或 Settings 受影响时，更新对应截图证据；
-7. 最后运行 `scripts/verify`；
+7. 最后在 awake/unlocked 本机运行 `scripts/verify --full`；不带参数的
+   `scripts/verify` 保持同义；
 8. 受影响组件的 view snapshot golden 通过，或经复核后重新录制；
 9. 不提交本机截图、私有路径、TCC 状态或 `.xcresult` 原始产物，除非它们是已脱敏、明确批准的文档资产。第 8 项的 golden 不在此列——它们渲染的是合成 component/page fixture；只允许固定的合成路径，不得读取宿主文件系统或包含用户私有数据，必须提交，见 [ADR 0014](../adr/0014-view-snapshot-regression.md)。
 
@@ -37,7 +38,11 @@ UI 小迭代完成必须同时满足：
 | Runtime visual | XcodeBuildMCP + Peekaboo | 当前构建的真实 `.app`、实际窗口、裁切/溢出/材质/层级 | CI 可移植性和行为断言 |
 | Human review | Coding Agent + user | 视觉质量、是否符合设计意图 | 自动回归 |
 
-这些层级互补，不互相替代。Peekaboo 是本地视觉补充；XCUITest 是可重复自动化契约。
+这些层级互补，不互相替代。Peekaboo 是本地视觉补充；XCUITest 是依赖 live
+macOS host 的可重复交互契约，不是普通 GitHub-hosted CI 的前置条件。headless CI
+使用 SwiftPM 与非 golden App contracts 形成基础回归网；view snapshot golden
+留在本机 full gate。真实 hosted run 已证明同一 Xcode 26.6 下 macOS 26.5.1 与
+26.5.2 的离屏像素仍会整体漂移，不能把“无需显示器”误当成“跨机器确定性”。
 
 ## 3. Current UI Contracts
 
@@ -145,6 +150,9 @@ TEST_RUNNER_STORNAUT_RECORD_SNAPSHOTS=1 xcodebuild … test
 `.xcresult`，用 `xcrun xcresulttool export attachments` 取出查看。
 
 重新录制的 golden 必须人工过目再提交。没人看过的参考图不构成任何断言。
+这两个 pixel-comparison suite 只属于 `scripts/verify --full`；普通 headless CI
+仍运行 `SnapshotHarnessTests` 的 8 个算法/状态合同，但显式跳过
+`DesignSystemSnapshotTests` 与 `OverviewSnapshotTests`。
 
 ## 4. Fast Iteration Loop
 
@@ -216,8 +224,23 @@ scripts/peekaboo-readonly image \
 ### 4.4 Full regression
 
 ```sh
-scripts/verify
+scripts/verify --full
 ```
+
+`scripts/verify` 不带参数时仍运行 full mode。普通 GitHub Actions 使用：
+
+```sh
+scripts/verify --headless
+```
+
+headless mode 运行 SwiftPM tests、106 个非 golden App contracts、边界检查、
+规则编译器、localization、bundle/signing 与 Debug/Release build fixture，但
+明确不运行两个 view snapshot pixel suite、XCUITest、window screenshot、
+Automation Mode readiness、Peekaboo/TCC 或性能 benchmark。两种模式都会把逐步耗时写入
+`.derivedData/verification/<mode>-timings.tsv`；具体职责见
+[ADR 0015](../adr/0015-headless-ci-verification.md)。headless Swift Testing
+用例之间显式串行，避免低资源 hosted runner 同时争抢大量进程与 pipe；各测试
+内部的 actor、worker、取消与进程树并发仍正常执行，full mode 仍保留用例间并行。
 
 开发 MCP/TCC 的独立验收：
 
@@ -272,9 +295,9 @@ scripts/peekaboo-readonly permissions status \
 2. 记录本轮为 host graphical-session blocked，而不是产品失败；
 3. 允许 unit/App tests 继续，但不能宣称 Peekaboo screenshot 或 XCUITest 已通过；
 4. 用户回到 awake/unlocked session 后，重跑受影响的 capture/XCUITest；
-5. 普通 GitHub-hosted CI 不依赖 XCUITest、Peekaboo 或 TCC；离屏 view
-   snapshot 与 App tests 可进入 headless gate。只有专用、受控的 macOS lab
-   runner 才适合另设 XCUITest job。
+5. 普通 GitHub-hosted CI 不依赖 XCUITest、Peekaboo、TCC 或 pixel golden；
+   非 golden App contracts 可进入 headless gate。只有专用、受控且固定 baseline
+   的 macOS lab runner 才适合另设 visual/XCUITest job。
 
 ### XCTest waits for `Enable UI Automation`
 
@@ -296,7 +319,7 @@ xcrun xcresulttool get test-results summary \
   --path .derivedData/ui-tests.xcresult
 ```
 
-`scripts/verify` 在任何 build/test 前运行只读
+`scripts/verify --full` 在任何 build/test 前运行只读
 `scripts/verify-ui-automation-mode --allow-auth-prompt`，并把 XCUITest 作为
 紧接其后的第一项外部命令。该 gate 只解析 `automationmodetool` 的状态输出：
 
@@ -313,10 +336,10 @@ Synthesizing、SIP、daemon 或凭据。
 普通开发机的处理：
 
 1. 确保用户位于 awake/unlocked 图形会话；
-2. 运行 `scripts/verify`；它会立即启动 UI-only test，不先执行耗时 gate；
+2. 运行 `scripts/verify --full`；它会立即启动 UI-only test，不先执行耗时 gate；
 3. 用户本人在 live runner 超时前批准 `Enable UI Automation`；
 4. 确认 UI test methods 实际执行，而不只是 runner 初始化成功；
-5. 同一次 `scripts/verify` 才继续 Phase B、SwiftPM、App 与 bundle gates。
+5. 同一次 full verifier 才继续 Phase B、SwiftPM、App 与 bundle gates。
 
 普通用户认证的 Automation Mode 不是供长流程预先开启的持久 host toggle。
 实机证据显示：一个旧 runner 的认证窗口可以在 runner 退出后残留，而认证成功
@@ -340,7 +363,7 @@ timeout 退出，而 `com.apple.LocalAuthentication.UIAgent` 的 `XCTest` 窗口
 4. 由用户本人批准或取消残留窗口；窗口消失后如 Automation Mode 仍 disabled，
    才重新启动一个 UI-only test 产生新的认证请求；
 5. 删除该认证探针的临时 DerivedData/失败 `.xcresult`，但不要把它计作产品
-   verifier，也不要让它替代之后一次完整的 `scripts/verify`。
+   verifier，也不要让它替代之后一次完整的 `scripts/verify --full`。
 
 不要在一个残留认证窗口尚存在时叠加第二个 UI test 请求。旧窗口可能已经与
 超时 runner 脱钩；重复请求既不能证明认证成功，也会让故障归因失真。

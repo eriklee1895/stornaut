@@ -1,80 +1,337 @@
 #!/bin/zsh
 
 set -euo pipefail
+zmodload zsh/datetime
 
 repo_root=${0:A:h:h}
 cd "$repo_root"
 
-scripts/verify-ui-automation-mode --allow-auth-prompt
+function print_usage() {
+    print "Usage: scripts/verify [--headless|--full] [--list-steps]"
+    print
+    print "  --headless   Deterministic build/test gates for ordinary CI."
+    print "  --full       Headless gates plus local XCUITest and performance evidence."
+    print "  --list-steps Print the selected ordered step names without running them."
+    print "  --help       Show this help."
+}
 
-rm -rf .derivedData
+mode=full
+mode_was_selected=false
+list_steps=false
 
-xcodebuild -quiet \
-    -project Stornaut.xcodeproj \
-    -scheme Stornaut \
-    -configuration Debug \
-    -destination 'platform=macOS,arch=arm64' \
-    -derivedDataPath .derivedData/ui-tests \
-    -resultBundlePath .derivedData/ui-tests.xcresult \
-    -only-testing:StornautAppUITests \
-    test
-
-scripts/export-ui-screenshots
-scripts/verify-ui-screenshots
-
-scripts/verify-phase-b-gate
-
-swift package clean
-swift build
-matcher_benchmarks='(cumulativeCatalogMatchingBenchmarkStaysBounded|completeCacheCatalogMatchingBenchmarkStaysBounded|completeCatalogMatchingBenchmarkStaysBounded)'
-swift test --skip "$matcher_benchmarks"
-for benchmark in \
-    cumulativeCatalogMatchingBenchmarkStaysBounded \
-    completeCacheCatalogMatchingBenchmarkStaysBounded \
-    completeCatalogMatchingBenchmarkStaysBounded; do
-    swift test --filter "$benchmark"
+while (( $# > 0 )); do
+    case $1 in
+        --headless)
+            if [[ "$mode_was_selected" == true && "$mode" != headless ]]; then
+                print -u2 "Choose only one verification mode."
+                print_usage >&2
+                exit 64
+            fi
+            mode=headless
+            mode_was_selected=true
+            ;;
+        --full)
+            if [[ "$mode_was_selected" == true && "$mode" != full ]]; then
+                print -u2 "Choose only one verification mode."
+                print_usage >&2
+                exit 64
+            fi
+            mode=full
+            mode_was_selected=true
+            ;;
+        --list-steps)
+            list_steps=true
+            ;;
+        --help|-h)
+            print_usage
+            exit 0
+            ;;
+        *)
+            print -u2 "Unknown verification argument: $1"
+            print_usage >&2
+            exit 64
+            ;;
+    esac
+    shift
 done
 
-scripts/verify-activity-boundaries
-scripts/verify-quick-scan-boundaries
-scripts/verify-app-state-boundaries
-scripts/verify-overview-boundaries
-scripts/verify-scan-boundaries
-scripts/verify-history-boundaries
-scripts/verify-settings-boundaries
+typeset -a headless_steps=(
+    clean-derived-data
+    swiftpm-build
+    swiftpm-tests-serialized
+    source-boundaries
+    automation-parser-self-test
+    app-contract-tests
+    debug-app-build
+    debug-app-sign
+    app-bundle
+    debug-release-fixture-boundary
+    localization-contract
+    rule-compiler
+    verifier-contract
+    docs-and-diff
+)
 
-xcodebuild -quiet \
-    -project Stornaut.xcodeproj \
-    -scheme Stornaut \
-    -configuration Debug \
-    -destination 'platform=macOS,arch=arm64' \
-    -derivedDataPath .derivedData/tests \
-    -skip-testing:StornautAppUITests \
-    test
+typeset -a full_steps=(
+    ui-automation-readiness
+    clean-derived-data
+    xcuitest
+    ui-screenshot-contract
+    swiftpm-build
+    swiftpm-tests
+    matcher-benchmarks
+    phase-b-product
+    source-boundaries
+    automation-parser-self-test
+    app-tests-and-snapshots
+    debug-app-build
+    debug-app-sign
+    app-bundle
+    debug-release-fixture-boundary
+    localization-contract
+    rule-compiler
+    verifier-contract
+    docs-and-diff
+)
 
-xcodebuild -quiet \
-    -project Stornaut.xcodeproj \
-    -scheme Stornaut \
-    -configuration Debug \
-    -destination 'platform=macOS,arch=arm64' \
-    -derivedDataPath .derivedData/app \
-    build
+typeset -a selected_steps
+if [[ "$mode" == headless ]]; then
+    selected_steps=("${headless_steps[@]}")
+else
+    selected_steps=("${full_steps[@]}")
+fi
 
-scripts/sign-local-app
-scripts/verify-app-bundle
-scripts/verify-app-release-boundaries
+if [[ "$list_steps" == true ]]; then
+    printf '%s\n' "${selected_steps[@]}"
+    exit 0
+fi
 
-for localization in StornautApp/Resources/*.lproj/Localizable.strings; do
-    plutil -lint "$localization"
+timing_temp=$(mktemp "${TMPDIR:-/tmp}/stornaut-verify-timings.XXXXXX")
+timing_file="$repo_root/.derivedData/verification/$mode-timings.tsv"
+trap 'rm -f "$timing_temp"' EXIT
+print -r -- $'mode\tstep\tseconds\tstatus' > "$timing_temp"
+
+function persist_timings() {
+    mkdir -p "${timing_file:h}"
+    cp "$timing_temp" "$timing_file"
+}
+
+function run_step() {
+    local step_name=$1
+    shift
+    local started_at=$EPOCHREALTIME
+    local step_status=0
+
+    print "[verify][$mode] START $step_name"
+    "$@" || step_status=$?
+
+    local finished_at=$EPOCHREALTIME
+    local elapsed_seconds
+    elapsed_seconds=$(printf '%.3f' "$(( finished_at - started_at ))")
+
+    if (( step_status == 0 )); then
+        print -r -- "$mode"$'\t'"$step_name"$'\t'"$elapsed_seconds"$'\tpass' \
+            >> "$timing_temp"
+        persist_timings
+        print "[verify][$mode] PASS  $step_name (${elapsed_seconds}s)"
+        return 0
+    fi
+
+    print -r -- "$mode"$'\t'"$step_name"$'\t'"$elapsed_seconds"$'\tfail' \
+        >> "$timing_temp"
+    print -u2 "[verify][$mode] FAIL  $step_name (${elapsed_seconds}s, exit $step_status)"
+    persist_timings
+    print "Verification timings: $timing_file"
+    return "$step_status"
+}
+
+function clean_derived_data() {
+    rm -rf "$repo_root/.derivedData"
+}
+
+function run_xcuitest() {
+    xcodebuild -quiet \
+        -project Stornaut.xcodeproj \
+        -scheme Stornaut \
+        -configuration Debug \
+        -destination 'platform=macOS,arch=arm64' \
+        -derivedDataPath .derivedData/ui-tests \
+        -resultBundlePath .derivedData/ui-tests.xcresult \
+        -only-testing:StornautAppUITests \
+        test
+}
+
+function verify_ui_screenshots() {
+    scripts/export-ui-screenshots
+    scripts/verify-ui-screenshots
+}
+
+function build_swift_package() {
+    swift package clean
+    swift build
+}
+
+function test_swift_package() {
+    local matcher_benchmarks='(cumulativeCatalogMatchingBenchmarkStaysBounded|completeCacheCatalogMatchingBenchmarkStaysBounded|completeCatalogMatchingBenchmarkStaysBounded)'
+    swift test --skip "$matcher_benchmarks"
+}
+
+function test_swift_package_serialized() {
+    local matcher_benchmarks='(cumulativeCatalogMatchingBenchmarkStaysBounded|completeCacheCatalogMatchingBenchmarkStaysBounded|completeCatalogMatchingBenchmarkStaysBounded)'
+    swift test --no-parallel --skip "$matcher_benchmarks"
+}
+
+function run_matcher_benchmarks() {
+    local benchmark
+    for benchmark in \
+        cumulativeCatalogMatchingBenchmarkStaysBounded \
+        completeCacheCatalogMatchingBenchmarkStaysBounded \
+        completeCatalogMatchingBenchmarkStaysBounded; do
+        swift test --filter "$benchmark"
+    done
+}
+
+function verify_source_boundaries() {
+    scripts/verify-activity-boundaries
+    scripts/verify-quick-scan-boundaries
+    scripts/verify-app-state-boundaries
+    scripts/verify-overview-boundaries
+    scripts/verify-scan-boundaries
+    scripts/verify-history-boundaries
+    scripts/verify-settings-boundaries
+}
+
+function test_app_and_snapshots() {
+    xcodebuild -quiet \
+        -project Stornaut.xcodeproj \
+        -scheme Stornaut \
+        -configuration Debug \
+        -destination 'platform=macOS,arch=arm64' \
+        -derivedDataPath .derivedData/tests \
+        -skip-testing:StornautAppUITests \
+        test
+}
+
+function test_app_contracts() {
+    xcodebuild -quiet \
+        -project Stornaut.xcodeproj \
+        -scheme Stornaut \
+        -configuration Debug \
+        -destination 'platform=macOS,arch=arm64' \
+        -derivedDataPath .derivedData/tests \
+        -skip-testing:StornautAppUITests \
+        -skip-testing:StornautAppTests/DesignSystemSnapshotTests \
+        -skip-testing:StornautAppTests/OverviewSnapshotTests \
+        test
+}
+
+function build_debug_app() {
+    xcodebuild -quiet \
+        -project Stornaut.xcodeproj \
+        -scheme Stornaut \
+        -configuration Debug \
+        -destination 'platform=macOS,arch=arm64' \
+        -derivedDataPath .derivedData/app \
+        build
+}
+
+function verify_localization_contract() {
+    local localization
+    for localization in StornautApp/Resources/*.lproj/Localizable.strings; do
+        plutil -lint "$localization"
+    done
+
+    diff -u \
+        <(rg -o '^"[^"]+"' StornautApp/Resources/en.lproj/Localizable.strings | sort) \
+        <(rg -o '^"[^"]+"' StornautApp/Resources/zh-Hans.lproj/Localizable.strings | sort)
+
+    rg -q 'SettingsLink' StornautApp/AppShell/RootView.swift
+    rg -q '\.keyboardShortcut\(",", modifiers: \.command\)' StornautApp/StornautApp.swift
+}
+
+function verify_docs_and_diff() {
+    scripts/check-doc-links
+    git diff --check
+}
+
+function execute_step() {
+    local step_name=$1
+
+    case $step_name in
+        ui-automation-readiness)
+            run_step "$step_name" scripts/verify-ui-automation-mode --allow-auth-prompt
+            ;;
+        clean-derived-data)
+            run_step "$step_name" clean_derived_data
+            ;;
+        xcuitest)
+            run_step "$step_name" run_xcuitest
+            ;;
+        ui-screenshot-contract)
+            run_step "$step_name" verify_ui_screenshots
+            ;;
+        swiftpm-build)
+            run_step "$step_name" build_swift_package
+            ;;
+        swiftpm-tests)
+            run_step "$step_name" test_swift_package
+            ;;
+        swiftpm-tests-serialized)
+            run_step "$step_name" test_swift_package_serialized
+            ;;
+        matcher-benchmarks)
+            run_step "$step_name" run_matcher_benchmarks
+            ;;
+        phase-b-product)
+            run_step "$step_name" scripts/verify-phase-b-gate --product-only
+            ;;
+        source-boundaries)
+            run_step "$step_name" verify_source_boundaries
+            ;;
+        automation-parser-self-test)
+            run_step "$step_name" scripts/verify-ui-automation-mode --self-test
+            ;;
+        app-tests-and-snapshots)
+            run_step "$step_name" test_app_and_snapshots
+            ;;
+        app-contract-tests)
+            run_step "$step_name" test_app_contracts
+            ;;
+        debug-app-build)
+            run_step "$step_name" build_debug_app
+            ;;
+        debug-app-sign)
+            run_step "$step_name" scripts/sign-local-app
+            ;;
+        app-bundle)
+            run_step "$step_name" scripts/verify-app-bundle
+            ;;
+        debug-release-fixture-boundary)
+            run_step "$step_name" scripts/verify-app-release-boundaries
+            ;;
+        localization-contract)
+            run_step "$step_name" verify_localization_contract
+            ;;
+        rule-compiler)
+            run_step "$step_name" scripts/verify-rule-compiler
+            ;;
+        verifier-contract)
+            run_step "$step_name" scripts/verify-contract
+            ;;
+        docs-and-diff)
+            run_step "$step_name" verify_docs_and_diff
+            ;;
+        *)
+            print -u2 "Unknown internal verification step: $step_name"
+            return 70
+            ;;
+    esac
+}
+
+for verification_step in "${selected_steps[@]}"; do
+    execute_step "$verification_step"
 done
 
-diff -u \
-    <(rg -o '^"[^"]+"' StornautApp/Resources/en.lproj/Localizable.strings | sort) \
-    <(rg -o '^"[^"]+"' StornautApp/Resources/zh-Hans.lproj/Localizable.strings | sort)
-
-rg -q 'SettingsLink' StornautApp/AppShell/RootView.swift
-rg -q '\.keyboardShortcut\(",", modifiers: \.command\)' StornautApp/StornautApp.swift
-
-scripts/verify-rule-compiler
-scripts/check-doc-links
-git diff --check
+persist_timings
+print "Verification timings: $timing_file"
+print "Verification passed in $mode mode."

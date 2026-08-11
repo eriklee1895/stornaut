@@ -350,10 +350,13 @@ func foundationProcessRunnerRejectsStandardInputUntilTaskFour() async {
 
 @Test
 func foundationProcessRunnerCapsStandardError() async throws {
+    let missingPath = URL.temporaryDirectory
+        .appending(path: "stornaut-missing-\(UUID().uuidString)")
+        .path()
     let request = ProcessRequest(
-        executableURL: URL(filePath: "/usr/bin/python3"),
-        arguments: ["-c", "import sys; sys.stderr.write('abcdefgh')"],
-        environment: ["PATH": "/usr/bin:/bin"],
+        executableURL: URL(filePath: "/bin/ls"),
+        arguments: ["-d", missingPath],
+        environment: ["PATH": "/usr/bin:/bin", "LC_ALL": "C"],
         standardOutputLimit: 4,
         standardErrorLimit: 3,
         timeout: .seconds(2)
@@ -361,8 +364,9 @@ func foundationProcessRunnerCapsStandardError() async throws {
 
     let output = try await FoundationProcessRunner().run(request)
 
-    #expect(output.exitStatus == 0)
-    #expect(String(decoding: output.stderr, as: UTF8.self) == "abc")
+    #expect(output.exitStatus != 0)
+    #expect(output.stdout.isEmpty)
+    #expect(String(decoding: output.stderr, as: UTF8.self) == "ls:")
     #expect(output.stderrWasTruncated)
 }
 
