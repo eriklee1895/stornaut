@@ -1,7 +1,10 @@
 import AppKit
 import Foundation
+import StornautCore
 import SwiftUI
 import Testing
+
+@testable import StornautApp
 
 enum SnapshotAppearance: String, CaseIterable, Sendable {
     case light
@@ -33,6 +36,46 @@ enum SnapshotLanguage: String, CaseIterable, Sendable {
     var locale: Locale {
         Locale(identifier: rawValue)
     }
+
+    /// `StornautLocalization` keeps the selected language in process-global
+    /// mutable state, and `StornautByteFormatter` reads it by default. A
+    /// snapshot that only injected `\.locale` would render whichever language
+    /// an earlier test happened to leave behind.
+    var settingsLanguage: SettingsLanguage {
+        switch self {
+        case .english:
+            .english
+        case .simplifiedChinese:
+            .simplifiedChinese
+        }
+    }
+}
+
+struct SnapshotVariant: Sendable, CustomStringConvertible {
+    let appearance: SnapshotAppearance
+    let language: SnapshotLanguage
+
+    /// Every appearance against every language. Worth the goldens for shared
+    /// components, where a translation length change is the likeliest cause
+    /// of a layout break.
+    static let fullMatrix: [SnapshotVariant] = SnapshotAppearance.allCases
+        .flatMap { appearance in
+            SnapshotLanguage.allCases.map {
+                SnapshotVariant(appearance: appearance, language: $0)
+            }
+        }
+
+    /// Both extremes without paying for the cross product on every page
+    /// state. Pages are large, and the appearance/language interaction is
+    /// already covered in detail by the component suite.
+    static let diagonal: [SnapshotVariant] = [
+        SnapshotVariant(appearance: .light, language: .english),
+        SnapshotVariant(appearance: .dark, language: .simplifiedChinese),
+    ]
+
+    var description: String {
+        "\(appearance.rawValue)/\(language.rawValue)"
+    }
 }
 
 enum SnapshotError: Error, CustomStringConvertible {
@@ -41,6 +84,7 @@ enum SnapshotError: Error, CustomStringConvertible {
     case decodingFailed(String)
     case missingGolden(String)
     case sizeMismatch(String, expected: String, actual: String)
+    case languageRaced(expected: String)
 
     var description: String {
         switch self {
@@ -57,6 +101,12 @@ enum SnapshotError: Error, CustomStringConvertible {
             """
         case let .sizeMismatch(name, expected, actual):
             "Golden \(name) is \(expected) but the render is \(actual)."
+        case let .languageRaced(expected):
+            """
+            Another suite changed the process-global language while rendering \
+            \(expected). Mark the interfering suite `.serialized` or stop it \
+            from writing StornautLocalization.
+            """
         }
     }
 }
@@ -87,17 +137,22 @@ enum SnapshotHarness {
         )
     }
 
+    /// The view is built lazily on purpose. Views such as `OverviewView`
+    /// capture a `StornautByteFormatter` in a stored property, which reads the
+    /// process-global language at construction time, so the language has to be
+    /// pinned before the view exists.
     static func verify(
-        _ view: some View,
+        _ view: @autoclosure () -> some View,
         named name: String,
         size: CGSize,
-        appearance: SnapshotAppearance = .light,
-        language: SnapshotLanguage = .english,
+        variant: SnapshotVariant,
         sourceLocation: SourceLocation = #_sourceLocation
     ) throws {
+        let appearance = variant.appearance
+        let language = variant.language
         let identifier = "\(name).\(appearance.rawValue).\(language.rawValue)"
         let rendered = try render(
-            view,
+            view(),
             size: size,
             appearance: appearance,
             language: language
@@ -158,12 +213,18 @@ enum SnapshotHarness {
     }
 
     static func render(
-        _ view: some View,
+        _ view: @autoclosure () -> some View,
         size: CGSize,
         appearance: SnapshotAppearance,
         language: SnapshotLanguage
     ) throws -> Data {
-        let content = view
+        // `StornautLocalization` has no reader, so restore the process default
+        // rather than the previous value; the snapshot suites are `.serialized`
+        // and always pin the language themselves before rendering.
+        defer { StornautLocalization.apply(.english) }
+        StornautLocalization.apply(language.settingsLanguage)
+
+        let content = view()
             .environment(\.colorScheme, appearance.colorScheme)
             .environment(\.locale, language.locale)
             .frame(width: size.width, height: size.height)
@@ -201,6 +262,13 @@ enum SnapshotHarness {
             )
         else {
             throw SnapshotError.encodingFailed
+        }
+
+        // `StornautAppModel` also writes the process-global language, so a
+        // suite running alongside this one could retarget the render midway.
+        // Fail loudly instead of recording a golden in the wrong language.
+        guard StornautLocalization.locale == language.locale else {
+            throw SnapshotError.languageRaced(expected: language.rawValue)
         }
         return data
     }

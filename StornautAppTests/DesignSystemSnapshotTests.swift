@@ -12,15 +12,12 @@ import Testing
 /// the components actually lay out, wrap and translate the way they did when
 /// the golden was recorded.
 @MainActor
-@Suite("Design system snapshots")
+@Suite("Design system snapshots", .serialized)
 struct DesignSystemSnapshotTests {
     private static let referenceDate = Date(timeIntervalSince1970: 1_786_320_000)
 
-    @Test(arguments: SnapshotAppearance.allCases, SnapshotLanguage.allCases)
-    func statusBadgeGallery(
-        appearance: SnapshotAppearance,
-        language: SnapshotLanguage
-    ) throws {
+    @Test(arguments: SnapshotVariant.fullMatrix)
+    func statusBadgeGallery(variant: SnapshotVariant) throws {
         let gallery = VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
                 CoverageBadge(
@@ -72,16 +69,12 @@ struct DesignSystemSnapshotTests {
             gallery,
             named: "design-system.status-badges",
             size: CGSize(width: 420, height: 260),
-            appearance: appearance,
-            language: language
+            variant: variant
         )
     }
 
-    @Test(arguments: SnapshotAppearance.allCases, SnapshotLanguage.allCases)
-    func metricTile(
-        appearance: SnapshotAppearance,
-        language: SnapshotLanguage
-    ) throws {
+    @Test(arguments: SnapshotVariant.fullMatrix)
+    func metricTile(variant: SnapshotVariant) throws {
         let tiles = HStack(spacing: 12) {
             MetricTile(
                 title: "overview.metric.ready",
@@ -102,16 +95,12 @@ struct DesignSystemSnapshotTests {
             tiles,
             named: "design-system.metric-tile",
             size: CGSize(width: 480, height: 140),
-            appearance: appearance,
-            language: language
+            variant: variant
         )
     }
 
-    @Test(arguments: SnapshotAppearance.allCases, SnapshotLanguage.allCases)
-    func emptyState(
-        appearance: SnapshotAppearance,
-        language: SnapshotLanguage
-    ) throws {
+    @Test(arguments: SnapshotVariant.fullMatrix)
+    func emptyState(variant: SnapshotVariant) throws {
         let view = StornautEmptyStateView(
             titleKey: "empty.snapshot.title",
             messageKey: "empty.snapshot.message",
@@ -124,16 +113,12 @@ struct DesignSystemSnapshotTests {
             view,
             named: "design-system.empty-state",
             size: CGSize(width: 480, height: 280),
-            appearance: appearance,
-            language: language
+            variant: variant
         )
     }
 
-    @Test(arguments: SnapshotAppearance.allCases, SnapshotLanguage.allCases)
-    func recoveryState(
-        appearance: SnapshotAppearance,
-        language: SnapshotLanguage
-    ) throws {
+    @Test(arguments: SnapshotVariant.fullMatrix)
+    func recoveryState(variant: SnapshotVariant) throws {
         let view = RecoveryStateView(
             model: RecoveryStateModel(
                 titleKey: "recovery.partial.title",
@@ -153,8 +138,7 @@ struct DesignSystemSnapshotTests {
             view,
             named: "design-system.recovery-state",
             size: CGSize(width: 620, height: 200),
-            appearance: appearance,
-            language: language
+            variant: variant
         )
     }
 }
