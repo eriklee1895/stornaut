@@ -33,6 +33,8 @@ struct CodexRuntimeProfileTests {
             "-c",
             "permissions.stornaut-capability-first-v1.network.mode=\"full\"",
             "-c",
+            "permissions.stornaut-capability-first-v1.network.enable_socks5=false",
+            "-c",
             "permissions.stornaut-capability-first-v1.network.allow_local_binding=false",
             "-c",
             "permissions.stornaut-capability-first-v1.network.dangerously_allow_non_loopback_proxy=false",
@@ -42,6 +44,8 @@ struct CodexRuntimeProfileTests {
             "features.network_proxy.enabled=true",
             "-c",
             "features.network_proxy.mode=\"full\"",
+            "-c",
+            "features.network_proxy.enable_socks5=false",
             "-c",
             "features.network_proxy.allow_local_binding=false",
             "-c",
@@ -125,6 +129,7 @@ struct CodexRuntimeProfileTests {
         #expect(overrides.contains("features.unified_exec=true"))
         #expect(overrides.contains("features.multi_agent=true"))
         #expect(overrides.contains("features.network_proxy.enabled=true"))
+        #expect(overrides.contains("features.network_proxy.enable_socks5=false"))
         #expect(overrides.contains("features.network_proxy.domains={ \"*\" = \"allow\" }"))
         #expect(overrides.contains("features.plugins=false"))
         #expect(overrides.contains("features.remote_plugin=false"))

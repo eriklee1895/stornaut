@@ -1,6 +1,6 @@
 # R2 Implementation Brief: Capability Model and Runtime Profile
 
-> Status: Complete — configurationReady; R3 behavioral gate remains pending
+> Status: Complete — configurationReady at R2; R3 later behaviorBlocked/no-go
 >
 > Prepared: 2026-08-11
 >

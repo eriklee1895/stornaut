@@ -1,6 +1,6 @@
 # ADR 0013: Capability-First Codex Runtime Containment
 
-> Status: Accepted for R2 configuration candidate; R3 behavioral gate pending
+> Status: R2 configuration candidate accepted; R3 behaviorBlocked/no-go
 >
 > Date: 2026-08-11
 >
@@ -94,6 +94,9 @@ output. Browser containment remains an R5 gate.
    evidence.
 10. Swift remains the only path to Policy/Executor.
 
+These facts remain the desired boundary, but the `0.147.0` candidate did not
+pass R3. The lifecycle result below prevents behavioral admission.
+
 ### Approved transport exception
 
 On 2026-08-11 the user explicitly approved this exact exception:
@@ -161,6 +164,9 @@ Costs:
 8. Browser connector topology is unresolved.
 9. Deprecated Seatbelt API availability must be probed at runtime.
 10. Signed-App FDA/TCC inheritance remains unproved for the new profile.
+11. A descendant can leave the parent process group with `setsid()` or
+    `POSIX_SPAWN_SETSID`, defeating process-group cancellation and crash
+    cleanup.
 
 ## Validation
 
@@ -186,3 +192,43 @@ approved; R3 must still add:
 ADR 0013 is accepted only for the R2 configuration candidate. R3 must still
 prove the transport identity, lifecycle, bypass denial and descendant
 inheritance before any behavioral or containment admission.
+
+## R3 Behavioral Decision
+
+R3 proved that the process lifecycle requirement cannot be met by the current
+candidate:
+
+```text
+lifecycle.direct_setsid_escape=observed
+lifecycle.posix_spawn_setsid_escape=observed
+lifecycle.launchd_job_escape=observed
+lifecycle.cleanup=complete
+probe.verdict=behaviorBlocked
+```
+
+Evidence:
+
+```text
+scripts/probe-codex-r3-lifecycle-escape
+/tmp/stornaut-r3-lifecycle-escape-probe-final.log
+SHA-256 f25700e0e35178910cda4809468ea1aa37a9936abaec4100fb6b74e49fde3557
+```
+
+The R3 review also tested and rejected:
+
+- direct `SYS_setsid` / `SYS_setpgid` Seatbelt denies, because
+  `POSIX_SPAWN_SETSID` still creates a new session;
+- a temporary launchd user job, because launchd's process-group cleanup does
+  not reclaim a descendant that created a different session/group;
+- recursive kqueue tracking, because modern macOS does not support
+  `NOTE_TRACK`;
+- PPID/environment polling, because reparenting, PID reuse and App crash make
+  it non-authoritative;
+- private coalition APIs, Endpoint Security and privileged daemons, because
+  they are unsupported or unapproved permission/product expansions.
+
+Therefore this ADR does not admit an R3 runtime. The implementation candidate
+was removed, R4–R6 were not started, and Deep Dive remains paused. The exact
+managed-proxy exception remains approved in principle, but it is insufficient
+without a supported per-investigation whole-process-tree containment
+mechanism.

@@ -1,7 +1,7 @@
 # Capability-First Codex Runtime Evidence Gate
 
-> Status: Approved — R1–R2 complete; R2 configurationReady; R3 behavioral
-> gate pending
+> Status: Stopped — R1–R2 complete; R3 behaviorBlocked/no-go; R4–R6 not
+> started
 >
 > Planned: 2026-08-11
 >
@@ -643,6 +643,12 @@ checks, docs links and diff hygiene.
 R3 is the hard gate. Any integrity failure blocks R4–R6 and yields a no-go
 report. Success ends with one independent commit/push.
 
+R3 reached that stop condition on 2026-08-12. Direct `setsid()` and
+`POSIX_SPAWN_SETSID` descendants escaped the investigation process group, and
+a launchd user job did not reclaim the new-session descendant. See the
+[R3 review](../../reports/capability-first-runtime-r3-review.md). No R3
+production runtime was retained and R4–R6 were not started.
+
 ## 12. R4 — Investigation Protocol v2 and No-Executor Seam
 
 ### Candidate files
@@ -1021,3 +1027,9 @@ This plan is complete only when:
 If any capability or integrity row remains uncertain, this gate is not
 complete. Record the no-go/conditional result and continue the deterministic
 product only through a separately reviewed roadmap update.
+
+Current outcome: the plan is **not complete** and is stopped at R3
+`behaviorBlocked`. Task 29 and production Deep Dive remain paused. Any future
+runtime attempt requires a separately reviewed architecture that supplies a
+supported per-investigation whole-process-tree container without weakening
+the approved capability or integrity boundary.

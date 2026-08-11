@@ -1,6 +1,6 @@
 # Capability-First Runtime R2 Review
 
-> Status: Passed — configurationReady; R3 behavioral gate pending
+> Status: Passed — configurationReady at R2; R3 later behaviorBlocked/no-go
 >
 > Date: 2026-08-12
 >
@@ -48,7 +48,8 @@ R2 replaces the historical Broker-only launch profile with:
 - exact Codex `0.147.0` compatibility;
 - deterministic root/config/exec argument ordering;
 - one secret-free profile digest:
-  `2173ca8ff4dcb49f02d320272bc834cd14807bf6a361757f2ba056fbf9526e5e`;
+  `2173ca8ff4dcb49f02d320272bc834cd14807bf6a361757f2ba056fbf9526e5e`
+  at R2 close;
 - typed `advertised`, `configured`, `observed` and `contained` evidence;
 - readiness limited to `configurationReady` or `configurationBlocked`;
 - closed no-model diagnostics with isolated `HOME`, `CODEX_HOME`, `TMPDIR`
@@ -208,13 +209,28 @@ Codex session-state path inventory did not change.
 - P1 unresolved: 0;
 - P2 unresolved: 0;
 - readiness: `configurationReady`;
-- R3 behavioral gate: pending;
+- R3 behavioral gate: later `behaviorBlocked/no-go`;
 - R5 signed-App behavior: pending;
 - R6 final admission: pending.
 
 R2 adds no production Runtime Home/auth lifecycle, Probe Broker transport,
 Investigation Envelope v2, Policy/Trash/Executor path, Deep Dive admission,
 release behavior or product safety claim.
+
+### R3 follow-up erratum
+
+R3 source review found that Codex `0.147.0` defaults SOCKS proxy support on.
+ADR 0013 permits one random managed HTTP listener only. The closed profile was
+therefore narrowed with `enable_socks5=false` in both permission and feature
+network blocks. The corrected digest is:
+
+```text
+38356703d195834c88ed5b9388f85a5e74737139278bef2c11c9b4cd250f4e65
+```
+
+This does not invalidate the R2 `configurationReady` classification, but R3
+later failed the mandatory process-tree lifecycle gate. See
+[R3 Review](capability-first-runtime-r3-review.md).
 
 The `bits-code-guard` working-tree workflow initially omitted untracked files.
 They were added with intent-to-add so the final scope covered 17 Swift files

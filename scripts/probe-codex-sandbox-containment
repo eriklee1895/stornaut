@@ -71,7 +71,7 @@ expect_line() {
 
 read_only_profile=$'default_permissions = "stornaut"\n\n[permissions.stornaut]\nextends = ":read-only"\n\n[permissions.stornaut.network]\nenabled = false'
 network_open_profile=$'default_permissions = "stornaut"\n\n[permissions.stornaut]\nextends = ":read-only"\n\n[permissions.stornaut.network]\nenabled = true'
-managed_network_profile=$'default_permissions = "stornaut"\n\n[permissions.stornaut]\nextends = ":read-only"\n\n[permissions.stornaut.network]\nenabled = true\nmode = "full"\nallow_local_binding = false\n\n[features.network_proxy]\nenabled = true\nmode = "full"\nallow_local_binding = false\n\n[features.network_proxy.domains]\n"*" = "allow"'
+managed_network_profile=$'default_permissions = "stornaut"\n\n[permissions.stornaut]\nextends = ":read-only"\n\n[permissions.stornaut.network]\nenabled = true\nmode = "full"\nenable_socks5 = false\nallow_local_binding = false\n\n[features.network_proxy]\nenabled = true\nmode = "full"\nenable_socks5 = false\nallow_local_binding = false\n\n[features.network_proxy.domains]\n"*" = "allow"'
 
 read_only_home=$(write_profile read-only "$read_only_profile")
 network_open_home=$(write_profile network-open "$network_open_profile")

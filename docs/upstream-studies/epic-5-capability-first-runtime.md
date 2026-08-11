@@ -534,3 +534,36 @@ Required explicit decision:
 If approved, R2 may model this as a closed internal transport, and R3 must prove
 port identity, lifecycle, bypass denial and descendant inheritance. If denied,
 the current `0.147.0` candidate is no-go and R2 does not start.
+
+## 14. R3 Lifecycle Correction
+
+R2 reached `configurationReady`, but R3 did not behaviorally admit this
+candidate. macOS measurements added on 2026-08-12 found:
+
+1. a descendant under the Codex outer Seatbelt can call `setsid()`, leave the
+   investigation process group and remain live after the sandbox leader exits;
+2. a stricter Stornaut-owned Seatbelt profile can deny direct `SYS_setsid` and
+   `SYS_setpgid`, but `posix_spawn(..., POSIX_SPAWN_SETSID)` still creates a
+   new session and survives the wrapper;
+3. a temporary launchd user job with `AbandonProcessGroup=false` does not
+   reclaim the new-session descendant after its leader exits;
+4. modern macOS does not support recursive kqueue `NOTE_TRACK`, and no public
+   parent-death signal or supported per-investigation process-container API was
+   found;
+5. PPID or environment polling is not crash-safe after reparenting and PID
+   reuse; private coalition APIs, Endpoint Security and a privileged daemon
+   would require a different supported architecture and explicit product/
+   permission review.
+
+Reproducible anonymous evidence:
+
+```text
+scripts/probe-codex-r3-lifecycle-escape
+/tmp/stornaut-r3-lifecycle-escape-probe-final.log
+SHA-256 f25700e0e35178910cda4809468ea1aa37a9936abaec4100fb6b74e49fde3557
+```
+
+This corrects the R1 conditional candidate: managed-proxy transport remains a
+viable network shape, but the current macOS process lifecycle shape is not
+viable. R3 is `behaviorBlocked/no-go`, no production runtime is retained and
+R4–R6 do not start.

@@ -219,7 +219,9 @@ R1–R6 通过后恢复 Task 29；若 gate 为 no-go，先记录证据并 review
   R1 已完成并得出 conditional-go：managed proxy 是唯一观察到能同时满足
   公网访问与任意 local/private/Unix target 阻断的候选，但需要 same-session、
   parent-owned random loopback proxy transport；该例外已获批准用于 R2
-  configuration candidate；R2 已完成并得出 `configurationReady`，R3 与
+  configuration candidate；R2 已完成并得出 `configurationReady`。R3 已因
+  direct `setsid()` / `POSIX_SPAWN_SETSID` new-session descendants 逃逸
+  process-group/launchd cleanup 而得出 `behaviorBlocked/no-go`；R4–R6 与
   Task 29 仍未启动。
 - Epic 0 Foundation Upstream Study：已完成，选择 checked-in Xcode App/Test host + local Swift packages。
 - Epic 0 Task 1：SwiftPM Core/Codex、smoke tests、`scripts/verify`、manual-only CI 与 ThirdPartyNotices 骨架已完成。
@@ -246,5 +248,6 @@ R1–R6 通过后恢复 Task 29；若 gate 为 no-go，先记录证据并 review
   Partial/Unmeasurable；Codex marker absent。完整结论见
   [Epic 2–4 Validation Report](../reports/epic-2-4-validation-report.md)。
 - 当前状态：ADR 0013 的精确 same-session managed proxy loopback transport
-  例外已获批准；R2 已完成并得出 `configurationReady`，R3 behavioral gate
-  pending。完整 gate 前不启动 Phase C Task 29。
+  例外已获批准；R2 已完成并得出 `configurationReady`；R3 behavioral gate
+  已得出 `behaviorBlocked/no-go`。完整 gate 未通过，Phase C Task 29 保持
+  paused。
