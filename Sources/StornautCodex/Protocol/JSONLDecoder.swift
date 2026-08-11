@@ -122,12 +122,22 @@ public struct JSONLDecoder: Sendable {
         case "turn.failed":
             return .turnFailed
         case "item.started":
-            guard let item = decodeItem(object["item"]) else {
+            guard
+                let item = decodeItem(
+                    object["item"],
+                    completed: false
+                )
+            else {
                 throw JSONLDecoderError.invalidEvent(lineNumber: lineNumber)
             }
             return .itemStarted(item)
         case "item.completed":
-            guard let item = decodeItem(object["item"]) else {
+            guard
+                let item = decodeItem(
+                    object["item"],
+                    completed: true
+                )
+            else {
                 throw JSONLDecoderError.invalidEvent(lineNumber: lineNumber)
             }
             return .itemCompleted(item)
@@ -172,7 +182,10 @@ public struct JSONLDecoder: Sendable {
         )
     }
 
-    private func decodeItem(_ value: Any?) -> CodexItem? {
+    private func decodeItem(
+        _ value: Any?,
+        completed: Bool
+    ) -> CodexItem? {
         guard
             let item = value as? [String: Any],
             let id = item["id"] as? String,
@@ -181,7 +194,27 @@ public struct JSONLDecoder: Sendable {
             return nil
         }
         let text = type == "agent_message" ? item["text"] as? String : nil
-        return CodexItem(id: id, type: type, agentMessageText: text)
+        let succeeded: Bool?
+        switch (completed, type) {
+        case (true, "command_execution"):
+            let status = item["status"] as? String
+            let exitCode = integer(item["exit_code"])
+            succeeded = status == "completed" && exitCode == 0
+        case (true, "web_search"):
+            succeeded = true
+        case (true, "collab_tool_call"),
+             (true, "mcp_tool_call"):
+            let status = item["status"] as? String
+            succeeded = status == "completed"
+        default:
+            succeeded = nil
+        }
+        return CodexItem(
+            id: id,
+            type: type,
+            succeeded: succeeded,
+            agentMessageText: text
+        )
     }
 
     private func boundedMetadata(
@@ -232,7 +265,10 @@ public struct JSONLDecoder: Sendable {
     }
 
     private func integer(_ value: Any?) -> Int64? {
-        guard let number = value as? NSNumber else {
+        guard
+            let number = value as? NSNumber,
+            CFGetTypeID(number) != CFBooleanGetTypeID()
+        else {
             return nil
         }
         let doubleValue = number.doubleValue

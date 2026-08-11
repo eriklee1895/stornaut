@@ -14,6 +14,8 @@ public struct CodexRunRequest: Sendable, Equatable {
     public let jsonLineByteLimit: Int
     public let unknownMetadataByteLimit: Int
     public let environment: [String: String]
+    public let runtimeProfile: CodexRuntimeProfile
+    public let model: CodexRuntimeModel?
 
     public init(
         executableURL: URL,
@@ -26,7 +28,10 @@ public struct CodexRunRequest: Sendable, Equatable {
         stderrByteLimit: Int,
         jsonLineByteLimit: Int,
         unknownMetadataByteLimit: Int,
-        environment: [String: String]
+        environment: [String: String],
+        runtimeProfile: CodexRuntimeProfile =
+            .capabilityFirstV1Codex0147,
+        model: CodexRuntimeModel? = nil
     ) {
         self.executableURL = executableURL
         self.isolatedWorkingDirectoryURL = isolatedWorkingDirectoryURL
@@ -39,70 +44,8 @@ public struct CodexRunRequest: Sendable, Equatable {
         self.jsonLineByteLimit = jsonLineByteLimit
         self.unknownMetadataByteLimit = unknownMetadataByteLimit
         self.environment = environment
-    }
-
-    public static func fixedArguments(
-        schemaURL: URL,
-        workingDirectoryURL: URL
-    ) -> [String] {
-        [
-            "exec",
-            "--strict-config",
-            "--ephemeral",
-            "--json",
-            "--output-schema",
-            schemaURL.path,
-            "--sandbox",
-            "read-only",
-            "--ignore-user-config",
-            "--ignore-rules",
-            "--skip-git-repo-check",
-            "-C",
-            workingDirectoryURL.path,
-            "-c",
-            "project_doc_max_bytes=0",
-            "-c",
-            "skills.include_instructions=false",
-            "-c",
-            "skills.bundled.enabled=false",
-            "-c",
-            "include_environment_context=false",
-            "-c",
-            "include_permissions_instructions=false",
-            "-c",
-            "include_apps_instructions=false",
-            "-c",
-            "include_collaboration_mode_instructions=false",
-            "-c",
-            "analytics.enabled=false",
-            "-c",
-            "otel.metrics_exporter=\"none\"",
-            "-c",
-            "features.shell_tool=false",
-            "-c",
-            "features.unified_exec=false",
-            "-c",
-            "features.hooks=false",
-            "-c",
-            "features.plugins=false",
-            "-c",
-            "features.apps=false",
-            "-c",
-            "features.computer_use=false",
-            "-c",
-            "features.browser_use=false",
-            "-c",
-            "features.browser_use_external=false",
-            "-c",
-            "features.browser_use_full_cdp_access=false",
-            "-c",
-            "features.image_generation=false",
-            "-c",
-            "orchestrator.skills.enabled=false",
-            "-c",
-            "orchestrator.mcp.enabled=false",
-            "-",
-        ]
+        self.runtimeProfile = runtimeProfile
+        self.model = model
     }
 }
 
@@ -437,10 +380,11 @@ private func spawnWithoutInheritingUnmappedDescriptors(
         }
 
         let arguments = [request.executableURL.path]
-            + CodexRunRequest.fixedArguments(
+            + (try request.runtimeProfile.execArguments(
                 schemaURL: request.schemaURL,
-                workingDirectoryURL: request.isolatedWorkingDirectoryURL
-            )
+                workingDirectoryURL: request.isolatedWorkingDirectoryURL,
+                model: request.model
+            ))
         let environment = sanitizedEnvironment(request.environment)
             .map { "\($0.key)=\($0.value)" }
             .sorted()

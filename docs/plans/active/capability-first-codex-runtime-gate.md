@@ -1,7 +1,7 @@
 # Capability-First Codex Runtime Evidence Gate
 
-> Status: Approved — R1 complete with conditional-go evidence; R2 blocked for
-> the ADR 0013 dedicated loopback managed-proxy decision
+> Status: Approved — R1–R2 complete; R2 configurationReady; R3 behavioral
+> gate pending
 >
 > Planned: 2026-08-11
 >

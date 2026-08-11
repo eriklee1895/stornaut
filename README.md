@@ -44,7 +44,7 @@ live search 与访问公共互联网，但仍无本地写入或清理执行权�
 | [docs/assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md](docs/assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md) | 权限受限、安全阻断、部分结果、stale preflight 与历史保留的恢复状态契约 |
 | [docs/reports/epic-2-4-validation-report.md](docs/reports/epic-2-4-validation-report.md) | Phase B domain/persistence、真实 Quick Scan benchmark、accounting、UI 与 scope gate |
 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) | 已归档的 Phase B Tasks 9–26 计划与逐 Task 证据 |
-| [docs/plans/active/README.md](docs/plans/active/README.md) | Runtime R1 conditional-go；R2 等待 same-session managed proxy 决策 |
+| [docs/plans/active/README.md](docs/plans/active/README.md) | Runtime R2 configurationReady；R3 pending |
 | [docs/plans/active/capability-first-codex-runtime-gate.md](docs/plans/active/capability-first-codex-runtime-gate.md) | Task 29 前插入的 capability-first Runtime/containment evidence gate |
 | [docs/plans/completed/epic-0-1-foundation-spikes.md](docs/plans/completed/epic-0-1-foundation-spikes.md) | 第一阶段工程骨架与高风险技术 Spike 实施计划 |
 | [docs/reports/epic-0-1-validation-report.md](docs/reports/epic-0-1-validation-report.md) | Epic 0–1 evidence gate、conditional-go/no-go 与残余风险 |

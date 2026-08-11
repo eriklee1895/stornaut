@@ -105,7 +105,6 @@ func missingSyntacticPrerequisiteMakesTheRelatedBehaviorUnsupported() throws {
 
     #expect(report.behaviorVerdicts[.structuredJSONL]?.isUnsupported == true)
     #expect(report.behaviorVerdicts[.ruleAndInstructionIsolation]?.isUnsupported == true)
-    #expect(report.behaviorVerdicts[.brokerOnlyToolSurface]?.isUnverified == true)
 }
 
 @Test
@@ -403,6 +402,50 @@ func foundationProcessRunnerTreatsNegativeTimeoutAsImmediate() async {
 }
 
 @Test
+func foundationProcessRunnerNormalExitKillsDescendants() async throws {
+    let root = FileManager.default.temporaryDirectory.appending(
+        path: "StornautProcessRunnerTimeout-\(UUID().uuidString)",
+        directoryHint: .isDirectory
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(
+        at: root,
+        withIntermediateDirectories: true
+    )
+    let executableURL = root.appending(path: "descendant-holder.sh")
+    let childPIDURL = root.appending(path: "child.pid")
+    let script = """
+    #!/bin/sh
+    /bin/sh -c 'trap "" INT TERM; sleep 30' &
+    printf '%s' "$!" > "\(childPIDURL.path)"
+    exit 0
+    """
+    try Data(script.utf8).write(to: executableURL)
+    try FileManager.default.setAttributes(
+        [.posixPermissions: 0o700],
+        ofItemAtPath: executableURL.path
+    )
+    let request = ProcessRequest(
+        executableURL: executableURL,
+        arguments: [],
+        environment: ["PATH": "/usr/bin:/bin"],
+        currentDirectoryURL: root,
+        standardOutputLimit: 32,
+        standardErrorLimit: 32,
+        timeout: .seconds(5)
+    )
+
+    let started = ContinuousClock.now
+    let output = try await FoundationProcessRunner().run(request)
+    #expect(output.exitStatus == 0)
+    #expect(started.duration(to: .now) < .seconds(5))
+
+    let childPID = try waitForProcessRunnerPID(at: childPIDURL)
+    defer { kill(childPID, SIGKILL) }
+    #expect(waitForProcessRunnerExit(childPID))
+}
+
+@Test
 func foundationProcessRunnerReturnsNonzeroExitForTheCallerToInterpret() async throws {
     let request = ProcessRequest(
         executableURL: URL(filePath: "/usr/bin/false"),
@@ -416,6 +459,35 @@ func foundationProcessRunnerReturnsNonzeroExitForTheCallerToInterpret() async th
     let output = try await FoundationProcessRunner().run(request)
 
     #expect(output.exitStatus != 0)
+}
+
+private func waitForProcessRunnerPID(at url: URL) throws -> pid_t {
+    let deadline = Date().addingTimeInterval(1)
+    while Date() < deadline {
+        if
+            let text = try? String(contentsOf: url, encoding: .utf8),
+            let pid = pid_t(text)
+        {
+            return pid
+        }
+        usleep(5_000)
+    }
+    throw ProcessRunnerTestError.missingChildPID
+}
+
+private func waitForProcessRunnerExit(_ pid: pid_t) -> Bool {
+    let deadline = Date().addingTimeInterval(1)
+    while Date() < deadline {
+        if kill(pid, 0) != 0, errno == ESRCH {
+            return true
+        }
+        usleep(5_000)
+    }
+    return false
+}
+
+private enum ProcessRunnerTestError: Error {
+    case missingChildPID
 }
 
 private actor RecordingProcessRunner: ProcessRunning {

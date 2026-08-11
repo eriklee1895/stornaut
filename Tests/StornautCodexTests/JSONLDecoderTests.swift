@@ -161,6 +161,89 @@ func finalAgentMessageDecodesToValidatedEnvelope() throws {
 }
 
 @Test
+func completedToolItemsExposeOnlyClosedSuccessEvidence() throws {
+    var decoder = JSONLDecoder(
+        lineByteLimit: 8_192,
+        sessionByteLimit: 32_768,
+        unknownMetadataByteLimit: 256
+    )
+    let jsonl = """
+    {"type":"item.completed","item":{"id":"command-1","type":"command_execution","command":"cat private.txt","aggregated_output":"secret output","exit_code":0,"status":"completed"}}
+    {"type":"item.completed","item":{"id":"search-1","type":"web_search","query":"private query","action":{"type":"search"}}}
+
+    """
+
+    let events = try decoder.append(Data(jsonl.utf8))
+    _ = try decoder.finish()
+
+    #expect(events.count == 2)
+    guard
+        case let .itemCompleted(command) = events[0],
+        case let .itemCompleted(search) = events[1]
+    else {
+        Issue.record("Expected two completed tool items")
+        return
+    }
+    #expect(command.type == "command_execution")
+    #expect(command.succeeded == true)
+    #expect(command.agentMessageText == nil)
+    #expect(search.type == "web_search")
+    #expect(search.succeeded == true)
+    #expect(search.agentMessageText == nil)
+}
+
+@Test
+func startedToolItemsNeverExposeSuccessEvidence() throws {
+    var decoder = JSONLDecoder(
+        lineByteLimit: 8_192,
+        sessionByteLimit: 32_768,
+        unknownMetadataByteLimit: 256
+    )
+    let jsonl = """
+    {"type":"item.started","item":{"id":"search-started","type":"web_search","query":"public query","action":{"type":"search"}}}
+
+    """
+
+    let events = try decoder.append(Data(jsonl.utf8))
+    _ = try decoder.finish()
+
+    guard case let .itemStarted(item) = try #require(events.first) else {
+        Issue.record("Expected a started tool item")
+        return
+    }
+    #expect(item.type == "web_search")
+    #expect(item.succeeded == nil)
+}
+
+@Test
+func commandSuccessRejectsBooleanAndMissingExitCodes() throws {
+    var decoder = JSONLDecoder(
+        lineByteLimit: 8_192,
+        sessionByteLimit: 32_768,
+        unknownMetadataByteLimit: 256
+    )
+    let jsonl = """
+    {"type":"item.completed","item":{"id":"boolean-exit","type":"command_execution","exit_code":false,"status":"completed"}}
+    {"type":"item.completed","item":{"id":"missing-exit","type":"command_execution","status":"completed"}}
+
+    """
+
+    let events = try decoder.append(Data(jsonl.utf8))
+    _ = try decoder.finish()
+
+    #expect(events.count == 2)
+    guard
+        case let .itemCompleted(booleanExit) = events[0],
+        case let .itemCompleted(missingExit) = events[1]
+    else {
+        Issue.record("Expected two completed command items")
+        return
+    }
+    #expect(booleanExit.succeeded == false)
+    #expect(missingExit.succeeded == false)
+}
+
+@Test
 func envelopeRejectsMissingExtraAndOversizedFields() {
     let missing = Data(#"{"summary":"Incomplete"}"#.utf8)
     #expect(throws: InvestigationEnvelopeError.invalidStructure) {

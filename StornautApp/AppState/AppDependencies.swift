@@ -290,7 +290,7 @@ private actor AppQuickScanRuntime {
     private var nextFlightID: UInt64 = 0
     private var preferencesStore: SettingsPreferencesStore?
     private var knowledgeStore: LocalKnowledgeStore?
-    private let codexDetector = CodexCapabilityDetector()
+    private let codexDetector = CodexRuntimeCapabilityDetector()
 
     init(
         rootURL: URL,
@@ -487,20 +487,8 @@ private actor AppQuickScanRuntime {
                 executableURL: installation.executableURL,
                 environment: environment
             )
-            let required: [CodexExecOption] = [
-                .structuredJSONL,
-                .outputSchema,
-                .ephemeral,
-                .readOnlySandbox,
-                .strictConfig,
-                .ignoreUserConfig,
-                .ignoreRules,
-                .skipGitRepositoryCheck,
-            ]
             let syntax: SettingsCodexSyntaxStatus =
-                required.allSatisfy {
-                    report.optionSupport[$0] == .supported
-                }
+                report.isSyntaxCompatible
                     ? .supported
                     : .unsupported
             return SettingsCodexStatus(

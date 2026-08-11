@@ -218,8 +218,9 @@ R1–R6 通过后恢复 Task 29；若 gate 为 no-go，先记录证据并 review
   [capability-first Codex runtime R1–R6 gate](active/capability-first-codex-runtime-gate.md)。
   R1 已完成并得出 conditional-go：managed proxy 是唯一观察到能同时满足
   公网访问与任意 local/private/Unix target 阻断的候选，但需要 same-session、
-  parent-owned random loopback proxy transport；R2 等待用户决策，Task 29
-  仍未启动。
+  parent-owned random loopback proxy transport；该例外已获批准用于 R2
+  configuration candidate；R2 已完成并得出 `configurationReady`，R3 与
+  Task 29 仍未启动。
 - Epic 0 Foundation Upstream Study：已完成，选择 checked-in Xcode App/Test host + local Swift packages。
 - Epic 0 Task 1：SwiftPM Core/Codex、smoke tests、`scripts/verify`、manual-only CI 与 ThirdPartyNotices 骨架已完成。
 - Bundle identifier：已确认 `com.eriklee.stornaut`。
@@ -244,6 +245,6 @@ R1–R6 通过后恢复 Task 29；若 gate 为 no-go，先记录证据并 review
   247.24 秒完成，peak RSS 73,220,096 bytes，132 个 permission gaps 保持
   Partial/Unmeasurable；Codex marker absent。完整结论见
   [Epic 2–4 Validation Report](../reports/epic-2-4-validation-report.md)。
-- 下一项对齐：批准或拒绝 ADR 0013 的精确 same-session managed proxy
-  loopback transport 例外。批准后启动 R2；拒绝则当前 Codex `0.147.0`
-  candidate no-go。完整 gate 前不启动 Phase C Task 29。
+- 当前状态：ADR 0013 的精确 same-session managed proxy loopback transport
+  例外已获批准；R2 已完成并得出 `configurationReady`，R3 behavioral gate
+  pending。完整 gate 前不启动 Phase C Task 29。

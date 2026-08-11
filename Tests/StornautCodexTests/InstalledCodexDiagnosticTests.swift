@@ -7,7 +7,7 @@ import Testing
         if: ProcessInfo.processInfo.environment[
             "STORNAUT_RUN_INSTALLED_CODEX_DIAGNOSTIC"
         ] == "1",
-        "Opt in to probing only `codex --version` and `codex exec --help`"
+        "Opt in to the no-model capability-first configuration diagnostic"
     )
 )
 func installedCodexCapabilityDiagnostic() async throws {
@@ -17,22 +17,27 @@ func installedCodexCapabilityDiagnostic() async throws {
         environment: environment
     )
     let installation = try #require(availability.installation)
-    let report = try await CodexCapabilityDetector().report(
+    let report = try await CodexRuntimeCapabilityDetector().report(
         executableURL: installation.executableURL,
         environment: environment
     )
 
     print("Codex executable: \(report.executableURL.path)")
     print("Codex version: \(report.version)")
-    for option in CodexExecOption.allCases {
-        print("Option \(option.rawValue): \(String(describing: report.optionSupport[option]))")
-        #expect(report.optionSupport[option] == .supported)
-    }
-    for behavior in CodexBehavior.allCases {
+    print("Runtime profile: \(report.profileIdentifier.rawValue)")
+    print("Runtime profile digest: \(report.profileDigest)")
+    print("Configuration readiness: \(report.readiness.rawValue)")
+    for capability in CodexRuntimeCapability.allCases {
+        let entry = report.entries[capability]
         print(
-            "Behavior \(behavior.rawValue): "
-                + "\(String(describing: report.behaviorVerdicts[behavior]))"
+            "Capability \(capability.rawValue): "
+                + "\(String(describing: entry))"
         )
-        #expect(report.behaviorVerdicts[behavior]?.isUnverified == true)
     }
+    #expect(report.readiness == .configurationReady)
+    #expect(report.configurationValidation == .passed)
+    #expect(report.requiredMissingCapabilities.isEmpty)
+    #expect(report.entries[.browserOrDirectFetch]?.observed == false)
+    #expect(report.entries[.userDataWriteDenial]?.contained == false)
+    #expect(report.entries[.noExecutorReachability]?.contained == false)
 }

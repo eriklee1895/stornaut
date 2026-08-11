@@ -7,7 +7,8 @@
 > Phase C deterministic Epic 8 详尽 plan 已于 2026-08-11 获用户批准，
 > Tasks 27–28 已完成；ADR 0004 回顾确认现有 Runtime 仍有旧 Broker-only
 > 漂移，用户已批准在 Task 29 前插入 capability-first Runtime R1–R6 gate；
-> R1 已完成并得出 conditional-go，R2 与 Task 29 均未启动；Task 5 的历史
+> R1–R2 已完成；R2 结论为 `configurationReady`，R3 与 Task 29 均未
+> 启动；Task 5 的历史
 > Broker-only no-go 已由 ADR 0004 capability-first 决策修订，Deep Dive 因
 > 新运行时实现/evidence gate 尚未交付而 paused；
 > release signing/notarization 未评估
@@ -222,8 +223,8 @@ R1–R6 通过后才恢复 Tasks 29–35；该插队不改变这些确定性 Tas
 R1 当前证据见
 [study](../upstream-studies/epic-5-capability-first-runtime.md) 与
 [ADR 0013](../adr/0013-capability-first-runtime-containment.md)：唯一候选需要
-same-session parent-owned random loopback managed proxy transport。用户批准或
-拒绝该精确例外前，R2 不得启动。
+same-session parent-owned random loopback managed proxy transport。该精确例外
+已获用户批准用于 R2 configuration candidate；R3 behavior evidence 仍 pending。
 
 跨 Epic 的阶段依赖、no-go 分支和交付顺序由 [Delivery Roadmap](../plans/roadmap.md) 管理；新 active plan 不得另起一套宏观路线。
 
@@ -310,7 +311,8 @@ docs/plans/active/capability-first-codex-runtime-gate.md 的 R1–R6，详尽 pl
 已获批准。R1 已完成并得出 conditional-go：read-only Seatbelt 阻断 user-data
 writes，managed proxy 可让公网访问成功并阻断 direct/local/private/Unix
 targets，但需要一个 same-session、父进程拥有、随机端口的 loopback proxy
-transport。该精确例外等待用户决策，R2 与 Task 29 均未启动。该 gate 必须证明完整调查能力和公共
+transport。该精确例外已获用户批准用于 R2 configuration candidate；R2 已
+完成并得出 `configurationReady`，R3 与 Task 29 仍未启动。该 gate 必须证明完整调查能力和公共
 联网可用时，Codex 全进程树不可写用户数据、不可访问 localhost/私网/任意 Unix
 socket 且无 Executor 路径；不得用 `danger-full-access`、命令/公共域名
 allowlist、逐命令审批或关闭调查能力绕过。生产 Deep Dive、Adapter、真实

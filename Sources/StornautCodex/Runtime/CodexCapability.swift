@@ -1,18 +1,18 @@
 import Foundation
 
-public enum CodexEvidenceVerdict: Sendable, Equatable {
+enum CodexEvidenceVerdict: Sendable, Equatable {
     case supported
     case unsupported(reason: String)
     case unverified(reason: String)
 
-    public var isUnsupported: Bool {
+    var isUnsupported: Bool {
         guard case .unsupported = self else {
             return false
         }
         return true
     }
 
-    public var isUnverified: Bool {
+    var isUnverified: Bool {
         guard case .unverified = self else {
             return false
         }
@@ -20,7 +20,7 @@ public enum CodexEvidenceVerdict: Sendable, Equatable {
     }
 }
 
-public enum CodexExecOption: String, CaseIterable, Sendable {
+enum CodexExecOption: String, CaseIterable, Sendable {
     case structuredJSONL
     case outputSchema
     case ephemeral
@@ -31,7 +31,7 @@ public enum CodexExecOption: String, CaseIterable, Sendable {
     case skipGitRepositoryCheck
 }
 
-public enum CodexBehavior: String, CaseIterable, Sendable {
+enum CodexBehavior: String, CaseIterable, Sendable {
     case structuredJSONL
     case outputSchemaCompliance
     case ephemeralSession
@@ -40,16 +40,15 @@ public enum CodexBehavior: String, CaseIterable, Sendable {
     case ignoredUserConfiguration
     case ruleAndInstructionIsolation
     case localProbeTransport
-    case brokerOnlyToolSurface
 }
 
-public struct CodexCapabilityReport: Sendable, Equatable {
-    public let executableURL: URL
-    public let version: String
-    public let optionSupport: [CodexExecOption: CodexEvidenceVerdict]
-    public let behaviorVerdicts: [CodexBehavior: CodexEvidenceVerdict]
+struct CodexCapabilityReport: Sendable, Equatable {
+    let executableURL: URL
+    let version: String
+    let optionSupport: [CodexExecOption: CodexEvidenceVerdict]
+    let behaviorVerdicts: [CodexBehavior: CodexEvidenceVerdict]
 
-    public init(
+    init(
         executableURL: URL,
         version: String,
         optionSupport: [CodexExecOption: CodexEvidenceVerdict],
@@ -62,8 +61,8 @@ public struct CodexCapabilityReport: Sendable, Equatable {
     }
 }
 
-public enum CodexCapabilityParser {
-    public static func parse(
+enum CodexCapabilityParser {
+    static func parse(
         executableURL: URL,
         versionOutput: String,
         execHelpOutput: String
@@ -269,7 +268,7 @@ public enum CodexCapabilityParser {
             [.ignoreUserConfig]
         case .ruleAndInstructionIsolation:
             [.ignoreUserConfig, .ignoreRules]
-        case .localProbeTransport, .brokerOnlyToolSurface:
+        case .localProbeTransport:
             nil
         }
     }
@@ -292,13 +291,11 @@ public enum CodexCapabilityParser {
             "Rules, global instructions, project docs, Skills, Plugins and Hooks are separate sources"
         case .localProbeTransport:
             "Task 5 must prove a bounded local Probe Broker transport"
-        case .brokerOnlyToolSurface:
-            "Task 5 must prove Shell, direct filesystem and unrelated tools are unavailable"
         }
     }
 }
 
-public enum CodexCapabilityProbeError: Error, Sendable, Equatable {
+enum CodexCapabilityProbeError: Error, Sendable, Equatable {
     case invalidExecutable(URL)
     case executableChangedDuringProbe(URL)
     case nonzeroExit(arguments: [String], status: Int32)
@@ -306,18 +303,18 @@ public enum CodexCapabilityProbeError: Error, Sendable, Equatable {
     case invalidUTF8(arguments: [String])
 }
 
-public actor CodexCapabilityDetector {
-    public static let outputLimit = 64 * 1_024
-    public static let probeTimeout: Duration = .seconds(5)
+actor CodexCapabilityDetector {
+    static let outputLimit = 64 * 1_024
+    static let probeTimeout: Duration = .seconds(5)
 
     private let processRunner: any ProcessRunning
     private var cached: CacheEntry?
 
-    public init(processRunner: any ProcessRunning = FoundationProcessRunner()) {
+    init(processRunner: any ProcessRunning = FoundationProcessRunner()) {
         self.processRunner = processRunner
     }
 
-    public func report(
+    func report(
         executableURL: URL,
         environment: [String: String]
     ) async throws -> CodexCapabilityReport {

@@ -25,16 +25,28 @@ public struct CodexUsage: Sendable, Equatable {
 public struct CodexItem: Sendable, Equatable {
     public let id: String
     public let type: String
+    public let succeeded: Bool?
     let agentMessageText: String?
 
-    init(id: String, type: String, agentMessageText: String?) {
+    init(
+        id: String,
+        type: String,
+        succeeded: Bool?,
+        agentMessageText: String?
+    ) {
         self.id = id
         self.type = type
+        self.succeeded = succeeded
         self.agentMessageText = agentMessageText
     }
 
     func redactedForStreaming() -> Self {
-        Self(id: id, type: type, agentMessageText: nil)
+        Self(
+            id: id,
+            type: type,
+            succeeded: succeeded,
+            agentMessageText: nil
+        )
     }
 }
 

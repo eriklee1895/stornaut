@@ -50,10 +50,23 @@ func successfulFakeProcessUsesFixedProtocolArgumentsAndSeparatesStderr() async t
     })
 
     let arguments = try fixture.recordedLines(named: "arguments.txt")
-    #expect(arguments == CodexRunRequest.fixedArguments(
-        schemaURL: fixture.schemaURL,
-        workingDirectoryURL: fixture.workingDirectoryURL
-    ))
+    let expectedArguments = try CodexRuntimeProfile
+        .capabilityFirstV1Codex0147
+        .execArguments(
+            schemaURL: fixture.schemaURL,
+            workingDirectoryURL: fixture.workingDirectoryURL
+        )
+    #expect(arguments == expectedArguments)
+    #expect(arguments.first == "--strict-config")
+    let searchIndex = try #require(arguments.firstIndex(of: "--search"))
+    let execIndex = try #require(arguments.firstIndex(of: "exec"))
+    #expect(searchIndex < execIndex)
+    #expect(!arguments.contains("--sandbox"))
+    #expect(!arguments.contains("read-only"))
+    #expect(!arguments.contains("features.shell_tool=false"))
+    #expect(!arguments.contains("features.unified_exec=false"))
+    #expect(!arguments.contains("features.browser_use=false"))
+    #expect(!arguments.contains("features.hooks=false"))
     #expect(try fixture.recordedString(named: "stdin.txt") == "Return only the static envelope.")
     let recordedWorkingDirectory = URL(
         filePath: try fixture.recordedString(named: "cwd.txt")

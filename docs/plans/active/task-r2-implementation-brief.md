@@ -1,7 +1,6 @@
 # R2 Implementation Brief: Capability Model and Runtime Profile
 
-> Status: Pre-implementation brief complete — production implementation
-> blocked by the pending ADR 0013 dedicated loopback managed-proxy decision
+> Status: Complete — configurationReady; R3 behavioral gate remains pending
 >
 > Prepared: 2026-08-11
 >
@@ -14,10 +13,9 @@
 > [study](../../upstream-studies/epic-5-capability-first-runtime.md),
 > [ADR 0013](../../adr/0013-capability-first-runtime-containment.md)
 
-## 1. Blocker
+## 1. Approved Transport Boundary
 
-This brief does not authorize R2 implementation. R2 starts only if the user
-approves this exact transport:
+The user approved R2 implementation with this exact transport:
 
 ```text
 Codex descendants may connect only to a same-investigation,
@@ -27,8 +25,8 @@ All other localhost/private/link-local destinations and every Unix socket
 remain OS-blocked.
 ```
 
-If rejected, the Codex `0.147.0` candidate is no-go and none of the production
-files listed below are changed.
+R2 models this exception only as a closed configuration candidate. R3 must
+prove it behaviorally before it can contribute containment evidence.
 
 ## 2. Purpose
 
@@ -42,13 +40,17 @@ version-aware contracts:
 
 R2 proves configuration expression and parser/report correctness without:
 
-- calling a model;
 - creating production Runtime Home/auth lifecycle;
 - claiming shell/browser/network behavior was observed in the signed App;
 - enabling Deep Dive;
 - changing the Investigation Envelope;
 - creating a Probe Broker transport;
 - touching Policy, Trash, Registered Actions or Executor.
+
+The user separately authorized real-model diagnostics in R2/R5. R2 prefers
+`gpt-5.6-luna`, uses only synthetic content/public endpoints and may record
+actual successful tool events as `observed`. A successful model call cannot set
+`contained`, prove signed-App inheritance or establish no-Executor reachability.
 
 ## 3. Exact File Scope
 
@@ -421,7 +423,9 @@ Rules:
 
 - help/features output can set `advertised` only;
 - generated-profile validation can set `configured`;
-- R2 cannot set `observed` or `contained` for Agent behavior;
+- R2 may set `observed` only from a successful synthetic real-model JSONL tool
+  event explicitly authorized by the user; model self-report is insufficient;
+- R2 cannot set `contained` for Agent behavior;
 - existing Task 4 protocol tests may contribute observed structured
   JSONL/schema/process lifecycle evidence only when explicitly mapped;
 - R1 probe evidence is not silently loaded from a prose report into production
@@ -796,6 +800,9 @@ HEAD == origin/main after independent push
 
 R2 may conclude only **configurationReady**. It does not enable Deep Dive,
 close ADR 0013, or start R3 automatically.
+
+Final evidence:
+[Capability-First Runtime R2 Review](../../reports/capability-first-runtime-r2-review.md).
 
 ## 11. Decision Branch
 

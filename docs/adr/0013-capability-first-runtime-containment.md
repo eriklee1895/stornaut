@@ -1,7 +1,6 @@
 # ADR 0013: Capability-First Codex Runtime Containment
 
-> Status: Proposed conditional-go — explicit dedicated loopback proxy decision
-> required before R2
+> Status: Accepted for R2 configuration candidate; R3 behavioral gate pending
 >
 > Date: 2026-08-11
 >
@@ -95,10 +94,9 @@ output. Browser containment remains an R5 gate.
    evidence.
 10. Swift remains the only path to Policy/Executor.
 
-### Pending decision
+### Approved transport exception
 
-R2 is blocked until the user explicitly approves or rejects this exact
-exception:
+On 2026-08-11 the user explicitly approved this exact exception:
 
 > Codex descendants may connect only to a managed proxy listener that is
 > created by the same Stornaut/Codex investigation session on a random
@@ -174,7 +172,8 @@ scripts/probe-codex-sandbox-containment
 SHA-256 2c5625b6f94164cc4c238fcd24a3b53d9104b84a340a0e2a9c0a161fb1c3c857
 ```
 
-R2 may start only after the pending decision. R3 must then add:
+At R1 close, R2 was blocked on the pending decision. That decision is now
+approved; R3 must still add:
 
 - typed profile generation tests;
 - full filesystem mutation matrix;
@@ -184,5 +183,6 @@ R2 may start only after the pending decision. R3 must then add:
 - runtime-home/auth lifecycle tests;
 - signed-App evidence.
 
-ADR 0013 remains Proposed until the pending exception is decided and R3
-behavioral evidence passes.
+ADR 0013 is accepted only for the R2 configuration candidate. R3 must still
+prove the transport identity, lifecycle, bypass denial and descendant
+inheritance before any behavioral or containment admission.

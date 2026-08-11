@@ -1,6 +1,7 @@
 # R1 Implementation Brief: Current Runtime and macOS Containment Study
 
-> Status: Complete — conditional-go evidence, R2 blocked for user decision
+> Status: Complete — conditional-go evidence; the later ADR 0013 transport
+> decision is now approved for the R2 configuration candidate
 >
 > Date: 2026-08-11
 >
