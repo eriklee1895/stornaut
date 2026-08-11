@@ -1,7 +1,8 @@
 # Stornaut Phase C — Epic 8 Safe Execution Vertical Slice Plan
 
-> **Status:** Paused by user after Task 28 — Tasks 27–28 completed; ADR 0004
-> capability-first review required before Task 29
+> **Status:** Paused after Task 28 — Tasks 27–28 completed; user approved a
+> capability-first Runtime R1–R6 interlock before Task 29, with its detailed
+> plan awaiting review
 >
 > **Roadmap phase:** Phase C — Safe Execution Vertical Slice
 >
@@ -686,9 +687,11 @@ Final verifier evidence:
 - App tests/build/signing/bundle, Release fixture isolation, localization,
   rule compiler, boundaries and docs passed.
 
-Task 29 is not active. The user requested a pause after Task 28 to review the
-updated ADR 0004 and ensure later Codex work maximizes capability for this
-personal-use product without weakening the Swift-only write/Executor boundary.
+Task 29 is not active. The ADR 0004 review is complete and confirmed that the
+current Runtime still implements the obsolete Broker-only profile. The user
+approved inserting
+[Runtime R1–R6](capability-first-codex-runtime-gate.md) before Task 29; its
+detailed plan currently awaits review and no Runtime implementation has begun.
 
 ## Task 27: Safe Execution Upstream Study and Architecture Decisions
 

@@ -19,7 +19,9 @@
 ```text
 Foundation & Risk Gates
 → Deterministic Product Core
-→ Safe Execution Vertical Slice
+→ Safe Execution Foundations
+→ Capability-First Codex Runtime Evidence Gate
+→ Complete Safe Execution Vertical Slice
 → Conditional Deep Dive
 → Adapters & Registered Actions
 → Product Completion & Release Readiness
@@ -30,7 +32,9 @@ Foundation & Risk Gates
 ```text
 Epic 0–1
 → Epic 2–4
-→ Epic 8 deterministic subset
+→ Epic 8 Tasks 27–28
+→ Epic 5 runtime R1–R6 evidence gate
+→ Epic 8 Tasks 29–35
 → Epic 5–6, only after the Deep Dive gate
 → Epic 7 + remaining Epic 8
 → Epic 9
@@ -109,6 +113,19 @@ Codex 进程树不可写、no-Executor。
 - 它是 Quick Scan 与 Deep Dive 共用的安全基础；
 - Deep Dive runtime gate 未完成时产品仍有完整、可用的确定性价值；
 - 后续 Agent 只能接入已经成熟的 CleanupPlan/Policy/Executor 契约。
+
+**2026-08-11 interlock：**
+
+Tasks 27–28 已先建立 cleanup domain/persistence/journal foundations。用户批准
+在 Task 29 前插入 ADR 0004 capability-first Runtime R1–R6 evidence gate，
+详见 [active plan](active/capability-first-codex-runtime-gate.md)。该 gate
+解决现有旧 Broker-only runtime 与最新产品边界的漂移；它不启用 Deep Dive，
+也不改变 Task 29–35 的确定性职责。
+
+R1–R6 通过后恢复 Task 29；若 gate 为 no-go，先记录证据并 review 路线调整，
+不得用 `danger-full-access`、命令/公共域名 allowlist、逐命令审批或关闭所需调查
+能力绕过。Task 35 完成后，Phase D 才可基于已验证的 runtime foundation
+实现完整 Deep Dive 产品流程。
 
 ### Phase D — Conditional Deep Dive
 
@@ -196,8 +213,10 @@ Codex 进程树不可写、no-Executor。
   9–26 通过最终统一 verifier 并归档至
   [`completed/`](completed/epic-2-4-deterministic-product-core.md)。
 - Phase C deterministic Epic 8 safe-execution 详尽 plan 已于 2026-08-11
-  获用户批准；Tasks 27–28 已完成。当前按用户要求暂停，先回顾 ADR 0004，
-  Task 29 尚未启动。
+  获用户批准；Tasks 27–28 已完成。ADR 0004 回顾确认实现仍有旧
+  Broker-only 漂移；用户已批准在 Task 29 前插入
+  [capability-first Codex runtime R1–R6 gate](active/capability-first-codex-runtime-gate.md)。
+  详尽计划当前等待 review，R1 与 Task 29 均未启动。
 - Epic 0 Foundation Upstream Study：已完成，选择 checked-in Xcode App/Test host + local Swift packages。
 - Epic 0 Task 1：SwiftPM Core/Codex、smoke tests、`scripts/verify`、manual-only CI 与 ThirdPartyNotices 骨架已完成。
 - Bundle identifier：已确认 `com.eriklee.stornaut`。
@@ -222,7 +241,6 @@ Codex 进程树不可写、no-Executor。
   247.24 秒完成，peak RSS 73,220,096 bytes，132 个 permission gaps 保持
   Partial/Unmeasurable；Codex marker absent。完整结论见
   [Epic 2–4 Validation Report](../reports/epic-2-4-validation-report.md)。
-- 下一项对齐：回顾更新后的 capability-first ADR 0004，确认个人工具应尽可能
-  发挥 Codex direct read、shell/unified exec、live search、browser/direct
-  fetch、skills/subagents 与公共联网能力，同时保持 Swift-only 用户数据写入
-  和 Executor 边界。完成回顾前不启动 Phase C Task 29。
+- 下一项对齐：review capability-first Runtime R1–R6 详尽计划；计划获批后从
+  R1 开始逐项 study、tests-first、review、focused/full verify、独立
+  commit/push。完整 gate 前不启动 Phase C Task 29。

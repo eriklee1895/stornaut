@@ -5,8 +5,9 @@
 > 当前状态：产品、Agent、UI 功能交互与品牌基线完成；Epic 0–1 evidence
 > gate 已完成；Epic 2–4 Tasks 9–26 通过最终 unified verifier 并归档；
 > Phase C deterministic Epic 8 详尽 plan 已于 2026-08-11 获用户批准，
-> Tasks 27–28 已完成；按用户要求 Phase C 暂停，当前无 active implementation
-> Task，必须先回顾更新后的 ADR 0004，Task 29 不得启动；Task 5 的历史
+> Tasks 27–28 已完成；ADR 0004 回顾确认现有 Runtime 仍有旧 Broker-only
+> 漂移，用户已批准在 Task 29 前插入 capability-first Runtime R1–R6 gate；
+> 详尽 plan 当前等待 review，R1 与 Task 29 均未启动；Task 5 的历史
 > Broker-only no-go 已由 ADR 0004 capability-first 决策修订，Deep Dive 因
 > 新运行时实现/evidence gate 尚未交付而 paused；
 > release signing/notarization 未评估
@@ -103,7 +104,9 @@ Epic 编号用于能力归属，不再被解释为严格的时间顺序。批准
 ```text
 Epic 0–1
 → Epic 2–4
-→ Epic 8 deterministic subset
+→ Epic 8 Tasks 27–28
+→ Epic 5 Runtime R1–R6 evidence gate
+→ Epic 8 Tasks 29–35
 → Epic 5–6（仅在 ADR 0004 capability-first runtime gate 允许时）
 → Epic 7 + Epic 8 remaining
 → Epic 9
@@ -212,7 +215,10 @@ Epic 0–1
 [Epic 2–4 Validation Report](../reports/epic-2-4-validation-report.md)。
 Phase C 详尽候选计划见
 [Epic 8 Safe Execution Vertical Slice](../plans/active/epic-8-safe-execution-vertical-slice.md)，
-已于 2026-08-11 获用户批准；Tasks 27–35 必须按顺序逐项 gate。
+已于 2026-08-11 获用户批准。Tasks 27–28 已完成；用户随后批准在 Task 29
+前插入
+[Capability-First Codex Runtime Evidence Gate](../plans/active/capability-first-codex-runtime-gate.md)。
+R1–R6 通过后才恢复 Tasks 29–35；该插队不改变这些确定性 Task 的职责。
 
 跨 Epic 的阶段依赖、no-go 分支和交付顺序由 [Delivery Roadmap](../plans/roadmap.md) 管理；新 active plan 不得另起一套宏观路线。
 
@@ -292,12 +298,15 @@ Phase C deterministic Epic 8 plan 已于 2026-08-11 获批并位于
 docs/plans/active/epic-8-safe-execution-vertical-slice.md，候选范围从 Quick
 Scan terminal projection 形成 Review Reclaim Plan，经 pure Policy Gate、
 fresh revalidation、用户确认与默认 MoveToTrash，最后写 immutable Cleanup
-Manifest 和 truthful Cleanup Result/History。Tasks 27–28 已完成。当前按用户
-要求暂停，先回顾 capability-first ADR 0004，确保后续 Codex 设计面向个人工具
-尽可能发挥 direct read、shell/unified exec、live search、browser/direct
-fetch、skills/subagents 与公共联网能力，同时保持 Swift-only 用户数据写入与
-Executor 边界。回顾与用户对齐前不得启动 Task 29。该阶段不包含 Adapter、真实
-destructive Registered Action、release/notarization 或任何写权限边界放宽。
+Manifest 和 truthful Cleanup Result/History。Tasks 27–28 已完成。ADR 0004
+回顾确认当前 `CodexProcess`、capability report、Investigation Envelope 与 UI
+copy 仍漂移在旧 Broker-only 模型。用户已批准在 Task 29 前插入
+docs/plans/active/capability-first-codex-runtime-gate.md 的 R1–R6，详尽 plan
+当前等待 review，R1 与 Task 29 均未启动。该 gate 必须证明完整调查能力和公共
+联网可用时，Codex 全进程树不可写用户数据、不可访问 localhost/私网/任意 Unix
+socket 且无 Executor 路径；不得用 `danger-full-access`、命令/公共域名
+allowlist、逐命令审批或关闭调查能力绕过。生产 Deep Dive、Adapter、真实
+destructive Registered Action、release/notarization 仍不在当前授权范围。
 
 任何权限、安全或许可证假设都必须有实际证据。设计或 PRD 如有冲突，先报告并修正文档。ADR 0004 已批准的直接只读 Agent 工具与公共联网无需再次缩减或请求授权；不得自行扩大本地写入、私网或 Executor 权限。
 ```

@@ -313,3 +313,9 @@ Task 28 adds no target filesystem write or product CTA. It is complete and may
 be committed/pushed as one iteration. Per the user's instruction, Phase C
 pauses after this Task for a review of the updated capability-first ADR 0004;
 Task 29 is not active.
+
+Post-completion sequencing update: the ADR 0004 review is complete. The user
+approved inserting the capability-first Runtime R1–R6 evidence gate before
+Task 29; see
+[`capability-first-codex-runtime-gate.md`](capability-first-codex-runtime-gate.md).
+The detailed Runtime plan awaits review and no implementation has started.

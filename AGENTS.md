@@ -13,12 +13,14 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 - Epic 0–1 与 Epic 2–4 Tasks 9–26 已完成；Phase B 最终 unified verifier
   单次 exit 0，计划与 Task 21–26 briefs 已归档；
   Phase C deterministic Epic 8 详尽 plan 已于 2026-08-11 获用户批准，
-  Tasks 27–28 已完成并通过 unified verifier；按用户要求 Phase C 暂停，
-  先回顾 capability-first ADR 0004，Task 29 尚未启动。逐 Task 完成
-  Upstream Study、实现、code review、
-  focused/full verify、独立 commit/push；不得提前混入 Deep Dive、Adapter、
-  真实 Registered Action 或 release 工作。
-- 新的 capability-first runtime/safety check 通过前，Deep Dive 必须保持 paused；发现 Codex ≠ 已证明“公共联网 + 完整调查能力 + 进程树不可写 + no-Executor”边界。
+  Tasks 27–28 已完成并通过 unified verifier。ADR 0004 回顾后，用户已批准在
+  Task 29 前插入 capability-first Runtime R1–R6 evidence gate；详尽 plan
+  当前等待 review，R1 与 Task 29 均未启动。逐 Task 完成 Upstream Study、
+  实现、code review、focused/full verify、独立 commit/push；不得提前混入
+  生产 Deep Dive、Adapter、真实 Registered Action 或 release 工作。
+- 新的 capability-first runtime/safety check 通过前，Deep Dive 必须保持
+  paused；发现 Codex 或 feature flag ≠ 已证明“公共联网 + 完整调查能力 +
+  全进程树不可写 + 私网/Unix socket 阻断 + no-Executor”边界。
 - 权限、隔离、许可证、性能主张必须有本机证据（`--help`、测试、Benchmark、ADR）。不确定时先 Spike/ADR，不用大段代码掩盖。
 - 保留现有 MIT `LICENSE`；新增依赖前记录许可证与理由。不要复制 Mole GPL 代码。
 - 视觉素材可通过 Web 搜索或 `$erik-gpt-image-2` 生成。Web 素材必须记录来源 URL、作者/版权、许可证和允许用途；AI 生成素材必须保留 prompt/metadata，不提交凭据。现有 UI/UX 与品牌概念图由 `$erik-gpt-image-2` 生成，仍只作非逐像素参考。
@@ -59,6 +61,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | 导航、文案、品牌、Light/Dark | [docs/design/ui-ux.md](docs/design/ui-ux.md) |
 | 跨 Epic 交付顺序与 Gate | [docs/plans/roadmap.md](docs/plans/roadmap.md) |
 | 当前 active plan 状态 | [docs/plans/active/README.md](docs/plans/active/README.md) |
+| Capability-first Codex Runtime Gate | [docs/plans/active/capability-first-codex-runtime-gate.md](docs/plans/active/capability-first-codex-runtime-gate.md) |
 | Phase C Epic 8 获批计划 | [docs/plans/active/epic-8-safe-execution-vertical-slice.md](docs/plans/active/epic-8-safe-execution-vertical-slice.md) |
 | Epic 2–4 历史计划 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) |
 | Epic 2–4 最终 Gate | [docs/reports/epic-2-4-validation-report.md](docs/reports/epic-2-4-validation-report.md) |
@@ -78,10 +81,10 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 Epic 0–1 与 Epic 2–4 evidence gates 已完成。Phase B 的
 domain/persistence、product Quick Scan、Space Ledger、Knowledge/Activity
 与 App/UI 产品证据通过最终统一验证。Phase C deterministic Epic 8 plan
-已获批准；Tasks 27–28 已完成。当前按用户要求暂停，不启动 Task 29，先回顾
-ADR 0004，确保后续个人工具尽可能发挥 Codex direct read、shell/unified exec、
-live search、browser/direct fetch、skills/subagents 与公共联网能力，同时继续
-由 Swift 独占用户数据写入与 Executor。
+已获批准；Tasks 27–28 已完成。ADR 0004 回顾确认当前 `CodexProcess`、
+capability report、Investigation Envelope 与 UI copy 仍漂移在旧 Broker-only
+模型；用户已批准在 Task 29 前插入 capability-first Runtime R1–R6 gate，
+当前等待详尽 plan review。R1–R6 与 Task 29 均未启动。
 Deep Dive 的旧 Broker-only no-go 已被 ADR 0004 的 capability-first 边界取代；
 当前仍 paused 的原因是新运行时实现/evidence gate 尚未交付，而非 Codex 工具
 能力过强。release signing/notarization 仍未评估。Overview、Scan、Scan-only

@@ -33,7 +33,8 @@
 | Agent、双模式与治理设计 | [Agent Disk Governance](design/agent-disk-governance.md) |
 | UI、品牌、状态与交互 | [UI/UX](design/ui-ux.md) |
 | 宏观交付顺序与阶段 Gate | [Delivery Roadmap](plans/roadmap.md) |
-| 当前计划状态 | [Active Plans](plans/active/README.md) — Tasks 27–28 complete；Phase C paused for ADR 0004 review |
+| 当前计划状态 | [Active Plans](plans/active/README.md) — Tasks 27–28 complete；Runtime R1–R6 详尽 plan 等待 review |
+| Capability-first Codex Runtime Gate | [Runtime Evidence Gate](plans/active/capability-first-codex-runtime-gate.md) — approved macro interlock；implementation not started |
 | Phase C Epic 8 获批计划 | [Safe Execution Vertical Slice](plans/active/epic-8-safe-execution-vertical-slice.md) |
 | Epic 2–4 历史计划 | [Deterministic Product Core](plans/completed/epic-2-4-deterministic-product-core.md) — Tasks 9–26 已完成并归档 |
 | 已完成计划 | [Completed Plans](plans/completed/README.md) — Epic 0–1 |
