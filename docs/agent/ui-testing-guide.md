@@ -2,7 +2,7 @@
 
 > 状态：Active
 >
-> 最近更新：2026-08-10
+> 最近更新：2026-08-11
 >
 > 适用范围：Stornaut 原生 macOS App 的 UI 实现、回归与运行时视觉验收
 
@@ -240,12 +240,20 @@ scripts/doctor-dev-tools
 ### Screen Recording
 
 ```sh
-scripts/peekaboo-readonly permissions status --json-output
+scripts/peekaboo-readonly permissions status \
+  --all-sources \
+  --json-output
 ```
 
-- `Screen Recording: granted` 才能执行 Peekaboo screenshot；
+- 实际被选中的 runtime source 报告 `Screen Recording: granted`，才能执行
+  Peekaboo screenshot；默认可能选择 support daemon 的 `bridge`，传入
+  `--no-remote` 才强制进程内 `local` runtime；
 - 缺失时停止本地视觉验收，不能自动打开、点击或重置 System Settings；
-- Accessibility / Event Synthesizing 缺失不阻止默认 image-only loop。
+- Accessibility / Event Synthesizing 缺失不阻止默认 image-only loop；
+- `inspect_ui` 使用 Accessibility；`list` 是多个子命令的命令族，是否可用必须按
+  `apps`、`windows` 等实际操作验证，不能从一个子命令推广到全部 `list`；
+- 记录证据时同时写明调用宿主和 JSON 的 `selectedSource`。换宿主或 runtime
+  source 后必须重新检查，不能沿用另一条进程链的结论。
 
 ### Displays asleep or session locked
 
