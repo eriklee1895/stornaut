@@ -68,6 +68,11 @@ UI lab.
   majors, `actions/checkout@v6` and `actions/upload-artifact@v7`; upstream usage
   is documented at <https://github.com/actions/checkout> and
   <https://github.com/actions/upload-artifact>.
+- A third hosted run, [GitHub Actions run 31512216719](https://github.com/eriklee1895/stornaut/actions/runs/31512216719),
+  passed all 303 tests in 37.164 seconds and then failed immediately because the
+  hosted image did not provide `rg`, which the seven boundary scripts,
+  verifier contract and documentation checks use. The workflow now installs
+  ripgrep only when absent and records `rg --version` before verification.
 
 ## Decision
 
@@ -115,7 +120,9 @@ evidence-driven.
 `Stornaut CI` runs on pull requests, pushes to `main`, and manual dispatch. It
 uses the pinned macOS 26 arm64/Xcode 26.6 hosted image, read-only repository
 permission, concurrency cancellation and a thirty-minute timeout. Its only
-project gate is `scripts/verify --headless`.
+project gate is `scripts/verify --headless`. A setup step supplies ripgrep when
+the runner image does not already include it because the repository's static
+fitness functions intentionally use `rg`.
 
 No ordinary GitHub-hosted job runs XCUITest, Peekaboo, Screen Recording/TCC or
 Automation Mode. A future dedicated UI runner requires its own approved host
@@ -143,6 +150,10 @@ security, session lifecycle and evidence policy.
 - GitHub can update a runner image behind a stable label. The explicit Xcode
   path and recorded toolchain fail or expose drift, but do not make the image
   immutable.
+- Ripgrep is a CI-only Homebrew dependency and its resolved version is recorded
+  rather than pinned to a shipped application artifact. A semantic CLI drift
+  will fail the boundary/contract steps and is reviewed as verifier-tooling
+  evidence.
 - The headless suite is still serial and includes multiple Xcode builds. The
   initial timing artifact must be collected before adding caching or parallelism.
 - Serializing test functions in headless CI reduces cross-test race stress.
@@ -174,11 +185,12 @@ confirmed:
   above passed. This is direct evidence for keeping live-desktop UI work out of
   ordinary hosted CI.
 
-The first two hosted runs were intentionally retained as evidence: the first
+The first three hosted runs were intentionally retained as evidence: the first
 reached the thirty-minute timeout inside the parallel SwiftPM test step; the
 second proved serialization removed that hang and isolated the heavyweight
-Python fixture. Final hosted timing and outcome are recorded by the replacement
-pull-request run.
+Python fixture; the third proved the portable test suite passes and exposed the
+missing static-analysis dependency. Final hosted timing and outcome are
+recorded by the replacement pull-request run.
 
 Final acceptance also requires the pull request's real `Stornaut CI` run to
 exit zero on GitHub's hosted `macos-26` arm64 runner.

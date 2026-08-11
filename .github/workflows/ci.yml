@@ -24,6 +24,13 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
+      - name: Prepare verifier dependencies
+        run: |
+          if ! command -v rg >/dev/null 2>&1; then
+            brew install ripgrep
+          fi
+          rg --version
+
       - name: Select the validated Xcode
         run: |
           test -d /Applications/Xcode_26.6.app
