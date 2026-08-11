@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 @testable import StornautApp
@@ -27,5 +28,21 @@ func appDestinationLocalizationKeysResolve() {
 
         #expect(localized != nil)
         #expect(localized != destination.localizationKey)
+    }
+}
+
+@Test
+func navigationAndSettingsSystemImagesResolve() {
+    let names = AppDestination.allCases.map(\.systemImage)
+        + SettingsSection.allCases.map(\.systemImage)
+
+    for name in names {
+        #expect(
+            NSImage(
+                systemSymbolName: name,
+                accessibilityDescription: nil
+            ) != nil,
+            "Missing system image: \(name)"
+        )
     }
 }

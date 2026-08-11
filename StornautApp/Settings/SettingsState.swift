@@ -39,7 +39,7 @@ enum SettingsSection:
         case .general:
             "gearshape"
         case .scanning:
-            "externaldrive.badge.magnifyingglass"
+            StornautSystemImage.quickScan
         case .permissions:
             "lock.shield"
         case .codexAndDeepDive:

@@ -92,8 +92,8 @@ hard part — would be written either way. What remains is golden file
 management, a tolerance rule and failure artefacts, and Swift Testing's
 attachment support already covers the last of those. Taking the package would
 add the repository's first external dependency and require hand-editing a
-hand-authored `project.pbxproj`. The harness is therefore written in-repo, at
-roughly 300 lines including the difference visualiser.
+hand-authored `project.pbxproj`. The harness is therefore written in-repo and
+includes its own difference visualiser.
 
 ### Tolerance
 
@@ -117,14 +117,17 @@ machine.
 This narrows, and does not remove, the guide's prohibition on committing
 screenshots. The prohibition exists because host captures carry real user
 paths, window contents and TCC state. Snapshot goldens render synthetic
-fixtures of isolated components with no filesystem content, so the privacy
-reason does not apply to them. Peekaboo captures and raw `.xcresult` bundles
-remain uncommitted.
+component and page fixtures. Page fixtures may render fixed synthetic paths,
+but no value may be derived from the host filesystem or contain private user
+data. The privacy reason therefore does not apply to them. Peekaboo captures
+and raw `.xcresult` bundles remain uncommitted.
 
 ## Consequences
 
-- Sixteen initial goldens cover the shared design system across Light/Dark and
-  `en`/`zh-Hans`, and execute in under two seconds.
+- Twenty-four initial goldens cover sixteen shared-design-system variants and
+  eight representative Overview page variants across Light/Dark and
+  `en`/`zh-Hans`. The two suites execute in under six seconds on the measured
+  development host.
 - The luminance contract in `scripts/verify-ui-screenshots` is retained as a
   cheap window-level sanity check. It is no longer the only mechanised visual
   evidence, and should not be extended to carry weight it cannot bear.
@@ -135,3 +138,45 @@ remain uncommitted.
   reference asserts nothing.
 - The harness does not exercise window chrome, real scan data, navigation or
   the app lifecycle. XCUITest and `scripts/verify` remain the acceptance truth.
+
+## Residual Risks
+
+- Determinism has been demonstrated on the recorded Apple Silicon host, not
+  across every macOS or Xcode patch release. A CI host must pin its image and
+  Xcode version; the first real hosted run is evidence, not a presumed pass.
+- Font rasterisation or SwiftUI renderer changes can cause legitimate broad
+  drift. Such a change requires visual review and an explicit golden update;
+  weakening the tolerance to absorb it is not an acceptable default.
+- A committed golden proves that rendering stayed stable, not that the
+  original visual choice was good. Initial and re-recorded baselines still
+  require human review.
+- Localization is process-global. Snapshot suites are serialized, restore the
+  prior language after every render, and fail if another writer changes it
+  during rendering, but an uncoordinated future test could still trigger that
+  fail-loud guard.
+- Current page-level coverage is Overview only. Window chrome, navigation,
+  Settings scenes, lifecycle and real runtime state remain outside this layer.
+
+## Validation
+
+The accepted implementation was checked on the spike host with:
+
+- 8 focused harness contract tests covering state restoration, remediation
+  text, decode/size failures, channel tolerance and ratio tolerance;
+- 24 golden comparisons across the Design System and Overview suites;
+- 10 consecutive runs of the three snapshot/harness suites without a drift or
+  localization race;
+- all 114 `StornautAppTests` passing in one App-test run after the harness and
+  system-image fixes;
+- a system API probe confirming the former
+  `externaldrive.badge.magnifyingglass` name did not resolve and its shared
+  `externaldrive` replacement does;
+- a real `Stornaut.app` build-and-run plus read-only Peekaboo capture, followed
+  by visual review of the fixed navigation and Quick Scan icons. The host
+  screenshot remains ignored because it contains a real user path.
+
+A fresh uninterrupted `scripts/verify` completed after all review fixes with
+exit 0 in 1,019.48 seconds. Its UI result bundle reports 9/9 XCUITest methods
+passed and all 17 expected attachments were exported; the same invocation then
+completed the SwiftPM, benchmark, boundary, App-test/snapshot, Debug/Release,
+signing, localization, rule-compiler and documentation gates.

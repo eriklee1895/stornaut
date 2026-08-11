@@ -9,8 +9,12 @@ enum StornautLocalization {
         language.withLock { $0 = value }
     }
 
+    static var currentLanguage: SettingsLanguage {
+        language.withLock { $0 }
+    }
+
     static var locale: Locale {
-        let selected = language.withLock { $0 }
+        let selected = currentLanguage
         return Locale(
             identifier: selected == .simplifiedChinese
                 ? "zh-Hans"

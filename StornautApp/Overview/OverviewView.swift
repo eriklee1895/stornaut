@@ -247,7 +247,7 @@ struct OverviewView: View {
             modeCard(
                 titleKey: "overview.quickScan.title",
                 messageKey: "overview.quickScan.message",
-                systemImage: "externaldrive.badge.magnifyingglass",
+                systemImage: StornautSystemImage.quickScan,
                 role: .informational
             ) {
                 Button(primaryActionTitle, action: primaryAction)

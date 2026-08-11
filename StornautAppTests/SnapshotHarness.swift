@@ -97,7 +97,7 @@ enum SnapshotError: Error, CustomStringConvertible {
         case let .missingGolden(name):
             """
             Missing golden \(name). Record it with \
-            STORNAUT_RECORD_SNAPSHOTS=1.
+            TEST_RUNNER_STORNAUT_RECORD_SNAPSHOTS=1.
             """
         case let .sizeMismatch(name, expected, actual):
             "Golden \(name) is \(expected) but the render is \(actual)."
@@ -205,8 +205,8 @@ enum SnapshotHarness {
             pixels differ (\(percentage(comparison.differingPixelRatio))), \
             largest channel delta \(comparison.maximumChannelDelta). \
             Inspect the attached golden, actual and difference images, then \
-            re-record with STORNAUT_RECORD_SNAPSHOTS=1 once the change is \
-            intended.
+            re-record with TEST_RUNNER_STORNAUT_RECORD_SNAPSHOTS=1 once the \
+            change is intended.
             """,
             sourceLocation: sourceLocation
         )
@@ -218,10 +218,8 @@ enum SnapshotHarness {
         appearance: SnapshotAppearance,
         language: SnapshotLanguage
     ) throws -> Data {
-        // `StornautLocalization` has no reader, so restore the process default
-        // rather than the previous value; the snapshot suites are `.serialized`
-        // and always pin the language themselves before rendering.
-        defer { StornautLocalization.apply(.english) }
+        let previousLanguage = StornautLocalization.currentLanguage
+        defer { StornautLocalization.apply(previousLanguage) }
         StornautLocalization.apply(language.settingsLanguage)
 
         let content = view()
