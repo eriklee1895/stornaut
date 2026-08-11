@@ -1,0 +1,137 @@
+# ADR 0014: Deterministic View Snapshot Regression
+
+> Status: Accepted for the test architecture workstream
+>
+> Date: 2026-08-11
+>
+> Decision owners: Stornaut maintainers
+>
+> Supersedes nothing. Amends the evidence standard in
+> [`../agent/ui-testing-guide.md`](../agent/ui-testing-guide.md).
+
+## Context
+
+UI regression evidence had one mechanised layer and one human layer, with
+nothing in between.
+
+`scripts/verify-ui-screenshots` computes mean luminance and luminance standard
+deviation over seventeen XCUITest attachments and asserts relationships such as
+`light - dark >= 40`, `standard deviation >= 20` and `160...250` bands. Those
+assertions detect an inverted appearance, a blank window and a missing
+attachment. They cannot detect a shifted layout, truncated text, overlapping
+controls, wrong spacing or a wrong rendered value, because none of those change
+the aggregate statistics of a window.
+
+Everything the luminance check cannot see was delegated to a Coding Agent
+looking at a Peekaboo capture. That judgement is not repeatable, is not
+reviewable after the fact, cannot run in CI, and by the guide's own rules is not
+committed. The strictness the guide claimed was therefore not the strictness the
+repository actually enforced.
+
+## Spike Evidence
+
+Recorded on macOS 26.5.1, Xcode 26.6, Swift 6.3.3, Apple Silicon.
+
+### Off-screen SwiftUI rendering is viable
+
+A throwaway package rendered SwiftUI content under plain `swift test` with
+`NSApp == nil`, no `NSWindow` and no active display requirement. Both
+`NSHostingView` + `cacheDisplay(in:to:)` and `ImageRenderer` produced non-blank,
+content-differentiated PNGs. Rendering therefore does not need the display, UI
+Automation Mode, Screen Recording or any TCC grant.
+
+`NSWindow` was deliberately excluded: a hosting window contributes a title bar
+whose height varies between a physical Mac and a virtual machine, which is a
+known source of environment-dependent snapshot drift.
+
+### SwiftUI ignores the module bundle for implicit localization
+
+The same spike placed `en.lproj/Localizable.strings` in the module's own
+resources and confirmed `Bundle.module` carried it. `Text("spike.key")`
+authored inside that module still rendered the literal key, byte-identical to
+`Text(verbatim: "spike.key")`. `Text("spike.key", bundle: .module)` rendered the
+translated value.
+
+Implicit `LocalizedStringKey` lookup therefore resolves against `Bundle.main`,
+not the defining module. Two consequences follow:
+
+- snapshots hosted by `StornautAppTests` inherit the real app bundle and render
+  genuine `en` and `zh-Hans` product strings;
+- a future move of the views into a SwiftPM module cannot rely on implicit
+  lookup, because a SwiftPM test runner has no app bundle.
+
+`StornautApp/` currently contains 180 implicit localization call sites across
+28 files. Only the 56 `Text(_:)` uses accept a `bundle:` argument; `Section`,
+`Button`, `Label`, `Picker`, `TextField`, `navigationTitle`, `help` and
+`accessibilityLabel` would each need a structural rewrite into their
+`Text`-taking or label-closure forms. That cost is recorded here so the module
+extraction is planned with it in view rather than discovering it midway.
+
+## Decision
+
+### Render off-screen at a fixed scale
+
+`SnapshotHarness` renders through a free-standing `NSHostingView` with an
+explicit `NSAppearance`, an injected `colorScheme` and an injected `locale`,
+into an `NSBitmapImageRep` allocated explicitly at 1x. Fixing the bitmap
+removes the host's backing scale factor from the result.
+
+### Host the snapshots in the app test target
+
+Snapshots live in `StornautAppTests`, whose `TEST_HOST` is `Stornaut.app`.
+`Bundle.main` is therefore the real product bundle and implicit localization
+resolves normally, so a snapshot exercises the same strings a user sees. This
+keeps the harness independent of the module extraction rather than blocked
+behind it.
+
+### Build the harness in-repo
+
+`swift-snapshot-testing` publishes no SwiftUI image strategy for macOS; the
+maintainers direct users to supply their own. The rendering step — the only
+hard part — would be written either way. What remains is golden file
+management, a tolerance rule and failure artefacts, and Swift Testing's
+attachment support already covers the last of those. Taking the package would
+add the repository's first external dependency and require hand-editing a
+hand-authored `project.pbxproj`. The harness is therefore written in-repo, at
+roughly 300 lines including the difference visualiser.
+
+### Tolerance
+
+A pixel counts as changed when any channel moves more than two levels; a
+snapshot fails when more than 0.1% of pixels changed. Text antialiasing moves
+single channels by one or two levels and stays far below the ratio.
+
+The rule was validated against a deliberate regression: changing `MetricTile`
+padding from 16 to 18 points, a change that is hard to see by eye, moved 4.7%
+to 5.6% of pixels across the four `metric-tile` variants — a margin of roughly
+fifty times the threshold — while the three unrelated components stayed at zero
+drift and passed.
+
+### Goldens are committed
+
+Goldens live in `Tests/Fixtures/Snapshots/` beside the existing domain and SQL
+fixtures, and are committed. A committed reference image is what makes the
+difference reviewable in a pull request rather than existing only on one
+machine.
+
+This narrows, and does not remove, the guide's prohibition on committing
+screenshots. The prohibition exists because host captures carry real user
+paths, window contents and TCC state. Snapshot goldens render synthetic
+fixtures of isolated components with no filesystem content, so the privacy
+reason does not apply to them. Peekaboo captures and raw `.xcresult` bundles
+remain uncommitted.
+
+## Consequences
+
+- Sixteen initial goldens cover the shared design system across Light/Dark and
+  `en`/`zh-Hans`, and execute in under two seconds.
+- The luminance contract in `scripts/verify-ui-screenshots` is retained as a
+  cheap window-level sanity check. It is no longer the only mechanised visual
+  evidence, and should not be extended to carry weight it cannot bear.
+- Re-recording is explicit: `TEST_RUNNER_STORNAUT_RECORD_SNAPSHOTS=1`. The
+  prefix is required because `xcodebuild test` does not forward the ambient
+  environment to the test process.
+- A reviewer must look at a re-recorded golden. A silently re-recorded
+  reference asserts nothing.
+- The harness does not exercise window chrome, real scan data, navigation or
+  the app lifecycle. XCUITest and `scripts/verify` remain the acceptance truth.
