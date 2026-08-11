@@ -16,4 +16,9 @@ Epic 2–4：
 - [Epic 4 Knowledge Base and Activity](epic-4-knowledge-activity.md) — Accepted for Tasks 14–19
 - [Epic 2–4 Native UI](epic-2-4-ui.md) — Accepted for Tasks 21–25
 
+Phase C：
+
+- [Epic 8 Safe Execution](epic-8-safe-execution.md) — Accepted for Tasks
+  28–35; npm/pip Ready, Go Review, uv non-executable
+
 研究记录必须包含精确 commit/version、license、阅读文件、可借鉴行为、不可复用代码、Stornaut 独立方案和 Benchmark/fixture。

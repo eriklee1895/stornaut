@@ -12,5 +12,7 @@
 8. [`0008-production-quick-scan-lifecycle.md`](0008-production-quick-scan-lifecycle.md) — Accepted; production Surveyor and persisted lifecycle validated in Task 12
 9. [`0009-space-accounting-semantics.md`](0009-space-accounting-semantics.md) — Accepted; truthful Space Ledger reconciliation validated in Task 13
 10. [`0010-knowledge-activity-policy.md`](0010-knowledge-activity-policy.md) — Accepted; Tasks 14–19 compiler, catalog, activity and structured knowledge gates validated
+11. [`0011-review-policy-authorization.md`](0011-review-policy-authorization.md) — Accepted for Phase C; separates Plan/selection/Policy from one-shot execution authority
+12. [`0012-cleanup-execution-journal.md`](0012-cleanup-execution-journal.md) — Accepted for Phase C; write-ahead recovery and insert-only Manifest semantics
 
 每份 ADR 至少记录 Status、Context、Evidence、Decision、Consequences、Residual Risks 和 Validation。安全假设没有测量证据时不得标记 Accepted。

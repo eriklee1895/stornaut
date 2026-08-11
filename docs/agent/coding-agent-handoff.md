@@ -4,8 +4,9 @@
 > 最近更新：2026-08-11
 > 当前状态：产品、Agent、UI 功能交互与品牌基线完成；Epic 0–1 evidence
 > gate 已完成；Epic 2–4 Tasks 9–26 通过最终 unified verifier 并归档；
-> 当前无获批 executable active plan，Phase C deterministic Epic 8 详尽
-> Proposed plan 已提交用户 review，批准前不得实现；Task 5 证明 Broker
+> Phase C deterministic Epic 8 详尽 plan 已于 2026-08-11 获用户批准，
+> Task 27 Upstream Study/ADR/profile gate 已完成，当前唯一 active Task 为
+> Task 28 domain v2 / Evidence Store v3 / journal contracts；Task 5 证明 Broker
 > 协议但未证明 Codex Broker-only 工具面，Deep Dive 明确 no-go/paused；
 > release signing/notarization 未评估
 
@@ -209,7 +210,7 @@ Epic 0–1
 [Epic 2–4 Validation Report](../reports/epic-2-4-validation-report.md)。
 Phase C 详尽候选计划见
 [Epic 8 Safe Execution Vertical Slice](../plans/active/epic-8-safe-execution-vertical-slice.md)，
-当前状态仅为 Proposed；用户明确批准前不得开始 Task 27–35。
+已于 2026-08-11 获用户批准；Tasks 27–35 必须按顺序逐项 gate。
 
 跨 Epic 的阶段依赖、no-go 分支和交付顺序由 [Delivery Roadmap](../plans/roadmap.md) 管理；新 active plan 不得另起一套宏观路线。
 
@@ -285,13 +286,13 @@ Scan-only History 与六区 Settings。Task 26 的 focused gate、真实 Home
 benchmark、scope audit、actual-window inspection、review 和最终 unified
 verifier 均通过；Epic 2–4 计划与 Task 21–26 briefs 已归档。
 
-当前没有获批 executable active plan。Phase C deterministic Epic 8
-Proposed plan 已位于
+Phase C deterministic Epic 8 plan 已于 2026-08-11 获批并位于
 docs/plans/active/epic-8-safe-execution-vertical-slice.md，候选范围从 Quick
 Scan terminal projection 形成 Review Reclaim Plan，经 pure Policy Gate、
 fresh revalidation、用户确认与默认 MoveToTrash，最后写 immutable Cleanup
-Manifest 和 truthful Cleanup Result/History。用户明确批准前不得开始 Task
-27–35。该阶段不包含 Deep Dive、Adapter、真实 destructive Registered
+Manifest 和 truthful Cleanup Result/History。Task 27 已完成，当前从 Task 28
+开始，后续
+Task 不得越序。该阶段不包含 Deep Dive、Adapter、真实 destructive Registered
 Action、release/notarization 或任何安全边界放宽。
 
 任何权限、安全或许可证假设都必须有实际证据。设计或 PRD 如有冲突，先报告并修正文档，不得自行扩大 Agent 或 Executor 权限。

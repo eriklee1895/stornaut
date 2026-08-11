@@ -414,10 +414,21 @@ final class StornautAppUITests: XCTestCase {
                     format: "identifier BEGINSWITH 'history.record.'"
                 )
             ).count
-        deleteButton.click()
         XCTAssertTrue(
-            deletion.app.buttons["Delete Record"].waitForExistence(
-                timeout: 5
+            performAction(
+                in: deletion.app,
+                action: {
+                    self.existingElement(
+                        "history.action.delete",
+                        in: deletion.app
+                    )
+                },
+                until: {
+                    self.element(
+                        "history.delete.confirm.action",
+                        in: deletion.app
+                    ).exists
+                }
             )
         )
         let confirmationMessage = deletion.app.staticTexts.matching(
@@ -429,15 +440,26 @@ final class StornautAppUITests: XCTestCase {
         XCTAssertTrue(confirmationMessage.waitForExistence(timeout: 5))
         let confirmationSheet = deletion.app.sheets.firstMatch
         XCTAssertTrue(confirmationSheet.waitForExistence(timeout: 5))
-        confirmationSheet.buttons["Delete Record"].click()
-        XCTAssertTrue(waitUntil(timeout: 5) {
-            deletion.app.descendants(matching: .any)
-                .matching(
-                    NSPredicate(
-                        format: "identifier BEGINSWITH 'history.record.'"
+        XCTAssertTrue(
+            performAction(
+                in: deletion.app,
+                action: {
+                    self.hittableElement(
+                        "history.delete.confirm.action",
+                        in: deletion.app
                     )
-                ).count == recordCountBefore - 1
-        })
+                },
+                until: {
+                    deletion.app.descendants(matching: .any)
+                        .matching(
+                            NSPredicate(
+                                format:
+                                    "identifier BEGINSWITH 'history.record.'"
+                            )
+                        ).count == recordCountBefore - 1
+                }
+            )
+        )
         XCTAssertTrue(element("history.detail", in: deletion.app).exists)
 
         deletion.app.terminate()
@@ -604,16 +626,16 @@ final class StornautAppUITests: XCTestCase {
 
         let language = element("settings.general.language", in: launched.app)
         XCTAssertTrue(language.waitForExistence(timeout: 5))
-        launched.app.activate()
-        XCTAssertTrue(waitUntil(timeout: 5) { language.isHittable })
-        language.click()
-        let simplifiedChinese = launched.app.menuItems[
-            "Simplified Chinese"
-        ]
         XCTAssertTrue(
-            simplifiedChinese.waitForExistence(timeout: 5)
+            selectMenuItem(
+                in: launched.app,
+                actionIdentifier: "settings.general.language",
+                menuItemLabel: "Simplified Chinese",
+                until: {
+                    launched.app.staticTexts["通用"].exists
+                }
+            )
         )
-        simplifiedChinese.click()
         XCTAssertTrue(
             launched.app.staticTexts["通用"].waitForExistence(timeout: 5)
         )
@@ -628,10 +650,23 @@ final class StornautAppUITests: XCTestCase {
             in: launched.app
         )
         XCTAssertTrue(darkOption.waitForExistence(timeout: 5))
-        darkOption.click()
-        XCTAssertTrue(waitUntil(timeout: 5) {
-            element("settings.appearance", in: launched.app).label == "dark"
-        })
+        XCTAssertTrue(
+            performAction(
+                in: launched.app,
+                action: {
+                    self.hittableElement(
+                        "settings.general.appearance.dark",
+                        in: launched.app
+                    )
+                },
+                until: {
+                    self.element(
+                        "settings.appearance",
+                        in: launched.app
+                    ).label == "dark"
+                }
+            )
+        )
         XCTAssertTrue(waitUntil(timeout: 5) {
             element("app.appearance", in: launched.app).label == "dark"
         })
@@ -657,10 +692,23 @@ final class StornautAppUITests: XCTestCase {
                 )
             ).firstMatch.exists
         )
-        element(
-            "settings.confirm.clearEvidence.action",
-            in: launched.app
-        ).click()
+        XCTAssertTrue(
+            performAction(
+                in: launched.app,
+                action: {
+                    self.hittableElement(
+                        "settings.confirm.clearEvidence.action",
+                        in: launched.app
+                    )
+                },
+                until: {
+                    !self.element(
+                        "settings.confirm.clearEvidence.action",
+                        in: launched.app
+                    ).exists
+                }
+            )
+        )
         XCTAssertTrue(waitUntil(timeout: 5) {
             !element(
                 "settings.action.clearEvidence",
@@ -694,10 +742,23 @@ final class StornautAppUITests: XCTestCase {
         )
         let forgetSheet = launched.app.sheets.firstMatch
         XCTAssertTrue(forgetSheet.exists)
-        element(
-            "settings.confirm.forgetKnowledge.action",
-            in: launched.app
-        ).click()
+        XCTAssertTrue(
+            performAction(
+                in: launched.app,
+                action: {
+                    self.hittableElement(
+                        "settings.confirm.forgetKnowledge.action",
+                        in: launched.app
+                    )
+                },
+                until: {
+                    !self.element(
+                        "settings.confirm.forgetKnowledge.action",
+                        in: launched.app
+                    ).exists
+                }
+            )
+        )
         XCTAssertTrue(waitUntil(timeout: 5) {
             rows.count == countBefore - 1
         })
@@ -783,13 +844,21 @@ final class StornautAppUITests: XCTestCase {
             .containing(.any, identifier: "settings.content")
             .firstMatch
         XCTAssertTrue(settingsWindow.waitForExistence(timeout: 5))
-        if !settingsWindow.isHittable {
-            app.activate()
-        }
+        app.activate()
         let settingsSidebar = element("settings.sidebar.general", in: app)
         XCTAssertTrue(settingsSidebar.waitForExistence(timeout: 5))
         XCTAssertTrue(waitUntil(timeout: 5) {
             settingsWindow.isHittable && settingsSidebar.isHittable
+        })
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            focusApplication(
+                app,
+                via: "settings.sidebar.general"
+            )
+        })
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            settingsWindow.isHittable
+                && isFrontmost(app)
         })
 
         addScreenshot(
@@ -904,18 +973,22 @@ final class StornautAppUITests: XCTestCase {
             identifier: "settings.sidebar.\(section.rawValue)"
         )
         XCTAssertTrue(waitUntil(timeout: 5) { items.count > 0 })
-        var item: XCUIElement?
         XCTAssertTrue(waitUntil(timeout: 5) {
-            item = items.allElementsBoundByIndex.first(where: \.isHittable)
-            return item != nil
+            items.allElementsBoundByIndex.contains(where: \.isHittable)
         })
-        guard let item else {
-            return
-        }
-        item.click()
         XCTAssertTrue(
-            element(section.pageIdentifier, in: app)
-                .waitForExistence(timeout: 5)
+            performAction(
+                in: app,
+                action: {
+                    self.hittableElement(
+                        "settings.sidebar.\(section.rawValue)",
+                        in: app
+                    )
+                },
+                until: {
+                    self.element(section.pageIdentifier, in: app).exists
+                }
+            )
         )
     }
 
@@ -962,6 +1035,117 @@ final class StornautAppUITests: XCTestCase {
             .firstMatch
     }
 
+    @MainActor
+    private func hittableElement(
+        _ identifier: String,
+        in app: XCUIApplication
+    ) -> XCUIElement? {
+        app.descendants(matching: .any)
+            .matching(identifier: identifier)
+            .allElementsBoundByIndex
+            .first(where: \.isHittable)
+    }
+
+    @MainActor
+    private func existingElement(
+        _ identifier: String,
+        in app: XCUIApplication
+    ) -> XCUIElement? {
+        let candidate = element(identifier, in: app)
+        return candidate.exists ? candidate : nil
+    }
+
+    @MainActor
+    private func selectMenuItem(
+        in app: XCUIApplication,
+        actionIdentifier: String,
+        menuItemLabel: String,
+        until condition: () -> Bool
+    ) -> Bool {
+        for _ in 0..<2 {
+            if condition() {
+                return true
+            }
+            app.activate()
+            guard let action = hittableElement(
+                actionIdentifier,
+                in: app
+            ) else {
+                continue
+            }
+            action.click()
+            let menuItem = app.menuItems[menuItemLabel]
+            guard waitUntil(timeout: 5, condition: {
+                menuItem.exists && menuItem.isHittable
+            }) else {
+                continue
+            }
+            menuItem.click()
+            if waitUntil(timeout: 5, condition: condition) {
+                return true
+            }
+        }
+        return condition()
+    }
+
+    @MainActor
+    private func performAction(
+        in app: XCUIApplication,
+        action: () -> XCUIElement?,
+        until condition: () -> Bool
+    ) -> Bool {
+        for _ in 0..<2 {
+            if condition() {
+                return true
+            }
+            app.activate()
+            guard waitUntil(timeout: 5, condition: {
+                self.isFrontmost(app)
+            }) else {
+                continue
+            }
+            var current: XCUIElement?
+            guard waitUntil(timeout: 5, condition: {
+                current = action()
+                return current != nil
+            }), let current else {
+                continue
+            }
+            current.click()
+            if waitUntil(timeout: 5, condition: condition) {
+                return true
+            }
+        }
+        return condition()
+    }
+
+    @MainActor
+    private func focusApplication(
+        _ app: XCUIApplication,
+        via identifier: String
+    ) -> Bool {
+        for _ in 0..<2 {
+            app.activate()
+            guard waitUntil(timeout: 5, condition: {
+                self.isFrontmost(app)
+            }), let current = hittableElement(identifier, in: app) else {
+                continue
+            }
+            current.click()
+            if waitUntil(timeout: 5, condition: {
+                self.isFrontmost(app)
+            }) {
+                return true
+            }
+        }
+        return isFrontmost(app)
+    }
+
+    @MainActor
+    private func isFrontmost(_ app: XCUIApplication) -> Bool {
+        app.state == .runningForeground
+    }
+
     private func addScreenshot(
         _ screenshot: XCUIScreenshot,
         named name: String
@@ -998,8 +1182,11 @@ final class StornautAppUITests: XCTestCase {
             pageMarker: element("overview.ledger", in: app),
             in: app
         )
+        XCTAssertTrue(
+            focusApplication(app, via: "sidebar.overview")
+        )
         XCTAssertTrue(waitUntil(timeout: 5) {
-            window.isHittable
+            window.isHittable && isFrontmost(app)
         })
     }
 
@@ -1014,8 +1201,11 @@ final class StornautAppUITests: XCTestCase {
             pageMarker: element("scan.results.table", in: app),
             in: app
         )
+        XCTAssertTrue(
+            focusApplication(app, via: "sidebar.scan")
+        )
         XCTAssertTrue(waitUntil(timeout: 5) {
-            window.isHittable
+            window.isHittable && isFrontmost(app)
         })
     }
 
@@ -1030,8 +1220,11 @@ final class StornautAppUITests: XCTestCase {
             pageMarker: element("history.navigator", in: app),
             in: app
         )
+        XCTAssertTrue(
+            focusApplication(app, via: "sidebar.history")
+        )
         XCTAssertTrue(waitUntil(timeout: 5) {
-            window.isHittable
+            window.isHittable && isFrontmost(app)
         })
     }
 
@@ -1048,8 +1241,18 @@ final class StornautAppUITests: XCTestCase {
         XCTAssertTrue(waitUntil(timeout: 5) {
             item.isHittable
         })
-        item.click()
-        XCTAssertTrue(pageMarker.waitForExistence(timeout: 5))
+        let identifier = item.identifier
+        XCTAssertTrue(
+            performAction(
+                in: app,
+                action: {
+                    self.hittableElement(identifier, in: app)
+                },
+                until: {
+                    pageMarker.exists
+                }
+            )
+        )
     }
 
     @MainActor

@@ -190,9 +190,8 @@ Epic 0–1
 - 当前阶段：Phase A 与 Phase B evidence gates 已完成。Epic 2–4 Tasks
   9–26 通过最终统一 verifier 并归档至
   [`completed/`](completed/epic-2-4-deterministic-product-core.md)。
-- 当前没有获批的 executable active plan。Phase C deterministic Epic 8
-  safe-execution 详尽 Proposed plan 已提交用户 review；明确批准前不开始
-  Task 27–35。
+- Phase C deterministic Epic 8 safe-execution 详尽 plan 已于 2026-08-11
+  获用户批准；Task 27 已完成，当前从 Task 28 开始并按 Task 28–35 顺序执行。
 - Epic 0 Foundation Upstream Study：已完成，选择 checked-in Xcode App/Test host + local Swift packages。
 - Epic 0 Task 1：SwiftPM Core/Codex、smoke tests、`scripts/verify`、manual-only CI 与 ThirdPartyNotices 骨架已完成。
 - Bundle identifier：已确认 `com.eriklee.stornaut`。

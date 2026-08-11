@@ -1,7 +1,7 @@
 # Stornaut Phase C — Epic 8 Safe Execution Vertical Slice Plan
 
-> **Status:** Proposed — awaiting user review and explicit approval; no
-> implementation task is authorized
+> **Status:** In progress — approved on 2026-08-11; Task 27 completed and Task
+> 28 is active
 >
 > **Roadmap phase:** Phase C — Safe Execution Vertical Slice
 >
@@ -9,9 +9,8 @@
 >
 > **Baseline:** `546b3a2c1fc689dfc288b46f61f9a134e8ffeaf5`
 >
-> **Execution rule:** This document may be reviewed and amended now. Coding
-> starts only after the user explicitly approves the plan. Approval authorizes
-> Tasks 27–35 in order; it does not authorize Deep Dive, Adapters, real
+> **Execution rule:** The user approved this plan on 2026-08-11. Tasks 27–35
+> are authorized in order; approval does not authorize Deep Dive, Adapters, real
 > Registered Actions, release/notarization, permanent deletion, background
 > cleanup, or any permission-boundary expansion. Approval authorizes building
 > the Task 35 signed-App diagnostic harness, but the diagnostic's real Trash
@@ -115,21 +114,25 @@ Phase B currently has 34 rules recommending `moveToTrash`, but zero production
 rules with a `readyToReclaim` base disposition. Phase C must not connect all 34
 recommendations to Trash or treat fixture provenance as fresh runtime proof.
 
-The proposed initial execution profile contains only four exact user-cache
-rules:
+Task 27 revalidated the proposed four-rule set and narrowed the executable
+profile to three exact user-cache rules:
 
 | Rule | Phase C disposition after all evidence passes | Default selection |
 | --- | --- | --- |
 | `cache-npm-content` — `.npm/_cacache` | `readyToReclaim` | selected |
 | `cache-pip` — `Library/Caches/pip` | `readyToReclaim` | selected |
-| `cache-uv` — `.cache/uv` | `readyToReclaim` | selected |
 | `cache-go-build` — `Library/Caches/go-build` | `reviewRecommended` | unselected |
 
-The exact list is a proposed product decision, not a hidden implementation
-detail. Task 27 must revalidate each path, recovery claim, process subject,
-license/provenance and upstream behavior. If any rule cannot satisfy the gate,
-stop and return with a narrower proposed list; do not substitute a wildcard,
-project artifact, runtime/update path or Agent-only item without user review.
+`cache-uv` remains ordinary read-only `reviewRecommended` classification
+evidence but receives no Phase C execution profile. uv's pinned official
+documentation states that directly modifying/removing its cache directory is
+never safe and that cleanup must use its lock-aware `uv cache` commands. Phase C
+does not ship that Registered Action, so moving `.cache/uv` directly would
+contradict upstream safety guidance.
+
+This evidence-driven narrowing is the Task 27 outcome allowed by the approved
+plan; it does not substitute a wildcard, project artifact, runtime/update path
+or Agent-only item.
 
 All other rules remain read-only classification evidence in Phase C. They may
 appear as Review Recommended, Protected or Unknown, but they are not
@@ -639,6 +642,25 @@ diagnostic and final gate pass.
 
 ---
 
+### Task 27 completion evidence
+
+- [x] Upstream study, current SDK/machine/Store/Catalog/App baseline
+- [x] ADR 0011 Review/Policy/authorization
+- [x] ADR 0012 journal/Manifest/accounting
+- [x] execution profile narrowed to npm/pip Ready + Go Review; uv non-executable
+- [x] code/design review with confirmed findings fixed
+- [x] final uninterrupted `scripts/verify` exit `0`
+
+Final verifier evidence:
+
+- log SHA-256:
+  `a634ca746cee1eef26ea66206281db8a96ea442b17fda48a64eb65b388e4b1e4`;
+- XCUITest `9/9`, 17 stable screenshots and theme/content gate;
+- SwiftPM `279/279` twice, with three opt-in diagnostics skipped;
+- matcher benchmarks `0.231 s`, `0.375 s`, `0.504 s`;
+- Phase B evidence gate, App/state/UI boundaries, App contracts, signed bundle,
+  Release fixture isolation, localization and docs all passed.
+
 ## Task 27: Safe Execution Upstream Study and Architecture Decisions
 
 ### Files
@@ -702,8 +724,9 @@ For each proposed rule, record:
 - mount/symlink/user-ownership behavior;
 - whether default Ready or explicit Review is justified.
 
-If the evidence does not support the exact list, stop and propose a narrower
-list. Do not silently choose alternatives.
+Task 27 result: npm and pip may become Ready, Go build remains explicit Review,
+and uv is removed from the executable profile. Do not silently choose
+alternatives.
 
 ### Step 4: Decide authorization semantics in ADR 0011
 
@@ -926,13 +949,14 @@ refresh. Collect one bounded running-activity snapshot per scan/refresh, not
 one whole-system enumeration per row. Provider failure makes dependent items
 Unknown/denied.
 
-### Step 3: Implement the proposed initial profile
+### Step 3: Implement the accepted narrowed initial profile
 
-After Task 27 confirms it:
+Task 27 confirms:
 
-- promote `cache-npm-content`, `cache-pip` and `cache-uv` to
+- promote `cache-npm-content` and `cache-pip` to
   `readyToReclaim` only when all closed evidence is present;
 - keep `cache-go-build` `reviewRecommended`;
+- keep `cache-uv` `reviewRecommended` without an execution profile;
 - attach explicit process/bundle subjects and deterministic evidence mapping;
 - preserve all other rule dispositions/actions.
 
@@ -1146,14 +1170,15 @@ Prove:
 
 For each ordered selected item:
 
-1. persist prepared/start journal state;
+1. persist prepared journal state;
 2. collect fresh context;
 3. run pure Policy again;
 4. call `ActionExecutor.preflight`;
-5. immediately call `ActionExecutor.execute`, which revalidates
+5. persist `actionStarted`;
+6. immediately call `ActionExecutor.execute`, which revalidates
    `ActionPolicyGate`;
-6. run typed postflight;
-7. persist outcome before moving to the next item.
+7. run typed postflight;
+8. persist outcome before moving to the next item.
 
 Only `.moveToTrash` is accepted. Any registered action at this boundary is a
 programming/policy error and performs no write.
@@ -1276,8 +1301,9 @@ Review state covers:
 
 Fixtures cover:
 
-- three default-selected Ready exact caches;
+- two default-selected Ready exact caches;
 - one unselected Go build Review item;
+- uv visible as non-executable Review context;
 - Protected and Unknown disabled;
 - empty executable plan;
 - overlap conflict;
@@ -1715,7 +1741,7 @@ docs: close safe execution vertical slice
 | Claim | Required evidence |
 | --- | --- |
 | Only approved exact rules can execute | compiler allowlist + generated manifest + negative catalog audit |
-| Ready defaults are safe | complete fresh evidence + Policy preview + exact three-rule assertion |
+| Ready defaults are safe | complete fresh evidence + Policy preview + exact two-rule assertion |
 | Review requires user intent | selection-generation and confirmation tests |
 | Protected/Unknown cannot execute | pure Policy and App disabled-state tests |
 | No overlapping actions | plan conflict fixtures and UI blocking state |
@@ -1791,8 +1817,8 @@ authorization tokens or temporary Trash receipts.
 ### Safety
 
 - Product write surface is exactly Foundation Trash.
-- Three Ready + one Review exact-cache rules are explicit user-review
-  decisions.
+- Two Ready + one Review exact-cache rules are the accepted Task 27 profile;
+  uv stays visible but non-executable.
 - All other rules remain non-executable.
 - Selection is not authority.
 - Authorization is one-shot and memory-only.
@@ -1807,7 +1833,7 @@ authorization tokens or temporary Trash receipts.
 
 - No content reading is added.
 - Journal and Manifest remain bounded, local and typed.
-- 7-day path-rich Evidence/Plan and 90-day minimal Manifest/unresolved-journal
+- 7-day path-rich Evidence/Plan and 90-day minimal Manifest/audit-pending
   ceilings remain separate.
 - Authorization is never persisted.
 - Exact original/Trash paths remain only in bounded linked recovery evidence
@@ -1861,8 +1887,8 @@ authorization tokens or temporary Trash receipts.
 The user should explicitly review these plan decisions before approval:
 
 1. **Scope:** MoveToTrash only; no real Registered Action.
-2. **Initial execution profile:** Ready = npm/pip/uv exact caches; Review =
-   Go build cache; all other rules non-executable.
+2. **Initial execution profile:** Ready = npm/pip exact caches; Review = Go
+   build cache; uv and all other rules non-executable.
 3. **Authorization:** final confirmation creates a 30-second, one-shot,
    memory-only authorization.
 4. **Selection:** only Ready defaults selected; Review explicit; overlap
@@ -1877,5 +1903,7 @@ The user should explicitly review these plan decisions before approval:
     completion; approving this plan accepts the gate but is not the later
     runtime opt-in.
 
-Until the user approves this checklist, the Review button remains disabled and
-no Task 27 implementation work starts.
+This checklist was approved on 2026-08-11. Task 27 may proceed; every later
+Task remains bound to its own study/brief/tests/review/verification/commit/push
+gate. The Review button and real Trash dependency remain disabled until the
+specific gates above allow them.

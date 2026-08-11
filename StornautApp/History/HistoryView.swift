@@ -131,6 +131,7 @@ struct HistoryView: View {
                         await appModel.deleteHistorySession(sessionID)
                     }
                 }
+                .accessibilityIdentifier("history.delete.confirm.action")
             }
             Button("history.delete.cancel", role: .cancel) {
                 pendingDelete = nil
