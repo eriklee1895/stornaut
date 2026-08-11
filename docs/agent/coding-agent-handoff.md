@@ -4,8 +4,8 @@
 > 最近更新：2026-08-11
 > 当前状态：产品、Agent、UI 功能交互与品牌基线完成；Epic 0–1 evidence
 > gate 已完成；Epic 2–4 Tasks 9–26 通过最终 unified verifier 并归档；
-> 当前无获批 executable active plan，下一步只编写 Phase C deterministic
-> Epic 8 详尽计划并交用户 review，批准前不得实现；Task 5 证明 Broker
+> 当前无获批 executable active plan，Phase C deterministic Epic 8 详尽
+> Proposed plan 已提交用户 review，批准前不得实现；Task 5 证明 Broker
 > 协议但未证明 Codex Broker-only 工具面，Deep Dive 明确 no-go/paused；
 > release signing/notarization 未评估
 
@@ -207,6 +207,9 @@ Epic 0–1
 [Epic 2–4 Deterministic Product Core Plan](../plans/completed/epic-2-4-deterministic-product-core.md)
 已完成并归档，不再构成当前执行授权。Phase B 最终证据见
 [Epic 2–4 Validation Report](../reports/epic-2-4-validation-report.md)。
+Phase C 详尽候选计划见
+[Epic 8 Safe Execution Vertical Slice](../plans/active/epic-8-safe-execution-vertical-slice.md)，
+当前状态仅为 Proposed；用户明确批准前不得开始 Task 27–35。
 
 跨 Epic 的阶段依赖、no-go 分支和交付顺序由 [Delivery Roadmap](../plans/roadmap.md) 管理；新 active plan 不得另起一套宏观路线。
 
@@ -282,13 +285,14 @@ Scan-only History 与六区 Settings。Task 26 的 focused gate、真实 Home
 benchmark、scope audit、actual-window inspection、review 和最终 unified
 verifier 均通过；Epic 2–4 计划与 Task 21–26 briefs 已归档。
 
-当前没有获批 executable active plan。下一项只编写独立 Phase C
-deterministic Epic 8 详尽计划：候选范围从 Quick Scan terminal projection
-形成 Review Reclaim Plan，经 pure Policy Gate、fresh revalidation、用户确认
-与默认 MoveToTrash，最后写 immutable Cleanup Manifest 和 truthful Cleanup
-Result/History。计划必须交用户 review 并获得明确批准后才可实现。该阶段不
-包含 Deep Dive、Adapter、真实 destructive Registered Action、
-release/notarization 或任何安全边界放宽。
+当前没有获批 executable active plan。Phase C deterministic Epic 8
+Proposed plan 已位于
+docs/plans/active/epic-8-safe-execution-vertical-slice.md，候选范围从 Quick
+Scan terminal projection 形成 Review Reclaim Plan，经 pure Policy Gate、
+fresh revalidation、用户确认与默认 MoveToTrash，最后写 immutable Cleanup
+Manifest 和 truthful Cleanup Result/History。用户明确批准前不得开始 Task
+27–35。该阶段不包含 Deep Dive、Adapter、真实 destructive Registered
+Action、release/notarization 或任何安全边界放宽。
 
 任何权限、安全或许可证假设都必须有实际证据。设计或 PRD 如有冲突，先报告并修正文档，不得自行扩大 Agent 或 Executor 权限。
 ```

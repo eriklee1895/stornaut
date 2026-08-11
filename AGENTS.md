@@ -12,8 +12,8 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 - 遵守全部产品不变量（见 handoff §3）。尤其：Quick Scan 不调模型；Codex 无写权限；磁盘调查只能走 Probe Broker；Executor 只接受 `MoveToTrash` 或 Registered Action；Trash 失败绝不永久删除；失败保持 `Unknown`。
 - Epic 0–1 与 Epic 2–4 Tasks 9–26 已完成；Phase B 最终 unified verifier
   单次 exit 0，计划与 Task 21–26 briefs 已归档。当前 active queue 为空；
-  下一步只允许编写 Phase C deterministic Epic 8 详尽计划并交用户 review，
-  未获批准不得开始实现。逐 Task 完成 Upstream Study、实现、code review、
+  Phase C deterministic Epic 8 详尽 Proposed plan 已提交用户 review，
+  未获批准不得开始 Task 27–35。逐 Task 完成 Upstream Study、实现、code review、
   focused/full verify、独立 commit/push；不得提前混入 Deep Dive、Adapter、
   真实 Registered Action 或 release 工作。
 - Spike / safety check 通过前，Deep Dive 必须保持 paused；发现 Codex ≠ 验证安全边界。
@@ -57,6 +57,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | 导航、文案、品牌、Light/Dark | [docs/design/ui-ux.md](docs/design/ui-ux.md) |
 | 跨 Epic 交付顺序与 Gate | [docs/plans/roadmap.md](docs/plans/roadmap.md) |
 | 当前 active plan 状态 | [docs/plans/active/README.md](docs/plans/active/README.md) |
+| Phase C Epic 8 Proposed plan（仅供 review） | [docs/plans/active/epic-8-safe-execution-vertical-slice.md](docs/plans/active/epic-8-safe-execution-vertical-slice.md) |
 | Epic 2–4 历史计划 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) |
 | Epic 2–4 最终 Gate | [docs/reports/epic-2-4-validation-report.md](docs/reports/epic-2-4-validation-report.md) |
 | Epic 0–1 历史计划与证据 | [docs/plans/completed/epic-0-1-foundation-spikes.md](docs/plans/completed/epic-0-1-foundation-spikes.md) |
@@ -75,7 +76,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 Epic 0–1 与 Epic 2–4 evidence gates 已完成。Phase B 的
 domain/persistence、product Quick Scan、Space Ledger、Knowledge/Activity
 与 App/UI 产品证据通过最终统一验证；active queue 当前为空。下一项仅为
-Phase C deterministic Epic 8 计划编写与用户 review，批准前不得实现。
+Phase C deterministic Epic 8 Proposed plan 的用户 review，批准前不得实现。
 Deep Dive 因 Broker-only 未被技术性证明而 no-go/paused，release
 signing/notarization 仍未评估。Overview、Scan、Scan-only History 与六区
 Settings 已是真实 typed projection/生命周期，Investigations 仍是 placeholder，
