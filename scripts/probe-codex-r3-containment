@@ -1,0 +1,889 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+codex_executable=${CODEX_EXECUTABLE:-$(command -v codex 2>/dev/null || true)}
+if [[ -z "$codex_executable" || ! -x "$codex_executable" ]]; then
+    print -u2 "Codex executable is unavailable."
+    exit 66
+fi
+codex_executable=${codex_executable:A}
+if [[ "$codex_executable" == */@openai/codex/bin/codex.js ]]; then
+    package_root=${codex_executable:h:h}
+    native_candidate="$package_root/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex"
+    if [[ ! -x "$native_candidate" ]]; then
+        print -u2 "Native Codex executable is unavailable."
+        exit 66
+    fi
+    codex_executable=${native_candidate:A}
+fi
+if [[ "$("$codex_executable" --version)" != "codex-cli 0.147.0" ]]; then
+    print -u2 "R3 containment evidence requires codex-cli 0.147.0."
+    exit 65
+fi
+if [[ "$(/usr/bin/uname -m)" != arm64 ]]; then
+    print -u2 "R3 containment evidence requires Apple Silicon."
+    exit 65
+fi
+
+for tool in \
+    /bin/cat \
+    /bin/chmod \
+    /bin/cp \
+    /bin/ln \
+    /bin/mkdir \
+    /bin/mv \
+    /bin/rm \
+    /bin/rmdir \
+    /bin/sleep \
+    /bin/zsh \
+    /usr/bin/chflags \
+    /usr/bin/clang \
+    /usr/bin/curl \
+    /usr/bin/dscacheutil \
+    /usr/bin/hdiutil \
+    /usr/bin/python3 \
+    /usr/bin/shasum \
+    /usr/bin/stat \
+    /usr/bin/touch \
+    /usr/bin/xattr \
+    /usr/sbin/chown \
+    /usr/sbin/ipconfig
+do
+    if [[ ! -x "$tool" ]]; then
+        print -u2 "Required tool is unavailable: $tool"
+        exit 66
+    fi
+done
+
+probe_root=$(/usr/bin/mktemp -d /private/tmp/stornaut-r3-containment.XXXXXX)
+typeset -a server_pids=()
+mounted=false
+cleanup_started=false
+
+process_is_live() {
+    local process_id=$1
+    local process_state
+
+    if ! kill -0 "$process_id" 2>/dev/null; then
+        return 1
+    fi
+    process_state=$(
+        /bin/ps -o stat= -p "$process_id" 2>/dev/null \
+            | /usr/bin/tr -d ' '
+    )
+    [[ -n "$process_state" && "$process_state" != Z* ]]
+}
+
+cleanup() {
+    local cleanup_failed=false
+    local process_id command_line
+
+    if [[ "$cleanup_started" == true ]]; then
+        return 0
+    fi
+    cleanup_started=true
+    set +e
+    if [[ "$mounted" == true ]]; then
+        /usr/bin/hdiutil detach "$probe_root/mount" -force >/dev/null 2>&1
+        mounted=false
+    fi
+    for process_id in "${server_pids[@]:-}"; do
+        if [[ -n "$process_id" ]] && process_is_live "$process_id"; then
+            kill -KILL "$process_id" 2>/dev/null
+        fi
+        wait "$process_id" 2>/dev/null
+    done
+    while read -r process_id; do
+        if [[ "$process_id" == <-> && "$process_id" != "$$" ]]; then
+            command_line=$(/bin/ps -o command= -p "$process_id" 2>/dev/null)
+            if [[ "$command_line" == *"$probe_root/"* ]]; then
+                kill -KILL "$process_id" 2>/dev/null
+            fi
+        fi
+    done < <(
+        /bin/ps -axo pid=,command= | /usr/bin/awk -v root="$probe_root/" \
+            'index($0, root) != 0 { print $1 }'
+    )
+    for _ in {1..100}; do
+        /bin/rm -rf "$probe_root"
+        [[ ! -e "$probe_root" ]] && break
+        /bin/sleep 0.01
+    done
+    [[ ! -e "$probe_root" ]] || cleanup_failed=true
+    if [[ "$cleanup_failed" == true ]]; then
+        print -u2 "Anonymous containment cleanup was incomplete."
+        return 1
+    fi
+}
+
+handle_exit() {
+    local original_status=$?
+
+    trap - EXIT INT TERM
+    if ! cleanup; then
+        original_status=1
+    fi
+    exit "$original_status"
+}
+
+trap handle_exit EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+runtime="$probe_root/runtime"
+home="$probe_root/home"
+work="$probe_root/work"
+target="$probe_root/target"
+auth="$probe_root/auth.json"
+outside="$probe_root/outside"
+mount_point="$probe_root/mount"
+/bin/mkdir -m 700 \
+    "$runtime" "$home" "$work" "$target" "$outside" "$mount_point"
+/bin/mkdir -m 700 "$runtime/tmp"
+
+print -r -- "auth-canary" > "$auth"
+/bin/chmod 600 "$auth"
+print -r -- "outside-read-canary" > "$outside/read.txt"
+
+/bin/cat > "$runtime/config.toml" <<EOF
+default_permissions = "stornaut-outer-v1"
+cli_auth_credentials_store = "ephemeral"
+permissions.stornaut-outer-v1.extends = ":read-only"
+permissions.stornaut-outer-v1.filesystem."$auth" = "deny"
+permissions.stornaut-outer-v1.filesystem."$runtime" = "write"
+permissions.stornaut-outer-v1.network.enabled = true
+permissions.stornaut-outer-v1.network.mode = "full"
+permissions.stornaut-outer-v1.network.enable_socks5 = false
+permissions.stornaut-outer-v1.network.allow_local_binding = false
+permissions.stornaut-outer-v1.network.dangerously_allow_non_loopback_proxy = false
+permissions.stornaut-outer-v1.network.dangerously_allow_all_unix_sockets = false
+permissions.stornaut-outer-v1.network.domains = { "*" = "allow" }
+features.network_proxy.enabled = true
+features.network_proxy.mode = "full"
+features.network_proxy.enable_socks5 = false
+features.network_proxy.allow_local_binding = false
+features.network_proxy.dangerously_allow_non_loopback_proxy = false
+features.network_proxy.dangerously_allow_all_unix_sockets = false
+features.network_proxy.domains = { "*" = "allow" }
+tools.web_search.context_size = "high"
+project_doc_max_bytes = 0
+skills.include_instructions = true
+skills.bundled.enabled = false
+features.shell_tool = true
+features.unified_exec = true
+features.multi_agent = true
+features.image_generation = false
+features.apps = false
+features.plugins = false
+features.remote_plugin = false
+features.plugin_sharing = false
+features.computer_use = false
+orchestrator.skills.enabled = false
+orchestrator.mcp.enabled = false
+analytics.enabled = false
+otel.metrics_exporter = "none"
+EOF
+/bin/chmod 600 "$runtime/config.toml"
+
+print -r -- "read-original" > "$target/read.txt"
+print -r -- "overwrite-original" > "$target/overwrite.txt"
+print -r -- "append-original" > "$target/append.txt"
+print -r -- "truncate-original" > "$target/truncate.txt"
+print -r -- "rename-original" > "$target/rename-source.txt"
+print -r -- "exchange-a-original" > "$target/exchange-a.txt"
+print -r -- "exchange-b-original" > "$target/exchange-b.txt"
+print -r -- "unlink-original" > "$target/unlink.txt"
+/bin/mkdir -m 700 "$target/rmdir"
+print -r -- "chmod-original" > "$target/chmod.txt"
+print -r -- "chown-original" > "$target/chown.txt"
+print -r -- "xattr-original" > "$target/xattr.txt"
+print -r -- "flags-original" > "$target/flags.txt"
+print -r -- "timestamp-original" > "$target/timestamp.txt"
+print -r -- "hardlink-original" > "$target/hardlink-source.txt"
+print -r -- "relative-original" > "$target/relative.txt"
+print -r -- "case-original" > "$target/CaseVariant.txt"
+print -r -- "unicode-original" > "$target/évidence.txt"
+print -r -- "replacement-old" > "$target/replacement.txt"
+/bin/chmod 644 "$target/chmod.txt"
+/usr/bin/touch -t 202401010101 "$target/timestamp.txt"
+/bin/ln -s "$target" "$work/target-link"
+
+/bin/cat > "$probe_root/rename-exchange.c" <<'EOF'
+#include <stdio.h>
+
+int main(int count, char **arguments) {
+    if (count != 3) {
+        return 64;
+    }
+    return renamex_np(arguments[1], arguments[2], RENAME_SWAP) == 0 ? 0 : 1;
+}
+EOF
+/usr/bin/clang -O2 -Wall -Wextra \
+    "$probe_root/rename-exchange.c" \
+    -o "$probe_root/rename-exchange"
+/bin/chmod 500 "$probe_root/rename-exchange"
+
+/usr/bin/hdiutil create \
+    -quiet \
+    -size 8m \
+    -fs APFS \
+    -volname STORNAUTR3 \
+    "$probe_root/probe.dmg"
+/usr/bin/hdiutil attach \
+    -quiet \
+    -nobrowse \
+    -mountpoint "$mount_point" \
+    "$probe_root/probe.dmg"
+mounted=true
+print -r -- "mount-original" > "$mount_point/mount.txt"
+
+snapshot_file() {
+    local path=$1
+
+    /usr/bin/stat -f '%d:%i:%p:%z:%m' "$path"
+    /usr/bin/shasum -a 256 "$path" | /usr/bin/awk '{ print $1 }'
+}
+
+snapshot_tree() {
+    local output=$1
+    shift
+    local path
+
+    : > "$output"
+    for path in "$@"; do
+        print -r -- "$path" >> "$output"
+        snapshot_file "$path" >> "$output"
+    done
+}
+
+typeset -a immutable_files=(
+    "$target/read.txt"
+    "$target/overwrite.txt"
+    "$target/append.txt"
+    "$target/truncate.txt"
+    "$target/rename-source.txt"
+    "$target/exchange-a.txt"
+    "$target/exchange-b.txt"
+    "$target/unlink.txt"
+    "$target/chmod.txt"
+    "$target/chown.txt"
+    "$target/xattr.txt"
+    "$target/flags.txt"
+    "$target/timestamp.txt"
+    "$target/hardlink-source.txt"
+    "$target/relative.txt"
+    "$target/CaseVariant.txt"
+    "$target/évidence.txt"
+    "$mount_point/mount.txt"
+)
+snapshot_tree "$probe_root/state.before" "${immutable_files[@]}"
+
+/bin/cat > "$probe_root/filesystem-probe.zsh" <<'EOF'
+set +e
+
+probe() {
+    local name=$1
+    shift
+    "$@" >/dev/null 2>&1
+    print -r -- "filesystem.${name}=$?"
+}
+
+probe read /bin/cat "$STORNAUT_TARGET/read.txt"
+probe outside_read /bin/cat "$STORNAUT_OUTSIDE/read.txt"
+probe auth_read /bin/cat "$STORNAUT_AUTH"
+probe runtime_write /bin/zsh -c 'print -r -- runtime > "$1"' \
+    probe "$STORNAUT_RUNTIME/runtime-write.txt"
+probe create /bin/zsh -c 'print -r -- create > "$1"' \
+    probe "$STORNAUT_TARGET/create.txt"
+probe overwrite /bin/zsh -c 'print -r -- overwrite > "$1"' \
+    probe "$STORNAUT_TARGET/overwrite.txt"
+probe append /bin/zsh -c 'print -r -- append >> "$1"' \
+    probe "$STORNAUT_TARGET/append.txt"
+probe truncate /bin/zsh -c ': > "$1"' \
+    probe "$STORNAUT_TARGET/truncate.txt"
+probe rename /bin/mv \
+    "$STORNAUT_TARGET/rename-source.txt" \
+    "$STORNAUT_TARGET/rename-destination.txt"
+probe exchange "$STORNAUT_EXCHANGE" \
+    "$STORNAUT_TARGET/exchange-a.txt" \
+    "$STORNAUT_TARGET/exchange-b.txt"
+probe unlink /bin/rm "$STORNAUT_TARGET/unlink.txt"
+probe rmdir /bin/rmdir "$STORNAUT_TARGET/rmdir"
+probe mkdir /bin/mkdir "$STORNAUT_TARGET/new-directory"
+probe chmod /bin/chmod 600 "$STORNAUT_TARGET/chmod.txt"
+probe chown /usr/sbin/chown \
+    "$(/usr/bin/id -u):$(/usr/bin/id -g)" \
+    "$STORNAUT_TARGET/chown.txt"
+probe xattr /usr/bin/xattr \
+    -w com.stornaut.synthetic blocked \
+    "$STORNAUT_TARGET/xattr.txt"
+probe flags /usr/bin/chflags hidden "$STORNAUT_TARGET/flags.txt"
+probe timestamp /usr/bin/touch \
+    -t 202501010101 \
+    "$STORNAUT_TARGET/timestamp.txt"
+probe hardlink /bin/ln \
+    "$STORNAUT_TARGET/hardlink-source.txt" \
+    "$STORNAUT_TARGET/hardlink-created.txt"
+probe symlink /bin/ln \
+    -s "$STORNAUT_TARGET/read.txt" \
+    "$STORNAUT_TARGET/symlink-created.txt"
+probe symlink_escape /bin/zsh -c 'print -r -- escaped > "$1"' \
+    probe "$STORNAUT_LINK/escaped.txt"
+probe relative /bin/zsh -c \
+    'cd "$1" && print -r -- relative > relative.txt' \
+    probe "$STORNAUT_TARGET"
+probe case_variant /bin/zsh -c 'print -r -- case > "$1"' \
+    probe "$STORNAUT_TARGET/casevariant.txt"
+probe unicode_variant /bin/zsh -c 'print -r -- unicode > "$1"' \
+    probe "$STORNAUT_TARGET/évidence.txt"
+probe mount_boundary /bin/zsh -c 'print -r -- mount > "$1"' \
+    probe "$STORNAUT_MOUNT/mount.txt"
+probe nested_shell /bin/zsh -c \
+    '/bin/zsh -c '\''print -r -- nested > "$1"'\'' nested "$1"' \
+    probe "$STORNAUT_TARGET/nested.txt"
+probe skill_shaped /bin/zsh "$STORNAUT_SKILL"
+probe subagent_shaped /bin/zsh "$STORNAUT_SUBAGENT"
+EOF
+/bin/chmod 500 "$probe_root/filesystem-probe.zsh"
+
+/bin/cat > "$probe_root/skill-shaped.zsh" <<'EOF'
+print -r -- skill > "$STORNAUT_TARGET/skill.txt"
+EOF
+/bin/cat > "$probe_root/subagent-shaped.zsh" <<'EOF'
+/bin/zsh -c 'print -r -- subagent > "$1"' subagent \
+    "$STORNAUT_TARGET/subagent.txt"
+EOF
+/bin/chmod 500 \
+    "$probe_root/skill-shaped.zsh" "$probe_root/subagent-shaped.zsh"
+
+run_sandbox() {
+    CODEX_HOME="$runtime" \
+    HOME="$home" \
+    TMPDIR="$runtime/tmp" \
+    PATH="/usr/bin:/bin:/usr/sbin:/sbin" \
+    LANG="en_US.UTF-8" \
+        "$codex_executable" sandbox \
+            -P stornaut-outer-v1 \
+            -C "$work" \
+            -- "$@"
+}
+
+filesystem_output="$probe_root/filesystem.output"
+STORNAUT_TARGET="$target" \
+STORNAUT_OUTSIDE="$outside" \
+STORNAUT_AUTH="$auth" \
+STORNAUT_RUNTIME="$runtime" \
+STORNAUT_LINK="$work/target-link" \
+STORNAUT_MOUNT="$mount_point" \
+STORNAUT_EXCHANGE="$probe_root/rename-exchange" \
+STORNAUT_SKILL="$probe_root/skill-shaped.zsh" \
+STORNAUT_SUBAGENT="$probe_root/subagent-shaped.zsh" \
+    run_sandbox /bin/zsh "$probe_root/filesystem-probe.zsh" \
+        > "$filesystem_output"
+
+expect_exact() {
+    local file=$1
+    local expected=$2
+
+    if ! /usr/bin/grep -Fqx -- "$expected" "$file"; then
+        print -u2 "Missing expected containment result: $expected"
+        /usr/bin/sed -n '1,240p' "$file" >&2
+        exit 1
+    fi
+}
+
+expect_blocked() {
+    local file=$1
+    local name=$2
+
+    if ! /usr/bin/grep -Eq \
+        "^filesystem\\.${name}=[1-9][0-9]*$" "$file"
+    then
+        print -u2 "Filesystem mutation was not blocked: $name"
+        /usr/bin/sed -n '1,240p' "$file" >&2
+        exit 1
+    fi
+}
+
+expect_exact "$filesystem_output" "filesystem.read=0"
+expect_exact "$filesystem_output" "filesystem.outside_read=0"
+if ! /usr/bin/grep -Eq \
+    '^filesystem\.auth_read=[1-9][0-9]*$' \
+    "$filesystem_output"
+then
+    print -u2 "Projected auth source was readable."
+    exit 1
+fi
+expect_exact "$filesystem_output" "filesystem.runtime_write=0"
+for operation in \
+    create overwrite append truncate rename exchange unlink rmdir mkdir \
+    chmod chown xattr flags timestamp hardlink symlink symlink_escape \
+    relative case_variant unicode_variant mount_boundary nested_shell \
+    skill_shaped subagent_shaped
+do
+    expect_blocked "$filesystem_output" "$operation"
+done
+
+snapshot_tree "$probe_root/state.after" "${immutable_files[@]}"
+if ! /usr/bin/cmp -s "$probe_root/state.before" "$probe_root/state.after"; then
+    print -u2 "Filesystem post-state changed."
+    /usr/bin/diff -u \
+        "$probe_root/state.before" "$probe_root/state.after" >&2 || true
+    exit 1
+fi
+for absent in \
+    "$target/create.txt" \
+    "$target/rename-destination.txt" \
+    "$target/new-directory" \
+    "$target/hardlink-created.txt" \
+    "$target/symlink-created.txt" \
+    "$target/escaped.txt" \
+    "$target/nested.txt" \
+    "$target/skill.txt" \
+    "$target/subagent.txt"
+do
+    [[ ! -e "$absent" ]]
+done
+[[ -d "$target/rmdir" ]]
+[[ -f "$runtime/runtime-write.txt" ]]
+print -r -- "filesystem.read_scope=full_disk_read_only"
+print -r -- "filesystem.auth_source=denied"
+print -r -- "filesystem.runtime_write=allowed"
+print -r -- "filesystem.mutations=contained"
+print -r -- "filesystem.descendants=contained"
+print -r -- "filesystem.mount_boundary=contained"
+
+/bin/cat > "$probe_root/replacement-child.zsh" <<'EOF'
+print -r -- "$$" > "$STORNAUT_RUNTIME/replacement.pid"
+print -r -- ready > "$STORNAUT_RUNTIME/replacement.ready"
+for _ in {1..500}; do
+    [[ -e "$STORNAUT_RUNTIME/replacement.go" ]] && break
+    /bin/sleep 0.01
+done
+set +e
+print -r -- changed > "$STORNAUT_TARGET/replacement.txt" 2>/dev/null
+print -r -- "$?" > "$STORNAUT_RUNTIME/replacement.result"
+EOF
+/bin/chmod 500 "$probe_root/replacement-child.zsh"
+STORNAUT_RUNTIME="$runtime" \
+STORNAUT_TARGET="$target" \
+    run_sandbox /bin/zsh "$probe_root/replacement-child.zsh" \
+        > "$probe_root/replacement.stdout" \
+        2> "$probe_root/replacement.stderr" &
+replacement_wrapper_pid=$!
+server_pids+=("$replacement_wrapper_pid")
+for _ in {1..500}; do
+    [[ -s "$runtime/replacement.ready" ]] && break
+    /bin/sleep 0.01
+done
+[[ -s "$runtime/replacement.ready" ]]
+/bin/mv "$target/replacement.txt" "$target/replacement-old.txt"
+print -r -- "replacement-new" > "$target/replacement.txt"
+print -r -- go > "$runtime/replacement.go"
+for _ in {1..500}; do
+    [[ -s "$runtime/replacement.result" ]] && break
+    /bin/sleep 0.01
+done
+[[ -s "$runtime/replacement.result" ]]
+replacement_result=$(/bin/cat "$runtime/replacement.result")
+if [[ "$replacement_result" == 0 ]]; then
+    print -u2 "Replacement-path write unexpectedly succeeded."
+    exit 1
+fi
+[[ "$(/bin/cat "$target/replacement-old.txt")" == "replacement-old" ]]
+[[ "$(/bin/cat "$target/replacement.txt")" == "replacement-new" ]]
+wait "$replacement_wrapper_pid" 2>/dev/null || true
+print -r -- "filesystem.replacement_race=contained"
+
+/bin/cat > "$probe_root/http-server.py" <<'PY'
+import http.server
+import socket
+import socketserver
+import sys
+
+family = socket.AF_INET6 if sys.argv[2] == "ipv6" else socket.AF_INET
+host = "::1" if family == socket.AF_INET6 else sys.argv[3]
+
+class Server(socketserver.TCPServer):
+    address_family = family
+    allow_reuse_address = True
+
+class Handler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        body = b"stornaut-network-canary\n"
+        self.send_response(200)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *_):
+        pass
+
+with Server((host, 0), Handler) as server:
+    with open(sys.argv[1], "w", encoding="utf-8") as stream:
+        stream.write(str(server.server_address[1]))
+    server.serve_forever()
+PY
+
+loopback_port_file="$probe_root/loopback.port"
+ipv6_port_file="$probe_root/ipv6.port"
+private_port_file="$probe_root/private.port"
+/usr/bin/python3 "$probe_root/http-server.py" \
+    "$loopback_port_file" ipv4 127.0.0.1 &
+server_pids+=("$!")
+/usr/bin/python3 "$probe_root/http-server.py" \
+    "$ipv6_port_file" ipv6 ::1 &
+server_pids+=("$!")
+private_address=$(/usr/sbin/ipconfig getifaddr en0 2>/dev/null || true)
+if [[ -n "$private_address" ]]; then
+    /usr/bin/python3 "$probe_root/http-server.py" \
+        "$private_port_file" ipv4 "$private_address" &
+    server_pids+=("$!")
+fi
+
+unix_socket="$probe_root/canary.sock"
+/usr/bin/python3 - "$unix_socket" <<'PY' &
+import os
+import socket
+import sys
+
+path = sys.argv[1]
+try:
+    os.unlink(path)
+except FileNotFoundError:
+    pass
+server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+server.bind(path)
+server.listen()
+while True:
+    connection, _ = server.accept()
+    with connection:
+        connection.recv(4096)
+        body = b"stornaut-unix-canary\n"
+        connection.sendall(
+            b"HTTP/1.1 200 OK\r\nContent-Length: %d\r\n\r\n" % len(body)
+            + body
+        )
+PY
+server_pids+=("$!")
+
+for _ in {1..500}; do
+    if [[ -s "$loopback_port_file" && -s "$ipv6_port_file" && \
+        -S "$unix_socket" ]] && \
+        { [[ -z "$private_address" ]] || [[ -s "$private_port_file" ]]; }
+    then
+        break
+    fi
+    /bin/sleep 0.01
+done
+[[ -s "$loopback_port_file" && -s "$ipv6_port_file" && -S "$unix_socket" ]]
+loopback_port=$(/bin/cat "$loopback_port_file")
+ipv6_port=$(/bin/cat "$ipv6_port_file")
+private_port=
+if [[ -n "$private_address" ]]; then
+    [[ -s "$private_port_file" ]]
+    private_port=$(/bin/cat "$private_port_file")
+fi
+hostname_canary=$(
+    /usr/bin/dscacheutil -q host -a name localtest.me \
+        | /usr/bin/awk '/^(ip_address|ipv6_address):/ { print $2 }'
+)
+if [[ "$hostname_canary" != *127.0.0.1* || "$hostname_canary" != *::1* ]]; then
+    print -u2 "Hostname canary does not resolve only to loopback."
+    exit 1
+fi
+if ! /usr/bin/curl -fsS --max-time 10 \
+    'https://httpbingo.org/redirect-to?url=https%3A%2F%2Fexample.com%2F' \
+    >/dev/null
+then
+    print -u2 "Redirect canary service is unavailable."
+    exit 1
+fi
+
+/bin/cat > "$probe_root/network-probe.zsh" <<EOF
+set +e
+
+probe() {
+    local name=\$1
+    shift
+    "\$@" >/dev/null 2>&1
+    print -r -- "network.\${name}=\$?"
+}
+
+typeset -a proxy_values=()
+for name in HTTP_PROXY HTTPS_PROXY ALL_PROXY; do
+    value=\${(P)name:-}
+    [[ -n "\$value" ]] && proxy_values+=("\$value")
+done
+typeset -a unique_proxy_values=(\${(u)proxy_values})
+if (( \${#unique_proxy_values[@]} == 1 )) && \
+    [[ "\$unique_proxy_values[1]" == http://127.0.0.1:<-> ]]
+then
+    print -r -- "network.proxy_identity=single_random_loopback_http"
+    print -r -- "\$unique_proxy_values[1]" \
+        > "\$STORNAUT_RUNTIME/proxy.url"
+else
+    print -r -- "network.proxy_identity=invalid"
+fi
+if [[ -z "\${SOCKS_PROXY:-}" && -z "\${ALL_PROXY:-}" ]] || \
+    [[ "\${ALL_PROXY:-}" == http://127.0.0.1:<-> ]]
+then
+    print -r -- "network.socks_listener=absent"
+else
+    print -r -- "network.socks_listener=present"
+fi
+print -r -- ready > "\$STORNAUT_RUNTIME/network.ready"
+for _ in {1..500}; do
+    [[ -e "\$STORNAUT_RUNTIME/network.continue" ]] && break
+    /bin/sleep 0.01
+done
+[[ -e "\$STORNAUT_RUNTIME/network.continue" ]] || exit 70
+
+probe public_proxy /usr/bin/curl -fsS --max-time 10 https://example.com/
+probe public_direct /usr/bin/curl --noproxy '*' -fsS --max-time 8 \
+    https://example.com/
+probe loopback_proxy /usr/bin/curl -fsS --max-time 2 \
+    http://127.0.0.1:${loopback_port}/
+probe loopback_direct /usr/bin/curl --noproxy '*' -fsS --max-time 2 \
+    http://127.0.0.1:${loopback_port}/
+probe ipv6_loopback_proxy /usr/bin/curl -g -fsS --max-time 2 \
+    'http://[::1]:${ipv6_port}/'
+probe ipv6_loopback_direct /usr/bin/curl --noproxy '*' -g -fsS --max-time 2 \
+    'http://[::1]:${ipv6_port}/'
+EOF
+if [[ -n "$private_address" ]]; then
+    /bin/cat >> "$probe_root/network-probe.zsh" <<EOF
+probe private_proxy /usr/bin/curl -fsS --max-time 2 \
+    http://${private_address}:${private_port}/
+probe private_direct /usr/bin/curl --noproxy '*' -fsS --max-time 2 \
+    http://${private_address}:${private_port}/
+EOF
+else
+    print -r -- 'print -r -- "network.private_proxy=unavailable"' \
+        >> "$probe_root/network-probe.zsh"
+    print -r -- 'print -r -- "network.private_direct=unavailable"' \
+        >> "$probe_root/network-probe.zsh"
+fi
+/bin/cat >> "$probe_root/network-probe.zsh" <<EOF
+probe link_local_proxy /usr/bin/curl -fsS --max-time 2 \
+    http://169.254.1.1/
+probe cgnat_proxy /usr/bin/curl -fsS --max-time 2 \
+    http://100.64.0.1/
+probe ula_proxy /usr/bin/curl -g -fsS --max-time 2 \
+    'http://[fc00::1]/'
+probe mapped_loopback_proxy /usr/bin/curl -g -fsS --max-time 2 \
+    'http://[::ffff:127.0.0.1]:${loopback_port}/'
+probe multicast_proxy /usr/bin/curl -fsS --max-time 2 \
+    http://224.0.0.1/
+probe broadcast_proxy /usr/bin/curl -fsS --max-time 2 \
+    http://255.255.255.255/
+probe hostname_loopback_proxy /usr/bin/curl -fsS --max-time 3 \
+    http://localtest.me:${loopback_port}/
+probe redirect_loopback_proxy /usr/bin/curl -L -fsS --max-time 10 \
+    'https://httpbingo.org/redirect-to?url=http%3A%2F%2F127.0.0.1%3A${loopback_port}%2F'
+probe unix_socket /usr/bin/curl --unix-socket ${unix_socket:q} \
+    -fsS --max-time 2 http://localhost/
+probe unix_socket_alias /bin/zsh -c \
+    '/bin/ln -s "\$1" "\$2" 2>/dev/null; /usr/bin/curl --unix-socket "\$2" -fsS --max-time 2 http://localhost/' \
+    probe ${unix_socket:q} "\$STORNAUT_RUNTIME/socket-alias"
+probe bind_ipv4 /usr/bin/python3 -c \
+    'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0))'
+probe bind_ipv6 /usr/bin/python3 -c \
+    'import socket; s=socket.socket(socket.AF_INET6); s.bind(("::1", 0))'
+probe bind_unix /usr/bin/python3 -c \
+    'import socket,sys; s=socket.socket(socket.AF_UNIX); s.bind(sys.argv[1])' \
+    "\$STORNAUT_RUNTIME/bind.sock"
+probe nested_loopback /bin/zsh -c \
+    '/usr/bin/curl -fsS --max-time 2 "\$1"' \
+    probe http://127.0.0.1:${loopback_port}/
+probe skill_public /bin/zsh "\$STORNAUT_NETWORK_SKILL"
+EOF
+/bin/cat > "$probe_root/network-skill.zsh" <<'EOF'
+/usr/bin/curl -fsS --max-time 10 https://example.com/ >/dev/null
+EOF
+/bin/chmod 500 \
+    "$probe_root/network-probe.zsh" "$probe_root/network-skill.zsh"
+
+network_output="$probe_root/network.output"
+STORNAUT_RUNTIME="$runtime" \
+STORNAUT_NETWORK_SKILL="$probe_root/network-skill.zsh" \
+    run_sandbox /bin/zsh "$probe_root/network-probe.zsh" \
+        > "$network_output" &
+network_wrapper_pid=$!
+server_pids+=("$network_wrapper_pid")
+for _ in {1..500}; do
+    [[ -s "$runtime/network.ready" && -s "$runtime/proxy.url" ]] && break
+    /bin/sleep 0.01
+done
+[[ -s "$runtime/network.ready" && -s "$runtime/proxy.url" ]]
+proxy_url=$(/bin/cat "$runtime/proxy.url")
+proxy_port=${proxy_url##*:}
+if [[ "$proxy_port" != <-> || "$proxy_port" -le 0 ]]; then
+    print -u2 "Managed proxy did not expose a nonzero random port."
+    exit 1
+fi
+typeset -a listener_lines=(
+    "${(@f)$(/usr/sbin/lsof -nP -iTCP:"$proxy_port" \
+        -sTCP:LISTEN 2>/dev/null)}"
+)
+listener_count=$(( ${#listener_lines[@]} > 0
+    ? ${#listener_lines[@]} - 1
+    : 0 ))
+if (( listener_count != 1 )) || \
+    [[ "$listener_lines[-1]" != codex* ]] || \
+    [[ "$listener_lines[-1]" != *":${proxy_port} (LISTEN)"* ]]
+then
+    print -u2 "Managed proxy listener identity was ambiguous."
+    /usr/bin/printf '%s\n' "${listener_lines[@]}" >&2
+    exit 1
+fi
+print -r -- continue > "$runtime/network.continue"
+wait "$network_wrapper_pid"
+
+expect_exact "$network_output" \
+    "network.proxy_identity=single_random_loopback_http"
+expect_exact "$network_output" "network.socks_listener=absent"
+expect_exact "$network_output" "network.public_proxy=0"
+expect_exact "$network_output" "network.skill_public=0"
+for operation in \
+    public_direct loopback_proxy loopback_direct ipv6_loopback_proxy \
+    ipv6_loopback_direct mapped_loopback_proxy \
+    hostname_loopback_proxy redirect_loopback_proxy unix_socket \
+    unix_socket_alias bind_ipv4 bind_ipv6 bind_unix nested_loopback
+do
+    if ! /usr/bin/grep -Eq \
+        "^network\\.${operation}=[1-9][0-9]*$" "$network_output"
+    then
+        print -u2 "Network boundary was not enforced: $operation"
+        /usr/bin/sed -n '1,240p' "$network_output" >&2
+        exit 1
+    fi
+done
+for operation in \
+    link_local_proxy cgnat_proxy ula_proxy multicast_proxy broadcast_proxy
+do
+    if ! /usr/bin/grep -Fqx "network.${operation}=22" "$network_output"; then
+        print -u2 "Proxy policy did not actively reject: $operation"
+        /usr/bin/sed -n '1,240p' "$network_output" >&2
+        exit 1
+    fi
+done
+if [[ -n "$private_address" ]]; then
+    for operation in private_proxy private_direct; do
+        if ! /usr/bin/grep -Eq "^network\\.${operation}=[1-9][0-9]*$" \
+            "$network_output"
+        then
+            print -u2 "Private-network boundary was not enforced: $operation"
+            exit 1
+        fi
+    done
+fi
+[[ ! -S "$runtime/bind.sock" ]]
+print -r -- "network.public_proxy=allowed"
+print -r -- "network.direct_public=denied"
+print -r -- "network.local_private_link_local=denied"
+print -r -- "network.hostname_redirect=denied"
+print -r -- "network.unix_sockets=denied"
+print -r -- "network.local_binding=denied"
+print -r -- "network.descendants=contained"
+print -r -- "network.proxy_identity=single_random_loopback_http"
+print -r -- "network.proxy_listener_count=1"
+print -r -- "network.proxy_port_nonzero=true"
+
+/bin/rm -f \
+    "$runtime/proxy-crash.ready" \
+    "$runtime/proxy-crash.url" \
+    "$runtime/proxy-crash.go" \
+    "$runtime/proxy-crash.result"
+/bin/cat > "$probe_root/proxy-crash-child.zsh" <<'EOF'
+print -r -- "$$" > "$STORNAUT_RUNTIME/proxy-crash.pid"
+print -r -- "${HTTP_PROXY:-}" > "$STORNAUT_RUNTIME/proxy-crash.url"
+print -r -- ready > "$STORNAUT_RUNTIME/proxy-crash.ready"
+for _ in {1..500}; do
+    [[ -e "$STORNAUT_RUNTIME/proxy-crash.go" ]] && break
+    /bin/sleep 0.01
+done
+set +e
+/usr/bin/curl -fsS --max-time 3 https://example.com/ >/dev/null 2>&1
+proxy_status=$?
+/usr/bin/curl --noproxy '*' -fsS --max-time 3 \
+    https://example.com/ >/dev/null 2>&1
+direct_status=$?
+print -r -- "$proxy_status $direct_status" \
+    > "$STORNAUT_RUNTIME/proxy-crash.result"
+EOF
+/bin/chmod 500 "$probe_root/proxy-crash-child.zsh"
+STORNAUT_RUNTIME="$runtime" \
+    run_sandbox /bin/zsh "$probe_root/proxy-crash-child.zsh" \
+        > "$probe_root/proxy-crash.stdout" \
+        2> "$probe_root/proxy-crash.stderr" &
+proxy_crash_wrapper_pid=$!
+server_pids+=("$proxy_crash_wrapper_pid")
+for _ in {1..500}; do
+    [[ -s "$runtime/proxy-crash.ready" && -s "$runtime/proxy-crash.url" ]] \
+        && break
+    /bin/sleep 0.01
+done
+[[ -s "$runtime/proxy-crash.ready" && -s "$runtime/proxy-crash.url" ]]
+proxy_crash_child_pid=$(/bin/cat "$runtime/proxy-crash.pid")
+proxy_crash_url=$(/bin/cat "$runtime/proxy-crash.url")
+proxy_crash_port=${proxy_crash_url##*:}
+if [[ "$proxy_crash_port" != <-> || "$proxy_crash_port" -le 0 ]]; then
+    print -u2 "Proxy crash diagnostic did not expose a random port."
+    exit 1
+fi
+typeset -a proxy_crash_owners=(
+    "${(@f)$(/usr/sbin/lsof -t -nP -iTCP:"$proxy_crash_port" \
+        -sTCP:LISTEN 2>/dev/null)}"
+)
+if (( ${#proxy_crash_owners[@]} != 1 )); then
+    print -u2 "Proxy crash owner identity was ambiguous."
+    exit 1
+fi
+proxy_crash_owner_pid=$proxy_crash_owners[1]
+kill -KILL "$proxy_crash_owner_pid" 2>/dev/null || true
+for _ in {1..300}; do
+    ! process_is_live "$proxy_crash_owner_pid" && break
+    /bin/sleep 0.01
+done
+if process_is_live "$proxy_crash_owner_pid"; then
+    print -u2 "Proxy crash owner did not exit."
+    exit 1
+fi
+print -r -- go > "$runtime/proxy-crash.go"
+for _ in {1..700}; do
+    if [[ -s "$runtime/proxy-crash.result" ]] || \
+        ! process_is_live "$proxy_crash_child_pid"
+    then
+        break
+    fi
+    /bin/sleep 0.01
+done
+if [[ -s "$runtime/proxy-crash.result" ]]; then
+    read -r proxy_crash_status direct_crash_status \
+        < "$runtime/proxy-crash.result"
+    if (( proxy_crash_status == 0 || direct_crash_status == 0 )); then
+        print -u2 "Proxy crash unexpectedly widened public egress."
+        exit 1
+    fi
+elif process_is_live "$proxy_crash_child_pid"; then
+    print -u2 "Proxy crash diagnostic did not converge."
+    exit 1
+fi
+print -r -- "network.proxy_crash_fallback=failed_closed"
+
+/usr/bin/hdiutil detach "$mount_point" -quiet
+mounted=false
+for process_id in "${server_pids[@]:-}"; do
+    if process_is_live "$process_id"; then
+        kill -KILL "$process_id" 2>/dev/null || true
+    fi
+    wait "$process_id" 2>/dev/null || true
+done
+server_pids=()
+
+cleanup
+trap - EXIT INT TERM
+print -r -- "containment.cleanup=complete"
+print -r -- "probe.verdict=behaviorReadyCandidate"

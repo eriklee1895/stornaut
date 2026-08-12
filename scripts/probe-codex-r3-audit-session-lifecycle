@@ -1,0 +1,1170 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+if [[ "${1:-}" != "--privileged" || $# != 6 ]]; then
+    print -u2 \
+        "Usage: $0 --privileged <drainer> <uid> <gid> <username> <codex>"
+    exit 64
+fi
+if (( EUID != 0 )); then
+    print -u2 "The audit-session lifecycle probe requires administrator authorization."
+    exit 77
+fi
+
+drainer_source=${2:A}
+target_uid=$3
+target_gid=$4
+target_user=$5
+codex_source=${6:A}
+
+if [[ ! -x "$drainer_source" || ! -x "$codex_source" || \
+    "$target_uid" != <-> || \
+    "$target_gid" != <-> || -z "$target_user" ]]
+then
+    print -u2 "Invalid lifecycle probe input."
+    exit 64
+fi
+if [[ "$("$codex_source" --version)" != "codex-cli 0.147.0" ]]; then
+    print -u2 "Lifecycle composition requires codex-cli 0.147.0."
+    exit 65
+fi
+if [[ "$(id -u "$target_user")" != "$target_uid" || \
+    "$(id -g "$target_user")" != "$target_gid" ]]
+then
+    print -u2 "Lifecycle probe user identity mismatch."
+    exit 65
+fi
+
+for tool in \
+    /bin/launchctl \
+    /bin/kill \
+    /bin/cp \
+    /bin/mkdir \
+    /bin/rm \
+    /bin/sleep \
+    /usr/bin/clang \
+    /usr/bin/getconf \
+    /usr/bin/id \
+    /usr/bin/plutil \
+    /usr/bin/stat \
+    /usr/bin/uuidgen
+do
+    if [[ ! -x "$tool" ]]; then
+        print -u2 "Required tool is unavailable: $tool"
+        exit 66
+    fi
+done
+
+probe_root=$(mktemp -d /private/tmp/stornaut-r3-audit-lifecycle.XXXXXX)
+chmod 711 "$probe_root"
+typeset -a labels=()
+typeset -a audit_sessions=()
+cleanup_started=false
+
+process_is_live() {
+    local process_id=$1
+    local process_state
+
+    if ! kill -0 "$process_id" 2>/dev/null; then
+        return 1
+    fi
+    process_state=$(ps -o stat= -p "$process_id" 2>/dev/null | tr -d ' ')
+    [[ -n "$process_state" && "$process_state" != Z* ]]
+}
+
+drain_recorded_sessions() {
+    local audit_session_id
+
+    for audit_session_id in "${audit_sessions[@]:-}"; do
+        if [[ "$audit_session_id" == <-> && "$audit_session_id" -gt 0 ]]; then
+            "$probe_root/stornaut-lifecycle-spike" \
+                drain \
+                --audit-session-id "$audit_session_id" \
+                --user-id "$target_uid" \
+                >/dev/null 2>&1 || true
+        fi
+    done
+}
+
+terminate_recorded_processes() {
+    local identity_file process_id command_line
+
+    for identity_file in "$probe_root"/**/identity.*(N); do
+        process_id=$(awk '{ print $1; exit }' "$identity_file" 2>/dev/null || true)
+        if [[ "$process_id" == <-> ]] && process_is_live "$process_id"; then
+            command_line=$(ps -o command= -p "$process_id" 2>/dev/null || true)
+            if [[ "$command_line" == *"$probe_root/"* ]]; then
+                kill -KILL "$process_id" 2>/dev/null || true
+            fi
+        fi
+    done
+}
+
+cleanup() {
+    local cleanup_failed=false
+    local label process_id command_line
+
+    if [[ "$cleanup_started" == true ]]; then
+        return 0
+    fi
+    cleanup_started=true
+    set +e
+    for label in "${labels[@]:-}"; do
+        /bin/launchctl bootout "system/$label" >/dev/null 2>&1 || true
+    done
+    drain_recorded_sessions
+    terminate_recorded_processes
+    while read -r process_id; do
+        if [[ "$process_id" == <-> && "$process_id" != "$$" ]]; then
+            command_line=$(ps -o command= -p "$process_id" 2>/dev/null || true)
+            if [[ "$command_line" == *"$probe_root/"* ]]; then
+                kill -KILL "$process_id" 2>/dev/null || true
+            fi
+        fi
+    done < <(
+        ps -axo pid=,command= | awk -v root="$probe_root/" \
+            'index($0, root) != 0 { print $1 }'
+    )
+    for _ in {1..100}; do
+        /bin/rm -rf "$probe_root"
+        [[ ! -e "$probe_root" ]] && break
+        /bin/sleep 0.01
+    done
+    [[ ! -e "$probe_root" ]] || cleanup_failed=true
+    for label in "${labels[@]:-}"; do
+        if /bin/launchctl print "system/$label" >/dev/null 2>&1; then
+            cleanup_failed=true
+        fi
+    done
+    while read -r process_id; do
+        if [[ "$process_id" == <-> && "$process_id" != "$$" ]]; then
+            command_line=$(ps -o command= -p "$process_id" 2>/dev/null || true)
+            if [[ "$command_line" == *"$probe_root/"* ]]; then
+                cleanup_failed=true
+            fi
+        fi
+    done < <(
+        ps -axo pid=,command= | awk -v root="$probe_root/" \
+            'index($0, root) != 0 { print $1 }'
+    )
+    if [[ "$cleanup_failed" == true ]]; then
+        print -u2 "Lifecycle probe cleanup was incomplete."
+        return 1
+    fi
+}
+
+handle_exit() {
+    local original_status=$?
+
+    trap - EXIT INT TERM
+    if ! cleanup; then
+        original_status=1
+    fi
+    exit "$original_status"
+}
+
+handle_signal() {
+    local signal_status=$1
+
+    trap - EXIT INT TERM
+    if ! cleanup; then
+        signal_status=1
+    fi
+    exit "$signal_status"
+}
+
+trap handle_exit EXIT
+trap 'handle_signal 130' INT
+trap 'handle_signal 143' TERM
+
+/bin/cp "$drainer_source" "$probe_root/stornaut-lifecycle-spike"
+chown root:wheel "$probe_root/stornaut-lifecycle-spike"
+chmod 500 "$probe_root/stornaut-lifecycle-spike"
+
+cat > "$probe_root/fanout.c" <<'EOF'
+#include <bsm/audit.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <grp.h>
+#include <spawn.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <unistd.h>
+
+extern char **environ;
+
+static void sleep_tick(void) {
+    struct timespec interval = {
+        .tv_sec = 0,
+        .tv_nsec = 50000000,
+    };
+    nanosleep(&interval, NULL);
+}
+
+static int write_identity(const char *kind, const char *runtime) {
+    char identity_path[1024];
+    char heartbeat_path[1024];
+    if (snprintf(
+            identity_path,
+            sizeof(identity_path),
+            "%s/identity.%s",
+            runtime,
+            kind
+        ) >= (int)sizeof(identity_path) ||
+        snprintf(
+            heartbeat_path,
+            sizeof(heartbeat_path),
+            "%s/heartbeat.%s",
+            runtime,
+            kind
+        ) >= (int)sizeof(heartbeat_path)) {
+        return 70;
+    }
+    auditinfo_addr_t audit_information = {0};
+    if (getaudit_addr(
+            &audit_information,
+            sizeof(audit_information)
+        ) != 0) {
+        return 71;
+    }
+    FILE *identity = fopen(identity_path, "w");
+    if (identity == NULL) {
+        return 72;
+    }
+    fprintf(
+        identity,
+        "%d %d %d %d %d %u\n",
+        getpid(),
+        getppid(),
+        getpgrp(),
+        getsid(0),
+        audit_information.ai_asid,
+        geteuid()
+    );
+    fclose(identity);
+    for (int iteration = 0; iteration < 600; iteration++) {
+        int descriptor = open(
+            heartbeat_path,
+            O_WRONLY | O_CREAT | O_TRUNC,
+            0600
+        );
+        if (descriptor >= 0) {
+            dprintf(descriptor, "%d\n", iteration);
+            close(descriptor);
+        }
+        sleep_tick();
+    }
+    return 0;
+}
+
+static int wait_for_identity(const char *kind, const char *runtime) {
+    char path[1024];
+    if (snprintf(
+            path,
+            sizeof(path),
+            "%s/identity.%s",
+            runtime,
+            kind
+        ) >= (int)sizeof(path)) {
+        return 73;
+    }
+    for (int attempt = 0; attempt < 300; attempt++) {
+        struct stat information;
+        if (stat(path, &information) == 0 && information.st_size > 0) {
+            return 0;
+        }
+        sleep_tick();
+    }
+    return 74;
+}
+
+static int write_groups(const char *runtime) {
+    char path[1024];
+    if (snprintf(path, sizeof(path), "%s/groups", runtime)
+        >= (int)sizeof(path)) {
+        return ENAMETOOLONG;
+    }
+    int group_count = getgroups(0, NULL);
+    if (group_count < 0 || group_count > 256) {
+        return EOVERFLOW;
+    }
+    gid_t groups[256] = {0};
+    if (group_count > 0 &&
+        getgroups(group_count, groups) != group_count) {
+        return errno == 0 ? EIO : errno;
+    }
+    FILE *file = fopen(path, "w");
+    if (file == NULL) {
+        return errno;
+    }
+    fprintf(
+        file,
+        "%u %u %d",
+        geteuid(),
+        getegid(),
+        group_count
+    );
+    for (int index = 0; index < group_count; index++) {
+        fprintf(file, " %u", groups[index]);
+    }
+    fprintf(file, "\n");
+    return fclose(file) == 0 ? 0 : errno;
+}
+
+static int write_containment_result(const char *runtime) {
+    char read_path[1024];
+    char write_path[1024];
+    char result_path[1024];
+    if (snprintf(
+            read_path,
+            sizeof(read_path),
+            "%s/../read-target",
+            runtime
+        ) >= (int)sizeof(read_path) ||
+        snprintf(
+            write_path,
+            sizeof(write_path),
+            "%s/../denied-write",
+            runtime
+        ) >= (int)sizeof(write_path) ||
+        snprintf(
+            result_path,
+            sizeof(result_path),
+            "%s/containment",
+            runtime
+        ) >= (int)sizeof(result_path)) {
+        return ENAMETOOLONG;
+    }
+    int read_descriptor = open(read_path, O_RDONLY);
+    int read_result = read_descriptor >= 0 ? 0 : errno;
+    if (read_descriptor >= 0) {
+        close(read_descriptor);
+    }
+    int write_descriptor = open(
+        write_path,
+        O_WRONLY | O_CREAT | O_EXCL,
+        0600
+    );
+    int write_result = write_descriptor >= 0 ? 0 : errno;
+    if (write_descriptor >= 0) {
+        close(write_descriptor);
+    }
+    FILE *result = fopen(result_path, "w");
+    if (result == NULL) {
+        return errno;
+    }
+    fprintf(result, "%d %d\n", read_result, write_result);
+    return fclose(result) == 0 ? 0 : errno;
+}
+
+static int write_parent_identity(const char *runtime) {
+    char path[1024];
+    if (snprintf(path, sizeof(path), "%s/parent", runtime)
+        >= (int)sizeof(path)) {
+        return ENAMETOOLONG;
+    }
+    auditinfo_addr_t audit_information = {0};
+    if (getaudit_addr(
+            &audit_information,
+            sizeof(audit_information)
+        ) != 0) {
+        return errno;
+    }
+    pid_t parent = getppid();
+    FILE *file = fopen(path, "w");
+    if (file == NULL) {
+        return errno;
+    }
+    fprintf(
+        file,
+        "%d %d %u\n",
+        parent,
+        audit_information.ai_asid,
+        geteuid()
+    );
+    return fclose(file) == 0 ? 0 : errno;
+}
+
+static int launch_direct(
+    const char *executable,
+    const char *runtime
+) {
+    pid_t child = fork();
+    if (child < 0) {
+        return errno;
+    }
+    if (child == 0) {
+        if (setsid() < 0) {
+            _exit(75);
+        }
+        execl(
+            executable,
+            executable,
+            "--heartbeat",
+            "direct",
+            runtime,
+            NULL
+        );
+        _exit(76);
+    }
+    return 0;
+}
+
+static int launch_spawn(
+    const char *executable,
+    const char *runtime
+) {
+    posix_spawnattr_t attributes;
+    if (posix_spawnattr_init(&attributes) != 0) {
+        return EINVAL;
+    }
+    if (posix_spawnattr_setflags(
+            &attributes,
+            POSIX_SPAWN_SETSID | POSIX_SPAWN_CLOEXEC_DEFAULT
+        ) != 0) {
+        posix_spawnattr_destroy(&attributes);
+        return EINVAL;
+    }
+    char *arguments[] = {
+        (char *)executable,
+        "--heartbeat",
+        "spawn",
+        (char *)runtime,
+        NULL,
+    };
+    pid_t child = 0;
+    int result = posix_spawn(
+        &child,
+        executable,
+        NULL,
+        &attributes,
+        arguments,
+        environ
+    );
+    posix_spawnattr_destroy(&attributes);
+    return result;
+}
+
+static int launch_double_fork(
+    const char *executable,
+    const char *runtime
+) {
+    pid_t intermediate = fork();
+    if (intermediate < 0) {
+        return errno;
+    }
+    if (intermediate == 0) {
+        if (setsid() < 0) {
+            _exit(77);
+        }
+        pid_t grandchild = fork();
+        if (grandchild < 0) {
+            _exit(78);
+        }
+        if (grandchild == 0) {
+            execl(
+                executable,
+                executable,
+                "--heartbeat",
+                "double",
+                runtime,
+                NULL
+            );
+            _exit(79);
+        }
+        _exit(0);
+    }
+    return 0;
+}
+
+int main(int argument_count, char **arguments) {
+    if (argument_count == 4 &&
+        strcmp(arguments[1], "--heartbeat") == 0) {
+        return write_identity(arguments[2], arguments[3]);
+    }
+    if (argument_count != 2) {
+        return 64;
+    }
+    const char *runtime = arguments[1];
+    const char *executable = arguments[0];
+    if (write_groups(runtime) != 0) {
+        return 80;
+    }
+    if (write_containment_result(runtime) != 0) {
+        return 80;
+    }
+    if (write_parent_identity(runtime) != 0) {
+        return 80;
+    }
+    int direct_result = launch_direct(executable, runtime);
+    int spawn_result = launch_spawn(executable, runtime);
+    int double_result = launch_double_fork(executable, runtime);
+    if (direct_result != 0 || spawn_result != 0 || double_result != 0) {
+        return 80;
+    }
+    if (wait_for_identity("direct", runtime) != 0 ||
+        wait_for_identity("spawn", runtime) != 0 ||
+        wait_for_identity("double", runtime) != 0) {
+        return 81;
+    }
+    char ready_path[1024];
+    if (snprintf(
+            ready_path,
+            sizeof(ready_path),
+            "%s/ready",
+            runtime
+        ) >= (int)sizeof(ready_path)) {
+        return 82;
+    }
+    FILE *ready = fopen(ready_path, "w");
+    if (ready == NULL) {
+        return 83;
+    }
+    fprintf(ready, "%d\n", getpid());
+    fclose(ready);
+    for (int iteration = 0; iteration < 600; iteration++) {
+        sleep_tick();
+    }
+    return 0;
+}
+EOF
+
+cat > "$probe_root/supervisor.c" <<'EOF'
+#include <bsm/audit.h>
+#include <errno.h>
+#include <grp.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <time.h>
+#include <unistd.h>
+
+static void sleep_tick(void) {
+    struct timespec interval = {
+        .tv_sec = 0,
+        .tv_nsec = 50000000,
+    };
+    nanosleep(&interval, NULL);
+}
+
+static int write_number(const char *path, long long number) {
+    FILE *file = fopen(path, "w");
+    if (file == NULL) {
+        return errno;
+    }
+    fprintf(file, "%lld\n", number);
+    if (fflush(file) != 0 || fsync(fileno(file)) != 0) {
+        int result = errno;
+        fclose(file);
+        return result;
+    }
+    return fclose(file) == 0 ? 0 : errno;
+}
+
+static int read_number(const char *path, long long *number) {
+    FILE *file = fopen(path, "r");
+    if (file == NULL) {
+        return errno;
+    }
+    int matched = fscanf(file, "%lld", number);
+    fclose(file);
+    return matched == 1 ? 0 : EINVAL;
+}
+
+static int wait_for_ready(const char *runtime) {
+    char path[1024];
+    if (snprintf(
+            path,
+            sizeof(path),
+            "%s/ready",
+            runtime
+        ) >= (int)sizeof(path)) {
+        return ENAMETOOLONG;
+    }
+    for (int attempt = 0; attempt < 400; attempt++) {
+        struct stat information;
+        if (stat(path, &information) == 0 && information.st_size > 0) {
+            return 0;
+        }
+        sleep_tick();
+    }
+    return ETIMEDOUT;
+}
+
+static int spawn_target(
+    const char *fanout,
+    const char *runtime,
+    const char *username,
+    uid_t uid,
+    gid_t gid
+) {
+    pid_t child = fork();
+    if (child < 0) {
+        return errno;
+    }
+    if (child == 0) {
+        if (initgroups(username, gid) != 0 ||
+            setgid(gid) != 0 ||
+            setuid(uid) != 0 ||
+            geteuid() != uid ||
+            getegid() != gid) {
+            _exit(90);
+        }
+        execl(fanout, fanout, runtime, NULL);
+        _exit(91);
+    }
+    return 0;
+}
+
+static int spawn_contained_target(
+    const char *codex,
+    const char *fanout,
+    const char *runtime,
+    const char *username,
+    uid_t uid,
+    gid_t gid
+) {
+    pid_t child = fork();
+    if (child < 0) {
+        return errno;
+    }
+    if (child == 0) {
+        if (initgroups(username, gid) != 0 ||
+            setgid(gid) != 0 ||
+            setuid(uid) != 0 ||
+            geteuid() != uid ||
+            getegid() != gid) {
+            _exit(90);
+        }
+        if (setenv("CODEX_HOME", runtime, 1) != 0 ||
+            setenv("HOME", runtime, 1) != 0 ||
+            setenv("TMPDIR", runtime, 1) != 0 ||
+            setenv(
+                "PATH",
+                "/usr/bin:/bin:/usr/sbin:/sbin",
+                1
+            ) != 0 ||
+            setenv("LANG", "en_US.UTF-8", 1) != 0) {
+            _exit(90);
+        }
+        execl(
+            codex,
+            codex,
+            "sandbox",
+            "-P",
+            "stornaut-r3-combined",
+            "-C",
+            runtime,
+            "--",
+            fanout,
+            runtime,
+            NULL
+        );
+        _exit(91);
+    }
+    return 0;
+}
+
+static int exec_drainer(
+    const char *drainer,
+    long long audit_session_id,
+    long long user_id,
+    int protect_current
+) {
+    char audit_session_text[32];
+    char user_id_text[32];
+    snprintf(
+        audit_session_text,
+        sizeof(audit_session_text),
+        "%lld",
+        audit_session_id
+    );
+    snprintf(user_id_text, sizeof(user_id_text), "%lld", user_id);
+    if (protect_current) {
+        execl(
+            drainer,
+            drainer,
+            "drain",
+            "--audit-session-id",
+            audit_session_text,
+            "--user-id",
+            user_id_text,
+            "--protect-current-process",
+            NULL
+        );
+    } else {
+        execl(
+            drainer,
+            drainer,
+            "drain",
+            "--audit-session-id",
+            audit_session_text,
+            "--user-id",
+            user_id_text,
+            NULL
+        );
+    }
+    return errno;
+}
+
+int main(int argument_count, char **arguments) {
+    if (argument_count != 12) {
+        return 64;
+    }
+    if (geteuid() != 0) {
+        return 92;
+    }
+    const char *mode = arguments[1];
+    const char *fanout = arguments[2];
+    const char *runtime = arguments[3];
+    const char *lease = arguments[4];
+    const char *state = arguments[5];
+    const char *drainer = arguments[6];
+    long long user_id = strtoll(arguments[7], NULL, 10);
+    long long group_id = strtoll(arguments[8], NULL, 10);
+    const char *username = arguments[9];
+    const char *event_path = arguments[10];
+    const char *codex = arguments[11];
+
+    auditinfo_addr_t audit_information = {0};
+    if (getaudit_addr(
+            &audit_information,
+            sizeof(audit_information)
+        ) != 0) {
+        return 93;
+    }
+    long long current_audit_session = audit_information.ai_asid;
+
+    if (strcmp(mode, "live") == 0 ||
+        strcmp(mode, "combined") == 0) {
+        if (write_number(lease, current_audit_session) != 0) {
+            return 94;
+        }
+        int spawn_result = strcmp(mode, "combined") == 0
+            ? spawn_contained_target(
+                codex,
+                fanout,
+                runtime,
+                username,
+                (uid_t)user_id,
+                (gid_t)group_id
+            )
+            : spawn_target(
+                fanout,
+                runtime,
+                username,
+                (uid_t)user_id,
+                (gid_t)group_id
+            );
+        if (spawn_result != 0 ||
+            wait_for_ready(runtime) != 0 ||
+            write_number(event_path, current_audit_session) != 0) {
+            return 94;
+        }
+        return exec_drainer(
+            drainer,
+            current_audit_session,
+            user_id,
+            1
+        );
+    }
+
+    if (strcmp(mode, "recovery") != 0) {
+        return 95;
+    }
+    long long run_count = 0;
+    if (read_number(state, &run_count) != 0) {
+        run_count = 0;
+    }
+    run_count++;
+    if (write_number(state, run_count) != 0) {
+        return 96;
+    }
+    if (run_count == 1) {
+        if (write_number(lease, current_audit_session) != 0 ||
+            spawn_target(
+                fanout,
+                runtime,
+                username,
+                (uid_t)user_id,
+                (gid_t)group_id
+            ) != 0 ||
+            wait_for_ready(runtime) != 0 ||
+            write_number(event_path, current_audit_session) != 0) {
+            return 97;
+        }
+        kill(getpid(), SIGKILL);
+        return 98;
+    }
+
+    long long stale_audit_session = 0;
+    if (read_number(lease, &stale_audit_session) != 0 ||
+        stale_audit_session <= 0 ||
+        stale_audit_session == current_audit_session) {
+        return 99;
+    }
+    FILE *event = fopen(event_path, "a");
+    if (event == NULL) {
+        return 100;
+    }
+    fprintf(
+        event,
+        "%lld %lld\n",
+        stale_audit_session,
+        current_audit_session
+    );
+    fclose(event);
+    return exec_drainer(
+        drainer,
+        stale_audit_session,
+        user_id,
+        0
+    );
+}
+EOF
+
+/usr/bin/clang \
+    -O2 \
+    -Wall \
+    -Wextra \
+    "$probe_root/fanout.c" \
+    -o "$probe_root/fanout"
+/usr/bin/clang \
+    -O2 \
+    -Wall \
+    -Wextra \
+    "$probe_root/supervisor.c" \
+    -o "$probe_root/supervisor"
+chown root:wheel "$probe_root/fanout" "$probe_root/supervisor"
+chmod 555 "$probe_root/fanout"
+chmod 500 "$probe_root/supervisor"
+
+wait_for_file() {
+    local file_path=$1
+    local evidence_name=$2
+
+    for _ in {1..600}; do
+        [[ -s "$file_path" ]] && return 0
+        /bin/sleep 0.02
+    done
+    print -u2 "Timed out waiting for lifecycle evidence: $evidence_name"
+    return 1
+}
+
+wait_for_service_stop() {
+    local label=$1
+
+    for _ in {1..600}; do
+        if /bin/launchctl print "system/$label" 2>/dev/null | \
+            grep -Fq 'state = not running'
+        then
+            return 0
+        fi
+        /bin/sleep 0.02
+    done
+    print -u2 "Lifecycle service did not stop."
+    return 1
+}
+
+print_case_diagnostics() {
+    local mode=$1
+    local output=$2
+    local errors=$3
+
+    print -u2 "Lifecycle case failed: $mode"
+    if [[ -s "$output" ]]; then
+        print -u2 -- "--- $mode stdout ---"
+        sed -n '1,120p' "$output" >&2
+    fi
+    if [[ -s "$errors" ]]; then
+        print -u2 -- "--- $mode stderr ---"
+        sed -n '1,120p' "$errors" >&2
+    fi
+}
+
+assert_recorded_processes_stopped() {
+    local case_root=$1
+    local identity_file process_id
+
+    for identity_file in "$case_root"/runtime/identity.*(N); do
+        process_id=$(awk '{ print $1; exit }' "$identity_file")
+        if [[ "$process_id" != <-> ]] || process_is_live "$process_id"; then
+            print -u2 "A recorded lifecycle process survived."
+            return 1
+        fi
+    done
+}
+
+run_case() {
+    local mode=$1
+    local case_root="$probe_root/$mode"
+    local runtime="$case_root/runtime"
+    local uuid label plist output errors
+    local lease state events
+
+    /bin/mkdir -p "$runtime"
+    /usr/sbin/chown "$target_uid:$target_gid" "$case_root" "$runtime"
+    /bin/chmod 700 "$case_root" "$runtime"
+    print -r -- "combined-read" > "$case_root/read-target"
+    /usr/sbin/chown "$target_uid:$target_gid" "$case_root/read-target"
+    /bin/chmod 600 "$case_root/read-target"
+    if [[ "$mode" == combined ]]; then
+        /bin/cat > "$runtime/config.toml" <<EOF
+default_permissions = "stornaut-r3-combined"
+cli_auth_credentials_store = "ephemeral"
+permissions.stornaut-r3-combined.extends = ":read-only"
+permissions.stornaut-r3-combined.filesystem."$runtime" = "write"
+permissions.stornaut-r3-combined.network.enabled = true
+permissions.stornaut-r3-combined.network.mode = "full"
+permissions.stornaut-r3-combined.network.enable_socks5 = false
+permissions.stornaut-r3-combined.network.allow_local_binding = false
+permissions.stornaut-r3-combined.network.dangerously_allow_non_loopback_proxy = false
+permissions.stornaut-r3-combined.network.dangerously_allow_all_unix_sockets = false
+permissions.stornaut-r3-combined.network.domains = { "*" = "allow" }
+features.network_proxy.enabled = true
+features.network_proxy.mode = "full"
+features.network_proxy.enable_socks5 = false
+features.network_proxy.allow_local_binding = false
+features.network_proxy.dangerously_allow_non_loopback_proxy = false
+features.network_proxy.dangerously_allow_all_unix_sockets = false
+features.network_proxy.domains = { "*" = "allow" }
+EOF
+        /usr/sbin/chown "$target_uid:$target_gid" "$runtime/config.toml"
+        /bin/chmod 600 "$runtime/config.toml"
+    fi
+    uuid=$(/usr/bin/uuidgen | tr '[:upper:]' '[:lower:]')
+    label="com.eriklee.stornaut.r3-audit-$mode.$uuid"
+    labels+=("$label")
+    plist="$case_root/job.plist"
+    output="$case_root/stdout.log"
+    errors="$case_root/stderr.log"
+    lease="$case_root/lease"
+    state="$case_root/state"
+    events="$case_root/events"
+
+    cat > "$plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" \
+"http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>$label</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>$probe_root/supervisor</string>
+    <string>$mode</string>
+    <string>$probe_root/fanout</string>
+    <string>$runtime</string>
+    <string>$lease</string>
+    <string>$state</string>
+    <string>$probe_root/stornaut-lifecycle-spike</string>
+    <string>$target_uid</string>
+    <string>$target_gid</string>
+    <string>$target_user</string>
+    <string>$events</string>
+    <string>$codex_source</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>SessionCreate</key>
+  <true/>
+  <key>AbandonProcessGroup</key>
+  <false/>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>StandardOutPath</key>
+  <string>$output</string>
+  <key>StandardErrorPath</key>
+  <string>$errors</string>
+EOF
+    if [[ "$mode" == recovery ]]; then
+        cat >> "$plist" <<'EOF'
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+  <key>ThrottleInterval</key>
+  <integer>1</integer>
+EOF
+    fi
+    cat >> "$plist" <<'EOF'
+</dict>
+</plist>
+EOF
+    chown root:wheel "$plist"
+    chmod 600 "$plist"
+    /usr/bin/plutil -lint "$plist" >/dev/null
+    /bin/launchctl bootstrap system "$plist"
+
+    if ! wait_for_file "$lease" "$mode.lease"; then
+        print_case_diagnostics "$mode" "$output" "$errors"
+        return 1
+    fi
+    local audit_session_id
+    audit_session_id=$(cat "$lease")
+    audit_sessions+=("$audit_session_id")
+    if ! wait_for_file "$events" "$mode.events"; then
+        print_case_diagnostics "$mode" "$output" "$errors"
+        return 1
+    fi
+    if [[ "$mode" == recovery ]]; then
+        for _ in {1..600}; do
+            [[ -s "$state" && "$(cat "$state")" -ge 2 ]] && break
+            /bin/sleep 0.02
+        done
+        if [[ ! -s "$state" || "$(cat "$state")" -lt 2 ]]; then
+            print -u2 "Recovery supervisor did not relaunch."
+            print_case_diagnostics "$mode" "$output" "$errors"
+            return 1
+        fi
+    fi
+    if ! wait_for_file "$output" "$mode.stdout"; then
+        print_case_diagnostics "$mode" "$output" "$errors"
+        return 1
+    fi
+    for _ in {1..600}; do
+        grep -Fq 'lifecycle.outcome=drained' "$output" 2>/dev/null && break
+        /bin/sleep 0.02
+    done
+    if ! grep -Fq 'lifecycle.outcome=drained' "$output"; then
+        print -u2 "Lifecycle drainer did not report success."
+        print_case_diagnostics "$mode" "$output" "$errors"
+        return 1
+    fi
+    if ! wait_for_service_stop "$label"; then
+        print_case_diagnostics "$mode" "$output" "$errors"
+        return 1
+    fi
+    if ! assert_recorded_processes_stopped "$case_root"; then
+        print_case_diagnostics "$mode" "$output" "$errors"
+        return 1
+    fi
+    local identity_file identity_asid
+    for identity_file in "$runtime"/identity.*(N); do
+        identity_asid=$(awk '{ print $5; exit }' "$identity_file")
+        if [[ "$identity_asid" != "$audit_session_id" ]]; then
+            print -u2 "A detached descendant left the audit session."
+            return 1
+        fi
+    done
+
+    if [[ "$mode" == combined ]]; then
+        local observed_uid observed_gid observed_group_count
+        local credential_group_limit
+        typeset -a group_fields observed_groups directory_groups expected_groups
+        group_fields=("${(@s: :)$(/bin/cat "$runtime/groups")}")
+        if (( ${#group_fields[@]} < 3 )); then
+            print -u2 "Contained child group evidence was malformed."
+            return 1
+        fi
+        observed_uid=$group_fields[1]
+        observed_gid=$group_fields[2]
+        observed_group_count=$group_fields[3]
+        observed_groups=("${group_fields[@]:3}")
+        credential_group_limit=$(/usr/bin/getconf NGROUPS_MAX)
+        directory_groups=(
+            "${(@s: :)$(/usr/bin/id -G "$target_user")}"
+        )
+        if [[ "$credential_group_limit" != <-> ||
+            "$credential_group_limit" -le 0 ||
+            "$credential_group_limit" -gt 256 ||
+            ${#directory_groups[@]} -lt 1 ]]
+        then
+            print -u2 "Unable to derive the target credential group set."
+            return 1
+        fi
+        expected_groups=(
+            "${directory_groups[@]:0:$credential_group_limit}"
+        )
+        expected_groups=("${(@on)expected_groups}")
+        observed_groups=("${(@on)observed_groups}")
+        if [[ "$observed_uid" != "$target_uid" ||
+            "$observed_gid" != "$target_gid" ||
+            "$observed_group_count" != "${#expected_groups[@]}" ||
+            "${(j: :)observed_groups}" != "${(j: :)expected_groups}" ]]
+        then
+            print -u2 "Contained child identity or group reset was invalid."
+            print -u2 "observed_uid=$observed_uid"
+            print -u2 "expected_uid=$target_uid"
+            print -u2 "observed_gid=$observed_gid"
+            print -u2 "expected_gid=$target_gid"
+            print -u2 "observed_group_count=$observed_group_count"
+            print -u2 "expected_group_count=${#expected_groups[@]}"
+            print -u2 "observed_groups=${(j: :)observed_groups}"
+            print -u2 "expected_groups=${(j: :)expected_groups}"
+            return 1
+        fi
+        local read_result write_result
+        read -r read_result write_result < "$runtime/containment"
+        if [[ "$read_result" != 0 || "$write_result" == 0 ||
+            -e "$case_root/denied-write" ]]
+        then
+            print -u2 "Outer Seatbelt ordering was not enforced."
+            return 1
+        fi
+        local parent_pid parent_asid parent_uid
+        read -r parent_pid parent_asid parent_uid < "$runtime/parent"
+        if [[ "$parent_pid" != <-> ||
+            "$parent_asid" != "$audit_session_id" ||
+            "$parent_uid" != "$target_uid" ]]
+        then
+            print -u2 "Managed proxy owner identity was invalid."
+            return 1
+        fi
+        if process_is_live "$parent_pid"; then
+            print -u2 "Managed proxy owner survived audit-session drain."
+            return 1
+        fi
+        print -r -- "lifecycle.identity_drop=observed"
+        print -r -- "lifecycle.outer_seatbelt=observed"
+        print -r -- "lifecycle.audit_session_inheritance=observed"
+        print -r -- "lifecycle.proxy_owner_drained=observed"
+    fi
+
+    "$probe_root/stornaut-lifecycle-spike" \
+        drain \
+        --audit-session-id "$audit_session_id" \
+        --user-id "$target_uid" \
+        > "$case_root/postcheck.log"
+    if ! grep -Fq \
+        'lifecycle.unique_member_count=0' \
+        "$case_root/postcheck.log"
+    then
+        print -u2 "Lifecycle post-check found surviving members."
+        print_case_diagnostics "$mode" "$output" "$errors"
+        return 1
+    fi
+
+    if [[ "$mode" == recovery ]]; then
+        local stale_asid restart_asid
+        read -r stale_asid restart_asid < <(tail -n 1 "$events")
+        if [[ "$stale_asid" != "$audit_session_id" || \
+            "$restart_asid" == "$stale_asid" ]]
+        then
+            print -u2 "Recovery audit-session identity was invalid."
+            return 1
+        fi
+        print -r -- "lifecycle.recovery_new_audit_session=observed"
+    fi
+    print -r -- "lifecycle.$mode=drained"
+    /bin/launchctl bootout "system/$label" >/dev/null 2>&1 || true
+}
+
+print -r -- "host.architecture=$(uname -m)"
+print -r -- "lifecycle.target_uid_is_nonroot=$(( target_uid > 0 ))"
+run_case live
+run_case combined
+run_case recovery
+cleanup
+trap - EXIT INT TERM
+print -r -- "lifecycle.cleanup=complete"
+print -r -- "probe.verdict=behaviorReadyCandidate"

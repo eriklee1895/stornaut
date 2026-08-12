@@ -127,6 +127,10 @@ R1–R6 通过后恢复 Task 29；若 gate 为 no-go，先记录证据并 review
 能力绕过。Task 35 完成后，Phase D 才可基于已验证的 runtime foundation
 实现完整 Deep Dive 产品流程。
 
+R3 已于 2026-08-12 得出 `behaviorReady` candidate。按用户要求，完成 R3
+独立 review/commit/push 后暂停，等待用户 review；R4 不自动启动。R3 不改变
+上述顺序，也不提前恢复 Task 29。
+
 ### Phase D — Conditional Deep Dive
 
 **范围：** Epic 5–6；仅在 ADR 0004 capability-first runtime gate 允许时进入。
@@ -219,10 +223,12 @@ R1–R6 通过后恢复 Task 29；若 gate 为 no-go，先记录证据并 review
   R1 已完成并得出 conditional-go：managed proxy 是唯一观察到能同时满足
   公网访问与任意 local/private/Unix target 阻断的候选，但需要 same-session、
   parent-owned random loopback proxy transport；该例外已获批准用于 R2
-  configuration candidate；R2 已完成并得出 `configurationReady`。R3 已因
-  direct `setsid()` / `POSIX_SPAWN_SETSID` new-session descendants 逃逸
-  process-group/launchd cleanup 而得出 `behaviorBlocked/no-go`；R4–R6 与
-  Task 29 仍未启动。
+  configuration candidate；R2 已完成并得出 `configurationReady`。R3 原
+  process-group candidate 因 direct `setsid()` /
+  `POSIX_SPAWN_SETSID` new-session descendants 逃逸而被拒；用户批准的
+  audit-session lifecycle supervisor 随后通过 live/combined/recovery
+  privileged composition，R3 得出 `behaviorReady` candidate。R4–R6 与
+  Task 29 仍未启动，当前暂停等待用户 review。
 - Epic 0 Foundation Upstream Study：已完成，选择 checked-in Xcode App/Test host + local Swift packages。
 - Epic 0 Task 1：SwiftPM Core/Codex、smoke tests、`scripts/verify`、manual-only CI 与 ThirdPartyNotices 骨架已完成。
 - Bundle identifier：已确认 `com.eriklee.stornaut`。
@@ -249,5 +255,5 @@ R1–R6 通过后恢复 Task 29；若 gate 为 no-go，先记录证据并 review
   [Epic 2–4 Validation Report](../reports/epic-2-4-validation-report.md)。
 - 当前状态：ADR 0013 的精确 same-session managed proxy loopback transport
   例外已获批准；R2 已完成并得出 `configurationReady`；R3 behavioral gate
-  已得出 `behaviorBlocked/no-go`。完整 gate 未通过，Phase C Task 29 保持
-  paused。
+  已得出 `behaviorReady` candidate。完整 gate 仍未通过，R4–R6 未启动，
+  Phase C Task 29 与生产 Deep Dive 保持 paused。

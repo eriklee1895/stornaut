@@ -33,10 +33,10 @@
 | Agent、双模式与治理设计 | [Agent Disk Governance](design/agent-disk-governance.md) |
 | UI、品牌、状态与交互 | [UI/UX](design/ui-ux.md) |
 | 宏观交付顺序与阶段 Gate | [Delivery Roadmap](plans/roadmap.md) |
-| 当前计划状态 | [Active Plans](plans/active/README.md) — Runtime R3 behaviorBlocked/no-go |
-| Capability-first Codex Runtime Gate | [Runtime Evidence Gate](plans/active/capability-first-codex-runtime-gate.md) — stopped at R3；R4–R6 not started |
+| 当前计划状态 | [Active Plans](plans/active/README.md) — Runtime R3 behaviorReady；等待用户 review |
+| Capability-first Codex Runtime Gate | [Runtime Evidence Gate](plans/active/capability-first-codex-runtime-gate.md) — paused after R3；R4–R6 not started |
 | R2 tests-first brief | [R2 Implementation Brief](plans/active/task-r2-implementation-brief.md) — complete |
-| R3 lifecycle hard-gate brief | [R3 Implementation Brief](plans/active/task-r3-implementation-brief.md) — behaviorBlocked/no-go |
+| R3 lifecycle hard-gate brief | [R3 Implementation Brief](plans/active/task-r3-implementation-brief.md) — behaviorReady candidate |
 | Phase C Epic 8 获批计划 | [Safe Execution Vertical Slice](plans/active/epic-8-safe-execution-vertical-slice.md) |
 | Epic 2–4 历史计划 | [Deterministic Product Core](plans/completed/epic-2-4-deterministic-product-core.md) — Tasks 9–26 已完成并归档 |
 | 已完成计划 | [Completed Plans](plans/completed/README.md) — Epic 0–1 |
@@ -47,15 +47,16 @@
 | Codex discovery/capability 决策 | [ADR 0002](adr/0002-codex-discovery-and-capabilities.md) |
 | Codex structured process 决策 | [ADR 0003](adr/0003-codex-process-protocol.md) |
 | Codex 能力优先调查与 Swift 执行边界 | [ADR 0004](adr/0004-codex-file-read-isolation.md) — direct read、live search、公共联网；无写入/Executor 权限 |
-| Capability-first Runtime containment 候选 | [ADR 0013](adr/0013-capability-first-runtime-containment.md) — R2 candidate accepted；R3 rejected |
+| Capability-first Runtime containment 候选 | [ADR 0013](adr/0013-capability-first-runtime-containment.md) — R3 behaviorReady candidate |
+| Investigation lifecycle supervisor | [ADR 0016](adr/0016-investigation-lifecycle-supervisor.md) — audit-session lifecycle accepted at R3；R5 packaging pending |
 | Swift Surveyor 性能决策 | [ADR 0005](adr/0005-swift-surveyor-performance.md) |
 | Trash 与 Registered Action 决策 | [ADR 0006](adr/0006-trash-and-registered-actions.md) |
 | 领域持久化决策 | [ADR 0007](adr/0007-domain-persistence-boundary.md) — Accepted，Task 11 verified |
 | Phase C Safe Execution Study | [Epic 8 Safe Execution](upstream-studies/epic-8-safe-execution.md) |
 | Capability-first Runtime Study | [Epic 5 Runtime Study](upstream-studies/epic-5-capability-first-runtime.md) — R1 evidence |
 | Capability-first Runtime R1 Review | [R1 Review](reports/capability-first-runtime-r1-review.md) — conditional-go evidence；transport later approved |
-| Capability-first Runtime R2 Review | [R2 Review](reports/capability-first-runtime-r2-review.md) — configurationReady at R2；R3 later blocked |
-| Capability-first Runtime R3 Review | [R3 Review](reports/capability-first-runtime-r3-review.md) — process-tree lifecycle no-go |
+| Capability-first Runtime R2 Review | [R2 Review](reports/capability-first-runtime-r2-review.md) — configurationReady at R2 |
+| Capability-first Runtime R3 Review | [R3 Review](reports/capability-first-runtime-r3-review.md) — behaviorReady candidate；R4 not started |
 | Review / Policy / Authorization 决策 | [ADR 0011](adr/0011-review-policy-authorization.md) |
 | Cleanup Journal / Manifest 决策 | [ADR 0012](adr/0012-cleanup-execution-journal.md) |
 | Epic 8 Task 27 Review | [Task 27 Code and Design Review](reports/epic-8-task-27-review.md) |

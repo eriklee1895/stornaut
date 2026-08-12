@@ -16,6 +16,10 @@ let package = Package(
             name: "StornautCodex",
             targets: ["StornautCodex"]
         ),
+        .library(
+            name: "StornautLifecycle",
+            targets: ["StornautLifecycle"]
+        ),
         .executable(
             name: "SurveyorBenchmark",
             targets: ["SurveyorBenchmark"]
@@ -23,6 +27,10 @@ let package = Package(
         .executable(
             name: "stornaut-rule-compiler",
             targets: ["StornautRuleCompiler"]
+        ),
+        .executable(
+            name: "stornaut-lifecycle-spike",
+            targets: ["StornautLifecycleSpike"]
         ),
     ],
     targets: [
@@ -42,6 +50,18 @@ let package = Package(
                 .copy("Schemas"),
             ]
         ),
+        .target(
+            name: "StornautLifecycle",
+            dependencies: ["CLifecycleSupport"]
+        ),
+        .target(
+            name: "CLifecycleSupport",
+            path: "Sources/CLifecycleSupport",
+            publicHeadersPath: "include",
+            linkerSettings: [
+                .linkedLibrary("bsm"),
+            ]
+        ),
         .executableTarget(
             name: "SurveyorBenchmark",
             dependencies: ["StornautCore"],
@@ -57,6 +77,11 @@ let package = Package(
             dependencies: ["RuleCompilerKit"],
             path: "Tools/StornautRuleCompiler"
         ),
+        .executableTarget(
+            name: "StornautLifecycleSpike",
+            dependencies: ["StornautLifecycle"],
+            path: "tools/StornautLifecycleSpike"
+        ),
         .testTarget(
             name: "StornautCoreTests",
             dependencies: ["StornautCore"]
@@ -64,6 +89,10 @@ let package = Package(
         .testTarget(
             name: "StornautCodexTests",
             dependencies: ["StornautCodex", "StornautCore"]
+        ),
+        .testTarget(
+            name: "StornautLifecycleTests",
+            dependencies: ["StornautLifecycle"]
         ),
         .testTarget(
             name: "RuleCompilerTests",

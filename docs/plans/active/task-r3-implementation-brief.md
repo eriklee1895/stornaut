@@ -1,10 +1,11 @@
 # R3 Implementation Brief: OS Containment, Runtime Home and Auth Projection
 
-> Status: Stopped — behaviorBlocked/no-go at the R3 lifecycle hard gate
+> Status: Complete — behaviorReady candidate; pause after R3 commit/push for
+> user review
 >
 > Prepared: 2026-08-12
 >
-> Baseline: `1af81872b745cc819dda1e5cac1de88e9c954f49`
+> Baseline: `956ea1c1945c1766060fdfbca8bd0ad136a57277`
 >
 > Plan:
 > [Capability-First Runtime Gate](capability-first-codex-runtime-gate.md)
@@ -23,6 +24,7 @@ trusted Swift parent
 → Codex-managed single HTTP proxy on a random loopback port
 → one outer macOS Seatbelt sandbox for the complete Codex process tree
 → closed App Server driver with programmatic externalSandbox turns
+→ one launchd-created audit session with identity-checked lifecycle recovery
 ```
 
 The outer sandbox, not model instructions or the inner tool wrapper, enforces:
@@ -43,12 +45,18 @@ R3 does not:
 - enable browser/image/subagent product behavior;
 - create cleanup, Trash or Registered Action paths.
 
-The candidate did not pass this gate. The checked-in lifecycle probe proved
-that a sandboxed descendant can leave the investigation process group with
-both direct `setsid()` and `POSIX_SPAWN_SETSID`. A temporary launchd user job
-also failed to reclaim the new-session descendant after its leader exited.
-R3 therefore stops as `behaviorBlocked`; the implementation candidate was
-removed rather than admitted with an unproved crash/cancellation boundary.
+The first candidate did not pass this gate: direct `setsid()`,
+`POSIX_SPAWN_SETSID` and double-fork descendants can leave a process group, and
+a launchd user job does not reclaim them. The user then approved the narrow
+privileged lifecycle architecture in
+[ADR 0016](../../adr/0016-investigation-lifecycle-supervisor.md). The final R3
+candidate places each investigation in a launchd-created audit session and
+drains membership by complete audit-token identity. The combined privileged
+probe proved UID/GID/group reduction, outer Seatbelt ordering, audit-session
+inheritance across all three detach shapes, managed-proxy-owner cleanup and
+same-boot stale-lease recovery. R3 therefore closes as `behaviorReady`
+candidate. This is not signed-App helper packaging or product admission; R5
+still owns that evidence.
 
 ## 2. Measured Upstream Facts
 
@@ -111,11 +119,26 @@ Swift performs all pre-sandbox work:
 - read the existing user auth through a closed projection interface;
 - retain only the access token, account ID and optional plan type in memory;
 - never copy the ID token, refresh token, API key, auth file or keyring item;
-- launch `codex sandbox` as the process-group leader;
+- send only the closed authenticated start/cancel operation to the lifecycle
+  supervisor;
 - drive only the closed App Server sequence;
 - answer an auth refresh request only through the same closed projection
   interface;
 - destroy projected auth bytes and the Runtime Workspace after exit.
+
+The lifecycle supervisor:
+
+- creates one launchd-owned audit session per investigation;
+- records only a root-owned, versioned anonymous lease;
+- calls `initgroups`, `setgid` and `setuid` before the Codex outer sandbox;
+- never accepts caller-supplied PID, signal, executable, argv or path;
+- drains the complete ASID by audit-token identity on cancel, App loss,
+  supervisor restart or stale-lease recovery.
+
+The checked-in `StornautLifecycle` module is the closed contract and
+deterministic drain implementation. R3 uses an explicitly authorized ephemeral
+system-domain job for behavioral evidence. Registration, installation,
+updating and signed-App XPC/Mach-service admission remain R5 work.
 
 ### 3.2 Runtime Workspace
 
@@ -325,13 +348,18 @@ Network:
 
 Lifecycle:
 
-- eight-way concurrent launch;
-- grandchild descriptor holder;
-- browser/worker-shaped descendant;
-- network timeout;
-- cancellation during fan-out;
-- output/event overflow;
-- no surviving process/listener/workspace.
+- direct `setsid()`, `POSIX_SPAWN_SETSID` and double-fork descendants remain in
+  the same investigation audit session;
+- fixed-point `SIGSTOP → rescan → SIGKILL → rescan` drains all members;
+- complete audit-token signalling prevents PID-reuse retargeting;
+- a vanished-before-freeze member is not added to the kill set;
+- fork storms and member-bound overflow fail closed;
+- helper restart receives a different ASID and drains only a same-boot stale
+  lease;
+- UID/GID and the kernel-bounded supplementary credential group cache are
+  reduced before the outer sandbox starts;
+- managed-proxy owner, detached descendants, listener, launchd label and
+  temporary root leave no residue.
 
 ### 6.3 External auth/App Server diagnostic
 
@@ -379,12 +407,13 @@ unsupported external auth, extra loopback listener, write/network escape,
 secret leak or cleanup ambiguity yields `behaviorBlocked`, records a no-go
 review and stops R4–R6.
 
-Success ends with one independent commit/push. It does not start R4 until that
-push and remote-state check complete.
+Success ends with one independent commit/push and remote-state check. Per the
+user's 2026-08-12 instruction, stop there for R3 review; do not start R4
+without a new instruction.
 
-## 8. Measured No-Go Outcome
+## 8. Measured Behavior-Ready Outcome
 
-Final anonymous probe:
+The original process-group no-go remains valid historical evidence:
 
 ```text
 scripts/probe-codex-r3-lifecycle-escape
@@ -392,46 +421,56 @@ scripts/probe-codex-r3-lifecycle-escape
 SHA-256 f25700e0e35178910cda4809468ea1aa37a9936abaec4100fb6b74e49fde3557
 ```
 
-Observed on Apple Silicon macOS with installed `codex-cli 0.147.0`:
+It proves why process-group-only cleanup and a launchd user job are rejected.
+It is superseded for the R3 candidate by the user-approved audit-session
+supervisor architecture, not erased or reinterpreted.
+
+Final combined lifecycle evidence:
 
 ```text
-lifecycle.direct_setsid_escape=observed
-lifecycle.posix_spawn_setsid_escape=observed
-lifecycle.launchd_job_escape=observed
+scripts/probe-codex-r3-audit-session-lifecycle
+/tmp/stornaut-r3-audit-session-combined-final.log
+SHA-256 509140cdfc431474e776c3b87a3fd1fc303cc34e420850f4f3dc800282dddb29
+
+lifecycle.live=drained
+lifecycle.identity_drop=observed
+lifecycle.outer_seatbelt=observed
+lifecycle.audit_session_inheritance=observed
+lifecycle.proxy_owner_drained=observed
+lifecycle.combined=drained
+lifecycle.recovery_new_audit_session=observed
+lifecycle.recovery=drained
 lifecycle.cleanup=complete
-probe.verdict=behaviorBlocked
+probe.verdict=behaviorReadyCandidate
 ```
 
-Interpretation:
+The macOS credential cache accepts at most `NGROUPS_MAX == 16` groups.
+`initgroups(3)` documents that additional OpenDirectory memberships are
+resolved dynamically rather than all appearing in `getgroups(2)`. The final
+probe therefore compares the exact kernel-bounded credential set instead of
+incorrectly requiring the unlimited `id -G` list to fit in the process cache.
 
-1. the current process-group terminator cannot reach a descendant after that
-   descendant creates a new POSIX session;
-2. adding Seatbelt denies for `SYS_setsid` and `SYS_setpgid` is insufficient
-   because `posix_spawn(..., POSIX_SPAWN_SETSID)` still creates the new
-   session;
-3. launchd's default process-group cleanup does not reclaim that new-session
-   descendant;
-4. modern macOS marks recursive kqueue `NOTE_TRACK` process tracking
-   unsupported, and no supported parent-death signal or public per-
-   investigation process-container API was found;
-5. private coalition APIs, Endpoint Security monitoring, a privileged daemon
-   or permission expansion are outside this approved candidate and were not
-   introduced.
+Final containment and model observations:
 
-The probe itself owns only anonymous `/private/tmp` fixtures, gives every
-helper a bounded lifetime and force-cleans every recorded PID and temporary
-launchd label before reporting `lifecycle.cleanup=complete`.
+```text
+scripts/probe-codex-r3-containment
+/tmp/stornaut-r3-containment-post-review.log
+SHA-256 d5c46588a1d1737eac232b3c44f1a6ed533aba6c003631b7498fff11c5de06a2
 
-Positive pre-blocker evidence remains useful but cannot override the hard
-failure:
+STORNAUT_RUN_R3_APP_SERVER_DIAGNOSTIC=1
+/tmp/stornaut-r3-real-app-server-post-review-retry.log
+SHA-256 fdd2ea2b00672650719a567c60bcf668a68323050f0165eca8c48bf4d198edf6
+```
 
-- the outer Seatbelt candidate denied target writes;
-- the managed proxy allowed public HTTPS while direct public, arbitrary
-  loopback and Unix-socket attempts failed;
-- external App Server authentication worked with `gpt-5.6-luna` without a
-  Runtime Home `auth.json`.
+The anonymous matrix observed full-disk read-only scope, Runtime Home writes,
+auth denial, mutation containment, one random loopback HTTP proxy, public
+egress and direct/local/private/link-local/Unix/local-bind denial with
+fail-closed proxy crash behavior. The synthetic real-model diagnostic observed
+external App Server auth and one `gpt-5.6-luna` turn without a Runtime Home
+`auth.json`.
 
-Those observations prove neither cancellation nor crash cleanup. The
-unresolved descendant escape is a P1 containment defect, so no R3 production
-runtime code, R4 protocol work, R5 signed-App admission or R6 final admission
-is retained or started.
+These observations do not prove signed-App helper packaging, FDA/TCC
+inheritance, Browser Use, image/subagent admission or no-Executor product
+integration. R4 owns protocol/no-Executor evidence; R5 owns signed-App
+capability and helper packaging evidence; R6 owns final admission. Deep Dive
+remains unavailable.

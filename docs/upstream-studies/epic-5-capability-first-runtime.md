@@ -537,8 +537,8 @@ the current `0.147.0` candidate is no-go and R2 does not start.
 
 ## 14. R3 Lifecycle Correction
 
-R2 reached `configurationReady`, but R3 did not behaviorally admit this
-candidate. macOS measurements added on 2026-08-12 found:
+R2 reached `configurationReady`. The first R3 process-group candidate did not
+behaviorally admit the runtime. macOS measurements added on 2026-08-12 found:
 
 1. a descendant under the Codex outer Seatbelt can call `setsid()`, leave the
    investigation process group and remain live after the sandbox leader exits;
@@ -551,9 +551,8 @@ candidate. macOS measurements added on 2026-08-12 found:
    parent-death signal or supported per-investigation process-container API was
    found;
 5. PPID or environment polling is not crash-safe after reparenting and PID
-   reuse; private coalition APIs, Endpoint Security and a privileged daemon
-   would require a different supported architecture and explicit product/
-   permission review.
+   reuse; private coalition APIs and Endpoint Security require unsupported or
+   broader architecture.
 
 Reproducible anonymous evidence:
 
@@ -564,6 +563,57 @@ SHA-256 f25700e0e35178910cda4809468ea1aa37a9936abaec4100fb6b74e49fde3557
 ```
 
 This corrects the R1 conditional candidate: managed-proxy transport remains a
-viable network shape, but the current macOS process lifecycle shape is not
-viable. R3 is `behaviorBlocked/no-go`, no production runtime is retained and
-R4–R6 do not start.
+viable network shape, but process-group-only lifecycle is not viable.
+
+The user then explicitly approved a narrow privileged lifecycle supervisor.
+Further supported-interface measurements found:
+
+1. launchd `SessionCreate` gives the supervisor job a new audit session;
+2. direct `setsid()`, `POSIX_SPAWN_SETSID`, double-fork and reparenting do not
+   change the descendant audit session;
+3. `TASK_AUDIT_TOKEN` exposes PID, ASID and pidversion from the privileged
+   helper context;
+4. `proc_signal_with_audittoken` supplies identity-checked signalling;
+5. root cannot directly read another user's full task audit token, but a
+   one-shot child can clear/init supplementary groups, drop GID/UID and read
+   its own complete token without giving Codex root;
+6. `initgroups(3)` stores at most `NGROUPS_MAX` IDs in the process credential
+   cache; additional OpenDirectory memberships are resolved dynamically.
+
+ADR 0016 fixes the accepted architecture:
+
+```text
+one launchd audit session per investigation
+→ root-owned versioned lease
+→ initgroups / setgid / setuid
+→ outer Codex Seatbelt and managed proxy
+→ audit-token inventory
+→ identity-checked SIGSTOP / fixed-point rescan
+→ identity-checked SIGKILL / empty-session confirmation
+```
+
+Final privileged composition evidence:
+
+```text
+scripts/probe-codex-r3-audit-session-lifecycle
+/tmp/stornaut-r3-audit-session-combined-final.log
+SHA-256 509140cdfc431474e776c3b87a3fd1fc303cc34e420850f4f3dc800282dddb29
+
+lifecycle.live=drained
+lifecycle.identity_drop=observed
+lifecycle.outer_seatbelt=observed
+lifecycle.audit_session_inheritance=observed
+lifecycle.proxy_owner_drained=observed
+lifecycle.combined=drained
+lifecycle.recovery_new_audit_session=observed
+lifecycle.recovery=drained
+lifecycle.cleanup=complete
+probe.verdict=behaviorReadyCandidate
+```
+
+The helper contract accepts only authenticated start/cancel by investigation
+ID and does not expose PID, signal, executable, argv, path, filesystem,
+network, Policy or Executor authority. R3 therefore closes as
+`behaviorReady` candidate. R5 still owns signed-App ServiceManagement/helper
+packaging, FDA/TCC inheritance and capability observation; R6 owns final
+admission.

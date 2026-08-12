@@ -1,7 +1,7 @@
 # Capability-First Codex Runtime Evidence Gate
 
-> Status: Stopped — R1–R2 complete; R3 behaviorBlocked/no-go; R4–R6 not
-> started
+> Status: Paused for user review — R1–R3 complete; R3 behaviorReady candidate;
+> R4–R6 not started
 >
 > Planned: 2026-08-11
 >
@@ -252,6 +252,11 @@ R1 Current Runtime and macOS Containment Study
 
 R1–R3 are the critical path. R4–R6 do not start if R3 cannot prove a viable
 containment design.
+
+R3 has now proved a viable candidate. Per the user's 2026-08-12 instruction,
+the plan pauses after the independent R3 commit/push and remote-state check.
+R4 does not start until the user reviews the R3 output and gives a new
+instruction.
 
 Every R-task follows:
 
@@ -643,11 +648,20 @@ checks, docs links and diff hygiene.
 R3 is the hard gate. Any integrity failure blocks R4–R6 and yields a no-go
 report. Success ends with one independent commit/push.
 
-R3 reached that stop condition on 2026-08-12. Direct `setsid()` and
-`POSIX_SPAWN_SETSID` descendants escaped the investigation process group, and
-a launchd user job did not reclaim the new-session descendant. See the
-[R3 review](../../reports/capability-first-runtime-r3-review.md). No R3
-production runtime was retained and R4–R6 were not started.
+The first R3 process-group candidate reached that stop condition on
+2026-08-12. Direct `setsid()` and `POSIX_SPAWN_SETSID` descendants escaped the
+investigation process group, and a launchd user job did not reclaim the
+new-session descendant. After explicit user approval, ADR 0016 introduced a
+narrow audit-session lifecycle supervisor. The final privileged composition
+proved identity reduction, outer Seatbelt ordering, audit-session inheritance
+across direct/spawn/double-fork detach shapes, managed-proxy-owner cleanup and
+stale-lease recovery with zero residue. The anonymous containment matrix and
+external-auth `gpt-5.6-luna` diagnostic also passed. See the
+[R3 review](../../reports/capability-first-runtime-r3-review.md).
+
+R3 closes as `behaviorReady` candidate. It does not prove signed-App helper
+packaging, FDA/TCC inheritance, no-Executor protocol integration or final
+product admission. R4–R6 remain not started.
 
 ## 12. R4 — Investigation Protocol v2 and No-Executor Seam
 
@@ -1028,8 +1042,7 @@ If any capability or integrity row remains uncertain, this gate is not
 complete. Record the no-go/conditional result and continue the deterministic
 product only through a separately reviewed roadmap update.
 
-Current outcome: the plan is **not complete** and is stopped at R3
-`behaviorBlocked`. Task 29 and production Deep Dive remain paused. Any future
-runtime attempt requires a separately reviewed architecture that supplies a
-supported per-investigation whole-process-tree container without weakening
-the approved capability or integrity boundary.
+Current outcome: the plan is **not complete**. R3 is a `behaviorReady`
+candidate and the workflow is paused for user review before R4. Task 29 and
+production Deep Dive remain paused. R4–R6 still must prove protocol/no-Executor,
+signed-App capability/helper packaging and final admission.

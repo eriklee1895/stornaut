@@ -864,7 +864,7 @@ struct FoundationCodexRuntimeDiagnosticProcessRunner: Sendable {
     }
 }
 
-private struct SpawnedDiagnosticProcess {
+struct SpawnedDiagnosticProcess {
     let pid: pid_t
     let processGroup: ProcessGroupID
     let standardInput: Int32
@@ -872,7 +872,7 @@ private struct SpawnedDiagnosticProcess {
     let standardError: Int32
 }
 
-private func spawnDiagnosticProcess(
+func spawnDiagnosticProcess(
     executableURL: URL,
     arguments: [String],
     environment: [String: String],
@@ -1050,7 +1050,7 @@ private final class DiagnosticTerminationResult: @unchecked Sendable {
     }
 }
 
-private func terminateDiagnosticProcessGroup(
+func terminateDiagnosticProcessGroup(
     _ processGroup: ProcessGroupID
 ) throws {
     let completed = DispatchSemaphore(value: 0)
@@ -1082,7 +1082,7 @@ private func terminateDiagnosticProcessGroup(
     }
 }
 
-private func forceCleanupDiagnosticProcess(
+func forceCleanupDiagnosticProcess(
     _ process: SpawnedDiagnosticProcess
 ) {
     kill(-process.processGroup.rawValue, SIGKILL)
@@ -1096,7 +1096,7 @@ private func forceCleanupDiagnosticProcess(
     }
 }
 
-private func reapDiagnosticProcess(_ pid: pid_t) throws -> Int32 {
+func reapDiagnosticProcess(_ pid: pid_t) throws -> Int32 {
     var status: Int32 = 0
     while waitpid(pid, &status, 0) < 0 {
         if errno != EINTR {
@@ -1106,7 +1106,7 @@ private func reapDiagnosticProcess(_ pid: pid_t) throws -> Int32 {
     return status
 }
 
-private func normalizedDiagnosticExitStatus(_ waitStatus: Int32) -> Int32 {
+func normalizedDiagnosticExitStatus(_ waitStatus: Int32) -> Int32 {
     if waitStatus & 0x7F == 0 {
         return (waitStatus >> 8) & 0xFF
     }
@@ -1413,7 +1413,7 @@ private func globalInstructionsAreAbsent(in home: URL) -> Bool {
     }
 }
 
-private extension Duration {
+extension Duration {
     var dispatchDeadline: DispatchTime {
         guard self > .zero else { return .now() }
         let components = self.components

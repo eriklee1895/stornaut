@@ -15,9 +15,11 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   Phase C deterministic Epic 8 详尽 plan 已于 2026-08-11 获用户批准，
   Tasks 27–28 已完成并通过 unified verifier。ADR 0004 回顾后，用户已批准在
   Task 29 前插入 capability-first Runtime R1–R6 evidence gate；R1 已完成并
-  transport 例外已获批准；R2 已完成并得出 `configurationReady`；R3 已因
-  new-session descendant lifecycle escape 得出 `behaviorBlocked/no-go`，
-  R4–R6 与 Task 29 均未启动。逐 Task 完成 Upstream Study、
+  transport 例外已获批准；R2 已完成并得出 `configurationReady`；原 R3
+  process-group candidate 的 new-session descendant escape 已由用户批准的
+  audit-session lifecycle supervisor 精确关闭，R3 得出 `behaviorReady`
+  candidate。当前按用户要求暂停等待 R3 review，R4–R6 与 Task 29 均未启动。
+  逐 Task 完成 Upstream Study、
   实现、code review、focused/full verify、独立 commit/push；不得提前混入
   生产 Deep Dive、Adapter、真实 Registered Action 或 release 工作。
 - 新的 capability-first runtime/safety check 通过前，Deep Dive 必须保持
@@ -65,7 +67,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | 当前 active plan 状态 | [docs/plans/active/README.md](docs/plans/active/README.md) |
 | Capability-first Codex Runtime Gate | [docs/plans/active/capability-first-codex-runtime-gate.md](docs/plans/active/capability-first-codex-runtime-gate.md) |
 | R1 Runtime Study / conditional decision | [docs/upstream-studies/epic-5-capability-first-runtime.md](docs/upstream-studies/epic-5-capability-first-runtime.md) / [ADR 0013](docs/adr/0013-capability-first-runtime-containment.md) |
-| R3 Runtime lifecycle no-go | [docs/reports/capability-first-runtime-r3-review.md](docs/reports/capability-first-runtime-r3-review.md) |
+| R3 Runtime behavior gate | [docs/reports/capability-first-runtime-r3-review.md](docs/reports/capability-first-runtime-r3-review.md) |
 | Phase C Epic 8 获批计划 | [docs/plans/active/epic-8-safe-execution-vertical-slice.md](docs/plans/active/epic-8-safe-execution-vertical-slice.md) |
 | Epic 2–4 历史计划 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) |
 | Epic 2–4 最终 Gate | [docs/reports/epic-2-4-validation-report.md](docs/reports/epic-2-4-validation-report.md) |
@@ -93,12 +95,17 @@ same-investigation parent-owned random-loopback managed proxy 例外；R2 已完
 并得出 `configurationReady`，
 允许 Codex descendants 仅连接 same-investigation、父进程拥有、随机端口的
 loopback managed proxy；其他 localhost/private/link-local 和所有 Unix sockets
-仍须阻断。R3 已证明 direct `setsid()`、`POSIX_SPAWN_SETSID` 与 launchd
-job cleanup 均不能保证整个调查进程树回收，结论为
-`behaviorBlocked/no-go`；R4–R6 与 Task 29 均未启动。
+仍须阻断。R3 首先证明 direct `setsid()`、`POSIX_SPAWN_SETSID` 与 launchd
+user-job cleanup 不能保证整个调查进程树回收；用户随后批准 ADR 0016 的窄
+audit-session lifecycle supervisor。最终 privileged composition 已观察到
+identity drop、outer Seatbelt ordering、audit-session inheritance、managed
+proxy owner drain 与 stale-lease recovery，live/combined/recovery 均完成且
+residue 为 0；R3 结论为 `behaviorReady` candidate。当前暂停等待用户 review，
+R4–R6 与 Task 29 均未启动。
 Deep Dive 的旧 Broker-only no-go 已被 ADR 0004 的 capability-first 边界取代；
-当前仍 paused 的原因是新运行时实现/evidence gate 尚未交付，而非 Codex 工具
-能力过强。release signing/notarization 仍未评估。Overview、Scan、Scan-only
+当前仍 paused 的原因是 R4–R6 与生产 Deep Dive 尚未交付，而非 Codex 工具
+能力过强。R3 不证明 signed-App helper packaging、FDA/TCC 或最终 no-Executor
+admission；release signing/notarization 仍未评估。Overview、Scan、Scan-only
 History 与六区 Settings 已是真实 typed projection/生命周期，Investigations 仍是 placeholder，
 Review/Trash 仍未启用。
 
@@ -107,6 +114,8 @@ Review/Trash 仍未启用。
 ```text
 Sources/StornautCore/    领域类型与安全接口
 Sources/StornautCodex/   Codex 发现、启动、JSONL/schema
+Sources/StornautLifecycle/
+                        closed audit-session lifecycle foundation
 Sources/StornautCore/Settings/
                         closed preferences、bookmark 与 exclusions
 Stornaut.xcodeproj/      原生 macOS App/Test host

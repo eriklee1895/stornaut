@@ -6,8 +6,10 @@ R1–R6 计划见
 [`capability-first-codex-runtime-gate.md`](capability-first-codex-runtime-gate.md)，
 详尽计划已获批准。R1 study/ADR/probe/review 与 R2 closed profile/report/
 diagnostic 已完成；R2 结论为 `configurationReady`。R3 已因 new-session
-descendant lifecycle escape 得出 `behaviorBlocked/no-go`；R4–R6 与 Task 29
-均未启动。
+descendant lifecycle escape 拒绝 process-group-only candidate；用户批准的
+audit-session lifecycle supervisor 随后通过 final privileged composition，
+R3 得出 `behaviorReady` candidate。当前完成 R3 独立 review/commit/push 后
+按用户要求暂停，等待用户 review；R4–R6 与 Task 29 均未启动。
 
 Epic 2–4 Tasks 9–26 已完成并归档；最终统一 verifier 单次 exit `0`。
 Phase C deterministic Epic 8 的详尽 plan 已于 2026-08-11 获用户批准，见
@@ -28,9 +30,13 @@ R1–R6 必须证明 direct read、shell/unified exec、live search、browser/di
 fetch、image、skills/subagents 与公共联网可用，同时 Codex 全进程树不可写用户
 数据、不可访问 localhost/私网/任意 Unix socket 且无 Executor 路径。不得用
 `danger-full-access`、关闭调查能力、命令/公共域名 allowlist 或逐命令审批制造
-通过。R1–R2 已完成，R2 结论为 `configurationReady`；R3 已证明 direct
-`setsid()`、`POSIX_SPAWN_SETSID` 与 launchd job cleanup 均不能保证整个调查
-进程树回收，因此当前 candidate 为 no-go。不得启动 R4–R6 或 Task 29。
+通过。R1–R2 已完成，R2 结论为 `configurationReady`；R3 首先证明 direct
+`setsid()`、`POSIX_SPAWN_SETSID` 与 launchd user-job cleanup 均不能保证整个
+调查进程树回收，随后用用户批准的 audit-session supervisor 关闭该 hard
+gate。最终 live/combined/recovery 均 drained，identity drop、outer Seatbelt、
+audit-session inheritance、proxy-owner recovery 均 observed，residue 为 0。
+R3 为 `behaviorReady` candidate。未经用户 review 后的新指示，不得启动 R4、
+R5、R6 或 Task 29。
 
 R1 证明 read-only Seatbelt 能阻断 user-data writes，且 Codex experimental
 managed proxy 能让公网请求成功并阻断 direct bypass、任意
@@ -50,8 +56,12 @@ managed-proxy 例外；R2 已按
 [`task-r2-implementation-brief.md`](task-r2-implementation-brief.md) 完成
 configuration candidate，并由
 [R2 Review](../../reports/capability-first-runtime-r2-review.md) 记录
-`configurationReady`。R3 behavioral gate 已失败；详见
+`configurationReady`。R3 behavioral gate 已通过；详见
 [R3 Review](../../reports/capability-first-runtime-r3-review.md)。
+
+R3 不证明 signed-App ServiceManagement/helper packaging、FDA/TCC inheritance、
+Browser/image/subagent capability admission 或最终 no-Executor product seam；
+这些仍分别属于 R4–R6。Deep Dive 保持 unavailable。
 
 即使计划获批，正常 App 也必须保持真实 Trash 依赖关闭，直到 Task 35 的
 signed-App disposable Trash diagnostic 与最终 gate 通过。Task 32 的 Review

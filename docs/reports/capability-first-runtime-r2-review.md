@@ -1,6 +1,7 @@
 # Capability-First Runtime R2 Review
 
-> Status: Passed — configurationReady at R2; R3 later behaviorBlocked/no-go
+> Status: Passed — configurationReady at R2; R3 later reached a
+> behaviorReady candidate
 >
 > Date: 2026-08-12
 >
@@ -209,7 +210,7 @@ Codex session-state path inventory did not change.
 - P1 unresolved: 0;
 - P2 unresolved: 0;
 - readiness: `configurationReady`;
-- R3 behavioral gate: later `behaviorBlocked/no-go`;
+- R3 behavioral gate: later `behaviorReady` candidate;
 - R5 signed-App behavior: pending;
 - R6 final admission: pending.
 

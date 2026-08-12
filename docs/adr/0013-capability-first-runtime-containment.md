@@ -1,6 +1,7 @@
 # ADR 0013: Capability-First Codex Runtime Containment
 
-> Status: R2 configuration candidate accepted; R3 behaviorBlocked/no-go
+> Status: R3 behaviorReady candidate accepted; R5 signed-App behavioral gate
+> pending
 >
 > Date: 2026-08-11
 >
@@ -94,8 +95,10 @@ output. Browser containment remains an R5 gate.
    evidence.
 10. Swift remains the only path to Policy/Executor.
 
-These facts remain the desired boundary, but the `0.147.0` candidate did not
-pass R3. The lifecycle result below prevents behavioral admission.
+These facts remain the admitted R3 boundary. The original process-group
+candidate failed, but the user-approved audit-session lifecycle supervisor in
+[ADR 0016](0016-investigation-lifecycle-supervisor.md) closed that hard gate
+without widening Codex filesystem, network or Executor authority.
 
 ### Approved transport exception
 
@@ -164,9 +167,11 @@ Costs:
 8. Browser connector topology is unresolved.
 9. Deprecated Seatbelt API availability must be probed at runtime.
 10. Signed-App FDA/TCC inheritance remains unproved for the new profile.
-11. A descendant can leave the parent process group with `setsid()` or
-    `POSIX_SPAWN_SETSID`, defeating process-group cancellation and crash
-    cleanup.
+11. Signed-App ServiceManagement/helper registration, update and uninstall
+    behavior remain R5 gates.
+12. The helper's packaged caller authentication and Codex denial require
+    actual App/XPC evidence; R3 proves the closed protocol and privileged
+    lifecycle composition only.
 
 ## Validation
 
@@ -178,8 +183,8 @@ scripts/probe-codex-sandbox-containment
 SHA-256 2c5625b6f94164cc4c238fcd24a3b53d9104b84a340a0e2a9c0a161fb1c3c857
 ```
 
-At R1 close, R2 was blocked on the pending decision. That decision is now
-approved; R3 must still add:
+At R1 close, R2 was blocked on the pending decision. That decision was
+approved, and R3 added:
 
 - typed profile generation tests;
 - full filesystem mutation matrix;
@@ -187,16 +192,16 @@ approved; R3 must still add:
 - IPv4/IPv6/private/link-local/rebinding/redirect tests;
 - descendant and cancellation stress;
 - runtime-home/auth lifecycle tests;
-- signed-App evidence.
+- privileged audit-session lifecycle evidence.
 
-ADR 0013 is accepted only for the R2 configuration candidate. R3 must still
-prove the transport identity, lifecycle, bypass denial and descendant
-inheritance before any behavioral or containment admission.
+R3 proved transport identity, lifecycle, bypass denial and descendant
+inheritance for an explicitly authorized local Spike topology. Signed-App
+evidence remains R5 work and is not inferred from R3.
 
 ## R3 Behavioral Decision
 
-R3 proved that the process lifecycle requirement cannot be met by the current
-candidate:
+The first R3 candidate proved that process groups and a launchd user job are
+not an investigation container:
 
 ```text
 lifecycle.direct_setsid_escape=observed
@@ -214,7 +219,7 @@ scripts/probe-codex-r3-lifecycle-escape
 SHA-256 f25700e0e35178910cda4809468ea1aa37a9936abaec4100fb6b74e49fde3557
 ```
 
-The R3 review also tested and rejected:
+That evidence remains authoritative for rejecting:
 
 - direct `SYS_setsid` / `SYS_setpgid` Seatbelt denies, because
   `POSIX_SPAWN_SETSID` still creates a new session;
@@ -224,11 +229,64 @@ The R3 review also tested and rejected:
   `NOTE_TRACK`;
 - PPID/environment polling, because reparenting, PID reuse and App crash make
   it non-authoritative;
-- private coalition APIs, Endpoint Security and privileged daemons, because
-  they are unsupported or unapproved permission/product expansions.
+- private coalition APIs and Endpoint Security, because they are unsupported
+  or require a different permission/product architecture.
 
-Therefore this ADR does not admit an R3 runtime. The implementation candidate
-was removed, R4–R6 were not started, and Deep Dive remains paused. The exact
-managed-proxy exception remains approved in principle, but it is insufficient
-without a supported per-investigation whole-process-tree containment
-mechanism.
+After the user explicitly approved a narrow privileged lifecycle supervisor,
+R3 implemented the closed design in ADR 0016:
+
+```text
+launchd SessionCreate
+→ root-owned versioned lease
+→ initgroups / setgid / setuid
+→ outer Codex Seatbelt and managed proxy
+→ complete audit-token inventory
+→ identity-checked SIGSTOP / fixed-point rescan
+→ identity-checked SIGKILL / empty-session confirmation
+```
+
+The helper protocol accepts only authenticated
+`start(investigationID)`/`cancel(investigationID)` operations. It exposes no
+caller-controlled PID, signal, executable, argv, path, filesystem, network,
+Policy or Executor surface.
+
+Final composition evidence:
+
+```text
+scripts/probe-codex-r3-audit-session-lifecycle
+/tmp/stornaut-r3-audit-session-combined-final.log
+SHA-256 509140cdfc431474e776c3b87a3fd1fc303cc34e420850f4f3dc800282dddb29
+
+lifecycle.live=drained
+lifecycle.identity_drop=observed
+lifecycle.outer_seatbelt=observed
+lifecycle.audit_session_inheritance=observed
+lifecycle.proxy_owner_drained=observed
+lifecycle.combined=drained
+lifecycle.recovery_new_audit_session=observed
+lifecycle.recovery=drained
+lifecycle.cleanup=complete
+probe.verdict=behaviorReadyCandidate
+```
+
+Final anonymous containment evidence:
+
+```text
+scripts/probe-codex-r3-containment
+/tmp/stornaut-r3-containment-post-review.log
+SHA-256 d5c46588a1d1737eac232b3c44f1a6ed533aba6c003631b7498fff11c5de06a2
+```
+
+It observed full-disk read-only access, the sole Runtime Home write root,
+auth-source denial, mutation containment, one random loopback HTTP proxy,
+public egress, and denial of direct public bypass, arbitrary
+localhost/private/link-local destinations, Unix sockets and local binding.
+Proxy crash fallback failed closed.
+
+The external-auth App Server diagnostic separately observed one synthetic
+`gpt-5.6-luna` turn with no Runtime Home `auth.json`. This is observed model
+evidence, not signed-App containment or no-Executor proof.
+
+Therefore ADR 0013 admits an R3 `behaviorReady` candidate. R4 owns protocol v2
+and no-Executor evidence; R5 owns signed-App helper packaging, FDA/TCC and
+capability observation; R6 owns final admission. Deep Dive remains paused.
