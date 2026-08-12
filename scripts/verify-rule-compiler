@@ -14,6 +14,7 @@ protected_catalog="$repo_root/Rules/BuiltIn/protected-v1.json"
 project_catalog="$repo_root/Rules/BuiltIn/project-artifacts-v1.json"
 cache_catalog="$repo_root/Rules/BuiltIn/package-build-caches-v1.json"
 runtime_catalog="$repo_root/Rules/BuiltIn/runtime-tool-residue-v1.json"
+compiled_runtime_catalog="$repo_root/Sources/StornautCore/Resources/BuiltInRuleCatalog.json"
 coverage_source="$repo_root/Tests/Fixtures/Rules/fr2-coverage-v1.json"
 
 for run in 1 2; do
@@ -72,6 +73,14 @@ cmp "$work_dir/complete-catalog-1.json" "$work_dir/complete-catalog-2.json"
 cmp "$work_dir/complete-manifest-1.json" "$work_dir/complete-manifest-2.json"
 cmp "$work_dir/complete-coverage-1.json" "$work_dir/complete-coverage-2.json"
 cmp "$work_dir/complete-hash-1.txt" "$work_dir/complete-hash-2.txt"
+
+cmp "$compiled_runtime_catalog" "$work_dir/complete-catalog-1.json"
+expected_runtime_hash=133b3829816fa951f03cb87473e03454c3e561b421c83e6c8efaf8ad89849e99
+actual_runtime_hash=$(tr -d '\n' < "$work_dir/complete-hash-1.txt")
+[[ "$actual_runtime_hash" == "$expected_runtime_hash" ]]
+[[ "$(shasum -a 256 "$compiled_runtime_catalog" | awk '{print $1}')" == \
+    "$expected_runtime_hash" ]]
+[[ "$(jq '.rules | length' "$compiled_runtime_catalog")" == "67" ]]
 
 swift run stornaut-rule-compiler \
     --catalog "$project_catalog" \
@@ -274,3 +283,4 @@ echo "Protected catalog verification passed: $(cat "$work_dir/protected-hash-1.t
 echo "Project catalog verification passed: $(cat "$work_dir/project-hash-1.txt")"
 echo "Cache catalog verification passed: $(cat "$work_dir/cache-hash-1.txt")"
 echo "Complete catalog verification passed: $(cat "$work_dir/complete-hash-1.txt")"
+echo "Compiled runtime catalog parity passed: $actual_runtime_hash"

@@ -28,6 +28,13 @@ require_fixed_text scripts/verify '.derivedData/verification'
 require_fixed_text scripts/verify 'swift test --no-parallel'
 require_fixed_text scripts/verify-phase-b-gate '--product-only'
 
+if rg -n \
+    '^[[:space:]]*swift[[:space:]]+(build|run|test)([[:space:]]|$)' \
+    scripts/verify-quick-scan-boundaries; then
+    fail_contract \
+        "Static Quick Scan boundary verification invokes Swift compilation or execution"
+fi
+
 help_output=$(scripts/verify --help)
 for expected in '--headless' '--full' '--list-steps'; do
     if [[ "$help_output" != *"$expected"* ]]; then
@@ -98,18 +105,126 @@ require_fixed_text scripts/verify \
 require_fixed_text scripts/verify \
     '-skip-testing:StornautAppTests/OverviewSnapshotTests'
 
-require_fixed_text .github/workflows/ci.yml 'name: Stornaut CI'
-require_fixed_text .github/workflows/ci.yml '  pull_request:'
-require_fixed_text .github/workflows/ci.yml '  push:'
-require_fixed_text .github/workflows/ci.yml '  workflow_dispatch:'
-require_fixed_text .github/workflows/ci.yml 'run: scripts/verify --headless'
-require_fixed_text .github/workflows/ci.yml 'uses: actions/checkout@v6'
-require_fixed_text .github/workflows/ci.yml 'uses: actions/upload-artifact@v7'
-require_fixed_text .github/workflows/ci.yml 'brew install ripgrep'
-require_fixed_text .github/workflows/ci.yml '    timeout-minutes: 10'
+workflow=.github/workflows/ci.yml
+require_fixed_text "$workflow" 'name: Stornaut CI'
+require_fixed_text "$workflow" 'uses: actions/checkout@v6'
+require_fixed_text "$workflow" 'uses: actions/upload-artifact@v7'
+require_fixed_text "$workflow" 'brew install ripgrep'
+require_fixed_text "$workflow" '    timeout-minutes: 10'
+
+if ! workflow_contract_error=$(python3 - "$workflow" 2>&1 <<'PY'
+from pathlib import Path
+import re
+import sys
+
+workflow = Path(sys.argv[1])
+lines = workflow.read_text(encoding="utf-8").splitlines()
+
+
+def fail(message):
+    raise SystemExit(f"{workflow} {message}")
+
+
+def indentation(line):
+    if "\t" in line[: len(line) - len(line.lstrip())]:
+        fail("uses a tab for YAML indentation")
+    return len(line) - len(line.lstrip(" "))
+
+
+def top_level_block(name):
+    header = f"{name}:"
+    matches = [index for index, line in enumerate(lines) if line == header]
+    if len(matches) != 1:
+        fail(f"must contain exactly one top-level {header} block")
+    start = matches[0]
+    end = len(lines)
+    for index in range(start + 1, len(lines)):
+        line = lines[index]
+        if line.strip() and not line.lstrip().startswith("#") and indentation(line) == 0:
+            end = index
+            break
+    return start, end
+
+
+def direct_mappings(start, end, indent):
+    pattern = re.compile(
+        r"^" + (" " * indent) + r"([A-Za-z0-9_-]+):(?:[ ]*(.*))?$"
+    )
+    entries = []
+    for index in range(start, end):
+        line = lines[index]
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if indentation(line) != indent:
+            continue
+        match = pattern.fullmatch(line)
+        if match is None:
+            fail(f"has an unsupported mapping at line {index + 1}")
+        entries.append((match.group(1), match.group(2) or "", index))
+    keys = [key for key, _, _ in entries]
+    if len(keys) != len(set(keys)):
+        fail(f"contains a duplicate mapping at indentation {indent}")
+    return entries
+
+
+on_start, on_end = top_level_block("on")
+triggers = direct_mappings(on_start + 1, on_end, 2)
+if {key for key, _, _ in triggers} != {
+    "pull_request",
+    "push",
+    "workflow_dispatch",
+}:
+    fail("must trigger only on pull_request, push, and workflow_dispatch")
+if any(value for _, value, _ in triggers):
+    fail("must express each trigger as a mapping")
+
+push_index = next(index for key, _, index in triggers if key == "push")
+push_end = on_end
+for index in range(push_index + 1, on_end):
+    line = lines[index]
+    if line.strip() and not line.lstrip().startswith("#") and indentation(line) <= 2:
+        push_end = index
+        break
+push_mappings = direct_mappings(push_index + 1, push_end, 4)
+if [(key, value) for key, value, _ in push_mappings] != [("branches", "")]:
+    fail("push must contain exactly one branches mapping")
+branch_values = []
+for index in range(push_mappings[0][2] + 1, push_end):
+    line = lines[index]
+    if not line.strip() or line.lstrip().startswith("#"):
+        continue
+    match = re.fullmatch(r" {6}-[ ]+([^ ]+)[ ]*", line)
+    if match is None:
+        fail(f"has an unsupported push branch entry at line {index + 1}")
+    branch_values.append(match.group(1))
+if branch_values != ["main"]:
+    fail("push branches must be exactly [main]")
+
+permissions_start, permissions_end = top_level_block("permissions")
+permissions = direct_mappings(permissions_start + 1, permissions_end, 2)
+if [(key, value) for key, value, _ in permissions] != [("contents", "read")]:
+    fail("permissions must be exactly contents: read")
+
+jobs_start, jobs_end = top_level_block("jobs")
+jobs = direct_mappings(jobs_start + 1, jobs_end, 2)
+if len(jobs) != 1 or jobs[0][1]:
+    fail("must contain exactly one job mapping")
+
+gate_occurrences = sum(line.count("scripts/verify --headless") for line in lines)
+job_gate_lines = [
+    line
+    for line in lines[jobs[0][2] + 1 : jobs_end]
+    if re.fullmatch(r"[ ]+run:[ ]+scripts/verify --headless[ ]*", line)
+]
+if gate_occurrences != 1 or len(job_gate_lines) != 1:
+    fail("must invoke exactly one scripts/verify --headless project gate in its job")
+PY
+); then
+    fail_contract "$workflow_contract_error"
+fi
 
 if rg -qi 'XCUITest|verify-ui|peekaboo|Automation Mode|TCC' \
-    .github/workflows/ci.yml; then
+    "$workflow"; then
     fail_contract "Headless CI workflow references a host/UI-only gate"
 fi
 
