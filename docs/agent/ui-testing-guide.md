@@ -2,7 +2,7 @@
 
 > 状态：Active
 >
-> 最近更新：2026-08-11
+> 最近更新：2026-08-12
 >
 > 适用范围：Stornaut 原生 macOS App 的 UI 实现、回归与运行时视觉验收
 
@@ -233,9 +233,11 @@ scripts/verify --full
 scripts/verify --headless
 ```
 
-headless mode 运行 SwiftPM tests、106 个非 golden App contracts、边界检查、
-规则编译器、localization、bundle/signing 与 Debug/Release build fixture，但
-明确不运行两个 view snapshot pixel suite、XCUITest、window screenshot、
+headless mode 运行所有非 benchmark SwiftPM tests、106 个非 golden App
+contracts、source boundaries、规则编译器、localization 以及
+documentation/verifier checks。SwiftPM 与 App test actions 各自承担所需编译；
+standalone Debug/Release、signing 与 bundle 证据保留在 `scripts/verify --full`。
+headless 明确不运行两个 view snapshot pixel suite、XCUITest、window screenshot、
 Automation Mode readiness、Peekaboo/TCC 或性能 benchmark。两种模式都会把逐步耗时写入
 `.derivedData/verification/<mode>-timings.tsv`；具体职责见
 [ADR 0015](../adr/0015-headless-ci-verification.md)。headless Swift Testing

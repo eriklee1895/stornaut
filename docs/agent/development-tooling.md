@@ -2,7 +2,7 @@
 
 > 状态：Active
 >
-> 最近更新：2026-08-11
+> 最近更新：2026-08-12
 >
 > 适用范围：实现 Stornaut 的本地 Coding Agent；不属于产品运行时
 
@@ -195,14 +195,17 @@ CLI syntax can change between versions; use `scripts/xcodebuildmcp <workflow> --
 Peekaboo and XCUITest are local/full-verifier evidence because Screen Recording,
 Automation Mode and the active desktop are host state. Ordinary GitHub-hosted CI
 must not claim it ran either layer. Its portable contract is
-`scripts/verify --headless`: SwiftPM tests, non-golden App contracts, boundary
-checks and Debug/Release builds on the pinned macOS/Xcode runner. The committed
-pixel goldens remain in `scripts/verify --full`: a real hosted run found broad
-drift between macOS 26.5.1 and 26.5.2 despite the same Xcode 26.6. Headless Swift
-Testing functions run with `--no-parallel` because many cases independently
-exercise processes, pipes, cancellation and workers; the full local verifier
-retains parallel execution as concurrency stress. A future dedicated UI lab is
-a separate security and operations decision; see
+`scripts/verify --headless`: all non-benchmark SwiftPM tests, all non-golden App
+contracts, source boundaries, rule compiler, localization and
+documentation/verifier checks. SwiftPM and App test actions each own their
+required compilation; standalone Debug/Release, signing and bundle evidence
+remain in `scripts/verify --full`. The committed pixel goldens remain in
+`scripts/verify --full`: a real hosted run found broad drift between macOS
+26.5.1 and 26.5.2 despite the same Xcode 26.6. Headless Swift Testing functions
+run with `--no-parallel` because many cases independently exercise processes,
+pipes, cancellation and workers; the full local verifier retains parallel
+execution as concurrency stress. A future dedicated UI lab is a separate
+security and operations decision; see
 [ADR 0015](../adr/0015-headless-ci-verification.md).
 
 ## 6. Upgrades and Failure Policy

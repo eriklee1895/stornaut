@@ -88,19 +88,18 @@ UI lab.
 
 ### Two explicit modes, with a compatible default
 
-`scripts/verify --headless` is the ordinary CI contract. It runs:
+`scripts/verify --headless` is the ordinary CI contract. The ordinary headless
+contract is incremental. It runs the cheap structural checks first, then all
+non-benchmark SwiftPM tests, the rule compiler, and all non-golden App
+contracts. `swift test` is the package compilation evidence and
+`xcodebuild test` is the Debug App compilation evidence. Headless test
+functions are serialized via `--no-parallel` to avoid process/pipe exhaustion
+on the lower-resource hosted runner.
 
-- SwiftPM build and the non-benchmark SwiftPM tests, with test functions
-  serialized via `--no-parallel` to avoid process/pipe exhaustion on the
-  lower-resource hosted runner;
-- all seven current source-boundary checks and the Automation Mode parser's
-  pure self-test;
-- 106 non-golden App-host contracts, including the eight snapshot-harness
-  algorithm/state tests, while explicitly skipping the Design System and
-  Overview pixel-comparison suites;
-- Debug App build, local signing/bundle checks and the Debug/Release fixture
-  boundary build;
-- localization, rule compiler, verifier-contract and documentation/diff checks.
+Headless CI does not clean build state, run a separate `swift build`, rebuild a
+standalone Debug App, sign or inspect a distributable bundle, or compile a
+Release App. Those product and fixture-leakage claims remain in the full local
+verifier.
 
 It does not run XCUITest, window screenshot export, Design System/Overview
 golden comparisons, Automation Mode readiness, Peekaboo/TCC checks, strict
@@ -132,10 +131,11 @@ evidence-driven.
 
 `Stornaut CI` runs on pull requests, pushes to `main`, and manual dispatch. It
 uses the pinned macOS 26 arm64/Xcode 26.6 hosted image, read-only repository
-permission, concurrency cancellation and a thirty-minute timeout. Its only
-project gate is `scripts/verify --headless`. A setup step supplies ripgrep when
-the runner image does not already include it because the repository's static
-fitness functions intentionally use `rg`.
+permission, concurrency cancellation and a ten-minute timeout. Its
+approximately three-minute target is observational, not an acceptance
+threshold. Its only project gate is `scripts/verify --headless`. A setup step
+supplies ripgrep when the runner image does not already include it because the
+repository's static fitness functions intentionally use `rg`.
 
 No ordinary GitHub-hosted job runs XCUITest, Peekaboo, Screen Recording/TCC or
 Automation Mode. A future dedicated UI runner requires its own approved host
@@ -143,8 +143,9 @@ security, session lifecycle and evidence policy.
 
 ## Consequences
 
-- Every pull request receives an automatic compile/test/safety baseline without
-  pretending a hosted worker is a trusted live desktop.
+- Every pull request receives an automatic incremental compile/test/safety
+  baseline without pretending a hosted worker is a trusted live desktop or a
+  distributable-product build host.
 - App/view-model and snapshot-harness contracts are part of the portable
   baseline. Pixel goldens, window interaction and runtime inspection stay in
   the full local UI evidence loop.
@@ -164,13 +165,12 @@ security, session lifecycle and evidence policy.
   hosted CI as portable.
 - GitHub can update a runner image behind a stable label. The explicit Xcode
   path and recorded toolchain fail or expose drift, but do not make the image
-  immutable.
+  immutable. App test-host compilation is Debug compilation evidence, not
+  standalone signing, bundle or distributable-product verification.
 - Ripgrep is a CI-only Homebrew dependency and its resolved version is recorded
   rather than pinned to a shipped application artifact. A semantic CLI drift
   will fail the boundary/contract steps and is reviewed as verifier-tooling
   evidence.
-- The headless suite is still serial and includes multiple Xcode builds. The
-  initial timing artifact must be collected before adding caching or parallelism.
 - Serializing test functions in headless CI reduces cross-test race stress.
   Full local verification remains parallel; individual concurrency tests still
   exercise their own workers, actors, cancellation and process trees in both
@@ -185,6 +185,10 @@ confirmed:
 
 - `scripts/verify-contract` passes, including negative CLI argument checks and
   the workflow prohibition on host/UI-only gates;
+- the 2026-08-12 lean-contract revalidation exits zero with seven unique timing
+  rows totaling 116.175 seconds: all 330 non-benchmark SwiftPM tests pass in the
+  serialized package action and all 106 non-golden App contracts pass in the
+  Debug App test action;
 - a fresh `scripts/verify --headless` exits zero with fourteen unique timing
   rows in 233.265 seconds. Its serialized SwiftPM step ran all 303
   non-benchmark tests in 47.239 seconds, with the test run itself completing in
