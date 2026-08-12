@@ -56,20 +56,13 @@ while (( $# > 0 )); do
 done
 
 typeset -a headless_steps=(
-    clean-derived-data
-    swiftpm-build
-    swiftpm-tests-serialized
     source-boundaries
-    automation-parser-self-test
-    app-contract-tests
-    debug-app-build
-    debug-app-sign
-    app-bundle
-    debug-release-fixture-boundary
     localization-contract
-    rule-compiler
     verifier-contract
     docs-and-diff
+    swiftpm-tests-serialized
+    rule-compiler
+    app-contract-tests
 )
 
 typeset -a full_steps=(
