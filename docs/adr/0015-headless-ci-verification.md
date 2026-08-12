@@ -183,14 +183,15 @@ security, session lifecycle and evidence policy.
 Local acceptance on the recorded macOS 26.5.1 / Xcode 26.6 Apple Silicon host
 confirmed:
 
-- `scripts/verify-contract` passes, including negative CLI argument checks and
-  the workflow prohibition on host/UI-only gates;
+- `scripts/verify-contract` passes, including negative CLI argument checks,
+  static-boundary step ownership, the exact workflow trigger/permission/job
+  structure and the prohibition on host/UI-only gates;
 - the 2026-08-12 lean-contract revalidation exits zero with seven unique timing
   rows totaling 116.175 seconds: all 330 non-benchmark SwiftPM tests pass in the
   serialized package action and all 106 non-golden App contracts pass in the
   Debug App test action;
-- a fresh `scripts/verify --headless` exits zero with fourteen unique timing
-  rows in 233.265 seconds. Its serialized SwiftPM step ran all 303
+- the pre-lean 2026-08-11 local headless baseline exited zero with fourteen
+  unique timing rows in 233.265 seconds. Its serialized SwiftPM step ran all 303
   non-benchmark tests in 47.239 seconds, with the test run itself completing in
   34.568 seconds; its App contract step passed 106 tests while excluding the
   two visual suites;
@@ -204,14 +205,15 @@ confirmed:
   or test-code change was added, and the fresh uninterrupted full invocation
   above passed. This is direct evidence for keeping live-desktop UI work out of
   ordinary hosted CI.
-- the final pull-request [GitHub Actions run 31513874516](https://github.com/eriklee1895/stornaut/actions/runs/31513874516)
+- the corresponding pre-lean 2026-08-11 pull-request
+  [GitHub Actions run 31513874516](https://github.com/eriklee1895/stornaut/actions/runs/31513874516)
   exited zero in 7 minutes 10 seconds. Its uploaded fourteen-row timing record
   totals 404.784 seconds: 303 serialized Swift tests took 78.316 seconds, 106
   App contracts took 67.256 seconds, and the Debug/Release fixture boundary
   took 150.367 seconds. No XCUITest, pixel golden, Automation Mode,
   Peekaboo/TCC or performance benchmark ran.
 
-The lean replacement's first hosted pull-request
+The historical pre-fix lean replacement's first hosted pull-request
 [GitHub Actions run 31564858817](https://github.com/eriklee1895/stornaut/actions/runs/31564858817)
 for head `0035633fde4c2f7581078cdf7054765aa6cfaa74` exited zero. Its
 uploaded seven-row timing record totals 201.678 seconds: the serialized SwiftPM
@@ -219,6 +221,16 @@ tests took 64.731 seconds, the rule compiler took 22.695 seconds and the App
 contract tests took 80.300 seconds. All current non-benchmark SwiftPM tests and
 all current non-golden App contracts remained enabled; the narrower job removed
 only redundant compilation and evidence that belongs to the local full verifier.
+
+The post-fix hosted implementation
+[GitHub Actions run 31567662504](https://github.com/eriklee1895/stornaut/actions/runs/31567662504)
+for exact head `a6b012d7aa9154e070ced604d0274dff2a7489c4` exited zero. Its
+uploaded seven-row timing record totals 159.479 seconds: source boundaries took
+10.101 seconds without a Swift build/run/test action, the serialized SwiftPM
+tests took 84.139 seconds, the rule compiler and compiled-catalog parity took
+14.605 seconds, and the App contracts took 50.188 seconds. Compiler-backed
+catalog parity therefore has one explicit owner after package compilation while
+all static boundary failures remain before compilation.
 
 The first four hosted runs were intentionally retained as evidence: the first
 reached the thirty-minute timeout inside the parallel SwiftPM test step; the
