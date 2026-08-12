@@ -110,7 +110,6 @@ require_fixed_text "$workflow" 'name: Stornaut CI'
 require_fixed_text "$workflow" 'uses: actions/checkout@v6'
 require_fixed_text "$workflow" 'uses: actions/upload-artifact@v7'
 require_fixed_text "$workflow" 'brew install ripgrep'
-require_fixed_text "$workflow" '    timeout-minutes: 10'
 
 if ! workflow_contract_error=$(python3 - "$workflow" 2>&1 <<'PY'
 from pathlib import Path
@@ -209,6 +208,14 @@ jobs_start, jobs_end = top_level_block("jobs")
 jobs = direct_mappings(jobs_start + 1, jobs_end, 2)
 if len(jobs) != 1 or jobs[0][1]:
     fail("must contain exactly one job mapping")
+job_settings = {
+    key: value
+    for key, value, _ in direct_mappings(jobs[0][2] + 1, jobs_end, 4)
+}
+if job_settings.get("runs-on") != "macos-26":
+    fail("the sole job must run on exactly macos-26")
+if job_settings.get("timeout-minutes") != "10":
+    fail("the sole job timeout-minutes must be exactly 10")
 
 gate_occurrences = sum(line.count("scripts/verify --headless") for line in lines)
 job_gate_lines = [
