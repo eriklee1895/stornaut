@@ -222,6 +222,16 @@ contract tests took 80.300 seconds. All current non-benchmark SwiftPM tests and
 all current non-golden App contracts remained enabled; the narrower job removed
 only redundant compilation and evidence that belongs to the local full verifier.
 
+The post-fix hosted implementation
+[GitHub Actions run 31567662504](https://github.com/eriklee1895/stornaut/actions/runs/31567662504)
+for exact head `a6b012d7aa9154e070ced604d0274dff2a7489c4` exited zero. Its
+uploaded seven-row timing record totals 159.479 seconds: source boundaries took
+10.101 seconds without a Swift build/run/test action, the serialized SwiftPM
+tests took 84.139 seconds, the rule compiler and compiled-catalog parity took
+14.605 seconds, and the App contracts took 50.188 seconds. Compiler-backed
+catalog parity therefore has one explicit owner after package compilation while
+all static boundary failures remain before compilation.
+
 The first four hosted runs were intentionally retained as evidence: the first
 reached the thirty-minute timeout inside the parallel SwiftPM test step; the
 second proved serialization removed that hang and isolated the heavyweight
