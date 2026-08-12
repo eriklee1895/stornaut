@@ -45,13 +45,29 @@ require_fixed_text "$unknown_output" 'Usage:'
 headless_steps=$(scripts/verify --headless --list-steps)
 full_steps=$(scripts/verify --full --list-steps)
 
-for expected in \
-    swiftpm-tests-serialized \
-    source-boundaries \
-    app-contract-tests \
-    debug-release-fixture-boundary; do
-    if [[ "$headless_steps" != *"$expected"* ]]; then
-        fail_contract "Headless verifier omitted $expected"
+expected_headless_steps=$'source-boundaries\nlocalization-contract\nverifier-contract\ndocs-and-diff\nswiftpm-tests-serialized\nrule-compiler\napp-contract-tests'
+if [[ "$headless_steps" != "$expected_headless_steps" ]]; then
+    fail_contract "Headless verifier steps differ from the lean seven-step contract"
+fi
+
+typeset -a forbidden_headless_steps=(
+    clean-derived-data
+    swiftpm-build
+    automation-parser-self-test
+    debug-app-build
+    debug-app-sign
+    app-bundle
+    debug-release-fixture-boundary
+    ui-automation-readiness
+    xcuitest
+    ui-screenshot-contract
+    app-tests-and-snapshots
+    matcher-benchmarks
+    phase-b-product
+)
+for forbidden in "${forbidden_headless_steps[@]}"; do
+    if [[ "$headless_steps" == *"$forbidden"* ]]; then
+        fail_contract "Headless verifier included non-CI step $forbidden"
     fi
 done
 
@@ -65,18 +81,15 @@ if [[ "$full_steps" == *"app-contract-tests"* ]]; then
     fail_contract "Full verifier unexpectedly omitted visual snapshot suites"
 fi
 
-for forbidden in \
+for expected in \
     ui-automation-readiness \
     xcuitest \
     ui-screenshot-contract \
     app-tests-and-snapshots \
     matcher-benchmarks \
     phase-b-product; do
-    if [[ "$headless_steps" == *"$forbidden"* ]]; then
-        fail_contract "Headless verifier included host/visual/performance step $forbidden"
-    fi
-    if [[ "$full_steps" != *"$forbidden"* ]]; then
-        fail_contract "Full verifier omitted $forbidden"
+    if [[ "$full_steps" != *"$expected"* ]]; then
+        fail_contract "Full verifier omitted $expected"
     fi
 done
 
@@ -93,6 +106,7 @@ require_fixed_text .github/workflows/ci.yml 'run: scripts/verify --headless'
 require_fixed_text .github/workflows/ci.yml 'uses: actions/checkout@v6'
 require_fixed_text .github/workflows/ci.yml 'uses: actions/upload-artifact@v7'
 require_fixed_text .github/workflows/ci.yml 'brew install ripgrep'
+require_fixed_text .github/workflows/ci.yml '    timeout-minutes: 10'
 
 if rg -qi 'XCUITest|verify-ui|peekaboo|Automation Mode|TCC' \
     .github/workflows/ci.yml; then
