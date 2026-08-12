@@ -211,6 +211,15 @@ confirmed:
   took 150.367 seconds. No XCUITest, pixel golden, Automation Mode,
   Peekaboo/TCC or performance benchmark ran.
 
+The lean replacement's first hosted pull-request
+[GitHub Actions run 31564858817](https://github.com/eriklee1895/stornaut/actions/runs/31564858817)
+for head `0035633fde4c2f7581078cdf7054765aa6cfaa74` exited zero. Its
+uploaded seven-row timing record totals 201.678 seconds: the serialized SwiftPM
+tests took 64.731 seconds, the rule compiler took 22.695 seconds and the App
+contract tests took 80.300 seconds. All current non-benchmark SwiftPM tests and
+all current non-golden App contracts remained enabled; the narrower job removed
+only redundant compilation and evidence that belongs to the local full verifier.
+
 The first four hosted runs were intentionally retained as evidence: the first
 reached the thirty-minute timeout inside the parallel SwiftPM test step; the
 second proved serialization removed that hang and isolated the heavyweight

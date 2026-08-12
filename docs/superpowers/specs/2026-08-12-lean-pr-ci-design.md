@@ -1,6 +1,6 @@
 # Lean Pull-Request CI Design
 
-> Status: User-approved design; implementation pending
+> Status: Implemented and validated
 >
 > Date: 2026-08-12
 >
