@@ -1,0 +1,266 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+cd "$repo_root"
+
+package_graph=$(swift package describe --type json)
+python3 - "$package_graph" <<'PY'
+import json
+import sys
+
+package = json.loads(sys.argv[1])
+targets = {target["name"]: target for target in package["targets"]}
+
+expected = {
+    "StornautCodex": {"StornautProcessSupport"},
+    "StornautCore": {"StornautProcessSupport"},
+    "StornautProbeBridge": {"StornautCodex", "StornautCore"},
+    "StornautProcessSupport": set(),
+}
+for name, dependencies in expected.items():
+    if name not in targets:
+        raise SystemExit(f"missing package target {name}")
+    actual = set(targets[name].get("target_dependencies", []))
+    if actual != dependencies:
+        raise SystemExit(
+            f"{name} dependencies {sorted(actual)} != {sorted(dependencies)}"
+        )
+
+prohibited = {
+    "RuleCompilerKit",
+    "StornautCore",
+    "StornautProbeBridge",
+}
+pending = ["StornautCodex"]
+reachable = set()
+while pending:
+    current = pending.pop()
+    for dependency in targets[current].get("target_dependencies", []):
+        if dependency not in reachable:
+            reachable.add(dependency)
+            pending.append(dependency)
+overlap = prohibited & reachable
+if overlap:
+    raise SystemExit(
+        f"StornautCodex reaches prohibited targets: {sorted(overlap)}"
+    )
+PY
+
+if rg -n \
+    '^import (StornautCore|StornautProbeBridge)$' \
+    Sources/StornautCodex \
+    --glob '*.swift' \
+    --glob '!**/ProbeBridge/**'; then
+    print -u2 "StornautCodex imports an Executor-bearing or host bridge target."
+    exit 1
+fi
+
+if rg -n \
+    '\b(ActionExecutor|ActionPolicyGate|CleanupAction|CleanupManifest|CleanupPlan|CleanupRunJournal|EvidenceStore|ExecutionAuthorization|FileManagerTrashAdapter|MoveToTrash|PolicyDecision|ProposedCleanupAction|RegisteredAction[A-Za-z]*|TrashMoving)\b' \
+    Sources/StornautCodex \
+    --glob '*.swift' \
+    --glob '!**/ProbeBridge/**'; then
+    print -u2 "StornautCodex references cleanup authority."
+    exit 1
+fi
+
+if rg -n \
+    '\b(StornautCore|StornautCodex|StornautProbeBridge)\b' \
+    Sources/StornautProcessSupport \
+    --glob '*.swift'; then
+    print -u2 "Process support acquired a higher-level dependency."
+    exit 1
+fi
+
+python3 - \
+    Sources/StornautCodex/Schemas/investigation-envelope-v2.schema.json <<'PY'
+import json
+import sys
+
+schema = json.load(open(sys.argv[1], encoding="utf-8"))
+forbidden = {
+    "action",
+    "actionID",
+    "arguments",
+    "authorization",
+    "cleanupAction",
+    "cleanupManifest",
+    "cleanupPlan",
+    "command",
+    "executable",
+    "executor",
+    "journal",
+    "manifest",
+    "moveToTrash",
+    "path",
+    "policyDecision",
+    "registeredAction",
+    "trash",
+}
+
+def property_names(value):
+    names = set()
+    if isinstance(value, dict):
+        properties = value.get("properties")
+        if isinstance(properties, dict):
+            names.update(properties)
+        for nested in value.values():
+            names.update(property_names(nested))
+    elif isinstance(value, list):
+        for nested in value:
+            names.update(property_names(nested))
+    return names
+
+def normalized_tokens(name):
+    import re
+    separated = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", name)
+    return {
+        token.casefold()
+        for token in re.split(r"[^A-Za-z0-9]+", separated)
+        if token
+    }
+
+names = property_names(schema)
+overlap = forbidden & names
+if overlap:
+    raise SystemExit(f"v2 schema exposes authority fields: {sorted(overlap)}")
+for name in names:
+    tokens = normalized_tokens(name)
+    if tokens & {
+        "action",
+        "arguments",
+        "authorization",
+        "cleanup",
+        "command",
+        "executable",
+        "executor",
+        "journal",
+        "manifest",
+        "path",
+        "policy",
+        "registered",
+        "trash",
+    }:
+        raise SystemExit(f"v2 schema exposes authority-like field: {name}")
+PY
+
+python3 - \
+    Sources/StornautCodex/Runtime/CodexRuntimeDiagnostic.swift \
+    Sources/StornautCodex/Runtime/CodexAppServerSessionRunner.swift \
+    Sources/StornautCodex/Runtime/CodexRuntimeEnvironment.swift \
+    Sources/StornautCodex/Runtime/CodexAppServerRuntime.swift <<'PY'
+import re
+import sys
+
+diagnostic = open(sys.argv[1], encoding="utf-8").read()
+session_runner = open(sys.argv[2], encoding="utf-8").read()
+environment = open(sys.argv[3], encoding="utf-8").read()
+app_server = open(sys.argv[4], encoding="utf-8").read()
+
+def declaration_body(source, marker):
+    start = source.find(marker)
+    if start < 0:
+        raise SystemExit(f"missing declaration {marker}")
+    opening = source.find("{", start)
+    if opening < 0:
+        raise SystemExit(f"missing body for {marker}")
+    depth = 0
+    for index in range(opening, len(source)):
+        if source[index] == "{":
+            depth += 1
+        elif source[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return source[opening + 1:index]
+    raise SystemExit(f"unterminated body for {marker}")
+
+spawn = declaration_body(diagnostic, "func spawnDiagnosticProcess(")
+required_spawn_tokens = {
+    "POSIX_SPAWN_CLOEXEC_DEFAULT",
+    "POSIX_SPAWN_SETPGROUP",
+    "posix_spawn_file_actions_addchdir",
+    "posix_spawnattr_setpgroup",
+    "posix_spawn(",
+}
+missing = required_spawn_tokens - {
+    token for token in required_spawn_tokens if token in spawn
+}
+if missing:
+    raise SystemExit(
+        f"diagnostic spawn boundary is incomplete: {sorted(missing)}"
+    )
+if "spawnDiagnosticProcess(" not in declaration_body(
+    session_runner,
+    "private func runSynchronously("
+):
+    raise SystemExit("App Server runner does not use the checked spawn boundary")
+
+allowed_match = re.search(
+    r"static let allowedKeys: Set<String>\s*=\s*\[(.*?)\n\s*\]",
+    environment,
+    re.DOTALL,
+)
+if not allowed_match:
+    raise SystemExit("missing typed runtime environment key contract")
+actual_keys = set(re.findall(r'"([A-Z][A-Z0-9_]*)"', allowed_match.group(1)))
+expected_keys = {
+    "CODEX_HOME",
+    "HOME",
+    "LANG",
+    "LC_ALL",
+    "LC_CTYPE",
+    "PATH",
+    "SSL_CERT_DIR",
+    "SSL_CERT_FILE",
+    "TERM",
+    "TMPDIR",
+}
+if actual_keys != expected_keys:
+    raise SystemExit(
+        f"runtime environment keys {sorted(actual_keys)} "
+        f"!= {sorted(expected_keys)}"
+    )
+environment_check = declaration_body(
+    session_runner,
+    "private func environmentIsClosed("
+)
+if "CodexRuntimeEnvironment.allowedKeys" not in environment_check:
+    raise SystemExit("App Server runner bypasses the typed environment contract")
+
+request = declaration_body(
+    app_server,
+    "struct CodexAppServerRuntimeRequest:"
+)
+request_prefix = request.split("init(", 1)[0]
+actual_fields = set(
+    re.findall(r"^\s*let\s+([A-Za-z][A-Za-z0-9]*)\s*:", request_prefix, re.MULTILINE)
+)
+expected_fields = {
+    "projectedAuthSourceURL",
+    "runtimeHomeURL",
+    "workingDirectoryURL",
+    "prompt",
+    "outputSchema",
+    "maximumPromptBytes",
+    "maximumSchemaBytes",
+    "maximumInputLineBytes",
+}
+if actual_fields != expected_fields:
+    raise SystemExit(
+        f"App Server request fields {sorted(actual_fields)} "
+        f"!= {sorted(expected_fields)}"
+    )
+PY
+
+if rg -n \
+    '(NSXPCConnection|NSXPCListener|mach_service|MachService|cleanup.*endpoint|executor.*endpoint)' \
+    Sources/StornautCodex \
+    --glob '*.swift' \
+    --glob '!**/ProbeBridge/**'; then
+    print -u2 "StornautCodex exposes a prohibited cleanup IPC surface."
+    exit 1
+fi
+
+print "Codex no-Executor boundary verification passed."

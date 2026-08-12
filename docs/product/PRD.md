@@ -305,7 +305,12 @@ Adapter 必须声明版本范围、能力、只读保证、超时和解析器测
 
 ### FR-8 CleanupPlan 与 Policy Gate
 
-Agent 只能输出不可执行的结构化 CleanupPlan。Policy Gate 必须：
+Agent 只能输出 versioned、不可执行的 advisory report，且只能引用 Swift
+预先提供的 investigation/run/target/candidate IDs。Agent 不能提供路径、
+CleanupAction、authorization、PolicyDecision、Trash、Registered Action、
+journal 或 Executor 字段。Swift coordinator 必须从 retained IDs 重新查找
+当前路径、canonicalize/revalidate，并显式构造结构化 CleanupPlan。
+Policy Gate 必须：
 
 - 重新规范化路径并检查 symlink/mount boundary
 - 重查大小、mtime、inode/文件标识和活动状态

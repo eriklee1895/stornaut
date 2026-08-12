@@ -1,4 +1,5 @@
 import Foundation
+import StornautCodex
 import StornautCore
 
 public struct ProbeBridgeRequest: Codable, Sendable, Equatable {

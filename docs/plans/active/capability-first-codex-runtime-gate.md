@@ -1,7 +1,6 @@
 # Capability-First Codex Runtime Evidence Gate
 
-> Status: Paused for user review — R1–R3 complete; R3 behaviorReady candidate;
-> R4–R6 not started
+> Status: In progress — R1–R4 complete; R4 `protocolReady`; R5 next
 >
 > Planned: 2026-08-11
 >
@@ -661,7 +660,7 @@ external-auth `gpt-5.6-luna` diagnostic also passed. See the
 
 R3 closes as `behaviorReady` candidate. It does not prove signed-App helper
 packaging, FDA/TCC inheritance, no-Executor protocol integration or final
-product admission. R4–R6 remain not started.
+product admission.
 
 ## 12. R4 — Investigation Protocol v2 and No-Executor Seam
 
@@ -753,6 +752,20 @@ any accidental action reachability. Run focused protocol/boundary tests,
 complete `StornautCodexTests`, full `swift test`, verifier scripts and docs.
 
 R4 ends with one independent commit/push.
+
+R4 completed on 2026-08-12 with a strict, bounded, identity-bound advisory
+protocol and a structural package seam:
+
+```text
+StornautCodex → StornautProcessSupport
+StornautCore → StornautProcessSupport
+StornautProbeBridge → StornautCodex + StornautCore
+```
+
+The final verifier proves `StornautCodex` has no direct or transitive route to
+the Executor-bearing Core target, checks the actual spawn/environment/request
+contracts, and rejects authority-like v2 schema fields. See the
+[R4 review](../../reports/capability-first-runtime-r4-review.md).
 
 ## 13. R5 — Signed-App Capability and Containment Diagnostic
 
@@ -1042,7 +1055,6 @@ If any capability or integrity row remains uncertain, this gate is not
 complete. Record the no-go/conditional result and continue the deterministic
 product only through a separately reviewed roadmap update.
 
-Current outcome: the plan is **not complete**. R3 is a `behaviorReady`
-candidate and the workflow is paused for user review before R4. Task 29 and
-production Deep Dive remain paused. R4–R6 still must prove protocol/no-Executor,
-signed-App capability/helper packaging and final admission.
+Current outcome: the plan is **not complete**. R4 is `protocolReady`; Task 29
+and production Deep Dive remain paused. R5–R6 still must prove signed-App
+capability/helper packaging and final admission.

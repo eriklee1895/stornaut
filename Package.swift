@@ -20,6 +20,14 @@ let package = Package(
             name: "StornautLifecycle",
             targets: ["StornautLifecycle"]
         ),
+        .library(
+            name: "StornautProbeBridge",
+            targets: ["StornautProbeBridge"]
+        ),
+        .library(
+            name: "StornautProcessSupport",
+            targets: ["StornautProcessSupport"]
+        ),
         .executable(
             name: "SurveyorBenchmark",
             targets: ["SurveyorBenchmark"]
@@ -36,6 +44,7 @@ let package = Package(
     targets: [
         .target(
             name: "StornautCore",
+            dependencies: ["StornautProcessSupport"],
             resources: [
                 .copy("Resources/BuiltInRuleCatalog.json"),
             ],
@@ -45,10 +54,19 @@ let package = Package(
         ),
         .target(
             name: "StornautCodex",
-            dependencies: ["StornautCore"],
+            dependencies: ["StornautProcessSupport"],
+            exclude: ["ProbeBridge"],
             resources: [
                 .copy("Schemas"),
             ]
+        ),
+        .target(
+            name: "StornautProbeBridge",
+            dependencies: ["StornautCodex", "StornautCore"],
+            path: "Sources/StornautCodex/ProbeBridge"
+        ),
+        .target(
+            name: "StornautProcessSupport"
         ),
         .target(
             name: "StornautLifecycle",
@@ -88,7 +106,12 @@ let package = Package(
         ),
         .testTarget(
             name: "StornautCodexTests",
-            dependencies: ["StornautCodex", "StornautCore"]
+            dependencies: [
+                "StornautCodex",
+                "StornautCore",
+                "StornautProbeBridge",
+                "StornautProcessSupport",
+            ]
         ),
         .testTarget(
             name: "StornautLifecycleTests",

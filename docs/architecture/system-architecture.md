@@ -274,8 +274,13 @@ expectedBytes × uncertainty × userRelevance / estimatedProbeCost
 
 Codex 根据候选、预算和已有证据，自主选择直接只读文件/元数据调查、shell
 命令、live web、browser/direct fetch、受支持的 Agent 能力或 Broker 类型化
-Probe。Swift 将可信结构化结果写入 Evidence Store，再把压缩状态提供给 Codex；
-直接工具结果始终作为不受 Broker 审计保证的 advisory evidence 标记来源。
+Probe。Codex 最终只返回 versioned `InvestigationAdvisoryReport`：模型回显
+Swift 提供的 investigation/run/target/candidate IDs，不能提供路径、动作、
+authorization、Policy、Trash 或 Executor 字段。Swift 绑定身份、规范化并将
+可信结构化结果写入 Evidence Store，再把压缩状态提供给 Codex；直接工具结果
+始终作为不受 Broker 审计保证的 advisory evidence 标记来源。未来 coordinator
+必须从 retained IDs 重新查找路径并执行 canonicalization/current identity/
+Policy，才能形成确定性 CleanupPlan。
 
 ### 4.7 Probe Broker
 
@@ -407,8 +412,9 @@ Codex → Files/Shell/Web/Browser: direct read-only investigation
 Codex ↔ Probe Broker: optional typed read-only requests
 Probe Broker/Normalizer → Evidence Store: typed evidence + source labels
 Evidence Store → Codex: compressed updated state
-Codex → App: EvidenceReport + CleanupPlan
-App → Policy Gate: validate
+Codex → App: versioned advisory report with Swift-bound IDs
+App → Swift Coordinator: lookup IDs, canonicalize, revalidate, build CleanupPlan
+Swift Coordinator → Policy Gate: validate
 Policy Gate → UI: approved/rejected items and reasons
 ```
 
@@ -514,10 +520,14 @@ stornaut/
 │   │   ├── Policy/
 │   │   ├── Actions/
 │   │   └── Accounting/
-│   └── StornautCodex/
+│   ├── StornautCodex/
 │       ├── Runtime/
 │       ├── Protocol/
-│       └── Schemas/
+│       ├── Schemas/
+│       └── ProbeBridge/     # source path of separate host-side target
+│   ├── StornautProcessSupport/
+│   ├── StornautLifecycle/
+│   └── CLifecycleSupport/
 ├── Rules/
 ├── Tests/
 │   ├── Fixtures/
@@ -527,7 +537,22 @@ stornaut/
 └── ThirdPartyNotices/
 ```
 
-`StornautCore` 与 `StornautCodex` 使用 Swift Package Manager；已接受的 Epic 0 Upstream Study 选择 checked-in `Stornaut.xcodeproj` 作为真实 App/Test host，并通过 local package products 接入两个库。最终 bundle identifier 与本地签名证据由 Task 2/ADR 0001 固化。规则、Policy 和 Probe 必须在不启动 GUI 时可测试。不要在 v1 为形式上的“微服务”拆多进程；Codex 隔离和必要的 XPC 技术 Spike 除外。
+Swift Package Manager 的当前安全边界为：
+
+```text
+StornautCodex → StornautProcessSupport
+StornautCore → StornautProcessSupport
+StornautProbeBridge → StornautCodex + StornautCore
+StornautProcessSupport → no target dependency
+```
+
+`StornautCodex` 不得直接或间接依赖 Executor-bearing `StornautCore`。
+`StornautProbeBridge` 是 host-side typed bridge target，不是 Codex child 的
+通用 IPC/cleanup endpoint。已接受的 Epic 0 Upstream Study 选择 checked-in
+`Stornaut.xcodeproj` 作为真实 App/Test host，并通过 local package products
+接入所需库。最终 bundle identifier 与本地签名证据由 Task 2/ADR 0001 固化。
+规则、Policy 和 Probe 必须在不启动 GUI 时可测试。不要在 v1 为形式上的
+“微服务”拆多进程；Codex 隔离和获批的 lifecycle supervisor/XPC 技术边界除外。
 
 ## 10. 实施前技术 Spike
 

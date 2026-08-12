@@ -1,6 +1,6 @@
 # Capability-First Runtime R3 Review
 
-> Status: Passed — behaviorReady candidate; R4 not started pending user review
+> Status: Passed — behaviorReady candidate; R4 later reached `protocolReady`
 >
 > Date: 2026-08-12
 >

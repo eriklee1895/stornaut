@@ -18,7 +18,10 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   transport 例外已获批准；R2 已完成并得出 `configurationReady`；原 R3
   process-group candidate 的 new-session descendant escape 已由用户批准的
   audit-session lifecycle supervisor 精确关闭，R3 得出 `behaviorReady`
-  candidate。当前按用户要求暂停等待 R3 review，R4–R6 与 Task 29 均未启动。
+  candidate。用户 review 后已继续；R4 的 strict Investigation Envelope v2、
+  Swift identity binding、ProcessSupport/ProbeBridge module separation 与
+  structural no-Executor verifier 已完成并得出 `protocolReady`。R5–R6 与
+  Task 29 均未启动。
   逐 Task 完成 Upstream Study、
   实现、code review、focused/full verify、独立 commit/push；不得提前混入
   生产 Deep Dive、Adapter、真实 Registered Action 或 release 工作。
@@ -68,6 +71,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Capability-first Codex Runtime Gate | [docs/plans/active/capability-first-codex-runtime-gate.md](docs/plans/active/capability-first-codex-runtime-gate.md) |
 | R1 Runtime Study / conditional decision | [docs/upstream-studies/epic-5-capability-first-runtime.md](docs/upstream-studies/epic-5-capability-first-runtime.md) / [ADR 0013](docs/adr/0013-capability-first-runtime-containment.md) |
 | R3 Runtime behavior gate | [docs/reports/capability-first-runtime-r3-review.md](docs/reports/capability-first-runtime-r3-review.md) |
+| R4 Protocol / no-Executor gate | [docs/reports/capability-first-runtime-r4-review.md](docs/reports/capability-first-runtime-r4-review.md) |
 | Phase C Epic 8 获批计划 | [docs/plans/active/epic-8-safe-execution-vertical-slice.md](docs/plans/active/epic-8-safe-execution-vertical-slice.md) |
 | Epic 2–4 历史计划 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) |
 | Epic 2–4 最终 Gate | [docs/reports/epic-2-4-validation-report.md](docs/reports/epic-2-4-validation-report.md) |
@@ -100,11 +104,12 @@ user-job cleanup 不能保证整个调查进程树回收；用户随后批准 AD
 audit-session lifecycle supervisor。最终 privileged composition 已观察到
 identity drop、outer Seatbelt ordering、audit-session inheritance、managed
 proxy owner drain 与 stale-lease recovery，live/combined/recovery 均完成且
-residue 为 0；R3 结论为 `behaviorReady` candidate。当前暂停等待用户 review，
-R4–R6 与 Task 29 均未启动。
+residue 为 0；R3 结论为 `behaviorReady` candidate。R4 已完成 strict v2
+advisory protocol、Swift-owned context binding 与 structural no-Executor
+module seam，结论为 `protocolReady`。R5–R6 与 Task 29 均未启动。
 Deep Dive 的旧 Broker-only no-go 已被 ADR 0004 的 capability-first 边界取代；
-当前仍 paused 的原因是 R4–R6 与生产 Deep Dive 尚未交付，而非 Codex 工具
-能力过强。R3 不证明 signed-App helper packaging、FDA/TCC 或最终 no-Executor
+当前仍 paused 的原因是 R5–R6 与生产 Deep Dive 尚未交付，而非 Codex 工具
+能力过强。R4 不证明 signed-App helper packaging、FDA/TCC 或最终 product
 admission；release signing/notarization 仍未评估。Overview、Scan、Scan-only
 History 与六区 Settings 已是真实 typed projection/生命周期，Investigations 仍是 placeholder，
 Review/Trash 仍未启用。
@@ -114,6 +119,10 @@ Review/Trash 仍未启用。
 ```text
 Sources/StornautCore/    领域类型与安全接口
 Sources/StornautCodex/   Codex 发现、启动、JSONL/schema
+Sources/StornautProcessSupport/
+                        无 Core 权限的通用进程组终止支持
+Sources/StornautCodex/ProbeBridge/
+                        独立 StornautProbeBridge host target
 Sources/StornautLifecycle/
                         closed audit-session lifecycle foundation
 Sources/StornautCore/Settings/

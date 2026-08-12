@@ -61,7 +61,8 @@
 - 元数据优先
 - Codex 可直接读取调查所需的 README/manifest/lockfile 等文件；文件内容可能进入模型上下文，UI 明确披露这一点
 - 主动采集凭据、绕过 TCC、访问 localhost/私网或任意 Unix socket 仍不属于调查范围
-- Agent 只生成结构化 CleanupPlan
+- Agent 只生成 versioned advisory report；Swift 从已绑定 ID 重新查找路径、
+  canonicalize/revalidate 后才可形成结构化 CleanupPlan
 - Swift Policy Gate 可以否决任何 Agent 结论
 - Executor 仅接受 Trash 或 Action Registry 中审核过的 Registered Action
 - Evidence Store 默认保留 7 天；原始内容片段不落盘
@@ -105,7 +106,8 @@ Deep Dive
   Evidence Store → Candidate Planner → Codex Commander
   Codex Commander ↔ Direct Read / Shell / Live Web / Browser / Agent Tools
   Codex Commander ↔ Probe Broker ↔ Built-in Probes / Optional Adapters
-  Codex Commander → EvidenceReport + CleanupPlan
+  Codex Commander → versioned advisory report with Swift-bound IDs
+  Swift Coordinator → canonicalize/revalidate → CleanupPlan
 
 Execution
   CleanupPlan → Policy Gate → User Approval → Executor → Manifest/Accounting

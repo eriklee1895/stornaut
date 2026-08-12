@@ -1,6 +1,6 @@
 import Darwin
 import Foundation
-import StornautCore
+import StornautProcessSupport
 
 struct CodexAppServerSessionRequest: Sendable {
     let executableURL: URL
@@ -461,19 +461,9 @@ private func globalInstructionsAreAbsent(in runtimeHomeURL: URL) -> Bool {
 private func environmentIsClosed(
     _ environment: CodexRuntimeEnvironment
 ) -> Bool {
-    let allowedKeys = Set([
-        "CODEX_HOME",
-        "HOME",
-        "LANG",
-        "LC_ALL",
-        "LC_CTYPE",
-        "PATH",
-        "SSL_CERT_DIR",
-        "SSL_CERT_FILE",
-        "TERM",
-        "TMPDIR",
-    ])
-    return Set(environment.values.keys).isSubset(of: allowedKeys)
+    Set(environment.values.keys).isSubset(
+        of: CodexRuntimeEnvironment.allowedKeys
+    )
         && environment.values.values.allSatisfy {
             !$0.isEmpty
                 && $0.unicodeScalars.allSatisfy {

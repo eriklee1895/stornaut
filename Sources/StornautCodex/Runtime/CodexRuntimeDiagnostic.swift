@@ -1,6 +1,6 @@
 import Darwin
 import Foundation
-import StornautCore
+import StornautProcessSupport
 
 struct CodexRuntimeDiagnosticRequest: Sendable, Equatable {
     let profile: CodexRuntimeProfile

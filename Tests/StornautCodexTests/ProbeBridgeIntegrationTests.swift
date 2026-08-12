@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import StornautProbeBridge
 import StornautCore
 @testable import StornautCodex
 

@@ -33,10 +33,11 @@
 | Agent、双模式与治理设计 | [Agent Disk Governance](design/agent-disk-governance.md) |
 | UI、品牌、状态与交互 | [UI/UX](design/ui-ux.md) |
 | 宏观交付顺序与阶段 Gate | [Delivery Roadmap](plans/roadmap.md) |
-| 当前计划状态 | [Active Plans](plans/active/README.md) — Runtime R3 behaviorReady；等待用户 review |
-| Capability-first Codex Runtime Gate | [Runtime Evidence Gate](plans/active/capability-first-codex-runtime-gate.md) — paused after R3；R4–R6 not started |
+| 当前计划状态 | [Active Plans](plans/active/README.md) — Runtime R4 protocolReady；R5 next |
+| Capability-first Codex Runtime Gate | [Runtime Evidence Gate](plans/active/capability-first-codex-runtime-gate.md) — R1–R4 complete；R5–R6 pending |
 | R2 tests-first brief | [R2 Implementation Brief](plans/active/task-r2-implementation-brief.md) — complete |
 | R3 lifecycle hard-gate brief | [R3 Implementation Brief](plans/active/task-r3-implementation-brief.md) — behaviorReady candidate |
+| R4 protocol/no-Executor brief | [R4 Implementation Brief](plans/active/task-r4-implementation-brief.md) — protocolReady |
 | Phase C Epic 8 获批计划 | [Safe Execution Vertical Slice](plans/active/epic-8-safe-execution-vertical-slice.md) |
 | Epic 2–4 历史计划 | [Deterministic Product Core](plans/completed/epic-2-4-deterministic-product-core.md) — Tasks 9–26 已完成并归档 |
 | 已完成计划 | [Completed Plans](plans/completed/README.md) — Epic 0–1 |
@@ -56,7 +57,8 @@
 | Capability-first Runtime Study | [Epic 5 Runtime Study](upstream-studies/epic-5-capability-first-runtime.md) — R1 evidence |
 | Capability-first Runtime R1 Review | [R1 Review](reports/capability-first-runtime-r1-review.md) — conditional-go evidence；transport later approved |
 | Capability-first Runtime R2 Review | [R2 Review](reports/capability-first-runtime-r2-review.md) — configurationReady at R2 |
-| Capability-first Runtime R3 Review | [R3 Review](reports/capability-first-runtime-r3-review.md) — behaviorReady candidate；R4 not started |
+| Capability-first Runtime R3 Review | [R3 Review](reports/capability-first-runtime-r3-review.md) — behaviorReady candidate |
+| Capability-first Runtime R4 Review | [R4 Review](reports/capability-first-runtime-r4-review.md) — protocolReady；R5 pending |
 | Review / Policy / Authorization 决策 | [ADR 0011](adr/0011-review-policy-authorization.md) |
 | Cleanup Journal / Manifest 决策 | [ADR 0012](adr/0012-cleanup-execution-journal.md) |
 | Epic 8 Task 27 Review | [Task 27 Code and Design Review](reports/epic-8-task-27-review.md) |

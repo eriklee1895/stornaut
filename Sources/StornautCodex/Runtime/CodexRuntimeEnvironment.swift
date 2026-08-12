@@ -2,6 +2,19 @@ import Darwin
 import Foundation
 
 struct CodexRuntimeEnvironment: Sendable, Equatable, CustomStringConvertible {
+    static let allowedKeys: Set<String> = [
+        "CODEX_HOME",
+        "HOME",
+        "LANG",
+        "LC_ALL",
+        "LC_CTYPE",
+        "PATH",
+        "SSL_CERT_DIR",
+        "SSL_CERT_FILE",
+        "TERM",
+        "TMPDIR",
+    ]
+
     let values: [String: String]
 
     var description: String {

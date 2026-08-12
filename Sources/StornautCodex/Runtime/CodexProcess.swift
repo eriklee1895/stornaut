@@ -1,6 +1,6 @@
 import Darwin
 import Foundation
-import StornautCore
+import StornautProcessSupport
 
 public struct CodexRunRequest: Sendable, Equatable {
     public let executableURL: URL

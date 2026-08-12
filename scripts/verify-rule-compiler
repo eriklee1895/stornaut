@@ -230,8 +230,15 @@ import sys
 graph = json.loads(sys.argv[1])
 targets = {target["name"]: target for target in graph["targets"]}
 
-if targets["StornautCore"].get("target_dependencies"):
+core_dependencies = set(
+    targets["StornautCore"].get("target_dependencies", [])
+)
+if "RuleCompilerKit" in core_dependencies:
     raise SystemExit("StornautCore must not depend on RuleCompilerKit")
+if core_dependencies != {"StornautProcessSupport"}:
+    raise SystemExit(
+        f"unexpected StornautCore dependencies: {sorted(core_dependencies)}"
+    )
 if "RuleCompilerKit" in targets["StornautCodex"].get("target_dependencies", []):
     raise SystemExit("StornautCodex must not depend on RuleCompilerKit")
 allowed = {"StornautRuleCompiler", "RuleCompilerTests"}

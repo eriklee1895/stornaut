@@ -10,8 +10,10 @@
 > R1–R2 已完成；R2 结论为 `configurationReady`；R3 的原 process-group
 > candidate 因 new-session descendant escape 被拒，用户批准的 audit-session
 > lifecycle supervisor 随后通过 final privileged composition，R3 得出
-> `behaviorReady` candidate。当前暂停等待用户 review；R4–R6 与 Task 29
-> 均未启动；Task 5 的历史
+> `behaviorReady` candidate；用户 review 后已继续。R4 已完成 strict
+> Investigation Envelope v2、Swift identity binding、ProcessSupport/ProbeBridge
+> module separation 与 structural no-Executor verifier，结论为
+> `protocolReady`。R5–R6 与 Task 29 均未启动；Task 5 的历史
 > Broker-only no-go 已由 ADR 0004 capability-first 决策修订，Deep Dive 因
 > 新运行时实现/evidence gate 尚未交付而 paused；
 > release signing/notarization 未评估
@@ -222,8 +224,8 @@ Phase C 详尽候选计划见
 已于 2026-08-11 获用户批准。Tasks 27–28 已完成；用户随后批准在 Task 29
 前插入
 [Capability-First Codex Runtime Evidence Gate](../plans/active/capability-first-codex-runtime-gate.md)。
-R1–R6 全部通过后才恢复 Tasks 29–35；R3 已完成但当前按用户要求暂停等待
-review，因此不得启动 R4 或恢复 Task 29。
+R1–R6 全部通过后才恢复 Tasks 29–35；R4 已完成并得出
+`protocolReady`，R5 可在 R4 独立 push 后启动；Task 29 仍不得恢复。
 R1 当前证据见
 [study](../upstream-studies/epic-5-capability-first-runtime.md) 与
 [ADR 0013](../adr/0013-capability-first-runtime-containment.md)：唯一候选需要
@@ -231,8 +233,10 @@ same-session parent-owned random loopback managed proxy transport。该精确例
 已获用户批准用于 R2 configuration candidate；R3 behavior evidence 因
 process-tree lifecycle escape 拒绝原 process-group design，随后由用户批准的
 [ADR 0016](../adr/0016-investigation-lifecycle-supervisor.md) audit-session
-supervisor 关闭 hard gate。R3 final verdict 为 `behaviorReady` candidate；
-signed-App helper packaging/FDA/TCC 与最终 no-Executor admission 尚未证明。
+supervisor 关闭 hard gate。R3 final verdict 为 `behaviorReady` candidate。
+R4 随后用 strict v2 advisory protocol 与 package graph separation 关闭
+no-Executor protocol seam；signed-App helper packaging/FDA/TCC 与最终 admission
+仍属于 R5–R6。
 
 跨 Epic 的阶段依赖、no-go 分支和交付顺序由 [Delivery Roadmap](../plans/roadmap.md) 管理；新 active plan 不得另起一套宏观路线。
 
@@ -325,7 +329,7 @@ transport。该精确例外已获用户批准用于 R2 configuration candidate�
 回收，随后通过用户批准的 audit-session lifecycle supervisor 取得
 `behaviorReady` candidate：identity drop、outer Seatbelt、ASID inheritance、
 managed-proxy-owner drain 与 stale-lease recovery 均 observed，residue 为 0。
-当前暂停等待用户 review；R4–R6 与 Task 29 仍未启动。该 gate
+R4 已完成并得出 `protocolReady`；R5–R6 与 Task 29 仍未启动。该 gate
 要求证明完整调查能力和公共联网可用时，Codex 全进程树不可写用户数据、不可
 访问 localhost/私网/任意 Unix socket 且无 Executor 路径；不得用
 `danger-full-access`、命令/公共域名

@@ -23,5 +23,8 @@
 - [Epic 8 Task 27 Code and Design Review — 2026-08-11](epic-8-task-27-review.md)：Safe Execution study、profile 收窄、authorization/journal ADR 与四项确认设计问题修复。
 - [Epic 8 Task 28 Code Review — 2026-08-11](epic-8-task-28-review.md)：cleanup domain v2、Evidence Store v3、path-free journal、atomic migration、immutable writes 与十三项确认问题修复。
 - [Capability-First Runtime R1 Review — 2026-08-11](capability-first-runtime-r1-review.md)：Codex `0.147.0` permission profiles、Seatbelt、managed network proxy、private Runtime Home 与 instruction/auth/browser 边界审查；R1 conditional-go，R2 等待 dedicated loopback proxy 决策。
+- [Capability-First Runtime R2 Review — 2026-08-12](capability-first-runtime-r2-review.md)：closed capability-first profile、advertised/configured/observed/contained evidence 与 `configurationReady` 结论。
+- [Capability-First Runtime R3 Review — 2026-08-12](capability-first-runtime-r3-review.md)：Runtime Home、external auth、Seatbelt/managed proxy 与 audit-session lifecycle supervisor 的 `behaviorReady` candidate。
+- [Capability-First Runtime R4 Review — 2026-08-12](capability-first-runtime-r4-review.md)：strict Investigation Envelope v2、Swift identity binding、module separation 与 structural no-Executor `protocolReady` 证据。
 
 报告记录测量事实；若事实要求降低安全、权限或隐私边界，必须先请求用户决策，不能直接改写批准规格。
