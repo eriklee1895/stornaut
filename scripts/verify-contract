@@ -115,116 +115,249 @@ if ! workflow_contract_error=$(python3 - "$workflow" 2>&1 <<'PY'
 from pathlib import Path
 import re
 import sys
-
-workflow = Path(sys.argv[1])
-lines = workflow.read_text(encoding="utf-8").splitlines()
+import tempfile
 
 
-def fail(message):
-    raise SystemExit(f"{workflow} {message}")
+class ContractViolation(Exception):
+    pass
 
 
-def indentation(line):
-    if "\t" in line[: len(line) - len(line.lstrip())]:
-        fail("uses a tab for YAML indentation")
-    return len(line) - len(line.lstrip(" "))
+def validate_workflow(workflow):
+    lines = workflow.read_text(encoding="utf-8").splitlines()
 
+    def fail(message):
+        raise ContractViolation(f"{workflow} {message}")
 
-def top_level_block(name):
-    header = f"{name}:"
-    matches = [index for index, line in enumerate(lines) if line == header]
-    if len(matches) != 1:
-        fail(f"must contain exactly one top-level {header} block")
-    start = matches[0]
-    end = len(lines)
-    for index in range(start + 1, len(lines)):
-        line = lines[index]
-        if line.strip() and not line.lstrip().startswith("#") and indentation(line) == 0:
-            end = index
-            break
-    return start, end
+    def indentation(line):
+        if "\t" in line[: len(line) - len(line.lstrip())]:
+            fail("uses a tab for YAML indentation")
+        return len(line) - len(line.lstrip(" "))
 
+    def top_level_block(name):
+        header = f"{name}:"
+        matches = [index for index, line in enumerate(lines) if line == header]
+        if len(matches) != 1:
+            fail(f"must contain exactly one top-level {header} block")
+        start = matches[0]
+        end = len(lines)
+        for index in range(start + 1, len(lines)):
+            line = lines[index]
+            if (
+                line.strip()
+                and not line.lstrip().startswith("#")
+                and indentation(line) == 0
+            ):
+                end = index
+                break
+        return start, end
 
-def direct_mappings(start, end, indent):
-    pattern = re.compile(
-        r"^" + (" " * indent) + r"([A-Za-z0-9_-]+):(?:[ ]*(.*))?$"
-    )
-    entries = []
-    for index in range(start, end):
+    def direct_mappings(start, end, indent):
+        pattern = re.compile(
+            r"^" + (" " * indent) + r"([A-Za-z0-9_-]+):(?:[ ]*(.*))?$"
+        )
+        entries = []
+        for index in range(start, end):
+            line = lines[index]
+            if not line.strip() or line.lstrip().startswith("#"):
+                continue
+            if indentation(line) != indent:
+                continue
+            match = pattern.fullmatch(line)
+            if match is None:
+                fail(f"has an unsupported mapping at line {index + 1}")
+            entries.append((match.group(1), match.group(2) or "", index))
+        keys = [key for key, _, _ in entries]
+        if len(keys) != len(set(keys)):
+            fail(f"contains a duplicate mapping at indentation {indent}")
+        return entries
+
+    def child_block_end(parent_index, enclosing_end, parent_indent):
+        for index in range(parent_index + 1, enclosing_end):
+            line = lines[index]
+            if (
+                line.strip()
+                and not line.lstrip().startswith("#")
+                and indentation(line) <= parent_indent
+            ):
+                return index
+        return enclosing_end
+
+    def substantive_lines(start, end):
+        return [
+            line
+            for line in lines[start:end]
+            if line.strip() and not line.lstrip().startswith("#")
+        ]
+
+    def run_command_sources(start, end):
+        commands = []
+        for index in range(start, end):
+            line = lines[index]
+            match = re.fullmatch(r"( +)run:[ ]*(.*)", line)
+            if match is None:
+                continue
+            run_indent = len(match.group(1))
+            value = match.group(2).strip()
+            if value not in {"|", "|-", "|+", ">", ">-", ">+"}:
+                commands.append(value)
+                continue
+            block_end = child_block_end(index, end, run_indent)
+            commands.append(
+                "\n".join(
+                    command_line.strip()
+                    for command_line in lines[index + 1 : block_end]
+                    if command_line.strip()
+                    and not command_line.lstrip().startswith("#")
+                )
+            )
+        return commands
+
+    on_start, on_end = top_level_block("on")
+    triggers = direct_mappings(on_start + 1, on_end, 2)
+    if {key for key, _, _ in triggers} != {
+        "pull_request",
+        "push",
+        "workflow_dispatch",
+    }:
+        fail("must trigger only on pull_request, push, and workflow_dispatch")
+    if any(value for _, value, _ in triggers):
+        fail("must express each trigger as a mapping")
+
+    triggers_by_name = {key: index for key, _, index in triggers}
+    for unfiltered_trigger in ("pull_request", "workflow_dispatch"):
+        trigger_index = triggers_by_name[unfiltered_trigger]
+        trigger_end = child_block_end(trigger_index, on_end, 2)
+        if substantive_lines(trigger_index + 1, trigger_end):
+            fail(f"{unfiltered_trigger} must be empty and unfiltered")
+
+    push_index = next(index for key, _, index in triggers if key == "push")
+    push_end = child_block_end(push_index, on_end, 2)
+    push_mappings = direct_mappings(push_index + 1, push_end, 4)
+    if [(key, value) for key, value, _ in push_mappings] != [("branches", "")]:
+        fail("push must contain exactly one branches mapping")
+    branch_values = []
+    for index in range(push_mappings[0][2] + 1, push_end):
         line = lines[index]
         if not line.strip() or line.lstrip().startswith("#"):
             continue
-        if indentation(line) != indent:
-            continue
-        match = pattern.fullmatch(line)
+        match = re.fullmatch(r" {6}-[ ]+([^ ]+)[ ]*", line)
         if match is None:
-            fail(f"has an unsupported mapping at line {index + 1}")
-        entries.append((match.group(1), match.group(2) or "", index))
-    keys = [key for key, _, _ in entries]
-    if len(keys) != len(set(keys)):
-        fail(f"contains a duplicate mapping at indentation {indent}")
-    return entries
+            fail(f"has an unsupported push branch entry at line {index + 1}")
+        branch_values.append(match.group(1))
+    if branch_values != ["main"]:
+        fail("push branches must be exactly [main]")
+
+    permissions_start, permissions_end = top_level_block("permissions")
+    permissions = direct_mappings(permissions_start + 1, permissions_end, 2)
+    if [(key, value) for key, value, _ in permissions] != [("contents", "read")]:
+        fail("permissions must be exactly contents: read")
+
+    jobs_start, jobs_end = top_level_block("jobs")
+    jobs = direct_mappings(jobs_start + 1, jobs_end, 2)
+    if len(jobs) != 1 or jobs[0][1]:
+        fail("must contain exactly one job mapping")
+    job_entries = direct_mappings(jobs[0][2] + 1, jobs_end, 4)
+    job_settings = {key: value for key, value, _ in job_entries}
+    allowed_job_keys = {"name", "runs-on", "timeout-minutes", "steps"}
+    if set(job_settings) != allowed_job_keys:
+        fail(
+            "the sole job keys must be exactly name, runs-on, "
+            "timeout-minutes, and steps; job-level permissions are forbidden"
+        )
+    if job_settings.get("runs-on") != "macos-26":
+        fail("the sole job must run on exactly macos-26")
+    if job_settings.get("timeout-minutes") != "10":
+        fail("the sole job timeout-minutes must be exactly 10")
+    if job_settings.get("steps"):
+        fail("the sole job steps must be expressed as a mapping sequence")
+
+    repository_script_pattern = re.compile(
+        r"(?:^|[^A-Za-z0-9_-])(?:\./)?scripts/[A-Za-z0-9_.-]+"
+        r"(?:[^A-Za-z0-9_.-]|$)"
+    )
+    repository_project_gates = [
+        command
+        for command in run_command_sources(jobs[0][2] + 1, jobs_end)
+        if repository_script_pattern.search(command)
+    ]
+    if repository_project_gates != ["scripts/verify --headless"]:
+        fail(
+            "the sole repository project gate must be exactly "
+            "scripts/verify --headless"
+        )
 
 
-on_start, on_end = top_level_block("on")
-triggers = direct_mappings(on_start + 1, on_end, 2)
-if {key for key, _, _ in triggers} != {
-    "pull_request",
-    "push",
-    "workflow_dispatch",
-}:
-    fail("must trigger only on pull_request, push, and workflow_dispatch")
-if any(value for _, value, _ in triggers):
-    fail("must express each trigger as a mapping")
+workflow = Path(sys.argv[1])
+try:
+    validate_workflow(workflow)
+except ContractViolation as error:
+    raise SystemExit(str(error)) from error
 
-push_index = next(index for key, _, index in triggers if key == "push")
-push_end = on_end
-for index in range(push_index + 1, on_end):
-    line = lines[index]
-    if line.strip() and not line.lstrip().startswith("#") and indentation(line) <= 2:
-        push_end = index
-        break
-push_mappings = direct_mappings(push_index + 1, push_end, 4)
-if [(key, value) for key, value, _ in push_mappings] != [("branches", "")]:
-    fail("push must contain exactly one branches mapping")
-branch_values = []
-for index in range(push_mappings[0][2] + 1, push_end):
-    line = lines[index]
-    if not line.strip() or line.lstrip().startswith("#"):
-        continue
-    match = re.fullmatch(r" {6}-[ ]+([^ ]+)[ ]*", line)
-    if match is None:
-        fail(f"has an unsupported push branch entry at line {index + 1}")
-    branch_values.append(match.group(1))
-if branch_values != ["main"]:
-    fail("push branches must be exactly [main]")
 
-permissions_start, permissions_end = top_level_block("permissions")
-permissions = direct_mappings(permissions_start + 1, permissions_end, 2)
-if [(key, value) for key, value, _ in permissions] != [("contents", "read")]:
-    fail("permissions must be exactly contents: read")
+def mutate_once(source, expected, replacement, fixture_name):
+    if source.count(expected) != 1:
+        raise SystemExit(
+            f"cannot construct {fixture_name}: expected one mutation anchor"
+        )
+    return source.replace(expected, replacement, 1)
 
-jobs_start, jobs_end = top_level_block("jobs")
-jobs = direct_mappings(jobs_start + 1, jobs_end, 2)
-if len(jobs) != 1 or jobs[0][1]:
-    fail("must contain exactly one job mapping")
-job_settings = {
-    key: value
-    for key, value, _ in direct_mappings(jobs[0][2] + 1, jobs_end, 4)
+
+canonical_workflow = workflow.read_text(encoding="utf-8")
+negative_fixtures = {
+    "job-level contents: write": (
+        mutate_once(
+            canonical_workflow,
+            "  verify:\n",
+            "  verify:\n    permissions:\n      contents: write\n",
+            "job-level contents: write",
+        ),
+        "job-level permissions are forbidden",
+    ),
+    "filtered pull_request closed-only": (
+        mutate_once(
+            canonical_workflow,
+            "  pull_request:\n",
+            "  pull_request:\n    types: [closed]\n",
+            "filtered pull_request closed-only",
+        ),
+        "pull_request must be empty and unfiltered",
+    ),
+    "additional scripts/verify --full gate": (
+        mutate_once(
+            canonical_workflow,
+            "      - name: Publish verification timings\n",
+            "      - name: Run full verification\n"
+            "        run: scripts/verify --full\n\n"
+            "      - name: Publish verification timings\n",
+            "additional scripts/verify --full gate",
+        ),
+        "sole repository project gate",
+    ),
 }
-if job_settings.get("runs-on") != "macos-26":
-    fail("the sole job must run on exactly macos-26")
-if job_settings.get("timeout-minutes") != "10":
-    fail("the sole job timeout-minutes must be exactly 10")
 
-gate_occurrences = sum(line.count("scripts/verify --headless") for line in lines)
-job_gate_lines = [
-    line
-    for line in lines[jobs[0][2] + 1 : jobs_end]
-    if re.fullmatch(r"[ ]+run:[ ]+scripts/verify --headless[ ]*", line)
-]
-if gate_occurrences != 1 or len(job_gate_lines) != 1:
-    fail("must invoke exactly one scripts/verify --headless project gate in its job")
+accepted_fixtures = []
+with tempfile.TemporaryDirectory(prefix="stornaut-workflow-contract-") as temp_dir:
+    for fixture_index, (
+        fixture_name,
+        (fixture_source, expected_error),
+    ) in enumerate(negative_fixtures.items()):
+        fixture_path = Path(temp_dir) / f"{fixture_index}-ci.yml"
+        fixture_path.write_text(fixture_source, encoding="utf-8")
+        try:
+            validate_workflow(fixture_path)
+        except ContractViolation as error:
+            if expected_error not in str(error):
+                raise SystemExit(
+                    f"{fixture_name} failed for the wrong reason: {error}"
+                ) from error
+            continue
+        accepted_fixtures.append(fixture_name)
+
+if accepted_fixtures:
+    raise SystemExit(
+        "negative workflow contract fixtures were accepted: "
+        + "; ".join(accepted_fixtures)
+    )
 PY
 ); then
     fail_contract "$workflow_contract_error"
