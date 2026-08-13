@@ -20,8 +20,27 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   audit-session lifecycle supervisor 精确关闭，R3 得出 `behaviorReady`
   candidate。用户 review 后已继续；R4 的 strict Investigation Envelope v2、
   Swift identity binding、ProcessSupport/ProbeBridge module separation 与
-  structural no-Executor verifier 已完成并得出 `protocolReady`。R5–R6 与
-  Task 29 均未启动。
+  structural no-Executor verifier 已完成并得出 `protocolReady`。用户明确当前
+  只需个人本机运行，不要求分发；R5 已采用 root-only
+  `/Library/Application Support/Stornaut/` App + 固定 plist 的 local-only
+  lifecycle candidate，原 notarization blocker 已转为未来 distribution gate。
+  provider/schema/raw-event 漂移已修复；官方 `openai` + ChatGPT subscription
+  的真实 `gpt-5.6-luna` worker 已观察 9/9 capabilities，errno-only probe
+  已观察 IPv4/IPv6/local/private/Unix denial，worker containment 6/6。
+  2026-08-13 post-fix review 又修复了
+  command/image/subagent 证据伪造窗口、随机 denial token 映射、synthetic
+  outer/inner launcher 漂移与漏 staged 官方 `codex-code-mode-host`；最新
+  focused/Codex/Lifecycle/Xcode/no-Executor/headless gates 通过。后续审查
+  进一步修复 current-build/installed-App 绑定、XPC continuation one-shot、
+  external-state outcome 优先级与 subagent sender identity。历史 TeamoRouter
+  与 `usageLimitExceeded` 只保留为 superseded 调试证据，不是当前 blocker，
+  也不得重新混入产品 profile。
+  最终 current-source signed App/helper machine report 已得出
+  `signedRuntimeReady`：9/9 capabilities observed、12/12 integrity
+  contained；machine report SHA-256 为
+  `08ba7c30373d4736124f0e507fcc9aa972880235251b8bbf636a7b2fabb1d193`。
+  fixed App/plist/service/lease/runtime 与匹配进程随后全部卸载并证明零残留。
+  R5 仅待本轮独立 commit/push；R6 与 Task 29 未启动。
   逐 Task 完成 Upstream Study、
   实现、code review、focused/full verify、独立 commit/push；不得提前混入
   生产 Deep Dive、Adapter、真实 Registered Action 或 release 工作。
@@ -72,6 +91,11 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | R1 Runtime Study / conditional decision | [docs/upstream-studies/epic-5-capability-first-runtime.md](docs/upstream-studies/epic-5-capability-first-runtime.md) / [ADR 0013](docs/adr/0013-capability-first-runtime-containment.md) |
 | R3 Runtime behavior gate | [docs/reports/capability-first-runtime-r3-review.md](docs/reports/capability-first-runtime-r3-review.md) |
 | R4 Protocol / no-Executor gate | [docs/reports/capability-first-runtime-r4-review.md](docs/reports/capability-first-runtime-r4-review.md) |
+| R5 local-only topology decision | [docs/reports/capability-first-runtime-r5-blocker.md](docs/reports/capability-first-runtime-r5-blocker.md) |
+| R5 historical App Server blocker | [docs/reports/capability-first-runtime-r5-api-key-blocker.md](docs/reports/capability-first-runtime-r5-api-key-blocker.md) |
+| R5 historical usage-limit blocker | [docs/reports/capability-first-runtime-r5-usage-limit-blocker.md](docs/reports/capability-first-runtime-r5-usage-limit-blocker.md) |
+| R5 current review | [docs/reports/capability-first-runtime-r5-review.md](docs/reports/capability-first-runtime-r5-review.md) |
+| Runtime R2–R6 progress audit | [docs/reports/capability-first-runtime-progress-audit-2026-08-13.md](docs/reports/capability-first-runtime-progress-audit-2026-08-13.md) |
 | Phase C Epic 8 获批计划 | [docs/plans/active/epic-8-safe-execution-vertical-slice.md](docs/plans/active/epic-8-safe-execution-vertical-slice.md) |
 | Epic 2–4 历史计划 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) |
 | Epic 2–4 最终 Gate | [docs/reports/epic-2-4-validation-report.md](docs/reports/epic-2-4-validation-report.md) |
@@ -106,11 +130,21 @@ identity drop、outer Seatbelt ordering、audit-session inheritance、managed
 proxy owner drain 与 stale-lease recovery，live/combined/recovery 均完成且
 residue 为 0；R3 结论为 `behaviorReady` candidate。R4 已完成 strict v2
 advisory protocol、Swift-owned context binding 与 structural no-Executor
-module seam，结论为 `protocolReady`。R5–R6 与 Task 29 均未启动。
+module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
+已完成 root-only topology、closed ChatGPT projection、App Server
+  provider/schema/raw-event compatibility、signed evidence contract 与 machine
+  verifier。官方 `openai` + ChatGPT subscription worker 已观察 9/9 capabilities；
+  errno-only IPv4/IPv6/private/local/Unix probe 与 write/auth/runtime cleanup 均
+  contained。post-fix source 已补齐 official code-mode host、anti-forgery
+  evidence、current-build binding、one-shot XPC reply、vanished-process
+  classification、provider-compatible group schema 与 fixed direct-read command
+  identity。current-source signed App/helper 已得出 `signedRuntimeReady`，并在
+  gate 后完成 fixed topology 零残留卸载。R5 仅待独立 commit/push；R6 与
+  Task 29 仍未完成。
 Deep Dive 的旧 Broker-only no-go 已被 ADR 0004 的 capability-first 边界取代；
-当前仍 paused 的原因是 R5–R6 与生产 Deep Dive 尚未交付，而非 Codex 工具
-能力过强。R4 不证明 signed-App helper packaging、FDA/TCC 或最终 product
-admission；release signing/notarization 仍未评估。Overview、Scan、Scan-only
+当前仍 paused 的原因是 R6 final admission 与生产 Deep Dive 尚未交付，而非
+Codex 工具能力过强。R5 不证明 release distribution、FDA/TCC 或 production
+Deep Dive；release signing/notarization 仍未评估。Overview、Scan、Scan-only
 History 与六区 Settings 已是真实 typed projection/生命周期，Investigations 仍是 placeholder，
 Review/Trash 仍未启用。
 

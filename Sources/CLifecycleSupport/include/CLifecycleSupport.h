@@ -19,12 +19,6 @@ int stornaut_lifecycle_identity_for_pid(
     stornaut_lifecycle_identity *identity
 );
 
-int stornaut_lifecycle_identity_for_pid_as_user(
-    pid_t process_id,
-    uid_t expected_user_id,
-    stornaut_lifecycle_identity *identity
-);
-
 int stornaut_lifecycle_signal_identity(
     const stornaut_lifecycle_identity *identity,
     int signal_number

@@ -40,6 +40,10 @@ let package = Package(
             name: "stornaut-lifecycle-spike",
             targets: ["StornautLifecycleSpike"]
         ),
+        .executable(
+            name: "stornaut-capability-runtime-verifier",
+            targets: ["StornautCapabilityRuntimeVerifier"]
+        ),
     ],
     targets: [
         .target(
@@ -99,6 +103,11 @@ let package = Package(
             name: "StornautLifecycleSpike",
             dependencies: ["StornautLifecycle"],
             path: "tools/StornautLifecycleSpike"
+        ),
+        .executableTarget(
+            name: "StornautCapabilityRuntimeVerifier",
+            dependencies: ["StornautCodex"],
+            path: "Tools/StornautCapabilityRuntimeVerifier"
         ),
         .testTarget(
             name: "StornautCoreTests",

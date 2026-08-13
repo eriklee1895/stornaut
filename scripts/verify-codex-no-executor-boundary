@@ -5,6 +5,12 @@ set -euo pipefail
 repo_root=${0:A:h:h}
 cd "$repo_root"
 
+if [[ $# > 1 ]]; then
+    print -u2 "Usage: $0 [repository-evidence]"
+    exit 64
+fi
+repository_evidence=${1:-}
+
 package_graph=$(swift package describe --type json)
 python3 - "$package_graph" <<'PY'
 import json
@@ -150,7 +156,8 @@ python3 - \
     Sources/StornautCodex/Runtime/CodexRuntimeDiagnostic.swift \
     Sources/StornautCodex/Runtime/CodexAppServerSessionRunner.swift \
     Sources/StornautCodex/Runtime/CodexRuntimeEnvironment.swift \
-    Sources/StornautCodex/Runtime/CodexAppServerRuntime.swift <<'PY'
+    Sources/StornautCodex/Runtime/CodexAppServerRuntime.swift \
+    Sources/StornautCodex/Diagnostics/CapabilityRuntimeWorker.swift <<'PY'
 import re
 import sys
 
@@ -158,6 +165,7 @@ diagnostic = open(sys.argv[1], encoding="utf-8").read()
 session_runner = open(sys.argv[2], encoding="utf-8").read()
 environment = open(sys.argv[3], encoding="utf-8").read()
 app_server = open(sys.argv[4], encoding="utf-8").read()
+worker = open(sys.argv[5], encoding="utf-8").read()
 
 def declaration_body(source, marker):
     start = source.find(marker)
@@ -191,11 +199,44 @@ if missing:
     raise SystemExit(
         f"diagnostic spawn boundary is incomplete: {sorted(missing)}"
     )
-if "spawnDiagnosticProcess(" not in declaration_body(
+run_synchronously = declaration_body(
     session_runner,
     "private func runSynchronously("
-):
-    raise SystemExit("App Server runner does not use the checked spawn boundary")
+)
+if "runProtocolSession(" not in run_synchronously:
+    raise SystemExit("App Server runner bypasses the shared protocol session")
+if "appServerExecutableIsAdmitted(" not in run_synchronously:
+    raise SystemExit("App Server runner bypasses fixed inner executable admission")
+protocol_session = declaration_body(
+    session_runner,
+    "private func runProtocolSession("
+)
+if "spawnDiagnosticProcess(" not in protocol_session:
+    raise SystemExit("App Server protocol session bypasses checked spawn")
+inner_admission = declaration_body(
+    session_runner,
+    "private func appServerExecutableIsAdmitted("
+)
+for token in {
+    "case .fullDiskReadOnly",
+    "case .syntheticDiagnostic",
+    "codex-r5-package/bin/codex",
+    "information.st_mode & 0o777 == 0o500",
+    "information.st_nlink == 1",
+}:
+    if token not in inner_admission:
+        raise SystemExit(
+            f"App Server inner executable admission omits {token}"
+        )
+for token in {
+    "bin/codex-code-mode-host",
+    "source.codeModeHostURL",
+    "destinationURL: package.codeModeHostURL",
+}:
+    if token not in worker:
+        raise SystemExit(
+            f"synthetic Codex package omits code-mode host staging: {token}"
+        )
 
 allowed_match = re.search(
     r"static let allowedKeys: Set<String>\s*=\s*\[(.*?)\n\s*\]",
@@ -238,19 +279,41 @@ actual_fields = set(
     re.findall(r"^\s*let\s+([A-Za-z][A-Za-z0-9]*)\s*:", request_prefix, re.MULTILINE)
 )
 expected_fields = {
-    "projectedAuthSourceURL",
-    "runtimeHomeURL",
-    "workingDirectoryURL",
-    "prompt",
-    "outputSchema",
+    "capabilityCommandRequirements",
+    "capabilityOutputMarkers",
+    "childAgentOutputMarkers",
+    "expectedImageURL",
+    "finalizationPrompt",
+    "maximumInputLineBytes",
     "maximumPromptBytes",
     "maximumSchemaBytes",
-    "maximumInputLineBytes",
+    "outputSchema",
+    "projectedAuthSourceURL",
+    "prompt",
+    "runtimeHomeURL",
+    "selectedRuntimeSkill",
+    "verifiesRawWebSearchCompletion",
+    "workingDirectoryURL",
 }
 if actual_fields != expected_fields:
     raise SystemExit(
         f"App Server request fields {sorted(actual_fields)} "
         f"!= {sorted(expected_fields)}"
+    )
+if not re.search(
+    r"let\s+finalizationPrompt\s*:\s*String\?",
+    request_prefix,
+):
+    raise SystemExit("App Server finalization prompt is not a closed optional string")
+turn_start = declaration_body(
+    app_server,
+    "private func turnStartRequest("
+)
+if "prompt: String" not in app_server or '"text": .string(prompt)' not in turn_start:
+    raise SystemExit("App Server finalization prompt bypasses the bounded text input")
+if "finalizationPrompt" in session_runner:
+    raise SystemExit(
+        "App Server finalization prompt leaked into the process launch boundary"
     )
 PY
 
@@ -261,6 +324,43 @@ if rg -n \
     --glob '!**/ProbeBridge/**'; then
     print -u2 "StornautCodex exposes a prohibited cleanup IPC surface."
     exit 1
+fi
+
+if [[ -n "$repository_evidence" ]]; then
+    [[ "$repository_evidence" == /* ]]
+    python3 - "$repository_evidence" <<'PY'
+import json
+import os
+import sys
+
+path = sys.argv[1]
+flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+if hasattr(os, "O_CLOEXEC"):
+    flags |= os.O_CLOEXEC
+if hasattr(os, "O_NOFOLLOW"):
+    flags |= os.O_NOFOLLOW
+descriptor = os.open(path, flags, 0o600)
+try:
+    payload = {
+        "integrity": [
+            {
+                "property": "noExecutorReachability",
+                "reasonKey": None,
+                "verdict": "contained",
+            }
+        ]
+    }
+    data = (
+        json.dumps(payload, indent=2, sort_keys=True)
+        + "\n"
+    ).encode("utf-8")
+    offset = 0
+    while offset < len(data):
+        offset += os.write(descriptor, data[offset:])
+    os.fsync(descriptor)
+finally:
+    os.close(descriptor)
+PY
 fi
 
 print "Codex no-Executor boundary verification passed."

@@ -129,7 +129,17 @@ R1–R6 通过后恢复 Task 29；若 gate 为 no-go，先记录证据并 review
 
 R3 已于 2026-08-12 得出 `behaviorReady` candidate。用户 review 后已继续；
 R4 strict v2 advisory protocol 与 structural no-Executor seam 已通过并得出
-`protocolReady`。R5–R6 仍按顺序执行；这不提前恢复 Task 29。
+`protocolReady`。用户随后明确只需个人本机运行，R5 采用 local-only
+lifecycle candidate；provider/schema/raw-event compatibility 修复后，真实
+`openai` + ChatGPT subscription `gpt-5.6-luna` worker 已观察 9/9
+capabilities 与 errno-only IPv4/IPv6/private/local/Unix denial。post-fix review
+已补齐 anti-forgery evidence、random denial-token translation、outer/inner
+privacy preflight、bundled `codex-code-mode-host`、current-build binding、XPC
+one-shot reply 与 exact subagent sender identity。final live fixes 关闭
+vanished-process errno 分类、strict-schema `$ref` sibling、direct-read fixed
+command 与 shell outcome shape。current-source signed App/helper 已得出
+`signedRuntimeReady`（9/9 capability、12/12 integrity），随后卸载并证明
+零残留。R5 等待独立 commit/push；R6 未启动，这不提前恢复 Task 29。
 
 ### Phase D — Conditional Deep Dive
 
@@ -229,7 +239,12 @@ R4 strict v2 advisory protocol 与 structural no-Executor seam 已通过并得�
   audit-session lifecycle supervisor 随后通过 live/combined/recovery
   privileged composition，R3 得出 `behaviorReady` candidate。R4 已完成
   Investigation Envelope v2、Swift identity binding 与 structural no-Executor
-  module seam，结论为 `protocolReady`。R5–R6 与 Task 29 仍未启动。
+  module seam，结论为 `protocolReady`。R5 local-only candidate 已完成 worker
+  9/9 capability、errno-only IPv4/IPv6/private/local/Unix denial、focused/
+  serial/headless contracts/build 与 review findings 修复；官方 `openai`
+  subscription worker 已通过，历史 TeamoRouter/usage-limit evidence 已
+  superseded。signed App/helper machine gate 已得出 `signedRuntimeReady`，
+  并完成零残留卸载；R5 等待独立 commit/push，R6 与 Task 29 未启动。
 - Epic 0 Foundation Upstream Study：已完成，选择 checked-in Xcode App/Test host + local Swift packages。
 - Epic 0 Task 1：SwiftPM Core/Codex、smoke tests、`scripts/verify`、manual-only CI 与 ThirdPartyNotices 骨架已完成。
 - Bundle identifier：已确认 `com.eriklee.stornaut`。
@@ -256,5 +271,6 @@ R4 strict v2 advisory protocol 与 structural no-Executor seam 已通过并得�
   [Epic 2–4 Validation Report](../reports/epic-2-4-validation-report.md)。
 - 当前状态：ADR 0013 的精确 same-session managed proxy loopback transport
   例外已获批准；R2 已完成并得出 `configurationReady`；R3 behavioral gate
-  已得出 `behaviorReady` candidate；R4 已得出 `protocolReady`。完整 gate
-  仍未通过，R5–R6 未启动，Phase C Task 29 与生产 Deep Dive 保持 paused。
+  已得出 `behaviorReady` candidate；R4 已得出 `protocolReady`；R5 已得出
+  `signedRuntimeReady` 并证明 zero residue，等待独立 commit/push。R6 未
+  启动，Phase C Task 29 与生产 Deep Dive 保持 paused。

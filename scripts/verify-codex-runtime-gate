@@ -1,0 +1,58 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+cd "$repo_root"
+
+if [[ $# != 1 ]]; then
+    print -u2 "Usage: $0 <machine-report>"
+    exit 64
+fi
+
+machine_report=$1
+[[ "$machine_report" == /* && -s "$machine_report" && ! -L "$machine_report" ]]
+
+scripts/verify-codex-no-executor-boundary
+
+verified_report="${machine_report}.verified"
+trap '/bin/rm -f -- "$verified_report"' EXIT INT TERM
+[[ ! -e "$verified_report" && ! -L "$verified_report" ]]
+
+/usr/bin/swift run --quiet stornaut-capability-runtime-verifier \
+    verify "$machine_report" "$verified_report"
+/usr/bin/cmp -s "$machine_report" "$verified_report"
+/usr/bin/python3 - "$machine_report" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    report = json.load(handle)
+
+if report.get("schemaVersion") != 2:
+    raise SystemExit("unexpected capability runtime report schema")
+metadata = report.get("metadata")
+if not isinstance(metadata, dict):
+    raise SystemExit("missing capability runtime metadata")
+if metadata.get("model") != "gpt-5.6-luna":
+    raise SystemExit("unexpected capability runtime model")
+if metadata.get("provider") != "openai":
+    raise SystemExit("unexpected capability runtime provider")
+if report.get("outcome") != {"signedRuntimeReady": {}}:
+    raise SystemExit("capability runtime report is not ready")
+PY
+
+if /usr/bin/find "/Library/Application Support/Stornaut/R5Runtime" \
+    -mindepth 2 -print -quit \
+    2>/dev/null | /usr/bin/grep -q .; then
+    print -u2 "R5 diagnostic runtime residue remains."
+    exit 1
+fi
+if /usr/bin/find /private/var/db/com.eriklee.stornaut.r5 \
+    -mindepth 1 -print -quit \
+    2>/dev/null | /usr/bin/grep -q .; then
+    print -u2 "R5 lifecycle lease residue remains."
+    exit 1
+fi
+
+print "Capability runtime machine gate passed."

@@ -6,6 +6,55 @@ import Testing
 @Suite("Codex App Server session runner", .serialized)
 struct CodexAppServerSessionRunnerTests {
     @Test
+    func runsProviderCatalogPreflightWithoutAuthOrTurn() async throws {
+        let fixture = try AppServerSessionFixture(
+            mode: "provider-preflight"
+        )
+        defer { fixture.remove() }
+        let request = try fixture.providerCatalogRequest()
+
+        let result = try await CodexAppServerSessionRunner()
+            .runProviderCatalogPreflight(request)
+
+        #expect(
+            result.report
+                == CodexProviderCatalogPreflightReport(
+                    effectiveProviderID: "openai",
+                    providerSelectionSource: .explicitConfiguration,
+                    configuredModelID: nil,
+                    targetModelID: "gpt-5.6-luna",
+                    targetModelAdvertised: false,
+                    catalogModelCount: 2,
+                    defaultModelID: "gpt-5.4",
+                    capabilities:
+                        CodexProviderCatalogCapabilities(
+                            namespaceTools: false,
+                            imageGeneration: false,
+                            webSearch: true
+                        )
+                )
+        )
+        #expect(result.standardErrorByteCount == 0)
+        let protocolLines = try fixture.recordedString(
+            named: "provider-protocol.jsonl"
+        )
+        #expect(
+            try fixture.recordedMethods(
+                named: "provider-protocol.jsonl"
+            ) == [
+                "config/read",
+                "modelProvider/capabilities/read",
+                "model/list",
+            ]
+        )
+        #expect(!protocolLines.contains("account/login"))
+        #expect(!protocolLines.contains("thread/start"))
+        #expect(!protocolLines.contains("turn/start"))
+        #expect(!protocolLines.contains("accessToken"))
+        #expect(!protocolLines.contains("apiKey"))
+    }
+
+    @Test
     func runsNestedOuterSandboxSessionToCompletion() async throws {
         let fixture = try AppServerSessionFixture(mode: "success")
         defer { fixture.remove() }
@@ -28,6 +77,9 @@ struct CodexAppServerSessionRunnerTests {
                 "-C",
                 fixture.workspace.paths.workURL.path,
                 "--",
+                "/usr/bin/env",
+                "-u",
+                "CODEX_SANDBOX",
                 fixture.executableURL.path,
                 "--strict-config",
                 "--disable",
@@ -51,6 +103,29 @@ struct CodexAppServerSessionRunnerTests {
                     .appending(path: "auth.json").path
             )
         )
+    }
+
+    @Test
+    func terminatesDaemonAfterProtocolCompletion() async throws {
+        let fixture = try AppServerSessionFixture(
+            mode: "success-daemon"
+        )
+        defer { fixture.remove() }
+        let started = ContinuousClock.now
+
+        let result = try await CodexAppServerSessionRunner().run(
+            fixture.request(timeout: .seconds(3))
+        )
+
+        #expect(started.duration(to: .now) < .seconds(2))
+        #expect(
+            result.observation.finalAgentMessage
+                == #"{"verdict":"passed"}"#
+        )
+        let parentPID = try fixture.recordedPID(named: "parent.pid")
+        let childPID = try fixture.recordedPID(named: "child.pid")
+        #expect(waitForSessionProcessExit(parentPID))
+        #expect(waitForSessionProcessExit(childPID))
     }
 
     @Test
@@ -372,7 +447,7 @@ private struct AppServerSessionFixture {
                     ownerUserID: geteuid(),
                     mode: 0o600
                 ),
-                credentials: CodexRuntimeAuthCredentials(
+                credentials: .chatGPT(
                     accessToken: "header.synthetic.signature",
                     accountID: "synthetic-account",
                     planType: nil
@@ -398,6 +473,29 @@ private struct AppServerSessionFixture {
             standardOutputByteLimit: 256 * 1_024,
             standardErrorByteLimit: standardErrorByteLimit,
             lineByteLimit: lineByteLimit
+        )
+    }
+
+    func providerCatalogRequest()
+        throws -> CodexProviderCatalogPreflightSessionRequest
+    {
+        CodexProviderCatalogPreflightSessionRequest(
+            executableURL: executableURL,
+            workspace: workspace.paths,
+            deniedAuthSourceURL: authSourceURL,
+            containmentConfiguration: containmentConfiguration,
+            environment: environment,
+            runtime: try CodexProviderCatalogPreflightRuntime(
+                request: CodexProviderCatalogPreflightRequest(
+                    runtimeHomeURL: workspace.paths.runtimeURL,
+                    workingDirectoryURL: workspace.paths.workURL,
+                    targetModel: .gpt56Luna
+                )
+            ),
+            timeout: .seconds(5),
+            standardOutputByteLimit: 256 * 1_024,
+            standardErrorByteLimit: 4_096,
+            lineByteLimit: 64 * 1_024
         )
     }
 
@@ -434,6 +532,24 @@ private struct AppServerSessionFixture {
             throw AppServerSessionFixtureError.invalidPID
         }
         return processID
+    }
+
+    func recordedMethods(named name: String) throws -> [String] {
+        try recordedString(named: name)
+            .split(separator: "\n")
+            .map { line in
+                let value = try JSONDecoder().decode(
+                    JSONValue.self,
+                    from: Data(line.utf8)
+                )
+                guard
+                    case let .object(object) = value,
+                    case let .string(method) = object["method"]
+                else {
+                    throw AppServerSessionFixtureError.invalidProtocol
+                }
+                return method
+            }
     }
 
     func waitForRecord(named name: String) throws -> URL {
@@ -511,11 +627,28 @@ private func fakeAppServerScript(
     fi
     print -r -- '{"id":1,"result":{"codexHome":"\(workspaceRuntimePlaceholder)","platformFamily":"unix","platformOs":"macos","userAgent":"fake"}}'
     IFS= read -r initialized
+    if [[ "$mode" == "provider-preflight" ]]; then
+        : > "$record_root/provider-protocol.jsonl"
+        IFS= read -r config_read
+        print -r -- "$config_read" >> "$record_root/provider-protocol.jsonl"
+        print -r -- '{"id":2,"result":{"config":{"model":null,"model_provider":"openai"},"layers":null,"origins":{}}}'
+        IFS= read -r capabilities_read
+        print -r -- "$capabilities_read" >> "$record_root/provider-protocol.jsonl"
+        print -r -- '{"id":3,"result":{"imageGeneration":false,"namespaceTools":false,"webSearch":true}}'
+        IFS= read -r model_list
+        print -r -- "$model_list" >> "$record_root/provider-protocol.jsonl"
+        print -r -- '{"id":4,"result":{"data":[{"id":"gpt-5.4","isDefault":true,"model":"gpt-5.4"},{"id":"gpt-5.3","isDefault":false,"model":"gpt-5.3"}],"nextCursor":null}}'
+        while IFS= read -r unexpected; do
+            print -r -- "$unexpected" >> "$record_root/provider-protocol.jsonl"
+            exit 70
+        done
+        exit 0
+    fi
     IFS= read -r login
     [[ "$login" == *'header.synthetic.signature'* ]]
     print -r -- '{"id":2,"result":{"type":"chatgptAuthTokens"}}'
     IFS= read -r thread
-    print -r -- '{"id":3,"result":{"activePermissionProfile":{"id":"stornaut-outer-v1"},"approvalPolicy":"never","cwd":"\(workspaceWorkPlaceholder)","instructionSources":[],"model":"gpt-5.6-luna","thread":{"id":"thread-synthetic"}}}'
+    print -r -- '{"id":3,"result":{"activePermissionProfile":{"id":"stornaut-outer-v1"},"approvalPolicy":"never","cwd":"\(workspaceWorkPlaceholder)","instructionSources":[],"model":"gpt-5.6-luna","modelProvider":"openai","thread":{"id":"thread-synthetic","modelProvider":"openai"}}}'
     if [[ "$mode" == "blocked-input" ]]; then
         /bin/zsh -c 'trap "" INT TERM; /bin/sleep 30' &
         print -r -- "$!" > "$record_root/child.pid"
@@ -524,10 +657,17 @@ private func fakeAppServerScript(
     fi
     IFS= read -r turn
     print -r -- '{"id":4,"result":{"turn":{"id":"turn-synthetic","items":[],"status":"inProgress"}}}'
-    print -r -- '{"method":"thread/settings/updated","params":{"threadId":"thread-synthetic","threadSettings":{"approvalPolicy":"never","cwd":"\(workspaceWorkPlaceholder)","model":"gpt-5.6-luna","sandboxPolicy":{"networkAccess":"enabled","type":"externalSandbox"}}}}'
+    print -r -- '{"method":"thread/settings/updated","params":{"threadId":"thread-synthetic","threadSettings":{"approvalPolicy":"never","cwd":"\(workspaceWorkPlaceholder)","model":"gpt-5.6-luna","modelProvider":"openai","sandboxPolicy":{"networkAccess":"enabled","type":"externalSandbox"}}}}'
     print -r -- '{"method":"turn/started","params":{"threadId":"thread-synthetic","turn":{"id":"turn-synthetic","items":[],"status":"inProgress"}}}'
     print -r -- '{"method":"item/completed","params":{"item":{"id":"message-synthetic","text":"{\\"verdict\\":\\"passed\\"}","type":"agentMessage"},"threadId":"thread-synthetic","turnId":"turn-synthetic"}}'
     print -r -- '{"method":"turn/completed","params":{"threadId":"thread-synthetic","turn":{"id":"turn-synthetic","items":[],"status":"completed"}}}'
+    if [[ "$mode" == "success-daemon" ]]; then
+        /bin/zsh -c 'trap "" INT TERM; /bin/sleep 30' &
+        print -r -- "$!" > "$record_root/child.pid"
+        trap '' INT TERM
+        /bin/sleep 30
+        exit 0
+    fi
     while IFS= read -r ignored; do
         :
     done
@@ -566,4 +706,5 @@ private enum AppServerSessionFixtureError: Error {
     case openFailed
     case invalidPID
     case missingRecord
+    case invalidProtocol
 }

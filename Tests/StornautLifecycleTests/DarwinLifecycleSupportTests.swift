@@ -22,6 +22,26 @@ struct DarwinLifecycleSupportTests {
     }
 
     @Test
+    func expectedUserIdentityValidatesTheKernelTokenWithoutDroppingReader()
+        throws
+    {
+        let inventory = DarwinLifecycleInventory()
+        let identity = try inventory.identity(
+            for: getpid(),
+            expectedUserID: geteuid()
+        )
+
+        #expect(identity.processID == getpid())
+        #expect(identity.effectiveUserID == geteuid())
+        #expect(throws: DarwinLifecycleSupportError.invalidIdentity) {
+            _ = try inventory.identity(
+                for: getpid(),
+                expectedUserID: geteuid() + 1
+            )
+        }
+    }
+
+    @Test
     func currentUserInventoryCanScanTheCurrentAuditSession() throws {
         let inventory = DarwinLifecycleInventory()
         if geteuid() == 0 {
@@ -70,6 +90,25 @@ struct DarwinLifecycleSupportTests {
             try signaler.send(.kill, to: identity)
                 == .noSuchProcess
         )
+    }
+
+    @Test
+    func exitedUnreapedChildIsClassifiedAsVanished() throws {
+        let child = try spawnSleepingChild()
+        defer {
+            _ = waitpid(child, nil, 0)
+        }
+        #expect(kill(child, SIGKILL) == 0)
+        usleep(100_000)
+
+        #expect(
+            throws:
+                DarwinLifecycleSupportError.identityUnavailable(
+                    errno: ESRCH
+                )
+        ) {
+            _ = try DarwinLifecycleInventory().identity(for: child)
+        }
     }
 }
 

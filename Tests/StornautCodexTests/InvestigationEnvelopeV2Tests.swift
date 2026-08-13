@@ -683,6 +683,63 @@ struct InvestigationEnvelopeV2Tests {
     }
 
     @Test
+    func structuredOutputProjectionKeepsShapeAndMovesStrictBoundsLocal()
+        throws
+    {
+        let source = try InvestigationEnvelopeV2Schema.loadJSONValue()
+        let projected = try InvestigationEnvelopeV2Schema
+            .loadStructuredOutputJSONValue()
+
+        guard
+            case let .object(sourceObject) = source,
+            case let .object(projectedObject) = projected,
+            case let .object(sourceProperties) =
+                sourceObject["properties"],
+            case let .object(projectedProperties) =
+                projectedObject["properties"],
+            case let .object(projectedProtocol) =
+                projectedProperties["protocolVersion"]
+        else {
+            Issue.record("Expected closed object schemas")
+            return
+        }
+
+        #expect(sourceObject["$schema"] != nil)
+        #expect(projectedObject["$schema"] == nil)
+        #expect(projectedObject["title"] == nil)
+        #expect(projectedObject["additionalProperties"] == .bool(false))
+        #expect(projectedObject["required"] == sourceObject["required"])
+        #expect(
+            Set(projectedProperties.keys)
+                == Set(sourceProperties.keys)
+        )
+        #expect(projectedProtocol["const"] == nil)
+        #expect(
+            projectedProtocol["enum"]
+                == .array([.number(2)])
+        )
+        for forbidden in [
+            "const",
+            "maxItems",
+            "maxLength",
+            "minItems",
+            "minLength",
+            "pattern",
+            "uniqueItems",
+        ] {
+            #expect(!jsonValueContainsKey(projected, forbidden))
+        }
+        #expect(jsonValueContainsKey(projected, "$ref"))
+        #expect(jsonValueContainsKey(projected, "$defs"))
+
+        let strictEnvelope = try InvestigationEnvelopeV2.decodeValidated(
+            from: validFixtureData(),
+            context: protocolContext()
+        )
+        #expect(strictEnvelope.protocolVersion == 2)
+    }
+
+    @Test
     func appServerResultRejectsMissingAndInvalidFinalMessage() throws {
         let context = try protocolContext()
         let missing = CodexAppServerSessionResult(
@@ -719,6 +776,23 @@ struct InvestigationEnvelopeV2Tests {
                 context: context
             )
         }
+    }
+}
+
+private func jsonValueContainsKey(
+    _ value: JSONValue,
+    _ key: String
+) -> Bool {
+    switch value {
+    case let .object(object):
+        object[key] != nil
+            || object.values.contains {
+                jsonValueContainsKey($0, key)
+            }
+    case let .array(array):
+        array.contains { jsonValueContainsKey($0, key) }
+    case .string, .number, .bool, .null:
+        false
     }
 }
 

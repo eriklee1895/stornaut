@@ -5,8 +5,9 @@
 > 2026-08-11 状态说明：报告中的 Broker-only/no-go/paused 是对应阶段的
 > 历史测量结论。当前产品已通过修订后的
 > [ADR 0004](../adr/0004-codex-file-read-isolation.md) 采用 capability-first
-> direct read/Agent tools/live public internet；Deep Dive 当前只等待新的
-> “完整调查能力 + 进程树不可写 + no-Executor”实现证据。
+> direct read/Agent tools/live public internet；R5 signed machine gate 已
+> `signedRuntimeReady`，Deep Dive 仍等待 R6 final admission 与后续生产实现，不因本地工具能力恢复而
+> 自动启用。
 
 - [Development Automation Validation — 2026-08-09](development-automation-2026-08-09.md)：XcodeBuildMCP、Peekaboo 只读目录、真实 App build/run 与 PID 窗口截图证据。
 - [Epic 0–1 Validation Report](epic-0-1-validation-report.md)：foundation、Codex、Surveyor、Action lifecycle 的历史 evidence gate；Broker-only no-go 已由 ADR 0004 修订。
@@ -26,5 +27,10 @@
 - [Capability-First Runtime R2 Review — 2026-08-12](capability-first-runtime-r2-review.md)：closed capability-first profile、advertised/configured/observed/contained evidence 与 `configurationReady` 结论。
 - [Capability-First Runtime R3 Review — 2026-08-12](capability-first-runtime-r3-review.md)：Runtime Home、external auth、Seatbelt/managed proxy 与 audit-session lifecycle supervisor 的 `behaviorReady` candidate。
 - [Capability-First Runtime R4 Review — 2026-08-12](capability-first-runtime-r4-review.md)：strict Investigation Envelope v2、Swift identity binding、module separation 与 structural no-Executor `protocolReady` 证据。
+- [Capability-First Runtime R5 Local-Only Topology Decision — 2026-08-12](capability-first-runtime-r5-blocker.md)：保留 packaged/notarization stop 与 rejected LaunchAgent 证据；用户随后批准个人本机 local-only lifecycle hard gate。
+- [Capability-First Runtime R5 Historical App Server Blocker — 2026-08-12](capability-first-runtime-r5-api-key-blocker.md)：保留早期 sanitized `other` 证据；后续 tests-first provider/schema/raw-event 修复已让真实 worker达到 capability 9/9 与 containment 6/6。
+- [Capability-First Runtime R5 Historical Provider/Usage-Limit Blocker — 2026-08-13](capability-first-runtime-r5-usage-limit-blocker.md)：保留 TeamoRouter 与 sanitized `usageLimitExceeded` 的历史诊断；当前 official subscription 已恢复，该报告已 superseded。
+- [Capability-First Runtime R5 Review — 2026-08-13](capability-first-runtime-r5-review.md)：official `openai` signed App 9/9 capability、12/12 integrity、review repairs、machine gate 与零残留证明。
+- [Capability-First Runtime R2–R6 Progress Audit — 2026-08-13](capability-first-runtime-progress-audit-2026-08-13.md)：逐条映射 active objective、phase artifacts、commands、capability/integrity rows 与 guardrails；R5 evidence complete，等待独立 push 后进入 R6。
 
 报告记录测量事实；若事实要求降低安全、权限或隐私边界，必须先请求用户决策，不能直接改写批准规格。

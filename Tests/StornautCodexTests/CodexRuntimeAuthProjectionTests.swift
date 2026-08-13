@@ -26,9 +26,17 @@ struct CodexRuntimeAuthProjectionTests {
         )
         var observedToken = ""
         projection.withCredentials { credentials in
-            observedToken = credentials.accessToken
-            #expect(credentials.accountID == "account-synthetic")
-            #expect(credentials.planType == nil)
+            guard case let .chatGPT(
+                accessToken,
+                accountID,
+                planType
+            ) = credentials else {
+                Issue.record("Expected ChatGPT credentials")
+                return
+            }
+            observedToken = accessToken
+            #expect(accountID == "account-synthetic")
+            #expect(planType == nil)
         }
         #expect(observedToken == jwt("access"))
         #expect(!projection.description.contains("access"))
@@ -41,6 +49,9 @@ struct CodexRuntimeAuthProjectionTests {
     func rejectsUnsupportedOrMalformedShapes() throws {
         let objects: [[String: Any]] = [
             ["auth_mode": "apikey", "tokens": [:]],
+            ["OPENAI_API_KEY": "sk-synthetic-api-key"],
+            ["OPENAI_API_KEY": ""],
+            ["OPENAI_API_KEY": "line\ninjected"],
             ["auth_mode": "chatgpt", "tokens": ["access_token": "bad"]],
             [
                 "auth_mode": "chatgpt",

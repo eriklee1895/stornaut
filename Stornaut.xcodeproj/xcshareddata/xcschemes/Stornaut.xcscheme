@@ -15,6 +15,20 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
+               BlueprintIdentifier = "A00000000000000000000004"
+               BuildableName = "StornautLifecycleHelper"
+               BlueprintName = "StornautLifecycleHelper"
+               ReferencedContainer = "container:Stornaut.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
                BlueprintIdentifier = "A00000000000000000000001"
                BuildableName = "Stornaut.app"
                BlueprintName = "StornautApp"

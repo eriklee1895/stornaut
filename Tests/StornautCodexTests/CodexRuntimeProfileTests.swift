@@ -69,6 +69,14 @@ struct CodexRuntimeProfileTests {
             "-c",
             "features.multi_agent=true",
             "-c",
+            "features.browser_use=true",
+            "-c",
+            "features.browser_use_external=true",
+            "-c",
+            "features.browser_use_full_cdp_access=true",
+            "-c",
+            "features.view_image=true",
+            "-c",
             "features.image_generation=false",
             "-c",
             "features.apps=false",
@@ -128,6 +136,10 @@ struct CodexRuntimeProfileTests {
         #expect(overrides.contains("features.shell_tool=true"))
         #expect(overrides.contains("features.unified_exec=true"))
         #expect(overrides.contains("features.multi_agent=true"))
+        #expect(overrides.contains("features.browser_use=true"))
+        #expect(overrides.contains("features.browser_use_external=true"))
+        #expect(overrides.contains("features.browser_use_full_cdp_access=true"))
+        #expect(overrides.contains("features.view_image=true"))
         #expect(overrides.contains("features.network_proxy.enabled=true"))
         #expect(overrides.contains("features.network_proxy.enable_socks5=false"))
         #expect(overrides.contains("features.network_proxy.domains={ \"*\" = \"allow\" }"))

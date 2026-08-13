@@ -1,0 +1,65 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+cd "$repo_root"
+
+if [[ $# != 1 ]]; then
+    print -u2 "Usage: $0 <machine-report>"
+    exit 64
+fi
+
+machine_report=$1
+[[ "$machine_report" == /* ]]
+[[ ! -e "$machine_report" && ! -L "$machine_report" ]]
+
+installed_app="/Library/Application Support/Stornaut/Stornaut-R5-Diagnostic.app"
+built_app="$repo_root/.derivedData/xcodebuildmcp/Build/Products/Debug/Stornaut.app"
+run_root=$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/stornaut-r5-report.XXXXXX")
+run_root=${run_root:A}
+/bin/chmod 0700 "$run_root"
+raw_report="$run_root/harness.json"
+repository_receipt="$run_root/repository.json"
+config="$run_root/config.json"
+investigation_id=$(/usr/bin/uuidgen | /usr/bin/tr '[:upper:]' '[:lower:]')
+
+cleanup() {
+    [[ -d "$run_root" && ! -L "$run_root" ]]
+    [[ "$(/usr/bin/stat -f '%u' "$run_root")" == "$EUID" ]]
+    [[ "$(/usr/bin/stat -f '%Mp%Lp' "$run_root")" == 0700 ]]
+    /bin/rm -f -- "$config" "$raw_report" "$repository_receipt"
+    /bin/rmdir -- "$run_root"
+}
+trap cleanup EXIT INT TERM
+
+scripts/stornaut-r5-local-lifecycle status |
+    /usr/bin/grep -qx 'lifecycle.local.state=installed'
+scripts/verify-codex-no-executor-boundary "$repository_receipt"
+[[ -d "$built_app" && ! -L "$built_app" ]]
+/usr/bin/codesign --verify --deep --strict "$built_app"
+/usr/bin/codesign --verify --deep --strict "$installed_app"
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' \
+    "$installed_app/Contents/Info.plist")" == "com.eriklee.stornaut" ]]
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' \
+    "$built_app/Contents/Info.plist")" == "com.eriklee.stornaut" ]]
+/usr/bin/diff -qr "$built_app" "$installed_app" >/dev/null
+
+/bin/cat >"$config" <<EOF
+{
+  "action": "fullDiagnostic",
+  "investigationID": "$investigation_id",
+  "reportPath": "$raw_report"
+}
+EOF
+/bin/chmod 0600 "$config"
+
+/usr/bin/open -W -n "$installed_app" --args \
+    "--stornaut-capability-runtime-config=$config"
+
+[[ -s "$raw_report" && ! -L "$raw_report" ]]
+/usr/bin/swift run --quiet stornaut-capability-runtime-verifier \
+    assemble "$raw_report" "$repository_receipt" "$machine_report"
+[[ -s "$machine_report" && ! -L "$machine_report" ]]
+
+print "Signed App capability runtime diagnostic passed."

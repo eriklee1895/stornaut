@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.eriklee.stornaut.lifecycle</string>
+    <key>Program</key>
+    <string>/Library/Application Support/Stornaut/Stornaut-R5-Diagnostic.app/Contents/MacOS/StornautLifecycleHelper</string>
+    <key>AssociatedBundleIdentifiers</key>
+    <array>
+        <string>com.eriklee.stornaut</string>
+    </array>
+    <key>MachServices</key>
+    <dict>
+        <key>com.eriklee.stornaut.lifecycle</key>
+        <true/>
+    </dict>
+    <key>SessionCreate</key>
+    <true/>
+    <key>ProcessType</key>
+    <string>Interactive</string>
+    <key>AbandonProcessGroup</key>
+    <false/>
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+    <key>ThrottleInterval</key>
+    <integer>1</integer>
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>

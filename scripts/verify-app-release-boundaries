@@ -22,6 +22,181 @@ debug_app="$derived_data/Build/Products/Debug/Stornaut.app"
 release_app="$derived_data/Build/Products/Release/Stornaut.app"
 test -x "$debug_app/Contents/MacOS/Stornaut"
 test -x "$release_app/Contents/MacOS/Stornaut"
+test -x "$debug_app/Contents/MacOS/StornautLifecycleHelper"
+test -x "$release_app/Contents/MacOS/StornautLifecycleHelper"
+test ! -e \
+    "$debug_app/Contents/Library/LaunchDaemons/com.eriklee.stornaut.lifecycle.plist"
+test ! -e \
+    "$release_app/Contents/Library/LaunchDaemons/com.eriklee.stornaut.lifecycle.plist"
+
+helper_source="StornautLifecycleHelper/main.swift"
+rg -q 'func invalidateAndDrain\(\)' "$helper_source"
+rg -q 'try self\?\.cancelActive\(\)' "$helper_source"
+rg -q 'LifecycleInheritedSessionAdmission\(\)\.validate' "$helper_source"
+rg -q 'LifecycleWorkerEvidenceReceipt\.decodeLine' "$helper_source"
+rg -q 'paths\.userRootURL' "$helper_source"
+rg -q 'POSIX_SPAWN_SETSID' "$helper_source"
+rg -q 'getsid\(child\) == child' "$helper_source"
+rg -q 'getpgid\(child\) == child' "$helper_source"
+rg -q 'crashDescendantReadyLine' "$helper_source"
+if rg -q '"setsid ' "$helper_source"; then
+    print -u2 "R5 crash fixture relies on a non-portable setsid command."
+    exit 1
+fi
+python3 - "$helper_source" <<'PY'
+import sys
+
+source = open(sys.argv[1], encoding="utf-8").read()
+start = source.find("private func prepareDiagnosticDirectories(\n")
+end = source.find("\n}\n\nprivate func prepareRootDirectory(", start)
+if start < 0 or end < 0:
+    raise SystemExit("missing closed R5 diagnostic-directory preparation")
+body = source[start:end]
+required = [
+    "paths.userRootURL",
+    "ownerUserID: 0",
+    "ownerGroupID: 0",
+    "mode: 0o711",
+    "paths.rootURL",
+    "ownerUserID: identity.userID",
+    "ownerGroupID: identity.groupID",
+    "mode: 0o700",
+    "mustCreate: true",
+]
+if not all(value in body for value in required):
+    raise SystemExit("R5 diagnostic directory ownership boundary is incomplete")
+PY
+
+lifecycle_script="scripts/stornaut-r5-local-lifecycle"
+diagnostic_script="scripts/verify-codex-runtime-diagnostic"
+gate_script="scripts/verify-codex-runtime-gate"
+python3 - "$lifecycle_script" <<'PY'
+import sys
+
+source = open(sys.argv[1], encoding="utf-8").read()
+
+def function_body(name, next_marker):
+    start = source.find(f"{name}() {{\n")
+    end = source.find(next_marker, start)
+    if start < 0 or end < 0:
+        raise SystemExit(f"missing closed R5 {name} function")
+    return source[start:end]
+
+recovery_body = function_body(
+    "recover_runtime_roots_after_bootout",
+    "\n}\n\nrollback_install() {",
+)
+uninstall_body = function_body(
+    "uninstall",
+    "\n}\n\ncase \"$action\" in",
+)
+recovery_call = uninstall_body.find("recover_runtime_roots_after_bootout")
+early_validation = uninstall_body.find("validate_runtime_roots_drained")
+if recovery_call < 0:
+    raise SystemExit("R5 uninstall omits stale-runtime recovery")
+if 0 <= early_validation < recovery_call:
+    raise SystemExit(
+        "R5 uninstall refuses stale runtime roots before attempting recovery"
+    )
+ordered_recovery_steps = [
+    "runtime_roots_are_drained && return",
+    '/bin/launchctl bootstrap system "$installed_plist"',
+    '/bin/launchctl kickstart "system/$label"',
+    '/bin/launchctl bootout "system/$label"',
+]
+positions = [recovery_body.find(step) for step in ordered_recovery_steps]
+if any(position < 0 for position in positions) or positions != sorted(positions):
+    raise SystemExit("R5 stale-runtime recovery sequence is incomplete")
+if recovery_body.rfind("validate_runtime_roots_drained") <= positions[-1]:
+    raise SystemExit("R5 stale-runtime recovery lacks final drained validation")
+
+bundle_validation = function_body(
+    "validate_bundle_permissions",
+    "\n}\n\nvalidate_installed_state() {",
+)
+if '/usr/bin/find "$app" -type f -print0' in bundle_validation:
+    raise SystemExit(
+        "R5 bundle validation checks file owners but skips directory owners"
+    )
+required_bundle_checks = [
+    '/usr/bin/find "$app" -print0',
+    '"$owner" == root',
+    '"$group" == wheel',
+    '"$file_type" == "Directory"',
+    '"$file_type" == "Regular File"',
+    '"$links" == 1',
+]
+if not all(check in bundle_validation for check in required_bundle_checks):
+    raise SystemExit("R5 bundle ownership/type validation is incomplete")
+
+artifact_validation = function_body(
+    "validate_installed_artifacts",
+    "\n}\n\nvalidate_installed_state() {",
+)
+required_artifact_checks = [
+    'exact_directory_metadata "$installed_app" root wheel 0755',
+    'exact_file_metadata "$installed_plist" root wheel 0644',
+    'validate_plist "$installed_plist"',
+    '/usr/bin/cmp -s "$source_plist" "$installed_plist"',
+    '/usr/bin/codesign --verify --deep --strict "$installed_app"',
+    'validate_bundle_permissions "$installed_app"',
+    '"$installed_app/Contents/MacOS/StornautLifecycleHelper"',
+]
+if not all(check in artifact_validation for check in required_artifact_checks):
+    raise SystemExit("R5 installed artifact validation is incomplete")
+artifact_call = recovery_body.find("validate_installed_artifacts")
+bootstrap = recovery_body.find(
+    '/bin/launchctl bootstrap system "$installed_plist"'
+)
+if artifact_call < 0 or artifact_call > bootstrap:
+    raise SystemExit("R5 recovery bootstraps before validating installed artifacts")
+uninstall_artifact_call = uninstall_body.find("validate_installed_artifacts")
+uninstall_bootout = uninstall_body.find(
+    '/bin/launchctl bootout "system/$label"'
+)
+if uninstall_artifact_call < 0 or uninstall_artifact_call > uninstall_bootout:
+    raise SystemExit("R5 uninstall acts before validating installed artifacts")
+runtime_removal = uninstall_body.find('/bin/rmdir -- "$diagnostic_root"')
+installed_root_removal = uninstall_body.find('/bin/rmdir -- "$installed_root"')
+if (
+    runtime_removal < 0
+    or installed_root_removal < 0
+    or runtime_removal > installed_root_removal
+):
+    raise SystemExit("R5 uninstall removes the runtime parent too early")
+PY
+
+python3 - "$diagnostic_script" <<'PY'
+import sys
+
+source = open(sys.argv[1], encoding="utf-8").read()
+required = [
+    'built_app="$repo_root/.derivedData/xcodebuildmcp/Build/Products/Debug/Stornaut.app"',
+    '/usr/bin/codesign --verify --deep --strict "$built_app"',
+    '/usr/bin/codesign --verify --deep --strict "$installed_app"',
+    '/usr/bin/diff -qr "$built_app" "$installed_app" >/dev/null',
+]
+if not all(value in source for value in required):
+    raise SystemExit(
+        "R5 machine diagnostic does not bind the installed App "
+        "to the current Xcode build"
+    )
+PY
+
+python3 - "$gate_script" <<'PY'
+import sys
+
+source = open(sys.argv[1], encoding="utf-8").read()
+required = [
+    'report.get("outcome") != {"signedRuntimeReady": {}}',
+    'metadata.get("model") != "gpt-5.6-luna"',
+    'metadata.get("provider") != "openai"',
+]
+if not all(value in source for value in required):
+    raise SystemExit(
+        "R5 machine gate does not validate the canonical ready outcome"
+    )
+PY
 
 app_contains() {
     local app=$1
@@ -54,6 +229,14 @@ debug_markers=(
     'fixture.volume'
     '/tmp/stornaut-fixture'
     '/tmp/stornaut-settings-fixture'
+    '--stornaut-capability-runtime-config='
+    '--stornaut-r5-worker'
+    '--stornaut-r5-network-denial-probe'
+    'stornaut-r5-worker-ready'
+    'stornaut-r5-evidence'
+    'STORNAUT_R5_'
+    'stornaut-r5-diagnostic'
+    'runtime.lifecycle.worker-failed'
 )
 
 for marker in "${debug_markers[@]}"; do

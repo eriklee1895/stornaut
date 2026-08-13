@@ -2,8 +2,19 @@ import Darwin
 import Foundation
 import StornautProcessSupport
 
+private protocol CodexAppServerProtocolDriving:
+    AnyObject,
+    Sendable
+{
+    var protocolCompleted: Bool { get }
+    func beginProtocol() throws -> [Data]
+    func receiveProtocol(_ line: Data) throws -> [Data]
+    func eraseSensitiveState()
+}
+
 struct CodexAppServerSessionRequest: Sendable {
     let executableURL: URL
+    let appServerExecutableURL: URL
     let workspace: CodexRuntimeWorkspacePaths
     let projectedAuthSourceURL: URL
     let containmentConfiguration: CodexContainmentConfiguration
@@ -13,10 +24,86 @@ struct CodexAppServerSessionRequest: Sendable {
     let standardOutputByteLimit: Int
     let standardErrorByteLimit: Int
     let lineByteLimit: Int
+
+    init(
+        executableURL: URL,
+        appServerExecutableURL: URL? = nil,
+        workspace: CodexRuntimeWorkspacePaths,
+        projectedAuthSourceURL: URL,
+        containmentConfiguration: CodexContainmentConfiguration,
+        environment: CodexRuntimeEnvironment,
+        runtime: CodexAppServerRuntime,
+        timeout: Duration,
+        standardOutputByteLimit: Int,
+        standardErrorByteLimit: Int,
+        lineByteLimit: Int
+    ) {
+        self.executableURL = executableURL
+        self.appServerExecutableURL =
+            appServerExecutableURL ?? executableURL
+        self.workspace = workspace
+        self.projectedAuthSourceURL = projectedAuthSourceURL
+        self.containmentConfiguration = containmentConfiguration
+        self.environment = environment
+        self.runtime = runtime
+        self.timeout = timeout
+        self.standardOutputByteLimit = standardOutputByteLimit
+        self.standardErrorByteLimit = standardErrorByteLimit
+        self.lineByteLimit = lineByteLimit
+    }
 }
 
 struct CodexAppServerSessionResult: Sendable, Equatable {
     let observation: CodexAppServerObservation
+    let standardErrorByteCount: Int
+}
+
+struct CodexProviderCatalogPreflightSessionRequest: Sendable {
+    let executableURL: URL
+    let appServerExecutableURL: URL
+    let workspace: CodexRuntimeWorkspacePaths
+    let deniedAuthSourceURL: URL
+    let containmentConfiguration: CodexContainmentConfiguration
+    let environment: CodexRuntimeEnvironment
+    let runtime: CodexProviderCatalogPreflightRuntime
+    let timeout: Duration
+    let standardOutputByteLimit: Int
+    let standardErrorByteLimit: Int
+    let lineByteLimit: Int
+
+    init(
+        executableURL: URL,
+        appServerExecutableURL: URL? = nil,
+        workspace: CodexRuntimeWorkspacePaths,
+        deniedAuthSourceURL: URL,
+        containmentConfiguration: CodexContainmentConfiguration,
+        environment: CodexRuntimeEnvironment,
+        runtime: CodexProviderCatalogPreflightRuntime,
+        timeout: Duration,
+        standardOutputByteLimit: Int,
+        standardErrorByteLimit: Int,
+        lineByteLimit: Int
+    ) {
+        self.executableURL = executableURL
+        self.appServerExecutableURL =
+            appServerExecutableURL ?? executableURL
+        self.workspace = workspace
+        self.deniedAuthSourceURL = deniedAuthSourceURL
+        self.containmentConfiguration = containmentConfiguration
+        self.environment = environment
+        self.runtime = runtime
+        self.timeout = timeout
+        self.standardOutputByteLimit = standardOutputByteLimit
+        self.standardErrorByteLimit = standardErrorByteLimit
+        self.lineByteLimit = lineByteLimit
+    }
+}
+
+struct CodexProviderCatalogPreflightSessionResult:
+    Sendable,
+    Equatable
+{
+    let report: CodexProviderCatalogPreflightReport
     let standardErrorByteCount: Int
 }
 
@@ -28,10 +115,53 @@ enum CodexAppServerSessionError: Error, Sendable, Equatable {
     case outputLimitExceeded
     case errorLimitExceeded
     case protocolFailure(CodexAppServerRuntimeError)
+    case providerCatalogProtocolFailure(
+        CodexProviderCatalogPreflightError
+    )
     case timedOut
     case cancelled
     case nonzeroExit
     case terminationFailed
+}
+
+extension CodexAppServerRuntime: CodexAppServerProtocolDriving {
+    fileprivate var protocolCompleted: Bool {
+        status == .completed
+    }
+
+    fileprivate func beginProtocol() throws -> [Data] {
+        try begin()
+    }
+
+    fileprivate func receiveProtocol(
+        _ line: Data
+    ) throws -> [Data] {
+        try receive(line)
+    }
+
+    fileprivate func eraseSensitiveState() {
+        eraseCredentials()
+    }
+}
+
+extension CodexProviderCatalogPreflightRuntime:
+    CodexAppServerProtocolDriving
+{
+    fileprivate var protocolCompleted: Bool {
+        status == .completed
+    }
+
+    fileprivate func beginProtocol() throws -> [Data] {
+        try begin()
+    }
+
+    fileprivate func receiveProtocol(
+        _ line: Data
+    ) throws -> [Data] {
+        try receive(line)
+    }
+
+    fileprivate func eraseSensitiveState() {}
 }
 
 struct CodexAppServerSessionRunner: Sendable {
@@ -51,6 +181,22 @@ struct CodexAppServerSessionRunner: Sendable {
         }
     }
 
+    func runProviderCatalogPreflight(
+        _ request: CodexProviderCatalogPreflightSessionRequest
+    ) async throws -> CodexProviderCatalogPreflightSessionResult {
+        let cancellation = AppServerSessionCancellation()
+        return try await withTaskCancellationHandler {
+            try await Task.detached(priority: .utility) {
+                try runProviderCatalogPreflightSynchronously(
+                    request,
+                    cancellation: cancellation
+                )
+            }.value
+        } onCancel: {
+            cancellation.cancel()
+        }
+    }
+
     private func runSynchronously(
         _ request: CodexAppServerSessionRequest,
         cancellation: AppServerSessionCancellation
@@ -59,6 +205,18 @@ struct CodexAppServerSessionRunner: Sendable {
             request.executableURL.isFileURL,
             request.executableURL.path.hasPrefix("/"),
             isCanonicalRegularExecutable(request.executableURL),
+            request.appServerExecutableURL.isFileURL,
+            request.appServerExecutableURL.path.hasPrefix("/"),
+            isCanonicalRegularExecutable(
+                request.appServerExecutableURL
+            ),
+            appServerExecutableIsAdmitted(
+                outerExecutableURL: request.executableURL,
+                appServerExecutableURL:
+                    request.appServerExecutableURL,
+                workspace: request.workspace,
+                readScope: request.containmentConfiguration.readScope
+            ),
             workspaceIsOwnerOnly(request.workspace),
             globalInstructionsAreAbsent(
                 in: request.workspace.runtimeURL
@@ -83,34 +241,151 @@ struct CodexAppServerSessionRunner: Sendable {
             throw CodexAppServerSessionError.invalidRequest
         }
 
-        let arguments: [String]
+        let arguments = try validatedArguments(
+            executableURL: request.appServerExecutableURL,
+            workspace: request.workspace,
+            deniedAuthSourceURL: request.projectedAuthSourceURL,
+            containmentConfiguration: request.containmentConfiguration
+        )
+        let standardErrorByteCount = try runProtocolSession(
+            executableURL: request.executableURL,
+            arguments: arguments,
+            workspace: request.workspace,
+            environment: request.environment,
+            runtime: request.runtime,
+            timeout: request.timeout,
+            standardOutputByteLimit: request.standardOutputByteLimit,
+            standardErrorByteLimit: request.standardErrorByteLimit,
+            lineByteLimit: request.lineByteLimit,
+            cancellation: cancellation
+        )
+        return CodexAppServerSessionResult(
+            observation: request.runtime.observation,
+            standardErrorByteCount: standardErrorByteCount
+        )
+    }
+
+    private func runProviderCatalogPreflightSynchronously(
+        _ request: CodexProviderCatalogPreflightSessionRequest,
+        cancellation: AppServerSessionCancellation
+    ) throws -> CodexProviderCatalogPreflightSessionResult {
+        guard
+            request.executableURL.isFileURL,
+            request.executableURL.path.hasPrefix("/"),
+            isCanonicalRegularExecutable(request.executableURL),
+            request.appServerExecutableURL.isFileURL,
+            request.appServerExecutableURL.path.hasPrefix("/"),
+            isCanonicalRegularExecutable(
+                request.appServerExecutableURL
+            ),
+            appServerExecutableIsAdmitted(
+                outerExecutableURL: request.executableURL,
+                appServerExecutableURL:
+                    request.appServerExecutableURL,
+                workspace: request.workspace,
+                readScope: request.containmentConfiguration.readScope
+            ),
+            workspaceIsOwnerOnly(request.workspace),
+            globalInstructionsAreAbsent(
+                in: request.workspace.runtimeURL
+            ),
+            environmentIsClosed(request.environment),
+            request.timeout > .zero,
+            request.standardOutputByteLimit > 0,
+            request.standardErrorByteLimit > 0,
+            request.lineByteLimit > 0,
+            request.lineByteLimit <= request.standardOutputByteLimit,
+            request.runtime.status == .ready,
+            request.environment.values["CODEX_HOME"]
+                == request.workspace.runtimeURL.path,
+            request.environment.values["HOME"]
+                == request.workspace.homeURL.path,
+            request.environment.values["TMPDIR"]
+                == request.workspace.runtimeURL.appending(
+                    path: "tmp",
+                    directoryHint: .isDirectory
+                ).path
+        else {
+            throw CodexAppServerSessionError.invalidRequest
+        }
+
+        let arguments = try validatedArguments(
+            executableURL: request.appServerExecutableURL,
+            workspace: request.workspace,
+            deniedAuthSourceURL: request.deniedAuthSourceURL,
+            containmentConfiguration: request.containmentConfiguration
+        )
+        let standardErrorByteCount = try runProtocolSession(
+            executableURL: request.executableURL,
+            arguments: arguments,
+            workspace: request.workspace,
+            environment: request.environment,
+            runtime: request.runtime,
+            timeout: request.timeout,
+            standardOutputByteLimit: request.standardOutputByteLimit,
+            standardErrorByteLimit: request.standardErrorByteLimit,
+            lineByteLimit: request.lineByteLimit,
+            cancellation: cancellation
+        )
+        guard let report = request.runtime.report else {
+            throw CodexAppServerSessionError.protocolFailure(
+                .invalidMessage
+            )
+        }
+        return CodexProviderCatalogPreflightSessionResult(
+            report: report,
+            standardErrorByteCount: standardErrorByteCount
+        )
+    }
+
+    private func validatedArguments(
+        executableURL: URL,
+        workspace: CodexRuntimeWorkspacePaths,
+        deniedAuthSourceURL: URL,
+        containmentConfiguration: CodexContainmentConfiguration
+    ) throws -> [String] {
         do {
             let policy = CodexContainmentPolicy()
             let expectedConfiguration = try policy.configuration(
-                workspace: request.workspace,
-                projectedAuthSourceURL: request.projectedAuthSourceURL
+                workspace: workspace,
+                projectedAuthSourceURL: deniedAuthSourceURL,
+                readScope: containmentConfiguration.readScope
             )
-            guard expectedConfiguration == request.containmentConfiguration else {
+            guard expectedConfiguration == containmentConfiguration else {
                 throw CodexAppServerSessionError.invalidRequest
             }
             try policy.validateInstalled(
-                request.containmentConfiguration,
-                in: request.workspace
+                containmentConfiguration,
+                in: workspace
             )
-            arguments = try policy.launchArguments(
-                codexExecutableURL: request.executableURL,
-                workspace: request.workspace
+            return try policy.launchArguments(
+                codexExecutableURL: executableURL,
+                workspace: workspace
             )
         } catch {
             throw CodexAppServerSessionError.invalidRequest
         }
+    }
+
+    private func runProtocolSession(
+        executableURL: URL,
+        arguments: [String],
+        workspace: CodexRuntimeWorkspacePaths,
+        environment: CodexRuntimeEnvironment,
+        runtime: any CodexAppServerProtocolDriving,
+        timeout: Duration,
+        standardOutputByteLimit: Int,
+        standardErrorByteLimit: Int,
+        lineByteLimit: Int,
+        cancellation: AppServerSessionCancellation
+    ) throws -> Int {
         let process: SpawnedDiagnosticProcess
         do {
             process = try spawnDiagnosticProcess(
-                executableURL: request.executableURL,
+                executableURL: executableURL,
                 arguments: arguments,
-                environment: request.environment.values,
-                currentDirectoryURL: request.workspace.workURL
+                environment: environment.values,
+                currentDirectoryURL: workspace.workURL
             )
         } catch {
             throw CodexAppServerSessionError.launchFailed
@@ -128,15 +403,15 @@ struct CodexAppServerSessionRunner: Sendable {
         }
         let reader = BoundedAppServerLineReader(
             descriptor: process.standardOutput,
-            lineByteLimit: request.lineByteLimit,
-            sessionByteLimit: request.standardOutputByteLimit
+            lineByteLimit: lineByteLimit,
+            sessionByteLimit: standardOutputByteLimit
         )
         let errorHandle = FileHandle(
             fileDescriptor: process.standardError,
             closeOnDealloc: true
         )
         let standardError = BoundedAppServerErrorOutput(
-            limit: request.standardErrorByteLimit
+            limit: standardErrorByteLimit
         )
         let errorGroup = DispatchGroup()
         errorGroup.enter()
@@ -145,7 +420,7 @@ struct CodexAppServerSessionRunner: Sendable {
             errorGroup.leave()
         }
         defer {
-            request.runtime.eraseCredentials()
+            runtime.eraseSensitiveState()
             writer.close()
             reader.close()
             try? errorHandle.close()
@@ -155,9 +430,9 @@ struct CodexAppServerSessionRunner: Sendable {
             errorGroup.wait()
         }
 
-        let deadline = request.timeout.dispatchDeadline
+        let deadline = timeout.dispatchDeadline
         do {
-            for var message in try request.runtime.begin() {
+            for var message in try runtime.beginProtocol() {
                 try writeAndErase(
                     &message,
                     to: writer,
@@ -171,7 +446,7 @@ struct CodexAppServerSessionRunner: Sendable {
             throw CodexAppServerSessionError.inputWriteFailed
         }
 
-        while request.runtime.status != .completed {
+        while !runtime.protocolCompleted {
             guard !cancellation.isCancelled else {
                 throw CodexAppServerSessionError.cancelled
             }
@@ -195,9 +470,12 @@ struct CodexAppServerSessionRunner: Sendable {
             }
             let responses: [Data]
             do {
-                responses = try request.runtime.receive(line)
+                responses = try runtime.receiveProtocol(line)
             } catch let error as CodexAppServerRuntimeError {
                 throw CodexAppServerSessionError.protocolFailure(error)
+            } catch let error as CodexProviderCatalogPreflightError {
+                throw CodexAppServerSessionError
+                    .providerCatalogProtocolFailure(error)
             } catch {
                 throw CodexAppServerSessionError.protocolFailure(
                     .invalidMessage
@@ -220,24 +498,10 @@ struct CodexAppServerSessionRunner: Sendable {
         }
 
         writer.close()
-        guard waitForExit(process.pid, deadline: deadline) else {
-            throw CodexAppServerSessionError.timedOut
-        }
-        if ProcessTreeTerminator.processGroupHasMembers(
-            process.processGroup,
-            excluding: process.pid
-        ) {
-            usleep(50_000)
-        }
-        if ProcessTreeTerminator.processGroupHasMembers(
-            process.processGroup,
-            excluding: process.pid
-        ) {
-            do {
-                try terminateDiagnosticProcessGroup(process.processGroup)
-            } catch {
-                throw CodexAppServerSessionError.terminationFailed
-            }
+        do {
+            try terminateDiagnosticProcessGroup(process.processGroup)
+        } catch {
+            throw CodexAppServerSessionError.terminationFailed
         }
         let waitStatus: Int32
         do {
@@ -253,13 +517,10 @@ struct CodexAppServerSessionRunner: Sendable {
         guard !standardError.wasTruncated else {
             throw CodexAppServerSessionError.errorLimitExceeded
         }
-        guard normalizedDiagnosticExitStatus(waitStatus) == 0 else {
+        guard protocolCompletionExitStatusIsAllowed(waitStatus) else {
             throw CodexAppServerSessionError.nonzeroExit
         }
-        return CodexAppServerSessionResult(
-            observation: request.runtime.observation,
-            standardErrorByteCount: standardError.byteCount
-        )
+        return standardError.byteCount
     }
 
     private func writeAndErase(
@@ -310,6 +571,16 @@ struct CodexAppServerSessionRunner: Sendable {
         }
         return false
     }
+}
+
+private func protocolCompletionExitStatusIsAllowed(
+    _ waitStatus: Int32
+) -> Bool {
+    let status = normalizedDiagnosticExitStatus(waitStatus)
+    return status == 0
+        || status == 128 + SIGINT
+        || status == 128 + SIGTERM
+        || status == 128 + SIGKILL
 }
 
 private final class BoundedAppServerWriter {
@@ -425,6 +696,31 @@ private func isCanonicalRegularExecutable(_ url: URL) -> Bool {
     return lstat(canonical.path, &information) == 0
         && information.st_mode & S_IFMT == S_IFREG
         && FileManager.default.isExecutableFile(atPath: canonical.path)
+}
+
+private func appServerExecutableIsAdmitted(
+    outerExecutableURL: URL,
+    appServerExecutableURL: URL,
+    workspace: CodexRuntimeWorkspacePaths,
+    readScope: CodexContainmentReadScope
+) -> Bool {
+    switch readScope {
+    case .fullDiskReadOnly:
+        return appServerExecutableURL == outerExecutableURL
+    case .syntheticDiagnostic:
+        let expected = workspace.fixturesURL.appending(
+            path: "codex-r5-package/bin/codex"
+        ).standardizedFileURL
+        guard appServerExecutableURL.standardizedFileURL == expected else {
+            return false
+        }
+        var information = stat()
+        return lstat(expected.path, &information) == 0
+            && information.st_mode & S_IFMT == S_IFREG
+            && information.st_uid == geteuid()
+            && information.st_mode & 0o777 == 0o500
+            && information.st_nlink == 1
+    }
 }
 
 private func workspaceIsOwnerOnly(

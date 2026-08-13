@@ -127,9 +127,16 @@ public struct LifecycleSessionDrainer: Sendable {
     public func drain(
         auditSessionID: Int32,
         expectedUserID: uid_t,
-        supervisorIdentity: LifecycleProcessIdentity?
+        supervisorIdentity: LifecycleProcessIdentity?,
+        allowRootMembersDuringRecovery: Bool = false
     ) throws -> LifecycleDrainReport {
         guard auditSessionID > 0 else {
+            throw LifecycleDrainError.unsafeAuditSession
+        }
+        guard
+            !allowRootMembersDuringRecovery
+                || supervisorIdentity == nil
+        else {
             throw LifecycleDrainError.unsafeAuditSession
         }
         if let supervisorIdentity {
@@ -151,7 +158,9 @@ public struct LifecycleSessionDrainer: Sendable {
             let snapshot = try targetSnapshot(
                 auditSessionID: auditSessionID,
                 expectedUserID: expectedUserID,
-                supervisorIdentity: supervisorIdentity
+                supervisorIdentity: supervisorIdentity,
+                allowRootMembersDuringRecovery:
+                    allowRootMembersDuringRecovery
             )
             freezePasses = pass
             let newIdentities = snapshot.filter {
@@ -199,7 +208,9 @@ public struct LifecycleSessionDrainer: Sendable {
             let remaining = try targetSnapshot(
                 auditSessionID: auditSessionID,
                 expectedUserID: expectedUserID,
-                supervisorIdentity: supervisorIdentity
+                supervisorIdentity: supervisorIdentity,
+                allowRootMembersDuringRecovery:
+                    allowRootMembersDuringRecovery
             )
             guard remaining.allSatisfy(knownIdentities.contains) else {
                 throw LifecycleDrainError.killDidNotConverge
@@ -221,7 +232,8 @@ public struct LifecycleSessionDrainer: Sendable {
     private func targetSnapshot(
         auditSessionID: Int32,
         expectedUserID: uid_t,
-        supervisorIdentity: LifecycleProcessIdentity?
+        supervisorIdentity: LifecycleProcessIdentity?,
+        allowRootMembersDuringRecovery: Bool
     ) throws -> [LifecycleProcessIdentity] {
         let snapshot = try inventory.processes(in: auditSessionID)
         guard Set(snapshot).count == snapshot.count else {
@@ -241,7 +253,11 @@ public struct LifecycleSessionDrainer: Sendable {
             if identity == supervisorIdentity {
                 continue
             }
-            guard identity.effectiveUserID == expectedUserID else {
+            guard
+                identity.effectiveUserID == expectedUserID
+                    || allowRootMembersDuringRecovery
+                        && identity.effectiveUserID == 0
+            else {
                 throw LifecycleDrainError.identityMismatch
             }
             targets.append(identity)

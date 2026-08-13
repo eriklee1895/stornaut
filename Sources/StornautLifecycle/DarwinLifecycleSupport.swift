@@ -121,21 +121,14 @@ public struct DarwinLifecycleInventory: LifecycleProcessInventory, Sendable {
         for processID: pid_t,
         expectedUserID: uid_t
     ) throws -> LifecycleProcessIdentity {
-        var rawIdentity = stornaut_lifecycle_identity()
-        let result = stornaut_lifecycle_identity_for_pid_as_user(
-            processID,
-            expectedUserID,
-            &rawIdentity
-        )
-        guard result == 0 else {
-            throw DarwinLifecycleSupportError.identityUnavailable(
-                errno: result
-            )
+        let identity = try identity(for: processID)
+        guard
+            expectedUserID > 0,
+            identity.effectiveUserID == expectedUserID
+        else {
+            throw DarwinLifecycleSupportError.invalidIdentity
         }
-        return try identity(
-            from: rawIdentity,
-            expectedProcessID: processID
-        )
+        return identity
     }
 
     public func identity(

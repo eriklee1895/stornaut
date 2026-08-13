@@ -33,8 +33,8 @@
 | Agent、双模式与治理设计 | [Agent Disk Governance](design/agent-disk-governance.md) |
 | UI、品牌、状态与交互 | [UI/UX](design/ui-ux.md) |
 | 宏观交付顺序与阶段 Gate | [Delivery Roadmap](plans/roadmap.md) |
-| 当前计划状态 | [Active Plans](plans/active/README.md) — Runtime R4 protocolReady；R5 next |
-| Capability-first Codex Runtime Gate | [Runtime Evidence Gate](plans/active/capability-first-codex-runtime-gate.md) — R1–R4 complete；R5–R6 pending |
+| 当前计划状态 | [Active Plans](plans/active/README.md) — R5 `signedRuntimeReady`、零残留；等待独立 commit/push 后进入 R6 |
+| Capability-first Codex Runtime Gate | [Runtime Evidence Gate](plans/active/capability-first-codex-runtime-gate.md) — R1–R5 evidence complete；R6 pending |
 | R2 tests-first brief | [R2 Implementation Brief](plans/active/task-r2-implementation-brief.md) — complete |
 | R3 lifecycle hard-gate brief | [R3 Implementation Brief](plans/active/task-r3-implementation-brief.md) — behaviorReady candidate |
 | R4 protocol/no-Executor brief | [R4 Implementation Brief](plans/active/task-r4-implementation-brief.md) — protocolReady |
@@ -49,7 +49,7 @@
 | Codex structured process 决策 | [ADR 0003](adr/0003-codex-process-protocol.md) |
 | Codex 能力优先调查与 Swift 执行边界 | [ADR 0004](adr/0004-codex-file-read-isolation.md) — direct read、live search、公共联网；无写入/Executor 权限 |
 | Capability-first Runtime containment 候选 | [ADR 0013](adr/0013-capability-first-runtime-containment.md) — R3 behaviorReady candidate |
-| Investigation lifecycle supervisor | [ADR 0016](adr/0016-investigation-lifecycle-supervisor.md) — audit-session lifecycle accepted at R3；R5 packaging pending |
+| Investigation lifecycle supervisor | [ADR 0016](adr/0016-investigation-lifecycle-supervisor.md) — audit-session lifecycle accepted；root-only R5 local candidate |
 | Swift Surveyor 性能决策 | [ADR 0005](adr/0005-swift-surveyor-performance.md) |
 | Trash 与 Registered Action 决策 | [ADR 0006](adr/0006-trash-and-registered-actions.md) |
 | 领域持久化决策 | [ADR 0007](adr/0007-domain-persistence-boundary.md) — Accepted，Task 11 verified |
@@ -58,7 +58,12 @@
 | Capability-first Runtime R1 Review | [R1 Review](reports/capability-first-runtime-r1-review.md) — conditional-go evidence；transport later approved |
 | Capability-first Runtime R2 Review | [R2 Review](reports/capability-first-runtime-r2-review.md) — configurationReady at R2 |
 | Capability-first Runtime R3 Review | [R3 Review](reports/capability-first-runtime-r3-review.md) — behaviorReady candidate |
-| Capability-first Runtime R4 Review | [R4 Review](reports/capability-first-runtime-r4-review.md) — protocolReady；R5 pending |
+| Capability-first Runtime R4 Review | [R4 Review](reports/capability-first-runtime-r4-review.md) — protocolReady |
+| Capability-first Runtime R5 Topology Decision | [R5 Topology Decision](reports/capability-first-runtime-r5-blocker.md) — local-only scope approved |
+| Capability-first Runtime R5 Historical Blocker | [R5 App Server Historical Blocker](reports/capability-first-runtime-r5-api-key-blocker.md) — resolved provider/schema/raw-event investigation |
+| Capability-first Runtime R5 Historical Provider Blocker | [R5 Usage-Limit Blocker](reports/capability-first-runtime-r5-usage-limit-blocker.md) — superseded by official subscription evidence |
+| Capability-first Runtime R5 Review | [R5 Review](reports/capability-first-runtime-r5-review.md) — `signedRuntimeReady`、9/9 capabilities、12/12 integrity、零残留 |
+| Capability-first Runtime Progress Audit | [R2–R6 Progress Audit](reports/capability-first-runtime-progress-audit-2026-08-13.md) — prompt-to-artifact coverage and resume checklist |
 | Review / Policy / Authorization 决策 | [ADR 0011](adr/0011-review-policy-authorization.md) |
 | Cleanup Journal / Manifest 决策 | [ADR 0012](adr/0012-cleanup-execution-journal.md) |
 | Epic 8 Task 27 Review | [Task 27 Code and Design Review](reports/epic-8-task-27-review.md) |

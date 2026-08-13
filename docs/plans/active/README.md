@@ -10,8 +10,23 @@ descendant lifecycle escape 拒绝 process-group-only candidate；用户批准�
 audit-session lifecycle supervisor 随后通过 final privileged composition，
 R3 得出 `behaviorReady` candidate。用户 review 后已继续；R4 的 Investigation
 Envelope v2、Swift identity binding、独立 ProcessSupport/ProbeBridge module
-seam 与 no-Executor verifier 已完成并得出 `protocolReady`。R5–R6 与 Task 29
-仍未启动。
+seam 与 no-Executor verifier 已完成并得出 `protocolReady`。R5 的
+	root-only local lifecycle、closed auth、App Server runtime worker 与 machine
+	verifier 已实现。官方 `openai` + ChatGPT subscription 的真实
+	`gpt-5.6-luna` worker 已观察 direct read、
+shell/unified exec、live search、public command network、browser/direct
+fetch、image、skill 与 subagent 共 9/9 capabilities；errno-only fixed probe
+观察到 IPv4/IPv6/private/local/Unix denial，worker containment 6/6。独立
+review findings 已修复；post-fix review 进一步关闭 command/image/subagent
+伪造窗口、random denial-token 映射、outer/inner privacy preflight 与漏 staged
+	`codex-code-mode-host`。后续审查又修复 current-build binding、XPC
+	one-shot continuation、external-state outcome priority 与 exact subagent
+	sender identity；final live fixes 又关闭 vanished-process errno 分类、
+	provider strict-schema `$ref` sibling 与 direct-read fixed command 漂移。
+	历史 TeamoRouter/usage-limit 只保留为 superseded 调试证据。current-source
+	signed App/helper 已得出 `signedRuntimeReady`：9/9 capabilities、12/12
+	integrity；fixed topology 随后卸载并证明零残留。R5 evidence complete，
+	等待独立 commit/push；R6 与 Task 29 均未开始。
 
 Epic 2–4 Tasks 9–26 已完成并归档；最终统一 verifier 单次 exit `0`。
 Phase C deterministic Epic 8 的详尽 plan 已于 2026-08-11 获用户批准，见
@@ -37,8 +52,16 @@ fetch、image、skills/subagents 与公共联网可用，同时 Codex 全进程�
 调查进程树回收，随后用用户批准的 audit-session supervisor 关闭该 hard
 gate。最终 live/combined/recovery 均 drained，identity drop、outer Seatbelt、
 audit-session inheritance、proxy-owner recovery 均 observed，residue 为 0。
-R3 为 `behaviorReady` candidate。R4 已完成并通过独立 review；R5 可在 R4
-独立 commit/push 后启动。R6 与 Task 29 仍须等待前序 gate。
+R3 为 `behaviorReady` candidate。R4 已完成并通过独立 review。R5 原
+notarization blocker 已由个人本机 local-only scope decision解决；历史
+API-key/App Server blocker 及 provider/schema 根因保留在
+[R5 App Server Historical Blocker](../../reports/capability-first-runtime-r5-api-key-blocker.md)。
+	官方 `openai` worker 与 repository gates 已通过；历史 provider blocker 见
+	[R5 Usage-Limit Blocker](../../reports/capability-first-runtime-r5-usage-limit-blocker.md)，
+	已被当前 subscription evidence supersede。当前执行点见
+	[R5 Review](../../reports/capability-first-runtime-r5-review.md)：signed
+	machine report 与零残留证明已完成；独立 commit/push 后才开始 R6。
+	Task 29 仍须等待 R6 final admission。
 
 R1 证明 read-only Seatbelt 能阻断 user-data writes，且 Codex experimental
 managed proxy 能让公网请求成功并阻断 direct bypass、任意
@@ -63,9 +86,9 @@ configuration candidate，并由
 [R4 Review](../../reports/capability-first-runtime-r4-review.md) 记录 strict v2
 advisory protocol 与 structural no-Executor seam 的 `protocolReady` 结论。
 
-R4 不证明 signed-App ServiceManagement/helper packaging、FDA/TCC inheritance
-或 Browser/image/subagent capability admission；这些属于 R5，最终产品 admission
-属于 R6。Deep Dive 保持 unavailable。
+R5 已关闭当前个人本机 local-only signed-App helper/capability gate，但不证明
+ServiceManagement distribution、Developer ID/notarization 或 FDA/TCC product
+flow；最终产品 admission 属于 R6。Deep Dive 保持 unavailable。
 
 即使计划获批，正常 App 也必须保持真实 Trash 依赖关闭，直到 Task 35 的
 signed-App disposable Trash diagnostic 与最终 gate 通过。Task 32 的 Review

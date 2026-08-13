@@ -9,8 +9,22 @@ public struct CodexRuntimeProfileID: RawRepresentable, Sendable, Equatable, Hash
     }
 }
 
-public enum CodexRuntimeModel: String, Sendable, Equatable {
+public enum CodexRuntimeModel:
+    String,
+    Codable,
+    Sendable,
+    Equatable
+{
     case gpt56Luna = "gpt-5.6-luna"
+}
+
+public enum CodexRuntimeProvider:
+    String,
+    Codable,
+    Sendable,
+    Equatable
+{
+    case openAI = "openai"
 }
 
 public enum CodexRuntimeProfileError: Error, Sendable, Equatable {
@@ -50,6 +64,10 @@ public struct CodexRuntimeProfile: Sendable, Equatable {
             "features.shell_tool=true",
             "features.unified_exec=true",
             "features.multi_agent=true",
+            "features.browser_use=true",
+            "features.browser_use_external=true",
+            "features.browser_use_full_cdp_access=true",
+            "features.view_image=true",
             "features.image_generation=false",
             "features.apps=false",
             "features.plugins=false",

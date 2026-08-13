@@ -14,7 +14,24 @@ import Testing
     )
 )
 func realCodexR3ExternalAuthAppServerDiagnostic() async throws {
-    let processEnvironment = ProcessInfo.processInfo.environment
+    let inherited = ProcessInfo.processInfo.environment
+    let normalHome = FileManager.default.homeDirectoryForCurrentUser
+    var processEnvironment = [
+        "HOME": normalHome.path,
+        "PATH":
+            "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+        "TERM": inherited["TERM"] ?? "dumb",
+    ]
+    for key in ["LANG", "LC_ALL", "LC_CTYPE"] {
+        if let value = inherited[key], !value.isEmpty {
+            processEnvironment[key] = value
+        }
+    }
+    for key in ["SSL_CERT_FILE", "SSL_CERT_DIR"] {
+        if let value = inherited[key], !value.isEmpty {
+            processEnvironment[key] = value
+        }
+    }
     let installation = try #require(
         await CodexLocator().locate(
             configuredURL: nil,
@@ -40,12 +57,13 @@ func realCodexR3ExternalAuthAppServerDiagnostic() async throws {
     )
     defer { try? FileManager.default.removeItem(at: parent) }
 
-    let normalHome = FileManager.default.homeDirectoryForCurrentUser
     let normalCodexHome = normalHome.appending(
         path: ".codex",
         directoryHint: .isDirectory
     )
-    let authURL = normalCodexHome.appending(path: "auth.json")
+    let authSourceURL = normalCodexHome.appending(
+        path: "auth.json"
+    )
     let workspace = try CodexRuntimeWorkspace.create(
         under: parent,
         forbiddenRoots: [
@@ -56,7 +74,7 @@ func realCodexR3ExternalAuthAppServerDiagnostic() async throws {
     let policy = CodexContainmentPolicy()
     let configuration = try policy.configuration(
         workspace: workspace.paths,
-        projectedAuthSourceURL: authURL
+        projectedAuthSourceURL: authSourceURL
     )
     _ = try policy.install(configuration, in: workspace.paths)
     let environment = try CodexRuntimeEnvironmentPolicy().project(
@@ -65,7 +83,7 @@ func realCodexR3ExternalAuthAppServerDiagnostic() async throws {
         forbiddenHomeURL: normalHome
     )
     let projector = CodexRuntimeAuthProjector()
-    let projection = try projector.read(from: authURL)
+    let projection = try projector.read(from: authSourceURL)
     let outputSchema: JSONValue = .object([
         "additionalProperties": .bool(false),
         "properties": .object([
@@ -79,7 +97,7 @@ func realCodexR3ExternalAuthAppServerDiagnostic() async throws {
     ])
     let runtime = try CodexAppServerRuntime(
         request: CodexAppServerRuntimeRequest(
-            projectedAuthSourceURL: authURL,
+            projectedAuthSourceURL: authSourceURL,
             runtimeHomeURL: workspace.paths.runtimeURL,
             workingDirectoryURL: workspace.paths.workURL,
             prompt: """
@@ -92,7 +110,7 @@ func realCodexR3ExternalAuthAppServerDiagnostic() async throws {
         ),
         authProjection: projection,
         refreshProvider: CodexRuntimeFileAuthRefreshProvider(
-            sourceURL: authURL,
+            sourceURL: authSourceURL,
             sourceIdentity: projection.sourceIdentity,
             projector: projector
         )
@@ -101,7 +119,7 @@ func realCodexR3ExternalAuthAppServerDiagnostic() async throws {
         CodexAppServerSessionRequest(
             executableURL: installation.executableURL,
             workspace: workspace.paths,
-            projectedAuthSourceURL: authURL,
+            projectedAuthSourceURL: authSourceURL,
             containmentConfiguration: configuration,
             environment: environment,
             runtime: runtime,

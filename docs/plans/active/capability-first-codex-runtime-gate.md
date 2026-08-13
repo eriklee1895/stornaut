@@ -1,6 +1,9 @@
 # Capability-First Codex Runtime Evidence Gate
 
-> Status: In progress — R1–R4 complete; R4 `protocolReady`; R5 next
+> Status: R5 `signedRuntimeReady` candidate — current-source signed App/helper
+> observed 9/9 capabilities and contained 12/12 integrity properties;
+> repository gates, independent review and zero-residue uninstall pass.
+> Independent R5 commit/push pending; R6 not started.
 >
 > Planned: 2026-08-11
 >
@@ -224,6 +227,8 @@ order, including:
 - disposable local listeners used solely as must-fail loopback/Unix-socket
   canaries;
 - local signing and launch of the Debug Stornaut App;
+- one explicit administrator-authenticated install/uninstall of the fixed
+  local-only R5 diagnostic App and legacy LaunchDaemon topology;
 - creation and removal of anonymous disposable fixture/runtime roots;
 - independent commits and pushes to `origin/main` after each passed R-task.
 
@@ -234,6 +239,8 @@ It does not authorize:
 - opening Codex access to localhost/private networks or Unix sockets;
 - changing the cleanup protected-path policy or Executor capability;
 - real Trash, Registered Action, release, notarization or force-push.
+- distribution of the App or treating local-only evidence as Developer ID /
+  notarization evidence.
 
 If R1 finds that satisfying a required capability needs one of those excluded
 permissions, stop and request a new explicit decision with measured evidence.
@@ -860,6 +867,26 @@ After focused diagnostic contract tests, run the signed-App diagnostic, full
 SwiftPM/App/build/bundle verification, review and docs. R5 ends with one
 independent commit/push only if every integrity requirement passes.
 
+R5 reached an external-state stop on 2026-08-12 before any real-model
+capability run. The current macOS SDK states that Apps containing
+`SMAppService` LaunchDaemons must be notarized. The machine has no valid
+code-signing identity or Developer ID identity; the locally signed App is
+ad-hoc with no TeamIdentifier, and the registration attempt returned an
+external failure. No launchd/helper process residue remained.
+
+The owner then clarified that the current product is for personal use on this
+Mac only and does not need distribution. R5 therefore uses a newly approved
+local-only hard gate: a complete ad-hoc signed Debug App at one fixed
+root-owned `/Library/Application Support/Stornaut` path and one exact legacy
+`/Library/LaunchDaemons` plist installed through explicit system administrator
+authentication. `/Applications` was rejected after review because its
+`root:admin 0775` parent is writable by the current administrator. The
+installer has no arbitrary destination/executable/argv surface, retains exact
+App/helper code-signing authentication and must prove install, recovery,
+uninstall and zero residue. This is not a private-API, PID-only or release
+bypass. The historical stop remains in the
+[R5 blocker report](../../reports/capability-first-runtime-r5-blocker.md).
+
 ## 14. R6 — Product Status Copy, Final Gate and Admission Decision
 
 ### Candidate files
@@ -1055,6 +1082,27 @@ If any capability or integrity row remains uncertain, this gate is not
 complete. Record the no-go/conditional result and continue the deterministic
 product only through a separately reviewed roadmap update.
 
-Current outcome: the plan is **not complete**. R4 is `protocolReady`; Task 29
-and production Deep Dive remain paused. R5–R6 still must prove signed-App
-capability/helper packaging and final admission.
+Current outcome: R4 remains `protocolReady`. R5 provider/schema/raw-event
+compatibility is resolved and the official `openai` + ChatGPT subscription
+`gpt-5.6-luna` worker observed all 9 required capabilities. Its fixed
+errno-only probe observed direct-public, IPv4/IPv6 local/private/link-local/ULA
+and Unix-socket denial; worker integrity is 6/6 contained and the no-sandbox
+negative control fails. The root-only local topology and verifier are
+implemented. Post-fix review closed command/image/subagent anti-forgery,
+random denial-token translation, outer/inner privacy-preflight parity, the
+missing bundled `codex-code-mode-host`, current-build/installed-App drift,
+XPC double-resume, external-state masking and subagent sender ambiguity.
+Final live repairs also closed exited-process error classification, provider
+strict-schema `$ref` sibling rejection, fixed direct-read command variants and
+the shell gate's Codable outcome-shape check.
+
+The historical TeamoRouter/usage-limit episode is superseded debugging
+evidence and is not part of the admitted product profile. The current-source
+signed App/helper report is `signedRuntimeReady` with 9/9 capabilities and
+12/12 integrity; fixed topology uninstall left zero residue. R5 waits only for
+its independent commit/push. R6 and Task 29 remain paused. Developer ID,
+notarization and distribution
+are not part of the current admission claim. See the
+[historical usage-limit blocker](../../reports/capability-first-runtime-r5-usage-limit-blocker.md),
+[historical App Server blocker](../../reports/capability-first-runtime-r5-api-key-blocker.md)
+and [current R5 review](../../reports/capability-first-runtime-r5-review.md).

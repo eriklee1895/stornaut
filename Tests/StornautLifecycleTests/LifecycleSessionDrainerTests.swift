@@ -213,6 +213,65 @@ struct LifecycleSessionDrainerTests {
     }
 
     @Test
+    func staleLeaseRecoveryMayDrainRootTransitionMember() throws {
+        let rootTransition = identity(
+            pid: 711,
+            pidVersion: 1,
+            effectiveUserID: 0
+        )
+        let child = identity(pid: 712, pidVersion: 1)
+        let inventory = ScriptedLifecycleInventory([
+            [rootTransition, child],
+            [rootTransition, child],
+            [],
+        ])
+        let signaler = RecordingLifecycleSignaler()
+
+        let report = try LifecycleSessionDrainer(
+            inventory: inventory,
+            signaler: signaler
+        ).drain(
+            auditSessionID: 44_001,
+            expectedUserID: 501,
+            supervisorIdentity: nil,
+            allowRootMembersDuringRecovery: true
+        )
+
+        #expect(report.uniqueMemberCount == 2)
+        #expect(signaler.calls == [
+            .init(signal: .stop, identity: rootTransition),
+            .init(signal: .stop, identity: child),
+            .init(signal: .kill, identity: rootTransition),
+            .init(signal: .kill, identity: child),
+        ])
+    }
+
+    @Test
+    func rootRecoveryExceptionCannotCoexistWithLiveSupervisor() {
+        let supervisor = identity(
+            pid: 710,
+            pidVersion: 1,
+            effectiveUserID: 0
+        )
+        let inventory = ScriptedLifecycleInventory([])
+        let signaler = RecordingLifecycleSignaler()
+
+        #expect(throws: LifecycleDrainError.unsafeAuditSession) {
+            _ = try LifecycleSessionDrainer(
+                inventory: inventory,
+                signaler: signaler
+            ).drain(
+                auditSessionID: 44_001,
+                expectedUserID: 501,
+                supervisorIdentity: supervisor,
+                allowRootMembersDuringRecovery: true
+            )
+        }
+        #expect(inventory.requestedAuditSessionIDs.isEmpty)
+        #expect(signaler.calls.isEmpty)
+    }
+
+    @Test
     func liveCancellationRejectsAProtectedIdentityNotInTheSession() {
         let supervisor = identity(
             pid: 703,

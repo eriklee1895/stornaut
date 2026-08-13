@@ -8,10 +8,12 @@ struct CodexRuntimeAuthSourceIdentity: Sendable, Equatable {
     let mode: mode_t
 }
 
-struct CodexRuntimeAuthCredentials: Sendable, Equatable {
-    let accessToken: String
-    let accountID: String
-    let planType: String?
+enum CodexRuntimeAuthCredentials: Sendable, Equatable {
+    case chatGPT(
+        accessToken: String,
+        accountID: String,
+        planType: String?
+    )
 }
 
 final class CodexRuntimeAuthProjection:
@@ -124,14 +126,15 @@ struct CodexRuntimeAuthProjector: Sendable {
         let planType = (object["plan_type"] as? String).flatMap {
             $0.isEmpty || $0.utf8.count > 64 ? nil : $0
         }
+        let credentials = CodexRuntimeAuthCredentials.chatGPT(
+            accessToken: accessToken,
+            accountID: accountID,
+            planType: planType
+        )
         return CodexRuntimeAuthProjection(
             sourceURL: sourceURL.standardizedFileURL,
             sourceIdentity: identity,
-            credentials: CodexRuntimeAuthCredentials(
-                accessToken: accessToken,
-                accountID: accountID,
-                planType: planType
-            )
+            credentials: credentials
         )
     }
 
@@ -252,6 +255,7 @@ struct CodexRuntimeAuthProjector: Sendable {
                     || (0x61...0x7A).contains($0.value)
             })
     }
+
 }
 
 private func canonicalAuthParent(_ url: URL) -> URL? {

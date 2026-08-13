@@ -1,7 +1,7 @@
 # Stornaut Coding Agent Handoff
 
 > 面向接手实现的 Coding Agent  
-> 最近更新：2026-08-12
+> 最近更新：2026-08-13
 > 当前状态：产品、Agent、UI 功能交互与品牌基线完成；Epic 0–1 evidence
 > gate 已完成；Epic 2–4 Tasks 9–26 通过最终 unified verifier 并归档；
 > Phase C deterministic Epic 8 详尽 plan 已于 2026-08-11 获用户批准，
@@ -13,7 +13,29 @@
 > `behaviorReady` candidate；用户 review 后已继续。R4 已完成 strict
 > Investigation Envelope v2、Swift identity binding、ProcessSupport/ProbeBridge
 > module separation 与 structural no-Executor verifier，结论为
-> `protocolReady`。R5–R6 与 Task 29 均未启动；Task 5 的历史
+> `protocolReady`。用户明确当前只需个人本机运行，不要求分发；R5 已采用
+> root-only `/Library/Application Support/Stornaut/` App + fixed plist 的
+> local-only lifecycle candidate。provider/schema/raw-event compatibility、
+> closed auth projection 与 machine verifier 已实现；官方 `openai` +
+> ChatGPT subscription `gpt-5.6-luna` worker 已观察 9/9 capabilities，
+> errno-only IPv4/IPv6/
+> private/local/Unix denial 与 worker containment 6/6。2026-08-13 post-fix
+> review 进一步关闭 command/image/subagent evidence forgery、random denial
+> token 映射、privacy-preflight outer/inner launcher 漂移与漏 staged
+> `codex-code-mode-host`；后续独立审查又修复 current-build binding、XPC
+> one-shot continuation、external-state priority 与 subagent sender identity；
+> final live fixes 关闭 vanished-process errno 分类、strict-schema `$ref`
+> sibling、direct-read fixed command 漂移和 shell gate Codable shape。
+> 最新 Codex 235/235、Lifecycle 60/60、serial 537/537、headless selected
+> 534/534、Xcode/Release/no-Executor gates 通过。历史
+> TeamoRouter/`usageLimitExceeded`
+> 仅为 superseded 调试证据。
+> current-source signed App/helper machine report 已得出 `signedRuntimeReady`
+>（9/9 capabilities、12/12 integrity，SHA-256
+> `08ba7c30373d4736124f0e507fcc9aa972880235251b8bbf636a7b2fabb1d193`），
+> 随后完成 fixed topology 零残留卸载。R5 evidence complete，等待独立
+> commit/push；R6 与 Task 29 均未开始。
+> Task 5 的历史
 > Broker-only no-go 已由 ADR 0004 capability-first 决策修订，Deep Dive 因
 > 新运行时实现/evidence gate 尚未交付而 paused；
 > release signing/notarization 未评估
@@ -225,7 +247,17 @@ Phase C 详尽候选计划见
 前插入
 [Capability-First Codex Runtime Evidence Gate](../plans/active/capability-first-codex-runtime-gate.md)。
 R1–R6 全部通过后才恢复 Tasks 29–35；R4 已完成并得出
-`protocolReady`，R5 可在 R4 独立 push 后启动；Task 29 仍不得恢复。
+`protocolReady`。R5 的 local-only topology、runtime worker 与 verifier 已
+实现；provider/schema/raw-event 漂移及 post-review closed-protocol findings
+已关闭。官方 `openai` worker 已观察 9/9 capabilities 与 6/6 worker
+containment；post-fix source 已补齐 official code-mode host、
+anti-forgery evidence、current-build binding 与 one-shot XPC reply。历史
+TeamoRouter/usage-limit 报告只作 superseded evidence。current-source signed
+App/helper 已得出 `signedRuntimeReady`，并完成 fixed App/plist/service/
+lease/runtime/process 零残留卸载。R5 仅待独立 commit/push；R6 完成前
+Task 29 不得恢复。
+逐项 artifact/command/gate 缺口与恢复顺序见
+[R2–R6 Progress Audit](../reports/capability-first-runtime-progress-audit-2026-08-13.md)。
 R1 当前证据见
 [study](../upstream-studies/epic-5-capability-first-runtime.md) 与
 [ADR 0013](../adr/0013-capability-first-runtime-containment.md)：唯一候选需要
@@ -329,7 +361,11 @@ transport。该精确例外已获用户批准用于 R2 configuration candidate�
 回收，随后通过用户批准的 audit-session lifecycle supervisor 取得
 `behaviorReady` candidate：identity drop、outer Seatbelt、ASID inheritance、
 managed-proxy-owner drain 与 stale-lease recovery 均 observed，residue 为 0。
-R4 已完成并得出 `protocolReady`；R5–R6 与 Task 29 仍未启动。该 gate
+R4 已完成并得出 `protocolReady`；R5 official `openai` worker gate 已通过
+9/9 capability 与 errno-only IPv4/IPv6/private/local/Unix containment；
+current-source signed App/helper report 进一步通过 9/9 capability、12/12
+integrity 与零残留卸载。repository gates 与独立 review 通过，R5 等待独立
+commit/push；R6 与 Task 29 未启动。该 gate
 要求证明完整调查能力和公共联网可用时，Codex 全进程树不可写用户数据、不可
 访问 localhost/私网/任意 Unix socket 且无 Executor 路径；不得用
 `danger-full-access`、命令/公共域名

@@ -1,7 +1,7 @@
 # ADR 0016: Investigation Lifecycle Supervisor
 
-> Status: Accepted for R3 behaviorReady candidate; R5 signed-App packaging
-> gate pending
+> Status: Accepted for local-only R5 `signedRuntimeReady`; future
+> distribution and R6 product admission pending
 >
 > Date: 2026-08-12
 >
@@ -100,11 +100,39 @@ unexpected inherited credential group.
 ### 1. Add a narrow lifecycle supervisor
 
 Stornaut may add one launchd-managed lifecycle supervisor for Codex
-investigations. The production candidate is an on-demand LaunchDaemon bundled
-with the signed App and registered through the current ServiceManagement API.
-R3 may use an explicitly authorized, ephemeral system-domain launchd job to
-measure the same process and audit-session behavior before notarized packaging
-is available.
+investigations. The future distributable candidate is an on-demand
+LaunchDaemon bundled with a Developer ID signed/notarized App and registered
+through the current ServiceManagement API.
+
+The current owner explicitly requires only personal use on this Mac and does
+not require App distribution. For R5 only, the accepted local diagnostic
+topology is:
+
+```text
+ad-hoc signed Debug Stornaut.app
+→ one explicit administrator-authenticated installation
+→ fixed root-owned /Library/Application Support/Stornaut/
+  Stornaut-R5-Diagnostic.app
+→ fixed root-owned /Library/LaunchDaemons plist
+→ system launchd SessionCreate helper
+```
+
+The legacy plist contains one fixed absolute helper path and no caller-
+controlled `ProgramArguments`. The installer accepts no destination, label,
+Mach service, executable or argument override. The installed App and plist
+must be root-owned, non-symlinked, mode-bounded and signature/layout verified
+before the service is bootstrapped. The parent is deliberately not
+`/Applications`: this machine's `root:admin 0775` `/Applications` is writable
+by the current administrator and cannot protect a privileged fixed Program
+from rename/replacement. The accepted `/Library/Application Support/Stornaut`
+parent is created `root:wheel 0755` under a root-owned non-user-writable
+ancestor; the entire App bundle is root-owned, single-linked and non-writable
+by group/other. This is a local diagnostic topology, not a
+release, update or distribution mechanism.
+
+R3 used an explicitly authorized, ephemeral system-domain launchd job to
+measure the same process and audit-session behavior before either packaged or
+local-only App integration was available.
 
 The supervisor is not:
 
@@ -126,17 +154,29 @@ scope.
 The trusted supervisor:
 
 1. accepts one closed launch request from an authenticated Stornaut App;
-2. creates a new audit session before the untrusted process starts;
-3. drops the child to the requesting user's UID/GID and supplementary groups;
-4. launches only the closed Codex outer-sandbox/App-Server profile;
-5. records a root-owned, versioned lease containing only anonymous
+2. runs as a one-shot `SessionCreate` LaunchDaemon, so launchd creates a new
+   audit session before the untrusted process starts;
+3. records a root-owned, versioned lease before any diagnostic directory or
+   child side effect;
+4. drops the child to the requesting user's UID/GID and supplementary groups;
+5. verifies the child PID/UID and inherited helper ASID from kernel identity;
+6. launches only the closed Codex outer-sandbox/App-Server profile;
+7. retains the lease containing only anonymous
    investigation identity and audit-session identity;
-6. retains lifecycle authority while the App drives stdio/App Server.
+8. retains lifecycle authority while the App drives stdio/App Server.
 
 The child cannot choose an ASID, PID, signal, executable, arbitrary argument
 list, path or lease location through the helper protocol. Diagnostic builds
 may launch a checked anonymous fixture under a separate Spike-only command;
 that command is not part of the product protocol.
+
+The public `setaudit_addr(AU_ASSIGN_ASID)` factory remains a tested
+future-composition seam, but the one-shot R5 helper does not call it after
+launchd has already created its audit session. The worker inherits that helper
+ASID, drops authority, emits one fixed ready marker, and is admitted only after
+the root helper re-reads its kernel PID/UID/ASID. Its final evidence crosses a
+private pipe as an inode/owner/mode/size plus SHA-256 receipt; reopening a
+same-UID replacement path cannot satisfy both identity and byte checks.
 
 ### 3. Close cancellation with audit-token identity
 
@@ -160,6 +200,13 @@ unexpected UID/session membership, inability to freeze, inability to kill or
 remaining membership yields `behaviorBlocked`; it never reports successful
 cleanup.
 
+Live cancellation protects the exact root supervisor identity and rejects any
+other root member. Same-boot stale recovery is the only explicit exception:
+a validated root-owned lease may identify the narrow pre-UID-drop crash
+window, so recovery with no protected live supervisor may identity-check and
+drain a root transition child. That exception cannot be enabled for live
+cancellation.
+
 ### 4. Recover supervisor/App failure
 
 - App connection invalidation triggers cancellation.
@@ -169,6 +216,8 @@ cleanup.
 - Startup reads only root-owned leases, revalidates their schema/owner/mode
   and drains stale ASIDs before accepting new work.
 - Normal completion removes the lease only after the target ASID is empty.
+- Diagnostic-root cleanup succeeds before lease removal; any cleanup failure
+  remains recoverable and cannot produce `drained=true`.
 - Reboot makes prior processes nonexistent; stale leases are still validated
   and retired before new work.
 
@@ -202,6 +251,11 @@ the Codex process is always launched after identity and privilege reduction.
 - disabling shell, unified exec, skills or subagents;
 - process-group-only cleanup;
 - `launchctl bootout` as whole-tree cleanup;
+- a per-user LaunchAgent with `SessionCreate`: launchd creates a distinct
+  audit session, but after agent crash/relaunch the new same-user instance
+  receives `EPERM` when it tries to inspect old-session descendants with
+  `audit_get_pinfo_addr`, so it cannot prove an empty member set or perform
+  identity-checked stale-session recovery;
 - polling PPID/environment markers;
 - `NOTE_FORK`/`p_puniqueid` as an admitting security boundary;
 - private coalition APIs;
@@ -223,7 +277,10 @@ Positive:
 Costs:
 
 - the App gains a privileged helper packaging and consent surface;
-- production LaunchDaemon packaging requires signed/notarized evidence;
+- the local-only diagnostic requires one explicit administrator-authenticated
+  install/uninstall operation and a root-owned copy of the Debug App;
+- future distributable LaunchDaemon packaging still requires Developer ID and
+  notarized evidence;
 - audit-session APIs are deprecated and must be re-probed on every supported
   macOS release;
 - the helper becomes a security-critical, deliberately tiny component;
@@ -232,16 +289,17 @@ Costs:
 
 ## Residual Risks
 
-1. ServiceManagement registration, install/update/uninstall behavior and the
-   actual signed App/helper topology are not admitted in R3 and remain R5
-   gates.
-2. Helper caller authentication has a closed pure contract in R3; audit-token
-   code-signing validation and Mach/XPC service denial require signed-App
-   adversarial evidence in R5.
+1. Local-only install/uninstall and the actual ad-hoc signed App/helper
+   topology passed R5. Packaged ServiceManagement distribution remains a
+   future distribution gate and cannot be inferred from local-only success.
+2. Helper caller authentication, code-signing admission and Mach/XPC
+   composition passed the local-only signed R5 diagnostic. Developer ID and
+   notarized distribution remain unproved.
 3. The privileged probe uses an explicitly authorized ephemeral system-domain
    job. It does not prove FDA/TCC inheritance or distribution viability.
-4. App/helper simultaneous crash pressure must be repeated from the packaged
-   signed topology rather than inferred from the Spike.
+4. App cancellation, timeout and helper crash recovery passed from the
+   current-source signed local topology. Broader release soak/pressure remains
+   a future release gate.
 5. Audit-session APIs may be removed in a future macOS release; runtime
    availability failure must fail closed.
 6. A root helper implementation defect has higher impact than an
@@ -276,5 +334,6 @@ scripts/verify --headless: passed
 XcodeBuildMCP macOS tests: 123/123 passed
 ```
 
-R5 still owns signed-App observed capability and helper-packaging evidence. R6
-still owns final admission. Deep Dive remains unavailable throughout R3.
+R5 closed the personal-local signed-App capability/helper gate with 9/9
+capabilities, 12/12 integrity and zero residue. R6 still owns final product
+admission. Deep Dive remains unavailable.

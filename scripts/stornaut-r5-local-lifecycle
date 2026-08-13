@@ -1,0 +1,383 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+action=${1:-}
+if [[ $# != 1 || "$action" != (status|install|uninstall) ]]; then
+    print -u2 "Usage: $0 <status|install|uninstall>"
+    exit 64
+fi
+
+label="com.eriklee.stornaut.lifecycle"
+application_support="/Library/Application Support"
+installed_root="$application_support/Stornaut"
+installed_app="$installed_root/Stornaut-R5-Diagnostic.app"
+installed_plist="/Library/LaunchDaemons/$label.plist"
+lease_root="/private/var/db/com.eriklee.stornaut.r5"
+diagnostic_root="$installed_root/R5Runtime"
+built_app="$repo_root/.derivedData/xcodebuildmcp/Build/Products/Debug/Stornaut.app"
+source_plist="$repo_root/StornautLifecycleHelper/$label.plist"
+
+exact_file_metadata() {
+    local path=$1
+    local expected_owner=$2
+    local expected_group=$3
+    local expected_mode=$4
+    local file_type owner group mode links
+
+    [[ -e "$path" && ! -L "$path" ]] || return 1
+    file_type=$(/usr/bin/stat -f '%HT' "$path")
+    owner=$(/usr/bin/stat -f '%Su' "$path")
+    group=$(/usr/bin/stat -f '%Sg' "$path")
+    mode=$(/usr/bin/stat -f '%Mp%Lp' "$path")
+    links=$(/usr/bin/stat -f '%l' "$path")
+    [[ "$file_type" == "Regular File" &&
+        "$owner" == "$expected_owner" &&
+        "$group" == "$expected_group" &&
+        "$mode" == "$expected_mode" &&
+        "$links" == 1 ]]
+}
+
+exact_directory_metadata() {
+    local path=$1
+    local expected_owner=$2
+    local expected_group=$3
+    local expected_mode=$4
+    local file_type owner group mode
+
+    [[ -d "$path" && ! -L "$path" ]] || return 1
+    file_type=$(/usr/bin/stat -f '%HT' "$path")
+    owner=$(/usr/bin/stat -f '%Su' "$path")
+    group=$(/usr/bin/stat -f '%Sg' "$path")
+    mode=$(/usr/bin/stat -f '%Mp%Lp' "$path")
+    [[ "$file_type" == "Directory" &&
+        "$owner" == "$expected_owner" &&
+        "$group" == "$expected_group" &&
+        "$mode" == "$expected_mode" ]]
+}
+
+validate_plist() {
+    local plist=$1
+    /usr/bin/plutil -lint "$plist" >/dev/null
+    [[ "$(
+        /usr/bin/plutil -convert xml1 -o - "$plist" |
+            /usr/bin/xmllint --xpath 'count(/plist/dict/key)' -
+    )" == 10 ]]
+    [[ "$(/usr/bin/plutil -extract Label raw "$plist")" == "$label" ]]
+    [[ "$(/usr/bin/plutil -extract Program raw "$plist")" ==
+        "$installed_app/Contents/MacOS/StornautLifecycleHelper" ]]
+    [[ "$(/usr/bin/plutil -extract ProcessType raw "$plist")" ==
+        "Interactive" ]]
+    [[ "$(/usr/bin/plutil -extract SessionCreate raw "$plist")" == true ]]
+    [[ "$(/usr/bin/plutil -extract RunAtLoad raw "$plist")" == false ]]
+    [[ "$(/usr/bin/plutil -extract AbandonProcessGroup raw "$plist")" == false ]]
+    [[ "$(/usr/bin/plutil -extract KeepAlive.SuccessfulExit raw "$plist")" == false ]]
+    [[ "$(/usr/bin/plutil -extract ThrottleInterval raw "$plist")" == 1 ]]
+    [[ "$(/usr/bin/plutil -extract AssociatedBundleIdentifiers raw "$plist")" == 1 ]]
+    [[ "$(
+        /usr/bin/plutil -extract AssociatedBundleIdentifiers.0 raw "$plist"
+    )" == "com.eriklee.stornaut" ]]
+    [[ "$(
+        /usr/bin/plutil -extract MachServices xml1 -o - "$plist" |
+            /usr/bin/xmllint --xpath 'string(/plist/dict/key)' -
+    )" == "$label" ]]
+    [[ "$(
+        /usr/bin/plutil -extract MachServices xml1 -o - "$plist" |
+            /usr/bin/xmllint --xpath \
+                'name(/plist/dict/key[.="com.eriklee.stornaut.lifecycle"]/following-sibling::*[1])' \
+                -
+    )" == "true" ]]
+    [[ "$(
+        /usr/bin/plutil -extract KeepAlive xml1 -o - "$plist" |
+            /usr/bin/xmllint --xpath 'count(/plist/dict/key)' -
+    )" == 1 ]]
+    [[ "$(
+        /usr/bin/plutil -extract MachServices xml1 -o - "$plist" |
+            /usr/bin/xmllint --xpath 'count(/plist/dict/key)' -
+    )" == 1 ]]
+}
+
+validate_built_app() {
+    [[ -d "$built_app" && ! -L "$built_app" ]]
+    for executable in \
+        "$built_app/Contents/MacOS/Stornaut" \
+        "$built_app/Contents/MacOS/StornautLifecycleHelper"
+    do
+        [[ -x "$executable" && ! -L "$executable" ]]
+        [[ "$(/usr/bin/file -b "$executable")" == *"arm64"* ]]
+    done
+    /usr/bin/codesign --verify --deep --strict "$built_app"
+    [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' \
+        "$built_app/Contents/Info.plist")" == "com.eriklee.stornaut" ]]
+    validate_plist "$source_plist"
+}
+
+validate_bundle_permissions() {
+    local app=$1
+    local file file_type owner group links
+    [[ -z "$(/usr/bin/find "$app" -type l -print -quit)" ]]
+    [[ -z "$(/usr/bin/find "$app" \
+        \( -perm -020 -o -perm -002 \) -print -quit)" ]]
+    while IFS= read -r -d '' file; do
+        file_type=$(/usr/bin/stat -f '%HT' "$file")
+        owner=$(/usr/bin/stat -f '%Su' "$file")
+        group=$(/usr/bin/stat -f '%Sg' "$file")
+        links=$(/usr/bin/stat -f '%l' "$file")
+        [[ "$owner" == root && "$group" == wheel ]]
+        if [[ "$file_type" == "Regular File" ]]; then
+            [[ "$links" == 1 ]]
+        else
+            [[ "$file_type" == "Directory" ]]
+        fi
+    done < <(/usr/bin/find "$app" -print0)
+}
+
+validate_installed_artifacts() {
+    exact_directory_metadata "$application_support" root admin 0755
+    exact_directory_metadata "$installed_root" root wheel 0755
+    exact_directory_metadata "$installed_app" root wheel 0755
+    exact_file_metadata "$installed_plist" root wheel 0644
+    validate_plist "$installed_plist"
+    /usr/bin/cmp -s "$source_plist" "$installed_plist"
+    /usr/bin/codesign --verify --deep --strict "$installed_app"
+    validate_bundle_permissions "$installed_app"
+    for executable in \
+        "$installed_app/Contents/MacOS/Stornaut" \
+        "$installed_app/Contents/MacOS/StornautLifecycleHelper"
+    do
+        exact_file_metadata "$executable" root wheel 0755
+    done
+}
+
+validate_installed_state() {
+    validate_installed_artifacts
+    /bin/launchctl print "system/$label" >/dev/null
+}
+
+validate_runtime_roots_drained() {
+    local user_root name
+    if [[ -e "$lease_root" || -L "$lease_root" ]]; then
+        exact_directory_metadata "$lease_root" root wheel 0700
+        [[ -z "$(/usr/bin/find "$lease_root" -mindepth 1 -print -quit)" ]]
+    fi
+    if [[ -e "$diagnostic_root" || -L "$diagnostic_root" ]]; then
+        exact_directory_metadata "$diagnostic_root" root wheel 0711
+        while IFS= read -r -d '' user_root; do
+            [[ -d "$user_root" && ! -L "$user_root" ]]
+            name=${user_root:t}
+            [[ "$name" == <1-> ]]
+            exact_directory_metadata "$user_root" root wheel 0711
+            [[ -z "$(/usr/bin/find "$user_root" -mindepth 1 -print -quit)" ]]
+        done < <(
+            /usr/bin/find "$diagnostic_root" \
+                -mindepth 1 -maxdepth 1 -print0
+        )
+    fi
+}
+
+runtime_roots_are_drained() {
+    validate_runtime_roots_drained >/dev/null 2>&1
+}
+
+recover_runtime_roots_after_bootout() {
+    runtime_roots_are_drained && return
+    validate_installed_artifacts
+    /bin/launchctl bootstrap system "$installed_plist"
+    local recovery_status=0
+    /bin/launchctl kickstart "system/$label" || recovery_status=$?
+    if (( recovery_status == 0 )); then
+        local attempt
+        for attempt in {1..100}; do
+            runtime_roots_are_drained && break
+            /bin/sleep 0.1
+        done
+        validate_runtime_roots_drained || recovery_status=$?
+    fi
+    /bin/launchctl bootout "system/$label" || recovery_status=$?
+    (( recovery_status == 0 )) || return "$recovery_status"
+    validate_runtime_roots_drained
+}
+
+rollback_install() {
+    local exit_status=${1:-1}
+    local may_remove_installed=1
+    trap - EXIT INT TERM
+    if /bin/launchctl print "system/$label" >/dev/null 2>&1; then
+        /bin/launchctl bootout "system/$label" >/dev/null 2>&1 ||
+            may_remove_installed=0
+    fi
+    if /bin/launchctl print "system/$label" >/dev/null 2>&1; then
+        may_remove_installed=0
+    fi
+    if [[ -n ${staging_plist:-} &&
+        ( -e "$staging_plist" || -L "$staging_plist" ) ]]
+    then
+        /bin/rm -f -- "$staging_plist"
+    fi
+    if [[ -n ${staging_app:-} &&
+        ( -e "$staging_app" || -L "$staging_app" ) ]]
+    then
+        /bin/rm -rf -- "$staging_app"
+    fi
+    if (( may_remove_installed && ${installed_plist_moved:-0} )); then
+        if exact_file_metadata "$installed_plist" root wheel 0644 &&
+            validate_plist "$installed_plist" &&
+            /usr/bin/cmp -s "$source_plist" "$installed_plist"
+        then
+            /bin/rm -f -- "$installed_plist"
+        fi
+    fi
+    if (( may_remove_installed && ${installed_app_moved:-0} )); then
+        if exact_directory_metadata "$installed_app" root wheel 0755 &&
+            /usr/bin/codesign --verify --deep --strict "$installed_app" &&
+            validate_bundle_permissions "$installed_app"
+        then
+            /bin/rm -rf -- "$installed_app"
+        fi
+    fi
+    if (( may_remove_installed && ${installed_root_created:-0} )); then
+        /bin/rmdir -- "$installed_root" >/dev/null 2>&1 || true
+    fi
+    exit "$exit_status"
+}
+
+status() {
+    local root_state=absent app_state=absent plist_state=absent service_state=absent
+    [[ -e "$installed_root" ]] && root_state=present
+    [[ -e "$installed_app" ]] && app_state=present
+    [[ -e "$installed_plist" ]] && plist_state=present
+    if /bin/launchctl print "system/$label" >/dev/null 2>&1; then
+        service_state=loaded
+    fi
+    if validate_installed_state >/dev/null 2>&1; then
+        print "lifecycle.local.state=installed"
+        return
+    fi
+    print "lifecycle.local.root=$root_state"
+    print "lifecycle.local.app=$app_state"
+    print "lifecycle.local.plist=$plist_state"
+    print "lifecycle.local.service=$service_state"
+    if [[ "$root_state" == absent &&
+        "$app_state" == absent &&
+        "$plist_state" == absent &&
+        "$service_state" == absent ]]
+    then
+        print "lifecycle.local.state=administratorInstallRequired"
+    else
+        print "lifecycle.local.state=inconsistentInstallation"
+        return 1
+    fi
+}
+
+install() {
+    (( EUID == 0 )) || {
+        print -u2 "Install requires explicit administrator authentication."
+        exit 77
+    }
+    validate_built_app
+    exact_directory_metadata "$application_support" root admin 0755
+    if [[ -e "$installed_root" || -L "$installed_root" ||
+        -e "$installed_app" || -L "$installed_app" ||
+        -e "$installed_plist" || -L "$installed_plist" ]] ||
+        /bin/launchctl print "system/$label" >/dev/null 2>&1
+    then
+        print -u2 "Refusing to replace an existing local lifecycle object."
+        exit 73
+    fi
+
+    local staging_app="$installed_app.staging.$$"
+    local staging_plist="$installed_plist.staging.$$"
+    local installed_root_created=0
+    local installed_app_moved=0
+    local installed_plist_moved=0
+    local service_bootstrapped=0
+    [[ ! -e "$staging_app" && ! -L "$staging_app" ]]
+    [[ ! -e "$staging_plist" && ! -L "$staging_plist" ]]
+    trap 'rollback_install $?' EXIT
+    trap 'rollback_install 1' INT TERM
+    /bin/mkdir -m 0755 "$installed_root"
+    installed_root_created=1
+    /usr/sbin/chown root:wheel "$installed_root"
+    exact_directory_metadata "$installed_root" root wheel 0755
+
+    /usr/bin/ditto --noqtn "$built_app" "$staging_app"
+    /usr/sbin/chown -R root:wheel "$staging_app"
+    /bin/chmod -R go-w "$staging_app"
+    /bin/chmod 0755 "$staging_app"
+    /bin/chmod 0755 \
+        "$staging_app/Contents/MacOS/Stornaut" \
+        "$staging_app/Contents/MacOS/StornautLifecycleHelper"
+    validate_bundle_permissions "$staging_app"
+    /usr/bin/codesign --verify --deep --strict "$staging_app"
+    [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' \
+        "$staging_app/Contents/Info.plist")" == "com.eriklee.stornaut" ]]
+    /bin/mv -n "$staging_app" "$installed_app"
+    installed_app_moved=1
+    /usr/bin/codesign --verify --deep --strict "$installed_app"
+
+    /usr/bin/install -o root -g wheel -m 0644 \
+        "$source_plist" "$staging_plist"
+    /bin/mv -n "$staging_plist" "$installed_plist"
+    installed_plist_moved=1
+    validate_plist "$installed_plist"
+    /bin/launchctl bootstrap system "$installed_plist"
+    service_bootstrapped=1
+    validate_installed_state
+    trap - EXIT INT TERM
+    print "lifecycle.local.install=complete"
+}
+
+uninstall() {
+    (( EUID == 0 )) || {
+        print -u2 "Uninstall requires explicit administrator authentication."
+        exit 77
+    }
+    validate_installed_artifacts
+    if /bin/launchctl print "system/$label" >/dev/null 2>&1; then
+        /bin/launchctl bootout "system/$label"
+    fi
+    recover_runtime_roots_after_bootout
+    if [[ -e "$installed_plist" || -L "$installed_plist" ]]; then
+        exact_file_metadata "$installed_plist" root wheel 0644
+        validate_plist "$installed_plist"
+        /usr/bin/cmp -s "$source_plist" "$installed_plist"
+        /bin/rm -f -- "$installed_plist"
+    fi
+    if [[ -e "$installed_app" || -L "$installed_app" ]]; then
+        exact_directory_metadata "$installed_app" root wheel 0755
+        /usr/bin/codesign --verify --deep --strict "$installed_app"
+        /bin/rm -rf -- "$installed_app"
+    fi
+    if [[ -e "$lease_root" || -L "$lease_root" ]]; then
+        exact_directory_metadata "$lease_root" root wheel 0700
+        /bin/rmdir -- "$lease_root"
+    fi
+    if [[ -e "$diagnostic_root" || -L "$diagnostic_root" ]]; then
+        exact_directory_metadata "$diagnostic_root" root wheel 0711
+        while IFS= read -r -d '' user_root; do
+            /bin/rmdir -- "$user_root"
+        done < <(
+            /usr/bin/find "$diagnostic_root" \
+                -mindepth 1 -maxdepth 1 -print0
+        )
+        /bin/rmdir -- "$diagnostic_root"
+    fi
+    if [[ -e "$installed_root" || -L "$installed_root" ]]; then
+        exact_directory_metadata "$installed_root" root wheel 0755
+        /bin/rmdir -- "$installed_root"
+    fi
+    [[ ! -e "$installed_app" && ! -L "$installed_app" ]]
+    [[ ! -e "$installed_root" && ! -L "$installed_root" ]]
+    [[ ! -e "$installed_plist" && ! -L "$installed_plist" ]]
+    [[ ! -e "$lease_root" && ! -L "$lease_root" ]]
+    [[ ! -e "$diagnostic_root" && ! -L "$diagnostic_root" ]]
+    ! /bin/launchctl print "system/$label" >/dev/null 2>&1
+    print "lifecycle.local.uninstall=complete"
+}
+
+case "$action" in
+    status) status ;;
+    install) install ;;
+    uninstall) uninstall ;;
+esac

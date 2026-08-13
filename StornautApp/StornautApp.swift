@@ -14,6 +14,7 @@ struct StornautApp: App {
         )
 #if DEBUG
         IsolationProbeHarness.startIfRequested()
+        CapabilityRuntimeProbeHarness.startIfRequested()
 #endif
     }
 

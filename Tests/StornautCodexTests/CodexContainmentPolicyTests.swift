@@ -27,6 +27,8 @@ struct CodexContainmentPolicyTests {
         let expected = """
         default_permissions = "stornaut-outer-v1"
         cli_auth_credentials_store = "ephemeral"
+        model_provider = "openai"
+        web_search = "live"
         permissions.stornaut-outer-v1.extends = ":read-only"
         permissions.stornaut-outer-v1.filesystem."/Users/example/.codex/auth.json" = "deny"
         permissions.stornaut-outer-v1.filesystem."/private/tmp/stornaut/runtime" = "write"
@@ -51,6 +53,10 @@ struct CodexContainmentPolicyTests {
         features.shell_tool = true
         features.unified_exec = true
         features.multi_agent = true
+        features.browser_use = true
+        features.browser_use_external = true
+        features.browser_use_full_cdp_access = true
+        features.view_image = true
         features.image_generation = false
         features.apps = false
         features.plugins = false
@@ -70,6 +76,9 @@ struct CodexContainmentPolicyTests {
 
         #expect(configuration.data == expectedData)
         #expect(configuration.digest == expectedDigest)
+        #expect(
+            configuration.provider == .openAI
+        )
         #expect(
             try policy.configuration(
                 workspace: workspace,
@@ -95,6 +104,9 @@ struct CodexContainmentPolicyTests {
             "-C",
             "/private/tmp/stornaut/work",
             "--",
+            "/usr/bin/env",
+            "-u",
+            "CODEX_SANDBOX",
             "/opt/stornaut/codex",
             "--strict-config",
             "--disable",
@@ -105,6 +117,8 @@ struct CodexContainmentPolicyTests {
         #expect(!arguments.contains("exec"))
         #expect(!arguments.contains("mcp-server"))
         #expect(!arguments.contains("danger-full-access"))
+        #expect(!arguments.contains("HTTP_PROXY"))
+        #expect(!arguments.contains("HTTPS_PROXY"))
     }
 
     @Test
@@ -140,6 +154,10 @@ struct CodexContainmentPolicyTests {
         ))
         #expect(containmentFileMode(installedURL) == 0o600)
         #expect(try Data(contentsOf: installedURL) == configuration.data)
+        try policy.validateInstalled(
+            configuration,
+            in: liveWorkspace.paths
+        )
         #expect(throws: CodexContainmentPolicyError.self) {
             _ = try policy.install(
                 configuration,
@@ -177,6 +195,8 @@ struct CodexContainmentPolicyTests {
             ".network.unix_sockets.",
             "allowed_domains",
             "OPENAI_API_KEY",
+            "experimental_bearer_token",
+            "synthetic-openrouter-token",
             "GITHUB_TOKEN",
             "MoveToTrash",
             "RegisteredAction",
@@ -189,6 +209,127 @@ struct CodexContainmentPolicyTests {
                 separatedBy: "enable_socks5 = false"
             ).count == 3
         )
+    }
+
+    @Test
+    func syntheticDiagnosticDeniesPrivateRootsAndOnlyCarvesOutWorkspace()
+        throws
+    {
+        let parent = FileManager.default.temporaryDirectory.appending(
+            path: "stornaut-policy-synthetic-\(UUID().uuidString)",
+            directoryHint: .isDirectory
+        )
+        let privateRoot = parent.appending(
+            path: "private-home",
+            directoryHint: .isDirectory
+        )
+        let scopedWorkspace = containmentWorkspace(
+            under: parent.appending(
+                path: "workspace",
+                directoryHint: .isDirectory
+            )
+        )
+        let deniedRead = scopedWorkspace.fixturesURL.appending(
+            path: "synthetic-denied-read.txt"
+        )
+        try FileManager.default.createDirectory(
+            at: privateRoot,
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
+        try FileManager.default.createDirectory(
+            at: scopedWorkspace.fixturesURL,
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
+        try Data("synthetic-denied\n".utf8).write(to: deniedRead)
+        defer { try? FileManager.default.removeItem(at: parent) }
+
+        let configuration = try policy.configuration(
+            workspace: scopedWorkspace,
+            projectedAuthSourceURL: privateRoot.appending(
+                path: ".codex/auth.json"
+            ),
+            readScope: .syntheticDiagnostic(
+                privateRootURL: privateRoot,
+                syntheticDeniedReadURL: deniedRead
+            )
+        )
+        let text = String(decoding: configuration.data, as: UTF8.self)
+
+        #expect(text.contains(
+            """
+            permissions.stornaut-outer-v1.filesystem."\
+            \(privateRoot.path)" = "deny"
+            """
+        ))
+        #expect(text.contains(
+            #"permissions.stornaut-outer-v1.filesystem."/Users" = "deny""#
+        ))
+        #expect(text.contains(
+            #"permissions.stornaut-outer-v1.filesystem."/Volumes" = "deny""#
+        ))
+        #expect(text.contains(
+            """
+            permissions.stornaut-outer-v1.filesystem."\
+            \(deniedRead.path)" = "deny"
+            """
+        ))
+        #expect(text.contains(
+            """
+            permissions.stornaut-outer-v1.filesystem."\
+            \(scopedWorkspace.rootURL.path)" = "read"
+            """
+        ))
+        #expect(
+            configuration.readScope == .syntheticDiagnostic(
+                privateRootURL: privateRoot,
+                syntheticDeniedReadURL: deniedRead
+            )
+        )
+    }
+
+    @Test
+    func syntheticDiagnosticRejectsAReadCarveoutOutsidePrivateRoot()
+        throws
+    {
+        let parent = FileManager.default.temporaryDirectory.appending(
+            path: "stornaut-policy-invalid-scope-\(UUID().uuidString)",
+            directoryHint: .isDirectory
+        )
+        let privateRoot = parent.appending(
+            path: "private-home",
+            directoryHint: .isDirectory
+        )
+        let scopedWorkspace = containmentWorkspace(
+            under: parent.appending(
+                path: "workspace",
+                directoryHint: .isDirectory
+            )
+        )
+        let deniedRead = parent.appending(
+            path: "synthetic-denied-read.txt"
+        )
+        try FileManager.default.createDirectory(
+            at: privateRoot,
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
+        try Data("synthetic-denied\n".utf8).write(to: deniedRead)
+        defer { try? FileManager.default.removeItem(at: parent) }
+
+        #expect(throws: CodexContainmentPolicyError.invalidReadScope) {
+            _ = try policy.configuration(
+                workspace: scopedWorkspace,
+                projectedAuthSourceURL: privateRoot.appending(
+                    path: ".codex/auth.json"
+                ),
+                readScope: .syntheticDiagnostic(
+                    privateRootURL: privateRoot,
+                    syntheticDeniedReadURL: deniedRead
+                )
+            )
+        }
     }
 
     @Test
@@ -222,4 +363,17 @@ private func containmentFileMode(_ url: URL) -> mode_t {
     var information = stat()
     guard lstat(url.path, &information) == 0 else { return 0 }
     return information.st_mode & 0o777
+}
+
+private func containmentWorkspace(
+    under root: URL
+) -> CodexRuntimeWorkspacePaths {
+    CodexRuntimeWorkspacePaths(
+        rootURL: root,
+        homeURL: root.appending(path: "home"),
+        runtimeURL: root.appending(path: "runtime"),
+        workURL: root.appending(path: "work"),
+        schemaURL: root.appending(path: "schema"),
+        fixturesURL: root.appending(path: "fixtures")
+    )
 }
