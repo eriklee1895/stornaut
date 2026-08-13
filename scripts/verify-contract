@@ -43,7 +43,8 @@ for expected in '--headless' '--full' '--list-steps'; do
 done
 
 unknown_output=$(mktemp)
-trap 'rm -f "$unknown_output"' EXIT
+contract_root=""
+trap 'rm -f "$unknown_output"; rm -rf "$contract_root"' EXIT
 if scripts/verify --unknown-mode >"$unknown_output" 2>&1; then
     fail_contract "Verifier accepted an unknown mode"
 fi
@@ -99,6 +100,48 @@ for expected in \
         fail_contract "Full verifier omitted $expected"
     fi
 done
+
+contract_root=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-verify-contract.XXXXXX")
+mkdir -p "$contract_root/scripts"
+cp scripts/verify "$contract_root/scripts/verify"
+chmod 755 "$contract_root/scripts/verify"
+typeset -a source_boundaries=(
+    verify-activity-boundaries
+    verify-quick-scan-boundaries
+    verify-review-boundaries
+    verify-review-workflow-boundaries
+    verify-cleanup-policy-boundaries
+    verify-cleanup-execution-boundaries
+    verify-codex-no-executor-boundary
+    verify-app-state-boundaries
+    verify-overview-boundaries
+    verify-scan-boundaries
+    verify-history-boundaries
+    verify-settings-boundaries
+)
+for boundary in "${source_boundaries[@]}"; do
+    cat > "$contract_root/scripts/$boundary" <<'SH'
+#!/bin/sh
+exit 0
+SH
+    chmod 755 "$contract_root/scripts/$boundary"
+done
+cat > "$contract_root/scripts/verify-review-boundaries" <<'SH'
+#!/bin/sh
+exit 23
+SH
+chmod 755 "$contract_root/scripts/verify-review-boundaries"
+source_failure_output="$contract_root/source-failure.log"
+if "$contract_root/scripts/verify" --headless \
+    >"$source_failure_output" 2>&1
+then
+    fail_contract "Verifier masked a failing source boundary"
+fi
+require_fixed_text "$source_failure_output" \
+    '[verify][headless] FAIL  source-boundaries'
+if rg -q 'START localization-contract' "$source_failure_output"; then
+    fail_contract "Verifier continued after a failing source boundary"
+fi
 
 require_fixed_text scripts/verify \
     '-skip-testing:StornautAppTests/DesignSystemSnapshotTests'

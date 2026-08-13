@@ -101,6 +101,9 @@ struct StornautApp: App {
                     historySelection: DebugHistoryFixtureSelection(
                         arguments: CommandLine.arguments
                     ),
+                    reviewSelection: DebugReviewFixtureSelection(
+                        arguments: CommandLine.arguments
+                    ),
                     settingsSelection: DebugSettingsFixtureSelection(
                         arguments: CommandLine.arguments
                     ),

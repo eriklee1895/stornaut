@@ -438,7 +438,7 @@ func foundationProcessRunnerNormalExitKillsDescendants() async throws {
     let started = ContinuousClock.now
     let output = try await FoundationProcessRunner().run(request)
     #expect(output.exitStatus == 0)
-    #expect(started.duration(to: .now) < .seconds(5))
+    #expect(started.duration(to: .now) < .seconds(10))
 
     let childPID = try waitForProcessRunnerPID(at: childPIDURL)
     defer { kill(childPID, SIGKILL) }

@@ -33,7 +33,7 @@
 | Agent、双模式与治理设计 | [Agent Disk Governance](design/agent-disk-governance.md) |
 | UI、品牌、状态与交互 | [UI/UX](design/ui-ux.md) |
 | 宏观交付顺序与阶段 Gate | [Delivery Roadmap](plans/roadmap.md) |
-| 当前计划状态 | [Active Plans](plans/active/README.md) — R1–R6 runtime foundation `go`；Tasks 29–31 complete；Task 32 next |
+| 当前计划状态 | [Active Plans](plans/active/README.md) — R1–R6 runtime foundation `go`；Tasks 29–32 complete |
 | Capability-first Codex Runtime Gate | [Runtime Evidence Gate](plans/active/capability-first-codex-runtime-gate.md) — complete |
 | R2 tests-first brief | [R2 Implementation Brief](plans/active/task-r2-implementation-brief.md) — complete |
 | R3 lifecycle hard-gate brief | [R3 Implementation Brief](plans/active/task-r3-implementation-brief.md) — behaviorReady candidate |
@@ -45,6 +45,8 @@
 | Epic 8 Task 30 Review | [Task 30 Code Review and Completion Audit](reports/epic-8-task-30-review.md) |
 | Epic 8 Task 31 实施计划 | [Task 31 Implementation Brief](plans/active/task-31-implementation-brief.md) — complete |
 | Epic 8 Task 31 Review | [Task 31 Code Review and Completion Audit](reports/epic-8-task-31-review.md) |
+| Epic 8 Task 32 实施计划 | [Task 32 Implementation Brief](plans/active/task-32-implementation-brief.md) — complete |
+| Epic 8 Task 32 Review | [Task 32 Code Review and Completion Audit](reports/epic-8-task-32-review.md) |
 | Epic 2–4 历史计划 | [Deterministic Product Core](plans/completed/epic-2-4-deterministic-product-core.md) — Tasks 9–26 已完成并归档 |
 | 已完成计划 | [Completed Plans](plans/completed/README.md) — Epic 0–1 |
 | 上游学习与许可证门禁 | [Upstream Reference Matrix](research/upstream-reference-matrix.md) |

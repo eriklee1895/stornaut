@@ -45,8 +45,10 @@
 > actor-owned one-shot authorization、independent review 与 unified verifier
 > 已完成。Task 31 的 serial injected fake-Trash coordinator、durable journal、
 > per-item fresh Policy、Manifest/accounting、audit retry、no-replay recovery、
-> independent review 与 unified verifier 已完成。Task 32 是下一项；真实 App
-> Trash 依赖仍保持关闭。
+> independent review 与 unified verifier 已完成。Task 32 的 typed
+> Scan→Review routing、Core-backed Plan/Policy、write-disabled execution seam、
+> native UI、实际窗口验证、independent review 与 authoritative unified
+> verifier 已完成；真实 App Trash 依赖仍保持关闭。
 > Task 5 的历史
 > Broker-only no-go 已由 ADR 0004 capability-first 决策修订，Deep Dive 因
 > 生产产品流程尚未实现而 unavailable；
@@ -276,7 +278,10 @@ foundation `go`；Task 29 已完成并通过 review/verify。实现与完成证�
 [Task 31 Implementation Brief](../plans/active/task-31-implementation-brief.md)；
 完成证据见
 [Task 31 Review](../reports/epic-8-task-31-review.md)。Task 32 只可接入 fake
-或 write-disabled coordinator，不得启用真实 App Trash。
+或 write-disabled coordinator，不得启用真实 App Trash。Task 32 详细边界见
+[Task 32 Implementation Brief](../plans/active/task-32-implementation-brief.md)，
+当前 completion audit 见
+[Task 32 Review](../reports/epic-8-task-32-review.md)。
 逐项 artifact/command/gate 缺口与恢复顺序见
 [R2–R6 Progress Audit](../reports/capability-first-runtime-progress-audit-2026-08-13.md)。
 R1 当前证据见
@@ -386,7 +391,8 @@ R4 已完成并得出 `protocolReady`；R5 official `openai` worker gate 已通�
 current-source signed App/helper report 进一步通过 9/9 capability、12/12
 integrity 与零残留卸载。R6 已完成 final matrix、five-dimensional status、
 typed disclosure、actual-window evidence 与 post-fix review，runtime
-foundation 结论为 `go`。Tasks 29–31 已完成，Task 32 是下一项。该 gate
+foundation 结论为 `go`。Tasks 29–32 已完成并分别通过 authoritative unified
+verifier。该 gate
 要求证明完整调查能力和公共联网可用时，Codex 全进程树不可写用户数据、不可
 访问 localhost/私网/任意 Unix socket 且无 Executor 路径；不得用
 `danger-full-access`、命令/公共域名

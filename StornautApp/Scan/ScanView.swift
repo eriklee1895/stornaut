@@ -11,7 +11,16 @@ struct ScanView: View {
 
     private let byteFormatter = StornautByteFormatter()
 
+    @ViewBuilder
     var body: some View {
+        if appModel.scanWorkspaceRoute == .review {
+            ReviewView()
+        } else {
+            scanResultsBody
+        }
+    }
+
+    private var scanResultsBody: some View {
         let model = ScanModel(
             flowState: appModel.scanState,
             pageState: appModel.pageState,
@@ -19,7 +28,7 @@ struct ScanView: View {
             filter: filter
         )
 
-        VStack(spacing: 0) {
+        return VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 16) {
                 header(model)
                 metricStrip(model)
@@ -322,11 +331,16 @@ struct ScanView: View {
             .font(.caption.weight(.medium))
             .foregroundStyle(.secondary)
 
-            Button("scan.review.unavailable") {}
+            Button("scan.review.action", action: appModel.openReview)
                 .buttonStyle(.borderedProminent)
-                .disabled(true)
-                .help("scan.review.unavailable.help")
-                .accessibilityIdentifier("scan.review.unavailable")
+                .disabled(
+                    model.summary.readyCount == 0
+                        || model.presentation == .active
+                        || model.presentation == .stopping
+                        || model.presentation == .failed
+                )
+                .help("scan.review.action.help")
+                .accessibilityIdentifier("scan.review.action")
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)

@@ -1,7 +1,7 @@
 # Stornaut Phase C — Epic 8 Safe Execution Vertical Slice Plan
 
-> **Status:** Tasks 27–31 complete; Runtime R1–R6 interlock complete with
-> foundation `go`; Task 32 is next
+> **Status:** Tasks 27–32 complete; Runtime R1–R6 interlock complete with
+> foundation `go`; Task 33 is next
 >
 > **Roadmap phase:** Phase C — Safe Execution Vertical Slice
 >
@@ -702,9 +702,13 @@ review and unified verifier passed; see
 Its serial injected fake-Trash coordinator, durable journal, per-item fresh
 Policy, truthful Manifest/accounting, audit retry, no-replay recovery,
 independent review and unified verifier passed; see
-[Task 31 Review](../../reports/epic-8-task-31-review.md). Task 32 is therefore
-the next eligible deterministic task. This status does not enable production
-Deep Dive or the real App Trash dependency.
+[Task 31 Review](../../reports/epic-8-task-31-review.md). Task 32 implementation,
+actual-window evidence, independent review and authoritative unified verifier
+are complete; see
+[Task 32 Review](../../reports/epic-8-task-32-review.md). Its detailed brief is
+[Task 32 Implementation Brief](task-32-implementation-brief.md). This status
+does not enable production Deep Dive or the real App Trash dependency. Task 33
+is the next deterministic task.
 
 ## Task 27: Safe Execution Upstream Study and Architecture Decisions
 
@@ -1328,6 +1332,11 @@ feat: orchestrate crash-safe trash execution
 ---
 
 ## Task 32: Review Workflow App State and Native UI
+
+Detailed implementation brief:
+[Task 32 Implementation Brief](task-32-implementation-brief.md).
+Current completion audit:
+[Task 32 Review](../../reports/epic-8-task-32-review.md).
 
 ### Files
 

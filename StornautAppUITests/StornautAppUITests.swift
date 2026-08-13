@@ -98,7 +98,7 @@ final class StornautAppUITests: XCTestCase {
         )
         XCTAssertEqual(element("scan.state.phase", in: app).label, "limitedPermission")
         XCTAssertTrue(element("scan.results.table", in: app).exists)
-        XCTAssertTrue(element("scan.review.unavailable", in: app).exists)
+        XCTAssertTrue(element("scan.review.action", in: app).exists)
         XCTAssertFalse(app.staticTexts[
             "Foundation shell — implementation follows the approved roadmap."
         ].exists)
@@ -262,7 +262,7 @@ final class StornautAppUITests: XCTestCase {
                 .waitForExistence(timeout: 5)
         )
         XCTAssertTrue(
-            element("scan.review.unavailable", in: completed.app)
+            element("scan.review.action", in: completed.app)
                 .waitForExistence(timeout: 5)
         )
 
@@ -294,6 +294,220 @@ final class StornautAppUITests: XCTestCase {
         addScreenshot(
             completed.window.screenshot(),
             named: "stornaut-scan-results-inspector-light"
+        )
+    }
+
+    @MainActor
+    func testReviewWorkflowStatesAndConfirmation() throws {
+        let light = launchReviewFixture(
+            fixture: "default",
+            appearance: "light"
+        )
+        defer {
+            light.app.terminate()
+            _ = light.app.wait(for: .notRunning, timeout: 5)
+        }
+        XCTAssertTrue(
+            waitForLabel(
+                "ready",
+                on: element("review.state.phase", in: light.app)
+            )
+        )
+        XCTAssertTrue(element("review.table", in: light.app).exists)
+        XCTAssertTrue(element("review.group.ready", in: light.app).exists)
+        XCTAssertTrue(element("review.group.review", in: light.app).exists)
+        XCTAssertTrue(
+            element("review.group.protected", in: light.app).exists
+        )
+        XCTAssertTrue(element("review.group.unknown", in: light.app).exists)
+        XCTAssertTrue(
+            element("review.group.registeredActions", in: light.app).exists
+        )
+        XCTAssertTrue(
+            element("review.action.preflight", in: light.app).exists
+        )
+        XCTAssertFalse(light.app.buttons["Delete Permanently"].exists)
+        focusReview(light.window, in: light.app)
+        addScreenshot(
+            light.window.screenshot(),
+            named: "stornaut-review-default-light"
+        )
+
+        XCTAssertTrue(
+            performAction(
+                in: light.app,
+                action: {
+                    self.hittableElement(
+                        "review.action.preflight",
+                        in: light.app
+                    )
+                },
+                until: {
+                    self.element(
+                        "review.confirmation",
+                        in: light.app
+                    ).exists
+                }
+            )
+        )
+        XCTAssertTrue(
+            element("review.confirmation.confirm", in: light.app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertFalse(
+            element("review.confirmation.writeDisabled", in: light.app)
+                .exists
+        )
+        element("review.confirmation.confirm", in: light.app).click()
+        XCTAssertTrue(
+            waitForLabel(
+                "executing",
+                on: element("review.state.phase", in: light.app)
+            )
+        )
+        XCTAssertTrue(
+            element("review.action.stopAfterCurrent", in: light.app).exists
+        )
+        element("review.action.stopAfterCurrent", in: light.app).click()
+        XCTAssertTrue(
+            waitForLabel(
+                "executing",
+                on: element("review.state.phase", in: light.app)
+            )
+        )
+
+        light.app.terminate()
+        XCTAssertTrue(light.app.wait(for: .notRunning, timeout: 5))
+
+        let dark = launchReviewFixture(
+            fixture: "default",
+            appearance: "dark"
+        )
+        defer {
+            dark.app.terminate()
+            _ = dark.app.wait(for: .notRunning, timeout: 5)
+        }
+        XCTAssertTrue(element("review.table", in: dark.app).exists)
+        focusReview(dark.window, in: dark.app)
+        addScreenshot(
+            dark.window.screenshot(),
+            named: "stornaut-review-default-dark"
+        )
+
+        dark.app.terminate()
+        XCTAssertTrue(dark.app.wait(for: .notRunning, timeout: 5))
+
+        let inspector = launchReviewFixture(
+            fixture: "inspector",
+            appearance: "dark"
+        )
+        defer {
+            inspector.app.terminate()
+            _ = inspector.app.wait(for: .notRunning, timeout: 5)
+        }
+        XCTAssertTrue(
+            element("review.inspector", in: inspector.app)
+                .waitForExistence(timeout: 10)
+        )
+        XCTAssertTrue(
+            element("review.inspector.readOnly", in: inspector.app)
+                .exists
+        )
+        XCTAssertFalse(
+            inspector.app.staticTexts["activity.process.inactive"].exists
+        )
+        XCTAssertTrue(
+            inspector.app.staticTexts[
+                "Retained Scan observed no related running process."
+            ].exists
+        )
+        let horizontalScrollBars = inspector.app.scrollBars
+            .allElementsBoundByIndex.filter {
+                $0.frame.width > 100
+                    && $0.frame.width > $0.frame.height * 2
+            }
+        XCTAssertTrue(horizontalScrollBars.isEmpty)
+        inspector.app.activate()
+        addScreenshot(
+            inspector.window.screenshot(),
+            named: "stornaut-review-inspector-dark"
+        )
+
+        inspector.app.terminate()
+        XCTAssertTrue(inspector.app.wait(for: .notRunning, timeout: 5))
+
+        let stale = launchReviewFixture(
+            fixture: "stale",
+            appearance: "dark"
+        )
+        defer {
+            stale.app.terminate()
+            _ = stale.app.wait(for: .notRunning, timeout: 5)
+        }
+        XCTAssertTrue(
+            element("review.stale", in: stale.app)
+                .waitForExistence(timeout: 10)
+        )
+        XCTAssertTrue(element("review.stale.refresh", in: stale.app).exists)
+        XCTAssertFalse(stale.app.buttons["Proceed Anyway"].exists)
+        stale.app.activate()
+        addScreenshot(
+            stale.window.screenshot(),
+            named: "stornaut-review-stale-dark"
+        )
+        element("review.stale.cancel", in: stale.app).click()
+        XCTAssertTrue(
+            waitForLabel(
+                "stale",
+                on: element("review.state.phase", in: stale.app)
+            )
+        )
+        XCTAssertFalse(element("review.stale", in: stale.app).exists)
+        XCTAssertFalse(
+            element("review.action.preflight", in: stale.app).exists
+        )
+
+        stale.app.terminate()
+        XCTAssertTrue(stale.app.wait(for: .notRunning, timeout: 5))
+
+        let empty = launchReviewFixture(
+            fixture: "empty",
+            appearance: "light"
+        )
+        defer {
+            empty.app.terminate()
+            _ = empty.app.wait(for: .notRunning, timeout: 5)
+        }
+        XCTAssertTrue(element("review.empty", in: empty.app).exists)
+        XCTAssertFalse(
+            element("review.action.preflight", in: empty.app).exists
+        )
+        focusReview(empty.window, in: empty.app)
+        addScreenshot(
+            empty.window.screenshot(),
+            named: "stornaut-review-empty-light"
+        )
+
+        empty.app.terminate()
+        XCTAssertTrue(empty.app.wait(for: .notRunning, timeout: 5))
+
+        let chinese = launchReviewFixture(
+            fixture: "default",
+            appearance: "light",
+            language: "zh-Hans",
+            locale: "zh_CN"
+        )
+        defer {
+            chinese.app.terminate()
+            _ = chinese.app.wait(for: .notRunning, timeout: 5)
+        }
+        XCTAssertTrue(element("review.table", in: chinese.app).exists)
+        XCTAssertTrue(chinese.app.staticTexts["复核回收计划"].exists)
+        XCTAssertFalse(chinese.app.staticTexts["Review Reclaim Plan"].exists)
+        focusReview(chinese.window, in: chinese.app)
+        addScreenshot(
+            chinese.window.screenshot(),
+            named: "stornaut-review-zh-Hans"
         )
     }
 
@@ -1026,6 +1240,37 @@ final class StornautAppUITests: XCTestCase {
     }
 
     @MainActor
+    private func launchReviewFixture(
+        fixture: String,
+        appearance: String,
+        language: String = "en",
+        locale: String = "en_US"
+    ) -> (app: XCUIApplication, window: XCUIElement) {
+        let app = XCUIApplication()
+        app.terminate()
+        XCTAssertTrue(app.wait(for: .notRunning, timeout: 5))
+        app.launchArguments = [
+            "-AppleLanguages", "(\(language))",
+            "-AppleLocale", locale,
+            "--stornaut-ui-test-appearance=\(appearance)",
+            "--stornaut-debug-fixture=success",
+            "--stornaut-debug-review=\(fixture)",
+            "--stornaut-debug-destination=scan",
+        ]
+        app.launch()
+        let window = app.windows["main"]
+        XCTAssertTrue(window.waitForExistence(timeout: 10))
+        XCTAssertTrue(
+            element("sidebar.scan", in: app).waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            element("review.state.phase", in: app)
+                .waitForExistence(timeout: 10)
+        )
+        return (app, window)
+    }
+
+    @MainActor
     private func launchHistoryFixture(
         fixture: String,
         appearance: String,
@@ -1289,6 +1534,17 @@ final class StornautAppUITests: XCTestCase {
         app.state == .runningForeground
     }
 
+    @MainActor
+    private func waitForLabel(
+        _ label: String,
+        on element: XCUIElement,
+        timeout: TimeInterval = 5
+    ) -> Bool {
+        waitUntil(timeout: timeout) {
+            element.exists && element.label == label
+        }
+    }
+
     private func addScreenshot(
         _ screenshot: XCUIScreenshot,
         named name: String
@@ -1347,6 +1603,17 @@ final class StornautAppUITests: XCTestCase {
         XCTAssertTrue(
             focusApplication(app, via: "sidebar.scan")
         )
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            window.isHittable && isFrontmost(app)
+        })
+    }
+
+    @MainActor
+    private func focusReview(
+        _ window: XCUIElement,
+        in app: XCUIApplication
+    ) {
+        app.activate()
         XCTAssertTrue(waitUntil(timeout: 5) {
             window.isHittable && isFrontmost(app)
         })

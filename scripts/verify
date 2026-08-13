@@ -185,17 +185,22 @@ function run_matcher_benchmarks() {
 }
 
 function verify_source_boundaries() {
-    scripts/verify-activity-boundaries
-    scripts/verify-quick-scan-boundaries
-    scripts/verify-review-boundaries
-    scripts/verify-cleanup-policy-boundaries
-    scripts/verify-cleanup-execution-boundaries
-    scripts/verify-codex-no-executor-boundary
-    scripts/verify-app-state-boundaries
-    scripts/verify-overview-boundaries
-    scripts/verify-scan-boundaries
-    scripts/verify-history-boundaries
-    scripts/verify-settings-boundaries
+    local boundary
+    for boundary in \
+        scripts/verify-activity-boundaries \
+        scripts/verify-quick-scan-boundaries \
+        scripts/verify-review-boundaries \
+        scripts/verify-review-workflow-boundaries \
+        scripts/verify-cleanup-policy-boundaries \
+        scripts/verify-cleanup-execution-boundaries \
+        scripts/verify-codex-no-executor-boundary \
+        scripts/verify-app-state-boundaries \
+        scripts/verify-overview-boundaries \
+        scripts/verify-scan-boundaries \
+        scripts/verify-history-boundaries \
+        scripts/verify-settings-boundaries; do
+        "$boundary" || return $?
+    done
 }
 
 function test_app_and_snapshots() {

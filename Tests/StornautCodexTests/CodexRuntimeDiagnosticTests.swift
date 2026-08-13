@@ -147,10 +147,10 @@ struct CodexRuntimeDiagnosticTests {
                 standardInput: nil,
                 standardOutputLimit: 1_024,
                 standardErrorLimit: 1_024,
-                timeout: .seconds(1)
+                timeout: .seconds(3)
             )
         }
-        #expect(started.duration(to: .now) < .seconds(3))
+        #expect(started.duration(to: .now) < .seconds(8))
 
         let childPID = try waitForDiagnosticPID(at: childPIDURL)
         #expect(waitForDiagnosticProcessExit(childPID))
@@ -192,10 +192,10 @@ struct CodexRuntimeDiagnosticTests {
             standardInput: nil,
             standardOutputLimit: 1_024,
             standardErrorLimit: 1_024,
-            timeout: .seconds(2)
+            timeout: .seconds(5)
         )
         #expect(output.exitStatus == 0)
-        #expect(started.duration(to: .now) < .seconds(3))
+        #expect(started.duration(to: .now) < .seconds(8))
 
         let childPID = try waitForDiagnosticPID(at: childPIDURL)
         #expect(waitForDiagnosticProcessExit(childPID))

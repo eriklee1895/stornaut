@@ -74,6 +74,10 @@ struct RootView: View {
                     phase: appModel.historyState.phase
                 )
                 .frame(width: 1, height: 1)
+                DebugReviewStateProbe(
+                    phase: appModel.reviewState.phase
+                )
+                .frame(width: 1, height: 1)
             }
         }
 #endif

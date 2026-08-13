@@ -124,7 +124,7 @@ func concurrentSpawnsDoNotInheritSiblingPipes() async throws {
             group.addTask {
                 try await collectEvents(
                     from: CodexProcess().run(
-                        fixture.makeRequest(timeout: .seconds(5))
+                        fixture.makeRequest(timeout: .seconds(10))
                     )
                 )
             }

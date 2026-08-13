@@ -125,6 +125,34 @@ enum DebugSettingsFixture: String, CaseIterable, Sendable {
     case runtimeUnverified = "runtime-unverified"
 }
 
+enum DebugReviewFixture: String, CaseIterable, Sendable {
+    case `default`
+    case inspector
+    case stale
+    case limited
+    case empty
+    case overlapConflict = "overlap-conflict"
+    case preflightFailure = "preflight-failure"
+    case executing
+}
+
+struct DebugReviewFixtureSelection: Sendable, Equatable {
+    let fixture: DebugReviewFixture
+
+    init?(arguments: [String]) {
+        let prefix = "--stornaut-debug-review="
+        let matches = arguments.filter { $0.hasPrefix(prefix) }
+        guard matches.count == 1,
+              let fixture = DebugReviewFixture(
+                  rawValue: String(matches[0].dropFirst(prefix.count))
+              )
+        else {
+            return nil
+        }
+        self.fixture = fixture
+    }
+}
+
 struct DebugSettingsFixtureSelection: Sendable, Equatable {
     let fixture: DebugSettingsFixture
 
@@ -239,6 +267,9 @@ extension AppComposition {
             historySelection: DebugHistoryFixtureSelection(
                 arguments: arguments
             ),
+            reviewSelection: DebugReviewFixtureSelection(
+                arguments: arguments
+            ),
             settingsSelection: DebugSettingsFixtureSelection(
                 arguments: arguments
             ),
@@ -251,13 +282,25 @@ extension AppComposition {
     static func debugFixture(
         selection: DebugAppFixtureSelection,
         historySelection: DebugHistoryFixtureSelection? = nil,
+        reviewSelection: DebugReviewFixtureSelection? = nil,
         settingsSelection: DebugSettingsFixtureSelection? = nil,
         settingsLanguage: SettingsLanguage = .english,
         makeState: @MainActor (DebugAppFixture) throws -> AppPageState = {
             try $0.makeState()
         }
     ) throws -> AppComposition {
-        let state = try makeState(selection.fixture)
+        let baseState = try makeState(selection.fixture)
+        let reviewSource = try reviewSelection.map {
+            try DebugProjectionFactory.review(
+                slug: "review-\($0.fixture.rawValue)"
+            )
+        }
+        let state = try reviewSource.map {
+            try AppPageState.success(
+                projection: $0,
+                refreshedAt: DebugProjectionFactory.now
+            )
+        } ?? baseState
         let scanState = try selection.fixture.makeScanState(
             pageState: state
         )
@@ -270,6 +313,14 @@ extension AppComposition {
             settingsSelection?.fixture ?? .populated
         ).makeSnapshot(language: settingsLanguage)
         let settingsStore = DebugSettingsStore(snapshot: initialSettings)
+        let reviewFixture = try reviewSelection.map { selection in
+            guard let projection = state.projection else {
+                throw DebugReviewFixtureError.unavailable
+            }
+            return try selection.fixture.makeFixture(
+                source: projection
+            )
+        }
         return AppComposition(
             model: StornautAppModel(
                 dependencies: AppDependencies(
@@ -297,6 +348,55 @@ extension AppComposition {
                     },
                     forgetAllSettingsKnowledge: {
                         await settingsStore.forgetAll()
+                    },
+                    buildReview: {
+                        reviewFixture?.buildOutcome
+                            ?? .unavailable([
+                                DomainToken(
+                                    rawValue:
+                                        "review.unavailable.fixture-not-selected"
+                                )!,
+                            ])
+                    },
+                    preflightReview: { plan, selection in
+                        guard let reviewFixture else {
+                            throw DebugReviewFixtureError.unavailable
+                        }
+                        if reviewFixture.fixture == .preflightFailure {
+                            throw DebugReviewFixtureError.preflight
+                        }
+                        return try reviewFixture.evaluation(
+                            plan: plan,
+                            selection: selection
+                        )
+                    },
+                    reviewExecutionAvailability:
+                        reviewFixture?.executionAvailability
+                            ?? .writeDisabled,
+                    startReviewExecution: { plan, selection, confirmation in
+                        guard let reviewFixture,
+                              reviewFixture.executionAvailability
+                                == .debugFake,
+                              plan == reviewFixture.plan,
+                              confirmation.planID == plan.id
+                        else {
+                            throw DebugReviewFixtureError.executionDisabled
+                        }
+                        return AsyncStream { continuation in
+                            continuation.yield(
+                                .queued(total: selection.items.count)
+                            )
+                            if let first = selection.items.first {
+                                continuation.yield(
+                                    .current(
+                                        index: 1,
+                                        total: selection.items.count,
+                                        itemID: first.itemID
+                                    )
+                                )
+                            }
+                            continuation.finish()
+                        }
                     }
                 ),
                 initialState: state,
@@ -306,11 +406,399 @@ extension AppComposition {
                 initialScanState: scanState,
                 initialHistoryState: initialHistory,
                 initialSettingsState: .loaded(initialSettings),
+                initialScanWorkspaceRoute:
+                    reviewFixture == nil ? .results : .review,
+                initialReviewState:
+                    reviewFixture?.initialState ?? .idle,
                 now: { DebugProjectionFactory.now },
                 refreshesServices: false
             )
         )
     }
+}
+
+private enum DebugReviewFixtureError: Error {
+    case unavailable
+    case preflight
+    case executionDisabled
+}
+
+private struct DebugReviewFixtureValue: Sendable {
+    let fixture: DebugReviewFixture
+    let plan: CleanupPlan
+    let projection: ReviewProjection
+    let initialState: ReviewState
+    let executionAvailability: ReviewExecutionAvailability
+
+    var buildOutcome: CleanupPlanBuildOutcome {
+        switch fixture {
+        case .empty:
+            .empty(projection)
+        case .limited:
+            .scanAgain([
+                DomainToken(rawValue: "review.scan-again.incomplete-scan")!,
+            ])
+        case .overlapConflict:
+            .unavailable([
+                DomainToken(rawValue: "review.unavailable.selection-conflict")!,
+            ])
+        case .default, .inspector, .stale,
+             .preflightFailure, .executing:
+            .planReady(plan, projection)
+        }
+    }
+
+    func evaluation(
+        plan suppliedPlan: CleanupPlan,
+        selection: ReviewSelection
+    ) throws -> CleanupPolicyEvaluation {
+        guard suppliedPlan == plan else {
+            throw DebugReviewFixtureError.unavailable
+        }
+        let dispositions = Dictionary(
+            uniqueKeysWithValues: projection.rows.compactMap { row in
+                plan.items.first(where: {
+                    $0.classificationID == row.classificationID
+                }).map { ($0.id, row.currentDisposition) }
+            }
+        )
+        let contexts = try selection.items.map { selected in
+            let item = plan.items.first { $0.id == selected.itemID }!
+            let disposition = dispositions[item.id] ?? .unknown
+            return try CleanupPolicyItemContext(
+                itemID: item.id,
+                snapshotID: item.snapshotID,
+                classificationID: item.classificationID,
+                ruleID: item.ruleID!,
+                executionProfileID: item.executionProfileID!,
+                proposedAction: item.proposedAction,
+                persistedDisposition: disposition,
+                currentDisposition: disposition,
+                expectedRelativePath: item.expectedRelativePath!,
+                currentRelativePath: item.expectedRelativePath!,
+                expectedIdentity: item.expectedIdentity!,
+                currentIdentity: item.expectedIdentity,
+                evidenceFingerprint: item.evidenceFingerprint!,
+                currentEvidenceFingerprint: item.evidenceFingerprint!,
+                activityFingerprint: item.activityFingerprint!,
+                currentActivityFingerprint: item.activityFingerprint!,
+                pathFacts: .allowed,
+                evidenceFacts: .current,
+                activityFacts: .inactive
+            )
+        }
+        let context = try CleanupPolicyContext(
+            capturedAt: DebugProjectionFactory.now,
+            planID: plan.id,
+            scanSessionID: plan.scanSessionID,
+            scanScopeID: plan.scanScopeID!,
+            scanIsTerminal: true,
+            planFingerprint: plan.planFingerprint!,
+            selectionGeneration: selection.generation,
+            selectionFingerprint: selection.fingerprint,
+            rootIdentity: plan.primaryRootIdentity,
+            catalogVersion: plan.catalogVersion,
+            executionProfileVersion: plan.executionProfileVersion,
+            workflow: .available,
+            items: contexts
+        )
+        return try CleanupPolicyGate().evaluate(
+            plan: plan,
+            selection: selection,
+            context: context,
+            evaluatedAt: DebugProjectionFactory.now
+        )
+    }
+}
+
+private extension DebugReviewFixture {
+    func makeFixture(
+        source: QuickScanProjection
+    ) throws -> DebugReviewFixtureValue {
+        guard source.session.terminalState == .completed,
+              let scope = source.session.completedScopes.first,
+              source.session.completedScopes.count == 1,
+              let root = source.snapshots.first(where: {
+                  $0.relativePath == "."
+              }),
+              let npm = source.snapshots.first(where: {
+                  $0.relativePath == ".npm/_cacache"
+              }),
+              let pip = source.snapshots.first(where: {
+                  $0.relativePath == "Library/Caches/pip"
+              }),
+              let goBuild = source.snapshots.first(where: {
+                  $0.relativePath == "Library/Caches/go-build"
+              }),
+              let uv = source.snapshots.first(where: {
+                  $0.relativePath == ".cache/uv"
+              }),
+              let protected = source.snapshots.first(where: {
+                  $0.relativePath == ".ssh"
+              }),
+              let npmClassification = source.classifications.first(
+                  where: { $0.snapshotID == npm.id }
+              ),
+              let pipClassification = source.classifications.first(
+                  where: { $0.snapshotID == pip.id }
+              ),
+              let goBuildClassification = source.classifications.first(
+                  where: { $0.snapshotID == goBuild.id }
+              ),
+              let uvClassification = source.classifications.first(
+                  where: { $0.snapshotID == uv.id }
+              ),
+              let protectedClassification = source.classifications.first(
+                  where: { $0.snapshotID == protected.id }
+              ),
+              let rootClassification = source.classifications.first(
+                  where: { $0.snapshotID == root.id }
+              ),
+              let rootIdentity = root.fileIdentity
+        else {
+            throw DebugReviewFixtureError.unavailable
+        }
+
+        let readyNPM = try debugReviewPlanItem(
+            slug: "npm",
+            snapshot: npm,
+            classification: npmClassification,
+            relativePath: npm.relativePath
+        )
+        let readyPIP = try debugReviewPlanItem(
+            slug: "pip",
+            snapshot: pip,
+            classification: pipClassification,
+            relativePath: pip.relativePath
+        )
+        let review = try debugReviewPlanItem(
+            slug: "go-build",
+            snapshot: goBuild,
+            classification: goBuildClassification,
+            relativePath: goBuild.relativePath
+        )
+        let plan = try CleanupPlan(
+            id: CleanupPlanID(
+                rawValue: "plan-review-fixture-\(rawValue)"
+            )!,
+            scanSessionID: source.session.id,
+            scanScopeID: scope.id,
+            primaryRootIdentity: rootIdentity,
+            catalogVersion: DomainToken(
+                rawValue: "catalog-review-fixture"
+            )!,
+            executionProfileVersion: DomainToken(
+                rawValue: "profiles-review-fixture"
+            )!,
+            planFingerprint: DomainToken(
+                rawValue: "plan.review-fixture.fingerprint"
+            )!,
+            createdAt: DebugProjectionFactory.now,
+            expiresAt: DebugProjectionFactory.now.addingTimeInterval(600),
+            items: [readyNPM, readyPIP, review]
+        )
+        let rows = [
+            debugReviewRow(
+                snapshot: npm,
+                classification: npmClassification,
+                relativePath: readyNPM.expectedRelativePath!.rawValue,
+                disposition: .readyToReclaim,
+                eligibility: .executable,
+                suggestedDefault: true
+            ),
+            debugReviewRow(
+                snapshot: pip,
+                classification: pipClassification,
+                relativePath: readyPIP.expectedRelativePath!.rawValue,
+                disposition: .readyToReclaim,
+                eligibility: .executable,
+                suggestedDefault: true
+            ),
+            debugReviewRow(
+                snapshot: goBuild,
+                classification: goBuildClassification,
+                relativePath: review.expectedRelativePath!.rawValue,
+                disposition: .reviewRecommended,
+                eligibility: .executable,
+                suggestedDefault: false
+            ),
+            ReviewProjectionRow(
+                snapshotID: uv.id,
+                classificationID: uvClassification.id,
+                relativePath: uv.relativePath,
+                ruleID: uvClassification.ruleID,
+                persistedDisposition: .reviewRecommended,
+                currentDisposition: .reviewRecommended,
+                eligibility: .noExecutionProfile,
+                suggestedDefault: false,
+                reasonKeys: [
+                    DomainToken(
+                        rawValue: "review.non-executable.no-profile"
+                    )!,
+                ]
+            ),
+            debugReviewRow(
+                snapshot: protected,
+                classification: protectedClassification,
+                relativePath: ".ssh",
+                disposition: .protected,
+                eligibility: .persistedDispositionBlocked,
+                suggestedDefault: false
+            ),
+            debugReviewRow(
+                snapshot: root,
+                classification: rootClassification,
+                relativePath: root.relativePath,
+                disposition: .unknown,
+                eligibility: .persistedDispositionBlocked,
+                suggestedDefault: false
+            ),
+        ].sorted { $0.relativePath < $1.relativePath }
+        let projection = try ReviewProjection(
+            sessionID: source.session.id,
+            planID: plan.id,
+            rows: rows,
+            totalRowCount: rows.count,
+            counts: ReviewProjectionCounts(
+                executableReady: 2,
+                executableReview: 1,
+                noExecutionProfile: 1,
+                persistedDispositionBlocked: 2,
+                currentEvidenceBlocked: 0
+            )
+        )
+        let availability: ReviewExecutionAvailability = .debugFake
+        var snapshot = try ReviewSnapshot(
+            plan: plan,
+            projection: projection,
+            generation: 1,
+            executionAvailability: availability
+        )
+        let initialState: ReviewState
+        switch self {
+        case .default:
+            initialState = .ready(snapshot)
+        case .inspector:
+            snapshot = snapshot.focusing(
+                rows.first {
+                    $0.currentDisposition == .reviewRecommended
+                        && $0.eligibility == .executable
+                }!.classificationID
+            )
+            initialState = .ready(snapshot)
+        case .stale:
+            initialState = .stale(
+                snapshot,
+                CleanupStaleResult(
+                    affectedItemIDs: [readyNPM.id],
+                    reasonGroups: [.activity, .identity]
+                )
+            )
+        case .limited:
+            initialState = .scanAgain([
+                DomainToken(rawValue: "review.scan-again.incomplete-scan")!,
+            ])
+        case .empty:
+            initialState = .empty(
+                try ReviewProjection(
+                    sessionID: source.session.id,
+                    planID: nil,
+                    rows: [],
+                    totalRowCount: 0,
+                    counts: ReviewProjectionCounts(
+                        executableReady: 0,
+                        executableReview: 0,
+                        noExecutionProfile: 0,
+                        persistedDispositionBlocked: 0,
+                        currentEvidenceBlocked: 0
+                    )
+                )
+            )
+        case .overlapConflict:
+            initialState = .unavailable([
+                DomainToken(rawValue: "review.unavailable.selection-conflict")!,
+            ])
+        case .preflightFailure:
+            initialState = .ready(snapshot)
+        case .executing:
+            initialState = .executing(
+                snapshot,
+                .current(
+                    index: 1,
+                    total: snapshot.selectedCount,
+                    itemID: readyNPM.id
+                )
+            )
+        }
+        return DebugReviewFixtureValue(
+            fixture: self,
+            plan: plan,
+            projection: projection,
+            initialState: initialState,
+            executionAvailability: availability
+        )
+    }
+}
+
+private func debugReviewPlanItem(
+    slug: String,
+    snapshot: PathSnapshot,
+    classification: Classification,
+    relativePath: String
+) throws -> CleanupPlanItem {
+    try CleanupPlanItem(
+        id: CleanupPlanItemID(
+            rawValue: "plan-item-review-fixture-\(slug)"
+        )!,
+        snapshotID: snapshot.id,
+        classificationID: classification.id,
+        ruleID: classification.ruleID!,
+        executionProfileID: DomainToken(
+            rawValue: "profile-review-fixture-\(slug)"
+        )!,
+        proposedAction: .moveToTrash,
+        expectedRelativePath: PersistedPath(rawValue: relativePath)!,
+        expectedIdentity: snapshot.fileIdentity!,
+        logicalBytes: snapshot.logicalByteCount!,
+        allocatedBytes: snapshot.allocatedByteCount!,
+        evidenceFingerprint: DomainToken(
+            rawValue: "evidence.review-fixture-\(slug)"
+        )!,
+        activityFingerprint: DomainToken(
+            rawValue: "activity.review-fixture-\(slug)"
+        )!
+    )
+}
+
+private func debugReviewRow(
+    snapshot: PathSnapshot,
+    classification: Classification,
+    relativePath: String,
+    disposition: ReclaimDisposition,
+    eligibility: ReviewEligibility,
+    suggestedDefault: Bool
+) -> ReviewProjectionRow {
+    ReviewProjectionRow(
+        snapshotID: snapshot.id,
+        classificationID: classification.id,
+        relativePath: relativePath,
+        ruleID: classification.ruleID,
+        persistedDisposition: disposition,
+        currentDisposition: disposition,
+        eligibility: eligibility,
+        suggestedDefault: suggestedDefault,
+        reasonKeys: [
+            DomainToken(
+                rawValue: eligibility == .executable
+                    ? "review.current.executable"
+                    : (
+                        eligibility == .noExecutionProfile
+                            ? "review.non-executable.no-profile"
+                            : "review.non-executable.persisted-disposition"
+                    )
+            )!,
+        ]
+    )
 }
 
 private extension DebugSettingsFixture {
@@ -817,6 +1305,41 @@ struct DebugHistoryStateProbe: NSViewRepresentable {
     }
 }
 
+struct DebugReviewStateProbe: NSViewRepresentable {
+    let phase: ReviewPhase
+
+    func makeNSView(context: Context) -> DebugReviewStateProbeView {
+        DebugReviewStateProbeView(phase: phase)
+    }
+
+    func updateNSView(
+        _ nsView: DebugReviewStateProbeView,
+        context: Context
+    ) {
+        nsView.phase = phase
+    }
+}
+
+final class DebugReviewStateProbeView: NSView {
+    var phase: ReviewPhase {
+        didSet { setAccessibilityLabel(phase.rawValue) }
+    }
+
+    init(phase: ReviewPhase) {
+        self.phase = phase
+        super.init(frame: .zero)
+        setAccessibilityElement(true)
+        setAccessibilityIdentifier("review.state.phase")
+        setAccessibilityRole(.staticText)
+        setAccessibilityLabel(phase.rawValue)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+}
+
 final class DebugHistoryStateProbeView: NSView {
     var phase: HistoryPhase {
         didSet { setAccessibilityLabel(phase.rawValue) }
@@ -842,6 +1365,191 @@ private enum DebugProjectionFactory {
 
     static func success(slug: String) throws -> QuickScanProjection {
         try projection(slug: slug, terminalState: .completed)
+    }
+
+    static func review(slug: String) throws -> QuickScanProjection {
+        let sessionID = ScanSessionID(
+            rawValue: "scan-fixture-\(slug)"
+        )!
+        let scopeID = ScanScopeID(
+            rawValue: "scope-fixture-\(slug)"
+        )!
+        let rootPath = PersistedPath(
+            rawValue: "/tmp/stornaut-review-fixture"
+        )!
+        let rootIdentity = try identity(
+            inode: 101,
+            mode: UInt16(S_IFDIR | 0o755)
+        )
+        let snapshots = try [
+            measuredSnapshot(
+                slug: slug,
+                suffix: "root",
+                sessionID: sessionID,
+                scopeID: scopeID,
+                relativePath: ".",
+                allocatedBytes: 0,
+                inode: 101
+            ),
+            measuredSnapshot(
+                slug: slug,
+                suffix: "npm",
+                sessionID: sessionID,
+                scopeID: scopeID,
+                relativePath: ".npm/_cacache",
+                allocatedBytes: 180_000,
+                inode: 102
+            ),
+            measuredSnapshot(
+                slug: slug,
+                suffix: "pip",
+                sessionID: sessionID,
+                scopeID: scopeID,
+                relativePath: "Library/Caches/pip",
+                allocatedBytes: 120_000,
+                inode: 103
+            ),
+            measuredSnapshot(
+                slug: slug,
+                suffix: "go-build",
+                sessionID: sessionID,
+                scopeID: scopeID,
+                relativePath: "Library/Caches/go-build",
+                allocatedBytes: 50_000,
+                inode: 104
+            ),
+            measuredSnapshot(
+                slug: slug,
+                suffix: "uv",
+                sessionID: sessionID,
+                scopeID: scopeID,
+                relativePath: ".cache/uv",
+                allocatedBytes: 40_000,
+                inode: 105
+            ),
+            measuredSnapshot(
+                slug: slug,
+                suffix: "protected",
+                sessionID: sessionID,
+                scopeID: scopeID,
+                relativePath: ".ssh",
+                allocatedBytes: 10_000,
+                inode: 106
+            ),
+        ]
+        let classifications = try [
+            classification(
+                slug: slug,
+                suffix: "root",
+                snapshot: snapshots[0],
+                producer: nil,
+                category: .unknownLargeConsumers,
+                disposition: .unknown,
+                recoveryCost: nil,
+                missingActivity: false
+            ),
+            classification(
+                slug: slug,
+                suffix: "npm",
+                snapshot: snapshots[1],
+                producer: "npm",
+                category: .packageAndBuildCaches,
+                disposition: .readyToReclaim,
+                recoveryCost: .low,
+                missingActivity: false
+            ),
+            classification(
+                slug: slug,
+                suffix: "pip",
+                snapshot: snapshots[2],
+                producer: "pip",
+                category: .packageAndBuildCaches,
+                disposition: .readyToReclaim,
+                recoveryCost: .low,
+                missingActivity: false
+            ),
+            classification(
+                slug: slug,
+                suffix: "go-build",
+                snapshot: snapshots[3],
+                producer: "Go command",
+                category: .packageAndBuildCaches,
+                disposition: .reviewRecommended,
+                recoveryCost: .medium,
+                missingActivity: false
+            ),
+            classification(
+                slug: slug,
+                suffix: "uv",
+                snapshot: snapshots[4],
+                producer: "uv",
+                category: .packageAndBuildCaches,
+                disposition: .reviewRecommended,
+                recoveryCost: .medium,
+                missingActivity: false
+            ),
+            classification(
+                slug: slug,
+                suffix: "protected",
+                snapshot: snapshots[5],
+                producer: "Developer credentials",
+                category: .protected,
+                disposition: .protected,
+                recoveryCost: nil,
+                missingActivity: false
+            ),
+        ]
+        let session = try ScanSession(
+            id: sessionID,
+            startedAt: now.addingTimeInterval(-10),
+            finishedAt: now,
+            terminalState: .completed,
+            completedScopes: [
+                ScanScope(
+                    id: scopeID,
+                    rootPath: rootPath,
+                    completedAt: now
+                ),
+            ],
+            unfinishedScopes: []
+        )
+        return try QuickScanProjection(
+            session: session,
+            snapshots: snapshots,
+            classifications: classifications,
+            evidence: [
+                activityEvidence(
+                    slug: slug,
+                    suffix: "npm",
+                    snapshotID: snapshots[1].id
+                ),
+                activityEvidence(
+                    slug: slug,
+                    suffix: "pip",
+                    snapshotID: snapshots[2].id
+                ),
+                activityEvidence(
+                    slug: slug,
+                    suffix: "go-build",
+                    snapshotID: snapshots[3].id
+                ),
+                activityEvidence(
+                    slug: slug,
+                    suffix: "uv",
+                    snapshotID: snapshots[4].id
+                ),
+            ],
+            ledger: try makeLedger(
+                sessionID: sessionID,
+                scopeID: scopeID,
+                rootPath: rootPath,
+                rootIdentity: rootIdentity,
+                snapshots: snapshots,
+                classifications: classifications
+            ),
+            issues: [],
+            corruptRecordIDs: []
+        )
     }
 
     static func partial(slug: String) throws -> QuickScanProjection {

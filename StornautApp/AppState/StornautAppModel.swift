@@ -10,10 +10,14 @@ final class StornautAppModel {
     private(set) var scanState: ScanFlowState
     private(set) var historyState: HistoryState
     private(set) var settingsState: SettingsState
+    private(set) var scanWorkspaceRoute: ScanWorkspaceRoute
+    private(set) var reviewState: ReviewState
+    private(set) var reviewStaleSheetIsPresented: Bool
 
     private let dependencies: AppDependencies
     private let reducer: AppPageReducer
     private let scanReducer: ScanFlowReducer
+    private let reviewReducer: ReviewReducer
     private let now: @Sendable () -> Date
     private let refreshesServices: Bool
     private var refreshIsActive = false
@@ -27,6 +31,10 @@ final class StornautAppModel {
     private var settingsRefreshGeneration: UInt64?
     private var settingsMutationIsActive = false
     private var settingsGeneration: UInt64 = 0
+    private var reviewTask: Task<Void, Never>?
+    private var reviewExecutionTask: Task<Void, Never>?
+    private var reviewStopIsPending = false
+    private var reviewGeneration: UInt64 = 0
 
     init(
         dependencies: AppDependencies,
@@ -35,8 +43,11 @@ final class StornautAppModel {
         initialScanState: ScanFlowState? = nil,
         initialHistoryState: HistoryState = .idle,
         initialSettingsState: SettingsState = .idle,
+        initialScanWorkspaceRoute: ScanWorkspaceRoute = .results,
+        initialReviewState: ReviewState = .idle,
         reducer: AppPageReducer = AppPageReducer(),
         scanReducer: ScanFlowReducer = ScanFlowReducer(),
+        reviewReducer: ReviewReducer = ReviewReducer(),
         now: @escaping @Sendable () -> Date = Date.init,
         refreshesServices: Bool = true
     ) {
@@ -48,6 +59,9 @@ final class StornautAppModel {
             ?? .idle
         historyState = initialHistoryState
         settingsState = initialSettingsState
+        scanWorkspaceRoute = initialScanWorkspaceRoute
+        reviewState = initialReviewState
+        reviewStaleSheetIsPresented = initialReviewState.stale != nil
         if let language = initialSettingsState.snapshot?
             .preferences.language
         {
@@ -55,6 +69,7 @@ final class StornautAppModel {
         }
         self.reducer = reducer
         self.scanReducer = scanReducer
+        self.reviewReducer = reviewReducer
         self.now = now
         self.refreshesServices = refreshesServices
     }
@@ -111,12 +126,16 @@ final class StornautAppModel {
         guard !scanState.isActive,
               scanTask == nil,
               cancellationTask == nil,
+              reviewTask == nil,
+              reviewExecutionTask == nil,
               !historyDeleteIsActive,
               !settingsMutationIsActive
         else {
             return
         }
         scanGeneration &+= 1
+        scanWorkspaceRoute = .results
+        reviewState = .idle
         historyGeneration &+= 1
         settingsGeneration &+= 1
         if historyRefreshGeneration != nil {
@@ -181,6 +200,212 @@ final class StornautAppModel {
         }
     }
 
+    func openReview() {
+        guard scanWorkspaceRoute == .results,
+              reviewTask == nil,
+              reviewExecutionTask == nil,
+              !scanState.isActive,
+              !historyDeleteIsActive,
+              !settingsMutationIsActive
+        else {
+            return
+        }
+        scanWorkspaceRoute = ReviewRouteReducer().openReview(
+            from: scanWorkspaceRoute
+        )
+        reviewStaleSheetIsPresented = false
+        reviewState = reviewReducer.beginLoading(previous: reviewState)
+        reviewGeneration &+= 1
+        let generation = reviewGeneration
+        reviewTask = Task { [weak self] in
+            guard let self else { return }
+            let outcome = await self.dependencies.buildReview()
+            guard !Task.isCancelled,
+                  self.reviewGeneration == generation,
+                  self.scanWorkspaceRoute == .review
+            else {
+                return
+            }
+            self.reviewState = self.reviewReducer.loaded(
+                outcome,
+                previous: self.reviewState,
+                executionAvailability:
+                    self.dependencies.reviewExecutionAvailability
+            )
+            if self.reviewGeneration == generation {
+                self.reviewTask = nil
+            }
+        }
+    }
+
+    func closeReview() {
+        guard reviewExecutionTask == nil else {
+            return
+        }
+        reviewGeneration &+= 1
+        reviewTask?.cancel()
+        reviewTask = nil
+        reviewStaleSheetIsPresented = false
+        switch reviewState {
+        case let .loading(snapshot):
+            reviewState = snapshot.map(ReviewState.ready) ?? .idle
+        case let .preflighting(snapshot):
+            reviewState = .ready(snapshot)
+        default:
+            break
+        }
+        scanWorkspaceRoute = ReviewRouteReducer().closeReview(
+            from: scanWorkspaceRoute
+        )
+    }
+
+    func focusReviewRow(_ classificationID: ClassificationID?) {
+        guard let snapshot = reviewState.snapshot else { return }
+        replaceReviewSnapshot(snapshot.focusing(classificationID))
+    }
+
+    func setReviewSelection(
+        classificationID: ClassificationID,
+        isSelected: Bool
+    ) {
+        guard case let .ready(snapshot) = reviewState,
+              let updated = try? snapshot.settingSelection(
+                  classificationID: classificationID,
+                  isSelected: isSelected
+              )
+        else {
+            return
+        }
+        replaceReviewSnapshot(updated)
+    }
+
+    func preflightReview() {
+        guard scanWorkspaceRoute == .review,
+              reviewTask == nil,
+              reviewExecutionTask == nil,
+              case let .ready(snapshot) = reviewState,
+              let selection = snapshot.reviewSelection
+        else {
+            return
+        }
+        reviewState = reviewReducer.beginPreflight(state: reviewState)
+        reviewStaleSheetIsPresented = false
+        reviewGeneration &+= 1
+        let generation = reviewGeneration
+        reviewTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let evaluation = try await self.dependencies
+                    .preflightReview(snapshot.plan, selection)
+                guard !Task.isCancelled,
+                      self.reviewGeneration == generation,
+                      self.scanWorkspaceRoute == .review
+                else {
+                    return
+                }
+                self.reviewState = self.reviewReducer.preflightCompleted(
+                    evaluation,
+                    state: self.reviewState
+                )
+                self.reviewStaleSheetIsPresented =
+                    self.reviewState.phase == .stale
+            } catch {
+                guard !Task.isCancelled,
+                      self.reviewGeneration == generation,
+                      self.scanWorkspaceRoute == .review
+                else {
+                    return
+                }
+                self.reviewState = .unavailable([
+                    token("review.unavailable.preflight"),
+                ])
+            }
+            if self.reviewGeneration == generation {
+                self.reviewTask = nil
+            }
+        }
+    }
+
+    func cancelReviewSheet() {
+        switch reviewState {
+        case let .confirming(snapshot, _):
+            reviewState = .ready(snapshot)
+        case .stale:
+            reviewStaleSheetIsPresented = false
+        default:
+            break
+        }
+    }
+
+    func refreshStaleReview() {
+        guard case .stale = reviewState else { return }
+        reviewStaleSheetIsPresented = false
+        reviewState = .idle
+        scanWorkspaceRoute = .results
+        openReview()
+    }
+
+    func confirmReviewExecution() {
+        guard reviewExecutionTask == nil,
+              case let .confirming(snapshot, confirmation) = reviewState,
+              let selection = snapshot.reviewSelection
+        else {
+            return
+        }
+        let next = reviewReducer.confirmExecution(state: reviewState)
+        reviewState = next
+        guard case .executing = next else {
+            return
+        }
+        reviewExecutionTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let stream = try await self.dependencies
+                    .startReviewExecution(
+                        snapshot.plan,
+                        selection,
+                        confirmation
+                    )
+                for await progress in stream {
+                    guard !Task.isCancelled else { return }
+                    guard !self.reviewState
+                        .stopAfterCurrentWasRequested
+                    else {
+                        continue
+                    }
+                    self.reviewState = .executing(snapshot, progress)
+                }
+            } catch {
+                self.reviewState = .executionBlocked(
+                    snapshot,
+                    .writeDisabled
+                )
+            }
+            self.reviewExecutionTask = nil
+        }
+    }
+
+    func stopReviewAfterCurrent() {
+        guard reviewState.phase == .executing,
+              !reviewState.stopAfterCurrentWasRequested,
+              !reviewStopIsPending,
+              let snapshot = reviewState.snapshot
+        else {
+            return
+        }
+        reviewStopIsPending = true
+        let total = snapshot.selectedCount
+        reviewState = .executing(
+            snapshot,
+            .stopRequested(completed: 0, total: total)
+        )
+        Task { [weak self] in
+            guard let self else { return }
+            await self.dependencies.stopReviewAfterCurrent()
+            self.reviewStopIsPending = false
+        }
+    }
+
     func refreshHistoryIfNeeded() async {
         guard historyState.phase == .idle else {
             return
@@ -240,7 +465,11 @@ final class StornautAppModel {
         else {
             return
         }
-        guard !scanState.isActive else {
+        guard !scanState.isActive,
+              scanWorkspaceRoute == .results,
+              reviewTask == nil,
+              reviewExecutionTask == nil
+        else {
             historyState = .failed(
                 page: page,
                 reasonKey: token("history.error.scanActive")
@@ -636,7 +865,10 @@ final class StornautAppModel {
         guard !settingsMutationIsActive else {
             return false
         }
-        guard !scanState.isActive else {
+        guard !scanState.isActive,
+              reviewTask == nil,
+              reviewExecutionTask == nil
+        else {
             settingsState = .failed(
                 snapshot: settingsState.snapshot,
                 reasonKey: token("settings.error.scanActive")
@@ -769,6 +1001,27 @@ final class StornautAppModel {
             previous: pageState,
             now: now()
         )
+    }
+
+    private func replaceReviewSnapshot(_ snapshot: ReviewSnapshot) {
+        switch reviewState {
+        case .ready:
+            reviewState = .ready(snapshot)
+        case .loading:
+            reviewState = .loading(snapshot)
+        case .preflighting:
+            reviewState = .preflighting(snapshot)
+        case let .stale(_, stale):
+            reviewState = .stale(snapshot, stale)
+        case let .confirming(_, confirmation):
+            reviewState = .confirming(snapshot, confirmation)
+        case let .executing(_, progress):
+            reviewState = .executing(snapshot, progress)
+        case let .executionBlocked(_, reason):
+            reviewState = .executionBlocked(snapshot, reason)
+        case .idle, .empty, .scanAgain, .unavailable:
+            break
+        }
     }
 }
 

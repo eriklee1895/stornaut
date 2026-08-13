@@ -8,8 +8,11 @@ struct AppDependencies: Sendable {
         QuickScanProductEvent,
         Error
     >
+    typealias ReviewExecutionStream = AsyncStream<
+        ReviewExecutionProgress
+    >
     typealias CoordinatorFactory = @Sendable (
-        LocalStoreConfiguration
+        EvidenceStore
     ) async throws -> QuickScanCoordinator
     struct QuickScanConfiguration: Sendable, Equatable {
         let rootPath: PersistedPath
@@ -40,6 +43,19 @@ struct AppDependencies: Sendable {
     let chooseSettingsExclusion: @Sendable () async throws
         -> SettingsPreferences?
     let openFullDiskAccessSettings: @Sendable () async -> Bool
+    let buildReview: @Sendable () async -> CleanupPlanBuildOutcome
+    let preflightReview: @Sendable (
+        CleanupPlan,
+        ReviewSelection
+    ) async throws -> CleanupPolicyEvaluation
+    let reviewExecutionAvailability:
+        ReviewExecutionAvailability
+    let startReviewExecution: @Sendable (
+        CleanupPlan,
+        ReviewSelection,
+        CleanupConfirmation
+    ) async throws -> ReviewExecutionStream
+    let stopReviewAfterCurrent: @Sendable () async -> Void
 
     init(
         loadLatestQuickScan: @escaping @Sendable () async throws
@@ -102,7 +118,31 @@ struct AppDependencies: Sendable {
         openFullDiskAccessSettings: @escaping @Sendable () async
             -> Bool = {
                 false
-        }
+        },
+        buildReview: @escaping @Sendable () async
+            -> CleanupPlanBuildOutcome = {
+            .unavailable([
+                DomainToken(
+                    rawValue: "review.unavailable.service"
+                )!,
+            ])
+        },
+        preflightReview: @escaping @Sendable (
+            CleanupPlan,
+            ReviewSelection
+        ) async throws -> CleanupPolicyEvaluation = { _, _ in
+            throw AppDependencyError.reviewUnavailable
+        },
+        reviewExecutionAvailability:
+            ReviewExecutionAvailability = .writeDisabled,
+        startReviewExecution: @escaping @Sendable (
+            CleanupPlan,
+            ReviewSelection,
+            CleanupConfirmation
+        ) async throws -> ReviewExecutionStream = { _, _, _ in
+            throw AppDependencyError.reviewExecutionDisabled
+        },
+        stopReviewAfterCurrent: @escaping @Sendable () async -> Void = {}
     ) {
         self.loadLatestQuickScan = loadLatestQuickScan
         self.startQuickScan = startQuickScan
@@ -120,22 +160,27 @@ struct AppDependencies: Sendable {
         self.chooseSettingsPrimaryRoot = chooseSettingsPrimaryRoot
         self.chooseSettingsExclusion = chooseSettingsExclusion
         self.openFullDiskAccessSettings = openFullDiskAccessSettings
+        self.buildReview = buildReview
+        self.preflightReview = preflightReview
+        self.reviewExecutionAvailability =
+            reviewExecutionAvailability
+        self.startReviewExecution = startReviewExecution
+        self.stopReviewAfterCurrent = stopReviewAfterCurrent
     }
 
     static func live(
         configuration: LocalStoreConfiguration,
         rootURL: URL = FileManager.default.homeDirectoryForCurrentUser,
-        makeCoordinator: @escaping CoordinatorFactory = {
-            configuration in
-            try await Task.detached(priority: .userInitiated) {
-                let store = try EvidenceStore(configuration: configuration)
-                return try QuickScanCoordinator(store: store)
-            }.value
+        makeCoordinator: @escaping CoordinatorFactory = { store in
+            try QuickScanCoordinator(store: store)
         }
     ) -> AppDependencies {
         let standardizedRoot = rootURL.standardizedFileURL
         let runtime = AppQuickScanRuntime(rootURL: standardizedRoot) {
-            try await makeCoordinator(configuration)
+            store in
+            try await makeCoordinator(store)
+        } makeEvidenceStore: {
+            try EvidenceStore(configuration: configuration)
         } makePreferencesStore: {
             try SettingsPreferencesStore(configuration: configuration)
         } makeKnowledgeStore: {
@@ -189,6 +234,15 @@ struct AppDependencies: Sendable {
             },
             openFullDiskAccessSettings: {
                 await openFullDiskAccessPane()
+            },
+            buildReview: {
+                await runtime.buildReview()
+            },
+            preflightReview: {
+                try await runtime.preflightReview(
+                    plan: $0,
+                    selection: $1
+                )
             }
         )
     }
@@ -198,11 +252,15 @@ struct AppDependencies: Sendable {
             .standardizedFileURL
         let runtime = AppQuickScanRuntime(
             rootURL: rootURL
-        ) {
+        ) { store in
             try await Task.detached(priority: .userInitiated) {
-                let configuration = try LocalStoreConfiguration.production()
-                let store = try EvidenceStore(configuration: configuration)
                 return try QuickScanCoordinator(store: store)
+            }.value
+        } makeEvidenceStore: {
+            try await Task.detached(priority: .userInitiated) {
+                try EvidenceStore(
+                    configuration: LocalStoreConfiguration.production()
+                )
             }.value
         } makePreferencesStore: {
             try await Task.detached(priority: .userInitiated) {
@@ -263,6 +321,15 @@ struct AppDependencies: Sendable {
             },
             openFullDiskAccessSettings: {
                 await openFullDiskAccessPane()
+            },
+            buildReview: {
+                await runtime.buildReview()
+            },
+            preflightReview: {
+                try await runtime.preflightReview(
+                    plan: $0,
+                    selection: $1
+                )
             }
         )
     }
@@ -278,8 +345,15 @@ private actor AppQuickScanRuntime {
         let task: Task<QuickScanCoordinator, Error>
     }
 
-    private let makeCoordinator: @Sendable () async throws
+    private struct EvidenceStoreFlight {
+        let id: UInt64
+        let task: Task<EvidenceStore, Error>
+    }
+
+    private let makeCoordinator: @Sendable (EvidenceStore) async throws
         -> QuickScanCoordinator
+    private let makeEvidenceStore: @Sendable () async throws
+        -> EvidenceStore
     private let makePreferencesStore: @Sendable () async throws
         -> SettingsPreferencesStore
     private let makeKnowledgeStore: @Sendable () async throws
@@ -288,14 +362,22 @@ private actor AppQuickScanRuntime {
     private var coordinator: QuickScanCoordinator?
     private var coordinatorFlight: CoordinatorFlight?
     private var nextFlightID: UInt64 = 0
+    private var evidenceStoreFlight: EvidenceStoreFlight?
+    private var nextEvidenceStoreFlightID: UInt64 = 0
     private var preferencesStore: SettingsPreferencesStore?
     private var knowledgeStore: LocalKnowledgeStore?
+    private var evidenceStore: EvidenceStore?
+    private let workflowCoordinator = CleanupWorkflowCoordinator()
     private let codexDetector = CodexRuntimeCapabilityDetector()
 
     init(
         rootURL: URL,
-        makeCoordinator: @escaping @Sendable () async throws
+        makeCoordinator: @escaping @Sendable (
+            EvidenceStore
+        ) async throws
             -> QuickScanCoordinator,
+        makeEvidenceStore: @escaping @Sendable () async throws
+            -> EvidenceStore,
         makePreferencesStore: @escaping @Sendable () async throws
             -> SettingsPreferencesStore,
         makeKnowledgeStore: @escaping @Sendable () async throws
@@ -303,6 +385,7 @@ private actor AppQuickScanRuntime {
     ) {
         self.rootURL = rootURL.standardizedFileURL
         self.makeCoordinator = makeCoordinator
+        self.makeEvidenceStore = makeEvidenceStore
         self.makePreferencesStore = makePreferencesStore
         self.makeKnowledgeStore = makeKnowledgeStore
     }
@@ -313,27 +396,37 @@ private actor AppQuickScanRuntime {
     }
 
     func start() async throws -> AppDependencies.QuickScanStream {
-        let coordinator = try await resolvedCoordinator()
-        let preferences = try await resolvedPreferencesStore().load()
-        let resolvedRoot = SettingsPrimaryRoot.resolve(
-            preferences.primaryRoot,
-            fallbackURL: rootURL
+        let workflowLease = try await workflowCoordinator.acquire(
+            .quickScan
         )
-        if preferences.primaryRoot != nil,
-           resolvedRoot.status != .available
-        {
-            throw RuntimeError.configuredRootUnavailable
-        }
-        let stream = try await coordinator.start(
-            ScanRequest(
-                rootURL: resolvedRoot.rootURL,
-                exclusions: preferences.exclusions
+        do {
+            let coordinator = try await resolvedCoordinator()
+            let preferences = try await resolvedPreferencesStore().load()
+            let resolvedRoot = SettingsPrimaryRoot.resolve(
+                preferences.primaryRoot,
+                fallbackURL: rootURL
             )
-        )
-        return retaining(
-            stream,
-            lease: resolvedRoot.accessLease
-        )
+            if preferences.primaryRoot != nil,
+               resolvedRoot.status != .available
+            {
+                throw RuntimeError.configuredRootUnavailable
+            }
+            let stream = try await coordinator.start(
+                ScanRequest(
+                    rootURL: resolvedRoot.rootURL,
+                    exclusions: preferences.exclusions
+                )
+            )
+            return retaining(
+                stream,
+                lease: resolvedRoot.accessLease,
+                workflowCoordinator: workflowCoordinator,
+                workflowLease: workflowLease
+            )
+        } catch {
+            await workflowCoordinator.release(workflowLease)
+            throw error
+        }
     }
 
     func quickScanConfiguration() async throws
@@ -375,8 +468,95 @@ private actor AppQuickScanRuntime {
     }
 
     func deleteHistory(id: ScanSessionID) async throws {
-        let coordinator = try await resolvedCoordinator()
-        try await coordinator.deleteHistorySession(id: id)
+        try await withWorkflowLease(.historyMutation) {
+            let coordinator = try await resolvedCoordinator()
+            try await coordinator.deleteHistorySession(id: id)
+        }
+    }
+
+    func buildReview() async -> CleanupPlanBuildOutcome {
+        do {
+            let preferences = try await resolvedPreferencesStore().load()
+            let resolvedRoot = SettingsPrimaryRoot.resolve(
+                preferences.primaryRoot,
+                fallbackURL: rootURL
+            )
+            guard resolvedRoot.status == .available
+                    || resolvedRoot.status == .fallbackHome
+            else {
+                return .unavailable([
+                    DomainToken(
+                        rawValue: "review.unavailable.root"
+                    )!,
+                ])
+            }
+            let store = try await resolvedEvidenceStore()
+            guard let sessionID = try await resolvedCoordinator()
+                .loadLatest()?.session.id
+            else {
+                return .unavailable([
+                    DomainToken(
+                        rawValue: "review.unavailable.no-snapshot"
+                    )!,
+                ])
+            }
+            let builder = try CleanupPlanBuilder(store: store)
+            let result = await builder.build(
+                sessionID: sessionID,
+                rootURL: resolvedRoot.rootURL
+            )
+            withExtendedLifetime(resolvedRoot.accessLease) {}
+            return result
+        } catch {
+            return .unavailable([
+                DomainToken(
+                    rawValue: "review.unavailable.persisted-truth"
+                )!,
+            ])
+        }
+    }
+
+    func preflightReview(
+        plan: CleanupPlan,
+        selection: ReviewSelection
+    ) async throws -> CleanupPolicyEvaluation {
+        let preferences = try await resolvedPreferencesStore().load()
+        let resolvedRoot = SettingsPrimaryRoot.resolve(
+            preferences.primaryRoot,
+            fallbackURL: rootURL
+        )
+        guard resolvedRoot.status == .available
+                || resolvedRoot.status == .fallbackHome
+        else {
+            throw AppDependencyError.reviewUnavailable
+        }
+        let store = try await resolvedEvidenceStore()
+        let observer = AppCleanupPolicyRootObserver(
+            observation: CleanupPolicyRootObservation(
+                rootURL: resolvedRoot.rootURL,
+                access: resolvedRoot.accessLease.map {
+                    .securityScoped($0)
+                } ?? .direct
+            )
+        )
+        let collector = try CleanupPolicyContextCollector(
+            store: store,
+            rootObserver: observer,
+            workflowObserver: workflowCoordinator
+        )
+        let outcome = await collector.collect(
+            plan: plan,
+            selection: selection
+        )
+        guard let context = outcome.context else {
+            throw AppDependencyError.reviewUnavailable
+        }
+        return try CleanupPolicyGate().evaluate(
+            plan: plan,
+            selection: selection,
+            context: context,
+            evaluatedAt: Date()
+        )
     }
 
     func loadSettings() async throws -> SettingsSnapshot {
@@ -419,7 +599,9 @@ private actor AppQuickScanRuntime {
     func saveSettingsPreferences(
         _ preferences: SettingsPreferences
     ) async throws {
-        try await resolvedPreferencesStore().save(preferences)
+        try await withWorkflowLease(.settingsMutation) {
+            try await resolvedPreferencesStore().save(preferences)
+        }
     }
 
     func loadSettingsPreferences() async throws -> SettingsPreferences {
@@ -437,19 +619,27 @@ private actor AppQuickScanRuntime {
     }
 
     func clearEvidence() async throws {
-        try await resolvedCoordinator().clearEvidenceRecords()
+        try await withWorkflowLease(.settingsMutation) {
+            try await resolvedCoordinator().clearEvidenceRecords()
+        }
     }
 
     func clearManifests() async throws {
-        try await resolvedCoordinator().clearManifestRecords()
+        try await withWorkflowLease(.settingsMutation) {
+            try await resolvedCoordinator().clearManifestRecords()
+        }
     }
 
     func forgetKnowledge(id: LocalKnowledgeID) async throws {
-        try await resolvedKnowledgeStore().forget(id: id)
+        try await withWorkflowLease(.settingsMutation) {
+            try await resolvedKnowledgeStore().forget(id: id)
+        }
     }
 
     func forgetAllKnowledge() async throws {
-        try await resolvedKnowledgeStore().forgetAll()
+        try await withWorkflowLease(.settingsMutation) {
+            try await resolvedKnowledgeStore().forgetAll()
+        }
     }
 
     private func resolvedPreferencesStore() async throws
@@ -461,6 +651,26 @@ private actor AppQuickScanRuntime {
         let created = try await makePreferencesStore()
         preferencesStore = created
         return created
+    }
+
+    private func resolvedEvidenceStore() async throws -> EvidenceStore {
+        if let evidenceStore {
+            return evidenceStore
+        }
+        let flight = evidenceStoreTask()
+        do {
+            let created = try await flight.task.value
+            evidenceStore = created
+            if evidenceStoreFlight?.id == flight.id {
+                evidenceStoreFlight = nil
+            }
+            return created
+        } catch {
+            if evidenceStoreFlight?.id == flight.id {
+                evidenceStoreFlight = nil
+            }
+            throw error
+        }
     }
 
     private func resolvedKnowledgeStore() async throws
@@ -521,8 +731,10 @@ private actor AppQuickScanRuntime {
             flight = coordinatorFlight
         } else {
             let makeCoordinator = self.makeCoordinator
+            let storeFlight = evidenceStoreTask()
             let createdTask = Task {
-                try await makeCoordinator()
+                let store = try await storeFlight.task.value
+                return try await makeCoordinator(store)
             }
             flight = CoordinatorFlight(
                 id: nextFlightID,
@@ -533,6 +745,15 @@ private actor AppQuickScanRuntime {
         }
         do {
             let created = try await flight.task.value
+            if evidenceStore == nil,
+               let storeFlight = evidenceStoreFlight
+            {
+                let store = try await storeFlight.task.value
+                evidenceStore = store
+                if evidenceStoreFlight?.id == storeFlight.id {
+                    evidenceStoreFlight = nil
+                }
+            }
             coordinator = created
             if coordinatorFlight?.id == flight.id {
                 coordinatorFlight = nil
@@ -542,6 +763,46 @@ private actor AppQuickScanRuntime {
             if coordinatorFlight?.id == flight.id {
                 coordinatorFlight = nil
             }
+            if evidenceStore == nil {
+                evidenceStoreFlight = nil
+            }
+            throw error
+        }
+    }
+
+    private func evidenceStoreTask() -> EvidenceStoreFlight {
+        if let evidenceStoreFlight {
+            return evidenceStoreFlight
+        }
+        if let evidenceStore {
+            return EvidenceStoreFlight(
+                id: nextEvidenceStoreFlightID,
+                task: Task { evidenceStore }
+            )
+        }
+        let makeEvidenceStore = self.makeEvidenceStore
+        let flight = EvidenceStoreFlight(
+            id: nextEvidenceStoreFlightID,
+            task: Task {
+                try await makeEvidenceStore()
+            }
+        )
+        nextEvidenceStoreFlightID &+= 1
+        evidenceStoreFlight = flight
+        return flight
+    }
+
+    private func withWorkflowLease<Result: Sendable>(
+        _ conflict: CleanupWorkflowConflict,
+        operation: () async throws -> Result
+    ) async throws -> Result {
+        let lease = try await workflowCoordinator.acquire(conflict)
+        do {
+            let result = try await operation()
+            await workflowCoordinator.release(lease)
+            return result
+        } catch {
+            await workflowCoordinator.release(lease)
             throw error
         }
     }
@@ -549,19 +810,22 @@ private actor AppQuickScanRuntime {
 
 private func retaining(
     _ stream: AppDependencies.QuickScanStream,
-    lease: SettingsPrimaryRootAccessLease?
+    lease: SettingsPrimaryRootAccessLease?,
+    workflowCoordinator: CleanupWorkflowCoordinator,
+    workflowLease: CleanupWorkflowLease
 ) -> AppDependencies.QuickScanStream {
     AsyncThrowingStream { continuation in
         let task = Task {
-            defer {
-                withExtendedLifetime(lease) {}
-            }
             do {
                 for try await event in stream {
                     continuation.yield(event)
                 }
+                withExtendedLifetime(lease) {}
+                await workflowCoordinator.release(workflowLease)
                 continuation.finish()
             } catch {
+                withExtendedLifetime(lease) {}
+                await workflowCoordinator.release(workflowLease)
                 continuation.finish(throwing: error)
             }
         }
@@ -659,6 +923,18 @@ private enum AppDependencyError: Error {
     case quickScanUnavailable
     case historyUnavailable
     case settingsUnavailable
+    case reviewUnavailable
+    case reviewExecutionDisabled
+}
+
+private struct AppCleanupPolicyRootObserver:
+    CleanupPolicyRootObserving
+{
+    let observation: CleanupPolicyRootObservation
+
+    func observeRoot() async -> CleanupPolicyRootObservation {
+        observation
+    }
 }
 
 @MainActor

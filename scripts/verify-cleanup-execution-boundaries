@@ -35,12 +35,6 @@ if rg -n 'try!|fatalError|preconditionFailure' "${execution_files[@]}"; then
     exit 1
 fi
 
-if git status --porcelain -- StornautApp StornautAppTests StornautAppUITests \
-    | grep -q .; then
-    print -u2 "Task 31 modified App/UI targets before Task 32."
-    exit 1
-fi
-
 rg -Fq 'ActionRegistry(definitions: [])' \
     Sources/StornautCore/Policy/ActionPolicyGate.swift
 rg -q 'private static let schemaVersion = 3' \

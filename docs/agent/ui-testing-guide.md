@@ -55,7 +55,7 @@ Epic 0 shell 当前必须保持：
 - System Light/Dark 均可读；
 - bundle identifier 为 `com.eriklee.stornaut`。
 
-现有 XCUITest 必须生成十七个稳定附件：
+现有 XCUITest 必须生成二十三个稳定附件：
 
 ```text
 stornaut-shell-light.png
@@ -67,6 +67,12 @@ stornaut-overview-zh-Hans.png
 stornaut-scan-progress-dark.png
 stornaut-scan-partial-light.png
 stornaut-scan-results-inspector-light.png
+stornaut-review-default-light.png
+stornaut-review-default-dark.png
+stornaut-review-inspector-dark.png
+stornaut-review-stale-dark.png
+stornaut-review-empty-light.png
+stornaut-review-zh-Hans.png
 stornaut-history-populated-light.png
 stornaut-history-expired-dark.png
 stornaut-history-corrupt-light.png
@@ -87,8 +93,16 @@ Dive implementation unavailable 和 localization 层级，不复制概念图示�
 Task 23 的三张 Scan 截图固定 deterministic DEBUG fake state，绝不扫描真实
 home：Dark active 验证五阶段 rail、四种独立进度单位和渐进结果；Light
 partial 验证 page-preserving partial truth；Light completed + Inspector
-验证 grouped lifecycle table 和只读证据详情。截图中不得出现 enabled Review、
-Trash、Registered Action 或 Codex action。
+验证 grouped lifecycle table 和只读证据详情。Scan Results 只通过
+`Review Reclaim Plan` 进入 Scan 内部子流程，不新增 Sidebar destination。
+
+Task 32 的六张 Review 截图固定 typed DEBUG Plan / Projection / Policy fixture：
+Light/Dark default 验证五组 grouped table、显式勾选与 Trash/permanent accounting
+分离；Dark Inspector 验证只读 evidence/path/activity/recovery；Dark stale 只允许
+refresh/cancel；Light empty 与 `zh-Hans` 验证空态和本地化层级。确认后进度只来自
+DEBUG fake seam，截图和测试不得被解释为真实 `FileManagerTrashAdapter`、Registered
+Action 或 production write availability 已放开；生产 composition 始终保持
+`writeDisabled`。
 
 Task 24 的四张 History 截图固定 typed DEBUG Evidence fixture：Light populated
 验证日期分组 master-detail 与真实 ledger measures；Dark expired 验证 retention
@@ -119,7 +133,7 @@ Settings Sidebar 控件将该 window 置前，不要重复发送 `⌘,`。重复
 
 ## 3.1 View Snapshots
 
-上面这十七张属于 window 级证据，只能证明窗口没空白、主题没反。组件/页面级的布局、
+上面这二十三张属于 window 级证据，只能证明窗口没空白、主题没反。组件/页面级的布局、
 换行、截断、间距和语义色由 `StornautAppTests/SnapshotHarness.swift` 的 view
 snapshot 负责，golden 提交在 `Tests/Fixtures/Snapshots/`。理由与容差依据见
 [ADR 0014](../adr/0014-view-snapshot-regression.md)。

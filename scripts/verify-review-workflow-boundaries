@@ -1,0 +1,83 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+cd "$repo_root"
+
+review_root=StornautApp/Review
+review_files=(
+    "$review_root/ReviewState.swift"
+    "$review_root/ReviewModel.swift"
+    "$review_root/ReviewView.swift"
+    "$review_root/ReviewTable.swift"
+    "$review_root/ReviewInspector.swift"
+    "$review_root/ReviewConfirmationSheet.swift"
+    "$review_root/ReviewStaleSheet.swift"
+)
+
+for file in "${review_files[@]}"; do
+    [[ -f "$file" ]] || {
+        print -u2 "Missing Task 32 Review workflow file: $file"
+        exit 1
+    }
+done
+
+if rg -n \
+    'CleanupExecutionCoordinator|ActionExecutor|TrashMoving|FileManagerTrashAdapter|ExecutionAuthorization|RegisteredActionDefinition|FoundationRegisteredActionRunner|StornautCodex|ProbeBridge|Adapter|Process\(|posix_spawn|URLSession' \
+    "${review_files[@]}"; then
+    print -u2 "App Review workflow contains prohibited execution/runtime authority."
+    exit 1
+fi
+
+if rg -n \
+    'removeItem\s*\(|moveItem\s*\(|copyItem\s*\(|createFile\s*\(|forWritingTo|O_WRONLY|O_RDWR|unlink\(|rename\(|trashItem\s*\(' \
+    "${review_files[@]}"; then
+    print -u2 "App Review workflow contains a filesystem write surface."
+    exit 1
+fi
+
+if rg -n 'try!|fatalError|preconditionFailure' "${review_files[@]}"; then
+    print -u2 "App Review workflow contains a crash-prone forced path."
+    exit 1
+fi
+
+if rg -n \
+    'ExecutionAuthorization|CleanupExecutionCoordinator|ActionExecutor|TrashMoving|FileManagerTrashAdapter' \
+    StornautApp/AppState StornautApp/Scan StornautApp/AppShell \
+    StornautApp/StornautApp.swift; then
+    print -u2 "Production App graph reaches Task 31 execution authority."
+    exit 1
+fi
+
+python3 - <<'PY'
+import pathlib
+import re
+
+source = pathlib.Path("StornautApp/AppShell/AppDestination.swift").read_text()
+cases = re.findall(r"^\s+case ([A-Za-z][A-Za-z0-9]*)\s*$", source, re.MULTILINE)
+expected = ["overview", "scan", "investigations", "history"]
+if cases != expected:
+    raise SystemExit(f"unexpected top-level destinations: {cases}")
+PY
+
+rg -Fq 'ReviewExecutionAvailability = .writeDisabled' \
+    StornautApp/AppState/AppDependencies.swift
+rg -Fq 'reviewFixture?.executionAvailability' \
+    StornautApp/AppState/DebugAppFixtures.swift
+rg -Fq 'reviewFixture == nil ? .results : .review' \
+    StornautApp/AppState/DebugAppFixtures.swift
+rg -Fq 'case cleanupResult' StornautApp/Review/ReviewState.swift
+rg -Fq 'func openCleanupResult(' StornautApp/Review/ReviewState.swift
+rg -Fq 'route' StornautApp/Review/ReviewState.swift
+! rg -n 'scanWorkspaceRoute\s*=\s*\.cleanupResult' StornautApp
+! rg -n 'ActionRegistry\(definitions:\s*\[[^]]' StornautApp
+
+rg -Fq 'ActionRegistry(definitions: [])' \
+    Sources/StornautCore/Policy/ActionPolicyGate.swift
+rg -q 'private static let schemaVersion = 3' \
+    Sources/StornautCore/Evidence/EvidenceStore.swift
+rg -Fq 'DebugReviewFixtureSelection' StornautApp/StornautApp.swift
+rg -Fq '#if DEBUG' StornautApp/StornautApp.swift
+
+echo "Review workflow boundary verification passed."

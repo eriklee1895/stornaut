@@ -8,7 +8,9 @@ verifier 已完成。Task 30 的 pure Policy、fresh revalidation 与 one-shot
 authorization、independent review 与 unified verifier 已完成。Task 31 的
 serial injected fake-Trash coordinator、durable journal、per-item fresh Policy、
 Manifest/accounting、audit retry、no-replay recovery、independent review 与
-unified verifier 已完成。Task 32 是下一项 eligible deterministic task。详细
+unified verifier 已完成。Task 32 的 typed Scan→Review routing、Core-backed
+Plan/Policy、write-disabled execution seam、native UI、实际窗口验证与
+independent review 与 authoritative unified verifier 已完成。详细
 R1–R6 计划见
 [`capability-first-codex-runtime-gate.md`](capability-first-codex-runtime-gate.md)，
 详尽计划已获批准。R1 study/ADR/probe/review 与 R2 closed profile/report/
@@ -35,7 +37,8 @@ review findings 已修复；post-fix review 进一步关闭 command/image/subage
 	integrity；fixed topology 随后卸载并证明零残留。R5 已提交推送。R6 已完成
 	exact receipt、five-dimensional Settings、typed disclosure、final matrix、
 	actual-window evidence 与 post-fix review；runtime foundation 结论为 `go`。
-	Tasks 29–31 已完成；Task 32 是当前 active deterministic task。
+	Tasks 29–32 已完成；下一项 deterministic task 是 Task 33 Cleanup
+	Result/Manifest UI。
 
 Task 30 的 collector/pure-gate 分层、memory-only `ReviewSelection`、bounded
 Store lookup、typed stale contract、workflow exclusion snapshot 与 actor-owned
@@ -51,6 +54,12 @@ recovery 计划见
 [`task-31-implementation-brief.md`](task-31-implementation-brief.md)，完成证据
 见 [Task 31 Review](../../reports/epic-8-task-31-review.md)。真实 App Trash
 依赖仍保持关闭。
+
+Task 32 的 typed Scan→Review routing、Core Plan/Policy service seam、
+memory-only selection、write-disabled execution contract、native Decision
+Table/Inspector/confirmation/stale UI 与实际窗口验收计划见
+[`task-32-implementation-brief.md`](task-32-implementation-brief.md)，completion
+audit 见 [Task 32 Review](../../reports/epic-8-task-32-review.md)。
 
 Task 29 的 tests-first、closed Execution Profile Catalog、shared one-snapshot
 activity、完整 Store join、Plan Builder、boundary/benchmark/review 计划见
@@ -123,7 +132,7 @@ advisory protocol 与 structural no-Executor seam 的 `protocolReady` 结论。
 
 R6 已关闭当前个人本机 capability-first runtime foundation，但不证明
 ServiceManagement distribution、Developer ID/notarization、FDA/TCC product
-flow 或 production Deep Dive。Deep Dive 保持 unavailable；Task 32 是下一项。
+flow 或 production Deep Dive。Deep Dive 保持 unavailable；Tasks 29–32 已完成。
 
 即使计划获批，正常 App 也必须保持真实 Trash 依赖关闭，直到 Task 35 的
 signed-App disposable Trash diagnostic 与最终 gate 通过。Task 32 的 Review

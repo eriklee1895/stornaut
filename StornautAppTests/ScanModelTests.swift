@@ -372,6 +372,7 @@ private enum ScanLocalizationKeys {
         "scan.inspector.supportingEvidence",
         "scan.inspector.missingEvidence",
         "scan.deepDive.implementationUnavailable",
-        "scan.review.unavailable",
+        "scan.review.action",
+        "scan.review.action.help",
     ]
 }

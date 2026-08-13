@@ -44,6 +44,12 @@ expected_names = %w[
   stornaut-scan-progress-dark
   stornaut-scan-partial-light
   stornaut-scan-results-inspector-light
+  stornaut-review-default-light
+  stornaut-review-default-dark
+  stornaut-review-inspector-dark
+  stornaut-review-stale-dark
+  stornaut-review-empty-light
+  stornaut-review-zh-Hans
   stornaut-history-populated-light
   stornaut-history-expired-dark
   stornaut-history-corrupt-light
@@ -76,6 +82,12 @@ for screenshot in \
     stornaut-scan-progress-dark.png \
     stornaut-scan-partial-light.png \
     stornaut-scan-results-inspector-light.png \
+    stornaut-review-default-light.png \
+    stornaut-review-default-dark.png \
+    stornaut-review-inspector-dark.png \
+    stornaut-review-stale-dark.png \
+    stornaut-review-empty-light.png \
+    stornaut-review-zh-Hans.png \
     stornaut-history-populated-light.png \
     stornaut-history-expired-dark.png \
     stornaut-history-corrupt-light.png \

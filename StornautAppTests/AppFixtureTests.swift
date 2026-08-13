@@ -89,6 +89,29 @@ func debugHistorySelectorAcceptsOnlyOneExactKnownArgument() {
 }
 
 @Test
+func debugReviewSelectorAcceptsOnlyOneExactKnownArgument() {
+    #expect(
+        DebugReviewFixtureSelection(arguments: [
+            "Stornaut",
+            "--stornaut-debug-review=default",
+        ])?.fixture == .default
+    )
+    #expect(
+        DebugReviewFixtureSelection(arguments: [
+            "Stornaut",
+            "--stornaut-debug-review=unknown",
+        ]) == nil
+    )
+    #expect(
+        DebugReviewFixtureSelection(arguments: [
+            "Stornaut",
+            "--stornaut-debug-review=default",
+            "--stornaut-debug-review=stale",
+        ]) == nil
+    )
+}
+
+@Test
 func debugHistoryPresentationAcceptsOnlyOneExactKnownArgument() {
     #expect(
         DebugHistoryInitialPresentation.selection(arguments: [
@@ -224,6 +247,68 @@ func debugFixturesCoverEveryApprovedPhaseDeterministically() throws {
         #expect(composition.model.historyState.phase == .loaded)
     }
 
+    let expectedReviewPhases: [DebugReviewFixture: ReviewPhase] = [
+        .default: .ready,
+        .inspector: .ready,
+        .stale: .stale,
+        .limited: .scanAgain,
+        .empty: .empty,
+        .overlapConflict: .unavailable,
+        .preflightFailure: .ready,
+        .executing: .executing,
+    ]
+    for fixture in DebugReviewFixture.allCases {
+        let composition = try AppComposition.debugFixture(
+            selection: DebugAppFixtureSelection(arguments: [
+                "Stornaut",
+                "--stornaut-debug-fixture=success",
+            ])!,
+            reviewSelection: DebugReviewFixtureSelection(arguments: [
+                "Stornaut",
+                "--stornaut-debug-review=\(fixture.rawValue)",
+            ])!
+        )
+        #expect(
+            composition.model.reviewState.phase
+                == expectedReviewPhases[fixture]
+        )
+        #expect(composition.model.scanWorkspaceRoute == .review)
+    }
+    let reviewComposition = try AppComposition.debugFixture(
+        selection: DebugAppFixtureSelection(arguments: [
+            "Stornaut",
+            "--stornaut-debug-fixture=success",
+        ])!,
+        reviewSelection: DebugReviewFixtureSelection(arguments: [
+            "Stornaut",
+            "--stornaut-debug-review=inspector",
+        ])!
+    )
+    let reviewModel = ReviewModel(
+        state: reviewComposition.model.reviewState,
+        pageProjection: reviewComposition.model.pageState.projection
+    )
+    let reviewInspector = try #require(reviewModel.inspector)
+    #expect(reviewModel.summary.selectedCount == 2)
+    #expect(
+        reviewModel.summary.estimatedTrashBytes == ByteCount(300_000)!
+    )
+    #expect(reviewInspector.producer?.rawValue == "Go command")
+    #expect(
+        reviewInspector.modifiedAt
+            == Date(timeIntervalSince1970: 1_786_320_000)
+    )
+    #expect(reviewInspector.recoveryCost == .medium)
+    #expect(
+        reviewInspector.exactPath
+            == "/tmp/stornaut-review-fixture/Library/Caches/go-build"
+    )
+    #expect(
+        reviewModel.rows.first {
+            $0.relativePath == "."
+        }?.itemName == "stornaut-review-fixture"
+    )
+
     for fixture in DebugSettingsFixture.allCases {
         let composition = try AppComposition.debugFixture(
             selection: DebugAppFixtureSelection(arguments: [
@@ -324,6 +409,17 @@ func liveDependenciesCanLoadAnEmptyInMemoryStore() async throws {
     let dependencies = AppDependencies.live(configuration: .memory)
 
     #expect(try await dependencies.loadLatestQuickScan() == nil)
+    #expect(
+        dependencies.reviewExecutionAvailability == .writeDisabled
+    )
+}
+
+@Test
+func productionDependenciesKeepReviewExecutionWriteDisabled() {
+    #expect(
+        AppDependencies.production().reviewExecutionAvailability
+            == .writeDisabled
+    )
 }
 
 @Test
@@ -361,6 +457,17 @@ func liveDependenciesRunOnlyTheExplicitTemporaryRoot() async throws {
     )
     #expect(dependencies.quickScanRootPath?.rawValue
         == rootURL.standardizedFileURL.path)
+    let review = await dependencies.buildReview()
+    switch review {
+    case let .planReady(plan, projection):
+        #expect(plan.scanSessionID == projection.sessionID)
+    case .empty:
+        break
+    case .scanAgain, .unavailable:
+        Issue.record(
+            "Review could not read the Quick Scan written by the same in-memory composition."
+        )
+    }
 }
 
 @Test
@@ -501,10 +608,8 @@ func liveDependencyCreationIsDeferredUntilAsyncLoad() async throws {
     let factory = AppTestDependencyFactory()
     let dependencies = AppDependencies.live(
         configuration: .memory,
-        makeCoordinator: { configuration in
-            try await factory.makeCoordinator(
-                configuration: configuration
-            )
+        makeCoordinator: { store in
+            try await factory.makeCoordinator(store: store)
         }
     )
 
@@ -520,10 +625,8 @@ func concurrentInitialLoadsShareOneCoordinatorFactory() async throws {
     let factory = AppTestDependencyFactory()
     let dependencies = AppDependencies.live(
         configuration: .memory,
-        makeCoordinator: { configuration in
-            try await factory.makeCoordinator(
-                configuration: configuration
-            )
+        makeCoordinator: { store in
+            try await factory.makeCoordinator(store: store)
         }
     )
 
@@ -540,10 +643,8 @@ func concurrentRetriesReplaceOnlyTheirOwnFailedCoordinatorFlight() async throws 
     let factory = AppTestRetryingDependencyFactory()
     let dependencies = AppDependencies.live(
         configuration: .memory,
-        makeCoordinator: { configuration in
-            try await factory.makeCoordinator(
-                configuration: configuration
-            )
+        makeCoordinator: { store in
+            try await factory.makeCoordinator(store: store)
         }
     )
 
@@ -573,11 +674,10 @@ private actor AppTestDependencyFactory {
     private(set) var callCount = 0
 
     func makeCoordinator(
-        configuration: LocalStoreConfiguration
+        store: EvidenceStore
     ) throws -> QuickScanCoordinator {
         callCount += 1
         usleep(10_000)
-        let store = try EvidenceStore(configuration: configuration)
         return try QuickScanCoordinator(store: store)
     }
 }
@@ -586,14 +686,13 @@ private actor AppTestRetryingDependencyFactory {
     private(set) var callCount = 0
 
     func makeCoordinator(
-        configuration: LocalStoreConfiguration
+        store: EvidenceStore
     ) async throws -> QuickScanCoordinator {
         callCount += 1
         try await Task.sleep(for: .milliseconds(50))
         if callCount == 1 {
             throw AppTestLoaderError.coordinatorCreationFailed
         }
-        let store = try EvidenceStore(configuration: configuration)
         return try QuickScanCoordinator(store: store)
     }
 }

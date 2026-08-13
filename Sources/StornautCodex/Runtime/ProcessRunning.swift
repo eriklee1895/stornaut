@@ -69,11 +69,25 @@ public struct FoundationProcessRunner: ProcessRunning {
     public init() {}
 
     public func run(_ request: ProcessRequest) async throws -> ProcessOutput {
-        try await Task.detached(priority: .utility) {
-            try runSynchronously(request)
-        }.value
+        try await withCheckedThrowingContinuation { continuation in
+            foundationProcessRunnerQueue.async {
+                do {
+                    continuation.resume(
+                        returning: try runSynchronously(request)
+                    )
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
     }
 }
+
+private let foundationProcessRunnerQueue = DispatchQueue(
+    label: "com.eriklee.stornaut.foundation-process-runner",
+    qos: .userInitiated,
+    attributes: .concurrent
+)
 
 private func runSynchronously(_ request: ProcessRequest) throws -> ProcessOutput {
     guard request.standardOutputLimit >= 0, request.standardErrorLimit >= 0 else {

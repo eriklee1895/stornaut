@@ -22,6 +22,12 @@ for screenshot in \
     stornaut-scan-progress-dark.png \
     stornaut-scan-partial-light.png \
     stornaut-scan-results-inspector-light.png \
+    stornaut-review-default-light.png \
+    stornaut-review-default-dark.png \
+    stornaut-review-inspector-dark.png \
+    stornaut-review-stale-dark.png \
+    stornaut-review-empty-light.png \
+    stornaut-review-zh-Hans.png \
     stornaut-history-populated-light.png \
     stornaut-history-expired-dark.png \
     stornaut-history-corrupt-light.png \
@@ -52,6 +58,12 @@ let names = [
     "stornaut-scan-progress-dark",
     "stornaut-scan-partial-light",
     "stornaut-scan-results-inspector-light",
+    "stornaut-review-default-light",
+    "stornaut-review-default-dark",
+    "stornaut-review-inspector-dark",
+    "stornaut-review-stale-dark",
+    "stornaut-review-empty-light",
+    "stornaut-review-zh-Hans",
     "stornaut-history-populated-light",
     "stornaut-history-expired-dark",
     "stornaut-history-corrupt-light",
@@ -161,6 +173,18 @@ guard let shellLight = statistics["stornaut-shell-light"],
       let scanPartialLight = statistics["stornaut-scan-partial-light"],
       let scanInspectorLight =
         statistics["stornaut-scan-results-inspector-light"],
+      let reviewDefaultLight =
+        statistics["stornaut-review-default-light"],
+      let reviewDefaultDark =
+        statistics["stornaut-review-default-dark"],
+      let reviewInspectorDark =
+        statistics["stornaut-review-inspector-dark"],
+      let reviewStaleDark =
+        statistics["stornaut-review-stale-dark"],
+      let reviewEmptyLight =
+        statistics["stornaut-review-empty-light"],
+      let reviewChineseLight =
+        statistics["stornaut-review-zh-Hans"],
       let historyPopulatedLight =
         statistics["stornaut-history-populated-light"],
       let historyExpiredDark =
@@ -181,12 +205,17 @@ guard let shellLight = statistics["stornaut-shell-light"],
       shellLight.meanLuminance - shellDark.meanLuminance >= 40,
       scanPartialLight.meanLuminance
         - scanProgressDark.meanLuminance >= 40,
+      reviewDefaultLight.meanLuminance
+        - reviewDefaultDark.meanLuminance >= 40,
       historyPopulatedLight.meanLuminance
         - historyExpiredDark.meanLuminance >= 40,
       (160...250).contains(limitedLight.meanLuminance),
       (160...250).contains(chineseLight.meanLuminance),
       (160...250).contains(scanPartialLight.meanLuminance),
       (160...250).contains(scanInspectorLight.meanLuminance),
+      (160...250).contains(reviewDefaultLight.meanLuminance),
+      (160...250).contains(reviewEmptyLight.meanLuminance),
+      (160...250).contains(reviewChineseLight.meanLuminance),
       (160...250).contains(historyPopulatedLight.meanLuminance),
       (160...250).contains(historyCorruptLight.meanLuminance),
       shellLight.luminanceStandardDeviation >= 20,
@@ -196,6 +225,15 @@ guard let shellLight = statistics["stornaut-shell-light"],
       scanProgressDark.luminanceStandardDeviation >= 20,
       scanPartialLight.luminanceStandardDeviation >= 20,
       scanInspectorLight.luminanceStandardDeviation >= 20,
+      reviewDefaultDark.meanLuminance <= 120,
+      reviewInspectorDark.meanLuminance <= 120,
+      reviewStaleDark.meanLuminance <= 120,
+      reviewDefaultLight.luminanceStandardDeviation >= 20,
+      reviewDefaultDark.luminanceStandardDeviation >= 20,
+      reviewInspectorDark.luminanceStandardDeviation >= 20,
+      reviewStaleDark.luminanceStandardDeviation >= 20,
+      reviewEmptyLight.luminanceStandardDeviation >= 20,
+      reviewChineseLight.luminanceStandardDeviation >= 20,
       historyPopulatedLight.luminanceStandardDeviation >= 20,
       historyExpiredDark.luminanceStandardDeviation >= 20,
       historyCorruptLight.luminanceStandardDeviation >= 20,
@@ -215,7 +253,7 @@ guard let shellLight = statistics["stornaut-shell-light"],
       settingsKnowledgeDark.luminanceStandardDeviation >= 8
 else {
     fputs(
-        "Overview/Scan/History/Settings screenshot theme contract failed.\n",
+        "Overview/Scan/Review/History/Settings screenshot theme contract failed.\n",
         stderr
     )
     exit(1)
