@@ -465,6 +465,86 @@ func cleanupJournalCanAdvanceToTheNextStartedAction() async throws {
 }
 
 @Test
+func auditJournalCannotStartAnotherActionAfterEvidenceWasCleared()
+    async throws
+{
+    let store = try EvidenceStore(configuration: .memory)
+    let plan = try CleanupPersistenceTestSupport.plan()
+    let decisions = try plan.items.map {
+        try CleanupPersistenceTestSupport.decision(plan: plan, item: $0)
+    }
+    let prepared = try CleanupPersistenceTestSupport.journal(plan: plan)
+    let firstStarted = try CleanupPersistenceTestSupport.journal(
+        plan: plan,
+        stage: .actionStarted,
+        entries: [
+            try CleanupPersistenceTestSupport.journalEntry(
+                item: plan.items[0],
+                state: .started,
+                decision: decisions[0]
+            ),
+            try CleanupPersistenceTestSupport.journalEntry(
+                item: plan.items[1],
+                decision: decisions[1]
+            ),
+        ]
+    )
+    let firstOutcome = try CleanupPersistenceTestSupport.journal(
+        plan: plan,
+        stage: .actionOutcomeRecorded,
+        entries: [
+            try CleanupPersistenceTestSupport.journalEntry(
+                item: plan.items[0],
+                state: .outcomeRecorded,
+                decision: decisions[0]
+            ),
+            try CleanupPersistenceTestSupport.journalEntry(
+                item: plan.items[1],
+                decision: decisions[1]
+            ),
+        ]
+    )
+    let secondStarted = try CleanupRunJournal(
+        id: firstOutcome.id,
+        planID: firstOutcome.planID,
+        manifestID: firstOutcome.manifestID,
+        selectionGeneration: firstOutcome.selectionGeneration,
+        selectionFingerprint: firstOutcome.selectionFingerprint,
+        stage: .actionStarted,
+        retentionClass: .audit,
+        stopAfterCurrentRequested: false,
+        entries: [
+            firstOutcome.entries[0],
+            try CleanupPersistenceTestSupport.journalEntry(
+                item: plan.items[1],
+                state: .started,
+                decision: decisions[1]
+            ),
+        ],
+        createdAt: firstOutcome.createdAt,
+        updatedAt: firstOutcome.updatedAt.addingTimeInterval(1),
+        expiresAt: firstOutcome.expiresAt
+    )
+    let session: ScanSession = try EvidenceStoreTestSupport.fixture(
+        ScanSession.self,
+        name: "scan-session-v1"
+    )
+    try await store.saveScanSession(session)
+    try await store.saveCleanupPlan(plan)
+    for decision in decisions {
+        try await store.savePolicyDecision(decision)
+    }
+    try await store.saveCleanupRunJournal(prepared)
+    try await store.saveCleanupRunJournal(firstStarted)
+    try await store.saveCleanupRunJournal(firstOutcome)
+    try await store.clearEvidence()
+
+    await #expect(throws: EvidenceStoreError.invalidJournalTransition) {
+        try await store.saveCleanupRunJournal(secondStarted)
+    }
+}
+
+@Test
 func cleanupStoreClearAndRetentionSeparateEvidenceFromAudit() async throws {
     let store = try EvidenceStore(configuration: .memory)
     let plan = try CleanupPersistenceTestSupport.plan()
@@ -536,7 +616,7 @@ func cleanupStoreClearAndRetentionSeparateEvidenceFromAudit() async throws {
     #expect(try await store.cleanupManifest(id: manifest.id) == manifest)
 
     try await store.clearManifests()
-    #expect(try await store.cleanupRunJournal(id: audit.id) == nil)
+    #expect(try await store.cleanupRunJournal(id: audit.id) == audit)
     #expect(try await store.cleanupManifest(id: manifest.id) == nil)
 }
 

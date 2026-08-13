@@ -25,6 +25,7 @@ func cleanupAuthorizationAdmitsExactlyOnceWithinDeadline() async throws {
     #expect(admission.orderedItemIDs == fixture.plan.items.map(\.id))
     #expect(admission.decisionFingerprint
         == fixture.confirmation.decisionFingerprint)
+    #expect(admission.rootURL == fixture.collectedContext.rootURL)
     await #expect(throws: CleanupAuthorizationError.alreadyConsumed) {
         _ = try await controller.admit(
             authorization,
@@ -347,6 +348,7 @@ private struct CleanupAuthorizationTestFixture {
         confirmation = try #require(evaluation.allowed?.confirmation)
         collectedContext = CleanupPolicyCollectedContext(
             policyContext: context,
+            rootURL: URL(filePath: "/tmp/stornaut-authorization-root"),
             rootAccess: .direct
         )
     }

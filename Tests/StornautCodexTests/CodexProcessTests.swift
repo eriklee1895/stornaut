@@ -450,6 +450,18 @@ func processTreeTerminatorRefusesTheCurrentProcessGroup() async {
     }
 }
 
+@Test
+func processTreeTerminatorSynchronouslyRefusesTheCurrentProcessGroup() {
+    let terminator = ProcessTreeTerminator()
+
+    #expect(throws: ProcessTreeTerminationError.unsafeProcessGroup) {
+        try terminator.terminateProcessGroupSynchronously(
+            ProcessGroupID(rawValue: getpgrp()),
+            gracePeriod: .milliseconds(10)
+        )
+    }
+}
+
 private struct CodexProcessFixture {
     let root: URL
     let workingDirectoryURL: URL

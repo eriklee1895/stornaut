@@ -189,6 +189,7 @@ function verify_source_boundaries() {
     scripts/verify-quick-scan-boundaries
     scripts/verify-review-boundaries
     scripts/verify-cleanup-policy-boundaries
+    scripts/verify-cleanup-execution-boundaries
     scripts/verify-codex-no-executor-boundary
     scripts/verify-app-state-boundaries
     scripts/verify-overview-boundaries

@@ -385,7 +385,9 @@ public struct ManifestSystemObservation: Codable, Sendable, Equatable {
         let expectedDelta = Int64(freeBytesAfter.value)
             - Int64(freeBytesBefore.value)
         guard sampledAfterAt >= sampledBeforeAt,
-              freeSpaceDelta.value == expectedDelta
+              freeSpaceDelta.value == expectedDelta,
+              unexplainedDelta == nil
+                || unexplainedDelta == freeSpaceDelta
         else {
             throw DomainContractError.invalidMeasurement
         }
@@ -503,7 +505,10 @@ public struct CleanupManifestRecord: Codable, Sendable, Equatable {
         let executableDisposition =
             policyDisposition == .readyToReclaim
                 || policyDisposition == .reviewRecommended
-        guard executableDisposition,
+        let knownDeniedBeforeWrite = result == .failed
+            && recovery == .notStarted
+            && startedAt == nil
+        guard executableDisposition || knownDeniedBeforeWrite,
               !policyReasonKeys.isEmpty,
               policyReasonKeys.count <= 32,
               Set(policyReasonKeys).count == policyReasonKeys.count,
@@ -787,8 +792,8 @@ public struct CleanupManifestRecord: Codable, Sendable, Equatable {
                 && measures.movedToTrashAllocatedBytes
                     == measures.processedAllocatedBytes
         case .failed:
-            return recovery == .originalConfirmed
-                && startedAt != nil
+            return (recovery == .originalConfirmed
+                || recovery == .notStarted)
                 && finishedAt != nil
                 && error != nil
                 && measures.movedToTrashLogicalBytes == ByteCount(0)
@@ -923,6 +928,10 @@ public struct CleanupManifest: Codable, Sendable, Equatable {
         ) ?? (persistedVersion == .v1 ? .legacyV1 : .current)
         switch (persistedVersion, compatibility) {
         case (.v1, .legacyV1), (.v2, .legacyV1):
+            let legacyObservation = try container.decodeIfPresent(
+                LegacyManifestSystemObservation.self,
+                forKey: .systemObservation
+            )
             try self.init(
                 legacyID: container.decode(
                     CleanupManifestID.self,
@@ -935,10 +944,9 @@ public struct CleanupManifest: Codable, Sendable, Equatable {
                     [CleanupManifestRecord].self,
                     forKey: .records
                 ),
-                systemObservation: container.decodeIfPresent(
-                    ManifestSystemObservation.self,
-                    forKey: .systemObservation
-                )
+                systemObservation: try legacyObservation.map {
+                    try $0.projection()
+                }
             )
         case (.v2, .current):
             try self.init(
@@ -977,5 +985,73 @@ public struct CleanupManifest: Codable, Sendable, Equatable {
         case records
         case summary
         case systemObservation
+    }
+}
+
+private struct LegacyManifestSystemObservation: Decodable {
+    let source: DomainToken
+    let freeBytesBefore: ByteCount
+    let sampledBeforeAt: Date
+    let freeBytesAfter: ByteCount
+    let sampledAfterAt: Date
+    let freeSpaceDelta: SignedByteDelta
+    let unexplainedDelta: SignedByteDelta?
+
+    init(from decoder: Decoder) throws {
+        try rejectUnknownCodingKeys(
+            decoder,
+            allowedKeys: Set(CodingKeys.allCases.map(\.stringValue))
+        )
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        source = try container.decode(DomainToken.self, forKey: .source)
+        freeBytesBefore = try container.decode(
+            ByteCount.self,
+            forKey: .freeBytesBefore
+        )
+        sampledBeforeAt = try container.decode(
+            Date.self,
+            forKey: .sampledBeforeAt
+        )
+        freeBytesAfter = try container.decode(
+            ByteCount.self,
+            forKey: .freeBytesAfter
+        )
+        sampledAfterAt = try container.decode(
+            Date.self,
+            forKey: .sampledAfterAt
+        )
+        freeSpaceDelta = try container.decode(
+            SignedByteDelta.self,
+            forKey: .freeSpaceDelta
+        )
+        unexplainedDelta = try container.decodeIfPresent(
+            SignedByteDelta.self,
+            forKey: .unexplainedDelta
+        )
+    }
+
+    func projection() throws -> ManifestSystemObservation {
+        try ManifestSystemObservation(
+            source: source,
+            freeBytesBefore: freeBytesBefore,
+            sampledBeforeAt: sampledBeforeAt,
+            freeBytesAfter: freeBytesAfter,
+            sampledAfterAt: sampledAfterAt,
+            freeSpaceDelta: freeSpaceDelta,
+            unexplainedDelta:
+                unexplainedDelta == freeSpaceDelta
+                    ? unexplainedDelta
+                    : nil
+        )
+    }
+
+    private enum CodingKeys: String, CodingKey, CaseIterable {
+        case source
+        case freeBytesBefore
+        case sampledBeforeAt
+        case freeBytesAfter
+        case sampledAfterAt
+        case freeSpaceDelta
+        case unexplainedDelta
     }
 }

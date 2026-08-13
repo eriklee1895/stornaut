@@ -1,7 +1,7 @@
 # Stornaut Coding Agent Handoff
 
 > 面向接手实现的 Coding Agent  
-> 最近更新：2026-08-13
+> 最近更新：2026-08-14
 > 当前状态：产品、Agent、UI 功能交互与品牌基线完成；Epic 0–1 evidence
 > gate 已完成；Epic 2–4 Tasks 9–26 通过最终 unified verifier 并归档；
 > Phase C deterministic Epic 8 详尽 plan 已于 2026-08-11 获用户批准，
@@ -43,7 +43,10 @@
 > projection、independent review 与 unified verifier 已完成。Task 30 的
 > collector/pure-gate、memory-only selection、typed stale contract、
 > actor-owned one-shot authorization、independent review 与 unified verifier
-> 已完成。Task 31 是下一项 eligible deterministic task。
+> 已完成。Task 31 的 serial injected fake-Trash coordinator、durable journal、
+> per-item fresh Policy、Manifest/accounting、audit retry、no-replay recovery、
+> independent review 与 unified verifier 已完成。Task 32 是下一项；真实 App
+> Trash 依赖仍保持关闭。
 > Task 5 的历史
 > Broker-only no-go 已由 ADR 0004 capability-first 决策修订，Deep Dive 因
 > 生产产品流程尚未实现而 unavailable；
@@ -269,9 +272,11 @@ foundation `go`；Task 29 已完成并通过 review/verify。实现与完成证�
 与 [Task 29 Review](../reports/epic-8-task-29-review.md)。Task 30 详细边界见
 [Task 30 Implementation Brief](../plans/active/task-30-implementation-brief.md)；
 完成证据见
-[Task 30 Review](../reports/epic-8-task-30-review.md)。Task 31 不得把
-generic Rule Catalog 变成 execution catalog，也不得提前混入 Trash 或 App
-CTA。
+[Task 30 Review](../reports/epic-8-task-30-review.md)。Task 31 详细边界见
+[Task 31 Implementation Brief](../plans/active/task-31-implementation-brief.md)；
+完成证据见
+[Task 31 Review](../reports/epic-8-task-31-review.md)。Task 32 只可接入 fake
+或 write-disabled coordinator，不得启用真实 App Trash。
 逐项 artifact/command/gate 缺口与恢复顺序见
 [R2–R6 Progress Audit](../reports/capability-first-runtime-progress-audit-2026-08-13.md)。
 R1 当前证据见
@@ -381,7 +386,7 @@ R4 已完成并得出 `protocolReady`；R5 official `openai` worker gate 已通�
 current-source signed App/helper report 进一步通过 9/9 capability、12/12
 integrity 与零残留卸载。R6 已完成 final matrix、five-dimensional status、
 typed disclosure、actual-window evidence 与 post-fix review，runtime
-foundation 结论为 `go`。Tasks 29–30 已完成，Task 31 是下一项。该 gate
+foundation 结论为 `go`。Tasks 29–31 已完成，Task 32 是下一项。该 gate
 要求证明完整调查能力和公共联网可用时，Codex 全进程树不可写用户数据、不可
 访问 localhost/私网/任意 Unix socket 且无 Executor 路径；不得用
 `danger-full-access`、命令/公共域名

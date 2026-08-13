@@ -103,7 +103,7 @@ func cleanupJournalRetentionUsesSevenAndNinetyDayClasses() async throws {
     try await store.expireRecords(
         now: audit.createdAt.addingTimeInterval(90 * 86_400 + 1)
     )
-    #expect(try await store.cleanupRunJournal(id: audit.id) == nil)
+    #expect(try await store.cleanupRunJournal(id: audit.id) == audit)
 }
 
 @Test

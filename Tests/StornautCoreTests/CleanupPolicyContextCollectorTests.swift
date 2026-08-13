@@ -181,7 +181,21 @@ func cleanupPolicyStoreLoadsSelectedTruthInPlanOrderAndRejectsUnknownItems()
 
     #expect(records.count == 1)
     #expect(records[0].planItem == fixture.plan.items[0])
-    #expect(records[0].snapshot == fixture.snapshot)
+    #expect(records[0].snapshot.id == fixture.snapshot.id)
+    #expect(records[0].snapshot.sessionID == fixture.snapshot.sessionID)
+    #expect(records[0].snapshot.scopeID == fixture.snapshot.scopeID)
+    #expect(records[0].snapshot.relativePath == fixture.snapshot.relativePath)
+    #expect(records[0].snapshot.kind == fixture.snapshot.kind)
+    #expect(records[0].snapshot.logicalByteCount
+        == fixture.snapshot.logicalByteCount)
+    #expect(records[0].snapshot.allocatedByteCount
+        == fixture.snapshot.allocatedByteCount)
+    #expect(records[0].snapshot.fileIdentity
+        == fixture.snapshot.fileIdentity)
+    #expect(abs(
+        try #require(records[0].snapshot.modifiedAt)
+            .timeIntervalSince(try #require(fixture.snapshot.modifiedAt))
+    ) < 0.001)
     #expect(records[0].classification == fixture.classification)
     #expect(records[0].evidence == fixture.evidence.sorted {
         if $0.observedAt != $1.observedAt {

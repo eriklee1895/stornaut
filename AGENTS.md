@@ -48,8 +48,10 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   Review projection、independent review 与 unified verifier 已完成；Task 30
   的 memory-only selection、pure Policy、fresh context collector、typed stale
   contract、one-shot authorization、independent review 与 unified verifier 已
-  完成；Task 31 是下一项 deterministic task。生产 Deep Dive 仍为 implementation
-  unavailable。
+  完成；Task 31 的 serial injected fake-Trash coordinator、durable journal、
+  per-item fresh Policy、Manifest/accounting、no-replay recovery、independent
+  review 与 unified verifier 已完成；Task 32 是下一项 deterministic task。
+  真实 App Trash 依赖仍保持关闭，生产 Deep Dive 仍为 implementation unavailable。
   逐 Task 完成 Upstream Study、
   实现、code review、focused/full verify、独立 commit/push；不得提前混入
   生产 Deep Dive、Adapter、真实 Registered Action 或 release 工作。
@@ -111,6 +113,8 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Epic 8 Task 29 review / completion audit | [docs/reports/epic-8-task-29-review.md](docs/reports/epic-8-task-29-review.md) |
 | Epic 8 Task 30 tests-first brief | [docs/plans/active/task-30-implementation-brief.md](docs/plans/active/task-30-implementation-brief.md) |
 | Epic 8 Task 30 review / completion audit | [docs/reports/epic-8-task-30-review.md](docs/reports/epic-8-task-30-review.md) |
+| Epic 8 Task 31 tests-first brief | [docs/plans/active/task-31-implementation-brief.md](docs/plans/active/task-31-implementation-brief.md) |
+| Epic 8 Task 31 review / completion audit | [docs/reports/epic-8-task-31-review.md](docs/reports/epic-8-task-31-review.md) |
 | Epic 2–4 历史计划 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) |
 | Epic 2–4 最终 Gate | [docs/reports/epic-2-4-validation-report.md](docs/reports/epic-2-4-validation-report.md) |
 | Epic 0–1 历史计划与证据 | [docs/plans/completed/epic-0-1-foundation-spikes.md](docs/plans/completed/epic-0-1-foundation-spikes.md) |
@@ -153,7 +157,7 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   classification、provider-compatible group schema 与 fixed direct-read command
   identity。current-source signed App/helper 已得出 `signedRuntimeReady`，并在
   gate 后完成 fixed topology 零残留卸载。R6 final admission 已完成并得出
-  runtime foundation `go`；Tasks 29–30 已完成，Task 31 是下一项。
+  runtime foundation `go`；Tasks 29–31 已完成，Task 32 是下一项。
 Deep Dive 的旧 Broker-only no-go 已被 ADR 0004 的 capability-first 边界取代；
 当前仍不可用的原因是生产 Deep Dive 尚未实现，而非 R6 或 Codex 工具能力。
 R6 不证明 release distribution、FDA/TCC 或 production Deep Dive；
@@ -176,6 +180,10 @@ Sources/StornautCore/Settings/
                         closed preferences、bookmark 与 exclusions
 Sources/StornautCore/Review/
                         deterministic execution Evidence、Plan Builder 与 projection
+Sources/StornautCore/Actions/
+                        closed action types、durable execution journal 与 serial coordinator
+Sources/StornautCore/Accounting/
+                        cleanup Manifest/accounting 与 read-only volume sampling
 Stornaut.xcodeproj/      原生 macOS App/Test host
 StornautApp/             最小原生 .app shell
 StornautAppTests/        App contract tests

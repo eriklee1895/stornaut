@@ -1158,13 +1158,28 @@ public actor EvidenceStore {
             throw EvidenceStoreError.retentionLimitExceeded
         }
         try connection.transaction(operation: "journal.save") {
-            if let current = try cleanupRunJournal(id: journal.id) {
+            let current = try cleanupRunJournal(id: journal.id)
+            if let current {
                 guard current.canTransition(to: journal) else {
                     throw EvidenceStoreError.invalidJournalTransition
                 }
+            }
+            let retainedPlan = try cleanupPlan(id: journal.planID)
+            if
+                retainedPlan == nil,
+                let current,
+                current.retentionClass == .audit
+            {
+                guard zip(current.entries, journal.entries).allSatisfy({
+                    existing, candidate in
+                    existing.state != .prepared
+                        || candidate.state == .prepared
+                        || candidate.state == .cancelled
+                }) else {
+                    throw EvidenceStoreError.invalidJournalTransition
+                }
             } else {
-                guard journal.stage == .prepared,
-                      let plan = try cleanupPlan(id: journal.planID),
+                guard let plan = retainedPlan,
                       plan.compatibility == .current,
                       journal.entries.count <= plan.items.count
                 else {
@@ -1173,7 +1188,7 @@ public actor EvidenceStore {
                 let planItemsByID = Dictionary(
                     uniqueKeysWithValues: plan.items.enumerated().map {
                         ($0.element.id, (index: $0.offset, item: $0.element))
-                    }
+                }
                 )
                 var previousPlanIndex = -1
                 for entry in journal.entries {
@@ -1184,6 +1199,10 @@ public actor EvidenceStore {
                     }
                     previousPlanIndex = indexedItem.index
                     let item = indexedItem.item
+                    let permitsDeniedDecision =
+                        entry.state == .outcomeRecorded
+                            && entry.outcome?.result == .failed
+                            && entry.outcome?.recovery == .notStarted
                     guard entry.planItemID == item.id,
                           entry.action == item.proposedAction,
                           entry.expectedIdentity == item.expectedIdentity,
@@ -1193,7 +1212,9 @@ public actor EvidenceStore {
                           decision.compatibility == .current,
                           decision.planID == plan.id,
                           decision.itemID == item.id,
-                          decision.outcome == .allowed,
+                          decision.outcome == .allowed
+                            || (permitsDeniedDecision
+                                && decision.outcome == .denied),
                           decision.disposition == entry.policyDisposition,
                           decision.reasonKeys == entry.policyReasonKeys,
                           decision.selectionGeneration
@@ -1202,6 +1223,14 @@ public actor EvidenceStore {
                         throw EvidenceStoreError.invalidJournalTransition
                     }
                 }
+            }
+            if current == nil {
+                guard journal.stage == .prepared,
+                      journal.selectionFingerprint.rawValue
+                        .hasPrefix("selection.")
+                    else {
+                        throw EvidenceStoreError.invalidJournalTransition
+                    }
             }
             try connection.execute(
                 """
@@ -1439,7 +1468,7 @@ public actor EvidenceStore {
                 """
                 DELETE FROM cleanup_run_journals
                 WHERE retention_class = 'audit'
-                  AND stage != 'auditPending'
+                  AND stage = 'finalized'
                   AND (
                     expires_at_ms <= ?
                     OR updated_at_ms <= ?
@@ -1517,7 +1546,10 @@ public actor EvidenceStore {
     public func clearManifests() throws {
         try connection.transaction(operation: "clear.manifests") {
             try connection.execute(
-                "DELETE FROM cleanup_run_journals",
+                """
+                DELETE FROM cleanup_run_journals
+                WHERE stage IN ('auditPending', 'finalized')
+                """,
                 operation: "clear.journals"
             )
             try connection.execute(

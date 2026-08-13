@@ -383,6 +383,11 @@ public struct CleanupPolicyBlocked: Sendable, Equatable {
     public let stale: CleanupStaleResult
 }
 
+struct CleanupPolicyItemEvaluation: Sendable, Equatable {
+    let decision: PolicyDecision
+    let stale: CleanupStaleResult?
+}
+
 public enum CleanupPolicyEvaluation: Sendable, Equatable {
     case allowed(CleanupPolicyAllowed)
     case blocked(CleanupPolicyBlocked)
@@ -415,7 +420,8 @@ public struct CleanupPolicyGate: Sendable {
             plan: plan,
             selection: selection,
             context: context,
-            evaluatedAt: evaluatedAt
+            evaluatedAt: evaluatedAt,
+            expectedItemIDs: selection.items.map(\.itemID)
         )
         let planItems = Dictionary(
             uniqueKeysWithValues: plan.items.map { ($0.id, $0) }
@@ -428,53 +434,15 @@ public struct CleanupPolicyGate: Sendable {
             guard let item = planItems[selected.itemID] else {
                 throw ReviewSelectionError.unknownItem
             }
-            let itemContext = contexts[selected.itemID]
-            var reasons = globalReasons
-            reasons.append(contentsOf: itemReasons(
-                item: item,
-                selected: selected,
-                context: itemContext
-            ))
-            reasons = Array(Set(reasons)).sorted {
-                $0.rawValue < $1.rawValue
-            }
-            let disposition = itemContext?.currentDisposition ?? .unknown
-            let outcome: PolicyDecisionOutcome =
-                reasons.isEmpty ? .allowed : .denied
-            let effectiveReasons = reasons.isEmpty
-                ? [cleanupPolicyToken("policy.item.allowed")]
-                : reasons
-            let decisionFingerprint = cleanupFingerprint(
-                prefix: "policy-decision",
-                lines: [
-                    "stornaut.cleanup-policy-decision.v1",
-                    plan.id.rawValue,
-                    item.id.rawValue,
-                    selection.fingerprint.rawValue,
-                    context.contextFingerprint.rawValue,
-                    disposition.rawValue,
-                    selected.origin.rawValue,
-                    outcome.rawValue,
-                    String(evaluatedAt.timeIntervalSince1970.bitPattern),
-                    effectiveReasons.map(\.rawValue)
-                        .joined(separator: ","),
-                ]
-            )
-            let decisionID = PolicyDecisionID(
-                rawValue: "decision-\(decisionFingerprint.rawValue)"
-            )!
             decisions.append(
-                try PolicyDecision(
-                    id: decisionID,
-                    planID: plan.id,
-                    itemID: item.id,
-                    outcome: outcome,
-                    disposition: disposition,
-                    selectionGeneration: selection.generation,
-                    selectionOrigin: selected.origin,
-                    planFingerprint: plan.planFingerprint!,
-                    decisionFingerprint: decisionFingerprint,
-                    reasonKeys: effectiveReasons,
+                try makeDecision(
+                    plan: plan,
+                    selection: selection,
+                    selected: selected,
+                    item: item,
+                    context: contexts[selected.itemID],
+                    contextFingerprint: context.contextFingerprint,
+                    globalReasons: globalReasons,
                     evaluatedAt: evaluatedAt
                 )
             )
@@ -510,11 +478,57 @@ public struct CleanupPolicyGate: Sendable {
         )
     }
 
-    private func globalReasons(
+    func revalidateItem(
+        itemID: CleanupPlanItemID,
         plan: CleanupPlan,
         selection: ReviewSelection,
         context: CleanupPolicyContext,
         evaluatedAt: Date
+    ) throws -> CleanupPolicyItemEvaluation {
+        guard let selected = selection.items.first(where: {
+            $0.itemID == itemID
+        }), let item = plan.items.first(where: {
+            $0.id == itemID
+        }) else {
+            throw ReviewSelectionError.unknownItem
+        }
+        let globalReasons = globalReasons(
+            plan: plan,
+            selection: selection,
+            context: context,
+            evaluatedAt: evaluatedAt,
+            expectedItemIDs: [itemID]
+        )
+        let decision = try makeDecision(
+            plan: plan,
+            selection: selection,
+            selected: selected,
+            item: item,
+            context: context.items.first { $0.itemID == itemID },
+            contextFingerprint: context.contextFingerprint,
+            globalReasons: globalReasons,
+            evaluatedAt: evaluatedAt
+        )
+        let stale = decision.outcome == .denied
+            ? CleanupStaleResult(
+                affectedItemIDs: [itemID],
+                reasonGroups: Set(
+                    decision.reasonKeys.compactMap(staleReasonGroup)
+                )
+            )
+            : nil
+        return CleanupPolicyItemEvaluation(
+            decision: decision,
+            stale: stale
+        )
+    }
+
+    private func globalReasons(
+        plan: CleanupPlan,
+        selection: ReviewSelection,
+        context: CleanupPolicyContext,
+        evaluatedAt: Date,
+        expectedItemIDs: [CleanupPlanItemID]
     ) -> [DomainToken] {
         var reasons: [DomainToken] = []
         if plan.compatibility != .current {
@@ -536,8 +550,7 @@ public struct CleanupPolicyGate: Sendable {
         }
         if context.selectionGeneration != selection.generation
             || context.selectionFingerprint != selection.fingerprint
-            || context.items.map(\.itemID)
-                != selection.items.map(\.itemID)
+            || context.items.map(\.itemID) != expectedItemIDs
         {
             reasons.append(
                 cleanupPolicyToken("policy.selection.generation-changed")
@@ -566,6 +579,64 @@ public struct CleanupPolicyGate: Sendable {
             reasons.append(workflowReason(conflict))
         }
         return reasons
+    }
+
+    private func makeDecision(
+        plan: CleanupPlan,
+        selection: ReviewSelection,
+        selected: ReviewSelectionItem,
+        item: CleanupPlanItem,
+        context: CleanupPolicyItemContext?,
+        contextFingerprint: DomainToken,
+        globalReasons: [DomainToken],
+        evaluatedAt: Date
+    ) throws -> PolicyDecision {
+        var reasons = globalReasons
+        reasons.append(contentsOf: itemReasons(
+            item: item,
+            selected: selected,
+            context: context
+        ))
+        reasons = Array(Set(reasons)).sorted {
+            $0.rawValue < $1.rawValue
+        }
+        let disposition = context?.currentDisposition ?? .unknown
+        let outcome: PolicyDecisionOutcome =
+            reasons.isEmpty ? .allowed : .denied
+        let effectiveReasons = reasons.isEmpty
+            ? [cleanupPolicyToken("policy.item.allowed")]
+            : reasons
+        let decisionFingerprint = cleanupFingerprint(
+            prefix: "policy-decision",
+            lines: [
+                "stornaut.cleanup-policy-decision.v1",
+                plan.id.rawValue,
+                item.id.rawValue,
+                selection.fingerprint.rawValue,
+                contextFingerprint.rawValue,
+                disposition.rawValue,
+                selected.origin.rawValue,
+                outcome.rawValue,
+                String(evaluatedAt.timeIntervalSince1970.bitPattern),
+                effectiveReasons.map(\.rawValue)
+                    .joined(separator: ","),
+            ]
+        )
+        return try PolicyDecision(
+            id: PolicyDecisionID(
+                rawValue: "decision-\(decisionFingerprint.rawValue)"
+            )!,
+            planID: plan.id,
+            itemID: item.id,
+            outcome: outcome,
+            disposition: disposition,
+            selectionGeneration: selection.generation,
+            selectionOrigin: selected.origin,
+            planFingerprint: plan.planFingerprint!,
+            decisionFingerprint: decisionFingerprint,
+            reasonKeys: effectiveReasons,
+            evaluatedAt: evaluatedAt
+        )
     }
 
     private func itemReasons(

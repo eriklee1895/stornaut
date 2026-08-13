@@ -1037,45 +1037,15 @@ private func waitForDiagnosticProcessExit(
     return false
 }
 
-private final class DiagnosticTerminationResult: @unchecked Sendable {
-    private let lock = NSLock()
-    private var failure: ProcessTreeTerminationError?
-
-    func store(_ error: ProcessTreeTerminationError?) {
-        lock.withLock { failure = error }
-    }
-
-    var error: ProcessTreeTerminationError? {
-        lock.withLock { failure }
-    }
-}
-
 func terminateDiagnosticProcessGroup(
     _ processGroup: ProcessGroupID
 ) throws {
-    let completed = DispatchSemaphore(value: 0)
-    let result = DiagnosticTerminationResult()
-    Task.detached(priority: .utility) {
-        do {
-            _ = try await ProcessTreeTerminator().terminateProcessGroup(
-                processGroup,
-                gracePeriod: .milliseconds(250)
-            )
-            result.store(nil)
-        } catch let error as ProcessTreeTerminationError {
-            result.store(error)
-        } catch {
-            result.store(.unexpected)
-        }
-        completed.signal()
-    }
-    guard completed.wait(timeout: .now() + .seconds(2)) == .success else {
-        kill(-processGroup.rawValue, SIGKILL)
-        throw CodexRuntimeDiagnosticError.processFailed(
-            reasonKey: "runtime.process.terminationTimedOut"
+    do {
+        _ = try ProcessTreeTerminator().terminateProcessGroupSynchronously(
+            processGroup,
+            gracePeriod: .milliseconds(250)
         )
-    }
-    if result.error != nil {
+    } catch {
         throw CodexRuntimeDiagnosticError.processFailed(
             reasonKey: "runtime.process.terminationFailed"
         )

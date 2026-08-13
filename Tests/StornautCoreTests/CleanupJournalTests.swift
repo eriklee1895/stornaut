@@ -24,6 +24,54 @@ func cleanupJournalPreparedStateIsBoundedAndPathFree() throws {
 }
 
 @Test
+func cleanupJournalSuccessBindsDestinationToExpectedIdentity() throws {
+    let plan = try CleanupPersistenceTestSupport.plan()
+    let item = plan.items[0]
+    let decision = try CleanupPersistenceTestSupport.decision(
+        plan: plan,
+        item: item
+    )
+    let expectedIdentity = try #require(item.expectedIdentity)
+    let differentIdentity = try FileIdentity(
+        device: expectedIdentity.device,
+        inode: expectedIdentity.inode + 1,
+        mode: expectedIdentity.mode,
+        ownerUserID: expectedIdentity.ownerUserID,
+        ownerGroupID: expectedIdentity.ownerGroupID,
+        size: expectedIdentity.size,
+        allocatedBytes: expectedIdentity.allocatedBytes,
+        modificationSeconds: expectedIdentity.modificationSeconds,
+        modificationNanoseconds: expectedIdentity.modificationNanoseconds
+    )
+
+    #expect(throws: DomainContractError.invalidMeasurement) {
+        _ = try CleanupRunJournalEntry(
+            actionID: CleanupActionID(rawValue: "action-destination-binding")!,
+            planItemID: item.id,
+            policyDecisionID: decision.id,
+            policyDisposition: decision.disposition,
+            policyReasonKeys: decision.reasonKeys,
+            action: item.proposedAction,
+            expectedIdentity: expectedIdentity,
+            actionFingerprint: DomainToken(
+                rawValue: "action.destination-binding.fingerprint"
+            )!,
+            state: .outcomeRecorded,
+            startedAt: CleanupPersistenceTestSupport.updatedAt,
+            outcome: CleanupJournalOutcome(
+                result: .succeeded,
+                recovery: .movedToTrash,
+                measures: try CleanupPersistenceTestSupport.measures(),
+                destinationIdentity: differentIdentity,
+                error: nil,
+                finishedAt: CleanupPersistenceTestSupport.updatedAt
+                    .addingTimeInterval(1)
+            )
+        )
+    }
+}
+
+@Test
 func cleanupJournalRejectsInvalidStartedPrefixAndRetention() throws {
     let plan = try CleanupPersistenceTestSupport.plan()
     let prepared = try CleanupPersistenceTestSupport.journalEntry(

@@ -93,7 +93,7 @@ public struct ProcessTreeTerminator: Sendable {
             processTreeTerminationQueue.async {
                 do {
                     continuation.resume(
-                        returning: try terminateSynchronously(
+                        returning: try terminateProcessGroupSynchronously(
                             processGroup,
                             gracePeriod: gracePeriod
                         )
@@ -103,6 +103,16 @@ public struct ProcessTreeTerminator: Sendable {
                 }
             }
         }
+    }
+
+    public func terminateProcessGroupSynchronously(
+        _ processGroup: ProcessGroupID,
+        gracePeriod: Duration
+    ) throws -> [ProcessTreeTerminationTransition] {
+        try terminateSynchronously(
+            processGroup,
+            gracePeriod: gracePeriod
+        )
     }
 }
 

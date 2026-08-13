@@ -57,7 +57,8 @@ public struct CleanupJournalOutcome: Codable, Sendable, Equatable {
                 && measures.movedToTrashAllocatedBytes
                     == measures.processedAllocatedBytes
         case .failed:
-            valid = recovery == .originalConfirmed
+            valid = (recovery == .originalConfirmed
+                || recovery == .notStarted)
                 && destinationIdentity == nil
                 && error != nil
                 && measures.movedToTrashLogicalBytes == ByteCount(0)
@@ -169,15 +170,20 @@ public struct CleanupRunJournalEntry: Codable, Sendable, Equatable {
         case .started:
             valid = startedAt != nil && outcome == nil
         case .outcomeRecorded:
-            valid = startedAt != nil
-                && outcome != nil
+            valid = outcome != nil
                 && outcome!.result != .cancelled
-                && outcome!.finishedAt >= startedAt!
+                && (startedAt == nil
+                    ? outcome!.recovery == .notStarted
+                    : outcome!.finishedAt >= startedAt!)
         case .cancelled:
             valid = startedAt == nil
                 && outcome?.result == .cancelled
         }
-        guard executableDisposition,
+        let knownDeniedBeforeWrite = state == .outcomeRecorded
+            && startedAt == nil
+            && outcome?.result == .failed
+            && outcome?.recovery == .notStarted
+        guard executableDisposition || knownDeniedBeforeWrite,
               !policyReasonKeys.isEmpty,
               policyReasonKeys.count <= 32,
               Set(policyReasonKeys).count == policyReasonKeys.count,
@@ -189,6 +195,8 @@ public struct CleanupRunJournalEntry: Codable, Sendable, Equatable {
                     == expectedLogicalBytes
                     && outcome!.measures.candidateAllocatedBytes
                     == expectedAllocatedBytes),
+              outcome?.destinationIdentity == nil
+                || outcome?.destinationIdentity == expectedIdentity,
               valid
         else {
             throw DomainContractError.invalidMeasurement
@@ -257,32 +265,45 @@ public struct CleanupRunJournalEntry: Codable, Sendable, Equatable {
     func canTransition(to next: Self) -> Bool {
         guard actionID == next.actionID,
               planItemID == next.planItemID,
-              policyDecisionID == next.policyDecisionID,
-              policyDisposition == next.policyDisposition,
-              policyReasonKeys == next.policyReasonKeys,
               action == next.action,
-              expectedIdentity == next.expectedIdentity,
-              actionFingerprint == next.actionFingerprint
+              expectedIdentity == next.expectedIdentity
         else {
             return false
         }
         switch (state, next.state) {
         case (.prepared, .prepared):
-            return startedAt == next.startedAt && outcome == next.outcome
+            return self == next
         case (.prepared, .started):
             return next.startedAt != nil && next.outcome == nil
+        case (.prepared, .outcomeRecorded):
+            return next.startedAt == nil
+                && next.outcome?.result == .failed
+                && next.outcome?.recovery == .notStarted
         case (.prepared, .cancelled):
-            return next.startedAt == nil && next.outcome?.result == .cancelled
+            return hasSamePolicyBinding(next)
+                && next.startedAt == nil
+                && next.outcome?.result == .cancelled
         case (.started, .started):
-            return startedAt == next.startedAt && outcome == next.outcome
+            return hasSamePolicyBinding(next)
+                && startedAt == next.startedAt
+                && outcome == next.outcome
         case (.started, .outcomeRecorded):
-            return startedAt == next.startedAt && next.outcome != nil
+            return hasSamePolicyBinding(next)
+                && startedAt == next.startedAt
+                && next.outcome != nil
         case (.outcomeRecorded, .outcomeRecorded),
              (.cancelled, .cancelled):
             return self == next
         default:
             return false
         }
+    }
+
+    private func hasSamePolicyBinding(_ next: Self) -> Bool {
+        policyDecisionID == next.policyDecisionID
+            && policyDisposition == next.policyDisposition
+            && policyReasonKeys == next.policyReasonKeys
+            && actionFingerprint == next.actionFingerprint
     }
 
     private enum CodingKeys: String, CodingKey, CaseIterable {
@@ -311,6 +332,8 @@ public struct CleanupRunJournal: Codable, Sendable, Equatable {
     public let retentionClass: CleanupJournalRetentionClass
     public let stopAfterCurrentRequested: Bool
     public let entries: [CleanupRunJournalEntry]
+    public let manifestCreatedAt: Date?
+    public let systemObservation: ManifestSystemObservation?
     public let createdAt: Date
     public let updatedAt: Date
     public let expiresAt: Date
@@ -327,10 +350,26 @@ public struct CleanupRunJournal: Codable, Sendable, Equatable {
         entries: [CleanupRunJournalEntry],
         createdAt: Date,
         updatedAt: Date,
-        expiresAt: Date
+        expiresAt: Date,
+        manifestCreatedAt: Date? = nil,
+        systemObservation: ManifestSystemObservation? = nil
     ) throws {
         let maximumLifetime: TimeInterval =
             retentionClass == .evidenceLinked ? 7 * 86_400 : 90 * 86_400
+        let manifestTimelineIsValid = manifestCreatedAt.map { created in
+            guard created >= createdAt,
+                  created <= expiresAt,
+                  entries.allSatisfy({
+                      ($0.outcome?.finishedAt ?? createdAt) <= created
+                  })
+            else {
+                return false
+            }
+            guard let systemObservation else {
+                return true
+            }
+            return systemObservation.sampledAfterAt <= created
+        } ?? true
         guard !entries.isEmpty,
               entries.count <= 100,
               Set(entries.map(\.actionID)).count == entries.count,
@@ -343,7 +382,17 @@ public struct CleanupRunJournal: Codable, Sendable, Equatable {
                   stage,
                   retentionClass: retentionClass,
                   entries: entries
-              )
+              ),
+              systemObservation == nil
+                || stage == .manifestPending
+                || stage == .auditPending
+                || stage == .finalized,
+              manifestCreatedAt == nil
+                || stage == .manifestPending
+                || stage == .auditPending
+                || stage == .finalized,
+              systemObservation == nil || manifestCreatedAt != nil,
+              manifestTimelineIsValid
         else {
             throw DomainContractError.invalidMeasurement
         }
@@ -357,6 +406,8 @@ public struct CleanupRunJournal: Codable, Sendable, Equatable {
         self.retentionClass = retentionClass
         self.stopAfterCurrentRequested = stopAfterCurrentRequested
         self.entries = entries
+        self.manifestCreatedAt = manifestCreatedAt
+        self.systemObservation = systemObservation
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.expiresAt = expiresAt
@@ -406,7 +457,15 @@ public struct CleanupRunJournal: Codable, Sendable, Equatable {
             ),
             createdAt: container.decode(Date.self, forKey: .createdAt),
             updatedAt: container.decode(Date.self, forKey: .updatedAt),
-            expiresAt: container.decode(Date.self, forKey: .expiresAt)
+            expiresAt: container.decode(Date.self, forKey: .expiresAt),
+            manifestCreatedAt: container.decodeIfPresent(
+                Date.self,
+                forKey: .manifestCreatedAt
+            ),
+            systemObservation: container.decodeIfPresent(
+                ManifestSystemObservation.self,
+                forKey: .systemObservation
+            )
         )
     }
 
@@ -424,6 +483,10 @@ public struct CleanupRunJournal: Codable, Sendable, Equatable {
                 || (self != next && updatedAt < next.updatedAt),
               (!stopAfterCurrentRequested || next.stopAfterCurrentRequested),
               retentionClass != .audit || next.retentionClass == .audit,
+              manifestCreatedAt == nil
+                || manifestCreatedAt == next.manifestCreatedAt,
+              systemObservation == nil
+                || systemObservation == next.systemObservation,
               expiresAt <= next.expiresAt,
               zip(entries, next.entries).allSatisfy({ current, candidate in
                   current.canTransition(to: candidate)
@@ -443,8 +506,10 @@ public struct CleanupRunJournal: Codable, Sendable, Equatable {
         }
         switch (current, next) {
         case (.prepared, .actionStarted),
+             (.prepared, .actionOutcomeRecorded),
              (.prepared, .manifestPending),
              (.actionStarted, .actionOutcomeRecorded),
+             (.actionStarted, .manifestPending),
              (.actionOutcomeRecorded, .actionStarted),
              (.actionOutcomeRecorded, .manifestPending),
              (.manifestPending, .auditPending),
@@ -536,6 +601,8 @@ public struct CleanupRunJournal: Codable, Sendable, Equatable {
         case retentionClass
         case stopAfterCurrentRequested
         case entries
+        case manifestCreatedAt
+        case systemObservation
         case createdAt
         case updatedAt
         case expiresAt

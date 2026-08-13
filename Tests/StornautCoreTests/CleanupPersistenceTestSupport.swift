@@ -202,7 +202,7 @@ enum CleanupPersistenceTestSupport {
                 result: .succeeded,
                 recovery: .movedToTrash,
                 measures: measures(),
-                destinationIdentity: identity(inode: 500),
+                destinationIdentity: item.expectedIdentity,
                 error: nil,
                 finishedAt: updatedAt.addingTimeInterval(1)
             )

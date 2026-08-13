@@ -38,11 +38,13 @@ struct ExecutionAuthorizationAdmission: Sendable {
     public let orderedItemIDs: [CleanupPlanItemID]
     public let decisionFingerprint: DomainToken
     public let admittedAt: Date
+    let rootURL: URL
     let rootAccess: CleanupPolicyRootAccess
 
     fileprivate init(
         authorization: ExecutionAuthorization,
         admittedAt: Date,
+        rootURL: URL,
         rootAccess: CleanupPolicyRootAccess
     ) {
         planID = authorization.planID
@@ -50,6 +52,7 @@ struct ExecutionAuthorizationAdmission: Sendable {
         orderedItemIDs = authorization.orderedItemIDs
         decisionFingerprint = authorization.decisionFingerprint
         self.admittedAt = admittedAt
+        self.rootURL = rootURL
         self.rootAccess = rootAccess
     }
 }
@@ -66,6 +69,7 @@ actor CleanupAuthorizationController {
     private struct PendingAuthorization {
         let authorization: ExecutionAuthorization
         let confirmation: CleanupConfirmation
+        let rootURL: URL
         let rootAccess: CleanupPolicyRootAccess
     }
 
@@ -131,6 +135,7 @@ actor CleanupAuthorizationController {
             PendingAuthorization(
                 authorization: authorization,
                 confirmation: confirmation,
+                rootURL: collectedContext.rootURL,
                 rootAccess: collectedContext.rootAccess
             )
         )
@@ -182,6 +187,7 @@ actor CleanupAuthorizationController {
             return ExecutionAuthorizationAdmission(
                 authorization: authorization,
                 admittedAt: now,
+                rootURL: pending.rootURL,
                 rootAccess: pending.rootAccess
             )
         }

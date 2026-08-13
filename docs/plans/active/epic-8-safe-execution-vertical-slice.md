@@ -1,7 +1,7 @@
 # Stornaut Phase C — Epic 8 Safe Execution Vertical Slice Plan
 
-> **Status:** Tasks 27–30 complete; Runtime R1–R6 interlock complete with
-> foundation `go`; Task 31 is next
+> **Status:** Tasks 27–31 complete; Runtime R1–R6 interlock complete with
+> foundation `go`; Task 32 is next
 >
 > **Roadmap phase:** Phase C — Safe Execution Vertical Slice
 >
@@ -698,7 +698,11 @@ a supported runtime foundation `go`; see the
 Task 30 is complete. Its memory-only selection, pure Policy, exact Store join,
 fresh collector, typed stale result, one-shot authorization, independent
 review and unified verifier passed; see
-[Task 30 Review](../../reports/epic-8-task-30-review.md). Task 31 is therefore
+[Task 30 Review](../../reports/epic-8-task-30-review.md). Task 31 is complete.
+Its serial injected fake-Trash coordinator, durable journal, per-item fresh
+Policy, truthful Manifest/accounting, audit retry, no-replay recovery,
+independent review and unified verifier passed; see
+[Task 31 Review](../../reports/epic-8-task-31-review.md). Task 32 is therefore
 the next eligible deterministic task. This status does not enable production
 Deep Dive or the real App Trash dependency.
 
@@ -1193,6 +1197,11 @@ feat: enforce reclaim authorization policy
 ---
 
 ## Task 31: Serial Trash Execution, Journal, Manifest and Accounting
+
+Detailed implementation brief:
+[Task 31 Implementation Brief](task-31-implementation-brief.md).
+Completion evidence:
+[Task 31 Review](../../reports/epic-8-task-31-review.md).
 
 ### Files
 

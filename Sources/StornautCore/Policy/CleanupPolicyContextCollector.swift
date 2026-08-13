@@ -10,6 +10,15 @@ public protocol CleanupPolicyStoreReading: Sendable {
 
 extension EvidenceStore: CleanupPolicyStoreReading {}
 
+protocol CleanupItemPolicyContextCollecting: Sendable {
+    func collectItem(
+        plan: CleanupPlan,
+        selection: ReviewSelection,
+        itemID: CleanupPlanItemID,
+        workflow: CleanupWorkflowAvailabilitySnapshot
+    ) async -> CleanupPolicyCollectionOutcome
+}
+
 public protocol CleanupPolicyRootLeasing: AnyObject, Sendable {}
 
 extension SettingsPrimaryRootAccessLease: CleanupPolicyRootLeasing {}
@@ -81,13 +90,16 @@ public enum CleanupPolicyCollectionError:
 
 public struct CleanupPolicyCollectedContext: Sendable {
     public let policyContext: CleanupPolicyContext
+    let rootURL: URL
     let rootAccess: CleanupPolicyRootAccess
 
     init(
         policyContext: CleanupPolicyContext,
+        rootURL: URL,
         rootAccess: CleanupPolicyRootAccess
     ) {
         self.policyContext = policyContext
+        self.rootURL = rootURL
         self.rootAccess = rootAccess
     }
 }
@@ -180,7 +192,42 @@ public struct CleanupPolicyContextCollector: Sendable {
         plan: CleanupPlan,
         selection: ReviewSelection
     ) async -> CleanupPolicyCollectionOutcome {
-        let selectedIDs = selection.items.map(\.itemID)
+        await collect(
+            plan: plan,
+            selection: selection,
+            selectedIDs: selection.items.map(\.itemID),
+            workflowOverride: nil
+        )
+    }
+
+    func collectItem(
+        plan: CleanupPlan,
+        selection: ReviewSelection,
+        itemID: CleanupPlanItemID,
+        workflow: CleanupWorkflowAvailabilitySnapshot
+    ) async -> CleanupPolicyCollectionOutcome {
+        guard selection.items.contains(where: {
+            $0.itemID == itemID
+        }) else {
+            return .blocked(
+                error: .invalidSelection,
+                affectedItemIDs: [itemID]
+            )
+        }
+        return await collect(
+            plan: plan,
+            selection: selection,
+            selectedIDs: [itemID],
+            workflowOverride: workflow
+        )
+    }
+
+    private func collect(
+        plan: CleanupPlan,
+        selection: ReviewSelection,
+        selectedIDs: [CleanupPlanItemID],
+        workflowOverride: CleanupWorkflowAvailabilitySnapshot?
+    ) async -> CleanupPolicyCollectionOutcome {
         let affected = Set(selectedIDs)
         guard selection.planID == plan.id,
               !selectedIDs.isEmpty,
@@ -231,7 +278,12 @@ public struct CleanupPolicyContextCollector: Sendable {
                 )
             }
             let root = await rootObserver.observeRoot()
-            let workflow = await workflowObserver.snapshot()
+            let workflow: CleanupWorkflowAvailabilitySnapshot
+            if let workflowOverride {
+                workflow = workflowOverride
+            } else {
+                workflow = await workflowObserver.snapshot()
+            }
             let capturedAt = now()
             let activityContext = await resolver.captureActivity(
                 observedAt: capturedAt
@@ -404,6 +456,7 @@ public struct CleanupPolicyContextCollector: Sendable {
                     ),
                     items: items
                     ),
+                    rootURL: canonicalRoot,
                     rootAccess: root.access
                 )
             )
@@ -521,6 +574,10 @@ public struct CleanupPolicyContextCollector: Sendable {
         }
     }
 }
+
+extension CleanupPolicyContextCollector:
+    CleanupItemPolicyContextCollecting
+{}
 
 private func cleanupPolicyEvidenceKind(
     _ resolver: ExecutionEvidenceResolver
