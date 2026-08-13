@@ -38,7 +38,8 @@
 > admitted receipt、five-dimensional Settings status、typed bilingual
 > disclosure、actual-window evidence、final matrix 与 independent post-fix
 > review，runtime foundation 结论为 `go`，无 unresolved P0–P2。Task 29
-> 是下一项 eligible deterministic task，但本轮尚未启动。
+> 是下一项 eligible deterministic task；详尽 brief 已进入用户 review，
+> 产品实现尚未启动。
 > Task 5 的历史
 > Broker-only no-go 已由 ADR 0004 capability-first 决策修订，Deep Dive 因
 > 生产产品流程尚未实现而 unavailable；
@@ -259,7 +260,11 @@ anti-forgery evidence、current-build binding 与 one-shot XPC reply。历史
 TeamoRouter/usage-limit 报告只作 superseded evidence。current-source signed
 App/helper 已得出 `signedRuntimeReady`，并完成 fixed App/plist/service/
 lease/runtime/process 零残留卸载。R6 final admission 已完成并得出 runtime
-foundation `go`；Task 29 可恢复但本轮未启动。
+foundation `go`；Task 29 tests-first brief 已进入 review，产品实现尚未启动。
+获批后按
+[Task 29 Implementation Brief](../plans/active/task-29-implementation-brief.md)
+执行；不得把 generic Rule Catalog 变成 execution catalog，也不得提前混入
+selection、Policy、authorization、Trash 或 App CTA。
 逐项 artifact/command/gate 缺口与恢复顺序见
 [R2–R6 Progress Audit](../reports/capability-first-runtime-progress-audit-2026-08-13.md)。
 R1 当前证据见
@@ -369,7 +374,8 @@ R4 已完成并得出 `protocolReady`；R5 official `openai` worker gate 已通�
 current-source signed App/helper report 进一步通过 9/9 capability、12/12
 integrity 与零残留卸载。R6 已完成 final matrix、five-dimensional status、
 typed disclosure、actual-window evidence 与 post-fix review，runtime
-foundation 结论为 `go`。Task 29 尚未启动。该 gate
+foundation 结论为 `go`。Task 29 brief 已进入 review，产品实现尚未启动。该
+gate
 要求证明完整调查能力和公共联网可用时，Codex 全进程树不可写用户数据、不可
 访问 localhost/私网/任意 Unix socket 且无 Executor 路径；不得用
 `danger-full-access`、命令/公共域名

@@ -33,12 +33,13 @@
 | Agent、双模式与治理设计 | [Agent Disk Governance](design/agent-disk-governance.md) |
 | UI、品牌、状态与交互 | [UI/UX](design/ui-ux.md) |
 | 宏观交付顺序与阶段 Gate | [Delivery Roadmap](plans/roadmap.md) |
-| 当前计划状态 | [Active Plans](plans/active/README.md) — R1–R6 runtime foundation `go`；Task 29 next but not started |
+| 当前计划状态 | [Active Plans](plans/active/README.md) — R1–R6 runtime foundation `go`；Task 29 brief in review |
 | Capability-first Codex Runtime Gate | [Runtime Evidence Gate](plans/active/capability-first-codex-runtime-gate.md) — complete |
 | R2 tests-first brief | [R2 Implementation Brief](plans/active/task-r2-implementation-brief.md) — complete |
 | R3 lifecycle hard-gate brief | [R3 Implementation Brief](plans/active/task-r3-implementation-brief.md) — behaviorReady candidate |
 | R4 protocol/no-Executor brief | [R4 Implementation Brief](plans/active/task-r4-implementation-brief.md) — protocolReady |
 | Phase C Epic 8 获批计划 | [Safe Execution Vertical Slice](plans/active/epic-8-safe-execution-vertical-slice.md) |
+| Epic 8 Task 29 实施计划 | [Task 29 Implementation Brief](plans/active/task-29-implementation-brief.md) — proposed for review；implementation not started |
 | Epic 2–4 历史计划 | [Deterministic Product Core](plans/completed/epic-2-4-deterministic-product-core.md) — Tasks 9–26 已完成并归档 |
 | 已完成计划 | [Completed Plans](plans/completed/README.md) — Epic 0–1 |
 | 上游学习与许可证门禁 | [Upstream Reference Matrix](research/upstream-reference-matrix.md) |

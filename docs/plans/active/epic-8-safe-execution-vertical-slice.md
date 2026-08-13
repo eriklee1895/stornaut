@@ -1,7 +1,8 @@
 # Stornaut Phase C — Epic 8 Safe Execution Vertical Slice Plan
 
 > **Status:** Tasks 27–28 complete; Runtime R1–R6 interlock complete with
-> foundation `go`; Task 29 is next but has not started
+> foundation `go`; Task 29 detailed brief is proposed for review and
+> implementation has not started
 >
 > **Roadmap phase:** Phase C — Safe Execution Vertical Slice
 >
@@ -39,11 +40,11 @@ latest valid Quick Scan
 
 The slice must run without Codex, without external tools and without a
 Registered Action. It must preserve the Phase B one-Primary-Scan-Root contract,
-keep Deep Dive outside this deterministic slice with its capability-first
-runtime gate still pending, and make `FileManager.trashItem` the only
-production write primitive that mutates a selected target path. Stornaut-owned
-SQLite, preferences and diagnostic fixture writes remain separate,
-scope-bounded infrastructure.
+keep Deep Dive outside this deterministic slice after its capability-first
+runtime foundation reached `go` but before its production product flow exists,
+and make `FileManager.trashItem` the only production write primitive that
+mutates a selected target path. Stornaut-owned SQLite, preferences and
+diagnostic fixture writes remain separate, scope-bounded infrastructure.
 
 ## Architecture
 
@@ -317,9 +318,10 @@ Therefore:
 
 - Preserve every invariant in `AGENTS.md`, the PRD, architecture, approved
   Agent/UI specifications and ADRs 0004/0006–0010.
-- Deep Dive remains outside Phase C and awaits its ADR 0004 capability-first
-  runtime gate; Phase C imports no `StornautCodex`,
-  `ProbeBridge`, Adapter or model dependency.
+- Deep Dive remains outside Phase C. Its ADR 0004 capability-first runtime
+  foundation is `go`, but its production product flow remains unavailable;
+  Phase C imports no `StornautCodex`, `ProbeBridge`, Adapter or model
+  dependency.
 - No arbitrary Shell, `Process`, executable URL or argument array reaches
   Review, plan, Policy, authorization or Manifest APIs.
 - The production App can reach `ActionExecutor` only through the coordinator
@@ -926,14 +928,20 @@ feat: add crash-safe cleanup persistence contracts
 
 ## Task 29: Deterministic Execution Evidence and Cleanup Plan Builder
 
+Detailed implementation brief:
+[Task 29 Implementation Brief](task-29-implementation-brief.md).
+
 ### Files
 
+- Create: closed execution-profile source schema, source and compiled runtime
+  catalog
+- Create: host-only execution-profile compiler and Core runtime catalog types
 - Create: `Sources/StornautCore/Review/ExecutableEvidenceResolver.swift`
 - Create: `Sources/StornautCore/Review/CleanupPlanBuilder.swift`
 - Create: `Sources/StornautCore/Review/ReviewProjection.swift`
 - Modify: `Sources/StornautCore/QuickScan/QuickScanCoordinator.swift`
-- Modify: Rule schema/compiler/runtime catalog types
-- Modify only the approved exact rule sources
+- Create a new Rule Catalog generation with only the approved npm/pip
+  disposition changes; do not add execution fields to generic Rules
 - Add safe-execution rule fixtures and compiler/runtime tests
 - Create: `docs/plans/active/task-29-implementation-brief.md`
 
@@ -944,7 +952,7 @@ execution authority.
 
 ### Step 1: Write compiler/profile rejection tests
 
-An execution profile is rejected unless:
+The separate closed execution-profile compiler rejects a profile unless:
 
 - the rule has one exact non-wildcard directory path;
 - `recommendedAction == moveToTrash`;
@@ -998,8 +1006,11 @@ Any active/unknown/missing-evidence case remains Protected/Unknown.
 
 `CleanupPlanBuilder`:
 
-- loads one retained terminal scan session and full candidate pages from
-  Evidence Store;
+- loads one retained terminal scan session plus complete joined
+  snapshot/classification/Evidence pages from Evidence Store rather than the
+  bounded Quick Scan UI projection;
+- validates physical row counts, Store summary counts and every corrupt,
+  orphaned or duplicate record before producing a proposal;
 - rejects cancelled/failed/uncommitted or corrupt terminal truth;
 - rejects an older catalog/profile generation and asks for `Scan Again`;
 - leaves persisted Quick Scan classifications immutable;
@@ -1013,23 +1024,29 @@ Any active/unknown/missing-evidence case remains Protected/Unknown.
 - produces deterministic stable order and IDs with injected clock/ID sources;
 - persists the proposal and auditable evidence lineage;
 - exposes Protected/Unknown and other non-profile candidates separately for
-  Review UI without placing them in the executable Plan item list.
+  Review UI without placing them in the executable Plan item list;
+- returns a typed empty Review result without persisting an invalid empty
+  `CleanupPlan`.
 
-### Step 5: Prove default selection policy
+### Step 5: Prove default-selection suggestion
 
 Tests cover:
 
-- only current Ready profile items selected;
-- Go build Review profile unselected;
-- Protected/Unknown disabled;
+- only current Ready profile items are suggested default-eligible;
+- Go build Review profile is never suggested;
+- Protected/Unknown are disabled;
 - old-catalog scans require `Scan Again`;
 - fresh Review evidence cannot promote persisted Protected/Unknown;
 - unsupported rules visible but non-executable;
-- Codex source badge cannot select/promote;
+- Codex source badge cannot suggest/promote;
 - plan generation contains no authorization;
 - limited permission cannot create bytes or eligibility;
 - one-root binding;
 - empty valid plan state.
+
+Task 29 does not create mutable `ReviewSelection` or a selection generation.
+Task 32 may turn the suggestion into an initial selection only after Task 30
+also provides an allowed current Policy preview.
 
 ### Step 6: Benchmark and verify
 
