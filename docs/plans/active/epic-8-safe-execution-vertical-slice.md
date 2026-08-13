@@ -1,7 +1,7 @@
 # Stornaut Phase C — Epic 8 Safe Execution Vertical Slice Plan
 
-> **Status:** Tasks 27–29 complete; Runtime R1–R6 interlock complete with
-> foundation `go`; Task 30 is next
+> **Status:** Tasks 27–30 complete; Runtime R1–R6 interlock complete with
+> foundation `go`; Task 31 is next
 >
 > **Roadmap phase:** Phase C — Safe Execution Vertical Slice
 >
@@ -695,8 +695,12 @@ unified verifier passed; see
 [Runtime R1–R6](capability-first-codex-runtime-gate.md) interlock completed with
 a supported runtime foundation `go`; see the
 [final validation](../../reports/capability-first-runtime-validation-report.md).
-Task 30 is therefore the next eligible deterministic task. This status does
-not enable production Deep Dive or any real execution path.
+Task 30 is complete. Its memory-only selection, pure Policy, exact Store join,
+fresh collector, typed stale result, one-shot authorization, independent
+review and unified verifier passed; see
+[Task 30 Review](../../reports/epic-8-task-30-review.md). Task 31 is therefore
+the next eligible deterministic task. This status does not enable production
+Deep Dive or the real App Trash dependency.
 
 ## Task 27: Safe Execution Upstream Study and Architecture Decisions
 
@@ -1073,6 +1077,9 @@ feat: build deterministic reclaim plans
 ---
 
 ## Task 30: Pure Cleanup Policy, Fresh Revalidation and Authorization
+
+Detailed implementation brief:
+[Task 30 Implementation Brief](task-30-implementation-brief.md).
 
 ### Files
 

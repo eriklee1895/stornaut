@@ -47,6 +47,25 @@ struct CleanupPlanningPage: Sendable {
     let rowCount: Int
 }
 
+public struct CleanupPolicyStoreRecord: Sendable, Equatable {
+    public let planItem: CleanupPlanItem
+    public let snapshot: PathSnapshot
+    public let classification: Classification
+    public let evidence: [EvidenceRecord]
+
+    public init(
+        planItem: CleanupPlanItem,
+        snapshot: PathSnapshot,
+        classification: Classification,
+        evidence: [EvidenceRecord]
+    ) {
+        self.planItem = planItem
+        self.snapshot = snapshot
+        self.classification = classification
+        self.evidence = evidence
+    }
+}
+
 public struct ScanHistoryPage: Sendable, Equatable {
     public let sessions: [ScanSession]
     public let ledgersBySessionID: [ScanSessionID: SpaceLedger]
@@ -1019,6 +1038,45 @@ public actor EvidenceStore {
             },
             operation: "plan.page"
         )
+    }
+
+    public func cleanupPolicyRecords(
+        plan: CleanupPlan,
+        selectedItemIDs: [CleanupPlanItemID]
+    ) throws -> [CleanupPolicyStoreRecord] {
+        guard plan.compatibility == .current,
+              !selectedItemIDs.isEmpty,
+              selectedItemIDs.count <= ReviewSelection.maximumItemCount,
+              Set(selectedItemIDs).count == selectedItemIDs.count,
+              try cleanupPlan(id: plan.id) == plan
+        else {
+            throw EvidenceStoreError.recordIdentityMismatch
+        }
+        let selected = Set(selectedItemIDs)
+        let orderedItems = plan.items.filter { selected.contains($0.id) }
+        guard orderedItems.count == selectedItemIDs.count else {
+            throw EvidenceStoreError.recordIdentityMismatch
+        }
+        return try orderedItems.map { item in
+            guard let snapshot = try policySnapshot(id: item.snapshotID),
+                  let classification = try policyClassification(
+                      id: item.classificationID
+                  ),
+                  snapshot.sessionID == plan.scanSessionID,
+                  snapshot.scopeID == plan.scanScopeID,
+                  classification.snapshotID == snapshot.id,
+                  item.snapshotID == snapshot.id,
+                  item.classificationID == classification.id
+            else {
+                throw EvidenceStoreError.recordIdentityMismatch
+            }
+            return CleanupPolicyStoreRecord(
+                planItem: item,
+                snapshot: snapshot,
+                classification: classification,
+                evidence: try policyEvidence(snapshotID: snapshot.id)
+            )
+        }
     }
 
     public func savePolicyDecision(_ decision: PolicyDecision) throws {
@@ -2338,6 +2396,84 @@ public actor EvidenceStore {
             return nil
         }
         return record
+    }
+
+    private func policySnapshot(
+        id: SnapshotID
+    ) throws -> PathSnapshot? {
+        try decodeOne(
+            table: "path_snapshots",
+            id: id.rawValue,
+            type: PathSnapshot.self,
+            recordID: \.id.rawValue,
+            storageColumns: ", session_id, relative_path, observed_at_ms",
+            validateStorage: { snapshot, statement in
+                columnText(statement, 1) == snapshot.sessionID.rawValue
+                    && columnText(statement, 2) == snapshot.relativePath
+                    && sqlite3_column_int64(statement, 3)
+                    == storeMilliseconds(snapshot.observedAt)
+            },
+            operation: "cleanupPolicy.snapshot"
+        )
+    }
+
+    private func policyClassification(
+        id: ClassificationID
+    ) throws -> Classification? {
+        try decodeOne(
+            table: "classifications",
+            id: id.rawValue,
+            type: Classification.self,
+            recordID: \.id.rawValue,
+            storageColumns:
+                ", snapshot_id, disposition, classified_at_ms",
+            validateStorage: { classification, statement in
+                columnText(statement, 1)
+                    == classification.snapshotID.rawValue
+                    && columnText(statement, 2)
+                    == classification.disposition.rawValue
+                    && sqlite3_column_int64(statement, 3)
+                    == storeMilliseconds(classification.classifiedAt)
+            },
+            operation: "cleanupPolicy.classification"
+        )
+    }
+
+    private func policyEvidence(
+        snapshotID: SnapshotID
+    ) throws -> [EvidenceRecord] {
+        let rows = try connection.query(
+            """
+            SELECT id, payload, snapshot_id, observed_at_ms
+            FROM evidence
+            WHERE snapshot_id = ?
+            ORDER BY observed_at_ms ASC, id ASC
+            LIMIT 101
+            """,
+            bindings: [.text(snapshotID.rawValue)],
+            operation: "cleanupPolicy.evidence"
+        ) { statement -> EvidenceRecord in
+            let id = columnText(statement, 0)
+            let record = try DomainJSON.decode(
+                EvidenceRecord.self,
+                from: Data(columnText(statement, 1).utf8)
+            )
+            guard record.id.rawValue == id,
+                  record.targetID == snapshotID,
+                  columnText(statement, 2) == snapshotID.rawValue,
+                  sqlite3_column_int64(statement, 3)
+                    == storeMilliseconds(record.observedAt)
+            else {
+                throw EvidenceStoreError.recordIdentityMismatch
+            }
+            return record
+        }
+        guard rows.count <= 100,
+              Set(rows.map(\.id)).count == rows.count
+        else {
+            throw EvidenceStoreError.recordIdentityMismatch
+        }
+        return rows
     }
 
     private func decodePage<T: Decodable & Sendable>(

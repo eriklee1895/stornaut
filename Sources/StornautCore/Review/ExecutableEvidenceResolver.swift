@@ -100,6 +100,28 @@ public struct ExecutableEvidenceResolver: Sendable {
             directoryHint: .isDirectory
         )
         let currentIdentity = identityReader(candidateURL)
+        return try resolveReview(
+            snapshot: snapshot,
+            currentIdentity: currentIdentity,
+            rootIdentity: rootIdentity,
+            rule: rule,
+            profile: profile,
+            profileCatalogVersion: profileCatalogVersion,
+            activityContext: activityContext,
+            evidenceID: evidenceID
+        )
+    }
+
+    public func resolveReview(
+        snapshot: PathSnapshot,
+        currentIdentity: FileIdentity?,
+        rootIdentity: FileIdentity,
+        rule: CompiledRule,
+        profile: ExecutionProfile,
+        profileCatalogVersion: DomainToken,
+        activityContext: RunningActivityContext,
+        evidenceID: EvidenceIDSource
+    ) throws -> ExecutableEvidenceResolution {
         let sameRootDevice = currentIdentity?.device == rootIdentity.device
         return try resolve(
             snapshot: snapshot,

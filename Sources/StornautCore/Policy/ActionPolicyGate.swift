@@ -18,6 +18,7 @@ public enum ActionPolicyError: Error, Sendable, Equatable {
     case sensitivePath
     case activePath
     case outsideAllowedRoots
+    case allowedRoot
     case identityChanged
     case missingPath
     case unregisteredAction
@@ -166,11 +167,18 @@ public struct ActionPolicyGate: Sendable {
             throw ActionPolicyError.activePath
         }
 
+        let canonicalAllowedRoots = context.allowedRoots.map {
+            $0.standardizedFileURL.resolvingSymlinksInPath()
+        }
+        if canonicalAllowedRoots.contains(where: {
+            sameActionPath($0, canonicalURL)
+        }) {
+            throw ActionPolicyError.allowedRoot
+        }
         let allowed = context.allowedRoots.contains { root in
             let canonicalRoot = root.standardizedFileURL
                 .resolvingSymlinksInPath()
             guard canonicalRoot.path != "/",
-                  !sameActionPath(canonicalRoot, homeDirectoryURL),
                   !isMountRoot(root.standardizedFileURL),
                   let rootIdentity = ActionFileIdentity.read(at: canonicalRoot)
             else {

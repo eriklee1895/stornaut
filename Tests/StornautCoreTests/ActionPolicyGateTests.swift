@@ -145,6 +145,97 @@ func actionPolicyGateRejectsRootHomeMountSymlinkDenylistAndActivePaths() throws 
     }
 }
 
+@Test
+func actionPolicyGateRejectsTheAllowedScanRootButAllowsItsDescendant() throws {
+    let fixture = try ActionPolicyFixture()
+    defer { fixture.remove() }
+    let descendantURL = fixture.rootURL.appending(path: "cache")
+    try fixture.write(Data("cache".utf8), to: descendantURL)
+    let gate = fixture.makeGate()
+    let context = ActionPolicyContext(
+        allowedRoots: [fixture.rootURL],
+        activeURLs: []
+    )
+
+    #expect(throws: ActionPolicyError.allowedRoot) {
+        _ = try gate.preflight(
+            .moveToTrash(
+                PathAction(
+                    targetURL: fixture.rootURL,
+                    expectedIdentity: try #require(
+                        ActionFileIdentity.read(at: fixture.rootURL)
+                    )
+                )
+            ),
+            context: context
+        )
+    }
+    #expect(throws: Never.self) {
+        _ = try gate.preflight(
+            .moveToTrash(
+                PathAction(
+                    targetURL: descendantURL,
+                    expectedIdentity: try #require(
+                        ActionFileIdentity.read(at: descendantURL)
+                    )
+                )
+            ),
+            context: context
+        )
+    }
+    #expect(throws: ActionPolicyError.allowedRoot) {
+        _ = try gate.preflight(
+            .moveToTrash(
+                PathAction(
+                    targetURL: fixture.rootURL,
+                    expectedIdentity: try #require(
+                        ActionFileIdentity.read(at: fixture.rootURL)
+                    )
+                )
+            ),
+            context: ActionPolicyContext(
+                allowedRoots: [
+                    fixture.rootURL.deletingLastPathComponent(),
+                    fixture.rootURL,
+                ],
+                activeURLs: []
+            )
+        )
+    }
+}
+
+@Test
+func actionPolicyGateAllowsSafeDescendantsWhenHomeIsTheScanRoot() throws {
+    let fixture = try ActionPolicyFixture()
+    defer { fixture.remove() }
+    let targetURL = fixture.fakeHomeURL.appending(
+        path: "Library/Caches/pip",
+        directoryHint: .isDirectory
+    )
+    try FileManager.default.createDirectory(
+        at: targetURL,
+        withIntermediateDirectories: true
+    )
+    let gate = fixture.makeGate()
+
+    #expect(throws: Never.self) {
+        _ = try gate.preflight(
+            .moveToTrash(
+                PathAction(
+                    targetURL: targetURL,
+                    expectedIdentity: try #require(
+                        ActionFileIdentity.read(at: targetURL)
+                    )
+                )
+            ),
+            context: ActionPolicyContext(
+                allowedRoots: [fixture.fakeHomeURL],
+                activeURLs: []
+            )
+        )
+    }
+}
+
 @Test(arguments: [
     ".aws",
     ".kube",
