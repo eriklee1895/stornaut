@@ -237,6 +237,46 @@ func debugFixturesCoverEveryApprovedPhaseDeterministically() throws {
         )
         #expect(composition.model.settingsState.phase == .loaded)
     }
+
+    let expectedRuntimeStates: [
+        DebugSettingsFixture: (
+            SettingsRuntimeGateStatus,
+            SettingsRuntimeGateReason?
+        )
+    ] = [
+        .populated: (.verified, nil),
+        .empty: (.verified, nil),
+        .corrupt: (.verified, nil),
+        .codexMissing: (.blocked, .codexUnavailable),
+        .syntaxUnsupported: (.blocked, .syntaxUnsupported),
+        .runtimeStale: (.blocked, .evidenceStale),
+        .runtimeFailed: (.blocked, .evidenceFailed),
+        .runtimeUnverified: (.unverified, .evidenceUnverified),
+    ]
+    for (fixture, expected) in expectedRuntimeStates {
+        let composition = try AppComposition.debugFixture(
+            selection: DebugAppFixtureSelection(arguments: [
+                "Stornaut",
+                "--stornaut-debug-fixture=success",
+            ])!,
+            settingsSelection: DebugSettingsFixtureSelection(arguments: [
+                "Stornaut",
+                "--stornaut-debug-settings=\(fixture.rawValue)",
+            ])!
+        )
+        let model = SettingsModel(
+            state: composition.model.settingsState,
+            latestProjection: nil
+        )
+
+        #expect(model.codex.runtimeGate == expected.0)
+        #expect(model.codex.runtimeGateReason == expected.1)
+        #expect(
+            model.codex.deepDiveAvailability
+                == .implementationUnavailable
+        )
+        #expect(model.codex.deepDiveCanStart == false)
+    }
 }
 
 @MainActor

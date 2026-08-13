@@ -52,6 +52,23 @@ struct SettingsStatusRow: View {
     let messageKey: String?
     let systemImage: String
     let role: SemanticStatusRole
+    let identifier: String?
+
+    init(
+        titleKey: String,
+        valueKey: String,
+        messageKey: String?,
+        systemImage: String,
+        role: SemanticStatusRole,
+        identifier: String? = nil
+    ) {
+        self.titleKey = titleKey
+        self.valueKey = valueKey
+        self.messageKey = messageKey
+        self.systemImage = systemImage
+        self.role = role
+        self.identifier = identifier
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -78,6 +95,7 @@ struct SettingsStatusRow: View {
         }
         .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(identifier ?? titleKey)
     }
 }
 

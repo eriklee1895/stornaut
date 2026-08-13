@@ -136,7 +136,7 @@ final class StornautAppUITests: XCTestCase {
             "light"
         )
         XCTAssertTrue(app.staticTexts["空间账本"].exists)
-        XCTAssertTrue(app.staticTexts["安全暂停"].exists)
+        XCTAssertTrue(app.staticTexts["尚不可用"].exists)
         XCTAssertTrue(app.buttons["快速扫描"].exists)
         XCTAssertFalse(app.staticTexts["Space Ledger"].exists)
 
@@ -283,7 +283,10 @@ final class StornautAppUITests: XCTestCase {
             completed.app.staticTexts["Library/Caches/build"].exists
         )
         XCTAssertTrue(
-            element("scan.inspector.deepDivePaused", in: completed.app).exists
+            element(
+                "scan.inspector.deepDiveImplementationUnavailable",
+                in: completed.app
+            ).exists
         )
         XCTAssertFalse(completed.app.buttons["Move to Trash"].exists)
         completed.app.activate()
@@ -563,17 +566,41 @@ final class StornautAppUITests: XCTestCase {
             element("settings.page.codexAndDeepDive", in: dark.app)
                 .waitForExistence(timeout: 5)
         )
+        let evidence = element("settings.codex.evidence", in: dark.app)
         XCTAssertTrue(
-            dark.app.staticTexts.matching(
-                NSPredicate(
-                    format:
-                        "label CONTAINS[c] 'Paused · Required' OR "
-                        + "value CONTAINS[c] 'Paused · Required'"
-                )
-            ).firstMatch.exists
+            evidence.waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(accessibilityText(of: evidence).contains("Passed"))
+        let runtimeGate = element(
+            "settings.codex.runtimeGate",
+            in: dark.app
+        )
+        XCTAssertTrue(runtimeGate.waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            accessibilityText(of: runtimeGate).contains("Verified")
+        )
+        XCTAssertTrue(
+            accessibilityText(of: runtimeGate).contains(
+                "Runtime boundary verified · "
+                    + "Deep Dive implementation not yet available"
+            )
+        )
+        let availability = element(
+            "settings.codex.deepDiveAvailability",
+            in: dark.app
+        )
+        XCTAssertTrue(availability.waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            accessibilityText(of: availability).contains(
+                "Implementation Not Yet Available"
+            )
+        )
+        XCTAssertTrue(
+            element("settings.codex.disclosure", in: dark.app).exists
         )
         XCTAssertFalse(dark.app.buttons["Start Deep Dive"].exists)
         XCTAssertFalse(dark.app.buttons["Trust Codex"].exists)
+        XCTAssertFalse(dark.app.buttons["Accept"].exists)
         addScreenshot(
             dark.window.screenshot(),
             named: "stornaut-settings-codex-dark"
@@ -610,6 +637,96 @@ final class StornautAppUITests: XCTestCase {
             knowledge.window.screenshot(),
             named: "stornaut-settings-knowledge-dark"
         )
+    }
+
+    @MainActor
+    func testSettingsRuntimeStatusVariantsRemainNonActionable() throws {
+        let variants = [
+            ("codex-missing", "Passed", "Blocked"),
+            ("syntax-unsupported", "Passed", "Blocked"),
+            ("runtime-stale", "Stale", "Blocked"),
+            ("runtime-failed", "Failed", "Blocked"),
+            ("runtime-unverified", "Unverified", "Unverified"),
+        ]
+
+        for (fixture, evidenceValue, gateValue) in variants {
+            let launched = launchSettingsFixture(
+                fixture: fixture,
+                appearance: "light",
+                section: "codexAndDeepDive"
+            )
+
+            let evidence = element(
+                "settings.codex.evidence",
+                in: launched.app
+            )
+            XCTAssertTrue(evidence.waitForExistence(timeout: 5))
+            XCTAssertTrue(
+                accessibilityText(of: evidence).contains(evidenceValue)
+            )
+            let runtimeGate = element(
+                "settings.codex.runtimeGate",
+                in: launched.app
+            )
+            XCTAssertTrue(runtimeGate.waitForExistence(timeout: 5))
+            XCTAssertTrue(
+                accessibilityText(of: runtimeGate).contains(gateValue)
+            )
+            XCTAssertTrue(
+                element(
+                    "settings.codex.deepDiveAvailability",
+                    in: launched.app
+                ).exists
+            )
+            XCTAssertFalse(launched.app.buttons["Start Deep Dive"].exists)
+            XCTAssertFalse(launched.app.buttons["Accept"].exists)
+
+            closeResidualSettingsWindow(in: launched.app)
+            launched.app.terminate()
+            XCTAssertTrue(
+                launched.app.wait(for: .notRunning, timeout: 5)
+            )
+        }
+    }
+
+    @MainActor
+    func testChineseSettingsRuntimeStatus() throws {
+        let launched = launchSettingsFixture(
+            fixture: "populated",
+            appearance: "light",
+            section: "codexAndDeepDive",
+            language: "zh-Hans",
+            locale: "zh_CN"
+        )
+        defer {
+            closeResidualSettingsWindow(in: launched.app)
+            launched.app.terminate()
+            _ = launched.app.wait(for: .notRunning, timeout: 5)
+        }
+
+        let runtimeGate = element(
+            "settings.codex.runtimeGate",
+            in: launched.app
+        )
+        XCTAssertTrue(runtimeGate.waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            accessibilityText(of: runtimeGate).contains("已验证")
+        )
+        XCTAssertTrue(
+            accessibilityText(of: runtimeGate).contains(
+                "运行时边界已验证 · 深度调查实现尚不可用"
+            )
+        )
+        XCTAssertTrue(
+            accessibilityText(
+                of: element(
+                    "settings.codex.deepDiveAvailability",
+                    in: launched.app
+                )
+            ).contains("实现尚不可用")
+        )
+        XCTAssertFalse(launched.app.buttons["启动深度调查"].exists)
+        XCTAssertFalse(launched.app.buttons["接受"].exists)
     }
 
     @MainActor
@@ -820,8 +937,18 @@ final class StornautAppUITests: XCTestCase {
         XCTAssertTrue(element("overview.metric.ready", in: app).exists)
         XCTAssertTrue(element("overview.coverage", in: app).exists)
         XCTAssertTrue(element("overview.ledger", in: app).exists)
-        XCTAssertTrue(element("overview.probe.paused", in: app).exists)
-        XCTAssertTrue(element("overview.deepDive.paused", in: app).exists)
+        XCTAssertTrue(
+            element(
+                "overview.probe.implementationUnavailable",
+                in: app
+            ).exists
+        )
+        XCTAssertTrue(
+            element(
+                "overview.deepDive.implementationUnavailable",
+                in: app
+            ).exists
+        )
         XCTAssertTrue(element("overview.action.quickScan", in: app).exists)
         XCTAssertFalse(app.staticTexts[
             "Foundation shell — implementation follows the approved roadmap."
@@ -933,14 +1060,16 @@ final class StornautAppUITests: XCTestCase {
     private func launchSettingsFixture(
         fixture: String,
         appearance: String,
-        section: String
+        section: String,
+        language: String = "en",
+        locale: String = "en_US"
     ) -> (app: XCUIApplication, window: XCUIElement) {
         let app = XCUIApplication()
         app.terminate()
         XCTAssertTrue(app.wait(for: .notRunning, timeout: 5))
         app.launchArguments = [
-            "-AppleLanguages", "(en)",
-            "-AppleLocale", "en_US",
+            "-AppleLanguages", "(\(language))",
+            "-AppleLocale", locale,
             "--stornaut-ui-test-appearance=\(appearance)",
             "--stornaut-debug-fixture=success",
             "--stornaut-debug-settings=\(fixture)",
@@ -967,6 +1096,14 @@ final class StornautAppUITests: XCTestCase {
             XCTFail("Unknown Settings section: \(section)")
         }
         return (app, window)
+    }
+
+    @MainActor
+    private func accessibilityText(of element: XCUIElement) -> String {
+        [
+            element.label,
+            element.value as? String ?? "",
+        ].joined(separator: " ")
     }
 
     @MainActor

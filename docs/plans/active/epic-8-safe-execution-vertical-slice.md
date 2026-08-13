@@ -1,8 +1,7 @@
 # Stornaut Phase C — Epic 8 Safe Execution Vertical Slice Plan
 
-> **Status:** Paused after Task 28 — Tasks 27–28 completed; user approved a
-> capability-first Runtime R1–R6 interlock before Task 29, with its detailed
-> plan awaiting review
+> **Status:** Tasks 27–28 complete; Runtime R1–R6 interlock complete with
+> foundation `go`; Task 29 is next but has not started
 >
 > **Roadmap phase:** Phase C — Safe Execution Vertical Slice
 >
@@ -687,12 +686,12 @@ Final verifier evidence:
 - App tests/build/signing/bundle, Release fixture isolation, localization,
   rule compiler, boundaries and docs passed.
 
-Task 29 is not active. The ADR 0004 review is complete and confirmed that the
-current Runtime still implements the obsolete Broker-only profile. The user
-approved inserting
-[Runtime R1–R6](capability-first-codex-runtime-gate.md) before Task 29; its
-detailed plan is approved. R1 is complete with a conditional-go outcome; R2 is
-blocked for the exact ADR 0013 dedicated loopback proxy decision.
+Task 29 has not started. The approved
+[Runtime R1–R6](capability-first-codex-runtime-gate.md) interlock completed with
+a supported runtime foundation `go`; see the
+[final validation](../../reports/capability-first-runtime-validation-report.md).
+Task 29 is therefore the next eligible deterministic task. This status does
+not enable production Deep Dive or any real execution path.
 
 ## Task 27: Safe Execution Upstream Study and Architecture Decisions
 

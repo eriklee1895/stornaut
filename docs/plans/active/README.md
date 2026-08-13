@@ -1,7 +1,8 @@
 # Active Plans
 
-当前获批 executable plan 仍为 Phase C deterministic Epic 8，但按用户要求在
-Task 28 后暂停。ADR 0004 capability-first 宏观插队顺序已获用户批准；详细
+当前获批 executable plan 仍为 Phase C deterministic Epic 8。Task 28 后插入的
+ADR 0004 capability-first runtime interlock 已完成；Task 29 是下一项 eligible
+task，但尚未启动。详细
 R1–R6 计划见
 [`capability-first-codex-runtime-gate.md`](capability-first-codex-runtime-gate.md)，
 详尽计划已获批准。R1 study/ADR/probe/review 与 R2 closed profile/report/
@@ -25,16 +26,17 @@ review findings 已修复；post-fix review 进一步关闭 command/image/subage
 	provider strict-schema `$ref` sibling 与 direct-read fixed command 漂移。
 	历史 TeamoRouter/usage-limit 只保留为 superseded 调试证据。current-source
 	signed App/helper 已得出 `signedRuntimeReady`：9/9 capabilities、12/12
-	integrity；fixed topology 随后卸载并证明零残留。R5 evidence complete，
-	等待独立 commit/push；R6 与 Task 29 均未开始。
+	integrity；fixed topology 随后卸载并证明零残留。R5 已提交推送。R6 已完成
+	exact receipt、five-dimensional Settings、typed disclosure、final matrix、
+	actual-window evidence 与 post-fix review；runtime foundation 结论为 `go`。
+	Task 29 是下一项可恢复的 deterministic task，但尚未启动。
 
 Epic 2–4 Tasks 9–26 已完成并归档；最终统一 verifier 单次 exit `0`。
 Phase C deterministic Epic 8 的详尽 plan 已于 2026-08-11 获用户批准，见
 [`epic-8-safe-execution-vertical-slice.md`](epic-8-safe-execution-vertical-slice.md)。
 Tasks 27–28 的 study/ADR、domain v2、Evidence Store v3、crash journal、
-code review 与 unified verifier 已完成。ADR 0004 回顾确认现有
-`CodexProcess`、capability report、Investigation Envelope 和 UI copy 仍漂移在
-旧 Broker-only 模型。获批的新顺序为：
+code review 与 unified verifier 已完成。ADR 0004 回顾发现的旧
+Broker-only runtime/protocol/UI 漂移已由 R1–R6 关闭。获批的交付顺序为：
 
 ```text
 Task 28 complete
@@ -58,10 +60,11 @@ API-key/App Server blocker 及 provider/schema 根因保留在
 [R5 App Server Historical Blocker](../../reports/capability-first-runtime-r5-api-key-blocker.md)。
 	官方 `openai` worker 与 repository gates 已通过；历史 provider blocker 见
 	[R5 Usage-Limit Blocker](../../reports/capability-first-runtime-r5-usage-limit-blocker.md)，
-	已被当前 subscription evidence supersede。当前执行点见
+	已被当前 subscription evidence supersede。R5 证据见
 	[R5 Review](../../reports/capability-first-runtime-r5-review.md)：signed
-	machine report 与零残留证明已完成；独立 commit/push 后才开始 R6。
-	Task 29 仍须等待 R6 final admission。
+	machine report 与零残留证明已完成。R6 final admission 见
+	[Runtime Validation](../../reports/capability-first-runtime-validation-report.md)
+	与 [R6 Review](../../reports/capability-first-runtime-r6-review.md)。
 
 R1 证明 read-only Seatbelt 能阻断 user-data writes，且 Codex experimental
 managed proxy 能让公网请求成功并阻断 direct bypass、任意
@@ -86,9 +89,9 @@ configuration candidate，并由
 [R4 Review](../../reports/capability-first-runtime-r4-review.md) 记录 strict v2
 advisory protocol 与 structural no-Executor seam 的 `protocolReady` 结论。
 
-R5 已关闭当前个人本机 local-only signed-App helper/capability gate，但不证明
-ServiceManagement distribution、Developer ID/notarization 或 FDA/TCC product
-flow；最终产品 admission 属于 R6。Deep Dive 保持 unavailable。
+R6 已关闭当前个人本机 capability-first runtime foundation，但不证明
+ServiceManagement distribution、Developer ID/notarization、FDA/TCC product
+flow 或 production Deep Dive。Deep Dive 保持 unavailable；Task 29 尚未启动。
 
 即使计划获批，正常 App 也必须保持真实 Trash 依赖关闭，直到 Task 35 的
 signed-App disposable Trash diagnostic 与最终 gate 通过。Task 32 的 Review

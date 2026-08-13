@@ -40,13 +40,17 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   contained；machine report SHA-256 为
   `08ba7c30373d4736124f0e507fcc9aa972880235251b8bbf636a7b2fabb1d193`。
   fixed App/plist/service/lease/runtime 与匹配进程随后全部卸载并证明零残留。
-  R5 仅待本轮独立 commit/push；R6 与 Task 29 未启动。
+  R5 已独立提交推送。R6 已完成 exact evidence receipt、五维 Settings 状态、
+  bilingual first-use disclosure、actual-window UI evidence、final matrix 与
+  independent review，runtime foundation 结论为 `go`，无 unresolved P0–P2。
+  Task 29 成为下一项可恢复的 deterministic task，但本轮未启动；生产 Deep
+  Dive 仍为 implementation unavailable。
   逐 Task 完成 Upstream Study、
   实现、code review、focused/full verify、独立 commit/push；不得提前混入
   生产 Deep Dive、Adapter、真实 Registered Action 或 release 工作。
-- 新的 capability-first runtime/safety check 通过前，Deep Dive 必须保持
-  paused；发现 Codex 或 feature flag ≠ 已证明“公共联网 + 完整调查能力 +
-  全进程树不可写 + 私网/Unix socket 阻断 + no-Executor”边界。
+- Capability-first runtime foundation 已通过；这不等于生产 Deep Dive 已实现。
+  Deep Dive 必须保持 unavailable，直到 Phase D 完整产品流程自己的实现与 gate
+  通过；发现 Codex、runtime receipt 或 feature flag 都不能单独启用它。
 - 权限、隔离、许可证、性能主张必须有本机证据（`--help`、测试、Benchmark、ADR）。不确定时先 Spike/ADR，不用大段代码掩盖。
 - 保留现有 MIT `LICENSE`；新增依赖前记录许可证与理由。不要复制 Mole GPL 代码。
 - 视觉素材可通过 Web 搜索或 `$erik-gpt-image-2` 生成。Web 素材必须记录来源 URL、作者/版权、许可证和允许用途；AI 生成素材必须保留 prompt/metadata，不提交凭据。现有 UI/UX 与品牌概念图由 `$erik-gpt-image-2` 生成，仍只作非逐像素参考。
@@ -95,6 +99,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | R5 historical App Server blocker | [docs/reports/capability-first-runtime-r5-api-key-blocker.md](docs/reports/capability-first-runtime-r5-api-key-blocker.md) |
 | R5 historical usage-limit blocker | [docs/reports/capability-first-runtime-r5-usage-limit-blocker.md](docs/reports/capability-first-runtime-r5-usage-limit-blocker.md) |
 | R5 current review | [docs/reports/capability-first-runtime-r5-review.md](docs/reports/capability-first-runtime-r5-review.md) |
+| Runtime final validation / R6 review | [docs/reports/capability-first-runtime-validation-report.md](docs/reports/capability-first-runtime-validation-report.md) / [docs/reports/capability-first-runtime-r6-review.md](docs/reports/capability-first-runtime-r6-review.md) |
 | Runtime R2–R6 progress audit | [docs/reports/capability-first-runtime-progress-audit-2026-08-13.md](docs/reports/capability-first-runtime-progress-audit-2026-08-13.md) |
 | Phase C Epic 8 获批计划 | [docs/plans/active/epic-8-safe-execution-vertical-slice.md](docs/plans/active/epic-8-safe-execution-vertical-slice.md) |
 | Epic 2–4 历史计划 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) |
@@ -115,10 +120,9 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 Epic 0–1 与 Epic 2–4 evidence gates 已完成。Phase B 的
 domain/persistence、product Quick Scan、Space Ledger、Knowledge/Activity
 与 App/UI 产品证据通过最终统一验证。Phase C deterministic Epic 8 plan
-已获批准；Tasks 27–28 已完成。ADR 0004 回顾确认当前 `CodexProcess`、
-capability report、Investigation Envelope 与 UI copy 仍漂移在旧 Broker-only
-模型；用户已批准在 Task 29 前插入 capability-first Runtime R1–R6 gate，
-R1 已完成并证明 read-only writes 隔离与 managed proxy 候选；用户已批准
+已获批准；Tasks 27–28 已完成。ADR 0004 回顾发现的旧 Broker-only runtime/
+UI 漂移已由 capability-first Runtime R1–R6 gate 关闭；R1 证明 read-only
+writes 隔离与 managed proxy 候选；用户已批准
 same-investigation parent-owned random-loopback managed proxy 例外；R2 已完成
 并得出 `configurationReady`，
 允许 Codex descendants 仅连接 same-investigation、父进程拥有、随机端口的
@@ -139,12 +143,12 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   evidence、current-build binding、one-shot XPC reply、vanished-process
   classification、provider-compatible group schema 与 fixed direct-read command
   identity。current-source signed App/helper 已得出 `signedRuntimeReady`，并在
-  gate 后完成 fixed topology 零残留卸载。R5 仅待独立 commit/push；R6 与
-  Task 29 仍未完成。
+  gate 后完成 fixed topology 零残留卸载。R6 final admission 已完成并得出
+  runtime foundation `go`；Task 29 尚未启动。
 Deep Dive 的旧 Broker-only no-go 已被 ADR 0004 的 capability-first 边界取代；
-当前仍 paused 的原因是 R6 final admission 与生产 Deep Dive 尚未交付，而非
-Codex 工具能力过强。R5 不证明 release distribution、FDA/TCC 或 production
-Deep Dive；release signing/notarization 仍未评估。Overview、Scan、Scan-only
+当前仍不可用的原因是生产 Deep Dive 尚未实现，而非 R6 或 Codex 工具能力。
+R6 不证明 release distribution、FDA/TCC 或 production Deep Dive；
+release signing/notarization 仍未评估。Overview、Scan、Scan-only
 History 与六区 Settings 已是真实 typed projection/生命周期，Investigations 仍是 placeholder，
 Review/Trash 仍未启用。
 

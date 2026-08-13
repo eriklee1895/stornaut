@@ -95,11 +95,31 @@ struct GeneralSettingsView: View {
                         : .neutral
                 )
                 SettingsStatusRow(
-                    titleKey: "settings.general.deepDiveSafety",
-                    valueKey: "settings.status.safety.pausedRequired",
-                    messageKey: "settings.general.deepDive.message",
+                    titleKey: "settings.general.runtimeGate",
+                    valueKey:
+                        "settings.status.runtimeGate.\(model.runtimeGate.rawValue)",
+                    messageKey:
+                        "settings.general.runtimeGate."
+                        + model.runtimeGate.rawValue
+                        + ".message",
                     systemImage: "lock.shield",
-                    role: .limited
+                    role: model.runtimeGate == .verified
+                        ? .positive
+                        : model.runtimeGate == .blocked
+                            ? .failed
+                            : .limited,
+                    identifier: "settings.general.runtimeGate"
+                )
+                SettingsStatusRow(
+                    titleKey: "settings.codex.deepDiveAvailability",
+                    valueKey:
+                        "settings.status.deepDive."
+                        + model.deepDiveAvailability.rawValue,
+                    messageKey:
+                        "settings.codex.deepDiveAvailability.message",
+                    systemImage: "hammer",
+                    role: .neutral,
+                    identifier: "settings.general.deepDiveAvailability"
                 )
             }
 

@@ -263,12 +263,14 @@ struct OverviewView: View {
                 role: .protected
             ) {
                 Label(
-                    "overview.deepDive.paused",
+                    "overview.deepDive.implementationUnavailable",
                     systemImage: "pause.circle"
                 )
                 .font(.callout.weight(.medium))
                 .foregroundStyle(.secondary)
-                .accessibilityIdentifier("overview.deepDive.paused")
+                .accessibilityIdentifier(
+                    "overview.deepDive.implementationUnavailable"
+                )
             }
         }
     }

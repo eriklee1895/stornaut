@@ -7,8 +7,79 @@ enum SettingsPresentation: String, Sendable, Equatable {
     case error
 }
 
-enum SettingsDeepDiveSafety: String, Sendable, Equatable {
-    case pausedRequired
+enum SettingsRuntimeGateStatus: String, Sendable, Equatable {
+    case verified
+    case blocked
+    case unverified
+}
+
+enum SettingsRuntimeGateReason: String, Sendable, Equatable {
+    case codexUnavailable
+    case codexCheckFailed
+    case syntaxUnsupported
+    case syntaxUnverified
+    case evidenceStale
+    case evidenceFailed
+    case evidenceUnverified
+}
+
+enum SettingsDeepDiveAvailability: String, Sendable, Equatable {
+    case implementationUnavailable
+}
+
+enum SettingsRuntimeDisclosureItem:
+    String,
+    CaseIterable,
+    Sendable,
+    Equatable
+{
+    case directReadOnlyFilesystemInvestigation
+    case modelContextProcessing
+    case publicInternetInvestigation
+    case noWriteOrCleanupAuthority
+    case swiftRevalidationAndExplicitSelection
+
+    var localizationKey: String {
+        switch self {
+        case .directReadOnlyFilesystemInvestigation:
+            "settings.codex.disclosure.directRead"
+        case .modelContextProcessing:
+            "settings.codex.disclosure.modelContext"
+        case .publicInternetInvestigation:
+            "settings.codex.disclosure.publicInternet"
+        case .noWriteOrCleanupAuthority:
+            "settings.codex.disclosure.noWriteAuthority"
+        case .swiftRevalidationAndExplicitSelection:
+            "settings.codex.disclosure.swiftRevalidation"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .directReadOnlyFilesystemInvestigation:
+            "doc.text.magnifyingglass"
+        case .modelContextProcessing:
+            "brain.head.profile"
+        case .publicInternetInvestigation:
+            "network"
+        case .noWriteOrCleanupAuthority:
+            "lock.shield"
+        case .swiftRevalidationAndExplicitSelection:
+            "checkmark.seal"
+        }
+    }
+}
+
+struct SettingsRuntimeDisclosure: Sendable, Equatable {
+    let items: [SettingsRuntimeDisclosureItem]
+    let hasAction: Bool
+    let persistsAcceptance: Bool
+
+    static let aggregate = SettingsRuntimeDisclosure(
+        items: SettingsRuntimeDisclosureItem.allCases,
+        hasAction: false,
+        persistsAcceptance: false
+    )
 }
 
 enum SettingsKnowledgeStatus: String, Sendable, Equatable {
@@ -22,7 +93,8 @@ struct GeneralSettingsModel: Sendable, Equatable {
     let appearance: SettingsAppearance
     let diskAccess: SettingsDiskAccessStatus
     let codexInstallation: SettingsCodexAvailability
-    let deepDiveSafety: SettingsDeepDiveSafety
+    let runtimeGate: SettingsRuntimeGateStatus
+    let deepDiveAvailability: SettingsDeepDiveAvailability
     let runsOnDemandOnly: Bool
 }
 
@@ -48,8 +120,12 @@ struct CodexSettingsModel: Sendable, Equatable {
     let syntaxStatus: SettingsCodexSyntaxStatus
     let executablePath: PersistedPath?
     let version: String?
-    let deepDiveSafety: SettingsDeepDiveSafety
+    let runtimeEvidence: SettingsRuntimeEvidence
+    let runtimeGate: SettingsRuntimeGateStatus
+    let runtimeGateReason: SettingsRuntimeGateReason?
+    let deepDiveAvailability: SettingsDeepDiveAvailability
     let deepDiveCanStart: Bool
+    let disclosure: SettingsRuntimeDisclosure
     let budget: InvestigationBudgetPreset
     let hasProviderSelector: Bool
     let hasArbitraryCLIFlags: Bool
@@ -118,12 +194,20 @@ struct SettingsModel: Sendable, Equatable {
                 : hasPermissionGap ? .limited
                     : snapshot?.diskAccess ?? .limited
         let codexStatus = snapshot?.codex ?? .unavailable
+        let runtimeEvidence = normalizedRuntimeEvidence(
+            snapshot?.runtimeEvidence ?? .unverified
+        )
+        let runtimeGate = deriveRuntimeGate(
+            codex: codexStatus,
+            evidence: runtimeEvidence
+        )
         general = GeneralSettingsModel(
             language: preferences.language,
             appearance: preferences.appearance,
             diskAccess: diskAccess,
             codexInstallation: codexStatus.availability,
-            deepDiveSafety: .pausedRequired,
+            runtimeGate: runtimeGate.status,
+            deepDiveAvailability: .implementationUnavailable,
             runsOnDemandOnly: true
         )
         scanning = ScanningSettingsModel(
@@ -150,8 +234,12 @@ struct SettingsModel: Sendable, Equatable {
             syntaxStatus: codexStatus.syntaxStatus,
             executablePath: codexStatus.executablePath,
             version: codexStatus.version,
-            deepDiveSafety: .pausedRequired,
+            runtimeEvidence: runtimeEvidence,
+            runtimeGate: runtimeGate.status,
+            runtimeGateReason: runtimeGate.reason,
+            deepDiveAvailability: .implementationUnavailable,
             deepDiveCanStart: false,
+            disclosure: .aggregate,
             budget: preferences.investigationBudget,
             hasProviderSelector: false,
             hasArbitraryCLIFlags: false,
@@ -182,6 +270,51 @@ struct SettingsModel: Sendable, Equatable {
             canOverrideDisposition: false
         )
     }
+}
+
+private func deriveRuntimeGate(
+    codex: SettingsCodexStatus,
+    evidence: SettingsRuntimeEvidence
+) -> (
+    status: SettingsRuntimeGateStatus,
+    reason: SettingsRuntimeGateReason?
+) {
+    if codex.availability == .unavailable {
+        return (.blocked, .codexUnavailable)
+    }
+    if codex.syntaxStatus == .unsupported {
+        return (.blocked, .syntaxUnsupported)
+    }
+    if evidence.status == .stale {
+        return (.blocked, .evidenceStale)
+    }
+    if evidence.status == .failed {
+        return (.blocked, .evidenceFailed)
+    }
+    if codex.availability == .checkFailed {
+        return (.unverified, .codexCheckFailed)
+    }
+    if codex.syntaxStatus == .unverified {
+        return (.unverified, .syntaxUnverified)
+    }
+    if evidence.status == .unverified {
+        return (.unverified, .evidenceUnverified)
+    }
+    if evidence.receipt != .admittedR5 {
+        return (.unverified, .evidenceUnverified)
+    }
+    return (.verified, nil)
+}
+
+private func normalizedRuntimeEvidence(
+    _ evidence: SettingsRuntimeEvidence
+) -> SettingsRuntimeEvidence {
+    if evidence.status == .passed,
+       evidence.receipt != .admittedR5
+    {
+        return .unverified
+    }
+    return evidence
 }
 
 private func knowledgeStatus(

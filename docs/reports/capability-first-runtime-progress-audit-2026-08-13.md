@@ -1,10 +1,10 @@
 # Capability-First Runtime Progress Audit — 2026-08-13
 
-> Status: Incomplete objective — R5 signed machine and zero-residue gates pass;
-> R5 commit/push and all R6 deliverables remain
+> Status: Superseded completion audit — R2–R6 artifacts and evidence complete;
+> the R6 publication is this report's change set
 >
-> Audited baseline: `origin/main`
-> `89f3a8532b5594632edb66c8e9ad06a313ad9a5c`
+> Audited baseline: R5 commit
+> `8b93852d901cc7bd78bf827c21dc4d85ab9d473f`
 >
 > Purpose: prompt-to-artifact coverage audit for the active R2–R6 objective;
 > not an R5 or R6 admission report
@@ -59,12 +59,12 @@ The active objective is complete only when:
 | R5 installed topology | Fixed App/plist/service plus lease/runtime roots | Installed from current build, measured, then fully uninstalled with zero residue |
 | R5 independent final review | Full `bits-code-guard` plus targeted post-fix review | Zero unresolved P0–P2 |
 | R5 review report | `docs/reports/capability-first-runtime-r5-review.md` | Complete |
-| R5 commit/push | Independent R5 commit on `origin/main` | Missing by design |
-| R6 brief | `docs/plans/active/task-r6-implementation-brief.md` | Missing |
-| R6 status contract/UI | Typed localized runtime/product availability status | Not started |
-| R6 final matrix/report | `capability-first-runtime-validation-report.md` | Missing |
-| R6 independent review | `capability-first-runtime-r6-review.md` | Missing |
-| R6 commit/push | Independent R6 commit on `origin/main` | Missing |
+| R5 commit/push | Independent R5 commit `8b93852d901cc7bd78bf827c21dc4d85ab9d473f` on `origin/main` | Complete |
+| R6 brief | `docs/plans/active/task-r6-implementation-brief.md` | Complete |
+| R6 status contract/UI | Typed localized runtime/product availability status | Complete |
+| R6 final matrix/report | `capability-first-runtime-validation-report.md` | Complete; `go` |
+| R6 independent review | `capability-first-runtime-r6-review.md` | Complete; zero unresolved P0–P2 |
+| R6 commit/push | Independent R6 change set | Completed by publishing this change set |
 
 The stale sentence at the end of the historical R2 review saying that R2 was
 “ready” for commit is superseded by repository fact: commit `1af81872` exists
@@ -154,18 +154,16 @@ and the historical
 
 ## 7. Remaining Checklist
 
-1. rerun docs links/diff hygiene after the final status refresh;
-2. create and push the independent R5 commit;
-3. only then create the R6 brief and start R6 tests-first.
+1. publish the independent R6 change set;
+2. verify `HEAD == origin/main` and a clean worktree;
+3. stop before Task 29.
 
 ## 8. Audit Verdict
 
-The active objective is **not achieved**.
+The implementation and evidence objective is achieved with a supported
+runtime foundation `go`.
 
-- R2–R4 are complete and pushed.
-- R5 implementation, signed-machine evidence, zero-residue proof, repository
-  verification and independent review pass; only the R5 commit/push remains.
-- R6 has not started.
-- `HEAD == origin/main` only because R5 remains an uncommitted worktree.
-- The worktree is intentionally dirty and no phase gate is bypassed.
-- Task 29 and production Deep Dive remain untouched.
+- R2–R5 are complete and pushed.
+- R6 implementation, validation and independent review are complete.
+- production Deep Dive remains unavailable.
+- Task 29 remains untouched by R6.

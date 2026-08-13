@@ -29,8 +29,9 @@ verifier 单次 exit 0，Phase B 已关闭。当前 Quick Scan 在 460 GiB-class
 范围内用 Swift product path 于 5 分钟内完成，保持 bounded memory、
 Partial/Unmeasurable truth、零 Codex 与零目标写入。Deep Dive 的旧
 Broker-only 前提已由 ADR 0004 修订为能力优先边界：Codex 可直接只读调查、
-live search 与访问公共互联网，但仍无本地写入或清理执行权。生产实现尚待新的
-运行时 evidence gate，release 仍未评估。见文档：
+live search 与访问公共互联网，但仍无本地写入或清理执行权。R1–R6 runtime
+foundation evidence gate 已得出 `go`；生产 Deep Dive 仍未实现，release
+仍未评估。见文档：
 
 | 文档 | 内容 |
 |---|---|
@@ -44,8 +45,9 @@ live search 与访问公共互联网，但仍无本地写入或清理执行权�
 | [docs/assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md](docs/assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md) | 权限受限、安全阻断、部分结果、stale preflight 与历史保留的恢复状态契约 |
 | [docs/reports/epic-2-4-validation-report.md](docs/reports/epic-2-4-validation-report.md) | Phase B domain/persistence、真实 Quick Scan benchmark、accounting、UI 与 scope gate |
 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) | 已归档的 Phase B Tasks 9–26 计划与逐 Task 证据 |
-| [docs/plans/active/README.md](docs/plans/active/README.md) | Runtime R2 configurationReady；R3 pending |
+| [docs/plans/active/README.md](docs/plans/active/README.md) | Runtime R1–R6 foundation `go`；Task 29 next but not started |
 | [docs/plans/active/capability-first-codex-runtime-gate.md](docs/plans/active/capability-first-codex-runtime-gate.md) | Task 29 前插入的 capability-first Runtime/containment evidence gate |
+| [docs/reports/capability-first-runtime-validation-report.md](docs/reports/capability-first-runtime-validation-report.md) | Runtime final matrix、ADR 0004 residual-risk mapping 与 `go` |
 | [docs/plans/completed/epic-0-1-foundation-spikes.md](docs/plans/completed/epic-0-1-foundation-spikes.md) | 第一阶段工程骨架与高风险技术 Spike 实施计划 |
 | [docs/reports/epic-0-1-validation-report.md](docs/reports/epic-0-1-validation-report.md) | Epic 0–1 evidence gate、conditional-go/no-go 与残余风险 |
 | [docs/research/](docs/research/) | 真实案例、竞品时间切片、上游学习与许可证边界 |

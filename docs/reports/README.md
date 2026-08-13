@@ -6,8 +6,8 @@
 > 历史测量结论。当前产品已通过修订后的
 > [ADR 0004](../adr/0004-codex-file-read-isolation.md) 采用 capability-first
 > direct read/Agent tools/live public internet；R5 signed machine gate 已
-> `signedRuntimeReady`，Deep Dive 仍等待 R6 final admission 与后续生产实现，不因本地工具能力恢复而
-> 自动启用。
+> `signedRuntimeReady`，R6 runtime foundation final admission 已得出 `go`。
+> Deep Dive 仍等待后续生产实现，不因 runtime receipt 自动启用。
 
 - [Development Automation Validation — 2026-08-09](development-automation-2026-08-09.md)：XcodeBuildMCP、Peekaboo 只读目录、真实 App build/run 与 PID 窗口截图证据。
 - [Epic 0–1 Validation Report](epic-0-1-validation-report.md)：foundation、Codex、Surveyor、Action lifecycle 的历史 evidence gate；Broker-only no-go 已由 ADR 0004 修订。
@@ -31,6 +31,8 @@
 - [Capability-First Runtime R5 Historical App Server Blocker — 2026-08-12](capability-first-runtime-r5-api-key-blocker.md)：保留早期 sanitized `other` 证据；后续 tests-first provider/schema/raw-event 修复已让真实 worker达到 capability 9/9 与 containment 6/6。
 - [Capability-First Runtime R5 Historical Provider/Usage-Limit Blocker — 2026-08-13](capability-first-runtime-r5-usage-limit-blocker.md)：保留 TeamoRouter 与 sanitized `usageLimitExceeded` 的历史诊断；当前 official subscription 已恢复，该报告已 superseded。
 - [Capability-First Runtime R5 Review — 2026-08-13](capability-first-runtime-r5-review.md)：official `openai` signed App 9/9 capability、12/12 integrity、review repairs、machine gate 与零残留证明。
-- [Capability-First Runtime R2–R6 Progress Audit — 2026-08-13](capability-first-runtime-progress-audit-2026-08-13.md)：逐条映射 active objective、phase artifacts、commands、capability/integrity rows 与 guardrails；R5 evidence complete，等待独立 push 后进入 R6。
+- [Capability-First Runtime Final Validation — 2026-08-13](capability-first-runtime-validation-report.md)：19-row prompt-to-evidence matrix、ADR 0004 九项 residual-risk mapping 与 runtime foundation `go`。
+- [Capability-First Runtime R6 Review — 2026-08-13](capability-first-runtime-r6-review.md)：five-dimensional Settings、typed disclosure、actual-window evidence、review fixes 与 zero unresolved P0–P2。
+- [Capability-First Runtime R2–R6 Progress Audit — 2026-08-13](capability-first-runtime-progress-audit-2026-08-13.md)：逐条映射 active objective、phase artifacts、commands、capability/integrity rows 与 guardrails；已由 final validation supersede。
 
 报告记录测量事实；若事实要求降低安全、权限或隐私边界，必须先请求用户决策，不能直接改写批准规格。

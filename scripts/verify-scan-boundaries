@@ -51,7 +51,7 @@ rg -q 'QuickScanCoordinator' StornautApp/AppState/AppDependencies.swift
 rg -q 'FileManager.default.homeDirectoryForCurrentUser' \
     StornautApp/AppState/AppDependencies.swift
 rg -q 'scan.review.unavailable' StornautApp/Scan/ScanView.swift
-rg -q 'Deep Dive Safety Paused' \
+rg -q 'Deep Dive implementation not yet available' \
     StornautApp/Resources/en.lproj/Localizable.strings
 
 print "Scan UI/service boundaries verified."

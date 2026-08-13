@@ -45,11 +45,56 @@ for forbidden in \
     fi
 done
 
-if rg -n 'Start Deep Dive|Trust Codex|Proceed Anyway|Adjust Retention' \
+if rg -n \
+    'Start Deep Dive|Trust Codex|Proceed Anyway|Adjust Retention|Accept' \
     "${settings_views[@]}"; then
     print -u2 "Deferred or unsafe Settings action leaked into Task 25 Views."
     exit 1
 fi
+
+if rg -n \
+    'Broker-only|仅限 Broker|pausedRequired|Deep Dive Safety Paused' \
+    StornautApp; then
+    print -u2 "Superseded runtime status copy leaked into the product."
+    exit 1
+fi
+
+rg -q 'enum SettingsRuntimeEvidenceStatus' \
+    StornautApp/Settings/SettingsState.swift
+rg -q 'enum SettingsRuntimeGateStatus' \
+    StornautApp/Settings/SettingsModel.swift
+rg -q 'case implementationUnavailable' \
+    StornautApp/Settings/SettingsModel.swift
+rg -q 'static let admittedR5' \
+    StornautApp/Settings/SettingsState.swift
+rg -q '8b93852d901cc7bd78bf827c21dc4d85ab9d473f' \
+    StornautApp/Settings/SettingsState.swift
+rg -q \
+    '08ba7c30373d4736124f0e507fcc9aa972880235251b8bbf636a7b2fabb1d193' \
+    StornautApp/Settings/SettingsState.swift
+rg -q 'capabilitiesObserved: 9' \
+    StornautApp/Settings/SettingsState.swift
+rg -q 'integrityContained: 12' \
+    StornautApp/Settings/SettingsState.swift
+rg -q 'evidence.receipt != .admittedR5' \
+    StornautApp/Settings/SettingsModel.swift
+rg -q 'deepDiveCanStart: false' \
+    StornautApp/Settings/SettingsModel.swift
+rg -q 'hasAction: false' \
+    StornautApp/Settings/SettingsModel.swift
+rg -q 'persistsAcceptance: false' \
+    StornautApp/Settings/SettingsModel.swift
+rg -q \
+    'Runtime boundary verified · Deep Dive implementation not yet available' \
+    StornautApp/Resources/en.lproj/Localizable.strings
+rg -q 'settings.codex.evidence' \
+    StornautApp/Settings/CodexSettingsView.swift
+rg -q 'settings.codex.runtimeGate' \
+    StornautApp/Settings/CodexSettingsView.swift
+rg -q 'settings.codex.deepDiveAvailability' \
+    StornautApp/Settings/CodexSettingsView.swift
+rg -q 'settings.codex.disclosure' \
+    StornautApp/Settings/CodexSettingsView.swift
 
 rg -q 'loadSettings' StornautApp/AppState/AppDependencies.swift
 rg -q 'saveSettingsPreferences' StornautApp/AppState/AppDependencies.swift

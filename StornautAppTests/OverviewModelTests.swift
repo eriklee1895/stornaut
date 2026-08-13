@@ -352,7 +352,7 @@ func overviewActionsStayInsideTaskTwentyTwoSafetyBoundary() throws {
     #expect(loading.primaryAction == nil)
     #expect(activeScan.primaryAction == .openScan)
     #expect(error.primaryAction == .retryLatestSnapshot)
-    #expect(current.deepDive == .paused)
+    #expect(current.deepDive == .implementationUnavailable)
 }
 
 @Test
@@ -400,7 +400,7 @@ private enum OverviewLocalizationKeys {
         "overview.ledger.free",
         "overview.action.quickScan",
         "overview.deepDive.title",
-        "overview.deepDive.paused",
+        "overview.deepDive.implementationUnavailable",
         "overview.opportunities.title",
         "overview.activity.checked",
         "overview.activity.unavailable",

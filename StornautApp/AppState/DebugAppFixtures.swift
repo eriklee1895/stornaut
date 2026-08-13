@@ -118,6 +118,11 @@ enum DebugSettingsFixture: String, CaseIterable, Sendable {
     case populated
     case empty
     case corrupt
+    case codexMissing = "codex-missing"
+    case syntaxUnsupported = "syntax-unsupported"
+    case runtimeStale = "runtime-stale"
+    case runtimeFailed = "runtime-failed"
+    case runtimeUnverified = "runtime-unverified"
 }
 
 struct DebugSettingsFixtureSelection: Sendable, Equatable {
@@ -335,7 +340,12 @@ private extension DebugSettingsFixture {
                 ),
             ]
             corrupt = []
-        case .empty:
+        case .empty,
+             .codexMissing,
+             .syntaxUnsupported,
+             .runtimeStale,
+             .runtimeFailed,
+             .runtimeUnverified:
             knowledge = []
             corrupt = []
         case .corrupt:
@@ -353,6 +363,38 @@ private extension DebugSettingsFixture {
             ScanExclusion(validating: "Library/Caches/npm"),
             ScanExclusion(validating: "Projects/Archived"),
         ]
+        let codex: SettingsCodexStatus = switch self {
+        case .codexMissing:
+            .unavailable
+        case .syntaxUnsupported:
+            SettingsCodexStatus(
+                availability: .installed,
+                executablePath: PersistedPath(
+                    rawValue: "/tmp/stornaut-settings-fixture/bin/codex"
+                ),
+                version: "codex-cli fixture",
+                syntaxStatus: .unsupported
+            )
+        default:
+            SettingsCodexStatus(
+                availability: .installed,
+                executablePath: PersistedPath(
+                    rawValue: "/tmp/stornaut-settings-fixture/bin/codex"
+                ),
+                version: "codex-cli fixture",
+                syntaxStatus: .supported
+            )
+        }
+        let runtimeEvidence: SettingsRuntimeEvidence = switch self {
+        case .runtimeStale:
+            .staleR5
+        case .runtimeFailed:
+            .failed
+        case .runtimeUnverified:
+            .unverified
+        default:
+            .admittedR5
+        }
         return SettingsSnapshot(
             preferences: try SettingsPreferences(
                 language: language,
@@ -366,14 +408,8 @@ private extension DebugSettingsFixture {
                 availability: .available
             ),
             diskAccess: .limited,
-            codex: SettingsCodexStatus(
-                availability: .installed,
-                executablePath: PersistedPath(
-                    rawValue: "/tmp/stornaut-settings-fixture/bin/codex"
-                ),
-                version: "codex-cli fixture",
-                syntaxStatus: .supported
-            ),
+            codex: codex,
+            runtimeEvidence: runtimeEvidence,
             counts: SettingsRecordCounts(
                 evidence: 4,
                 manifests: 2,

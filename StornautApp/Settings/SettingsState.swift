@@ -58,13 +58,23 @@ enum SettingsDiskAccessStatus: String, Sendable, Equatable {
     case checkFailed
 }
 
-enum SettingsCodexAvailability: String, Sendable, Equatable {
+enum SettingsCodexAvailability:
+    String,
+    CaseIterable,
+    Sendable,
+    Equatable
+{
     case installed
     case unavailable
     case checkFailed
 }
 
-enum SettingsCodexSyntaxStatus: String, Sendable, Equatable {
+enum SettingsCodexSyntaxStatus:
+    String,
+    CaseIterable,
+    Sendable,
+    Equatable
+{
     case supported
     case unsupported
     case unverified
@@ -82,6 +92,101 @@ struct SettingsCodexStatus: Sendable, Equatable {
         version: nil,
         syntaxStatus: .unverified
     )
+
+    static let installedSupported = SettingsCodexStatus(
+        availability: .installed,
+        executablePath: nil,
+        version: nil,
+        syntaxStatus: .supported
+    )
+}
+
+enum SettingsRuntimeEvidenceStatus:
+    String,
+    CaseIterable,
+    Sendable,
+    Equatable
+{
+    case passed
+    case stale
+    case failed
+    case unverified
+}
+
+enum SettingsRuntimeEvidenceOutcome: String, Sendable, Equatable {
+    case passed
+}
+
+struct SettingsRuntimeEvidenceReceipt: Sendable, Equatable {
+    let schemaVersion: Int
+    let runtimeProfile: String
+    let runtimeRevision: String
+    let reportSchemaVersion: Int
+    let reportSHA256: String
+    let verifiedAt: Date
+    let provider: String
+    let model: String
+    let capabilitiesObserved: Int
+    let integrityContained: Int
+    let outcome: SettingsRuntimeEvidenceOutcome
+
+    static let admittedR5 = SettingsRuntimeEvidenceReceipt(
+        schemaVersion: 1,
+        runtimeProfile: "capability-first-v1",
+        runtimeRevision:
+            "8b93852d901cc7bd78bf827c21dc4d85ab9d473f",
+        reportSchemaVersion: 2,
+        reportSHA256:
+            "08ba7c30373d4736124f0e507fcc9aa972880235251b8bbf636a7b2fabb1d193",
+        verifiedAt: Date(timeIntervalSince1970: 1_786_619_347),
+        provider: "openai",
+        model: "gpt-5.6-luna",
+        capabilitiesObserved: 9,
+        integrityContained: 12,
+        outcome: .passed
+    )
+}
+
+struct SettingsRuntimeEvidence: Sendable, Equatable {
+    let status: SettingsRuntimeEvidenceStatus
+    let receipt: SettingsRuntimeEvidenceReceipt?
+
+    private init(
+        status: SettingsRuntimeEvidenceStatus,
+        receipt: SettingsRuntimeEvidenceReceipt?
+    ) {
+        self.status = status
+        self.receipt = receipt
+    }
+
+    static let admittedR5 = SettingsRuntimeEvidence(
+        status: .passed,
+        receipt: .admittedR5
+    )
+
+    static let staleR5 = SettingsRuntimeEvidence(
+        status: .stale,
+        receipt: .admittedR5
+    )
+
+    static let failed = SettingsRuntimeEvidence(
+        status: .failed,
+        receipt: nil
+    )
+
+    static let unverified = SettingsRuntimeEvidence(
+        status: .unverified,
+        receipt: nil
+    )
+
+    static func passed(
+        receipt: SettingsRuntimeEvidenceReceipt?
+    ) -> SettingsRuntimeEvidence {
+        SettingsRuntimeEvidence(
+            status: .passed,
+            receipt: receipt
+        )
+    }
 }
 
 struct SettingsPrimaryRootStatus: Sendable, Equatable {
@@ -100,6 +205,7 @@ struct SettingsSnapshot: Sendable, Equatable {
     let primaryRoot: SettingsPrimaryRootStatus
     let diskAccess: SettingsDiskAccessStatus
     let codex: SettingsCodexStatus
+    let runtimeEvidence: SettingsRuntimeEvidence
     let counts: SettingsRecordCounts
     let knowledge: [LocalKnowledgeFact]
     let corruptKnowledgeIDs: [String]
@@ -111,6 +217,7 @@ struct SettingsSnapshot: Sendable, Equatable {
         primaryRoot: SettingsPrimaryRootStatus,
         diskAccess: SettingsDiskAccessStatus,
         codex: SettingsCodexStatus,
+        runtimeEvidence: SettingsRuntimeEvidence,
         counts: SettingsRecordCounts,
         knowledge: [LocalKnowledgeFact],
         corruptKnowledgeIDs: [String],
@@ -121,6 +228,7 @@ struct SettingsSnapshot: Sendable, Equatable {
         self.primaryRoot = primaryRoot
         self.diskAccess = diskAccess
         self.codex = codex
+        self.runtimeEvidence = runtimeEvidence
         self.counts = counts
         self.knowledge = knowledge.sorted {
             if $0.updatedAt != $1.updatedAt {
@@ -139,6 +247,7 @@ struct SettingsSnapshot: Sendable, Equatable {
         primaryRoot: SettingsPrimaryRootStatus? = nil,
         diskAccess: SettingsDiskAccessStatus? = nil,
         codex: SettingsCodexStatus? = nil,
+        runtimeEvidence: SettingsRuntimeEvidence? = nil,
         counts: SettingsRecordCounts? = nil,
         knowledge: [LocalKnowledgeFact]? = nil,
         corruptKnowledgeIDs: [String]? = nil,
@@ -149,6 +258,7 @@ struct SettingsSnapshot: Sendable, Equatable {
             primaryRoot: primaryRoot ?? self.primaryRoot,
             diskAccess: diskAccess ?? self.diskAccess,
             codex: codex ?? self.codex,
+            runtimeEvidence: runtimeEvidence ?? self.runtimeEvidence,
             counts: counts ?? self.counts,
             knowledge: knowledge ?? self.knowledge,
             corruptKnowledgeIDs:
@@ -171,6 +281,7 @@ struct SettingsSnapshot: Sendable, Equatable {
             ),
             diskAccess: .limited,
             codex: .unavailable,
+            runtimeEvidence: .admittedR5,
             counts: SettingsRecordCounts(
                 evidence: 0,
                 manifests: 0,

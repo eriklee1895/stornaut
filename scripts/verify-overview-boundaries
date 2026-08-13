@@ -36,7 +36,8 @@ rg -q --fixed-strings 'prefix(3)' StornautApp/Overview/OverviewModel.swift
 rg -q 'AppScanActivity' StornautApp/AppState/AppPageState.swift
 rg -q 'appModel.scanActivity' StornautApp/AppShell/RootView.swift
 rg -q 'CoverageBadge' StornautApp/Overview/OverviewView.swift
-rg -q 'overview.probe.paused' StornautApp/Overview/StorageOrbitView.swift
+rg -q 'overview.probe.implementationUnavailable' \
+    StornautApp/Overview/StorageOrbitView.swift
 
 if rg -n \
     '125 GB|87%|23\.4 GB|#07152E|#3F469A|#6573E6|#32D6F4|#FFB547|#EAFBFF|Constellation|star(field| map)' \

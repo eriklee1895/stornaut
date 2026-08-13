@@ -5,8 +5,8 @@
 > 当前状态：产品、Agent、UI 功能交互与品牌基线完成；Epic 0–1 evidence
 > gate 已完成；Epic 2–4 Tasks 9–26 通过最终 unified verifier 并归档；
 > Phase C deterministic Epic 8 详尽 plan 已于 2026-08-11 获用户批准，
-> Tasks 27–28 已完成；ADR 0004 回顾确认现有 Runtime 仍有旧 Broker-only
-> 漂移，用户已批准在 Task 29 前插入 capability-first Runtime R1–R6 gate；
+> Tasks 27–28 已完成；ADR 0004 回顾发现的旧 Broker-only Runtime 漂移已由
+> capability-first Runtime R1–R6 gate 关闭；
 > R1–R2 已完成；R2 结论为 `configurationReady`；R3 的原 process-group
 > candidate 因 new-session descendant escape 被拒，用户批准的 audit-session
 > lifecycle supervisor 随后通过 final privileged composition，R3 得出
@@ -26,18 +26,22 @@
 > one-shot continuation、external-state priority 与 subagent sender identity；
 > final live fixes 关闭 vanished-process errno 分类、strict-schema `$ref`
 > sibling、direct-read fixed command 漂移和 shell gate Codable shape。
-> 最新 Codex 235/235、Lifecycle 60/60、serial 537/537、headless selected
+> 最新 Codex 227 passed + 8 explicit opt-in skipped、Lifecycle 60/60、
+> serial 537/537、headless selected
 > 534/534、Xcode/Release/no-Executor gates 通过。历史
 > TeamoRouter/`usageLimitExceeded`
 > 仅为 superseded 调试证据。
 > current-source signed App/helper machine report 已得出 `signedRuntimeReady`
 >（9/9 capabilities、12/12 integrity，SHA-256
 > `08ba7c30373d4736124f0e507fcc9aa972880235251b8bbf636a7b2fabb1d193`），
-> 随后完成 fixed topology 零残留卸载。R5 evidence complete，等待独立
-> commit/push；R6 与 Task 29 均未开始。
+> 随后完成 fixed topology 零残留卸载并独立提交推送。R6 已完成 exact
+> admitted receipt、five-dimensional Settings status、typed bilingual
+> disclosure、actual-window evidence、final matrix 与 independent post-fix
+> review，runtime foundation 结论为 `go`，无 unresolved P0–P2。Task 29
+> 是下一项 eligible deterministic task，但本轮尚未启动。
 > Task 5 的历史
 > Broker-only no-go 已由 ADR 0004 capability-first 决策修订，Deep Dive 因
-> 新运行时实现/evidence gate 尚未交付而 paused；
+> 生产产品流程尚未实现而 unavailable；
 > release signing/notarization 未评估
 
 ## 1. 任务目标
@@ -254,8 +258,8 @@ containment；post-fix source 已补齐 official code-mode host、
 anti-forgery evidence、current-build binding 与 one-shot XPC reply。历史
 TeamoRouter/usage-limit 报告只作 superseded evidence。current-source signed
 App/helper 已得出 `signedRuntimeReady`，并完成 fixed App/plist/service/
-lease/runtime/process 零残留卸载。R5 仅待独立 commit/push；R6 完成前
-Task 29 不得恢复。
+lease/runtime/process 零残留卸载。R6 final admission 已完成并得出 runtime
+foundation `go`；Task 29 可恢复但本轮未启动。
 逐项 artifact/command/gate 缺口与恢复顺序见
 [R2–R6 Progress Audit](../reports/capability-first-runtime-progress-audit-2026-08-13.md)。
 R1 当前证据见
@@ -267,8 +271,8 @@ process-tree lifecycle escape 拒绝原 process-group design，随后由用户�
 [ADR 0016](../adr/0016-investigation-lifecycle-supervisor.md) audit-session
 supervisor 关闭 hard gate。R3 final verdict 为 `behaviorReady` candidate。
 R4 随后用 strict v2 advisory protocol 与 package graph separation 关闭
-no-Executor protocol seam；signed-App helper packaging/FDA/TCC 与最终 admission
-仍属于 R5–R6。
+no-Executor protocol seam；R5 signed-App helper 与 R6 final admission 已
+完成。FDA/TCC product flow 与 production Deep Dive 仍不在当前 admission。
 
 跨 Epic 的阶段依赖、no-go 分支和交付顺序由 [Delivery Roadmap](../plans/roadmap.md) 管理；新 active plan 不得另起一套宏观路线。
 
@@ -349,10 +353,9 @@ docs/plans/active/epic-8-safe-execution-vertical-slice.md，候选范围从 Quic
 Scan terminal projection 形成 Review Reclaim Plan，经 pure Policy Gate、
 fresh revalidation、用户确认与默认 MoveToTrash，最后写 immutable Cleanup
 Manifest 和 truthful Cleanup Result/History。Tasks 27–28 已完成。ADR 0004
-回顾确认当前 `CodexProcess`、capability report、Investigation Envelope 与 UI
-copy 仍漂移在旧 Broker-only 模型。用户已批准在 Task 29 前插入
-docs/plans/active/capability-first-codex-runtime-gate.md 的 R1–R6，详尽 plan
-已获批准。R1 已完成并得出 conditional-go：read-only Seatbelt 阻断 user-data
+回顾发现的旧 Broker-only runtime/UI 漂移已由
+docs/plans/active/capability-first-codex-runtime-gate.md 的 R1–R6 关闭。
+R1 得出 conditional-go：read-only Seatbelt 阻断 user-data
 writes，managed proxy 可让公网访问成功并阻断 direct/local/private/Unix
 targets，但需要一个 same-session、父进程拥有、随机端口的 loopback proxy
 transport。该精确例外已获用户批准用于 R2 configuration candidate；R2 已
@@ -364,8 +367,9 @@ managed-proxy-owner drain 与 stale-lease recovery 均 observed，residue 为 0�
 R4 已完成并得出 `protocolReady`；R5 official `openai` worker gate 已通过
 9/9 capability 与 errno-only IPv4/IPv6/private/local/Unix containment；
 current-source signed App/helper report 进一步通过 9/9 capability、12/12
-integrity 与零残留卸载。repository gates 与独立 review 通过，R5 等待独立
-commit/push；R6 与 Task 29 未启动。该 gate
+integrity 与零残留卸载。R6 已完成 final matrix、five-dimensional status、
+typed disclosure、actual-window evidence 与 post-fix review，runtime
+foundation 结论为 `go`。Task 29 尚未启动。该 gate
 要求证明完整调查能力和公共联网可用时，Codex 全进程树不可写用户数据、不可
 访问 localhost/私网/任意 Unix socket 且无 Executor 路径；不得用
 `danger-full-access`、命令/公共域名

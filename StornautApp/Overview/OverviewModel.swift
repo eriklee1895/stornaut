@@ -20,7 +20,7 @@ enum OverviewPrimaryAction: String, Sendable, Equatable {
 }
 
 enum OverviewDeepDiveState: String, Sendable, Equatable {
-    case paused
+    case implementationUnavailable
 }
 
 enum OverviewMetricKind: String, Sendable, Equatable {
@@ -131,7 +131,7 @@ struct OverviewModel: Sendable, Equatable {
         )
         reasonKey = pageState.reasonKey
         recoveryIntent = pageState.recoveryIntent
-        deepDive = .paused
+        deepDive = .implementationUnavailable
 
         guard let projection = pageState.projection else {
             snapshot = nil

@@ -135,7 +135,7 @@ struct ScanEvidenceInspector: View {
                 }
 
                 Label {
-                    Text("scan.deepDive.paused")
+                    Text("scan.deepDive.implementationUnavailable")
                 } icon: {
                     Image(systemName: "lock.shield")
                 }
@@ -147,7 +147,9 @@ struct ScanEvidenceInspector: View {
                     .background.secondary,
                     in: RoundedRectangle(cornerRadius: 10)
                 )
-                .accessibilityIdentifier("scan.inspector.deepDivePaused")
+                .accessibilityIdentifier(
+                    "scan.inspector.deepDiveImplementationUnavailable"
+                )
             }
             .padding(20)
         }

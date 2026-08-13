@@ -73,7 +73,7 @@ struct StorageOrbitView: View {
                             }
                             .offset(x: point.x, y: point.y)
                             .accessibilityHidden(true)
-                            .help("overview.probe.paused")
+                            .help("overview.probe.implementationUnavailable")
                     }
                 }
                 .frame(width: 184, height: 184)
@@ -96,9 +96,11 @@ struct StorageOrbitView: View {
                     }
                     if probePoint != nil {
                         Circle()
-                            .accessibilityLabel("overview.probe.paused")
+                            .accessibilityLabel(
+                                "overview.probe.implementationUnavailable"
+                            )
                             .accessibilityIdentifier(
-                                "overview.probe.paused"
+                                "overview.probe.implementationUnavailable"
                             )
                     }
                 }
@@ -137,7 +139,7 @@ struct StorageOrbitView: View {
     }
 
     private var probePoint: CGPoint? {
-        guard deepDive == .paused,
+        guard deepDive == .implementationUnavailable,
               let unknownIndex = segments.firstIndex(where: {
                   $0.kind == .unknown
               })

@@ -33,8 +33,8 @@
 | Agent、双模式与治理设计 | [Agent Disk Governance](design/agent-disk-governance.md) |
 | UI、品牌、状态与交互 | [UI/UX](design/ui-ux.md) |
 | 宏观交付顺序与阶段 Gate | [Delivery Roadmap](plans/roadmap.md) |
-| 当前计划状态 | [Active Plans](plans/active/README.md) — R5 `signedRuntimeReady`、零残留；等待独立 commit/push 后进入 R6 |
-| Capability-first Codex Runtime Gate | [Runtime Evidence Gate](plans/active/capability-first-codex-runtime-gate.md) — R1–R5 evidence complete；R6 pending |
+| 当前计划状态 | [Active Plans](plans/active/README.md) — R1–R6 runtime foundation `go`；Task 29 next but not started |
+| Capability-first Codex Runtime Gate | [Runtime Evidence Gate](plans/active/capability-first-codex-runtime-gate.md) — complete |
 | R2 tests-first brief | [R2 Implementation Brief](plans/active/task-r2-implementation-brief.md) — complete |
 | R3 lifecycle hard-gate brief | [R3 Implementation Brief](plans/active/task-r3-implementation-brief.md) — behaviorReady candidate |
 | R4 protocol/no-Executor brief | [R4 Implementation Brief](plans/active/task-r4-implementation-brief.md) — protocolReady |
@@ -63,6 +63,8 @@
 | Capability-first Runtime R5 Historical Blocker | [R5 App Server Historical Blocker](reports/capability-first-runtime-r5-api-key-blocker.md) — resolved provider/schema/raw-event investigation |
 | Capability-first Runtime R5 Historical Provider Blocker | [R5 Usage-Limit Blocker](reports/capability-first-runtime-r5-usage-limit-blocker.md) — superseded by official subscription evidence |
 | Capability-first Runtime R5 Review | [R5 Review](reports/capability-first-runtime-r5-review.md) — `signedRuntimeReady`、9/9 capabilities、12/12 integrity、零残留 |
+| Capability-first Runtime Final Validation | [Final Validation](reports/capability-first-runtime-validation-report.md) — complete matrix、ADR 0004 risk mapping、runtime foundation `go` |
+| Capability-first Runtime R6 Review | [R6 Review](reports/capability-first-runtime-r6-review.md) — status/UI evidence、post-fix review、zero unresolved P0–P2 |
 | Capability-first Runtime Progress Audit | [R2–R6 Progress Audit](reports/capability-first-runtime-progress-audit-2026-08-13.md) — prompt-to-artifact coverage and resume checklist |
 | Review / Policy / Authorization 决策 | [ADR 0011](adr/0011-review-policy-authorization.md) |
 | Cleanup Journal / Manifest 决策 | [ADR 0012](adr/0012-cleanup-execution-journal.md) |

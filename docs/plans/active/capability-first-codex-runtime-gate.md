@@ -1,9 +1,8 @@
 # Capability-First Codex Runtime Evidence Gate
 
-> Status: R5 `signedRuntimeReady` candidate — current-source signed App/helper
-> observed 9/9 capabilities and contained 12/12 integrity properties;
-> repository gates, independent review and zero-residue uninstall pass.
-> Independent R5 commit/push pending; R6 not started.
+> Status: Complete — runtime foundation `go`; R5 signed evidence observed 9/9
+> capabilities and contained 12/12 integrity properties; R6 product status,
+> final matrix, actual-window evidence and independent review pass.
 >
 > Planned: 2026-08-11
 >
@@ -1082,27 +1081,18 @@ If any capability or integrity row remains uncertain, this gate is not
 complete. Record the no-go/conditional result and continue the deterministic
 product only through a separately reviewed roadmap update.
 
-Current outcome: R4 remains `protocolReady`. R5 provider/schema/raw-event
-compatibility is resolved and the official `openai` + ChatGPT subscription
-`gpt-5.6-luna` worker observed all 9 required capabilities. Its fixed
-errno-only probe observed direct-public, IPv4/IPv6 local/private/link-local/ULA
-and Unix-socket denial; worker integrity is 6/6 contained and the no-sandbox
-negative control fails. The root-only local topology and verifier are
-implemented. Post-fix review closed command/image/subagent anti-forgery,
-random denial-token translation, outer/inner privacy-preflight parity, the
-missing bundled `codex-code-mode-host`, current-build/installed-App drift,
-XPC double-resume, external-state masking and subagent sender ambiguity.
-Final live repairs also closed exited-process error classification, provider
-strict-schema `$ref` sibling rejection, fixed direct-read command variants and
-the shell gate's Codable outcome-shape check.
+Current outcome: R1–R6 are complete. The current-source signed App/helper
+report is `signedRuntimeReady` with 9/9 capabilities and 12/12 integrity;
+fixed topology uninstall left zero residue. R6 projects the exact admitted
+receipt, separates installation/syntax/evidence/gate/feature availability,
+adds a typed bilingual non-actionable disclosure and maps every final matrix
+and ADR 0004 residual-risk row. Post-fix review has zero unresolved P0–P2.
 
-The historical TeamoRouter/usage-limit episode is superseded debugging
-evidence and is not part of the admitted product profile. The current-source
-signed App/helper report is `signedRuntimeReady` with 9/9 capabilities and
-12/12 integrity; fixed topology uninstall left zero residue. R5 waits only for
-its independent commit/push. R6 and Task 29 remain paused. Developer ID,
-notarization and distribution
-are not part of the current admission claim. See the
+The runtime foundation decision is `go`. Task 29 is eligible to resume but was
+not started by R6. Production Deep Dive, Developer ID, notarization and
+distribution are not part of the current admission claim. See the
 [historical usage-limit blocker](../../reports/capability-first-runtime-r5-usage-limit-blocker.md),
 [historical App Server blocker](../../reports/capability-first-runtime-r5-api-key-blocker.md)
-and [current R5 review](../../reports/capability-first-runtime-r5-review.md).
+and [current R5 review](../../reports/capability-first-runtime-r5-review.md),
+[final validation](../../reports/capability-first-runtime-validation-report.md)
+and [R6 review](../../reports/capability-first-runtime-r6-review.md).

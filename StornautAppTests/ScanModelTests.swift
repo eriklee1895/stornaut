@@ -371,7 +371,7 @@ private enum ScanLocalizationKeys {
         "scan.inspector.exactPath",
         "scan.inspector.supportingEvidence",
         "scan.inspector.missingEvidence",
-        "scan.deepDive.paused",
+        "scan.deepDive.implementationUnavailable",
         "scan.review.unavailable",
     ]
 }

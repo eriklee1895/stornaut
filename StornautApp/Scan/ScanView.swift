@@ -316,7 +316,7 @@ struct ScanView: View {
             Spacer()
 
             Label(
-                "scan.deepDive.paused",
+                "scan.deepDive.implementationUnavailable",
                 systemImage: "lock.shield"
             )
             .font(.caption.weight(.medium))

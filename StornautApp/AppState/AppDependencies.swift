@@ -403,6 +403,7 @@ private actor AppQuickScanRuntime {
             ),
             diskAccess: .limited,
             codex: codex,
+            runtimeEvidence: .admittedR5,
             counts: SettingsRecordCounts(
                 evidence: counts.evidenceSessions,
                 manifests: counts.manifests,

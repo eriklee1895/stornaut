@@ -81,8 +81,8 @@ stornaut-settings-knowledge-dark.png
 
 Task 22 起，shell Light/Dark 截图使用真实 `success` Overview fixture，不再
 使用 foundation placeholder。额外两张截图分别固定 permission-limited
-Overview 与 `zh-Hans` Overview；它们验证 Unknown/Unmeasurable 分离、安全暂停
-Deep Dive 和 localization 层级，不复制概念图示例数字。
+Overview 与 `zh-Hans` Overview；它们验证 Unknown/Unmeasurable 分离、Deep
+Dive implementation unavailable 和 localization 层级，不复制概念图示例数字。
 
 Task 23 的三张 Scan 截图固定 deterministic DEBUG fake state，绝不扫描真实
 home：Dark active 验证五阶段 rail、四种独立进度单位和渐进结果；Light
@@ -96,13 +96,14 @@ Task 24 的四张 History 截图固定 typed DEBUG Evidence fixture：Light popu
 measured、可比较、不同时间戳样本的 Used/Free 直标与非因果文案。它们不得
 显示 Deep Dive、Cleanup Manifest、export 或暗示后台采集。
 
-Task 25 的四张新增 Settings 截图固定 closed typed fixture：Light Scanning
+Task 25/R6 的 Settings 截图固定 closed typed fixture：Light Scanning
 验证单一真实 Primary Root、明确 exclusions 与永久保护；Light Privacy & Data
 验证固定 7/90 天政策与分离 clear actions；Dark Codex 验证 installation、
-syntax 与 safety paused 三者分离；Dark Local Knowledge 验证结构化事实、
+syntax、signed evidence、runtime gate 与 implementation unavailable 分离，
+并显示无 action/persistence 的 first-use disclosure；Dark Local Knowledge 验证结构化事实、
 provenance、context unavailable/stale 与 destructive hierarchy。不得出现
 FDA toggle、Run Safety Check 假动作、provider/Shell、retention override、
-free-text memory 或策略绕过。
+free-text memory、Start Deep Dive、Accept 或策略绕过。
 
 Settings 附件必须截取包含 `settings.content` 的独立 window，不能直接对
 `settings.content` accessibility element 截图。后者在 macOS 26 的透明
