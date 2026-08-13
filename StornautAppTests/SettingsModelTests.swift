@@ -262,15 +262,15 @@ func localKnowledgeWithoutCompleteLiveContextIsNeverCalledCurrent()
     throws
 {
     let fact = try SettingsAppTestFactory.fact(
-        catalogVersion: "builtin-runtime-tool-residue-v1"
+        catalogVersion: "builtin-runtime-tool-residue-v2"
     )
     let currentCatalog = try SettingsAppTestFactory.snapshot(
         knowledge: [fact],
-        catalogVersion: "builtin-runtime-tool-residue-v1"
+        catalogVersion: "builtin-runtime-tool-residue-v2"
     )
     let changedCatalog = try SettingsAppTestFactory.snapshot(
         knowledge: [fact],
-        catalogVersion: "builtin-runtime-tool-residue-v2"
+        catalogVersion: "builtin-runtime-tool-residue-v3"
     )
 
     let unavailable = SettingsModel(
@@ -390,7 +390,7 @@ enum SettingsAppTestFactory {
         codex: SettingsCodexStatus = .unavailable,
         runtimeEvidence: SettingsRuntimeEvidence = .admittedR5,
         knowledge: [LocalKnowledgeFact] = [],
-        catalogVersion: String = "builtin-runtime-tool-residue-v1",
+        catalogVersion: String = "builtin-runtime-tool-residue-v2",
         counts: SettingsRecordCounts? = nil,
         primaryRootAvailability: SettingsPrimaryRootAvailability = .fallbackHome
     ) throws -> SettingsSnapshot {

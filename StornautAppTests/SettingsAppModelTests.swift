@@ -115,7 +115,7 @@ func clearEvidenceInvalidatesOverviewScanAndHistoryWithoutTouchingManifests()
 @Test
 func forgetKnowledgeUpdatesOnlyKnowledgePage() async throws {
     let fact = try SettingsAppTestFactory.fact(
-        catalogVersion: "builtin-runtime-tool-residue-v1"
+        catalogVersion: "builtin-runtime-tool-residue-v2"
     )
     let driver = SettingsAppTestDriver(
         snapshot: try SettingsAppTestFactory.snapshot(

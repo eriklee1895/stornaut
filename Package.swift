@@ -51,6 +51,7 @@ let package = Package(
             dependencies: ["StornautProcessSupport"],
             resources: [
                 .copy("Resources/BuiltInRuleCatalog.json"),
+                .copy("Resources/BuiltInExecutionProfileCatalog.json"),
             ],
             linkerSettings: [
                 .linkedLibrary("sqlite3"),

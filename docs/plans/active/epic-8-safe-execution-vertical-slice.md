@@ -1,8 +1,7 @@
 # Stornaut Phase C — Epic 8 Safe Execution Vertical Slice Plan
 
-> **Status:** Tasks 27–28 complete; Runtime R1–R6 interlock complete with
-> foundation `go`; Task 29 detailed brief is proposed for review and
-> implementation has not started
+> **Status:** Tasks 27–29 complete; Runtime R1–R6 interlock complete with
+> foundation `go`; Task 30 is next
 >
 > **Roadmap phase:** Phase C — Safe Execution Vertical Slice
 >
@@ -688,11 +687,15 @@ Final verifier evidence:
 - App tests/build/signing/bundle, Release fixture isolation, localization,
   rule compiler, boundaries and docs passed.
 
-Task 29 has not started. The approved
+Task 29 is complete. Its closed Execution Profile Catalog, one-snapshot
+Activity/evidence resolver, Quick Scan integration, complete Store join,
+Cleanup Plan Builder, bounded Review projection, independent review and
+unified verifier passed; see
+[Task 29 Review](../../reports/epic-8-task-29-review.md). The approved
 [Runtime R1–R6](capability-first-codex-runtime-gate.md) interlock completed with
 a supported runtime foundation `go`; see the
 [final validation](../../reports/capability-first-runtime-validation-report.md).
-Task 29 is therefore the next eligible deterministic task. This status does
+Task 30 is therefore the next eligible deterministic task. This status does
 not enable production Deep Dive or any real execution path.
 
 ## Task 27: Safe Execution Upstream Study and Architecture Decisions

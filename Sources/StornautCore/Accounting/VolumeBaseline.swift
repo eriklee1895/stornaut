@@ -137,6 +137,7 @@ public struct FoundationVolumeBaselineSampler: VolumeBaselineSampling {
             mode: UInt16(info.st_mode),
             ownerUserID: info.st_uid,
             ownerGroupID: info.st_gid,
+            linkCount: UInt64(info.st_nlink),
             size: max(0, Int64(info.st_size)),
             allocatedBytes: allocatedBytes(info),
             modificationSeconds: Int64(info.st_mtimespec.tv_sec),

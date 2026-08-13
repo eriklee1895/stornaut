@@ -140,8 +140,9 @@ vanished-process errno 分类、strict-schema `$ref` sibling、direct-read fixed
 command 与 shell outcome shape。current-source signed App/helper 已得出
 `signedRuntimeReady`（9/9 capability、12/12 integrity），随后卸载并证明
 零残留。R6 已完成 final matrix、product status 与 independent review，并得出
-runtime foundation `go`。Task 29 可恢复但尚未启动；production Deep Dive 仍须
-等待 Phase D 自己的实现与 gate。
+runtime foundation `go`。Task 29 已完成并通过 independent review/unified
+verifier；Task 30 是下一项。production Deep Dive 仍须等待 Phase D 自己的
+实现与 gate。
 
 ### Phase D — Conditional Deep Dive
 
@@ -246,8 +247,8 @@ runtime foundation `go`。Task 29 可恢复但尚未启动；production Deep Div
   serial/headless contracts/build 与 review findings 修复；官方 `openai`
   subscription worker 已通过，历史 TeamoRouter/usage-limit evidence 已
   superseded。signed App/helper machine gate 已得出 `signedRuntimeReady`，
-  并完成零残留卸载；R6 已得出 runtime foundation `go`。Task 29 尚未启动，
-  production Deep Dive 仍不可用。
+  并完成零残留卸载；R6 已得出 runtime foundation `go`。Task 29 已完成，
+  Task 30 是下一项；production Deep Dive 仍不可用。
 - Epic 0 Foundation Upstream Study：已完成，选择 checked-in Xcode App/Test host + local Swift packages。
 - Epic 0 Task 1：SwiftPM Core/Codex、smoke tests、`scripts/verify`、manual-only CI 与 ThirdPartyNotices 骨架已完成。
 - Bundle identifier：已确认 `com.eriklee.stornaut`。
@@ -276,4 +277,5 @@ runtime foundation `go`。Task 29 可恢复但尚未启动；production Deep Div
   例外已获批准；R2 已完成并得出 `configurationReady`；R3 behavioral gate
   已得出 `behaviorReady` candidate；R4 已得出 `protocolReady`；R5 已得出
   `signedRuntimeReady` 并证明 zero residue；R6 final admission 已得出 runtime
-  foundation `go`。Phase C Task 29 尚未启动，生产 Deep Dive 保持 unavailable。
+  foundation `go`。Phase C Task 29 已完成，Task 30 是下一项；生产 Deep Dive
+  保持 unavailable。

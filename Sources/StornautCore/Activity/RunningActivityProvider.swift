@@ -133,6 +133,22 @@ public struct RunningActivityResult: Sendable, Equatable {
     public let matchedProcessNames: [DomainLabel]
 }
 
+public struct RunningActivityContext: Sendable, Equatable {
+    let snapshot: RunningActivitySnapshot?
+    let failure: ActivityProviderFailure?
+    public let observedAt: Date
+
+    init(
+        snapshot: RunningActivitySnapshot?,
+        failure: ActivityProviderFailure?,
+        observedAt: Date
+    ) {
+        self.snapshot = snapshot
+        self.failure = failure
+        self.observedAt = observedAt
+    }
+}
+
 public struct RunningActivityProvider: Sendable {
     private let source: any RunningActivitySnapshotting
 
@@ -148,6 +164,13 @@ public struct RunningActivityProvider: Sendable {
         query: RelatedProcessQuery,
         observedAt: Date
     ) async -> RunningActivityResult {
+        let context = await capture(observedAt: observedAt)
+        return evaluate(query: query, context: context)
+    }
+
+    public func capture(
+        observedAt: Date
+    ) async -> RunningActivityContext {
         let fallbackDate = safeActivityObservationDate(observedAt)
         do {
             let snapshot = try await source.snapshot()
@@ -157,60 +180,121 @@ public struct RunningActivityProvider: Sendable {
             else {
                 throw ActivityProviderFailure.outputLimitExceeded
             }
-            let requestedBundles = Set(query.bundleIdentifiers)
-            let requestedProcesses = Set(query.processNames)
-            let matchedBundles = Array(Set(snapshot.applications.compactMap {
-                requestedBundles.contains($0.bundleIdentifier)
-                    ? $0.bundleIdentifier
-                    : nil
-            })).sorted { $0.rawValue < $1.rawValue }
-            let matchedProcesses = Array(Set(snapshot.processes.compactMap {
-                requestedProcesses.contains($0.name) ? $0.name : nil
-            })).sorted { $0.rawValue < $1.rawValue }
-            let active = !matchedBundles.isEmpty || !matchedProcesses.isEmpty
-            if !active,
-               !query.processNames.isEmpty,
-               snapshot.processStatus != .available
-            {
-                let failure = snapshot.processStatus.failure
-                    ?? .permissionDenied
-                return unavailableRunningActivityResult(
-                    failure: failure,
-                    source: .runningProcess,
-                    observedAt: snapshot.observedAt
-                )
-            }
-            let source: ActivityEvidenceSource = query.processNames.isEmpty
-                ? .runningApplication
-                : .runningProcess
-            return RunningActivityResult(
-                status: .available,
-                observation: try ActivityObservation(
-                    key: .processInactive,
-                    state: active ? .contradicted : .satisfied,
-                    source: source,
-                    origin: .external,
-                    observedAt: snapshot.observedAt,
-                    reason: DomainToken(
-                        rawValue: active
-                            ? "activity.process.related-running"
-                            : "activity.process.inactive"
-                    )!
-                ),
-                matchedBundleIdentifiers: matchedBundles,
-                matchedProcessNames: matchedProcesses
+            return RunningActivityContext(
+                snapshot: snapshot,
+                failure: nil,
+                observedAt: snapshot.observedAt
             )
         } catch {
             let failure = error as? ActivityProviderFailure
                 ?? .launchFailed
-            return unavailableRunningActivityResult(
+            return RunningActivityContext(
+                snapshot: nil,
                 failure: failure,
-                source: query.processNames.isEmpty
-                    ? .runningApplication
-                    : .runningProcess,
                 observedAt: fallbackDate
             )
         }
+    }
+
+    public func evaluate(
+        query: RelatedProcessQuery,
+        context: RunningActivityContext
+    ) -> RunningActivityResult {
+        guard let snapshot = context.snapshot else {
+            return unavailableRunningActivityResult(
+                failure: context.failure ?? .launchFailed,
+                source: query.processNames.isEmpty
+                    ? .runningApplication
+                    : .runningProcess,
+                observedAt: context.observedAt
+            )
+        }
+        let requestedBundles = Set(query.bundleIdentifiers)
+        let requestedProcesses = Set(query.processNames)
+        let matchedBundles = Array(Set(snapshot.applications.compactMap {
+            requestedBundles.contains($0.bundleIdentifier)
+                ? $0.bundleIdentifier
+                : nil
+        })).sorted { $0.rawValue < $1.rawValue }
+        let matchedProcesses = Array(Set(snapshot.processes.compactMap {
+            requestedProcesses.contains($0.name) ? $0.name : nil
+        })).sorted { $0.rawValue < $1.rawValue }
+        return activityResult(
+            snapshot: snapshot,
+            matchedBundles: matchedBundles,
+            matchedProcesses: matchedProcesses,
+            hasProcessSubjects: !query.processNames.isEmpty
+        )
+    }
+
+    public func evaluate(
+        subjects: ExecutionProcessSubjects,
+        context: RunningActivityContext
+    ) -> RunningActivityResult {
+        guard let snapshot = context.snapshot else {
+            return unavailableRunningActivityResult(
+                failure: context.failure ?? .launchFailed,
+                source: .runningProcess,
+                observedAt: context.observedAt
+            )
+        }
+        let requestedBundles = Set(subjects.bundleIdentifiers)
+        let matchedBundles = Array(Set(snapshot.applications.compactMap {
+            requestedBundles.contains($0.bundleIdentifier)
+                ? $0.bundleIdentifier
+                : nil
+        })).sorted { $0.rawValue < $1.rawValue }
+        let matchedProcesses = Array(Set(snapshot.processes.compactMap {
+            subjects.matches(processName: $0.name.rawValue)
+                ? $0.name
+                : nil
+        })).sorted { $0.rawValue < $1.rawValue }
+        return activityResult(
+            snapshot: snapshot,
+            matchedBundles: matchedBundles,
+            matchedProcesses: matchedProcesses,
+            hasProcessSubjects: true
+        )
+    }
+
+    private func activityResult(
+        snapshot: RunningActivitySnapshot,
+        matchedBundles: [DomainToken],
+        matchedProcesses: [DomainLabel],
+        hasProcessSubjects: Bool
+    ) -> RunningActivityResult {
+        let active = !matchedBundles.isEmpty || !matchedProcesses.isEmpty
+        if !active,
+           hasProcessSubjects,
+           snapshot.processStatus != .available
+        {
+            return unavailableRunningActivityResult(
+                failure: snapshot.processStatus.failure
+                    ?? .permissionDenied,
+                source: .runningProcess,
+                observedAt: snapshot.observedAt
+            )
+        }
+        let source: ActivityEvidenceSource = hasProcessSubjects
+            ? .runningProcess
+            : .runningApplication
+        return RunningActivityResult(
+            status: .available,
+            observation: try! ActivityObservation(
+                key: .processInactive,
+                state: active ? .contradicted : .satisfied,
+                source: source,
+                origin: .external,
+                observedAt: snapshot.observedAt,
+                reason: DomainToken(
+                    rawValue: active
+                        ? "activity.process.related-running"
+                        : "activity.process.inactive"
+                )!
+            ),
+            matchedBundleIdentifiers: matchedBundles,
+            matchedProcessNames: matchedProcesses
+        )
     }
 }
 

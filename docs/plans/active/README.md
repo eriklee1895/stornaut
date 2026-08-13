@@ -1,8 +1,10 @@
 # Active Plans
 
 当前获批 executable plan 仍为 Phase C deterministic Epic 8。Task 28 后插入的
-ADR 0004 capability-first runtime interlock 已完成；Task 29 是下一项 eligible
-task，详尽 implementation brief 已进入 review，产品实现尚未启动。详细
+ADR 0004 capability-first runtime interlock 已完成；Task 29 的 closed
+Execution Profile Catalog、shared one-snapshot Activity/Evidence、完整 Store
+join、Cleanup Plan Builder、bounded Review projection、独立 review 与 unified
+verifier 已完成。Task 30 是下一项 eligible task。详细
 R1–R6 计划见
 [`capability-first-codex-runtime-gate.md`](capability-first-codex-runtime-gate.md)，
 详尽计划已获批准。R1 study/ADR/probe/review 与 R2 closed profile/report/
@@ -29,18 +31,17 @@ review findings 已修复；post-fix review 进一步关闭 command/image/subage
 	integrity；fixed topology 随后卸载并证明零残留。R5 已提交推送。R6 已完成
 	exact receipt、five-dimensional Settings、typed disclosure、final matrix、
 	actual-window evidence 与 post-fix review；runtime foundation 结论为 `go`。
-	Task 29 是下一项可恢复的 deterministic task；brief 已进入 review，产品
-	实现尚未启动。
+	Task 29 已完成；Task 30 是下一项可恢复的 deterministic task。
 
 Task 29 的 tests-first、closed Execution Profile Catalog、shared one-snapshot
 activity、完整 Store join、Plan Builder、boundary/benchmark/review 计划见
-[`task-29-implementation-brief.md`](task-29-implementation-brief.md)。该 brief
-当前为 proposed-for-review；批准前不得开始 Task 29 产品代码。它明确要求：
+[`task-29-implementation-brief.md`](task-29-implementation-brief.md)，完成证据
+见 [Task 29 Review](../../reports/epic-8-task-29-review.md)。它保持：
 
 - execution profile 与 generic Rule Catalog 分离；
 - 新 Rule Catalog generation 只提升 npm/pip，Go 保持 Review，uv 无 profile；
 - Review projection 不创建 selection、Policy 或 authority；
-- Store v3 不迁移，除非新证据触发重新规划；
+- Store v3 未迁移；
 - Task 29 不包含 App CTA、Trash、Registered Action 或 Deep Dive。
 
 Epic 2–4 Tasks 9–26 已完成并归档；最终统一 verifier 单次 exit `0`。
@@ -103,8 +104,7 @@ advisory protocol 与 structural no-Executor seam 的 `protocolReady` 结论。
 
 R6 已关闭当前个人本机 capability-first runtime foundation，但不证明
 ServiceManagement distribution、Developer ID/notarization、FDA/TCC product
-flow 或 production Deep Dive。Deep Dive 保持 unavailable；Task 29 产品实现
-尚未启动。
+flow 或 production Deep Dive。Deep Dive 保持 unavailable；Task 30 是下一项。
 
 即使计划获批，正常 App 也必须保持真实 Trash 依赖关闭，直到 Task 35 的
 signed-App disposable Trash diagnostic 与最终 gate 通过。Task 32 的 Review

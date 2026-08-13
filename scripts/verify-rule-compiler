@@ -13,8 +13,11 @@ overlay="$repo_root/Tests/Fixtures/Rules/conservative-overlay.json"
 protected_catalog="$repo_root/Rules/BuiltIn/protected-v1.json"
 project_catalog="$repo_root/Rules/BuiltIn/project-artifacts-v1.json"
 cache_catalog="$repo_root/Rules/BuiltIn/package-build-caches-v1.json"
+cache_promotion="$repo_root/Rules/BuiltIn/package-build-caches-v2.json"
 runtime_catalog="$repo_root/Rules/BuiltIn/runtime-tool-residue-v1.json"
+execution_profiles="$repo_root/Rules/BuiltIn/safe-execution-profiles-v1.json"
 compiled_runtime_catalog="$repo_root/Sources/StornautCore/Resources/BuiltInRuleCatalog.json"
+compiled_execution_profiles="$repo_root/Sources/StornautCore/Resources/BuiltInExecutionProfileCatalog.json"
 coverage_source="$repo_root/Tests/Fixtures/Rules/fr2-coverage-v1.json"
 
 for run in 1 2; do
@@ -49,11 +52,17 @@ for run in 1 2; do
         --catalog "$project_catalog" \
         --catalog "$cache_catalog" \
         --catalog "$runtime_catalog" \
-        --catalog-version builtin-runtime-tool-residue-v1 \
+        --catalog-version builtin-runtime-tool-residue-v2 \
+        --promotion "$cache_promotion" \
         --coverage "$coverage_source" \
+        --execution-profile "$execution_profiles" \
         --output "$work_dir/complete-catalog-$run.json" \
         --manifest "$work_dir/complete-manifest-$run.json" \
         --coverage-manifest "$work_dir/complete-coverage-$run.json" \
+        --execution-profile-output \
+            "$work_dir/execution-profile-$run.json" \
+        --execution-profile-manifest \
+            "$work_dir/execution-profile-manifest-$run.json" \
         > "$work_dir/complete-hash-$run.txt"
 done
 
@@ -72,15 +81,35 @@ cmp "$work_dir/cache-hash-1.txt" "$work_dir/cache-hash-2.txt"
 cmp "$work_dir/complete-catalog-1.json" "$work_dir/complete-catalog-2.json"
 cmp "$work_dir/complete-manifest-1.json" "$work_dir/complete-manifest-2.json"
 cmp "$work_dir/complete-coverage-1.json" "$work_dir/complete-coverage-2.json"
+cmp "$work_dir/execution-profile-1.json" \
+    "$work_dir/execution-profile-2.json"
+cmp "$work_dir/execution-profile-manifest-1.json" \
+    "$work_dir/execution-profile-manifest-2.json"
 cmp "$work_dir/complete-hash-1.txt" "$work_dir/complete-hash-2.txt"
 
 cmp "$compiled_runtime_catalog" "$work_dir/complete-catalog-1.json"
-expected_runtime_hash=133b3829816fa951f03cb87473e03454c3e561b421c83e6c8efaf8ad89849e99
+cmp "$compiled_execution_profiles" "$work_dir/execution-profile-1.json"
+expected_runtime_hash=d94ef23f9dc0d772499a192e9205d09aafa9618a1adbe7ec41c6aacc927a913a
+expected_profile_hash=f43aa94da659fb6b5c64f5e2822e21141cd882390f96cb5f69452f2de5b467f2
 actual_runtime_hash=$(tr -d '\n' < "$work_dir/complete-hash-1.txt")
 [[ "$actual_runtime_hash" == "$expected_runtime_hash" ]]
 [[ "$(shasum -a 256 "$compiled_runtime_catalog" | awk '{print $1}')" == \
     "$expected_runtime_hash" ]]
+[[ "$(shasum -a 256 "$compiled_execution_profiles" | awk '{print $1}')" == \
+    "$expected_profile_hash" ]]
 [[ "$(jq '.rules | length' "$compiled_runtime_catalog")" == "67" ]]
+[[ "$(jq -r '.catalogVersion' "$compiled_runtime_catalog")" == \
+    "builtin-runtime-tool-residue-v2" ]]
+[[ "$(jq -r '[.rules[] | select(.disposition == "readyToReclaim") | .id] | join(",")' \
+    "$compiled_runtime_catalog")" == "cache-npm-content,cache-pip" ]]
+[[ "$(jq '.profiles | length' "$compiled_execution_profiles")" == "3" ]]
+[[ "$(jq -r '.catalogVersion' "$compiled_execution_profiles")" == \
+    "safe-execution-v1" ]]
+[[ "$(jq -r '.ruleCatalogVersion' "$compiled_execution_profiles")" == \
+    "builtin-runtime-tool-residue-v2" ]]
+[[ "$(jq -r '[.profiles[].ruleID] | join(",")' \
+    "$compiled_execution_profiles")" == \
+    "cache-go-build,cache-npm-content,cache-pip" ]]
 
 swift run stornaut-rule-compiler \
     --catalog "$project_catalog" \
@@ -110,15 +139,25 @@ swift run stornaut-rule-compiler \
     --catalog "$cache_catalog" \
     --catalog "$project_catalog" \
     --catalog "$protected_catalog" \
-    --catalog-version builtin-runtime-tool-residue-v1 \
+    --catalog-version builtin-runtime-tool-residue-v2 \
+    --promotion "$cache_promotion" \
     --coverage "$coverage_source" \
+    --execution-profile "$execution_profiles" \
     --output "$work_dir/complete-catalog-reordered.json" \
     --manifest "$work_dir/complete-manifest-reordered.json" \
     --coverage-manifest "$work_dir/complete-coverage-reordered.json" \
+    --execution-profile-output \
+        "$work_dir/execution-profile-reordered.json" \
+    --execution-profile-manifest \
+        "$work_dir/execution-profile-manifest-reordered.json" \
     > "$work_dir/complete-hash-reordered.txt"
 cmp "$work_dir/complete-catalog-1.json" "$work_dir/complete-catalog-reordered.json"
 cmp "$work_dir/complete-manifest-1.json" "$work_dir/complete-manifest-reordered.json"
 cmp "$work_dir/complete-coverage-1.json" "$work_dir/complete-coverage-reordered.json"
+cmp "$work_dir/execution-profile-1.json" \
+    "$work_dir/execution-profile-reordered.json"
+cmp "$work_dir/execution-profile-manifest-1.json" \
+    "$work_dir/execution-profile-manifest-reordered.json"
 cmp "$work_dir/complete-hash-1.txt" "$work_dir/complete-hash-reordered.txt"
 
 python3 - "$coverage_source" "$work_dir/invalid-coverage.json" <<'PY'
@@ -137,11 +176,16 @@ swift run stornaut-rule-compiler \
     --catalog "$project_catalog" \
     --catalog "$cache_catalog" \
     --catalog "$runtime_catalog" \
-    --catalog-version builtin-runtime-tool-residue-v1 \
+    --catalog-version builtin-runtime-tool-residue-v2 \
+    --promotion "$cache_promotion" \
     --coverage "$work_dir/invalid-coverage.json" \
+    --execution-profile "$execution_profiles" \
     --output "$work_dir/invalid-coverage-catalog.json" \
     --manifest "$work_dir/invalid-coverage-manifest.json" \
     --coverage-manifest "$work_dir/invalid-coverage-output.json" \
+    --execution-profile-output "$work_dir/invalid-coverage-profile.json" \
+    --execution-profile-manifest \
+        "$work_dir/invalid-coverage-profile-manifest.json" \
     > /dev/null 2>&1
 invalid_coverage_status=$?
 set -e
@@ -152,9 +196,56 @@ fi
 for unexpected in \
     "$work_dir/invalid-coverage-catalog.json" \
     "$work_dir/invalid-coverage-manifest.json" \
-    "$work_dir/invalid-coverage-output.json"; do
+    "$work_dir/invalid-coverage-output.json" \
+    "$work_dir/invalid-coverage-profile.json" \
+    "$work_dir/invalid-coverage-profile-manifest.json"; do
     if [[ -e "$unexpected" ]]; then
         echo "coverage failure left a partial output: $unexpected" >&2
+        exit 1
+    fi
+done
+
+python3 - "$execution_profiles" "$work_dir/invalid-profile.json" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as source:
+    profile = json.load(source)
+profile["profiles"][0]["ruleID"] = "cache-uv"
+with open(sys.argv[2], "w", encoding="utf-8") as output:
+    json.dump(profile, output, sort_keys=True)
+PY
+set +e
+swift run stornaut-rule-compiler \
+    --catalog "$protected_catalog" \
+    --catalog "$project_catalog" \
+    --catalog "$cache_catalog" \
+    --catalog "$runtime_catalog" \
+    --catalog-version builtin-runtime-tool-residue-v2 \
+    --promotion "$cache_promotion" \
+    --coverage "$coverage_source" \
+    --execution-profile "$work_dir/invalid-profile.json" \
+    --output "$work_dir/invalid-profile-catalog.json" \
+    --manifest "$work_dir/invalid-profile-rule-manifest.json" \
+    --coverage-manifest "$work_dir/invalid-profile-coverage.json" \
+    --execution-profile-output "$work_dir/invalid-profile-output.json" \
+    --execution-profile-manifest \
+        "$work_dir/invalid-profile-manifest.json" \
+    > /dev/null 2>&1
+invalid_profile_status=$?
+set -e
+if (( invalid_profile_status == 0 )); then
+    echo "execution profile compiler accepted an unapproved rule" >&2
+    exit 1
+fi
+for unexpected in \
+    "$work_dir/invalid-profile-catalog.json" \
+    "$work_dir/invalid-profile-rule-manifest.json" \
+    "$work_dir/invalid-profile-coverage.json" \
+    "$work_dir/invalid-profile-output.json" \
+    "$work_dir/invalid-profile-manifest.json"; do
+    if [[ -e "$unexpected" ]]; then
+        echo "profile failure left a partial output: $unexpected" >&2
         exit 1
     fi
 done
@@ -191,9 +282,16 @@ fi
 
 python3 -m json.tool Rules/Schema/rule-catalog-source.schema.json >/dev/null
 python3 -m json.tool Rules/Schema/rule-overlay-source.schema.json >/dev/null
+python3 -m json.tool \
+    Rules/Schema/rule-disposition-promotion-source.schema.json >/dev/null
+python3 -m json.tool \
+    Rules/Schema/execution-profile-source.schema.json >/dev/null
 python3 -m json.tool Rules/BuiltIn/protected-v1.json >/dev/null
 python3 -m json.tool Rules/BuiltIn/project-artifacts-v1.json >/dev/null
 python3 -m json.tool Rules/BuiltIn/package-build-caches-v1.json >/dev/null
+python3 -m json.tool Rules/BuiltIn/package-build-caches-v2.json >/dev/null
+python3 -m json.tool \
+    Rules/BuiltIn/safe-execution-profiles-v1.json >/dev/null
 python3 -m json.tool Rules/BuiltIn/runtime-tool-residue-v1.json >/dev/null
 python3 -m json.tool Tests/Fixtures/Rules/protected-path-cases.json >/dev/null
 python3 -m json.tool Tests/Fixtures/Rules/protected-downgrade-overlay.json >/dev/null
@@ -218,6 +316,9 @@ python3 -m json.tool "$work_dir/cache-manifest-1.json" >/dev/null
 python3 -m json.tool "$work_dir/complete-catalog-1.json" >/dev/null
 python3 -m json.tool "$work_dir/complete-manifest-1.json" >/dev/null
 python3 -m json.tool "$work_dir/complete-coverage-1.json" >/dev/null
+python3 -m json.tool "$work_dir/execution-profile-1.json" >/dev/null
+python3 -m json.tool \
+    "$work_dir/execution-profile-manifest-1.json" >/dev/null
 
 swift package show-dependencies --format text \
     | grep -Fx 'No external dependencies found' >/dev/null
@@ -278,6 +379,55 @@ if (( symlink_status == 0 )); then
     exit 1
 fi
 
+set +e
+swift run stornaut-rule-compiler \
+    --catalog "$protected_catalog" \
+    --catalog "$project_catalog" \
+    --catalog "$cache_catalog" \
+    --catalog "$runtime_catalog" \
+    --catalog-version builtin-runtime-tool-residue-v2 \
+    --promotion "$cache_promotion" \
+    --coverage "$coverage_source" \
+    --execution-profile "$execution_profiles" \
+    --output "$work_dir/profile-collision-catalog.json" \
+    --manifest "$work_dir/profile-collision-rule-manifest.json" \
+    --coverage-manifest "$work_dir/profile-collision-coverage.json" \
+    --execution-profile-output "$execution_profiles" \
+    --execution-profile-manifest \
+        "$work_dir/profile-collision-manifest.json" \
+    > /dev/null 2>&1
+profile_collision_status=$?
+set -e
+if (( profile_collision_status == 0 )); then
+    echo "compiler accepted a Profile source/output collision" >&2
+    exit 1
+fi
+
+ln -s "$execution_profiles" "$work_dir/profile-output-link.json"
+set +e
+swift run stornaut-rule-compiler \
+    --catalog "$protected_catalog" \
+    --catalog "$project_catalog" \
+    --catalog "$cache_catalog" \
+    --catalog "$runtime_catalog" \
+    --catalog-version builtin-runtime-tool-residue-v2 \
+    --promotion "$cache_promotion" \
+    --coverage "$coverage_source" \
+    --execution-profile "$execution_profiles" \
+    --output "$work_dir/profile-link-catalog.json" \
+    --manifest "$work_dir/profile-link-rule-manifest.json" \
+    --coverage-manifest "$work_dir/profile-link-coverage.json" \
+    --execution-profile-output "$work_dir/profile-output-link.json" \
+    --execution-profile-manifest \
+        "$work_dir/profile-link-manifest.json" \
+    > /dev/null 2>&1
+profile_link_status=$?
+set -e
+if (( profile_link_status == 0 )); then
+    echo "compiler accepted a symlinked Profile source/output collision" >&2
+    exit 1
+fi
+
 if find .derivedData -path '*/Stornaut.app/*' \
     \( -iname '*yams*' -o -iname '*yaml*' -o -iname '*rulecompiler*' \) \
     -print -quit 2>/dev/null | grep -q .; then
@@ -291,3 +441,4 @@ echo "Project catalog verification passed: $(cat "$work_dir/project-hash-1.txt")
 echo "Cache catalog verification passed: $(cat "$work_dir/cache-hash-1.txt")"
 echo "Complete catalog verification passed: $(cat "$work_dir/complete-hash-1.txt")"
 echo "Compiled runtime catalog parity passed: $actual_runtime_hash"
+echo "Compiled execution profile parity passed: $expected_profile_hash"

@@ -3,6 +3,83 @@ import Testing
 @testable import StornautCore
 
 @Test
+func builtInExecutionProfilesBindOnlyApprovedPhaseCRules() throws {
+    let rules = try BuiltInRuleCatalog.load()
+    let profiles = try BuiltInExecutionProfileCatalog.load(
+        ruleCatalog: rules
+    )
+
+    #expect(rules.catalogVersion.rawValue
+        == "builtin-runtime-tool-residue-v2")
+    #expect(rules.rules.count == 67)
+    #expect(
+        rules.rules.filter {
+            $0.disposition == .readyToReclaim
+        }.map(\.id.rawValue) == [
+            "cache-npm-content",
+            "cache-pip",
+        ]
+    )
+    #expect(profiles.catalogVersion.rawValue == "safe-execution-v1")
+    #expect(profiles.profiles.map(\.ruleID.rawValue) == [
+        "cache-go-build",
+        "cache-npm-content",
+        "cache-pip",
+    ])
+    #expect(
+        profiles.profiles.allSatisfy {
+            $0.ruleID.rawValue != "cache-uv"
+        }
+    )
+}
+
+@Test
+func builtInExecutionProfileValidationRejectsSubjectOrResolverDrift()
+    throws
+{
+    let rules = try BuiltInRuleCatalog.load()
+    let profiles = try BuiltInExecutionProfileCatalog.load(
+        ruleCatalog: rules
+    )
+    let npm = try #require(
+        profiles.profiles.first {
+            $0.ruleID.rawValue == "cache-npm-content"
+        }
+    )
+    let drifted = try ExecutionProfile(
+        id: npm.id,
+        ruleID: npm.ruleID,
+        relativePath: npm.relativePath,
+        expectedKind: npm.expectedKind,
+        resolverBindings: npm.resolverBindings,
+        processSubjects: ExecutionProcessSubjects(
+            bundleIdentifiers: [],
+            exactNames: [
+                DomainLabel(rawValue: "node")!,
+                DomainLabel(rawValue: "npm")!,
+            ],
+            versionedFamilies: []
+        ),
+        defaultSuggestion: npm.defaultSuggestion,
+        fixtureIDs: npm.fixtureIDs
+    )
+    let modified = try ExecutionProfileCatalog(
+        catalogVersion: profiles.catalogVersion,
+        ruleCatalogVersion: profiles.ruleCatalogVersion,
+        profiles: profiles.profiles.map {
+            $0.id == npm.id ? drifted : $0
+        }.sorted { $0.id.rawValue < $1.id.rawValue }
+    )
+
+    #expect(
+        !BuiltInExecutionProfileCatalog.isApprovedPhaseCCatalog(
+            modified,
+            ruleCatalog: rules
+        )
+    )
+}
+
+@Test
 func protectedRuleRequiresCriticalRisk() throws {
     #expect(throws: RuleCatalogError.invalidRule) {
         _ = try makeProtectedRule(risk: .high)

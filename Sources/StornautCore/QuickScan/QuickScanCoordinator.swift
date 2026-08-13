@@ -193,17 +193,24 @@ public actor QuickScanCoordinator {
         SnapshotID,
         ActivityObservation
     ) -> EvidenceID
+    public typealias ExecutionEvidenceIDSource = @Sendable (
+        SnapshotID,
+        DomainToken
+    ) -> EvidenceID
 
     private let store: any QuickScanProductPersisting
     private let historyStore: (any QuickScanHistoryPersisting)?
     private let catalog: RuleCatalog
     private let matcher: RuleCatalogMatcher
     private let activityProvider: any QuickScanActivityProviding
+    private let executionProfileCatalog: ExecutionProfileCatalog?
+    private let executableEvidenceResolver: ExecutableEvidenceResolver?
     private let volumeSampler: any VolumeBaselineSampling
     private let now: @Sendable () -> Date
     private let snapshotID: SnapshotIDSource
     private let classificationID: ClassificationIDSource
     private let evidenceID: EvidenceIDSource
+    private let executionEvidenceID: ExecutionEvidenceIDSource
     private var activeControl: QuickScanProductRunControl?
     private var activeWriter: ScanSessionWriter?
     private var scanIsActive = false
@@ -268,6 +275,8 @@ public actor QuickScanCoordinator {
         catalog: RuleCatalog,
         activityProvider: any QuickScanActivityProviding =
             NativeQuickScanActivityProvider(),
+        executionProfileCatalog: ExecutionProfileCatalog? = nil,
+        executableEvidenceResolver: ExecutableEvidenceResolver? = nil,
         volumeSampler: any VolumeBaselineSampling =
             FoundationVolumeBaselineSampler(),
         now: @escaping @Sendable () -> Date = Date.init,
@@ -277,6 +286,9 @@ public actor QuickScanCoordinator {
         },
         evidenceID: @escaping EvidenceIDSource = {
             _, _ in EvidenceID()
+        },
+        executionEvidenceID: @escaping ExecutionEvidenceIDSource = {
+            _, _ in EvidenceID()
         }
     ) {
         self.store = store
@@ -284,20 +296,29 @@ public actor QuickScanCoordinator {
         self.catalog = catalog
         matcher = RuleCatalogMatcher(catalog: catalog)
         self.activityProvider = activityProvider
+        self.executionProfileCatalog = executionProfileCatalog
+        self.executableEvidenceResolver = executableEvidenceResolver
         self.volumeSampler = volumeSampler
         self.now = now
         self.snapshotID = snapshotID
         self.classificationID = classificationID
         self.evidenceID = evidenceID
+        self.executionEvidenceID = executionEvidenceID
     }
 
     public init(
         store: EvidenceStore
     ) throws {
+        let catalog = try BuiltInRuleCatalog.load()
         try self.init(
             store: store,
             historyStore: store,
-            catalog: BuiltInRuleCatalog.load()
+            catalog: catalog,
+            executionProfileCatalog:
+                BuiltInExecutionProfileCatalog.load(
+                    ruleCatalog: catalog
+                ),
+            executableEvidenceResolver: ExecutableEvidenceResolver()
         )
     }
 
@@ -1057,6 +1078,17 @@ public actor QuickScanCoordinator {
     ) async throws -> ProductClassificationResult {
         var result = ProductClassificationResult()
         var cursor: PathSnapshotCursor?
+        let executionActivityContext: RunningActivityContext?
+        if let executableEvidenceResolver,
+           executionProfileCatalog != nil
+        {
+            executionActivityContext =
+                await executableEvidenceResolver.captureActivity(
+                    observedAt: classifiedAt
+                )
+        } else {
+            executionActivityContext = nil
+        }
         while true {
             try checkProductCancellation()
             let cursorPage = try await store.pathSnapshots(
@@ -1110,10 +1142,78 @@ public actor QuickScanCoordinator {
                     result.projectedSnapshotIDs.insert(snapshot.id)
                 }
                 var observations: [ActivityObservation] = []
+                var satisfiedEvidence = satisfiedEvidence(
+                    for: snapshot,
+                    rules: rules
+                )
+                var evidence: [EvidenceRecord] = []
                 if rules.count == 1,
                    let rule = rules.first,
-                   !rule.veto,
-                   !rule.requiredActivityKeys.isEmpty
+                   let profile = executionProfileCatalog?.profile(
+                       ruleID: rule.id
+                   ),
+                   let executableEvidenceResolver,
+                   let executionActivityContext,
+                   executionProfileCatalog?.ruleCatalogVersion
+                    == catalog.catalogVersion
+                {
+                    do {
+                        let resolution =
+                            try executableEvidenceResolver.resolveQuickScan(
+                            snapshot: snapshot,
+                            rule: rule,
+                            profile: profile,
+                            profileCatalogVersion:
+                                executionProfileCatalog!.catalogVersion,
+                            activityContext: executionActivityContext,
+                            evidenceID: executionEvidenceID
+                        )
+                        observations = resolution.activityObservations
+                        satisfiedEvidence =
+                            resolution.satisfiedEvidenceKeys
+                        evidence = resolution.evidenceRecords
+                    } catch {
+                        do {
+                            observations = try providerFailureObservations(
+                                for: rule,
+                                observedAt: classifiedAt
+                            )
+                        } catch {
+                            throw ProcessingFailure(
+                                issue: productIssue(
+                                    .activityUnavailable,
+                                    snapshotID: snapshot.id,
+                                    reason:
+                                        "quick-scan.activity.provider-failure"
+                                ),
+                                underlying: error
+                            )
+                        }
+                        result.issues.append(
+                            productIssue(
+                                .activityUnavailable,
+                                snapshotID: snapshot.id,
+                                reason:
+                                    "quick-scan.activity.provider-failure"
+                            )
+                        )
+                    }
+                } else if rules.count == 1,
+                          let rule = rules.first,
+                          rule.id.rawValue == "cache-uv",
+                          let executableEvidenceResolver,
+                          let executionActivityContext
+                {
+                    observations = [
+                        executableEvidenceResolver.evaluateActivity(
+                            subjects: Self.uvReadOnlyProcessSubjects,
+                            context: executionActivityContext
+                        ),
+                    ]
+                } else if rules.count == 1,
+                          let rule = rules.first,
+                          !rule.veto,
+                          !rule.requiredActivityKeys.isEmpty
                 {
                     do {
                         observations = try await activityProvider.observations(
@@ -1149,18 +1249,20 @@ public actor QuickScanCoordinator {
                         )
                     }
                 }
-                let evidence = observations.map {
-                    evidenceRecord(
-                        snapshotID: snapshot.id,
-                        observation: $0
-                    )
+                if evidence.isEmpty {
+                    evidence = observations.map {
+                        evidenceRecord(
+                            snapshotID: snapshot.id,
+                            observation: $0
+                        )
+                    }
                 }
                 let classification: Classification
                 do {
                     classification = try DeterministicClassifier().classify(
                         snapshot: snapshot,
                         candidates: rules,
-                        satisfiedEvidenceKeys: satisfiedEvidence(for: snapshot),
+                        satisfiedEvidenceKeys: satisfiedEvidence,
                         activityObservations: observations,
                         classifiedAt: classifiedAt,
                         classificationID: classificationID(snapshot.id),
@@ -1562,7 +1664,8 @@ public actor QuickScanCoordinator {
     }
 
     private func satisfiedEvidence(
-        for snapshot: PathSnapshot
+        for snapshot: PathSnapshot,
+        rules: [CompiledRule]
     ) -> [DomainToken] {
         var keys: [DomainToken] = []
         if snapshot.allocatedByteCount != nil {
@@ -1573,8 +1676,37 @@ public actor QuickScanCoordinator {
                 DomainToken(rawValue: "evidence.scope.user-owned")!
             )
         }
+        if rules.count == 1,
+           let rule = rules.first,
+           rule.id.rawValue == "cache-uv",
+           rule.match.pathPattern.rawValue == ".cache/uv",
+           rule.match.expectedKind == .directory,
+           snapshot.relativePath == ".cache/uv",
+           snapshot.kind == .directory,
+           rule.disposition == .reviewRecommended,
+           rule.recommendedAction == .moveToTrash
+        {
+            let approvedStaticKeys: Set<String> = [
+                "evidence.cache.layout",
+                "evidence.cache.reclaimable",
+                "evidence.cache.tool-owned",
+            ]
+            keys.append(contentsOf: rule.requiredEvidenceKeys.filter {
+                approvedStaticKeys.contains($0.rawValue)
+            })
+        }
         return keys
     }
+
+    private static let uvReadOnlyProcessSubjects: ExecutionProcessSubjects = {
+        try! ExecutionProcessSubjects(
+            bundleIdentifiers: [],
+            exactNames: [
+                DomainLabel(rawValue: "uv")!,
+            ],
+            versionedFamilies: []
+        )
+    }()
 
     private func evidenceRecord(
         snapshotID: SnapshotID,

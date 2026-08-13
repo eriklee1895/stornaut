@@ -1,6 +1,6 @@
 # Task 29 Implementation Brief — Deterministic Execution Evidence and Cleanup Plan Builder
 
-> Status: Proposed for user review; implementation has not started
+> Status: Completed; implementation, review and final gates passed
 >
 > Date: 2026-08-13
 >
@@ -50,7 +50,9 @@ The Task is complete only when:
 - tests-first evidence, focused/full verification, benchmark, code review,
   independent report and one commit/push are complete.
 
-Task 29 does not start until this brief is reviewed.
+Task 29 was implemented tests-first and independently reviewed. Completion
+evidence is recorded in
+[Task 29 Review](../../reports/epic-8-task-29-review.md).
 
 ## 2. Planning Corrections
 
@@ -87,8 +89,8 @@ Promoting npm and pip changes classification semantics. The implementation
 must not rewrite `package-build-caches-v1` or continue emitting
 `builtin-runtime-tool-residue-v1` under the old identity.
 
-Create a new package-cache source generation and compile a new complete Rule
-Catalog generation. Update:
+Create a new closed package-cache promotion generation and compile a new
+complete Rule Catalog generation. Update:
 
 - source filename/version;
 - merged Catalog version;
@@ -106,10 +108,11 @@ Merged Rule catalogVersion: builtin-runtime-tool-residue-v2
 Execution Profile catalogVersion: safe-execution-v1
 ```
 
-`package-build-caches-v1.json` remains historical source evidence and is
-removed from active complete-Catalog compiler inputs rather than edited in
-place. The built-in Catalog still contains 67 Rules; only its version, npm/pip
-dispositions and resulting hash change.
+`package-build-caches-v1.json` remains the immutable base source and stays in
+the complete-Catalog compiler inputs. `package-build-caches-v2.json` is a
+strict, host-only two-rule promotion source that can change only npm and pip
+from Review to Ready. The built-in Catalog still contains 67 Rules; only its
+version, npm/pip dispositions and resulting hash change.
 
 Historical persisted classifications retain their original Catalog version.
 They are never rewritten or reinterpreted as Task 29 Ready results.
@@ -579,7 +582,7 @@ Acceptance is structural as well as temporal:
 
 ## 9. Implementation Sequence
 
-Execute Task 29 in this order after approval:
+Task 29 was executed in this order:
 
 ### T29.1 Red compiler/profile tests
 
@@ -741,3 +744,25 @@ to add:
 - non-`Codable`, one-shot, 30-second admission authorization.
 
 Task 30 must not reinterpret or expand the Task 29 Profile Catalog.
+
+## 14. Implementation Outcome
+
+Delivered:
+
+- `builtin-runtime-tool-residue-v2`, still 67 Rules, with npm/pip as the only
+  Ready rules;
+- separate `safe-execution-v1` Profile Catalog with exact Go/npm/pip profiles
+  and no uv profile;
+- one captured running-activity context per complete Quick Scan/Review pass;
+- closed static/filesystem/activity Evidence with complete privacy-safe
+  fingerprints;
+- exact uv read-only Review classification with no Plan eligibility;
+- cursor-based complete Store validation and corruption isolation;
+- immutable Cleanup Plans or typed empty/Scan Again outcomes;
+- bounded five-group Review projection with all execution-profile candidates
+  retained;
+- new compiler/App resource parity and Review boundary gates.
+
+The completion audit, confirmed findings, hashes, benchmark and verification
+matrix are in
+[Task 29 Review](../../reports/epic-8-task-29-review.md).

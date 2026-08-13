@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "package-build-caches-v2",
+  "baseCatalogVersion": "package-build-caches-v1",
+  "promotions": [
+    {
+      "ruleID": "cache-npm-content",
+      "from": "reviewRecommended",
+      "to": "readyToReclaim"
+    },
+    {
+      "ruleID": "cache-pip",
+      "from": "reviewRecommended",
+      "to": "readyToReclaim"
+    }
+  ]
+}

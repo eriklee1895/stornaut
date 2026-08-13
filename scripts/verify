@@ -187,6 +187,7 @@ function run_matcher_benchmarks() {
 function verify_source_boundaries() {
     scripts/verify-activity-boundaries
     scripts/verify-quick-scan-boundaries
+    scripts/verify-review-boundaries
     scripts/verify-codex-no-executor-boundary
     scripts/verify-app-state-boundaries
     scripts/verify-overview-boundaries

@@ -290,7 +290,7 @@ struct SettingsSnapshot: Sendable, Equatable {
             knowledge: [],
             corruptKnowledgeIDs: [],
             currentCatalogVersion: DomainToken(
-                rawValue: "builtin-runtime-tool-residue-v1"
+                rawValue: "builtin-runtime-tool-residue-v2"
             )!,
             refreshedAt: refreshedAt
         )

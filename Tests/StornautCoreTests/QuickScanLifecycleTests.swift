@@ -563,6 +563,21 @@ func quickScanDuplicateSessionIDDoesNotOverwriteExistingHistory() async throws {
 }
 
 @Test
+func foundationVolumeBaselinePreservesCompleteRootIdentity() throws {
+    let fixture = try QuickScanFixture(fileCount: 1)
+    defer { fixture.remove() }
+    let request = ScanRequest(rootURL: fixture.rootURL)
+
+    let baseline = try FoundationVolumeBaselineSampler().sample(
+        request: request,
+        sampledAt: Date(timeIntervalSince1970: 1)
+    )
+
+    #expect(baseline.rootIdentity == FileIdentity.read(at: fixture.rootURL))
+    #expect(baseline.rootIdentity.linkCount > 0)
+}
+
+@Test
 func volumeBaselineRejectsImpossibleCapacityAndNonDirectoryRoot() throws {
     let fixture = try QuickScanFixture(fileCount: 1)
     defer { fixture.remove() }

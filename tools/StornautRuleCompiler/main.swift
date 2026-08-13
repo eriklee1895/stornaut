@@ -12,12 +12,16 @@ struct StornautRuleCompilerCommand {
             let overlay = try options.overlayURL.map {
                 try Data(contentsOf: $0)
             }
+            let promotion = try options.promotionURL.map {
+                try Data(contentsOf: $0)
+            }
             let compiler = RuleSourceCompiler()
             let artifact: CompiledRuleArtifact
             if catalogs.count == 1, options.catalogVersion == nil {
                 artifact = try compiler.compile(
                     catalogData: catalogs[0],
-                    overlayData: overlay
+                    overlayData: overlay,
+                    promotionData: promotion
                 )
             } else {
                 guard let catalogVersion = options.catalogVersion else {
@@ -26,7 +30,8 @@ struct StornautRuleCompilerCommand {
                 artifact = try compiler.compile(
                     catalogSources: catalogs,
                     catalogVersion: catalogVersion,
-                    overlayData: overlay
+                    overlayData: overlay,
+                    promotionData: promotion
                 )
             }
             let coverageOutput: (data: Data, url: URL)?
@@ -45,6 +50,29 @@ struct StornautRuleCompilerCommand {
             } else {
                 coverageOutput = nil
             }
+            let executionProfileOutput: (
+                data: Data,
+                manifest: Data,
+                dataURL: URL,
+                manifestURL: URL
+            )?
+            if let profileURL = options.executionProfileURL,
+               let outputURL = options.executionProfileOutputURL,
+               let manifestURL = options.executionProfileManifestURL
+            {
+                let profileArtifact = try ExecutionProfileCompiler().compile(
+                    profileData: Data(contentsOf: profileURL),
+                    ruleCatalog: artifact.catalog
+                )
+                executionProfileOutput = (
+                    profileArtifact.data,
+                    try JSONEncoder.sorted.encode(profileArtifact.manifest),
+                    outputURL,
+                    manifestURL
+                )
+            } else {
+                executionProfileOutput = nil
+            }
             try writeAtomically(artifact.data, to: options.outputURL)
             let manifest = try JSONEncoder.sorted.encode(artifact.manifest)
             try writeAtomically(manifest, to: options.manifestURL)
@@ -52,6 +80,16 @@ struct StornautRuleCompilerCommand {
                 try writeAtomically(
                     coverageOutput.data,
                     to: coverageOutput.url
+                )
+            }
+            if let executionProfileOutput {
+                try writeAtomically(
+                    executionProfileOutput.data,
+                    to: executionProfileOutput.dataURL
+                )
+                try writeAtomically(
+                    executionProfileOutput.manifest,
+                    to: executionProfileOutput.manifestURL
                 )
             }
             FileHandle.standardOutput.write(
@@ -70,19 +108,27 @@ private struct CompilerOptions {
     let catalogURLs: [URL]
     let catalogVersion: String?
     let overlayURL: URL?
+    let promotionURL: URL?
     let coverageURL: URL?
+    let executionProfileURL: URL?
     let outputURL: URL
     let manifestURL: URL
     let coverageManifestURL: URL?
+    let executionProfileOutputURL: URL?
+    let executionProfileManifestURL: URL?
 
     static func parse(_ arguments: [String]) throws -> Self {
         var catalogURLs: [URL] = []
         var catalogVersion: String?
         var overlayURL: URL?
+        var promotionURL: URL?
         var coverageURL: URL?
+        var executionProfileURL: URL?
         var outputURL: URL?
         var manifestURL: URL?
         var coverageManifestURL: URL?
+        var executionProfileOutputURL: URL?
+        var executionProfileManifestURL: URL?
         var index = 1
         while index < arguments.count {
             let flag = arguments[index]
@@ -104,11 +150,21 @@ private struct CompilerOptions {
                     throw CompilerCommandError.invalidArguments
                 }
                 overlayURL = try absoluteURL(value)
+            case "--promotion":
+                guard promotionURL == nil else {
+                    throw CompilerCommandError.invalidArguments
+                }
+                promotionURL = try absoluteURL(value)
             case "--coverage":
                 guard coverageURL == nil else {
                     throw CompilerCommandError.invalidArguments
                 }
                 coverageURL = try absoluteURL(value)
+            case "--execution-profile":
+                guard executionProfileURL == nil else {
+                    throw CompilerCommandError.invalidArguments
+                }
+                executionProfileURL = try absoluteURL(value)
             case "--output":
                 guard outputURL == nil else {
                     throw CompilerCommandError.invalidArguments
@@ -124,6 +180,16 @@ private struct CompilerOptions {
                     throw CompilerCommandError.invalidArguments
                 }
                 coverageManifestURL = try absoluteURL(value)
+            case "--execution-profile-output":
+                guard executionProfileOutputURL == nil else {
+                    throw CompilerCommandError.invalidArguments
+                }
+                executionProfileOutputURL = try absoluteURL(value)
+            case "--execution-profile-manifest":
+                guard executionProfileManifestURL == nil else {
+                    throw CompilerCommandError.invalidArguments
+                }
+                executionProfileManifestURL = try absoluteURL(value)
             default:
                 throw CompilerCommandError.invalidArguments
             }
@@ -133,6 +199,11 @@ private struct CompilerOptions {
               catalogURLs.count <= RuleSourceCompiler.maximumSourceCount,
               catalogURLs.count == 1 || catalogVersion != nil,
               (coverageURL == nil) == (coverageManifestURL == nil),
+              (executionProfileURL == nil)
+                == (executionProfileOutputURL == nil),
+              (executionProfileURL == nil)
+                == (executionProfileManifestURL == nil),
+              promotionURL == nil || catalogVersion != nil,
               let outputURL,
               let manifestURL
         else {
@@ -140,13 +211,17 @@ private struct CompilerOptions {
         }
         let sourcePaths = try [
             overlayURL,
+            promotionURL,
             coverageURL,
+            executionProfileURL,
         ].compactMap { $0 }.map(canonicalExistingPath)
             + catalogURLs.map(canonicalExistingPath)
         let destinationPaths = [
             outputURL,
             manifestURL,
             coverageManifestURL,
+            executionProfileOutputURL,
+            executionProfileManifestURL,
         ].compactMap { $0 }.map(canonicalDestinationPath)
         guard Set(sourcePaths + destinationPaths).count
                 == sourcePaths.count + destinationPaths.count
@@ -157,10 +232,14 @@ private struct CompilerOptions {
             catalogURLs: catalogURLs,
             catalogVersion: catalogVersion,
             overlayURL: overlayURL,
+            promotionURL: promotionURL,
             coverageURL: coverageURL,
+            executionProfileURL: executionProfileURL,
             outputURL: outputURL,
             manifestURL: manifestURL,
-            coverageManifestURL: coverageManifestURL
+            coverageManifestURL: coverageManifestURL,
+            executionProfileOutputURL: executionProfileOutputURL,
+            executionProfileManifestURL: executionProfileManifestURL
         )
     }
 }

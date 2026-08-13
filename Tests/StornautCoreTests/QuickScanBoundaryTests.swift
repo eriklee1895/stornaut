@@ -74,7 +74,7 @@ func builtInRuntimeCatalogMatchesDeterministicCompiledArtifact() throws {
 
     #expect(
         catalog.catalogVersion.rawValue
-            == "builtin-runtime-tool-residue-v1"
+            == "builtin-runtime-tool-residue-v2"
     )
     #expect(catalog.rules.count == 67)
     #expect(catalog.rules.first?.id.rawValue == "cache-bun-install")

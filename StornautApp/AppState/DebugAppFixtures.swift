@@ -418,7 +418,7 @@ private extension DebugSettingsFixture {
             knowledge: knowledge,
             corruptKnowledgeIDs: corrupt,
             currentCatalogVersion: DomainToken(
-                rawValue: "builtin-runtime-tool-residue-v1"
+                rawValue: "builtin-runtime-tool-residue-v2"
             )!,
             refreshedAt: DebugProjectionFactory.now
         )
@@ -461,7 +461,7 @@ private enum DebugSettingsFactory {
                     rawValue: "activity.settings-fixture"
                 )!,
                 catalogVersion: DomainToken(
-                    rawValue: "builtin-runtime-tool-residue-v1"
+                    rawValue: "builtin-runtime-tool-residue-v2"
                 )!
             ),
             provenance: .userConfirmed,

@@ -45,8 +45,23 @@ runtime_catalog=$(
 test -n "$runtime_catalog"
 test "$(
     shasum -a 256 "$runtime_catalog" | awk '{print $1}'
-)" = "133b3829816fa951f03cb87473e03454c3e561b421c83e6c8efaf8ad89849e99"
+)" = "d94ef23f9dc0d772499a192e9205d09aafa9618a1adbe7ec41c6aacc927a913a"
 test "$(jq '.rules | length' "$runtime_catalog")" = "67"
+test "$(jq -r '.catalogVersion' "$runtime_catalog")" = \
+    "builtin-runtime-tool-residue-v2"
+runtime_profiles=$(
+    find "$app_path/Contents/Resources" \
+        -type f \
+        -name BuiltInExecutionProfileCatalog.json \
+        -print -quit
+)
+test -n "$runtime_profiles"
+test "$(
+    shasum -a 256 "$runtime_profiles" | awk '{print $1}'
+)" = "f43aa94da659fb6b5c64f5e2822e21141cd882390f96cb5f69452f2de5b467f2"
+test "$(jq '.profiles | length' "$runtime_profiles")" = "3"
+test "$(jq -r '.catalogVersion' "$runtime_profiles")" = \
+    "safe-execution-v1"
 test ! -d "$app_path/Contents/PlugIns"
 
 print "App bundle verification passed: $app_path"

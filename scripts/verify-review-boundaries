@@ -1,0 +1,87 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+cd "$repo_root"
+
+review_root=Sources/StornautCore/Review
+profile_resource=Sources/StornautCore/Resources/BuiltInExecutionProfileCatalog.json
+
+required_files=(
+    "$review_root/ExecutableEvidenceResolver.swift"
+    "$review_root/CleanupPlanBuilder.swift"
+    "$review_root/ReviewProjection.swift"
+    Sources/StornautCore/KnowledgeBase/ExecutionProfileCatalog.swift
+    Sources/StornautCore/KnowledgeBase/BuiltInExecutionProfileCatalog.swift
+    "$profile_resource"
+)
+
+for file in "${required_files[@]}"; do
+    [[ -f "$file" ]] || {
+        print -u2 "Missing Task 29 review boundary file: $file"
+        exit 1
+    }
+done
+
+if rg -n \
+    'StornautCodex|ProbeBridge|Adapter|URLSession|Network|Process\(|posix_spawn|ActionExecutor|TrashMoving|trashItem|RegisteredAction|ExecutionAuthorization|CleanupPolicyGate|PolicyDecision' \
+    "$review_root"; then
+    print -u2 "Review layer contains a prohibited authority or runtime dependency."
+    exit 1
+fi
+
+if rg -n \
+    'removeItem|moveItem|copyItem|createFile|forWritingTo|O_WRONLY|O_RDWR|unlink\(|rename\(' \
+    "$review_root"; then
+    print -u2 "Review layer contains a target-write surface."
+    exit 1
+fi
+
+if rg -n 'import (SwiftUI|AppKit)' "$review_root"; then
+    print -u2 "Review layer imports an App/UI framework."
+    exit 1
+fi
+
+[[ "$(jq -r '.catalogVersion' "$profile_resource")" == \
+    "safe-execution-v1" ]]
+[[ "$(jq -r '.ruleCatalogVersion' "$profile_resource")" == \
+    "builtin-runtime-tool-residue-v2" ]]
+[[ "$(jq '.profiles | length' "$profile_resource")" == "3" ]]
+[[ "$(jq -r '[.profiles[].ruleID] | join(",")' "$profile_resource")" == \
+    "cache-go-build,cache-npm-content,cache-pip" ]]
+! jq -e '.profiles[] | select(.ruleID == "cache-uv")' \
+    "$profile_resource" >/dev/null
+
+rg -Fq 'ActionRegistry(definitions: [])' \
+    Sources/StornautCore/Policy/ActionPolicyGate.swift
+rg -q 'private static let schemaVersion = 3' \
+    Sources/StornautCore/Evidence/EvidenceStore.swift
+
+package_graph=$(swift package describe --type json)
+python3 - "$package_graph" <<'PY'
+import json
+import sys
+
+package = json.loads(sys.argv[1])
+targets = {target["name"]: target for target in package["targets"]}
+core = targets["StornautCore"]
+dependencies = set(core.get("target_dependencies", []))
+if dependencies != {"StornautProcessSupport"}:
+    raise SystemExit(f"unexpected StornautCore dependencies: {sorted(dependencies)}")
+resources = {
+    resource["path"].split("/Sources/StornautCore/", 1)[-1]
+    for resource in core.get("resources", [])
+}
+expected = {
+    "Resources/BuiltInRuleCatalog.json",
+    "Resources/BuiltInExecutionProfileCatalog.json",
+}
+if not expected.issubset(resources):
+    raise SystemExit(f"missing compiled Core resources: {sorted(expected - resources)}")
+PY
+
+swift package show-dependencies --format text \
+    | grep -Fx 'No external dependencies found' >/dev/null
+
+echo "Review boundary verification passed."

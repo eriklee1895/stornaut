@@ -29,6 +29,24 @@ struct PathSnapshotCursorPage: Sendable {
     let rowCount: Int
 }
 
+struct CleanupPlanningCursor: Sendable, Equatable {
+    let relativePath: String
+    let snapshotID: String
+    let classificationID: String
+}
+
+struct CleanupPlanningRecord: Sendable, Equatable {
+    let snapshot: PathSnapshot
+    let classification: Classification
+}
+
+struct CleanupPlanningPage: Sendable {
+    let records: [CleanupPlanningRecord]
+    let corruptRecordIDs: [String]
+    let nextCursor: CleanupPlanningCursor?
+    let rowCount: Int
+}
+
 public struct ScanHistoryPage: Sendable, Equatable {
     public let sessions: [ScanSession]
     public let ledgersBySessionID: [ScanSessionID: SpaceLedger]
@@ -662,6 +680,120 @@ public actor EvidenceStore {
                     == storeMilliseconds(classification.classifiedAt)
             },
             operation: "classification.list"
+        )
+    }
+
+    func cleanupPlanningPage(
+        sessionID: ScanSessionID,
+        after cursor: CleanupPlanningCursor?,
+        limit: Int
+    ) throws -> CleanupPlanningPage {
+        try validatePage(limit: limit, offset: 0)
+        let cursorClause = cursor == nil
+            ? ""
+            : """
+              AND (
+                s.relative_path > ?
+                OR (
+                    s.relative_path = ?
+                    AND s.id > ?
+                )
+                OR (
+                    s.relative_path = ?
+                    AND s.id = ?
+                    AND c.id > ?
+                )
+              )
+              """
+        var bindings: [SQLiteValue] = [.text(sessionID.rawValue)]
+        if let cursor {
+            bindings.append(.text(cursor.relativePath))
+            bindings.append(.text(cursor.relativePath))
+            bindings.append(.text(cursor.snapshotID))
+            bindings.append(.text(cursor.relativePath))
+            bindings.append(.text(cursor.snapshotID))
+            bindings.append(.text(cursor.classificationID))
+        }
+        bindings.append(.integer(Int64(limit)))
+        let rows = try connection.query(
+            """
+            SELECT s.id, s.payload, s.session_id, s.relative_path,
+                   s.observed_at_ms,
+                   c.id, c.payload, c.snapshot_id, c.disposition,
+                   c.classified_at_ms
+            FROM classifications c
+            JOIN path_snapshots s ON s.id = c.snapshot_id
+            WHERE s.session_id = ?
+            \(cursorClause)
+            ORDER BY s.relative_path ASC, s.id ASC, c.id ASC
+            LIMIT ?
+            """,
+            bindings: bindings,
+            operation: "cleanupPlanning.page"
+        ) { statement -> (
+            record: CleanupPlanningRecord?,
+            corrupt: [String],
+            cursor: CleanupPlanningCursor
+        ) in
+            let snapshotID = columnText(statement, 0)
+            let relativePath = columnText(statement, 3)
+            let classificationID = columnText(statement, 5)
+            let rowCursor = CleanupPlanningCursor(
+                relativePath: relativePath,
+                snapshotID: snapshotID,
+                classificationID: classificationID
+            )
+            do {
+                let snapshot = try DomainJSON.decode(
+                    PathSnapshot.self,
+                    from: Data(columnText(statement, 1).utf8)
+                )
+                let classification = try DomainJSON.decode(
+                    Classification.self,
+                    from: Data(columnText(statement, 6).utf8)
+                )
+                guard snapshot.id.rawValue == snapshotID,
+                      snapshot.sessionID.rawValue
+                        == columnText(statement, 2),
+                      snapshot.sessionID == sessionID,
+                      snapshot.relativePath == relativePath,
+                      storeMilliseconds(snapshot.observedAt)
+                        == sqlite3_column_int64(statement, 4),
+                      classification.id.rawValue == classificationID,
+                      classification.snapshotID == snapshot.id,
+                      classification.snapshotID.rawValue
+                        == columnText(statement, 7),
+                      classification.disposition.rawValue
+                        == columnText(statement, 8),
+                      storeMilliseconds(classification.classifiedAt)
+                        == sqlite3_column_int64(statement, 9)
+                else {
+                    throw EvidenceStoreError.recordIdentityMismatch
+                }
+                return (
+                    CleanupPlanningRecord(
+                        snapshot: snapshot,
+                        classification: classification
+                    ),
+                    [],
+                    rowCursor
+                )
+            } catch {
+                return (
+                    nil,
+                    [
+                        "snapshot:\(snapshotID)",
+                        "classification:\(classificationID)",
+                    ],
+                    rowCursor
+                )
+            }
+        }
+        return CleanupPlanningPage(
+            records: rows.compactMap(\.record),
+            corruptRecordIDs: rows.flatMap(\.corrupt),
+            nextCursor: rows.last?.cursor,
+            rowCount: rows.count
         )
     }
 
@@ -1396,6 +1528,20 @@ public actor EvidenceStore {
                 .text(id.rawValue),
             ],
             operation: "test.changeClassificationDisposition"
+        )
+    }
+
+    func _testReplaceClassificationPayload(
+        id: ClassificationID,
+        payload: String
+    ) throws {
+        try connection.execute(
+            "UPDATE classifications SET payload = ? WHERE id = ?",
+            bindings: [
+                .text(payload),
+                .text(id.rawValue),
+            ],
+            operation: "test.replaceClassificationPayload"
         )
     }
 

@@ -90,7 +90,10 @@ public struct RuleCoverageCompiler: Sendable {
               schemaVersion.doubleValue.rounded() == schemaVersion.doubleValue,
               schemaVersion.intValue == 1,
               let catalogVersion = root["catalogVersion"] as? String,
-              catalogVersion == catalog.catalogVersion.rawValue,
+              Self.isCompatibleCoverageSource(
+                  catalogVersion,
+                  catalog: catalog
+              ),
               let familyValues = root["families"] as? [[String: Any]],
               familyValues.count == Self.requiredFamilyIDs.count
         else {
@@ -239,4 +242,22 @@ public struct RuleCoverageCompiler: Sendable {
         "policy.canonical.mount-root",
         "policy.sensitive.system-locations",
     ].map { DomainToken(rawValue: $0)! })
+
+    private static func isCompatibleCoverageSource(
+        _ sourceVersion: String,
+        catalog: RuleCatalog
+    ) -> Bool {
+        sourceVersion == catalog.catalogVersion.rawValue
+            || (
+                sourceVersion == "builtin-runtime-tool-residue-v1"
+                    && catalog.catalogVersion.rawValue
+                        == "builtin-runtime-tool-residue-v2"
+                    && Set(catalog.rules.filter {
+                        $0.disposition == .readyToReclaim
+                    }.map(\.id.rawValue)) == [
+                        "cache-npm-content",
+                        "cache-pip",
+                    ]
+            )
+    }
 }

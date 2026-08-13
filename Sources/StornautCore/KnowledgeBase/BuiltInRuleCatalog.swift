@@ -19,7 +19,7 @@ public enum BuiltInRuleCatalog {
                 from: Data(contentsOf: url)
             )
             guard catalog.catalogVersion.rawValue
-                    == "builtin-runtime-tool-residue-v1",
+                    == "builtin-runtime-tool-residue-v2",
                   catalog.rules.count == 67
             else {
                 throw BuiltInRuleCatalogError.invalidCatalog

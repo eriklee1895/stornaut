@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stornaut.dev/schemas/rule-disposition-promotion-source-v1.json",
+  "title": "Stornaut Closed Rule Disposition Promotion Source v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "catalogVersion",
+    "baseCatalogVersion",
+    "promotions"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "catalogVersion": {
+      "const": "package-build-caches-v2"
+    },
+    "baseCatalogVersion": {
+      "const": "package-build-caches-v1"
+    },
+    "promotions": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ruleID",
+          "from",
+          "to"
+        ],
+        "properties": {
+          "ruleID": {
+            "enum": [
+              "cache-npm-content",
+              "cache-pip"
+            ]
+          },
+          "from": {
+            "const": "reviewRecommended"
+          },
+          "to": {
+            "const": "readyToReclaim"
+          }
+        }
+      }
+    }
+  }
+}

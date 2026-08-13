@@ -104,25 +104,29 @@ public struct RuleSourceCompiler: Sendable {
 
     public func compile(
         catalogData: Data,
-        overlayData: Data? = nil
+        overlayData: Data? = nil,
+        promotionData: Data? = nil
     ) throws -> CompiledRuleArtifact {
         try compile(
             catalogSources: [catalogData],
             catalogVersion: try catalogVersion(catalogData),
-            overlayData: overlayData
+            overlayData: overlayData,
+            promotionData: promotionData
         )
     }
 
     public func compile(
         catalogSources: [Data],
         catalogVersion: DomainToken,
-        overlayData: Data? = nil
+        overlayData: Data? = nil,
+        promotionData: Data? = nil
     ) throws -> CompiledRuleArtifact {
         do {
             return try compileValidated(
                 catalogSources: catalogSources,
                 catalogVersion: catalogVersion,
-                overlayData: overlayData
+                overlayData: overlayData,
+                promotionData: promotionData
             )
         } catch let error as RuleCompilerError {
             throw error
@@ -134,7 +138,8 @@ public struct RuleSourceCompiler: Sendable {
     public func compile(
         catalogSources: [Data],
         catalogVersion: String,
-        overlayData: Data? = nil
+        overlayData: Data? = nil,
+        promotionData: Data? = nil
     ) throws -> CompiledRuleArtifact {
         guard let version = DomainToken(rawValue: catalogVersion) else {
             throw RuleCompilerError.invalidValue("catalogVersion")
@@ -142,14 +147,16 @@ public struct RuleSourceCompiler: Sendable {
         return try compile(
             catalogSources: catalogSources,
             catalogVersion: version,
-            overlayData: overlayData
+            overlayData: overlayData,
+            promotionData: promotionData
         )
     }
 
     private func compileValidated(
         catalogSources: [Data],
         catalogVersion: DomainToken,
-        overlayData: Data?
+        overlayData: Data?,
+        promotionData: Data?
     ) throws -> CompiledRuleArtifact {
         guard !catalogSources.isEmpty,
               catalogSources.count <= Self.maximumSourceCount,
@@ -169,6 +176,7 @@ public struct RuleSourceCompiler: Sendable {
         }
         var ruleIDs = Set<RuleID>()
         var rules: [CompiledRule] = []
+        var effectiveSourceVersions = sourceVersions
         for rule in decodedSources.flatMap(\.rules) {
             guard ruleIDs.insert(rule.id).inserted else {
                 throw RuleCompilerError.duplicateRule(rule.id.rawValue)
@@ -189,6 +197,23 @@ public struct RuleSourceCompiler: Sendable {
             overlayVersion = nil
             overlays = []
         }
+        if let promotionData {
+            let result = try RuleDispositionPromotionCompiler().apply(
+                promotionData: promotionData,
+                rules: rules
+            )
+            guard sourceVersions.contains(result.baseCatalogVersion),
+                  catalogVersion.rawValue
+                    == "builtin-runtime-tool-residue-v2"
+            else {
+                throw RuleCompilerError.invalidValue("promotionCatalog")
+            }
+            rules = result.rules
+            effectiveSourceVersions.append(result.sourceVersion)
+            effectiveSourceVersions.sort {
+                $0.rawValue < $1.rawValue
+            }
+        }
         let finalVersionValue = overlayVersion.map {
             "\(catalogVersion.rawValue).\($0.rawValue)"
         } ?? catalogVersion.rawValue
@@ -204,7 +229,8 @@ public struct RuleSourceCompiler: Sendable {
         let sha256 = digest.map { String(format: "%02x", $0) }.joined()
         let manifest = RuleCompileManifest(
             catalogVersion: catalog.catalogVersion.rawValue,
-            sourceCatalogVersions: sourceVersions.map(\.rawValue),
+            sourceCatalogVersions:
+                effectiveSourceVersions.map(\.rawValue),
             ruleCount: catalog.rules.count,
             ruleIDs: catalog.rules.map(\.id),
             provenanceSourceCount: catalog.rules.reduce(0) {
