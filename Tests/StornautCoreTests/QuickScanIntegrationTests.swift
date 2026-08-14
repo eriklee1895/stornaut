@@ -749,6 +749,43 @@ func quickScanWaitsForInFlightHistoryAccessBeforeStarting() async throws {
 }
 
 @Test
+func quickScanWaitsForCompleteManifestHistoryPagingBeforeStarting()
+    async throws
+{
+    let fixture = try Task20Fixture()
+    defer { fixture.remove() }
+    let store = try EvidenceStore(configuration: fixture.storeConfiguration)
+    let historyStore = BlockingCompleteHistoryStore(backing: store)
+    let coordinator = QuickScanCoordinator(
+        store: store,
+        historyStore: historyStore,
+        catalog: try task20Catalog(),
+        activityProvider: FixtureQuickScanActivityProvider(),
+        volumeSampler: Task20VolumeSampler()
+    )
+    let history = Task {
+        try await coordinator.loadHistorySnapshot(pageSize: 2)
+    }
+    try await historyStore.waitUntilManifestPageBlocked()
+
+    let start = Task {
+        try await coordinator.start(
+            ScanRequest(rootURL: fixture.targetURL)
+        )
+    }
+    try await Task.sleep(for: .milliseconds(25))
+    #expect(await coordinator.hasActiveScan == false)
+
+    await historyStore.releaseManifestPage()
+    _ = try await history.value
+    let stream = try await start.value
+    #expect(await coordinator.hasActiveScan)
+    await coordinator.cancel()
+    _ = try await collectProductEvents(stream)
+    #expect(await coordinator.hasActiveScan == false)
+}
+
+@Test
 func quickScanImmediateCancellationIsNotLost() async throws {
     let fixture = try Task20Fixture(extraFileCount: 40)
     defer { fixture.remove() }
@@ -1603,8 +1640,26 @@ private actor BlockingHistoryStore: QuickScanHistoryPersisting {
         try await backing.scanHistory(limit: limit, offset: offset)
     }
 
+    func cleanupManifestHistory(
+        limit: Int,
+        offset: Int,
+        now: Date
+    ) async throws -> CleanupManifestHistoryPage {
+        try await backing.cleanupManifestHistory(
+            limit: limit,
+            offset: offset,
+            now: now
+        )
+    }
+
     func deleteScanSession(id: ScanSessionID) async throws {
         try await backing.deleteScanSession(id: id)
+    }
+
+    func deleteCleanupManifest(
+        id: CleanupManifestID
+    ) async throws -> Bool {
+        try await backing.deleteCleanupManifest(id: id)
     }
 
     func waitUntilBlocked() async throws {
@@ -1620,6 +1675,87 @@ private actor BlockingHistoryStore: QuickScanHistoryPersisting {
 
     func release() {
         released = true
+    }
+}
+
+private actor BlockingCompleteHistoryStore: QuickScanHistoryPersisting {
+    private let backing: EvidenceStore
+    private var manifestPageBlocked = false
+    private var manifestPageReleased = false
+
+    init(backing: EvidenceStore) {
+        self.backing = backing
+    }
+
+    func expireRecords(now: Date) async throws {
+        try await backing.expireRecords(now: now)
+    }
+
+    func recordCounts() async throws -> EvidenceRecordCounts {
+        try await backing.recordCounts()
+    }
+
+    func clearEvidence() async throws {
+        try await backing.clearEvidence()
+    }
+
+    func clearManifests() async throws {
+        try await backing.clearManifests()
+    }
+
+    func scanHistory(
+        limit: Int,
+        offset: Int
+    ) async throws -> ScanHistoryPage {
+        try await backing.scanHistory(limit: limit, offset: offset)
+    }
+
+    func cleanupManifestHistory(
+        limit: Int,
+        offset: Int,
+        now: Date
+    ) async throws -> CleanupManifestHistoryPage {
+        if offset == 0 {
+            return CleanupManifestHistoryPage(
+                records: [],
+                corruptManifestIDs: (0..<limit).map {
+                    "manifest-corrupt-\($0)"
+                }
+            )
+        }
+        manifestPageBlocked = true
+        while !manifestPageReleased {
+            await Task.yield()
+        }
+        return CleanupManifestHistoryPage(
+            records: [],
+            corruptManifestIDs: []
+        )
+    }
+
+    func deleteScanSession(id: ScanSessionID) async throws {
+        try await backing.deleteScanSession(id: id)
+    }
+
+    func deleteCleanupManifest(
+        id: CleanupManifestID
+    ) async throws -> Bool {
+        try await backing.deleteCleanupManifest(id: id)
+    }
+
+    func waitUntilManifestPageBlocked() async throws {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .seconds(5))
+        while !manifestPageBlocked {
+            guard clock.now < deadline else {
+                throw Task20TestError.timedOut
+            }
+            await Task.yield()
+        }
+    }
+
+    func releaseManifestPage() {
+        manifestPageReleased = true
     }
 }
 

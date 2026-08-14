@@ -1,7 +1,8 @@
 # Stornaut Phase C — Epic 8 Safe Execution Vertical Slice Plan
 
-> **Status:** Tasks 27–32 complete; Runtime R1–R6 interlock complete with
-> foundation `go`; Task 33 is next
+> **Status:** Tasks 27–34 complete; Runtime R1–R6 interlock complete with
+> foundation `go`; Task 35 is next and its bounded real Trash diagnostic is
+> explicitly authorized
 >
 > **Roadmap phase:** Phase C — Safe Execution Vertical Slice
 >
@@ -13,8 +14,8 @@
 > are authorized in order; approval does not authorize Deep Dive, Adapters, real
 > Registered Actions, release/notarization, permanent deletion, background
 > cleanup, or any permission-boundary expansion. Approval authorizes building
-> the Task 35 signed-App diagnostic harness, but the diagnostic's real Trash
-> run still requires a separate explicit opt-in when Task 35 is reached.
+> the Task 35 signed-App diagnostic harness. The user provided the separate
+> explicit opt-in for its bounded real Trash run on 2026-08-15.
 
 ## Goal
 
@@ -1701,8 +1702,8 @@ The diagnostic:
 - uses a diagnostic-only store/settings namespace so no product history or
   Primary Root preference is changed;
 - runs through the locally signed App product coordinator;
-- requires a fresh explicit opt-in at Task 35; approval of this plan alone is
-  not that runtime opt-in;
+- uses the fresh explicit user opt-in provided on 2026-08-15; that opt-in is
+  limited to this diagnostic's uniquely marked disposable fixture;
 - uses real Foundation Trash;
 - records returned destination and identity;
 - opens no private user path;
@@ -1866,11 +1867,7 @@ git status --short
 git diff --check
 ```
 
-Commit messages end with exactly one:
-
-```text
-Co-authored-by: TRAE CLI <noreply@bytedance.com>
-```
+Commit messages do not add a Coding Agent co-author trailer.
 
 Push with:
 

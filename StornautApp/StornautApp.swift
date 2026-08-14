@@ -37,7 +37,7 @@ struct StornautApp: App {
                 }
 #endif
         }
-        .defaultSize(width: 1_180, height: 760)
+        .defaultSize(width: 1_340, height: 760)
         .windowResizability(.contentMinSize)
         .commands {
             CommandGroup(replacing: .newItem) {}

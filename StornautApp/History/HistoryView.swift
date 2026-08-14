@@ -7,8 +7,9 @@ struct HistoryView: View {
 
     @State private var query = ""
     @State private var terminalFilter = HistoryTerminalFilter.all
+    @State private var typeFilter = HistoryTypeFilter.all
     @State private var dateFilter = HistoryDateFilter.allRetained
-    @State private var selection: ScanSessionID?
+    @State private var selection: HistoryRecordID?
     @State private var showsTrend = false
     @State private var pendingDelete: HistoryDeleteContract?
 
@@ -31,62 +32,15 @@ struct HistoryView: View {
             calendar: .autoupdatingCurrent,
             query: query,
             terminalFilter: terminalFilter,
+            typeFilter: typeFilter,
             dateFilter: dateFilter,
-            selectedID: selection
+            selectedRecordID: selection
         )
 
         VStack(spacing: 0) {
             header(model)
             Divider()
-
-            if model.presentation == .empty {
-                emptyState
-            } else if model.presentation == .noResults {
-                noResultsState
-            } else {
-                statusBanner(model)
-                HSplitView {
-                    HistoryNavigator(
-                        groups: model.groups,
-                        corruptRecords: model.corruptRecords,
-                        now: now,
-                        selection: $selection
-                    )
-                    .frame(minWidth: 340, idealWidth: 370, maxWidth: 410)
-
-                    Group {
-                        if showsTrend, let trend = model.trend {
-                            StorageTrendView(
-                                model: trend,
-                                close: { showsTrend = false }
-                            )
-                        } else if let selection,
-                                  let record = model.records.first(
-                                      where: { $0.id == selection }
-                                  )
-                        {
-                            HistoryDetailView(
-                                record: record,
-                                now: now,
-                                requestDelete: {
-                                    pendingDelete = model.deleteContract(
-                                        for: record.id
-                                    )
-                                }
-                            )
-                        } else {
-                            ContentUnavailableView(
-                                "history.selection.title",
-                                systemImage: "clock.arrow.circlepath",
-                                description: Text(
-                                    "history.selection.message"
-                                )
-                            )
-                        }
-                    }
-                    .frame(minWidth: 500, maxWidth: .infinity)
-                }
-            }
+            content(model: model, now: now)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(pageBackground)
@@ -97,13 +51,13 @@ struct HistoryView: View {
         ) {
             await appModel.refreshHistoryIfNeeded()
         }
-        .onChange(of: model.records.map(\.id), initial: true) {
+        .onChange(of: model.items.map(\.id), initial: true) {
             _,
             IDs in
             if let selection, IDs.contains(selection) {
                 return
             }
-            selection = model.selectedID
+            selection = model.selectedRecordID
             if model.trend == nil {
                 showsTrend = false
             }
@@ -125,10 +79,10 @@ struct HistoryView: View {
                     "history.delete.confirm.action",
                     role: .destructive
                 ) {
-                    let sessionID = pendingDelete.sessionID
+                    let recordID = pendingDelete.recordID
                     self.pendingDelete = nil
                     Task {
-                        await appModel.deleteHistorySession(sessionID)
+                        await appModel.deleteHistoryRecord(recordID)
                     }
                 }
                 .accessibilityIdentifier("history.delete.confirm.action")
@@ -144,77 +98,176 @@ struct HistoryView: View {
         }
     }
 
-    private func header(_ model: HistoryModel) -> some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("history.title")
-                    .font(.largeTitle.weight(.semibold))
-                Text("history.subtitle")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+    @ViewBuilder
+    private func content(model: HistoryModel, now: Date) -> some View {
+        if model.presentation == .empty {
+            emptyState
+        } else if model.presentation == .noResults {
+            noResultsState
+        } else {
+            statusBanner(model)
+            HSplitView {
+                HistoryNavigator(
+                    groups: model.groups,
+                    corruptRecords: model.corruptRecords,
+                    now: now,
+                    selection: $selection
+                )
+                .frame(minWidth: 340, idealWidth: 370, maxWidth: 410)
+
+                detail(model: model, now: now)
+                    .frame(minWidth: 500, maxWidth: .infinity)
             }
+        }
+    }
 
-            Spacer()
-
-            TextField("history.search", text: $query)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 230)
-                .accessibilityIdentifier("history.search")
-
-            Picker("history.filter.status", selection: $terminalFilter) {
-                ForEach(HistoryTerminalFilter.allCases) { value in
-                    Text(
-                        localized(
-                            "history.filter.status.\(value.rawValue)"
-                        )
-                    )
-                    .tag(value)
-                }
-            }
-            .pickerStyle(.menu)
-            .frame(width: 130)
-
-            Picker("history.filter.date", selection: $dateFilter) {
-                ForEach(HistoryDateFilter.allCases) { value in
-                    Text(
-                        localized(
-                            "history.filter.date.\(value.rawValue)"
-                        )
-                    )
-                    .tag(value)
-                }
-            }
-            .pickerStyle(.menu)
-            .frame(width: 130)
-
-            if model.trend != nil {
-                Button {
-                    showsTrend.toggle()
-                } label: {
-                    Label(
-                        showsTrend
-                            ? "history.trend.back"
-                            : "history.action.trend",
-                        systemImage: "chart.xyaxis.line"
-                    )
-                }
-                .buttonStyle(.bordered)
-                .accessibilityIdentifier("history.action.trend")
-            }
-
-            Button {
-                Task {
-                    await appModel.refreshHistory()
-                }
-            } label: {
-                Image(systemName: "arrow.clockwise")
-            }
-            .buttonStyle(.borderless)
-            .accessibilityLabel("history.action.refresh")
-            .disabled(
-                model.presentation == .loading
-                    || model.presentation == .deleting
+    @ViewBuilder
+    private func detail(model: HistoryModel, now: Date) -> some View {
+        if showsTrend, let trend = model.trend {
+            StorageTrendView(
+                model: trend,
+                close: { showsTrend = false }
             )
+        } else if let selection,
+                  let item = model.items.first(
+                      where: { $0.id == selection }
+                  )
+        {
+            selectedDetail(item: item, model: model, now: now)
+        } else {
+            ContentUnavailableView(
+                "history.selection.title",
+                systemImage: "clock.arrow.circlepath",
+                description: Text("history.selection.message")
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func selectedDetail(
+        item: HistoryItemModel,
+        model: HistoryModel,
+        now: Date
+    ) -> some View {
+        switch item {
+        case let .quickScan(record):
+            HistoryDetailView(
+                record: record,
+                now: now,
+                requestExport: {
+                    Task {
+                        await appModel.exportHistoryRecord(item.id)
+                    }
+                },
+                requestDelete: {
+                    pendingDelete = model.deleteContract(for: item.id)
+                }
+            )
+        case let .cleanupManifest(record):
+            HistoryManifestDetailView(
+                record: record,
+                now: now,
+                requestExport: {
+                    Task {
+                        await appModel.exportHistoryRecord(item.id)
+                    }
+                },
+                requestDelete: {
+                    pendingDelete = model.deleteContract(for: item.id)
+                }
+            )
+        }
+    }
+
+    private func header(_ model: HistoryModel) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("history.title")
+                        .font(.largeTitle.weight(.semibold))
+                    Text("history.subtitle")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                if model.trend != nil {
+                    Button {
+                        showsTrend.toggle()
+                    } label: {
+                        Label(
+                            showsTrend
+                                ? "history.trend.back"
+                                : "history.action.trend",
+                            systemImage: "chart.xyaxis.line"
+                        )
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("history.action.trend")
+                }
+
+                Button {
+                    Task {
+                        await appModel.refreshHistory()
+                    }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("history.action.refresh")
+                .disabled(
+                    model.presentation == .loading
+                        || model.presentation == .deleting
+                )
+            }
+
+            HStack(spacing: 12) {
+                TextField("history.search", text: $query)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(minWidth: 180, idealWidth: 230, maxWidth: 300)
+                    .accessibilityIdentifier("history.search")
+
+                Picker("history.filter.type", selection: $typeFilter) {
+                    ForEach(HistoryTypeFilter.allCases) { value in
+                        Text(
+                            localized(
+                                "history.filter.type.\(value.rawValue)"
+                            )
+                        )
+                        .tag(value)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(width: 150)
+                .accessibilityIdentifier("history.filter.type")
+
+                Picker("history.filter.status", selection: $terminalFilter) {
+                    ForEach(HistoryTerminalFilter.allCases) { value in
+                        Text(
+                            localized(
+                                "history.filter.status.\(value.rawValue)"
+                            )
+                        )
+                        .tag(value)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(width: 130)
+
+                Picker("history.filter.date", selection: $dateFilter) {
+                    ForEach(HistoryDateFilter.allCases) { value in
+                        Text(
+                            localized(
+                                "history.filter.date.\(value.rawValue)"
+                            )
+                        )
+                        .tag(value)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(width: 130)
+            }
         }
         .padding(.horizontal, 22)
         .padding(.vertical, 16)

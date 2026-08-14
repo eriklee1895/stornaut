@@ -47,7 +47,7 @@ struct RootView: View {
         } detail: {
             destinationContent(selection ?? .overview)
         }
-        .frame(minWidth: 960, minHeight: 640)
+        .frame(minWidth: 1_340, minHeight: 640)
         .task {
             async let page: Void = appModel.refreshIfNeeded()
             async let settings: Void = appModel.refreshSettingsIfNeeded()

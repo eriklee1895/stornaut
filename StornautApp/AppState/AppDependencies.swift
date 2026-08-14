@@ -2,6 +2,7 @@ import AppKit
 import Foundation
 import StornautCore
 import StornautCodex
+import UniformTypeIdentifiers
 
 struct AppDependencies: Sendable {
     typealias QuickScanStream = AsyncThrowingStream<
@@ -28,6 +29,12 @@ struct AppDependencies: Sendable {
         -> QuickScanConfiguration?
     let loadScanHistory: @Sendable () async throws -> HistoryPage
     let deleteScanHistory: @Sendable (ScanSessionID) async throws -> Void
+    let deleteManifestHistory: @Sendable (
+        CleanupManifestID
+    ) async throws -> Void
+    let exportHistory: @Sendable (
+        HistoryExportDocument
+    ) async throws -> Bool
     let loadSettings: @Sendable () async throws -> SettingsSnapshot
     let saveSettingsPreferences: @Sendable (
         SettingsPreferences
@@ -87,6 +94,16 @@ struct AppDependencies: Sendable {
             ScanSessionID
         ) async throws -> Void = { _ in
             throw AppDependencyError.historyUnavailable
+        },
+        deleteManifestHistory: @escaping @Sendable (
+            CleanupManifestID
+        ) async throws -> Void = { _ in
+            throw AppDependencyError.historyUnavailable
+        },
+        exportHistory: @escaping @Sendable (
+            HistoryExportDocument
+        ) async throws -> Bool = { document in
+            try saveHistoryExport(document)
         },
         loadSettings: @escaping @Sendable () async throws
             -> SettingsSnapshot = {
@@ -172,6 +189,8 @@ struct AppDependencies: Sendable {
         self.loadQuickScanConfiguration = loadQuickScanConfiguration
         self.loadScanHistory = loadScanHistory
         self.deleteScanHistory = deleteScanHistory
+        self.deleteManifestHistory = deleteManifestHistory
+        self.exportHistory = exportHistory
         self.loadSettings = loadSettings
         self.saveSettingsPreferences = saveSettingsPreferences
         self.clearSettingsEvidence = clearSettingsEvidence
@@ -231,6 +250,9 @@ struct AppDependencies: Sendable {
             },
             deleteScanHistory: {
                 try await runtime.deleteHistory(id: $0)
+            },
+            deleteManifestHistory: {
+                try await runtime.deleteManifestHistory(id: $0)
             },
             loadSettings: {
                 try await runtime.loadSettings()
@@ -318,6 +340,9 @@ struct AppDependencies: Sendable {
             },
             deleteScanHistory: {
                 try await runtime.deleteHistory(id: $0)
+            },
+            deleteManifestHistory: {
+                try await runtime.deleteManifestHistory(id: $0)
             },
             loadSettings: {
                 try await runtime.loadSettings()
@@ -478,16 +503,20 @@ private actor AppQuickScanRuntime {
 
     func loadHistory() async throws -> HistoryPage {
         let coordinator = try await resolvedCoordinator()
-        let page = try await coordinator.loadHistory()
+        let snapshot = try await coordinator.loadHistorySnapshot()
         return HistoryPage(
-            records: page.sessions.map {
+            records: snapshot.scans.sessions.map {
                 HistoryRecord(
                     session: $0,
-                    ledger: page.ledgersBySessionID[$0.id]
+                    ledger: snapshot.scans.ledgersBySessionID[$0.id]
                 )
             },
-            corruptSessionIDs: page.corruptSessionIDs,
-            corruptLedgerSessionIDs: page.corruptLedgerSessionIDs
+            manifests: snapshot.manifests.records,
+            corruptSessionIDs: snapshot.scans.corruptSessionIDs,
+            corruptLedgerSessionIDs:
+                snapshot.scans.corruptLedgerSessionIDs,
+            corruptManifestIDs:
+                snapshot.manifests.corruptManifestIDs
         )
     }
 
@@ -495,6 +524,15 @@ private actor AppQuickScanRuntime {
         try await withWorkflowLease(.historyMutation) {
             let coordinator = try await resolvedCoordinator()
             try await coordinator.deleteHistorySession(id: id)
+        }
+    }
+
+    func deleteManifestHistory(
+        id: CleanupManifestID
+    ) async throws {
+        try await withWorkflowLease(.historyMutation) {
+            _ = try await resolvedCoordinator()
+                .deleteHistoryManifest(id: id)
         }
     }
 
@@ -857,6 +895,29 @@ private func retaining(
             task.cancel()
         }
     }
+}
+
+@MainActor
+private func saveHistoryExport(
+    _ document: HistoryExportDocument
+) throws -> Bool {
+    let panel = NSSavePanel()
+    panel.title = localized("history.export.panel.title")
+    panel.prompt = localized("history.export.panel.action")
+    panel.message = localized("history.export.panel.privacy")
+    panel.nameFieldStringValue = document.suggestedFilename
+    panel.allowedContentTypes = [.json]
+    panel.canCreateDirectories = true
+    guard panel.runModal() == .OK,
+          let destination = panel.url
+    else {
+        return false
+    }
+    try document.data.write(
+        to: destination,
+        options: [.atomic, .completeFileProtection]
+    )
+    return true
 }
 
 @MainActor

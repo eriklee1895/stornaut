@@ -607,6 +607,7 @@ final class StornautAppModel {
             return
         }
         let retained = historyState.page
+        historyGeneration &+= 1
         let generation = historyGeneration
         historyRefreshGeneration = generation
         historyState = .loading(retained)
@@ -639,6 +640,12 @@ final class StornautAppModel {
     func deleteHistorySession(
         _ sessionID: ScanSessionID
     ) async {
+        await deleteHistoryRecord(.quickScan(sessionID))
+    }
+
+    func deleteHistoryRecord(
+        _ recordID: HistoryRecordID
+    ) async {
         guard !historyDeleteIsActive,
               historyRefreshGeneration == nil,
               let page = historyState.page
@@ -658,39 +665,81 @@ final class StornautAppModel {
         }
         historyDeleteIsActive = true
         historyGeneration &+= 1
-        historyState = .deleting(sessionID, page: page)
+        let deletionGeneration = historyGeneration
+        historyState = .deleting(recordID, page: page)
         defer { historyDeleteIsActive = false }
         do {
-            try await dependencies.deleteScanHistory(sessionID)
+            switch recordID {
+            case let .quickScan(sessionID):
+                try await dependencies.deleteScanHistory(sessionID)
+            case let .cleanupManifest(manifestID):
+                try await dependencies.deleteManifestHistory(manifestID)
+            }
         } catch {
+            guard deletionGeneration == historyGeneration else {
+                return
+            }
             historyState = .failed(
                 page: page,
                 reasonKey: token("history.error.deleteFailed")
             )
             return
         }
-        let localPage = HistoryPage(
-            records: page.records.filter {
-                $0.session.id != sessionID
-            },
-            corruptSessionIDs: page.corruptSessionIDs,
-            corruptLedgerSessionIDs: page.corruptLedgerSessionIDs.filter {
-                $0 != sessionID.rawValue
-            }
-        )
+        guard deletionGeneration == historyGeneration else {
+            return
+        }
+        let localPage: HistoryPage = switch recordID {
+        case let .quickScan(sessionID):
+            HistoryPage(
+                records: page.records.filter {
+                    $0.session.id != sessionID
+                },
+                manifests: page.manifests,
+                corruptSessionIDs: page.corruptSessionIDs,
+                corruptLedgerSessionIDs:
+                    page.corruptLedgerSessionIDs.filter {
+                        $0 != sessionID.rawValue
+                    },
+                corruptManifestIDs: page.corruptManifestIDs
+            )
+        case let .cleanupManifest(manifestID):
+            HistoryPage(
+                records: page.records,
+                manifests: page.manifests.filter {
+                    $0.manifest.id != manifestID
+                },
+                corruptSessionIDs: page.corruptSessionIDs,
+                corruptLedgerSessionIDs: page.corruptLedgerSessionIDs,
+                corruptManifestIDs:
+                    page.corruptManifestIDs.filter {
+                        $0 != manifestID.rawValue
+                    }
+            )
+        }
         historyState = .loaded(localPage)
         do {
-            historyState = .loaded(
-                try await dependencies.loadScanHistory()
-            )
+            let reloaded = try await dependencies.loadScanHistory()
+            guard deletionGeneration == historyGeneration else {
+                return
+            }
+            historyState = .loaded(reloaded)
         } catch {
+            guard deletionGeneration == historyGeneration else {
+                return
+            }
             historyState = .failed(
                 page: localPage,
                 reasonKey: token("history.error.storeUnavailable")
             )
         }
+        guard case let .quickScan(sessionID) = recordID else {
+            return
+        }
         do {
             let projection = try await dependencies.loadLatestQuickScan()
+            guard deletionGeneration == historyGeneration else {
+                return
+            }
             pageState = reducer.loaded(
                 projection,
                 previous: pageState,
@@ -700,7 +749,9 @@ final class StornautAppModel {
                 scanState = projection.map(ScanFlowState.retained) ?? .idle
             }
         } catch {
-            guard pageState.projection?.session.id == sessionID else {
+            guard deletionGeneration == historyGeneration,
+                  pageState.projection?.session.id == sessionID
+            else {
                 return
             }
             pageState = try! AppPageState(
@@ -711,6 +762,51 @@ final class StornautAppModel {
                 refreshedAt: now()
             )
             scanState = .idle
+        }
+    }
+
+    func exportHistoryRecord(
+        _ recordID: HistoryRecordID
+    ) async {
+        guard let page = historyState.page else {
+            return
+        }
+        let exportGeneration = historyGeneration
+        let currentProjection = HistoryModel(
+            state: historyState,
+            now: now(),
+            calendar: .autoupdatingCurrent,
+            selectedRecordID: recordID
+        )
+        guard let item = currentProjection.items.first(where: {
+            $0.id == recordID
+        }) else {
+            return
+        }
+        let retentionIsExpired = switch item {
+        case let .quickScan(record):
+            record.retention.state == .expired
+        case let .cleanupManifest(record):
+            record.retention.state == .expired
+        }
+        guard !retentionIsExpired else {
+            return
+        }
+        do {
+            let document = try HistoryExport.document(
+                for: item,
+                homeDirectory:
+                    FileManager.default.homeDirectoryForCurrentUser
+            )
+            _ = try await dependencies.exportHistory(document)
+        } catch {
+            guard exportGeneration == historyGeneration else {
+                return
+            }
+            historyState = .failed(
+                page: page,
+                reasonKey: token("history.error.exportFailed")
+            )
         }
     }
 
@@ -930,6 +1026,9 @@ final class StornautAppModel {
             }
             pageState = .empty
             scanState = .idle
+            scanGeneration &+= 1
+            invalidateReviewWorkflow()
+            invalidateCleanupResultWorkflow()
             historyGeneration &+= 1
             historyRefreshGeneration = nil
             historyState = .idle
@@ -962,11 +1061,49 @@ final class StornautAppModel {
                     )
                 )
             }
+            invalidateCleanupResultWorkflow()
+            historyGeneration &+= 1
+            historyRefreshGeneration = nil
+            if let page = historyState.page {
+                historyState = .loaded(
+                    HistoryPage(
+                        records: page.records,
+                        corruptSessionIDs: page.corruptSessionIDs,
+                        corruptLedgerSessionIDs:
+                            page.corruptLedgerSessionIDs
+                    )
+                )
+            } else {
+                historyState = .idle
+            }
         } catch {
             settingsState = .failed(
                 snapshot: previous,
                 reasonKey: token("settings.error.clearManifestsFailed")
             )
+        }
+    }
+
+    private func invalidateReviewWorkflow() {
+        reviewGeneration &+= 1
+        reviewTask?.cancel()
+        reviewTask = nil
+        reviewExecutionGeneration &+= 1
+        reviewExecutionTask?.cancel()
+        reviewExecutionTask = nil
+        reviewStopIsPending = false
+        reviewState = .idle
+        reviewStaleSheetIsPresented = false
+        scanWorkspaceRoute = .results
+    }
+
+    private func invalidateCleanupResultWorkflow() {
+        cleanupResultGeneration &+= 1
+        cleanupResultTask?.cancel()
+        cleanupResultTask = nil
+        cleanupResultState = .idle
+        if scanWorkspaceRoute == .cleanupResult {
+            scanWorkspaceRoute = .results
         }
     }
 

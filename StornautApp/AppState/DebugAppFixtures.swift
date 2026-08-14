@@ -402,7 +402,13 @@ extension AppComposition {
                         await historyStore.load()
                     },
                     deleteScanHistory: {
-                        await historyStore.delete($0)
+                        await historyStore.deleteScan($0)
+                    },
+                    deleteManifestHistory: {
+                        await historyStore.deleteManifest($0)
+                    },
+                    exportHistory: { _ in
+                        true
                     },
                     loadSettings: {
                         await settingsStore.load()
@@ -1617,34 +1623,57 @@ private extension DebugHistoryFixture {
         case .empty:
             return .loaded(.empty)
         case .populated:
+            let manifest = try DebugHistoryFactory.manifestRecord(
+                fixture: .completed,
+                evidenceAvailability: .retained
+            )
             return .loaded(
                 try DebugHistoryFactory.page(
-                    slugs: ["current", "yesterday", "partial"]
+                    slugs: ["current", "yesterday", "partial"],
+                    manifests: [manifest]
                 )
             )
         case .expired:
+            let manifest = try DebugHistoryFactory.manifestRecord(
+                fixture: .evidenceExpired,
+                evidenceAvailability: .expired
+            )
             return .loaded(
                 try DebugHistoryFactory.page(
                     slugs: ["expired"],
-                    expired: true
+                    expired: true,
+                    manifests: [manifest]
                 )
             )
         case .corrupt:
             var page = try DebugHistoryFactory.page(
-                slugs: ["healthy", "ledger-corrupt"]
+                slugs: ["healthy", "ledger-corrupt"],
+                manifests: [
+                    try DebugHistoryFactory.manifestRecord(
+                        fixture: .partial,
+                        evidenceAvailability: .retained
+                    ),
+                ]
             )
             page = HistoryPage(
                 records: page.records,
+                manifests: page.manifests,
                 corruptSessionIDs: ["scan-fixture-unreadable"],
                 corruptLedgerSessionIDs: [
                     page.records[1].session.id.rawValue,
-                ]
+                ],
+                corruptManifestIDs: ["manifest-fixture-unreadable"]
             )
             return .loaded(page)
         case .trend:
+            let manifest = try DebugHistoryFactory.manifestRecord(
+                fixture: .completed,
+                evidenceAvailability: .retained
+            )
             return .loaded(
                 try DebugHistoryFactory.page(
-                    slugs: ["trend-0", "trend-1", "trend-2", "trend-3"]
+                    slugs: ["trend-0", "trend-1", "trend-2", "trend-3"],
+                    manifests: [manifest]
                 )
             )
         }
@@ -1654,7 +1683,8 @@ private extension DebugHistoryFixture {
 private enum DebugHistoryFactory {
     static func page(
         slugs: [String],
-        expired: Bool = false
+        expired: Bool = false,
+        manifests: [CleanupManifestHistoryRecord] = []
     ) throws -> HistoryPage {
         let records = try slugs.enumerated().map { index, slug in
             let terminal: ScanTerminalState = slug == "partial"
@@ -1700,7 +1730,51 @@ private enum DebugHistoryFactory {
             }
             return HistoryRecord(session: session, ledger: ledger)
         }
-        return HistoryPage(records: records)
+        return HistoryPage(
+            records: records,
+            manifests: manifests
+        )
+    }
+
+    static func manifestRecord(
+        fixture: DebugCleanupFixture,
+        evidenceAvailability:
+            CleanupManifestEvidenceAvailability
+    ) throws -> CleanupManifestHistoryRecord {
+        let projection = try DebugProjectionFactory.review(
+            slug: "history-manifest-\(fixture.rawValue)"
+        )
+        let review = try DebugReviewFixture.default.makeFixture(
+            source: projection
+        )
+        let cleanup = try fixture.makeFixture(review: review)
+        guard let manifest = cleanup.result?.manifest else {
+            throw DebugReviewFixtureError.unavailable
+        }
+        return CleanupManifestHistoryRecord(
+            manifest: manifest,
+            linkedPlan: evidenceAvailability == .retained
+                ? try retainedHistoryPlan(review.plan)
+                : nil,
+            evidenceAvailability: evidenceAvailability
+        )
+    }
+
+    private static func retainedHistoryPlan(
+        _ plan: CleanupPlan
+    ) throws -> CleanupPlan {
+        try CleanupPlan(
+            id: plan.id,
+            scanSessionID: plan.scanSessionID,
+            scanScopeID: plan.scanScopeID!,
+            primaryRootIdentity: plan.primaryRootIdentity!,
+            catalogVersion: plan.catalogVersion!,
+            executionProfileVersion: plan.executionProfileVersion!,
+            planFingerprint: plan.planFingerprint!,
+            createdAt: plan.createdAt,
+            expiresAt: plan.createdAt.addingTimeInterval(7 * 86_400),
+            items: plan.items
+        )
     }
 
     private static func relabel(
@@ -1729,16 +1803,32 @@ private actor DebugHistoryStore {
         page
     }
 
-    func delete(_ sessionID: ScanSessionID) {
+    func deleteScan(_ sessionID: ScanSessionID) {
         page = HistoryPage(
             records: page.records.filter {
                 $0.session.id != sessionID
             },
+            manifests: page.manifests,
             corruptSessionIDs: page.corruptSessionIDs,
             corruptLedgerSessionIDs:
                 page.corruptLedgerSessionIDs.filter {
                     $0 != sessionID.rawValue
-                }
+                },
+            corruptManifestIDs: page.corruptManifestIDs
+        )
+    }
+
+    func deleteManifest(_ manifestID: CleanupManifestID) {
+        page = HistoryPage(
+            records: page.records,
+            manifests: page.manifests.filter {
+                $0.manifest.id != manifestID
+            },
+            corruptSessionIDs: page.corruptSessionIDs,
+            corruptLedgerSessionIDs: page.corruptLedgerSessionIDs,
+            corruptManifestIDs: page.corruptManifestIDs.filter {
+                $0 != manifestID.rawValue
+            }
         )
     }
 }

@@ -69,6 +69,19 @@ func clearEvidenceInvalidatesOverviewScanAndHistoryWithoutTouchingManifests()
     let projection = try OverviewTestProjectionFactory.projection(
         slug: "settings-clear-evidence"
     )
+    let review = try ReviewAppFixture()
+    let reviewSnapshot = try ReviewSnapshot(
+        plan: review.plan,
+        projection: review.projection,
+        generation: 7,
+        executionAvailability: .writeDisabled
+    )
+    let cleanup = try CleanupResultTestSupport.fixture(.completed)
+    let cleanupSnapshot = try CleanupResultSnapshot(
+        executionState: cleanup.executionState,
+        itemFacts: cleanup.retainedFacts,
+        evidenceAvailability: .retained
+    )
     let driver = SettingsAppTestDriver(
         snapshot: try SettingsAppTestFactory.snapshot(
             counts: SettingsRecordCounts(
@@ -96,6 +109,9 @@ func clearEvidenceInvalidatesOverviewScanAndHistoryWithoutTouchingManifests()
             )
         ),
         initialSettingsState: .loaded(await driver.snapshot),
+        initialScanWorkspaceRoute: .cleanupResult,
+        initialReviewState: .ready(reviewSnapshot),
+        initialCleanupResultState: .presented(cleanupSnapshot),
         now: { SettingsAppTestFactory.now },
         refreshesServices: false
     )
@@ -107,8 +123,120 @@ func clearEvidenceInvalidatesOverviewScanAndHistoryWithoutTouchingManifests()
     #expect(model.pageState == .empty)
     #expect(model.scanState == .idle)
     #expect(model.historyState == .idle)
+    #expect(model.scanWorkspaceRoute == .results)
+    #expect(model.reviewState == .idle)
+    #expect(!model.reviewStaleSheetIsPresented)
+    #expect(model.cleanupResultState == .idle)
     #expect(model.settingsState.snapshot?.counts.evidence == 0)
     #expect(model.settingsState.snapshot?.counts.manifests == 3)
+}
+
+@MainActor
+@Test
+func clearManifestsInvalidatesManifestHistoryWithoutTouchingScanFacts()
+    async throws
+{
+    let projection = try OverviewTestProjectionFactory.projection(
+        slug: "settings-clear-manifests"
+    )
+    let fixture = try CleanupResultTestSupport.fixture(.completed)
+    let cleanupSnapshot = try CleanupResultSnapshot(
+        executionState: fixture.executionState,
+        itemFacts: fixture.retainedFacts,
+        evidenceAvailability: .retained
+    )
+    let driver = SettingsAppTestDriver(
+        snapshot: try SettingsAppTestFactory.snapshot(
+            counts: SettingsRecordCounts(
+                evidence: 2,
+                manifests: 1,
+                localKnowledge: 1
+            )
+        )
+    )
+    let retainedHistory = HistoryPage(
+        records: [
+            HistoryRecord(
+                session: projection.session,
+                ledger: projection.ledger
+            ),
+        ],
+        manifests: [
+            CleanupManifestHistoryRecord(
+                manifest: fixture.result.manifest,
+                linkedPlan: fixture.plan,
+                evidenceAvailability: .retained
+            ),
+        ]
+    )
+    let model = StornautAppModel(
+        dependencies: settingsDependencies(driver: driver),
+        initialState: try .success(
+            projection: projection,
+            refreshedAt: SettingsAppTestFactory.now
+        ),
+        initialScanState: .retained(projection),
+        initialHistoryState: .loaded(retainedHistory),
+        initialSettingsState: .loaded(await driver.snapshot),
+        initialScanWorkspaceRoute: .cleanupResult,
+        initialCleanupResultState: .presented(cleanupSnapshot),
+        now: { SettingsAppTestFactory.now },
+        refreshesServices: false
+    )
+
+    await model.clearSettingsManifests()
+
+    #expect(await driver.clearEvidenceCount == 0)
+    #expect(await driver.clearManifestsCount == 1)
+    #expect(model.pageState.projection == projection)
+    #expect(model.scanState.projection == projection)
+    #expect(model.historyState.phase == .loaded)
+    #expect(model.historyState.page?.records == retainedHistory.records)
+    #expect(model.historyState.page?.manifests.isEmpty == true)
+    #expect(model.scanWorkspaceRoute == .results)
+    #expect(model.cleanupResultState == .idle)
+    #expect(model.settingsState.snapshot?.counts.evidence == 2)
+    #expect(model.settingsState.snapshot?.counts.manifests == 0)
+}
+
+@MainActor
+@Test
+func clearEvidenceInvalidatesAnInFlightOverviewRefresh() async throws {
+    let projection = try OverviewTestProjectionFactory.projection(
+        slug: "settings-clear-evidence-stale-refresh"
+    )
+    let loader = SuspendedProjectionLoader(projection: projection)
+    let driver = SettingsAppTestDriver(
+        snapshot: try SettingsAppTestFactory.snapshot(
+            counts: SettingsRecordCounts(
+                evidence: 1,
+                manifests: 0,
+                localKnowledge: 0
+            )
+        )
+    )
+    let model = StornautAppModel(
+        dependencies: AppDependencies(
+            loadLatestQuickScan: { await loader.load() },
+            loadSettings: { await driver.load() },
+            clearSettingsEvidence: { await driver.clearEvidence() }
+        ),
+        initialSettingsState: .loaded(await driver.snapshot),
+        now: { SettingsAppTestFactory.now },
+        refreshesServices: false
+    )
+
+    let refresh = Task { @MainActor in
+        await model.refresh()
+    }
+    await loader.waitUntilStarted()
+    await model.clearSettingsEvidence()
+    await loader.resume()
+    await refresh.value
+
+    #expect(await driver.clearEvidenceCount == 1)
+    #expect(model.pageState == .empty)
+    #expect(model.scanState == .idle)
 }
 
 @MainActor
@@ -366,6 +494,35 @@ private actor SuspendedSettingsLoader {
 
     func waitUntilStarted() async {
         while continuation == nil {
+            await Task.yield()
+        }
+    }
+
+    func resume() {
+        continuation?.resume()
+        continuation = nil
+    }
+}
+
+private actor SuspendedProjectionLoader {
+    private let projection: QuickScanProjection
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var started = false
+
+    init(projection: QuickScanProjection) {
+        self.projection = projection
+    }
+
+    func load() async -> QuickScanProjection {
+        started = true
+        await withCheckedContinuation {
+            continuation = $0
+        }
+        return projection
+    }
+
+    func waitUntilStarted() async {
+        while !started {
             await Task.yield()
         }
     }

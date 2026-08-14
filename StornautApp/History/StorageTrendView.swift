@@ -23,6 +23,19 @@ struct StorageTrendView: View {
                 }
 
                 Chart {
+                    ForEach(model.events) { event in
+                        RuleMark(
+                            x: .value(
+                                localized("history.trend.event"),
+                                event.createdAt
+                            )
+                        )
+                        .foregroundStyle(.secondary.opacity(0.3))
+                        .lineStyle(
+                            StrokeStyle(lineWidth: 1, dash: [2, 4])
+                        )
+                    }
+
                     ForEach(model.samples) { sample in
                         LineMark(
                             x: .value(

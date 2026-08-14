@@ -4,6 +4,7 @@ import SwiftUI
 struct HistoryDetailView: View {
     let record: HistoryRecordModel
     let now: Date
+    let requestExport: () -> Void
     let requestDelete: () -> Void
 
     private let byteFormatter = StornautByteFormatter()
@@ -183,6 +184,11 @@ struct HistoryDetailView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
+            Button(
+                "history.action.export",
+                action: requestExport
+            )
+            .accessibilityIdentifier("history.action.export")
             Button(
                 "history.action.delete",
                 role: .destructive,

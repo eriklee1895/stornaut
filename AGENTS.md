@@ -58,6 +58,13 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   read-only Manifest detail、真实 Review→confirmation→terminal DEBUG fixtures、
   独立 review findings 修复、App tests/focused XCUITest 与
   actual-App/Peekaboo 已完成；authoritative full verifier 单次 exit 0。
+  Task 34 的 Store v3 Manifest paging、独立 7/90-day retention、typed
+  Quick Scan/Manifest History union、exact local-record deletion、
+  privacy-bounded export、non-causal trend marker、actual-App/Peekaboo 与
+  independent review 已完成；authoritative full verifier 单次 exit 0。
+  Task 35 为下一项 Phase C gate；用户已明确授权 signed-App disposable exact
+  fixture 的 real Trash diagnostic 与 identity-checked restore。授权不覆盖任意
+  用户路径、永久删除、Empty Trash、blind retry 或普通 UI restore。
   真实 App Trash 依赖仍保持关闭，生产 Deep Dive 仍为 implementation unavailable。
   逐 Task 完成 Upstream Study、
   实现、code review、focused/full verify、独立 commit/push；不得提前混入
@@ -126,6 +133,8 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Epic 8 Task 32 review / completion audit | [docs/reports/epic-8-task-32-review.md](docs/reports/epic-8-task-32-review.md) |
 | Epic 8 Task 33 tests-first brief | [docs/plans/active/task-33-implementation-brief.md](docs/plans/active/task-33-implementation-brief.md) |
 | Epic 8 Task 33 review / completion audit | [docs/reports/epic-8-task-33-review.md](docs/reports/epic-8-task-33-review.md) |
+| Epic 8 Task 34 tests-first brief | [docs/plans/active/task-34-implementation-brief.md](docs/plans/active/task-34-implementation-brief.md) |
+| Epic 8 Task 34 review / completion audit | [docs/reports/epic-8-task-34-review.md](docs/reports/epic-8-task-34-review.md) |
 | Epic 2–4 历史计划 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) |
 | Epic 2–4 最终 Gate | [docs/reports/epic-2-4-validation-report.md](docs/reports/epic-2-4-validation-report.md) |
 | Epic 0–1 历史计划与证据 | [docs/plans/completed/epic-0-1-foundation-spikes.md](docs/plans/completed/epic-0-1-foundation-spikes.md) |
@@ -168,8 +177,8 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   classification、provider-compatible group schema 与 fixed direct-read command
   identity。current-source signed App/helper 已得出 `signedRuntimeReady`，并在
   gate 后完成 fixed topology 零残留卸载。R6 final admission 已完成并得出
-  runtime foundation `go`；Tasks 29–33 已完成且各自通过 authoritative
-  unified verifier；Task 34 为下一项 deterministic Epic 8 工作。
+  runtime foundation `go`；Tasks 29–34 已完成且各自通过 authoritative
+  unified verifier；Task 35 为下一项 deterministic Epic 8 gate。
 Deep Dive 的旧 Broker-only no-go 已被 ADR 0004 的 capability-first 边界取代；
 当前仍不可用的原因是生产 Deep Dive 尚未实现，而非 R6 或 Codex 工具能力。
 R6 不证明 release distribution、FDA/TCC 或 production Deep Dive；

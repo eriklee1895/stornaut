@@ -85,6 +85,57 @@ public struct ScanHistoryPage: Sendable, Equatable {
     }
 }
 
+public enum CleanupManifestEvidenceAvailability:
+    String,
+    Sendable,
+    Equatable
+{
+    case retained
+    case expired
+}
+
+public struct CleanupManifestHistoryRecord: Sendable, Equatable {
+    public let manifest: CleanupManifest
+    public let linkedPlan: CleanupPlan?
+    public let evidenceAvailability: CleanupManifestEvidenceAvailability
+
+    public init(
+        manifest: CleanupManifest,
+        linkedPlan: CleanupPlan?,
+        evidenceAvailability: CleanupManifestEvidenceAvailability
+    ) {
+        self.manifest = manifest
+        self.linkedPlan = linkedPlan
+        self.evidenceAvailability = evidenceAvailability
+    }
+}
+
+public struct CleanupManifestHistoryPage: Sendable, Equatable {
+    public let records: [CleanupManifestHistoryRecord]
+    public let corruptManifestIDs: [String]
+
+    public init(
+        records: [CleanupManifestHistoryRecord],
+        corruptManifestIDs: [String]
+    ) {
+        self.records = records
+        self.corruptManifestIDs = Array(Set(corruptManifestIDs)).sorted()
+    }
+}
+
+public struct EvidenceHistorySnapshot: Sendable, Equatable {
+    public let scans: ScanHistoryPage
+    public let manifests: CleanupManifestHistoryPage
+
+    public init(
+        scans: ScanHistoryPage,
+        manifests: CleanupManifestHistoryPage
+    ) {
+        self.scans = scans
+        self.manifests = manifests
+    }
+}
+
 public struct EvidenceRecordCounts: Sendable, Equatable {
     public let evidenceSessions: Int
     public let manifests: Int
@@ -1417,6 +1468,94 @@ public actor EvidenceStore {
         )
     }
 
+    public func cleanupManifestHistory(
+        limit: Int,
+        offset: Int,
+        now: Date
+    ) throws -> CleanupManifestHistoryPage {
+        let page = try cleanupManifests(limit: limit, offset: offset)
+        let records = try page.records.map { manifest in
+            let plan = try cleanupHistoryPlan(id: manifest.planID)
+            let retainedPlan = plan.flatMap {
+                Self.planEnrichment(
+                    $0,
+                    matches: manifest,
+                    now: now
+                ) ? $0 : nil
+            }
+            return CleanupManifestHistoryRecord(
+                manifest: manifest,
+                linkedPlan: retainedPlan,
+                evidenceAvailability: retainedPlan == nil
+                    ? .expired
+                    : .retained
+            )
+        }
+        return CleanupManifestHistoryPage(
+            records: records,
+            corruptManifestIDs: page.corruptRecordIDs
+        )
+    }
+
+    public func deleteCleanupManifest(
+        id: CleanupManifestID
+    ) throws -> Bool {
+        try connection.transaction(operation: "manifest.delete") {
+            guard let manifest = try cleanupManifest(id: id) else {
+                return false
+            }
+            let journals = try connection.query(
+                """
+                SELECT id, payload, plan_id, stage, retention_class,
+                       updated_at_ms, expires_at_ms
+                FROM cleanup_run_journals
+                WHERE plan_id = ?
+                ORDER BY id ASC
+                """,
+                bindings: [.text(manifest.planID.rawValue)],
+                operation: "manifest.delete.journals"
+            ) { statement -> CleanupRunJournal in
+                let storedID = columnText(statement, 0)
+                do {
+                    let journal = try DomainJSON.decode(
+                        CleanupRunJournal.self,
+                        from: Data(columnText(statement, 1).utf8)
+                    )
+                    guard journal.id.rawValue == storedID,
+                          columnText(statement, 2)
+                            == journal.planID.rawValue,
+                          columnText(statement, 3)
+                            == journal.stage.rawValue,
+                          columnText(statement, 4)
+                            == journal.retentionClass.rawValue,
+                          sqlite3_column_int64(statement, 5)
+                            == storeMilliseconds(journal.updatedAt),
+                          sqlite3_column_int64(statement, 6)
+                            == storeMilliseconds(journal.expiresAt)
+                    else {
+                        throw EvidenceStoreError.recordIdentityMismatch
+                    }
+                    return journal
+                } catch {
+                    throw EvidenceStoreError.recordIdentityMismatch
+                }
+            }
+            for journal in journals where journal.manifestID == manifest.id {
+                try connection.execute(
+                    "DELETE FROM cleanup_run_journals WHERE id = ?",
+                    bindings: [.text(journal.id.rawValue)],
+                    operation: "manifest.delete.journal"
+                )
+            }
+            try connection.execute(
+                "DELETE FROM cleanup_manifests WHERE id = ?",
+                bindings: [.text(manifest.id.rawValue)],
+                operation: "manifest.delete.record"
+            )
+            return true
+        }
+    }
+
     public func deleteScanSession(id: ScanSessionID) throws {
         try connection.transaction(operation: "scanSession.delete") {
             try connection.execute(
@@ -1468,7 +1607,6 @@ public actor EvidenceStore {
                 """
                 DELETE FROM cleanup_run_journals
                 WHERE retention_class = 'audit'
-                  AND stage = 'finalized'
                   AND (
                     expires_at_ms <= ?
                     OR updated_at_ms <= ?
@@ -1548,7 +1686,7 @@ public actor EvidenceStore {
             try connection.execute(
                 """
                 DELETE FROM cleanup_run_journals
-                WHERE stage IN ('auditPending', 'finalized')
+                WHERE retention_class = 'audit'
                 """,
                 operation: "clear.journals"
             )
@@ -1651,15 +1789,22 @@ public actor EvidenceStore {
 
     func _testInsertMalformedCleanupJournal(
         id: String,
+        planID: CleanupPlanID = CleanupPlanID(
+            rawValue: "plan-corrupt"
+        )!,
         payload: String
     ) throws {
         try connection.execute(
             """
             INSERT INTO cleanup_run_journals
             (id, plan_id, stage, retention_class, updated_at_ms, expires_at_ms, payload)
-            VALUES (?, 'plan-corrupt', 'prepared', 'evidenceLinked', 0, 1, ?)
+            VALUES (?, ?, 'prepared', 'evidenceLinked', 0, 1, ?)
             """,
-            bindings: [.text(id), .text(payload)],
+            bindings: [
+                .text(id),
+                .text(planID.rawValue),
+                .text(payload),
+            ],
             operation: "test.malformedJournal"
         )
     }
@@ -1706,15 +1851,26 @@ public actor EvidenceStore {
 
     func _testInsertMalformedCleanupManifest(
         id: String,
+        planID: CleanupPlanID? = nil,
+        createdAt: Date? = nil,
+        expiresAt: Date? = nil,
         payload: String
     ) throws {
+        let createdAt = createdAt ?? Date(timeIntervalSince1970: 0)
+        let expiresAt = expiresAt ?? Date(timeIntervalSince1970: 0.001)
         try connection.execute(
             """
             INSERT INTO cleanup_manifests
             (id, plan_id, created_at_ms, expires_at_ms, payload)
-            VALUES (?, 'plan-corrupt', 0, 1, ?)
+            VALUES (?, ?, ?, ?, ?)
             """,
-            bindings: [.text(id), .text(payload)],
+            bindings: [
+                .text(id),
+                .text(planID?.rawValue ?? "plan-corrupt"),
+                .integer(storeMilliseconds(createdAt)),
+                .integer(storeMilliseconds(expiresAt)),
+                .text(payload),
+            ],
             operation: "test.malformedManifest"
         )
     }
@@ -2428,6 +2584,72 @@ public actor EvidenceStore {
             return nil
         }
         return record
+    }
+
+    private func cleanupHistoryPlan(
+        id: CleanupPlanID
+    ) throws -> CleanupPlan? {
+        let rows = try connection.query(
+            """
+            SELECT id, payload, session_id, created_at_ms, expires_at_ms
+            FROM cleanup_plans
+            WHERE id = ?
+            """,
+            bindings: [.text(id.rawValue)],
+            operation: "history.plan"
+        ) { statement -> StoreDecodedRow<CleanupPlan> in
+            let storedID = columnText(statement, 0)
+            do {
+                let plan = try DomainJSON.decode(
+                    CleanupPlan.self,
+                    from: Data(columnText(statement, 1).utf8)
+                )
+                guard plan.id.rawValue == storedID,
+                      columnText(statement, 2)
+                        == plan.scanSessionID.rawValue,
+                      sqlite3_column_int64(statement, 3)
+                        == storeMilliseconds(plan.createdAt),
+                      sqlite3_column_int64(statement, 4)
+                        == storeMilliseconds(plan.expiresAt)
+                else {
+                    throw EvidenceStoreError.recordIdentityMismatch
+                }
+                return .record(plan)
+            } catch {
+                return .corrupt(storedID)
+            }
+        }
+        guard let row = rows.first else {
+            return nil
+        }
+        switch row {
+        case let .record(plan):
+            return plan
+        case .corrupt:
+            return nil
+        }
+    }
+
+    private static func planEnrichment(
+        _ plan: CleanupPlan,
+        matches manifest: CleanupManifest,
+        now: Date
+    ) -> Bool {
+        guard plan.compatibility == .current,
+              plan.id == manifest.planID,
+              now < plan.expiresAt
+        else {
+            return false
+        }
+        let items = Dictionary(
+            uniqueKeysWithValues: plan.items.map { ($0.id, $0) }
+        )
+        return manifest.records.allSatisfy { record in
+            guard let item = items[record.planItemID] else {
+                return false
+            }
+            return item.proposedAction == record.action
+        }
     }
 
     private func policySnapshot(

@@ -9,6 +9,8 @@ history_views=(
     StornautApp/History/HistoryView.swift
     StornautApp/History/HistoryNavigator.swift
     StornautApp/History/HistoryDetailView.swift
+    StornautApp/History/HistoryManifestDetailView.swift
+    StornautApp/History/HistoryExport.swift
     StornautApp/History/StorageTrendView.swift
 )
 
@@ -27,7 +29,6 @@ for forbidden in \
     ProbeBridge \
     PolicyGate \
     Executor \
-    MoveToTrash \
     RegisteredAction \
     LocalKnowledgeStore \
     'FileManager\.' \
@@ -39,19 +40,41 @@ for forbidden in \
     fi
 done
 
-if rg -n 'Cleanup Manifest|Deep Dive|Export Record' "${history_views[@]}"; then
-    print -u2 "Deferred History record/action leaked into Task 24 Views."
+if rg -n \
+    'Delete Permanently|Empty Trash|Restore|Run Again|Freed|Reclaimed|Start Deep Dive' \
+    "${history_views[@]}"; then
+    print -u2 "Execution, restore, permanent deletion or misleading copy leaked into History."
+    exit 1
+fi
+
+if rg -n \
+    'removeItem\s*\(|moveItem\s*\(|copyItem\s*\(|createFile\s*\(|forWritingTo|O_WRONLY|O_RDWR|unlink\(|rename\(|trashItem\s*\(' \
+    "${history_views[@]}"; then
+    print -u2 "History View contains a filesystem write surface."
     exit 1
 fi
 
 rg -q 'loadScanHistory' StornautApp/AppState/AppDependencies.swift
 rg -q 'deleteScanHistory' StornautApp/AppState/AppDependencies.swift
+rg -q 'deleteManifestHistory' StornautApp/AppState/AppDependencies.swift
+rg -q 'exportHistory' StornautApp/AppState/AppDependencies.swift
 rg -q 'refreshHistory' StornautApp/AppState/StornautAppModel.swift
-rg -q 'deleteHistorySession' StornautApp/AppState/StornautAppModel.swift
+rg -q 'deleteHistoryRecord' StornautApp/AppState/StornautAppModel.swift
+rg -q 'exportHistoryRecord' StornautApp/AppState/StornautAppModel.swift
 rg -q 'scanHistory' Sources/StornautCore/Evidence/EvidenceStore.swift
+rg -q 'cleanupManifestHistory' \
+    Sources/StornautCore/Evidence/EvidenceStore.swift
+rg -q 'deleteCleanupManifest' \
+    Sources/StornautCore/Evidence/EvidenceStore.swift
+rg -q 'private static let schemaVersion = 3' \
+    Sources/StornautCore/Evidence/EvidenceStore.swift
 rg -q 'history.delete.confirm.message' \
+    StornautApp/Resources/en.lproj/Localizable.strings
+rg -q 'history.record.cleanupManifest' \
+    StornautApp/Resources/en.lproj/Localizable.strings
+rg -q 'history.action.export' \
     StornautApp/Resources/en.lproj/Localizable.strings
 rg -q 'history.trend.nonCausal' \
     StornautApp/Resources/en.lproj/Localizable.strings
 
-print "History UI/service boundaries verified."
+print "Manifest-aware History UI/service boundaries verified."

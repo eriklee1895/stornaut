@@ -103,7 +103,78 @@ func cleanupJournalRetentionUsesSevenAndNinetyDayClasses() async throws {
     try await store.expireRecords(
         now: audit.createdAt.addingTimeInterval(90 * 86_400 + 1)
     )
-    #expect(try await store.cleanupRunJournal(id: audit.id) == audit)
+    #expect(try await store.cleanupRunJournal(id: audit.id) == nil)
+
+    let pendingStore = try EvidenceStore(configuration: .memory)
+    let pendingPlan = try CleanupPersistenceTestSupport.plan(
+        items: [plan.items[0]]
+    )
+    let pendingDecision = try CleanupPersistenceTestSupport.decision(
+        plan: pendingPlan,
+        item: pendingPlan.items[0]
+    )
+    let pendingPrepared = try CleanupPersistenceTestSupport.journal(
+        plan: pendingPlan,
+        entries: [
+            try CleanupPersistenceTestSupport.journalEntry(
+                item: pendingPlan.items[0],
+                decision: pendingDecision
+            ),
+        ]
+    )
+    let pendingStarted = try CleanupPersistenceTestSupport.journal(
+        plan: pendingPlan,
+        stage: .actionStarted,
+        entries: [
+            try CleanupPersistenceTestSupport.journalEntry(
+                item: pendingPlan.items[0],
+                state: .started,
+                decision: pendingDecision
+            ),
+        ]
+    )
+    let pendingOutcome = try CleanupPersistenceTestSupport.journal(
+        plan: pendingPlan,
+        stage: .actionOutcomeRecorded,
+        entries: [
+            try CleanupPersistenceTestSupport.journalEntry(
+                item: pendingPlan.items[0],
+                state: .outcomeRecorded,
+                decision: pendingDecision
+            ),
+        ]
+    )
+    let pendingEntries = [
+        try CleanupPersistenceTestSupport.journalEntry(
+            item: pendingPlan.items[0],
+            state: .outcomeRecorded
+        ),
+    ]
+    let manifestPending = try CleanupPersistenceTestSupport.journal(
+        plan: pendingPlan,
+        stage: .manifestPending,
+        entries: pendingEntries
+    )
+    let auditPending = try CleanupPersistenceTestSupport.journal(
+        plan: pendingPlan,
+        stage: .auditPending,
+        entries: pendingEntries
+    )
+    try await pendingStore.saveScanSession(session)
+    try await pendingStore.saveCleanupPlan(pendingPlan)
+    try await pendingStore.savePolicyDecision(pendingDecision)
+    try await pendingStore.saveCleanupRunJournal(pendingPrepared)
+    try await pendingStore.saveCleanupRunJournal(pendingStarted)
+    try await pendingStore.saveCleanupRunJournal(pendingOutcome)
+    try await pendingStore.saveCleanupRunJournal(manifestPending)
+    try await pendingStore.saveCleanupRunJournal(auditPending)
+
+    try await pendingStore.expireRecords(
+        now: auditPending.createdAt.addingTimeInterval(90 * 86_400 + 1)
+    )
+    #expect(
+        try await pendingStore.cleanupRunJournal(id: auditPending.id) == nil
+    )
 }
 
 @Test

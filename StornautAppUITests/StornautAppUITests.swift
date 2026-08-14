@@ -980,19 +980,28 @@ final class StornautAppUITests: XCTestCase {
                 .waitForExistence(timeout: 5)
         )
         XCTAssertTrue(
-            element("history.detail", in: populated.app)
+            element("history.manifest.detail", in: populated.app)
                 .waitForExistence(timeout: 5)
         )
-        let knownMetric = element(
-            "history.ledger.metric.known",
+        let manifestRow = element(
+            "history.manifest.manifest-debug-cleanup-completed",
             in: populated.app
         )
-        XCTAssertTrue(knownMetric.waitForExistence(timeout: 5))
-        XCTAssertEqual(knownMetric.label, "Known")
+        XCTAssertTrue(manifestRow.waitForExistence(timeout: 5))
+        XCTAssertTrue(populated.app.staticTexts["Cleanup Manifest"].exists)
+        XCTAssertTrue(
+            (manifestRow.value as? String)?.contains("Moved to Trash")
+                == true
+        )
         XCTAssertTrue(
             element("history.action.delete", in: populated.app).exists
         )
-        XCTAssertFalse(populated.app.staticTexts["Cleanup Manifest"].exists)
+        XCTAssertTrue(
+            element("history.action.export", in: populated.app).exists
+        )
+        XCTAssertFalse(populated.app.buttons["Restore"].exists)
+        XCTAssertFalse(populated.app.buttons["Empty Trash"].exists)
+        XCTAssertFalse(populated.app.buttons["Move to Trash"].exists)
         focusHistory(populated.window, in: populated.app)
         addScreenshot(
             populated.window.screenshot(),
@@ -1014,10 +1023,19 @@ final class StornautAppUITests: XCTestCase {
             element("history.state.phase", in: expired.app)
                 .waitForExistence(timeout: 5)
         )
-        XCTAssertTrue(expired.app.staticTexts["Expired"].exists)
         XCTAssertTrue(
-            element("history.detail", in: expired.app)
+            element("history.manifest.detail", in: expired.app)
                 .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            element(
+                "history.manifest.evidenceExpired",
+                in: expired.app
+            ).exists
+        )
+        XCTAssertFalse(expired.app.staticTexts["npm"].exists)
+        XCTAssertFalse(
+            expired.app.staticTexts[".npm/_cacache"].exists
         )
         focusHistory(expired.window, in: expired.app)
         addScreenshot(
@@ -1047,17 +1065,40 @@ final class StornautAppUITests: XCTestCase {
             ).exists
         )
         XCTAssertTrue(
-            element("history.detail", in: corrupt.app)
-                .waitForExistence(timeout: 5)
+            element(
+                "history.corrupt.manifest-fixture-unreadable",
+                in: corrupt.app
+            ).exists
         )
         XCTAssertTrue(
-            corrupt.app.staticTexts["Quick Scan"].exists
+            element("history.manifest.detail", in: corrupt.app)
+                .waitForExistence(timeout: 5)
         )
         focusHistory(corrupt.window, in: corrupt.app)
         addScreenshot(
             corrupt.window.screenshot(),
             named: "stornaut-history-corrupt-light"
         )
+
+        corrupt.app.terminate()
+        XCTAssertTrue(corrupt.app.wait(for: .notRunning, timeout: 5))
+
+        let chinese = launchHistoryFixture(
+            fixture: "populated",
+            appearance: "light",
+            language: "zh-Hans",
+            locale: "zh_CN"
+        )
+        defer {
+            chinese.app.terminate()
+            _ = chinese.app.wait(for: .notRunning, timeout: 5)
+        }
+        XCTAssertTrue(
+            element("history.manifest.detail", in: chinese.app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(chinese.app.staticTexts["清理清单"].exists)
+        XCTAssertFalse(chinese.app.staticTexts["Cleanup Manifest"].exists)
     }
 
     @MainActor
@@ -1075,12 +1116,16 @@ final class StornautAppUITests: XCTestCase {
             in: deletion.app
         )
         XCTAssertTrue(deleteButton.waitForExistence(timeout: 5))
-        let recordCountBefore = deletion.app.descendants(matching: .any)
-            .matching(
-                NSPredicate(
-                    format: "identifier BEGINSWITH 'history.record.'"
-                )
-            ).count
+        let manifest = element(
+            "history.manifest.manifest-debug-cleanup-completed",
+            in: deletion.app
+        )
+        XCTAssertTrue(manifest.waitForExistence(timeout: 5))
+        let scan = element(
+            "history.record.scan-fixture-history-current",
+            in: deletion.app
+        )
+        XCTAssertTrue(scan.exists)
         XCTAssertTrue(
             performAction(
                 in: deletion.app,
@@ -1108,16 +1153,11 @@ final class StornautAppUITests: XCTestCase {
                     )
                 },
                 until: {
-                    deletion.app.descendants(matching: .any)
-                        .matching(
-                            NSPredicate(
-                                format:
-                                    "identifier BEGINSWITH 'history.record.'"
-                            )
-                        ).count == recordCountBefore - 1
+                    !manifest.exists
                 }
             )
         )
+        XCTAssertTrue(scan.exists)
         XCTAssertTrue(element("history.detail", in: deletion.app).exists)
 
         deletion.app.terminate()
@@ -1803,14 +1843,16 @@ final class StornautAppUITests: XCTestCase {
     private func launchHistoryFixture(
         fixture: String,
         appearance: String,
-        presentation: String = "detail"
+        presentation: String = "detail",
+        language: String = "en",
+        locale: String = "en_US"
     ) -> (app: XCUIApplication, window: XCUIElement) {
         let app = XCUIApplication()
         app.terminate()
         XCTAssertTrue(app.wait(for: .notRunning, timeout: 5))
         app.launchArguments = [
-            "-AppleLanguages", "(en)",
-            "-AppleLocale", "en_US",
+            "-AppleLanguages", "(\(language))",
+            "-AppleLocale", locale,
             "--stornaut-ui-test-appearance=\(appearance)",
             "--stornaut-debug-fixture=success",
             "--stornaut-debug-history=\(fixture)",

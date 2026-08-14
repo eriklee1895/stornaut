@@ -292,6 +292,40 @@ func debugFixturesCoverEveryApprovedPhaseDeterministically() async throws {
         )
         #expect(composition.model.historyState.phase == .loaded)
     }
+    let retainedHistory = try AppComposition.debugFixture(
+        selection: DebugAppFixtureSelection(arguments: [
+            "Stornaut",
+            "--stornaut-debug-fixture=success",
+        ])!,
+        historySelection: DebugHistoryFixtureSelection(arguments: [
+            "Stornaut",
+            "--stornaut-debug-history=populated",
+        ])!
+    )
+    let retainedManifest = try #require(
+        retainedHistory.model.historyState.page?.manifests.first
+    )
+    #expect(retainedManifest.evidenceAvailability == .retained)
+    #expect(retainedManifest.linkedPlan != nil)
+    #expect(
+        retainedManifest.linkedPlan!.expiresAt
+            > retainedManifest.manifest.createdAt
+    )
+    let expiredHistory = try AppComposition.debugFixture(
+        selection: DebugAppFixtureSelection(arguments: [
+            "Stornaut",
+            "--stornaut-debug-fixture=success",
+        ])!,
+        historySelection: DebugHistoryFixtureSelection(arguments: [
+            "Stornaut",
+            "--stornaut-debug-history=expired",
+        ])!
+    )
+    let expiredManifest = try #require(
+        expiredHistory.model.historyState.page?.manifests.first
+    )
+    #expect(expiredManifest.evidenceAvailability == .expired)
+    #expect(expiredManifest.linkedPlan == nil)
 
     let expectedReviewPhases: [DebugReviewFixture: ReviewPhase] = [
         .default: .ready,

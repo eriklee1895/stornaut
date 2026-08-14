@@ -53,7 +53,13 @@ protocol QuickScanHistoryPersisting: Sendable {
         limit: Int,
         offset: Int
     ) async throws -> ScanHistoryPage
+    func cleanupManifestHistory(
+        limit: Int,
+        offset: Int,
+        now: Date
+    ) async throws -> CleanupManifestHistoryPage
     func deleteScanSession(id: ScanSessionID) async throws
+    func deleteCleanupManifest(id: CleanupManifestID) async throws -> Bool
 }
 
 extension EvidenceStore: QuickScanHistoryPersisting {}
@@ -487,6 +493,81 @@ public actor QuickScanCoordinator {
         )
     }
 
+    public func loadHistorySnapshot(
+        pageSize: Int = 50
+    ) async throws -> EvidenceHistorySnapshot {
+        guard pageSize > 0 else {
+            throw EvidenceStoreError.invalidPage
+        }
+        try beginHistoryRead()
+        defer { historyReadCount -= 1 }
+        guard let historyStore else {
+            throw EvidenceStoreError.schemaMismatch
+        }
+        let historyNow = now()
+        try await historyStore.expireRecords(now: historyNow)
+        var scanOffset = 0
+        var sessions: [ScanSession] = []
+        var ledgersBySessionID: [ScanSessionID: SpaceLedger] = [:]
+        var corruptSessionIDs: [String] = []
+        var corruptLedgerSessionIDs: [String] = []
+        while true {
+            let page = try await historyStore.scanHistory(
+                limit: pageSize,
+                offset: scanOffset
+            )
+            sessions.append(contentsOf: page.sessions)
+            ledgersBySessionID.merge(
+                page.ledgersBySessionID,
+                uniquingKeysWith: { current, _ in current }
+            )
+            corruptSessionIDs.append(contentsOf: page.corruptSessionIDs)
+            corruptLedgerSessionIDs.append(
+                contentsOf: page.corruptLedgerSessionIDs
+            )
+            let rowCount = page.sessions.count
+                + page.corruptSessionIDs.count
+            guard rowCount == pageSize else {
+                break
+            }
+            scanOffset += rowCount
+        }
+        var manifestOffset = 0
+        var manifests: [CleanupManifestHistoryRecord] = []
+        var corruptManifestIDs: [String] = []
+        while true {
+            let page = try await historyStore.cleanupManifestHistory(
+                limit: pageSize,
+                offset: manifestOffset,
+                now: historyNow
+            )
+            manifests.append(contentsOf: page.records)
+            corruptManifestIDs.append(
+                contentsOf: page.corruptManifestIDs
+            )
+            let rowCount = page.records.count
+                + page.corruptManifestIDs.count
+            guard rowCount == pageSize else {
+                break
+            }
+            manifestOffset += rowCount
+        }
+        return EvidenceHistorySnapshot(
+            scans: ScanHistoryPage(
+                sessions: sessions,
+                ledgersBySessionID: ledgersBySessionID,
+                corruptSessionIDs:
+                    Array(Set(corruptSessionIDs)).sorted(),
+                corruptLedgerSessionIDs:
+                    Array(Set(corruptLedgerSessionIDs)).sorted()
+            ),
+            manifests: CleanupManifestHistoryPage(
+                records: manifests,
+                corruptManifestIDs: corruptManifestIDs
+            )
+        )
+    }
+
     public func deleteHistorySession(
         id: ScanSessionID
     ) async throws {
@@ -496,6 +577,18 @@ public actor QuickScanCoordinator {
             throw EvidenceStoreError.schemaMismatch
         }
         try await historyStore.deleteScanSession(id: id)
+    }
+
+    @discardableResult
+    public func deleteHistoryManifest(
+        id: CleanupManifestID
+    ) async throws -> Bool {
+        try beginHistoryMutation()
+        defer { historyMutationIsActive = false }
+        guard let historyStore else {
+            throw EvidenceStoreError.schemaMismatch
+        }
+        return try await historyStore.deleteCleanupManifest(id: id)
     }
 
     public func loadRecordCounts() async throws -> EvidenceRecordCounts {

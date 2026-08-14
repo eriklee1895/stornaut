@@ -1,6 +1,20 @@
 import Foundation
 import StornautCore
 
+enum HistoryRecordID: Hashable, Sendable {
+    case quickScan(ScanSessionID)
+    case cleanupManifest(CleanupManifestID)
+
+    var rawValue: String {
+        switch self {
+        case let .quickScan(id):
+            "quickScan:\(id.rawValue)"
+        case let .cleanupManifest(id):
+            "cleanupManifest:\(id.rawValue)"
+        }
+    }
+}
+
 struct HistoryRecord: Sendable, Equatable {
     let session: ScanSession
     let ledger: SpaceLedger?
@@ -8,18 +22,25 @@ struct HistoryRecord: Sendable, Equatable {
 
 struct HistoryPage: Sendable, Equatable {
     let records: [HistoryRecord]
+    let manifests: [CleanupManifestHistoryRecord]
     let corruptSessionIDs: [String]
     let corruptLedgerSessionIDs: [String]
+    let corruptManifestIDs: [String]
 
     init(
         records: [HistoryRecord],
+        manifests: [CleanupManifestHistoryRecord] = [],
         corruptSessionIDs: [String] = [],
-        corruptLedgerSessionIDs: [String] = []
+        corruptLedgerSessionIDs: [String] = [],
+        corruptManifestIDs: [String] = []
     ) {
         self.records = records
+        self.manifests = manifests
         self.corruptSessionIDs = Array(Set(corruptSessionIDs)).sorted()
         self.corruptLedgerSessionIDs =
             Array(Set(corruptLedgerSessionIDs)).sorted()
+        self.corruptManifestIDs =
+            Array(Set(corruptManifestIDs)).sorted()
     }
 
     static let empty = HistoryPage(records: [])
@@ -36,13 +57,20 @@ enum HistoryPhase: String, Sendable, Equatable {
 struct HistoryState: Sendable, Equatable {
     let phase: HistoryPhase
     let page: HistoryPage?
-    let deletingSessionID: ScanSessionID?
+    let deletingRecordID: HistoryRecordID?
     let reasonKey: DomainToken?
+
+    var deletingSessionID: ScanSessionID? {
+        guard case let .quickScan(id) = deletingRecordID else {
+            return nil
+        }
+        return id
+    }
 
     static let idle = HistoryState(
         phase: .idle,
         page: nil,
-        deletingSessionID: nil,
+        deletingRecordID: nil,
         reasonKey: nil
     )
 
@@ -52,7 +80,7 @@ struct HistoryState: Sendable, Equatable {
         HistoryState(
             phase: .loading,
             page: page,
-            deletingSessionID: nil,
+            deletingRecordID: nil,
             reasonKey: nil
         )
     }
@@ -61,7 +89,7 @@ struct HistoryState: Sendable, Equatable {
         HistoryState(
             phase: .loaded,
             page: page,
-            deletingSessionID: nil,
+            deletingRecordID: nil,
             reasonKey: nil
         )
     }
@@ -70,10 +98,17 @@ struct HistoryState: Sendable, Equatable {
         _ sessionID: ScanSessionID,
         page: HistoryPage
     ) -> HistoryState {
+        deleting(.quickScan(sessionID), page: page)
+    }
+
+    static func deleting(
+        _ recordID: HistoryRecordID,
+        page: HistoryPage
+    ) -> HistoryState {
         HistoryState(
             phase: .deleting,
             page: page,
-            deletingSessionID: sessionID,
+            deletingRecordID: recordID,
             reasonKey: nil
         )
     }
@@ -85,7 +120,7 @@ struct HistoryState: Sendable, Equatable {
         HistoryState(
             phase: .error,
             page: page,
-            deletingSessionID: nil,
+            deletingRecordID: nil,
             reasonKey: reasonKey
         )
     }

@@ -151,6 +151,36 @@ func historyIsolatesCorruptSessionAndLedgerRecords() throws {
 }
 
 @Test
+func historyDefaultSelectionSkipsNewestScanWithCorruptLedger() throws {
+    let newestCorrupt = try HistoryTestFactory.record(
+        slug: "newest-corrupt-ledger",
+        finishedAt: HistoryTestFactory.now,
+        terminalState: .completed
+    )
+    let olderHealthy = try HistoryTestFactory.record(
+        slug: "older-healthy-ledger",
+        finishedAt: HistoryTestFactory.now.addingTimeInterval(-60),
+        terminalState: .completed
+    )
+    let model = HistoryModel(
+        state: .loaded(
+            HistoryPage(
+                records: [newestCorrupt, olderHealthy],
+                corruptLedgerSessionIDs: [
+                    newestCorrupt.session.id.rawValue,
+                ]
+            )
+        ),
+        now: HistoryTestFactory.now,
+        calendar: HistoryTestFactory.calendar
+    )
+
+    #expect(
+        model.selectedRecordID == .quickScan(olderHealthy.session.id)
+    )
+}
+
+@Test
 func historyNeverImpliesCorruptRowsMatchUnknownStatusOrDate() {
     let page = HistoryPage(
         records: [],
@@ -410,6 +440,202 @@ func historyDeleteContractNamesOnlyEvidenceRecordEffects() throws {
     #expect(contract.altersTrash == false)
     #expect(contract.altersLocalKnowledge == false)
     #expect(contract.isUndoable == false)
+}
+
+@Test
+func historyMergesQuickScanAndManifestWithTypedStableSelection() throws {
+    let fixture = try CleanupResultTestSupport.fixture(.completed)
+    let manifest = fixture.result.manifest
+    let scan = try HistoryTestFactory.record(
+        slug: "same-time-scan",
+        finishedAt: manifest.createdAt,
+        terminalState: .completed
+    )
+    let page = HistoryPage(
+        records: [scan],
+        manifests: [
+            CleanupManifestHistoryRecord(
+                manifest: manifest,
+                linkedPlan: fixture.plan,
+                evidenceAvailability: .retained
+            ),
+        ]
+    )
+
+    let all = HistoryModel(
+        state: .loaded(page),
+        now: manifest.createdAt,
+        calendar: HistoryTestFactory.calendar
+    )
+    let manifests = HistoryModel(
+        state: .loaded(page),
+        now: manifest.createdAt,
+        calendar: HistoryTestFactory.calendar,
+        typeFilter: .cleanupManifest
+    )
+
+    #expect(all.items.map(\.id) == [
+        .quickScan(scan.session.id),
+        .cleanupManifest(manifest.id),
+    ])
+    #expect(all.selectedRecordID == .quickScan(scan.session.id))
+    #expect(manifests.records.isEmpty)
+    #expect(manifests.manifestRecords.map(\.manifestID) == [manifest.id])
+    #expect(manifests.selectedRecordID == .cleanupManifest(manifest.id))
+}
+
+@Test
+func historyManifestEvidenceExpiryDropsNamesAndPathsButKeepsAuditTruth()
+    throws
+{
+    let fixture = try CleanupResultTestSupport.fixture(.completed)
+    let retainedRecord = CleanupManifestHistoryRecord(
+        manifest: fixture.result.manifest,
+        linkedPlan: fixture.plan,
+        evidenceAvailability: .retained
+    )
+    let expiredRecord = CleanupManifestHistoryRecord(
+        manifest: fixture.result.manifest,
+        linkedPlan: nil,
+        evidenceAvailability: .expired
+    )
+
+    let retained = HistoryModel(
+        state: .loaded(
+            HistoryPage(records: [], manifests: [retainedRecord])
+        ),
+        now: fixture.result.manifest.createdAt,
+        calendar: HistoryTestFactory.calendar
+    )
+    let expired = HistoryModel(
+        state: .loaded(
+            HistoryPage(records: [], manifests: [expiredRecord])
+        ),
+        now: fixture.result.manifest.createdAt,
+        calendar: HistoryTestFactory.calendar
+    )
+    let retainedManifest = try #require(retained.manifestRecords.first)
+    let expiredManifest = try #require(expired.manifestRecords.first)
+
+    #expect(retainedManifest.evidenceAvailability == .retained)
+    #expect(retainedManifest.items.allSatisfy { $0.itemName != nil })
+    #expect(retainedManifest.items.allSatisfy { $0.relativePath != nil })
+    #expect(expiredManifest.evidenceAvailability == .expired)
+    #expect(expiredManifest.items.allSatisfy { $0.itemName == nil })
+    #expect(expiredManifest.items.allSatisfy { $0.relativePath == nil })
+    #expect(expiredManifest.summary == fixture.result.manifest.summary)
+    #expect(
+        expiredManifest.items.map(\.actionID)
+            == fixture.result.manifest.records.map(\.actionID)
+    )
+}
+
+@Test
+func historyManifestDeleteContractAndTrendMarkersStayReadOnlyAndNonCausal()
+    throws
+{
+    let fixture = try CleanupResultTestSupport.fixture(.completed)
+    let scans = try (0..<4).map { index in
+        try HistoryTestFactory.record(
+            slug: "manifest-trend-\(index)",
+            finishedAt: fixture.result.manifest.createdAt.addingTimeInterval(
+                -Double(4 - index) * 86_400
+            ),
+            terminalState: .completed
+        )
+    }
+    let model = HistoryModel(
+        state: .loaded(
+            HistoryPage(
+                records: scans,
+                manifests: [
+                    CleanupManifestHistoryRecord(
+                        manifest: fixture.result.manifest,
+                        linkedPlan: fixture.plan,
+                        evidenceAvailability: .retained
+                    ),
+                ]
+            )
+        ),
+        now: fixture.result.manifest.createdAt,
+        calendar: HistoryTestFactory.calendar
+    )
+    let contract = try #require(
+        model.deleteContract(for: .cleanupManifest(
+            fixture.result.manifest.id
+        ))
+    )
+    let trend = try #require(model.trend)
+
+    #expect(contract.recordID == .cleanupManifest(
+        fixture.result.manifest.id
+    ))
+    #expect(contract.altersScannedFiles == false)
+    #expect(contract.altersTrash == false)
+    #expect(contract.altersLocalKnowledge == false)
+    #expect(trend.samples.count == 4)
+    #expect(trend.events.contains {
+        $0.id == .cleanupManifest(fixture.result.manifest.id)
+    })
+    #expect(trend.causalityDisclaimerKey == "history.trend.nonCausal")
+}
+
+@Test
+func historyIsolatesCorruptManifestIndependentlyFromHealthyRecords() throws {
+    let fixture = try CleanupResultTestSupport.fixture(.completed)
+    let model = HistoryModel(
+        state: .loaded(
+            HistoryPage(
+                records: [],
+                manifests: [
+                    CleanupManifestHistoryRecord(
+                        manifest: fixture.result.manifest,
+                        linkedPlan: fixture.plan,
+                        evidenceAvailability: .retained
+                    ),
+                ],
+                corruptSessionIDs: ["scan-corrupt"],
+                corruptManifestIDs: ["manifest-corrupt"]
+            )
+        ),
+        now: fixture.result.manifest.createdAt,
+        calendar: HistoryTestFactory.calendar
+    )
+
+    #expect(model.manifestRecords.count == 1)
+    #expect(model.corruptRecords.map(\.id) == [
+        "cleanupManifest:manifest-corrupt",
+        "quickScan:scan-corrupt",
+    ])
+}
+
+@Test
+func historyManifestFailureUsesClosedLocalizedDescriptors() throws {
+    let unavailable = HistoryManifestFailureDescriptor(
+        CleanupManifestError(
+            stage: .moveToTrash,
+            code: DomainToken(rawValue: "trash.destination.unavailable")!
+        )
+    )
+    let unknown = HistoryManifestFailureDescriptor(
+        CleanupManifestError(
+            stage: .crashRecovery,
+            code: DomainToken(rawValue: "cleanup.recovery.unknown")!
+        )
+    )
+    let boundedFallback = HistoryManifestFailureDescriptor(
+        CleanupManifestError(
+            stage: .postflight,
+            code: DomainToken(rawValue: "cleanup.failure.fixture")!
+        )
+    )
+
+    #expect(unavailable.stageKey == "cleanup.failure.stage.moveToTrash")
+    #expect(unavailable.failureKey == "cleanup.failure.trashUnavailable")
+    #expect(unknown.stageKey == "cleanup.failure.stage.crashRecovery")
+    #expect(unknown.failureKey == "cleanup.failure.outcomeUnknown")
+    #expect(boundedFallback.stageKey == "cleanup.failure.stage.postflight")
+    #expect(boundedFallback.failureKey == "cleanup.failure.unknown")
 }
 
 @Test

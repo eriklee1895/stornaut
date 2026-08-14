@@ -9,7 +9,7 @@ struct HistoryNavigator: View {
     let groups: [HistoryDateGroup]
     let corruptRecords: [HistoryCorruptRecord]
     let now: Date
-    @Binding var selection: ScanSessionID?
+    @Binding var selection: HistoryRecordID?
 
     private let byteFormatter = StornautByteFormatter()
 
@@ -17,13 +17,23 @@ struct HistoryNavigator: View {
         List(selection: $selection) {
             ForEach(groups) { group in
                 Section {
-                    ForEach(group.records) { record in
-                        HistoryNavigatorRow(
-                            record: record,
-                            byteFormatter: byteFormatter,
-                            now: now
-                        )
-                        .tag(record.id)
+                    ForEach(group.items) { item in
+                        switch item {
+                        case let .quickScan(record):
+                            HistoryNavigatorRow(
+                                record: record,
+                                byteFormatter: byteFormatter,
+                                now: now
+                            )
+                            .tag(item.id)
+                        case let .cleanupManifest(record):
+                            HistoryManifestNavigatorRow(
+                                record: record,
+                                byteFormatter: byteFormatter,
+                                now: now
+                            )
+                            .tag(item.id)
+                        }
                     }
                 } header: {
                     Text(
@@ -41,6 +51,14 @@ struct HistoryNavigator: View {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text("history.corrupt.title")
                                     .font(.callout.weight(.medium))
+                                Text(
+                                    historyLocalized(
+                                        "history.record."
+                                            + record.source.rawValue
+                                    )
+                                )
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
                                 Text(record.rawID)
                                     .font(.caption.monospaced())
                                     .foregroundStyle(.secondary)
@@ -114,11 +132,9 @@ private struct HistoryNavigatorRow: View {
 
                 Spacer()
 
-                Label(
-                    retentionText,
-                    systemImage: retentionImage
+                HistoryRetentionLabel(
+                    retention: record.retention
                 )
-                .foregroundStyle(retentionColor)
             }
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -131,41 +147,180 @@ private struct HistoryNavigatorRow: View {
     }
 
     private var retentionText: String {
-        switch record.retention.state {
+        HistoryRetentionLabel.text(for: record.retention)
+    }
+}
+
+private struct HistoryManifestNavigatorRow: View {
+    let record: HistoryManifestRecordModel
+    let byteFormatter: StornautByteFormatter
+    let now: Date
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 7) {
+                Label(
+                    "history.record.cleanupManifest",
+                    systemImage: "doc.text.magnifyingglass"
+                )
+                .font(.callout.weight(.medium))
+
+                Spacer()
+
+                HistoryManifestTerminalLabel(outcome: record.outcome)
+            }
+
+            Text(record.manifestID.rawValue)
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+
+            HStack(spacing: 8) {
+                Text(
+                    record.createdAt,
+                    format: .dateTime.hour().minute()
+                )
+                .monospacedDigit()
+
+                HStack(spacing: 3) {
+                    Text("history.manifest.movedToTrash")
+                    Text(
+                        byteFormatter.string(
+                            for: record.summary
+                                .movedToTrashAllocatedBytes
+                        )
+                    )
+                    .monospacedDigit()
+                }
+
+                Spacer()
+
+                HistoryRetentionLabel(retention: record.retention)
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(
+            "history.manifest.\(record.manifestID.rawValue)"
+        )
+        .accessibilityLabel("history.record.cleanupManifest")
+        .accessibilityValue(accessibilitySummary)
+    }
+
+    private var accessibilitySummary: String {
+        [
+            historyLocalized(
+                HistoryManifestTerminalDescriptor(record.outcome)
+                    .localizationKey
+            ),
+            historyLocalized("history.manifest.movedToTrash")
+                + " "
+                + byteFormatter.accessibilityString(
+                    for: record.summary.movedToTrashAllocatedBytes
+                ),
+            HistoryRetentionLabel.text(for: record.retention),
+        ].joined(separator: ", ")
+    }
+}
+
+struct HistoryManifestTerminalLabel: View {
+    let outcome: HistoryManifestOutcome
+
+    var body: some View {
+        let descriptor = HistoryManifestTerminalDescriptor(outcome)
+        Label(
+            LocalizedStringKey(descriptor.localizationKey),
+            systemImage: descriptor.systemImage
+        )
+        .font(.caption.weight(.medium))
+        .foregroundStyle(descriptor.role.color)
+        .accessibilityLabel(
+            Text(LocalizedStringKey(descriptor.localizationKey))
+        )
+    }
+}
+
+struct HistoryManifestTerminalDescriptor {
+    let localizationKey: String
+    let systemImage: String
+    let role: SemanticStatusRole
+
+    init(_ outcome: HistoryManifestOutcome) {
+        switch outcome {
+        case .completed:
+            localizationKey = "history.manifest.status.completed"
+            systemImage = "checkmark.circle"
+            role = .positive
+        case .completedWithIssues:
+            localizationKey = "history.manifest.status.completedWithIssues"
+            systemImage = "exclamationmark.circle"
+            role = .limited
+        case .stopped:
+            localizationKey = "history.manifest.status.stopped"
+            systemImage = "stop.circle"
+            role = .neutral
+        case .failed:
+            localizationKey = "history.manifest.status.failed"
+            systemImage = "xmark.octagon"
+            role = .failed
+        case .outcomeUnknown:
+            localizationKey = "history.manifest.status.outcomeUnknown"
+            systemImage = "questionmark.diamond"
+            role = .limited
+        }
+    }
+}
+
+private struct HistoryRetentionLabel: View {
+    let retention: HistoryRetention
+
+    var body: some View {
+        Label(
+            Self.text(for: retention),
+            systemImage: Self.image(for: retention)
+        )
+        .foregroundStyle(Self.color(for: retention))
+    }
+
+    static func text(for retention: HistoryRetention) -> String {
+        switch retention.state {
         case .expired:
-            historyLocalized("retention.expired")
+            return historyLocalized("retention.expired")
         case .expiringSoon, .retained:
-            String(
+            return String(
                 format: historyLocalized(
                     "history.retention.daysRemaining"
                 ),
                 max(
                     1,
-                    Int(ceil(record.retention.remaining / 86_400))
+                    Int(ceil(retention.remaining / 86_400))
                 )
             )
         }
     }
 
-    private var retentionImage: String {
-        switch record.retention.state {
+    static func image(for retention: HistoryRetention) -> String {
+        switch retention.state {
         case .expired:
-            "clock.badge.xmark"
+            return "clock.badge.xmark"
         case .expiringSoon:
-            "clock.badge.exclamationmark"
+            return "clock.badge.exclamationmark"
         case .retained:
-            "clock"
+            return "clock"
         }
     }
 
-    private var retentionColor: Color {
-        switch record.retention.state {
+    static func color(for retention: HistoryRetention) -> Color {
+        switch retention.state {
         case .expired:
-            .secondary
+            return .secondary
         case .expiringSoon:
-            .orange
+            return .orange
         case .retained:
-            .secondary
+            return .secondary
         }
     }
 }

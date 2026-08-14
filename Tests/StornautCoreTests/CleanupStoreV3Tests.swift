@@ -616,7 +616,7 @@ func cleanupStoreClearAndRetentionSeparateEvidenceFromAudit() async throws {
     #expect(try await store.cleanupManifest(id: manifest.id) == manifest)
 
     try await store.clearManifests()
-    #expect(try await store.cleanupRunJournal(id: audit.id) == audit)
+    #expect(try await store.cleanupRunJournal(id: audit.id) == nil)
     #expect(try await store.cleanupManifest(id: manifest.id) == nil)
 }
 

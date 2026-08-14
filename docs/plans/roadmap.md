@@ -140,9 +140,10 @@ vanished-process errno 分类、strict-schema `$ref` sibling、direct-read fixed
 command 与 shell outcome shape。current-source signed App/helper 已得出
 `signedRuntimeReady`（9/9 capability、12/12 integrity），随后卸载并证明
 零残留。R6 已完成 final matrix、product status 与 independent review，并得出
-	runtime foundation `go`。Tasks 29–33 已完成并通过 independent
-	review/unified verifier；Task 34 为下一项 deterministic Epic 8 工作。
-	production Deep Dive 仍须等待 Phase D 自己的实现与 gate。
+	runtime foundation `go`。Tasks 29–34 已完成并通过 independent
+	review/unified verifier；Task 35 为下一项 deterministic Epic 8 gate。
+	用户已明确授权仅针对 signed-App disposable exact fixture 的 real Trash
+	diagnostic；production Deep Dive 仍须等待 Phase D 自己的实现与 gate。
 
 ### Phase D — Conditional Deep Dive
 
@@ -219,7 +220,7 @@ command 与 shell outcome shape。current-source signed App/helper 已得出
 - 完成后运行该目标的 focused checks，再运行当前统一验证入口。
 - 不把已知失败、私密数据、原始 Codex JSONL 或本机敏感路径提交到仓库。
 - 每个完成的小迭代创建独立 commit，并及时 push 到 `origin/main`。
-- Commit message 必须包含仓库要求的 TRAE co-author trailer。
+- Commit message 不添加 Coding Agent co-author trailer。
 - push 前若存在失效 `GITHUB_TOKEN`/`GH_TOKEN`，清除环境变量并使用 keyring/SSH 登录。
 - force-push、历史重写、release、notarization、修改许可证和触发外部发布流程仍需用户单独确认。
 - 若某轮只得到 no-go 证据，提交测试、ADR 和报告，不提交绕过安全边界的替代实现。
@@ -247,8 +248,8 @@ command 与 shell outcome shape。current-source signed App/helper 已得出
   serial/headless contracts/build 与 review findings 修复；官方 `openai`
   subscription worker 已通过，历史 TeamoRouter/usage-limit evidence 已
   superseded。signed App/helper machine gate 已得出 `signedRuntimeReady`，
-	  并完成零残留卸载；R6 已得出 runtime foundation `go`。Tasks 29–33 已完成；
-	  Task 34 为下一项 deterministic Epic 8 工作；production Deep Dive 仍不可用。
+	  并完成零残留卸载；R6 已得出 runtime foundation `go`。Tasks 29–34 已完成；
+	  Task 35 为下一项 deterministic Epic 8 gate；production Deep Dive 仍不可用。
 - Epic 0 Foundation Upstream Study：已完成，选择 checked-in Xcode App/Test host + local Swift packages。
 - Epic 0 Task 1：SwiftPM Core/Codex、smoke tests、`scripts/verify`、manual-only CI 与 ThirdPartyNotices 骨架已完成。
 - Bundle identifier：已确认 `com.eriklee.stornaut`。
@@ -277,5 +278,5 @@ command 与 shell outcome shape。current-source signed App/helper 已得出
   例外已获批准；R2 已完成并得出 `configurationReady`；R3 behavioral gate
   已得出 `behaviorReady` candidate；R4 已得出 `protocolReady`；R5 已得出
   `signedRuntimeReady` 并证明 zero residue；R6 final admission 已得出 runtime
-	  foundation `go`。Phase C Tasks 29–33 已完成；Task 34 为下一项
-	  deterministic Epic 8 工作；生产 Deep Dive 保持 unavailable。
+	  foundation `go`。Phase C Tasks 29–34 已完成；Task 35 为下一项
+	  deterministic Epic 8 gate；生产 Deep Dive 保持 unavailable。

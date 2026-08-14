@@ -61,9 +61,9 @@ if rg -n \
 fi
 
 if rg -n \
-    'CleanupManifest|Cleanup Result|cleanupResult|cleanup\.result' \
+    'CleanupExecutionCoordinator|ActionExecutor|TrashMoving|FileManagerTrashAdapter|ExecutionAuthorization|retryCleanupAudit|openTrash' \
     StornautApp/History; then
-    print -u2 "Task 34 Manifest-aware History leaked into Task 33."
+    print -u2 "Cleanup execution or recovery authority leaked into History."
     exit 1
 fi
 
