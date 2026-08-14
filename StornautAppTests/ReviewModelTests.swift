@@ -227,6 +227,7 @@ private enum ReviewLocalizationKeys {
         "review.action.refreshAffected",
         "review.action.cancel",
         "review.action.stopAfterCurrent",
+        "review.action.stopWaiting",
         "review.inspector.title",
         "review.inspector.missing.activity.process.inactive",
         "review.inspector.missing.activity.git.clean",

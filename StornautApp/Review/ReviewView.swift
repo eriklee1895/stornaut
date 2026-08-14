@@ -265,6 +265,15 @@ struct ReviewView: View {
                 .accessibilityIdentifier(
                     "review.action.stopAfterCurrent"
                 )
+            case .stopWaiting:
+                Button(
+                    "review.action.stopWaiting",
+                    action: appModel.cancelReviewExecutionWait
+                )
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier(
+                    "review.action.stopWaiting"
+                )
             case .none:
                 EmptyView()
             }

@@ -336,7 +336,7 @@ private struct ReviewDependencyDriver {
 }
 
 private actor ReviewDependencyStorage {
-    typealias Stream = AsyncStream<ReviewExecutionProgress>
+    typealias Stream = AsyncStream<ReviewExecutionEvent>
 
     private let buildOutcome: CleanupPlanBuildOutcome
     private let preflightOutcome: CleanupPolicyEvaluation?
@@ -378,7 +378,9 @@ private actor ReviewDependencyStorage {
         executeCount += 1
         return Stream { continuation in
             executionContinuation = continuation
-            continuation.yield(.queued(total: selection.items.count))
+            continuation.yield(
+                .progress(.queued(total: selection.items.count))
+            )
         }
     }
 
@@ -388,10 +390,12 @@ private actor ReviewDependencyStorage {
            let total = preflightSelections.last?.items.count
         {
             executionContinuation?.yield(
-                .current(
-                    index: 1,
-                    total: total,
-                    itemID: itemID
+                .progress(
+                    .current(
+                        index: 1,
+                        total: total,
+                        itemID: itemID
+                    )
                 )
             )
         }

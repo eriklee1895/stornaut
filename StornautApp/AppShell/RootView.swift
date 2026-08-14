@@ -78,6 +78,28 @@ struct RootView: View {
                     phase: appModel.reviewState.phase
                 )
                 .frame(width: 1, height: 1)
+                DebugCleanupResultStateProbe(
+                    phase: appModel.cleanupResultState.phase
+                )
+                .frame(width: 1, height: 1)
+                DebugCleanupResultOutcomeProbe(
+                    outcome: CleanupResultModel(
+                        state: appModel.cleanupResultState
+                    ).outcome
+                )
+                .frame(width: 1, height: 1)
+                DebugCleanupResultPersistenceProbe(
+                    persistence: CleanupResultModel(
+                        state: appModel.cleanupResultState
+                    ).manifestPersistence
+                )
+                .frame(width: 1, height: 1)
+                DebugCleanupResultSummaryProbe(
+                    model: CleanupResultModel(
+                        state: appModel.cleanupResultState
+                    )
+                )
+                .frame(width: 1, height: 1)
             }
         }
 #endif

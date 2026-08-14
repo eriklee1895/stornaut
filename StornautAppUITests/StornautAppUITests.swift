@@ -361,23 +361,43 @@ final class StornautAppUITests: XCTestCase {
         element("review.confirmation.confirm", in: light.app).click()
         XCTAssertTrue(
             waitForLabel(
-                "executing",
-                on: element("review.state.phase", in: light.app)
-            )
-        )
-        XCTAssertTrue(
-            element("review.action.stopAfterCurrent", in: light.app).exists
-        )
-        element("review.action.stopAfterCurrent", in: light.app).click()
-        XCTAssertTrue(
-            waitForLabel(
-                "executing",
+                "executionBlocked",
                 on: element("review.state.phase", in: light.app)
             )
         )
 
         light.app.terminate()
         XCTAssertTrue(light.app.wait(for: .notRunning, timeout: 5))
+
+        let waiting = launchReviewFixture(
+            fixture: "executing",
+            appearance: "light"
+        )
+        defer {
+            waiting.app.terminate()
+            _ = waiting.app.wait(for: .notRunning, timeout: 5)
+        }
+        XCTAssertTrue(
+            element("review.action.stopAfterCurrent", in: waiting.app)
+                .waitForExistence(timeout: 5)
+        )
+        element(
+            "review.action.stopAfterCurrent",
+            in: waiting.app
+        ).click()
+        XCTAssertTrue(
+            element("review.action.stopWaiting", in: waiting.app)
+                .waitForExistence(timeout: 5)
+        )
+        element("review.action.stopWaiting", in: waiting.app).click()
+        XCTAssertTrue(
+            waitForLabel(
+                "executionBlocked",
+                on: element("review.state.phase", in: waiting.app)
+            )
+        )
+        waiting.app.terminate()
+        XCTAssertTrue(waiting.app.wait(for: .notRunning, timeout: 5))
 
         let dark = launchReviewFixture(
             fixture: "default",
@@ -508,6 +528,436 @@ final class StornautAppUITests: XCTestCase {
         addScreenshot(
             chinese.window.screenshot(),
             named: "stornaut-review-zh-Hans"
+        )
+    }
+
+    @MainActor
+    func testCleanupResultStatesAndManifest() throws {
+        let light = launchCleanupFixture(
+            fixture: "completed",
+            appearance: "light"
+        )
+        defer {
+            light.app.terminate()
+            _ = light.app.wait(for: .notRunning, timeout: 5)
+        }
+        XCTAssertTrue(
+            element("cleanup.result.hero", in: light.app)
+                .waitForExistence(timeout: 10)
+        )
+        XCTAssertTrue(element("cleanup.result.table", in: light.app).exists)
+        XCTAssertEqual(
+            element("cleanup.result.state.outcome", in: light.app).label,
+            "completed"
+        )
+        XCTAssertEqual(
+            element("cleanup.result.state.persistence", in: light.app)
+                .label,
+            "saved"
+        )
+        XCTAssertGreaterThan(
+            light.app.descendants(matching: .any).matching(
+                NSPredicate(format: "label == %@", "Completed")
+            ).count,
+            0
+        )
+        XCTAssertGreaterThan(
+            light.app.descendants(matching: .any).matching(
+                NSPredicate(format: "label == %@", "Moved to Trash")
+            ).count,
+            0
+        )
+        XCTAssertEqual(
+            light.app.descendants(matching: .any).matching(
+                NSPredicate(
+                    format: "label == %@",
+                    "cleanup.result.outcome.completed"
+                )
+            ).count,
+            0
+        )
+        XCTAssertEqual(
+            light.app.descendants(matching: .any).matching(
+                NSPredicate(
+                    format: "label == %@",
+                    "cleanup.result.row.result.succeeded"
+                )
+            ).count,
+            0
+        )
+        let horizontalScrollBars = light.app.scrollBars
+            .allElementsBoundByIndex.filter {
+                $0.frame.width > 100
+                    && $0.frame.width > $0.frame.height * 2
+            }
+        XCTAssertTrue(horizontalScrollBars.isEmpty)
+        XCTAssertEqual(
+            light.app.buttons.matching(
+                NSPredicate(format: "label == %@", "Open Trash")
+            ).count,
+            1
+        )
+        XCTAssertEqual(
+            light.app.buttons.matching(
+                NSPredicate(format: "label == %@", "Done")
+            ).count,
+            1
+        )
+        XCTAssertFalse(light.app.staticTexts["Freed"].exists)
+        XCTAssertFalse(light.app.staticTexts["Reclaimed"].exists)
+        XCTAssertFalse(light.app.buttons["Delete Permanently"].exists)
+        XCTAssertFalse(light.app.buttons["Restore"].exists)
+        XCTAssertFalse(light.app.buttons["Empty Trash"].exists)
+        focusCleanup(light.window, in: light.app)
+        addScreenshot(
+            light.window.screenshot(),
+            named: "stornaut-cleanup-completed-light"
+        )
+
+        XCTAssertTrue(
+            performAction(
+                in: light.app,
+                action: {
+                    self.hittableButton(
+                        "View Manifest",
+                        in: light.app
+                    )
+                },
+                until: {
+                    self.element(
+                        "cleanup.manifest.detail",
+                        in: light.app
+                    ).exists
+                }
+            )
+        )
+        XCTAssertTrue(
+            element("cleanup.manifest.detail", in: light.app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            element("cleanup.manifest.candidate", in: light.app).exists
+        )
+        XCTAssertTrue(
+            element("cleanup.manifest.permanent", in: light.app).exists
+        )
+        XCTAssertTrue(
+            element(
+                "cleanup.manifest.policyReason.policy.item.allowed",
+                in: light.app
+            ).exists
+        )
+        XCTAssertTrue(
+            element(
+                "cleanup.manifest.lineage.cleanup.evidence.rule",
+                in: light.app
+            ).exists
+        )
+        XCTAssertTrue(
+            element("cleanup.manifest.freeDelta", in: light.app).exists
+        )
+        XCTAssertTrue(
+            element(
+                "cleanup.manifest.unexplainedDelta",
+                in: light.app
+            ).exists
+        )
+        XCTAssertFalse(light.app.staticTexts["Raw JSON"].exists)
+        XCTAssertFalse(light.app.buttons["Run Again"].exists)
+        focusCleanup(light.window, in: light.app)
+        addScreenshot(
+            light.window.screenshot(),
+            named: "stornaut-cleanup-manifest-light"
+        )
+        XCTAssertNotNil(
+            hittableButton("Done", in: light.app)
+        )
+        hittableButton("Done", in: light.app)?.click()
+
+        light.app.terminate()
+        XCTAssertTrue(light.app.wait(for: .notRunning, timeout: 5))
+
+        let dark = launchCleanupFixture(
+            fixture: "completed",
+            appearance: "dark"
+        )
+        defer {
+            dark.app.terminate()
+            _ = dark.app.wait(for: .notRunning, timeout: 5)
+        }
+        XCTAssertTrue(element("cleanup.result.table", in: dark.app).exists)
+        focusCleanup(dark.window, in: dark.app)
+        addScreenshot(
+            dark.window.screenshot(),
+            named: "stornaut-cleanup-completed-dark"
+        )
+
+        dark.app.terminate()
+        XCTAssertTrue(dark.app.wait(for: .notRunning, timeout: 5))
+
+        let partial = launchCleanupFixture(
+            fixture: "partial",
+            appearance: "dark"
+        )
+        defer {
+            partial.app.terminate()
+            _ = partial.app.wait(for: .notRunning, timeout: 5)
+        }
+        XCTAssertTrue(
+            waitForLabel(
+                "completedWithIssues",
+                on: element(
+                    "cleanup.result.state.outcome",
+                    in: partial.app
+                )
+            )
+        )
+        XCTAssertEqual(
+            element(
+                "cleanup.result.row.recovery.action-debug-cleanup-1",
+                in: partial.app
+            ).label,
+            "Original remains in place"
+        )
+        XCTAssertFalse(partial.app.buttons["Delete Permanently"].exists)
+        focusCleanup(partial.window, in: partial.app)
+        addScreenshot(
+            partial.window.screenshot(),
+            named: "stornaut-cleanup-partial-dark"
+        )
+
+        partial.app.terminate()
+        XCTAssertTrue(partial.app.wait(for: .notRunning, timeout: 5))
+
+        let audit = launchCleanupFixture(
+            fixture: "audit-pending",
+            appearance: "dark"
+        )
+        defer {
+            audit.app.terminate()
+            _ = audit.app.wait(for: .notRunning, timeout: 5)
+        }
+        XCTAssertTrue(
+            element("cleanup.result.auditPending", in: audit.app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertNotNil(
+            hittableButton("Retry Saving Audit", in: audit.app)
+        )
+        focusCleanup(audit.window, in: audit.app)
+        addScreenshot(
+            audit.window.screenshot(),
+            named: "stornaut-cleanup-audit-pending-dark"
+        )
+        XCTAssertNotNil(
+            hittableButton("Retry Saving Audit", in: audit.app)
+        )
+        hittableButton("Retry Saving Audit", in: audit.app)?.click()
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            element(
+                "cleanup.result.state.persistence",
+                in: audit.app
+            ).label == "saved"
+        })
+        XCTAssertEqual(
+            element(
+                "cleanup.result.state.persistence",
+                in: audit.app
+            ).label,
+            "saved"
+        )
+
+        audit.app.terminate()
+        XCTAssertTrue(audit.app.wait(for: .notRunning, timeout: 5))
+
+        let unknown = launchCleanupFixture(
+            fixture: "outcome-unknown",
+            appearance: "dark"
+        )
+        defer {
+            unknown.app.terminate()
+            _ = unknown.app.wait(for: .notRunning, timeout: 5)
+        }
+        XCTAssertEqual(
+            element("cleanup.result.state.outcome", in: unknown.app)
+                .label,
+            "outcomeUnknown"
+        )
+        XCTAssertEqual(
+            element(
+                "cleanup.result.row.recovery.action-debug-cleanup-0",
+                in: unknown.app
+            ).label,
+            "Location is unknown"
+        )
+        XCTAssertFalse(unknown.app.buttons["Retry"].exists)
+        XCTAssertFalse(
+            element("cleanup.result.openTrash", in: unknown.app).exists
+        )
+        XCTAssertTrue(
+            element(
+                "cleanup.result.state.summary",
+                in: unknown.app
+            ).label.contains("unknown=1")
+        )
+        focusCleanup(unknown.window, in: unknown.app)
+        addScreenshot(
+            unknown.window.screenshot(),
+            named: "stornaut-cleanup-outcome-unknown-dark"
+        )
+
+        unknown.app.terminate()
+        XCTAssertTrue(unknown.app.wait(for: .notRunning, timeout: 5))
+
+        let expired = launchCleanupFixture(
+            fixture: "evidence-expired",
+            appearance: "light"
+        )
+        defer {
+            expired.app.terminate()
+            _ = expired.app.wait(for: .notRunning, timeout: 5)
+        }
+        XCTAssertTrue(
+            expired.app.staticTexts[
+                "Retained item details expired"
+            ].exists
+        )
+        XCTAssertNotNil(
+            hittableButton("View Manifest", in: expired.app)
+        )
+        hittableButton("View Manifest", in: expired.app)?.click()
+        XCTAssertTrue(
+            element("cleanup.manifest.detail", in: expired.app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertEqual(
+            element("cleanup.manifest.evidence.status", in: expired.app)
+                .label,
+            "Evidence expired"
+        )
+        XCTAssertFalse(
+            expired.app.staticTexts[
+                "/tmp/stornaut-review-fixture/.npm/_cacache"
+            ].exists
+        )
+        XCTAssertNotNil(
+            hittableButton("Done", in: expired.app)
+        )
+        hittableButton("Done", in: expired.app)?.click()
+
+        expired.app.terminate()
+        XCTAssertTrue(expired.app.wait(for: .notRunning, timeout: 5))
+
+        let noObservation = launchCleanupFixture(
+            fixture: "observation-unavailable",
+            appearance: "light"
+        )
+        defer {
+            noObservation.app.terminate()
+            _ = noObservation.app.wait(for: .notRunning, timeout: 5)
+        }
+        XCTAssertNotNil(
+            hittableButton("View Manifest", in: noObservation.app)
+        )
+        hittableButton("View Manifest", in: noObservation.app)?.click()
+        XCTAssertTrue(
+            element(
+                "cleanup.manifest.system.unavailable",
+                in: noObservation.app
+            ).waitForExistence(timeout: 5)
+        )
+        noObservation.app.terminate()
+        XCTAssertTrue(
+            noObservation.app.wait(for: .notRunning, timeout: 5)
+        )
+
+        let trashFailure = launchCleanupFixture(
+            fixture: "trash-unavailable",
+            appearance: "light"
+        )
+        defer {
+            trashFailure.app.terminate()
+            _ = trashFailure.app.wait(for: .notRunning, timeout: 5)
+        }
+        XCTAssertTrue(
+            element(
+                "cleanup.result.trashUnavailable",
+                in: trashFailure.app
+            ).exists
+        )
+        XCTAssertTrue(
+            trashFailure.app.staticTexts[
+                "Trash could not be opened. Cleanup results are unchanged."
+            ].exists
+        )
+        XCTAssertTrue(
+            element("cleanup.result.table", in: trashFailure.app).exists
+        )
+
+        trashFailure.app.terminate()
+        XCTAssertTrue(
+            trashFailure.app.wait(for: .notRunning, timeout: 5)
+        )
+
+        let chinese = launchCleanupFixture(
+            fixture: "completed",
+            appearance: "light",
+            language: "zh-Hans",
+            locale: "zh_CN"
+        )
+        defer {
+            chinese.app.terminate()
+            _ = chinese.app.wait(for: .notRunning, timeout: 5)
+        }
+        XCTAssertEqual(
+            element("cleanup.result.state.outcome", in: chinese.app)
+                .label,
+            "completed"
+        )
+        XCTAssertEqual(
+            element(
+                "cleanup.result.state.persistence",
+                in: chinese.app
+            ).label,
+            "saved"
+        )
+        XCTAssertTrue(chinese.app.staticTexts["清理结果"].exists)
+        XCTAssertFalse(chinese.app.staticTexts["Cleanup Result"].exists)
+        focusCleanup(chinese.window, in: chinese.app)
+        addScreenshot(
+            chinese.window.screenshot(),
+            named: "stornaut-cleanup-zh-Hans"
+        )
+    }
+
+    @MainActor
+    func testCleanupResultArrivesOnlyThroughTerminalReviewFlow() throws {
+        let flow = launchCleanupFixture(
+            fixture: "completed",
+            appearance: "light"
+        )
+        defer {
+            flow.app.terminate()
+            _ = flow.app.wait(for: .notRunning, timeout: 5)
+        }
+
+        XCTAssertTrue(
+            element("cleanup.result.table", in: flow.app)
+                .waitForExistence(timeout: 10)
+        )
+        XCTAssertEqual(
+            element("cleanup.result.state.phase", in: flow.app).label,
+            "presented"
+        )
+        XCTAssertEqual(
+            element("review.state.phase", in: flow.app).label,
+            "executing"
+        )
+        XCTAssertTrue(
+            element(
+                "cleanup.result.state.summary",
+                in: flow.app
+            ).label.contains("succeeded=2")
         )
     }
 
@@ -1271,6 +1721,85 @@ final class StornautAppUITests: XCTestCase {
     }
 
     @MainActor
+    private func launchCleanupFixture(
+        fixture: String,
+        appearance: String,
+        language: String = "en",
+        locale: String = "en_US"
+    ) -> (app: XCUIApplication, window: XCUIElement) {
+        let app = XCUIApplication()
+        app.terminate()
+        XCTAssertTrue(app.wait(for: .notRunning, timeout: 5))
+        app.launchArguments = [
+            "-AppleLanguages", "(\(language))",
+            "-AppleLocale", locale,
+            "--stornaut-ui-test-appearance=\(appearance)",
+            "--stornaut-debug-fixture=success",
+            "--stornaut-debug-cleanup=\(fixture)",
+            "--stornaut-debug-destination=scan",
+        ]
+        app.launch()
+        let window = app.windows["main"]
+        XCTAssertTrue(window.waitForExistence(timeout: 10))
+        XCTAssertTrue(
+            element("sidebar.scan", in: app).waitForExistence(timeout: 5)
+        )
+        if fixture != "corrupt" {
+            XCTAssertTrue(
+                element("review.action.preflight", in: app)
+                    .waitForExistence(timeout: 10)
+            )
+            XCTAssertTrue(
+                performAction(
+                    in: app,
+                    action: {
+                        self.hittableElement(
+                            "review.action.preflight",
+                            in: app
+                        )
+                    },
+                    until: {
+                        self.element(
+                            "review.confirmation",
+                            in: app
+                        ).exists
+                    }
+                )
+            )
+            XCTAssertTrue(
+                element("review.confirmation.confirm", in: app)
+                    .waitForExistence(timeout: 5)
+            )
+            element("review.confirmation.confirm", in: app).click()
+        }
+        XCTAssertTrue(
+            element(
+                "cleanup.result.presentation."
+                    + (
+                        fixture == "corrupt"
+                            ? "corrupt"
+                            : "presented"
+                    ),
+                in: app
+            ).waitForExistence(timeout: 10)
+        )
+        if fixture == "trash-unavailable" {
+            XCTAssertTrue(
+                element("cleanup.result.openTrash", in: app)
+                    .waitForExistence(timeout: 5)
+            )
+            element("cleanup.result.openTrash", in: app).click()
+            XCTAssertTrue(
+                element(
+                    "cleanup.result.trashUnavailable",
+                    in: app
+                ).waitForExistence(timeout: 5)
+            )
+        }
+        return (app, window)
+    }
+
+    @MainActor
     private func launchHistoryFixture(
         fixture: String,
         appearance: String,
@@ -1432,6 +1961,16 @@ final class StornautAppUITests: XCTestCase {
             .matching(identifier: identifier)
             .allElementsBoundByIndex
             .first(where: \.isHittable)
+    }
+
+    @MainActor
+    private func hittableButton(
+        _ label: String,
+        in app: XCUIApplication
+    ) -> XCUIElement? {
+        app.buttons.matching(
+            NSPredicate(format: "label == %@", label)
+        ).allElementsBoundByIndex.first(where: \.isHittable)
     }
 
     @MainActor
@@ -1610,6 +2149,17 @@ final class StornautAppUITests: XCTestCase {
 
     @MainActor
     private func focusReview(
+        _ window: XCUIElement,
+        in app: XCUIApplication
+    ) {
+        app.activate()
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            window.isHittable && isFrontmost(app)
+        })
+    }
+
+    @MainActor
+    private func focusCleanup(
         _ window: XCUIElement,
         in app: XCUIApplication
     ) {

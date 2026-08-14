@@ -37,8 +37,10 @@ review findings 已修复；post-fix review 进一步关闭 command/image/subage
 	integrity；fixed topology 随后卸载并证明零残留。R5 已提交推送。R6 已完成
 	exact receipt、five-dimensional Settings、typed disclosure、final matrix、
 	actual-window evidence 与 post-fix review；runtime foundation 结论为 `go`。
-	Tasks 29–32 已完成；下一项 deterministic task 是 Task 33 Cleanup
-	Result/Manifest UI。
+	Tasks 29–33 已完成。Task 33 Cleanup Result/Manifest UI 的 tests-first
+	实现、精确 terminal admission、真实 Review→terminal DEBUG fixture、
+	独立审查修复、App tests、focused XCUITest、actual-App/Peekaboo 与
+	authoritative full verifier 已完成，后者单次 exit 0。
 
 Task 30 的 collector/pure-gate 分层、memory-only `ReviewSelection`、bounded
 Store lookup、typed stale contract、workflow exclusion snapshot 与 actor-owned
@@ -60,6 +62,15 @@ memory-only selection、write-disabled execution contract、native Decision
 Table/Inspector/confirmation/stale UI 与实际窗口验收计划见
 [`task-32-implementation-brief.md`](task-32-implementation-brief.md)，completion
 audit 见 [Task 32 Review](../../reports/epic-8-task-32-review.md)。
+
+Task 33 的 immutable Manifest/journal projection、typed Evidence enrichment、
+Reversible First Cleanup Result、只读 Manifest detail、Open Trash/audit-only
+retry 与 Scan-owned route 计划见
+[`task-33-implementation-brief.md`](task-33-implementation-brief.md)。当前实现
+仍保持 production execution `writeDisabled`；正常 DEBUG fixtures 已通过
+Review preflight/confirmation/terminal event 到达 Cleanup Result，只有 corrupt
+record 使用隔离直达态。完成证据见
+[Task 33 Review](../../reports/epic-8-task-33-review.md)。
 
 Task 29 的 tests-first、closed Execution Profile Catalog、shared one-snapshot
 activity、完整 Store join、Plan Builder、boundary/benchmark/review 计划见
@@ -132,7 +143,8 @@ advisory protocol 与 structural no-Executor seam 的 `protocolReady` 结论。
 
 R6 已关闭当前个人本机 capability-first runtime foundation，但不证明
 ServiceManagement distribution、Developer ID/notarization、FDA/TCC product
-flow 或 production Deep Dive。Deep Dive 保持 unavailable；Tasks 29–32 已完成。
+flow 或 production Deep Dive。Deep Dive 保持 unavailable；Tasks 29–33 已完成，
+Task 34 为下一项 deterministic Epic 8 工作。
 
 即使计划获批，正常 App 也必须保持真实 Trash 依赖关闭，直到 Task 35 的
 signed-App disposable Trash diagnostic 与最终 gate 通过。Task 32 的 Review

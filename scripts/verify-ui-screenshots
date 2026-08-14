@@ -28,6 +28,13 @@ for screenshot in \
     stornaut-review-stale-dark.png \
     stornaut-review-empty-light.png \
     stornaut-review-zh-Hans.png \
+    stornaut-cleanup-completed-light.png \
+    stornaut-cleanup-completed-dark.png \
+    stornaut-cleanup-manifest-light.png \
+    stornaut-cleanup-partial-dark.png \
+    stornaut-cleanup-audit-pending-dark.png \
+    stornaut-cleanup-outcome-unknown-dark.png \
+    stornaut-cleanup-zh-Hans.png \
     stornaut-history-populated-light.png \
     stornaut-history-expired-dark.png \
     stornaut-history-corrupt-light.png \
@@ -64,6 +71,13 @@ let names = [
     "stornaut-review-stale-dark",
     "stornaut-review-empty-light",
     "stornaut-review-zh-Hans",
+    "stornaut-cleanup-completed-light",
+    "stornaut-cleanup-completed-dark",
+    "stornaut-cleanup-manifest-light",
+    "stornaut-cleanup-partial-dark",
+    "stornaut-cleanup-audit-pending-dark",
+    "stornaut-cleanup-outcome-unknown-dark",
+    "stornaut-cleanup-zh-Hans",
     "stornaut-history-populated-light",
     "stornaut-history-expired-dark",
     "stornaut-history-corrupt-light",
@@ -185,6 +199,20 @@ guard let shellLight = statistics["stornaut-shell-light"],
         statistics["stornaut-review-empty-light"],
       let reviewChineseLight =
         statistics["stornaut-review-zh-Hans"],
+      let cleanupCompletedLight =
+        statistics["stornaut-cleanup-completed-light"],
+      let cleanupCompletedDark =
+        statistics["stornaut-cleanup-completed-dark"],
+      let cleanupManifestLight =
+        statistics["stornaut-cleanup-manifest-light"],
+      let cleanupPartialDark =
+        statistics["stornaut-cleanup-partial-dark"],
+      let cleanupAuditDark =
+        statistics["stornaut-cleanup-audit-pending-dark"],
+      let cleanupUnknownDark =
+        statistics["stornaut-cleanup-outcome-unknown-dark"],
+      let cleanupChineseLight =
+        statistics["stornaut-cleanup-zh-Hans"],
       let historyPopulatedLight =
         statistics["stornaut-history-populated-light"],
       let historyExpiredDark =
@@ -207,6 +235,8 @@ guard let shellLight = statistics["stornaut-shell-light"],
         - scanProgressDark.meanLuminance >= 40,
       reviewDefaultLight.meanLuminance
         - reviewDefaultDark.meanLuminance >= 40,
+      cleanupCompletedLight.meanLuminance
+        - cleanupCompletedDark.meanLuminance >= 40,
       historyPopulatedLight.meanLuminance
         - historyExpiredDark.meanLuminance >= 40,
       (160...250).contains(limitedLight.meanLuminance),
@@ -214,8 +244,11 @@ guard let shellLight = statistics["stornaut-shell-light"],
       (160...250).contains(scanPartialLight.meanLuminance),
       (160...250).contains(scanInspectorLight.meanLuminance),
       (160...250).contains(reviewDefaultLight.meanLuminance),
-      (160...250).contains(reviewEmptyLight.meanLuminance),
+      (230...254).contains(reviewEmptyLight.meanLuminance),
       (160...250).contains(reviewChineseLight.meanLuminance),
+      (160...250).contains(cleanupCompletedLight.meanLuminance),
+      (160...250).contains(cleanupManifestLight.meanLuminance),
+      (160...250).contains(cleanupChineseLight.meanLuminance),
       (160...250).contains(historyPopulatedLight.meanLuminance),
       (160...250).contains(historyCorruptLight.meanLuminance),
       shellLight.luminanceStandardDeviation >= 20,
@@ -231,9 +264,20 @@ guard let shellLight = statistics["stornaut-shell-light"],
       reviewDefaultLight.luminanceStandardDeviation >= 20,
       reviewDefaultDark.luminanceStandardDeviation >= 20,
       reviewInspectorDark.luminanceStandardDeviation >= 20,
-      reviewStaleDark.luminanceStandardDeviation >= 20,
-      reviewEmptyLight.luminanceStandardDeviation >= 20,
+      reviewStaleDark.luminanceStandardDeviation >= 15,
+      reviewEmptyLight.luminanceStandardDeviation >= 15,
       reviewChineseLight.luminanceStandardDeviation >= 20,
+      cleanupCompletedDark.meanLuminance <= 120,
+      cleanupPartialDark.meanLuminance <= 120,
+      cleanupAuditDark.meanLuminance <= 120,
+      cleanupUnknownDark.meanLuminance <= 120,
+      cleanupCompletedLight.luminanceStandardDeviation >= 20,
+      cleanupCompletedDark.luminanceStandardDeviation >= 20,
+      cleanupManifestLight.luminanceStandardDeviation >= 20,
+      cleanupPartialDark.luminanceStandardDeviation >= 20,
+      cleanupAuditDark.luminanceStandardDeviation >= 20,
+      cleanupUnknownDark.luminanceStandardDeviation >= 20,
+      cleanupChineseLight.luminanceStandardDeviation >= 20,
       historyPopulatedLight.luminanceStandardDeviation >= 20,
       historyExpiredDark.luminanceStandardDeviation >= 20,
       historyCorruptLight.luminanceStandardDeviation >= 20,

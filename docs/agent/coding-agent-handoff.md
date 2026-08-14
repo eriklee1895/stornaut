@@ -49,6 +49,13 @@
 > Scan→Review routing、Core-backed Plan/Policy、write-disabled execution seam、
 > native UI、实际窗口验证、independent review 与 authoritative unified
 > verifier 已完成；真实 App Trash 依赖仍保持关闭。
+> Task 33 的 exact terminal Plan/Policy admission、typed Evidence enrichment、
+> immutable Manifest/journal projection、Reversible First Cleanup Result、
+> read-only Manifest detail、Open Trash/audit-only retry、真实
+> Review→confirmation→terminal DEBUG fixtures、独立 review findings 修复、
+> App tests/focused XCUITest、actual-App/Peekaboo 与 authoritative full
+> verifier 已完成，后者单次 exit 0。production execution 继续
+> `writeDisabled`。
 > Task 5 的历史
 > Broker-only no-go 已由 ADR 0004 capability-first 决策修订，Deep Dive 因
 > 生产产品流程尚未实现而 unavailable；
@@ -282,6 +289,12 @@ foundation `go`；Task 29 已完成并通过 review/verify。实现与完成证�
 [Task 32 Implementation Brief](../plans/active/task-32-implementation-brief.md)，
 当前 completion audit 见
 [Task 32 Review](../reports/epic-8-task-32-review.md)。
+Task 33 详细边界见
+[Task 33 Implementation Brief](../plans/active/task-33-implementation-brief.md)；
+当前 completion audit 草稿见
+[Task 33 Review](../reports/epic-8-task-33-review.md)。Task 33 只展示已接受的
+Core terminal Manifest；它不启用真实 App Trash、Task 34 History 或 Task 35
+signed-App admission。
 逐项 artifact/command/gate 缺口与恢复顺序见
 [R2–R6 Progress Audit](../reports/capability-first-runtime-progress-audit-2026-08-13.md)。
 R1 当前证据见
@@ -391,8 +404,8 @@ R4 已完成并得出 `protocolReady`；R5 official `openai` worker gate 已通�
 current-source signed App/helper report 进一步通过 9/9 capability、12/12
 integrity 与零残留卸载。R6 已完成 final matrix、five-dimensional status、
 typed disclosure、actual-window evidence 与 post-fix review，runtime
-foundation 结论为 `go`。Tasks 29–32 已完成并分别通过 authoritative unified
-verifier。该 gate
+foundation 结论为 `go`。Tasks 29–33 已完成并分别通过 authoritative unified
+verifier；Task 34 为下一项 deterministic Epic 8 工作。该 gate
 要求证明完整调查能力和公共联网可用时，Codex 全进程树不可写用户数据、不可
 访问 localhost/私网/任意 Unix socket 且无 Executor 路径；不得用
 `danger-full-access`、命令/公共域名

@@ -50,6 +50,13 @@ expected_names = %w[
   stornaut-review-stale-dark
   stornaut-review-empty-light
   stornaut-review-zh-Hans
+  stornaut-cleanup-completed-light
+  stornaut-cleanup-completed-dark
+  stornaut-cleanup-manifest-light
+  stornaut-cleanup-partial-dark
+  stornaut-cleanup-audit-pending-dark
+  stornaut-cleanup-outcome-unknown-dark
+  stornaut-cleanup-zh-Hans
   stornaut-history-populated-light
   stornaut-history-expired-dark
   stornaut-history-corrupt-light
@@ -88,6 +95,13 @@ for screenshot in \
     stornaut-review-stale-dark.png \
     stornaut-review-empty-light.png \
     stornaut-review-zh-Hans.png \
+    stornaut-cleanup-completed-light.png \
+    stornaut-cleanup-completed-dark.png \
+    stornaut-cleanup-manifest-light.png \
+    stornaut-cleanup-partial-dark.png \
+    stornaut-cleanup-audit-pending-dark.png \
+    stornaut-cleanup-outcome-unknown-dark.png \
+    stornaut-cleanup-zh-Hans.png \
     stornaut-history-populated-light.png \
     stornaut-history-expired-dark.png \
     stornaut-history-corrupt-light.png \

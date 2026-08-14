@@ -28,6 +28,7 @@ enum ReviewGroupKind:
 enum ReviewPrimaryAction: String, Sendable, Equatable {
     case preflight
     case stopAfterCurrent
+    case stopWaiting
     case none
 }
 
@@ -263,7 +264,7 @@ struct ReviewModel: Sendable, Equatable {
             primaryAction = .none
         case .executing:
             primaryAction = state.stopAfterCurrentWasRequested
-                ? .none
+                ? .stopWaiting
                 : .stopAfterCurrent
         case .ready:
             primaryAction = .preflight
@@ -271,9 +272,16 @@ struct ReviewModel: Sendable, Equatable {
              .stale, .confirming, .executionBlocked:
             primaryAction = .none
         }
-        primaryActionTitleKey = primaryAction == .stopAfterCurrent
-            ? "review.action.stopAfterCurrent"
-            : "review.action.moveItemsToTrash"
+        primaryActionTitleKey = switch primaryAction {
+        case .preflight:
+            "review.action.moveItemsToTrash"
+        case .stopAfterCurrent:
+            "review.action.stopAfterCurrent"
+        case .stopWaiting:
+            "review.action.stopWaiting"
+        case .none:
+            "review.action.moveItemsToTrash"
+        }
         if let focused = projectedRows.first(where: \.isFocused) {
             let facts = scanFacts[
                 focused.classificationID,

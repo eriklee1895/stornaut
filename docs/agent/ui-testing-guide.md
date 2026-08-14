@@ -55,7 +55,7 @@ Epic 0 shell 当前必须保持：
 - System Light/Dark 均可读；
 - bundle identifier 为 `com.eriklee.stornaut`。
 
-现有 XCUITest 必须生成二十三个稳定附件：
+现有 XCUITest 必须生成三十个稳定附件：
 
 ```text
 stornaut-shell-light.png
@@ -73,6 +73,13 @@ stornaut-review-inspector-dark.png
 stornaut-review-stale-dark.png
 stornaut-review-empty-light.png
 stornaut-review-zh-Hans.png
+stornaut-cleanup-completed-light.png
+stornaut-cleanup-completed-dark.png
+stornaut-cleanup-manifest-light.png
+stornaut-cleanup-partial-dark.png
+stornaut-cleanup-audit-pending-dark.png
+stornaut-cleanup-outcome-unknown-dark.png
+stornaut-cleanup-zh-Hans.png
 stornaut-history-populated-light.png
 stornaut-history-expired-dark.png
 stornaut-history-corrupt-light.png
@@ -104,6 +111,14 @@ DEBUG fake seam，截图和测试不得被解释为真实 `FileManagerTrashAdapt
 Action 或 production write availability 已放开；生产 composition 始终保持
 `writeDisabled`。
 
+Task 33 的七张 Cleanup Result 截图固定 immutable Core Manifest/journal 与
+typed Evidence enrichment fixture：Completed Light/Dark 验证可恢复优先层级和
+Trash/permanent/system accounting 分离；Manifest Light 验证只读 detail；
+partial、audit pending、outcome unknown Dark 验证不重放、不盲重试和未知优先级；
+`zh-Hans` 验证 terminal summary 与 recovery copy。本组 fixture 通过 Review
+preflight/confirmation/terminal event 到达 Cleanup Result，不能解释为真实 App
+Trash 已启用；生产 composition 继续 `writeDisabled`。
+
 Task 24 的四张 History 截图固定 typed DEBUG Evidence fixture：Light populated
 验证日期分组 master-detail 与真实 ledger measures；Dark expired 验证 retention
 语义；Light corrupt 验证单条 session/ledger 隔离；Dark trend 验证至少四个
@@ -133,7 +148,7 @@ Settings Sidebar 控件将该 window 置前，不要重复发送 `⌘,`。重复
 
 ## 3.1 View Snapshots
 
-上面这二十三张属于 window 级证据，只能证明窗口没空白、主题没反。组件/页面级的布局、
+上面这三十张属于 window 级证据，只能证明窗口没空白、主题没反。组件/页面级的布局、
 换行、截断、间距和语义色由 `StornautAppTests/SnapshotHarness.swift` 的 view
 snapshot 负责，golden 提交在 `Tests/Fixtures/Snapshots/`。理由与容差依据见
 [ADR 0014](../adr/0014-view-snapshot-regression.md)。

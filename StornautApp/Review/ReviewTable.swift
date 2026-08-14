@@ -18,7 +18,7 @@ struct ReviewTable: View {
                 )
             }
             .width(
-                min: compactColumns ? 160 : 230,
+                min: compactColumns ? 156 : 230,
                 ideal: compactColumns ? 190 : 330,
                 max: compactColumns ? 220 : 440
             )
@@ -34,7 +34,7 @@ struct ReviewTable: View {
                 }
             }
             .width(
-                min: compactColumns ? 76 : 100,
+                min: compactColumns ? 72 : 100,
                 ideal: compactColumns ? 86 : 120,
                 max: compactColumns ? 96 : 150
             )
@@ -53,7 +53,7 @@ struct ReviewTable: View {
                 }
             }
             .width(
-                min: compactColumns ? 82 : 110,
+                min: compactColumns ? 78 : 110,
                 ideal: compactColumns ? 92 : 135,
                 max: compactColumns ? 102 : 175
             )
@@ -72,7 +72,7 @@ struct ReviewTable: View {
                 }
             }
             .width(
-                min: compactColumns ? 88 : 110,
+                min: compactColumns ? 84 : 110,
                 ideal: compactColumns ? 98 : 138,
                 max: compactColumns ? 108 : 175
             )
@@ -91,7 +91,7 @@ struct ReviewTable: View {
                 }
             }
             .width(
-                min: compactColumns ? 66 : 90,
+                min: compactColumns ? 62 : 90,
                 ideal: compactColumns ? 76 : 110,
                 max: compactColumns ? 86 : 140
             )

@@ -15,6 +15,8 @@ struct ScanView: View {
     var body: some View {
         if appModel.scanWorkspaceRoute == .review {
             ReviewView()
+        } else if appModel.scanWorkspaceRoute == .cleanupResult {
+            CleanupResultView()
         } else {
             scanResultsBody
         }

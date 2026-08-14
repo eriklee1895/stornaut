@@ -13,11 +13,13 @@ final class StornautAppModel {
     private(set) var scanWorkspaceRoute: ScanWorkspaceRoute
     private(set) var reviewState: ReviewState
     private(set) var reviewStaleSheetIsPresented: Bool
+    private(set) var cleanupResultState: CleanupResultState
 
     private let dependencies: AppDependencies
     private let reducer: AppPageReducer
     private let scanReducer: ScanFlowReducer
     private let reviewReducer: ReviewReducer
+    private let cleanupResultReducer: CleanupResultReducer
     private let now: @Sendable () -> Date
     private let refreshesServices: Bool
     private var refreshIsActive = false
@@ -35,6 +37,9 @@ final class StornautAppModel {
     private var reviewExecutionTask: Task<Void, Never>?
     private var reviewStopIsPending = false
     private var reviewGeneration: UInt64 = 0
+    private var reviewExecutionGeneration: UInt64 = 0
+    private var cleanupResultTask: Task<Void, Never>?
+    private var cleanupResultGeneration: UInt64 = 0
 
     init(
         dependencies: AppDependencies,
@@ -45,9 +50,12 @@ final class StornautAppModel {
         initialSettingsState: SettingsState = .idle,
         initialScanWorkspaceRoute: ScanWorkspaceRoute = .results,
         initialReviewState: ReviewState = .idle,
+        initialCleanupResultState: CleanupResultState = .idle,
         reducer: AppPageReducer = AppPageReducer(),
         scanReducer: ScanFlowReducer = ScanFlowReducer(),
         reviewReducer: ReviewReducer = ReviewReducer(),
+        cleanupResultReducer:
+            CleanupResultReducer = CleanupResultReducer(),
         now: @escaping @Sendable () -> Date = Date.init,
         refreshesServices: Bool = true
     ) {
@@ -62,6 +70,7 @@ final class StornautAppModel {
         scanWorkspaceRoute = initialScanWorkspaceRoute
         reviewState = initialReviewState
         reviewStaleSheetIsPresented = initialReviewState.stale != nil
+        cleanupResultState = initialCleanupResultState
         if let language = initialSettingsState.snapshot?
             .preferences.language
         {
@@ -70,6 +79,7 @@ final class StornautAppModel {
         self.reducer = reducer
         self.scanReducer = scanReducer
         self.reviewReducer = reviewReducer
+        self.cleanupResultReducer = cleanupResultReducer
         self.now = now
         self.refreshesServices = refreshesServices
     }
@@ -210,6 +220,7 @@ final class StornautAppModel {
         else {
             return
         }
+        cleanupResultState = .idle
         scanWorkspaceRoute = ReviewRouteReducer().openReview(
             from: scanWorkspaceRoute
         )
@@ -357,8 +368,15 @@ final class StornautAppModel {
         guard case .executing = next else {
             return
         }
+        reviewExecutionGeneration &+= 1
+        let executionGeneration = reviewExecutionGeneration
         reviewExecutionTask = Task { [weak self] in
             guard let self else { return }
+            defer {
+                if self.reviewExecutionGeneration == executionGeneration {
+                    self.reviewExecutionTask = nil
+                }
+            }
             do {
                 let stream = try await self.dependencies
                     .startReviewExecution(
@@ -366,22 +384,168 @@ final class StornautAppModel {
                         selection,
                         confirmation
                     )
-                for await progress in stream {
+                var acceptedTerminal = false
+                eventLoop: for await event in stream {
                     guard !Task.isCancelled else { return }
-                    guard !self.reviewState
-                        .stopAfterCurrentWasRequested
-                    else {
-                        continue
+                    switch event {
+                    case let .progress(progress):
+                        guard !acceptedTerminal,
+                              self.scanWorkspaceRoute == .review,
+                              !self.reviewState
+                                .stopAfterCurrentWasRequested
+                        else {
+                            continue
+                        }
+                        self.reviewState = .executing(snapshot, progress)
+                    case let .terminal(executionState):
+                        guard !acceptedTerminal,
+                              self.scanWorkspaceRoute == .review,
+                              let result = executionState.cleanupResult,
+                              Self.matches(
+                                  result: result,
+                                  snapshot: snapshot,
+                                  selection: selection,
+                                  confirmation: confirmation
+                              )
+                        else {
+                            continue
+                        }
+                        let enrichment = await self.dependencies
+                            .cleanupResultEnrichment(result)
+                        guard !Task.isCancelled,
+                              self.reviewExecutionGeneration
+                                == executionGeneration,
+                              self.scanWorkspaceRoute == .review,
+                              Self.matches(
+                                  enrichment: enrichment,
+                                  snapshot: snapshot
+                              )
+                        else {
+                            continue
+                        }
+                        let next = self.cleanupResultReducer
+                            .receivedTerminal(
+                                executionState,
+                                itemFacts: enrichment.itemFacts,
+                                evidenceAvailability:
+                                    enrichment.evidenceAvailability,
+                                state: self.cleanupResultState
+                            )
+                        guard next.phase == .presented else {
+                            continue
+                        }
+                        acceptedTerminal = true
+                        self.cleanupResultState = next
+                        self.scanWorkspaceRoute = ReviewRouteReducer()
+                            .openCleanupResult(
+                                from: self.scanWorkspaceRoute,
+                                terminalWasAccepted: true
+                            )
+                        break eventLoop
                     }
-                    self.reviewState = .executing(snapshot, progress)
+                }
+                if !acceptedTerminal,
+                   self.scanWorkspaceRoute == .review
+                {
+                    self.reviewState = .executionBlocked(
+                        snapshot,
+                        .missingTerminal
+                    )
                 }
             } catch {
-                self.reviewState = .executionBlocked(
-                    snapshot,
-                    .writeDisabled
-                )
+                if self.reviewExecutionGeneration == executionGeneration,
+                   self.scanWorkspaceRoute == .review
+                {
+                    self.reviewState = .executionBlocked(
+                        snapshot,
+                        .writeDisabled
+                    )
+                }
             }
-            self.reviewExecutionTask = nil
+        }
+    }
+
+    func doneCleanupResult() {
+        reviewExecutionGeneration &+= 1
+        reviewExecutionTask?.cancel()
+        reviewExecutionTask = nil
+        cleanupResultGeneration &+= 1
+        cleanupResultTask?.cancel()
+        cleanupResultTask = nil
+        cleanupResultState = cleanupResultReducer.done(
+            state: cleanupResultState
+        )
+        reviewState = .idle
+        reviewStaleSheetIsPresented = false
+        scanWorkspaceRoute = ReviewRouteReducer()
+            .closeCleanupResult(from: scanWorkspaceRoute)
+    }
+
+    func openTrashFromCleanupResult() {
+        guard cleanupResultTask == nil,
+              cleanupResultState.phase == .presented
+                    || cleanupResultState.phase == .trashUnavailable
+        else {
+            return
+        }
+        if cleanupResultState.phase == .trashUnavailable {
+            cleanupResultState = cleanupResultReducer
+                .dismissTrashFailure(state: cleanupResultState)
+        }
+        let opening = cleanupResultReducer.beginOpenTrash(
+            state: cleanupResultState
+        )
+        guard opening.phase == .openingTrash else { return }
+        cleanupResultState = opening
+        cleanupResultGeneration &+= 1
+        let generation = cleanupResultGeneration
+        cleanupResultTask = Task { [weak self] in
+            guard let self else { return }
+            let succeeded = await self.dependencies.openTrash()
+            guard generation == self.cleanupResultGeneration else {
+                return
+            }
+            self.cleanupResultState = self.cleanupResultReducer
+                .openTrashFinished(
+                    succeeded: succeeded,
+                    state: self.cleanupResultState
+                )
+            self.cleanupResultTask = nil
+        }
+    }
+
+    func dismissCleanupResultTrashFailure() {
+        guard cleanupResultTask == nil else { return }
+        cleanupResultState = cleanupResultReducer
+            .dismissTrashFailure(state: cleanupResultState)
+    }
+
+    func retryCleanupResultAudit() {
+        guard cleanupResultTask == nil,
+              let snapshot = cleanupResultState.snapshot
+        else {
+            return
+        }
+        let retrying = cleanupResultReducer.beginAuditRetry(
+            state: cleanupResultState
+        )
+        guard retrying.phase == .retryingAudit else { return }
+        cleanupResultState = retrying
+        cleanupResultGeneration &+= 1
+        let generation = cleanupResultGeneration
+        cleanupResultTask = Task { [weak self] in
+            guard let self else { return }
+            let result = await self.dependencies
+                .retryCleanupAudit(snapshot.result)
+            guard generation == self.cleanupResultGeneration else {
+                return
+            }
+            self.cleanupResultState = self.cleanupResultReducer
+                .auditRetryFinished(
+                    result,
+                    state: self.cleanupResultState
+                )
+            self.cleanupResultTask = nil
         }
     }
 
@@ -404,6 +568,22 @@ final class StornautAppModel {
             await self.dependencies.stopReviewAfterCurrent()
             self.reviewStopIsPending = false
         }
+    }
+
+    func cancelReviewExecutionWait() {
+        guard reviewState.stopAfterCurrentWasRequested,
+              let snapshot = reviewState.snapshot
+        else {
+            return
+        }
+        reviewExecutionGeneration &+= 1
+        reviewExecutionTask?.cancel()
+        reviewExecutionTask = nil
+        reviewStopIsPending = false
+        reviewState = .executionBlocked(
+            snapshot,
+            .missingTerminal
+        )
     }
 
     func refreshHistoryIfNeeded() async {
@@ -1021,6 +1201,82 @@ final class StornautAppModel {
             reviewState = .executionBlocked(snapshot, reason)
         case .idle, .empty, .scanAgain, .unavailable:
             break
+        }
+    }
+
+    private static func matches(
+        result: CleanupExecutionResult,
+        snapshot: ReviewSnapshot,
+        selection: ReviewSelection,
+        confirmation: CleanupConfirmation
+    ) -> Bool {
+        let selectedItems = selection.items.compactMap { selected in
+            snapshot.plan.items.first {
+                $0.id == selected.itemID
+            }
+        }
+        guard selectedItems.count == selection.items.count,
+              result.manifest.planID == snapshot.plan.id,
+              result.journal.selectionGeneration == selection.generation,
+              result.journal.selectionFingerprint == selection.fingerprint,
+              result.manifest.records.map(\.planItemID)
+                == selection.items.map(\.itemID),
+              confirmation.planID == snapshot.plan.id,
+              confirmation.selectionGeneration == selection.generation,
+              confirmation.orderedItemIDs
+                == selection.items.map(\.itemID),
+              confirmation.itemCount == selection.items.count,
+              confirmation.action == .moveToTrash,
+              confirmation.planFingerprint
+                == snapshot.plan.planFingerprint,
+              confirmation.selectionFingerprint == selection.fingerprint,
+              confirmation.logicalBytes
+                == result.manifest.summary.selectedLogicalBytes,
+              confirmation.allocatedBytes
+                == result.manifest.summary.selectedAllocatedBytes,
+              result.journal.entries.count == selectedItems.count
+        else {
+            return false
+        }
+        return zip(
+            result.journal.entries,
+            selectedItems
+        ).allSatisfy { entry, item in
+            guard let expectedIdentity = item.expectedIdentity,
+                  let logicalBytes = item.logicalBytes,
+                  let allocatedBytes = item.allocatedBytes,
+                  let row = snapshot.projection.rows.first(where: {
+                      $0.classificationID == item.classificationID
+                  })
+            else {
+                return false
+            }
+            return entry.planItemID == item.id
+                && entry.expectedIdentity == expectedIdentity
+                && entry.action == item.proposedAction
+                && entry.policyDisposition == row.currentDisposition
+                && entry.outcome?.measures.candidateLogicalBytes
+                    == logicalBytes
+                && entry.outcome?.measures.candidateAllocatedBytes
+                    == allocatedBytes
+        }
+    }
+
+    private static func matches(
+        enrichment: CleanupResultEnrichment,
+        snapshot: ReviewSnapshot
+    ) -> Bool {
+        let planItems = Dictionary(
+            uniqueKeysWithValues: snapshot.plan.items.map {
+                ($0.id, $0)
+            }
+        )
+        return enrichment.itemFacts.allSatisfy { facts in
+            guard let item = planItems[facts.planItemID] else {
+                return false
+            }
+            return facts.expectedIdentity == item.expectedIdentity
+                && facts.evidenceFingerprint == item.evidenceFingerprint
         }
     }
 }

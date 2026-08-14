@@ -9,7 +9,7 @@ struct AppDependencies: Sendable {
         Error
     >
     typealias ReviewExecutionStream = AsyncStream<
-        ReviewExecutionProgress
+        ReviewExecutionEvent
     >
     typealias CoordinatorFactory = @Sendable (
         EvidenceStore
@@ -56,6 +56,13 @@ struct AppDependencies: Sendable {
         CleanupConfirmation
     ) async throws -> ReviewExecutionStream
     let stopReviewAfterCurrent: @Sendable () async -> Void
+    let cleanupResultEnrichment: @Sendable (
+        CleanupExecutionResult
+    ) async -> CleanupResultEnrichment
+    let openTrash: @Sendable () async -> Bool
+    let retryCleanupAudit: @Sendable (
+        CleanupExecutionResult
+    ) async -> CleanupExecutionState?
 
     init(
         loadLatestQuickScan: @escaping @Sendable () async throws
@@ -142,7 +149,21 @@ struct AppDependencies: Sendable {
         ) async throws -> ReviewExecutionStream = { _, _, _ in
             throw AppDependencyError.reviewExecutionDisabled
         },
-        stopReviewAfterCurrent: @escaping @Sendable () async -> Void = {}
+        stopReviewAfterCurrent: @escaping @Sendable () async -> Void = {},
+        cleanupResultEnrichment: @escaping @Sendable (
+            CleanupExecutionResult
+        ) async -> CleanupResultEnrichment = { _ in
+            CleanupResultEnrichment(
+                itemFacts: [],
+                evidenceAvailability: .expired
+            )
+        },
+        openTrash: @escaping @Sendable () async -> Bool = {
+            openSystemTrash()
+        },
+        retryCleanupAudit: @escaping @Sendable (
+            CleanupExecutionResult
+        ) async -> CleanupExecutionState? = { _ in nil }
     ) {
         self.loadLatestQuickScan = loadLatestQuickScan
         self.startQuickScan = startQuickScan
@@ -166,6 +187,9 @@ struct AppDependencies: Sendable {
             reviewExecutionAvailability
         self.startReviewExecution = startReviewExecution
         self.stopReviewAfterCurrent = stopReviewAfterCurrent
+        self.cleanupResultEnrichment = cleanupResultEnrichment
+        self.openTrash = openTrash
+        self.retryCleanupAudit = retryCleanupAudit
     }
 
     static func live(
@@ -917,6 +941,17 @@ private func openFullDiskAccessPane() -> Bool {
         return false
     }
     return NSWorkspace.shared.open(url)
+}
+
+@MainActor
+private func openSystemTrash() -> Bool {
+    guard let trashURL = FileManager.default.urls(
+        for: .trashDirectory,
+        in: .userDomainMask
+    ).first else {
+        return false
+    }
+    return NSWorkspace.shared.open(trashURL)
 }
 
 private enum AppDependencyError: Error {

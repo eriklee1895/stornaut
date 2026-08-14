@@ -112,6 +112,52 @@ func debugReviewSelectorAcceptsOnlyOneExactKnownArgument() {
 }
 
 @Test
+func debugCleanupSelectorAcceptsOnlyOneExactKnownArgument() {
+    #expect(
+        DebugCleanupFixtureSelection(arguments: [
+            "Stornaut",
+            "--stornaut-debug-cleanup=completed",
+        ])?.fixture == .completed
+    )
+    #expect(
+        DebugCleanupFixtureSelection(arguments: [
+            "Stornaut",
+            "--stornaut-debug-cleanup=unknown",
+        ]) == nil
+    )
+    #expect(
+        DebugCleanupFixtureSelection(arguments: [
+            "Stornaut",
+            "--stornaut-debug-cleanup=completed",
+            "--stornaut-debug-cleanup=partial",
+        ]) == nil
+    )
+}
+
+@Test
+func debugCleanupAutoRunAcceptsOnlyOneExactArgument() {
+    #expect(
+        DebugCleanupAutoRun.enabled(arguments: [
+            "Stornaut",
+            "--stornaut-debug-auto-cleanup-terminal",
+        ])
+    )
+    #expect(
+        !DebugCleanupAutoRun.enabled(arguments: [
+            "Stornaut",
+            "--stornaut-debug-auto-cleanup-terminal=true",
+        ])
+    )
+    #expect(
+        !DebugCleanupAutoRun.enabled(arguments: [
+            "Stornaut",
+            "--stornaut-debug-auto-cleanup-terminal",
+            "--stornaut-debug-auto-cleanup-terminal",
+        ])
+    )
+}
+
+@Test
 func debugHistoryPresentationAcceptsOnlyOneExactKnownArgument() {
     #expect(
         DebugHistoryInitialPresentation.selection(arguments: [
@@ -177,7 +223,7 @@ func debugSettingsSelectorsAcceptOnlyExactSingleArguments() {
 
 @MainActor
 @Test
-func debugFixturesCoverEveryApprovedPhaseDeterministically() throws {
+func debugFixturesCoverEveryApprovedPhaseDeterministically() async throws {
     let expected: [DebugAppFixture: AppPagePhase] = [
         .empty: .empty,
         .loading: .loading,
@@ -309,6 +355,57 @@ func debugFixturesCoverEveryApprovedPhaseDeterministically() throws {
         }?.itemName == "stornaut-review-fixture"
     )
 
+    for fixture in DebugCleanupFixture.allCases {
+        let composition = try AppComposition.debugFixture(
+            selection: DebugAppFixtureSelection(arguments: [
+                "Stornaut",
+                "--stornaut-debug-fixture=success",
+            ])!,
+            cleanupSelection: DebugCleanupFixtureSelection(arguments: [
+                "Stornaut",
+                "--stornaut-debug-cleanup=\(fixture.rawValue)",
+            ])!
+        )
+        if fixture != .corrupt {
+            composition.model.preflightReview()
+            await waitForCleanupFixture {
+                composition.model.reviewState.phase == .confirming
+            }
+            composition.model.confirmReviewExecution()
+            await waitForCleanupFixture {
+                composition.model.scanWorkspaceRoute == .cleanupResult
+            }
+            if fixture == .trashUnavailable {
+                composition.model.openTrashFromCleanupResult()
+                await waitForCleanupFixture {
+                    composition.model.cleanupResultState.phase
+                        == .trashUnavailable
+                }
+            }
+        }
+        #expect(composition.model.scanWorkspaceRoute == .cleanupResult)
+        #expect(
+            composition.model.cleanupResultState.phase
+                == (
+                    fixture == .corrupt
+                        ? .corrupt
+                        : fixture == .trashUnavailable
+                            ? .trashUnavailable
+                            : .presented
+                )
+        )
+        if fixture != .corrupt {
+            let model = CleanupResultModel(
+                state: composition.model.cleanupResultState
+            )
+            #expect(model.summary != nil)
+            #expect(!model.rows.isEmpty)
+            #expect(
+                model.permanentlyReleasedBytes == ByteCount(0)!
+            )
+        }
+    }
+
     for fixture in DebugSettingsFixture.allCases {
         let composition = try AppComposition.debugFixture(
             selection: DebugAppFixtureSelection(arguments: [
@@ -361,6 +458,18 @@ func debugFixturesCoverEveryApprovedPhaseDeterministically() throws {
                 == .implementationUnavailable
         )
         #expect(model.codex.deepDiveCanStart == false)
+    }
+}
+
+@MainActor
+private func waitForCleanupFixture(
+    _ condition: () -> Bool
+) async {
+    for _ in 0..<1_000 {
+        if condition() {
+            return
+        }
+        await Task.yield()
     }
 }
 

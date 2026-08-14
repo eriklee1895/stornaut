@@ -26,9 +26,27 @@ struct ReviewRouteReducer: Sendable {
     }
 
     func openCleanupResult(
+        from route: ScanWorkspaceRoute,
+        terminalWasAccepted: Bool
+    ) -> ScanWorkspaceRoute {
+        route == .review && terminalWasAccepted
+            ? .cleanupResult
+            : route
+    }
+
+    func openCleanupResult(
         from route: ScanWorkspaceRoute
     ) -> ScanWorkspaceRoute {
-        route
+        openCleanupResult(
+            from: route,
+            terminalWasAccepted: false
+        )
+    }
+
+    func closeCleanupResult(
+        from route: ScanWorkspaceRoute
+    ) -> ScanWorkspaceRoute {
+        route == .cleanupResult ? .results : route
     }
 }
 
@@ -48,6 +66,7 @@ enum ReviewExecutionBlockReason:
 {
     case writeDisabled
     case invalidSelection
+    case missingTerminal
 }
 
 enum ReviewExecutionProgress: Sendable, Equatable {
@@ -58,6 +77,11 @@ enum ReviewExecutionProgress: Sendable, Equatable {
         itemID: CleanupPlanItemID
     )
     case stopRequested(completed: Int, total: Int)
+}
+
+enum ReviewExecutionEvent: Sendable, Equatable {
+    case progress(ReviewExecutionProgress)
+    case terminal(CleanupExecutionState)
 }
 
 enum ReviewAppContractError: Error, Sendable, Equatable {

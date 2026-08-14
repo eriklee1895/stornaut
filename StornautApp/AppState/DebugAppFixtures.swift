@@ -136,6 +136,19 @@ enum DebugReviewFixture: String, CaseIterable, Sendable {
     case executing
 }
 
+enum DebugCleanupFixture: String, CaseIterable, Sendable {
+    case completed
+    case partial
+    case failed
+    case stopped
+    case auditPending = "audit-pending"
+    case outcomeUnknown = "outcome-unknown"
+    case observationUnavailable = "observation-unavailable"
+    case evidenceExpired = "evidence-expired"
+    case trashUnavailable = "trash-unavailable"
+    case corrupt
+}
+
 struct DebugReviewFixtureSelection: Sendable, Equatable {
     let fixture: DebugReviewFixture
 
@@ -150,6 +163,36 @@ struct DebugReviewFixtureSelection: Sendable, Equatable {
             return nil
         }
         self.fixture = fixture
+    }
+}
+
+struct DebugCleanupFixtureSelection: Sendable, Equatable {
+    let fixture: DebugCleanupFixture
+
+    init?(arguments: [String]) {
+        let prefix = "--stornaut-debug-cleanup="
+        let matches = arguments.filter { $0.hasPrefix(prefix) }
+        guard matches.count == 1,
+              let fixture = DebugCleanupFixture(
+                  rawValue: String(matches[0].dropFirst(prefix.count))
+              )
+        else {
+            return nil
+        }
+        self.fixture = fixture
+    }
+}
+
+struct DebugCleanupAutoRun: Sendable, Equatable {
+    static func enabled(arguments: [String]) -> Bool {
+        let matches = arguments.filter {
+            $0 == "--stornaut-debug-auto-cleanup-terminal"
+        }
+        let malformed = arguments.contains {
+            $0.hasPrefix("--stornaut-debug-auto-cleanup-terminal")
+                && $0 != "--stornaut-debug-auto-cleanup-terminal"
+        }
+        return matches.count == 1 && !malformed
     }
 }
 
@@ -270,6 +313,11 @@ extension AppComposition {
             reviewSelection: DebugReviewFixtureSelection(
                 arguments: arguments
             ),
+            cleanupSelection: DebugCleanupFixtureSelection(
+                arguments: arguments
+            ),
+            autoRunsCleanupTerminal:
+                DebugCleanupAutoRun.enabled(arguments: arguments),
             settingsSelection: DebugSettingsFixtureSelection(
                 arguments: arguments
             ),
@@ -283,6 +331,8 @@ extension AppComposition {
         selection: DebugAppFixtureSelection,
         historySelection: DebugHistoryFixtureSelection? = nil,
         reviewSelection: DebugReviewFixtureSelection? = nil,
+        cleanupSelection: DebugCleanupFixtureSelection? = nil,
+        autoRunsCleanupTerminal: Bool = false,
         settingsSelection: DebugSettingsFixtureSelection? = nil,
         settingsLanguage: SettingsLanguage = .english,
         makeState: @MainActor (DebugAppFixture) throws -> AppPageState = {
@@ -290,10 +340,17 @@ extension AppComposition {
         }
     ) throws -> AppComposition {
         let baseState = try makeState(selection.fixture)
-        let reviewSource = try reviewSelection.map {
-            try DebugProjectionFactory.review(
-                slug: "review-\($0.fixture.rawValue)"
+        let reviewSource: QuickScanProjection?
+        if let cleanupSelection {
+            reviewSource = try DebugProjectionFactory.review(
+                slug: "cleanup-\(cleanupSelection.fixture.rawValue)"
             )
+        } else if let reviewSelection {
+            reviewSource = try DebugProjectionFactory.review(
+                slug: "review-\(reviewSelection.fixture.rawValue)"
+            )
+        } else {
+            reviewSource = nil
         }
         let state = try reviewSource.map {
             try AppPageState.success(
@@ -321,7 +378,23 @@ extension AppComposition {
                 source: projection
             )
         }
-        return AppComposition(
+        let cleanupReviewFixture = try cleanupSelection.map { _ in
+            guard let projection = state.projection else {
+                throw DebugReviewFixtureError.unavailable
+            }
+            return try DebugReviewFixture.default.makeFixture(
+                source: projection
+            )
+        }
+        let cleanupFixture = try cleanupSelection.map {
+            guard let cleanupReviewFixture else {
+                throw DebugReviewFixtureError.unavailable
+            }
+            return try $0.fixture.makeFixture(
+                review: cleanupReviewFixture
+            )
+        }
+        let composition = AppComposition(
             model: StornautAppModel(
                 dependencies: AppDependencies(
                     loadLatestQuickScan: { nil },
@@ -350,7 +423,7 @@ extension AppComposition {
                         await settingsStore.forgetAll()
                     },
                     buildReview: {
-                        reviewFixture?.buildOutcome
+                        (reviewFixture ?? cleanupReviewFixture)?.buildOutcome
                             ?? .unavailable([
                                 DomainToken(
                                     rawValue:
@@ -359,44 +432,88 @@ extension AppComposition {
                             ])
                     },
                     preflightReview: { plan, selection in
-                        guard let reviewFixture else {
+                        guard let activeReviewFixture =
+                            reviewFixture ?? cleanupReviewFixture
+                        else {
                             throw DebugReviewFixtureError.unavailable
                         }
-                        if reviewFixture.fixture == .preflightFailure {
+                        if activeReviewFixture.fixture
+                            == .preflightFailure
+                        {
                             throw DebugReviewFixtureError.preflight
                         }
-                        return try reviewFixture.evaluation(
+                        return try activeReviewFixture.evaluation(
                             plan: plan,
                             selection: selection
                         )
                     },
                     reviewExecutionAvailability:
-                        reviewFixture?.executionAvailability
+                        (
+                            reviewFixture ?? cleanupReviewFixture
+                        )?.executionAvailability
                             ?? .writeDisabled,
                     startReviewExecution: { plan, selection, confirmation in
-                        guard let reviewFixture,
-                              reviewFixture.executionAvailability
+                        let activeReviewFixture =
+                            reviewFixture ?? cleanupReviewFixture
+                        guard let activeReviewFixture,
+                              activeReviewFixture.executionAvailability
                                 == .debugFake,
-                              plan == reviewFixture.plan,
+                              plan == activeReviewFixture.plan,
                               confirmation.planID == plan.id
                         else {
                             throw DebugReviewFixtureError.executionDisabled
                         }
                         return AsyncStream { continuation in
                             continuation.yield(
-                                .queued(total: selection.items.count)
+                                .progress(
+                                    .queued(
+                                        total: selection.items.count
+                                    )
+                                )
                             )
                             if let first = selection.items.first {
                                 continuation.yield(
-                                    .current(
-                                        index: 1,
-                                        total: selection.items.count,
-                                        itemID: first.itemID
+                                    .progress(
+                                        .current(
+                                            index: 1,
+                                            total: selection.items.count,
+                                            itemID: first.itemID
+                                        )
                                     )
+                                )
+                            }
+                            if let cleanupFixture,
+                               let executionState =
+                                cleanupFixture.result.map({
+                                    debugCleanupExecutionState(
+                                        fixture: cleanupFixture.fixture,
+                                        result: $0
+                                    )
+                                })
+                            {
+                                continuation.yield(
+                                    .terminal(executionState)
                                 )
                             }
                             continuation.finish()
                         }
+                    },
+                    cleanupResultEnrichment: { _ in
+                        CleanupResultEnrichment(
+                            itemFacts: cleanupFixture?.itemFacts ?? [],
+                            evidenceAvailability:
+                                cleanupFixture?.evidenceAvailability
+                                    ?? .expired
+                        )
+                    },
+                    openTrash: {
+                        cleanupFixture?.openTrashSucceeds ?? false
+                    },
+                    retryCleanupAudit: { result in
+                        guard result == cleanupFixture?.result else {
+                            return nil
+                        }
+                        return cleanupFixture?.auditRetryState
                     }
                 ),
                 initialState: state,
@@ -407,13 +524,44 @@ extension AppComposition {
                 initialHistoryState: initialHistory,
                 initialSettingsState: .loaded(initialSettings),
                 initialScanWorkspaceRoute:
-                    reviewFixture == nil ? .results : .review,
+                    cleanupFixture?.fixture == .corrupt
+                        ? .cleanupResult
+                        : (
+                            reviewFixture == nil
+                                && cleanupFixture == nil
+                                    ? .results
+                                    : .review
+                        ),
                 initialReviewState:
-                    reviewFixture?.initialState ?? .idle,
+                    reviewFixture?.initialState
+                        ?? cleanupReviewFixture?.initialState
+                        ?? .idle,
+                initialCleanupResultState:
+                    cleanupFixture?.fixture == .corrupt
+                        ? cleanupFixture?.initialState ?? .idle
+                        : .idle,
                 now: { DebugProjectionFactory.now },
                 refreshesServices: false
             )
         )
+        if autoRunsCleanupTerminal,
+           cleanupFixture?.fixture != .corrupt,
+           cleanupFixture != nil
+        {
+            composition.model.preflightReview()
+            Task { @MainActor in
+                for _ in 0..<1_000 {
+                    if composition.model.reviewState.phase
+                        == .confirming
+                    {
+                        composition.model.confirmReviewExecution()
+                        return
+                    }
+                    await Task.yield()
+                }
+            }
+        }
+        return composition
     }
 }
 
@@ -509,6 +657,450 @@ private struct DebugReviewFixtureValue: Sendable {
             evaluatedAt: DebugProjectionFactory.now
         )
     }
+}
+
+private struct DebugCleanupFixtureValue: Sendable {
+    let fixture: DebugCleanupFixture
+    let result: CleanupExecutionResult?
+    let initialState: CleanupResultState
+    let itemFacts: [CleanupResultItemFacts]
+    let evidenceAvailability: CleanupResultEvidenceAvailability
+    let openTrashSucceeds: Bool
+    let auditRetryState: CleanupExecutionState?
+}
+
+private extension DebugCleanupFixture {
+    func makeFixture(
+        review: DebugReviewFixtureValue
+    ) throws -> DebugCleanupFixtureValue {
+        if self == .corrupt {
+            return DebugCleanupFixtureValue(
+                fixture: self,
+                result: nil,
+                initialState: .corrupt("manifest-debug-corrupt"),
+                itemFacts: [],
+                evidenceAvailability: .expired,
+                openTrashSucceeds: false,
+                auditRetryState: nil
+            )
+        }
+
+        guard let snapshot = review.initialState.snapshot else {
+            throw DebugReviewFixtureError.unavailable
+        }
+        guard let selection = snapshot.reviewSelection else {
+            throw DebugReviewFixtureError.unavailable
+        }
+        let policyEvaluation = try review.evaluation(
+            plan: review.plan,
+            selection: selection
+        )
+        guard let policyDecisions =
+            policyEvaluation.allowed?.decisions
+        else {
+            throw DebugReviewFixtureError.unavailable
+        }
+        let specifications = debugCleanupSpecifications(
+            fixture: self,
+            plan: review.plan,
+            selection: selection
+        )
+        let records = try specifications.enumerated().map {
+            try debugCleanupRecord(
+                specification: $0.element,
+                index: $0.offset,
+                decision: policyDecisions[$0.offset]
+            )
+        }
+        let observation = try self == .observationUnavailable
+            ? nil
+            : debugCleanupObservation()
+        let manifest = try CleanupManifest(
+            id: CleanupManifestID(
+                rawValue: "manifest-debug-cleanup-\(rawValue)"
+            )!,
+            planID: review.plan.id,
+            createdAt: DebugProjectionFactory.now.addingTimeInterval(20),
+            expiresAt: DebugProjectionFactory.now
+                .addingTimeInterval(90 * 86_400),
+            records: records,
+            summary: CleanupManifestSummary(records: records),
+            systemObservation: observation
+        )
+        let stage: CleanupRunJournalStage =
+            self == .auditPending ? .auditPending : .finalized
+        let journal = try debugCleanupJournal(
+            slug: rawValue,
+            stage: stage,
+            stopAfterCurrentRequested: self == .stopped,
+            plan: review.plan,
+            selection: selection,
+            manifest: manifest,
+            specifications: specifications,
+            records: records,
+            observation: observation,
+            updatedOffset: 21
+        )
+        let result = try CleanupExecutionResult(
+            journal: journal,
+            manifest: manifest
+        )
+        let executionState = debugCleanupExecutionState(
+            fixture: self,
+            result: result
+        )
+        let evidenceAvailability:
+            CleanupResultEvidenceAvailability =
+                self == .evidenceExpired ? .expired : .retained
+        let facts = debugCleanupItemFacts(
+            plan: review.plan,
+            selection: selection
+        )
+        let initial = CleanupResultReducer().receivedTerminal(
+            executionState,
+            itemFacts: facts,
+            evidenceAvailability: evidenceAvailability,
+            state: .idle
+        )
+        let initialState = self == .trashUnavailable
+            ? initial.snapshot.map(CleanupResultState.trashUnavailable)
+                ?? initial
+            : initial
+
+        let auditRetryState: CleanupExecutionState?
+        if self == .auditPending {
+            let finalized = try debugCleanupJournal(
+                slug: rawValue,
+                stage: .finalized,
+                stopAfterCurrentRequested: false,
+                plan: review.plan,
+                selection: selection,
+                manifest: manifest,
+                specifications: specifications,
+                records: records,
+                observation: observation,
+                updatedOffset: 22
+            )
+            auditRetryState = .completed(
+                try CleanupExecutionResult(
+                    journal: finalized,
+                    manifest: manifest
+                )
+            )
+        } else {
+            auditRetryState = nil
+        }
+
+        return DebugCleanupFixtureValue(
+            fixture: self,
+            result: result,
+            initialState: initialState,
+            itemFacts: facts,
+            evidenceAvailability: evidenceAvailability,
+            openTrashSucceeds: self != .trashUnavailable,
+            auditRetryState: auditRetryState
+        )
+    }
+}
+
+private struct DebugCleanupRecordSpecification {
+    let item: CleanupPlanItem
+    let result: ManifestActionResult
+    let recovery: CleanupRecoveryState
+    let startedAt: Date?
+    let finishedAt: Date?
+    let error: CleanupManifestError?
+}
+
+private func debugCleanupSpecifications(
+    fixture: DebugCleanupFixture,
+    plan: CleanupPlan,
+    selection: ReviewSelection
+) -> [DebugCleanupRecordSpecification] {
+    selection.items.enumerated().compactMap { index, selected in
+        guard let item = plan.items.first(where: {
+            $0.id == selected.itemID
+        }) else {
+            return nil
+        }
+        let started = DebugProjectionFactory.now
+            .addingTimeInterval(10 + Double(index * 2))
+        let finished = started.addingTimeInterval(1)
+        switch fixture {
+        case .completed, .auditPending, .observationUnavailable,
+             .evidenceExpired, .trashUnavailable:
+            return DebugCleanupRecordSpecification(
+                item: item,
+                result: .succeeded,
+                recovery: .movedToTrash,
+                startedAt: started,
+                finishedAt: finished,
+                error: nil
+            )
+        case .partial:
+            return index == 0
+                ? DebugCleanupRecordSpecification(
+                    item: item,
+                    result: .succeeded,
+                    recovery: .movedToTrash,
+                    startedAt: started,
+                    finishedAt: finished,
+                    error: nil
+                )
+                : DebugCleanupRecordSpecification(
+                    item: item,
+                    result: .failed,
+                    recovery: .originalConfirmed,
+                    startedAt: started,
+                    finishedAt: finished,
+                    error: CleanupManifestError(
+                        stage: .moveToTrash,
+                        code: DomainToken(
+                            rawValue: "trash.destination.unavailable"
+                        )!
+                    )
+                )
+        case .failed:
+            return DebugCleanupRecordSpecification(
+                item: item,
+                result: .failed,
+                recovery: .originalConfirmed,
+                startedAt: started,
+                finishedAt: finished,
+                error: CleanupManifestError(
+                    stage: .moveToTrash,
+                    code: DomainToken(
+                        rawValue: "trash.destination.unavailable"
+                    )!
+                )
+            )
+        case .stopped:
+            return index == 0
+                ? DebugCleanupRecordSpecification(
+                    item: item,
+                    result: .succeeded,
+                    recovery: .movedToTrash,
+                    startedAt: started,
+                    finishedAt: finished,
+                    error: nil
+                )
+                : DebugCleanupRecordSpecification(
+                    item: item,
+                    result: .cancelled,
+                    recovery: .notStarted,
+                    startedAt: nil,
+                    finishedAt: nil,
+                    error: nil
+                )
+        case .outcomeUnknown:
+            return index == 0
+                ? DebugCleanupRecordSpecification(
+                    item: item,
+                    result: .outcomeUnknown,
+                    recovery: .outcomeUnknown,
+                    startedAt: started,
+                    finishedAt: finished,
+                    error: CleanupManifestError(
+                        stage: .crashRecovery,
+                        code: DomainToken(
+                            rawValue: "cleanup.recovery.unknown"
+                        )!
+                    )
+                )
+                : DebugCleanupRecordSpecification(
+                    item: item,
+                    result: .cancelled,
+                    recovery: .notStarted,
+                    startedAt: nil,
+                    finishedAt: nil,
+                    error: nil
+                )
+        case .corrupt:
+            return nil
+        }
+    }
+}
+
+private func debugCleanupRecord(
+    specification: DebugCleanupRecordSpecification,
+    index: Int,
+    decision: PolicyDecision
+) throws -> CleanupManifestRecord {
+    try CleanupManifestRecord(
+        actionID: CleanupActionID(
+            rawValue: "action-debug-cleanup-\(index)"
+        )!,
+        planItemID: specification.item.id,
+        policyDecisionID: decision.id,
+        policyDisposition: decision.disposition,
+        policyReasonKeys: decision.reasonKeys,
+        action: .moveToTrash,
+        result: specification.result,
+        recovery: specification.recovery,
+        measures: try debugCleanupMeasures(specification),
+        startedAt: specification.startedAt,
+        finishedAt: specification.finishedAt,
+        error: specification.error
+    )
+}
+
+private func debugCleanupMeasures(
+    _ specification: DebugCleanupRecordSpecification
+) throws -> CleanupManifestMeasures {
+    let item = specification.item
+    let processed = specification.result == .succeeded
+        || specification.result == .partiallyFailed
+    let moved = specification.recovery == .movedToTrash
+    return try CleanupManifestMeasures(
+        candidateLogicalBytes: item.logicalBytes!,
+        candidateAllocatedBytes: item.allocatedBytes!,
+        processedLogicalBytes:
+            processed ? item.logicalBytes! : ByteCount(0)!,
+        processedAllocatedBytes:
+            processed ? item.allocatedBytes! : ByteCount(0)!,
+        movedToTrashLogicalBytes:
+            moved ? item.logicalBytes! : ByteCount(0)!,
+        movedToTrashAllocatedBytes:
+            moved ? item.allocatedBytes! : ByteCount(0)!,
+        permanentlyReleasedLogicalBytes: ByteCount(0)!,
+        permanentlyReleasedAllocatedBytes: ByteCount(0)!
+    )
+}
+
+private func debugCleanupJournal(
+    slug: String,
+    stage: CleanupRunJournalStage,
+    stopAfterCurrentRequested: Bool,
+    plan: CleanupPlan,
+    selection: ReviewSelection,
+    manifest: CleanupManifest,
+    specifications: [DebugCleanupRecordSpecification],
+    records: [CleanupManifestRecord],
+    observation: ManifestSystemObservation?,
+    updatedOffset: TimeInterval
+) throws -> CleanupRunJournal {
+    let entries = try zip(specifications, records).map {
+        specification, record in
+        try CleanupRunJournalEntry(
+            actionID: record.actionID,
+            planItemID: record.planItemID,
+            policyDecisionID: record.policyDecisionID!,
+            policyDisposition: record.policyDisposition,
+            policyReasonKeys: record.policyReasonKeys,
+            action: record.action,
+            expectedIdentity: specification.item.expectedIdentity!,
+            actionFingerprint: DomainToken(
+                rawValue: "action.debug-cleanup.fingerprint"
+            )!,
+            state: record.result == .cancelled
+                ? .cancelled
+                : .outcomeRecorded,
+            startedAt: record.startedAt,
+            outcome: CleanupJournalOutcome(
+                result: record.result,
+                recovery: record.recovery,
+                measures: record.measures,
+                destinationIdentity:
+                    record.recovery == .movedToTrash
+                        ? specification.item.expectedIdentity
+                        : nil,
+                error: record.error,
+                finishedAt:
+                    record.finishedAt
+                        ?? DebugProjectionFactory.now
+                            .addingTimeInterval(19)
+            )
+        )
+    }
+    return try CleanupRunJournal(
+        id: CleanupRunID(
+            rawValue: "run-debug-cleanup-\(slug)"
+        )!,
+        planID: plan.id,
+        manifestID: manifest.id,
+        selectionGeneration: selection.generation,
+        selectionFingerprint: selection.fingerprint,
+        stage: stage,
+        retentionClass: .audit,
+        stopAfterCurrentRequested: stopAfterCurrentRequested,
+        entries: entries,
+        createdAt: DebugProjectionFactory.now,
+        updatedAt: DebugProjectionFactory.now
+            .addingTimeInterval(updatedOffset),
+        expiresAt: DebugProjectionFactory.now
+            .addingTimeInterval(90 * 86_400),
+        manifestCreatedAt: manifest.createdAt,
+        systemObservation: observation
+    )
+}
+
+private func debugCleanupExecutionState(
+    fixture: DebugCleanupFixture,
+    result: CleanupExecutionResult
+) -> CleanupExecutionState {
+    switch fixture {
+    case .completed, .observationUnavailable, .evidenceExpired,
+         .trashUnavailable:
+        .completed(result)
+    case .partial, .failed:
+        .partiallyFailed(result)
+    case .stopped:
+        .stopped(result)
+    case .auditPending:
+        .auditPending(result)
+    case .outcomeUnknown:
+        .recoveryRequired(result)
+    case .corrupt:
+        .recoveryCorrupt(1)
+    }
+}
+
+private func debugCleanupItemFacts(
+    plan: CleanupPlan,
+    selection: ReviewSelection
+) -> [CleanupResultItemFacts] {
+    selection.items.compactMap { selected in
+        guard let item = plan.items.first(where: {
+            $0.id == selected.itemID
+        }) else {
+            return nil
+        }
+        let path = item.expectedRelativePath!.rawValue
+        let name = URL(fileURLWithPath: path).lastPathComponent
+        let producer = path.contains("pip") ? "pip" : "npm"
+        return CleanupResultItemFacts(
+            planItemID: item.id,
+            itemName: name,
+            exactOriginalPath:
+                "/tmp/stornaut-review-fixture/\(path)",
+            expectedIdentity: item.expectedIdentity!,
+            evidenceFingerprint: item.evidenceFingerprint!,
+            producer: DomainLabel(rawValue: producer),
+            recoveryDetailKey: DomainToken(
+                rawValue: "cleanup.recovery.trash"
+            )!,
+            evidenceLineage: [
+                DomainToken(rawValue: "cleanup.evidence.rule")!,
+                DomainToken(rawValue: "cleanup.evidence.activity")!,
+            ]
+        )
+    }
+}
+
+private func debugCleanupObservation()
+    throws -> ManifestSystemObservation
+{
+    try ManifestSystemObservation(
+        source: DomainToken(rawValue: "system.volume.home")!,
+        freeBytesBefore: ByteCount(20_000_000)!,
+        sampledBeforeAt: DebugProjectionFactory.now
+            .addingTimeInterval(1),
+        freeBytesAfter: ByteCount(20_210_000)!,
+        sampledAfterAt: DebugProjectionFactory.now
+            .addingTimeInterval(19),
+        freeSpaceDelta: SignedByteDelta(210_000),
+        unexplainedDelta: SignedByteDelta(210_000)
+    )
 }
 
 private extension DebugReviewFixture {
@@ -1317,6 +1909,134 @@ struct DebugReviewStateProbe: NSViewRepresentable {
         context: Context
     ) {
         nsView.phase = phase
+    }
+}
+
+struct DebugCleanupResultStateProbe: NSViewRepresentable {
+    let phase: CleanupResultPhase
+
+    func makeNSView(
+        context: Context
+    ) -> DebugCleanupResultStateProbeView {
+        DebugCleanupResultStateProbeView(phase: phase)
+    }
+
+    func updateNSView(
+        _ nsView: DebugCleanupResultStateProbeView,
+        context: Context
+    ) {
+        nsView.phase = phase
+    }
+}
+
+final class DebugCleanupResultStateProbeView: NSView {
+    var phase: CleanupResultPhase {
+        didSet { setAccessibilityLabel(phase.rawValue) }
+    }
+
+    init(phase: CleanupResultPhase) {
+        self.phase = phase
+        super.init(frame: .zero)
+        setAccessibilityElement(true)
+        setAccessibilityIdentifier("cleanup.result.state.phase")
+        setAccessibilityRole(.staticText)
+        setAccessibilityLabel(phase.rawValue)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+}
+
+struct DebugCleanupResultOutcomeProbe: NSViewRepresentable {
+    let outcome: CleanupResultOutcome?
+
+    func makeNSView(
+        context: Context
+    ) -> DebugCleanupResultValueProbeView {
+        DebugCleanupResultValueProbeView(
+            identifier: "cleanup.result.state.outcome",
+            value: outcome?.rawValue ?? "none"
+        )
+    }
+
+    func updateNSView(
+        _ nsView: DebugCleanupResultValueProbeView,
+        context: Context
+    ) {
+        nsView.value = outcome?.rawValue ?? "none"
+    }
+}
+
+struct DebugCleanupResultPersistenceProbe: NSViewRepresentable {
+    let persistence: CleanupManifestPersistence?
+
+    func makeNSView(
+        context: Context
+    ) -> DebugCleanupResultValueProbeView {
+        DebugCleanupResultValueProbeView(
+            identifier: "cleanup.result.state.persistence",
+            value: persistence?.rawValue ?? "none"
+        )
+    }
+
+    func updateNSView(
+        _ nsView: DebugCleanupResultValueProbeView,
+        context: Context
+    ) {
+        nsView.value = persistence?.rawValue ?? "none"
+    }
+}
+
+struct DebugCleanupResultSummaryProbe: NSViewRepresentable {
+    let model: CleanupResultModel
+
+    func makeNSView(
+        context: Context
+    ) -> DebugCleanupResultValueProbeView {
+        DebugCleanupResultValueProbeView(
+            identifier: "cleanup.result.state.summary",
+            value: summary
+        )
+    }
+
+    func updateNSView(
+        _ nsView: DebugCleanupResultValueProbeView,
+        context: Context
+    ) {
+        nsView.value = summary
+    }
+
+    private var summary: String {
+        [
+            "succeeded=\(model.summary?.succeededCount ?? 0)",
+            "failed=\(model.summary?.failedCount ?? 0)",
+            "cancelled=\(model.summary?.cancelledCount ?? 0)",
+            "unknown=\(model.summary?.unknownCount ?? 0)",
+            "trash=\(model.movedToTrashBytes.value)",
+            "permanent=\(model.permanentlyReleasedBytes.value)",
+        ].joined(separator: ";")
+    }
+}
+
+final class DebugCleanupResultValueProbeView: NSView {
+    var value: String {
+        didSet { setAccessibilityLabel(value) }
+    }
+
+    init(identifier: String, value: String) {
+        self.value = value
+        super.init(frame: .zero)
+        setAccessibilityElement(true)
+        setAccessibilityIdentifier(identifier)
+        setAccessibilityRole(.staticText)
+        setAccessibilityLabel(value)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 }
 

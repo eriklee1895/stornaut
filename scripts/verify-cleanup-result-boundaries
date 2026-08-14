@@ -1,0 +1,131 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+cd "$repo_root"
+
+cleanup_root=StornautApp/Cleanup
+cleanup_files=(
+    "$cleanup_root/CleanupResultState.swift"
+    "$cleanup_root/CleanupResultModel.swift"
+    "$cleanup_root/CleanupResultView.swift"
+    "$cleanup_root/CleanupResultTable.swift"
+    "$cleanup_root/CleanupAccountingDetails.swift"
+    "$cleanup_root/CleanupManifestDetail.swift"
+)
+cleanup_view_files=(
+    "$cleanup_root/CleanupResultView.swift"
+    "$cleanup_root/CleanupResultTable.swift"
+    "$cleanup_root/CleanupAccountingDetails.swift"
+    "$cleanup_root/CleanupManifestDetail.swift"
+)
+
+for file in "${cleanup_files[@]}"; do
+    [[ -f "$file" ]] || {
+        print -u2 "Missing Task 33 Cleanup Result file: $file"
+        exit 1
+    }
+done
+
+if rg -n \
+    'CleanupExecutionCoordinator|ActionExecutor|TrashMoving|FileManagerTrashAdapter|ExecutionAuthorization|RegisteredActionDefinition|FoundationRegisteredActionRunner|StornautCodex|ProbeBridge|Adapter|NSWorkspace|FileManager|Process\(|posix_spawn|URLSession' \
+    "${cleanup_files[@]}"; then
+    print -u2 "Cleanup Result reaches prohibited execution, runtime or workspace authority."
+    exit 1
+fi
+
+if rg -n \
+    'removeItem\s*\(|moveItem\s*\(|copyItem\s*\(|createFile\s*\(|forWritingTo|O_WRONLY|O_RDWR|unlink\(|rename\(|trashItem\s*\(' \
+    "${cleanup_files[@]}"; then
+    print -u2 "Cleanup Result contains a filesystem write surface."
+    exit 1
+fi
+
+if rg -n '^import AppKit$|LocalizedStringKey\(' "${cleanup_files[@]}"; then
+    print -u2 "Cleanup Result contains View-side AppKit or unresolved dynamic localization."
+    exit 1
+fi
+
+if rg -n 'try!|fatalError|preconditionFailure' "${cleanup_files[@]}"; then
+    print -u2 "Cleanup Result contains a crash-prone forced path."
+    exit 1
+fi
+
+if rg -n \
+    'CleanupExecutionCoordinator|ActionExecutor|TrashMoving|FileManagerTrashAdapter|ExecutionAuthorization|RegisteredActionDefinition|FoundationRegisteredActionRunner' \
+    StornautApp/AppState StornautApp/Review StornautApp/Scan \
+    StornautApp/AppShell StornautApp/StornautApp.swift; then
+    print -u2 "Production App graph reaches Task 31 execution authority."
+    exit 1
+fi
+
+if rg -n \
+    'CleanupManifest|Cleanup Result|cleanupResult|cleanup\.result' \
+    StornautApp/History; then
+    print -u2 "Task 34 Manifest-aware History leaked into Task 33."
+    exit 1
+fi
+
+if rg -n \
+    'Delete Permanently|Empty Trash|Restore|Run Again|Freed|Reclaimed' \
+    "${cleanup_view_files[@]}"; then
+    print -u2 "Deferred or misleading Cleanup Result action/copy leaked into Task 33."
+    exit 1
+fi
+
+python3 - <<'PY'
+import pathlib
+import re
+
+source = pathlib.Path("StornautApp/AppShell/AppDestination.swift").read_text()
+cases = re.findall(r"^\s+case ([A-Za-z][A-Za-z0-9]*)\s*$", source, re.MULTILINE)
+expected = ["overview", "scan", "investigations", "history"]
+if cases != expected:
+    raise SystemExit(f"unexpected top-level destinations: {cases}")
+PY
+
+rg -Fq 'ReviewExecutionAvailability = .writeDisabled' \
+    StornautApp/AppState/AppDependencies.swift
+rg -Fq 'throw AppDependencyError.reviewExecutionDisabled' \
+    StornautApp/AppState/AppDependencies.swift
+rg -Fq 'case terminal(CleanupExecutionState)' \
+    StornautApp/Review/ReviewState.swift
+rg -Fq 'case cleanupResult' StornautApp/Review/ReviewState.swift
+rg -Fq 'appModel.scanWorkspaceRoute == .cleanupResult' \
+    StornautApp/Scan/ScanView.swift
+rg -Fq 'CleanupResultView()' StornautApp/Scan/ScanView.swift
+rg -Fq 'case let .terminal(executionState)' \
+    StornautApp/AppState/StornautAppModel.swift
+rg -Fq '.missingTerminal' StornautApp/AppState/StornautAppModel.swift
+rg -Fq 'acceptedTerminal = true' StornautApp/AppState/StornautAppModel.swift
+rg -Fq 'cleanupResultEnrichment' \
+    StornautApp/AppState/AppDependencies.swift
+rg -Fq 'reviewExecutionGeneration' \
+    StornautApp/AppState/StornautAppModel.swift
+rg -Fq 'func cancelReviewExecutionWait()' \
+    StornautApp/AppState/StornautAppModel.swift
+rg -Fq 'case stopWaiting' StornautApp/Review/ReviewModel.swift
+rg -Fq 'snapshot.manifest.summary.unknownCount == 0' \
+    StornautApp/Cleanup/CleanupResultState.swift
+rg -Fq 'snapshot.journal.canTransition(' \
+    StornautApp/Cleanup/CleanupResultState.swift
+rg -Fq 'movedToTrashItemCount > 0' \
+    StornautApp/Cleanup/CleanupResultModel.swift
+rg -Fq 'cleanup.manifest.system.unavailable' \
+    StornautApp/Cleanup/CleanupManifestDetail.swift
+rg -Fq 'openSystemTrash()' StornautApp/AppState/AppDependencies.swift
+rg -Fq 'retryCleanupAudit' StornautApp/AppState/AppDependencies.swift
+rg -Fq 'hasSyntheticReclaimedTotal = false' \
+    StornautApp/Cleanup/CleanupResultModel.swift
+rg -Fq 'hasRawJSON = false' StornautApp/Cleanup/CleanupResultModel.swift
+rg -Fq 'hasExecutionAction = false' \
+    StornautApp/Cleanup/CleanupResultModel.swift
+rg -Fq 'ActionRegistry(definitions: [])' \
+    Sources/StornautCore/Policy/ActionPolicyGate.swift
+rg -q 'private static let schemaVersion = 3' \
+    Sources/StornautCore/Evidence/EvidenceStore.swift
+rg -Fq 'DebugCleanupFixtureSelection' StornautApp/StornautApp.swift
+rg -Fq '#if DEBUG' StornautApp/StornautApp.swift
+
+echo "Cleanup Result boundary verification passed."

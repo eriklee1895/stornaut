@@ -63,13 +63,22 @@ PY
 
 rg -Fq 'ReviewExecutionAvailability = .writeDisabled' \
     StornautApp/AppState/AppDependencies.swift
-rg -Fq 'reviewFixture?.executionAvailability' \
+rg -Fq 'activeReviewFixture.executionAvailability' \
     StornautApp/AppState/DebugAppFixtures.swift
-rg -Fq 'reviewFixture == nil ? .results : .review' \
+rg -Fq '== .debugFake' \
     StornautApp/AppState/DebugAppFixtures.swift
 rg -Fq 'case cleanupResult' StornautApp/Review/ReviewState.swift
-rg -Fq 'func openCleanupResult(' StornautApp/Review/ReviewState.swift
-rg -Fq 'route' StornautApp/Review/ReviewState.swift
+rg -Fq 'terminalWasAccepted: Bool' StornautApp/Review/ReviewState.swift
+rg -Fq 'route == .review && terminalWasAccepted' \
+    StornautApp/Review/ReviewState.swift
+rg -Fq 'var acceptedTerminal = false' \
+    StornautApp/AppState/StornautAppModel.swift
+rg -Fq 'case let .terminal(executionState)' \
+    StornautApp/AppState/StornautAppModel.swift
+rg -Fq 'acceptedTerminal = true' \
+    StornautApp/AppState/StornautAppModel.swift
+rg -Fq 'terminalWasAccepted: true' \
+    StornautApp/AppState/StornautAppModel.swift
 ! rg -n 'scanWorkspaceRoute\s*=\s*\.cleanupResult' StornautApp
 ! rg -n 'ActionRegistry\(definitions:\s*\[[^]]' StornautApp
 

@@ -104,6 +104,13 @@ struct StornautApp: App {
                     reviewSelection: DebugReviewFixtureSelection(
                         arguments: CommandLine.arguments
                     ),
+                    cleanupSelection: DebugCleanupFixtureSelection(
+                        arguments: CommandLine.arguments
+                    ),
+                    autoRunsCleanupTerminal:
+                        DebugCleanupAutoRun.enabled(
+                            arguments: CommandLine.arguments
+                        ),
                     settingsSelection: DebugSettingsFixtureSelection(
                         arguments: CommandLine.arguments
                     ),
