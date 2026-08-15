@@ -1,0 +1,63 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+cd "$repo_root"
+
+investigation_root=Sources/StornautCore/Investigation
+required_files=(
+    "$investigation_root/InvestigationCanonical.swift"
+    "$investigation_root/InvestigationBudget.swift"
+    "$investigation_root/InvestigationPlan.swift"
+    "$investigation_root/InvestigationSourceProjection.swift"
+    "$investigation_root/InvestigationCandidatePlanner.swift"
+    "$investigation_root/InvestigationStopEvaluator.swift"
+)
+
+for file in "${required_files[@]}"; do
+    if [[ ! -f "$file" ]]; then
+        print -u2 "Missing Task 36 Investigation file: $file"
+        exit 1
+    fi
+done
+
+if rg -n \
+    'ActionExecutor|CleanupExecutionRuntime|ExecutionAuthorization|TrashMoving|FileManager\.trashItem|RegisteredActionRunner|StornautCodex|StornautLifecycle' \
+    "$investigation_root"; then
+    print -u2 "Investigation Core references prohibited authority or runtime modules."
+    exit 1
+fi
+
+if rg -n \
+    '\bProcess\s*\(|NSTask|posix_spawn|/bin/(ba)?sh|/usr/bin/env[[:space:]]+(ba)?sh|system\s*\(' \
+    "$investigation_root"; then
+    print -u2 "Investigation Core contains a process or shell execution surface."
+    exit 1
+fi
+
+if rg -n \
+    'removeItem|moveItem|copyItem|createFile|forWritingTo|O_WRONLY|O_RDWR|unlink\(|rename\(' \
+    "$investigation_root"; then
+    print -u2 "Investigation Core contains a filesystem write surface."
+    exit 1
+fi
+
+package_graph=$(swift package describe --type json)
+python3 - "$package_graph" <<'PY'
+import json
+import sys
+
+package = json.loads(sys.argv[1])
+targets = {target["name"]: target for target in package["targets"]}
+core = targets["StornautCore"]
+dependencies = set(core.get("target_dependencies", []))
+forbidden = {"StornautCodex", "StornautLifecycle"}
+present = dependencies & forbidden
+if present:
+    raise SystemExit(
+        f"StornautCore depends on prohibited runtime targets: {sorted(present)}"
+    )
+PY
+
+print "Investigation Core boundary verification passed."

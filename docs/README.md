@@ -33,7 +33,7 @@
 | Agent、双模式与治理设计 | [Agent Disk Governance](design/agent-disk-governance.md) |
 | UI、品牌、状态与交互 | [UI/UX](design/ui-ux.md) |
 | 宏观交付顺序与阶段 Gate | [Delivery Roadmap](plans/roadmap.md) |
-| 当前计划状态 | [Active Plans](plans/active/README.md) — 当前无 executable plan；Phase D 尚待新计划 |
+| 当前计划状态 | [Active Plans](plans/active/README.md) — Phase D approved；Task 36 complete，Task 37 current |
 | Capability-first Codex Runtime Gate | [Runtime Evidence Gate](plans/completed/capability-first-codex-runtime-gate.md) — complete / archived |
 | R2 tests-first brief | [R2 Implementation Brief](plans/completed/task-r2-implementation-brief.md) — complete |
 | R3 lifecycle hard-gate brief | [R3 Implementation Brief](plans/completed/task-r3-implementation-brief.md) — behaviorReady candidate |
@@ -54,6 +54,13 @@
 | Epic 8 Task 35 实施计划 | [Task 35 Implementation Brief](plans/completed/task-35-implementation-brief.md) — complete / mutation sealed |
 | Epic 8 Task 35 Review | [Task 35 Code Review and Completion Audit](reports/epic-8-task-35-review.md) |
 | Phase C Final Validation | [Safe Execution Validation Report](reports/epic-8-safe-execution-validation-report.md) — admission `go` |
+| Phase D 获批计划 | [Conditional Deep Dive](plans/active/phase-d-conditional-deep-dive.md) — Tasks 36–44 |
+| Investigation Canonical v1 | [Canonical and Accounting Contract](specs/investigation-canonical-v1.md) — normative |
+| Epic 6 Investigation Study | [Planning and Budget Upstream Study](upstream-studies/epic-6-investigation-planning.md) |
+| ADR 0017 | [Investigation Planning, Budget and Stop Semantics](adr/0017-investigation-planning-and-stop-semantics.md) — Accepted |
+| Phase D Task 36 | [Implementation Brief](plans/active/task-36-implementation-brief.md) — complete |
+| Phase D Task 36 Review | [Code Review and Completion Audit](reports/phase-d-task-36-review.md) |
+| Phase D Task 37 | [Implementation Brief](plans/active/task-37-implementation-brief.md) — current |
 | Epic 2–4 历史计划 | [Deterministic Product Core](plans/completed/epic-2-4-deterministic-product-core.md) — Tasks 9–26 已完成并归档 |
 | 已完成计划 | [Completed Plans](plans/completed/README.md) — Epic 0–1 |
 | 上游学习与许可证门禁 | [Upstream Reference Matrix](research/upstream-reference-matrix.md) |
@@ -106,6 +113,7 @@
 | [`architecture/`](architecture/) | 技术架构 | 进程边界、模块责任、安全不变量与数据流 |
 | [`design/`](design/) | 已批准设计 | Agent 治理、UI/UX、品牌和交互规范 |
 | [`plans/`](plans/) | 路线图与可执行计划 | `roadmap.md` 管阶段；`active/` 管当前 Task；完成后移入 `completed/` |
+| [`specs/`](specs/) | 低层规范 | 稳定 codec、fingerprint、accounting 与跨 Task canonical contract |
 | [`agent/`](agent/) | Coding Agent 路由 | handoff、工作循环和最小阅读入口 |
 | [`research/`](research/) | 研究与时间切片 | 案例、竞品、上游矩阵；不能覆盖规范 |
 | [`upstream-studies/`](upstream-studies/) | 实施前研究证据 | 每个 Epic/技术主题的 Reference Study Gate |

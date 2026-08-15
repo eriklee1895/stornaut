@@ -47,12 +47,22 @@ require_fixed_text scripts/verify-phase-c-trash-diagnostic \
     'Task 35 signed Trash mutation is sealed'
 require_fixed_text scripts/verify-phase-c-trash-recovery \
     'Task 35 recovery mutation is sealed'
+require_fixed_text scripts/verify 'scripts/verify-investigation-boundaries'
+require_fixed_text scripts/verify 'investigation-benchmarks'
+require_fixed_text scripts/verify \
+    'investigationSourceProjectionMaximumStreamingBenchmark'
+require_fixed_text scripts/verify \
+    'investigationCandidatePlannerHundredThousandRowBenchmark'
+require_fixed_text \
+    Tests/StornautCoreTests/InvestigationPlannerBenchmarkTests.swift \
+    'ledger_phys_footprint_peak'
 if [[ -e scripts/verify-phase-c-trash-safe-window ]]; then
     fail_contract \
         "Obsolete global Phase C Trash safe-window still exists"
 fi
 
 python3 - <<'PY'
+import re
 from pathlib import Path
 
 
@@ -95,6 +105,64 @@ for path in phase_c_scripts:
             raise SystemExit(
                 f"{path} regained global process coordination: {prohibited}"
             )
+
+verify_source = Path("scripts/verify").read_text(encoding="utf-8")
+preflight = (
+    "STORNAUT_PHASE_C_TRASH_EVIDENCE_ROOT= \\\n"
+    "    scripts/verify-phase-c-trash-receipt >/dev/null"
+)
+if verify_source.count(preflight) != 1:
+    raise SystemExit(
+        "scripts/verify must perform exactly one early Task 35 receipt preflight"
+    )
+if verify_source.index(preflight) > verify_source.index("typeset -a headless_steps"):
+    raise SystemExit(
+        "Task 35 receipt preflight must run before verifier step selection"
+    )
+investigation_benchmarks = (
+    "investigationSourceProjectionMaximumStreamingBenchmark",
+    "investigationCandidatePlannerHundredThousandRowBenchmark",
+)
+
+
+def function_body(name: str) -> str:
+    match = re.search(
+        rf"function {re.escape(name)}\(\) \{{\n(?P<body>.*?)\n\}}",
+        verify_source,
+        flags=re.DOTALL,
+    )
+    if match is None:
+        raise SystemExit(f"scripts/verify is missing function {name}")
+    return match.group("body")
+
+
+for suite_function in ("test_swift_package", "test_swift_package_serialized"):
+    body = function_body(suite_function)
+    if body.count('--skip "$isolated_benchmarks"') != 1:
+        raise SystemExit(
+            f"{suite_function} must apply exactly one isolated benchmark skip"
+        )
+    for benchmark in investigation_benchmarks:
+        if body.count(benchmark) != 1:
+            raise SystemExit(
+                f"{suite_function} does not skip exactly one {benchmark}"
+            )
+
+benchmark_body = function_body("run_investigation_benchmarks")
+for benchmark in investigation_benchmarks:
+    if benchmark_body.count(benchmark) != 1:
+        raise SystemExit(
+            "run_investigation_benchmarks must list each Investigation "
+            f"benchmark exactly once: {benchmark}"
+        )
+if benchmark_body.count(
+    'swift test --no-parallel --filter "$benchmark"'
+) != 1:
+    raise SystemExit(
+        "Investigation benchmarks must use one serial exact-filter command"
+    )
+if "&" in benchmark_body:
+    raise SystemExit("Investigation benchmarks must not run in the background")
 PY
 
 if rg -n \
@@ -144,6 +212,7 @@ typeset -a forbidden_headless_steps=(
     xcuitest
     ui-screenshot-contract
     app-tests-and-snapshots
+    investigation-benchmarks
     matcher-benchmarks
     phase-b-product
 )
@@ -168,6 +237,7 @@ for expected in \
     xcuitest \
     ui-screenshot-contract \
     app-tests-and-snapshots \
+    investigation-benchmarks \
     matcher-benchmarks \
     phase-b-product \
     phase-c-product \
@@ -181,6 +251,11 @@ contract_root=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-verify-contract.XXXXXX")
 mkdir -p "$contract_root/scripts"
 cp scripts/verify "$contract_root/scripts/verify"
 chmod 755 "$contract_root/scripts/verify"
+cat > "$contract_root/scripts/verify-phase-c-trash-receipt" <<'SH'
+#!/bin/sh
+exit 0
+SH
+chmod 755 "$contract_root/scripts/verify-phase-c-trash-receipt"
 cat > "$contract_root/scripts/verify-phase-c-trash-diagnostic-contract" <<'SH'
 #!/bin/sh
 echo "synthetic target-aware diagnostic contract failure" >&2
@@ -203,6 +278,7 @@ fi
 typeset -a source_boundaries=(
     verify-activity-boundaries
     verify-quick-scan-boundaries
+    verify-investigation-boundaries
     verify-review-boundaries
     verify-review-workflow-boundaries
     verify-cleanup-policy-boundaries

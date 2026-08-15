@@ -175,6 +175,18 @@ public enum EvidenceIDTag: DomainIDTag {
     public static let prefix = "evidence-"
 }
 
+public enum InvestigationIDTag: DomainIDTag {
+    public static let prefix = "investigation-"
+}
+
+public enum InvestigationRunIDTag: DomainIDTag {
+    public static let prefix = "investigation-run-"
+}
+
+public enum InvestigationReportIDTag: DomainIDTag {
+    public static let prefix = "investigation-report-"
+}
+
 public enum InvestigationTargetIDTag: DomainIDTag {
     public static let prefix = "target-"
 }
@@ -208,6 +220,9 @@ public typealias ScanScopeID = DomainID<ScanScopeIDTag>
 public typealias SnapshotID = DomainID<SnapshotIDTag>
 public typealias ClassificationID = DomainID<ClassificationIDTag>
 public typealias EvidenceID = DomainID<EvidenceIDTag>
+public typealias InvestigationID = DomainID<InvestigationIDTag>
+public typealias InvestigationRunID = DomainID<InvestigationRunIDTag>
+public typealias InvestigationReportID = DomainID<InvestigationReportIDTag>
 public typealias InvestigationTargetID = DomainID<InvestigationTargetIDTag>
 public typealias CleanupPlanID = DomainID<CleanupPlanIDTag>
 public typealias CleanupPlanItemID = DomainID<CleanupPlanItemIDTag>
@@ -344,20 +359,70 @@ public struct SignedByteDelta: Codable, Sendable, Hashable, Comparable {
     }
 }
 
+protocol StrictIntegerDomainJSON {}
+
 public enum DomainJSON {
     public static func encode<T: Encodable>(_ value: T) throws -> Data {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .millisecondsSince1970
-        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-        return try encoder.encode(value)
+        try DomainJSONCanonicalCodec().encode(value)
     }
 
     public static func decode<T: Decodable>(
         _ type: T.Type,
         from data: Data
     ) throws -> T {
+        let numberPolicy: StrictDomainJSONNumberPolicy =
+            type is any StrictIntegerDomainJSON.Type
+                ? .exactInteger64
+                : .standardJSON
+        let auditor = StrictDomainJSONAuditor(
+            data: data,
+            numberPolicy: numberPolicy
+        )
+        try auditor.validate()
+        return try decodePayload(type, from: data)
+    }
+
+    static func decodeCanonical<T: Codable>(
+        _ type: T.Type,
+        from data: Data
+    ) throws -> T {
+        try DomainJSONCanonicalCodec().decode(type, from: data)
+    }
+
+    private static func decodePayload<T: Decodable>(
+        _ type: T.Type,
+        from data: Data
+    ) throws -> T {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .millisecondsSince1970
         return try decoder.decode(type, from: data)
+    }
+}
+
+final class DomainJSONCanonicalCodec {
+    private let encoder: JSONEncoder
+    private let decoder: JSONDecoder
+
+    init() {
+        encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .millisecondsSince1970
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .millisecondsSince1970
+    }
+
+    func encode<T: Encodable>(_ value: T) throws -> Data {
+        try encoder.encode(value)
+    }
+
+    func decode<T: Codable>(
+        _ type: T.Type,
+        from data: Data
+    ) throws -> T {
+        let decoded = try decoder.decode(type, from: data)
+        guard try encoder.encode(decoded) == data else {
+            throw StrictDomainJSONError.invalidJSON
+        }
+        return decoded
     }
 }

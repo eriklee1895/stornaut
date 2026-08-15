@@ -1,17 +1,28 @@
 # Active Plans
 
-当前没有获批且正在执行的 implementation plan。
+The approved executable plan is
+[Phase D — Conditional Deep Dive](phase-d-conditional-deep-dive.md).
+Task 36 is complete; Task 37 is current from its pushed baseline. Tasks 38–44
+remain blocked on the pushed completion commit of their immediate predecessor.
 
-Phase C Safe Execution Vertical Slice（Epic 8 Tasks 27–35）与插入的
-capability-first Runtime R1–R6 evidence gate 已于 2026-08-15 完成并归档到
-[`../completed/`](../completed/README.md)。最终证据见：
+The normative low-level contract is
+[Investigation Canonical v1](../../specs/investigation-canonical-v1.md).
+Task 36 is deterministic and non-executing: it added the canonical codec,
+source projection, v2 Investigation domain, Candidate Planner, budget ledger
+and stop evaluator. It did not launch Codex, call a model, migrate the Store,
+change App availability or create cleanup authority.
 
-- [Task 35 Completion Audit](../../reports/epic-8-task-35-review.md)
-- [Phase C Validation Report](../../reports/epic-8-safe-execution-validation-report.md)
+Production Deep Dive remains `.implementationUnavailable` until Task 44 is
+the sole normal-product admission gate.
 
-Phase C admission 为 `go`，但这只关闭确定性安全执行基础。普通 App execution
-仍保持 `writeDisabled`，production Deep Dive 仍 unavailable。
-
-下一步是 Phase D Conditional Deep Dive。开始实现前必须创建新的 active plan，
-明确复用已验证的 Runtime foundation、Phase C Policy/Executor、no-Executor
-边界和自己的产品级 behavioral gates；不得直接从 completed briefs 推断新授权。
+| Task | Scope | Status |
+| --- | --- | --- |
+| [36](task-36-implementation-brief.md) | Domain, canonical projection, planner, budget and stop contracts | complete; [review](../../reports/phase-d-task-36-review.md) |
+| [37](task-37-implementation-brief.md) | Store v4, retention and source rejoin | current |
+| [38](task-38-implementation-brief.md) | Closed coordinator with fake runtime | blocked on Task 37 |
+| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | blocked on Task 38 |
+| [40](task-40-implementation-brief.md) | Evidence report and conservative Review projection | blocked on Task 39 |
+| [41](task-41-implementation-brief.md) | First-use disclosure and typed availability | blocked on Task 40 |
+| [42](task-42-implementation-brief.md) | App workflow and recovery state | blocked on Task 41 |
+| [43](task-43-implementation-brief.md) | Investigations UI and navigation | blocked on Task 42 |
+| [44](task-44-implementation-brief.md) | Production vertical slice and final gate | blocked on Task 43 |

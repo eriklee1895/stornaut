@@ -156,6 +156,13 @@ Phase C plans/briefs 已归档，admission 为 `go`。production Deep Dive 仍�
 
 ### Phase D — Conditional Deep Dive
 
+**当前计划：** [Phase D Tasks 36–44](active/phase-d-conditional-deep-dive.md)；
+Task 36 deterministic planning core 已完成并通过独立审查、连续最大规模
+benchmark 与 authoritative full verifier；Task 37 Store v4/persistence/
+retention/source rejoin 为当前 Task，Task 44 是唯一 normal-product admission
+gate。Task 36 completion evidence 见
+[review](../reports/phase-d-task-36-review.md)。
+
 **范围：** Epic 5–6；仅在 ADR 0004 capability-first runtime gate 允许时进入。
 
 **目标：**
@@ -261,6 +268,11 @@ Phase C plans/briefs 已归档，admission 为 `go`。production Deep Dive 仍�
 	  Phase C final gate 已完成：receipt/source/raw-evidence、SwiftPM 634/634、
 	  Phase C 74/74、完整 App/UI 和 authoritative full verifier 均通过，计划已
 	  归档。旧 global process safe-window 已删除；production Deep Dive 仍不可用。
+	  Phase D Tasks 36–44 plan 已获批；Task 36 deterministic
+	  domain/planner/budget/stop contracts 已完成，300,002-row / 256 MiB
+	  source benchmark 连续最慢 `22.540198084` 秒且 authoritative full
+	  verifier 单次 exit 0；Task 37 Store v4/persistence/retention/source
+	  rejoin 为当前 Task。
 - Epic 0 Foundation Upstream Study：已完成，选择 checked-in Xcode App/Test host + local Swift packages。
 - Epic 0 Task 1：SwiftPM Core/Codex、smoke tests、`scripts/verify`、manual-only CI 与 ThirdPartyNotices 骨架已完成。
 - Bundle identifier：已确认 `com.eriklee.stornaut`。

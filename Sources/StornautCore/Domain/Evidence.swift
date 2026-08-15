@@ -90,7 +90,7 @@ public struct EvidenceRecord: Codable, Sendable, Equatable {
     }
 }
 
-public struct InvestigationTarget: Codable, Sendable, Equatable {
+public struct LegacyInvestigationTargetV1: Codable, Sendable, Equatable {
     public let schemaVersion: DomainSchemaVersion
     public let id: InvestigationTargetID
     public let snapshotID: SnapshotID
@@ -114,6 +114,10 @@ public struct InvestigationTarget: Codable, Sendable, Equatable {
     }
 
     public init(from decoder: Decoder) throws {
+        try rejectUnknownCodingKeys(
+            decoder,
+            allowedKeys: Set(CodingKeys.allCases.map(\.stringValue))
+        )
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let schemaVersion = try container.decode(
             DomainSchemaVersion.self,
@@ -129,5 +133,14 @@ public struct InvestigationTarget: Codable, Sendable, Equatable {
         )
         reasonKey = try container.decode(DomainToken.self, forKey: .reasonKey)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
+    }
+
+    private enum CodingKeys: String, CodingKey, CaseIterable {
+        case schemaVersion
+        case id
+        case snapshotID
+        case expectedBytes
+        case reasonKey
+        case createdAt
     }
 }

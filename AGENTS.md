@@ -83,6 +83,16 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   stages 单次 exit 0（847.921 秒）。最终 whole-diff 与 timestamp-focused
   independent review 均无 unresolved P0–P2，Phase C 计划已归档，admission
   为 `go`。
+  Phase D Task 36 的 strict Investigation domain、canonical binary/source
+  projection、Candidate Planner、budget ledger、stop semantics 与 structural
+  no-Executor gate 已完成。300,002-row / 256 MiB source benchmark 连续三次
+  最慢 `22.540198084` 秒、kernel peak increment 最坏 `100,958,328` bytes；
+  maximum benchmarks 已从普通 suites 精确隔离并只在 full 中独立串行一次。
+  Task 35 receipt/source seal 已前移到所有昂贵步骤之前，未来 verifier 漂移
+  fail-fast。independent review 无 unresolved P0–P2，authoritative
+  `scripts/verify --full` 23/23 stages 单次 exit 0（875.36 秒）。Task 36 已
+  完成，Task 37 Store v4/persistence/retention/source rejoin 为当前 Task；
+  必须先执行 brief 规定的 Release 最大规模 Store benchmark，再进入实现。
   真实 App Trash 依赖仍保持关闭，生产 Deep Dive 仍为 implementation unavailable。
   逐 Task 完成 Upstream Study、
   实现、code review、focused/full verify、独立 commit/push；不得提前混入
@@ -156,6 +166,12 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Epic 8 Task 35 tests-first brief | [docs/plans/completed/task-35-implementation-brief.md](docs/plans/completed/task-35-implementation-brief.md) |
 | Epic 8 Task 35 review / completion audit | [docs/reports/epic-8-task-35-review.md](docs/reports/epic-8-task-35-review.md) |
 | Phase C final validation | [docs/reports/epic-8-safe-execution-validation-report.md](docs/reports/epic-8-safe-execution-validation-report.md) |
+| Phase D 获批计划 | [docs/plans/active/phase-d-conditional-deep-dive.md](docs/plans/active/phase-d-conditional-deep-dive.md) |
+| Investigation Canonical v1 | [docs/specs/investigation-canonical-v1.md](docs/specs/investigation-canonical-v1.md) |
+| Epic 6 Investigation Study / ADR | [docs/upstream-studies/epic-6-investigation-planning.md](docs/upstream-studies/epic-6-investigation-planning.md) / [ADR 0017](docs/adr/0017-investigation-planning-and-stop-semantics.md) |
+| Phase D Task 36 tests-first brief | [docs/plans/active/task-36-implementation-brief.md](docs/plans/active/task-36-implementation-brief.md) |
+| Phase D Task 36 review / completion audit | [docs/reports/phase-d-task-36-review.md](docs/reports/phase-d-task-36-review.md) |
+| Phase D Task 37 tests-first brief | [docs/plans/active/task-37-implementation-brief.md](docs/plans/active/task-37-implementation-brief.md) |
 | Epic 2–4 历史计划 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) |
 | Epic 2–4 最终 Gate | [docs/reports/epic-2-4-validation-report.md](docs/reports/epic-2-4-validation-report.md) |
 | Epic 0–1 历史计划与证据 | [docs/plans/completed/epic-0-1-foundation-spikes.md](docs/plans/completed/epic-0-1-foundation-spikes.md) |
@@ -200,7 +216,10 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   gate 后完成 fixed topology 零残留卸载。R6 final admission 已完成并得出
   runtime foundation `go`；Tasks 29–35 与完整 Phase C gate 已完成，
   authoritative full verifier 单次 exit 0，计划已归档，Phase C admission
-  为 `go`。
+  为 `go`。Phase D Tasks 36–44 plan 已获批；Task 36 deterministic
+  Investigation domain/planner/budget/stop core 已完成并通过 independent
+  review 与 authoritative full verifier，Task 37 Store v4/persistence/
+  retention/source rejoin 为当前 Task。
 Deep Dive 的旧 Broker-only no-go 已被 ADR 0004 的 capability-first 边界取代；
 当前仍不可用的原因是生产 Deep Dive 尚未实现，而非 R6 或 Codex 工具能力。
 R6 不证明 release distribution、FDA/TCC 或 production Deep Dive；
@@ -247,9 +266,9 @@ scripts/check-doc-links  文档本地链接检查
 App host 拓扑已由 [`docs/upstream-studies/epic-0-foundation.md`](docs/upstream-studies/epic-0-foundation.md) 选定，bundle identifier 已确认为 `com.eriklee.stornaut`；ADR 0001 记录最终 build/signing 证据。
 
 宏观交付顺序以 [`docs/plans/roadmap.md`](docs/plans/roadmap.md) 为准。Epic
-编号表示能力归属，不要求严格按数字顺序交付；下一份 Phase D plan 必须明确
-复用现有 Runtime、Policy/Trash foundations，并保持 production Deep Dive
-和普通 App 执行能力关闭直到各自 gate。
+编号表示能力归属，不要求严格按数字顺序交付；获批 Phase D plan 明确复用
+现有 Runtime、Policy/Trash foundations，并保持 production Deep Dive 和普通
+App 执行能力关闭直到各自 gate。
 
 ## Working loop
 

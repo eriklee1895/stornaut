@@ -1,9 +1,9 @@
 # Stornaut 产品需求文档
 
 > 版本：2.3
-> 状态：设计基线已批准；ADR 0004 已批准 capability-first Codex 边界，Deep Dive 等待新运行时 evidence gate
+> 状态：设计基线已批准；capability-first Runtime R1–R6 foundation `go`，生产 Deep Dive 等待 Phase D Tasks 36–44 与 Task 44 admission
 > 初版日期：2026-08-06
-> 最近更新：2026-08-11
+> 最近更新：2026-08-15
 > 产品策略：个人自用优先，GitHub Public 开源，不以付费独立产品为目标
 
 配套文档：
@@ -167,9 +167,9 @@ Agent 不应浪费 Token 重新发现已经被可靠规则解决的问题。快�
 ```text
 复用 Quick Scan 快照
 → 计算未解释空间与候选目标
-→ Codex 生成 InvestigationPlan
+→ Swift Candidate Planner 生成并准入 InvestigationPlan
 → Codex 使用直接只读工具、Probe Broker 与 live public internet 调查
-→ Agent 根据证据动态调整下一步
+→ Agent 在 Swift 准入的目标与预算内动态调整调查策略
 → 达到覆盖率、时间或 Token 预算
 → 生成 EvidenceReport 与 CleanupPlan
 ```

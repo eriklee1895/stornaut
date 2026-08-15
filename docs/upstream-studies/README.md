@@ -24,7 +24,12 @@ Phase C：
 Capability-first Runtime interlock：
 
 - [Epic 5 Capability-First Runtime](epic-5-capability-first-runtime.md) —
-  Accepted for R1 evidence; conditional managed-proxy candidate, explicit
-  dedicated loopback transport decision required before R2
+  Accepted through R6; local-only runtime foundation `go`, production Deep
+  Dive remains gated by its own Phase D implementation
+
+Phase D：
+
+- [Epic 6 Investigation Planning and Budget](epic-6-investigation-planning.md) —
+  Accepted for Task 36; canonical planning, budget and stop contracts
 
 研究记录必须包含精确 commit/version、license、阅读文件、可借鉴行为、不可复用代码、Stornaut 独立方案和 Benchmark/fixture。

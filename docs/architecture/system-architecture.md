@@ -1,8 +1,8 @@
 # Stornaut 技术架构
 
 > 版本：2.2
-> 状态：与 PRD 2.3 / ADR 0004 capability-first 设计基线同步；Deep Dive 等待新运行时 evidence gate
-> 初版：2026-08-06；最近更新：2026-08-11
+> 状态：与 PRD 2.3 / ADR 0004 capability-first 设计基线同步；runtime foundation `go`，生产 Deep Dive 等待 Phase D Tasks 36–44
+> 初版：2026-08-06；最近更新：2026-08-15
 
 配套文档：[PRD](../product/PRD.md)、[Agent 设计规格](../design/agent-disk-governance.md)、[UI/UX 设计规格](../design/ui-ux.md)、[上游参考矩阵](../research/upstream-reference-matrix.md)、[Coding Agent Handoff](../agent/coding-agent-handoff.md)、[Epic 0–1 验证报告](../reports/epic-0-1-validation-report.md)。
 
@@ -103,11 +103,12 @@ ADR 0004 明确把读取/联网能力与写入/执行权分开。实施前必须
 5. Codex 输出、命令与工具调用均不存在直达 Trash、Registered Action、
    Policy Gate bypass 或 Executor 的路径。
 
-`--sandbox read-only` 是候选写边界，不是完整结论；installed Codex 若不能在
-自身 sandbox 中同时提供公共联网与不可写，必须增加外层 OS containment。
-不得使用 `danger-full-access`，也不得通过关闭 shell/browser/search/skills 来
-伪造 gate 通过。Deep Dive 在这组运行时证据完成前保持 paused，原因是实现尚未
-交付，而不是 Broker-only 未成立。
+`--sandbox read-only` 单独不是完整结论。R1–R6 已通过外层 OS containment、
+signed-App identity、完整工具观察、adversarial denial、no-Executor 与零残留
+证据，runtime foundation 结论为 `go`。不得使用 `danger-full-access`，也不得
+通过关闭 shell/browser/search/skills 伪造后续 gate。生产 Deep Dive 仍保持
+unavailable，唯一原因是 Phase D Tasks 36–44 产品流程尚未完成并通过 Task 44
+admission；runtime receipt 或 Codex discovery 不能单独启用它。
 
 ## 4. 模块设计
 

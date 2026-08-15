@@ -55,6 +55,9 @@ while (( $# > 0 )); do
     shift
 done
 
+STORNAUT_PHASE_C_TRASH_EVIDENCE_ROOT= \
+    scripts/verify-phase-c-trash-receipt >/dev/null
+
 typeset -a headless_steps=(
     source-boundaries
     localization-contract
@@ -74,6 +77,7 @@ typeset -a full_steps=(
     ui-screenshot-contract
     swiftpm-build
     swiftpm-tests
+    investigation-benchmarks
     matcher-benchmarks
     phase-b-product
     source-boundaries
@@ -169,14 +173,23 @@ function build_swift_package() {
 }
 
 function test_swift_package() {
-    local matcher_benchmarks='(cumulativeCatalogMatchingBenchmarkStaysBounded|completeCacheCatalogMatchingBenchmarkStaysBounded|completeCatalogMatchingBenchmarkStaysBounded)'
+    local isolated_benchmarks='(cumulativeCatalogMatchingBenchmarkStaysBounded|completeCacheCatalogMatchingBenchmarkStaysBounded|completeCatalogMatchingBenchmarkStaysBounded|investigationSourceProjectionMaximumStreamingBenchmark|investigationCandidatePlannerHundredThousandRowBenchmark)'
     SWT_EXPERIMENTAL_MAXIMUM_PARALLELIZATION_WIDTH=2 \
-        swift test --parallel --num-workers 4 --skip "$matcher_benchmarks"
+        swift test --parallel --num-workers 4 --skip "$isolated_benchmarks"
 }
 
 function test_swift_package_serialized() {
-    local matcher_benchmarks='(cumulativeCatalogMatchingBenchmarkStaysBounded|completeCacheCatalogMatchingBenchmarkStaysBounded|completeCatalogMatchingBenchmarkStaysBounded)'
-    swift test --no-parallel --skip "$matcher_benchmarks"
+    local isolated_benchmarks='(cumulativeCatalogMatchingBenchmarkStaysBounded|completeCacheCatalogMatchingBenchmarkStaysBounded|completeCatalogMatchingBenchmarkStaysBounded|investigationSourceProjectionMaximumStreamingBenchmark|investigationCandidatePlannerHundredThousandRowBenchmark)'
+    swift test --no-parallel --skip "$isolated_benchmarks"
+}
+
+function run_investigation_benchmarks() {
+    local benchmark
+    for benchmark in \
+        investigationSourceProjectionMaximumStreamingBenchmark \
+        investigationCandidatePlannerHundredThousandRowBenchmark; do
+        swift test --no-parallel --filter "$benchmark"
+    done
 }
 
 function run_matcher_benchmarks() {
@@ -194,6 +207,7 @@ function verify_source_boundaries() {
     for boundary in \
         scripts/verify-activity-boundaries \
         scripts/verify-quick-scan-boundaries \
+        scripts/verify-investigation-boundaries \
         scripts/verify-review-boundaries \
         scripts/verify-review-workflow-boundaries \
         scripts/verify-cleanup-policy-boundaries \
@@ -290,6 +304,9 @@ function execute_step() {
             ;;
         swiftpm-tests-serialized)
             run_step "$step_name" test_swift_package_serialized
+            ;;
+        investigation-benchmarks)
+            run_step "$step_name" run_investigation_benchmarks
             ;;
         matcher-benchmarks)
             run_step "$step_name" run_matcher_benchmarks
