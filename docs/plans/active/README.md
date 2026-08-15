@@ -2,8 +2,10 @@
 
 The approved executable plan is
 [Phase D — Conditional Deep Dive](phase-d-conditional-deep-dive.md).
-Task 36 is complete; Task 37 is current from its pushed baseline. Tasks 38–44
-remain blocked on the pushed completion commit of their immediate predecessor.
+Tasks 36–37 are complete. Task 37 Store v4, independent review, two complete
+`15`-sample capacity runs and the 23/23-stage authoritative full verifier
+passed. Task 38 is the next unblocked implementation Task; Tasks 39–44 remain
+blocked on the pushed completion commit of their immediate predecessor.
 
 The normative low-level contract is
 [Investigation Canonical v1](../../specs/investigation-canonical-v1.md).
@@ -18,8 +20,8 @@ the sole normal-product admission gate.
 | Task | Scope | Status |
 | --- | --- | --- |
 | [36](task-36-implementation-brief.md) | Domain, canonical projection, planner, budget and stop contracts | complete; [review](../../reports/phase-d-task-36-review.md) |
-| [37](task-37-implementation-brief.md) | Store v4, retention and source rejoin | current |
-| [38](task-38-implementation-brief.md) | Closed coordinator with fake runtime | blocked on Task 37 |
+| [37](task-37-implementation-brief.md) | Store v4, retention and source rejoin | complete; [review](../../reports/phase-d-task-37-review.md) |
+| [38](task-38-implementation-brief.md) | Closed coordinator with fake runtime | next / unblocked |
 | [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | blocked on Task 38 |
 | [40](task-40-implementation-brief.md) | Evidence report and conservative Review projection | blocked on Task 39 |
 | [41](task-41-implementation-brief.md) | First-use disclosure and typed availability | blocked on Task 40 |

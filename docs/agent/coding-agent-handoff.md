@@ -1,7 +1,7 @@
 # Stornaut Coding Agent Handoff
 
 > 面向接手实现的 Coding Agent  
-> 最近更新：2026-08-15
+> 最近更新：2026-08-16
 > 当前状态：产品、Agent、UI 功能交互与品牌基线完成；Epic 0–1 evidence
 > gate 已完成；Epic 2–4 Tasks 9–26 通过最终 unified verifier 并归档；
 > Phase C deterministic Epic 8 详尽 plan 已于 2026-08-11 获用户批准，
@@ -89,8 +89,12 @@
 > Task 35 receipt/source seal 也已前移到所有昂贵步骤之前。independent
 > review 无 unresolved P0–P2，authoritative `scripts/verify --full` 23/23
 > stages 单次 exit 0（875.36 秒）。Task 37 Store v4/persistence/retention/
-> source rejoin 为当前 Task，其 Release 最大规模 Store benchmark 必须在实现
-> admission 前运行。
+> source rejoin 已完成实现与 independent review；两轮完整 Release capacity
+> gate 共 `30/30` 样本通过，最慢 `53.159062` 秒、最坏 kernel footprint
+> increment `210,944,240` bytes。普通 suites 明确跳过该显式 opt-in
+> benchmark，worker 直接运行已构建 test bundle、不嵌套 SwiftPM。
+> authoritative `scripts/verify --full` 23/23 stages 单次 exit 0（893.65 秒）。
+> Task 37 已完成，Task 38 已解锁为下一项实施任务。
 > Task 5 的历史
 > Broker-only no-go 已由 ADR 0004 capability-first 决策修订，Deep Dive 因
 > 生产产品流程尚未实现而 unavailable；
@@ -353,8 +357,10 @@ Phase D 当前实现入口为
 [Conditional Deep Dive Plan](../plans/active/phase-d-conditional-deep-dive.md)、
 [Investigation Canonical v1](../specs/investigation-canonical-v1.md) 与
 [Task 37 Brief](../plans/active/task-37-implementation-brief.md)；Task 36 的
-完成证据见 [Task 36 Review](../reports/phase-d-task-36-review.md)。生产 Deep
-Dive 继续 unavailable，直到 Task 44 final admission。
+完成证据见 [Task 36 Review](../reports/phase-d-task-36-review.md)，Task 37
+完成证据见 [Task 37 Review](../reports/phase-d-task-37-review.md)。Task 38
+已解锁并按其 [Implementation Brief](../plans/active/task-38-implementation-brief.md)
+实施。生产 Deep Dive 继续 unavailable，直到 Task 44 final admission。
 
 跨 Epic 的阶段依赖、no-go 分支和交付顺序由 [Delivery Roadmap](../plans/roadmap.md) 管理；新 active plan 不得另起一套宏观路线。
 
@@ -454,8 +460,10 @@ integrity 与零残留卸载。R6 已完成 final matrix、five-dimensional stat
 typed disclosure、actual-window evidence 与 post-fix review，runtime
 foundation 结论为 `go`。Tasks 29–35 与完整 Phase C gate 已完成；
 authoritative full verifier 单次 exit 0，计划已归档，Phase C admission 为
-`go`。Task 36 deterministic Investigation foundation 已完成，Task 37 Store
-v4/persistence/retention/source rejoin 为当前 Task。该 gate
+`go`。Task 36 deterministic Investigation foundation 已完成。Task 37 Store
+v4/persistence/retention/source rejoin 已完成实现、independent review 和两轮
+完整容量 gate，authoritative full verifier 23/23 stages 单次 exit 0；Task 37
+已完成，Task 38 已解锁。该 gate
 要求证明完整调查能力和公共联网可用时，Codex 全进程树不可写用户数据、不可
 访问 localhost/私网/任意 Unix socket 且无 Executor 路径；不得用
 `danger-full-access`、命令/公共域名

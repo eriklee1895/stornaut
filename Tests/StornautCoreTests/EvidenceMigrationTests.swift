@@ -12,7 +12,7 @@ func evidenceStoreCreatesAndMigratesSchemaAtomically() async throws {
 
     let fresh = try EvidenceStore(configuration: configuration)
     let freshDiagnostics = try await fresh.diagnostics()
-    #expect(freshDiagnostics.schemaVersion == 3)
+    #expect(freshDiagnostics.schemaVersion == 4)
     #expect(freshDiagnostics.applicationID == .evidence)
     #expect(freshDiagnostics.journalMode == "delete")
     #expect(freshDiagnostics.foreignKeysEnabled)
@@ -41,7 +41,7 @@ func evidenceStoreCreatesAndMigratesSchemaAtomically() async throws {
     let sessions = try await migrated.scanSessions(limit: 10, offset: 0)
     #expect(sessions.records.map(\.id.rawValue) == ["scan-legacy-v0"])
     #expect(sessions.corruptRecordIDs.isEmpty)
-    #expect(try await migrated.diagnostics().schemaVersion == 3)
+    #expect(try await migrated.diagnostics().schemaVersion == 4)
 
     let v1Root = try EvidenceStoreTestSupport.temporaryDirectory("v1")
     defer { try? FileManager.default.removeItem(at: v1Root) }
@@ -62,8 +62,8 @@ func evidenceStoreCreatesAndMigratesSchemaAtomically() async throws {
         databaseURL: v1Configuration.evidenceDatabaseURL,
         sql: v1SQL
     )
-    let v3FromV1 = try EvidenceStore(configuration: v1Configuration)
-    #expect(try await v3FromV1.diagnostics().schemaVersion == 3)
+    let v4FromV1 = try EvidenceStore(configuration: v1Configuration)
+    #expect(try await v4FromV1.diagnostics().schemaVersion == 4)
     #expect(
         try EvidenceStoreTestSupport.runSQLite(
             databaseURL: v1Configuration.evidenceDatabaseURL,
@@ -93,8 +93,8 @@ func evidenceStoreCreatesAndMigratesSchemaAtomically() async throws {
         databaseURL: v2Configuration.evidenceDatabaseURL,
         sql: v2SQL
     )
-    let v3FromV2 = try EvidenceStore(configuration: v2Configuration)
-    #expect(try await v3FromV2.diagnostics().schemaVersion == 3)
+    let v4FromV2 = try EvidenceStore(configuration: v2Configuration)
+    #expect(try await v4FromV2.diagnostics().schemaVersion == 4)
     #expect(
         try EvidenceStoreTestSupport.runSQLite(
             databaseURL: v2Configuration.evidenceDatabaseURL,

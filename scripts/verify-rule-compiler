@@ -336,7 +336,7 @@ core_dependencies = set(
 )
 if "RuleCompilerKit" in core_dependencies:
     raise SystemExit("StornautCore must not depend on RuleCompilerKit")
-if core_dependencies != {"StornautProcessSupport"}:
+if core_dependencies != {"CSQLiteSupport", "StornautProcessSupport"}:
     raise SystemExit(
         f"unexpected StornautCore dependencies: {sorted(core_dependencies)}"
     )

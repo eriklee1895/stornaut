@@ -447,16 +447,26 @@ public struct InvestigationSourceProjectionBuilder: Sendable {
         )
         let payloadCodec = DomainJSONCanonicalCodec()
 
-        while let row = try firstCursor.next() {
-            let record = try row.validatedRecord(using: payloadCodec)
-            let manifest = try row.manifestRow
-            let encoded = try manifest.canonicalBytes
-            try passOne.accept(
-                record: record,
-                manifestRow: manifest,
-                canonicalBytes: encoded,
-                manifestSink: &manifestSink
-            )
+        while true {
+            var reachedEnd = false
+            try autoreleasepool {
+                guard let row = try firstCursor.next() else {
+                    reachedEnd = true
+                    return
+                }
+                let record = try row.validatedRecord(using: payloadCodec)
+                let manifest = try row.manifestRow
+                let encoded = try manifest.canonicalBytes
+                try passOne.accept(
+                    record: record,
+                    manifestRow: manifest,
+                    canonicalBytes: encoded,
+                    manifestSink: &manifestSink
+                )
+            }
+            if reachedEnd {
+                break
+            }
         }
         let index = try passOne.finish(planningAt: planningAt)
 
@@ -492,13 +502,23 @@ public struct InvestigationSourceProjectionBuilder: Sendable {
             expectedFramedRowsByteCount: passOne.framedRowsByteCount,
             relevanceTokens: relevanceTokens
         )
-        while let row = try secondCursor.next() {
-            let manifest = try row.manifestRow
-            let encoded = try manifest.canonicalBytes
-            try passTwo.accept(
-                manifestRow: manifest,
-                canonicalBytes: encoded
-            )
+        while true {
+            var reachedEnd = false
+            try autoreleasepool {
+                guard let row = try secondCursor.next() else {
+                    reachedEnd = true
+                    return
+                }
+                let manifest = try row.manifestRow
+                let encoded = try manifest.canonicalBytes
+                try passTwo.accept(
+                    manifestRow: manifest,
+                    canonicalBytes: encoded
+                )
+            }
+            if reachedEnd {
+                break
+            }
         }
         let finalGeneration = factory.generation
         guard factory.scanSessionID == selectedScanSessionID,

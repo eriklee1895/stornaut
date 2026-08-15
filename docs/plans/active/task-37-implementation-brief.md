@@ -1,6 +1,8 @@
 # Task 37 Implementation Brief — Investigation Persistence and Retention
 
-> **Status:** Approved; current from the pushed Task 36 baseline.
+> **Status:** Complete from the pushed Task 36 baseline. Implementation,
+> independent review, two complete capacity runs and the 23/23-stage
+> authoritative `scripts/verify --full` passed.
 >
 > **Parent plan:**
 > [Phase D Conditional Deep Dive](phase-d-conditional-deep-dive.md)
@@ -1710,7 +1712,9 @@ swift test --filter InvestigationStoreV4
 swift test --filter InvestigationMigration
 swift test --filter InvestigationSourceRejoin
 swift test --filter InvestigationStorePerformance
-swift test -c release --filter InvestigationStoreCapacityBenchmark
+STORNAUT_RUN_TASK37_CAPACITY_BENCHMARK=1 \
+  swift test -c release -Xswiftc -DDEBUG --no-parallel \
+  --filter investigationStoreCapacityBenchmark
 swift test --filter PersistedWebProvenance
 swift test --filter CleanupHistoryStore
 swift test --filter RetentionPolicy

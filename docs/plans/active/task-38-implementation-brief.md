@@ -1,6 +1,7 @@
 # Task 38 Implementation Brief — Closed Investigation Coordinator with Fake Runtime
 
-> **Status:** Approved; blocked on pushed Task 37 baseline.
+> **Status:** Approved; unblocked by completed Task 37. Next implementation
+> Task from the pushed Task 37 baseline.
 >
 > **Parent plan:**
 > [Phase D Conditional Deep Dive](phase-d-conditional-deep-dive.md)

@@ -34,7 +34,9 @@ foundation evidence gate 已得出 `go`；生产 Deep Dive 仍未实现，releas
 仍未评估。Phase C Tasks 27–35 已完成：唯一 signed-App diagnostic Trash
 attempt、zero-replay recovery、source-bound receipt、独立审查与 authoritative
 full verifier 均通过，admission 为 `go`；普通 App execution 仍
-`writeDisabled`。见文档：
+`writeDisabled`。Phase D Tasks 36–37 已完成；Task 37 Store v4、独立审查、
+两轮正式容量验证（`30/30` 样本）与 23/23 authoritative full verifier
+均通过，Task 38 已解锁为下一项实施任务。见文档：
 
 | 文档 | 内容 |
 |---|---|
@@ -48,8 +50,9 @@ full verifier 均通过，admission 为 `go`；普通 App execution 仍
 | [docs/assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md](docs/assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md) | 权限受限、安全阻断、部分结果、stale preflight 与历史保留的恢复状态契约 |
 | [docs/reports/epic-2-4-validation-report.md](docs/reports/epic-2-4-validation-report.md) | Phase B domain/persistence、真实 Quick Scan benchmark、accounting、UI 与 scope gate |
 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) | 已归档的 Phase B Tasks 9–26 计划与逐 Task 证据 |
-| [docs/plans/active/README.md](docs/plans/active/README.md) | Phase D approved；Task 36 complete，Task 37 Store v4 persistence is current |
+| [docs/plans/active/README.md](docs/plans/active/README.md) | Phase D approved；Tasks 36–37 complete，Task 38 next |
 | [docs/reports/phase-d-task-36-review.md](docs/reports/phase-d-task-36-review.md) | Task 36 deterministic planning core、performance evidence 与 completion audit |
+| [docs/reports/phase-d-task-37-review.md](docs/reports/phase-d-task-37-review.md) | Task 37 Store v4、capacity/performance evidence 与 completion audit |
 | [docs/plans/completed/epic-8-safe-execution-vertical-slice.md](docs/plans/completed/epic-8-safe-execution-vertical-slice.md) | 已归档的 Phase C Tasks 27–35 计划 |
 | [docs/reports/epic-8-safe-execution-validation-report.md](docs/reports/epic-8-safe-execution-validation-report.md) | Phase C final matrix、signed receipt 与 admission `go` |
 | [docs/plans/completed/capability-first-codex-runtime-gate.md](docs/plans/completed/capability-first-codex-runtime-gate.md) | 已归档的 capability-first Runtime/containment evidence gate |

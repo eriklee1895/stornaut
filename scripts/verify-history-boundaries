@@ -66,7 +66,7 @@ rg -q 'cleanupManifestHistory' \
     Sources/StornautCore/Evidence/EvidenceStore.swift
 rg -q 'deleteCleanupManifest' \
     Sources/StornautCore/Evidence/EvidenceStore.swift
-rg -q 'private static let schemaVersion = 3' \
+rg -q 'private static let schemaVersion = 4' \
     Sources/StornautCore/Evidence/EvidenceStore.swift
 rg -q 'history.delete.confirm.message' \
     StornautApp/Resources/en.lproj/Localizable.strings

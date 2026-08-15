@@ -1,7 +1,8 @@
 # Stornaut Phase D — Conditional Deep Dive Product Flow Plan
 
-> **Status:** Approved for sequential Tasks 36–44; Task 36 is complete and
-> Task 37 is current.
+> **Status:** Approved for sequential Tasks 36–44; Tasks 36–37 are complete.
+> Task 37 passed implementation, independent review, two complete capacity
+> runs and the 23/23-stage authoritative full verifier. Task 38 is next.
 > Production Deep Dive remains unavailable until Task 44 admission.
 >
 > **Roadmap phase:** Phase D — Conditional Deep Dive

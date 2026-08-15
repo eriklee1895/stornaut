@@ -3,9 +3,9 @@ import Testing
 @testable import StornautCore
 
 @Test
-func cleanupStoreV3RoundTripsCurrentRecordsAndPages() async throws {
+func cleanupStoreV3RecordsSurviveSchemaV4AndRoundTrip() async throws {
     let store = try EvidenceStore(configuration: .memory)
-    #expect(try await store.diagnostics().schemaVersion == 3)
+    #expect(try await store.diagnostics().schemaVersion == 4)
 
     let plan = try CleanupPersistenceTestSupport.plan()
     let journal = try CleanupPersistenceTestSupport.journal(plan: plan)

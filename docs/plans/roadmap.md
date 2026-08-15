@@ -159,9 +159,11 @@ Phase C plans/briefs 已归档，admission 为 `go`。production Deep Dive 仍�
 **当前计划：** [Phase D Tasks 36–44](active/phase-d-conditional-deep-dive.md)；
 Task 36 deterministic planning core 已完成并通过独立审查、连续最大规模
 benchmark 与 authoritative full verifier；Task 37 Store v4/persistence/
-retention/source rejoin 为当前 Task，Task 44 是唯一 normal-product admission
-gate。Task 36 completion evidence 见
-[review](../reports/phase-d-task-36-review.md)。
+retention/source rejoin 已完成，两轮正式容量 gate 共 `30/30` 样本通过，
+最慢 `53.159062` 秒，authoritative full verifier 23/23 stages 单次 exit 0。
+Task 38 已解锁为下一项实施任务。Task 44 是唯一 normal-product admission gate。completion
+evidence 见 Task 36 [review](../reports/phase-d-task-36-review.md) 与 Task 37
+[review](../reports/phase-d-task-37-review.md)。
 
 **范围：** Epic 5–6；仅在 ADR 0004 capability-first runtime gate 允许时进入。
 
@@ -272,7 +274,10 @@ gate。Task 36 completion evidence 见
 	  domain/planner/budget/stop contracts 已完成，300,002-row / 256 MiB
 	  source benchmark 连续最慢 `22.540198084` 秒且 authoritative full
 	  verifier 单次 exit 0；Task 37 Store v4/persistence/retention/source
-	  rejoin 为当前 Task。
+	  rejoin 已完成实现与独立审查，两轮正式 `3 × 5` capacity runs 共
+	  `30/30` 通过，最慢 `53.159062` 秒、最坏 kernel footprint increment
+	  `210,944,240` bytes；authoritative full verifier 23/23 stages 单次 exit 0。
+	  Task 37 已完成，Task 38 已解锁为下一项实施任务。
 - Epic 0 Foundation Upstream Study：已完成，选择 checked-in Xcode App/Test host + local Swift packages。
 - Epic 0 Task 1：SwiftPM Core/Codex、smoke tests、`scripts/verify`、manual-only CI 与 ThirdPartyNotices 骨架已完成。
 - Bundle identifier：已确认 `com.eriklee.stornaut`。

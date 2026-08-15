@@ -6,6 +6,7 @@ repo_root=${0:A:h:h}
 cd "$repo_root"
 
 investigation_root=Sources/StornautCore/Investigation
+evidence_root=Sources/StornautCore/Evidence
 required_files=(
     "$investigation_root/InvestigationCanonical.swift"
     "$investigation_root/InvestigationBudget.swift"
@@ -13,6 +14,11 @@ required_files=(
     "$investigation_root/InvestigationSourceProjection.swift"
     "$investigation_root/InvestigationCandidatePlanner.swift"
     "$investigation_root/InvestigationStopEvaluator.swift"
+    "$investigation_root/InvestigationPersistence.swift"
+    "$investigation_root/PersistedWebProvenance.swift"
+    "$evidence_root/EvidenceStore.swift"
+    "$evidence_root/SQLiteConnection.swift"
+    "$evidence_root/InvestigationSchemaV4.swift"
 )
 
 for file in "${required_files[@]}"; do
@@ -24,15 +30,20 @@ done
 
 if rg -n \
     'ActionExecutor|CleanupExecutionRuntime|ExecutionAuthorization|TrashMoving|FileManager\.trashItem|RegisteredActionRunner|StornautCodex|StornautLifecycle' \
-    "$investigation_root"; then
-    print -u2 "Investigation Core references prohibited authority or runtime modules."
+    "$investigation_root" \
+    "$evidence_root/SQLiteConnection.swift" \
+    "$evidence_root/InvestigationSchemaV4.swift"; then
+    print -u2 "Investigation persistence references prohibited authority or runtime modules."
     exit 1
 fi
 
 if rg -n \
     '\bProcess\s*\(|NSTask|posix_spawn|/bin/(ba)?sh|/usr/bin/env[[:space:]]+(ba)?sh|system\s*\(' \
-    "$investigation_root"; then
-    print -u2 "Investigation Core contains a process or shell execution surface."
+    "$investigation_root" \
+    "$evidence_root/EvidenceStore.swift" \
+    "$evidence_root/SQLiteConnection.swift" \
+    "$evidence_root/InvestigationSchemaV4.swift"; then
+    print -u2 "Investigation persistence contains a process or shell execution surface."
     exit 1
 fi
 
@@ -42,6 +53,114 @@ if rg -n \
     print -u2 "Investigation Core contains a filesystem write surface."
     exit 1
 fi
+
+if rg -n \
+    'URLSession|dataTask|downloadTask|uploadTask|WebSocket|NWConnection|CFStream' \
+    "$investigation_root" \
+    "$evidence_root/EvidenceStore.swift" \
+    "$evidence_root/SQLiteConnection.swift" \
+    "$evidence_root/InvestigationSchemaV4.swift"; then
+    print -u2 "Investigation persistence contains a network execution surface."
+    exit 1
+fi
+
+python3 - \
+    "$evidence_root/EvidenceStore.swift" \
+    "$evidence_root/SQLiteConnection.swift" \
+    "$evidence_root/InvestigationSchemaV4.swift" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+store_path, connection_path, schema_path = map(Path, sys.argv[1:])
+store = store_path.read_text()
+connection = connection_path.read_text()
+schema = schema_path.read_text()
+
+required_connection_guards = (
+    "private let database: OpaquePointer",
+    "fileprivate func prepare(",
+    "fileprivate func bind(",
+    "sqlite3_set_authorizer(",
+    "private static func authorizationMode(",
+)
+for guard in required_connection_guards:
+    if guard not in connection:
+        raise SystemExit(
+            f"{connection_path} lost closed SQLite guard: {guard}"
+        )
+
+public_declaration = re.compile(
+    r"\bpublic\s+(?:func|var|let)\s+([A-Za-z_][A-Za-z0-9_]*)"
+)
+generic_sql_names = {
+    "sql",
+    "query",
+    "execute",
+    "executesql",
+    "prepare",
+    "preparestatement",
+    "statement",
+    "database",
+    "databasehandle",
+    "connection",
+    "sqliteconnection",
+}
+for path, text in (
+    (store_path, store),
+    (connection_path, connection),
+):
+    for match in public_declaration.finditer(text):
+        if match.group(1).lower() in generic_sql_names:
+            raise SystemExit(
+                f"{path} exposes a generic public SQL surface: "
+                f"{match.group(0)}"
+            )
+
+ddl_pattern = re.compile(
+    r"\b(?:CREATE|DROP|ALTER)\s+"
+    r"(?:TABLE|INDEX|TRIGGER)\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?"
+    r"(?:idx_)?investigation_",
+    re.IGNORECASE,
+)
+dml_pattern = re.compile(
+    r"\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+"
+    r"investigation_",
+    re.IGNORECASE,
+)
+
+connection_without_debug_probe = connection.replace(
+    '"CREATE TABLE investigation_probe (id INTEGER)"',
+    '""',
+)
+if ddl_pattern.search(store) or ddl_pattern.search(connection_without_debug_probe):
+    raise SystemExit(
+        "Investigation schema DDL escaped InvestigationSchemaV4.swift"
+    )
+if not ddl_pattern.search(schema):
+    raise SystemExit("InvestigationSchemaV4.swift contains no closed DDL")
+
+allowed_dml_paths = {store_path, connection_path}
+for path in Path("Sources/StornautCore").rglob("*.swift"):
+    text = path.read_text()
+    if dml_pattern.search(text) and path not in allowed_dml_paths:
+        raise SystemExit(
+            f"Investigation table DML escaped the persistence owner: {path}"
+        )
+
+for token in (
+    "raw_prompt",
+    "raw_jsonl",
+    "stdout",
+    "stderr",
+    "model_reasoning",
+    "file_snippet",
+):
+    if token in schema.lower():
+        raise SystemExit(
+            f"Investigation schema regained prohibited raw content: {token}"
+        )
+PY
 
 package_graph=$(swift package describe --type json)
 python3 - "$package_graph" <<'PY'

@@ -35,6 +35,12 @@ require_fixed_text scripts/verify-phase-c-gate \
     '--signed-app-trash-receipt'
 require_fixed_text scripts/verify-phase-c-gate \
     'scripts/verify-phase-c-trash-receipt'
+require_fixed_text scripts/verify-phase-c-gate \
+    'swift package describe --type json'
+require_fixed_text scripts/verify-phase-c-gate \
+    'expected_core_dependencies = {"CSQLiteSupport", "StornautProcessSupport"}'
+require_fixed_text scripts/verify-phase-c-gate \
+    "grep -Fx 'No external dependencies found'"
 require_fixed_text scripts/verify \
     'phase-c-trash-diagnostic-contract'
 require_fixed_text scripts/verify-phase-c-trash-diagnostic-contract \
@@ -56,6 +62,15 @@ require_fixed_text scripts/verify \
 require_fixed_text \
     Tests/StornautCoreTests/InvestigationPlannerBenchmarkTests.swift \
     'ledger_phys_footprint_peak'
+require_fixed_text \
+    Tests/StornautCoreTests/InvestigationStoreCapacityBenchmarkTests.swift \
+    'STORNAUT_RUN_TASK37_CAPACITY_BENCHMARK'
+require_fixed_text \
+    Tests/StornautCoreTests/InvestigationStoreCapacityBenchmarkTests.swift \
+    'swiftpm-testing-helper'
+require_fixed_text \
+    Tests/StornautCoreTests/InvestigationStoreCapacityBenchmarkTests.swift \
+    'DYLD_FRAMEWORK_PATH'
 if [[ -e scripts/verify-phase-c-trash-safe-window ]]; then
     fail_contract \
         "Obsolete global Phase C Trash safe-window still exists"
@@ -67,6 +82,11 @@ from pathlib import Path
 
 
 source = Path("scripts/verify-phase-c-gate").read_text(encoding="utf-8")
+if "git status --short -- Package.swift" in source:
+    raise SystemExit(
+        "Phase C gate must validate package semantics instead of requiring "
+        "an unchanged Package.swift"
+    )
 if "verify-phase-c-trash-safe-window" in source:
     raise SystemExit(
         "Phase C signed-App gate still depends on global process activity"
@@ -107,6 +127,9 @@ for path in phase_c_scripts:
             )
 
 verify_source = Path("scripts/verify").read_text(encoding="utf-8")
+task37_capacity_source = Path(
+    "Tests/StornautCoreTests/InvestigationStoreCapacityBenchmarkTests.swift"
+).read_text(encoding="utf-8")
 preflight = (
     "STORNAUT_PHASE_C_TRASH_EVIDENCE_ROOT= \\\n"
     "    scripts/verify-phase-c-trash-receipt >/dev/null"
@@ -119,6 +142,48 @@ if verify_source.index(preflight) > verify_source.index("typeset -a headless_ste
     raise SystemExit(
         "Task 35 receipt preflight must run before verifier step selection"
     )
+for forbidden in (
+    "STORNAUT_RUN_TASK37_CAPACITY_BENCHMARK",
+    "investigationStoreCapacityBenchmark",
+):
+    if forbidden in verify_source:
+        raise SystemExit(
+            "scripts/verify must not run the explicit Task 37 maximum-size "
+            f"capacity benchmark: {forbidden}"
+        )
+
+required_task37_capacity_contracts = {
+    '"STORNAUT_RUN_TASK37_CAPACITY_BENCHMARK"': 2,
+    '"STORNAUT_TASK37_CAPACITY_WORKER"': 2,
+    "let sampleCount = 3": 1,
+    "#expect(samples.count == 15)": 1,
+    "samples.allSatisfy { $0.durationSeconds <= 75 }": 1,
+    "static let maximumPeakIncrement: UInt64 = 218_103_808": 1,
+    "swiftpm-testing-helper": 1,
+    'environment["STORNAUT_RUN_TASK37_CAPACITY_BENCHMARK"] = nil': 1,
+    'environment["STORNAUT_TASK37_CAPACITY_WORKER"] = "1"': 1,
+    'environment["DYLD_FRAMEWORK_PATH"]': 1,
+}
+for contract, count in required_task37_capacity_contracts.items():
+    if task37_capacity_source.count(contract) != count:
+        raise SystemExit(
+            "Task 37 capacity benchmark contract drifted: "
+            f"{contract}"
+        )
+if "swift test" in task37_capacity_source:
+    raise SystemExit(
+        "Task 37 capacity worker must execute the built test bundle directly "
+        "instead of nesting swift test under its parent SwiftPM process"
+    )
+for prohibited in (
+    "STORNAUT_TASK37_CAPACITY_SMOKE",
+    "STORNAUT_TASK37_CAPACITY_INSERTION_DIAGNOSTIC",
+):
+    if prohibited in task37_capacity_source:
+        raise SystemExit(
+            "Task 37 formal capacity benchmark regained a partial-run "
+            f"bypass: {prohibited}"
+        )
 investigation_benchmarks = (
     "investigationSourceProjectionMaximumStreamingBenchmark",
     "investigationCandidatePlannerHundredThousandRowBenchmark",

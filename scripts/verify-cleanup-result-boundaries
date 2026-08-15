@@ -123,7 +123,7 @@ rg -Fq 'hasExecutionAction = false' \
     StornautApp/Cleanup/CleanupResultModel.swift
 rg -Fq 'ActionRegistry(definitions: [])' \
     Sources/StornautCore/Policy/ActionPolicyGate.swift
-rg -q 'private static let schemaVersion = 3' \
+rg -q 'private static let schemaVersion = 4' \
     Sources/StornautCore/Evidence/EvidenceStore.swift
 rg -Fq 'DebugCleanupFixtureSelection' StornautApp/StornautApp.swift
 rg -Fq '#if DEBUG' StornautApp/StornautApp.swift

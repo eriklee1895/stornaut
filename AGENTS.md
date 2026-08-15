@@ -91,8 +91,12 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   Task 35 receipt/source seal 已前移到所有昂贵步骤之前，未来 verifier 漂移
   fail-fast。independent review 无 unresolved P0–P2，authoritative
   `scripts/verify --full` 23/23 stages 单次 exit 0（875.36 秒）。Task 36 已
-  完成，Task 37 Store v4/persistence/retention/source rejoin 为当前 Task；
-  必须先执行 brief 规定的 Release 最大规模 Store benchmark，再进入实现。
+  完成。Task 37 Store v4/persistence/retention/source rejoin 已完成实现与
+  independent review；两轮完整 Release capacity gate 共 `30/30` 样本通过，
+  最慢 `53.159062` 秒，最坏 kernel footprint increment `210,944,240` bytes。
+  普通 suites 明确跳过该显式 opt-in benchmark，worker 直接运行已构建 test
+  bundle 而不嵌套 SwiftPM；authoritative `scripts/verify --full` 23/23 stages
+  单次 exit 0（893.65 秒）。Task 37 已完成，Task 38 是下一项已解锁 Task。
   真实 App Trash 依赖仍保持关闭，生产 Deep Dive 仍为 implementation unavailable。
   逐 Task 完成 Upstream Study、
   实现、code review、focused/full verify、独立 commit/push；不得提前混入
@@ -172,6 +176,8 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 36 tests-first brief | [docs/plans/active/task-36-implementation-brief.md](docs/plans/active/task-36-implementation-brief.md) |
 | Phase D Task 36 review / completion audit | [docs/reports/phase-d-task-36-review.md](docs/reports/phase-d-task-36-review.md) |
 | Phase D Task 37 tests-first brief | [docs/plans/active/task-37-implementation-brief.md](docs/plans/active/task-37-implementation-brief.md) |
+| Phase D Task 37 review / completion audit | [docs/reports/phase-d-task-37-review.md](docs/reports/phase-d-task-37-review.md) |
+| Phase D Task 38 tests-first brief | [docs/plans/active/task-38-implementation-brief.md](docs/plans/active/task-38-implementation-brief.md) |
 | Epic 2–4 历史计划 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) |
 | Epic 2–4 最终 Gate | [docs/reports/epic-2-4-validation-report.md](docs/reports/epic-2-4-validation-report.md) |
 | Epic 0–1 历史计划与证据 | [docs/plans/completed/epic-0-1-foundation-spikes.md](docs/plans/completed/epic-0-1-foundation-spikes.md) |
@@ -218,8 +224,10 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   authoritative full verifier 单次 exit 0，计划已归档，Phase C admission
   为 `go`。Phase D Tasks 36–44 plan 已获批；Task 36 deterministic
   Investigation domain/planner/budget/stop core 已完成并通过 independent
-  review 与 authoritative full verifier，Task 37 Store v4/persistence/
-  retention/source rejoin 为当前 Task。
+  review 与 authoritative full verifier。Task 37 Store v4/persistence/
+  retention/source rejoin 已完成实现、independent review 与两轮完整 capacity
+  gate，authoritative full verifier 23/23 stages 单次 exit 0；Task 37 已完成，
+  Task 38 已解锁为下一项实施任务。
 Deep Dive 的旧 Broker-only no-go 已被 ADR 0004 的 capability-first 边界取代；
 当前仍不可用的原因是生产 Deep Dive 尚未实现，而非 R6 或 Codex 工具能力。
 R6 不证明 release distribution、FDA/TCC 或 production Deep Dive；

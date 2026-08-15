@@ -21,7 +21,7 @@ targets = {target["name"]: target for target in package["targets"]}
 
 expected = {
     "StornautCodex": {"StornautProcessSupport"},
-    "StornautCore": {"StornautProcessSupport"},
+    "StornautCore": {"CSQLiteSupport", "StornautProcessSupport"},
     "StornautProbeBridge": {"StornautCodex", "StornautCore"},
     "StornautProcessSupport": set(),
 }

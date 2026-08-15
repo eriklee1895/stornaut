@@ -48,7 +48,7 @@ let package = Package(
     targets: [
         .target(
             name: "StornautCore",
-            dependencies: ["StornautProcessSupport"],
+            dependencies: ["CSQLiteSupport", "StornautProcessSupport"],
             resources: [
                 .copy("Resources/BuiltInRuleCatalog.json"),
                 .copy("Resources/BuiltInExecutionProfileCatalog.json"),
@@ -83,6 +83,14 @@ let package = Package(
             publicHeadersPath: "include",
             linkerSettings: [
                 .linkedLibrary("bsm"),
+            ]
+        ),
+        .target(
+            name: "CSQLiteSupport",
+            path: "Sources/CSQLiteSupport",
+            publicHeadersPath: "include",
+            linkerSettings: [
+                .linkedLibrary("sqlite3"),
             ]
         ),
         .executableTarget(

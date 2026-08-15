@@ -103,7 +103,7 @@ func cleanupHistoryIsolatesCorruptManifestWithoutHidingHealthyPages()
 }
 
 @Test
-func cleanupHistoryRetentionRemainsSchemaV3AndIndependentFromEvidence()
+func cleanupHistoryRetentionRemainsIndependentAfterSchemaV4Migration()
     async throws
 {
     let store = try EvidenceStore(configuration: .memory)
@@ -124,7 +124,7 @@ func cleanupHistoryRetentionRemainsSchemaV3AndIndependentFromEvidence()
         ).addingTimeInterval(1)
     )
 
-    #expect(try await store.diagnostics().schemaVersion == 3)
+    #expect(try await store.diagnostics().schemaVersion == 4)
     #expect(try await store.cleanupPlan(id: plan.id) == nil)
     #expect(try await store.scanSession(id: session.id) == nil)
     #expect(try await store.cleanupManifest(id: manifest.id) == manifest)

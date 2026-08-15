@@ -55,7 +55,7 @@ fi
 
 rg -Fq 'ActionRegistry(definitions: [])' \
     Sources/StornautCore/Policy/ActionPolicyGate.swift
-rg -q 'private static let schemaVersion = 3' \
+rg -q 'private static let schemaVersion = 4' \
     Sources/StornautCore/Evidence/EvidenceStore.swift
 
 package_graph=$(swift package describe --type json)
@@ -67,7 +67,7 @@ package = json.loads(sys.argv[1])
 targets = {target["name"]: target for target in package["targets"]}
 core = targets["StornautCore"]
 dependencies = set(core.get("target_dependencies", []))
-if dependencies != {"StornautProcessSupport"}:
+if dependencies != {"CSQLiteSupport", "StornautProcessSupport"}:
     raise SystemExit(f"unexpected StornautCore dependencies: {sorted(dependencies)}")
 resources = {
     resource["path"].split("/Sources/StornautCore/", 1)[-1]

@@ -312,8 +312,57 @@ PY
         return 1
     fi
 
-    if [[ -n "$(git status --short -- Package.swift Package.resolved ThirdPartyNotices)" ]]; then
-        print -u2 "Phase C introduced unreviewed dependency/license drift."
+    local package_graph
+    package_graph=$(swift package describe --type json)
+    python3 - "$package_graph" <<'PY'
+import json
+from pathlib import Path
+import sys
+
+
+package = json.loads(sys.argv[1])
+if package.get("dependencies"):
+    raise SystemExit("Phase C package gained an external dependency")
+
+targets = {target["name"]: target for target in package["targets"]}
+core_dependencies = set(
+    targets["StornautCore"].get("target_dependencies", [])
+)
+expected_core_dependencies = {"CSQLiteSupport", "StornautProcessSupport"}
+if core_dependencies != expected_core_dependencies:
+    raise SystemExit(
+        "Phase C StornautCore dependencies drifted: "
+        f"{sorted(core_dependencies)}"
+    )
+
+sqlite_support = targets.get("CSQLiteSupport")
+if sqlite_support is None:
+    raise SystemExit("Phase C SQLite defensive-mode shim is missing")
+if sqlite_support.get("module_type") != "ClangTarget":
+    raise SystemExit("CSQLiteSupport must remain a repository-owned Clang target")
+if sqlite_support.get("path") != "Sources/CSQLiteSupport":
+    raise SystemExit("CSQLiteSupport escaped its repository-owned source path")
+if sqlite_support.get("target_dependencies", []):
+    raise SystemExit("CSQLiteSupport gained a target dependency")
+if sqlite_support.get("sources") != ["CSQLiteSupport.c"]:
+    raise SystemExit("CSQLiteSupport source scope drifted")
+
+manifest = Path("Package.swift").read_text(encoding="utf-8")
+for prohibited in (".package(", ".binaryTarget("):
+    if prohibited in manifest:
+        raise SystemExit(
+            f"Phase C package gained prohibited dependency surface: {prohibited}"
+        )
+PY
+
+    if ! swift package show-dependencies --format text \
+        | grep -Fx 'No external dependencies found' >/dev/null; then
+        print -u2 "Phase C package gained an external dependency."
+        return 1
+    fi
+
+    if [[ -n "$(git status --short -- Package.resolved ThirdPartyNotices LICENSE)" ]]; then
+        print -u2 "Phase C introduced unreviewed lockfile/license drift."
         return 1
     fi
 }

@@ -84,7 +84,7 @@ rg -Fq 'terminalWasAccepted: true' \
 
 rg -Fq 'ActionRegistry(definitions: [])' \
     Sources/StornautCore/Policy/ActionPolicyGate.swift
-rg -q 'private static let schemaVersion = 3' \
+rg -q 'private static let schemaVersion = 4' \
     Sources/StornautCore/Evidence/EvidenceStore.swift
 rg -Fq 'DebugReviewFixtureSelection' StornautApp/StornautApp.swift
 rg -Fq '#if DEBUG' StornautApp/StornautApp.swift
