@@ -33,24 +33,27 @@
 | Agent、双模式与治理设计 | [Agent Disk Governance](design/agent-disk-governance.md) |
 | UI、品牌、状态与交互 | [UI/UX](design/ui-ux.md) |
 | 宏观交付顺序与阶段 Gate | [Delivery Roadmap](plans/roadmap.md) |
-| 当前计划状态 | [Active Plans](plans/active/README.md) — R1–R6 runtime foundation `go`；Tasks 29–34 complete；Task 35 next |
-| Capability-first Codex Runtime Gate | [Runtime Evidence Gate](plans/active/capability-first-codex-runtime-gate.md) — complete |
-| R2 tests-first brief | [R2 Implementation Brief](plans/active/task-r2-implementation-brief.md) — complete |
-| R3 lifecycle hard-gate brief | [R3 Implementation Brief](plans/active/task-r3-implementation-brief.md) — behaviorReady candidate |
-| R4 protocol/no-Executor brief | [R4 Implementation Brief](plans/active/task-r4-implementation-brief.md) — protocolReady |
-| Phase C Epic 8 获批计划 | [Safe Execution Vertical Slice](plans/active/epic-8-safe-execution-vertical-slice.md) |
-| Epic 8 Task 29 实施计划 | [Task 29 Implementation Brief](plans/active/task-29-implementation-brief.md) — complete |
+| 当前计划状态 | [Active Plans](plans/active/README.md) — 当前无 executable plan；Phase D 尚待新计划 |
+| Capability-first Codex Runtime Gate | [Runtime Evidence Gate](plans/completed/capability-first-codex-runtime-gate.md) — complete / archived |
+| R2 tests-first brief | [R2 Implementation Brief](plans/completed/task-r2-implementation-brief.md) — complete |
+| R3 lifecycle hard-gate brief | [R3 Implementation Brief](plans/completed/task-r3-implementation-brief.md) — behaviorReady candidate |
+| R4 protocol/no-Executor brief | [R4 Implementation Brief](plans/completed/task-r4-implementation-brief.md) — protocolReady |
+| Phase C Epic 8 已完成计划 | [Safe Execution Vertical Slice](plans/completed/epic-8-safe-execution-vertical-slice.md) |
+| Epic 8 Task 29 实施计划 | [Task 29 Implementation Brief](plans/completed/task-29-implementation-brief.md) — complete |
 | Epic 8 Task 29 Review | [Task 29 Code Review and Completion Audit](reports/epic-8-task-29-review.md) |
-| Epic 8 Task 30 实施计划 | [Task 30 Implementation Brief](plans/active/task-30-implementation-brief.md) — complete |
+| Epic 8 Task 30 实施计划 | [Task 30 Implementation Brief](plans/completed/task-30-implementation-brief.md) — complete |
 | Epic 8 Task 30 Review | [Task 30 Code Review and Completion Audit](reports/epic-8-task-30-review.md) |
-| Epic 8 Task 31 实施计划 | [Task 31 Implementation Brief](plans/active/task-31-implementation-brief.md) — complete |
+| Epic 8 Task 31 实施计划 | [Task 31 Implementation Brief](plans/completed/task-31-implementation-brief.md) — complete |
 | Epic 8 Task 31 Review | [Task 31 Code Review and Completion Audit](reports/epic-8-task-31-review.md) |
-| Epic 8 Task 32 实施计划 | [Task 32 Implementation Brief](plans/active/task-32-implementation-brief.md) — complete |
+| Epic 8 Task 32 实施计划 | [Task 32 Implementation Brief](plans/completed/task-32-implementation-brief.md) — complete |
 | Epic 8 Task 32 Review | [Task 32 Code Review and Completion Audit](reports/epic-8-task-32-review.md) |
-| Epic 8 Task 33 实施计划 | [Task 33 Implementation Brief](plans/active/task-33-implementation-brief.md) — complete |
+| Epic 8 Task 33 实施计划 | [Task 33 Implementation Brief](plans/completed/task-33-implementation-brief.md) — complete |
 | Epic 8 Task 33 Review | [Task 33 Code Review and Completion Audit](reports/epic-8-task-33-review.md) |
-| Epic 8 Task 34 实施计划 | [Task 34 Implementation Brief](plans/active/task-34-implementation-brief.md) — complete |
+| Epic 8 Task 34 实施计划 | [Task 34 Implementation Brief](plans/completed/task-34-implementation-brief.md) — complete |
 | Epic 8 Task 34 Review | [Task 34 Code Review and Completion Audit](reports/epic-8-task-34-review.md) |
+| Epic 8 Task 35 实施计划 | [Task 35 Implementation Brief](plans/completed/task-35-implementation-brief.md) — complete / mutation sealed |
+| Epic 8 Task 35 Review | [Task 35 Code Review and Completion Audit](reports/epic-8-task-35-review.md) |
+| Phase C Final Validation | [Safe Execution Validation Report](reports/epic-8-safe-execution-validation-report.md) — admission `go` |
 | Epic 2–4 历史计划 | [Deterministic Product Core](plans/completed/epic-2-4-deterministic-product-core.md) — Tasks 9–26 已完成并归档 |
 | 已完成计划 | [Completed Plans](plans/completed/README.md) — Epic 0–1 |
 | 上游学习与许可证门禁 | [Upstream Reference Matrix](research/upstream-reference-matrix.md) |

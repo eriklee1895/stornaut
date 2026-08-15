@@ -811,7 +811,9 @@ final class StornautAppModel {
     }
 
     func refreshSettingsIfNeeded() async {
-        guard settingsState.phase == .idle else {
+        guard refreshesServices,
+              settingsState.phase == .idle
+        else {
             return
         }
         await refreshSettings()

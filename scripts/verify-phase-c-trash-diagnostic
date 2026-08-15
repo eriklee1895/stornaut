@@ -1,0 +1,351 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+cd "$repo_root"
+
+sealed_receipt="$repo_root/docs/reports/evidence/epic-8-task-35-signed-trash-receipt.json"
+if [[ -s "$sealed_receipt" && ! -L "$sealed_receipt" ]]; then
+    print -u2 \
+        "Task 35 signed Trash mutation is sealed; verify the checked receipt instead."
+    exit 65
+fi
+
+if [[ $# != 1 ]]; then
+    print -u2 "Usage: $0 <validated-report-output>"
+    exit 64
+fi
+
+output_report=${1:A}
+[[ ! -e "$output_report" && ! -L "$output_report" ]] || {
+    print -u2 "Refusing existing report output: $output_report"
+    exit 1
+}
+[[ -d "$output_report:h" && ! -L "$output_report:h" ]]
+
+app="$repo_root/.derivedData/app/Build/Products/Debug/Stornaut.app"
+executable="$app/Contents/MacOS/Stornaut"
+[[ -d "$app" && ! -L "$app" && -x "$executable" ]]
+/usr/bin/codesign --verify --deep --strict "$app"
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' \
+    "$app/Contents/Info.plist")" == "com.eriklee.stornaut" ]]
+
+temp_parent=${TMPDIR:-/tmp}
+temp_parent=${temp_parent:A}
+run_root=$(/usr/bin/mktemp -d \
+    "$temp_parent/stornaut-phase-c-trash.XXXXXX")
+run_root=${run_root:A}
+/bin/chmod 0700 "$run_root"
+config="$run_root/config.json"
+raw_report="$run_root/report.json"
+preflight_error="$run_root/preflight-error.json"
+fixture_root="$run_root/fixture"
+support_base="$run_root/support"
+caches_base="$run_root/caches"
+nonce=$(/usr/bin/uuidgen | /usr/bin/tr '[:upper:]' '[:lower:]')
+opt_in_nonce=${STORNAUT_PHASE_C_TRASH_OPT_IN:-}
+executable_sha=$(/usr/bin/shasum -a 256 "$executable" | /usr/bin/awk '{print $1}')
+
+function validate_run_root() {
+    [[ -d "$run_root" && ! -L "$run_root" ]]
+    [[ "$run_root:h" == "$temp_parent" ]]
+    [[ "$run_root:t" == stornaut-phase-c-trash.* ]]
+    [[ "$(/usr/bin/stat -f '%u' "$run_root")" == "$EUID" ]]
+    [[ "$(/usr/bin/stat -f '%Mp%Lp' "$run_root")" == 0700 ]]
+}
+
+function cleanup() {
+    validate_run_root || return
+    print -u2 \
+        "Phase C Trash diagnostic retained exact residual evidence: $run_root"
+}
+
+trap cleanup EXIT INT TERM
+
+if ! /usr/bin/python3 - "$opt_in_nonce" <<'PY'
+import sys
+import uuid
+
+try:
+    value = uuid.UUID(sys.argv[1])
+except (ValueError, IndexError):
+    raise SystemExit(1)
+if str(value) != sys.argv[1]:
+    raise SystemExit(1)
+PY
+then
+    print -u2 "A fresh STORNAUT_PHASE_C_TRASH_OPT_IN UUID is required."
+    exit 64
+fi
+
+validate_run_root
+issued_at=$(/bin/date +%s)
+expires_at=$(( issued_at + 300 ))
+
+/usr/bin/python3 - \
+    "$config" \
+    "$nonce" \
+    "$opt_in_nonce" \
+    "$run_root" \
+    "$fixture_root" \
+    "$support_base" \
+    "$caches_base" \
+    "$raw_report" \
+    "$executable_sha" \
+    "$issued_at" \
+    "$expires_at" <<'PY'
+import json
+import os
+import sys
+
+(
+    config,
+    nonce,
+    opt_in_nonce,
+    diagnostic_root,
+    fixture_root,
+    support_base,
+    caches_base,
+    report,
+    executable_sha,
+    issued_at,
+    expires_at,
+) = sys.argv[1:]
+
+payload = {
+    "schemaVersion": 1,
+    "nonce": nonce,
+    "optInStatement": (
+        "I authorize Stornaut Task 35 to Trash and restore only "
+        "this disposable fixture."
+    ),
+    "optInNonce": opt_in_nonce,
+    "diagnosticRoot": diagnostic_root,
+    "fixtureRoot": fixture_root,
+    "applicationSupportBase": support_base,
+    "cachesBase": caches_base,
+    "reportPath": report,
+    "expectedBundleIdentifier": "com.eriklee.stornaut",
+    "expectedExecutableSHA256": executable_sha,
+    "expectedRelativePath": ".npm/_cacache",
+    "issuedAt": int(issued_at),
+    "expiresAt": int(expires_at),
+}
+
+fd = os.open(config, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+with os.fdopen(fd, "w", encoding="utf-8") as stream:
+    json.dump(payload, stream, sort_keys=True, indent=2)
+    stream.write("\n")
+PY
+
+[[ -f "$config" && ! -L "$config" ]]
+[[ "$(/usr/bin/stat -f '%u' "$config")" == "$EUID" ]]
+[[ "$(/usr/bin/stat -f '%Mp%Lp' "$config")" == 0600 ]]
+
+/usr/bin/open -W -n \
+    --env "STORNAUT_PHASE_C_TRASH_OPT_IN=$opt_in_nonce" \
+    "$app" \
+    --args "--stornaut-phase-c-trash-config=$config"
+
+if [[ ! -e "$raw_report" && -s "$preflight_error" \
+    && ! -L "$preflight_error" ]]; then
+    [[ "$(/usr/bin/stat -f '%u' "$preflight_error")" == "$EUID" ]]
+    [[ "$(/usr/bin/stat -f '%Mp%Lp' "$preflight_error")" == 0600 ]]
+    print -u2 "Phase C Trash diagnostic blocked during preflight:"
+    /bin/cat "$preflight_error" >&2
+    exit 1
+fi
+
+[[ -s "$raw_report" && ! -L "$raw_report" ]]
+[[ "$(/usr/bin/stat -f '%u' "$raw_report")" == "$EUID" ]]
+[[ "$(/usr/bin/stat -f '%Mp%Lp' "$raw_report")" == 0600 ]]
+
+/usr/bin/python3 - \
+    "$raw_report" \
+    "$output_report" \
+    "$nonce" \
+    "$executable_sha" \
+    "$fixture_root" <<'PY'
+import json
+import os
+import pathlib
+import re
+import sys
+import time
+
+raw_report, output_report, nonce, executable_sha, fixture_root = sys.argv[1:]
+with open(raw_report, encoding="utf-8") as stream:
+    report = json.load(stream)
+
+expected_keys = {
+    "schemaVersion",
+    "nonce",
+    "startedAt",
+    "finishedAt",
+    "outcome",
+    "configured",
+    "planned",
+    "observed",
+    "contained",
+    "restored",
+    "bundleIdentifier",
+    "executablePath",
+    "executableSHA256",
+    "designatedRequirementSHA256",
+    "codeDirectoryHash",
+    "adHocSigned",
+    "appSandboxEntitlement",
+    "expectedRelativePath",
+    "planID",
+    "selectionGeneration",
+    "selectionFingerprint",
+    "decisionFingerprint",
+    "originalIdentity",
+    "returnedTrashPath",
+    "destinationIdentity",
+    "trashAttemptCount",
+    "journalID",
+    "journalStage",
+    "journalEntryCount",
+    "manifestID",
+    "manifestRecordCount",
+    "succeededCount",
+    "failedCount",
+    "cancelledCount",
+    "unknownCount",
+    "selectedLogicalBytes",
+    "processedLogicalBytes",
+    "movedToTrashLogicalBytes",
+    "permanentlyReleasedLogicalBytes",
+    "systemObservationRecorded",
+    "restoreOutcome",
+    "residual",
+    "errorStage",
+    "error",
+    "limitations",
+}
+if set(report) != expected_keys:
+    raise SystemExit("Phase C Trash report has an unexpected schema.")
+if report["schemaVersion"] != 2:
+    raise SystemExit("Phase C Trash report schema version mismatch.")
+if report["nonce"] != nonce:
+    raise SystemExit("Phase C Trash report nonce mismatch.")
+if report["outcome"] != "signedAppTrashReady":
+    raise SystemExit(
+        f"Signed App Trash diagnostic blocked: {report.get('error')}, "
+        f"residual={report.get('residual')}"
+    )
+for gate in ("configured", "planned", "observed", "contained", "restored"):
+    if report[gate] is not True:
+        raise SystemExit(f"Phase C Trash report did not prove {gate}.")
+if report["bundleIdentifier"] != "com.eriklee.stornaut":
+    raise SystemExit("Phase C Trash report bundle mismatch.")
+expected_executable = str(
+    pathlib.Path(
+        ".derivedData/app/Build/Products/Debug/Stornaut.app/"
+        "Contents/MacOS/Stornaut"
+    ).resolve()
+)
+if report["executablePath"] != expected_executable:
+    raise SystemExit("Phase C Trash report executable path mismatch.")
+if report["executableSHA256"] != executable_sha:
+    raise SystemExit("Phase C Trash report build mismatch.")
+for key in ("designatedRequirementSHA256", "codeDirectoryHash"):
+    value = report[key]
+    if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{40,64}", value):
+        raise SystemExit(f"Phase C Trash report has invalid {key}.")
+if report["adHocSigned"] is not True:
+    raise SystemExit("Phase C Trash diagnostic did not use the signed App.")
+if report["appSandboxEntitlement"] is not False:
+    raise SystemExit("Phase C Trash diagnostic entitlement mismatch.")
+if report["expectedRelativePath"] != ".npm/_cacache":
+    raise SystemExit("Phase C Trash diagnostic used an unexpected rule path.")
+if not report["planID"] or report["selectionGeneration"] != 1:
+    raise SystemExit("Phase C Trash report omitted Plan/Selection binding.")
+for key in ("selectionFingerprint", "decisionFingerprint"):
+    if not isinstance(report[key], str) or not report[key]:
+        raise SystemExit(f"Phase C Trash report omitted {key}.")
+if report["originalIdentity"] != report["destinationIdentity"]:
+    raise SystemExit("Phase C Trash destination identity mismatch.")
+if report["trashAttemptCount"] != 1:
+    raise SystemExit("Phase C Trash did not prove exactly one real attempt.")
+if report["journalStage"] != "finalized":
+    raise SystemExit("Phase C Trash journal was not finalized.")
+if not report["journalID"] or not report["manifestID"]:
+    raise SystemExit("Phase C Trash report omitted durable audit IDs.")
+expected_counts = {
+    "journalEntryCount": 1,
+    "manifestRecordCount": 1,
+    "succeededCount": 1,
+    "failedCount": 0,
+    "cancelledCount": 0,
+    "unknownCount": 0,
+}
+for key, expected in expected_counts.items():
+    if report[key] != expected:
+        raise SystemExit(f"Phase C Trash report count mismatch: {key}.")
+selected = report["selectedLogicalBytes"]
+processed = report["processedLogicalBytes"]
+moved = report["movedToTrashLogicalBytes"]
+if (
+    not isinstance(selected, int)
+    or selected <= 0
+    or processed != selected
+    or moved != selected
+):
+    raise SystemExit("Phase C Trash logical-byte accounting mismatch.")
+if report["permanentlyReleasedLogicalBytes"] != 0:
+    raise SystemExit("Phase C Trash reported permanent release.")
+if not isinstance(report["systemObservationRecorded"], bool):
+    raise SystemExit("Phase C Trash omitted system observation status.")
+if report["restoreOutcome"] != "restored":
+    raise SystemExit("Phase C disposable fixture was not restored.")
+if report["residual"] != {
+    "originalPresent": True,
+    "trashPresent": False,
+    "fixtureRootPresent": True,
+}:
+    raise SystemExit(
+        f"Phase C Trash residual is not clean: {report['residual']}"
+    )
+returned = pathlib.Path(report["returnedTrashPath"])
+if not returned.is_absolute():
+    raise SystemExit("Phase C Trash destination was not absolute.")
+if returned.exists() or returned.is_symlink():
+    raise SystemExit("Phase C Trash destination still exists after restore.")
+if not pathlib.Path(fixture_root, ".npm", "_cacache").is_dir():
+    raise SystemExit("Phase C restored fixture is missing.")
+if report["error"] is not None:
+    raise SystemExit("Phase C ready report contains an error.")
+if report["errorStage"] is not None:
+    raise SystemExit("Phase C ready report contains an error stage.")
+started = report["startedAt"]
+finished = report["finishedAt"]
+if (
+    not isinstance(started, (int, float))
+    or not isinstance(finished, (int, float))
+    or started > finished
+    or finished > time.time() + 5
+    or time.time() - started > 300
+):
+    raise SystemExit("Phase C Trash report time binding is invalid.")
+required_limitations = {
+    "diagnostic-owned disposable fixture only",
+    "FDA and TCC inheritance not evaluated",
+    "release distribution not evaluated",
+    "unrelated user paths not evaluated",
+}
+if set(report["limitations"]) != required_limitations:
+    raise SystemExit("Phase C report limitations are incomplete.")
+
+fd = os.open(output_report, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+with os.fdopen(fd, "w", encoding="utf-8") as stream:
+    json.dump(report, stream, sort_keys=True, indent=2)
+    stream.write("\n")
+PY
+
+[[ -s "$output_report" && ! -L "$output_report" ]]
+[[ "$(/usr/bin/stat -f '%Mp%Lp' "$output_report")" == 0600 ]]
+
+print "Signed App disposable Trash diagnostic passed."

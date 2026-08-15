@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Testing
 @testable import StornautCore
@@ -86,6 +87,26 @@ func evidenceStoreRoundTripsEveryTypedRepository() async throws {
     #expect(try await store.cleanupPlan(id: plan.id) == plan)
     #expect(try await store.policyDecision(id: decision.id) == decision)
     #expect(try await store.cleanupManifest(id: manifest.id) == manifest)
+}
+
+@Test
+func evidenceStoreDiagnosticHashBindsTheOpenedDatabase() async throws {
+    let root = try EvidenceStoreTestSupport.temporaryDirectory(
+        "opened-database-hash"
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    let configuration = try EvidenceStoreTestSupport.makeFileConfiguration(
+        root: root
+    )
+    let store = try EvidenceStore(configuration: configuration)
+    let openedHash = try await store.diagnosticDatabaseSHA256()
+    let fileHash = SHA256.hash(
+        data: try Data(contentsOf: configuration.evidenceDatabaseURL)
+    ).map {
+        String(format: "%02x", $0)
+    }.joined()
+
+    #expect(openedHash == fileHash)
 }
 
 @Test

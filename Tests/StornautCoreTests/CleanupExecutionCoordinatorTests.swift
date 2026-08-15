@@ -21,6 +21,256 @@ func cleanupExecutionCoordinatorHasNoDefaultFoundationTrashSurface() throws {
 }
 
 @Test
+func cleanupExecutionRuntimeOwnsTheOnlyClosedFoundationTrashComposition()
+    throws
+{
+    let root = URL(filePath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let sourceURL = root.appending(
+        path:
+            "Sources/StornautCore/Actions/CleanupExecutionRuntime.swift"
+    )
+    let source = try String(contentsOf: sourceURL, encoding: .utf8)
+
+    #expect(source.contains("FileManagerTrashAdapter()"))
+    #expect(source.contains("ActionRegistry(definitions: [])"))
+    #expect(source.contains("DenyRegisteredActionRunner()"))
+    #expect(!source.contains("FoundationRegisteredActionRunner()"))
+    #expect(!source.contains("public let authorization"))
+    #expect(!source.contains("public let coordinator"))
+    #expect(
+        !source.contains(
+            """
+                public init(
+                    store: EvidenceStore,
+            """
+        )
+    )
+}
+
+@Test
+func cleanupExecutionRuntimeConsumesOneExactPendingPreflight()
+    async throws
+{
+    let harness = try await CleanupExecutionHarness()
+    let runtime = CleanupExecutionRuntime(
+        collect: { plan, selection in
+            guard plan == harness.plan,
+                  selection == harness.selection
+            else {
+                return .blocked(
+                    error: .invalidSelection,
+                    affectedItemIDs: Set(
+                        selection.items.map(\.itemID)
+                    )
+                )
+            }
+            return .collected(harness.collected)
+        },
+        authorizationController: harness.authorizationController,
+        coordinator: harness.coordinator,
+        now: ExecutionHarnessClock(harness.now).now
+    )
+
+    let evaluation = try await runtime.preflight(
+        plan: harness.plan,
+        selection: harness.selection
+    )
+    let confirmation = try #require(
+        evaluation.allowed?.confirmation
+    )
+    let first = await runtime.execute(
+        plan: harness.plan,
+        selection: harness.selection,
+        confirmation: confirmation
+    )
+    let second = await runtime.execute(
+        plan: harness.plan,
+        selection: harness.selection,
+        confirmation: confirmation
+    )
+
+    #expect(first.isCompleted)
+    #expect(second == .rejected(.authorization))
+    #expect(await harness.executor.callCount == 2)
+}
+
+@Test
+func cleanupExecutionCoordinatorContinuesFromCanonicalStoreJournal()
+    async throws
+{
+    let now = CleanupPersistenceTestSupport.createdAt
+        .addingTimeInterval(10.000_123)
+    let harness = try await CleanupExecutionHarness(
+        now: now,
+        canonicalizeJournals: true,
+        canonicalizeManifests: true
+    )
+    let request = try await harness.request()
+
+    let state = await harness.coordinator.run(request)
+
+    #expect(state.isCompleted)
+    #expect(await harness.executor.callCount == 2)
+    #expect(
+        await harness.store.currentJournal?.stage == .finalized
+    )
+}
+
+@Test
+func cleanupExecutionManifestTimelineIncludesFinalVolumeSample()
+    async throws
+{
+    let finalSampleAt = try backwardDriftingDomainDate(
+        after: Date().addingTimeInterval(30)
+    )
+    let now = finalSampleAt.addingTimeInterval(-30)
+    let sampler = try SequencedCleanupVolumeSampler(
+        samples: [
+            CleanupVolumeSample(
+                device: 101,
+                freeBytes: ByteCount(1_000_000)!,
+                source: DomainToken(
+                    rawValue: "test.volume-sampler"
+                )!,
+                sampledAt: now
+            ),
+            CleanupVolumeSample(
+                device: 101,
+                freeBytes: ByteCount(1_000_128)!,
+                source: DomainToken(
+                    rawValue: "test.volume-sampler"
+                )!,
+                sampledAt: finalSampleAt
+            ),
+        ]
+    )
+    let harness = try await CleanupExecutionHarness(
+        now: now,
+        volumeSampler: sampler
+    )
+    let request = try await harness.request()
+
+    let state = await harness.coordinator.run(request)
+    let result = try #require(state.result)
+
+    #expect(state.isCompleted)
+    #expect(
+        abs(
+            (
+                result.manifest.systemObservation?.sampledAfterAt
+                    .timeIntervalSince(finalSampleAt)
+            ) ?? .infinity
+        ) < 0.001
+    )
+    let persistedSampleAt = try #require(
+        result.manifest.systemObservation?.sampledAfterAt
+    )
+    #expect(result.manifest.createdAt >= persistedSampleAt)
+}
+
+@Test
+func cleanupExecutionRuntimeBlockedCollectionLeavesNoAuthority()
+    async throws
+{
+    let harness = try await CleanupExecutionHarness()
+    let runtime = CleanupExecutionRuntime(
+        collect: { _, selection in
+            .blocked(
+                error: .storeTruthUnavailable,
+                affectedItemIDs: Set(
+                    selection.items.map(\.itemID)
+                )
+            )
+        },
+        authorizationController: harness.authorizationController,
+        coordinator: harness.coordinator,
+        now: ExecutionHarnessClock(harness.now).now
+    )
+
+    await #expect(
+        throws: CleanupExecutionRuntimeError.policyContextUnavailable(
+            .storeTruthUnavailable
+        )
+    ) {
+        _ = try await runtime.preflight(
+            plan: harness.plan,
+            selection: harness.selection
+        )
+    }
+    let state = await runtime.execute(
+        plan: harness.plan,
+        selection: harness.selection,
+        confirmation: harness.confirmation
+    )
+
+    #expect(state == .rejected(.authorization))
+    #expect(await harness.executor.callCount == 0)
+}
+
+@Test
+func cleanupExecutionRuntimeOlderPreflightCannotReplaceNewerAuthority()
+    async throws
+{
+    let harness = try await CleanupExecutionHarness()
+    let olderSelection = try ReviewSelection(
+        plan: harness.plan,
+        generation: harness.selection.generation + 1,
+        items: harness.selection.items,
+        dispositions: Dictionary(
+            uniqueKeysWithValues: harness.plan.items.map {
+                ($0.id, ReclaimDisposition.readyToReclaim)
+            }
+        )
+    )
+    let olderCollected = try cleanupExecutionCollectedContext(
+        harness: harness,
+        selection: olderSelection
+    )
+    let collector = OrderedRuntimePreflightCollector(
+        delayedSelection: olderSelection,
+        delayedOutcome: .collected(olderCollected),
+        currentOutcome: .collected(harness.collected)
+    )
+    let runtime = CleanupExecutionRuntime(
+        collect: { _, selection in
+            await collector.collect(selection: selection)
+        },
+        authorizationController: harness.authorizationController,
+        coordinator: harness.coordinator,
+        now: ExecutionHarnessClock(harness.now).now
+    )
+
+    let olderTask = Task {
+        try await runtime.preflight(
+            plan: harness.plan,
+            selection: olderSelection
+        )
+    }
+    await collector.waitUntilDelayedCollectionStarts()
+    let currentEvaluation = try await runtime.preflight(
+        plan: harness.plan,
+        selection: harness.selection
+    )
+    let currentConfirmation = try #require(
+        currentEvaluation.allowed?.confirmation
+    )
+    await collector.releaseDelayedCollection()
+    _ = try await olderTask.value
+
+    let state = await runtime.execute(
+        plan: harness.plan,
+        selection: harness.selection,
+        confirmation: currentConfirmation
+    )
+
+    #expect(state.isCompleted)
+    #expect(await harness.executor.callCount == 2)
+}
+
+@Test
 func cleanupExecutionPreparedJournalPreservesAdmittedOrderAndAuthority()
     throws
 {
@@ -245,11 +495,14 @@ func cleanupExecutionCoordinatorStopsAfterCurrentWithoutStartingNext()
     }
     await executor.waitUntilBlocked()
 
+    let stopStarted = ContinuousClock.now
     try await harness.coordinator.requestStopAfterCurrent()
+    let stopElapsed = stopStarted.duration(to: .now)
     #expect(
         await harness.store.currentJournal?
             .stopAfterCurrentRequested == true
     )
+    #expect(stopElapsed < .milliseconds(100))
     await executor.release()
     let state = await task.value
     let result = try #require(state.result)
@@ -590,6 +843,77 @@ func cleanupExecutionRecoveryCancelsPreparedJournalWithoutReplay()
     })
 }
 
+@Test
+func cleanupExecutionDiagnosticRecoveryFinalizesWithoutExecutorReplay()
+    async throws
+{
+    let store = try EvidenceStore(configuration: .memory)
+    let basePlan = try CleanupPersistenceTestSupport.plan()
+    let plan = try CleanupPersistenceTestSupport.plan(
+        items: [basePlan.items[0]]
+    )
+    let decision = try CleanupPersistenceTestSupport.decision(
+        plan: plan,
+        item: plan.items[0]
+    )
+    let prepared = try CleanupPersistenceTestSupport.journal(
+        plan: plan,
+        entries: [
+            try CleanupPersistenceTestSupport.journalEntry(
+                item: plan.items[0],
+                decision: decision
+            ),
+        ]
+    )
+    let started = try CleanupPersistenceTestSupport.journal(
+        plan: plan,
+        stage: .actionStarted,
+        entries: [
+            try CleanupPersistenceTestSupport.journalEntry(
+                item: plan.items[0],
+                state: .started,
+                decision: decision
+            ),
+        ]
+    )
+    let journal = try CleanupPersistenceTestSupport.journal(
+        plan: plan,
+        stage: .actionOutcomeRecorded,
+        entries: [
+            try CleanupPersistenceTestSupport.journalEntry(
+                item: plan.items[0],
+                state: .outcomeRecorded,
+                decision: decision
+            ),
+        ]
+    )
+    let session: ScanSession = try EvidenceStoreTestSupport.fixture(
+        ScanSession.self,
+        name: "scan-session-v1"
+    )
+    try await store.saveScanSession(session)
+    try await store.saveCleanupPlan(plan)
+    try await store.savePolicyDecision(decision)
+    try await store.saveCleanupRunJournal(prepared)
+    try await store.saveCleanupRunJournal(started)
+    try await store.saveCleanupRunJournal(journal)
+    let observation = CleanupRecoveryDiagnosticObservation()
+    let runtime = CleanupExecutionRuntime.diagnosticRecovery(
+        store: store,
+        workflowCoordinator: CleanupWorkflowCoordinator(),
+        observation: observation
+    )
+
+    let states = await runtime.recover()
+    let result = try #require(states.first?.result)
+
+    #expect(states.count == 1)
+    #expect(states.first?.isCompleted == true)
+    #expect(result.journal.stage == .finalized)
+    #expect(result.manifest.summary.succeededCount == 1)
+    #expect(observation.invocationCount() == 0)
+}
+
 private extension CleanupExecutionState {
     var result: CleanupExecutionResult? {
         switch self {
@@ -647,8 +971,7 @@ private func cancelledCoordinatorEntry(
 }
 
 private struct CleanupExecutionHarness {
-    let now = CleanupPersistenceTestSupport.createdAt
-        .addingTimeInterval(10)
+    let now: Date
     let rootURL = URL(filePath: "/tmp/stornaut-execution-fixture")
     let plan: CleanupPlan
     let selection: ReviewSelection
@@ -665,8 +988,14 @@ private struct CleanupExecutionHarness {
         storeFailure: FakeCleanupExecutionStore.Failure? = nil,
         executor: (any HarnessCleanupExecutor)? = nil,
         deniedItemID: CleanupPlanItemID? = nil,
-        originalIdentityAvailable: Bool = true
+        originalIdentityAvailable: Bool = true,
+        now: Date = CleanupPersistenceTestSupport.createdAt
+            .addingTimeInterval(10),
+        canonicalizeJournals: Bool = false,
+        canonicalizeManifests: Bool = false,
+        volumeSampler: (any CleanupVolumeSampling)? = nil
     ) async throws {
+        self.now = now
         plan = try CleanupPersistenceTestSupport.plan()
         selection = try ReviewSelection(
             plan: plan,
@@ -718,7 +1047,9 @@ private struct CleanupExecutionHarness {
         )
         store = FakeCleanupExecutionStore(
             plan: plan,
-            failure: storeFailure
+            failure: storeFailure,
+            canonicalizeJournals: canonicalizeJournals,
+            canonicalizeManifests: canonicalizeManifests
         )
         let executor = executor ?? SerialSuccessCleanupExecutor()
         self.executor = executor
@@ -740,6 +1071,7 @@ private struct CleanupExecutionHarness {
             workflowCoordinator: workflow,
             itemCollector: collector,
             executor: executor,
+            volumeSampler: volumeSampler,
             identityReader: { url in
                 if url.path.contains("/tmp/fake-trash/") {
                     return planValue.items.first {
@@ -870,6 +1202,136 @@ private func cleanupExecutionContext(
         evidenceFacts: .current,
         activityFacts: .inactive
     )
+}
+
+private func cleanupExecutionCollectedContext(
+    harness: CleanupExecutionHarness,
+    selection: ReviewSelection
+) throws -> CleanupPolicyCollectedContext {
+    CleanupPolicyCollectedContext(
+        policyContext: try CleanupPolicyContext(
+            capturedAt: harness.now,
+            planID: harness.plan.id,
+            scanSessionID: harness.plan.scanSessionID,
+            scanScopeID: harness.plan.scanScopeID!,
+            scanIsTerminal: true,
+            planFingerprint: harness.plan.planFingerprint!,
+            selectionGeneration: selection.generation,
+            selectionFingerprint: selection.fingerprint,
+            rootIdentity: harness.plan.primaryRootIdentity!,
+            catalogVersion: harness.plan.catalogVersion!,
+            executionProfileVersion:
+                harness.plan.executionProfileVersion!,
+            workflow: .available,
+            items: try harness.plan.items.map {
+                try cleanupExecutionContext(
+                    item: $0,
+                    disposition: .readyToReclaim
+                )
+            }
+        ),
+        rootURL: harness.rootURL,
+        rootAccess: .direct
+    )
+}
+
+private struct CleanupExecutionDateBox: Codable {
+    let value: Date
+}
+
+private func backwardDriftingDomainDate(after start: Date) throws -> Date {
+    for offset in 0..<10_000 {
+        let candidate = start.addingTimeInterval(
+            Double(offset) / 1_000_000
+        )
+        let canonical = try DomainJSON.decode(
+            CleanupExecutionDateBox.self,
+            from: DomainJSON.encode(
+                CleanupExecutionDateBox(value: candidate)
+            )
+        ).value
+        if canonical < candidate {
+            return candidate
+        }
+    }
+    throw DomainContractError.invalidMeasurement
+}
+
+private final class SequencedCleanupVolumeSampler:
+    @unchecked Sendable,
+    CleanupVolumeSampling
+{
+    private let lock = NSLock()
+    private let samples: [CleanupVolumeSample]
+    private var index = 0
+
+    init(samples: [CleanupVolumeSample]) throws {
+        guard !samples.isEmpty else {
+            throw DomainContractError.invalidMeasurement
+        }
+        self.samples = samples
+    }
+
+    func sample(
+        rootURL: URL,
+        sampledAt: Date
+    ) throws -> CleanupVolumeSample {
+        _ = rootURL
+        _ = sampledAt
+        return lock.withLock {
+            let sample = samples[min(index, samples.count - 1)]
+            index += 1
+            return sample
+        }
+    }
+}
+
+private actor OrderedRuntimePreflightCollector {
+    let delayedSelection: ReviewSelection
+    let delayedOutcome: CleanupPolicyCollectionOutcome
+    let currentOutcome: CleanupPolicyCollectionOutcome
+    private var delayedCollectionStarted = false
+    private var startWaiter: CheckedContinuation<Void, Never>?
+    private var releaseContinuation: CheckedContinuation<Void, Never>?
+
+    init(
+        delayedSelection: ReviewSelection,
+        delayedOutcome: CleanupPolicyCollectionOutcome,
+        currentOutcome: CleanupPolicyCollectionOutcome
+    ) {
+        self.delayedSelection = delayedSelection
+        self.delayedOutcome = delayedOutcome
+        self.currentOutcome = currentOutcome
+    }
+
+    func collect(
+        selection: ReviewSelection
+    ) async -> CleanupPolicyCollectionOutcome {
+        guard selection == delayedSelection else {
+            return currentOutcome
+        }
+        delayedCollectionStarted = true
+        startWaiter?.resume()
+        startWaiter = nil
+        await withCheckedContinuation { continuation in
+            releaseContinuation = continuation
+        }
+        return delayedOutcome
+    }
+
+    func waitUntilDelayedCollectionStarts() async {
+        if delayedCollectionStarted {
+            return
+        }
+        await withCheckedContinuation { continuation in
+            startWaiter = continuation
+        }
+    }
+
+    func releaseDelayedCollection() {
+        releaseContinuation?.resume()
+        releaseContinuation = nil
+    }
 }
 
 private actor FakeCleanupItemCollector:
@@ -1256,6 +1718,8 @@ private actor FakeCleanupExecutionStore: CleanupExecutionStore {
 
     let plan: CleanupPlan
     private var failure: Failure?
+    private let canonicalizeJournals: Bool
+    private let canonicalizeManifests: Bool
     private var journalSaveCalls = 0
     private var decisions: [PolicyDecisionID: PolicyDecision] = [:]
     private var journal: CleanupRunJournal?
@@ -1263,9 +1727,16 @@ private actor FakeCleanupExecutionStore: CleanupExecutionStore {
     private(set) var savedJournalStages: [CleanupRunJournalStage] = []
     var currentJournal: CleanupRunJournal? { journal }
 
-    init(plan: CleanupPlan, failure: Failure?) {
+    init(
+        plan: CleanupPlan,
+        failure: Failure?,
+        canonicalizeJournals: Bool = false,
+        canonicalizeManifests: Bool = false
+    ) {
         self.plan = plan
         self.failure = failure
+        self.canonicalizeJournals = canonicalizeJournals
+        self.canonicalizeManifests = canonicalizeManifests
     }
 
     func clearFailure() {
@@ -1291,7 +1762,12 @@ private actor FakeCleanupExecutionStore: CleanupExecutionStore {
         if failure == .journalSave(call: journalSaveCalls) {
             throw EvidenceStoreError.integrityCheckFailed
         }
-        self.journal = journal
+        self.journal = canonicalizeJournals
+            ? try DomainJSON.decode(
+                CleanupRunJournal.self,
+                from: DomainJSON.encode(journal)
+            )
+            : journal
         savedJournalStages.append(journal.stage)
     }
 
@@ -1315,7 +1791,12 @@ private actor FakeCleanupExecutionStore: CleanupExecutionStore {
         if failure == .manifestSave {
             throw EvidenceStoreError.integrityCheckFailed
         }
-        self.manifest = manifest
+        self.manifest = canonicalizeManifests
+            ? try DomainJSON.decode(
+                CleanupManifest.self,
+                from: DomainJSON.encode(manifest)
+            )
+            : manifest
     }
 
     func cleanupManifest(

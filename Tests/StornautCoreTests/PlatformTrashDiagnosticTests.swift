@@ -50,7 +50,7 @@ func platformTrashLifecycleDiagnostic() async throws {
     let ordinaryIdentity = try #require(
         ActionFileIdentity.read(at: ordinaryURL)
     )
-    let ordinaryReceipt = try await TrashMoving().trashItem(
+    let ordinaryReceipt = try await platformTrashMoving().trashItem(
         at: ordinaryURL,
         expectedIdentity: ordinaryIdentity
     )
@@ -63,13 +63,13 @@ func platformTrashLifecycleDiagnostic() async throws {
     let secondCollisionURL = rootURL.appending(path: "second/same-name")
     try writePlatformTrashFixture("first", to: firstCollisionURL)
     try writePlatformTrashFixture("second", to: secondCollisionURL)
-    let firstCollisionReceipt = try await TrashMoving().trashItem(
+    let firstCollisionReceipt = try await platformTrashMoving().trashItem(
         at: firstCollisionURL,
         expectedIdentity: try #require(
             ActionFileIdentity.read(at: firstCollisionURL)
         )
     )
-    let secondCollisionReceipt = try await TrashMoving().trashItem(
+    let secondCollisionReceipt = try await platformTrashMoving().trashItem(
         at: secondCollisionURL,
         expectedIdentity: try #require(
             ActionFileIdentity.read(at: secondCollisionURL)
@@ -153,7 +153,7 @@ func platformTrashLifecycleDiagnostic() async throws {
             path: "stornaut-mounted-trash-\(UUID().uuidString)"
         )
         try writePlatformTrashFixture("mounted", to: mountedURL)
-        let receipt = try await TrashMoving().trashItem(
+        let receipt = try await platformTrashMoving().trashItem(
             at: mountedURL,
             expectedIdentity: try #require(
                 ActionFileIdentity.read(at: mountedURL)
@@ -180,6 +180,10 @@ func platformTrashLifecycleDiagnostic() async throws {
         "Mounted-volume destination: "
             + anonymizedPlatformTrashDestination(mountedVolumeResult)
     )
+}
+
+private func platformTrashMoving() -> TrashMoving {
+    TrashMoving(adapter: FileManagerTrashAdapter())
 }
 
 private func writePlatformTrashFixture(

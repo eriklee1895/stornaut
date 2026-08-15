@@ -120,6 +120,12 @@ func quickScanCoordinatorRunsTheRealDeterministicPipeline() async throws {
         )
     )
     #expect(projection.session.terminalState == .completed)
+    #expect(
+        projection.evidence.allSatisfy {
+            $0.observedAt >= projection.session.startedAt
+                && $0.observedAt <= projection.session.finishedAt
+        }
+    )
     #expect(projection.snapshots.count >= 8)
     #expect(
         projection.classifications.count

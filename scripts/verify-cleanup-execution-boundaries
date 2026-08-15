@@ -10,6 +10,7 @@ execution_files=(
     Sources/StornautCore/Actions/CleanupExecutionState.swift
     Sources/StornautCore/Accounting/CleanupAccounting.swift
 )
+runtime_file=Sources/StornautCore/Actions/CleanupExecutionRuntime.swift
 
 for file in "${execution_files[@]}"; do
     [[ -f "$file" ]] || {
@@ -18,6 +19,11 @@ for file in "${execution_files[@]}"; do
     }
 done
 
+[[ -f "$runtime_file" ]] || {
+    print -u2 "Missing Task 35 closed execution runtime: $runtime_file"
+    exit 1
+}
+
 if rg -n \
     'FileManagerTrashAdapter|TrashMoving\(\)|ActionExecutor\(|runRegisteredAction|RegisteredActionDefinition|FoundationRegisteredActionRunner|StornautCodex|ProbeBridge|Adapter|Process\(|posix_spawn|URLSession|removeItem|unlink\(|rename\(' \
     "${execution_files[@]}"; then
@@ -25,8 +31,20 @@ if rg -n \
     exit 1
 fi
 
+if rg -n \
+    'FoundationRegisteredActionRunner|Process\(|posix_spawn|URLSession|removeItem|unlink\(|rename\(' \
+    "$runtime_file"; then
+    print -u2 "Task 35 closed runtime contains prohibited process/delete authority."
+    exit 1
+fi
+
 if rg -n '^import (SwiftUI|AppKit)$' "${execution_files[@]}"; then
     print -u2 "Task 31 execution layer imports App/UI frameworks."
+    exit 1
+fi
+
+if rg -n '^import (SwiftUI|AppKit)$' "$runtime_file"; then
+    print -u2 "Task 35 closed runtime imports App/UI frameworks."
     exit 1
 fi
 
@@ -49,5 +67,23 @@ rg -q 'try await saveAndVerify\(journal\)' \
     Sources/StornautCore/Actions/CleanupExecutionCoordinator.swift
 rg -q 'permanentlyReleasedLogicalBytes: ByteCount\(0\)' \
     Sources/StornautCore/Actions/CleanupExecutionCoordinator.swift
+rg -q '^public actor CleanupExecutionRuntime' "$runtime_file"
+rg -Fq 'ActionRegistry(definitions: [])' "$runtime_file"
+rg -Fq 'adapter: FileManagerTrashAdapter()' "$runtime_file"
+rg -Fq 'DenyRegisteredActionRunner()' "$runtime_file"
+rg -Fq 'private var pending: PendingPreflight?' "$runtime_file"
+rg -Fq 'self.pending = nil' "$runtime_file"
+rg -Fq 'public func requestStopAfterCurrent()' "$runtime_file"
+rg -Fq 'public func retrySavingAudit(' "$runtime_file"
+rg -Fq 'public func recover()' "$runtime_file"
+! rg -q '^public struct ActionExecutor' \
+    Sources/StornautCore/Actions/ActionExecutor.swift
+! rg -q '^public struct TrashMoving' \
+    Sources/StornautCore/Actions/TrashMoving.swift
+! rg -q '^public struct FileManagerTrashAdapter' \
+    Sources/StornautCore/Actions/TrashMoving.swift
+! rg -q 'TrashMoving\s*\(\s*\)' \
+    Sources/StornautCore/Actions/TrashMoving.swift \
+    Sources/StornautCore/Actions/ActionExecutor.swift
 
 echo "Cleanup execution boundary verification passed."

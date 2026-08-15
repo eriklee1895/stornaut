@@ -240,6 +240,15 @@ debug_markers=(
     'STORNAUT_R5_'
     'stornaut-r5-diagnostic'
     'runtime.lifecycle.worker-failed'
+    '--stornaut-phase-c-trash-config='
+    '--stornaut-phase-c-trash-recovery-config='
+    'STORNAUT_PHASE_C_TRASH_OPT_IN'
+    'STORNAUT_PHASE_C_TRASH_RECOVERY_OPT_IN'
+    'stornaut-phase-c-trash-item:'
+    'signedAppTrashReady'
+    'signedAppTrashRecoveryReady'
+    'I authorize Stornaut Task 35 to Trash and restore only this disposable fixture.'
+    'I authorize Stornaut Task 35 to recover the retained journal and restore only its exact disposable fixture without another Trash attempt.'
 )
 
 for marker in "${debug_markers[@]}"; do

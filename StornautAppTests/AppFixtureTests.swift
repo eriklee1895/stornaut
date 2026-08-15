@@ -566,6 +566,70 @@ func productionDependenciesKeepReviewExecutionWriteDisabled() {
 }
 
 @Test
+func ordinaryLiveDependenciesRejectReviewExecution()
+    async throws
+{
+    let fixture = try ReviewAppFixture()
+    let snapshot = try ReviewSnapshot(
+        plan: fixture.plan,
+        projection: fixture.projection,
+        generation: 1,
+        executionAvailability: .debugFake
+    )
+    let selection = try #require(snapshot.reviewSelection)
+    let evaluation = try ReviewConfirmationFixture.evaluate(
+        plan: fixture.plan,
+        selection: selection,
+        activityFacts: .inactive
+    )
+    let confirmation = try #require(
+        evaluation.allowed?.confirmation
+    )
+    let dependencies = AppDependencies.live(
+        configuration: .memory
+    )
+
+    await #expect(throws: (any Error).self) {
+        _ = try await dependencies.startReviewExecution(
+            fixture.plan,
+            selection,
+            confirmation
+        )
+    }
+}
+
+@Test
+func liveExecutionReservesItsSingleFlightBeforeRuntimeResolution()
+    throws
+{
+    let repositoryRoot = URL(filePath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let source = try String(
+        contentsOf: repositoryRoot.appending(
+            path: "StornautApp/AppState/AppDependencies.swift"
+        ),
+        encoding: .utf8
+    )
+    let function = try #require(
+        source.range(of: "    func startReviewExecution(")
+    )
+    let suffix = source[function.lowerBound...]
+    let end = try #require(
+        suffix.range(of: "\n    func stopReviewAfterCurrent(")
+    )
+    let body = suffix[..<end.lowerBound]
+    let reservation = try #require(
+        body.range(of: "executionIsActive = true")
+    )
+    let runtimeResolution = try #require(
+        body.range(of: "try await resolvedExecutionRuntime()")
+    )
+
+    #expect(reservation.lowerBound < runtimeResolution.lowerBound)
+}
+
+@Test
 func liveDependenciesRunOnlyTheExplicitTemporaryRoot() async throws {
     let rootURL = FileManager.default.temporaryDirectory.appending(
         path: "stornaut-app-live-\(UUID().uuidString)",
@@ -840,8 +904,33 @@ private actor AppTestRetryingDependencyFactory {
     }
 }
 
+private final class AppTestExecutionFactoryProbe:
+    @unchecked Sendable
+{
+    private let lock = NSLock()
+    private var calls = 0
+
+    var callCount: Int {
+        lock.withLock { calls }
+    }
+
+    func make(
+        store: EvidenceStore,
+        rootObserver: any CleanupPolicyRootObserving,
+        workflowCoordinator: CleanupWorkflowCoordinator,
+        resolver: ExecutableEvidenceResolver
+    ) throws -> CleanupExecutionRuntime {
+        _ = resolver
+        lock.withLock {
+            calls += 1
+        }
+        throw AppTestLoaderError.executionFactoryReached
+    }
+}
+
 private enum AppTestLoaderError: Error {
     case coordinatorCreationFailed
+    case executionFactoryReached
     case fixtureConstructionFailed
 }
 

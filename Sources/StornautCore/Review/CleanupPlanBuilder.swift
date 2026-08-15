@@ -95,6 +95,24 @@ public struct CleanupPlanBuilder: Sendable {
         )
     }
 
+#if DEBUG
+    public static func phaseCTrashDiagnostic(
+        store: EvidenceStore,
+        resolver: ExecutableEvidenceResolver
+    ) throws -> CleanupPlanBuilder {
+        let rules = try BuiltInRuleCatalog.load()
+        return try CleanupPlanBuilder(
+            store: store,
+            ruleCatalog: rules,
+            executionProfileCatalog:
+                BuiltInExecutionProfileCatalog.load(
+                    ruleCatalog: rules
+                ),
+            evidenceResolver: resolver
+        )
+    }
+#endif
+
     public func build(
         sessionID: ScanSessionID,
         rootURL: URL
@@ -484,9 +502,13 @@ public struct CleanupPlanBuilder: Sendable {
             ),
             items: sortedItems
         )
-        try await store.saveCleanupPlan(plan)
+        let canonicalPlan = try DomainJSON.decode(
+            CleanupPlan.self,
+            from: DomainJSON.encode(plan)
+        )
+        try await store.saveCleanupPlan(canonicalPlan)
         return .planReady(
-            plan,
+            canonicalPlan,
             try ReviewProjection(
                 sessionID: sessionID,
                 planID: newPlanID,
@@ -602,8 +624,10 @@ public struct CleanupPlanBuilder: Sendable {
                 return record.kind == expectedEvidenceKind(binding.resolver)
                     && record.source.kind
                         == expectedEvidenceSourceKind(binding.resolver)
-                    && record.summaryKey.rawValue
-                    == "execution.\(binding.key.rawValue).satisfied"
+                    && evidenceResolver.acceptsPersistedSummary(
+                        record.summaryKey,
+                        binding: binding
+                    )
             }
     }
 

@@ -548,7 +548,8 @@ extension AppComposition {
                         : .idle,
                 now: { DebugProjectionFactory.now },
                 refreshesServices: false
-            )
+            ),
+            kind: .debugFixture
         )
         if autoRunsCleanupTerminal,
            cleanupFixture?.fixture != .corrupt,

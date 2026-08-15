@@ -180,6 +180,26 @@ final class SQLiteConnection: @unchecked Sendable {
         }
     }
 
+#if DEBUG
+    func serializedDatabase() throws -> Data {
+        var size: sqlite3_int64 = 0
+        guard let bytes = sqlite3_serialize(
+            database,
+            "main",
+            &size,
+            0
+        ), size >= 0, size <= Int.max
+        else {
+            throw error(
+                operation: "diagnostic.serialize",
+                code: sqlite3_errcode(database)
+            )
+        }
+        defer { sqlite3_free(bytes) }
+        return Data(bytes: bytes, count: Int(size))
+    }
+#endif
+
     private func prepare(
         _ sql: String,
         operation: String

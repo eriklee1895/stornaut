@@ -188,6 +188,27 @@ public struct CleanupPolicyContextCollector: Sendable {
         )
     }
 
+#if DEBUG
+    static func phaseCTrashDiagnostic(
+        store: EvidenceStore,
+        resolver: ExecutableEvidenceResolver,
+        rootObserver: any CleanupPolicyRootObserving,
+        workflowObserver: any CleanupWorkflowAvailabilityObserving
+    ) throws -> CleanupPolicyContextCollector {
+        let rules = try BuiltInRuleCatalog.load()
+        return try CleanupPolicyContextCollector(
+            store: store,
+            ruleCatalog: rules,
+            profileCatalog: BuiltInExecutionProfileCatalog.load(
+                ruleCatalog: rules
+            ),
+            resolver: resolver,
+            rootObserver: rootObserver,
+            workflowObserver: workflowObserver
+        )
+    }
+#endif
+
     public func collect(
         plan: CleanupPlan,
         selection: ReviewSelection
@@ -537,8 +558,10 @@ public struct CleanupPolicyContextCollector: Sendable {
                       == cleanupPolicyEvidenceKind(binding.resolver)
                       && record.source.kind
                       == cleanupPolicyEvidenceSourceKind(binding.resolver)
-                      && record.summaryKey.rawValue
-                      == "execution.\(binding.key.rawValue).satisfied"
+                      && resolver.acceptsPersistedSummary(
+                          record.summaryKey,
+                          binding: binding
+                      )
               })
         else {
             return .missing

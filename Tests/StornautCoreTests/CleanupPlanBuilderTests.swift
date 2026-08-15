@@ -325,7 +325,7 @@ func cleanupPlanBuilderStreamsFourThousandRowsAndRetainsLateProfiles()
             ]
         )
     )
-    #expect(elapsed < .seconds(5))
+    #expect(elapsed < .seconds(2))
 }
 
 @Test

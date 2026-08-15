@@ -328,6 +328,25 @@ public actor QuickScanCoordinator {
         )
     }
 
+#if DEBUG
+    public static func phaseCTrashDiagnostic(
+        store: EvidenceStore,
+        resolver: ExecutableEvidenceResolver
+    ) throws -> QuickScanCoordinator {
+        let catalog = try BuiltInRuleCatalog.load()
+        return try QuickScanCoordinator(
+            store: store,
+            historyStore: store,
+            catalog: catalog,
+            executionProfileCatalog:
+                BuiltInExecutionProfileCatalog.load(
+                    ruleCatalog: catalog
+                ),
+            executableEvidenceResolver: resolver
+        )
+    }
+#endif
+
     public var hasActiveScan: Bool {
         scanIsActive
     }
@@ -661,6 +680,7 @@ public actor QuickScanCoordinator {
             store: store,
             volumeSampler: volumeSampler,
             now: now,
+            sessionStartedAt: observationTime,
             snapshotID: snapshotID,
             snapshotObservedAt: { _ in observationTime },
             defersProductFinalization: true,

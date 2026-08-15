@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 import SQLite3
 
 public struct StoreDiagnostics: Sendable, Equatable {
@@ -270,6 +271,14 @@ public actor EvidenceStore {
             foreignKeysEnabled: foreignKeys
         )
     }
+
+#if DEBUG
+    public func diagnosticDatabaseSHA256() throws -> String {
+        SHA256.hash(data: try connection.serializedDatabase()).map {
+            String(format: "%02x", $0)
+        }.joined()
+    }
+#endif
 
     public func saveScanSession(_ session: ScanSession) throws {
         let payload = try encodeStorePayload(session)

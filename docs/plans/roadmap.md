@@ -118,7 +118,7 @@ Codex 进程树不可写、no-Executor。
 
 Tasks 27–28 已先建立 cleanup domain/persistence/journal foundations。用户批准
 在 Task 29 前插入 ADR 0004 capability-first Runtime R1–R6 evidence gate，
-详见 [active plan](active/capability-first-codex-runtime-gate.md)。该 gate
+详见 [completed plan](completed/capability-first-codex-runtime-gate.md)。该 gate
 解决现有旧 Broker-only runtime 与最新产品边界的漂移；它不启用 Deep Dive，
 也不改变 Task 29–35 的确定性职责。
 
@@ -140,10 +140,19 @@ vanished-process errno 分类、strict-schema `$ref` sibling、direct-read fixed
 command 与 shell outcome shape。current-source signed App/helper 已得出
 `signedRuntimeReady`（9/9 capability、12/12 integrity），随后卸载并证明
 零残留。R6 已完成 final matrix、product status 与 independent review，并得出
-	runtime foundation `go`。Tasks 29–34 已完成并通过 independent
-	review/unified verifier；Task 35 为下一项 deterministic Epic 8 gate。
-	用户已明确授权仅针对 signed-App disposable exact fixture 的 real Trash
-	diagnostic；production Deep Dive 仍须等待 Phase D 自己的实现与 gate。
+	runtime foundation `go`。Tasks 29–35 已完成并通过 independent
+review/unified verifier。Task 35 唯一授权的 signed-App real Trash attempt 已
+消费：exact diagnostic fixture 被移动且 journal durably 记录
+`actionOutcomeRecorded`；原 report 因 Manifest timeline 缺陷正确保持
+blocked，未重试。独立 signed recovery-only App 随后以零 Executor replay
+完成 finalized journal、one-record Manifest、truthful accounting 与
+identity-checked restore。privacy-safe checked receipt 已绑定原始/恢复
+reports、final Store 和安全关键源码，mutation scripts 已 sealed。旧 global
+same-UID Node safe-window 已删除；verifier 不得阻断或终止 Chrome、Cursor、
+Claude、MCP 等其他 App。最终 whole-diff 与 timestamp-focused review 均无
+unresolved P0–P2；authoritative full verifier 22/22 stages 单次 exit 0，
+Phase C plans/briefs 已归档，admission 为 `go`。production Deep Dive 仍须
+等待 Phase D 自己的实现与 gate。
 
 ### Phase D — Conditional Deep Dive
 
@@ -227,13 +236,13 @@ command 与 shell outcome shape。current-source signed App/helper 已得出
 
 ## 6. 当前状态
 
-- 当前阶段：Phase A 与 Phase B evidence gates 已完成。Epic 2–4 Tasks
+- 当前阶段：Phase A、Phase B 与 Phase C evidence gates 已完成。Epic 2–4 Tasks
   9–26 通过最终统一 verifier 并归档至
   [`completed/`](completed/epic-2-4-deterministic-product-core.md)。
 - Phase C deterministic Epic 8 safe-execution 详尽 plan 已于 2026-08-11
-  获用户批准；Tasks 27–28 已完成。ADR 0004 回顾确认实现仍有旧
+  获用户批准并于 2026-08-15 完成归档。ADR 0004 回顾确认实现仍有旧
   Broker-only 漂移；用户已批准在 Task 29 前插入
-  [capability-first Codex runtime R1–R6 gate](active/capability-first-codex-runtime-gate.md)。
+  [capability-first Codex runtime R1–R6 gate](completed/capability-first-codex-runtime-gate.md)。
   R1 已完成并得出 conditional-go：managed proxy 是唯一观察到能同时满足
   公网访问与任意 local/private/Unix target 阻断的候选，但需要 same-session、
   parent-owned random loopback proxy transport；该例外已获批准用于 R2
@@ -248,8 +257,10 @@ command 与 shell outcome shape。current-source signed App/helper 已得出
   serial/headless contracts/build 与 review findings 修复；官方 `openai`
   subscription worker 已通过，历史 TeamoRouter/usage-limit evidence 已
   superseded。signed App/helper machine gate 已得出 `signedRuntimeReady`，
-	  并完成零残留卸载；R6 已得出 runtime foundation `go`。Tasks 29–34 已完成；
-	  Task 35 为下一项 deterministic Epic 8 gate；production Deep Dive 仍不可用。
+	  并完成零残留卸载；R6 已得出 runtime foundation `go`。Tasks 29–35 与
+	  Phase C final gate 已完成：receipt/source/raw-evidence、SwiftPM 634/634、
+	  Phase C 74/74、完整 App/UI 和 authoritative full verifier 均通过，计划已
+	  归档。旧 global process safe-window 已删除；production Deep Dive 仍不可用。
 - Epic 0 Foundation Upstream Study：已完成，选择 checked-in Xcode App/Test host + local Swift packages。
 - Epic 0 Task 1：SwiftPM Core/Codex、smoke tests、`scripts/verify`、manual-only CI 与 ThirdPartyNotices 骨架已完成。
 - Bundle identifier：已确认 `com.eriklee.stornaut`。
@@ -278,5 +289,7 @@ command 与 shell outcome shape。current-source signed App/helper 已得出
   例外已获批准；R2 已完成并得出 `configurationReady`；R3 behavioral gate
   已得出 `behaviorReady` candidate；R4 已得出 `protocolReady`；R5 已得出
   `signedRuntimeReady` 并证明 zero residue；R6 final admission 已得出 runtime
-	  foundation `go`。Phase C Tasks 29–34 已完成；Task 35 为下一项
-	  deterministic Epic 8 gate；生产 Deep Dive 保持 unavailable。
+	  foundation `go`。Phase C Tasks 29–35、exact signed mutation +
+	  zero-replay recovery evidence、最终 review/full verifier 与归档均完成，
+	  admission 为 `go`。normal App execution 仍 write-disabled；生产 Deep
+	  Dive 保持 unavailable。

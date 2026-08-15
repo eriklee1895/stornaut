@@ -41,7 +41,7 @@ func registeredActionRegistryResolvesOnlyFixedModeArguments() throws {
 func registeredActionDryRunDoesNotLaunchTheExecutable() async throws {
     let harness = try RegisteredActionHarness()
     let runner = RegisteredActionRunnerSpy()
-    let executor = ActionExecutor(
+    let executor = registeredActionExecutor(
         policyGate: harness.gate,
         registeredActionRunner: runner
     )
@@ -72,7 +72,7 @@ func registeredActionDryRunDoesNotLaunchTheExecutable() async throws {
 @Test
 func registeredActionSuccessRunsFixtureAndReportsMeasuredEffects() async throws {
     let harness = try RegisteredActionHarness()
-    let executor = ActionExecutor(policyGate: harness.gate)
+    let executor = registeredActionExecutor(policyGate: harness.gate)
     let token = try executor.preflight(
         .runRegisteredAction(
             RegisteredActionRequest(
@@ -122,7 +122,7 @@ func registeredActionNormalExitTerminatesSurvivingChild() async throws {
     let gate = ActionPolicyGate(
         registry: ActionRegistry(definitions: [definition])
     )
-    let executor = ActionExecutor(policyGate: gate)
+    let executor = registeredActionExecutor(policyGate: gate)
     let token = try executor.preflight(
         .runRegisteredAction(
             RegisteredActionRequest(id: definition.id, mode: .success)
@@ -149,7 +149,7 @@ func registeredActionNormalExitTerminatesSurvivingChild() async throws {
 @Test
 func registeredActionTimeoutTerminatesTheFixture() async throws {
     let harness = try RegisteredActionHarness(timeout: .milliseconds(100))
-    let executor = ActionExecutor(policyGate: harness.gate)
+    let executor = registeredActionExecutor(policyGate: harness.gate)
     let token = try executor.preflight(
         .runRegisteredAction(
             RegisteredActionRequest(
@@ -197,7 +197,7 @@ func registeredActionTimeoutTerminatesTheFixtureProcessGroup() async throws {
     let gate = ActionPolicyGate(
         registry: ActionRegistry(definitions: [definition])
     )
-    let executor = ActionExecutor(policyGate: gate)
+    let executor = registeredActionExecutor(policyGate: gate)
     let token = try executor.preflight(
         .runRegisteredAction(
             RegisteredActionRequest(id: definition.id, mode: .timeout)
@@ -228,7 +228,7 @@ func registeredActionTimeoutTerminatesTheFixtureProcessGroup() async throws {
 @Test
 func registeredActionPostflightPreservesPartialFailure() async throws {
     let harness = try RegisteredActionHarness()
-    let executor = ActionExecutor(policyGate: harness.gate)
+    let executor = registeredActionExecutor(policyGate: harness.gate)
     let token = try executor.preflight(
         .runRegisteredAction(
             RegisteredActionRequest(
@@ -265,6 +265,29 @@ private struct RegisteredActionHarness {
         )
         gate = ActionPolicyGate(
             registry: ActionRegistry(definitions: [definition])
+        )
+    }
+}
+
+private func registeredActionExecutor(
+    policyGate: ActionPolicyGate,
+    registeredActionRunner: any RegisteredActionRunning =
+        FoundationRegisteredActionRunner()
+) -> ActionExecutor {
+    ActionExecutor(
+        policyGate: policyGate,
+        trashMoving: TrashMoving(
+            adapter: RegisteredActionUnusedTrashAdapter()
+        ),
+        registeredActionRunner: registeredActionRunner
+    )
+}
+
+private struct RegisteredActionUnusedTrashAdapter: TrashAdapting {
+    func trashItem(at url: URL) throws -> URL? {
+        _ = url
+        throw TrashAdapterError.operationFailed(
+            "Trash is not available in Registered Action tests"
         )
     }
 }

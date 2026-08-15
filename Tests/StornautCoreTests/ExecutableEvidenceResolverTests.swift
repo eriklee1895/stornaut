@@ -314,6 +314,298 @@ func executableEvidenceResolverFailsClosedForOwnerActivityAndIdentityDrift()
     #expect(review.isEligible == false)
 }
 
+@Test
+func executableEvidenceResolverKeepsOrdinaryNPMBlockedByUnrelatedNode()
+    async throws
+{
+    let profile = try executionProfileFixture(
+        ruleID: "cache-npm-content"
+    )
+    let rule = try executionRuleFixture(
+        ruleID: "cache-npm-content",
+        disposition: .readyToReclaim
+    )
+    let snapshot = try executionSnapshotFixture(
+        relativePath: ".npm/_cacache"
+    )
+    let resolver = ExecutableEvidenceResolver(
+        activityProvider: RunningActivityProvider(
+            source: CountingExecutionActivitySource(
+                snapshot: try unrelatedNodeActivitySnapshot()
+            )
+        )
+    )
+    let context = await resolver.captureActivity(
+        observedAt: Date(timeIntervalSince1970: 141)
+    )
+
+    let resolution = try resolver.resolveQuickScan(
+        snapshot: snapshot,
+        rule: rule,
+        profile: profile,
+        profileCatalogVersion: executionProfileCatalogVersion,
+        activityContext: context,
+        evidenceID: executionEvidenceID
+    )
+
+    #expect(resolution.activityObservations[0].state == .contradicted)
+    #expect(
+        resolution.activityObservations[0].reason.rawValue
+            == "activity.process.related-running"
+    )
+    #expect(!resolution.isEligible)
+}
+
+@Test
+func executableEvidenceResolverAttestsOnlyTheIsolatedDiagnosticTarget()
+    async throws
+{
+    let fixture = try IsolatedDiagnosticEvidenceFixture()
+    defer { fixture.remove() }
+    let profile = try executionProfileFixture(
+        ruleID: "cache-npm-content"
+    )
+    let rule = try executionRuleFixture(
+        ruleID: "cache-npm-content",
+        disposition: .readyToReclaim
+    )
+    let resolver = try ExecutableEvidenceResolver
+        .phaseCTrashDiagnostic(
+            diagnosticRootURL: fixture.diagnosticRootURL,
+            fixtureRootURL: fixture.fixtureRootURL,
+            nonce: fixture.nonce,
+            expectedTargetIdentity: fixture.targetIdentity,
+            activityProvider: RunningActivityProvider(
+                source: CountingExecutionActivitySource(
+                    snapshot: try unrelatedNodeActivitySnapshot()
+                )
+            )
+        )
+    let context = await resolver.captureActivity(
+        observedAt: Date(timeIntervalSince1970: 151)
+    )
+
+    let resolution = try resolver.resolveQuickScan(
+        snapshot: try executionSnapshotFixture(
+            relativePath: ".npm/_cacache",
+            fileIdentity: fixture.targetIdentity
+        ),
+        rule: rule,
+        profile: profile,
+        profileCatalogVersion: executionProfileCatalogVersion,
+        activityContext: context,
+        evidenceID: executionEvidenceID
+    )
+
+    #expect(resolution.activityObservations[0].state == .satisfied)
+    #expect(resolution.activityObservations[0].origin == .stornaut)
+    #expect(
+        resolution.activityObservations[0].reason.rawValue
+            == "activity.process.isolated-diagnostic-attested"
+    )
+    #expect(
+        resolution.evidenceRecords.contains {
+            $0.summaryKey.rawValue
+                == "execution.activity.process.inactive.isolated-diagnostic-attested"
+        }
+    )
+    #expect(resolution.isCurrentIdentity)
+    #expect(resolution.isEligible)
+}
+
+@Test
+func executableEvidenceResolverOwnsDiagnosticPersistedSummaryAdmission()
+    throws
+{
+    let fixture = try IsolatedDiagnosticEvidenceFixture()
+    defer { fixture.remove() }
+    let ordinary = ExecutableEvidenceResolver()
+    let diagnostic = try ExecutableEvidenceResolver
+        .phaseCTrashDiagnostic(
+            diagnosticRootURL: fixture.diagnosticRootURL,
+            fixtureRootURL: fixture.fixtureRootURL,
+            nonce: fixture.nonce,
+            expectedTargetIdentity: fixture.targetIdentity
+        )
+    let activityBinding = ExecutionEvidenceBinding(
+        key: DomainToken(
+            rawValue: ActivityKey.processInactive.rawValue
+        )!,
+        resolver: .currentActivity
+    )
+    let compilerBinding = ExecutionEvidenceBinding(
+        key: DomainToken(rawValue: "evidence.cache.layout")!,
+        resolver: .compilerAttested
+    )
+    let isolated = DomainToken(
+        rawValue:
+            "execution.activity.process.inactive.isolated-diagnostic-attested"
+    )!
+
+    #expect(
+        ordinary.acceptsPersistedSummary(
+            DomainToken(
+                rawValue:
+                    "execution.activity.process.inactive.satisfied"
+            )!,
+            binding: activityBinding
+        )
+    )
+    #expect(
+        !ordinary.acceptsPersistedSummary(
+            isolated,
+            binding: activityBinding
+        )
+    )
+    #expect(
+        diagnostic.acceptsPersistedSummary(
+            isolated,
+            binding: activityBinding
+        )
+    )
+    #expect(
+        !diagnostic.acceptsPersistedSummary(
+            isolated,
+            binding: compilerBinding
+        )
+    )
+}
+
+@Test
+func executableEvidenceResolverFailsClosedWhenDiagnosticMarkersOrModesDrift()
+    async throws
+{
+    let profile = try executionProfileFixture(
+        ruleID: "cache-npm-content"
+    )
+    let rule = try executionRuleFixture(
+        ruleID: "cache-npm-content",
+        disposition: .readyToReclaim
+    )
+
+    for drift in IsolatedDiagnosticEvidenceFixture.Drift.markerAndMode {
+        let fixture = try IsolatedDiagnosticEvidenceFixture()
+        defer { fixture.remove() }
+        let resolver = try ExecutableEvidenceResolver
+            .phaseCTrashDiagnostic(
+                diagnosticRootURL: fixture.diagnosticRootURL,
+                fixtureRootURL: fixture.fixtureRootURL,
+                nonce: fixture.nonce,
+                expectedTargetIdentity: fixture.targetIdentity,
+                activityProvider: RunningActivityProvider(
+                    source: CountingExecutionActivitySource(
+                        snapshot: try unrelatedNodeActivitySnapshot()
+                    )
+                )
+            )
+        let context = await resolver.captureActivity(
+            observedAt: Date(timeIntervalSince1970: 161)
+        )
+        try fixture.apply(drift)
+
+        let resolution = try resolver.resolveQuickScan(
+            snapshot: try executionSnapshotFixture(
+                relativePath: ".npm/_cacache",
+                fileIdentity: fixture.targetIdentity
+            ),
+            rule: rule,
+            profile: profile,
+            profileCatalogVersion: executionProfileCatalogVersion,
+            activityContext: context,
+            evidenceID: executionEvidenceID
+        )
+
+        #expect(resolution.activityObservations[0].state == .unavailable)
+        #expect(
+            resolution.activityObservations[0].reason.rawValue
+                != "activity.process.isolated-diagnostic-attested"
+        )
+        #expect(!resolution.isEligible)
+    }
+}
+
+@Test
+func executableEvidenceResolverFailsClosedForDiagnosticIdentityProfileAndPathDrift()
+    async throws
+{
+    let fixture = try IsolatedDiagnosticEvidenceFixture()
+    defer { fixture.remove() }
+    let npmProfile = try executionProfileFixture(
+        ruleID: "cache-npm-content"
+    )
+    let npmRule = try executionRuleFixture(
+        ruleID: "cache-npm-content",
+        disposition: .readyToReclaim
+    )
+    let resolver = try ExecutableEvidenceResolver
+        .phaseCTrashDiagnostic(
+            diagnosticRootURL: fixture.diagnosticRootURL,
+            fixtureRootURL: fixture.fixtureRootURL,
+            nonce: fixture.nonce,
+            expectedTargetIdentity: fixture.targetIdentity,
+            activityProvider: RunningActivityProvider(
+                source: CountingExecutionActivitySource(
+                    snapshot: try unrelatedNodeActivitySnapshot()
+                )
+            )
+        )
+    let context = await resolver.captureActivity(
+        observedAt: Date(timeIntervalSince1970: 171)
+    )
+    let originalSnapshot = try executionSnapshotFixture(
+        relativePath: ".npm/_cacache",
+        fileIdentity: fixture.targetIdentity
+    )
+    let valid = try resolver.resolveQuickScan(
+        snapshot: originalSnapshot,
+        rule: npmRule,
+        profile: npmProfile,
+        profileCatalogVersion: executionProfileCatalogVersion,
+        activityContext: context,
+        evidenceID: executionEvidenceID
+    )
+
+    try fixture.apply(.identity)
+    let identityDrift = try resolver.resolveQuickScan(
+        snapshot: originalSnapshot,
+        rule: npmRule,
+        profile: npmProfile,
+        profileCatalogVersion: executionProfileCatalogVersion,
+        activityContext: context,
+        evidenceID: executionEvidenceID
+    )
+    let pipProfile = try executionProfileFixture(ruleID: "cache-pip")
+    let profileDrift = try resolver.resolveQuickScan(
+        snapshot: originalSnapshot,
+        rule: try executionRuleFixture(
+            ruleID: "cache-pip",
+            disposition: .readyToReclaim
+        ),
+        profile: pipProfile,
+        profileCatalogVersion: executionProfileCatalogVersion,
+        activityContext: context,
+        evidenceID: executionEvidenceID
+    )
+    let pathDrift = try resolver.resolveQuickScan(
+        snapshot: try executionSnapshotFixture(
+            relativePath: "Library/Caches/pip",
+            fileIdentity: fixture.targetIdentity
+        ),
+        rule: npmRule,
+        profile: npmProfile,
+        profileCatalogVersion: executionProfileCatalogVersion,
+        activityContext: context,
+        evidenceID: executionEvidenceID
+    )
+
+    for drifted in [identityDrift, profileDrift, pathDrift] {
+        #expect(drifted.activityObservations[0].state == .unavailable)
+        #expect(!drifted.isEligible)
+        #expect(drifted.activityFingerprint != valid.activityFingerprint)
+        #expect(drifted.evidenceFingerprint != valid.evidenceFingerprint)
+    }
+}
+
 private actor CountingExecutionActivitySource:
     RunningActivitySnapshotting
 {
@@ -478,9 +770,10 @@ private func executionRuleFixture(
 
 private func executionSnapshotFixture(
     relativePath: String,
-    ownerUserID: UInt32 = getuid()
+    ownerUserID: UInt32 = getuid(),
+    fileIdentity: FileIdentity? = nil
 ) throws -> PathSnapshot {
-    let identity = try executionIdentityFixture(
+    let identity = try fileIdentity ?? executionIdentityFixture(
         inode: 42,
         ownerUserID: ownerUserID
     )
@@ -495,11 +788,17 @@ private func executionSnapshotFixture(
         modifiedAt: Date(
             timeIntervalSince1970:
                 TimeInterval(identity.modificationSeconds)
+                + TimeInterval(identity.modificationNanoseconds)
+                    / 1_000_000_000
         ),
         fileIdentity: identity,
         symlinkTarget: nil,
         measurementStatus: .measured,
-        observedAt: Date(timeIntervalSince1970: 125)
+        observedAt: Date(
+            timeIntervalSince1970: TimeInterval(
+                max(125, identity.modificationSeconds + 1)
+            )
+        )
     )
 }
 
@@ -527,4 +826,170 @@ private func executionEvidenceID(
     EvidenceID(
         rawValue: "evidence-\(snapshotID.rawValue)-\(key.rawValue)"
     )!
+}
+
+private let executionProfileCatalogVersion = DomainToken(
+    rawValue: "safe-execution-v1"
+)!
+
+private func unrelatedNodeActivitySnapshot()
+    throws -> RunningActivitySnapshot
+{
+    RunningActivitySnapshot(
+        applications: [],
+        processes: [
+            try RunningProcessRecord(
+                name: DomainLabel(validating: "node"),
+                processIdentifier: 701
+            ),
+        ],
+        observedAt: Date(timeIntervalSince1970: 140)
+    )
+}
+
+private struct IsolatedDiagnosticEvidenceFixture {
+    enum Drift {
+        case diagnosticRootMode
+        case targetMode
+        case rootMarker
+        case itemMarker
+        case identity
+
+        static let markerAndMode: [Self] = [
+            .diagnosticRootMode,
+            .targetMode,
+            .rootMarker,
+            .itemMarker,
+        ]
+    }
+
+    let nonce = UUID().uuidString.lowercased()
+    let diagnosticRootURL: URL
+    let fixtureRootURL: URL
+    let targetURL: URL
+    let targetIdentity: FileIdentity
+
+    init() throws {
+        diagnosticRootURL = FileManager.default.temporaryDirectory
+            .appending(
+                path: "stornaut-phase-c-trash.\(UUID().uuidString)",
+                directoryHint: .isDirectory
+            )
+        fixtureRootURL = diagnosticRootURL.appending(
+            path: "fixture",
+            directoryHint: .isDirectory
+        )
+        targetURL = fixtureRootURL.appending(
+            path: ".npm/_cacache",
+            directoryHint: .isDirectory
+        )
+        try Self.createTree(
+            diagnosticRootURL: diagnosticRootURL,
+            targetURL: targetURL,
+            nonce: nonce
+        )
+        targetIdentity = try #require(FileIdentity.read(at: targetURL))
+    }
+
+    func apply(_ drift: Drift) throws {
+        switch drift {
+        case .diagnosticRootMode:
+            try FileManager.default.setAttributes(
+                [.posixPermissions: 0o755],
+                ofItemAtPath: diagnosticRootURL.path
+            )
+        case .targetMode:
+            try FileManager.default.setAttributes(
+                [.posixPermissions: 0o755],
+                ofItemAtPath: targetURL.path
+            )
+        case .rootMarker:
+            try Data("stornaut-phase-c-root:wrong".utf8).write(
+                to: diagnosticRootURL.appending(
+                    path: ".stornaut-phase-c-trash-fixture-\(nonce)"
+                ),
+                options: .atomic
+            )
+        case .itemMarker:
+            try Data("stornaut-phase-c-trash-item:wrong".utf8).write(
+                to: targetURL.appending(
+                    path: ".stornaut-phase-c-trash-item-\(nonce)"
+                ),
+                options: .atomic
+            )
+        case .identity:
+            let displacedURL = targetURL.deletingLastPathComponent()
+                .appending(
+                    path: "_cacache-displaced",
+                    directoryHint: .isDirectory
+                )
+            try FileManager.default.moveItem(
+                at: targetURL,
+                to: displacedURL
+            )
+            try FileManager.default.createDirectory(
+                at: targetURL,
+                withIntermediateDirectories: false,
+                attributes: [.posixPermissions: 0o700]
+            )
+            try Data(
+                "stornaut-phase-c-trash-item:\(nonce)".utf8
+            ).write(
+                to: targetURL.appending(
+                    path: ".stornaut-phase-c-trash-item-\(nonce)"
+                )
+            )
+        }
+    }
+
+    func remove() {
+        try? FileManager.default.removeItem(at: diagnosticRootURL)
+    }
+
+    private static func createTree(
+        diagnosticRootURL: URL,
+        targetURL: URL,
+        nonce: String
+    ) throws {
+        try FileManager.default.createDirectory(
+            at: targetURL.appending(
+                path: "content-v2/sha512",
+                directoryHint: .isDirectory
+            ),
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
+        for url in [
+            diagnosticRootURL,
+            diagnosticRootURL.appending(
+                path: "fixture",
+                directoryHint: .isDirectory
+            ),
+            diagnosticRootURL.appending(
+                path: "fixture/.npm",
+                directoryHint: .isDirectory
+            ),
+            targetURL,
+        ] {
+            try FileManager.default.setAttributes(
+                [.posixPermissions: 0o700],
+                ofItemAtPath: url.path
+            )
+        }
+        try Data("stornaut-phase-c-root:\(nonce)".utf8).write(
+            to: diagnosticRootURL.appending(
+                path: ".stornaut-phase-c-trash-fixture-\(nonce)"
+            )
+        )
+        try Data("stornaut-phase-c-trash-item:\(nonce)".utf8).write(
+            to: targetURL.appending(
+                path: ".stornaut-phase-c-trash-item-\(nonce)"
+            )
+        )
+        try Data("disposable".utf8).write(
+            to: targetURL.appending(
+                path: "content-v2/sha512/disposable"
+            )
+        )
+    }
 }

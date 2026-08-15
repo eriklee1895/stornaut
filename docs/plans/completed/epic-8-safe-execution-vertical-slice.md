@@ -1,8 +1,7 @@
 # Stornaut Phase C — Epic 8 Safe Execution Vertical Slice Plan
 
-> **Status:** Tasks 27–34 complete; Runtime R1–R6 interlock complete with
-> foundation `go`; Task 35 is next and its bounded real Trash diagnostic is
-> explicitly authorized
+> **Status:** Complete and archived; Tasks 27–35 and Runtime R1–R6 passed
+> their final evidence gates; Phase C admission `go`
 >
 > **Roadmap phase:** Phase C — Safe Execution Vertical Slice
 >

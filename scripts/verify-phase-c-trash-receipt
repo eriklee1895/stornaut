@@ -1,0 +1,408 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+cd "$repo_root"
+
+receipt="$repo_root/docs/reports/evidence/epic-8-task-35-signed-trash-receipt.json"
+[[ -s "$receipt" && ! -L "$receipt" ]]
+
+/usr/bin/python3 - "$receipt" "${STORNAUT_PHASE_C_TRASH_EVIDENCE_ROOT:-}" <<'PY'
+import hashlib
+import json
+import os
+import pathlib
+import sqlite3
+import stat
+import sys
+
+
+receipt_path = pathlib.Path(sys.argv[1])
+external_root_value = sys.argv[2]
+receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+
+expected_top_level = {
+    "artifactSHA256",
+    "diagnostic",
+    "limitations",
+    "outcome",
+    "recovery",
+    "schemaVersion",
+    "sourceSHA256",
+    "task",
+}
+if set(receipt) != expected_top_level:
+    raise SystemExit("Task 35 signed Trash receipt schema drifted.")
+if (
+    receipt["schemaVersion"] != 1
+    or receipt["task"] != "epic-8-task-35"
+    or receipt["outcome"] != "signedAppTrashRecoveredReady"
+):
+    raise SystemExit("Task 35 signed Trash receipt admission drifted.")
+
+artifact_hashes = receipt["artifactSHA256"]
+if set(artifact_hashes) != {
+    "finalEvidenceStore",
+    "originalConfiguration",
+    "originalReport",
+    "recoveryConfiguration",
+    "recoveryReport",
+}:
+    raise SystemExit("Task 35 signed Trash artifact digest set drifted.")
+
+diagnostic = receipt["diagnostic"]
+if diagnostic != {
+    "error": "executionFailed",
+    "executableSHA256":
+        "bc6d645bcca74d8ce23c1d72144473c6f4f59abaa8bc8fee65a2ed74b33306ec",
+    "outcome": "signedAppTrashBlocked",
+    "trashAttemptCount": 1,
+}:
+    raise SystemExit("Task 35 original signed Trash attempt receipt drifted.")
+
+recovery = receipt["recovery"]
+expected_recovery = {
+    "cancelledCount": 0,
+    "executableSHA256":
+        "b65a635a1f437bbb3648db2aec22de000d90776245458574b7ea60c78266b4b4",
+    "executorInvocationCount": 0,
+    "failedCount": 0,
+    "journalID": "run-c86bf521-86d1-45fa-b9c8-854a951aa3b2",
+    "journalStageAfter": "finalized",
+    "journalStageBefore": "actionOutcomeRecorded",
+    "manifestID":
+        "manifest-c2d3c0d3-1470-4075-b819-fff5f941fbbd",
+    "manifestRecordCount": 1,
+    "movedToTrashLogicalBytes": 128,
+    "originalPresent": True,
+    "permanentlyReleasedLogicalBytes": 0,
+    "processedLogicalBytes": 128,
+    "restoreOutcome": "restored",
+    "selectedLogicalBytes": 128,
+    "succeededCount": 1,
+    "trashPresent": False,
+    "unknownCount": 0,
+}
+if recovery != expected_recovery:
+    raise SystemExit("Task 35 recovery-only receipt drifted.")
+
+expected_limitations = {
+    "diagnostic-owned disposable fixture only",
+    "local ad-hoc signed Debug App only",
+    "no release distribution claim",
+    "raw evidence remains external and local",
+    "ordinary App execution remains write-disabled",
+}
+if set(receipt["limitations"]) != expected_limitations:
+    raise SystemExit("Task 35 receipt limitations drifted.")
+
+def sha256(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+source_hashes = receipt["sourceSHA256"]
+expected_source_paths = {
+    "Sources/StornautCore/Actions/ActionExecutor.swift",
+    "Sources/StornautCore/Actions/CleanupExecutionCoordinator.swift",
+    "Sources/StornautCore/Actions/CleanupExecutionRuntime.swift",
+    "Sources/StornautCore/Actions/TrashMoving.swift",
+    "Sources/StornautCore/Evidence/EvidenceStore.swift",
+    "Sources/StornautCore/Evidence/SQLiteConnection.swift",
+    "Sources/StornautCore/Policy/CleanupPolicyContextCollector.swift",
+    "Sources/StornautCore/QuickScan/QuickScanCoordinator.swift",
+    "Sources/StornautCore/QuickScan/ScanSessionWriter.swift",
+    "Sources/StornautCore/Resources/BuiltInExecutionProfileCatalog.json",
+    "Sources/StornautCore/Resources/BuiltInRuleCatalog.json",
+    "Sources/StornautCore/Review/CleanupPlanBuilder.swift",
+    "Sources/StornautCore/Review/ExecutableEvidenceResolver.swift",
+    "Stornaut.xcodeproj/project.pbxproj",
+    "StornautApp/AppState/AppDependencies.swift",
+    "StornautApp/AppState/DebugAppFixtures.swift",
+    "StornautApp/AppState/StornautAppModel.swift",
+    "StornautApp/Diagnostics/PhaseCTrashDiagnosticHarness.swift",
+    "StornautApp/Diagnostics/PhaseCTrashRecoveryHarness.swift",
+    "StornautApp/Review/ReviewModel.swift",
+    "StornautApp/Review/ReviewState.swift",
+    "StornautApp/StornautApp.swift",
+    "scripts/verify",
+    "scripts/verify-app-release-boundaries",
+    "scripts/verify-cleanup-execution-boundaries",
+    "scripts/verify-contract",
+    "scripts/verify-phase-c-gate",
+    "scripts/verify-phase-c-trash-diagnostic",
+    "scripts/verify-phase-c-trash-diagnostic-contract",
+    "scripts/verify-phase-c-trash-receipt",
+    "scripts/verify-phase-c-trash-recovery",
+}
+if (
+    not isinstance(source_hashes, dict)
+    or set(source_hashes) != expected_source_paths
+):
+    raise SystemExit("Task 35 source binding set drifted.")
+for raw_path, expected_hash in source_hashes.items():
+    path = pathlib.Path(raw_path)
+    if (
+        path.is_absolute()
+        or ".." in path.parts
+        or not path.is_file()
+        or path.is_symlink()
+        or sha256(path) != expected_hash
+    ):
+        raise SystemExit(
+            f"Task 35 safety-critical source binding drifted: {raw_path}"
+        )
+
+serialized = receipt_path.read_text(encoding="utf-8")
+for forbidden in (
+    "/Users/",
+    "/private/",
+    "optInNonce",
+    "recoveryOptInNonce",
+    "returnedTrashPath",
+):
+    if forbidden in serialized:
+        raise SystemExit(
+            f"Task 35 checked receipt contains private data: {forbidden}"
+        )
+
+if not external_root_value:
+    print(
+        "Phase C signed Trash checked receipt and source binding passed "
+        "(external raw evidence not requested)."
+    )
+    raise SystemExit(0)
+
+root = pathlib.Path(external_root_value)
+if (
+    not root.is_absolute()
+    or root.is_symlink()
+    or not root.is_dir()
+    or not root.name.startswith("stornaut-phase-c-trash.")
+):
+    raise SystemExit("Task 35 external evidence root is unsafe.")
+root_stat = root.stat()
+if (
+    stat.S_IMODE(root_stat.st_mode) != 0o700
+    or root_stat.st_uid != os.geteuid()
+):
+    raise SystemExit("Task 35 external evidence root ownership drifted.")
+
+config_path = root / "config.json"
+original_report_path = root / "report.json"
+database_path = (
+    root / "support/com.eriklee.stornaut/Evidence.sqlite"
+)
+for path, digest_key in (
+    (config_path, "originalConfiguration"),
+    (original_report_path, "originalReport"),
+    (database_path, "finalEvidenceStore"),
+):
+    if (
+        not path.is_file()
+        or path.is_symlink()
+        or sha256(path) != artifact_hashes[digest_key]
+    ):
+        raise SystemExit(
+            f"Task 35 external artifact digest drifted: {digest_key}"
+        )
+
+def one_matching_artifact(pattern, digest_key):
+    matches = [
+        path
+        for path in root.glob(pattern)
+        if path.is_file()
+        and not path.is_symlink()
+        and sha256(path) == artifact_hashes[digest_key]
+    ]
+    if len(matches) != 1:
+        raise SystemExit(
+            f"Task 35 external artifact cardinality drifted: {digest_key}"
+        )
+    return matches[0]
+
+recovery_config_path = one_matching_artifact(
+    "recovery-config-*.json",
+    "recoveryConfiguration",
+)
+recovery_report_path = one_matching_artifact(
+    "recovery-report-*.json",
+    "recoveryReport",
+)
+
+config = json.loads(config_path.read_text(encoding="utf-8"))
+original_report = json.loads(
+    original_report_path.read_text(encoding="utf-8")
+)
+recovery_config = json.loads(
+    recovery_config_path.read_text(encoding="utf-8")
+)
+recovery_report = json.loads(
+    recovery_report_path.read_text(encoding="utf-8")
+)
+
+if (
+    config.get("schemaVersion") != 1
+    or config.get("diagnosticRoot") != str(root)
+    or config.get("expectedRelativePath") != ".npm/_cacache"
+    or config.get("expectedExecutableSHA256")
+        != diagnostic["executableSHA256"]
+):
+    raise SystemExit("Task 35 original configuration binding drifted.")
+if (
+    original_report.get("schemaVersion") != 2
+    or original_report.get("nonce") != config.get("nonce")
+    or original_report.get("outcome") != diagnostic["outcome"]
+    or original_report.get("error") != diagnostic["error"]
+    or original_report.get("trashAttemptCount")
+        != diagnostic["trashAttemptCount"]
+    or original_report.get("configured") is not True
+    or original_report.get("planned") is not True
+    or original_report.get("restored") is not False
+    or original_report.get("originalIdentity")
+        != original_report.get("destinationIdentity")
+    or original_report.get("residual")
+        != {
+            "fixtureRootPresent": True,
+            "originalPresent": False,
+            "trashPresent": True,
+        }
+):
+    raise SystemExit("Task 35 original report truth drifted.")
+if (
+    recovery_config.get("diagnosticNonce") != config.get("nonce")
+    or recovery_config.get("expectedOriginalExecutableSHA256")
+        != diagnostic["executableSHA256"]
+    or recovery_config.get("expectedRecoveryExecutableSHA256")
+        != recovery["executableSHA256"]
+    or recovery_config.get("expectedJournalID")
+        != recovery["journalID"]
+    or recovery_config.get("expectedManifestID")
+        != recovery["manifestID"]
+    or recovery_config.get("expectedDatabaseSHA256")
+        == artifact_hashes["finalEvidenceStore"]
+):
+    raise SystemExit("Task 35 recovery configuration binding drifted.")
+if (
+    recovery_report.get("schemaVersion") != 1
+    or recovery_report.get("outcome")
+        != "signedAppTrashRecoveryReady"
+    or recovery_report.get("recoveryExecutableSHA256")
+        != recovery["executableSHA256"]
+    or recovery_report.get("originalExecutableSHA256")
+        != diagnostic["executableSHA256"]
+    or recovery_report.get("journalID") != recovery["journalID"]
+    or recovery_report.get("journalStageBeforeRecovery")
+        != recovery["journalStageBefore"]
+    or recovery_report.get("journalStageAfterRecovery")
+        != recovery["journalStageAfter"]
+    or recovery_report.get("manifestID") != recovery["manifestID"]
+    or recovery_report.get("executorInvocationCount")
+        != recovery["executorInvocationCount"]
+    or recovery_report.get("retainedTrashAttemptCount") != 1
+    or recovery_report.get("restoreOutcome")
+        != recovery["restoreOutcome"]
+    or recovery_report.get("originalPresent") is not True
+    or recovery_report.get("trashPresent") is not False
+    or recovery_report.get("error") is not None
+):
+    raise SystemExit("Task 35 recovery report truth drifted.")
+
+for report_key, receipt_key in (
+    ("manifestRecordCount", "manifestRecordCount"),
+    ("succeededCount", "succeededCount"),
+    ("failedCount", "failedCount"),
+    ("cancelledCount", "cancelledCount"),
+    ("unknownCount", "unknownCount"),
+    ("selectedLogicalBytes", "selectedLogicalBytes"),
+    ("processedLogicalBytes", "processedLogicalBytes"),
+    ("movedToTrashLogicalBytes", "movedToTrashLogicalBytes"),
+    (
+        "permanentlyReleasedLogicalBytes",
+        "permanentlyReleasedLogicalBytes",
+    ),
+):
+    if recovery_report.get(report_key) != recovery[receipt_key]:
+        raise SystemExit(
+            f"Task 35 recovery report field drifted: {report_key}"
+        )
+
+connection = sqlite3.connect(
+    f"file:{database_path.as_posix()}?mode=ro&immutable=1",
+    uri=True,
+)
+integrity = connection.execute("PRAGMA integrity_check").fetchall()
+journals = connection.execute(
+    "SELECT id, stage, payload FROM cleanup_run_journals"
+).fetchall()
+manifests = connection.execute(
+    "SELECT id, payload FROM cleanup_manifests"
+).fetchall()
+connection.close()
+if integrity != [("ok",)] or len(journals) != 1 or len(manifests) != 1:
+    raise SystemExit("Task 35 final Store integrity drifted.")
+journal_id, journal_stage, journal_payload = journals[0]
+manifest_id, manifest_payload = manifests[0]
+journal = json.loads(journal_payload)
+manifest = json.loads(manifest_payload)
+if (
+    journal_id != recovery["journalID"]
+    or journal_stage != "finalized"
+    or journal.get("stage") != "finalized"
+    or journal.get("manifestID") != recovery["manifestID"]
+    or len(journal.get("entries", [])) != 1
+    or manifest_id != recovery["manifestID"]
+    or len(manifest.get("records", [])) != 1
+    or manifest.get("summary", {}).get("succeededCount") != 1
+    or manifest.get("summary", {}).get("failedCount") != 0
+    or manifest.get("summary", {}).get("cancelledCount") != 0
+    or manifest.get("summary", {}).get("unknownCount") != 0
+    or manifest.get("summary", {}).get(
+        "permanentlyReleasedLogicalBytes"
+    )
+        != 0
+):
+    raise SystemExit("Task 35 final journal or Manifest truth drifted.")
+
+def file_identity(path):
+    information = os.lstat(path)
+    return {
+        "allocatedBytes": information.st_blocks * 512,
+        "device": information.st_dev,
+        "inode": information.st_ino,
+        "linkCount": information.st_nlink,
+        "mode": information.st_mode,
+        "modificationNanoseconds":
+            information.st_mtime_ns % 1_000_000_000,
+        "modificationSeconds":
+            information.st_mtime_ns // 1_000_000_000,
+        "ownerGroupID": information.st_gid,
+        "ownerUserID": information.st_uid,
+        "size": information.st_size,
+    }
+
+fixture = (
+    pathlib.Path(config["fixtureRoot"])
+    / config["expectedRelativePath"]
+)
+returned_trash = pathlib.Path(original_report["returnedTrashPath"])
+expected_identity = original_report["originalIdentity"]
+marker = (
+    fixture
+    / f".stornaut-phase-c-trash-item-{config['nonce']}"
+)
+if (
+    not fixture.is_dir()
+    or fixture.is_symlink()
+    or file_identity(fixture) != expected_identity
+    or returned_trash.exists()
+    or returned_trash.is_symlink()
+    or marker.read_text(encoding="utf-8")
+        != f"stornaut-phase-c-trash-item:{config['nonce']}"
+):
+    raise SystemExit("Task 35 final fixture or Trash residual drifted.")
+
+print(
+    "Phase C signed Trash checked receipt, source binding, raw Store, "
+    "and restored fixture passed."
+)
+PY

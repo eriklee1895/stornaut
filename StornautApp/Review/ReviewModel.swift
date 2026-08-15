@@ -126,7 +126,7 @@ struct ReviewConfirmationModel: Sendable, Equatable {
         permanentReleaseBytes = ByteCount(0)!
         recoveryCaveatKey = confirmation.recoveryCaveatKey
         canConfirmExecution =
-            snapshot.executionAvailability == .debugFake
+            snapshot.executionAvailability.admitsExecution
         availableActions = canConfirmExecution
             ? [.cancel, .confirm]
             : [.cancel]

@@ -10,11 +10,15 @@ struct StornautApp: App {
     init() {
         LaunchAppearanceOverride.apply()
         _appModel = State(
-            initialValue: Self.makeComposition().model
+            initialValue: Self.makeComposition(
+                arguments: CommandLine.arguments
+            ).model
         )
 #if DEBUG
         IsolationProbeHarness.startIfRequested()
         CapabilityRuntimeProbeHarness.startIfRequested()
+        PhaseCTrashDiagnosticHarness.startIfRequested()
+        PhaseCTrashRecoveryHarness.startIfRequested()
 #endif
     }
 
@@ -90,32 +94,41 @@ struct StornautApp: App {
     }
 
     @MainActor
-    private static func makeComposition() -> AppComposition {
+    static func makeComposition(
+        arguments: [String]
+    ) -> AppComposition {
 #if DEBUG
+        if PhaseCTrashDiagnosticLaunchRequest(arguments: arguments)
+            != nil
+            || PhaseCTrashRecoveryLaunchRequest(arguments: arguments)
+                != nil
+        {
+            return AppComposition.phaseCTrashDiagnostic()
+        }
         if let selection = DebugAppFixtureSelection(
-            arguments: CommandLine.arguments
+            arguments: arguments
         ) {
             do {
                 return try AppComposition.debugFixture(
                     selection: selection,
                     historySelection: DebugHistoryFixtureSelection(
-                        arguments: CommandLine.arguments
+                        arguments: arguments
                     ),
                     reviewSelection: DebugReviewFixtureSelection(
-                        arguments: CommandLine.arguments
+                        arguments: arguments
                     ),
                     cleanupSelection: DebugCleanupFixtureSelection(
-                        arguments: CommandLine.arguments
+                        arguments: arguments
                     ),
                     autoRunsCleanupTerminal:
                         DebugCleanupAutoRun.enabled(
-                            arguments: CommandLine.arguments
+                            arguments: arguments
                         ),
                     settingsSelection: DebugSettingsFixtureSelection(
-                        arguments: CommandLine.arguments
+                        arguments: arguments
                     ),
                     settingsLanguage: DebugSettingsLanguage.selection(
-                        arguments: CommandLine.arguments
+                        arguments: arguments
                     )
                 )
             } catch {
@@ -146,7 +159,8 @@ struct StornautApp: App {
                     throw error
                 },
                 initialState: state
-            )
+            ),
+            kind: .failed
         )
     }
 }

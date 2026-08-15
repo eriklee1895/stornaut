@@ -183,6 +183,37 @@ func reviewConfirmationAndStaleModelsExposeOnlyApprovedActions() throws {
 }
 
 @Test
+func reviewConfirmationAllowsOnlyExplicitExecutionAvailabilities() throws {
+    let fixture = try ReviewAppFixture()
+
+    for availability in [
+        ReviewExecutionAvailability.debugFake,
+        .productionTrash,
+    ] {
+        let snapshot = try ReviewSnapshot(
+            plan: fixture.plan,
+            projection: fixture.projection,
+            generation: 1,
+            executionAvailability: availability
+        )
+        let selection = try #require(snapshot.reviewSelection)
+        let evaluation = try ReviewConfirmationFixture.evaluate(
+            plan: fixture.plan,
+            selection: selection,
+            activityFacts: .inactive
+        )
+        let confirmation = try #require(evaluation.allowed?.confirmation)
+        let model = try ReviewConfirmationModel(
+            snapshot: snapshot,
+            confirmation: confirmation
+        )
+
+        #expect(model.canConfirmExecution)
+        #expect(model.availableActions == [.cancel, .confirm])
+    }
+}
+
+@Test
 func reviewLocalizationKeysResolveInBothLanguages() throws {
     let bundle = try #require(Bundle(identifier: "com.eriklee.stornaut"))
 

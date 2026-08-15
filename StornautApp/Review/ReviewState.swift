@@ -57,6 +57,16 @@ enum ReviewExecutionAvailability:
 {
     case writeDisabled
     case debugFake
+    case productionTrash
+
+    var admitsExecution: Bool {
+        switch self {
+        case .writeDisabled:
+            false
+        case .debugFake, .productionTrash:
+            true
+        }
+    }
 }
 
 enum ReviewExecutionBlockReason:
@@ -250,7 +260,7 @@ struct ReviewSnapshot: Sendable, Equatable {
     }
 
     var canExecute: Bool {
-        canPreflight && executionAvailability == .debugFake
+        canPreflight && executionAvailability.admitsExecution
     }
 
     func focusing(
@@ -514,7 +524,7 @@ struct ReviewReducer: Sendable {
         guard case let .confirming(snapshot, _) = state else {
             return state
         }
-        guard snapshot.executionAvailability == .debugFake else {
+        guard snapshot.executionAvailability.admitsExecution else {
             return .executionBlocked(snapshot, .writeDisabled)
         }
         return .executing(

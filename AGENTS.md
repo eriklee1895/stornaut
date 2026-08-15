@@ -62,9 +62,27 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   Quick Scan/Manifest History union、exact local-record deletion、
   privacy-bounded export、non-causal trend marker、actual-App/Peekaboo 与
   independent review 已完成；authoritative full verifier 单次 exit 0。
-  Task 35 为下一项 Phase C gate；用户已明确授权 signed-App disposable exact
-  fixture 的 real Trash diagnostic 与 identity-checked restore。授权不覆盖任意
-  用户路径、永久删除、Empty Trash、blind retry 或普通 UI restore。
+  Task 35 的 closed real-Trash composition、strict signed-App disposable
+  diagnostic、recovery-only runtime、Phase C product gate、benchmark 与
+  Core/App regressions 已实现。唯一授权的真实 Trash attempt 已消费：
+  exact diagnostic-owned fixture 被移动且 journal durably 停在
+  `actionOutcomeRecorded`；Manifest timeline 缺陷使原 report 正确保持
+  `signedAppTrashBlocked` / `executionFailed`，没有重试。随后独立 signed
+  recovery-only App 以 Executor invocation `0` 完成 journal
+  `actionOutcomeRecorded → finalized`、one-record Manifest、1 success /
+  0 failed/cancelled/unknown、permanent bytes `0`，并按 identity 恢复 fixture，
+  原位置存在且 Trash destination 不存在。privacy-safe checked receipt 已绑定
+  原始/恢复 report、final Store 与安全关键源码。
+  diagnostic/recovery mutation scripts 现均 sealed；`scripts/verify --full`
+  最终只运行 receipt/source/raw-evidence read-only gate，绝不得再次调用真实
+  Trash 或 recovery。旧 global same-UID Node safe-window 已删除，contracts
+  禁止 `pkill`/`killall`/`pgrep`/`ps -U` 全局进程协调；Chrome、Cursor、
+  Claude、MCP 或其他 App 的进程不得因此被阻断或终止。focused product gate
+  74/74、SwiftPM 634/634、完整 App/UI、receipt/raw evidence 与
+  Debug/Release gates 已通过；authoritative `scripts/verify --full` 22/22
+  stages 单次 exit 0（847.921 秒）。最终 whole-diff 与 timestamp-focused
+  independent review 均无 unresolved P0–P2，Phase C 计划已归档，admission
+  为 `go`。
   真实 App Trash 依赖仍保持关闭，生产 Deep Dive 仍为 implementation unavailable。
   逐 Task 完成 Upstream Study、
   实现、code review、focused/full verify、独立 commit/push；不得提前混入
@@ -112,7 +130,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | 导航、文案、品牌、Light/Dark | [docs/design/ui-ux.md](docs/design/ui-ux.md) |
 | 跨 Epic 交付顺序与 Gate | [docs/plans/roadmap.md](docs/plans/roadmap.md) |
 | 当前 active plan 状态 | [docs/plans/active/README.md](docs/plans/active/README.md) |
-| Capability-first Codex Runtime Gate | [docs/plans/active/capability-first-codex-runtime-gate.md](docs/plans/active/capability-first-codex-runtime-gate.md) |
+| Capability-first Codex Runtime Gate（历史） | [docs/plans/completed/capability-first-codex-runtime-gate.md](docs/plans/completed/capability-first-codex-runtime-gate.md) |
 | R1 Runtime Study / conditional decision | [docs/upstream-studies/epic-5-capability-first-runtime.md](docs/upstream-studies/epic-5-capability-first-runtime.md) / [ADR 0013](docs/adr/0013-capability-first-runtime-containment.md) |
 | R3 Runtime behavior gate | [docs/reports/capability-first-runtime-r3-review.md](docs/reports/capability-first-runtime-r3-review.md) |
 | R4 Protocol / no-Executor gate | [docs/reports/capability-first-runtime-r4-review.md](docs/reports/capability-first-runtime-r4-review.md) |
@@ -122,19 +140,22 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | R5 current review | [docs/reports/capability-first-runtime-r5-review.md](docs/reports/capability-first-runtime-r5-review.md) |
 | Runtime final validation / R6 review | [docs/reports/capability-first-runtime-validation-report.md](docs/reports/capability-first-runtime-validation-report.md) / [docs/reports/capability-first-runtime-r6-review.md](docs/reports/capability-first-runtime-r6-review.md) |
 | Runtime R2–R6 progress audit | [docs/reports/capability-first-runtime-progress-audit-2026-08-13.md](docs/reports/capability-first-runtime-progress-audit-2026-08-13.md) |
-| Phase C Epic 8 获批计划 | [docs/plans/active/epic-8-safe-execution-vertical-slice.md](docs/plans/active/epic-8-safe-execution-vertical-slice.md) |
-| Epic 8 Task 29 tests-first brief | [docs/plans/active/task-29-implementation-brief.md](docs/plans/active/task-29-implementation-brief.md) |
+| Phase C Epic 8 已完成计划 | [docs/plans/completed/epic-8-safe-execution-vertical-slice.md](docs/plans/completed/epic-8-safe-execution-vertical-slice.md) |
+| Epic 8 Task 29 tests-first brief | [docs/plans/completed/task-29-implementation-brief.md](docs/plans/completed/task-29-implementation-brief.md) |
 | Epic 8 Task 29 review / completion audit | [docs/reports/epic-8-task-29-review.md](docs/reports/epic-8-task-29-review.md) |
-| Epic 8 Task 30 tests-first brief | [docs/plans/active/task-30-implementation-brief.md](docs/plans/active/task-30-implementation-brief.md) |
+| Epic 8 Task 30 tests-first brief | [docs/plans/completed/task-30-implementation-brief.md](docs/plans/completed/task-30-implementation-brief.md) |
 | Epic 8 Task 30 review / completion audit | [docs/reports/epic-8-task-30-review.md](docs/reports/epic-8-task-30-review.md) |
-| Epic 8 Task 31 tests-first brief | [docs/plans/active/task-31-implementation-brief.md](docs/plans/active/task-31-implementation-brief.md) |
+| Epic 8 Task 31 tests-first brief | [docs/plans/completed/task-31-implementation-brief.md](docs/plans/completed/task-31-implementation-brief.md) |
 | Epic 8 Task 31 review / completion audit | [docs/reports/epic-8-task-31-review.md](docs/reports/epic-8-task-31-review.md) |
-| Epic 8 Task 32 tests-first brief | [docs/plans/active/task-32-implementation-brief.md](docs/plans/active/task-32-implementation-brief.md) |
+| Epic 8 Task 32 tests-first brief | [docs/plans/completed/task-32-implementation-brief.md](docs/plans/completed/task-32-implementation-brief.md) |
 | Epic 8 Task 32 review / completion audit | [docs/reports/epic-8-task-32-review.md](docs/reports/epic-8-task-32-review.md) |
-| Epic 8 Task 33 tests-first brief | [docs/plans/active/task-33-implementation-brief.md](docs/plans/active/task-33-implementation-brief.md) |
+| Epic 8 Task 33 tests-first brief | [docs/plans/completed/task-33-implementation-brief.md](docs/plans/completed/task-33-implementation-brief.md) |
 | Epic 8 Task 33 review / completion audit | [docs/reports/epic-8-task-33-review.md](docs/reports/epic-8-task-33-review.md) |
-| Epic 8 Task 34 tests-first brief | [docs/plans/active/task-34-implementation-brief.md](docs/plans/active/task-34-implementation-brief.md) |
+| Epic 8 Task 34 tests-first brief | [docs/plans/completed/task-34-implementation-brief.md](docs/plans/completed/task-34-implementation-brief.md) |
 | Epic 8 Task 34 review / completion audit | [docs/reports/epic-8-task-34-review.md](docs/reports/epic-8-task-34-review.md) |
+| Epic 8 Task 35 tests-first brief | [docs/plans/completed/task-35-implementation-brief.md](docs/plans/completed/task-35-implementation-brief.md) |
+| Epic 8 Task 35 review / completion audit | [docs/reports/epic-8-task-35-review.md](docs/reports/epic-8-task-35-review.md) |
+| Phase C final validation | [docs/reports/epic-8-safe-execution-validation-report.md](docs/reports/epic-8-safe-execution-validation-report.md) |
 | Epic 2–4 历史计划 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) |
 | Epic 2–4 最终 Gate | [docs/reports/epic-2-4-validation-report.md](docs/reports/epic-2-4-validation-report.md) |
 | Epic 0–1 历史计划与证据 | [docs/plans/completed/epic-0-1-foundation-spikes.md](docs/plans/completed/epic-0-1-foundation-spikes.md) |
@@ -177,8 +198,9 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   classification、provider-compatible group schema 与 fixed direct-read command
   identity。current-source signed App/helper 已得出 `signedRuntimeReady`，并在
   gate 后完成 fixed topology 零残留卸载。R6 final admission 已完成并得出
-  runtime foundation `go`；Tasks 29–34 已完成且各自通过 authoritative
-  unified verifier；Task 35 为下一项 deterministic Epic 8 gate。
+  runtime foundation `go`；Tasks 29–35 与完整 Phase C gate 已完成，
+  authoritative full verifier 单次 exit 0，计划已归档，Phase C admission
+  为 `go`。
 Deep Dive 的旧 Broker-only no-go 已被 ADR 0004 的 capability-first 边界取代；
 当前仍不可用的原因是生产 Deep Dive 尚未实现，而非 R6 或 Codex 工具能力。
 R6 不证明 release distribution、FDA/TCC 或 production Deep Dive；
@@ -225,8 +247,9 @@ scripts/check-doc-links  文档本地链接检查
 App host 拓扑已由 [`docs/upstream-studies/epic-0-foundation.md`](docs/upstream-studies/epic-0-foundation.md) 选定，bundle identifier 已确认为 `com.eriklee.stornaut`；ADR 0001 记录最终 build/signing 证据。
 
 宏观交付顺序以 [`docs/plans/roadmap.md`](docs/plans/roadmap.md) 为准。Epic
-编号表示能力归属，不要求严格按数字顺序交付；Phase C 新 plan 必须明确复用
-现有 Policy/Trash foundations，并保持所有真实执行能力关闭直到自己的 gate。
+编号表示能力归属，不要求严格按数字顺序交付；下一份 Phase D plan 必须明确
+复用现有 Runtime、Policy/Trash foundations，并保持 production Deep Dive
+和普通 App 执行能力关闭直到各自 gate。
 
 ## Working loop
 

@@ -112,7 +112,7 @@ struct CleanupExecutionJournalBuilder: Sendable {
                 outcome: nil
             )
         }
-        return try CleanupRunJournal(
+        let journal = try CleanupRunJournal(
             id: runID,
             planID: plan.id,
             manifestID: manifestID,
@@ -128,6 +128,10 @@ struct CleanupExecutionJournalBuilder: Sendable {
                 plan.expiresAt,
                 createdAt.addingTimeInterval(7 * 86_400)
             )
+        )
+        return try DomainJSON.decode(
+            CleanupRunJournal.self,
+            from: DomainJSON.encode(journal)
         )
     }
 }
@@ -751,8 +755,6 @@ actor CleanupExecutionCoordinator {
         if journal.entries.contains(where: { $0.state == .prepared }) {
             journal = try await cancelRemaining(journal, from: 0)
         }
-        let manifestCreatedAt = journal.manifestCreatedAt
-            ?? nextTimestamp(after: journal.updatedAt)
         let volumeAfter = volumeBefore == nil
             ? nil
             : sampleVolume(rootURL: rootURL)
@@ -765,6 +767,11 @@ actor CleanupExecutionCoordinator {
                 after: volumeAfter
             )
         }
+        let proposedManifestCreatedAt = journal.manifestCreatedAt
+            ?? max(
+                nextTimestamp(after: journal.updatedAt),
+                observation?.sampledAfterAt ?? journal.updatedAt
+            )
         if journal.stage != .auditPending
             && (
                 journal.stage != .manifestPending
@@ -780,12 +787,15 @@ actor CleanupExecutionCoordinator {
                 stopRequested:
                     journal.stopAfterCurrentRequested
                         || stopAfterCurrentRequested,
-                manifestCreatedAt: manifestCreatedAt,
+                manifestCreatedAt: proposedManifestCreatedAt,
                 systemObservation: observation
             )
             try await saveAndVerify(journal)
             activeJournal = journal
         }
+        let manifestCreatedAt = journal.manifestCreatedAt
+            ?? proposedManifestCreatedAt
+        let persistedObservation = journal.systemObservation
         let manifest = try accounting.manifest(
             journal: journal,
             volumeBefore: nil,
@@ -806,7 +816,7 @@ actor CleanupExecutionCoordinator {
                 updatedAt: nextTimestamp(after: journal.updatedAt),
                 stopRequested: journal.stopAfterCurrentRequested,
                 manifestCreatedAt: manifestCreatedAt,
-                systemObservation: observation
+                systemObservation: persistedObservation
             )
             try await saveAndVerify(finalized)
             return try CleanupExecutionResult(
@@ -826,7 +836,7 @@ actor CleanupExecutionCoordinator {
                     updatedAt: nextTimestamp(after: journal.updatedAt),
                     stopRequested: journal.stopAfterCurrentRequested,
                     manifestCreatedAt: manifestCreatedAt,
-                    systemObservation: observation
+                    systemObservation: persistedObservation
                 )
             do {
                 try await saveAndVerify(pending)
@@ -852,8 +862,12 @@ actor CleanupExecutionCoordinator {
             if source.stage == .auditPending
                 || source.stage == .manifestPending
             {
-                let createdAt = source.manifestCreatedAt
-                    ?? nextTimestamp(after: source.updatedAt)
+                let proposedCreatedAt = source.manifestCreatedAt
+                    ?? max(
+                        nextTimestamp(after: source.updatedAt),
+                        source.systemObservation?.sampledAfterAt
+                            ?? source.updatedAt
+                    )
                 let sourceWithMetadata: CleanupRunJournal
                 if source.manifestCreatedAt == nil {
                     sourceWithMetadata = try transitionJournal(
@@ -862,13 +876,15 @@ actor CleanupExecutionCoordinator {
                         entries: source.entries,
                         updatedAt: nextTimestamp(after: source.updatedAt),
                         stopRequested: source.stopAfterCurrentRequested,
-                        manifestCreatedAt: createdAt,
+                        manifestCreatedAt: proposedCreatedAt,
                         systemObservation: source.systemObservation
                     )
                     try await saveAndVerify(sourceWithMetadata)
                 } else {
                     sourceWithMetadata = source
                 }
+                let createdAt = sourceWithMetadata.manifestCreatedAt
+                    ?? proposedCreatedAt
                 let manifest = try accounting.manifest(
                     journal: sourceWithMetadata,
                     volumeBefore: nil,
@@ -1123,7 +1139,7 @@ actor CleanupExecutionCoordinator {
         manifestCreatedAt: Date?,
         systemObservation: ManifestSystemObservation?
     ) throws -> CleanupRunJournal {
-        try CleanupRunJournal(
+        let transitioned = try CleanupRunJournal(
             id: journal.id,
             planID: journal.planID,
             manifestID: journal.manifestID,
@@ -1145,6 +1161,10 @@ actor CleanupExecutionCoordinator {
                 ),
             manifestCreatedAt: manifestCreatedAt,
             systemObservation: systemObservation
+        )
+        return try DomainJSON.decode(
+            CleanupRunJournal.self,
+            from: DomainJSON.encode(transitioned)
         )
     }
 

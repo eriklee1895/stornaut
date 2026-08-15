@@ -1,29 +1,28 @@
 import Foundation
 
-public struct ActionExecutor: Sendable {
+struct ActionExecutor: Sendable {
     private let policyGate: ActionPolicyGate
     private let trashMoving: TrashMoving
     private let registeredActionRunner: any RegisteredActionRunning
 
-    public init(
+    init(
         policyGate: ActionPolicyGate,
-        trashMoving: TrashMoving = TrashMoving(),
-        registeredActionRunner: any RegisteredActionRunning =
-            FoundationRegisteredActionRunner()
+        trashMoving: TrashMoving,
+        registeredActionRunner: any RegisteredActionRunning
     ) {
         self.policyGate = policyGate
         self.trashMoving = trashMoving
         self.registeredActionRunner = registeredActionRunner
     }
 
-    public func preflight(
+    func preflight(
         _ action: CleanupAction,
         context: ActionPolicyContext
     ) throws -> ActionPreflightToken {
         try policyGate.preflight(action, context: context)
     }
 
-    public func execute(
+    func execute(
         _ token: ActionPreflightToken,
         context: ActionPolicyContext
     ) async throws -> ActionExecution {
@@ -84,7 +83,7 @@ public struct ActionExecutor: Sendable {
         }
     }
 
-    public func postflight(
+    func postflight(
         _ execution: ActionExecution
     ) throws -> ActionResult {
         switch execution {

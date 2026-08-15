@@ -1,0 +1,340 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+cd "$repo_root"
+
+function usage() {
+    print "Usage: scripts/verify-phase-c-gate --product-only|--signed-app-trash-receipt"
+}
+
+if [[ $# != 1 ]]; then
+    usage >&2
+    exit 64
+fi
+
+mode=$1
+case "$mode" in
+    --product-only|--signed-app-trash-receipt)
+        ;;
+    --help|-h)
+        usage
+        exit 0
+        ;;
+    *)
+        usage >&2
+        exit 64
+        ;;
+esac
+
+function verify_phase_c_structure() {
+    local required
+    for required in \
+        Sources/StornautCore/Actions/CleanupExecutionRuntime.swift \
+        Sources/StornautCore/Actions/CleanupExecutionCoordinator.swift \
+        Sources/StornautCore/Actions/ActionExecutor.swift \
+        Sources/StornautCore/Actions/TrashMoving.swift \
+        Sources/StornautCore/Policy/CleanupAuthorization.swift \
+        StornautApp/AppState/AppDependencies.swift \
+        StornautApp/Diagnostics/PhaseCTrashDiagnosticHarness.swift; do
+        [[ -f "$required" ]] || {
+            print -u2 "Missing Phase C artifact: $required"
+            return 1
+        }
+    done
+
+    scripts/verify-cleanup-policy-boundaries
+    scripts/verify-cleanup-execution-boundaries
+    scripts/verify-review-workflow-boundaries
+    scripts/verify-cleanup-result-boundaries
+    scripts/verify-history-boundaries
+    scripts/verify-codex-no-executor-boundary
+
+    python3 - <<'PY'
+import json
+from pathlib import Path
+
+
+catalog = json.loads(
+    Path(
+        "Sources/StornautCore/Resources/"
+        "BuiltInExecutionProfileCatalog.json"
+    ).read_text(encoding="utf-8")
+)
+profiles = catalog.get("profiles")
+if catalog.get("schemaVersion") != 1:
+    raise SystemExit("Phase C execution profile schema drifted")
+if catalog.get("catalogVersion") != "safe-execution-v1":
+    raise SystemExit("Phase C execution profile version drifted")
+if catalog.get("ruleCatalogVersion") != "builtin-runtime-tool-residue-v2":
+    raise SystemExit("Phase C rule catalog binding drifted")
+if not isinstance(profiles, list) or len(profiles) != 3:
+    raise SystemExit("Phase C must contain exactly three execution profiles")
+
+expected = [
+    (
+        "phase-c.go-build-cache-v1",
+        "cache-go-build",
+        "Library/Caches/go-build",
+        "never",
+    ),
+    (
+        "phase-c.npm-cacache-v1",
+        "cache-npm-content",
+        ".npm/_cacache",
+        "readyWhenEligible",
+    ),
+    (
+        "phase-c.pip-cache-v1",
+        "cache-pip",
+        "Library/Caches/pip",
+        "readyWhenEligible",
+    ),
+]
+actual = [
+    (
+        profile.get("id"),
+        profile.get("ruleID"),
+        profile.get("relativePath"),
+        profile.get("defaultSuggestion"),
+    )
+    for profile in profiles
+]
+if actual != expected:
+    raise SystemExit(f"Phase C execution profile scope drifted: {actual}")
+if sum(
+    profile.get("defaultSuggestion") == "readyWhenEligible"
+    for profile in profiles
+) != 2:
+    raise SystemExit("Phase C must have exactly two default-ready profiles")
+if any(profile.get("expectedKind") != "directory" for profile in profiles):
+    raise SystemExit("Phase C execution profile kind drifted")
+PY
+
+    python3 - <<'PY'
+from pathlib import Path
+import re
+
+
+runtime_path = Path(
+    "Sources/StornautCore/Actions/CleanupExecutionRuntime.swift"
+)
+runtime = runtime_path.read_text(encoding="utf-8")
+executor = Path(
+    "Sources/StornautCore/Actions/ActionExecutor.swift"
+).read_text(encoding="utf-8")
+trash = Path(
+    "Sources/StornautCore/Actions/TrashMoving.swift"
+).read_text(encoding="utf-8")
+app_dependencies = Path(
+    "StornautApp/AppState/AppDependencies.swift"
+).read_text(encoding="utf-8")
+
+required_runtime = {
+    "public actor CleanupExecutionRuntime",
+    "ActionRegistry(definitions: [])",
+    "adapter: FileManagerTrashAdapter()",
+    "DenyRegisteredActionRunner()",
+    "public func preflight(",
+    "public func execute(",
+    "public func requestStopAfterCurrent()",
+    "public func retrySavingAudit(",
+    "public func recover()",
+}
+missing = sorted(token for token in required_runtime if token not in runtime)
+if missing:
+    raise SystemExit(f"closed execution runtime is incomplete: {missing}")
+if re.search(
+    r"public\s+init\s*\(\s*store:\s*EvidenceStore",
+    runtime,
+):
+    raise SystemExit(
+        "closed Foundation Trash constructor escaped StornautCore"
+    )
+for forbidden in {
+    "FoundationRegisteredActionRunner()",
+    "public let authorization",
+    "public let coordinator",
+    "Process(",
+    "posix_spawn",
+    "URLSession",
+    "removeItem",
+}:
+    if forbidden in runtime:
+        raise SystemExit(
+            f"closed execution runtime contains prohibited surface: {forbidden}"
+        )
+if "public struct ActionExecutor" in executor:
+    raise SystemExit("ActionExecutor escaped the StornautCore boundary")
+if "public struct TrashMoving" in trash:
+    raise SystemExit("TrashMoving escaped the StornautCore boundary")
+if "public struct FileManagerTrashAdapter" in trash:
+    raise SystemExit("Foundation Trash adapter escaped the Core boundary")
+if re.search(r"TrashMoving\s*\(\s*\)", trash + executor):
+    raise SystemExit("TrashMoving regained an implicit real adapter")
+if "trashMoving: TrashMoving =" in executor:
+    raise SystemExit("ActionExecutor regained an implicit Trash executor")
+if "registeredActionRunner: any RegisteredActionRunning =" in executor:
+    raise SystemExit("ActionExecutor regained an implicit process runner")
+if trash.count("FileManager.default.trashItem(") != 1:
+    raise SystemExit("Foundation Trash mutation count drifted")
+if "FileManagerTrashAdapter" in app_dependencies:
+    raise SystemExit("AppDependencies constructs the raw Trash adapter")
+if "reviewExecutionAvailability: .writeDisabled" not in app_dependencies:
+    raise SystemExit("normal App composition did not remain write-disabled")
+live_start = app_dependencies.find("    static func live(")
+diagnostic_start = app_dependencies.find(
+    "\n#if DEBUG\n    static func phaseCTrashDiagnostic(",
+    live_start,
+)
+diagnostic_end = app_dependencies.find(
+    "\n#endif",
+    diagnostic_start,
+)
+if min(live_start, diagnostic_start, diagnostic_end) < 0:
+    raise SystemExit("App dependency composition boundaries drifted")
+live_composition = app_dependencies[live_start:diagnostic_start]
+diagnostic_composition = app_dependencies[
+    diagnostic_start:diagnostic_end
+]
+for forbidden in {
+    "ReviewExecutionAvailability",
+    "ExecutableEvidenceResolver",
+    "ExecutionRuntimeFactory",
+    "productionTrash",
+    "makeExecutionRuntime",
+}:
+    if forbidden in live_composition:
+        raise SystemExit(
+            "normal App composition retained execution authority: "
+            f"{forbidden}"
+        )
+for required in {
+    "static func phaseCTrashDiagnostic(",
+    "diagnosticEvidenceResolver: ExecutableEvidenceResolver",
+    "makeExecutionRuntime:",
+    "executionAvailability: .productionTrash",
+}:
+    if required not in diagnostic_composition:
+        raise SystemExit(
+            f"DEBUG diagnostic composition omitted: {required}"
+        )
+diagnostic = Path(
+    "StornautApp/Diagnostics/PhaseCTrashDiagnosticHarness.swift"
+).read_text(encoding="utf-8")
+diagnostic_script = Path(
+    "scripts/verify-phase-c-trash-diagnostic"
+).read_text(encoding="utf-8")
+for required in {
+    "AppDependencies.phaseCTrashDiagnostic(",
+    "makeExecutionRuntime:",
+    "CleanupExecutionRuntime.diagnostic(",
+}:
+    if required not in diagnostic:
+        raise SystemExit(
+            f"signed-App diagnostic omitted closed Trash injection: {required}"
+        )
+for forbidden in {
+    "FileManager.default.removeItem(",
+    "unlink(",
+    "rmdir(",
+}:
+    if forbidden in diagnostic:
+        raise SystemExit(
+            f"signed-App diagnostic contains permanent cleanup: {forbidden}"
+        )
+if re.search(r"(^|[;&|\s])rm(\s|$)", diagnostic_script):
+    raise SystemExit(
+        "signed-App diagnostic verifier contains shell cleanup"
+    )
+
+app_roots = [
+    Path("StornautApp/Review"),
+    Path("StornautApp/Cleanup"),
+    Path("StornautApp/History"),
+    Path("StornautApp/Scan"),
+    Path("StornautApp/AppShell"),
+]
+for root in app_roots:
+    for path in root.rglob("*.swift"):
+        source = path.read_text(encoding="utf-8")
+        for forbidden in {
+            "CleanupExecutionRuntime",
+            "FileManagerTrashAdapter",
+            "ActionExecutor",
+            "TrashMoving",
+            "ExecutionAuthorization",
+        }:
+            if forbidden in source:
+                raise SystemExit(
+                    f"{path} reaches execution authority: {forbidden}"
+                )
+PY
+
+    if rg -n \
+        'StornautCodex|StornautProbeBridge|ProbeBridge|ExternalAdapter' \
+        Sources/StornautCore/Actions/CleanupExecutionRuntime.swift \
+        Sources/StornautCore/Actions/CleanupExecutionCoordinator.swift \
+        Sources/StornautCore/Policy; then
+        print -u2 "Deterministic execution reaches Agent/Adapter code."
+        return 1
+    fi
+
+    if rg -n \
+        'removeItem\s*\(|unlink\s*\(|rmdir\s*\(|Empty Trash|Delete Permanently' \
+        Sources/StornautCore/Actions \
+        Sources/StornautCore/Policy \
+        StornautApp/AppState \
+        StornautApp/Review \
+        StornautApp/Cleanup; then
+        print -u2 "Phase C production flow contains permanent-delete surface."
+        return 1
+    fi
+
+    if rg -n \
+        'MenuBarExtra|SMAppService|NSBackgroundActivityScheduler|Timer\.scheduled|LaunchAtLogin|telemetry|remote rule service' \
+        Sources/StornautCore \
+        StornautApp \
+        --glob '*.swift'; then
+        print -u2 "Phase C scope gained background, telemetry or remote service."
+        return 1
+    fi
+
+    if rg -n \
+        'STORNAUT_PHASE_C_TRASH_OPT_IN|stornaut-phase-c-trash-config' \
+        Sources/StornautCore \
+        StornautApp \
+        --glob '*.swift' \
+        --glob '!**/PhaseCTrashDiagnosticHarness.swift' \
+        --glob '!**/PhaseCTrashRecoveryHarness.swift'; then
+        print -u2 "Phase C diagnostic opt-in leaked outside the DEBUG harness."
+        return 1
+    fi
+
+    if [[ -n "$(git status --short -- Package.swift Package.resolved ThirdPartyNotices)" ]]; then
+        print -u2 "Phase C introduced unreviewed dependency/license drift."
+        return 1
+    fi
+}
+
+function run_product_only() {
+    local focused_tests
+    focused_tests='(phaseCOneHundredItemPolicyAuthorizationAndAuditStayBounded|cleanupPlanBuilderStreamsFourThousandRowsAndRetainsLateProfiles|cleanupPolicyCollectorUsesOneActivityCaptureAndProducesAllowedContext|cleanupExecutionRuntime|cleanupExecutionCoordinator|cleanupAuthorization|cleanupPolicy|cleanupJournal|cleanupAccounting|cleanupHistory|cleanupStore|trashMoving|actionPolicy)'
+
+    swift test --no-parallel --filter "$focused_tests"
+    verify_phase_c_structure
+    print "Phase C product, benchmark and scope verification passed."
+}
+
+function verify_signed_app_trash_receipt() {
+    verify_phase_c_structure
+    scripts/verify-phase-c-trash-receipt
+    print "Phase C signed-App Trash receipt verification passed."
+}
+
+if [[ "$mode" == --product-only ]]; then
+    run_product_only
+else
+    verify_signed_app_trash_receipt
+fi

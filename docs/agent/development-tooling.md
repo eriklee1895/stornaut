@@ -208,6 +208,19 @@ execution as concurrency stress. A future dedicated UI lab is a separate
 security and operations decision; see
 [ADR 0015](../adr/0015-headless-ci-verification.md).
 
+The Phase C signed-App mutation is complete and sealed. `scripts/verify --full`
+now ends with a non-mutating checked-receipt gate. It verifies safety-critical
+source hashes and, when `STORNAUT_PHASE_C_TRASH_EVIDENCE_ROOT` is supplied,
+the retained original/recovery reports, final Evidence Store and restored
+residual. It never launches the Trash or recovery harness.
+
+The former global same-user Node safe-window was deleted. Repository
+verification must not enumerate, suspend, signal or terminate Chrome, Cursor,
+Claude, MCP servers or other user Apps merely because they contain Node
+processes. `scripts/verify-contract` rejects reintroduction of global
+`pkill`/`killall`/`pgrep`/same-UID `ps` coordination. This does not weaken
+ordinary product Activity policy for real cache candidates.
+
 ## 6. Upgrades and Failure Policy
 
 Before upgrading either tool:

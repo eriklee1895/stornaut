@@ -26,7 +26,76 @@ require_fixed_text scripts/verify '--full'
 require_fixed_text scripts/verify '--list-steps'
 require_fixed_text scripts/verify '.derivedData/verification'
 require_fixed_text scripts/verify 'swift test --no-parallel'
+require_fixed_text scripts/verify '--parallel --num-workers 4'
+require_fixed_text scripts/verify \
+    'SWT_EXPERIMENTAL_MAXIMUM_PARALLELIZATION_WIDTH=2'
 require_fixed_text scripts/verify-phase-b-gate '--product-only'
+require_fixed_text scripts/verify-phase-c-gate '--product-only'
+require_fixed_text scripts/verify-phase-c-gate \
+    '--signed-app-trash-receipt'
+require_fixed_text scripts/verify-phase-c-gate \
+    'scripts/verify-phase-c-trash-receipt'
+require_fixed_text scripts/verify \
+    'phase-c-trash-diagnostic-contract'
+require_fixed_text scripts/verify-phase-c-trash-diagnostic-contract \
+    'phaseCTrashDiagnostic'
+require_fixed_text scripts/verify-phase-c-trash-diagnostic-contract \
+    'isolated-diagnostic-attested'
+require_fixed_text scripts/verify-phase-c-trash-diagnostic-contract \
+    'diagnosticEvidenceResolver'
+require_fixed_text scripts/verify-phase-c-trash-diagnostic \
+    'Task 35 signed Trash mutation is sealed'
+require_fixed_text scripts/verify-phase-c-trash-recovery \
+    'Task 35 recovery mutation is sealed'
+if [[ -e scripts/verify-phase-c-trash-safe-window ]]; then
+    fail_contract \
+        "Obsolete global Phase C Trash safe-window still exists"
+fi
+
+python3 - <<'PY'
+from pathlib import Path
+
+
+source = Path("scripts/verify-phase-c-gate").read_text(encoding="utf-8")
+if "verify-phase-c-trash-safe-window" in source:
+    raise SystemExit(
+        "Phase C signed-App gate still depends on global process activity"
+    )
+if 'scripts/verify-phase-c-trash-diagnostic "$' in source:
+    raise SystemExit(
+        "Phase C gate regained a signed-App Trash mutation"
+    )
+if 'scripts/verify-phase-c-trash-recovery "$' in source:
+    raise SystemExit(
+        "Phase C gate regained a recovery mutation"
+    )
+if source.count("scripts/verify-phase-c-trash-receipt") != 1:
+    raise SystemExit(
+        "Phase C gate receipt verification cardinality drifted"
+    )
+
+phase_c_scripts = [
+    Path("scripts/verify"),
+    Path("scripts/verify-phase-c-gate"),
+    Path("scripts/verify-phase-c-trash-diagnostic"),
+    Path("scripts/verify-phase-c-trash-diagnostic-contract"),
+    Path("scripts/verify-phase-c-trash-recovery"),
+    Path("scripts/verify-phase-c-trash-receipt"),
+]
+for path in phase_c_scripts:
+    text = path.read_text(encoding="utf-8")
+    for prohibited in (
+        "pkill",
+        "killall",
+        "pgrep",
+        'ps -U "$uid"',
+        "blocked_process_names",
+    ):
+        if prohibited in text:
+            raise SystemExit(
+                f"{path} regained global process coordination: {prohibited}"
+            )
+PY
 
 if rg -n \
     '^[[:space:]]*swift[[:space:]]+(build|run|test)([[:space:]]|$)' \
@@ -53,12 +122,17 @@ require_fixed_text "$unknown_output" 'Usage:'
 headless_steps=$(scripts/verify --headless --list-steps)
 full_steps=$(scripts/verify --full --list-steps)
 
-expected_headless_steps=$'source-boundaries\nlocalization-contract\nverifier-contract\ndocs-and-diff\nswiftpm-tests-serialized\nrule-compiler\napp-contract-tests'
+expected_headless_steps=$'source-boundaries\nlocalization-contract\nverifier-contract\ndocs-and-diff\nswiftpm-tests-serialized\nrule-compiler\napp-contract-tests\nphase-c-product'
 if [[ "$headless_steps" != "$expected_headless_steps" ]]; then
-    fail_contract "Headless verifier steps differ from the lean seven-step contract"
+    fail_contract "Headless verifier steps differ from the lean eight-step contract"
+fi
+if [[ "${full_steps%%$'\n'*}" != "phase-c-trash-diagnostic-contract" ]]; then
+    fail_contract \
+        "Full verifier does not fail fast on the target-aware Trash diagnostic contract"
 fi
 
 typeset -a forbidden_headless_steps=(
+    phase-c-trash-diagnostic-contract
     clean-derived-data
     swiftpm-build
     automation-parser-self-test
@@ -95,7 +169,9 @@ for expected in \
     ui-screenshot-contract \
     app-tests-and-snapshots \
     matcher-benchmarks \
-    phase-b-product; do
+    phase-b-product \
+    phase-c-product \
+    phase-c-signed-app-trash-receipt; do
     if [[ "$full_steps" != *"$expected"* ]]; then
         fail_contract "Full verifier omitted $expected"
     fi
@@ -105,6 +181,25 @@ contract_root=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-verify-contract.XXXXXX")
 mkdir -p "$contract_root/scripts"
 cp scripts/verify "$contract_root/scripts/verify"
 chmod 755 "$contract_root/scripts/verify"
+cat > "$contract_root/scripts/verify-phase-c-trash-diagnostic-contract" <<'SH'
+#!/bin/sh
+echo "synthetic target-aware diagnostic contract failure" >&2
+exit 75
+SH
+chmod 755 "$contract_root/scripts/verify-phase-c-trash-diagnostic-contract"
+diagnostic_contract_output="$contract_root/diagnostic-contract.log"
+if "$contract_root/scripts/verify" --full \
+    >"$diagnostic_contract_output" 2>&1
+then
+    fail_contract "Full verifier ignored a broken target-aware Trash contract"
+fi
+require_fixed_text "$diagnostic_contract_output" \
+    '[verify][full] FAIL  phase-c-trash-diagnostic-contract'
+if rg -q 'START ui-automation-readiness' "$diagnostic_contract_output"; then
+    fail_contract \
+        "Full verifier entered UI readiness after a broken Trash diagnostic contract"
+fi
+
 typeset -a source_boundaries=(
     verify-activity-boundaries
     verify-quick-scan-boundaries
@@ -142,6 +237,8 @@ require_fixed_text "$source_failure_output" \
 if rg -q 'START localization-contract' "$source_failure_output"; then
     fail_contract "Verifier continued after a failing source boundary"
 fi
+
+scripts/verify-phase-c-trash-diagnostic-contract
 
 require_fixed_text scripts/verify \
     '-skip-testing:StornautAppTests/DesignSystemSnapshotTests'

@@ -39,6 +39,91 @@ func cleanupPolicyCollectorUsesOneActivityCaptureAndProducesAllowedContext()
 }
 
 @Test
+func cleanupPolicyCollectorAdmitsOnlyMatchingDiagnosticEvidence()
+    async throws
+{
+    let nonce = UUID().uuidString.lowercased()
+    let fixture = try await CleanupPolicyCollectorFixture(
+        diagnosticNonce: nonce
+    )
+    defer { fixture.remove() }
+    let unrelatedNode = RunningActivitySnapshot(
+        applications: [],
+        processes: [
+            try RunningProcessRecord(
+                name: DomainLabel(validating: "node"),
+                processIdentifier: 7_035
+            ),
+        ],
+        observedAt: fixture.now.addingTimeInterval(-2)
+    )
+    let diagnosticSource = CleanupPolicyCollectorActivitySource(
+        snapshot: unrelatedNode
+    )
+    let targetIdentity = try #require(fixture.snapshot.fileIdentity)
+    let diagnosticResolver = try ExecutableEvidenceResolver
+        .phaseCTrashDiagnostic(
+            diagnosticRootURL: fixture.removalRootURL,
+            fixtureRootURL: fixture.rootURL,
+            nonce: nonce,
+            expectedTargetIdentity: targetIdentity,
+            activityProvider: RunningActivityProvider(
+                source: diagnosticSource
+            )
+        )
+    let diagnosticCollector = fixture.collector(
+        activitySource: diagnosticSource,
+        leaseAvailable: true,
+        resolver: diagnosticResolver
+    )
+
+    let diagnosticOutcome = await diagnosticCollector.collect(
+        plan: fixture.plan,
+        selection: fixture.selection
+    )
+    let diagnosticContext = try #require(diagnosticOutcome.context)
+    let diagnosticEvaluation = try CleanupPolicyGate().evaluate(
+        plan: fixture.plan,
+        selection: fixture.selection,
+        context: diagnosticContext,
+        evaluatedAt: fixture.now
+    )
+
+    #expect(diagnosticContext.items[0].evidenceFacts == .current)
+    #expect(
+        diagnosticContext.items[0].activityFacts
+            == CleanupActivityPolicyFacts.inactive
+    )
+    #expect(diagnosticEvaluation.allowed != nil)
+
+    let ordinarySource = CleanupPolicyCollectorActivitySource(
+        snapshot: unrelatedNode
+    )
+    let ordinaryCollector = fixture.collector(
+        activitySource: ordinarySource,
+        leaseAvailable: true
+    )
+    let ordinaryOutcome = await ordinaryCollector.collect(
+        plan: fixture.plan,
+        selection: fixture.selection
+    )
+    let ordinaryContext = try #require(ordinaryOutcome.context)
+    let ordinaryEvaluation = try CleanupPolicyGate().evaluate(
+        plan: fixture.plan,
+        selection: fixture.selection,
+        context: ordinaryContext,
+        evaluatedAt: fixture.now
+    )
+
+    #expect(ordinaryContext.items[0].evidenceFacts == .missing)
+    #expect(
+        ordinaryContext.items[0].activityFacts
+            == CleanupActivityPolicyFacts.active
+    )
+    #expect(ordinaryEvaluation.blocked != nil)
+}
+
+@Test
 func cleanupPolicyCollectorFailsClosedForUnavailableActivityAndRootLease()
     async throws
 {
@@ -216,6 +301,7 @@ func cleanupPolicyStoreLoadsSelectedTruthInPlanOrderAndRejectsUnknownItems()
 private struct CleanupPolicyCollectorFixture {
     let now: Date
     let rootURL: URL
+    let removalRootURL: URL
     let cacheURL: URL
     let rules: RuleCatalog
     let profiles: ExecutionProfileCatalog
@@ -228,12 +314,26 @@ private struct CleanupPolicyCollectorFixture {
     let selection: ReviewSelection
     let store: CleanupPolicyCollectorStore
 
-    init() async throws {
+    init(diagnosticNonce: String? = nil) async throws {
         now = Date(timeIntervalSince1970: 1_786_640_000)
-        rootURL = FileManager.default.temporaryDirectory.appending(
-            path: "stornaut-policy-collector-\(UUID().uuidString)",
-            directoryHint: .isDirectory
-        )
+        if diagnosticNonce != nil {
+            removalRootURL = FileManager.default.temporaryDirectory
+                .appending(
+                    path:
+                        "stornaut-phase-c-trash.\(UUID().uuidString)",
+                    directoryHint: .isDirectory
+                )
+            rootURL = removalRootURL.appending(
+                path: "fixture",
+                directoryHint: .isDirectory
+            )
+        } else {
+            rootURL = FileManager.default.temporaryDirectory.appending(
+                path: "stornaut-policy-collector-\(UUID().uuidString)",
+                directoryHint: .isDirectory
+            )
+            removalRootURL = rootURL
+        }
         cacheURL = rootURL.appending(
             path: ".npm/_cacache",
             directoryHint: .isDirectory
@@ -242,6 +342,38 @@ private struct CleanupPolicyCollectorFixture {
             at: cacheURL,
             withIntermediateDirectories: true
         )
+        if let diagnosticNonce {
+            for url in [
+                removalRootURL,
+                rootURL,
+                rootURL.appending(
+                    path: ".npm",
+                    directoryHint: .isDirectory
+                ),
+                cacheURL,
+            ] {
+                try FileManager.default.setAttributes(
+                    [.posixPermissions: 0o700],
+                    ofItemAtPath: url.path
+                )
+            }
+            try Data(
+                "stornaut-phase-c-root:\(diagnosticNonce)".utf8
+            ).write(
+                to: removalRootURL.appending(
+                    path:
+                        ".stornaut-phase-c-trash-fixture-\(diagnosticNonce)"
+                )
+            )
+            try Data(
+                "stornaut-phase-c-trash-item:\(diagnosticNonce)".utf8
+            ).write(
+                to: cacheURL.appending(
+                    path:
+                        ".stornaut-phase-c-trash-item-\(diagnosticNonce)"
+                )
+            )
+        }
         let rootIdentity = try #require(FileIdentity.read(at: rootURL))
         let cacheIdentity = try #require(FileIdentity.read(at: cacheURL))
         rules = try BuiltInRuleCatalog.load()
@@ -262,7 +394,7 @@ private struct CleanupPolicyCollectorFixture {
         let activityContext = RunningActivityContext(
             snapshot: activitySnapshot,
             failure: nil,
-            observedAt: now
+            observedAt: activitySnapshot.observedAt
         )
         let sessionID = ScanSessionID(rawValue: "scan-policy-collector")!
         let scopeID = ScanScopeID(rawValue: "scope-policy-collector")!
@@ -326,13 +458,29 @@ private struct CleanupPolicyCollectorFixture {
             measurementStatus: .measured,
             observedAt: now.addingTimeInterval(-2)
         )
-        let resolver = ExecutableEvidenceResolver(
-            activityProvider: RunningActivityProvider(
-                source: CleanupPolicyCollectorActivitySource(
-                    snapshot: activitySnapshot
+        let resolver: ExecutableEvidenceResolver
+        if let diagnosticNonce {
+            resolver = try ExecutableEvidenceResolver
+                .phaseCTrashDiagnostic(
+                    diagnosticRootURL: removalRootURL,
+                    fixtureRootURL: rootURL,
+                    nonce: diagnosticNonce,
+                    expectedTargetIdentity: cacheIdentity,
+                    activityProvider: RunningActivityProvider(
+                        source: CleanupPolicyCollectorActivitySource(
+                            snapshot: activitySnapshot
+                        )
+                    )
+                )
+        } else {
+            resolver = ExecutableEvidenceResolver(
+                activityProvider: RunningActivityProvider(
+                    source: CleanupPolicyCollectorActivitySource(
+                        snapshot: activitySnapshot
+                    )
                 )
             )
-        )
+        }
         let resolution = try resolver.resolveQuickScan(
             snapshot: snapshot,
             rule: rule,
@@ -414,13 +562,14 @@ private struct CleanupPolicyCollectorFixture {
     func collector(
         store: (any CleanupPolicyStoreReading)? = nil,
         activitySource: CleanupPolicyCollectorActivitySource,
-        leaseAvailable: Bool
+        leaseAvailable: Bool,
+        resolver: ExecutableEvidenceResolver? = nil
     ) -> CleanupPolicyContextCollector {
         CleanupPolicyContextCollector(
             store: store ?? self.store,
             ruleCatalog: rules,
             profileCatalog: profiles,
-            resolver: ExecutableEvidenceResolver(
+            resolver: resolver ?? ExecutableEvidenceResolver(
                 activityProvider: RunningActivityProvider(
                     source: activitySource
                 )
@@ -439,7 +588,7 @@ private struct CleanupPolicyCollectorFixture {
     }
 
     func remove() {
-        try? FileManager.default.removeItem(at: rootURL)
+        try? FileManager.default.removeItem(at: removalRootURL)
     }
 }
 

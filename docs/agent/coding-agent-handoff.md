@@ -1,7 +1,7 @@
 # Stornaut Coding Agent Handoff
 
 > 面向接手实现的 Coding Agent  
-> 最近更新：2026-08-14
+> 最近更新：2026-08-15
 > 当前状态：产品、Agent、UI 功能交互与品牌基线完成；Epic 0–1 evidence
 > gate 已完成；Epic 2–4 Tasks 9–26 通过最终 unified verifier 并归档；
 > Phase C deterministic Epic 8 详尽 plan 已于 2026-08-11 获用户批准，
@@ -60,9 +60,26 @@
 > Quick Scan/Manifest History union、exact local-record deletion、
 > privacy-bounded export、non-causal trend marker、实际窗口证据与独立 review
 > 已完成；authoritative `scripts/verify --full` 单次 exit 0（826.52 秒）。
-> Task 35 为下一项 Phase C gate；用户已明确授权 signed-App disposable exact
-> fixture 的 real Trash diagnostic 与 identity-checked restore。授权不覆盖任意
-> 用户路径、永久删除、Empty Trash、blind retry 或普通 UI restore。
+> Task 35 的 closed runtime facade、strict signed-App diagnostic、
+> recovery-only runtime、Phase C product gate、benchmark 与 App/Core
+> regressions 已实现。唯一授权的真实 Trash attempt 已消费：exact
+> diagnostic-owned fixture 被移动且 journal durably 停在
+> `actionOutcomeRecorded`；Manifest timeline 缺陷使原 report 正确保持
+> `signedAppTrashBlocked` / `executionFailed`，未重试。随后独立 signed
+> recovery-only App 以 Executor invocation `0` 完成 journal finalization、
+> one-record Manifest、1 success / 0 failed/cancelled/unknown、permanent bytes
+> `0`，并按 identity 恢复 fixture，证明原位置存在且 Trash destination
+> 不存在。privacy-safe checked receipt 已绑定原始/恢复 reports、final Store
+> 与安全关键源码。
+> mutation scripts 现均 sealed；authoritative `scripts/verify --full` 最终只
+> 验证 receipt/source/raw evidence，绝不再调用真实 Trash 或 recovery。
+> 旧 global same-UID Node safe-window 已删除，contracts 禁止
+> `pkill`/`killall`/`pgrep`/`ps -U` 全局进程协调；Chrome、Cursor、Claude、
+> MCP 或其他 App 不得因 Task 35 被阻断或终止。focused product gate 74/74、
+> SwiftPM 634/634、完整 App/UI、Debug/Release 与 receipt/raw-evidence gates
+> 均通过；authoritative full verifier 22/22 stages 单次 exit 0（847.921 秒）。
+> 最终 whole-diff 与 timestamp-focused review 均无 unresolved P0–P2，Phase C
+> plans/briefs 已归档，admission 为 `go`。normal App execution 仍不得启用。
 > Task 5 的历史
 > Broker-only no-go 已由 ADR 0004 capability-first 决策修订，Deep Dive 因
 > 生产产品流程尚未实现而 unavailable；
@@ -269,11 +286,11 @@ Epic 0–1
 [Epic 2–4 Deterministic Product Core Plan](../plans/completed/epic-2-4-deterministic-product-core.md)
 已完成并归档，不再构成当前执行授权。Phase B 最终证据见
 [Epic 2–4 Validation Report](../reports/epic-2-4-validation-report.md)。
-Phase C 详尽候选计划见
-[Epic 8 Safe Execution Vertical Slice](../plans/active/epic-8-safe-execution-vertical-slice.md)，
-已于 2026-08-11 获用户批准。Tasks 27–28 已完成；用户随后批准在 Task 29
-前插入
-[Capability-First Codex Runtime Evidence Gate](../plans/active/capability-first-codex-runtime-gate.md)。
+Phase C 详尽计划见已归档的
+[Epic 8 Safe Execution Vertical Slice](../plans/completed/epic-8-safe-execution-vertical-slice.md)，
+已于 2026-08-11 获用户批准并于 2026-08-15 完成。用户在 Task 29 前插入的
+[Capability-First Codex Runtime Evidence Gate](../plans/completed/capability-first-codex-runtime-gate.md)
+也已完成并归档。
 R1–R6 全部通过后才恢复 Tasks 29–35；R4 已完成并得出
 `protocolReady`。R5 的 local-only topology、runtime worker 与 verifier 已
 实现；provider/schema/raw-event 漂移及 post-review closed-protocol findings
@@ -284,26 +301,26 @@ TeamoRouter/usage-limit 报告只作 superseded evidence。current-source signed
 App/helper 已得出 `signedRuntimeReady`，并完成 fixed App/plist/service/
 lease/runtime/process 零残留卸载。R6 final admission 已完成并得出 runtime
 foundation `go`；Task 29 已完成并通过 review/verify。实现与完成证据见
-[Task 29 Implementation Brief](../plans/active/task-29-implementation-brief.md)
+[Task 29 Implementation Brief](../plans/completed/task-29-implementation-brief.md)
 与 [Task 29 Review](../reports/epic-8-task-29-review.md)。Task 30 详细边界见
-[Task 30 Implementation Brief](../plans/active/task-30-implementation-brief.md)；
+[Task 30 Implementation Brief](../plans/completed/task-30-implementation-brief.md)；
 完成证据见
 [Task 30 Review](../reports/epic-8-task-30-review.md)。Task 31 详细边界见
-[Task 31 Implementation Brief](../plans/active/task-31-implementation-brief.md)；
+[Task 31 Implementation Brief](../plans/completed/task-31-implementation-brief.md)；
 完成证据见
 [Task 31 Review](../reports/epic-8-task-31-review.md)。Task 32 只可接入 fake
 或 write-disabled coordinator，不得启用真实 App Trash。Task 32 详细边界见
-[Task 32 Implementation Brief](../plans/active/task-32-implementation-brief.md)，
+[Task 32 Implementation Brief](../plans/completed/task-32-implementation-brief.md)，
 当前 completion audit 见
 [Task 32 Review](../reports/epic-8-task-32-review.md)。
 Task 33 详细边界见
-[Task 33 Implementation Brief](../plans/active/task-33-implementation-brief.md)；
+[Task 33 Implementation Brief](../plans/completed/task-33-implementation-brief.md)；
 completion audit 见
 [Task 33 Review](../reports/epic-8-task-33-review.md)。Task 33 只展示已接受的
 Core terminal Manifest；它不启用真实 App Trash、Task 34 History 或 Task 35
 signed-App admission。
 Task 34 详细边界见
-[Task 34 Implementation Brief](../plans/active/task-34-implementation-brief.md)；
+[Task 34 Implementation Brief](../plans/completed/task-34-implementation-brief.md)；
 完成证据见
 [Task 34 Review](../reports/epic-8-task-34-review.md)。Task 34 将 Manifest
 加入 typed History，但仍未执行或启用真实 App Trash。
@@ -395,13 +412,14 @@ Scan-only History 与六区 Settings。Task 26 的 focused gate、真实 Home
 benchmark、scope audit、actual-window inspection、review 和最终 unified
 verifier 均通过；Epic 2–4 计划与 Task 21–26 briefs 已归档。
 
-Phase C deterministic Epic 8 plan 已于 2026-08-11 获批并位于
-docs/plans/active/epic-8-safe-execution-vertical-slice.md，候选范围从 Quick
+Phase C deterministic Epic 8 plan 已于 2026-08-11 获批、于 2026-08-15
+完成并归档至
+docs/plans/completed/epic-8-safe-execution-vertical-slice.md，范围从 Quick
 Scan terminal projection 形成 Review Reclaim Plan，经 pure Policy Gate、
 fresh revalidation、用户确认与默认 MoveToTrash，最后写 immutable Cleanup
 Manifest 和 truthful Cleanup Result/History。Tasks 27–28 已完成。ADR 0004
 回顾发现的旧 Broker-only runtime/UI 漂移已由
-docs/plans/active/capability-first-codex-runtime-gate.md 的 R1–R6 关闭。
+docs/plans/completed/capability-first-codex-runtime-gate.md 的 R1–R6 关闭。
 R1 得出 conditional-go：read-only Seatbelt 阻断 user-data
 writes，managed proxy 可让公网访问成功并阻断 direct/local/private/Unix
 targets，但需要一个 same-session、父进程拥有、随机端口的 loopback proxy
@@ -416,8 +434,9 @@ R4 已完成并得出 `protocolReady`；R5 official `openai` worker gate 已通�
 current-source signed App/helper report 进一步通过 9/9 capability、12/12
 integrity 与零残留卸载。R6 已完成 final matrix、five-dimensional status、
 typed disclosure、actual-window evidence 与 post-fix review，runtime
-foundation 结论为 `go`。Tasks 29–34 已完成并分别通过 authoritative unified
-verifier；Task 35 为下一项 deterministic Epic 8 gate。该 gate
+foundation 结论为 `go`。Tasks 29–35 与完整 Phase C gate 已完成；
+authoritative full verifier 单次 exit 0，计划已归档，Phase C admission 为
+`go`。该 gate
 要求证明完整调查能力和公共联网可用时，Codex 全进程树不可写用户数据、不可
 访问 localhost/私网/任意 Unix socket 且无 Executor 路径；不得用
 `danger-full-access`、命令/公共域名

@@ -15,6 +15,12 @@ struct AppDependencies: Sendable {
     typealias CoordinatorFactory = @Sendable (
         EvidenceStore
     ) async throws -> QuickScanCoordinator
+    typealias ExecutionRuntimeFactory = @Sendable (
+        EvidenceStore,
+        any CleanupPolicyRootObserving,
+        CleanupWorkflowCoordinator,
+        ExecutableEvidenceResolver
+    ) throws -> CleanupExecutionRuntime
     struct QuickScanConfiguration: Sendable, Equatable {
         let rootPath: PersistedPath
         let exclusions: [ScanExclusion]
@@ -219,7 +225,9 @@ struct AppDependencies: Sendable {
         }
     ) -> AppDependencies {
         let standardizedRoot = rootURL.standardizedFileURL
-        let runtime = AppQuickScanRuntime(rootURL: standardizedRoot) {
+        let runtime = AppQuickScanRuntime(
+            rootURL: standardizedRoot
+        ) {
             store in
             try await makeCoordinator(store)
         } makeEvidenceStore: {
@@ -229,6 +237,48 @@ struct AppDependencies: Sendable {
         } makeKnowledgeStore: {
             try LocalKnowledgeStore(configuration: configuration)
         }
+        return liveDependencies(
+            runtime: runtime,
+            standardizedRoot: standardizedRoot,
+            executionAvailability: .writeDisabled
+        )
+    }
+
+#if DEBUG
+    static func phaseCTrashDiagnostic(
+        configuration: LocalStoreConfiguration,
+        rootURL: URL,
+        diagnosticEvidenceResolver: ExecutableEvidenceResolver,
+        makeExecutionRuntime:
+            @escaping ExecutionRuntimeFactory
+    ) -> AppDependencies {
+        let standardizedRoot = rootURL.standardizedFileURL
+        let runtime = AppQuickScanRuntime(
+            rootURL: standardizedRoot,
+            makeExecutionRuntime: makeExecutionRuntime,
+            diagnosticEvidenceResolver: diagnosticEvidenceResolver
+        ) { store in
+            try QuickScanCoordinator(store: store)
+        } makeEvidenceStore: {
+            try EvidenceStore(configuration: configuration)
+        } makePreferencesStore: {
+            try SettingsPreferencesStore(configuration: configuration)
+        } makeKnowledgeStore: {
+            try LocalKnowledgeStore(configuration: configuration)
+        }
+        return liveDependencies(
+            runtime: runtime,
+            standardizedRoot: standardizedRoot,
+            executionAvailability: .productionTrash
+        )
+    }
+#endif
+
+    private static func liveDependencies(
+        runtime: AppQuickScanRuntime,
+        standardizedRoot: URL,
+        executionAvailability: ReviewExecutionAvailability
+    ) -> AppDependencies {
         return AppDependencies(
             loadLatestQuickScan: {
                 try await runtime.loadLatest()
@@ -289,6 +339,23 @@ struct AppDependencies: Sendable {
                     plan: $0,
                     selection: $1
                 )
+            },
+            reviewExecutionAvailability: executionAvailability,
+            startReviewExecution: {
+                try await runtime.startReviewExecution(
+                    plan: $0,
+                    selection: $1,
+                    confirmation: $2
+                )
+            },
+            stopReviewAfterCurrent: {
+                await runtime.stopReviewAfterCurrent()
+            },
+            cleanupResultEnrichment: {
+                await runtime.cleanupResultEnrichment($0)
+            },
+            retryCleanupAudit: {
+                await runtime.retryCleanupAudit($0)
             }
         )
     }
@@ -297,7 +364,9 @@ struct AppDependencies: Sendable {
         let rootURL = FileManager.default.homeDirectoryForCurrentUser
             .standardizedFileURL
         let runtime = AppQuickScanRuntime(
-            rootURL: rootURL
+            rootURL: rootURL,
+            makeExecutionRuntime: nil,
+            diagnosticEvidenceResolver: nil
         ) { store in
             try await Task.detached(priority: .userInitiated) {
                 return try QuickScanCoordinator(store: store)
@@ -379,6 +448,10 @@ struct AppDependencies: Sendable {
                     plan: $0,
                     selection: $1
                 )
+            },
+            reviewExecutionAvailability: .writeDisabled,
+            cleanupResultEnrichment: {
+                await runtime.cleanupResultEnrichment($0)
             }
         )
     }
@@ -407,6 +480,10 @@ private actor AppQuickScanRuntime {
         -> SettingsPreferencesStore
     private let makeKnowledgeStore: @Sendable () async throws
         -> LocalKnowledgeStore
+    private let makeExecutionRuntime:
+        AppDependencies.ExecutionRuntimeFactory?
+    private let diagnosticEvidenceResolver:
+        ExecutableEvidenceResolver?
     private let rootURL: URL
     private var coordinator: QuickScanCoordinator?
     private var coordinatorFlight: CoordinatorFlight?
@@ -416,6 +493,9 @@ private actor AppQuickScanRuntime {
     private var preferencesStore: SettingsPreferencesStore?
     private var knowledgeStore: LocalKnowledgeStore?
     private var evidenceStore: EvidenceStore?
+    private var executionRuntime: CleanupExecutionRuntime?
+    private var executionGeneration: UInt64 = 0
+    private var executionIsActive = false
     private let workflowCoordinator = CleanupWorkflowCoordinator()
     private let codexDetector = CodexRuntimeCapabilityDetector()
 
@@ -437,6 +517,35 @@ private actor AppQuickScanRuntime {
         self.makeEvidenceStore = makeEvidenceStore
         self.makePreferencesStore = makePreferencesStore
         self.makeKnowledgeStore = makeKnowledgeStore
+        self.makeExecutionRuntime = nil
+        self.diagnosticEvidenceResolver = nil
+    }
+
+    init(
+        rootURL: URL,
+        makeExecutionRuntime:
+            AppDependencies.ExecutionRuntimeFactory?,
+        diagnosticEvidenceResolver:
+            ExecutableEvidenceResolver?,
+        makeCoordinator: @escaping @Sendable (
+            EvidenceStore
+        ) async throws
+            -> QuickScanCoordinator,
+        makeEvidenceStore: @escaping @Sendable () async throws
+            -> EvidenceStore,
+        makePreferencesStore: @escaping @Sendable () async throws
+            -> SettingsPreferencesStore,
+        makeKnowledgeStore: @escaping @Sendable () async throws
+            -> LocalKnowledgeStore
+    ) {
+        self.rootURL = rootURL.standardizedFileURL
+        self.makeCoordinator = makeCoordinator
+        self.makeEvidenceStore = makeEvidenceStore
+        self.makePreferencesStore = makePreferencesStore
+        self.makeKnowledgeStore = makeKnowledgeStore
+        self.makeExecutionRuntime = makeExecutionRuntime
+        self.diagnosticEvidenceResolver =
+            diagnosticEvidenceResolver
     }
 
     func loadLatest() async throws -> QuickScanProjection? {
@@ -562,7 +671,20 @@ private actor AppQuickScanRuntime {
                     )!,
                 ])
             }
-            let builder = try CleanupPlanBuilder(store: store)
+            let builder: CleanupPlanBuilder
+#if DEBUG
+            if let diagnosticEvidenceResolver {
+                builder = try CleanupPlanBuilder
+                    .phaseCTrashDiagnostic(
+                        store: store,
+                        resolver: diagnosticEvidenceResolver
+                    )
+            } else {
+                builder = try CleanupPlanBuilder(store: store)
+            }
+#else
+            builder = try CleanupPlanBuilder(store: store)
+#endif
             let result = await builder.build(
                 sessionID: sessionID,
                 rootURL: resolvedRoot.rootURL
@@ -582,6 +704,15 @@ private actor AppQuickScanRuntime {
         plan: CleanupPlan,
         selection: ReviewSelection
     ) async throws -> CleanupPolicyEvaluation {
+        guard !executionIsActive else {
+            throw AppDependencyError.reviewUnavailable
+        }
+        if makeExecutionRuntime != nil {
+            return try await resolvedExecutionRuntime().preflight(
+                plan: plan,
+                selection: selection
+            )
+        }
         let preferences = try await resolvedPreferencesStore().load()
         let resolvedRoot = SettingsPrimaryRoot.resolve(
             preferences.primaryRoot,
@@ -594,12 +725,8 @@ private actor AppQuickScanRuntime {
         }
         let store = try await resolvedEvidenceStore()
         let observer = AppCleanupPolicyRootObserver(
-            observation: CleanupPolicyRootObservation(
-                rootURL: resolvedRoot.rootURL,
-                access: resolvedRoot.accessLease.map {
-                    .securityScoped($0)
-                } ?? .direct
-            )
+            preferencesStore: try await resolvedPreferencesStore(),
+            fallbackURL: rootURL
         )
         let collector = try CleanupPolicyContextCollector(
             store: store,
@@ -613,11 +740,150 @@ private actor AppQuickScanRuntime {
         guard let context = outcome.context else {
             throw AppDependencyError.reviewUnavailable
         }
+        withExtendedLifetime(resolvedRoot.accessLease) {}
         return try CleanupPolicyGate().evaluate(
             plan: plan,
             selection: selection,
             context: context,
             evaluatedAt: Date()
+        )
+    }
+
+    func startReviewExecution(
+        plan: CleanupPlan,
+        selection: ReviewSelection,
+        confirmation: CleanupConfirmation
+    ) async throws -> AppDependencies.ReviewExecutionStream {
+        guard !executionIsActive else {
+            throw AppDependencyError.reviewUnavailable
+        }
+        executionIsActive = true
+        executionGeneration &+= 1
+        let generation = executionGeneration
+        let runtime: CleanupExecutionRuntime
+        do {
+            runtime = try await resolvedExecutionRuntime()
+        } catch {
+            finishExecution(generation: generation)
+            throw error
+        }
+        return AsyncStream { continuation in
+            let task = Task {
+                continuation.yield(
+                    .progress(
+                        .queued(total: selection.items.count)
+                    )
+                )
+                let state = await runtime.execute(
+                    plan: plan,
+                    selection: selection,
+                    confirmation: confirmation
+                )
+                continuation.yield(.terminal(state))
+                continuation.finish()
+                self.finishExecution(generation: generation)
+            }
+            continuation.onTermination = { @Sendable _ in
+                task.cancel()
+            }
+        }
+    }
+
+    func stopReviewAfterCurrent() async {
+        guard executionIsActive,
+              let executionRuntime
+        else {
+            return
+        }
+        await executionRuntime.requestStopAfterCurrent()
+    }
+
+    func retryCleanupAudit(
+        _ result: CleanupExecutionResult
+    ) async -> CleanupExecutionState? {
+        guard !executionIsActive,
+              let runtime = try? await resolvedExecutionRuntime()
+        else {
+            return nil
+        }
+        return await runtime.retrySavingAudit(result)
+    }
+
+    func cleanupResultEnrichment(
+        _ result: CleanupExecutionResult
+    ) async -> CleanupResultEnrichment {
+        let store: EvidenceStore
+        let plan: CleanupPlan
+        let scope: ScanScope
+        do {
+            store = try await resolvedEvidenceStore()
+            guard let retainedPlan = try await store.cleanupPlan(
+                id: result.manifest.planID
+            ), retainedPlan.id == result.manifest.planID,
+                  Date() <= retainedPlan.expiresAt,
+                  let scopeID = retainedPlan.scanScopeID,
+                  let session = try await store.scanSession(
+                      id: retainedPlan.scanSessionID
+                  ),
+                  let retainedScope = session.completedScopes.first(
+                      where: { $0.id == scopeID }
+                  )
+            else {
+                throw AppDependencyError.reviewUnavailable
+            }
+            plan = retainedPlan
+            scope = retainedScope
+        } catch {
+            return CleanupResultEnrichment(
+                itemFacts: [],
+                evidenceAvailability: .expired
+            )
+        }
+        let retainedRoot = URL(filePath: scope.rootPath.rawValue)
+        let items = Dictionary(
+            uniqueKeysWithValues: plan.items.map {
+                ($0.id, $0)
+            }
+        )
+        let facts: [CleanupResultItemFacts] =
+            result.manifest.records.compactMap { record in
+            guard let item = items[record.planItemID],
+                  let relativePath = item.expectedRelativePath,
+                  let expectedIdentity = item.expectedIdentity,
+                  let evidenceFingerprint = item.evidenceFingerprint
+            else {
+                return nil
+            }
+            let originalURL = retainedRoot.appending(
+                path: relativePath.rawValue,
+                directoryHint: .isDirectory
+            )
+            let lineage = [
+                item.ruleID,
+                item.executionProfileID,
+            ].compactMap { $0 }
+            return CleanupResultItemFacts(
+                planItemID: item.id,
+                itemName: originalURL.lastPathComponent,
+                exactOriginalPath: originalURL.path,
+                expectedIdentity: expectedIdentity,
+                evidenceFingerprint: evidenceFingerprint,
+                producer: nil,
+                recoveryDetailKey: DomainToken(
+                    rawValue: "cleanup.recovery.trash"
+                )!,
+                evidenceLineage: lineage
+            )
+        }
+        guard facts.count == result.manifest.records.count else {
+            return CleanupResultEnrichment(
+                itemFacts: [],
+                evidenceAvailability: .expired
+            )
+        }
+        return CleanupResultEnrichment(
+            itemFacts: facts,
+            evidenceAvailability: .retained
         )
     }
 
@@ -746,6 +1012,40 @@ private actor AppQuickScanRuntime {
         return created
     }
 
+    private func resolvedExecutionRuntime() async throws
+        -> CleanupExecutionRuntime
+    {
+        if let executionRuntime {
+            return executionRuntime
+        }
+        guard let makeExecutionRuntime,
+              let diagnosticEvidenceResolver
+        else {
+            throw AppDependencyError.reviewExecutionDisabled
+        }
+        let preferencesStore = try await resolvedPreferencesStore()
+        let observer = AppCleanupPolicyRootObserver(
+            preferencesStore: preferencesStore,
+            fallbackURL: rootURL
+        )
+        let store = try await resolvedEvidenceStore()
+        let created = try makeExecutionRuntime(
+            store,
+            observer,
+            workflowCoordinator,
+            diagnosticEvidenceResolver
+        )
+        executionRuntime = created
+        return created
+    }
+
+    private func finishExecution(generation: UInt64) {
+        guard executionGeneration == generation else {
+            return
+        }
+        executionIsActive = false
+    }
+
     private func codexStatus() async -> SettingsCodexStatus {
         let environment = ProcessInfo.processInfo.environment
         let availability = await CodexLocator().locate(
@@ -796,6 +1096,17 @@ private actor AppQuickScanRuntime {
             let storeFlight = evidenceStoreTask()
             let createdTask = Task {
                 let store = try await storeFlight.task.value
+#if DEBUG
+                if let diagnosticEvidenceResolver =
+                    self.diagnosticEvidenceResolver
+                {
+                    return try QuickScanCoordinator
+                        .phaseCTrashDiagnostic(
+                            store: store,
+                            resolver: diagnosticEvidenceResolver
+                        )
+                }
+#endif
                 return try await makeCoordinator(store)
             }
             flight = CoordinatorFlight(
@@ -1026,22 +1337,73 @@ private enum AppDependencyError: Error {
 private struct AppCleanupPolicyRootObserver:
     CleanupPolicyRootObserving
 {
-    let observation: CleanupPolicyRootObservation
+    let preferencesStore: SettingsPreferencesStore
+    let fallbackURL: URL
 
     func observeRoot() async -> CleanupPolicyRootObservation {
-        observation
+        do {
+            let preferences = try await preferencesStore.load()
+            let resolved = SettingsPrimaryRoot.resolve(
+                preferences.primaryRoot,
+                fallbackURL: fallbackURL
+            )
+            guard resolved.status == .available
+                    || resolved.status == .fallbackHome
+            else {
+                return CleanupPolicyRootObservation(
+                    rootURL: resolved.rootURL,
+                    access: .unavailable
+                )
+            }
+            return CleanupPolicyRootObservation(
+                rootURL: resolved.rootURL,
+                access: resolved.accessLease.map {
+                    .securityScoped($0)
+                } ?? .direct
+            )
+        } catch {
+            return CleanupPolicyRootObservation(
+                rootURL: fallbackURL.standardizedFileURL,
+                access: .unavailable
+            )
+        }
     }
 }
 
 @MainActor
 struct AppComposition {
+    enum Kind: Sendable, Equatable {
+        case production
+#if DEBUG
+        case phaseCTrashDiagnostic
+        case debugFixture
+#endif
+        case failed
+    }
+
     let model: StornautAppModel
+    let kind: Kind
 
     static func production() -> AppComposition {
         AppComposition(
             model: StornautAppModel(
                 dependencies: .production()
-            )
+            ),
+            kind: .production
         )
     }
+
+#if DEBUG
+    static func phaseCTrashDiagnostic() -> AppComposition {
+        AppComposition(
+            model: StornautAppModel(
+                dependencies: AppDependencies(
+                    loadLatestQuickScan: { nil }
+                ),
+                refreshesServices: false
+            ),
+            kind: .phaseCTrashDiagnostic
+        )
+    }
+#endif
 }

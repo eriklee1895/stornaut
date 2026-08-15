@@ -63,9 +63,11 @@ typeset -a headless_steps=(
     swiftpm-tests-serialized
     rule-compiler
     app-contract-tests
+    phase-c-product
 )
 
 typeset -a full_steps=(
+    phase-c-trash-diagnostic-contract
     ui-automation-readiness
     clean-derived-data
     xcuitest
@@ -85,6 +87,8 @@ typeset -a full_steps=(
     rule-compiler
     verifier-contract
     docs-and-diff
+    phase-c-product
+    phase-c-signed-app-trash-receipt
 )
 
 typeset -a selected_steps
@@ -166,7 +170,8 @@ function build_swift_package() {
 
 function test_swift_package() {
     local matcher_benchmarks='(cumulativeCatalogMatchingBenchmarkStaysBounded|completeCacheCatalogMatchingBenchmarkStaysBounded|completeCatalogMatchingBenchmarkStaysBounded)'
-    swift test --skip "$matcher_benchmarks"
+    SWT_EXPERIMENTAL_MAXIMUM_PARALLELIZATION_WIDTH=2 \
+        swift test --parallel --num-workers 4 --skip "$matcher_benchmarks"
 }
 
 function test_swift_package_serialized() {
@@ -261,6 +266,10 @@ function execute_step() {
     local step_name=$1
 
     case $step_name in
+        phase-c-trash-diagnostic-contract)
+            run_step "$step_name" \
+                scripts/verify-phase-c-trash-diagnostic-contract
+            ;;
         ui-automation-readiness)
             run_step "$step_name" scripts/verify-ui-automation-mode --allow-auth-prompt
             ;;
@@ -287,6 +296,13 @@ function execute_step() {
             ;;
         phase-b-product)
             run_step "$step_name" scripts/verify-phase-b-gate --product-only
+            ;;
+        phase-c-product)
+            run_step "$step_name" scripts/verify-phase-c-gate --product-only
+            ;;
+        phase-c-signed-app-trash-receipt)
+            run_step "$step_name" \
+                scripts/verify-phase-c-gate --signed-app-trash-receipt
             ;;
         source-boundaries)
             run_step "$step_name" verify_source_boundaries

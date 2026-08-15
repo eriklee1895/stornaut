@@ -1,3 +1,4 @@
+import Foundation
 import StornautCore
 import Testing
 @testable import StornautApp
@@ -220,6 +221,101 @@ func productionDependenciesCannotEmitCleanupTerminal() {
 
     #expect(
         dependencies.reviewExecutionAvailability == .writeDisabled
+    )
+}
+
+@Test
+func cleanupResultEnrichmentUsesRetainedScopeAfterSettingsRootChanges()
+    async throws
+{
+    let storageRoot = FileManager.default.temporaryDirectory.appending(
+        path: "stornaut-cleanup-enrichment-\(UUID().uuidString)",
+        directoryHint: .isDirectory
+    )
+    let retainedRoot = storageRoot.appending(
+        path: "retained",
+        directoryHint: .isDirectory
+    )
+    let changedRoot = storageRoot.appending(
+        path: "changed",
+        directoryHint: .isDirectory
+    )
+    try FileManager.default.createDirectory(
+        at: retainedRoot,
+        withIntermediateDirectories: true
+    )
+    try FileManager.default.createDirectory(
+        at: changedRoot,
+        withIntermediateDirectories: true
+    )
+    defer { try? FileManager.default.removeItem(at: storageRoot) }
+
+    let configuration = try LocalStoreConfiguration(
+        applicationSupportBaseURL: storageRoot.appending(
+            path: "Application Support",
+            directoryHint: .isDirectory
+        ),
+        cachesBaseURL: storageRoot.appending(
+            path: "Caches",
+            directoryHint: .isDirectory
+        )
+    )
+    let fixture = try CleanupResultTestSupport.fixture(.completed)
+    let plan = fixture.plan
+    let scope = ScanScope(
+        id: try #require(plan.scanScopeID),
+        rootPath: try #require(
+            PersistedPath(
+                rawValue: retainedRoot.standardizedFileURL.path
+            )
+        ),
+        completedAt: plan.createdAt
+    )
+    let session = try ScanSession(
+        id: plan.scanSessionID,
+        startedAt: plan.createdAt.addingTimeInterval(-1),
+        finishedAt: plan.createdAt,
+        terminalState: .completed,
+        completedScopes: [scope],
+        unfinishedScopes: []
+    )
+    let store = try EvidenceStore(configuration: configuration)
+    try await store.saveScanSession(session)
+    try await store.saveCleanupPlan(plan)
+    try await SettingsPreferencesStore(
+        configuration: configuration
+    ).save(
+        SettingsPreferences(
+            primaryRoot: try SettingsPrimaryRoot.bookmark(
+                for: changedRoot
+            )
+        )
+    )
+    let dependencies = AppDependencies.live(
+        configuration: configuration,
+        rootURL: changedRoot
+    )
+
+    let enrichment = await dependencies.cleanupResultEnrichment(
+        fixture.result
+    )
+
+    #expect(enrichment.evidenceAvailability == .retained)
+    #expect(
+        enrichment.itemFacts.map(\.exactOriginalPath)
+            == plan.items.map {
+                retainedRoot.appending(
+                    path: $0.expectedRelativePath!.rawValue,
+                    directoryHint: .isDirectory
+                ).path
+            }
+    )
+    #expect(
+        enrichment.itemFacts.allSatisfy {
+            !$0.exactOriginalPath.hasPrefix(
+                changedRoot.standardizedFileURL.path + "/"
+            )
+        }
     )
 }
 

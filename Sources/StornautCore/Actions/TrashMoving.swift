@@ -1,18 +1,18 @@
 import Foundation
 
-public protocol TrashAdapting: Sendable {
+protocol TrashAdapting: Sendable {
     func trashItem(at url: URL) throws -> URL?
 }
 
-public enum TrashAdapterError: Error, Sendable, Equatable {
+enum TrashAdapterError: Error, Sendable, Equatable {
     case permissionDenied
     case operationFailed(String)
 }
 
-public struct FileManagerTrashAdapter: TrashAdapting {
-    public init() {}
+struct FileManagerTrashAdapter: TrashAdapting {
+    init() {}
 
-    public func trashItem(at url: URL) throws -> URL? {
+    func trashItem(at url: URL) throws -> URL? {
         var resultingURL: NSURL?
         do {
             try FileManager.default.trashItem(
@@ -58,7 +58,7 @@ public struct TrashedItemReceipt: Codable, Sendable, Equatable {
     }
 }
 
-public enum TrashMovingError: Error, Sendable, Equatable {
+enum TrashMovingError: Error, Sendable, Equatable {
     case permissionDenied
     case missingItem
     case identityChanged
@@ -66,14 +66,14 @@ public enum TrashMovingError: Error, Sendable, Equatable {
     case operationFailed(String)
 }
 
-public struct TrashMoving: Sendable {
+struct TrashMoving: Sendable {
     private let adapter: any TrashAdapting
 
-    public init(adapter: any TrashAdapting = FileManagerTrashAdapter()) {
+    init(adapter: any TrashAdapting) {
         self.adapter = adapter
     }
 
-    public func trashItem(
+    func trashItem(
         at url: URL,
         expectedIdentity: ActionFileIdentity
     ) async throws -> TrashedItemReceipt {

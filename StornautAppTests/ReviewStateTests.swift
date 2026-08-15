@@ -24,6 +24,13 @@ func reviewWorkspaceRouteStaysUnderScanAndReservesCleanupResult() {
 }
 
 @Test
+func reviewExecutionAvailabilityUsesAnExplicitExecutionAllowlist() {
+    #expect(!ReviewExecutionAvailability.writeDisabled.admitsExecution)
+    #expect(ReviewExecutionAvailability.debugFake.admitsExecution)
+    #expect(ReviewExecutionAvailability.productionTrash.admitsExecution)
+}
+
+@Test
 func reviewSnapshotDefaultsOnlyExecutableReadyItems() throws {
     let fixture = try ReviewAppFixture()
 
@@ -88,6 +95,39 @@ func reviewSelectionRequiresExplicitReviewAndKeepsFocusIndependent()
         ),
     ])
     #expect(selected.canExecute)
+}
+
+@Test
+func reviewProductionTrashAvailabilityAllowsTheTypedConfirmationPath()
+    throws
+{
+    let fixture = try ReviewAppFixture()
+    let snapshot = try ReviewSnapshot(
+        plan: fixture.plan,
+        projection: fixture.projection,
+        generation: 9,
+        executionAvailability: .productionTrash
+    )
+    let selection = try #require(snapshot.reviewSelection)
+    let evaluation = try ReviewConfirmationFixture.evaluate(
+        plan: fixture.plan,
+        selection: selection,
+        activityFacts: .inactive
+    )
+    let confirmation = try #require(
+        evaluation.allowed?.confirmation
+    )
+    let state = ReviewState.confirming(
+        snapshot,
+        confirmation
+    )
+
+    #expect(snapshot.canExecute)
+    guard case .executing = ReviewReducer().confirmExecution(state: state)
+    else {
+        Issue.record("production Trash must use the typed execution path")
+        return
+    }
 }
 
 @Test

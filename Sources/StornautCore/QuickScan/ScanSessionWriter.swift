@@ -13,6 +13,7 @@ public actor ScanSessionWriter {
     private let store: any ScanSessionPersisting
     private let volumeSampler: any VolumeBaselineSampling
     private let now: @Sendable () -> Date
+    private let sessionStartedAt: Date?
     private let snapshotID: @Sendable (String) -> SnapshotID
     private let snapshotObservedAt: (@Sendable (String) -> Date)?
     private let defersProductFinalization: Bool
@@ -25,6 +26,7 @@ public actor ScanSessionWriter {
         volumeSampler: any VolumeBaselineSampling =
             FoundationVolumeBaselineSampler(),
         now: @escaping @Sendable () -> Date = Date.init,
+        sessionStartedAt: Date? = nil,
         snapshotID: @escaping @Sendable (String) -> SnapshotID = {
             _ in SnapshotID()
         },
@@ -35,6 +37,7 @@ public actor ScanSessionWriter {
             store: store,
             volumeSampler: volumeSampler,
             now: now,
+            sessionStartedAt: sessionStartedAt,
             snapshotID: snapshotID,
             snapshotObservedAt: snapshotObservedAt,
             defersProductFinalization: defersProductFinalization,
@@ -47,6 +50,7 @@ public actor ScanSessionWriter {
         volumeSampler: any VolumeBaselineSampling =
             FoundationVolumeBaselineSampler(),
         now: @escaping @Sendable () -> Date = Date.init,
+        sessionStartedAt: Date? = nil,
         snapshotID: @escaping @Sendable (String) -> SnapshotID = {
             _ in SnapshotID()
         },
@@ -57,6 +61,7 @@ public actor ScanSessionWriter {
         self.store = store
         self.volumeSampler = volumeSampler
         self.now = now
+        self.sessionStartedAt = sessionStartedAt
         self.snapshotID = snapshotID
         self.snapshotObservedAt = snapshotObservedAt
         self.defersProductFinalization = defersProductFinalization
@@ -117,7 +122,7 @@ public actor ScanSessionWriter {
             scanIsActive = false
             activeControl = nil
         }
-        let startedAt = now()
+        let startedAt = sessionStartedAt ?? now()
         let rootPath: PersistedPath
         do {
             rootPath = try PersistedPath(

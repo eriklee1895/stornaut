@@ -1,0 +1,157 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+cd "$repo_root"
+
+python3 - <<'PY'
+from pathlib import Path
+
+
+resolver_path = Path(
+    "Sources/StornautCore/Review/ExecutableEvidenceResolver.swift"
+)
+dependencies_path = Path("StornautApp/AppState/AppDependencies.swift")
+harness_path = Path(
+    "StornautApp/Diagnostics/PhaseCTrashDiagnosticHarness.swift"
+)
+runtime_path = Path(
+    "Sources/StornautCore/Actions/CleanupExecutionRuntime.swift"
+)
+
+resolver = resolver_path.read_text(encoding="utf-8")
+dependencies = dependencies_path.read_text(encoding="utf-8")
+harness = harness_path.read_text(encoding="utf-8")
+runtime = runtime_path.read_text(encoding="utf-8")
+
+resolver_requirements = {
+    "public static func phaseCTrashDiagnostic(",
+    "diagnosticRootURL: URL",
+    "fixtureRootURL: URL",
+    "expectedTargetIdentity: FileIdentity",
+    "expectedProfileCatalogVersion:",
+    "activity.process.isolated-diagnostic-attested",
+    "activity.process.isolated-diagnostic-contract-drift",
+    "activity.process.isolated-diagnostic-root-drift",
+    "activity.process.isolated-diagnostic-identity-drift",
+    "activity.process.isolated-diagnostic-marker-drift",
+}
+missing = sorted(
+    requirement
+    for requirement in resolver_requirements
+    if requirement not in resolver
+)
+if missing:
+    raise SystemExit(
+        f"target-aware diagnostic resolver contract is incomplete: {missing}"
+    )
+
+dependency_requirements = {
+    "diagnosticEvidenceResolver:",
+    "private let diagnosticEvidenceResolver:",
+    "QuickScanCoordinator\n                        .phaseCTrashDiagnostic(",
+    "CleanupPlanBuilder\n                    .phaseCTrashDiagnostic(",
+    "makeExecutionRuntime(\n            store,\n            observer,\n            workflowCoordinator,\n            diagnosticEvidenceResolver",
+}
+missing = sorted(
+    requirement
+    for requirement in dependency_requirements
+    if requirement not in dependencies
+)
+if missing:
+    raise SystemExit(
+        f"App target-aware diagnostic wiring is incomplete: {missing}"
+    )
+
+harness_requirements = {
+    "let evidenceResolver = try ExecutableEvidenceResolver",
+    ".phaseCTrashDiagnostic(",
+    "expectedTargetIdentity: identity",
+    "diagnosticEvidenceResolver: evidenceResolver",
+    "resolver: $3",
+}
+missing = sorted(
+    requirement
+    for requirement in harness_requirements
+    if requirement not in harness
+)
+if missing:
+    raise SystemExit(
+        f"signed-App diagnostic attestation wiring is incomplete: {missing}"
+    )
+if harness.count("ExecutableEvidenceResolver") != 1:
+    raise SystemExit(
+        "signed-App diagnostic must construct exactly one evidence resolver"
+    )
+
+runtime_requirements = {
+    "public static func diagnostic(",
+    "resolver: ExecutableEvidenceResolver",
+    ".phaseCTrashDiagnostic(",
+    "resolver: resolver",
+}
+missing = sorted(
+    requirement
+    for requirement in runtime_requirements
+    if requirement not in runtime
+)
+if missing:
+    raise SystemExit(
+        f"fresh Policy target-aware resolver wiring is incomplete: {missing}"
+    )
+
+ordinary_source = (
+    "Sources/StornautCore/Activity/RunningActivityProvider.swift"
+)
+ordinary = Path(ordinary_source).read_text(encoding="utf-8")
+if "phaseCTrashDiagnostic" in ordinary:
+    raise SystemExit(
+        "ordinary process activity provider gained a diagnostic bypass"
+    )
+
+for path in (
+    Path("scripts/verify"),
+    Path("scripts/verify-phase-c-gate"),
+    Path("scripts/verify-phase-c-trash-diagnostic"),
+    Path("scripts/verify-phase-c-trash-recovery"),
+    Path("scripts/verify-phase-c-trash-receipt"),
+):
+    source = path.read_text(encoding="utf-8")
+    prohibited_tokens = (
+        "verify-phase-c-trash-" + "safe-window",
+        "p" + "kill",
+        "kill" + "all",
+        "p" + "grep",
+        "ps -U " + '"$uid"',
+        "blocked_process_" + "names",
+    )
+    for prohibited in prohibited_tokens:
+        if prohibited in source:
+            raise SystemExit(
+                f"{path} regained global process coordination: {prohibited}"
+            )
+
+gate = Path("scripts/verify-phase-c-gate").read_text(encoding="utf-8")
+if 'scripts/verify-phase-c-trash-diagnostic "$' in gate:
+    raise SystemExit("sealed Phase C gate regained Trash mutation")
+if 'scripts/verify-phase-c-trash-recovery "$' in gate:
+    raise SystemExit("sealed Phase C gate regained recovery mutation")
+if gate.count("scripts/verify-phase-c-trash-receipt") != 1:
+    raise SystemExit("sealed Phase C receipt invocation drifted")
+
+for path, marker in (
+    (
+        Path("scripts/verify-phase-c-trash-diagnostic"),
+        "Task 35 signed Trash mutation is sealed",
+    ),
+    (
+        Path("scripts/verify-phase-c-trash-recovery"),
+        "Task 35 recovery mutation is sealed",
+    ),
+):
+    if marker not in path.read_text(encoding="utf-8"):
+        raise SystemExit(f"{path} is no longer sealed")
+PY
+
+print "Phase C target-aware Trash diagnostic contract passed."
