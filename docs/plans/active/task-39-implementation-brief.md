@@ -1,9 +1,11 @@
 # Task 39 Implementation Brief — Signed-App Production Runtime Admission
 
-> **Status:** In progress; 39A contract/composition foundation is complete and
-> independently verified, while 39B signed-App machine admission remains
-> pending. Evidence:
-> [Task 39A Review](../../reports/phase-d-task-39a-review.md).
+> **Status:** In progress; 39A contract/composition foundation and 39B1a exact
+> Store/async-lifecycle prerequisite closure are complete and independently
+> verified. 39B1b transport/App leaf is next; 39B2 signed-App machine admission
+> remains pending. Evidence:
+> [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
+> [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md).
 >
 > **Parent plan:**
 > [Phase D Conditional Deep Dive](phase-d-conditional-deep-dive.md)
@@ -88,19 +90,57 @@ reviewed/pushed checkpoints:
 3. **Machine gate** — signed-App helper invocation, real bounded model run,
    three-plane report assembly, failure matrix, teardown and zero residue.
 
-Checkpoint **39A** closes the contract and reusable composition foundation
-without linking the App, launching Codex or claiming signed runtime readiness.
-Checkpoint **39B** owns DEBUG App/helper composition and the machine gate;
-Task 39 completes only after 39B. Each checkpoint receives focused tests,
-boundary checks, serialized SwiftPM, independent review, one uninterrupted
-authoritative full verifier and an independent commit/push. This intentionally
-spends a second full verifier to keep each pushed checkpoint authoritative
-rather than repeating Task 38's oversized review surface.
+Checkpoint **39A** closes the contract and reusable coordinator facade
+foundation without linking the App, launching Codex or claiming signed runtime
+readiness. The 39B preflight found that DEBUG App composition plus the complete
+signed machine gate still exceeded one reviewable checkpoint, so it is split
+before implementation:
+
+1. **39B1 App composition** — package-closed interactive Codex transport,
+   composition target, strict DEBUG App diagnostic leaf, fake-transport tests
+   and Release/no-Executor structural boundaries. It does not launch Codex or
+   claim machine readiness. Its scope preflight is itself split into:
+   - **39B1a prerequisite closure** — exact Evidence v4 Store-path binding and
+     a directly async lifecycle drain protocol with no semaphore/blocking XPC
+     bridge;
+   - **39B1b transport/App leaf** — package-closed transport, composition
+     target, strict DEBUG activation and structural Release boundaries.
+2. **39B2 machine admission** — current-source signed App/helper invocation,
+   bounded real model run, three-plane machine report, failure matrix,
+   teardown and zero-residue proof.
+
+Task 39 completes only after 39B2. Checkpoints 39A, 39B1a, 39B1b and 39B2 each
+receive focused tests, boundary checks, serialized SwiftPM, independent
+review, one uninterrupted authoritative full verifier and an independent
+commit/push. The additional verifier cost keeps every pushed checkpoint
+authoritative rather than recreating the oversized Task 36–38 review surfaces.
 
 Before either checkpoint expands beyond 14 non-document source/test/script
 files or approximately 4,000 added non-document lines, stop and split again
 before adding code. A split must preserve the same Task 39 product gate and
 cannot weaken any final completion criterion.
+
+The 39B1 preflight initially fixed its implementation write set to one package
+composition target, one package-closed Codex interactive transport seam, one
+DEBUG App leaf, focused SwiftPM/App tests and structural verifier updates. A
+second preflight found that the Store-path correction and async lifecycle
+composition would push that set beyond the 14-path absolute maximum, so 39B1a
+was split before transport implementation. The completed 39B1a diff changed
+eight non-document source/test/script paths and added 246 non-document lines;
+it remained well below the hard split gate. 39B1b remains limited to 10–12
+non-document paths and fewer than 3,500 added non-document lines. Real model
+execution, fixed-topology installation, machine-report assembly and
+failure-matrix diagnostics are prohibited in both 39B1 checkpoints and remain
+exclusively 39B2.
+
+39B1a bound the diagnostic configuration to the real Evidence Store v4 path,
+made lifecycle drain directly asynchronous, reloaded actor-owned run state
+after suspension, rechecked the 135-second terminal deadline before artifact
+retirement or Store commit, and added a structural no-blocking-bridge gate.
+Its 83-test Investigation suite, 833-test serialized SwiftPM regression,
+independent post-fix review and uninterrupted 23/23-stage authoritative full
+verifier passed. See
+[Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md).
 
 ## 3. Composition Boundary
 

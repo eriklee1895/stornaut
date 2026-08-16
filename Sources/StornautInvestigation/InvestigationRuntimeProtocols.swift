@@ -306,7 +306,7 @@ package protocol InvestigationLifecycleOwning: Sendable {
     func drain(
         investigationID: InvestigationID,
         runID: InvestigationRunID
-    ) throws -> InvestigationLifecycleDrainResultV1
+    ) async throws -> InvestigationLifecycleDrainResultV1
 }
 
 package protocol InvestigationProbeOwning: Sendable {

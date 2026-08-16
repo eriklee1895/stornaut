@@ -425,6 +425,9 @@ public struct SignedInvestigationRuntimeDiagnosticConfiguration:
             containsPath(diagnosticRootPath, runtimeRootPath),
             containsPath(diagnosticRootPath, reportPath),
             containsPath(diagnosticRootPath, storePath),
+            storePath
+                == supportRootPath
+                    + "/com.eriklee.stornaut/Evidence.sqlite",
             !pathsOverlap(sourceRootPath, supportRootPath),
             !pathsOverlap(sourceRootPath, runtimeRootPath),
             !pathsOverlap(supportRootPath, runtimeRootPath)

@@ -85,6 +85,30 @@ struct InvestigationCoordinatorTests {
     }
 
     @Test
+    func failedStartAwaitsAsynchronousLifecycleDrainBeforeRetiringArtifacts()
+        async throws
+    {
+        let fixture = try InvestigationCoordinatorFixture()
+        fixture.runtime.startError = InvestigationRuntimeError.startFailed
+        let gate = InvestigationProbeExecutionGate()
+        fixture.lifecycle.drainGate = gate
+        let coordinator = fixture.coordinator()
+        let task = Task {
+            try await coordinator.start(fixture.admission())
+        }
+
+        await gate.waitUntilStarted()
+
+        #expect(fixture.lifecycle.drainedRuns == [fixture.session.runID])
+        #expect(fixture.runtime.retiredRuns.isEmpty)
+        await gate.release()
+        await #expect(throws: InvestigationRuntimeError.startFailed) {
+            _ = try await task.value
+        }
+        #expect(fixture.runtime.retiredRuns == [fixture.session.runID])
+    }
+
+    @Test
     func unprovedCleanupReplacesUnderlyingStartFailure() async throws {
         let fixture = try InvestigationCoordinatorFixture()
         fixture.runtime.startError = InvestigationRuntimeError.startFailed

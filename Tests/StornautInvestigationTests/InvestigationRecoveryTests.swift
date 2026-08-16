@@ -404,6 +404,80 @@ struct InvestigationRecoveryTests {
     }
 
     @Test
+    func settlePreservesTokenUsageAcceptedDuringAsynchronousLifecycleDrain()
+        async throws
+    {
+        let fixture = try InvestigationCoordinatorFixture()
+        let gate = InvestigationProbeExecutionGate()
+        fixture.lifecycle.drainGate = gate
+        let coordinator = fixture.coordinator()
+        _ = try await coordinator.start(fixture.admission())
+        try await fixture.startAndFinishRootTurn(on: coordinator)
+        _ = try await coordinator.requestStop(
+            investigationID: fixture.session.id,
+            runID: fixture.session.runID
+        )
+
+        let settlement = Task {
+            try await coordinator.settle(
+                investigationID: fixture.session.id,
+                runID: fixture.session.runID
+            )
+        }
+        await gate.waitUntilStarted()
+        _ = try await coordinator.acceptTokenUsage(
+            fixture.usage(
+                total: 120,
+                payload: "usage-accepted-during-lifecycle-drain"
+            )
+        )
+        await gate.release()
+        _ = try await settlement.value
+
+        let command = try #require(fixture.store.terminalCommands.first)
+        let tokenEvent = try #require(
+            command.budgetEvents.first {
+                $0.kind == .tokenObservation
+            }
+        )
+        #expect(tokenEvent.payload.amount == 120)
+    }
+
+    @Test
+    func settleRechecksTerminalDeadlineAfterAsynchronousLifecycleDrain()
+        async throws
+    {
+        let fixture = try InvestigationCoordinatorFixture()
+        let gate = InvestigationProbeExecutionGate()
+        fixture.lifecycle.drainGate = gate
+        let coordinator = fixture.coordinator()
+        _ = try await coordinator.start(fixture.admission())
+        try await fixture.startAndFinishRootTurn(on: coordinator)
+        _ = try await coordinator.requestStop(
+            investigationID: fixture.session.id,
+            runID: fixture.session.runID
+        )
+
+        let settlement = Task {
+            try await coordinator.settle(
+                investigationID: fixture.session.id,
+                runID: fixture.session.runID
+            )
+        }
+        await gate.waitUntilStarted()
+        fixture.clock.advance(by: .seconds(135))
+        await gate.release()
+
+        await #expect(
+            throws: InvestigationCoordinatorError.terminalDeadlineExceeded
+        ) {
+            _ = try await settlement.value
+        }
+        #expect(fixture.store.terminalCommands.isEmpty)
+        #expect(fixture.runtime.retiredRuns.isEmpty)
+    }
+
+    @Test
     func exact135SecondBoundaryRefusesLateStoreCommit() async throws {
         let fixture = try InvestigationCoordinatorFixture()
         let coordinator = fixture.coordinator()

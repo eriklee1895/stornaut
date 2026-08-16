@@ -662,16 +662,21 @@ final class FakeInvestigationLifecycle:
         auditSessionEmpty: true,
         managedProxyOwnerEmpty: true
     )
+    var drainGate: InvestigationProbeExecutionGate?
     private(set) var drainedRuns: [InvestigationRunID] = []
 
     func drain(
         investigationID: InvestigationID,
         runID: InvestigationRunID
-    ) throws -> InvestigationLifecycleDrainResultV1 {
-        lock.withLock {
+    ) async throws -> InvestigationLifecycleDrainResultV1 {
+        let snapshot = lock.withLock {
             drainedRuns.append(runID)
-            return result
+            return (drainGate, result)
         }
+        if let gate = snapshot.0 {
+            await gate.arriveAndWait()
+        }
+        return snapshot.1
     }
 }
 

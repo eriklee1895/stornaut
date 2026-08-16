@@ -93,6 +93,38 @@ struct SignedRuntimeContractTests {
     }
 
     @Test
+    func configurationBindsTheExactEvidenceStoreV4Path() throws {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let storeConfiguration = try LocalStoreConfiguration(
+            applicationSupportBaseURL: fixture.supportRoot,
+            cachesBaseURL: fixture.runtimeRoot
+        )
+        let configuration = try fixture.configuration()
+
+        #expect(
+            configuration.storePath
+                == storeConfiguration.evidenceDatabaseURL.path
+        )
+        _ = try EvidenceStore(configuration: storeConfiguration)
+        #expect(
+            FileManager.default.fileExists(
+                atPath: storeConfiguration.evidenceDatabaseURL.path
+            )
+        )
+        #expect(
+            throws:
+                SignedInvestigationRuntimeContractError.invalidConfiguration
+        ) {
+            _ = try fixture.configuration(
+                storePath: fixture.diagnosticRoot
+                    .appending(path: "alternate.sqlite")
+                    .path
+            )
+        }
+    }
+
+    @Test
     func completeIndependentEvidenceProducesReadyVerdict() throws {
         let fixture = try SignedRuntimeContractFixture()
         defer { fixture.remove() }
@@ -642,7 +674,12 @@ private struct SignedRuntimeContractFixture {
             directoryHint: .isDirectory
         )
         reportURL = diagnosticRoot.appending(path: "report.json")
-        storeURL = diagnosticRoot.appending(path: "evidence.sqlite")
+        storeURL = supportRoot
+            .appending(
+                path: "com.eriklee.stornaut",
+                directoryHint: .isDirectory
+            )
+            .appending(path: "Evidence.sqlite")
         try FileManager.default.createDirectory(
             at: sourceRoot,
             withIntermediateDirectories: true,
@@ -650,6 +687,11 @@ private struct SignedRuntimeContractFixture {
         )
         try FileManager.default.createDirectory(
             at: supportRoot,
+            withIntermediateDirectories: false,
+            attributes: [.posixPermissions: 0o700]
+        )
+        try FileManager.default.createDirectory(
+            at: storeURL.deletingLastPathComponent(),
             withIntermediateDirectories: false,
             attributes: [.posixPermissions: 0o700]
         )
@@ -684,7 +726,8 @@ private struct SignedRuntimeContractFixture {
     func configuration(
         nonce: UUID? = nil,
         sourceRootPath: String? = nil,
-        supportRootPath: String? = nil
+        supportRootPath: String? = nil,
+        storePath: String? = nil
     ) throws -> SignedInvestigationRuntimeDiagnosticConfiguration {
         try SignedInvestigationRuntimeDiagnosticConfiguration(
             nonce: nonce ?? self.nonce,
@@ -696,7 +739,7 @@ private struct SignedRuntimeContractFixture {
             supportRootPath: supportRootPath ?? supportRoot.path,
             runtimeRootPath: runtimeRoot.path,
             reportPath: reportURL.path,
-            storePath: storeURL.path,
+            storePath: storePath ?? storeURL.path,
             binding: binding(),
             expectedModel: .gpt56Luna,
             expectedProvider: .openAI,

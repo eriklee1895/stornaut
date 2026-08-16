@@ -332,7 +332,7 @@ public actor InvestigationCoordinator {
             )
         } catch {
             if startAttempt.wasAttempted {
-                try cleanFailedRuntimeStart(
+                try await cleanFailedRuntimeStart(
                     investigationID: admission.investigationID,
                     runID: admission.runID
                 )
@@ -948,7 +948,7 @@ public actor InvestigationCoordinator {
         } catch {
             closingError = error
         }
-        try cleanFailedRuntimeStart(
+        try await cleanFailedRuntimeStart(
             investigationID: investigationID,
             runID: runID
         )
@@ -978,16 +978,16 @@ public actor InvestigationCoordinator {
             activeRun = run
             throw InvestigationCoordinatorError.invalidMonotonicClock
         }
-        let phase = barrier.phase(atNanoseconds: currentNanoseconds)
+        var phase = barrier.phase(atNanoseconds: currentNanoseconds)
         guard phase != .rollbackCleanup,
               phase != .rollbackUnconfirmed
         else {
             activeRun = run
             throw InvestigationCoordinatorError.terminalDeadlineExceeded
         }
-        let elapsedNanoseconds =
+        var elapsedNanoseconds =
             currentNanoseconds - barrier.t0Nanoseconds
-        let remainingStoreNanoseconds =
+        var remainingStoreNanoseconds =
             135_000_000_000 - elapsedNanoseconds
         if let retained = run.retainedTerminalCommand {
             let result = try await store.settleTerminal(
@@ -1005,10 +1005,34 @@ public actor InvestigationCoordinator {
             activeRun = run
             throw InvestigationCoordinatorError.terminalNotReady
         }
-        let drain = try? lifecycle.drain(
+        let drain = try? await lifecycle.drain(
             investigationID: investigationID,
             runID: runID
         )
+        run = try requireActiveRun(
+            investigationID: investigationID,
+            runID: runID
+        )
+        let postDrainNanoseconds = monotonicNow()
+        guard let postDrainBarrier = run.barrier,
+              postDrainNanoseconds >= postDrainBarrier.t0Nanoseconds
+        else {
+            activeRun = run
+            throw InvestigationCoordinatorError.invalidMonotonicClock
+        }
+        phase = postDrainBarrier.phase(
+            atNanoseconds: postDrainNanoseconds
+        )
+        guard phase != .rollbackCleanup,
+              phase != .rollbackUnconfirmed
+        else {
+            activeRun = run
+            throw InvestigationCoordinatorError.terminalDeadlineExceeded
+        }
+        elapsedNanoseconds =
+            postDrainNanoseconds - postDrainBarrier.t0Nanoseconds
+        remainingStoreNanoseconds =
+            135_000_000_000 - elapsedNanoseconds
         run.lifecycleDrained = drain?.provedEmpty == true
             && run.normalizer.activeProbeLeaseCount == 0
         if run.lifecycleDrained {
@@ -1163,7 +1187,7 @@ public actor InvestigationCoordinator {
         )
         var results: [InvestigationTerminalResult] = []
         for candidate in candidates {
-            let drain = try? lifecycle.drain(
+            let drain = try? await lifecycle.drain(
                 investigationID: candidate.investigationID,
                 runID: candidate.runID
             )
@@ -1722,10 +1746,10 @@ public actor InvestigationCoordinator {
     private func cleanFailedRuntimeStart(
         investigationID: InvestigationID,
         runID: InvestigationRunID
-    ) throws {
+    ) async throws {
         let drain: InvestigationLifecycleDrainResultV1
         do {
-            drain = try lifecycle.drain(
+            drain = try await lifecycle.drain(
                 investigationID: investigationID,
                 runID: runID
             )

@@ -315,6 +315,63 @@ for prohibited in (
             f"{prohibited}"
         )
 
+required_async_lifecycle = {
+    "package protocol InvestigationLifecycleOwning: Sendable",
+    ") async throws -> InvestigationLifecycleDrainResultV1",
+}
+missing_async_lifecycle = {
+    marker for marker in required_async_lifecycle
+    if marker not in protocol_source
+}
+if missing_async_lifecycle:
+    raise SystemExit(
+        "Investigation lifecycle drain is not directly async: "
+        f"{sorted(missing_async_lifecycle)}"
+    )
+for prohibited in (
+    "DispatchSemaphore",
+    "dispatch_semaphore",
+    "dispatch_sync(",
+    "dispatch_group_wait(",
+    "xpc_connection_send_message_with_reply_sync(",
+    "synchronousRemoteObjectProxyWithErrorHandler",
+    "CFRunLoopRun(",
+    "waitUntilExit()",
+    "readDataToEndOfFile()",
+    ".wait()",
+    ".wait(timeout:",
+    ".wait(until:",
+):
+    lifecycle_boundary_paths = {
+        Path(sys.argv[2]),
+        Path(sys.argv[3]),
+    }
+    for target in package["targets"]:
+        if target.get("type") == "test":
+            continue
+        target_root = Path(target.get("path", ""))
+        target_sources = {
+            target_root / source
+            for source in target.get("sources", [])
+            if source.endswith(".swift")
+        }
+        if any(
+            "InvestigationLifecycleOwning" in path.read_text(
+                encoding="utf-8"
+            )
+            for path in target_sources
+        ):
+            lifecycle_boundary_paths.update(target_sources)
+    lifecycle_boundary_paths.update(
+        Path("StornautApp").rglob("*.swift")
+    )
+    for path in sorted(lifecycle_boundary_paths):
+        if prohibited in path.read_text(encoding="utf-8"):
+            raise SystemExit(
+                "Investigation lifecycle regained a blocking async bridge: "
+                f"{path}: {prohibited}"
+            )
+
 required_signed_contract = {
     "public struct SignedInvestigationRuntimeDiagnosticConfiguration:",
     "public struct SignedInvestigationRuntimeReport:",
