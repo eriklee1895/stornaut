@@ -17,7 +17,7 @@ harness_path = Path(
     "StornautApp/Diagnostics/PhaseCTrashDiagnosticHarness.swift"
 )
 runtime_path = Path(
-    "Sources/StornautCore/Actions/CleanupExecutionRuntime.swift"
+    "Sources/StornautExecution/Actions/CleanupExecutionAuthority.swift"
 )
 
 resolver = resolver_path.read_text(encoding="utf-8")
@@ -86,7 +86,8 @@ if harness.count("ExecutableEvidenceResolver") != 1:
     )
 
 runtime_requirements = {
-    "public static func diagnostic(",
+    "public extension CleanupExecutionRuntime",
+    "static func diagnostic(",
     "resolver: ExecutableEvidenceResolver",
     ".phaseCTrashDiagnostic(",
     "resolver: resolver",

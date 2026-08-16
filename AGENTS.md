@@ -146,8 +146,14 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   migration。E2a 已完成：47/47 focused cleanup、8/8 headless stages（内含
   893-test serialized regression）、targeted Debug App build、historical
   Task 35 source-snapshot correction 与 independent review 均通过，且未移动
-  concrete authority。E2b concrete Trash/Executor migration 与 strict final
-  Mach-O admission active；原 signed composition diff 保持 stash。只有 39B2c
+  concrete authority。E2b 已按第 15 个必要 verifier 路径继续拆为 E2b-i
+  authority relocation 与 E2b-ii strict final-Mach-O admission。E2b-i 已把
+  concrete Trash/Executor authority 迁入 `StornautExecution`，Core 只保留
+  typed seam/receipt/无权 state machine；3/3 package、32/32 affected、
+  73/73 Phase C、ordinary/diagnostic App builds 与单次 898-test serial
+  regression 通过，independent review 无 unresolved P0–P2。E2b-i 已完成，
+  E2b-ii strict final-Mach-O 与 E2 checkpoint 唯一一次 clean full active；
+  原 signed composition diff 保持 stash。只有 39B2c
   可以作 machine readiness claim；Task 39 尚未完成。
   真实 App Trash 依赖仍保持关闭，生产 Deep Dive 仍为 implementation unavailable。
   逐 Task 完成 Upstream Study、
@@ -250,6 +256,8 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2a review / completion audit | [docs/reports/phase-d-task-39b2a-review.md](docs/reports/phase-d-task-39b2a-review.md) |
 | Phase D Task 39B2b-i review / completion audit | [docs/reports/phase-d-task-39b2b-i-review.md](docs/reports/phase-d-task-39b2b-i-review.md) |
 | Phase D Task 39B2b-ii-E1 review / completion audit | [docs/reports/phase-d-task-39b2b-ii-e1-review.md](docs/reports/phase-d-task-39b2b-ii-e1-review.md) |
+| Phase D Task 39B2b-ii-E2a review / completion audit | [docs/reports/phase-d-task-39b2b-ii-e2a-review.md](docs/reports/phase-d-task-39b2b-ii-e2a-review.md) |
+| Phase D Task 39B2b-ii-E2b-i review / completion audit | [docs/reports/phase-d-task-39b2b-ii-e2b-i-review.md](docs/reports/phase-d-task-39b2b-ii-e2b-i-review.md) |
 | Epic 2–4 历史计划 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) |
 | Epic 2–4 最终 Gate | [docs/reports/epic-2-4-validation-report.md](docs/reports/epic-2-4-validation-report.md) |
 | Epic 0–1 历史计划与证据 | [docs/plans/completed/epic-0-1-foundation-spikes.md](docs/plans/completed/epic-0-1-foundation-spikes.md) |
@@ -324,8 +332,11 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   39B2b-ii-E1 Registered Action authority extraction 与 E2a package-only
   cleanup seam 已完成；E2a 的 47-test focused、893-test headless regression、
   targeted Debug App build、independent review 与 Task 35 historical
-  source-snapshot verifier 均通过。E2b concrete Trash/Executor authority
-  migration active。Task 39 尚未完成。
+  source-snapshot verifier 均通过。E2b-i concrete Trash/Executor authority
+  relocation、authorized ordinary-App linkage、3/3 package、32/32 affected、
+  73/73 Phase C、ordinary/diagnostic App builds 与 898-test serial regression
+  已通过。E2b-i complete，E2b-ii strict final-Mach-O admission active。
+  Task 39 尚未完成。
 Deep Dive 的旧 Broker-only no-go 已被 ADR 0004 的 capability-first 边界取代；
 当前仍不可用的原因是生产 Deep Dive 尚未实现，而非 R6 或 Codex 工具能力。
 R6 不证明 release distribution、FDA/TCC 或 production Deep Dive；

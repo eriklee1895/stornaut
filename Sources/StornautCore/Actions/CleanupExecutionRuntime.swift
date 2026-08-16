@@ -9,8 +9,8 @@ public enum CleanupExecutionRuntimeError:
 }
 
 public actor CleanupExecutionRuntime {
-    typealias Clock = @Sendable () -> Date
-    typealias Collect = @Sendable (
+    package typealias Clock = @Sendable () -> Date
+    package typealias Collect = @Sendable (
         CleanupPlan,
         ReviewSelection
     ) async -> CleanupPolicyCollectionOutcome
@@ -30,91 +30,21 @@ public actor CleanupExecutionRuntime {
     private var pending: PendingPreflight?
     private var preflightGeneration: UInt64 = 0
 
-    init(
-        store: EvidenceStore,
-        rootObserver: any CleanupPolicyRootObserving,
-        workflowCoordinator: CleanupWorkflowCoordinator
-    ) throws {
-        let collector = try CleanupPolicyContextCollector(
-            store: store,
-            rootObserver: rootObserver,
-            workflowObserver: workflowCoordinator
-        )
-        let authorizationController = CleanupAuthorizationController()
-        let executor = ActionExecutor(
-            policyGate: ActionPolicyGate(
-                registry: ActionRegistry(definitions: [])
-            ),
-            trashMoving: TrashMoving(
-                adapter: FileManagerTrashAdapter()
-            ),
-            registeredActionRunner: DenyRegisteredActionRunner()
-        )
-        self.collect = { plan, selection in
-            await collector.collect(
-                plan: plan,
-                selection: selection
-            )
-        }
-        policyGate = CleanupPolicyGate()
+    package init(
+        collect: @escaping Collect,
+        policyGate: CleanupPolicyGate = CleanupPolicyGate(),
+        authorizationController: CleanupAuthorizationController,
+        coordinator: CleanupExecutionCoordinator,
+        now: @escaping Clock = Date.init
+    ) {
+        self.collect = collect
+        self.policyGate = policyGate
         self.authorizationController = authorizationController
-        coordinator = CleanupExecutionCoordinator(
-            store: store,
-            authorizationController: authorizationController,
-            workflowCoordinator: workflowCoordinator,
-            itemCollector: collector,
-            executor: executor,
-            volumeSampler: FoundationCleanupVolumeSampler()
-        )
-        now = Date.init
+        self.coordinator = coordinator
+        self.now = now
     }
 
 #if DEBUG
-    public static func diagnostic(
-        store: EvidenceStore,
-        rootObserver: any CleanupPolicyRootObserving,
-        workflowCoordinator: CleanupWorkflowCoordinator,
-        resolver: ExecutableEvidenceResolver,
-        observation: CleanupTrashDiagnosticObservation
-    ) throws -> CleanupExecutionRuntime {
-        let collector = try CleanupPolicyContextCollector
-            .phaseCTrashDiagnostic(
-            store: store,
-            resolver: resolver,
-            rootObserver: rootObserver,
-            workflowObserver: workflowCoordinator
-        )
-        let authorizationController = CleanupAuthorizationController()
-        let executor = ActionExecutor(
-            policyGate: ActionPolicyGate(
-                registry: ActionRegistry(definitions: [])
-            ),
-            trashMoving: TrashMoving(
-                adapter: RecordingFileManagerTrashAdapter(
-                    observation: observation
-                )
-            ),
-            registeredActionRunner: DenyRegisteredActionRunner()
-        )
-        return CleanupExecutionRuntime(
-            collect: { plan, selection in
-                await collector.collect(
-                    plan: plan,
-                    selection: selection
-                )
-            },
-            authorizationController: authorizationController,
-            coordinator: CleanupExecutionCoordinator(
-                store: store,
-                authorizationController: authorizationController,
-                workflowCoordinator: workflowCoordinator,
-                itemCollector: collector,
-                executor: executor,
-                volumeSampler: FoundationCleanupVolumeSampler()
-            )
-        )
-    }
-
     public static func diagnosticRecovery(
         store: EvidenceStore,
         workflowCoordinator: CleanupWorkflowCoordinator,
@@ -143,20 +73,6 @@ public actor CleanupExecutionRuntime {
         )
     }
 #endif
-
-    init(
-        collect: @escaping Collect,
-        policyGate: CleanupPolicyGate = CleanupPolicyGate(),
-        authorizationController: CleanupAuthorizationController,
-        coordinator: CleanupExecutionCoordinator,
-        now: @escaping Clock = Date.init
-    ) {
-        self.collect = collect
-        self.policyGate = policyGate
-        self.authorizationController = authorizationController
-        self.coordinator = coordinator
-        self.now = now
-    }
 
     public func preflight(
         plan: CleanupPlan,
@@ -247,37 +163,7 @@ public actor CleanupExecutionRuntime {
     }
 }
 
-private struct DenyRegisteredActionRunner: RegisteredActionRunning {
-    func run(
-        _ invocation: RegisteredActionInvocation
-    ) async throws -> RegisteredActionProcessOutput {
-        _ = invocation
-        throw RegisteredActionRunnerError.launchFailed(
-            "registered actions are unavailable"
-        )
-    }
-}
-
 #if DEBUG
-public final class CleanupRecoveryDiagnosticObservation:
-    @unchecked Sendable
-{
-    private let lock = NSLock()
-    private var calls = 0
-
-    public init() {}
-
-    fileprivate func recordInvocation() {
-        lock.withLock {
-            calls += 1
-        }
-    }
-
-    public func invocationCount() -> Int {
-        lock.withLock { calls }
-    }
-}
-
 private struct DenyRecoveryItemCollector:
     CleanupItemPolicyContextCollecting
 {
@@ -329,6 +215,25 @@ private struct DenyRecoveryExecutor: CleanupActionExecuting {
     }
 }
 
+public final class CleanupRecoveryDiagnosticObservation:
+    @unchecked Sendable
+{
+    private let lock = NSLock()
+    private var calls = 0
+
+    public init() {}
+
+    package func recordInvocation() {
+        lock.withLock {
+            calls += 1
+        }
+    }
+
+    public func invocationCount() -> Int {
+        lock.withLock { calls }
+    }
+}
+
 public final class CleanupTrashDiagnosticObservation:
     @unchecked Sendable
 {
@@ -338,13 +243,13 @@ public final class CleanupTrashDiagnosticObservation:
 
     public init() {}
 
-    fileprivate func recordAttempt() {
+    package func recordAttempt() {
         lock.withLock {
             trashAttemptCount += 1
         }
     }
 
-    fileprivate func record(returnedTrashURL: URL?) {
+    package func record(returnedTrashURL: URL?) {
         lock.withLock {
             self.returnedTrashURL = returnedTrashURL
         }
@@ -356,17 +261,6 @@ public final class CleanupTrashDiagnosticObservation:
 
     public func trashURL() -> URL? {
         lock.withLock { returnedTrashURL }
-    }
-}
-
-private struct RecordingFileManagerTrashAdapter: TrashAdapting {
-    let observation: CleanupTrashDiagnosticObservation
-
-    func trashItem(at url: URL) throws -> URL? {
-        observation.recordAttempt()
-        let result = try FileManagerTrashAdapter().trashItem(at: url)
-        observation.record(returnedTrashURL: result)
-        return result
     }
 }
 #endif

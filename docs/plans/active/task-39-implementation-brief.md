@@ -20,7 +20,10 @@
 > authority into `StornautExecution`; E2a established the package-only cleanup
 > injection seam and validated the corrected verification funnel with 47/47
 > focused tests, an 893-test headless regression and a targeted Debug App
-> build. E2b concrete Trash/Executor authority migration is active. Evidence:
+> build. E2b-i then moved concrete Trash/Executor authority into
+> `StornautExecution`, kept Core authority-free, linked only the ordinary App,
+> and passed its focused/product/App/serialized funnel plus isolated review.
+> E2b-ii strict final-Mach-O admission is active. Evidence:
 > [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
 > [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md) and
 > [Task 39B1b-i Review](../../reports/phase-d-task-39b1b-i-review.md) and
@@ -29,7 +32,9 @@
 > [Task 39B2b-i Review](../../reports/phase-d-task-39b2b-i-review.md) and
 > [Task 39B2b-ii-E1 Review](../../reports/phase-d-task-39b2b-ii-e1-review.md)
 > and
-> [Task 39B2b-ii-E2a Review](../../reports/phase-d-task-39b2b-ii-e2a-review.md).
+> [Task 39B2b-ii-E2a Review](../../reports/phase-d-task-39b2b-ii-e2a-review.md)
+> and
+> [Task 39B2b-ii-E2b-i Review](../../reports/phase-d-task-39b2b-ii-e2b-i-review.md).
 >
 > **Parent plan:**
 > [Phase D Conditional Deep Dive](phase-d-conditional-deep-dive.md)
@@ -350,6 +355,75 @@ See
 [Task 39B2b-ii-E2a Review](../../reports/phase-d-task-39b2b-ii-e2a-review.md).
 E2b concrete authority migration is now active; signed composition remains
 stashed and 39B2c still exclusively owns machine execution.
+
+E2b preflight traced every current construction and test owner before moving
+code. It initially fixed a 14-path write set, but the red gate exposed a
+fifteenth mandatory verifier owner:
+`scripts/verify-phase-c-trash-diagnostic-contract`. The checkpoint is
+therefore split before exceeding the hard maximum:
+
+- **E2b-i authority relocation and green App linkage** — at most 14
+  non-document paths; moves concrete authority, updates behavioral tests,
+  imports/links `StornautExecution` only into the ordinary App/Task 35
+  diagnostic host, and updates every source/Phase C contract so the repository
+  remains buildable;
+- **E2b-ii strict final-Mach-O admission** — strengthens the built-artifact
+  authority markers and exact Xcode dependency allowlist, runs the strict
+  Debug/Release/Investigation diagnostic bundle gate, independent review and
+  exactly one final full verifier.
+
+The E2b-i fixed non-document write set is:
+
+```text
+Sources/StornautCore/Actions/ActionExecutor.swift
+Sources/StornautCore/Actions/TrashMoving.swift
+Sources/StornautCore/Actions/CleanupExecutionCoordinator.swift
+Sources/StornautCore/Actions/CleanupExecutionRuntime.swift
+Sources/StornautExecution/Actions/CleanupExecutionAuthority.swift
+Tests/StornautCoreTests/TrashMovingTests.swift
+Tests/StornautCoreTests/PlatformTrashDiagnosticTests.swift
+Tests/StornautCoreTests/CleanupExecutionCoordinatorTests.swift
+StornautApp/Diagnostics/PhaseCTrashDiagnosticHarness.swift
+StornautAppTests/PhaseCTrashDiagnosticTests.swift
+Stornaut.xcodeproj/project.pbxproj
+scripts/verify-cleanup-execution-boundaries
+scripts/verify-phase-c-gate
+scripts/verify-phase-c-trash-diagnostic-contract
+```
+
+`ActionExecutor.swift` in Core retains only the package-scoped injected
+execution protocol and typed failure contract. `TrashMoving.swift` in Core
+retains only the public immutable Trash receipt. The concrete Executor,
+Trash adapter/mover and DEBUG diagnostic composition move together into
+`StornautExecution`; the Core runtime remains a no-authority state machine
+with package-scoped injection. Existing behavioral tests import the execution
+module rather than duplicating fixtures. The ordinary App explicitly links
+`StornautExecution` only because its sealed DEBUG Task 35 diagnostic source
+constructs that authority; production composition remains `writeDisabled`.
+The separate Investigation diagnostic target must not link the execution
+product.
+
+E2b-i starts with the red source/package authority assertion already observed,
+then runs the affected Execution/Core tests, Phase C product gate, one
+serialized SwiftPM regression, targeted ordinary/diagnostic App builds and
+independent review. It cannot be pushed with a broken App. E2b-ii then owns the
+strict Debug/Release/Investigation diagnostic bundle gate and exactly one final
+full verifier. The Release/bundle gate must inspect built artifacts for
+concrete Trash, Executor, Registered Action and process-runner markers and
+verify the diagnostic target does not link `StornautExecution`;
+source-reference checks alone are not accepted as final Mach-O evidence.
+
+E2b-i is complete. The initial authority assertion failed with the expected
+missing-Execution-source reason. The final 14-path checkpoint passed 3/3
+package seam tests, 32/32 affected cleanup tests, the 73/73 Phase C product
+gate, ordinary and Investigation diagnostic Debug App builds, and one
+898-test / 37-suite serialized SwiftPM regression. Static review found no
+public concrete authority, no concrete authority remaining in Core, and no
+Investigation diagnostic dependency on `StornautExecution`; no unresolved
+P0–P2 remain. See
+[Task 39B2b-ii-E2b-i Review](../../reports/phase-d-task-39b2b-ii-e2b-i-review.md).
+E2b-ii strict final-Mach-O admission is now active and exclusively owns the
+single clean authoritative full verifier for the E2 checkpoint.
 
 39B1a bound the diagnostic configuration to the real Evidence Store v4 path,
 made lifecycle drain directly asynchronous, reloaded actor-owned run state
@@ -744,14 +818,15 @@ bundle-boundary failures. Resolve and rerun the narrow failed stage first.
 Start one clean final full only when the focused funnel and independent review
 are green, and preserve per-stage timing in the checkpoint report.
 
-The active E2a seam is the explicit exception documented in §3: after its red
+The completed E2a seam used the explicit exception documented in §3: after its red
 structural gate and focused tests, run `scripts/verify --headless`, which owns
 the checkpoint's one serialized SwiftPM regression, then a targeted Debug App
 build and independent review. Do not run a second standalone serialized suite
 before or after headless. E2a omits full/XCUITest because it changes neither UI
 nor final authority.
-E2b must run the strict final-binary/Release gates and exactly one clean
-authoritative full.
+The active E2b-ii checkpoint must run the strict final-binary/Release gates
+and exactly one clean authoritative full after all cheaper layers and review
+are green. E2b-i is complete and must not receive a redundant full run.
 
 The focused real-model diagnostic may be repeated with fresh nonces when a
 provider/transient failure is honestly classified. It may not reinterpret a

@@ -35,6 +35,7 @@ function verify_phase_c_structure() {
         Sources/StornautCore/Actions/CleanupExecutionCoordinator.swift \
         Sources/StornautCore/Actions/ActionExecutor.swift \
         Sources/StornautCore/Actions/TrashMoving.swift \
+        Sources/StornautExecution/Actions/CleanupExecutionAuthority.swift \
         Sources/StornautCore/Policy/CleanupAuthorization.swift \
         StornautApp/AppState/AppDependencies.swift \
         StornautApp/Diagnostics/PhaseCTrashDiagnosticHarness.swift; do
@@ -127,15 +128,15 @@ executor = Path(
 trash = Path(
     "Sources/StornautCore/Actions/TrashMoving.swift"
 ).read_text(encoding="utf-8")
+authority = Path(
+    "Sources/StornautExecution/Actions/CleanupExecutionAuthority.swift"
+).read_text(encoding="utf-8")
 app_dependencies = Path(
     "StornautApp/AppState/AppDependencies.swift"
 ).read_text(encoding="utf-8")
 
 required_runtime = {
     "public actor CleanupExecutionRuntime",
-    "ActionRegistry(definitions: [])",
-    "adapter: FileManagerTrashAdapter()",
-    "DenyRegisteredActionRunner()",
     "public func preflight(",
     "public func execute(",
     "public func requestStopAfterCurrent()",
@@ -145,6 +146,22 @@ required_runtime = {
 missing = sorted(token for token in required_runtime if token not in runtime)
 if missing:
     raise SystemExit(f"closed execution runtime is incomplete: {missing}")
+required_authority = {
+    "package struct ActionExecutor",
+    "package struct TrashMoving",
+    "package struct FileManagerTrashAdapter",
+    "ActionRegistry(definitions: [])",
+    "adapter: FileManagerTrashAdapter()",
+    "DenyRegisteredActionRunner()",
+    "FileManager.default.trashItem(",
+    "public extension CleanupExecutionRuntime",
+    "static func diagnostic(",
+}
+missing = sorted(
+    token for token in required_authority if token not in authority
+)
+if missing:
+    raise SystemExit(f"execution authority is incomplete: {missing}")
 if re.search(
     r"public\s+init\s*\(\s*store:\s*EvidenceStore",
     runtime,
@@ -165,19 +182,29 @@ for forbidden in {
         raise SystemExit(
             f"closed execution runtime contains prohibited surface: {forbidden}"
         )
-if "public struct ActionExecutor" in executor:
-    raise SystemExit("ActionExecutor escaped the StornautCore boundary")
-if "public struct TrashMoving" in trash:
-    raise SystemExit("TrashMoving escaped the StornautCore boundary")
-if "public struct FileManagerTrashAdapter" in trash:
-    raise SystemExit("Foundation Trash adapter escaped the Core boundary")
-if re.search(r"TrashMoving\s*\(\s*\)", trash + executor):
+for forbidden in {
+    "struct ActionExecutor",
+    "struct TrashMoving",
+    "struct FileManagerTrashAdapter",
+    "FileManager.default.trashItem(",
+}:
+    if forbidden in runtime + executor + trash:
+        raise SystemExit(
+            f"StornautCore regained concrete execution authority: {forbidden}"
+        )
+if "public struct ActionExecutor" in authority:
+    raise SystemExit("ActionExecutor escaped as public API")
+if "public struct TrashMoving" in authority:
+    raise SystemExit("TrashMoving escaped as public API")
+if "public struct FileManagerTrashAdapter" in authority:
+    raise SystemExit("Foundation Trash adapter escaped as public API")
+if re.search(r"TrashMoving\s*\(\s*\)", authority):
     raise SystemExit("TrashMoving regained an implicit real adapter")
-if "trashMoving: TrashMoving =" in executor:
+if "trashMoving: TrashMoving =" in authority:
     raise SystemExit("ActionExecutor regained an implicit Trash executor")
-if "registeredActionRunner: any RegisteredActionRunning =" in executor:
+if "registeredActionRunner: any RegisteredActionRunning =" in authority:
     raise SystemExit("ActionExecutor regained an implicit process runner")
-if trash.count("FileManager.default.trashItem(") != 1:
+if authority.count("FileManager.default.trashItem(") != 1:
     raise SystemExit("Foundation Trash mutation count drifted")
 if "FileManagerTrashAdapter" in app_dependencies:
     raise SystemExit("AppDependencies constructs the raw Trash adapter")

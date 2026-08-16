@@ -21,27 +21,35 @@ func cleanupExecutionCoordinatorHasNoDefaultFoundationTrashSurface() throws {
 }
 
 @Test
-func cleanupExecutionRuntimeOwnsTheOnlyClosedFoundationTrashComposition()
+func cleanupExecutionAuthorityLivesOutsideCore()
     throws
 {
     let root = URL(filePath: #filePath)
         .deletingLastPathComponent()
         .deletingLastPathComponent()
         .deletingLastPathComponent()
-    let sourceURL = root.appending(
+    let runtimeURL = root.appending(
         path:
             "Sources/StornautCore/Actions/CleanupExecutionRuntime.swift"
     )
-    let source = try String(contentsOf: sourceURL, encoding: .utf8)
+    let authorityURL = root.appending(
+        path:
+            "Sources/StornautExecution/Actions/CleanupExecutionAuthority.swift"
+    )
+    let runtime = try String(contentsOf: runtimeURL, encoding: .utf8)
+    let authority = try String(contentsOf: authorityURL, encoding: .utf8)
 
-    #expect(source.contains("FileManagerTrashAdapter()"))
-    #expect(source.contains("ActionRegistry(definitions: [])"))
-    #expect(source.contains("DenyRegisteredActionRunner()"))
-    #expect(!source.contains("FoundationRegisteredActionRunner()"))
-    #expect(!source.contains("public let authorization"))
-    #expect(!source.contains("public let coordinator"))
+    #expect(!runtime.contains("FileManagerTrashAdapter"))
+    #expect(!runtime.contains("ActionExecutor"))
+    #expect(!runtime.contains("TrashMoving"))
+    #expect(authority.contains("FileManagerTrashAdapter()"))
+    #expect(authority.contains("ActionRegistry(definitions: [])"))
+    #expect(authority.contains("DenyRegisteredActionRunner()"))
+    #expect(!authority.contains("FoundationRegisteredActionRunner()"))
+    #expect(!runtime.contains("public let authorization"))
+    #expect(!runtime.contains("public let coordinator"))
     #expect(
-        !source.contains(
+        !runtime.contains(
             """
                 public init(
                     store: EvidenceStore,
@@ -1577,7 +1585,7 @@ private actor FailingThenSuccessCleanupExecutor: HarnessCleanupExecutor {
     ) async throws -> ActionExecution {
         attempts += 1
         if attempts == 1 {
-            throw TrashMovingError.permissionDenied
+            throw CleanupActionExecutionFailure.permissionDenied
         }
         return try await base.execute(token, context: context)
     }
@@ -1680,7 +1688,7 @@ private actor FailingThenBlockingCleanupExecutor: HarnessCleanupExecutor {
     ) async throws -> ActionExecution {
         attempts += 1
         if attempts == 1 {
-            throw TrashMovingError.permissionDenied
+            throw CleanupActionExecutionFailure.permissionDenied
         }
         blocked = true
         waiter?.resume()

@@ -28,8 +28,13 @@ complete. E2a then established the minimum package-only cleanup injection seam,
 corrected the historical Task 35 source-snapshot verifier and passed 47/47
 focused cleanup tests, all 8 headless stages including 893 serialized tests,
 a targeted Debug App build and independent review. E2a is complete; E2b
-concrete Trash/Executor authority migration and strict final-Mach-O admission
-are active.
+was split before its fifteenth required verifier path. E2b-i moved concrete
+Trash/Executor authority into `StornautExecution`, retained only typed
+injection/state-machine surfaces in Core, explicitly linked only the ordinary
+App and passed 3/3 package, 32/32 affected cleanup, 73/73 Phase C, targeted App
+builds and one 898-test serialized regression. E2b-i is complete; E2b-ii
+strict final-Mach-O admission and the E2 checkpoint's single final full
+verifier are active.
 39B2c alone
 owns machine admission. Tasks 40–44
 remain blocked on the pushed completion commit of their immediate predecessor.
@@ -49,7 +54,7 @@ the sole normal-product admission gate.
 | [36](task-36-implementation-brief.md) | Domain, canonical projection, planner, budget and stop contracts | complete; [review](../../reports/phase-d-task-36-review.md) |
 | [37](task-37-implementation-brief.md) | Store v4, retention and source rejoin | complete; [review](../../reports/phase-d-task-37-review.md) |
 | [38](task-38-implementation-brief.md) | Closed coordinator with fake runtime | complete; [review](../../reports/phase-d-task-38-review.md) |
-| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; 39A [complete](../../reports/phase-d-task-39a-review.md), 39B1a [complete](../../reports/phase-d-task-39b1a-review.md), 39B1b-i [complete](../../reports/phase-d-task-39b1b-i-review.md), 39B1b-ii [complete](../../reports/phase-d-task-39b1b-ii-review.md), 39B2a [complete](../../reports/phase-d-task-39b2a-review.md), 39B2b-i [complete](../../reports/phase-d-task-39b2b-i-review.md), 39B2b-ii-E1 [complete](../../reports/phase-d-task-39b2b-ii-e1-review.md), E2a [complete](../../reports/phase-d-task-39b2b-ii-e2a-review.md), E2b active |
+| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; 39A [complete](../../reports/phase-d-task-39a-review.md), 39B1a [complete](../../reports/phase-d-task-39b1a-review.md), 39B1b-i [complete](../../reports/phase-d-task-39b1b-i-review.md), 39B1b-ii [complete](../../reports/phase-d-task-39b1b-ii-review.md), 39B2a [complete](../../reports/phase-d-task-39b2a-review.md), 39B2b-i [complete](../../reports/phase-d-task-39b2b-i-review.md), 39B2b-ii-E1 [complete](../../reports/phase-d-task-39b2b-ii-e1-review.md), E2a [complete](../../reports/phase-d-task-39b2b-ii-e2a-review.md), E2b-i [complete](../../reports/phase-d-task-39b2b-ii-e2b-i-review.md), E2b-ii active |
 | [40](task-40-implementation-brief.md) | Evidence report and conservative Review projection | blocked on Task 39 |
 | [41](task-41-implementation-brief.md) | First-use disclosure and typed availability | blocked on Task 40 |
 | [42](task-42-implementation-brief.md) | App workflow and recovery state | blocked on Task 41 |

@@ -17,6 +17,7 @@
 		B00000000000000000000016 /* InvestigationRuntimeDiagnosticTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D00000000000000000000008 /* InvestigationRuntimeDiagnosticTests.swift */; };
 		B00000000000000000000017 /* InvestigationRuntimeDiagnosticHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = D00000000000000000000009 /* InvestigationRuntimeDiagnosticHarness.swift */; };
 		B00000000000000000000018 /* StornautInvestigation in Frameworks */ = {isa = PBXBuildFile; productRef = F00000000000000000000005 /* StornautInvestigation */; };
+		B00000000000000000000019 /* StornautExecution in Frameworks */ = {isa = PBXBuildFile; productRef = F00000000000000000000007 /* StornautExecution */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -147,6 +148,7 @@
 			files = (
 				B00000000000000000000001 /* StornautCore in Frameworks */,
 				B00000000000000000000002 /* StornautCodex in Frameworks */,
+				B00000000000000000000019 /* StornautExecution in Frameworks */,
 				B00000000000000000000006 /* StornautLifecycle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -244,6 +246,7 @@
 				F00000000000000000000002 /* StornautCore */,
 				F00000000000000000000003 /* StornautCodex */,
 				F00000000000000000000004 /* StornautLifecycle */,
+				F00000000000000000000007 /* StornautExecution */,
 			);
 			productName = Stornaut;
 			productReference = D00000000000000000000001 /* Stornaut.app */;
@@ -944,6 +947,10 @@
 		F00000000000000000000006 /* StornautInvestigationDiagnostic */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = StornautInvestigationDiagnostic;
+		};
+		F00000000000000000000007 /* StornautExecution */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = StornautExecution;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -13,6 +13,9 @@ execution_files=(
 authorization_file=Sources/StornautCore/Policy/CleanupAuthorization.swift
 collector_file=Sources/StornautCore/Policy/CleanupPolicyContextCollector.swift
 runtime_file=Sources/StornautCore/Actions/CleanupExecutionRuntime.swift
+executor_contract=Sources/StornautCore/Actions/ActionExecutor.swift
+trash_receipt=Sources/StornautCore/Actions/TrashMoving.swift
+execution_authority=Sources/StornautExecution/Actions/CleanupExecutionAuthority.swift
 
 for file in "${execution_files[@]}"; do
     [[ -f "$file" ]] || {
@@ -23,6 +26,11 @@ done
 
 [[ -f "$runtime_file" ]] || {
     print -u2 "Missing Task 35 closed execution runtime: $runtime_file"
+    exit 1
+}
+
+[[ -f "$execution_authority" ]] || {
+    print -u2 "Missing E2b concrete execution authority: $execution_authority"
     exit 1
 }
 
@@ -70,33 +78,48 @@ rg -q 'try await saveAndVerify\(journal\)' \
 rg -q 'permanentlyReleasedLogicalBytes: ByteCount\(0\)' \
     Sources/StornautCore/Actions/CleanupExecutionCoordinator.swift
 rg -q '^public actor CleanupExecutionRuntime' "$runtime_file"
-rg -Fq 'ActionRegistry(definitions: [])' "$runtime_file"
-rg -Fq 'adapter: FileManagerTrashAdapter()' "$runtime_file"
-rg -Fq 'DenyRegisteredActionRunner()' "$runtime_file"
+rg -Fq 'ActionRegistry(definitions: [])' "$execution_authority"
+rg -Fq 'adapter: FileManagerTrashAdapter()' "$execution_authority"
+rg -Fq 'DenyRegisteredActionRunner()' "$execution_authority"
 rg -Fq 'private var pending: PendingPreflight?' "$runtime_file"
 rg -Fq 'self.pending = nil' "$runtime_file"
 rg -Fq 'public func requestStopAfterCurrent()' "$runtime_file"
 rg -Fq 'public func retrySavingAudit(' "$runtime_file"
 rg -Fq 'public func recover()' "$runtime_file"
-! rg -q '^public struct ActionExecutor' \
-    Sources/StornautCore/Actions/ActionExecutor.swift
-! rg -q '^public struct TrashMoving' \
-    Sources/StornautCore/Actions/TrashMoving.swift
-! rg -q '^public struct FileManagerTrashAdapter' \
-    Sources/StornautCore/Actions/TrashMoving.swift
-! rg -q 'TrashMoving\s*\(\s*\)' \
-    Sources/StornautCore/Actions/TrashMoving.swift \
-    Sources/StornautCore/Actions/ActionExecutor.swift
+for declaration in \
+    'package protocol CleanupActionExecuting' \
+    'package enum CleanupActionExecutionFailure'; do
+    rg -Fq "$declaration" "$executor_contract"
+done
+
+for marker in \
+    'package struct ActionExecutor' \
+    'package struct TrashMoving' \
+    'package struct FileManagerTrashAdapter' \
+    'FileManager.default.trashItem(' \
+    'public extension CleanupExecutionRuntime' \
+    'static func diagnostic('; do
+    rg -Fq "$marker" "$execution_authority"
+done
+
+if rg -n \
+    '\b(struct|actor) (ActionExecutor|TrashMoving|FileManagerTrashAdapter)\b|FileManager\.default\.trashItem\(' \
+    "$executor_contract" \
+    "$trash_receipt" \
+    "$runtime_file"; then
+    print -u2 "StornautCore still contains concrete Trash or Executor authority."
+    exit 1
+fi
 
 for declaration in \
     'package protocol CleanupExecutionStore' \
-    'package protocol CleanupActionExecuting' \
     'package protocol CleanupVolumeSampling' \
-    'package enum CleanupActionExecutionFailure' \
     'package actor CleanupExecutionCoordinator'; do
     rg -Fq "$declaration" \
         Sources/StornautCore/Actions/CleanupExecutionCoordinator.swift
 done
+rg -Fq 'package protocol CleanupActionExecuting' "$executor_contract"
+rg -Fq 'package enum CleanupActionExecutionFailure' "$executor_contract"
 
 rg -Fq 'package protocol CleanupItemPolicyContextCollecting' \
     "$collector_file"
@@ -106,7 +129,7 @@ rg -Fq 'package actor CleanupAuthorizationController' "$authorization_file"
 rg -Fq 'package struct FoundationCleanupVolumeSampler' \
     Sources/StornautCore/Accounting/CleanupAccounting.swift
 rg -Fq 'typealias TrashMovingError = CleanupActionExecutionFailure' \
-    Sources/StornautCore/Actions/TrashMoving.swift
+    "$execution_authority"
 rg -Fq 'catch let error as CleanupActionExecutionFailure' \
     Sources/StornautCore/Actions/CleanupExecutionCoordinator.swift
 
@@ -120,10 +143,9 @@ if rg -n \
 fi
 
 if rg -n \
-    '^package (struct|protocol|actor) (ActionExecutor|TrashMoving|FileManagerTrashAdapter|TrashAdapting)\b' \
-    Sources/StornautCore/Actions/ActionExecutor.swift \
-    Sources/StornautCore/Actions/TrashMoving.swift; then
-    print -u2 "Concrete Trash or Executor authority escaped through E2a."
+    '^public (struct|protocol|actor) (ActionExecutor|TrashMoving|FileManagerTrashAdapter|TrashAdapting)\b' \
+    "$execution_authority"; then
+    print -u2 "Concrete Trash or Executor authority escaped as public API."
     exit 1
 fi
 

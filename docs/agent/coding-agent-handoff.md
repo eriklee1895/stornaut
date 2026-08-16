@@ -147,7 +147,13 @@
 > 8/8 headless stages（内含 893-test serialized regression）、targeted
 > Debug App build、Task 35 historical source-snapshot correction 与
 > independent review 均通过，未移动 concrete authority。E2a 已完成，
-> E2b active；原 signed composition diff 保持 stash。39B2c 才能作
+> E2b 已继续拆为 E2b-i authority relocation 与 E2b-ii strict
+> final-Mach-O admission。E2b-i 已把 concrete Trash/Executor authority
+> 迁入 `StornautExecution`，Core 只保留 typed seam/receipt/无权 runtime
+> state machine；3/3 package、32/32 affected、73/73 Phase C、
+> ordinary/diagnostic App builds 与单次 898-test serial regression 均通过，
+> independent review 无 unresolved P0–P2。E2b-i complete，E2b-ii active；
+> 原 signed composition diff 保持 stash。39B2c 才能作
 > readiness claim。
 > 生产 Deep Dive 仍 unavailable。
 > Task 5 的历史
@@ -563,8 +569,11 @@ target，并通过 11-test focused、895-test serialized、independent review
 与 authoritative full 23/23 stages。E2a package-only cleanup seam 随后
 通过 47-test focused、893-test headless regression、targeted Debug App
 build、historical Task 35 source-snapshot gate 与 independent review；
-E2b concrete Trash/Executor authority migration active，原 signed
-composition diff 保持 stash。39B2c 才是 machine admission。该最终 gate
+E2b-i concrete Trash/Executor authority relocation 与 authorized ordinary-App
+linkage 已完成，3/3 package、32/32 affected、73/73 Phase C、
+ordinary/diagnostic App builds 与 898-test serial regression 均通过；
+E2b-ii strict final-Mach-O admission active，原 signed composition diff
+保持 stash。39B2c 才是 machine admission。该最终 gate
 要求证明完整调查能力和公共联网可用时，
 Codex 全进程树不可写用户数据、不可
 访问 localhost/私网/任意 Unix socket 且无 Executor 路径；不得用

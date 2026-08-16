@@ -5,6 +5,7 @@ import Darwin
 import Foundation
 import Security
 import StornautCore
+import StornautExecution
 import StornautLifecycle
 
 enum PhaseCTrashDiagnosticError:
