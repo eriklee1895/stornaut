@@ -231,6 +231,12 @@ struct SignedRuntimeContractTests {
                 == SignedInvestigationRuntimeDenialKind.required
         )
         #expect(report.denials.allSatisfy { $0.contained })
+        #expect(
+            report.denials.allSatisfy {
+                $0.controlReasonKey != nil
+                    && $0.failureReasonKey == nil
+            }
+        )
         #expect(report.residue.isZero)
         let admission = try SignedInvestigationRuntimeAdmissionReceipt(
             report: report
@@ -245,6 +251,29 @@ struct SignedRuntimeContractTests {
                     now: report.completedAt
                 ) == report
         )
+    }
+
+    @Test
+    func containedDenialPreservesEnforcedControlAttribution() throws {
+        let controlReasonKey =
+            "runtime.control.outer-seatbelt.write-denied"
+        let evidence = try SignedInvestigationRuntimeDenialEvidence(
+            kind: .userDataWrite,
+            attempted: true,
+            contained: true,
+            controlReasonKey: controlReasonKey,
+            failureReasonKey: nil
+        )
+        let data = try JSONEncoder().encode(evidence)
+        let decoded = try JSONDecoder().decode(
+            SignedInvestigationRuntimeDenialEvidence.self,
+            from: data
+        )
+
+        #expect(decoded == evidence)
+        #expect(decoded.attempted)
+        #expect(decoded.contained)
+        #expect(decoded.controlReasonKey == controlReasonKey)
     }
 
     @Test
@@ -289,7 +318,8 @@ struct SignedRuntimeContractTests {
             kind: denials[0].kind,
             attempted: true,
             contained: false,
-            controlReasonKey:
+            controlReasonKey: nil,
+            failureReasonKey:
                 "runtime.denial.user-write.not-contained"
         )
         let denialBlocked = try fixture.report(
@@ -997,7 +1027,9 @@ private struct SignedRuntimeContractFixture {
                     kind: $0,
                     attempted: true,
                     contained: true,
-                    controlReasonKey: nil
+                    controlReasonKey:
+                        "runtime.control.\($0.rawValue).denied",
+                    failureReasonKey: nil
                 )
             }
     }

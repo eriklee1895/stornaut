@@ -496,17 +496,21 @@ public struct SignedInvestigationRuntimeDenialEvidence:
     public let attempted: Bool
     public let contained: Bool
     public let controlReasonKey: String?
+    public let failureReasonKey: String?
 
     public init(
         kind: SignedInvestigationRuntimeDenialKind,
         attempted: Bool,
         contained: Bool,
-        controlReasonKey: String?
+        controlReasonKey: String?,
+        failureReasonKey: String?
     ) throws {
         guard
             !contained || attempted,
-            contained == (controlReasonKey == nil),
-            controlReasonKey.map(stableReasonKey) ?? true
+            stableReasonKey(controlReasonKey),
+            stableReasonKey(failureReasonKey),
+            contained == (controlReasonKey != nil),
+            contained == (failureReasonKey == nil)
         else {
             throw SignedInvestigationRuntimeContractError.invalidReport
         }
@@ -514,13 +518,17 @@ public struct SignedInvestigationRuntimeDenialEvidence:
         self.attempted = attempted
         self.contained = contained
         self.controlReasonKey = controlReasonKey
+        self.failureReasonKey = failureReasonKey
     }
 
     public init(from decoder: Decoder) throws {
         let container = try strictSignedRuntimeContainer(
             decoder,
             keys: Set(CodingKeys.allCases.map(\.rawValue)),
-            optionalKeys: [CodingKeys.controlReasonKey.rawValue]
+            optionalKeys: [
+                CodingKeys.controlReasonKey.rawValue,
+                CodingKeys.failureReasonKey.rawValue,
+            ]
         )
         try self.init(
             kind: container.decode(
@@ -544,6 +552,12 @@ public struct SignedInvestigationRuntimeDenialEvidence:
                 forKey: SignedRuntimeCodingKey(
                     CodingKeys.controlReasonKey.rawValue
                 )
+            ),
+            failureReasonKey: container.decodeIfPresent(
+                String.self,
+                forKey: SignedRuntimeCodingKey(
+                    CodingKeys.failureReasonKey.rawValue
+                )
             )
         )
     }
@@ -553,6 +567,7 @@ public struct SignedInvestigationRuntimeDenialEvidence:
         case attempted
         case contained
         case controlReasonKey
+        case failureReasonKey
     }
 }
 
@@ -818,7 +833,7 @@ public struct SignedInvestigationRuntimeReport:
     Sendable,
     Equatable
 {
-    public static let schemaVersion = 1
+    public static let schemaVersion = 2
 
     public let schemaVersion: Int
     public let nonce: UUID
@@ -876,7 +891,8 @@ public struct SignedInvestigationRuntimeReport:
                 kind: $0.kind,
                 attempted: $0.attempted,
                 contained: $0.contained,
-                controlReasonKey: $0.controlReasonKey
+                controlReasonKey: $0.controlReasonKey,
+                failureReasonKey: $0.failureReasonKey
             )
         }
         schemaVersion = Self.schemaVersion
@@ -998,7 +1014,7 @@ public struct SignedInvestigationRuntimeReport:
             guard !$0.attempted || !$0.contained else {
                 return nil
             }
-            return $0.controlReasonKey
+            return $0.failureReasonKey
                 ?? "runtime.denial.\($0.kind.rawValue).not-attempted"
         })
         if !production.isReady {
