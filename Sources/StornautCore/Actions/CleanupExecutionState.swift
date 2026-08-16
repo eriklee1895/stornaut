@@ -181,11 +181,27 @@ public enum CleanupExecutionState: Sendable, Equatable {
     }
 }
 
-struct CleanupExecutionRequest: Sendable {
-    let plan: CleanupPlan
-    let selection: ReviewSelection
-    let evaluation: CleanupPolicyEvaluation
-    let confirmation: CleanupConfirmation
-    let collectedContext: CleanupPolicyCollectedContext
-    let authorization: ExecutionAuthorization
+package struct CleanupExecutionRequest: Sendable {
+    package let plan: CleanupPlan
+    package let selection: ReviewSelection
+    package let evaluation: CleanupPolicyEvaluation
+    package let confirmation: CleanupConfirmation
+    package let collectedContext: CleanupPolicyCollectedContext
+    package let authorization: ExecutionAuthorization
+
+    package init(
+        plan: CleanupPlan,
+        selection: ReviewSelection,
+        evaluation: CleanupPolicyEvaluation,
+        confirmation: CleanupConfirmation,
+        collectedContext: CleanupPolicyCollectedContext,
+        authorization: ExecutionAuthorization
+    ) {
+        self.plan = plan
+        self.selection = selection
+        self.evaluation = evaluation
+        self.confirmation = confirmation
+        self.collectedContext = collectedContext
+        self.authorization = authorization
+    }
 }

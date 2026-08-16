@@ -23,8 +23,10 @@ public struct CleanupVolumeSample: Sendable, Equatable {
     }
 }
 
-struct FoundationCleanupVolumeSampler: CleanupVolumeSampling {
-    func sample(
+package struct FoundationCleanupVolumeSampler: CleanupVolumeSampling {
+    package init() {}
+
+    package func sample(
         rootURL: URL,
         sampledAt: Date
     ) throws -> CleanupVolumeSample {

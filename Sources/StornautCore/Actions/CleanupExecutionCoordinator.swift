@@ -1,6 +1,6 @@
 import Foundation
 
-protocol CleanupExecutionStore: Sendable {
+package protocol CleanupExecutionStore: Sendable {
     func scanSession(id: ScanSessionID) async throws -> ScanSession?
     func savePolicyDecision(_ decision: PolicyDecision) async throws
     func saveCleanupRunJournal(_ journal: CleanupRunJournal) async throws
@@ -20,7 +20,7 @@ protocol CleanupExecutionStore: Sendable {
 
 extension EvidenceStore: CleanupExecutionStore {}
 
-protocol CleanupActionExecuting: Sendable {
+package protocol CleanupActionExecuting: Sendable {
     func preflight(
         _ action: CleanupAction,
         context: ActionPolicyContext
@@ -32,9 +32,21 @@ protocol CleanupActionExecuting: Sendable {
     func postflight(_ execution: ActionExecution) throws -> ActionResult
 }
 
+package enum CleanupActionExecutionFailure:
+    Error,
+    Sendable,
+    Equatable
+{
+    case permissionDenied
+    case missingItem
+    case identityChanged
+    case postconditionFailed
+    case operationFailed(String)
+}
+
 extension ActionExecutor: CleanupActionExecuting {}
 
-protocol CleanupVolumeSampling: Sendable {
+package protocol CleanupVolumeSampling: Sendable {
     func sample(rootURL: URL, sampledAt: Date) throws -> CleanupVolumeSample
 }
 
@@ -136,11 +148,11 @@ struct CleanupExecutionJournalBuilder: Sendable {
     }
 }
 
-actor CleanupExecutionCoordinator {
-    typealias Clock = @Sendable () -> Date
-    typealias IdentityReader = @Sendable (URL) -> FileIdentity?
-    typealias RunIDSource = @Sendable () -> CleanupRunID
-    typealias ManifestIDSource = @Sendable () -> CleanupManifestID
+package actor CleanupExecutionCoordinator {
+    package typealias Clock = @Sendable () -> Date
+    package typealias IdentityReader = @Sendable (URL) -> FileIdentity?
+    package typealias RunIDSource = @Sendable () -> CleanupRunID
+    package typealias ManifestIDSource = @Sendable () -> CleanupManifestID
 
     private let store: any CleanupExecutionStore
     private let authorizationController: CleanupAuthorizationController
@@ -159,7 +171,7 @@ actor CleanupExecutionCoordinator {
     private var activeJournal: CleanupRunJournal?
     private var stopAfterCurrentRequested = false
 
-    init(
+    package init(
         store: any CleanupExecutionStore,
         authorizationController: CleanupAuthorizationController,
         workflowCoordinator: CleanupWorkflowCoordinator,
@@ -172,7 +184,9 @@ actor CleanupExecutionCoordinator {
         now: @escaping Clock = Date.init,
         runID: @escaping RunIDSource = CleanupRunID.init,
         manifestID: @escaping ManifestIDSource = CleanupManifestID.init,
-        actionID: @escaping CleanupExecutionJournalBuilder.ActionIDSource = {
+        actionID: @escaping @Sendable (
+            CleanupPlanItemID
+        ) -> CleanupActionID = {
             _ in CleanupActionID()
         }
     ) {
@@ -191,7 +205,7 @@ actor CleanupExecutionCoordinator {
         journalBuilder = CleanupExecutionJournalBuilder(actionID: actionID)
     }
 
-    func requestStopAfterCurrent() async throws {
+    package func requestStopAfterCurrent() async throws {
         guard let journal = activeJournal else { return }
         stopAfterCurrentRequested = true
         guard journal.stage == .actionStarted,
@@ -212,7 +226,9 @@ actor CleanupExecutionCoordinator {
         acceptPersistedStop(updated)
     }
 
-    func run(_ request: CleanupExecutionRequest) async -> CleanupExecutionState {
+    package func run(
+        _ request: CleanupExecutionRequest
+    ) async -> CleanupExecutionState {
         let lease: CleanupWorkflowLease
         do {
             lease = try await workflowCoordinator.acquire(.cleanupExecution)
@@ -257,7 +273,7 @@ actor CleanupExecutionCoordinator {
         return state
     }
 
-    func retrySavingAudit(
+    package func retrySavingAudit(
         _ result: CleanupExecutionResult
     ) async -> CleanupExecutionState {
         let lease: CleanupWorkflowLease
@@ -319,7 +335,7 @@ actor CleanupExecutionCoordinator {
         }
     }
 
-    func recover() async -> [CleanupExecutionState] {
+    package func recover() async -> [CleanupExecutionState] {
         let lease: CleanupWorkflowLease
         do {
             lease = try await workflowCoordinator.acquire(.cleanupExecution)
@@ -670,7 +686,7 @@ actor CleanupExecutionCoordinator {
                 ),
                 true
             )
-        } catch let error as TrashMovingError {
+        } catch let error as CleanupActionExecutionFailure {
             switch error {
             case .permissionDenied, .operationFailed:
                 if identityReader(targetURL) == expectedIdentity {
@@ -1445,7 +1461,9 @@ private func token(_ rawValue: String) -> DomainToken {
     DomainToken(rawValue: rawValue)!
 }
 
-private func trashErrorCode(_ error: TrashMovingError) -> DomainToken {
+private func trashErrorCode(
+    _ error: CleanupActionExecutionFailure
+) -> DomainToken {
     switch error {
     case .permissionDenied:
         token("cleanup.trash.permission-denied")

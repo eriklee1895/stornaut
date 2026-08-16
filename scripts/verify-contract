@@ -35,6 +35,14 @@ require_fixed_text scripts/verify-phase-c-gate \
     '--signed-app-trash-receipt'
 require_fixed_text scripts/verify-phase-c-gate \
     'scripts/verify-phase-c-trash-receipt'
+require_fixed_text scripts/verify-phase-c-trash-receipt \
+    'epic-8-task-35-source-snapshot.json'
+require_fixed_text scripts/verify-phase-c-trash-receipt \
+    'git", "merge-base", "--is-ancestor"'
+require_fixed_text scripts/verify-phase-c-trash-receipt \
+    'git", "show"'
+require_fixed_text .github/workflows/ci.yml \
+    'fetch-depth: 0'
 require_fixed_text scripts/verify-phase-c-gate \
     'swift package describe --type json'
 require_fixed_text scripts/verify-phase-c-gate \

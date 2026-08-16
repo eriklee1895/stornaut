@@ -10,6 +10,8 @@ execution_files=(
     Sources/StornautCore/Actions/CleanupExecutionState.swift
     Sources/StornautCore/Accounting/CleanupAccounting.swift
 )
+authorization_file=Sources/StornautCore/Policy/CleanupAuthorization.swift
+collector_file=Sources/StornautCore/Policy/CleanupPolicyContextCollector.swift
 runtime_file=Sources/StornautCore/Actions/CleanupExecutionRuntime.swift
 
 for file in "${execution_files[@]}"; do
@@ -57,7 +59,7 @@ rg -Fq 'ActionRegistry(definitions: [])' \
     Sources/StornautCore/Policy/ActionPolicyGate.swift
 rg -q 'private static let schemaVersion = 4' \
     Sources/StornautCore/Evidence/EvidenceStore.swift
-rg -q '^actor CleanupExecutionCoordinator' \
+rg -q '^package actor CleanupExecutionCoordinator' \
     Sources/StornautCore/Actions/CleanupExecutionCoordinator.swift
 rg -q 'executor: any CleanupActionExecuting' \
     Sources/StornautCore/Actions/CleanupExecutionCoordinator.swift
@@ -85,5 +87,44 @@ rg -Fq 'public func recover()' "$runtime_file"
 ! rg -q 'TrashMoving\s*\(\s*\)' \
     Sources/StornautCore/Actions/TrashMoving.swift \
     Sources/StornautCore/Actions/ActionExecutor.swift
+
+for declaration in \
+    'package protocol CleanupExecutionStore' \
+    'package protocol CleanupActionExecuting' \
+    'package protocol CleanupVolumeSampling' \
+    'package enum CleanupActionExecutionFailure' \
+    'package actor CleanupExecutionCoordinator'; do
+    rg -Fq "$declaration" \
+        Sources/StornautCore/Actions/CleanupExecutionCoordinator.swift
+done
+
+rg -Fq 'package protocol CleanupItemPolicyContextCollecting' \
+    "$collector_file"
+rg -Fq 'package let rootURL: URL' "$collector_file"
+rg -Fq 'package let rootAccess: CleanupPolicyRootAccess' "$collector_file"
+rg -Fq 'package actor CleanupAuthorizationController' "$authorization_file"
+rg -Fq 'package struct FoundationCleanupVolumeSampler' \
+    Sources/StornautCore/Accounting/CleanupAccounting.swift
+rg -Fq 'typealias TrashMovingError = CleanupActionExecutionFailure' \
+    Sources/StornautCore/Actions/TrashMoving.swift
+rg -Fq 'catch let error as CleanupActionExecutionFailure' \
+    Sources/StornautCore/Actions/CleanupExecutionCoordinator.swift
+
+if rg -n \
+    '^public (protocol|actor) (CleanupExecutionStore|CleanupActionExecuting|CleanupVolumeSampling|CleanupExecutionCoordinator|CleanupItemPolicyContextCollecting|CleanupAuthorizationController)\b' \
+    Sources/StornautCore/Actions/CleanupExecutionCoordinator.swift \
+    "$authorization_file" \
+    "$collector_file"; then
+    print -u2 "Cleanup execution package seam escaped as public API."
+    exit 1
+fi
+
+if rg -n \
+    '^package (struct|protocol|actor) (ActionExecutor|TrashMoving|FileManagerTrashAdapter|TrashAdapting)\b' \
+    Sources/StornautCore/Actions/ActionExecutor.swift \
+    Sources/StornautCore/Actions/TrashMoving.swift; then
+    print -u2 "Concrete Trash or Executor authority escaped through E2a."
+    exit 1
+fi
 
 echo "Cleanup execution boundary verification passed."

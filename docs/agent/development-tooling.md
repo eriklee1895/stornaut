@@ -2,7 +2,7 @@
 
 > 状态：Active
 >
-> 最近更新：2026-08-12
+> 最近更新：2026-08-16
 >
 > 适用范围：实现 Stornaut 的本地 Coding Agent；不属于产品运行时
 
@@ -155,7 +155,51 @@ No AI provider is configured. Do not pass analysis questions to `image` or enabl
 
 Although `permissions` can describe permission repair, the repository rule is status-only: never use it to trigger or automate permission changes.
 
-## 5. UI Verification Loop
+## 5. Validation Funnel
+
+`scripts/verify --full` is an acceptance gate, not a debugging loop. Its UI
+automation, committed-golden and standalone Debug/Release artifact stages are
+intentionally expensive and often provide no additional signal for a
+package-only or non-UI failure.
+
+Every implementation checkpoint must move through the cheapest trustworthy
+layers in order:
+
+1. tests-first structural or contract gate that initially fails for the
+   intended reason;
+2. the narrowest affected unit/App/XCUITest suite;
+3. one serialized SwiftPM regression when package code changed; when
+   `scripts/verify --headless` is required, its `swiftpm-tests-serialized`
+   stage owns this run and must not be duplicated as a standalone command;
+4. the applicable source, headless, App-build or final-binary boundary gate;
+5. independent review and reruns of only affected gates;
+6. one clean uninterrupted `scripts/verify --full` when the checkpoint changes
+   product behavior, App/UI, target linkage, signing, final-binary authority or
+   makes a security/readiness claim.
+
+Do not launch a full verifier while a cheaper layer is known to fail. If a
+focused, headless, binary or full stage fails, diagnose and rerun only that
+stage, suite or case until fixed. Then start the checkpoint's single clean
+authoritative full from the beginning. Record per-stage durations in the
+review report so regressions remain visible.
+
+A prerequisite-only seam may omit full/XCUITest only when its approved
+implementation brief explicitly records the substitution and the change:
+
+- moves no concrete authority;
+- changes no App/UI behavior;
+- changes no Xcode target linkage or final Mach-O;
+- makes no capability, containment or readiness claim;
+- still passes focused gates, `scripts/verify --headless` (including its one
+  serialized SwiftPM regression), the applicable targeted App build and
+  independent review.
+
+The enclosing product/security checkpoint remains responsible for the final
+binary, Release, XCUITest where applicable and exactly one authoritative full.
+This substitution reduces redundant host-state work; it does not weaken
+no-Executor, no-Trash, Codex containment or product admission.
+
+### UI Verification Loop
 
 For every App/UI change, use the smallest trustworthy loop:
 
@@ -167,8 +211,9 @@ For every App/UI change, use the smallest trustworthy loop:
 6. use `see` or `inspect_ui` only when read-only accessibility structure adds useful evidence;
 7. inspect the returned screenshot for layout, clipping, state, theme and requested interaction result;
 8. add or update XCUITest assertions and screenshot attachments for behavior that must remain deterministic;
-9. finish the local task with `scripts/verify --full` (bare `scripts/verify`
-   remains an alias for compatibility).
+9. finish the product/UI checkpoint with the one clean
+   `scripts/verify --full` acceptance run required by the funnel (bare
+   `scripts/verify` remains an alias for compatibility).
 
 Example local CLI checks:
 

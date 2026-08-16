@@ -15,13 +15,21 @@
 > review are complete; its authoritative full verifier passed all 23 stages in
 > one uninterrupted run. 39B2b-i implementation/focused post-fix review are
 > complete, its 889-test serialized regression passed, and its authoritative
-> full verifier passed 23/23 stages in one uninterrupted run. Evidence:
+> full verifier passed 23/23 stages in one uninterrupted run. 39B2b-ii
+> prerequisite E1 and E2a are complete: E1 moved Registered Action process
+> authority into `StornautExecution`; E2a established the package-only cleanup
+> injection seam and validated the corrected verification funnel with 47/47
+> focused tests, an 893-test headless regression and a targeted Debug App
+> build. E2b concrete Trash/Executor authority migration is active. Evidence:
 > [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
 > [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md) and
 > [Task 39B1b-i Review](../../reports/phase-d-task-39b1b-i-review.md) and
 > [Task 39B1b-ii Review](../../reports/phase-d-task-39b1b-ii-review.md) and
 > [Task 39B2a Review](../../reports/phase-d-task-39b2a-review.md) and
-> [Task 39B2b-i Review](../../reports/phase-d-task-39b2b-i-review.md).
+> [Task 39B2b-i Review](../../reports/phase-d-task-39b2b-i-review.md) and
+> [Task 39B2b-ii-E1 Review](../../reports/phase-d-task-39b2b-ii-e1-review.md)
+> and
+> [Task 39B2b-ii-E2a Review](../../reports/phase-d-task-39b2b-ii-e2a-review.md).
 >
 > **Parent plan:**
 > [Phase D Conditional Deep Dive](phase-d-conditional-deep-dive.md)
@@ -141,12 +149,15 @@ before implementation:
      bounded real model run, three-plane machine report, failure matrix,
      teardown and zero-residue proof.
 
-Task 39 completes only after 39B2. Checkpoints 39A, 39B1a, 39B1b-i, 39B1b-ii,
-39B2a, 39B2b-i, 39B2b-ii and 39B2c each receive focused tests, boundary
-checks, serialized SwiftPM, independent review, one uninterrupted
-authoritative full verifier and an independent commit/push. The additional
-verifier cost keeps every pushed checkpoint authoritative rather than
-recreating the oversized Task 36–38 review surfaces.
+Task 39 completes only after 39B2. Product/security checkpoints 39A, 39B1a,
+39B1b-i, 39B1b-ii, 39B2a, 39B2b-i, 39B2b-ii and 39B2c each receive focused
+tests, boundary checks, serialized SwiftPM, independent review, one
+uninterrupted authoritative full verifier and an independent commit/push.
+Narrow prerequisite-only seam checkpoints may use the explicitly documented
+risk-equivalent substitution in this brief when they do not move authority,
+change App/UI behavior, alter the final binary or make a readiness claim. The
+enclosing product/security checkpoint still receives exactly one final full
+verifier after every prerequisite is integrated.
 
 Before either checkpoint expands beyond 14 non-document source/test/script
 files or approximately 4,000 added non-document lines, stop and split again
@@ -271,18 +282,54 @@ before resuming signed composition:
    `posix_spawn`/process-tree runner into a one-way `StornautExecution →
    StornautCore + StornautProcessSupport` target while Core retains only the
    typed protocol, result and error contract.
-2. **39B2b-ii-E2 Trash/Executor authority extraction** — remove concrete
-   FileManager Trash and Executor composition from the Core dependency closure,
-   explicitly link it only into the ordinary App/authorized diagnostic paths,
-   and prove the Investigation diagnostic Mach-O has no write authority.
+2. **39B2b-ii-E2 Trash/Executor authority extraction** — split before coding:
+   - **E2a package-only seam** exposes only the minimum package-scoped injected
+     policy/coordinator/accounting contracts needed by a sibling package
+     target. It does not move concrete authority, change an App target, change
+     a final binary or claim that the Investigation diagnostic is clean.
+   - **E2b concrete authority migration** moves FileManager Trash,
+     `ActionExecutor` and concrete cleanup runtime composition out of Core,
+     explicitly links them only into ordinary App/authorized diagnostic paths,
+     and proves the Investigation diagnostic Mach-O has no write authority.
 
-Each prerequisite receives tests-first structural coverage, focused tests,
+E1 and final E2b receive tests-first structural coverage, focused tests,
 serialized SwiftPM regression, independent review, one authoritative full
-verifier and an independent commit/push. Neither prerequisite launches Codex,
-invokes a model, creates an Investigation readiness report or changes normal
-product availability. After E1/E2 pass, the stashed 39B2b-ii signed composition
-diff resumes under its original scope and machine execution remains exclusive
-to 39B2c.
+verifier and an independent commit/push. E2a is a deliberately narrow
+prerequisite seam and uses this documented substitution instead:
+
+```text
+red structural/package boundary gate
+→ focused affected tests
+→ scripts/verify --headless
+  (owns the checkpoint's one serialized SwiftPM regression)
+→ targeted Debug App build
+→ independent review
+→ commit/push
+```
+
+E2a does not run XCUITest or `scripts/verify --full`; neither layer can add
+evidence for a package-visibility-only change, while they accounted for most
+of the last full verifier's 954.459 seconds. E2b owns the strict final Mach-O,
+Debug/Release bundle and Xcode linkage gates and receives exactly one
+authoritative full verifier after all focused failures are resolved. No E2
+checkpoint launches Codex, invokes a model, creates an Investigation readiness
+report or changes normal product availability. After E2b passes, the stashed
+39B2b-ii signed composition diff resumes under its original scope and machine
+execution remains exclusive to 39B2c.
+
+E2a also corrects the sealed Task 35 receipt verifier before changing
+safety-critical cleanup source. The immutable receipt remains unchanged; its
+last rolled-forward source-hash set binds to the exact pre-extraction E1
+ancestor recorded by a checked sidecar, while current source is independently
+covered by live Phase C structural/product gates. Do not roll the receipt
+hashes forward through this authority extraction or claim that a later build
+performed the already-consumed Trash attempt.
+
+The full verifier is an acceptance run, never a debugging loop. Record each
+stage duration. If focused, headless, binary or full validation fails, diagnose
+and rerun only the exact failed stage/suite/case until it is green; restart the
+single clean authoritative full only after the defect is fixed. Do not rerun
+unrelated XCUITest, golden or Release stages to obtain debugging signal.
 
 39B2b-ii-E1 changed six non-document source, test and script paths. It adds
 the one-way `StornautExecution → StornautCore + StornautProcessSupport`
@@ -293,8 +340,16 @@ read-only review passed with no unresolved P0–P2. Its one uninterrupted
 authoritative full verifier passed 23/23 stages with exit `0`; timed stages
 totaled 954.459 seconds. E1 is complete. See
 [Task 39B2b-ii-E1 Review](../../reports/phase-d-task-39b2b-ii-e1-review.md).
-E2 is now the active prerequisite; signed composition remains stashed and
-39B2c still exclusively owns machine execution.
+E2a is also complete. It exposes only package-scoped injected cleanup
+contracts, moves no concrete authority, and passed 47/47 focused cleanup tests,
+all 8 headless stages including the 893-test serialized regression, a targeted
+Debug App build and isolated review with no unresolved P0–P2. Its 170.717
+seconds of headless timed stages were approximately 82 percent shorter than
+E1's full-verifier timed stages without weakening E2b's final acceptance gate.
+See
+[Task 39B2b-ii-E2a Review](../../reports/phase-d-task-39b2b-ii-e2a-review.md).
+E2b concrete authority migration is now active; signed composition remains
+stashed and 39B2c still exclusively owns machine execution.
 
 39B1a bound the diagnostic configuration to the real Evidence Store v4 path,
 made lifecycle drain directly asynchronous, reloaded actor-owned run state
@@ -663,7 +718,7 @@ verifier merely for naming convenience.
 
 ## 11. Focused Validation
 
-Run heavy work serially:
+Use a cost-ordered validation funnel. Run heavy work serially:
 
 ```text
 swift test --filter SignedRuntimeContract
@@ -677,12 +732,26 @@ scripts/check-doc-links
 git diff --check
 ```
 
-Then:
+For a product/security checkpoint, then run:
 
 ```text
 swift test --no-parallel
 scripts/verify --full
 ```
+
+Do not use the full verifier to discover ordinary compile, unit, structural or
+bundle-boundary failures. Resolve and rerun the narrow failed stage first.
+Start one clean final full only when the focused funnel and independent review
+are green, and preserve per-stage timing in the checkpoint report.
+
+The active E2a seam is the explicit exception documented in §3: after its red
+structural gate and focused tests, run `scripts/verify --headless`, which owns
+the checkpoint's one serialized SwiftPM regression, then a targeted Debug App
+build and independent review. Do not run a second standalone serialized suite
+before or after headless. E2a omits full/XCUITest because it changes neither UI
+nor final authority.
+E2b must run the strict final-binary/Release gates and exactly one clean
+authoritative full.
 
 The focused real-model diagnostic may be repeated with fresh nonces when a
 provider/transient failure is honestly classified. It may not reinterpret a

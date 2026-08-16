@@ -10,7 +10,7 @@ public protocol CleanupPolicyStoreReading: Sendable {
 
 extension EvidenceStore: CleanupPolicyStoreReading {}
 
-protocol CleanupItemPolicyContextCollecting: Sendable {
+package protocol CleanupItemPolicyContextCollecting: Sendable {
     func collectItem(
         plan: CleanupPlan,
         selection: ReviewSelection,
@@ -90,10 +90,10 @@ public enum CleanupPolicyCollectionError:
 
 public struct CleanupPolicyCollectedContext: Sendable {
     public let policyContext: CleanupPolicyContext
-    let rootURL: URL
-    let rootAccess: CleanupPolicyRootAccess
+    package let rootURL: URL
+    package let rootAccess: CleanupPolicyRootAccess
 
-    init(
+    package init(
         policyContext: CleanupPolicyContext,
         rootURL: URL,
         rootAccess: CleanupPolicyRootAccess
@@ -189,7 +189,7 @@ public struct CleanupPolicyContextCollector: Sendable {
     }
 
 #if DEBUG
-    static func phaseCTrashDiagnostic(
+    package static func phaseCTrashDiagnostic(
         store: EvidenceStore,
         resolver: ExecutableEvidenceResolver,
         rootObserver: any CleanupPolicyRootObserving,
@@ -221,7 +221,7 @@ public struct CleanupPolicyContextCollector: Sendable {
         )
     }
 
-    func collectItem(
+    package func collectItem(
         plan: CleanupPlan,
         selection: ReviewSelection,
         itemID: CleanupPlanItemID,

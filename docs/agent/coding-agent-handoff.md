@@ -142,8 +142,13 @@
 > `StornautExecution → StornautCore + StornautProcessSupport` target，Core
 > 只保留 typed contract；11-test focused、895-test serialized、
 > independent review 与 authoritative full 23/23 stages 单次通过（timed
-> stages 954.459 秒）。E1 已完成，E2 active；原 signed composition diff
-> 保持 stash。39B2c 才能作 readiness claim。
+> stages 954.459 秒）。E1 已完成。E2 已继续拆为 E2a package-only seam
+> 与 E2b concrete authority migration；E2a 的 47/47 focused cleanup、
+> 8/8 headless stages（内含 893-test serialized regression）、targeted
+> Debug App build、Task 35 historical source-snapshot correction 与
+> independent review 均通过，未移动 concrete authority。E2a 已完成，
+> E2b active；原 signed composition diff 保持 stash。39B2c 才能作
+> readiness claim。
 > 生产 Deep Dive 仍 unavailable。
 > Task 5 的历史
 > Broker-only no-go 已由 ADR 0004 capability-first 决策修订，Deep Dive 因
@@ -555,9 +560,11 @@ dependency closure 携带 concrete cleanup/Registered Action authority；
 dead stripping 与优化实验均不能移除。前置修复拆为 E1/E2，E1 已把
 concrete Registered Action process runner 迁入单向 `StornautExecution`
 target，并通过 11-test focused、895-test serialized、independent review
-与 authoritative full 23/23 stages；E2 Trash/Executor authority extraction
-active，原 signed composition diff 保持 stash。39B2c 才是 machine
-admission。该最终 gate
+与 authoritative full 23/23 stages。E2a package-only cleanup seam 随后
+通过 47-test focused、893-test headless regression、targeted Debug App
+build、historical Task 35 source-snapshot gate 与 independent review；
+E2b concrete Trash/Executor authority migration active，原 signed
+composition diff 保持 stash。39B2c 才是 machine admission。该最终 gate
 要求证明完整调查能力和公共联网可用时，
 Codex 全进程树不可写用户数据、不可
 访问 localhost/私网/任意 Unix socket 且无 Executor 路径；不得用

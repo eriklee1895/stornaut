@@ -6,21 +6,60 @@ repo_root=${0:A:h:h}
 cd "$repo_root"
 
 receipt="$repo_root/docs/reports/evidence/epic-8-task-35-signed-trash-receipt.json"
+snapshot="$repo_root/docs/reports/evidence/epic-8-task-35-source-snapshot.json"
 [[ -s "$receipt" && ! -L "$receipt" ]]
+[[ -s "$snapshot" && ! -L "$snapshot" ]]
 
-/usr/bin/python3 - "$receipt" "${STORNAUT_PHASE_C_TRASH_EVIDENCE_ROOT:-}" <<'PY'
+/usr/bin/python3 - \
+    "$receipt" \
+    "$snapshot" \
+    "${STORNAUT_PHASE_C_TRASH_EVIDENCE_ROOT:-}" <<'PY'
 import hashlib
 import json
 import os
 import pathlib
+import subprocess
 import sqlite3
 import stat
 import sys
 
 
 receipt_path = pathlib.Path(sys.argv[1])
-external_root_value = sys.argv[2]
+snapshot_path = pathlib.Path(sys.argv[2])
+external_root_value = sys.argv[3]
 receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+
+expected_snapshot = {
+    "commit": "23cb9fbe1494f3fe0dd6bd82bb82c99a5d13fb2f",
+    "receiptPath":
+        "docs/reports/evidence/epic-8-task-35-signed-trash-receipt.json",
+    "receiptSHA256":
+        "23dd2c3f8df8739c55ebe1873f4a72923051f5c359a81c968fa6d08c6efc2383",
+    "schemaVersion": 1,
+}
+if snapshot != expected_snapshot:
+    raise SystemExit("Task 35 historical source snapshot drifted.")
+
+receipt_bytes = receipt_path.read_bytes()
+if hashlib.sha256(receipt_bytes).hexdigest() != snapshot["receiptSHA256"]:
+    raise SystemExit("Task 35 checked receipt digest drifted.")
+
+snapshot_commit = snapshot["commit"]
+commit_check = subprocess.run(
+    ["git", "cat-file", "-e", f"{snapshot_commit}^{{commit}}"],
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL,
+)
+if commit_check.returncode != 0:
+    raise SystemExit("Task 35 historical source snapshot is unavailable.")
+ancestor_check = subprocess.run(
+    ["git", "merge-base", "--is-ancestor", snapshot_commit, "HEAD"],
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL,
+)
+if ancestor_check.returncode != 0:
+    raise SystemExit("Task 35 historical source snapshot is not an ancestor.")
 
 expected_top_level = {
     "artifactSHA256",
@@ -100,6 +139,18 @@ if set(receipt["limitations"]) != expected_limitations:
 def sha256(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
+def historical_blob(path):
+    result = subprocess.run(
+        ["git", "show", f"{snapshot_commit}:{path}"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+    )
+    if result.returncode != 0:
+        raise SystemExit(
+            f"Task 35 historical source blob is unavailable: {path}"
+        )
+    return result.stdout
+
 source_hashes = receipt["sourceSHA256"]
 expected_source_paths = {
     "Sources/StornautCore/Actions/ActionExecutor.swift",
@@ -144,12 +195,11 @@ for raw_path, expected_hash in source_hashes.items():
     if (
         path.is_absolute()
         or ".." in path.parts
-        or not path.is_file()
-        or path.is_symlink()
-        or sha256(path) != expected_hash
+        or hashlib.sha256(historical_blob(raw_path)).hexdigest()
+            != expected_hash
     ):
         raise SystemExit(
-            f"Task 35 safety-critical source binding drifted: {raw_path}"
+            f"Task 35 historical source binding drifted: {raw_path}"
         )
 
 serialized = receipt_path.read_text(encoding="utf-8")
@@ -167,7 +217,8 @@ for forbidden in (
 
 if not external_root_value:
     print(
-        "Phase C signed Trash checked receipt and source binding passed "
+        "Phase C signed Trash checked receipt and historical source snapshot "
+        "passed "
         "(external raw evidence not requested)."
     )
     raise SystemExit(0)
@@ -402,7 +453,7 @@ if (
     raise SystemExit("Task 35 final fixture or Trash residual drifted.")
 
 print(
-    "Phase C signed Trash checked receipt, source binding, raw Store, "
-    "and restored fixture passed."
+    "Phase C signed Trash checked receipt, historical source snapshot, "
+    "raw Store, and restored fixture passed."
 )
 PY

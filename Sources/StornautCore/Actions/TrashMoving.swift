@@ -58,13 +58,7 @@ public struct TrashedItemReceipt: Codable, Sendable, Equatable {
     }
 }
 
-enum TrashMovingError: Error, Sendable, Equatable {
-    case permissionDenied
-    case missingItem
-    case identityChanged
-    case postconditionFailed
-    case operationFailed(String)
-}
+typealias TrashMovingError = CleanupActionExecutionFailure
 
 struct TrashMoving: Sendable {
     private let adapter: any TrashAdapting

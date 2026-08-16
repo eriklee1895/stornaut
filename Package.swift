@@ -169,6 +169,13 @@ let package = Package(
             ]
         ),
         .testTarget(
+            name: "StornautExecutionTests",
+            dependencies: [
+                "StornautCore",
+                "StornautExecution",
+            ]
+        ),
+        .testTarget(
             name: "StornautCodexTests",
             dependencies: [
                 "StornautCodex",

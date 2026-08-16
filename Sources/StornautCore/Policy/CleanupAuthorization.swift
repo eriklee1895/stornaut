@@ -57,8 +57,8 @@ struct ExecutionAuthorizationAdmission: Sendable {
     }
 }
 
-actor CleanupAuthorizationController {
-    typealias Clock = @Sendable () -> Date
+package actor CleanupAuthorizationController {
+    package typealias Clock = @Sendable () -> Date
 
     private enum State {
         case pending(PendingAuthorization)
@@ -78,11 +78,11 @@ actor CleanupAuthorizationController {
         [DomainToken: UUID] = [:]
     private let now: Clock
 
-    init(now: @escaping Clock = Date.init) {
+    package init(now: @escaping Clock = Date.init) {
         self.now = now
     }
 
-    func issue(
+    package func issue(
         evaluation: CleanupPolicyEvaluation,
         confirmation: CleanupConfirmation,
         collectedContext: CleanupPolicyCollectedContext

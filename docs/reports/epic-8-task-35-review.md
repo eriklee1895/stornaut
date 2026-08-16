@@ -32,6 +32,17 @@ Both mutation scripts are now sealed by the checked receipt. The final
 authoritative `scripts/verify --full` completed with exit `0`; it was read-only
 with respect to Task 35 evidence and did not invoke either mutation harness.
 
+Task 39B2b-ii-E2a later separated this historical mutation receipt from
+current-source admission. The receipt JSON remains unchanged and its last
+rolled-forward source-hash set is verified against the exact pre-extraction E1
+ancestor recorded in
+`docs/reports/evidence/epic-8-task-35-source-snapshot.json`; current cleanup
+source continues to pass the live Phase C structural/product gates. The
+receipt's artifact hashes and outcome remain the Task 35 mutation evidence,
+while the source snapshot proves the last code state to which those bindings
+were explicitly revalidated. Neither is misrepresented as proof that a later
+build performed the already-consumed Task 35 attempt.
+
 Normal App composition remains:
 
 ```text
