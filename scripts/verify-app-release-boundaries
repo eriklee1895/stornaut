@@ -5,6 +5,8 @@ set -euo pipefail
 repo_root=${0:A:h:h}
 cd "$repo_root"
 
+scripts/verify-contract
+
 mkdir -p "$repo_root/.derivedData"
 derived_data=$(
     mktemp -d "$repo_root/.derivedData/app-release-boundaries.XXXXXX"
@@ -49,7 +51,7 @@ test -f "$authority_object"
 file "$authority_object" | grep -q 'Mach-O'
 test -x "$debug_app/Contents/MacOS/StornautLifecycleHelper"
 test -x "$release_app/Contents/MacOS/StornautLifecycleHelper"
-test ! -e \
+test -x \
     "$diagnostic_debug_app/Contents/MacOS/StornautLifecycleHelper"
 test ! -e \
     "$debug_app/Contents/Library/LaunchDaemons/com.eriklee.stornaut.lifecycle.plist"
@@ -167,6 +169,7 @@ required_artifact_checks = [
     '/usr/bin/cmp -s "$source_plist" "$installed_plist"',
     '/usr/bin/codesign --verify --deep --strict "$installed_app"',
     'validate_bundle_permissions "$installed_app"',
+    '"$installed_app/Contents/MacOS/StornautInvestigationDiagnostic"',
     '"$installed_app/Contents/MacOS/StornautLifecycleHelper"',
 ]
 if not all(check in artifact_validation for check in required_artifact_checks):
@@ -210,6 +213,34 @@ if not all(value in source for value in required):
     )
 PY
 
+python3 - "$lifecycle_script" <<'PY'
+import sys
+
+source = open(sys.argv[1], encoding="utf-8").read()
+required = [
+    'built_app="$repo_root/.derivedData/xcodebuildmcp/Build/Products/Debug/StornautInvestigationDiagnostic.app"',
+    '"$built_app/Contents/MacOS/StornautInvestigationDiagnostic"',
+    '"$built_app/Contents/MacOS/StornautLifecycleHelper"',
+    '"$installed_app/Contents/MacOS/StornautInvestigationDiagnostic"',
+    '"$staging_app/Contents/MacOS/StornautInvestigationDiagnostic"',
+]
+if not all(value in source for value in required):
+    raise SystemExit(
+        "local lifecycle installer is not bound to the dedicated "
+        "Investigation diagnostic App"
+    )
+for prohibited in (
+    '"$built_app/Contents/MacOS/Stornaut"',
+    '"$installed_app/Contents/MacOS/Stornaut"',
+    '"$staging_app/Contents/MacOS/Stornaut"',
+):
+    if prohibited in source:
+        raise SystemExit(
+            "local lifecycle installer still accepts the ordinary App "
+            f"executable: {prohibited}"
+        )
+PY
+
 python3 - "$gate_script" <<'PY'
 import sys
 
@@ -245,22 +276,52 @@ mach_o_contains() {
     return 1
 }
 
+mach_o_has_demangled_symbol() {
+    local root=$1
+    local marker=$2
+    local file
+    local symbols
+
+    while IFS= read -r -d '' file; do
+        if ! file "$file" 2>/dev/null | grep -q 'Mach-O'; then
+            continue
+        fi
+        if ! symbols=$(
+            xcrun nm -j "$file" 2>/dev/null \
+                | xcrun swift-demangle 2>/dev/null
+        ); then
+            print -u2 "Demangled symbol scan failed: $file"
+            return 2
+        fi
+        if [[ "$symbols" == *"$marker"* ]]; then
+            return 0
+        fi
+    done < <(find "$root" -type f -print0)
+    return 1
+}
+
 authority_object_markers=(
-    'ActionExecutor'
-    'TrashMoving'
-    'FileManagerTrashAdapter'
+    'StornautExecution.ActionExecutor'
+    'StornautExecution.TrashMoving'
+    'StornautExecution.FileManagerTrashAdapter'
     'RecordingFileManagerTrashAdapter'
     'DenyRegisteredActionRunner'
-    'FoundationRegisteredActionRunner'
+    'StornautExecution.FoundationRegisteredActionRunner'
     'spawnRegisteredActionWithPipes'
 )
 
 for marker in "${authority_object_markers[@]}"; do
-    if ! rg -a -q --fixed-strings -- "$marker" "$authority_object"; then
-        print -u2 \
-            "Execution authority positive control is missing: $marker"
+    if mach_o_has_demangled_symbol "$authority_object" "$marker"; then
+        continue
+    else
+        symbol_scan_status=$?
+    fi
+    if (( symbol_scan_status == 2 )); then
         exit 1
     fi
+    print -u2 \
+        "Execution authority positive control is missing: $marker"
+    exit 1
 done
 
 if ! mach_o_contains \
@@ -324,6 +385,9 @@ done
 investigation_diagnostic_markers=(
     '--stornaut-investigation-runtime-config='
     'InvestigationRuntimeDiagnosticAppLeaf'
+    'InvestigationRuntimeDiagnosticComposition'
+    'InvestigationLifecycleAppServerTransport'
+    'InvestigationCodexSessionAdapter'
     'investigationRuntimeDebugCompositionPrepared'
     'I authorize one bounded disposable read-only Stornaut Investigation diagnostic.'
 )
@@ -354,9 +418,6 @@ diagnostic_forbidden_activation_markers=(
     'PhaseCTrashDiagnosticHarness'
     'StornautAppModel'
     'AppDependencies'
-    'StornautLifecycleHelper'
-    'InvestigationCodexSessionAdapter'
-    'InteractiveCodexAppServerClient'
 )
 
 for marker in "${diagnostic_forbidden_activation_markers[@]}"; do
@@ -368,22 +429,29 @@ for marker in "${diagnostic_forbidden_activation_markers[@]}"; do
 done
 
 diagnostic_authority_forbidden_markers=(
-    'ActionExecutor'
-    'TrashMoving'
-    'FileManagerTrashAdapter'
+    'StornautExecution.ActionExecutor'
+    'StornautExecution.TrashMoving'
+    'StornautExecution.FileManagerTrashAdapter'
     'RecordingFileManagerTrashAdapter'
     'DenyRegisteredActionRunner'
-    'FoundationRegisteredActionRunner'
+    'StornautExecution.FoundationRegisteredActionRunner'
     'spawnRegisteredActionWithPipes'
 )
+diagnostic_authority_forbidden_symbol_prefix='StornautExecution.'
 
-for marker in "${diagnostic_authority_forbidden_markers[@]}"; do
-    if mach_o_contains "$diagnostic_debug_app" "$marker"; then
-        print -u2 \
-            "Concrete authority leaked into Investigation diagnostic Mach-O: $marker"
-        exit 1
-    fi
-done
+if mach_o_has_demangled_symbol \
+    "$diagnostic_debug_app" \
+    "$diagnostic_authority_forbidden_symbol_prefix"
+then
+    print -u2 \
+        "StornautExecution symbol leaked into Investigation diagnostic Mach-O."
+    exit 1
+else
+    symbol_scan_status=$?
+fi
+if (( symbol_scan_status == 2 )); then
+    exit 1
+fi
 
 python3 - Stornaut.xcodeproj/project.pbxproj <<'PY'
 from pathlib import Path
@@ -467,13 +535,25 @@ for forbidden in (
     "StornautExecution",
     "Copy Helper",
     "fileSystemSynchronizedGroups",
-    "PBXTargetDependency",
 ):
     if forbidden in diagnostic_app:
         raise SystemExit(
             "dedicated Investigation diagnostic App regained forbidden "
             f"target surface: {forbidden}"
         )
+for required in (
+    "B00000000000000000000041 /* Copy Investigation Helper */",
+    "C0000000000000000000000A /* PBXTargetDependency */",
+):
+    if required not in diagnostic_app:
+        raise SystemExit(
+            "dedicated Investigation diagnostic App lost its exact helper "
+            f"composition: {required}"
+        )
+if diagnostic_app.count("PBXTargetDependency") != 1:
+    raise SystemExit(
+        "dedicated Investigation diagnostic target dependency drifted"
+    )
 
 source_phase_marker = (
     "B00000000000000000000024 /* Sources */ = {"
@@ -550,6 +630,51 @@ if (
         "StornautExecution Xcode dependency allowlist drifted in Frameworks"
     )
 
+copy_phase_marker = (
+    "B00000000000000000000041 /* Copy Investigation Helper */ = {"
+)
+copy_phase_start = project.find(copy_phase_marker)
+copy_phase_end = project.find(
+    "\n\t\t};",
+    copy_phase_start + len(copy_phase_marker),
+)
+if copy_phase_start < 0 or copy_phase_end < 0:
+    raise SystemExit("missing dedicated diagnostic helper copy phase")
+copy_phase = project[copy_phase_start:copy_phase_end]
+required_helper_build_file = (
+    "B0000000000000000000001A "
+    "/* StornautLifecycleHelper in Copy Investigation Helper */"
+)
+if (
+    copy_phase.count(" in Copy Investigation Helper */") != 1
+    or required_helper_build_file not in copy_phase
+    or copy_phase.count('name = "Copy Investigation Helper";') != 1
+):
+    raise SystemExit(
+        "dedicated diagnostic helper copy allowlist drifted"
+    )
+
+required_helper_dependency = [
+    (
+        "C00000000000000000000009 /* PBXContainerItemProxy */ = {\n"
+        "\t\t\tisa = PBXContainerItemProxy;"
+    ),
+    "remoteGlobalIDString = A00000000000000000000004;",
+    "remoteInfo = StornautLifecycleHelper;",
+    (
+        "C0000000000000000000000A /* PBXTargetDependency */ = {\n"
+        "\t\t\tisa = PBXTargetDependency;\n"
+        "\t\t\ttarget = A00000000000000000000004 "
+        "/* StornautLifecycleHelper */;\n"
+        "\t\t\ttargetProxy = C00000000000000000000009 "
+        "/* PBXContainerItemProxy */;"
+    ),
+]
+if not all(value in project for value in required_helper_dependency):
+    raise SystemExit(
+        "dedicated diagnostic helper target dependency drifted"
+    )
+
 required_exact_membership = [
     (
         "B00000000000000000000017 "
@@ -589,10 +714,28 @@ from pathlib import Path
 import sys
 
 scheme = Path(sys.argv[1]).read_text(encoding="utf-8")
-if "StornautLifecycleHelper" in scheme:
+helper_entry = """
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "A00000000000000000000004"
+               BuildableName = "StornautLifecycleHelper"
+               BlueprintName = "StornautLifecycleHelper"
+               ReferencedContainer = "container:Stornaut.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+"""
+if helper_entry not in scheme:
     raise SystemExit(
-        "dedicated Investigation diagnostic scheme regained the lifecycle helper"
+        "dedicated Investigation diagnostic scheme lost its exact helper entry"
     )
+if scheme.count('BlueprintName = "StornautLifecycleHelper"') != 1:
+    raise SystemExit("dedicated diagnostic helper scheme identity drifted")
 if scheme.count('BlueprintName = "StornautInvestigationDiagnosticApp"') != 4:
     raise SystemExit("dedicated diagnostic scheme App identity drifted")
 PY

@@ -82,11 +82,13 @@ struct StornautInvestigationDiagnosticApp: App {
         else {
             return
         }
-        Darwin.exit(
-            InvestigationRuntimeDiagnosticHarness.run(
-                arguments: CommandLine.arguments
+        Task {
+            Darwin.exit(
+                await InvestigationRuntimeDiagnosticHarness.run(
+                    arguments: CommandLine.arguments
+                )
             )
-        )
+        }
     }
 
     var body: some Scene {
@@ -99,15 +101,43 @@ struct StornautInvestigationDiagnosticApp: App {
 enum InvestigationRuntimeDiagnosticHarness {
     static func run(
         arguments: [String],
-        now: Date = Date()
-    ) -> Int32 {
+        now: Date = Date(),
+        compositionPrepare:
+            @escaping @Sendable (Data, Date) async throws -> UUID = {
+                data,
+                now in
+                let composition =
+                    try InvestigationRuntimeDiagnosticComposition
+                        .prepare(
+                            configurationData: data,
+                            now: now
+                        )
+                guard composition.hasRuntimeFacade else {
+                    throw InvestigationRuntimeDiagnosticCompositionError
+                        .compositionUnavailable
+                }
+                let nonce = composition.nonce
+                guard
+                    await composition.retirePreparedComposition()
+                        == .retiredWithoutStarting
+                else {
+                    throw InvestigationRuntimeDiagnosticCompositionError
+                        .compositionUnavailable
+                }
+                return nonce
+            }
+    ) async -> Int32 {
         switch InvestigationRuntimeDiagnosticActivation.select(
             arguments: arguments
         ) {
         case .notRequested, .invalid:
             return 64
         case let .request(request):
-            let receipt = prepare(request: request, now: now)
+            let receipt = await prepare(
+                request: request,
+                now: now,
+                compositionPrepare: compositionPrepare
+            )
             guard
                 InvestigationRuntimeDiagnosticReceiptWriter.write(
                     receipt: receipt,
@@ -122,22 +152,29 @@ enum InvestigationRuntimeDiagnosticHarness {
 
     private static func prepare(
         request: InvestigationRuntimeDiagnosticLaunchRequest,
-        now: Date
-    ) -> InvestigationRuntimeDiagnosticPreflightReceipt {
+        now: Date,
+        compositionPrepare:
+            @Sendable (Data, Date) async throws -> UUID
+    ) async -> InvestigationRuntimeDiagnosticPreflightReceipt {
         do {
             let data = try loadConfiguration(request.configURL)
             let leaf = try InvestigationRuntimeDiagnosticLeaf.prepare(
                 configurationData: data,
                 now: now
             )
+            let nonce = try await compositionPrepare(data, now)
+            guard nonce == leaf.nonce else {
+                throw InvestigationRuntimeDiagnosticCompositionError
+                    .bindingMismatch
+            }
             return .prepared(
-                nonce: leaf.nonce,
+                nonce: nonce,
                 startedAt: now
             )
         } catch {
             return .blocked(
                 reasonKey:
-                    "investigation.runtime.debug.invalid-configuration",
+                    "investigation.runtime.debug.invalid-composition",
                 startedAt: now
             )
         }

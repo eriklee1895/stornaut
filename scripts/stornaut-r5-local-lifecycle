@@ -16,7 +16,7 @@ installed_app="$installed_root/Stornaut-R5-Diagnostic.app"
 installed_plist="/Library/LaunchDaemons/$label.plist"
 lease_root="/private/var/db/com.eriklee.stornaut.r5"
 diagnostic_root="$installed_root/R5Runtime"
-built_app="$repo_root/.derivedData/xcodebuildmcp/Build/Products/Debug/Stornaut.app"
+built_app="$repo_root/.derivedData/xcodebuildmcp/Build/Products/Debug/StornautInvestigationDiagnostic.app"
 source_plist="$repo_root/StornautLifecycleHelper/$label.plist"
 
 exact_file_metadata() {
@@ -101,7 +101,7 @@ validate_plist() {
 validate_built_app() {
     [[ -d "$built_app" && ! -L "$built_app" ]]
     for executable in \
-        "$built_app/Contents/MacOS/Stornaut" \
+        "$built_app/Contents/MacOS/StornautInvestigationDiagnostic" \
         "$built_app/Contents/MacOS/StornautLifecycleHelper"
     do
         [[ -x "$executable" && ! -L "$executable" ]]
@@ -143,7 +143,7 @@ validate_installed_artifacts() {
     /usr/bin/codesign --verify --deep --strict "$installed_app"
     validate_bundle_permissions "$installed_app"
     for executable in \
-        "$installed_app/Contents/MacOS/Stornaut" \
+        "$installed_app/Contents/MacOS/StornautInvestigationDiagnostic" \
         "$installed_app/Contents/MacOS/StornautLifecycleHelper"
     do
         exact_file_metadata "$executable" root wheel 0755
@@ -306,7 +306,7 @@ install() {
     /bin/chmod -R go-w "$staging_app"
     /bin/chmod 0755 "$staging_app"
     /bin/chmod 0755 \
-        "$staging_app/Contents/MacOS/Stornaut" \
+        "$staging_app/Contents/MacOS/StornautInvestigationDiagnostic" \
         "$staging_app/Contents/MacOS/StornautLifecycleHelper"
     validate_bundle_permissions "$staging_app"
     /usr/bin/codesign --verify --deep --strict "$staging_app"

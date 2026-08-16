@@ -18,6 +18,7 @@
 		B00000000000000000000017 /* InvestigationRuntimeDiagnosticHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = D00000000000000000000009 /* InvestigationRuntimeDiagnosticHarness.swift */; };
 		B00000000000000000000018 /* StornautInvestigation in Frameworks */ = {isa = PBXBuildFile; productRef = F00000000000000000000005 /* StornautInvestigation */; };
 		B00000000000000000000019 /* StornautExecution in Frameworks */ = {isa = PBXBuildFile; productRef = F00000000000000000000007 /* StornautExecution */; };
+		B0000000000000000000001A /* StornautLifecycleHelper in Copy Investigation Helper */ = {isa = PBXBuildFile; fileRef = D00000000000000000000004 /* StornautLifecycleHelper */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -49,6 +50,13 @@
 			remoteGlobalIDString = A00000000000000000000005;
 			remoteInfo = StornautInvestigationDiagnosticApp;
 		};
+		C00000000000000000000009 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A00000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A00000000000000000000004;
+			remoteInfo = StornautLifecycleHelper;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -61,6 +69,17 @@
 				B00000000000000000000004 /* StornautLifecycleHelper in Copy Helper */,
 			);
 			name = "Copy Helper";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B00000000000000000000041 /* Copy Investigation Helper */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/MacOS;
+			dstSubfolderSpec = 1;
+			files = (
+				B0000000000000000000001A /* StornautLifecycleHelper in Copy Investigation Helper */,
+			);
+			name = "Copy Investigation Helper";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -328,10 +347,12 @@
 				B00000000000000000000024 /* Sources */,
 				B00000000000000000000014 /* Frameworks */,
 				B00000000000000000000033 /* Resources */,
+				B00000000000000000000041 /* Copy Investigation Helper */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				C0000000000000000000000A /* PBXTargetDependency */,
 			);
 			name = StornautInvestigationDiagnosticApp;
 			packageProductDependencies = (
@@ -525,6 +546,11 @@
 			isa = PBXTargetDependency;
 			target = A00000000000000000000005 /* StornautInvestigationDiagnosticApp */;
 			targetProxy = C00000000000000000000007 /* PBXContainerItemProxy */;
+		};
+		C0000000000000000000000A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A00000000000000000000004 /* StornautLifecycleHelper */;
+			targetProxy = C00000000000000000000009 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 

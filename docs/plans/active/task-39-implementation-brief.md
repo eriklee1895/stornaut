@@ -23,7 +23,12 @@
 > build. E2b-i then moved concrete Trash/Executor authority into
 > `StornautExecution`, kept Core authority-free, linked only the ordinary App,
 > and passed its focused/product/App/serialized funnel plus isolated review.
-> E2b-ii strict final-Mach-O admission is active. Evidence:
+> E2b-ii strict final-Mach-O admission is complete. The resumed 39B2b-ii
+> signed diagnostic composition implementation, focused acceptance and
+> independent post-fix review are also complete. Its single authoritative full
+> verifier passed all 23 stages in one uninterrupted run, including the
+> 898-test serialized regression. 39B2b-ii is complete; 39B2c remains blocked
+> only until this checkpoint is independently committed and pushed. Evidence:
 > [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
 > [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md) and
 > [Task 39B1b-i Review](../../reports/phase-d-task-39b1b-i-review.md) and
@@ -34,7 +39,11 @@
 > and
 > [Task 39B2b-ii-E2a Review](../../reports/phase-d-task-39b2b-ii-e2a-review.md)
 > and
-> [Task 39B2b-ii-E2b-i Review](../../reports/phase-d-task-39b2b-ii-e2b-i-review.md).
+> [Task 39B2b-ii-E2b-i Review](../../reports/phase-d-task-39b2b-ii-e2b-i-review.md)
+> and
+> [Task 39B2b-ii-E2b-ii Review](../../reports/phase-d-task-39b2b-ii-e2b-ii-review.md)
+> and
+> [Task 39B2b-ii Review](../../reports/phase-d-task-39b2b-ii-review.md).
 >
 > **Parent plan:**
 > [Phase D Conditional Deep Dive](phase-d-conditional-deep-dive.md)
@@ -435,6 +444,150 @@ built-artifact gate passed after review strengthening; no unresolved P0–P2
 remain. Its one clean authoritative full passed 23/23 stages without restart
 or stage rerun; timed stages totaled 1,046.300 seconds. See
 [Task 39B2b-ii-E2b-ii Review](../../reports/phase-d-task-39b2b-ii-e2b-ii-review.md).
+
+With the E1/E2 prerequisites complete, the original signed-composition scope
+resumes under the following frozen preflight.
+
+### 2.4 39B2b-ii scope/cost preflight
+
+39B2b-ii is a construction and signed-installation checkpoint, not a model or
+machine-admission checkpoint. Its exact production call chain is:
+
+```text
+StornautInvestigationDiagnosticApp
+→ StornautInvestigationDiagnostic static wrapper
+→ InvestigationRuntimeDiagnosticFacade
+→ InvestigationCodexSessionAdapter
+→ CodexInteractiveAppServerClient
+→ InvestigationLifecycleAppServerTransport
+→ LifecycleInteractiveSessionXPCClient
+→ installed StornautLifecycleHelper
+→ same-helper user-UID worker
+```
+
+The package wrapper is the only new public composition surface. The dedicated
+App continues to link one static package product and does not import the
+package-closed `StornautInvestigationRuntime` target directly. The wrapper
+internally owns the exact Evidence Store v4 path, bounded Probe Broker adapter,
+nonce-derived report identity provider, lifecycle drain adapter, App Server
+client and supervised interactive transport. It returns only an opaque
+prepared composition whose public surface can prove identities and perform
+explicit retirement. It does not expose arbitrary executable, provider,
+model, auth, socket, command, network or cleanup inputs.
+
+Construction validates the strict diagnostic configuration, exact fixed
+installed-App/helper topology, current helper path and the checked-in
+Investigation Envelope v2 schema. The App wrapper derives only the fixed
+current non-root UID's `~/.codex/auth.json` path; it does not accept an auth
+path from configuration, and the App Server client delays reading credential
+bytes until `prepareRoot`. The helper-owned user-UID worker remains responsible
+for fixed workspace creation, containment and Codex process launch. This
+checkpoint never reads or edits `~/.codex/config.toml`.
+
+The dedicated DEBUG diagnostic App becomes the exact fixed installed App for
+the Investigation diagnostic and embeds the existing lifecycle helper through
+an explicit helper target dependency and copy phase. The local lifecycle
+installer therefore binds to:
+
+```text
+.derivedData/xcodebuildmcp/Build/Products/Debug/
+    StornautInvestigationDiagnostic.app
+```
+
+and validates the diagnostic executable
+`Contents/MacOS/StornautInvestigationDiagnostic` plus
+`Contents/MacOS/StornautLifecycleHelper`. Ordinary `Stornaut.app` Debug and
+Release builds remain negative controls and retain no Investigation diagnostic
+activation marker or wrapper dependency.
+
+The planned non-document write set was initially limited to:
+
+```text
+Package.swift
+Sources/StornautInvestigationDiagnostic/
+    InvestigationRuntimeDiagnosticAppLeaf.swift
+Sources/StornautInvestigationDiagnostic/
+    InvestigationRuntimeDiagnosticComposition.swift
+StornautApp/Diagnostics/InvestigationRuntimeDiagnosticHarness.swift
+StornautAppTests/InvestigationRuntimeDiagnosticTests.swift
+Stornaut.xcodeproj/project.pbxproj
+Stornaut.xcodeproj/xcshareddata/xcschemes/
+    StornautInvestigationDiagnosticApp.xcscheme
+scripts/stornaut-r5-local-lifecycle
+scripts/verify-app-release-boundaries
+scripts/verify-investigation-boundaries
+```
+
+That is ten non-document paths, below the fourteen-path checkpoint limit. New
+non-document code is budgeted below approximately 3,000 lines. If
+implementation requires another privilege surface, more than fourteen paths
+or approximately 4,000 new non-document lines, it must split again before
+those changes are written.
+
+The pre-implementation call-chain audit then found one protocol-identity gap:
+the App-side App Server client currently validates one exact `codexHome`, while
+the helper-owned contained worker creates its workspace only after the
+interactive `start` request and uses a random workspace component. A wrapper
+cannot truthfully precompute that path. 39B2b-ii therefore also owns the narrow
+fix that makes the client validate the server-reported `codexHome` against the
+exact fixed Investigation run root and closed workspace shape rather than an
+invented exact child path. This adds at most these four existing
+non-document paths:
+
+```text
+Sources/StornautCodex/Runtime/CodexAppServerAdvisoryResult.swift
+Sources/StornautCodex/Runtime/CodexInteractiveAppServerClient.swift
+Sources/StornautInvestigationRuntime/
+    InvestigationLifecycleAppServerTransport.swift
+Tests/StornautInvestigationTests/
+    InvestigationLifecycleAppServerTransportTests.swift
+```
+
+The resulting ceiling is fourteen non-document paths, still within the
+approved checkpoint limit. The change may only expose the checked-in
+Investigation Envelope v2 structured-output schema to sibling package targets,
+validate `codexHome` under the nonce/user-bound fixed runtime root, and expose
+the transport's already-confirmed retirement state to the lifecycle adapter.
+It must not add a new request kind, arbitrary runtime/auth path input, broader
+network authority or another lifecycle service.
+
+The final implementation uses exactly fourteen non-document paths and adds
+1,296 non-document lines with 96 deletions. It uses the two Codex runtime paths
+above, a focused Codex client test and `scripts/verify-contract`; it does not
+modify the existing Investigation lifecycle transport or its tests. The
+checkpoint therefore reaches but does not exceed the frozen path ceiling.
+
+Tests-first gates must initially fail because the current repository still has
+a zero-dependency diagnostic leaf, no approved production-wrapper dependency
+graph, no helper in the dedicated App, no helper scheme build entry, an
+installer bound to ordinary `Stornaut.app`, and no opaque Task 38 composition
+handle. The implementation turns only those exact failures green.
+
+39B2b-ii may construct the full chain and prove that construction itself does
+not start XPC, launch Codex, create an Investigation root, invoke a model or
+write a readiness report. It may perform a signed deterministic composition
+smoke against the installed helper only when the smoke terminates before
+`prepareRoot`, `start` or `startTurn`. It must emit a
+`compositionPrepared`/`compositionBlocked` receipt, never
+`signedInvestigationRuntimeReady`.
+
+The completed implementation follows that boundary. Construction initializes
+the exact diagnostic Evidence Store v4 database but does not create the
+helper-owned `R5Runtime/<uid>/<investigation>` root, open XPC, launch Codex or
+read auth credential bytes. Focused validation and independent review are
+recorded in
+[Task 39B2b-ii Review](../../reports/phase-d-task-39b2b-ii-review.md); the
+checkpoint's one frozen authoritative full verifier passed 23/23 stages in
+981 wall-clock seconds with no restart or stage retry. 39B2b-ii is complete.
+
+39B2c remains the sole owner of:
+
+- any real model invocation;
+- Task 38 start/turn/event/settlement driving;
+- capability/control/denial three-plane evidence;
+- failure-matrix execution;
+- zero-residue machine admission; and
+- every `signedInvestigationRuntimeReady` claim.
 
 39B1a bound the diagnostic configuration to the real Evidence Store v4 path,
 made lifecycle drain directly asynchronous, reloaded actor-owned run state

@@ -28,23 +28,20 @@ package protocol CodexInteractiveSessionDriving: Sendable {
 }
 
 package struct CodexInteractiveAppServerConfiguration: Sendable {
-    package let runtimeHomeURL: URL
-    package let workingDirectoryURL: URL
+    package let allowedRuntimeRootURL: URL
     package let projectedAuthSourceURL: URL
     package let outputSchema: JSONValue
     package let maximumLineBytes: Int
     package let maximumInputTextBytes: Int
 
     package init(
-        runtimeHomeURL: URL,
-        workingDirectoryURL: URL,
+        allowedRuntimeRootURL: URL,
         projectedAuthSourceURL: URL,
         outputSchema: JSONValue,
         maximumLineBytes: Int = 2 * 1_024 * 1_024,
         maximumInputTextBytes: Int = 256 * 1_024
     ) {
-        self.runtimeHomeURL = runtimeHomeURL
-        self.workingDirectoryURL = workingDirectoryURL
+        self.allowedRuntimeRootURL = allowedRuntimeRootURL
         self.projectedAuthSourceURL = projectedAuthSourceURL
         self.outputSchema = outputSchema
         self.maximumLineBytes = maximumLineBytes
@@ -146,9 +143,13 @@ package actor CodexInteractiveAppServerClient:
 
     private let configuration: CodexInteractiveAppServerConfiguration
     private let transport: any CodexInteractiveAppServerTransport
-    private var authProjection: CodexRuntimeAuthProjection
-    private let refreshProvider:
+    private var authProjection: CodexRuntimeAuthProjection?
+    private var refreshProvider:
         (any CodexRuntimeAuthRefreshProviding)?
+    private let authProjectionLoader:
+        (@Sendable () throws -> CodexRuntimeAuthProjection)?
+    private var observedRuntimeHomeURL: URL?
+    private var observedWorkingDirectoryURL: URL?
     private var state = State.ready
     private var nextRequestID = 1
     private var pendingResponses: [Int: ResponseContinuation] = [:]
@@ -163,19 +164,16 @@ package actor CodexInteractiveAppServerClient:
         configuration: CodexInteractiveAppServerConfiguration,
         transport: any CodexInteractiveAppServerTransport
     ) throws {
-        let projector = CodexRuntimeAuthProjector()
-        let projection = try projector.read(
-            from: configuration.projectedAuthSourceURL
-        )
         try self.init(
             configuration: configuration,
             transport: transport,
-            authProjection: projection,
-            refreshProvider: CodexRuntimeFileAuthRefreshProvider(
-                sourceURL: projection.sourceURL,
-                sourceIdentity: projection.sourceIdentity,
-                projector: projector
-            )
+            authProjection: nil,
+            refreshProvider: nil,
+            authProjectionLoader: {
+                try CodexRuntimeAuthProjector().read(
+                    from: configuration.projectedAuthSourceURL
+                )
+            }
         )
     }
 
@@ -185,12 +183,32 @@ package actor CodexInteractiveAppServerClient:
         authProjection: CodexRuntimeAuthProjection,
         refreshProvider: (any CodexRuntimeAuthRefreshProviding)?
     ) throws {
-        guard
-            Self.validAbsoluteURL(configuration.runtimeHomeURL),
-            Self.validAbsoluteURL(configuration.workingDirectoryURL),
-            Self.validAbsoluteURL(configuration.projectedAuthSourceURL),
+        try self.init(
+            configuration: configuration,
+            transport: transport,
+            authProjection: authProjection,
+            refreshProvider: refreshProvider,
+            authProjectionLoader: nil
+        )
+    }
+
+    private init(
+        configuration: CodexInteractiveAppServerConfiguration,
+        transport: any CodexInteractiveAppServerTransport,
+        authProjection: CodexRuntimeAuthProjection?,
+        refreshProvider: (any CodexRuntimeAuthRefreshProviding)?,
+        authProjectionLoader:
+            (@Sendable () throws -> CodexRuntimeAuthProjection)?
+    ) throws {
+        let authSourceMatches = authProjection.map {
             configuration.projectedAuthSourceURL.standardizedFileURL
-                == authProjection.sourceURL.standardizedFileURL,
+                == $0.sourceURL.standardizedFileURL
+        } ?? true
+        guard
+            Self.validAbsoluteURL(configuration.allowedRuntimeRootURL),
+            Self.validAbsoluteURL(configuration.projectedAuthSourceURL),
+            authSourceMatches,
+            authProjection != nil || authProjectionLoader != nil,
             configuration.maximumLineBytes > 0,
             configuration.maximumInputTextBytes > 0,
             Self.closedOutputSchema(configuration.outputSchema),
@@ -205,6 +223,7 @@ package actor CodexInteractiveAppServerClient:
         self.transport = transport
         self.authProjection = authProjection
         self.refreshProvider = refreshProvider
+        self.authProjectionLoader = authProjectionLoader
     }
 
     package func prepareRoot() async throws
@@ -215,6 +234,7 @@ package actor CodexInteractiveAppServerClient:
         }
         state = .preparingRoot
         do {
+            try loadAuthProjectionIfNeeded()
             let initialized = try await request(
                 method: "initialize",
                 params: .object([
@@ -242,13 +262,19 @@ package actor CodexInteractiveAppServerClient:
                 initialized["result"],
                 reasonKey: "initialize-result"
             )
-            guard canonicalPath(
-                string(initializeResult["codexHome"])
-            ) == canonicalPath(configuration.runtimeHomeURL.path) else {
+            guard
+                let runtimeHomeURL = closedRuntimeHomeURL(
+                    string(initializeResult["codexHome"])
+                )
+            else {
                 throw CodexInteractiveAppServerError.identityMismatch(
                     reasonKey: "initialize-codex-home"
                 )
             }
+            observedRuntimeHomeURL = runtimeHomeURL
+            observedWorkingDirectoryURL = runtimeHomeURL
+                .deletingLastPathComponent()
+                .appending(path: "work", directoryHint: .isDirectory)
             try await writeNotification(method: "initialized")
 
             let login = try await request(
@@ -268,11 +294,14 @@ package actor CodexInteractiveAppServerClient:
                 )
             }
 
+            guard let observedWorkingDirectoryURL else {
+                throw CodexInteractiveAppServerError.invalidState
+            }
             let response = try await request(
                 method: "thread/start",
                 params: .object([
                     "approvalPolicy": .string("never"),
-                    "cwd": .string(configuration.workingDirectoryURL.path),
+                    "cwd": .string(observedWorkingDirectoryURL.path),
                     "ephemeral": .bool(true),
                     "model": .string(Self.model),
                     "modelProvider": .string(Self.provider),
@@ -305,9 +334,7 @@ package actor CodexInteractiveAppServerClient:
                     == CodexContainmentPolicy.profileName,
                 array(result["instructionSources"])?.isEmpty == true,
                 canonicalPath(string(result["cwd"]))
-                    == canonicalPath(
-                        configuration.workingDirectoryURL.path
-                    )
+                    == canonicalPath(observedWorkingDirectoryURL.path)
             else {
                 throw CodexInteractiveAppServerError.identityMismatch(
                     reasonKey: "thread-start-root-identity"
@@ -333,6 +360,7 @@ package actor CodexInteractiveAppServerClient:
         guard
             state == .active,
             let root,
+            let observedWorkingDirectoryURL,
             boundedIdentifier(threadID) != nil,
             !inputTexts.isEmpty,
             inputTexts.count <= 8,
@@ -366,9 +394,7 @@ package actor CodexInteractiveAppServerClient:
                 method: "turn/start",
                 params: .object([
                     "approvalPolicy": .string("never"),
-                    "cwd": .string(
-                        configuration.workingDirectoryURL.path
-                    ),
+                    "cwd": .string(observedWorkingDirectoryURL.path),
                     "input": .array(input),
                     "model": .string(Self.model),
                     "outputSchema": configuration.outputSchema,
@@ -517,7 +543,8 @@ package actor CodexInteractiveAppServerClient:
         drainWaiters(error: error)
         readTask?.cancel()
         readTask = nil
-        authProjection.erase()
+        authProjection?.erase()
+        authProjection = nil
         try await transport.retire()
     }
 
@@ -755,6 +782,7 @@ package actor CodexInteractiveAppServerClient:
             let identifier = object["id"],
             validRPCIdentifier(identifier),
             let refreshProvider,
+            let currentAuthProjection = authProjection,
             case let .chatGPT(_, currentAccountID, _)
                 = currentCredentials()
         else {
@@ -781,7 +809,8 @@ package actor CodexInteractiveAppServerClient:
         }
         let credentials = refreshed.withCredentials { $0 }
         guard
-            refreshed.sourceIdentity == authProjection.sourceIdentity,
+            refreshed.sourceIdentity
+                == currentAuthProjection.sourceIdentity,
             refreshed.sourceURL.standardizedFileURL
                 == configuration.projectedAuthSourceURL.standardizedFileURL,
             case let .chatGPT(_, accountID, _) = credentials,
@@ -793,8 +822,8 @@ package actor CodexInteractiveAppServerClient:
             )
         }
         refreshUsed = true
-        authProjection.erase()
-        authProjection = refreshed
+        currentAuthProjection.erase()
+        self.authProjection = refreshed
         do {
             try await transport.writeLine(
                 try encodeLine([
@@ -812,7 +841,8 @@ package actor CodexInteractiveAppServerClient:
             return
         }
         state = .failed
-        authProjection.erase()
+        authProjection?.erase()
+        authProjection = nil
         drainWaiters(error: mapError(error))
         readTask?.cancel()
         readTask = nil
@@ -838,7 +868,67 @@ package actor CodexInteractiveAppServerClient:
     }
 
     private func currentCredentials() -> CodexRuntimeAuthCredentials {
-        authProjection.withCredentials { $0 }
+        guard let authProjection else {
+            preconditionFailure("Interactive auth was not loaded")
+        }
+        return authProjection.withCredentials { $0 }
+    }
+
+    private func loadAuthProjectionIfNeeded() throws {
+        guard authProjection == nil else {
+            return
+        }
+        guard let authProjectionLoader else {
+            throw CodexInteractiveAppServerError.invalidConfiguration
+        }
+        let projection: CodexRuntimeAuthProjection
+        do {
+            projection = try authProjectionLoader()
+        } catch {
+            throw CodexInteractiveAppServerError.invalidConfiguration
+        }
+        guard
+            projection.sourceURL.standardizedFileURL
+                == configuration.projectedAuthSourceURL.standardizedFileURL
+        else {
+            projection.erase()
+            throw CodexInteractiveAppServerError.invalidConfiguration
+        }
+        authProjection = projection
+        refreshProvider = CodexRuntimeFileAuthRefreshProvider(
+            sourceURL: projection.sourceURL,
+            sourceIdentity: projection.sourceIdentity
+        )
+    }
+
+    private func closedRuntimeHomeURL(_ value: String?) -> URL? {
+        guard
+            let path = canonicalPath(value),
+            let allowedRootPath = canonicalPath(
+                configuration.allowedRuntimeRootURL.path
+            )
+        else {
+            return nil
+        }
+        let runtimeURL = URL(filePath: path).standardizedFileURL
+        let workspaceURL = runtimeURL.deletingLastPathComponent()
+        guard
+            runtimeURL.lastPathComponent == "runtime",
+            workspaceURL.deletingLastPathComponent().path
+                == allowedRootPath,
+            workspaceURL.lastPathComponent
+                .hasPrefix("stornaut-runtime-v1-"),
+            UUID(
+                uuidString: String(
+                    workspaceURL.lastPathComponent.dropFirst(
+                        "stornaut-runtime-v1-".count
+                    )
+                )
+            ) != nil
+        else {
+            return nil
+        }
+        return runtimeURL
     }
 
     private func authObject(

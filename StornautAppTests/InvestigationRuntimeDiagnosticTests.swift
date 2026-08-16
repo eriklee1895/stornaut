@@ -305,7 +305,7 @@ func investigationRuntimeDiagnosticReceiptIsExclusiveAndPreservesExisting()
 
 @Test
 func investigationRuntimeDiagnosticRunExposesOneShotReceiptFailure()
-    throws
+    async throws
 {
     let fixture = try InvestigationRuntimeAppLeafFixture()
     defer { fixture.remove() }
@@ -323,11 +323,18 @@ func investigationRuntimeDiagnosticRunExposesOneShotReceiptFailure()
         "StornautInvestigationDiagnostic",
         "--stornaut-investigation-runtime-config=\(configURL.path)",
     ]
+    let compositionPrepare:
+        @Sendable (Data, Date) async throws -> UUID = { data, now in
+            try InvestigationRuntimeDiagnosticConfiguration
+                .decodeValidated(from: data, now: now)
+                .nonce
+        }
 
     #expect(
-        InvestigationRuntimeDiagnosticHarness.run(
+        await InvestigationRuntimeDiagnosticHarness.run(
             arguments: arguments,
-            now: fixture.now
+            now: fixture.now,
+            compositionPrepare: compositionPrepare
         ) == 0
     )
     let receiptURL = fixture.root.appending(
@@ -337,9 +344,10 @@ func investigationRuntimeDiagnosticRunExposesOneShotReceiptFailure()
     #expect(!original.isEmpty)
 
     #expect(
-        InvestigationRuntimeDiagnosticHarness.run(
+        await InvestigationRuntimeDiagnosticHarness.run(
             arguments: arguments,
-            now: fixture.now
+            now: fixture.now,
+            compositionPrepare: compositionPrepare
         ) == 73
     )
     #expect(try Data(contentsOf: receiptURL) == original)

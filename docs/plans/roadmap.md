@@ -181,8 +181,14 @@ stages 单次 exit 0。39B2 已拆为 39B2a strict supervised transport、39B2b
 signed production composition 与 39B2c machine admission；39B2a
 implementation、73-test Lifecycle、103-test Investigation、865-test
 serialized regression 与 independent post-fix review 已通过，authoritative
-full verifier 23/23 stages 单次 exit 0（932 秒）。39B2a 已完成；39B2b
-是下一 checkpoint，39B2c 才能作 machine readiness claim。
+full verifier 23/23 stages 单次 exit 0（932 秒）。39B2a 已完成。39B2b-i
+helper-owned contained worker 与 39B2b-ii 的 E1/E2 authority extraction
+prerequisites 均已完成并通过各自 gate；恢复后的 39B2b-ii signed diagnostic
+composition 已完成实现、focused tests、strict final-Mach-O gate 与
+independent post-fix review；该 checkpoint 唯一一次 authoritative full
+verifier 以 23/23 stages、898-test serialized regression、981 秒 wall time
+单次通过，无 restart 或 stage retry。39B2b-ii 已完成；39B2c 才能作
+machine readiness claim。
 Task 44 是唯一
 normal-product admission gate。completion evidence 见
 Task 36 [review](../reports/phase-d-task-36-review.md)、Task 37
@@ -327,8 +333,15 @@ Task 36 [review](../reports/phase-d-task-36-review.md)、Task 37
 	  package-closed transport implementation 已完成；73-test Lifecycle、
 	  103-test Investigation、865-test serialized regression 与 independent
 	  post-fix review 已通过，authoritative full verifier 23/23 stages 单次
-	  exit 0（932 秒）。39B2a 已完成；39B2b signed production composition
-	  是下一 checkpoint，39B2c 才是 machine admission，Task 39 尚未完成。
+	  exit 0（932 秒）。39B2a 已完成；39B2b-i helper-owned contained worker
+	  与 39B2b-ii E1/E2 authority extraction 已完成。恢复后的 39B2b-ii
+	  signed diagnostic composition 已绑定 opaque Task 38 facade、delayed
+	  auth projection、helper-reported random workspace、exact diagnostic
+	  Store 与 dedicated App/helper topology；focused tests、strict
+	  final-Mach-O gate 与 independent post-fix review 已通过；唯一一次
+	  authoritative full verifier 以 23/23 stages、898-test serialized
+	  regression、981 秒 wall time 单次通过，无 restart 或 stage retry。
+	  39B2b-ii 已完成；39B2c 才是 machine admission，Task 39 尚未完成。
 - Epic 0 Foundation Upstream Study：已完成，选择 checked-in Xcode App/Test host + local Swift packages。
 - Epic 0 Task 1：SwiftPM Core/Codex、smoke tests、`scripts/verify`、manual-only CI 与 ThirdPartyNotices 骨架已完成。
 - Bundle identifier：已确认 `com.eriklee.stornaut`。

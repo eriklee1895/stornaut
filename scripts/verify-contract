@@ -70,6 +70,24 @@ require_fixed_text scripts/verify-app-release-boundaries \
 require_fixed_text scripts/verify-app-release-boundaries \
     'mach_o_contains()'
 require_fixed_text scripts/verify-app-release-boundaries \
+    'mach_o_has_demangled_symbol()'
+require_fixed_text scripts/verify-app-release-boundaries \
+    'diagnostic_authority_forbidden_symbol_prefix='
+require_fixed_text scripts/verify-app-release-boundaries \
+    'xcrun swift-demangle'
+require_fixed_text scripts/verify-app-release-boundaries \
+    'Demangled symbol scan failed:'
+require_fixed_text scripts/verify-app-release-boundaries \
+    'symbol_scan_status=$?'
+require_fixed_text scripts/verify-app-release-boundaries \
+    '(( symbol_scan_status == 2 ))'
+require_fixed_text scripts/verify-app-release-boundaries \
+    'copy_phase_end = project.find('
+require_fixed_text scripts/verify-app-release-boundaries \
+    '"\n\t\t};",'
+require_fixed_text scripts/verify-app-release-boundaries \
+    'scripts/verify-contract'
+require_fixed_text scripts/verify-app-release-boundaries \
     'StornautExecution Xcode dependency allowlist drifted'
 require_fixed_text scripts/verify 'scripts/verify-investigation-boundaries'
 require_fixed_text scripts/verify 'investigation-benchmarks'
@@ -93,6 +111,69 @@ if [[ -e scripts/verify-phase-c-trash-safe-window ]]; then
     fail_contract \
         "Obsolete global Phase C Trash safe-window still exists"
 fi
+
+python3 - <<'PY'
+from pathlib import Path
+
+source = Path("scripts/verify-app-release-boundaries").read_text(
+    encoding="utf-8"
+)
+symbol_scan_start = source.find("mach_o_has_demangled_symbol() {")
+symbol_scan_end = source.find(
+    "\n}\n\nauthority_object_markers=(",
+    symbol_scan_start,
+)
+if symbol_scan_start < 0 or symbol_scan_end < 0:
+    raise SystemExit("missing demangled Mach-O symbol scanner")
+symbol_scan = source[symbol_scan_start:symbol_scan_end]
+if (
+    'print -u2 "Demangled symbol scan failed: $file"' not in symbol_scan
+    or "return 2" not in symbol_scan
+    or "continue" in symbol_scan[
+        symbol_scan.find("if ! symbols=$("):
+    ]
+):
+    raise SystemExit(
+        "demangled Mach-O symbol scanner must fail closed on scan errors"
+    )
+if source.count("(( symbol_scan_status == 2 ))") != 2:
+    raise SystemExit(
+        "positive and negative demangled-symbol gates must handle scan errors"
+    )
+contract_gate = source.find("scripts/verify-contract")
+first_build = source.find("xcodebuild")
+if contract_gate < 0 or first_build < 0 or contract_gate > first_build:
+    raise SystemExit(
+        "App release static contract must run before the first Xcode build"
+    )
+
+project = Path("Stornaut.xcodeproj/project.pbxproj").read_text(
+    encoding="utf-8"
+)
+copy_phase_marker = (
+    "B00000000000000000000041 /* Copy Investigation Helper */ = {"
+)
+copy_phase_start = project.find(copy_phase_marker)
+copy_phase_end = project.find(
+    "\n\t\t};",
+    copy_phase_start + len(copy_phase_marker),
+)
+if copy_phase_start < 0 or copy_phase_end < 0:
+    raise SystemExit("missing dedicated diagnostic helper copy phase")
+copy_phase = project[copy_phase_start:copy_phase_end]
+required_helper_build_file = (
+    "B0000000000000000000001A "
+    "/* StornautLifecycleHelper in Copy Investigation Helper */"
+)
+if (
+    copy_phase.count(" in Copy Investigation Helper */") != 1
+    or required_helper_build_file not in copy_phase
+    or copy_phase.count('name = "Copy Investigation Helper";') != 1
+):
+    raise SystemExit(
+        "dedicated diagnostic helper copy allowlist drifted"
+    )
+PY
 
 python3 - <<'PY'
 import re

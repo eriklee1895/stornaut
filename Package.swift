@@ -118,7 +118,13 @@ let package = Package(
         ),
         .target(
             name: "StornautInvestigationDiagnostic",
-            dependencies: []
+            dependencies: [
+                "StornautCodex",
+                "StornautCore",
+                "StornautInvestigation",
+                "StornautInvestigationRuntime",
+                "StornautLifecycle",
+            ]
         ),
         .target(
             name: "CLifecycleSupport",
@@ -192,6 +198,7 @@ let package = Package(
         .testTarget(
             name: "StornautInvestigationTests",
             dependencies: [
+                "StornautInvestigationDiagnostic",
                 "StornautInvestigation",
                 "StornautInvestigationRuntime",
                 "StornautCore",

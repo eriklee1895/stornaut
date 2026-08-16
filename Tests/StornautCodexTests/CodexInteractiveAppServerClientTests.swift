@@ -145,6 +145,54 @@ struct CodexInteractiveAppServerClientTests {
     }
 
     @Test
+    func rejectsServerRuntimeHomeOutsideClosedWorkspaceShape()
+        async throws
+    {
+        let fixture = InteractiveAppServerFixture()
+        let transport = FakeInteractiveAppServerTransport(lines: [
+            fixture.initializeResponse(
+                runtimeHomeURL: URL(
+                    filePath:
+                        "/tmp/stornaut-interactive/foreign/runtime"
+                )
+            ),
+        ])
+        let client = try fixture.client(transport: transport)
+
+        await #expect(
+            throws: CodexInteractiveAppServerError.identityMismatch(
+                reasonKey: "initialize-codex-home"
+            )
+        ) {
+            _ = try await client.prepareRoot()
+        }
+        try await client.retire()
+    }
+
+    @Test
+    func constructionDefersAuthProjectionUntilRootPreparation()
+        async throws
+    {
+        let fixture = InteractiveAppServerFixture()
+        let transport = FakeInteractiveAppServerTransport(lines: [])
+        let client = try CodexInteractiveAppServerClient(
+            configuration: CodexInteractiveAppServerConfiguration(
+                allowedRuntimeRootURL: fixture.allowedRuntimeRootURL,
+                projectedAuthSourceURL: URL(
+                    filePath:
+                        "/definitely-absent-stornaut-auth/auth.json"
+                ),
+                outputSchema: fixture.outputSchema
+            ),
+            transport: transport
+        )
+
+        #expect(try transport.recordedObjects().isEmpty)
+        try await client.retire()
+        #expect(transport.retireCount == 1)
+    }
+
+    @Test
     func retirementIsOneShotAndClosesFurtherRequests() async throws {
         let fixture = InteractiveAppServerFixture()
         let transport = FakeInteractiveAppServerTransport(lines: [])
@@ -166,10 +214,29 @@ struct CodexInteractiveAppServerClientTests {
 }
 
 private struct InteractiveAppServerFixture {
-    let runtimeHomeURL = URL(filePath: "/tmp/stornaut-interactive/runtime")
-    let workingDirectoryURL = URL(
-        filePath: "/tmp/stornaut-interactive/work"
+    let allowedRuntimeRootURL = URL(
+        filePath: "/tmp/stornaut-interactive",
+        directoryHint: .isDirectory
     )
+    let workspaceURL = URL(
+        filePath:
+            "/tmp/stornaut-interactive/"
+            + "stornaut-runtime-v1-"
+            + "93939393-9393-4393-8393-939393939393",
+        directoryHint: .isDirectory
+    )
+    var runtimeHomeURL: URL {
+        workspaceURL.appending(
+            path: "runtime",
+            directoryHint: .isDirectory
+        )
+    }
+    var workingDirectoryURL: URL {
+        workspaceURL.appending(
+            path: "work",
+            directoryHint: .isDirectory
+        )
+    }
     let authSourceURL = URL(
         filePath: "/Users/example/.codex/auth.json"
     )
@@ -192,8 +259,7 @@ private struct InteractiveAppServerFixture {
     ) throws -> CodexInteractiveAppServerClient {
         try CodexInteractiveAppServerClient(
             configuration: CodexInteractiveAppServerConfiguration(
-                runtimeHomeURL: runtimeHomeURL,
-                workingDirectoryURL: workingDirectoryURL,
+                allowedRuntimeRootURL: allowedRuntimeRootURL,
                 projectedAuthSourceURL: authSourceURL,
                 outputSchema: outputSchema
             ),
@@ -216,11 +282,15 @@ private struct InteractiveAppServerFixture {
         )
     }
 
-    func initializeResponse() -> Data {
+    func initializeResponse(
+        runtimeHomeURL: URL? = nil
+    ) -> Data {
         line([
             "id": .number(1),
             "result": .object([
-                "codexHome": .string(runtimeHomeURL.path),
+                "codexHome": .string(
+                    (runtimeHomeURL ?? self.runtimeHomeURL).path
+                ),
             ]),
         ])
     }

@@ -3,15 +3,14 @@
 > **Status:** Approved for sequential Tasks 36–44; Tasks 36–38 are complete.
 > Task 38 passed implementation, independent review, an 811-test serialized
 > regression and the 23/23-stage authoritative full verifier. Task 39 is in
-> progress: 39A contract/composition foundation is independently complete and
-> pushed; the 39B preflight split remaining work into 39B1 DEBUG App
-> composition and 39B2 signed-App machine admission, then split 39B1 into
-> 39B1a Store/async-lifecycle prerequisites and 39B1b transport/App leaf before
-> the write set exceeded its hard budget. 39B1a is complete and independently
-> verified; 39B1b-i is complete and independently verified. 39B1b-ii strict
-> DEBUG App leaf is complete; focused validation, independent post-fix review
-> and its 23-stage authoritative full verifier passed. 39B2 signed-App machine
-> admission is next.
+> progress: 39A, 39B1a, 39B1b-i, 39B1b-ii, 39B2a and 39B2b-i are complete
+> and independently verified. 39B2b-ii prerequisite authority extraction is
+> complete; the resumed signed diagnostic-App/Task 38 composition has passed
+> focused validation, strict final-Mach-O admission and independent post-fix
+> review. Its single authoritative full verifier passed 23/23 stages in 981
+> wall-clock seconds, including the 898-test serialized regression, with no
+> restart or stage retry. 39B2b-ii is complete. 39B2c machine admission remains
+> blocked only until 39B2b-ii is independently committed and pushed.
 > Production Deep Dive remains unavailable until Task 44 admission.
 >
 > **Roadmap phase:** Phase D — Conditional Deep Dive
@@ -820,9 +819,21 @@ Checkpoint status:
   and independent post-fix review passed. Its 23-stage authoritative full
   verifier exited `0` in 972 seconds. See
   [Task 39B1b-ii Review](../../reports/phase-d-task-39b1b-ii-review.md).
-- 39B2 is next and owns real-model signed-App machine admission, failure matrix and
-  zero-residue proof. Task 39 and production Deep Dive are not admitted by 39A
-  or any 39B1 checkpoint.
+- 39B2a strict supervised interactive transport and 39B2b-i helper-owned
+  contained worker are complete and independently verified.
+- 39B2b-ii prerequisite authority extraction is complete. The resumed signed
+  diagnostic composition binds the opaque Task 38 facade, delayed auth
+  projection, helper-reported random workspace, exact diagnostic Store and
+  dedicated App/helper topology. Focused Codex/Investigation/App tests, the
+  strict final-Mach-O gate and independent post-fix review passed. Its single
+  authoritative full verifier passed 23/23 stages in 981 wall-clock seconds,
+  including the 898-test serialized regression, with no restart or stage
+  retry. 39B2b-ii is complete. See
+  [Task 39B2b-ii Review](../../reports/phase-d-task-39b2b-ii-review.md).
+- 39B2c is next after that checkpoint's independent commit/push and exclusively
+  owns real-model signed-App machine admission, failure matrix and zero-residue
+  proof. Task 39 and production Deep Dive are not admitted by any earlier
+  checkpoint.
 
 Deliver:
 

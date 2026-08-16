@@ -3,9 +3,97 @@ import Testing
 import StornautCodex
 import StornautCore
 @testable import StornautInvestigation
+@testable import StornautInvestigationDiagnostic
 
 @Suite("Task 39 signed Investigation runtime contract", .serialized)
 struct SignedRuntimeContractTests {
+    @Test
+    func diagnosticCompositionPreparesOpaqueProductionChain()
+        async throws
+    {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let configuration = try fixture.configuration()
+        let installation = fixture.installationObservation()
+
+        let composition =
+            try InvestigationRuntimeDiagnosticComposition.prepare(
+                configurationData: try configuration.canonicalJSONData(),
+                now: fixture.now,
+                installation: installation,
+                runtimeNow: { fixture.now }
+            )
+
+        #expect(composition.nonce == configuration.nonce)
+        #expect(
+            composition.investigationID
+                == "investigation-"
+                    + configuration.nonce.uuidString.lowercased()
+        )
+        #expect(composition.storePath == configuration.storePath)
+        #expect(
+            composition.helperExecutablePath
+                == "/Library/Application Support/Stornaut/"
+                    + "Stornaut-R5-Diagnostic.app/Contents/MacOS/"
+                    + "StornautLifecycleHelper"
+        )
+        #expect(composition.hasRuntimeFacade)
+        #expect(
+            await composition.retirePreparedComposition()
+                == .retiredWithoutStarting
+        )
+    }
+
+    @Test
+    func diagnosticCompositionRejectsBindingDrift() throws {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let configuration = try fixture.configuration()
+        let expected = fixture.installationObservation()
+        let drifted = InvestigationRuntimeDiagnosticBindingObservation(
+            installedAppURL: expected.installedAppURL,
+            helperExecutableURL: expected.helperExecutableURL,
+            appExecutableName: expected.appExecutableName,
+            appExecutableSHA256: expected.appExecutableSHA256,
+            helperExecutableSHA256: String(repeating: "0", count: 64),
+            appBundleIdentifier: expected.appBundleIdentifier,
+            helperSigningIdentifier: expected.helperSigningIdentifier,
+            serviceIdentifier: expected.serviceIdentifier
+        )
+
+        #expect(
+            throws:
+                InvestigationRuntimeDiagnosticCompositionError
+                .bindingMismatch
+        ) {
+            _ = try InvestigationRuntimeDiagnosticComposition.prepare(
+                configurationData: try configuration.canonicalJSONData(),
+                now: fixture.now,
+                installation: drifted
+            )
+        }
+    }
+
+    @Test
+    func diagnosticCompositionUsesLiveRuntimeClock() throws {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let configuration = try fixture.configuration()
+
+        #expect(
+            throws:
+                InvestigationRuntimeDiagnosticCompositionError
+                .compositionUnavailable
+        ) {
+            _ = try InvestigationRuntimeDiagnosticComposition.prepare(
+                configurationData: try configuration.canonicalJSONData(),
+                now: fixture.now,
+                installation: fixture.installationObservation(),
+                runtimeNow: { configuration.validBefore }
+            )
+        }
+    }
+
     @Test
     func strictConfigurationRoundTripsAndRejectsUnknownFields() throws {
         let fixture = try SignedRuntimeContractFixture()
@@ -766,6 +854,31 @@ private struct SignedRuntimeContractFixture {
             appBundleIdentifier: "com.eriklee.stornaut",
             helperServiceIdentifier:
                 "com.eriklee.stornaut.lifecycle"
+        )
+    }
+
+    func installationObservation()
+        -> InvestigationRuntimeDiagnosticBindingObservation
+    {
+        let app = URL(
+            filePath:
+                "/Library/Application Support/Stornaut/"
+                + "Stornaut-R5-Diagnostic.app",
+            directoryHint: .isDirectory
+        )
+        return InvestigationRuntimeDiagnosticBindingObservation(
+            installedAppURL: app,
+            helperExecutableURL: app.appending(
+                path: "Contents/MacOS/StornautLifecycleHelper"
+            ),
+            appExecutableName: "StornautInvestigationDiagnostic",
+            appExecutableSHA256: binding().appExecutableSHA256,
+            helperExecutableSHA256:
+                binding().helperExecutableSHA256,
+            appBundleIdentifier: binding().appBundleIdentifier,
+            helperSigningIdentifier:
+                "com.eriklee.stornaut.lifecycle.helper",
+            serviceIdentifier: binding().helperServiceIdentifier
         )
     }
 

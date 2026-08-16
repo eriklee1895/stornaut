@@ -157,8 +157,14 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   Mach-O negative control 与六 target Xcode allowlist 均通过；E2 checkpoint
   唯一一次 clean full 23/23 stages 单次通过（timed 1,046.300 秒），无 restart
   或 stage rerun。E2b-ii 已完成；
-  原 signed composition diff 保持 stash。只有 39B2c
-  可以作 machine readiness claim；Task 39 尚未完成。
+  恢复后的 39B2b-ii signed diagnostic composition 已绑定 opaque Task 38
+  facade、delayed auth projection、helper-reported random workspace、exact
+  diagnostic Store 与 dedicated App/helper topology；focused Codex/
+  Investigation/App tests、strict final-Mach-O gate 与 independent post-fix
+  review 已通过；该 checkpoint 唯一一次 authoritative full verifier 以
+  23/23 stages、898-test serialized regression、981 秒 wall time 单次通过，
+  无 restart 或 stage retry。39B2b-ii 已完成；只有 39B2c 可以作 machine
+  readiness claim，Task 39 尚未完成。
   真实 App Trash 依赖仍保持关闭，生产 Deep Dive 仍为 implementation unavailable。
   逐 Task 完成 Upstream Study、
   实现、code review、分层验证、独立 commit/push；`scripts/verify --full`
@@ -263,6 +269,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2b-ii-E2a review / completion audit | [docs/reports/phase-d-task-39b2b-ii-e2a-review.md](docs/reports/phase-d-task-39b2b-ii-e2a-review.md) |
 | Phase D Task 39B2b-ii-E2b-i review / completion audit | [docs/reports/phase-d-task-39b2b-ii-e2b-i-review.md](docs/reports/phase-d-task-39b2b-ii-e2b-i-review.md) |
 | Phase D Task 39B2b-ii-E2b-ii review / completion audit | [docs/reports/phase-d-task-39b2b-ii-e2b-ii-review.md](docs/reports/phase-d-task-39b2b-ii-e2b-ii-review.md) |
+| Phase D Task 39B2b-ii review / completion audit | [docs/reports/phase-d-task-39b2b-ii-review.md](docs/reports/phase-d-task-39b2b-ii-review.md) |
 | Epic 2–4 历史计划 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) |
 | Epic 2–4 最终 Gate | [docs/reports/epic-2-4-validation-report.md](docs/reports/epic-2-4-validation-report.md) |
 | Epic 0–1 历史计划与证据 | [docs/plans/completed/epic-0-1-foundation-spikes.md](docs/plans/completed/epic-0-1-foundation-spikes.md) |
@@ -343,7 +350,11 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   已通过。E2b-i complete；E2b-ii strict final-Mach-O verifier/review 已通过，
   built authority 正控制、full-bundle Mach-O 负控制与 exact Xcode allowlist
   均绿色，唯一一次 clean full 23/23 stages 单次通过（1,046.300 秒）。
-  E2b-ii complete，原 signed composition 下一步恢复。
+  E2b-ii complete；恢复后的 signed composition 已完成实现、focused tests、
+  strict final-Mach-O gate 与 independent post-fix review；唯一一次
+  authoritative full verifier 以 23/23 stages、898-test serialized
+  regression、981 秒 wall time 单次通过，无 restart 或 stage retry。
+  39B2b-ii 已完成。
   Task 39 尚未完成。
 Deep Dive 的旧 Broker-only no-go 已被 ADR 0004 的 capability-first 边界取代；
 当前仍不可用的原因是生产 Deep Dive 尚未实现，而非 R6 或 Codex 工具能力。

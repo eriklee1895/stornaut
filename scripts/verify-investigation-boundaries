@@ -41,6 +41,7 @@ required_files=(
     "$runtime_root/InvestigationCodexSessionAdapter.swift"
     "$runtime_root/InvestigationLifecycleAppServerTransport.swift"
     "$diagnostic_root/InvestigationRuntimeDiagnosticAppLeaf.swift"
+    "$diagnostic_root/InvestigationRuntimeDiagnosticComposition.swift"
     "$lifecycle_root/LifecycleInteractiveSessionContract.swift"
     "$lifecycle_root/LifecycleSupervisorXPC.swift"
     "$contained_session"
@@ -260,7 +261,8 @@ python3 - \
     "$lifecycle_root/LifecycleSupervisorXPC.swift" \
     "$runtime_root/InvestigationLifecycleAppServerTransport.swift" \
     "$lifecycle_helper" \
-    "$contained_session" <<'PY'
+    "$contained_session" \
+    "$diagnostic_root/InvestigationRuntimeDiagnosticComposition.swift" <<'PY'
 import json
 from pathlib import Path
 import re
@@ -330,7 +332,13 @@ if diagnostic_leaf is None:
 actual_diagnostic_dependencies = set(
     diagnostic_leaf.get("target_dependencies", [])
 )
-expected_diagnostic_dependencies = set()
+expected_diagnostic_dependencies = {
+    "StornautCodex",
+    "StornautCore",
+    "StornautInvestigation",
+    "StornautInvestigationRuntime",
+    "StornautLifecycle",
+}
 if actual_diagnostic_dependencies != expected_diagnostic_dependencies:
     raise SystemExit(
         "StornautInvestigationDiagnostic dependencies "
@@ -363,6 +371,52 @@ interactive_transport_source = Path(sys.argv[9]).read_text(
 )
 lifecycle_helper_source = Path(sys.argv[10]).read_text(encoding="utf-8")
 contained_session_source = Path(sys.argv[11]).read_text(encoding="utf-8")
+diagnostic_composition_source = Path(sys.argv[12]).read_text(
+    encoding="utf-8"
+)
+
+required_diagnostic_composition = {
+    "public final class InvestigationRuntimeDiagnosticComposition:",
+    "public static func prepare(",
+    "public func retirePreparedComposition() async",
+    "runtimeNow: Date.init",
+    "now: runtimeNow",
+    "InvestigationRuntimeDiagnosticFacade(",
+    "InvestigationCodexSessionAdapter(",
+    "CodexInteractiveAppServerClient(",
+    "InvestigationLifecycleAppServerTransport(",
+    "LifecycleInteractiveSessionXPCClient(",
+    "EvidenceStore(configuration:",
+    "InvestigationProbeBrokerAdapter(",
+}
+missing_diagnostic_composition = {
+    marker
+    for marker in required_diagnostic_composition
+    if marker not in diagnostic_composition_source
+}
+if missing_diagnostic_composition:
+    raise SystemExit(
+        "Investigation diagnostic composition drifted: "
+        f"{sorted(missing_diagnostic_composition)}"
+    )
+for prohibited in (
+    "public var runtimeFacade",
+    "public let runtimeFacade",
+    "now: { now }",
+    "prepareRoot(",
+    ".start(",
+    ".startTurn(",
+    "signedInvestigationRuntimeReady",
+    "ActionExecutor",
+    "CleanupExecutionRuntime",
+    "ExecutionAuthorization",
+    "RegisteredAction",
+):
+    if prohibited in diagnostic_composition_source:
+        raise SystemExit(
+            "Investigation diagnostic composition exposes or starts a "
+            f"prohibited surface: {prohibited}"
+        )
 
 required_public_facade = {
     "public func start(",
@@ -706,6 +760,7 @@ for path in Path("StornautApp").rglob("*.swift"):
         "FileManagerTrashAdapter",
         "MoveToTrash",
         "RegisteredAction",
+        "signedInvestigationRuntimeReady",
         "TrashMoving",
     ):
         if token in source:

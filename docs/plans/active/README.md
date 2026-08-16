@@ -38,6 +38,14 @@ built execution-object positive controls, full diagnostic-bundle Mach-O
 negative controls and six-target Xcode allowlist passed; the E2 checkpoint's
 single final full verifier passed 23/23 stages in 1,046.300 timed seconds.
 E2b-ii is complete.
+The resumed 39B2b-ii signed diagnostic composition now binds the opaque Task
+38 facade, delayed auth projection, helper-reported random workspace, exact
+diagnostic Store and dedicated App/helper installation topology. Its focused
+tests, strict final-Mach-O gate and independent post-fix review passed. Its
+single authoritative full verifier passed 23/23 stages in 981 wall-clock
+seconds, including the 898-test serialized regression, with no restart or
+stage retry. 39B2b-ii is complete. See the
+[39B2b-ii review](../../reports/phase-d-task-39b2b-ii-review.md).
 39B2c alone
 owns machine admission. Tasks 40–44
 remain blocked on the pushed completion commit of their immediate predecessor.
@@ -57,7 +65,7 @@ the sole normal-product admission gate.
 | [36](task-36-implementation-brief.md) | Domain, canonical projection, planner, budget and stop contracts | complete; [review](../../reports/phase-d-task-36-review.md) |
 | [37](task-37-implementation-brief.md) | Store v4, retention and source rejoin | complete; [review](../../reports/phase-d-task-37-review.md) |
 | [38](task-38-implementation-brief.md) | Closed coordinator with fake runtime | complete; [review](../../reports/phase-d-task-38-review.md) |
-| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; 39A [complete](../../reports/phase-d-task-39a-review.md), 39B1a [complete](../../reports/phase-d-task-39b1a-review.md), 39B1b-i [complete](../../reports/phase-d-task-39b1b-i-review.md), 39B1b-ii [complete](../../reports/phase-d-task-39b1b-ii-review.md), 39B2a [complete](../../reports/phase-d-task-39b2a-review.md), 39B2b-i [complete](../../reports/phase-d-task-39b2b-i-review.md), 39B2b-ii-E1 [complete](../../reports/phase-d-task-39b2b-ii-e1-review.md), E2a [complete](../../reports/phase-d-task-39b2b-ii-e2a-review.md), E2b-i [complete](../../reports/phase-d-task-39b2b-ii-e2b-i-review.md), E2b-ii [complete](../../reports/phase-d-task-39b2b-ii-e2b-ii-review.md); signed composition remains to resume |
+| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; 39A [complete](../../reports/phase-d-task-39a-review.md), 39B1a [complete](../../reports/phase-d-task-39b1a-review.md), 39B1b-i [complete](../../reports/phase-d-task-39b1b-i-review.md), 39B1b-ii [complete](../../reports/phase-d-task-39b1b-ii-review.md), 39B2a [complete](../../reports/phase-d-task-39b2a-review.md), 39B2b-i [complete](../../reports/phase-d-task-39b2b-i-review.md), 39B2b-ii-E1 [complete](../../reports/phase-d-task-39b2b-ii-e1-review.md), E2a [complete](../../reports/phase-d-task-39b2b-ii-e2a-review.md), E2b-i [complete](../../reports/phase-d-task-39b2b-ii-e2b-i-review.md), E2b-ii [complete](../../reports/phase-d-task-39b2b-ii-e2b-ii-review.md), 39B2b-ii [complete](../../reports/phase-d-task-39b2b-ii-review.md); 39B2c next after push |
 | [40](task-40-implementation-brief.md) | Evidence report and conservative Review projection | blocked on Task 39 |
 | [41](task-41-implementation-brief.md) | First-use disclosure and typed availability | blocked on Task 40 |
 | [42](task-42-implementation-brief.md) | App workflow and recovery state | blocked on Task 41 |

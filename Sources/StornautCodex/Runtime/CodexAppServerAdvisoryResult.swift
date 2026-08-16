@@ -27,8 +27,8 @@ struct CodexAppServerAdvisoryResultDecoder: Sendable {
     }
 }
 
-enum InvestigationEnvelopeV2Schema {
-    static func loadJSONValue(
+package enum InvestigationEnvelopeV2Schema {
+    package static func loadJSONValue(
         bundle: Bundle = .module
     ) throws -> JSONValue {
         guard
@@ -48,7 +48,7 @@ enum InvestigationEnvelopeV2Schema {
         return value
     }
 
-    static func loadStructuredOutputJSONValue(
+    package static func loadStructuredOutputJSONValue(
         bundle: Bundle = .module
     ) throws -> JSONValue {
         try structuredOutputProjection(

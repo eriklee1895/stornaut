@@ -157,8 +157,13 @@
 > full diagnostic bundle Mach-O 负控制与六 target Xcode allowlist 均通过，
 > 唯一一次 clean full 23/23 stages 单次通过（timed 1,046.300 秒），无
 > restart 或 stage rerun。E2b-ii complete；
-> 原 signed composition diff 保持 stash。39B2c 才能作
-> readiness claim。
+> 恢复后的 39B2b-ii signed diagnostic composition 已绑定 opaque Task 38
+> facade、delayed auth projection、helper-reported random workspace、exact
+> diagnostic Store 与 dedicated App/helper topology；focused Codex/
+> Investigation/App tests、strict final-Mach-O gate 与 independent post-fix
+> review 已通过；该 checkpoint 唯一一次 authoritative full verifier 以
+> 23/23 stages、898-test serialized regression、981 秒 wall time 单次通过，
+> 无 restart 或 stage retry。39B2b-ii 已完成；39B2c 才能作 readiness claim。
 > 生产 Deep Dive 仍 unavailable。
 > Task 5 的历史
 > Broker-only no-go 已由 ADR 0004 capability-first 决策修订，Deep Dive 因
@@ -441,7 +446,12 @@ authoritative full verifier 23/23 stages 单次 exit 0。39B2b-i
 implementation/focused review evidence 见
 [Task 39B2b-i Review](../reports/phase-d-task-39b2b-i-review.md)；
 889-test serialized regression 与 authoritative full verifier 23/23 stages
-单次 exit 0（933.21 秒）已通过。
+单次 exit 0（933.21 秒）已通过。39B2b-ii authority-extraction prerequisites
+与 resumed signed composition evidence 见
+[Task 39B2b-ii Review](../reports/phase-d-task-39b2b-ii-review.md)；focused
+acceptance、independent post-fix review 与唯一一次 authoritative full
+23/23 stages 已通过；该 run 包含 898-test serialized regression，wall time
+981 秒，无 restart 或 stage retry。39B2b-ii 已完成。
 生产 Deep Dive 继续 unavailable，直到 Task 44 final admission。
 
 跨 Epic 的阶段依赖、no-go 分支和交付顺序由 [Delivery Roadmap](../plans/roadmap.md) 管理；新 active plan 不得另起一套宏观路线。
@@ -579,7 +589,10 @@ ordinary/diagnostic App builds 与 898-test serial regression 均通过；
 E2b-ii strict final-Mach-O verifier/review 已完成，built authority 正控制、
 full-bundle Mach-O 负控制与 exact Xcode allowlist 均通过，唯一一次 clean
 full 23/23 stages 单次通过（1,046.300 秒）。E2b-ii complete；原 signed
-composition diff 保持 stash。39B2c 才是 machine
+composition 已恢复并完成 implementation、focused tests、strict binary
+gate 与 independent post-fix review；该 checkpoint 唯一一次 authoritative
+full 以 23/23 stages、898-test serialized regression、981 秒 wall time
+单次通过，无 restart 或 stage retry。39B2b-ii 已完成；39B2c 才是 machine
 admission。该最终 gate
 要求证明完整调查能力和公共联网可用时，
 Codex 全进程树不可写用户数据、不可
