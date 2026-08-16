@@ -211,6 +211,28 @@ package struct InvestigationRuntimeStartRequestV1:
     }
 }
 
+package struct InvestigationRuntimeRootPreparationRequestV1:
+    Sendable,
+    Equatable
+{
+    package let investigationID: InvestigationID
+    package let runID: InvestigationRunID
+    package let receiptID: DomainToken
+    package let schema: InvestigationCollaborationSchemaV1
+
+    package init(
+        investigationID: InvestigationID,
+        runID: InvestigationRunID,
+        receiptID: DomainToken,
+        schema: InvestigationCollaborationSchemaV1
+    ) {
+        self.investigationID = investigationID
+        self.runID = runID
+        self.receiptID = receiptID
+        self.schema = schema
+    }
+}
+
 package struct InvestigationRuntimeTurnStartRequestV1:
     Sendable,
     Equatable
@@ -256,27 +278,31 @@ package struct InvestigationRuntimeTurnIdentityV1:
 }
 
 package protocol InvestigationRuntimeOwning: Sendable {
+    func prepareRoot(
+        _ request: InvestigationRuntimeRootPreparationRequestV1
+    ) async throws
+
     func start(
         _ request: InvestigationRuntimeStartRequestV1
     ) throws -> InvestigationRuntimeRootV1
 
     func startTurn(
         _ request: InvestigationRuntimeTurnStartRequestV1
-    ) throws -> InvestigationRuntimeTurnIdentityV1
+    ) async throws -> InvestigationRuntimeTurnIdentityV1
 
     func readThreadMetadata(
         threadID: DomainToken,
         rootSessionID: DomainToken
-    ) throws -> InvestigationRuntimeThreadMetadataV1
+    ) async throws -> InvestigationRuntimeThreadMetadataV1
 
     func interrupt(
         _ turn: InvestigationRuntimeTurnIdentityV1
-    ) throws
+    ) async throws
 
     func retireArtifacts(
         investigationID: InvestigationID,
         runID: InvestigationRunID
-    ) throws
+    ) async throws
 }
 
 package struct InvestigationLifecycleDrainResultV1:

@@ -567,6 +567,9 @@ final class FakeInvestigationRuntime:
     var threadMetadata:
         [DomainToken: InvestigationRuntimeThreadMetadataV1] = [:]
     var onTurnStart: ((InvestigationRuntimeTurnStartRequestV1) -> Void)?
+    var turnStartGate: InvestigationProbeExecutionGate?
+    private(set) var rootPreparationRequests:
+        [InvestigationRuntimeRootPreparationRequestV1] = []
     private(set) var startRequests: [InvestigationRuntimeStartRequestV1] = []
     private(set) var turnStartRequests:
         [InvestigationRuntimeTurnStartRequestV1] = []
@@ -578,23 +581,32 @@ final class FakeInvestigationRuntime:
         self.root = root
     }
 
-    func start(
-        _ request: InvestigationRuntimeStartRequestV1
-    ) throws -> InvestigationRuntimeRootV1 {
+    func prepareRoot(
+        _ request: InvestigationRuntimeRootPreparationRequestV1
+    ) async throws {
         try lock.withLock {
-            startRequests.append(request)
-            operationLog.append("runtime.start")
+            rootPreparationRequests.append(request)
+            operationLog.append("runtime.root.prepare")
             if let startError {
                 throw startError
             }
+        }
+    }
+
+    func start(
+        _ request: InvestigationRuntimeStartRequestV1
+    ) throws -> InvestigationRuntimeRootV1 {
+        lock.withLock {
+            startRequests.append(request)
+            operationLog.append("runtime.start")
             return root
         }
     }
 
     func startTurn(
         _ request: InvestigationRuntimeTurnStartRequestV1
-    ) throws -> InvestigationRuntimeTurnIdentityV1 {
-        try lock.withLock {
+    ) async throws -> InvestigationRuntimeTurnIdentityV1 {
+        let result = try lock.withLock {
             turnStartRequests.append(request)
             operationLog.append("runtime.turn.start")
             onTurnStart?(request)
@@ -613,12 +625,16 @@ final class FakeInvestigationRuntime:
                     : returnedTurnIDs.removeFirst()
             )
         }
+        if let turnStartGate {
+            await turnStartGate.arriveAndWait()
+        }
+        return result
     }
 
     func readThreadMetadata(
         threadID: DomainToken,
         rootSessionID: DomainToken
-    ) throws -> InvestigationRuntimeThreadMetadataV1 {
+    ) async throws -> InvestigationRuntimeThreadMetadataV1 {
         try lock.withLock {
             guard let metadata = threadMetadata[threadID],
                   metadata.sessionID == rootSessionID
@@ -631,7 +647,7 @@ final class FakeInvestigationRuntime:
 
     func interrupt(
         _ turn: InvestigationRuntimeTurnIdentityV1
-    ) throws {
+    ) async throws {
         try lock.withLock {
             interrupts.append(turn)
             if !interruptErrors.isEmpty {
@@ -643,7 +659,7 @@ final class FakeInvestigationRuntime:
     func retireArtifacts(
         investigationID: InvestigationID,
         runID: InvestigationRunID
-    ) throws {
+    ) async throws {
         try lock.withLock {
             if let drainError {
                 throw drainError
@@ -846,6 +862,30 @@ struct InvestigationEventFixture {
             receipt: receipt,
             limits: .forPreset(.focused)
         )
+    }
+
+    func reserveAndBindTurn(
+        on normalizer: inout InvestigationEventNormalizer,
+        threadID: DomainToken,
+        turnID: DomainToken,
+        contextByteCount: UInt64 = 128
+    ) throws -> InvestigationHardBudgetUsage {
+        let usage = try normalizer.reserveTurnStart(
+            threadID: threadID,
+            turnID: turnID,
+            contextByteCount: contextByteCount
+        )
+        try normalizer.bindReservedTurn(
+            reservationThreadID: threadID,
+            reservationTurnID: turnID,
+            runtimeIdentity: InvestigationRuntimeTurnIdentityV1(
+                investigationID: identity.investigationID,
+                runID: identity.runID,
+                threadID: threadID,
+                turnID: turnID
+            )
+        )
+        return usage
     }
 
     func payload(_ value: String) -> Data {

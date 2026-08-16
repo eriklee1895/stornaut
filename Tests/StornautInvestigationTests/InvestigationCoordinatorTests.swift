@@ -46,7 +46,8 @@ struct InvestigationCoordinatorTests {
         await #expect(throws: InvestigationCoordinatorError.admissionConsumed) {
             _ = try await coordinator.start(admission)
         }
-        #expect(fixture.runtime.startRequests.count == 1)
+        #expect(fixture.runtime.rootPreparationRequests.count == 1)
+        #expect(fixture.runtime.startRequests.isEmpty)
     }
 
     @Test
@@ -157,6 +158,7 @@ struct InvestigationCoordinatorTests {
         #expect(fixture.runtime.turnStartRequests.count == 1)
         #expect(
             fixture.runtime.operationLog == [
+                "runtime.root.prepare",
                 "runtime.start",
                 "runtime.turn.start",
             ]
@@ -337,6 +339,127 @@ struct InvestigationCoordinatorTests {
             )
         }
         #expect(fixture.runtime.turnStartRequests.isEmpty)
+    }
+
+    @Test
+    func closingDuringAsynchronousTurnStartInterruptsServerTurn()
+        async throws
+    {
+        let fixture = try InvestigationCoordinatorFixture()
+        let coordinator = fixture.coordinator()
+        _ = try await coordinator.start(fixture.admission())
+        try await coordinator.acceptRootStartedNotification(
+            investigationID: fixture.session.id,
+            runID: fixture.session.runID,
+            root: fixture.root,
+            payload: fixture.payload("root-started")
+        )
+        let gate = InvestigationProbeExecutionGate()
+        fixture.runtime.turnStartGate = gate
+        let task = Task {
+            try await coordinator.startTurn(
+                investigationID: fixture.session.id,
+                runID: fixture.session.runID,
+                threadID: fixture.root.id,
+                turnID: fixture.rootTurnID,
+                contextBytes: fixture.initialContextBytes
+            )
+        }
+
+        await gate.waitUntilStarted()
+        _ = try await coordinator.requestStop(
+            investigationID: fixture.session.id,
+            runID: fixture.session.runID
+        )
+        await gate.release()
+
+        await #expect(
+            throws: InvestigationCoordinatorError.scientificAdmissionClosed
+        ) {
+            _ = try await task.value
+        }
+        #expect(
+            fixture.runtime.interrupts.map(\.turnID)
+                == [fixture.rootTurnID]
+        )
+    }
+
+    @Test
+    func pendingTurnReservationPreventsPrematureSettlement()
+        async throws
+    {
+        let fixture = try InvestigationCoordinatorFixture()
+        let coordinator = fixture.coordinator()
+        _ = try await coordinator.start(fixture.admission())
+        try await coordinator.acceptRootStartedNotification(
+            investigationID: fixture.session.id,
+            runID: fixture.session.runID,
+            root: fixture.root,
+            payload: fixture.payload("root-started")
+        )
+        _ = try await coordinator.startTurn(
+            investigationID: fixture.session.id,
+            runID: fixture.session.runID,
+            threadID: fixture.root.id,
+            turnID: fixture.rootTurnID,
+            contextBytes: fixture.initialContextBytes
+        )
+        try await coordinator.acceptTurnStarted(
+            investigationID: fixture.session.id,
+            runID: fixture.session.runID,
+            threadID: fixture.root.id,
+            turnID: fixture.rootTurnID,
+            payload: fixture.payload("first-root-turn")
+        )
+        try await coordinator.acceptTurnTerminal(
+            investigationID: fixture.session.id,
+            runID: fixture.session.runID,
+            threadID: fixture.root.id,
+            turnID: fixture.rootTurnID,
+            payload: fixture.payload("first-root-terminal")
+        )
+        let serverTurnID = DomainToken(
+            rawValue: "turn-task39-late-server"
+        )!
+        fixture.runtime.returnedTurnIDs = [serverTurnID]
+        let gate = InvestigationProbeExecutionGate()
+        fixture.runtime.turnStartGate = gate
+        let task = Task {
+            try await coordinator.startTurn(
+                investigationID: fixture.session.id,
+                runID: fixture.session.runID,
+                threadID: fixture.root.id,
+                turnID: fixture.secondRootTurnID,
+                contextBytes: fixture.initialContextBytes
+            )
+        }
+
+        await gate.waitUntilStarted()
+        _ = try await coordinator.requestStop(
+            investigationID: fixture.session.id,
+            runID: fixture.session.runID
+        )
+        await #expect(
+            throws: InvestigationCoordinatorError.terminalNotReady
+        ) {
+            _ = try await coordinator.settle(
+                investigationID: fixture.session.id,
+                runID: fixture.session.runID
+            )
+        }
+        #expect(fixture.lifecycle.drainedRuns.isEmpty)
+        #expect(fixture.runtime.retiredRuns.isEmpty)
+        #expect(fixture.store.terminalCommands.isEmpty)
+
+        await gate.release()
+        await #expect(
+            throws: InvestigationCoordinatorError.scientificAdmissionClosed
+        ) {
+            _ = try await task.value
+        }
+        #expect(
+            fixture.runtime.interrupts.map(\.turnID) == [serverTurnID]
+        )
     }
 
     @Test

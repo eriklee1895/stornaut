@@ -13,10 +13,10 @@ struct InvestigationEventNormalizerTests {
         var normalizer = fixture.normalizer()
 
         try fixture.acceptRoot(on: &normalizer)
-        _ = try normalizer.reserveTurnStart(
+        _ = try fixture.reserveAndBindTurn(
+            on: &normalizer,
             threadID: fixture.root.id,
-            turnID: fixture.rootTurnID,
-            contextByteCount: 128
+            turnID: fixture.rootTurnID
         )
         try normalizer.acceptTurnStarted(
             threadID: fixture.root.id,
@@ -45,10 +45,10 @@ struct InvestigationEventNormalizerTests {
                 sessionID: fixture.root.id
             )
         )
-        _ = try normalizer.reserveTurnStart(
+        _ = try fixture.reserveAndBindTurn(
+            on: &normalizer,
             threadID: fixture.childID,
-            turnID: fixture.childTurnID,
-            contextByteCount: 128
+            turnID: fixture.childTurnID
         )
         try normalizer.acceptTurnStarted(
             threadID: fixture.childID,
@@ -80,10 +80,10 @@ struct InvestigationEventNormalizerTests {
         )
         var normalizer = fixture.normalizer()
         try fixture.acceptRoot(on: &normalizer)
-        _ = try normalizer.reserveTurnStart(
+        _ = try fixture.reserveAndBindTurn(
+            on: &normalizer,
             threadID: fixture.root.id,
-            turnID: fixture.rootTurnID,
-            contextByteCount: 128
+            turnID: fixture.rootTurnID
         )
         try normalizer.acceptTurnStarted(
             threadID: fixture.root.id,
@@ -131,10 +131,10 @@ struct InvestigationEventNormalizerTests {
         )
         var normalizer = fixture.normalizer()
         try fixture.acceptRoot(on: &normalizer)
-        _ = try normalizer.reserveTurnStart(
+        _ = try fixture.reserveAndBindTurn(
+            on: &normalizer,
             threadID: fixture.root.id,
-            turnID: fixture.rootTurnID,
-            contextByteCount: 128
+            turnID: fixture.rootTurnID
         )
         try normalizer.acceptTurnStarted(
             threadID: fixture.root.id,
@@ -197,10 +197,10 @@ struct InvestigationEventNormalizerTests {
         )
         var normalizer = fixture.normalizer()
         try fixture.acceptRoot(on: &normalizer)
-        _ = try normalizer.reserveTurnStart(
+        _ = try fixture.reserveAndBindTurn(
+            on: &normalizer,
             threadID: fixture.root.id,
-            turnID: fixture.rootTurnID,
-            contextByteCount: 128
+            turnID: fixture.rootTurnID
         )
         try normalizer.acceptTurnStarted(
             threadID: fixture.root.id,
@@ -285,10 +285,10 @@ struct InvestigationEventNormalizerTests {
         )
         var normalizer = fixture.normalizer()
         try fixture.acceptRoot(on: &normalizer)
-        _ = try normalizer.reserveTurnStart(
+        _ = try fixture.reserveAndBindTurn(
+            on: &normalizer,
             threadID: fixture.root.id,
-            turnID: fixture.rootTurnID,
-            contextByteCount: 128
+            turnID: fixture.rootTurnID
         )
         try normalizer.acceptTurnStarted(
             threadID: fixture.root.id,
@@ -337,10 +337,10 @@ struct InvestigationEventNormalizerTests {
         )
         var normalizer = fixture.normalizer()
         try fixture.acceptRoot(on: &normalizer)
-        _ = try normalizer.reserveTurnStart(
+        _ = try fixture.reserveAndBindTurn(
+            on: &normalizer,
             threadID: fixture.root.id,
-            turnID: fixture.rootTurnID,
-            contextByteCount: 128
+            turnID: fixture.rootTurnID
         )
         try normalizer.acceptTurnStarted(
             threadID: fixture.root.id,
@@ -377,10 +377,10 @@ struct InvestigationEventNormalizerTests {
         )
         var normalizer = fixture.normalizer()
         try fixture.acceptRoot(on: &normalizer)
-        _ = try normalizer.reserveTurnStart(
+        _ = try fixture.reserveAndBindTurn(
+            on: &normalizer,
             threadID: fixture.root.id,
-            turnID: fixture.rootTurnID,
-            contextByteCount: 128
+            turnID: fixture.rootTurnID
         )
         try normalizer.acceptTurnStarted(
             threadID: fixture.root.id,
@@ -425,10 +425,10 @@ struct InvestigationEventNormalizerTests {
         )
         var pending = fixture.normalizer()
         try fixture.acceptRoot(on: &pending)
-        _ = try pending.reserveTurnStart(
+        _ = try fixture.reserveAndBindTurn(
+            on: &pending,
             threadID: fixture.root.id,
-            turnID: fixture.rootTurnID,
-            contextByteCount: 128
+            turnID: fixture.rootTurnID
         )
         try pending.acceptTurnStarted(
             threadID: fixture.root.id,
@@ -449,10 +449,10 @@ struct InvestigationEventNormalizerTests {
 
         var live = fixture.normalizer()
         try fixture.acceptRoot(on: &live)
-        _ = try live.reserveTurnStart(
+        _ = try fixture.reserveAndBindTurn(
+            on: &live,
             threadID: fixture.root.id,
-            turnID: fixture.rootTurnID,
-            contextByteCount: 128
+            turnID: fixture.rootTurnID
         )
         try live.acceptTurnStarted(
             threadID: fixture.root.id,
@@ -463,10 +463,10 @@ struct InvestigationEventNormalizerTests {
             fixture.spawnEvent(payload: "spawn-live-child")
         )
         try live.verifyChild(fixture.childMetadata)
-        _ = try live.reserveTurnStart(
+        _ = try fixture.reserveAndBindTurn(
+            on: &live,
             threadID: fixture.childID,
-            turnID: fixture.childTurnID,
-            contextByteCount: 128
+            turnID: fixture.childTurnID
         )
         try live.acceptTurnStarted(
             threadID: fixture.childID,
@@ -484,6 +484,43 @@ struct InvestigationEventNormalizerTests {
     }
 
     @Test
+    func pendingTurnReservationPreventsTreeFinalization() throws {
+        let fixture = try InvestigationEventFixture(
+            schema: .collabToolCallV1
+        )
+        let pendingTurnID = DomainToken(
+            rawValue: "turn-root-pending"
+        )!
+        var normalizer = fixture.normalizer()
+        try fixture.acceptRoot(on: &normalizer)
+        _ = try fixture.reserveAndBindTurn(
+            on: &normalizer,
+            threadID: fixture.root.id,
+            turnID: fixture.rootTurnID
+        )
+        try normalizer.acceptTurnStarted(
+            threadID: fixture.root.id,
+            turnID: fixture.rootTurnID,
+            payload: fixture.payload("first-root-turn")
+        )
+        try normalizer.acceptTurnTerminal(
+            threadID: fixture.root.id,
+            turnID: fixture.rootTurnID,
+            payload: fixture.payload("first-root-terminal")
+        )
+        _ = try normalizer.reserveTurnStart(
+            threadID: fixture.root.id,
+            turnID: pendingTurnID,
+            contextByteCount: 128
+        )
+
+        #expect(!normalizer.treeReadyForFinalization)
+        #expect(throws: InvestigationEventError.liveDescendant) {
+            _ = try normalizer.finalizeTree()
+        }
+    }
+
+    @Test
     func terminalTreeClassifiesMissingUsageWithoutEstimatingTokens()
         throws
     {
@@ -492,10 +529,10 @@ struct InvestigationEventNormalizerTests {
         )
         var normalizer = fixture.normalizer()
         try fixture.acceptRoot(on: &normalizer)
-        _ = try normalizer.reserveTurnStart(
+        _ = try fixture.reserveAndBindTurn(
+            on: &normalizer,
             threadID: fixture.root.id,
-            turnID: fixture.rootTurnID,
-            contextByteCount: 128
+            turnID: fixture.rootTurnID
         )
         try normalizer.acceptTurnStarted(
             threadID: fixture.root.id,
@@ -523,10 +560,10 @@ struct InvestigationEventNormalizerTests {
         )
         var normalizer = fixture.normalizer()
         try fixture.acceptRoot(on: &normalizer)
-        _ = try normalizer.reserveTurnStart(
+        _ = try fixture.reserveAndBindTurn(
+            on: &normalizer,
             threadID: fixture.root.id,
-            turnID: fixture.rootTurnID,
-            contextByteCount: 128
+            turnID: fixture.rootTurnID
         )
         try normalizer.acceptTurnStarted(
             threadID: fixture.root.id,
@@ -559,10 +596,10 @@ struct InvestigationEventNormalizerTests {
         )
         var normalizer = fixture.normalizer()
         try fixture.acceptRoot(on: &normalizer)
-        _ = try normalizer.reserveTurnStart(
+        _ = try fixture.reserveAndBindTurn(
+            on: &normalizer,
             threadID: fixture.root.id,
-            turnID: fixture.rootTurnID,
-            contextByteCount: 128
+            turnID: fixture.rootTurnID
         )
         try normalizer.acceptTurnStarted(
             threadID: fixture.root.id,
@@ -585,10 +622,10 @@ struct InvestigationEventNormalizerTests {
             payload: fixture.payload("root-terminal")
         )
 
-        _ = try normalizer.reserveTurnStart(
+        _ = try fixture.reserveAndBindTurn(
+            on: &normalizer,
             threadID: fixture.childID,
-            turnID: fixture.childTurnID,
-            contextByteCount: 128
+            turnID: fixture.childTurnID
         )
         try normalizer.acceptTurnStarted(
             threadID: fixture.childID,
@@ -607,25 +644,28 @@ struct InvestigationEventNormalizerTests {
         )
         #expect(normalizer.terminalEnvelopeData == earlyRootMessage)
 
-        _ = try normalizer.reserveTurnStart(
+        let finalRootTurnID = DomainToken(
+            rawValue: "turn-root-final"
+        )!
+        _ = try fixture.reserveAndBindTurn(
+            on: &normalizer,
             threadID: fixture.root.id,
-            turnID: DomainToken(rawValue: "turn-root-final")!,
-            contextByteCount: 128
+            turnID: finalRootTurnID
         )
         try normalizer.acceptTurnStarted(
             threadID: fixture.root.id,
-            turnID: DomainToken(rawValue: "turn-root-final")!,
+            turnID: finalRootTurnID,
             payload: fixture.payload("root-final-turn")
         )
         let finalEnvelope = fixture.payload("strict-final-envelope")
         try normalizer.retainFinalEnvelope(
             threadID: fixture.root.id,
-            turnID: DomainToken(rawValue: "turn-root-final")!,
+            turnID: finalRootTurnID,
             data: finalEnvelope
         )
         try normalizer.acceptTurnTerminal(
             threadID: fixture.root.id,
-            turnID: DomainToken(rawValue: "turn-root-final")!,
+            turnID: finalRootTurnID,
             payload: fixture.payload("root-final-terminal")
         )
 
@@ -639,10 +679,10 @@ struct InvestigationEventNormalizerTests {
         )
         var normalizer = fixture.normalizer()
         try fixture.acceptRoot(on: &normalizer)
-        _ = try normalizer.reserveTurnStart(
+        _ = try fixture.reserveAndBindTurn(
+            on: &normalizer,
             threadID: fixture.root.id,
-            turnID: fixture.rootTurnID,
-            contextByteCount: 128
+            turnID: fixture.rootTurnID
         )
         try normalizer.acceptTurnStarted(
             threadID: fixture.root.id,

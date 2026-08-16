@@ -262,11 +262,13 @@ package struct InvestigationEventNormalizer: Sendable {
         }
         try requireVerifiedThread(threadID)
         let key = TurnKey(threadID: threadID, turnID: turnID)
-        guard !reservedTurns.contains(key),
+        guard !reservedTurns.contains(where: {
+                  $0.threadID == threadID
+              }),
               !failedTurnStarts.contains(key),
               turnReplays[key] == nil,
               !activeTurns.contains(where: {
-                $0.threadID == threadID && $0.turnID != turnID
+                $0.threadID == threadID
               })
         else {
             throw InvestigationEventError.turnIdentityMismatch
@@ -276,7 +278,6 @@ package struct InvestigationEventNormalizer: Sendable {
             coordinatorOrdinal: consumeOrdinal()
         )
         reservedTurns.insert(key)
-        activeTurns.insert(key)
         if threadID == identity.rootSessionID {
             retainedEnvelope = nil
         }
@@ -290,10 +291,11 @@ package struct InvestigationEventNormalizer: Sendable {
         let key = TurnKey(threadID: threadID, turnID: turnID)
         guard reservedTurns.contains(key),
               turnReplays[key] == nil,
-              activeTurns.remove(key) != nil
+              !activeTurns.contains(key)
         else {
             throw InvestigationEventError.turnIdentityMismatch
         }
+        reservedTurns.remove(key)
         failedTurnStarts.insert(key)
     }
 
@@ -315,7 +317,7 @@ package struct InvestigationEventNormalizer: Sendable {
               runtimeIdentity.runID == identity.runID,
               runtimeIdentity.threadID == reservationThreadID,
               reservedTurns.contains(reservedKey),
-              activeTurns.contains(reservedKey),
+              !activeTurns.contains(reservedKey),
               !failedTurnStarts.contains(runtimeKey),
               turnReplays[runtimeKey] == nil,
               runtimeKey == reservedKey
@@ -326,12 +328,7 @@ package struct InvestigationEventNormalizer: Sendable {
         else {
             throw InvestigationEventError.turnIdentityMismatch
         }
-        guard runtimeKey != reservedKey else {
-            return
-        }
         reservedTurns.remove(reservedKey)
-        activeTurns.remove(reservedKey)
-        reservedTurns.insert(runtimeKey)
         activeTurns.insert(runtimeKey)
     }
 
@@ -645,7 +642,8 @@ package struct InvestigationEventNormalizer: Sendable {
         let threadsWithTerminalTurns = Set(
             terminalTurns.map(\.threadID)
         )
-        guard activeTurns.isEmpty,
+        guard reservedTurns.isEmpty,
+              activeTurns.isEmpty,
               verifiedThreads.isSubset(of: threadsWithTerminalTurns)
         else {
             throw InvestigationEventError.liveDescendant
@@ -712,6 +710,7 @@ package struct InvestigationEventNormalizer: Sendable {
 
     package var treeReadyForFinalization: Bool {
         pendingChildren.isEmpty
+            && reservedTurns.isEmpty
             && activeTurns.isEmpty
             && verifiedThreads.isSubset(
                 of: Set(terminalTurns.map(\.threadID))

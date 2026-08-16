@@ -8,6 +8,7 @@ cd "$repo_root"
 investigation_root=Sources/StornautCore/Investigation
 evidence_root=Sources/StornautCore/Evidence
 coordinator_root=Sources/StornautInvestigation
+runtime_root=Sources/StornautInvestigationRuntime
 required_files=(
     "$investigation_root/InvestigationCanonical.swift"
     "$investigation_root/InvestigationBudget.swift"
@@ -31,6 +32,7 @@ required_files=(
     "$coordinator_root/InvestigationRuntimeDiagnosticFacade.swift"
     "$coordinator_root/SignedInvestigationRuntimeContract.swift"
     "$coordinator_root/Resources/investigation-prompt-v1.txt"
+    "$runtime_root/InvestigationCodexSessionAdapter.swift"
 )
 
 for file in "${required_files[@]}"; do
@@ -79,32 +81,36 @@ fi
 if rg -n \
     '\b(ActionExecutor|ActionPolicyGate|CleanupExecutionRuntime|ExecutionAuthorization|FileManagerTrashAdapter|MoveToTrash|ProposedCleanupAction|RegisteredAction[A-Za-z]*|TrashMoving)\b' \
     "$coordinator_root" \
+    "$runtime_root" \
     --glob '*.swift'; then
-    print -u2 "Investigation coordinator references cleanup authority."
+    print -u2 "Investigation runtime composition references cleanup authority."
     exit 1
 fi
 
 if rg -n \
     '\bProcess\s*\(|NSTask|posix_spawn|/bin/(ba)?sh|/usr/bin/env[[:space:]]+(ba)?sh|system\s*\(' \
     "$coordinator_root" \
+    "$runtime_root" \
     --glob '*.swift'; then
-    print -u2 "Investigation coordinator contains an arbitrary process surface."
+    print -u2 "Investigation runtime composition contains an arbitrary process surface."
     exit 1
 fi
 
 if rg -n \
     'removeItem|moveItem|copyItem|createFile|forWritingTo|O_WRONLY|O_RDWR|unlink\(|rename\(|FileManager\.default' \
     "$coordinator_root" \
+    "$runtime_root" \
     --glob '*.swift'; then
-    print -u2 "Investigation coordinator contains a filesystem mutation surface."
+    print -u2 "Investigation runtime composition contains a filesystem mutation surface."
     exit 1
 fi
 
 if rg -n \
     'URLSession|dataTask|downloadTask|uploadTask|WebSocket|NWConnection|CFStream' \
     "$coordinator_root" \
+    "$runtime_root" \
     --glob '*.swift'; then
-    print -u2 "Investigation coordinator contains a direct network surface."
+    print -u2 "Investigation runtime composition contains a direct network surface."
     exit 1
 fi
 
@@ -249,6 +255,31 @@ if resource_paths != {"investigation-prompt-v1.txt"}:
     raise SystemExit(
         "StornautInvestigation resources drifted: "
         f"{sorted(resource_paths)}"
+    )
+
+runtime_composition = targets.get("StornautInvestigationRuntime")
+if runtime_composition is None:
+    raise SystemExit("missing StornautInvestigationRuntime package target")
+actual_runtime_dependencies = set(
+    runtime_composition.get("target_dependencies", [])
+)
+expected_runtime_dependencies = {
+    "StornautCodex",
+    "StornautCore",
+    "StornautInvestigation",
+}
+if actual_runtime_dependencies != expected_runtime_dependencies:
+    raise SystemExit(
+        "StornautInvestigationRuntime dependencies "
+        f"{sorted(actual_runtime_dependencies)} != "
+        f"{sorted(expected_runtime_dependencies)}"
+    )
+if any(
+    product.get("name") == "StornautInvestigationRuntime"
+    for product in package.get("products", [])
+):
+    raise SystemExit(
+        "StornautInvestigationRuntime became a public package product"
     )
 
 coordinator_source = Path(sys.argv[2]).read_text(encoding="utf-8")

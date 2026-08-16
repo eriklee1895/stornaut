@@ -1,11 +1,13 @@
 # Task 39 Implementation Brief — Signed-App Production Runtime Admission
 
-> **Status:** In progress; 39A contract/composition foundation and 39B1a exact
-> Store/async-lifecycle prerequisite closure are complete and independently
-> verified. 39B1b transport/App leaf is next; 39B2 signed-App machine admission
-> remains pending. Evidence:
+> **Status:** In progress; 39A contract/facade foundation, 39B1a exact
+> Store/async-lifecycle prerequisite closure and 39B1b-i package-closed
+> transport/composition are complete and independently verified. 39B1b-ii
+> strict DEBUG App leaf is next; 39B2 signed-App machine admission remains
+> pending. Evidence:
 > [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
-> [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md).
+> [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md) and
+> [Task 39B1b-i Review](../../reports/phase-d-task-39b1b-i-review.md).
 >
 > **Parent plan:**
 > [Phase D Conditional Deep Dive](phase-d-conditional-deep-dive.md)
@@ -103,17 +105,21 @@ before implementation:
    - **39B1a prerequisite closure** — exact Evidence v4 Store-path binding and
      a directly async lifecycle drain protocol with no semaphore/blocking XPC
      bridge;
-   - **39B1b transport/App leaf** — package-closed transport, composition
-     target, strict DEBUG activation and structural Release boundaries.
+   - **39B1b-i transport/composition** — package-closed transport, dedicated
+     non-product composition target, server-owned identity mapping and
+     structural no-Executor boundaries;
+   - **39B1b-ii DEBUG App leaf** — strict DEBUG activation, App composition
+     tests and structural Release boundaries.
 2. **39B2 machine admission** — current-source signed App/helper invocation,
    bounded real model run, three-plane machine report, failure matrix,
    teardown and zero-residue proof.
 
-Task 39 completes only after 39B2. Checkpoints 39A, 39B1a, 39B1b and 39B2 each
-receive focused tests, boundary checks, serialized SwiftPM, independent
-review, one uninterrupted authoritative full verifier and an independent
-commit/push. The additional verifier cost keeps every pushed checkpoint
-authoritative rather than recreating the oversized Task 36–38 review surfaces.
+Task 39 completes only after 39B2. Checkpoints 39A, 39B1a, 39B1b-i, 39B1b-ii
+and 39B2 each receive focused tests, boundary checks, serialized SwiftPM,
+independent review, one uninterrupted authoritative full verifier and an
+independent commit/push. The additional verifier cost keeps every pushed
+checkpoint authoritative rather than recreating the oversized Task 36–38
+review surfaces.
 
 Before either checkpoint expands beyond 14 non-document source/test/script
 files or approximately 4,000 added non-document lines, stop and split again
@@ -127,11 +133,28 @@ second preflight found that the Store-path correction and async lifecycle
 composition would push that set beyond the 14-path absolute maximum, so 39B1a
 was split before transport implementation. The completed 39B1a diff changed
 eight non-document source/test/script paths and added 246 non-document lines;
-it remained well below the hard split gate. 39B1b remains limited to 10–12
-non-document paths and fewer than 3,500 added non-document lines. Real model
-execution, fixed-topology installation, machine-report assembly and
-failure-matrix diagnostics are prohibited in both 39B1 checkpoints and remain
-exclusively 39B2.
+it remained well below the hard split gate.
+
+Implementation then showed that combining the stateful transport/composition
+with its DEBUG App leaf would again create an avoidably broad review surface,
+so 39B1b was split before any App source changed:
+
+- **39B1b-i** owns only the package-closed App Server client, dedicated
+  non-product composition target, production session adapter, async identity
+  integration and structural boundaries;
+- **39B1b-ii** owns only the strict DEBUG App diagnostic activation,
+  App-level fake composition tests and Release activation boundaries.
+
+39B1b-i changed 13 non-document source/test/script paths, adding 2,760 lines
+and deleting 122. Its 92-test Investigation suite, 240-test Codex suite,
+846-test serialized SwiftPM regression, independent post-fix review and one
+uninterrupted 23-stage authoritative full verifier passed. See
+[Task 39B1b-i Review](../../reports/phase-d-task-39b1b-i-review.md).
+
+39B1b-ii must remain independently below the same 14-path/approximately
+4,000-added-line hard split gate. Real model execution, fixed-topology
+installation, machine-report assembly and failure-matrix diagnostics are
+prohibited in every 39B1 checkpoint and remain exclusively 39B2.
 
 39B1a bound the diagnostic configuration to the real Evidence Store v4 path,
 made lifecycle drain directly asynchronous, reloaded actor-owned run state
@@ -141,6 +164,18 @@ Its 83-test Investigation suite, 833-test serialized SwiftPM regression,
 independent post-fix review and uninterrupted 23/23-stage authoritative full
 verifier passed. See
 [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md).
+
+39B1b-i added the package-scoped stateful JSON-RPC App Server client and a
+dedicated `StornautInvestigationRuntime` target that is not a public package
+product. It preopens the ephemeral root asynchronously, claims that root
+exactly once inside Store admission, injects canonical prompt/context only on
+the first admitted turn, maps only server-owned thread/turn identities,
+supports bounded metadata/interrupt/retirement operations and fails closed on
+transport loss. Pending turn reservation is distinct from an active turn so
+an async response cannot cause premature settlement. The target graph and
+source verifier reject cleanup/Executor authority, direct process spawning,
+filesystem mutation and direct networking. No App source, real model, fixed
+topology or machine report changed.
 
 ## 3. Composition Boundary
 

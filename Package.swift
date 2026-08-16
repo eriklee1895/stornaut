@@ -92,6 +92,14 @@ let package = Package(
             ]
         ),
         .target(
+            name: "StornautInvestigationRuntime",
+            dependencies: [
+                "StornautCodex",
+                "StornautCore",
+                "StornautInvestigation",
+            ]
+        ),
+        .target(
             name: "CLifecycleSupport",
             path: "Sources/CLifecycleSupport",
             publicHeadersPath: "include",
@@ -153,6 +161,7 @@ let package = Package(
             name: "StornautInvestigationTests",
             dependencies: [
                 "StornautInvestigation",
+                "StornautInvestigationRuntime",
                 "StornautCore",
                 "StornautCodex",
             ]

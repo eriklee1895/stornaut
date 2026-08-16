@@ -245,6 +245,15 @@ public actor InvestigationCoordinator {
         let runStartBox = InvestigationNanosecondsBox()
 
         do {
+            startAttempt.markAttempted()
+            try await runtime.prepareRoot(
+                InvestigationRuntimeRootPreparationRequestV1(
+                    investigationID: admission.investigationID,
+                    runID: admission.runID,
+                    receiptID: receipt.id,
+                    schema: receipt.schema
+                )
+            )
             let admitted = try await store.admitRuntimeStart(
                 request
             ) { context in
@@ -275,7 +284,6 @@ public actor InvestigationCoordinator {
                 )
                 let prompt = try InvestigationPromptV1.load()
                 runStartBox.value = monotonicNow()
-                startAttempt.markAttempted()
                 let root = try runtime.start(
                     InvestigationRuntimeStartRequestV1(
                         investigationID: context.plan.id,
@@ -404,7 +412,7 @@ public actor InvestigationCoordinator {
             case let .itemCompleted(item):
                 let result = try run.normalizer.acceptItemCompleted(item)
                 for childID in result.admittedChildThreadIDs {
-                    let metadata = try runtime.readThreadMetadata(
+                    let metadata = try await runtime.readThreadMetadata(
                         threadID: childID,
                         rootSessionID: run.root.sessionID
                     )
@@ -501,7 +509,7 @@ public actor InvestigationCoordinator {
         activeRun = run
         let runtimeIdentity: InvestigationRuntimeTurnIdentityV1
         do {
-            runtimeIdentity = try runtime.startTurn(
+            runtimeIdentity = try await runtime.startTurn(
                 InvestigationRuntimeTurnStartRequestV1(
                     identity: InvestigationRuntimeTurnIdentityV1(
                         investigationID: investigationID,
@@ -526,18 +534,16 @@ public actor InvestigationCoordinator {
             activeRun = retained
             throw error
         }
+        var retained = try requireActiveRun(
+            investigationID: investigationID,
+            runID: runID
+        )
         do {
-            var retained = try requireActiveRun(
-                investigationID: investigationID,
-                runID: runID
-            )
             try retained.normalizer.bindReservedTurn(
                 reservationThreadID: threadID,
                 reservationTurnID: turnID,
                 runtimeIdentity: runtimeIdentity
             )
-            activeRun = retained
-            return runtimeIdentity
         } catch {
             var retained = try requireActiveRun(
                 investigationID: investigationID,
@@ -556,6 +562,15 @@ public actor InvestigationCoordinator {
             )
             throw error
         }
+        activeRun = retained
+        guard retained.state == .running,
+              retained.barrier == nil
+        else {
+            try await runtime.interrupt(runtimeIdentity)
+            throw InvestigationCoordinatorError
+                .scientificAdmissionClosed
+        }
+        return runtimeIdentity
     }
 
     package func executeProbe(
@@ -1037,7 +1052,7 @@ public actor InvestigationCoordinator {
             && run.normalizer.activeProbeLeaseCount == 0
         if run.lifecycleDrained {
             do {
-                try runtime.retireArtifacts(
+                try await runtime.retireArtifacts(
                     investigationID: investigationID,
                     runID: runID
                 )
@@ -1195,7 +1210,7 @@ public actor InvestigationCoordinator {
             var artifactsRetired = false
             if provedEmpty {
                 do {
-                    try runtime.retireArtifacts(
+                    try await runtime.retireArtifacts(
                         investigationID: candidate.investigationID,
                         runID: candidate.runID
                     )
@@ -1300,7 +1315,7 @@ public actor InvestigationCoordinator {
         var interruptError: Error?
         for turn in interrupts {
             do {
-                try runtime.interrupt(turn)
+                try await runtime.interrupt(turn)
             } catch {
                 if interruptError == nil {
                     interruptError = error
@@ -1760,7 +1775,7 @@ public actor InvestigationCoordinator {
             throw InvestigationCoordinatorError.runtimeCleanupUnconfirmed
         }
         do {
-            try runtime.retireArtifacts(
+            try await runtime.retireArtifacts(
                 investigationID: investigationID,
                 runID: runID
             )

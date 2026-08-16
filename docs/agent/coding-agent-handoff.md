@@ -111,9 +111,17 @@
 > lifecycle、actor reentrancy/deadline preservation 与 structural
 > no-blocking-bridge gate 已完成，83-test Investigation suite、833-test
 > serialized regression、independent post-fix review 与 authoritative
-> `scripts/verify --full` 23/23 stages 单次 exit 0（883.38 秒）。39B1b
-> package-closed transport/DEBUG App leaf 是下一 checkpoint；39B2 signed-App
-> machine admission 仍 pending，生产 Deep Dive 仍 unavailable。
+> `scripts/verify --full` 23/23 stages 单次 exit 0（883.38 秒）。39B1b 已继续
+> 拆为 39B1b-i transport/composition 与 39B1b-ii DEBUG App leaf。39B1b-i
+> package-scoped stateful App Server client、non-product
+> `StornautInvestigationRuntime` target、async root preopen/one-shot Store
+> claim、canonical first-turn injection、server-owned identity mapping、
+> pending reservation/active turn separation 与 transport fail-closed cleanup
+> 已完成。92-test Investigation、240-test Codex、846-test serialized
+> regression、independent post-fix review 与 authoritative
+> `scripts/verify --full` 23/23 stages 单次 exit 0（900 秒）。39B1b-ii strict
+> DEBUG App leaf 是下一 checkpoint；39B2 signed-App machine admission 仍
+> pending，生产 Deep Dive 仍 unavailable。
 > Task 5 的历史
 > Broker-only no-go 已由 ADR 0004 capability-first 决策修订，Deep Dive 因
 > 生产产品流程尚未实现而 unavailable；
@@ -382,8 +390,10 @@ Phase D 当前实现入口为
 的 39A contract/composition foundation 已完成，证据见
 [Task 39A Review](../reports/phase-d-task-39a-review.md)。39B1a prerequisite
 closure 也已完成，证据见
-[Task 39B1a Review](../reports/phase-d-task-39b1a-review.md)；39B1b/39B2 只按
-signed-App diagnostic
+[Task 39B1a Review](../reports/phase-d-task-39b1a-review.md)。39B1b-i
+transport/composition 也已完成，证据见
+[Task 39B1b-i Review](../reports/phase-d-task-39b1b-i-review.md)；39B1b-ii/
+39B2 只按 signed-App diagnostic
 [Implementation Brief](../plans/active/task-39-implementation-brief.md) 实施。
 生产 Deep Dive 继续 unavailable，直到 Task 44 final admission。
 
@@ -494,9 +504,10 @@ authoritative full verifier 23/23 stages 单次 exit 0。Task 39 的 39A
 strict contract、server-owned turn binding 与 package-closed diagnostic
 facade 已完成并通过 authoritative full verifier；39B1a exact Store binding、
 directly async lifecycle、actor reentrancy/deadline preservation 与
-no-blocking-bridge gate 也已完成并通过 authoritative full verifier。39B1b
-transport/DEBUG App leaf 是下一 checkpoint，39B2 signed-App machine admission
-仍 pending。该 gate 要求证明完整调查能力和公共联网可用时，
+no-blocking-bridge gate 也已完成并通过 authoritative full verifier。39B1b-i
+package-closed transport/non-product composition 也已完成并通过 authoritative
+full verifier。39B1b-ii strict DEBUG App leaf 是下一 checkpoint，39B2
+signed-App machine admission 仍 pending。该 gate 要求证明完整调查能力和公共联网可用时，
 Codex 全进程树不可写用户数据、不可
 访问 localhost/私网/任意 Unix socket 且无 Executor 路径；不得用
 `danger-full-access`、命令/公共域名

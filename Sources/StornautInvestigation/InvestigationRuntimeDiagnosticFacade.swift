@@ -76,16 +76,7 @@ public actor InvestigationRuntimeDiagnosticFacade {
                 rootSessionID: identity.rootSessionID
             )
         } catch {
-            activeIdentity = nil
-            do {
-                try await coordinator.failClosedTransport(
-                    investigationID: identity.investigationID,
-                    runID: identity.runID
-                )
-            } catch {
-                throw InvestigationCoordinatorError
-                    .runtimeCleanupUnconfirmed
-            }
+            try await revokeAndClean(identity)
             throw error
         }
         guard let line else {
@@ -105,13 +96,18 @@ public actor InvestigationRuntimeDiagnosticFacade {
         contextBytes: Data
     ) async throws -> DomainToken {
         let identity = try requireActiveIdentity()
-        return try await coordinator.startTurn(
-            investigationID: identity.investigationID,
-            runID: identity.runID,
-            threadID: threadID,
-            turnID: turnID,
-            contextBytes: contextBytes
-        ).turnID
+        do {
+            return try await coordinator.startTurn(
+                investigationID: identity.investigationID,
+                runID: identity.runID,
+                threadID: threadID,
+                turnID: turnID,
+                contextBytes: contextBytes
+            ).turnID
+        } catch {
+            try await revokeAndClean(identity)
+            throw error
+        }
     }
 
     public func acceptScientificDelta(
@@ -170,5 +166,19 @@ public actor InvestigationRuntimeDiagnosticFacade {
             throw InvestigationRuntimeDiagnosticFacadeError.noActiveRun
         }
         return activeIdentity
+    }
+
+    private func revokeAndClean(
+        _ identity: ActiveIdentity
+    ) async throws {
+        activeIdentity = nil
+        do {
+            try await coordinator.failClosedTransport(
+                investigationID: identity.investigationID,
+                runID: identity.runID
+            )
+        } catch {
+            throw InvestigationCoordinatorError.runtimeCleanupUnconfirmed
+        }
     }
 }
