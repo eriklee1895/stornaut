@@ -425,6 +425,17 @@ P0–P2 remain. See
 E2b-ii strict final-Mach-O admission is now active and exclusively owns the
 single clean authoritative full verifier for the E2 checkpoint.
 
+E2b-ii is complete. Its verifier contract
+first failed on the missing authority-object requirement, then the final gate
+bound seven concrete authority markers to the built `StornautExecution.o`
+positive control, scanned every Mach-O in the Investigation diagnostic bundle
+for the same forbidden markers, and enforced that only the ordinary
+`StornautApp` target/Frameworks phase links `StornautExecution`. The strict
+built-artifact gate passed after review strengthening; no unresolved P0–P2
+remain. Its one clean authoritative full passed 23/23 stages without restart
+or stage rerun; timed stages totaled 1,046.300 seconds. See
+[Task 39B2b-ii-E2b-ii Review](../../reports/phase-d-task-39b2b-ii-e2b-ii-review.md).
+
 39B1a bound the diagnostic configuration to the real Evidence Store v4 path,
 made lifecycle drain directly asynchronous, reloaded actor-owned run state
 after suspension, rechecked the 135-second terminal deadline before artifact
@@ -824,9 +835,9 @@ the checkpoint's one serialized SwiftPM regression, then a targeted Debug App
 build and independent review. Do not run a second standalone serialized suite
 before or after headless. E2a omits full/XCUITest because it changes neither UI
 nor final authority.
-The active E2b-ii checkpoint must run the strict final-binary/Release gates
+The completed E2b-ii checkpoint passed the strict final-binary/Release gates
 and exactly one clean authoritative full after all cheaper layers and review
-are green. E2b-i is complete and must not receive a redundant full run.
+were green. E2b-i did not receive a redundant full run.
 
 The focused real-model diagnostic may be repeated with fresh nonces when a
 provider/transient failure is honestly classified. It may not reinterpret a

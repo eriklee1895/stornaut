@@ -40,10 +40,13 @@ xcodebuild -quiet \
 debug_app="$derived_data/Build/Products/Debug/Stornaut.app"
 release_app="$derived_data/Build/Products/Release/Stornaut.app"
 diagnostic_debug_app="$diagnostic_derived_data/Build/Products/Debug/StornautInvestigationDiagnostic.app"
+authority_object="$derived_data/Build/Products/Debug/StornautExecution.o"
 test -x "$debug_app/Contents/MacOS/Stornaut"
 test -x "$release_app/Contents/MacOS/Stornaut"
 test -x \
     "$diagnostic_debug_app/Contents/MacOS/StornautInvestigationDiagnostic"
+test -f "$authority_object"
+file "$authority_object" | grep -q 'Mach-O'
 test -x "$debug_app/Contents/MacOS/StornautLifecycleHelper"
 test -x "$release_app/Contents/MacOS/StornautLifecycleHelper"
 test ! -e \
@@ -225,15 +228,47 @@ PY
 app_contains() {
     local app=$1
     local marker=$2
+    mach_o_contains "$app" "$marker"
+}
+
+mach_o_contains() {
+    local root=$1
+    local marker=$2
     local file
 
     while IFS= read -r -d '' file; do
-        if rg -a -q --fixed-strings -- "$marker" "$file"; then
+        if file "$file" 2>/dev/null | grep -q 'Mach-O' \
+            && rg -a -q --fixed-strings -- "$marker" "$file"; then
             return 0
         fi
-    done < <(find "$app" -type f -print0)
+    done < <(find "$root" -type f -print0)
     return 1
 }
+
+authority_object_markers=(
+    'ActionExecutor'
+    'TrashMoving'
+    'FileManagerTrashAdapter'
+    'RecordingFileManagerTrashAdapter'
+    'DenyRegisteredActionRunner'
+    'FoundationRegisteredActionRunner'
+    'spawnRegisteredActionWithPipes'
+)
+
+for marker in "${authority_object_markers[@]}"; do
+    if ! rg -a -q --fixed-strings -- "$marker" "$authority_object"; then
+        print -u2 \
+            "Execution authority positive control is missing: $marker"
+        exit 1
+    fi
+done
+
+if ! mach_o_contains \
+    "$diagnostic_debug_app" \
+    'InvestigationRuntimeDiagnosticAppLeaf'; then
+    print -u2 "Investigation diagnostic Mach-O positive control is missing."
+    exit 1
+fi
 
 debug_markers=(
     '--stornaut-debug-fixture='
@@ -308,7 +343,7 @@ for marker in "${investigation_diagnostic_markers[@]}"; do
     fi
 done
 
-diagnostic_forbidden_markers=(
+diagnostic_forbidden_activation_markers=(
     '--stornaut-debug-fixture='
     '--stornaut-capability-runtime-config='
     '--stornaut-isolation-probe-config='
@@ -317,9 +352,6 @@ diagnostic_forbidden_markers=(
     'signedAppTrashReady'
     'signedAppTrashRecoveryReady'
     'PhaseCTrashDiagnosticHarness'
-    'ActionExecutor'
-    'MoveToTrash'
-    'RegisteredAction'
     'StornautAppModel'
     'AppDependencies'
     'StornautLifecycleHelper'
@@ -327,10 +359,28 @@ diagnostic_forbidden_markers=(
     'InteractiveCodexAppServerClient'
 )
 
-for marker in "${diagnostic_forbidden_markers[@]}"; do
+for marker in "${diagnostic_forbidden_activation_markers[@]}"; do
     if app_contains "$diagnostic_debug_app" "$marker"; then
         print -u2 \
             "Forbidden surface leaked into Investigation diagnostic App: $marker"
+        exit 1
+    fi
+done
+
+diagnostic_authority_forbidden_markers=(
+    'ActionExecutor'
+    'TrashMoving'
+    'FileManagerTrashAdapter'
+    'RecordingFileManagerTrashAdapter'
+    'DenyRegisteredActionRunner'
+    'FoundationRegisteredActionRunner'
+    'spawnRegisteredActionWithPipes'
+)
+
+for marker in "${diagnostic_authority_forbidden_markers[@]}"; do
+    if mach_o_contains "$diagnostic_debug_app" "$marker"; then
+        print -u2 \
+            "Concrete authority leaked into Investigation diagnostic Mach-O: $marker"
         exit 1
     fi
 done
@@ -359,11 +409,27 @@ ordinary_tests = target_body(
     "StornautAppTests",
     "\n\t\tA00000000000000000000003 /* StornautAppUITests */",
 )
+ordinary_ui_tests = target_body(
+    "A00000000000000000000003",
+    "StornautAppUITests",
+    "\n\t\tA00000000000000000000004 /* StornautLifecycleHelper */",
+)
+lifecycle_helper = target_body(
+    "A00000000000000000000004",
+    "StornautLifecycleHelper",
+    "\n\t\tA00000000000000000000005 "
+    "/* StornautInvestigationDiagnosticApp */",
+)
 diagnostic_app = target_body(
     "A00000000000000000000005",
     "StornautInvestigationDiagnosticApp",
     "\n\t\tA00000000000000000000006 "
     "/* StornautInvestigationDiagnosticAppTests */",
+)
+diagnostic_tests = target_body(
+    "A00000000000000000000006",
+    "StornautInvestigationDiagnosticAppTests",
+    "\n/* End PBXNativeTarget section */",
 )
 for name, body in (
     ("StornautApp", ordinary_app),
@@ -377,10 +443,28 @@ if "StornautInvestigationDiagnostic" not in diagnostic_app:
     raise SystemExit(
         "dedicated Investigation diagnostic App lost its package product"
     )
+target_execution_dependencies = {
+    name
+    for name, body in (
+        ("StornautApp", ordinary_app),
+        ("StornautAppTests", ordinary_tests),
+        ("StornautAppUITests", ordinary_ui_tests),
+        ("StornautLifecycleHelper", lifecycle_helper),
+        ("StornautInvestigationDiagnosticApp", diagnostic_app),
+        ("StornautInvestigationDiagnosticAppTests", diagnostic_tests),
+    )
+    if "StornautExecution" in body
+}
+if target_execution_dependencies != {"StornautApp"}:
+    raise SystemExit(
+        "StornautExecution Xcode dependency allowlist drifted: "
+        f"{sorted(target_execution_dependencies)}"
+    )
 for forbidden in (
     "StornautCore",
     "StornautCodex",
     "StornautLifecycle",
+    "StornautExecution",
     "Copy Helper",
     "fileSystemSynchronizedGroups",
     "PBXTargetDependency",
@@ -432,6 +516,38 @@ if (
 ):
     raise SystemExit(
         "dedicated Investigation diagnostic dependency allowlist drifted"
+    )
+
+execution_framework_phases = []
+phase_start = project.find("/* Begin PBXFrameworksBuildPhase section */")
+phase_end = project.find("/* End PBXFrameworksBuildPhase section */")
+if phase_start < 0 or phase_end < 0:
+    raise SystemExit("missing Xcode Frameworks phase section")
+frameworks = project[phase_start:phase_end]
+cursor = 0
+while True:
+    start = frameworks.find("/* Frameworks */ = {", cursor)
+    if start < 0:
+        break
+    line_start = frameworks.rfind("\n", 0, start) + 1
+    end = frameworks.find("\n\t\t};", start)
+    if end < 0:
+        raise SystemExit("malformed Xcode Frameworks phase")
+    body = frameworks[line_start:end]
+    if "StornautExecution in Frameworks" in body:
+        execution_framework_phases.append(body)
+    cursor = end + 1
+if (
+    len(execution_framework_phases) != 1
+    or "B00000000000000000000010 /* Frameworks */"
+    not in execution_framework_phases[0]
+    or execution_framework_phases[0].count(
+        "StornautExecution in Frameworks"
+    )
+    != 1
+):
+    raise SystemExit(
+        "StornautExecution Xcode dependency allowlist drifted in Frameworks"
     )
 
 required_exact_membership = [

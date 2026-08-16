@@ -152,7 +152,11 @@
 > 迁入 `StornautExecution`，Core 只保留 typed seam/receipt/无权 runtime
 > state machine；3/3 package、32/32 affected、73/73 Phase C、
 > ordinary/diagnostic App builds 与单次 898-test serial regression 均通过，
-> independent review 无 unresolved P0–P2。E2b-i complete，E2b-ii active；
+> independent review 无 unresolved P0–P2。E2b-i complete；E2b-ii strict
+> final-Mach-O verifier/review 已完成，built Execution authority 正控制、
+> full diagnostic bundle Mach-O 负控制与六 target Xcode allowlist 均通过，
+> 唯一一次 clean full 23/23 stages 单次通过（timed 1,046.300 秒），无
+> restart 或 stage rerun。E2b-ii complete；
 > 原 signed composition diff 保持 stash。39B2c 才能作
 > readiness claim。
 > 生产 Deep Dive 仍 unavailable。
@@ -572,8 +576,11 @@ build、historical Task 35 source-snapshot gate 与 independent review；
 E2b-i concrete Trash/Executor authority relocation 与 authorized ordinary-App
 linkage 已完成，3/3 package、32/32 affected、73/73 Phase C、
 ordinary/diagnostic App builds 与 898-test serial regression 均通过；
-E2b-ii strict final-Mach-O admission active，原 signed composition diff
-保持 stash。39B2c 才是 machine admission。该最终 gate
+E2b-ii strict final-Mach-O verifier/review 已完成，built authority 正控制、
+full-bundle Mach-O 负控制与 exact Xcode allowlist 均通过，唯一一次 clean
+full 23/23 stages 单次通过（1,046.300 秒）。E2b-ii complete；原 signed
+composition diff 保持 stash。39B2c 才是 machine
+admission。该最终 gate
 要求证明完整调查能力和公共联网可用时，
 Codex 全进程树不可写用户数据、不可
 访问 localhost/私网/任意 Unix socket 且无 Executor 路径；不得用

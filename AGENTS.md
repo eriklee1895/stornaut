@@ -152,7 +152,11 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   typed seam/receipt/无权 state machine；3/3 package、32/32 affected、
   73/73 Phase C、ordinary/diagnostic App builds 与单次 898-test serial
   regression 通过，independent review 无 unresolved P0–P2。E2b-i 已完成，
-  E2b-ii strict final-Mach-O 与 E2 checkpoint 唯一一次 clean full active；
+  E2b-ii strict final-Mach-O verifier implementation/review 已完成：
+  built `StornautExecution.o` authority positive control、完整 diagnostic bundle
+  Mach-O negative control 与六 target Xcode allowlist 均通过；E2 checkpoint
+  唯一一次 clean full 23/23 stages 单次通过（timed 1,046.300 秒），无 restart
+  或 stage rerun。E2b-ii 已完成；
   原 signed composition diff 保持 stash。只有 39B2c
   可以作 machine readiness claim；Task 39 尚未完成。
   真实 App Trash 依赖仍保持关闭，生产 Deep Dive 仍为 implementation unavailable。
@@ -258,6 +262,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2b-ii-E1 review / completion audit | [docs/reports/phase-d-task-39b2b-ii-e1-review.md](docs/reports/phase-d-task-39b2b-ii-e1-review.md) |
 | Phase D Task 39B2b-ii-E2a review / completion audit | [docs/reports/phase-d-task-39b2b-ii-e2a-review.md](docs/reports/phase-d-task-39b2b-ii-e2a-review.md) |
 | Phase D Task 39B2b-ii-E2b-i review / completion audit | [docs/reports/phase-d-task-39b2b-ii-e2b-i-review.md](docs/reports/phase-d-task-39b2b-ii-e2b-i-review.md) |
+| Phase D Task 39B2b-ii-E2b-ii review / completion audit | [docs/reports/phase-d-task-39b2b-ii-e2b-ii-review.md](docs/reports/phase-d-task-39b2b-ii-e2b-ii-review.md) |
 | Epic 2–4 历史计划 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) |
 | Epic 2–4 最终 Gate | [docs/reports/epic-2-4-validation-report.md](docs/reports/epic-2-4-validation-report.md) |
 | Epic 0–1 历史计划与证据 | [docs/plans/completed/epic-0-1-foundation-spikes.md](docs/plans/completed/epic-0-1-foundation-spikes.md) |
@@ -335,7 +340,10 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   source-snapshot verifier 均通过。E2b-i concrete Trash/Executor authority
   relocation、authorized ordinary-App linkage、3/3 package、32/32 affected、
   73/73 Phase C、ordinary/diagnostic App builds 与 898-test serial regression
-  已通过。E2b-i complete，E2b-ii strict final-Mach-O admission active。
+  已通过。E2b-i complete；E2b-ii strict final-Mach-O verifier/review 已通过，
+  built authority 正控制、full-bundle Mach-O 负控制与 exact Xcode allowlist
+  均绿色，唯一一次 clean full 23/23 stages 单次通过（1,046.300 秒）。
+  E2b-ii complete，原 signed composition 下一步恢复。
   Task 39 尚未完成。
 Deep Dive 的旧 Broker-only no-go 已被 ADR 0004 的 capability-first 边界取代；
 当前仍不可用的原因是生产 Deep Dive 尚未实现，而非 R6 或 Codex 工具能力。

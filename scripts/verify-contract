@@ -61,6 +61,16 @@ require_fixed_text scripts/verify-phase-c-trash-diagnostic \
     'Task 35 signed Trash mutation is sealed'
 require_fixed_text scripts/verify-phase-c-trash-recovery \
     'Task 35 recovery mutation is sealed'
+require_fixed_text scripts/verify-app-release-boundaries \
+    'authority_object='
+require_fixed_text scripts/verify-app-release-boundaries \
+    'authority_object_markers=('
+require_fixed_text scripts/verify-app-release-boundaries \
+    'diagnostic_authority_forbidden_markers=('
+require_fixed_text scripts/verify-app-release-boundaries \
+    'mach_o_contains()'
+require_fixed_text scripts/verify-app-release-boundaries \
+    'StornautExecution Xcode dependency allowlist drifted'
 require_fixed_text scripts/verify 'scripts/verify-investigation-boundaries'
 require_fixed_text scripts/verify 'investigation-benchmarks'
 require_fixed_text scripts/verify \
