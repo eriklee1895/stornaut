@@ -6,6 +6,8 @@ import StornautLifecycle
 private let serviceName = LifecycleSupervisorXPCClient.serviceName
 #if DEBUG
 private let workerMode = "--stornaut-r5-worker"
+private let interactiveWorkerMode =
+    "--stornaut-investigation-worker"
 private let crashMode = "--stornaut-r5-crash-fixture"
 private let networkProbeMode =
     "--stornaut-r5-network-denial-probe"
@@ -45,6 +47,27 @@ private enum LifecycleHelperFailure: Error {
     case drainFailed(reasonKey: String)
 }
 
+private struct InteractiveWorkerReply: Codable {
+    let operationID: UUID
+    let response: LifecycleInteractiveSessionResponse?
+    let reasonKey: String?
+
+    init(
+        operationID: UUID,
+        response: LifecycleInteractiveSessionResponse
+    ) {
+        self.operationID = operationID
+        self.response = response
+        reasonKey = nil
+    }
+
+    init(operationID: UUID, reasonKey: String) {
+        self.operationID = operationID
+        response = nil
+        self.reasonKey = reasonKey
+    }
+}
+
 private func writeAll(
     _ data: Data,
     to descriptor: Int32
@@ -68,6 +91,115 @@ private func writeAll(
     }
     guard didWrite else {
         throw LifecycleHelperFailure.evidenceFailed
+    }
+}
+
+private func writeFramedData(
+    _ data: Data,
+    to descriptor: Int32
+) throws {
+    guard
+        !data.isEmpty,
+        data.count <= LifecycleInteractiveSessionRequest
+            .maximumEncodedEnvelopeBytes,
+        data.count <= Int(UInt32.max)
+    else {
+        throw LifecycleHelperFailure.invalidInvocation
+    }
+    var length = UInt32(data.count).bigEndian
+    try withUnsafeBytes(of: &length) {
+        try writeAll(Data($0), to: descriptor)
+    }
+    try writeAll(data, to: descriptor)
+}
+
+private func readFramedData(
+    from descriptor: Int32,
+    maximumBytes: Int,
+    timeoutMilliseconds: Int32
+) throws -> Data {
+    var lengthBytes = Data()
+    try readExactly(
+        into: &lengthBytes,
+        byteCount: MemoryLayout<UInt32>.size,
+        from: descriptor,
+        timeoutMilliseconds: timeoutMilliseconds
+    )
+    let encodedLength = lengthBytes.withUnsafeBytes {
+        $0.loadUnaligned(as: UInt32.self)
+    }
+    let length = Int(UInt32(bigEndian: encodedLength))
+    guard length > 0, length <= maximumBytes else {
+        throw LifecycleHelperFailure.invalidInvocation
+    }
+    var data = Data()
+    try readExactly(
+        into: &data,
+        byteCount: length,
+        from: descriptor,
+        timeoutMilliseconds: timeoutMilliseconds
+    )
+    return data
+}
+
+private func readExactly(
+    into data: inout Data,
+    byteCount: Int,
+    from descriptor: Int32,
+    timeoutMilliseconds: Int32
+) throws {
+    guard
+        descriptor >= 0,
+        byteCount > 0,
+        timeoutMilliseconds > 0
+    else {
+        throw LifecycleHelperFailure.invalidInvocation
+    }
+    let deadline = ContinuousClock.now
+        + .milliseconds(Int64(timeoutMilliseconds))
+    var buffer = [UInt8](repeating: 0, count: min(byteCount, 4_096))
+    while data.count < byteCount {
+        let remaining = ContinuousClock.now.duration(to: deadline)
+        guard remaining > .zero else {
+            throw LifecycleHelperFailure.workerFailed
+        }
+        let components = remaining.components
+        let milliseconds = max(
+            1,
+            min(
+                Int64(Int32.max),
+                components.seconds * 1_000
+                    + components.attoseconds
+                        / 1_000_000_000_000_000
+            )
+        )
+        var pollDescriptor = pollfd(
+            fd: descriptor,
+            events: Int16(POLLIN | POLLHUP),
+            revents: 0
+        )
+        let pollResult = poll(
+            &pollDescriptor,
+            1,
+            Int32(milliseconds)
+        )
+        if pollResult < 0 {
+            if errno == EINTR { continue }
+            throw LifecycleHelperFailure.workerFailed
+        }
+        guard pollResult > 0 else {
+            throw LifecycleHelperFailure.workerFailed
+        }
+        let requested = min(buffer.count, byteCount - data.count)
+        let count = Darwin.read(descriptor, &buffer, requested)
+        if count < 0 {
+            if errno == EINTR { continue }
+            throw LifecycleHelperFailure.workerFailed
+        }
+        guard count > 0 else {
+            throw LifecycleHelperFailure.workerFailed
+        }
+        data.append(contentsOf: buffer.prefix(count))
     }
 }
 
@@ -292,6 +424,201 @@ private func runWorkerMode(
         dispatchMain()
     } catch {
         exit(78)
+    }
+}
+#endif
+
+#if DEBUG
+private func runInteractiveWorkerMode(
+    investigationID: UUID,
+    userID: uid_t
+) -> Never {
+    guard geteuid() == 0 else {
+        exit(78)
+    }
+    do {
+        let identity = try LifecycleUserIdentity.read(userID: userID)
+        guard
+            identity.groupID <= gid_t(Int32.max),
+            initgroups(
+                identity.username,
+                Int32(identity.groupID)
+            ) == 0,
+            setgid(identity.groupID) == 0,
+            setuid(identity.userID) == 0,
+            geteuid() == identity.userID,
+            getegid() == identity.groupID
+        else {
+            throw LifecycleHelperFailure.invalidIdentity
+        }
+        try writeAll(workerReadyLine, to: STDOUT_FILENO)
+        let session = CodexContainedInteractiveSession()
+        let worker = LifecycleContainedInteractiveWorker(session: session)
+        let broker = LifecycleInteractiveSessionBroker(worker: worker)
+        let replyWriter = LifecycleInteractiveWorkerReplyWriter(
+            descriptor: STDOUT_FILENO
+        )
+        while true {
+            let requestData = try readFramedData(
+                from: STDIN_FILENO,
+                maximumBytes: LifecycleInteractiveSessionRequest
+                    .maximumEncodedEnvelopeBytes,
+                timeoutMilliseconds: 900_000
+            )
+            let request = try JSONDecoder().decode(
+                LifecycleInteractiveSessionRequest.self,
+                from: requestData
+            )
+            guard
+                request.investigationID.rawValue == investigationID
+            else {
+                throw LifecycleHelperFailure.invalidInvocation
+            }
+            Task {
+                let reply: InteractiveWorkerReply
+                do {
+                    let response =
+                    try await broker.handle(request)
+                    reply = InteractiveWorkerReply(
+                        operationID: request.operationID,
+                        response: response
+                    )
+                } catch let error
+                    as LifecycleInteractiveSessionBrokerError
+                {
+                    reply = InteractiveWorkerReply(
+                        operationID: request.operationID,
+                        reasonKey: lifecycleInteractiveReasonKey(error)
+                    )
+                } catch {
+                    reply = InteractiveWorkerReply(
+                        operationID: request.operationID,
+                        reasonKey:
+                            "runtime.lifecycle.interactive.remote-rejected"
+                    )
+                }
+                do {
+                    try replyWriter.write(reply)
+                } catch {
+                    exit(70)
+                }
+                if request.kind == .retire {
+                    close(STDIN_FILENO)
+                    close(STDOUT_FILENO)
+                    exit(reply.response == nil ? 70 : 0)
+                }
+            }
+        }
+    } catch {
+        exit(78)
+    }
+}
+
+private final class LifecycleInteractiveWorkerReplyWriter:
+    @unchecked Sendable
+{
+    private let lock = NSLock()
+    private let descriptor: Int32
+
+    init(descriptor: Int32) {
+        self.descriptor = descriptor
+    }
+
+    func write(_ reply: InteractiveWorkerReply) throws {
+        try lock.withLock {
+            try writeFramedData(
+                try JSONEncoder().encode(reply),
+                to: descriptor
+            )
+        }
+    }
+}
+
+private struct LifecycleContainedInteractiveWorker:
+    LifecycleInteractiveWorkerDriving,
+    Sendable
+{
+    let session: CodexContainedInteractiveSession
+
+    func start(
+        _ configuration: LifecycleInteractiveWorkerConfiguration
+    ) async throws {
+        do {
+            try await session.start(
+                CodexContainedInteractiveSessionConfiguration(
+                    investigationID:
+                        configuration.investigationID.rawValue,
+                    validBefore: configuration.validBefore,
+                    maximumLineBytes: configuration.maximumLineBytes,
+                    maximumSessionBytes:
+                        configuration.maximumSessionBytes
+                )
+            )
+        } catch let error as CodexContainedInteractiveSessionError {
+            if let mapped = lifecycleInteractiveWorkerError(error) {
+                throw mapped
+            }
+            throw error
+        }
+    }
+
+    func writeLine(_ line: Data) async throws {
+        do {
+            try await session.writeLine(line)
+        } catch let error as CodexContainedInteractiveSessionError {
+            if let mapped = lifecycleInteractiveWorkerError(error) {
+                throw mapped
+            }
+            throw error
+        }
+    }
+
+    func readLine(maximumBytes: Int) async throws -> Data? {
+        let line: Data
+        do {
+            line = try await session.readLine()
+        } catch let error as CodexContainedInteractiveSessionError {
+            if let mapped = lifecycleInteractiveWorkerError(error) {
+                throw mapped
+            }
+            throw error
+        }
+        guard line.count <= maximumBytes else {
+            throw LifecycleInteractiveWorkerError
+                .lineLimitExceeded
+        }
+        return line
+    }
+
+    func retire() async throws -> Bool {
+        do {
+            return try await session.retire()
+        } catch let error as CodexContainedInteractiveSessionError {
+            if let mapped = lifecycleInteractiveWorkerError(error) {
+                throw mapped
+            }
+            throw error
+        }
+    }
+}
+
+private func lifecycleInteractiveWorkerError(
+    _ error: CodexContainedInteractiveSessionError
+) -> LifecycleInteractiveWorkerError? {
+    switch error {
+    case .invalidConfiguration:
+        return .sessionExpired
+    case .lineLimitExceeded:
+        return .lineLimitExceeded
+    case .sessionLimitExceeded:
+        return .sessionLimitExceeded
+    case .sessionUnavailable:
+        return .sessionUnavailable
+    case .launchFailed,
+         .writeFailed,
+         .readFailed,
+         .retirementFailed:
+        return nil
     }
 }
 #endif
@@ -734,7 +1061,7 @@ private final class LifecycleHelperListenerDelegate:
             recoveredInvestigations: recoveredInvestigations
         )
         connection.exportedInterface = NSXPCInterface(
-            with: LifecycleSupervisorXPCWire.self
+            with: LifecycleInteractiveSessionXPCWire.self
         )
         connection.exportedObject = service
         connection.invalidationHandler = {
@@ -750,7 +1077,7 @@ private final class LifecycleHelperListenerDelegate:
 
 private final class LifecycleHelperService:
     NSObject,
-    LifecycleSupervisorXPCWire,
+    LifecycleInteractiveSessionXPCWire,
     @unchecked Sendable
 {
     private let callerProcessID: pid_t
@@ -770,6 +1097,11 @@ private final class LifecycleHelperService:
     private var activeLeaseCreated = false
     private var activeReply:
         ((Data?, String?) -> Void)?
+    private var interactiveInput: FileHandle?
+    private var interactiveOutput: FileHandle?
+    private var interactivePending:
+        [UUID: LifecycleInteractivePendingReply] = [:]
+    private var interactiveExpiryWorkItem: DispatchWorkItem?
 
     init(
         callerProcessID: pid_t,
@@ -846,6 +1178,88 @@ private final class LifecycleHelperService:
         }
     }
 
+    func handleInteractive(
+        _ request: Data,
+        withReply reply: @escaping (Data?, String?) -> Void
+    ) {
+#if DEBUG
+        guard
+            callerProcessID > 1,
+            callerUserID > 0,
+            helperIdentity.auditSessionID > 0,
+            request.count <= LifecycleInteractiveSessionRequest
+                .maximumEncodedEnvelopeBytes,
+            let decoded = try? JSONDecoder().decode(
+                LifecycleInteractiveSessionRequest.self,
+                from: request
+            )
+        else {
+            reply(
+                nil,
+                "runtime.lifecycle.interactive.invalid-request"
+            )
+            return
+        }
+        let pending = LifecycleInteractivePendingReply(
+            request: decoded,
+            reply: reply
+        )
+        let admitted = lock.withLock {
+            guard
+                !invalidated,
+                activeReply == nil,
+                interactivePending.count < 16_384,
+                interactivePending[decoded.operationID] == nil
+            else {
+                return false
+            }
+            switch decoded.kind {
+            case .start:
+                guard
+                    activeInvestigationID == nil,
+                    LifecycleRecoveredInvestigationPolicy()
+                        .permitsStart(
+                            decoded.investigationID,
+                            recovered: recoveredInvestigations
+                        )
+                else {
+                    return false
+                }
+                activeInvestigationID = decoded.investigationID
+            case .write, .read, .retire:
+                guard
+                    activeInvestigationID
+                        == decoded.investigationID,
+                    interactiveInput != nil,
+                    interactiveOutput != nil
+                else {
+                    return false
+                }
+            }
+            interactivePending[decoded.operationID] = pending
+            return true
+        }
+        guard admitted else {
+            reply(
+                nil,
+                "runtime.lifecycle.interactive.session-unavailable"
+            )
+            return
+        }
+        operationQueue.async { [weak self] in
+            self?.dispatchInteractive(
+                request,
+                decoded: decoded
+            )
+        }
+#else
+        reply(
+            nil,
+            "runtime.lifecycle.interactive.session-unavailable"
+        )
+#endif
+    }
+
     func invalidateAndDrain() {
         let shouldDrain = lock.withLock {
             guard !invalidated else { return false }
@@ -865,6 +1279,411 @@ private final class LifecycleHelperService:
             scheduleSuccessfulExit()
         }
     }
+
+#if DEBUG
+    private func dispatchInteractive(
+        _ encoded: Data,
+        decoded: LifecycleInteractiveSessionRequest
+    ) {
+        do {
+            if decoded.kind == .start {
+                guard let validBefore = decoded.validBefore else {
+                    throw LifecycleHelperFailure.invalidInvocation
+                }
+                try startInteractiveWorker(
+                    decoded.investigationID,
+                    validBefore: validBefore
+                )
+            }
+            guard let input = lock.withLock({
+                interactiveInput
+            }) else {
+                throw LifecycleHelperFailure.workerFailed
+            }
+            try writeFramedData(
+                encoded,
+                to: input.fileDescriptor
+            )
+        } catch {
+            failInteractiveOperation(
+                decoded.operationID,
+                reasonKey:
+                    "runtime.lifecycle.interactive.start-failed",
+                drain: true
+            )
+        }
+    }
+
+    private func startInteractiveWorker(
+        _ investigationID: LifecycleInvestigationID,
+        validBefore: Date
+    ) throws {
+        let userIdentity = try LifecycleUserIdentity.read(
+            userID: callerUserID
+        )
+        let paths = try LifecycleLocalInstallationContract()
+            .diagnosticPaths(
+                userID: callerUserID,
+                investigationID: investigationID
+            )
+        let store = try LifecycleLeaseStore(rootURL: leaseRootURL)
+        let lease = try LifecycleInvestigationLease(
+            investigationID: investigationID,
+            bootSessionID: currentLifecycleBootSessionID(),
+            auditSessionID: helperIdentity.auditSessionID,
+            userID: callerUserID
+        )
+        _ = try store.create(lease)
+        lock.withLock {
+            activeAuditSessionID = helperIdentity.auditSessionID
+            activeLeaseCreated = true
+        }
+        _ = try prepareDiagnosticDirectories(
+            identity: userIdentity,
+            investigationID: investigationID
+        )
+
+        let process = Process()
+        let sessionInput = Pipe()
+        let sessionOutput = Pipe()
+        process.executableURL = helperExecutableURL
+        process.arguments = [
+            interactiveWorkerMode,
+            investigationID.rawValue.uuidString.lowercased(),
+            String(callerUserID),
+        ]
+        process.environment = [
+            "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+        ]
+        process.currentDirectoryURL = paths.rootURL
+        process.standardInput = sessionInput
+        process.standardOutput = sessionOutput
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        sessionInput.fileHandleForReading.closeFile()
+        sessionOutput.fileHandleForWriting.closeFile()
+        guard
+            fcntl(
+                sessionInput.fileHandleForWriting.fileDescriptor,
+                F_SETNOSIGPIPE,
+                1
+            ) == 0
+        else {
+            throw LifecycleHelperFailure.workerFailed
+        }
+        guard
+            try readBoundedLine(
+                from:
+                    sessionOutput.fileHandleForReading.fileDescriptor,
+                maximumBytes: workerReadyLine.count,
+                timeoutMilliseconds: 5_000
+            ) == workerReadyLine
+        else {
+            throw LifecycleHelperFailure.invalidIdentity
+        }
+        let childIdentity = try DarwinLifecycleInventory(
+            expectedUserID: callerUserID
+        ).identity(
+            for: process.processIdentifier,
+            expectedUserID: callerUserID
+        )
+        guard LifecycleInheritedSessionAdmission().validate(
+            expectedProcessID: process.processIdentifier,
+            expectedUserID: callerUserID,
+            helperIdentity: helperIdentity,
+            childIdentity: childIdentity
+        ) else {
+            throw LifecycleHelperFailure.invalidIdentity
+        }
+        lock.withLock {
+            activeProcess = process
+            interactiveInput = sessionInput.fileHandleForWriting
+            interactiveOutput = sessionOutput.fileHandleForReading
+        }
+        startInteractiveReplyReader(
+            sessionOutput.fileHandleForReading
+        )
+        scheduleInteractiveExpiry(
+            investigationID,
+            validBefore: validBefore
+        )
+    }
+
+    private func scheduleInteractiveExpiry(
+        _ investigationID: LifecycleInvestigationID,
+        validBefore: Date
+    ) {
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.operationQueue.async { [weak self] in
+                guard let self else { return }
+                let shouldExpire = self.lock.withLock {
+                    self.activeInvestigationID == investigationID
+                        && !self.invalidated
+                }
+                guard shouldExpire else { return }
+                self.failAllInteractiveOperations(
+                    reasonKey:
+                        "runtime.lifecycle.interactive.session-expired",
+                    drain: true
+                )
+            }
+        }
+        let previous = lock.withLock {
+            let value = interactiveExpiryWorkItem
+            interactiveExpiryWorkItem = workItem
+            return value
+        }
+        previous?.cancel()
+        let interval = max(
+            0,
+            validBefore.timeIntervalSinceNow
+        )
+        DispatchQueue.global(qos: .utility).asyncAfter(
+            deadline: .now() + interval,
+            execute: workItem
+        )
+    }
+
+    private func startInteractiveReplyReader(
+        _ output: FileHandle
+    ) {
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self else { return }
+            do {
+                while true {
+                    let data = try readFramedData(
+                        from: output.fileDescriptor,
+                        maximumBytes:
+                            LifecycleInteractiveSessionRequest
+                                .maximumEncodedEnvelopeBytes,
+                        timeoutMilliseconds: 900_000
+                    )
+                    let workerReply = try JSONDecoder().decode(
+                        InteractiveWorkerReply.self,
+                        from: data
+                    )
+                    self.operationQueue.async { [weak self] in
+                        self?.receiveInteractiveReply(workerReply)
+                    }
+                    if workerReply.response?.kind == .retired {
+                        return
+                    }
+                }
+            } catch {
+                self.operationQueue.async { [weak self] in
+                    self?.failAllInteractiveOperations(
+                        reasonKey:
+                            "runtime.lifecycle.interactive.remote-rejected",
+                        drain: true
+                    )
+                }
+            }
+        }
+    }
+
+    private func receiveInteractiveReply(
+        _ workerReply: InteractiveWorkerReply
+    ) {
+        guard let pending = lock.withLock({
+            interactivePending.removeValue(
+                forKey: workerReply.operationID
+            )
+        }) else {
+            failAllInteractiveOperations(
+                reasonKey:
+                    "runtime.lifecycle.interactive.remote-rejected",
+                drain: true
+            )
+            return
+        }
+        guard workerReply.reasonKey == nil else {
+            pending.reply(
+                nil,
+                workerReply.reasonKey.map(
+                    sanitizeInteractiveReasonKey
+                )
+            )
+            if pending.request.kind == .retire {
+                failAllInteractiveOperations(
+                    reasonKey:
+                        "runtime.lifecycle.interactive.retire-failed",
+                    drain: true
+                )
+            } else {
+                let retirementPending = lock.withLock {
+                    interactivePending.values.contains {
+                        $0.request.kind == .retire
+                    }
+                }
+                if !retirementPending {
+                    failAllInteractiveOperations(
+                        reasonKey:
+                            workerReply.reasonKey
+                                ?? "runtime.lifecycle.interactive.remote-rejected",
+                        drain: true
+                    )
+                }
+            }
+            return
+        }
+        guard
+            let response = workerReply.response,
+            let validated = try? response.validated(
+                for: pending.request
+            )
+        else {
+            pending.reply(
+                nil,
+                "runtime.lifecycle.interactive.remote-rejected"
+            )
+            failAllInteractiveOperations(
+                reasonKey:
+                    "runtime.lifecycle.interactive.remote-rejected",
+                drain: true
+            )
+            return
+        }
+        if pending.request.kind == .retire {
+            let interrupted = lock.withLock {
+                let values = Array(interactivePending.values)
+                interactivePending.removeAll()
+                return values
+            }
+            for value in interrupted {
+                value.reply(
+                    nil,
+                    "runtime.lifecycle.interactive.session-unavailable"
+                )
+            }
+            do {
+                try finishInteractiveSession()
+                pending.reply(
+                    try JSONEncoder().encode(validated),
+                    nil
+                )
+                scheduleSuccessfulExitAfterReply()
+            } catch {
+                pending.reply(
+                    nil,
+                    "runtime.lifecycle.interactive.retire-failed"
+                )
+                do {
+                    try cancelActive()
+                } catch {
+                    exit(71)
+                }
+                scheduleFailureExitAfterReply()
+            }
+            return
+        }
+        do {
+            pending.reply(
+                try JSONEncoder().encode(validated),
+                nil
+            )
+        } catch {
+            pending.reply(
+                nil,
+                "runtime.lifecycle.interactive.remote-rejected"
+            )
+            failAllInteractiveOperations(
+                reasonKey:
+                    "runtime.lifecycle.interactive.remote-rejected",
+                drain: true
+            )
+        }
+    }
+
+    private func failInteractiveOperation(
+        _ operationID: UUID,
+        reasonKey: String,
+        drain: Bool
+    ) {
+        let pending = lock.withLock {
+            interactivePending.removeValue(forKey: operationID)
+        }
+        pending?.reply(nil, sanitizeInteractiveReasonKey(reasonKey))
+        if drain {
+            failAllInteractiveOperations(
+                reasonKey: reasonKey,
+                drain: true
+            )
+        }
+    }
+
+    private func failAllInteractiveOperations(
+        reasonKey: String,
+        drain: Bool
+    ) {
+        let pending = lock.withLock {
+            let values = Array(interactivePending.values)
+            interactivePending.removeAll()
+            return values
+        }
+        let sanitized = sanitizeInteractiveReasonKey(reasonKey)
+        for value in pending {
+            value.reply(nil, sanitized)
+        }
+        if drain {
+            do {
+                try cancelActive()
+            } catch {
+                scheduleFailureExitAfterReply()
+                return
+            }
+            scheduleFailureExitAfterReply()
+        }
+    }
+
+    private func finishInteractiveSession() throws {
+        try drainActiveSession()
+        let state = lock.withLock {
+            (
+                activeProcess,
+                activeInvestigationID,
+                activeLeaseCreated,
+                interactiveInput,
+                interactiveOutput
+            )
+        }
+        state.3?.closeFile()
+        state.4?.closeFile()
+        if let process = state.0 {
+            try waitForProcessExit(
+                process,
+                timeoutMilliseconds: 5_000
+            )
+        }
+        if let investigationID = state.1 {
+            let paths = try LifecycleLocalInstallationContract()
+                .diagnosticPaths(
+                    userID: callerUserID,
+                    investigationID: investigationID
+                )
+            if lstatExists(paths.rootURL) {
+                try removeDiagnosticRoot(
+                    paths.rootURL,
+                    ownerUserID: callerUserID
+                )
+            }
+            if state.2 {
+                try LifecycleLeaseStore(rootURL: leaseRootURL)
+                    .remove(investigationID)
+            }
+        }
+        lock.withLock {
+            activeProcess = nil
+            activeInvestigationID = nil
+            activeAuditSessionID = nil
+            activeLeaseCreated = false
+            interactiveInput = nil
+            interactiveOutput = nil
+            interactiveExpiryWorkItem?.cancel()
+            interactiveExpiryWorkItem = nil
+        }
+    }
+#endif
 
 #if DEBUG
     private func run(_ investigationID: LifecycleInvestigationID) {
@@ -1178,7 +1997,9 @@ private final class LifecycleHelperService:
                 activeProcess,
                 activeInvestigationID,
                 activeAuditSessionID,
-                activeLeaseCreated
+                activeLeaseCreated,
+                interactiveInput,
+                interactiveOutput
             )
         }
         guard let investigationID = state.1 else { return }
@@ -1199,6 +2020,8 @@ private final class LifecycleHelperService:
                 timeoutMilliseconds: 5_000
             )
         }
+        state.4?.closeFile()
+        state.5?.closeFile()
         let paths = try LifecycleLocalInstallationContract()
             .diagnosticPaths(
                 userID: callerUserID,
@@ -1221,6 +2044,10 @@ private final class LifecycleHelperService:
             activeInvestigationID = nil
             activeAuditSessionID = nil
             activeLeaseCreated = false
+            interactiveInput = nil
+            interactiveOutput = nil
+            interactiveExpiryWorkItem?.cancel()
+            interactiveExpiryWorkItem = nil
         }
     }
 
@@ -1310,6 +2137,67 @@ private final class LifecycleReplyBox: @unchecked Sendable {
     init(_ call: @escaping (Data?, String?) -> Void) {
         self.call = call
     }
+}
+
+private final class LifecycleInteractivePendingReply:
+    @unchecked Sendable
+{
+    let request: LifecycleInteractiveSessionRequest
+    let reply: (Data?, String?) -> Void
+
+    init(
+        request: LifecycleInteractiveSessionRequest,
+        reply: @escaping (Data?, String?) -> Void
+    ) {
+        self.request = request
+        self.reply = reply
+    }
+}
+
+private func lifecycleInteractiveReasonKey(
+    _ error: LifecycleInteractiveSessionBrokerError
+) -> String {
+    switch error {
+    case .invalidRequest:
+        "runtime.lifecycle.interactive.invalid-request"
+    case .sessionUnavailable:
+        "runtime.lifecycle.interactive.session-unavailable"
+    case .sessionMismatch:
+        "runtime.lifecycle.interactive.session-mismatch"
+    case .sessionExpired:
+        "runtime.lifecycle.interactive.session-expired"
+    case .lineLimitExceeded:
+        "runtime.lifecycle.interactive.line-limit-exceeded"
+    case .sessionLimitExceeded:
+        "runtime.lifecycle.interactive.session-limit-exceeded"
+    case .startFailed:
+        "runtime.lifecycle.interactive.start-failed"
+    case .writeFailed:
+        "runtime.lifecycle.interactive.write-failed"
+    case .readFailed:
+        "runtime.lifecycle.interactive.read-failed"
+    case .retireFailed:
+        "runtime.lifecycle.interactive.retire-failed"
+    }
+}
+
+private func sanitizeInteractiveReasonKey(_ value: String) -> String {
+    let allowed = Set([
+        "runtime.lifecycle.interactive.invalid-request",
+        "runtime.lifecycle.interactive.session-unavailable",
+        "runtime.lifecycle.interactive.session-mismatch",
+        "runtime.lifecycle.interactive.session-expired",
+        "runtime.lifecycle.interactive.line-limit-exceeded",
+        "runtime.lifecycle.interactive.session-limit-exceeded",
+        "runtime.lifecycle.interactive.start-failed",
+        "runtime.lifecycle.interactive.write-failed",
+        "runtime.lifecycle.interactive.read-failed",
+        "runtime.lifecycle.interactive.retire-failed",
+        "runtime.lifecycle.interactive.remote-rejected",
+    ])
+    return allowed.contains(value)
+        ? value
+        : "runtime.lifecycle.interactive.remote-rejected"
 }
 
 #if DEBUG
@@ -1672,6 +2560,19 @@ if
 {
     runWorkerMode(
         mode: CommandLine.arguments[1],
+        investigationID: investigationID,
+        userID: uid_t(parsedUserID)
+    )
+} else if
+    CommandLine.arguments.count == 4,
+    CommandLine.arguments[1] == interactiveWorkerMode,
+    let investigationID = UUID(
+        uuidString: CommandLine.arguments[2]
+    ),
+    let parsedUserID = UInt32(CommandLine.arguments[3]),
+    parsedUserID > 0
+{
+    runInteractiveWorkerMode(
         investigationID: investigationID,
         userID: uid_t(parsedUserID)
     )

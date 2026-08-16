@@ -483,6 +483,40 @@ struct LifecycleInteractiveSessionContractTests {
             } as LifecycleInteractiveSessionResponse
         }
     }
+
+    @Test
+    func interactiveXPCReplyResolverPreservesBoundedLimitCategories()
+        async
+    {
+        let fixture = LifecycleInteractiveSessionFixture()
+        let request = LifecycleInteractiveSessionRequest.read(
+            investigationID: fixture.investigationID,
+            operationID: fixture.operationID
+        )
+        for reasonKey in [
+            "runtime.lifecycle.interactive.session-expired",
+            "runtime.lifecycle.interactive.line-limit-exceeded",
+            "runtime.lifecycle.interactive.session-limit-exceeded",
+        ] {
+            await #expect(
+                throws:
+                    LifecycleInteractiveSessionXPCError.remoteRejected(
+                        reasonKey: reasonKey
+                    )
+            ) {
+                _ = try await withCheckedThrowingContinuation {
+                    continuation in
+                    LifecycleInteractiveSessionXPCReplyResolver(
+                        request: request,
+                        continuation: continuation
+                    ).resolve(
+                        response: nil,
+                        reasonKey: reasonKey
+                    )
+                } as LifecycleInteractiveSessionResponse
+            }
+        }
+    }
 }
 
 private struct LifecycleInteractiveSessionFixture {

@@ -8,15 +8,20 @@
 > carry the Task 38 interactive App Server session that ADR 0016 requires the
 > App to drive. To stay below the hard review budget, 39B2 is split into
 > 39B2a strict supervised interactive transport, 39B2b signed-App/helper
-> production composition and 39B2c machine admission/failure matrix. 39B2a
+> production composition and 39B2c machine admission/failure matrix. 39B2b
+> is further split into 39B2b-i helper-owned contained worker and 39B2b-ii
+> signed diagnostic-App/Task 38 composition. 39B2a
 > implementation, focused/serialized regression and independent post-fix
 > review are complete; its authoritative full verifier passed all 23 stages in
-> one uninterrupted run. Evidence:
+> one uninterrupted run. 39B2b-i implementation/focused post-fix review are
+> complete, its 889-test serialized regression passed, and its authoritative
+> full verifier passed 23/23 stages in one uninterrupted run. Evidence:
 > [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
 > [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md) and
 > [Task 39B1b-i Review](../../reports/phase-d-task-39b1b-i-review.md) and
 > [Task 39B1b-ii Review](../../reports/phase-d-task-39b1b-ii-review.md) and
-> [Task 39B2a Review](../../reports/phase-d-task-39b2a-review.md).
+> [Task 39B2a Review](../../reports/phase-d-task-39b2a-review.md) and
+> [Task 39B2b-i Review](../../reports/phase-d-task-39b2b-i-review.md).
 >
 > **Parent plan:**
 > [Phase D Conditional Deep Dive](phase-d-conditional-deep-dive.md)
@@ -124,21 +129,24 @@ before implementation:
      lifecycle wire contract, exact signed-peer XPC client and package-closed
      Codex interactive transport. It does not change the helper, invoke a
      model or claim admission;
-   - **39B2b signed production composition** — helper-owned contained
-     interactive worker, DEBUG diagnostic App composition and Task 38
-     production-session driver under the fixed topology. It may exercise
-     deterministic/synthetic protocol fixtures but does not assemble a Ready
-     machine report;
+   - **39B2b signed production composition** — split before implementation:
+     - **39B2b-i helper-owned contained worker** — root helper owns XPC,
+       lease/audit-session lifecycle and cleanup; a same-helper child drops to
+       the caller UID before constructing the fixed contained Codex session;
+     - **39B2b-ii signed diagnostic composition** — DEBUG diagnostic App and
+       Task 38 production-session driver under the fixed topology.
+     These checkpoints may exercise deterministic/synthetic protocol fixtures
+     but do not assemble a Ready machine report;
    - **39B2c machine admission** — current-source signed App/helper invocation,
      bounded real model run, three-plane machine report, failure matrix,
      teardown and zero-residue proof.
 
-Task 39 completes only after 39B2. Checkpoints 39A, 39B1a, 39B1b-i, 39B1b-ii
-and 39B2a–c each receive focused tests, boundary checks, serialized SwiftPM,
-independent review, one uninterrupted authoritative full verifier and an
-independent commit/push. The additional verifier cost keeps every pushed
-checkpoint authoritative rather than recreating the oversized Task 36–38
-review surfaces.
+Task 39 completes only after 39B2. Checkpoints 39A, 39B1a, 39B1b-i, 39B1b-ii,
+39B2a, 39B2b-i, 39B2b-ii and 39B2c each receive focused tests, boundary
+checks, serialized SwiftPM, independent review, one uninterrupted
+authoritative full verifier and an independent commit/push. The additional
+verifier cost keeps every pushed checkpoint authoritative rather than
+recreating the oversized Task 36–38 review surfaces.
 
 Before either checkpoint expands beyond 14 non-document source/test/script
 files or approximately 4,000 added non-document lines, stop and split again
@@ -229,6 +237,24 @@ post-fix review closed all P0–P2 findings, and its one uninterrupted
 authoritative full verifier passed 23/23 stages in 932 seconds. 39B2a is
 complete; helper implementation, signed production composition and every
 readiness claim remain outside this checkpoint.
+
+The 39B2b preflight then found that combining the helper state machine,
+contained Codex process, signed diagnostic App and Task 38 production driver
+would approach the 4,000-line hard limit and create two distinct privilege
+review surfaces. It was split before implementation:
+
+- **39B2b-i** is fixed to the root-helper/UID-worker boundary, contained
+  session, process/pipe cleanup and structural gates;
+- **39B2b-ii** owns only signed diagnostic-App composition and Task 38
+  production driving.
+
+39B2b-i changes nine non-document source, test and script paths and adds 3,497
+non-document lines with 30 deletions. Its helper-owned worker, fixed contained
+session and post-fix review are complete; 37 focused tests and the structural
+boundary gate pass, as does the 889-test serialized SwiftPM regression. Its
+one uninterrupted authoritative full verifier passed 23/23 stages with exit
+`0` in 933.21 seconds. 39B2b-i is complete. See
+[Task 39B2b-i Review](../../reports/phase-d-task-39b2b-i-review.md).
 
 39B1a bound the diagnostic configuration to the real Evidence Store v4 path,
 made lifecycle drain directly asynchronous, reloaded actor-owned run state

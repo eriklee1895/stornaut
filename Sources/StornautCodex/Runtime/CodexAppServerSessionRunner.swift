@@ -583,7 +583,7 @@ private func protocolCompletionExitStatusIsAllowed(
         || status == 128 + SIGKILL
 }
 
-private final class BoundedAppServerWriter {
+final class BoundedAppServerWriter {
     enum Error: Swift.Error {
         case invalidDescriptor
         case timedOut
@@ -768,7 +768,7 @@ private func environmentIsClosed(
         }
 }
 
-private final class BoundedAppServerLineReader {
+final class BoundedAppServerLineReader {
     enum Error: Swift.Error {
         case timedOut
         case cancelled
@@ -884,7 +884,7 @@ private final class BoundedAppServerLineReader {
     }
 }
 
-private final class AppServerSessionCancellation: @unchecked Sendable {
+final class AppServerSessionCancellation: @unchecked Sendable {
     private let lock = NSLock()
     private var cancelled = false
 
@@ -897,7 +897,7 @@ private final class AppServerSessionCancellation: @unchecked Sendable {
     }
 }
 
-private final class BoundedAppServerErrorOutput: @unchecked Sendable {
+final class BoundedAppServerErrorOutput: @unchecked Sendable {
     private let lock = NSLock()
     private let limit: Int
     private var count = 0
@@ -920,6 +920,51 @@ private final class BoundedAppServerErrorOutput: @unchecked Sendable {
         lock.withLock { failed }
     }
 
+    func drain(
+        descriptor: Int32,
+        cancellation: AppServerSessionCancellation
+    ) {
+        while true {
+            let isCancelled = cancellation.isCancelled
+            var pollDescriptor = pollfd(
+                fd: descriptor,
+                events: Int16(POLLIN | POLLHUP),
+                revents: 0
+            )
+            let result = poll(
+                &pollDescriptor,
+                1,
+                isCancelled ? 0 : 50
+            )
+            if result == 0 {
+                if isCancelled {
+                    return
+                }
+                continue
+            }
+            if result < 0 {
+                if errno == EINTR { continue }
+                lock.withLock { failed = true }
+                return
+            }
+            var bytes = [UInt8](repeating: 0, count: 4_096)
+            let readCount = Darwin.read(
+                descriptor,
+                &bytes,
+                bytes.count
+            )
+            if readCount == 0 {
+                return
+            }
+            if readCount < 0 {
+                if errno == EINTR { continue }
+                lock.withLock { failed = true }
+                return
+            }
+            record(readCount)
+        }
+    }
+
     func drain(_ handle: FileHandle) {
         while true {
             do {
@@ -929,18 +974,22 @@ private final class BoundedAppServerErrorOutput: @unchecked Sendable {
                 else {
                     return
                 }
-                lock.withLock {
-                    let next = count.addingReportingOverflow(chunk.count)
-                    if next.overflow || next.partialValue > limit {
-                        truncated = true
-                        count = limit
-                    } else {
-                        count = next.partialValue
-                    }
-                }
+                record(chunk.count)
             } catch {
                 lock.withLock { failed = true }
                 return
+            }
+        }
+    }
+
+    private func record(_ byteCount: Int) {
+        lock.withLock {
+            let next = count.addingReportingOverflow(byteCount)
+            if next.overflow || next.partialValue > limit {
+                truncated = true
+                count = limit
+            } else {
+                count = next.partialValue
             }
         }
     }

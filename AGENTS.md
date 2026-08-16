@@ -129,8 +129,14 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   composition 与 39B2c machine admission。39B2a implementation、73-test
   Lifecycle、103-test Investigation、865-test serialized regression 与
   independent post-fix review 已通过；authoritative full verifier 23/23
-  stages 单次 exit 0（932 秒）。39B2a 已完成；39B2b 是下一 checkpoint，
-  只有 39B2c 可以作 machine readiness claim；Task 39 尚未完成。
+  stages 单次 exit 0（932 秒）。39B2b 已进一步拆为 39B2b-i
+  helper-owned contained worker 与 39B2b-ii signed diagnostic-App/Task 38
+  composition。39B2b-i 的 root-helper/UID-worker boundary、closed broker、
+  fixed contained session、37-test focused regression、889-test serialized
+  regression 与 independent post-fix review 已完成；authoritative full
+  verifier 23/23 stages 单次 exit 0（933.21 秒）。39B2b-i 已完成。只有
+  39B2c 可以作
+  machine readiness claim；Task 39 尚未完成。
   真实 App Trash 依赖仍保持关闭，生产 Deep Dive 仍为 implementation unavailable。
   逐 Task 完成 Upstream Study、
   实现、code review、focused/full verify、独立 commit/push；不得提前混入
@@ -222,6 +228,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B1b-i review / completion audit | [docs/reports/phase-d-task-39b1b-i-review.md](docs/reports/phase-d-task-39b1b-i-review.md) |
 | Phase D Task 39B1b-ii review / completion audit | [docs/reports/phase-d-task-39b1b-ii-review.md](docs/reports/phase-d-task-39b1b-ii-review.md) |
 | Phase D Task 39B2a review / completion audit | [docs/reports/phase-d-task-39b2a-review.md](docs/reports/phase-d-task-39b2a-review.md) |
+| Phase D Task 39B2b-i review / completion audit | [docs/reports/phase-d-task-39b2b-i-review.md](docs/reports/phase-d-task-39b2b-i-review.md) |
 | Epic 2–4 历史计划 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) |
 | Epic 2–4 最终 Gate | [docs/reports/epic-2-4-validation-report.md](docs/reports/epic-2-4-validation-report.md) |
 | Epic 0–1 历史计划与证据 | [docs/plans/completed/epic-0-1-foundation-spikes.md](docs/plans/completed/epic-0-1-foundation-spikes.md) |
@@ -288,8 +295,12 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   transport implementation 已完成；73-test Lifecycle、103-test
   Investigation、865-test serialized regression 与 independent post-fix
   review 已通过，authoritative full verifier 23/23 stages 单次 exit 0
-  （932 秒）。39B2a 已完成；39B2b signed composition 是下一 checkpoint；
-  39B2c 才是 machine admission，Task 39 尚未完成。
+  （932 秒）。39B2a 已完成。39B2b 已拆为 39B2b-i helper-owned contained
+  worker 与 39B2b-ii signed diagnostic-App/Task 38 composition；39B2b-i
+  implementation、37-test focused regression、889-test serialized regression
+  与 independent post-fix review 已完成，authoritative full verifier 23/23
+  stages 单次 exit 0（933.21 秒）。39B2b-i 已完成。39B2c 才是 machine admission，
+  Task 39 尚未完成。
 Deep Dive 的旧 Broker-only no-go 已被 ADR 0004 的 capability-first 边界取代；
 当前仍不可用的原因是生产 Deep Dive 尚未实现，而非 R6 或 Codex 工具能力。
 R6 不证明 release distribution、FDA/TCC 或 production Deep Dive；

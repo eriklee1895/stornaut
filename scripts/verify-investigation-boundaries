@@ -12,6 +12,7 @@ runtime_root=Sources/StornautInvestigationRuntime
 diagnostic_root=Sources/StornautInvestigationDiagnostic
 lifecycle_root=Sources/StornautLifecycle
 lifecycle_helper=StornautLifecycleHelper/main.swift
+contained_session=Sources/StornautCodex/Runtime/CodexContainedInteractiveSession.swift
 required_files=(
     "$investigation_root/InvestigationCanonical.swift"
     "$investigation_root/InvestigationBudget.swift"
@@ -40,6 +41,7 @@ required_files=(
     "$diagnostic_root/InvestigationRuntimeDiagnosticAppLeaf.swift"
     "$lifecycle_root/LifecycleInteractiveSessionContract.swift"
     "$lifecycle_root/LifecycleSupervisorXPC.swift"
+    "$contained_session"
     "$lifecycle_helper"
 )
 
@@ -123,14 +125,6 @@ if rg -n \
     "$diagnostic_root" \
     --glob '*.swift'; then
     print -u2 "Investigation runtime composition contains a direct network surface."
-    exit 1
-fi
-
-if rg -n \
-    'handleInteractive|LifecycleInteractiveSessionXPCWire' \
-    "$lifecycle_helper"; then
-    print -u2 \
-        "Lifecycle helper exported the 39B2b interactive wire during 39B2a."
     exit 1
 fi
 
@@ -243,7 +237,8 @@ python3 - \
     "$lifecycle_root/LifecycleInteractiveSessionContract.swift" \
     "$lifecycle_root/LifecycleSupervisorXPC.swift" \
     "$runtime_root/InvestigationLifecycleAppServerTransport.swift" \
-    "$lifecycle_helper" <<'PY'
+    "$lifecycle_helper" \
+    "$contained_session" <<'PY'
 import json
 from pathlib import Path
 import re
@@ -345,6 +340,7 @@ interactive_transport_source = Path(sys.argv[9]).read_text(
     encoding="utf-8"
 )
 lifecycle_helper_source = Path(sys.argv[10]).read_text(encoding="utf-8")
+contained_session_source = Path(sys.argv[11]).read_text(encoding="utf-8")
 
 required_public_facade = {
     "public func start(",
@@ -578,14 +574,89 @@ for prohibited in (
             f"{prohibited}"
         )
 
-for prohibited in (
-    "handleInteractive",
+required_interactive_helper = {
     "LifecycleInteractiveSessionXPCWire",
+    "func handleInteractive(",
+    "LifecycleInteractiveSessionBroker(",
+    "CodexContainedInteractiveSession()",
+    "interactiveWorkerMode",
+    "runInteractiveWorkerMode(",
+    "setuid(identity.userID) == 0",
+    "F_SETNOSIGPIPE",
+}
+missing_interactive_helper = {
+    marker
+    for marker in required_interactive_helper
+    if marker not in lifecycle_helper_source
+}
+if missing_interactive_helper:
+    raise SystemExit(
+        "Lifecycle helper interactive composition drifted: "
+        f"{sorted(missing_interactive_helper)}"
+    )
+worker_start = lifecycle_helper_source.index(
+    "private func runInteractiveWorkerMode("
+)
+worker_end = lifecycle_helper_source.index(
+    "\n#endif",
+    worker_start,
+)
+worker_source = lifecycle_helper_source[worker_start:worker_end]
+drop_index = worker_source.index("setuid(identity.userID) == 0")
+session_index = worker_source.index(
+    "CodexContainedInteractiveSession()"
+)
+if session_index <= drop_index:
+    raise SystemExit(
+        "Contained Codex session is constructed before helper identity drop"
+    )
+root_helper_source = (
+    lifecycle_helper_source[:worker_start]
+    + lifecycle_helper_source[worker_end:]
+)
+if "CodexContainedInteractiveSession()" in root_helper_source:
+    raise SystemExit(
+        "Root helper gained a direct contained Codex session constructor"
+    )
+
+configuration_match = re.search(
+    r"public struct CodexContainedInteractiveSessionConfiguration:"
+    r"(.*?)\n}",
+    contained_session_source,
+    re.DOTALL,
+)
+if configuration_match is None:
+    raise SystemExit("Missing contained interactive public configuration")
+configuration_source = configuration_match.group(1)
+required_configuration = {
+    "public let investigationID: UUID",
+    "public let validBefore: Date",
+    "public let maximumLineBytes: Int",
+    "public let maximumSessionBytes: Int",
+}
+missing_configuration = {
+    marker
+    for marker in required_configuration
+    if marker not in configuration_source
+}
+if missing_configuration:
+    raise SystemExit(
+        "Contained interactive configuration drifted: "
+        f"{sorted(missing_configuration)}"
+    )
+for prohibited in (
+    "URL",
+    "executable",
+    "provider",
+    "model",
+    "argument",
+    "environment",
+    "String",
 ):
-    if prohibited in lifecycle_helper_source:
+    if prohibited in configuration_source:
         raise SystemExit(
-            "Lifecycle helper implemented the 39B2b wire during 39B2a: "
-            f"{prohibited}"
+            "Contained interactive public configuration exposes launch "
+            f"authority: {prohibited}"
         )
 
 required_prompt = {
