@@ -125,6 +125,126 @@ func investigationBlockedTerminalPersistsNoReportOrEvidence() async throws {
 }
 
 @Test
+func investigationAtomicTerminalSettlementMovesFromRequestStateInOneTransaction()
+    async throws
+{
+    let fixture = try InvestigationStoreV4Fixture()
+    let store = try EvidenceStore(configuration: .memory)
+    try await fixture.seed(store)
+    let created = try await store.createInvestigation(
+        fixture.command(
+            investigationID: "investigation-terminal-atomic",
+            runID: "investigation-run-terminal-atomic"
+        )
+    )
+    _ = try await store.transitionInvestigationRun(
+        InvestigationRunTransitionCommand(
+            investigationID: created.id,
+            runID: created.runID,
+            expectedRunState: .planned,
+            runState: .ready,
+            sessionState: .ready,
+            stage: .prioritize,
+            updatedAt: created.createdAt.addingTimeInterval(1)
+        )
+    )
+    _ = try await store.transitionInvestigationRun(
+        InvestigationRunTransitionCommand(
+            investigationID: created.id,
+            runID: created.runID,
+            expectedRunState: .ready,
+            runState: .running,
+            sessionState: .running,
+            stage: .identify,
+            updatedAt: created.createdAt.addingTimeInterval(2)
+        )
+    )
+    _ = try await store.transitionInvestigationRun(
+        InvestigationRunTransitionCommand(
+            investigationID: created.id,
+            runID: created.runID,
+            expectedRunState: .running,
+            runState: .stopRequested,
+            sessionState: .stopRequested,
+            stage: .verify,
+            updatedAt: created.createdAt.addingTimeInterval(3)
+        )
+    )
+    let command = try terminalCommand(
+        session: created,
+        state: .partial,
+        sessionState: .partial,
+        reportID: "investigation-report-terminal-atomic",
+        cause: .userStopped,
+        terminalAt: created.createdAt.addingTimeInterval(4)
+    )
+
+    let result = try await store.settleInvestigationTerminal(
+        command,
+        expectedRunState: .stopRequested,
+        maximumDurationNanoseconds: 90_000_000_000
+    )
+    let replay = try await store.settleInvestigationTerminal(
+        command,
+        expectedRunState: .stopRequested,
+        maximumDurationNanoseconds: 90_000_000_000
+    )
+
+    #expect(result == replay)
+    #expect(result.investigation.state == .partial)
+    #expect(result.report?.id == command.report?.id)
+}
+
+@Test
+func investigationTerminalSettlementHonorsShorterOuterDeadline()
+    async throws
+{
+    let fixture = try InvestigationStoreV4Fixture()
+    let deadline = InvestigationTerminalDeadlineClock()
+    let store = try EvidenceStore(
+        configuration: .memory,
+        testHooks: EvidenceStoreTestHooks(
+            monotonicNanoseconds: { deadline.next() },
+            isCancelled: { false }
+        )
+    )
+    try await fixture.seed(store)
+    let created = try await store.createInvestigation(
+        fixture.command(
+            investigationID: "investigation-terminal-outer-deadline",
+            runID: "investigation-run-terminal-outer-deadline"
+        )
+    )
+    try await enterTerminalBarrier(
+        store: store,
+        session: created,
+        cause: .coverageReached
+    )
+    let command = try terminalCommand(
+        session: created,
+        state: .completed,
+        sessionState: .completed,
+        reportID: "investigation-report-terminal-outer-deadline",
+        cause: .coverageReached,
+        terminalAt: created.createdAt.addingTimeInterval(4)
+    )
+    deadline.arm(deadlineNanoseconds: 35_000_000_000)
+
+    await #expect(throws: EvidenceStoreError.operationDeadlineExceeded) {
+        _ = try await store.settleInvestigationTerminal(
+            command,
+            expectedRunState: .terminalBarrier,
+            maximumDurationNanoseconds: 35_000_000_000
+        )
+    }
+    #expect(
+        try await store.investigation(id: created.id)?.state
+            == .terminalBarrier
+    )
+    #expect(await store.storeHealth() == .ready)
+}
+
+@Test
 func investigationTerminalRecordsPageWithinExactOwners() async throws {
     let fixture = try InvestigationStoreV4Fixture()
     let store = try EvidenceStore(configuration: .memory)
@@ -449,6 +569,31 @@ private func budgetEvent(
             quality: DomainToken(rawValue: "quality.observed")
         )
     )
+}
+
+private final class InvestigationTerminalDeadlineClock:
+    @unchecked Sendable
+{
+    private let lock = NSLock()
+    private var deadlineNanoseconds: UInt64?
+    private var readCount = 0
+
+    func arm(deadlineNanoseconds: UInt64) {
+        lock.withLock {
+            self.deadlineNanoseconds = deadlineNanoseconds
+            readCount = 0
+        }
+    }
+
+    func next() -> UInt64 {
+        lock.withLock {
+            guard let deadlineNanoseconds else {
+                return 0
+            }
+            defer { readCount += 1 }
+            return readCount == 0 ? 0 : deadlineNanoseconds
+        }
+    }
 }
 
 private final class InvestigationTestWallClock: @unchecked Sendable {

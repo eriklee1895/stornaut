@@ -315,6 +315,7 @@ final class SQLiteConnection: @unchecked Sendable {
 
     func transaction<T>(
         operation: String,
+        maximumDurationNanoseconds: UInt64? = nil,
         body: () throws -> T
     ) throws -> T {
         guard health == .ready else {
@@ -327,7 +328,14 @@ final class SQLiteConnection: @unchecked Sendable {
             }
         }
         if isBounded {
-            try beginOperation(durationNanoseconds: 90_000_000_000)
+            let duration = min(
+                maximumDurationNanoseconds ?? 90_000_000_000,
+                90_000_000_000
+            )
+            guard duration > 0 else {
+                throw EvidenceStoreError.operationDeadlineExceeded
+            }
+            try beginOperation(durationNanoseconds: duration)
             reportInvestigationProgress(
                 phase: .lockAcquisition,
                 force: true
@@ -980,6 +988,7 @@ final class SQLiteConnection: @unchecked Sendable {
         switch operation {
         case "investigation.create",
              "investigation.rejoin",
+             "investigation.runtimeAdmission",
              "investigation.terminal",
              "investigation.continuation",
              "investigation.recoveryPromotion":
@@ -1072,10 +1081,20 @@ final class SQLiteConnection: @unchecked Sendable {
                 table: "investigation_runs",
                 columns: ["state", "stage", "terminal_cause", "updated_at_ms"]
             )
+        case "investigation.runtimeAdmission.run":
+            return .update(
+                table: "investigation_runs",
+                columns: ["state", "updated_at_ms"]
+            )
         case "investigation.transition.session":
             return .update(
                 table: "investigation_sessions",
                 columns: ["state", "stage", "updated_at_ms"]
+            )
+        case "investigation.runtimeAdmission.session":
+            return .update(
+                table: "investigation_sessions",
+                columns: ["state", "updated_at_ms"]
             )
         case "investigation.terminal.run":
             return .update(

@@ -290,6 +290,30 @@ func investigationBudgetLedgerEnforcesSingleAndCumulativeContextLimits() throws 
 }
 
 @Test
+func investigationTurnAndContextReservationIsAtomic() throws {
+    var ledger = InvestigationBudgetLedger(
+        identity: fixtureInvestigationBudgetIdentity(),
+        limits: .forPreset(.focused)
+    )
+
+    #expect(throws: InvestigationBudgetError.hardLimitExceeded) {
+        try ledger.reserveTurn(
+            contextByteCount: 262_145,
+            coordinatorOrdinal: 1
+        )
+    }
+    #expect(ledger.hardUsage.coordinatorTurns == 0)
+    #expect(ledger.hardUsage.cumulativeContextBytes == 0)
+
+    try ledger.reserveTurn(
+        contextByteCount: 262_144,
+        coordinatorOrdinal: 1
+    )
+    #expect(ledger.hardUsage.coordinatorTurns == 1)
+    #expect(ledger.hardUsage.cumulativeContextBytes == 262_144)
+}
+
+@Test
 func investigationBudgetLedgerOwnsProbeLeasesAndNoGainOnce() throws {
     let identity = fixtureInvestigationBudgetIdentity()
     var ledger = InvestigationBudgetLedger(

@@ -612,6 +612,96 @@ public actor EvidenceStore {
         }
     }
 
+    package func withInvestigationRuntimeAdmission(
+        _ request: InvestigationRuntimeAdmissionRequestV1,
+        operation: @Sendable (
+            InvestigationRuntimeAdmissionContextV1
+        ) throws -> InvestigationRuntimeAdmissionClosureResultV1
+    ) throws -> InvestigationRuntimeAdmissionResultV1 {
+        try connection.transaction(
+            operation: "investigation.runtimeAdmission"
+        ) {
+            guard let stored = try loadInvestigation(
+                id: request.investigationID
+            ), stored.runID == request.runID,
+               stored.state == .ready,
+               stored.plan.sourceFingerprint == request.sourceFingerprint,
+               stored.plan.fingerprint == request.planFingerprint,
+               stored.plan.targetSetFingerprint
+                == request.targetSetFingerprint,
+               storeMilliseconds(request.startedAt)
+                >= storeMilliseconds(stored.updatedAt)
+            else {
+                throw InvestigationPersistenceError.conflictingReplay
+            }
+            switch try rejoinInvestigationInCurrentTransaction(
+                id: request.investigationID,
+                currentTime: now()
+            ) {
+            case .matching:
+                break
+            case .stale:
+                throw InvestigationPersistenceError.sourceStale
+            case .corrupt:
+                throw InvestigationPersistenceError.sourceCorrupt
+            case .expired:
+                throw InvestigationPersistenceError.sourceExpired
+            case .missing:
+                throw InvestigationPersistenceError.sourceMissing
+            }
+            let context = InvestigationRuntimeAdmissionContextV1(
+                plan: stored.plan,
+                runID: stored.runID,
+                runtimeReceiptID: request.runtimeReceiptID,
+                runtimeReceiptSchema: request.runtimeReceiptSchema
+            )
+            let closureResult = try operation(context)
+            let updatedAt = storeMilliseconds(request.startedAt)
+            try connection.execute(
+                """
+                UPDATE investigation_runs
+                SET state = ?, updated_at_ms = ?
+                WHERE investigation_id = ? AND run_id = ?
+                  AND state = ?
+                """,
+                bindings: [
+                    .text(InvestigationRunState.running.rawValue),
+                    .integer(updatedAt),
+                    .text(request.investigationID.rawValue),
+                    .text(request.runID.rawValue),
+                    .text(InvestigationRunState.ready.rawValue),
+                ],
+                operation: "investigation.runtimeAdmission.run"
+            )
+            try connection.execute(
+                """
+                UPDATE investigation_sessions
+                SET state = ?, updated_at_ms = ?
+                WHERE id = ? AND state = ?
+                """,
+                bindings: [
+                    .text(InvestigationSessionState.running.rawValue),
+                    .integer(updatedAt),
+                    .text(request.investigationID.rawValue),
+                    .text(InvestigationSessionState.ready.rawValue),
+                ],
+                operation: "investigation.runtimeAdmission.session"
+            )
+            guard let running = try loadInvestigation(
+                id: request.investigationID
+            ), running.runID == request.runID,
+               running.state == .running,
+               running.stage == stored.stage
+            else {
+                throw InvestigationPersistenceError.invalidStoredRecord
+            }
+            return InvestigationRuntimeAdmissionResultV1(
+                investigation: running,
+                rootSessionID: closureResult.rootSessionID
+            )
+        }
+    }
+
     public func investigation(
         id: InvestigationID
     ) throws -> InvestigationStoredSession? {
@@ -743,7 +833,8 @@ public actor EvidenceStore {
     ) throws -> InvestigationTerminalResult {
         try commitInvestigationTerminal(
             command,
-            transactionOperation: "investigation.terminal"
+            transactionOperation: "investigation.terminal",
+            expectedRunState: .terminalBarrier
         )
     }
 
@@ -752,15 +843,47 @@ public actor EvidenceStore {
     ) throws -> InvestigationTerminalResult {
         try commitInvestigationTerminal(
             command,
-            transactionOperation: "investigation.recoveryPromotion"
+            transactionOperation: "investigation.recoveryPromotion",
+            expectedRunState: .terminalBarrier
+        )
+    }
+
+    package func settleInvestigationTerminal(
+        _ command: InvestigationTerminalCommand,
+        expectedRunState: InvestigationRunState,
+        maximumDurationNanoseconds: UInt64
+    ) throws -> InvestigationTerminalResult {
+        try commitInvestigationTerminal(
+            command,
+            transactionOperation: "investigation.terminal",
+            expectedRunState: expectedRunState,
+            maximumDurationNanoseconds: maximumDurationNanoseconds
+        )
+    }
+
+    package func settleInvestigationRecovery(
+        _ command: InvestigationTerminalCommand,
+        expectedRunState: InvestigationRunState,
+        maximumDurationNanoseconds: UInt64
+    ) throws -> InvestigationTerminalResult {
+        try commitInvestigationTerminal(
+            command,
+            transactionOperation: "investigation.recoveryPromotion",
+            expectedRunState: expectedRunState,
+            maximumDurationNanoseconds: maximumDurationNanoseconds
         )
     }
 
     private func commitInvestigationTerminal(
         _ command: InvestigationTerminalCommand,
-        transactionOperation: String
+        transactionOperation: String,
+        expectedRunState: InvestigationRunState,
+        maximumDurationNanoseconds: UInt64? = nil
     ) throws -> InvestigationTerminalResult {
-        try connection.transaction(operation: transactionOperation) {
+        try connection.transaction(
+            operation: transactionOperation,
+            maximumDurationNanoseconds: maximumDurationNanoseconds
+        ) {
             if let replay = try terminalReplay(command) {
                 return replay
             }
@@ -784,15 +907,66 @@ public actor EvidenceStore {
                 investigationID: command.investigationID,
                 runID: command.runID
             )
-            guard current.runState == .terminalBarrier,
-                  current.sessionState == .terminalBarrier,
-                  current.terminalCause == command.cause,
+            guard current.runState == expectedRunState,
+                  current.sessionState.rawValue
+                    == expectedRunState.rawValue,
                   current.terminalReportID == nil,
                   current.terminalAtMilliseconds == nil,
                   storeMilliseconds(command.terminalAt)
                     >= current.updatedAtMilliseconds
             else {
                 throw InvestigationPersistenceError.conflictingTerminalReplay
+            }
+            if expectedRunState == .terminalBarrier {
+                guard current.terminalCause == command.cause else {
+                    throw InvestigationPersistenceError
+                        .conflictingTerminalReplay
+                }
+            } else {
+                guard current.terminalCause == nil,
+                      Self.isTerminalSettlementSource(expectedRunState)
+                else {
+                    throw InvestigationPersistenceError
+                        .conflictingTerminalReplay
+                }
+                let barrierAt = storeMilliseconds(command.terminalAt)
+                try connection.execute(
+                    """
+                    UPDATE investigation_runs
+                    SET state = ?, stage = ?, terminal_cause = ?,
+                        updated_at_ms = ?
+                    WHERE investigation_id = ? AND run_id = ?
+                      AND state = ?
+                    """,
+                    bindings: [
+                        .text(InvestigationRunState.terminalBarrier.rawValue),
+                        .text(command.stage.rawValue),
+                        .text(command.cause.rawValue),
+                        .integer(barrierAt),
+                        .text(command.investigationID.rawValue),
+                        .text(command.runID.rawValue),
+                        .text(expectedRunState.rawValue),
+                    ],
+                    operation: "investigation.transition.run"
+                )
+                try connection.execute(
+                    """
+                    UPDATE investigation_sessions
+                    SET state = ?, stage = ?, updated_at_ms = ?
+                    WHERE id = ? AND state = ?
+                    """,
+                    bindings: [
+                        .text(
+                            InvestigationSessionState
+                                .terminalBarrier.rawValue
+                        ),
+                        .text(command.stage.rawValue),
+                        .integer(barrierAt),
+                        .text(command.investigationID.rawValue),
+                        .text(expectedRunState.rawValue),
+                    ],
+                    operation: "investigation.transition.session"
+                )
             }
 
             let prepared = try prepareTerminalCommand(command)
@@ -960,6 +1134,26 @@ public actor EvidenceStore {
                 throw InvestigationPersistenceError.invalidStoredRecord
             }
             return result
+        }
+    }
+
+    private static func isTerminalSettlementSource(
+        _ state: InvestigationRunState
+    ) -> Bool {
+        switch state {
+        case .planned,
+             .awaitingDisclosure,
+             .ready,
+             .running,
+             .pauseRequested,
+             .stopRequested:
+            true
+        case .terminalBarrier,
+             .completed,
+             .partial,
+             .blocked,
+             .failed:
+            false
         }
     }
 
@@ -4214,7 +4408,14 @@ public actor EvidenceStore {
         guard let row = rows.first else {
             throw InvestigationPersistenceError.invalidStoredRecord
         }
-        guard row.state != InvestigationRunState.terminalBarrier.rawValue else {
+        guard let storedState = InvestigationRunState(
+            rawValue: row.state
+        ) else {
+            throw InvestigationPersistenceError.invalidStoredRecord
+        }
+        if storedState == .terminalBarrier
+            || Self.isTerminalSettlementSource(storedState)
+        {
             return nil
         }
         guard row.state == command.runState.rawValue,

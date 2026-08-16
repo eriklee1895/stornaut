@@ -21,6 +21,10 @@ let package = Package(
             targets: ["StornautLifecycle"]
         ),
         .library(
+            name: "StornautInvestigation",
+            targets: ["StornautInvestigation"]
+        ),
+        .library(
             name: "StornautProbeBridge",
             targets: ["StornautProbeBridge"]
         ),
@@ -76,6 +80,16 @@ let package = Package(
         .target(
             name: "StornautLifecycle",
             dependencies: ["CLifecycleSupport"]
+        ),
+        .target(
+            name: "StornautInvestigation",
+            dependencies: [
+                "StornautCore",
+                "StornautCodex",
+            ],
+            resources: [
+                .copy("Resources/investigation-prompt-v1.txt"),
+            ]
         ),
         .target(
             name: "CLifecycleSupport",
@@ -134,6 +148,14 @@ let package = Package(
         .testTarget(
             name: "StornautLifecycleTests",
             dependencies: ["StornautLifecycle"]
+        ),
+        .testTarget(
+            name: "StornautInvestigationTests",
+            dependencies: [
+                "StornautInvestigation",
+                "StornautCore",
+                "StornautCodex",
+            ]
         ),
         .testTarget(
             name: "RuleCompilerTests",

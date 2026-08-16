@@ -1,6 +1,7 @@
 # Task 39 Implementation Brief — Signed-App Production Runtime Admission
 
-> **Status:** Approved; blocked on pushed Task 38 baseline.
+> **Status:** Approved; next implementation Task after the completed Task 38
+> coordinator baseline is committed and pushed.
 >
 > **Parent plan:**
 > [Phase D Conditional Deep Dive](phase-d-conditional-deep-dive.md)

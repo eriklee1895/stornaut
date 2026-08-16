@@ -500,6 +500,34 @@ public struct InvestigationBudgetLedger: Sendable {
         )
     }
 
+    public mutating func reserveTurn(
+        contextByteCount: UInt64,
+        coordinatorOrdinal: UInt64
+    ) throws {
+        guard contextByteCount > 0 else {
+            throw InvestigationBudgetError.invalidAmount
+        }
+        try requireIncreasingOrdinal(coordinatorOrdinal)
+        guard hardAdmission(.coordinatorTurns, amount: 1) == .admitted,
+              hardAdmission(
+                  .cumulativeContextBytes,
+                  amount: contextByteCount
+              ) == .admitted
+        else {
+            throw InvestigationBudgetError.hardLimitExceeded
+        }
+        let nextTurnCount = hardUsage.coordinatorTurns
+            .addingReportingOverflow(1)
+        let nextContextBytes = hardUsage.cumulativeContextBytes
+            .addingReportingOverflow(contextByteCount)
+        guard !nextTurnCount.overflow, !nextContextBytes.overflow else {
+            throw InvestigationBudgetError.integerOverflow
+        }
+        hardUsage.coordinatorTurns = nextTurnCount.partialValue
+        hardUsage.cumulativeContextBytes = nextContextBytes.partialValue
+        lastCoordinatorOrdinal = coordinatorOrdinal
+    }
+
     public mutating func acquireProbeLease(
         coordinatorOrdinal: UInt64
     ) throws -> InvestigationProbeLease {

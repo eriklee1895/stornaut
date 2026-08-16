@@ -44,6 +44,22 @@ public struct ProbeBudgetLimits: Codable, Sendable, Equatable {
     )
 }
 
+public struct ProbeBudgetUsage: Sendable, Equatable {
+    public let callCount: Int
+    public let readBytes: Int
+    public let outputBytes: Int
+
+    public init(
+        callCount: Int,
+        readBytes: Int,
+        outputBytes: Int
+    ) {
+        self.callCount = callCount
+        self.readBytes = readBytes
+        self.outputBytes = outputBytes
+    }
+}
+
 public actor ProbeSessionBudget {
     private let limits: ProbeBudgetLimits
     private var callCount = 0
@@ -52,6 +68,14 @@ public actor ProbeSessionBudget {
 
     public init(limits: ProbeBudgetLimits) {
         self.limits = limits
+    }
+
+    public var usage: ProbeBudgetUsage {
+        ProbeBudgetUsage(
+            callCount: callCount,
+            readBytes: readBytes,
+            outputBytes: outputBytes
+        )
     }
 
     func reserveCall() -> Bool {

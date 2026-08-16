@@ -360,12 +360,16 @@ public struct InvestigationEvidencePayload:
     Equatable
 {
     public let summary: String
+    public let advisoryID: DomainToken?
+    public let sourceLabel: DomainToken?
     public let confidence: DomainToken
     public let uncertainty: String
     public let webProvenance: PersistedWebProvenance?
 
     public init(
         summary: String,
+        advisoryID: DomainToken? = nil,
+        sourceLabel: DomainToken? = nil,
         confidence: DomainToken,
         uncertainty: String,
         webProvenance: PersistedWebProvenance? = nil
@@ -380,6 +384,8 @@ public struct InvestigationEvidencePayload:
             throw InvestigationPersistenceDomainError.invalidText
         }
         self.summary = summary
+        self.advisoryID = advisoryID
+        self.sourceLabel = sourceLabel
         self.confidence = confidence
         self.uncertainty = uncertainty
         self.webProvenance = webProvenance
@@ -393,6 +399,14 @@ public struct InvestigationEvidencePayload:
         let container = try decoder.container(keyedBy: CodingKeys.self)
         try self.init(
             summary: container.decode(String.self, forKey: .summary),
+            advisoryID: container.decodeIfPresent(
+                DomainToken.self,
+                forKey: .advisoryID
+            ),
+            sourceLabel: container.decodeIfPresent(
+                DomainToken.self,
+                forKey: .sourceLabel
+            ),
             confidence: container.decode(
                 DomainToken.self,
                 forKey: .confidence
@@ -410,6 +424,8 @@ public struct InvestigationEvidencePayload:
 
     private enum CodingKeys: String, CodingKey, CaseIterable {
         case summary
+        case advisoryID
+        case sourceLabel
         case confidence
         case uncertainty
         case webProvenance
@@ -770,6 +786,26 @@ public struct InvestigationRecoveryCandidate: Sendable, Equatable {
     public let plan: InvestigationPlan
     public let updatedAt: Date
     public let expiresAt: Date
+
+    public init(
+        investigationID: InvestigationID,
+        runID: InvestigationRunID,
+        state: InvestigationRunState,
+        stage: InvestigationStage,
+        terminalCause: InvestigationTerminalCause?,
+        plan: InvestigationPlan,
+        updatedAt: Date,
+        expiresAt: Date
+    ) {
+        self.investigationID = investigationID
+        self.runID = runID
+        self.state = state
+        self.stage = stage
+        self.terminalCause = terminalCause
+        self.plan = plan
+        self.updatedAt = updatedAt
+        self.expiresAt = expiresAt
+    }
 }
 
 public struct InvestigationStoredReport: Sendable, Equatable {

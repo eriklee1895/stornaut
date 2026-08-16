@@ -1,7 +1,9 @@
 # Task 38 Implementation Brief — Closed Investigation Coordinator with Fake Runtime
 
-> **Status:** Approved; unblocked by completed Task 37. Next implementation
-> Task from the pushed Task 37 baseline.
+> **Status:** Complete; implementation, independent review, serialized
+> SwiftPM regression and the 23/23-stage authoritative full verifier passed.
+> Completion evidence:
+> [Task 38 Review](../../reports/phase-d-task-38-review.md).
 >
 > **Parent plan:**
 > [Phase D Conditional Deep Dive](phase-d-conditional-deep-dive.md)

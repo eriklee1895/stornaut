@@ -94,7 +94,15 @@
 > increment `210,944,240` bytes。普通 suites 明确跳过该显式 opt-in
 > benchmark，worker 直接运行已构建 test bundle、不嵌套 SwiftPM。
 > authoritative `scripts/verify --full` 23/23 stages 单次 exit 0（893.65 秒）。
-> Task 37 已完成，Task 38 已解锁为下一项实施任务。
+> Task 38 closed dependency-injected Investigation coordinator/fake runtime、
+> Store-owned one-shot admission、strict event/lineage/token normalization、
+> scientific loop、terminal/recovery barrier、versioned prompt 与 structural
+> no-Executor gate 已完成。review 发现的 prose replay、actor reentrancy、
+> Probe usage regression、spawn started/completed、completion-side tool
+> classification 与 terminal deadline 六类 P1 问题均已 tests-first 修复；
+> 811-test serialized regression、independent post-fix review 与 authoritative
+> `scripts/verify --full` 23/23 stages 单次 exit 0（884.57 秒）。Task 39 已解锁
+> 为下一项 signed-App diagnostic gate；生产 Deep Dive 仍 unavailable。
 > Task 5 的历史
 > Broker-only no-go 已由 ADR 0004 capability-first 决策修订，Deep Dive 因
 > 生产产品流程尚未实现而 unavailable；
@@ -356,11 +364,13 @@ no-Executor protocol seam；R5 signed-App helper 与 R6 final admission 已
 Phase D 当前实现入口为
 [Conditional Deep Dive Plan](../plans/active/phase-d-conditional-deep-dive.md)、
 [Investigation Canonical v1](../specs/investigation-canonical-v1.md) 与
-[Task 37 Brief](../plans/active/task-37-implementation-brief.md)；Task 36 的
+[Task 39 Brief](../plans/active/task-39-implementation-brief.md)；Task 36 的
 完成证据见 [Task 36 Review](../reports/phase-d-task-36-review.md)，Task 37
-完成证据见 [Task 37 Review](../reports/phase-d-task-37-review.md)。Task 38
-已解锁并按其 [Implementation Brief](../plans/active/task-38-implementation-brief.md)
-实施。生产 Deep Dive 继续 unavailable，直到 Task 44 final admission。
+完成证据见 [Task 37 Review](../reports/phase-d-task-37-review.md)，Task 38
+完成证据见 [Task 38 Review](../reports/phase-d-task-38-review.md)。Task 39
+已解锁并只按其 signed-App diagnostic
+[Implementation Brief](../plans/active/task-39-implementation-brief.md) 实施。
+生产 Deep Dive 继续 unavailable，直到 Task 44 final admission。
 
 跨 Epic 的阶段依赖、no-go 分支和交付顺序由 [Delivery Roadmap](../plans/roadmap.md) 管理；新 active plan 不得另起一套宏观路线。
 
@@ -463,7 +473,9 @@ authoritative full verifier 单次 exit 0，计划已归档，Phase C admission 
 `go`。Task 36 deterministic Investigation foundation 已完成。Task 37 Store
 v4/persistence/retention/source rejoin 已完成实现、independent review 和两轮
 完整容量 gate，authoritative full verifier 23/23 stages 单次 exit 0；Task 37
-已完成，Task 38 已解锁。该 gate
+已完成。Task 38 closed coordinator/fake runtime、strict normalization、
+terminal/recovery barrier 与 structural no-Executor gate 已完成，
+authoritative full verifier 23/23 stages 单次 exit 0；Task 39 已解锁。该 gate
 要求证明完整调查能力和公共联网可用时，Codex 全进程树不可写用户数据、不可
 访问 localhost/私网/任意 Unix socket 且无 Executor 路径；不得用
 `danger-full-access`、命令/公共域名
