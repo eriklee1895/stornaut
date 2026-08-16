@@ -24,7 +24,8 @@ struct LifecycleSupervisorContractTests {
                 rawValue: UUID(
                     uuidString: "11111111-2222-3333-4444-555555555555"
                 )!
-            )
+            ),
+            evidenceBindingSHA256: lifecycleEvidenceBinding
         )
         let caller = authorizer.authorizedIdentity
 
@@ -42,6 +43,7 @@ struct LifecycleSupervisorContractTests {
         #expect(dispatcher.operations == [
             .start(
                 start.investigationID,
+                evidenceBindingSHA256: lifecycleEvidenceBinding,
                 requestingUserID: 501
             ),
             .cancel(
@@ -68,7 +70,10 @@ struct LifecycleSupervisorContractTests {
 
         #expect(throws: LifecycleSupervisorContractError.unauthorizedCaller) {
             _ = try contract.handle(
-                .start(LifecycleInvestigationID()),
+                .start(
+                    LifecycleInvestigationID(),
+                    evidenceBindingSHA256: lifecycleEvidenceBinding
+                ),
                 caller: LifecycleCallerIdentity(
                     processID: 702,
                     effectiveUserID: 501,
@@ -118,7 +123,10 @@ struct LifecycleSupervisorContractTests {
             throws: LifecycleSupervisorContractError.invalidCallerIdentity
         ) {
             _ = try contract.handle(
-                .start(LifecycleInvestigationID()),
+                .start(
+                    LifecycleInvestigationID(),
+                    evidenceBindingSHA256: lifecycleEvidenceBinding
+                ),
                 caller: caller
             )
         }
@@ -133,7 +141,8 @@ struct LifecycleSupervisorContractTests {
                 rawValue: UUID(
                     uuidString: "11111111-2222-3333-4444-555555555555"
                 )!
-            )
+            ),
+            evidenceBindingSHA256: lifecycleEvidenceBinding
         )
         let data = try JSONEncoder().encode(request)
         let object = try #require(
@@ -141,12 +150,17 @@ struct LifecycleSupervisorContractTests {
         )
 
         #expect(Set(object.keys) == [
+            "evidenceBindingSHA256",
             "investigationID",
             "protocolVersion",
             "type",
         ])
-        #expect(object["protocolVersion"] as? Int == 1)
+        #expect(object["protocolVersion"] as? Int == 2)
         #expect(object["type"] as? String == "start")
+        #expect(
+            object["evidenceBindingSHA256"] as? String
+                == lifecycleEvidenceBinding
+        )
         for forbidden in [
             "auditSessionID",
             "pid",
@@ -169,25 +183,47 @@ struct LifecycleSupervisorContractTests {
     func decoderRejectsUnknownFieldsVersionsAndCommands() {
         for object: [String: Any] in [
             [
+                "protocolVersion": 3,
+                "type": "start",
+                "investigationID": UUID().uuidString,
+                "evidenceBindingSHA256": lifecycleEvidenceBinding,
+            ],
+            [
+                "protocolVersion": 2,
+                "type": "spawn",
+                "investigationID": UUID().uuidString,
+                "evidenceBindingSHA256": lifecycleEvidenceBinding,
+            ],
+            [
                 "protocolVersion": 2,
                 "type": "start",
                 "investigationID": UUID().uuidString,
-            ],
-            [
-                "protocolVersion": 1,
-                "type": "spawn",
-                "investigationID": UUID().uuidString,
-            ],
-            [
-                "protocolVersion": 1,
-                "type": "start",
-                "investigationID": UUID().uuidString,
+                "evidenceBindingSHA256": lifecycleEvidenceBinding,
                 "executable": "/bin/sh",
             ],
             [
-                "protocolVersion": 1,
+                "protocolVersion": 2,
                 "type": "cancel",
                 "investigationID": "not-a-uuid",
+                "evidenceBindingSHA256": NSNull(),
+            ],
+            [
+                "protocolVersion": 2,
+                "type": "start",
+                "investigationID": UUID().uuidString,
+                "evidenceBindingSHA256": String(repeating: "a", count: 63),
+            ],
+            [
+                "protocolVersion": 2,
+                "type": "start",
+                "investigationID": UUID().uuidString,
+                "evidenceBindingSHA256": String(repeating: "A", count: 64),
+            ],
+            [
+                "protocolVersion": 2,
+                "type": "cancel",
+                "investigationID": UUID().uuidString,
+                "evidenceBindingSHA256": lifecycleEvidenceBinding,
             ],
         ] {
             let data = try! JSONSerialization.data(withJSONObject: object)
@@ -200,6 +236,9 @@ struct LifecycleSupervisorContractTests {
         }
     }
 }
+
+private let lifecycleEvidenceBinding =
+    String(repeating: "9", count: 64)
 
 private final class RecordingLifecycleCallerAuthorizer:
     LifecycleCallerAuthorizing,

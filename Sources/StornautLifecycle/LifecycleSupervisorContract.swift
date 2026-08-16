@@ -36,13 +36,17 @@ public enum LifecycleSupervisorRequest:
     Sendable,
     Equatable
 {
-    case start(LifecycleInvestigationID)
+    case start(
+        LifecycleInvestigationID,
+        evidenceBindingSHA256: String
+    )
     case cancel(LifecycleInvestigationID)
 
     private enum CodingKeys: String {
         case protocolVersion
         case type
         case investigationID
+        case evidenceBindingSHA256
     }
 
     private enum RequestType: String, Codable {
@@ -52,7 +56,7 @@ public enum LifecycleSupervisorRequest:
 
     public var investigationID: LifecycleInvestigationID {
         switch self {
-        case let .start(investigationID),
+        case let .start(investigationID, _),
              let .cancel(investigationID):
             investigationID
         }
@@ -65,6 +69,7 @@ public enum LifecycleSupervisorRequest:
                 CodingKeys.protocolVersion.rawValue,
                 CodingKeys.type.rawValue,
                 CodingKeys.investigationID.rawValue,
+                CodingKeys.evidenceBindingSHA256.rawValue,
             ])
         )
         guard
@@ -73,7 +78,7 @@ public enum LifecycleSupervisorRequest:
                 forKey: AnyLifecycleCodingKey(
                     CodingKeys.protocolVersion.rawValue
                 )
-            ) == 1
+            ) == 2
         else {
             throw DecodingError.dataCorruptedError(
                 forKey: AnyLifecycleCodingKey(
@@ -93,10 +98,42 @@ public enum LifecycleSupervisorRequest:
                 CodingKeys.investigationID.rawValue
             )
         )
+        let evidenceBindingSHA256 = try container.decodeIfPresent(
+            String.self,
+            forKey: AnyLifecycleCodingKey(
+                CodingKeys.evidenceBindingSHA256.rawValue
+            )
+        )
         switch type {
         case .start:
-            self = .start(investigationID)
+            guard
+                let evidenceBindingSHA256,
+                validLifecycleSHA256(evidenceBindingSHA256)
+            else {
+                throw DecodingError.dataCorruptedError(
+                    forKey: AnyLifecycleCodingKey(
+                        CodingKeys.evidenceBindingSHA256.rawValue
+                    ),
+                    in: container,
+                    debugDescription:
+                        "Invalid lifecycle evidence binding"
+                )
+            }
+            self = .start(
+                investigationID,
+                evidenceBindingSHA256: evidenceBindingSHA256
+            )
         case .cancel:
+            guard evidenceBindingSHA256 == nil else {
+                throw DecodingError.dataCorruptedError(
+                    forKey: AnyLifecycleCodingKey(
+                        CodingKeys.evidenceBindingSHA256.rawValue
+                    ),
+                    in: container,
+                    debugDescription:
+                        "Unexpected lifecycle evidence binding"
+                )
+            }
             self = .cancel(investigationID)
         }
     }
@@ -106,13 +143,13 @@ public enum LifecycleSupervisorRequest:
             keyedBy: AnyLifecycleCodingKey.self
         )
         try container.encode(
-            1,
+            2,
             forKey: AnyLifecycleCodingKey(
                 CodingKeys.protocolVersion.rawValue
             )
         )
         switch self {
-        case let .start(investigationID):
+        case let .start(investigationID, evidenceBindingSHA256):
             try container.encode(
                 RequestType.start,
                 forKey: AnyLifecycleCodingKey(CodingKeys.type.rawValue)
@@ -121,6 +158,12 @@ public enum LifecycleSupervisorRequest:
                 investigationID,
                 forKey: AnyLifecycleCodingKey(
                     CodingKeys.investigationID.rawValue
+                )
+            )
+            try container.encode(
+                evidenceBindingSHA256,
+                forKey: AnyLifecycleCodingKey(
+                    CodingKeys.evidenceBindingSHA256.rawValue
                 )
             )
         case let .cancel(investigationID):
@@ -132,6 +175,11 @@ public enum LifecycleSupervisorRequest:
                 investigationID,
                 forKey: AnyLifecycleCodingKey(
                     CodingKeys.investigationID.rawValue
+                )
+            )
+            try container.encodeNil(
+                forKey: AnyLifecycleCodingKey(
+                    CodingKeys.evidenceBindingSHA256.rawValue
                 )
             )
         }
@@ -161,6 +209,7 @@ public protocol LifecycleCallerAuthorizing: Sendable {
 public enum LifecycleSupervisorOperation: Sendable, Equatable {
     case start(
         LifecycleInvestigationID,
+        evidenceBindingSHA256: String,
         requestingUserID: uid_t
     )
     case cancel(
@@ -219,10 +268,12 @@ public struct LifecycleSupervisorContract: Sendable {
             throw LifecycleSupervisorContractError.unauthorizedCaller
         }
         switch request {
-        case let .start(investigationID):
+        case let .start(investigationID, evidenceBindingSHA256):
             return try dispatcher.dispatch(
                 .start(
                     investigationID,
+                    evidenceBindingSHA256:
+                        evidenceBindingSHA256,
                     requestingUserID: caller.effectiveUserID
                 )
             )
@@ -235,6 +286,14 @@ public struct LifecycleSupervisorContract: Sendable {
             )
         }
     }
+}
+
+private func validLifecycleSHA256(_ value: String) -> Bool {
+    value.count == 64
+        && value.unicodeScalars.allSatisfy {
+            (0x30...0x39).contains($0.value)
+                || (0x61...0x66).contains($0.value)
+        }
 }
 
 struct AnyLifecycleCodingKey: CodingKey, Hashable {

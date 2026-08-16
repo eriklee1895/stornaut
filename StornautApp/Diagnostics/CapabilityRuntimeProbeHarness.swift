@@ -1,5 +1,6 @@
 #if DEBUG
 import AppKit
+import CryptoKit
 import Darwin
 import Foundation
 import StornautCodex
@@ -68,7 +69,9 @@ enum CapabilityRuntimeProbeHarness {
             return await fullDiagnostic(
                 LifecycleInvestigationID(
                     rawValue: investigationID
-                )
+                ),
+                evidenceBindingSHA256:
+                    config.evidenceBindingSHA256
             )
         case .start:
             guard let investigationID = UUID(
@@ -82,7 +85,9 @@ enum CapabilityRuntimeProbeHarness {
                 .start(
                     LifecycleInvestigationID(
                         rawValue: investigationID
-                    )
+                    ),
+                    evidenceBindingSHA256:
+                        config.evidenceBindingSHA256
                 )
             )
         case .cancelFixture:
@@ -117,7 +122,8 @@ enum CapabilityRuntimeProbeHarness {
     }
 
     private static func fullDiagnostic(
-        _ investigationID: LifecycleInvestigationID
+        _ investigationID: LifecycleInvestigationID,
+        evidenceBindingSHA256: String
     ) async -> CapabilityRuntimeHarnessResponse {
         let helperURL = Bundle.main.bundleURL.appending(
             path: "Contents/MacOS/StornautLifecycleHelper"
@@ -197,7 +203,13 @@ enum CapabilityRuntimeProbeHarness {
             helperBundleURL: helperURL
         )
         do {
-            response = try await client.send(.start(investigationID))
+            response = try await client.send(
+                .start(
+                    investigationID,
+                    evidenceBindingSHA256:
+                        evidenceBindingSHA256
+                )
+            )
             await client.invalidate()
         } catch {
             await client.invalidate()
@@ -217,6 +229,9 @@ enum CapabilityRuntimeProbeHarness {
                 CapabilityRuntimeWorkerEvidence.self,
                 from: workerEvidenceData
             ),
+            worker.investigationID == investigationID.rawValue,
+            worker.evidenceBindingSHA256
+                == evidenceBindingSHA256,
             let signing = try? LifecycleBundleSigningIdentityReader()
                 .evidence(bundleURL: Bundle.main.bundleURL),
             signing.isAdHoc
@@ -317,7 +332,15 @@ enum CapabilityRuntimeProbeHarness {
             helperBundleURL: helperURL
         )
         let startTask = Task {
-            try await client.send(.start(cancellationFixtureID))
+            try await client.send(
+                .start(
+                    cancellationFixtureID,
+                    evidenceBindingSHA256:
+                        fixtureEvidenceBindingSHA256(
+                            cancellationFixtureID
+                        )
+                )
+            )
         }
         try await Task.sleep(for: .milliseconds(500))
         let response = try await client.send(
@@ -335,7 +358,11 @@ enum CapabilityRuntimeProbeHarness {
             helperBundleURL: helperURL
         )
         let response = try await client.send(
-            .start(timeoutFixtureID)
+            .start(
+                timeoutFixtureID,
+                evidenceBindingSHA256:
+                    fixtureEvidenceBindingSHA256(timeoutFixtureID)
+            )
         )
         await client.invalidate()
         return response
@@ -348,7 +375,13 @@ enum CapabilityRuntimeProbeHarness {
             helperBundleURL: helperURL
         )
         do {
-            _ = try await crashingClient.send(.start(crashFixtureID))
+            _ = try await crashingClient.send(
+                .start(
+                    crashFixtureID,
+                    evidenceBindingSHA256:
+                        fixtureEvidenceBindingSHA256(crashFixtureID)
+                )
+            )
             throw CapabilityRuntimeHarnessError.crashDidNotInterrupt
         } catch LifecycleSupervisorXPCError.connectionFailed {
         } catch LifecycleSupervisorXPCError.invalidResponse {
@@ -466,7 +499,13 @@ enum CapabilityRuntimeProbeHarness {
             helperBundleURL: helperURL
         )
         let startTask = Task {
-            try await client.send(.start(investigationID))
+            try await client.send(
+                .start(
+                    investigationID,
+                    evidenceBindingSHA256:
+                        fixtureEvidenceBindingSHA256(investigationID)
+                )
+            )
         }
         try? await Task.sleep(for: .milliseconds(500))
         do {
@@ -598,6 +637,9 @@ enum CapabilityRuntimeProbeHarness {
                 CapabilityRuntimeHarnessConfiguration.self,
                 from: data
             ),
+            validCapabilityEvidenceBinding(
+                config.evidenceBindingSHA256
+            ),
             validReportURL(
                 URL(filePath: config.reportPath),
                 configURL: url
@@ -624,6 +666,28 @@ enum CapabilityRuntimeProbeHarness {
             configURL: configURL
         )
     }
+}
+
+private func fixtureEvidenceBindingSHA256(
+    _ investigationID: LifecycleInvestigationID
+) -> String {
+    let data = Data(
+        (
+            "stornaut-r5-lifecycle-fixture-v1\u{0}"
+                + investigationID.rawValue.uuidString.lowercased()
+        ).utf8
+    )
+    return SHA256.hash(data: data)
+        .map { String(format: "%02x", $0) }
+        .joined()
+}
+
+private func validCapabilityEvidenceBinding(_ value: String) -> Bool {
+    value.utf8.count == 64
+        && value.utf8.allSatisfy {
+            (0x30...0x39).contains($0)
+                || (0x61...0x66).contains($0)
+        }
 }
 
 private func validReportURL(
@@ -732,6 +796,7 @@ private struct CapabilityRuntimeHarnessConfiguration: Codable {
     let action: CapabilityRuntimeHarnessAction
     let reportPath: String
     let investigationID: String
+    let evidenceBindingSHA256: String
 }
 
 private enum CapabilityRuntimeHarnessAction: String, Codable {

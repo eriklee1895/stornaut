@@ -258,6 +258,16 @@ public struct SignedInvestigationRuntimeDiagnosticConfiguration:
         return try encoder.encode(self)
     }
 
+    public func capabilityEvidenceBindingSHA256() throws -> String {
+        try canonicalCapabilityEvidenceBindingSHA256(
+            schemaVersion: schemaVersion,
+            nonce: nonce,
+            binding: binding,
+            expectedModel: expectedModel,
+            expectedProvider: expectedProvider
+        )
+    }
+
     public init(from decoder: Decoder) throws {
         let container = try strictSignedRuntimeContainer(
             decoder,
@@ -828,19 +838,251 @@ public enum SignedInvestigationRuntimeVerdict:
     case signedInvestigationRuntimeFailed(reasonKeys: [String])
 }
 
+public struct SignedInvestigationCapabilityEvidenceReceipt:
+    Codable,
+    Sendable,
+    Equatable
+{
+    public static let schemaVersion = 1
+
+    public let schemaVersion: Int
+    public let nonce: UUID
+    public let binding: SignedInvestigationRuntimeBinding
+    public let metadataSHA256: String
+    public let workerSHA256: String
+    public let lifecycleSHA256: String
+    public let repositorySHA256: String
+    public let reportSHA256: String
+    public let report: CapabilityRuntimeDiagnosticReport
+
+    package init(
+        configuration:
+            SignedInvestigationRuntimeDiagnosticConfiguration,
+        metadata: CapabilityRuntimeDiagnosticMetadata,
+        worker: CapabilityRuntimeWorkerEvidence,
+        lifecycleIntegrity: [CapabilityRuntimeIntegrityEvidence],
+        repository: CapabilityRuntimeRepositoryEvidence
+    ) throws {
+        guard
+            worker.investigationID == configuration.nonce,
+            worker.evidenceBindingSHA256
+                == (try configuration.capabilityEvidenceBindingSHA256())
+        else {
+            throw SignedInvestigationRuntimeContractError.bindingMismatch
+        }
+        let lifecycle = try CapabilityRuntimeLifecycleEvidence(
+            integrity: lifecycleIntegrity
+        )
+        let report = try CapabilityRuntimeDiagnosticVerifier()
+            .assembleSignedRuntimeReport(
+                metadata: metadata,
+                worker: worker,
+                lifecycleIntegrity: lifecycle.integrity,
+                repository: repository
+            )
+        try self.init(
+            nonce: configuration.nonce,
+            binding: configuration.binding,
+            metadataSHA256: try canonicalSHA256(metadata),
+            workerSHA256: try canonicalSHA256(worker),
+            lifecycleSHA256: try canonicalSHA256(lifecycle),
+            repositorySHA256: try canonicalSHA256(repository),
+            report: report
+        )
+    }
+
+    private init(
+        nonce: UUID,
+        binding: SignedInvestigationRuntimeBinding,
+        metadataSHA256: String,
+        workerSHA256: String,
+        lifecycleSHA256: String,
+        repositorySHA256: String,
+        report: CapabilityRuntimeDiagnosticReport
+    ) throws {
+        let report = try revalidatedCapabilityReport(report)
+        let expectedComponentHashes = try Self.componentHashes(
+            nonce: nonce,
+            binding: binding,
+            report: report
+        )
+        guard
+            binding.isValid,
+            metadataSHA256 == expectedComponentHashes.metadata,
+            workerSHA256 == expectedComponentHashes.worker,
+            lifecycleSHA256 == expectedComponentHashes.lifecycle,
+            repositorySHA256 == expectedComponentHashes.repository,
+            report.metadata.appBundleIdentifier
+                == binding.appBundleIdentifier,
+            report.metadata.appExecutableSHA256
+                == binding.appExecutableSHA256,
+            report.metadata.codexExecutableSHA256
+                == binding.codexExecutableSHA256,
+            report.metadata.model == .gpt56Luna,
+            report.metadata.provider == .openAI
+        else {
+            throw SignedInvestigationRuntimeContractError.invalidReport
+        }
+        schemaVersion = Self.schemaVersion
+        self.nonce = nonce
+        self.binding = binding
+        self.metadataSHA256 = metadataSHA256
+        self.workerSHA256 = workerSHA256
+        self.lifecycleSHA256 = lifecycleSHA256
+        self.repositorySHA256 = repositorySHA256
+        reportSHA256 = try capabilityReportSHA256(report)
+        self.report = report
+    }
+
+    private static func componentHashes(
+        nonce: UUID,
+        binding: SignedInvestigationRuntimeBinding,
+        report: CapabilityRuntimeDiagnosticReport
+    ) throws -> (
+        metadata: String,
+        worker: String,
+        lifecycle: String,
+        repository: String
+    ) {
+        let worker = try CapabilityRuntimeWorkerEvidence(
+            investigationID: nonce,
+            evidenceBindingSHA256:
+                canonicalCapabilityEvidenceBindingSHA256(
+                    schemaVersion:
+                        SignedInvestigationRuntimeDiagnosticConfiguration
+                            .schemaVersion,
+                    nonce: nonce,
+                    binding: binding,
+                    expectedModel: report.metadata.model,
+                    expectedProvider: report.metadata.provider
+                ),
+            codexVersion: report.metadata.codexVersion,
+            codexExecutableSHA256:
+                report.metadata.codexExecutableSHA256,
+            provider: report.metadata.provider,
+            publicEndpointHosts: report.metadata.publicEndpointHosts,
+            syntheticFixtureSHA256s:
+                report.metadata.syntheticFixtureSHA256s,
+            sanitizedEventCategories:
+                report.metadata.sanitizedEventCategories,
+            durationMilliseconds: report.metadata.durationMilliseconds,
+            capabilities: report.capabilities,
+            integrity: report.integrity.filter {
+                CapabilityRuntimeWorkerEvidence
+                    .allowedIntegrityProperties
+                    .contains($0.property)
+            }
+        )
+        let lifecycle = try CapabilityRuntimeLifecycleEvidence(
+            integrity: report.integrity.filter {
+                CapabilityRuntimeLifecycleEvidence
+                    .allowedIntegrityProperties
+                    .contains($0.property)
+            }
+        )
+        let repository = try CapabilityRuntimeRepositoryEvidence(
+            integrity: report.integrity.filter {
+                $0.property == .noExecutorReachability
+            }
+        )
+        return (
+            metadata: try canonicalSHA256(report.metadata),
+            worker: try canonicalSHA256(worker),
+            lifecycle: try canonicalSHA256(lifecycle),
+            repository: try canonicalSHA256(repository)
+        )
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try strictSignedRuntimeContainer(
+            decoder,
+            keys: Set(CodingKeys.allCases.map(\.rawValue))
+        )
+        let schemaVersion = try container.decode(
+            Int.self,
+            forKey: SignedRuntimeCodingKey(
+                CodingKeys.schemaVersion.rawValue
+            )
+        )
+        guard schemaVersion == Self.schemaVersion else {
+            throw SignedInvestigationRuntimeContractError.invalidReport
+        }
+        let decodedHash = try container.decode(
+            String.self,
+            forKey: SignedRuntimeCodingKey(
+                CodingKeys.reportSHA256.rawValue
+            )
+        )
+        try self.init(
+            nonce: container.decode(
+                UUID.self,
+                forKey: SignedRuntimeCodingKey(CodingKeys.nonce.rawValue)
+            ),
+            binding: container.decode(
+                SignedInvestigationRuntimeBinding.self,
+                forKey: SignedRuntimeCodingKey(CodingKeys.binding.rawValue)
+            ),
+            metadataSHA256: container.decode(
+                String.self,
+                forKey: SignedRuntimeCodingKey(
+                    CodingKeys.metadataSHA256.rawValue
+                )
+            ),
+            workerSHA256: container.decode(
+                String.self,
+                forKey: SignedRuntimeCodingKey(
+                    CodingKeys.workerSHA256.rawValue
+                )
+            ),
+            lifecycleSHA256: container.decode(
+                String.self,
+                forKey: SignedRuntimeCodingKey(
+                    CodingKeys.lifecycleSHA256.rawValue
+                )
+            ),
+            repositorySHA256: container.decode(
+                String.self,
+                forKey: SignedRuntimeCodingKey(
+                    CodingKeys.repositorySHA256.rawValue
+                )
+            ),
+            report: container.decode(
+                StrictSignedCapabilityRuntimeReport.self,
+                forKey: SignedRuntimeCodingKey(CodingKeys.report.rawValue)
+            ).value
+        )
+        guard reportSHA256 == decodedHash else {
+            throw SignedInvestigationRuntimeContractError.invalidReport
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey, CaseIterable {
+        case schemaVersion
+        case nonce
+        case binding
+        case metadataSHA256
+        case workerSHA256
+        case lifecycleSHA256
+        case repositorySHA256
+        case reportSHA256
+        case report
+    }
+}
+
 public struct SignedInvestigationRuntimeReport:
     Codable,
     Sendable,
     Equatable
 {
-    public static let schemaVersion = 2
+    public static let schemaVersion = 3
 
     public let schemaVersion: Int
     public let nonce: UUID
     public let binding: SignedInvestigationRuntimeBinding
     public let model: CodexRuntimeModel
     public let provider: CodexRuntimeProvider
-    public let capabilityReport: CapabilityRuntimeDiagnosticReport
+    public let capabilityEvidence:
+        SignedInvestigationCapabilityEvidenceReceipt
     public let production: SignedInvestigationProductionEvidence
     public let denials: [SignedInvestigationRuntimeDenialEvidence]
     public let residue: SignedInvestigationRuntimeResidue
@@ -848,25 +1090,32 @@ public struct SignedInvestigationRuntimeReport:
     public let completedAt: Date
     public let verdict: SignedInvestigationRuntimeVerdict
 
+    public var capabilityReport: CapabilityRuntimeDiagnosticReport {
+        capabilityEvidence.report
+    }
+
     package init(
         nonce: UUID,
         binding: SignedInvestigationRuntimeBinding,
         model: CodexRuntimeModel,
         provider: CodexRuntimeProvider,
-        capabilityReport: CapabilityRuntimeDiagnosticReport,
+        capabilityEvidence:
+            SignedInvestigationCapabilityEvidenceReceipt,
         production: SignedInvestigationProductionEvidence,
         denials: [SignedInvestigationRuntimeDenialEvidence],
         residue: SignedInvestigationRuntimeResidue,
         startedAt: Date,
         completedAt: Date
     ) throws {
-        let capabilityReport = try revalidatedCapabilityReport(
-            capabilityReport
-        )
+        let capabilityReport = capabilityEvidence.report
         guard
             binding.isValid,
             model == .gpt56Luna,
             provider == .openAI,
+            capabilityEvidence.nonce == nonce,
+            capabilityEvidence.binding == binding,
+            try capabilityReportSHA256(capabilityReport)
+                == capabilityEvidence.reportSHA256,
             capabilityReport.metadata.model == model,
             capabilityReport.metadata.provider == provider,
             capabilityReport.metadata.appExecutableSHA256
@@ -900,7 +1149,7 @@ public struct SignedInvestigationRuntimeReport:
         self.binding = binding
         self.model = model
         self.provider = provider
-        self.capabilityReport = capabilityReport
+        self.capabilityEvidence = capabilityEvidence
         self.production = production
         self.denials = revalidatedDenials.sorted {
             $0.kind.rawValue < $1.kind.rawValue
@@ -953,12 +1202,12 @@ public struct SignedInvestigationRuntimeReport:
                     CodingKeys.provider.rawValue
                 )
             ),
-            capabilityReport: container.decode(
-                StrictSignedCapabilityRuntimeReport.self,
+            capabilityEvidence: container.decode(
+                SignedInvestigationCapabilityEvidenceReceipt.self,
                 forKey: SignedRuntimeCodingKey(
-                    CodingKeys.capabilityReport.rawValue
+                    CodingKeys.capabilityEvidence.rawValue
                 )
-            ).value,
+            ),
             production: container.decode(
                 SignedInvestigationProductionEvidence.self,
                 forKey: SignedRuntimeCodingKey(
@@ -1039,7 +1288,7 @@ public struct SignedInvestigationRuntimeReport:
         case binding
         case model
         case provider
-        case capabilityReport
+        case capabilityEvidence
         case production
         case denials
         case residue
@@ -1084,6 +1333,11 @@ public struct SignedInvestigationRuntimeReportVerifier: Sendable {
         _ report: SignedInvestigationRuntimeReport,
         configuration:
             SignedInvestigationRuntimeDiagnosticConfiguration,
+        capabilityMetadata: CapabilityRuntimeDiagnosticMetadata,
+        capabilityWorker: CapabilityRuntimeWorkerEvidence,
+        capabilityLifecycleIntegrity:
+            [CapabilityRuntimeIntegrityEvidence],
+        capabilityRepository: CapabilityRuntimeRepositoryEvidence,
         admission: SignedInvestigationRuntimeAdmissionReceipt,
         now: Date
     ) throws -> SignedInvestigationRuntimeReport {
@@ -1091,11 +1345,22 @@ public struct SignedInvestigationRuntimeReportVerifier: Sendable {
             now: now,
             outputs: .ownerRegularFile
         )
+        let capabilityEvidence =
+            try SignedInvestigationCapabilityEvidenceReceipt(
+                configuration: configuration,
+                metadata: capabilityMetadata,
+                worker: capabilityWorker,
+                lifecycleIntegrity: capabilityLifecycleIntegrity,
+                repository: capabilityRepository
+            )
         guard
             report.nonce == configuration.nonce,
             report.binding == configuration.binding,
             report.model == configuration.expectedModel,
             report.provider == configuration.expectedProvider,
+            report.capabilityEvidence == capabilityEvidence,
+            capabilityEvidence.nonce == configuration.nonce,
+            capabilityEvidence.binding == configuration.binding,
             report.nonce == admission.nonce,
             report.binding.runtimeReceiptSHA256
                 == admission.runtimeReceiptSHA256,
@@ -1115,7 +1380,7 @@ public struct SignedInvestigationRuntimeReportVerifier: Sendable {
             binding: report.binding,
             model: report.model,
             provider: report.provider,
-            capabilityReport: report.capabilityReport,
+            capabilityEvidence: report.capabilityEvidence,
             production: report.production,
             denials: report.denials,
             residue: report.residue,
@@ -1145,6 +1410,46 @@ private extension SignedInvestigationRuntimeReport {
         let digest = SHA256.hash(data: try encoder.encode(self))
         return digest.map { String(format: "%02x", $0) }.joined()
     }
+}
+
+private func capabilityReportSHA256(
+    _ report: CapabilityRuntimeDiagnosticReport
+) throws -> String {
+    try canonicalSHA256(report)
+}
+
+private func canonicalCapabilityEvidenceBindingSHA256(
+    schemaVersion: Int,
+    nonce: UUID,
+    binding: SignedInvestigationRuntimeBinding,
+    expectedModel: CodexRuntimeModel,
+    expectedProvider: CodexRuntimeProvider
+) throws -> String {
+    struct CapabilityEvidenceBinding: Encodable {
+        let schemaVersion: Int
+        let nonce: UUID
+        let binding: SignedInvestigationRuntimeBinding
+        let expectedModel: CodexRuntimeModel
+        let expectedProvider: CodexRuntimeProvider
+    }
+    return try canonicalSHA256(
+        CapabilityEvidenceBinding(
+            schemaVersion: schemaVersion,
+            nonce: nonce,
+            binding: binding,
+            expectedModel: expectedModel,
+            expectedProvider: expectedProvider
+        )
+    )
+}
+
+private func canonicalSHA256<T: Encodable>(
+    _ value: T
+) throws -> String {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let digest = SHA256.hash(data: try encoder.encode(value))
+    return digest.map { String(format: "%02x", $0) }.joined()
 }
 
 private func revalidatedCapabilityReport(

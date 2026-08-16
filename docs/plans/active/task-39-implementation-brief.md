@@ -27,8 +27,12 @@
 > signed diagnostic composition implementation, focused acceptance and
 > independent post-fix review are also complete. Its single authoritative full
 > verifier passed all 23 stages in one uninterrupted run, including the
-> 898-test serialized regression. 39B2b-ii is complete; 39B2c remains blocked
-> only until this checkpoint is independently committed and pushed. Evidence:
+> 898-test serialized regression. 39B2b-ii is complete and independently
+> pushed. Before machine admission, a narrow 39B2c prerequisite closed the
+> cross-attempt replay window between raw R5 capability evidence and the exact
+> Task 39 nonce/source/build/runtime receipt. Its tests-first repair,
+> 903-test headless regression and post-fix independent review passed.
+> 39B2c machine driver/failure-matrix implementation is next. Evidence:
 > [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
 > [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md) and
 > [Task 39B1b-i Review](../../reports/phase-d-task-39b1b-i-review.md) and
@@ -43,7 +47,8 @@
 > and
 > [Task 39B2b-ii-E2b-ii Review](../../reports/phase-d-task-39b2b-ii-e2b-ii-review.md)
 > and
-> [Task 39B2b-ii Review](../../reports/phase-d-task-39b2b-ii-review.md).
+> [Task 39B2b-ii Review](../../reports/phase-d-task-39b2b-ii-review.md) and
+> [39B2c Attempt-Binding Prerequisite Review](../../reports/phase-d-task-39b2c-attempt-binding-prerequisite-review.md).
 >
 > **Parent plan:**
 > [Phase D Conditional Deep Dive](phase-d-conditional-deep-dive.md)
@@ -588,6 +593,16 @@ checkpoint's one frozen authoritative full verifier passed 23/23 stages in
 - failure-matrix execution;
 - zero-residue machine admission; and
 - every `signedInvestigationRuntimeReady` claim.
+
+Before implementing those machine-only surfaces, the independently reviewed
+attempt-binding prerequisite made raw capability worker evidence carry the
+exact Task 39 Investigation UUID and complete configuration-binding SHA-256
+through App → XPC → helper → worker. The final verifier reconstructs the
+receipt from authoritative raw metadata/worker/lifecycle/repository evidence,
+and receipt decoding reconstructs all four canonical component projections.
+See the
+[39B2c Attempt-Binding Prerequisite Review](../../reports/phase-d-task-39b2c-attempt-binding-prerequisite-review.md).
+This prerequisite made no machine-readiness claim.
 
 39B1a bound the diagnostic configuration to the real Evidence Store v4 path,
 made lifecycle drain directly asynchronous, reloaded actor-owned run state

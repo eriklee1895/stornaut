@@ -345,6 +345,8 @@ public struct CapabilityRuntimeWorkerEvidence:
             .authStateNonPersistence,
         ]
 
+    public let investigationID: UUID
+    public let evidenceBindingSHA256: String
     public let codexVersion: String
     public let codexExecutableSHA256: String
     public let provider: CodexRuntimeProvider
@@ -356,6 +358,8 @@ public struct CapabilityRuntimeWorkerEvidence:
     public let integrity: [CapabilityRuntimeIntegrityEvidence]
 
     public init(
+        investigationID: UUID,
+        evidenceBindingSHA256: String,
         codexVersion: String,
         codexExecutableSHA256: String,
         provider: CodexRuntimeProvider,
@@ -369,6 +373,7 @@ public struct CapabilityRuntimeWorkerEvidence:
         let capabilityKeys = Set(capabilities.map(\.capability))
         let integrityKeys = Set(integrity.map(\.property))
         guard
+            sha256Digest(evidenceBindingSHA256),
             boundedRuntimeText(codexVersion, maximumBytes: 128),
             sha256Digest(codexExecutableSHA256),
             publicEndpointHosts.count <= 16,
@@ -390,6 +395,8 @@ public struct CapabilityRuntimeWorkerEvidence:
         else {
             throw CapabilityRuntimeDiagnosticError.invalidReport
         }
+        self.investigationID = investigationID
+        self.evidenceBindingSHA256 = evidenceBindingSHA256
         self.codexVersion = codexVersion
         self.codexExecutableSHA256 = codexExecutableSHA256
         self.provider = provider
@@ -585,6 +592,8 @@ public struct CapabilityRuntimeDiagnosticVerifier: Sendable {
         _ worker: CapabilityRuntimeWorkerEvidence
     ) throws -> CapabilityRuntimeWorkerEvidence {
         try CapabilityRuntimeWorkerEvidence(
+            investigationID: worker.investigationID,
+            evidenceBindingSHA256: worker.evidenceBindingSHA256,
             codexVersion: worker.codexVersion,
             codexExecutableSHA256: worker.codexExecutableSHA256,
             provider: worker.provider,

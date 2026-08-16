@@ -329,6 +329,7 @@ private struct LifecycleUserIdentity {
 private func runWorkerMode(
     mode: String,
     investigationID: UUID,
+    evidenceBindingSHA256: String,
     userID: uid_t
 ) -> Never {
     guard geteuid() == 0 else {
@@ -365,7 +366,9 @@ private func runWorkerMode(
             do {
                 let evidence = try await CapabilityRuntimeWorker
                     .runLocalDiagnostic(
-                        investigationID: investigationID
+                        investigationID: investigationID,
+                        evidenceBindingSHA256:
+                            evidenceBindingSHA256
                     )
                 let data = try JSONEncoder().encode(evidence)
                 let paths = try LifecycleLocalInstallationContract()
@@ -1093,6 +1096,7 @@ private final class LifecycleHelperService:
     private var invalidated = false
     private var activeProcess: Process?
     private var activeInvestigationID: LifecycleInvestigationID?
+    private var activeEvidenceBindingSHA256: String?
     private var activeAuditSessionID: Int32?
     private var activeLeaseCreated = false
     private var activeReply:
@@ -1134,7 +1138,10 @@ private final class LifecycleHelperService:
             return
         }
         switch decoded {
-        case let .start(investigationID):
+        case let .start(
+            investigationID,
+            evidenceBindingSHA256
+        ):
 #if DEBUG
             guard LifecycleRecoveredInvestigationPolicy().permitsStart(
                 investigationID,
@@ -1154,6 +1161,8 @@ private final class LifecycleHelperService:
                     return false
                 }
                 activeInvestigationID = investigationID
+                activeEvidenceBindingSHA256 =
+                    evidenceBindingSHA256
                 activeReply = reply
                 return true
             }
@@ -1162,7 +1171,11 @@ private final class LifecycleHelperService:
                 return
             }
             operationQueue.async { [weak self] in
-                self?.run(investigationID)
+                self?.run(
+                    investigationID,
+                    evidenceBindingSHA256:
+                        evidenceBindingSHA256
+                )
             }
 #else
             reply(nil, "runtime.lifecycle.diagnostic-unavailable")
@@ -1675,6 +1688,7 @@ private final class LifecycleHelperService:
         lock.withLock {
             activeProcess = nil
             activeInvestigationID = nil
+            activeEvidenceBindingSHA256 = nil
             activeAuditSessionID = nil
             activeLeaseCreated = false
             interactiveInput = nil
@@ -1686,7 +1700,10 @@ private final class LifecycleHelperService:
 #endif
 
 #if DEBUG
-    private func run(_ investigationID: LifecycleInvestigationID) {
+    private func run(
+        _ investigationID: LifecycleInvestigationID,
+        evidenceBindingSHA256: String
+    ) {
         do {
             let userIdentity = try LifecycleUserIdentity.read(
                 userID: callerUserID
@@ -1727,6 +1744,7 @@ private final class LifecycleHelperService:
                     ? crashMode
                     : workerMode,
                 investigationID.rawValue.uuidString.lowercased(),
+                evidenceBindingSHA256,
                 String(callerUserID),
             ]
             process.environment = [
@@ -1740,6 +1758,8 @@ private final class LifecycleHelperService:
                 self.operationQueue.async {
                     self.workerDidExit(
                         investigationID: investigationID,
+                        evidenceBindingSHA256:
+                            evidenceBindingSHA256,
                         paths: paths,
                         receiptHandle:
                             sessionOutput.fileHandleForReading,
@@ -1826,12 +1846,15 @@ private final class LifecycleHelperService:
 #if DEBUG
     private func workerDidExit(
         investigationID: LifecycleInvestigationID,
+        evidenceBindingSHA256: String,
         paths: LifecycleLocalDiagnosticPaths,
         receiptHandle: FileHandle,
         terminationStatus: Int32
     ) {
         guard lock.withLock({
             activeInvestigationID == investigationID
+                && activeEvidenceBindingSHA256
+                    == evidenceBindingSHA256
         }) else {
             return
         }
@@ -1864,7 +1887,11 @@ private final class LifecycleHelperService:
             let evidence = try readWorkerEvidence(
                 url: paths.workerEvidenceURL,
                 ownerUserID: callerUserID,
-                receipt: receipt
+                receipt: receipt,
+                expectedInvestigationID:
+                    investigationID.rawValue,
+                expectedEvidenceBindingSHA256:
+                    evidenceBindingSHA256
             )
             try drainActiveSession()
             try removeDiagnosticRoot(
@@ -2042,6 +2069,7 @@ private final class LifecycleHelperService:
         lock.withLock {
             activeProcess = nil
             activeInvestigationID = nil
+            activeEvidenceBindingSHA256 = nil
             activeAuditSessionID = nil
             activeLeaseCreated = false
             interactiveInput = nil
@@ -2095,6 +2123,7 @@ private final class LifecycleHelperService:
             activeReply = nil
             activeProcess = nil
             activeInvestigationID = nil
+            activeEvidenceBindingSHA256 = nil
             activeAuditSessionID = nil
             activeLeaseCreated = false
             return value
@@ -2111,6 +2140,7 @@ private final class LifecycleHelperService:
             activeReply = nil
             activeProcess = nil
             activeInvestigationID = nil
+            activeEvidenceBindingSHA256 = nil
             activeAuditSessionID = nil
             activeLeaseCreated = false
             return value
@@ -2341,7 +2371,9 @@ private func validateDirectory(
 private func readWorkerEvidence(
     url: URL,
     ownerUserID: uid_t,
-    receipt: LifecycleWorkerEvidenceReceipt
+    receipt: LifecycleWorkerEvidenceReceipt,
+    expectedInvestigationID: UUID,
+    expectedEvidenceBindingSHA256: String
 ) throws -> Data {
     let descriptor = open(
         url.path,
@@ -2379,6 +2411,10 @@ private func readWorkerEvidence(
         data.append(contentsOf: buffer.prefix(count))
     }
     var finalInformation = stat()
+    let decoded = try? JSONDecoder().decode(
+        CapabilityRuntimeWorkerEvidence.self,
+        from: data
+    )
     guard
         fstat(descriptor, &finalInformation) == 0,
         receipt.matches(
@@ -2387,10 +2423,9 @@ private func readWorkerEvidence(
             expectedOwnerUserID: ownerUserID
         ),
         identity == workerEvidenceIdentity(finalInformation),
-        (try? JSONDecoder().decode(
-            CapabilityRuntimeWorkerEvidence.self,
-            from: data
-        )) != nil
+        decoded?.investigationID == expectedInvestigationID,
+        decoded?.evidenceBindingSHA256
+            == expectedEvidenceBindingSHA256
     else {
         throw LifecycleHelperFailure.evidenceFailed
     }
@@ -2550,17 +2585,23 @@ private func darwinLifecycleFailureReasonKey(
 
 #if DEBUG
 if
-    CommandLine.arguments.count == 4,
+    CommandLine.arguments.count == 5,
     [workerMode, crashMode].contains(CommandLine.arguments[1]),
     let investigationID = UUID(
         uuidString: CommandLine.arguments[2]
     ),
-    let parsedUserID = UInt32(CommandLine.arguments[3]),
+    CommandLine.arguments[3].utf8.count == 64,
+    CommandLine.arguments[3].utf8.allSatisfy({
+        (0x30...0x39).contains($0)
+            || (0x61...0x66).contains($0)
+    }),
+    let parsedUserID = UInt32(CommandLine.arguments[4]),
     parsedUserID > 0
 {
     runWorkerMode(
         mode: CommandLine.arguments[1],
         investigationID: investigationID,
+        evidenceBindingSHA256: CommandLine.arguments[3],
         userID: uid_t(parsedUserID)
     )
 } else if

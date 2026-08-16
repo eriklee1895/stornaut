@@ -163,7 +163,11 @@
 > Investigation/App tests、strict final-Mach-O gate 与 independent post-fix
 > review 已通过；该 checkpoint 唯一一次 authoritative full verifier 以
 > 23/23 stages、898-test serialized regression、981 秒 wall time 单次通过，
-> 无 restart 或 stage retry。39B2b-ii 已完成；39B2c 才能作 readiness claim。
+> 无 restart 或 stage retry。39B2b-ii 已完成；39B2c 的窄 attempt-binding
+> prerequisite 已把 raw capability worker evidence 绑定到 exact nonce 与完整
+> signed runtime binding，修复 component-hash review P2，并通过 903-test
+> headless regression 与 post-fix review。machine driver/failure matrix
+> 尚未实现；39B2c 才能作 readiness claim。
 > 生产 Deep Dive 仍 unavailable。
 > Task 5 的历史
 > Broker-only no-go 已由 ADR 0004 capability-first 决策修订，Deep Dive 因
@@ -451,7 +455,11 @@ implementation/focused review evidence 见
 [Task 39B2b-ii Review](../reports/phase-d-task-39b2b-ii-review.md)；focused
 acceptance、independent post-fix review 与唯一一次 authoritative full
 23/23 stages 已通过；该 run 包含 898-test serialized regression，wall time
-981 秒，无 restart 或 stage retry。39B2b-ii 已完成。
+981 秒，无 restart 或 stage retry。39B2b-ii 已完成。39B2c attempt-binding
+prerequisite evidence 见
+[review](../reports/phase-d-task-39b2c-attempt-binding-prerequisite-review.md)；
+其 903-test headless regression 与 independent post-fix review 已通过，
+machine driver/failure matrix 仍待实现。
 生产 Deep Dive 继续 unavailable，直到 Task 44 final admission。
 
 跨 Epic 的阶段依赖、no-go 分支和交付顺序由 [Delivery Roadmap](../plans/roadmap.md) 管理；新 active plan 不得另起一套宏观路线。
@@ -592,8 +600,9 @@ full 23/23 stages 单次通过（1,046.300 秒）。E2b-ii complete；原 signed
 composition 已恢复并完成 implementation、focused tests、strict binary
 gate 与 independent post-fix review；该 checkpoint 唯一一次 authoritative
 full 以 23/23 stages、898-test serialized regression、981 秒 wall time
-单次通过，无 restart 或 stage retry。39B2b-ii 已完成；39B2c 才是 machine
-admission。该最终 gate
+单次通过，无 restart 或 stage retry。39B2b-ii 已完成；39B2c 的 exact
+attempt-binding prerequisite 已完成并通过 903-test headless regression，
+machine driver/failure matrix 仍待实现。39B2c 才是 machine admission。该最终 gate
 要求证明完整调查能力和公共联网可用时，
 Codex 全进程树不可写用户数据、不可
 访问 localhost/私网/任意 Unix socket 且无 Executor 路径；不得用

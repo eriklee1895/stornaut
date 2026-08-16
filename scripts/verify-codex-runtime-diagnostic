@@ -23,6 +23,15 @@ raw_report="$run_root/harness.json"
 repository_receipt="$run_root/repository.json"
 config="$run_root/config.json"
 investigation_id=$(/usr/bin/uuidgen | /usr/bin/tr '[:upper:]' '[:lower:]')
+evidence_binding=$(
+    /usr/bin/printf '%s\0%s' \
+        'stornaut-r5-capability-attempt-v1' \
+        "$investigation_id" |
+        /usr/bin/shasum -a 256 |
+        /usr/bin/awk '{print $1}'
+)
+[[ ${#evidence_binding} == 64 ]]
+[[ "$evidence_binding" != *[^0-9a-f]* ]]
 
 cleanup() {
     [[ -d "$run_root" && ! -L "$run_root" ]]
@@ -49,6 +58,7 @@ scripts/verify-codex-no-executor-boundary "$repository_receipt"
 {
   "action": "fullDiagnostic",
   "investigationID": "$investigation_id",
+  "evidenceBindingSHA256": "$evidence_binding",
   "reportPath": "$raw_report"
 }
 EOF

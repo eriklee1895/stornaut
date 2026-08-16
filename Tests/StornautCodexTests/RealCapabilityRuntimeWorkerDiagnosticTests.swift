@@ -64,6 +64,7 @@ func realCapabilityRuntimeWorkerDiagnostic() async throws {
     let evidence = try await CapabilityRuntimeWorker
         .runSyntheticDiagnosticForTesting(
             investigationID: investigationID,
+            evidenceBindingSHA256: String(repeating: "9", count: 64),
             networkProbeExecutableURL: URL(filePath: helperPath),
             runRootURL: investigationRoot,
             primaryTimeout: diagnosticTimeout()

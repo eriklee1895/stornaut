@@ -243,13 +243,12 @@ struct SignedRuntimeContractTests {
         )
         fixture.materializeOutputs()
         #expect(
-            try SignedInvestigationRuntimeReportVerifier()
-                .verifyReady(
-                    report,
-                    configuration: configuration,
-                    admission: admission,
-                    now: report.completedAt
-                ) == report
+            try fixture.verifyReady(
+                report,
+                configuration: configuration,
+                admission: admission,
+                now: report.completedAt
+            ) == report
         )
     }
 
@@ -284,13 +283,14 @@ struct SignedRuntimeContractTests {
         defer { fixture.remove() }
         let configuration = try fixture.configuration()
 
-        let blockedCapabilityReport =
-            try fixture.capabilityReport(
+        let blockedCapabilityEvidence =
+            try fixture.capabilityEvidence(
+                configuration: configuration,
                 missing: .subagents
             )
         let capabilityBlocked = try fixture.report(
             configuration: configuration,
-            capabilityReport: blockedCapabilityReport
+            capabilityEvidence: blockedCapabilityEvidence
         )
         #expect(
             capabilityBlocked.verdict
@@ -357,13 +357,12 @@ struct SignedRuntimeContractTests {
                 try SignedInvestigationRuntimeAdmissionReceipt(
                     report: report
                 )
-            _ = try SignedInvestigationRuntimeReportVerifier()
-                .verifyReady(
-                    report,
-                    configuration: foreign,
-                    admission: admission,
-                    now: report.completedAt
-                )
+            _ = try fixture.verifyReady(
+                report,
+                configuration: foreign,
+                admission: admission,
+                now: report.completedAt
+            )
         }
 
         let encoded = try JSONEncoder().encode(report)
@@ -380,24 +379,179 @@ struct SignedRuntimeContractTests {
             withJSONObject: object,
             options: [.sortedKeys]
         )
-        let decoded = try JSONDecoder().decode(
-            SignedInvestigationRuntimeReport.self,
-            from: tampered
+        #expect(
+            throws:
+                SignedInvestigationRuntimeContractError.invalidReport
+        ) {
+            _ = try JSONDecoder().decode(
+                SignedInvestigationRuntimeReport.self,
+                from: tampered
+            )
+        }
+    }
+
+    @Test
+    func capabilityEvidenceCannotBeRewrappedAcrossRunBindings() throws {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let sourceConfiguration = try fixture.configuration()
+        let sourceReceipt =
+            try SignedInvestigationCapabilityEvidenceReceipt(
+                configuration: sourceConfiguration,
+                metadata: fixture.capabilityMetadata(),
+                worker: fixture.capabilityWorker(
+                    investigationID: sourceConfiguration.nonce,
+                    evidenceBindingSHA256:
+                        sourceConfiguration
+                        .capabilityEvidenceBindingSHA256()
+                ),
+                lifecycleIntegrity: fixture.capabilityLifecycleIntegrity(),
+                repository: fixture.capabilityRepositoryEvidence()
+            )
+        let sourceReport = try fixture.report(
+            configuration: sourceConfiguration,
+            capabilityEvidence: sourceReceipt
         )
+        #expect(sourceReport.capabilityEvidence == sourceReceipt)
+        let foreignNonceConfiguration = try fixture.configuration(
+            nonce: UUID()
+        )
+        let foreignBindingConfiguration = try fixture.configuration(
+            binding: fixture.binding(
+                sourceFingerprintSHA256: String(repeating: "3", count: 64),
+                runtimeReceiptSHA256: String(repeating: "9", count: 64)
+            )
+        )
+
+        for configuration in [
+            foreignNonceConfiguration,
+            foreignBindingConfiguration,
+        ] {
+            #expect(
+                throws:
+                    SignedInvestigationRuntimeContractError.invalidReport
+            ) {
+                _ = try fixture.report(
+                    configuration: configuration,
+                    capabilityEvidence: sourceReceipt
+                )
+            }
+        }
+    }
+
+    @Test
+    func capabilityEvidenceBindsTheCompleteSignedAttempt() throws {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let sourceConfiguration = try fixture.configuration()
+        let sourceBinding =
+            try sourceConfiguration.capabilityEvidenceBindingSHA256()
+        let foreignConfiguration = try fixture.configuration(
+            binding: fixture.binding(
+                sourceFingerprintSHA256: String(repeating: "3", count: 64),
+                runtimeReceiptSHA256: String(repeating: "9", count: 64)
+            )
+        )
+        let foreignBinding =
+            try foreignConfiguration.capabilityEvidenceBindingSHA256()
+
+        #expect(sourceBinding != foreignBinding)
         #expect(
             throws:
                 SignedInvestigationRuntimeContractError.bindingMismatch
         ) {
-            let admission =
-                try SignedInvestigationRuntimeAdmissionReceipt(
-                    report: report
+            _ = try SignedInvestigationCapabilityEvidenceReceipt(
+                configuration: foreignConfiguration,
+                metadata: fixture.capabilityMetadata(),
+                worker: fixture.capabilityWorker(
+                    investigationID: foreignConfiguration.nonce,
+                    evidenceBindingSHA256: sourceBinding
+                ),
+                lifecycleIntegrity:
+                    fixture.capabilityLifecycleIntegrity(),
+                repository: fixture.capabilityRepositoryEvidence()
+            )
+        }
+    }
+
+    @Test
+    func capabilityEvidenceRejectsTamperedComponentHashesOnDecode()
+        throws
+    {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let configuration = try fixture.configuration()
+        let report = try fixture.report(configuration: configuration)
+        let encoded = try JSONEncoder().encode(report)
+
+        for key in [
+            "metadataSHA256",
+            "workerSHA256",
+            "lifecycleSHA256",
+            "repositorySHA256",
+        ] {
+            var object = try #require(
+                JSONSerialization.jsonObject(with: encoded)
+                    as? [String: Any]
+            )
+            var capabilityEvidence = try #require(
+                object["capabilityEvidence"] as? [String: Any]
+            )
+            let existing = try #require(
+                capabilityEvidence[key] as? String
+            )
+            capabilityEvidence[key] =
+                existing == String(repeating: "b", count: 64)
+                ? String(repeating: "c", count: 64)
+                : String(repeating: "b", count: 64)
+            object["capabilityEvidence"] = capabilityEvidence
+            let tampered = try JSONSerialization.data(
+                withJSONObject: object,
+                options: [.sortedKeys]
+            )
+
+            #expect(
+                throws:
+                    SignedInvestigationRuntimeContractError.invalidReport,
+                "accepted tampered \(key)"
+            ) {
+                _ = try JSONDecoder().decode(
+                    SignedInvestigationRuntimeReport.self,
+                    from: tampered
                 )
+            }
+        }
+    }
+
+    @Test
+    func verifierRejectsForeignRawCapabilityAttempt() throws {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let configuration = try fixture.configuration()
+        let report = try fixture.report(configuration: configuration)
+        let admission = try SignedInvestigationRuntimeAdmissionReceipt(
+            report: report
+        )
+        fixture.materializeOutputs()
+
+        #expect(
+            throws:
+                SignedInvestigationRuntimeContractError.bindingMismatch
+        ) {
             _ = try SignedInvestigationRuntimeReportVerifier()
                 .verifyReady(
-                    decoded,
+                    report,
                     configuration: configuration,
+                    capabilityMetadata: fixture.capabilityMetadata(),
+                    capabilityWorker: fixture.capabilityWorker(
+                        investigationID: UUID()
+                    ),
+                    capabilityLifecycleIntegrity:
+                        fixture.capabilityLifecycleIntegrity(),
+                    capabilityRepository:
+                        fixture.capabilityRepositoryEvidence(),
                     admission: admission,
-                    now: decoded.completedAt
+                    now: report.completedAt
                 )
         }
     }
@@ -423,25 +577,23 @@ struct SignedRuntimeContractTests {
             throws:
                 SignedInvestigationRuntimeContractError.bindingMismatch
         ) {
-            _ = try SignedInvestigationRuntimeReportVerifier()
-                .verifyReady(
-                    rewrapped,
-                    configuration: configuration,
-                    admission: admission,
-                    now: rewrapped.completedAt
-                )
+            _ = try fixture.verifyReady(
+                rewrapped,
+                configuration: configuration,
+                admission: admission,
+                now: rewrapped.completedAt
+            )
         }
         #expect(
             throws:
                 SignedInvestigationRuntimeContractError.invalidConfiguration
         ) {
-            _ = try SignedInvestigationRuntimeReportVerifier()
-                .verifyReady(
-                    report,
-                    configuration: configuration,
-                    admission: admission,
-                    now: configuration.validBefore
-                )
+            _ = try fixture.verifyReady(
+                report,
+                configuration: configuration,
+                admission: admission,
+                now: configuration.validBefore
+            )
         }
     }
 
@@ -470,13 +622,12 @@ struct SignedRuntimeContractTests {
         )
 
         #expect(
-            try SignedInvestigationRuntimeReportVerifier()
-                .verifyReady(
-                    report,
-                    configuration: configuration,
-                    admission: admission,
-                    now: report.completedAt
-                ) == report
+            try fixture.verifyReady(
+                report,
+                configuration: configuration,
+                admission: admission,
+                now: report.completedAt
+            ) == report
         )
     }
 
@@ -679,8 +830,11 @@ private func addingCapabilityUnknownField(
         JSONSerialization.jsonObject(with: data)
             as? [String: Any]
     )
+    var capabilityEvidence = try #require(
+        object["capabilityEvidence"] as? [String: Any]
+    )
     var capabilityReport = try #require(
-        object["capabilityReport"] as? [String: Any]
+        capabilityEvidence["report"] as? [String: Any]
     )
     switch target {
     case .report:
@@ -704,7 +858,8 @@ private func addingCapabilityUnknownField(
         integrity[0]["unexpected"] = true
         capabilityReport["integrity"] = integrity
     }
-    object["capabilityReport"] = capabilityReport
+    capabilityEvidence["report"] = capabilityReport
+    object["capabilityEvidence"] = capabilityEvidence
     return try JSONSerialization.data(
         withJSONObject: object,
         options: [.sortedKeys]
@@ -725,13 +880,17 @@ private func addingVerdictPayloadUnknownField(
             object["verdict"]
         )
     case .capabilityOutcome:
+        var capabilityEvidence = try #require(
+            object["capabilityEvidence"] as? [String: Any]
+        )
         var capabilityReport = try #require(
-            object["capabilityReport"] as? [String: Any]
+            capabilityEvidence["report"] as? [String: Any]
         )
         capabilityReport["outcome"] = try verdictWithUnknownField(
             capabilityReport["outcome"]
         )
-        object["capabilityReport"] = capabilityReport
+        capabilityEvidence["report"] = capabilityReport
+        object["capabilityEvidence"] = capabilityEvidence
     }
     return try JSONSerialization.data(
         withJSONObject: object,
@@ -845,7 +1004,8 @@ private struct SignedRuntimeContractFixture {
         nonce: UUID? = nil,
         sourceRootPath: String? = nil,
         supportRootPath: String? = nil,
-        storePath: String? = nil
+        storePath: String? = nil,
+        binding: SignedInvestigationRuntimeBinding? = nil
     ) throws -> SignedInvestigationRuntimeDiagnosticConfiguration {
         try SignedInvestigationRuntimeDiagnosticConfiguration(
             nonce: nonce ?? self.nonce,
@@ -858,7 +1018,7 @@ private struct SignedRuntimeContractFixture {
             runtimeRootPath: runtimeRoot.path,
             reportPath: reportURL.path,
             storePath: storePath ?? storeURL.path,
-            binding: binding(),
+            binding: binding ?? self.binding(),
             expectedModel: .gpt56Luna,
             expectedProvider: .openAI,
             validBefore: now.addingTimeInterval(300),
@@ -870,13 +1030,20 @@ private struct SignedRuntimeContractFixture {
         )
     }
 
-    func binding() -> SignedInvestigationRuntimeBinding {
+    func binding(
+        sourceFingerprintSHA256: String? = nil,
+        runtimeReceiptSHA256: String? = nil
+    ) -> SignedInvestigationRuntimeBinding {
         SignedInvestigationRuntimeBinding(
             repositoryHEAD: String(repeating: "1", count: 40),
-            sourceFingerprintSHA256: String(repeating: "2", count: 64),
+            sourceFingerprintSHA256:
+                sourceFingerprintSHA256
+                ?? String(repeating: "2", count: 64),
             appExecutableSHA256: String(repeating: "a", count: 64),
             helperExecutableSHA256: String(repeating: "4", count: 64),
-            runtimeReceiptSHA256: String(repeating: "5", count: 64),
+            runtimeReceiptSHA256:
+                runtimeReceiptSHA256
+                ?? String(repeating: "5", count: 64),
             promptSHA256: String(repeating: "6", count: 64),
             envelopeSchemaSHA256: String(repeating: "7", count: 64),
             facadeSHA256: String(repeating: "8", count: 64),
@@ -915,17 +1082,20 @@ private struct SignedRuntimeContractFixture {
     func report(
         configuration:
             SignedInvestigationRuntimeDiagnosticConfiguration,
-        capabilityReport: CapabilityRuntimeDiagnosticReport? = nil,
+        capabilityEvidence:
+            SignedInvestigationCapabilityEvidenceReceipt? = nil,
         denials: [SignedInvestigationRuntimeDenialEvidence]? = nil,
         completedAt: Date? = nil
     ) throws -> SignedInvestigationRuntimeReport {
-        try SignedInvestigationRuntimeReport(
+        let evidence =
+            try capabilityEvidence
+            ?? self.capabilityEvidence(configuration: configuration)
+        return try SignedInvestigationRuntimeReport(
             nonce: configuration.nonce,
             binding: configuration.binding,
             model: .gpt56Luna,
             provider: .openAI,
-            capabilityReport:
-                capabilityReport ?? self.capabilityReport(),
+            capabilityEvidence: evidence,
             production: SignedInvestigationProductionEvidence(
                 investigationID: InvestigationID(
                     rawValue: "investigation-task39"
@@ -966,11 +1136,54 @@ private struct SignedRuntimeContractFixture {
         )
     }
 
-    func capabilityReport(
+    func verifyReady(
+        _ report: SignedInvestigationRuntimeReport,
+        configuration:
+            SignedInvestigationRuntimeDiagnosticConfiguration,
+        admission: SignedInvestigationRuntimeAdmissionReceipt,
+        now: Date
+    ) throws -> SignedInvestigationRuntimeReport {
+        try SignedInvestigationRuntimeReportVerifier().verifyReady(
+            report,
+            configuration: configuration,
+            capabilityMetadata: capabilityMetadata(),
+            capabilityWorker: capabilityWorker(
+                investigationID: configuration.nonce,
+                evidenceBindingSHA256:
+                    configuration.capabilityEvidenceBindingSHA256()
+            ),
+            capabilityLifecycleIntegrity:
+                capabilityLifecycleIntegrity(),
+            capabilityRepository: capabilityRepositoryEvidence(),
+            admission: admission,
+            now: now
+        )
+    }
+
+    func capabilityEvidence(
+        configuration:
+            SignedInvestigationRuntimeDiagnosticConfiguration,
         missing: CapabilityRuntimeCapability? = nil
-    ) throws -> CapabilityRuntimeDiagnosticReport {
+    ) throws -> SignedInvestigationCapabilityEvidenceReceipt {
+        try SignedInvestigationCapabilityEvidenceReceipt(
+            configuration: configuration,
+            metadata: capabilityMetadata(),
+            worker: capabilityWorker(
+                investigationID: configuration.nonce,
+                evidenceBindingSHA256:
+                    configuration.capabilityEvidenceBindingSHA256(),
+                missing: missing
+            ),
+            lifecycleIntegrity: capabilityLifecycleIntegrity(),
+            repository: capabilityRepositoryEvidence()
+        )
+    }
+
+    func capabilityMetadata() throws
+        -> CapabilityRuntimeDiagnosticMetadata
+    {
         let hash = String(repeating: "a", count: 64)
-        let metadata = try CapabilityRuntimeDiagnosticMetadata(
+        return try CapabilityRuntimeDiagnosticMetadata(
             appBundleIdentifier: "com.eriklee.stornaut",
             appExecutableSHA256: hash,
             appDesignatedRequirementSHA256: hash,
@@ -984,6 +1197,14 @@ private struct SignedRuntimeContractFixture {
             sanitizedEventCategories: ["item.command"],
             durationMilliseconds: 1_000
         )
+    }
+
+    func capabilityWorker(
+        investigationID: UUID,
+        evidenceBindingSHA256: String? = nil,
+        missing: CapabilityRuntimeCapability? = nil
+    ) throws -> CapabilityRuntimeWorkerEvidence {
+        let hash = String(repeating: "a", count: 64)
         let capabilities = try CapabilityRuntimeCapability.required
             .sorted { $0.rawValue < $1.rawValue }
             .map { capability in
@@ -1002,18 +1223,59 @@ private struct SignedRuntimeContractFixture {
                 )
             }
         let integrity =
-            try CapabilityRuntimeIntegrityProperty.allCases.map {
+            try CapabilityRuntimeWorkerEvidence
+            .allowedIntegrityProperties
+            .sorted { $0.rawValue < $1.rawValue }
+            .map {
                 try CapabilityRuntimeIntegrityEvidence(
                     property: $0,
                     verdict: .contained,
                     reasonKey: nil
                 )
             }
-        return try CapabilityRuntimeDiagnosticReport(
-            metadata: metadata,
+        return try CapabilityRuntimeWorkerEvidence(
+            investigationID: investigationID,
+            evidenceBindingSHA256:
+                evidenceBindingSHA256
+                ?? String(repeating: "9", count: 64),
+            codexVersion: "codex-cli 0.147.0",
+            codexExecutableSHA256: hash,
+            provider: .openAI,
+            publicEndpointHosts: ["example.com"],
+            syntheticFixtureSHA256s: [hash],
+            sanitizedEventCategories: ["item.command"],
+            durationMilliseconds: 1_000,
             capabilities: capabilities,
-            integrity: integrity,
-            externalStateReasonKeys: []
+            integrity: integrity
+        )
+    }
+
+    func capabilityLifecycleIntegrity() throws
+        -> [CapabilityRuntimeIntegrityEvidence]
+    {
+        try CapabilityRuntimeLifecycleEvidence
+            .allowedIntegrityProperties
+            .sorted { $0.rawValue < $1.rawValue }
+            .map {
+                try CapabilityRuntimeIntegrityEvidence(
+                    property: $0,
+                    verdict: .contained,
+                    reasonKey: nil
+                )
+            }
+    }
+
+    func capabilityRepositoryEvidence() throws
+        -> CapabilityRuntimeRepositoryEvidence
+    {
+        try CapabilityRuntimeRepositoryEvidence(
+            integrity: [
+                CapabilityRuntimeIntegrityEvidence(
+                    property: .noExecutorReachability,
+                    verdict: .contained,
+                    reasonKey: nil
+                ),
+            ]
         )
     }
 

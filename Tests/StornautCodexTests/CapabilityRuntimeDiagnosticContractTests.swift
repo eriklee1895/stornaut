@@ -1187,6 +1187,8 @@ struct CapabilityRuntimeDiagnosticContractTests {
     @Test
     func assemblerRequiresDisjointWorkerAndLifecycleIntegrity() throws {
         let worker = try CapabilityRuntimeWorkerEvidence(
+            investigationID: capabilityInvestigationID,
+            evidenceBindingSHA256: capabilityEvidenceBindingSHA256,
             codexVersion: "codex-cli 0.147.0",
             codexExecutableSHA256: digest("c"),
             provider: .openAI,
@@ -1230,6 +1232,9 @@ struct CapabilityRuntimeDiagnosticContractTests {
             .assembleSignedRuntimeReport(
                 metadata: metadata(),
                 worker: CapabilityRuntimeWorkerEvidence(
+                    investigationID: capabilityInvestigationID,
+                    evidenceBindingSHA256:
+                        capabilityEvidenceBindingSHA256,
                     codexVersion: "codex-cli 0.147.0",
                     codexExecutableSHA256: digest("c"),
                     provider: .openAI,
@@ -1307,6 +1312,8 @@ struct CapabilityRuntimeDiagnosticContractTests {
             durationMilliseconds: 1_250
         )
         let worker = try CapabilityRuntimeWorkerEvidence(
+            investigationID: capabilityInvestigationID,
+            evidenceBindingSHA256: capabilityEvidenceBindingSHA256,
             codexVersion: "codex-cli 0.147.0",
             codexExecutableSHA256: digest("c"),
             provider: .openAI,
@@ -1354,6 +1361,9 @@ struct CapabilityRuntimeDiagnosticContractTests {
 
         #expect(throws: CapabilityRuntimeDiagnosticError.invalidReport) {
             _ = try CapabilityRuntimeWorkerEvidence(
+                investigationID: capabilityInvestigationID,
+                evidenceBindingSHA256:
+                    capabilityEvidenceBindingSHA256,
                 codexVersion: "codex-cli 0.147.0",
                 codexExecutableSHA256: digest("c"),
                 provider: .openAI,
@@ -1392,6 +1402,9 @@ struct CapabilityRuntimeDiagnosticContractTests {
 
         #expect(throws: CapabilityRuntimeDiagnosticError.invalidReport) {
             _ = try CapabilityRuntimeWorkerEvidence(
+                investigationID: capabilityInvestigationID,
+                evidenceBindingSHA256:
+                    capabilityEvidenceBindingSHA256,
                 codexVersion: "codex-cli 0.147.0",
                 codexExecutableSHA256: digest("c"),
                 provider: .openAI,
@@ -1715,6 +1728,12 @@ private func metadata() -> CapabilityRuntimeDiagnosticMetadata {
         durationMilliseconds: 1_250
     )
 }
+
+private let capabilityInvestigationID = UUID(
+    uuidString: "11111111-2222-4333-8444-555555555555"
+)!
+private let capabilityEvidenceBindingSHA256 =
+    String(repeating: "9", count: 64)
 
 private func digest(_ character: Character) -> String {
     String(repeating: String(character), count: 64)

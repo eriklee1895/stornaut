@@ -9,8 +9,12 @@
 > focused validation, strict final-Mach-O admission and independent post-fix
 > review. Its single authoritative full verifier passed 23/23 stages in 981
 > wall-clock seconds, including the 898-test serialized regression, with no
-> restart or stage retry. 39B2b-ii is complete. 39B2c machine admission remains
-> blocked only until 39B2b-ii is independently committed and pushed.
+> restart or stage retry. 39B2b-ii is complete. The narrow 39B2c
+> attempt-binding prerequisite is also complete: exact nonce and full
+> signed-runtime binding now travel with raw capability worker evidence; the
+> independently found component-hash validation P2 is fixed; 903 serialized
+> tests and the post-fix review passed. The machine driver, failure matrix,
+> real-model run and readiness verdict remain unimplemented.
 > Production Deep Dive remains unavailable until Task 44 admission.
 >
 > **Roadmap phase:** Phase D — Conditional Deep Dive
@@ -830,10 +834,15 @@ Checkpoint status:
   including the 898-test serialized regression, with no restart or stage
   retry. 39B2b-ii is complete. See
   [Task 39B2b-ii Review](../../reports/phase-d-task-39b2b-ii-review.md).
-- 39B2c is next after that checkpoint's independent commit/push and exclusively
-  owns real-model signed-App machine admission, failure matrix and zero-residue
-  proof. Task 39 and production Deep Dive are not admitted by any earlier
-  checkpoint.
+- The narrow 39B2c attempt-binding prerequisite is complete and independently
+  reviewed: raw R5 capability evidence is bound to the exact Task 39
+  nonce/source/build/runtime receipt; the final verifier reconstructs the
+  receipt from authoritative raw evidence; 903 serialized tests passed. See
+  the
+  [Attempt-Binding Prerequisite Review](../../reports/phase-d-task-39b2c-attempt-binding-prerequisite-review.md).
+- 39B2c machine driver implementation is next and exclusively owns real-model
+  signed-App machine admission, failure matrix and zero-residue proof. Task 39
+  and production Deep Dive are not admitted by any earlier checkpoint.
 
 Deliver:
 

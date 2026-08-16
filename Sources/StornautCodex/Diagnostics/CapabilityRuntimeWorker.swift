@@ -420,10 +420,12 @@ public enum CapabilityRuntimeWorker {
 
     public static func runLocalDiagnostic(
         investigationID: UUID,
+        evidenceBindingSHA256: String,
         networkProbeExecutableURL: URL? = nil
     ) async throws -> CapabilityRuntimeWorkerEvidence {
         try await runPreparedDiagnostic(
             investigationID: investigationID,
+            evidenceBindingSHA256: evidenceBindingSHA256,
             networkProbeExecutableURL: networkProbeExecutableURL,
             runRootURL: nil
         )
@@ -431,6 +433,7 @@ public enum CapabilityRuntimeWorker {
 
     static func runSyntheticDiagnosticForTesting(
         investigationID: UUID,
+        evidenceBindingSHA256: String,
         networkProbeExecutableURL: URL,
         runRootURL: URL,
         primaryTimeout: Duration = primaryDiagnosticTimeout
@@ -443,6 +446,7 @@ public enum CapabilityRuntimeWorker {
         )
         return try await runPreparedDiagnostic(
             investigationID: investigationID,
+            evidenceBindingSHA256: evidenceBindingSHA256,
             networkProbeExecutableURL: networkProbeExecutableURL,
             runRootURL: validatedRoot,
             primaryTimeout: primaryTimeout
@@ -451,11 +455,20 @@ public enum CapabilityRuntimeWorker {
 
     private static func runPreparedDiagnostic(
         investigationID: UUID,
+        evidenceBindingSHA256: String,
         networkProbeExecutableURL: URL?,
         runRootURL: URL?,
         primaryTimeout: Duration = primaryDiagnosticTimeout
     ) async throws -> CapabilityRuntimeWorkerEvidence {
-        guard primaryTimeout > .zero, primaryTimeout <= .seconds(300) else {
+        guard
+            primaryTimeout > .zero,
+            primaryTimeout <= .seconds(300),
+            evidenceBindingSHA256.count == 64,
+            evidenceBindingSHA256.utf8.allSatisfy({
+                (0x30...0x39).contains($0)
+                    || (0x61...0x66).contains($0)
+            })
+        else {
             throw CapabilityRuntimeWorkerError.invalidIdentity
         }
         let started = ContinuousClock.now
@@ -906,6 +919,8 @@ public enum CapabilityRuntimeWorker {
             ),
         ]
         return try CapabilityRuntimeWorkerEvidence(
+            investigationID: investigationID,
+            evidenceBindingSHA256: evidenceBindingSHA256,
             codexVersion: version.trimmingCharacters(
                 in: .whitespacesAndNewlines
             ),
