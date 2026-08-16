@@ -166,7 +166,9 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   无 restart 或 stage retry。39B2b-ii 已完成；39B2c 的窄 attempt-binding
   prerequisite 也已 tests-first 完成：raw capability worker evidence 现绑定
   exact nonce 与完整 signed runtime binding，component-hash review P2 已修复，
-  903-test headless regression 与 post-fix review 通过。39B2c machine
+  903-test headless regression 与 post-fix review 通过。随后独立拆出的
+  strict-decoding prerequisite 已关闭 capability report/outcome unknown-field
+  接受窗口，255-test serial Codex suite 与 post-fix review 通过。39B2c machine
   driver/failure matrix 仍未实现；只有它可以作 machine readiness claim，
   Task 39 尚未完成。
   真实 App Trash 依赖仍保持关闭，生产 Deep Dive 仍为 implementation unavailable。
@@ -275,6 +277,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2b-ii-E2b-ii review / completion audit | [docs/reports/phase-d-task-39b2b-ii-e2b-ii-review.md](docs/reports/phase-d-task-39b2b-ii-e2b-ii-review.md) |
 | Phase D Task 39B2b-ii review / completion audit | [docs/reports/phase-d-task-39b2b-ii-review.md](docs/reports/phase-d-task-39b2b-ii-review.md) |
 | Phase D Task 39B2c attempt-binding prerequisite review | [docs/reports/phase-d-task-39b2c-attempt-binding-prerequisite-review.md](docs/reports/phase-d-task-39b2c-attempt-binding-prerequisite-review.md) |
+| Phase D Task 39B2c strict-decoding prerequisite review | [docs/reports/phase-d-task-39b2c-strict-capability-decoding-prerequisite-review.md](docs/reports/phase-d-task-39b2c-strict-capability-decoding-prerequisite-review.md) |
 | Epic 2–4 历史计划 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) |
 | Epic 2–4 最终 Gate | [docs/reports/epic-2-4-validation-report.md](docs/reports/epic-2-4-validation-report.md) |
 | Epic 0–1 历史计划与证据 | [docs/plans/completed/epic-0-1-foundation-spikes.md](docs/plans/completed/epic-0-1-foundation-spikes.md) |

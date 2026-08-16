@@ -32,6 +32,9 @@
 > cross-attempt replay window between raw R5 capability evidence and the exact
 > Task 39 nonce/source/build/runtime receipt. Its tests-first repair,
 > 903-test headless regression and post-fix independent review passed.
+> A separate tests-first strict-decoding prerequisite then made the reused
+> capability report and derived outcome reject unknown fields; its 255-test
+> serialized Codex suite and independent post-fix review passed.
 > 39B2c machine driver/failure-matrix implementation is next. Evidence:
 > [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
 > [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md) and
@@ -48,7 +51,9 @@
 > [Task 39B2b-ii-E2b-ii Review](../../reports/phase-d-task-39b2b-ii-e2b-ii-review.md)
 > and
 > [Task 39B2b-ii Review](../../reports/phase-d-task-39b2b-ii-review.md) and
-> [39B2c Attempt-Binding Prerequisite Review](../../reports/phase-d-task-39b2c-attempt-binding-prerequisite-review.md).
+> [39B2c Attempt-Binding Prerequisite Review](../../reports/phase-d-task-39b2c-attempt-binding-prerequisite-review.md)
+> and
+> [39B2c Strict-Decoding Prerequisite Review](../../reports/phase-d-task-39b2c-strict-capability-decoding-prerequisite-review.md).
 >
 > **Parent plan:**
 > [Phase D Conditional Deep Dive](phase-d-conditional-deep-dive.md)
@@ -603,6 +608,14 @@ and receipt decoding reconstructs all four canonical component projections.
 See the
 [39B2c Attempt-Binding Prerequisite Review](../../reports/phase-d-task-39b2c-attempt-binding-prerequisite-review.md).
 This prerequisite made no machine-readiness claim.
+
+The independently reviewed deterministic machine-contract preflight also found
+that the reused capability report and serialized derived outcome accepted
+unknown fields. The tests-first strict-decoding prerequisite closed every
+relevant report layer and requires reconstructed outcome equality. See the
+[39B2c Strict-Decoding Prerequisite Review](../../reports/phase-d-task-39b2c-strict-capability-decoding-prerequisite-review.md).
+It likewise made no machine-readiness claim and did not consume the frozen
+39B2c checkpoint's final full-verifier run.
 
 39B1a bound the diagnostic configuration to the real Evidence Store v4 path,
 made lifecycle drain directly asynchronous, reloaded actor-owned run state

@@ -1265,6 +1265,107 @@ struct CapabilityRuntimeDiagnosticContractTests {
     }
 
     @Test
+    func capabilityEvidenceDecodingRejectsUnknownFields() throws {
+        let worker = try CapabilityRuntimeWorkerEvidence(
+            investigationID: capabilityInvestigationID,
+            evidenceBindingSHA256: capabilityEvidenceBindingSHA256,
+            codexVersion: "codex-cli 0.147.0",
+            codexExecutableSHA256: digest("c"),
+            provider: .openAI,
+            publicEndpointHosts: ["example.com"],
+            syntheticFixtureSHA256s: [digest("d"), digest("e")],
+            sanitizedEventCategories: [
+                "item.completed.commandExecution",
+                "item.completed.webSearch",
+            ],
+            durationMilliseconds: 1_250,
+            capabilities: passingCapabilities(),
+            integrity: workerIntegrity()
+        )
+        let values: [
+            (
+                name: String,
+                data: Data,
+                decode: (Data) throws -> Void
+            )
+        ] = [
+            (
+                "metadata",
+                try JSONEncoder().encode(metadata()),
+                {
+                    _ = try JSONDecoder().decode(
+                        CapabilityRuntimeDiagnosticMetadata.self,
+                        from: $0
+                    )
+                }
+            ),
+            (
+                "worker",
+                try JSONEncoder().encode(worker),
+                {
+                    _ = try JSONDecoder().decode(
+                        CapabilityRuntimeWorkerEvidence.self,
+                        from: $0
+                    )
+                }
+            ),
+            (
+                "capability",
+                try JSONEncoder().encode(worker.capabilities[0]),
+                {
+                    _ = try JSONDecoder().decode(
+                        CapabilityRuntimeCapabilityEvidence.self,
+                        from: $0
+                    )
+                }
+            ),
+            (
+                "integrity",
+                try JSONEncoder().encode(worker.integrity[0]),
+                {
+                    _ = try JSONDecoder().decode(
+                        CapabilityRuntimeIntegrityEvidence.self,
+                        from: $0
+                    )
+                }
+            ),
+            (
+                "repository",
+                try JSONEncoder().encode(
+                    CapabilityRuntimeRepositoryEvidence(
+                        integrity: repositoryIntegrity()
+                    )
+                ),
+                {
+                    _ = try JSONDecoder().decode(
+                        CapabilityRuntimeRepositoryEvidence.self,
+                        from: $0
+                    )
+                }
+            ),
+        ]
+
+        for value in values {
+            var object = try #require(
+                JSONSerialization.jsonObject(with: value.data)
+                    as? [String: Any]
+            )
+            object["unexpected"] = true
+            let tampered = try JSONSerialization.data(
+                withJSONObject: object,
+                options: [.sortedKeys]
+            )
+
+            #expect(
+                throws: CapabilityRuntimeDiagnosticError.invalidReport,
+                "type=\(value.name)"
+            ) {
+                try value.decode(tampered)
+            }
+        }
+    }
+
+    @Test
     func verifierRejectsDecodedBlockedReport() throws {
         var capabilities = passingCapabilities()
         capabilities[0] = try CapabilityRuntimeCapabilityEvidence(
@@ -1604,6 +1705,50 @@ struct CapabilityRuntimeDiagnosticContractTests {
             "rawJSONL",
         ] {
             #expect(!text.localizedCaseInsensitiveContains(forbidden))
+        }
+    }
+
+    @Test
+    func reportAndOutcomeRejectUnknownFields() throws {
+        let encoded = try JSONEncoder().encode(passingReport())
+        var reportObject = try #require(
+            JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+        )
+        reportObject["unexpected"] = true
+        let unknownReport = try JSONSerialization.data(
+            withJSONObject: reportObject,
+            options: [.sortedKeys]
+        )
+        #expect(
+            throws: CapabilityRuntimeDiagnosticError.invalidReport
+        ) {
+            _ = try JSONDecoder().decode(
+                CapabilityRuntimeDiagnosticReport.self,
+                from: unknownReport
+            )
+        }
+
+        reportObject.removeValue(forKey: "unexpected")
+        var outcomeObject = try #require(
+            reportObject["outcome"] as? [String: Any]
+        )
+        var readyPayload = try #require(
+            outcomeObject["signedRuntimeReady"] as? [String: Any]
+        )
+        readyPayload["unexpected"] = true
+        outcomeObject["signedRuntimeReady"] = readyPayload
+        reportObject["outcome"] = outcomeObject
+        let unknownOutcomePayload = try JSONSerialization.data(
+            withJSONObject: reportObject,
+            options: [.sortedKeys]
+        )
+        #expect(
+            throws: CapabilityRuntimeDiagnosticError.invalidReport
+        ) {
+            _ = try JSONDecoder().decode(
+                CapabilityRuntimeDiagnosticReport.self,
+                from: unknownOutcomePayload
+            )
         }
     }
 }

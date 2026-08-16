@@ -51,6 +51,11 @@ capability evidence to the exact Task 39 nonce and complete signed runtime
 binding, fixed the independently found component-hash validation P2 and passed
 the 903-test headless regression plus post-fix review. See the
 [attempt-binding review](../../reports/phase-d-task-39b2c-attempt-binding-prerequisite-review.md).
+The separate strict-decoding prerequisite then closed unknown-field acceptance
+in the reused capability report and its derived outcome. Its tests-first
+regression, 255-test serialized Codex suite and independent post-fix review
+passed. See the
+[strict-decoding review](../../reports/phase-d-task-39b2c-strict-capability-decoding-prerequisite-review.md).
 39B2c machine driver/failure-matrix implementation is next and alone owns
 machine admission. Tasks 40–44
 remain blocked on the pushed completion commit of their immediate predecessor.
@@ -70,7 +75,7 @@ the sole normal-product admission gate.
 | [36](task-36-implementation-brief.md) | Domain, canonical projection, planner, budget and stop contracts | complete; [review](../../reports/phase-d-task-36-review.md) |
 | [37](task-37-implementation-brief.md) | Store v4, retention and source rejoin | complete; [review](../../reports/phase-d-task-37-review.md) |
 | [38](task-38-implementation-brief.md) | Closed coordinator with fake runtime | complete; [review](../../reports/phase-d-task-38-review.md) |
-| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; 39A [complete](../../reports/phase-d-task-39a-review.md), 39B1a [complete](../../reports/phase-d-task-39b1a-review.md), 39B1b-i [complete](../../reports/phase-d-task-39b1b-i-review.md), 39B1b-ii [complete](../../reports/phase-d-task-39b1b-ii-review.md), 39B2a [complete](../../reports/phase-d-task-39b2a-review.md), 39B2b-i [complete](../../reports/phase-d-task-39b2b-i-review.md), 39B2b-ii-E1 [complete](../../reports/phase-d-task-39b2b-ii-e1-review.md), E2a [complete](../../reports/phase-d-task-39b2b-ii-e2a-review.md), E2b-i [complete](../../reports/phase-d-task-39b2b-ii-e2b-i-review.md), E2b-ii [complete](../../reports/phase-d-task-39b2b-ii-e2b-ii-review.md), 39B2b-ii [complete](../../reports/phase-d-task-39b2b-ii-review.md), 39B2c attempt binding [complete](../../reports/phase-d-task-39b2c-attempt-binding-prerequisite-review.md); machine driver next |
+| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; 39A [complete](../../reports/phase-d-task-39a-review.md), 39B1a [complete](../../reports/phase-d-task-39b1a-review.md), 39B1b-i [complete](../../reports/phase-d-task-39b1b-i-review.md), 39B1b-ii [complete](../../reports/phase-d-task-39b1b-ii-review.md), 39B2a [complete](../../reports/phase-d-task-39b2a-review.md), 39B2b-i [complete](../../reports/phase-d-task-39b2b-i-review.md), 39B2b-ii-E1 [complete](../../reports/phase-d-task-39b2b-ii-e1-review.md), E2a [complete](../../reports/phase-d-task-39b2b-ii-e2a-review.md), E2b-i [complete](../../reports/phase-d-task-39b2b-ii-e2b-i-review.md), E2b-ii [complete](../../reports/phase-d-task-39b2b-ii-e2b-ii-review.md), 39B2b-ii [complete](../../reports/phase-d-task-39b2b-ii-review.md), 39B2c attempt binding [complete](../../reports/phase-d-task-39b2c-attempt-binding-prerequisite-review.md), strict decoding [complete](../../reports/phase-d-task-39b2c-strict-capability-decoding-prerequisite-review.md); machine driver next |
 | [40](task-40-implementation-brief.md) | Evidence report and conservative Review projection | blocked on Task 39 |
 | [41](task-41-implementation-brief.md) | First-use disclosure and typed availability | blocked on Task 40 |
 | [42](task-42-implementation-brief.md) | App workflow and recovery state | blocked on Task 41 |

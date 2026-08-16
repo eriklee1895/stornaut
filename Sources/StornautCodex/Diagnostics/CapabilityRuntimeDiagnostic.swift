@@ -79,6 +79,90 @@ public enum CapabilityRuntimeDiagnosticOutcome:
     case signedRuntimeReady
     case signedRuntimeBlocked(reasonKeys: [String])
     case externalStateBlocked(reasonKeys: [String])
+
+    public init(from decoder: Decoder) throws {
+        let container = try strictCapabilityRuntimeContainer(
+            decoder,
+            keys: Set(CodingKeys.allCases.map(\.rawValue)),
+            optionalKeys: Set(CodingKeys.allCases.map(\.rawValue))
+        )
+        guard container.allKeys.count == 1,
+              let key = container.allKeys.first,
+              let codingKey = CodingKeys(rawValue: key.stringValue)
+        else {
+            throw CapabilityRuntimeDiagnosticError.invalidReport
+        }
+        let payload = try container.nestedContainer(
+            keyedBy: CapabilityRuntimeCodingKey.self,
+            forKey: key
+        )
+        switch codingKey {
+        case .signedRuntimeReady:
+            guard payload.allKeys.isEmpty else {
+                throw CapabilityRuntimeDiagnosticError.invalidReport
+            }
+            self = .signedRuntimeReady
+        case .signedRuntimeBlocked, .externalStateBlocked:
+            let reasonKey = CapabilityRuntimeCodingKey(
+                PayloadCodingKeys.reasonKeys.rawValue
+            )
+            guard
+                Set(payload.allKeys.map(\.stringValue))
+                    == [PayloadCodingKeys.reasonKeys.rawValue]
+            else {
+                throw CapabilityRuntimeDiagnosticError.invalidReport
+            }
+            let reasonKeys = try payload.decode(
+                [String].self,
+                forKey: reasonKey
+            )
+            self = codingKey == .signedRuntimeBlocked
+                ? .signedRuntimeBlocked(reasonKeys: reasonKeys)
+                : .externalStateBlocked(reasonKeys: reasonKeys)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(
+            keyedBy: CapabilityRuntimeCodingKey.self
+        )
+        let codingKey: CodingKeys
+        let reasonKeys: [String]?
+        switch self {
+        case .signedRuntimeReady:
+            codingKey = .signedRuntimeReady
+            reasonKeys = nil
+        case let .signedRuntimeBlocked(values):
+            codingKey = .signedRuntimeBlocked
+            reasonKeys = values
+        case let .externalStateBlocked(values):
+            codingKey = .externalStateBlocked
+            reasonKeys = values
+        }
+        let key = CapabilityRuntimeCodingKey(codingKey.rawValue)
+        var payload = container.nestedContainer(
+            keyedBy: CapabilityRuntimeCodingKey.self,
+            forKey: key
+        )
+        if let reasonKeys {
+            try payload.encode(
+                reasonKeys,
+                forKey: CapabilityRuntimeCodingKey(
+                    PayloadCodingKeys.reasonKeys.rawValue
+                )
+            )
+        }
+    }
+
+    private enum CodingKeys: String, CaseIterable {
+        case signedRuntimeReady
+        case signedRuntimeBlocked
+        case externalStateBlocked
+    }
+
+    private enum PayloadCodingKeys: String {
+        case reasonKeys
+    }
 }
 
 public enum CapabilityRuntimeDiagnosticError:
@@ -131,6 +215,61 @@ public struct CapabilityRuntimeCapabilityEvidence:
         self.observed = observed
         self.reasonKey = reasonKey
     }
+
+    public init(from decoder: Decoder) throws {
+        let container = try strictCapabilityRuntimeContainer(
+            decoder,
+            keys: Set(CodingKeys.allCases.map(\.rawValue)),
+            optionalKeys: [CodingKeys.reasonKey.rawValue]
+        )
+        try self.init(
+            capability: container.decode(
+                CapabilityRuntimeCapability.self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.capability.rawValue
+                )
+            ),
+            advertised: container.decode(
+                Bool.self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.advertised.rawValue
+                )
+            ),
+            configured: container.decode(
+                Bool.self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.configured.rawValue
+                )
+            ),
+            invoked: container.decode(
+                Bool.self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.invoked.rawValue
+                )
+            ),
+            observed: container.decode(
+                Bool.self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.observed.rawValue
+                )
+            ),
+            reasonKey: container.decodeIfPresent(
+                String.self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.reasonKey.rawValue
+                )
+            )
+        )
+    }
+
+    private enum CodingKeys: String, CodingKey, CaseIterable {
+        case capability
+        case advertised
+        case configured
+        case invoked
+        case observed
+        case reasonKey
+    }
 }
 
 private extension CapabilityRuntimeCapability {
@@ -170,6 +309,40 @@ public struct CapabilityRuntimeIntegrityEvidence:
         self.property = property
         self.verdict = verdict
         self.reasonKey = reasonKey
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try strictCapabilityRuntimeContainer(
+            decoder,
+            keys: Set(CodingKeys.allCases.map(\.rawValue)),
+            optionalKeys: [CodingKeys.reasonKey.rawValue]
+        )
+        try self.init(
+            property: container.decode(
+                CapabilityRuntimeIntegrityProperty.self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.property.rawValue
+                )
+            ),
+            verdict: container.decode(
+                CapabilityRuntimeIntegrityVerdict.self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.verdict.rawValue
+                )
+            ),
+            reasonKey: container.decodeIfPresent(
+                String.self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.reasonKey.rawValue
+                )
+            )
+        )
+    }
+
+    private enum CodingKeys: String, CodingKey, CaseIterable {
+        case property
+        case verdict
+        case reasonKey
     }
 }
 
@@ -239,6 +412,102 @@ public struct CapabilityRuntimeDiagnosticMetadata:
         self.syntheticFixtureSHA256s = syntheticFixtureSHA256s.sorted()
         self.sanitizedEventCategories = sanitizedEventCategories.sorted()
         self.durationMilliseconds = durationMilliseconds
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try strictCapabilityRuntimeContainer(
+            decoder,
+            keys: Set(CodingKeys.allCases.map(\.rawValue))
+        )
+        try self.init(
+            appBundleIdentifier: container.decode(
+                String.self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.appBundleIdentifier.rawValue
+                )
+            ),
+            appExecutableSHA256: container.decode(
+                String.self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.appExecutableSHA256.rawValue
+                )
+            ),
+            appDesignatedRequirementSHA256: container.decode(
+                String.self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.appDesignatedRequirementSHA256.rawValue
+                )
+            ),
+            signatureKind: container.decode(
+                CapabilityRuntimeSignatureKind.self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.signatureKind.rawValue
+                )
+            ),
+            codexVersion: container.decode(
+                String.self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.codexVersion.rawValue
+                )
+            ),
+            codexExecutableSHA256: container.decode(
+                String.self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.codexExecutableSHA256.rawValue
+                )
+            ),
+            model: container.decode(
+                CodexRuntimeModel.self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.model.rawValue
+                )
+            ),
+            provider: container.decode(
+                CodexRuntimeProvider.self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.provider.rawValue
+                )
+            ),
+            publicEndpointHosts: container.decode(
+                [String].self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.publicEndpointHosts.rawValue
+                )
+            ),
+            syntheticFixtureSHA256s: container.decode(
+                [String].self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.syntheticFixtureSHA256s.rawValue
+                )
+            ),
+            sanitizedEventCategories: container.decode(
+                [String].self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.sanitizedEventCategories.rawValue
+                )
+            ),
+            durationMilliseconds: container.decode(
+                Int.self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.durationMilliseconds.rawValue
+                )
+            )
+        )
+    }
+
+    private enum CodingKeys: String, CodingKey, CaseIterable {
+        case appBundleIdentifier
+        case appExecutableSHA256
+        case appDesignatedRequirementSHA256
+        case signatureKind
+        case codexVersion
+        case codexExecutableSHA256
+        case model
+        case provider
+        case publicEndpointHosts
+        case syntheticFixtureSHA256s
+        case sanitizedEventCategories
+        case durationMilliseconds
     }
 }
 
@@ -328,6 +597,66 @@ public struct CapabilityRuntimeDiagnosticReport:
             externalStateReasonKeys.sorted()
         self.outcome = outcome
     }
+
+    public init(from decoder: Decoder) throws {
+        let container = try strictCapabilityRuntimeContainer(
+            decoder,
+            keys: Set(CodingKeys.allCases.map(\.rawValue))
+        )
+        let schemaVersion = try container.decode(
+            Int.self,
+            forKey: CapabilityRuntimeCodingKey(
+                CodingKeys.schemaVersion.rawValue
+            )
+        )
+        guard schemaVersion == Self.schemaVersion else {
+            throw CapabilityRuntimeDiagnosticError.invalidReport
+        }
+        let decodedOutcome = try container.decode(
+            CapabilityRuntimeDiagnosticOutcome.self,
+            forKey: CapabilityRuntimeCodingKey(
+                CodingKeys.outcome.rawValue
+            )
+        )
+        try self.init(
+            metadata: container.decode(
+                CapabilityRuntimeDiagnosticMetadata.self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.metadata.rawValue
+                )
+            ),
+            capabilities: container.decode(
+                [CapabilityRuntimeCapabilityEvidence].self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.capabilities.rawValue
+                )
+            ),
+            integrity: container.decode(
+                [CapabilityRuntimeIntegrityEvidence].self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.integrity.rawValue
+                )
+            ),
+            externalStateReasonKeys: container.decode(
+                [String].self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.externalStateReasonKeys.rawValue
+                )
+            )
+        )
+        guard outcome == decodedOutcome else {
+            throw CapabilityRuntimeDiagnosticError.invalidReport
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey, CaseIterable {
+        case schemaVersion
+        case metadata
+        case capabilities
+        case integrity
+        case externalStateReasonKeys
+        case outcome
+    }
 }
 
 public struct CapabilityRuntimeWorkerEvidence:
@@ -411,6 +740,95 @@ public struct CapabilityRuntimeWorkerEvidence:
             $0.property.rawValue < $1.property.rawValue
         }
     }
+
+    public init(from decoder: Decoder) throws {
+        let container = try strictCapabilityRuntimeContainer(
+            decoder,
+            keys: Set(CodingKeys.allCases.map(\.rawValue))
+        )
+        try self.init(
+            investigationID: container.decode(
+                UUID.self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.investigationID.rawValue
+                )
+            ),
+            evidenceBindingSHA256: container.decode(
+                String.self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.evidenceBindingSHA256.rawValue
+                )
+            ),
+            codexVersion: container.decode(
+                String.self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.codexVersion.rawValue
+                )
+            ),
+            codexExecutableSHA256: container.decode(
+                String.self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.codexExecutableSHA256.rawValue
+                )
+            ),
+            provider: container.decode(
+                CodexRuntimeProvider.self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.provider.rawValue
+                )
+            ),
+            publicEndpointHosts: container.decode(
+                [String].self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.publicEndpointHosts.rawValue
+                )
+            ),
+            syntheticFixtureSHA256s: container.decode(
+                [String].self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.syntheticFixtureSHA256s.rawValue
+                )
+            ),
+            sanitizedEventCategories: container.decode(
+                [String].self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.sanitizedEventCategories.rawValue
+                )
+            ),
+            durationMilliseconds: container.decode(
+                Int.self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.durationMilliseconds.rawValue
+                )
+            ),
+            capabilities: container.decode(
+                [CapabilityRuntimeCapabilityEvidence].self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.capabilities.rawValue
+                )
+            ),
+            integrity: container.decode(
+                [CapabilityRuntimeIntegrityEvidence].self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.integrity.rawValue
+                )
+            )
+        )
+    }
+
+    private enum CodingKeys: String, CodingKey, CaseIterable {
+        case investigationID
+        case evidenceBindingSHA256
+        case codexVersion
+        case codexExecutableSHA256
+        case provider
+        case publicEndpointHosts
+        case syntheticFixtureSHA256s
+        case sanitizedEventCategories
+        case durationMilliseconds
+        case capabilities
+        case integrity
+    }
 }
 
 public struct CapabilityRuntimeLifecycleEvidence:
@@ -443,6 +861,25 @@ public struct CapabilityRuntimeLifecycleEvidence:
             $0.property.rawValue < $1.property.rawValue
         }
     }
+
+    public init(from decoder: Decoder) throws {
+        let container = try strictCapabilityRuntimeContainer(
+            decoder,
+            keys: [CodingKeys.integrity.rawValue]
+        )
+        try self.init(
+            integrity: container.decode(
+                [CapabilityRuntimeIntegrityEvidence].self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.integrity.rawValue
+                )
+            )
+        )
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case integrity
+    }
 }
 
 public struct CapabilityRuntimeRepositoryEvidence:
@@ -462,6 +899,25 @@ public struct CapabilityRuntimeRepositoryEvidence:
             throw CapabilityRuntimeDiagnosticError.invalidReport
         }
         self.integrity = integrity
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try strictCapabilityRuntimeContainer(
+            decoder,
+            keys: [CodingKeys.integrity.rawValue]
+        )
+        try self.init(
+            integrity: container.decode(
+                [CapabilityRuntimeIntegrityEvidence].self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.integrity.rawValue
+                )
+            )
+        )
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case integrity
     }
 }
 
@@ -697,4 +1153,40 @@ private func publicDiagnosticHost(_ value: String) -> Bool {
                         || $0.value == 0x2D
                 }
         }
+}
+
+private struct CapabilityRuntimeCodingKey: CodingKey, Hashable {
+    let stringValue: String
+    let intValue: Int? = nil
+
+    init(_ value: String) {
+        stringValue = value
+    }
+
+    init?(stringValue: String) {
+        self.stringValue = stringValue
+    }
+
+    init?(intValue: Int) {
+        return nil
+    }
+}
+
+private func strictCapabilityRuntimeContainer(
+    _ decoder: Decoder,
+    keys: Set<String>,
+    optionalKeys: Set<String> = []
+) throws -> KeyedDecodingContainer<CapabilityRuntimeCodingKey> {
+    let container = try decoder.container(
+        keyedBy: CapabilityRuntimeCodingKey.self
+    )
+    let actualKeys = Set(container.allKeys.map(\.stringValue))
+    guard
+        optionalKeys.isSubset(of: keys),
+        actualKeys.isSubset(of: keys),
+        keys.subtracting(optionalKeys).isSubset(of: actualKeys)
+    else {
+        throw CapabilityRuntimeDiagnosticError.invalidReport
+    }
+    return container
 }
