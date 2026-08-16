@@ -3,11 +3,20 @@
 > **Status:** In progress; 39A contract/facade foundation, 39B1a exact
 > Store/async-lifecycle prerequisite closure and 39B1b-i package-closed
 > transport/composition plus 39B1b-ii strict DEBUG App leaf are complete and
-> independently verified. 39B2 signed-App machine admission is next. Evidence:
+> independently verified. The 39B2 preflight found that the accepted R5 helper
+> still exposes only its one-shot capability-worker protocol; it cannot yet
+> carry the Task 38 interactive App Server session that ADR 0016 requires the
+> App to drive. To stay below the hard review budget, 39B2 is split into
+> 39B2a strict supervised interactive transport, 39B2b signed-App/helper
+> production composition and 39B2c machine admission/failure matrix. 39B2a
+> implementation, focused/serialized regression and independent post-fix
+> review are complete; its authoritative full verifier passed all 23 stages in
+> one uninterrupted run. Evidence:
 > [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
 > [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md) and
 > [Task 39B1b-i Review](../../reports/phase-d-task-39b1b-i-review.md) and
-> [Task 39B1b-ii Review](../../reports/phase-d-task-39b1b-ii-review.md).
+> [Task 39B1b-ii Review](../../reports/phase-d-task-39b1b-ii-review.md) and
+> [Task 39B2a Review](../../reports/phase-d-task-39b2a-review.md).
 >
 > **Parent plan:**
 > [Phase D Conditional Deep Dive](phase-d-conditional-deep-dive.md)
@@ -110,12 +119,22 @@ before implementation:
      structural no-Executor boundaries;
    - **39B1b-ii DEBUG App leaf** — strict DEBUG activation, App composition
      tests and structural Release boundaries.
-2. **39B2 machine admission** — current-source signed App/helper invocation,
-   bounded real model run, three-plane machine report, failure matrix,
-   teardown and zero-residue proof.
+2. **39B2 signed machine gate**:
+   - **39B2a supervised interactive transport** — strict identity-bound
+     lifecycle wire contract, exact signed-peer XPC client and package-closed
+     Codex interactive transport. It does not change the helper, invoke a
+     model or claim admission;
+   - **39B2b signed production composition** — helper-owned contained
+     interactive worker, DEBUG diagnostic App composition and Task 38
+     production-session driver under the fixed topology. It may exercise
+     deterministic/synthetic protocol fixtures but does not assemble a Ready
+     machine report;
+   - **39B2c machine admission** — current-source signed App/helper invocation,
+     bounded real model run, three-plane machine report, failure matrix,
+     teardown and zero-residue proof.
 
 Task 39 completes only after 39B2. Checkpoints 39A, 39B1a, 39B1b-i, 39B1b-ii
-and 39B2 each receive focused tests, boundary checks, serialized SwiftPM,
+and 39B2a–c each receive focused tests, boundary checks, serialized SwiftPM,
 independent review, one uninterrupted authoritative full verifier and an
 independent commit/push. The additional verifier cost keeps every pushed
 checkpoint authoritative rather than recreating the oversized Task 36–38
@@ -163,6 +182,53 @@ no-Executor structural gates, 846-test serialized SwiftPM regression and
 independent post-fix review passed. Its one uninterrupted 23-stage
 authoritative full verifier exited `0` in 972 seconds. See
 [Task 39B1b-ii Review](../../reports/phase-d-task-39b1b-ii-review.md).
+
+The 39B2 preflight traced the live implementation rather than assuming that
+the earlier R5 diagnostic was already interactive:
+
+- `LifecycleSupervisorRequest` and `LifecycleSupervisorXPCWire` expose only
+  one-shot `start`/`cancel`;
+- `StornautLifecycleHelper` launches
+  `CapabilityRuntimeWorker.runLocalDiagnostic`, waits for one final evidence
+  receipt and then drains the audit session;
+- `CodexInteractiveAppServerClient`, added in 39B1b-i, requires an ongoing
+  bidirectional line transport for Task 38 identities and events;
+- ADR 0016 explicitly requires the helper to retain lifecycle authority while
+  the App drives stdio/App Server.
+
+Adding the strict wire contract and XPC client, helper state machine and
+contained child transport, diagnostic App composition, production driver,
+three-plane assembler, scripts and failure matrix in one diff would exceed
+both the 14-path and approximately 4,000-line hard limits. The split above was
+therefore required before helper or App behavior changed. 39B2a is fixed to
+at most nine non-document paths and approximately 2,500 added lines:
+
+```text
+Package.swift
+Sources/StornautLifecycle/LifecycleInteractiveSessionContract.swift
+Sources/StornautLifecycle/LifecycleSupervisorXPC.swift
+Sources/StornautInvestigationRuntime/InvestigationLifecycleAppServerTransport.swift
+Tests/StornautLifecycleTests/LifecycleInteractiveSessionContractTests.swift
+Tests/StornautInvestigationTests/InvestigationLifecycleAppServerTransportTests.swift
+scripts/verify-investigation-boundaries
+```
+
+The source/test names may be merged when that reduces surface area, but 39B2a
+may not edit `StornautLifecycleHelper`, the Xcode App target, runtime report
+assembly or any real-model script. A green 39B2a proves only a closed,
+testable transport foundation; it cannot produce
+`signedInvestigationRuntimeReady`.
+
+39B2a changed seven non-document source, test and script paths and added 2,572
+non-document lines with two deletions. It added the strict versioned
+interactive contract, exact signed-peer XPC client, cancellation/dispatch
+linearization, privacy-safe reason allowlist and package-closed serialized
+transport. The final affected suites passed 73 Lifecycle and 103 Investigation
+tests; the serialized SwiftPM regression passed 865 tests. Independent
+post-fix review closed all P0–P2 findings, and its one uninterrupted
+authoritative full verifier passed 23/23 stages in 932 seconds. 39B2a is
+complete; helper implementation, signed production composition and every
+readiness claim remain outside this checkpoint.
 
 39B1a bound the diagnostic configuration to the real Evidence Store v4 path,
 made lifecycle drain directly asynchronous, reloaded actor-owned run state

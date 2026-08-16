@@ -10,9 +10,13 @@ closed the exact Evidence Store v4 path and directly async lifecycle prerequisit
 39B1b-i closed the package-scoped transport/non-product composition seam.
 39B1b-ii closed the strict DEBUG App leaf, exclusive preflight receipt and
 ordinary Debug/Release activation boundaries; its independent post-fix review
-and 23-stage authoritative full verifier passed. 39B2 signed-App machine
-admission is next. Tasks 40–44 remain blocked on the pushed completion commit
-of their immediate predecessor.
+and 23-stage authoritative full verifier passed. 39B2a strict supervised
+interactive transport implementation, 73-test Lifecycle suite, 103-test
+Investigation suite, 865-test serialized regression and independent post-fix
+review passed; its authoritative full verifier passed 23/23 stages in 932
+seconds. 39B2a is complete. 39B2b signed production composition is next after
+that independent commit. 39B2c alone owns machine admission. Tasks 40–44
+remain blocked on the pushed completion commit of their immediate predecessor.
 
 The normative low-level contract is
 [Investigation Canonical v1](../../specs/investigation-canonical-v1.md).
@@ -29,7 +33,7 @@ the sole normal-product admission gate.
 | [36](task-36-implementation-brief.md) | Domain, canonical projection, planner, budget and stop contracts | complete; [review](../../reports/phase-d-task-36-review.md) |
 | [37](task-37-implementation-brief.md) | Store v4, retention and source rejoin | complete; [review](../../reports/phase-d-task-37-review.md) |
 | [38](task-38-implementation-brief.md) | Closed coordinator with fake runtime | complete; [review](../../reports/phase-d-task-38-review.md) |
-| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; 39A [complete](../../reports/phase-d-task-39a-review.md), 39B1a [complete](../../reports/phase-d-task-39b1a-review.md), 39B1b-i [complete](../../reports/phase-d-task-39b1b-i-review.md), 39B1b-ii [complete](../../reports/phase-d-task-39b1b-ii-review.md), 39B2 next |
+| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; 39A [complete](../../reports/phase-d-task-39a-review.md), 39B1a [complete](../../reports/phase-d-task-39b1a-review.md), 39B1b-i [complete](../../reports/phase-d-task-39b1b-i-review.md), 39B1b-ii [complete](../../reports/phase-d-task-39b1b-ii-review.md), 39B2a [complete](../../reports/phase-d-task-39b2a-review.md), 39B2b next |
 | [40](task-40-implementation-brief.md) | Evidence report and conservative Review projection | blocked on Task 39 |
 | [41](task-41-implementation-brief.md) | First-use disclosure and typed availability | blocked on Task 40 |
 | [42](task-42-implementation-brief.md) | App workflow and recovery state | blocked on Task 41 |

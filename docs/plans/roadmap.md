@@ -177,7 +177,12 @@ independent post-fix review 与 authoritative full verifier 23/23 stages
 单次 exit 0。39B1b-ii strict DEBUG App leaf implementation、11-test dedicated
 App target、pure-product Debug/Release boundary、846-test serialized regression
 与 independent post-fix review 已通过，authoritative full verifier 23/23
-stages 单次 exit 0；39B2 signed-App machine admission 是下一 checkpoint。
+stages 单次 exit 0。39B2 已拆为 39B2a strict supervised transport、39B2b
+signed production composition 与 39B2c machine admission；39B2a
+implementation、73-test Lifecycle、103-test Investigation、865-test
+serialized regression 与 independent post-fix review 已通过，authoritative
+full verifier 23/23 stages 单次 exit 0（932 秒）。39B2a 已完成；39B2b
+是下一 checkpoint，39B2c 才能作 machine readiness claim。
 Task 44 是唯一
 normal-product admission gate。completion evidence 见
 Task 36 [review](../reports/phase-d-task-36-review.md)、Task 37
@@ -186,7 +191,8 @@ Task 36 [review](../reports/phase-d-task-36-review.md)、Task 37
 [review](../reports/phase-d-task-39a-review.md)，39B1a checkpoint evidence 见
 [review](../reports/phase-d-task-39b1a-review.md)，39B1b-i/ii evidence 见
 [transport review](../reports/phase-d-task-39b1b-i-review.md) 与
-[App leaf review](../reports/phase-d-task-39b1b-ii-review.md)。
+[App leaf review](../reports/phase-d-task-39b1b-ii-review.md)，39B2a evidence
+见 [supervised transport review](../reports/phase-d-task-39b2a-review.md)。
 
 **范围：** Epic 5–6；仅在 ADR 0004 capability-first runtime gate 允许时进入。
 
@@ -316,8 +322,13 @@ Task 36 [review](../reports/phase-d-task-36-review.md)、Task 37
 	  review 与 authoritative full verifier。39B1b-ii strict DEBUG App leaf
 	  implementation、11-test App target、pure-product Debug/Release boundary、
 	  846-test serialized regression、independent post-fix review 与
-	  authoritative full verifier 已通过；39B2 machine admission 是下一
-	  checkpoint，Task 39 尚未完成。
+	  authoritative full verifier 已通过。39B2a strict lifecycle contract、
+	  signed-peer XPC client、cancellation/dispatch linearization 与
+	  package-closed transport implementation 已完成；73-test Lifecycle、
+	  103-test Investigation、865-test serialized regression 与 independent
+	  post-fix review 已通过，authoritative full verifier 23/23 stages 单次
+	  exit 0（932 秒）。39B2a 已完成；39B2b signed production composition
+	  是下一 checkpoint，39B2c 才是 machine admission，Task 39 尚未完成。
 - Epic 0 Foundation Upstream Study：已完成，选择 checked-in Xcode App/Test host + local Swift packages。
 - Epic 0 Task 1：SwiftPM Core/Codex、smoke tests、`scripts/verify`、manual-only CI 与 ThirdPartyNotices 骨架已完成。
 - Bundle identifier：已确认 `com.eriklee.stornaut`。

@@ -10,6 +10,8 @@ evidence_root=Sources/StornautCore/Evidence
 coordinator_root=Sources/StornautInvestigation
 runtime_root=Sources/StornautInvestigationRuntime
 diagnostic_root=Sources/StornautInvestigationDiagnostic
+lifecycle_root=Sources/StornautLifecycle
+lifecycle_helper=StornautLifecycleHelper/main.swift
 required_files=(
     "$investigation_root/InvestigationCanonical.swift"
     "$investigation_root/InvestigationBudget.swift"
@@ -34,12 +36,16 @@ required_files=(
     "$coordinator_root/SignedInvestigationRuntimeContract.swift"
     "$coordinator_root/Resources/investigation-prompt-v1.txt"
     "$runtime_root/InvestigationCodexSessionAdapter.swift"
+    "$runtime_root/InvestigationLifecycleAppServerTransport.swift"
     "$diagnostic_root/InvestigationRuntimeDiagnosticAppLeaf.swift"
+    "$lifecycle_root/LifecycleInteractiveSessionContract.swift"
+    "$lifecycle_root/LifecycleSupervisorXPC.swift"
+    "$lifecycle_helper"
 )
 
 for file in "${required_files[@]}"; do
     if [[ ! -f "$file" ]]; then
-        print -u2 "Missing Task 36 Investigation file: $file"
+        print -u2 "Missing Investigation boundary file: $file"
         exit 1
     fi
 done
@@ -117,6 +123,14 @@ if rg -n \
     "$diagnostic_root" \
     --glob '*.swift'; then
     print -u2 "Investigation runtime composition contains a direct network surface."
+    exit 1
+fi
+
+if rg -n \
+    'handleInteractive|LifecycleInteractiveSessionXPCWire' \
+    "$lifecycle_helper"; then
+    print -u2 \
+        "Lifecycle helper exported the 39B2b interactive wire during 39B2a."
     exit 1
 fi
 
@@ -225,7 +239,11 @@ python3 - \
     "$coordinator_root/InvestigationRuntimeProtocols.swift" \
     "$coordinator_root/InvestigationRuntimeDiagnosticFacade.swift" \
     "$coordinator_root/SignedInvestigationRuntimeContract.swift" \
-    "$coordinator_root/Resources/investigation-prompt-v1.txt" <<'PY'
+    "$coordinator_root/Resources/investigation-prompt-v1.txt" \
+    "$lifecycle_root/LifecycleInteractiveSessionContract.swift" \
+    "$lifecycle_root/LifecycleSupervisorXPC.swift" \
+    "$runtime_root/InvestigationLifecycleAppServerTransport.swift" \
+    "$lifecycle_helper" <<'PY'
 import json
 from pathlib import Path
 import re
@@ -273,6 +291,7 @@ expected_runtime_dependencies = {
     "StornautCodex",
     "StornautCore",
     "StornautInvestigation",
+    "StornautLifecycle",
 }
 if actual_runtime_dependencies != expected_runtime_dependencies:
     raise SystemExit(
@@ -318,6 +337,14 @@ protocol_source = Path(sys.argv[3]).read_text(encoding="utf-8")
 diagnostic_facade_source = Path(sys.argv[4]).read_text(encoding="utf-8")
 signed_contract_source = Path(sys.argv[5]).read_text(encoding="utf-8")
 prompt = Path(sys.argv[6]).read_text(encoding="utf-8")
+interactive_contract_source = Path(sys.argv[7]).read_text(
+    encoding="utf-8"
+)
+interactive_xpc_source = Path(sys.argv[8]).read_text(encoding="utf-8")
+interactive_transport_source = Path(sys.argv[9]).read_text(
+    encoding="utf-8"
+)
+lifecycle_helper_source = Path(sys.argv[10]).read_text(encoding="utf-8")
 
 required_public_facade = {
     "public func start(",
@@ -452,6 +479,114 @@ if missing_signed_contract:
         "Signed Investigation runtime contract drifted: "
         f"{sorted(missing_signed_contract)}"
     )
+
+required_interactive_contract = {
+    "public enum LifecycleInteractiveSessionRequestKind:",
+    "public struct LifecycleInteractiveSessionRequest:",
+    "public static let maximumAllowedLineBytes = 2 * 1_024 * 1_024",
+    "public static let maximumAllowedSessionBytes = 16 * 1_024 * 1_024",
+    "public static let maximumEncodedEnvelopeBytes = 3 * 1_024 * 1_024",
+    "public enum LifecycleInteractiveSessionResponseKind:",
+    "public struct LifecycleInteractiveSessionResponse:",
+    "public func validated(",
+}
+missing_interactive_contract = {
+    marker
+    for marker in required_interactive_contract
+    if marker not in interactive_contract_source
+}
+if missing_interactive_contract:
+    raise SystemExit(
+        "Lifecycle interactive contract drifted: "
+        f"{sorted(missing_interactive_contract)}"
+    )
+for operation in ("case start", "case write", "case read", "case retire"):
+    if operation not in interactive_contract_source:
+        raise SystemExit(
+            f"Lifecycle interactive contract lost operation: {operation}"
+        )
+
+required_interactive_xpc = {
+    "@objc public protocol LifecycleInteractiveSessionXPCWire:",
+    "func handleInteractive(",
+    "public actor LifecycleInteractiveSessionXPCClient:",
+    "setCodeSigningRequirement(",
+    "final class LifecycleInteractiveSessionXPCReplyResolver:",
+    "sanitizedLifecycleInteractiveReasonKey(",
+    "request.kind == .retire ? 45 : 15",
+    "withTaskCancellationHandler",
+    "guard resolver.beginDispatch() else",
+    "private var dispatchBegan = false",
+    "onlyBeforeDispatch: true",
+    "!onlyBeforeDispatch || !dispatchBegan",
+    "\"runtime.lifecycle.interactive.retire-failed\"",
+    ".maximumEncodedEnvelopeBytes",
+}
+missing_interactive_xpc = {
+    marker
+    for marker in required_interactive_xpc
+    if marker not in interactive_xpc_source
+}
+if missing_interactive_xpc:
+    raise SystemExit(
+        "Lifecycle interactive XPC client drifted: "
+        f"{sorted(missing_interactive_xpc)}"
+    )
+for prohibited in (
+    "synchronousRemoteObjectProxyWithErrorHandler",
+    "DispatchSemaphore",
+    "dispatch_semaphore",
+    "xpc_connection_send_message_with_reply_sync(",
+):
+    if prohibited in interactive_xpc_source:
+        raise SystemExit(
+            "Lifecycle interactive XPC client regained a blocking bridge: "
+            f"{prohibited}"
+        )
+
+required_interactive_transport = {
+    "package actor InvestigationLifecycleAppServerTransport:",
+    "CodexInteractiveAppServerTransport",
+    "private let session: any LifecycleInteractiveSessionSending",
+    "try response.validated(for: request)",
+    "validated.drained == true",
+    "guard state == .ready || state == .active || state == .failed else",
+    "private var operationInProgress = false",
+    "private func requireUnexpired() throws",
+}
+missing_interactive_transport = {
+    marker
+    for marker in required_interactive_transport
+    if marker not in interactive_transport_source
+}
+if missing_interactive_transport:
+    raise SystemExit(
+        "Investigation lifecycle transport drifted: "
+        f"{sorted(missing_interactive_transport)}"
+    )
+for prohibited in (
+    "public actor InvestigationLifecycleAppServerTransport",
+    "LifecycleInteractiveSessionXPCClient(",
+    "NSXPCConnection(",
+    "ActionExecutor",
+    "CleanupExecutionRuntime",
+    "ExecutionAuthorization",
+):
+    if prohibited in interactive_transport_source:
+        raise SystemExit(
+            "Investigation lifecycle transport exposes prohibited authority: "
+            f"{prohibited}"
+        )
+
+for prohibited in (
+    "handleInteractive",
+    "LifecycleInteractiveSessionXPCWire",
+):
+    if prohibited in lifecycle_helper_source:
+        raise SystemExit(
+            "Lifecycle helper implemented the 39B2b wire during 39B2a: "
+            f"{prohibited}"
+        )
 
 required_prompt = {
     "read-only investigator",

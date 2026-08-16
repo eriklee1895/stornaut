@@ -102,6 +102,7 @@ let package = Package(
                 "StornautCodex",
                 "StornautCore",
                 "StornautInvestigation",
+                "StornautLifecycle",
             ]
         ),
         .target(

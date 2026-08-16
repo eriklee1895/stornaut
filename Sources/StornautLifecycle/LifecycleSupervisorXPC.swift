@@ -18,6 +18,34 @@ public enum LifecycleSupervisorXPCError:
     )
 }
 
+@objc public protocol LifecycleInteractiveSessionXPCWire:
+    LifecycleSupervisorXPCWire
+{
+    func handleInteractive(
+        _ request: Data,
+        withReply reply: @escaping (Data?, String?) -> Void
+    )
+}
+
+public enum LifecycleInteractiveSessionXPCError:
+    Error,
+    Sendable,
+    Equatable
+{
+    case invalidPeer
+    case connectionFailed
+    case timedOut
+    case cancelled
+    case invalidResponse
+    case remoteRejected(reasonKey: String)
+}
+
+public protocol LifecycleInteractiveSessionSending: Sendable {
+    func send(
+        _ request: LifecycleInteractiveSessionRequest
+    ) async throws -> LifecycleInteractiveSessionResponse
+}
+
 public struct LifecycleSupervisorXPCResponse:
     Codable,
     Sendable,
@@ -244,6 +272,119 @@ public actor LifecycleSupervisorXPCClient {
     }
 }
 
+public actor LifecycleInteractiveSessionXPCClient:
+    LifecycleInteractiveSessionSending
+{
+    private let helperBundleURL: URL
+    private let identityReader: LifecycleBundleSigningIdentityReader
+    private var connection: NSXPCConnection?
+
+    public init(
+        helperBundleURL: URL,
+        identityReader: LifecycleBundleSigningIdentityReader = .init()
+    ) {
+        self.helperBundleURL = helperBundleURL
+        self.identityReader = identityReader
+    }
+
+    public func send(
+        _ request: LifecycleInteractiveSessionRequest
+    ) async throws -> LifecycleInteractiveSessionResponse {
+        let connection = try activeConnection()
+        let data: Data
+        do {
+            data = try JSONEncoder().encode(request)
+            guard
+                data.count <= LifecycleInteractiveSessionRequest
+                    .maximumEncodedEnvelopeBytes
+            else {
+                throw LifecycleInteractiveSessionXPCError
+                    .invalidResponse
+            }
+        } catch {
+            if let error = error as? LifecycleInteractiveSessionXPCError {
+                throw error
+            }
+            throw LifecycleInteractiveSessionXPCError.invalidResponse
+        }
+        let resolver = LifecycleInteractiveSessionXPCReplyResolver(
+            request: request
+        )
+        return try await withTaskCancellationHandler {
+            if request.kind != .retire {
+                try Task.checkCancellation()
+            }
+            return try await withCheckedThrowingContinuation {
+                continuation in
+                guard resolver.install(continuation) else {
+                    return
+                }
+                resolver.scheduleTimeout(
+                    seconds: request.kind == .retire ? 45 : 15
+                )
+                let proxy = connection.remoteObjectProxyWithErrorHandler {
+                    _ in
+                    resolver.failConnection()
+                }
+                guard
+                    let wire =
+                        proxy as? LifecycleInteractiveSessionXPCWire
+                else {
+                    resolver.failConnection()
+                    return
+                }
+                guard resolver.beginDispatch() else {
+                    return
+                }
+                wire.handleInteractive(data) { response, reasonKey in
+                    resolver.resolve(
+                        response: response,
+                        reasonKey: reasonKey
+                    )
+                }
+            }
+        } onCancel: {
+            if request.kind != .retire {
+                resolver.failCancellation()
+            }
+        }
+    }
+
+    public func invalidate() {
+        connection?.invalidate()
+        connection = nil
+    }
+
+    private func activeConnection() throws -> NSXPCConnection {
+        if let connection {
+            return connection
+        }
+        let identity: LifecycleSigningIdentity
+        do {
+            identity = try identityReader.read(
+                bundleURL: helperBundleURL
+            )
+        } catch {
+            throw LifecycleInteractiveSessionXPCError.invalidPeer
+        }
+        let connection = NSXPCConnection(
+            machServiceName: LifecycleSupervisorXPCClient.serviceName,
+            options: .privileged
+        )
+        connection.remoteObjectInterface = NSXPCInterface(
+            with: LifecycleInteractiveSessionXPCWire.self
+        )
+        connection.setCodeSigningRequirement(
+            LifecyclePeerCodeSigningRequirement.exact(
+                identity: identity
+            )
+        )
+        connection.resume()
+        self.connection = connection
+        return connection
+    }
+}
+
 final class LifecycleSupervisorXPCReplyResolver:
     @unchecked Sendable
 {
@@ -317,6 +458,212 @@ final class LifecycleSupervisorXPCReplyResolver:
         }
         continuation?.resume(with: result)
     }
+}
+
+final class LifecycleInteractiveSessionXPCReplyResolver:
+    @unchecked Sendable
+{
+    private let lock = NSLock()
+    private let request: LifecycleInteractiveSessionRequest
+    private var finished = false
+    private var continuation:
+        CheckedContinuation<
+            LifecycleInteractiveSessionResponse,
+            any Error
+        >?
+    private var pendingResult:
+        Result<LifecycleInteractiveSessionResponse, any Error>?
+    private var timeoutTask: Task<Void, Never>?
+    private var dispatchBegan = false
+
+    init(request: LifecycleInteractiveSessionRequest) {
+        self.request = request
+    }
+
+    convenience init(
+        request: LifecycleInteractiveSessionRequest,
+        continuation:
+            CheckedContinuation<
+                LifecycleInteractiveSessionResponse,
+                any Error
+            >
+    ) {
+        self.init(request: request)
+        _ = install(continuation)
+    }
+
+    func install(
+        _ continuation:
+            CheckedContinuation<
+                LifecycleInteractiveSessionResponse,
+                any Error
+            >
+    ) -> Bool {
+        let pending = lock.withLock {
+            if finished {
+                return pendingResult
+            }
+            self.continuation = continuation
+            return nil
+        }
+        if let pending {
+            continuation.resume(with: pending)
+            return false
+        }
+        return true
+    }
+
+    func scheduleTimeout(seconds: Int) {
+        guard seconds > 0 else {
+            failTimeout()
+            return
+        }
+        let task = Task.detached(priority: nil) { [self] in
+            do {
+                try await Task.sleep(for: .seconds(seconds))
+            } catch {
+                return
+            }
+            failTimeout()
+        }
+        let cancel = lock.withLock {
+            guard !finished else {
+                return true
+            }
+            timeoutTask = task
+            return false
+        }
+        if cancel {
+            task.cancel()
+        }
+    }
+
+    func beginDispatch() -> Bool {
+        lock.withLock {
+            guard !finished, !dispatchBegan else {
+                return false
+            }
+            dispatchBegan = true
+            return true
+        }
+    }
+
+    func failConnection() {
+        finish(
+            .failure(
+                LifecycleInteractiveSessionXPCError.connectionFailed
+            )
+        )
+    }
+
+    func failTimeout() {
+        finish(
+            .failure(
+                LifecycleInteractiveSessionXPCError.timedOut
+            )
+        )
+    }
+
+    func failCancellation() {
+        guard request.kind != .retire else {
+            return
+        }
+        finish(
+            .failure(
+                LifecycleInteractiveSessionXPCError.cancelled
+            ),
+            onlyBeforeDispatch: true
+        )
+    }
+
+    func resolve(
+        response: Data?,
+        reasonKey: String?
+    ) {
+        if let reasonKey {
+            finish(
+                .failure(
+                    LifecycleInteractiveSessionXPCError.remoteRejected(
+                        reasonKey:
+                            sanitizedLifecycleInteractiveReasonKey(
+                                reasonKey
+                            )
+                    )
+                )
+            )
+            return
+        }
+        guard
+            let response,
+            response.count <= LifecycleInteractiveSessionRequest
+                .maximumEncodedEnvelopeBytes,
+            let decoded = try? JSONDecoder().decode(
+                LifecycleInteractiveSessionResponse.self,
+                from: response
+            ),
+            let validated = try? decoded.validated(for: request)
+        else {
+            finish(
+                .failure(
+                    LifecycleInteractiveSessionXPCError.invalidResponse
+                )
+            )
+            return
+        }
+        finish(.success(validated))
+    }
+
+    private func finish(
+        _ result: Result<
+            LifecycleInteractiveSessionResponse,
+            any Error
+        >,
+        onlyBeforeDispatch: Bool = false
+    ) {
+        let completion = lock.withLock {
+            guard
+                !finished,
+                !onlyBeforeDispatch || !dispatchBegan
+            else {
+                return (
+                    nil as CheckedContinuation<
+                        LifecycleInteractiveSessionResponse,
+                        any Error
+                    >?,
+                    nil as Task<Void, Never>?
+                )
+            }
+            finished = true
+            let value = self.continuation
+            self.continuation = nil
+            if value == nil {
+                pendingResult = result
+            }
+            let timeout = timeoutTask
+            timeoutTask = nil
+            return (value, timeout)
+        }
+        completion.1?.cancel()
+        completion.0?.resume(with: result)
+    }
+}
+
+private func sanitizedLifecycleInteractiveReasonKey(
+    _ value: String
+) -> String {
+    let allowed = Set([
+        "runtime.lifecycle.interactive.invalid-request",
+        "runtime.lifecycle.interactive.session-unavailable",
+        "runtime.lifecycle.interactive.session-mismatch",
+        "runtime.lifecycle.interactive.start-failed",
+        "runtime.lifecycle.interactive.write-failed",
+        "runtime.lifecycle.interactive.read-failed",
+        "runtime.lifecycle.interactive.retire-failed",
+        "runtime.lifecycle.interactive.remote-rejected",
+    ])
+    return allowed.contains(value)
+        ? value
+        : "runtime.lifecycle.interactive.remote-rejected"
 }
 
 public func lifecycleContainingAppURL(
