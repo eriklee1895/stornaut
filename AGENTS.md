@@ -121,8 +121,11 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   已完成。92-test Investigation、240-test Codex、846-test serialized
   regression、independent post-fix review 与 authoritative
   `scripts/verify --full` 23/23 stages 单次 exit 0（900 秒）。39B1b-ii strict
-  DEBUG App leaf 是下一 checkpoint；39B2 signed-App machine admission 仍
-  pending，Task 39 尚未完成。
+  DEBUG App leaf implementation、11-test dedicated App target、
+  pure-product Debug/Release boundary、846-test serialized regression 与
+  independent post-fix review 已通过；authoritative `scripts/verify --full`
+  23/23 stages 单次 exit 0（972 秒）。39B2 signed-App machine admission 是
+  下一 checkpoint，Task 39 尚未完成。
   真实 App Trash 依赖仍保持关闭，生产 Deep Dive 仍为 implementation unavailable。
   逐 Task 完成 Upstream Study、
   实现、code review、focused/full verify、独立 commit/push；不得提前混入
@@ -212,6 +215,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39A review / completion audit | [docs/reports/phase-d-task-39a-review.md](docs/reports/phase-d-task-39a-review.md) |
 | Phase D Task 39B1a review / completion audit | [docs/reports/phase-d-task-39b1a-review.md](docs/reports/phase-d-task-39b1a-review.md) |
 | Phase D Task 39B1b-i review / completion audit | [docs/reports/phase-d-task-39b1b-i-review.md](docs/reports/phase-d-task-39b1b-i-review.md) |
+| Phase D Task 39B1b-ii review / completion audit | [docs/reports/phase-d-task-39b1b-ii-review.md](docs/reports/phase-d-task-39b1b-ii-review.md) |
 | Epic 2–4 历史计划 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) |
 | Epic 2–4 最终 Gate | [docs/reports/epic-2-4-validation-report.md](docs/reports/epic-2-4-validation-report.md) |
 | Epic 0–1 历史计划与证据 | [docs/plans/completed/epic-0-1-foundation-spikes.md](docs/plans/completed/epic-0-1-foundation-spikes.md) |
@@ -270,8 +274,11 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   lifecycle、actor reentrancy/deadline preservation 与 no-blocking-bridge gate
   也已完成并通过 independent review 与 authoritative full verifier。39B1b-i
   package-closed transport/non-product composition 也已完成并通过 independent
-  review 与 authoritative full verifier。39B1b-ii strict DEBUG App leaf 是
-  下一 checkpoint，39B2 machine admission 仍 pending，Task 39 尚未完成。
+  review 与 authoritative full verifier。39B1b-ii strict DEBUG App leaf
+  implementation、11-test dedicated App target、pure-product Debug/Release
+  boundary、846-test serialized regression、independent post-fix review 与
+  authoritative full verifier 已通过；39B2 machine admission 是下一
+  checkpoint，Task 39 尚未完成。
 Deep Dive 的旧 Broker-only no-go 已被 ADR 0004 的 capability-first 边界取代；
 当前仍不可用的原因是生产 Deep Dive 尚未实现，而非 R6 或 Codex 工具能力。
 R6 不证明 release distribution、FDA/TCC 或 production Deep Dive；

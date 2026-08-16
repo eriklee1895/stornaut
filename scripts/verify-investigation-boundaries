@@ -9,6 +9,7 @@ investigation_root=Sources/StornautCore/Investigation
 evidence_root=Sources/StornautCore/Evidence
 coordinator_root=Sources/StornautInvestigation
 runtime_root=Sources/StornautInvestigationRuntime
+diagnostic_root=Sources/StornautInvestigationDiagnostic
 required_files=(
     "$investigation_root/InvestigationCanonical.swift"
     "$investigation_root/InvestigationBudget.swift"
@@ -33,6 +34,7 @@ required_files=(
     "$coordinator_root/SignedInvestigationRuntimeContract.swift"
     "$coordinator_root/Resources/investigation-prompt-v1.txt"
     "$runtime_root/InvestigationCodexSessionAdapter.swift"
+    "$diagnostic_root/InvestigationRuntimeDiagnosticAppLeaf.swift"
 )
 
 for file in "${required_files[@]}"; do
@@ -82,6 +84,7 @@ if rg -n \
     '\b(ActionExecutor|ActionPolicyGate|CleanupExecutionRuntime|ExecutionAuthorization|FileManagerTrashAdapter|MoveToTrash|ProposedCleanupAction|RegisteredAction[A-Za-z]*|TrashMoving)\b' \
     "$coordinator_root" \
     "$runtime_root" \
+    "$diagnostic_root" \
     --glob '*.swift'; then
     print -u2 "Investigation runtime composition references cleanup authority."
     exit 1
@@ -91,6 +94,7 @@ if rg -n \
     '\bProcess\s*\(|NSTask|posix_spawn|/bin/(ba)?sh|/usr/bin/env[[:space:]]+(ba)?sh|system\s*\(' \
     "$coordinator_root" \
     "$runtime_root" \
+    "$diagnostic_root" \
     --glob '*.swift'; then
     print -u2 "Investigation runtime composition contains an arbitrary process surface."
     exit 1
@@ -100,6 +104,7 @@ if rg -n \
     'removeItem|moveItem|copyItem|createFile|forWritingTo|O_WRONLY|O_RDWR|unlink\(|rename\(|FileManager\.default' \
     "$coordinator_root" \
     "$runtime_root" \
+    "$diagnostic_root" \
     --glob '*.swift'; then
     print -u2 "Investigation runtime composition contains a filesystem mutation surface."
     exit 1
@@ -109,6 +114,7 @@ if rg -n \
     'URLSession|dataTask|downloadTask|uploadTask|WebSocket|NWConnection|CFStream' \
     "$coordinator_root" \
     "$runtime_root" \
+    "$diagnostic_root" \
     --glob '*.swift'; then
     print -u2 "Investigation runtime composition contains a direct network surface."
     exit 1
@@ -280,6 +286,31 @@ if any(
 ):
     raise SystemExit(
         "StornautInvestigationRuntime became a public package product"
+    )
+
+diagnostic_leaf = targets.get("StornautInvestigationDiagnostic")
+if diagnostic_leaf is None:
+    raise SystemExit("missing StornautInvestigationDiagnostic package target")
+actual_diagnostic_dependencies = set(
+    diagnostic_leaf.get("target_dependencies", [])
+)
+expected_diagnostic_dependencies = set()
+if actual_diagnostic_dependencies != expected_diagnostic_dependencies:
+    raise SystemExit(
+        "StornautInvestigationDiagnostic dependencies "
+        f"{sorted(actual_diagnostic_dependencies)} != "
+        f"{sorted(expected_diagnostic_dependencies)}"
+    )
+matching_products = [
+    product
+    for product in package.get("products", [])
+    if product.get("name") == "StornautInvestigationDiagnostic"
+]
+if len(matching_products) != 1 or set(
+    matching_products[0].get("targets", [])
+) != {"StornautInvestigationDiagnostic"}:
+    raise SystemExit(
+        "StornautInvestigationDiagnostic product surface drifted"
     )
 
 coordinator_source = Path(sys.argv[2]).read_text(encoding="utf-8")

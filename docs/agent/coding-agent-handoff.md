@@ -120,8 +120,11 @@
 > 已完成。92-test Investigation、240-test Codex、846-test serialized
 > regression、independent post-fix review 与 authoritative
 > `scripts/verify --full` 23/23 stages 单次 exit 0（900 秒）。39B1b-ii strict
-> DEBUG App leaf 是下一 checkpoint；39B2 signed-App machine admission 仍
-> pending，生产 Deep Dive 仍 unavailable。
+> DEBUG App leaf implementation、11-test dedicated App target、
+> pure-product Debug/Release boundary、846-test serialized regression 与
+> independent post-fix review 已通过；authoritative `scripts/verify --full`
+> 23/23 stages 单次 exit 0（972 秒）。39B2 signed-App machine admission 是
+> 下一 checkpoint，生产 Deep Dive 仍 unavailable。
 > Task 5 的历史
 > Broker-only no-go 已由 ADR 0004 capability-first 决策修订，Deep Dive 因
 > 生产产品流程尚未实现而 unavailable；
@@ -395,6 +398,9 @@ transport/composition 也已完成，证据见
 [Task 39B1b-i Review](../reports/phase-d-task-39b1b-i-review.md)；39B1b-ii/
 39B2 只按 signed-App diagnostic
 [Implementation Brief](../plans/active/task-39-implementation-brief.md) 实施。
+39B1b-ii implementation/review evidence 见
+[Task 39B1b-ii Review](../reports/phase-d-task-39b1b-ii-review.md)；其
+authoritative full verifier 已通过。
 生产 Deep Dive 继续 unavailable，直到 Task 44 final admission。
 
 跨 Epic 的阶段依赖、no-go 分支和交付顺序由 [Delivery Roadmap](../plans/roadmap.md) 管理；新 active plan 不得另起一套宏观路线。
@@ -506,8 +512,11 @@ facade 已完成并通过 authoritative full verifier；39B1a exact Store bindin
 directly async lifecycle、actor reentrancy/deadline preservation 与
 no-blocking-bridge gate 也已完成并通过 authoritative full verifier。39B1b-i
 package-closed transport/non-product composition 也已完成并通过 authoritative
-full verifier。39B1b-ii strict DEBUG App leaf 是下一 checkpoint，39B2
-signed-App machine admission 仍 pending。该 gate 要求证明完整调查能力和公共联网可用时，
+full verifier。39B1b-ii strict DEBUG App leaf implementation、11-test
+dedicated App target、pure-product Debug/Release boundary、846-test serialized
+regression、independent post-fix review 与 authoritative full verifier 已
+通过；39B2 signed-App machine admission 是下一 checkpoint。该 gate
+要求证明完整调查能力和公共联网可用时，
 Codex 全进程树不可写用户数据、不可
 访问 localhost/私网/任意 Unix socket 且无 Executor 路径；不得用
 `danger-full-access`、命令/公共域名

@@ -8,8 +8,11 @@
 > composition and 39B2 signed-App machine admission, then split 39B1 into
 > 39B1a Store/async-lifecycle prerequisites and 39B1b transport/App leaf before
 > the write set exceeded its hard budget. 39B1a is complete and independently
-> verified; 39B1b is next. Production Deep Dive remains unavailable until Task
-> 44 admission.
+> verified; 39B1b-i is complete and independently verified. 39B1b-ii strict
+> DEBUG App leaf is complete; focused validation, independent post-fix review
+> and its 23-stage authoritative full verifier passed. 39B2 signed-App machine
+> admission is next.
+> Production Deep Dive remains unavailable until Task 44 admission.
 >
 > **Roadmap phase:** Phase D — Conditional Deep Dive
 >
@@ -807,10 +810,19 @@ Checkpoint status:
   independent post-fix review and 23/23-stage authoritative full verifier
   passed. See
   [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md).
-- 39B1b next owns package-closed interactive transport and the strict DEBUG App
-  leaf. 39B2 owns real-model signed-App machine admission, failure matrix and
+- 39B1b-i package-closed interactive transport and non-product composition are
+  complete; its 92-test Investigation suite, 240-test Codex suite, 846-test
+  serialized SwiftPM regression, independent post-fix review and 23/23-stage
+  authoritative full verifier passed. See
+  [Task 39B1b-i Review](../../reports/phase-d-task-39b1b-i-review.md).
+- 39B1b-ii strict DEBUG App leaf implementation, 11-test dedicated App target,
+  pure-product Debug/Release boundary, 846-test serialized SwiftPM regression
+  and independent post-fix review passed. Its 23-stage authoritative full
+  verifier exited `0` in 972 seconds. See
+  [Task 39B1b-ii Review](../../reports/phase-d-task-39b1b-ii-review.md).
+- 39B2 is next and owns real-model signed-App machine admission, failure matrix and
   zero-residue proof. Task 39 and production Deep Dive are not admitted by 39A
-  or either 39B1 checkpoint.
+  or any 39B1 checkpoint.
 
 Deliver:
 

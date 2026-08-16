@@ -2,12 +2,12 @@
 
 > **Status:** In progress; 39A contract/facade foundation, 39B1a exact
 > Store/async-lifecycle prerequisite closure and 39B1b-i package-closed
-> transport/composition are complete and independently verified. 39B1b-ii
-> strict DEBUG App leaf is next; 39B2 signed-App machine admission remains
-> pending. Evidence:
+> transport/composition plus 39B1b-ii strict DEBUG App leaf are complete and
+> independently verified. 39B2 signed-App machine admission is next. Evidence:
 > [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
 > [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md) and
-> [Task 39B1b-i Review](../../reports/phase-d-task-39b1b-i-review.md).
+> [Task 39B1b-i Review](../../reports/phase-d-task-39b1b-i-review.md) and
+> [Task 39B1b-ii Review](../../reports/phase-d-task-39b1b-ii-review.md).
 >
 > **Parent plan:**
 > [Phase D Conditional Deep Dive](phase-d-conditional-deep-dive.md)
@@ -156,6 +156,14 @@ uninterrupted 23-stage authoritative full verifier passed. See
 installation, machine-report assembly and failure-matrix diagnostics are
 prohibited in every 39B1 checkpoint and remain exclusively 39B2.
 
+39B1b-ii changed nine non-document source, test, project and script paths,
+adding 2,131 lines and deleting three. Its dedicated App test target passed
+11/11 tests; the pure-product Debug/Release bundle boundary, Investigation and
+no-Executor structural gates, 846-test serialized SwiftPM regression and
+independent post-fix review passed. Its one uninterrupted 23-stage
+authoritative full verifier exited `0` in 972 seconds. See
+[Task 39B1b-ii Review](../../reports/phase-d-task-39b1b-ii-review.md).
+
 39B1a bound the diagnostic configuration to the real Evidence Store v4 path,
 made lifecycle drain directly asynchronous, reloaded actor-owned run state
 after suspension, rechecked the 135-second terminal deadline before artifact
@@ -176,6 +184,16 @@ an async response cannot cause premature settlement. The target graph and
 source verifier reject cleanup/Executor authority, direct process spawning,
 filesystem mutation and direct networking. No App source, real model, fixed
 topology or machine report changed.
+
+39B1b-ii adds a separate zero-dependency static diagnostic leaf and a
+one-source DEBUG App target that performs only strict configuration preflight
+and exclusive bounded receipt creation. Ordinary Debug/Release Apps reject the
+diagnostic marker; the diagnostic product contains no normal App model/UI,
+Codex transport, Lifecycle/helper, cleanup, Executor, network or process
+surface. The test bundle alone links `StornautInvestigation` to compare the
+preflight against the authoritative configuration, and product scanning occurs
+before XCTest injection. It still does not invoke a model or compose the
+production Investigation runtime.
 
 ## 3. Composition Boundary
 

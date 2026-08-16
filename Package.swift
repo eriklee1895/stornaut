@@ -25,6 +25,11 @@ let package = Package(
             targets: ["StornautInvestigation"]
         ),
         .library(
+            name: "StornautInvestigationDiagnostic",
+            type: .static,
+            targets: ["StornautInvestigationDiagnostic"]
+        ),
+        .library(
             name: "StornautProbeBridge",
             targets: ["StornautProbeBridge"]
         ),
@@ -98,6 +103,10 @@ let package = Package(
                 "StornautCore",
                 "StornautInvestigation",
             ]
+        ),
+        .target(
+            name: "StornautInvestigationDiagnostic",
+            dependencies: []
         ),
         .target(
             name: "CLifecycleSupport",

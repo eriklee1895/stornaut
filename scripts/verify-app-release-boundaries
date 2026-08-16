@@ -5,8 +5,18 @@ set -euo pipefail
 repo_root=${0:A:h:h}
 cd "$repo_root"
 
-derived_data="$repo_root/.derivedData/app-release-boundaries"
-rm -rf "$derived_data"
+mkdir -p "$repo_root/.derivedData"
+derived_data=$(
+    mktemp -d "$repo_root/.derivedData/app-release-boundaries.XXXXXX"
+)
+diagnostic_derived_data=$(
+    mktemp -d \
+        "$repo_root/.derivedData/investigation-diagnostic-boundary.XXXXXX"
+)
+cleanup() {
+    rm -rf "$derived_data" "$diagnostic_derived_data" || true
+}
+trap cleanup EXIT
 
 for configuration in Debug Release; do
     xcodebuild -quiet \
@@ -18,12 +28,26 @@ for configuration in Debug Release; do
         build
 done
 
+diagnostic_scheme=StornautInvestigationDiagnosticApp
+xcodebuild -quiet \
+    -project Stornaut.xcodeproj \
+    -scheme "$diagnostic_scheme" \
+    -configuration Debug \
+    -destination 'platform=macOS,arch=arm64' \
+    -derivedDataPath "$diagnostic_derived_data" \
+    build
+
 debug_app="$derived_data/Build/Products/Debug/Stornaut.app"
 release_app="$derived_data/Build/Products/Release/Stornaut.app"
+diagnostic_debug_app="$diagnostic_derived_data/Build/Products/Debug/StornautInvestigationDiagnostic.app"
 test -x "$debug_app/Contents/MacOS/Stornaut"
 test -x "$release_app/Contents/MacOS/Stornaut"
+test -x \
+    "$diagnostic_debug_app/Contents/MacOS/StornautInvestigationDiagnostic"
 test -x "$debug_app/Contents/MacOS/StornautLifecycleHelper"
 test -x "$release_app/Contents/MacOS/StornautLifecycleHelper"
+test ! -e \
+    "$diagnostic_debug_app/Contents/MacOS/StornautLifecycleHelper"
 test ! -e \
     "$debug_app/Contents/Library/LaunchDaemons/com.eriklee.stornaut.lifecycle.plist"
 test ! -e \
@@ -261,5 +285,209 @@ for marker in "${debug_markers[@]}"; do
         exit 1
     fi
 done
+
+investigation_diagnostic_markers=(
+    '--stornaut-investigation-runtime-config='
+    'InvestigationRuntimeDiagnosticAppLeaf'
+    'investigationRuntimeDebugCompositionPrepared'
+    'I authorize one bounded disposable read-only Stornaut Investigation diagnostic.'
+)
+
+for marker in "${investigation_diagnostic_markers[@]}"; do
+    if app_contains "$debug_app" "$marker"; then
+        print -u2 "Investigation diagnostic leaked into the ordinary DEBUG App: $marker"
+        exit 1
+    fi
+    if app_contains "$release_app" "$marker"; then
+        print -u2 "Investigation diagnostic leaked into the Release App: $marker"
+        exit 1
+    fi
+    if ! app_contains "$diagnostic_debug_app" "$marker"; then
+        print -u2 "Investigation diagnostic positive control is missing: $marker"
+        exit 1
+    fi
+done
+
+diagnostic_forbidden_markers=(
+    '--stornaut-debug-fixture='
+    '--stornaut-capability-runtime-config='
+    '--stornaut-isolation-probe-config='
+    '--stornaut-phase-c-trash-config='
+    '--stornaut-phase-c-trash-recovery-config='
+    'signedAppTrashReady'
+    'signedAppTrashRecoveryReady'
+    'PhaseCTrashDiagnosticHarness'
+    'ActionExecutor'
+    'MoveToTrash'
+    'RegisteredAction'
+    'StornautAppModel'
+    'AppDependencies'
+    'StornautLifecycleHelper'
+    'InvestigationCodexSessionAdapter'
+    'InteractiveCodexAppServerClient'
+)
+
+for marker in "${diagnostic_forbidden_markers[@]}"; do
+    if app_contains "$diagnostic_debug_app" "$marker"; then
+        print -u2 \
+            "Forbidden surface leaked into Investigation diagnostic App: $marker"
+        exit 1
+    fi
+done
+
+python3 - Stornaut.xcodeproj/project.pbxproj <<'PY'
+from pathlib import Path
+import sys
+
+project = Path(sys.argv[1]).read_text(encoding="utf-8")
+
+def target_body(identifier, name, next_identifier):
+    marker = f"{identifier} /* {name} */ = {{"
+    start = project.find(marker)
+    end = project.find(next_identifier, start)
+    if start < 0 or end < 0:
+        raise SystemExit(f"missing Xcode target boundary for {name}")
+    return project[start:end]
+
+ordinary_app = target_body(
+    "A00000000000000000000001",
+    "StornautApp",
+    "\n\t\tA00000000000000000000002 /* StornautAppTests */",
+)
+ordinary_tests = target_body(
+    "A00000000000000000000002",
+    "StornautAppTests",
+    "\n\t\tA00000000000000000000003 /* StornautAppUITests */",
+)
+diagnostic_app = target_body(
+    "A00000000000000000000005",
+    "StornautInvestigationDiagnosticApp",
+    "\n\t\tA00000000000000000000006 "
+    "/* StornautInvestigationDiagnosticAppTests */",
+)
+for name, body in (
+    ("StornautApp", ordinary_app),
+    ("StornautAppTests", ordinary_tests),
+):
+    if "StornautInvestigationDiagnostic" in body:
+        raise SystemExit(
+            f"{name} regained the Investigation diagnostic package product"
+        )
+if "StornautInvestigationDiagnostic" not in diagnostic_app:
+    raise SystemExit(
+        "dedicated Investigation diagnostic App lost its package product"
+    )
+for forbidden in (
+    "StornautCore",
+    "StornautCodex",
+    "StornautLifecycle",
+    "Copy Helper",
+    "fileSystemSynchronizedGroups",
+    "PBXTargetDependency",
+):
+    if forbidden in diagnostic_app:
+        raise SystemExit(
+            "dedicated Investigation diagnostic App regained forbidden "
+            f"target surface: {forbidden}"
+        )
+
+source_phase_marker = (
+    "B00000000000000000000024 /* Sources */ = {"
+)
+source_phase_start = project.find(source_phase_marker)
+source_phase_end = project.find(
+    "\n\t\tB00000000000000000000025 /* Sources */",
+    source_phase_start,
+)
+if source_phase_start < 0 or source_phase_end < 0:
+    raise SystemExit("missing dedicated diagnostic Sources phase")
+source_phase = project[source_phase_start:source_phase_end]
+expected_source = (
+    "B00000000000000000000017 "
+    "/* InvestigationRuntimeDiagnosticHarness.swift in Sources */"
+)
+if source_phase.count(" in Sources */") != 1 or expected_source not in source_phase:
+    raise SystemExit(
+        "dedicated Investigation diagnostic source allowlist drifted"
+    )
+
+framework_phase_marker = (
+    "B00000000000000000000014 /* Frameworks */ = {"
+)
+framework_phase_start = project.find(framework_phase_marker)
+framework_phase_end = project.find(
+    "\n\t\tB00000000000000000000015 /* Frameworks */",
+    framework_phase_start,
+)
+if framework_phase_start < 0 or framework_phase_end < 0:
+    raise SystemExit("missing dedicated diagnostic Frameworks phase")
+framework_phase = project[framework_phase_start:framework_phase_end]
+expected_framework = (
+    "B00000000000000000000009 "
+    "/* StornautInvestigationDiagnostic in Frameworks */"
+)
+if (
+    framework_phase.count(" in Frameworks */") != 1
+    or expected_framework not in framework_phase
+):
+    raise SystemExit(
+        "dedicated Investigation diagnostic dependency allowlist drifted"
+    )
+
+required_exact_membership = [
+    (
+        "B00000000000000000000017 "
+        "/* InvestigationRuntimeDiagnosticHarness.swift in Sources */ = "
+        "{isa = PBXBuildFile; fileRef = "
+        "D00000000000000000000009 "
+        "/* InvestigationRuntimeDiagnosticHarness.swift */; };"
+    ),
+    (
+        "D00000000000000000000009 "
+        "/* InvestigationRuntimeDiagnosticHarness.swift */ = "
+        "{isa = PBXFileReference; lastKnownFileType = sourcecode.swift; "
+        "path = "
+        "StornautApp/Diagnostics/InvestigationRuntimeDiagnosticHarness.swift; "
+        "sourceTree = SOURCE_ROOT; };"
+    ),
+]
+if not all(value in project for value in required_exact_membership):
+    raise SystemExit(
+        "dedicated Investigation diagnostic source identity drifted"
+    )
+if (
+    "Diagnostics/InvestigationRuntimeDiagnosticHarness.swift"
+    not in project
+    or "target = A00000000000000000000001 /* StornautApp */"
+    not in project
+):
+    raise SystemExit(
+        "ordinary App lost its diagnostic harness membership exclusion"
+    )
+PY
+
+python3 - \
+    Stornaut.xcodeproj/xcshareddata/xcschemes/StornautInvestigationDiagnosticApp.xcscheme \
+    <<'PY'
+from pathlib import Path
+import sys
+
+scheme = Path(sys.argv[1]).read_text(encoding="utf-8")
+if "StornautLifecycleHelper" in scheme:
+    raise SystemExit(
+        "dedicated Investigation diagnostic scheme regained the lifecycle helper"
+    )
+if scheme.count('BlueprintName = "StornautInvestigationDiagnosticApp"') != 4:
+    raise SystemExit("dedicated diagnostic scheme App identity drifted")
+PY
+
+xcodebuild -quiet \
+    -project Stornaut.xcodeproj \
+    -scheme "$diagnostic_scheme" \
+    -configuration Debug \
+    -destination 'platform=macOS,arch=arm64' \
+    -derivedDataPath "$diagnostic_derived_data" \
+    -only-testing:StornautInvestigationDiagnosticAppTests \
+    test
 
 print "Release App fixture boundary verification passed."
