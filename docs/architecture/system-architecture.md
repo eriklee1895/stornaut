@@ -521,6 +521,8 @@ stornaut/
 │   │   ├── Policy/
 │   │   ├── Actions/
 │   │   └── Accounting/
+│   ├── StornautExecution/
+│       └── Actions/         # concrete process/OS mutation authority
 │   ├── StornautCodex/
 │       ├── Runtime/
 │       ├── Protocol/
@@ -543,11 +545,15 @@ Swift Package Manager 的当前安全边界为：
 ```text
 StornautCodex → StornautProcessSupport
 StornautCore → StornautProcessSupport
+StornautExecution → StornautCore + StornautProcessSupport
 StornautProbeBridge → StornautCodex + StornautCore
 StornautProcessSupport → no target dependency
 ```
 
-`StornautCodex` 不得直接或间接依赖 Executor-bearing `StornautCore`。
+`StornautCore` 只保留类型化执行合同、Policy、持久化和注入式协调逻辑；
+具体 Registered Action 进程启动与 OS mutation authority 必须位于
+`StornautExecution`。Investigation/Codex/diagnostic targets 不得直接或间接
+依赖 `StornautExecution`。
 `StornautProbeBridge` 是 host-side typed bridge target，不是 Codex child 的
 通用 IPC/cleanup endpoint。已接受的 Epic 0 Upstream Study 选择 checked-in
 `Stornaut.xcodeproj` 作为真实 App/Test host，并通过 local package products

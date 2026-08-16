@@ -134,8 +134,15 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   composition。39B2b-i 的 root-helper/UID-worker boundary、closed broker、
   fixed contained session、37-test focused regression、889-test serialized
   regression 与 independent post-fix review 已完成；authoritative full
-  verifier 23/23 stages 单次 exit 0（933.21 秒）。39B2b-i 已完成。只有
-  39B2c 可以作
+  verifier 23/23 stages 单次 exit 0（933.21 秒）。39B2b-i 已完成。
+  39B2b-ii preflight 发现 diagnostic final Mach-O 静态携带 Core concrete
+  cleanup/Registered Action authority，且 dead stripping/优化不能移除；
+  前置修复拆为 E1/E2。E1 已把 concrete Registered Action
+  `posix_spawn`/process-tree runner 迁入单向
+  `StornautExecution → StornautCore + StornautProcessSupport` target；
+  11-test focused、895-test serialized、independent review 与 authoritative
+  full 23/23 stages 单次通过。E1 已完成，E2 Trash/Executor authority
+  extraction active；原 signed composition diff 保持 stash。只有 39B2c 可以作
   machine readiness claim；Task 39 尚未完成。
   真实 App Trash 依赖仍保持关闭，生产 Deep Dive 仍为 implementation unavailable。
   逐 Task 完成 Upstream Study、
@@ -229,6 +236,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B1b-ii review / completion audit | [docs/reports/phase-d-task-39b1b-ii-review.md](docs/reports/phase-d-task-39b1b-ii-review.md) |
 | Phase D Task 39B2a review / completion audit | [docs/reports/phase-d-task-39b2a-review.md](docs/reports/phase-d-task-39b2a-review.md) |
 | Phase D Task 39B2b-i review / completion audit | [docs/reports/phase-d-task-39b2b-i-review.md](docs/reports/phase-d-task-39b2b-i-review.md) |
+| Phase D Task 39B2b-ii-E1 review / completion audit | [docs/reports/phase-d-task-39b2b-ii-e1-review.md](docs/reports/phase-d-task-39b2b-ii-e1-review.md) |
 | Epic 2–4 历史计划 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) |
 | Epic 2–4 最终 Gate | [docs/reports/epic-2-4-validation-report.md](docs/reports/epic-2-4-validation-report.md) |
 | Epic 0–1 历史计划与证据 | [docs/plans/completed/epic-0-1-foundation-spikes.md](docs/plans/completed/epic-0-1-foundation-spikes.md) |
@@ -325,6 +333,8 @@ Sources/StornautCore/Review/
                         deterministic execution Evidence、Plan Builder 与 projection
 Sources/StornautCore/Actions/
                         closed action types、durable execution journal 与 serial coordinator
+Sources/StornautExecution/
+                        concrete Registered Action process/OS authority
 Sources/StornautCore/Accounting/
                         cleanup Manifest/accounting 与 read-only volume sampling
 Stornaut.xcodeproj/      原生 macOS App/Test host

@@ -3,6 +3,7 @@ import Foundation
 import Testing
 @testable import StornautCore
 @testable import StornautCodex
+import StornautExecution
 
 @Test
 func successfulFakeProcessUsesFixedProtocolArgumentsAndSeparatesStderr() async throws {

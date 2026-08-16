@@ -64,13 +64,14 @@
 | Phase D Task 37 Review | [Code Review and Completion Audit](reports/phase-d-task-37-review.md) |
 | Phase D Task 38 | [Implementation Brief](plans/active/task-38-implementation-brief.md) — complete |
 | Phase D Task 38 Review | [Code Review and Completion Audit](reports/phase-d-task-38-review.md) |
-| Phase D Task 39 | [Implementation Brief](plans/active/task-39-implementation-brief.md) — in progress；39B2b-i complete，39B2b-ii next |
+| Phase D Task 39 | [Implementation Brief](plans/active/task-39-implementation-brief.md) — in progress；39B2b-ii-E1 complete，E2 active |
 | Phase D Task 39A Review | [Code Review and Completion Audit](reports/phase-d-task-39a-review.md) |
 | Phase D Task 39B1a Review | [Code Review and Completion Audit](reports/phase-d-task-39b1a-review.md) |
 | Phase D Task 39B1b-i Review | [Code Review and Completion Audit](reports/phase-d-task-39b1b-i-review.md) |
 | Phase D Task 39B1b-ii Review | [Code Review and Completion Audit](reports/phase-d-task-39b1b-ii-review.md) |
 | Phase D Task 39B2a Review | [Code Review and Completion Audit](reports/phase-d-task-39b2a-review.md) |
 | Phase D Task 39B2b-i Review | [Code Review and Completion Audit](reports/phase-d-task-39b2b-i-review.md) |
+| Phase D Task 39B2b-ii-E1 Review | [Code Review and Completion Audit](reports/phase-d-task-39b2b-ii-e1-review.md) |
 | Epic 2–4 历史计划 | [Deterministic Product Core](plans/completed/epic-2-4-deterministic-product-core.md) — Tasks 9–26 已完成并归档 |
 | 已完成计划 | [Completed Plans](plans/completed/README.md) — Epic 0–1 |
 | 上游学习与许可证门禁 | [Upstream Reference Matrix](research/upstream-reference-matrix.md) |

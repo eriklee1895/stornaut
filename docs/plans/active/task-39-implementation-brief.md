@@ -256,6 +256,46 @@ one uninterrupted authoritative full verifier passed 23/23 stages with exit
 `0` in 933.21 seconds. 39B2b-i is complete. See
 [Task 39B2b-i Review](../../reports/phase-d-task-39b2b-i-review.md).
 
+39B2b-ii preflight exposed a pre-existing link-boundary defect before any
+model run: the dedicated diagnostic App linked the complete `StornautCore`
+static target, so its final Mach-O contained concrete cleanup and Registered
+Action authority even though the diagnostic source never referenced it.
+`DEAD_CODE_STRIPPING=YES`, disabling the Xcode Debug dylib, whole-module
+optimization and `-Osize` all retained the authority symbols. The binary gate
+therefore remains valid and must not be weakened to a source-reference check.
+
+To remain below the 14-path review maximum, the prerequisite repair is split
+before resuming signed composition:
+
+1. **39B2b-ii-E1 Registered Action authority extraction** — move the concrete
+   `posix_spawn`/process-tree runner into a one-way `StornautExecution →
+   StornautCore + StornautProcessSupport` target while Core retains only the
+   typed protocol, result and error contract.
+2. **39B2b-ii-E2 Trash/Executor authority extraction** — remove concrete
+   FileManager Trash and Executor composition from the Core dependency closure,
+   explicitly link it only into the ordinary App/authorized diagnostic paths,
+   and prove the Investigation diagnostic Mach-O has no write authority.
+
+Each prerequisite receives tests-first structural coverage, focused tests,
+serialized SwiftPM regression, independent review, one authoritative full
+verifier and an independent commit/push. Neither prerequisite launches Codex,
+invokes a model, creates an Investigation readiness report or changes normal
+product availability. After E1/E2 pass, the stashed 39B2b-ii signed composition
+diff resumes under its original scope and machine execution remains exclusive
+to 39B2c.
+
+39B2b-ii-E1 changed six non-document source, test and script paths. It adds
+the one-way `StornautExecution → StornautCore + StornautProcessSupport`
+target, moves the existing concrete Registered Action runner without changing
+its behavior, and leaves only typed contracts in Core. Its 11-test focused
+suite, structural gate, 895-test serialized regression and independent
+read-only review passed with no unresolved P0–P2. Its one uninterrupted
+authoritative full verifier passed 23/23 stages with exit `0`; timed stages
+totaled 954.459 seconds. E1 is complete. See
+[Task 39B2b-ii-E1 Review](../../reports/phase-d-task-39b2b-ii-e1-review.md).
+E2 is now the active prerequisite; signed composition remains stashed and
+39B2c still exclusively owns machine execution.
+
 39B1a bound the diagnostic configuration to the real Evidence Store v4 path,
 made lifecycle drain directly asynchronous, reloaded actor-owned run state
 after suspension, rechecked the 135-second terminal deadline before artifact

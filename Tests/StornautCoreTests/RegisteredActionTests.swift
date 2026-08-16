@@ -2,6 +2,72 @@ import Darwin
 import Foundation
 import Testing
 @testable import StornautCore
+import StornautExecution
+
+@Test
+func registeredActionProcessAuthorityLivesOutsideCore() throws {
+    let repositoryRoot = URL(filePath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let coreRunnerURL = repositoryRoot.appending(
+        path: "Sources/StornautCore/Actions/RegisteredActionRunner.swift"
+    )
+    let executionRunnerURL = repositoryRoot.appending(
+        path:
+            "Sources/StornautExecution/Actions/"
+                + "FoundationRegisteredActionRunner.swift"
+    )
+    let packageURL = repositoryRoot.appending(path: "Package.swift")
+    let coreSource = try String(
+        contentsOf: coreRunnerURL,
+        encoding: .utf8
+    )
+    let executionSource = try String(
+        contentsOf: executionRunnerURL,
+        encoding: .utf8
+    )
+    let package = try String(contentsOf: packageURL, encoding: .utf8)
+
+    for forbidden in [
+        "FoundationRegisteredActionRunner",
+        "posix_spawn",
+        "ProcessTreeTerminator",
+        "waitpid(",
+        "kill(",
+    ] {
+        #expect(!coreSource.contains(forbidden))
+    }
+    for required in [
+        "public struct FoundationRegisteredActionRunner",
+        "posix_spawn",
+        "ProcessTreeTerminator",
+    ] {
+        #expect(executionSource.contains(required))
+    }
+    #expect(
+        package.contains(
+            """
+            .target(
+                        name: "StornautExecution",
+                        dependencies: [
+                            "StornautCore",
+                            "StornautProcessSupport",
+                        ]
+                    )
+            """
+        )
+    )
+    let coreTarget = try #require(
+        package.range(of: ".target(\n            name: \"StornautCore\"")
+    )
+    let coreSuffix = package[coreTarget.lowerBound...]
+    let nextTarget = try #require(
+        coreSuffix.dropFirst().range(of: "\n        .target(")
+    )
+    let coreBlock = String(coreSuffix[..<nextTarget.lowerBound])
+    #expect(!coreBlock.contains("StornautExecution"))
+}
 
 @Test
 func registeredActionRegistryResolvesOnlyFixedModeArguments() throws {

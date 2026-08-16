@@ -13,6 +13,10 @@ let package = Package(
             targets: ["StornautCore"]
         ),
         .library(
+            name: "StornautExecution",
+            targets: ["StornautExecution"]
+        ),
+        .library(
             name: "StornautCodex",
             targets: ["StornautCodex"]
         ),
@@ -64,6 +68,13 @@ let package = Package(
             ],
             linkerSettings: [
                 .linkedLibrary("sqlite3"),
+            ]
+        ),
+        .target(
+            name: "StornautExecution",
+            dependencies: [
+                "StornautCore",
+                "StornautProcessSupport",
             ]
         ),
         .target(
@@ -152,13 +163,17 @@ let package = Package(
         ),
         .testTarget(
             name: "StornautCoreTests",
-            dependencies: ["StornautCore"]
+            dependencies: [
+                "StornautCore",
+                "StornautExecution",
+            ]
         ),
         .testTarget(
             name: "StornautCodexTests",
             dependencies: [
                 "StornautCodex",
                 "StornautCore",
+                "StornautExecution",
                 "StornautProbeBridge",
                 "StornautProcessSupport",
             ]

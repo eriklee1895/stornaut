@@ -133,7 +133,17 @@
 > root-helper/UID-worker boundary、closed broker、fixed contained session、
 > 37-test focused regression、889-test serialized regression 与 independent
 > post-fix review 已完成；authoritative full verifier 23/23 stages 单次
-> exit 0（933.21 秒）。39B2b-i 已完成。39B2c 才能作 readiness claim。
+> exit 0（933.21 秒）。39B2b-i 已完成。39B2b-ii preflight 随后发现
+> diagnostic final Mach-O 因静态链接整个 Core 而携带 concrete cleanup 与
+> Registered Action authority；dead stripping、关闭 Debug dylib、whole-module
+> 与 `-Osize` 均不能移除。前置修复因此拆为 E1 Registered Action authority
+> extraction 与 E2 Trash/Executor authority extraction。E1 已将 concrete
+> `posix_spawn`/process-tree runner 迁入单向
+> `StornautExecution → StornautCore + StornautProcessSupport` target，Core
+> 只保留 typed contract；11-test focused、895-test serialized、
+> independent review 与 authoritative full 23/23 stages 单次通过（timed
+> stages 954.459 秒）。E1 已完成，E2 active；原 signed composition diff
+> 保持 stash。39B2c 才能作 readiness claim。
 > 生产 Deep Dive 仍 unavailable。
 > Task 5 的历史
 > Broker-only no-go 已由 ADR 0004 capability-first 决策修订，Deep Dive 因
@@ -540,7 +550,14 @@ full verifier 23/23 stages 单次 exit 0（932 秒）。39B2a 已完成。39B2b 
 diagnostic-App/Task 38 composition；39B2b-i implementation、37-test focused
 regression、889-test serialized regression 与 independent post-fix review
 已完成，authoritative full verifier 23/23 stages 单次 exit 0（933.21 秒）。
-39B2b-i 已完成。39B2c 才是 machine admission。该最终 gate
+39B2b-i 已完成。39B2b-ii preflight 发现 final Mach-O 的静态 Core
+dependency closure 携带 concrete cleanup/Registered Action authority；
+dead stripping 与优化实验均不能移除。前置修复拆为 E1/E2，E1 已把
+concrete Registered Action process runner 迁入单向 `StornautExecution`
+target，并通过 11-test focused、895-test serialized、independent review
+与 authoritative full 23/23 stages；E2 Trash/Executor authority extraction
+active，原 signed composition diff 保持 stash。39B2c 才是 machine
+admission。该最终 gate
 要求证明完整调查能力和公共联网可用时，
 Codex 全进程树不可写用户数据、不可
 访问 localhost/私网/任意 Unix socket 且无 Executor 路径；不得用
