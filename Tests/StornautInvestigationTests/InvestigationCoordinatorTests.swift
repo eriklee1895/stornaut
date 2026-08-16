@@ -122,7 +122,7 @@ struct InvestigationCoordinatorTests {
             )
         }
 
-        try await coordinator.startTurn(
+        _ = try await coordinator.startTurn(
             investigationID: fixture.session.id,
             runID: fixture.session.runID,
             threadID: fixture.root.id,
@@ -137,6 +137,105 @@ struct InvestigationCoordinatorTests {
                 "runtime.turn.start",
             ]
         )
+    }
+
+    @Test
+    func bindsServerAssignedTurnIdentityAfterBudgetReservation()
+        async throws
+    {
+        let fixture = try InvestigationCoordinatorFixture()
+        let coordinator = fixture.coordinator()
+        _ = try await coordinator.start(fixture.admission())
+        try await coordinator.acceptRootStartedNotification(
+            investigationID: fixture.session.id,
+            runID: fixture.session.runID,
+            root: fixture.root,
+            payload: fixture.payload("root-started")
+        )
+        let serverTurnID = DomainToken(
+            rawValue: "turn-task39-server-assigned"
+        )!
+        fixture.runtime.returnedTurnIDs = [serverTurnID]
+
+        let identity = try await coordinator.startTurn(
+            investigationID: fixture.session.id,
+            runID: fixture.session.runID,
+            threadID: fixture.root.id,
+            turnID: fixture.rootTurnID,
+            contextBytes: fixture.initialContextBytes
+        )
+        try await coordinator.acceptTurnStarted(
+            investigationID: fixture.session.id,
+            runID: fixture.session.runID,
+            threadID: fixture.root.id,
+            turnID: serverTurnID,
+            payload: fixture.payload("server-assigned-turn")
+        )
+
+        #expect(identity.turnID == serverTurnID)
+        #expect(
+            fixture.runtime.turnStartRequests[0].identity.turnID
+                == fixture.rootTurnID
+        )
+    }
+
+    @Test
+    func mismatchedServerTurnIdentityClosesAdmissionAndKeepsReservation()
+        async throws
+    {
+        let fixture = try InvestigationCoordinatorFixture()
+        let coordinator = fixture.coordinator()
+        _ = try await coordinator.start(fixture.admission())
+        try await coordinator.acceptRootStartedNotification(
+            investigationID: fixture.session.id,
+            runID: fixture.session.runID,
+            root: fixture.root,
+            payload: fixture.payload("root-started")
+        )
+        fixture.runtime.returnedTurnIdentities = [
+            InvestigationRuntimeTurnIdentityV1(
+                investigationID: fixture.session.id,
+                runID: fixture.session.runID,
+                threadID: DomainToken(
+                    rawValue: "thread-task39-foreign"
+                )!,
+                turnID: DomainToken(
+                    rawValue: "turn-task39-foreign"
+                )!
+            ),
+        ]
+
+        await #expect(
+            throws: InvestigationEventError.turnIdentityMismatch
+        ) {
+            _ = try await coordinator.startTurn(
+                investigationID: fixture.session.id,
+                runID: fixture.session.runID,
+                threadID: fixture.root.id,
+                turnID: fixture.rootTurnID,
+                contextBytes: fixture.initialContextBytes
+            )
+        }
+        await #expect(
+            throws:
+                InvestigationCoordinatorError.scientificAdmissionClosed
+        ) {
+            _ = try await coordinator.startTurn(
+                investigationID: fixture.session.id,
+                runID: fixture.session.runID,
+                threadID: fixture.root.id,
+                turnID: fixture.secondRootTurnID,
+                contextBytes: fixture.initialContextBytes
+            )
+        }
+
+        #expect(fixture.runtime.turnStartRequests.count == 1)
+        #expect(
+            fixture.store.operationLog.contains(
+                "transition.terminalBarrier"
+            )
+        )
+        #expect(fixture.runtime.interrupts.isEmpty)
     }
 
     @Test
@@ -165,7 +264,7 @@ struct InvestigationCoordinatorTests {
                 contextBytes: fixture.initialContextBytes
             )
         }
-        try await coordinator.startTurn(
+        _ = try await coordinator.startTurn(
             investigationID: fixture.session.id,
             runID: fixture.session.runID,
             threadID: fixture.root.id,

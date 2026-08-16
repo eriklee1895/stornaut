@@ -2,8 +2,10 @@
 
 > **Status:** Approved for sequential Tasks 36–44; Tasks 36–38 are complete.
 > Task 38 passed implementation, independent review, an 811-test serialized
-> regression and the 23/23-stage authoritative full verifier. Task 39 is next.
-> Production Deep Dive remains unavailable until Task 44 admission.
+> regression and the 23/23-stage authoritative full verifier. Task 39 is in
+> progress: 39A contract/composition foundation is independently complete and
+> pushed; 39B signed-App machine admission is next. Production Deep Dive
+> remains unavailable until Task 44 admission.
 >
 > **Roadmap phase:** Phase D — Conditional Deep Dive
 >
@@ -788,6 +790,16 @@ Gate:
 - independent commit/push.
 
 ### Task 39 — Signed-App Production Runtime Admission
+
+Checkpoint status:
+
+- 39A strict signed-runtime contract, server-owned turn identity binding and
+  package-closed diagnostic facade are complete; focused tests, 829-test
+  serialized SwiftPM, independent post-fix review and the 23/23-stage
+  authoritative full verifier passed. See
+  [Task 39A Review](../../reports/phase-d-task-39a-review.md).
+- 39B DEBUG App/helper composition and signed-App machine admission remain
+  pending. Task 39 and production Deep Dive are not admitted by 39A.
 
 Deliver:
 

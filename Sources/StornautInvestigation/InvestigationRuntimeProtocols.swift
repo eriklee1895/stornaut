@@ -262,7 +262,7 @@ package protocol InvestigationRuntimeOwning: Sendable {
 
     func startTurn(
         _ request: InvestigationRuntimeTurnStartRequestV1
-    ) throws
+    ) throws -> InvestigationRuntimeTurnIdentityV1
 
     func readThreadMetadata(
         threadID: DomainToken,

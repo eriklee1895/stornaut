@@ -297,6 +297,44 @@ package struct InvestigationEventNormalizer: Sendable {
         failedTurnStarts.insert(key)
     }
 
+    package mutating func bindReservedTurn(
+        reservationThreadID: DomainToken,
+        reservationTurnID: DomainToken,
+        runtimeIdentity: InvestigationRuntimeTurnIdentityV1
+    ) throws {
+        let reservedKey = TurnKey(
+            threadID: reservationThreadID,
+            turnID: reservationTurnID
+        )
+        let runtimeKey = TurnKey(
+            threadID: runtimeIdentity.threadID,
+            turnID: runtimeIdentity.turnID
+        )
+        guard !finalized,
+              runtimeIdentity.investigationID == identity.investigationID,
+              runtimeIdentity.runID == identity.runID,
+              runtimeIdentity.threadID == reservationThreadID,
+              reservedTurns.contains(reservedKey),
+              activeTurns.contains(reservedKey),
+              !failedTurnStarts.contains(runtimeKey),
+              turnReplays[runtimeKey] == nil,
+              runtimeKey == reservedKey
+                || (
+                    !reservedTurns.contains(runtimeKey)
+                        && !activeTurns.contains(runtimeKey)
+                )
+        else {
+            throw InvestigationEventError.turnIdentityMismatch
+        }
+        guard runtimeKey != reservedKey else {
+            return
+        }
+        reservedTurns.remove(reservedKey)
+        activeTurns.remove(reservedKey)
+        reservedTurns.insert(runtimeKey)
+        activeTurns.insert(runtimeKey)
+    }
+
     package mutating func acceptTurnStarted(
         threadID: DomainToken,
         turnID: DomainToken,

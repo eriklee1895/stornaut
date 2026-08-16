@@ -1,7 +1,9 @@
 # Task 39 Implementation Brief — Signed-App Production Runtime Admission
 
-> **Status:** Approved; next implementation Task after the completed Task 38
-> coordinator baseline is committed and pushed.
+> **Status:** In progress; 39A contract/composition foundation is complete and
+> independently verified, while 39B signed-App machine admission remains
+> pending. Evidence:
+> [Task 39A Review](../../reports/phase-d-task-39a-review.md).
 >
 > **Parent plan:**
 > [Phase D Conditional Deep Dive](phase-d-conditional-deep-dive.md)
@@ -52,6 +54,53 @@ It requires:
 
 Any runtime/topology/receipt drift requires a focused diagnostic and review,
 not optimistic compatibility.
+
+## 2.1 Scope and Cost Preflight
+
+Task 39 reuses the accepted R5/R6 capability worker, machine-report
+assembler, fixed lifecycle installation and signed-App binding as
+authoritative low-level evidence owners. It must not copy or rename those
+implementations.
+
+The existing R5/R6 worker is a multi-session synthetic capability diagnostic.
+It is not the Task 38 production coordinator and its aggregated report cannot
+be replayed, translated or concatenated into a purported production
+Investigation run. In particular:
+
+- a successful R5/R6 capability report cannot fabricate Task 38 root, turn,
+  lineage, budget, terminal-barrier or normalized-report evidence;
+- synthetic capability Envelopes from separate sessions cannot be combined
+  into the one Task 39 production diagnostic Envelope;
+- Task 39 must add one distinct bounded production-session driver whose live
+  identity-bound events are consumed by the existing Task 38 coordinator;
+- R5/R6 capability, containment and lifecycle evidence remains a separate
+  plane and is joined only by exact nonce/source/build/receipt bindings in
+  the final machine report.
+
+Implementation is divided into three internal gates and two independently
+reviewed/pushed checkpoints:
+
+1. **Contract gate** — strict configuration/report/binding/verdict types and
+   tamper/freshness tests; no App launch or model call.
+2. **Composition gate** — one reusable production App Server session adapter,
+   one narrow `StornautInvestigation` diagnostic facade and DEBUG-only App
+   composition; fake transport tests first, no product availability change.
+3. **Machine gate** — signed-App helper invocation, real bounded model run,
+   three-plane report assembly, failure matrix, teardown and zero residue.
+
+Checkpoint **39A** closes the contract and reusable composition foundation
+without linking the App, launching Codex or claiming signed runtime readiness.
+Checkpoint **39B** owns DEBUG App/helper composition and the machine gate;
+Task 39 completes only after 39B. Each checkpoint receives focused tests,
+boundary checks, serialized SwiftPM, independent review, one uninterrupted
+authoritative full verifier and an independent commit/push. This intentionally
+spends a second full verifier to keep each pushed checkpoint authoritative
+rather than repeating Task 38's oversized review surface.
+
+Before either checkpoint expands beyond 14 non-document source/test/script
+files or approximately 4,000 added non-document lines, stop and split again
+before adding code. A split must preserve the same Task 39 product gate and
+cannot weaken any final completion criterion.
 
 ## 3. Composition Boundary
 
@@ -375,6 +424,7 @@ scripts/verify-investigation-boundaries
 scripts/verify-app-release-boundaries
 scripts/verify
 docs/plans/active/task-39-implementation-brief.md
+docs/reports/phase-d-task-39a-review.md
 docs/reports/phase-d-task-39-review.md
 docs/agent/coding-agent-handoff.md
 docs/plans/active/README.md
@@ -405,7 +455,7 @@ git diff --check
 Then:
 
 ```text
-swift test --parallel false
+swift test --no-parallel
 scripts/verify --full
 ```
 

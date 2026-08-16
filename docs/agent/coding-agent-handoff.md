@@ -101,8 +101,14 @@
 > Probe usage regression、spawn started/completed、completion-side tool
 > classification 与 terminal deadline 六类 P1 问题均已 tests-first 修复；
 > 811-test serialized regression、independent post-fix review 与 authoritative
-> `scripts/verify --full` 23/23 stages 单次 exit 0（884.57 秒）。Task 39 已解锁
-> 为下一项 signed-App diagnostic gate；生产 Deep Dive 仍 unavailable。
+> `scripts/verify --full` 23/23 stages 单次 exit 0（884.57 秒）。Task 39 已按
+> 39A/39B checkpoint 拆分；39A strict signed-runtime contract、server-owned
+> turn identity binding 与 package-closed diagnostic facade 已完成。11/11
+> contract、5/5 facade、77/77 Investigation focused tests、829-test
+> serialized regression、independent post-fix review 与 authoritative
+> `scripts/verify --full` 23/23 stages 单次 exit 0（891.15 秒）。39B
+> signed-App machine admission 是下一 checkpoint；生产 Deep Dive 仍
+> unavailable。
 > Task 5 的历史
 > Broker-only no-go 已由 ADR 0004 capability-first 决策修订，Deep Dive 因
 > 生产产品流程尚未实现而 unavailable；
@@ -368,7 +374,9 @@ Phase D 当前实现入口为
 完成证据见 [Task 36 Review](../reports/phase-d-task-36-review.md)，Task 37
 完成证据见 [Task 37 Review](../reports/phase-d-task-37-review.md)，Task 38
 完成证据见 [Task 38 Review](../reports/phase-d-task-38-review.md)。Task 39
-已解锁并只按其 signed-App diagnostic
+的 39A contract/composition foundation 已完成，证据见
+[Task 39A Review](../reports/phase-d-task-39a-review.md)；39B 只按其
+signed-App diagnostic
 [Implementation Brief](../plans/active/task-39-implementation-brief.md) 实施。
 生产 Deep Dive 继续 unavailable，直到 Task 44 final admission。
 
@@ -475,8 +483,11 @@ v4/persistence/retention/source rejoin 已完成实现、independent review 和�
 完整容量 gate，authoritative full verifier 23/23 stages 单次 exit 0；Task 37
 已完成。Task 38 closed coordinator/fake runtime、strict normalization、
 terminal/recovery barrier 与 structural no-Executor gate 已完成，
-authoritative full verifier 23/23 stages 单次 exit 0；Task 39 已解锁。该 gate
-要求证明完整调查能力和公共联网可用时，Codex 全进程树不可写用户数据、不可
+authoritative full verifier 23/23 stages 单次 exit 0。Task 39 的 39A
+strict contract、server-owned turn binding 与 package-closed diagnostic
+facade 已完成并通过 authoritative full verifier；39B signed-App machine
+admission 是下一 checkpoint。该 gate 要求证明完整调查能力和公共联网可用时，
+Codex 全进程树不可写用户数据、不可
 访问 localhost/私网/任意 Unix socket 且无 Executor 路径；不得用
 `danger-full-access`、命令/公共域名
 allowlist、逐命令审批或关闭调查能力绕过。生产 Deep Dive、Adapter、真实

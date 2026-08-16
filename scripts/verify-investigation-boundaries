@@ -28,6 +28,8 @@ required_files=(
     "$coordinator_root/InvestigationProbeAdapter.swift"
     "$coordinator_root/InvestigationReportNormalizer.swift"
     "$coordinator_root/InvestigationTerminalBarrier.swift"
+    "$coordinator_root/InvestigationRuntimeDiagnosticFacade.swift"
+    "$coordinator_root/SignedInvestigationRuntimeContract.swift"
     "$coordinator_root/Resources/investigation-prompt-v1.txt"
 )
 
@@ -209,6 +211,8 @@ python3 - \
     "$package_graph" \
     "$coordinator_root/InvestigationCoordinator.swift" \
     "$coordinator_root/InvestigationRuntimeProtocols.swift" \
+    "$coordinator_root/InvestigationRuntimeDiagnosticFacade.swift" \
+    "$coordinator_root/SignedInvestigationRuntimeContract.swift" \
     "$coordinator_root/Resources/investigation-prompt-v1.txt" <<'PY'
 import json
 from pathlib import Path
@@ -249,7 +253,9 @@ if resource_paths != {"investigation-prompt-v1.txt"}:
 
 coordinator_source = Path(sys.argv[2]).read_text(encoding="utf-8")
 protocol_source = Path(sys.argv[3]).read_text(encoding="utf-8")
-prompt = Path(sys.argv[4]).read_text(encoding="utf-8")
+diagnostic_facade_source = Path(sys.argv[4]).read_text(encoding="utf-8")
+signed_contract_source = Path(sys.argv[5]).read_text(encoding="utf-8")
+prompt = Path(sys.argv[6]).read_text(encoding="utf-8")
 
 required_public_facade = {
     "public func start(",
@@ -277,6 +283,55 @@ public_protocol = re.compile(
 if public_protocol.search(protocol_source):
     raise SystemExit(
         "Investigation injected owner protocol became publicly constructible"
+    )
+
+required_diagnostic_boundary = {
+    "package protocol InvestigationProductionSessionDriving:",
+    "package init(",
+    "private let session: any InvestigationProductionSessionDriving",
+    "public func forwardNextValidatedAppServerLine()",
+}
+missing_diagnostic_boundary = {
+    marker for marker in required_diagnostic_boundary
+    if marker not in diagnostic_facade_source
+}
+if missing_diagnostic_boundary:
+    raise SystemExit(
+        "Investigation diagnostic facade boundary drifted: "
+        f"{sorted(missing_diagnostic_boundary)}"
+    )
+for prohibited in (
+    "public protocol InvestigationProductionSessionDriving",
+    "public init(",
+    "CapabilityRuntimeWorker",
+    "CapabilityRuntimeDiagnosticReport",
+    "ActionExecutor",
+    "CleanupExecutionRuntime",
+    "ExecutionAuthorization",
+):
+    if prohibited in diagnostic_facade_source:
+        raise SystemExit(
+            "Investigation diagnostic facade exposes a prohibited surface: "
+            f"{prohibited}"
+        )
+
+required_signed_contract = {
+    "public struct SignedInvestigationRuntimeDiagnosticConfiguration:",
+    "public struct SignedInvestigationRuntimeReport:",
+    "public struct SignedInvestigationRuntimeReportVerifier:",
+    "strictSignedRuntimeContainer(",
+    "case signedInvestigationRuntimeReady",
+    "case signedInvestigationRuntimeBlocked(reasonKeys: [String])",
+    "case signedInvestigationRuntimeFailed(reasonKeys: [String])",
+}
+missing_signed_contract = {
+    marker for marker in required_signed_contract
+    if marker not in signed_contract_source
+}
+if missing_signed_contract:
+    raise SystemExit(
+        "Signed Investigation runtime contract drifted: "
+        f"{sorted(missing_signed_contract)}"
     )
 
 required_prompt = {

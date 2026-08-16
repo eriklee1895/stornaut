@@ -163,11 +163,16 @@ retention/source rejoin 已完成，两轮正式容量 gate 共 `30/30` 样本�
 最慢 `53.159062` 秒，authoritative full verifier 23/23 stages 单次 exit 0。
 Task 38 closed fake-runtime coordinator、event normalization、terminal/recovery
 barrier 与 structural no-Executor gate 已完成，811-test serialized regression
-与 authoritative full verifier 23/23 stages 单次 exit 0。Task 39 是下一项实施
-任务；Task 44 是唯一 normal-product admission gate。completion evidence 见
+与 authoritative full verifier 23/23 stages 单次 exit 0。Task 39 正在按
+39A/39B 小 checkpoint 实施；39A strict signed-runtime contract、
+server-owned turn identity binding 与 package-closed diagnostic facade 已完成，
+829-test serialized regression、independent post-fix review 与 authoritative
+full verifier 23/23 stages 单次 exit 0；39B signed-App machine admission 是
+下一 checkpoint。Task 44 是唯一 normal-product admission gate。completion evidence 见
 Task 36 [review](../reports/phase-d-task-36-review.md)、Task 37
 [review](../reports/phase-d-task-37-review.md) 与 Task 38
-[review](../reports/phase-d-task-38-review.md)。
+[review](../reports/phase-d-task-38-review.md)；39A checkpoint evidence 见
+[review](../reports/phase-d-task-39a-review.md)。
 
 **范围：** Epic 5–6；仅在 ADR 0004 capability-first runtime gate 允许时进入。
 
@@ -284,7 +289,11 @@ Task 36 [review](../reports/phase-d-task-36-review.md)、Task 37
 	  Task 38 closed Investigation coordinator/fake runtime、strict event
 	  normalization、terminal/recovery barrier 与 structural no-Executor gate 已
 	  完成，811-test serialized regression 与 authoritative full verifier
-	  23/23 stages 单次 exit 0；Task 39 已解锁为下一项实施任务。
+	  23/23 stages 单次 exit 0。Task 39 的 39A strict signed-runtime contract、
+	  server-owned turn identity binding 与 package-closed diagnostic facade 已
+	  完成并通过 829-test serialized regression、independent post-fix review
+	  与 authoritative full verifier 23/23 stages；39B signed-App machine
+	  admission 是下一 checkpoint，Task 39 尚未完成。
 - Epic 0 Foundation Upstream Study：已完成，选择 checked-in Xcode App/Test host + local Swift packages。
 - Epic 0 Task 1：SwiftPM Core/Codex、smoke tests、`scripts/verify`、manual-only CI 与 ThirdPartyNotices 骨架已完成。
 - Bundle identifier：已确认 `com.eriklee.stornaut`。

@@ -17,7 +17,7 @@ struct InvestigationScientificLoopTests {
             runID: fixture.session.runID,
             line: fixture.rootStartedLine()
         )
-        try await coordinator.startTurn(
+        _ = try await coordinator.startTurn(
             investigationID: fixture.session.id,
             runID: fixture.session.runID,
             threadID: fixture.root.id,
@@ -280,7 +280,7 @@ struct InvestigationScientificLoopTests {
         #expect(first.stopEvaluation == .continueInvestigation)
         #expect(first.consecutiveNoGainSteps == 1)
 
-        try await coordinator.startTurn(
+        _ = try await coordinator.startTurn(
             investigationID: fixture.session.id,
             runID: fixture.session.runID,
             threadID: fixture.root.id,

@@ -315,7 +315,7 @@ struct InvestigationCoordinatorFixture {
             root: root,
             payload: payload("root-started")
         )
-        try await coordinator.startTurn(
+        _ = try await coordinator.startTurn(
             investigationID: session.id,
             runID: session.runID,
             threadID: root.id,
@@ -561,6 +561,8 @@ final class FakeInvestigationRuntime:
     var startError: Error?
     var drainError: Error?
     var turnStartErrors: [Error] = []
+    var returnedTurnIDs: [DomainToken] = []
+    var returnedTurnIdentities: [InvestigationRuntimeTurnIdentityV1] = []
     var interruptErrors: [Error] = []
     var threadMetadata:
         [DomainToken: InvestigationRuntimeThreadMetadataV1] = [:]
@@ -591,7 +593,7 @@ final class FakeInvestigationRuntime:
 
     func startTurn(
         _ request: InvestigationRuntimeTurnStartRequestV1
-    ) throws {
+    ) throws -> InvestigationRuntimeTurnIdentityV1 {
         try lock.withLock {
             turnStartRequests.append(request)
             operationLog.append("runtime.turn.start")
@@ -599,6 +601,17 @@ final class FakeInvestigationRuntime:
             if !turnStartErrors.isEmpty {
                 throw turnStartErrors.removeFirst()
             }
+            if !returnedTurnIdentities.isEmpty {
+                return returnedTurnIdentities.removeFirst()
+            }
+            return InvestigationRuntimeTurnIdentityV1(
+                investigationID: request.identity.investigationID,
+                runID: request.identity.runID,
+                threadID: request.identity.threadID,
+                turnID: returnedTurnIDs.isEmpty
+                    ? request.identity.turnID
+                    : returnedTurnIDs.removeFirst()
+            )
         }
     }
 

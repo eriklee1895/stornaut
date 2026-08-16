@@ -475,7 +475,7 @@ public actor InvestigationCoordinator {
         threadID: DomainToken,
         turnID: DomainToken,
         contextBytes: Data
-    ) async throws {
+    ) async throws -> InvestigationRuntimeTurnIdentityV1 {
         var run = try await requireScientificAdmission(
             investigationID: investigationID,
             runID: runID
@@ -499,8 +499,9 @@ public actor InvestigationCoordinator {
             contextByteCount: UInt64(contextBytes.count)
         )
         activeRun = run
+        let runtimeIdentity: InvestigationRuntimeTurnIdentityV1
         do {
-            try runtime.startTurn(
+            runtimeIdentity = try runtime.startTurn(
                 InvestigationRuntimeTurnStartRequestV1(
                     identity: InvestigationRuntimeTurnIdentityV1(
                         investigationID: investigationID,
@@ -523,6 +524,36 @@ public actor InvestigationCoordinator {
                 turnID: turnID
             )
             activeRun = retained
+            throw error
+        }
+        do {
+            var retained = try requireActiveRun(
+                investigationID: investigationID,
+                runID: runID
+            )
+            try retained.normalizer.bindReservedTurn(
+                reservationThreadID: threadID,
+                reservationTurnID: turnID,
+                runtimeIdentity: runtimeIdentity
+            )
+            activeRun = retained
+            return runtimeIdentity
+        } catch {
+            var retained = try requireActiveRun(
+                investigationID: investigationID,
+                runID: runID
+            )
+            try retained.normalizer.abandonTurnStart(
+                threadID: threadID,
+                turnID: turnID
+            )
+            activeRun = retained
+            _ = try? await requestClosing(
+                investigationID: investigationID,
+                runID: runID,
+                requestState: .terminalBarrier,
+                cause: .protocolLost
+            )
             throw error
         }
     }
@@ -900,6 +931,31 @@ public actor InvestigationCoordinator {
             requestState: .stopRequested,
             cause: .userCancelled
         )
+    }
+
+    package func failClosedTransport(
+        investigationID: InvestigationID,
+        runID: InvestigationRunID
+    ) async throws {
+        var closingError: Error?
+        do {
+            _ = try await requestClosing(
+                investigationID: investigationID,
+                runID: runID,
+                requestState: .terminalBarrier,
+                cause: .protocolLost
+            )
+        } catch {
+            closingError = error
+        }
+        try cleanFailedRuntimeStart(
+            investigationID: investigationID,
+            runID: runID
+        )
+        activeRun = nil
+        if let closingError {
+            throw closingError
+        }
     }
 
     public func settle(
