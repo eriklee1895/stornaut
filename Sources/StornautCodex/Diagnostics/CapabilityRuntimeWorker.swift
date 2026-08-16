@@ -930,6 +930,7 @@ public enum CapabilityRuntimeWorker {
             syntheticFixtureSHA256s: fixture.hashes,
             sanitizedEventCategories: Array(Set(eventCategories)).sorted(),
             durationMilliseconds: duration,
+            completedAt: Date(),
             capabilities: capabilities,
             integrity: integrity
         )

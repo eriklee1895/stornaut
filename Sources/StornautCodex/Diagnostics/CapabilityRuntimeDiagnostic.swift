@@ -683,6 +683,7 @@ public struct CapabilityRuntimeWorkerEvidence:
     public let syntheticFixtureSHA256s: [String]
     public let sanitizedEventCategories: [String]
     public let durationMilliseconds: Int
+    public let completedAt: Date
     public let capabilities: [CapabilityRuntimeCapabilityEvidence]
     public let integrity: [CapabilityRuntimeIntegrityEvidence]
 
@@ -696,6 +697,7 @@ public struct CapabilityRuntimeWorkerEvidence:
         syntheticFixtureSHA256s: [String],
         sanitizedEventCategories: [String],
         durationMilliseconds: Int,
+        completedAt: Date,
         capabilities: [CapabilityRuntimeCapabilityEvidence],
         integrity: [CapabilityRuntimeIntegrityEvidence]
     ) throws {
@@ -717,6 +719,7 @@ public struct CapabilityRuntimeWorkerEvidence:
             Set(sanitizedEventCategories).count
                 == sanitizedEventCategories.count,
             (0...3_600_000).contains(durationMilliseconds),
+            completedAt.timeIntervalSince1970.isFinite,
             capabilityKeys == CapabilityRuntimeCapability.required,
             capabilities.count == capabilityKeys.count,
             integrityKeys == Self.allowedIntegrityProperties,
@@ -733,6 +736,7 @@ public struct CapabilityRuntimeWorkerEvidence:
         self.syntheticFixtureSHA256s = syntheticFixtureSHA256s.sorted()
         self.sanitizedEventCategories = sanitizedEventCategories.sorted()
         self.durationMilliseconds = durationMilliseconds
+        self.completedAt = completedAt
         self.capabilities = capabilities.sorted {
             $0.capability.rawValue < $1.capability.rawValue
         }
@@ -801,6 +805,12 @@ public struct CapabilityRuntimeWorkerEvidence:
                     CodingKeys.durationMilliseconds.rawValue
                 )
             ),
+            completedAt: container.decode(
+                Date.self,
+                forKey: CapabilityRuntimeCodingKey(
+                    CodingKeys.completedAt.rawValue
+                )
+            ),
             capabilities: container.decode(
                 [CapabilityRuntimeCapabilityEvidence].self,
                 forKey: CapabilityRuntimeCodingKey(
@@ -826,6 +836,7 @@ public struct CapabilityRuntimeWorkerEvidence:
         case syntheticFixtureSHA256s
         case sanitizedEventCategories
         case durationMilliseconds
+        case completedAt
         case capabilities
         case integrity
     }
@@ -1059,6 +1070,7 @@ public struct CapabilityRuntimeDiagnosticVerifier: Sendable {
             sanitizedEventCategories:
                 worker.sanitizedEventCategories,
             durationMilliseconds: worker.durationMilliseconds,
+            completedAt: worker.completedAt,
             capabilities: try worker.capabilities.map(revalidate),
             integrity: try worker.integrity.map(revalidate)
         )

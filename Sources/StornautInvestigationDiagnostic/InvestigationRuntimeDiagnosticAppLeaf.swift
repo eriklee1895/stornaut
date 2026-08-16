@@ -7,6 +7,7 @@ public struct InvestigationRuntimeDiagnosticAppLeaf: Sendable {
         "I authorize one bounded disposable read-only Stornaut Investigation diagnostic."
 
     public let nonce: UUID
+    public let scenario: String
     public let diagnosticRootPath: String
 
     public static func prepare(
@@ -30,6 +31,7 @@ public struct InvestigationRuntimeDiagnosticAppLeaf: Sendable {
         try configuration.validate(now: now)
         return Self(
             nonce: configuration.nonce,
+            scenario: configuration.scenario.rawValue,
             diagnosticRootPath: configuration.diagnosticRootPath
         )
     }
@@ -46,6 +48,7 @@ public enum InvestigationRuntimeDiagnosticAppLeafError:
 private struct Configuration: Decodable {
     let schemaVersion: Int
     let nonce: UUID
+    let scenario: Scenario
     let optIn: String
     let diagnosticRootPath: String
     let sourceRootPath: String
@@ -74,6 +77,10 @@ private struct Configuration: Decodable {
         nonce = try container.decode(
             UUID.self,
             forKey: DynamicCodingKey(CodingKeys.nonce.rawValue)
+        )
+        scenario = try container.decode(
+            Scenario.self,
+            forKey: DynamicCodingKey(CodingKeys.scenario.rawValue)
         )
         optIn = try container.decode(
             String.self,
@@ -150,7 +157,7 @@ private struct Configuration: Decodable {
         ]
         let filePaths = [reportPath, storePath]
         guard
-            schemaVersion == 1,
+            schemaVersion == 2,
             optIn == InvestigationRuntimeDiagnosticAppLeaf.requiredOptIn,
             binding.isValid,
             expectedModel == "gpt-5.6-luna",
@@ -192,6 +199,7 @@ private struct Configuration: Decodable {
     private enum CodingKeys: String, CodingKey, CaseIterable {
         case schemaVersion
         case nonce
+        case scenario
         case optIn
         case diagnosticRootPath
         case sourceRootPath
@@ -208,6 +216,17 @@ private struct Configuration: Decodable {
         case maximumProbeCalls
         case maximumContextBytes
     }
+}
+
+private enum Scenario: String, Decodable, CaseIterable {
+    case success
+    case cancellation
+    case timeout
+    case invalidEnvelope
+    case identityMismatch
+    case transportLoss
+    case lifecycleRecovery
+    case artifactCleanupFailure
 }
 
 private struct Binding: Decodable {

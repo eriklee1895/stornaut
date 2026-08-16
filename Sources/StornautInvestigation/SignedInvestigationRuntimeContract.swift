@@ -14,6 +14,24 @@ public enum SignedInvestigationRuntimeContractError:
     case bindingMismatch
 }
 
+public enum SignedInvestigationRuntimeDiagnosticScenario:
+    String,
+    Codable,
+    Sendable,
+    Equatable,
+    Hashable,
+    CaseIterable
+{
+    case success
+    case cancellation
+    case timeout
+    case invalidEnvelope
+    case identityMismatch
+    case transportLoss
+    case lifecycleRecovery
+    case artifactCleanupFailure
+}
+
 public struct SignedInvestigationRuntimeBinding:
     Codable,
     Sendable,
@@ -135,7 +153,7 @@ public struct SignedInvestigationRuntimeBinding:
         }
     }
 
-    fileprivate var isValid: Bool {
+    var isValid: Bool {
         lowercaseHex(repositoryHEAD, count: 40)
             && [
                 sourceFingerprintSHA256,
@@ -172,12 +190,13 @@ public struct SignedInvestigationRuntimeDiagnosticConfiguration:
     Sendable,
     Equatable
 {
-    public static let schemaVersion = 1
+    public static let schemaVersion = 2
     public static let requiredOptIn =
         "I authorize one bounded disposable read-only Stornaut Investigation diagnostic."
 
     public let schemaVersion: Int
     public let nonce: UUID
+    public let scenario: SignedInvestigationRuntimeDiagnosticScenario
     public let optIn: String
     public let diagnosticRootPath: String
     public let sourceRootPath: String
@@ -196,6 +215,7 @@ public struct SignedInvestigationRuntimeDiagnosticConfiguration:
 
     public init(
         nonce: UUID,
+        scenario: SignedInvestigationRuntimeDiagnosticScenario,
         optIn: String,
         diagnosticRootPath: String,
         sourceRootPath: String,
@@ -215,6 +235,7 @@ public struct SignedInvestigationRuntimeDiagnosticConfiguration:
     ) throws {
         schemaVersion = Self.schemaVersion
         self.nonce = nonce
+        self.scenario = scenario
         self.optIn = optIn
         self.diagnosticRootPath = diagnosticRootPath
         self.sourceRootPath = sourceRootPath
@@ -262,13 +283,37 @@ public struct SignedInvestigationRuntimeDiagnosticConfiguration:
         try canonicalCapabilityEvidenceBindingSHA256(
             schemaVersion: schemaVersion,
             nonce: nonce,
+            scenario: scenario,
             binding: binding,
             expectedModel: expectedModel,
             expectedProvider: expectedProvider
         )
     }
 
+    public func machineConfigurationSHA256() throws -> String {
+        try canonicalSHA256(self)
+    }
+
     public init(from decoder: Decoder) throws {
+        try self.init(
+            decoder: decoder,
+            outputs: .vacant
+        )
+    }
+
+    init(
+        completedOutputsFrom decoder: Decoder
+    ) throws {
+        try self.init(
+            decoder: decoder,
+            outputs: .ownerRegularFile
+        )
+    }
+
+    private init(
+        decoder: Decoder,
+        outputs: OutputPathExpectation
+    ) throws {
         let container = try strictSignedRuntimeContainer(
             decoder,
             keys: Set(CodingKeys.allCases.map(\.rawValue)),
@@ -288,6 +333,10 @@ public struct SignedInvestigationRuntimeDiagnosticConfiguration:
         nonce = try container.decode(
             UUID.self,
             forKey: SignedRuntimeCodingKey(CodingKeys.nonce.rawValue)
+        )
+        scenario = try container.decode(
+            SignedInvestigationRuntimeDiagnosticScenario.self,
+            forKey: SignedRuntimeCodingKey(CodingKeys.scenario.rawValue)
         )
         optIn = try container.decode(
             String.self,
@@ -373,10 +422,10 @@ public struct SignedInvestigationRuntimeDiagnosticConfiguration:
                 CodingKeys.maximumContextBytes.rawValue
             )
         )
-        try validate(now: nil)
+        try validate(now: nil, outputs: outputs)
     }
 
-    fileprivate func validate(
+    func validate(
         now: Date?,
         outputs: OutputPathExpectation = .vacant
     ) throws {
@@ -447,7 +496,7 @@ public struct SignedInvestigationRuntimeDiagnosticConfiguration:
         }
     }
 
-    fileprivate enum OutputPathExpectation {
+    enum OutputPathExpectation {
         case vacant
         case ownerRegularFile
     }
@@ -455,6 +504,7 @@ public struct SignedInvestigationRuntimeDiagnosticConfiguration:
     private enum CodingKeys: String, CodingKey, CaseIterable {
         case schemaVersion
         case nonce
+        case scenario
         case optIn
         case diagnosticRootPath
         case sourceRootPath
@@ -834,8 +884,14 @@ public enum SignedInvestigationRuntimeVerdict:
     Equatable
 {
     case signedInvestigationRuntimeReady
+    case evidenceContractValidatedMachineAdmissionPending
     case signedInvestigationRuntimeBlocked(reasonKeys: [String])
     case signedInvestigationRuntimeFailed(reasonKeys: [String])
+}
+
+package enum SignedInvestigationRuntimeVerdictMode: Sendable {
+    case evaluate
+    case machineAdmissionPending
 }
 
 public struct SignedInvestigationCapabilityEvidenceReceipt:
@@ -843,11 +899,13 @@ public struct SignedInvestigationCapabilityEvidenceReceipt:
     Sendable,
     Equatable
 {
-    public static let schemaVersion = 1
+    public static let schemaVersion = 3
 
     public let schemaVersion: Int
     public let nonce: UUID
+    public let scenario: SignedInvestigationRuntimeDiagnosticScenario
     public let binding: SignedInvestigationRuntimeBinding
+    public let completedAt: Date
     public let metadataSHA256: String
     public let workerSHA256: String
     public let lifecycleSHA256: String
@@ -882,7 +940,9 @@ public struct SignedInvestigationCapabilityEvidenceReceipt:
             )
         try self.init(
             nonce: configuration.nonce,
+            scenario: configuration.scenario,
             binding: configuration.binding,
+            completedAt: worker.completedAt,
             metadataSHA256: try canonicalSHA256(metadata),
             workerSHA256: try canonicalSHA256(worker),
             lifecycleSHA256: try canonicalSHA256(lifecycle),
@@ -893,7 +953,9 @@ public struct SignedInvestigationCapabilityEvidenceReceipt:
 
     private init(
         nonce: UUID,
+        scenario: SignedInvestigationRuntimeDiagnosticScenario,
         binding: SignedInvestigationRuntimeBinding,
+        completedAt: Date,
         metadataSHA256: String,
         workerSHA256: String,
         lifecycleSHA256: String,
@@ -903,11 +965,14 @@ public struct SignedInvestigationCapabilityEvidenceReceipt:
         let report = try revalidatedCapabilityReport(report)
         let expectedComponentHashes = try Self.componentHashes(
             nonce: nonce,
+            scenario: scenario,
             binding: binding,
+            completedAt: completedAt,
             report: report
         )
         guard
             binding.isValid,
+            completedAt.timeIntervalSince1970.isFinite,
             metadataSHA256 == expectedComponentHashes.metadata,
             workerSHA256 == expectedComponentHashes.worker,
             lifecycleSHA256 == expectedComponentHashes.lifecycle,
@@ -925,7 +990,9 @@ public struct SignedInvestigationCapabilityEvidenceReceipt:
         }
         schemaVersion = Self.schemaVersion
         self.nonce = nonce
+        self.scenario = scenario
         self.binding = binding
+        self.completedAt = completedAt
         self.metadataSHA256 = metadataSHA256
         self.workerSHA256 = workerSHA256
         self.lifecycleSHA256 = lifecycleSHA256
@@ -936,7 +1003,9 @@ public struct SignedInvestigationCapabilityEvidenceReceipt:
 
     private static func componentHashes(
         nonce: UUID,
+        scenario: SignedInvestigationRuntimeDiagnosticScenario,
         binding: SignedInvestigationRuntimeBinding,
+        completedAt: Date,
         report: CapabilityRuntimeDiagnosticReport
     ) throws -> (
         metadata: String,
@@ -952,6 +1021,7 @@ public struct SignedInvestigationCapabilityEvidenceReceipt:
                         SignedInvestigationRuntimeDiagnosticConfiguration
                             .schemaVersion,
                     nonce: nonce,
+                    scenario: scenario,
                     binding: binding,
                     expectedModel: report.metadata.model,
                     expectedProvider: report.metadata.provider
@@ -966,6 +1036,7 @@ public struct SignedInvestigationCapabilityEvidenceReceipt:
             sanitizedEventCategories:
                 report.metadata.sanitizedEventCategories,
             durationMilliseconds: report.metadata.durationMilliseconds,
+            completedAt: completedAt,
             capabilities: report.capabilities,
             integrity: report.integrity.filter {
                 CapabilityRuntimeWorkerEvidence
@@ -1018,9 +1089,19 @@ public struct SignedInvestigationCapabilityEvidenceReceipt:
                 UUID.self,
                 forKey: SignedRuntimeCodingKey(CodingKeys.nonce.rawValue)
             ),
+            scenario: container.decode(
+                SignedInvestigationRuntimeDiagnosticScenario.self,
+                forKey: SignedRuntimeCodingKey(CodingKeys.scenario.rawValue)
+            ),
             binding: container.decode(
                 SignedInvestigationRuntimeBinding.self,
                 forKey: SignedRuntimeCodingKey(CodingKeys.binding.rawValue)
+            ),
+            completedAt: container.decode(
+                Date.self,
+                forKey: SignedRuntimeCodingKey(
+                    CodingKeys.completedAt.rawValue
+                )
             ),
             metadataSHA256: container.decode(
                 String.self,
@@ -1059,7 +1140,9 @@ public struct SignedInvestigationCapabilityEvidenceReceipt:
     private enum CodingKeys: String, CodingKey, CaseIterable {
         case schemaVersion
         case nonce
+        case scenario
         case binding
+        case completedAt
         case metadataSHA256
         case workerSHA256
         case lifecycleSHA256
@@ -1105,7 +1188,8 @@ public struct SignedInvestigationRuntimeReport:
         denials: [SignedInvestigationRuntimeDenialEvidence],
         residue: SignedInvestigationRuntimeResidue,
         startedAt: Date,
-        completedAt: Date
+        completedAt: Date,
+        verdictMode: SignedInvestigationRuntimeVerdictMode = .evaluate
     ) throws {
         let capabilityReport = capabilityEvidence.report
         guard
@@ -1157,12 +1241,31 @@ public struct SignedInvestigationRuntimeReport:
         self.residue = residue
         self.startedAt = startedAt
         self.completedAt = completedAt
-        verdict = Self.verdict(
+        let evaluatedVerdict = Self.verdict(
             capabilityReport: capabilityReport,
             production: production,
             denials: revalidatedDenials,
             residue: residue
         )
+        if verdictMode == .machineAdmissionPending {
+            guard
+                capabilityEvidence.scenario == .success,
+                evaluatedVerdict == .signedInvestigationRuntimeReady
+            else {
+                throw SignedInvestigationRuntimeContractError.invalidReport
+            }
+            verdict =
+                .evidenceContractValidatedMachineAdmissionPending
+        } else {
+            guard
+                capabilityEvidence.scenario == .success
+                    || evaluatedVerdict
+                        != .signedInvestigationRuntimeReady
+            else {
+                throw SignedInvestigationRuntimeContractError.invalidReport
+            }
+            verdict = evaluatedVerdict
+        }
     }
 
     public init(from decoder: Decoder) throws {
@@ -1233,7 +1336,11 @@ public struct SignedInvestigationRuntimeReport:
                 forKey: SignedRuntimeCodingKey(
                     CodingKeys.completedAt.rawValue
                 )
-            )
+            ),
+            verdictMode: decodedVerdict
+                == .evidenceContractValidatedMachineAdmissionPending
+                ? .machineAdmissionPending
+                : .evaluate
         )
         guard verdict == decodedVerdict else {
             throw SignedInvestigationRuntimeContractError.invalidReport
@@ -1354,6 +1461,7 @@ public struct SignedInvestigationRuntimeReportVerifier: Sendable {
                 repository: capabilityRepository
             )
         guard
+            configuration.scenario == .success,
             report.nonce == configuration.nonce,
             report.binding == configuration.binding,
             report.model == configuration.expectedModel,
@@ -1371,6 +1479,17 @@ public struct SignedInvestigationRuntimeReportVerifier: Sendable {
                 == admission.sourceFingerprint,
             report.production.planFingerprint
                 == admission.planFingerprint,
+            report.production.investigationID.rawValue
+                == "investigation-"
+                    + configuration.nonce.uuidString.lowercased(),
+            report.production.runID.rawValue
+                == "investigation-run-"
+                    + configuration.nonce.uuidString.lowercased(),
+            report.production.reportID.rawValue
+                == "investigation-report-"
+                    + configuration.nonce.uuidString.lowercased(),
+            report.production.sourceFingerprint.hex
+                == configuration.binding.sourceFingerprintSHA256,
             try report.canonicalSHA256() == admission.reportSHA256
         else {
             throw SignedInvestigationRuntimeContractError.bindingMismatch
@@ -1391,6 +1510,13 @@ public struct SignedInvestigationRuntimeReportVerifier: Sendable {
             validated == report,
             validated.verdict
                 == .signedInvestigationRuntimeReady,
+            capabilityEvidence.completedAt <= report.startedAt,
+            report.startedAt.timeIntervalSince(
+                capabilityEvidence.completedAt
+            ) <= Double(configuration.maximumWallClockSeconds),
+            capabilityEvidence.completedAt
+                <= configuration.validBefore,
+            capabilityEvidence.completedAt <= now,
             report.startedAt <= now,
             report.completedAt <= now,
             report.completedAt <= configuration.validBefore,
@@ -1421,6 +1547,7 @@ private func capabilityReportSHA256(
 private func canonicalCapabilityEvidenceBindingSHA256(
     schemaVersion: Int,
     nonce: UUID,
+    scenario: SignedInvestigationRuntimeDiagnosticScenario,
     binding: SignedInvestigationRuntimeBinding,
     expectedModel: CodexRuntimeModel,
     expectedProvider: CodexRuntimeProvider
@@ -1428,6 +1555,7 @@ private func canonicalCapabilityEvidenceBindingSHA256(
     struct CapabilityEvidenceBinding: Encodable {
         let schemaVersion: Int
         let nonce: UUID
+        let scenario: SignedInvestigationRuntimeDiagnosticScenario
         let binding: SignedInvestigationRuntimeBinding
         let expectedModel: CodexRuntimeModel
         let expectedProvider: CodexRuntimeProvider
@@ -1436,6 +1564,7 @@ private func canonicalCapabilityEvidenceBindingSHA256(
         CapabilityEvidenceBinding(
             schemaVersion: schemaVersion,
             nonce: nonce,
+            scenario: scenario,
             binding: binding,
             expectedModel: expectedModel,
             expectedProvider: expectedProvider
@@ -1704,6 +1833,10 @@ private struct StrictSignedInvestigationRuntimeVerdict: Decodable {
         case "signedInvestigationRuntimeReady":
             try requireEmptySignedRuntimePayload(payload)
             value = .signedInvestigationRuntimeReady
+        case "evidenceContractValidatedMachineAdmissionPending":
+            try requireEmptySignedRuntimePayload(payload)
+            value =
+                .evidenceContractValidatedMachineAdmissionPending
         case "signedInvestigationRuntimeBlocked":
             value = .signedInvestigationRuntimeBlocked(
                 reasonKeys: try StrictSignedReasonKeysPayload(

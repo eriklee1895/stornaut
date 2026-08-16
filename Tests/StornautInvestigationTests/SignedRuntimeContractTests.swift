@@ -136,6 +136,62 @@ struct SignedRuntimeContractTests {
                     now: fixture.now
                 )
         }
+
+        var nulPaths = try #require(
+            JSONSerialization.jsonObject(with: data)
+                as? [String: Any]
+        )
+        for key in [
+            "sourceRootPath",
+            "supportRootPath",
+            "runtimeRootPath",
+            "reportPath",
+            "storePath",
+        ] {
+            nulPaths[key] = try #require(nulPaths[key] as? String)
+                + "\0ignored"
+        }
+        let nulPathData = try JSONSerialization.data(
+            withJSONObject: nulPaths,
+            options: [.sortedKeys]
+        )
+        #expect(
+            throws:
+                SignedInvestigationRuntimeContractError.invalidConfiguration
+        ) {
+            _ = try SignedInvestigationRuntimeDiagnosticConfiguration
+                .decodeValidated(
+                    from: nulPathData,
+                    now: fixture.now
+                )
+        }
+    }
+
+    @Test
+    func directConfigurationDecodingRejectsReusedOutputPaths() throws {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let data = try fixture.configurationData()
+        for (url, contents) in [
+            (fixture.reportURL, Data("report".utf8)),
+            (fixture.storeURL, Data("store".utf8)),
+        ] {
+            try contents.write(to: url, options: .withoutOverwriting)
+            try FileManager.default.setAttributes(
+                [.posixPermissions: 0o600],
+                ofItemAtPath: url.path
+            )
+        }
+
+        #expect(
+            throws:
+                SignedInvestigationRuntimeContractError.invalidConfiguration
+        ) {
+            _ = try JSONDecoder().decode(
+                SignedInvestigationRuntimeDiagnosticConfiguration.self,
+                from: data
+            )
+        }
     }
 
     @Test
@@ -151,6 +207,14 @@ struct SignedRuntimeContractTests {
         ) {
             _ = try fixture.configuration(
                 sourceRootPath: "relative/source"
+            )
+        }
+        #expect(
+            throws:
+                SignedInvestigationRuntimeContractError.invalidConfiguration
+        ) {
+            _ = try fixture.configuration(
+                sourceRootPath: fixture.sourceRoot.path + "\0ignored"
             )
         }
         #expect(
@@ -337,6 +401,49 @@ struct SignedRuntimeContractTests {
     }
 
     @Test
+    func nonSuccessScenarioCanReportFailureButCannotBeAdmitted()
+        throws
+    {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let configuration = try fixture.configuration(
+            scenario: .cancellation
+        )
+        let blockedEvidence = try fixture.capabilityEvidence(
+            configuration: configuration,
+            missing: .subagents
+        )
+
+        let blockedReport = try fixture.report(
+            configuration: configuration,
+            capabilityEvidence: blockedEvidence
+        )
+        #expect(
+            blockedReport.verdict
+                == .signedInvestigationRuntimeBlocked(
+                    reasonKeys: [
+                        "runtime.capability.subagents.not-observed",
+                    ]
+                )
+        )
+        #expect(blockedReport.capabilityEvidence.scenario == .cancellation)
+        #expect(
+            throws:
+                SignedInvestigationRuntimeContractError.invalidReport
+        ) {
+            _ = try SignedInvestigationRuntimeAdmissionReceipt(
+                report: blockedReport
+            )
+        }
+        #expect(
+            throws:
+                SignedInvestigationRuntimeContractError.invalidReport
+        ) {
+            _ = try fixture.report(configuration: configuration)
+        }
+    }
+
+    @Test
     func foreignNonceAndBindingTamperAreRejected() throws {
         let fixture = try SignedRuntimeContractFixture()
         defer { fixture.remove() }
@@ -518,6 +625,90 @@ struct SignedRuntimeContractTests {
                 _ = try JSONDecoder().decode(
                     SignedInvestigationRuntimeReport.self,
                     from: tampered
+                )
+            }
+        }
+    }
+
+    @Test
+    func capabilityEvidenceReceiptOwnsItsCompletionTimestamp() throws {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let configuration = try fixture.configuration()
+        let receipt = try fixture.capabilityEvidence(
+            configuration: configuration
+        )
+        var object = try #require(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(receipt)
+            ) as? [String: Any]
+        )
+
+        #expect(object["completedAt"] != nil)
+        object["completedAt"] =
+            receipt.completedAt.timeIntervalSinceReferenceDate + 1
+        let tampered = try JSONSerialization.data(
+            withJSONObject: object,
+            options: [.sortedKeys]
+        )
+        #expect(
+            throws:
+                SignedInvestigationRuntimeContractError.invalidReport
+        ) {
+            _ = try JSONDecoder().decode(
+                SignedInvestigationCapabilityEvidenceReceipt.self,
+                from: tampered
+            )
+        }
+    }
+
+    @Test
+    func readyVerifierRejectsStaleOrFutureCapabilityReceipt()
+        throws
+    {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let configuration = try fixture.configuration()
+        fixture.materializeOutputs()
+
+        for completedAt in [
+            fixture.now.addingTimeInterval(-4_000),
+            fixture.now.addingTimeInterval(31),
+        ] {
+            let report = try fixture.report(
+                configuration: configuration,
+                capabilityEvidence: fixture.capabilityEvidence(
+                    configuration: configuration,
+                    completedAt: completedAt
+                )
+            )
+            let admission =
+                try SignedInvestigationRuntimeAdmissionReceipt(
+                    report: report
+                )
+
+            #expect(
+                throws:
+                    SignedInvestigationRuntimeContractError.invalidReport
+            ) {
+                _ = try SignedInvestigationRuntimeReportVerifier()
+                    .verifyReady(
+                    report,
+                    configuration: configuration,
+                    capabilityMetadata: fixture.capabilityMetadata(),
+                    capabilityWorker: fixture.capabilityWorker(
+                        investigationID: configuration.nonce,
+                        evidenceBindingSHA256:
+                            configuration
+                            .capabilityEvidenceBindingSHA256(),
+                        completedAt: completedAt
+                    ),
+                    capabilityLifecycleIntegrity:
+                        fixture.capabilityLifecycleIntegrity(),
+                    capabilityRepository:
+                        fixture.capabilityRepositoryEvidence(),
+                    admission: admission,
+                    now: report.completedAt
                 )
             }
         }
@@ -749,8 +940,8 @@ struct SignedRuntimeContractTests {
             }
         }
     }
-}
 
+}
 private enum NestedSignedRuntimeTarget:
     String,
     CaseIterable,
@@ -906,9 +1097,8 @@ private func verdictWithUnknownField(_ value: Any?) throws -> Any {
     verdict[caseKey] = payload
     return verdict
 }
-
-private struct SignedRuntimeContractFixture {
-    let now = Date(timeIntervalSince1970: 1_800_000_000)
+struct SignedRuntimeContractFixture {
+    let now: Date
     let nonce = UUID(
         uuidString: "11111111-2222-4333-8444-555555555555"
     )!
@@ -920,7 +1110,10 @@ private struct SignedRuntimeContractFixture {
     let reportURL: URL
     let storeURL: URL
 
-    init() throws {
+    init(
+        now: Date = Date(timeIntervalSince1970: 1_800_000_000)
+    ) throws {
+        self.now = now
         let temporaryPath = FileManager.default.temporaryDirectory.path
         let resolvedTemporaryPath = try #require(
             realpath(temporaryPath, nil)
@@ -984,50 +1177,164 @@ private struct SignedRuntimeContractFixture {
     }
 
     func materializeOutputs() {
-        _ = FileManager.default.createFile(
-            atPath: reportURL.path,
-            contents: Data("report".utf8),
-            attributes: [.posixPermissions: 0o600]
+        let enumerator = FileManager.default.enumerator(
+            at: root,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
         )
-        _ = FileManager.default.createFile(
-            atPath: storeURL.path,
-            contents: Data("store".utf8),
-            attributes: [.posixPermissions: 0o600]
-        )
+        let supportURLs = (enumerator?.allObjects as? [URL] ?? [])
+            .filter { $0.lastPathComponent == "support" }
+        for supportURL in supportURLs {
+            let reportURL = supportURL.deletingLastPathComponent()
+                .appending(path: "report.json")
+            let storeURL = supportURL
+                .appending(
+                    path: "com.eriklee.stornaut",
+                    directoryHint: .isDirectory
+                )
+                .appending(path: "Evidence.sqlite")
+            _ = FileManager.default.createFile(
+                atPath: reportURL.path,
+                contents: Data(
+                    "report:\(reportURL.deletingLastPathComponent().lastPathComponent)"
+                        .utf8
+                ),
+                attributes: [.posixPermissions: 0o600]
+            )
+            _ = FileManager.default.createFile(
+                atPath: storeURL.path,
+                contents: Data("store".utf8),
+                attributes: [.posixPermissions: 0o600]
+            )
+        }
     }
 
     func configurationData() throws -> Data {
         try JSONEncoder().encode(configuration())
     }
 
+    func machineConfigurations() throws
+        -> [SignedInvestigationRuntimeDiagnosticConfiguration]
+    {
+        try SignedInvestigationRuntimeDiagnosticScenario.allCases.map {
+            try configuration(nonce: UUID(), scenario: $0)
+        }
+    }
+
     func configuration(
         nonce: UUID? = nil,
+        scenario: SignedInvestigationRuntimeDiagnosticScenario = .success,
+        diagnosticRootPath: String? = nil,
         sourceRootPath: String? = nil,
         supportRootPath: String? = nil,
         storePath: String? = nil,
-        binding: SignedInvestigationRuntimeBinding? = nil
+        binding: SignedInvestigationRuntimeBinding? = nil,
+        reuseDefaultPaths: Bool = false,
+        configurationNow: Date? = nil,
+        validBefore: Date? = nil
     ) throws -> SignedInvestigationRuntimeDiagnosticConfiguration {
-        try SignedInvestigationRuntimeDiagnosticConfiguration(
-            nonce: nonce ?? self.nonce,
+        let selectedNonce = nonce ?? self.nonce
+        let paths = try attemptPaths(
+            nonce: selectedNonce,
+            reuseDefaultPaths: reuseDefaultPaths,
+            diagnosticRootPath: diagnosticRootPath
+        )
+        return try SignedInvestigationRuntimeDiagnosticConfiguration(
+            nonce: selectedNonce,
+            scenario: scenario,
             optIn:
                 SignedInvestigationRuntimeDiagnosticConfiguration
                     .requiredOptIn,
-            diagnosticRootPath: diagnosticRoot.path,
-            sourceRootPath: sourceRootPath ?? sourceRoot.path,
-            supportRootPath: supportRootPath ?? supportRoot.path,
-            runtimeRootPath: runtimeRoot.path,
-            reportPath: reportURL.path,
-            storePath: storePath ?? storeURL.path,
+            diagnosticRootPath: paths.diagnosticRoot.path,
+            sourceRootPath: sourceRootPath ?? paths.sourceRoot.path,
+            supportRootPath: supportRootPath ?? paths.supportRoot.path,
+            runtimeRootPath: paths.runtimeRoot.path,
+            reportPath: paths.reportURL.path,
+            storePath: storePath ?? paths.storeURL.path,
             binding: binding ?? self.binding(),
             expectedModel: .gpt56Luna,
             expectedProvider: .openAI,
-            validBefore: now.addingTimeInterval(300),
+            validBefore: validBefore ?? now.addingTimeInterval(300),
             maximumWallClockSeconds: 140,
             maximumTurns: 3,
             maximumProbeCalls: 16,
             maximumContextBytes: 1_048_576,
-            now: now
+            now: configurationNow ?? now
         )
+    }
+
+    private func attemptPaths(
+        nonce: UUID,
+        reuseDefaultPaths: Bool,
+        diagnosticRootPath: String?
+    ) throws -> AttemptPaths {
+        if diagnosticRootPath == nil,
+           nonce == self.nonce || reuseDefaultPaths
+        {
+            return AttemptPaths(
+                diagnosticRoot: diagnosticRoot,
+                sourceRoot: sourceRoot,
+                supportRoot: supportRoot,
+                runtimeRoot: runtimeRoot,
+                reportURL: reportURL,
+                storeURL: storeURL
+            )
+        }
+        let diagnosticRoot = diagnosticRootPath.map {
+            URL(filePath: $0, directoryHint: .isDirectory)
+        } ?? root
+            .appending(path: "attempts", directoryHint: .isDirectory)
+            .appending(
+                path: nonce.uuidString.lowercased(),
+                directoryHint: .isDirectory
+            )
+        let sourceRoot = diagnosticRoot.appending(
+            path: "source",
+            directoryHint: .isDirectory
+        )
+        let supportRoot = diagnosticRoot.appending(
+            path: "support",
+            directoryHint: .isDirectory
+        )
+        let runtimeRoot = diagnosticRoot.appending(
+            path: "runtime",
+            directoryHint: .isDirectory
+        )
+        let reportURL = diagnosticRoot.appending(path: "report.json")
+        let storeURL = supportRoot
+            .appending(
+                path: "com.eriklee.stornaut",
+                directoryHint: .isDirectory
+            )
+            .appending(path: "Evidence.sqlite")
+        for directory in [
+            sourceRoot,
+            storeURL.deletingLastPathComponent(),
+            runtimeRoot,
+        ] {
+            try FileManager.default.createDirectory(
+                at: directory,
+                withIntermediateDirectories: true,
+                attributes: [.posixPermissions: 0o700]
+            )
+        }
+        return AttemptPaths(
+            diagnosticRoot: diagnosticRoot,
+            sourceRoot: sourceRoot,
+            supportRoot: supportRoot,
+            runtimeRoot: runtimeRoot,
+            reportURL: reportURL,
+            storeURL: storeURL
+        )
+    }
+
+    private struct AttemptPaths {
+        let diagnosticRoot: URL
+        let sourceRoot: URL
+        let supportRoot: URL
+        let runtimeRoot: URL
+        let reportURL: URL
+        let storeURL: URL
     }
 
     func binding(
@@ -1098,18 +1405,25 @@ private struct SignedRuntimeContractFixture {
             capabilityEvidence: evidence,
             production: SignedInvestigationProductionEvidence(
                 investigationID: InvestigationID(
-                    rawValue: "investigation-task39"
+                    rawValue:
+                        "investigation-"
+                        + configuration.nonce.uuidString.lowercased()
                 )!,
                 runID: InvestigationRunID(
-                    rawValue: "investigation-run-task39"
+                    rawValue:
+                        "investigation-run-"
+                        + configuration.nonce.uuidString.lowercased()
                 )!,
                 reportID: InvestigationReportID(
-                    rawValue: "investigation-report-task39"
+                    rawValue:
+                        "investigation-report-"
+                        + configuration.nonce.uuidString.lowercased()
                 )!,
                 sourceFingerprint:
                     try InvestigationFingerprint(
                         validatingHex:
-                            String(repeating: "a", count: 64)
+                            configuration.binding
+                            .sourceFingerprintSHA256
                     ),
                 planFingerprint:
                     try InvestigationFingerprint(
@@ -1163,7 +1477,8 @@ private struct SignedRuntimeContractFixture {
     func capabilityEvidence(
         configuration:
             SignedInvestigationRuntimeDiagnosticConfiguration,
-        missing: CapabilityRuntimeCapability? = nil
+        missing: CapabilityRuntimeCapability? = nil,
+        completedAt: Date? = nil
     ) throws -> SignedInvestigationCapabilityEvidenceReceipt {
         try SignedInvestigationCapabilityEvidenceReceipt(
             configuration: configuration,
@@ -1172,7 +1487,8 @@ private struct SignedRuntimeContractFixture {
                 investigationID: configuration.nonce,
                 evidenceBindingSHA256:
                     configuration.capabilityEvidenceBindingSHA256(),
-                missing: missing
+                missing: missing,
+                completedAt: completedAt
             ),
             lifecycleIntegrity: capabilityLifecycleIntegrity(),
             repository: capabilityRepositoryEvidence()
@@ -1202,7 +1518,8 @@ private struct SignedRuntimeContractFixture {
     func capabilityWorker(
         investigationID: UUID,
         evidenceBindingSHA256: String? = nil,
-        missing: CapabilityRuntimeCapability? = nil
+        missing: CapabilityRuntimeCapability? = nil,
+        completedAt: Date? = nil
     ) throws -> CapabilityRuntimeWorkerEvidence {
         let hash = String(repeating: "a", count: 64)
         let capabilities = try CapabilityRuntimeCapability.required
@@ -1245,6 +1562,8 @@ private struct SignedRuntimeContractFixture {
             syntheticFixtureSHA256s: [hash],
             sanitizedEventCategories: ["item.command"],
             durationMilliseconds: 1_000,
+            completedAt:
+                completedAt ?? now.addingTimeInterval(-1),
             capabilities: capabilities,
             integrity: integrity
         )

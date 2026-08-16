@@ -1199,6 +1199,7 @@ struct CapabilityRuntimeDiagnosticContractTests {
                 "item.completed.webSearch",
             ],
             durationMilliseconds: 1_250,
+            completedAt: capabilityCompletedAt,
             capabilities: passingCapabilities(),
             integrity: workerIntegrity()
         )
@@ -1248,6 +1249,7 @@ struct CapabilityRuntimeDiagnosticContractTests {
                         "item.completed.webSearch",
                     ],
                     durationMilliseconds: 1_250,
+                    completedAt: capabilityCompletedAt,
                     capabilities: passingCapabilities(),
                     integrity: workerIntegrity()
                 ),
@@ -1279,6 +1281,7 @@ struct CapabilityRuntimeDiagnosticContractTests {
                 "item.completed.webSearch",
             ],
             durationMilliseconds: 1_250,
+            completedAt: capabilityCompletedAt,
             capabilities: passingCapabilities(),
             integrity: workerIntegrity()
         )
@@ -1425,6 +1428,7 @@ struct CapabilityRuntimeDiagnosticContractTests {
                 "item.completed.webSearch",
             ],
             durationMilliseconds: 1_250,
+            completedAt: capabilityCompletedAt,
             capabilities: passingCapabilities(),
             integrity: workerIntegrity()
         )
@@ -1472,6 +1476,7 @@ struct CapabilityRuntimeDiagnosticContractTests {
                 syntheticFixtureSHA256s: [digest("d")],
                 sanitizedEventCategories: [],
                 durationMilliseconds: 1,
+                completedAt: capabilityCompletedAt,
                 capabilities: passingCapabilities(),
                 integrity: workerIntegrity() + [lifecycleRow]
             )
@@ -1513,6 +1518,7 @@ struct CapabilityRuntimeDiagnosticContractTests {
                 syntheticFixtureSHA256s: [digest("d")],
                 sanitizedEventCategories: [],
                 durationMilliseconds: 1,
+                completedAt: capabilityCompletedAt,
                 capabilities: passingCapabilities(),
                 integrity: workerIntegrity() + [repositoryRow]
             )
@@ -1879,6 +1885,8 @@ private let capabilityInvestigationID = UUID(
 )!
 private let capabilityEvidenceBindingSHA256 =
     String(repeating: "9", count: 64)
+private let capabilityCompletedAt =
+    Date(timeIntervalSince1970: 1_800_000_030)
 
 private func digest(_ character: Character) -> String {
     String(repeating: String(character), count: 64)

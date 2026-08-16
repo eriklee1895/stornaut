@@ -149,6 +149,7 @@ func investigationRuntimeDiagnosticLeafValidatesTheClosedConfiguration()
         now: fixture.now
     )
     #expect(leaf.nonce == configuration.nonce)
+    #expect(leaf.scenario == configuration.scenario.rawValue)
     #expect(leaf.diagnosticRootPath == configuration.diagnosticRootPath)
 
     var object = try #require(
@@ -601,6 +602,7 @@ private struct InvestigationRuntimeAppLeafFixture {
     {
         try InvestigationRuntimeDiagnosticConfiguration(
             nonce: UUID(),
+            scenario: .success,
             optIn:
                 InvestigationRuntimeDiagnosticConfiguration
                 .requiredOptIn,
