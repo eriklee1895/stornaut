@@ -15,7 +15,9 @@
 > prerequisites. L3c1b-i closed the configuration-bound memory-only helper
 > escrow, and L3c1b-ii closed the synthetic non-Codable Machine claim/collector
 > join; their 1025- and 1035-test clean staged-only serials plus independent
-> reviews passed. L3c1 is complete; L3c2 preflight is next. The Machine driver, failure matrix,
+> reviews passed. L3c1 is complete. The mandatory L3c2 preflight split claim
+> transport, root-host/topology composition and eight-scenario driving into
+> L3c2a-i/L3c2a-ii/L3c2b; L3c2a-i is next. The Machine driver, failure matrix,
 > real-model run and readiness verdict remain unimplemented.
 > Production Deep Dive remains unavailable until Task 44 admission.
 >
@@ -847,7 +849,9 @@ Checkpoint status:
   deterministic machine driver, L3c3 current-source real-success three-plane
   composition and L3c4 sealed final admission. L3c1a typed owner retirement,
   L3c1b-i configuration-bound helper escrow and L3c1b-ii synthetic Machine
-  claim/collector join are complete; L3c1 is closed and L3c2 preflight is next.
+  claim/collector join are complete; L3c1 is closed. L3c2 is split into
+  L3c2a-i strict claim transport, L3c2a-ii non-product root host/topology and
+  L3c2b fixed eight-scenario driving; L3c2a-i is next.
   See the
   [L3c1b-i Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
   and

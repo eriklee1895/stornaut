@@ -198,7 +198,9 @@
 > transport、memory-only helper escrow、1025-test clean staged-only serial 与
 > independent post-fix review；L3c1b-ii complete synthetic non-Codable Machine
 > claim/collector join、1035-test clean staged-only serial 与 independent grouped/
-> cross-group review。L3c1 已关闭，L3c2 preflight next。只有 L3c4 可作 readiness claim，
+> cross-group review。L3c1 已关闭；L3c2 mandatory preflight 已拆成 a-i strict
+> claim transport、a-ii non-product root host/topology 与 b eight-scenario
+> driving，L3c2a-i next。只有 L3c4 可作 readiness claim，
 > final full 尚未消耗。
 > 生产 Deep Dive 仍 unavailable。
 > Task 5 的历史
@@ -514,7 +516,8 @@ L3b2 trusted lifecycle collector 见
 其 1001-test clean staged-only serial、targeted builds 与 post-fix review 已
 通过。L3c 已按 scope/trust preflight 拆成 L3c1–L3c4；L3c1a typed owner
 retirement、L3c1b-i configuration-bound helper escrow 与 L3c1b-ii synthetic
-Machine claim/collector join 已完成，L3c1 已关闭，L3c2 preflight next；L3c4
+Machine claim/collector join 已完成，L3c1 已关闭；L3c2 已拆为 a-i/a-ii/b，
+L3c2a-i strict claim transport next；L3c4
 独占 final admission 与剩余 full。L3c1b-i/ii 证据见
 [i review](../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
 与

@@ -90,7 +90,8 @@
 > retirement escrow, L3c2 closed deterministic machine driver, L3c3 current-source
 > real-success three-plane composition and L3c4 sealed final admission. Only L3c4
 > may claim readiness or consume the remaining authoritative full verifier. L3c1
-> is complete; L3c2 scope/trust/cost preflight is next. Evidence:
+> is complete; the L3c2 scope/trust/cost preflight split the driver into
+> L3c2a-i/L3c2a-ii/L3c2b, and L3c2a-i is next. Evidence:
 > [39B2c-L3c1a Typed Owner Retirement Review](../../reports/phase-d-task-39b2c-l3c1a-typed-owner-retirement-review.md)
 > and
 > [39B2c-L3c1b-i Configuration-Bound Helper Escrow Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
@@ -783,21 +784,136 @@ The remaining L3 work is split before driver coding:
    values with an independent typed owner-retirement observation joined to the
    same audit-session L1 zero. Both are synthetic-only: no install/uninstall,
    model, report, readiness or full verifier.
-4. **L3c2 closed deterministic machine driver** — add the non-product root
-   driver host and fixed eight-scenario state machine using closed DEBUG fault
-   injection and deterministic transports. Prove fresh nonce/root/config/Store
-   isolation, exact Task 38 terminal semantics, installed-L2-before-transition
-   ordering, fail-closed teardown and pending-only output. It must not call a
-   real model, perform the final live admission or create a Ready receipt. If its
-   preflight reaches a fifteenth non-document path or 4,000 added lines, split the
-   host/topology and scenario-driving surfaces again before coding.
+4. **L3c2 closed deterministic machine driver** — the mandatory post-L3c1
+   scope/trust/cost preflight found three independent security surfaces: a
+   role-separated root claim transport, a non-product root host/L1+L2 topology
+   composition and the eight-scenario Task 38 state machine. Their combined
+   write set exceeds fourteen non-document paths, so L3c2 is split before
+   coding rather than recreating an oversized review surface. Local evidence
+   supports the selected topology: the installed `launchd.plist` manual
+   requires a daemon to check in for any advertised `MachServices`, and the
+   current Foundation SDK exposes per-name privileged `NSXPCListener` and
+   `NSXPCConnection` initializers. A repository-external SwiftPM spike also
+   proved that a non-product executable target can depend on a non-product
+   library target and call its `package` facade on the current toolchain. An
+   independent sanity review found two preflight P2s—an omitted root-policy
+   path and an unspecified second service identifier—which were corrected by
+   the exact fourteen-path list and fixed identifiers below:
+   - **L3c2a-i strict Machine-claim transport** adds a second fixed launchd Mach
+     service, exactly
+     `com.eriklee.stornaut.lifecycle.machine-claim`, owned by the existing root
+     helper, with a separate claim-only XPC interface and listener delegate. The
+     existing App endpoint remains exact
+     App-signed, non-root and one-connection; its interface, peer policy and
+     accepted-connection state are not shared with the root-driver role. The
+     claim listener accepts only EUID 0 plus the complete PID-version/audit-
+     session/audit-token identity, exact fixed executable path and exact code-
+     signing identity of
+     `/Library/Application Support/Stornaut/Stornaut-R5-Diagnostic.app/Contents/MacOS/StornautInvestigationMachineDriver`.
+     The driver's fixed signing identifier is exactly
+     `com.eriklee.stornaut.investigation.machine-driver`; no prefix, team-only,
+     bundle-only or caller-supplied identity match is accepted.
+     It revalidates that identity immediately before calling the escrow, and
+     authorization must be established before `claim` can consume any entry.
+     The escrow exposes one integrated fixed-driver authorization-and-claim
+     operation; a public/package Boolean `authorized` parameter, raw caller-
+     selected signing identity or separately mintable claim authority is
+     prohibited. The operation re-reads the full caller identity, fixed process
+     executable path and static/dynamic signing identity immediately before the
+     terminal escrow state change.
+     The root client independently pins the current helper executable and
+     signing identity. Missing driver/helper files, helper restart, peer drift,
+     selector drift, replay, malformed wire, deadline or connection failure all
+     fail closed. The helper may start while the driver is not yet packaged; in
+     that intermediate state the new role is unreachable rather than weakening
+     the App route. This checkpoint owns exactly fourteen possible non-document
+     paths and at most 3,000 added lines:
+     `Sources/StornautLifecycle/LifecycleServiceRegistration.swift`,
+     `Sources/StornautLifecycle/LifecycleAppAuthorization.swift`,
+     `Sources/StornautLifecycle/LifecycleSupervisorXPC.swift`,
+     `Sources/StornautLifecycle/LifecycleMachineRetirementEscrow.swift`,
+     `StornautLifecycleHelper/main.swift`,
+     `StornautLifecycleHelper/com.eriklee.stornaut.lifecycle.plist`,
+     `Tests/StornautLifecycleTests/LifecycleServiceRegistrationTests.swift`,
+     `Tests/StornautLifecycleTests/LifecycleAppAuthorizationTests.swift`,
+     `Tests/StornautLifecycleTests/LifecycleMachineRetirementEscrowTests.swift`,
+     `Tests/StornautLifecycleTests/LifecycleMachineClaimXPCContractTests.swift`
+     (new),
+     `Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift`,
+     `scripts/verify-investigation-boundaries`,
+     `scripts/stornaut-r5-local-lifecycle` and
+     `scripts/verify-app-release-boundaries`. It adds no Machine host, App
+     handoff, model, scenario driver, report or readiness result.
+     `LifecycleMachineDriverAdmissionPolicy` lives only in
+     `LifecycleAppAuthorization.swift`; it owns fixed path plus complete static/
+     dynamic signing and full process-identity comparison. The XPC/helper files
+     may consume its Boolean result but may not reimplement or weaken it. The
+     fourteenth-path ceiling is hard: any additional source/test/script path
+     requires another pre-coding split.
+   - **L3c2a-ii non-product root host and topology composition** adds an
+     executable SwiftPM target that depends on the non-product
+     `StornautInvestigationMachine` target but is itself omitted from the
+     package `products` list. The host is
+     root-only and exposes one narrow `package` facade; it composes the strict
+     claim client/claimant with the existing collector, enforces
+     `claim -> installed L2 -> transition -> post-teardown L2`, and returns only
+     opaque non-`Codable` authority to the Machine module. It accepts no caller-
+     selected executable, service, path, socket, PID, signal or cleanup action.
+     Its deterministic checkpoint uses an injected one-shot handle handoff;
+     packaging the driver into the installed App and the real App-to-driver
+     handoff remain L3c3 scope. This checkpoint owns at most eight non-document
+     paths and 2,400 added lines: `Package.swift`,
+     `Tools/StornautInvestigationMachineDriver/main.swift` (new),
+     `Sources/StornautInvestigationMachine/InvestigationMachineDriverHost.swift`
+     (new), optional narrow edits to
+     `Sources/StornautInvestigationMachine/InvestigationMachineRetirementClaim.swift`
+     and
+     `Sources/StornautInvestigationMachine/InvestigationLifecycleTopologyCollector.swift`,
+     `Tests/StornautInvestigationTests/InvestigationMachineDriverHostTests.swift`
+     (new),
+     `Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift`
+     and `scripts/verify-investigation-boundaries`.
+   - **L3c2b fixed eight-scenario driving** adds the closed deterministic state
+     machine using injected DEBUG faults and fake Task 38 transports. It creates
+     a fresh nonce/root/config/Store per scenario and proves the exact success,
+     cancellation, timeout, invalid-envelope, identity-mismatch, transport-loss,
+     lifecycle-recovery and artifact-cleanup-recovery controls already pinned by
+     `SignedInvestigationRuntimeMachineCaseEvidence`. Every path must settle or
+     fail closed, retire artifacts, drain local runtime and preserve one-shot
+     topology collection. It may emit a failure matrix or machine-admission-
+     pending candidate only; it cannot call a real model, use authoritative R5
+     capability evidence, create a Ready receipt or perform live install/
+     uninstall. This checkpoint owns at most eight non-document paths and 3,000
+     added lines: up to two new Machine scenario-driver/fault files, the existing
+     host file, up to two focused test/support files, the Machine boundary test
+     and structural verifier, plus at most one fixed runner contract.
+
+   The L3c2 preflight also closed two ordering ambiguities. The escrow surviving
+   App disconnect is a failure-tolerance property, not permission to postpone
+   installed-L2 proof until the App has vanished: the live order remains driver
+   ready, App retirement/record, driver claim while the exact App/helper/service
+   topology is still observable, installed L2, transition, then post-teardown
+   L2. The opaque App-to-driver handle handoff is not smuggled through JSON, a
+   filesystem mailbox or the helper claim response; its current-source live
+   implementation is explicitly deferred to L3c3. The untracked verifier/CLI
+   sketches in the user's separate main worktree are stale, outside this
+   worktree and excluded from every L3c2 budget.
 5. **L3c3 current-source real-success three-plane composition** — bind one fresh
    success attempt to the exact current source/App/helper/runtime receipt and run
    the bounded real Task 38 flow with authenticated `openai` / `gpt-5.6-luna`.
    Reuse the existing R5 capability collector and strict report types rather than
    nesting the old R5 script or generating a second nonce. Join 9/9 observed
    capabilities, 12/12 enforced controls, attributed adversarial denials and the
-   opaque L1/L2/owner-retirement cohort. This checkpoint may produce only a
+   opaque L1/L2/owner-retirement cohort. Its preflight must also package the
+   fixed Machine driver into the installed current-source App, add the driver
+   executable/code-signing hash and fixed Machine-claim service identifier to
+   the authoritative attempt/runtime binding, and implement a one-shot non-
+   persistent App-to-parent handle handoff that is
+   ready before App launch. It must prove the App stays alive through driver
+   claim and installed-L2 observation; only the driver transition may allow App/
+   helper/service teardown. The handle may not travel through config JSON, the
+   filesystem, the claim response or a caller-selected endpoint. This checkpoint
+   may produce only a
    machine-admission-pending candidate and does not consume the final full.
 6. **L3c4 sealed final admission** — execute the authoritative current-source
    cohort with eight independent fresh nonces, one real success model run and
@@ -809,13 +925,15 @@ The remaining L3 work is split before driver coding:
    uninterrupted authoritative full verifier. The final full is receipt/source/
    raw-evidence read-only and must not repeat model calls or root mutation.
 
-The order is strict: `L3c1a -> L3c1b-i -> L3c1b-ii -> L3c2 -> L3c3 -> L3c4`.
-L3c1a, L3c1b-i and L3c1b-ii are complete; L3c1 is closed and L3c2 preflight is
-next. L3c1 used focused
+The order is strict: `L3c1a -> L3c1b-i -> L3c1b-ii -> L3c2a-i -> L3c2a-ii ->
+L3c2b -> L3c3 -> L3c4`. L3c1a, L3c1b-i and L3c1b-ii are complete; L3c1 is
+closed, the L3c2 preflight is complete and L3c2a-i is next. L3c1 used focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean
 staged serial regression, targeted helper/diagnostic builds and independent
-review in place of full. L3c2 and L3c3 must each receive a fresh scope/cost
-preflight and a recorded non-admitting validation funnel. L3c4 alone owns the
+review in place of full. Each L3c2 sub-checkpoint uses structural, focused, one
+clean staged serial, applicable targeted build and independent review in place
+of full. L3c3 must receive its own fresh scope/cost preflight and recorded non-
+admitting validation funnel. L3c4 alone owns the
 live readiness claim and Task 39's final full.
 
 39B1a bound the diagnostic configuration to the real Evidence Store v4 path,
