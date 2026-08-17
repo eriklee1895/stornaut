@@ -38,8 +38,12 @@
 > The 39B2c-L1 prerequisite then made the root helper seal exact per-run
 > audit-session/lease/runtime-root residue after cleanup and before active state
 > release. Its 949-test staged-only regression, targeted Debug helper build and
-> independent post-fix review passed. Root topology observation and the machine
-> driver/failure matrix remain next. Evidence:
+> independent post-fix review passed. L2 then added package-closed, non-Codable
+> installed/post-teardown observation for fixed App/helper/plist/service/process/
+> runtime/lease topology. Its root-helper signing P1 was fixed tests-first;
+> 117-test focused, exact source-boundaries, targeted Debug diagnostic build,
+> 981-test clean staged-only serial and post-fix review passed. The machine
+> driver/failure matrix remains next. Evidence:
 > [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
 > [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md) and
 > [Task 39B1b-i Review](../../reports/phase-d-task-39b1b-i-review.md) and
@@ -59,7 +63,9 @@
 > and
 > [39B2c Strict-Decoding Prerequisite Review](../../reports/phase-d-task-39b2c-strict-capability-decoding-prerequisite-review.md)
 > and
-> [39B2c-L1 Residue Observation Review](../../reports/phase-d-task-39b2c-l1-residue-observation-review.md).
+> [39B2c-L1 Residue Observation Review](../../reports/phase-d-task-39b2c-l1-residue-observation-review.md)
+> and
+> [39B2c-L2 Root Topology Observation Review](../../reports/phase-d-task-39b2c-l2-root-topology-observation-review.md).
 >
 > **Parent plan:**
 > [Phase D Conditional Deep Dive](phase-d-conditional-deep-dive.md)
@@ -632,6 +638,17 @@ foreign, stale, future, replayed or non-zero observations. See the
 It proves only per-run helper-owned residue. The machine driver must still
 provide an independent root topology observation for App/helper/service
 teardown before any readiness verdict.
+
+The independently reviewed L2 prerequisite now provides that read-only
+topology observation contract without performing teardown itself. It binds the
+fixed App/helper executables, signatures, plist, service identity, complete
+PID-version/audit-token identities and whole runtime/lease roots across
+installed and post-teardown phases. Only initial `ENOENT`/`ESRCH` observations
+prove absence; later disappearance or observer failure stays unresolved. The
+observation is package-closed, non-`Codable` and file-private to construct. See
+the [39B2c-L2 Review](../../reports/phase-d-task-39b2c-l2-root-topology-observation-review.md).
+It makes no readiness claim and leaves build/install/run/bootout/uninstall,
+failure-matrix execution and sealed machine-report assembly to the driver.
 
 39B1a bound the diagnostic configuration to the real Evidence Store v4 path,
 made lifecycle drain directly asynchronous, reloaded actor-owned run state

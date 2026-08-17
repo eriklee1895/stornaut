@@ -331,7 +331,7 @@ extension SecurityLifecycleCodeSigningVerifier:
         }
         let processID = audit_token_to_pid(rawToken)
         let effectiveUserID = audit_token_to_euid(rawToken)
-        guard processID > 1, effectiveUserID > 0 else {
+        guard processID > 1 else {
             return .unresolved
         }
 

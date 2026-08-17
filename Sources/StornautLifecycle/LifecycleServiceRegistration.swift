@@ -215,11 +215,15 @@ public struct LifecycleRecoveredInvestigationPolicy: Sendable {
 public struct LifecycleLocalInstallationContract: Sendable {
     public let installedRootURL: URL
     public let installedAppURL: URL
+    package let appExecutableURL: URL
     public let helperExecutableURL: URL
     public let launchDaemonPlistURL: URL
+    package let runtimeRootURL: URL
+    package let leaseRootURL: URL
     public let label: String
     public let machServiceName: String
     public let appBundleIdentifier: String
+    package let helperSigningIdentifier: String
     public let appOwnerUserID: uid_t
     public let appOwnerGroupID: gid_t
     public let appMode: mode_t
@@ -239,13 +243,27 @@ public struct LifecycleLocalInstallationContract: Sendable {
             path: "Contents/MacOS/StornautLifecycleHelper",
             directoryHint: .notDirectory
         )
+        let appExecutableURL = installedAppURL.appending(
+            path: "Contents/MacOS/StornautInvestigationDiagnostic",
+            directoryHint: .notDirectory
+        )
         let launchDaemonPlistURL = URL(
             filePath:
                 "/Library/LaunchDaemons/com.eriklee.stornaut.lifecycle.plist",
             directoryHint: .notDirectory
         ).standardizedFileURL
+        let runtimeRootURL = URL(
+            filePath: "/Library/Application Support/Stornaut/R5Runtime",
+            directoryHint: .isDirectory
+        ).standardizedFileURL
+        let leaseRootURL = URL(
+            filePath: "/private/var/db/com.eriklee.stornaut.r5",
+            directoryHint: .isDirectory
+        ).standardizedFileURL
         let label = "com.eriklee.stornaut.lifecycle"
         let appBundleIdentifier = "com.eriklee.stornaut"
+        let helperSigningIdentifier =
+            "com.eriklee.stornaut.lifecycle.helper"
         guard
             installedRootURL.path
                 == "/Library/Application Support/Stornaut",
@@ -255,21 +273,32 @@ public struct LifecycleLocalInstallationContract: Sendable {
                 == installedRootURL,
             helperExecutableURL.path
                 == "/Library/Application Support/Stornaut/Stornaut-R5-Diagnostic.app/Contents/MacOS/StornautLifecycleHelper",
+            appExecutableURL.path
+                == "/Library/Application Support/Stornaut/Stornaut-R5-Diagnostic.app/Contents/MacOS/StornautInvestigationDiagnostic",
             launchDaemonPlistURL.path
                 == "/Library/LaunchDaemons/com.eriklee.stornaut.lifecycle.plist",
+            runtimeRootURL.path
+                == "/Library/Application Support/Stornaut/R5Runtime",
+            leaseRootURL.path
+                == "/private/var/db/com.eriklee.stornaut.r5",
             boundedLifecycleIdentifier(label),
-            boundedLifecycleIdentifier(appBundleIdentifier)
+            boundedLifecycleIdentifier(appBundleIdentifier),
+            boundedLifecycleIdentifier(helperSigningIdentifier)
         else {
             throw LifecycleLocalInstallationContractError
                 .invalidFixedTopology
         }
         self.installedRootURL = installedRootURL
         self.installedAppURL = installedAppURL
+        self.appExecutableURL = appExecutableURL
         self.helperExecutableURL = helperExecutableURL
         self.launchDaemonPlistURL = launchDaemonPlistURL
+        self.runtimeRootURL = runtimeRootURL
+        self.leaseRootURL = leaseRootURL
         self.label = label
         machServiceName = label
         self.appBundleIdentifier = appBundleIdentifier
+        self.helperSigningIdentifier = helperSigningIdentifier
         appOwnerUserID = 0
         appOwnerGroupID = 0
         appMode = 0o755
@@ -325,12 +354,7 @@ public struct LifecycleLocalInstallationContract: Sendable {
             throw LifecycleLocalInstallationContractError
                 .invalidDiagnosticIdentity
         }
-        let base = URL(
-            filePath:
-                "/Library/Application Support/Stornaut/R5Runtime",
-            directoryHint: .isDirectory
-        )
-        let userRoot = base.appending(
+        let userRoot = runtimeRootURL.appending(
             path: String(userID),
             directoryHint: .isDirectory
         )
@@ -340,8 +364,7 @@ public struct LifecycleLocalInstallationContract: Sendable {
             directoryHint: .isDirectory
         )
         .standardizedFileURL
-        let expectedPrefix =
-            "/Library/Application Support/Stornaut/R5Runtime/\(userID)/"
+        let expectedPrefix = "\(runtimeRootURL.path)/\(userID)/"
         guard
             root.path.hasPrefix(expectedPrefix),
             root.lastPathComponent

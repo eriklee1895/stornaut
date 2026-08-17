@@ -170,8 +170,13 @@
 > prerequisite 已关闭 capability report/outcome unknown-field 接受窗口，
 > 255-test serial Codex suite 与 post-fix review 通过。L1 helper-sealed
 > per-run residue observation 随后完成，949-test staged-only serial regression、
-> targeted Debug helper build 与 post-fix review 通过。root topology observer
-> 与 machine driver/failure matrix 尚未实现；39B2c 才能作 readiness claim。
+> targeted Debug helper build 与 post-fix review 通过。L2 exact root topology
+> observer 随后完成 package-closed/non-Codable contract、fixed-node/signing/
+> PID-version/audit-token identity 复查与 installed/post-teardown phase proof；
+> root-helper signing review P1 已 tests-first 修复，117-test focused、exact
+> source-boundaries、targeted Debug diagnostic App/helper build、981-test clean
+> staged-only serial 与 post-fix review 通过。machine driver/failure matrix 尚未
+> 实现；39B2c 才能作 readiness claim。
 > 生产 Deep Dive 仍 unavailable。
 > Task 5 的历史
 > Broker-only no-go 已由 ADR 0004 capability-first 决策修订，Deep Dive 因
@@ -469,8 +474,11 @@ strict-decoding prerequisite evidence 见
 L1 helper-sealed residue evidence 见
 [review](../reports/phase-d-task-39b2c-l1-residue-observation-review.md)；
 其 949-test staged-only serial regression、targeted helper build 与 independent
-post-fix review 已通过。root topology observer 与 machine driver/failure matrix
-仍待实现。
+post-fix review 已通过。L2 root topology evidence 见
+[review](../reports/phase-d-task-39b2c-l2-root-topology-observation-review.md)；
+其 117-test Lifecycle focused、exact source-boundaries、targeted Debug
+diagnostic build、981-test clean staged-only serial 与 independent post-fix
+review 已通过。machine driver/failure matrix 仍待实现。
 生产 Deep Dive 继续 unavailable，直到 Task 44 final admission。
 
 跨 Epic 的阶段依赖、no-go 分支和交付顺序由 [Delivery Roadmap](../plans/roadmap.md) 管理；新 active plan 不得另起一套宏观路线。
@@ -612,8 +620,9 @@ composition 已恢复并完成 implementation、focused tests、strict binary
 gate 与 independent post-fix review；该 checkpoint 唯一一次 authoritative
 full 以 23/23 stages、898-test serialized regression、981 秒 wall time
 单次通过，无 restart 或 stage retry。39B2b-ii 已完成；39B2c 的 exact
-attempt-binding prerequisite 已完成并通过 903-test headless regression，
-machine driver/failure matrix 仍待实现。39B2c 才是 machine admission。该最终 gate
+attempt-binding prerequisite、L1 helper residue 与 L2 root topology observer
+均已完成，L2 通过 981-test clean staged-only serial regression；machine
+driver/failure matrix 仍待实现。39B2c 才是 machine admission。该最终 gate
 要求证明完整调查能力和公共联网可用时，
 Codex 全进程树不可写用户数据、不可
 访问 localhost/私网/任意 Unix socket 且无 Executor 路径；不得用
