@@ -168,8 +168,11 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   exact nonce 与完整 signed runtime binding，component-hash review P2 已修复，
   903-test headless regression 与 post-fix review 通过。随后独立拆出的
   strict-decoding prerequisite 已关闭 capability report/outcome unknown-field
-  接受窗口，255-test serial Codex suite 与 post-fix review 通过。39B2c machine
-  driver/failure matrix 仍未实现；只有它可以作 machine readiness claim，
+  接受窗口，255-test serial Codex suite 与 post-fix review 通过。L1
+  helper-sealed per-run residue observation 已完成，949-test staged-only serial
+  regression、targeted Debug helper build 与 post-fix review 通过。39B2c root
+  topology observer 与 machine driver/failure matrix 仍未实现；只有它们可以
+  作 machine readiness claim，
   Task 39 尚未完成。
   真实 App Trash 依赖仍保持关闭，生产 Deep Dive 仍为 implementation unavailable。
   逐 Task 完成 Upstream Study、
@@ -278,6 +281,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2b-ii review / completion audit | [docs/reports/phase-d-task-39b2b-ii-review.md](docs/reports/phase-d-task-39b2b-ii-review.md) |
 | Phase D Task 39B2c attempt-binding prerequisite review | [docs/reports/phase-d-task-39b2c-attempt-binding-prerequisite-review.md](docs/reports/phase-d-task-39b2c-attempt-binding-prerequisite-review.md) |
 | Phase D Task 39B2c strict-decoding prerequisite review | [docs/reports/phase-d-task-39b2c-strict-capability-decoding-prerequisite-review.md](docs/reports/phase-d-task-39b2c-strict-capability-decoding-prerequisite-review.md) |
+| Phase D Task 39B2c-L1 residue observation review | [docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md](docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md) |
 | Epic 2–4 历史计划 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) |
 | Epic 2–4 最终 Gate | [docs/reports/epic-2-4-validation-report.md](docs/reports/epic-2-4-validation-report.md) |
 | Epic 0–1 历史计划与证据 | [docs/plans/completed/epic-0-1-foundation-spikes.md](docs/plans/completed/epic-0-1-foundation-spikes.md) |
@@ -364,7 +368,9 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   regression、981 秒 wall time 单次通过，无 restart 或 stage retry。
   39B2b-ii 已完成。39B2c attempt-binding prerequisite 已关闭跨-attempt
   capability evidence replay，903-test headless regression 与 post-fix review
-  通过；machine driver/failure matrix 仍待实现。
+  通过；L1 helper-sealed residue observation 与 949-test staged-only serial
+  regression 已通过；root topology observer 与 machine driver/failure matrix
+  仍待实现。
   Task 39 尚未完成。
 Deep Dive 的旧 Broker-only no-go 已被 ADR 0004 的 capability-first 边界取代；
 当前仍不可用的原因是生产 Deep Dive 尚未实现，而非 R6 或 Codex 工具能力。

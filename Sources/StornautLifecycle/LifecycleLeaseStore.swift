@@ -248,6 +248,26 @@ public enum LifecycleLeaseStoreError:
     case removeFailed
 }
 
+public struct LifecycleLeaseResidueObservation:
+    Sendable,
+    Equatable
+{
+    public let matchingLeaseCount: Int
+    public let leaseRootEntryCount: Int
+
+    public var provedEmpty: Bool {
+        matchingLeaseCount == 0 && leaseRootEntryCount == 0
+    }
+
+    public init(
+        matchingLeaseCount: Int,
+        leaseRootEntryCount: Int
+    ) {
+        self.matchingLeaseCount = matchingLeaseCount
+        self.leaseRootEntryCount = leaseRootEntryCount
+    }
+}
+
 public struct LifecycleLeaseStore: Sendable {
     private let rootURL: URL
     private let requiredOwnerUserID: uid_t
@@ -353,6 +373,28 @@ public struct LifecycleLeaseStore: Sendable {
             leases.append(try readLease(from: url))
         }
         return leases
+    }
+
+    public func observeResidue(
+        for investigationID: LifecycleInvestigationID
+    ) throws -> LifecycleLeaseResidueObservation {
+        let leases = try readAll()
+        guard
+            leases.count
+                <= LifecycleInvestigationResidueObservation.maximumCount
+        else {
+            throw LifecycleLeaseStoreError.invalidRoot
+        }
+        let matching = leases.filter {
+            $0.investigationID == investigationID
+        }.count
+        guard matching <= 1 else {
+            throw LifecycleLeaseStoreError.invalidLease
+        }
+        return LifecycleLeaseResidueObservation(
+            matchingLeaseCount: matching,
+            leaseRootEntryCount: leases.count
+        )
     }
 
     @discardableResult

@@ -26,10 +26,8 @@ struct InvestigationLifecycleAppServerTransportTests {
                     operationID: fixture.operationIDs[2],
                     line: fixture.responseLine
                 ),
-                .retired(
-                    investigationID: fixture.investigationID,
-                    operationID: fixture.operationIDs[3],
-                    drained: true
+                try fixture.retiredResponse(
+                    operationID: fixture.operationIDs[3]
                 ),
             ]
         )
@@ -58,10 +56,8 @@ struct InvestigationLifecycleAppServerTransportTests {
         let fixture = InvestigationLifecycleTransportFixture()
         let session = FakeLifecycleInteractiveSession(
             responses: [
-                .retired(
-                    investigationID: fixture.investigationID,
-                    operationID: fixture.operationIDs[0],
-                    drained: true
+                try fixture.retiredResponse(
+                    operationID: fixture.operationIDs[0]
                 ),
             ]
         )
@@ -163,6 +159,130 @@ struct InvestigationLifecycleAppServerTransportTests {
                 .drainUnconfirmed
         ) {
             try await undrainedTransport.retire()
+        }
+    }
+
+    @Test
+    func retireRequiresFreshExactZeroResidueObservation() async throws {
+        let fixture = InvestigationLifecycleTransportFixture()
+        let valid = try fixture.residueObservation()
+        let acceptedSession = FakeLifecycleInteractiveSession(
+            responses: [
+                .retired(
+                    investigationID: fixture.investigationID,
+                    operationID: fixture.operationIDs[0],
+                    drained: true,
+                    residueObservation: valid
+                ),
+            ]
+        )
+        let accepted = try fixture.transport(
+            session: acceptedSession,
+            operationIDs: Array(fixture.operationIDs.prefix(1))
+        )
+        try await accepted.retire()
+        #expect(try await accepted.acceptedResidueObservation() == valid)
+
+        let missing = try fixture.transport(
+            session: FakeLifecycleInteractiveSession(responses: [
+                .retired(
+                    investigationID: fixture.investigationID,
+                    operationID: fixture.operationIDs[0],
+                    drained: true
+                ),
+            ]),
+            operationIDs: Array(fixture.operationIDs.prefix(1))
+        )
+        await #expect(
+            throws: InvestigationLifecycleAppServerTransportError
+                .drainUnconfirmed
+        ) {
+            try await missing.retire()
+        }
+
+        let foreignObservation = try fixture.residueObservation(
+            investigationID: LifecycleInvestigationID()
+        )
+        let foreign = try fixture.transport(
+            session: FakeLifecycleInteractiveSession(responses: [
+                .retired(
+                    investigationID: fixture.investigationID,
+                    operationID: fixture.operationIDs[0],
+                    drained: true,
+                    residueObservation: foreignObservation
+                ),
+            ]),
+            operationIDs: Array(fixture.operationIDs.prefix(1))
+        )
+        await #expect(
+            throws: InvestigationLifecycleAppServerTransportError
+                .identityMismatch
+        ) {
+            try await foreign.retire()
+        }
+
+        let foreignUserObservation = try fixture.residueObservation(
+            userID: 502
+        )
+        let foreignUser = try fixture.transport(
+            session: FakeLifecycleInteractiveSession(responses: [
+                .retired(
+                    investigationID: fixture.investigationID,
+                    operationID: fixture.operationIDs[0],
+                    drained: true,
+                    residueObservation: foreignUserObservation
+                ),
+            ]),
+            operationIDs: Array(fixture.operationIDs.prefix(1))
+        )
+        await #expect(
+            throws: InvestigationLifecycleAppServerTransportError
+                .identityMismatch
+        ) {
+            try await foreignUser.retire()
+        }
+
+        let nonzero = try fixture.residueObservation(
+            remainingAuditSessionMemberCount: 1
+        )
+        let undrained = try fixture.transport(
+            session: FakeLifecycleInteractiveSession(responses: [
+                .retired(
+                    investigationID: fixture.investigationID,
+                    operationID: fixture.operationIDs[0],
+                    drained: true,
+                    residueObservation: nonzero
+                ),
+            ]),
+            operationIDs: Array(fixture.operationIDs.prefix(1))
+        )
+        await #expect(
+            throws: InvestigationLifecycleAppServerTransportError
+                .drainUnconfirmed
+        ) {
+            try await undrained.retire()
+        }
+
+        for observedAt in [
+            fixture.now.addingTimeInterval(-1),
+            fixture.now.addingTimeInterval(-61),
+            fixture.now.addingTimeInterval(1),
+        ] {
+            let staleOrFuture = try fixture.transport(
+                session: FakeLifecycleInteractiveSession(responses: [
+                    try fixture.retiredResponse(
+                        operationID: fixture.operationIDs[0],
+                        observedAt: observedAt
+                    ),
+                ]),
+                operationIDs: Array(fixture.operationIDs.prefix(1))
+            )
+            await #expect(
+                throws: InvestigationLifecycleAppServerTransportError
+                    .drainUnconfirmed
+            ) {
+                try await staleOrFuture.retire()
+            }
         }
     }
 
@@ -280,10 +400,9 @@ struct InvestigationLifecycleAppServerTransportTests {
                     investigationID: fixture.investigationID,
                     operationID: fixture.operationIDs[0]
                 ),
-                .retired(
-                    investigationID: fixture.investigationID,
+                try fixture.retiredResponse(
                     operationID: fixture.operationIDs[1],
-                    drained: true
+                    observedAt: fixture.validBefore
                 ),
             ],
             beforeResponse: { request in
@@ -321,10 +440,9 @@ struct InvestigationLifecycleAppServerTransportTests {
                     investigationID: fixture.investigationID,
                     operationID: fixture.operationIDs[1]
                 ),
-                .retired(
-                    investigationID: fixture.investigationID,
+                try fixture.retiredResponse(
                     operationID: fixture.operationIDs[2],
-                    drained: true
+                    observedAt: fixture.validBefore
                 ),
             ],
             beforeResponse: { request in
@@ -364,10 +482,9 @@ struct InvestigationLifecycleAppServerTransportTests {
                     operationID: fixture.operationIDs[1],
                     line: fixture.responseLine
                 ),
-                .retired(
-                    investigationID: fixture.investigationID,
+                try fixture.retiredResponse(
                     operationID: fixture.operationIDs[2],
-                    drained: true
+                    observedAt: fixture.validBefore
                 ),
             ],
             beforeResponse: { request in
@@ -501,6 +618,42 @@ private struct InvestigationLifecycleTransportFixture {
     let requestLine = Data("{\"method\":\"initialize\"}\n".utf8)
     let responseLine = Data("{\"id\":1,\"result\":{}}\n".utf8)
 
+    func residueObservation(
+        investigationID: LifecycleInvestigationID? = nil,
+        userID: UInt32 = 501,
+        observedAt: Date? = nil,
+        remainingAuditSessionMemberCount: Int = 0,
+        matchingLeaseCount: Int = 0,
+        leaseRootEntryCount: Int = 0,
+        investigationArtifactCount: Int = 0
+    ) throws -> LifecycleInvestigationResidueObservation {
+        try LifecycleInvestigationResidueObservation(
+            investigationID: investigationID ?? self.investigationID,
+            auditSessionID: 44_001,
+            userID: userID,
+            observedAt: observedAt ?? now,
+            remainingAuditSessionMemberCount:
+                remainingAuditSessionMemberCount,
+            matchingLeaseCount: matchingLeaseCount,
+            leaseRootEntryCount: leaseRootEntryCount,
+            investigationArtifactCount: investigationArtifactCount
+        )
+    }
+
+    func retiredResponse(
+        operationID: UUID,
+        observedAt: Date? = nil
+    ) throws -> LifecycleInteractiveSessionResponse {
+        .retired(
+            investigationID: investigationID,
+            operationID: operationID,
+            drained: true,
+            residueObservation: try residueObservation(
+                observedAt: observedAt
+            )
+        )
+    }
+
     func transport(
         session: any LifecycleInteractiveSessionSending,
         operationIDs: [UUID]? = nil,
@@ -514,6 +667,7 @@ private struct InvestigationLifecycleTransportFixture {
             validBefore: validBefore,
             maximumLineBytes: 1_024,
             maximumSessionBytes: 8_192,
+            expectedUserID: 501,
             now: now ?? { self.now },
             operationID: { try provider.next() },
             session: session
@@ -562,7 +716,20 @@ private actor SuspendedLifecycleInteractiveSession:
             return .retired(
                 investigationID: investigationID,
                 operationID: operationIDs[2],
-                drained: true
+                drained: true,
+                residueObservation:
+                    try LifecycleInvestigationResidueObservation(
+                        investigationID: investigationID,
+                        auditSessionID: 44_001,
+                        userID: 501,
+                        observedAt: Date(
+                            timeIntervalSince1970: 1_900_000_000
+                        ),
+                        remainingAuditSessionMemberCount: 0,
+                        matchingLeaseCount: 0,
+                        leaseRootEntryCount: 0,
+                        investigationArtifactCount: 0
+                    )
             )
         case .read:
             throw InvestigationLifecycleAppServerTransportError
@@ -660,7 +827,20 @@ private actor AmbiguousStartLifecycleInteractiveSession:
             return .retired(
                 investigationID: investigationID,
                 operationID: retireOperationID,
-                drained: true
+                drained: true,
+                residueObservation:
+                    try LifecycleInvestigationResidueObservation(
+                        investigationID: investigationID,
+                        auditSessionID: 44_001,
+                        userID: 501,
+                        observedAt: Date(
+                            timeIntervalSince1970: 1_900_000_000
+                        ),
+                        remainingAuditSessionMemberCount: 0,
+                        matchingLeaseCount: 0,
+                        leaseRootEntryCount: 0,
+                        investigationArtifactCount: 0
+                    )
             )
         case .write, .read:
             throw InvestigationLifecycleAppServerTransportError

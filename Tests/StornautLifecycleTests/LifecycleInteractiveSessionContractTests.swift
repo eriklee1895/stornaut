@@ -44,6 +44,16 @@ struct LifecycleInteractiveSessionContractTests {
     @Test
     func strictResponsesRoundTripForEveryOutcome() throws {
         let fixture = LifecycleInteractiveSessionFixture()
+        let residue = try LifecycleInvestigationResidueObservation(
+            investigationID: fixture.investigationID,
+            auditSessionID: 44_001,
+            userID: 501,
+            observedAt: fixture.validBefore.addingTimeInterval(-1),
+            remainingAuditSessionMemberCount: 0,
+            matchingLeaseCount: 0,
+            leaseRootEntryCount: 0,
+            investigationArtifactCount: 0
+        )
         let responses: [LifecycleInteractiveSessionResponse] = [
             .started(
                 investigationID: fixture.investigationID,
@@ -65,12 +75,18 @@ struct LifecycleInteractiveSessionContractTests {
             .retired(
                 investigationID: fixture.investigationID,
                 operationID: fixture.operationID,
-                drained: true
+                drained: true,
+                residueObservation: residue
             ),
         ]
 
         for response in responses {
             let encoded = try JSONEncoder().encode(response)
+            let object = try #require(
+                JSONSerialization.jsonObject(with: encoded)
+                    as? [String: Any]
+            )
+            #expect(object["protocolVersion"] as? Int == 2)
             #expect(
                 try JSONDecoder().decode(
                     LifecycleInteractiveSessionResponse.self,
@@ -78,6 +94,113 @@ struct LifecycleInteractiveSessionContractTests {
                 ) == response
             )
         }
+    }
+
+    @Test
+    func residueObservationIsStrictIdentityBoundAndCanonical() throws {
+        let fixture = LifecycleInteractiveSessionFixture()
+        let observation = try LifecycleInvestigationResidueObservation(
+            investigationID: fixture.investigationID,
+            auditSessionID: 44_001,
+            userID: 501,
+            observedAt: fixture.validBefore.addingTimeInterval(-1),
+            remainingAuditSessionMemberCount: 0,
+            matchingLeaseCount: 0,
+            leaseRootEntryCount: 0,
+            investigationArtifactCount: 0
+        )
+        #expect(observation.provedEmpty)
+        let encoded = try JSONEncoder().encode(observation)
+        #expect(
+            try JSONDecoder().decode(
+                LifecycleInvestigationResidueObservation.self,
+                from: encoded
+            ) == observation
+        )
+
+        var object = try #require(
+            JSONSerialization.jsonObject(with: encoded)
+                as? [String: Any]
+        )
+        object["unexpected"] = true
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(
+                LifecycleInvestigationResidueObservation.self,
+                from: try JSONSerialization.data(withJSONObject: object)
+            )
+        }
+
+        #expect(throws: LifecycleInteractiveSessionContractError.self) {
+            _ = try LifecycleInvestigationResidueObservation(
+                investigationID: fixture.investigationID,
+                auditSessionID: 0,
+                userID: 501,
+                observedAt: fixture.validBefore,
+                remainingAuditSessionMemberCount: 0,
+                matchingLeaseCount: 0,
+                leaseRootEntryCount: 0,
+                investigationArtifactCount: 0
+            )
+        }
+    }
+
+    @Test
+    func rootHelperSealsResidueAfterCleanupBeforeStateRelease() throws {
+        let repositoryRoot = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let helperURL = repositoryRoot.appending(
+            path: "StornautLifecycleHelper/main.swift"
+        )
+        let source = try String(contentsOf: helperURL, encoding: .utf8)
+        let functionStart = try #require(
+            source.range(
+                of: "private func finishInteractiveSession() throws"
+            )
+        )
+        let suffix = source[functionStart.lowerBound...]
+        let functionEnd = try #require(
+            suffix.range(of: "\n    }\n#endif")
+        )
+        let body = String(suffix[..<functionEnd.upperBound])
+
+        let removeRoot = try #require(
+            body.range(of: "try removeDiagnosticRoot(")
+        )
+        let removeLease = try #require(
+            body.range(of: ".remove(investigationID)")
+        )
+        let observation = try #require(
+            body.range(of: "makeResidueObservation(")
+        )
+        let zeroGuard = try #require(
+            body.range(of: "guard residueObservation.provedEmpty")
+        )
+        let stateRelease = try #require(
+            body.range(of: "activeInvestigationID = nil")
+        )
+        #expect(removeRoot.lowerBound < observation.lowerBound)
+        #expect(removeLease.lowerBound < observation.lowerBound)
+        #expect(observation.lowerBound < stateRelease.lowerBound)
+        #expect(observation.lowerBound < zeroGuard.lowerBound)
+        #expect(zeroGuard.lowerBound < stateRelease.lowerBound)
+
+        let retireBranch = try #require(
+            source.range(
+                of: "if pending.request.kind == .retire {"
+            )
+        )
+        let retireSuffix = source[retireBranch.lowerBound...]
+        let nextBranch = try #require(
+            retireSuffix.range(of: "\n        do {\n            pending.reply(")
+        )
+        let retireBody = String(
+            retireSuffix[..<nextBranch.lowerBound]
+        )
+        #expect(retireBody.contains("let residueObservation"))
+        #expect(retireBody.contains(".retired("))
+        #expect(!retireBody.contains("encode(validated)"))
     }
 
     @Test

@@ -10,6 +10,237 @@ public enum LifecycleInteractiveSessionContractError:
     case identityMismatch
 }
 
+public struct LifecycleInvestigationResidueObservation:
+    Codable,
+    Sendable,
+    Equatable
+{
+    public static let protocolVersion = 1
+    public static let maximumCount = 4_096
+
+    public let investigationID: LifecycleInvestigationID
+    public let auditSessionID: Int32
+    public let userID: UInt32
+    public let observedAt: Date
+    public let remainingAuditSessionMemberCount: Int
+    public let matchingLeaseCount: Int
+    public let leaseRootEntryCount: Int
+    public let investigationArtifactCount: Int
+
+    public var provedEmpty: Bool {
+        remainingAuditSessionMemberCount == 0
+            && matchingLeaseCount == 0
+            && leaseRootEntryCount == 0
+            && investigationArtifactCount == 0
+    }
+
+    public init(
+        investigationID: LifecycleInvestigationID,
+        auditSessionID: Int32,
+        userID: UInt32,
+        observedAt: Date,
+        remainingAuditSessionMemberCount: Int,
+        matchingLeaseCount: Int,
+        leaseRootEntryCount: Int,
+        investigationArtifactCount: Int
+    ) throws {
+        guard
+            auditSessionID > 0,
+            userID > 0,
+            observedAt.timeIntervalSince1970.isFinite,
+            Self.validCount(remainingAuditSessionMemberCount),
+            (0...1).contains(matchingLeaseCount),
+            Self.validCount(leaseRootEntryCount),
+            (0...1).contains(investigationArtifactCount),
+            matchingLeaseCount <= leaseRootEntryCount
+        else {
+            throw LifecycleInteractiveSessionContractError
+                .invalidResponse
+        }
+        self.investigationID = investigationID
+        self.auditSessionID = auditSessionID
+        self.userID = userID
+        self.observedAt = observedAt
+        self.remainingAuditSessionMemberCount =
+            remainingAuditSessionMemberCount
+        self.matchingLeaseCount = matchingLeaseCount
+        self.leaseRootEntryCount = leaseRootEntryCount
+        self.investigationArtifactCount = investigationArtifactCount
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try strictContainer(
+            decoder: decoder,
+            expectedKeys: Set(CodingKeys.allCases.map(\.rawValue))
+        )
+        guard try container.decode(
+            Int.self,
+            forKey: AnyLifecycleCodingKey(
+                CodingKeys.protocolVersion.rawValue
+            )
+        ) == Self.protocolVersion else {
+            throw DecodingError.dataCorruptedError(
+                forKey: AnyLifecycleCodingKey(
+                    CodingKeys.protocolVersion.rawValue
+                ),
+                in: container,
+                debugDescription: "Unsupported residue observation"
+            )
+        }
+        do {
+            try self.init(
+                investigationID: container.decode(
+                    LifecycleInvestigationID.self,
+                    forKey: AnyLifecycleCodingKey(
+                        CodingKeys.investigationID.rawValue
+                    )
+                ),
+                auditSessionID: container.decode(
+                    Int32.self,
+                    forKey: AnyLifecycleCodingKey(
+                        CodingKeys.auditSessionID.rawValue
+                    )
+                ),
+                userID: container.decode(
+                    UInt32.self,
+                    forKey: AnyLifecycleCodingKey(
+                        CodingKeys.userID.rawValue
+                    )
+                ),
+                observedAt: container.decode(
+                    Date.self,
+                    forKey: AnyLifecycleCodingKey(
+                        CodingKeys.observedAt.rawValue
+                    )
+                ),
+                remainingAuditSessionMemberCount: container.decode(
+                    Int.self,
+                    forKey: AnyLifecycleCodingKey(
+                        CodingKeys.remainingAuditSessionMemberCount
+                            .rawValue
+                    )
+                ),
+                matchingLeaseCount: container.decode(
+                    Int.self,
+                    forKey: AnyLifecycleCodingKey(
+                        CodingKeys.matchingLeaseCount.rawValue
+                    )
+                ),
+                leaseRootEntryCount: container.decode(
+                    Int.self,
+                    forKey: AnyLifecycleCodingKey(
+                        CodingKeys.leaseRootEntryCount.rawValue
+                    )
+                ),
+                investigationArtifactCount: container.decode(
+                    Int.self,
+                    forKey: AnyLifecycleCodingKey(
+                        CodingKeys.investigationArtifactCount.rawValue
+                    )
+                )
+            )
+        } catch {
+            throw DecodingError.dataCorruptedError(
+                forKey: AnyLifecycleCodingKey(
+                    CodingKeys.investigationID.rawValue
+                ),
+                in: container,
+                debugDescription: "Invalid residue observation"
+            )
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        guard
+            (try? Self(
+                investigationID: investigationID,
+                auditSessionID: auditSessionID,
+                userID: userID,
+                observedAt: observedAt,
+                remainingAuditSessionMemberCount:
+                    remainingAuditSessionMemberCount,
+                matchingLeaseCount: matchingLeaseCount,
+                leaseRootEntryCount: leaseRootEntryCount,
+                investigationArtifactCount: investigationArtifactCount
+            )) != nil
+        else {
+            throw LifecycleInteractiveSessionContractError
+                .invalidResponse
+        }
+        var container = encoder.container(
+            keyedBy: AnyLifecycleCodingKey.self
+        )
+        try container.encode(
+            Self.protocolVersion,
+            forKey: AnyLifecycleCodingKey(
+                CodingKeys.protocolVersion.rawValue
+            )
+        )
+        try container.encode(
+            investigationID,
+            forKey: AnyLifecycleCodingKey(
+                CodingKeys.investigationID.rawValue
+            )
+        )
+        try container.encode(
+            auditSessionID,
+            forKey: AnyLifecycleCodingKey(
+                CodingKeys.auditSessionID.rawValue
+            )
+        )
+        try container.encode(
+            userID,
+            forKey: AnyLifecycleCodingKey(CodingKeys.userID.rawValue)
+        )
+        try container.encode(
+            observedAt,
+            forKey: AnyLifecycleCodingKey(
+                CodingKeys.observedAt.rawValue
+            )
+        )
+        try container.encode(
+            remainingAuditSessionMemberCount,
+            forKey: AnyLifecycleCodingKey(
+                CodingKeys.remainingAuditSessionMemberCount.rawValue
+            )
+        )
+        try container.encode(
+            matchingLeaseCount,
+            forKey: AnyLifecycleCodingKey(
+                CodingKeys.matchingLeaseCount.rawValue
+            )
+        )
+        try container.encode(
+            leaseRootEntryCount,
+            forKey: AnyLifecycleCodingKey(
+                CodingKeys.leaseRootEntryCount.rawValue
+            )
+        )
+        try container.encode(
+            investigationArtifactCount,
+            forKey: AnyLifecycleCodingKey(
+                CodingKeys.investigationArtifactCount.rawValue
+            )
+        )
+    }
+
+    private static func validCount(_ value: Int) -> Bool {
+        (0...maximumCount).contains(value)
+    }
+
+    private enum CodingKeys: String, CodingKey, CaseIterable {
+        case protocolVersion
+        case investigationID
+        case auditSessionID
+        case userID
+        case observedAt
+        case remainingAuditSessionMemberCount
+        case matchingLeaseCount
+        case leaseRootEntryCount
+        case investigationArtifactCount
+    }
+}
+
 public enum LifecycleInteractiveSessionRequestKind:
     String,
     Codable,
@@ -313,26 +544,30 @@ public struct LifecycleInteractiveSessionResponse:
     Sendable,
     Equatable
 {
-    public static let protocolVersion = 1
+    public static let protocolVersion = 2
 
     public let kind: LifecycleInteractiveSessionResponseKind
     public let investigationID: LifecycleInvestigationID
     public let operationID: UUID
     public let line: Data?
     public let drained: Bool?
+    public let residueObservation:
+        LifecycleInvestigationResidueObservation?
 
     private init(
         kind: LifecycleInteractiveSessionResponseKind,
         investigationID: LifecycleInvestigationID,
         operationID: UUID,
         line: Data?,
-        drained: Bool?
+        drained: Bool?,
+        residueObservation: LifecycleInvestigationResidueObservation?
     ) {
         self.kind = kind
         self.investigationID = investigationID
         self.operationID = operationID
         self.line = line
         self.drained = drained
+        self.residueObservation = residueObservation
     }
 
     public static func started(
@@ -344,7 +579,8 @@ public struct LifecycleInteractiveSessionResponse:
             investigationID: investigationID,
             operationID: operationID,
             line: nil,
-            drained: nil
+            drained: nil,
+            residueObservation: nil
         )
     }
 
@@ -357,7 +593,8 @@ public struct LifecycleInteractiveSessionResponse:
             investigationID: investigationID,
             operationID: operationID,
             line: nil,
-            drained: nil
+            drained: nil,
+            residueObservation: nil
         )
     }
 
@@ -371,7 +608,8 @@ public struct LifecycleInteractiveSessionResponse:
             investigationID: investigationID,
             operationID: operationID,
             line: line,
-            drained: nil
+            drained: nil,
+            residueObservation: nil
         )
         guard response.isValid else {
             throw LifecycleInteractiveSessionContractError.invalidResponse
@@ -388,21 +626,25 @@ public struct LifecycleInteractiveSessionResponse:
             investigationID: investigationID,
             operationID: operationID,
             line: nil,
-            drained: nil
+            drained: nil,
+            residueObservation: nil
         )
     }
 
     public static func retired(
         investigationID: LifecycleInvestigationID,
         operationID: UUID,
-        drained: Bool
+        drained: Bool,
+        residueObservation:
+            LifecycleInvestigationResidueObservation? = nil
     ) -> Self {
         Self(
             kind: .retired,
             investigationID: investigationID,
             operationID: operationID,
             line: nil,
-            drained: drained
+            drained: drained,
+            residueObservation: residueObservation
         )
     }
 
@@ -454,6 +696,12 @@ public struct LifecycleInteractiveSessionResponse:
             Bool.self,
             forKey: AnyLifecycleCodingKey(CodingKeys.drained.rawValue)
         )
+        residueObservation = try container.decodeIfPresent(
+            LifecycleInvestigationResidueObservation.self,
+            forKey: AnyLifecycleCodingKey(
+                CodingKeys.residueObservation.rawValue
+            )
+        )
         guard isValid else {
             throw DecodingError.dataCorruptedError(
                 forKey: AnyLifecycleCodingKey(CodingKeys.kind.rawValue),
@@ -500,6 +748,12 @@ public struct LifecycleInteractiveSessionResponse:
             drained,
             forKey: AnyLifecycleCodingKey(CodingKeys.drained.rawValue)
         )
+        try container.encode(
+            residueObservation,
+            forKey: AnyLifecycleCodingKey(
+                CodingKeys.residueObservation.rawValue
+            )
+        )
     }
 
     public func validated(
@@ -520,8 +774,10 @@ public struct LifecycleInteractiveSessionResponse:
         switch kind {
         case .started, .writeAccepted, .endOfStream:
             return line == nil && drained == nil
+                && residueObservation == nil
         case .line:
             return line.map(validLine) == true && drained == nil
+                && residueObservation == nil
         case .retired:
             return line == nil && drained != nil
         }
@@ -549,6 +805,7 @@ public struct LifecycleInteractiveSessionResponse:
         case operationID
         case line
         case drained
+        case residueObservation
     }
 }
 

@@ -168,8 +168,10 @@
 > signed runtime binding，修复 component-hash review P2，并通过 903-test
 > headless regression 与 post-fix review。随后独立 strict-decoding
 > prerequisite 已关闭 capability report/outcome unknown-field 接受窗口，
-> 255-test serial Codex suite 与 post-fix review 通过。machine driver/failure matrix
-> 尚未实现；39B2c 才能作 readiness claim。
+> 255-test serial Codex suite 与 post-fix review 通过。L1 helper-sealed
+> per-run residue observation 随后完成，949-test staged-only serial regression、
+> targeted Debug helper build 与 post-fix review 通过。root topology observer
+> 与 machine driver/failure matrix 尚未实现；39B2c 才能作 readiness claim。
 > 生产 Deep Dive 仍 unavailable。
 > Task 5 的历史
 > Broker-only no-go 已由 ADR 0004 capability-first 决策修订，Deep Dive 因
@@ -464,7 +466,11 @@ prerequisite evidence 见
 strict-decoding prerequisite evidence 见
 [review](../reports/phase-d-task-39b2c-strict-capability-decoding-prerequisite-review.md)；
 其 255-test serial Codex suite 与 independent post-fix review 已通过，
-machine driver/failure matrix 仍待实现。
+L1 helper-sealed residue evidence 见
+[review](../reports/phase-d-task-39b2c-l1-residue-observation-review.md)；
+其 949-test staged-only serial regression、targeted helper build 与 independent
+post-fix review 已通过。root topology observer 与 machine driver/failure matrix
+仍待实现。
 生产 Deep Dive 继续 unavailable，直到 Task 44 final admission。
 
 跨 Epic 的阶段依赖、no-go 分支和交付顺序由 [Delivery Roadmap](../plans/roadmap.md) 管理；新 active plan 不得另起一套宏观路线。

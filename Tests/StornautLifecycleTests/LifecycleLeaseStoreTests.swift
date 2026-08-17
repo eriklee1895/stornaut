@@ -216,6 +216,50 @@ struct LifecycleLeaseStoreTests {
             )
         }
     }
+
+    @Test
+    func residueObservationCountsExactAndRootLeases() throws {
+        let fixture = try LeaseStoreFixture()
+        defer { fixture.remove() }
+        let target = try LifecycleInvestigationLease(
+            investigationID: LifecycleInvestigationID(),
+            bootSessionID: fixture.bootSessionID,
+            auditSessionID: 44_001,
+            userID: 501
+        )
+        let other = try LifecycleInvestigationLease(
+            investigationID: LifecycleInvestigationID(),
+            bootSessionID: fixture.bootSessionID,
+            auditSessionID: 44_002,
+            userID: 501
+        )
+        _ = try fixture.store.create(target)
+        _ = try fixture.store.create(other)
+
+        #expect(
+            try fixture.store.observeResidue(
+                for: target.investigationID
+            ) == LifecycleLeaseResidueObservation(
+                matchingLeaseCount: 1,
+                leaseRootEntryCount: 2
+            )
+        )
+        try fixture.store.remove(target.investigationID)
+        #expect(
+            try fixture.store.observeResidue(
+                for: target.investigationID
+            ) == LifecycleLeaseResidueObservation(
+                matchingLeaseCount: 0,
+                leaseRootEntryCount: 1
+            )
+        )
+        try fixture.store.remove(other.investigationID)
+        #expect(
+            try fixture.store.observeResidue(
+                for: target.investigationID
+            ).provedEmpty
+        )
+    }
 }
 
 private enum LeaseStoreFixtureError: Error {

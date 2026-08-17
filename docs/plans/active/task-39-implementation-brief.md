@@ -35,7 +35,11 @@
 > A separate tests-first strict-decoding prerequisite then made the reused
 > capability report and derived outcome reject unknown fields; its 255-test
 > serialized Codex suite and independent post-fix review passed.
-> 39B2c machine driver/failure-matrix implementation is next. Evidence:
+> The 39B2c-L1 prerequisite then made the root helper seal exact per-run
+> audit-session/lease/runtime-root residue after cleanup and before active state
+> release. Its 949-test staged-only regression, targeted Debug helper build and
+> independent post-fix review passed. Root topology observation and the machine
+> driver/failure matrix remain next. Evidence:
 > [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
 > [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md) and
 > [Task 39B1b-i Review](../../reports/phase-d-task-39b1b-i-review.md) and
@@ -53,7 +57,9 @@
 > [Task 39B2b-ii Review](../../reports/phase-d-task-39b2b-ii-review.md) and
 > [39B2c Attempt-Binding Prerequisite Review](../../reports/phase-d-task-39b2c-attempt-binding-prerequisite-review.md)
 > and
-> [39B2c Strict-Decoding Prerequisite Review](../../reports/phase-d-task-39b2c-strict-capability-decoding-prerequisite-review.md).
+> [39B2c Strict-Decoding Prerequisite Review](../../reports/phase-d-task-39b2c-strict-capability-decoding-prerequisite-review.md)
+> and
+> [39B2c-L1 Residue Observation Review](../../reports/phase-d-task-39b2c-l1-residue-observation-review.md).
 >
 > **Parent plan:**
 > [Phase D Conditional Deep Dive](phase-d-conditional-deep-dive.md)
@@ -616,6 +622,16 @@ relevant report layer and requires reconstructed outcome equality. See the
 [39B2c Strict-Decoding Prerequisite Review](../../reports/phase-d-task-39b2c-strict-capability-decoding-prerequisite-review.md).
 It likewise made no machine-readiness claim and did not consume the frozen
 39B2c checkpoint's final full-verifier run.
+
+The independently reviewed L1 residue prerequisite now requires the signed
+root helper to generate a strict nonce/UID/same-retire observation after
+audit-session drain, worker reap, diagnostic-root removal and lease removal,
+before releasing the active slot. Investigation transport rejects missing,
+foreign, stale, future, replayed or non-zero observations. See the
+[39B2c-L1 Review](../../reports/phase-d-task-39b2c-l1-residue-observation-review.md).
+It proves only per-run helper-owned residue. The machine driver must still
+provide an independent root topology observation for App/helper/service
+teardown before any readiness verdict.
 
 39B1a bound the diagnostic configuration to the real Evidence Store v4 path,
 made lifecycle drain directly asynchronous, reloaded actor-owned run state

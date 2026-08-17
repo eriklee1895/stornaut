@@ -148,6 +148,50 @@ struct LifecycleSessionDrainerTests {
     }
 
     @Test
+    func residueObservationReusesExactLiveIdentityValidation() throws {
+        let supervisor = identity(
+            pid: 701,
+            pidVersion: 3,
+            effectiveUserID: 0
+        )
+        let inventory = ScriptedLifecycleInventory([[supervisor]])
+        let signaler = RecordingLifecycleSignaler()
+        let drainer = LifecycleSessionDrainer(
+            inventory: inventory,
+            signaler: signaler
+        )
+
+        #expect(
+            try drainer.observeRemainingMemberCount(
+                auditSessionID: 44_001,
+                expectedUserID: 501,
+                supervisorIdentity: supervisor
+            ) == 0
+        )
+        #expect(signaler.calls.isEmpty)
+
+        let unexpectedRoot = identity(
+            pid: 702,
+            pidVersion: 1,
+            effectiveUserID: 0
+        )
+        let invalid = LifecycleSessionDrainer(
+            inventory: ScriptedLifecycleInventory([[
+                supervisor,
+                unexpectedRoot,
+            ]]),
+            signaler: signaler
+        )
+        #expect(throws: LifecycleDrainError.identityMismatch) {
+            _ = try invalid.observeRemainingMemberCount(
+                auditSessionID: 44_001,
+                expectedUserID: 501,
+                supervisorIdentity: supervisor
+            )
+        }
+    }
+
+    @Test
     func liveCancellationProtectsOnlyTheExactSupervisorIdentity() throws {
         let supervisor = identity(
             pid: 701,

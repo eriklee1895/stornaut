@@ -130,25 +130,12 @@ public struct LifecycleSessionDrainer: Sendable {
         supervisorIdentity: LifecycleProcessIdentity?,
         allowRootMembersDuringRecovery: Bool = false
     ) throws -> LifecycleDrainReport {
-        guard auditSessionID > 0 else {
-            throw LifecycleDrainError.unsafeAuditSession
-        }
-        guard
-            !allowRootMembersDuringRecovery
-                || supervisorIdentity == nil
-        else {
-            throw LifecycleDrainError.unsafeAuditSession
-        }
-        if let supervisorIdentity {
-            guard
-                supervisorIdentity.processID > 1,
-                supervisorIdentity.processIDVersion > 0,
-                supervisorIdentity.auditSessionID == auditSessionID,
-                supervisorIdentity.effectiveUserID == 0
-            else {
-                throw LifecycleDrainError.unsafeAuditSession
-            }
-        }
+        try validateObservationIdentity(
+            auditSessionID: auditSessionID,
+            supervisorIdentity: supervisorIdentity,
+            allowRootMembersDuringRecovery:
+                allowRootMembersDuringRecovery
+        )
 
         var knownIdentities = Set<LifecycleProcessIdentity>()
         var freezePasses = 0
@@ -227,6 +214,53 @@ public struct LifecycleSessionDrainer: Sendable {
         }
 
         throw LifecycleDrainError.killDidNotConverge
+    }
+
+    public func observeRemainingMemberCount(
+        auditSessionID: Int32,
+        expectedUserID: uid_t,
+        supervisorIdentity: LifecycleProcessIdentity?,
+        allowRootMembersDuringRecovery: Bool = false
+    ) throws -> Int {
+        try validateObservationIdentity(
+            auditSessionID: auditSessionID,
+            supervisorIdentity: supervisorIdentity,
+            allowRootMembersDuringRecovery:
+                allowRootMembersDuringRecovery
+        )
+        return try targetSnapshot(
+            auditSessionID: auditSessionID,
+            expectedUserID: expectedUserID,
+            supervisorIdentity: supervisorIdentity,
+            allowRootMembersDuringRecovery:
+                allowRootMembersDuringRecovery
+        ).count
+    }
+
+    private func validateObservationIdentity(
+        auditSessionID: Int32,
+        supervisorIdentity: LifecycleProcessIdentity?,
+        allowRootMembersDuringRecovery: Bool
+    ) throws {
+        guard auditSessionID > 0 else {
+            throw LifecycleDrainError.unsafeAuditSession
+        }
+        guard
+            !allowRootMembersDuringRecovery
+                || supervisorIdentity == nil
+        else {
+            throw LifecycleDrainError.unsafeAuditSession
+        }
+        if let supervisorIdentity {
+            guard
+                supervisorIdentity.processID > 1,
+                supervisorIdentity.processIDVersion > 0,
+                supervisorIdentity.auditSessionID == auditSessionID,
+                supervisorIdentity.effectiveUserID == 0
+            else {
+                throw LifecycleDrainError.unsafeAuditSession
+            }
+        }
     }
 
     private func targetSnapshot(

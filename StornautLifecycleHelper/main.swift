@@ -1570,9 +1570,18 @@ private final class LifecycleHelperService:
                 )
             }
             do {
-                try finishInteractiveSession()
+                let residueObservation =
+                    try finishInteractiveSession()
+                let sealedResponse =
+                    LifecycleInteractiveSessionResponse.retired(
+                        investigationID:
+                            pending.request.investigationID,
+                        operationID: pending.request.operationID,
+                        drained: residueObservation.provedEmpty,
+                        residueObservation: residueObservation
+                    )
                 pending.reply(
-                    try JSONEncoder().encode(validated),
+                    try JSONEncoder().encode(sealedResponse),
                     nil
                 )
                 scheduleSuccessfulExitAfterReply()
@@ -1649,41 +1658,63 @@ private final class LifecycleHelperService:
         }
     }
 
-    private func finishInteractiveSession() throws {
+    private func finishInteractiveSession() throws
+        -> LifecycleInvestigationResidueObservation
+    {
         try drainActiveSession()
         let state = lock.withLock {
             (
                 activeProcess,
                 activeInvestigationID,
+                activeAuditSessionID,
                 activeLeaseCreated,
                 interactiveInput,
                 interactiveOutput
             )
         }
-        state.3?.closeFile()
         state.4?.closeFile()
+        state.5?.closeFile()
         if let process = state.0 {
             try waitForProcessExit(
                 process,
                 timeoutMilliseconds: 5_000
             )
         }
-        if let investigationID = state.1 {
-            let paths = try LifecycleLocalInstallationContract()
-                .diagnosticPaths(
-                    userID: callerUserID,
-                    investigationID: investigationID
-                )
-            if lstatExists(paths.rootURL) {
-                try removeDiagnosticRoot(
-                    paths.rootURL,
-                    ownerUserID: callerUserID
-                )
+        guard let investigationID = state.1,
+              let auditSessionID = state.2
+        else {
+            throw LifecycleHelperFailure.drainFailed(
+                reasonKey: "runtime.lifecycle.residue.identity-missing"
+            )
+        }
+        let paths = try LifecycleLocalInstallationContract()
+            .diagnosticPaths(
+                userID: callerUserID,
+                investigationID: investigationID
+            )
+        if lstatExists(paths.rootURL) {
+            try removeDiagnosticRoot(
+                paths.rootURL,
+                ownerUserID: callerUserID
+            )
+        }
+        let store = try LifecycleLeaseStore(rootURL: leaseRootURL)
+        if state.3 {
+            try store.remove(investigationID)
+            lock.withLock {
+                activeLeaseCreated = false
             }
-            if state.2 {
-                try LifecycleLeaseStore(rootURL: leaseRootURL)
-                    .remove(investigationID)
-            }
+        }
+        let residueObservation = try makeResidueObservation(
+            investigationID: investigationID,
+            auditSessionID: auditSessionID,
+            diagnosticRootURL: paths.rootURL,
+            store: store
+        )
+        guard residueObservation.provedEmpty else {
+            throw LifecycleHelperFailure.drainFailed(
+                reasonKey: "runtime.lifecycle.residue.nonzero"
+            )
         }
         lock.withLock {
             activeProcess = nil
@@ -1696,6 +1727,50 @@ private final class LifecycleHelperService:
             interactiveExpiryWorkItem?.cancel()
             interactiveExpiryWorkItem = nil
         }
+        return residueObservation
+    }
+
+    private func makeResidueObservation(
+        investigationID: LifecycleInvestigationID,
+        auditSessionID: Int32,
+        diagnosticRootURL: URL,
+        store: LifecycleLeaseStore
+    ) throws -> LifecycleInvestigationResidueObservation {
+        let remainingMembers = try LifecycleSessionDrainer(
+            inventory: DarwinLifecycleInventory(
+                expectedUserID: callerUserID,
+                privilegedProcessID: getpid()
+            ),
+            signaler: DarwinLifecycleSignaler()
+        ).observeRemainingMemberCount(
+            auditSessionID: auditSessionID,
+            expectedUserID: callerUserID,
+            supervisorIdentity: helperIdentity
+        )
+        let leaseObservation = try store.observeResidue(
+            for: investigationID
+        )
+        var information = stat()
+        let artifactCount: Int
+        if lstat(diagnosticRootURL.path, &information) == 0 {
+            artifactCount = 1
+        } else if errno == ENOENT {
+            artifactCount = 0
+        } else {
+            throw LifecycleHelperFailure.invalidFilesystemState
+        }
+        return try LifecycleInvestigationResidueObservation(
+            investigationID: investigationID,
+            auditSessionID: auditSessionID,
+            userID: UInt32(callerUserID),
+            observedAt: Date(),
+            remainingAuditSessionMemberCount: remainingMembers,
+            matchingLeaseCount:
+                leaseObservation.matchingLeaseCount,
+            leaseRootEntryCount:
+                leaseObservation.leaseRootEntryCount,
+            investigationArtifactCount: artifactCount
+        )
     }
 #endif
 

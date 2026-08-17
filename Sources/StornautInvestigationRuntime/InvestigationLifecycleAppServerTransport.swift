@@ -29,6 +29,7 @@ package actor InvestigationLifecycleAppServerTransport:
     }
 
     private let investigationID: LifecycleInvestigationID
+    private let expectedUserID: UInt32
     private let validBefore: Date
     private let maximumLineBytes: Int
     private let maximumSessionBytes: Int
@@ -37,6 +38,8 @@ package actor InvestigationLifecycleAppServerTransport:
     private let session: any LifecycleInteractiveSessionSending
     private var state = State.ready
     private var transferredBytes = 0
+    private var residueObservation:
+        LifecycleInvestigationResidueObservation?
     private var operationInProgress = false
     private var operationWaiters: [
         (
@@ -52,6 +55,7 @@ package actor InvestigationLifecycleAppServerTransport:
         validBefore: Date,
         maximumLineBytes: Int,
         maximumSessionBytes: Int,
+        expectedUserID: UInt32 = UInt32(geteuid()),
         now: @escaping @Sendable () -> Date = Date.init,
         operationID: @escaping @Sendable () throws -> UUID = UUID.init,
         session: any LifecycleInteractiveSessionSending
@@ -65,12 +69,14 @@ package actor InvestigationLifecycleAppServerTransport:
                 .maximumAllowedLineBytes).contains(maximumLineBytes),
             maximumSessionBytes >= maximumLineBytes,
             maximumSessionBytes <= LifecycleInteractiveSessionRequest
-                .maximumAllowedSessionBytes
+                .maximumAllowedSessionBytes,
+            expectedUserID > 0
         else {
             throw InvestigationLifecycleAppServerTransportError
                 .invalidConfiguration
         }
         self.investigationID = investigationID
+        self.expectedUserID = expectedUserID
         self.validBefore = validBefore
         self.maximumLineBytes = maximumLineBytes
         self.maximumSessionBytes = maximumSessionBytes
@@ -163,6 +169,7 @@ package actor InvestigationLifecycleAppServerTransport:
                     .invalidState
             }
             state = .retiring
+            let retirementStartedAt = now()
             let request = LifecycleInteractiveSessionRequest.retire(
                 investigationID: investigationID,
                 operationID: try operationID()
@@ -171,16 +178,46 @@ package actor InvestigationLifecycleAppServerTransport:
             let validated = try response.validated(for: request)
             guard
                 validated.kind == .retired,
-                validated.drained == true
+                validated.drained == true,
+                let observation = validated.residueObservation
             else {
                 throw InvestigationLifecycleAppServerTransportError
                     .drainUnconfirmed
             }
+            guard
+                observation.investigationID == investigationID,
+                observation.userID == expectedUserID
+            else {
+                throw InvestigationLifecycleAppServerTransportError
+                    .identityMismatch
+            }
+            let observedNow = now()
+            guard
+                observation.observedAt >= retirementStartedAt,
+                observation.observedAt <= observedNow,
+                observedNow.timeIntervalSince(observation.observedAt)
+                    <= 60,
+                observation.provedEmpty
+            else {
+                throw InvestigationLifecycleAppServerTransportError
+                    .drainUnconfirmed
+            }
+            residueObservation = observation
             state = .retired
         } catch {
             fail()
             throw map(error)
         }
+    }
+
+    package func acceptedResidueObservation() throws
+        -> LifecycleInvestigationResidueObservation
+    {
+        guard state == .retired, let residueObservation else {
+            throw InvestigationLifecycleAppServerTransportError
+                .drainUnconfirmed
+        }
+        return residueObservation
     }
 
     private func startIfNeeded() async throws {
