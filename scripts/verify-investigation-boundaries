@@ -65,10 +65,16 @@ done
 
 machine_collector_source="$machine_root/InvestigationLifecycleTopologyCollector.swift"
 machine_service_source="$machine_root/FixedLifecycleServiceProbe.swift"
+machine_claim_source="$machine_root/InvestigationMachineRetirementClaim.swift"
+[[ -f "$machine_claim_source" ]] || {
+    print -u2 "Missing trusted machine retirement claim source."
+    exit 1
+}
 for marker in \
     'actor InvestigationLifecycleTopologyCollector' \
     'struct InvestigationLifecycleTopologyCohort' \
-    'await retirementEvidenceStore.consume()' \
+    'await retirementClaimStore.consume()' \
+    'InvestigationMachineRetirementClaimStore' \
     'case rootAuthorityRequired' \
     'case collectorConsumed' \
     'provesInstalledTopology' \
@@ -78,6 +84,71 @@ for marker in \
         exit 1
     }
 done
+if rg -q --fixed-strings -- 'InvestigationLifecycleRetirementEvidenceStore' \
+    "$machine_collector_source"; then
+    print -u2 "Collector still accepts App-local retirement evidence."
+    exit 1
+fi
+for marker in \
+    'protocol InvestigationMachineRetirementClaimSource' \
+    'struct InvestigationMachineRetirementClaim' \
+    'actor InvestigationMachineRetirementClaimStore'; do
+    rg -q --fixed-strings -- "$marker" "$machine_claim_source" || {
+        print -u2 "Machine retirement claim marker missing: $marker"
+        exit 1
+    }
+done
+if rg -n \
+    'Codable|JSONDecoder|JSONEncoder|PropertyListDecoder|PropertyListEncoder|NSXPCConnection|LifecycleSupervisorXPCWire|LifecycleInteractiveSessionXPCWire|StornautExecution|ActionExecutor|TrashMoving|signedInvestigationRuntimeReady' \
+    "$machine_claim_source"; then
+    print -u2 "Machine retirement claim gained prohibited authority."
+    exit 1
+fi
+if rg -q --fixed-strings -- 'LifecycleMachineRetirementClaim' \
+    "$lifecycle_root/LifecycleSupervisorXPC.swift"; then
+    print -u2 "Production XPC machine-claim route opened before L3c2."
+    exit 1
+fi
+claim_route_hits=$(
+    rg -n \
+        'LifecycleMachineRetirementClaim(Request|Response)|\.claim\(' \
+        "$lifecycle_root" "$lifecycle_helper" \
+        --glob '*.swift' \
+        --glob '!LifecycleMachineRetirementEscrow.swift' \
+        || true
+)
+if [[ -n "$claim_route_hits" ]]; then
+    print -u2 "Production Lifecycle source opened a machine-claim route:"
+    print -u2 -- "$claim_route_hits"
+    exit 1
+fi
+python3 - "$lifecycle_root/LifecycleSupervisorXPC.swift" <<'PY'
+import pathlib
+import re
+import sys
+
+source = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
+expected = {
+    "LifecycleSupervisorXPCWire": ["attestHelper", "handle"],
+    "LifecycleInteractiveSessionXPCWire": ["handleInteractive"],
+}
+observed = {}
+for match in re.finditer(
+    r"@objc public protocol\s+(\w+)(?:\s*:[^{]+)?\s*\{(.*?)^\}",
+    source,
+    re.MULTILINE | re.DOTALL,
+):
+    observed[match.group(1)] = re.findall(
+        r"^\s+func\s+(\w+)\s*\(",
+        match.group(2),
+        re.MULTILINE,
+    )
+if observed != expected:
+    raise SystemExit(
+        "Lifecycle exported XPC selector allowlist drifted: "
+        f"expected={expected!r} observed={observed!r}"
+    )
+PY
 if rg -q --fixed-strings -- 'SignedInvestigationRuntimeResidue(' \
     "$machine_collector_source"; then
     print -u2 "L3b2 over-claimed final machine residue."
@@ -814,7 +885,8 @@ required_interactive_contract = {
     "public enum LifecycleInteractiveSessionResponseKind:",
     "public struct LifecycleInteractiveSessionResponse:",
     "public struct LifecycleInteractiveWorkerRetirementObservation:",
-    "public static let protocolVersion = 3",
+    "public static let protocolVersion = 4",
+    "machineRetirementHandle:",
     "ownerRetirementObservation:",
     "public struct LifecycleInteractiveWorkerReply:",
     "(response != nil) != (reasonKey != nil)",
@@ -882,6 +954,9 @@ required_interactive_transport = {
     "validated.drained == true",
     "validated.ownerRetirementObservation",
     "== .retiredOwnedResources",
+    "machineRetirementHandle.investigationID",
+    "machineRetirementHandle.retireOperationID",
+    "machineRetirementHandle.configurationSHA256",
     "guard state == .ready || state == .active || state == .failed else",
     "private var operationInProgress = false",
     "private func requireUnexpired() throws",

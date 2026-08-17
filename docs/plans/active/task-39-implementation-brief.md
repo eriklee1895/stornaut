@@ -89,11 +89,13 @@
 > than observing it. L3c is therefore split before coding into L3c1 opaque
 > retirement escrow, L3c2 closed deterministic machine driver, L3c3 current-source
 > real-success three-plane composition and L3c4 sealed final admission. Only L3c4
-> may claim readiness or consume the remaining authoritative full verifier. L3c1a
-> and L3c1b-i are complete; L3c1b-ii is next. Evidence:
+> may claim readiness or consume the remaining authoritative full verifier. L3c1
+> is complete; L3c2 scope/trust/cost preflight is next. Evidence:
 > [39B2c-L3c1a Typed Owner Retirement Review](../../reports/phase-d-task-39b2c-l3c1a-typed-owner-retirement-review.md)
 > and
-> [39B2c-L3c1b-i Configuration-Bound Helper Escrow Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md).
+> [39B2c-L3c1b-i Configuration-Bound Helper Escrow Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
+> and
+> [39B2c-L3c1b-ii Synthetic Machine Claim Review](../../reports/phase-d-task-39b2c-l3c1b-ii-synthetic-machine-claim-review.md).
 >
 > **Parent plan:**
 > [Phase D Conditional Deep Dive](phase-d-conditional-deep-dive.md)
@@ -762,6 +764,11 @@ The remaining L3 work is split before driver coding:
        digest in the non-`Codable` claim and rejects any mismatch with the
        collection request's canonical signed-runtime configuration before L2 or
        transition work.
+       This checkpoint is complete. Its 20-test focused gate, 139-test
+       Lifecycle suite, 178-test Investigation suite, targeted Debug diagnostic
+       App build, 1035-test clean staged-only serial and independent grouped/
+       cross-group review passed. See the
+       [L3c1b-ii Review](../../reports/phase-d-task-39b2c-l3c1b-ii-synthetic-machine-claim-review.md).
      It must not modify `LifecycleSupervisorXPC.swift`, add an Objective-C XPC
      selector, add a concrete claim client/sender or weaken the existing exact
      App-only/non-root one-connection listener. The helper owns one bounded
@@ -803,8 +810,8 @@ The remaining L3 work is split before driver coding:
    raw-evidence read-only and must not repeat model calls or root mutation.
 
 The order is strict: `L3c1a -> L3c1b-i -> L3c1b-ii -> L3c2 -> L3c3 -> L3c4`.
-L3c1a and L3c1b-i are complete; L3c1b-ii is next, and only those two sub-gates
-together close L3c1b. L3c1 uses focused
+L3c1a, L3c1b-i and L3c1b-ii are complete; L3c1 is closed and L3c2 preflight is
+next. L3c1 used focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean
 staged serial regression, targeted helper/diagnostic builds and independent
 review in place of full. L3c2 and L3c3 must each receive a fresh scope/cost

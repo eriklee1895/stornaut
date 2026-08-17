@@ -76,6 +76,77 @@ struct InvestigationMachineTargetBoundaryTests {
             ),
             encoding: .utf8
         )
+        let claimSource = repositoryRoot.appending(
+            path: "Sources/StornautInvestigationMachine/"
+                + "InvestigationMachineRetirementClaim.swift"
+        )
+        #expect(FileManager.default.fileExists(atPath: claimSource.path))
+        let claimText = try String(
+            contentsOf: claimSource,
+            encoding: .utf8
+        )
+        for marker in [
+            "protocol InvestigationMachineRetirementClaimSource",
+            "struct InvestigationMachineRetirementClaim",
+            "actor InvestigationMachineRetirementClaimStore",
+        ] {
+            #expect(claimText.contains(marker))
+            #expect(!claimText.contains("public \(marker)"))
+            #expect(!claimText.contains("package \(marker)"))
+        }
+        for forbidden in [
+            "Codable",
+            "JSONDecoder",
+            "JSONEncoder",
+            "PropertyListDecoder",
+            "PropertyListEncoder",
+            "NSXPCConnection",
+            "LifecycleSupervisorXPCWire",
+            "LifecycleInteractiveSessionXPCWire",
+        ] {
+            #expect(!claimText.contains(forbidden))
+        }
+        let xpcSource = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "Sources/StornautLifecycle/LifecycleSupervisorXPC.swift"
+            ),
+            encoding: .utf8
+        )
+        #expect(!xpcSource.contains("LifecycleMachineRetirementClaim"))
+        for method in [
+            "func attestHelper(",
+            "func handle(",
+            "func handleInteractive(",
+        ] {
+            #expect(xpcSource.components(separatedBy: method).count == 2)
+        }
+        let exportedMethodCount = xpcSource
+            .components(separatedBy: "@objc public protocol")
+            .dropFirst()
+            .map { protocolSource in
+                protocolSource
+                    .prefix { $0 != "}" }
+                    .components(separatedBy: "func " )
+                    .count - 1
+            }
+            .reduce(0, +)
+        #expect(exportedMethodCount == 3)
+        let escrowSource = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "Sources/StornautLifecycle/"
+                    + "LifecycleMachineRetirementEscrow.swift"
+            ),
+            encoding: .utf8
+        )
+        #expect(!escrowSource.contains("public func claim("))
+        #expect(escrowSource.contains("let tokenSHA256: Data"))
+        let entryStart = try #require(
+            escrowSource.range(of: "fileprivate struct Entry {")
+        )
+        let entrySuffix = escrowSource[entryStart.lowerBound...]
+        let entryEnd = try #require(entrySuffix.range(of: "\n    }"))
+        let entrySource = String(entrySuffix[..<entryEnd.upperBound])
+        #expect(!entrySource.contains("LifecycleMachineRetirementHandle"))
         for trustedDeclaration in [
             "protocol SignedInvestigationRuntimeSealedCohortAuthority",
             "struct SignedInvestigationRuntimeMachineAssembler",

@@ -78,9 +78,11 @@ L3b1 exact helper-peer/opaque L1 retirement handoff and L3b2 root-only
 one-shot L1/L2 collector are complete. The mandatory cost/trust preflight split
 L3c into L3c1 helper-owned opaque retirement escrow, L3c2 deterministic machine
 driver, L3c3 real-success three-plane composition and L3c4 final admission.
-L3c1a typed owner retirement and
+L3c1a typed owner retirement,
 [L3c1b-i configuration-bound helper escrow](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
-are complete; L3c1b-ii synthetic Machine claim/collector join is next. Only
+and
+[L3c1b-ii synthetic Machine claim](../../reports/phase-d-task-39b2c-l3c1b-ii-synthetic-machine-claim-review.md)
+are complete; L3c1 is closed and L3c2 scope/trust/cost preflight is next. Only
 L3c4 owns machine readiness and the remaining full verifier.
 Tasks 40–44
 remain blocked on the pushed completion commit of their immediate predecessor.
@@ -100,7 +102,7 @@ the sole normal-product admission gate.
 | [36](task-36-implementation-brief.md) | Domain, canonical projection, planner, budget and stop contracts | complete; [review](../../reports/phase-d-task-36-review.md) |
 | [37](task-37-implementation-brief.md) | Store v4, retention and source rejoin | complete; [review](../../reports/phase-d-task-37-review.md) |
 | [38](task-38-implementation-brief.md) | Closed coordinator with fake runtime | complete; [review](../../reports/phase-d-task-38-review.md) |
-| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; 39A through 39B2b-ii complete; 39B2c attempt binding, strict decoding, [L1 residue](../../reports/phase-d-task-39b2c-l1-residue-observation-review.md), [L2 topology](../../reports/phase-d-task-39b2c-l2-root-topology-observation-review.md), [L3a trusted target](../../reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md), [L3b1 peer/L1 handoff](../../reports/phase-d-task-39b2c-l3b1-peer-retirement-handoff-review.md), [L3b2 lifecycle collector](../../reports/phase-d-task-39b2c-l3b2-lifecycle-topology-collector-review.md), [L3c1a typed owner retirement](../../reports/phase-d-task-39b2c-l3c1a-typed-owner-retirement-review.md) and [L3c1b-i configuration-bound helper escrow](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md) complete; L3c1b-ii next |
+| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; 39A through 39B2b-ii complete; 39B2c attempt binding, strict decoding, [L1 residue](../../reports/phase-d-task-39b2c-l1-residue-observation-review.md), [L2 topology](../../reports/phase-d-task-39b2c-l2-root-topology-observation-review.md), [L3a trusted target](../../reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md), [L3b1 peer/L1 handoff](../../reports/phase-d-task-39b2c-l3b1-peer-retirement-handoff-review.md), [L3b2 lifecycle collector](../../reports/phase-d-task-39b2c-l3b2-lifecycle-topology-collector-review.md), [L3c1a typed owner retirement](../../reports/phase-d-task-39b2c-l3c1a-typed-owner-retirement-review.md), [L3c1b-i helper escrow](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md) and [L3c1b-ii synthetic Machine claim](../../reports/phase-d-task-39b2c-l3c1b-ii-synthetic-machine-claim-review.md) complete; L3c2 preflight next |
 | [40](task-40-implementation-brief.md) | Evidence report and conservative Review projection | blocked on Task 39 |
 | [41](task-41-implementation-brief.md) | First-use disclosure and typed availability | blocked on Task 40 |
 | [42](task-42-implementation-brief.md) | App workflow and recovery state | blocked on Task 41 |

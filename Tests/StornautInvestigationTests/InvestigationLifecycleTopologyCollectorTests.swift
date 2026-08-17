@@ -11,7 +11,7 @@ struct InvestigationLifecycleTopologyCollectorTests {
     @Test
     func collectsOneOrderedOpaqueL1L2Cohort() async throws {
         let fixture = try LifecycleTopologyCollectorFixture()
-        let retirementStore = try await fixture.retirementEvidenceStore()
+        let retirementStore = try await fixture.retirementClaimStore()
         let topology = ScriptedTopologyObserver(
             results: [
                 .success(try fixture.installedObservation()),
@@ -30,7 +30,7 @@ struct InvestigationLifecycleTopologyCollectorTests {
 
         let cohort = try await collector.collect(
             request: fixture.collectionRequest(),
-            retirementEvidenceStore: retirementStore,
+            retirementClaimStore: retirementStore,
             transition: transition
         )
 
@@ -38,6 +38,10 @@ struct InvestigationLifecycleTopologyCollectorTests {
         #expect(cohort.helperProcessIdentity == fixture.helperIdentity)
         #expect(cohort.appProcessIdentity == fixture.appIdentity)
         #expect(cohort.lifecycleResidueObservation.provedEmpty)
+        #expect(
+            cohort.ownerRetirementObservation
+                == .retiredOwnedResources
+        )
         #expect(cohort.installedTopology.provesInstalledTopology)
         #expect(
             cohort.postTeardownTopology.provesPostTeardownTopology
@@ -72,8 +76,8 @@ struct InvestigationLifecycleTopologyCollectorTests {
         ) {
             _ = try await nonRoot.collect(
                 request: fixture.collectionRequest(),
-                retirementEvidenceStore:
-                    try await fixture.retirementEvidenceStore(),
+                retirementClaimStore:
+                    try await fixture.retirementClaimStore(),
                 transition: transition
             )
         }
@@ -94,10 +98,12 @@ struct InvestigationLifecycleTopologyCollectorTests {
         ) {
             _ = try await foreign.collect(
                 request: fixture.collectionRequest(
-                    investigationID: LifecycleInvestigationID()
+                    configuration: try fixture.configuration(
+                        nonce: UUID()
+                    )
                 ),
-                retirementEvidenceStore:
-                    try await fixture.retirementEvidenceStore(),
+                retirementClaimStore:
+                    try await fixture.retirementClaimStore(),
                 transition: transition
             )
         }
@@ -130,8 +136,8 @@ struct InvestigationLifecycleTopologyCollectorTests {
         ) {
             _ = try await collector.collect(
                 request: fixture.collectionRequest(),
-                retirementEvidenceStore:
-                    try await fixture.retirementEvidenceStore(),
+                retirementClaimStore:
+                    try await fixture.retirementClaimStore(),
                 transition: transition
             )
         }
@@ -141,8 +147,8 @@ struct InvestigationLifecycleTopologyCollectorTests {
         ) {
             _ = try await collector.collect(
                 request: fixture.collectionRequest(),
-                retirementEvidenceStore:
-                    try await fixture.retirementEvidenceStore(),
+                retirementClaimStore:
+                    try await fixture.retirementClaimStore(),
                 transition: RecordingTopologyTransition()
             )
         }
@@ -179,8 +185,8 @@ struct InvestigationLifecycleTopologyCollectorTests {
         ) {
             _ = try await bindingCollector.collect(
                 request: fixture.collectionRequest(),
-                retirementEvidenceStore:
-                    try await fixture.retirementEvidenceStore(),
+                retirementClaimStore:
+                    try await fixture.retirementClaimStore(),
                 transition: transition
             )
         }
@@ -203,8 +209,65 @@ struct InvestigationLifecycleTopologyCollectorTests {
         ) {
             _ = try await deadlineCollector.collect(
                 request: request,
-                retirementEvidenceStore:
-                    try await fixture.retirementEvidenceStore(),
+                retirementClaimStore:
+                    try await fixture.retirementClaimStore(),
+                transition: transition
+            )
+        }
+        #expect(await topology.phases.isEmpty)
+        #expect(await transition.invocationCount == 0)
+    }
+
+    @Test
+    func foreignSignedConfigurationFailsBeforeTopologyOrTransition()
+        async throws
+    {
+        let fixture = try LifecycleTopologyCollectorFixture()
+        let foreignBinding = SignedInvestigationRuntimeBinding(
+            repositoryHEAD: fixture.signedBinding.repositoryHEAD,
+            sourceFingerprintSHA256: String(repeating: "e", count: 64),
+            appExecutableSHA256:
+                fixture.signedBinding.appExecutableSHA256,
+            helperExecutableSHA256:
+                fixture.signedBinding.helperExecutableSHA256,
+            runtimeReceiptSHA256:
+                fixture.signedBinding.runtimeReceiptSHA256,
+            promptSHA256: fixture.signedBinding.promptSHA256,
+            envelopeSchemaSHA256:
+                fixture.signedBinding.envelopeSchemaSHA256,
+            facadeSHA256: fixture.signedBinding.facadeSHA256,
+            codexExecutableSHA256:
+                fixture.signedBinding.codexExecutableSHA256,
+            appBundleIdentifier:
+                fixture.signedBinding.appBundleIdentifier,
+            helperServiceIdentifier:
+                fixture.signedBinding.helperServiceIdentifier
+        )
+        let topology = ScriptedTopologyObserver(results: [
+            .success(try fixture.installedObservation()),
+            .success(try fixture.postTeardownObservation()),
+        ])
+        let transition = RecordingTopologyTransition()
+        let collector = InvestigationLifecycleTopologyCollector(
+            topologyObserver: topology,
+            bindingReader: FixedTopologyBindingReader(binding: fixture.binding),
+            effectiveUserID: { 0 },
+            now: fixture.clock.read
+        )
+        let request = try fixture.collectionRequest(
+            configuration: fixture.configuration(
+                binding: foreignBinding
+            )
+        )
+
+        await #expect(
+            throws: InvestigationLifecycleTopologyCollectorError
+                .retirementEvidenceMismatch
+        ) {
+            _ = try await collector.collect(
+                request: request,
+                retirementClaimStore:
+                    try await fixture.retirementClaimStore(),
                 transition: transition
             )
         }
@@ -237,8 +300,8 @@ struct InvestigationLifecycleTopologyCollectorTests {
         ) {
             _ = try await rootCollector.collect(
                 request: fixture.collectionRequest(),
-                retirementEvidenceStore:
-                    try await fixture.retirementEvidenceStore(),
+                retirementClaimStore:
+                    try await fixture.retirementClaimStore(),
                 transition: rootTransition
             )
         }
@@ -264,8 +327,8 @@ struct InvestigationLifecycleTopologyCollectorTests {
         ) {
             _ = try await deadlineCollector.collect(
                 request: deadlineRequest,
-                retirementEvidenceStore:
-                    try await fixture.retirementEvidenceStore(),
+                retirementClaimStore:
+                    try await fixture.retirementClaimStore(),
                 transition: deadlineTransition
             )
         }
@@ -297,8 +360,8 @@ struct InvestigationLifecycleTopologyCollectorTests {
         ) {
             _ = try await collector.collect(
                 request: fixture.collectionRequest(),
-                retirementEvidenceStore:
-                    try await fixture.retirementEvidenceStore(),
+                retirementClaimStore:
+                    try await fixture.retirementClaimStore(),
                 transition: transition
             )
         }
@@ -309,8 +372,8 @@ struct InvestigationLifecycleTopologyCollectorTests {
         ) {
             _ = try await collector.collect(
                 request: fixture.collectionRequest(),
-                retirementEvidenceStore:
-                    try await fixture.retirementEvidenceStore(),
+                retirementClaimStore:
+                    try await fixture.retirementClaimStore(),
                 transition: transition
             )
         }
@@ -337,8 +400,8 @@ struct InvestigationLifecycleTopologyCollectorTests {
         ) {
             _ = try await collector.collect(
                 request: fixture.collectionRequest(),
-                retirementEvidenceStore:
-                    try await fixture.retirementEvidenceStore(),
+                retirementClaimStore:
+                    try await fixture.retirementClaimStore(),
                 transition: RecordingTopologyTransition()
             )
         }
@@ -360,12 +423,12 @@ struct InvestigationLifecycleTopologyCollectorTests {
             effectiveUserID: { 0 },
             now: fixture.clock.read
         )
-        let retirementStore = try await fixture.retirementEvidenceStore()
+        let retirementStore = try await fixture.retirementClaimStore()
 
         let first = Task {
             try await collector.collect(
                 request: fixture.collectionRequest(),
-                retirementEvidenceStore: retirementStore,
+                retirementClaimStore: retirementStore,
                 transition: transition
             )
         }
@@ -376,7 +439,7 @@ struct InvestigationLifecycleTopologyCollectorTests {
         ) {
             _ = try await collector.collect(
                 request: fixture.collectionRequest(),
-                retirementEvidenceStore: retirementStore,
+                retirementClaimStore: retirementStore,
                 transition: RecordingTopologyTransition()
             )
         }
@@ -397,7 +460,7 @@ struct InvestigationLifecycleTopologyCollectorTests {
         ) {
             _ = try await replayCollector.collect(
                 request: fixture.collectionRequest(),
-                retirementEvidenceStore: retirementStore,
+                retirementClaimStore: retirementStore,
                 transition: RecordingTopologyTransition()
             )
         }
@@ -420,11 +483,11 @@ struct InvestigationLifecycleTopologyCollectorTests {
             effectiveUserID: { 0 },
             now: fixture.clock.read
         )
-        let store = try await fixture.retirementEvidenceStore()
+        let store = try await fixture.retirementClaimStore()
         let task = Task {
             try await collector.collect(
                 request: fixture.collectionRequest(),
-                retirementEvidenceStore: store,
+                retirementClaimStore: store,
                 transition: transition
             )
         }
@@ -440,8 +503,8 @@ struct InvestigationLifecycleTopologyCollectorTests {
         ) {
             _ = try await collector.collect(
                 request: fixture.collectionRequest(),
-                retirementEvidenceStore:
-                    try await fixture.retirementEvidenceStore(),
+                retirementClaimStore:
+                    try await fixture.retirementClaimStore(),
                 transition: RecordingTopologyTransition()
             )
         }

@@ -28,23 +28,32 @@ struct InvestigationLifecycleTopologyCollectionRequest:
     let userID: UInt32
     let scenario: SignedInvestigationRuntimeDiagnosticScenario
     let signedBinding: SignedInvestigationRuntimeBinding
+    let configurationSHA256: String
     let appProcessIdentity: LifecycleProcessIdentity
     let openedAt: Date
     let validBefore: Date
 
     init(
-        investigationID: LifecycleInvestigationID,
         userID: UInt32,
-        scenario: SignedInvestigationRuntimeDiagnosticScenario = .success,
-        signedBinding: SignedInvestigationRuntimeBinding,
+        configuration:
+            SignedInvestigationRuntimeDiagnosticConfiguration,
         appProcessIdentity: LifecycleProcessIdentity,
         openedAt: Date,
         validBefore: Date
     ) throws {
         let duration = validBefore.timeIntervalSince(openedAt)
+        let configurationSHA256: String
+        do {
+            configurationSHA256 =
+                try configuration.machineConfigurationSHA256()
+        } catch {
+            throw InvestigationLifecycleTopologyCollectorError
+                .invalidRequest
+        }
         guard
             userID > 0,
-            signedBinding.isValid,
+            configuration.binding.isValid,
+            configuration.validBefore >= validBefore,
             appProcessIdentity.processID > 1,
             appProcessIdentity.processIDVersion > 0,
             appProcessIdentity.auditSessionID > 0,
@@ -58,10 +67,13 @@ struct InvestigationLifecycleTopologyCollectionRequest:
             throw InvestigationLifecycleTopologyCollectorError
                 .invalidRequest
         }
-        self.investigationID = investigationID
+        investigationID = LifecycleInvestigationID(
+            rawValue: configuration.nonce
+        )
         self.userID = userID
-        self.scenario = scenario
-        self.signedBinding = signedBinding
+        scenario = configuration.scenario
+        signedBinding = configuration.binding
+        self.configurationSHA256 = configurationSHA256
         self.appProcessIdentity = appProcessIdentity
         self.openedAt = openedAt
         self.validBefore = validBefore
@@ -164,13 +176,15 @@ struct InvestigationLifecycleTopologyCohort: Sendable, Equatable {
     let helperAttestedAt: Date
     let lifecycleResidueObservation:
         LifecycleInvestigationResidueObservation
+    let ownerRetirementObservation:
+        LifecycleInteractiveWorkerRetirementObservation
     let installedTopology: LifecycleRootTopologyObservation
     let postTeardownTopology: LifecycleRootTopologyObservation
     let observedAt: Date
 
     fileprivate init(
         request: InvestigationLifecycleTopologyCollectionRequest,
-        retirementEvidence: InvestigationLifecycleRetirementEvidence,
+        retirementClaim: InvestigationMachineRetirementClaim,
         installedTopology: LifecycleRootTopologyObservation,
         postTeardownTopology: LifecycleRootTopologyObservation
     ) {
@@ -180,10 +194,12 @@ struct InvestigationLifecycleTopologyCohort: Sendable, Equatable {
         signedBinding = request.signedBinding
         appProcessIdentity = request.appProcessIdentity
         helperProcessIdentity =
-            retirementEvidence.helperProcessIdentity
-        helperAttestedAt = retirementEvidence.helperAttestedAt
+            retirementClaim.helperPeerIdentity
+        helperAttestedAt = retirementClaim.helperPeerAttestedAt
         lifecycleResidueObservation =
-            retirementEvidence.residueObservation
+            retirementClaim.residueObservation
+        ownerRetirementObservation =
+            retirementClaim.ownerRetirementObservation
         self.installedTopology = installedTopology
         self.postTeardownTopology = postTeardownTopology
         observedAt = postTeardownTopology.observedAt
@@ -219,8 +235,8 @@ actor InvestigationLifecycleTopologyCollector {
 
     func collect(
         request: InvestigationLifecycleTopologyCollectionRequest,
-        retirementEvidenceStore:
-            InvestigationLifecycleRetirementEvidenceStore,
+        retirementClaimStore:
+            InvestigationMachineRetirementClaimStore,
         transition: any InvestigationLifecycleTopologyTransitioning
     ) async throws -> InvestigationLifecycleTopologyCohort {
         guard state == .ready else {
@@ -237,9 +253,10 @@ actor InvestigationLifecycleTopologyCollector {
         }
         let startedAt = now()
         try requireWindow(request, at: startedAt)
-        guard let retirementEvidence =
-            await retirementEvidenceStore.consume()
-        else {
+        let retirementClaim: InvestigationMachineRetirementClaim
+        do {
+            retirementClaim = try await retirementClaimStore.consume()
+        } catch {
             throw InvestigationLifecycleTopologyCollectorError
                 .retirementEvidenceMismatch
         }
@@ -252,8 +269,8 @@ actor InvestigationLifecycleTopologyCollector {
             throw InvestigationLifecycleTopologyCollectorError
                 .bindingMismatch
         }
-        try validateRetirementEvidence(
-            retirementEvidence,
+        try validateRetirementClaim(
+            retirementClaim,
             request: request,
             topologyBinding: topologyBinding
         )
@@ -266,7 +283,7 @@ actor InvestigationLifecycleTopologyCollector {
             binding: topologyBinding,
             appProcessIdentity: request.appProcessIdentity,
             helperProcessIdentity:
-                retirementEvidence.helperProcessIdentity,
+                retirementClaim.helperPeerIdentity,
             window: window
         )
         let installed: LifecycleRootTopologyObservation
@@ -287,14 +304,17 @@ actor InvestigationLifecycleTopologyCollector {
             installed.binding == topologyBinding,
             installed.appProcessIdentity == request.appProcessIdentity,
             installed.helperProcessIdentity
-                == retirementEvidence.helperProcessIdentity,
+                == retirementClaim.helperPeerIdentity,
             installed.startedAt >= request.openedAt,
             installed.observedAt >= installed.startedAt,
             installed.observedAt <= request.validBefore,
-            retirementEvidence.helperAttestedAt
-                <= retirementEvidence.residueObservation.observedAt,
-            retirementEvidence.residueObservation.observedAt
-                <= installed.startedAt
+            retirementClaim.residueObservation.observedAt
+                <= retirementClaim.recordedAt,
+            retirementClaim.recordedAt
+                <= retirementClaim.request.issuedAt,
+            retirementClaim.request.issuedAt
+                <= retirementClaim.claimedAt,
+            retirementClaim.claimedAt <= installed.startedAt
         else {
             throw InvestigationLifecycleTopologyCollectorError
                 .installedTopologyUnproved
@@ -324,7 +344,7 @@ actor InvestigationLifecycleTopologyCollector {
             binding: topologyBinding,
             appProcessIdentity: request.appProcessIdentity,
             helperProcessIdentity:
-                retirementEvidence.helperProcessIdentity,
+                retirementClaim.helperPeerIdentity,
             window: window
         )
         let post: LifecycleRootTopologyObservation
@@ -343,7 +363,7 @@ actor InvestigationLifecycleTopologyCollector {
             post.binding == topologyBinding,
             post.appProcessIdentity == request.appProcessIdentity,
             post.helperProcessIdentity
-                == retirementEvidence.helperProcessIdentity,
+                == retirementClaim.helperPeerIdentity,
             post.startedAt >= installed.observedAt,
             post.observedAt >= post.startedAt,
             post.observedAt <= request.validBefore
@@ -354,31 +374,47 @@ actor InvestigationLifecycleTopologyCollector {
         try requireWindow(request, at: post.observedAt)
         return InvestigationLifecycleTopologyCohort(
             request: request,
-            retirementEvidence: retirementEvidence,
+            retirementClaim: retirementClaim,
             installedTopology: installed,
             postTeardownTopology: post
         )
     }
 
-    private func validateRetirementEvidence(
-        _ evidence: InvestigationLifecycleRetirementEvidence,
+    private func validateRetirementClaim(
+        _ claim: InvestigationMachineRetirementClaim,
         request: InvestigationLifecycleTopologyCollectionRequest,
         topologyBinding: LifecycleRootTopologyBinding
     ) throws {
-        let residue = evidence.residueObservation
+        let residue = claim.residueObservation
         guard
+            claim.request.handle.investigationID
+                == request.investigationID,
+            claim.configurationSHA256
+                == request.configurationSHA256,
+            claim.ownerRetirementObservation
+                == .retiredOwnedResources,
             residue.investigationID == request.investigationID,
             residue.userID == request.userID,
             residue.provedEmpty,
-            evidence.helperProcessIdentity.processID > 1,
-            evidence.helperProcessIdentity.processIDVersion > 0,
-            evidence.helperProcessIdentity.effectiveUserID == 0,
-            evidence.helperProcessIdentity.auditSessionID
+            claim.helperPeerIdentity.processID > 1,
+            claim.helperPeerIdentity.processIDVersion > 0,
+            claim.helperPeerIdentity.effectiveUserID == 0,
+            claim.helperPeerIdentity.auditSessionID
                 == residue.auditSessionID,
-            evidence.helperProcessIdentity.processID
+            claim.helperPeerIdentity.processID
                 != request.appProcessIdentity.processID,
-            evidence.helperAttestedAt >= request.openedAt,
-            evidence.helperAttestedAt <= residue.observedAt,
+            claim.appIdentity.processID
+                == request.appProcessIdentity.processID,
+            claim.appIdentity.processIDVersion
+                == request.appProcessIdentity.processIDVersion,
+            claim.appIdentity.auditSessionID
+                == request.appProcessIdentity.auditSessionID,
+            claim.appIdentity.effectiveUserID == request.userID,
+            claim.appIdentity.auditTokenWords
+                == request.appProcessIdentity.auditToken.words,
+            claim.claimedAt <= request.openedAt,
+            claim.request.validBefore >= request.openedAt,
+            claim.request.validBefore >= claim.claimedAt,
             residue.observedAt <= request.validBefore,
             topologyBinding.appSigningEvidence.executableSHA256
                 == request.signedBinding.appExecutableSHA256,

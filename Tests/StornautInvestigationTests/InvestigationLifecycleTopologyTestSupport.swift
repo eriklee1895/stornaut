@@ -1,12 +1,13 @@
 import Darwin
 import Foundation
 import Testing
+import StornautCodex
 @testable import StornautInvestigationMachine
 import StornautInvestigation
 @testable import StornautInvestigationRuntime
 @testable import StornautLifecycle
 
-struct LifecycleTopologyCollectorFixture {
+final class LifecycleTopologyCollectorFixture: @unchecked Sendable {
     let contract: LifecycleLocalInstallationContract
     let investigationID = LifecycleInvestigationID(
         rawValue: UUID(
@@ -18,12 +19,25 @@ struct LifecycleTopologyCollectorFixture {
     let helperIdentity: LifecycleProcessIdentity
     let binding: LifecycleRootTopologyBinding
     let signedBinding: SignedInvestigationRuntimeBinding
+    let root: URL
+    let configuration: SignedInvestigationRuntimeDiagnosticConfiguration
     let clock = TopologyCollectorClock(
         now: Date(timeIntervalSince1970: 1_900_000_000)
     )
 
     init() throws {
         contract = try LifecycleLocalInstallationContract()
+        let resolvedTemporaryPath = try #require(
+            realpath(FileManager.default.temporaryDirectory.path, nil)
+        )
+        defer { free(resolvedTemporaryPath) }
+        root = URL(
+            filePath: String(cString: resolvedTemporaryPath),
+            directoryHint: .isDirectory
+        ).appending(
+            path: "stornaut-topology-\(UUID().uuidString)",
+            directoryHint: .isDirectory
+        )
         appIdentity = Self.identity(
             processID: 701,
             processIDVersion: 11,
@@ -76,6 +90,16 @@ struct LifecycleTopologyCollectorFixture {
             appBundleIdentifier: contract.appBundleIdentifier,
             helperServiceIdentifier: contract.label
         )
+        configuration = try Self.configuration(
+            root: root,
+            nonce: investigationID.rawValue,
+            binding: signedBinding,
+            now: clock.read()
+        )
+    }
+
+    deinit {
+        try? FileManager.default.removeItem(at: root)
     }
 
     func processIdentity(
@@ -93,70 +117,156 @@ struct LifecycleTopologyCollectorFixture {
     }
 
     func collectionRequest(
-        investigationID: LifecycleInvestigationID? = nil
+        configuration:
+            SignedInvestigationRuntimeDiagnosticConfiguration? = nil
     ) throws -> InvestigationLifecycleTopologyCollectionRequest {
         try InvestigationLifecycleTopologyCollectionRequest(
-            investigationID: investigationID ?? self.investigationID,
             userID: userID,
-            signedBinding: signedBinding,
+            configuration: configuration ?? self.configuration,
             appProcessIdentity: appIdentity,
             openedAt: clock.read(),
             validBefore: clock.read().addingTimeInterval(30)
         )
     }
 
-    func retirementEvidenceStore() async throws
-        -> InvestigationLifecycleRetirementEvidenceStore
+    func retirementClaimStore() async throws
+        -> InvestigationMachineRetirementClaimStore
     {
         let now = clock.read()
         let operationID = UUID(
             uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
         )!
-        let configurationSHA256 = String(repeating: "a", count: 64)
-        let session = CollectorLifecycleSession(
-            helperIdentity: helperIdentity,
-            helperAttestedAt: now,
-            response: .retired(
+        let handle = try LifecycleMachineRetirementHandle(
+            token: UUID(
+                uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+            )!,
+            investigationID: investigationID,
+            retireOperationID: operationID,
+            configurationSHA256: configuration.machineConfigurationSHA256(),
+            validBefore: now.addingTimeInterval(30)
+        )
+        let residueObservedAt = now.addingTimeInterval(-4)
+        let recordedAt = now.addingTimeInterval(-3)
+        let claimIssuedAt = now.addingTimeInterval(-2)
+        let claimCompletedAt = now.addingTimeInterval(-1)
+        let request = try LifecycleMachineRetirementClaimRequest(
+            handle: handle,
+            challengeNonce: UUID(
+                uuidString: "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+            )!,
+            issuedAt: claimIssuedAt,
+            validBefore: now.addingTimeInterval(13)
+        )
+        let response = try LifecycleMachineRetirementClaimResponse(
+            request: request,
+            appIdentity: try machineRecord(appIdentity),
+            helperIdentity: try machineRecord(helperIdentity),
+            userID: userID,
+            recordedAt: recordedAt,
+            claimedAt: claimCompletedAt,
+            ownerRetirementObservation: .retiredOwnedResources,
+            residueObservation: try LifecycleInvestigationResidueObservation(
                 investigationID: investigationID,
-                operationID: operationID,
-                drained: true,
-                ownerRetirementObservation: .retiredOwnedResources,
-                machineRetirementHandle:
-                    try LifecycleMachineRetirementHandle(
-                        token: UUID(),
-                        investigationID: investigationID,
-                        retireOperationID: operationID,
-                        configurationSHA256: configurationSHA256,
-                        validBefore: now.addingTimeInterval(30)
-                    ),
-                residueObservation:
-                    try LifecycleInvestigationResidueObservation(
-                        investigationID: investigationID,
-                        auditSessionID: helperIdentity.auditSessionID,
-                        userID: userID,
-                        observedAt: now,
-                        remainingAuditSessionMemberCount: 0,
-                        matchingLeaseCount: 0,
-                        leaseRootEntryCount: 0,
-                        investigationArtifactCount: 0
-                    )
+                auditSessionID: helperIdentity.auditSessionID,
+                userID: userID,
+                observedAt: residueObservedAt,
+                remainingAuditSessionMemberCount: 0,
+                matchingLeaseCount: 0,
+                leaseRootEntryCount: 0,
+                investigationArtifactCount: 0
             )
         )
-        let store = InvestigationLifecycleRetirementEvidenceStore()
-        let transport = try InvestigationLifecycleAppServerTransport(
-            investigationID: investigationID,
-            configurationSHA256: configurationSHA256,
-            validBefore: now.addingTimeInterval(30),
-            maximumLineBytes: 1_024,
-            maximumSessionBytes: 8_192,
-            expectedUserID: userID,
-            now: clock.read,
-            operationID: { operationID },
-            session: session,
-            retirementEvidenceStore: store
+        let claimant = try InvestigationMachineRetirementClaimant(
+            source: CollectorMachineClaimSource(
+                response: response,
+                helperIdentity: helperIdentity
+            ),
+            signingVerifier: CollectorHelperSigningVerifier(),
+            effectiveUserID: { 0 },
+            now: { claimIssuedAt },
+            challenge: { request.challengeNonce },
+            configuration: configuration,
+            expectedAppIdentity: try machineRecord(appIdentity),
+            expectedUserID: userID
         )
-        _ = try await transport.retireWithEvidence()
+        let store = InvestigationMachineRetirementClaimStore()
+        try await store.record(try await claimant.claim(handle: handle))
         return store
+    }
+
+    private func machineRecord(
+        _ identity: LifecycleProcessIdentity
+    ) throws -> LifecycleMachineProcessIdentityRecord {
+        try LifecycleMachineProcessIdentityRecord(
+            processID: identity.processID,
+            processIDVersion: identity.processIDVersion,
+            auditSessionID: identity.auditSessionID,
+            effectiveUserID: identity.effectiveUserID,
+            auditTokenWords: identity.auditToken.words
+        )
+    }
+
+    func configuration(
+        nonce: UUID? = nil,
+        binding: SignedInvestigationRuntimeBinding? = nil
+    ) throws -> SignedInvestigationRuntimeDiagnosticConfiguration {
+        try Self.configuration(
+            root: root,
+            nonce: nonce ?? investigationID.rawValue,
+            binding: binding ?? signedBinding,
+            now: clock.read()
+        )
+    }
+
+    private static func configuration(
+        root: URL,
+        nonce: UUID,
+        binding: SignedInvestigationRuntimeBinding,
+        now: Date
+    ) throws -> SignedInvestigationRuntimeDiagnosticConfiguration {
+        let sourceRoot = root.appending(
+            path: "source",
+            directoryHint: .isDirectory
+        )
+        let supportRoot = root.appending(
+            path: "support",
+            directoryHint: .isDirectory
+        )
+        let runtimeRoot = root.appending(
+            path: "runtime",
+            directoryHint: .isDirectory
+        )
+        let storeParent = supportRoot.appending(
+            path: "com.eriklee.stornaut",
+            directoryHint: .isDirectory
+        )
+        for directory in [root, sourceRoot, supportRoot, runtimeRoot, storeParent] {
+            try FileManager.default.createDirectory(
+                at: directory,
+                withIntermediateDirectories: true,
+                attributes: [.posixPermissions: 0o700]
+            )
+        }
+        return try SignedInvestigationRuntimeDiagnosticConfiguration(
+            nonce: nonce,
+            scenario: .success,
+            optIn: SignedInvestigationRuntimeDiagnosticConfiguration.requiredOptIn,
+            diagnosticRootPath: root.path,
+            sourceRootPath: sourceRoot.path,
+            supportRootPath: supportRoot.path,
+            runtimeRootPath: runtimeRoot.path,
+            reportPath: root.appending(path: "report.json").path,
+            storePath: storeParent.appending(path: "Evidence.sqlite").path,
+            binding: binding,
+            expectedModel: .gpt56Luna,
+            expectedProvider: .openAI,
+            validBefore: now.addingTimeInterval(60),
+            maximumWallClockSeconds: 30,
+            maximumTurns: 1,
+            maximumProbeCalls: 1,
+            maximumContextBytes: 1_024,
+            now: now
+        )
     }
 
     func installedObservation() throws
@@ -232,7 +342,8 @@ struct LifecycleTopologyCollectorFixture {
             auditSessionID: auditSessionID,
             effectiveUserID: effectiveUserID,
             auditToken: try! LifecycleAuditToken(words: [
-                effectiveUserID, 0, 0, effectiveUserID, 0,
+                effectiveUserID, effectiveUserID, 0,
+                effectiveUserID, 0,
                 UInt32(processID), UInt32(auditSessionID),
                 UInt32(processIDVersion),
             ])
@@ -309,44 +420,27 @@ final class TopologyCollectorClock: @unchecked Sendable {
     }
 }
 
-private actor CollectorLifecycleSession:
-    LifecycleInteractiveSessionEvidenceSending
+private struct CollectorMachineClaimSource:
+    InvestigationMachineRetirementClaimSource
 {
-    private let helperIdentity: LifecycleProcessIdentity
-    private let helperAttestedAt: Date
-    private let response: LifecycleInteractiveSessionResponse
-    private var peer: LifecycleConnectedHelperPeer?
+    let response: LifecycleMachineRetirementClaimResponse
+    let helperIdentity: LifecycleProcessIdentity
 
-    init(
-        helperIdentity: LifecycleProcessIdentity,
-        helperAttestedAt: Date,
-        response: LifecycleInteractiveSessionResponse
+    func fetch(
+        request _: LifecycleMachineRetirementClaimRequest
+    ) async throws -> (
+        LifecycleMachineRetirementClaimResponse,
+        LifecycleProcessIdentity,
+        Date
     ) {
-        self.helperIdentity = helperIdentity
-        self.helperAttestedAt = helperAttestedAt
-        self.response = response
+        (response, helperIdentity, response.request.issuedAt)
     }
+}
 
-    func freshAttestedHelperPeer() -> LifecycleConnectedHelperPeer {
-        let value = LifecycleConnectedHelperPeer(
-            identity: helperIdentity,
-            attestedAt: helperAttestedAt
-        )
-        peer = value
-        return value
-    }
-
-    func send(
-        _ request: LifecycleInteractiveSessionRequest
-    ) async throws -> LifecycleInteractiveSessionResponse {
-        _ = freshAttestedHelperPeer()
-        return try response.validated(for: request)
-    }
-
-    func takeRetirementHelperPeer(
-        operationID _: UUID
-    ) -> LifecycleConnectedHelperPeer? {
-        defer { peer = nil }
-        return peer
+private struct CollectorHelperSigningVerifier:
+    InvestigationMachineRetirementHelperSigningVerifying
+{
+    func verifies(helperIdentity _: LifecycleProcessIdentity) -> Bool {
+        true
     }
 }

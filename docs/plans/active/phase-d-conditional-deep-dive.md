@@ -12,9 +12,10 @@
 > restart or stage retry. 39B2b-ii is complete. The narrow 39B2c
 > attempt-binding prerequisite is also complete, followed by strict decoding,
 > L1/L2 observation, L3 trusted-target/root-collection and L3c1a typed-owner
-> prerequisites. L3c1b-i now closes the configuration-bound, memory-only helper
-> escrow half of L3c1b; its 1025-test clean staged-only serial and independent
-> post-fix reviews passed. L3c1b-ii is next. The machine driver, failure matrix,
+> prerequisites. L3c1b-i closed the configuration-bound memory-only helper
+> escrow, and L3c1b-ii closed the synthetic non-Codable Machine claim/collector
+> join; their 1025- and 1035-test clean staged-only serials plus independent
+> reviews passed. L3c1 is complete; L3c2 preflight is next. The Machine driver, failure matrix,
 > real-model run and readiness verdict remain unimplemented.
 > Production Deep Dive remains unavailable until Task 44 admission.
 >
@@ -844,10 +845,13 @@ Checkpoint status:
 - 39B2c L3a/L3b are complete. The mandatory L3c scope/trust preflight split
   the remaining work into L3c1 helper-owned opaque retirement escrow, L3c2
   deterministic machine driver, L3c3 current-source real-success three-plane
-  composition and L3c4 sealed final admission. L3c1a typed owner retirement and
-  L3c1b-i configuration-bound helper escrow are complete; L3c1b-ii synthetic
-  Machine claim/collector join is next. See the
-  [L3c1b-i Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md).
+  composition and L3c4 sealed final admission. L3c1a typed owner retirement,
+  L3c1b-i configuration-bound helper escrow and L3c1b-ii synthetic Machine
+  claim/collector join are complete; L3c1 is closed and L3c2 preflight is next.
+  See the
+  [L3c1b-i Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
+  and
+  [L3c1b-ii Review](../../reports/phase-d-task-39b2c-l3c1b-ii-synthetic-machine-claim-review.md).
   Only L3c4 owns
   real-model signed-App machine readiness, the complete failure matrix, exact
   zero-residue proof and the remaining authoritative full verifier. Task 39 and
