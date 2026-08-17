@@ -708,8 +708,34 @@ The remaining L3 work is split before driver coding:
      internal, non-`Codable` authority. The claim must survive App exit, but
      helper restart, stale/foreign identity, connection-epoch drift, replay,
      cancellation or deadline failure must destroy admission. Production root
-     claim stays closed until L3c2 supplies an exact signed driver identity. Its
-     budget is at most 12 non-document paths and 3,200 added lines.
+     claim stays closed until L3c2 supplies an exact signed driver identity.
+     The exact path preflight is frozen at the following 11 non-document paths
+     and at most 3,600 added non-document lines:
+     `Sources/StornautLifecycle/LifecycleMachineRetirementEscrow.swift` (new),
+     `Sources/StornautLifecycle/LifecycleInteractiveSessionContract.swift`,
+     `StornautLifecycleHelper/main.swift`,
+     `Sources/StornautInvestigationMachine/InvestigationMachineRetirementClaim.swift`
+     (new),
+     `Sources/StornautInvestigationMachine/InvestigationLifecycleTopologyCollector.swift`,
+     `Tests/StornautLifecycleTests/LifecycleMachineRetirementEscrowTests.swift`
+     (new),
+     `Tests/StornautLifecycleTests/LifecycleInteractiveSessionContractTests.swift`,
+     `Tests/StornautInvestigationTests/InvestigationMachineRetirementClaimTests.swift`
+     (new),
+     `Tests/StornautInvestigationTests/InvestigationLifecycleTopologyCollectorTests.swift`,
+     `Tests/StornautInvestigationTests/InvestigationLifecycleTopologyTestSupport.swift`
+     and
+     `Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift`.
+     It must not modify `LifecycleSupervisorXPC.swift`, add an Objective-C XPC
+     selector, add a concrete claim client/sender or weaken the existing exact
+     App-only/non-root one-connection listener. The helper owns one bounded
+     in-memory `empty -> recorded -> consumed` escrow. It records before the
+     retired reply, enters `awaitingClaim`, survives the expected App disconnect
+     until the claim deadline, and exits on expiry. A disconnect before record,
+     helper restart, invalid claim or expiry remains blocked; no escrow data is
+     persisted. L3c1b exposes only an injected synthetic Machine claim source.
+     L3c2 must separately preflight the exact signed root-driver identity,
+     endpoint and authorization-before-consume ordering.
    Together they replace inferred `managedProxyOwnerEmpty`/`probeWorkerEmpty`
    values with an independent typed owner-retirement observation joined to the
    same audit-session L1 zero. Both are synthetic-only: no install/uninstall,
