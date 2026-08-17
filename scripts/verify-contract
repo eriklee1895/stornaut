@@ -24,6 +24,8 @@ function require_fixed_text() {
 require_fixed_text scripts/verify '--headless'
 require_fixed_text scripts/verify '--full'
 require_fixed_text scripts/verify '--list-steps'
+require_fixed_text scripts/verify '--step <name>'
+require_fixed_text scripts/verify 'diagnostic only'
 require_fixed_text scripts/verify '.derivedData/verification'
 require_fixed_text scripts/verify 'swift test --no-parallel'
 require_fixed_text scripts/verify '--parallel --num-workers 4'
@@ -237,9 +239,20 @@ if verify_source.count(preflight) != 1:
     raise SystemExit(
         "scripts/verify must perform exactly one early Task 35 receipt preflight"
     )
-if verify_source.index(preflight) > verify_source.index("typeset -a headless_steps"):
+list_exit = 'if [[ "$list_steps" == true ]]; then'
+timing_start = 'timing_temp=$(mktemp'
+if list_exit not in verify_source or timing_start not in verify_source:
     raise SystemExit(
-        "Task 35 receipt preflight must run before verifier step selection"
+        "scripts/verify lost list or timing selection anchors"
+    )
+if not (
+    verify_source.index(list_exit)
+    < verify_source.index(preflight)
+    < verify_source.index(timing_start)
+):
+    raise SystemExit(
+        "Task 35 receipt preflight must run after validated listing and "
+        "before timed execution"
     )
 for forbidden in (
     "STORNAUT_RUN_TASK37_CAPACITY_BENCHMARK",
@@ -337,7 +350,8 @@ if rg -n \
 fi
 
 help_output=$(scripts/verify --help)
-for expected in '--headless' '--full' '--list-steps'; do
+for expected in '--headless' '--full' '--list-steps' '--step <name>' \
+    'diagnostic only'; do
     if [[ "$help_output" != *"$expected"* ]]; then
         fail_contract "Verifier help omitted $expected"
     fi
@@ -417,15 +431,113 @@ cp scripts/verify "$contract_root/scripts/verify"
 chmod 755 "$contract_root/scripts/verify"
 cat > "$contract_root/scripts/verify-phase-c-trash-receipt" <<'SH'
 #!/bin/sh
-exit 0
+if [ -n "${STORNAUT_VERIFY_CONTRACT_TRACE:-}" ]; then
+    printf '%s\n' receipt >> "$STORNAUT_VERIFY_CONTRACT_TRACE"
+fi
+exit "${STORNAUT_VERIFY_CONTRACT_RECEIPT_STATUS:-0}"
 SH
 chmod 755 "$contract_root/scripts/verify-phase-c-trash-receipt"
 cat > "$contract_root/scripts/verify-phase-c-trash-diagnostic-contract" <<'SH'
 #!/bin/sh
+if [ -n "${STORNAUT_VERIFY_CONTRACT_TRACE:-}" ]; then
+    printf '%s\n' diagnostic-contract \
+        >> "$STORNAUT_VERIFY_CONTRACT_TRACE"
+fi
 echo "synthetic target-aware diagnostic contract failure" >&2
-exit 75
+exit "${STORNAUT_VERIFY_CONTRACT_STAGE_STATUS:-75}"
 SH
 chmod 755 "$contract_root/scripts/verify-phase-c-trash-diagnostic-contract"
+
+function expect_cli_usage_failure_without_execution() {
+    local case_name=$1
+    shift
+    local output="$contract_root/$case_name.log"
+    local trace="$contract_root/$case_name.trace"
+    : > "$trace"
+
+    local cli_status=0
+    STORNAUT_VERIFY_CONTRACT_TRACE="$trace" \
+        "$contract_root/scripts/verify" "$@" \
+        >"$output" 2>&1 || cli_status=$?
+    if (( cli_status != 64 )); then
+        fail_contract \
+            "$case_name returned $cli_status instead of usage status 64"
+    fi
+    require_fixed_text "$output" 'Usage:'
+    if [[ -s "$trace" ]]; then
+        fail_contract "$case_name executed receipt or verifier stages"
+    fi
+}
+
+expect_cli_usage_failure_without_execution \
+    step-without-mode --step source-boundaries
+expect_cli_usage_failure_without_execution \
+    step-without-value --headless --step
+expect_cli_usage_failure_without_execution \
+    unknown-step --headless --step unknown-step
+expect_cli_usage_failure_without_execution \
+    duplicate-step --headless --step source-boundaries \
+        --step source-boundaries
+expect_cli_usage_failure_without_execution \
+    listed-step --headless --step source-boundaries --list-steps
+expect_cli_usage_failure_without_execution \
+    incompatible-step --headless --step xcuitest
+
+list_trace="$contract_root/list.trace"
+: > "$list_trace"
+STORNAUT_VERIFY_CONTRACT_TRACE="$list_trace" \
+    "$contract_root/scripts/verify" --headless --list-steps \
+    >"$contract_root/list.log"
+if [[ -s "$list_trace" ]]; then
+    fail_contract "Listing verifier steps unexpectedly ran receipt preflight"
+fi
+
+mkdir -p "$contract_root/.derivedData/verification"
+print -r -- 'authoritative-full-sentinel' \
+    > "$contract_root/.derivedData/verification/full-timings.tsv"
+exact_trace="$contract_root/exact.trace"
+: > "$exact_trace"
+STORNAUT_VERIFY_CONTRACT_TRACE="$exact_trace" \
+STORNAUT_VERIFY_CONTRACT_STAGE_STATUS=0 \
+    "$contract_root/scripts/verify" \
+    --full --step phase-c-trash-diagnostic-contract \
+    >"$contract_root/exact.log" 2>&1
+if [[ "$(<"$exact_trace")" != $'receipt\ndiagnostic-contract' ]]; then
+    fail_contract "Exact verifier step did not run receipt then stage once"
+fi
+if [[ "$(<"$contract_root/.derivedData/verification/full-timings.tsv")" \
+    != 'authoritative-full-sentinel' ]]; then
+    fail_contract "Exact verifier step overwrote authoritative full timings"
+fi
+exact_timing="$contract_root/.derivedData/verification/steps/full/phase-c-trash-diagnostic-contract-timings.tsv"
+if [[ ! -s "$exact_timing" ]] \
+    || (( $(wc -l < "$exact_timing") != 2 )); then
+    fail_contract "Exact verifier step did not persist isolated timing"
+fi
+require_fixed_text "$contract_root/exact.log" 'diagnostic only'
+if rg -q --fixed-strings 'Verification passed in full mode.' \
+    "$contract_root/exact.log"; then
+    fail_contract "Exact verifier step claimed authoritative full success"
+fi
+
+receipt_failure_trace="$contract_root/receipt-failure.trace"
+: > "$receipt_failure_trace"
+receipt_failure_status=0
+STORNAUT_VERIFY_CONTRACT_TRACE="$receipt_failure_trace" \
+STORNAUT_VERIFY_CONTRACT_RECEIPT_STATUS=74 \
+STORNAUT_VERIFY_CONTRACT_STAGE_STATUS=0 \
+    "$contract_root/scripts/verify" \
+    --full --step phase-c-trash-diagnostic-contract \
+    >"$contract_root/receipt-failure.log" 2>&1 \
+    || receipt_failure_status=$?
+if (( receipt_failure_status != 74 )); then
+    fail_contract \
+        "Exact verifier step did not preserve receipt failure status"
+fi
+if [[ "$(<"$receipt_failure_trace")" != receipt ]]; then
+    fail_contract "Exact verifier step ran after receipt preflight failed"
+fi
+
 diagnostic_contract_output="$contract_root/diagnostic-contract.log"
 if "$contract_root/scripts/verify" --full \
     >"$diagnostic_contract_output" 2>&1
@@ -747,5 +859,7 @@ if rg -qi 'XCUITest|verify-ui|peekaboo|Automation Mode|TCC' \
     "$workflow"; then
     fail_contract "Headless CI workflow references a host/UI-only gate"
 fi
+
+scripts/verify-clean-validation-snapshot-contract
 
 print "Verifier mode and CI contract verification passed."

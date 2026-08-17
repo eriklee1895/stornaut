@@ -71,7 +71,9 @@ func registeredActionProcessAuthorityLivesOutsideCore() throws {
 
 @Test
 func registeredActionRegistryResolvesOnlyFixedModeArguments() throws {
-    let fixtureURL = try fakeCleanerFixtureURL()
+    let fixture = try OwnedExecutableFixture(copying: fakeCleanerSourceURL())
+    defer { fixture.remove() }
+    let fixtureURL = fixture.executableURL
     let definition = RegisteredActionDefinition.fakeCleaner(
         executableURL: fixtureURL
     )
@@ -104,8 +106,63 @@ func registeredActionRegistryResolvesOnlyFixedModeArguments() throws {
 }
 
 @Test
+func registeredActionFixtureIsCanonicalExecutableAndTestOwned() throws {
+    let sourceURL = try fakeCleanerSourceURL()
+    let sourceData = try Data(contentsOf: sourceURL)
+    let sourceAttributes = try FileManager.default.attributesOfItem(
+        atPath: sourceURL.path
+    )
+    let first = try OwnedExecutableFixture(
+        copying: sourceURL,
+        baseDirectoryURL: URL(
+            fileURLWithPath: "/private/tmp",
+            isDirectory: true
+        )
+    )
+    let second = try OwnedExecutableFixture(copying: sourceURL)
+    defer {
+        first.remove()
+        second.remove()
+    }
+
+    #expect(first.executableURL == first.executableURL.standardizedFileURL)
+    #expect(second.executableURL == second.executableURL.standardizedFileURL)
+    #expect(first.rootURL != second.rootURL)
+    #expect(
+        FileManager.default.isExecutableFile(
+            atPath: first.executableURL.path
+        )
+    )
+    let registry = ActionRegistry(definitions: [
+        .fakeCleaner(executableURL: first.executableURL),
+    ])
+    let invocation = try registry.resolve(
+        RegisteredActionRequest(
+            id: "fixture.fake-cleaner",
+            mode: .success
+        )
+    )
+    #expect(invocation.executableURL == first.executableURL)
+
+    first.remove()
+    #expect(!FileManager.default.fileExists(atPath: first.rootURL.path))
+    #expect(FileManager.default.fileExists(atPath: second.executableURL.path))
+    #expect(try Data(contentsOf: sourceURL) == sourceData)
+    let currentSourceAttributes = try FileManager.default.attributesOfItem(
+        atPath: sourceURL.path
+    )
+    #expect(
+        currentSourceAttributes[FileAttributeKey.posixPermissions]
+            as? NSNumber
+            == sourceAttributes[FileAttributeKey.posixPermissions]
+                as? NSNumber
+    )
+}
+
+@Test
 func registeredActionDryRunDoesNotLaunchTheExecutable() async throws {
     let harness = try RegisteredActionHarness()
+    defer { harness.remove() }
     let runner = RegisteredActionRunnerSpy()
     let executor = registeredActionExecutor(
         policyGate: harness.gate,
@@ -138,6 +195,7 @@ func registeredActionDryRunDoesNotLaunchTheExecutable() async throws {
 @Test
 func registeredActionSuccessRunsFixtureAndReportsMeasuredEffects() async throws {
     let harness = try RegisteredActionHarness()
+    defer { harness.remove() }
     let executor = registeredActionExecutor(policyGate: harness.gate)
     let token = try executor.preflight(
         .runRegisteredAction(
@@ -165,11 +223,10 @@ func registeredActionSuccessRunsFixtureAndReportsMeasuredEffects() async throws 
 
 @Test
 func registeredActionNormalExitTerminatesSurvivingChild() async throws {
-    let fixtureURL = try fakeCleanerFixtureURL()
-    let pidFileURL = FileManager.default.temporaryDirectory.appending(
-        path: "stornaut-fake-cleaner-normal-exit-\(UUID().uuidString).pid"
-    )
-    defer { try? FileManager.default.removeItem(at: pidFileURL) }
+    let fixture = try OwnedExecutableFixture(copying: fakeCleanerSourceURL())
+    defer { fixture.remove() }
+    let fixtureURL = fixture.executableURL
+    let pidFileURL = fixture.rootURL.appending(path: "child.pid")
     let definition = RegisteredActionDefinition(
         id: "fixture.fake-cleaner-normal-exit",
         executableURL: fixtureURL,
@@ -215,6 +272,7 @@ func registeredActionNormalExitTerminatesSurvivingChild() async throws {
 @Test
 func registeredActionTimeoutTerminatesTheFixture() async throws {
     let harness = try RegisteredActionHarness(timeout: .milliseconds(100))
+    defer { harness.remove() }
     let executor = registeredActionExecutor(policyGate: harness.gate)
     let token = try executor.preflight(
         .runRegisteredAction(
@@ -240,11 +298,10 @@ func registeredActionTimeoutTerminatesTheFixture() async throws {
 
 @Test
 func registeredActionTimeoutTerminatesTheFixtureProcessGroup() async throws {
-    let fixtureURL = try fakeCleanerFixtureURL()
-    let pidFileURL = FileManager.default.temporaryDirectory.appending(
-        path: "stornaut-fake-cleaner-\(UUID().uuidString).pid"
-    )
-    defer { try? FileManager.default.removeItem(at: pidFileURL) }
+    let fixture = try OwnedExecutableFixture(copying: fakeCleanerSourceURL())
+    defer { fixture.remove() }
+    let fixtureURL = fixture.executableURL
+    let pidFileURL = fixture.rootURL.appending(path: "process-group.pid")
     let definition = RegisteredActionDefinition(
         id: "fixture.fake-cleaner-process-group",
         executableURL: fixtureURL,
@@ -254,7 +311,7 @@ func registeredActionTimeoutTerminatesTheFixtureProcessGroup() async throws {
             "PATH": "/usr/bin:/bin",
             "STORNAUT_FAKE_CLEANER_PID_FILE": pidFileURL.path,
         ],
-        timeout: .milliseconds(250),
+        timeout: .seconds(1),
         standardOutputLimit: 1_024,
         standardErrorLimit: 1_024
     ) { mode in
@@ -294,6 +351,7 @@ func registeredActionTimeoutTerminatesTheFixtureProcessGroup() async throws {
 @Test
 func registeredActionPostflightPreservesPartialFailure() async throws {
     let harness = try RegisteredActionHarness()
+    defer { harness.remove() }
     let executor = registeredActionExecutor(policyGate: harness.gate)
     let token = try executor.preflight(
         .runRegisteredAction(
@@ -319,19 +377,24 @@ func registeredActionPostflightPreservesPartialFailure() async throws {
     #expect(result.exitStatus == 3)
 }
 
-private struct RegisteredActionHarness {
+private final class RegisteredActionHarness {
+    private let fixture: OwnedExecutableFixture
     let definition: RegisteredActionDefinition
     let gate: ActionPolicyGate
 
     init(timeout: Duration = .seconds(10)) throws {
-        let fixtureURL = try fakeCleanerFixtureURL()
+        fixture = try OwnedExecutableFixture(copying: fakeCleanerSourceURL())
         definition = RegisteredActionDefinition.fakeCleaner(
-            executableURL: fixtureURL,
+            executableURL: fixture.executableURL,
             timeout: timeout
         )
         gate = ActionPolicyGate(
             registry: ActionRegistry(definitions: [definition])
         )
+    }
+
+    func remove() {
+        fixture.remove()
     }
 }
 
@@ -381,7 +444,7 @@ private final class RegisteredActionRunnerSpy:
     }
 }
 
-private func fakeCleanerFixtureURL() throws -> URL {
+private func fakeCleanerSourceURL() throws -> URL {
     let url = URL(filePath: #filePath)
         .deletingLastPathComponent()
         .deletingLastPathComponent()
@@ -390,6 +453,69 @@ private func fakeCleanerFixtureURL() throws -> URL {
         throw RegisteredActionTestError.fixtureIsNotExecutable
     }
     return url
+}
+
+private final class OwnedExecutableFixture {
+    let rootURL: URL
+    let executableURL: URL
+
+    init(
+        copying sourceURL: URL,
+        baseDirectoryURL: URL = FileManager.default.temporaryDirectory
+    ) throws {
+        let fileManager = FileManager.default
+        let canonicalBaseURL = baseDirectoryURL.standardizedFileURL
+        let candidateRootURL = canonicalBaseURL.appending(
+            path: "StornautOwnedExecutable-\(UUID().uuidString)",
+            directoryHint: .isDirectory
+        ).standardizedFileURL
+        let candidateExecutableURL = candidateRootURL.appending(
+            path: sourceURL.lastPathComponent
+        ).standardizedFileURL
+        var createdRoot = false
+
+        do {
+            try fileManager.createDirectory(
+                at: candidateRootURL,
+                withIntermediateDirectories: false,
+                attributes: [.posixPermissions: 0o700]
+            )
+            createdRoot = true
+            try fileManager.copyItem(
+                at: sourceURL,
+                to: candidateExecutableURL
+            )
+            try fileManager.setAttributes(
+                [.posixPermissions: 0o700],
+                ofItemAtPath: candidateExecutableURL.path
+            )
+            guard candidateRootURL == candidateRootURL.standardizedFileURL,
+                  candidateExecutableURL
+                    == candidateExecutableURL.standardizedFileURL,
+                  fileManager.isExecutableFile(
+                    atPath: candidateExecutableURL.path
+                  )
+            else {
+                throw RegisteredActionTestError.fixtureIsNotExecutable
+            }
+        } catch {
+            if createdRoot {
+                try? fileManager.removeItem(at: candidateRootURL)
+            }
+            throw error
+        }
+
+        rootURL = candidateRootURL
+        executableURL = candidateExecutableURL
+    }
+
+    func remove() {
+        try? FileManager.default.removeItem(at: rootURL)
+    }
+
+    deinit {
+        remove()
+    }
 }
 
 private func waitUntilProcessExits(_ pid: pid_t) async throws {

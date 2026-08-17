@@ -7,17 +7,20 @@ repo_root=${0:A:h:h}
 cd "$repo_root"
 
 function print_usage() {
-    print "Usage: scripts/verify [--headless|--full] [--list-steps]"
+    print "Usage: scripts/verify [--headless|--full] [--list-steps] [--step <name>]"
     print
     print "  --headless   Deterministic build/test gates for ordinary CI."
     print "  --full       Headless gates plus local XCUITest and performance evidence."
     print "  --list-steps Print the selected ordered step names without running them."
+    print "  --step <name> Run one mode-owned step for diagnostic only; dependencies are not run."
     print "  --help       Show this help."
 }
 
 mode=full
 mode_was_selected=false
 list_steps=false
+requested_step=""
+step_was_selected=false
 
 while (( $# > 0 )); do
     case $1 in
@@ -42,6 +45,21 @@ while (( $# > 0 )); do
         --list-steps)
             list_steps=true
             ;;
+        --step)
+            if [[ "$step_was_selected" == true ]]; then
+                print -u2 "Choose only one diagnostic verification step."
+                print_usage >&2
+                exit 64
+            fi
+            if (( $# < 2 )) || [[ "$2" == --* ]]; then
+                print -u2 -- "--step requires an exact step name."
+                print_usage >&2
+                exit 64
+            fi
+            requested_step=$2
+            step_was_selected=true
+            shift
+            ;;
         --help|-h)
             print_usage
             exit 0
@@ -54,9 +72,6 @@ while (( $# > 0 )); do
     esac
     shift
 done
-
-STORNAUT_PHASE_C_TRASH_EVIDENCE_ROOT= \
-    scripts/verify-phase-c-trash-receipt >/dev/null
 
 typeset -a headless_steps=(
     source-boundaries
@@ -102,13 +117,51 @@ else
     selected_steps=("${full_steps[@]}")
 fi
 
+function selected_mode_contains_step() {
+    local candidate=$1
+    local available_step
+    for available_step in "${selected_steps[@]}"; do
+        if [[ "$available_step" == "$candidate" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+if [[ "$step_was_selected" == true ]]; then
+    if [[ "$mode_was_selected" != true ]]; then
+        print -u2 -- "--step requires an explicit --headless or --full mode."
+        print_usage >&2
+        exit 64
+    fi
+    if [[ "$list_steps" == true ]]; then
+        print -u2 -- "--step cannot be combined with --list-steps."
+        print_usage >&2
+        exit 64
+    fi
+    if ! selected_mode_contains_step "$requested_step"; then
+        print -u2 \
+            "Verification step is not available in $mode mode: $requested_step"
+        print_usage >&2
+        exit 64
+    fi
+    selected_steps=("$requested_step")
+fi
+
 if [[ "$list_steps" == true ]]; then
     printf '%s\n' "${selected_steps[@]}"
     exit 0
 fi
 
+STORNAUT_PHASE_C_TRASH_EVIDENCE_ROOT= \
+    scripts/verify-phase-c-trash-receipt >/dev/null
+
 timing_temp=$(mktemp "${TMPDIR:-/tmp}/stornaut-verify-timings.XXXXXX")
-timing_file="$repo_root/.derivedData/verification/$mode-timings.tsv"
+if [[ "$step_was_selected" == true ]]; then
+    timing_file="$repo_root/.derivedData/verification/steps/$mode/$requested_step-timings.tsv"
+else
+    timing_file="$repo_root/.derivedData/verification/$mode-timings.tsv"
+fi
 trap 'rm -f "$timing_temp"' EXIT
 print -r -- $'mode\tstep\tseconds\tstatus' > "$timing_temp"
 
@@ -370,4 +423,10 @@ done
 
 persist_timings
 print "Verification timings: $timing_file"
-print "Verification passed in $mode mode."
+if [[ "$step_was_selected" == true ]]; then
+    print \
+        "Verification diagnostic only step passed: $requested_step ($mode scope)."
+    print "Authoritative $mode verification was not run."
+else
+    print "Verification passed in $mode mode."
+fi

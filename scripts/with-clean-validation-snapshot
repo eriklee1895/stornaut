@@ -1,0 +1,319 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+repo_parent=${repo_root:h}
+snapshot_source=commit
+requested_revision=HEAD
+source_was_selected=false
+
+function print_usage() {
+    print \
+        "Usage: scripts/with-clean-validation-snapshot [--commit <commit-ish>|--staged] -- <command> [args...]"
+    print
+    print "  --commit <commit-ish> Validate an exact existing commit (default: HEAD)."
+    print "  --staged              Validate the current index without unstaged or untracked files."
+    print "  --                    End snapshot options and start the command."
+}
+
+function fail_usage() {
+    print -u2 -- "$1"
+    print_usage >&2
+    exit 64
+}
+
+while (( $# > 0 )); do
+    case $1 in
+        --commit)
+            [[ "$source_was_selected" != true ]] \
+                || fail_usage "Choose only one snapshot source."
+            (( $# >= 2 )) && [[ "$2" != --* ]] \
+                || fail_usage "--commit requires a commit-ish."
+            snapshot_source=commit
+            requested_revision=$2
+            source_was_selected=true
+            shift 2
+            ;;
+        --staged)
+            [[ "$source_was_selected" != true ]] \
+                || fail_usage "Choose only one snapshot source."
+            snapshot_source=staged
+            source_was_selected=true
+            shift
+            ;;
+        --help|-h)
+            print_usage
+            exit 0
+            ;;
+        --)
+            shift
+            break
+            ;;
+        *)
+            fail_usage "Unknown snapshot argument: $1"
+            ;;
+    esac
+done
+
+(( $# > 0 )) || fail_usage "A validation command is required after --."
+[[ "$repo_root" == /Users/* ]] \
+    || fail_usage "Validation snapshots require a physical /Users repository path."
+[[ ! -L "$repo_root" && ! -L "$repo_parent" ]] \
+    || fail_usage "Validation snapshots reject symbolic-link repository paths."
+
+head_commit=$(
+    git -C "$repo_root" rev-parse --verify 'HEAD^{commit}' 2>/dev/null
+) || fail_usage "The repository has no valid HEAD commit."
+
+if [[ "$snapshot_source" == staged ]]; then
+    index_tree=$(git -C "$repo_root" write-tree 2>/dev/null) \
+        || fail_usage "The staged index cannot be written as a clean tree."
+    validation_commit=$(
+        print -r -- 'Stornaut staged validation snapshot' \
+            | env \
+                GIT_AUTHOR_NAME='Stornaut Validation' \
+                GIT_AUTHOR_EMAIL='stornaut-validation@example.invalid' \
+                GIT_COMMITTER_NAME='Stornaut Validation' \
+                GIT_COMMITTER_EMAIL='stornaut-validation@example.invalid' \
+                git -C "$repo_root" commit-tree \
+                    "$index_tree" -p "$head_commit"
+    ) || fail_usage "The staged tree could not be sealed as a validation commit."
+else
+    validation_commit=$(
+        git -C "$repo_root" rev-parse \
+            --verify "$requested_revision^{commit}" 2>/dev/null
+    ) || fail_usage "Invalid validation commit: $requested_revision"
+fi
+
+container=""
+function cleanup_snapshot_setup_and_exit() {
+    local setup_status=$1
+    trap - EXIT HUP INT TERM
+    if [[ -n "$container" && -d "$container" ]]; then
+        if ! rmdir "$container" >/dev/null 2>&1; then
+            print -u2 \
+                "Validation snapshot setup cleanup failed; retained exact path: $container"
+            exit 70
+        fi
+    fi
+    exit "$setup_status"
+}
+trap 'cleanup_snapshot_setup_and_exit $?' EXIT
+trap 'cleanup_snapshot_setup_and_exit 129' HUP
+trap 'cleanup_snapshot_setup_and_exit 130' INT
+trap 'cleanup_snapshot_setup_and_exit 143' TERM
+
+container=$(mktemp -d "$repo_parent/stornaut-validation.XXXXXX")
+snapshot_root="$container/worktree"
+worktree_add_started=false
+cleanup_completed=false
+active_command_pid=0
+pending_launch_signal_name=""
+pending_launch_signal_status=0
+
+[[ "${container:A:h}" == "$repo_parent" \
+    && "${container:t}" == stornaut-validation.* \
+    && ! -L "$container" \
+    && ! -e "$snapshot_root" ]] \
+    || fail_usage "The validation snapshot container is unsafe."
+
+function cleanup_snapshot() {
+    if [[ "$cleanup_completed" == true ]]; then
+        return 0
+    fi
+
+    local cleanup_rc=0
+    if [[ "$worktree_add_started" == true ]]; then
+        git -C "$repo_root" worktree remove --force -- \
+            "$snapshot_root" >/dev/null 2>&1 || cleanup_rc=$?
+    fi
+    if (( cleanup_rc == 0 )); then
+        rmdir "$container" >/dev/null 2>&1 || cleanup_rc=$?
+    fi
+    if (( cleanup_rc != 0 )); then
+        print -u2 \
+            "Validation snapshot cleanup failed; retained exact path: $container"
+        return "$cleanup_rc"
+    fi
+    cleanup_completed=true
+}
+
+function cleanup_snapshot_on_exit() {
+    local command_rc=$?
+    trap - EXIT
+    trap '' HUP INT TERM
+    if ! cleanup_snapshot; then
+        exit 70
+    fi
+    exit "$command_rc"
+}
+
+function cleanup_snapshot_on_signal() {
+    local signal_name=$1
+    local signal_status=$2
+    trap - EXIT
+    trap '' HUP INT TERM
+
+    if (( active_command_pid > 0 )); then
+        /bin/kill -"$signal_name" "$active_command_pid" \
+            >/dev/null 2>&1 || true
+        wait "$active_command_pid" >/dev/null 2>&1 || true
+        active_command_pid=0
+    fi
+    if ! cleanup_snapshot; then
+        exit 70
+    fi
+    exit "$signal_status"
+}
+
+function record_pending_launch_signal() {
+    if (( pending_launch_signal_status == 0 )); then
+        pending_launch_signal_name=$1
+        pending_launch_signal_status=$2
+    fi
+}
+
+trap cleanup_snapshot_on_exit EXIT
+trap 'cleanup_snapshot_on_signal HUP 129' HUP
+trap 'cleanup_snapshot_on_signal INT 130' INT
+trap 'cleanup_snapshot_on_signal TERM 143' TERM
+
+worktree_add_started=true
+git -C "$repo_root" worktree add --detach -- \
+    "$snapshot_root" "$validation_commit" >/dev/null
+
+observed_commit=$(git -C "$snapshot_root" rev-parse --verify HEAD)
+[[ "$observed_commit" == "$validation_commit" ]] \
+    || { print -u2 "Validation snapshot commit drifted."; exit 70; }
+[[ -z "$(
+    git -C "$snapshot_root" status --porcelain=v1 --untracked-files=all
+)" ]] || { print -u2 "Validation snapshot is not clean."; exit 70; }
+
+source_common_dir=$(
+    cd "$repo_root"
+    cd "$(git rev-parse --git-common-dir)"
+    pwd -P
+)
+snapshot_common_dir=$(
+    cd "$snapshot_root"
+    cd "$(git rev-parse --git-common-dir)"
+    pwd -P
+)
+[[ "$source_common_dir" == "$snapshot_common_dir" ]] \
+    || { print -u2 "Validation snapshot belongs to a foreign repository."; exit 70; }
+
+command_rc=0
+trap 'record_pending_launch_signal HUP 129' HUP
+trap 'record_pending_launch_signal INT 130' INT
+trap 'record_pending_launch_signal TERM 143' TERM
+/usr/bin/python3 - \
+    "$snapshot_root" \
+    "$validation_commit" \
+    "$snapshot_source" \
+    "$@" <<'PY' &
+import os
+import signal
+import subprocess
+import sys
+import time
+
+
+snapshot_root, validation_commit, snapshot_source, *command = sys.argv[1:]
+child = None
+pending_signal = None
+
+
+def process_group_exists(process_group_id):
+    try:
+        os.killpg(process_group_id, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def signal_process_group(signum):
+    if child is None:
+        return
+    try:
+        os.killpg(child.pid, signum)
+    except ProcessLookupError:
+        pass
+
+
+def record_signal(signum, _frame):
+    global pending_signal
+    pending_signal = signum
+    signal_process_group(signum)
+
+
+for handled_signal in (signal.SIGHUP, signal.SIGINT, signal.SIGTERM):
+    signal.signal(handled_signal, record_signal)
+
+environment = os.environ.copy()
+environment["STORNAUT_VALIDATION_COMMIT"] = validation_commit
+environment["STORNAUT_VALIDATION_SOURCE"] = snapshot_source
+child = subprocess.Popen(
+    command,
+    cwd=snapshot_root,
+    env=environment,
+    start_new_session=True,
+)
+if pending_signal is not None:
+    signal_process_group(pending_signal)
+
+while child.poll() is None and pending_signal is None:
+    time.sleep(0.01)
+
+if pending_signal is not None and child.poll() is None:
+    deadline = time.monotonic() + 1.0
+    while child.poll() is None and time.monotonic() < deadline:
+        time.sleep(0.01)
+    if child.poll() is None:
+        try:
+            os.killpg(child.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+child_status = child.wait()
+process_group_id = child.pid
+if process_group_exists(process_group_id):
+    try:
+        os.killpg(process_group_id, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    deadline = time.monotonic() + 1.0
+    while process_group_exists(process_group_id) and time.monotonic() < deadline:
+        time.sleep(0.01)
+    if process_group_exists(process_group_id):
+        try:
+            os.killpg(process_group_id, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+if pending_signal is not None:
+    raise SystemExit(128 + pending_signal)
+if child_status < 0:
+    raise SystemExit(128 - child_status)
+raise SystemExit(child_status)
+PY
+active_command_pid=$!
+trap 'cleanup_snapshot_on_signal HUP 129' HUP
+trap 'cleanup_snapshot_on_signal INT 130' INT
+trap 'cleanup_snapshot_on_signal TERM 143' TERM
+if (( pending_launch_signal_status != 0 )); then
+    cleanup_snapshot_on_signal \
+        "$pending_launch_signal_name" \
+        "$pending_launch_signal_status"
+fi
+wait "$active_command_pid" || command_rc=$?
+active_command_pid=0
+
+trap '' HUP INT TERM
+if ! cleanup_snapshot; then
+    exit 70
+fi
+trap - EXIT
+exit "$command_rc"

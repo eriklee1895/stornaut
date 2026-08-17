@@ -90,7 +90,7 @@ func successfulFakeProcessUsesFixedProtocolArgumentsAndSeparatesStderr() async t
 @Test
 func concurrentSpawnsDoNotInheritSiblingPipes() async throws {
     let fixtures = try (0..<7).map { _ in
-        try CodexProcessFixture(mode: "success")
+        try CodexProcessFixture(mode: "wait-for-release")
     }
     defer {
         for fixture in fixtures {
@@ -98,26 +98,42 @@ func concurrentSpawnsDoNotInheritSiblingPipes() async throws {
         }
     }
 
-    let actionURL = URL(filePath: #filePath)
+    let actionSourceURL = URL(filePath: #filePath)
         .deletingLastPathComponent()
         .deletingLastPathComponent()
         .deletingLastPathComponent()
         .appending(path: "Tests/Fixtures/Actions/fake-cleaner.sh")
+    let actionFixture = try CodexOwnedExecutableFixture(
+        copying: actionSourceURL
+    )
+    defer { actionFixture.remove() }
+    let actionReadyURL = actionFixture.rootURL.appending(
+        path: "action.pid"
+    )
     let invocation = RegisteredActionInvocation(
         id: "fixture.fake-cleaner",
         mode: .success,
-        executableURL: actionURL,
-        arguments: ["success"],
+        executableURL: actionFixture.executableURL,
+        arguments: ["success-after-files"] + fixtures.map {
+            $0.recordURL(named: "pid.txt").path
+        },
         environment: [
             "LANG": "C",
             "LC_ALL": "C",
             "PATH": "/usr/bin:/bin",
+            "STORNAUT_FAKE_CLEANER_PID_FILE": actionReadyURL.path,
         ],
-        timeout: .seconds(2),
+        timeout: .seconds(10),
         standardOutputLimit: 16_384,
         standardErrorLimit: 4_096
     )
 
+    let clock = ContinuousClock()
+    let started = clock.now
+    async let actionOutput = FoundationRegisteredActionRunner().run(
+        invocation
+    )
+    try await waitForFile(actionReadyURL)
     async let codexResults = withThrowingTaskGroup(
         of: [CodexProcessEvent].self
     ) { group in
@@ -125,7 +141,7 @@ func concurrentSpawnsDoNotInheritSiblingPipes() async throws {
             group.addTask {
                 try await collectEvents(
                     from: CodexProcess().run(
-                        fixture.makeRequest(timeout: .seconds(10))
+                        fixture.makeRequest(timeout: .seconds(30))
                     )
                 )
             }
@@ -137,9 +153,31 @@ func concurrentSpawnsDoNotInheritSiblingPipes() async throws {
         }
         return collected
     }
-    async let actionOutput = FoundationRegisteredActionRunner().run(invocation)
+    let releaseURLs = fixtures.map(\.releaseURL)
+    let watchdog = Task {
+        try await Task.sleep(for: .seconds(8))
+        for releaseURL in releaseURLs {
+            try Data("release".utf8).write(to: releaseURL)
+        }
+    }
+    defer {
+        watchdog.cancel()
+        for fixture in fixtures {
+            try? fixture.release()
+        }
+    }
 
-    let (results, output) = try await (codexResults, actionOutput)
+    let output = try await actionOutput
+    let actionDuration = started.duration(to: clock.now)
+    watchdog.cancel()
+    _ = try? await watchdog.value
+    for fixture in fixtures {
+        try fixture.release()
+    }
+    let results = try await codexResults
+
+    #expect(output.exitStatus == 0)
+    #expect(actionDuration < .seconds(6))
     #expect(results.count == fixtures.count)
     #expect(results.allSatisfy {
         $0.contains(.completed(
@@ -150,7 +188,6 @@ func concurrentSpawnsDoNotInheritSiblingPipes() async throws {
             )
         ))
     })
-    #expect(output.exitStatus == 0)
 }
 
 @Test
@@ -535,6 +572,14 @@ private struct CodexProcessFixture {
             .appending(path: name)
     }
 
+    var releaseURL: URL {
+        workingDirectoryURL.appending(path: ".fake-release")
+    }
+
+    func release() throws {
+        try Data("release".utf8).write(to: releaseURL)
+    }
+
     func recordedString(named name: String) throws -> String {
         try String(contentsOf: recordURL(named: name), encoding: .utf8)
     }
@@ -554,6 +599,72 @@ private struct CodexProcessFixture {
     func remove() {
         try? FileManager.default.removeItem(at: root)
     }
+}
+
+private final class CodexOwnedExecutableFixture {
+    let rootURL: URL
+    let executableURL: URL
+
+    init(
+        copying sourceURL: URL,
+        baseDirectoryURL: URL = FileManager.default.temporaryDirectory
+    ) throws {
+        let fileManager = FileManager.default
+        let canonicalBaseURL = baseDirectoryURL.standardizedFileURL
+        let candidateRootURL = canonicalBaseURL.appending(
+            path: "StornautCodexOwnedExecutable-\(UUID().uuidString)",
+            directoryHint: .isDirectory
+        ).standardizedFileURL
+        let candidateExecutableURL = candidateRootURL.appending(
+            path: sourceURL.lastPathComponent
+        ).standardizedFileURL
+        var createdRoot = false
+
+        do {
+            try fileManager.createDirectory(
+                at: candidateRootURL,
+                withIntermediateDirectories: false,
+                attributes: [.posixPermissions: 0o700]
+            )
+            createdRoot = true
+            try fileManager.copyItem(
+                at: sourceURL,
+                to: candidateExecutableURL
+            )
+            try fileManager.setAttributes(
+                [.posixPermissions: 0o700],
+                ofItemAtPath: candidateExecutableURL.path
+            )
+            guard candidateExecutableURL
+                == candidateExecutableURL.standardizedFileURL,
+                  fileManager.isExecutableFile(
+                    atPath: candidateExecutableURL.path
+                  )
+            else {
+                throw CodexOwnedExecutableFixtureError.notExecutable
+            }
+        } catch {
+            if createdRoot {
+                try? fileManager.removeItem(at: candidateRootURL)
+            }
+            throw error
+        }
+
+        rootURL = candidateRootURL
+        executableURL = candidateExecutableURL
+    }
+
+    func remove() {
+        try? FileManager.default.removeItem(at: rootURL)
+    }
+
+    deinit {
+        remove()
+    }
+}
+
+private enum CodexOwnedExecutableFixtureError: Error {
+    case notExecutable
 }
 
 private func collectEvents(

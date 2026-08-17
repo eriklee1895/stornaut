@@ -32,6 +32,12 @@ case "$mode" in
         printf '%s\n' 'diagnostic only' >&2
         emit_success
         ;;
+    wait-for-release)
+        while [ ! -s "$PWD/.fake-release" ]; do
+            sleep 0.01
+        done
+        emit_success
+        ;;
     invalid-envelope)
         printf '%s\n' '{"type":"thread.started","thread_id":"thread-fake"}'
         printf '%s\n' '{"type":"item.completed","item":{"id":"message-fake","type":"agent_message","text":"{\"summary\":\"Missing required fields\"}"}}'
