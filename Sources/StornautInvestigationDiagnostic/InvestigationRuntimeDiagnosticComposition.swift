@@ -34,6 +34,7 @@ public final class InvestigationRuntimeDiagnosticComposition:
     public let storePath: String
     public let helperExecutablePath: String
     public let hasRuntimeFacade: Bool
+    package let configurationSHA256: String
 
     private let runtimeFacade: InvestigationRuntimeDiagnosticFacade
     private let transportOwner:
@@ -46,6 +47,7 @@ public final class InvestigationRuntimeDiagnosticComposition:
         investigationID: InvestigationID,
         storePath: String,
         helperExecutablePath: String,
+        configurationSHA256: String,
         runtimeFacade: InvestigationRuntimeDiagnosticFacade,
         transportOwner: InvestigationRuntimeDiagnosticTransportOwner,
         retirementEvidenceStore:
@@ -55,6 +57,7 @@ public final class InvestigationRuntimeDiagnosticComposition:
         self.investigationID = investigationID.rawValue
         self.storePath = storePath
         self.helperExecutablePath = helperExecutablePath
+        self.configurationSHA256 = configurationSHA256
         hasRuntimeFacade = true
         self.runtimeFacade = runtimeFacade
         self.transportOwner = transportOwner
@@ -136,9 +139,12 @@ public final class InvestigationRuntimeDiagnosticComposition:
             )
             let retirementEvidenceStore =
                 InvestigationLifecycleRetirementEvidenceStore()
+            let configurationSHA256 =
+                try configuration.machineConfigurationSHA256()
             let lifecycleTransport =
                 try InvestigationLifecycleAppServerTransport(
                     investigationID: lifecycleID,
+                    configurationSHA256: configurationSHA256,
                     validBefore: configuration.validBefore,
                     maximumLineBytes:
                         LifecycleInteractiveSessionRequest
@@ -226,6 +232,7 @@ public final class InvestigationRuntimeDiagnosticComposition:
                 storePath: configuration.storePath,
                 helperExecutablePath:
                     installation.helperExecutableURL.path,
+                configurationSHA256: configurationSHA256,
                 runtimeFacade: facade,
                 transportOwner: transportOwner,
                 retirementEvidenceStore: retirementEvidenceStore

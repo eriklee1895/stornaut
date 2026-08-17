@@ -20,15 +20,19 @@ package struct InvestigationLifecycleRetirementEvidence:
     Sendable,
     Equatable
 {
+    package let machineRetirementHandle:
+        LifecycleMachineRetirementHandle
     package let residueObservation:
         LifecycleInvestigationResidueObservation
     package let helperProcessIdentity: LifecycleProcessIdentity
     package let helperAttestedAt: Date
 
     fileprivate init(
+        machineRetirementHandle: LifecycleMachineRetirementHandle,
         residueObservation: LifecycleInvestigationResidueObservation,
         helperPeer: LifecycleConnectedHelperPeer
     ) {
+        self.machineRetirementHandle = machineRetirementHandle
         self.residueObservation = residueObservation
         helperProcessIdentity = helperPeer.identity
         helperAttestedAt = helperPeer.attestedAt
@@ -80,6 +84,7 @@ package actor InvestigationLifecycleAppServerTransport:
     }
 
     private let investigationID: LifecycleInvestigationID
+    private let configurationSHA256: String
     private let expectedUserID: UInt32
     private let validBefore: Date
     private let maximumLineBytes: Int
@@ -107,6 +112,7 @@ package actor InvestigationLifecycleAppServerTransport:
 
     package init(
         investigationID: LifecycleInvestigationID,
+        configurationSHA256: String,
         validBefore: Date,
         maximumLineBytes: Int,
         maximumSessionBytes: Int,
@@ -122,6 +128,7 @@ package actor InvestigationLifecycleAppServerTransport:
             validBefore.timeIntervalSince1970.isFinite,
             validBefore > current,
             validBefore.timeIntervalSince(current) <= 900,
+            validRuntimeSHA256(configurationSHA256),
             (1...LifecycleInteractiveSessionRequest
                 .maximumAllowedLineBytes).contains(maximumLineBytes),
             maximumSessionBytes >= maximumLineBytes,
@@ -133,6 +140,7 @@ package actor InvestigationLifecycleAppServerTransport:
                 .invalidConfiguration
         }
         self.investigationID = investigationID
+        self.configurationSHA256 = configurationSHA256
         self.expectedUserID = expectedUserID
         self.validBefore = validBefore
         self.maximumLineBytes = maximumLineBytes
@@ -163,6 +171,7 @@ package actor InvestigationLifecycleAppServerTransport:
             let request = try LifecycleInteractiveSessionRequest.write(
                 investigationID: investigationID,
                 operationID: operationID(),
+                configurationSHA256: configurationSHA256,
                 line: line
             )
             try Task.checkCancellation()
@@ -190,9 +199,10 @@ package actor InvestigationLifecycleAppServerTransport:
                     .invalidState
             }
             try requireUnexpired()
-            let request = LifecycleInteractiveSessionRequest.read(
+            let request = try LifecycleInteractiveSessionRequest.read(
                 investigationID: investigationID,
-                operationID: try operationID()
+                operationID: operationID(),
+                configurationSHA256: configurationSHA256
             )
             try Task.checkCancellation()
             let response = try await session.send(request)
@@ -240,9 +250,10 @@ package actor InvestigationLifecycleAppServerTransport:
             }
             state = .retiring
             let retirementStartedAt = now()
-            let request = LifecycleInteractiveSessionRequest.retire(
+            let request = try LifecycleInteractiveSessionRequest.retire(
                 investigationID: investigationID,
-                operationID: try operationID()
+                operationID: operationID(),
+                configurationSHA256: configurationSHA256
             )
             let response = try await session.send(request)
             guard
@@ -264,6 +275,14 @@ package actor InvestigationLifecycleAppServerTransport:
                 validated.drained == true,
                 validated.ownerRetirementObservation
                     == .retiredOwnedResources,
+                let machineRetirementHandle =
+                    validated.machineRetirementHandle,
+                machineRetirementHandle.investigationID
+                    == investigationID,
+                machineRetirementHandle.retireOperationID
+                    == request.operationID,
+                machineRetirementHandle.configurationSHA256
+                    == configurationSHA256,
                 let observation = validated.residueObservation
             else {
                 throw InvestigationLifecycleAppServerTransportError
@@ -288,6 +307,7 @@ package actor InvestigationLifecycleAppServerTransport:
                     .drainUnconfirmed
             }
             let evidence = InvestigationLifecycleRetirementEvidence(
+                machineRetirementHandle: machineRetirementHandle,
                 residueObservation: observation,
                 helperPeer: helperPeer
             )
@@ -337,6 +357,7 @@ package actor InvestigationLifecycleAppServerTransport:
             let request = try LifecycleInteractiveSessionRequest.start(
                 investigationID: investigationID,
                 operationID: operationID(),
+                configurationSHA256: configurationSHA256,
                 validBefore: validBefore,
                 maximumLineBytes: maximumLineBytes,
                 maximumSessionBytes: maximumSessionBytes
@@ -482,4 +503,12 @@ package actor InvestigationLifecycleAppServerTransport:
         }
         return .transportFailed
     }
+}
+
+private func validRuntimeSHA256(_ value: String) -> Bool {
+    value.count == 64
+        && value.unicodeScalars.allSatisfy {
+            (0x30...0x39).contains($0.value)
+                || (0x61...0x66).contains($0.value)
+        }
 }

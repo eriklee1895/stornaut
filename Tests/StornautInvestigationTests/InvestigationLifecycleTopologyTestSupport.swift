@@ -112,6 +112,7 @@ struct LifecycleTopologyCollectorFixture {
         let operationID = UUID(
             uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
         )!
+        let configurationSHA256 = String(repeating: "a", count: 64)
         let session = CollectorLifecycleSession(
             helperIdentity: helperIdentity,
             helperAttestedAt: now,
@@ -120,6 +121,14 @@ struct LifecycleTopologyCollectorFixture {
                 operationID: operationID,
                 drained: true,
                 ownerRetirementObservation: .retiredOwnedResources,
+                machineRetirementHandle:
+                    try LifecycleMachineRetirementHandle(
+                        token: UUID(),
+                        investigationID: investigationID,
+                        retireOperationID: operationID,
+                        configurationSHA256: configurationSHA256,
+                        validBefore: now.addingTimeInterval(30)
+                    ),
                 residueObservation:
                     try LifecycleInvestigationResidueObservation(
                         investigationID: investigationID,
@@ -136,6 +145,7 @@ struct LifecycleTopologyCollectorFixture {
         let store = InvestigationLifecycleRetirementEvidenceStore()
         let transport = try InvestigationLifecycleAppServerTransport(
             investigationID: investigationID,
+            configurationSHA256: configurationSHA256,
             validBefore: now.addingTimeInterval(30),
             maximumLineBytes: 1_024,
             maximumSessionBytes: 8_192,

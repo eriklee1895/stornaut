@@ -11,6 +11,7 @@ struct LifecycleInteractiveSessionContractTests {
             try .start(
                 investigationID: fixture.investigationID,
                 operationID: fixture.operationID,
+                configurationSHA256: fixture.configurationSHA256,
                 validBefore: fixture.validBefore,
                 maximumLineBytes: 1_024,
                 maximumSessionBytes: 8_192
@@ -18,15 +19,18 @@ struct LifecycleInteractiveSessionContractTests {
             try .write(
                 investigationID: fixture.investigationID,
                 operationID: fixture.operationID,
+                configurationSHA256: fixture.configurationSHA256,
                 line: Data("{\"id\":1}\n".utf8)
             ),
-            .read(
+            try .read(
                 investigationID: fixture.investigationID,
-                operationID: fixture.operationID
+                operationID: fixture.operationID,
+                configurationSHA256: fixture.configurationSHA256
             ),
-            .retire(
+            try .retire(
                 investigationID: fixture.investigationID,
-                operationID: fixture.operationID
+                operationID: fixture.operationID,
+                configurationSHA256: fixture.configurationSHA256
             ),
         ]
 
@@ -87,7 +91,7 @@ struct LifecycleInteractiveSessionContractTests {
                 JSONSerialization.jsonObject(with: encoded)
                     as? [String: Any]
             )
-            #expect(object["protocolVersion"] as? Int == 3)
+            #expect(object["protocolVersion"] as? Int == 4)
             #expect(
                 try JSONDecoder().decode(
                     LifecycleInteractiveSessionResponse.self,
@@ -291,6 +295,162 @@ struct LifecycleInteractiveSessionContractTests {
     }
 
     @Test
+    func rootHelperRecordsRetirementBeforeReplyAndAwaitsClaimAfterDisconnect()
+        throws
+    {
+        let repositoryRoot = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "StornautLifecycleHelper/main.swift"
+            ),
+            encoding: .utf8
+        )
+        let retireStart = try #require(
+            source.range(
+                of: "if pending.request.kind == .retire {\n"
+                    + "            guard let ownerRetirementObservation"
+            )
+        )
+        let suffix = source[retireStart.lowerBound...]
+        let retireEnd = try #require(
+            suffix.range(of: "\n            return\n        }")
+        )
+        let retireBody = String(suffix[..<retireEnd.upperBound])
+        let record = try #require(
+            retireBody.range(of: "recordMachineRetirementEscrow(")
+        )
+        let sealedResponse = try #require(
+            retireBody.range(of: "let sealedResponse")
+        )
+        let reply = try #require(
+            retireBody.range(
+                of: "pending.reply(",
+                range: sealedResponse.lowerBound..<retireBody.endIndex
+            )
+        )
+        #expect(record.lowerBound < reply.lowerBound)
+        #expect(source.contains("let handle = try retirementEscrow.record("))
+        #expect(source.contains("guard !invalidated else"))
+        #expect(source.contains("interactiveRouteClosed = true"))
+        #expect(source.contains("!interactiveRouteClosed"))
+        #expect(
+            retireBody.contains("scheduleRetirementClaimDeadline(")
+        )
+        #expect(retireBody.contains("machineRetirementHandle: handle"))
+        #expect(!retireBody.contains("scheduleSuccessfulExitAfterReply()"))
+
+        let invalidationStart = try #require(
+            source.range(of: "func invalidateAndDrain() {")
+        )
+        let invalidationSuffix = source[invalidationStart.lowerBound...]
+        let invalidationEnd = try #require(
+            invalidationSuffix.range(of: "\n    }\n\n#if DEBUG")
+        )
+        let invalidationBody = String(
+            invalidationSuffix[..<invalidationEnd.upperBound]
+        )
+        #expect(
+            invalidationBody.contains("retirementEscrow.isAwaitingClaim")
+        )
+        #expect(
+            invalidationBody.contains("preserveRetirementEscrow")
+        )
+
+        let legacyStart = try #require(
+            source.range(
+                of: "case let .start(\n"
+                    + "            investigationID,\n"
+                    + "            evidenceBindingSHA256"
+            )
+        )
+        let legacySuffix = source[legacyStart.lowerBound...]
+        let legacyEnd = try #require(
+            legacySuffix.range(
+                of: "\n    }\n\n#if DEBUG\n"
+                    + "    private func admitAndEnqueueLegacyStart("
+            )
+        )
+        let legacyBody = String(legacySuffix[..<legacyEnd.upperBound])
+        #expect(legacyBody.contains("interactiveRouteClosed"))
+        #expect(legacyBody.contains("retirementEscrow.isAwaitingClaim"))
+    }
+
+    @Test
+    func rootHelperLinearizesInteractiveAdmissionQueueAndDispatchEpoch()
+        throws
+    {
+        let repositoryRoot = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let helperSource = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "StornautLifecycleHelper/main.swift"
+            ),
+            encoding: .utf8
+        )
+        let contractSource = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "Sources/StornautLifecycle/"
+                    + "LifecycleInteractiveSessionContract.swift"
+            ),
+            encoding: .utf8
+        )
+
+        #expect(!contractSource.contains("public func validatedResponse("))
+        #expect(helperSource.contains("private func validateWorkerReply("))
+
+        let admissionStart = try #require(
+            helperSource.range(of: "private func admitAndEnqueueInteractive(")
+        )
+        let admissionSuffix = helperSource[admissionStart.lowerBound...]
+        let admissionEnd = try #require(
+            admissionSuffix.range(
+                of: "\n    }\n#endif\n\n    func invalidateAndDrain()"
+            )
+        )
+        let admissionBody = String(
+            admissionSuffix[..<admissionEnd.upperBound]
+        )
+        let lock = try #require(
+            admissionBody.range(of: "lock.withLock")
+        )
+        let enqueue = try #require(
+            admissionBody.range(of: "operationQueue.async")
+        )
+        #expect(lock.lowerBound < enqueue.lowerBound)
+        #expect(admissionBody.contains("interactivePending[decoded.operationID] = pending"))
+
+        let dispatchStart = try #require(
+            helperSource.range(of: "private func dispatchInteractive(")
+        )
+        let dispatchSuffix = helperSource[dispatchStart.lowerBound...]
+        let dispatchEnd = try #require(
+            dispatchSuffix.range(of: "\n    }\n\n    private func startInteractiveWorker(")
+        )
+        let dispatchBody = String(dispatchSuffix[..<dispatchEnd.upperBound])
+        #expect(dispatchBody.contains("interactiveDispatchStillAdmitted("))
+        #expect(dispatchBody.contains("failInteractiveOperation("))
+
+        #expect(helperSource.contains("private func admitAndEnqueueLegacyStart("))
+        #expect(helperSource.contains("legacyRunStillAdmitted("))
+        let runStart = try #require(
+            helperSource.range(of: "private func run(\n")
+        )
+        let runSuffix = helperSource[runStart.lowerBound...]
+        let userRead = try #require(
+            runSuffix.range(of: "let userIdentity = try LifecycleUserIdentity.read(")
+        )
+        let epochCheck = try #require(
+            runSuffix.range(of: "legacyRunStillAdmitted(")
+        )
+        #expect(epochCheck.lowerBound < userRead.lowerBound)
+    }
+
+    @Test
     func workerReplyRejectsUnknownMissingAndAmbiguousPayloads() throws {
         let fixture = LifecycleInteractiveSessionFixture()
         let response = LifecycleInteractiveSessionResponse.started(
@@ -352,9 +512,10 @@ struct LifecycleInteractiveSessionContractTests {
     {
         let fixture = LifecycleInteractiveSessionFixture()
         let valid = try JSONEncoder().encode(
-            LifecycleInteractiveSessionRequest.read(
+            try LifecycleInteractiveSessionRequest.read(
                 investigationID: fixture.investigationID,
-                operationID: fixture.operationID
+                operationID: fixture.operationID,
+                configurationSHA256: fixture.configurationSHA256
             )
         )
         let object = try #require(
@@ -403,6 +564,7 @@ struct LifecycleInteractiveSessionContractTests {
             _ = try LifecycleInteractiveSessionRequest.start(
                 investigationID: fixture.investigationID,
                 operationID: fixture.operationID,
+                configurationSHA256: fixture.configurationSHA256,
                 validBefore: Date(timeIntervalSince1970: .infinity),
                 maximumLineBytes: 1_024,
                 maximumSessionBytes: 8_192
@@ -415,6 +577,7 @@ struct LifecycleInteractiveSessionContractTests {
             _ = try LifecycleInteractiveSessionRequest.start(
                 investigationID: fixture.investigationID,
                 operationID: fixture.operationID,
+                configurationSHA256: fixture.configurationSHA256,
                 validBefore: fixture.validBefore,
                 maximumLineBytes: 0,
                 maximumSessionBytes: 8_192
@@ -427,6 +590,7 @@ struct LifecycleInteractiveSessionContractTests {
             _ = try LifecycleInteractiveSessionRequest.write(
                 investigationID: fixture.investigationID,
                 operationID: fixture.operationID,
+                configurationSHA256: fixture.configurationSHA256,
                 line: Data("{}".utf8)
             )
         }
@@ -437,6 +601,7 @@ struct LifecycleInteractiveSessionContractTests {
             _ = try LifecycleInteractiveSessionRequest.write(
                 investigationID: fixture.investigationID,
                 operationID: fixture.operationID,
+                configurationSHA256: fixture.configurationSHA256,
                 line: Data([0x7B, 0x00, 0x7D, 0x0A])
             )
         }
@@ -455,9 +620,10 @@ struct LifecycleInteractiveSessionContractTests {
     @Test
     func responseIdentityMustMatchTheExactRequest() throws {
         let fixture = LifecycleInteractiveSessionFixture()
-        let request = LifecycleInteractiveSessionRequest.read(
+        let request = try LifecycleInteractiveSessionRequest.read(
             investigationID: fixture.investigationID,
-            operationID: fixture.operationID
+            operationID: fixture.operationID,
+            configurationSHA256: fixture.configurationSHA256
         )
         let matching = try LifecycleInteractiveSessionResponse.line(
             investigationID: fixture.investigationID,
@@ -480,11 +646,56 @@ struct LifecycleInteractiveSessionContractTests {
     }
 
     @Test
+    func ownedOuterRetirementRequiresTheExactClaimHandle() throws {
+        let fixture = LifecycleInteractiveSessionFixture()
+        let request = try LifecycleInteractiveSessionRequest.retire(
+            investigationID: fixture.investigationID,
+            operationID: fixture.operationID,
+            configurationSHA256: fixture.configurationSHA256
+        )
+        let unsealed = LifecycleInteractiveSessionResponse.retired(
+            investigationID: fixture.investigationID,
+            operationID: fixture.operationID,
+            drained: true,
+            ownerRetirementObservation: .retiredOwnedResources
+        )
+
+        #expect(
+            throws: LifecycleInteractiveSessionContractError.identityMismatch
+        ) {
+            _ = try unsealed.validated(for: request)
+        }
+
+        var object = try #require(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(unsealed)
+            ) as? [String: Any]
+        )
+        object["machineRetirementHandle"] = NSNull()
+        let decoded = try JSONDecoder().decode(
+            LifecycleInteractiveSessionResponse.self,
+            from: JSONSerialization.data(withJSONObject: object)
+        )
+        #expect(
+            throws: LifecycleInteractiveSessionContractError.identityMismatch
+        ) {
+            _ = try decoded.validated(for: request)
+        }
+
+        let workerReply = LifecycleInteractiveWorkerReply(
+            operationID: fixture.operationID,
+            response: unsealed
+        )
+        #expect(workerReply.response == unsealed)
+    }
+
+    @Test
     func interactiveXPCReplyResolverCompletesExactlyOnce() async throws {
         let fixture = LifecycleInteractiveSessionFixture()
-        let request = LifecycleInteractiveSessionRequest.read(
+        let request = try LifecycleInteractiveSessionRequest.read(
             investigationID: fixture.investigationID,
-            operationID: fixture.operationID
+            operationID: fixture.operationID,
+            configurationSHA256: fixture.configurationSHA256
         )
         let response = try LifecycleInteractiveSessionResponse.line(
             investigationID: fixture.investigationID,
@@ -513,9 +724,10 @@ struct LifecycleInteractiveSessionContractTests {
         async
     {
         let fixture = LifecycleInteractiveSessionFixture()
-        let request = LifecycleInteractiveSessionRequest.read(
+        let request = try! LifecycleInteractiveSessionRequest.read(
             investigationID: fixture.investigationID,
-            operationID: fixture.operationID
+            operationID: fixture.operationID,
+            configurationSHA256: fixture.configurationSHA256
         )
         let foreign = try! LifecycleInteractiveSessionResponse.line(
             investigationID: fixture.investigationID,
@@ -580,9 +792,10 @@ struct LifecycleInteractiveSessionContractTests {
     @Test
     func interactiveXPCReplyResolverTimesOutExactlyOnce() async {
         let fixture = LifecycleInteractiveSessionFixture()
-        let request = LifecycleInteractiveSessionRequest.read(
+        let request = try! LifecycleInteractiveSessionRequest.read(
             investigationID: fixture.investigationID,
-            operationID: fixture.operationID
+            operationID: fixture.operationID,
+            configurationSHA256: fixture.configurationSHA256
         )
 
         await #expect(
@@ -604,9 +817,10 @@ struct LifecycleInteractiveSessionContractTests {
     @Test
     func interactiveXPCReplyResolverOrdersCancellationBeforeDispatch() async {
         let fixture = LifecycleInteractiveSessionFixture()
-        let request = LifecycleInteractiveSessionRequest.read(
+        let request = try! LifecycleInteractiveSessionRequest.read(
             investigationID: fixture.investigationID,
-            operationID: fixture.operationID
+            operationID: fixture.operationID,
+            configurationSHA256: fixture.configurationSHA256
         )
 
         await #expect(
@@ -630,9 +844,10 @@ struct LifecycleInteractiveSessionContractTests {
         async throws
     {
         let fixture = LifecycleInteractiveSessionFixture()
-        let request = LifecycleInteractiveSessionRequest.read(
+        let request = try LifecycleInteractiveSessionRequest.read(
             investigationID: fixture.investigationID,
-            operationID: fixture.operationID
+            operationID: fixture.operationID,
+            configurationSHA256: fixture.configurationSHA256
         )
         let response = try LifecycleInteractiveSessionResponse.line(
             investigationID: fixture.investigationID,
@@ -661,9 +876,10 @@ struct LifecycleInteractiveSessionContractTests {
         async throws
     {
         let fixture = LifecycleInteractiveSessionFixture()
-        let request = LifecycleInteractiveSessionRequest.retire(
+        let request = try LifecycleInteractiveSessionRequest.retire(
             investigationID: fixture.investigationID,
-            operationID: fixture.operationID
+            operationID: fixture.operationID,
+            configurationSHA256: fixture.configurationSHA256
         )
         let response = LifecycleInteractiveSessionResponse.retired(
             investigationID: fixture.investigationID,
@@ -690,9 +906,10 @@ struct LifecycleInteractiveSessionContractTests {
     @Test
     func interactiveXPCReplyResolverSanitizesRemoteRejection() async {
         let fixture = LifecycleInteractiveSessionFixture()
-        let request = LifecycleInteractiveSessionRequest.retire(
+        let request = try! LifecycleInteractiveSessionRequest.retire(
             investigationID: fixture.investigationID,
-            operationID: fixture.operationID
+            operationID: fixture.operationID,
+            configurationSHA256: fixture.configurationSHA256
         )
 
         await #expect(
@@ -756,9 +973,10 @@ struct LifecycleInteractiveSessionContractTests {
         async
     {
         let fixture = LifecycleInteractiveSessionFixture()
-        let request = LifecycleInteractiveSessionRequest.read(
+        let request = try! LifecycleInteractiveSessionRequest.read(
             investigationID: fixture.investigationID,
-            operationID: fixture.operationID
+            operationID: fixture.operationID,
+            configurationSHA256: fixture.configurationSHA256
         )
         for reasonKey in [
             "runtime.lifecycle.interactive.session-expired",
@@ -795,5 +1013,6 @@ private struct LifecycleInteractiveSessionFixture {
     let operationID = UUID(
         uuidString: "92929292-9292-4292-8292-929292929292"
     )!
+    let configurationSHA256 = String(repeating: "a", count: 64)
     let validBefore = Date(timeIntervalSince1970: 2_000_000_000)
 }

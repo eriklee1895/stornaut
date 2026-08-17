@@ -5,17 +5,20 @@ public struct LifecycleInteractiveWorkerConfiguration:
     Equatable
 {
     public let investigationID: LifecycleInvestigationID
+    public let configurationSHA256: String
     public let validBefore: Date
     public let maximumLineBytes: Int
     public let maximumSessionBytes: Int
 
     public init(
         investigationID: LifecycleInvestigationID,
+        configurationSHA256: String,
         validBefore: Date,
         maximumLineBytes: Int,
         maximumSessionBytes: Int
     ) {
         self.investigationID = investigationID
+        self.configurationSHA256 = configurationSHA256
         self.validBefore = validBefore
         self.maximumLineBytes = maximumLineBytes
         self.maximumSessionBytes = maximumSessionBytes
@@ -133,6 +136,7 @@ public actor LifecycleInteractiveSessionBroker {
         try admitOperation(request.operationID)
         let configuration = LifecycleInteractiveWorkerConfiguration(
             investigationID: request.investigationID,
+            configurationSHA256: request.configurationSHA256,
             validBefore: validBefore,
             maximumLineBytes: maximumLineBytes,
             maximumSessionBytes: maximumSessionBytes
@@ -280,7 +284,9 @@ public actor LifecycleInteractiveSessionBroker {
                 .sessionUnavailable
         }
         guard
-            configuration.investigationID == request.investigationID
+            configuration.investigationID == request.investigationID,
+            configuration.configurationSHA256
+                == request.configurationSHA256
         else {
             throw LifecycleInteractiveSessionBrokerError.sessionMismatch
         }
@@ -303,6 +309,8 @@ public actor LifecycleInteractiveSessionBroker {
         if let configuration {
             guard
                 configuration.investigationID == request.investigationID
+                    && configuration.configurationSHA256
+                        == request.configurationSHA256
             else {
                 throw LifecycleInteractiveSessionBrokerError
                     .sessionMismatch
@@ -310,6 +318,7 @@ public actor LifecycleInteractiveSessionBroker {
         } else {
             configuration = LifecycleInteractiveWorkerConfiguration(
                 investigationID: request.investigationID,
+                configurationSHA256: request.configurationSHA256,
                 validBefore: now(),
                 maximumLineBytes: 1,
                 maximumSessionBytes: 1

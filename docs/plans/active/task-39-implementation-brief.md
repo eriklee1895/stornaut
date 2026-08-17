@@ -42,8 +42,8 @@
 > installed/post-teardown observation for fixed App/helper/plist/service/process/
 > runtime/lease topology. Its root-helper signing P1 was fixed tests-first;
 > 117-test focused, exact source-boundaries, targeted Debug diagnostic build,
-> 981-test clean staged-only serial and post-fix review passed. The machine
-> driver/failure matrix remains next. Evidence:
+> 981-test clean staged-only serial and post-fix review passed. The later
+> machine driver/failure matrix remains unimplemented. Evidence:
 > [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
 > [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md) and
 > [Task 39B1b-i Review](../../reports/phase-d-task-39b1b-i-review.md) and
@@ -89,8 +89,11 @@
 > than observing it. L3c is therefore split before coding into L3c1 opaque
 > retirement escrow, L3c2 closed deterministic machine driver, L3c3 current-source
 > real-success three-plane composition and L3c4 sealed final admission. Only L3c4
-> may claim readiness or consume the remaining authoritative full verifier. L3c1
-> is next.
+> may claim readiness or consume the remaining authoritative full verifier. L3c1a
+> and L3c1b-i are complete; L3c1b-ii is next. Evidence:
+> [39B2c-L3c1a Typed Owner Retirement Review](../../reports/phase-d-task-39b2c-l3c1a-typed-owner-retirement-review.md)
+> and
+> [39B2c-L3c1b-i Configuration-Bound Helper Escrow Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md).
 >
 > **Parent plan:**
 > [Phase D Conditional Deep Dive](phase-d-conditional-deep-dive.md)
@@ -709,23 +712,56 @@ The remaining L3 work is split before driver coding:
      helper restart, stale/foreign identity, connection-epoch drift, replay,
      cancellation or deadline failure must destroy admission. Production root
      claim stays closed until L3c2 supplies an exact signed driver identity.
-     The exact path preflight is frozen at the following 11 non-document paths
-     and at most 3,600 added non-document lines:
-     `Sources/StornautLifecycle/LifecycleMachineRetirementEscrow.swift` (new),
-     `Sources/StornautLifecycle/LifecycleInteractiveSessionContract.swift`,
-     `StornautLifecycleHelper/main.swift`,
-     `Sources/StornautInvestigationMachine/InvestigationMachineRetirementClaim.swift`
-     (new),
-     `Sources/StornautInvestigationMachine/InvestigationLifecycleTopologyCollector.swift`,
-     `Tests/StornautLifecycleTests/LifecycleMachineRetirementEscrowTests.swift`
-     (new),
-     `Tests/StornautLifecycleTests/LifecycleInteractiveSessionContractTests.swift`,
-     `Tests/StornautInvestigationTests/InvestigationMachineRetirementClaimTests.swift`
-     (new),
-     `Tests/StornautInvestigationTests/InvestigationLifecycleTopologyCollectorTests.swift`,
-     `Tests/StornautInvestigationTests/InvestigationLifecycleTopologyTestSupport.swift`
-     and
-     `Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift`.
+     The original path preflight reached exactly 14 non-document paths after
+     preserving the helper-minted opaque handle through Runtime and migrating
+     the structural gate. Independent review then found that Investigation ID,
+     operation, token and process identities alone did not prevent a capsule
+     from one signed-runtime configuration being joined to another configuration
+     with the same Investigation ID. Closing that P1 requires the production
+     diagnostic composition to inject its canonical complete machine-configuration
+     binding,
+     which would be a fifteenth path. L3c1b is therefore split before that
+     review fix is coded:
+     - **L3c1b-i configuration-bound helper escrow** owns at most twelve
+       non-document paths and 2,500 added lines:
+       `Sources/StornautLifecycle/LifecycleMachineRetirementEscrow.swift` (new),
+       `Sources/StornautLifecycle/LifecycleInteractiveSessionContract.swift`,
+       `Sources/StornautLifecycle/LifecycleInteractiveSessionBroker.swift`,
+       `StornautLifecycleHelper/main.swift`,
+       `Sources/StornautInvestigationRuntime/InvestigationLifecycleAppServerTransport.swift`,
+       `Sources/StornautInvestigationDiagnostic/InvestigationRuntimeDiagnosticComposition.swift`,
+       `Tests/StornautLifecycleTests/LifecycleMachineRetirementEscrowTests.swift`
+       (new),
+       `Tests/StornautLifecycleTests/LifecycleInteractiveSessionContractTests.swift`,
+       `Tests/StornautLifecycleTests/LifecycleInteractiveSessionBrokerTests.swift`,
+       `Tests/StornautInvestigationTests/InvestigationLifecycleAppServerTransportTests.swift`
+       `Tests/StornautInvestigationTests/SignedRuntimeContractTests.swift` and the
+       minimal existing Runtime-constructor compatibility hunk in
+       `Tests/StornautInvestigationTests/InvestigationLifecycleTopologyTestSupport.swift`.
+       It reuses `machineConfigurationSHA256()` from the exact decoded signed
+       configuration; no alternate hash, optional/empty value or legacy
+       fallback is permitted. The strict interactive start/retire path, escrow
+       entry, opaque handle and claim echo must all carry the same lowercase
+       64-hex value. The helper stores only that digest and the token digest.
+       This checkpoint is complete. Its 58-test clean staged focused gate,
+       136-test Lifecycle suite, 168-test Investigation suite, targeted Debug
+       App/helper build, 11/11 dedicated App tests, 1025-test clean staged-only
+       serial and independent post-fix reviews passed. See the
+       [L3c1b-i Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md).
+     - **L3c1b-ii synthetic Machine claim and collector join** owns at most seven
+       non-document paths and 1,900 added lines:
+       `Sources/StornautInvestigationMachine/InvestigationMachineRetirementClaim.swift`
+       (new),
+       `Sources/StornautInvestigationMachine/InvestigationLifecycleTopologyCollector.swift`,
+       `Tests/StornautInvestigationTests/InvestigationMachineRetirementClaimTests.swift`
+       (new),
+       `Tests/StornautInvestigationTests/InvestigationLifecycleTopologyCollectorTests.swift`,
+       `Tests/StornautInvestigationTests/InvestigationLifecycleTopologyTestSupport.swift`,
+       `Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift`
+       and `scripts/verify-investigation-boundaries`. It preserves the exact
+       digest in the non-`Codable` claim and rejects any mismatch with the
+       collection request's canonical signed-runtime configuration before L2 or
+       transition work.
      It must not modify `LifecycleSupervisorXPC.swift`, add an Objective-C XPC
      selector, add a concrete claim client/sender or weaken the existing exact
      App-only/non-root one-connection listener. The helper owns one bounded
@@ -733,7 +769,7 @@ The remaining L3 work is split before driver coding:
      retired reply, enters `awaitingClaim`, survives the expected App disconnect
      until the claim deadline, and exits on expiry. A disconnect before record,
      helper restart, invalid claim or expiry remains blocked; no escrow data is
-     persisted. L3c1b exposes only an injected synthetic Machine claim source.
+     persisted. L3c1b-ii exposes only an injected synthetic Machine claim source.
      L3c2 must separately preflight the exact signed root-driver identity,
      endpoint and authorization-before-consume ordering.
    Together they replace inferred `managedProxyOwnerEmpty`/`probeWorkerEmpty`
@@ -766,8 +802,9 @@ The remaining L3 work is split before driver coding:
    uninterrupted authoritative full verifier. The final full is receipt/source/
    raw-evidence read-only and must not repeat model calls or root mutation.
 
-The order is strict: `L3c1a -> L3c1b -> L3c2 -> L3c3 -> L3c4`. L3c1a is
-complete and L3c1b is next. L3c1 uses focused
+The order is strict: `L3c1a -> L3c1b-i -> L3c1b-ii -> L3c2 -> L3c3 -> L3c4`.
+L3c1a and L3c1b-i are complete; L3c1b-ii is next, and only those two sub-gates
+together close L3c1b. L3c1 uses focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean
 staged serial regression, targeted helper/diagnostic builds and independent
 review in place of full. L3c2 and L3c3 must each receive a fresh scope/cost

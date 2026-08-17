@@ -66,6 +66,7 @@ struct LifecycleInteractiveSessionBrokerTests {
                 try LifecycleInteractiveSessionRequest.start(
                     investigationID: fixture.investigationID,
                     operationID: UUID(),
+                    configurationSHA256: fixture.configurationSHA256,
                     validBefore: fixture.now,
                     maximumLineBytes: 1_024,
                     maximumSessionBytes: 8_192
@@ -80,6 +81,7 @@ struct LifecycleInteractiveSessionBrokerTests {
                 try LifecycleInteractiveSessionRequest.start(
                     investigationID: fixture.investigationID,
                     operationID: UUID(),
+                    configurationSHA256: fixture.configurationSHA256,
                     validBefore:
                         fixture.now.addingTimeInterval(901),
                     maximumLineBytes: 1_024,
@@ -105,19 +107,21 @@ struct LifecycleInteractiveSessionBrokerTests {
                 LifecycleInteractiveSessionBrokerError.sessionMismatch
         ) {
             _ = try await broker.handle(
-                LifecycleInteractiveSessionRequest.read(
+                try LifecycleInteractiveSessionRequest.read(
                     investigationID: LifecycleInvestigationID(
                         rawValue: UUID()
                     ),
-                    operationID: UUID()
+                    operationID: UUID(),
+                    configurationSHA256: fixture.configurationSHA256
                 )
             )
         }
 
         let replayedOperationID = UUID()
-        let first = LifecycleInteractiveSessionRequest.read(
+        let first = try LifecycleInteractiveSessionRequest.read(
             investigationID: fixture.investigationID,
-            operationID: replayedOperationID
+            operationID: replayedOperationID,
+            configurationSHA256: fixture.configurationSHA256
         )
         await worker.appendRead(Data("{\"first\":true}\n".utf8))
         _ = try await broker.handle(first)
@@ -126,6 +130,40 @@ struct LifecycleInteractiveSessionBrokerTests {
                 LifecycleInteractiveSessionBrokerError.invalidRequest
         ) {
             _ = try await broker.handle(first)
+        }
+    }
+
+    @Test
+    func brokerRejectsConfigurationDriftAcrossTheSession() async throws {
+        let fixture = LifecycleInteractiveBrokerFixture()
+        let broker = LifecycleInteractiveSessionBroker(
+            worker: RecordingLifecycleInteractiveWorker(),
+            now: { fixture.now }
+        )
+        _ = try await broker.handle(try fixture.startRequest())
+        let foreignHash = String(repeating: "b", count: 64)
+
+        await #expect(
+            throws: LifecycleInteractiveSessionBrokerError.sessionMismatch
+        ) {
+            _ = try await broker.handle(
+                try LifecycleInteractiveSessionRequest.read(
+                    investigationID: fixture.investigationID,
+                    operationID: UUID(),
+                    configurationSHA256: foreignHash
+                )
+            )
+        }
+        await #expect(
+            throws: LifecycleInteractiveSessionBrokerError.sessionMismatch
+        ) {
+            _ = try await broker.handle(
+                try LifecycleInteractiveSessionRequest.retire(
+                    investigationID: fixture.investigationID,
+                    operationID: UUID(),
+                    configurationSHA256: foreignHash
+                )
+            )
         }
     }
 
@@ -420,6 +458,7 @@ private struct LifecycleInteractiveBrokerFixture {
             uuidString: "93939393-9393-4393-8393-939393939393"
         )!
     )
+    let configurationSHA256 = String(repeating: "a", count: 64)
 
     func startRequest(
         maximumLineBytes: Int = 1_024,
@@ -428,6 +467,7 @@ private struct LifecycleInteractiveBrokerFixture {
         try .start(
             investigationID: investigationID,
             operationID: UUID(),
+            configurationSHA256: configurationSHA256,
             validBefore: now.addingTimeInterval(60),
             maximumLineBytes: maximumLineBytes,
             maximumSessionBytes: maximumSessionBytes
@@ -440,21 +480,24 @@ private struct LifecycleInteractiveBrokerFixture {
         try .write(
             investigationID: investigationID,
             operationID: UUID(),
+            configurationSHA256: configurationSHA256,
             line: line
         )
     }
 
     func readRequest() -> LifecycleInteractiveSessionRequest {
-        .read(
+        try! .read(
             investigationID: investigationID,
-            operationID: UUID()
+            operationID: UUID(),
+            configurationSHA256: configurationSHA256
         )
     }
 
     func retireRequest() -> LifecycleInteractiveSessionRequest {
-        .retire(
+        try! .retire(
             investigationID: investigationID,
-            operationID: UUID()
+            operationID: UUID(),
+            configurationSHA256: configurationSHA256
         )
     }
 }

@@ -34,6 +34,9 @@ struct SignedRuntimeContractTests {
                     + configuration.nonce.uuidString.lowercased()
         )
         #expect(composition.storePath == configuration.storePath)
+        let configurationSHA256 =
+            try configuration.machineConfigurationSHA256()
+        #expect(composition.configurationSHA256 == configurationSHA256)
         #expect(
             composition.helperExecutablePath
                 == "/Library/Application Support/Stornaut/"

@@ -1010,6 +1010,7 @@ private final class LifecycleHelperListenerDelegate:
     private let recoveredInvestigations:
         Set<LifecycleInvestigationID>
     private let lock = NSLock()
+    private let retirementEscrow = LifecycleMachineRetirementEscrow()
     private var acceptedConnection = false
 
     init(
@@ -1070,11 +1071,11 @@ private final class LifecycleHelperListenerDelegate:
             return false
         }
         let service = LifecycleHelperService(
-            callerProcessID: connection.processIdentifier,
-            callerUserID: connection.effectiveUserIdentifier,
+            callerIdentity: callerIdentity,
             helperIdentity: helperIdentity,
             helperExecutableURL: helperExecutableURL,
-            recoveredInvestigations: recoveredInvestigations
+            recoveredInvestigations: recoveredInvestigations,
+            retirementEscrow: retirementEscrow
         )
         connection.exportedInterface = NSXPCInterface(
             with: LifecycleInteractiveSessionXPCWire.self
@@ -1098,10 +1099,12 @@ private final class LifecycleHelperService:
 {
     private let callerProcessID: pid_t
     private let callerUserID: uid_t
+    private let callerIdentity: LifecycleProcessIdentity
     private let helperIdentity: LifecycleProcessIdentity
     private let helperExecutableURL: URL
     private let recoveredInvestigations:
         Set<LifecycleInvestigationID>
+    private let retirementEscrow: LifecycleMachineRetirementEscrow
     private let operationQueue = DispatchQueue(
         label: "com.eriklee.stornaut.lifecycle.operation"
     )
@@ -1119,19 +1122,22 @@ private final class LifecycleHelperService:
     private var interactivePending:
         [UUID: LifecycleInteractivePendingReply] = [:]
     private var interactiveExpiryWorkItem: DispatchWorkItem?
+    private var interactiveRouteClosed = false
 
     init(
-        callerProcessID: pid_t,
-        callerUserID: uid_t,
+        callerIdentity: LifecycleProcessIdentity,
         helperIdentity: LifecycleProcessIdentity,
         helperExecutableURL: URL,
-        recoveredInvestigations: Set<LifecycleInvestigationID>
+        recoveredInvestigations: Set<LifecycleInvestigationID>,
+        retirementEscrow: LifecycleMachineRetirementEscrow
     ) {
-        self.callerProcessID = callerProcessID
-        self.callerUserID = callerUserID
+        self.callerIdentity = callerIdentity
+        callerProcessID = callerIdentity.processID
+        callerUserID = callerIdentity.effectiveUserID
         self.helperIdentity = helperIdentity
         self.helperExecutableURL = helperExecutableURL
         self.recoveredInvestigations = recoveredInvestigations
+        self.retirementEscrow = retirementEscrow
     }
 
     func attestHelper(
@@ -1183,6 +1189,15 @@ private final class LifecycleHelperService:
             reply(nil, "runtime.lifecycle.invalid-request")
             return
         }
+        let supervisorRouteAvailable = lock.withLock {
+            !invalidated
+                && !interactiveRouteClosed
+                && !retirementEscrow.isAwaitingClaim
+        }
+        guard supervisorRouteAvailable else {
+            reply(nil, "runtime.lifecycle.session-unavailable")
+            return
+        }
         switch decoded {
         case let .start(
             investigationID,
@@ -1199,34 +1214,30 @@ private final class LifecycleHelperService:
                 )
                 return
             }
-            let didActivate = lock.withLock {
-                guard
-                    !invalidated,
-                    activeInvestigationID == nil
-                else {
-                    return false
-                }
-                activeInvestigationID = investigationID
-                activeEvidenceBindingSHA256 =
-                    evidenceBindingSHA256
-                activeReply = reply
-                return true
-            }
+            let didActivate = admitAndEnqueueLegacyStart(
+                investigationID: investigationID,
+                evidenceBindingSHA256: evidenceBindingSHA256,
+                reply: reply
+            )
             guard didActivate else {
                 reply(nil, "runtime.lifecycle.already-active")
                 return
-            }
-            operationQueue.async { [weak self] in
-                self?.run(
-                    investigationID,
-                    evidenceBindingSHA256:
-                        evidenceBindingSHA256
-                )
             }
 #else
             reply(nil, "runtime.lifecycle.diagnostic-unavailable")
 #endif
         case let .cancel(investigationID):
+            let canCancelLegacySession = lock.withLock {
+                !invalidated
+                    && !interactiveRouteClosed
+                    && !retirementEscrow.isAwaitingClaim
+                    && activeInvestigationID == investigationID
+                    && activeReply != nil
+            }
+            guard canCancelLegacySession else {
+                reply(nil, "runtime.lifecycle.session-unavailable")
+                return
+            }
             let replyBox = LifecycleReplyBox(reply)
             operationQueue.async { [weak self] in
                 self?.cancel(
@@ -1236,6 +1247,37 @@ private final class LifecycleHelperService:
             }
         }
     }
+
+#if DEBUG
+    private func admitAndEnqueueLegacyStart(
+        investigationID: LifecycleInvestigationID,
+        evidenceBindingSHA256: String,
+        reply: @escaping (Data?, String?) -> Void
+    ) -> Bool {
+        lock.withLock {
+            guard
+                !invalidated,
+                !interactiveRouteClosed,
+                !retirementEscrow.isAwaitingClaim,
+                activeInvestigationID == nil,
+                activeEvidenceBindingSHA256 == nil,
+                activeReply == nil
+            else {
+                return false
+            }
+            activeInvestigationID = investigationID
+            activeEvidenceBindingSHA256 = evidenceBindingSHA256
+            activeReply = reply
+            operationQueue.async { [weak self] in
+                self?.run(
+                    investigationID,
+                    evidenceBindingSHA256: evidenceBindingSHA256
+                )
+            }
+            return true
+        }
+    }
+#endif
 
     func handleInteractive(
         _ request: Data,
@@ -1263,9 +1305,36 @@ private final class LifecycleHelperService:
             request: decoded,
             reply: reply
         )
-        let admitted = lock.withLock {
+        let admitted = admitAndEnqueueInteractive(
+            request,
+            decoded: decoded,
+            pending: pending
+        )
+        guard admitted else {
+            reply(
+                nil,
+                "runtime.lifecycle.interactive.session-unavailable"
+            )
+            return
+        }
+#else
+        reply(
+            nil,
+            "runtime.lifecycle.interactive.session-unavailable"
+        )
+#endif
+    }
+
+#if DEBUG
+    private func admitAndEnqueueInteractive(
+        _ encoded: Data,
+        decoded: LifecycleInteractiveSessionRequest,
+        pending: LifecycleInteractivePendingReply
+    ) -> Bool {
+        lock.withLock {
             guard
                 !invalidated,
+                !interactiveRouteClosed,
                 activeReply == nil,
                 interactivePending.count < 16_384,
                 interactivePending[decoded.operationID] == nil
@@ -1276,6 +1345,7 @@ private final class LifecycleHelperService:
             case .start:
                 guard
                     activeInvestigationID == nil,
+                    activeEvidenceBindingSHA256 == nil,
                     LifecycleRecoveredInvestigationPolicy()
                         .permitsStart(
                             decoded.investigationID,
@@ -1285,47 +1355,51 @@ private final class LifecycleHelperService:
                     return false
                 }
                 activeInvestigationID = decoded.investigationID
+                activeEvidenceBindingSHA256 =
+                    decoded.configurationSHA256
             case .write, .read, .retire:
                 guard
                     activeInvestigationID
                         == decoded.investigationID,
+                    activeEvidenceBindingSHA256
+                        == decoded.configurationSHA256,
                     interactiveInput != nil,
                     interactiveOutput != nil
                 else {
                     return false
                 }
             }
+            if decoded.kind == .retire {
+                interactiveRouteClosed = true
+            }
             interactivePending[decoded.operationID] = pending
+            operationQueue.async { [weak self] in
+                self?.dispatchInteractive(
+                    encoded,
+                    decoded: decoded
+                )
+            }
             return true
         }
-        guard admitted else {
-            reply(
-                nil,
-                "runtime.lifecycle.interactive.session-unavailable"
-            )
-            return
-        }
-        operationQueue.async { [weak self] in
-            self?.dispatchInteractive(
-                request,
-                decoded: decoded
-            )
-        }
-#else
-        reply(
-            nil,
-            "runtime.lifecycle.interactive.session-unavailable"
-        )
-#endif
     }
+#endif
 
     func invalidateAndDrain() {
-        let shouldDrain = lock.withLock {
-            guard !invalidated else { return false }
+        let disposition: LifecycleHelperInvalidationDisposition =
+            lock.withLock {
+            guard !invalidated else { return .alreadyInvalidated }
             invalidated = true
+            if retirementEscrow.isAwaitingClaim {
+                return .preserveRetirementEscrow
+            }
             return activeInvestigationID != nil
+                ? .drainActive
+                : .exitCleanly
         }
-        if shouldDrain {
+        switch disposition {
+        case .alreadyInvalidated, .preserveRetirementEscrow:
+            return
+        case .drainActive:
             operationQueue.async { [weak self] in
                 do {
                     try self?.cancelActive()
@@ -1334,7 +1408,7 @@ private final class LifecycleHelperService:
                     exit(71)
                 }
             }
-        } else {
+        case .exitCleanly:
             scheduleSuccessfulExit()
         }
     }
@@ -1344,6 +1418,15 @@ private final class LifecycleHelperService:
         _ encoded: Data,
         decoded: LifecycleInteractiveSessionRequest
     ) {
+        guard interactiveDispatchStillAdmitted(decoded) else {
+            failInteractiveOperation(
+                decoded.operationID,
+                reasonKey:
+                    "runtime.lifecycle.interactive.session-unavailable",
+                drain: false
+            )
+            return
+        }
         do {
             if decoded.kind == .start {
                 guard let validBefore = decoded.validBefore else {
@@ -1370,6 +1453,24 @@ private final class LifecycleHelperService:
                     "runtime.lifecycle.interactive.start-failed",
                 drain: true
             )
+        }
+    }
+
+    private func interactiveDispatchStillAdmitted(
+        _ request: LifecycleInteractiveSessionRequest
+    ) -> Bool {
+        lock.withLock {
+            guard
+                !invalidated,
+                let pending = interactivePending[request.operationID],
+                pending.request == request,
+                activeInvestigationID == request.investigationID,
+                activeEvidenceBindingSHA256
+                    == request.configurationSHA256
+            else {
+                return false
+            }
+            return true
         }
     }
 
@@ -1587,8 +1688,8 @@ private final class LifecycleHelperService:
             return
         }
         guard
-            let response = workerReply.response,
-            let validated = try? response.validated(
+            let validated = validateWorkerReply(
+                workerReply,
                 for: pending.request
             )
         else {
@@ -1632,6 +1733,37 @@ private final class LifecycleHelperService:
             do {
                 let residueObservation =
                     try finishInteractiveSession()
+                let currentCallerIdentity =
+                    try DarwinLifecycleInventory(
+                        expectedUserID: callerUserID
+                    ).identity(
+                        for: callerProcessID,
+                        expectedUserID: callerUserID
+                    )
+                guard currentCallerIdentity == callerIdentity else {
+                    throw LifecycleHelperFailure.invalidIdentity
+                }
+                let appIdentity = try machineIdentityRecord(
+                    callerIdentity
+                )
+                let helperRecord = try machineIdentityRecord(
+                    helperIdentity
+                )
+                let handle = try recordMachineRetirementEscrow(
+                    investigationID:
+                        pending.request.investigationID,
+                    retireOperationID:
+                        pending.request.operationID,
+                    configurationSHA256:
+                        pending.request.configurationSHA256,
+                    validBefore: Date().addingTimeInterval(30),
+                    appIdentity: appIdentity,
+                    helperIdentity: helperRecord,
+                    userID: UInt32(callerUserID),
+                    ownerRetirementObservation:
+                        ownerRetirementObservation,
+                    residueObservation: residueObservation
+                )
                 let sealedResponse =
                     LifecycleInteractiveSessionResponse.retired(
                         investigationID:
@@ -1640,13 +1772,17 @@ private final class LifecycleHelperService:
                         drained: residueObservation.provedEmpty,
                         ownerRetirementObservation:
                             ownerRetirementObservation,
+                        machineRetirementHandle: handle,
                         residueObservation: residueObservation
                     )
                 pending.reply(
                     try JSONEncoder().encode(sealedResponse),
                     nil
                 )
-                scheduleSuccessfulExitAfterReply()
+                scheduleRetirementClaimDeadline(
+                    handle.validBefore,
+                    retirementEscrow: retirementEscrow
+                )
             } catch {
                 pending.reply(
                     nil,
@@ -1676,6 +1812,68 @@ private final class LifecycleHelperService:
                     "runtime.lifecycle.interactive.remote-rejected",
                 drain: true
             )
+        }
+    }
+
+    private func validateWorkerReply(
+        _ workerReply: LifecycleInteractiveWorkerReply,
+        for request: LifecycleInteractiveSessionRequest
+    ) -> LifecycleInteractiveSessionResponse? {
+        guard
+            workerReply.operationID == request.operationID,
+            workerReply.reasonKey == nil,
+            let response = workerReply.response,
+            response.investigationID == request.investigationID,
+            response.operationID == request.operationID,
+            response.machineRetirementHandle == nil
+        else {
+            return nil
+        }
+        let kindMatches = switch (request.kind, response.kind) {
+        case (.start, .started),
+             (.write, .writeAccepted),
+             (.read, .line),
+             (.read, .endOfStream),
+             (.retire, .retired):
+            true
+        default:
+            false
+        }
+        return kindMatches ? response : nil
+    }
+
+    private func recordMachineRetirementEscrow(
+        investigationID: LifecycleInvestigationID,
+        retireOperationID: UUID,
+        configurationSHA256: String,
+        validBefore: Date,
+        appIdentity: LifecycleMachineProcessIdentityRecord,
+        helperIdentity: LifecycleMachineProcessIdentityRecord,
+        userID: UInt32,
+        ownerRetirementObservation:
+            LifecycleInteractiveWorkerRetirementObservation,
+        residueObservation: LifecycleInvestigationResidueObservation
+    ) throws -> LifecycleMachineRetirementHandle {
+        try lock.withLock {
+            guard !invalidated else {
+                throw LifecycleHelperFailure.invalidIdentity
+            }
+            let handle = try retirementEscrow.record(
+                investigationID: investigationID,
+                retireOperationID: retireOperationID,
+                configurationSHA256: configurationSHA256,
+                validBefore: validBefore,
+                appIdentity: appIdentity,
+                helperIdentity: helperIdentity,
+                userID: userID,
+                ownerRetirementObservation:
+                    ownerRetirementObservation,
+                residueObservation: residueObservation
+            )
+            guard interactiveRouteClosed else {
+                throw LifecycleHelperFailure.invalidIdentity
+            }
+            return handle
         }
     }
 
@@ -1841,6 +2039,12 @@ private final class LifecycleHelperService:
         _ investigationID: LifecycleInvestigationID,
         evidenceBindingSHA256: String
     ) {
+        guard legacyRunStillAdmitted(
+            investigationID: investigationID,
+            evidenceBindingSHA256: evidenceBindingSHA256
+        ) else {
+            return
+        }
         do {
             let userIdentity = try LifecycleUserIdentity.read(
                 userID: callerUserID
@@ -1976,6 +2180,21 @@ private final class LifecycleHelperService:
             } catch {
                 exit(71)
             }
+        }
+    }
+
+    private func legacyRunStillAdmitted(
+        investigationID: LifecycleInvestigationID,
+        evidenceBindingSHA256: String
+    ) -> Bool {
+        lock.withLock {
+            !invalidated
+                && !interactiveRouteClosed
+                && !retirementEscrow.isAwaitingClaim
+                && activeInvestigationID == investigationID
+                && activeEvidenceBindingSHA256
+                    == evidenceBindingSHA256
+                && activeReply != nil
         }
     }
 #endif
@@ -2296,6 +2515,13 @@ private final class LifecycleHelperService:
         }
         reply(data, nil)
     }
+}
+
+private enum LifecycleHelperInvalidationDisposition {
+    case alreadyInvalidated
+    case preserveRetirementEscrow
+    case drainActive
+    case exitCleanly
 }
 
 private final class LifecycleReplyBox: @unchecked Sendable {
@@ -2654,6 +2880,31 @@ private func scheduleSuccessfulExitAfterReply() {
     ) {
         exit(0)
     }
+}
+
+private func scheduleRetirementClaimDeadline(
+    _ deadline: Date,
+    retirementEscrow: LifecycleMachineRetirementEscrow
+) {
+    let interval = max(0, deadline.timeIntervalSinceNow)
+    DispatchQueue.global().asyncAfter(deadline: .now() + interval) {
+        if retirementEscrow.isAwaitingClaim {
+            retirementEscrow.expire()
+        }
+        exit(0)
+    }
+}
+
+private func machineIdentityRecord(
+    _ identity: LifecycleProcessIdentity
+) throws -> LifecycleMachineProcessIdentityRecord {
+    try LifecycleMachineProcessIdentityRecord(
+        processID: identity.processID,
+        processIDVersion: identity.processIDVersion,
+        auditSessionID: identity.auditSessionID,
+        effectiveUserID: identity.effectiveUserID,
+        auditTokenWords: identity.auditToken.words
+    )
 }
 
 private func scheduleFailureExitAfterReply() {

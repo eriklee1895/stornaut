@@ -157,7 +157,7 @@ struct InvestigationLifecycleAppServerTransportTests {
         )
         await #expect(
             throws: InvestigationLifecycleAppServerTransportError
-                .drainUnconfirmed
+                .identityMismatch
         ) {
             try await undrainedTransport.retire()
         }
@@ -174,6 +174,9 @@ struct InvestigationLifecycleAppServerTransportTests {
                     operationID: fixture.operationIDs[0],
                     drained: true,
                     ownerRetirementObservation: .retiredOwnedResources,
+                    machineRetirementHandle: try fixture.handle(
+                        operationID: fixture.operationIDs[0]
+                    ),
                     residueObservation: valid
                 ),
             ]
@@ -198,7 +201,7 @@ struct InvestigationLifecycleAppServerTransportTests {
         )
         await #expect(
             throws: InvestigationLifecycleAppServerTransportError
-                .drainUnconfirmed
+                .identityMismatch
         ) {
             try await missing.retire()
         }
@@ -213,6 +216,9 @@ struct InvestigationLifecycleAppServerTransportTests {
                     operationID: fixture.operationIDs[0],
                     drained: true,
                     ownerRetirementObservation: .retiredOwnedResources,
+                    machineRetirementHandle: try fixture.handle(
+                        operationID: fixture.operationIDs[0]
+                    ),
                     residueObservation: foreignObservation
                 ),
             ]),
@@ -235,6 +241,9 @@ struct InvestigationLifecycleAppServerTransportTests {
                     operationID: fixture.operationIDs[0],
                     drained: true,
                     ownerRetirementObservation: .retiredOwnedResources,
+                    machineRetirementHandle: try fixture.handle(
+                        operationID: fixture.operationIDs[0]
+                    ),
                     residueObservation: foreignUserObservation
                 ),
             ]),
@@ -257,6 +266,9 @@ struct InvestigationLifecycleAppServerTransportTests {
                     operationID: fixture.operationIDs[0],
                     drained: true,
                     ownerRetirementObservation: .retiredOwnedResources,
+                    machineRetirementHandle: try fixture.handle(
+                        operationID: fixture.operationIDs[0]
+                    ),
                     residueObservation: nonzero
                 ),
             ]),
@@ -293,6 +305,53 @@ struct InvestigationLifecycleAppServerTransportTests {
     }
 
     @Test
+    func retireRejectsEveryForeignOpaqueHandleBinding() async throws {
+        let fixture = InvestigationLifecycleTransportFixture()
+        let operationID = fixture.operationIDs[0]
+        let handles = [
+            try fixture.handle(
+                operationID: operationID,
+                investigationID: LifecycleInvestigationID()
+            ),
+            try fixture.handle(operationID: UUID()),
+            try fixture.handle(
+                operationID: operationID,
+                configurationSHA256: String(repeating: "b", count: 64)
+            ),
+        ]
+
+        for handle in handles {
+            let session = FakeLifecycleInteractiveSession(responses: [
+                .retired(
+                    investigationID: fixture.investigationID,
+                    operationID: operationID,
+                    drained: true,
+                    ownerRetirementObservation: .retiredOwnedResources,
+                    machineRetirementHandle: handle,
+                    residueObservation: try fixture.residueObservation()
+                ),
+            ])
+            let transport = try fixture.transport(
+                session: session,
+                operationIDs: [operationID]
+            )
+
+            await #expect(
+                throws: InvestigationLifecycleAppServerTransportError
+                    .identityMismatch
+            ) {
+                try await transport.retire()
+            }
+            await #expect(
+                throws: InvestigationLifecycleAppServerTransportError
+                    .drainUnconfirmed
+            ) {
+                _ = try await transport.acceptedRetirementEvidence()
+            }
+        }
+    }
+
+    @Test
     func retireReturnsOpaqueResidueAndExactHelperIdentity() async throws {
         let fixture = InvestigationLifecycleTransportFixture()
         let helperIdentity = try fixture.helperIdentity()
@@ -304,6 +363,9 @@ struct InvestigationLifecycleAppServerTransportTests {
                     operationID: fixture.operationIDs[0],
                     drained: true,
                     ownerRetirementObservation: .retiredOwnedResources,
+                    machineRetirementHandle: try fixture.handle(
+                        operationID: fixture.operationIDs[0]
+                    ),
                     residueObservation: residue
                 ),
             ],
@@ -316,6 +378,14 @@ struct InvestigationLifecycleAppServerTransportTests {
 
         let evidence = try await transport.retireWithEvidence()
 
+        #expect(
+            evidence.machineRetirementHandle.investigationID
+                == fixture.investigationID
+        )
+        #expect(
+            evidence.machineRetirementHandle.retireOperationID
+                == fixture.operationIDs[0]
+        )
         #expect(evidence.residueObservation == residue)
         #expect(evidence.helperProcessIdentity == helperIdentity)
         #expect(
@@ -346,6 +416,7 @@ struct InvestigationLifecycleAppServerTransportTests {
         )
         let transport = try InvestigationLifecycleAppServerTransport(
             investigationID: fixture.investigationID,
+            configurationSHA256: fixture.configurationSHA256,
             validBefore: fixture.validBefore,
             maximumLineBytes: 1_024,
             maximumSessionBytes: 8_192,
@@ -424,6 +495,7 @@ struct InvestigationLifecycleAppServerTransportTests {
         ) {
             _ = try InvestigationLifecycleAppServerTransport(
                 investigationID: fixture.investigationID,
+                configurationSHA256: fixture.configurationSHA256,
                 validBefore: fixture.validBefore,
                 maximumLineBytes: 1_024,
                 maximumSessionBytes: 8_192,
@@ -447,6 +519,7 @@ struct InvestigationLifecycleAppServerTransportTests {
         ) {
             _ = try InvestigationLifecycleAppServerTransport(
                 investigationID: fixture.investigationID,
+                configurationSHA256: fixture.configurationSHA256,
                 validBefore: fixture.now,
                 maximumLineBytes: 1_024,
                 maximumSessionBytes: 8_192,
@@ -461,6 +534,7 @@ struct InvestigationLifecycleAppServerTransportTests {
         ) {
             _ = try InvestigationLifecycleAppServerTransport(
                 investigationID: fixture.investigationID,
+                configurationSHA256: fixture.configurationSHA256,
                 validBefore: fixture.now.addingTimeInterval(901),
                 maximumLineBytes: 1_024,
                 maximumSessionBytes: 8_192,
@@ -770,6 +844,7 @@ private struct InvestigationLifecycleTransportFixture {
     ]
     let requestLine = Data("{\"method\":\"initialize\"}\n".utf8)
     let responseLine = Data("{\"id\":1,\"result\":{}}\n".utf8)
+    let configurationSHA256 = String(repeating: "a", count: 64)
 
     func helperIdentity() throws -> LifecycleProcessIdentity {
         LifecycleProcessIdentity(
@@ -814,9 +889,27 @@ private struct InvestigationLifecycleTransportFixture {
             operationID: operationID,
             drained: true,
             ownerRetirementObservation: .retiredOwnedResources,
+            machineRetirementHandle: try handle(
+                operationID: operationID
+            ),
             residueObservation: try residueObservation(
                 observedAt: observedAt
             )
+        )
+    }
+
+    func handle(
+        operationID: UUID,
+        investigationID: LifecycleInvestigationID? = nil,
+        configurationSHA256: String? = nil
+    ) throws -> LifecycleMachineRetirementHandle {
+        try LifecycleMachineRetirementHandle(
+            token: UUID(),
+            investigationID: investigationID ?? self.investigationID,
+            retireOperationID: operationID,
+            configurationSHA256:
+                configurationSHA256 ?? self.configurationSHA256,
+            validBefore: validBefore
         )
     }
 
@@ -830,6 +923,7 @@ private struct InvestigationLifecycleTransportFixture {
         )
         return try InvestigationLifecycleAppServerTransport(
             investigationID: investigationID,
+            configurationSHA256: configurationSHA256,
             validBefore: validBefore,
             maximumLineBytes: 1_024,
             maximumSessionBytes: 8_192,
@@ -887,6 +981,16 @@ private actor SuspendedLifecycleInteractiveSession:
                 operationID: operationIDs[2],
                 drained: true,
                 ownerRetirementObservation: .retiredOwnedResources,
+                machineRetirementHandle:
+                    try LifecycleMachineRetirementHandle(
+                        token: UUID(),
+                        investigationID: investigationID,
+                        retireOperationID: operationIDs[2],
+                        configurationSHA256: request.configurationSHA256,
+                        validBefore: Date(
+                            timeIntervalSince1970: 1_900_000_030
+                        )
+                    ),
                 residueObservation:
                     try LifecycleInvestigationResidueObservation(
                         investigationID: investigationID,
@@ -1075,6 +1179,16 @@ private actor AmbiguousStartLifecycleInteractiveSession:
                 operationID: retireOperationID,
                 drained: true,
                 ownerRetirementObservation: .retiredOwnedResources,
+                machineRetirementHandle:
+                    try LifecycleMachineRetirementHandle(
+                        token: UUID(),
+                        investigationID: investigationID,
+                        retireOperationID: retireOperationID,
+                        configurationSHA256: request.configurationSHA256,
+                        validBefore: Date(
+                            timeIntervalSince1970: 1_900_000_030
+                        )
+                    ),
                 residueObservation:
                     try LifecycleInvestigationResidueObservation(
                         investigationID: investigationID,
