@@ -76,6 +76,7 @@ struct LifecycleInteractiveSessionContractTests {
                 investigationID: fixture.investigationID,
                 operationID: fixture.operationID,
                 drained: true,
+                ownerRetirementObservation: .retiredOwnedResources,
                 residueObservation: residue
             ),
         ]
@@ -86,7 +87,7 @@ struct LifecycleInteractiveSessionContractTests {
                 JSONSerialization.jsonObject(with: encoded)
                     as? [String: Any]
             )
-            #expect(object["protocolVersion"] as? Int == 2)
+            #expect(object["protocolVersion"] as? Int == 3)
             #expect(
                 try JSONDecoder().decode(
                     LifecycleInteractiveSessionResponse.self,
@@ -94,6 +95,92 @@ struct LifecycleInteractiveSessionContractTests {
                 ) == response
             )
         }
+    }
+
+    @Test
+    func ownerRetirementObservationRejectsInconsistentWireFacts() throws {
+        let fixture = LifecycleInteractiveSessionFixture()
+        for observation in [
+            LifecycleInteractiveWorkerRetirementObservation
+                .noOwnedResources,
+            .retiredPreparedWorkspace,
+            .retiredOwnedResources,
+        ] {
+            let encoded = try JSONEncoder().encode(observation)
+            #expect(
+                try JSONDecoder().decode(
+                    LifecycleInteractiveWorkerRetirementObservation.self,
+                    from: encoded
+                ) == observation
+            )
+        }
+
+        let inconsistent: [[String: Any]] = [
+            [
+                "resourceOwnership": "owned",
+                "processGroupTerminated": false,
+                "standardErrorContained": true,
+                "workspaceRemoved": true,
+            ],
+            [
+                "resourceOwnership": "none",
+                "processGroupTerminated": true,
+                "standardErrorContained": false,
+                "workspaceRemoved": false,
+            ],
+            [
+                "resourceOwnership": "preparedWorkspace",
+                "processGroupTerminated": true,
+                "standardErrorContained": false,
+                "workspaceRemoved": true,
+            ],
+        ]
+        for object in inconsistent {
+            #expect(throws: DecodingError.self) {
+                _ = try JSONDecoder().decode(
+                    LifecycleInteractiveWorkerRetirementObservation.self,
+                    from: try JSONSerialization.data(withJSONObject: object)
+                )
+            }
+        }
+
+        var unknown = try #require(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(
+                    LifecycleInteractiveWorkerRetirementObservation
+                        .retiredOwnedResources
+                )
+            ) as? [String: Any]
+        )
+        unknown["unexpected"] = true
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(
+                LifecycleInteractiveWorkerRetirementObservation.self,
+                from: try JSONSerialization.data(withJSONObject: unknown)
+            )
+        }
+
+        let retired = LifecycleInteractiveSessionResponse.retired(
+            investigationID: fixture.investigationID,
+            operationID: fixture.operationID,
+            drained: true,
+            ownerRetirementObservation: .retiredOwnedResources
+        )
+        let encoded = try JSONEncoder().encode(retired)
+        var responseObject = try #require(
+            JSONSerialization.jsonObject(with: encoded)
+                as? [String: Any]
+        )
+        responseObject.removeValue(forKey: "ownerRetirementObservation")
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(
+                LifecycleInteractiveSessionResponse.self,
+                from: try JSONSerialization.data(
+                    withJSONObject: responseObject
+                )
+            )
+        }
+
     }
 
     @Test
@@ -201,6 +288,62 @@ struct LifecycleInteractiveSessionContractTests {
         #expect(retireBody.contains("let residueObservation"))
         #expect(retireBody.contains(".retired("))
         #expect(!retireBody.contains("encode(validated)"))
+    }
+
+    @Test
+    func workerReplyRejectsUnknownMissingAndAmbiguousPayloads() throws {
+        let fixture = LifecycleInteractiveSessionFixture()
+        let response = LifecycleInteractiveSessionResponse.started(
+            investigationID: fixture.investigationID,
+            operationID: fixture.operationID
+        )
+        let reply = LifecycleInteractiveWorkerReply(
+            operationID: fixture.operationID,
+            response: response
+        )
+        let encoded = try JSONEncoder().encode(reply)
+        #expect(
+            try JSONDecoder().decode(
+                LifecycleInteractiveWorkerReply.self,
+                from: encoded
+            ) == reply
+        )
+        var object = try #require(
+            JSONSerialization.jsonObject(with: encoded)
+                as? [String: Any]
+        )
+        object["unexpected"] = true
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(
+                LifecycleInteractiveWorkerReply.self,
+                from: try JSONSerialization.data(withJSONObject: object)
+            )
+        }
+        object.removeValue(forKey: "unexpected")
+        object.removeValue(forKey: "operationID")
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(
+                LifecycleInteractiveWorkerReply.self,
+                from: try JSONSerialization.data(withJSONObject: object)
+            )
+        }
+        object["operationID"] = fixture.operationID.uuidString
+        object["reasonKey"] =
+            "runtime.lifecycle.interactive.retire-failed"
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(
+                LifecycleInteractiveWorkerReply.self,
+                from: try JSONSerialization.data(withJSONObject: object)
+            )
+        }
+        object["response"] = NSNull()
+        object["reasonKey"] = NSNull()
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(
+                LifecycleInteractiveWorkerReply.self,
+                from: try JSONSerialization.data(withJSONObject: object)
+            )
+        }
     }
 
     @Test
@@ -525,7 +668,8 @@ struct LifecycleInteractiveSessionContractTests {
         let response = LifecycleInteractiveSessionResponse.retired(
             investigationID: fixture.investigationID,
             operationID: fixture.operationID,
-            drained: true
+            drained: true,
+            ownerRetirementObservation: .noOwnedResources
         )
         let encoded = try JSONEncoder().encode(response)
 

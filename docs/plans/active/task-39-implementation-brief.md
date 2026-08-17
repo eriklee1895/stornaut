@@ -687,19 +687,33 @@ The remaining L3 work is split before driver coding:
    machine driver composition inside the trusted target, combine L1/L2 evidence
    in one sealed window and exercise synthetic lifecycle transitions. It must not
    emit final readiness or consume the final full gate.
-3. **L3c1 helper-owned opaque retirement escrow** — close the live handoff gap
-   before adding a driver. A successful contained-session retirement must mint a
-   helper-owned, challenge-bound, one-shot escrow record only after exact worker
-   reap, workspace retirement and the same-retire L1 observation. A future exact
-   signed root driver may claim it once and reconstruct only a module-internal,
-   non-`Codable` authority. The claim must survive App exit, but helper restart,
-   stale/foreign identity, connection-epoch drift, replay, cancellation or
-   deadline failure must destroy admission. This checkpoint also replaces the
-   inferred `managedProxyOwnerEmpty`/`probeWorkerEmpty` values with an independent
-   typed owner-retirement observation joined to the same audit-session L1 zero.
-   It is synthetic-only: no install/uninstall, model, report, readiness or full
-   verifier. The frozen budget is at most 14 non-document paths and 3,900 added
-   non-document lines.
+3. **L3c1 opaque retirement bridge** — close the live handoff gap before adding
+   a driver. Its path-level preflight is split again because the strict worker/
+   broker wire and the helper/root escrow have separate test surfaces and would
+   otherwise require more than 14 non-document paths:
+   - **L3c1a typed owner retirement** makes the contained owner mint a non-
+     `Codable` success observation only after exact process-group reap, bounded
+     stderr retirement and workspace removal; propagates only strict wire facts
+     through the worker/broker/helper path; and makes Investigation transport
+     distinguish owned-resource retirement from a never-started no-resource
+     retirement. It changes no XPC listener role and creates no root claim. Its
+     budget is at most 14 non-document paths and 2,200 added lines, including
+     the exact structural boundary verifier. This checkpoint is complete; its
+     86 focused tests, exact boundaries, targeted build, 11 App tests, 1012-test
+     clean staged-only serial and post-fix review passed. See the
+     [L3c1a Review](../../reports/phase-d-task-39b2c-l3c1a-typed-owner-retirement-review.md).
+   - **L3c1b helper-owned opaque escrow** records a challenge-bound, one-shot
+     capsule only after the L3c1a owner truth and same-retire L1 zero. A future
+     exact signed root driver may claim it once and reconstruct only a module-
+     internal, non-`Codable` authority. The claim must survive App exit, but
+     helper restart, stale/foreign identity, connection-epoch drift, replay,
+     cancellation or deadline failure must destroy admission. Production root
+     claim stays closed until L3c2 supplies an exact signed driver identity. Its
+     budget is at most 12 non-document paths and 3,200 added lines.
+   Together they replace inferred `managedProxyOwnerEmpty`/`probeWorkerEmpty`
+   values with an independent typed owner-retirement observation joined to the
+   same audit-session L1 zero. Both are synthetic-only: no install/uninstall,
+   model, report, readiness or full verifier.
 4. **L3c2 closed deterministic machine driver** — add the non-product root
    driver host and fixed eight-scenario state machine using closed DEBUG fault
    injection and deterministic transports. Prove fresh nonce/root/config/Store
@@ -726,7 +740,8 @@ The remaining L3 work is split before driver coding:
    uninterrupted authoritative full verifier. The final full is receipt/source/
    raw-evidence read-only and must not repeat model calls or root mutation.
 
-The order is strict: `L3c1 -> L3c2 -> L3c3 -> L3c4`. L3c1 uses focused
+The order is strict: `L3c1a -> L3c1b -> L3c2 -> L3c3 -> L3c4`. L3c1a is
+complete and L3c1b is next. L3c1 uses focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean
 staged serial regression, targeted helper/diagnostic builds and independent
 review in place of full. L3c2 and L3c3 must each receive a fresh scope/cost

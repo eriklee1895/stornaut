@@ -114,6 +114,23 @@ public struct ProcessTreeTerminator: Sendable {
             gracePeriod: gracePeriod
         )
     }
+
+    public static func waitForProcessGroupExit(
+        _ processGroup: ProcessGroupID,
+        timeout: Duration
+    ) -> Bool {
+        let deadline = ContinuousClock.now.advanced(by: timeout)
+        repeat {
+            guard let members = processGroupMembers(processGroup) else {
+                return false
+            }
+            if members.isEmpty {
+                return true
+            }
+            usleep(1_000)
+        } while ContinuousClock.now < deadline
+        return processGroupMembers(processGroup)?.isEmpty == true
+    }
 }
 
 private let processTreeTerminationQueue = DispatchQueue(

@@ -39,6 +39,55 @@ public enum CodexContainedInteractiveSessionError:
     case retirementFailed
 }
 
+public struct CodexContainedInteractiveOwnerRetirementObservation:
+    Sendable,
+    Equatable
+{
+    public enum ResourceOwnership: Sendable, Equatable {
+        case none
+        case preparedWorkspace
+        case owned
+    }
+
+    public let resourceOwnership: ResourceOwnership
+    public let processGroupTerminated: Bool
+    public let standardErrorContained: Bool
+    public let workspaceRemoved: Bool
+
+    fileprivate init(
+        resourceOwnership: ResourceOwnership,
+        processGroupTerminated: Bool,
+        standardErrorContained: Bool,
+        workspaceRemoved: Bool
+    ) {
+        self.resourceOwnership = resourceOwnership
+        self.processGroupTerminated = processGroupTerminated
+        self.standardErrorContained = standardErrorContained
+        self.workspaceRemoved = workspaceRemoved
+    }
+
+    static let noOwnedResources = Self(
+        resourceOwnership: .none,
+        processGroupTerminated: false,
+        standardErrorContained: false,
+        workspaceRemoved: false
+    )
+
+    static let retiredOwnedResources = Self(
+        resourceOwnership: .owned,
+        processGroupTerminated: true,
+        standardErrorContained: true,
+        workspaceRemoved: true
+    )
+
+    static let retiredPreparedWorkspace = Self(
+        resourceOwnership: .preparedWorkspace,
+        processGroupTerminated: false,
+        standardErrorContained: false,
+        workspaceRemoved: true
+    )
+}
+
 struct CodexContainedInteractiveLaunchPlan: Sendable {
     let executableURL: URL
     let arguments: [String]
@@ -81,6 +130,14 @@ public actor CodexContainedInteractiveSession {
         case retired
     }
 
+    private enum PrelaunchRetirementOutcome {
+        case absent
+        case observed(
+            CodexContainedInteractiveOwnerRetirementObservation
+        )
+        case failed
+    }
+
     private static let maximumAllowedLineBytes = 2 * 1_024 * 1_024
     private static let maximumAllowedSessionBytes = 16 * 1_024 * 1_024
 
@@ -90,9 +147,20 @@ public actor CodexContainedInteractiveSession {
     private var configuration:
         CodexContainedInteractiveSessionConfiguration?
     private var resources: CodexContainedInteractiveResources?
+    private var startingTask: Task<
+        CodexContainedInteractiveLaunchPlan,
+        any Error
+    >?
+    private var prelaunchRetirementOutcome =
+        PrelaunchRetirementOutcome.absent
     private var transferredBytes = 0
     private var operationInProgress = false
-    private var retirementTask: Task<Bool, Never>?
+    private var retirementTask: Task<
+        CodexContainedInteractiveOwnerRetirementObservation?,
+        Never
+    >?
+    private var retirementObservation:
+        CodexContainedInteractiveOwnerRetirementObservation?
 
     public init() {
         now = Date.init
@@ -123,29 +191,43 @@ public actor CodexContainedInteractiveSession {
         self.configuration = configuration
         state = .starting
 
-        let plan: CodexContainedInteractiveLaunchPlan
-        do {
-            plan = try await planBuilder(configuration)
-        } catch {
-            if state == .starting {
-                state = .failed
-            }
-            throw CodexContainedInteractiveSessionError.launchFailed
+        let task = Task {
+            try await planBuilder(configuration)
         }
-        guard state == .starting else {
-            try? plan.workspace.remove()
+        startingTask = task
+        let result = await withTaskCancellationHandler {
+            await task.result
+        } onCancel: {
+            task.cancel()
+        }
+        let plan: CodexContainedInteractiveLaunchPlan
+        switch result {
+        case let .success(value):
+            plan = value
+        case .failure:
+            if state == .starting {
+                startingTask = nil
+                prelaunchRetirementOutcome = .failed
+                state = .failed
+                throw CodexContainedInteractiveSessionError.launchFailed
+            }
             throw CodexContainedInteractiveSessionError
                 .sessionUnavailable
         }
+        guard state == .starting else {
+            throw CodexContainedInteractiveSessionError
+                .sessionUnavailable
+        }
+        startingTask = nil
         guard valid(configuration, at: now()) else {
+            recordPreparedWorkspaceRetirement(plan)
             state = .failed
-            try? plan.workspace.remove()
             throw CodexContainedInteractiveSessionError
                 .invalidConfiguration
         }
         guard valid(plan) else {
+            recordPreparedWorkspaceRetirement(plan)
             state = .failed
-            try? plan.workspace.remove()
             throw CodexContainedInteractiveSessionError.launchFailed
         }
 
@@ -156,6 +238,7 @@ public actor CodexContainedInteractiveSession {
                 maximumSessionBytes: configuration.maximumSessionBytes
             )
         } catch {
+            prelaunchRetirementOutcome = .failed
             state = .failed
             try? plan.workspace.remove()
             throw CodexContainedInteractiveSessionError.launchFailed
@@ -227,25 +310,72 @@ public actor CodexContainedInteractiveSession {
         }
     }
 
-    public func retire() async throws -> Bool {
-        if state == .retired {
-            return true
+    public func retire() async throws
+        -> CodexContainedInteractiveOwnerRetirementObservation
+    {
+        if state == .retired, let retirementObservation {
+            return retirementObservation
         }
         if let retirementTask {
-            let drained = await retirementTask.value
-            if !drained {
+            guard let observation = await retirementTask.value else {
                 throw CodexContainedInteractiveSessionError
                     .retirementFailed
             }
-            return true
+            return observation
+        }
+        if state == .starting {
+            guard let startingTask else {
+                state = .failed
+                throw CodexContainedInteractiveSessionError
+                    .retirementFailed
+            }
+            state = .retiring
+            let task = Task<
+                CodexContainedInteractiveOwnerRetirementObservation?,
+                Never
+            > {
+                switch await startingTask.result {
+                case let .success(plan):
+                    do {
+                        try plan.workspace.remove()
+                        return .retiredPreparedWorkspace
+                    } catch {
+                        return nil
+                    }
+                case .failure:
+                    return nil
+                }
+            }
+            retirementTask = task
+            return try await acceptRetirementTask(task)
+        }
+        if resources == nil {
+            switch prelaunchRetirementOutcome {
+            case .absent where state == .ready:
+                let observation =
+                    CodexContainedInteractiveOwnerRetirementObservation
+                        .noOwnedResources
+                retirementObservation = observation
+                state = .retired
+                return observation
+            case let .observed(observation):
+                retirementObservation = observation
+                state = .retired
+                return observation
+            case .absent, .failed:
+                throw CodexContainedInteractiveSessionError
+                    .retirementFailed
+            }
         }
         state = .retiring
         guard let resources else {
-            state = .retired
-            return true
+            throw CodexContainedInteractiveSessionError.retirementFailed
         }
         resources.cancellation.cancel()
-        let task = Task<Bool, Never> {
+        let task = Task<
+            CodexContainedInteractiveOwnerRetirementObservation?,
+            Never
+        > {
             while operationInProgress {
                 await Task.yield()
             }
@@ -254,13 +384,48 @@ public actor CodexContainedInteractiveSession {
             }.value
         }
         retirementTask = task
-        let drained = await task.value
+        return try await acceptRetirementTask(task)
+    }
+
+    private func acceptRetirementTask(
+        _ task: Task<
+            CodexContainedInteractiveOwnerRetirementObservation?,
+            Never
+        >
+    ) async throws
+        -> CodexContainedInteractiveOwnerRetirementObservation
+    {
+        let observation = await task.value
+        startingTask = nil
         self.resources = nil
-        state = drained ? .retired : .failed
-        guard drained else {
+        retirementObservation = observation
+        state = observation == nil ? .failed : .retired
+        guard let observation else {
             throw CodexContainedInteractiveSessionError.retirementFailed
         }
-        return true
+        return observation
+    }
+
+    private func recordPreparedWorkspaceRetirement(
+        _ plan: CodexContainedInteractiveLaunchPlan
+    ) {
+        var information = stat()
+        if lstat(plan.workspace.paths.rootURL.path, &information) != 0,
+           errno == ENOENT
+        {
+            prelaunchRetirementOutcome = .observed(
+                .retiredPreparedWorkspace
+            )
+            return
+        }
+        do {
+            try plan.workspace.remove()
+            prelaunchRetirementOutcome = .observed(
+                .retiredPreparedWorkspace
+            )
+        } catch {
+            prelaunchRetirementOutcome = .failed
+        }
     }
 
     private func valid(
@@ -688,13 +853,21 @@ private final class CodexContainedInteractiveResources:
         }
     }
 
-    func retire() -> Bool {
+    func retire()
+        -> CodexContainedInteractiveOwnerRetirementObservation?
+    {
         cancellation.cancel()
         writer.close()
         var terminated = true
         do {
             try terminateDiagnosticProcessGroup(process.processGroup)
             _ = try reapDiagnosticProcess(process.pid)
+            guard ProcessTreeTerminator.waitForProcessGroupExit(
+                process.processGroup,
+                timeout: .seconds(2)
+            ) else {
+                throw ProcessTreeTerminationError.unexpected
+            }
         } catch {
             terminated = false
             forceCleanupDiagnosticProcess(process)
@@ -710,6 +883,9 @@ private final class CodexContainedInteractiveResources:
         } catch {
             workspaceRemoved = false
         }
-        return terminated && stderrContained && workspaceRemoved
+        guard terminated, stderrContained, workspaceRemoved else {
+            return nil
+        }
+        return .retiredOwnedResources
     }
 }

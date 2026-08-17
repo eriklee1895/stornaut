@@ -539,18 +539,169 @@ public enum LifecycleInteractiveSessionResponseKind:
     case retired
 }
 
+public struct LifecycleInteractiveWorkerRetirementObservation:
+    Codable,
+    Sendable,
+    Equatable
+{
+    public enum ResourceOwnership: String, Codable, Sendable {
+        case none
+        case preparedWorkspace
+        case owned
+    }
+
+    public let resourceOwnership: ResourceOwnership
+    public let processGroupTerminated: Bool
+    public let standardErrorContained: Bool
+    public let workspaceRemoved: Bool
+
+    private init(
+        resourceOwnership: ResourceOwnership,
+        processGroupTerminated: Bool,
+        standardErrorContained: Bool,
+        workspaceRemoved: Bool
+    ) {
+        self.resourceOwnership = resourceOwnership
+        self.processGroupTerminated = processGroupTerminated
+        self.standardErrorContained = standardErrorContained
+        self.workspaceRemoved = workspaceRemoved
+    }
+
+    public static let noOwnedResources = Self(
+        resourceOwnership: .none,
+        processGroupTerminated: false,
+        standardErrorContained: false,
+        workspaceRemoved: false
+    )
+
+    public static let retiredOwnedResources = Self(
+        resourceOwnership: .owned,
+        processGroupTerminated: true,
+        standardErrorContained: true,
+        workspaceRemoved: true
+    )
+
+    public static let retiredPreparedWorkspace = Self(
+        resourceOwnership: .preparedWorkspace,
+        processGroupTerminated: false,
+        standardErrorContained: false,
+        workspaceRemoved: true
+    )
+
+    public init(from decoder: Decoder) throws {
+        let container = try strictContainer(
+            decoder: decoder,
+            expectedKeys: Set(CodingKeys.allCases.map(\.rawValue))
+        )
+        self.init(
+            resourceOwnership: try container.decode(
+                ResourceOwnership.self,
+                forKey: AnyLifecycleCodingKey(
+                    CodingKeys.resourceOwnership.rawValue
+                )
+            ),
+            processGroupTerminated: try container.decode(
+                Bool.self,
+                forKey: AnyLifecycleCodingKey(
+                    CodingKeys.processGroupTerminated.rawValue
+                )
+            ),
+            standardErrorContained: try container.decode(
+                Bool.self,
+                forKey: AnyLifecycleCodingKey(
+                    CodingKeys.standardErrorContained.rawValue
+                )
+            ),
+            workspaceRemoved: try container.decode(
+                Bool.self,
+                forKey: AnyLifecycleCodingKey(
+                    CodingKeys.workspaceRemoved.rawValue
+                )
+            )
+        )
+        guard isValid else {
+            throw DecodingError.dataCorruptedError(
+                forKey: AnyLifecycleCodingKey(
+                    CodingKeys.resourceOwnership.rawValue
+                ),
+                in: container,
+                debugDescription: "Inconsistent worker retirement facts"
+            )
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        guard isValid else {
+            throw LifecycleInteractiveSessionContractError.invalidResponse
+        }
+        var container = encoder.container(
+            keyedBy: AnyLifecycleCodingKey.self
+        )
+        try container.encode(
+            resourceOwnership,
+            forKey: AnyLifecycleCodingKey(
+                CodingKeys.resourceOwnership.rawValue
+            )
+        )
+        try container.encode(
+            processGroupTerminated,
+            forKey: AnyLifecycleCodingKey(
+                CodingKeys.processGroupTerminated.rawValue
+            )
+        )
+        try container.encode(
+            standardErrorContained,
+            forKey: AnyLifecycleCodingKey(
+                CodingKeys.standardErrorContained.rawValue
+            )
+        )
+        try container.encode(
+            workspaceRemoved,
+            forKey: AnyLifecycleCodingKey(
+                CodingKeys.workspaceRemoved.rawValue
+            )
+        )
+    }
+
+    private var isValid: Bool {
+        switch resourceOwnership {
+        case .none:
+            !processGroupTerminated
+                && !standardErrorContained
+                && !workspaceRemoved
+        case .preparedWorkspace:
+            !processGroupTerminated
+                && !standardErrorContained
+                && workspaceRemoved
+        case .owned:
+            processGroupTerminated
+                && standardErrorContained
+                && workspaceRemoved
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey, CaseIterable {
+        case resourceOwnership
+        case processGroupTerminated
+        case standardErrorContained
+        case workspaceRemoved
+    }
+}
+
 public struct LifecycleInteractiveSessionResponse:
     Codable,
     Sendable,
     Equatable
 {
-    public static let protocolVersion = 2
+    public static let protocolVersion = 3
 
     public let kind: LifecycleInteractiveSessionResponseKind
     public let investigationID: LifecycleInvestigationID
     public let operationID: UUID
     public let line: Data?
     public let drained: Bool?
+    public let ownerRetirementObservation:
+        LifecycleInteractiveWorkerRetirementObservation?
     public let residueObservation:
         LifecycleInvestigationResidueObservation?
 
@@ -560,6 +711,8 @@ public struct LifecycleInteractiveSessionResponse:
         operationID: UUID,
         line: Data?,
         drained: Bool?,
+        ownerRetirementObservation:
+            LifecycleInteractiveWorkerRetirementObservation?,
         residueObservation: LifecycleInvestigationResidueObservation?
     ) {
         self.kind = kind
@@ -567,6 +720,7 @@ public struct LifecycleInteractiveSessionResponse:
         self.operationID = operationID
         self.line = line
         self.drained = drained
+        self.ownerRetirementObservation = ownerRetirementObservation
         self.residueObservation = residueObservation
     }
 
@@ -580,6 +734,7 @@ public struct LifecycleInteractiveSessionResponse:
             operationID: operationID,
             line: nil,
             drained: nil,
+            ownerRetirementObservation: nil,
             residueObservation: nil
         )
     }
@@ -594,6 +749,7 @@ public struct LifecycleInteractiveSessionResponse:
             operationID: operationID,
             line: nil,
             drained: nil,
+            ownerRetirementObservation: nil,
             residueObservation: nil
         )
     }
@@ -609,6 +765,7 @@ public struct LifecycleInteractiveSessionResponse:
             operationID: operationID,
             line: line,
             drained: nil,
+            ownerRetirementObservation: nil,
             residueObservation: nil
         )
         guard response.isValid else {
@@ -627,6 +784,7 @@ public struct LifecycleInteractiveSessionResponse:
             operationID: operationID,
             line: nil,
             drained: nil,
+            ownerRetirementObservation: nil,
             residueObservation: nil
         )
     }
@@ -635,6 +793,8 @@ public struct LifecycleInteractiveSessionResponse:
         investigationID: LifecycleInvestigationID,
         operationID: UUID,
         drained: Bool,
+        ownerRetirementObservation:
+            LifecycleInteractiveWorkerRetirementObservation,
         residueObservation:
             LifecycleInvestigationResidueObservation? = nil
     ) -> Self {
@@ -644,6 +804,7 @@ public struct LifecycleInteractiveSessionResponse:
             operationID: operationID,
             line: nil,
             drained: drained,
+            ownerRetirementObservation: ownerRetirementObservation,
             residueObservation: residueObservation
         )
     }
@@ -695,6 +856,12 @@ public struct LifecycleInteractiveSessionResponse:
         drained = try container.decodeIfPresent(
             Bool.self,
             forKey: AnyLifecycleCodingKey(CodingKeys.drained.rawValue)
+        )
+        ownerRetirementObservation = try container.decodeIfPresent(
+            LifecycleInteractiveWorkerRetirementObservation.self,
+            forKey: AnyLifecycleCodingKey(
+                CodingKeys.ownerRetirementObservation.rawValue
+            )
         )
         residueObservation = try container.decodeIfPresent(
             LifecycleInvestigationResidueObservation.self,
@@ -749,6 +916,12 @@ public struct LifecycleInteractiveSessionResponse:
             forKey: AnyLifecycleCodingKey(CodingKeys.drained.rawValue)
         )
         try container.encode(
+            ownerRetirementObservation,
+            forKey: AnyLifecycleCodingKey(
+                CodingKeys.ownerRetirementObservation.rawValue
+            )
+        )
+        try container.encode(
             residueObservation,
             forKey: AnyLifecycleCodingKey(
                 CodingKeys.residueObservation.rawValue
@@ -774,12 +947,16 @@ public struct LifecycleInteractiveSessionResponse:
         switch kind {
         case .started, .writeAccepted, .endOfStream:
             return line == nil && drained == nil
+                && ownerRetirementObservation == nil
                 && residueObservation == nil
         case .line:
             return line.map(validLine) == true && drained == nil
+                && ownerRetirementObservation == nil
                 && residueObservation == nil
         case .retired:
-            return line == nil && drained != nil
+            return line == nil
+                && drained == true
+                && ownerRetirementObservation != nil
         }
     }
 
@@ -805,7 +982,110 @@ public struct LifecycleInteractiveSessionResponse:
         case operationID
         case line
         case drained
+        case ownerRetirementObservation
         case residueObservation
+    }
+}
+
+public struct LifecycleInteractiveWorkerReply:
+    Codable,
+    Sendable,
+    Equatable
+{
+    public let operationID: UUID
+    public let response: LifecycleInteractiveSessionResponse?
+    public let reasonKey: String?
+
+    public init(
+        operationID: UUID,
+        response: LifecycleInteractiveSessionResponse
+    ) {
+        self.operationID = operationID
+        self.response = response
+        reasonKey = nil
+    }
+
+    public init(operationID: UUID, reasonKey: String) throws {
+        guard validInteractiveWorkerReasonKey(reasonKey) else {
+            throw LifecycleInteractiveSessionContractError
+                .invalidResponse
+        }
+        self.operationID = operationID
+        response = nil
+        self.reasonKey = reasonKey
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try strictContainer(
+            decoder: decoder,
+            expectedKeys: Set(CodingKeys.allCases.map(\.rawValue))
+        )
+        operationID = try container.decode(
+            UUID.self,
+            forKey: AnyLifecycleCodingKey(
+                CodingKeys.operationID.rawValue
+            )
+        )
+        response = try container.decodeIfPresent(
+            LifecycleInteractiveSessionResponse.self,
+            forKey: AnyLifecycleCodingKey(
+                CodingKeys.response.rawValue
+            )
+        )
+        reasonKey = try container.decodeIfPresent(
+            String.self,
+            forKey: AnyLifecycleCodingKey(
+                CodingKeys.reasonKey.rawValue
+            )
+        )
+        guard isValid else {
+            throw DecodingError.dataCorruptedError(
+                forKey: AnyLifecycleCodingKey(
+                    CodingKeys.operationID.rawValue
+                ),
+                in: container,
+                debugDescription: "Invalid interactive worker reply"
+            )
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        guard isValid else {
+            throw LifecycleInteractiveSessionContractError
+                .invalidResponse
+        }
+        var container = encoder.container(
+            keyedBy: AnyLifecycleCodingKey.self
+        )
+        try container.encode(
+            operationID,
+            forKey: AnyLifecycleCodingKey(
+                CodingKeys.operationID.rawValue
+            )
+        )
+        try container.encode(
+            response,
+            forKey: AnyLifecycleCodingKey(
+                CodingKeys.response.rawValue
+            )
+        )
+        try container.encode(
+            reasonKey,
+            forKey: AnyLifecycleCodingKey(
+                CodingKeys.reasonKey.rawValue
+            )
+        )
+    }
+
+    private var isValid: Bool {
+        (response != nil) != (reasonKey != nil)
+            && reasonKey.map(validInteractiveWorkerReasonKey) != false
+    }
+
+    private enum CodingKeys: String, CodingKey, CaseIterable {
+        case operationID
+        case response
+        case reasonKey
     }
 }
 
@@ -814,4 +1094,16 @@ private func validLine(_ data: Data) -> Bool {
         .contains(data.count)
         && data.last == 0x0A
         && !data.dropLast().contains(0x00)
+}
+
+private func validInteractiveWorkerReasonKey(_ value: String) -> Bool {
+    !value.isEmpty
+        && value.utf8.count <= 160
+        && value.hasPrefix("runtime.lifecycle.interactive.")
+        && value.unicodeScalars.allSatisfy { scalar in
+            ("a"..."z").contains(Character(String(scalar)))
+                || ("0"..."9").contains(Character(String(scalar)))
+                || scalar == "."
+                || scalar == "-"
+        }
 }

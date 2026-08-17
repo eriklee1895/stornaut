@@ -262,6 +262,8 @@ package actor InvestigationLifecycleAppServerTransport:
             guard
                 validated.kind == .retired,
                 validated.drained == true,
+                validated.ownerRetirementObservation
+                    == .retiredOwnedResources,
                 let observation = validated.residueObservation
             else {
                 throw InvestigationLifecycleAppServerTransportError

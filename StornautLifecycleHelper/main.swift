@@ -47,27 +47,6 @@ private enum LifecycleHelperFailure: Error {
     case drainFailed(reasonKey: String)
 }
 
-private struct InteractiveWorkerReply: Codable {
-    let operationID: UUID
-    let response: LifecycleInteractiveSessionResponse?
-    let reasonKey: String?
-
-    init(
-        operationID: UUID,
-        response: LifecycleInteractiveSessionResponse
-    ) {
-        self.operationID = operationID
-        self.response = response
-        reasonKey = nil
-    }
-
-    init(operationID: UUID, reasonKey: String) {
-        self.operationID = operationID
-        response = nil
-        self.reasonKey = reasonKey
-    }
-}
-
 private func writeAll(
     _ data: Data,
     to descriptor: Int32
@@ -478,23 +457,23 @@ private func runInteractiveWorkerMode(
                 throw LifecycleHelperFailure.invalidInvocation
             }
             Task {
-                let reply: InteractiveWorkerReply
+                let reply: LifecycleInteractiveWorkerReply
                 do {
                     let response =
                     try await broker.handle(request)
-                    reply = InteractiveWorkerReply(
+                    reply = LifecycleInteractiveWorkerReply(
                         operationID: request.operationID,
                         response: response
                     )
                 } catch let error
                     as LifecycleInteractiveSessionBrokerError
                 {
-                    reply = InteractiveWorkerReply(
+                    reply = try LifecycleInteractiveWorkerReply(
                         operationID: request.operationID,
                         reasonKey: lifecycleInteractiveReasonKey(error)
                     )
                 } catch {
-                    reply = InteractiveWorkerReply(
+                    reply = try LifecycleInteractiveWorkerReply(
                         operationID: request.operationID,
                         reasonKey:
                             "runtime.lifecycle.interactive.remote-rejected"
@@ -527,7 +506,7 @@ private final class LifecycleInteractiveWorkerReplyWriter:
         self.descriptor = descriptor
     }
 
-    func write(_ reply: InteractiveWorkerReply) throws {
+    func write(_ reply: LifecycleInteractiveWorkerReply) throws {
         try lock.withLock {
             try writeFramedData(
                 try JSONEncoder().encode(reply),
@@ -593,9 +572,43 @@ private struct LifecycleContainedInteractiveWorker:
         return line
     }
 
-    func retire() async throws -> Bool {
+    func retire() async throws
+        -> LifecycleInteractiveWorkerRetirementObservation
+    {
         do {
-            return try await session.retire()
+            let observation = try await session.retire()
+            switch observation.resourceOwnership {
+            case .none:
+                guard
+                    !observation.processGroupTerminated,
+                    !observation.standardErrorContained,
+                    !observation.workspaceRemoved
+                else {
+                    throw CodexContainedInteractiveSessionError
+                        .retirementFailed
+                }
+                return .noOwnedResources
+            case .preparedWorkspace:
+                guard
+                    !observation.processGroupTerminated,
+                    !observation.standardErrorContained,
+                    observation.workspaceRemoved
+                else {
+                    throw CodexContainedInteractiveSessionError
+                        .retirementFailed
+                }
+                return .retiredPreparedWorkspace
+            case .owned:
+                guard
+                    observation.processGroupTerminated,
+                    observation.standardErrorContained,
+                    observation.workspaceRemoved
+                else {
+                    throw CodexContainedInteractiveSessionError
+                        .retirementFailed
+                }
+                return .retiredOwnedResources
+            }
         } catch let error as CodexContainedInteractiveSessionError {
             if let mapped = lifecycleInteractiveWorkerError(error) {
                 throw mapped
@@ -1506,7 +1519,7 @@ private final class LifecycleHelperService:
                         timeoutMilliseconds: 900_000
                     )
                     let workerReply = try JSONDecoder().decode(
-                        InteractiveWorkerReply.self,
+                        LifecycleInteractiveWorkerReply.self,
                         from: data
                     )
                     self.operationQueue.async { [weak self] in
@@ -1529,7 +1542,7 @@ private final class LifecycleHelperService:
     }
 
     private func receiveInteractiveReply(
-        _ workerReply: InteractiveWorkerReply
+        _ workerReply: LifecycleInteractiveWorkerReply
     ) {
         guard let pending = lock.withLock({
             interactivePending.removeValue(
@@ -1591,6 +1604,20 @@ private final class LifecycleHelperService:
             return
         }
         if pending.request.kind == .retire {
+            guard let ownerRetirementObservation =
+                validated.ownerRetirementObservation
+            else {
+                pending.reply(
+                    nil,
+                    "runtime.lifecycle.interactive.retire-failed"
+                )
+                failAllInteractiveOperations(
+                    reasonKey:
+                        "runtime.lifecycle.interactive.retire-failed",
+                    drain: true
+                )
+                return
+            }
             let interrupted = lock.withLock {
                 let values = Array(interactivePending.values)
                 interactivePending.removeAll()
@@ -1611,6 +1638,8 @@ private final class LifecycleHelperService:
                             pending.request.investigationID,
                         operationID: pending.request.operationID,
                         drained: residueObservation.provedEmpty,
+                        ownerRetirementObservation:
+                            ownerRetirementObservation,
                         residueObservation: residueObservation
                     )
                 pending.reply(

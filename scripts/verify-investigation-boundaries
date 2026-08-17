@@ -601,6 +601,17 @@ if "Codable" in interactive_transport_source[
     raise SystemExit(
         "opaque Investigation retirement evidence became Codable"
     )
+retirement_evidence_source = interactive_transport_source[
+    interactive_transport_source.index(
+        "package struct InvestigationLifecycleRetirementEvidence:"
+    ):interactive_transport_source.index(
+        "package actor InvestigationLifecycleRetirementEvidenceStore:"
+    )
+]
+if "ownerRetirementObservation" in retirement_evidence_source:
+    raise SystemExit(
+        "Untrusted worker retirement wire entered package evidence."
+    )
 if "package actor InvestigationLifecycleRetirementEvidenceStore: Sendable" \
         not in interactive_transport_source:
     raise SystemExit(
@@ -802,6 +813,11 @@ required_interactive_contract = {
     "public static let maximumEncodedEnvelopeBytes = 3 * 1_024 * 1_024",
     "public enum LifecycleInteractiveSessionResponseKind:",
     "public struct LifecycleInteractiveSessionResponse:",
+    "public struct LifecycleInteractiveWorkerRetirementObservation:",
+    "public static let protocolVersion = 3",
+    "ownerRetirementObservation:",
+    "public struct LifecycleInteractiveWorkerReply:",
+    "(response != nil) != (reasonKey != nil)",
     "public func validated(",
 }
 missing_interactive_contract = {
@@ -864,6 +880,8 @@ required_interactive_transport = {
     "private let session: any LifecycleInteractiveSessionSending",
     "try response.validated(for: request)",
     "validated.drained == true",
+    "validated.ownerRetirementObservation",
+    "== .retiredOwnedResources",
     "guard state == .ready || state == .active || state == .failed else",
     "private var operationInProgress = false",
     "private func requireUnexpired() throws",
@@ -901,6 +919,10 @@ required_interactive_helper = {
     "runInteractiveWorkerMode(",
     "setuid(identity.userID) == 0",
     "F_SETNOSIGPIPE",
+    "LifecycleInteractiveWorkerRetirementObservation",
+    "observation.resourceOwnership",
+    "ownerRetirementObservation:",
+    "LifecycleInteractiveWorkerReply.self",
 }
 missing_interactive_helper = {
     marker
@@ -936,6 +958,31 @@ if "CodexContainedInteractiveSession()" in root_helper_source:
     raise SystemExit(
         "Root helper gained a direct contained Codex session constructor"
     )
+
+for source_name, source in (
+    ("Lifecycle contract", interactive_contract_source),
+    ("Investigation transport", interactive_transport_source),
+    ("Lifecycle helper", lifecycle_helper_source),
+):
+    for forbidden in (
+        "drained && residueObservation?.provedEmpty",
+        "ownerRetirementObservation!",
+    ):
+        if forbidden in source:
+            raise SystemExit(
+                f"{source_name} infers or force-unwraps owner retirement: "
+                f"{forbidden}"
+            )
+
+for marker in (
+    "ProcessTreeTerminator.waitForProcessGroupExit(",
+    "timeout: .seconds(2)",
+):
+    if marker not in contained_session_source:
+        raise SystemExit(
+            "Contained retirement lost exact process-group exit proof: "
+            f"{marker}"
+        )
 
 configuration_match = re.search(
     r"public struct CodexContainedInteractiveSessionConfiguration:"

@@ -37,6 +37,10 @@ struct LifecycleInteractiveSessionBrokerTests {
         )
         #expect(retired.kind == .retired)
         #expect(retired.drained == true)
+        #expect(
+            retired.ownerRetirementObservation
+                == .retiredOwnedResources
+        )
         #expect(await worker.startCount == 1)
         #expect(await worker.writes == [write.line!])
         #expect(await worker.readCount == 1)
@@ -328,9 +332,14 @@ struct LifecycleInteractiveSessionBrokerTests {
             await broker.invalidateAndRetire()
         }
         await Task.yield()
-        await worker.resumeRetire(drained: true)
+        await worker.resumeRetire(
+            observation: .retiredOwnedResources
+        )
 
-        #expect(try await retireTask.value.drained == true)
+        #expect(
+            try await retireTask.value.ownerRetirementObservation
+                == .retiredOwnedResources
+        )
         #expect(await invalidateTask.value)
         #expect(await worker.retireCount == 1)
     }
@@ -349,6 +358,9 @@ struct LifecycleInteractiveSessionBrokerTests {
         )
         #expect(response.kind == .retired)
         #expect(response.drained == true)
+        #expect(
+            response.ownerRetirementObservation == .noOwnedResources
+        )
         #expect(await worker.startCount == 0)
         #expect(await worker.retireCount == 1)
     }
@@ -382,7 +394,7 @@ struct LifecycleInteractiveSessionBrokerTests {
     func unconfirmedDrainNeverProducesARetiredResponse() async throws {
         let fixture = LifecycleInteractiveBrokerFixture()
         let worker = RecordingLifecycleInteractiveWorker(
-            retirementDrained: false
+            retirementObservation: nil
         )
         let broker = LifecycleInteractiveSessionBroker(
             worker: worker,
@@ -462,7 +474,8 @@ private actor RecordingLifecycleInteractiveWorker:
     private let startError: (any Error)?
     private let writeError: (any Error)?
     private let readError: (any Error)?
-    private let retirementDrained: Bool
+    private let retirementObservation:
+        LifecycleInteractiveWorkerRetirementObservation?
     private let beforeWrite: @Sendable () -> Void
 
     init(
@@ -470,14 +483,16 @@ private actor RecordingLifecycleInteractiveWorker:
         startError: (any Error)? = nil,
         writeError: (any Error)? = nil,
         readError: (any Error)? = nil,
-        retirementDrained: Bool = true,
+        retirementObservation:
+            LifecycleInteractiveWorkerRetirementObservation? =
+                .retiredOwnedResources,
         beforeWrite: @escaping @Sendable () -> Void = {}
     ) {
         self.reads = reads
         self.startError = startError
         self.writeError = writeError
         self.readError = readError
-        self.retirementDrained = retirementDrained
+        self.retirementObservation = retirementObservation
         self.beforeWrite = beforeWrite
     }
 
@@ -512,9 +527,17 @@ private actor RecordingLifecycleInteractiveWorker:
         return line
     }
 
-    func retire() async throws -> Bool {
+    func retire() async throws
+        -> LifecycleInteractiveWorkerRetirementObservation
+    {
         retireCount += 1
-        return retirementDrained
+        guard let retirementObservation else {
+            throw LifecycleInteractiveWorkerTestError.failed
+        }
+        if startCount == 0 {
+            return .noOwnedResources
+        }
+        return retirementObservation
     }
 
     func appendRead(_ line: Data) {
@@ -549,13 +572,15 @@ private actor SuspendedLifecycleInteractiveWorker:
         }
     }
 
-    func retire() async throws -> Bool {
+    func retire() async throws
+        -> LifecycleInteractiveWorkerRetirementObservation
+    {
         retireCount += 1
         readContinuation?.resume(
             throwing: LifecycleInteractiveWorkerTestError.failed
         )
         readContinuation = nil
-        return true
+        return .retiredOwnedResources
     }
 
     func waitUntilReadIsSuspended() async {
@@ -600,10 +625,12 @@ private actor SuspendedFirstWriteLifecycleInteractiveWorker:
         return nil
     }
 
-    func retire() async throws -> Bool {
+    func retire() async throws
+        -> LifecycleInteractiveWorkerRetirementObservation
+    {
         firstWriteContinuation?.resume()
         firstWriteContinuation = nil
-        return true
+        return .retiredOwnedResources
     }
 
     func waitUntilFirstWriteIsSuspended() async {
@@ -626,7 +653,10 @@ private actor SuspendedRetirementLifecycleInteractiveWorker:
 {
     private(set) var retireCount = 0
     private var retireContinuation:
-        CheckedContinuation<Bool, Never>?
+        CheckedContinuation<
+            LifecycleInteractiveWorkerRetirementObservation,
+            Never
+        >?
     private var retireWaiter: CheckedContinuation<Void, Never>?
 
     func start(
@@ -644,7 +674,9 @@ private actor SuspendedRetirementLifecycleInteractiveWorker:
         return nil
     }
 
-    func retire() async throws -> Bool {
+    func retire() async throws
+        -> LifecycleInteractiveWorkerRetirementObservation
+    {
         retireCount += 1
         return await withCheckedContinuation {
             retireContinuation = $0
@@ -662,8 +694,10 @@ private actor SuspendedRetirementLifecycleInteractiveWorker:
         }
     }
 
-    func resumeRetire(drained: Bool) {
-        retireContinuation?.resume(returning: drained)
+    func resumeRetire(
+        observation: LifecycleInteractiveWorkerRetirementObservation
+    ) {
+        retireContinuation?.resume(returning: observation)
         retireContinuation = nil
     }
 }

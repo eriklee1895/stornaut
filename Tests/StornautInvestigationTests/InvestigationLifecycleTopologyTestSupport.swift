@@ -119,6 +119,7 @@ struct LifecycleTopologyCollectorFixture {
                 investigationID: investigationID,
                 operationID: operationID,
                 drained: true,
+                ownerRetirementObservation: .retiredOwnedResources,
                 residueObservation:
                     try LifecycleInvestigationResidueObservation(
                         investigationID: investigationID,

@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import StornautProcessSupport
 import Testing
 @testable import StornautCodex
 
@@ -20,7 +21,11 @@ struct CodexContainedInteractiveSessionTests {
         try await session.writeLine(Data("{\"id\":1}\n".utf8))
         let line = try await session.readLine()
         #expect(line == Data("{\"id\":1}\n".utf8))
-        #expect(try await session.retire())
+        let retirement = try await session.retire()
+        #expect(retirement.resourceOwnership == .owned)
+        #expect(retirement.processGroupTerminated)
+        #expect(retirement.standardErrorContained)
+        #expect(retirement.workspaceRemoved)
         #expect(
             try fixture.recordedArguments() == [
                 "sandbox",
@@ -115,7 +120,7 @@ struct CodexContainedInteractiveSessionTests {
         ) {
             _ = try await session.readLine()
         }
-        #expect(try await session.retire())
+        #expect(try await session.retire() == .retiredOwnedResources)
         #expect(
             !FileManager.default.fileExists(
                 atPath: fixture.workspace.paths.rootURL.path
@@ -136,9 +141,19 @@ struct CodexContainedInteractiveSessionTests {
         try await session.start(fixture.configuration)
         let childPID = try fixture.waitForRecordedPID()
 
-        #expect(try await session.retire())
+        let firstRetirement = try await session.retire()
         #expect(waitForContainedProcessExit(childPID))
-        #expect(try await session.retire())
+        let repeatedRetirement = try await session.retire()
+        #expect(firstRetirement == .retiredOwnedResources)
+        #expect(repeatedRetirement == firstRetirement)
+        #expect(
+            !ProcessTreeTerminator.processGroupHasMembers(
+                ProcessGroupID(
+                    rawValue: try fixture.waitForRecordedPGID()
+                ),
+                excluding: 0
+            )
+        )
         await #expect(
             throws:
                 CodexContainedInteractiveSessionError.sessionUnavailable
@@ -166,7 +181,7 @@ struct CodexContainedInteractiveSessionTests {
         _ = try fixture.waitForRecordedPID(name: "escaped.pid")
 
         let start = ContinuousClock.now
-        #expect(try await session.retire())
+        #expect(try await session.retire() == .retiredOwnedResources)
         let duration = start.duration(to: .now)
 
         #expect(duration < .seconds(2))
@@ -229,7 +244,7 @@ struct CodexContainedInteractiveSessionTests {
         }
         try fixture.waitForMarker("read-ready")
 
-        #expect(try await session.retire())
+        let firstRetirement = try await session.retire()
         await #expect(
             throws:
                 CodexContainedInteractiveSessionError
@@ -237,7 +252,9 @@ struct CodexContainedInteractiveSessionTests {
         ) {
             _ = try await read.value
         }
-        #expect(try await session.retire())
+        #expect(
+            try await session.retire() == firstRetirement
+        )
         #expect(
             !FileManager.default.fileExists(
                 atPath: fixture.workspace.paths.rootURL.path
@@ -271,7 +288,7 @@ struct CodexContainedInteractiveSessionTests {
         ) {
             _ = try await session.readLine()
         }
-        #expect(try await session.retire())
+        #expect(try await session.retire() == .retiredOwnedResources)
     }
 
     @Test
@@ -291,8 +308,48 @@ struct CodexContainedInteractiveSessionTests {
         async let second = session.retire()
         let results = try await [first, second]
 
-        #expect(results == [true, true])
+        #expect(
+            results == [
+                .retiredOwnedResources,
+                .retiredOwnedResources,
+            ]
+        )
         #expect(waitForContainedProcessExit(childPID))
+        #expect(
+            !FileManager.default.fileExists(
+                atPath: fixture.workspace.paths.rootURL.path
+            )
+        )
+    }
+
+    @Test
+    func failedRetirementNeverMintsAnOwnerObservation() async throws {
+        let fixture = try ContainedInteractiveSessionFixture(
+            mode: "stderr-overflow"
+        )
+        defer { fixture.remove() }
+        let session = CodexContainedInteractiveSession(
+            now: { fixture.now },
+            planBuilder: { _ in fixture.plan }
+        )
+        try await session.start(
+            fixture.configuration(
+                maximumLineBytes: 64,
+                maximumSessionBytes: 64
+            )
+        )
+        try fixture.waitForMarker("stderr-ready")
+
+        await #expect(
+            throws: CodexContainedInteractiveSessionError.retirementFailed
+        ) {
+            _ = try await session.retire()
+        }
+        await #expect(
+            throws: CodexContainedInteractiveSessionError.retirementFailed
+        ) {
+            _ = try await session.retire()
+        }
         #expect(
             !FileManager.default.fileExists(
                 atPath: fixture.workspace.paths.rootURL.path
@@ -333,6 +390,101 @@ struct CodexContainedInteractiveSessionTests {
                 atPath: fixture.workspace.paths.rootURL.path
             )
         )
+    }
+
+    @Test
+    func retirementBeforeStartDistinguishesNoOwnedResources() async throws {
+        let counter = LockedContainedPlanCounter()
+        let session = CodexContainedInteractiveSession(
+            planBuilder: { _ in
+                counter.increment()
+                throw ContainedInteractiveSessionFixtureError.unexpected
+            }
+        )
+
+        let first = try await session.retire()
+        let repeated = try await session.retire()
+
+        #expect(first == .noOwnedResources)
+        #expect(repeated == first)
+        #expect(first.resourceOwnership == .none)
+        #expect(!first.processGroupTerminated)
+        #expect(!first.standardErrorContained)
+        #expect(!first.workspaceRemoved)
+        #expect(counter.value == 0)
+    }
+
+    @Test
+    func retirementWaitsForAStartingPlanAndRetiresItsWorkspace()
+        async throws
+    {
+        let fixture = try ContainedInteractiveSessionFixture(mode: "echo")
+        defer { fixture.remove() }
+        let builder = SuspendedContainedPlanBuilder(plan: fixture.plan)
+        let completion = RetirementCompletionProbe()
+        let session = CodexContainedInteractiveSession(
+            now: { fixture.now },
+            planBuilder: { _ in try await builder.build() }
+        )
+        let start = Task { try await session.start(fixture.configuration) }
+        await builder.waitUntilEntered()
+        let retirement = Task {
+            let observation = try await session.retire()
+            await completion.record(observation)
+            return observation
+        }
+        for _ in 0..<10 {
+            await Task.yield()
+        }
+        #expect(await completion.value == nil)
+
+        await builder.resume()
+
+        #expect(
+            try await retirement.value == .retiredPreparedWorkspace
+        )
+        await #expect(
+            throws: CodexContainedInteractiveSessionError
+                .sessionUnavailable
+        ) {
+            try await start.value
+        }
+        #expect(
+            !FileManager.default.fileExists(
+                atPath: fixture.workspace.paths.rootURL.path
+            )
+        )
+    }
+
+    @Test
+    func startingPlanCleanupFailureCannotMintRetirementEvidence()
+        async throws
+    {
+        let fixture = try ContainedInteractiveSessionFixture(mode: "echo")
+        defer { fixture.remove() }
+        let builder = SuspendedContainedPlanBuilder(plan: fixture.plan)
+        let session = CodexContainedInteractiveSession(
+            now: { fixture.now },
+            planBuilder: { _ in try await builder.build() }
+        )
+        let start = Task { try await session.start(fixture.configuration) }
+        await builder.waitUntilEntered()
+        let retirement = Task { try await session.retire() }
+        try FileManager.default.removeItem(at: fixture.workspace.markerURL)
+        await builder.resume()
+
+        await #expect(
+            throws: CodexContainedInteractiveSessionError
+                .retirementFailed
+        ) {
+            _ = try await retirement.value
+        }
+        await #expect(
+            throws: CodexContainedInteractiveSessionError
+                .sessionUnavailable
+        ) {
+            try await start.value
+        }
     }
 
     @Test
@@ -491,6 +643,23 @@ private struct ContainedInteractiveSessionFixture {
         throw ContainedInteractiveSessionFixtureError.missingPID
     }
 
+    func waitForRecordedPGID() throws -> pid_t {
+        let deadline = Date().addingTimeInterval(2)
+        while Date() < deadline {
+            if
+                let value = try? String(
+                    contentsOf: recordURL.appending(path: "pgid.txt"),
+                    encoding: .utf8
+                ).trimmingCharacters(in: .whitespacesAndNewlines),
+                let processGroupID = pid_t(value)
+            {
+                return processGroupID
+            }
+            usleep(5_000)
+        }
+        throw ContainedInteractiveSessionFixtureError.missingPID
+    }
+
     func killRecordedProcess(_ name: String) {
         guard let processID = try? waitForRecordedPID(name: name) else {
             return
@@ -530,6 +699,49 @@ private final class LockedContainedPlanCounter:
     }
 }
 
+private actor SuspendedContainedPlanBuilder {
+    private let plan: CodexContainedInteractiveLaunchPlan
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var waiter: CheckedContinuation<Void, Never>?
+
+    init(plan: CodexContainedInteractiveLaunchPlan) {
+        self.plan = plan
+    }
+
+    func build() async throws -> CodexContainedInteractiveLaunchPlan {
+        await withCheckedContinuation {
+            continuation = $0
+            waiter?.resume()
+            waiter = nil
+        }
+        return plan
+    }
+
+    func waitUntilEntered() async {
+        if continuation != nil {
+            return
+        }
+        await withCheckedContinuation { waiter = $0 }
+    }
+
+    func resume() {
+        continuation?.resume()
+        continuation = nil
+    }
+}
+
+private actor RetirementCompletionProbe {
+    private(set) var value:
+        CodexContainedInteractiveOwnerRetirementObservation?
+
+    func record(
+        _ observation:
+            CodexContainedInteractiveOwnerRetirementObservation
+    ) {
+        value = observation
+    }
+}
+
 private enum ContainedInteractiveSessionFixtureError: Error {
     case missingMarker
     case missingPID
@@ -547,6 +759,7 @@ private func containedInteractiveScript(
     record_root=\(containedShellQuote(recordURL.path))
     mode=\(containedShellQuote(mode))
     printf '%s\n' "$@" > "$record_root/arguments.txt"
+    ps -o pgid= -p $$ | tr -d ' ' > "$record_root/pgid.txt"
 
     if [[ "$mode" == "descendant" ]]; then
         /bin/zsh -c 'trap "" INT TERM; /bin/sleep 30' &
@@ -578,6 +791,16 @@ private func containedInteractiveScript(
     fi
     if [[ "$mode" == "blocked-read" ]]; then
         : > "$record_root/read-ready"
+        /bin/sleep 30
+        exit 0
+    fi
+    if [[ "$mode" == "stderr-overflow" ]]; then
+        /usr/bin/python3 - <<'PY'
+    import sys
+    sys.stderr.write("x" * 256)
+    sys.stderr.flush()
+    PY
+        : > "$record_root/stderr-ready"
         /bin/sleep 30
         exit 0
     fi

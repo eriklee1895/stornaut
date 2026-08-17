@@ -31,7 +31,8 @@ public protocol LifecycleInteractiveWorkerDriving: Sendable {
 
     func readLine(maximumBytes: Int) async throws -> Data?
 
-    func retire() async throws -> Bool
+    func retire() async throws
+        -> LifecycleInteractiveWorkerRetirementObservation
 }
 
 public enum LifecycleInteractiveWorkerError:
@@ -81,7 +82,12 @@ public actor LifecycleInteractiveSessionBroker {
     private var operationIDs = Set<UUID>()
     private var transferredBytes = 0
     private var ioOperationInProgress = false
-    private var retirementTask: Task<Bool, Never>?
+    private var retirementTask: Task<
+        LifecycleInteractiveWorkerRetirementObservation?,
+        Never
+    >?
+    private var retirementObservation:
+        LifecycleInteractiveWorkerRetirementObservation?
 
     public init(
         worker: any LifecycleInteractiveWorkerDriving,
@@ -107,7 +113,7 @@ public actor LifecycleInteractiveSessionBroker {
     }
 
     public func invalidateAndRetire() async -> Bool {
-        await drainOnce()
+        await drainOnce() != nil
     }
 
     private func start(
@@ -252,13 +258,14 @@ public actor LifecycleInteractiveSessionBroker {
         _ request: LifecycleInteractiveSessionRequest
     ) async throws -> LifecycleInteractiveSessionResponse {
         try admitRetirement(request)
-        guard await drainOnce() else {
+        guard let observation = await drainOnce() else {
             throw LifecycleInteractiveSessionBrokerError.retireFailed
         }
         return .retired(
             investigationID: request.investigationID,
             operationID: request.operationID,
-            drained: true
+            drained: true,
+            ownerRetirementObservation: observation
         )
     }
 
@@ -377,25 +384,31 @@ public actor LifecycleInteractiveSessionBroker {
         }
     }
 
-    private func drainOnce() async -> Bool {
+    private func drainOnce() async
+        -> LifecycleInteractiveWorkerRetirementObservation?
+    {
         if phase == .retired {
-            return true
+            return retirementObservation
         }
         if let retirementTask {
             return await retirementTask.value
         }
         phase = .retiring
         let worker = self.worker
-        let task = Task<Bool, Never> {
+        let task = Task<
+            LifecycleInteractiveWorkerRetirementObservation?,
+            Never
+        > {
             do {
                 return try await worker.retire()
             } catch {
-                return false
+                return nil
             }
         }
         retirementTask = task
-        let drained = await task.value
-        phase = drained ? .retired : .failed
-        return drained
+        let observation = await task.value
+        retirementObservation = observation
+        phase = observation == nil ? .failed : .retired
+        return observation
     }
 }

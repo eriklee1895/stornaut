@@ -146,7 +146,8 @@ struct InvestigationLifecycleAppServerTransportTests {
                 .retired(
                     investigationID: fixture.investigationID,
                     operationID: fixture.operationIDs[0],
-                    drained: false
+                    drained: false,
+                    ownerRetirementObservation: .retiredOwnedResources
                 ),
             ]
         )
@@ -172,6 +173,7 @@ struct InvestigationLifecycleAppServerTransportTests {
                     investigationID: fixture.investigationID,
                     operationID: fixture.operationIDs[0],
                     drained: true,
+                    ownerRetirementObservation: .retiredOwnedResources,
                     residueObservation: valid
                 ),
             ]
@@ -188,7 +190,8 @@ struct InvestigationLifecycleAppServerTransportTests {
                 .retired(
                     investigationID: fixture.investigationID,
                     operationID: fixture.operationIDs[0],
-                    drained: true
+                    drained: true,
+                    ownerRetirementObservation: .retiredOwnedResources
                 ),
             ]),
             operationIDs: Array(fixture.operationIDs.prefix(1))
@@ -209,6 +212,7 @@ struct InvestigationLifecycleAppServerTransportTests {
                     investigationID: fixture.investigationID,
                     operationID: fixture.operationIDs[0],
                     drained: true,
+                    ownerRetirementObservation: .retiredOwnedResources,
                     residueObservation: foreignObservation
                 ),
             ]),
@@ -230,6 +234,7 @@ struct InvestigationLifecycleAppServerTransportTests {
                     investigationID: fixture.investigationID,
                     operationID: fixture.operationIDs[0],
                     drained: true,
+                    ownerRetirementObservation: .retiredOwnedResources,
                     residueObservation: foreignUserObservation
                 ),
             ]),
@@ -251,6 +256,7 @@ struct InvestigationLifecycleAppServerTransportTests {
                     investigationID: fixture.investigationID,
                     operationID: fixture.operationIDs[0],
                     drained: true,
+                    ownerRetirementObservation: .retiredOwnedResources,
                     residueObservation: nonzero
                 ),
             ]),
@@ -297,6 +303,7 @@ struct InvestigationLifecycleAppServerTransportTests {
                     investigationID: fixture.investigationID,
                     operationID: fixture.operationIDs[0],
                     drained: true,
+                    ownerRetirementObservation: .retiredOwnedResources,
                     residueObservation: residue
                 ),
             ],
@@ -806,6 +813,7 @@ private struct InvestigationLifecycleTransportFixture {
             investigationID: investigationID,
             operationID: operationID,
             drained: true,
+            ownerRetirementObservation: .retiredOwnedResources,
             residueObservation: try residueObservation(
                 observedAt: observedAt
             )
@@ -878,6 +886,7 @@ private actor SuspendedLifecycleInteractiveSession:
                 investigationID: investigationID,
                 operationID: operationIDs[2],
                 drained: true,
+                ownerRetirementObservation: .retiredOwnedResources,
                 residueObservation:
                     try LifecycleInvestigationResidueObservation(
                         investigationID: investigationID,
@@ -1065,6 +1074,7 @@ private actor AmbiguousStartLifecycleInteractiveSession:
                 investigationID: investigationID,
                 operationID: retireOperationID,
                 drained: true,
+                ownerRetirementObservation: .retiredOwnedResources,
                 residueObservation:
                     try LifecycleInvestigationResidueObservation(
                         investigationID: investigationID,

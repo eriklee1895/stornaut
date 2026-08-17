@@ -195,7 +195,11 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   识别出 App-local handoff 无法跨 App exit 与 managed-proxy/probe retirement
   仍为推断两个真实缺口，因此继续拆为 L3c1 helper-owned opaque retirement
   escrow、L3c2 deterministic machine driver、L3c3 current-source real-success
-  three-plane composition 与 L3c4 sealed final admission。L3c1 next；只有 L3c4
+  three-plane composition 与 L3c4 sealed final admission。L3c1 路径 preflight
+  又拆为 L3c1a typed owner retirement 与 L3c1b helper-owned opaque escrow。
+  L3c1a 已完成 typed none/prepared/owned truth、strict response v3、suspended
+  start join、exact PGID zero、strict worker reply、86-test focused、11-test App、
+  1012-test clean staged-only serial 与 post-fix review；L3c1b next。只有 L3c4
   可作 readiness claim，final full 尚未消耗。
   Task 39 尚未完成。
   真实 App Trash 依赖仍保持关闭，生产 Deep Dive 仍为 implementation unavailable。
@@ -403,7 +407,8 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   review 已通过；L3b2 trusted root collection 与 L3c failure matrix/final
   admission 随后继续推进；L3b2 lifecycle collector、1001-test clean
   staged-only serial 与 post-fix review 已通过；L3c 已按 trust/cost preflight
-  拆成 L3c1–L3c4，L3c1 opaque retirement escrow next，L3c4 独占 final
+  拆成 L3c1–L3c4，L3c1 又拆为 L3c1a/L3c1b；L3c1a 已完成 typed owner
+  retirement、1012-test serial 与 post-fix review，L3c1b next，L3c4 独占 final
   admission 与剩余 full。
   Task 39 尚未完成。
 Deep Dive 的旧 Broker-only no-go 已被 ADR 0004 的 capability-first 边界取代；
