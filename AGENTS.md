@@ -188,7 +188,11 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   XPC epoch、operation-bound L1/helper handoff 与 irreversible one-shot Store
   已完成，987-test clean staged-only serial、targeted helper/diagnostic builds
   与 independent post-fix review 均通过。L3b2 trusted L1/L2 collection 与 L3c
-  final admission 仍未实现，final full 尚未消耗。
+  final admission 随后继续拆分；L3b2 root-only one-shot L1/L2 collector、
+  non-activating exact service/PID observation 与 synthetic transition contract
+  已完成，1001-test clean staged-only serial、targeted helper/diagnostic builds
+  与 independent post-fix review 均通过。L3c final admission 仍未实现，final
+  full 尚未消耗。
   Task 39 尚未完成。
   真实 App Trash 依赖仍保持关闭，生产 Deep Dive 仍为 implementation unavailable。
   逐 Task 完成 Upstream Study、
@@ -393,6 +397,8 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   151-test focused、982-test clean staged-only serial 与 independent review
   已通过；L3b1 peer/L1 handoff、987-test clean staged-only serial 与 post-fix
   review 已通过；L3b2 trusted root collection 与 L3c failure matrix/final
+  admission 随后继续推进；L3b2 lifecycle collector、1001-test clean
+  staged-only serial 与 post-fix review 已通过；L3c failure matrix/final
   admission 仍待实现。
   Task 39 尚未完成。
 Deep Dive 的旧 Broker-only no-go 已被 ADR 0004 的 capability-first 边界取代；

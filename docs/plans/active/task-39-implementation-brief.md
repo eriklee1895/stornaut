@@ -78,7 +78,12 @@
 > its 987-test clean staged-only regression, targeted helper/diagnostic builds
 > and independent post-fix review passed. Evidence:
 > [39B2c-L3b1 Peer/Retirement Handoff Review](../../reports/phase-d-task-39b2c-l3b1-peer-retirement-handoff-review.md).
-> L3b2 trusted L1/L2 collection and L3c final admission remain pending.
+> L3b2 then completed the root-only one-shot L1/L2 topology collector,
+> non-activating exact service/PID observation and synthetic transition
+> contract. Its 1001-test clean staged-only regression, targeted builds and
+> independent post-fix review passed. Evidence:
+> [39B2c-L3b2 Lifecycle Topology Collector Review](../../reports/phase-d-task-39b2c-l3b2-lifecycle-topology-collector-review.md).
+> L3c final admission remains pending.
 >
 > **Parent plan:**
 > [Phase D Conditional Deep Dive](phase-d-conditional-deep-dive.md)

@@ -185,7 +185,10 @@
 > independent review 通过。L3b1 exact helper-peer/non-reconnectable XPC epoch、
 > operation-bound L1 handoff 与 irreversible one-shot Store 随后完成，987-test
 > clean staged-only serial、targeted helper/diagnostic builds 与 independent
-> post-fix review 通过。L3b2/L3c 尚未实现，final full 尚未消耗。
+> post-fix review 通过。L3b2 root-only one-shot L1/L2 collector、exact
+> non-activating service/PID observation 与 synthetic transition contract
+> 随后完成，1001-test clean staged-only serial、targeted builds 与 post-fix
+> review 通过。L3c 尚未实现，final full 尚未消耗。
 > 生产 Deep Dive 仍 unavailable。
 > Task 5 的历史
 > Broker-only no-go 已由 ADR 0004 capability-first 决策修订，Deep Dive 因
@@ -495,7 +498,10 @@ independent review 已通过。
 L3b1 peer/L1 handoff 见
 [review](../reports/phase-d-task-39b2c-l3b1-peer-retirement-handoff-review.md)；
 其 987-test clean staged-only serial、targeted builds 与 post-fix review 已通过。
-L3b2 trusted root collection 与 L3c final admission 仍待实现。
+L3b2 trusted lifecycle collector 见
+[review](../reports/phase-d-task-39b2c-l3b2-lifecycle-topology-collector-review.md)；
+其 1001-test clean staged-only serial、targeted builds 与 post-fix review 已
+通过。L3c final admission 仍待实现。
 生产 Deep Dive 继续 unavailable，直到 Task 44 final admission。
 
 跨 Epic 的阶段依赖、no-go 分支和交付顺序由 [Delivery Roadmap](../plans/roadmap.md) 管理；新 active plan 不得另起一套宏观路线。

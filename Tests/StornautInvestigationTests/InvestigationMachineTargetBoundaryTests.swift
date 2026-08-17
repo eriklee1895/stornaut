@@ -39,13 +39,13 @@ struct InvestigationMachineTargetBoundaryTests {
             "\"StornautCodex\"",
             "\"StornautCore\"",
             "\"StornautInvestigation\"",
+            "\"StornautInvestigationRuntime\"",
+            "\"StornautLifecycle\"",
         ] {
             #expect(targetSource.contains(dependency))
         }
         for forbidden in [
             "StornautExecution",
-            "StornautLifecycle",
-            "StornautInvestigationRuntime",
             "StornautInvestigationDiagnostic",
         ] {
             #expect(!targetSource.contains(forbidden))
@@ -60,6 +60,20 @@ struct InvestigationMachineTargetBoundaryTests {
 
         let machineText = try String(
             contentsOf: machineSource,
+            encoding: .utf8
+        )
+        let collectorSource = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "Sources/StornautInvestigationMachine/"
+                    + "InvestigationLifecycleTopologyCollector.swift"
+            ),
+            encoding: .utf8
+        )
+        let serviceSource = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "Sources/StornautInvestigationMachine/"
+                    + "FixedLifecycleServiceProbe.swift"
+            ),
             encoding: .utf8
         )
         for trustedDeclaration in [
@@ -80,6 +94,26 @@ struct InvestigationMachineTargetBoundaryTests {
             "signedInvestigationRuntimeReady",
         ] {
             #expect(!machineText.contains(forbidden))
+        }
+        for source in [collectorSource, serviceSource] {
+            for forbidden in [
+                "StornautExecution",
+                "StornautInvestigationDiagnostic",
+                "ActionExecutor",
+                "TrashMoving",
+                "RegisteredAction",
+                "SignedInvestigationRuntimeMachineAssembler",
+                "SignedInvestigationRuntimeMachineVerifier",
+                "signedInvestigationRuntimeReady",
+                "Codable",
+                "JSONEncoder",
+                "JSONDecoder",
+                "bootout",
+                "bootstrap system",
+                "FileManager.default.remove",
+            ] {
+                #expect(!source.contains(forbidden))
+            }
         }
     }
 }

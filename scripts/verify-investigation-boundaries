@@ -39,12 +39,16 @@ required_files=(
     "$coordinator_root/InvestigationRuntimeDiagnosticFacade.swift"
     "$coordinator_root/SignedInvestigationRuntimeContract.swift"
     "$machine_root/SignedInvestigationRuntimeMachineContract.swift"
+    "$machine_root/FixedLifecycleServiceProbe.swift"
+    "$machine_root/InvestigationLifecycleTopologyCollector.swift"
     "$coordinator_root/Resources/investigation-prompt-v1.txt"
     "$runtime_root/InvestigationCodexSessionAdapter.swift"
     "$runtime_root/InvestigationLifecycleAppServerTransport.swift"
     "$diagnostic_root/InvestigationRuntimeDiagnosticAppLeaf.swift"
     "$diagnostic_root/InvestigationRuntimeDiagnosticComposition.swift"
     "$lifecycle_root/LifecycleInteractiveSessionContract.swift"
+    "$lifecycle_root/DarwinFixedSystemServiceRegistry.swift"
+    "$lifecycle_root/LifecycleRootTopologyObservation.swift"
     "$lifecycle_root/LifecycleSupervisorXPC.swift"
     "$contained_session"
     "$registered_action_contract"
@@ -58,6 +62,81 @@ for file in "${required_files[@]}"; do
         exit 1
     fi
 done
+
+machine_collector_source="$machine_root/InvestigationLifecycleTopologyCollector.swift"
+machine_service_source="$machine_root/FixedLifecycleServiceProbe.swift"
+for marker in \
+    'actor InvestigationLifecycleTopologyCollector' \
+    'struct InvestigationLifecycleTopologyCohort' \
+    'await retirementEvidenceStore.consume()' \
+    'case rootAuthorityRequired' \
+    'case collectorConsumed' \
+    'provesInstalledTopology' \
+    'provesPostTeardownTopology'; do
+    rg -q --fixed-strings -- "$marker" "$machine_collector_source" || {
+        print -u2 "Trusted lifecycle collector marker missing: $marker"
+        exit 1
+    }
+done
+if rg -q --fixed-strings -- 'SignedInvestigationRuntimeResidue(' \
+    "$machine_collector_source"; then
+    print -u2 "L3b2 over-claimed final machine residue."
+    exit 1
+fi
+for marker in \
+    'struct DarwinFixedLifecycleServiceProbe' \
+    'DarwinLifecycleFixedSystemServiceRegistry().lookup()' \
+    'runtime.topology.service-label-mismatch' \
+    'runtime.topology.service-identity-mismatch'; do
+    rg -q --fixed-strings -- "$marker" "$machine_service_source" || {
+        print -u2 "Fixed service observer marker missing: $marker"
+        exit 1
+    }
+done
+for source in "$machine_collector_source" "$machine_service_source"; do
+    if rg -n \
+        'StornautExecution|StornautInvestigationDiagnostic|ActionExecutor|TrashMoving|RegisteredAction|SignedInvestigationRuntimeMachineAssembler|SignedInvestigationRuntimeMachineVerifier|signedInvestigationRuntimeReady|Codable|JSONEncoder|JSONDecoder|bootout|bootstrap system|removeItem|moveItem|copyItem|posix_spawn|Process\(' \
+        "$source"; then
+        print -u2 "L3b2 trusted collector contains prohibited authority."
+        exit 1
+    fi
+done
+if rg -n \
+    ': InvestigationLifecycleTopologyTransitioning' \
+    "$machine_root"; then
+    print -u2 "L3b2 production target gained topology mutation authority."
+    exit 1
+fi
+if rg -n \
+    'package (protocol LifecycleRootTopologyArtifactReading|protocol LifecycleRootTopologyProcessReading|enum LifecycleRootTopologyProcessReadResult|struct LifecycleRootTopologyProcessSnapshot)' \
+    "$lifecycle_root/LifecycleRootTopologyObservation.swift"; then
+    print -u2 "L2 observation injection seam escaped module scope."
+    exit 1
+fi
+fixed_registry_source="$lifecycle_root/DarwinFixedSystemServiceRegistry.swift"
+for marker in \
+    'package struct DarwinLifecycleFixedSystemServiceRegistry' \
+    'SMJobCopyDictionary(' \
+    'SMAppService.statusForLegacyPlist(' \
+    'kSMDomainSystemLaunchd' \
+    'status == .notRegistered || status == .notFound' \
+    'status == .enabled' \
+    'dictionary["Label"] as? String' \
+    'dictionary["PID"] as? NSNumber' \
+    'label == contract.label' \
+    'fieldCount <= 128' \
+    'rawProcessID <= Int64(Int32.max)'; do
+    rg -q --fixed-strings -- "$marker" "$fixed_registry_source" || {
+        print -u2 "Fixed system service registry marker missing: $marker"
+        exit 1
+    }
+done
+if rg -n \
+    'launchctl|pgrep|pkill|killall|ps -U|bootstrap_look_up|SMCopyAllJobDictionaries' \
+    "$fixed_registry_source" "$machine_service_source"; then
+    print -u2 "Fixed service observer gained text/global process discovery."
+    exit 1
+fi
 
 if [[ -e "$coordinator_root/SignedInvestigationRuntimeMachineContract.swift" ]]; then
     print -u2 "Trusted machine implementation remained in StornautInvestigation."
@@ -369,6 +448,8 @@ expected_machine_dependencies = {
     "StornautCodex",
     "StornautCore",
     "StornautInvestigation",
+    "StornautInvestigationRuntime",
+    "StornautLifecycle",
 }
 if actual_machine_dependencies != expected_machine_dependencies:
     raise SystemExit(

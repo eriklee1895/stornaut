@@ -200,7 +200,8 @@ contract/assembler 迁入非产品 target，并通过 151-test focused、targete
 build、982-test clean staged-only serial 与 independent review。
 L3b1 exact helper-peer/opaque L1 handoff 随后完成，并通过 987-test clean
 staged-only serial、targeted helper/diagnostic builds 与 post-fix review；L3b2
-trusted collection 与 L3c final admission 待实现。
+trusted lifecycle collector 随后完成，并通过 1001-test clean staged-only
+serial、targeted builds 与 post-fix review；L3c final admission 待实现。
 Task 44 是唯一
 normal-product admission gate。completion evidence 见
 Task 36 [review](../reports/phase-d-task-36-review.md)、Task 37
@@ -358,7 +359,8 @@ Task 36 [review](../reports/phase-d-task-36-review.md)、Task 37
 	  regression；L3a trusted target extraction 也已通过 151-test focused、
 	  982-test clean staged-only serial 与 independent review；L3b1 peer/L1
 	  handoff 也已通过 987-test clean staged-only serial 与 post-fix review。L3b2
-	  root collection 与 L3c failure matrix/final admission 仍待实现。
+	  lifecycle collector 也已通过 1001-test clean staged-only serial、targeted
+	  builds 与 post-fix review。L3c failure matrix/final admission 仍待实现。
 	  39B2c 才是 machine admission，Task 39 尚未完成。
 - Epic 0 Foundation Upstream Study：已完成，选择 checked-in Xcode App/Test host + local Swift packages。
 - Epic 0 Task 1：SwiftPM Core/Codex、smoke tests、`scripts/verify`、manual-only CI 与 ThirdPartyNotices 骨架已完成。
