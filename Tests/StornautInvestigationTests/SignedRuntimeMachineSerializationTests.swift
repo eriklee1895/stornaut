@@ -1,8 +1,8 @@
 import Foundation
 import Testing
 import StornautCore
-@_private(sourceFile: "SignedInvestigationRuntimeMachineContract.swift")
 import StornautInvestigation
+@testable import StornautInvestigationMachine
 
 @Suite("Task 39 machine report serialization", .serialized)
 struct SignedRuntimeMachineSerializationTests {

@@ -4,9 +4,9 @@ import Foundation
 import Testing
 import StornautCodex
 import StornautCore
-@_private(sourceFile: "SignedInvestigationRuntimeMachineContract.swift")
 import StornautInvestigation
 @testable import StornautInvestigationDiagnostic
+@testable import StornautInvestigationMachine
 
 @Suite("Task 39 signed Investigation runtime contract", .serialized)
 struct SignedRuntimeContractTests {

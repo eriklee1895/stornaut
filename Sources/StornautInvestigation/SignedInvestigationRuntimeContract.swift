@@ -153,7 +153,7 @@ public struct SignedInvestigationRuntimeBinding:
         }
     }
 
-    var isValid: Bool {
+    package var isValid: Bool {
         lowercaseHex(repositoryHEAD, count: 40)
             && [
                 sourceFingerprintSHA256,
@@ -301,7 +301,7 @@ public struct SignedInvestigationRuntimeDiagnosticConfiguration:
         )
     }
 
-    init(
+    package init(
         completedOutputsFrom decoder: Decoder
     ) throws {
         try self.init(
@@ -425,7 +425,7 @@ public struct SignedInvestigationRuntimeDiagnosticConfiguration:
         try validate(now: nil, outputs: outputs)
     }
 
-    func validate(
+    package func validate(
         now: Date?,
         outputs: OutputPathExpectation = .vacant
     ) throws {
@@ -496,7 +496,7 @@ public struct SignedInvestigationRuntimeDiagnosticConfiguration:
         }
     }
 
-    enum OutputPathExpectation {
+    package enum OutputPathExpectation {
         case vacant
         case ownerRegularFile
     }
@@ -742,7 +742,7 @@ public struct SignedInvestigationProductionEvidence:
         }
     }
 
-    fileprivate var isReady: Bool {
+    package var isReady: Bool {
         finalEnvelopeAccepted
             && terminalBarrierSettled
             && artifactsRetired
@@ -750,7 +750,7 @@ public struct SignedInvestigationProductionEvidence:
             && failureReasonKey == nil
     }
 
-    fileprivate var isValid: Bool {
+    package var isValid: Bool {
         let controlsReady = finalEnvelopeAccepted
             && terminalBarrierSettled
             && artifactsRetired
@@ -853,7 +853,7 @@ public struct SignedInvestigationRuntimeResidue:
         counts.allSatisfy { $0 == 0 }
     }
 
-    fileprivate var isValid: Bool {
+    package var isValid: Bool {
         counts.allSatisfy { (0...1_000_000).contains($0) }
     }
 

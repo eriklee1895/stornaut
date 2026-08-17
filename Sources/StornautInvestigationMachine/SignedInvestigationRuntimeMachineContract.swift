@@ -3,6 +3,7 @@ import Darwin
 import Foundation
 import StornautCodex
 import StornautCore
+import StornautInvestigation
 
 public enum SignedInvestigationRuntimeMachineCaseOutcome:
     String,
@@ -835,14 +836,14 @@ public struct SignedInvestigationRuntimeLifecycleResidueRecord:
     }
 }
 
-fileprivate struct SignedInvestigationRuntimeLifecycleResidueObservation:
+struct SignedInvestigationRuntimeLifecycleResidueObservation:
     Sendable,
     Equatable
 {
     let record:
         SignedInvestigationRuntimeLifecycleResidueRecord
 
-    fileprivate init(
+    init(
         record: SignedInvestigationRuntimeLifecycleResidueRecord
     ) {
         self.record = record
@@ -1025,7 +1026,7 @@ private struct CompletedMachineConfiguration: Decodable {
     }
 }
 
-fileprivate enum SignedInvestigationRuntimeMachineObservationPhase:
+enum SignedInvestigationRuntimeMachineObservationPhase:
     Sendable,
     Equatable
 {
@@ -1035,7 +1036,7 @@ fileprivate enum SignedInvestigationRuntimeMachineObservationPhase:
     )
 }
 
-fileprivate protocol SignedInvestigationRuntimeSealedCohortAuthority:
+protocol SignedInvestigationRuntimeSealedCohortAuthority:
     Sendable
 {
     func withSealedCohort<Result: Sendable>(
@@ -1077,7 +1078,7 @@ private final class SignedInvestigationRuntimeMachineInvocationState:
     }
 }
 
-fileprivate struct SignedInvestigationRuntimeMachineAssembler: Sendable {
+struct SignedInvestigationRuntimeMachineAssembler: Sendable {
     private let observationHook:
         (@Sendable (
             SignedInvestigationRuntimeMachineObservationPhase
@@ -1330,7 +1331,7 @@ fileprivate struct SignedInvestigationRuntimeMachineAssembler: Sendable {
     }
 }
 
-fileprivate struct SignedInvestigationRuntimeMachineVerifier: Sendable {
+struct SignedInvestigationRuntimeMachineVerifier: Sendable {
     init() {}
 
     func verifyCandidate<Authority>(

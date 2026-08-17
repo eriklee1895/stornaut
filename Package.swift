@@ -114,6 +114,14 @@ let package = Package(
             ]
         ),
         .target(
+            name: "StornautInvestigationMachine",
+            dependencies: [
+                "StornautCodex",
+                "StornautCore",
+                "StornautInvestigation",
+            ]
+        ),
+        .target(
             name: "StornautInvestigationRuntime",
             dependencies: [
                 "StornautCodex",
@@ -206,6 +214,7 @@ let package = Package(
             dependencies: [
                 "StornautInvestigationDiagnostic",
                 "StornautInvestigation",
+                "StornautInvestigationMachine",
                 "StornautInvestigationRuntime",
                 "StornautCore",
                 "StornautCodex",

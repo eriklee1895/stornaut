@@ -66,6 +66,13 @@
 > [39B2c-L1 Residue Observation Review](../../reports/phase-d-task-39b2c-l1-residue-observation-review.md)
 > and
 > [39B2c-L2 Root Topology Observation Review](../../reports/phase-d-task-39b2c-l2-root-topology-observation-review.md).
+> L3 preflight then split the remaining work into L3a trusted target extraction,
+> L3b root driver/L1+L2 collection and L3c failure matrix/final admission. L3a
+> moved the machine-only contract and assembler into the non-product
+> `StornautInvestigationMachine` target. Its 58 machine-focused tests, 151-test
+> Investigation suite, exact boundaries, targeted Debug diagnostic build,
+> 982-test clean staged-only serial and independent review passed. Evidence:
+> [39B2c-L3a Trusted Machine Target Review](../../reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md).
 >
 > **Parent plan:**
 > [Phase D Conditional Deep Dive](phase-d-conditional-deep-dive.md)
@@ -649,6 +656,23 @@ observation is package-closed, non-`Codable` and file-private to construct. See
 the [39B2c-L2 Review](../../reports/phase-d-task-39b2c-l2-root-topology-observation-review.md).
 It makes no readiness claim and leaves build/install/run/bootout/uninstall,
 failure-matrix execution and sealed machine-report assembly to the driver.
+
+The remaining L3 work is split before driver coding:
+
+1. **L3a trusted target extraction** — move the existing machine-only Codable
+   contract, filesystem revalidation, sealed cohort, assembler and verifier into
+   the non-product `StornautInvestigationMachine` target. Keep trusted
+   declarations module-internal; do not add an executable, CLI, collector,
+   model call or readiness result. This checkpoint is complete; see the
+   [L3a Review](../../reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md).
+2. **L3b root collection** — add the fixed-service observer and root-owned
+   machine driver composition inside the trusted target, combine L1/L2 evidence
+   in one sealed window and exercise synthetic lifecycle transitions. It must not
+   emit final readiness or consume the final full gate.
+3. **L3c final machine admission** — own current-source build/install/invoke,
+   eight fresh-nonce scenarios, the bounded real Task 38/model run, three-plane
+   evidence join, bootout/uninstall/zero residue, final report/receipt and the
+   one uninterrupted authoritative full verifier.
 
 39B1a bound the diagnostic configuration to the real Evidence Store v4 path,
 made lifecycle drain directly asynchronous, reloaded actor-owned run state

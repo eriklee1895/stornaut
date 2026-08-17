@@ -194,6 +194,10 @@ attempt-binding prerequisite 已绑定 raw capability evidence 到 exact nonce
 root topology observer 也已完成，L2 通过 981-test clean staged-only serial
 regression 与 post-fix review；machine driver/failure matrix 仍未实现，39B2c
 才作 machine readiness claim。
+L3 preflight 已把余下范围拆为 L3a trusted target extraction、L3b root
+collection 与 L3c failure matrix/final admission。L3a 已把 machine-only
+contract/assembler 迁入非产品 target，并通过 151-test focused、targeted Debug
+build、982-test clean staged-only serial 与 independent review；L3b/L3c 待实现。
 Task 44 是唯一
 normal-product admission gate。completion evidence 见
 Task 36 [review](../reports/phase-d-task-36-review.md)、Task 37
@@ -348,7 +352,9 @@ Task 36 [review](../reports/phase-d-task-36-review.md)、Task 37
 	  regression、981 秒 wall time 单次通过，无 restart 或 stage retry。
 	  39B2b-ii 已完成；39B2c attempt-binding、L1 helper residue 与 L2 root
 	  topology prerequisites 已完成；L2 通过 981-test clean staged-only serial
-	  regression，machine driver/failure matrix 仍待实现。
+	  regression；L3a trusted target extraction 也已通过 151-test focused、
+	  982-test clean staged-only serial 与 independent review。L3b root collection
+	  与 L3c failure matrix/final admission 仍待实现。
 	  39B2c 才是 machine admission，Task 39 尚未完成。
 - Epic 0 Foundation Upstream Study：已完成，选择 checked-in Xcode App/Test host + local Swift packages。
 - Epic 0 Task 1：SwiftPM Core/Codex、smoke tests、`scripts/verify`、manual-only CI 与 ThirdPartyNotices 骨架已完成。

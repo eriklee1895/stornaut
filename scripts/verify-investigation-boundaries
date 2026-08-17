@@ -8,6 +8,7 @@ cd "$repo_root"
 investigation_root=Sources/StornautCore/Investigation
 evidence_root=Sources/StornautCore/Evidence
 coordinator_root=Sources/StornautInvestigation
+machine_root=Sources/StornautInvestigationMachine
 runtime_root=Sources/StornautInvestigationRuntime
 diagnostic_root=Sources/StornautInvestigationDiagnostic
 lifecycle_root=Sources/StornautLifecycle
@@ -37,6 +38,7 @@ required_files=(
     "$coordinator_root/InvestigationTerminalBarrier.swift"
     "$coordinator_root/InvestigationRuntimeDiagnosticFacade.swift"
     "$coordinator_root/SignedInvestigationRuntimeContract.swift"
+    "$machine_root/SignedInvestigationRuntimeMachineContract.swift"
     "$coordinator_root/Resources/investigation-prompt-v1.txt"
     "$runtime_root/InvestigationCodexSessionAdapter.swift"
     "$runtime_root/InvestigationLifecycleAppServerTransport.swift"
@@ -53,6 +55,39 @@ required_files=(
 for file in "${required_files[@]}"; do
     if [[ ! -f "$file" ]]; then
         print -u2 "Missing Investigation boundary file: $file"
+        exit 1
+    fi
+done
+
+if [[ -e "$coordinator_root/SignedInvestigationRuntimeMachineContract.swift" ]]; then
+    print -u2 "Trusted machine implementation remained in StornautInvestigation."
+    exit 1
+fi
+
+machine_source="$machine_root/SignedInvestigationRuntimeMachineContract.swift"
+for declaration in \
+    'protocol SignedInvestigationRuntimeSealedCohortAuthority' \
+    'struct SignedInvestigationRuntimeMachineAssembler' \
+    'struct SignedInvestigationRuntimeMachineVerifier'; do
+    rg -q --fixed-strings -- "$declaration" "$machine_source" || {
+        print -u2 "Trusted machine declaration is missing: $declaration"
+        exit 1
+    }
+    if rg -q --fixed-strings -- "public $declaration" "$machine_source" \
+        || rg -q --fixed-strings -- "package $declaration" "$machine_source"; then
+        print -u2 "Trusted machine declaration escaped module scope: $declaration"
+        exit 1
+    fi
+done
+
+for prohibited in \
+    StornautExecution StornautLifecycle ActionExecutor TrashMoving \
+    FileManagerTrashAdapter RegisteredAction posix_spawn NSTask \
+    'Process(' URLSession NWConnection removeItem moveItem copyItem \
+    createFile forWritingTo O_WRONLY O_RDWR 'unlink(' 'rename(' \
+    FileManager.default Darwin.write signedInvestigationRuntimeReady; do
+    if rg -q --fixed-strings -- "$prohibited" "$machine_source"; then
+        print -u2 "Trusted machine target contains prohibited surface: $prohibited"
         exit 1
     fi
 done
@@ -325,6 +360,41 @@ if any(
     raise SystemExit(
         "StornautInvestigationRuntime became a public package product"
     )
+
+machine = targets.get("StornautInvestigationMachine")
+if machine is None:
+    raise SystemExit("missing StornautInvestigationMachine package target")
+actual_machine_dependencies = set(machine.get("target_dependencies", []))
+expected_machine_dependencies = {
+    "StornautCodex",
+    "StornautCore",
+    "StornautInvestigation",
+}
+if actual_machine_dependencies != expected_machine_dependencies:
+    raise SystemExit(
+        "StornautInvestigationMachine dependencies "
+        f"{sorted(actual_machine_dependencies)} != "
+        f"{sorted(expected_machine_dependencies)}"
+    )
+if any(
+    product.get("name") == "StornautInvestigationMachine"
+    or "StornautInvestigationMachine" in product.get("targets", [])
+    for product in package.get("products", [])
+):
+    raise SystemExit(
+        "StornautInvestigationMachine became a package product"
+    )
+for target_name in (
+    "StornautInvestigation",
+    "StornautInvestigationRuntime",
+    "StornautInvestigationDiagnostic",
+):
+    if "StornautInvestigationMachine" in set(
+        targets[target_name].get("target_dependencies", [])
+    ):
+        raise SystemExit(
+            f"{target_name} gained trusted machine implementation"
+        )
 
 diagnostic_leaf = targets.get("StornautInvestigationDiagnostic")
 if diagnostic_leaf is None:

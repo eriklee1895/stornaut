@@ -68,7 +68,13 @@ runtime/lease topology. Its 117-test focused suite, exact source-boundaries,
 targeted Debug diagnostic build, 981-test clean staged-only regression and
 independent post-fix review passed. See the
 [L2 review](../../reports/phase-d-task-39b2c-l2-root-topology-observation-review.md).
-39B2c machine driver/failure-matrix implementation is next and alone owns
+L3 preflight then split the remaining gate into trusted target extraction, root
+collection and final matrix/admission. L3a moved the existing machine-only
+contract/assembler into the non-product `StornautInvestigationMachine` target;
+its 151-test focused suite, targeted Debug build, 982-test clean staged-only
+serial and independent review passed. See the
+[L3a review](../../reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md).
+L3b root collection and L3c failure-matrix/admission are next; L3c alone owns
 machine admission. Tasks 40–44
 remain blocked on the pushed completion commit of their immediate predecessor.
 
@@ -87,7 +93,7 @@ the sole normal-product admission gate.
 | [36](task-36-implementation-brief.md) | Domain, canonical projection, planner, budget and stop contracts | complete; [review](../../reports/phase-d-task-36-review.md) |
 | [37](task-37-implementation-brief.md) | Store v4, retention and source rejoin | complete; [review](../../reports/phase-d-task-37-review.md) |
 | [38](task-38-implementation-brief.md) | Closed coordinator with fake runtime | complete; [review](../../reports/phase-d-task-38-review.md) |
-| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; 39A through 39B2b-ii complete; 39B2c attempt binding, strict decoding, [L1 helper residue](../../reports/phase-d-task-39b2c-l1-residue-observation-review.md) and [L2 root topology](../../reports/phase-d-task-39b2c-l2-root-topology-observation-review.md) complete; machine driver/failure matrix next |
+| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; 39A through 39B2b-ii complete; 39B2c attempt binding, strict decoding, [L1 residue](../../reports/phase-d-task-39b2c-l1-residue-observation-review.md), [L2 topology](../../reports/phase-d-task-39b2c-l2-root-topology-observation-review.md) and [L3a trusted target](../../reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md) complete; L3b/L3c next |
 | [40](task-40-implementation-brief.md) | Evidence report and conservative Review projection | blocked on Task 39 |
 | [41](task-41-implementation-brief.md) | First-use disclosure and typed availability | blocked on Task 40 |
 | [42](task-42-implementation-brief.md) | App workflow and recovery state | blocked on Task 41 |
