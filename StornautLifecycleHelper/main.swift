@@ -1121,6 +1121,39 @@ private final class LifecycleHelperService:
         self.recoveredInvestigations = recoveredInvestigations
     }
 
+    func attestHelper(
+        _ request: Data,
+        withReply reply: @escaping (Data?, String?) -> Void
+    ) {
+        guard
+            request.count <= LifecycleHelperPeerAttestationRequest
+                .maximumEncodedBytes,
+            let decoded = try? JSONDecoder().decode(
+                LifecycleHelperPeerAttestationRequest.self,
+                from: request
+            ),
+            !lock.withLock({ invalidated }),
+            helperIdentity.processID == getpid(),
+            helperIdentity.effectiveUserID == 0,
+            let currentIdentity = try? DarwinLifecycleInventory(
+                privilegedProcessID: getpid()
+            ).identity(for: getpid()),
+            currentIdentity == helperIdentity,
+            let response = try? LifecycleHelperPeerAttestationResponse(
+                request: decoded,
+                identity: currentIdentity,
+                observedAt: Date()
+            ),
+            let data = try? JSONEncoder().encode(response),
+            data.count <= LifecycleHelperPeerAttestationRequest
+                .maximumEncodedBytes
+        else {
+            reply(nil, "runtime.lifecycle.interactive.invalid-peer")
+            return
+        }
+        reply(data, nil)
+    }
+
     func handle(
         _ request: Data,
         withReply reply: @escaping (Data?, String?) -> Void

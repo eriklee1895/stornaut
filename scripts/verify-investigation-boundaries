@@ -445,6 +445,97 @@ diagnostic_composition_source = Path(sys.argv[12]).read_text(
     encoding="utf-8"
 )
 
+required_helper_attestation = {
+    "public struct LifecycleHelperPeerAttestationRequest:",
+    "public struct LifecycleHelperPeerAttestationResponse:",
+    "package struct LifecycleConnectedHelperPeer:",
+    "package protocol LifecycleHelperPeerAttesting: Sendable",
+    "package protocol LifecycleInteractiveSessionEvidenceSending:",
+    "func freshAttestedHelperPeer() async throws",
+    "connection.auditSessionIdentifier",
+    "connection.invalidationHandler =",
+    "connection.interruptionHandler =",
+    "connectionPermanentlyInvalidated",
+    "connectionEpoch === epoch",
+    "epoch.isValid",
+    "SecurityLifecycleCodeSigningVerifier()",
+    "audit_token_to_pidversion(token)",
+    "if request.kind != .retire {\n            try Task.checkCancellation()\n        }",
+}
+missing_helper_attestation = sorted(
+    required_helper_attestation - set(
+        fragment
+        for fragment in required_helper_attestation
+        if fragment in interactive_xpc_source
+    )
+)
+if missing_helper_attestation:
+    raise SystemExit(
+        "helper peer attestation contract drifted: "
+        + ", ".join(missing_helper_attestation)
+    )
+for forbidden in (
+    "public struct LifecycleConnectedHelperPeer",
+    "public protocol LifecycleInteractiveSessionEvidenceSending",
+    "Codable,\n    Sendable,\n    Equatable\n{\n    package let identity",
+):
+    if forbidden in interactive_xpc_source:
+        raise SystemExit(
+            "trusted helper peer evidence escaped package boundary"
+        )
+if "func attestHelper(" not in lifecycle_helper_source:
+    raise SystemExit(
+        "lifecycle helper does not expose strict self-attestation"
+    )
+if "session is any LifecycleInteractiveSessionEvidenceSending" \
+        not in interactive_transport_source:
+    raise SystemExit(
+        "retirement does not require helper identity on its session"
+    )
+if "takeRetirementHelperPeer(" not in interactive_transport_source:
+    raise SystemExit(
+        "retirement helper identity is not bound to the retire operation"
+    )
+if "session is any LifecycleInteractiveSessionEvidenceSending" \
+        not in interactive_transport_source:
+    raise SystemExit(
+        "retirement transport accepts a detached helper attestor"
+    )
+if "case consumed" not in interactive_transport_source:
+    raise SystemExit(
+        "retirement evidence store lacks a terminal consumed state"
+    )
+if "package struct InvestigationLifecycleRetirementEvidence:" \
+        not in interactive_transport_source:
+    raise SystemExit(
+        "opaque Investigation retirement evidence is missing"
+    )
+if "Codable" in interactive_transport_source[
+    interactive_transport_source.index(
+        "package struct InvestigationLifecycleRetirementEvidence:"
+    ):interactive_transport_source.index(
+        "package actor InvestigationLifecycleAppServerTransport:"
+    )
+]:
+    raise SystemExit(
+        "opaque Investigation retirement evidence became Codable"
+    )
+if "package actor InvestigationLifecycleRetirementEvidenceStore: Sendable" \
+        not in interactive_transport_source:
+    raise SystemExit(
+        "one-shot Investigation retirement handoff is missing"
+    )
+if "retirementEvidenceStore?.record(evidence)" \
+        not in interactive_transport_source:
+    raise SystemExit(
+        "validated retirement evidence is not handed off"
+    )
+if "retirePreparedCompositionWithEvidence() async throws" \
+        not in diagnostic_composition_source:
+    raise SystemExit(
+        "diagnostic composition lost opaque retirement handoff"
+    )
+
 required_diagnostic_composition = {
     "public final class InvestigationRuntimeDiagnosticComposition:",
     "public static func prepare(",

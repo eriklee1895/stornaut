@@ -16,6 +16,57 @@ package enum InvestigationLifecycleAppServerTransportError:
     case transportFailed
 }
 
+package struct InvestigationLifecycleRetirementEvidence:
+    Sendable,
+    Equatable
+{
+    package let residueObservation:
+        LifecycleInvestigationResidueObservation
+    package let helperProcessIdentity: LifecycleProcessIdentity
+    package let helperAttestedAt: Date
+
+    fileprivate init(
+        residueObservation: LifecycleInvestigationResidueObservation,
+        helperPeer: LifecycleConnectedHelperPeer
+    ) {
+        self.residueObservation = residueObservation
+        helperProcessIdentity = helperPeer.identity
+        helperAttestedAt = helperPeer.attestedAt
+    }
+}
+
+package actor InvestigationLifecycleRetirementEvidenceStore: Sendable {
+    private enum State {
+        case empty
+        case recorded(InvestigationLifecycleRetirementEvidence)
+        case consumed
+    }
+
+    private var state = State.empty
+
+    package init() {}
+
+    package func record(
+        _ evidence: InvestigationLifecycleRetirementEvidence
+    ) throws {
+        guard case .empty = state else {
+            throw InvestigationLifecycleAppServerTransportError
+                .invalidState
+        }
+        state = .recorded(evidence)
+    }
+
+    package func consume()
+        -> InvestigationLifecycleRetirementEvidence?
+    {
+        guard case let .recorded(evidence) = state else {
+            return nil
+        }
+        state = .consumed
+        return evidence
+    }
+}
+
 package actor InvestigationLifecycleAppServerTransport:
     CodexInteractiveAppServerTransport
 {
@@ -36,10 +87,14 @@ package actor InvestigationLifecycleAppServerTransport:
     private let now: @Sendable () -> Date
     private let operationID: @Sendable () throws -> UUID
     private let session: any LifecycleInteractiveSessionSending
+    private let retirementEvidenceStore:
+        InvestigationLifecycleRetirementEvidenceStore?
     private var state = State.ready
     private var transferredBytes = 0
     private var residueObservation:
         LifecycleInvestigationResidueObservation?
+    private var retirementEvidence:
+        InvestigationLifecycleRetirementEvidence?
     private var operationInProgress = false
     private var operationWaiters: [
         (
@@ -58,7 +113,9 @@ package actor InvestigationLifecycleAppServerTransport:
         expectedUserID: UInt32 = UInt32(geteuid()),
         now: @escaping @Sendable () -> Date = Date.init,
         operationID: @escaping @Sendable () throws -> UUID = UUID.init,
-        session: any LifecycleInteractiveSessionSending
+        session: any LifecycleInteractiveSessionSending,
+        retirementEvidenceStore:
+            InvestigationLifecycleRetirementEvidenceStore? = nil
     ) throws {
         let current = now()
         guard
@@ -83,6 +140,12 @@ package actor InvestigationLifecycleAppServerTransport:
         self.now = now
         self.operationID = operationID
         self.session = session
+        guard session is any LifecycleInteractiveSessionEvidenceSending
+        else {
+            throw InvestigationLifecycleAppServerTransportError
+                .invalidConfiguration
+        }
+        self.retirementEvidenceStore = retirementEvidenceStore
     }
 
     package func writeLine(_ line: Data) async throws {
@@ -157,6 +220,12 @@ package actor InvestigationLifecycleAppServerTransport:
     }
 
     package func retire() async throws {
+        _ = try await retireWithEvidence()
+    }
+
+    package func retireWithEvidence() async throws
+        -> InvestigationLifecycleRetirementEvidence
+    {
         try await acquireOperation(cancellationSensitive: false)
         defer { releaseOperation() }
         guard state != .retired, state != .retiring else {
@@ -164,6 +233,7 @@ package actor InvestigationLifecycleAppServerTransport:
                 .invalidState
         }
         do {
+            let evidenceCollectionStartedAt = now()
             guard state == .ready || state == .active || state == .failed else {
                 throw InvestigationLifecycleAppServerTransportError
                     .invalidState
@@ -175,6 +245,19 @@ package actor InvestigationLifecycleAppServerTransport:
                 operationID: try operationID()
             )
             let response = try await session.send(request)
+            guard
+                let evidenceSession = session
+                    as? any LifecycleInteractiveSessionEvidenceSending,
+                let helperPeer = await evidenceSession
+                    .takeRetirementHelperPeer(
+                        operationID: request.operationID
+                    ),
+                helperPeer.attestedAt >= evidenceCollectionStartedAt,
+                helperPeer.attestedAt <= now()
+            else {
+                throw InvestigationLifecycleAppServerTransportError
+                    .identityMismatch
+            }
             let validated = try response.validated(for: request)
             guard
                 validated.kind == .retired,
@@ -202,12 +285,29 @@ package actor InvestigationLifecycleAppServerTransport:
                 throw InvestigationLifecycleAppServerTransportError
                     .drainUnconfirmed
             }
+            let evidence = InvestigationLifecycleRetirementEvidence(
+                residueObservation: observation,
+                helperPeer: helperPeer
+            )
             residueObservation = observation
+            retirementEvidence = evidence
+            try await retirementEvidenceStore?.record(evidence)
             state = .retired
+            return evidence
         } catch {
             fail()
             throw map(error)
         }
+    }
+
+    package func acceptedRetirementEvidence() throws
+        -> InvestigationLifecycleRetirementEvidence
+    {
+        guard state == .retired, let retirementEvidence else {
+            throw InvestigationLifecycleAppServerTransportError
+                .drainUnconfirmed
+        }
+        return retirementEvidence
     }
 
     package func acceptedResidueObservation() throws
@@ -369,6 +469,12 @@ package actor InvestigationLifecycleAppServerTransport:
         if
             error as? LifecycleInteractiveSessionContractError
                 == .identityMismatch
+        {
+            return .identityMismatch
+        }
+        if
+            error as? LifecycleInteractiveSessionXPCError
+                == .invalidPeer
         {
             return .identityMismatch
         }

@@ -73,6 +73,12 @@
 > Investigation suite, exact boundaries, targeted Debug diagnostic build,
 > 982-test clean staged-only serial and independent review passed. Evidence:
 > [39B2c-L3a Trusted Machine Target Review](../../reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md).
+> L3b has now been split before collector coding. L3b1 completed the exact
+> connected-helper peer attestation and opaque one-shot L1 retirement handoff;
+> its 987-test clean staged-only regression, targeted helper/diagnostic builds
+> and independent post-fix review passed. Evidence:
+> [39B2c-L3b1 Peer/Retirement Handoff Review](../../reports/phase-d-task-39b2c-l3b1-peer-retirement-handoff-review.md).
+> L3b2 trusted L1/L2 collection and L3c final admission remain pending.
 >
 > **Parent plan:**
 > [Phase D Conditional Deep Dive](phase-d-conditional-deep-dive.md)

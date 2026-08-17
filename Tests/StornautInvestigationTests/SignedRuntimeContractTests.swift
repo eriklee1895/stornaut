@@ -45,6 +45,17 @@ struct SignedRuntimeContractTests {
             await composition.retirePreparedComposition()
                 == .retiredWithoutStarting
         )
+        let publicRetirement = String(
+            describing: InvestigationRuntimeDiagnosticCompositionRetirement
+                .retiredAfterUse
+        )
+        #expect(!publicRetirement.contains("processID"))
+        #expect(!publicRetirement.contains("auditSessionID"))
+        #expect(!publicRetirement.contains("residueObservation"))
+        #expect(
+            try await composition.retirePreparedCompositionWithEvidence()
+                == nil
+        )
     }
 
     @Test

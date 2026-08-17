@@ -38,6 +38,8 @@ public final class InvestigationRuntimeDiagnosticComposition:
     private let runtimeFacade: InvestigationRuntimeDiagnosticFacade
     private let transportOwner:
         InvestigationRuntimeDiagnosticTransportOwner
+    private let retirementEvidenceStore:
+        InvestigationLifecycleRetirementEvidenceStore
 
     private init(
         nonce: UUID,
@@ -45,7 +47,9 @@ public final class InvestigationRuntimeDiagnosticComposition:
         storePath: String,
         helperExecutablePath: String,
         runtimeFacade: InvestigationRuntimeDiagnosticFacade,
-        transportOwner: InvestigationRuntimeDiagnosticTransportOwner
+        transportOwner: InvestigationRuntimeDiagnosticTransportOwner,
+        retirementEvidenceStore:
+            InvestigationLifecycleRetirementEvidenceStore
     ) {
         self.nonce = nonce
         self.investigationID = investigationID.rawValue
@@ -54,6 +58,7 @@ public final class InvestigationRuntimeDiagnosticComposition:
         hasRuntimeFacade = true
         self.runtimeFacade = runtimeFacade
         self.transportOwner = transportOwner
+        self.retirementEvidenceStore = retirementEvidenceStore
     }
 
     public static func prepare(
@@ -129,6 +134,8 @@ public final class InvestigationRuntimeDiagnosticComposition:
             let session = LifecycleInteractiveSessionXPCClient(
                 helperBundleURL: installation.helperExecutableURL
             )
+            let retirementEvidenceStore =
+                InvestigationLifecycleRetirementEvidenceStore()
             let lifecycleTransport =
                 try InvestigationLifecycleAppServerTransport(
                     investigationID: lifecycleID,
@@ -140,7 +147,8 @@ public final class InvestigationRuntimeDiagnosticComposition:
                         LifecycleInteractiveSessionRequest
                         .maximumAllowedSessionBytes,
                     now: runtimeNow,
-                    session: session
+                    session: session,
+                    retirementEvidenceStore: retirementEvidenceStore
                 )
             let transportOwner =
                 InvestigationRuntimeDiagnosticTransportOwner(
@@ -219,7 +227,8 @@ public final class InvestigationRuntimeDiagnosticComposition:
                 helperExecutablePath:
                     installation.helperExecutableURL.path,
                 runtimeFacade: facade,
-                transportOwner: transportOwner
+                transportOwner: transportOwner,
+                retirementEvidenceStore: retirementEvidenceStore
             )
         } catch let error
             as InvestigationRuntimeDiagnosticCompositionError
@@ -242,6 +251,14 @@ public final class InvestigationRuntimeDiagnosticComposition:
             return .retirementFailed
         }
     }
+
+    package func retirePreparedCompositionWithEvidence() async throws
+        -> InvestigationLifecycleRetirementEvidence?
+    {
+        _ = try await transportOwner.retirePrepared()
+        return await retirementEvidenceStore.consume()
+    }
+
 }
 
 package struct InvestigationRuntimeDiagnosticBindingObservation:
@@ -346,7 +363,12 @@ private actor InvestigationRuntimeDiagnosticTransportOwner:
     private let transport: InvestigationLifecycleAppServerTransport
     private let session: LifecycleInteractiveSessionXPCClient
     private var state = State.ready
-    private var retirementTask: Task<Void, any Error>?
+    private var retirementTask: Task<
+        InvestigationLifecycleRetirementEvidence,
+        any Error
+    >?
+    private var retirementEvidence:
+        InvestigationLifecycleRetirementEvidence?
 
     init(
         transport: InvestigationLifecycleAppServerTransport,
@@ -382,7 +404,7 @@ private actor InvestigationRuntimeDiagnosticTransportOwner:
 
     func retirePrepared() async throws -> Bool {
         if let retirementTask {
-            try await retirementTask.value
+            _ = try await retirementTask.value
             return false
         }
         switch state {
@@ -404,8 +426,10 @@ private actor InvestigationRuntimeDiagnosticTransportOwner:
         let session = self.session
         let task = Task {
             do {
-                try await transport.retire()
+                let evidence = try await transport
+                    .retireWithEvidence()
                 await session.invalidate()
+                return evidence
             } catch {
                 await session.invalidate()
                 throw error
@@ -413,7 +437,7 @@ private actor InvestigationRuntimeDiagnosticTransportOwner:
         }
         retirementTask = task
         do {
-            try await task.value
+            retirementEvidence = try await task.value
             state = .retired
             return false
         } catch {

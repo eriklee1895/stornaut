@@ -1,5 +1,5 @@
 import Foundation
-import StornautLifecycle
+@testable import StornautLifecycle
 import Testing
 @testable import StornautCodex
 @testable import StornautInvestigationRuntime
@@ -287,6 +287,149 @@ struct InvestigationLifecycleAppServerTransportTests {
     }
 
     @Test
+    func retireReturnsOpaqueResidueAndExactHelperIdentity() async throws {
+        let fixture = InvestigationLifecycleTransportFixture()
+        let helperIdentity = try fixture.helperIdentity()
+        let residue = try fixture.residueObservation()
+        let session = FakeLifecycleInteractiveSession(
+            responses: [
+                .retired(
+                    investigationID: fixture.investigationID,
+                    operationID: fixture.operationIDs[0],
+                    drained: true,
+                    residueObservation: residue
+                ),
+            ],
+            helperIdentityResult: .success(helperIdentity)
+        )
+        let transport = try fixture.transport(
+            session: session,
+            operationIDs: Array(fixture.operationIDs.prefix(1))
+        )
+
+        let evidence = try await transport.retireWithEvidence()
+
+        #expect(evidence.residueObservation == residue)
+        #expect(evidence.helperProcessIdentity == helperIdentity)
+        #expect(
+            try await transport.acceptedRetirementEvidence()
+                == evidence
+        )
+        #expect(await session.helperIdentityRequestCount == 1)
+        #expect(await session.requests.map(\.kind) == [.retire])
+    }
+
+    @Test
+    func retirementEvidenceStoreIsOneShotAndRejectsDuplicateRecord()
+        async throws
+    {
+        let fixture = InvestigationLifecycleTransportFixture()
+        let helperIdentity = try fixture.helperIdentity()
+        let store = InvestigationLifecycleRetirementEvidenceStore()
+        let session = FakeLifecycleInteractiveSession(
+            responses: [
+                try fixture.retiredResponse(
+                    operationID: fixture.operationIDs[0]
+                ),
+            ],
+            helperIdentityResult: .success(helperIdentity)
+        )
+        let provider = SequentialOperationIDProvider(
+            values: Array(fixture.operationIDs.prefix(1))
+        )
+        let transport = try InvestigationLifecycleAppServerTransport(
+            investigationID: fixture.investigationID,
+            validBefore: fixture.validBefore,
+            maximumLineBytes: 1_024,
+            maximumSessionBytes: 8_192,
+            expectedUserID: 501,
+            now: { fixture.now },
+            operationID: { try provider.next() },
+            session: session,
+            retirementEvidenceStore: store
+        )
+
+        let expected = try await transport.retireWithEvidence()
+        #expect(await store.consume() == expected)
+        #expect(await store.consume() == nil)
+        await #expect(
+            throws: InvestigationLifecycleAppServerTransportError
+                .invalidState
+        ) {
+            try await store.record(expected)
+        }
+    }
+
+    @Test
+    func missingOrForeignHelperAttestationFailsClosedBeforeRetire()
+        async throws
+    {
+        let fixture = InvestigationLifecycleTransportFixture()
+        let session = FakeLifecycleInteractiveSession(
+            responses: [
+                try fixture.retiredResponse(
+                    operationID: fixture.operationIDs[0]
+                ),
+            ],
+            helperIdentityResult: .failure(
+                LifecycleInteractiveSessionXPCError.invalidPeer
+            )
+        )
+        let transport = try fixture.transport(
+            session: session,
+            operationIDs: Array(fixture.operationIDs.prefix(1))
+        )
+
+        await #expect(
+            throws: InvestigationLifecycleAppServerTransportError
+                .identityMismatch
+        ) {
+            _ = try await transport.retireWithEvidence()
+        }
+        #expect(await session.helperIdentityRequestCount == 1)
+        #expect(await session.requests.isEmpty)
+        await #expect(
+            throws: InvestigationLifecycleAppServerTransportError
+                .drainUnconfirmed
+        ) {
+            _ = try await transport.acceptedRetirementEvidence()
+        }
+    }
+
+    @Test
+    func helperIdentityMustBeSealedIntoTheExactRetireResponse()
+        async throws
+    {
+        let fixture = InvestigationLifecycleTransportFixture()
+        let nonEvidenceSession = NonEvidenceLifecycleInteractiveSession(
+            responses: [
+                try fixture.retiredResponse(
+                    operationID: fixture.operationIDs[0]
+                ),
+            ]
+        )
+        let provider = SequentialOperationIDProvider(
+            values: Array(fixture.operationIDs.prefix(1))
+        )
+        #expect(
+            throws: InvestigationLifecycleAppServerTransportError
+                .invalidConfiguration
+        ) {
+            _ = try InvestigationLifecycleAppServerTransport(
+                investigationID: fixture.investigationID,
+                validBefore: fixture.validBefore,
+                maximumLineBytes: 1_024,
+                maximumSessionBytes: 8_192,
+                expectedUserID: 501,
+                now: { fixture.now },
+                operationID: { try provider.next() },
+                session: nonEvidenceSession
+            )
+        }
+        #expect(await nonEvidenceSession.requests.isEmpty)
+    }
+
+    @Test
     func rejectsExpiredOrOverbroadConfiguration() {
         let fixture = InvestigationLifecycleTransportFixture()
         let session = FakeLifecycleInteractiveSession(responses: [])
@@ -405,6 +548,7 @@ struct InvestigationLifecycleAppServerTransportTests {
                     observedAt: fixture.validBefore
                 ),
             ],
+            helperAttestedAt: { startClock.read() },
             beforeResponse: { request in
                 if request.kind == .start {
                     startClock.set(fixture.validBefore)
@@ -445,6 +589,7 @@ struct InvestigationLifecycleAppServerTransportTests {
                     observedAt: fixture.validBefore
                 ),
             ],
+            helperAttestedAt: { writeClock.read() },
             beforeResponse: { request in
                 if request.kind == .write {
                     writeClock.set(fixture.validBefore)
@@ -487,6 +632,7 @@ struct InvestigationLifecycleAppServerTransportTests {
                     observedAt: fixture.validBefore
                 ),
             ],
+            helperAttestedAt: { readClock.read() },
             beforeResponse: { request in
                 if request.kind == .read {
                     readClock.set(fixture.validBefore)
@@ -618,6 +764,18 @@ private struct InvestigationLifecycleTransportFixture {
     let requestLine = Data("{\"method\":\"initialize\"}\n".utf8)
     let responseLine = Data("{\"id\":1,\"result\":{}}\n".utf8)
 
+    func helperIdentity() throws -> LifecycleProcessIdentity {
+        LifecycleProcessIdentity(
+            processID: 702,
+            processIDVersion: 12,
+            auditSessionID: 33_001,
+            effectiveUserID: 0,
+            auditToken: try LifecycleAuditToken(words: [
+                0, 0, 0, 0, 0, 702, 33_001, 12,
+            ])
+        )
+    }
+
     func residueObservation(
         investigationID: LifecycleInvestigationID? = nil,
         userID: UInt32 = 501,
@@ -676,7 +834,7 @@ private struct InvestigationLifecycleTransportFixture {
 }
 
 private actor SuspendedLifecycleInteractiveSession:
-    LifecycleInteractiveSessionSending
+    LifecycleInteractiveSessionEvidenceSending
 {
     private(set) var requests: [LifecycleInteractiveSessionRequest] = []
     private let investigationID: LifecycleInvestigationID
@@ -695,6 +853,9 @@ private actor SuspendedLifecycleInteractiveSession:
     func send(
         _ request: LifecycleInteractiveSessionRequest
     ) async throws -> LifecycleInteractiveSessionResponse {
+        if request.kind == .retire {
+            _ = try await freshAttestedHelperPeer()
+        }
         requests.append(request)
         switch request.kind {
         case .start:
@@ -737,6 +898,18 @@ private actor SuspendedLifecycleInteractiveSession:
         }
     }
 
+    func freshAttestedHelperPeer() async throws
+        -> LifecycleConnectedHelperPeer
+    {
+        try investigationTransportHelperPeer()
+    }
+
+    func takeRetirementHelperPeer(
+        operationID _: UUID
+    ) -> LifecycleConnectedHelperPeer? {
+        try? investigationTransportHelperPeer()
+    }
+
     func waitUntilStartIsSuspended() async {
         if startContinuation != nil {
             return
@@ -770,27 +943,66 @@ private final class MutableTransportClock: @unchecked Sendable {
 }
 
 private actor FakeLifecycleInteractiveSession:
-    LifecycleInteractiveSessionSending
+    LifecycleInteractiveSessionEvidenceSending
 {
     private(set) var requests: [LifecycleInteractiveSessionRequest] = []
+    private(set) var helperIdentityRequestCount = 0
     private var responses: [LifecycleInteractiveSessionResponse]
+    private let helperIdentityResult:
+        Result<LifecycleProcessIdentity, any Error>
+    private let helperAttestedAt:
+        @Sendable () -> Date
+    private var pendingHelperPeer: LifecycleConnectedHelperPeer?
     private let beforeResponse:
         @Sendable (LifecycleInteractiveSessionRequest) -> Void
 
     init(
         responses: [LifecycleInteractiveSessionResponse],
+        helperIdentityResult:
+            Result<LifecycleProcessIdentity, any Error> = .success(
+                try! InvestigationLifecycleTransportFixture()
+                    .helperIdentity()
+            ),
+        helperAttestedAt:
+            @escaping @Sendable () -> Date = {
+                Date(timeIntervalSince1970: 1_900_000_000)
+            },
         beforeResponse:
             @escaping @Sendable (
                 LifecycleInteractiveSessionRequest
             ) -> Void = { _ in }
     ) {
         self.responses = responses
+        self.helperIdentityResult = helperIdentityResult
+        self.helperAttestedAt = helperAttestedAt
         self.beforeResponse = beforeResponse
+    }
+
+    func freshAttestedHelperPeer() async throws
+        -> LifecycleConnectedHelperPeer
+    {
+        helperIdentityRequestCount += 1
+        let peer = LifecycleConnectedHelperPeer(
+            identity: try helperIdentityResult.get(),
+            attestedAt: helperAttestedAt()
+        )
+        pendingHelperPeer = peer
+        return peer
+    }
+
+    func takeRetirementHelperPeer(
+        operationID _: UUID
+    ) -> LifecycleConnectedHelperPeer? {
+        defer { pendingHelperPeer = nil }
+        return pendingHelperPeer
     }
 
     func send(
         _ request: LifecycleInteractiveSessionRequest
     ) async throws -> LifecycleInteractiveSessionResponse {
+        if request.kind == .retire {
+            _ = try await freshAttestedHelperPeer()
+        }
         requests.append(request)
         beforeResponse(request)
         guard !responses.isEmpty else {
@@ -801,8 +1013,30 @@ private actor FakeLifecycleInteractiveSession:
     }
 }
 
-private actor AmbiguousStartLifecycleInteractiveSession:
+private actor NonEvidenceLifecycleInteractiveSession:
     LifecycleInteractiveSessionSending
+{
+    private(set) var requests: [LifecycleInteractiveSessionRequest] = []
+    private var responses: [LifecycleInteractiveSessionResponse]
+
+    init(responses: [LifecycleInteractiveSessionResponse]) {
+        self.responses = responses
+    }
+
+    func send(
+        _ request: LifecycleInteractiveSessionRequest
+    ) async throws -> LifecycleInteractiveSessionResponse {
+        requests.append(request)
+        guard !responses.isEmpty else {
+            throw InvestigationLifecycleAppServerTransportError
+                .transportFailed
+        }
+        return responses.removeFirst()
+    }
+}
+
+private actor AmbiguousStartLifecycleInteractiveSession:
+    LifecycleInteractiveSessionEvidenceSending
 {
     private(set) var requests: [LifecycleInteractiveSessionRequest] = []
     private let investigationID: LifecycleInvestigationID
@@ -819,6 +1053,9 @@ private actor AmbiguousStartLifecycleInteractiveSession:
     func send(
         _ request: LifecycleInteractiveSessionRequest
     ) async throws -> LifecycleInteractiveSessionResponse {
+        if request.kind == .retire {
+            _ = try await freshAttestedHelperPeer()
+        }
         requests.append(request)
         switch request.kind {
         case .start:
@@ -847,6 +1084,28 @@ private actor AmbiguousStartLifecycleInteractiveSession:
                 .transportFailed
         }
     }
+
+    func freshAttestedHelperPeer() async throws
+        -> LifecycleConnectedHelperPeer
+    {
+        try investigationTransportHelperPeer()
+    }
+
+    func takeRetirementHelperPeer(
+        operationID _: UUID
+    ) -> LifecycleConnectedHelperPeer? {
+        try? investigationTransportHelperPeer()
+    }
+}
+
+private func investigationTransportHelperPeer() throws
+    -> LifecycleConnectedHelperPeer
+{
+    LifecycleConnectedHelperPeer(
+        identity: try InvestigationLifecycleTransportFixture()
+            .helperIdentity(),
+        attestedAt: Date(timeIntervalSince1970: 1_900_000_000)
+    )
 }
 
 private final class SequentialOperationIDProvider: @unchecked Sendable {
