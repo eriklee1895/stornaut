@@ -188,7 +188,11 @@
 > post-fix review 通过。L3b2 root-only one-shot L1/L2 collector、exact
 > non-activating service/PID observation 与 synthetic transition contract
 > 随后完成，1001-test clean staged-only serial、targeted builds 与 post-fix
-> review 通过。L3c 尚未实现，final full 尚未消耗。
+> review 通过。L3c scope/trust preflight 随后识别出 App-local handoff 无法
+> 跨 App exit 与 managed-proxy/probe retirement 仍为推断两个缺口，因此拆为
+> L3c1 opaque retirement escrow、L3c2 deterministic machine driver、L3c3
+> current-source real-success three-plane composition 与 L3c4 sealed final
+> admission。L3c1 next；只有 L3c4 可作 readiness claim，final full 尚未消耗。
 > 生产 Deep Dive 仍 unavailable。
 > Task 5 的历史
 > Broker-only no-go 已由 ADR 0004 capability-first 决策修订，Deep Dive 因
@@ -501,7 +505,8 @@ L3b1 peer/L1 handoff 见
 L3b2 trusted lifecycle collector 见
 [review](../reports/phase-d-task-39b2c-l3b2-lifecycle-topology-collector-review.md)；
 其 1001-test clean staged-only serial、targeted builds 与 post-fix review 已
-通过。L3c final admission 仍待实现。
+通过。L3c 已按 scope/trust preflight 拆成 L3c1–L3c4；L3c1 opaque retirement
+escrow next，L3c4 独占 final admission 与剩余 full。
 生产 Deep Dive 继续 unavailable，直到 Task 44 final admission。
 
 跨 Epic 的阶段依赖、no-go 分支和交付顺序由 [Delivery Roadmap](../plans/roadmap.md) 管理；新 active plan 不得另起一套宏观路线。
@@ -645,7 +650,8 @@ full 以 23/23 stages、898-test serialized regression、981 秒 wall time
 单次通过，无 restart 或 stage retry。39B2b-ii 已完成；39B2c 的 exact
 attempt-binding prerequisite、L1 helper residue 与 L2 root topology observer
 均已完成，L2 通过 981-test clean staged-only serial regression；machine
-driver/failure matrix 仍待实现。39B2c 才是 machine admission。该最终 gate
+driver/failure matrix 仍待实现。L3c1–L3c3 均为 non-admitting prerequisite，
+L3c4 才是 machine admission。该最终 gate
 要求证明完整调查能力和公共联网可用时，
 Codex 全进程树不可写用户数据、不可
 访问 localhost/私网/任意 Unix socket 且无 Executor 路径；不得用

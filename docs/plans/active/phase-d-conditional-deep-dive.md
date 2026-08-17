@@ -840,9 +840,13 @@ Checkpoint status:
   receipt from authoritative raw evidence; 903 serialized tests passed. See
   the
   [Attempt-Binding Prerequisite Review](../../reports/phase-d-task-39b2c-attempt-binding-prerequisite-review.md).
-- 39B2c machine driver implementation is next and exclusively owns real-model
-  signed-App machine admission, failure matrix and zero-residue proof. Task 39
-  and production Deep Dive are not admitted by any earlier checkpoint.
+- 39B2c L3a/L3b are complete. The mandatory L3c scope/trust preflight split
+  the remaining work into L3c1 helper-owned opaque retirement escrow, L3c2
+  deterministic machine driver, L3c3 current-source real-success three-plane
+  composition and L3c4 sealed final admission. L3c1 is next. Only L3c4 owns
+  real-model signed-App machine readiness, the complete failure matrix, exact
+  zero-residue proof and the remaining authoritative full verifier. Task 39 and
+  production Deep Dive are not admitted by any earlier checkpoint.
 
 Deliver:
 

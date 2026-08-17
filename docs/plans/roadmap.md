@@ -201,7 +201,11 @@ build、982-test clean staged-only serial 与 independent review。
 L3b1 exact helper-peer/opaque L1 handoff 随后完成，并通过 987-test clean
 staged-only serial、targeted helper/diagnostic builds 与 post-fix review；L3b2
 trusted lifecycle collector 随后完成，并通过 1001-test clean staged-only
-serial、targeted builds 与 post-fix review；L3c final admission 待实现。
+serial、targeted builds 与 post-fix review。强制 scope/trust preflight 将 L3c
+继续拆为 L3c1 helper-owned opaque retirement escrow、L3c2 deterministic
+machine driver、L3c3 current-source real-success three-plane composition 与
+L3c4 sealed final admission；L3c1 next，只有 L3c4 可作 readiness claim 并运行
+Task 39 剩余唯一 full。
 Task 44 是唯一
 normal-product admission gate。completion evidence 见
 Task 36 [review](../reports/phase-d-task-36-review.md)、Task 37
@@ -360,7 +364,8 @@ Task 36 [review](../reports/phase-d-task-36-review.md)、Task 37
 	  982-test clean staged-only serial 与 independent review；L3b1 peer/L1
 	  handoff 也已通过 987-test clean staged-only serial 与 post-fix review。L3b2
 	  lifecycle collector 也已通过 1001-test clean staged-only serial、targeted
-	  builds 与 post-fix review。L3c failure matrix/final admission 仍待实现。
+	  builds 与 post-fix review。L3c 已按 trust/cost preflight 拆为 L3c1–L3c4；
+	  L3c1 opaque retirement escrow next，L3c4 才拥有 final admission/full。
 	  39B2c 才是 machine admission，Task 39 尚未完成。
 - Epic 0 Foundation Upstream Study：已完成，选择 checked-in Xcode App/Test host + local Swift packages。
 - Epic 0 Task 1：SwiftPM Core/Codex、smoke tests、`scripts/verify`、manual-only CI 与 ThirdPartyNotices 骨架已完成。

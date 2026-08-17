@@ -83,7 +83,14 @@
 > contract. Its 1001-test clean staged-only regression, targeted builds and
 > independent post-fix review passed. Evidence:
 > [39B2c-L3b2 Lifecycle Topology Collector Review](../../reports/phase-d-task-39b2c-l3b2-lifecycle-topology-collector-review.md).
-> L3c final admission remains pending.
+> The mandatory L3c scope/cost preflight found two additional trust boundaries:
+> the current App-local retirement handoff cannot survive App exit, and the
+> diagnostic lifecycle owner still infers managed-proxy/probe retirement rather
+> than observing it. L3c is therefore split before coding into L3c1 opaque
+> retirement escrow, L3c2 closed deterministic machine driver, L3c3 current-source
+> real-success three-plane composition and L3c4 sealed final admission. Only L3c4
+> may claim readiness or consume the remaining authoritative full verifier. L3c1
+> is next.
 >
 > **Parent plan:**
 > [Phase D Conditional Deep Dive](phase-d-conditional-deep-dive.md)
@@ -680,10 +687,51 @@ The remaining L3 work is split before driver coding:
    machine driver composition inside the trusted target, combine L1/L2 evidence
    in one sealed window and exercise synthetic lifecycle transitions. It must not
    emit final readiness or consume the final full gate.
-3. **L3c final machine admission** — own current-source build/install/invoke,
-   eight fresh-nonce scenarios, the bounded real Task 38/model run, three-plane
-   evidence join, bootout/uninstall/zero residue, final report/receipt and the
-   one uninterrupted authoritative full verifier.
+3. **L3c1 helper-owned opaque retirement escrow** — close the live handoff gap
+   before adding a driver. A successful contained-session retirement must mint a
+   helper-owned, challenge-bound, one-shot escrow record only after exact worker
+   reap, workspace retirement and the same-retire L1 observation. A future exact
+   signed root driver may claim it once and reconstruct only a module-internal,
+   non-`Codable` authority. The claim must survive App exit, but helper restart,
+   stale/foreign identity, connection-epoch drift, replay, cancellation or
+   deadline failure must destroy admission. This checkpoint also replaces the
+   inferred `managedProxyOwnerEmpty`/`probeWorkerEmpty` values with an independent
+   typed owner-retirement observation joined to the same audit-session L1 zero.
+   It is synthetic-only: no install/uninstall, model, report, readiness or full
+   verifier. The frozen budget is at most 14 non-document paths and 3,900 added
+   non-document lines.
+4. **L3c2 closed deterministic machine driver** — add the non-product root
+   driver host and fixed eight-scenario state machine using closed DEBUG fault
+   injection and deterministic transports. Prove fresh nonce/root/config/Store
+   isolation, exact Task 38 terminal semantics, installed-L2-before-transition
+   ordering, fail-closed teardown and pending-only output. It must not call a
+   real model, perform the final live admission or create a Ready receipt. If its
+   preflight reaches a fifteenth non-document path or 4,000 added lines, split the
+   host/topology and scenario-driving surfaces again before coding.
+5. **L3c3 current-source real-success three-plane composition** — bind one fresh
+   success attempt to the exact current source/App/helper/runtime receipt and run
+   the bounded real Task 38 flow with authenticated `openai` / `gpt-5.6-luna`.
+   Reuse the existing R5 capability collector and strict report types rather than
+   nesting the old R5 script or generating a second nonce. Join 9/9 observed
+   capabilities, 12/12 enforced controls, attributed adversarial denials and the
+   opaque L1/L2/owner-retirement cohort. This checkpoint may produce only a
+   machine-admission-pending candidate and does not consume the final full.
+6. **L3c4 sealed final admission** — execute the authoritative current-source
+   cohort with eight independent fresh nonces, one real success model run and
+   bounded closed failure injections; perform exact per-case teardown, fixed
+   bootout/uninstall and zero-residue observation; revalidate all three planes in
+   the sealed machine target; promote pending to
+   `signedInvestigationRuntimeReady`; create the privacy-safe report/receipt and
+   source seal; then, after independent review is green, run the one remaining
+   uninterrupted authoritative full verifier. The final full is receipt/source/
+   raw-evidence read-only and must not repeat model calls or root mutation.
+
+The order is strict: `L3c1 -> L3c2 -> L3c3 -> L3c4`. L3c1 uses focused
+Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean
+staged serial regression, targeted helper/diagnostic builds and independent
+review in place of full. L3c2 and L3c3 must each receive a fresh scope/cost
+preflight and a recorded non-admitting validation funnel. L3c4 alone owns the
+live readiness claim and Task 39's final full.
 
 39B1a bound the diagnostic configuration to the real Evidence Store v4 path,
 made lifecycle drain directly asynchronous, reloaded actor-owned run state
