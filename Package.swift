@@ -105,6 +105,12 @@ let package = Package(
             ],
             resources: [
                 .copy("Resources/investigation-prompt-v1.txt"),
+            ],
+            swiftSettings: [
+                .unsafeFlags(
+                    ["-enable-private-imports"],
+                    .when(configuration: .debug)
+                ),
             ]
         ),
         .target(

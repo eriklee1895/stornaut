@@ -1,8 +1,11 @@
+import CryptoKit
+import Darwin
 import Foundation
 import Testing
 import StornautCodex
 import StornautCore
-@testable import StornautInvestigation
+@_private(sourceFile: "SignedInvestigationRuntimeMachineContract.swift")
+import StornautInvestigation
 @testable import StornautInvestigationDiagnostic
 
 @Suite("Task 39 signed Investigation runtime contract", .serialized)
@@ -941,7 +944,1083 @@ struct SignedRuntimeContractTests {
         }
     }
 
+    @Test
+    func pendingMachineVerdictCannotOverrideBlockedEvidence() throws {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let configuration = try fixture.configuration()
+        let blocked = try fixture.report(
+            configuration: configuration,
+            capabilityEvidence: fixture.capabilityEvidence(
+                configuration: configuration,
+                missing: .subagents
+            )
+        )
+        var object = try #require(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(blocked)
+            ) as? [String: Any]
+        )
+        object["verdict"] = [
+            "evidenceContractValidatedMachineAdmissionPending": [:],
+        ]
+        let forgedPending = try JSONSerialization.data(
+            withJSONObject: object,
+            options: [.sortedKeys]
+        )
+
+        #expect(
+            throws:
+                SignedInvestigationRuntimeContractError.invalidReport
+        ) {
+            _ = try JSONDecoder().decode(
+                SignedInvestigationRuntimeReport.self,
+                from: forgedPending
+            )
+        }
+    }
+
+    @Test
+    func machineScenarioIsPartOfTheExactCapabilityAttemptBinding()
+        throws
+    {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let success = try fixture.configuration(scenario: .success)
+        let cancellation = try fixture.configuration(
+            scenario: .cancellation
+        )
+
+        #expect(success.scenario == .success)
+        #expect(cancellation.scenario == .cancellation)
+        #expect(
+            try success.capabilityEvidenceBindingSHA256()
+                != cancellation.capabilityEvidenceBindingSHA256()
+        )
+        #expect(
+            try success.machineConfigurationSHA256()
+                != cancellation.machineConfigurationSHA256()
+        )
+    }
+
+    @Test
+    func exactMachineCaseMatrixAcceptsOnlyFreshBoundExpectedOutcomes()
+        throws
+    {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let cases = try SignedInvestigationRuntimeDiagnosticScenario
+            .allCases
+            .map { scenario in
+                let configuration = try fixture.configuration(
+                    nonce: UUID(),
+                    scenario: scenario
+                )
+                return try fixture.caseEvidence(
+                    configuration: configuration
+                )
+            }
+        let matrix = try SignedInvestigationRuntimeFailureMatrix(
+            cases: cases
+        )
+
+        #expect(
+            Set(matrix.cases.map(\.scenario))
+                == Set(
+                    SignedInvestigationRuntimeDiagnosticScenario.allCases
+                )
+        )
+        #expect(Set(matrix.cases.map(\.nonce)).count == cases.count)
+        #expect(
+            matrix.cases.allSatisfy { $0.isExpectedOutcome }
+        )
+
+        #expect(
+            throws:
+                SignedInvestigationRuntimeContractError.invalidReport
+        ) {
+            _ = try SignedInvestigationRuntimeFailureMatrix(
+                cases: Array(cases.dropLast())
+            )
+        }
+        var replayed = cases
+        replayed[1] = try fixture.caseEvidence(
+            configuration: try fixture.configuration(
+                nonce: cases[0].nonce,
+                scenario: replayed[1].scenario
+            )
+        )
+        #expect(
+            throws:
+                SignedInvestigationRuntimeContractError.invalidReport
+        ) {
+            _ = try SignedInvestigationRuntimeFailureMatrix(
+                cases: replayed
+            )
+        }
+    }
+
+    @Test
+    func machineCaseEvidenceRejectsForeignReportIdentity() throws {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let configuration = try fixture.configuration(
+            scenario: .success
+        )
+        let evidence = try fixture.caseEvidence(
+            configuration: configuration
+        )
+        var object = try #require(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(evidence)
+            ) as? [String: Any]
+        )
+        object["reportID"] =
+            "investigation-report-foreign-attempt"
+        let foreign = try JSONSerialization.data(
+            withJSONObject: object,
+            options: [.sortedKeys]
+        )
+
+        #expect(
+            throws:
+                SignedInvestigationRuntimeContractError.invalidReport
+        ) {
+            _ = try JSONDecoder().decode(
+                SignedInvestigationRuntimeMachineCaseEvidence.self,
+                from: foreign
+            )
+        }
+    }
+
+    @Test
+    func lifecycleAndArtifactFailuresRequireObservedRecoveryAndZeroResidue()
+        throws
+    {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+
+        for scenario in [
+            SignedInvestigationRuntimeDiagnosticScenario.lifecycleRecovery,
+            .artifactCleanupFailure,
+        ] {
+            let configuration = try fixture.configuration(
+                nonce: UUID(),
+                scenario: scenario
+            )
+            let valid = try fixture.caseEvidence(
+                configuration: configuration
+            )
+            #expect(valid.recoveryAttempted)
+            #expect(valid.recoveryCompleted)
+            #expect(valid.finalResidue.isZero)
+
+            #expect(
+                throws:
+                    SignedInvestigationRuntimeContractError.invalidReport
+            ) {
+                _ = try fixture.caseEvidence(
+                    configuration: configuration,
+                    recoveryCompleted: false
+                )
+            }
+            #expect(
+                throws:
+                    SignedInvestigationRuntimeContractError.invalidReport
+            ) {
+                _ = try fixture.caseEvidence(
+                    configuration: configuration,
+                    finalResidue:
+                        SignedInvestigationRuntimeResidue(
+                            appProcessCount: 0,
+                            helperProcessCount: 0,
+                            workerProcessCount: 1,
+                            proxyProcessCount: 0,
+                            leaseCount: 0,
+                            runtimeArtifactCount: 0
+                        )
+                )
+            }
+        }
+    }
+
+    @Test
+    func machineCaseEvidenceRejectsSuccessOrNonObservationAsContainment()
+        throws
+    {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let configuration = try fixture.configuration(
+            scenario: .success
+        )
+        var denials = try fixture.denials()
+        denials[0] = try SignedInvestigationRuntimeDenialEvidence(
+            kind: denials[0].kind,
+            attempted: false,
+            contained: false,
+            controlReasonKey: nil,
+            failureReasonKey:
+                "runtime.denial.not-attempted"
+        )
+
+        #expect(
+            throws:
+                SignedInvestigationRuntimeContractError.invalidReport
+        ) {
+            _ = try fixture.caseEvidence(
+                configuration: configuration,
+                denials: denials
+            )
+        }
+    }
+
+    @Test
+    func machineAssemblerRejectsIncompleteCapabilityPlane() throws {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let configurations = try fixture.machineConfigurations()
+        fixture.materializeOutputs()
+        let artifacts = try configurations.map {
+            try fixture.caseEvidence(configuration: $0)
+        }
+        let success = try #require(
+            configurations.first { $0.scenario == .success }
+        )
+
+        #expect(
+            throws:
+                SignedInvestigationRuntimeContractError.invalidReport
+        ) {
+            _ = try SignedInvestigationRuntimeMachineAssembler()
+                .assemble(
+                    configurations: configurations,
+                    artifacts: artifacts,
+                    capabilityMetadata: fixture.capabilityMetadata(),
+                    capabilityWorker: fixture.capabilityWorker(
+                        investigationID: success.nonce,
+                        evidenceBindingSHA256:
+                            success.capabilityEvidenceBindingSHA256(),
+                        missing: .directRead
+                    ),
+                    capabilityLifecycleIntegrity:
+                        fixture.capabilityLifecycleIntegrity(),
+                    capabilityRepository:
+                        fixture.capabilityRepositoryEvidence(),
+                    now: artifacts.map(\.completedAt).max()!
+                )
+        }
+    }
+
+    @Test
+    func machineAssemblerRejectsExpiredOrFutureCaseEvidence()
+        throws
+    {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let configurations = try fixture.machineConfigurations()
+        fixture.materializeOutputs()
+        let validArtifacts = try configurations.map {
+            try fixture.caseEvidence(configuration: $0)
+        }
+        let successConfiguration = try #require(
+            configurations.first { $0.scenario == .success }
+        )
+        let capabilityWorker = try fixture.capabilityWorker(
+            investigationID: successConfiguration.nonce,
+            evidenceBindingSHA256:
+                successConfiguration.capabilityEvidenceBindingSHA256()
+        )
+        let assembler = SignedInvestigationRuntimeMachineAssembler()
+
+        var expiredArtifacts = validArtifacts
+        let expiredIndex = try #require(
+            expiredArtifacts.firstIndex {
+                $0.scenario == .cancellation
+            }
+        )
+        let expiredConfiguration = configurations[expiredIndex]
+        expiredArtifacts[expiredIndex] = try fixture.caseEvidence(
+            configuration: expiredConfiguration,
+            startedAt:
+                expiredConfiguration.validBefore.addingTimeInterval(1),
+            completedAt:
+                expiredConfiguration.validBefore.addingTimeInterval(2)
+        )
+        #expect(throws: (any Error).self) {
+            _ = try assembler.assemble(
+                configurations: configurations,
+                artifacts: expiredArtifacts,
+                capabilityMetadata: fixture.capabilityMetadata(),
+                capabilityWorker: capabilityWorker,
+                capabilityLifecycleIntegrity:
+                    fixture.capabilityLifecycleIntegrity(),
+                capabilityRepository:
+                    fixture.capabilityRepositoryEvidence(),
+                now: expiredArtifacts.map(\.completedAt).max()!
+            )
+        }
+
+        var futureArtifacts = validArtifacts
+        let futureIndex = try #require(
+            futureArtifacts.firstIndex {
+                $0.scenario == .transportLoss
+            }
+        )
+        futureArtifacts[futureIndex] = try fixture.caseEvidence(
+            configuration: configurations[futureIndex],
+            startedAt: fixture.now.addingTimeInterval(60),
+            completedAt: fixture.now.addingTimeInterval(61)
+        )
+        #expect(throws: (any Error).self) {
+            _ = try assembler.assemble(
+                configurations: configurations,
+                artifacts: futureArtifacts,
+                capabilityMetadata: fixture.capabilityMetadata(),
+                capabilityWorker: capabilityWorker,
+                capabilityLifecycleIntegrity:
+                    fixture.capabilityLifecycleIntegrity(),
+                capabilityRepository:
+                    fixture.capabilityRepositoryEvidence(),
+                now: fixture.now.addingTimeInterval(30)
+            )
+        }
+    }
+
+    @Test
+    func machineAssemblerRejectsConfigurationExpiredAtVerification()
+        throws
+    {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let configurations = try fixture.machineConfigurations()
+        fixture.materializeOutputs()
+        let artifacts = try configurations.map {
+            try fixture.caseEvidence(configuration: $0)
+        }
+        let success = try #require(
+            configurations.first { $0.scenario == .success }
+        )
+
+        #expect(throws: (any Error).self) {
+            _ = try SignedInvestigationRuntimeMachineAssembler()
+                .assemble(
+                    configurations: configurations,
+                    artifacts: artifacts,
+                    capabilityMetadata: fixture.capabilityMetadata(),
+                    capabilityWorker: fixture.capabilityWorker(
+                        investigationID: success.nonce,
+                        evidenceBindingSHA256:
+                            success.capabilityEvidenceBindingSHA256()
+                    ),
+                    capabilityLifecycleIntegrity:
+                        fixture.capabilityLifecycleIntegrity(),
+                    capabilityRepository:
+                        fixture.capabilityRepositoryEvidence(),
+                    now: success.validBefore.addingTimeInterval(1)
+                )
+        }
+    }
+
+    @Test
+    func machineAssemblerRejectsStaleCapabilityObservation()
+        throws
+    {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let configurations = try fixture.machineConfigurations()
+        fixture.materializeOutputs()
+        let success = try #require(
+            configurations.first { $0.scenario == .success }
+        )
+
+        for completedAt in [
+            fixture.now.addingTimeInterval(-4_000),
+            fixture.now.addingTimeInterval(0.5),
+            fixture.now.addingTimeInterval(31),
+        ] {
+            let timestampedArtifacts = try configurations.map {
+                try fixture.caseEvidence(
+                    configuration: $0,
+                    capabilityCompletedAt: completedAt
+                )
+            }
+            #expect(
+                throws:
+                    SignedInvestigationRuntimeContractError.invalidReport
+            ) {
+                _ = try SignedInvestigationRuntimeMachineAssembler()
+                    .assemble(
+                        configurations: configurations,
+                        artifacts: timestampedArtifacts,
+                        capabilityMetadata: fixture.capabilityMetadata(),
+                        capabilityWorker: fixture.capabilityWorker(
+                            investigationID: success.nonce,
+                            evidenceBindingSHA256:
+                                success.capabilityEvidenceBindingSHA256(),
+                            completedAt: completedAt
+                        ),
+                        capabilityLifecycleIntegrity:
+                            fixture.capabilityLifecycleIntegrity(),
+                        capabilityRepository:
+                            fixture.capabilityRepositoryEvidence(),
+                        now: fixture.now.addingTimeInterval(30)
+                    )
+            }
+        }
+    }
+
+    @Test
+    func machineAssemblerAcceptsFreshCapabilityPreflightBeforeProduction()
+        throws
+    {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let configurations = try fixture.machineConfigurations()
+        fixture.materializeOutputs()
+        let artifacts = try configurations.map {
+            try fixture.caseEvidence(configuration: $0)
+        }
+        let success = try #require(
+            configurations.first { $0.scenario == .success }
+        )
+
+        let report = try SignedInvestigationRuntimeMachineAssembler()
+            .assemble(
+                configurations: configurations,
+                artifacts: artifacts,
+                capabilityMetadata: fixture.capabilityMetadata(),
+                capabilityWorker: fixture.capabilityWorker(
+                    investigationID: success.nonce,
+                    evidenceBindingSHA256:
+                        success.capabilityEvidenceBindingSHA256(),
+                    completedAt: fixture.now.addingTimeInterval(-1)
+                ),
+                capabilityLifecycleIntegrity:
+                    fixture.capabilityLifecycleIntegrity(),
+                capabilityRepository:
+                    fixture.capabilityRepositoryEvidence(),
+                now: fixture.now.addingTimeInterval(30)
+            )
+
+        #expect(
+            report.verdict
+                == .evidenceContractValidatedMachineAdmissionPending
+        )
+    }
+
+    @Test
+    func machineAssemblerRejectsMixedBuildOrPlanEvidence()
+        throws
+    {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let configurations = try fixture.machineConfigurations()
+        var mixedConfigurations = configurations
+        let mixedIndex = try #require(
+            mixedConfigurations.firstIndex {
+                $0.scenario == .timeout
+            }
+        )
+        mixedConfigurations[mixedIndex] = try fixture.configuration(
+            nonce: configurations[mixedIndex].nonce,
+            scenario: .timeout,
+            binding: fixture.binding(
+                runtimeReceiptSHA256:
+                    String(repeating: "c", count: 64)
+            )
+        )
+        fixture.materializeOutputs()
+        let validArtifacts = try configurations.map {
+            try fixture.caseEvidence(configuration: $0)
+        }
+        let successConfiguration = try #require(
+            configurations.first { $0.scenario == .success }
+        )
+        let capabilityWorker = try fixture.capabilityWorker(
+            investigationID: successConfiguration.nonce,
+            evidenceBindingSHA256:
+                successConfiguration.capabilityEvidenceBindingSHA256()
+        )
+        let assembler = SignedInvestigationRuntimeMachineAssembler()
+
+        var mixedArtifacts = validArtifacts
+        mixedArtifacts[mixedIndex] = try fixture.caseEvidence(
+            configuration: mixedConfigurations[mixedIndex]
+        )
+        #expect(throws: (any Error).self) {
+            _ = try assembler.assemble(
+                configurations: mixedConfigurations,
+                artifacts: mixedArtifacts,
+                capabilityMetadata: fixture.capabilityMetadata(),
+                capabilityWorker: capabilityWorker,
+                capabilityLifecycleIntegrity:
+                    fixture.capabilityLifecycleIntegrity(),
+                capabilityRepository:
+                    fixture.capabilityRepositoryEvidence(),
+                now: fixture.now.addingTimeInterval(30)
+            )
+        }
+
+        var mixedPlans = validArtifacts
+        let planIndex = try #require(
+            mixedPlans.firstIndex {
+                $0.scenario == .transportLoss
+            }
+        )
+        mixedPlans[planIndex] = try fixture.caseEvidence(
+            configuration: configurations[planIndex],
+            planFingerprint: try InvestigationFingerprint(
+                validatingHex: String(repeating: "d", count: 64)
+            )
+        )
+        #expect(throws: (any Error).self) {
+            _ = try assembler.assemble(
+                configurations: configurations,
+                artifacts: mixedPlans,
+                capabilityMetadata: fixture.capabilityMetadata(),
+                capabilityWorker: capabilityWorker,
+                capabilityLifecycleIntegrity:
+                    fixture.capabilityLifecycleIntegrity(),
+                capabilityRepository:
+                    fixture.capabilityRepositoryEvidence(),
+                now: fixture.now.addingTimeInterval(30)
+            )
+        }
+    }
+
+    @Test
+    func machineAssemblerRejectsReusedAttemptPathsOrStaleCohort()
+        throws
+    {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let reusedConfigurations =
+            try SignedInvestigationRuntimeDiagnosticScenario
+                .allCases
+                .map {
+                    try fixture.configuration(
+                        nonce: UUID(),
+                        scenario: $0,
+                        reuseDefaultPaths: true
+                    )
+                }
+        fixture.materializeOutputs()
+        let reusedArtifacts = try reusedConfigurations.map {
+            try fixture.caseEvidence(configuration: $0)
+        }
+        let reusedSuccess = try #require(
+            reusedConfigurations.first { $0.scenario == .success }
+        )
+        #expect(throws: (any Error).self) {
+            _ = try SignedInvestigationRuntimeMachineAssembler()
+                .assemble(
+                    configurations: reusedConfigurations,
+                    artifacts: reusedArtifacts,
+                    capabilityMetadata: fixture.capabilityMetadata(),
+                    capabilityWorker: fixture.capabilityWorker(
+                        investigationID: reusedSuccess.nonce,
+                        evidenceBindingSHA256:
+                            reusedSuccess
+                            .capabilityEvidenceBindingSHA256()
+                    ),
+                    capabilityLifecycleIntegrity:
+                        fixture.capabilityLifecycleIntegrity(),
+                    capabilityRepository:
+                        fixture.capabilityRepositoryEvidence(),
+                    now: fixture.now.addingTimeInterval(30)
+                )
+        }
+
+        try FileManager.default.removeItem(at: fixture.reportURL)
+        try FileManager.default.removeItem(at: fixture.storeURL)
+        var freshConfigurations = try fixture.machineConfigurations()
+        let staleIndex = try #require(
+            freshConfigurations.firstIndex {
+                $0.scenario == .cancellation
+            }
+        )
+        freshConfigurations[staleIndex] = try fixture.configuration(
+            nonce: freshConfigurations[staleIndex].nonce,
+            scenario: .cancellation,
+            configurationNow:
+                fixture.now.addingTimeInterval(-4_100),
+            validBefore:
+                fixture.now.addingTimeInterval(-3_900)
+        )
+        fixture.materializeOutputs()
+        var staleArtifacts = try freshConfigurations.map {
+            try fixture.caseEvidence(configuration: $0)
+        }
+        staleArtifacts[staleIndex] = try fixture.caseEvidence(
+            configuration: freshConfigurations[staleIndex],
+            startedAt: fixture.now.addingTimeInterval(-4_000),
+            completedAt: fixture.now.addingTimeInterval(-3_970)
+        )
+        let freshSuccess = try #require(
+            freshConfigurations.first { $0.scenario == .success }
+        )
+        #expect(throws: (any Error).self) {
+            _ = try SignedInvestigationRuntimeMachineAssembler()
+                .assemble(
+                    configurations: freshConfigurations,
+                    artifacts: staleArtifacts,
+                    capabilityMetadata: fixture.capabilityMetadata(),
+                    capabilityWorker: fixture.capabilityWorker(
+                        investigationID: freshSuccess.nonce,
+                        evidenceBindingSHA256:
+                            freshSuccess
+                            .capabilityEvidenceBindingSHA256()
+                    ),
+                    capabilityLifecycleIntegrity:
+                        fixture.capabilityLifecycleIntegrity(),
+                    capabilityRepository:
+                        fixture.capabilityRepositoryEvidence(),
+                    now: fixture.now.addingTimeInterval(30)
+                )
+        }
+    }
+
+    @Test
+    func machineAssemblerRejectsUndeclaredDiagnosticResidue()
+        throws
+    {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let configurations = try fixture.machineConfigurations()
+        fixture.materializeOutputs()
+        let artifacts = try configurations.map {
+            try fixture.caseEvidence(configuration: $0)
+        }
+        let success = try #require(
+            configurations.first { $0.scenario == .success }
+        )
+        let residueURLs = [
+            URL(filePath: success.sourceRootPath)
+                .appending(path: "stale-source-fixture.txt"),
+            URL(filePath: success.runtimeRootPath)
+                .appending(path: "stale-runtime.json"),
+            URL(filePath: success.supportRootPath)
+                .appending(path: "stale-auth-projection.json"),
+            URL(filePath: success.diagnosticRootPath)
+                .appending(path: "unexpected-machine-artifact.json"),
+        ]
+
+        for residueURL in residueURLs {
+            try writeOwnerOnly(
+                Data("undeclared-runtime-residue".utf8),
+                to: residueURL
+            )
+            #expect(
+                throws:
+                    SignedInvestigationRuntimeContractError.invalidReport,
+                "residue=\(residueURL.lastPathComponent)"
+            ) {
+                _ = try SignedInvestigationRuntimeMachineAssembler()
+                    .assemble(
+                        configurations: configurations,
+                        artifacts: artifacts,
+                        capabilityMetadata: fixture.capabilityMetadata(),
+                        capabilityWorker: fixture.capabilityWorker(
+                            investigationID: success.nonce,
+                            evidenceBindingSHA256:
+                                success.capabilityEvidenceBindingSHA256()
+                        ),
+                        capabilityLifecycleIntegrity:
+                            fixture.capabilityLifecycleIntegrity(),
+                        capabilityRepository:
+                            fixture.capabilityRepositoryEvidence(),
+                        now: fixture.now.addingTimeInterval(30)
+                    )
+            }
+            try FileManager.default.removeItem(at: residueURL)
+        }
+    }
+
+    @Test
+    func machineAssemblerRejectsUndeclaredCohortAttempt()
+        throws
+    {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let configurations = try fixture.machineConfigurations()
+        fixture.materializeOutputs()
+        let artifacts = try configurations.map {
+            try fixture.caseEvidence(configuration: $0)
+        }
+        let success = try #require(
+            configurations.first { $0.scenario == .success }
+        )
+        let cohortRoot = URL(filePath: success.diagnosticRootPath)
+            .deletingLastPathComponent()
+        let undeclaredAttempt = cohortRoot.appending(
+            path: "undeclared-attempt",
+            directoryHint: .isDirectory
+        )
+        try FileManager.default.createDirectory(
+            at: undeclaredAttempt,
+            withIntermediateDirectories: false,
+            attributes: [.posixPermissions: 0o700]
+        )
+        try writeOwnerOnly(
+            Data("undeclared-cohort-residue".utf8),
+            to: undeclaredAttempt.appending(path: "runtime.json")
+        )
+
+        #expect(
+            throws:
+                SignedInvestigationRuntimeContractError.invalidReport
+        ) {
+            _ = try SignedInvestigationRuntimeMachineAssembler()
+                .assemble(
+                    configurations: configurations,
+                    artifacts: artifacts,
+                    capabilityMetadata: fixture.capabilityMetadata(),
+                    capabilityWorker: fixture.capabilityWorker(
+                        investigationID: success.nonce,
+                        evidenceBindingSHA256:
+                            success.capabilityEvidenceBindingSHA256()
+                    ),
+                    capabilityLifecycleIntegrity:
+                        fixture.capabilityLifecycleIntegrity(),
+                    capabilityRepository:
+                        fixture.capabilityRepositoryEvidence(),
+                    now: fixture.now.addingTimeInterval(30)
+                )
+        }
+    }
+
+    @Test
+    func machineAssemblerRejectsMissingOrForgedLifecycleObservation()
+        throws
+    {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let configurations = try fixture.machineConfigurations()
+        fixture.materializeOutputs()
+        let artifacts = try configurations.map {
+            try fixture.caseEvidence(configuration: $0)
+        }
+        let success = try #require(
+            configurations.first { $0.scenario == .success }
+        )
+        let evidence = try SignedInvestigationRuntimeMachineEvidenceBundle(
+            configurations: configurations,
+            artifacts: artifacts,
+            lifecycleResidueRecords: [],
+            capabilityMetadata: fixture.capabilityMetadata(),
+            capabilityWorker: fixture.capabilityWorker(
+                investigationID: success.nonce,
+                evidenceBindingSHA256:
+                    success.capabilityEvidenceBindingSHA256()
+            ),
+            capabilityLifecycleIntegrity:
+                fixture.capabilityLifecycleIntegrity(),
+            capabilityRepository:
+                fixture.capabilityRepositoryEvidence()
+        )
+
+        #expect(
+            throws:
+                SignedInvestigationRuntimeContractError.invalidReport
+        ) {
+            _ = try SignedInvestigationRuntimeMachineAssembler()
+                .assemble(
+                    evidence: evidence,
+                    now: fixture.now.addingTimeInterval(30)
+                )
+        }
+
+        let authoritativeRecords =
+            try fixture.lifecycleResidueRecords(
+                artifacts: artifacts
+            )
+        let forgedRecords = try artifacts.map {
+            let residue =
+                $0.scenario == .success
+                ? SignedInvestigationRuntimeResidue(
+                    appProcessCount: 0,
+                    helperProcessCount: 0,
+                    workerProcessCount: 1,
+                    proxyProcessCount: 0,
+                    leaseCount: 0,
+                    runtimeArtifactCount: 0
+                )
+                : $0.finalResidue
+            return try SignedInvestigationRuntimeLifecycleResidueRecord(
+                scenario: $0.scenario,
+                nonce: $0.nonce,
+                binding: $0.binding,
+                observedAt: $0.completedAt,
+                residue: residue
+            )
+        }
+        #expect(
+            throws:
+                SignedInvestigationRuntimeContractError.invalidReport
+        ) {
+            _ = try SignedInvestigationRuntimeMachineAssembler()
+                .assemble(
+                    configurations: configurations,
+                    artifacts: artifacts,
+                    lifecycleResidueRecords: forgedRecords,
+                    capabilityMetadata: fixture.capabilityMetadata(),
+                    capabilityWorker: fixture.capabilityWorker(
+                        investigationID: success.nonce,
+                        evidenceBindingSHA256:
+                            success.capabilityEvidenceBindingSHA256()
+                    ),
+                    capabilityLifecycleIntegrity:
+                        fixture.capabilityLifecycleIntegrity(),
+                    capabilityRepository:
+                        fixture.capabilityRepositoryEvidence(),
+                    sealedCohortAuthority:
+                        TestSignedInvestigationRuntimeSealedCohortAuthority(
+                            lifecycleRecords: authoritativeRecords
+                        ),
+                    now: fixture.now.addingTimeInterval(30)
+                )
+        }
+    }
+
+    @Test
+    func machineAssemblerRejectsMutationBeforeFinalRevalidation()
+        throws
+    {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let configurations = try fixture.machineConfigurations()
+        fixture.materializeOutputs()
+        let artifacts = try configurations.map {
+            try fixture.caseEvidence(configuration: $0)
+        }
+        let success = try #require(
+            configurations.first { $0.scenario == .success }
+        )
+        let assembler = SignedInvestigationRuntimeMachineAssembler {
+            phase in
+            guard phase == .beforeFinalRevalidation else { return }
+            try writeOwnerOnly(
+                Data("late-runtime-residue".utf8),
+                to: URL(filePath: success.runtimeRootPath)
+                    .appending(path: "late-residue.json")
+            )
+        }
+
+        #expect(
+            throws:
+                SignedInvestigationRuntimeContractError.invalidReport
+        ) {
+            _ = try assembler.assemble(
+                configurations: configurations,
+                artifacts: artifacts,
+                lifecycleResidueRecords:
+                    fixture.lifecycleResidueRecords(
+                        artifacts: artifacts
+                    ),
+                capabilityMetadata: fixture.capabilityMetadata(),
+                capabilityWorker: fixture.capabilityWorker(
+                    investigationID: success.nonce,
+                    evidenceBindingSHA256:
+                        success.capabilityEvidenceBindingSHA256()
+                ),
+                capabilityLifecycleIntegrity:
+                    fixture.capabilityLifecycleIntegrity(),
+                capabilityRepository:
+                    fixture.capabilityRepositoryEvidence(),
+                sealedCohortAuthority:
+                    TestSignedInvestigationRuntimeSealedCohortAuthority(
+                        lifecycleRecords:
+                            fixture.lifecycleResidueRecords(
+                                artifacts: artifacts
+                            )
+                    ),
+                now: fixture.now.addingTimeInterval(30)
+            )
+        }
+    }
+
+    @Test
+    func machineAssemblerRejectsMutationAfterEarlierFinalRevalidation()
+        throws
+    {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let configurations = try fixture.machineConfigurations()
+        fixture.materializeOutputs()
+        let artifacts = try configurations.map {
+            try fixture.caseEvidence(configuration: $0)
+        }
+        let firstArtifact = try #require(
+            SignedInvestigationRuntimeFailureMatrix(cases: artifacts)
+                .cases.first
+        )
+        let firstConfiguration = try #require(
+            configurations.first {
+                $0.scenario == firstArtifact.scenario
+            }
+        )
+        let successConfiguration = try #require(
+            configurations.first { $0.scenario == .success }
+        )
+        let assembler = SignedInvestigationRuntimeMachineAssembler {
+            phase in
+            guard
+                phase
+                    == .afterFinalRevalidation(firstArtifact.scenario)
+            else {
+                return
+            }
+            try writeOwnerOnly(
+                Data("post-revalidation-residue".utf8),
+                to: URL(filePath: firstConfiguration.runtimeRootPath)
+                    .appending(path: "post-revalidation.json")
+            )
+        }
+
+        #expect(
+            throws:
+                SignedInvestigationRuntimeContractError.invalidReport
+        ) {
+            _ = try assembler.assemble(
+                configurations: configurations,
+                artifacts: artifacts,
+                lifecycleResidueRecords:
+                    fixture.lifecycleResidueRecords(
+                        artifacts: artifacts
+                    ),
+                capabilityMetadata: fixture.capabilityMetadata(),
+                capabilityWorker: fixture.capabilityWorker(
+                    investigationID: successConfiguration.nonce,
+                    evidenceBindingSHA256:
+                        successConfiguration
+                        .capabilityEvidenceBindingSHA256()
+                ),
+                capabilityLifecycleIntegrity:
+                    fixture.capabilityLifecycleIntegrity(),
+                capabilityRepository:
+                    fixture.capabilityRepositoryEvidence(),
+                sealedCohortAuthority:
+                    TestSignedInvestigationRuntimeSealedCohortAuthority(
+                        lifecycleRecords:
+                            fixture.lifecycleResidueRecords(
+                                artifacts: artifacts
+                            )
+                    ),
+                now: fixture.now.addingTimeInterval(30)
+            )
+        }
+    }
+
+    @Test
+    func machineLifecycleObservationCannotBeDecodedAsTrustedEvidence()
+        throws
+    {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let configurations = try fixture.machineConfigurations()
+        fixture.materializeOutputs()
+        let artifacts = try configurations.map {
+            try fixture.caseEvidence(configuration: $0)
+        }
+        let records = try fixture.lifecycleResidueRecords(
+            artifacts: artifacts
+        )
+        let successConfiguration = try #require(
+            configurations.first { $0.scenario == .success }
+        )
+        let bundle = try SignedInvestigationRuntimeMachineEvidenceBundle(
+            configurations: configurations,
+            artifacts: artifacts,
+            lifecycleResidueRecords: records,
+            capabilityMetadata: fixture.capabilityMetadata(),
+            capabilityWorker: fixture.capabilityWorker(
+                investigationID: successConfiguration.nonce,
+                evidenceBindingSHA256:
+                    successConfiguration
+                    .capabilityEvidenceBindingSHA256()
+            ),
+            capabilityLifecycleIntegrity:
+                fixture.capabilityLifecycleIntegrity(),
+            capabilityRepository:
+                fixture.capabilityRepositoryEvidence()
+        )
+        let bundleData = try bundle.canonicalJSONData()
+
+        #expect(
+            !((SignedInvestigationRuntimeLifecycleResidueObservation.self
+                as Any.Type) is any Decodable.Type)
+        )
+        let decoded = try JSONDecoder().decode(
+            SignedInvestigationRuntimeMachineEvidenceBundle.self,
+            from: bundleData
+        )
+        #expect(
+            decoded.lifecycleResidueRecords
+                == records.sorted {
+                    $0.scenario.rawValue < $1.scenario.rawValue
+                }
+        )
+        #expect(decoded == bundle)
+    }
+
+    @Test
+    func machineUpstreamErrorsAreSanitizedAndStrict()
+        throws
+    {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let configuration = try fixture.configuration(
+            scenario: .cancellation
+        )
+        let upstreamError = try SignedInvestigationRuntimeUpstreamError(
+            category: .usageLimit,
+            code: "provider.rate_limit",
+            willRetry: true
+        )
+        let evidence = try fixture.caseEvidence(
+            configuration: configuration,
+            upstreamError: upstreamError
+        )
+        #expect(evidence.upstreamError == upstreamError)
+
+        #expect(
+            throws:
+                SignedInvestigationRuntimeContractError.invalidReport
+        ) {
+            _ = try SignedInvestigationRuntimeUpstreamError(
+                category: .runtime,
+                code: "secret/path\nunsafe",
+                willRetry: false
+            )
+        }
+
+        var object = try #require(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(evidence)
+            ) as? [String: Any]
+        )
+        var errorObject = try #require(
+            object["upstreamError"] as? [String: Any]
+        )
+        errorObject["details"] = "must-not-survive"
+        object["upstreamError"] = errorObject
+        let tampered = try JSONSerialization.data(
+            withJSONObject: object,
+            options: [.sortedKeys]
+        )
+        #expect(
+            throws:
+                SignedInvestigationRuntimeContractError.invalidReport
+        ) {
+            _ = try JSONDecoder().decode(
+                SignedInvestigationRuntimeMachineCaseEvidence.self,
+                from: tampered
+            )
+        }
+    }
+
 }
+
 private enum NestedSignedRuntimeTarget:
     String,
     CaseIterable,
@@ -1097,6 +2176,203 @@ private func verdictWithUnknownField(_ value: Any?) throws -> Any {
     verdict[caseKey] = payload
     return verdict
 }
+
+func writeOwnerOnly(_ data: Data, to url: URL) throws {
+    try data.write(to: url, options: .withoutOverwriting)
+    try FileManager.default.setAttributes(
+        [.posixPermissions: 0o600],
+        ofItemAtPath: url.path
+    )
+}
+
+extension SignedInvestigationRuntimeMachineAssembler {
+    func assemble(
+        evidence: SignedInvestigationRuntimeMachineEvidenceBundle,
+        now: Date
+    ) throws -> SignedInvestigationRuntimeMachineReport {
+        return try assemble(
+            evidence: evidence,
+            sealedCohortAuthority:
+                TestSignedInvestigationRuntimeSealedCohortAuthority(
+                    lifecycleRecords:
+                        evidence.lifecycleResidueRecords
+                ),
+            now: now
+        )
+    }
+
+    func assemble(
+        configurations:
+            [SignedInvestigationRuntimeDiagnosticConfiguration],
+        artifacts: [SignedInvestigationRuntimeMachineCaseEvidence],
+        lifecycleResidueRecords:
+            [SignedInvestigationRuntimeLifecycleResidueRecord],
+        capabilityMetadata: CapabilityRuntimeDiagnosticMetadata,
+        capabilityWorker: CapabilityRuntimeWorkerEvidence,
+        capabilityLifecycleIntegrity:
+            [CapabilityRuntimeIntegrityEvidence],
+        capabilityRepository: CapabilityRuntimeRepositoryEvidence,
+        now: Date
+    ) throws -> SignedInvestigationRuntimeMachineReport {
+        return try assemble(
+            configurations: configurations,
+            artifacts: artifacts,
+            lifecycleResidueRecords: lifecycleResidueRecords,
+            capabilityMetadata: capabilityMetadata,
+            capabilityWorker: capabilityWorker,
+            capabilityLifecycleIntegrity:
+                capabilityLifecycleIntegrity,
+            capabilityRepository: capabilityRepository,
+            sealedCohortAuthority:
+                TestSignedInvestigationRuntimeSealedCohortAuthority(
+                    lifecycleRecords: lifecycleResidueRecords
+                ),
+            now: now
+        )
+    }
+
+    func assemble(
+        configurations:
+            [SignedInvestigationRuntimeDiagnosticConfiguration],
+        artifacts: [SignedInvestigationRuntimeMachineCaseEvidence],
+        capabilityMetadata: CapabilityRuntimeDiagnosticMetadata,
+        capabilityWorker: CapabilityRuntimeWorkerEvidence,
+        capabilityLifecycleIntegrity:
+            [CapabilityRuntimeIntegrityEvidence],
+        capabilityRepository: CapabilityRuntimeRepositoryEvidence,
+        now: Date
+    ) throws -> SignedInvestigationRuntimeMachineReport {
+        let lifecycleRecords = try artifacts.map {
+            try SignedInvestigationRuntimeLifecycleResidueRecord(
+                scenario: $0.scenario,
+                nonce: $0.nonce,
+                binding: $0.binding,
+                observedAt: $0.completedAt,
+                residue: $0.finalResidue
+            )
+        }
+        return try assemble(
+            configurations: configurations,
+            artifacts: artifacts,
+            lifecycleResidueRecords: lifecycleRecords,
+            capabilityMetadata: capabilityMetadata,
+            capabilityWorker: capabilityWorker,
+            capabilityLifecycleIntegrity:
+                capabilityLifecycleIntegrity,
+            capabilityRepository: capabilityRepository,
+            sealedCohortAuthority:
+                TestSignedInvestigationRuntimeSealedCohortAuthority(
+                    lifecycleRecords: lifecycleRecords
+                ),
+            now: now
+        )
+    }
+}
+
+extension SignedInvestigationRuntimeMachineVerifier {
+    func verifyCandidate(
+        _ report: SignedInvestigationRuntimeMachineReport,
+        evidence: SignedInvestigationRuntimeMachineEvidenceBundle,
+        now: Date
+    ) throws -> SignedInvestigationRuntimeMachineReport {
+        return try verifyCandidate(
+            report,
+            evidence: evidence,
+            sealedCohortAuthority:
+                TestSignedInvestigationRuntimeSealedCohortAuthority(
+                    lifecycleRecords:
+                        evidence.lifecycleResidueRecords
+                ),
+            now: now
+        )
+    }
+
+    func verifyCandidate(
+        _ report: SignedInvestigationRuntimeMachineReport,
+        configurations:
+            [SignedInvestigationRuntimeDiagnosticConfiguration],
+        artifacts: [SignedInvestigationRuntimeMachineCaseEvidence],
+        capabilityMetadata: CapabilityRuntimeDiagnosticMetadata,
+        capabilityWorker: CapabilityRuntimeWorkerEvidence,
+        capabilityLifecycleIntegrity:
+            [CapabilityRuntimeIntegrityEvidence],
+        capabilityRepository: CapabilityRuntimeRepositoryEvidence,
+        now: Date
+    ) throws -> SignedInvestigationRuntimeMachineReport {
+        let lifecycleRecords = try artifacts.map {
+            try SignedInvestigationRuntimeLifecycleResidueRecord(
+                scenario: $0.scenario,
+                nonce: $0.nonce,
+                binding: $0.binding,
+                observedAt: $0.completedAt,
+                residue: $0.finalResidue
+            )
+        }
+        return try verifyCandidate(
+            report,
+            configurations: configurations,
+            artifacts: artifacts,
+            lifecycleResidueRecords: lifecycleRecords,
+            capabilityMetadata: capabilityMetadata,
+            capabilityWorker: capabilityWorker,
+            capabilityLifecycleIntegrity:
+                capabilityLifecycleIntegrity,
+            capabilityRepository: capabilityRepository,
+            sealedCohortAuthority:
+                TestSignedInvestigationRuntimeSealedCohortAuthority(
+                    lifecycleRecords: lifecycleRecords
+                ),
+            now: now
+        )
+    }
+}
+
+private struct TestSignedInvestigationRuntimeSealedCohortAuthority:
+    SignedInvestigationRuntimeSealedCohortAuthority
+{
+    let lifecycleRecords:
+        [SignedInvestigationRuntimeLifecycleResidueRecord]
+
+    func withSealedCohort<Result: Sendable>(
+        configurations:
+            [SignedInvestigationRuntimeDiagnosticConfiguration],
+        expectedLifecycleResidueRecords:
+            [SignedInvestigationRuntimeLifecycleResidueRecord],
+        _ operation:
+            @Sendable (
+                [
+                    SignedInvestigationRuntimeLifecycleResidueObservation
+                ]
+            ) throws -> Result
+    ) throws -> Result {
+        guard
+            lifecycleRecords.sorted(by: lifecycleRecordOrder)
+                == expectedLifecycleResidueRecords.sorted(
+                    by: lifecycleRecordOrder
+                )
+        else {
+            throw SignedInvestigationRuntimeContractError.invalidReport
+        }
+        guard !configurations.isEmpty else {
+            throw SignedInvestigationRuntimeContractError.invalidReport
+        }
+        return try operation(
+            lifecycleRecords.map {
+                SignedInvestigationRuntimeLifecycleResidueObservation(
+                    record: $0
+                )
+            }
+        )
+    }
+
+    private func lifecycleRecordOrder(
+        _ left: SignedInvestigationRuntimeLifecycleResidueRecord,
+        _ right: SignedInvestigationRuntimeLifecycleResidueRecord
+    ) -> Bool {
+        left.scenario.rawValue < right.scenario.rawValue
+    }
+}
+
 struct SignedRuntimeContractFixture {
     let now: Date
     let nonce = UUID(
@@ -1448,6 +2724,176 @@ struct SignedRuntimeContractFixture {
             startedAt: now,
             completedAt: completedAt ?? now.addingTimeInterval(30)
         )
+    }
+
+    func caseEvidence(
+        configuration:
+            SignedInvestigationRuntimeDiagnosticConfiguration,
+        recoveryCompleted: Bool? = nil,
+        denials: [SignedInvestigationRuntimeDenialEvidence]? = nil,
+        finalResidue: SignedInvestigationRuntimeResidue? = nil,
+        planFingerprint: InvestigationFingerprint? = nil,
+        upstreamError: SignedInvestigationRuntimeUpstreamError? = nil,
+        startedAt: Date? = nil,
+        completedAt: Date? = nil,
+        capabilityCompletedAt: Date? = nil
+    ) throws -> SignedInvestigationRuntimeMachineCaseEvidence {
+        let scenario = configuration.scenario
+        let controls = machineControls(for: scenario)
+        let nonceText = configuration.nonce.uuidString.lowercased()
+        let capabilityEvidenceSHA256: String?
+        if scenario == .success {
+            capabilityEvidenceSHA256 =
+                try capabilityEvidence(
+                    configuration: configuration,
+                    completedAt: capabilityCompletedAt
+                ).machineEvidenceSHA256()
+        } else {
+            capabilityEvidenceSHA256 = nil
+        }
+        return try SignedInvestigationRuntimeMachineCaseEvidence(
+            scenario: scenario,
+            nonce: configuration.nonce,
+            configurationSHA256:
+                configuration.machineConfigurationSHA256(),
+            runtimeArtifactSHA256:
+                try runtimeArtifactSHA256(configuration.reportPath),
+            evidenceStoreSHA256:
+                try runtimeArtifactSHA256(configuration.storePath),
+            capabilityEvidenceSHA256: capabilityEvidenceSHA256,
+            binding: configuration.binding,
+            investigationID: InvestigationID(
+                rawValue: "investigation-\(nonceText)"
+            )!,
+            runID: InvestigationRunID(
+                rawValue: "investigation-run-\(nonceText)"
+            )!,
+            reportID: scenario == .success
+                ? InvestigationReportID(
+                    rawValue: "investigation-report-\(nonceText)"
+                )
+                : nil,
+            sourceFingerprint: try InvestigationFingerprint(
+                validatingHex:
+                    configuration.binding.sourceFingerprintSHA256
+            ),
+            planFingerprint: try planFingerprint
+                ?? InvestigationFingerprint(
+                    validatingHex: String(repeating: "b", count: 64)
+                ),
+            outcome: machineOutcome(for: scenario),
+            runStarted: controls.runStarted,
+            turnAdmitted: controls.turnAdmitted,
+            finalEnvelopeAccepted:
+                controls.finalEnvelopeAccepted,
+            terminalBarrierSettled:
+                controls.terminalBarrierSettled,
+            artifactsRetired: controls.artifactsRetired,
+            localRuntimeDrained: controls.localRuntimeDrained,
+            recoveryAttempted: controls.recoveryAttempted,
+            recoveryCompleted:
+                recoveryCompleted ?? controls.recoveryCompleted,
+            denials: denials
+                ?? (scenario == .success ? self.denials() : []),
+            finalResidue: finalResidue
+                ?? SignedInvestigationRuntimeResidue(
+                    appProcessCount: 0,
+                    helperProcessCount: 0,
+                    workerProcessCount: 0,
+                    proxyProcessCount: 0,
+                    leaseCount: 0,
+                    runtimeArtifactCount: 0
+                ),
+            observationReasonKey: scenario == .success
+                ? nil
+                : "runtime.machine.\(scenario.rawValue)",
+            upstreamError: upstreamError,
+            startedAt: startedAt ?? now,
+            completedAt: completedAt ?? now.addingTimeInterval(30)
+        )
+    }
+
+    func lifecycleResidueRecords(
+        artifacts: [SignedInvestigationRuntimeMachineCaseEvidence]
+    ) throws
+        -> [SignedInvestigationRuntimeLifecycleResidueRecord]
+    {
+        try artifacts.map {
+            try SignedInvestigationRuntimeLifecycleResidueRecord(
+                scenario: $0.scenario,
+                nonce: $0.nonce,
+                binding: $0.binding,
+                observedAt: $0.completedAt,
+                residue: $0.finalResidue
+            )
+        }
+    }
+
+    private func machineOutcome(
+        for scenario: SignedInvestigationRuntimeDiagnosticScenario
+    ) -> SignedInvestigationRuntimeMachineCaseOutcome {
+        switch scenario {
+        case .success:
+            .succeeded
+        case .cancellation:
+            .cancelled
+        case .timeout:
+            .timedOut
+        case .invalidEnvelope:
+            .invalidEnvelopeBlocked
+        case .identityMismatch:
+            .identityMismatchBlocked
+        case .transportLoss:
+            .transportLossBlocked
+        case .lifecycleRecovery:
+            .lifecycleRecovered
+        case .artifactCleanupFailure:
+            .artifactCleanupRecovered
+        }
+    }
+
+    private func runtimeArtifactSHA256(
+        _ path: String,
+        nonce: UUID? = nil
+    ) throws -> String {
+        let data: Data
+        if FileManager.default.fileExists(atPath: path) {
+            data = try Data(contentsOf: URL(filePath: path))
+        } else {
+            data = Data(
+                "synthetic-runtime-artifact-\((nonce ?? self.nonce).uuidString)"
+                    .utf8
+            )
+        }
+        return SHA256.hash(data: data)
+            .map { String(format: "%02x", $0) }
+            .joined()
+    }
+
+    private func machineControls(
+        for scenario: SignedInvestigationRuntimeDiagnosticScenario
+    ) -> (
+        runStarted: Bool,
+        turnAdmitted: Bool,
+        finalEnvelopeAccepted: Bool,
+        terminalBarrierSettled: Bool,
+        artifactsRetired: Bool,
+        localRuntimeDrained: Bool,
+        recoveryAttempted: Bool,
+        recoveryCompleted: Bool
+    ) {
+        switch scenario {
+        case .success:
+            (true, true, true, true, true, true, false, false)
+        case .cancellation, .timeout, .invalidEnvelope:
+            (true, true, false, true, true, true, false, false)
+        case .identityMismatch:
+            (false, false, false, false, true, true, false, false)
+        case .transportLoss:
+            (true, true, false, false, true, true, false, false)
+        case .lifecycleRecovery, .artifactCleanupFailure:
+            (true, true, false, true, true, true, true, true)
+        }
     }
 
     func verifyReady(
