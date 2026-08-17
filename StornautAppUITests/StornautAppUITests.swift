@@ -1894,24 +1894,74 @@ final class StornautAppUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.windows["main"].waitForExistence(timeout: 10))
         app.typeKey(",", modifierFlags: .command)
-        let content = element("settings.content", in: app)
-        XCTAssertTrue(content.waitForExistence(timeout: 10))
-        let window = app.windows
-            .containing(.any, identifier: "settings.content")
-            .firstMatch
-        XCTAssertTrue(window.waitForExistence(timeout: 5))
-        if !window.isHittable {
-            app.activate()
+        XCTAssertTrue(
+            element("settings.content", in: app)
+                .waitForExistence(timeout: 10)
+        )
+        var settingsWindow: XCUIElement?
+        for attempt in 0..<2 where settingsWindow == nil {
+            if attempt > 0 {
+                app.activate()
+                if let settingsLink = hittableElement(
+                    "sidebar.settings",
+                    in: app
+                ) {
+                    settingsLink.click()
+                }
+            }
+            _ = waitUntil(timeout: 5) {
+                let current = self.currentSettingsWindow(in: app)
+                guard
+                    current?.isHittable == true,
+                    self.isFrontmost(app)
+                else {
+                    return false
+                }
+                settingsWindow = current
+                return true
+            }
         }
-        XCTAssertTrue(waitUntil(timeout: 5) {
-            window.isHittable
-        })
+        if settingsWindow == nil {
+            app.activate()
+            if let settingsLink = self.hittableElement(
+                "sidebar.settings",
+                in: app
+            ) {
+                settingsLink.click()
+            }
+            _ = waitUntil(timeout: 5) {
+                let current = self.currentSettingsWindow(in: app)
+                guard
+                    current?.isHittable == true,
+                    self.isFrontmost(app)
+                else {
+                    return false
+                }
+                settingsWindow = current
+                return true
+            }
+        }
+        guard let window = settingsWindow else {
+            XCTFail("Unable to present the Settings window")
+            return (app, app.windows["main"])
+        }
         if let requestedSection = SettingsTestSection(rawValue: section) {
             selectSettings(requestedSection, in: app)
         } else {
             XCTFail("Unknown Settings section: \(section)")
         }
         return (app, window)
+    }
+
+    @MainActor
+    private func currentSettingsWindow(
+        in app: XCUIApplication
+    ) -> XCUIElement? {
+        app.windows.allElementsBoundByIndex.first { window in
+            !window.descendants(matching: .any)
+                .matching(identifier: "settings.content")
+                .allElementsBoundByIndex.isEmpty
+        }
     }
 
     @MainActor
@@ -1927,27 +1977,39 @@ final class StornautAppUITests: XCTestCase {
         _ section: SettingsTestSection,
         in app: XCUIApplication
     ) {
-        app.activate()
-        let items = app.descendants(matching: .any).matching(
-            identifier: "settings.sidebar.\(section.rawValue)"
-        )
-        XCTAssertTrue(waitUntil(timeout: 5) { items.count > 0 })
-        XCTAssertTrue(waitUntil(timeout: 5) {
-            items.allElementsBoundByIndex.contains(where: \.isHittable)
-        })
-        XCTAssertTrue(
-            performAction(
-                in: app,
-                action: {
-                    self.hittableElement(
-                        "settings.sidebar.\(section.rawValue)",
-                        in: app
-                    )
-                },
-                until: {
-                    self.element(section.pageIdentifier, in: app).exists
-                }
-            )
+        let targetIdentifier =
+            "settings.sidebar.\(section.rawValue)"
+        for _ in 0..<2 {
+            app.activate()
+            if hittableElement(targetIdentifier, in: app) == nil,
+                let settingsLink = hittableElement(
+                    "sidebar.settings",
+                    in: app
+                )
+            {
+                settingsLink.click()
+            }
+
+            var target: XCUIElement?
+            guard waitUntil(timeout: 5, condition: {
+                target = self.hittableElement(
+                    targetIdentifier,
+                    in: app
+                )
+                return target != nil
+            }), let target else {
+                continue
+            }
+
+            target.click()
+            if waitUntil(timeout: 5, condition: {
+                self.element(section.pageIdentifier, in: app).exists
+            }) {
+                return
+            }
+        }
+        XCTFail(
+            "Unable to present Settings section: \(section.rawValue)"
         )
     }
 
