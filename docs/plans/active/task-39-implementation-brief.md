@@ -944,6 +944,22 @@ The remaining L3 work is split before driver coding:
    filesystem, the claim response or a caller-selected endpoint. This checkpoint
    may produce only a
    machine-admission-pending candidate and does not consume the final full.
+   The mandatory fresh scope/trust preflight found four independent surfaces
+   and split this work before coding into **L3c3a driver-bound signed-attempt
+   schema**, **L3c3b native driver packaging/installed-topology admission**,
+   **L3c3c-i parent-owned handoff/launcher spike and ADR**, **L3c3c-ii fixed
+   live handoff/transition composition**, and **L3c3d one real-success
+   three-plane pending candidate**. The current SwiftPM driver has a
+   toolchain-derived ad-hoc identifier rather than the fixed accepted signing
+   identifier; the Xcode diagnostic target and installer currently reject a
+   packaged driver; and the current App receives retirement handle material in
+   the helper XPC response before immediately retiring and writing a filesystem
+   receipt. The original parent-owned/anonymous-XPC idea was not an accepted
+   transport design. L3c3c-i must prove and record the exact launcher/handoff
+   topology before production code. See the
+   [L3c3 Scope/Trust Preflight](../../reports/phase-d-task-39b2c-l3c3-scope-trust-preflight.md).
+   L3c3a is next and owns exactly fourteen possible non-document paths / 3,000 added
+   lines; later sub-checkpoints each require their own exact path preflight.
 6. **L3c4 sealed final admission** — execute the authoritative current-source
    cohort with eight independent fresh nonces, one real success model run and
    bounded closed failure injections; perform exact per-case teardown, fixed
