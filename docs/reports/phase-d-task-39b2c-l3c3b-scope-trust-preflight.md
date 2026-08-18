@@ -1,6 +1,6 @@
 # Phase D Task 39B2c-L3c3b Scope and Trust Preflight
 
-> Status: Split frozen; L3c3b-0 and L3c3b-i complete, L3c3b-ii next
+> Status: Split complete; L3c3b-0, L3c3b-i and L3c3b-ii complete
 >
 > Date: 2026-08-18
 >
@@ -161,5 +161,5 @@ permitted.
 
 This preflight changed no product code, installed nothing, launched nothing and
 did not modify `~/.codex/config.toml`. Production Deep Dive remains unavailable.
-L3c3b-0 and L3c3b-i are complete; L3c3b-ii is next. L3c3c-i remains the mandatory repository-external
+L3c3b-0, L3c3b-i and L3c3b-ii are complete. L3c3c-i remains the mandatory repository-external
 launcher/handoff spike and ADR; packaging evidence cannot substitute for it.

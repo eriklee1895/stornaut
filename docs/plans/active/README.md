@@ -122,7 +122,12 @@ CodeSignOnCopy membership, ordinary-App absence, final-artifact identity and
 authority gates, one 1,060-test clean staged-only serial and independent
 post-fix/cross-group review passed. See the
 [L3c3b-i review](../../reports/phase-d-task-39b2c-l3c3b-i-native-driver-packaging-review.md).
-L3c3b-ii installer/L2 admission is next. Only
+L3c3b-ii is also complete: its exact installer/L2 driver admission, ACL
+fail-closed trust transition, whole-installer source seal, six-case disposable
+matrix, one 1,067-test clean staged-only serial and grouped/post-fix/cross-group
+review passed. See the
+[L3c3b-ii review](../../reports/phase-d-task-39b2c-l3c3b-ii-installer-l2-admission-review.md).
+L3c3c-i parent-owned handoff/launcher spike and ADR is next. Only
 L3c4 owns machine readiness and the remaining full verifier.
 The L3c2b preflight's
 [plan-freshness prerequisite](../../reports/phase-d-task-39b2c-l3c2b-plan-freshness-prerequisite-review.md)
@@ -146,7 +151,7 @@ the sole normal-product admission gate.
 | [36](task-36-implementation-brief.md) | Domain, canonical projection, planner, budget and stop contracts | complete; [review](../../reports/phase-d-task-36-review.md) |
 | [37](task-37-implementation-brief.md) | Store v4, retention and source rejoin | complete; [review](../../reports/phase-d-task-37-review.md) |
 | [38](task-38-implementation-brief.md) | Closed coordinator with fake runtime | complete; [review](../../reports/phase-d-task-38-review.md) |
-| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; through L3c3b-i complete; L3c3b-ii installer/L2 admission next |
+| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; through L3c3b-ii complete; L3c3c-i handoff/launcher spike next |
 | [40](task-40-implementation-brief.md) | Evidence report and conservative Review projection | blocked on Task 39 |
 | [41](task-41-implementation-brief.md) | First-use disclosure and typed availability | blocked on Task 40 |
 | [42](task-42-implementation-brief.md) | App workflow and recovery state | blocked on Task 41 |

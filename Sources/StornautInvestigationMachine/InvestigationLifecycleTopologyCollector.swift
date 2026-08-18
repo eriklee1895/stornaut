@@ -108,6 +108,9 @@ struct InstalledLifecycleTopologyBindingReader:
         let helperEvidence = try signingReader.evidence(
             bundleURL: contract.helperExecutableURL
         )
+        let machineDriverEvidence = try signingReader.evidence(
+            bundleURL: contract.machineDriverExecutableURL
+        )
         guard
             signedBinding.isValid,
             signedBinding.appExecutableSHA256
@@ -116,7 +119,18 @@ struct InstalledLifecycleTopologyBindingReader:
                 == helperEvidence.executableSHA256,
             signedBinding.appBundleIdentifier
                 == contract.appBundleIdentifier,
-            signedBinding.helperServiceIdentifier == contract.label
+            signedBinding.helperServiceIdentifier == contract.label,
+            signedBinding.machineDriver.executableSHA256
+                == machineDriverEvidence.executableSHA256,
+            signedBinding.machineDriver.signingIdentifier
+                == machineDriverEvidence.identity.signingIdentifier,
+            signedBinding.machineDriver.designatedRequirementSHA256
+                == machineDriverEvidence.identity
+                    .designatedRequirementSHA256,
+            signedBinding.machineDriver.codeDirectoryHash
+                == machineDriverEvidence.identity.codeDirectoryHash,
+            signedBinding.machineDriver.machineClaimServiceIdentifier
+                == contract.machineClaimMachServiceName
         else {
             throw InvestigationLifecycleTopologyCollectorError
                 .bindingMismatch
@@ -125,6 +139,7 @@ struct InstalledLifecycleTopologyBindingReader:
             return try LifecycleRootTopologyBinding(
                 appSigningEvidence: appEvidence,
                 helperSigningEvidence: helperEvidence,
+                machineDriverSigningEvidence: machineDriverEvidence,
                 appBundleIdentifier: contract.appBundleIdentifier,
                 helperServiceIdentifier: contract.label
             )
@@ -420,6 +435,23 @@ actor InvestigationLifecycleTopologyCollector {
                 == request.signedBinding.appExecutableSHA256,
             topologyBinding.helperSigningEvidence.executableSHA256
                 == request.signedBinding.helperExecutableSHA256,
+            topologyBinding.machineDriverSigningEvidence
+                .executableSHA256
+                == request.signedBinding.machineDriver.executableSHA256,
+            topologyBinding.machineDriverSigningEvidence.identity
+                .signingIdentifier
+                == request.signedBinding.machineDriver.signingIdentifier,
+            topologyBinding.machineDriverSigningEvidence.identity
+                .designatedRequirementSHA256
+                == request.signedBinding.machineDriver
+                    .designatedRequirementSHA256,
+            topologyBinding.machineDriverSigningEvidence.identity
+                .codeDirectoryHash
+                == request.signedBinding.machineDriver.codeDirectoryHash,
+            request.signedBinding.machineDriver
+                .machineClaimServiceIdentifier
+                == SignedInvestigationRuntimeMachineDriverBinding
+                    .requiredMachineClaimServiceIdentifier,
             topologyBinding.appBundleIdentifier
                 == request.signedBinding.appBundleIdentifier,
             topologyBinding.helperServiceIdentifier

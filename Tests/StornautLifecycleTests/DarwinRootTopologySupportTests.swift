@@ -6,6 +6,70 @@ import Testing
 @Suite("Darwin root topology support", .serialized)
 struct DarwinRootTopologySupportTests {
     @Test
+    func artifactSwitchBindsAndRechecksTheFixedMachineDriver() throws {
+        let repositoryRoot = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let sourceURL = repositoryRoot.appending(
+            path: "Sources/StornautLifecycle/DarwinRootTopologySupport.swift"
+        )
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+
+        let readerStart = try #require(source.range(
+            of: "struct DarwinRootTopologyArtifactReader:"
+        ))
+        let constantsEnd = try #require(source.range(
+            of: "private let nodeObserver:",
+            range: readerStart.upperBound..<source.endIndex
+        ))
+        let readerConstants =
+            source[readerStart.lowerBound..<constantsEnd.lowerBound]
+        #expect(readerConstants.contains(
+            "static let maximumMachineDriverExecutableBytes = "
+                + "16 * 1_024 * 1_024"
+        ))
+
+        let switchStart = try #require(source.range(
+            of: "        switch role {",
+            range: constantsEnd.upperBound..<source.endIndex
+        ))
+        let switchEnd = try #require(source.range(
+            of: "    private func observeNode(",
+            range: switchStart.upperBound..<source.endIndex
+        ))
+        let artifactSwitch = source[switchStart.lowerBound..<switchEnd.lowerBound]
+        let driverStart = try #require(artifactSwitch.range(
+            of: "        case .machineDriverExecutable:"
+        ))
+        let driverSuffix = artifactSwitch[driverStart.lowerBound...]
+        let driverEnd = driverSuffix.range(
+            of: "\n        case ",
+            range: driverStart.upperBound..<driverSuffix.endIndex
+        )?.lowerBound ?? driverSuffix.endIndex
+        let driverCase = String(driverSuffix[..<driverEnd])
+
+        #expect(driverCase.contains("contract.machineDriverExecutableURL"))
+        #expect(driverCase.contains("binding.machineDriverSigningEvidence"))
+        #expect(driverCase.contains(
+            "maximumSize: Self.maximumMachineDriverExecutableBytes"
+        ))
+        let initialNode = try #require(driverCase.range(
+            of: "let node = nodeObserver.observe(expectation)"
+        ))
+        let signing = try #require(driverCase.range(
+            of: "let signing = observeSigning(",
+            range: initialNode.upperBound..<driverCase.endIndex
+        ))
+        let postSigningNode = try #require(driverCase.range(
+            of: "return nodeObserver.observe(expectation)",
+            range: signing.upperBound..<driverCase.endIndex
+        ))
+        #expect(initialNode.lowerBound < signing.lowerBound)
+        #expect(signing.lowerBound < postSigningNode.lowerBound)
+    }
+
+    @Test
     func onlyInitialENOENTIsClassifiedAsAbsent() throws {
         let fixture = try DarwinRootTopologyFixture()
         defer { fixture.remove() }
@@ -351,7 +415,7 @@ struct DarwinRootTopologySupportTests {
         let nodes = RecordingRootTopologyNodeObserver(
             results: Array(
                 repeating: .presentValid,
-                count: 8
+                count: 10
             )
         )
         let signing = RecordingRootTopologySigningReader(
@@ -360,6 +424,8 @@ struct DarwinRootTopologySupportTests {
                     .observed(binding.appSigningEvidence),
                 contract.helperExecutableURL:
                     .observed(binding.helperSigningEvidence),
+                contract.machineDriverExecutableURL:
+                    .observed(binding.machineDriverSigningEvidence),
             ]
         )
         let manifest = RecordingRootTopologyManifestReader(
@@ -424,6 +490,24 @@ struct DarwinRootTopologySupportTests {
                     .maximumExecutableBytes
             ),
             topologyNodeExpectation(
+                url: contract.machineDriverExecutableURL,
+                kind: .regularFile,
+                mode: 0o755,
+                expectedSHA256:
+                    binding.machineDriverSigningEvidence.executableSHA256,
+                maximumSize: DarwinRootTopologyArtifactReader
+                    .maximumMachineDriverExecutableBytes
+            ),
+            topologyNodeExpectation(
+                url: contract.machineDriverExecutableURL,
+                kind: .regularFile,
+                mode: 0o755,
+                expectedSHA256:
+                    binding.machineDriverSigningEvidence.executableSHA256,
+                maximumSize: DarwinRootTopologyArtifactReader
+                    .maximumMachineDriverExecutableBytes
+            ),
+            topologyNodeExpectation(
                 url: contract.runtimeRootURL,
                 kind: .directory,
                 mode: 0o711
@@ -437,6 +521,7 @@ struct DarwinRootTopologySupportTests {
         #expect(signing.urls == [
             contract.installedAppURL,
             contract.helperExecutableURL,
+            contract.machineDriverExecutableURL,
         ])
         #expect(manifest.expectations == [
             topologyNodeExpectation(
@@ -955,6 +1040,12 @@ private func topologySupportBinding() throws -> LifecycleRootTopologyBinding {
         designatedRequirementSHA256: topologySupportDigest("b"),
         codeDirectoryHash: String(repeating: "2", count: 40)
     )
+    let machineDriverIdentity = try LifecycleSigningIdentity(
+        signingIdentifier:
+            "com.eriklee.stornaut.investigation.machine-driver",
+        designatedRequirementSHA256: topologySupportDigest("e"),
+        codeDirectoryHash: String(repeating: "3", count: 40)
+    )
     return try LifecycleRootTopologyBinding(
         appSigningEvidence: LifecycleBundleSigningEvidence(
             identity: appIdentity,
@@ -964,6 +1055,11 @@ private func topologySupportBinding() throws -> LifecycleRootTopologyBinding {
         helperSigningEvidence: LifecycleBundleSigningEvidence(
             identity: helperIdentity,
             executableSHA256: topologySupportDigest("d"),
+            isAdHoc: true
+        ),
+        machineDriverSigningEvidence: LifecycleBundleSigningEvidence(
+            identity: machineDriverIdentity,
+            executableSHA256: topologySupportDigest("f"),
             isAdHoc: true
         ),
         appBundleIdentifier: "com.eriklee.stornaut",

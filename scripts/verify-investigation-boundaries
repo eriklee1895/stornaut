@@ -21,6 +21,8 @@ runtime_root=Sources/StornautInvestigationRuntime
 diagnostic_root=Sources/StornautInvestigationDiagnostic
 lifecycle_root=Sources/StornautLifecycle
 lifecycle_helper=StornautLifecycleHelper/main.swift
+root_topology_observation=$lifecycle_root/LifecycleRootTopologyObservation.swift
+root_topology_support=$lifecycle_root/DarwinRootTopologySupport.swift
 contained_session=Sources/StornautCodex/Runtime/CodexContainedInteractiveSession.swift
 registered_action_contract=Sources/StornautCore/Actions/RegisteredActionRunner.swift
 registered_action_runner=Sources/StornautExecution/Actions/FoundationRegisteredActionRunner.swift
@@ -64,7 +66,8 @@ required_files=(
     "$diagnostic_root/InvestigationRuntimeDiagnosticComposition.swift"
     "$lifecycle_root/LifecycleInteractiveSessionContract.swift"
     "$lifecycle_root/DarwinFixedSystemServiceRegistry.swift"
-    "$lifecycle_root/LifecycleRootTopologyObservation.swift"
+    "$root_topology_observation"
+    "$root_topology_support"
     "$lifecycle_root/LifecycleSupervisorXPC.swift"
     "$contained_session"
     "$registered_action_contract"
@@ -1015,6 +1018,239 @@ if rg -n \
     print -u2 "Fixed service observer gained text/global process discovery."
     exit 1
 fi
+
+python3 - \
+    "$root_topology_observation" \
+    "$root_topology_support" \
+    "$machine_collector_source" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+observation_path, support_path, collector_path = map(Path, sys.argv[1:])
+observation = observation_path.read_text(encoding="utf-8")
+support = support_path.read_text(encoding="utf-8")
+collector = collector_path.read_text(encoding="utf-8")
+
+
+def require(condition, message):
+    if not condition:
+        raise SystemExit(message)
+
+
+def block(source, start_marker, end_marker):
+    start = source.find(start_marker)
+    end = source.find(end_marker, start + len(start_marker))
+    require(
+        start >= 0 and end > start,
+        f"missing closed L2 source block: {start_marker}",
+    )
+    return source[start:end]
+
+
+def compact(source):
+    return re.sub(r"\s+", "", source)
+
+
+role_source = block(
+    observation,
+    "package enum LifecycleRootTopologyArtifactRole:",
+    "package enum LifecycleRootTopologyArtifactObservation:",
+)
+roles = re.findall(r"^    case ([A-Za-z0-9_]+)$", role_source, re.MULTILINE)
+require(
+    roles
+    == [
+        "installedRoot",
+        "installedApp",
+        "appExecutable",
+        "helperExecutable",
+        "machineDriverExecutable",
+        "launchDaemonPlist",
+        "runtimeRoot",
+        "leaseRoot",
+    ],
+    f"L2 artifact-role allowlist drifted: {roles!r}",
+)
+
+binding_source = block(
+    observation,
+    "package struct LifecycleRootTopologyBinding: Sendable, Equatable",
+    "package struct LifecycleRootTopologyObservationWindow:",
+)
+binding_compact = compact(binding_source)
+for marker in (
+    "packageletmachineDriverSigningEvidence:LifecycleBundleSigningEvidence",
+    "machineDriverSigningEvidence.identity.signingIdentifier==contract.machineDriverSigningIdentifier",
+    "machineDriverSigningEvidence.isAdHoc",
+    "appSigningEvidence.identity!=machineDriverSigningEvidence.identity",
+    "helperSigningEvidence.identity!=machineDriverSigningEvidence.identity",
+    "self.machineDriverSigningEvidence=machineDriverSigningEvidence",
+):
+    require(
+        marker in binding_compact,
+        f"L2 Machine driver binding drifted: {marker}",
+    )
+
+installed_contract = compact(block(
+    observation,
+    "private var installedContractSatisfied: Bool {",
+    "private var postTeardownContractSatisfied: Bool {",
+))
+for role in (
+    "installedRoot",
+    "installedApp",
+    "appExecutable",
+    "helperExecutable",
+    "machineDriverExecutable",
+    "launchDaemonPlist",
+):
+    require(
+        f".{role}," in installed_contract,
+        f"installed L2 topology omitted role: {role}",
+    )
+post_teardown_contract = compact(block(
+    observation,
+    "private var postTeardownContractSatisfied: Bool {",
+    "package struct LifecycleRootTopologyObserver:",
+))
+require(
+    "LifecycleRootTopologyArtifactRole.allCases.allSatisfy"
+    in post_teardown_contract
+    and "artifacts[$0]==.absent" in post_teardown_contract,
+    "post-teardown L2 topology no longer proves every closed artifact absent",
+)
+
+driver_case = block(
+    support,
+    "        case .machineDriverExecutable:",
+    "        case .launchDaemonPlist:",
+)
+driver_case_compact = compact(driver_case)
+for marker in (
+    "url:contract.machineDriverExecutableURL",
+    "kind:.regularFile",
+    "mode:0o755",
+    "expectedSHA256:binding.machineDriverSigningEvidence.executableSHA256",
+    "maximumSize:Self.maximumMachineDriverExecutableBytes",
+    "expected:binding.machineDriverSigningEvidence",
+):
+    require(
+        marker in driver_case_compact,
+        f"Darwin L2 Machine driver observation drifted: {marker}",
+    )
+require(
+    "static let maximumMachineDriverExecutableBytes = 16 * 1_024 * 1_024"
+    in support,
+    "Darwin L2 Machine driver size bound drifted",
+)
+first_node = driver_case.find(
+    "let node = nodeObserver.observe(expectation)"
+)
+signing = driver_case.find("let signing = observeSigning(", first_node)
+second_node = driver_case.find(
+    "return nodeObserver.observe(expectation)", signing
+)
+require(
+    0 <= first_node < signing < second_node,
+    "Darwin L2 Machine driver lost node/signing/node re-observation order",
+)
+expectation_source = compact(block(
+    support,
+    "    private func expectation(",
+    "    private func observeSigning(",
+))
+for marker in (
+    "ownerUserID:0",
+    "ownerGroupID:0",
+    "requiresSingleLink:kind==.regularFile",
+):
+    require(
+        marker in expectation_source,
+        f"Darwin L2 root-owned node expectation drifted: {marker}",
+    )
+
+installed_reader = compact(block(
+    collector,
+    "struct InstalledLifecycleTopologyBindingReader:",
+    "protocol InvestigationLifecycleTopologyObserving:",
+))
+five_dimensional_join = (
+    "signedBinding.machineDriver.executableSHA256==machineDriverEvidence.executableSHA256",
+    "signedBinding.machineDriver.signingIdentifier==machineDriverEvidence.identity.signingIdentifier",
+    "signedBinding.machineDriver.designatedRequirementSHA256==machineDriverEvidence.identity.designatedRequirementSHA256",
+    "signedBinding.machineDriver.codeDirectoryHash==machineDriverEvidence.identity.codeDirectoryHash",
+    "signedBinding.machineDriver.machineClaimServiceIdentifier==contract.machineClaimMachServiceName",
+)
+for marker in five_dimensional_join:
+    require(
+        marker in installed_reader,
+        f"installed L2 five-dimensional Machine driver join drifted: {marker}",
+    )
+for marker in (
+    "contract.machineDriverExecutableURL",
+    "machineDriverSigningEvidence:machineDriverEvidence",
+):
+    require(
+        marker in installed_reader,
+        f"installed L2 Machine driver binding reader drifted: {marker}",
+    )
+
+retirement_join = compact(block(
+    collector,
+    "    private func validateRetirementClaim(",
+    "    private func requireWindow(",
+))
+for marker in (
+    "topologyBinding.machineDriverSigningEvidence.executableSHA256==request.signedBinding.machineDriver.executableSHA256",
+    "topologyBinding.machineDriverSigningEvidence.identity.signingIdentifier==request.signedBinding.machineDriver.signingIdentifier",
+    "topologyBinding.machineDriverSigningEvidence.identity.designatedRequirementSHA256==request.signedBinding.machineDriver.designatedRequirementSHA256",
+    "topologyBinding.machineDriverSigningEvidence.identity.codeDirectoryHash==request.signedBinding.machineDriver.codeDirectoryHash",
+    "request.signedBinding.machineDriver.machineClaimServiceIdentifier==SignedInvestigationRuntimeMachineDriverBinding.requiredMachineClaimServiceIdentifier",
+):
+    require(
+        marker in retirement_join,
+        f"retirement L2 Machine driver identity join drifted: {marker}",
+    )
+
+closed_sources = {
+    observation_path: binding_source
+    + "\n"
+    + installed_contract
+    + "\n"
+    + post_teardown_contract,
+    support_path: driver_case,
+    collector_path: installed_reader + "\n" + retirement_join,
+}
+driver_process = re.compile(
+    r"(?i)(?:machineDriver|driver)(?:ProcessIdentity|ProcessID|PID)"
+)
+authority = re.compile(
+    r"\b(?:StornautExecution|ActionExecutor|TrashMoving|"
+    r"RegisteredAction|MoveToTrash|FileManagerTrashAdapter|"
+    r"CleanupExecutionRuntime|ExecutionAuthorization|posix_spawn)\b"
+    r"|\bProcess\s*\("
+)
+for path, source in closed_sources.items():
+    require(
+        "Codable" not in source
+        and "JSONEncoder" not in source
+        and "JSONDecoder" not in source,
+        f"L2 Machine driver evidence became serializable: {path}",
+    )
+    match = driver_process.search(source)
+    require(
+        match is None,
+        f"L2 gained prohibited Machine driver process evidence: "
+        f"{path}: {match.group(0) if match else ''}",
+    )
+    match = authority.search(source)
+    require(
+        match is None,
+        f"L2 Machine driver observation gained authority: "
+        f"{path}: {match.group(0) if match else ''}",
+    )
+PY
 
 if [[ -e "$coordinator_root/SignedInvestigationRuntimeMachineContract.swift" ]]; then
     print -u2 "Trusted machine implementation remained in StornautInvestigation."

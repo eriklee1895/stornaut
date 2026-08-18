@@ -6,6 +6,76 @@ import Testing
 @Suite("Lifecycle root topology observation")
 struct LifecycleRootTopologyObservationTests {
     @Test
+    func closedArtifactRolesRequireInstalledMachineDriverEvidence() throws {
+        #expect(LifecycleRootTopologyArtifactRole.allCases.count == 8)
+
+        let repositoryRoot = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let sourceURL = repositoryRoot.appending(
+            path: "Sources/StornautLifecycle/"
+                + "LifecycleRootTopologyObservation.swift"
+        )
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+
+        let roleStart = try #require(source.range(
+            of: "package enum LifecycleRootTopologyArtifactRole:"
+        ))
+        let roleEnd = try #require(source.range(
+            of: "package enum LifecycleRootTopologyArtifactObservation:",
+            range: roleStart.upperBound..<source.endIndex
+        ))
+        let roleDeclaration = source[roleStart.lowerBound..<roleEnd.lowerBound]
+        #expect(roleDeclaration.contains("case machineDriverExecutable"))
+
+        let bindingStart = try #require(source.range(
+            of: "package struct LifecycleRootTopologyBinding:"
+        ))
+        let bindingEnd = try #require(source.range(
+            of: "package struct LifecycleRootTopologyObservationWindow:",
+            range: bindingStart.upperBound..<source.endIndex
+        ))
+        let bindingDeclaration =
+            source[bindingStart.lowerBound..<bindingEnd.lowerBound]
+        #expect(bindingDeclaration.contains("machineDriverSigningEvidence"))
+
+        let installedStart = try #require(source.range(
+            of: "private var installedContractSatisfied: Bool {"
+        ))
+        let installedEnd = try #require(source.range(
+            of: "private var postTeardownContractSatisfied: Bool {",
+            range: installedStart.upperBound..<source.endIndex
+        ))
+        let installedContract =
+            source[installedStart.lowerBound..<installedEnd.lowerBound]
+        #expect(installedContract.contains(".machineDriverExecutable,"))
+    }
+
+    @Test
+    func bindingRejectsNonAdHocMachineDriverEvidence() throws {
+        let valid = try rootTopologyBinding()
+        let nonAdHocDriver = try LifecycleBundleSigningEvidence(
+            identity: valid.machineDriverSigningEvidence.identity,
+            executableSHA256:
+                valid.machineDriverSigningEvidence.executableSHA256,
+            isAdHoc: false
+        )
+
+        #expect(
+            throws: LifecycleRootTopologyObservationError.invalidRequest
+        ) {
+            _ = try LifecycleRootTopologyBinding(
+                appSigningEvidence: valid.appSigningEvidence,
+                helperSigningEvidence: valid.helperSigningEvidence,
+                machineDriverSigningEvidence: nonAdHocDriver,
+                appBundleIdentifier: valid.appBundleIdentifier,
+                helperServiceIdentifier: valid.helperServiceIdentifier
+            )
+        }
+    }
+
+    @Test
     func canonicalLayoutBindsEveryFixedRootTopologyObject() throws {
         let contract = try LifecycleLocalInstallationContract()
 
@@ -658,6 +728,12 @@ private func rootTopologyBinding() throws -> LifecycleRootTopologyBinding {
         designatedRequirementSHA256: topologyDigest("b"),
         codeDirectoryHash: String(repeating: "2", count: 40)
     )
+    let machineDriverIdentity = try LifecycleSigningIdentity(
+        signingIdentifier:
+            "com.eriklee.stornaut.investigation.machine-driver",
+        designatedRequirementSHA256: topologyDigest("e"),
+        codeDirectoryHash: String(repeating: "3", count: 40)
+    )
     return try LifecycleRootTopologyBinding(
         appSigningEvidence: LifecycleBundleSigningEvidence(
             identity: appIdentity,
@@ -667,6 +743,11 @@ private func rootTopologyBinding() throws -> LifecycleRootTopologyBinding {
         helperSigningEvidence: LifecycleBundleSigningEvidence(
             identity: helperIdentity,
             executableSHA256: topologyDigest("d"),
+            isAdHoc: true
+        ),
+        machineDriverSigningEvidence: LifecycleBundleSigningEvidence(
+            identity: machineDriverIdentity,
+            executableSHA256: topologyDigest("f"),
             isAdHoc: true
         ),
         appBundleIdentifier: "com.eriklee.stornaut",

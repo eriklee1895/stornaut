@@ -15,6 +15,7 @@ package enum LifecycleRootTopologyArtifactRole:
     case installedApp
     case appExecutable
     case helperExecutable
+    case machineDriverExecutable
     case launchDaemonPlist
     case runtimeRoot
     case leaseRoot
@@ -90,21 +91,32 @@ package enum LifecycleRootTopologyObservationError:
 package struct LifecycleRootTopologyBinding: Sendable, Equatable {
     package let appSigningEvidence: LifecycleBundleSigningEvidence
     package let helperSigningEvidence: LifecycleBundleSigningEvidence
+    package let machineDriverSigningEvidence:
+        LifecycleBundleSigningEvidence
     package let appBundleIdentifier: String
     package let helperServiceIdentifier: String
 
     package init(
         appSigningEvidence: LifecycleBundleSigningEvidence,
         helperSigningEvidence: LifecycleBundleSigningEvidence,
+        machineDriverSigningEvidence: LifecycleBundleSigningEvidence,
         appBundleIdentifier: String,
         helperServiceIdentifier: String
     ) throws {
+        let contract = try LifecycleLocalInstallationContract()
         guard
             appSigningEvidence.identity.signingIdentifier
                 == appBundleIdentifier,
             helperSigningEvidence.identity.signingIdentifier
                 == helperServiceIdentifier + ".helper",
+            machineDriverSigningEvidence.identity.signingIdentifier
+                == contract.machineDriverSigningIdentifier,
+            machineDriverSigningEvidence.isAdHoc,
             appSigningEvidence.identity != helperSigningEvidence.identity,
+            appSigningEvidence.identity
+                != machineDriverSigningEvidence.identity,
+            helperSigningEvidence.identity
+                != machineDriverSigningEvidence.identity,
             rootTopologyIdentifier(appBundleIdentifier),
             rootTopologyIdentifier(helperServiceIdentifier)
         else {
@@ -112,6 +124,8 @@ package struct LifecycleRootTopologyBinding: Sendable, Equatable {
         }
         self.appSigningEvidence = appSigningEvidence
         self.helperSigningEvidence = helperSigningEvidence
+        self.machineDriverSigningEvidence =
+            machineDriverSigningEvidence
         self.appBundleIdentifier = appBundleIdentifier
         self.helperServiceIdentifier = helperServiceIdentifier
     }
@@ -238,6 +252,7 @@ package struct LifecycleRootTopologyObservation: Sendable, Equatable {
             .installedApp,
             .appExecutable,
             .helperExecutable,
+            .machineDriverExecutable,
             .launchDaemonPlist,
         ]
         return required.allSatisfy { artifacts[$0] == .presentValid }
@@ -419,6 +434,8 @@ private extension LifecycleRootTopologyBinding {
                 == contract.appBundleIdentifier
             && helperSigningEvidence.identity.signingIdentifier
                 == contract.helperSigningIdentifier
+            && machineDriverSigningEvidence.identity.signingIdentifier
+                == contract.machineDriverSigningIdentifier
     }
 }
 

@@ -127,6 +127,137 @@ test ! -e \
 test ! -e \
     "$release_app/Contents/Library/LaunchDaemons/com.eriklee.stornaut.lifecycle.plist"
 
+verify_machine_driver_disposable_matrix() {
+    (
+        setopt local_options pipe_fail
+
+        local validator="$repo_root/scripts/stornaut-r5-local-lifecycle"
+        local authorization="I authorize one bounded disposable read-only Stornaut L3c3b-ii Machine driver validation."
+        local temporary_root outside_temporary_root
+        local built_app staging_app installed_app identity_mismatch_app
+        local acl_mismatch_app
+        local outside_built_app outside_staging_app outside_installed_app
+        local positive_output
+
+        mkdir -p "$repo_root/.derivedData"
+        temporary_root=$(
+            mktemp -d \
+                "$repo_root/.derivedData/machine-driver-validation.XXXXXX"
+        )
+        outside_temporary_root=$(
+            mktemp -d \
+                /private/tmp/stornaut-machine-driver-outside-root.XXXXXX
+        )
+        cleanup_machine_driver_disposable_matrix() {
+            rm -rf -- "$temporary_root" "$outside_temporary_root"
+        }
+        trap cleanup_machine_driver_disposable_matrix EXIT INT TERM
+
+        built_app="$temporary_root/built.app"
+        staging_app="$temporary_root/staging.app"
+        installed_app="$temporary_root/installed.app"
+        identity_mismatch_app="$temporary_root/identity-mismatch.app"
+        acl_mismatch_app="$temporary_root/acl-mismatch.app"
+        outside_built_app="$outside_temporary_root/built.app"
+        outside_staging_app="$outside_temporary_root/staging.app"
+        outside_installed_app="$outside_temporary_root/installed.app"
+
+        for disposable_app in \
+            "$built_app" \
+            "$staging_app" \
+            "$installed_app" \
+            "$identity_mismatch_app" \
+            "$acl_mismatch_app" \
+            "$outside_built_app" \
+            "$outside_staging_app" \
+            "$outside_installed_app"
+        do
+            /usr/bin/ditto --noqtn \
+                "$diagnostic_debug_app" "$disposable_app"
+        done
+
+        # positive: all three disposable planes carry one exact identity.
+        positive_output=$(
+            "$validator" validate-machine-driver \
+                "$authorization" \
+                "$temporary_root" \
+                "$built_app" \
+                "$staging_app" \
+                "$installed_app"
+        )
+        test "$positive_output" = \
+            "lifecycle.local.machine-driver-validation=complete"
+
+        # wrong-token: exact authorization text is mandatory.
+        if "$validator" validate-machine-driver \
+            "wrong-token" \
+            "$temporary_root" \
+            "$built_app" \
+            "$staging_app" \
+            "$installed_app" >/dev/null 2>&1
+        then
+            print -u2 "wrong-token Machine driver validation passed"
+            return 1
+        fi
+
+        # outside-root: canonical root outside repo .derivedData is rejected.
+        if "$validator" validate-machine-driver \
+            "$authorization" \
+            "$outside_temporary_root" \
+            "$outside_built_app" \
+            "$outside_staging_app" \
+            "$outside_installed_app" >/dev/null 2>&1
+        then
+            print -u2 "outside-root Machine driver validation passed"
+            return 1
+        fi
+
+        # duplicate-app: the three validation planes must be distinct.
+        if "$validator" validate-machine-driver \
+            "$authorization" \
+            "$temporary_root" \
+            "$built_app" \
+            "$built_app" \
+            "$installed_app" >/dev/null 2>&1
+        then
+            print -u2 "duplicate-app Machine driver validation passed"
+            return 1
+        fi
+
+        /bin/cp -f \
+            "$identity_mismatch_app/Contents/MacOS/StornautLifecycleHelper" \
+            "$identity_mismatch_app/Contents/MacOS/StornautInvestigationMachineDriver"
+        # identity-mismatch: installed plane must equal the built identity.
+        if "$validator" validate-machine-driver \
+            "$authorization" \
+            "$temporary_root" \
+            "$built_app" \
+            "$staging_app" \
+            "$identity_mismatch_app" >/dev/null 2>&1
+        then
+            print -u2 "identity-mismatch Machine driver validation passed"
+            return 1
+        fi
+
+        /bin/chmod +a \
+            "user:$(/usr/bin/id -un) allow read,write" \
+            "$acl_mismatch_app/Contents/MacOS/StornautInvestigationMachineDriver"
+        # acl-mismatch: no validation plane may carry an extended ACL.
+        if "$validator" validate-machine-driver \
+            "$authorization" \
+            "$temporary_root" \
+            "$built_app" \
+            "$staging_app" \
+            "$acl_mismatch_app" >/dev/null 2>&1
+        then
+            print -u2 "acl-mismatch Machine driver validation passed"
+            return 1
+        fi
+    )
+}
+
+verify_machine_driver_disposable_matrix
+
 helper_source="StornautLifecycleHelper/main.swift"
 rg -q 'func invalidateAndDrain\(\)' "$helper_source"
 rg -q 'try self\?\.cancelActive\(\)' "$helper_source"
@@ -191,7 +322,7 @@ def function_body(name, next_marker):
 
 recovery_body = function_body(
     "recover_runtime_roots_after_bootout",
-    "\n}\n\nrollback_install() {",
+    "\n}\n\nrollback_failed_lifecycle() {",
 )
 uninstall_body = function_body(
     "uninstall",
@@ -249,9 +380,25 @@ required_artifact_checks = [
     'validate_bundle_permissions "$installed_app"',
     '"$installed_app/Contents/MacOS/StornautInvestigationDiagnostic"',
     '"$installed_app/Contents/MacOS/StornautLifecycleHelper"',
+    '"$installed_app/Contents/MacOS/StornautInvestigationMachineDriver"',
+    'validate_machine_driver_artifact',
+    '[[ -n "$installed_machine_driver_identity" ]]',
 ]
 if not all(check in artifact_validation for check in required_artifact_checks):
     raise SystemExit("R5 installed artifact validation is incomplete")
+if "validate_built_app" in artifact_validation or ".derivedData" in artifact_validation:
+    raise SystemExit(
+        "installed Machine driver validation depends on a local build"
+    )
+installed_state_body = function_body(
+    "validate_installed_state",
+    "\n}\n\nvalidate_runtime_roots_drained() {",
+)
+if 'validate_installed_artifacts "$expected_machine_driver_identity"' \
+        not in installed_state_body:
+    raise SystemExit(
+        "installed state does not preserve optional transaction identity"
+    )
 artifact_call = recovery_body.find("validate_installed_artifacts")
 bootstrap = recovery_body.find(
     '/bin/launchctl bootstrap system "$installed_plist"'
@@ -264,6 +411,22 @@ uninstall_bootout = uninstall_body.find(
 )
 if uninstall_artifact_call < 0 or uninstall_artifact_call > uninstall_bootout:
     raise SystemExit("R5 uninstall acts before validating installed artifacts")
+for context, body in (
+    ("recovery", recovery_body),
+    ("uninstall", uninstall_body),
+):
+    if not any(
+        line.strip() == "validate_installed_artifacts"
+        for line in body.splitlines()
+    ):
+        raise SystemExit(
+            f"R5 {context} no longer validates installed identity independently"
+        )
+status_body = function_body("status", "\n}\n\ninstall() {")
+if "validate_installed_state >/dev/null 2>&1" not in status_body:
+    raise SystemExit(
+        "R5 status no longer validates fixed installed identity"
+    )
 runtime_removal = uninstall_body.find('/bin/rmdir -- "$diagnostic_root"')
 installed_root_removal = uninstall_body.find('/bin/rmdir -- "$installed_root"')
 if (

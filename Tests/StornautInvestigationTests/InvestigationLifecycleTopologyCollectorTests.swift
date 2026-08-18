@@ -9,6 +9,134 @@ import StornautLifecycle
 @Suite("Investigation lifecycle topology collector")
 struct InvestigationLifecycleTopologyCollectorTests {
     @Test
+    func installedBindingAndRetirementValidationJoinMachineDriverEvidence()
+        throws
+    {
+        let repositoryRoot = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "Sources/StornautInvestigationMachine/"
+                    + "InvestigationLifecycleTopologyCollector.swift"
+            ),
+            encoding: .utf8
+        )
+        let installedReaderStart = try #require(source.range(
+            of: "struct InstalledLifecycleTopologyBindingReader:"
+        ))
+        let installedReaderSuffix =
+            source[installedReaderStart.lowerBound...]
+        let readBindingStart = try #require(installedReaderSuffix.range(
+            of: "    func readBinding("
+        ))
+        let readBindingSuffix =
+            installedReaderSuffix[readBindingStart.lowerBound...]
+        let readBindingEnd = try #require(readBindingSuffix.range(
+            of: "\n    }\n}\n\nprotocol "
+                + "InvestigationLifecycleTopologyObserving"
+        ))
+        let readBindingSource = String(
+            readBindingSuffix[..<readBindingEnd.lowerBound]
+        )
+        let retirementValidationStart = try #require(source.range(
+            of: "    private func validateRetirementClaim("
+        ))
+        let retirementValidationSuffix =
+            source[retirementValidationStart.lowerBound...]
+        let retirementValidationEnd = try #require(
+            retirementValidationSuffix.range(
+                of: "\n    private func requireWindow("
+            )
+        )
+        let retirementValidationSource = String(
+            retirementValidationSuffix[
+                ..<retirementValidationEnd.lowerBound
+            ]
+        )
+        let compactReadBinding = readBindingSource.replacingOccurrences(
+            of: #"\s+"#,
+            with: "",
+            options: .regularExpression
+        )
+        let compactRetirementValidation =
+            retirementValidationSource.replacingOccurrences(
+                of: #"\s+"#,
+                with: "",
+                options: .regularExpression
+            )
+
+        #expect(readBindingSource.contains(
+            "contract.machineDriverExecutableURL"
+        ))
+        for comparison in [
+            "signedBinding.machineDriver.executableSHA256"
+                + "==machineDriverEvidence.executableSHA256",
+            "signedBinding.machineDriver.signingIdentifier"
+                + "==machineDriverEvidence.identity.signingIdentifier",
+            "signedBinding.machineDriver.designatedRequirementSHA256"
+                + "==machineDriverEvidence.identity"
+                + ".designatedRequirementSHA256",
+            "signedBinding.machineDriver.codeDirectoryHash"
+                + "==machineDriverEvidence.identity.codeDirectoryHash",
+            "signedBinding.machineDriver.machineClaimServiceIdentifier"
+                + "==contract.machineClaimMachServiceName",
+        ] {
+            #expect(compactReadBinding.contains(comparison))
+        }
+        #expect(compactReadBinding.contains(
+            "machineDriverSigningEvidence:machineDriverEvidence"
+        ))
+
+        for comparison in [
+            "topologyBinding.machineDriverSigningEvidence"
+                + ".executableSHA256"
+                + "==request.signedBinding.machineDriver.executableSHA256",
+            "topologyBinding.machineDriverSigningEvidence.identity"
+                + ".signingIdentifier"
+                + "==request.signedBinding.machineDriver.signingIdentifier",
+            "topologyBinding.machineDriverSigningEvidence.identity"
+                + ".designatedRequirementSHA256"
+                + "==request.signedBinding.machineDriver"
+                + ".designatedRequirementSHA256",
+            "topologyBinding.machineDriverSigningEvidence.identity"
+                + ".codeDirectoryHash"
+                + "==request.signedBinding.machineDriver.codeDirectoryHash",
+            "request.signedBinding.machineDriver"
+                + ".machineClaimServiceIdentifier"
+                + "==SignedInvestigationRuntimeMachineDriverBinding"
+                + ".requiredMachineClaimServiceIdentifier",
+        ] {
+            #expect(compactRetirementValidation.contains(comparison))
+        }
+
+        let closedSlices = readBindingSource
+            + "\n" + retirementValidationSource
+        for forbidden in [
+            "Codable",
+            "JSONEncoder",
+            "JSONDecoder",
+            "machineDriverProcessIdentity",
+            "machineDriverProcessID",
+            "machineDriverPID",
+            "driverProcessIdentity",
+            "driverProcessID",
+            "driverPID",
+            "StornautExecution",
+            "ActionExecutor",
+            "TrashMoving",
+            "RegisteredAction",
+            "MoveToTrash",
+            "FileManagerTrashAdapter",
+            "posix_spawn",
+            "Process(",
+        ] {
+            #expect(!closedSlices.contains(forbidden))
+        }
+    }
+
+    @Test
     func collectsOneOrderedOpaqueL1L2Cohort() async throws {
         let fixture = try LifecycleTopologyCollectorFixture()
         let retirementStore = try await fixture.retirementClaimStore()
@@ -167,6 +295,8 @@ struct InvestigationLifecycleTopologyCollectorTests {
             ),
             helperSigningEvidence:
                 fixture.binding.helperSigningEvidence,
+            machineDriverSigningEvidence:
+                fixture.binding.machineDriverSigningEvidence,
             appBundleIdentifier: fixture.binding.appBundleIdentifier,
             helperServiceIdentifier:
                 fixture.binding.helperServiceIdentifier

@@ -589,6 +589,7 @@ struct DarwinRootTopologyArtifactReader:
     Sendable
 {
     static let maximumExecutableBytes = 256 * 1_024 * 1_024
+    static let maximumMachineDriverExecutableBytes = 16 * 1_024 * 1_024
     static let maximumLaunchDaemonPlistBytes = 64 * 1_024
 
     private let nodeObserver: any LifecycleRootTopologyNodeObserving
@@ -664,6 +665,27 @@ struct DarwinRootTopologyArtifactReader:
             let signing = observeSigning(
                 at: contract.helperExecutableURL,
                 expected: binding.helperSigningEvidence
+            )
+            guard signing == .presentValid else {
+                return signing
+            }
+            return nodeObserver.observe(expectation)
+        case .machineDriverExecutable:
+            let expectation = expectation(
+                url: contract.machineDriverExecutableURL,
+                kind: .regularFile,
+                mode: 0o755,
+                expectedSHA256:
+                    binding.machineDriverSigningEvidence.executableSHA256,
+                maximumSize: Self.maximumMachineDriverExecutableBytes
+            )
+            let node = nodeObserver.observe(expectation)
+            guard node == .presentValid else {
+                return node
+            }
+            let signing = observeSigning(
+                at: contract.machineDriverExecutableURL,
+                expected: binding.machineDriverSigningEvidence
             )
             guard signing == .presentValid else {
                 return signing

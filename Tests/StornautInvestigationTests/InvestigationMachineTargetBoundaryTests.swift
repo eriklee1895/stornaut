@@ -3,6 +3,84 @@ import Testing
 
 @Suite("Task 39 trusted machine target boundary")
 struct InvestigationMachineTargetBoundaryTests {
+    private func l3c3biiSource(
+        _ path: String,
+        repositoryRoot: URL
+    ) throws -> String {
+        try String(
+            contentsOf: repositoryRoot.appending(path: path),
+            encoding: .utf8
+        )
+    }
+
+    private func l3c3biiFunction(
+        _ name: String,
+        in source: String
+    ) throws -> String {
+        let starts = [
+            "\(name)() {",
+            "function \(name)() {",
+        ].compactMap { source.range(of: $0) }
+        let start = try #require(
+            starts.min(by: { $0.lowerBound < $1.lowerBound })
+        )
+        let suffix = source[start.lowerBound...]
+        let end = try #require(suffix.range(of: "\n}\n"))
+        return String(suffix[..<end.upperBound])
+    }
+
+    private func l3c3biiCaseArm(
+        _ label: String,
+        in source: String
+    ) throws -> String {
+        let start = try #require(source.range(of: "\n    \(label))"))
+        let suffix = source[start.lowerBound...]
+        let end = try #require(suffix.range(of: ";;"))
+        return String(suffix[..<end.upperBound])
+    }
+
+    private func l3c3biiFunction(
+        containing marker: String,
+        in source: String
+    ) throws -> String {
+        let markerRange = try #require(source.range(of: marker))
+        let expression = try NSRegularExpression(
+            pattern:
+                #"(?m)^(?:function[ \t]+)?[A-Za-z_][A-Za-z0-9_]*\(\)[ \t]+\{"#
+        )
+        let prefixRange = NSRange(
+            source.startIndex..<markerRange.lowerBound,
+            in: source
+        )
+        let match = try #require(
+            expression.matches(in: source, range: prefixRange).last
+        )
+        let start = try #require(Range(match.range, in: source))
+        let suffix = source[start.lowerBound...]
+        let end = try #require(suffix.range(of: "\n}\n"))
+        return String(suffix[..<end.upperBound])
+    }
+
+    private func l3c3biiFlattened(_ source: String) -> String {
+        source
+            .replacingOccurrences(of: "\\\n", with: " ")
+            .split(whereSeparator: { $0.isWhitespace })
+            .joined(separator: " ")
+    }
+
+    private func l3c3biiRequireOrder(
+        _ markers: [String],
+        in source: String
+    ) throws {
+        var cursor = source.startIndex
+        for marker in markers {
+            let range = try #require(
+                source.range(of: marker, range: cursor..<source.endIndex)
+            )
+            cursor = range.upperBound
+        }
+    }
+
     @Test
     func driverRuntimeRemainsAuthorityClosedForNativePackaging() throws {
         let repositoryRoot = URL(filePath: #filePath)
@@ -664,8 +742,10 @@ struct InvestigationMachineTargetBoundaryTests {
             "validate_machine_driver_packaging_contract",
             "validate_built_app",
             "validate_installed_artifacts",
-            "staging_guard = reject_before(",
-            "installer admitted the Machine driver before L3c3b-ii",
+            "validate_machine_driver_artifact",
+            "validate_machine_driver_identity",
+            "validate_machine_driver_fixtures",
+            "validate-machine-driver",
         ] {
             #expect(verifierContract.contains(marker))
         }
@@ -1075,5 +1155,361 @@ struct InvestigationMachineTargetBoundaryTests {
                 #expect(!source.contains(forbidden))
             }
         }
+    }
+
+    @Test
+    func l3c3biiInstallerValidatesOneDriverIdentityAcrossAllPhases()
+        throws
+    {
+        let repositoryRoot = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let installer = try l3c3biiSource(
+            "scripts/stornaut-r5-local-lifecycle",
+            repositoryRoot: repositoryRoot
+        )
+        let exactMetadata = l3c3biiFlattened(try l3c3biiFunction(
+            "exact_file_metadata",
+            in: installer
+        ))
+        let identity = l3c3biiFlattened(try l3c3biiFunction(
+            "validate_machine_driver_identity",
+            in: installer
+        ))
+        let artifact = l3c3biiFlattened(try l3c3biiFunction(
+            "validate_machine_driver_artifact",
+            in: installer
+        ))
+        let built = l3c3biiFlattened(try l3c3biiFunction(
+            "validate_built_app",
+            in: installer
+        ))
+        let installed = l3c3biiFlattened(try l3c3biiFunction(
+            "validate_installed_artifacts",
+            in: installer
+        ))
+        let bundlePermissions = l3c3biiFlattened(try l3c3biiFunction(
+            "validate_bundle_permissions",
+            in: installer
+        ))
+        let install = l3c3biiFlattened(try l3c3biiFunction(
+            "install",
+            in: installer
+        ))
+
+        for marker in [
+            "/usr/bin/codesign -d --verbose=4",
+            "Identifier=",
+            "CDHash=",
+            "/usr/bin/codesign -d -r-",
+            "designated => cdhash H",
+            "/usr/bin/shasum -a 256",
+            "com.eriklee.stornaut.investigation.machine-driver",
+            "$machine_claim_service",
+        ] {
+            #expect(identity.contains(marker))
+        }
+        for marker in [
+            "exact_file_metadata",
+            "/usr/bin/stat -f '%z'",
+            "/usr/bin/lipo -archs",
+            "/usr/bin/codesign --verify --strict",
+            "validate_machine_driver_identity",
+        ] {
+            #expect(artifact.contains(marker))
+        }
+        #expect(artifact.components(
+            separatedBy: "/usr/bin/stat -f '%d:%i'"
+        ).count >= 3)
+        for source in [exactMetadata, bundlePermissions] {
+            #expect(source.contains("/bin/ls -lde"))
+            #expect(source.contains("acl_listing"))
+            #expect(source.contains("!= *$'\\n'*"))
+        }
+        #expect(install.contains("/bin/chmod -RN \"$staging_app\""))
+
+        for (slice, root) in [
+            (built, "built_app"),
+            (install, "staging_app"),
+            (installed, "installed_app"),
+        ] {
+            let path =
+                "$\(root)/Contents/MacOS/"
+                + "StornautInvestigationMachineDriver"
+            #expect(!slice.contains("[[ ! -e \"\(path)\""))
+            #expect(!slice.contains("! -L \"\(path)\""))
+            #expect(slice.contains(
+                "validate_machine_driver_artifact \"\(path)\""
+            ))
+        }
+
+        #expect(install.contains("built_machine_driver_identity="))
+        #expect(install.components(
+            separatedBy: "$built_machine_driver_identity"
+        ).count >= 3)
+        #expect(install.contains(
+            "validate_machine_driver_artifact \"$staging_app/Contents/"
+                + "MacOS/StornautInvestigationMachineDriver\""
+        ))
+        #expect(install.contains(
+            "validate_installed_artifacts \"$built_machine_driver_identity\""
+        ))
+        try l3c3biiRequireOrder(
+            [
+                "built_machine_driver_identity=",
+                "validate_built_app",
+                "/usr/bin/ditto --noqtn",
+                "/bin/chmod -RN \"$staging_app\"",
+                "validate_bundle_permissions \"$staging_app\"",
+                "validate_machine_driver_artifact \"$staging_app/Contents/",
+                "/bin/mv -n \"$staging_app\" \"$installed_app\"",
+                "validate_installed_artifacts \"$built_machine_driver_identity\"",
+                "/bin/launchctl bootstrap system \"$installed_plist\"",
+                "validate_installed_state",
+                "lifecycle.local.install=complete",
+            ],
+            in: install
+        )
+    }
+
+    @Test
+    func l3c3biiValidationOnlyActionIsTokenBoundPathConfinedAndReadOnly()
+        throws
+    {
+        let repositoryRoot = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let installer = try l3c3biiSource(
+            "scripts/stornaut-r5-local-lifecycle",
+            repositoryRoot: repositoryRoot
+        )
+        let token =
+            "I authorize one bounded disposable read-only Stornaut "
+            + "L3c3b-ii Machine driver validation."
+        let firstFunction = try #require(installer.range(
+            of: "\nexact_file_metadata() {"
+        ))
+        let preamble = String(installer[..<firstFunction.lowerBound])
+        #expect(preamble.contains(
+            "machine_driver_validation_token=\"\(token)\""
+        ))
+
+        let actionCaseStart = try #require(installer.range(
+            of: "case \"$action\" in"
+        ))
+        let actionCaseSuffix = installer[actionCaseStart.lowerBound...]
+        let actionCaseEnd = try #require(actionCaseSuffix.range(
+            of: "\nesac"
+        ))
+        let actionCase = String(
+            actionCaseSuffix[..<actionCaseEnd.upperBound]
+        )
+        for unchanged in [
+            "status) status ;;",
+            "install) install ;;",
+            "uninstall) uninstall ;;",
+        ] {
+            #expect(actionCase.contains(unchanged))
+        }
+
+        let arm = l3c3biiFlattened(try l3c3biiCaseArm(
+            "validate-machine-driver",
+            in: installer
+        ))
+        #expect(arm.contains("[[ $# == 6 ]]") || arm.contains("(( $# == 6 ))"))
+        #expect(arm.contains(
+            "validate_machine_driver_fixtures \"$2\" \"$3\" "
+                + "\"$4\" \"$5\" \"$6\""
+        ))
+
+        let exactMetadata = try l3c3biiFunction(
+            "exact_file_metadata",
+            in: installer
+        )
+        let identity = try l3c3biiFunction(
+            "validate_machine_driver_identity",
+            in: installer
+        )
+        let artifact = try l3c3biiFunction(
+            "validate_machine_driver_artifact",
+            in: installer
+        )
+        let fixtures = l3c3biiFlattened(try l3c3biiFunction(
+            "validate_machine_driver_fixtures",
+            in: installer
+        ))
+        #expect(fixtures.contains(
+            "[[ \"$token\" == \"$machine_driver_validation_token\" ]]"
+        ))
+        for path in [
+            "temporary_root",
+            "built_app",
+            "staging_app",
+            "installed_app",
+        ] {
+            #expect(fixtures.contains("[[ \"$\(path)\" == /* ]]"))
+            #expect(fixtures.contains(
+                "canonical_\(path)=$(/bin/realpath \"$\(path)\")"
+            ))
+        }
+        for app in ["built_app", "staging_app", "installed_app"] {
+            #expect(fixtures.contains(
+                "[[ \"$canonical_\(app)\" == "
+                    + "\"$canonical_temporary_root/\"* ]]"
+            ))
+        }
+        for pair in [
+            ("built_app", "staging_app"),
+            ("built_app", "installed_app"),
+            ("staging_app", "installed_app"),
+        ] {
+            #expect(fixtures.contains(
+                "[[ \"$canonical_\(pair.0)\" != "
+                    + "\"$canonical_\(pair.1)\" ]]"
+            ))
+        }
+        #expect(fixtures.components(
+            separatedBy: "validate_machine_driver_artifact"
+        ).count == 4)
+        #expect(fixtures.contains("built_machine_driver_identity"))
+
+        let validationOnlySource =
+            exactMetadata + identity + artifact + fixtures + arm
+        for forbidden in [
+            "launchctl",
+            "mkdir",
+            "chown",
+            "chmod",
+            "ditto",
+            "/bin/mv",
+            "/bin/rm",
+            "/usr/bin/install",
+            "/Library/",
+            "/private/var/",
+            "posix_spawn",
+            "exec ",
+            "eval ",
+            "xargs",
+        ] {
+            #expect(!validationOnlySource.contains(forbidden))
+        }
+        let directDriverExecution = try NSRegularExpression(
+            pattern:
+                #"(?m)^[ \t]*"?\$(?:\{)?(?:driver|machine_driver)(?:\})?"?[ \t]*(?:$|[;&|])"#
+        )
+        #expect(directDriverExecution.firstMatch(
+            in: validationOnlySource,
+            range: NSRange(
+                validationOnlySource.startIndex...,
+                in: validationOnlySource
+            )
+        ) == nil)
+    }
+
+    @Test
+    func l3c3biiReleaseAndContractGatesFreezeDisposableValidation()
+        throws
+    {
+        let repositoryRoot = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let release = try l3c3biiSource(
+            "scripts/verify-app-release-boundaries",
+            repositoryRoot: repositoryRoot
+        )
+        let verifier = try l3c3biiSource(
+            "scripts/verify-contract",
+            repositoryRoot: repositoryRoot
+        )
+        let token =
+            "I authorize one bounded disposable read-only Stornaut "
+            + "L3c3b-ii Machine driver validation."
+        let matrix = try l3c3biiFunction(
+            containing: "validate-machine-driver",
+            in: release
+        )
+        let matrixLowercase = matrix.lowercased()
+        #expect(matrix.contains(token))
+        #expect(matrix.contains("mktemp -d"))
+        #expect(matrix.contains("trap"))
+        #expect(matrix.components(
+            separatedBy: "validate-machine-driver"
+        ).count >= 6)
+        for marker in [
+            "positive",
+            "wrong-token",
+            "outside-root",
+            "duplicate-app",
+            "identity-mismatch",
+            "acl-mismatch",
+        ] {
+            #expect(matrixLowercase.contains(marker))
+        }
+        for marker in [
+            "temporary_root",
+            "built_app",
+            "staging_app",
+            "installed_app",
+        ] {
+            #expect(matrix.contains(marker))
+        }
+        for forbidden in [
+            " launchctl",
+            " install ;;",
+            " uninstall ;;",
+            " stornaut-r5-local-lifecycle install",
+            " stornaut-r5-local-lifecycle uninstall",
+        ] {
+            #expect(!matrix.contains(forbidden))
+        }
+
+        let contract = try l3c3biiFunction(
+            "validate_machine_driver_packaging_contract",
+            in: verifier
+        )
+        let contractLowercase = contract.lowercased()
+        for marker in [
+            "validate_machine_driver_identity",
+            "validate_machine_driver_artifact",
+            "validate_machine_driver_fixtures",
+            "validate-machine-driver",
+            "exact_metadata = function_body",
+            "validation_only = exact_metadata + identity",
+            "validation-only mutation negative control",
+            "expected_installer_sha256 =",
+            "installer_sha256 =",
+            "whole-installer generic mutation negative control",
+            "/usr/bin/touch",
+            "extended ACL",
+            "/bin/chmod -RN",
+            "acl-mismatch",
+            token,
+            "canonical_temporary_root",
+            "canonical_built_app",
+            "canonical_staging_app",
+            "canonical_installed_app",
+            "$canonical_temporary_root/",
+            "/bin/realpath",
+            "launchctl",
+            "mkdir",
+            "chown",
+            "chmod",
+            "ditto",
+            "/bin/mv",
+            "/bin/rm",
+            "/Library/",
+            "/private/var/",
+        ] {
+            #expect(contract.contains(marker))
+        }
+        #expect(contractLowercase.contains("path confinement"))
+        #expect(contractLowercase.contains("live action"))
+        #expect(!contract.contains("reject_before("))
+        #expect(!contract.contains(
+            "installer admitted the Machine driver before L3c3b-ii"
+        ))
     }
 }

@@ -68,6 +68,13 @@ final class LifecycleTopologyCollectorFixture: @unchecked Sendable {
                 String(repeating: "b", count: 64),
             codeDirectoryHash: String(repeating: "2", count: 40)
         )
+        let machineDriverSigning = try LifecycleSigningIdentity(
+            signingIdentifier:
+                contract.machineDriverSigningIdentifier,
+            designatedRequirementSHA256:
+                String(repeating: "9", count: 64),
+            codeDirectoryHash: String(repeating: "3", count: 40)
+        )
         binding = try LifecycleRootTopologyBinding(
             appSigningEvidence: try LifecycleBundleSigningEvidence(
                 identity: appSigning,
@@ -79,6 +86,13 @@ final class LifecycleTopologyCollectorFixture: @unchecked Sendable {
                 executableSHA256: String(repeating: "d", count: 64),
                 isAdHoc: true
             ),
+            machineDriverSigningEvidence:
+                try LifecycleBundleSigningEvidence(
+                    identity: machineDriverSigning,
+                    executableSHA256:
+                        String(repeating: "8", count: 64),
+                    isAdHoc: true
+                ),
             appBundleIdentifier: contract.appBundleIdentifier,
             helperServiceIdentifier: contract.label
         )

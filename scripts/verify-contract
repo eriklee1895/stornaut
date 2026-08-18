@@ -117,6 +117,7 @@ fi
 function validate_machine_driver_packaging_contract() {
     python3 - <<'PY'
 import re
+import hashlib
 from pathlib import Path
 
 release = Path("scripts/verify-app-release-boundaries").read_text(
@@ -324,68 +325,324 @@ require(
 built = flat(function_body(installer, "validate_built_app"))
 installed = flat(function_body(installer, "validate_installed_artifacts"))
 install = flat(function_body(installer, "install"))
+exact_metadata = function_body(installer, "exact_file_metadata")
+bundle_permissions = function_body(installer, "validate_bundle_permissions")
+identity = function_body(installer, "validate_machine_driver_identity")
+artifact = function_body(installer, "validate_machine_driver_artifact")
+fixtures = function_body(installer, "validate_machine_driver_fixtures")
+fixtures_flat = flat(fixtures)
 
-
-def reject_before(source, root, later_markers, context):
-    path = "$" + root + "/Contents/MacOS/" + driver
-    guard = f'[[ ! -e "{path}" && ! -L "{path}" ]]'
-    if source.count(guard) != 1:
-        raise SystemExit(
-            "installer admitted the Machine driver before L3c3b-ii: "
-            + f"{context} lacks the exact file/symlink rejection"
-        )
-    require_order(
-        source,
-        (guard,) + tuple(later_markers),
-        "installer admitted the Machine driver before L3c3b-ii: "
-        + f"{context} rejection occurs after success or mutation",
-    )
-    return guard
-
-
-reject_before(
-    built,
-    "built_app",
-    (
-        '/usr/bin/codesign --verify --deep --strict "$built_app"',
-        "Print :CFBundleIdentifier",
-        'validate_plist "$source_plist"',
-    ),
-    "validate_built_app",
+authorization = "I authorize one bounded disposable read-only Stornaut L3c3b-ii Machine driver validation."
+require(
+    f'machine_driver_validation_token="{authorization}"' in installer,
+    "Machine driver validation token drifted",
 )
-installed_guard = reject_before(
-    installed,
+for name in (
+    "validate_machine_driver_identity",
+    "validate_machine_driver_artifact",
+    "validate_machine_driver_fixtures",
+):
+    require(
+        installer.count(f"{name}() {{") == 1,
+        f"Machine driver validation function drifted: {name}",
+    )
+
+for marker in (
+    "/usr/bin/codesign -d --verbose=4",
+    "Identifier=",
+    "CDHash=",
+    "/usr/bin/codesign -d -r-",
+    "designated => cdhash H",
+    "/usr/bin/shasum -a 256",
+    "com.eriklee.stornaut.investigation.machine-driver",
+    "$machine_claim_service",
+):
+    require(
+        marker in identity,
+        f"Machine driver static identity contract drifted: {marker}",
+    )
+for marker in (
+    "exact_file_metadata",
+    "/usr/bin/stat -f '%z'",
+    "/usr/bin/lipo -archs",
+    "/usr/bin/codesign --verify --strict",
+    "validate_machine_driver_identity",
+):
+    require(
+        marker in artifact,
+        f"Machine driver artifact contract drifted: {marker}",
+    )
+for source_name, source in (
+    ("exact_file_metadata", exact_metadata),
+    ("validate_bundle_permissions", bundle_permissions),
+):
+    for marker in ("/bin/ls -lde", "acl_listing", "!= *$'\\n'*"):
+        require(
+            marker in source,
+            f"extended ACL rejection drifted in {source_name}: {marker}",
+        )
+require(
+    artifact.count("/usr/bin/stat -f '%d:%i'") >= 2
+    and "sysopen -r -o nofollow" in artifact
+    and "zstat -H descriptor_stat -f" in artifact,
+    "Machine driver descriptor/node re-observation drifted",
+)
+
+for variable in (
+    "temporary_root",
+    "built_app",
+    "staging_app",
     "installed_app",
-    (),
-    "validate_installed_artifacts",
+):
+    require(
+        f'[[ "${variable}" == /* ]]' in fixtures_flat,
+        f"Machine driver path lost absolute-path guard: {variable}",
+    )
+    require(
+        f'canonical_{variable}=$(/bin/realpath "${variable}")'
+        in fixtures_flat,
+        f"Machine driver path lost canonical binding: {variable}",
+    )
+
+# path confinement: validation is limited to one exact canonical descendant of
+# the repository .derivedData root, never /Library or another live system root.
+fixtures_compact = re.sub(r"\s+", "", fixtures)
+require(
+    'canonical_validation_parent=$(/bin/realpath"$repo_root/.derivedData")'
+    in fixtures_compact,
+    "Machine driver repo-derived-data parent binding drifted",
+)
+for marker in (
+    '[[ "$canonical_temporary_root" == "$canonical_validation_parent/"* ]]',
+    '[[ "$canonical_temporary_root" != "$canonical_validation_parent" ]]',
+    '[[ "$canonical_built_app" == "$canonical_temporary_root/"* ]]',
+    '[[ "$canonical_staging_app" == "$canonical_temporary_root/"* ]]',
+    '[[ "$canonical_installed_app" == "$canonical_temporary_root/"* ]]',
+):
+    require(
+        marker in fixtures_flat,
+        f"Machine driver repo-derived-data path confinement drifted: {marker}",
+    )
+for left, right in (
+    ("built_app", "staging_app"),
+    ("built_app", "installed_app"),
+    ("staging_app", "installed_app"),
+):
+    require(
+        f'[[ "$canonical_{left}" != "$canonical_{right}" ]]'
+        in fixtures_flat,
+        f"Machine driver validation planes are not distinct: {left}/{right}",
+    )
+require(
+    fixtures.count("validate_machine_driver_artifact") == 3
+    and "built_machine_driver_identity" in fixtures,
+    "Machine driver validation lost the three-plane identity join",
+)
+require_order(
+    fixtures_flat,
+    (
+        '[[ "$token" == "$machine_driver_validation_token" ]]',
+        "canonical_validation_parent=",
+        "canonical_temporary_root=",
+        '[[ "$canonical_temporary_root" == "$canonical_validation_parent/"* ]]',
+        "built_machine_driver_identity=",
+        "staging_machine_driver_identity=",
+        "installed_machine_driver_identity=",
+        "lifecycle.local.machine-driver-validation=complete",
+    ),
+    "Machine driver path confinement or three-plane validation order drifted",
+)
+
+case_match = re.search(
+    r'(?ms)^    validate-machine-driver\)\n(?P<body>.*?)^        ;;$',
+    installer,
+)
+require(case_match is not None, "missing validate-machine-driver action")
+validation_action = case_match.group("body")
+require(
+    "[[ $# == 6 ]]" in validation_action
+    and 'validate_machine_driver_fixtures "$2" "$3" "$4" "$5" "$6"'
+    in flat(validation_action),
+    "validate-machine-driver argv contract drifted",
+)
+
+# no live action: the complete validation-only function closure and action may
+# inspect disposable artifacts, but may not install, launch, execute, or mutate.
+validation_only_forbidden = (
+    "launchctl",
+    "mkdir",
+    "chown",
+    "chmod",
+    "ditto",
+    "/bin/mv",
+    "/bin/rm",
+    "/usr/bin/install",
+    "/Library/",
+    "/private/var/",
+    "posix_spawn",
+    "exec ",
+    "eval ",
+    "xargs",
+)
+direct_driver_execution = re.compile(
+        r'(?m)^[ \t]*"?\$(?:\{)?(?:driver|machine_driver)(?:\})?"?'
+        r'[ \t]*(?:$|[;&|])'
+)
+
+
+def validation_only_violation(source):
+    for forbidden in validation_only_forbidden:
+        if forbidden in source:
+            return forbidden
+    if direct_driver_execution.search(source) is not None:
+        return "direct-driver-execution"
+    return None
+
+
+validation_only = exact_metadata + identity + artifact + fixtures + validation_action
+expected_installer_sha256 = (
+    "3db2b0471504fde111f5fe610f516bb43a6b1f5e74ca800de8a2806f0d6ae8e6"
+)
+installer_sha256 = hashlib.sha256(installer.encode("utf-8")).hexdigest()
+require(
+    installer_sha256 == expected_installer_sha256,
+    "whole installer source seal drifted",
 )
 require(
-    installed.endswith(installed_guard),
-    "installer admitted the Machine driver before L3c3b-ii: "
-    "installed driver rejection is not the final success condition",
+    validation_only_violation(validation_only) is None,
+    "Machine driver validation gained live action: "
+    + str(validation_only_violation(validation_only)),
 )
-staging_guard = reject_before(
-    install,
-    "staging_app",
-    (
-        '/bin/mv -n "$staging_app" "$installed_app"',
-        "installed_app_moved=1",
-        '/bin/launchctl bootstrap system "$installed_plist"',
-        "validate_installed_state",
-        'print "lifecycle.local.install=complete"',
-    ),
-    "install staging",
+
+# validation-only mutation negative control: a transitive helper mutation must
+# fail the same closure gate even when it preserves the already-required mode.
+mutation_anchor = "    local path=$1\n"
+require(
+    exact_metadata.count(mutation_anchor) == 1,
+    "cannot construct validation-only mutation negative control",
+)
+mutated_exact_metadata = exact_metadata.replace(
+    mutation_anchor,
+    mutation_anchor + '    /bin/chmod 0755 "$path"\n',
+    1,
+)
+require(
+    validation_only_violation(
+        mutated_exact_metadata
+        + identity
+        + artifact
+        + fixtures
+        + validation_action
+    ) == "chmod",
+    "validation-only mutation negative control was accepted",
+)
+
+# whole-installer generic mutation negative control: a previously unknown
+# top-level mutator between functions must be rejected without name matching.
+top_level_anchor = "}\n\nexact_directory_metadata() {"
+require(
+    installer.count(top_level_anchor) == 1,
+    "cannot construct whole-installer generic mutation negative control",
+)
+generic_mutated_installer = installer.replace(
+    top_level_anchor,
+    "}\n\n"
+    + 'if [[ "$action" == validate-machine-driver ]]; then\n'
+    + '    /usr/bin/touch "$5/Contents/MacOS/'
+    + 'StornautInvestigationMachineDriver"\n'
+    + "fi\n\nexact_directory_metadata() {",
+    1,
+)
+require(
+    hashlib.sha256(generic_mutated_installer.encode("utf-8")).hexdigest()
+    != expected_installer_sha256,
+    "whole-installer generic mutation negative control was accepted",
+)
+
+for source, root in (
+    (built, "built_app"),
+    (install, "staging_app"),
+    (installed, "installed_app"),
+):
+    path = f'$' + root + f'/Contents/MacOS/{driver}'
+    require(
+        f'validate_machine_driver_artifact "{path}"' in source,
+        f"Machine driver phase admission drifted: {root}",
+    )
+    require(
+        f'[[ ! -e "{path}"' not in source,
+        f"Machine driver phase retained obsolete absence guard: {root}",
+    )
+
+require(
+    "validate_built_app" not in installed and ".derivedData" not in installed,
+    "installed Machine driver validation depends on a local build",
+)
+require(
+    '[[ -n "$installed_machine_driver_identity" ]]' in installed
+    and 'if [[ -n "$expected_machine_driver_identity" ]]' in installed,
+    "installed Machine driver standalone/transaction identity split drifted",
 )
 require_order(
     install,
     (
-        "validate_built_app",
+        "built_machine_driver_identity=$(validate_built_app)",
         '/usr/bin/ditto --noqtn "$built_app" "$staging_app"',
-        staging_guard,
+        '/bin/chmod -RN "$staging_app"',
+        'validate_bundle_permissions "$staging_app"',
+        'validate_machine_driver_artifact "$staging_app/Contents/MacOS/',
+        '/bin/mv -n "$staging_app" "$installed_app"',
+        'validate_machine_driver_artifact "$installed_app/Contents/MacOS/',
+        'validate_installed_artifacts "$built_machine_driver_identity"',
+        '/bin/launchctl bootstrap system "$installed_plist"',
+        'validate_installed_state "$built_machine_driver_identity"',
+        'print "lifecycle.local.install=complete"',
     ),
-    "installer admitted the Machine driver before L3c3b-ii: "
-    "built/staging rejection ordering drifted",
+    "Machine driver install transaction validation order drifted",
 )
+
+release_matrix = function_body(
+    release, "verify_machine_driver_disposable_matrix"
+)
+require(
+    authorization in release_matrix
+    and "mktemp -d" in release_matrix
+    and "trap" in release_matrix
+    and release_matrix.count("validate-machine-driver") >= 6,
+    "release disposable Machine driver matrix is incomplete",
+)
+for label in (
+    "positive",
+    "wrong-token",
+    "outside-root",
+    "duplicate-app",
+    "identity-mismatch",
+    "acl-mismatch",
+):
+    require(
+        label in release_matrix.lower(),
+        f"release disposable Machine driver matrix omitted {label}",
+    )
+for marker in (
+    '/bin/chmod +a',
+    'allow read,write',
+    '$acl_mismatch_app/Contents/MacOS/StornautInvestigationMachineDriver',
+):
+    require(
+        marker in release_matrix,
+        f"release ACL negative control drifted: {marker}",
+    )
+for forbidden in (
+    " launchctl",
+    " install ;;",
+    " uninstall ;;",
+    " stornaut-r5-local-lifecycle install",
+    " stornaut-r5-local-lifecycle uninstall",
+):
+    require(
+        forbidden not in release_matrix,
+        f"release disposable matrix gained live action: {forbidden}",
+    )
 PY
 }
 
