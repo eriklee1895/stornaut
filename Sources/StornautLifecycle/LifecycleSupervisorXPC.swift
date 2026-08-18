@@ -33,6 +33,44 @@ public enum LifecycleSupervisorXPCError:
     )
 }
 
+@objc public protocol LifecycleMachineClaimXPCWire {
+    func claimMachineRetirement(
+        _ request: Data,
+        withReply reply: @escaping (Data?, String?) -> Void
+    )
+}
+
+public enum LifecycleMachineClaimXPCError:
+    Error,
+    Sendable,
+    Equatable
+{
+    case rootAuthorityRequired
+    case invalidPeer
+    case connectionFailed
+    case timedOut
+    case cancelled
+    case outcomeUnknown
+    case invalidResponse
+    case remoteRejected(reasonKey: String)
+}
+
+public struct LifecycleMachineClaimResult: Sendable, Equatable {
+    public let response: LifecycleMachineRetirementClaimResponse
+    public let helperIdentity: LifecycleProcessIdentity
+    public let helperAttestedAt: Date
+
+    init(
+        response: LifecycleMachineRetirementClaimResponse,
+        helperIdentity: LifecycleProcessIdentity,
+        helperAttestedAt: Date
+    ) {
+        self.response = response
+        self.helperIdentity = helperIdentity
+        self.helperAttestedAt = helperAttestedAt
+    }
+}
+
 public enum LifecycleInteractiveSessionXPCError:
     Error,
     Sendable,
@@ -759,6 +797,164 @@ public actor LifecycleSupervisorXPCClient {
     }
 }
 
+public actor LifecycleMachineClaimXPCClient {
+    public static let serviceName =
+        "com.eriklee.stornaut.lifecycle.machine-claim"
+
+    private let identityReader: LifecycleBundleSigningIdentityReader
+    private let now: @Sendable () -> Date
+    private var connection: NSXPCConnection?
+    private var connectionEpoch: LifecycleXPCConnectionEpoch?
+    private var consumed = false
+
+    public init(
+        identityReader: LifecycleBundleSigningIdentityReader = .init(),
+        now: @escaping @Sendable () -> Date = Date.init
+    ) {
+        self.identityReader = identityReader
+        self.now = now
+    }
+
+    public func claim(
+        _ request: LifecycleMachineRetirementClaimRequest
+    ) async throws -> LifecycleMachineClaimResult {
+        try Task.checkCancellation()
+        guard geteuid() == 0, !consumed else {
+            throw geteuid() == 0
+                ? LifecycleMachineClaimXPCError.invalidPeer
+                : LifecycleMachineClaimXPCError.rootAuthorityRequired
+        }
+        consumed = true
+        let connection = try activeConnection()
+        guard let epoch = connectionEpoch, epoch.isValid else {
+            invalidate()
+            throw LifecycleMachineClaimXPCError.invalidPeer
+        }
+        let data = try JSONEncoder().encode(request)
+        guard data.count <= 16 * 1_024 else {
+            invalidate()
+            throw LifecycleMachineClaimXPCError.invalidResponse
+        }
+        let resolver = LifecycleMachineClaimXPCReplyResolver()
+        let response = try await withTaskCancellationHandler {
+            try Task.checkCancellation()
+            return try await withCheckedThrowingContinuation {
+                continuation in
+                guard resolver.install(continuation) else { return }
+                resolver.scheduleTimeout()
+                let proxy = connection.remoteObjectProxyWithErrorHandler {
+                    _ in resolver.failConnection()
+                }
+                guard
+                    let wire = proxy as? LifecycleMachineClaimXPCWire,
+                    resolver.beginDispatch()
+                else {
+                    resolver.failConnection()
+                    return
+                }
+                wire.claimMachineRetirement(data) { response, reasonKey in
+                    resolver.resolve(
+                        response: response,
+                        reasonKey: reasonKey
+                    )
+                }
+            }
+        } onCancel: {
+            resolver.failCancellation()
+        }
+        let receivedAt = now()
+        guard
+            epoch.isValid,
+            self.connection === connection,
+            request == response.request,
+            receivedAt >= response.claimedAt,
+            receivedAt <= request.validBefore,
+            let helperIdentity = try? response.helperIdentity
+                .lifecycleIdentityForMachineClaim,
+            let contract = try? LifecycleLocalInstallationContract(),
+            let liveHelper = try? DarwinLifecycleInventory(
+                privilegedProcessID: connection.processIdentifier
+            ).identity(for: connection.processIdentifier),
+            liveHelper == helperIdentity,
+            lifecycleProcessExecutableURL(
+                connection.processIdentifier
+            ) == contract.helperExecutableURL,
+            connection.effectiveUserIdentifier == 0,
+            Int32(connection.auditSessionIdentifier)
+                == helperIdentity.auditSessionID,
+            let staticEvidence = try? identityReader.evidence(
+                bundleURL: contract.helperExecutableURL
+            ),
+            case let .verified(
+                verifiedPID,
+                verifiedUID,
+                identifier,
+                requirement,
+                codeDirectoryHash
+            ) = SecurityLifecycleCodeSigningVerifier().verify(
+                auditToken: helperIdentity.auditToken
+            ),
+            verifiedPID == helperIdentity.processID,
+            verifiedUID == 0,
+            identifier == staticEvidence.identity.signingIdentifier,
+            requirement
+                == staticEvidence.identity.designatedRequirementSHA256,
+            codeDirectoryHash
+                == staticEvidence.identity.codeDirectoryHash
+        else {
+            invalidate()
+            throw LifecycleMachineClaimXPCError.outcomeUnknown
+        }
+        invalidate()
+        return LifecycleMachineClaimResult(
+            response: response,
+            helperIdentity: helperIdentity,
+            helperAttestedAt: receivedAt
+        )
+    }
+
+    public func invalidate() {
+        connectionEpoch?.invalidate()
+        connection?.invalidate()
+        connection = nil
+        connectionEpoch = nil
+    }
+
+    private func activeConnection() throws -> NSXPCConnection {
+        guard connection == nil, connectionEpoch == nil else {
+            throw LifecycleMachineClaimXPCError.invalidPeer
+        }
+        let helperIdentity: LifecycleSigningIdentity
+        do {
+            let contract = try LifecycleLocalInstallationContract()
+            helperIdentity = try identityReader.read(
+                bundleURL: contract.helperExecutableURL
+            )
+        } catch {
+            throw LifecycleMachineClaimXPCError.invalidPeer
+        }
+        let connection = NSXPCConnection(
+            machServiceName: Self.serviceName,
+            options: .privileged
+        )
+        connection.remoteObjectInterface = NSXPCInterface(
+            with: LifecycleMachineClaimXPCWire.self
+        )
+        connection.setCodeSigningRequirement(
+            LifecyclePeerCodeSigningRequirement.exact(
+                identity: helperIdentity
+            )
+        )
+        let epoch = LifecycleXPCConnectionEpoch()
+        connection.invalidationHandler = { epoch.invalidate() }
+        connection.interruptionHandler = { epoch.invalidate() }
+        connection.resume()
+        self.connection = connection
+        connectionEpoch = epoch
+        return connection
+    }
+}
+
 public actor LifecycleInteractiveSessionXPCClient:
     LifecycleInteractiveSessionEvidenceSending,
     LifecycleHelperPeerAttesting
@@ -1153,6 +1349,181 @@ final class LifecycleSupervisorXPCReplyResolver:
     }
 }
 
+final class LifecycleMachineClaimXPCReplyResolver:
+    @unchecked Sendable
+{
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<
+        LifecycleMachineRetirementClaimResponse,
+        any Error
+    >?
+    private var pendingResult: Result<
+        LifecycleMachineRetirementClaimResponse,
+        any Error
+    >?
+    private var timeoutTask: Task<Void, Never>?
+    private var dispatchBegan = false
+    private var finished = false
+
+    func install(
+        _ continuation: CheckedContinuation<
+            LifecycleMachineRetirementClaimResponse,
+            any Error
+        >
+    ) -> Bool {
+        let pending = lock.withLock {
+            if finished { return pendingResult }
+            self.continuation = continuation
+            return nil
+        }
+        if let pending {
+            continuation.resume(with: pending)
+            return false
+        }
+        return true
+    }
+
+    func scheduleTimeout() {
+        let task = Task.detached(priority: nil) { [weak self] in
+            do {
+                try await Task.sleep(for: .seconds(15))
+            } catch {
+                return
+            }
+            self?.failTimeout()
+        }
+        let cancel = lock.withLock {
+            guard !finished else { return true }
+            timeoutTask = task
+            return false
+        }
+        if cancel { task.cancel() }
+    }
+
+    func beginDispatch() -> Bool {
+        lock.withLock {
+            guard !finished, !dispatchBegan else { return false }
+            dispatchBegan = true
+            return true
+        }
+    }
+
+    func failConnection() {
+        finishTransportFailure(
+            beforeDispatch: .connectionFailed
+        )
+    }
+
+    func failTimeout() {
+        finishTransportFailure(
+            beforeDispatch: .timedOut
+        )
+    }
+
+    func failCancellation() {
+        finish(
+            .failure(LifecycleMachineClaimXPCError.cancelled),
+            onlyBeforeDispatch: true
+        )
+    }
+
+    func resolve(response: Data?, reasonKey: String?) {
+        if let reasonKey {
+            finish(.failure(
+                LifecycleMachineClaimXPCError.remoteRejected(
+                    reasonKey: sanitizedLifecycleMachineClaimReasonKey(
+                        reasonKey
+                    )
+                )
+            ))
+            return
+        }
+        guard
+            let response,
+            response.count <= 32 * 1_024,
+            let decoded = try? JSONDecoder().decode(
+                LifecycleMachineRetirementClaimResponse.self,
+                from: response
+            )
+        else {
+            finishTransportFailure(
+                beforeDispatch: .invalidResponse
+            )
+            return
+        }
+        finish(.success(decoded))
+    }
+
+    private func finish(
+        _ result: Result<
+            LifecycleMachineRetirementClaimResponse,
+            any Error
+        >,
+        onlyBeforeDispatch: Bool = false
+    ) {
+        let completion = lock.withLock {
+            guard
+                !finished,
+                !onlyBeforeDispatch || !dispatchBegan
+            else {
+                return (
+                    nil as CheckedContinuation<
+                        LifecycleMachineRetirementClaimResponse,
+                        any Error
+                    >?,
+                    nil as Task<Void, Never>?
+                )
+            }
+            finished = true
+            let value = continuation
+            continuation = nil
+            if value == nil { pendingResult = result }
+            let timeout = timeoutTask
+            timeoutTask = nil
+            return (value, timeout)
+        }
+        completion.1?.cancel()
+        completion.0?.resume(with: result)
+    }
+
+    private func finishTransportFailure(
+        beforeDispatch: LifecycleMachineClaimXPCError
+    ) {
+        let completion = lock.withLock {
+            guard !finished else {
+                return (
+                    nil as CheckedContinuation<
+                        LifecycleMachineRetirementClaimResponse,
+                        any Error
+                    >?,
+                    nil as Task<Void, Never>?,
+                    nil as Result<
+                        LifecycleMachineRetirementClaimResponse,
+                        any Error
+                    >?
+                )
+            }
+            let error: LifecycleMachineClaimXPCError =
+                dispatchBegan ? .outcomeUnknown : beforeDispatch
+            let result: Result<
+                LifecycleMachineRetirementClaimResponse,
+                any Error
+            > = .failure(error)
+            finished = true
+            let value = continuation
+            continuation = nil
+            if value == nil { pendingResult = result }
+            let timeout = timeoutTask
+            timeoutTask = nil
+            return (value, timeout, result)
+        }
+        completion.1?.cancel()
+        if let result = completion.2 {
+            completion.0?.resume(with: result)
+        }
+    }
+}
+
 final class LifecycleHelperPeerAttestationReplyResolver:
     @unchecked Sendable
 {
@@ -1442,6 +1813,39 @@ private func sanitizedLifecycleInteractiveReasonKey(
     return allowed.contains(value)
         ? value
         : "runtime.lifecycle.interactive.remote-rejected"
+}
+
+private func sanitizedLifecycleMachineClaimReasonKey(
+    _ value: String
+) -> String {
+    let allowed = Set([
+        "runtime.lifecycle.machine-claim.invalid-request",
+        "runtime.lifecycle.machine-claim.invalid-peer",
+        "runtime.lifecycle.machine-claim.empty",
+        "runtime.lifecycle.machine-claim.consumed",
+        "runtime.lifecycle.machine-claim.expired",
+        "runtime.lifecycle.machine-claim.mismatch",
+        "runtime.lifecycle.machine-claim.unavailable",
+    ])
+    return allowed.contains(value)
+        ? value
+        : "runtime.lifecycle.machine-claim.unavailable"
+}
+
+private extension LifecycleMachineProcessIdentityRecord {
+    var lifecycleIdentityForMachineClaim: LifecycleProcessIdentity {
+        get throws {
+            LifecycleProcessIdentity(
+                processID: processID,
+                processIDVersion: processIDVersion,
+                auditSessionID: auditSessionID,
+                effectiveUserID: effectiveUserID,
+                auditToken: try LifecycleAuditToken(
+                    words: auditTokenWords
+                )
+            )
+        }
+    }
 }
 
 private func lifecycleIdentityMatchesAuditToken(

@@ -217,13 +217,16 @@ public struct LifecycleLocalInstallationContract: Sendable {
     public let installedAppURL: URL
     package let appExecutableURL: URL
     public let helperExecutableURL: URL
+    public let machineDriverExecutableURL: URL
     public let launchDaemonPlistURL: URL
     package let runtimeRootURL: URL
     package let leaseRootURL: URL
     public let label: String
     public let machServiceName: String
+    public let machineClaimMachServiceName: String
     public let appBundleIdentifier: String
     package let helperSigningIdentifier: String
+    public let machineDriverSigningIdentifier: String
     public let appOwnerUserID: uid_t
     public let appOwnerGroupID: gid_t
     public let appMode: mode_t
@@ -247,6 +250,10 @@ public struct LifecycleLocalInstallationContract: Sendable {
             path: "Contents/MacOS/StornautInvestigationDiagnostic",
             directoryHint: .notDirectory
         )
+        let machineDriverExecutableURL = installedAppURL.appending(
+            path: "Contents/MacOS/StornautInvestigationMachineDriver",
+            directoryHint: .notDirectory
+        )
         let launchDaemonPlistURL = URL(
             filePath:
                 "/Library/LaunchDaemons/com.eriklee.stornaut.lifecycle.plist",
@@ -261,9 +268,13 @@ public struct LifecycleLocalInstallationContract: Sendable {
             directoryHint: .isDirectory
         ).standardizedFileURL
         let label = "com.eriklee.stornaut.lifecycle"
+        let machineClaimMachServiceName =
+            "com.eriklee.stornaut.lifecycle.machine-claim"
         let appBundleIdentifier = "com.eriklee.stornaut"
         let helperSigningIdentifier =
             "com.eriklee.stornaut.lifecycle.helper"
+        let machineDriverSigningIdentifier =
+            "com.eriklee.stornaut.investigation.machine-driver"
         guard
             installedRootURL.path
                 == "/Library/Application Support/Stornaut",
@@ -275,6 +286,8 @@ public struct LifecycleLocalInstallationContract: Sendable {
                 == "/Library/Application Support/Stornaut/Stornaut-R5-Diagnostic.app/Contents/MacOS/StornautLifecycleHelper",
             appExecutableURL.path
                 == "/Library/Application Support/Stornaut/Stornaut-R5-Diagnostic.app/Contents/MacOS/StornautInvestigationDiagnostic",
+            machineDriverExecutableURL.path
+                == "/Library/Application Support/Stornaut/Stornaut-R5-Diagnostic.app/Contents/MacOS/StornautInvestigationMachineDriver",
             launchDaemonPlistURL.path
                 == "/Library/LaunchDaemons/com.eriklee.stornaut.lifecycle.plist",
             runtimeRootURL.path
@@ -282,8 +295,11 @@ public struct LifecycleLocalInstallationContract: Sendable {
             leaseRootURL.path
                 == "/private/var/db/com.eriklee.stornaut.r5",
             boundedLifecycleIdentifier(label),
+            boundedLifecycleIdentifier(machineClaimMachServiceName),
             boundedLifecycleIdentifier(appBundleIdentifier),
-            boundedLifecycleIdentifier(helperSigningIdentifier)
+            boundedLifecycleIdentifier(helperSigningIdentifier),
+            boundedLifecycleIdentifier(machineDriverSigningIdentifier),
+            machineClaimMachServiceName != label
         else {
             throw LifecycleLocalInstallationContractError
                 .invalidFixedTopology
@@ -292,13 +308,17 @@ public struct LifecycleLocalInstallationContract: Sendable {
         self.installedAppURL = installedAppURL
         self.appExecutableURL = appExecutableURL
         self.helperExecutableURL = helperExecutableURL
+        self.machineDriverExecutableURL = machineDriverExecutableURL
         self.launchDaemonPlistURL = launchDaemonPlistURL
         self.runtimeRootURL = runtimeRootURL
         self.leaseRootURL = leaseRootURL
         self.label = label
         machServiceName = label
+        self.machineClaimMachServiceName = machineClaimMachServiceName
         self.appBundleIdentifier = appBundleIdentifier
         self.helperSigningIdentifier = helperSigningIdentifier
+        self.machineDriverSigningIdentifier =
+            machineDriverSigningIdentifier
         appOwnerUserID = 0
         appOwnerGroupID = 0
         appMode = 0o755
@@ -311,7 +331,10 @@ public struct LifecycleLocalInstallationContract: Sendable {
             "AssociatedBundleIdentifiers": [appBundleIdentifier],
             "KeepAlive": ["SuccessfulExit": false],
             "Label": label,
-            "MachServices": [machServiceName: true],
+            "MachServices": [
+                machServiceName: true,
+                machineClaimMachServiceName: true,
+            ],
             "ProcessType": "Interactive",
             "Program": helperExecutableURL.path,
             "RunAtLoad": false,
@@ -332,7 +355,10 @@ public struct LifecycleLocalInstallationContract: Sendable {
                 == ["SuccessfulExit": false],
             manifest["Label"] as? String == label,
             manifest["MachServices"] as? [String: Bool]
-                == [machServiceName: true],
+                == [
+                    machServiceName: true,
+                    machineClaimMachServiceName: true,
+                ],
             manifest["ProcessType"] as? String == "Interactive",
             manifest["Program"] as? String
                 == helperExecutableURL.path,

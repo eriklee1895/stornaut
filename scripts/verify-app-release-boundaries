@@ -53,6 +53,16 @@ test -x "$debug_app/Contents/MacOS/StornautLifecycleHelper"
 test -x "$release_app/Contents/MacOS/StornautLifecycleHelper"
 test -x \
     "$diagnostic_debug_app/Contents/MacOS/StornautLifecycleHelper"
+for app_without_machine_driver in \
+    "$debug_app" \
+    "$release_app" \
+    "$diagnostic_debug_app"
+do
+    test ! -e \
+        "$app_without_machine_driver/Contents/MacOS/StornautInvestigationMachineDriver"
+    test ! -L \
+        "$app_without_machine_driver/Contents/MacOS/StornautInvestigationMachineDriver"
+done
 test ! -e \
     "$debug_app/Contents/Library/LaunchDaemons/com.eriklee.stornaut.lifecycle.plist"
 test ! -e \
@@ -68,6 +78,15 @@ rg -q 'POSIX_SPAWN_SETSID' "$helper_source"
 rg -q 'getsid\(child\) == child' "$helper_source"
 rg -q 'getpgid\(child\) == child' "$helper_source"
 rg -q 'crashDescendantReadyLine' "$helper_source"
+rg -q 'LifecycleMachineClaimListenerDelegate' "$helper_source"
+rg -q 'LifecycleMachineClaimHelperService' "$helper_source"
+rg -q 'listener === expectedListener' "$helper_source"
+rg -q 'connection.effectiveUserIdentifier == 0' "$helper_source"
+rg -q 'machineDriverIdentity: callerIdentity' "$helper_source"
+if rg -q 'authorized: true' "$helper_source"; then
+    print -u2 "Root helper bypasses fixed Machine driver admission."
+    exit 1
+fi
 if rg -q '"setsid ' "$helper_source"; then
     print -u2 "R5 crash fixture relies on a non-portable setsid command."
     exit 1
@@ -223,6 +242,11 @@ required = [
     '"$built_app/Contents/MacOS/StornautLifecycleHelper"',
     '"$installed_app/Contents/MacOS/StornautInvestigationDiagnostic"',
     '"$staging_app/Contents/MacOS/StornautInvestigationDiagnostic"',
+    'machine_claim_service="com.eriklee.stornaut.lifecycle.machine-claim"',
+    'count(/plist/dict/key)',
+    '"$built_app/Contents/MacOS/StornautInvestigationMachineDriver"',
+    '"$installed_app/Contents/MacOS/StornautInvestigationMachineDriver"',
+    '"$staging_app/Contents/MacOS/StornautInvestigationMachineDriver"',
 ]
 if not all(value in source for value in required):
     raise SystemExit(

@@ -1,7 +1,7 @@
 # Stornaut Coding Agent Handoff
 
 > 面向接手实现的 Coding Agent  
-> 最近更新：2026-08-16
+> 最近更新：2026-08-18
 > 当前状态：产品、Agent、UI 功能交互与品牌基线完成；Epic 0–1 evidence
 > gate 已完成；Epic 2–4 Tasks 9–26 通过最终 unified verifier 并归档；
 > Phase C deterministic Epic 8 详尽 plan 已于 2026-08-11 获用户批准，
@@ -200,7 +200,10 @@
 > claim/collector join、1035-test clean staged-only serial 与 independent grouped/
 > cross-group review。L3c1 已关闭；L3c2 mandatory preflight 已拆成 a-i strict
 > claim transport、a-ii non-product root host/topology 与 b eight-scenario
-> driving，L3c2a-i next。只有 L3c4 可作 readiness claim，
+> driving。L3c2a-i strict Machine-claim transport、36-test focused、144-test
+> Lifecycle、178-test Investigation、targeted build/release boundaries、
+> 1041-test clean staged-only serial 与 independent post-fix review 已完成；
+> L3c2a-ii next。只有 L3c4 可作 readiness claim，
 > final full 尚未消耗。
 > 生产 Deep Dive 仍 unavailable。
 > Task 5 的历史
@@ -517,11 +520,15 @@ L3b2 trusted lifecycle collector 见
 通过。L3c 已按 scope/trust preflight 拆成 L3c1–L3c4；L3c1a typed owner
 retirement、L3c1b-i configuration-bound helper escrow 与 L3c1b-ii synthetic
 Machine claim/collector join 已完成，L3c1 已关闭；L3c2 已拆为 a-i/a-ii/b，
-L3c2a-i strict claim transport next；L3c4
+L3c2a-i strict claim transport、1041-test clean staged-only serial 与
+independent post-fix review 已完成，L3c2a-ii non-product root host/topology
+next；L3c4
 独占 final admission 与剩余 full。L3c1b-i/ii 证据见
 [i review](../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
 与
 [ii review](../reports/phase-d-task-39b2c-l3c1b-ii-synthetic-machine-claim-review.md)。
+L3c2a-i 证据见
+[review](../reports/phase-d-task-39b2c-l3c2a-i-machine-claim-transport-review.md)。
 生产 Deep Dive 继续 unavailable，直到 Task 44 final admission。
 
 跨 Epic 的阶段依赖、no-go 分支和交付顺序由 [Delivery Roadmap](../plans/roadmap.md) 管理；新 active plan 不得另起一套宏观路线。

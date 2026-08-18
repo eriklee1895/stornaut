@@ -593,43 +593,76 @@ public final class LifecycleMachineRetirementEscrow: @unchecked Sendable {
         authorized: Bool
     ) throws -> LifecycleMachineRetirementClaimResponse {
         try lock.withLock {
-            guard authorized else {
-                throw LifecycleMachineRetirementEscrowError.unauthorized
-            }
-            let entry: Entry
-            switch state {
-            case .empty:
-                throw LifecycleMachineRetirementEscrowError.empty
-            case .consumed:
-                throw LifecycleMachineRetirementEscrowError.consumed
-            case let .recorded(value):
-                entry = value
-                state = .consumed
-            }
-            let claimedAt = now()
-            guard
-                claimedAt.timeIntervalSince1970.isFinite,
-                claimedAt <= entry.validBefore,
-                claimedAt >= request.issuedAt,
-                claimedAt <= request.validBefore
-            else { throw LifecycleMachineRetirementEscrowError.expired }
-            guard
-                request.handle.investigationID == entry.investigationID,
-                request.handle.retireOperationID == entry.retireOperationID,
-                request.handle.configurationSHA256
-                    == entry.configurationSHA256,
-                request.handle.validBefore == entry.validBefore,
-                machineTokenSHA256(request.handle.token)
-                    == entry.tokenSHA256
-            else {
-                throw LifecycleMachineRetirementEscrowError.claimMismatch
-            }
-            return try LifecycleMachineRetirementClaimResponse(
-                request: request,
-                entry: entry,
-                claimedAt: claimedAt
+            try claimLocked(request, authorized: authorized)
+        }
+    }
+
+    public func claim(
+        _ request: LifecycleMachineRetirementClaimRequest,
+        machineDriverIdentity: LifecycleProcessIdentity
+    ) throws -> LifecycleMachineRetirementClaimResponse {
+        try claim(
+            request,
+            machineDriverIdentity: machineDriverIdentity,
+            admission: LifecycleMachineDriverAdmissionPolicy()
+        )
+    }
+
+    func claim(
+        _ request: LifecycleMachineRetirementClaimRequest,
+        machineDriverIdentity: LifecycleProcessIdentity,
+        admission: any LifecycleMachineDriverClaimAdmitting
+    ) throws -> LifecycleMachineRetirementClaimResponse {
+        try lock.withLock {
+            try claimLocked(
+                request,
+                authorized: admission.authorize(
+                    machineDriverIdentity
+                )
             )
         }
+    }
+
+    private func claimLocked(
+        _ request: LifecycleMachineRetirementClaimRequest,
+        authorized: Bool
+    ) throws -> LifecycleMachineRetirementClaimResponse {
+        guard authorized else {
+            throw LifecycleMachineRetirementEscrowError.unauthorized
+        }
+        let entry: Entry
+        switch state {
+        case .empty:
+            throw LifecycleMachineRetirementEscrowError.empty
+        case .consumed:
+            throw LifecycleMachineRetirementEscrowError.consumed
+        case let .recorded(value):
+            entry = value
+            state = .consumed
+        }
+        let claimedAt = now()
+        guard
+            claimedAt.timeIntervalSince1970.isFinite,
+            claimedAt <= entry.validBefore,
+            claimedAt >= request.issuedAt,
+            claimedAt <= request.validBefore
+        else { throw LifecycleMachineRetirementEscrowError.expired }
+        guard
+            request.handle.investigationID == entry.investigationID,
+            request.handle.retireOperationID == entry.retireOperationID,
+            request.handle.configurationSHA256
+                == entry.configurationSHA256,
+            request.handle.validBefore == entry.validBefore,
+            machineTokenSHA256(request.handle.token)
+                == entry.tokenSHA256
+        else {
+            throw LifecycleMachineRetirementEscrowError.claimMismatch
+        }
+        return try LifecycleMachineRetirementClaimResponse(
+            request: request,
+            entry: entry,
+            claimedAt: claimedAt
+        )
     }
 }
 

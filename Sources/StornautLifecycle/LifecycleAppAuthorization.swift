@@ -253,6 +253,119 @@ public struct LifecyclePeerAdmissionPolicy: Sendable {
     }
 }
 
+protocol LifecycleMachineDriverClaimAdmitting: Sendable {
+    func authorize(_ identity: LifecycleProcessIdentity) -> Bool
+}
+
+public struct LifecycleMachineDriverAdmissionPolicy:
+    LifecycleMachineDriverClaimAdmitting,
+    Sendable
+{
+    private let processIdentity:
+        @Sendable (pid_t) -> LifecycleProcessIdentity?
+    private let processExecutableURL: @Sendable (pid_t) -> URL?
+    private let signingEvidence:
+        @Sendable (URL) -> LifecycleBundleSigningEvidence?
+    private let codeSigningVerifier:
+        any LifecycleCodeSigningVerifying
+
+    public init() {
+        processIdentity = { processID in
+            try? DarwinLifecycleInventory(
+                privilegedProcessID: processID
+            ).identity(for: processID)
+        }
+        processExecutableURL = lifecycleProcessExecutableURL
+        signingEvidence = { url in
+            try? LifecycleBundleSigningIdentityReader().evidence(
+                bundleURL: url
+            )
+        }
+        codeSigningVerifier = SecurityLifecycleCodeSigningVerifier()
+    }
+
+    init(
+        processIdentity:
+            @escaping @Sendable (pid_t) -> LifecycleProcessIdentity?,
+        processExecutableURL:
+            @escaping @Sendable (pid_t) -> URL?,
+        signingEvidence:
+            @escaping @Sendable (URL)
+                -> LifecycleBundleSigningEvidence?,
+        codeSigningVerifier: any LifecycleCodeSigningVerifying
+    ) {
+        self.processIdentity = processIdentity
+        self.processExecutableURL = processExecutableURL
+        self.signingEvidence = signingEvidence
+        self.codeSigningVerifier = codeSigningVerifier
+    }
+
+    public func authorize(
+        _ identity: LifecycleProcessIdentity
+    ) -> Bool {
+        guard
+            lifecycleMachineIdentityMatchesAuditToken(identity),
+            identity.processID > 1,
+            identity.processIDVersion > 0,
+            identity.auditSessionID > 0,
+            identity.effectiveUserID == 0,
+            let contract = try? LifecycleLocalInstallationContract(),
+            let initialIdentity = processIdentity(identity.processID),
+            initialIdentity == identity,
+            let initialExecutableURL =
+                processExecutableURL(identity.processID)?
+                    .standardizedFileURL,
+            initialExecutableURL
+                == contract.machineDriverExecutableURL,
+            let staticEvidence = signingEvidence(
+                contract.machineDriverExecutableURL
+            ),
+            staticEvidence.isAdHoc,
+            staticEvidence.identity.signingIdentifier
+                == contract.machineDriverSigningIdentifier,
+            case let .verified(
+                verifiedProcessID,
+                verifiedEffectiveUserID,
+                signingIdentifier,
+                designatedRequirementSHA256,
+                codeDirectoryHash
+            ) = codeSigningVerifier.verify(
+                auditToken: identity.auditToken
+            ),
+            verifiedProcessID == identity.processID,
+            verifiedEffectiveUserID == 0,
+            signingIdentifier
+                == staticEvidence.identity.signingIdentifier,
+            designatedRequirementSHA256
+                == staticEvidence.identity.designatedRequirementSHA256,
+            codeDirectoryHash
+                == staticEvidence.identity.codeDirectoryHash,
+            processIdentity(identity.processID) == identity,
+            processExecutableURL(identity.processID)?
+                .standardizedFileURL
+                == contract.machineDriverExecutableURL,
+            signingEvidence(contract.machineDriverExecutableURL)
+                == staticEvidence,
+            codeSigningVerifier.verify(
+                auditToken: identity.auditToken
+            ) == .verified(
+                processID: identity.processID,
+                effectiveUserID: 0,
+                signingIdentifier:
+                    staticEvidence.identity.signingIdentifier,
+                designatedRequirementSHA256:
+                    staticEvidence.identity
+                        .designatedRequirementSHA256,
+                codeDirectoryHash:
+                    staticEvidence.identity.codeDirectoryHash
+            )
+        else {
+            return false
+        }
+        return true
+    }
+}
+
 public struct LifecycleAppAuthorizationPolicy: Sendable {
     private let expectedSigningIdentifier: String
     private let expectedDesignatedRequirementSHA256: String
@@ -498,6 +611,65 @@ private func lifecycleCodeSigningVerification(
         designatedRequirementSHA256: sha256(requirementData),
         codeDirectoryHash: codeDirectoryHash
     )
+}
+
+func lifecycleProcessExecutableURL(
+    _ processID: pid_t
+) -> URL? {
+    guard processID > 1 else { return nil }
+    var buffer = [CChar](
+        repeating: 0,
+        count: 4 * Int(MAXPATHLEN)
+    )
+    Darwin.errno = 0
+    let count = buffer.withUnsafeMutableBytes { bytes in
+        proc_pidpath(
+            processID,
+            bytes.baseAddress,
+            UInt32(bytes.count)
+        )
+    }
+    guard count > 0 else { return nil }
+    let returned = buffer.prefix(Int(count))
+    let pathBytes: ArraySlice<CChar>
+    if let terminator = returned.firstIndex(of: 0) {
+        guard returned[terminator...].allSatisfy({ $0 == 0 }) else {
+            return nil
+        }
+        pathBytes = returned[..<terminator]
+    } else {
+        pathBytes = returned[...]
+    }
+    let utf8 = pathBytes.map { UInt8(bitPattern: $0) }
+    guard
+        let path = String(bytes: utf8, encoding: .utf8),
+        path.utf8.count == utf8.count,
+        path.hasPrefix("/")
+    else {
+        return nil
+    }
+    return URL(filePath: path).standardizedFileURL
+}
+
+private func lifecycleMachineIdentityMatchesAuditToken(
+    _ identity: LifecycleProcessIdentity
+) -> Bool {
+    guard identity.auditToken.words.count == LifecycleAuditToken.wordCount
+    else { return false }
+    var token = audit_token_t()
+    let copied = withUnsafeMutableBytes(of: &token) { destination in
+        identity.auditToken.words.withUnsafeBytes { source in
+            guard destination.count == source.count else { return false }
+            destination.copyBytes(from: source)
+            return true
+        }
+    }
+    return copied
+        && audit_token_to_pid(token) == identity.processID
+        && audit_token_to_pidversion(token)
+            == identity.processIDVersion
+        && audit_token_to_asid(token) == identity.auditSessionID
+        && audit_token_to_euid(token) == identity.effectiveUserID
 }
 
 private func requirementData(

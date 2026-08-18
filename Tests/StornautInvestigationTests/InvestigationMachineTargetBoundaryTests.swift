@@ -15,6 +15,40 @@ struct InvestigationMachineTargetBoundaryTests {
             contentsOf: repositoryRoot.appending(path: "Package.swift"),
             encoding: .utf8
         )
+        let releaseBoundary = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "scripts/verify-app-release-boundaries"
+            ),
+            encoding: .utf8
+        )
+        let driverLoopStart = try #require(releaseBoundary.range(
+            of: "for app_without_machine_driver in \\\n"
+        ))
+        let driverLoopSuffix = releaseBoundary[driverLoopStart.lowerBound...]
+        let driverLoopEnd = try #require(
+            driverLoopSuffix.range(of: "\ndone")
+        )
+        let driverLoop = String(
+            driverLoopSuffix[..<driverLoopEnd.upperBound]
+        )
+        for appVariable in [
+            "\"$debug_app\"",
+            "\"$release_app\"",
+            "\"$diagnostic_debug_app\"",
+        ] {
+            #expect(
+                driverLoop.components(separatedBy: appVariable).count
+                    == 2
+            )
+        }
+        let exactDriverPath =
+            "$app_without_machine_driver/Contents/MacOS/StornautInvestigationMachineDriver"
+        #expect(
+            driverLoop.components(separatedBy: exactDriverPath).count
+                == 3
+        )
+        #expect(driverLoop.contains("test ! -e"))
+        #expect(driverLoop.contains("test ! -L"))
         let investigationSource = repositoryRoot.appending(
             path: "Sources/StornautInvestigation/"
                 + "SignedInvestigationRuntimeMachineContract.swift"
@@ -112,11 +146,18 @@ struct InvestigationMachineTargetBoundaryTests {
             ),
             encoding: .utf8
         )
-        #expect(!xpcSource.contains("LifecycleMachineRetirementClaim"))
+        #expect(xpcSource.contains("LifecycleMachineRetirementClaimRequest"))
+        #expect(xpcSource.contains("LifecycleMachineRetirementClaimResponse"))
+        #expect(
+            xpcSource.contains(
+                "@objc public protocol LifecycleMachineClaimXPCWire"
+            )
+        )
         for method in [
             "func attestHelper(",
             "func handle(",
             "func handleInteractive(",
+            "func claimMachineRetirement(",
         ] {
             #expect(xpcSource.components(separatedBy: method).count == 2)
         }
@@ -130,7 +171,7 @@ struct InvestigationMachineTargetBoundaryTests {
                     .count - 1
             }
             .reduce(0, +)
-        #expect(exportedMethodCount == 3)
+        #expect(exportedMethodCount == 4)
         let escrowSource = try String(
             contentsOf: repositoryRoot.appending(
                 path: "Sources/StornautLifecycle/"
@@ -138,7 +179,18 @@ struct InvestigationMachineTargetBoundaryTests {
             ),
             encoding: .utf8
         )
-        #expect(!escrowSource.contains("public func claim("))
+        #expect(
+            escrowSource.contains(
+                "machineDriverIdentity: LifecycleProcessIdentity"
+            )
+        )
+        #expect(
+            escrowSource.contains(
+                "admission: any LifecycleMachineDriverClaimAdmitting"
+            )
+        )
+        #expect(!escrowSource.contains("public func claim(\n        _ request: LifecycleMachineRetirementClaimRequest,\n        authorized: Bool"))
+        #expect(!escrowSource.contains("package func claim(\n        _ request: LifecycleMachineRetirementClaimRequest,\n        authorized: Bool"))
         #expect(escrowSource.contains("let tokenSHA256: Data"))
         let entryStart = try #require(
             escrowSource.range(of: "fileprivate struct Entry {")

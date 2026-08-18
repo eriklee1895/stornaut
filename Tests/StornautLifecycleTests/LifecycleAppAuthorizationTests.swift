@@ -243,6 +243,130 @@ struct LifecycleAppAuthorizationTests {
             )
         )
     }
+
+    @Test
+    func machineDriverAdmissionRequiresFreshRootIdentityPathAndSigning()
+        throws
+    {
+        let contract = try LifecycleLocalInstallationContract()
+        let identity = try machineDriverIdentity()
+        let signingIdentity = try LifecycleSigningIdentity(
+            signingIdentifier:
+                contract.machineDriverSigningIdentifier,
+            designatedRequirementSHA256: digest("d"),
+            codeDirectoryHash: cdhash("4")
+        )
+        let verifier = RecordingLifecycleCodeSigningVerifier(
+            result: .verified(
+                processID: identity.processID,
+                effectiveUserID: 0,
+                signingIdentifier: signingIdentity.signingIdentifier,
+                designatedRequirementSHA256:
+                    signingIdentity.designatedRequirementSHA256,
+                codeDirectoryHash: signingIdentity.codeDirectoryHash
+            )
+        )
+        let observation = RecordingMachineDriverObservation(
+            identity: identity,
+            executableURL: contract.machineDriverExecutableURL,
+            signingEvidence: try LifecycleBundleSigningEvidence(
+                identity: signingIdentity,
+                executableSHA256: digest("e"),
+                isAdHoc: true
+            )
+        )
+        let policy = LifecycleMachineDriverAdmissionPolicy(
+            processIdentity: observation.processIdentity,
+            processExecutableURL: observation.processExecutableURL,
+            signingEvidence: observation.signingEvidence,
+            codeSigningVerifier: verifier
+        )
+
+        #expect(policy.authorize(identity))
+        #expect(
+            observation.identityRequests
+                == [identity.processID, identity.processID]
+        )
+        #expect(
+            observation.executableRequests
+                == [identity.processID, identity.processID]
+        )
+        #expect(
+            observation.signingRequests
+                == [
+                    contract.machineDriverExecutableURL,
+                    contract.machineDriverExecutableURL,
+                ]
+        )
+        #expect(
+            verifier.auditTokens
+                == [identity.auditToken, identity.auditToken]
+        )
+    }
+
+    @Test
+    func machineDriverAdmissionRejectsEveryRootIdentityAndPathDrift()
+        throws
+    {
+        let contract = try LifecycleLocalInstallationContract()
+        let identity = try machineDriverIdentity()
+        let signingIdentity = try LifecycleSigningIdentity(
+            signingIdentifier:
+                contract.machineDriverSigningIdentifier,
+            designatedRequirementSHA256: digest("d"),
+            codeDirectoryHash: cdhash("4")
+        )
+        let evidence = try LifecycleBundleSigningEvidence(
+            identity: signingIdentity,
+            executableSHA256: digest("e"),
+            isAdHoc: true
+        )
+        let validVerification = LifecycleCodeSigningVerification.verified(
+            processID: identity.processID,
+            effectiveUserID: 0,
+            signingIdentifier: signingIdentity.signingIdentifier,
+            designatedRequirementSHA256:
+                signingIdentity.designatedRequirementSHA256,
+            codeDirectoryHash: signingIdentity.codeDirectoryHash
+        )
+
+        for observation in [
+            RecordingMachineDriverObservation(
+                identity: try machineDriverIdentity(processIDVersion: 99),
+                executableURL: contract.machineDriverExecutableURL,
+                signingEvidence: evidence
+            ),
+            RecordingMachineDriverObservation(
+                identity: identity,
+                executableURL: URL(filePath: "/tmp/foreign-driver"),
+                signingEvidence: evidence
+            ),
+            RecordingMachineDriverObservation(
+                identity: identity,
+                executableURL: contract.machineDriverExecutableURL,
+                signingEvidence: try LifecycleBundleSigningEvidence(
+                    identity: LifecycleSigningIdentity(
+                        signingIdentifier: "foreign.machine-driver",
+                        designatedRequirementSHA256: digest("d"),
+                        codeDirectoryHash: cdhash("4")
+                    ),
+                    executableSHA256: digest("e"),
+                    isAdHoc: true
+                )
+            ),
+        ] {
+            let policy = LifecycleMachineDriverAdmissionPolicy(
+                processIdentity: observation.processIdentity,
+                processExecutableURL: observation.processExecutableURL,
+                signingEvidence: observation.signingEvidence,
+                codeSigningVerifier:
+                    RecordingLifecycleCodeSigningVerifier(
+                        result: validVerification
+                    )
+            )
+            #expect(!policy.authorize(identity))
+        }
+    }
 }
 
 private final class RecordingLifecycleCodeSigningVerifier:
@@ -298,9 +422,61 @@ private final class RecordingLifecycleProcessCodeSigningVerifier:
     }
 }
 
+private final class RecordingMachineDriverObservation:
+    @unchecked Sendable
+{
+    private let lock = NSLock()
+    private let identity: LifecycleProcessIdentity
+    private let executableURL: URL
+    private let evidence: LifecycleBundleSigningEvidence
+    private(set) var identityRequests: [pid_t] = []
+    private(set) var executableRequests: [pid_t] = []
+    private(set) var signingRequests: [URL] = []
+
+    init(
+        identity: LifecycleProcessIdentity,
+        executableURL: URL,
+        signingEvidence: LifecycleBundleSigningEvidence
+    ) {
+        self.identity = identity
+        self.executableURL = executableURL
+        evidence = signingEvidence
+    }
+
+    func processIdentity(_ processID: pid_t) -> LifecycleProcessIdentity? {
+        lock.withLock { identityRequests.append(processID) }
+        return identity
+    }
+
+    func processExecutableURL(_ processID: pid_t) -> URL? {
+        lock.withLock { executableRequests.append(processID) }
+        return executableURL
+    }
+
+    func signingEvidence(_ url: URL) -> LifecycleBundleSigningEvidence? {
+        lock.withLock { signingRequests.append(url) }
+        return evidence
+    }
+}
+
 private func auditToken() -> LifecycleAuditToken {
     try! LifecycleAuditToken(
         words: [501, 20, 501, 501, 501, 701, 44_001, 3]
+    )
+}
+
+private func machineDriverIdentity(
+    processIDVersion: Int32 = 7
+) throws -> LifecycleProcessIdentity {
+    LifecycleProcessIdentity(
+        processID: 801,
+        processIDVersion: processIDVersion,
+        auditSessionID: 55_001,
+        effectiveUserID: 0,
+        auditToken: try LifecycleAuditToken(words: [
+            0, 0, 0, 0, 0, 801, 55_001,
+            UInt32(processIDVersion),
+        ])
     )
 }
 

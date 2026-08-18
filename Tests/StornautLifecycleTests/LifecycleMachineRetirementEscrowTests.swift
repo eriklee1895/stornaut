@@ -296,6 +296,60 @@ struct LifecycleMachineRetirementEscrowTests {
         #expect(successes == 1)
         #expect(!escrow.isAwaitingClaim)
     }
+
+    @Test
+    func productionClaimRequiresLiveMachineDriverAdmissionBeforeConsume()
+        throws
+    {
+        let fixture = try MachineRetirementEscrowFixture()
+        let denied = fixture.escrow()
+        let deniedRequest = try fixture.request(
+            handle: try fixture.record(into: denied)
+        )
+        let rejected = RecordingMachineDriverClaimAdmission(
+            accepted: false
+        )
+
+        #expect(throws: LifecycleMachineRetirementEscrowError.unauthorized) {
+            _ = try denied.claim(
+                deniedRequest,
+                machineDriverIdentity: fixture.machineDriverIdentity,
+                admission: rejected
+            )
+        }
+        #expect(denied.isAwaitingClaim)
+        #expect(rejected.identities == [fixture.machineDriverIdentity])
+
+        let accepted = fixture.escrow()
+        let acceptedRequest = try fixture.request(
+            handle: try fixture.record(into: accepted)
+        )
+        let allowed = RecordingMachineDriverClaimAdmission(accepted: true)
+        let response = try accepted.claim(
+            acceptedRequest,
+            machineDriverIdentity: fixture.machineDriverIdentity,
+            admission: allowed
+        )
+        #expect(response.request == acceptedRequest)
+        #expect(!accepted.isAwaitingClaim)
+        #expect(allowed.identities == [fixture.machineDriverIdentity])
+    }
+}
+
+private final class RecordingMachineDriverClaimAdmission:
+    LifecycleMachineDriverClaimAdmitting,
+    @unchecked Sendable
+{
+    private let accepted: Bool
+    private let lock = NSLock()
+    private(set) var identities: [LifecycleProcessIdentity] = []
+
+    init(accepted: Bool) { self.accepted = accepted }
+
+    func authorize(_ identity: LifecycleProcessIdentity) -> Bool {
+        lock.withLock { identities.append(identity) }
+        return accepted
+    }
 }
 
 private struct MachineRetirementEscrowFixture {
@@ -319,6 +373,7 @@ private struct MachineRetirementEscrowFixture {
     let userID: UInt32 = 501
     let appRecord: LifecycleMachineProcessIdentityRecord
     let helperRecord: LifecycleMachineProcessIdentityRecord
+    let machineDriverIdentity: LifecycleProcessIdentity
 
     init() throws {
         appRecord = try Self.identity(
@@ -332,6 +387,15 @@ private struct MachineRetirementEscrowFixture {
             processIDVersion: 12,
             auditSessionID: 33_001,
             effectiveUserID: 0
+        )
+        machineDriverIdentity = LifecycleProcessIdentity(
+            processID: 801,
+            processIDVersion: 7,
+            auditSessionID: 55_001,
+            effectiveUserID: 0,
+            auditToken: try LifecycleAuditToken(words: [
+                0, 0, 0, 0, 0, 801, 55_001, 7,
+            ])
         )
     }
 

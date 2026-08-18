@@ -10,6 +10,7 @@ if [[ $# != 1 || "$action" != (status|install|uninstall) ]]; then
 fi
 
 label="com.eriklee.stornaut.lifecycle"
+machine_claim_service="com.eriklee.stornaut.lifecycle.machine-claim"
 application_support="/Library/Application Support"
 installed_root="$application_support/Stornaut"
 installed_app="$installed_root/Stornaut-R5-Diagnostic.app"
@@ -80,12 +81,22 @@ validate_plist() {
     )" == "com.eriklee.stornaut" ]]
     [[ "$(
         /usr/bin/plutil -extract MachServices xml1 -o - "$plist" |
-            /usr/bin/xmllint --xpath 'string(/plist/dict/key)' -
+            /usr/bin/xmllint --xpath 'string(/plist/dict/key[1])' -
     )" == "$label" ]]
+    [[ "$(
+        /usr/bin/plutil -extract MachServices xml1 -o - "$plist" |
+            /usr/bin/xmllint --xpath 'string(/plist/dict/key[2])' -
+    )" == "$machine_claim_service" ]]
     [[ "$(
         /usr/bin/plutil -extract MachServices xml1 -o - "$plist" |
             /usr/bin/xmllint --xpath \
                 'name(/plist/dict/key[.="com.eriklee.stornaut.lifecycle"]/following-sibling::*[1])' \
+                -
+    )" == "true" ]]
+    [[ "$(
+        /usr/bin/plutil -extract MachServices xml1 -o - "$plist" |
+            /usr/bin/xmllint --xpath \
+                'name(/plist/dict/key[.="com.eriklee.stornaut.lifecycle.machine-claim"]/following-sibling::*[1])' \
                 -
     )" == "true" ]]
     [[ "$(
@@ -95,7 +106,7 @@ validate_plist() {
     [[ "$(
         /usr/bin/plutil -extract MachServices xml1 -o - "$plist" |
             /usr/bin/xmllint --xpath 'count(/plist/dict/key)' -
-    )" == 1 ]]
+    )" == 2 ]]
 }
 
 validate_built_app() {
@@ -107,6 +118,8 @@ validate_built_app() {
         [[ -x "$executable" && ! -L "$executable" ]]
         [[ "$(/usr/bin/file -b "$executable")" == *"arm64"* ]]
     done
+    [[ ! -e "$built_app/Contents/MacOS/StornautInvestigationMachineDriver" &&
+        ! -L "$built_app/Contents/MacOS/StornautInvestigationMachineDriver" ]]
     /usr/bin/codesign --verify --deep --strict "$built_app"
     [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' \
         "$built_app/Contents/Info.plist")" == "com.eriklee.stornaut" ]]
@@ -148,6 +161,8 @@ validate_installed_artifacts() {
     do
         exact_file_metadata "$executable" root wheel 0755
     done
+    [[ ! -e "$installed_app/Contents/MacOS/StornautInvestigationMachineDriver" &&
+        ! -L "$installed_app/Contents/MacOS/StornautInvestigationMachineDriver" ]]
 }
 
 validate_installed_state() {
@@ -308,6 +323,8 @@ install() {
     /bin/chmod 0755 \
         "$staging_app/Contents/MacOS/StornautInvestigationDiagnostic" \
         "$staging_app/Contents/MacOS/StornautLifecycleHelper"
+    [[ ! -e "$staging_app/Contents/MacOS/StornautInvestigationMachineDriver" &&
+        ! -L "$staging_app/Contents/MacOS/StornautInvestigationMachineDriver" ]]
     validate_bundle_permissions "$staging_app"
     /usr/bin/codesign --verify --deep --strict "$staging_app"
     [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' \

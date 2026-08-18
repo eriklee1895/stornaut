@@ -988,16 +988,28 @@ private func runLifecycleHelper() {
     else {
         exit(78)
     }
-    let delegate = LifecycleHelperListenerDelegate(
-        appIdentity: appIdentity,
-        helperExecutableURL: executableURL,
-        recoveredInvestigations: recoveredInvestigations
-    )
-    let listener = NSXPCListener(
+    let retirementEscrow = LifecycleMachineRetirementEscrow()
+    let appListener = NSXPCListener(
         machServiceName: serviceName
     )
-    listener.delegate = delegate
-    listener.resume()
+    let machineClaimListener = NSXPCListener(
+        machServiceName:
+            LifecycleMachineClaimXPCClient.serviceName
+    )
+    let appDelegate = LifecycleHelperListenerDelegate(
+        appIdentity: appIdentity,
+        helperExecutableURL: executableURL,
+        recoveredInvestigations: recoveredInvestigations,
+        retirementEscrow: retirementEscrow
+    )
+    let machineClaimDelegate = LifecycleMachineClaimListenerDelegate(
+        retirementEscrow: retirementEscrow,
+        expectedListener: machineClaimListener
+    )
+    appListener.delegate = appDelegate
+    machineClaimListener.delegate = machineClaimDelegate
+    appListener.resume()
+    machineClaimListener.resume()
     RunLoop.current.run()
 }
 
@@ -1010,17 +1022,19 @@ private final class LifecycleHelperListenerDelegate:
     private let recoveredInvestigations:
         Set<LifecycleInvestigationID>
     private let lock = NSLock()
-    private let retirementEscrow = LifecycleMachineRetirementEscrow()
+    private let retirementEscrow: LifecycleMachineRetirementEscrow
     private var acceptedConnection = false
 
     init(
         appIdentity: LifecycleSigningIdentity,
         helperExecutableURL: URL,
-        recoveredInvestigations: Set<LifecycleInvestigationID>
+        recoveredInvestigations: Set<LifecycleInvestigationID>,
+        retirementEscrow: LifecycleMachineRetirementEscrow
     ) {
         self.appIdentity = appIdentity
         self.helperExecutableURL = helperExecutableURL
         self.recoveredInvestigations = recoveredInvestigations
+        self.retirementEscrow = retirementEscrow
     }
 
     func listener(
@@ -1089,6 +1103,153 @@ private final class LifecycleHelperListenerDelegate:
         }
         connection.resume()
         return true
+    }
+}
+
+private final class LifecycleMachineClaimListenerDelegate:
+    NSObject,
+    NSXPCListenerDelegate
+{
+    private let retirementEscrow: LifecycleMachineRetirementEscrow
+    private weak var expectedListener: NSXPCListener?
+    private let lock = NSLock()
+    private var acceptedConnection = false
+
+    init(
+        retirementEscrow: LifecycleMachineRetirementEscrow,
+        expectedListener: NSXPCListener
+    ) {
+        self.retirementEscrow = retirementEscrow
+        self.expectedListener = expectedListener
+    }
+
+    func listener(
+        _ listener: NSXPCListener,
+        shouldAcceptNewConnection connection: NSXPCConnection
+    ) -> Bool {
+        guard
+            listener === expectedListener,
+            let contract = try? LifecycleLocalInstallationContract(),
+            let driverEvidence = try?
+                LifecycleBundleSigningIdentityReader().evidence(
+                    bundleURL: contract.machineDriverExecutableURL
+                ),
+            driverEvidence.isAdHoc,
+            driverEvidence.identity.signingIdentifier
+                == contract.machineDriverSigningIdentifier
+        else {
+            return false
+        }
+        connection.setCodeSigningRequirement(
+            LifecyclePeerCodeSigningRequirement.exact(
+                identity: driverEvidence.identity
+            )
+        )
+        guard
+            connection.processIdentifier > 1,
+            connection.effectiveUserIdentifier == 0,
+            let callerIdentity = try? DarwinLifecycleInventory(
+                privilegedProcessID: connection.processIdentifier
+            ).identity(for: connection.processIdentifier),
+            callerIdentity.processID == connection.processIdentifier,
+            callerIdentity.effectiveUserID == 0,
+            callerIdentity.auditSessionID
+                == Int32(connection.auditSessionIdentifier),
+            LifecycleMachineDriverAdmissionPolicy().authorize(
+                callerIdentity
+            ),
+            lock.withLock({
+                guard !acceptedConnection else { return false }
+                acceptedConnection = true
+                return true
+            })
+        else {
+            return false
+        }
+        let service = LifecycleMachineClaimHelperService(
+            callerIdentity: callerIdentity,
+            retirementEscrow: retirementEscrow
+        )
+        connection.exportedInterface = NSXPCInterface(
+            with: LifecycleMachineClaimXPCWire.self
+        )
+        connection.exportedObject = service
+        connection.invalidationHandler = {
+            service.invalidate()
+        }
+        connection.interruptionHandler = {
+            service.invalidate()
+        }
+        connection.resume()
+        return true
+    }
+}
+
+private final class LifecycleMachineClaimHelperService:
+    NSObject,
+    LifecycleMachineClaimXPCWire,
+    @unchecked Sendable
+{
+    private let callerIdentity: LifecycleProcessIdentity
+    private let retirementEscrow: LifecycleMachineRetirementEscrow
+    private let lock = NSLock()
+    private var invalidated = false
+    private var invoked = false
+
+    init(
+        callerIdentity: LifecycleProcessIdentity,
+        retirementEscrow: LifecycleMachineRetirementEscrow
+    ) {
+        self.callerIdentity = callerIdentity
+        self.retirementEscrow = retirementEscrow
+    }
+
+    func claimMachineRetirement(
+        _ request: Data,
+        withReply reply: @escaping (Data?, String?) -> Void
+    ) {
+        guard
+            request.count <= 16 * 1_024,
+            let decoded = try? JSONDecoder().decode(
+                LifecycleMachineRetirementClaimRequest.self,
+                from: request
+            ),
+            lock.withLock({
+                guard !invalidated, !invoked else { return false }
+                invoked = true
+                return true
+            })
+        else {
+            reply(
+                nil,
+                "runtime.lifecycle.machine-claim.invalid-request"
+            )
+            return
+        }
+        do {
+            let response = try retirementEscrow.claim(
+                decoded,
+                machineDriverIdentity: callerIdentity
+            )
+            let data = try JSONEncoder().encode(response)
+            guard data.count <= 32 * 1_024 else {
+                throw LifecycleMachineRetirementEscrowError.invalidRecord
+            }
+            reply(data, nil)
+        } catch let error as LifecycleMachineRetirementEscrowError {
+            reply(nil, machineClaimFailureReasonKey(error))
+            scheduleFailureExitAfterReply()
+        } catch {
+            reply(
+                nil,
+                "runtime.lifecycle.machine-claim.unavailable"
+            )
+            scheduleFailureExitAfterReply()
+        }
+    }
+
+    func invalidate() {
+        lock.withLock { invalidated = true }
     }
 }
 
@@ -2892,6 +3053,25 @@ private func scheduleRetirementClaimDeadline(
             retirementEscrow.expire()
         }
         exit(0)
+    }
+}
+
+private func machineClaimFailureReasonKey(
+    _ error: LifecycleMachineRetirementEscrowError
+) -> String {
+    switch error {
+    case .invalidRecord, .invalidRequest:
+        "runtime.lifecycle.machine-claim.invalid-request"
+    case .empty:
+        "runtime.lifecycle.machine-claim.empty"
+    case .alreadyRecorded, .consumed:
+        "runtime.lifecycle.machine-claim.consumed"
+    case .unauthorized:
+        "runtime.lifecycle.machine-claim.invalid-peer"
+    case .claimMismatch:
+        "runtime.lifecycle.machine-claim.mismatch"
+    case .expired:
+        "runtime.lifecycle.machine-claim.expired"
     }
 }
 

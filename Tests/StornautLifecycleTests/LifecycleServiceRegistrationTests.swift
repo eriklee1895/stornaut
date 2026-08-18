@@ -26,6 +26,18 @@ struct LifecycleServiceRegistrationTests {
         )
         #expect(contract.label == "com.eriklee.stornaut.lifecycle")
         #expect(contract.machServiceName == contract.label)
+        #expect(
+            contract.machineClaimMachServiceName
+                == "com.eriklee.stornaut.lifecycle.machine-claim"
+        )
+        #expect(
+            contract.machineDriverExecutableURL.path
+                == "/Library/Application Support/Stornaut/Stornaut-R5-Diagnostic.app/Contents/MacOS/StornautInvestigationMachineDriver"
+        )
+        #expect(
+            contract.machineDriverSigningIdentifier
+                == "com.eriklee.stornaut.investigation.machine-driver"
+        )
         #expect(contract.appBundleIdentifier == "com.eriklee.stornaut")
         #expect(contract.appOwnerUserID == 0)
         #expect(contract.appOwnerGroupID == 0)
@@ -90,6 +102,13 @@ struct LifecycleServiceRegistrationTests {
         #expect(
             manifest["KeepAlive"] as? [String: Bool]
                 == ["SuccessfulExit": false]
+        )
+        #expect(
+            manifest["MachServices"] as? [String: Bool]
+                == [
+                    "com.eriklee.stornaut.lifecycle": true,
+                    "com.eriklee.stornaut.lifecycle.machine-claim": true,
+                ]
         )
         #expect(manifest["ThrottleInterval"] as? Int == 1)
         for forbidden in [

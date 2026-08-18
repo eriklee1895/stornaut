@@ -104,22 +104,65 @@ if rg -n \
     print -u2 "Machine retirement claim gained prohibited authority."
     exit 1
 fi
-if rg -q --fixed-strings -- 'LifecycleMachineRetirementClaim' \
-    "$lifecycle_root/LifecycleSupervisorXPC.swift"; then
-    print -u2 "Production XPC machine-claim route opened before L3c2."
+machine_xpc_source="$lifecycle_root/LifecycleSupervisorXPC.swift"
+machine_authorization_source="$lifecycle_root/LifecycleAppAuthorization.swift"
+machine_escrow_source="$lifecycle_root/LifecycleMachineRetirementEscrow.swift"
+machine_registration_source="$lifecycle_root/LifecycleServiceRegistration.swift"
+for marker in \
+    'com.eriklee.stornaut.lifecycle.machine-claim' \
+    'com.eriklee.stornaut.investigation.machine-driver' \
+    'Contents/MacOS/StornautInvestigationMachineDriver'; do
+    rg -q --fixed-strings -- "$marker" "$machine_registration_source" || {
+        print -u2 "Fixed Machine claim topology marker missing: $marker"
+        exit 1
+    }
+done
+for marker in \
+    'public struct LifecycleMachineDriverAdmissionPolicy' \
+    'identity.effectiveUserID == 0' \
+    'processIdentity(identity.processID) == identity' \
+    'contract.machineDriverExecutableURL' \
+    'contract.machineDriverSigningIdentifier'; do
+    rg -q --fixed-strings -- "$marker" "$machine_authorization_source" || {
+        print -u2 "Machine driver admission marker missing: $marker"
+        exit 1
+    }
+done
+for marker in \
+    '@objc public protocol LifecycleMachineClaimXPCWire' \
+    'public actor LifecycleMachineClaimXPCClient' \
+    'func claimMachineRetirement(' \
+    'LifecycleMachineClaimXPCReplyResolver' \
+    'options: .privileged'; do
+    rg -q --fixed-strings -- "$marker" "$machine_xpc_source" || {
+        print -u2 "Machine claim XPC marker missing: $marker"
+        exit 1
+    }
+done
+for marker in \
+    'LifecycleMachineClaimListenerDelegate' \
+    'LifecycleMachineClaimHelperService' \
+    'listener === expectedListener' \
+    'connection.effectiveUserIdentifier == 0' \
+    'LifecycleMachineDriverAdmissionPolicy().authorize(' \
+    'machineDriverIdentity: callerIdentity'; do
+    rg -q --fixed-strings -- "$marker" "$lifecycle_helper" || {
+        print -u2 "Machine claim helper marker missing: $marker"
+        exit 1
+    }
+done
+if rg -n \
+    'public protocol LifecycleMachineDriverClaimAdmitting|package protocol LifecycleMachineDriverClaimAdmitting|authorized: true|authorized: false' \
+    "$machine_authorization_source" "$machine_escrow_source" \
+    "$machine_xpc_source" "$lifecycle_helper"; then
+    print -u2 "Machine claim route exposes a caller-mintable authorization."
     exit 1
 fi
-claim_route_hits=$(
-    rg -n \
-        'LifecycleMachineRetirementClaim(Request|Response)|\.claim\(' \
-        "$lifecycle_root" "$lifecycle_helper" \
-        --glob '*.swift' \
-        --glob '!LifecycleMachineRetirementEscrow.swift' \
-        || true
-)
-if [[ -n "$claim_route_hits" ]]; then
-    print -u2 "Production Lifecycle source opened a machine-claim route:"
-    print -u2 -- "$claim_route_hits"
+if rg -n \
+    'StornautExecution|ActionExecutor|TrashMoving|RegisteredAction|signedInvestigationRuntimeReady' \
+    "$machine_authorization_source" "$machine_escrow_source" \
+    "$machine_xpc_source" "$lifecycle_helper"; then
+    print -u2 "Machine claim transport gained prohibited authority."
     exit 1
 fi
 python3 - "$lifecycle_root/LifecycleSupervisorXPC.swift" <<'PY'
@@ -131,6 +174,7 @@ source = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
 expected = {
     "LifecycleSupervisorXPCWire": ["attestHelper", "handle"],
     "LifecycleInteractiveSessionXPCWire": ["handleInteractive"],
+    "LifecycleMachineClaimXPCWire": ["claimMachineRetirement"],
 }
 observed = {}
 for match in re.finditer(
