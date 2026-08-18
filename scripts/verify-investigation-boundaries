@@ -9,6 +9,8 @@ investigation_root=Sources/StornautCore/Investigation
 evidence_root=Sources/StornautCore/Evidence
 coordinator_root=Sources/StornautInvestigation
 machine_root=Sources/StornautInvestigationMachine
+machine_driver_host=$machine_root/InvestigationMachineDriverHost.swift
+machine_driver_main=Tools/StornautInvestigationMachineDriver/main.swift
 runtime_root=Sources/StornautInvestigationRuntime
 diagnostic_root=Sources/StornautInvestigationDiagnostic
 lifecycle_root=Sources/StornautLifecycle
@@ -41,6 +43,8 @@ required_files=(
     "$machine_root/SignedInvestigationRuntimeMachineContract.swift"
     "$machine_root/FixedLifecycleServiceProbe.swift"
     "$machine_root/InvestigationLifecycleTopologyCollector.swift"
+    "$machine_driver_host"
+    "$machine_driver_main"
     "$coordinator_root/Resources/investigation-prompt-v1.txt"
     "$runtime_root/InvestigationCodexSessionAdapter.swift"
     "$runtime_root/InvestigationLifecycleAppServerTransport.swift"
@@ -102,6 +106,55 @@ if rg -n \
     'Codable|JSONDecoder|JSONEncoder|PropertyListDecoder|PropertyListEncoder|NSXPCConnection|LifecycleSupervisorXPCWire|LifecycleInteractiveSessionXPCWire|StornautExecution|ActionExecutor|TrashMoving|signedInvestigationRuntimeReady' \
     "$machine_claim_source"; then
     print -u2 "Machine retirement claim gained prohibited authority."
+    exit 1
+fi
+for marker in \
+    'package enum InvestigationMachineDriverEntryPoint' \
+    'package static func run() async -> Int32' \
+    'actor InvestigationMachineDriverHost' \
+    'struct StrictMachineRetirementClaimSource' \
+    'LifecycleMachineClaimXPCClient()' \
+    'struct InstalledMachineRetirementHelperSigningVerifier' \
+    'contract.helperExecutableURL' \
+    'SecurityLifecycleCodeSigningVerifier().verify(' \
+    'InvestigationMachineRetirementClaimStore()' \
+    'InvestigationLifecycleTopologyCollectionRequest(' \
+    'DarwinInvestigationLifecycleTopologyObserver('; do
+    rg -q --fixed-strings -- "$marker" "$machine_driver_host" || {
+        print -u2 "Machine driver host marker missing: $marker"
+        exit 1
+    }
+done
+package_surface_count=$(rg -o --fixed-strings -- 'package ' \
+    "$machine_driver_host" | wc -l | tr -d ' ')
+if [[ "$package_surface_count" != 2 ]]; then
+    print -u2 \
+        "Machine driver package surface drifted: $package_surface_count"
+    exit 1
+fi
+for declaration in \
+    'protocol InvestigationMachineRetirementHandleHandoff' \
+    'protocol InvestigationMachineRetirementClaiming' \
+    'struct InvestigationMachineTopologyAuthority' \
+    'actor InvestigationMachineDriverHost'; do
+    if rg -q --fixed-strings -- "public $declaration" "$machine_driver_host" \
+        || rg -q --fixed-strings -- "package $declaration" "$machine_driver_host"; then
+        print -u2 "Machine driver authority escaped module scope: $declaration"
+        exit 1
+    fi
+done
+for marker in \
+    'import StornautInvestigationMachine' \
+    'await InvestigationMachineDriverEntryPoint.run()'; do
+    rg -q --fixed-strings -- "$marker" "$machine_driver_main" || {
+        print -u2 "Machine driver executable marker missing: $marker"
+        exit 1
+    }
+done
+if rg -n \
+    'StornautExecution|StornautInvestigationDiagnostic|ActionExecutor|TrashMoving|RegisteredAction|SignedInvestigationRuntimeMachineAssembler|SignedInvestigationRuntimeMachineVerifier|signedInvestigationRuntimeReady|JSONEncoder|JSONDecoder|PropertyListEncoder|PropertyListDecoder|NSXPCConnection|URLSession|posix_spawn|removeItem|moveItem|copyItem|CommandLine\.arguments|ProcessInfo\.processInfo\.environment|readLine\(|kill\(' \
+    "$machine_driver_host" "$machine_driver_main"; then
+    print -u2 "Machine driver host gained prohibited input or authority."
     exit 1
 fi
 machine_xpc_source="$lifecycle_root/LifecycleSupervisorXPC.swift"
@@ -479,8 +532,10 @@ for token in (
 PY
 
 package_graph=$(swift package describe --type json)
+package_manifest=$(swift package dump-package)
 python3 - \
     "$package_graph" \
+    "$package_manifest" \
     "$coordinator_root/InvestigationCoordinator.swift" \
     "$coordinator_root/InvestigationRuntimeProtocols.swift" \
     "$coordinator_root/InvestigationRuntimeDiagnosticFacade.swift" \
@@ -498,6 +553,7 @@ import re
 import sys
 
 package = json.loads(sys.argv[1])
+manifest = json.loads(sys.argv[2])
 targets = {target["name"]: target for target in package["targets"]}
 core = targets["StornautCore"]
 dependencies = set(core.get("target_dependencies", []))
@@ -580,6 +636,128 @@ if any(
     raise SystemExit(
         "StornautInvestigationMachine became a package product"
     )
+machine_source_root = Path(machine.get("path", ""))
+machine_sources = machine.get("sources", [])
+if not machine_source_root.is_dir() or not machine_sources:
+    raise SystemExit("Machine target has no resolved source graph")
+machine_authority_pattern = re.compile(
+    r"import\s+StornautExecution"
+    r"|import\s+StornautInvestigationDiagnostic"
+    r"|\b(?:ActionExecutor|TrashMoving|RegisteredAction|URLSession|"
+    r"NWConnection|NSTask|posix_spawn|O_WRONLY|O_RDWR|O_CREAT|"
+    r"O_TRUNC|O_APPEND)\b"
+    r"|\bProcess\s*\("
+    r"|FileManager\.default\.(?:remove|move|copy|trash|replace|"
+    r"createDirectory|createSymbolicLink|link|setAttributes)"
+    r"|\b(?:removeItem|moveItem|copyItem|trashItem|replaceItem|"
+    r"createFile|createDirectory|createSymbolicLink|linkItem|"
+    r"setAttributes|forWritingTo|writeabilityHandler)\b"
+    r"|\bFileHandle\s*\(\s*forWritingTo:"
+    r"|\b(?:write|writeData|synchronizeFile|truncateFile)\s*\("
+    r"|\.write\s*\(\s*to:"
+    r"|\b(?:unlink|rename|fopen|mkdir|rmdir|chmod|chown|"
+    r"symlink|link|truncate|kill)\s*\("
+    r"|Darwin\.write\s*\("
+    r"|CommandLine\.arguments"
+    r"|ProcessInfo\.processInfo\.environment"
+    r"|readLine\s*\("
+    r"|NSXPCConnection"
+    r"|signedInvestigationRuntimeReady"
+)
+for source_name in machine_sources:
+    source_path = machine_source_root / source_name
+    if not source_path.is_file():
+        raise SystemExit(
+            f"Resolved Machine source is missing: {source_path}"
+        )
+    match = machine_authority_pattern.search(
+        source_path.read_text(encoding="utf-8")
+    )
+    if match:
+        raise SystemExit(
+            "StornautInvestigationMachine source gained prohibited "
+            f"authority: {source_path}: {match.group(0)!r}"
+        )
+machine_driver = targets.get("StornautInvestigationMachineDriver")
+if machine_driver is None:
+    raise SystemExit("missing StornautInvestigationMachineDriver target")
+if machine_driver.get("type") != "executable":
+    raise SystemExit("Machine driver target is not executable")
+actual_driver_dependencies = set(
+    machine_driver.get("target_dependencies", [])
+)
+expected_driver_dependencies = {"StornautInvestigationMachine"}
+if actual_driver_dependencies != expected_driver_dependencies:
+    raise SystemExit(
+        "StornautInvestigationMachineDriver dependencies "
+        f"{sorted(actual_driver_dependencies)} != "
+        f"{sorted(expected_driver_dependencies)}"
+    )
+if Path(machine_driver.get("path", "")) != Path(
+    "Tools/StornautInvestigationMachineDriver"
+):
+    raise SystemExit("Machine driver target path drifted")
+manifest_targets = {
+    target["name"]: target
+    for target in manifest.get("targets", [])
+}
+manifest_driver = manifest_targets.get(
+    "StornautInvestigationMachineDriver"
+)
+if manifest_driver is None:
+    raise SystemExit("Machine driver is missing from resolved manifest")
+manifest_driver_dependencies = []
+for dependency in manifest_driver.get("dependencies", []):
+    if "byName" in dependency:
+        manifest_driver_dependencies.append(dependency["byName"][0])
+    elif "target" in dependency:
+        manifest_driver_dependencies.append(dependency["target"][0])
+    else:
+        raise SystemExit(
+            f"Unsupported Machine driver dependency: {dependency!r}"
+        )
+if manifest_driver_dependencies != ["StornautInvestigationMachine"]:
+    raise SystemExit(
+        "Manifest Machine driver dependencies drifted: "
+        f"{manifest_driver_dependencies!r}"
+    )
+if any(
+    product.get("name") == "StornautInvestigationMachineDriver"
+    or "StornautInvestigationMachineDriver"
+        in product.get("targets", [])
+    for product in manifest.get("products", [])
+):
+    raise SystemExit(
+        "Machine driver was added to the explicit products list"
+    )
+matching_driver_products = [
+    product
+    for product in package.get("products", [])
+    if product.get("name") == "StornautInvestigationMachineDriver"
+]
+if len(matching_driver_products) != 1 or set(
+    matching_driver_products[0].get("targets", [])
+) != {"StornautInvestigationMachineDriver"}:
+    raise SystemExit(
+        "Machine driver implicit executable product surface drifted"
+    )
+if set(machine.get("product_memberships", [])) != {
+    "StornautInvestigationMachineDriver"
+}:
+    raise SystemExit(
+        "Machine target product membership drifted: "
+        f"{machine.get('product_memberships', [])!r}"
+    )
+for product in package.get("products", []):
+    targets_in_product = set(product.get("targets", []))
+    if (
+        "StornautInvestigationMachineDriver" in targets_in_product
+        and product.get("name")
+            != "StornautInvestigationMachineDriver"
+    ):
+        raise SystemExit(
+            "Machine driver escaped into another package product"
+        )
 for target_name in (
     "StornautInvestigation",
     "StornautInvestigationRuntime",
@@ -623,21 +801,21 @@ if len(matching_products) != 1 or set(
         "StornautInvestigationDiagnostic product surface drifted"
     )
 
-coordinator_source = Path(sys.argv[2]).read_text(encoding="utf-8")
-protocol_source = Path(sys.argv[3]).read_text(encoding="utf-8")
-diagnostic_facade_source = Path(sys.argv[4]).read_text(encoding="utf-8")
-signed_contract_source = Path(sys.argv[5]).read_text(encoding="utf-8")
-prompt = Path(sys.argv[6]).read_text(encoding="utf-8")
-interactive_contract_source = Path(sys.argv[7]).read_text(
+coordinator_source = Path(sys.argv[3]).read_text(encoding="utf-8")
+protocol_source = Path(sys.argv[4]).read_text(encoding="utf-8")
+diagnostic_facade_source = Path(sys.argv[5]).read_text(encoding="utf-8")
+signed_contract_source = Path(sys.argv[6]).read_text(encoding="utf-8")
+prompt = Path(sys.argv[7]).read_text(encoding="utf-8")
+interactive_contract_source = Path(sys.argv[8]).read_text(
     encoding="utf-8"
 )
-interactive_xpc_source = Path(sys.argv[8]).read_text(encoding="utf-8")
-interactive_transport_source = Path(sys.argv[9]).read_text(
+interactive_xpc_source = Path(sys.argv[9]).read_text(encoding="utf-8")
+interactive_transport_source = Path(sys.argv[10]).read_text(
     encoding="utf-8"
 )
-lifecycle_helper_source = Path(sys.argv[10]).read_text(encoding="utf-8")
-contained_session_source = Path(sys.argv[11]).read_text(encoding="utf-8")
-diagnostic_composition_source = Path(sys.argv[12]).read_text(
+lifecycle_helper_source = Path(sys.argv[11]).read_text(encoding="utf-8")
+contained_session_source = Path(sys.argv[12]).read_text(encoding="utf-8")
+diagnostic_composition_source = Path(sys.argv[13]).read_text(
     encoding="utf-8"
 )
 
@@ -872,8 +1050,8 @@ for prohibited in (
     ".wait(until:",
 ):
     lifecycle_boundary_paths = {
-        Path(sys.argv[2]),
         Path(sys.argv[3]),
+        Path(sys.argv[4]),
     }
     for target in package["targets"]:
         if target.get("type") == "test":

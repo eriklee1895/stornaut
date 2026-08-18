@@ -89,7 +89,11 @@ topology composition and L3c2b eight-scenario driving. L3c2a-i is complete; its
 targeted build, release boundaries, 1041-test clean staged-only serial and
 independent post-fix review passed. See the
 [L3c2a-i review](../../reports/phase-d-task-39b2c-l3c2a-i-machine-claim-transport-review.md).
-L3c2a-ii is next. Only
+L3c2a-ii is also complete; its seven-path root host, strict adapters, resolved
+authority gate, targeted builds/release boundary, 1046-test clean staged-only
+serial and independent post-fix review passed. See the
+[L3c2a-ii review](../../reports/phase-d-task-39b2c-l3c2a-ii-machine-driver-host-review.md).
+L3c2b is next. Only
 L3c4 owns machine readiness and the remaining full verifier.
 Tasks 40–44
 remain blocked on the pushed completion commit of their immediate predecessor.
@@ -109,7 +113,7 @@ the sole normal-product admission gate.
 | [36](task-36-implementation-brief.md) | Domain, canonical projection, planner, budget and stop contracts | complete; [review](../../reports/phase-d-task-36-review.md) |
 | [37](task-37-implementation-brief.md) | Store v4, retention and source rejoin | complete; [review](../../reports/phase-d-task-37-review.md) |
 | [38](task-38-implementation-brief.md) | Closed coordinator with fake runtime | complete; [review](../../reports/phase-d-task-38-review.md) |
-| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; 39A through 39B2b-ii complete; 39B2c attempt binding, strict decoding, L1/L2, L3a/L3b, L3c1 and L3c2a-i complete; L3c2a-ii root host/topology next, then L3c2b eight-scenario driving |
+| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; 39A through 39B2b-ii complete; 39B2c attempt binding, strict decoding, L1/L2, L3a/L3b, L3c1 and L3c2a-i/ii complete; L3c2b eight-scenario driving next |
 | [40](task-40-implementation-brief.md) | Evidence report and conservative Review projection | blocked on Task 39 |
 | [41](task-41-implementation-brief.md) | First-use disclosure and typed availability | blocked on Task 40 |
 | [42](task-42-implementation-brief.md) | App workflow and recovery state | blocked on Task 41 |

@@ -11,6 +11,7 @@ enum InvestigationMachineRetirementClaimError:
     case rootAuthorityRequired
     case invalidWindow
     case sourceFailed
+    case outcomeUnknown
     case responseMismatch
     case identityMismatch
     case helperPeerMismatch
@@ -204,6 +205,8 @@ struct InvestigationMachineRetirementClaimant: Sendable {
                 try await source.fetch(request: request)
         } catch is CancellationError {
             throw CancellationError()
+        } catch LifecycleMachineClaimXPCError.outcomeUnknown {
+            throw InvestigationMachineRetirementClaimError.outcomeUnknown
         } catch {
             try Task.checkCancellation()
             throw InvestigationMachineRetirementClaimError.sourceFailed

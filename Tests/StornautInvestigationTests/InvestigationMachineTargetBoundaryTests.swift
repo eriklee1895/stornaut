@@ -91,6 +91,117 @@ struct InvestigationMachineTargetBoundaryTests {
         #expect(!packageSource.contains(
             ".executable(\n            name: \"StornautInvestigationMachine\""
         ))
+        let driverTargetStart = try #require(packageSource.range(
+            of: ".executableTarget(\n            name: \"StornautInvestigationMachineDriver\""
+        ))
+        let driverTargetSuffix = packageSource[
+            driverTargetStart.lowerBound...
+        ]
+        let driverTargetEnd = try #require(
+            driverTargetSuffix.range(of: "\n        ),")
+        )
+        let driverTargetSource = String(
+            driverTargetSuffix[..<driverTargetEnd.upperBound]
+        )
+        #expect(driverTargetSource.contains(
+            "dependencies: [\n                \"StornautInvestigationMachine\",\n            ]"
+        ))
+        #expect(driverTargetSource.contains(
+            "path: \"Tools/StornautInvestigationMachineDriver\""
+        ))
+        for forbidden in [
+            "StornautLifecycle",
+            "StornautInvestigationRuntime",
+            "StornautInvestigationDiagnostic",
+            "StornautExecution",
+            "StornautCore",
+            "StornautCodex",
+        ] {
+            #expect(!driverTargetSource.contains(forbidden))
+        }
+        #expect(!packageSource.contains(
+            ".executable(\n            name: \"StornautInvestigationMachineDriver\""
+        ))
+
+        let driverHostURL = repositoryRoot.appending(
+            path: "Sources/StornautInvestigationMachine/"
+                + "InvestigationMachineDriverHost.swift"
+        )
+        let driverMainURL = repositoryRoot.appending(
+            path: "Tools/StornautInvestigationMachineDriver/main.swift"
+        )
+        #expect(FileManager.default.fileExists(atPath: driverHostURL.path))
+        #expect(FileManager.default.fileExists(atPath: driverMainURL.path))
+        let driverHost = try String(
+            contentsOf: driverHostURL,
+            encoding: .utf8
+        )
+        let driverMain = try String(
+            contentsOf: driverMainURL,
+            encoding: .utf8
+        )
+        for marker in [
+            "package enum InvestigationMachineDriverEntryPoint",
+            "package static func run() async -> Int32",
+            "actor InvestigationMachineDriverHost",
+            "struct StrictMachineRetirementClaimSource",
+            "LifecycleMachineClaimXPCClient()",
+            "struct InstalledMachineRetirementHelperSigningVerifier",
+            "InvestigationMachineRetirementClaimStore()",
+            "InvestigationLifecycleTopologyCollectionRequest(",
+            "DarwinInvestigationLifecycleTopologyObserver(",
+        ] {
+            #expect(driverHost.contains(marker))
+        }
+        #expect(
+            driverHost.components(separatedBy: "package " ).count == 3
+        )
+        for internalDeclaration in [
+            "protocol InvestigationMachineRetirementHandleHandoff",
+            "protocol InvestigationMachineRetirementClaiming",
+            "struct InvestigationMachineTopologyAuthority",
+            "actor InvestigationMachineDriverHost",
+        ] {
+            #expect(driverHost.contains(internalDeclaration))
+            #expect(!driverHost.contains("public \(internalDeclaration)"))
+            #expect(!driverHost.contains("package \(internalDeclaration)"))
+        }
+        #expect(driverMain.contains(
+            "import StornautInvestigationMachine"
+        ))
+        #expect(driverMain.contains(
+            "await InvestigationMachineDriverEntryPoint.run()"
+        ))
+        #expect(!driverMain.contains("CommandLine"))
+        #expect(!driverMain.contains("ProcessInfo"))
+        for source in [driverHost, driverMain] {
+            for forbidden in [
+                "StornautExecution",
+                "StornautInvestigationDiagnostic",
+                "ActionExecutor",
+                "TrashMoving",
+                "RegisteredAction",
+                "SignedInvestigationRuntimeMachineAssembler",
+                "SignedInvestigationRuntimeMachineVerifier",
+                "signedInvestigationRuntimeReady",
+                "JSONEncoder",
+                "JSONDecoder",
+                "PropertyListEncoder",
+                "PropertyListDecoder",
+                "NSXPCConnection",
+                "URLSession",
+                "posix_spawn",
+                "removeItem",
+                "moveItem",
+                "copyItem",
+                "CommandLine.arguments",
+                "ProcessInfo.processInfo.environment",
+                "readLine(",
+                "kill(",
+            ] {
+                #expect(!source.contains(forbidden))
+            }
+        }
 
         let machineText = try String(
             contentsOf: machineSource,

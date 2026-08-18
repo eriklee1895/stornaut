@@ -19,7 +19,8 @@
 > transport, root-host/topology composition and eight-scenario driving into
 > L3c2a-i/L3c2a-ii/L3c2b. L3c2a-i strict Machine-claim transport is complete
 > after a 1041-test clean staged-only serial and independent post-fix review;
-> L3c2a-ii is next. The Machine host, failure matrix,
+> L3c2a-ii root host/topology is also complete after a 1046-test clean staged-only
+> serial and independent post-fix review; L3c2b is next. The failure matrix,
 > real-model run and readiness verdict remain unimplemented.
 > Production Deep Dive remains unavailable until Task 44 admission.
 >
@@ -855,13 +856,18 @@ Checkpoint status:
   L3c2a-i strict claim transport, L3c2a-ii non-product root host/topology and
   L3c2b fixed eight-scenario driving. L3c2a-i is complete after its exact
   14-path implementation, layered gates, 1041-test clean staged-only serial and
-  independent post-fix review; L3c2a-ii is next.
+  independent post-fix review. L3c2a-ii is also complete after its seven-path
+  root host/topology composition, resolved authority gates, targeted builds,
+  1046-test clean staged-only serial and independent post-fix review; L3c2b is
+  next.
   See the
   [L3c1b-i Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
   and
   [L3c1b-ii Review](../../reports/phase-d-task-39b2c-l3c1b-ii-synthetic-machine-claim-review.md).
   L3c2a-i evidence is in the
   [Machine-Claim Transport Review](../../reports/phase-d-task-39b2c-l3c2a-i-machine-claim-transport-review.md).
+  L3c2a-ii evidence is in the
+  [Machine Driver Host Review](../../reports/phase-d-task-39b2c-l3c2a-ii-machine-driver-host-review.md).
   Only L3c4 owns
   real-model signed-App machine readiness, the complete failure matrix, exact
   zero-residue proof and the remaining authoritative full verifier. Task 39 and

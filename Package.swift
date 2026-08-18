@@ -183,6 +183,13 @@ let package = Package(
             dependencies: ["StornautCodex"],
             path: "Tools/StornautCapabilityRuntimeVerifier"
         ),
+        .executableTarget(
+            name: "StornautInvestigationMachineDriver",
+            dependencies: [
+                "StornautInvestigationMachine",
+            ],
+            path: "Tools/StornautInvestigationMachineDriver"
+        ),
         .testTarget(
             name: "StornautCoreTests",
             dependencies: [

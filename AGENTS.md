@@ -211,7 +211,11 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   拆为 L3c2a-i/L3c2a-ii/L3c2b。L3c2a-i strict Machine-claim transport、
   36-test focused、144-test Lifecycle、178-test Investigation、targeted
   build/release boundaries、1041-test clean staged-only serial 与 independent
-  post-fix review 已完成；L3c2a-ii next。只有 L3c4 可作 readiness claim，
+  post-fix review 已完成；L3c2a-ii non-product root host/topology、strict
+  XPC/signing adapters、resolved package/source authority gate、20-test affected、
+  187-test Investigation、targeted driver/diagnostic builds、release boundary、
+  1046-test clean staged-only serial 与 independent post-fix review 也已完成；
+  L3c2b next。只有 L3c4 可作 readiness claim，
   final full 尚未消耗。
   Task 39 尚未完成。
   真实 App Trash 依赖仍保持关闭，生产 Deep Dive 仍为 implementation unavailable。
@@ -425,8 +429,9 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   independent post-fix review 已完成；L3c1b-ii synthetic Machine claim/collector
   join、1035-test clean staged-only serial 与 independent review 也已完成。L3c1
   已关闭；L3c2 已拆为 a-i/a-ii/b；L3c2a-i strict claim transport、1041-test
-  clean staged-only serial 与 independent post-fix review 已完成，L3c2a-ii
-  non-product root host/topology next；L3c4
+  clean staged-only serial 与 independent post-fix review 已完成；L3c2a-ii
+  non-product root host/topology、1046-test clean staged-only serial 与
+  independent post-fix review 也已完成，L3c2b next；L3c4
   独占 final admission 与剩余 full。
   Task 39 尚未完成。
 Deep Dive 的旧 Broker-only no-go 已被 ADR 0004 的 capability-first 边界取代；

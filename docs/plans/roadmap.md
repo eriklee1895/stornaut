@@ -212,7 +212,9 @@ L3c2 mandatory preflight 已将 claim transport、root-host/topology 与八场�
 driving 拆为 L3c2a-i/L3c2a-ii/L3c2b；L3c2a-i strict Machine-claim transport
 已完成，并通过 36-test focused、144-test Lifecycle、178-test Investigation、
 targeted build/release boundaries、1041-test clean staged-only serial 与
-independent post-fix review；L3c2a-ii next，
+independent post-fix review；L3c2a-ii non-product root host/topology、resolved
+authority gates、targeted builds/release boundary、1046-test clean staged-only
+serial 与 independent post-fix review 也已完成；L3c2b next，
 只有 L3c4 可作 readiness claim 并运行
 Task 39 剩余唯一 full。
 Task 44 是唯一
@@ -378,7 +380,9 @@ Task 36 [review](../reports/phase-d-task-36-review.md)、Task 37
 	  L3c1b-ii synthetic Machine claim/collector join 已完成，L3c1 已关闭；L3c2
 	  已按强制 preflight 拆为 a-i claim transport、a-ii root host/topology 与 b
 	  eight-scenario driving；L3c2a-i 已通过 1041-test clean staged-only serial
-	  与 independent post-fix review，L3c2a-ii next，L3c4 才拥有
+	  与 independent post-fix review；L3c2a-ii root host/topology 也已通过
+	  1046-test clean staged-only serial 与 independent post-fix review，L3c2b
+	  next，L3c4 才拥有
 	  final admission/full。
 	  39B2c 才是 machine admission，Task 39 尚未完成。
 - Epic 0 Foundation Upstream Study：已完成，选择 checked-in Xcode App/Test host + local Swift packages。

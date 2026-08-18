@@ -91,8 +91,9 @@
 > real-success three-plane composition and L3c4 sealed final admission. Only L3c4
 > may claim readiness or consume the remaining authoritative full verifier. L3c1
 > is complete; the L3c2 scope/trust/cost preflight split the driver into
-> L3c2a-i/L3c2a-ii/L3c2b. L3c2a-i strict Machine-claim transport is complete,
-> and L3c2a-ii non-product root host/topology composition is next. Evidence:
+> L3c2a-i/L3c2a-ii/L3c2b. L3c2a-i strict Machine-claim transport and
+> L3c2a-ii non-product root host/topology composition are complete; L3c2b fixed
+> eight-scenario driving is next. Evidence:
 > [39B2c-L3c1a Typed Owner Retirement Review](../../reports/phase-d-task-39b2c-l3c1a-typed-owner-retirement-review.md)
 > and
 > [39B2c-L3c1b-i Configuration-Bound Helper Escrow Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
@@ -100,6 +101,8 @@
 > [39B2c-L3c1b-ii Synthetic Machine Claim Review](../../reports/phase-d-task-39b2c-l3c1b-ii-synthetic-machine-claim-review.md)
 > and
 > [39B2c-L3c2a-i Machine-Claim Transport Review](../../reports/phase-d-task-39b2c-l3c2a-i-machine-claim-transport-review.md).
+> and
+> [39B2c-L3c2a-ii Machine Driver Host Review](../../reports/phase-d-task-39b2c-l3c2a-ii-machine-driver-host-review.md).
 >
 > **Parent plan:**
 > [Phase D Conditional Deep Dive](phase-d-conditional-deep-dive.md)
@@ -881,6 +884,13 @@ The remaining L3 work is split before driver coding:
      (new),
      `Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift`
      and `scripts/verify-investigation-boundaries`.
+     This checkpoint is complete. Its root-only terminal host, strict XPC and
+     independent helper-signing adapters, resolved package/source authority
+     gate, 20-test affected regression, 187-test Investigation suite, targeted
+     driver/diagnostic builds, three-bundle release boundary, mutation negative
+     control, 1046-test clean staged-only serial and independent post-fix review
+     passed. See the
+     [L3c2a-ii Review](../../reports/phase-d-task-39b2c-l3c2a-ii-machine-driver-host-review.md).
    - **L3c2b fixed eight-scenario driving** adds the closed deterministic state
      machine using injected DEBUG faults and fake Task 38 transports. It creates
      a fresh nonce/root/config/Store per scenario and proves the exact success,
@@ -934,8 +944,8 @@ The remaining L3 work is split before driver coding:
    raw-evidence read-only and must not repeat model calls or root mutation.
 
 The order is strict: `L3c1a -> L3c1b-i -> L3c1b-ii -> L3c2a-i -> L3c2a-ii ->
-L3c2b -> L3c3 -> L3c4`. L3c1a, L3c1b-i, L3c1b-ii and L3c2a-i are complete;
-L3c1 is closed, the L3c2 preflight is complete and L3c2a-ii is next. L3c1 used focused
+L3c2b -> L3c3 -> L3c4`. L3c1a, L3c1b-i, L3c1b-ii, L3c2a-i and L3c2a-ii are
+complete; L3c1 is closed, the L3c2 preflight is complete and L3c2b is next. L3c1 used focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean
 staged serial regression, targeted helper/diagnostic builds and independent
 review in place of full. Each L3c2 sub-checkpoint uses structural, focused, one
