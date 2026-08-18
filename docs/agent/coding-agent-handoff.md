@@ -214,7 +214,9 @@
 > join、structural/release gates、199-test Investigation、11-test App、1057-test
 > clean staged-only serial 与 independent post-fix review 已通过；accepted
 > implementation tree 为 `41521e44ba1e349496f3ab708d8e9f3f376620b3`。L3c3b
-> native diagnostic-only driver packaging/topology admission next。只有 L3c4 可作 readiness claim，
+> native diagnostic-only driver packaging/topology admission 已按 fresh preflight
+> 拆为 L3c3b-i native packaging 与 L3c3b-ii installer/L2 admission；b-i next。
+> 只有 L3c4 可作 readiness claim，
 > L3c2b preflight 的 fresh-plan matrix contradiction 已由 plan-freshness
 > prerequisite 关闭：八个 actual plan fingerprints 全唯一、一个 exact
 > target-set fingerprint 绑定 cohort，affected/Investigation/structural/review
@@ -541,8 +543,8 @@ independent post-fix review 已完成；L3c2a-ii non-product root host/topology�
 1046-test clean staged-only serial 与 independent post-fix review 也已完成；
 L3c2b eight-scenario driver、1055-test clean staged-only serial 与 final
 independent review 已完成，L3c2 已关闭；L3c3a strict driver-bound attempt
-schema、1057-test clean staged-only serial 与 post-fix review 已完成，L3c3b
-native packaging next；L3c4
+schema、1057-test clean staged-only serial 与 post-fix review 已完成；L3c3b
+拆为 b-i native packaging / b-ii installer+L2 admission，b-i next；L3c4
 独占 final admission 与剩余 full。L3c1b-i/ii 证据见
 [i review](../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
 与

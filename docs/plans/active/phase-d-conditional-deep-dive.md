@@ -24,7 +24,8 @@
 > driving is complete after its exact eight-path implementation, layered gates,
 > 1,055-test clean staged-only serial and independent final review. L3c3a then
 > closed the strict driver-bound attempt schema after its 1,057-test serial and
-> independent post-fix review; L3c3b native packaging is next. The authoritative
+> independent post-fix review. L3c3b preflight split native packaging from
+> installer/L2 admission; L3c3b-i native packaging is next. The authoritative
 > real-model run and readiness verdict remain unimplemented.
 > Production Deep Dive remains unavailable until Task 44 admission.
 >
@@ -868,7 +869,8 @@ Checkpoint status:
   review. L3c3a strict driver binding is also complete after its exact 14-path
   schema/identity implementation, structural and App gates, 1,057-test clean
   staged-only serial and independent post-fix review. L3c3b native diagnostic-
-  only driver packaging/topology admission is next.
+  only driver packaging/topology admission was split before coding into
+  L3c3b-i native packaging and L3c3b-ii installer/L2 admission; b-i is next.
   See the
   [L3c1b-i Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
   and
@@ -883,6 +885,8 @@ Checkpoint status:
   [Eight-Scenario Driver Review](../../reports/phase-d-task-39b2c-l3c2b-eight-scenario-driver-review.md);
   L3c3a evidence is in the
   [Driver-Bound Attempt Review](../../reports/phase-d-task-39b2c-l3c3a-driver-binding-review.md).
+  The split is recorded in the
+  [L3c3b Scope/Trust Preflight](../../reports/phase-d-task-39b2c-l3c3b-scope-trust-preflight.md).
   Only L3c4 owns
   real-model signed-App machine readiness, the complete failure matrix, exact
   zero-residue proof and the remaining authoritative full verifier. Task 39 and

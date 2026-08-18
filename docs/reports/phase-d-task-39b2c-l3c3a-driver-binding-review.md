@@ -140,8 +140,9 @@ handoff channel, call or authenticate a model, consume authoritative capability
 evidence, install/remove the fixed topology, create a Machine report, enable
 Deep Dive or claim readiness. Production Deep Dive remains unavailable.
 
-L3c3b is next. It must perform a fresh exact path/line/trust preflight before
-choosing the native Xcode driver topology, then package the fixed-signing driver
+The subsequent
+[L3c3b preflight](phase-d-task-39b2c-l3c3b-scope-trust-preflight.md) split native
+packaging from installer/L2 admission; L3c3b-i is next. It must package the fixed-signing driver
 only in the diagnostic App and prove its built/staging/installed topology without
 live installation, handoff or model execution. L3c3c-i remains a mandatory
 repository-external launcher/handoff spike and ADR before any production handoff

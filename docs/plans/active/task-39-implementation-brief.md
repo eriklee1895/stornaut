@@ -96,7 +96,8 @@
 > native packaging, L3c3c-i/ii handoff design/implementation and L3c3d one real
 > pending candidate. L3c3a is complete after its exact 14-path implementation,
 > 199-test Investigation and 11-test App gates, 1,057-test clean staged-only
-> serial and independent post-fix review; L3c3b is next. Evidence:
+> serial and independent post-fix review. The fresh L3c3b preflight split native
+> packaging from installer/L2 admission; L3c3b-i is next. Evidence:
 > [39B2c-L3c1a Typed Owner Retirement Review](../../reports/phase-d-task-39b2c-l3c1a-typed-owner-retirement-review.md)
 > and
 > [39B2c-L3c1b-i Configuration-Bound Helper Escrow Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
@@ -973,7 +974,13 @@ The remaining L3 work is split before driver coding:
    tests, 11 App tests, targeted gates, one 1,057-test clean staged-only serial and
    independent post-fix review passed. See the
    [L3c3a Review](../../reports/phase-d-task-39b2c-l3c3a-driver-binding-review.md).
-   L3c3b is next; later sub-checkpoints each require their own exact path preflight.
+   The fresh L3c3b preflight found that native Xcode packaging and root-owned
+   installer/L2 admission are independent trust surfaces whose combined path set
+   exceeds the hard review ceiling. L3c3b is therefore split before coding into
+   **L3c3b-i native diagnostic-only packaging** and **L3c3b-ii installer and L2
+   driver admission**. See the
+   [L3c3b Scope/Trust Preflight](../../reports/phase-d-task-39b2c-l3c3b-scope-trust-preflight.md).
+   L3c3b-i is next; later sub-checkpoints retain their own exact path preflight.
 6. **L3c4 sealed final admission** — execute the authoritative current-source
    cohort with eight independent fresh nonces, one real success model run and
    bounded closed failure injections; perform exact per-case teardown, fixed
@@ -985,8 +992,8 @@ The remaining L3 work is split before driver coding:
    raw-evidence read-only and must not repeat model calls or root mutation.
 
 The order is strict: `L3c1a -> L3c1b-i -> L3c1b-ii -> L3c2a-i -> L3c2a-ii ->
-L3c2b -> L3c3a -> L3c3b -> L3c3c-i -> L3c3c-ii -> L3c3d -> L3c4`. L3c1,
-L3c2 and L3c3a are complete; L3c3b is next. L3c1 used focused
+L3c2b -> L3c3a -> L3c3b-i -> L3c3b-ii -> L3c3c-i -> L3c3c-ii -> L3c3d ->
+L3c4`. L3c1, L3c2 and L3c3a are complete; L3c3b-i is next. L3c1 used focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean
 staged serial regression, targeted helper/diagnostic builds and independent
 review in place of full. Each L3c2 sub-checkpoint uses structural, focused, one
