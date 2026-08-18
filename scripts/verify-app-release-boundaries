@@ -42,6 +42,9 @@ xcodebuild -quiet \
 debug_app="$derived_data/Build/Products/Debug/Stornaut.app"
 release_app="$derived_data/Build/Products/Release/Stornaut.app"
 diagnostic_debug_app="$diagnostic_derived_data/Build/Products/Debug/StornautInvestigationDiagnostic.app"
+machine_driver_product="$diagnostic_derived_data/Build/Products/Debug/StornautInvestigationMachineDriver"
+diagnostic_machine_driver="$diagnostic_debug_app/Contents/MacOS/StornautInvestigationMachineDriver"
+machine_driver_max_bytes=$((16 * 1024 * 1024))
 authority_object="$derived_data/Build/Products/Debug/StornautExecution.o"
 test -x "$debug_app/Contents/MacOS/Stornaut"
 test -x "$release_app/Contents/MacOS/Stornaut"
@@ -55,14 +58,70 @@ test -x \
     "$diagnostic_debug_app/Contents/MacOS/StornautLifecycleHelper"
 for app_without_machine_driver in \
     "$debug_app" \
-    "$release_app" \
-    "$diagnostic_debug_app"
+    "$release_app"
 do
     test ! -e \
         "$app_without_machine_driver/Contents/MacOS/StornautInvestigationMachineDriver"
     test ! -L \
         "$app_without_machine_driver/Contents/MacOS/StornautInvestigationMachineDriver"
 done
+test -f "$machine_driver_product"
+test -x "$diagnostic_machine_driver"
+test ! -L "$machine_driver_product"
+test ! -L "$diagnostic_machine_driver"
+machine_driver_product_node=$(/usr/bin/stat -f '%d:%i' "$machine_driver_product")
+diagnostic_machine_driver_node=$(/usr/bin/stat -f '%d:%i' "$diagnostic_machine_driver")
+test "$(/usr/bin/find "$diagnostic_debug_app" -type f \
+    -name StornautInvestigationMachineDriver -print | /usr/bin/wc -l | tr -d ' ')" = 1
+for machine_driver in "$machine_driver_product" "$diagnostic_machine_driver"; do
+    test "$(/usr/bin/stat -f '%HT' "$machine_driver")" = "Regular File"
+    test "$(/usr/bin/stat -f '%Lp' "$machine_driver")" = 755
+    test "$(/usr/bin/stat -f '%l' "$machine_driver")" = 1
+    machine_driver_bytes=$(/usr/bin/stat -f '%z' "$machine_driver")
+    (( machine_driver_bytes > 0 && machine_driver_bytes <= machine_driver_max_bytes ))
+    test "$(/usr/bin/lipo -archs "$machine_driver")" = arm64
+    /usr/bin/codesign --verify --strict "$machine_driver"
+done
+/usr/bin/codesign --verify --deep --strict "$diagnostic_debug_app"
+
+machine_driver_product_identifier=$(
+    /usr/bin/codesign -d --verbose=4 "$machine_driver_product" 2>&1 | /usr/bin/sed -n 's/^Identifier=//p'
+)
+diagnostic_machine_driver_identifier=$(
+    /usr/bin/codesign -d --verbose=4 "$diagnostic_machine_driver" 2>&1 | /usr/bin/sed -n 's/^Identifier=//p'
+)
+expected_machine_driver_identifier_line="Identifier=com.eriklee.stornaut.investigation.machine-driver"
+test "Identifier=$machine_driver_product_identifier" = "$expected_machine_driver_identifier_line"
+test "Identifier=$diagnostic_machine_driver_identifier" = "$expected_machine_driver_identifier_line"
+machine_driver_product_cdhash=$(
+    /usr/bin/codesign -d --verbose=4 "$machine_driver_product" 2>&1 | /usr/bin/sed -n 's/^CDHash=//p'
+)
+diagnostic_machine_driver_cdhash=$(
+    /usr/bin/codesign -d --verbose=4 "$diagnostic_machine_driver" 2>&1 | /usr/bin/sed -n 's/^CDHash=//p'
+)
+print -r -- "$machine_driver_product_cdhash" | /usr/bin/grep -Eq '^[0-9a-f]{40}([0-9a-f]{24})?$'
+test "$diagnostic_machine_driver_cdhash" = "$machine_driver_product_cdhash"
+machine_driver_product_requirement=$(
+    /usr/bin/codesign -d -r- "$machine_driver_product" 2>&1 | /usr/bin/sed -n 's/^# //p'
+)
+diagnostic_machine_driver_requirement=$(
+    /usr/bin/codesign -d -r- "$diagnostic_machine_driver" 2>&1 | /usr/bin/sed -n 's/^# //p'
+)
+test "$machine_driver_product_requirement" = "designated => cdhash H\"$machine_driver_product_cdhash\""
+test "$diagnostic_machine_driver_requirement" = "$machine_driver_product_requirement"
+machine_driver_product_sha256=$(
+    /usr/bin/shasum -a 256 "$machine_driver_product" | /usr/bin/awk '{print $1}'
+)
+diagnostic_machine_driver_sha256=$(
+    /usr/bin/shasum -a 256 "$diagnostic_machine_driver" | /usr/bin/awk '{print $1}'
+)
+print -r -- "$machine_driver_product_sha256" | /usr/bin/grep -Eq '^[0-9a-f]{64}$'
+test "$diagnostic_machine_driver_sha256" = "$machine_driver_product_sha256"
+test "$diagnostic_machine_driver_identifier" = "$machine_driver_product_identifier"
+test "$(/usr/bin/stat -f '%d:%i' "$machine_driver_product")" = \
+    "$machine_driver_product_node"
+test "$(/usr/bin/stat -f '%d:%i' "$diagnostic_machine_driver")" = \
+    "$diagnostic_machine_driver_node"
 test ! -e \
     "$debug_app/Contents/Library/LaunchDaemons/com.eriklee.stornaut.lifecycle.plist"
 test ! -e \
@@ -462,6 +521,48 @@ diagnostic_authority_forbidden_markers=(
     'spawnRegisteredActionWithPipes'
 )
 diagnostic_authority_forbidden_symbol_prefix='StornautExecution.'
+machine_driver_authority_forbidden_markers=(
+    'StornautExecution.'
+    'StornautCore.ActionExecutor'
+    'StornautCore.TrashMoving'
+    'StornautCore.FileManagerTrashAdapter'
+    'StornautCore.Cleanup'
+    'StornautCore.ActionPolicy'
+    'StornautCore.CleanupPolicy'
+    'StornautCore.ExecutionAuthorization'
+    'StornautCore.RegisteredAction'
+    'StornautCore.MoveToTrash'
+    'StornautCore.ProposedCleanupAction'
+    'signedInvestigationRuntimeReady'
+    'signedRuntimeReady'
+    'Readiness'
+    'readiness'
+)
+if mach_o_has_demangled_symbol \
+    "$diagnostic_machine_driver" \
+    'InvestigationMachineDriverSupport.run() async -> Swift.Int32'
+then
+    :
+else
+    symbol_scan_status=$?
+    if (( symbol_scan_status == 2 )); then
+        exit 1
+    fi
+    print -u2 "Machine driver support symbol positive control is missing."
+    exit 1
+fi
+
+for marker in "${machine_driver_authority_forbidden_markers[@]}"; do
+    if mach_o_has_demangled_symbol "$diagnostic_machine_driver" "$marker"; then
+        print -u2 "Authority or readiness leaked into Machine driver: $marker"
+        exit 1
+    else
+        symbol_scan_status=$?
+    fi
+    if (( symbol_scan_status == 2 )); then
+        exit 1
+    fi
+done
 
 if mach_o_has_demangled_symbol \
     "$diagnostic_debug_app" \
@@ -483,13 +584,6 @@ import sys
 
 project = Path(sys.argv[1]).read_text(encoding="utf-8")
 
-# Temporary L3c3a checkpoint contract. L3c3b must deliberately replace this
-# exact absence proof with diagnostic-only native driver packaging.
-if "StornautInvestigationMachineDriver" in project:
-    raise SystemExit(
-        "L3c3a Xcode project packaged the Machine driver before L3c3b"
-    )
-
 native_target_section_start = project.find(
     "/* Begin PBXNativeTarget section */"
 )
@@ -502,8 +596,8 @@ if native_target_section_start < 0 or native_target_section_end < 0:
 native_target_section = project[
     native_target_section_start:native_target_section_end
 ]
-if native_target_section.count("isa = PBXNativeTarget;") != 6:
-    raise SystemExit("L3c3a Xcode native-target allowlist drifted")
+if native_target_section.count("isa = PBXNativeTarget;") != 7:
+    raise SystemExit("L3c3b-i Xcode native-target allowlist drifted")
 expected_native_targets = {
     "StornautApp",
     "StornautAppTests",
@@ -511,11 +605,12 @@ expected_native_targets = {
     "StornautLifecycleHelper",
     "StornautInvestigationDiagnosticApp",
     "StornautInvestigationDiagnosticAppTests",
+    "StornautInvestigationMachineDriverNative",
 }
 for target_name in expected_native_targets:
     if native_target_section.count(f"name = {target_name};") != 1:
         raise SystemExit(
-            f"L3c3a Xcode target identity drifted: {target_name}"
+            f"L3c3b-i Xcode target identity drifted: {target_name}"
         )
 
 copy_phase_section_start = project.find(
@@ -530,12 +625,16 @@ if copy_phase_section_start < 0 or copy_phase_section_end < 0:
 copy_phase_section = project[
     copy_phase_section_start:copy_phase_section_end
 ]
-if copy_phase_section.count("isa = PBXCopyFilesBuildPhase;") != 2:
-    raise SystemExit("L3c3a Xcode copy-phase allowlist drifted")
-for phase_name in ("Copy Helper", "Copy Investigation Helper"):
+if copy_phase_section.count("isa = PBXCopyFilesBuildPhase;") != 3:
+    raise SystemExit("L3c3b-i Xcode copy-phase allowlist drifted")
+for phase_name in (
+    "Copy Helper",
+    "Copy Investigation Helper",
+    "Copy Investigation Driver",
+):
     if copy_phase_section.count(f'name = "{phase_name}";') != 1:
         raise SystemExit(
-            f"L3c3a helper copy-phase identity drifted: {phase_name}"
+            f"L3c3b-i copy-phase identity drifted: {phase_name}"
         )
 
 def target_body(identifier, name, next_identifier):
@@ -576,6 +675,12 @@ diagnostic_app = target_body(
 diagnostic_tests = target_body(
     "A00000000000000000000006",
     "StornautInvestigationDiagnosticAppTests",
+    "\n\t\tA00000000000000000000007 "
+    "/* StornautInvestigationMachineDriverNative */",
+)
+machine_driver = target_body(
+    "A00000000000000000000007",
+    "StornautInvestigationMachineDriverNative",
     "\n/* End PBXNativeTarget section */",
 )
 for name, body in (
@@ -599,6 +704,7 @@ target_execution_dependencies = {
         ("StornautLifecycleHelper", lifecycle_helper),
         ("StornautInvestigationDiagnosticApp", diagnostic_app),
         ("StornautInvestigationDiagnosticAppTests", diagnostic_tests),
+        ("StornautInvestigationMachineDriverNative", machine_driver),
     )
     if "StornautExecution" in body
 }
@@ -622,17 +728,45 @@ for forbidden in (
         )
 for required in (
     "B00000000000000000000041 /* Copy Investigation Helper */",
+    "B00000000000000000000042 /* Copy Investigation Driver */",
     "C0000000000000000000000A /* PBXTargetDependency */",
+    "C0000000000000000000000C /* PBXTargetDependency */",
 ):
     if required not in diagnostic_app:
         raise SystemExit(
             "dedicated Investigation diagnostic App lost its exact helper "
             f"composition: {required}"
         )
-if diagnostic_app.count("PBXTargetDependency") != 1:
+if diagnostic_app.count("PBXTargetDependency") != 2:
     raise SystemExit(
         "dedicated Investigation diagnostic target dependency drifted"
     )
+for required in (
+    "productName = StornautInvestigationMachineDriver;",
+    'productType = "com.apple.product-type.tool";',
+    "F00000000000000000000008 "
+    "/* StornautInvestigationMachineDriverSupport */",
+    "B00000000000000000000026 /* Sources */",
+    "B00000000000000000000027 /* Frameworks */",
+):
+    if required not in machine_driver:
+        raise SystemExit(
+            f"Machine driver native target lost closed membership: {required}"
+        )
+for forbidden in (
+    "StornautInvestigationMachine ",
+    "StornautCore",
+    "StornautCodex",
+    "StornautLifecycle",
+    "StornautInvestigationRuntime",
+    "StornautInvestigationDiagnostic",
+    "StornautExecution",
+    "fileSystemSynchronizedGroups",
+):
+    if forbidden in machine_driver:
+        raise SystemExit(
+            f"Machine driver native target gained authority: {forbidden}"
+        )
 
 source_phase_marker = (
     "B00000000000000000000024 /* Sources */ = {"
@@ -732,6 +866,39 @@ if (
     raise SystemExit(
         "dedicated diagnostic helper copy allowlist drifted"
     )
+driver_copy_marker = (
+    "B00000000000000000000042 /* Copy Investigation Driver */ = {"
+)
+driver_copy_start = project.find(driver_copy_marker)
+driver_copy_end = project.find(
+    "\n\t\t};",
+    driver_copy_start + len(driver_copy_marker),
+)
+if driver_copy_start < 0 or driver_copy_end < 0:
+    raise SystemExit("missing dedicated diagnostic driver copy phase")
+driver_copy = project[driver_copy_start:driver_copy_end]
+for required in (
+    "B0000000000000000000001D "
+    "/* StornautInvestigationMachineDriver in Copy Investigation Driver */",
+    "dstPath = Contents/MacOS;",
+    'name = "Copy Investigation Driver";',
+):
+    if driver_copy.count(required) != 1:
+        raise SystemExit(
+            f"dedicated diagnostic driver copy membership drifted: {required}"
+        )
+driver_build_file = (
+    "B0000000000000000000001D "
+    "/* StornautInvestigationMachineDriver in Copy Investigation Driver */ "
+    "= {isa = PBXBuildFile; fileRef = "
+    "D0000000000000000000000A "
+    "/* StornautInvestigationMachineDriver */; "
+    "settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };"
+)
+if project.count(driver_build_file) != 1:
+    raise SystemExit(
+        "dedicated diagnostic driver CodeSignOnCopy build file drifted"
+    )
 
 required_helper_dependency = [
     (
@@ -817,6 +984,14 @@ if scheme.count('BlueprintName = "StornautLifecycleHelper"') != 1:
     raise SystemExit("dedicated diagnostic helper scheme identity drifted")
 if scheme.count('BlueprintName = "StornautInvestigationDiagnosticApp"') != 4:
     raise SystemExit("dedicated diagnostic scheme App identity drifted")
+if scheme.count(
+    'BlueprintName = "StornautInvestigationMachineDriverNative"'
+) != 1:
+    raise SystemExit("dedicated diagnostic driver scheme identity drifted")
+if scheme.count(
+    'BuildableName = "StornautInvestigationMachineDriver"'
+) != 1:
+    raise SystemExit("dedicated diagnostic driver product identity drifted")
 PY
 
 xcodebuild -quiet \

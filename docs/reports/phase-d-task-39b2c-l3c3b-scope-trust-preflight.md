@@ -1,6 +1,6 @@
 # Phase D Task 39B2c-L3c3b Scope and Trust Preflight
 
-> Status: Split frozen; inserted L3c3b-0 is complete and L3c3b-i is next
+> Status: Split frozen; L3c3b-0 and L3c3b-i complete, L3c3b-ii next
 >
 > Date: 2026-08-18
 >
@@ -60,11 +60,12 @@ Create one Xcode command-line target whose final signing identifier is exactly
 `com.eriklee.stornaut.investigation.machine-driver`, product name is exactly
 `StornautInvestigationMachineDriver`, architecture is arm64 and signing is
 manual ad-hoc with no App entitlements. The target compiles the existing
-`Tools/StornautInvestigationMachineDriver/main.swift` and links one new narrow
-static package facade. The facade exposes only a no-argument asynchronous
-`run() -> Int32` that delegates to the package-scoped Machine entry point; it
-must not expose the Machine target as a general library product. The existing
-SwiftPM driver uses the same main source and facade.
+`Tools/StornautInvestigationMachineDriver/main.swift` and links only the
+zero-dependency authority-closed DriverSupport static product inserted by
+L3c3b-0. DriverSupport exposes only a no-argument asynchronous `run() -> Int32`
+that fails closed with fixed status until the later handoff exists; it does not
+expose or link the Machine target. The existing SwiftPM driver uses the same
+main source and Support product.
 
 The diagnostic App gains one exact driver target dependency and a separate
 `Copy Investigation Driver` phase with one CodeSignOnCopy member. Its helper
@@ -160,5 +161,5 @@ permitted.
 
 This preflight changed no product code, installed nothing, launched nothing and
 did not modify `~/.codex/config.toml`. Production Deep Dive remains unavailable.
-L3c3b-0 is complete and L3c3b-i is next. L3c3c-i remains the mandatory repository-external
+L3c3b-0 and L3c3b-i are complete; L3c3b-ii is next. L3c3c-i remains the mandatory repository-external
 launcher/handoff spike and ADR; packaging evidence cannot substitute for it.

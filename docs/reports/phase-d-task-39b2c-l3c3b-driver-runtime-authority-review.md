@@ -118,6 +118,7 @@ runtime, implement handoff, call a model, consume authoritative evidence or make
 a readiness claim. The Support runtime is deliberately unavailable after root
 admission until L3c3c's separately approved handoff implementation exists.
 
-L3c3b-i native diagnostic-only packaging is next and may now link only this
-authority-closed Support product. Production Deep Dive remains unavailable.
+L3c3b-i native diagnostic-only packaging subsequently completed while linking
+only this authority-closed Support product. L3c3b-ii installer/L2 admission is
+next. Production Deep Dive remains unavailable.
 `~/.codex/config.toml` was not modified.

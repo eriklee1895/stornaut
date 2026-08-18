@@ -221,7 +221,11 @@
 > driver runtime extraction。L3c3b-0 零依赖 DriverSupport、Debug/Release final-
 > Mach-O authority gate、1059-test clean staged-only serial 与 independent post-
 > fix review 已完成；accepted tree 为
-> `9b3642ad88fcccf9768141a8ebf1917565c99c49`。b-i native packaging next。只有
+> `9b3642ad88fcccf9768141a8ebf1917565c99c49`。L3c3b-i diagnostic-only native
+> target、独立 CodeSignOnCopy、ordinary absence、final artifact gate、202-test
+> Investigation、1060-test clean staged-only serial 与 independent post-fix/
+> cross-group review 已完成；accepted tree 为
+> `e1878eced30a6193aa89ad89dd88d02949e9f2a3`。b-ii installer/L2 next。只有
 > L3c4 可作 readiness claim，
 > L3c2b preflight 的 fresh-plan matrix contradiction 已由 plan-freshness
 > prerequisite 关闭：八个 actual plan fingerprints 全唯一、一个 exact
@@ -552,7 +556,8 @@ independent review 已完成，L3c2 已关闭；L3c3a strict driver-bound attemp
 schema、1057-test clean staged-only serial 与 post-fix review 已完成；L3c3b
 拆为 b-i native packaging / b-ii installer+L2 admission；final-Mach-O blocker
 插入的 b-0 authority closure、1059-test clean staged-only serial 与 independent
-post-fix review 已完成，b-i next；L3c4
+post-fix review 已完成；b-i native packaging、1060-test clean staged-only serial
+与 independent post-fix/cross-group review 也已完成，b-ii next；L3c4
 独占 final admission 与剩余 full。L3c1b-i/ii 证据见
 [i review](../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
 与

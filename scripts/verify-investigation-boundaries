@@ -14,6 +14,9 @@ machine_scenario_runner=$machine_root/InvestigationFixedScenarioRunner.swift
 machine_scenario_driver=$machine_root/InvestigationMachineScenarioDriver.swift
 machine_driver_main=Tools/StornautInvestigationMachineDriver/main.swift
 machine_driver_support=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDriverSupport.swift
+xcode_project=Stornaut.xcodeproj/project.pbxproj
+ordinary_scheme=Stornaut.xcodeproj/xcshareddata/xcschemes/Stornaut.xcscheme
+diagnostic_scheme=Stornaut.xcodeproj/xcshareddata/xcschemes/StornautInvestigationDiagnosticApp.xcscheme
 runtime_root=Sources/StornautInvestigationRuntime
 diagnostic_root=Sources/StornautInvestigationDiagnostic
 lifecycle_root=Sources/StornautLifecycle
@@ -51,6 +54,9 @@ required_files=(
     "$machine_scenario_driver"
     "$machine_driver_main"
     "$machine_driver_support"
+    "$xcode_project"
+    "$ordinary_scheme"
+    "$diagnostic_scheme"
     "$coordinator_root/Resources/investigation-prompt-v1.txt"
     "$runtime_root/InvestigationCodexSessionAdapter.swift"
     "$runtime_root/InvestigationLifecycleAppServerTransport.swift"
@@ -72,6 +78,657 @@ for file in "${required_files[@]}"; do
         exit 1
     fi
 done
+
+python3 - "$xcode_project" "$ordinary_scheme" "$diagnostic_scheme" <<'PY'
+from collections import Counter
+from pathlib import Path
+import re
+import sys
+import xml.etree.ElementTree as ET
+
+project_path, ordinary_scheme_path, diagnostic_scheme_path = map(
+    Path,
+    sys.argv[1:],
+)
+project = project_path.read_text(encoding="utf-8")
+object_id_pattern = r"[A-F0-9]{24}"
+
+
+def section(name):
+    match = re.search(
+        rf"/\* Begin {re.escape(name)} section \*/"
+        rf"(.*?)"
+        rf"/\* End {re.escape(name)} section \*/",
+        project,
+        re.DOTALL,
+    )
+    if match is None:
+        raise SystemExit(f"Missing Xcode project section: {name}")
+    return match.group(1)
+
+
+def matching_brace(source, opening):
+    depth = 0
+    quoted = False
+    escaped = False
+    in_comment = False
+    index = opening
+    while index < len(source):
+        character = source[index]
+        following = source[index + 1] if index + 1 < len(source) else ""
+        if in_comment:
+            if character == "*" and following == "/":
+                in_comment = False
+                index += 2
+                continue
+        elif quoted:
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == '"':
+                quoted = False
+        elif character == "/" and following == "*":
+            in_comment = True
+            index += 2
+            continue
+        elif character == '"':
+            quoted = True
+        elif character == "{":
+            depth += 1
+        elif character == "}":
+            depth -= 1
+            if depth == 0:
+                return index
+        index += 1
+    raise SystemExit("Unterminated object in Xcode project")
+
+
+def objects(name):
+    source = section(name)
+    header = re.compile(
+        rf"^[ \t]*({object_id_pattern}) /\* (.*?) \*/ = \{{",
+        re.MULTILINE,
+    )
+    parsed = {}
+    for match in header.finditer(source):
+        object_id = match.group(1)
+        if object_id in parsed:
+            raise SystemExit(
+                f"Duplicate object in {name}: {object_id}"
+            )
+        opening = match.end() - 1
+        closing = matching_brace(source, opening)
+        if source[closing + 1 :].lstrip()[:1] != ";":
+            raise SystemExit(
+                f"Malformed object terminator in {name}: {object_id}"
+            )
+        parsed[object_id] = (
+            match.group(2),
+            source[opening + 1 : closing],
+        )
+    if not parsed:
+        raise SystemExit(f"Xcode project section has no objects: {name}")
+    return parsed
+
+
+def value(body, key):
+    match = re.search(
+        rf"(?:^|;)[ \t]*{re.escape(key)} = (.*?);",
+        body,
+        re.MULTILINE | re.DOTALL,
+    )
+    if match is None:
+        raise SystemExit(f"Missing Xcode object field: {key}")
+    result = match.group(1).strip()
+    if result.startswith('"') and result.endswith('"'):
+        result = result[1:-1]
+    return result
+
+
+def references(body, key):
+    match = re.search(
+        rf"^[ \t]*{re.escape(key)} = \((.*?)^[ \t]*\);",
+        body,
+        re.MULTILINE | re.DOTALL,
+    )
+    if match is None:
+        raise SystemExit(f"Missing Xcode object reference list: {key}")
+    return re.findall(
+        rf"({object_id_pattern}) /\* (.*?) \*/",
+        match.group(1),
+    )
+
+
+def reference(body, key):
+    match = re.search(
+        rf"(?:^|;)[ \t]*{re.escape(key)} = ({object_id_pattern})"
+        rf" /\* (.*?) \*/;",
+        body,
+        re.MULTILINE,
+    )
+    if match is None:
+        raise SystemExit(f"Missing Xcode object reference: {key}")
+    return match.group(1), match.group(2)
+
+
+native_targets = objects("PBXNativeTarget")
+native_by_name = {}
+for target_id, (_, body) in native_targets.items():
+    target_name = value(body, "name")
+    if target_name in native_by_name:
+        raise SystemExit(f"Duplicate native target name: {target_name}")
+    native_by_name[target_name] = (target_id, body)
+
+expected_native_targets = {
+    "StornautApp",
+    "StornautAppTests",
+    "StornautAppUITests",
+    "StornautLifecycleHelper",
+    "StornautInvestigationDiagnosticApp",
+    "StornautInvestigationDiagnosticAppTests",
+    "StornautInvestigationMachineDriverNative",
+}
+if set(native_by_name) != expected_native_targets:
+    raise SystemExit(
+        "Xcode native target allowlist drifted: "
+        f"{sorted(native_by_name)}"
+    )
+if len(native_targets) != 7:
+    raise SystemExit(
+        f"Expected exactly 7 Xcode native targets, found {len(native_targets)}"
+    )
+
+project_objects = objects("PBXProject")
+if len(project_objects) != 1:
+    raise SystemExit(
+        f"Expected one PBXProject object, found {len(project_objects)}"
+    )
+_, project_body = next(iter(project_objects.values()))
+project_target_ids = [
+    object_id for object_id, _ in references(project_body, "targets")
+]
+if len(project_target_ids) != 7 or set(project_target_ids) != set(
+    native_targets
+):
+    raise SystemExit(
+        "PBXProject target membership does not equal the 7 native targets"
+    )
+
+copy_phases = objects("PBXCopyFilesBuildPhase")
+copy_by_name = {}
+for phase_id, (comment, body) in copy_phases.items():
+    phase_name = value(body, "name")
+    if phase_name in copy_by_name:
+        raise SystemExit(f"Duplicate copy phase name: {phase_name}")
+    copy_by_name[phase_name] = (phase_id, comment, body)
+expected_copy_phases = {
+    "Copy Helper",
+    "Copy Investigation Helper",
+    "Copy Investigation Driver",
+}
+if set(copy_by_name) != expected_copy_phases or len(copy_phases) != 3:
+    raise SystemExit(
+        "Xcode copy phase allowlist drifted: "
+        f"{sorted(copy_by_name)}"
+    )
+
+source_phases = objects("PBXSourcesBuildPhase")
+framework_phases = objects("PBXFrameworksBuildPhase")
+build_files = objects("PBXBuildFile")
+file_references = objects("PBXFileReference")
+package_products = objects("XCSwiftPackageProductDependency")
+target_dependencies = objects("PBXTargetDependency")
+container_proxies = objects("PBXContainerItemProxy")
+phase_types = {
+    **{object_id: "PBXCopyFilesBuildPhase" for object_id in copy_phases},
+    **{object_id: "PBXSourcesBuildPhase" for object_id in source_phases},
+    **{object_id: "PBXFrameworksBuildPhase" for object_id in framework_phases},
+}
+
+driver_name = "StornautInvestigationMachineDriverNative"
+driver_id, driver_body = native_by_name[driver_name]
+driver_phase_ids = [
+    object_id for object_id, _ in references(driver_body, "buildPhases")
+]
+driver_phase_type_counts = Counter(
+    phase_types.get(object_id, "other") for object_id in driver_phase_ids
+)
+if driver_phase_type_counts != Counter(
+    {"PBXSourcesBuildPhase": 1, "PBXFrameworksBuildPhase": 1}
+):
+    raise SystemExit(
+        "Machine driver native phase graph drifted: "
+        f"{dict(driver_phase_type_counts)}"
+    )
+if references(driver_body, "dependencies"):
+    raise SystemExit(
+        "Machine driver native target gained a native target dependency"
+    )
+if value(driver_body, "productType") != "com.apple.product-type.tool":
+    raise SystemExit("Machine driver native target is not a command-line tool")
+if value(driver_body, "productName") != (
+    "StornautInvestigationMachineDriver"
+):
+    raise SystemExit("Machine driver native product name drifted")
+driver_product_ref, _ = reference(driver_body, "productReference")
+driver_product_body = file_references[driver_product_ref][1]
+if (
+    value(driver_product_body, "path")
+    != "StornautInvestigationMachineDriver"
+    or value(driver_product_body, "sourceTree") != "BUILT_PRODUCTS_DIR"
+    or value(driver_product_body, "explicitFileType")
+    != "compiled.mach-o.executable"
+):
+    raise SystemExit("Machine driver native product reference drifted")
+
+main_file_refs = [
+    object_id
+    for object_id, (_, body) in file_references.items()
+    if re.search(
+        r"(?:^|;)[ \t]*path = Tools/StornautInvestigationMachineDriver/"
+        r"main\.swift;",
+        body,
+        re.MULTILINE,
+    )
+]
+if len(main_file_refs) != 1:
+    raise SystemExit(
+        "Expected one explicit Machine driver main.swift file reference, "
+        f"found {len(main_file_refs)}"
+    )
+main_file_ref = main_file_refs[0]
+main_build_files = [
+    object_id
+    for object_id, (_, body) in build_files.items()
+    if re.search(
+        rf"(?:^|;)[ \t]*fileRef = {main_file_ref} /\* .*? \*/;",
+        body,
+        re.MULTILINE,
+    )
+]
+if len(main_build_files) != 1:
+    raise SystemExit(
+        "Expected one Machine driver main.swift build file, "
+        f"found {len(main_build_files)}"
+    )
+main_build_file = main_build_files[0]
+driver_source_phase = next(
+    object_id
+    for object_id in driver_phase_ids
+    if object_id in source_phases
+)
+if [
+    object_id
+    for object_id, _ in references(
+        source_phases[driver_source_phase][1],
+        "files",
+    )
+] != [main_build_file]:
+    raise SystemExit(
+        "Machine driver native target must compile only its exact main.swift"
+    )
+main_source_memberships = [
+    phase_id
+    for phase_id, (_, body) in source_phases.items()
+    if main_build_file in {
+        object_id for object_id, _ in references(body, "files")
+    }
+]
+if main_source_memberships != [driver_source_phase]:
+    raise SystemExit(
+        "Machine driver main.swift escaped its unique native source phase"
+    )
+
+support_name = "StornautInvestigationMachineDriverSupport"
+support_products = [
+    object_id
+    for object_id, (_, body) in package_products.items()
+    if value(body, "productName") == support_name
+]
+if len(support_products) != 1:
+    raise SystemExit(
+        f"Expected one {support_name} Xcode package product, "
+        f"found {len(support_products)}"
+    )
+support_product = support_products[0]
+driver_package_products = [
+    object_id
+    for object_id, _ in references(
+        driver_body,
+        "packageProductDependencies",
+    )
+]
+if driver_package_products != [support_product]:
+    resolved = [
+        value(package_products[object_id][1], "productName")
+        for object_id in driver_package_products
+    ]
+    raise SystemExit(
+        "Machine driver native package dependencies drifted: "
+        f"{resolved}"
+    )
+package_memberships = [
+    target_name
+    for target_name, (_, body) in native_by_name.items()
+    if support_product in {
+        object_id
+        for object_id, _ in references(
+            body,
+            "packageProductDependencies",
+        )
+    }
+]
+if package_memberships != [driver_name]:
+    raise SystemExit(
+        f"{support_name} native membership drifted: {package_memberships}"
+    )
+support_build_files = [
+    object_id
+    for object_id, (_, body) in build_files.items()
+    if re.search(
+        rf"(?:^|;)[ \t]*productRef = {support_product} /\* .*? \*/;",
+        body,
+        re.MULTILINE,
+    )
+]
+if len(support_build_files) != 1:
+    raise SystemExit(
+        f"Expected one {support_name} framework build file, "
+        f"found {len(support_build_files)}"
+    )
+support_build_file = support_build_files[0]
+driver_framework_phase = next(
+    object_id
+    for object_id in driver_phase_ids
+    if object_id in framework_phases
+)
+if [
+    object_id
+    for object_id, _ in references(
+        framework_phases[driver_framework_phase][1],
+        "files",
+    )
+] != [support_build_file]:
+    raise SystemExit(
+        "Machine driver native target must link only DriverSupport"
+    )
+for forbidden_product in (
+    "StornautInvestigationMachine",
+    "StornautCore",
+    "StornautLifecycle",
+    "StornautInvestigationRuntime",
+    "StornautInvestigationDiagnostic",
+    "StornautExecution",
+):
+    if forbidden_product in {
+        value(package_products[object_id][1], "productName")
+        for object_id in driver_package_products
+    }:
+        raise SystemExit(
+            "Machine driver native target gained prohibited authority "
+            f"dependency: {forbidden_product}"
+        )
+
+dependency_targets = {}
+for dependency_id, (_, body) in target_dependencies.items():
+    dependency_targets[dependency_id] = reference(body, "target")[0]
+driver_dependency_objects = [
+    object_id
+    for object_id, target_id in dependency_targets.items()
+    if target_id == driver_id
+]
+if len(driver_dependency_objects) != 1:
+    raise SystemExit(
+        "Expected one native dependency object targeting Machine driver, "
+        f"found {len(driver_dependency_objects)}"
+    )
+driver_dependency = driver_dependency_objects[0]
+dependency_body = target_dependencies[driver_dependency][1]
+driver_proxy, _ = reference(dependency_body, "targetProxy")
+driver_proxy_body = container_proxies[driver_proxy][1]
+if (
+    value(driver_proxy_body, "remoteGlobalIDString") != driver_id
+    or value(driver_proxy_body, "remoteInfo") != driver_name
+):
+    raise SystemExit("Machine driver native dependency proxy drifted")
+driver_proxies = [
+    object_id
+    for object_id, (_, body) in container_proxies.items()
+    if value(body, "remoteGlobalIDString") == driver_id
+]
+if driver_proxies != [driver_proxy]:
+    raise SystemExit("Machine driver native dependency proxy is not unique")
+
+diagnostic_name = "StornautInvestigationDiagnosticApp"
+_, diagnostic_body = native_by_name[diagnostic_name]
+diagnostic_dependency_ids = [
+    object_id
+    for object_id, _ in references(diagnostic_body, "dependencies")
+]
+diagnostic_dependency_targets = [
+    dependency_targets[object_id] for object_id in diagnostic_dependency_ids
+]
+helper_id = native_by_name["StornautLifecycleHelper"][0]
+if Counter(diagnostic_dependency_targets) != Counter(
+    {helper_id: 1, driver_id: 1}
+):
+    raise SystemExit(
+        "Diagnostic App native dependencies must be exactly helper + driver"
+    )
+if diagnostic_dependency_ids.count(driver_dependency) != 1:
+    raise SystemExit(
+        "Diagnostic App must contain exactly one Machine driver dependency"
+    )
+
+driver_copy_phase = copy_by_name["Copy Investigation Driver"][0]
+driver_copy_body = copy_by_name["Copy Investigation Driver"][2]
+if (
+    value(driver_copy_body, "dstPath") != "Contents/MacOS"
+    or value(driver_copy_body, "dstSubfolderSpec") != "1"
+):
+    raise SystemExit("Machine driver copy destination drifted")
+driver_copy_build_files = [
+    object_id for object_id, _ in references(driver_copy_body, "files")
+]
+if len(driver_copy_build_files) != 1:
+    raise SystemExit(
+        "Copy Investigation Driver must contain exactly one build file"
+    )
+driver_copy_build_file = driver_copy_build_files[0]
+driver_copy_build_body = build_files[driver_copy_build_file][1]
+if reference(driver_copy_build_body, "fileRef")[0] != driver_product_ref:
+    raise SystemExit("Machine driver copy phase references the wrong product")
+if re.search(
+    r"settings = \{[ \t]*ATTRIBUTES = \("
+    r"[ \t]*CodeSignOnCopy,[ \t]*\);[ \t]*\};",
+    driver_copy_build_body,
+) is None:
+    raise SystemExit(
+        "Machine driver copy member must have exactly CodeSignOnCopy"
+    )
+code_sign_on_copy_build_files = [
+    object_id
+    for object_id, (_, body) in build_files.items()
+    if "CodeSignOnCopy" in body
+]
+if code_sign_on_copy_build_files != [driver_copy_build_file]:
+    raise SystemExit(
+        "CodeSignOnCopy must belong only to the Machine driver copy member"
+    )
+
+copy_phase_owners = {}
+for target_name, (_, body) in native_by_name.items():
+    for phase_id, _ in references(body, "buildPhases"):
+        if phase_id in copy_phases:
+            copy_phase_owners.setdefault(phase_id, []).append(target_name)
+expected_copy_owners = {
+    copy_by_name["Copy Helper"][0]: ["StornautApp"],
+    copy_by_name["Copy Investigation Helper"][0]: [diagnostic_name],
+    driver_copy_phase: [diagnostic_name],
+}
+if copy_phase_owners != expected_copy_owners:
+    raise SystemExit(
+        f"Xcode copy phase ownership drifted: {copy_phase_owners!r}"
+    )
+diagnostic_phase_ids = [
+    object_id
+    for object_id, _ in references(diagnostic_body, "buildPhases")
+]
+if diagnostic_phase_ids.count(driver_copy_phase) != 1:
+    raise SystemExit(
+        "Diagnostic App must contain one separate Machine driver copy phase"
+    )
+driver_copy_memberships = [
+    phase_id
+    for phase_id, (_, body) in copy_phases.items()
+    if driver_copy_build_file in {
+        object_id for object_id, _ in references(body, "files")
+    }
+]
+if driver_copy_memberships != [driver_copy_phase]:
+    raise SystemExit(
+        "Machine driver copy member escaped its dedicated copy phase"
+    )
+
+driver_free_targets = (
+    "StornautApp",
+    "StornautAppTests",
+    "StornautAppUITests",
+    "StornautLifecycleHelper",
+    "StornautInvestigationDiagnosticAppTests",
+)
+driver_artifact_build_files = {
+    main_build_file,
+    support_build_file,
+    driver_copy_build_file,
+}
+all_phase_objects = {**copy_phases, **source_phases, **framework_phases}
+for target_name in driver_free_targets:
+    _, body = native_by_name[target_name]
+    dependency_ids = {
+        object_id for object_id, _ in references(body, "dependencies")
+    }
+    if driver_dependency in dependency_ids:
+        raise SystemExit(f"{target_name} gained Machine driver dependency")
+    package_ids = {
+        object_id
+        for object_id, _ in references(
+            body,
+            "packageProductDependencies",
+        )
+    }
+    if support_product in package_ids:
+        raise SystemExit(f"{target_name} gained DriverSupport membership")
+    target_phase_ids = {
+        object_id for object_id, _ in references(body, "buildPhases")
+    }
+    if driver_copy_phase in target_phase_ids:
+        raise SystemExit(f"{target_name} gained Machine driver copy phase")
+    member_build_files = set()
+    for phase_id in target_phase_ids:
+        phase = all_phase_objects.get(phase_id)
+        if phase is not None:
+            member_build_files.update(
+                object_id
+                for object_id, _ in references(phase[1], "files")
+            )
+    escaped = member_build_files & driver_artifact_build_files
+    if escaped:
+        raise SystemExit(
+            f"{target_name} gained Machine driver build membership: "
+            f"{sorted(escaped)}"
+        )
+
+
+def load_scheme(path):
+    try:
+        return path.read_text(encoding="utf-8"), ET.parse(path).getroot()
+    except (OSError, ET.ParseError) as error:
+        raise SystemExit(f"Cannot parse Xcode scheme {path}: {error}")
+
+
+ordinary_scheme_text, ordinary_scheme_root = load_scheme(ordinary_scheme_path)
+diagnostic_scheme_text, diagnostic_scheme_root = load_scheme(
+    diagnostic_scheme_path
+)
+driver_product_name = "StornautInvestigationMachineDriver"
+driver_identity = {driver_id, driver_name, driver_product_name}
+for token in driver_identity:
+    if token in ordinary_scheme_text:
+        raise SystemExit(
+            f"Ordinary scheme gained Machine driver identity: {token}"
+        )
+
+
+def is_driver_reference(element):
+    return bool(
+        driver_identity
+        & {
+            element.get("BlueprintIdentifier", ""),
+            element.get("BlueprintName", ""),
+            element.get("BuildableName", ""),
+        }
+    )
+
+
+if any(
+    is_driver_reference(element)
+    for element in ordinary_scheme_root.iter("BuildableReference")
+):
+    raise SystemExit("Ordinary scheme gained a Machine driver reference")
+diagnostic_driver_references = [
+    element
+    for element in diagnostic_scheme_root.iter("BuildableReference")
+    if is_driver_reference(element)
+]
+if len(diagnostic_driver_references) != 1:
+    raise SystemExit(
+        "Diagnostic scheme must contain exactly one Machine driver "
+        f"reference, found {len(diagnostic_driver_references)}"
+    )
+driver_reference = diagnostic_driver_references[0]
+expected_driver_reference = {
+    "BuildableIdentifier": "primary",
+    "BlueprintIdentifier": driver_id,
+    "BuildableName": driver_product_name,
+    "BlueprintName": driver_name,
+    "ReferencedContainer": "container:Stornaut.xcodeproj",
+}
+if driver_reference.attrib != expected_driver_reference:
+    raise SystemExit(
+        "Diagnostic scheme Machine driver reference drifted: "
+        f"{driver_reference.attrib!r}"
+    )
+driver_entries = []
+for entry in diagnostic_scheme_root.findall(
+    "./BuildAction/BuildActionEntries/BuildActionEntry"
+):
+    references_in_entry = entry.findall("./BuildableReference")
+    if driver_reference in references_in_entry:
+        driver_entries.append(entry)
+if len(driver_entries) != 1:
+    raise SystemExit(
+        "Diagnostic scheme must contain one explicit Machine driver "
+        "BuildActionEntry"
+    )
+expected_driver_entry = {
+    "buildForTesting": "YES",
+    "buildForRunning": "YES",
+    "buildForProfiling": "NO",
+    "buildForArchiving": "NO",
+    "buildForAnalyzing": "YES",
+}
+if driver_entries[0].attrib != expected_driver_entry:
+    raise SystemExit(
+        "Diagnostic scheme Machine driver build entry drifted: "
+        f"{driver_entries[0].attrib!r}"
+    )
+if diagnostic_scheme_text.count(driver_id) != 1:
+    raise SystemExit(
+        "Diagnostic scheme Machine driver target identifier is not unique"
+    )
+PY
 
 machine_collector_source="$machine_root/InvestigationLifecycleTopologyCollector.swift"
 machine_service_source="$machine_root/FixedLifecycleServiceProbe.swift"

@@ -4,7 +4,7 @@ import Testing
 @Suite("Task 39 trusted machine target boundary")
 struct InvestigationMachineTargetBoundaryTests {
     @Test
-    func driverRuntimeIsAuthorityClosedBeforeNativePackaging() throws {
+    func driverRuntimeRemainsAuthorityClosedForNativePackaging() throws {
         let repositoryRoot = URL(filePath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
@@ -102,14 +102,198 @@ struct InvestigationMachineTargetBoundaryTests {
         ))
         #expect(!driverTarget.contains("\"StornautInvestigationMachine\""))
 
+    }
+
+    @Test
+    func nativeMachineDriverPackagingIsDiagnosticOnly() throws {
+        let repositoryRoot = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
         let projectSource = try String(
             contentsOf: repositoryRoot.appending(
                 path: "Stornaut.xcodeproj/project.pbxproj"
             ),
             encoding: .utf8
         )
-        #expect(!projectSource.contains(
-            "StornautInvestigationMachineDriverNative"
+        let diagnosticScheme = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "Stornaut.xcodeproj/xcshareddata/xcschemes/"
+                    + "StornautInvestigationDiagnosticApp.xcscheme"
+            ),
+            encoding: .utf8
+        )
+        let ordinaryScheme = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "Stornaut.xcodeproj/xcshareddata/xcschemes/"
+                    + "Stornaut.xcscheme"
+            ),
+            encoding: .utf8
+        )
+
+        func objectBlock(
+            id: String,
+            comment: String,
+            in source: String
+        ) throws -> String {
+            let marker = "\(id) /* \(comment) */ = {"
+            let start = try #require(source.range(of: marker))
+            let suffix = source[start.lowerBound...]
+            let end = try #require(suffix.range(of: "\n\t\t};"))
+            return String(suffix[..<end.upperBound])
+        }
+
+        func objectLine(
+            containing marker: String,
+            in source: String
+        ) throws -> String {
+            let range = try #require(source.range(of: marker))
+            return String(source[source.lineRange(for: range)])
+        }
+
+        #expect(
+            projectSource.components(
+                separatedBy: "isa = PBXNativeTarget;"
+            ).count == 8
+        )
+        #expect(
+            projectSource.components(
+                separatedBy:
+                    "name = StornautInvestigationMachineDriverNative;"
+            ).count == 2
+        )
+        let driverTarget = try objectBlock(
+            id: "A00000000000000000000007",
+            comment: "StornautInvestigationMachineDriverNative",
+            in: projectSource
+        )
+        for marker in [
+            "productName = StornautInvestigationMachineDriver;",
+            "productType = \"com.apple.product-type.tool\";",
+            "StornautInvestigationMachineDriverSupport",
+            "B00000000000000000000026 /* Sources */",
+            "B00000000000000000000027 /* Frameworks */",
+        ] {
+            #expect(driverTarget.contains(marker))
+        }
+        for forbidden in [
+            "StornautInvestigationMachine ",
+            "StornautCore",
+            "StornautCodex",
+            "StornautLifecycle",
+            "StornautInvestigationRuntime",
+            "StornautInvestigationDiagnostic",
+            "StornautExecution",
+            "fileSystemSynchronizedGroups",
+        ] {
+            #expect(!driverTarget.contains(forbidden))
+        }
+
+        let driverSources = try objectBlock(
+            id: "B00000000000000000000026",
+            comment: "Sources",
+            in: projectSource
+        )
+        #expect(driverSources.contains(
+            "B0000000000000000000001B /* main.swift in Sources */"
+        ))
+        #expect(driverSources.components(separatedBy: " in Sources */").count == 2)
+
+        let driverFrameworks = try objectBlock(
+            id: "B00000000000000000000027",
+            comment: "Frameworks",
+            in: projectSource
+        )
+        #expect(driverFrameworks.contains(
+            "B0000000000000000000001C "
+                + "/* StornautInvestigationMachineDriverSupport in Frameworks */"
+        ))
+        #expect(
+            driverFrameworks.components(separatedBy: " in Frameworks */").count
+                == 2
+        )
+
+        let driverCopy = try objectBlock(
+            id: "B00000000000000000000042",
+            comment: "Copy Investigation Driver",
+            in: projectSource
+        )
+        for marker in [
+            "B0000000000000000000001D "
+                + "/* StornautInvestigationMachineDriver in Copy Investigation Driver */",
+            "name = \"Copy Investigation Driver\";",
+            "dstPath = Contents/MacOS;",
+        ] {
+            #expect(driverCopy.contains(marker))
+        }
+        #expect(
+            driverCopy.components(
+                separatedBy: " in Copy Investigation Driver */"
+            ).count == 2
+        )
+        let driverCopyBuildFile = try objectLine(
+            containing:
+                "B0000000000000000000001D "
+                    + "/* StornautInvestigationMachineDriver in Copy Investigation Driver */ =",
+            in: projectSource
+        )
+        #expect(driverCopyBuildFile.contains(
+            "settings = {ATTRIBUTES = (CodeSignOnCopy, ); };"
+        ))
+
+        let driverConfigurationList = try objectBlock(
+            id: "A00000000000000000000027",
+            comment:
+                "Build configuration list for PBXNativeTarget "
+                    + "\"StornautInvestigationMachineDriverNative\"",
+            in: projectSource
+        )
+        for (id, name) in [
+            ("A00000000000000000000170", "Debug"),
+            ("A00000000000000000000171", "Release"),
+        ] {
+            #expect(driverConfigurationList.contains("\(id) /* \(name) */"))
+            let configuration = try objectBlock(
+                id: id,
+                comment: name,
+                in: projectSource
+            )
+            for marker in [
+                "PRODUCT_BUNDLE_IDENTIFIER = "
+                    + "com.eriklee.stornaut.investigation.machine-driver;",
+                "CODE_SIGN_IDENTITY = \"-\";",
+                "CODE_SIGN_STYLE = Manual;",
+                "CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;",
+                "ARCHS = arm64;",
+                #"OTHER_SWIFT_FLAGS = "$(inherited) -parse-as-library";"#,
+                "SKIP_INSTALL = YES;",
+            ] {
+                #expect(configuration.contains(marker))
+            }
+            #expect(!configuration.contains("CODE_SIGN_ENTITLEMENTS"))
+        }
+        #expect(
+            projectSource.components(
+                separatedBy: "name = \"Copy Investigation Driver\";"
+            ).count == 2
+        )
+        #expect(
+            projectSource.components(
+                separatedBy: "isa = PBXCopyFilesBuildPhase;"
+            ).count == 4
+        )
+        #expect(
+            diagnosticScheme.components(
+                separatedBy:
+                    "BlueprintName = \""
+                        + "StornautInvestigationMachineDriverNative\""
+            ).count == 2
+        )
+        #expect(diagnosticScheme.contains(
+            "BuildableName = \"StornautInvestigationMachineDriver\""
+        ))
+        #expect(!ordinaryScheme.contains(
+            "StornautInvestigationMachineDriver"
         ))
     }
 
@@ -397,10 +581,11 @@ struct InvestigationMachineTargetBoundaryTests {
             }
         }
 
-        // Temporary L3c3a checkpoint contract. L3c3b must replace this
-        // assertion with exact diagnostic-only native driver packaging.
-        #expect(!xcodeProject.contains(
-            "StornautInvestigationMachineDriver"
+        #expect(xcodeProject.contains(
+            "StornautInvestigationMachineDriverNative"
+        ))
+        #expect(xcodeProject.contains(
+            "com.eriklee.stornaut.investigation.machine-driver"
         ))
     }
 
@@ -435,13 +620,13 @@ struct InvestigationMachineTargetBoundaryTests {
         for appVariable in [
             "\"$debug_app\"",
             "\"$release_app\"",
-            "\"$diagnostic_debug_app\"",
         ] {
             #expect(
                 driverLoop.components(separatedBy: appVariable).count
                     == 2
             )
         }
+        #expect(!driverLoop.contains("\"$diagnostic_debug_app\""))
         let exactDriverPath =
             "$app_without_machine_driver/Contents/MacOS/StornautInvestigationMachineDriver"
         #expect(
@@ -450,6 +635,40 @@ struct InvestigationMachineTargetBoundaryTests {
         )
         #expect(driverLoop.contains("test ! -e"))
         #expect(driverLoop.contains("test ! -L"))
+        for marker in [
+            "diagnostic_machine_driver=",
+            "machine_driver_product=",
+            "machine_driver_max_bytes=$((16 * 1024 * 1024))",
+            "/usr/bin/lipo -archs",
+            "/usr/bin/codesign --verify --strict",
+            "Identifier=com.eriklee.stornaut.investigation.machine-driver",
+            "designated => cdhash H",
+            "machine_driver_product_sha256",
+            "diagnostic_machine_driver_sha256",
+            "machine_driver_product_cdhash",
+            "diagnostic_machine_driver_cdhash",
+            "machine_driver_authority_forbidden_markers",
+            "signedInvestigationRuntimeReady",
+            "signedRuntimeReady",
+        ] {
+            #expect(releaseBoundary.contains(marker))
+        }
+
+        let verifierContract = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "scripts/verify-contract"
+            ),
+            encoding: .utf8
+        )
+        for marker in [
+            "validate_machine_driver_packaging_contract",
+            "validate_built_app",
+            "validate_installed_artifacts",
+            "staging_guard = reject_before(",
+            "installer admitted the Machine driver before L3c3b-ii",
+        ] {
+            #expect(verifierContract.contains(marker))
+        }
 
         let investigationSource = repositoryRoot.appending(
             path: "Sources/StornautInvestigation/"

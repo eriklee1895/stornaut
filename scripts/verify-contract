@@ -114,6 +114,283 @@ if [[ -e scripts/verify-phase-c-trash-safe-window ]]; then
         "Obsolete global Phase C Trash safe-window still exists"
 fi
 
+function validate_machine_driver_packaging_contract() {
+    python3 - <<'PY'
+import re
+from pathlib import Path
+
+release = Path("scripts/verify-app-release-boundaries").read_text(
+    encoding="utf-8"
+)
+installer = Path("scripts/stornaut-r5-local-lifecycle").read_text(
+    encoding="utf-8"
+)
+driver = "StornautInvestigationMachineDriver"
+
+
+def require(condition, message):
+    if not condition:
+        raise SystemExit(message)
+
+
+def flat(source):
+    return re.sub(r"\s+", " ", source.replace("\\\n", " ")).strip()
+
+
+def function_body(source, name):
+    match = re.search(
+        rf"(?ms)^{re.escape(name)}\(\) \{{\n(.*?)(?=^\}}\n\n)",
+        source,
+    )
+    require(match is not None, f"missing function body: {name}")
+    return match.group(1)
+
+
+def require_order(source, markers, message):
+    positions = [source.find(marker) for marker in markers]
+    require(
+        all(position >= 0 for position in positions)
+        and positions == sorted(positions),
+        message,
+    )
+
+
+require(
+    release.startswith("#!/bin/zsh\n\nset -euo pipefail\n"),
+    "App release boundary is not fail closed",
+)
+ordinary = re.search(
+    r'(?ms)^for app_without_machine_driver in \\\n'
+    r'(?P<header>.*?)\ndo\n(?P<body>.*?)\ndone\n',
+    release,
+)
+require(ordinary is not None, "missing ordinary driver-absence loop")
+require(
+    re.findall(r'"\$([a-z_]+)"', ordinary.group("header"))
+    == ["debug_app", "release_app"]
+    and "diagnostic" not in ordinary.group("header"),
+    "ordinary driver-absence loop must cover only debug_app/release_app",
+)
+ordinary_body = flat(ordinary.group("body"))
+ordinary_path = "$app_without_machine_driver/Contents/MacOS/" + driver
+for predicate in ("-e", "-L"):
+    require(
+        ordinary_body.count(
+            f'test ! {predicate} "{ordinary_path}"'
+        ) == 1,
+        "ordinary Apps must reject a present file and symlink driver",
+    )
+
+release_flat = flat(release)
+for contract in (
+    f'diagnostic_machine_driver="$diagnostic_debug_app/Contents/MacOS/{driver}"',
+    f'machine_driver_product="$diagnostic_derived_data/Build/Products/Debug/{driver}"',
+    "machine_driver_max_bytes=$((16 * 1024 * 1024))",
+    'test -f "$machine_driver_product"',
+    'test -x "$diagnostic_machine_driver"',
+    'test ! -L "$machine_driver_product"',
+    'test ! -L "$diagnostic_machine_driver"',
+    f'-name {driver} -print | /usr/bin/wc -l | tr -d \' \')" = 1',
+    '/usr/bin/codesign --verify --deep --strict "$diagnostic_debug_app"',
+):
+    require(
+        release_flat.count(contract) == 1,
+        f"diagnostic driver membership contract drifted: {contract}",
+    )
+
+driver_loop = re.search(
+    r'(?ms)^for machine_driver in "\$machine_driver_product" '
+    r'"\$diagnostic_machine_driver"; do\n(?P<body>.*?)\ndone\n',
+    release,
+)
+require(driver_loop is not None, "missing exact product/nested driver loop")
+driver_loop_body = flat(driver_loop.group("body"))
+for contract in (
+    'test "$(/usr/bin/stat -f \'%HT\' "$machine_driver")" = "Regular File"',
+    'test "$(/usr/bin/stat -f \'%Lp\' "$machine_driver")" = 755',
+    'test "$(/usr/bin/stat -f \'%l\' "$machine_driver")" = 1',
+    'machine_driver_bytes=$(/usr/bin/stat -f \'%z\' "$machine_driver")',
+    "machine_driver_bytes <= machine_driver_max_bytes",
+    'test "$(/usr/bin/lipo -archs "$machine_driver")" = arm64',
+    '/usr/bin/codesign --verify --strict "$machine_driver"',
+):
+    require(
+        driver_loop_body.count(contract) == 1,
+        f"driver stat/architecture/signing contract drifted: {contract}",
+    )
+
+for contract in (
+    'Identifier=com.eriklee.stornaut.investigation.machine-driver',
+    'test "Identifier=$machine_driver_product_identifier" = "$expected_machine_driver_identifier_line"',
+    'test "Identifier=$diagnostic_machine_driver_identifier" = "$expected_machine_driver_identifier_line"',
+    'test "$diagnostic_machine_driver_cdhash" = "$machine_driver_product_cdhash"',
+    'test "$diagnostic_machine_driver_requirement" = "$machine_driver_product_requirement"',
+    'test "$diagnostic_machine_driver_sha256" = "$machine_driver_product_sha256"',
+    'test "$diagnostic_machine_driver_identifier" = "$machine_driver_product_identifier"',
+    "grep -Eq '^[0-9a-f]{40}([0-9a-f]{24})?$'",
+    "grep -Eq '^[0-9a-f]{64}$'",
+):
+    require(
+        release.count(contract) == 1,
+        f"driver product/nested identity contract drifted: {contract}",
+    )
+require(
+    release.count("designated => cdhash H") == 1
+    and release.count("$machine_driver_product_cdhash") >= 2,
+    "driver product designated requirement lost its exact CDHash binding",
+)
+for variable, artifact, extractor in (
+    ("machine_driver_product_cdhash", "$machine_driver_product", "CDHash"),
+    ("diagnostic_machine_driver_cdhash", "$diagnostic_machine_driver", "CDHash"),
+    ("machine_driver_product_requirement", "$machine_driver_product", "-r-"),
+    ("diagnostic_machine_driver_requirement", "$diagnostic_machine_driver", "-r-"),
+    ("machine_driver_product_sha256", "$machine_driver_product", "shasum -a 256"),
+    ("diagnostic_machine_driver_sha256", "$diagnostic_machine_driver", "shasum -a 256"),
+):
+    assignment = re.search(
+        rf"(?ms)^{variable}=\$\(\n(?P<body>.*?)\n\)$",
+        release,
+    )
+    require(
+        assignment is not None
+        and artifact in assignment.group("body")
+        and extractor in assignment.group("body"),
+        f"driver identity extraction drifted: {variable}",
+    )
+
+for marker in (
+    "StornautExecution.",
+    "StornautCore.ActionExecutor",
+    "StornautCore.TrashMoving",
+    "StornautCore.Cleanup",
+    "StornautCore.ActionPolicy",
+    "StornautCore.CleanupPolicy",
+    "StornautCore.ExecutionAuthorization",
+    "StornautCore.RegisteredAction",
+    "StornautCore.MoveToTrash",
+    "signedInvestigationRuntimeReady",
+    "signedRuntimeReady",
+    "Readiness",
+    "readiness",
+):
+    require(
+        f"    '{marker}'" in release,
+        f"driver forbidden authority/readiness marker drifted: {marker}",
+    )
+symbol_scan = function_body(release, "mach_o_has_demangled_symbol")
+scan_start = symbol_scan.find("if ! symbols=$(")
+scan_end = symbol_scan.find('if [[ "$symbols" == *"$marker"* ]]')
+require(
+    scan_start >= 0 and scan_end > scan_start,
+    "driver symbol scanner lost its checked command substitution",
+)
+scan_failure = symbol_scan[scan_start:scan_end]
+for contract in (
+    'xcrun nm -j "$file"',
+    "xcrun swift-demangle",
+    'print -u2 "Demangled symbol scan failed: $file"',
+    "return 2",
+):
+    require(
+        scan_failure.count(contract) == 1,
+        f"driver symbol scan is not fail closed: {contract}",
+    )
+require(
+    "continue" not in scan_failure and "|| true" not in scan_failure,
+    "driver symbol scan regained an error bypass",
+)
+forbidden_loop = re.search(
+    r'(?ms)^for marker in "\$\{machine_driver_authority_forbidden_markers\[@\]\}"; do\n'
+    r'(?P<body>.*?)\ndone\n',
+    release,
+)
+require(forbidden_loop is not None, "missing driver forbidden-symbol loop")
+forbidden_body = flat(forbidden_loop.group("body"))
+for contract in (
+    'if mach_o_has_demangled_symbol "$diagnostic_machine_driver" "$marker"; then',
+    'print -u2 "Authority or readiness leaked into Machine driver: $marker"',
+    "else symbol_scan_status=$? fi",
+    "if (( symbol_scan_status == 2 )); then exit 1 fi",
+):
+    require(
+        forbidden_body.count(contract) == 1,
+        f"driver forbidden-symbol loop is not fail closed: {contract}",
+    )
+
+require(
+    installer.startswith("#!/bin/zsh\n\nset -euo pipefail\n"),
+    "local lifecycle installer is not fail closed",
+)
+built = flat(function_body(installer, "validate_built_app"))
+installed = flat(function_body(installer, "validate_installed_artifacts"))
+install = flat(function_body(installer, "install"))
+
+
+def reject_before(source, root, later_markers, context):
+    path = "$" + root + "/Contents/MacOS/" + driver
+    guard = f'[[ ! -e "{path}" && ! -L "{path}" ]]'
+    if source.count(guard) != 1:
+        raise SystemExit(
+            "installer admitted the Machine driver before L3c3b-ii: "
+            + f"{context} lacks the exact file/symlink rejection"
+        )
+    require_order(
+        source,
+        (guard,) + tuple(later_markers),
+        "installer admitted the Machine driver before L3c3b-ii: "
+        + f"{context} rejection occurs after success or mutation",
+    )
+    return guard
+
+
+reject_before(
+    built,
+    "built_app",
+    (
+        '/usr/bin/codesign --verify --deep --strict "$built_app"',
+        "Print :CFBundleIdentifier",
+        'validate_plist "$source_plist"',
+    ),
+    "validate_built_app",
+)
+installed_guard = reject_before(
+    installed,
+    "installed_app",
+    (),
+    "validate_installed_artifacts",
+)
+require(
+    installed.endswith(installed_guard),
+    "installer admitted the Machine driver before L3c3b-ii: "
+    "installed driver rejection is not the final success condition",
+)
+staging_guard = reject_before(
+    install,
+    "staging_app",
+    (
+        '/bin/mv -n "$staging_app" "$installed_app"',
+        "installed_app_moved=1",
+        '/bin/launchctl bootstrap system "$installed_plist"',
+        "validate_installed_state",
+        'print "lifecycle.local.install=complete"',
+    ),
+    "install staging",
+)
+require_order(
+    install,
+    (
+        "validate_built_app",
+        '/usr/bin/ditto --noqtn "$built_app" "$staging_app"',
+        staging_guard,
+    ),
+    "installer admitted the Machine driver before L3c3b-ii: "
+    "built/staging rejection ordering drifted",
+)
+PY
+}
+
+validate_machine_driver_packaging_contract
+
 python3 - <<'PY'
 from pathlib import Path
 
@@ -138,9 +415,9 @@ if (
     raise SystemExit(
         "demangled Mach-O symbol scanner must fail closed on scan errors"
     )
-if source.count("(( symbol_scan_status == 2 ))") != 2:
+if source.count("(( symbol_scan_status == 2 ))") != 4:
     raise SystemExit(
-        "positive and negative demangled-symbol gates must handle scan errors"
+        "all four demangled-symbol gates must handle scan errors"
     )
 contract_gate = source.find("scripts/verify-contract")
 first_build = source.find("xcodebuild")

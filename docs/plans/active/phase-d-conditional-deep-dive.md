@@ -28,7 +28,9 @@
 > installer/L2 admission. A final-Mach-O spike then inserted L3c3b-0 authority
 > closure before packaging. Its zero-dependency DriverSupport, final-Mach-O
 > authority gates, 1,059-test clean staged-only serial and independent post-fix
-> review passed; L3c3b-i native packaging is next. The authoritative
+> review passed. L3c3b-i diagnostic-only native packaging, final-artifact gates,
+> 1,060-test clean staged-only serial and post-fix/cross-group review also passed;
+> L3c3b-ii installer/L2 admission is next. The authoritative
 > real-model run and readiness verdict remain unimplemented.
 > Production Deep Dive remains unavailable until Task 44 admission.
 >
@@ -875,9 +877,11 @@ Checkpoint status:
   only driver packaging/topology admission was split before coding into
   L3c3b-i native packaging and L3c3b-ii installer/L2 admission. A final-Mach-O
   spike then exposed forbidden Cleanup/Policy surfaces through the full Machine
-  graph. L3c3b-0 authority closure is now complete after its final-Mach-O gates,
-  1,059-test clean staged-only serial and independent post-fix review; L3c3b-i
-  native packaging is next.
+  graph. L3c3b-0 authority closure is complete after its final-Mach-O gates,
+  1,059-test clean staged-only serial and independent post-fix review. L3c3b-i
+  native packaging is also complete after its diagnostic-only Xcode graph,
+  final-artifact identity/authority gates, 1,060-test clean staged-only serial
+  and independent post-fix/cross-group review. L3c3b-ii installer/L2 is next.
   See the
   [L3c1b-i Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
   and
@@ -898,6 +902,8 @@ Checkpoint status:
   [Driver Runtime Authority Preflight](../../reports/phase-d-task-39b2c-l3c3b-driver-runtime-authority-preflight.md).
   Completion evidence is in the
   [Driver Runtime Authority Review](../../reports/phase-d-task-39b2c-l3c3b-driver-runtime-authority-review.md).
+  Native packaging evidence is in the
+  [Native Driver Packaging Review](../../reports/phase-d-task-39b2c-l3c3b-i-native-driver-packaging-review.md).
   Only L3c4 owns
   real-model signed-App machine readiness, the complete failure matrix, exact
   zero-residue proof and the remaining authoritative full verifier. Task 39 and

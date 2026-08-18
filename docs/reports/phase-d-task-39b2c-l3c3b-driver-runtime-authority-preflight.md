@@ -1,6 +1,6 @@
 # Phase D Task 39B2c-L3c3b Driver Runtime Authority Preflight
 
-> Status: Implemented and reviewed; L3c3b-0 complete, L3c3b-i next
+> Status: Implemented and reviewed; L3c3b-0 and L3c3b-i complete, L3c3b-ii next
 >
 > Date: 2026-08-18
 >
@@ -96,4 +96,5 @@ installed state. Its prototype repository diff was fully reverted before this
 preflight. `~/.codex/config.toml` was not modified. Production Deep Dive remains
 unavailable. L3c3b-0 is complete; see the
 [completion review](phase-d-task-39b2c-l3c3b-driver-runtime-authority-review.md).
-L3c3b-i resumes after the prerequisite's pushed completion.
+L3c3b-i subsequently completed with the authority-closed Support product;
+L3c3b-ii installer/L2 admission is next.
