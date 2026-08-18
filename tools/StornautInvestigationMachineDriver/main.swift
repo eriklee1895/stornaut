@@ -1,10 +1,10 @@
 import Darwin
-import StornautInvestigationMachine
+import StornautInvestigationMachineDriverSupport
 
 @main
 struct StornautInvestigationMachineDriverCommand {
     static func main() async {
-        let status = await InvestigationMachineDriverEntryPoint.run()
+        let status = await InvestigationMachineDriverSupport.run()
         exit(status)
     }
 }

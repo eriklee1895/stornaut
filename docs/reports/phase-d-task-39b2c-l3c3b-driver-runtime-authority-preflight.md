@@ -1,6 +1,6 @@
 # Phase D Task 39B2c-L3c3b Driver Runtime Authority Preflight
 
-> Status: Mandatory pre-coding prerequisite frozen; L3c3b-0 is next
+> Status: Implemented and reviewed; L3c3b-0 complete, L3c3b-i next
 >
 > Date: 2026-08-18
 >
@@ -94,4 +94,6 @@ root execution, handoff, model or readiness is permitted.
 The failed artifact spike used isolated temporary build roots and changed no
 installed state. Its prototype repository diff was fully reverted before this
 preflight. `~/.codex/config.toml` was not modified. Production Deep Dive remains
-unavailable. L3c3b-0 is next; L3c3b-i resumes only after its pushed completion.
+unavailable. L3c3b-0 is complete; see the
+[completion review](phase-d-task-39b2c-l3c3b-driver-runtime-authority-review.md).
+L3c3b-i resumes after the prerequisite's pushed completion.

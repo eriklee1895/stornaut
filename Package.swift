@@ -34,6 +34,11 @@ let package = Package(
             targets: ["StornautInvestigationDiagnostic"]
         ),
         .library(
+            name: "StornautInvestigationMachineDriverSupport",
+            type: .static,
+            targets: ["StornautInvestigationMachineDriverSupport"]
+        ),
+        .library(
             name: "StornautProbeBridge",
             targets: ["StornautProbeBridge"]
         ),
@@ -119,9 +124,14 @@ let package = Package(
                 "StornautCodex",
                 "StornautCore",
                 "StornautInvestigation",
+                "StornautInvestigationMachineDriverSupport",
                 "StornautInvestigationRuntime",
                 "StornautLifecycle",
             ]
+        ),
+        .target(
+            name: "StornautInvestigationMachineDriverSupport",
+            dependencies: []
         ),
         .target(
             name: "StornautInvestigationRuntime",
@@ -186,7 +196,7 @@ let package = Package(
         .executableTarget(
             name: "StornautInvestigationMachineDriver",
             dependencies: [
-                "StornautInvestigationMachine",
+                "StornautInvestigationMachineDriverSupport",
             ],
             path: "Tools/StornautInvestigationMachineDriver"
         ),
@@ -224,6 +234,7 @@ let package = Package(
                 "StornautInvestigationDiagnostic",
                 "StornautInvestigation",
                 "StornautInvestigationMachine",
+                "StornautInvestigationMachineDriverSupport",
                 "StornautInvestigationRuntime",
                 "StornautCore",
                 "StornautCodex",

@@ -3,11 +3,24 @@ import Foundation
 import Testing
 import StornautInvestigation
 @testable import StornautInvestigationMachine
+@testable import StornautInvestigationMachineDriverSupport
 import StornautInvestigationRuntime
 import StornautLifecycle
 
 @Suite("Investigation machine driver host")
 struct InvestigationMachineDriverHostTests {
+    @Test
+    func authorityClosedSupportPreservesFixedUnavailableStatuses() async {
+        #expect(
+            InvestigationMachineDriverSupport.status(effectiveUserID: 501)
+                == 77
+        )
+        #expect(
+            InvestigationMachineDriverSupport.status(effectiveUserID: 0)
+                == 78
+        )
+    }
+
     @Test
     func nonRootFailsBeforeHandoffOrClaimAndConsumesHost() async throws {
         let fixture = try DriverHostFixture()

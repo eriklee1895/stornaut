@@ -1,6 +1,7 @@
 import Darwin
 import Foundation
 import StornautInvestigation
+import StornautInvestigationMachineDriverSupport
 import StornautInvestigationRuntime
 import StornautLifecycle
 
@@ -309,11 +310,13 @@ actor InvestigationMachineDriverHost {
 }
 
 package enum InvestigationMachineDriverEntryPoint {
-    static let rootAuthorityRequiredExitStatus: Int32 = 77
-    static let handoffUnavailableExitStatus: Int32 = 78
+    static let rootAuthorityRequiredExitStatus =
+        InvestigationMachineDriverSupport.rootAuthorityRequiredExitStatus
+    static let handoffUnavailableExitStatus =
+        InvestigationMachineDriverSupport.handoffUnavailableExitStatus
 
     package static func run() async -> Int32 {
-        await run(effectiveUserID: geteuid)
+        await InvestigationMachineDriverSupport.run()
     }
 
     static func run(

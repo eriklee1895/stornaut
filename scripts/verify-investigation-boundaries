@@ -13,6 +13,7 @@ machine_driver_host=$machine_root/InvestigationMachineDriverHost.swift
 machine_scenario_runner=$machine_root/InvestigationFixedScenarioRunner.swift
 machine_scenario_driver=$machine_root/InvestigationMachineScenarioDriver.swift
 machine_driver_main=Tools/StornautInvestigationMachineDriver/main.swift
+machine_driver_support=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDriverSupport.swift
 runtime_root=Sources/StornautInvestigationRuntime
 diagnostic_root=Sources/StornautInvestigationDiagnostic
 lifecycle_root=Sources/StornautLifecycle
@@ -49,6 +50,7 @@ required_files=(
     "$machine_scenario_runner"
     "$machine_scenario_driver"
     "$machine_driver_main"
+    "$machine_driver_support"
     "$coordinator_root/Resources/investigation-prompt-v1.txt"
     "$runtime_root/InvestigationCodexSessionAdapter.swift"
     "$runtime_root/InvestigationLifecycleAppServerTransport.swift"
@@ -148,8 +150,8 @@ for declaration in \
     fi
 done
 for marker in \
-    'import StornautInvestigationMachine' \
-    'await InvestigationMachineDriverEntryPoint.run()'; do
+    'import StornautInvestigationMachineDriverSupport' \
+    'await InvestigationMachineDriverSupport.run()'; do
     rg -q --fixed-strings -- "$marker" "$machine_driver_main" || {
         print -u2 "Machine driver executable marker missing: $marker"
         exit 1
@@ -159,6 +161,25 @@ if rg -n \
     'StornautExecution|StornautInvestigationDiagnostic|ActionExecutor|TrashMoving|RegisteredAction|SignedInvestigationRuntimeMachineAssembler|SignedInvestigationRuntimeMachineVerifier|signedInvestigationRuntimeReady|JSONEncoder|JSONDecoder|PropertyListEncoder|PropertyListDecoder|NSXPCConnection|URLSession|posix_spawn|removeItem|moveItem|copyItem|CommandLine\.arguments|ProcessInfo\.processInfo\.environment|readLine\(|kill\(' \
     "$machine_driver_host" "$machine_driver_main"; then
     print -u2 "Machine driver host gained prohibited input or authority."
+    exit 1
+fi
+for marker in \
+    'import Darwin' \
+    'public enum InvestigationMachineDriverSupport' \
+    'public static func run() async -> Int32' \
+    'static func status(effectiveUserID: uid_t) -> Int32' \
+    'rootAuthorityRequiredExitStatus: Int32 = 77' \
+    'handoffUnavailableExitStatus: Int32 = 78'; do
+    rg -q --fixed-strings -- "$marker" "$machine_driver_support" || {
+        print -u2 "Authority-closed driver support marker missing: $marker"
+        exit 1
+    }
+done
+public_support_surface_count=$(rg -o --fixed-strings -- 'public static ' \
+    "$machine_driver_support" | wc -l | tr -d ' ')
+if [[ "$public_support_surface_count" != 1 ]]; then
+    print -u2 \
+        "Driver support public static surface drifted: $public_support_surface_count"
     exit 1
 fi
 for marker in \
@@ -653,6 +674,7 @@ expected_machine_dependencies = {
     "StornautCodex",
     "StornautCore",
     "StornautInvestigation",
+    "StornautInvestigationMachineDriverSupport",
     "StornautInvestigationRuntime",
     "StornautLifecycle",
 }
@@ -761,7 +783,43 @@ if machine_driver.get("type") != "executable":
 actual_driver_dependencies = set(
     machine_driver.get("target_dependencies", [])
 )
-expected_driver_dependencies = {"StornautInvestigationMachine"}
+driver_support = targets.get(
+    "StornautInvestigationMachineDriverSupport"
+)
+if driver_support is None:
+    raise SystemExit("missing authority-closed Machine driver support")
+if set(driver_support.get("target_dependencies", [])):
+    raise SystemExit("Machine driver support gained a target dependency")
+if Path(driver_support.get("path", "")) != Path(
+    "Sources/StornautInvestigationMachineDriverSupport"
+):
+    raise SystemExit("Machine driver support target path drifted")
+driver_support_source_root = Path(driver_support.get("path", ""))
+driver_support_sources = driver_support.get("sources", [])
+if not driver_support_source_root.is_dir() or not driver_support_sources:
+    raise SystemExit("Machine driver support has no resolved source graph")
+for source_name in driver_support_sources:
+    source_path = driver_support_source_root / source_name
+    if not source_path.is_file():
+        raise SystemExit(
+            f"Resolved Machine driver support source is missing: {source_path}"
+        )
+    source_text = source_path.read_text(encoding="utf-8")
+    match = machine_authority_pattern.search(source_text)
+    if match:
+        raise SystemExit(
+            "Machine driver support gained prohibited authority: "
+            f"{source_path}: {match.group(0)!r}"
+        )
+    match = machine_readiness_pattern.search(source_text)
+    if match:
+        raise SystemExit(
+            "Machine driver support gained prohibited readiness: "
+            f"{source_path}: {match.group(0)!r}"
+        )
+expected_driver_dependencies = {
+    "StornautInvestigationMachineDriverSupport"
+}
 if actual_driver_dependencies != expected_driver_dependencies:
     raise SystemExit(
         "StornautInvestigationMachineDriver dependencies "
@@ -814,7 +872,9 @@ for dependency in manifest_driver.get("dependencies", []):
         raise SystemExit(
             f"Unsupported Machine driver dependency: {dependency!r}"
         )
-if manifest_driver_dependencies != ["StornautInvestigationMachine"]:
+if manifest_driver_dependencies != [
+    "StornautInvestigationMachineDriverSupport"
+]:
     raise SystemExit(
         "Manifest Machine driver dependencies drifted: "
         f"{manifest_driver_dependencies!r}"
@@ -839,12 +899,18 @@ if len(matching_driver_products) != 1 or set(
     raise SystemExit(
         "Machine driver implicit executable product surface drifted"
     )
-if set(machine.get("product_memberships", [])) != {
-    "StornautInvestigationMachineDriver"
-}:
+if set(machine.get("product_memberships", [])):
     raise SystemExit(
         "Machine target product membership drifted: "
         f"{machine.get('product_memberships', [])!r}"
+    )
+if set(driver_support.get("product_memberships", [])) != {
+    "StornautInvestigationMachineDriverSupport",
+    "StornautInvestigationMachineDriver",
+}:
+    raise SystemExit(
+        "Machine driver support product membership drifted: "
+        f"{driver_support.get('product_memberships', [])!r}"
     )
 for product in package.get("products", []):
     targets_in_product = set(product.get("targets", []))
@@ -1700,5 +1766,69 @@ for path in Path("StornautApp").rglob("*.swift"):
                 f"{path}: {token}"
             )
 PY
+
+if [[ "${STORNAUT_VERIFY_MACHINE_DRIVER_BINARY:-0}" == 1 ]]; then
+    machine_driver_scratch=$(mktemp -d \
+        "${TMPDIR:-/tmp}/stornaut-machine-driver-binary.XXXXXX")
+    trap 'rm -rf "$machine_driver_scratch"' EXIT
+    authority_markers=(
+        'StornautExecution.'
+        'StornautCore.ActionExecutor'
+        'StornautCore.TrashMoving'
+        'StornautCore.FileManagerTrashAdapter'
+        'StornautCore.Cleanup'
+        'StornautCore.ActionPolicy'
+        'StornautCore.ExecutionAuthorization'
+        'StornautCore.RegisteredAction'
+        'StornautCore.MoveToTrash'
+        'StornautCore.ProposedCleanupAction'
+    )
+    for configuration in debug release; do
+        scratch_path="$machine_driver_scratch/$configuration"
+        mkdir -p "$scratch_path"
+        swift build \
+            --scratch-path "$scratch_path" \
+            --configuration "$configuration" \
+            --product StornautInvestigationMachineDriver
+        driver=$(
+            swift build \
+                --scratch-path "$scratch_path" \
+                --configuration "$configuration" \
+                --show-bin-path
+        )/StornautInvestigationMachineDriver
+        [[ -x "$driver" && ! -L "$driver" ]] || {
+            print -u2 "Machine driver binary is missing: $driver"
+            exit 1
+        }
+        [[ "$(file -b "$driver")" == *"Mach-O 64-bit executable arm64"* ]]
+        driver_status=0
+        "$driver" || driver_status=$?
+        if (( driver_status != 77 )); then
+            print -u2 \
+                "Machine driver fail-closed status drifted: $driver_status"
+            exit 1
+        fi
+        driver_symbols=$(
+            xcrun nm -j "$driver" 2>/dev/null \
+                | xcrun swift-demangle 2>/dev/null
+        ) || {
+            print -u2 "Machine driver symbol scan failed: $driver"
+            exit 1
+        }
+        for marker in "${authority_markers[@]}"; do
+            if [[ "$driver_symbols" == *"$marker"* ]]; then
+                print -u2 \
+                    "Machine driver contains prohibited authority: $marker"
+                exit 1
+            fi
+        done
+    done
+    rm -rf "$machine_driver_scratch"
+    trap - EXIT
+    print "Authority-closed Debug/Release Machine driver binaries passed."
+elif [[ "${STORNAUT_VERIFY_MACHINE_DRIVER_BINARY:-0}" != 0 ]]; then
+    print -u2 "Invalid STORNAUT_VERIFY_MACHINE_DRIVER_BINARY value."
+    exit 64
+fi
 
 print "Investigation Core and coordinator boundary verification passed."

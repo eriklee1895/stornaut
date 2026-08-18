@@ -1,6 +1,6 @@
 # Phase D Task 39B2c-L3c3b Scope and Trust Preflight
 
-> Status: Split frozen; later final-Mach-O evidence inserted L3c3b-0 before L3c3b-i
+> Status: Split frozen; inserted L3c3b-0 is complete and L3c3b-i is next
 >
 > Date: 2026-08-18
 >
@@ -29,7 +29,8 @@ The first b-i artifact spike later proved that the proposed facade would link
 the complete Machine/Core graph and carry forbidden Cleanup/Policy/Registered
 Action typed surfaces in Debug and Release. The mandatory
 [driver-runtime authority preflight](phase-d-task-39b2c-l3c3b-driver-runtime-authority-preflight.md)
-therefore inserts `L3c3b-0` before b-i.
+therefore inserted `L3c3b-0` before b-i. The prerequisite is complete; see its
+[review](phase-d-task-39b2c-l3c3b-driver-runtime-authority-review.md).
 
 ## 2. Current-Checkout Evidence
 
@@ -159,5 +160,5 @@ permitted.
 
 This preflight changed no product code, installed nothing, launched nothing and
 did not modify `~/.codex/config.toml`. Production Deep Dive remains unavailable.
-L3c3b-0 is next. L3c3c-i remains the mandatory repository-external
+L3c3b-0 is complete and L3c3b-i is next. L3c3c-i remains the mandatory repository-external
 launcher/handoff spike and ADR; packaging evidence cannot substitute for it.

@@ -113,7 +113,11 @@ split native diagnostic-only packaging from root installer/L2 admission before
 coding. A final-Mach-O spike then exposed forbidden Cleanup/Policy typed surfaces
 through the full Machine/Core graph, so the
 [L3c3b-0 preflight](../../reports/phase-d-task-39b2c-l3c3b-driver-runtime-authority-preflight.md)
-inserts an authority-closed driver runtime extraction. L3c3b-0 is next. Only
+inserted an authority-closed driver runtime extraction. Its zero-dependency
+DriverSupport target, Debug/Release final-Mach-O authority gate, one 1,059-test
+clean staged-only serial and independent post-fix review passed. See the
+[L3c3b-0 review](../../reports/phase-d-task-39b2c-l3c3b-driver-runtime-authority-review.md).
+L3c3b-0 is complete and L3c3b-i native packaging is next. Only
 L3c4 owns machine readiness and the remaining full verifier.
 The L3c2b preflight's
 [plan-freshness prerequisite](../../reports/phase-d-task-39b2c-l3c2b-plan-freshness-prerequisite-review.md)
@@ -137,7 +141,7 @@ the sole normal-product admission gate.
 | [36](task-36-implementation-brief.md) | Domain, canonical projection, planner, budget and stop contracts | complete; [review](../../reports/phase-d-task-36-review.md) |
 | [37](task-37-implementation-brief.md) | Store v4, retention and source rejoin | complete; [review](../../reports/phase-d-task-37-review.md) |
 | [38](task-38-implementation-brief.md) | Closed coordinator with fake runtime | complete; [review](../../reports/phase-d-task-38-review.md) |
-| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; through L3c3a complete; L3c3b split b-0 authority closure / b-i packaging / b-ii installer+L2; b-0 next |
+| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; through L3c3b-0 complete; L3c3b-i native packaging next |
 | [40](task-40-implementation-brief.md) | Evidence report and conservative Review projection | blocked on Task 39 |
 | [41](task-41-implementation-brief.md) | First-use disclosure and typed availability | blocked on Task 40 |
 | [42](task-42-implementation-brief.md) | App workflow and recovery state | blocked on Task 41 |

@@ -4,6 +4,116 @@ import Testing
 @Suite("Task 39 trusted machine target boundary")
 struct InvestigationMachineTargetBoundaryTests {
     @Test
+    func driverRuntimeIsAuthorityClosedBeforeNativePackaging() throws {
+        let repositoryRoot = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let packageSource = try String(
+            contentsOf: repositoryRoot.appending(path: "Package.swift"),
+            encoding: .utf8
+        )
+        let supportURL = repositoryRoot.appending(
+            path: "Sources/StornautInvestigationMachineDriverSupport/"
+                + "InvestigationMachineDriverSupport.swift"
+        )
+        #expect(FileManager.default.fileExists(atPath: supportURL.path))
+        let supportSource = try String(
+            contentsOf: supportURL,
+            encoding: .utf8
+        )
+        for marker in [
+            "import Darwin",
+            "public enum InvestigationMachineDriverSupport",
+            "package static let rootAuthorityRequiredExitStatus: Int32 = 77",
+            "package static let handoffUnavailableExitStatus: Int32 = 78",
+            "public static func run() async -> Int32",
+            "static func status(effectiveUserID: uid_t) -> Int32",
+        ] {
+            #expect(supportSource.contains(marker))
+        }
+        for forbidden in [
+            "StornautCore",
+            "StornautInvestigation",
+            "StornautLifecycle",
+            "StornautExecution",
+            "Cleanup",
+            "Policy",
+            "RegisteredAction",
+            "Process(",
+            "posix_spawn",
+            "CommandLine",
+            "ProcessInfo.processInfo.environment",
+            "NSXPC",
+            "URLSession",
+            "readLine(",
+            "FileManager.default.",
+            "FileHandle(forWritingTo:",
+            "O_WRONLY",
+            "O_RDWR",
+            "O_CREAT",
+            "Darwin.write(",
+            "unlink(",
+            "rename(",
+            "mkdir(",
+            "chmod(",
+            "chown(",
+            "socket",
+            "connect",
+            "send(",
+            "recv(",
+            "kill(",
+        ] {
+            #expect(!supportSource.contains(forbidden))
+        }
+        #expect(!supportSource.contains("package static func status"))
+        #expect(!supportSource.contains("public static func status"))
+        #expect(
+            supportSource.components(separatedBy: "public static " ).count
+                == 2
+        )
+
+        let supportTargetStart = try #require(packageSource.range(
+            of: ".target(\n            name: \"StornautInvestigationMachineDriverSupport\""
+        ))
+        let supportTargetSuffix = packageSource[
+            supportTargetStart.lowerBound...
+        ]
+        let supportTargetEnd = try #require(
+            supportTargetSuffix.range(of: "\n        ),")
+        )
+        let supportTarget = String(
+            supportTargetSuffix[..<supportTargetEnd.upperBound]
+        )
+        #expect(supportTarget.contains("dependencies: []"))
+
+        let driverTargetStart = try #require(packageSource.range(
+            of: ".executableTarget(\n            name: \"StornautInvestigationMachineDriver\""
+        ))
+        let driverTargetSuffix = packageSource[driverTargetStart.lowerBound...]
+        let driverTargetEnd = try #require(
+            driverTargetSuffix.range(of: "\n        ),")
+        )
+        let driverTarget = String(
+            driverTargetSuffix[..<driverTargetEnd.upperBound]
+        )
+        #expect(driverTarget.contains(
+            "\"StornautInvestigationMachineDriverSupport\""
+        ))
+        #expect(!driverTarget.contains("\"StornautInvestigationMachine\""))
+
+        let projectSource = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "Stornaut.xcodeproj/project.pbxproj"
+            ),
+            encoding: .utf8
+        )
+        #expect(!projectSource.contains(
+            "StornautInvestigationMachineDriverNative"
+        ))
+    }
+
+    @Test
     func l3c3aAddsOnlyStrictDriverBindingWithoutAdvancingTopology()
         throws
     {
@@ -396,7 +506,9 @@ struct InvestigationMachineTargetBoundaryTests {
             driverTargetSuffix[..<driverTargetEnd.upperBound]
         )
         #expect(driverTargetSource.contains(
-            "dependencies: [\n                \"StornautInvestigationMachine\",\n            ]"
+            "dependencies: [\n                "
+                + "\"StornautInvestigationMachineDriverSupport\",\n"
+                + "            ]"
         ))
         #expect(driverTargetSource.contains(
             "path: \"Tools/StornautInvestigationMachineDriver\""
@@ -477,10 +589,10 @@ struct InvestigationMachineTargetBoundaryTests {
             #expect(!driverHost.contains("package \(internalDeclaration)"))
         }
         #expect(driverMain.contains(
-            "import StornautInvestigationMachine"
+            "import StornautInvestigationMachineDriverSupport"
         ))
         #expect(driverMain.contains(
-            "await InvestigationMachineDriverEntryPoint.run()"
+            "await InvestigationMachineDriverSupport.run()"
         ))
         #expect(!driverMain.contains("CommandLine"))
         #expect(!driverMain.contains("ProcessInfo"))

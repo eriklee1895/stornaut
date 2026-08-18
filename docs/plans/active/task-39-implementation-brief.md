@@ -98,20 +98,24 @@
 > 199-test Investigation and 11-test App gates, 1,057-test clean staged-only
 > serial and independent post-fix review. The fresh L3c3b preflight split native
 > packaging from installer/L2 admission. A later final-Mach-O spike inserted
-> L3c3b-0 authority closure before packaging; b-0 is next. Evidence:
+> L3c3b-0 authority closure before packaging. Its zero-dependency DriverSupport,
+> Debug/Release final-Mach-O gates, 1,059-test clean staged-only serial and
+> independent post-fix review passed; L3c3b-i native packaging is next. Evidence:
 > [39B2c-L3c1a Typed Owner Retirement Review](../../reports/phase-d-task-39b2c-l3c1a-typed-owner-retirement-review.md)
 > and
 > [39B2c-L3c1b-i Configuration-Bound Helper Escrow Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
 > and
 > [39B2c-L3c1b-ii Synthetic Machine Claim Review](../../reports/phase-d-task-39b2c-l3c1b-ii-synthetic-machine-claim-review.md)
 > and
-> [39B2c-L3c2a-i Machine-Claim Transport Review](../../reports/phase-d-task-39b2c-l3c2a-i-machine-claim-transport-review.md).
+> [39B2c-L3c2a-i Machine-Claim Transport Review](../../reports/phase-d-task-39b2c-l3c2a-i-machine-claim-transport-review.md)
 > and
 > [39B2c-L3c2a-ii Machine Driver Host Review](../../reports/phase-d-task-39b2c-l3c2a-ii-machine-driver-host-review.md)
 > and
 > [39B2c-L3c2b Eight-Scenario Driver Review](../../reports/phase-d-task-39b2c-l3c2b-eight-scenario-driver-review.md)
 > and
-> [39B2c-L3c3a Driver-Bound Attempt Review](../../reports/phase-d-task-39b2c-l3c3a-driver-binding-review.md).
+> [39B2c-L3c3a Driver-Bound Attempt Review](../../reports/phase-d-task-39b2c-l3c3a-driver-binding-review.md)
+> and
+> [39B2c-L3c3b-0 Driver Runtime Authority Review](../../reports/phase-d-task-39b2c-l3c3b-driver-runtime-authority-review.md).
 >
 > **Parent plan:**
 > [Phase D Conditional Deep Dive](phase-d-conditional-deep-dive.md)
@@ -986,7 +990,11 @@ The remaining L3 work is split before driver coding:
    in Release. A mandatory **L3c3b-0 authority-closed driver runtime extraction**
    is inserted before b-i; see its
    [preflight](../../reports/phase-d-task-39b2c-l3c3b-driver-runtime-authority-preflight.md).
-   L3c3b-0 is next; later sub-checkpoints retain their exact path preflights.
+   L3c3b-0 is complete after the authority-closed target extraction, explicit
+   Debug/Release final-Mach-O gates, one clean staged-only serial and independent
+   post-fix review; see its
+   [review](../../reports/phase-d-task-39b2c-l3c3b-driver-runtime-authority-review.md).
+   L3c3b-i is next; later sub-checkpoints retain their exact path preflights.
 6. **L3c4 sealed final admission** — execute the authoritative current-source
    cohort with eight independent fresh nonces, one real success model run and
    bounded closed failure injections; perform exact per-case teardown, fixed
@@ -999,7 +1007,7 @@ The remaining L3 work is split before driver coding:
 
 The order is strict: `L3c1a -> L3c1b-i -> L3c1b-ii -> L3c2a-i -> L3c2a-ii ->
 L3c2b -> L3c3a -> L3c3b-0 -> L3c3b-i -> L3c3b-ii -> L3c3c-i -> L3c3c-ii ->
-L3c3d -> L3c4`. L3c1, L3c2 and L3c3a are complete; L3c3b-0 is next. L3c1 used focused
+L3c3d -> L3c4`. L3c1, L3c2, L3c3a and L3c3b-0 are complete; L3c3b-i is next. L3c1 used focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean
 staged serial regression, targeted helper/diagnostic builds and independent
 review in place of full. Each L3c2 sub-checkpoint uses structural, focused, one
