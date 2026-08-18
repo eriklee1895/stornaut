@@ -1,6 +1,6 @@
 # Phase D Task 39B2c-L3c3b Scope and Trust Preflight
 
-> Status: Pre-coding split frozen; L3c3b-i is next
+> Status: Split frozen; later final-Mach-O evidence inserted L3c3b-0 before L3c3b-i
 >
 > Date: 2026-08-18
 >
@@ -24,6 +24,12 @@ Combining the Xcode/package graph, scheme, copy phase, artifact verifier, root
 installer, L2 domain/reader and all affected tests exceeds the repository's
 fourteen-path review ceiling. L3c3b is therefore split before coding into
 `L3c3b-i native packaging -> L3c3b-ii installer and L2 admission`.
+
+The first b-i artifact spike later proved that the proposed facade would link
+the complete Machine/Core graph and carry forbidden Cleanup/Policy/Registered
+Action typed surfaces in Debug and Release. The mandatory
+[driver-runtime authority preflight](phase-d-task-39b2c-l3c3b-driver-runtime-authority-preflight.md)
+therefore inserts `L3c3b-0` before b-i.
 
 ## 2. Current-Checkout Evidence
 
@@ -153,5 +159,5 @@ permitted.
 
 This preflight changed no product code, installed nothing, launched nothing and
 did not modify `~/.codex/config.toml`. Production Deep Dive remains unavailable.
-L3c3b-i is next. L3c3c-i remains the mandatory repository-external
+L3c3b-0 is next. L3c3c-i remains the mandatory repository-external
 launcher/handoff spike and ADR; packaging evidence cannot substitute for it.

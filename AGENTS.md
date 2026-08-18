@@ -229,7 +229,10 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   accepted implementation tree 为
   `41521e44ba1e349496f3ab708d8e9f3f376620b3`。L3c3b native diagnostic-only
   driver packaging/topology admission 已由 fresh preflight 拆为 L3c3b-i native
-  packaging 与 L3c3b-ii installer/L2 admission；b-i next。只有 L3c4
+  packaging 与 L3c3b-ii installer/L2 admission；首个 final-Mach-O spike 又
+  证明 full Machine/Core graph 携带 forbidden Cleanup/Policy/Registered Action
+  typed surface，因此插入 L3c3b-0 authority-closed driver runtime extraction；
+  b-0 next。只有 L3c4
   可作 readiness claim，
   final full 尚未消耗。
   Task 39 尚未完成。
@@ -343,6 +346,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c L3c2b eight-scenario driver review | [docs/reports/phase-d-task-39b2c-l3c2b-eight-scenario-driver-review.md](docs/reports/phase-d-task-39b2c-l3c2b-eight-scenario-driver-review.md) |
 | Phase D Task 39B2c L3c3a driver-bound attempt review | [docs/reports/phase-d-task-39b2c-l3c3a-driver-binding-review.md](docs/reports/phase-d-task-39b2c-l3c3a-driver-binding-review.md) |
 | Phase D Task 39B2c L3c3b scope/trust preflight | [docs/reports/phase-d-task-39b2c-l3c3b-scope-trust-preflight.md](docs/reports/phase-d-task-39b2c-l3c3b-scope-trust-preflight.md) |
+| Phase D Task 39B2c L3c3b driver runtime authority preflight | [docs/reports/phase-d-task-39b2c-l3c3b-driver-runtime-authority-preflight.md](docs/reports/phase-d-task-39b2c-l3c3b-driver-runtime-authority-preflight.md) |
 | Phase D Task 39B2c-L1 residue observation review | [docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md](docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md) |
 | Phase D Task 39B2c-L2 root topology observation review | [docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md](docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md) |
 | Phase D Task 39B2c-L3a trusted machine target review | [docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md](docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md) |
@@ -453,7 +457,8 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   clean staged-only serial 与 final independent review 已完成，L3c2 已关闭；
   L3c3a driver-bound attempt schema、1057-test clean staged-only serial 与
   independent post-fix review 已完成；L3c3b 拆为 b-i native packaging / b-ii
-  installer+L2 admission，b-i next；L3c4
+  installer+L2 admission；final-Mach-O blocker 插入 b-0 authority closure，
+  b-0 next；L3c4
   独占 final admission 与剩余 full。
   Task 39 尚未完成。
 Deep Dive 的旧 Broker-only no-go 已被 ADR 0004 的 capability-first 边界取代；

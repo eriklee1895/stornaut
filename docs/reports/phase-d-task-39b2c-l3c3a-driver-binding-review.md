@@ -142,9 +142,13 @@ Deep Dive or claim readiness. Production Deep Dive remains unavailable.
 
 The subsequent
 [L3c3b preflight](phase-d-task-39b2c-l3c3b-scope-trust-preflight.md) split native
-packaging from installer/L2 admission; L3c3b-i is next. It must package the fixed-signing driver
-only in the diagnostic App and prove its built/staging/installed topology without
-live installation, handoff or model execution. L3c3c-i remains a mandatory
+packaging from installer/L2 admission. The later
+[driver-runtime authority preflight](phase-d-task-39b2c-l3c3b-driver-runtime-authority-preflight.md)
+inserted L3c3b-0 before packaging after final-Mach-O evidence disproved the full
+Machine/Core facade; b-0 is next. It must make the packageable entrypoint
+authority-closed without Xcode packaging. L3c3b-i later packages it only in the
+diagnostic App; L3c3b-ii proves built/staging/installed admission without live
+installation. L3c3c-i remains a mandatory
 repository-external launcher/handoff spike and ADR before any production handoff
 code. L3c4 alone owns readiness and the remaining authoritative full verifier.
 
