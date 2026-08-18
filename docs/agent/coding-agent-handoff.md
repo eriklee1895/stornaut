@@ -207,6 +207,10 @@
 > gates、20-test affected、187-test Investigation、targeted builds/release
 > boundary、1046-test clean staged-only serial 与 independent post-fix review
 > 也已完成；L3c2b next。只有 L3c4 可作 readiness claim，
+> L3c2b preflight 的 fresh-plan matrix contradiction 已由 plan-freshness
+> prerequisite 关闭：八个 actual plan fingerprints 全唯一、一个 exact
+> target-set fingerprint 绑定 cohort，affected/Investigation/structural/review
+> gates 通过；L3c2b driving 继续 next。
 > final full 尚未消耗。
 > 生产 Deep Dive 仍 unavailable。
 > Task 5 的历史

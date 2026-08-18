@@ -115,7 +115,7 @@ public struct SignedInvestigationRuntimeMachineCaseEvidence:
     Sendable,
     Equatable
 {
-    public static let schemaVersion = 1
+    public static let schemaVersion = 2
     public static let maximumEvidenceAgeSeconds = 3_600
 
     public let schemaVersion: Int
@@ -131,6 +131,7 @@ public struct SignedInvestigationRuntimeMachineCaseEvidence:
     public let reportID: InvestigationReportID?
     public let sourceFingerprint: InvestigationFingerprint
     public let planFingerprint: InvestigationFingerprint
+    public let targetSetFingerprint: InvestigationFingerprint
     public let outcome: SignedInvestigationRuntimeMachineCaseOutcome
     public let runStarted: Bool
     public let turnAdmitted: Bool
@@ -160,6 +161,7 @@ public struct SignedInvestigationRuntimeMachineCaseEvidence:
         reportID: InvestigationReportID?,
         sourceFingerprint: InvestigationFingerprint,
         planFingerprint: InvestigationFingerprint,
+        targetSetFingerprint: InvestigationFingerprint,
         outcome: SignedInvestigationRuntimeMachineCaseOutcome,
         runStarted: Bool,
         turnAdmitted: Bool,
@@ -189,6 +191,7 @@ public struct SignedInvestigationRuntimeMachineCaseEvidence:
         self.reportID = reportID
         self.sourceFingerprint = sourceFingerprint
         self.planFingerprint = planFingerprint
+        self.targetSetFingerprint = targetSetFingerprint
         self.outcome = outcome
         self.runStarted = runStarted
         self.turnAdmitted = turnAdmitted
@@ -288,6 +291,12 @@ public struct SignedInvestigationRuntimeMachineCaseEvidence:
                 InvestigationFingerprint.self,
                 forKey: MachineCodingKey(
                     CodingKeys.planFingerprint.rawValue
+                )
+            ),
+            targetSetFingerprint: container.decode(
+                InvestigationFingerprint.self,
+                forKey: MachineCodingKey(
+                    CodingKeys.targetSetFingerprint.rawValue
                 )
             ),
             outcome: container.decode(
@@ -537,6 +546,7 @@ public struct SignedInvestigationRuntimeMachineCaseEvidence:
         case reportID
         case sourceFingerprint
         case planFingerprint
+        case targetSetFingerprint
         case outcome
         case runStarted
         case turnAdmitted
@@ -560,7 +570,7 @@ public struct SignedInvestigationRuntimeFailureMatrix:
     Sendable,
     Equatable
 {
-    public static let schemaVersion = 1
+    public static let schemaVersion = 2
 
     public let schemaVersion: Int
     public let cases: [SignedInvestigationRuntimeMachineCaseEvidence]
@@ -586,8 +596,10 @@ public struct SignedInvestigationRuntimeFailureMatrix:
             sorted.dropFirst().allSatisfy({
                 $0.binding == sorted[0].binding
             }),
+            Set(sorted.map(\.planFingerprint)).count == sorted.count,
             sorted.dropFirst().allSatisfy({
-                $0.planFingerprint == sorted[0].planFingerprint
+                $0.targetSetFingerprint
+                    == sorted[0].targetSetFingerprint
             })
         else {
             throw SignedInvestigationRuntimeContractError.invalidReport
@@ -633,7 +645,7 @@ public struct SignedInvestigationRuntimeMachineReport:
     Sendable,
     Equatable
 {
-    public static let schemaVersion = 1
+    public static let schemaVersion = 2
 
     public let schemaVersion: Int
     public let successReport: SignedInvestigationRuntimeReport
@@ -883,7 +895,7 @@ public struct SignedInvestigationRuntimeMachineEvidenceBundle:
     Sendable,
     Equatable
 {
-    public static let schemaVersion = 5
+    public static let schemaVersion = 6
 
     public let schemaVersion: Int
     public let configurations:

@@ -95,6 +95,10 @@ serial and independent post-fix review passed. See the
 [L3c2a-ii review](../../reports/phase-d-task-39b2c-l3c2a-ii-machine-driver-host-review.md).
 L3c2b is next. Only
 L3c4 owns machine readiness and the remaining full verifier.
+The L3c2b preflight's
+[plan-freshness prerequisite](../../reports/phase-d-task-39b2c-l3c2b-plan-freshness-prerequisite-review.md)
+is complete: real fresh plan fingerprints are unique, one target-set fingerprint
+binds the cohort, and 59-test affected plus 189-test Investigation gates passed.
 Tasks 40–44
 remain blocked on the pushed completion commit of their immediate predecessor.
 

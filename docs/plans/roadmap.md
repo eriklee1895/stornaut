@@ -215,6 +215,8 @@ targeted build/release boundaries、1041-test clean staged-only serial 与
 independent post-fix review；L3c2a-ii non-product root host/topology、resolved
 authority gates、targeted builds/release boundary、1046-test clean staged-only
 serial 与 independent post-fix review 也已完成；L3c2b next，
+L3c2b preflight 的 real-plan matrix contradiction 已由 3-path plan-freshness
+prerequisite 关闭，affected/Investigation/structural/review gates 通过；
 只有 L3c4 可作 readiness claim 并运行
 Task 39 剩余唯一 full。
 Task 44 是唯一

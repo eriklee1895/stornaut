@@ -868,6 +868,9 @@ Checkpoint status:
   [Machine-Claim Transport Review](../../reports/phase-d-task-39b2c-l3c2a-i-machine-claim-transport-review.md).
   L3c2a-ii evidence is in the
   [Machine Driver Host Review](../../reports/phase-d-task-39b2c-l3c2a-ii-machine-driver-host-review.md).
+  The L3c2b preflight's real-plan matrix contradiction is closed by the
+  [Plan Freshness Prerequisite Review](../../reports/phase-d-task-39b2c-l3c2b-plan-freshness-prerequisite-review.md);
+  L3c2b driving remains next.
   Only L3c4 owns
   real-model signed-App machine readiness, the complete failure matrix, exact
   zero-residue proof and the remaining authoritative full verifier. Task 39 and

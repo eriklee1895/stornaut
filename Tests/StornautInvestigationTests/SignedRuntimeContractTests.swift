@@ -1075,6 +1075,49 @@ struct SignedRuntimeContractTests {
     }
 
     @Test
+    func machineMatrixAcceptsFreshPlansForOneExactTargetSet() throws {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let configurations = try fixture.machineConfigurations()
+        let plans = try configurations.map {
+            try fixture.machinePlan(configuration: $0)
+        }
+        let cases = try zip(configurations, plans).map {
+            configuration, plan in
+            try fixture.caseEvidence(
+                configuration: configuration,
+                planFingerprint: plan.fingerprint,
+                targetSetFingerprint: plan.targetSetFingerprint
+            )
+        }
+
+        #expect(Set(plans.map(\.fingerprint)).count == plans.count)
+        #expect(
+            Set(plans.map(\.targetSetFingerprint)).count == 1
+        )
+
+        let matrix = try SignedInvestigationRuntimeFailureMatrix(
+            cases: cases
+        )
+        #expect(matrix.cases.count == configurations.count)
+
+        var replayedPlan = cases
+        replayedPlan[1] = try fixture.caseEvidence(
+            configuration: configurations[1],
+            planFingerprint: plans[0].fingerprint,
+            targetSetFingerprint: plans[1].targetSetFingerprint
+        )
+        #expect(
+            throws:
+                SignedInvestigationRuntimeContractError.invalidReport
+        ) {
+            _ = try SignedInvestigationRuntimeFailureMatrix(
+                cases: replayedPlan
+            )
+        }
+    }
+
+    @Test
     func machineCaseEvidenceRejectsForeignReportIdentity() throws {
         let fixture = try SignedRuntimeContractFixture()
         defer { fixture.remove() }
@@ -1483,7 +1526,7 @@ struct SignedRuntimeContractTests {
         )
         mixedPlans[planIndex] = try fixture.caseEvidence(
             configuration: configurations[planIndex],
-            planFingerprint: try InvestigationFingerprint(
+            targetSetFingerprint: try InvestigationFingerprint(
                 validatingHex: String(repeating: "d", count: 64)
             )
         )
@@ -2511,6 +2554,56 @@ struct SignedRuntimeContractFixture {
         }
     }
 
+    func machinePlan(
+        configuration: SignedInvestigationRuntimeDiagnosticConfiguration
+    ) throws -> InvestigationPlan {
+        let scanSessionID = ScanSessionID(
+            rawValue: "scan-task39-machine-cohort"
+        )!
+        let scanScopeID = ScanScopeID(
+            rawValue: "scope-task39-machine-cohort"
+        )!
+        let target = try InvestigationTarget(
+            scanSessionID: scanSessionID,
+            scanScopeID: scanScopeID,
+            sourceBinding: .snapshot(
+                SnapshotID(
+                    rawValue: "snapshot-task39-machine-cohort"
+                )!
+            ),
+            kind: .unknownLargeConsumer,
+            reasonKeys: [
+                DomainToken(rawValue: "reason.task39.machine")!,
+            ],
+            expectedAllocatedBytes: ByteCount(2_147_483_648),
+            uncertaintyPermille: 900,
+            relevancePermille: 800,
+            investigationCostPermille: 500,
+            createdAt: now
+        )
+        return try InvestigationPlan(
+            id: InvestigationID(
+                rawValue: "investigation-"
+                    + configuration.nonce.uuidString.lowercased()
+            )!,
+            scanSessionID: scanSessionID,
+            scanScopeID: scanScopeID,
+            sourceFingerprint: InvestigationFingerprint(
+                validatingHex:
+                    configuration.binding.sourceFingerprintSHA256
+            ),
+            budgetPreset: .focused,
+            targets: [target],
+            createdAt: now,
+            expiresAt: now.addingTimeInterval(3_600),
+            requestedCoveragePermille:
+                InvestigationPlan.policyRequestedCoveragePermille,
+            remainingUnknownByteThreshold:
+                InvestigationPlan.policyRemainingUnknownByteThreshold,
+            requiredCapabilities: InvestigationCapability.required
+        )
+    }
+
     func configuration(
         nonce: UUID? = nil,
         scenario: SignedInvestigationRuntimeDiagnosticScenario = .success,
@@ -2747,6 +2840,7 @@ struct SignedRuntimeContractFixture {
         denials: [SignedInvestigationRuntimeDenialEvidence]? = nil,
         finalResidue: SignedInvestigationRuntimeResidue? = nil,
         planFingerprint: InvestigationFingerprint? = nil,
+        targetSetFingerprint: InvestigationFingerprint? = nil,
         upstreamError: SignedInvestigationRuntimeUpstreamError? = nil,
         startedAt: Date? = nil,
         completedAt: Date? = nil,
@@ -2754,6 +2848,7 @@ struct SignedRuntimeContractFixture {
     ) throws -> SignedInvestigationRuntimeMachineCaseEvidence {
         let scenario = configuration.scenario
         let controls = machineControls(for: scenario)
+        let plan = try machinePlan(configuration: configuration)
         let nonceText = configuration.nonce.uuidString.lowercased()
         let capabilityEvidenceSHA256: String?
         if scenario == .success {
@@ -2791,10 +2886,9 @@ struct SignedRuntimeContractFixture {
                 validatingHex:
                     configuration.binding.sourceFingerprintSHA256
             ),
-            planFingerprint: try planFingerprint
-                ?? InvestigationFingerprint(
-                    validatingHex: String(repeating: "b", count: 64)
-                ),
+            planFingerprint: planFingerprint ?? plan.fingerprint,
+            targetSetFingerprint:
+                targetSetFingerprint ?? plan.targetSetFingerprint,
             outcome: machineOutcome(for: scenario),
             runStarted: controls.runStarted,
             turnAdmitted: controls.turnAdmitted,

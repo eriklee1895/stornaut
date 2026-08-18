@@ -215,7 +215,11 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   XPC/signing adapters、resolved package/source authority gate、20-test affected、
   187-test Investigation、targeted driver/diagnostic builds、release boundary、
   1046-test clean staged-only serial 与 independent post-fix review 也已完成；
-  L3c2b next。只有 L3c4 可作 readiness claim，
+  L3c2b preflight 发现的 fresh plan/matrix contradiction 已由 3-path
+  plan-freshness prerequisite 关闭：actual plan fingerprints 全唯一、exact
+  target-set fingerprint 全相同，59-test affected、189-test Investigation、
+  structural gate 与 independent review 已通过；L3c2b driving next。只有 L3c4
+  可作 readiness claim，
   final full 尚未消耗。
   Task 39 尚未完成。
   真实 App Trash 依赖仍保持关闭，生产 Deep Dive 仍为 implementation unavailable。

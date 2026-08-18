@@ -44,6 +44,21 @@ struct SignedRuntimeMachineSerializationTests {
 
         #expect(decoded == report)
         #expect(
+            decoded.schemaVersion
+                == SignedInvestigationRuntimeMachineReport.schemaVersion
+        )
+        #expect(
+            decoded.failureMatrix.schemaVersion
+                == SignedInvestigationRuntimeFailureMatrix.schemaVersion
+        )
+        #expect(
+            decoded.failureMatrix.cases.allSatisfy {
+                $0.schemaVersion
+                    == SignedInvestigationRuntimeMachineCaseEvidence
+                        .schemaVersion
+            }
+        )
+        #expect(
             report.verdict
                 == .evidenceContractValidatedMachineAdmissionPending
         )
@@ -87,6 +102,42 @@ struct SignedRuntimeMachineSerializationTests {
             JSONSerialization.jsonObject(with: encoded)
                 as? [String: Any]
         )
+        var legacyReport = object
+        legacyReport["schemaVersion"] = 1
+        let legacyReportData = try JSONSerialization.data(
+            withJSONObject: legacyReport,
+            options: [.sortedKeys]
+        )
+        #expect(
+            throws:
+                SignedInvestigationRuntimeContractError.invalidReport
+        ) {
+            _ = try JSONDecoder().decode(
+                SignedInvestigationRuntimeMachineReport.self,
+                from: legacyReportData
+            )
+        }
+
+        var legacyMatrix = object
+        var matrix = try #require(
+            legacyMatrix["failureMatrix"] as? [String: Any]
+        )
+        matrix["schemaVersion"] = 1
+        legacyMatrix["failureMatrix"] = matrix
+        let legacyMatrixData = try JSONSerialization.data(
+            withJSONObject: legacyMatrix,
+            options: [.sortedKeys]
+        )
+        #expect(
+            throws:
+                SignedInvestigationRuntimeContractError.invalidReport
+        ) {
+            _ = try JSONDecoder().decode(
+                SignedInvestigationRuntimeMachineReport.self,
+                from: legacyMatrixData
+            )
+        }
+
         object["matrixSHA256"] = String(repeating: "0", count: 64)
         let tampered = try JSONSerialization.data(
             withJSONObject: object,
@@ -256,6 +307,11 @@ struct SignedRuntimeMachineSerializationTests {
 
         #expect(decoded == bundle)
         #expect(
+            decoded.schemaVersion
+                == SignedInvestigationRuntimeMachineEvidenceBundle
+                    .schemaVersion
+        )
+        #expect(
             decoded.capabilityWorker.completedAt
                 == fixture.now.addingTimeInterval(-1)
         )
@@ -324,6 +380,83 @@ struct SignedRuntimeMachineSerializationTests {
         }
 
         object.removeValue(forKey: "unexpected")
+        var legacyBundle = object
+        legacyBundle["schemaVersion"] = 5
+        let legacyBundleData = try JSONSerialization.data(
+            withJSONObject: legacyBundle,
+            options: [.sortedKeys]
+        )
+        #expect(
+            throws:
+                SignedInvestigationRuntimeContractError.invalidReport
+        ) {
+            _ = try JSONDecoder().decode(
+                SignedInvestigationRuntimeMachineEvidenceBundle.self,
+                from: legacyBundleData
+            )
+        }
+
+        var missingTargetSet = object
+        var cases = try #require(
+            missingTargetSet["artifacts"] as? [[String: Any]]
+        )
+        cases[0].removeValue(forKey: "targetSetFingerprint")
+        missingTargetSet["artifacts"] = cases
+        let missingTargetSetData = try JSONSerialization.data(
+            withJSONObject: missingTargetSet,
+            options: [.sortedKeys]
+        )
+        #expect(
+            throws:
+                SignedInvestigationRuntimeContractError.invalidReport
+        ) {
+            _ = try JSONDecoder().decode(
+                SignedInvestigationRuntimeMachineEvidenceBundle.self,
+                from: missingTargetSetData
+            )
+        }
+
+        var legacyCase = object
+        var legacyCases = try #require(
+            legacyCase["artifacts"] as? [[String: Any]]
+        )
+        legacyCases[0]["schemaVersion"] = 1
+        legacyCase["artifacts"] = legacyCases
+        let legacyCaseData = try JSONSerialization.data(
+            withJSONObject: legacyCase,
+            options: [.sortedKeys]
+        )
+        #expect(
+            throws:
+                SignedInvestigationRuntimeContractError.invalidReport
+        ) {
+            _ = try JSONDecoder().decode(
+                SignedInvestigationRuntimeMachineEvidenceBundle.self,
+                from: legacyCaseData
+            )
+        }
+
+        var foreignTargetSet = object
+        var foreignCases = try #require(
+            foreignTargetSet["artifacts"] as? [[String: Any]]
+        )
+        foreignCases[0]["targetSetFingerprint"] =
+            String(repeating: "d", count: 64)
+        foreignTargetSet["artifacts"] = foreignCases
+        let foreignTargetSetData = try JSONSerialization.data(
+            withJSONObject: foreignTargetSet,
+            options: [.sortedKeys]
+        )
+        #expect(
+            throws:
+                SignedInvestigationRuntimeContractError.invalidReport
+        ) {
+            _ = try JSONDecoder().decode(
+                SignedInvestigationRuntimeMachineEvidenceBundle.self,
+                from: foreignTargetSetData
+            )
+        }
+
         var worker = try #require(
             object["capabilityWorker"] as? [String: Any]
         )

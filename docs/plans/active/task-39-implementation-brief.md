@@ -905,6 +905,13 @@ The remaining L3 work is split before driver coding:
      added lines: up to two new Machine scenario-driver/fault files, the existing
      host file, up to two focused test/support files, the Machine boundary test
      and structural verifier, plus at most one fixed runner contract.
+     Its mandatory preflight found that fresh nonces/Investigation IDs make
+     actual plan fingerprints unique while the old matrix incorrectly required
+     one shared synthetic plan fingerprint. The independently reviewed
+     [plan-freshness prerequisite](../../reports/phase-d-task-39b2c-l3c2b-plan-freshness-prerequisite-review.md)
+     now requires eight unique actual plan fingerprints plus one shared exact
+     target-set fingerprint, with strict schema migration. L3c2b driving remains
+     next.
 
    The L3c2 preflight also closed two ordering ambiguities. The escrow surviving
    App disconnect is a failure-tolerance property, not permission to postpone
