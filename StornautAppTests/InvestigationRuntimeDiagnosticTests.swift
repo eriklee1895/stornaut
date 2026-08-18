@@ -152,6 +152,35 @@ func investigationRuntimeDiagnosticLeafValidatesTheClosedConfiguration()
     #expect(leaf.scenario == configuration.scenario.rawValue)
     #expect(leaf.diagnosticRootPath == configuration.diagnosticRootPath)
 
+    for hashLength in [40, 64] {
+        var root = try #require(
+            JSONSerialization.jsonObject(with: data)
+                as? [String: Any]
+        )
+        var binding = try #require(
+            root["binding"] as? [String: Any]
+        )
+        var driver = try #require(
+            binding["machineDriver"] as? [String: Any]
+        )
+        driver["codeDirectoryHash"] = String(
+            repeating: "6",
+            count: hashLength
+        )
+        binding["machineDriver"] = driver
+        root["binding"] = binding
+        let validHashLength = try JSONSerialization.data(
+            withJSONObject: root,
+            options: [.sortedKeys]
+        )
+        #expect(
+            try InvestigationRuntimeDiagnosticLeaf.prepare(
+                configurationData: validHashLength,
+                now: fixture.now
+            ).nonce == configuration.nonce
+        )
+    }
+
     var object = try #require(
         JSONSerialization.jsonObject(with: data) as? [String: Any]
     )
@@ -165,6 +194,87 @@ func investigationRuntimeDiagnosticLeafValidatesTheClosedConfiguration()
             configurationData: invalid,
             now: fixture.now
         )
+    }
+
+    for mutation in [
+        "missing",
+        "unknown",
+        "schema",
+        "executable",
+        "signing",
+        "requirement",
+        "cdhash39",
+        "cdhash41",
+        "cdhash63",
+        "cdhash65",
+        "cdhashUppercase",
+        "cdhashNonHex",
+        "service",
+    ] {
+        var root = try #require(
+            JSONSerialization.jsonObject(with: data)
+                as? [String: Any]
+        )
+        var binding = try #require(
+            root["binding"] as? [String: Any]
+        )
+        if mutation == "missing" {
+            binding.removeValue(forKey: "machineDriver")
+        } else {
+            var driver = try #require(
+                binding["machineDriver"] as? [String: Any]
+            )
+            switch mutation {
+            case "unknown": driver["unexpected"] = true
+            case "schema": driver["schemaVersion"] = 2
+            case "executable":
+                driver["executableSHA256"] = String(
+                    repeating: "0", count: 63
+                )
+            case "signing":
+                driver["signingIdentifier"] = "foreign.driver"
+            case "requirement":
+                driver["designatedRequirementSHA256"] =
+                    String(repeating: "0", count: 63)
+            case "cdhash39":
+                driver["codeDirectoryHash"] =
+                    String(repeating: "0", count: 39)
+            case "cdhash41":
+                driver["codeDirectoryHash"] =
+                    String(repeating: "0", count: 41)
+            case "cdhash63":
+                driver["codeDirectoryHash"] =
+                    String(repeating: "0", count: 63)
+            case "cdhash65":
+                driver["codeDirectoryHash"] =
+                    String(repeating: "0", count: 65)
+            case "cdhashUppercase":
+                driver["codeDirectoryHash"] =
+                    String(repeating: "A", count: 40)
+            case "cdhashNonHex":
+                driver["codeDirectoryHash"] =
+                    String(repeating: "g", count: 64)
+            case "service":
+                driver["machineClaimServiceIdentifier"] =
+                    "com.eriklee.stornaut.lifecycle"
+            default: break
+            }
+            binding["machineDriver"] = driver
+        }
+        root["binding"] = binding
+        let mutated = try JSONSerialization.data(
+            withJSONObject: root,
+            options: [.sortedKeys]
+        )
+        #expect(
+            throws: InvestigationRuntimeDiagnosticContractError
+                .invalidConfiguration
+        ) {
+            _ = try InvestigationRuntimeDiagnosticLeaf.prepare(
+                configurationData: mutated,
+                now: fixture.now
+            )
+        }
     }
 }
 
@@ -630,7 +740,20 @@ private struct InvestigationRuntimeAppLeafFixture {
                     String(repeating: "3", count: 64),
                 appBundleIdentifier: "com.eriklee.stornaut",
                 helperServiceIdentifier:
-                    "com.eriklee.stornaut.lifecycle"
+                    "com.eriklee.stornaut.lifecycle",
+                machineDriver:
+                    try SignedInvestigationRuntimeMachineDriverBinding(
+                        executableSHA256:
+                            String(repeating: "4", count: 64),
+                        signingIdentifier:
+                            "com.eriklee.stornaut.investigation.machine-driver",
+                        designatedRequirementSHA256:
+                            String(repeating: "5", count: 64),
+                        codeDirectoryHash:
+                            String(repeating: "6", count: 64),
+                        machineClaimServiceIdentifier:
+                            "com.eriklee.stornaut.lifecycle.machine-claim"
+                    )
             ),
             expectedModel: .gpt56Luna,
             expectedProvider: .openAI,

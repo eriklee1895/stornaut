@@ -241,7 +241,8 @@ struct InvestigationLifecycleTopologyCollectorTests {
             appBundleIdentifier:
                 fixture.signedBinding.appBundleIdentifier,
             helperServiceIdentifier:
-                fixture.signedBinding.helperServiceIdentifier
+                fixture.signedBinding.helperServiceIdentifier,
+            machineDriver: fixture.signedBinding.machineDriver
         )
         let topology = ScriptedTopologyObserver(results: [
             .success(try fixture.installedObservation()),

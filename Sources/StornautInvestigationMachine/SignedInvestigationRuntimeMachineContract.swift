@@ -115,7 +115,7 @@ public struct SignedInvestigationRuntimeMachineCaseEvidence:
     Sendable,
     Equatable
 {
-    public static let schemaVersion = 2
+    public static let schemaVersion = 3
     public static let maximumEvidenceAgeSeconds = 3_600
 
     public let schemaVersion: Int
@@ -570,7 +570,7 @@ public struct SignedInvestigationRuntimeFailureMatrix:
     Sendable,
     Equatable
 {
-    public static let schemaVersion = 2
+    public static let schemaVersion = 3
 
     public let schemaVersion: Int
     public let cases: [SignedInvestigationRuntimeMachineCaseEvidence]
@@ -645,7 +645,7 @@ public struct SignedInvestigationRuntimeMachineReport:
     Sendable,
     Equatable
 {
-    public static let schemaVersion = 2
+    public static let schemaVersion = 3
 
     public let schemaVersion: Int
     public let successReport: SignedInvestigationRuntimeReport
@@ -768,7 +768,7 @@ public struct SignedInvestigationRuntimeLifecycleResidueRecord:
     Sendable,
     Equatable
 {
-    public static let schemaVersion = 1
+    public static let schemaVersion = 2
 
     public let schemaVersion: Int
     public let scenario: SignedInvestigationRuntimeDiagnosticScenario
@@ -895,7 +895,7 @@ public struct SignedInvestigationRuntimeMachineEvidenceBundle:
     Sendable,
     Equatable
 {
-    public static let schemaVersion = 6
+    public static let schemaVersion = 7
 
     public let schemaVersion: Int
     public let configurations:

@@ -267,7 +267,8 @@ final class InvestigationMachineScenarioAttemptFixture:
             facadeSHA256: binding.facadeSHA256,
             codexExecutableSHA256: binding.codexExecutableSHA256,
             appBundleIdentifier: binding.appBundleIdentifier,
-            helperServiceIdentifier: binding.helperServiceIdentifier
+            helperServiceIdentifier: binding.helperServiceIdentifier,
+            machineDriver: binding.machineDriver
         )
     }
 

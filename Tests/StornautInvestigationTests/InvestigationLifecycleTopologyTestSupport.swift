@@ -93,7 +93,17 @@ final class LifecycleTopologyCollectorFixture: @unchecked Sendable {
             facadeSHA256: String(repeating: "6", count: 64),
             codexExecutableSHA256: String(repeating: "7", count: 64),
             appBundleIdentifier: contract.appBundleIdentifier,
-            helperServiceIdentifier: contract.label
+            helperServiceIdentifier: contract.label,
+            machineDriver: try SignedInvestigationRuntimeMachineDriverBinding(
+                executableSHA256: String(repeating: "8", count: 64),
+                signingIdentifier:
+                    contract.machineDriverSigningIdentifier,
+                designatedRequirementSHA256:
+                    String(repeating: "9", count: 64),
+                codeDirectoryHash: String(repeating: "3", count: 40),
+                machineClaimServiceIdentifier:
+                    contract.machineClaimMachServiceName
+            )
         )
         configuration = try Self.configuration(
             root: root,

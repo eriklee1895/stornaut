@@ -157,7 +157,7 @@ private struct Configuration: Decodable {
         ]
         let filePaths = [reportPath, storePath]
         guard
-            schemaVersion == 2,
+            schemaVersion == 3,
             optIn == InvestigationRuntimeDiagnosticAppLeaf.requiredOptIn,
             binding.isValid,
             expectedModel == "gpt-5.6-luna",
@@ -230,6 +230,7 @@ private enum Scenario: String, Decodable, CaseIterable {
 }
 
 private struct Binding: Decodable {
+    let schemaVersion: Int
     let repositoryHEAD: String
     let sourceFingerprintSHA256: String
     let appExecutableSHA256: String
@@ -241,11 +242,16 @@ private struct Binding: Decodable {
     let codexExecutableSHA256: String
     let appBundleIdentifier: String
     let helperServiceIdentifier: String
+    let machineDriver: MachineDriverBinding
 
     init(from decoder: Decoder) throws {
         let container = try strictContainer(
             decoder,
             keys: Set(CodingKeys.allCases.map(\.rawValue))
+        )
+        schemaVersion = try container.decode(
+            Int.self,
+            forKey: DynamicCodingKey(CodingKeys.schemaVersion.rawValue)
         )
         repositoryHEAD = try container.decode(
             String.self,
@@ -307,10 +313,15 @@ private struct Binding: Decodable {
                 CodingKeys.helperServiceIdentifier.rawValue
             )
         )
+        machineDriver = try container.decode(
+            MachineDriverBinding.self,
+            forKey: DynamicCodingKey(CodingKeys.machineDriver.rawValue)
+        )
     }
 
     var isValid: Bool {
-        lowercaseHex(repositoryHEAD, count: 40)
+        schemaVersion == 2
+            && lowercaseHex(repositoryHEAD, count: 40)
             && [
                 sourceFingerprintSHA256,
                 appExecutableSHA256,
@@ -324,9 +335,11 @@ private struct Binding: Decodable {
             && appBundleIdentifier == "com.eriklee.stornaut"
             && helperServiceIdentifier
                 == "com.eriklee.stornaut.lifecycle"
+            && machineDriver.isValid
     }
 
     private enum CodingKeys: String, CodingKey, CaseIterable {
+        case schemaVersion
         case repositoryHEAD
         case sourceFingerprintSHA256
         case appExecutableSHA256
@@ -338,6 +351,75 @@ private struct Binding: Decodable {
         case codexExecutableSHA256
         case appBundleIdentifier
         case helperServiceIdentifier
+        case machineDriver
+    }
+}
+
+private struct MachineDriverBinding: Decodable {
+    let schemaVersion: Int
+    let executableSHA256: String
+    let signingIdentifier: String
+    let designatedRequirementSHA256: String
+    let codeDirectoryHash: String
+    let machineClaimServiceIdentifier: String
+
+    init(from decoder: Decoder) throws {
+        let container = try strictContainer(
+            decoder,
+            keys: Set(CodingKeys.allCases.map(\.rawValue))
+        )
+        schemaVersion = try container.decode(
+            Int.self,
+            forKey: DynamicCodingKey(CodingKeys.schemaVersion.rawValue)
+        )
+        executableSHA256 = try container.decode(
+            String.self,
+            forKey: DynamicCodingKey(CodingKeys.executableSHA256.rawValue)
+        )
+        signingIdentifier = try container.decode(
+            String.self,
+            forKey: DynamicCodingKey(CodingKeys.signingIdentifier.rawValue)
+        )
+        designatedRequirementSHA256 = try container.decode(
+            String.self,
+            forKey: DynamicCodingKey(
+                CodingKeys.designatedRequirementSHA256.rawValue
+            )
+        )
+        codeDirectoryHash = try container.decode(
+            String.self,
+            forKey: DynamicCodingKey(CodingKeys.codeDirectoryHash.rawValue)
+        )
+        machineClaimServiceIdentifier = try container.decode(
+            String.self,
+            forKey: DynamicCodingKey(
+                CodingKeys.machineClaimServiceIdentifier.rawValue
+            )
+        )
+    }
+
+    var isValid: Bool {
+        schemaVersion == 1
+            && lowercaseHex(executableSHA256, count: 64)
+            && signingIdentifier
+                == "com.eriklee.stornaut.investigation.machine-driver"
+            && lowercaseHex(
+                designatedRequirementSHA256,
+                count: 64
+            )
+            && (lowercaseHex(codeDirectoryHash, count: 40)
+                || lowercaseHex(codeDirectoryHash, count: 64))
+            && machineClaimServiceIdentifier
+                == "com.eriklee.stornaut.lifecycle.machine-claim"
+    }
+
+    private enum CodingKeys: String, CodingKey, CaseIterable {
+        case schemaVersion
+        case executableSHA256
+        case signingIdentifier
+        case designatedRequirementSHA256
+        case codeDirectoryHash
+        case machineClaimServiceIdentifier
     }
 }
 

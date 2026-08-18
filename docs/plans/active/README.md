@@ -102,7 +102,12 @@ driver binding schema, L3c3b native packaging/topology admission, L3c3c-i
 handoff/launcher spike and ADR, L3c3c-ii fixed live handoff, and L3c3d one real
 success pending candidate. See the
 [L3c3 preflight](../../reports/phase-d-task-39b2c-l3c3-scope-trust-preflight.md).
-L3c3a is next. Only
+L3c3a is complete: its strict driver-bound attempt schema, App-leaf decoder,
+installed identity join, structural/release gates, 199-test Investigation suite,
+11-test App target, one 1,057-test clean staged-only serial and independent
+post-fix review passed. See the
+[L3c3a review](../../reports/phase-d-task-39b2c-l3c3a-driver-binding-review.md).
+L3c3b native diagnostic-only driver packaging/topology admission is next. Only
 L3c4 owns machine readiness and the remaining full verifier.
 The L3c2b preflight's
 [plan-freshness prerequisite](../../reports/phase-d-task-39b2c-l3c2b-plan-freshness-prerequisite-review.md)
@@ -126,7 +131,7 @@ the sole normal-product admission gate.
 | [36](task-36-implementation-brief.md) | Domain, canonical projection, planner, budget and stop contracts | complete; [review](../../reports/phase-d-task-36-review.md) |
 | [37](task-37-implementation-brief.md) | Store v4, retention and source rejoin | complete; [review](../../reports/phase-d-task-37-review.md) |
 | [38](task-38-implementation-brief.md) | Closed coordinator with fake runtime | complete; [review](../../reports/phase-d-task-38-review.md) |
-| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; 39A through 39B2b-ii and 39B2c L3c1/L3c2 complete; L3c3 split by mandatory preflight; L3c3a driver binding schema next |
+| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; 39A through 39B2b-ii and 39B2c L3c1/L3c2/L3c3a complete; L3c3b native driver packaging next |
 | [40](task-40-implementation-brief.md) | Evidence report and conservative Review projection | blocked on Task 39 |
 | [41](task-41-implementation-brief.md) | First-use disclosure and typed availability | blocked on Task 40 |
 | [42](task-42-implementation-brief.md) | App workflow and recovery state | blocked on Task 41 |

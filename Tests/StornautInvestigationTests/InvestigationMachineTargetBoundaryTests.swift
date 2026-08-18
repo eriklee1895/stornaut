@@ -4,6 +4,297 @@ import Testing
 @Suite("Task 39 trusted machine target boundary")
 struct InvestigationMachineTargetBoundaryTests {
     @Test
+    func l3c3aAddsOnlyStrictDriverBindingWithoutAdvancingTopology()
+        throws
+    {
+        let repositoryRoot = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+
+        func source(_ path: String) throws -> String {
+            try String(
+                contentsOf: repositoryRoot.appending(path: path),
+                encoding: .utf8
+            )
+        }
+
+        func block(
+            _ text: String,
+            from startMarker: String,
+            until endMarker: String
+        ) throws -> String {
+            let start = try #require(text.range(of: startMarker))
+            let suffix = text[start.lowerBound...]
+            let end = try #require(suffix.range(of: endMarker))
+            return String(suffix[..<end.lowerBound])
+        }
+
+        func requireSchema(
+            _ version: Int,
+            declaration: String,
+            in text: String,
+            until endMarker: String
+        ) throws {
+            let declarationSource = try block(
+                text,
+                from: "public struct \(declaration):",
+                until: endMarker
+            )
+            #expect(declarationSource.contains(
+                "public static let schemaVersion = \(version)"
+            ))
+        }
+
+        let signedContract = try source(
+            "Sources/StornautInvestigation/"
+                + "SignedInvestigationRuntimeContract.swift"
+        )
+        let machineContract = try source(
+            "Sources/StornautInvestigationMachine/"
+                + "SignedInvestigationRuntimeMachineContract.swift"
+        )
+        let appLeaf = try source(
+            "Sources/StornautInvestigationDiagnostic/"
+                + "InvestigationRuntimeDiagnosticAppLeaf.swift"
+        )
+        let composition = try source(
+            "Sources/StornautInvestigationDiagnostic/"
+                + "InvestigationRuntimeDiagnosticComposition.swift"
+        )
+        let lifecycleRegistration = try source(
+            "Sources/StornautLifecycle/"
+                + "LifecycleServiceRegistration.swift"
+        )
+        let xcodeProject = try source(
+            "Stornaut.xcodeproj/project.pbxproj"
+        )
+
+        let driverBinding = try block(
+            signedContract,
+            from:
+                "public struct "
+                + "SignedInvestigationRuntimeMachineDriverBinding:",
+            until: "public struct SignedInvestigationRuntimeBinding:"
+        )
+        for marker in [
+            "public static let schemaVersion = 1",
+            "strictSignedRuntimeContainer(",
+            #"keys: Set(CodingKeys.allCases.map(\.rawValue))"#,
+            "public let executableSHA256: String",
+            "public let signingIdentifier: String",
+            "public let designatedRequirementSHA256: String",
+            "public let codeDirectoryHash: String",
+            "public let machineClaimServiceIdentifier: String",
+            "lowercaseHex(codeDirectoryHash, count: 40)",
+            "lowercaseHex(codeDirectoryHash, count: 64)",
+            "case schemaVersion",
+            "case executableSHA256",
+            "case signingIdentifier",
+            "case designatedRequirementSHA256",
+            "case codeDirectoryHash",
+            "case machineClaimServiceIdentifier",
+            "lowercaseHex(codeDirectoryHash, count: 40)",
+            "lowercaseHex(codeDirectoryHash, count: 64)",
+        ] {
+            #expect(driverBinding.contains(marker))
+        }
+        #expect(
+            driverBinding.components(separatedBy: "        case " ).count
+                == 7
+        )
+
+        let runtimeBinding = try block(
+            signedContract,
+            from: "public struct SignedInvestigationRuntimeBinding:",
+            until:
+                "public struct "
+                + "SignedInvestigationRuntimeDiagnosticConfiguration:"
+        )
+        for marker in [
+            "public static let schemaVersion = 2",
+            "public let machineDriver:",
+            "SignedInvestigationRuntimeMachineDriverBinding",
+            "case machineDriver",
+            "machineDriver: try container.decode(",
+        ] {
+            #expect(runtimeBinding.contains(marker))
+        }
+        #expect(!runtimeBinding.contains(
+            "machineDriver:\n"
+                + "        SignedInvestigationRuntimeMachineDriverBinding?"
+        ))
+        #expect(!runtimeBinding.contains(
+            "machineDriver: container.decodeIfPresent"
+        ))
+
+        try requireSchema(
+            3,
+            declaration: "SignedInvestigationRuntimeDiagnosticConfiguration",
+            in: signedContract,
+            until: "public enum SignedInvestigationRuntimeDenialKind:"
+        )
+        try requireSchema(
+            4,
+            declaration: "SignedInvestigationCapabilityEvidenceReceipt",
+            in: signedContract,
+            until: "public struct SignedInvestigationRuntimeReport:"
+        )
+        try requireSchema(
+            4,
+            declaration: "SignedInvestigationRuntimeReport",
+            in: signedContract,
+            until: "public struct SignedInvestigationRuntimeAdmissionReceipt:"
+        )
+        for (declaration, version, nextDeclaration) in [
+            (
+                "SignedInvestigationRuntimeMachineCaseEvidence",
+                3,
+                "SignedInvestigationRuntimeFailureMatrix"
+            ),
+            (
+                "SignedInvestigationRuntimeFailureMatrix",
+                3,
+                "SignedInvestigationRuntimeMachineReport"
+            ),
+            (
+                "SignedInvestigationRuntimeMachineReport",
+                3,
+                "SignedInvestigationRuntimeLifecycleResidueRecord"
+            ),
+            (
+                "SignedInvestigationRuntimeLifecycleResidueRecord",
+                2,
+                "SignedInvestigationRuntimeMachineEvidenceBundle"
+            ),
+        ] {
+            try requireSchema(
+                version,
+                declaration: declaration,
+                in: machineContract,
+                until: "public struct \(nextDeclaration):"
+            )
+        }
+        let evidenceBundle = try block(
+            machineContract,
+            from:
+                "public struct "
+                + "SignedInvestigationRuntimeMachineEvidenceBundle:",
+            until:
+                "private struct "
+                + "CompletedMachineConfiguration: Decodable"
+        )
+        #expect(evidenceBundle.contains(
+            "public static let schemaVersion = 7"
+        ))
+
+        let leafConfiguration = try block(
+            appLeaf,
+            from: "private struct Configuration: Decodable",
+            until: "private enum Scenario:"
+        )
+        let leafBinding = try block(
+            appLeaf,
+            from: "private struct Binding: Decodable",
+            until: "private struct MachineDriverBinding: Decodable"
+        )
+        let leafDriverBinding = try block(
+            appLeaf,
+            from: "private struct MachineDriverBinding: Decodable",
+            until: "private struct DynamicCodingKey:"
+        )
+        #expect(leafConfiguration.contains("schemaVersion == 3"))
+        #expect(leafBinding.contains("schemaVersion == 2"))
+        #expect(leafBinding.contains("case machineDriver"))
+        #expect(leafDriverBinding.contains("schemaVersion == 1"))
+        for marker in [
+            "strictContainer(",
+            #"keys: Set(CodingKeys.allCases.map(\.rawValue))"#,
+            "case schemaVersion",
+            "case executableSHA256",
+            "case signingIdentifier",
+            "case designatedRequirementSHA256",
+            "case codeDirectoryHash",
+            "case machineClaimServiceIdentifier",
+        ] {
+            #expect(leafDriverBinding.contains(marker))
+        }
+        #expect(
+            leafDriverBinding.components(
+                separatedBy: "        case "
+            ).count == 7
+        )
+
+        let observation = try block(
+            composition,
+            from:
+                "package struct "
+                + "InvestigationRuntimeDiagnosticBindingObservation:",
+            until:
+                "private actor "
+                + "InvestigationRuntimeDiagnosticTransportOwner:"
+        )
+        for marker in [
+            "LifecycleBundleSigningIdentityReader()",
+            "contract.machineDriverExecutableURL",
+            "Contents/MacOS/",
+            "StornautInvestigationMachineDriver",
+            "machineDriverEvidence.executableSHA256",
+            "machineDriverEvidence.identity.signingIdentifier",
+            "machineDriverDesignatedRequirementSHA256",
+            "machineDriverCodeDirectoryHash",
+            "machineClaimServiceIdentifier",
+            "binding.machineDriver",
+        ] {
+            #expect(observation.contains(marker))
+        }
+
+        let signingIdentifier =
+            "com.eriklee.stornaut.investigation.machine-driver"
+        let claimServiceIdentifier =
+            "com.eriklee.stornaut.lifecycle.machine-claim"
+        for text in [driverBinding, leafDriverBinding, lifecycleRegistration] {
+            #expect(text.contains(signingIdentifier))
+            #expect(text.contains(claimServiceIdentifier))
+        }
+
+        let l3c3aSources = [driverBinding, leafDriverBinding, observation]
+        for text in l3c3aSources {
+            for forbidden in [
+                "StornautExecution",
+                "ActionExecutor",
+                "TrashMoving",
+                "RegisteredAction",
+                "MoveToTrash",
+                "posix_spawn",
+                "Process(",
+                "CommandLine",
+                "ProcessInfo.processInfo.environment",
+                "NSXPCListener",
+                "NSXPCConnection",
+                "LifecycleMachineRetirementHandle",
+                "Launcher",
+                "launcher",
+                "signedInvestigationRuntimeReady",
+                "signedRuntimeReady",
+                "Readiness",
+                "readiness",
+                "arguments:",
+                "environment:",
+                "fileDescriptor:",
+            ] {
+                #expect(!text.contains(forbidden))
+            }
+        }
+
+        // Temporary L3c3a checkpoint contract. L3c3b must replace this
+        // assertion with exact diagnostic-only native driver packaging.
+        #expect(!xcodeProject.contains(
+            "StornautInvestigationMachineDriver"
+        ))
+    }
+
+    @Test
     func trustedMachineImplementationLivesOnlyInTheNonProductTarget()
         throws
     {
@@ -49,6 +340,7 @@ struct InvestigationMachineTargetBoundaryTests {
         )
         #expect(driverLoop.contains("test ! -e"))
         #expect(driverLoop.contains("test ! -L"))
+
         let investigationSource = repositoryRoot.appending(
             path: "Sources/StornautInvestigation/"
                 + "SignedInvestigationRuntimeMachineContract.swift"

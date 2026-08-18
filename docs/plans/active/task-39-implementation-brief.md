@@ -91,9 +91,12 @@
 > real-success three-plane composition and L3c4 sealed final admission. Only L3c4
 > may claim readiness or consume the remaining authoritative full verifier. L3c1
 > is complete; the L3c2 scope/trust/cost preflight split the driver into
-> L3c2a-i/L3c2a-ii/L3c2b. L3c2a-i strict Machine-claim transport and
-> L3c2a-ii non-product root host/topology composition are complete; L3c2b fixed
-> eight-scenario driving is next. Evidence:
+> L3c2a-i/L3c2a-ii/L3c2b, all now complete. The mandatory L3c3 preflight then
+> split real-success composition into L3c3a driver-bound attempt schema, L3c3b
+> native packaging, L3c3c-i/ii handoff design/implementation and L3c3d one real
+> pending candidate. L3c3a is complete after its exact 14-path implementation,
+> 199-test Investigation and 11-test App gates, 1,057-test clean staged-only
+> serial and independent post-fix review; L3c3b is next. Evidence:
 > [39B2c-L3c1a Typed Owner Retirement Review](../../reports/phase-d-task-39b2c-l3c1a-typed-owner-retirement-review.md)
 > and
 > [39B2c-L3c1b-i Configuration-Bound Helper Escrow Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
@@ -102,7 +105,11 @@
 > and
 > [39B2c-L3c2a-i Machine-Claim Transport Review](../../reports/phase-d-task-39b2c-l3c2a-i-machine-claim-transport-review.md).
 > and
-> [39B2c-L3c2a-ii Machine Driver Host Review](../../reports/phase-d-task-39b2c-l3c2a-ii-machine-driver-host-review.md).
+> [39B2c-L3c2a-ii Machine Driver Host Review](../../reports/phase-d-task-39b2c-l3c2a-ii-machine-driver-host-review.md)
+> and
+> [39B2c-L3c2b Eight-Scenario Driver Review](../../reports/phase-d-task-39b2c-l3c2b-eight-scenario-driver-review.md)
+> and
+> [39B2c-L3c3a Driver-Bound Attempt Review](../../reports/phase-d-task-39b2c-l3c3a-driver-binding-review.md).
 >
 > **Parent plan:**
 > [Phase D Conditional Deep Dive](phase-d-conditional-deep-dive.md)
@@ -958,8 +965,15 @@ The remaining L3 work is split before driver coding:
    transport design. L3c3c-i must prove and record the exact launcher/handoff
    topology before production code. See the
    [L3c3 Scope/Trust Preflight](../../reports/phase-d-task-39b2c-l3c3-scope-trust-preflight.md).
-   L3c3a is next and owns exactly fourteen possible non-document paths / 3,000 added
-   lines; later sub-checkpoints each require their own exact path preflight.
+   L3c3a is complete. Its exact fourteen-path / 1,266-added-line implementation
+   added the strict driver binding and enclosing schema migrations, independent
+   App-leaf decoding, complete installed static-identity comparison and temporary
+   blocked-until-L3c3b structural/release gates. Review found and tests-first
+   fixed a 40-versus-64-hex CodeDirectory-hash incompatibility; 199 Investigation
+   tests, 11 App tests, targeted gates, one 1,057-test clean staged-only serial and
+   independent post-fix review passed. See the
+   [L3c3a Review](../../reports/phase-d-task-39b2c-l3c3a-driver-binding-review.md).
+   L3c3b is next; later sub-checkpoints each require their own exact path preflight.
 6. **L3c4 sealed final admission** — execute the authoritative current-source
    cohort with eight independent fresh nonces, one real success model run and
    bounded closed failure injections; perform exact per-case teardown, fixed
@@ -971,8 +985,8 @@ The remaining L3 work is split before driver coding:
    raw-evidence read-only and must not repeat model calls or root mutation.
 
 The order is strict: `L3c1a -> L3c1b-i -> L3c1b-ii -> L3c2a-i -> L3c2a-ii ->
-L3c2b -> L3c3 -> L3c4`. L3c1a, L3c1b-i, L3c1b-ii, L3c2a-i and L3c2a-ii are
-complete; L3c1 and L3c2 are closed, and L3c3 is next. L3c1 used focused
+L3c2b -> L3c3a -> L3c3b -> L3c3c-i -> L3c3c-ii -> L3c3d -> L3c4`. L3c1,
+L3c2 and L3c3a are complete; L3c3b is next. L3c1 used focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean
 staged serial regression, targeted helper/diagnostic builds and independent
 review in place of full. Each L3c2 sub-checkpoint uses structural, focused, one

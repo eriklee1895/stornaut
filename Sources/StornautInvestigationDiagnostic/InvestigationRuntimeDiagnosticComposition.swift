@@ -280,6 +280,12 @@ package struct InvestigationRuntimeDiagnosticBindingObservation:
     package let appBundleIdentifier: String
     package let helperSigningIdentifier: String
     package let serviceIdentifier: String
+    package let machineDriverExecutableURL: URL
+    package let machineDriverExecutableSHA256: String
+    package let machineDriverSigningIdentifier: String
+    package let machineDriverDesignatedRequirementSHA256: String
+    package let machineDriverCodeDirectoryHash: String
+    package let machineClaimServiceIdentifier: String
 
     package init(
         installedAppURL: URL,
@@ -289,7 +295,13 @@ package struct InvestigationRuntimeDiagnosticBindingObservation:
         helperExecutableSHA256: String,
         appBundleIdentifier: String,
         helperSigningIdentifier: String,
-        serviceIdentifier: String
+        serviceIdentifier: String,
+        machineDriverExecutableURL: URL,
+        machineDriverExecutableSHA256: String,
+        machineDriverSigningIdentifier: String,
+        machineDriverDesignatedRequirementSHA256: String,
+        machineDriverCodeDirectoryHash: String,
+        machineClaimServiceIdentifier: String
     ) {
         self.installedAppURL = installedAppURL.standardizedFileURL
         self.helperExecutableURL =
@@ -300,6 +312,18 @@ package struct InvestigationRuntimeDiagnosticBindingObservation:
         self.appBundleIdentifier = appBundleIdentifier
         self.helperSigningIdentifier = helperSigningIdentifier
         self.serviceIdentifier = serviceIdentifier
+        self.machineDriverExecutableURL =
+            machineDriverExecutableURL.standardizedFileURL
+        self.machineDriverExecutableSHA256 =
+            machineDriverExecutableSHA256
+        self.machineDriverSigningIdentifier =
+            machineDriverSigningIdentifier
+        self.machineDriverDesignatedRequirementSHA256 =
+            machineDriverDesignatedRequirementSHA256
+        self.machineDriverCodeDirectoryHash =
+            machineDriverCodeDirectoryHash
+        self.machineClaimServiceIdentifier =
+            machineClaimServiceIdentifier
     }
 
     package static func installed() throws -> Self {
@@ -310,6 +334,9 @@ package struct InvestigationRuntimeDiagnosticBindingObservation:
         )
         let helperEvidence = try reader.evidence(
             bundleURL: contract.helperExecutableURL
+        )
+        let machineDriverEvidence = try reader.evidence(
+            bundleURL: contract.machineDriverExecutableURL
         )
         guard
             let bundle = Bundle(url: contract.installedAppURL),
@@ -329,7 +356,20 @@ package struct InvestigationRuntimeDiagnosticBindingObservation:
             appBundleIdentifier: bundleIdentifier,
             helperSigningIdentifier:
                 helperEvidence.identity.signingIdentifier,
-            serviceIdentifier: contract.machServiceName
+            serviceIdentifier: contract.machServiceName,
+            machineDriverExecutableURL:
+                contract.machineDriverExecutableURL,
+            machineDriverExecutableSHA256:
+                machineDriverEvidence.executableSHA256,
+            machineDriverSigningIdentifier:
+                machineDriverEvidence.identity.signingIdentifier,
+            machineDriverDesignatedRequirementSHA256:
+                machineDriverEvidence.identity
+                    .designatedRequirementSHA256,
+            machineDriverCodeDirectoryHash:
+                machineDriverEvidence.identity.codeDirectoryHash,
+            machineClaimServiceIdentifier:
+                contract.machineClaimMachServiceName
         )
     }
 
@@ -353,6 +393,23 @@ package struct InvestigationRuntimeDiagnosticBindingObservation:
                 == "com.eriklee.stornaut.lifecycle.helper"
             && serviceIdentifier
                 == binding.helperServiceIdentifier
+            && machineDriverExecutableURL
+                == installedAppURL.appending(
+                    path: "Contents/MacOS/"
+                        + "StornautInvestigationMachineDriver"
+                )
+            && machineDriverExecutableSHA256
+                == binding.machineDriver.executableSHA256
+            && machineDriverSigningIdentifier
+                == binding.machineDriver.signingIdentifier
+            && machineDriverDesignatedRequirementSHA256
+                == binding.machineDriver
+                    .designatedRequirementSHA256
+            && machineDriverCodeDirectoryHash
+                == binding.machineDriver.codeDirectoryHash
+            && machineClaimServiceIdentifier
+                == binding.machineDriver
+                    .machineClaimServiceIdentifier
     }
 }
 

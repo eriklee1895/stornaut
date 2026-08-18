@@ -32,11 +32,117 @@ public enum SignedInvestigationRuntimeDiagnosticScenario:
     case artifactCleanupFailure
 }
 
+public struct SignedInvestigationRuntimeMachineDriverBinding:
+    Codable,
+    Sendable,
+    Equatable
+{
+    public static let schemaVersion = 1
+    public static let requiredSigningIdentifier =
+        "com.eriklee.stornaut.investigation.machine-driver"
+    public static let requiredMachineClaimServiceIdentifier =
+        "com.eriklee.stornaut.lifecycle.machine-claim"
+
+    public let schemaVersion: Int
+    public let executableSHA256: String
+    public let signingIdentifier: String
+    public let designatedRequirementSHA256: String
+    public let codeDirectoryHash: String
+    public let machineClaimServiceIdentifier: String
+
+    public init(
+        executableSHA256: String,
+        signingIdentifier: String,
+        designatedRequirementSHA256: String,
+        codeDirectoryHash: String,
+        machineClaimServiceIdentifier: String
+    ) throws {
+        guard
+            lowercaseHex(executableSHA256, count: 64),
+            signingIdentifier == Self.requiredSigningIdentifier,
+            lowercaseHex(designatedRequirementSHA256, count: 64),
+            (lowercaseHex(codeDirectoryHash, count: 40)
+                || lowercaseHex(codeDirectoryHash, count: 64)),
+            machineClaimServiceIdentifier
+                == Self.requiredMachineClaimServiceIdentifier
+        else {
+            throw SignedInvestigationRuntimeContractError.invalidReport
+        }
+        schemaVersion = Self.schemaVersion
+        self.executableSHA256 = executableSHA256
+        self.signingIdentifier = signingIdentifier
+        self.designatedRequirementSHA256 =
+            designatedRequirementSHA256
+        self.codeDirectoryHash = codeDirectoryHash
+        self.machineClaimServiceIdentifier =
+            machineClaimServiceIdentifier
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try strictSignedRuntimeContainer(
+            decoder,
+            keys: Set(CodingKeys.allCases.map(\.rawValue))
+        )
+        guard try container.decode(
+            Int.self,
+            forKey: SignedRuntimeCodingKey(
+                CodingKeys.schemaVersion.rawValue
+            )
+        ) == Self.schemaVersion else {
+            throw SignedInvestigationRuntimeContractError.invalidReport
+        }
+        try self.init(
+            executableSHA256: container.decode(
+                String.self,
+                forKey: SignedRuntimeCodingKey(
+                    CodingKeys.executableSHA256.rawValue
+                )
+            ),
+            signingIdentifier: container.decode(
+                String.self,
+                forKey: SignedRuntimeCodingKey(
+                    CodingKeys.signingIdentifier.rawValue
+                )
+            ),
+            designatedRequirementSHA256: container.decode(
+                String.self,
+                forKey: SignedRuntimeCodingKey(
+                    CodingKeys.designatedRequirementSHA256.rawValue
+                )
+            ),
+            codeDirectoryHash: container.decode(
+                String.self,
+                forKey: SignedRuntimeCodingKey(
+                    CodingKeys.codeDirectoryHash.rawValue
+                )
+            ),
+            machineClaimServiceIdentifier: container.decode(
+                String.self,
+                forKey: SignedRuntimeCodingKey(
+                    CodingKeys.machineClaimServiceIdentifier.rawValue
+                )
+            )
+        )
+    }
+
+    private enum CodingKeys: String, CodingKey, CaseIterable {
+        case schemaVersion
+        case executableSHA256
+        case signingIdentifier
+        case designatedRequirementSHA256
+        case codeDirectoryHash
+        case machineClaimServiceIdentifier
+    }
+}
+
 public struct SignedInvestigationRuntimeBinding:
     Codable,
     Sendable,
     Equatable
 {
+    public static let schemaVersion = 2
+
+    public let schemaVersion: Int
     public let repositoryHEAD: String
     public let sourceFingerprintSHA256: String
     public let appExecutableSHA256: String
@@ -48,6 +154,8 @@ public struct SignedInvestigationRuntimeBinding:
     public let codexExecutableSHA256: String
     public let appBundleIdentifier: String
     public let helperServiceIdentifier: String
+    public let machineDriver:
+        SignedInvestigationRuntimeMachineDriverBinding
 
     public init(
         repositoryHEAD: String,
@@ -60,8 +168,10 @@ public struct SignedInvestigationRuntimeBinding:
         facadeSHA256: String,
         codexExecutableSHA256: String,
         appBundleIdentifier: String,
-        helperServiceIdentifier: String
+        helperServiceIdentifier: String,
+        machineDriver: SignedInvestigationRuntimeMachineDriverBinding
     ) {
+        schemaVersion = Self.schemaVersion
         self.repositoryHEAD = repositoryHEAD
         self.sourceFingerprintSHA256 = sourceFingerprintSHA256
         self.appExecutableSHA256 = appExecutableSHA256
@@ -73,6 +183,7 @@ public struct SignedInvestigationRuntimeBinding:
         self.codexExecutableSHA256 = codexExecutableSHA256
         self.appBundleIdentifier = appBundleIdentifier
         self.helperServiceIdentifier = helperServiceIdentifier
+        self.machineDriver = machineDriver
     }
 
     public init(from decoder: Decoder) throws {
@@ -80,6 +191,14 @@ public struct SignedInvestigationRuntimeBinding:
             decoder,
             keys: Set(CodingKeys.allCases.map(\.rawValue))
         )
+        guard try container.decode(
+            Int.self,
+            forKey: SignedRuntimeCodingKey(
+                CodingKeys.schemaVersion.rawValue
+            )
+        ) == Self.schemaVersion else {
+            throw SignedInvestigationRuntimeContractError.invalidReport
+        }
         self.init(
             repositoryHEAD: try container.decode(
                 String.self,
@@ -146,6 +265,12 @@ public struct SignedInvestigationRuntimeBinding:
                 forKey: SignedRuntimeCodingKey(
                     CodingKeys.helperServiceIdentifier.rawValue
                 )
+            ),
+            machineDriver: try container.decode(
+                SignedInvestigationRuntimeMachineDriverBinding.self,
+                forKey: SignedRuntimeCodingKey(
+                    CodingKeys.machineDriver.rawValue
+                )
             )
         )
         guard isValid else {
@@ -168,9 +293,13 @@ public struct SignedInvestigationRuntimeBinding:
             && appBundleIdentifier == "com.eriklee.stornaut"
             && helperServiceIdentifier
                 == "com.eriklee.stornaut.lifecycle"
+            && machineDriver.signingIdentifier
+                == SignedInvestigationRuntimeMachineDriverBinding
+                    .requiredSigningIdentifier
     }
 
     private enum CodingKeys: String, CodingKey, CaseIterable {
+        case schemaVersion
         case repositoryHEAD
         case sourceFingerprintSHA256
         case appExecutableSHA256
@@ -182,6 +311,7 @@ public struct SignedInvestigationRuntimeBinding:
         case codexExecutableSHA256
         case appBundleIdentifier
         case helperServiceIdentifier
+        case machineDriver
     }
 }
 
@@ -190,7 +320,7 @@ public struct SignedInvestigationRuntimeDiagnosticConfiguration:
     Sendable,
     Equatable
 {
-    public static let schemaVersion = 2
+    public static let schemaVersion = 3
     public static let requiredOptIn =
         "I authorize one bounded disposable read-only Stornaut Investigation diagnostic."
 
@@ -899,7 +1029,7 @@ public struct SignedInvestigationCapabilityEvidenceReceipt:
     Sendable,
     Equatable
 {
-    public static let schemaVersion = 3
+    public static let schemaVersion = 4
 
     public let schemaVersion: Int
     public let nonce: UUID
@@ -1157,7 +1287,7 @@ public struct SignedInvestigationRuntimeReport:
     Sendable,
     Equatable
 {
-    public static let schemaVersion = 3
+    public static let schemaVersion = 4
 
     public let schemaVersion: Int
     public let nonce: UUID

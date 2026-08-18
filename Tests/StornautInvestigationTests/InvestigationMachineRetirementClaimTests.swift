@@ -534,7 +534,17 @@ private final class ClaimFixture: @unchecked Sendable {
             facadeSHA256: String(repeating: "8", count: 64),
             codexExecutableSHA256: String(repeating: "9", count: 64),
             appBundleIdentifier: "com.eriklee.stornaut",
-            helperServiceIdentifier: "com.eriklee.stornaut.lifecycle"
+            helperServiceIdentifier: "com.eriklee.stornaut.lifecycle",
+            machineDriver: try! SignedInvestigationRuntimeMachineDriverBinding(
+                executableSHA256: String(repeating: "a", count: 64),
+                signingIdentifier:
+                    "com.eriklee.stornaut.investigation.machine-driver",
+                designatedRequirementSHA256:
+                    String(repeating: "b", count: 64),
+                codeDirectoryHash: String(repeating: "4", count: 40),
+                machineClaimServiceIdentifier:
+                    "com.eriklee.stornaut.lifecycle.machine-claim"
+            )
         )
     }
 

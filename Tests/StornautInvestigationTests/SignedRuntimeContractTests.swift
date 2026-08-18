@@ -75,7 +75,19 @@ struct SignedRuntimeContractTests {
             helperExecutableSHA256: String(repeating: "0", count: 64),
             appBundleIdentifier: expected.appBundleIdentifier,
             helperSigningIdentifier: expected.helperSigningIdentifier,
-            serviceIdentifier: expected.serviceIdentifier
+            serviceIdentifier: expected.serviceIdentifier,
+            machineDriverExecutableURL:
+                expected.machineDriverExecutableURL,
+            machineDriverExecutableSHA256:
+                expected.machineDriverExecutableSHA256,
+            machineDriverSigningIdentifier:
+                expected.machineDriverSigningIdentifier,
+            machineDriverDesignatedRequirementSHA256:
+                expected.machineDriverDesignatedRequirementSHA256,
+            machineDriverCodeDirectoryHash:
+                expected.machineDriverCodeDirectoryHash,
+            machineClaimServiceIdentifier:
+                expected.machineClaimServiceIdentifier
         )
 
         #expect(
@@ -88,6 +100,58 @@ struct SignedRuntimeContractTests {
                 now: fixture.now,
                 installation: drifted
             )
+        }
+
+        for mutation in 0..<6 {
+            let driver = configuration.binding.machineDriver
+            let driftedDriver =
+                InvestigationRuntimeDiagnosticBindingObservation(
+                    installedAppURL: expected.installedAppURL,
+                    helperExecutableURL:
+                        expected.helperExecutableURL,
+                    appExecutableName: expected.appExecutableName,
+                    appExecutableSHA256:
+                        expected.appExecutableSHA256,
+                    helperExecutableSHA256:
+                        expected.helperExecutableSHA256,
+                    appBundleIdentifier: expected.appBundleIdentifier,
+                    helperSigningIdentifier:
+                        expected.helperSigningIdentifier,
+                    serviceIdentifier: expected.serviceIdentifier,
+                    machineDriverExecutableURL: mutation == 0
+                        ? expected.installedAppURL.appending(
+                            path: "Contents/MacOS/ForeignDriver"
+                        )
+                        : expected.machineDriverExecutableURL,
+                    machineDriverExecutableSHA256: mutation == 1
+                        ? String(repeating: "0", count: 64)
+                        : driver.executableSHA256,
+                    machineDriverSigningIdentifier: mutation == 2
+                        ? "foreign.driver"
+                        : driver.signingIdentifier,
+                    machineDriverDesignatedRequirementSHA256:
+                        mutation == 3
+                            ? String(repeating: "0", count: 64)
+                            : driver.designatedRequirementSHA256,
+                    machineDriverCodeDirectoryHash: mutation == 4
+                        ? String(repeating: "0", count: 40)
+                        : driver.codeDirectoryHash,
+                    machineClaimServiceIdentifier: mutation == 5
+                        ? "com.eriklee.stornaut.lifecycle"
+                        : driver.machineClaimServiceIdentifier
+                )
+            #expect(
+                throws:
+                    InvestigationRuntimeDiagnosticCompositionError
+                    .bindingMismatch
+            ) {
+                _ = try InvestigationRuntimeDiagnosticComposition.prepare(
+                    configurationData:
+                        try configuration.canonicalJSONData(),
+                    now: fixture.now,
+                    installation: driftedDriver
+                )
+            }
         }
     }
 
@@ -126,6 +190,14 @@ struct SignedRuntimeContractTests {
 
         #expect(configuration.nonce == fixture.nonce)
         #expect(
+            configuration.binding.machineDriver
+                == fixture.machineDriverBinding()
+        )
+        #expect(
+            SignedInvestigationRuntimeDiagnosticConfiguration
+                .schemaVersion == 3
+        )
+        #expect(
             configuration.diagnosticRootPath
                 == fixture.diagnosticRoot.path
         )
@@ -150,6 +222,60 @@ struct SignedRuntimeContractTests {
             _ = try SignedInvestigationRuntimeDiagnosticConfiguration
                 .decodeValidated(
                     from: unknown,
+                    now: fixture.now
+                )
+        }
+
+        var missingDriver = try #require(
+            JSONSerialization.jsonObject(with: data)
+                as? [String: Any]
+        )
+        var missingBinding = try #require(
+            missingDriver["binding"] as? [String: Any]
+        )
+        missingBinding.removeValue(forKey: "machineDriver")
+        missingDriver["binding"] = missingBinding
+        let missingDriverData = try JSONSerialization.data(
+            withJSONObject: missingDriver,
+            options: [.sortedKeys]
+        )
+        #expect(
+            throws:
+                SignedInvestigationRuntimeContractError
+                .invalidConfiguration
+        ) {
+            _ = try SignedInvestigationRuntimeDiagnosticConfiguration
+                .decodeValidated(
+                    from: missingDriverData,
+                    now: fixture.now
+                )
+        }
+
+        var unknownDriver = try #require(
+            JSONSerialization.jsonObject(with: data)
+                as? [String: Any]
+        )
+        var unknownBinding = try #require(
+            unknownDriver["binding"] as? [String: Any]
+        )
+        var driver = try #require(
+            unknownBinding["machineDriver"] as? [String: Any]
+        )
+        driver["unexpected"] = true
+        unknownBinding["machineDriver"] = driver
+        unknownDriver["binding"] = unknownBinding
+        let unknownDriverData = try JSONSerialization.data(
+            withJSONObject: unknownDriver,
+            options: [.sortedKeys]
+        )
+        #expect(
+            throws:
+                SignedInvestigationRuntimeContractError
+                .invalidConfiguration
+        ) {
+            _ = try SignedInvestigationRuntimeDiagnosticConfiguration
+                .decodeValidated(
+                    from: unknownDriverData,
                     now: fixture.now
                 )
         }
@@ -181,6 +307,58 @@ struct SignedRuntimeContractTests {
                     from: nulPathData,
                     now: fixture.now
                 )
+        }
+    }
+
+    @Test
+    func machineDriverBindingAcceptsEveryLifecycleCodeDirectoryHashLength()
+        throws
+    {
+        for hashLength in [40, 64] {
+            let binding =
+                try SignedInvestigationRuntimeMachineDriverBinding(
+                    executableSHA256:
+                        String(repeating: "b", count: 64),
+                    signingIdentifier:
+                        "com.eriklee.stornaut.investigation.machine-driver",
+                    designatedRequirementSHA256:
+                        String(repeating: "c", count: 64),
+                    codeDirectoryHash:
+                        String(repeating: "d", count: hashLength),
+                    machineClaimServiceIdentifier:
+                        "com.eriklee.stornaut.lifecycle.machine-claim"
+                )
+            let decoded = try JSONDecoder().decode(
+                SignedInvestigationRuntimeMachineDriverBinding.self,
+                from: JSONEncoder().encode(binding)
+            )
+            #expect(decoded == binding)
+        }
+        for invalidHash in [
+            String(repeating: "d", count: 39),
+            String(repeating: "d", count: 41),
+            String(repeating: "d", count: 63),
+            String(repeating: "d", count: 65),
+            String(repeating: "D", count: 40),
+            String(repeating: "g", count: 64),
+        ] {
+            #expect(
+                throws:
+                    SignedInvestigationRuntimeContractError
+                    .invalidReport
+            ) {
+                _ = try SignedInvestigationRuntimeMachineDriverBinding(
+                    executableSHA256:
+                        String(repeating: "b", count: 64),
+                    signingIdentifier:
+                        "com.eriklee.stornaut.investigation.machine-driver",
+                    designatedRequirementSHA256:
+                        String(repeating: "c", count: 64),
+                    codeDirectoryHash: invalidHash,
+                    machineClaimServiceIdentifier:
+                        "com.eriklee.stornaut.lifecycle.machine-claim"
+                )
+            }
         }
     }
 
@@ -2740,7 +2918,23 @@ struct SignedRuntimeContractFixture {
             codexExecutableSHA256: String(repeating: "a", count: 64),
             appBundleIdentifier: "com.eriklee.stornaut",
             helperServiceIdentifier:
-                "com.eriklee.stornaut.lifecycle"
+                "com.eriklee.stornaut.lifecycle",
+            machineDriver: machineDriverBinding()
+        )
+    }
+
+    func machineDriverBinding()
+        -> SignedInvestigationRuntimeMachineDriverBinding
+    {
+        try! SignedInvestigationRuntimeMachineDriverBinding(
+            executableSHA256: String(repeating: "b", count: 64),
+            signingIdentifier:
+                "com.eriklee.stornaut.investigation.machine-driver",
+            designatedRequirementSHA256:
+                String(repeating: "c", count: 64),
+            codeDirectoryHash: String(repeating: "4", count: 64),
+            machineClaimServiceIdentifier:
+                "com.eriklee.stornaut.lifecycle.machine-claim"
         )
     }
 
@@ -2765,7 +2959,23 @@ struct SignedRuntimeContractFixture {
             appBundleIdentifier: binding().appBundleIdentifier,
             helperSigningIdentifier:
                 "com.eriklee.stornaut.lifecycle.helper",
-            serviceIdentifier: binding().helperServiceIdentifier
+            serviceIdentifier: binding().helperServiceIdentifier,
+            machineDriverExecutableURL: app.appending(
+                path: "Contents/MacOS/"
+                    + "StornautInvestigationMachineDriver"
+            ),
+            machineDriverExecutableSHA256:
+                binding().machineDriver.executableSHA256,
+            machineDriverSigningIdentifier:
+                binding().machineDriver.signingIdentifier,
+            machineDriverDesignatedRequirementSHA256:
+                binding().machineDriver
+                    .designatedRequirementSHA256,
+            machineDriverCodeDirectoryHash:
+                binding().machineDriver.codeDirectoryHash,
+            machineClaimServiceIdentifier:
+                binding().machineDriver
+                    .machineClaimServiceIdentifier
         )
     }
 

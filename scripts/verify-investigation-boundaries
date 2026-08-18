@@ -578,7 +578,9 @@ python3 - \
     "$runtime_root/InvestigationLifecycleAppServerTransport.swift" \
     "$lifecycle_helper" \
     "$contained_session" \
-    "$diagnostic_root/InvestigationRuntimeDiagnosticComposition.swift" <<'PY'
+    "$diagnostic_root/InvestigationRuntimeDiagnosticComposition.swift" \
+    "$diagnostic_root/InvestigationRuntimeDiagnosticAppLeaf.swift" \
+    "$machine_root/SignedInvestigationRuntimeMachineContract.swift" <<'PY'
 import json
 from pathlib import Path
 import re
@@ -914,6 +916,253 @@ contained_session_source = Path(sys.argv[12]).read_text(encoding="utf-8")
 diagnostic_composition_source = Path(sys.argv[13]).read_text(
     encoding="utf-8"
 )
+diagnostic_leaf_source = Path(sys.argv[14]).read_text(encoding="utf-8")
+machine_contract_source = Path(sys.argv[15]).read_text(encoding="utf-8")
+
+def declaration_block(source, declaration, next_declaration):
+    start = source.find(declaration)
+    end = source.find(next_declaration, start + len(declaration))
+    if start < 0 or end < 0:
+        raise SystemExit(
+            f"missing closed declaration block: {declaration}"
+        )
+    return source[start:end]
+
+def require_schema(source, declaration, next_declaration, version):
+    declaration_source = declaration_block(
+        source, declaration, next_declaration
+    )
+    marker = f"public static let schemaVersion = {version}"
+    if marker not in declaration_source:
+        raise SystemExit(
+            f"strict schema drifted: {declaration} != {version}"
+        )
+    return declaration_source
+
+driver_binding_source = require_schema(
+    signed_contract_source,
+    "public struct SignedInvestigationRuntimeMachineDriverBinding:",
+    "public struct SignedInvestigationRuntimeBinding:",
+    1,
+)
+runtime_binding_source = require_schema(
+    signed_contract_source,
+    "public struct SignedInvestigationRuntimeBinding:",
+    "public struct SignedInvestigationRuntimeDiagnosticConfiguration:",
+    2,
+)
+require_schema(
+    signed_contract_source,
+    "public struct SignedInvestigationRuntimeDiagnosticConfiguration:",
+    "public enum SignedInvestigationRuntimeDenialKind:",
+    3,
+)
+require_schema(
+    signed_contract_source,
+    "public struct SignedInvestigationCapabilityEvidenceReceipt:",
+    "public struct SignedInvestigationRuntimeReport:",
+    4,
+)
+require_schema(
+    signed_contract_source,
+    "public struct SignedInvestigationRuntimeReport:",
+    "public struct SignedInvestigationRuntimeAdmissionReceipt:",
+    4,
+)
+machine_schema_contracts = (
+    (
+        "public struct SignedInvestigationRuntimeMachineCaseEvidence:",
+        "public struct SignedInvestigationRuntimeFailureMatrix:",
+        3,
+    ),
+    (
+        "public struct SignedInvestigationRuntimeFailureMatrix:",
+        "public struct SignedInvestigationRuntimeMachineReport:",
+        3,
+    ),
+    (
+        "public struct SignedInvestigationRuntimeMachineReport:",
+        "public struct SignedInvestigationRuntimeLifecycleResidueRecord:",
+        3,
+    ),
+    (
+        "public struct SignedInvestigationRuntimeLifecycleResidueRecord:",
+        "public struct SignedInvestigationRuntimeMachineEvidenceBundle:",
+        2,
+    ),
+    (
+        "public struct SignedInvestigationRuntimeMachineEvidenceBundle:",
+        "private struct CompletedMachineConfiguration: Decodable",
+        7,
+    ),
+)
+for declaration, next_declaration, version in machine_schema_contracts:
+    require_schema(
+        machine_contract_source, declaration, next_declaration, version
+    )
+
+required_driver_binding = {
+    "strictSignedRuntimeContainer(",
+    r"keys: Set(CodingKeys.allCases.map(\.rawValue))",
+    "public let executableSHA256: String",
+    "public let signingIdentifier: String",
+    "public let designatedRequirementSHA256: String",
+    "public let codeDirectoryHash: String",
+    "public let machineClaimServiceIdentifier: String",
+    "lowercaseHex(codeDirectoryHash, count: 40)",
+    "lowercaseHex(codeDirectoryHash, count: 64)",
+    "com.eriklee.stornaut.investigation.machine-driver",
+    "com.eriklee.stornaut.lifecycle.machine-claim",
+}
+missing_driver_binding = required_driver_binding - {
+    marker for marker in required_driver_binding
+    if marker in driver_binding_source
+}
+if missing_driver_binding:
+    raise SystemExit(
+        "signed Machine driver binding drifted: "
+        f"{sorted(missing_driver_binding)}"
+    )
+driver_coding_keys = re.findall(
+    r"^        case ([A-Za-z0-9_]+)$",
+    driver_binding_source,
+    re.MULTILINE,
+)
+if driver_coding_keys != [
+    "schemaVersion",
+    "executableSHA256",
+    "signingIdentifier",
+    "designatedRequirementSHA256",
+    "codeDirectoryHash",
+    "machineClaimServiceIdentifier",
+]:
+    raise SystemExit(
+        f"signed Machine driver CodingKeys drifted: {driver_coding_keys}"
+    )
+required_runtime_driver = {
+    "public let machineDriver:",
+    "SignedInvestigationRuntimeMachineDriverBinding",
+    "case machineDriver",
+    "machineDriver: try container.decode(",
+}
+if any(
+    marker not in runtime_binding_source
+    for marker in required_runtime_driver
+):
+    raise SystemExit("signed runtime binding lost required Machine driver")
+if (
+    "SignedInvestigationRuntimeMachineDriverBinding?"
+    in runtime_binding_source
+    or "machineDriver: container.decodeIfPresent"
+    in runtime_binding_source
+):
+    raise SystemExit("signed runtime Machine driver became optional")
+
+leaf_configuration_source = declaration_block(
+    diagnostic_leaf_source,
+    "private struct Configuration: Decodable",
+    "private enum Scenario:",
+)
+leaf_binding_source = declaration_block(
+    diagnostic_leaf_source,
+    "private struct Binding: Decodable",
+    "private struct MachineDriverBinding: Decodable",
+)
+leaf_driver_source = declaration_block(
+    diagnostic_leaf_source,
+    "private struct MachineDriverBinding: Decodable",
+    "private struct DynamicCodingKey:",
+)
+for source, marker in (
+    (leaf_configuration_source, "schemaVersion == 3"),
+    (leaf_binding_source, "schemaVersion == 2"),
+    (leaf_driver_source, "schemaVersion == 1"),
+):
+    if marker not in source:
+        raise SystemExit(
+            f"diagnostic App leaf strict schema drifted: {marker}"
+        )
+if "case machineDriver" not in leaf_binding_source:
+    raise SystemExit("diagnostic App leaf lost required Machine driver")
+leaf_driver_keys = re.findall(
+    r"^        case ([A-Za-z0-9_]+)$",
+    leaf_driver_source,
+    re.MULTILINE,
+)
+if leaf_driver_keys != driver_coding_keys:
+    raise SystemExit(
+        "diagnostic App leaf Machine driver CodingKeys drifted: "
+        f"{leaf_driver_keys}"
+    )
+for marker in (
+    "strictContainer(",
+    r"keys: Set(CodingKeys.allCases.map(\.rawValue))",
+    "com.eriklee.stornaut.investigation.machine-driver",
+    "com.eriklee.stornaut.lifecycle.machine-claim",
+    "lowercaseHex(codeDirectoryHash, count: 40)",
+    "lowercaseHex(codeDirectoryHash, count: 64)",
+):
+    if marker not in leaf_driver_source:
+        raise SystemExit(
+            f"diagnostic App leaf driver binding drifted: {marker}"
+        )
+
+observation_source = declaration_block(
+    diagnostic_composition_source,
+    "package struct InvestigationRuntimeDiagnosticBindingObservation:",
+    "private actor InvestigationRuntimeDiagnosticTransportOwner:",
+)
+for marker in (
+    "LifecycleBundleSigningIdentityReader()",
+    "contract.machineDriverExecutableURL",
+    "Contents/MacOS/",
+    "StornautInvestigationMachineDriver",
+    "machineDriverEvidence.executableSHA256",
+    "machineDriverEvidence.identity.signingIdentifier",
+    "machineDriverDesignatedRequirementSHA256",
+    "machineDriverCodeDirectoryHash",
+    "machineClaimServiceIdentifier",
+    "binding.machineDriver",
+):
+    if marker not in observation_source:
+        raise SystemExit(
+            f"installed Machine driver identity join drifted: {marker}"
+        )
+
+l3c3a_sources = (
+    ("driver binding", driver_binding_source),
+    ("diagnostic App leaf driver binding", leaf_driver_source),
+    ("installed driver observation", observation_source),
+)
+for source_name, source in l3c3a_sources:
+    for prohibited in (
+        "StornautExecution",
+        "ActionExecutor",
+        "TrashMoving",
+        "RegisteredAction",
+        "MoveToTrash",
+        "posix_spawn",
+        "Process(",
+        "CommandLine",
+        "ProcessInfo.processInfo.environment",
+        "NSXPCListener",
+        "NSXPCConnection",
+        "LifecycleMachineRetirementHandle",
+        "Launcher",
+        "launcher",
+        "signedInvestigationRuntimeReady",
+        "signedRuntimeReady",
+        "Readiness",
+        "readiness",
+        "arguments:",
+        "environment:",
+        "fileDescriptor:",
+    ):
+        if prohibited in source:
+            raise SystemExit(
+                f"L3c3a {source_name} gained prohibited authority: "
+                f"{prohibited}"
+            )
 
 required_helper_attestation = {
     "public struct LifecycleHelperPeerAttestationRequest:",

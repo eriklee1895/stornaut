@@ -483,6 +483,61 @@ import sys
 
 project = Path(sys.argv[1]).read_text(encoding="utf-8")
 
+# Temporary L3c3a checkpoint contract. L3c3b must deliberately replace this
+# exact absence proof with diagnostic-only native driver packaging.
+if "StornautInvestigationMachineDriver" in project:
+    raise SystemExit(
+        "L3c3a Xcode project packaged the Machine driver before L3c3b"
+    )
+
+native_target_section_start = project.find(
+    "/* Begin PBXNativeTarget section */"
+)
+native_target_section_end = project.find(
+    "/* End PBXNativeTarget section */",
+    native_target_section_start,
+)
+if native_target_section_start < 0 or native_target_section_end < 0:
+    raise SystemExit("missing PBX native-target section")
+native_target_section = project[
+    native_target_section_start:native_target_section_end
+]
+if native_target_section.count("isa = PBXNativeTarget;") != 6:
+    raise SystemExit("L3c3a Xcode native-target allowlist drifted")
+expected_native_targets = {
+    "StornautApp",
+    "StornautAppTests",
+    "StornautAppUITests",
+    "StornautLifecycleHelper",
+    "StornautInvestigationDiagnosticApp",
+    "StornautInvestigationDiagnosticAppTests",
+}
+for target_name in expected_native_targets:
+    if native_target_section.count(f"name = {target_name};") != 1:
+        raise SystemExit(
+            f"L3c3a Xcode target identity drifted: {target_name}"
+        )
+
+copy_phase_section_start = project.find(
+    "/* Begin PBXCopyFilesBuildPhase section */"
+)
+copy_phase_section_end = project.find(
+    "/* End PBXCopyFilesBuildPhase section */",
+    copy_phase_section_start,
+)
+if copy_phase_section_start < 0 or copy_phase_section_end < 0:
+    raise SystemExit("missing PBX copy-phase section")
+copy_phase_section = project[
+    copy_phase_section_start:copy_phase_section_end
+]
+if copy_phase_section.count("isa = PBXCopyFilesBuildPhase;") != 2:
+    raise SystemExit("L3c3a Xcode copy-phase allowlist drifted")
+for phase_name in ("Copy Helper", "Copy Investigation Helper"):
+    if copy_phase_section.count(f'name = "{phase_name}";') != 1:
+        raise SystemExit(
+            f"L3c3a helper copy-phase identity drifted: {phase_name}"
+        )
+
 def target_body(identifier, name, next_identifier):
     marker = f"{identifier} /* {name} */ = {{"
     start = project.find(marker)

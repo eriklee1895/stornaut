@@ -59,6 +59,30 @@ struct SignedRuntimeMachineSerializationTests {
             }
         )
         #expect(
+            SignedInvestigationRuntimeMachineCaseEvidence
+                .schemaVersion == 3
+        )
+        #expect(
+            SignedInvestigationRuntimeFailureMatrix
+                .schemaVersion == 3
+        )
+        #expect(
+            SignedInvestigationRuntimeMachineReport
+                .schemaVersion == 3
+        )
+        #expect(
+            SignedInvestigationRuntimeLifecycleResidueRecord
+                .schemaVersion == 2
+        )
+        #expect(
+            SignedInvestigationRuntimeMachineEvidenceBundle
+                .schemaVersion == 7
+        )
+        #expect(
+            decoded.successReport.binding.machineDriver
+                == success.binding.machineDriver
+        )
+        #expect(
             report.verdict
                 == .evidenceContractValidatedMachineAdmissionPending
         )
