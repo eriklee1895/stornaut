@@ -229,8 +229,11 @@
 > admission、ACL fail-closed、whole-installer source seal、disposable matrix、
 > 1067-test clean staged-only serial 与 independent grouped/post-fix/cross-group
 > review 已完成；accepted tree 为
-> `1c4a665151e6bca44d784c94b2a9c461217f83e2`。L3c3c-i handoff/launcher
-> spike 与 ADR next。只有
+> `1c4a665151e6bca44d784c94b2a9c461217f83e2`。L3c3c-i 已拆为 i-a/i-b1/
+> i-b2；external i-a transport/identity/protocol/lifecycle 与 i-b1 root-to-UID
+> implementation/non-root/cleanup/static review 已完成。唯一 privileged i-b2
+> machine run 未执行，ADR 0018 仍 Proposed，L3c3c-i 尚未完成且 L3c3c-ii
+> blocked。只有
 > L3c4 可作 readiness claim，
 > L3c2b preflight 的 fresh-plan matrix contradiction 已由 plan-freshness
 > prerequisite 关闭：八个 actual plan fingerprints 全唯一、一个 exact
@@ -564,7 +567,8 @@ schema、1057-test clean staged-only serial 与 post-fix review 已完成；L3c3
 post-fix review 已完成；b-i native packaging、1060-test clean staged-only serial
 与 independent post-fix/cross-group review 也已完成；b-ii installer/L2 admission、
 ACL fail-closed、whole-installer seal、1067-test clean staged-only serial 与
-independent grouped/post-fix/cross-group review 已完成，L3c3c-i next；L3c4
+independent grouped/post-fix/cross-group review 已完成。L3c3c-i-a/i-b1 已
+完成，privileged i-b2 未执行，ADR 0018 仍 Proposed，L3c3c-ii blocked；L3c4
 独占 final admission 与剩余 full。L3c1b-i/ii 证据见
 [i review](../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
 与
@@ -575,6 +579,10 @@ L3c2a-ii 证据见
 [review](../reports/phase-d-task-39b2c-l3c2a-ii-machine-driver-host-review.md)。
 L3c3b-ii 证据见
 [review](../reports/phase-d-task-39b2c-l3c3b-ii-installer-l2-admission-review.md)。
+L3c3c-i 条件性证据见
+[study](../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md)、
+[Proposed ADR 0018](../adr/0018-parent-owned-investigation-handoff.md) 与
+[conditional review](../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md)。
 生产 Deep Dive 继续 unavailable，直到 Task 44 final admission。
 
 跨 Epic 的阶段依赖、no-go 分支和交付顺序由 [Delivery Roadmap](../plans/roadmap.md) 管理；新 active plan 不得另起一套宏观路线。

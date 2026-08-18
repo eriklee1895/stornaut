@@ -1,6 +1,7 @@
 # Phase D Task 39B2c-L3c3 Scope and Trust Preflight
 
-> Status: Pre-coding split frozen; L3c3a is next
+> Status: Split frozen; L3c3a/L3c3b complete; L3c3c-i-a/i-b1 complete;
+> privileged i-b2 not executed; ADR 0018 Proposed; L3c3c-ii blocked
 >
 > Date: 2026-08-18
 >
@@ -124,6 +125,16 @@ candidate before L3c3c-ii. Spike code lives outside the repository and is not a
 product implementation checkpoint; only its ADR/study and reproducible evidence
 may be committed. This spike adds no product launcher authority.
 
+Current status: the external study rejected anonymous-XPC keyed transfer and
+symmetric inherited peer-token authentication, then conditionally selected one
+asymmetrically identity-bound fixed socketpair topology. L3c3c-i-a transport/
+lifecycle evidence and i-b1 root-to-UID implementation, non-root gate, cleanup
+negative and static review are complete. The mandatory privileged i-b2 machine
+run did not execute; [ADR 0018](../adr/0018-parent-owned-investigation-handoff.md)
+therefore remains Proposed and L3c3c-ii remains blocked. See the
+[study](../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md)
+and [conditional review](phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md).
+
 ### L3c3c-ii — Fixed Live Handoff and Transition Composition
 
 Implement only the accepted spike topology. Process-launch authority must live
@@ -156,5 +167,7 @@ L3c3a, L3c3b, L3c3c-i and L3c3c-ii must not authenticate Codex or call a model.
 
 This preflight made no repository code change, installed nothing, launched no
 model and did not alter `~/.codex/config.toml`. Production Deep Dive remains
-unavailable. L3c3a is next; any path beyond its frozen ceiling requires another
-split before coding.
+unavailable. L3c3a and L3c3b are now complete. L3c3c-i remains incomplete
+because privileged i-b2 did not execute; L3c3c-ii is blocked until that gate
+succeeds and ADR 0018 becomes Accepted. Any path beyond a frozen ceiling still
+requires another split before coding.

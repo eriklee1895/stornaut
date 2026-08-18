@@ -127,8 +127,14 @@ fail-closed trust transition, whole-installer source seal, six-case disposable
 matrix, one 1,067-test clean staged-only serial and grouped/post-fix/cross-group
 review passed. See the
 [L3c3b-ii review](../../reports/phase-d-task-39b2c-l3c3b-ii-installer-l2-admission-review.md).
-L3c3c-i parent-owned handoff/launcher spike and ADR is next. Only
-L3c4 owns machine readiness and the remaining full verifier.
+L3c3c-i is conditionally checkpointed. Its external i-a transport/identity/
+lifecycle study and i-b1 root-to-UID implementation, non-root gate, cleanup
+negative and static review are complete. The mandatory privileged i-b2 machine
+run did not execute, so [ADR 0018](../../adr/0018-parent-owned-investigation-handoff.md)
+remains Proposed, L3c3c-i is incomplete and L3c3c-ii remains blocked. See the
+[study](../../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md)
+and [conditional review](../../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md).
+Only L3c4 owns machine readiness and the remaining full verifier.
 The L3c2b preflight's
 [plan-freshness prerequisite](../../reports/phase-d-task-39b2c-l3c2b-plan-freshness-prerequisite-review.md)
 is complete: real fresh plan fingerprints are unique, one target-set fingerprint
@@ -151,7 +157,7 @@ the sole normal-product admission gate.
 | [36](task-36-implementation-brief.md) | Domain, canonical projection, planner, budget and stop contracts | complete; [review](../../reports/phase-d-task-36-review.md) |
 | [37](task-37-implementation-brief.md) | Store v4, retention and source rejoin | complete; [review](../../reports/phase-d-task-37-review.md) |
 | [38](task-38-implementation-brief.md) | Closed coordinator with fake runtime | complete; [review](../../reports/phase-d-task-38-review.md) |
-| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; through L3c3b-ii complete; L3c3c-i handoff/launcher spike next |
+| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; L3c3c-i-a/i-b1 complete; privileged i-b2 not executed; ADR 0018 Proposed; L3c3c-ii blocked |
 | [40](task-40-implementation-brief.md) | Evidence report and conservative Review projection | blocked on Task 39 |
 | [41](task-41-implementation-brief.md) | First-use disclosure and typed availability | blocked on Task 40 |
 | [42](task-42-implementation-brief.md) | App workflow and recovery state | blocked on Task 41 |

@@ -29,8 +29,11 @@
 > closure before packaging. Its zero-dependency DriverSupport, final-Mach-O
 > authority gates, 1,059-test clean staged-only serial and independent post-fix
 > review passed. L3c3b-i diagnostic-only native packaging, final-artifact gates,
-> 1,060-test clean staged-only serial and post-fix/cross-group review also passed;
-> L3c3b-ii installer/L2 admission is next. The authoritative
+> 1,060-test clean staged-only serial and post-fix/cross-group review also passed.
+> L3c3b-ii installer/L2 admission is complete. L3c3c-i-a transport/identity/
+> protocol/lifecycle and i-b1 root-to-UID implementation/non-root/cleanup/static
+> review are complete; privileged i-b2 did not execute, ADR 0018 remains
+> Proposed, L3c3c-i is incomplete and L3c3c-ii is blocked. The authoritative
 > real-model run and readiness verdict remain unimplemented.
 > Production Deep Dive remains unavailable until Task 44 admission.
 >
@@ -881,7 +884,11 @@ Checkpoint status:
   1,059-test clean staged-only serial and independent post-fix review. L3c3b-i
   native packaging is also complete after its diagnostic-only Xcode graph,
   final-artifact identity/authority gates, 1,060-test clean staged-only serial
-  and independent post-fix/cross-group review. L3c3b-ii installer/L2 is next.
+  and independent post-fix/cross-group review. L3c3b-ii installer/L2 is complete.
+  L3c3c-i-a transport/identity/protocol/lifecycle and i-b1 root-to-UID
+  implementation/non-root/cleanup/static review are complete; privileged i-b2
+  did not execute, ADR 0018 remains Proposed, L3c3c-i is incomplete and
+  L3c3c-ii is blocked.
   See the
   [L3c1b-i Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
   and
@@ -904,6 +911,13 @@ Checkpoint status:
   [Driver Runtime Authority Review](../../reports/phase-d-task-39b2c-l3c3b-driver-runtime-authority-review.md).
   Native packaging evidence is in the
   [Native Driver Packaging Review](../../reports/phase-d-task-39b2c-l3c3b-i-native-driver-packaging-review.md).
+  Installer/L2 admission evidence is in the
+  [Installer/L2 Admission Review](../../reports/phase-d-task-39b2c-l3c3b-ii-installer-l2-admission-review.md).
+  L3c3c's measured candidate, remaining privileged gate and product-code block
+  are recorded in the
+  [Parent-Owned Handoff Study](../../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md),
+  [Proposed ADR 0018](../../adr/0018-parent-owned-investigation-handoff.md) and
+  [L3c3c-i Conditional Review](../../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md).
   Only L3c4 owns
   real-model signed-App machine readiness, the complete failure matrix, exact
   zero-residue proof and the remaining authoritative full verifier. Task 39 and
