@@ -246,9 +246,10 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   clean staged-only serial 与 independent grouped/post-fix/cross-group review 已
   完成；accepted implementation tree 为
   `1c4a665151e6bca44d784c94b2a9c461217f83e2`。L3c3b-ii 已完成。
-  L3c3c-i 已拆为 i-a/i-b1/i-b2：external i-a transport/identity/protocol/
-  lifecycle 与 i-b1 root-to-UID implementation/non-root/cleanup/static review
-  已完成；唯一 privileged i-b2 machine run 未执行，ADR 0018 仍为
+  L3c3c-i 已拆为 i-a/i-b1/i-b2a/i-b2b：external i-a transport/identity/
+  protocol/lifecycle、i-b1 root-to-UID implementation/non-root/cleanup/static
+  review 与 i-b2a 三层 signed-projection reproducibility contract 已完成；
+  唯一 privileged i-b2b machine run 未执行，ADR 0018 仍为
   Proposed，L3c3c-i 尚未完成且 L3c3c-ii blocked。
   只有 L3c4
   可作 readiness claim，
@@ -370,6 +371,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c L3c3b-ii installer/L2 admission review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3b-ii-installer-l2-admission-review.md](docs/reports/phase-d-task-39b2c-l3c3b-ii-installer-l2-admission-review.md) |
 | Phase D Task 39B2c L3c3c parent-owned handoff study / Proposed ADR | [docs/upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md](docs/upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md) / [ADR 0018](docs/adr/0018-parent-owned-investigation-handoff.md) |
 | Phase D Task 39B2c L3c3c-i conditional review | [docs/reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md](docs/reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md) |
+| Phase D Task 39B2c L3c3c-i-b2a reproducibility review | [docs/reports/phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md](docs/reports/phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md) |
 | Phase D Task 39B2c-L1 residue observation review | [docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md](docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md) |
 | Phase D Task 39B2c-L2 root topology observation review | [docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md](docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md) |
 | Phase D Task 39B2c-L3a trusted machine target review | [docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md](docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md) |
@@ -485,8 +487,8 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   b-i diagnostic-only native packaging、1060-test clean staged-only serial 与
   independent post-fix/cross-group review 也已完成；b-ii installer/L2 admission、
   ACL fail-closed、whole-installer seal、1067-test clean staged-only serial 与
-  independent grouped/post-fix/cross-group review 已完成。L3c3c-i-a/i-b1 已
-  完成，privileged i-b2 未执行，ADR 0018 仍 Proposed，L3c3c-ii blocked；L3c4
+  independent grouped/post-fix/cross-group review 已完成。L3c3c-i-a/i-b1/i-b2a
+  已完成，privileged i-b2b 未执行，ADR 0018 仍 Proposed，L3c3c-ii blocked；L3c4
   独占 final admission 与剩余 full。
   Task 39 尚未完成。
 Deep Dive 的旧 Broker-only no-go 已被 ADR 0004 的 capability-first 边界取代；

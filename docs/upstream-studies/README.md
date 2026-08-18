@@ -33,6 +33,8 @@ Phase D：
   Accepted for Task 36; canonical planning, budget and stop contracts
 - [Task 39B2c-L3c3c Parent-Owned Handoff](phase-d-task-39b2c-l3c3c-parent-owned-handoff.md) —
   conditional study; transport/lifecycle and root-to-UID implementation/static
-  evidence complete, privileged machine run not executed, ADR 0018 Proposed
+  evidence plus i-b2a three-layer reproducibility complete, privileged i-b2b
+  machine run not executed, ADR 0018 Proposed; see the
+  [i-b2a review](../reports/phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md)
 
 研究记录必须包含精确 commit/version、license、阅读文件、可借鉴行为、不可复用代码、Stornaut 独立方案和 Benchmark/fixture。

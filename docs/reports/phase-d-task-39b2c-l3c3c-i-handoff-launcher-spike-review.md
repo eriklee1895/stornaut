@@ -1,6 +1,6 @@
 # Phase D Task 39B2c-L3c3c-i Handoff/Launcher Spike Conditional Review
 
-> Status: Conditional; i-a and i-b1 complete, privileged i-b2 not executed
+> Status: Conditional; i-a/i-b1/i-b2a complete, privileged i-b2b not executed
 >
 > Date: 2026-08-19
 >
@@ -13,8 +13,10 @@
 
 L3c3c-i is not complete. The external study selected one conditional candidate
 and closed its unprivileged transport/lifecycle design, root-to-UID code design,
-non-root gate, cleanup negative and static reviews. The one mandatory
-administrator-authorized B4 run did not execute, so
+non-root gate, cleanup negative and static reviews. The separate
+[i-b2a reproducibility contract](phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md)
+is also complete. The one mandatory administrator-authorized i-b2b B4 run did
+not execute, so
 [ADR 0018](../adr/0018-parent-owned-investigation-handoff.md) remains Proposed
 and L3c3c-ii cannot start.
 
@@ -31,10 +33,11 @@ mutation, no product App/helper/driver execution and no model call.
 | one-shot, bounded, non-persistent | unnamed socketpair, strict state/nonce/sequence/deadline, EOF/trailing gate | two B3-v8 19/19 runs |
 | no JSON/filesystem/helper-reply handle | binary in-memory frame only | proved structurally in spike |
 | complete peer identity | audit/process/path/SHA/signing/DR/CDHash, two-stage root-to-UID join | B3 live; B4 implemented/reviewed, privileged pending |
+| reproducible B4 projections | exact execution SHA plus normalized unsigned and signed semantic projections | i-b2a complete |
 | cancellation, App crash, driver crash, replay, deadline | exact scenarios plus hang and forced-drain negatives | B3-v8 green |
 | zero residue | WNOWAIT/exact member/final SIGKILL/reap-last/retained identity | B3-v8 and forced negative green |
 | App remains alive through installed-L2 | `ALIVE -> strict EOF -> parent check -> EXIT` barrier | transport proved; product composition deferred |
-| exact root-to-UID machine behavior | B4 formal binary | **not executed** |
+| exact root-to-UID machine behavior | exact `d157…` B4 formal binary | **i-b2b not executed** |
 | accepted ADR before product code | ADR 0018 | **Proposed, not Accepted** |
 
 ## 3. Scope and Cost
@@ -48,7 +51,9 @@ The external spike was split during investigation into:
 - **i-a** — candidate comparison, transport/identity/protocol/lifecycle matrix;
 - **i-b1** — root-to-UID candidate implementation, non-root gate, forced-cleanup
   negative and static review; and
-- **i-b2** — one privileged root-to-UID machine run, still pending.
+- **i-b2a** — exact execution-artifact and signed-projection reproducibility
+  contract, complete; and
+- **i-b2b** — one privileged root-to-UID machine run, still pending.
 
 The split prevented a system authorization gap from being hidden inside a large
 production implementation checkpoint.
@@ -115,6 +120,14 @@ The formal product candidate does not contain the compile-time forced-cleanup
 entry or an environment test seam. Two fresh static reviews found no unresolved
 P0-P2.
 
+### B4 i-b2a
+
+The [reproducibility contract review](phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md)
+records the fresh `-O2` / fixed-UID object, two matching normalized unsigned
+complete-Mach-O projections, matching fixed-identifier CodeDirectory and the
+bounded 193-byte post-SuperBlob padding difference. It prohibits copying that
+padding and preserves `d157…` as the exact whole-file identity for execution.
+
 ## 6. Privileged Gate Status
 
 Two standard macOS administrator prompts were initiated for the same formal
@@ -123,10 +136,11 @@ created and the binary never opened in a process. Both pending prompts were
 cancelled. A read-only follow-up confirmed repository cleanliness and no change
 to Stornaut install/plist paths.
 
-Therefore the privileged gate is **not run**, not failed and not passed. The next
-step is exactly one authorized disposable B4 invocation followed by source/
-binary/output binding, exact PID/PGID residue checks and independent review. No
-production handoff code may be written first.
+Therefore i-b2b is **not run**, not failed and not passed. The next step is
+exactly one authorized disposable invocation of the `d157…` B4 artifact, with
+that full SHA checked before/after and bound into source/binary/output evidence,
+followed by exact PID/PGID residue checks and independent review. No production
+handoff code may be written first.
 
 ## 7. Safety and Admission
 
@@ -135,5 +149,5 @@ production handoff code may be written first.
 - `~/.codex/config.toml` was not modified.
 - No model/auth/capability evidence was consumed.
 - `scripts/verify --full` remains reserved for L3c4.
-- L3c3c-ii remains blocked on i-b2 plus acceptance of ADR 0018.
+- L3c3c-ii remains blocked on i-b2b plus acceptance of ADR 0018.
 - Task 39 remains incomplete.

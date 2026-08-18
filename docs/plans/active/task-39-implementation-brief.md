@@ -43,7 +43,9 @@
 > runtime/lease topology. Its root-helper signing P1 was fixed tests-first;
 > 117-test focused, exact source-boundaries, targeted Debug diagnostic build,
 > 981-test clean staged-only serial and post-fix review passed. The later
-> machine driver/failure matrix remains unimplemented. Evidence:
+> deterministic machine driver/failure matrix is complete; the current frontier
+> is L3c3c-i, whose i-b2a reproducibility contract is complete while privileged
+> i-b2b remains unexecuted. Evidence:
 > [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
 > [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md) and
 > [Task 39B1b-i Review](../../reports/phase-d-task-39b1b-i-review.md) and
@@ -105,9 +107,10 @@
 > post-fix/cross-group review also passed. L3c3b-ii exact installer/L2 admission,
 > ACL fail-closed, whole-installer source seal, six-case disposable matrix,
 > 1,067-test clean staged-only serial and grouped/post-fix/cross-group review also
-> passed. L3c3c-i-a transport/identity/protocol/lifecycle and i-b1 root-to-UID
-> implementation/non-root/cleanup/static review are complete; privileged i-b2
-> did not execute, so ADR 0018 remains Proposed and L3c3c-ii is blocked. Evidence:
+> passed. L3c3c-i-a transport/identity/protocol/lifecycle, i-b1 root-to-UID
+> implementation/non-root/cleanup/static review and i-b2a reproducibility are
+> complete; privileged i-b2b did not execute, so ADR 0018 remains Proposed and
+> L3c3c-ii is blocked. Evidence:
 > [39B2c-L3c1a Typed Owner Retirement Review](../../reports/phase-d-task-39b2c-l3c1a-typed-owner-retirement-review.md)
 > and
 > [39B2c-L3c1b-i Configuration-Bound Helper Escrow Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
@@ -130,7 +133,9 @@
 > and
 > [39B2c-L3c3c Parent-Owned Handoff Study](../../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md),
 > [Proposed ADR 0018](../../adr/0018-parent-owned-investigation-handoff.md) and
-> [L3c3c-i Conditional Review](../../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md).
+> [L3c3c-i Conditional Review](../../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md),
+> plus the
+> [L3c3c-i-b2a Reproducibility Review](../../reports/phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md).
 >
 > **Parent plan:**
 > [Phase D Conditional Deep Dive](phase-d-conditional-deep-dive.md)
@@ -1018,17 +1023,25 @@ The remaining L3 work is split before driver coding:
    post-fix/cross-group review; see its
    [review](../../reports/phase-d-task-39b2c-l3c3b-ii-installer-l2-admission-review.md).
    L3c3c-i is now split into **i-a** transport/identity/protocol/lifecycle,
-   **i-b1** root-to-UID implementation/non-root/cleanup/static review, and
-   **i-b2** one privileged root-to-UID machine run. i-a and i-b1 are complete:
+   **i-b1** root-to-UID implementation/non-root/cleanup/static review,
+   **i-b2a** signed-projection reproducibility contract, and **i-b2b** one
+   privileged root-to-UID machine run. i-a, i-b1 and i-b2a are complete:
    two B3-v8 19/19 matrices and the forced-drain negative contained all
    scenarios, the public Security probe preserved live-vnode validity while
    rejecting replacement-path static identity, and B4 passed strict compile,
    pre-spawn non-root rejection, cleanup negative and independent static review.
-   The privileged i-b2 formal run did not execute, so
+   i-b2a freezes three mandatory layers: the actual run artifact remains exact
+   full SHA `d157241035e9bdda8bd5ed139509fcb23ae45528ae79b89e3d22b98d614e760d`
+   before/after execution; a fresh fixed-UID build must match both normalized
+   unsigned complete-Mach-O projections; and fixed-identifier strict signing,
+   CodeDirectory and the parsed signed prefix must match. Only the measured 193
+   post-SuperBlob padding bytes may differ, and copying reviewed padding is
+   forbidden. The privileged i-b2b formal run did not execute, so
    [ADR 0018](../../adr/0018-parent-owned-investigation-handoff.md) remains
    Proposed, L3c3c-i is incomplete and L3c3c-ii is blocked. See the
    [study](../../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md)
-   and [conditional review](../../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md).
+   and [conditional review](../../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md),
+   plus the [i-b2a review](../../reports/phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md).
    Later sub-checkpoints retain their exact path preflights.
 6. **L3c4 sealed final admission** — execute the authoritative current-source
    cohort with eight independent fresh nonces, one real success model run and
@@ -1041,11 +1054,12 @@ The remaining L3 work is split before driver coding:
    raw-evidence read-only and must not repeat model calls or root mutation.
 
 The order is strict: `L3c1a -> L3c1b-i -> L3c1b-ii -> L3c2a-i -> L3c2a-ii ->
-L3c2b -> L3c3a -> L3c3b-0 -> L3c3b-i -> L3c3b-ii -> L3c3c-i -> L3c3c-ii ->
+L3c2b -> L3c3a -> L3c3b-0 -> L3c3b-i -> L3c3b-ii -> L3c3c-i-a ->
+L3c3c-i-b1 -> L3c3c-i-b2a -> L3c3c-i-b2b -> L3c3c-ii ->
 L3c3d -> L3c4`. L3c1, L3c2, L3c3a, L3c3b-0, L3c3b-i and L3c3b-ii are
-complete; L3c3c-i-a and i-b1 are complete, while privileged i-b2 has not
+complete; L3c3c-i-a, i-b1 and i-b2a are complete, while privileged i-b2b has not
 executed and therefore L3c3c-i remains incomplete. L3c3c-ii cannot begin until
-i-b2 succeeds and ADR 0018 becomes Accepted. L3c1 used focused
+i-b2b succeeds and ADR 0018 becomes Accepted. L3c1 used focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean
 staged serial regression, targeted helper/diagnostic builds and independent
 review in place of full. Each L3c2 sub-checkpoint uses structural, focused, one

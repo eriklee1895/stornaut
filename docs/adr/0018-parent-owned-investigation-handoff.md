@@ -1,6 +1,6 @@
 # ADR 0018: Parent-Owned Investigation Handoff and Fixed App Launch
 
-> **Status:** Proposed; blocked on one authorized root-to-UID B4 machine run
+> **Status:** Proposed; i-b2a complete, blocked on one authorized i-b2b B4 run
 >
 > **Date:** 2026-08-19
 >
@@ -32,7 +32,10 @@ not an accepted production decision.
 
 The related study records the exact environment, rejected-candidate errors,
 B3-v8 two-run matrix, forced-cleanup negative, live Security API behavior and
-B4 source/binary hashes. Important measured conclusions are:
+B4 source/binary hashes. The
+[i-b2a review](../reports/phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md)
+freezes the three-layer reproducibility contract. Important measured
+conclusions are:
 
 - an inherited socket's peer token does not rebind to the child;
 - an anonymous XPC endpoint cannot be converted to an ordinary byte archive;
@@ -42,7 +45,10 @@ B4 source/binary hashes. Important measured conclusions are:
 - WNOWAIT, exact PGID membership, bounded final SIGKILL, reap-last and retained
   identity are required to avoid PGID reuse, hangs and silent residue; and
 - B4's static/non-root/forced-cleanup evidence is green, while its privileged
-  root-to-UID evidence is absent.
+  root-to-UID evidence is absent; and
+- a fresh signed build reproduces the normalized unsigned and signed semantic
+  projections, while literal whole-file equality is prevented only by 193 bytes
+  of non-semantic post-SuperBlob padding.
 
 ## Proposed Decision
 
@@ -118,15 +124,21 @@ child/descendant/PGID absence but may not signal unrelated processes.
 
 ## Residual Risks and Acceptance Gate
 
-This ADR cannot become Accepted from same-UID or static evidence. One explicitly
-authorized disposable B4 run must prove:
+This ADR cannot become Accepted from same-UID, static or reproducibility
+evidence. Its residual gate has two distinct parts: i-b2a is complete; one
+explicitly authorized disposable i-b2b B4 run must still prove:
 
 1. root parent and exact fixed UID 501 child;
 2. the two-stage identity transition and exact 17-to-16 kernel group rule;
 3. irreversible credential drop;
 4. the strict happy/replay/deadline/cancellation/crash/hang matrix;
 5. zero child, descendant, channel and exact-PGID residue; and
-6. output bound to the reviewed source and formal-binary hashes.
+6. exact execution artifact full SHA-256
+   `d157241035e9bdda8bd5ed139509fcb23ae45528ae79b89e3d22b98d614e760d`
+   before and after execution, with output bound to that same value; and
+7. the already-complete i-b2a normalized unsigned and signed semantic
+   projections remain independently reproducible without copying reviewed
+   signature padding.
 
 The two attempted standard administrator prompts did not start the binary and
 were cancelled. They are not evidence. Until the gate above is green,
@@ -145,5 +157,8 @@ claim is allowed and the remaining full verifier is not consumed.
 | B4 strict compile/non-root gate | passed |
 | B4 compile-time forced-cleanup negative | passed |
 | B4 independent static review | no unresolved P0-P2 |
-| B4 privileged root-to-UID machine run | **not executed** |
+| i-b2a exact execution-artifact contract | full SHA `d157241035e9bdda8bd5ed139509fcb23ae45528ae79b89e3d22b98d614e760d` frozen |
+| i-b2a normalized unsigned projections | complete; both reviewed/rebuilt comparisons matched |
+| i-b2a signed semantic projection | complete; fixed identifier/CodeDirectory/prefix matched; only bounded post-SuperBlob padding differed |
+| i-b2b privileged root-to-UID machine run | **not executed** |
 | ADR status | **Proposed** |

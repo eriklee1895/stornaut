@@ -1,6 +1,6 @@
 # Phase D Task 39B2c-L3c3c Parent-Owned Handoff Study
 
-> Status: Transport study complete; privileged root-to-UID evidence pending
+> Status: Transport and i-b2a reproducibility complete; privileged i-b2b pending
 >
 > Date: 2026-08-19
 >
@@ -236,14 +236,42 @@ the formal binary had no open process, no system install path changed and the
 repository stayed clean. This is an authorization/evidence gap, not a passing or
 failing runtime result.
 
-Until one authorized run proves the exact root-to-UID happy and failure matrix,
-ADR 0018 remains Proposed and L3c3c-ii remains blocked.
+The former i-b2 gate is split into i-b2a reproducibility and i-b2b privileged
+execution. The non-privileged i-b2a evidence is complete; the exact run remains
+unexecuted. Until one authorized i-b2b run proves the exact root-to-UID happy
+and failure matrix, ADR 0018 remains Proposed and L3c3c-ii remains blocked.
 
-## 8. Reproducible Privileged Gate
+## 8. Three-Layer Reproducible Privileged Gate
 
-The next run must rebuild from the reviewed B4 source, reproduce the source and
-formal-binary hashes above, and then use one explicit administrator-
-authenticated invocation. It must require all scenario rows to be contained,
+Independent preflight returned NO-GO under the former literal requirement that
+a fresh `codesign` reproduce the entire reviewed signed-file SHA. The measured
+drift is exactly 193 bytes of padding after the declared SuperBlob, inside the
+file-backed `__LINKEDIT` / allocated `LC_CODE_SIGNATURE` range but outside all
+parsed signature blobs and CodeDirectory coverage. It is not a source, object or
+parsed-signature difference. The amended gate has three mandatory layers:
+
+1. **Exact execution artifact:** the sole privileged input remains the reviewed
+   formal binary with full SHA-256
+   `d157241035e9bdda8bd5ed139509fcb23ae45528ae79b89e3d22b98d614e760d`.
+   Its exact whole-file SHA must match immediately before and after execution and
+   be bound by the result artifacts. A rebuilt file cannot replace it.
+2. **Normalized unsigned projections:** a fresh `-O2` /
+   `FIXED_TARGET_UID=501` build from source SHA-256
+   `e683480689d72118d494270b72ded3a8baa448ba5026d5cf63780990ca64bb25`
+   must reproduce the reviewed object and both complete-Mach-O normalized
+   unsigned projections. Normalization may strip the signature and, in the
+   stated comparison, zero only `LC_UUID`; it may not copy reviewed padding.
+3. **Signed semantic projection:** fresh and reviewed artifacts must have the
+   same fixed identifier, strict-valid signature, CodeDirectory and complete
+   bytes through the declared SuperBlob end. The only permitted whole-file
+   drift is the exact measured offset/value relation for the post-SuperBlob
+   padding; any parsed-blob, CodeDirectory, other-offset or additional difference
+   fails closed.
+
+Exact hashes, offsets, projection procedure and checklist are frozen in the
+[i-b2a reproducibility contract review](../reports/phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md).
+i-b2a is complete. i-b2b remains exactly one explicit administrator-
+authenticated invocation; it must require all scenario rows to be contained,
 all child identities to show EUID 501, exact kernel groups, the three irreversible
 drop probes, strict EOF, bounded cleanup and no retained PID/PGID. It may not
 install files, call launchd, run a product binary, call a model or retry a failed
@@ -255,6 +283,8 @@ The exact formal invocation has no arguments:
 /tmp/stornaut-l3c3ci.zzGX7U/root-uid-b4/b4-privileged
 ```
 
-After the run, the verifier must bind the output to the reviewed source/binary,
-confirm zero exact-process and exact-PGID residue, and only then promote ADR
-0018 from Proposed to Accepted.
+Before and after the run, the verifier must bind the exact full execution file
+to the reviewed source/binary, bind the output to that same full SHA, confirm
+zero exact-process and exact-PGID residue, and only then promote ADR 0018 from
+Proposed to Accepted. The privileged result JSONL, stderr and return-code
+artifacts remain absent.
