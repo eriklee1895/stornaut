@@ -20,7 +20,9 @@
 > L3c2a-i/L3c2a-ii/L3c2b. L3c2a-i strict Machine-claim transport is complete
 > after a 1041-test clean staged-only serial and independent post-fix review;
 > L3c2a-ii root host/topology is also complete after a 1046-test clean staged-only
-> serial and independent post-fix review; L3c2b is next. The failure matrix,
+> serial and independent post-fix review. L3c2b deterministic eight-scenario
+> driving is complete after its exact eight-path implementation, layered gates,
+> 1,055-test clean staged-only serial and independent final review; L3c3 is next. The authoritative
 > real-model run and readiness verdict remain unimplemented.
 > Production Deep Dive remains unavailable until Task 44 admission.
 >
@@ -858,8 +860,10 @@ Checkpoint status:
   14-path implementation, layered gates, 1041-test clean staged-only serial and
   independent post-fix review. L3c2a-ii is also complete after its seven-path
   root host/topology composition, resolved authority gates, targeted builds,
-  1046-test clean staged-only serial and independent post-fix review; L3c2b is
-  next.
+  1046-test clean staged-only serial and independent post-fix review. L3c2b is
+  also complete after its deterministic eight-scenario driver, structural and
+  targeted gates, 1,055-test clean staged-only serial and final independent
+  review; L3c3 is next.
   See the
   [L3c1b-i Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
   and
@@ -870,7 +874,9 @@ Checkpoint status:
   [Machine Driver Host Review](../../reports/phase-d-task-39b2c-l3c2a-ii-machine-driver-host-review.md).
   The L3c2b preflight's real-plan matrix contradiction is closed by the
   [Plan Freshness Prerequisite Review](../../reports/phase-d-task-39b2c-l3c2b-plan-freshness-prerequisite-review.md);
-  L3c2b driving remains next.
+  L3c2b evidence is in the
+  [Eight-Scenario Driver Review](../../reports/phase-d-task-39b2c-l3c2b-eight-scenario-driver-review.md);
+  L3c3 real-success three-plane composition is next.
   Only L3c4 owns
   real-model signed-App machine readiness, the complete failure matrix, exact
   zero-residue proof and the remaining authoritative full verifier. Task 39 and

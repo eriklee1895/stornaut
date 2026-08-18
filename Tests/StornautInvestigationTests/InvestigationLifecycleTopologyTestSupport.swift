@@ -9,11 +9,7 @@ import StornautInvestigation
 
 final class LifecycleTopologyCollectorFixture: @unchecked Sendable {
     let contract: LifecycleLocalInstallationContract
-    let investigationID = LifecycleInvestigationID(
-        rawValue: UUID(
-            uuidString: "12345678-1234-4234-8234-123456789abc"
-        )!
-    )
+    let investigationID: LifecycleInvestigationID
     let userID: UInt32 = 501
     let appIdentity: LifecycleProcessIdentity
     let helperIdentity: LifecycleProcessIdentity
@@ -25,7 +21,16 @@ final class LifecycleTopologyCollectorFixture: @unchecked Sendable {
         now: Date(timeIntervalSince1970: 1_900_000_000)
     )
 
-    init() throws {
+    init(
+        investigationID: LifecycleInvestigationID =
+            LifecycleInvestigationID(
+                rawValue: UUID(
+                    uuidString:
+                        "12345678-1234-4234-8234-123456789abc"
+                )!
+            )
+    ) throws {
+        self.investigationID = investigationID
         contract = try LifecycleLocalInstallationContract()
         let resolvedTemporaryPath = try #require(
             realpath(FileManager.default.temporaryDirectory.path, nil)
@@ -208,12 +213,15 @@ final class LifecycleTopologyCollectorFixture: @unchecked Sendable {
 
     func configuration(
         nonce: UUID? = nil,
-        binding: SignedInvestigationRuntimeBinding? = nil
+        binding: SignedInvestigationRuntimeBinding? = nil,
+        scenario: SignedInvestigationRuntimeDiagnosticScenario = .success,
+        rootOverride: URL? = nil
     ) throws -> SignedInvestigationRuntimeDiagnosticConfiguration {
         try Self.configuration(
-            root: root,
+            root: rootOverride ?? root,
             nonce: nonce ?? investigationID.rawValue,
             binding: binding ?? signedBinding,
+            scenario: scenario,
             now: clock.read()
         )
     }
@@ -222,6 +230,7 @@ final class LifecycleTopologyCollectorFixture: @unchecked Sendable {
         root: URL,
         nonce: UUID,
         binding: SignedInvestigationRuntimeBinding,
+        scenario: SignedInvestigationRuntimeDiagnosticScenario = .success,
         now: Date
     ) throws -> SignedInvestigationRuntimeDiagnosticConfiguration {
         let sourceRoot = root.appending(
@@ -249,7 +258,7 @@ final class LifecycleTopologyCollectorFixture: @unchecked Sendable {
         }
         return try SignedInvestigationRuntimeDiagnosticConfiguration(
             nonce: nonce,
-            scenario: .success,
+            scenario: scenario,
             optIn: SignedInvestigationRuntimeDiagnosticConfiguration.requiredOptIn,
             diagnosticRootPath: root.path,
             sourceRootPath: sourceRoot.path,

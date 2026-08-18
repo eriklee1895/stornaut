@@ -173,7 +173,7 @@ actor InvestigationMachineDriverHost {
         case consumed
     }
 
-    private let configuration:
+    nonisolated let configuration:
         SignedInvestigationRuntimeDiagnosticConfiguration
     private let appProcessIdentity: LifecycleProcessIdentity
     private let userID: UInt32
@@ -183,6 +183,7 @@ actor InvestigationMachineDriverHost {
         -> InvestigationLifecycleTopologyCollector
     private let transition:
         any InvestigationLifecycleTopologyTransitioning
+    nonisolated let transitionBindingToken: UUID?
     private let effectiveUserID: @Sendable () -> uid_t
     private let now: @Sendable () -> Date
     private var state = State.ready
@@ -206,6 +207,9 @@ actor InvestigationMachineDriverHost {
         self.claimant = claimant
         self.collectorFactory = collectorFactory
         self.transition = transition
+        transitionBindingToken =
+            (transition as? InvestigationFixedScenarioRunner)?
+                .bindingToken
         self.effectiveUserID = effectiveUserID
         self.now = now
     }

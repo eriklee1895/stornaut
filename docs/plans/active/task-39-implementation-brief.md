@@ -910,8 +910,12 @@ The remaining L3 work is split before driver coding:
      one shared synthetic plan fingerprint. The independently reviewed
      [plan-freshness prerequisite](../../reports/phase-d-task-39b2c-l3c2b-plan-freshness-prerequisite-review.md)
      now requires eight unique actual plan fingerprints plus one shared exact
-     target-set fingerprint, with strict schema migration. L3c2b driving remains
-     next.
+     target-set fingerprint, with strict schema migration. L3c2b is complete:
+     its exact eight-path implementation, 8/8 focused scenarios, 197-test
+     Investigation suite, structural and targeted driver/App/release gates,
+     final independent review and one 1,055-test clean staged-only serial passed.
+     See the
+     [L3c2b Review](../../reports/phase-d-task-39b2c-l3c2b-eight-scenario-driver-review.md).
 
    The L3c2 preflight also closed two ordering ambiguities. The escrow surviving
    App disconnect is a failure-tolerance property, not permission to postpone
@@ -952,7 +956,7 @@ The remaining L3 work is split before driver coding:
 
 The order is strict: `L3c1a -> L3c1b-i -> L3c1b-ii -> L3c2a-i -> L3c2a-ii ->
 L3c2b -> L3c3 -> L3c4`. L3c1a, L3c1b-i, L3c1b-ii, L3c2a-i and L3c2a-ii are
-complete; L3c1 is closed, the L3c2 preflight is complete and L3c2b is next. L3c1 used focused
+complete; L3c1 and L3c2 are closed, and L3c3 is next. L3c1 used focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean
 staged serial regression, targeted helper/diagnostic builds and independent
 review in place of full. Each L3c2 sub-checkpoint uses structural, focused, one

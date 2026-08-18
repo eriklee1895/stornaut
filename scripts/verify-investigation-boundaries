@@ -10,6 +10,8 @@ evidence_root=Sources/StornautCore/Evidence
 coordinator_root=Sources/StornautInvestigation
 machine_root=Sources/StornautInvestigationMachine
 machine_driver_host=$machine_root/InvestigationMachineDriverHost.swift
+machine_scenario_runner=$machine_root/InvestigationFixedScenarioRunner.swift
+machine_scenario_driver=$machine_root/InvestigationMachineScenarioDriver.swift
 machine_driver_main=Tools/StornautInvestigationMachineDriver/main.swift
 runtime_root=Sources/StornautInvestigationRuntime
 diagnostic_root=Sources/StornautInvestigationDiagnostic
@@ -44,6 +46,8 @@ required_files=(
     "$machine_root/FixedLifecycleServiceProbe.swift"
     "$machine_root/InvestigationLifecycleTopologyCollector.swift"
     "$machine_driver_host"
+    "$machine_scenario_runner"
+    "$machine_scenario_driver"
     "$machine_driver_main"
     "$coordinator_root/Resources/investigation-prompt-v1.txt"
     "$runtime_root/InvestigationCodexSessionAdapter.swift"
@@ -155,6 +159,34 @@ if rg -n \
     'StornautExecution|StornautInvestigationDiagnostic|ActionExecutor|TrashMoving|RegisteredAction|SignedInvestigationRuntimeMachineAssembler|SignedInvestigationRuntimeMachineVerifier|signedInvestigationRuntimeReady|JSONEncoder|JSONDecoder|PropertyListEncoder|PropertyListDecoder|NSXPCConnection|URLSession|posix_spawn|removeItem|moveItem|copyItem|CommandLine\.arguments|ProcessInfo\.processInfo\.environment|readLine\(|kill\(' \
     "$machine_driver_host" "$machine_driver_main"; then
     print -u2 "Machine driver host gained prohibited input or authority."
+    exit 1
+fi
+for marker in \
+    'actor InvestigationFixedScenarioRunner' \
+    'typealias Operation = @Sendable () async throws' \
+    'struct InvestigationFixedScenarioObservation' \
+    'actor InvestigationMachineScenarioDriver' \
+    'struct InvestigationMachineScenarioAttempt' \
+    'struct InvestigationMachineSyntheticSuccessEvidence' \
+    'async throws -> SignedInvestigationRuntimeFailureMatrix' \
+    'let authority = try await attempt.host.run()' \
+    'try await attempt.runner.consumeObservation()'; do
+    rg -q --fixed-strings -- "$marker" \
+        "$machine_scenario_runner" "$machine_scenario_driver" || {
+        print -u2 "Machine scenario driver marker missing: $marker"
+        exit 1
+    }
+done
+if rg -n '^[[:space:]]*(?:@[A-Za-z_][A-Za-z0-9_.]*(?:\([^)]*\))?[[:space:]]+|(?:final|indirect|nonisolated|override|required|static|class|mutating|nonmutating|convenience|distributed)[[:space:]]+)*(?:public|package)(?:\(set\))?[[:space:]]+' \
+    "$machine_scenario_runner" "$machine_scenario_driver"; then
+    print -u2 "Machine scenario source escaped module scope."
+    exit 1
+fi
+if rg -n \
+    'import StornautExecution|import StornautInvestigationDiagnostic|import StornautCodex|ActionExecutor|TrashMoving|RegisteredAction|FileManagerTrashAdapter|CleanupExecutionRuntime|ExecutionAuthorization|ActionPolicyGate|CleanupPolicyGate|MoveToTrash|ProposedCleanupAction|CleanupAction|SignedInvestigationCapabilityEvidenceReceipt|SignedInvestigationRuntimeMachineAssembler|SignedInvestigationRuntimeMachineVerifier|SignedInvestigationRuntimeMachineReport|signedInvestigationRuntimeReady|signedRuntimeReady|readiness|Readiness|Codable|JSONEncoder|JSONDecoder|PropertyListEncoder|PropertyListDecoder|FileManager\.default|NSXPCConnection|URLSession|NWConnection|WebSocket|CFStream|NSTask|posix_spawn|O_WRONLY|O_RDWR|O_CREAT|O_TRUNC|O_APPEND|Process[[:space:]]*\(|removeItem|moveItem|copyItem|trashItem|replaceItem|createDirectory|createFile|createSymbolicLink|linkItem|setAttributes|forWritingTo|writeabilityHandler|unlink[[:space:]]*\(|rename[[:space:]]*\(|fopen[[:space:]]*\(|mkdir[[:space:]]*\(|rmdir[[:space:]]*\(|chmod[[:space:]]*\(|chown[[:space:]]*\(|symlink[[:space:]]*\(|truncate[[:space:]]*\(|kill[[:space:]]*\(|CommandLine\.arguments|ProcessInfo\.processInfo\.environment|readLine[[:space:]]*\(' \
+    "$machine_scenario_runner" "$machine_scenario_driver"; then
+    print -u2 \
+        "Machine scenario driver gained authority or readiness output."
     exit 1
 fi
 machine_xpc_source="$lifecycle_root/LifecycleSupervisorXPC.swift"
@@ -643,7 +675,12 @@ if not machine_source_root.is_dir() or not machine_sources:
 machine_authority_pattern = re.compile(
     r"import\s+StornautExecution"
     r"|import\s+StornautInvestigationDiagnostic"
-    r"|\b(?:ActionExecutor|TrashMoving|RegisteredAction|URLSession|"
+    r"|\b(?:ActionExecutor|TrashMoving|RegisteredAction|"
+    r"FileManagerTrashAdapter|CleanupExecutionRuntime|"
+    r"CleanupExecutionCoordinator|CleanupActionExecuting|"
+    r"CleanupAuthorizationController|ExecutionAuthorization|"
+    r"ActionPolicyGate|CleanupPolicyGate|MoveToTrash|"
+    r"ProposedCleanupAction|CleanupAction|URLSession|"
     r"NWConnection|NSTask|posix_spawn|O_WRONLY|O_RDWR|O_CREAT|"
     r"O_TRUNC|O_APPEND)\b"
     r"|\bProcess\s*\("
@@ -658,12 +695,35 @@ machine_authority_pattern = re.compile(
     r"|\b(?:unlink|rename|fopen|mkdir|rmdir|chmod|chown|"
     r"symlink|link|truncate|kill)\s*\("
     r"|Darwin\.write\s*\("
+    r"|\b(?:Darwin\.)?(?:socket|connect|send|sendto|recv|recvfrom)\b"
     r"|CommandLine\.arguments"
     r"|ProcessInfo\.processInfo\.environment"
     r"|readLine\s*\("
     r"|NSXPCConnection"
     r"|signedInvestigationRuntimeReady"
 )
+machine_readiness_pattern = re.compile(
+    r"\b(?:SignedInvestigationCapabilityEvidenceReceipt|"
+    r"SignedInvestigationRuntimeMachineReport|"
+    r"signedInvestigationRuntimeReady|signedRuntimeReady|"
+    r"[A-Za-z_][A-Za-z0-9_]*Ready|readiness|Readiness)\b"
+)
+machine_readiness_baseline = {
+    "SignedInvestigationRuntimeMachineContract.swift": [
+        (643, "public struct SignedInvestigationRuntimeMachineReport:"),
+        (1116, ") throws -> SignedInvestigationRuntimeMachineReport"),
+        (1146, ") throws -> SignedInvestigationRuntimeMachineReport"),
+        (1196, ") throws -> SignedInvestigationRuntimeMachineReport {"),
+        (1264, "try SignedInvestigationCapabilityEvidenceReceipt("),
+        (1273, "== .signedRuntimeReady,"),
+        (1298, "let report = try SignedInvestigationRuntimeMachineReport("),
+        (1350, "_ report: SignedInvestigationRuntimeMachineReport,"),
+        (1354, ") throws -> SignedInvestigationRuntimeMachineReport"),
+        (1373, "_ report: SignedInvestigationRuntimeMachineReport,"),
+        (1386, ") throws -> SignedInvestigationRuntimeMachineReport"),
+        (1721, "package extension SignedInvestigationCapabilityEvidenceReceipt {"),
+    ],
+}
 for source_name in machine_sources:
     source_path = machine_source_root / source_name
     if not source_path.is_file():
@@ -677,6 +737,19 @@ for source_name in machine_sources:
         raise SystemExit(
             "StornautInvestigationMachine source gained prohibited "
             f"authority: {source_path}: {match.group(0)!r}"
+        )
+    source_lines = source_path.read_text(encoding="utf-8").splitlines()
+    observed_readiness = [
+        (line_number, line.strip())
+        for line_number, line in enumerate(source_lines, start=1)
+        if machine_readiness_pattern.search(line)
+    ]
+    expected_readiness = machine_readiness_baseline.get(source_name, [])
+    if observed_readiness != expected_readiness:
+        raise SystemExit(
+            "StornautInvestigationMachine readiness surface drifted: "
+            f"{source_path}: {observed_readiness!r} != "
+            f"{expected_readiness!r}"
         )
 machine_driver = targets.get("StornautInvestigationMachineDriver")
 if machine_driver is None:
@@ -697,6 +770,29 @@ if Path(machine_driver.get("path", "")) != Path(
     "Tools/StornautInvestigationMachineDriver"
 ):
     raise SystemExit("Machine driver target path drifted")
+machine_driver_source_root = Path(machine_driver.get("path", ""))
+machine_driver_sources = machine_driver.get("sources", [])
+if not machine_driver_source_root.is_dir() or not machine_driver_sources:
+    raise SystemExit("Machine driver has no resolved source graph")
+for source_name in machine_driver_sources:
+    source_path = machine_driver_source_root / source_name
+    if not source_path.is_file():
+        raise SystemExit(
+            f"Resolved Machine driver source is missing: {source_path}"
+        )
+    source_text = source_path.read_text(encoding="utf-8")
+    match = machine_authority_pattern.search(source_text)
+    if match:
+        raise SystemExit(
+            "Machine driver source gained prohibited authority: "
+            f"{source_path}: {match.group(0)!r}"
+        )
+    match = machine_readiness_pattern.search(source_text)
+    if match:
+        raise SystemExit(
+            "Machine driver source gained prohibited readiness: "
+            f"{source_path}: {match.group(0)!r}"
+        )
 manifest_targets = {
     target["name"]: target
     for target in manifest.get("targets", [])

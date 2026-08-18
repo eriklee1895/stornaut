@@ -130,14 +130,32 @@ struct InvestigationMachineTargetBoundaryTests {
         let driverMainURL = repositoryRoot.appending(
             path: "Tools/StornautInvestigationMachineDriver/main.swift"
         )
+        let scenarioRunnerURL = repositoryRoot.appending(
+            path: "Sources/StornautInvestigationMachine/"
+                + "InvestigationFixedScenarioRunner.swift"
+        )
+        let scenarioDriverURL = repositoryRoot.appending(
+            path: "Sources/StornautInvestigationMachine/"
+                + "InvestigationMachineScenarioDriver.swift"
+        )
         #expect(FileManager.default.fileExists(atPath: driverHostURL.path))
         #expect(FileManager.default.fileExists(atPath: driverMainURL.path))
+        #expect(FileManager.default.fileExists(atPath: scenarioRunnerURL.path))
+        #expect(FileManager.default.fileExists(atPath: scenarioDriverURL.path))
         let driverHost = try String(
             contentsOf: driverHostURL,
             encoding: .utf8
         )
         let driverMain = try String(
             contentsOf: driverMainURL,
+            encoding: .utf8
+        )
+        let scenarioRunner = try String(
+            contentsOf: scenarioRunnerURL,
+            encoding: .utf8
+        )
+        let scenarioDriver = try String(
+            contentsOf: scenarioDriverURL,
             encoding: .utf8
         )
         for marker in [
@@ -194,6 +212,91 @@ struct InvestigationMachineTargetBoundaryTests {
                 "removeItem",
                 "moveItem",
                 "copyItem",
+                "CommandLine.arguments",
+                "ProcessInfo.processInfo.environment",
+                "readLine(",
+                "kill(",
+            ] {
+                #expect(!source.contains(forbidden))
+            }
+        }
+        for marker in [
+            "actor InvestigationFixedScenarioRunner",
+            "typealias Operation = @Sendable () async throws",
+            "InvestigationFixedScenarioObservation",
+            "InvestigationFixedScenarioTrace",
+        ] {
+            #expect(scenarioRunner.contains(marker))
+        }
+        for marker in [
+            "actor InvestigationMachineScenarioDriver",
+            "struct InvestigationMachineScenarioAttempt",
+            "struct InvestigationMachineSyntheticSuccessEvidence",
+            "async throws -> SignedInvestigationRuntimeFailureMatrix",
+            "let authority = try await attempt.host.run()",
+            "try await attempt.runner.consumeObservation()",
+        ] {
+            #expect(scenarioDriver.contains(marker))
+        }
+        let scenarioSources = scenarioRunner + "\n" + scenarioDriver
+        let accessDeclaration = try NSRegularExpression(
+            pattern: #"(?m)^\s*(?:(?:@[A-Za-z_][A-Za-z0-9_.]*(?:\([^)]*\))?|final|indirect|nonisolated|override|required|static|class|mutating|nonmutating|convenience|distributed)\s+)*(?:public|package)(?:\(set\))?\s+"#
+        )
+        #expect(accessDeclaration.firstMatch(
+            in: scenarioSources,
+            range: NSRange(
+                scenarioSources.startIndex...,
+                in: scenarioSources
+            )
+        ) == nil)
+        for source in [scenarioRunner, scenarioDriver] {
+            for forbidden in [
+                "import StornautExecution",
+                "import StornautInvestigationDiagnostic",
+                "import StornautCodex",
+                "ActionExecutor",
+                "TrashMoving",
+                "RegisteredAction",
+                "FileManagerTrashAdapter",
+                "CleanupExecutionRuntime",
+                "CleanupExecutionCoordinator",
+                "CleanupActionExecuting",
+                "CleanupAuthorizationController",
+                "ExecutionAuthorization",
+                "ActionPolicyGate",
+                "CleanupPolicyGate",
+                "MoveToTrash",
+                "ProposedCleanupAction",
+                "CleanupAction",
+                "SignedInvestigationCapabilityEvidenceReceipt",
+                "SignedInvestigationRuntimeMachineAssembler",
+                "SignedInvestigationRuntimeMachineVerifier",
+                "SignedInvestigationRuntimeMachineReport",
+                "signedInvestigationRuntimeReady",
+                "signedRuntimeReady",
+                "readiness",
+                "Readiness",
+                "Codable",
+                "JSONEncoder",
+                "JSONDecoder",
+                "PropertyListEncoder",
+                "PropertyListDecoder",
+                "FileManager.default",
+                "NSXPCConnection",
+                "URLSession",
+                "NWConnection",
+                "WebSocket",
+                "CFStream",
+                "socket",
+                "connect",
+                "send",
+                "recv",
+                "posix_spawn",
+                "removeItem",
+                "moveItem",
+                "copyItem",
+                "createDirectory",
+                "createFile",
                 "CommandLine.arguments",
                 "ProcessInfo.processInfo.environment",
                 "readLine(",

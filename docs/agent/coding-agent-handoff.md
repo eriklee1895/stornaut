@@ -175,8 +175,8 @@
 > PID-version/audit-token identity 复查与 installed/post-teardown phase proof；
 > root-helper signing review P1 已 tests-first 修复，117-test focused、exact
 > source-boundaries、targeted Debug diagnostic App/helper build、981-test clean
-> staged-only serial 与 post-fix review 通过。machine driver/failure matrix 尚未
-> 实现；39B2c 才能作 readiness claim。
+> staged-only serial 与 post-fix review 通过。L3c2b deterministic failure
+> matrix driver 随后完成；39B2c readiness 仍仅归 L3c4。
 > L3 preflight 随后拆为 L3a trusted target extraction、L3b root driver/L1+L2
 > collection 与 L3c failure matrix/final admission。L3a 已把 machine-only
 > contract/assembler 以 99% rename 迁入非产品 `StornautInvestigationMachine`
@@ -206,11 +206,16 @@
 > L3c2a-ii root host/topology、strict XPC/signing adapters、resolved authority
 > gates、20-test affected、187-test Investigation、targeted builds/release
 > boundary、1046-test clean staged-only serial 与 independent post-fix review
-> 也已完成；L3c2b next。只有 L3c4 可作 readiness claim，
+> 也已完成；L3c2b deterministic eight-scenario driver、exact cohort preflight、
+> Task 38 fake-runtime flow、structural/targeted gates 与 final independent review
+> 已完成，唯一一次 clean staged-only serial 以 1055 tests / 51 suites 通过，
+> accepted tree 为 `dcd6f33e60521a1a6d4adae2173d14e8bb17abc0`；L3c2 已
+> 关闭，L3c3 next。只有 L3c4 可作 readiness claim，
 > L3c2b preflight 的 fresh-plan matrix contradiction 已由 plan-freshness
 > prerequisite 关闭：八个 actual plan fingerprints 全唯一、一个 exact
 > target-set fingerprint 绑定 cohort，affected/Investigation/structural/review
-> gates 通过；L3c2b driving 继续 next。
+> gates 通过；L3c2b evidence 见
+> `phase-d-task-39b2c-l3c2b-eight-scenario-driver-review.md`。
 > final full 尚未消耗。
 > 生产 Deep Dive 仍 unavailable。
 > Task 5 的历史
@@ -513,7 +518,7 @@ post-fix review 已通过。L2 root topology evidence 见
 [review](../reports/phase-d-task-39b2c-l2-root-topology-observation-review.md)；
 其 117-test Lifecycle focused、exact source-boundaries、targeted Debug
 diagnostic build、981-test clean staged-only serial 与 independent post-fix
-review 已通过。machine driver/failure matrix 仍待实现。
+review 已通过。
 L3a trusted machine target evidence 见
 [review](../reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md)；
 其 151-test focused、targeted Debug build、982-test clean staged-only serial 与
@@ -529,8 +534,9 @@ retirement、L3c1b-i configuration-bound helper escrow 与 L3c1b-ii synthetic
 Machine claim/collector join 已完成，L3c1 已关闭；L3c2 已拆为 a-i/a-ii/b，
 L3c2a-i strict claim transport、1041-test clean staged-only serial 与
 independent post-fix review 已完成；L3c2a-ii non-product root host/topology、
-1046-test clean staged-only serial 与 independent post-fix review 也已完成，
-L3c2b next；L3c4
+1046-test clean staged-only serial 与 independent post-fix review 也已完成；
+L3c2b eight-scenario driver、1055-test clean staged-only serial 与 final
+independent review 已完成，L3c2 已关闭，L3c3 next；L3c4
 独占 final admission 与剩余 full。L3c1b-i/ii 证据见
 [i review](../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
 与

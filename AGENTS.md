@@ -215,10 +215,14 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   XPC/signing adapters、resolved package/source authority gate、20-test affected、
   187-test Investigation、targeted driver/diagnostic builds、release boundary、
   1046-test clean staged-only serial 与 independent post-fix review 也已完成；
+  L3c2b deterministic eight-scenario driver、exact cohort preflight、Task 38
+  fake-runtime flow、structural/targeted gates 与 final independent review 已
+  完成；唯一一次 clean staged-only serial 以 1055 tests / 51 suites 通过，
+  accepted tree 为 `dcd6f33e60521a1a6d4adae2173d14e8bb17abc0`。
   L3c2b preflight 发现的 fresh plan/matrix contradiction 已由 3-path
   plan-freshness prerequisite 关闭：actual plan fingerprints 全唯一、exact
   target-set fingerprint 全相同，59-test affected、189-test Investigation、
-  structural gate 与 independent review 已通过；L3c2b driving next。只有 L3c4
+  structural gate 与 independent review 已通过；L3c2 已关闭，L3c3 next。只有 L3c4
   可作 readiness claim，
   final full 尚未消耗。
   Task 39 尚未完成。
@@ -329,6 +333,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2b-ii review / completion audit | [docs/reports/phase-d-task-39b2b-ii-review.md](docs/reports/phase-d-task-39b2b-ii-review.md) |
 | Phase D Task 39B2c attempt-binding prerequisite review | [docs/reports/phase-d-task-39b2c-attempt-binding-prerequisite-review.md](docs/reports/phase-d-task-39b2c-attempt-binding-prerequisite-review.md) |
 | Phase D Task 39B2c strict-decoding prerequisite review | [docs/reports/phase-d-task-39b2c-strict-capability-decoding-prerequisite-review.md](docs/reports/phase-d-task-39b2c-strict-capability-decoding-prerequisite-review.md) |
+| Phase D Task 39B2c L3c2b eight-scenario driver review | [docs/reports/phase-d-task-39b2c-l3c2b-eight-scenario-driver-review.md](docs/reports/phase-d-task-39b2c-l3c2b-eight-scenario-driver-review.md) |
 | Phase D Task 39B2c-L1 residue observation review | [docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md](docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md) |
 | Phase D Task 39B2c-L2 root topology observation review | [docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md](docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md) |
 | Phase D Task 39B2c-L3a trusted machine target review | [docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md](docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md) |
@@ -435,7 +440,9 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   已关闭；L3c2 已拆为 a-i/a-ii/b；L3c2a-i strict claim transport、1041-test
   clean staged-only serial 与 independent post-fix review 已完成；L3c2a-ii
   non-product root host/topology、1046-test clean staged-only serial 与
-  independent post-fix review 也已完成，L3c2b next；L3c4
+  independent post-fix review 也已完成；L3c2b eight-scenario driver、1055-test
+  clean staged-only serial 与 final independent review 已完成，L3c2 已关闭，
+  L3c3 next；L3c4
   独占 final admission 与剩余 full。
   Task 39 尚未完成。
 Deep Dive 的旧 Broker-only no-go 已被 ADR 0004 的 capability-first 边界取代；
