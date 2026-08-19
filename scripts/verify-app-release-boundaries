@@ -5,6 +5,14 @@ set -euo pipefail
 repo_root=${0:A:h:h}
 cd "$repo_root"
 
+handoff_only=false
+if [[ $# == 1 && $1 == --investigation-handoff-only ]]; then
+    handoff_only=true
+elif (( $# != 0 )); then
+    print -u2 "Usage: scripts/verify-app-release-boundaries [--investigation-handoff-only]"
+    exit 64
+fi
+
 scripts/verify-contract
 
 mkdir -p "$repo_root/.derivedData"
@@ -31,6 +39,7 @@ for configuration in Debug Release; do
 done
 
 diagnostic_scheme=StornautInvestigationDiagnosticApp
+release_shell_scheme=StornautInvestigationDiagnosticReleaseShell
 xcodebuild -quiet \
     -project Stornaut.xcodeproj \
     -scheme "$diagnostic_scheme" \
@@ -38,10 +47,19 @@ xcodebuild -quiet \
     -destination 'platform=macOS,arch=arm64' \
     -derivedDataPath "$diagnostic_derived_data" \
     build
+xcodebuild -quiet \
+    -project Stornaut.xcodeproj \
+    -scheme "$release_shell_scheme" \
+    -configuration Release \
+    -destination 'platform=macOS,arch=arm64' \
+    -derivedDataPath "$diagnostic_derived_data" \
+    build
 
 debug_app="$derived_data/Build/Products/Debug/Stornaut.app"
 release_app="$derived_data/Build/Products/Release/Stornaut.app"
 diagnostic_debug_app="$diagnostic_derived_data/Build/Products/Debug/StornautInvestigationDiagnostic.app"
+diagnostic_release_app="$diagnostic_derived_data/Build/Products/Release/StornautInvestigationDiagnosticReleaseShell.app"
+legacy_diagnostic_release_app="$diagnostic_derived_data/Build/Products/Release/StornautInvestigationDiagnostic.app"
 machine_driver_product="$diagnostic_derived_data/Build/Products/Debug/StornautInvestigationMachineDriver"
 diagnostic_machine_driver="$diagnostic_debug_app/Contents/MacOS/StornautInvestigationMachineDriver"
 machine_driver_max_bytes=$((16 * 1024 * 1024))
@@ -50,6 +68,124 @@ test -x "$debug_app/Contents/MacOS/Stornaut"
 test -x "$release_app/Contents/MacOS/Stornaut"
 test -x \
     "$diagnostic_debug_app/Contents/MacOS/StornautInvestigationDiagnostic"
+test -x \
+    "$diagnostic_release_app/Contents/MacOS/StornautInvestigationDiagnosticReleaseShell"
+test ! -e "$legacy_diagnostic_release_app"
+test ! -L "$legacy_diagnostic_release_app"
+
+bundle_mach_o_contains() {
+    local bundle=$1
+    local marker=$2
+    local candidate
+
+    while IFS= read -r -d '' candidate; do
+        if file "$candidate" 2>/dev/null | grep -q 'Mach-O' \
+            && rg -a -q --fixed-strings -- "$marker" "$candidate"; then
+            return 0
+        fi
+    done < <(find "$bundle" -path '*/Contents/PlugIns' -prune \
+        -o -type f -print0)
+    return 1
+}
+
+handoff_debug_markers=(
+    'StornautInvestigationHandoffContract.'
+    'StornautInvestigationMachineClaimXPCWire'
+    'InvestigationHandoffAppLeaf'
+    'InvestigationHandoffAppLeafEntryPoint'
+    'InvestigationHandoffDescriptorAdmission'
+)
+for marker in "${handoff_debug_markers[@]}"; do
+    for forbidden_bundle in \
+        "$debug_app" \
+        "$release_app" \
+        "$diagnostic_release_app"
+    do
+        if bundle_mach_o_contains "$forbidden_bundle" "$marker"; then
+            print -u2 "Handoff contract leaked into an App bundle: $forbidden_bundle: $marker"
+            exit 1
+        fi
+    done
+    if ! bundle_mach_o_contains "$diagnostic_debug_app" "$marker"; then
+        print -u2 "Investigation handoff Debug marker is missing: $marker"
+        exit 1
+    fi
+done
+if ! bundle_mach_o_contains \
+    "$diagnostic_release_app" \
+    'StornautInvestigationDiagnosticReleaseShell'
+then
+    print -u2 "Investigation diagnostic Release shell is missing."
+    exit 1
+fi
+release_shell_mach_o_paths=$(
+    find "$diagnostic_release_app" -type f -print0 \
+        | while IFS= read -r -d '' candidate; do
+            if file "$candidate" 2>/dev/null | grep -q 'Mach-O'; then
+                print -r -- "${candidate#$diagnostic_release_app/}"
+            fi
+        done \
+        | LC_ALL=C sort
+)
+if [[ "$release_shell_mach_o_paths" != \
+    'Contents/MacOS/StornautInvestigationDiagnosticReleaseShell' ]]
+then
+    print -u2 "Investigation Release shell Mach-O allowlist drifted."
+    exit 1
+fi
+for forbidden_shell_artifact in \
+    StornautInvestigationDiagnostic \
+    StornautInvestigationMachineDriver \
+    StornautLifecycleHelper
+do
+    if find "$diagnostic_release_app" -type f \
+        -name "$forbidden_shell_artifact" -print -quit | grep -q .
+    then
+        print -u2 \
+            "Investigation Release shell gained artifact: $forbidden_shell_artifact"
+        exit 1
+    fi
+done
+if find "$diagnostic_release_app" -type f \
+    \( -name '*.a' -o -name '*.o' -o -name '*.bundle' -o -name '*.plugin' \) \
+    -print -quit | grep -q .
+then
+    print -u2 "Investigation Release shell contains a packaged binary."
+    exit 1
+fi
+/usr/bin/codesign --verify --deep --strict "$diagnostic_release_app"
+release_shell_link_files=(
+    "$diagnostic_derived_data"/Build/Intermediates.noindex/Stornaut.build/Release/StornautInvestigationDiagnosticReleaseShell.build/Objects-normal/arm64/*.LinkFileList(N)
+)
+if (( ${#release_shell_link_files} != 1 )); then
+    print -u2 "Investigation Release shell LinkFileList is not unique."
+    exit 1
+fi
+release_shell_link_entries=(
+    "${(@f)$(sed '/^[[:space:]]*$/d' "$release_shell_link_files[1]")}"
+)
+if (( ${#release_shell_link_entries} != 1 )) \
+    || [[ "${release_shell_link_entries[1]:t}" \
+        != InvestigationRuntimeDiagnosticHarness.o ]] \
+    || [[ "${release_shell_link_entries[1]}" == \
+        *'/Build/Products/Release/'* ]]
+then
+    print -u2 "Investigation Release shell link inputs drifted."
+    exit 1
+fi
+
+if $handoff_only; then
+    xcodebuild -quiet \
+        -project Stornaut.xcodeproj \
+        -scheme "$diagnostic_scheme" \
+        -configuration Debug \
+        -destination 'platform=macOS,arch=arm64' \
+        -derivedDataPath "$diagnostic_derived_data" \
+        -only-testing:StornautInvestigationDiagnosticAppTests \
+        test
+    print "Investigation handoff App boundary verification passed."
+    exit 0
+fi
 test -f "$authority_object"
 file "$authority_object" | grep -q 'Mach-O'
 test -x "$debug_app/Contents/MacOS/StornautLifecycleHelper"
@@ -594,7 +730,7 @@ done
 for app_bundle in \
     "$debug_app" \
     "$release_app" \
-    "$diagnostic_debug_app"
+    "$diagnostic_release_app"
 do
     for handoff_symbol in \
         'StornautInvestigationHandoffContract.' \
@@ -940,7 +1076,7 @@ if native_target_section_start < 0 or native_target_section_end < 0:
 native_target_section = project[
     native_target_section_start:native_target_section_end
 ]
-if native_target_section.count("isa = PBXNativeTarget;") != 7:
+if native_target_section.count("isa = PBXNativeTarget;") != 8:
     raise SystemExit("L3c3b-i Xcode native-target allowlist drifted")
 expected_native_targets = {
     "StornautApp",
@@ -949,6 +1085,7 @@ expected_native_targets = {
     "StornautLifecycleHelper",
     "StornautInvestigationDiagnosticApp",
     "StornautInvestigationDiagnosticAppTests",
+    "StornautInvestigationDiagnosticReleaseShell",
     "StornautInvestigationMachineDriverNative",
 }
 for target_name in expected_native_targets:
@@ -1025,6 +1162,12 @@ diagnostic_tests = target_body(
 machine_driver = target_body(
     "A00000000000000000000007",
     "StornautInvestigationMachineDriverNative",
+    "\n\t\tA00000000000000000000008 "
+    "/* StornautInvestigationDiagnosticReleaseShell */",
+)
+release_shell = target_body(
+    "A00000000000000000000008",
+    "StornautInvestigationDiagnosticReleaseShell",
     "\n/* End PBXNativeTarget section */",
 )
 for name, body in (
@@ -1048,6 +1191,7 @@ target_execution_dependencies = {
         ("StornautLifecycleHelper", lifecycle_helper),
         ("StornautInvestigationDiagnosticApp", diagnostic_app),
         ("StornautInvestigationDiagnosticAppTests", diagnostic_tests),
+        ("StornautInvestigationDiagnosticReleaseShell", release_shell),
         ("StornautInvestigationMachineDriverNative", machine_driver),
     )
     if "StornautExecution" in body
@@ -1085,6 +1229,29 @@ if diagnostic_app.count("PBXTargetDependency") != 2:
     raise SystemExit(
         "dedicated Investigation diagnostic target dependency drifted"
     )
+for required in (
+    "B00000000000000000000029 /* Sources */",
+    "B00000000000000000000028 /* Frameworks */",
+    "B00000000000000000000035 /* Resources */",
+    "productName = StornautInvestigationDiagnosticReleaseShell;",
+    'productType = "com.apple.product-type.application";',
+):
+    if required not in release_shell:
+        raise SystemExit(
+            f"Release shell lost closed membership: {required}"
+        )
+for forbidden in (
+    "PBXTargetDependency",
+    "Copy Investigation",
+    "StornautInvestigationDiagnostic in Frameworks",
+    "StornautInvestigationMachineDriver",
+    "StornautLifecycleHelper",
+    "F000000000000000000000",
+):
+    if forbidden in release_shell:
+        raise SystemExit(
+            f"Release shell gained a dependency surface: {forbidden}"
+        )
 for required in (
     "productName = StornautInvestigationMachineDriver;",
     'productType = "com.apple.product-type.tool";',
@@ -1274,6 +1441,13 @@ required_exact_membership = [
         "/* InvestigationRuntimeDiagnosticHarness.swift */; };"
     ),
     (
+        "B0000000000000000000001E "
+        "/* InvestigationRuntimeDiagnosticHarness.swift in Sources */ = "
+        "{isa = PBXBuildFile; fileRef = "
+        "D00000000000000000000009 "
+        "/* InvestigationRuntimeDiagnosticHarness.swift */; };"
+    ),
+    (
         "D00000000000000000000009 "
         "/* InvestigationRuntimeDiagnosticHarness.swift */ = "
         "{isa = PBXFileReference; lastKnownFileType = sourcecode.swift; "
@@ -1286,6 +1460,56 @@ if not all(value in project for value in required_exact_membership):
     raise SystemExit(
         "dedicated Investigation diagnostic source identity drifted"
     )
+if project.count(
+    "fileRef = D00000000000000000000009 "
+    "/* InvestigationRuntimeDiagnosticHarness.swift */;"
+) != 2:
+    raise SystemExit("diagnostic harness native membership count drifted")
+
+diagnostic_configuration_start = project.find(
+    "A00000000000000000000025 /* Build configuration list for "
+    '"StornautInvestigationDiagnosticApp" */ = {'
+)
+diagnostic_configuration_end = project.find(
+    "A00000000000000000000026 /* Build configuration list for "
+    '"StornautInvestigationDiagnosticAppTests" */ = {'
+)
+release_shell_configuration_start = project.find(
+    "A00000000000000000000028 /* Build configuration list for "
+    '"StornautInvestigationDiagnosticReleaseShell" */ = {'
+)
+release_shell_configuration_end = project.find(
+    "/* End XCConfigurationList section */"
+)
+if min(
+    diagnostic_configuration_start,
+    diagnostic_configuration_end,
+    release_shell_configuration_start,
+    release_shell_configuration_end,
+) < 0:
+    raise SystemExit("missing diagnostic configuration-list boundary")
+diagnostic_configuration = project[
+    diagnostic_configuration_start:diagnostic_configuration_end
+]
+release_shell_configuration = project[
+    release_shell_configuration_start:release_shell_configuration_end
+]
+if (
+    diagnostic_configuration.count(
+        "A00000000000000000000150 /* Debug */"
+    ) != 1
+    or "A00000000000000000000151 /* Release */"
+        in diagnostic_configuration
+):
+    raise SystemExit("diagnostic App is not Debug-only")
+if (
+    release_shell_configuration.count(
+        "A00000000000000000000151 /* Release */"
+    ) != 1
+    or "A00000000000000000000150 /* Debug */"
+        in release_shell_configuration
+):
+    raise SystemExit("Release shell is not Release-only")
 if (
     "Diagnostics/InvestigationRuntimeDiagnosticHarness.swift"
     not in project

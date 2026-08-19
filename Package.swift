@@ -155,6 +155,7 @@ let package = Package(
                 "StornautCodex",
                 "StornautCore",
                 "StornautInvestigation",
+                "StornautInvestigationHandoffContract",
                 "StornautInvestigationRuntime",
                 "StornautLifecycle",
             ]

@@ -124,8 +124,18 @@ require_fixed_text scripts/verify-app-release-boundaries \
     'Handoff contract leaked into an App bundle'
 require_fixed_text scripts/verify-app-release-boundaries \
     'StornautInvestigationMachineClaimXPCWire'
+require_fixed_text scripts/verify-app-release-boundaries \
+    '--investigation-handoff-only'
+require_fixed_text scripts/verify-app-release-boundaries \
+    'Investigation handoff App boundary verification passed.'
+require_fixed_text scripts/verify-app-release-boundaries \
+    'StornautInvestigationDiagnosticReleaseShell'
 require_fixed_text Package.swift \
     'name: "StornautInvestigationHandoffContract"'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'Investigation handoff App leaf public surface drifted'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'static let fixedDescriptor: Int32 = 7'
 require_fixed_text scripts/verify-app-release-boundaries \
     'expected_diagnostic_mach_o_paths='
 require_fixed_text scripts/verify-app-release-boundaries \
@@ -707,9 +717,9 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "c4f4d41524fc7319e895f02a9924192c0cf1d80a0eb61d7c173af591bd130e54",
+        "55c94f91867c4d60430553d72bd4b8777c558fb9f4c5655d51c7fce8a83edc6d",
     Path("scripts/verify-app-release-boundaries"):
-        "7a55c2a2c1e137c8671f068cc291b54eb108ece3adab9954ab1652438f905b5b",
+        "5a74abe27334dd2d7aaf2243ddcbc5789a590e7700dd12f1a602b6e0b52ddaa6",
 }
 for path, expected_sha in expected.items():
     observed_sha = hashlib.sha256(path.read_bytes()).hexdigest()

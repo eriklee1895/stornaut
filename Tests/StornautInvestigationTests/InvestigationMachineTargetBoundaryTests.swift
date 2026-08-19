@@ -509,12 +509,18 @@ struct InvestigationMachineTargetBoundaryTests {
         #expect(
             projectSource.components(
                 separatedBy: "isa = PBXNativeTarget;"
-            ).count == 8
+            ).count == 9
         )
         #expect(
             projectSource.components(
                 separatedBy:
                     "name = StornautInvestigationMachineDriverNative;"
+            ).count == 2
+        )
+        #expect(
+            projectSource.components(
+                separatedBy:
+                    "name = StornautInvestigationDiagnosticReleaseShell;"
             ).count == 2
         )
         let driverTarget = try objectBlock(
@@ -543,6 +549,89 @@ struct InvestigationMachineTargetBoundaryTests {
         ] {
             #expect(!driverTarget.contains(forbidden))
         }
+
+        let releaseShellTarget = try objectBlock(
+            id: "A00000000000000000000008",
+            comment: "StornautInvestigationDiagnosticReleaseShell",
+            in: projectSource
+        )
+        for marker in [
+            "B00000000000000000000029 /* Sources */",
+            "B00000000000000000000028 /* Frameworks */",
+            "B00000000000000000000035 /* Resources */",
+            "dependencies = (\n\t\t\t);",
+            "packageProductDependencies = (\n\t\t\t);",
+            "productName = StornautInvestigationDiagnosticReleaseShell;",
+        ] {
+            #expect(releaseShellTarget.contains(marker))
+        }
+        for forbidden in [
+            "PBXTargetDependency",
+            "Copy Investigation",
+            "StornautInvestigationDiagnostic in Frameworks",
+            "StornautInvestigationMachineDriver",
+            "StornautLifecycleHelper",
+        ] {
+            #expect(!releaseShellTarget.contains(forbidden))
+        }
+        let releaseShellSources = try objectBlock(
+            id: "B00000000000000000000029",
+            comment: "Sources",
+            in: projectSource
+        )
+        #expect(releaseShellSources.contains(
+            "B0000000000000000000001E "
+                + "/* InvestigationRuntimeDiagnosticHarness.swift in Sources */"
+        ))
+        #expect(
+            releaseShellSources.components(
+                separatedBy: " in Sources */"
+            ).count == 2
+        )
+        for (id, comment) in [
+            ("B00000000000000000000028", "Frameworks"),
+            ("B00000000000000000000035", "Resources"),
+        ] {
+            let phase = try objectBlock(
+                id: id,
+                comment: comment,
+                in: projectSource
+            )
+            #expect(phase.contains("files = (\n\t\t\t);"))
+        }
+        #expect(
+            projectSource.components(
+                separatedBy:
+                    "fileRef = D00000000000000000000009 "
+                        + "/* InvestigationRuntimeDiagnosticHarness.swift */;"
+            ).count == 3
+        )
+        let diagnosticConfigurationList = try objectBlock(
+            id: "A00000000000000000000025",
+            comment:
+                "Build configuration list for PBXNativeTarget "
+                    + "\"StornautInvestigationDiagnosticApp\"",
+            in: projectSource
+        )
+        #expect(diagnosticConfigurationList.contains(
+            "A00000000000000000000150 /* Debug */"
+        ))
+        #expect(!diagnosticConfigurationList.contains(
+            "A00000000000000000000151 /* Release */"
+        ))
+        let releaseShellConfigurationList = try objectBlock(
+            id: "A00000000000000000000028",
+            comment:
+                "Build configuration list for PBXNativeTarget "
+                    + "\"StornautInvestigationDiagnosticReleaseShell\"",
+            in: projectSource
+        )
+        #expect(releaseShellConfigurationList.contains(
+            "A00000000000000000000151 /* Release */"
+        ))
+        #expect(!releaseShellConfigurationList.contains(
+            "A00000000000000000000150 /* Debug */"
+        ))
 
         let driverSources = try objectBlock(
             id: "B00000000000000000000026",

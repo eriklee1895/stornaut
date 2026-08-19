@@ -230,6 +230,7 @@ expected_native_targets = {
     "StornautLifecycleHelper",
     "StornautInvestigationDiagnosticApp",
     "StornautInvestigationDiagnosticAppTests",
+    "StornautInvestigationDiagnosticReleaseShell",
     "StornautInvestigationMachineDriverNative",
 }
 if set(native_by_name) != expected_native_targets:
@@ -237,9 +238,9 @@ if set(native_by_name) != expected_native_targets:
         "Xcode native target allowlist drifted: "
         f"{sorted(native_by_name)}"
     )
-if len(native_targets) != 7:
+if len(native_targets) != 8:
     raise SystemExit(
-        f"Expected exactly 7 Xcode native targets, found {len(native_targets)}"
+        f"Expected exactly 8 Xcode native targets, found {len(native_targets)}"
     )
 
 project_objects = objects("PBXProject")
@@ -251,11 +252,11 @@ _, project_body = next(iter(project_objects.values()))
 project_target_ids = [
     object_id for object_id, _ in references(project_body, "targets")
 ]
-if len(project_target_ids) != 7 or set(project_target_ids) != set(
+if len(project_target_ids) != 8 or set(project_target_ids) != set(
     native_targets
 ):
     raise SystemExit(
-        "PBXProject target membership does not equal the 7 native targets"
+        "PBXProject target membership does not equal the 8 native targets"
     )
 
 copy_phases = objects("PBXCopyFilesBuildPhase")
@@ -278,15 +279,19 @@ if set(copy_by_name) != expected_copy_phases or len(copy_phases) != 3:
 
 source_phases = objects("PBXSourcesBuildPhase")
 framework_phases = objects("PBXFrameworksBuildPhase")
+resource_phases = objects("PBXResourcesBuildPhase")
 build_files = objects("PBXBuildFile")
 file_references = objects("PBXFileReference")
 package_products = objects("XCSwiftPackageProductDependency")
 target_dependencies = objects("PBXTargetDependency")
 container_proxies = objects("PBXContainerItemProxy")
+configuration_lists = objects("XCConfigurationList")
+build_configurations = objects("XCBuildConfiguration")
 phase_types = {
     **{object_id: "PBXCopyFilesBuildPhase" for object_id in copy_phases},
     **{object_id: "PBXSourcesBuildPhase" for object_id in source_phases},
     **{object_id: "PBXFrameworksBuildPhase" for object_id in framework_phases},
+    **{object_id: "PBXResourcesBuildPhase" for object_id in resource_phases},
 }
 
 driver_name = "StornautInvestigationMachineDriverNative"
@@ -504,7 +509,9 @@ if driver_proxies != [driver_proxy]:
     raise SystemExit("Machine driver native dependency proxy is not unique")
 
 diagnostic_name = "StornautInvestigationDiagnosticApp"
-_, diagnostic_body = native_by_name[diagnostic_name]
+diagnostic_id, diagnostic_body = native_by_name[diagnostic_name]
+release_shell_name = "StornautInvestigationDiagnosticReleaseShell"
+release_shell_id, release_shell_body = native_by_name[release_shell_name]
 diagnostic_dependency_ids = [
     object_id
     for object_id, _ in references(diagnostic_body, "dependencies")
@@ -523,6 +530,208 @@ if diagnostic_dependency_ids.count(driver_dependency) != 1:
     raise SystemExit(
         "Diagnostic App must contain exactly one Machine driver dependency"
     )
+if references(release_shell_body, "dependencies"):
+    raise SystemExit("Release shell gained a native target dependency")
+if references(release_shell_body, "packageProductDependencies"):
+    raise SystemExit("Release shell gained a package product dependency")
+if value(release_shell_body, "productType") != (
+    "com.apple.product-type.application"
+):
+    raise SystemExit("Release shell is not an App target")
+if value(release_shell_body, "productName") != release_shell_name:
+    raise SystemExit("Release shell product name drifted")
+release_shell_product_ref, _ = reference(
+    release_shell_body, "productReference"
+)
+release_shell_product_body = file_references[release_shell_product_ref][1]
+if (
+    value(release_shell_product_body, "path")
+        != f"{release_shell_name}.app"
+    or value(release_shell_product_body, "sourceTree")
+        != "BUILT_PRODUCTS_DIR"
+    or value(release_shell_product_body, "explicitFileType")
+        != "wrapper.application"
+):
+    raise SystemExit("Release shell product reference drifted")
+
+release_shell_phase_ids = [
+    object_id
+    for object_id, _ in references(release_shell_body, "buildPhases")
+]
+release_shell_phase_types = Counter(
+    phase_types.get(object_id, "other")
+    for object_id in release_shell_phase_ids
+)
+if release_shell_phase_types != Counter({
+    "PBXSourcesBuildPhase": 1,
+    "PBXFrameworksBuildPhase": 1,
+    "PBXResourcesBuildPhase": 1,
+}):
+    raise SystemExit(
+        "Release shell phase graph drifted: "
+        f"{dict(release_shell_phase_types)}"
+    )
+release_shell_framework_phase = next(
+    object_id
+    for object_id in release_shell_phase_ids
+    if object_id in framework_phases
+)
+release_shell_resource_phase = next(
+    object_id
+    for object_id in release_shell_phase_ids
+    if object_id in resource_phases
+)
+if references(
+    framework_phases[release_shell_framework_phase][1], "files"
+) or references(
+    resource_phases[release_shell_resource_phase][1], "files"
+):
+    raise SystemExit("Release shell Frameworks/Resources must be empty")
+
+harness_file_refs = [
+    object_id
+    for object_id, (_, body) in file_references.items()
+    if value(body, "path") == (
+        "StornautApp/Diagnostics/"
+        "InvestigationRuntimeDiagnosticHarness.swift"
+    )
+]
+if len(harness_file_refs) != 1:
+    raise SystemExit("Diagnostic harness file reference is not unique")
+harness_file_ref = harness_file_refs[0]
+harness_build_files = [
+    object_id
+    for object_id, (_, body) in build_files.items()
+    if re.search(
+        rf"(?:^|;)[ \t]*fileRef = {harness_file_ref} /\* .*? \*/;",
+        body,
+        re.MULTILINE,
+    )
+]
+if len(harness_build_files) != 2:
+    raise SystemExit("Expected two diagnostic harness build memberships")
+diagnostic_source_phase = next(
+    object_id
+    for object_id, _ in references(diagnostic_body, "buildPhases")
+    if object_id in source_phases
+)
+release_shell_source_phase = next(
+    object_id
+    for object_id in release_shell_phase_ids
+    if object_id in source_phases
+)
+source_memberships = {
+    phase_id: [
+        object_id
+        for object_id, _ in references(body, "files")
+        if object_id in harness_build_files
+    ]
+    for phase_id, (_, body) in source_phases.items()
+}
+source_memberships = {
+    phase_id: members
+    for phase_id, members in source_memberships.items()
+    if members
+}
+if (
+    set(source_memberships)
+        != {diagnostic_source_phase, release_shell_source_phase}
+    or sorted(len(members) for members in source_memberships.values())
+        != [1, 1]
+    or set().union(*map(set, source_memberships.values()))
+        != set(harness_build_files)
+):
+    raise SystemExit("Diagnostic harness source ownership drifted")
+
+diagnostic_products = [
+    object_id
+    for object_id, (_, body) in package_products.items()
+    if value(body, "productName")
+        == "StornautInvestigationDiagnostic"
+]
+if len(diagnostic_products) != 1:
+    raise SystemExit("Diagnostic package product is not unique")
+diagnostic_product = diagnostic_products[0]
+diagnostic_product_owners = [
+    target_name
+    for target_name, (_, body) in native_by_name.items()
+    if diagnostic_product in {
+        object_id
+        for object_id, _ in references(
+            body, "packageProductDependencies"
+        )
+    }
+]
+if diagnostic_product_owners != [diagnostic_name]:
+    raise SystemExit(
+        "Diagnostic package product ownership drifted: "
+        f"{diagnostic_product_owners!r}"
+    )
+
+def target_configuration(target_body):
+    list_id, _ = reference(target_body, "buildConfigurationList")
+    names_and_ids = [
+        (comment, object_id)
+        for object_id, comment in references(
+            configuration_lists[list_id][1], "buildConfigurations"
+        )
+    ]
+    return list_id, names_and_ids
+
+diagnostic_configuration_list, diagnostic_configurations = (
+    target_configuration(diagnostic_body)
+)
+release_configuration_list, release_configurations = target_configuration(
+    release_shell_body
+)
+if [name for name, _ in diagnostic_configurations] != ["Debug"]:
+    raise SystemExit("Diagnostic target is not Debug-only")
+if [name for name, _ in release_configurations] != ["Release"]:
+    raise SystemExit("Release shell target is not Release-only")
+configuration_owners = {
+    configuration_id: [
+        list_id
+        for list_id, (_, body) in configuration_lists.items()
+        if configuration_id in {
+            object_id
+            for object_id, _ in references(body, "buildConfigurations")
+        }
+    ]
+    for configuration_id in (
+        diagnostic_configurations[0][1],
+        release_configurations[0][1],
+    )
+}
+if configuration_owners != {
+    diagnostic_configurations[0][1]: [diagnostic_configuration_list],
+    release_configurations[0][1]: [release_configuration_list],
+}:
+    raise SystemExit(
+        f"Diagnostic configuration ownership drifted: {configuration_owners!r}"
+    )
+debug_configuration = build_configurations[
+    diagnostic_configurations[0][1]
+][1]
+release_configuration = build_configurations[
+    release_configurations[0][1]
+][1]
+for required in (
+    "PRODUCT_NAME = StornautInvestigationDiagnostic",
+    "PRODUCT_MODULE_NAME = StornautInvestigationDiagnosticApp",
+    "STORNAUT_INVESTIGATION_DIAGNOSTIC",
+):
+    if required not in debug_configuration:
+        raise SystemExit(f"Diagnostic Debug configuration drifted: {required}")
+for required in (
+    "PRODUCT_NAME = StornautInvestigationDiagnosticReleaseShell",
+    "PRODUCT_MODULE_NAME = StornautInvestigationDiagnosticReleaseShellApp",
+    "PRODUCT_BUNDLE_IDENTIFIER = "
+        "com.eriklee.stornaut.investigation-diagnostic-release-shell",
+):
+    if required not in release_configuration:
+        raise SystemExit(f"Release shell configuration drifted: {required}")
+if "STORNAUT_INVESTIGATION_DIAGNOSTIC" in release_configuration:
+    raise SystemExit("Release shell gained the Debug diagnostic condition")
 
 driver_copy_phase = copy_by_name["Copy Investigation Driver"][0]
 driver_copy_body = copy_by_name["Copy Investigation Driver"][2]
@@ -600,6 +809,7 @@ driver_free_targets = (
     "StornautAppUITests",
     "StornautLifecycleHelper",
     "StornautInvestigationDiagnosticAppTests",
+    "StornautInvestigationDiagnosticReleaseShell",
 )
 driver_artifact_build_files = {
     main_build_file,
@@ -1528,7 +1738,10 @@ if any("StornautInvestigationHandoffContract" in product.get("targets", [])
 consumers = {target["name"] for target in package["targets"]
              if "StornautInvestigationHandoffContract"
              in target.get("target_dependencies", [])}
-if consumers != {"StornautInvestigationTests"}:
+if consumers != {
+    "StornautInvestigationDiagnostic",
+    "StornautInvestigationTests",
+}:
     raise SystemExit(f"handoff contract consumers drifted: {sorted(consumers)}")
 expected_imports = {
     "HandoffBinaryTranscript.swift": {"CryptoKit", "Foundation"},
@@ -2051,6 +2264,7 @@ expected_diagnostic_dependencies = {
     "StornautCodex",
     "StornautCore",
     "StornautInvestigation",
+    "StornautInvestigationHandoffContract",
     "StornautInvestigationRuntime",
     "StornautLifecycle",
 }
@@ -2071,6 +2285,57 @@ if len(matching_products) != 1 or set(
     raise SystemExit(
         "StornautInvestigationDiagnostic product surface drifted"
     )
+expected_diagnostic_sources = {
+    "InvestigationHandoffAppLeaf.swift",
+    "InvestigationRuntimeDiagnosticAppLeaf.swift",
+    "InvestigationRuntimeDiagnosticComposition.swift",
+}
+if set(diagnostic_leaf.get("sources", [])) != expected_diagnostic_sources:
+    raise SystemExit("StornautInvestigationDiagnostic source allowlist drifted")
+handoff_leaf_source = (
+    Path(diagnostic_leaf["path"]) / "InvestigationHandoffAppLeaf.swift"
+).read_text(encoding="utf-8")
+required_handoff_leaf = (
+    "#if DEBUG\nimport Foundation",
+    "package actor InvestigationHandoffAppLeaf",
+    "package protocol InvestigationHandoffAppLeafOperations",
+    "public enum InvestigationHandoffAppLeafEntryPoint",
+    "public static func run() -> Int32",
+    "concreteAdapterUnavailableExitStatus: Int32 = 78",
+)
+if not all(marker in handoff_leaf_source for marker in required_handoff_leaf):
+    raise SystemExit("Investigation handoff App leaf surface drifted")
+if len(re.findall(r"\bpublic\s+", handoff_leaf_source)) != 2:
+    raise SystemExit("Investigation handoff App leaf public surface drifted")
+if not handoff_leaf_source.endswith("#endif\n"):
+    raise SystemExit("Investigation handoff App leaf Debug guard drifted")
+for forbidden in (
+    "Codable", "NSXPC", "FileManager", "URLSession", "Process(",
+    "posix_spawn", "CommandLine.arguments",
+    "ProcessInfo.processInfo.environment", "LifecycleInteractiveSession",
+    "CodexInteractiveAppServer", "EvidenceStore", "ProbeBroker",
+    "ActionExecutor", "Cleanup", "Trash", "RegisteredAction",
+):
+    if forbidden in handoff_leaf_source:
+        raise SystemExit(
+            f"Investigation handoff App leaf gained authority: {forbidden}"
+        )
+harness_source = Path(
+    "StornautApp/Diagnostics/InvestigationRuntimeDiagnosticHarness.swift"
+).read_text(encoding="utf-8")
+for required in (
+    "case inheritedHandoff",
+    "static let fixedDescriptor: Int32 = 7",
+    "status & O_ACCMODE == O_RDWR",
+    "socketType == SOCK_STREAM",
+    "localFamily == AF_UNIX",
+    "peerFamily == AF_UNIX",
+    "node != channelNode",
+    "InvestigationHandoffAppLeafEntryPoint.run()",
+    "struct StornautInvestigationDiagnosticReleaseShell: App",
+):
+    if required not in harness_source:
+        raise SystemExit(f"Investigation handoff harness drifted: {required}")
 
 coordinator_source = Path(sys.argv[3]).read_text(encoding="utf-8")
 protocol_source = Path(sys.argv[4]).read_text(encoding="utf-8")

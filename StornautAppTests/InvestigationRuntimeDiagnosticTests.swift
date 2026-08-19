@@ -89,7 +89,7 @@ func investigationRuntimeDiagnosticLaunchAcceptsOneExactAbsoluteConfig() {
     #expect(
         InvestigationRuntimeDiagnosticActivation.select(arguments: [
             "Stornaut",
-        ]) == .notRequested
+        ]) == .inheritedHandoff
     )
 }
 
@@ -652,6 +652,101 @@ func investigationRuntimeDiagnosticLeafIsAClosedDebugTerminal() throws {
                 + "\t\t\t);\n"
                 + "\t\t\tname = StornautInvestigationDiagnosticApp"
         )
+    )
+}
+
+@Test
+func investigationInheritedHandoffAdmitsOnlyFixedDuplexUnixDescriptor() {
+    #expect(
+        InvestigationHandoffDescriptorAdmission.admits(
+            system: admittedHandoffDescriptorSystem()
+        )
+    )
+    for mutation in InvestigationHandoffDescriptorMutation.allCases {
+        #expect(
+            !InvestigationHandoffDescriptorAdmission.admits(
+                system: admittedHandoffDescriptorSystem(mutation: mutation)
+            )
+        )
+    }
+    for descriptor in Int32(0)...Int32(2) {
+        #expect(
+            InvestigationHandoffDescriptorAdmission.admits(
+                system: admittedHandoffDescriptorSystem(
+                    closedStdioDescriptor: descriptor
+                )
+            )
+        )
+    }
+    #expect(InvestigationHandoffDescriptorAdmission.fixedDescriptor == 7)
+}
+
+@Test
+func investigationInheritedHandoffShellReturnsUnavailableWithoutAdapter() async {
+    let result = await InvestigationRuntimeDiagnosticHarness.run(
+        arguments: ["StornautInvestigationDiagnostic"],
+        handoffDescriptorSystem: admittedHandoffDescriptorSystem(),
+        handoffEntry: { 78 }
+    )
+    #expect(result == 78)
+}
+
+private enum InvestigationHandoffDescriptorMutation: CaseIterable, Sendable {
+    case descriptorClosed
+    case statusUnavailable
+    case readOnly
+    case writeOnly
+    case datagram
+    case localInet
+    case peerInet
+    case noPeer
+    case sameAsStdin
+    case sameAsStdout
+    case sameAsStderr
+    case stdioLookupFailure
+    case stdioNodeFailure
+}
+
+private func admittedHandoffDescriptorSystem(
+    mutation: InvestigationHandoffDescriptorMutation? = nil,
+    closedStdioDescriptor: Int32? = nil
+) -> InvestigationHandoffDescriptorSystem {
+    let channel = InvestigationHandoffDescriptorNode(device: 1, inode: 7)
+    return InvestigationHandoffDescriptorSystem(
+        descriptorFlags: { descriptor in
+            if descriptor == 7, mutation == .descriptorClosed { return .badDescriptor }
+            if descriptor == closedStdioDescriptor { return .badDescriptor }
+            if descriptor == 0, mutation == .stdioLookupFailure { return .failed }
+            return .value(0)
+        },
+        statusFlags: { _ in
+            switch mutation {
+            case .statusUnavailable: .failed
+            case .readOnly: .value(O_RDONLY)
+            case .writeOnly: .value(O_WRONLY)
+            default: .value(O_RDWR)
+            }
+        },
+        node: { descriptor in
+            if descriptor == 7 { return .value(channel) }
+            if descriptor == 0, mutation == .stdioNodeFailure { return .failed }
+            if descriptor == 0, mutation == .sameAsStdin { return .value(channel) }
+            if descriptor == 1, mutation == .sameAsStdout { return .value(channel) }
+            if descriptor == 2, mutation == .sameAsStderr { return .value(channel) }
+            return .value(InvestigationHandoffDescriptorNode(
+                device: 1, inode: UInt64(descriptor + 20)
+            ))
+        },
+        socketType: { _ in
+            mutation == .datagram ? .value(SOCK_DGRAM) : .value(SOCK_STREAM)
+        },
+        localFamily: { _ in
+            mutation == .localInet ? .value(AF_INET) : .value(AF_UNIX)
+        },
+        peerFamily: { _ in
+            if mutation == .noPeer { return .failed }
+            return mutation == .peerInet ? .value(AF_INET) : .value(AF_UNIX)
+        }
     )
 }
 

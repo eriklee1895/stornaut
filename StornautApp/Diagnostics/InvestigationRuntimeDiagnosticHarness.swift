@@ -55,9 +55,13 @@ enum InvestigationRuntimeDiagnosticActivation:
 {
     case notRequested
     case invalid
+    case inheritedHandoff
     case request(InvestigationRuntimeDiagnosticLaunchRequest)
 
     static func select(arguments: [String]) -> Self {
+        if arguments.count == 1 {
+            return .inheritedHandoff
+        }
         if let request = InvestigationRuntimeDiagnosticLaunchRequest(
             arguments: arguments
         ) {
@@ -68,7 +72,7 @@ enum InvestigationRuntimeDiagnosticActivation:
         ) {
             return .invalid
         }
-        return .notRequested
+        return arguments.isEmpty ? .notRequested : .invalid
     }
 }
 
@@ -102,6 +106,11 @@ enum InvestigationRuntimeDiagnosticHarness {
     static func run(
         arguments: [String],
         now: Date = Date(),
+        handoffDescriptorSystem:
+            InvestigationHandoffDescriptorSystem = .system,
+        handoffEntry: @escaping @Sendable () -> Int32 = {
+            InvestigationHandoffAppLeafEntryPoint.run()
+        },
         compositionPrepare:
             @escaping @Sendable (Data, Date) async throws -> UUID = {
                 data,
@@ -132,6 +141,13 @@ enum InvestigationRuntimeDiagnosticHarness {
         ) {
         case .notRequested, .invalid:
             return 64
+        case .inheritedHandoff:
+            guard InvestigationHandoffDescriptorAdmission.admits(
+                system: handoffDescriptorSystem
+            ) else {
+                return 64
+            }
+            return handoffEntry()
         case let .request(request):
             let receipt = await prepare(
                 request: request,
@@ -265,6 +281,133 @@ enum InvestigationRuntimeDiagnosticHarness {
             return nil
         }
         return data
+    }
+}
+
+struct InvestigationHandoffDescriptorNode:
+    Sendable,
+    Equatable
+{
+    let device: UInt64
+    let inode: UInt64
+}
+
+enum InvestigationHandoffDescriptorLookup<Value: Sendable>: Sendable {
+    case value(Value)
+    case badDescriptor
+    case failed
+}
+
+struct InvestigationHandoffDescriptorSystem: Sendable {
+    let descriptorFlags:
+        @Sendable (Int32) -> InvestigationHandoffDescriptorLookup<Int32>
+    let statusFlags:
+        @Sendable (Int32) -> InvestigationHandoffDescriptorLookup<Int32>
+    let node:
+        @Sendable (Int32)
+            -> InvestigationHandoffDescriptorLookup<
+                InvestigationHandoffDescriptorNode
+            >
+    let socketType:
+        @Sendable (Int32) -> InvestigationHandoffDescriptorLookup<Int32>
+    let localFamily:
+        @Sendable (Int32) -> InvestigationHandoffDescriptorLookup<Int32>
+    let peerFamily:
+        @Sendable (Int32) -> InvestigationHandoffDescriptorLookup<Int32>
+
+    static let system = Self(
+        descriptorFlags: { descriptor in
+            let result = fcntl(descriptor, F_GETFD)
+            if result >= 0 { return .value(result) }
+            return errno == EBADF ? .badDescriptor : .failed
+        },
+        statusFlags: { descriptor in
+            let result = fcntl(descriptor, F_GETFL)
+            if result >= 0 { return .value(result) }
+            return errno == EBADF ? .badDescriptor : .failed
+        },
+        node: { descriptor in
+            var information = stat()
+            guard fstat(descriptor, &information) == 0 else {
+                return errno == EBADF ? .badDescriptor : .failed
+            }
+            return .value(InvestigationHandoffDescriptorNode(
+                device: UInt64(bitPattern: Int64(information.st_dev)),
+                inode: UInt64(information.st_ino)
+            ))
+        },
+        socketType: { descriptor in
+            var value: Int32 = 0
+            var length = socklen_t(MemoryLayout<Int32>.size)
+            guard getsockopt(
+                descriptor, SOL_SOCKET, SO_TYPE, &value, &length
+            ) == 0, length == MemoryLayout<Int32>.size else {
+                return .failed
+            }
+            return .value(value)
+        },
+        localFamily: { descriptor in
+            var address = sockaddr_storage()
+            var length = socklen_t(MemoryLayout<sockaddr_storage>.size)
+            let result = withUnsafeMutablePointer(to: &address) { pointer in
+                pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                    getsockname(descriptor, $0, &length)
+                }
+            }
+            guard result == 0 else { return .failed }
+            return .value(Int32(address.ss_family))
+        },
+        peerFamily: { descriptor in
+            var address = sockaddr_storage()
+            var length = socklen_t(MemoryLayout<sockaddr_storage>.size)
+            let result = withUnsafeMutablePointer(to: &address) { pointer in
+                pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                    getpeername(descriptor, $0, &length)
+                }
+            }
+            guard result == 0 else { return .failed }
+            return .value(Int32(address.ss_family))
+        }
+    )
+}
+
+enum InvestigationHandoffDescriptorAdmission {
+    static let fixedDescriptor: Int32 = 7
+
+    static func admits(
+        system: InvestigationHandoffDescriptorSystem
+    ) -> Bool {
+        guard
+            case .value = system.descriptorFlags(fixedDescriptor),
+            case let .value(status) = system.statusFlags(fixedDescriptor),
+            status & O_ACCMODE == O_RDWR,
+            case let .value(channelNode) = system.node(fixedDescriptor),
+            case let .value(socketType) = system.socketType(fixedDescriptor),
+            socketType == SOCK_STREAM,
+            case let .value(localFamily) = system.localFamily(fixedDescriptor),
+            localFamily == AF_UNIX,
+            case let .value(peerFamily) = system.peerFamily(fixedDescriptor),
+            peerFamily == AF_UNIX
+        else {
+            return false
+        }
+
+        for descriptor in Int32(0)...Int32(2) {
+            switch system.descriptorFlags(descriptor) {
+            case .badDescriptor:
+                continue
+            case .failed:
+                return false
+            case .value:
+                guard
+                    case let .value(node) = system.node(descriptor),
+                    node != channelNode
+                else {
+                    return false
+                }
+            }
+        }
+        return true
     }
 }
 
@@ -449,6 +592,17 @@ private extension JSONEncoder {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         return encoder
+    }
+}
+#else
+import SwiftUI
+
+@main
+struct StornautInvestigationDiagnosticReleaseShell: App {
+    var body: some Scene {
+        WindowGroup {
+            EmptyView()
+        }
     }
 }
 #endif

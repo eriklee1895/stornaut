@@ -22,6 +22,7 @@
 		B0000000000000000000001B /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0000000000000000000000B /* main.swift */; };
 		B0000000000000000000001C /* StornautInvestigationMachineDriverSupport in Frameworks */ = {isa = PBXBuildFile; productRef = F00000000000000000000008 /* StornautInvestigationMachineDriverSupport */; };
 		B0000000000000000000001D /* StornautInvestigationMachineDriver in Copy Investigation Driver */ = {isa = PBXBuildFile; fileRef = D0000000000000000000000A /* StornautInvestigationMachineDriver */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		B0000000000000000000001E /* InvestigationRuntimeDiagnosticHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = D00000000000000000000009 /* InvestigationRuntimeDiagnosticHarness.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -117,6 +118,7 @@
 		D00000000000000000000009 /* InvestigationRuntimeDiagnosticHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StornautApp/Diagnostics/InvestigationRuntimeDiagnosticHarness.swift; sourceTree = SOURCE_ROOT; };
 		D0000000000000000000000A /* StornautInvestigationMachineDriver */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = StornautInvestigationMachineDriver; sourceTree = BUILT_PRODUCTS_DIR; };
 		D0000000000000000000000B /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tools/StornautInvestigationMachineDriver/main.swift; sourceTree = SOURCE_ROOT; };
+		D0000000000000000000000C /* StornautInvestigationDiagnosticReleaseShell.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = StornautInvestigationDiagnosticReleaseShell.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -242,6 +244,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B00000000000000000000028 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -269,6 +278,7 @@
 				D00000000000000000000006 /* StornautInvestigationDiagnostic.app */,
 				D00000000000000000000007 /* StornautInvestigationDiagnosticAppTests.xctest */,
 				D0000000000000000000000A /* StornautInvestigationMachineDriver */,
+				D0000000000000000000000C /* StornautInvestigationDiagnosticReleaseShell.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -437,6 +447,25 @@
 			productReference = D0000000000000000000000A /* StornautInvestigationMachineDriver */;
 			productType = "com.apple.product-type.tool";
 		};
+		A00000000000000000000008 /* StornautInvestigationDiagnosticReleaseShell */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A00000000000000000000028 /* Build configuration list for PBXNativeTarget "StornautInvestigationDiagnosticReleaseShell" */;
+			buildPhases = (
+				B00000000000000000000029 /* Sources */,
+				B00000000000000000000028 /* Frameworks */,
+				B00000000000000000000035 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = StornautInvestigationDiagnosticReleaseShell;
+			packageProductDependencies = (
+			);
+			productName = StornautInvestigationDiagnosticReleaseShell;
+			productReference = D0000000000000000000000C /* StornautInvestigationDiagnosticReleaseShell.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -468,6 +497,9 @@
 					A00000000000000000000007 = {
 						CreatedOnToolsVersion = 26.6;
 					};
+					A00000000000000000000008 = {
+						CreatedOnToolsVersion = 26.6;
+					};
 				};
 			};
 			buildConfigurationList = A00000000000000000000020 /* Build configuration list for PBXProject "Stornaut" */;
@@ -495,6 +527,7 @@
 				A00000000000000000000005 /* StornautInvestigationDiagnosticApp */,
 				A00000000000000000000006 /* StornautInvestigationDiagnosticAppTests */,
 				A00000000000000000000007 /* StornautInvestigationMachineDriverNative */,
+				A00000000000000000000008 /* StornautInvestigationDiagnosticReleaseShell */,
 			);
 		};
 /* End PBXProject section */
@@ -529,6 +562,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		B00000000000000000000034 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B00000000000000000000035 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -587,6 +627,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				B0000000000000000000001B /* main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B00000000000000000000029 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B0000000000000000000001E /* InvestigationRuntimeDiagnosticHarness.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -896,9 +944,9 @@
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 0.1.0;
 				ONLY_ACTIVE_ARCH = NO;
-				PRODUCT_BUNDLE_IDENTIFIER = com.eriklee.stornaut;
-				PRODUCT_MODULE_NAME = StornautInvestigationDiagnosticApp;
-				PRODUCT_NAME = StornautInvestigationDiagnostic;
+				PRODUCT_BUNDLE_IDENTIFIER = com.eriklee.stornaut.investigation-diagnostic-release-shell;
+				PRODUCT_MODULE_NAME = StornautInvestigationDiagnosticReleaseShellApp;
+				PRODUCT_NAME = StornautInvestigationDiagnosticReleaseShell;
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
 				SUPPORTED_PLATFORMS = macosx;
@@ -1051,7 +1099,6 @@
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A00000000000000000000150 /* Debug */,
-				A00000000000000000000151 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
@@ -1073,6 +1120,14 @@
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
+		};
+		A00000000000000000000028 /* Build configuration list for PBXNativeTarget "StornautInvestigationDiagnosticReleaseShell" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A00000000000000000000151 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 
