@@ -242,8 +242,11 @@
 > affected/structural/Debug/Release gates、1,107-test staged-only serial 与
 > independent review 已完成；ii-b0b claim/release wire、1,122-test staged-only
 > serial 与 independent review 也已完成。ii-b1 preflight 发现 first-frame
-> epoch origin contradiction，已由 ii-b0c fixed bootstrap prelude关闭；ii-b0c
-> 已完成，ii-b1 是当前 frontier。随后为
+> epoch origin contradiction，已由 ii-b0c fixed bootstrap prelude关闭。ii-b1
+> authority-free App leaf 随后按 post-RED topology correction 拆成 Debug-only
+> diagnostic 与 dependency-free Release shell，并通过 9/9 leaf、13/13 App、
+> 277 affected、exact structural/final-artifact gates、1,138-test staged-only
+> serial 与 independent post-fix review；ii-b2 是当前 frontier。随后为
 > ii-c 唯一 no-model privileged installed-driver gate。只有
 > L3c4 可作 readiness claim，
 > L3c2b preflight 的 fresh-plan matrix contradiction 已由 plan-freshness
@@ -585,7 +588,7 @@ ACL fail-closed、whole-installer seal、1067-test clean staged-only serial 与
 independent grouped/post-fix/cross-group review 已完成。L3c3c-i root-launch
 audit 已完成并拒绝 external branch；i-b2b-0b/i-b2b-1 在执行前 superseded，
 B4 root execution count 为 0。L3c3c-ii-a 与 ii-b0a 已完成，当前 frontier 为
-L3c3c-ii-b1；ii-b0a/ii-b0b/ii-b0c 已完成，ii-b1 current，
+L3c3c-ii-b2；ii-b0a/ii-b0b/ii-b0c/ii-b1 已完成，ii-b2 current，
 ii-b 已拆为 ii-b0a/ii-b0b/ii-b0c 与
 ii-b1–ii-b5，并在 ii-c 前插入 ii-c0。
 ADR 0018 仍 Proposed，L3c4 独占 final admission 与剩余 full。
@@ -616,6 +619,10 @@ L3c3c-i 条件性证据见
 冻结 PRE_DROP_READY 前的 driver-owned epoch UUID/deadline prelude。
 [ii-b0c review](../reports/phase-d-task-39b2c-l3c3c-ii-b0c-review.md)
 记录 fixed STNP prelude implementation completion。
+[ii-b1 preflight](../reports/phase-d-task-39b2c-l3c3c-ii-b1-app-leaf-preflight.md)
+冻结 post-RED Debug-only diagnostic/dependency-free Release-shell correction；
+[ii-b1 review](../reports/phase-d-task-39b2c-l3c3c-ii-b1-review.md)
+记录 authority-free leaf completion 与 non-admitting evidence。
 生产 Deep Dive 继续 unavailable，直到 Task 44 final admission。
 
 跨 Epic 的阶段依赖、no-go 分支和交付顺序由 [Delivery Roadmap](../plans/roadmap.md) 管理；新 active plan 不得另起一套宏观路线。
@@ -761,8 +768,8 @@ attempt-binding prerequisite、L1 helper residue、L2 root topology observer 与
 L3c2 deterministic machine driver/failure matrix 均已完成；L3c3c-i root-launch
 audit 已完成并给出 external NO-GO，i-b2b-0b/i-b2b-1 在执行前 superseded，
 B4 root execution count 为 0；L3c3c-ii-a 已完成，ii-b split preflight 已
-冻结 ii-b0a/ii-b0b、ii-b1–ii-b5 与 ii-c0；ii-b0a/ii-b0b 已完成，ii-b1
-是当前 frontier。已完成部分均为
+冻结 ii-b0a/ii-b0b、ii-b1–ii-b5 与 ii-c0；ii-b0a/ii-b0b/ii-b0c/ii-b1
+已完成，ii-b2 是当前 frontier。已完成部分均为
 non-admitting prerequisite，
 L3c4 才是 machine admission。该最终 gate
 要求证明完整调查能力和公共联网可用时，

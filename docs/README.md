@@ -33,7 +33,7 @@
 | Agent、双模式与治理设计 | [Agent Disk Governance](design/agent-disk-governance.md) |
 | UI、品牌、状态与交互 | [UI/UX](design/ui-ux.md) |
 | 宏观交付顺序与阶段 Gate | [Delivery Roadmap](plans/roadmap.md) |
-| 当前计划状态 | [Active Plans](plans/active/README.md) — Phase D approved；Task 39 in progress；external root launch NO-GO；ii-a/ii-b0a/ii-b0b/ii-b0c complete；ii-b1 current；ADR 0018 Proposed |
+| 当前计划状态 | [Active Plans](plans/active/README.md) — Phase D approved；Task 39 in progress；external root launch NO-GO；ii-a/ii-b0a/ii-b0b/ii-b0c/ii-b1 complete；ii-b2 current；ADR 0018 Proposed |
 | Capability-first Codex Runtime Gate | [Runtime Evidence Gate](plans/completed/capability-first-codex-runtime-gate.md) — complete / archived |
 | R2 tests-first brief | [R2 Implementation Brief](plans/completed/task-r2-implementation-brief.md) — complete |
 | R3 lifecycle hard-gate brief | [R3 Implementation Brief](plans/completed/task-r3-implementation-brief.md) — behaviorReady candidate |
@@ -64,7 +64,7 @@
 | Phase D Task 37 Review | [Code Review and Completion Audit](reports/phase-d-task-37-review.md) |
 | Phase D Task 38 | [Implementation Brief](plans/active/task-38-implementation-brief.md) — complete |
 | Phase D Task 38 Review | [Code Review and Completion Audit](reports/phase-d-task-38-review.md) |
-| Phase D Task 39 | [Implementation Brief](plans/active/task-39-implementation-brief.md) — in progress；external root launch rejected；current order ii-b0a → ii-b0b → ii-b1 → ii-b2 → ii-b3 → ii-b4 → ii-b5 → ii-c0 → ii-c → L3c3d → L3c4 |
+| Phase D Task 39 | [Implementation Brief](plans/active/task-39-implementation-brief.md) — in progress；external root launch rejected；ii-b0a/ii-b0b/ii-b0c/ii-b1 complete；current order ii-b2 → ii-b3 → ii-b4 → ii-b5 → ii-c0 → ii-c → L3c3d → L3c4 |
 | Phase D Task 39A Review | [Code Review and Completion Audit](reports/phase-d-task-39a-review.md) |
 | Phase D Task 39B1a Review | [Code Review and Completion Audit](reports/phase-d-task-39b1a-review.md) |
 | Phase D Task 39B1b-i Review | [Code Review and Completion Audit](reports/phase-d-task-39b1b-i-review.md) |
@@ -91,14 +91,16 @@
 | Phase D Task 39B2c L3c3c-i Final Review | [Study and Root-Launch Audit](reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md) — complete；external branch rejected |
 | Phase D Task 39B2c L3c3c-i-b2a Reproducibility | [Historical Three-Layer Contract Review](reports/phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md) — complete；non-admitting B4 evidence |
 | Phase D Task 39B2c L3c3c-i-b2b-0a Root-Launch Audit | [Trust-Anchor Audit](reports/phase-d-task-39b2c-l3c3c-i-b2b-0a-root-provenance-review.md) — complete；all UID-staged external root paths NO-GO |
-| Phase D Task 39B2c L3c3c-ii Installed-Driver Preflight | [Path and Cost Preflight](reports/phase-d-task-39b2c-l3c3c-ii-installed-driver-path-cost-preflight.md) — split frozen；ii-a/ii-b0a/ii-b0b/ii-b0c complete；ii-b1 current |
+| Phase D Task 39B2c L3c3c-ii Installed-Driver Preflight | [Path and Cost Preflight](reports/phase-d-task-39b2c-l3c3c-ii-installed-driver-path-cost-preflight.md) — split frozen；ii-a/ii-b0a/ii-b0b/ii-b0c/ii-b1 complete；ii-b2 current |
 | Phase D Task 39B2c L3c3c-ii-a Review | [Installed-Driver Observation Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md) — complete；non-admitting |
 | Phase D Task 39B2c L3c3c-ii-b Split Preflight | [Handoff Composition Split](reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md) — parent split frozen；ii-b0 superseded by b0a/b0b；non-admitting |
-| Phase D Task 39B2c L3c3c-ii-b0 Wire Contract Preflight | [Exact Wire Split](reports/phase-d-task-39b2c-l3c3c-ii-b0-wire-contract-preflight.md) — b0a/b0b complete；ii-b0c bootstrap correction complete；ii-b1 current |
+| Phase D Task 39B2c L3c3c-ii-b0 Wire Contract Preflight | [Exact Wire Split](reports/phase-d-task-39b2c-l3c3c-ii-b0-wire-contract-preflight.md) — b0a/b0b/b0c/ii-b1 complete；ii-b2 current |
 | Phase D Task 39B2c L3c3c-ii-b0a Review | [Frame/Capsule Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b0a-review.md) — complete；1,107-test staged-only serial；non-admitting |
 | Phase D Task 39B2c L3c3c-ii-b0b Review | [Claim/Release Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b0b-review.md) — complete；1,122-test staged-only serial；non-admitting |
 | Phase D Task 39B2c L3c3c-ii-b0c Preflight | [Epoch Bootstrap Prelude](reports/phase-d-task-39b2c-l3c3c-ii-b0c-epoch-bootstrap-preflight.md) — closes PRE_DROP_READY epoch-origin contradiction；pre-implementation/non-admitting |
 | Phase D Task 39B2c L3c3c-ii-b0c Review | [Epoch Bootstrap Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b0c-review.md) — complete；1,129-test staged-only serial；non-admitting |
+| Phase D Task 39B2c L3c3c-ii-b1 Preflight | [Authority-Free App Leaf](reports/phase-d-task-39b2c-l3c3c-ii-b1-app-leaf-preflight.md) — frozen；post-RED Debug-only diagnostic/dependency-free Release-shell correction |
+| Phase D Task 39B2c L3c3c-ii-b1 Review | [Authority-Free App Leaf Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b1-review.md) — complete；1,138-test staged-only serial；non-admitting；ii-b2 current |
 | Epic 2–4 历史计划 | [Deterministic Product Core](plans/completed/epic-2-4-deterministic-product-core.md) — Tasks 9–26 已完成并归档 |
 | 已完成计划 | [Completed Plans](plans/completed/README.md) — Epic 0–1 |
 | 上游学习与许可证门禁 | [Upstream Reference Matrix](research/upstream-reference-matrix.md) |

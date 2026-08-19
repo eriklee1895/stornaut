@@ -37,9 +37,10 @@
 > L3c3c-ii-a authority-closed installed-driver/manifest observation and exact
 > source/final-Mach-O admission are complete. ii-b is split into ii-b0a/ii-b0b
 > and ii-b1–ii-b5 with ii-c0 before the privileged gate. ii-b0a exact
-> frame/capsule and ii-b0b claim/release implementations are complete; ii-b0c
-> bootstrap is complete after a first-frame origin audit, with ii-b1 current, followed by
-> ii-c one no-model privileged gate. The authoritative
+> frame/capsule, ii-b0b claim/release and ii-b0c bootstrap implementations are
+> complete. ii-b1 is also complete after the post-RED topology correction split
+> one Debug-only diagnostic target from one dependency-free Release shell; ii-b2
+> is current, followed eventually by ii-c one no-model privileged gate. The authoritative
 > real-model run and readiness verdict remain unimplemented.
 > Production Deep Dive remains unavailable until Task 44 admission.
 >
@@ -896,7 +897,11 @@ Checkpoint status:
   Proposed. L3c3c-ii-a is complete; ii-b is frozen as ii-b0a/ii-b0b and
   ii-b1–ii-b5 with ii-c0 before the privileged gate. ii-b0a and ii-b0b are
   complete after their single staged-only serials and independent reviews. ii-b0c
-  bootstrap is complete after the ii-b1 first-frame origin audit; ii-b1 is current.
+  bootstrap is complete after the ii-b1 first-frame origin audit. ii-b1 is also
+  complete after its corrected Debug-only diagnostic/dependency-free Release-shell
+  topology, 9/9 leaf, 13/13 App and 277 affected tests, exact structural/artifact
+  gates, one 1,138-test staged-only serial and independent post-fix review; ii-b2
+  is current.
   See the
   [L3c1b-i Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
   and
@@ -941,6 +946,10 @@ Checkpoint status:
   [ii-b0c Preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b0c-epoch-bootstrap-preflight.md).
   Completion evidence is in the
   [ii-b0c Review](../../reports/phase-d-task-39b2c-l3c3c-ii-b0c-review.md).
+  The authority-free leaf contract and completion evidence are in the
+  [ii-b1 Preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b1-app-leaf-preflight.md)
+  and
+  [ii-b1 Review](../../reports/phase-d-task-39b2c-l3c3c-ii-b1-review.md).
   ii-a completion evidence is in the
   [Installed-Driver Observation Review](../../reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md).
   Only L3c4 owns
