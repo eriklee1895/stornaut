@@ -1,7 +1,7 @@
 # ADR 0018: Parent-Owned Investigation Handoff and Fixed App Launch
 
-> **Status:** Proposed; external root-launch branch rejected; ii-b0a/b0b exact
-> wire split frozen after iterative independent review; ii-b0a current
+> **Status:** Proposed; external root-launch branch rejected; ii-b0a complete;
+> ii-b0b current
 >
 > **Date:** 2026-08-19
 >
@@ -322,6 +322,7 @@ unconsumed.
 | installed diagnostic driver | conditionally selected; currently absent |
 | ii-a installed-driver self-observation | complete; non-admitting |
 | ii-b split preflight | parent split frozen; ii-b0 replaced by exact b0a/b0b wire checkpoints |
-| ii-b0 wire preflight | frozen after iterative post-fix review; ii-b0a current; no implementation admitted |
+| ii-b0 wire preflight | b0a/b0b split frozen after iterative post-fix review |
+| ii-b0a frame/capsule contract | complete; non-product and non-admitting; ii-b0b current |
 | ii-c no-model privileged machine gate | not executed |
 | ADR status | **Proposed** |

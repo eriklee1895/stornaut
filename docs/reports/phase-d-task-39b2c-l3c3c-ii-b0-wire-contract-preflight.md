@@ -1,7 +1,7 @@
 # Phase D Task 39B2c-L3c3c-ii-b0 Wire Contract Clarification Preflight
 
-> Status: Split frozen after iterative independent review; ii-b0a current;
-> implementation not started
+> Status: Split frozen after iterative independent review; ii-b0a complete;
+> ii-b0b current
 >
 > Date: 2026-08-19
 >
@@ -603,7 +603,7 @@ a fresh split before coding continues.
 This preflight admits no implementation and consumes no serial, privilege or full-
 verifier evidence. ADR 0018 remains Proposed, Task 39 remains incomplete, production
 Deep Dive remains unavailable and the remaining authoritative full stays reserved for
-L3c4. b0a is the sole implementation frontier.
+L3c4. ii-b0a completion evidence is in the separate review; ii-b0b is current.
 
 ## 9. Independent Review Closure
 
@@ -622,5 +622,7 @@ Independent adversarial reviews found and closed:
   and
 - the parent budget supersession and independent b0a/b0b review surfaces.
 
-Latest post-fix reviews report no unresolved P0-P2. No implementation, test,
-serial, App, privileged, model or full-verifier action occurred.
+Latest pre-implementation post-fix reviews reported no unresolved P0-P2. ii-b0a
+later completed under its separate completion audit; ii-b0b is current. This
+preflight itself consumed no serial, App, privileged, model or full-verifier
+action.

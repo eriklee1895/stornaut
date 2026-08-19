@@ -1,7 +1,7 @@
 # Phase D Task 39B2c-L3c3 Scope and Trust Preflight
 
 > Status: Split revised; L3c3a/L3c3b/L3c3c-i/L3c3c-ii-a complete; external
-> root-launch branch rejected; L3c3c-ii-b0a/b0b wire split frozen; ii-b0a current
+> root-launch branch rejected; ii-b0a complete; ii-b0b current
 >
 > Date: 2026-08-18
 >
@@ -209,7 +209,7 @@ This preflight made no repository code change, installed nothing, launched no
 model and did not alter `~/.codex/config.toml`. Production Deep Dive remains
 unavailable. L3c3a, L3c3b, L3c3c-i and L3c3c-ii-a are complete; the root-launch
 audit closed the external branch with NO-GO and did not accept ADR 0018.
-The ii-b0 wire split passed iterative independent post-fix review and ii-b0a is
+The ii-b0 wire split passed iterative review; ii-b0a is complete and ii-b0b is
 current.
 ADR 0018 may become Accepted only after
 ii-c succeeds. Any

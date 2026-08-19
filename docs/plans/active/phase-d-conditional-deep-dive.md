@@ -36,8 +36,8 @@
 > superseded before execution; B4 root count is zero. ADR 0018 remains Proposed.
 > L3c3c-ii-a authority-closed installed-driver/manifest observation and exact
 > source/final-Mach-O admission are complete. ii-b is split into ii-b0a/ii-b0b
-> and ii-b1–ii-b5 with ii-c0 before the privileged gate. The exact wire
-> preflight has no unresolved P0–P2 and ii-b0a is current, followed by
+> and ii-b1–ii-b5 with ii-c0 before the privileged gate. ii-b0a exact
+> frame/capsule implementation is complete and ii-b0b is current, followed by
 > ii-c one no-model privileged gate. The authoritative
 > real-model run and readiness verdict remain unimplemented.
 > Production Deep Dive remains unavailable until Task 44 admission.
@@ -893,8 +893,8 @@ Checkpoint status:
   L3c3c-i transport/root-launch audit is complete and rejects the external
   branch; i-b2b-0b/i-b2b-1 were superseded before execution. ADR 0018 remains
   Proposed. L3c3c-ii-a is complete; ii-b is frozen as ii-b0a/ii-b0b and
-  ii-b1–ii-b5 with ii-c0 before the privileged gate. Iterative exact-wire reviews
-  are green and ii-b0a is current.
+  ii-b1–ii-b5 with ii-c0 before the privileged gate. ii-b0a is complete after
+  one 1,107-test staged-only serial and independent review; ii-b0b is current.
   See the
   [L3c1b-i Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
   and
@@ -932,6 +932,8 @@ Checkpoint status:
   The nested handoff budgets and protocol corrections are frozen by the
   [ii-b Split Preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md)
   and [ii-b0 Wire Preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b0-wire-contract-preflight.md).
+  ii-b0a completion evidence is in the
+  [Frame/Capsule Review](../../reports/phase-d-task-39b2c-l3c3c-ii-b0a-review.md).
   ii-a completion evidence is in the
   [Installed-Driver Observation Review](../../reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md).
   Only L3c4 owns
