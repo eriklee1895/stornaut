@@ -9,6 +9,13 @@ claim_asid_contract_only=false
 claim_asid_contract_source=
 deadline_state_contract_only=false
 deadline_state_contract_source=
+claim_server_contract_only=false
+claim_server_adapter_source=
+claim_server_effects_source=
+claim_server_deadline_source=
+claim_server_package_contract_only=false
+claim_server_package_graph=
+claim_server_package_manifest=
 if (( $# > 0 )); then
     if (( $# == 2 )) && [[ $1 == --claim-asid-contract-only ]]; then
         claim_asid_contract_only=true
@@ -16,12 +23,453 @@ if (( $# > 0 )); then
     elif (( $# == 2 )) && [[ $1 == --deadline-state-contract-only ]]; then
         deadline_state_contract_only=true
         deadline_state_contract_source=$2
+    elif (( $# == 4 )) && [[ $1 == --claim-server-contract-only ]]; then
+        claim_server_contract_only=true
+        claim_server_adapter_source=$2
+        claim_server_effects_source=$3
+        claim_server_deadline_source=$4
+    elif (( $# == 3 )) && [[ $1 == --claim-server-package-contract-only ]]; then
+        claim_server_package_contract_only=true
+        claim_server_package_graph=$2
+        claim_server_package_manifest=$3
     else
         print -u2 \
-            "Usage: scripts/verify-investigation-boundaries [--claim-asid-contract-only <source> | --deadline-state-contract-only <source>]"
+            "Usage: scripts/verify-investigation-boundaries [--claim-asid-contract-only <source> | --deadline-state-contract-only <source> | --claim-server-contract-only <adapter> <effects> <deadline-state> | --claim-server-package-contract-only <describe-json> <dump-json>]"
         exit 64
     fi
 fi
+
+function verify_claim_server_contract() {
+    local adapter_source=$1
+    local effects_source=$2
+    local deadline_source=$3
+    python3 - "$adapter_source" "$effects_source" "$deadline_source" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+
+def code_only(source, label):
+    output = list(source)
+    index = 0
+    block_depth = 0
+    delimiter = None
+    while index < len(source):
+        if block_depth:
+            if source.startswith("/*", index):
+                output[index:index + 2] = "  "
+                block_depth += 1
+                index += 2
+            elif source.startswith("*/", index):
+                output[index:index + 2] = "  "
+                block_depth -= 1
+                index += 2
+            else:
+                if source[index] != "\n":
+                    output[index] = " "
+                index += 1
+            continue
+        if delimiter is not None:
+            if source.startswith(delimiter, index):
+                width = len(delimiter)
+                output[index:index + width] = " " * width
+                delimiter = None
+                index += width
+            elif delimiter == '"' and source[index] == "\\":
+                output[index] = " "
+                if index + 1 < len(source):
+                    output[index + 1] = " "
+                index += 2
+            else:
+                if source[index] != "\n":
+                    output[index] = " "
+                index += 1
+            continue
+        if source.startswith("//", index):
+            end = source.find("\n", index)
+            end = len(source) if end < 0 else end
+            output[index:end] = " " * (end - index)
+            index = end
+        elif source.startswith("/*", index):
+            output[index:index + 2] = "  "
+            block_depth = 1
+            index += 2
+        elif source.startswith('"""', index):
+            output[index:index + 3] = "   "
+            delimiter = '"""'
+            index += 3
+        elif source[index] == '"':
+            output[index] = " "
+            delimiter = '"'
+            index += 1
+        else:
+            index += 1
+    if block_depth or delimiter is not None:
+        raise SystemExit(f"{label} has an unterminated comment or string")
+    return "".join(output)
+
+
+def body(source, pattern, label):
+    match = re.search(pattern, source)
+    if match is None:
+        raise SystemExit(f"claim server {label} drifted: {pattern}")
+    opening = source.find("{", match.end())
+    if opening < 0:
+        raise SystemExit(f"claim server {label} has no body: {pattern}")
+    depth = 0
+    for index in range(opening, len(source)):
+        if source[index] == "{":
+            depth += 1
+        elif source[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return source[match.start():index + 1]
+    raise SystemExit(f"claim server {label} body is unterminated: {pattern}")
+
+
+def bodies(source, pattern, label):
+    results = []
+    for match in re.finditer(pattern, source):
+        opening = source.find("{", match.end())
+        if opening < 0:
+            raise SystemExit(f"claim server {label} has no body: {pattern}")
+        depth = 0
+        for index in range(opening, len(source)):
+            if source[index] == "{":
+                depth += 1
+            elif source[index] == "}":
+                depth -= 1
+                if depth == 0:
+                    results.append(source[match.start():index + 1])
+                    break
+        else:
+            raise SystemExit(
+                f"claim server {label} body is unterminated: {pattern}"
+            )
+    return results
+
+
+def require_patterns(source, patterns, label):
+    for pattern in patterns:
+        if re.search(pattern, source) is None:
+            raise SystemExit(f"claim server {label} drifted: {pattern}")
+
+
+adapter_path, effects_path, deadline_path = map(Path, sys.argv[1:])
+raw_sources = {
+    "adapter": adapter_path.read_text(encoding="utf-8"),
+    "effects": effects_path.read_text(encoding="utf-8"),
+    "deadline": deadline_path.read_text(encoding="utf-8"),
+}
+for source_name, source in raw_sources.items():
+    if re.search(r"#+(?:\"|/)", source):
+        raise SystemExit(
+            f"claim server {source_name} gained raw literal or regex"
+        )
+adapter = code_only(raw_sources["adapter"], "adapter")
+effects = code_only(raw_sources["effects"], "effects")
+deadline = code_only(raw_sources["deadline"], "deadline")
+for source_name, source in (
+    ("adapter", adapter), ("effects", effects), ("deadline", deadline),
+):
+    if re.search(r"(?m)^\s*#(?:if|elseif|else|endif)\b", source):
+        raise SystemExit(
+            f"claim server {source_name} gained conditional compilation"
+        )
+    if re.search(r"(?m)(?:^|[^/])/(?![/*])[^\n/]+/(?:[A-Za-z]*)", source):
+        raise SystemExit(
+            f"claim server {source_name} gained raw literal or regex"
+        )
+
+adapter_imports = re.findall(
+    r"(?m)^import\s+([A-Za-z0-9_]+)\s*$", adapter
+)
+if adapter_imports != [
+    "CryptoKit", "Foundation",
+    "StornautInvestigationHandoffContract", "StornautLifecycle",
+]:
+    raise SystemExit(f"claim server adapter imports drifted: {adapter_imports}")
+effects_imports = re.findall(
+    r"(?m)^import\s+([A-Za-z0-9_]+)\s*$", effects
+)
+if effects_imports != ["Foundation", "StornautLifecycle"]:
+    raise SystemExit(f"claim server effects imports drifted: {effects_imports}")
+
+for source_name, source in (("adapter", adapter), ("effects", effects)):
+    if re.search(r"(?m)^\s*(?:public|open)\s+", source):
+        raise SystemExit(f"claim server {source_name} exposed public surface")
+    authority = re.search(
+        r"\b(?:NSXPCConnection|NSXPCListener|NSXPCListenerEndpoint|"
+        r"FileManager|URLSession|Process|Security|ActionExecutor|Policy|"
+        r"Cleanup|Executor|StornautExecution)\b|"
+        r"\b(?:exit|kill|posix_spawn|unlink|rename|socket|connect)\s*\(",
+        source,
+    )
+    if authority:
+        raise SystemExit(
+            f"claim server {source_name} gained authority: "
+            f"{authority.group(0)!r}"
+        )
+
+projection = body(
+    adapter,
+    r"private\s+struct\s+InvestigationMachineClaimServerProjection\b",
+    "sealed transfer projection",
+)
+projection_init = body(
+    projection,
+    r"init\s*\(\s*transfer\s*:\s*"
+        r"LifecycleMachineRetirementReservationTransfer",
+    "sealed transfer initializer",
+)
+require_patterns(projection_init, (
+    r"transfer\.ownerRetirementObservation\s*==\s*"
+        r"\.retiredOwnedResources",
+    r"transfer\.residueObservation\.provedEmpty",
+    r"transfer\.residueObservation\.investigationID\s*==\s*"
+        r"transfer\.investigationID",
+    r"transfer\.residueObservation\.auditSessionID\s*==\s*"
+        r"transfer\.helperIdentity\.auditSessionID",
+    r"transfer\.residueObservation\.userID\s*==\s*transfer\.userID",
+    r"\(0\.\.\.60_000_000\)\.contains\(residueAge\.partialValue\)",
+    r"handoffOwnerRetirement\s*\(\s*"
+        r"transfer\.ownerRetirementObservation",
+    r"handoffL1Residue\s*\(\s*transfer\.residueObservation",
+), "sealed transfer admission")
+if "LifecycleMachineRetirementReservationTransfer(" in adapter:
+    raise SystemExit("claim server re-minted sealed transfer")
+
+if re.search(r"package\s+actor\s+InvestigationMachineClaimServerAdapter", adapter):
+    raise SystemExit("claim server adapter regained actor isolation")
+adapter_class = body(
+    adapter,
+    r"package\s+final\s+class\s+"
+        r"InvestigationMachineClaimServerAdapter\s*:\s*"
+        r"@unchecked\s+Sendable",
+    "non-actor adapter",
+)
+require_patterns(adapter_class, (
+    r"private\s+let\s+evidenceLock\s*=\s*NSLock\s*\(\s*\)",
+    r"transfer\s*:\s*LifecycleMachineRetirementReservationTransfer",
+), "non-actor adapter boundary")
+claim = body(adapter_class, r"package\s+func\s+claim\s*\(", "claim")
+release = body(adapter_class, r"package\s+func\s+release\s*\(", "release")
+reply = body(
+    adapter_class, r"package\s+func\s+replyDidDispatch\s*\(", "reply"
+)
+next_observation = body(
+    adapter_class, r"private\s+func\s+nextObservation\s*\(",
+    "operation observation",
+)
+require_patterns(claim, (
+    r"ownerRetirement:\s*projection\.ownerRetirement",
+    r"l1Residue:\s*projection\.l1Residue",
+    r"evidenceLock\.withLock\s*\{\s*evidence\s*=\s*value\s*\}",
+    r"state\.commitClaimResponse\s*\(",
+    r"if\s+evidence\s*==\s*value\s*\{\s*evidence\s*=\s*nil\s*\}",
+), "claim projection")
+lock_bodies = bodies(
+    adapter_class, r"evidenceLock\.withLock", "evidence lock"
+)
+normalized_lock_bodies = [re.sub(r"\s+", "", value) for value in lock_bodies]
+allowed_lock_bodies = [
+    "evidenceLock.withLock{evidence=value}",
+    "evidenceLock.withLock{ifevidence==value{evidence=nil}}",
+    "evidenceLock.withLock({evidence}",
+    "evidenceLock.withLock({evidence}",
+]
+if sorted(normalized_lock_bodies) != sorted(allowed_lock_bodies):
+    raise SystemExit(
+        f"claim server evidence lock scope drifted: {normalized_lock_bodies}"
+    )
+claim_order = (
+    re.search(r"let\s+encoded\s*=\s*try\s+value\.encoded\s*\(\s*\)", claim),
+    re.search(r"evidenceLock\.withLock\s*\{\s*evidence\s*=\s*value\s*\}", claim),
+    re.search(r"let\s+committed\s*=\s*state\.commitClaimResponse\s*\(", claim),
+    re.search(r"try\s+requireApplied\s*\(\s*committed\s*\)", claim),
+    re.search(r"return\s+encoded", claim),
+)
+if not (
+    all(claim_order)
+    and all(
+        earlier.start() < later.start()
+        for earlier, later in zip(claim_order, claim_order[1:])
+    )
+):
+    raise SystemExit("claim server claim response commit order drifted")
+if re.search(r"ownerRetirement:\s*InvestigationMachineOwnerRetirement\s*\(", claim):
+    raise SystemExit("claim server claim synthesized owner retirement")
+require_patterns(release, (
+    r"release\.requestBindingSHA256\.rawBytes",
+    r"release\.claimedHelperIdentitySHA256\.rawBytes",
+    r"release\.claimConnectionEpoch\s*==\s*"
+        r"evidence\.claimConnectionEpoch",
+    r"release\.releaseDeadlineNanoseconds\s*"
+        r"==\s*evidence\.releaseDeadlineNanoseconds",
+    r"state\.commitReleaseResponse\s*\(",
+), "release binding")
+if not re.search(
+    r"catch\s*\{\s*rejectBinding\s*\(\s*\)\s*"
+    r"throw\s+InvestigationMachineClaimServerError\.bindingMismatch",
+    release,
+):
+    raise SystemExit("claim server malformed release reason drifted")
+release_order = (
+    re.search(
+        r"let\s+encoded\s*=\s*try\s+"
+        r"InvestigationMachineClaimReleased\s*\(",
+        release,
+    ),
+    re.search(
+        r"let\s+committed\s*=\s*state\.commitReleaseResponse\s*\(",
+        release,
+    ),
+    re.search(r"try\s+requireApplied\s*\(\s*committed\s*\)", release),
+    re.search(r"return\s+encoded", release),
+)
+if not (
+    all(release_order)
+    and all(
+        earlier.start() < later.start()
+        for earlier, later in zip(release_order, release_order[1:])
+    )
+):
+    raise SystemExit("claim server release response commit order drifted")
+if "expectedReleaseChallenge" in adapter or re.search(
+    r"release\s*\.\s*validate\s*\(", release
+):
+    raise SystemExit("claim server release regained self-challenge validation")
+require_patterns(reply, (
+    r"state\.replyDidDispatch\s*\(",
+), "reply commitment")
+require_patterns(next_observation, (
+    r"state\.rejectOperationObservation\s*\(",
+    r"reservationID:\s*reservationID",
+    r"executor\.apply\s*\(\s*transition,\s*to:\s*state\s*\)",
+), "operation rejection")
+
+owner_projection = body(
+    adapter, r"private\s+func\s+handoffOwnerRetirement\s*\(",
+    "owner projection",
+)
+require_patterns(owner_projection, (
+    r"observation\.resourceOwnership\s*==\s*\.owned",
+    r"observation\.processGroupTerminated",
+    r"observation\.standardErrorContained",
+    r"observation\.workspaceRemoved",
+), "owner projection")
+residue_projection = body(
+    adapter, r"private\s+func\s+handoffL1Residue\s*\(",
+    "residue projection",
+)
+for marker in (
+    "observation.investigationID.rawValue",
+    "observation.auditSessionID",
+    "observation.userID",
+    "observation.remainingAuditSessionMemberCount",
+    "observation.matchingLeaseCount",
+    "observation.leaseRootEntryCount",
+    "observation.investigationArtifactCount",
+):
+    if marker not in residue_projection:
+        raise SystemExit(f"claim server residue projection drifted: {marker}")
+
+executor = body(
+    effects,
+    r"package\s+final\s+class\s+"
+        r"InvestigationMachineClaimServerEffectExecutor\b",
+    "effect executor",
+)
+slot = body(executor, r"private\s+final\s+class\s+Slot\b", "slot")
+require_patterns(slot, (
+    r"private\s+var\s+cancelRequested\s*=\s*false",
+    r"private\s+var\s+cancelApplied\s*=\s*false",
+    r"private\s+var\s+callbackFinished\s*=\s*false",
+    r"callbackFinished\s*=\s*true",
+    r"removeSlot:\s*callbackFinished\s*\|\|\s*cancelRequested",
+), "slot lifecycle")
+schedule = body(executor, r"private\s+func\s+schedule\s*\(", "schedule")
+require_patterns(schedule, (
+    r"defer\s*\{\s*finishCallback\s*\(\s*ticket\s*\)\s*\}",
+    r"state\.rejectObservation\s*\(\s*ticket:\s*ticket\s*\)",
+    r"perform\s*\(\s*slot\.install\s*\(\s*handle\s*\),"
+        r"\s*ticket:\s*ticket\s*\)",
+), "callback ownership")
+arm_match = re.search(r"let\s+armed\s*=\s*state\.armSucceeded\s*\(\s*ticket\s*\)", schedule)
+apply_arm_match = re.search(r"try\s+apply\s*\(\s*armed,\s*to:\s*state\s*\)", schedule)
+install_match = re.search(
+    r"perform\s*\(\s*slot\.install\s*\(\s*handle\s*\),"
+    r"\s*ticket:\s*ticket\s*\)",
+    schedule,
+)
+if not (
+    arm_match and apply_arm_match and install_match
+    and arm_match.start() < apply_arm_match.start() < install_match.start()
+):
+    raise SystemExit("claim server arm/install linearization drifted")
+if "rejectOperationObservation" in effects:
+    raise SystemExit("claim server callback used operation-bound rejection")
+
+deadline_class = body(
+    deadline,
+    r"package\s+final\s+class\s+"
+        r"LifecycleMachineRetirementEscrowDeadlineState\b",
+    "deadline owner",
+)
+binding_rejection = body(
+    deadline_class, r"package\s+func\s+rejectBinding\s*\(",
+    "binding rejection",
+)
+callback_rejection = body(
+    deadline_class, r"package\s+func\s+rejectObservation\s*\(",
+    "callback rejection",
+)
+operation_rejection = body(
+    deadline_class,
+    r"package\s+func\s+rejectOperationObservation\s*\(",
+    "operation rejection seam",
+)
+claim_commit = body(
+    deadline_class, r"package\s+func\s+commitClaimResponse\s*\(",
+    "claim response commit",
+)
+release_commit = body(
+    deadline_class, r"package\s+func\s+commitReleaseResponse\s*\(",
+    "release response commit",
+)
+require_patterns(claim_commit, (
+    r"context\.reservation\.reservationID\s*==\s*reservationID",
+    r"context\.connectionEpoch\s*==\s*connectionEpoch",
+    r"state\s*=\s*\.claimed\s*\(\s*context,\s*ticket\s*\)",
+), "claim response commit")
+require_patterns(release_commit, (
+    r"context\.claim\.reservation\.reservationID\s*==\s*reservationID",
+    r"context\.claim\.connectionEpoch\s*==\s*connectionEpoch",
+    r"context\.releaseChallenge\s*==\s*releaseChallenge",
+    r"state\s*=\s*\.releasedWaiting\s*\(\s*context\s*\)",
+), "release response commit")
+for label, commit in (
+    ("claim", claim_commit), ("release", release_commit),
+):
+    if re.search(r"effects\s*:|\.schedule\s*\(|\.cancel\s*\(", commit):
+        raise SystemExit(f"claim server {label} response commit gained effects")
+require_patterns(binding_rejection, (
+    r"context\.reservationID\s*==\s*reservationID",
+    r"\.bindingMismatch",
+    r"rememberLateArm:\s*pendingTicketLocked",
+), "binding rejection")
+require_patterns(callback_rejection, (
+    r"currentTicketLocked\s*==\s*ticket",
+    r"\.invalidTimeObservation",
+    r"pendingTicketLocked\s*==\s*ticket\s*\?\s*ticket\s*:\s*nil",
+), "callback rejection")
+require_patterns(operation_rejection, (
+    r"context\.reservationID\s*==\s*reservationID",
+    r"\.invalidTimeObservation",
+    r"rememberLateArm:\s*pendingTicketLocked",
+), "operation rejection seam")
+PY
+}
 
 function verify_claim_asid_contract() {
     local source=$1
@@ -347,44 +795,79 @@ if not re.search(
 PY
 }
 
-function verify_deadline_state_scope() {
+function verify_claim_server_scope() {
     python3 - <<'PY'
 from pathlib import Path
 import json
 import subprocess
 
-baseline = "354ff3bd4602c5595811513fb9aefa5b8e5e8adb"
+baseline = "0e6a377f020d3e446ea9a8d7b045516d0bd9515b"
+checker_path = "scripts/verify-investigation-boundaries"
+contract_path = "scripts/verify-contract"
+allowed_states = ({
+    checker_path,
+}, {
+    checker_path,
+    contract_path,
+})
 allowed = {
-    "Sources/StornautLifecycle/LifecycleMachineRetirementEscrowDeadlineState.swift",
-    "Tests/StornautLifecycleTests/LifecycleMachineRetirementEscrowDeadlineStateTests.swift",
     "scripts/verify-investigation-boundaries",
     "scripts/verify-contract",
 }
+
 changed = subprocess.check_output(
+    ["git", "status", "--porcelain=v1", "--untracked-files=all", "-z"],
+    text=False,
+).split(b"\0")
+worktree_paths = set()
+for row in changed:
+    if not row:
+        continue
+    decoded = row.decode("utf-8", errors="strict")
+    if len(decoded) < 4:
+        raise SystemExit(f"claim server status row drifted: {decoded!r}")
+    path = decoded[3:]
+    if " -> " in path:
+        path = path.split(" -> ", 1)[1]
+    worktree_paths.add(path)
+baseline_paths = set(subprocess.check_output(
     ["git", "diff", "--name-only", baseline, "--"], text=True
-).splitlines()
-non_document = {path for path in changed if not path.startswith("docs/")}
-if non_document != allowed:
+).splitlines())
+non_document = {
+    path for path in baseline_paths
+    if not path.startswith("docs/")
+}
+dirty_non_document = {
+    path for path in worktree_paths if not path.startswith("docs/")
+}
+if dirty_non_document:
     raise SystemExit(
-        f"deadline state non-document paths drifted: {sorted(non_document)}"
+        f"claim server dirty non-document paths drifted: "
+        f"{sorted(dirty_non_document)}"
+    )
+if non_document not in allowed_states:
+    raise SystemExit(
+        f"claim server non-document paths drifted: {sorted(non_document)}"
     )
 counts = {path: 0 for path in allowed}
 for row in subprocess.check_output(
     ["git", "diff", "--numstat", baseline, "--"], text=True
 ).splitlines():
     added, deleted, path = row.split("\t")
-    if path in counts:
+    if path in counts and added != "-" and deleted != "-":
         counts[path] = int(added) + int(deleted)
-source_test = sum(
-    counts[path] for path in counts if path.startswith(("Sources/", "Tests/"))
-)
-scripts = sum(counts[path] for path in counts if path.startswith("scripts/"))
-if source_test > 1900 or scripts > 700 or source_test + scripts > 2600:
+for path in allowed:
+    if path in baseline_paths or path not in worktree_paths:
+        continue
+    file_path = Path(path)
+    if file_path.exists():
+        counts[path] = len(file_path.read_text(encoding="utf-8").splitlines())
+if counts[checker_path] > 650 or counts[contract_path] > 400:
     raise SystemExit(
-        f"deadline state budget drifted: source/tests={source_test}, scripts={scripts}"
+        "claim server budget drifted: "
+        f"checker={counts[checker_path]}, contract={counts[contract_path]}"
     )
 protected = [
-    "Package.swift",
     "Sources/StornautLifecycle/LifecycleMachineRetirementEscrow.swift",
     "Sources/StornautLifecycle/LifecycleSupervisorXPC.swift",
     "StornautLifecycleHelper/main.swift",
@@ -397,18 +880,7 @@ protected = [
 if subprocess.run(
     ["git", "diff", "--quiet", baseline, "--", *protected]
 ).returncode != 0:
-    raise SystemExit("deadline state protected product blobs drifted")
-symbol = "LifecycleMachineRetirementEscrowDeadlineState"
-owners = []
-for root in ("Sources", "StornautApp", "StornautLifecycleHelper", "Tools"):
-    for path in Path(root).rglob("*.swift"):
-        if symbol in path.read_text(encoding="utf-8"):
-            owners.append(str(path))
-expected = [
-    "Sources/StornautLifecycle/LifecycleMachineRetirementEscrowDeadlineState.swift"
-]
-if sorted(owners) != expected:
-    raise SystemExit(f"deadline state product consumers drifted: {owners}")
+    raise SystemExit("claim server protected product blobs drifted")
 package = json.loads(subprocess.check_output(
     ["swift", "package", "dump-package"], text=True
 ))
@@ -421,6 +893,63 @@ if dependencies != ["CLifecycleSupport"]:
 PY
 }
 
+function verify_claim_server_package_contract() {
+    local describe_json=$1
+    local dump_json=$2
+    python3 - "$describe_json" "$dump_json" <<'PY'
+import json
+from pathlib import Path
+import sys
+
+package = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+manifest = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+targets = {target["name"]: target for target in package["targets"]}
+server = targets.get("StornautInvestigationMachineClaimServer")
+if server is None:
+    raise SystemExit("missing StornautInvestigationMachineClaimServer target")
+if Path(server.get("path", "")) != Path(
+    "Sources/StornautInvestigationMachineClaimServer"
+):
+    raise SystemExit("machine claim server target path drifted")
+if set(server.get("target_dependencies", [])) != {
+    "StornautInvestigationHandoffContract", "StornautLifecycle",
+}:
+    raise SystemExit("machine claim server dependencies drifted")
+if set(server.get("sources", [])) != {
+    "InvestigationMachineClaimServerAdapter.swift",
+    "InvestigationMachineClaimServerEffects.swift",
+}:
+    raise SystemExit("machine claim server source allowlist drifted")
+products = [
+    product for product in package.get("products", [])
+    if "StornautInvestigationMachineClaimServer" in product.get("targets", [])
+]
+if len(products) != 1 or products[0].get("name") != (
+    "StornautInvestigationMachineClaimServer"
+):
+    raise SystemExit("machine claim server product ownership drifted")
+manifest_products = {product["name"]: product for product in manifest["products"]}
+product = manifest_products.get("StornautInvestigationMachineClaimServer")
+if (
+    product is None
+    or product.get("targets") != ["StornautInvestigationMachineClaimServer"]
+    or product.get("type") != {"library": ["static"]}
+):
+    raise SystemExit("machine claim server static product drifted")
+consumers = {
+    target["name"] for target in package["targets"]
+    if "StornautInvestigationMachineClaimServer"
+    in target.get("target_dependencies", [])
+}
+if consumers != {"StornautInvestigationTests"}:
+    raise SystemExit(f"machine claim server consumers drifted: {sorted(consumers)}")
+if "StornautInvestigationHandoffContract" in set(
+    targets["StornautLifecycle"].get("target_dependencies", [])
+):
+    raise SystemExit("Lifecycle gained HandoffContract dependency")
+PY
+}
+
 if $claim_asid_contract_only; then
     verify_claim_asid_contract "$claim_asid_contract_source"
     print "Claim evidence ASID contract verification passed."
@@ -429,6 +958,21 @@ fi
 if $deadline_state_contract_only; then
     verify_deadline_state_contract "$deadline_state_contract_source"
     print "Retirement deadline state contract verification passed."
+    exit 0
+fi
+if $claim_server_contract_only; then
+    verify_claim_server_contract \
+        "$claim_server_adapter_source" \
+        "$claim_server_effects_source" \
+        "$claim_server_deadline_source"
+    print "Machine claim server source contract verification passed."
+    exit 0
+fi
+if $claim_server_package_contract_only; then
+    verify_claim_server_package_contract \
+        "$claim_server_package_graph" \
+        "$claim_server_package_manifest"
+    print "Machine claim server package contract verification passed."
     exit 0
 fi
 
@@ -2118,10 +2662,21 @@ verify_claim_asid_contract \
     Sources/StornautInvestigationHandoffContract/InvestigationMachineClaimContract.swift
 verify_deadline_state_contract \
     Sources/StornautLifecycle/LifecycleMachineRetirementEscrowDeadlineState.swift
-verify_deadline_state_scope
+verify_claim_server_contract \
+    Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerAdapter.swift \
+    Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerEffects.swift \
+    Sources/StornautLifecycle/LifecycleMachineRetirementEscrowDeadlineState.swift
+verify_claim_server_scope
 
 package_graph=$(swift package describe --type json)
 package_manifest=$(swift package dump-package)
+claim_server_package_root=$(mktemp -d /tmp/stornaut-claim-server-package.XXXXXX)
+print -r -- "$package_graph" > "$claim_server_package_root/describe.json"
+print -r -- "$package_manifest" > "$claim_server_package_root/dump.json"
+verify_claim_server_package_contract \
+    "$claim_server_package_root/describe.json" \
+    "$claim_server_package_root/dump.json"
+rm -rf "$claim_server_package_root"
 python3 - \
     "$package_graph" \
     "$package_manifest" \
@@ -2173,6 +2728,7 @@ consumers = {target["name"] for target in package["targets"]
              in target.get("target_dependencies", [])}
 if consumers != {
     "StornautInvestigationDiagnostic",
+    "StornautInvestigationMachineClaimServer",
     "StornautInvestigationTests",
 }:
     raise SystemExit(f"handoff contract consumers drifted: {sorted(consumers)}")

@@ -148,18 +148,26 @@ non-document paths, at most 2,650 added-or-changed lines:
 4. new `Tests/StornautInvestigationTests/InvestigationMachineClaimServerAdapterTests.swift`;
 5. `Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift`.
 
-ii-b2b-i-b begins only from the pushed i-a2 completion tree and owns exactly two
-non-document paths, at most 800 added-or-changed lines:
+ii-b2b-i-b begins only from the pushed i-a2 completion tree. The production
+checker plus honest executable mutations measured 855 changed lines before the
+package-graph negative controls, crossing the frozen 800-line ceiling. It is
+therefore frozen as two ordered verifier-only checkpoints without increasing
+that ceiling:
 
-1. `scripts/verify-investigation-boundaries`;
-2. `scripts/verify-contract`.
+1. **i-b1**, exactly `scripts/verify-investigation-boundaries`, at most 650
+   added-or-changed lines: parser-backed source/state/effect, scope and package
+   positive gates;
+2. **i-b2**, exactly `scripts/verify-contract`, at most 400 added-or-changed
+   lines: canonical invocation, executable source/package/scope mutations and
+   verifier self-contract.
 
 i-a2 owns server focused/affected tests, combined focused coverage and the
-parent's sole staged-only serial after a1 is present. i-b may run the canonical source-contract mode,
-the full boundary script, verifier mutation controls and independent review, but
+parent's sole staged-only serial after a1 is present. i-b1 may run the canonical
+source-contract mode and full boundary script; i-b2 owns verifier mutation
+controls and self-contract. Both receive independent review, but
 must not repeat the SwiftPM serial. The server source contract tests in i-a stay
-as a small independent positive control; i-b adds the parser-backed structural
-gate, exact package/scope graph and executable negative mutations. All three commits
+as a small independent positive control; i-b1/i-b2 add the parser-backed structural
+gate, exact package/scope graph and executable negative mutations. All four commits
 must be independently pushed before ii-b2b-i is complete.
 
 Approaching either ceiling requires another split before coding. No Xcode project,
