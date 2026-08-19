@@ -1,7 +1,7 @@
 # ADR 0018: Parent-Owned Investigation Handoff and Fixed App Launch
 
-> **Status:** Proposed; external root-launch branch rejected; ii-b split frozen
-> after three independent review rounds; ii-b0 current
+> **Status:** Proposed; external root-launch branch rejected; ii-b0a/b0b exact
+> wire split frozen after iterative independent review; ii-b0a current
 >
 > **Date:** 2026-08-19
 >
@@ -256,7 +256,8 @@ not a fault target and may not signal unrelated processes.
 - L3c3c-i is complete as a research/root-launch audit with an external NO-GO; it
   does not accept this ADR or prove machine behavior.
 - Product work is split into ii-a authority-closed live driver runtime;
-  ii-b0–ii-b5 shared contract/App/helper/client/single-epoch implementation;
+  ii-b0a/ii-b0b/ii-b1–ii-b5 shared contract/App/helper/client/single-epoch
+  implementation;
   ii-c0 TTY/capsule launcher evidence; and ii-c one outer no-model privileged
   driver invocation containing closed scenario epochs.
 - No anonymous-XPC, filesystem mailbox, generic IPC, generic root launcher,
@@ -320,6 +321,7 @@ unconsumed.
 | i-b2b-1 external privileged run | superseded before execution; root count 0 |
 | installed diagnostic driver | conditionally selected; currently absent |
 | ii-a installed-driver self-observation | complete; non-admitting |
-| ii-b split preflight | frozen after three review rounds; ii-b0 current; no implementation admitted |
+| ii-b split preflight | parent split frozen; ii-b0 replaced by exact b0a/b0b wire checkpoints |
+| ii-b0 wire preflight | frozen after iterative post-fix review; ii-b0a current; no implementation admitted |
 | ii-c no-model privileged machine gate | not executed |
 | ADR status | **Proposed** |

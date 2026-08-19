@@ -35,9 +35,9 @@
 > and UID-staged no-cache external root paths are NO-GO. i-b2b-0b/i-b2b-1 were
 > superseded before execution; B4 root count is zero. ADR 0018 remains Proposed.
 > L3c3c-ii-a authority-closed installed-driver/manifest observation and exact
-> source/final-Mach-O admission are complete. ii-b is split into ii-b0–ii-b5
-> with ii-c0 before the privileged gate. Three review rounds are green and ii-b0
-> is current, followed by
+> source/final-Mach-O admission are complete. ii-b is split into ii-b0a/ii-b0b
+> and ii-b1–ii-b5 with ii-c0 before the privileged gate. The exact wire
+> preflight has no unresolved P0–P2 and ii-b0a is current, followed by
 > ii-c one no-model privileged gate. The authoritative
 > real-model run and readiness verdict remain unimplemented.
 > Production Deep Dive remains unavailable until Task 44 admission.
@@ -892,8 +892,9 @@ Checkpoint status:
   and independent post-fix/cross-group review. L3c3b-ii installer/L2 is complete.
   L3c3c-i transport/root-launch audit is complete and rejects the external
   branch; i-b2b-0b/i-b2b-1 were superseded before execution. ADR 0018 remains
-  Proposed. L3c3c-ii-a is complete; ii-b is frozen as ii-b0–ii-b5 with ii-c0
-  before the privileged gate. Three review rounds are green and ii-b0 is current.
+  Proposed. L3c3c-ii-a is complete; ii-b is frozen as ii-b0a/ii-b0b and
+  ii-b1–ii-b5 with ii-c0 before the privileged gate. Iterative exact-wire reviews
+  are green and ii-b0a is current.
   See the
   [L3c1b-i Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
   and
@@ -929,7 +930,8 @@ Checkpoint status:
   The revised implementation split is frozen by the
   [Installed-Driver Preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-installed-driver-path-cost-preflight.md).
   The nested handoff budgets and protocol corrections are frozen by the
-  [ii-b Split Preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md).
+  [ii-b Split Preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md)
+  and [ii-b0 Wire Preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b0-wire-contract-preflight.md).
   ii-a completion evidence is in the
   [Installed-Driver Observation Review](../../reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md).
   Only L3c4 owns

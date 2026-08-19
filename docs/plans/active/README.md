@@ -134,9 +134,9 @@ i-b2b-0b/i-b2b-1 were superseded before execution; B4 root count is zero.
 [ADR 0018](../../adr/0018-parent-owned-investigation-handoff.md) remains
 Proposed. L3c3c-ii-a is complete after authority-closed installed-driver and
 manifest observation, exact source/final-Mach-O admission and independent
-post-fix review; ii-b is frozen as ii-b0 through ii-b5 with ii-c0 before the
-privileged gate. Three independent review rounds have no unresolved P0-P2 and
-ii-b0 is the current frontier. See the
+post-fix review; ii-b is frozen as ii-b0a, ii-b0b and ii-b1 through ii-b5 with
+ii-c0 before the privileged gate. The wire-completeness preflight closed all
+iterative review findings and ii-b0a is the current frontier. See the
 [study](../../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md),
 [final review](../../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md)
 and [i-b2a review](../../reports/phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md),
@@ -144,7 +144,8 @@ plus the [i-b2b-0a audit](../../reports/phase-d-task-39b2c-l3c3c-i-b2b-0a-root-p
 and [installed-driver preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-installed-driver-path-cost-preflight.md),
 plus the [ii-a completion review](../../reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md).
 The narrower budgets and protocol/topology corrections are frozen in the
-[ii-b split preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md).
+[ii-b split preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md)
+and [ii-b0 wire preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b0-wire-contract-preflight.md).
 Only L3c4 owns machine readiness and the remaining full verifier.
 The L3c2b preflight's
 [plan-freshness prerequisite](../../reports/phase-d-task-39b2c-l3c2b-plan-freshness-prerequisite-review.md)
@@ -168,7 +169,7 @@ the sole normal-product admission gate.
 | [36](task-36-implementation-brief.md) | Domain, canonical projection, planner, budget and stop contracts | complete; [review](../../reports/phase-d-task-36-review.md) |
 | [37](task-37-implementation-brief.md) | Store v4, retention and source rejoin | complete; [review](../../reports/phase-d-task-37-review.md) |
 | [38](task-38-implementation-brief.md) | Closed coordinator with fake runtime | complete; [review](../../reports/phase-d-task-38-review.md) |
-| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; external root launch NO-GO; ii-a complete; ii-b split frozen; ii-b0 current; ADR 0018 Proposed |
+| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; external root launch NO-GO; ii-a complete; b0a/b0b split frozen; ii-b0a current; ADR 0018 Proposed |
 | [40](task-40-implementation-brief.md) | Evidence report and conservative Review projection | blocked on Task 39 |
 | [41](task-41-implementation-brief.md) | First-use disclosure and typed availability | blocked on Task 40 |
 | [42](task-42-implementation-brief.md) | App workflow and recovery state | blocked on Task 41 |

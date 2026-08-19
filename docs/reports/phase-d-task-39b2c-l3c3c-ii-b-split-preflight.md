@@ -1,6 +1,7 @@
 # Phase D Task 39B2c-L3c3c-ii-b Handoff Composition Split Preflight
 
-> Status: Split frozen after three independent review rounds; ii-b0 current
+> Status: Parent split frozen; ii-b0 wire/budget details superseded by b0a/b0b;
+> ii-b0a current
 >
 > Date: 2026-08-19
 >
@@ -37,7 +38,8 @@ argument.
 The strict order is:
 
 ```text
-L3c3c-ii-b0 shared wire/capsule contract
+L3c3c-ii-b0a frame/capsule contract
+-> L3c3c-ii-b0b claim/release wire contract
 -> L3c3c-ii-b1 authority-free App inherited-FD leaf
 -> L3c3c-ii-b2 handle-free helper response migration
 -> L3c3c-ii-b3 concrete App drop/no-auth retirement adapter
@@ -419,7 +421,14 @@ No missing Release implementation may be described as runtime rejection.
 
 ## 4. Frozen Implementation Checkpoints
 
-### 4.1 L3c3c-ii-b0 — Shared Wire and Capsule Contract
+### 4.1 L3c3c-ii-b0 — Shared Wire and Capsule Contract (Superseded)
+
+The exact byte-completeness audit found unresolved digest, nonce, payload and
+transcript-join ambiguity before implementation. The authoritative replacement is
+the [ii-b0 Wire Contract Preflight](phase-d-task-39b2c-l3c3c-ii-b0-wire-contract-preflight.md),
+which splits this checkpoint into b0a and b0b and supersedes the budget, wire
+layout and validation details below. The text below is retained only as the parent
+split's historical input.
 
 Create exact non-product package target `StornautInvestigationHandoffContract`
 owning standalone strict binary capsule,
@@ -674,7 +683,7 @@ honestly and is not rerun merely for a green headline.
 | Requirement | Current-source evidence | Decision |
 | --- | --- | --- |
 | continue Task 39 without repeating ii-a | HEAD/origin at ii-a completion | satisfied |
-| split before review ceiling | six independent trust surfaces | b0-b5/c0 frozen |
+| split before review ceiling | six independent trust surfaces plus b0 wire completeness audit | b0a/b0b/b1-b5/c0 frozen |
 | no heavy Machine/Lifecycle graph in driver | package and final-Mach-O gates | mandatory |
 | handle direct App->driver only | current helper-response echo identified | b0/b2 repair |
 | canonical protocol order | ADR/study plus product direction audit | frozen |
@@ -706,5 +715,7 @@ Three read-only review rounds found and closed:
 - gate-side-only c0 evidence and real-sudo residual uncertainty; and
 - active-router, path-budget and non-claim consistency.
 
-Final review verdict: no unresolved P0–P2. No implementation, serial, App,
-privileged, model or full-verifier action occurred.
+Final parent-split review verdict: no unresolved P0–P2 at that scope. The later
+wire-completeness preflight supersedes b0 details and closed its own iterative
+review findings. No implementation, serial, App, privileged, model or full-
+verifier action occurred.

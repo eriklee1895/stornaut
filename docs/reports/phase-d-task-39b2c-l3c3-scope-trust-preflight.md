@@ -1,7 +1,7 @@
 # Phase D Task 39B2c-L3c3 Scope and Trust Preflight
 
 > Status: Split revised; L3c3a/L3c3b/L3c3c-i/L3c3c-ii-a complete; external
-> root-launch branch rejected; L3c3c-ii-b split frozen; ii-b0 current
+> root-launch branch rejected; L3c3c-ii-b0a/b0b wire split frozen; ii-b0a current
 >
 > Date: 2026-08-18
 >
@@ -154,13 +154,15 @@ fixed installed driver is conditionally selected and ii is split again:
   minimum socketpair/launch/lifecycle primitives while preserving the
   Debug/Release final-Mach-O prohibition on Core/Execution/Cleanup/Policy/Trash/
   Executor/Registered Action authority. No install, App launch, sudo or model.
-- **ii-b fixed handoff composition** is further split into ii-b0 shared
-  wire/capsule, ii-b1 App leaf, ii-b2 handle-free helper response, ii-b3 concrete
-  App adapter, ii-b4 fixed claim client and ii-b5 single-epoch composition;
+- **ii-b fixed handoff composition** is further split into ii-b0a frame/capsule,
+  ii-b0b claim/release wire, ii-b1 App leaf, ii-b2 handle-free helper response,
+  ii-b3 concrete App adapter, ii-b4 fixed claim client and ii-b5 single-epoch
+  composition;
   ii-c0 separately proves the TTY/capsule launcher before privilege. This closes
   the helper-response handle echo and distinguishes per-epoch process retirement
   from final uninstall. See the
-  [ii-b split preflight](phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md).
+  [ii-b split preflight](phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md) and
+  [ii-b0 wire preflight](phase-d-task-39b2c-l3c3c-ii-b0-wire-contract-preflight.md).
 - **ii-c one no-model outer installed-driver gate** follows a fresh ii-c0
   launcher-authoring preflight, then builds and installs the exact
   current-source topology, repeats static artifact/service admission, then
@@ -207,7 +209,8 @@ This preflight made no repository code change, installed nothing, launched no
 model and did not alter `~/.codex/config.toml`. Production Deep Dive remains
 unavailable. L3c3a, L3c3b, L3c3c-i and L3c3c-ii-a are complete; the root-launch
 audit closed the external branch with NO-GO and did not accept ADR 0018.
-The ii-b split passed three independent review rounds and ii-b0 is current.
+The ii-b0 wire split passed iterative independent post-fix review and ii-b0a is
+current.
 ADR 0018 may become Accepted only after
 ii-c succeeds. Any
 path beyond a frozen ceiling still

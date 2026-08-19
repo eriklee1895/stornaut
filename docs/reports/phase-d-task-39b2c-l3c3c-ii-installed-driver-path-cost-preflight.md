@@ -1,6 +1,6 @@
 # Phase D Task 39B2c-L3c3c-ii Installed-Driver Path and Cost Preflight
 
-> Status: Split frozen; external staging rejected; ii-a complete; ii-b0 current
+> Status: Split frozen; external staging rejected; ii-a complete; ii-b0a current
 >
 > Date: 2026-08-19
 >
@@ -162,14 +162,17 @@ the driver completes installed-L2 observation. No handle may travel through
 JSON, a file, configuration, helper reply or caller-selected endpoint.
 
 The live checkout confirms that this cannot fit inside one reviewable
-twelve-path checkpoint. The split is now frozen as ii-b0 shared contract, ii-b1
-App inherited-FD leaf, ii-b2 handle-free helper response, ii-b3 concrete App
-adapter, ii-b4 fixed claim client and ii-b5 single-epoch composition, followed
+twelve-path checkpoint. The split is now frozen as ii-b0a frame/capsule contract,
+ii-b0b claim/release wire, ii-b1 App inherited-FD leaf, ii-b2 handle-free helper
+response, ii-b3 concrete App adapter, ii-b4 fixed claim client and ii-b5
+single-epoch composition, followed
 by ii-c0 TTY/capsule launcher evidence. The response currently echoes the opaque handle through the
 helper reply, and existing post-teardown L2 means final uninstall rather than
 per-epoch retirement; both defects must be closed before root composition.
 Exact budgets, validation gates and the bounded zero-argument stdin cohort-
 capsule contract are recorded in the
+[ii-b0 Wire Preflight](phase-d-task-39b2c-l3c3c-ii-b0-wire-contract-preflight.md),
+which supersedes the parent ii-b0 wire/budget details, and the
 [ii-b Split Preflight](phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md).
 No sudo, live install or model call occurs in any ii-b sub-checkpoint.
 
@@ -241,7 +244,8 @@ The strict order is now:
 ```text
 L3c3c-i root-launch audit complete
 -> L3c3c-ii-a authority-closed live driver runtime complete
--> L3c3c-ii-b0 shared wire/capsule contract
+-> L3c3c-ii-b0a frame/capsule contract
+-> L3c3c-ii-b0b claim/release wire contract
 -> L3c3c-ii-b1 inherited-FD App leaf
 -> L3c3c-ii-b2 handle-free helper response
 -> L3c3c-ii-b3 concrete App adapter
@@ -261,5 +265,5 @@ Dive remains unavailable.
 Post-preflight status: ii-a completed the authority-closed executable/manifest
 observation and exact source/final-Mach-O admission. Completion evidence is in
 the [ii-a review](phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md).
-The split passed three independent review rounds and ii-b0 is current; the
-remaining non-claims above still apply.
+The exact wire split passed iterative independent post-fix review and ii-b0a is
+current; the remaining non-claims above still apply.
