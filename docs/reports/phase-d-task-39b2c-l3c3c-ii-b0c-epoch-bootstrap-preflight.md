@@ -1,7 +1,7 @@
 # Phase D Task 39B2c-L3c3c-ii-b0c Epoch Bootstrap Prelude Preflight
 
-> Status: Pre-implementation split frozen; ii-b0a/ii-b0b complete; ii-b0c
-> current
+> Status: Complete; implementation evidence in the separate ii-b0c review;
+> ii-b1 current
 >
 > Date: 2026-08-19
 >
@@ -132,10 +132,9 @@ auth. It cannot accept ADR 0018 or claim Task 39 readiness.
 
 ## 6. Status and Next Gate
 
-ii-b0a and ii-b0b remain complete and are not reopened. ii-b0c is current only
-to close the first-frame origin contradiction. After ii-b0c is independently
-green and pushed, ii-b1 resumes with the corrected order and its own exact-path
-preflight.
+ii-b0a and ii-b0b remain complete and are not reopened. ii-b0c completed the
+first-frame origin correction; ii-b1 resumes with the corrected order and its
+own exact-path preflight.
 
 ADR 0018 remains Proposed, Task 39 remains incomplete, production Deep Dive
 remains unavailable, real Trash remains closed and the remaining authoritative

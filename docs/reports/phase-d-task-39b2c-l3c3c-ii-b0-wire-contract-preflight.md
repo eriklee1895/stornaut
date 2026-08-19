@@ -1,7 +1,7 @@
 # Phase D Task 39B2c-L3c3c-ii-b0 Wire Contract Clarification Preflight
 
 > Status: Split frozen after iterative independent review; ii-b0a complete;
-> ii-b0a/ii-b0b complete; ii-b0c bootstrap current; ii-b1 next
+> ii-b0a/ii-b0b/ii-b0c complete; ii-b1 current
 >
 > Date: 2026-08-19
 >

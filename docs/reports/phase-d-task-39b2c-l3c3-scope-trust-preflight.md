@@ -1,7 +1,7 @@
 # Phase D Task 39B2c-L3c3 Scope and Trust Preflight
 
 > Status: Split revised; L3c3a/L3c3b/L3c3c-i/L3c3c-ii-a complete; external
-> root-launch branch rejected; ii-b0a/ii-b0b complete; ii-b0c current; ii-b1 next
+> root-launch branch rejected; ii-b0a/ii-b0b/ii-b0c complete; ii-b1 current
 >
 > Date: 2026-08-18
 >
@@ -210,7 +210,7 @@ model and did not alter `~/.codex/config.toml`. Production Deep Dive remains
 unavailable. L3c3a, L3c3b, L3c3c-i and L3c3c-ii-a are complete; the root-launch
 audit closed the external branch with NO-GO and did not accept ADR 0018.
 The ii-b0 wire split passed iterative review; ii-b0a/ii-b0b are complete. The
-ii-b1 first-frame origin audit inserted ii-b0c; ii-b0c is current and ii-b1 next.
+ii-b1 first-frame origin audit inserted and completed ii-b0c; ii-b1 is current.
 ADR 0018 may become Accepted only after
 ii-c succeeds. Any
 path beyond a frozen ceiling still

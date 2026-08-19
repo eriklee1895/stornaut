@@ -273,8 +273,10 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   strict Data-only XPC、15-test focused、261-test Investigation、1,122-test/
   54-suite staged-only serial 与 independent review 也已完成。ii-b1 preflight
   随后发现 PRE_DROP_READY 无合法 epoch UUID/deadline 来源，已在其前插入
-  ii-b0c fixed 32-byte epoch bootstrap prelude；ii-b0c 是当前 implementation
-  frontier，ii-b1 紧随其后。随后严格为 ii-c 唯一 no-model
+  ii-b0c fixed 32-byte epoch bootstrap prelude；ii-b0c exact implementation、
+  7-test focused、268-test Investigation、1,129-test/55-suite staged-only serial
+  与 independent review 已完成，ii-b1 是当前 implementation frontier。随后
+  严格为 ii-c 唯一 no-model
   privileged machine gate，只有 ii-c 可接受 ADR 0018。
   只有 L3c4
   可作 readiness claim，
@@ -405,6 +407,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c L3c3c-ii-b0a frame/capsule review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b0a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b0a-review.md) |
 | Phase D Task 39B2c L3c3c-ii-b0b claim/release review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b0b-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b0b-review.md) |
 | Phase D Task 39B2c L3c3c-ii-b0c epoch bootstrap preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b0c-epoch-bootstrap-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b0c-epoch-bootstrap-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-b0c epoch bootstrap review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b0c-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b0c-review.md) |
 | Phase D Task 39B2c-L1 residue observation review | [docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md](docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md) |
 | Phase D Task 39B2c-L2 root topology observation review | [docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md](docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md) |
 | Phase D Task 39B2c-L3a trusted machine target review | [docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md](docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md) |
@@ -527,8 +530,8 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   已拆为 ii-b0a / ii-b0b / ii-b1 / ii-b2 / ii-b3 / ii-b4 / ii-b5，并插入
   ii-c0；ii-b0a frame/capsule 与 ii-b0b claim/release wire implementation 均已
   完成并通过各自 staged-only serial 与 independent review；ii-b1 preflight
-  发现的 first-frame origin contradiction 已前插 ii-b0c bootstrap prelude，
-  ii-b0c 是当前 frontier，ii-b1 next。ADR 0018 仍 Proposed；L3c4 独占 final admission 与
+  发现的 first-frame origin contradiction 已由 ii-b0c bootstrap prelude关闭，
+  ii-b0c 已完成，ii-b1 是当前 frontier。ADR 0018 仍 Proposed；L3c4 独占 final admission 与
   剩余 full。
   Task 39 尚未完成。
 Deep Dive 的旧 Broker-only no-go 已被 ADR 0004 的 capability-first 边界取代；

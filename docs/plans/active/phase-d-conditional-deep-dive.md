@@ -38,7 +38,7 @@
 > source/final-Mach-O admission are complete. ii-b is split into ii-b0a/ii-b0b
 > and ii-b1–ii-b5 with ii-c0 before the privileged gate. ii-b0a exact
 > frame/capsule and ii-b0b claim/release implementations are complete; ii-b0c
-> bootstrap is current after a first-frame origin audit, with ii-b1 next, followed by
+> bootstrap is complete after a first-frame origin audit, with ii-b1 current, followed by
 > ii-c one no-model privileged gate. The authoritative
 > real-model run and readiness verdict remain unimplemented.
 > Production Deep Dive remains unavailable until Task 44 admission.
@@ -896,7 +896,7 @@ Checkpoint status:
   Proposed. L3c3c-ii-a is complete; ii-b is frozen as ii-b0a/ii-b0b and
   ii-b1–ii-b5 with ii-c0 before the privileged gate. ii-b0a and ii-b0b are
   complete after their single staged-only serials and independent reviews. ii-b0c
-  bootstrap is current after the ii-b1 first-frame origin audit; ii-b1 is next.
+  bootstrap is complete after the ii-b1 first-frame origin audit; ii-b1 is current.
   See the
   [L3c1b-i Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
   and
@@ -939,6 +939,8 @@ Checkpoint status:
   [Claim/Release Review](../../reports/phase-d-task-39b2c-l3c3c-ii-b0b-review.md).
   The inserted bootstrap contract is in the
   [ii-b0c Preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b0c-epoch-bootstrap-preflight.md).
+  Completion evidence is in the
+  [ii-b0c Review](../../reports/phase-d-task-39b2c-l3c3c-ii-b0c-review.md).
   ii-a completion evidence is in the
   [Installed-Driver Observation Review](../../reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md).
   Only L3c4 owns
