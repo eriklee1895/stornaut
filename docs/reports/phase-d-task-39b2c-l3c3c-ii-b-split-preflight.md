@@ -1,7 +1,7 @@
 # Phase D Task 39B2c-L3c3c-ii-b Handoff Composition Split Preflight
 
 > Status: Parent split frozen; ii-b0 wire/budget details superseded; ii-b0a
-> and ii-b0b complete; ii-b1 current
+> and ii-b0b complete; ii-b0c bootstrap inserted/current; ii-b1 next
 >
 > Date: 2026-08-19
 >
@@ -40,6 +40,7 @@ The strict order is:
 ```text
 L3c3c-ii-b0a frame/capsule contract
 -> L3c3c-ii-b0b claim/release wire contract
+-> L3c3c-ii-b0c epoch bootstrap prelude
 -> L3c3c-ii-b1 authority-free App inherited-FD leaf
 -> L3c3c-ii-b2 handle-free helper response migration
 -> L3c3c-ii-b3 concrete App drop/no-auth retirement adapter

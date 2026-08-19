@@ -53,7 +53,9 @@
 > froze ii-b as ii-b0–ii-b5 and inserted ii-c0 before privilege. A subsequent
 > byte-completeness audit split ii-b0 into ii-b0a/ii-b0b. ii-b0a exact
 > frame/capsule implementation and ii-b0b claim/release wire implementation,
-> their staged-only serials and independent reviews are complete; ii-b1 is current. Evidence:
+> their staged-only serials and independent reviews are complete. ii-b1 preflight
+> exposed a first-frame epoch-origin contradiction, so ii-b0c bootstrap is current
+> and ii-b1 is next. Evidence:
 > [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
 > [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md) and
 > [Task 39B1b-i Review](../../reports/phase-d-task-39b1b-i-review.md) and
@@ -1067,7 +1069,8 @@ The remaining L3 work is split before driver coding:
    Therefore
    [ADR 0018](../../adr/0018-parent-owned-investigation-handoff.md) remains
    Proposed, while L3c3c-i is complete as a NO-GO audit, L3c3c-ii-a is complete,
-   and the nested exact-wire split is frozen; ii-b0a/ii-b0b are complete and ii-b1 is current. See the
+   and the nested exact-wire split is frozen; ii-b0a/ii-b0b are complete, ii-b0c
+   bootstrap is current and ii-b1 is next. See the
    [study](../../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md)
    and [final review](../../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md),
    plus the [i-b2a review](../../reports/phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md),
@@ -1078,6 +1081,8 @@ The remaining L3 work is split before driver coding:
    [ii-b0 wire preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b0-wire-contract-preflight.md),
    [ii-b0a review](../../reports/phase-d-task-39b2c-l3c3c-ii-b0a-review.md) and
    [ii-b0b review](../../reports/phase-d-task-39b2c-l3c3c-ii-b0b-review.md).
+   The first-frame origin correction is frozen in the
+   [ii-b0c preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b0c-epoch-bootstrap-preflight.md).
    ii-a implements only authority-closed self-observation/runtime primitives.
    ii-b is frozen as **ii-b0a frame/capsule contract**, **ii-b0b claim/release
    wire contract**, **ii-b1 authority-
@@ -1106,12 +1111,12 @@ The remaining L3 work is split before driver coding:
 The order is strict: `L3c1a -> L3c1b-i -> L3c1b-ii -> L3c2a-i -> L3c2a-ii ->
 L3c2b -> L3c3a -> L3c3b-0 -> L3c3b-i -> L3c3b-ii -> L3c3c-i-a ->
 L3c3c-i-b1 -> L3c3c-i-b2a -> L3c3c-i-b2b-0a -> L3c3c-ii-a ->
-L3c3c-ii-b0a -> L3c3c-ii-b0b -> L3c3c-ii-b1 -> L3c3c-ii-b2 -> L3c3c-ii-b3 ->
+L3c3c-ii-b0a -> L3c3c-ii-b0b -> L3c3c-ii-b0c -> L3c3c-ii-b1 -> L3c3c-ii-b2 -> L3c3c-ii-b3 ->
 L3c3c-ii-b4 -> L3c3c-ii-b5 -> L3c3c-ii-c0 -> L3c3c-ii-c -> L3c3d -> L3c4`.
 L3c1, L3c2, L3c3a,
 L3c3b-0, L3c3b-i, L3c3b-ii, L3c3c-i and L3c3c-ii-a are complete;
 i-b2b-0b/i-b2b-1 were superseded before execution. The ii-b split is frozen and
-ii-b0a/ii-b0b are complete and ii-b1 is current. ADR 0018
+ii-b0a/ii-b0b are complete, ii-b0c is current and ii-b1 is next. ADR 0018
 remains Proposed until ii-c succeeds. L3c1 used focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean
 staged serial regression, targeted helper/diagnostic builds and independent

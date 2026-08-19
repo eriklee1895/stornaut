@@ -1,7 +1,7 @@
 # ADR 0018: Parent-Owned Investigation Handoff and Fixed App Launch
 
 > **Status:** Proposed; external root-launch branch rejected; ii-b0a/ii-b0b
-> complete; ii-b1 current
+> complete; ii-b0c bootstrap current; ii-b1 next
 >
 > **Date:** 2026-08-19
 >
@@ -126,6 +126,13 @@ collision with the fixed descriptor is relocated before file actions are
 constructed. No filesystem socket, Mach registration or persistent endpoint is
 created.
 
+After the child independently admits the inherited root peer and before the
+first STNH frame, the driver writes one exact 32-byte `STNP` prelude containing
+only magic/version/size plus the capsule-owned epoch UUID and absolute deadline.
+The child strictly decodes it and must echo those exact values in
+`PRE_DROP_READY`; the driver joins that frame to both the sent prelude and the
+capsule row. The prelude is not an STNH frame and does not consume sequence zero.
+
 The zero-argument driver receives its bounded cohort input only through the
 ii-c0 gate's pre-opened standard-input descriptor. That descriptor must be an
 owner-UID-501 regular file with mode `0600`, one link, bounded finite size, no ACL or
@@ -145,7 +152,8 @@ authority-free Machine domain receives only opaque non-Codable results.
 
 Before credential drop, the child validates the root parent using the inherited
 endpoint's kernel peer token and complete dynamic/static signing identity. It
-sends `PRE_DROP_READY`; the root parent freezes the exact spawn PID, PID version,
+reads the fixed STNP prelude and sends `PRE_DROP_READY` with the exact epoch
+UUID/deadline; the root parent freezes the exact spawn PID, PID version,
 ASID, path, SHA and signing identity while the child is still root, then sends
 `DROP_RELEASE`.
 
@@ -256,7 +264,7 @@ not a fault target and may not signal unrelated processes.
 - L3c3c-i is complete as a research/root-launch audit with an external NO-GO; it
   does not accept this ADR or prove machine behavior.
 - Product work is split into ii-a authority-closed live driver runtime;
-  ii-b0a/ii-b0b/ii-b1–ii-b5 shared contract/App/helper/client/single-epoch
+  ii-b0a/ii-b0b/ii-b0c/ii-b1–ii-b5 shared contract/bootstrap/App/helper/client/single-epoch
   implementation;
   ii-c0 TTY/capsule launcher evidence; and ii-c one outer no-model privileged
   driver invocation containing closed scenario epochs.
@@ -324,6 +332,7 @@ unconsumed.
 | ii-b split preflight | parent split frozen; ii-b0 replaced by exact b0a/b0b wire checkpoints |
 | ii-b0 wire preflight | b0a/b0b split frozen after iterative post-fix review |
 | ii-b0a frame/capsule contract | complete; non-product and non-admitting |
-| ii-b0b claim/release wire contract | complete; non-product and non-admitting; ii-b1 current |
+| ii-b0b claim/release wire contract | complete; non-product and non-admitting |
+| ii-b0c epoch bootstrap prelude | pre-implementation; closes first-frame origin contradiction; ii-b1 next |
 | ii-c no-model privileged machine gate | not executed |
 | ADR status | **Proposed** |

@@ -1,6 +1,6 @@
 # Phase D Task 39B2c-L3c3c-ii Installed-Driver Path and Cost Preflight
 
-> Status: Split frozen; external staging rejected; ii-a/ii-b0a/ii-b0b complete; ii-b1 current
+> Status: Split frozen; external staging rejected; ii-a/ii-b0a/ii-b0b complete; ii-b0c current; ii-b1 next
 >
 > Date: 2026-08-19
 >
@@ -163,7 +163,7 @@ JSON, a file, configuration, helper reply or caller-selected endpoint.
 
 The live checkout confirms that this cannot fit inside one reviewable
 twelve-path checkpoint. The split is now frozen as ii-b0a frame/capsule contract,
-ii-b0b claim/release wire, ii-b1 App inherited-FD leaf, ii-b2 handle-free helper
+ii-b0b claim/release wire, inserted ii-b0c epoch bootstrap, ii-b1 App inherited-FD leaf, ii-b2 handle-free helper
 response, ii-b3 concrete App adapter, ii-b4 fixed claim client and ii-b5
 single-epoch composition, followed
 by ii-c0 TTY/capsule launcher evidence. The response currently echoes the opaque handle through the
@@ -265,5 +265,6 @@ Dive remains unavailable.
 Post-preflight status: ii-a completed the authority-closed executable/manifest
 observation and exact source/final-Mach-O admission. Completion evidence is in
 the [ii-a review](phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md).
-The exact wire split passed iterative review; ii-b0a/ii-b0b are complete and
-ii-b1 is current. The remaining non-claims above still apply.
+The exact wire split passed iterative review; ii-b0a/ii-b0b are complete. The
+ii-b1 first-frame origin audit inserted ii-b0c; ii-b0c is current and ii-b1 next.
+The remaining non-claims above still apply.

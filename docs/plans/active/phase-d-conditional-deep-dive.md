@@ -37,7 +37,8 @@
 > L3c3c-ii-a authority-closed installed-driver/manifest observation and exact
 > source/final-Mach-O admission are complete. ii-b is split into ii-b0a/ii-b0b
 > and ii-b1–ii-b5 with ii-c0 before the privileged gate. ii-b0a exact
-> frame/capsule and ii-b0b claim/release implementations are complete; ii-b1 is current, followed by
+> frame/capsule and ii-b0b claim/release implementations are complete; ii-b0c
+> bootstrap is current after a first-frame origin audit, with ii-b1 next, followed by
 > ii-c one no-model privileged gate. The authoritative
 > real-model run and readiness verdict remain unimplemented.
 > Production Deep Dive remains unavailable until Task 44 admission.
@@ -894,7 +895,8 @@ Checkpoint status:
   branch; i-b2b-0b/i-b2b-1 were superseded before execution. ADR 0018 remains
   Proposed. L3c3c-ii-a is complete; ii-b is frozen as ii-b0a/ii-b0b and
   ii-b1–ii-b5 with ii-c0 before the privileged gate. ii-b0a and ii-b0b are
-  complete after their single staged-only serials and independent reviews; ii-b1 is current.
+  complete after their single staged-only serials and independent reviews. ii-b0c
+  bootstrap is current after the ii-b1 first-frame origin audit; ii-b1 is next.
   See the
   [L3c1b-i Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
   and
@@ -935,6 +937,8 @@ Checkpoint status:
   ii-b0a/ii-b0b completion evidence is in the
   [Frame/Capsule Review](../../reports/phase-d-task-39b2c-l3c3c-ii-b0a-review.md) and
   [Claim/Release Review](../../reports/phase-d-task-39b2c-l3c3c-ii-b0b-review.md).
+  The inserted bootstrap contract is in the
+  [ii-b0c Preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b0c-epoch-bootstrap-preflight.md).
   ii-a completion evidence is in the
   [Installed-Driver Observation Review](../../reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md).
   Only L3c4 owns
