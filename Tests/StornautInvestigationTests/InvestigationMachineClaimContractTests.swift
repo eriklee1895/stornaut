@@ -343,6 +343,35 @@ struct InvestigationMachineClaimContractTests {
     }
 
     @Test
+    func evidenceDecoderRejectsResidueBoundToAppInsteadOfHelperSession() throws {
+        let request = try claimRequest()
+        let app = try appIdentity(auditSessionID: 7)
+        let helper = try helperIdentity(auditSessionID: 9)
+        let encoded = try HandoffBinaryTranscript.encode(
+            domain: InvestigationMachineClaimEvidence.domain,
+            businessFields: [
+                request.bindingSHA256().rawBytes,
+                uuidBytes(request.claimChallenge),
+                uuidBytes(request.claimConnectionEpoch),
+                app.encoded(),
+                helper.encoded(),
+                handoffData(UInt32(501)),
+                handoffData(Int64(950_000)),
+                handoffData(Int64(1_300_000)),
+                InvestigationMachineOwnerRetirement().encoded(),
+                l1Residue(auditSessionID: 7).encoded(),
+                handoffData(UInt64(0x1112_1314_1516_1718)),
+            ],
+            maximumByteCount:
+                InvestigationMachineClaimEvidence.maximumByteCount
+        )
+
+        #expect(throws: (any Error).self) {
+            _ = try InvestigationMachineClaimEvidence.decode(encoded)
+        }
+    }
+
+    @Test
     func evidenceRejectsResidueBoundToAppInsteadOfHelperSession() throws {
         #expect(throws: (any Error).self) {
             _ = try claimEvidence(
