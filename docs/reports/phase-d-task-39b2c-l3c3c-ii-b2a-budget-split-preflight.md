@@ -22,8 +22,9 @@ boundary, binding and deterministic linearization repairs, a-i is currently
 1,858 lines and its focused suite passes 19/19. It remains below the superseding
 1,900-line a-i ceiling.
 
-The mandatory cost rule therefore applies before more coding. No serial,
-affected suite, coverage or completion claim has run.
+The a-i focused suite passed 19/19, the complete affected Lifecycle suite passed
+167 tests in 17 suites, and focused coverage reached 55/55 functions, 97.74%
+lines and 86.79% regions. No staged serial or ii-b2a completion claim has run.
 
 ## 2. Frozen Sub-checkpoints
 
