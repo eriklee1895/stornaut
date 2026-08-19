@@ -132,7 +132,8 @@ func cleanupExecutionManifestTimelineIncludesFinalVolumeSample()
     async throws
 {
     let finalSampleAt = try backwardDriftingDomainDate(
-        after: Date().addingTimeInterval(30)
+        after: CleanupPersistenceTestSupport.createdAt
+            .addingTimeInterval(40)
     )
     let now = finalSampleAt.addingTimeInterval(-30)
     let sampler = try SequencedCleanupVolumeSampler(
