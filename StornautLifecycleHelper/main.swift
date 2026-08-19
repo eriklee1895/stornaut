@@ -4,6 +4,16 @@ import StornautCodex
 import StornautLifecycle
 
 private let serviceName = LifecycleSupervisorXPCClient.serviceName
+private let legacyMachineClaimServiceName =
+    "com.eriklee.stornaut.lifecycle.machine-claim"
+
+@objc private protocol LifecycleMachineClaimXPCWire {
+    func claimMachineRetirement(
+        _ request: Data,
+        withReply reply: @escaping (Data?, String?) -> Void
+    )
+}
+
 #if DEBUG
 private let workerMode = "--stornaut-r5-worker"
 private let interactiveWorkerMode =
@@ -993,8 +1003,7 @@ private func runLifecycleHelper() {
         machServiceName: serviceName
     )
     let machineClaimListener = NSXPCListener(
-        machServiceName:
-            LifecycleMachineClaimXPCClient.serviceName
+        machServiceName: legacyMachineClaimServiceName
     )
     let appDelegate = LifecycleHelperListenerDelegate(
         appIdentity: appIdentity,

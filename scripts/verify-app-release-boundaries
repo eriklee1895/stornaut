@@ -6,11 +6,136 @@ repo_root=${0:A:h:h}
 cd "$repo_root"
 
 handoff_only=false
+legacy_machine_claim_contract_only=false
+legacy_machine_claim_contract_source=
 if [[ $# == 1 && $1 == --investigation-handoff-only ]]; then
     handoff_only=true
+elif [[ $# == 2 && $1 == --legacy-machine-claim-contract-only ]]; then
+    legacy_machine_claim_contract_only=true
+    legacy_machine_claim_contract_source=$2
 elif (( $# != 0 )); then
-    print -u2 "Usage: scripts/verify-app-release-boundaries [--investigation-handoff-only]"
+    print -u2 \
+        "Usage: scripts/verify-app-release-boundaries [--investigation-handoff-only | --legacy-machine-claim-contract-only <source>]"
     exit 64
+fi
+
+function verify_ordinary_machine_claim_macho_source_contract() {
+    local source_path=$1
+    python3 - "$source_path" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+source = Path(sys.argv[1]).read_text(encoding="utf-8")
+
+array_match = re.search(
+    r"ordinary_machine_claim_forbidden_symbols=\(\n"
+    r"(?P<body>.*?)^\)\n",
+    source,
+    re.MULTILINE | re.DOTALL,
+)
+if array_match is None:
+    raise SystemExit(
+        "ordinary App machine-claim Mach-O symbol allowlist is missing"
+    )
+observed_symbols = re.findall(
+    r"^\s+'([^']+)'\s*$", array_match.group("body"), re.MULTILINE
+)
+expected_symbols = [
+    "StornautLifecycle.LifecycleMachineClaimXPCWire",
+    "StornautLifecycle.LifecycleMachineClaimXPCClient.init",
+    "StornautLifecycle.LifecycleMachineClaimXPCClient.claim",
+    "StornautLifecycle.LifecycleMachineClaimXPCClient.activeConnection",
+    "StornautLifecycle.LifecycleMachineClaimXPCClient.serviceName",
+    "StornautLifecycle.LifecycleMachineClaimXPCReplyResolver",
+    "StornautLifecycle.LifecycleMachineClaimResult",
+    "StornautLifecycle.LifecycleMachineClaimXPCError",
+    "StornautLifecycle.LifecycleMachineClaimXPCServerNamespace",
+]
+if observed_symbols != expected_symbols:
+    raise SystemExit(
+        "ordinary App machine-claim Mach-O symbol allowlist drifted: "
+        f"{observed_symbols!r}"
+    )
+
+function_match = re.search(
+    r"verify_ordinary_machine_claim_main_macho\(\) \{\n"
+    r"(?P<body>.*?)^\}\n",
+    source,
+    re.MULTILINE | re.DOTALL,
+)
+if function_match is None:
+    raise SystemExit(
+        "ordinary App machine-claim Mach-O verifier is missing"
+    )
+body = function_match.group("body")
+required_body_fragments = (
+    "local executable=$1",
+    "local label=$2",
+    'local debug_dylib="${executable:h}/${executable:t:r}.debug.dylib"',
+    'local main_images=("$executable")',
+    'if [[ -e "$debug_dylib" ]]; then',
+    'test -f "$debug_dylib"',
+    'test ! -L "$debug_dylib"',
+    'main_images+=("$debug_dylib")',
+    'for marker in "${ordinary_machine_claim_forbidden_symbols[@]}"; do',
+    'for image in "${main_images[@]}"; do',
+    'if mach_o_has_demangled_symbol "$image" "$marker"; then',
+    "Legacy machine-claim authority leaked into ordinary "
+    "$label main Mach-O: $marker",
+    "symbol_scan_status=$?",
+    "if (( symbol_scan_status == 2 )); then",
+    "exit 1",
+)
+missing_body = [marker for marker in required_body_fragments if marker not in body]
+if missing_body:
+    raise SystemExit(
+        "ordinary App machine-claim Mach-O verifier body drifted: "
+        f"{missing_body!r}"
+    )
+if body.count("mach_o_has_demangled_symbol") != 1 or body.count("exit 1") != 2:
+    raise SystemExit(
+        "ordinary App machine-claim Mach-O verifier cardinality drifted"
+    )
+
+normalized_source = " ".join(
+    source.replace(chr(92) + chr(10), " " ).split()
+)
+expected_calls = (
+    'verify_ordinary_machine_claim_main_macho '
+    '"$debug_app/Contents/MacOS/Stornaut" Debug',
+    'verify_ordinary_machine_claim_main_macho '
+    '"$release_app/Contents/MacOS/Stornaut" Release',
+)
+for call in expected_calls:
+    if normalized_source.count(call) != 1:
+        raise SystemExit(
+            "ordinary App machine-claim main-Mach-O call drifted: "
+            f"{call!r}"
+        )
+runtime_source = source[array_match.end():]
+normalized_runtime = " ".join(
+    runtime_source.replace(chr(92) + chr(10), " " ).split()
+)
+for forbidden in (
+    'verify_ordinary_machine_claim_main_macho "$debug_app" Debug',
+    'verify_ordinary_machine_claim_main_macho "$release_app" Release',
+    'bundle_mach_o_contains "$debug_app"',
+    'bundle_mach_o_contains "$release_app"',
+):
+    if forbidden in normalized_runtime:
+        raise SystemExit(
+            "ordinary App machine-claim gate became bundle-recursive: "
+            f"{forbidden}"
+        )
+PY
+}
+
+if $legacy_machine_claim_contract_only; then
+    verify_ordinary_machine_claim_macho_source_contract \
+        "$legacy_machine_claim_contract_source"
+    print "Ordinary App machine-claim main-Mach-O contract verification passed."
+    exit 0
 fi
 
 scripts/verify-contract
@@ -702,6 +827,52 @@ mach_o_has_demangled_symbol() {
     done < <(find "$root" -type f -print0)
     return 1
 }
+
+ordinary_machine_claim_forbidden_symbols=(
+    'StornautLifecycle.LifecycleMachineClaimXPCWire'
+    'StornautLifecycle.LifecycleMachineClaimXPCClient.init'
+    'StornautLifecycle.LifecycleMachineClaimXPCClient.claim'
+    'StornautLifecycle.LifecycleMachineClaimXPCClient.activeConnection'
+    'StornautLifecycle.LifecycleMachineClaimXPCClient.serviceName'
+    'StornautLifecycle.LifecycleMachineClaimXPCReplyResolver'
+    'StornautLifecycle.LifecycleMachineClaimResult'
+    'StornautLifecycle.LifecycleMachineClaimXPCError'
+    'StornautLifecycle.LifecycleMachineClaimXPCServerNamespace'
+)
+
+verify_ordinary_machine_claim_main_macho() {
+    local executable=$1
+    local label=$2
+    local debug_dylib="${executable:h}/${executable:t:r}.debug.dylib"
+    local main_images=("$executable")
+    local image
+    local marker
+    local symbol_scan_status
+    if [[ -e "$debug_dylib" ]]; then
+        test -f "$debug_dylib"
+        test ! -L "$debug_dylib"
+        main_images+=("$debug_dylib")
+    fi
+    for marker in "${ordinary_machine_claim_forbidden_symbols[@]}"; do
+        for image in "${main_images[@]}"; do
+            if mach_o_has_demangled_symbol "$image" "$marker"; then
+                print -u2 \
+                    "Legacy machine-claim authority leaked into ordinary $label main Mach-O: $marker"
+                exit 1
+            else
+                symbol_scan_status=$?
+            fi
+            if (( symbol_scan_status == 2 )); then
+                exit 1
+            fi
+        done
+    done
+}
+
+verify_ordinary_machine_claim_main_macho \
+    "$debug_app/Contents/MacOS/Stornaut" Debug
+verify_ordinary_machine_claim_main_macho \
+    "$release_app/Contents/MacOS/Stornaut" Release
 
 authority_object_markers=(
     'StornautExecution.ActionExecutor'
@@ -1468,15 +1639,15 @@ if project.count(
 
 diagnostic_configuration_start = project.find(
     "A00000000000000000000025 /* Build configuration list for "
-    '"StornautInvestigationDiagnosticApp" */ = {'
+    'PBXNativeTarget "StornautInvestigationDiagnosticApp" */ = {'
 )
 diagnostic_configuration_end = project.find(
     "A00000000000000000000026 /* Build configuration list for "
-    '"StornautInvestigationDiagnosticAppTests" */ = {'
+    'PBXNativeTarget "StornautInvestigationDiagnosticAppTests" */ = {'
 )
 release_shell_configuration_start = project.find(
     "A00000000000000000000028 /* Build configuration list for "
-    '"StornautInvestigationDiagnosticReleaseShell" */ = {'
+    'PBXNativeTarget "StornautInvestigationDiagnosticReleaseShell" */ = {'
 )
 release_shell_configuration_end = project.find(
     "/* End XCConfigurationList section */"

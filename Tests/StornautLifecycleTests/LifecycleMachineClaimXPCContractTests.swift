@@ -10,10 +10,6 @@ struct LifecycleMachineClaimXPCContractTests {
         let encodedRequest = try JSONEncoder().encode(fixture.request)
         let encodedResponse = try JSONEncoder().encode(fixture.response)
 
-        #expect(
-            LifecycleMachineClaimXPCClient.serviceName
-                == "com.eriklee.stornaut.lifecycle.machine-claim"
-        )
         #expect(encodedRequest.count <= 16 * 1_024)
         #expect(encodedResponse.count <= 32 * 1_024)
         #expect(
@@ -49,14 +45,20 @@ struct LifecycleMachineClaimXPCContractTests {
             encoding: .utf8
         )
 
-        #expect(xpc.contains("@objc public protocol LifecycleMachineClaimXPCWire"))
-        #expect(xpc.contains("func claimMachineRetirement("))
-        #expect(xpc.contains("public actor LifecycleMachineClaimXPCClient"))
+        #expect(!xpc.contains("LifecycleMachineClaimXPCWire"))
+        #expect(!xpc.contains("LifecycleMachineClaimXPCClient"))
+        #expect(!xpc.contains("LifecycleMachineClaimXPCServerNamespace"))
         #expect(
-            xpc.contains(
+            helper.contains(
                 "com.eriklee.stornaut.lifecycle.machine-claim"
             )
         )
+        #expect(
+            helper.contains(
+                "@objc private protocol LifecycleMachineClaimXPCWire"
+            )
+        )
+        #expect(helper.contains("func claimMachineRetirement("))
         #expect(helper.contains("LifecycleMachineClaimListenerDelegate"))
         #expect(helper.contains("LifecycleMachineClaimHelperService"))
         #expect(helper.contains("LifecycleMachineDriverAdmissionPolicy"))
@@ -72,73 +74,42 @@ struct LifecycleMachineClaimXPCContractTests {
         )
         let claimBody = claimSuffix[..<claimEnd.lowerBound]
         #expect(!claimBody.contains("scheduleSuccessfulExitAfterReply"))
-        #expect(
-            xpc.contains(
-                "contract.helperExecutableURL"
-            )
-        )
-        let resolverStart = try #require(
-            xpc.range(of: "final class LifecycleMachineClaimXPCReplyResolver:")
-        )
-        let resolverSuffix = xpc[resolverStart.lowerBound...]
-        let resolverEnd = try #require(
-            resolverSuffix.range(
-                of: "\nfinal class LifecycleHelperPeerAttestationReplyResolver:"
-            )
-        )
-        let resolverBody = resolverSuffix[..<resolverEnd.lowerBound]
-        #expect(!resolverBody.contains("transportFailure("))
-        #expect(resolverBody.contains("finishTransportFailure("))
-        #expect(resolverBody.contains("dispatchBegan ? .outcomeUnknown"))
+        #expect(!xpc.contains("contract.helperExecutableURL"))
+        #expect(!xpc.contains("public actor LifecycleMachineClaimXPCClient"))
+        #expect(!xpc.contains("LifecycleMachineClaimXPCReplyResolver"))
+        #expect(!xpc.contains("LifecycleMachineClaimResult"))
+        #expect(!xpc.contains("LifecycleMachineClaimXPCError"))
+        #expect(!xpc.contains("proxy as? LifecycleMachineClaimXPCWire"))
     }
 
     @Test
-    func postDispatchTransportFailureIsOutcomeUnknown() async {
-        await #expect(
-            throws: LifecycleMachineClaimXPCError.connectionFailed
-        ) {
-            _ = try await withCheckedThrowingContinuation { continuation in
-                let resolver = LifecycleMachineClaimXPCReplyResolver()
-                #expect(resolver.install(continuation))
-                resolver.failConnection()
-            } as LifecycleMachineRetirementClaimResponse
-        }
-
-        await #expect(
-            throws: LifecycleMachineClaimXPCError.outcomeUnknown
-        ) {
-            _ = try await withCheckedThrowingContinuation { continuation in
-                let resolver = LifecycleMachineClaimXPCReplyResolver()
-                #expect(resolver.install(continuation))
-                #expect(resolver.beginDispatch())
-                resolver.failConnection()
-            } as LifecycleMachineRetirementClaimResponse
-        }
-
-        await #expect(
-            throws: LifecycleMachineClaimXPCError.outcomeUnknown
-        ) {
-            _ = try await withCheckedThrowingContinuation { continuation in
-                let resolver = LifecycleMachineClaimXPCReplyResolver()
-                #expect(resolver.install(continuation))
-                #expect(resolver.beginDispatch())
-                resolver.resolve(
-                    response: Data("not-json".utf8),
-                    reasonKey: nil
-                )
-            } as LifecycleMachineRetirementClaimResponse
-        }
-
-        await #expect(
-            throws: LifecycleMachineClaimXPCError.outcomeUnknown
-        ) {
-            _ = try await withCheckedThrowingContinuation { continuation in
-                let resolver = LifecycleMachineClaimXPCReplyResolver()
-                #expect(resolver.install(continuation))
-                #expect(resolver.beginDispatch())
-                resolver.failTimeout()
-            } as LifecycleMachineRetirementClaimResponse
-        }
+    func legacyServerContractIsHelperOwnedAndHasNoClientAuthority() throws {
+        let root = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let lifecycle = try String(
+            contentsOf: root.appending(
+                path: "Sources/StornautLifecycle/LifecycleSupervisorXPC.swift"
+            ),
+            encoding: .utf8
+        )
+        let helper = try String(
+            contentsOf: root.appending(
+                path: "StornautLifecycleHelper/main.swift"
+            ),
+            encoding: .utf8
+        )
+        #expect(!lifecycle.contains("LifecycleMachineClaimXPCWire"))
+        #expect(!lifecycle.contains("LifecycleMachineClaimXPCClient"))
+        #expect(
+            helper.components(
+                separatedBy: "@objc private protocol LifecycleMachineClaimXPCWire"
+            ).count == 2
+        )
+        #expect(!helper.contains("LifecycleMachineClaimXPCClient"))
+        #expect(!helper.contains("LifecycleMachineClaimXPCReplyResolver"))
+        #expect(!helper.contains("remoteObjectProxy"))
     }
 }
 

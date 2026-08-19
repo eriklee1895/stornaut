@@ -13,6 +13,7 @@ enum InvestigationMachineDriverHostError:
     case rootAuthorityRequired
     case hostConsumed
     case handoffUnavailable
+    case implementationUnavailable
 }
 
 protocol InvestigationMachineRetirementHandleHandoff: Sendable {
@@ -47,18 +48,6 @@ struct StrictMachineRetirementClaimSource:
         LifecycleMachineRetirementClaimRequest
     ) async throws -> Result
 
-    init() {
-        let client = LifecycleMachineClaimXPCClient()
-        fetchOperation = { request in
-            let result = try await client.claim(request)
-            return (
-                result.response,
-                result.helperIdentity,
-                result.helperAttestedAt
-            )
-        }
-    }
-
     init(
         fetch: @escaping @Sendable (
             LifecycleMachineRetirementClaimRequest
@@ -71,99 +60,6 @@ struct StrictMachineRetirementClaimSource:
         request: LifecycleMachineRetirementClaimRequest
     ) async throws -> Result {
         try await fetchOperation(request)
-    }
-}
-
-struct InstalledMachineRetirementHelperSigningVerifier:
-    InvestigationMachineRetirementHelperSigningVerifying,
-    Sendable
-{
-    private let staticEvidence: @Sendable () throws
-        -> LifecycleBundleSigningEvidence
-    private let dynamicVerification: @Sendable (LifecycleAuditToken)
-        -> LifecycleCodeSigningVerification
-
-    init() {
-        staticEvidence = {
-            let contract = try LifecycleLocalInstallationContract()
-            return try LifecycleBundleSigningIdentityReader().evidence(
-                bundleURL: contract.helperExecutableURL
-            )
-        }
-        dynamicVerification = { auditToken in
-            SecurityLifecycleCodeSigningVerifier().verify(
-                auditToken: auditToken
-            )
-        }
-    }
-
-    init(
-        staticEvidence: @escaping @Sendable () throws
-            -> LifecycleBundleSigningEvidence,
-        dynamicVerification: @escaping @Sendable (LifecycleAuditToken)
-            -> LifecycleCodeSigningVerification
-    ) {
-        self.staticEvidence = staticEvidence
-        self.dynamicVerification = dynamicVerification
-    }
-
-    func verifies(helperIdentity: LifecycleProcessIdentity) -> Bool {
-        guard
-            validRootIdentity(helperIdentity),
-            let contract = try? LifecycleLocalInstallationContract(),
-            let staticEvidence = try? staticEvidence(),
-            staticEvidence.identity.signingIdentifier
-                == contract.helperSigningIdentifier,
-            case let .verified(
-                processID,
-                effectiveUserID,
-                signingIdentifier,
-                designatedRequirementSHA256,
-                codeDirectoryHash
-            ) = dynamicVerification(helperIdentity.auditToken)
-        else {
-            return false
-        }
-        return processID == helperIdentity.processID
-            && effectiveUserID == 0
-            && signingIdentifier
-                == staticEvidence.identity.signingIdentifier
-            && designatedRequirementSHA256
-                == staticEvidence.identity.designatedRequirementSHA256
-            && codeDirectoryHash
-                == staticEvidence.identity.codeDirectoryHash
-    }
-
-    private func validRootIdentity(
-        _ identity: LifecycleProcessIdentity
-    ) -> Bool {
-        guard
-            identity.processID > 1,
-            identity.processIDVersion > 0,
-            identity.auditSessionID > 0,
-            identity.effectiveUserID == 0,
-            identity.auditToken.words.count
-                == LifecycleAuditToken.wordCount
-        else {
-            return false
-        }
-        var token = audit_token_t()
-        let copied = withUnsafeMutableBytes(of: &token) { destination in
-            identity.auditToken.words.withUnsafeBytes { source in
-                guard destination.count == source.count else {
-                    return false
-                }
-                destination.copyBytes(from: source)
-                return true
-            }
-        }
-        return copied
-            && audit_token_to_pid(token) == identity.processID
-            && audit_token_to_pidversion(token)
-                == identity.processIDVersion
-            && audit_token_to_asid(token)
-                == identity.auditSessionID
-            && audit_token_to_euid(token) == 0
     }
 }
 
@@ -224,40 +120,11 @@ actor InvestigationMachineDriverHost {
         effectiveUserID: @escaping @Sendable () -> uid_t = geteuid,
         now: @escaping @Sendable () -> Date = Date.init
     ) throws -> InvestigationMachineDriverHost {
-        let claimant = try InvestigationMachineRetirementClaimant(
-            source: StrictMachineRetirementClaimSource(),
-            signingVerifier:
-                InstalledMachineRetirementHelperSigningVerifier(),
-            effectiveUserID: effectiveUserID,
-            now: now,
-            configuration: configuration,
-            expectedAppIdentity: try machineIdentityRecord(
-                appProcessIdentity
-            ),
-            expectedUserID: userID
+        _ = (
+            configuration, appProcessIdentity, userID, handoff, transition,
+            effectiveUserID, now
         )
-        return InvestigationMachineDriverHost(
-            configuration: configuration,
-            appProcessIdentity: appProcessIdentity,
-            userID: userID,
-            handoff: handoff,
-            claimant: claimant,
-            collectorFactory: { helperIdentity in
-                InvestigationLifecycleTopologyCollector(
-                    topologyObserver:
-                        DarwinInvestigationLifecycleTopologyObserver(
-                            expectedHelperIdentity: helperIdentity
-                        ),
-                    bindingReader:
-                        InstalledLifecycleTopologyBindingReader(),
-                    effectiveUserID: effectiveUserID,
-                    now: now
-                )
-            },
-            transition: transition,
-            effectiveUserID: effectiveUserID,
-            now: now
-        )
+        throw InvestigationMachineDriverHostError.implementationUnavailable
     }
 
     func run() async throws -> InvestigationMachineTopologyAuthority {
@@ -327,16 +194,4 @@ package enum InvestigationMachineDriverEntryPoint {
         }
         return handoffUnavailableExitStatus
     }
-}
-
-private func machineIdentityRecord(
-    _ identity: LifecycleProcessIdentity
-) throws -> LifecycleMachineProcessIdentityRecord {
-    try LifecycleMachineProcessIdentityRecord(
-        processID: identity.processID,
-        processIDVersion: identity.processIDVersion,
-        auditSessionID: identity.auditSessionID,
-        effectiveUserID: identity.effectiveUserID,
-        auditTokenWords: identity.auditToken.words
-    )
 }

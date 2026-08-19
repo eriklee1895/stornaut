@@ -123,6 +123,45 @@ struct InvestigationMachineRetirementClaimTests {
     }
 
     @Test
+    func outcomeUnknownIsMappedWithoutCancellation() async throws {
+        let fixture = try ClaimFixture()
+        let source = SuspendedFailingClaimSource()
+        let claimant = fixture.claimant(source: source)
+        let task = Task {
+            try await claimant.claim(handle: fixture.handle)
+        }
+
+        await source.waitUntilFetched()
+        await source.fail(with: .outcomeUnknown)
+
+        await #expect(
+            throws: InvestigationMachineRetirementClaimError.outcomeUnknown
+        ) {
+            _ = try await task.value
+        }
+    }
+
+    @Test
+    func outcomeUnknownWinsAfterDispatchWhenCancellationRaces() async throws {
+        let fixture = try ClaimFixture()
+        let source = SuspendedFailingClaimSource()
+        let claimant = fixture.claimant(source: source)
+        let task = Task {
+            try await claimant.claim(handle: fixture.handle)
+        }
+
+        await source.waitUntilFetched()
+        task.cancel()
+        await source.fail(with: .outcomeUnknown)
+
+        await #expect(
+            throws: InvestigationMachineRetirementClaimError.outcomeUnknown
+        ) {
+            _ = try await task.value
+        }
+    }
+
+    @Test
     func helperAndAppMismatchesAreRejected() async throws {
         let fixture = try ClaimFixture()
         let foreign = try ClaimFixture(
@@ -253,6 +292,10 @@ private actor SuspendedFailingClaimSource:
     InvestigationMachineRetirementClaimSource
 {
     private struct TransportFailure: Error {}
+    enum Failure: Sendable {
+        case transport
+        case outcomeUnknown
+    }
 
     private var fetchContinuation:
         CheckedContinuation<
@@ -286,8 +329,14 @@ private actor SuspendedFailingClaimSource:
         }
     }
 
-    func fail() {
-        fetchContinuation?.resume(throwing: TransportFailure())
+    func fail(with failure: Failure = .transport) {
+        let error: any Error = switch failure {
+        case .transport:
+            TransportFailure()
+        case .outcomeUnknown:
+            InvestigationMachineRetirementClaimSourceError.outcomeUnknown
+        }
+        fetchContinuation?.resume(throwing: error)
         fetchContinuation = nil
     }
 }

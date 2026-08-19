@@ -4,15 +4,20 @@ set -euo pipefail
 
 repo_root=${0:A:h:h}
 cd "$repo_root"
-if [[ -n $(git diff-tree --no-commit-id --name-only -r HEAD -- scripts/verify-contract) ]]; then
-    ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r HEAD)"})
-    [[ "${(j: :)ib2_paths}" == scripts/verify-contract ]] \
-        || { print -u2 "Machine claim verifier contract scope drifted"; exit 1; }
-    ib2_lines=$(git diff-tree --numstat --no-commit-id -r HEAD -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
-    (( ib2_lines <= 400 )) \
-        || { print -u2 "Machine claim verifier contract budget drifted"; exit 1; }
-fi
-ib2_self_sha=fb977e4027d32e5663edc3e47ba3ff239e7b3e01a18bf976a842f0d318157350
+ib2_commit=08184b0a769d904b895636455688ada9e3c3e9e3
+ib2_parent=147247ffadcb37c8a7ab83983bf884bd858ac51b
+ib2_tree=2d9a22d0e9fc5158898fd3c2a304582c93ec8a94
+[[ "$(git show -s --format=%P "$ib2_commit")" == "$ib2_parent" ]] \
+    || { print -u2 "Machine claim verifier historical parent drifted"; exit 1; }
+[[ "$(git show -s --format=%T "$ib2_commit")" == "$ib2_tree" ]] \
+    || { print -u2 "Machine claim verifier historical tree drifted"; exit 1; }
+ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
+[[ "${(j: :)ib2_paths}" == scripts/verify-contract ]] \
+    || { print -u2 "Machine claim verifier historical scope drifted"; exit 1; }
+ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
+(( ib2_lines <= 400 )) \
+    || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
+ib2_self_sha=5d7ed1045dd4b57a60d0686f472b130250f1ee85ecdb7ca1ee0e706c597f9cdb
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -143,6 +148,22 @@ require_fixed_text scripts/verify-investigation-boundaries \
 require_fixed_text scripts/verify-investigation-boundaries \
     '--claim-server-package-contract-only'
 require_fixed_text scripts/verify-investigation-boundaries \
+    '--legacy-machine-claim-contract-only'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'legacy machine claim concrete client remains'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'legacy machine claim fixed helper service drifted'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'legacy machine claim helper gained client authority'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'legacy machine claim Machine consumer remains'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'legacy machine claim production is not immediately typed unavailable'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'legacy machine claim external-state outcome priority drifted'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'legacy machine claim checkpoint paths drifted'
+require_fixed_text scripts/verify-investigation-boundaries \
     'claim server adapter regained actor isolation'
 require_fixed_text scripts/verify-investigation-boundaries \
     'claim server re-minted sealed transfer'
@@ -153,9 +174,9 @@ require_fixed_text scripts/verify-investigation-boundaries \
 require_fixed_text scripts/verify-investigation-boundaries \
     'machine claim server consumers drifted'
 require_fixed_text scripts/verify-investigation-boundaries \
-    'claim server non-document paths drifted'
+    'claim server historical {label} paths drifted'
 require_fixed_text scripts/verify-investigation-boundaries \
-    'claim server budget drifted'
+    'claim server historical {label} budget drifted'
 require_fixed_text scripts/verify-investigation-boundaries \
     'claim server evidence lock scope drifted'
 require_fixed_text scripts/verify-investigation-boundaries \
@@ -165,7 +186,7 @@ require_fixed_text scripts/verify-investigation-boundaries \
 require_fixed_text scripts/verify-investigation-boundaries \
     'claim server {source_name} gained raw literal or regex'
 require_fixed_text scripts/verify-investigation-boundaries \
-    'claim server dirty non-document paths drifted'
+    'legacy machine claim checkpoint budget drifted'
 require_fixed_text scripts/verify-investigation-boundaries \
     'deadline stale arm success no longer cancels timer'
 require_fixed_text scripts/verify-investigation-boundaries \
@@ -182,6 +203,20 @@ require_fixed_text scripts/verify-app-release-boundaries \
     '--investigation-handoff-only'
 require_fixed_text scripts/verify-app-release-boundaries \
     'Investigation handoff App boundary verification passed.'
+require_fixed_text scripts/verify-app-release-boundaries \
+    '--legacy-machine-claim-contract-only'
+require_fixed_text scripts/verify-app-release-boundaries \
+    'ordinary_machine_claim_forbidden_symbols=('
+require_fixed_text scripts/verify-app-release-boundaries \
+    'verify_ordinary_machine_claim_main_macho()'
+require_fixed_text scripts/verify-app-release-boundaries \
+    'Legacy machine-claim authority leaked into ordinary $label main Mach-O'
+require_fixed_text scripts/verify-app-release-boundaries \
+    'ordinary App machine-claim gate became bundle-recursive'
+require_fixed_text scripts/verify-app-release-boundaries \
+    'PBXNativeTarget "StornautInvestigationDiagnosticApp" */ = {'
+require_fixed_text scripts/verify-app-release-boundaries \
+    'PBXNativeTarget "StornautInvestigationDiagnosticReleaseShell" */ = {'
 require_fixed_text scripts/verify-app-release-boundaries \
     'StornautInvestigationDiagnosticReleaseShell'
 require_fixed_text Package.swift \
@@ -771,9 +806,9 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "ad573a455b19258cf017bb24ec019a669de37a519af5bc7dd7efac6a64156a6e",
+        "dae5f988aead366919ee8726722e900a1f4b33c011163ee395828051c4543a7e",
     Path("scripts/verify-app-release-boundaries"):
-        "5a74abe27334dd2d7aaf2243ddcbc5789a590e7700dd12f1a602b6e0b52ddaa6",
+        "4db61fb90277399d6088ac85c4f79553ce6a21b7aaa584d981b6abf8520c2b5c",
 }
 for path, expected_sha in expected.items():
     observed_sha = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -838,7 +873,7 @@ source = Path("scripts/verify-app-release-boundaries").read_text(
 )
 symbol_scan_start = source.find("mach_o_has_demangled_symbol() {")
 symbol_scan_end = source.find(
-    "\n}\n\nauthority_object_markers=(",
+    "\n}\n\nordinary_machine_claim_forbidden_symbols=(",
     symbol_scan_start,
 )
 if symbol_scan_start < 0 or symbol_scan_end < 0:
@@ -854,9 +889,12 @@ if (
     raise SystemExit(
         "demangled Mach-O symbol scanner must fail closed on scan errors"
     )
-symbol_gate_calls = source.count("mach_o_has_demangled_symbol") - 1
-symbol_gate_error_checks = source.count("(( symbol_scan_status == 2 ))")
-if symbol_gate_calls != 6 or symbol_gate_error_checks != symbol_gate_calls:
+runtime_source = source[source.find("mach_o_has_demangled_symbol() {"): ]
+symbol_gate_calls = runtime_source.count("mach_o_has_demangled_symbol") - 1
+symbol_gate_error_checks = runtime_source.count(
+    "(( symbol_scan_status == 2 ))"
+)
+if symbol_gate_calls != 7 or symbol_gate_error_checks != symbol_gate_calls:
     raise SystemExit(
         "every demangled-symbol gate must handle scan errors: "
         f"calls={symbol_gate_calls} checks={symbol_gate_error_checks}"
@@ -1830,6 +1868,362 @@ for fixture diagnostic in \
     fi
     require_fixed_text "$output" "$diagnostic"
 done
+
+legacy_machine_claim_lifecycle=Sources/StornautLifecycle/LifecycleSupervisorXPC.swift
+legacy_machine_claim_helper=StornautLifecycleHelper/main.swift
+legacy_machine_claim_host=Sources/StornautInvestigationMachine/InvestigationMachineDriverHost.swift
+legacy_machine_claim_source=Sources/StornautInvestigationMachine/InvestigationMachineRetirementClaim.swift
+legacy_machine_claim_gate=scripts/verify-investigation-boundaries
+"$legacy_machine_claim_gate" --legacy-machine-claim-contract-only \
+    "$legacy_machine_claim_lifecycle" \
+    "$legacy_machine_claim_helper" \
+    "$legacy_machine_claim_host" \
+    "$legacy_machine_claim_source" \
+    >"$contract_root/legacy-machine-claim-canonical.log"
+function require_legacy_machine_claim_mutation_rejected() {
+    local fixture_name=$1
+    local lifecycle_fixture=$2
+    local helper_fixture=$3
+    local host_fixture=$4
+    local claim_fixture=$5
+    local expected_diagnostic=$6
+    local output="$contract_root/$fixture_name.log"
+    if "$legacy_machine_claim_gate" \
+        --legacy-machine-claim-contract-only \
+        "$lifecycle_fixture" \
+        "$helper_fixture" \
+        "$host_fixture" \
+        "$claim_fixture" >"$output" 2>&1
+    then
+        fail_contract \
+            "Legacy machine claim mutation was accepted: $fixture_name"
+    fi
+    require_fixed_text "$output" "$expected_diagnostic"
+}
+python3 - \
+    "$legacy_machine_claim_lifecycle" \
+    "$legacy_machine_claim_helper" \
+    "$legacy_machine_claim_host" \
+    "$legacy_machine_claim_source" \
+    "$contract_root/legacy-machine-client.swift" \
+    "$contract_root/legacy-machine-resolver.swift" \
+    "$contract_root/legacy-machine-connection.swift" \
+    "$contract_root/legacy-machine-consumer.swift" \
+    "$contract_root/legacy-machine-production-open.swift" \
+    "$contract_root/legacy-machine-production-late.swift" \
+    "$contract_root/legacy-machine-lifecycle-error.swift" \
+    "$contract_root/legacy-machine-cancellation.swift" \
+    "$contract_root/legacy-machine-helper-public.swift" \
+    "$contract_root/legacy-machine-helper-service.swift" <<'PY'
+from pathlib import Path
+import sys
+
+(
+    lifecycle_path, helper_path, host_path, claim_path, client_path, resolver_path,
+    connection_path, consumer_path, production_open_path,
+    production_late_path, lifecycle_error_path, cancellation_path,
+    helper_public_path, helper_service_path,
+) = map(Path, sys.argv[1:])
+lifecycle = lifecycle_path.read_text(encoding="utf-8")
+helper = helper_path.read_text(encoding="utf-8")
+host = host_path.read_text(encoding="utf-8")
+claim = claim_path.read_text(encoding="utf-8")
+
+
+def mutate_once(value, old, new, name):
+    if value.count(old) != 1:
+        raise SystemExit(
+            f"cannot construct legacy machine claim mutation: {name}"
+        )
+    return value.replace(old, new, 1)
+
+
+client_path.write_text(
+    mutate_once(
+        lifecycle,
+        "public enum LifecycleInteractiveSessionXPCError:",
+        "public actor RestoredLifecycleMachineClaimClient {\n"
+        "    public init() { _ = LifecycleMachineClaimXPCClient() }\n"
+        "}\n\n"
+        "public enum LifecycleInteractiveSessionXPCError:",
+        "concrete actor client restored",
+    ),
+    encoding="utf-8",
+)
+resolver_path.write_text(
+    mutate_once(
+        lifecycle,
+        "public enum LifecycleInteractiveSessionXPCError:",
+        "final class LifecycleMachineClaimXPCReplyResolver {}\n\n"
+        "public enum LifecycleInteractiveSessionXPCError:",
+        "reply resolver restored",
+    ),
+    encoding="utf-8",
+)
+connection_path.write_text(
+    mutate_once(
+        lifecycle,
+        "public enum LifecycleInteractiveSessionXPCError:",
+        "private func restoredMachineClaimConnection() {\n"
+        "    let connection = NSXPCConnection(\n"
+        "        machServiceName: LifecycleMachineClaimXPCClient.serviceName,\n"
+        "        options: .privileged\n"
+        "    )\n"
+        "    let proxy = connection.remoteObjectProxy\n"
+        "    _ = proxy as? LifecycleMachineClaimXPCWire\n"
+        "}\n\n"
+        "public enum LifecycleInteractiveSessionXPCError:",
+        "connection and proxy restored",
+    ),
+    encoding="utf-8",
+)
+consumer_path.write_text(
+    mutate_once(
+        host,
+        "    init(\n"
+        "        fetch: @escaping @Sendable (\n",
+        "    init() {\n"
+        "        let client = LifecycleMachineClaimXPCClient()\n"
+        "        fetchOperation = { _ in fatalError(\"restored\") }\n"
+        "        _ = client\n"
+        "    }\n\n"
+        "    init(\n"
+        "        fetch: @escaping @Sendable (\n",
+        "Machine concrete client construction restored",
+    ),
+    encoding="utf-8",
+)
+production_open_path.write_text(
+    mutate_once(
+        host,
+        "        throw InvestigationMachineDriverHostError.implementationUnavailable",
+        "        fatalError(\"production opened\")",
+        "production no longer unavailable",
+    ),
+    encoding="utf-8",
+)
+production_late_path.write_text(
+    mutate_once(
+        host,
+        "        _ = (\n"
+        "            configuration, appProcessIdentity, userID, handoff, transition,\n",
+        "        let claimant = StrictMachineRetirementClaimSource(\n"
+        "            fetch: { _ in fatalError(\"constructed\") }\n"
+        "        )\n"
+        "        _ = claimant\n"
+        "        _ = (\n"
+        "            configuration, appProcessIdentity, userID, handoff, transition,\n",
+        "production constructs before unavailable",
+    ),
+    encoding="utf-8",
+)
+lifecycle_error_path.write_text(
+    mutate_once(
+        claim,
+        "catch InvestigationMachineRetirementClaimSourceError.outcomeUnknown {",
+        "catch LifecycleMachineClaimXPCError.outcomeUnknown {",
+        "Lifecycle transport error restored",
+    ),
+    encoding="utf-8",
+)
+cancellation_path.write_text(
+    mutate_once(
+        claim,
+        "        } catch InvestigationMachineRetirementClaimSourceError.outcomeUnknown {\n"
+        "            throw InvestigationMachineRetirementClaimError.outcomeUnknown",
+        "        } catch InvestigationMachineRetirementClaimSourceError.outcomeUnknown {\n"
+        "            try Task.checkCancellation()\n"
+        "            throw InvestigationMachineRetirementClaimError.outcomeUnknown",
+        "cancellation masks external-state outcome",
+    ),
+    encoding="utf-8",
+)
+helper_public_path.write_text(
+    mutate_once(
+        helper,
+        "@objc private protocol LifecycleMachineClaimXPCWire",
+        "@objc public protocol LifecycleMachineClaimXPCWire",
+        "helper protocol made public",
+    ),
+    encoding="utf-8",
+)
+helper_service_path.write_text(
+    mutate_once(
+        helper,
+        'private let legacyMachineClaimServiceName =\n'
+        '    "com.eriklee.stornaut.lifecycle.machine-claim"',
+        'private let legacyMachineClaimServiceName =\n'
+        '    ProcessInfo.processInfo.environment["MACHINE_CLAIM_SERVICE"]!',
+        "helper fixed service replaced by caller input",
+    ),
+    encoding="utf-8",
+)
+PY
+for fixture expected in \
+    legacy-machine-client \
+        'legacy machine claim concrete client remains' \
+    legacy-machine-resolver \
+        'legacy machine claim concrete client remains' \
+    legacy-machine-connection \
+        'legacy machine claim concrete client remains'
+do
+    require_legacy_machine_claim_mutation_rejected \
+        "$fixture" \
+        "$contract_root/$fixture.swift" \
+        "$legacy_machine_claim_helper" \
+        "$legacy_machine_claim_host" \
+        "$legacy_machine_claim_source" \
+        "$expected"
+done
+require_legacy_machine_claim_mutation_rejected \
+    legacy-machine-consumer \
+    "$legacy_machine_claim_lifecycle" \
+    "$legacy_machine_claim_helper" \
+    "$contract_root/legacy-machine-consumer.swift" \
+    "$legacy_machine_claim_source" \
+    'legacy machine claim Machine consumer remains'
+for fixture in legacy-machine-production-open legacy-machine-production-late; do
+    require_legacy_machine_claim_mutation_rejected \
+        "$fixture" \
+        "$legacy_machine_claim_lifecycle" \
+        "$legacy_machine_claim_helper" \
+        "$contract_root/$fixture.swift" \
+        "$legacy_machine_claim_source" \
+        'legacy machine claim production is not immediately typed unavailable'
+done
+require_legacy_machine_claim_mutation_rejected \
+    legacy-machine-lifecycle-error \
+    "$legacy_machine_claim_lifecycle" \
+    "$legacy_machine_claim_helper" \
+    "$legacy_machine_claim_host" \
+    "$contract_root/legacy-machine-lifecycle-error.swift" \
+    'legacy machine claim Machine consumer remains'
+require_legacy_machine_claim_mutation_rejected \
+    legacy-machine-cancellation \
+    "$legacy_machine_claim_lifecycle" \
+    "$legacy_machine_claim_helper" \
+    "$legacy_machine_claim_host" \
+    "$contract_root/legacy-machine-cancellation.swift" \
+    'legacy machine claim external-state outcome priority drifted'
+require_legacy_machine_claim_mutation_rejected \
+    legacy-machine-helper-public \
+    "$legacy_machine_claim_lifecycle" \
+    "$contract_root/legacy-machine-helper-public.swift" \
+    "$legacy_machine_claim_host" \
+    "$legacy_machine_claim_source" \
+    'legacy machine claim server-only wire missing'
+require_legacy_machine_claim_mutation_rejected \
+    legacy-machine-helper-service \
+    "$legacy_machine_claim_lifecycle" \
+    "$contract_root/legacy-machine-helper-service.swift" \
+    "$legacy_machine_claim_host" \
+    "$legacy_machine_claim_source" \
+    'legacy machine claim fixed helper service drifted'
+
+ordinary_machine_claim_gate=scripts/verify-app-release-boundaries
+"$ordinary_machine_claim_gate" --legacy-machine-claim-contract-only \
+    "$ordinary_machine_claim_gate" \
+    >"$contract_root/ordinary-machine-claim-canonical.log"
+function require_ordinary_machine_claim_mutation_rejected() {
+    local fixture_name=$1
+    local fixture_path=$2
+    local expected_diagnostic=$3
+    local output="$contract_root/$fixture_name.log"
+    if "$ordinary_machine_claim_gate" \
+        --legacy-machine-claim-contract-only \
+        "$fixture_path" >"$output" 2>&1
+    then
+        fail_contract \
+            "Ordinary machine claim mutation was accepted: $fixture_name"
+    fi
+    require_fixed_text "$output" "$expected_diagnostic"
+}
+python3 - \
+    "$ordinary_machine_claim_gate" \
+    "$contract_root/ordinary-machine-claim-symbol.swift" \
+    "$contract_root/ordinary-machine-claim-bundle.swift" \
+    "$contract_root/ordinary-machine-claim-debug-dylib.swift" \
+    "$contract_root/ordinary-machine-claim-fail-open.swift" <<'PY'
+from pathlib import Path
+import sys
+
+source_path, symbol_path, bundle_path, dylib_path, fail_open_path = map(
+    Path, sys.argv[1:]
+)
+source = source_path.read_text(encoding="utf-8")
+
+
+def mutate_once(value, old, new, name):
+    if value.count(old) != 1:
+        raise SystemExit(
+            f"cannot construct ordinary machine claim mutation: {name}"
+        )
+    return value.replace(old, new, 1)
+
+
+symbol_path.write_text(
+    mutate_once(
+        source,
+        "    'StornautLifecycle.LifecycleMachineClaimXPCReplyResolver'\n",
+        "",
+        "forbidden resolver symbol removed",
+    ),
+    encoding="utf-8",
+)
+bundle_path.write_text(
+    mutate_once(
+        source,
+        '    "$debug_app/Contents/MacOS/Stornaut" Debug',
+        '    "$debug_app" Debug',
+        "Debug gate changed to bundle root",
+    ),
+    encoding="utf-8",
+)
+dylib_path.write_text(
+    mutate_once(
+        source,
+        '        main_images+=("$debug_dylib")',
+        '        _ = "$debug_dylib"',
+        "Debug dylib omitted",
+    ),
+    encoding="utf-8",
+)
+function_start = source.index(
+    "verify_ordinary_machine_claim_main_macho() {"
+)
+function_end = source.index(
+    "\n}\n\nverify_ordinary_machine_claim_main_macho",
+    function_start,
+)
+function_body = source[function_start:function_end]
+if function_body.count("            exit 1") != 2:
+    raise SystemExit(
+        "cannot construct ordinary machine claim mutation: fail-open exit"
+    )
+mutated_body = function_body.replace(
+    "            exit 1", "            return 0", 1
+)
+fail_open_path.write_text(
+    source[:function_start] + mutated_body + source[function_end:],
+    encoding="utf-8",
+)
+PY
+require_ordinary_machine_claim_mutation_rejected \
+    ordinary-machine-claim-symbol \
+    "$contract_root/ordinary-machine-claim-symbol.swift" \
+    'ordinary App machine-claim Mach-O symbol allowlist drifted'
+require_ordinary_machine_claim_mutation_rejected \
+    ordinary-machine-claim-bundle \
+    "$contract_root/ordinary-machine-claim-bundle.swift" \
+    'ordinary App machine-claim main-Mach-O call drifted'
+require_ordinary_machine_claim_mutation_rejected \
+    ordinary-machine-claim-debug-dylib \
+    "$contract_root/ordinary-machine-claim-debug-dylib.swift" \
+    'ordinary App machine-claim Mach-O verifier body drifted'
+require_ordinary_machine_claim_mutation_rejected \
+    ordinary-machine-claim-fail-open \
+    "$contract_root/ordinary-machine-claim-fail-open.swift" \
+    'ordinary App machine-claim Mach-O verifier cardinality drifted'
 
 typeset -a source_boundaries=(
     verify-activity-boundaries

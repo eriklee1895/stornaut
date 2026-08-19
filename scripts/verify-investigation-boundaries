@@ -16,6 +16,11 @@ claim_server_deadline_source=
 claim_server_package_contract_only=false
 claim_server_package_graph=
 claim_server_package_manifest=
+legacy_machine_claim_contract_only=false
+legacy_machine_claim_lifecycle_source=
+legacy_machine_claim_helper_source=
+legacy_machine_claim_host_source=
+legacy_machine_claim_source=
 if (( $# > 0 )); then
     if (( $# == 2 )) && [[ $1 == --claim-asid-contract-only ]]; then
         claim_asid_contract_only=true
@@ -32,12 +37,257 @@ if (( $# > 0 )); then
         claim_server_package_contract_only=true
         claim_server_package_graph=$2
         claim_server_package_manifest=$3
+    elif (( $# == 5 )) \
+        && [[ $1 == --legacy-machine-claim-contract-only ]]; then
+        legacy_machine_claim_contract_only=true
+        legacy_machine_claim_lifecycle_source=$2
+        legacy_machine_claim_helper_source=$3
+        legacy_machine_claim_host_source=$4
+        legacy_machine_claim_source=$5
     else
         print -u2 \
-            "Usage: scripts/verify-investigation-boundaries [--claim-asid-contract-only <source> | --deadline-state-contract-only <source> | --claim-server-contract-only <adapter> <effects> <deadline-state> | --claim-server-package-contract-only <describe-json> <dump-json>]"
+            "Usage: scripts/verify-investigation-boundaries [--claim-asid-contract-only <source> | --deadline-state-contract-only <source> | --claim-server-contract-only <adapter> <effects> <deadline-state> | --claim-server-package-contract-only <describe-json> <dump-json> | --legacy-machine-claim-contract-only <lifecycle-xpc> <helper> <machine-host> <machine-claim>]"
         exit 64
     fi
 fi
+
+function verify_legacy_machine_claim_contract() {
+    local lifecycle_source=$1
+    local helper_source=$2
+    local host_source=$3
+    local claim_source=$4
+    python3 - "$lifecycle_source" "$helper_source" \
+        "$host_source" "$claim_source" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+
+def code_only(source, label):
+    output = list(source)
+    index = 0
+    block_depth = 0
+    delimiter = None
+    while index < len(source):
+        if block_depth:
+            if source.startswith("/*", index):
+                output[index:index + 2] = "  "
+                block_depth += 1
+                index += 2
+            elif source.startswith("*/", index):
+                output[index:index + 2] = "  "
+                block_depth -= 1
+                index += 2
+            else:
+                if source[index] != "\n":
+                    output[index] = " "
+                index += 1
+            continue
+        if delimiter is not None:
+            if source.startswith(delimiter, index):
+                width = len(delimiter)
+                output[index:index + width] = " " * width
+                delimiter = None
+                index += width
+            elif delimiter == '"' and source[index] == "\\":
+                output[index] = " "
+                if index + 1 < len(source):
+                    output[index + 1] = " "
+                index += 2
+            else:
+                if source[index] != "\n":
+                    output[index] = " "
+                index += 1
+            continue
+        if source.startswith("//", index):
+            end = source.find("\n", index)
+            end = len(source) if end < 0 else end
+            output[index:end] = " " * (end - index)
+            index = end
+        elif source.startswith("/*", index):
+            output[index:index + 2] = "  "
+            block_depth = 1
+            index += 2
+        elif source.startswith('"""', index):
+            output[index:index + 3] = "   "
+            delimiter = '"""'
+            index += 3
+        elif source[index] == '"':
+            output[index] = " "
+            delimiter = '"'
+            index += 1
+        else:
+            index += 1
+    if block_depth or delimiter is not None:
+        raise SystemExit(f"legacy machine claim {label} has unterminated text")
+    return "".join(output)
+
+
+def declaration(source, pattern, label):
+    match = re.search(pattern, source, re.MULTILINE | re.DOTALL)
+    if match is None:
+        raise SystemExit(f"legacy machine claim {label} missing")
+    opening = source.find("{", match.end())
+    if opening < 0:
+        raise SystemExit(f"legacy machine claim {label} has no body")
+    depth = 0
+    for index in range(opening, len(source)):
+        if source[index] == "{":
+            depth += 1
+        elif source[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return source[match.start():index + 1], source[opening + 1:index]
+    raise SystemExit(f"legacy machine claim {label} is unterminated")
+
+
+lifecycle_path, helper_path, host_path, claim_path = map(Path, sys.argv[1:])
+lifecycle_raw = lifecycle_path.read_text(encoding="utf-8")
+helper_raw = helper_path.read_text(encoding="utf-8")
+host_raw = host_path.read_text(encoding="utf-8")
+claim_raw = claim_path.read_text(encoding="utf-8")
+lifecycle = code_only(lifecycle_raw, "Lifecycle source")
+helper = code_only(helper_raw, "helper source")
+host = code_only(host_raw, "Machine host")
+claim = code_only(claim_raw, "Machine claim source")
+
+_, wire_body = declaration(
+    helper,
+    r"@objc\s+private\s+protocol\s+LifecycleMachineClaimXPCWire\s*",
+    "server-only wire",
+)
+selectors = re.findall(r"^\s*func\s+(\w+)\s*\(", wire_body, re.MULTILINE)
+if selectors != ["claimMachineRetirement"]:
+    raise SystemExit(
+        f"legacy machine claim server-only selector drifted: {selectors!r}"
+    )
+
+if helper_raw.count(
+    'private let legacyMachineClaimServiceName =\n'
+    '    "com.eriklee.stornaut.lifecycle.machine-claim"'
+) != 1:
+    raise SystemExit(
+        "legacy machine claim fixed helper service drifted"
+    )
+if helper.count("legacyMachineClaimServiceName") != 2:
+    raise SystemExit(
+        "legacy machine claim helper service selection cardinality drifted"
+    )
+
+for marker in (
+    "LifecycleMachineClaimXPCWire",
+    "public actor LifecycleMachineClaimXPCClient",
+    "LifecycleMachineClaimXPCClient()",
+    "LifecycleMachineClaimXPCServerNamespace",
+    "LifecycleMachineClaimXPCReplyResolver",
+    "LifecycleMachineClaimResult",
+    "LifecycleMachineClaimXPCError",
+    "proxy as? LifecycleMachineClaimXPCWire",
+    "with: LifecycleMachineClaimXPCWire.self",
+    "machServiceName: LifecycleMachineClaimXPCClient.serviceName",
+):
+    if marker in lifecycle:
+        raise SystemExit(
+            f"legacy machine claim concrete client remains: {marker}"
+        )
+for marker in (
+    "LifecycleMachineClaimXPCClient",
+    "LifecycleMachineClaimXPCServerNamespace",
+    "LifecycleMachineClaimXPCReplyResolver",
+    "remoteObjectProxy",
+    "activeConnection",
+):
+    if marker in helper:
+        raise SystemExit(
+            f"legacy machine claim helper gained client authority: {marker}"
+        )
+
+combined_machine = host + "\n" + claim
+for marker in (
+    "LifecycleMachineClaimXPCClient",
+    "LifecycleMachineClaimXPCWire",
+    "LifecycleMachineClaimXPCError",
+    "NSXPCConnection",
+    "LifecycleLocalInstallationContract",
+    "helperExecutableURL",
+    "SecurityLifecycleCodeSigningVerifier",
+):
+    if marker in combined_machine:
+        raise SystemExit(
+            f"legacy machine claim Machine consumer remains: {marker}"
+        )
+
+strict_source, _ = declaration(
+    host,
+    r"struct\s+StrictMachineRetirementClaimSource\s*:",
+    "injected Machine source",
+)
+if strict_source.count("init(") != 1 or re.search(
+    r"init\s*\(\s*fetch:", strict_source
+) is None:
+    raise SystemExit(
+        "legacy machine claim injected source initializer drifted"
+    )
+for marker in (
+    "init()",
+    "serviceName",
+    "machServiceName",
+    "remoteObject",
+    "activeConnection",
+):
+    if marker in strict_source:
+        raise SystemExit(
+            f"legacy machine claim injected source gained transport: {marker}"
+        )
+
+_, production_body = declaration(
+    host,
+    r"static\s+func\s+production\s*\(",
+    "production factory",
+)
+normalized_production = re.sub(r"\s+", "", production_body)
+expected_production = (
+    "_=(configuration,appProcessIdentity,userID,handoff,transition,"
+    "effectiveUserID,now)"
+    "throwInvestigationMachineDriverHostError.implementationUnavailable"
+)
+if normalized_production != expected_production:
+    raise SystemExit(
+        "legacy machine claim production is not immediately typed unavailable"
+    )
+
+source_error, _ = declaration(
+    claim,
+    r"enum\s+InvestigationMachineRetirementClaimSourceError\s*:",
+    "Machine-local source error",
+)
+if (
+    "case outcomeUnknown" not in source_error
+    or "public " in source_error
+    or "package " in source_error
+):
+    raise SystemExit(
+        "legacy machine claim Machine-local source error drifted"
+    )
+outcome_catch = re.search(
+    r"catch\s+InvestigationMachineRetirementClaimSourceError"
+    r"\.outcomeUnknown\s*\{(?P<body>.*?)\}",
+    claim,
+    re.DOTALL,
+)
+if outcome_catch is None:
+    raise SystemExit(
+        "legacy machine claim outcome-unknown mapping is missing"
+    )
+outcome_body = re.sub(r"\s+", "", outcome_catch.group("body"))
+if outcome_body != (
+    "throwInvestigationMachineRetirementClaimError.outcomeUnknown"
+):
+    raise SystemExit(
+        "legacy machine claim external-state outcome priority drifted"
+    )
+PY
+}
 
 function verify_claim_server_contract() {
     local adapter_source=$1
@@ -797,99 +1047,136 @@ PY
 
 function verify_claim_server_scope() {
     python3 - <<'PY'
-from pathlib import Path
-import json
 import subprocess
 
-baseline = "0e6a377f020d3e446ea9a8d7b045516d0bd9515b"
-checker_path = "scripts/verify-investigation-boundaries"
-contract_path = "scripts/verify-contract"
-allowed_states = ({
-    checker_path,
-}, {
-    checker_path,
-    contract_path,
-})
-allowed = {
+checkpoints = (
+    (
+        "147247ffadcb37c8a7ab83983bf884bd858ac51b",
+        "0e6a377f020d3e446ea9a8d7b045516d0bd9515b",
+        "617b73625180d05591061abcbbb5f470bab00656",
+        {"scripts/verify-investigation-boundaries"},
+        650,
+        "b1",
+    ),
+    (
+        "08184b0a769d904b895636455688ada9e3c3e9e3",
+        "147247ffadcb37c8a7ab83983bf884bd858ac51b",
+        "2d9a22d0e9fc5158898fd3c2a304582c93ec8a94",
+        {"scripts/verify-contract"},
+        400,
+        "b2",
+    ),
+)
+for commit, parent, tree, expected_paths, ceiling, label in checkpoints:
+    observed_parent = subprocess.check_output(
+        ["git", "show", "-s", "--format=%P", commit], text=True
+    ).strip()
+    observed_tree = subprocess.check_output(
+        ["git", "show", "-s", "--format=%T", commit], text=True
+    ).strip()
+    if observed_parent != parent or observed_tree != tree:
+        raise SystemExit(
+            f"claim server historical {label} identity drifted"
+        )
+    paths = {
+        path
+        for path in subprocess.check_output(
+            ["git", "diff-tree", "--no-commit-id", "--name-only",
+             "-r", commit],
+            text=True,
+        ).splitlines()
+        if not path.startswith("docs/")
+    }
+    if paths != expected_paths:
+        raise SystemExit(
+            f"claim server historical {label} paths drifted: {sorted(paths)}"
+        )
+    changed_lines = 0
+    for row in subprocess.check_output(
+        ["git", "diff-tree", "--numstat", "--no-commit-id",
+         "-r", commit],
+        text=True,
+    ).splitlines():
+        added, deleted, path = row.split("\t")
+        if path in expected_paths and added != "-" and deleted != "-":
+            changed_lines += int(added) + int(deleted)
+    if changed_lines > ceiling:
+        raise SystemExit(
+            f"claim server historical {label} budget drifted: "
+            f"{changed_lines} > {ceiling}"
+        )
+PY
+}
+
+function verify_legacy_machine_claim_scope() {
+    python3 - <<'PY'
+from pathlib import Path
+import subprocess
+
+baseline = "ecd76e922f5433d023110910d4e777aa9c714592"
+expected = {
+    "Sources/StornautLifecycle/LifecycleSupervisorXPC.swift",
+    "Sources/StornautInvestigationMachine/InvestigationMachineRetirementClaim.swift",
+    "Sources/StornautInvestigationMachine/InvestigationMachineDriverHost.swift",
+    "Tests/StornautLifecycleTests/LifecycleMachineClaimXPCContractTests.swift",
+    "Tests/StornautInvestigationTests/InvestigationMachineRetirementClaimTests.swift",
+    "Tests/StornautInvestigationTests/InvestigationMachineDriverHostTests.swift",
+    "Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift",
+    "StornautLifecycleHelper/main.swift",
+    "scripts/verify-app-release-boundaries",
     "scripts/verify-investigation-boundaries",
     "scripts/verify-contract",
 }
-
-changed = subprocess.check_output(
-    ["git", "status", "--porcelain=v1", "--untracked-files=all", "-z"],
-    text=False,
-).split(b"\0")
-worktree_paths = set()
-for row in changed:
-    if not row:
-        continue
-    decoded = row.decode("utf-8", errors="strict")
-    if len(decoded) < 4:
-        raise SystemExit(f"claim server status row drifted: {decoded!r}")
-    path = decoded[3:]
-    if " -> " in path:
-        path = path.split(" -> ", 1)[1]
-    worktree_paths.add(path)
-baseline_paths = set(subprocess.check_output(
-    ["git", "diff", "--name-only", baseline, "--"], text=True
-).splitlines())
-non_document = {
-    path for path in baseline_paths
-    if not path.startswith("docs/")
-}
-dirty_non_document = {
-    path for path in worktree_paths if not path.startswith("docs/")
-}
-if dirty_non_document:
+descendants = subprocess.check_output(
+    ["git", "rev-list", "--ancestry-path", "--reverse",
+     f"{baseline}..HEAD"],
+    text=True,
+).splitlines()
+if descendants:
+    checkpoint = descendants[0]
+    parent = subprocess.check_output(
+        ["git", "show", "-s", "--format=%P", checkpoint], text=True
+    ).strip()
+    if parent != baseline:
+        raise SystemExit(
+            "legacy machine claim checkpoint is not the direct baseline child"
+        )
+    diff_command = ["git", "diff", "--numstat", baseline, checkpoint, "--"]
+    name_command = ["git", "diff", "--name-only", baseline, checkpoint, "--"]
+    untracked = set()
+else:
+    diff_command = ["git", "diff", "--numstat", baseline, "--"]
+    name_command = ["git", "diff", "--name-only", baseline, "--"]
+    untracked = set(subprocess.check_output(
+        ["git", "ls-files", "--others", "--exclude-standard"],
+        text=True,
+    ).splitlines())
+paths = set(subprocess.check_output(name_command, text=True).splitlines()) | untracked
+non_document = {path for path in paths if not path.startswith("docs/")}
+if non_document != expected:
     raise SystemExit(
-        f"claim server dirty non-document paths drifted: "
-        f"{sorted(dirty_non_document)}"
+        "legacy machine claim checkpoint paths drifted: "
+        f"{sorted(non_document)}"
     )
-if non_document not in allowed_states:
-    raise SystemExit(
-        f"claim server non-document paths drifted: {sorted(non_document)}"
-    )
-counts = {path: 0 for path in allowed}
-for row in subprocess.check_output(
-    ["git", "diff", "--numstat", baseline, "--"], text=True
-).splitlines():
+changed_lines = 0
+counted = set()
+for row in subprocess.check_output(diff_command, text=True).splitlines():
     added, deleted, path = row.split("\t")
-    if path in counts and added != "-" and deleted != "-":
-        counts[path] = int(added) + int(deleted)
-for path in allowed:
-    if path in baseline_paths or path not in worktree_paths:
-        continue
-    file_path = Path(path)
-    if file_path.exists():
-        counts[path] = len(file_path.read_text(encoding="utf-8").splitlines())
-if counts[checker_path] > 650 or counts[contract_path] > 400:
+    if path in expected and added != "-" and deleted != "-":
+        changed_lines += int(added) + int(deleted)
+        counted.add(path)
+for path in expected & untracked:
+    changed_lines += len(Path(path).read_text(encoding="utf-8").splitlines())
+    counted.add(path)
+if counted != expected:
     raise SystemExit(
-        "claim server budget drifted: "
-        f"checker={counts[checker_path]}, contract={counts[contract_path]}"
+        "legacy machine claim checkpoint numstat drifted: "
+        f"{sorted(counted)}"
     )
-protected = [
-    "Sources/StornautLifecycle/LifecycleMachineRetirementEscrow.swift",
-    "Sources/StornautLifecycle/LifecycleSupervisorXPC.swift",
-    "StornautLifecycleHelper/main.swift",
-    "Sources/StornautInvestigationMachine",
-    "Sources/StornautInvestigationMachineDriverSupport",
-    "StornautApp",
-    "Stornaut.xcodeproj/project.pbxproj",
-    "Stornaut.xcodeproj/xcshareddata/xcschemes",
-]
-if subprocess.run(
-    ["git", "diff", "--quiet", baseline, "--", *protected]
-).returncode != 0:
-    raise SystemExit("claim server protected product blobs drifted")
-package = json.loads(subprocess.check_output(
-    ["swift", "package", "dump-package"], text=True
-))
-target = next(
-    item for item in package["targets"] if item["name"] == "StornautLifecycle"
-)
-dependencies = [item.get("byName", [None])[0] for item in target["dependencies"]]
-if dependencies != ["CLifecycleSupport"]:
-    raise SystemExit(f"Lifecycle dependencies drifted: {dependencies}")
+if changed_lines > 3_000:
+    raise SystemExit(
+        f"legacy machine claim checkpoint budget drifted: {changed_lines} > 3000"
+    )
 PY
 }
 
@@ -973,6 +1260,15 @@ if $claim_server_package_contract_only; then
         "$claim_server_package_graph" \
         "$claim_server_package_manifest"
     print "Machine claim server package contract verification passed."
+    exit 0
+fi
+if $legacy_machine_claim_contract_only; then
+    verify_legacy_machine_claim_contract \
+        "$legacy_machine_claim_lifecycle_source" \
+        "$legacy_machine_claim_helper_source" \
+        "$legacy_machine_claim_host_source" \
+        "$legacy_machine_claim_source"
+    print "Legacy machine claim quarantine contract verification passed."
     exit 0
 fi
 
@@ -1942,6 +2238,7 @@ if rg -q --fixed-strings -- 'InvestigationLifecycleRetirementEvidenceStore' \
 fi
 for marker in \
     'protocol InvestigationMachineRetirementClaimSource' \
+    'enum InvestigationMachineRetirementClaimSourceError' \
     'struct InvestigationMachineRetirementClaim' \
     'actor InvestigationMachineRetirementClaimStore'; do
     rg -q --fixed-strings -- "$marker" "$machine_claim_source" || {
@@ -1960,13 +2257,10 @@ for marker in \
     'package static func run() async -> Int32' \
     'actor InvestigationMachineDriverHost' \
     'struct StrictMachineRetirementClaimSource' \
-    'LifecycleMachineClaimXPCClient()' \
-    'struct InstalledMachineRetirementHelperSigningVerifier' \
-    'contract.helperExecutableURL' \
-    'SecurityLifecycleCodeSigningVerifier().verify(' \
+    'case implementationUnavailable' \
+    'throw InvestigationMachineDriverHostError.implementationUnavailable' \
     'InvestigationMachineRetirementClaimStore()' \
-    'InvestigationLifecycleTopologyCollectionRequest(' \
-    'DarwinInvestigationLifecycleTopologyObserver('; do
+    'InvestigationLifecycleTopologyCollectionRequest('; do
     rg -q --fixed-strings -- "$marker" "$machine_driver_host" || {
         print -u2 "Machine driver host marker missing: $marker"
         exit 1
@@ -1999,7 +2293,7 @@ for marker in \
     }
 done
 if rg -n \
-    'StornautExecution|StornautInvestigationDiagnostic|ActionExecutor|TrashMoving|RegisteredAction|SignedInvestigationRuntimeMachineAssembler|SignedInvestigationRuntimeMachineVerifier|signedInvestigationRuntimeReady|JSONEncoder|JSONDecoder|PropertyListEncoder|PropertyListDecoder|NSXPCConnection|URLSession|posix_spawn|removeItem|moveItem|copyItem|CommandLine\.arguments|ProcessInfo\.processInfo\.environment|readLine\(|kill\(' \
+    'StornautExecution|StornautInvestigationDiagnostic|ActionExecutor|TrashMoving|RegisteredAction|SignedInvestigationRuntimeMachineAssembler|SignedInvestigationRuntimeMachineVerifier|signedInvestigationRuntimeReady|JSONEncoder|JSONDecoder|PropertyListEncoder|PropertyListDecoder|LifecycleMachineClaimXPCClient|LifecycleMachineClaimXPCWire|LifecycleMachineClaimXPCError|LifecycleLocalInstallationContract|SecurityLifecycleCodeSigningVerifier|helperExecutableURL|NSXPCConnection|URLSession|posix_spawn|removeItem|moveItem|copyItem|CommandLine\.arguments|ProcessInfo\.processInfo\.environment|readLine\(|kill\(' \
     "$machine_driver_host" "$machine_driver_main"; then
     print -u2 "Machine driver host gained prohibited input or authority."
     exit 1
@@ -2075,17 +2369,11 @@ for marker in \
         exit 1
     }
 done
-for marker in \
-    '@objc public protocol LifecycleMachineClaimXPCWire' \
-    'public actor LifecycleMachineClaimXPCClient' \
-    'func claimMachineRetirement(' \
-    'LifecycleMachineClaimXPCReplyResolver' \
-    'options: .privileged'; do
-    rg -q --fixed-strings -- "$marker" "$machine_xpc_source" || {
-        print -u2 "Machine claim XPC marker missing: $marker"
-        exit 1
-    }
-done
+verify_legacy_machine_claim_contract \
+    "$machine_xpc_source" \
+    "$lifecycle_helper" \
+    "$machine_driver_host" \
+    "$machine_claim_source"
 for marker in \
     'LifecycleMachineClaimListenerDelegate' \
     'LifecycleMachineClaimHelperService' \
@@ -2121,7 +2409,6 @@ source = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
 expected = {
     "LifecycleSupervisorXPCWire": ["attestHelper", "handle"],
     "LifecycleInteractiveSessionXPCWire": ["handleInteractive"],
-    "LifecycleMachineClaimXPCWire": ["claimMachineRetirement"],
 }
 observed = {}
 for match in re.finditer(
@@ -2667,6 +2954,7 @@ verify_claim_server_contract \
     Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerEffects.swift \
     Sources/StornautLifecycle/LifecycleMachineRetirementEscrowDeadlineState.swift
 verify_claim_server_scope
+verify_legacy_machine_claim_scope
 
 package_graph=$(swift package describe --type json)
 package_manifest=$(swift package dump-package)

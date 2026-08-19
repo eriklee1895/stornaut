@@ -349,7 +349,13 @@ ii-b2b-i, and ii-b2b-i cannot complete ii-b2b.
 
 ### 5.1 Exact scope and cost
 
-Exactly ten non-document paths, at most 3,000 added-or-changed lines:
+Originally frozen at ten non-document paths, this checkpoint is now exactly
+eleven non-document paths, still at most 3,000 added-or-changed lines. A real
+ordinary Debug main-Mach-O RED proved that retaining even a server-only public
+wire/service namespace in broad `StornautLifecycle` exports its runtime symbols
+into `Stornaut.debug.dylib`; moving it between files in the same Swift target
+did not change that result. The necessary correction adds only the existing
+helper source as path 11:
 
 1. `Sources/StornautLifecycle/LifecycleSupervisorXPC.swift`;
 2. `Sources/StornautInvestigationMachine/InvestigationMachineRetirementClaim.swift`;
@@ -361,17 +367,22 @@ Exactly ten non-document paths, at most 3,000 added-or-changed lines:
 8. `scripts/verify-app-release-boundaries`;
 9. `scripts/verify-investigation-boundaries`;
 10. `scripts/verify-contract`.
+11. `StornautLifecycleHelper/main.swift`.
 
-No Package/Xcode/helper/server source is changed.
+No Package/Xcode/new-server source is changed. The existing helper source may
+change only to own the legacy one-selector private protocol and fixed service
+literal locally; its listener, escrow, admission, reply and lifecycle behavior
+remain unchanged.
 
 ### 5.2 Responsibilities
 
 Before the helper wire changes, remove the old broad Lifecycle concrete client,
 reply resolver, concrete connection/signing/path logic and outcome transport.
-The legacy one-selector protocol/service-name namespace may remain temporarily
-only because the current helper still compiles against it; it must have no client
-constructor, `NSXPCConnection` callsite or Machine consumer. ii-b2b-iii removes
-the protocol after helper migration.
+The legacy one-selector protocol and fixed service literal remain temporarily
+only as private declarations owned by the current helper. Broad Lifecycle must
+export neither the wire nor a client/server namespace; the helper declaration
+must have no client constructor, remote proxy or Machine consumer. ii-b2b-iii
+removes this private legacy declaration after helper migration.
 
 `InvestigationMachineDriverHost.production` must become explicitly
 implementation-unavailable before creating a claimant or consuming a handle.

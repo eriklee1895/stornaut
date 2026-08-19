@@ -1295,14 +1295,15 @@ struct InvestigationMachineTargetBoundaryTests {
             "package static func run() async -> Int32",
             "actor InvestigationMachineDriverHost",
             "struct StrictMachineRetirementClaimSource",
-            "LifecycleMachineClaimXPCClient()",
-            "struct InstalledMachineRetirementHelperSigningVerifier",
             "InvestigationMachineRetirementClaimStore()",
             "InvestigationLifecycleTopologyCollectionRequest(",
-            "DarwinInvestigationLifecycleTopologyObserver(",
         ] {
             #expect(driverHost.contains(marker))
         }
+        #expect(!driverHost.contains("LifecycleMachineClaimXPCClient()"))
+        #expect(!driverHost.contains("InstalledMachineRetirementHelperSigningVerifier"))
+        #expect(driverHost.contains("case implementationUnavailable"))
+        #expect(driverHost.contains("throw InvestigationMachineDriverHostError.implementationUnavailable"))
         #expect(
             driverHost.components(separatedBy: "package " ).count == 3
         )
@@ -1492,11 +1493,18 @@ struct InvestigationMachineTargetBoundaryTests {
             ),
             encoding: .utf8
         )
-        #expect(xpcSource.contains("LifecycleMachineRetirementClaimRequest"))
-        #expect(xpcSource.contains("LifecycleMachineRetirementClaimResponse"))
+        #expect(!xpcSource.contains("LifecycleMachineRetirementClaimRequest"))
+        #expect(!xpcSource.contains("LifecycleMachineRetirementClaimResponse"))
+        #expect(!xpcSource.contains("LifecycleMachineClaimXPCWire"))
+        let helperSource = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "StornautLifecycleHelper/main.swift"
+            ),
+            encoding: .utf8
+        )
         #expect(
-            xpcSource.contains(
-                "@objc public protocol LifecycleMachineClaimXPCWire"
+            helperSource.contains(
+                "@objc private protocol LifecycleMachineClaimXPCWire"
             )
         )
         for method in [
@@ -1505,7 +1513,16 @@ struct InvestigationMachineTargetBoundaryTests {
             "func handleInteractive(",
             "func claimMachineRetirement(",
         ] {
-            #expect(xpcSource.components(separatedBy: method).count == 2)
+            let owner = method == "func claimMachineRetirement("
+                ? helperSource
+                : xpcSource
+            let expectedCount = method == "func claimMachineRetirement("
+                ? 3
+                : 2
+            #expect(
+                owner.components(separatedBy: method).count
+                    == expectedCount
+            )
         }
         let exportedMethodCount = xpcSource
             .components(separatedBy: "@objc public protocol")
@@ -1517,7 +1534,7 @@ struct InvestigationMachineTargetBoundaryTests {
                     .count - 1
             }
             .reduce(0, +)
-        #expect(exportedMethodCount == 4)
+        #expect(exportedMethodCount == 3)
         let escrowSource = try String(
             contentsOf: repositoryRoot.appending(
                 path: "Sources/StornautLifecycle/"

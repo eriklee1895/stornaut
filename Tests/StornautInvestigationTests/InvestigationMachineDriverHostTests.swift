@@ -10,6 +10,44 @@ import StornautLifecycle
 @Suite("Investigation machine driver host")
 struct InvestigationMachineDriverHostTests {
     @Test
+    func productionFactoryIsUnavailableBeforeHandoffOrTopology() async throws {
+        let fixture = try DriverHostFixture()
+        let events = DriverHostEventRecorder()
+        let handoff = RecordingDriverHandoff(
+            handle: fixture.handle,
+            events: events
+        )
+
+        #expect(
+            throws: InvestigationMachineDriverHostError
+                .implementationUnavailable
+        ) {
+            _ = try InvestigationMachineDriverHost.production(
+                configuration: fixture.topology.configuration,
+                appProcessIdentity: fixture.topology.appIdentity,
+                userID: fixture.topology.userID,
+                handoff: handoff,
+                transition: DriverHostTransition(events: events, error: nil),
+                effectiveUserID: { 0 },
+                now: fixture.topology.clock.read
+            )
+        }
+        #expect(await events.snapshot.isEmpty)
+
+        let source = try String(
+            contentsOf: URL(filePath: #filePath)
+                .deletingLastPathComponent().deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appending(path: "Sources/StornautInvestigationMachine/InvestigationMachineDriverHost.swift"),
+            encoding: .utf8
+        )
+        #expect(source.contains("case implementationUnavailable"))
+        #expect(source.contains("throw InvestigationMachineDriverHostError.implementationUnavailable"))
+        #expect(!source.contains("LifecycleMachineClaimXPCClient()"))
+        #expect(!source.contains("InstalledMachineRetirementHelperSigningVerifier"))
+    }
+
+    @Test
     func authorityClosedSupportPreservesFixedUnavailableStatuses() async {
         #expect(
             InvestigationMachineDriverSupport.status(effectiveUserID: 501)
@@ -303,7 +341,7 @@ struct InvestigationMachineDriverHostTests {
     }
 
     @Test
-    func strictClaimSourceForwardsOnceAndPreservesOutcomeUnknown() async throws {
+    func strictClaimSourceForwardsOnceAndKeepsTransportInternal() async throws {
         let fixture = try DriverHostFixture()
         let requests = DriverClaimRequestRecorder()
         let success = StrictMachineRetirementClaimSource(fetch: { request in
@@ -321,22 +359,23 @@ struct InvestigationMachineDriverHostTests {
         #expect(result.1 == fixture.topology.helperIdentity)
         #expect(await requests.snapshot == [fixture.request])
 
-        let failures = DriverClaimRequestRecorder()
-        let uncertain = StrictMachineRetirementClaimSource(fetch: { request in
-            await failures.record(request)
-            throw LifecycleMachineClaimXPCError.outcomeUnknown
-        })
-        await #expect(throws: LifecycleMachineClaimXPCError.outcomeUnknown) {
-            _ = try await uncertain.fetch(request: fixture.request)
-        }
-        #expect(await failures.snapshot == [fixture.request])
+        let source = try String(
+            contentsOf: URL(filePath: #filePath)
+                .deletingLastPathComponent().deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appending(path: "Sources/StornautInvestigationMachine/InvestigationMachineRetirementClaim.swift"),
+            encoding: .utf8
+        )
+        #expect(source.contains("enum InvestigationMachineRetirementClaimSourceError"))
+        #expect(source.contains("case outcomeUnknown"))
+        #expect(!source.contains("LifecycleMachineClaimXPCError"))
     }
 
     @Test
     func productionClaimantPreservesPostDispatchOutcomeUnknown() async throws {
         let fixture = try DriverHostFixture()
         let source = StrictMachineRetirementClaimSource(fetch: { _ in
-            throw LifecycleMachineClaimXPCError.outcomeUnknown
+            throw InvestigationMachineRetirementClaimSourceError.outcomeUnknown
         })
         let claimant = try InvestigationMachineRetirementClaimant(
             source: source,
@@ -398,99 +437,6 @@ struct InvestigationMachineDriverHostTests {
         ) {
             _ = try await task.value
         }
-    }
-
-    @Test
-    func helperSigningVerifierRequiresFullStaticDynamicIdentityMatch()
-        async throws
-    {
-        let fixture = try DriverHostFixture()
-        let identity = fixture.topology.helperIdentity
-        let signing = try LifecycleSigningIdentity(
-            signingIdentifier: "com.eriklee.stornaut.lifecycle.helper",
-            designatedRequirementSHA256: String(repeating: "a", count: 64),
-            codeDirectoryHash: String(repeating: "b", count: 40)
-        )
-        let evidence = try LifecycleBundleSigningEvidence(
-            identity: signing,
-            executableSHA256: String(repeating: "c", count: 64),
-            isAdHoc: true
-        )
-        let accepted = InstalledMachineRetirementHelperSigningVerifier(
-            staticEvidence: { evidence },
-            dynamicVerification: { _ in
-                .verified(
-                    processID: identity.processID,
-                    effectiveUserID: 0,
-                    signingIdentifier: signing.signingIdentifier,
-                    designatedRequirementSHA256:
-                        signing.designatedRequirementSHA256,
-                    codeDirectoryHash: signing.codeDirectoryHash
-                )
-            }
-        )
-        #expect(accepted.verifies(helperIdentity: identity))
-
-        let wrongPID = InstalledMachineRetirementHelperSigningVerifier(
-            staticEvidence: { evidence },
-            dynamicVerification: { _ in
-                .verified(
-                    processID: identity.processID + 1,
-                    effectiveUserID: 0,
-                    signingIdentifier: signing.signingIdentifier,
-                    designatedRequirementSHA256:
-                        signing.designatedRequirementSHA256,
-                    codeDirectoryHash: signing.codeDirectoryHash
-                )
-            }
-        )
-        #expect(!wrongPID.verifies(helperIdentity: identity))
-
-        let wrongSigning = try LifecycleSigningIdentity(
-            signingIdentifier: "com.eriklee.stornaut.lifecycle.foreign",
-            designatedRequirementSHA256: String(repeating: "d", count: 64),
-            codeDirectoryHash: String(repeating: "e", count: 40)
-        )
-        let wrongEvidence = try LifecycleBundleSigningEvidence(
-            identity: wrongSigning,
-            executableSHA256: String(repeating: "f", count: 64),
-            isAdHoc: true
-        )
-        let staticDrift = InstalledMachineRetirementHelperSigningVerifier(
-            staticEvidence: { wrongEvidence },
-            dynamicVerification: { _ in
-                .verified(
-                    processID: identity.processID,
-                    effectiveUserID: 0,
-                    signingIdentifier: signing.signingIdentifier,
-                    designatedRequirementSHA256:
-                        signing.designatedRequirementSHA256,
-                    codeDirectoryHash: signing.codeDirectoryHash
-                )
-            }
-        )
-        #expect(!staticDrift.verifies(helperIdentity: identity))
-
-        let mismatchedToken = try LifecycleAuditToken(words: [
-            0, 0, 0, 0, 0,
-            UInt32(identity.processID + 1),
-            UInt32(identity.auditSessionID),
-            UInt32(identity.processIDVersion),
-        ])
-        let tokenDriftIdentity = LifecycleProcessIdentity(
-            processID: identity.processID,
-            processIDVersion: identity.processIDVersion,
-            auditSessionID: identity.auditSessionID,
-            effectiveUserID: 0,
-            auditToken: mismatchedToken
-        )
-        #expect(!accepted.verifies(helperIdentity: tokenDriftIdentity))
-
-        let unresolved = InstalledMachineRetirementHelperSigningVerifier(
-            staticEvidence: { evidence },
-            dynamicVerification: { _ in .unresolved }
-        )
-        #expect(!unresolved.verifies(helperIdentity: identity))
     }
 
     @Test
@@ -915,7 +861,8 @@ private actor SuspendedOutcomeUnknownClaimSource:
 
     func failOutcomeUnknown() {
         continuation?.resume(
-            throwing: LifecycleMachineClaimXPCError.outcomeUnknown
+            throwing: InvestigationMachineRetirementClaimSourceError
+                .outcomeUnknown
         )
         continuation = nil
     }
