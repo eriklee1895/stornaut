@@ -1,8 +1,8 @@
 # ADR 0018: Parent-Owned Investigation Handoff and Fixed App Launch
 
 > **Status:** Proposed; external root-launch branch rejected; ii-b0a/ii-b0b/
-> ii-b0c/ii-b1 and the ii-b2 ASID prerequisite complete; ii-b2a current,
-> followed by ii-b2b integration
+> ii-b0c/ii-b1, the ii-b2 ASID prerequisite and ii-b2a complete; ii-b2b
+> server-side adapter/live integration current
 >
 > **Date:** 2026-08-19
 >
@@ -337,6 +337,7 @@ unconsumed.
 | ii-b0c epoch bootstrap prelude | complete; closes first-frame origin contradiction |
 | ii-b1 authority-free App leaf | complete; non-admitting |
 | ii-b2 ASID cohort prerequisite | complete; App/helper independently bound, L1 residue bound to helper; non-admitting |
-| ii-b2a typed escrow/deadline state | current; ii-b2b integration follows |
+| ii-b2a typed escrow/deadline state | complete; non-connected/non-admitting |
+| ii-b2b server-side adapter/live integration | current |
 | ii-c no-model privileged machine gate | not executed |
 | ADR status | **Proposed** |

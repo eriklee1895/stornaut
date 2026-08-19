@@ -41,8 +41,9 @@
 > complete. ii-b1 is also complete after the post-RED topology correction split
 > one Debug-only diagnostic target from one dependency-free Release shell. The
 > ii-b2 ASID prerequisite is complete after separate 1,142-test implementation
-> and 1,143-test decoder-negative supplement serials; ii-b2a typed escrow/
-> deadline state is current, followed by ii-b2b integration and eventually ii-c
+> and 1,143-test decoder-negative supplement serials. ii-b2a typed escrow/
+> deadline state is complete after its 1,162-test combined serial; ii-b2b
+> server-side adapter/live integration is current, followed eventually by ii-c
 > one no-model privileged gate. The authoritative
 > real-model run and readiness verdict remain unimplemented.
 > Production Deep Dive remains unavailable until Task 44 admission.
@@ -907,9 +908,13 @@ Checkpoint status:
   ii-b2 ASID prerequisite is also complete after its semantic-only shared
   contract correction, structural mutation controls, separate 1,142-test
   implementation serial and independent 1,143-test decoder-negative supplement.
-  ii-b2a typed escrow/deadline state is current, followed by ii-b2b integration.
+  ii-b2a typed escrow/deadline state is complete after its focused/affected/
+  coverage/structural gates, sole 1,162-test combined serial and final review.
+  ii-b2b server-side adapter/live integration is current.
   See the
   [ii-b2 ASID prerequisite review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2-asid-prerequisite-review.md),
+  the
+  [ii-b2a typed escrow/deadline review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2a-review.md),
   the
   [L3c1b-i Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
   and
