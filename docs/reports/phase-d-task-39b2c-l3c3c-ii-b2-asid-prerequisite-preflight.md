@@ -81,6 +81,22 @@ fixture. They must prove all of the following independently:
 - the exact encoded evidence byte count/layout changes only where the fixture's
   already-present ASID bytes change; no field, tag or length changes.
 
+### Post-serial completion-audit split
+
+The prerequisite implementation and verifier tree passed its single staged
+serial before the final prompt-to-artifact completion audit. That audit then
+found one test-evidence-only omission: the constructor rejected a helper/L1
+residue ASID mismatch, but the decoder did not yet have its own explicit
+negative regression even though it calls the same throwing initializer.
+
+The accepted implementation/verifier tree remains bound to its original serial
+and is committed separately. The missing decoder regression is therefore a
+distinct one-path test-only supplement with its own staged snapshot, focused
+run, single serial and independent review. The supplement may not change
+production or verifier code, and neither serial may be represented as covering
+the other tree. This preserves the repository's one-serial-per-checkpoint rule
+without accepting the completion-audit omission.
+
 ## 3. Exact Scope and Cost
 
 The prerequisite may change exactly four non-document paths and at most 500
