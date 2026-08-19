@@ -4,6 +4,18 @@ set -euo pipefail
 
 repo_root=${0:A:h:h}
 cd "$repo_root"
+if [[ -n $(git diff-tree --no-commit-id --name-only -r HEAD -- scripts/verify-contract) ]]; then
+    ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r HEAD)"})
+    [[ "${(j: :)ib2_paths}" == scripts/verify-contract ]] \
+        || { print -u2 "Machine claim verifier contract scope drifted"; exit 1; }
+    ib2_lines=$(git diff-tree --numstat --no-commit-id -r HEAD -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
+    (( ib2_lines <= 400 )) \
+        || { print -u2 "Machine claim verifier contract budget drifted"; exit 1; }
+fi
+ib2_self_sha=fb977e4027d32e5663edc3e47ba3ff239e7b3e01a18bf976a842f0d318157350
+ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
+[[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
+    || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
 
 function fail_contract() {
     print -u2 -- "$1"
@@ -126,6 +138,34 @@ require_fixed_text scripts/verify-investigation-boundaries \
     'claim evidence regained invalid App/helper ASID join'
 require_fixed_text scripts/verify-investigation-boundaries \
     '--deadline-state-contract-only'
+require_fixed_text scripts/verify-investigation-boundaries \
+    '--claim-server-contract-only'
+require_fixed_text scripts/verify-investigation-boundaries \
+    '--claim-server-package-contract-only'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'claim server adapter regained actor isolation'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'claim server re-minted sealed transfer'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'claim server release regained self-challenge validation'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'claim server callback used operation-bound rejection'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'machine claim server consumers drifted'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'claim server non-document paths drifted'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'claim server budget drifted'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'claim server evidence lock scope drifted'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'claim server arm/install linearization drifted'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'claim server {source_name} gained conditional compilation'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'claim server {source_name} gained raw literal or regex'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'claim server dirty non-document paths drifted'
 require_fixed_text scripts/verify-investigation-boundaries \
     'deadline stale arm success no longer cancels timer'
 require_fixed_text scripts/verify-investigation-boundaries \
@@ -731,7 +771,7 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "e5312f6e10b95dac5d3f3bd255016fa8139ed47b435a550f8277afe5eff61ea7",
+        "ad573a455b19258cf017bb24ec019a669de37a519af5bc7dd7efac6a64156a6e",
     Path("scripts/verify-app-release-boundaries"):
         "5a74abe27334dd2d7aaf2243ddcbc5789a590e7700dd12f1a602b6e0b52ddaa6",
 }
@@ -1435,6 +1475,361 @@ require_deadline_state_mutation_rejected \
 require_deadline_state_mutation_rejected \
     deadline-public "$contract_root/deadline-public.swift" \
     "deadline state exposed public surface"
+
+claim_server_adapter=Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerAdapter.swift
+claim_server_effects=Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerEffects.swift
+claim_server_deadline=Sources/StornautLifecycle/LifecycleMachineRetirementEscrowDeadlineState.swift
+claim_server_gate=scripts/verify-investigation-boundaries
+"$claim_server_gate" --claim-server-contract-only \
+    "$claim_server_adapter" \
+    "$claim_server_effects" \
+    "$claim_server_deadline" \
+    >"$contract_root/claim-server-canonical.log"
+function require_claim_server_mutation_rejected() {
+    local fixture_name=$1
+    local adapter_fixture=$2
+    local effects_fixture=$3
+    local deadline_fixture=$4
+    local expected_diagnostic=$5
+    local output="$contract_root/$fixture_name.log"
+    if "$claim_server_gate" --claim-server-contract-only \
+        "$adapter_fixture" \
+        "$effects_fixture" \
+        "$deadline_fixture" >"$output" 2>&1
+    then
+        fail_contract "Machine claim server mutation was accepted: $fixture_name"
+    fi
+    require_fixed_text "$output" "$expected_diagnostic"
+}
+python3 - \
+    "$claim_server_adapter" \
+    "$claim_server_effects" \
+    "$claim_server_deadline" \
+    "$contract_root/claim-server-actor.swift" \
+    "$contract_root/claim-server-remint.swift" \
+    "$contract_root/claim-server-claim-commit.swift" \
+    "$contract_root/claim-server-release-commit.swift" \
+    "$contract_root/claim-server-release-reason.swift" \
+    "$contract_root/claim-server-lock-scope.swift" \
+    "$contract_root/claim-server-conditional.swift" \
+    "$contract_root/claim-server-raw.swift" \
+    "$contract_root/claim-server-self-challenge.swift" \
+    "$contract_root/claim-server-callback-operation.swift" \
+    "$contract_root/claim-server-no-finished.swift" \
+    "$contract_root/claim-server-install-before-arm.swift" \
+    "$contract_root/claim-server-operation-reason.swift" \
+    "$contract_root/claim-server-authority.swift" <<'PY'
+from pathlib import Path
+import sys
+
+(
+    adapter_path, effects_path, deadline_path, actor_path, remint_path,
+    claim_commit_path, release_commit_path, release_reason_path,
+    lock_scope_path, conditional_path, raw_path, self_challenge_path,
+    callback_operation_path,
+    no_finished_path, install_before_arm_path, operation_reason_path,
+    authority_path,
+) = map(Path, sys.argv[1:])
+adapter = adapter_path.read_text(encoding="utf-8")
+effects = effects_path.read_text(encoding="utf-8")
+deadline = deadline_path.read_text(encoding="utf-8")
+
+
+def mutate_once(value, old, new, name):
+    if value.count(old) != 1:
+        raise SystemExit(
+            f"cannot construct machine claim server mutation: {name}"
+        )
+    return value.replace(old, new, 1)
+
+
+actor_path.write_text(
+    mutate_once(
+        adapter,
+        "package final class InvestigationMachineClaimServerAdapter:\n"
+        "    @unchecked Sendable\n"
+        "{",
+        "package actor InvestigationMachineClaimServerAdapter {",
+        "class replaced by actor",
+    ),
+    encoding="utf-8",
+)
+remint_path.write_text(
+    mutate_once(
+        adapter,
+        "        projection = try InvestigationMachineClaimServerProjection(\n",
+        "        _ = LifecycleMachineRetirementReservationTransfer(\n"
+        "        projection = try InvestigationMachineClaimServerProjection(\n",
+        "sealed transfer re-minted",
+    ),
+    encoding="utf-8",
+)
+claim_commit_path.write_text(
+    mutate_once(
+        adapter, "state.commitClaimResponse(", "state.cancel(",
+        "claim response commit removed",
+    ),
+    encoding="utf-8",
+)
+release_commit_path.write_text(
+    mutate_once(
+        adapter, "state.commitReleaseResponse(", "state.cancel(",
+        "release response commit removed",
+    ),
+    encoding="utf-8",
+)
+release_reason_path.write_text(
+    mutate_once(
+        adapter,
+        "        } catch {\n"
+        "            rejectBinding()\n"
+        "            throw InvestigationMachineClaimServerError.bindingMismatch\n"
+        "        }\n"
+        "        guard let evidence = evidenceLock.withLock({ evidence }) else {",
+        "        } catch {\n"
+        "            rejectBinding()\n"
+        "            throw InvestigationMachineClaimServerError.invalidRequest\n"
+        "        }\n"
+        "        guard let evidence = evidenceLock.withLock({ evidence }) else {",
+        "malformed release reason changed",
+    ),
+    encoding="utf-8",
+)
+lock_scope_path.write_text(
+    mutate_once(
+        adapter,
+        "        evidenceLock.withLock { evidence = value }",
+        "        evidenceLock.withLock { evidence = value }\n"
+        "        evidenceLock.withLock { _ = state.phase }",
+        "external state read moved under evidence lock",
+    ),
+    encoding="utf-8",
+)
+conditional_path.write_text(
+    adapter + "\n#if false\nprivate let spoof = 1\n#endif\n",
+    encoding="utf-8",
+)
+raw_path.write_text(
+    adapter + '\nprivate let spoof = #"state.commitClaimResponse("#\n',
+    encoding="utf-8",
+)
+self_challenge_path.write_text(
+    mutate_once(
+        adapter,
+        "        let expectedHelperDigest = try evidence.helperIdentity\n"
+        "            .helperIdentitySHA256()\n",
+        "        try release.validate(\n"
+        "            against: evidence,\n"
+        "            expectedReleaseChallenge: release.releaseChallenge\n"
+        "        )\n"
+        "        let expectedHelperDigest = try evidence.helperIdentity\n"
+        "            .helperIdentitySHA256()\n",
+        "self-challenge validation restored",
+    ),
+    encoding="utf-8",
+)
+callback_operation_path.write_text(
+    mutate_once(
+        effects,
+        "                    transition = state.rejectObservation(ticket: ticket)",
+        "                    transition = state.rejectOperationObservation(\n"
+        "                        reservationID: ticket.reservationID\n"
+        "                    )",
+        "callback weakened to reservation identity",
+    ),
+    encoding="utf-8",
+)
+no_finished_path.write_text(
+    mutate_once(
+        effects,
+        "        private var callbackFinished = false\n",
+        "",
+        "callback finished state removed",
+    ),
+    encoding="utf-8",
+)
+install_before_arm_path.write_text(
+    mutate_once(
+        effects,
+        "        let armed = state.armSucceeded(ticket)\n"
+        "        try apply(armed, to: state)\n"
+        "        perform(slot.install(handle), ticket: ticket)",
+        "        perform(slot.install(handle), ticket: ticket)\n"
+        "        let armed = state.armSucceeded(ticket)\n"
+        "        try apply(armed, to: state)",
+        "handle installed before arm commit",
+    ),
+    encoding="utf-8",
+)
+operation_reason_path.write_text(
+    mutate_once(
+        deadline,
+        "    package func rejectOperationObservation(\n"
+        "        reservationID: UUID\n"
+        "    ) -> LifecycleMachineRetirementDeadlineTransition {\n",
+        "    package func rejectOperationObservation(\n"
+        "        reservationID: UUID\n"
+        "    ) -> LifecycleMachineRetirementDeadlineTransition {\n"
+        "        _ = LifecycleMachineRetirementDeadlineTerminalReason."
+        "bindingMismatch\n",
+        "operation rejection reason spoof",
+    ).replace(
+        "                .invalidTimeObservation,\n"
+        "                rememberLateArm: pendingTicketLocked\n"
+        "            )\n"
+        "        }\n"
+        "    }\n",
+        "                .bindingMismatch,\n"
+        "                rememberLateArm: pendingTicketLocked\n"
+        "            )\n"
+        "        }\n"
+        "    }\n",
+        1,
+    ),
+    encoding="utf-8",
+)
+authority_path.write_text(
+    mutate_once(
+        adapter,
+        "import Foundation\n",
+        "import Foundation\nimport Security\n",
+        "authority import injected",
+    ),
+    encoding="utf-8",
+)
+PY
+require_claim_server_mutation_rejected \
+    claim-server-actor \
+    "$contract_root/claim-server-actor.swift" \
+    "$claim_server_effects" \
+    "$claim_server_deadline" \
+    "claim server adapter regained actor isolation"
+require_claim_server_mutation_rejected \
+    claim-server-remint \
+    "$contract_root/claim-server-remint.swift" \
+    "$claim_server_effects" \
+    "$claim_server_deadline" \
+    "claim server re-minted sealed transfer"
+require_claim_server_mutation_rejected \
+    claim-server-claim-commit \
+    "$contract_root/claim-server-claim-commit.swift" \
+    "$claim_server_effects" \
+    "$claim_server_deadline" \
+    "claim server claim projection drifted"
+require_claim_server_mutation_rejected \
+    claim-server-release-commit \
+    "$contract_root/claim-server-release-commit.swift" \
+    "$claim_server_effects" \
+    "$claim_server_deadline" \
+    "claim server release binding drifted"
+require_claim_server_mutation_rejected \
+    claim-server-release-reason \
+    "$contract_root/claim-server-release-reason.swift" \
+    "$claim_server_effects" \
+    "$claim_server_deadline" \
+    "claim server malformed release reason drifted"
+require_claim_server_mutation_rejected \
+    claim-server-lock-scope \
+    "$contract_root/claim-server-lock-scope.swift" \
+    "$claim_server_effects" \
+    "$claim_server_deadline" \
+    "claim server evidence lock scope drifted"
+require_claim_server_mutation_rejected \
+    claim-server-conditional \
+    "$contract_root/claim-server-conditional.swift" \
+    "$claim_server_effects" "$claim_server_deadline" \
+    "claim server adapter gained conditional compilation"
+require_claim_server_mutation_rejected \
+    claim-server-raw \
+    "$contract_root/claim-server-raw.swift" \
+    "$claim_server_effects" "$claim_server_deadline" \
+    "claim server adapter gained raw literal or regex"
+require_claim_server_mutation_rejected \
+    claim-server-self-challenge \
+    "$contract_root/claim-server-self-challenge.swift" \
+    "$claim_server_effects" \
+    "$claim_server_deadline" \
+    "claim server release regained self-challenge validation"
+require_claim_server_mutation_rejected \
+    claim-server-callback-operation \
+    "$claim_server_adapter" \
+    "$contract_root/claim-server-callback-operation.swift" \
+    "$claim_server_deadline" \
+    "claim server callback ownership drifted"
+require_claim_server_mutation_rejected \
+    claim-server-no-finished \
+    "$claim_server_adapter" \
+    "$contract_root/claim-server-no-finished.swift" \
+    "$claim_server_deadline" \
+    "claim server slot lifecycle drifted"
+require_claim_server_mutation_rejected \
+    claim-server-install-before-arm \
+    "$claim_server_adapter" \
+    "$contract_root/claim-server-install-before-arm.swift" \
+    "$claim_server_deadline" \
+    "claim server arm/install linearization drifted"
+require_claim_server_mutation_rejected \
+    claim-server-operation-reason \
+    "$claim_server_adapter" \
+    "$claim_server_effects" \
+    "$contract_root/claim-server-operation-reason.swift" \
+    "claim server operation rejection seam drifted"
+require_claim_server_mutation_rejected \
+    claim-server-authority \
+    "$contract_root/claim-server-authority.swift" \
+    "$claim_server_effects" \
+    "$claim_server_deadline" \
+    "claim server adapter imports drifted"
+
+claim_server_describe="$contract_root/claim-server-describe.json"
+claim_server_dump="$contract_root/claim-server-dump.json"
+swift package describe --type json > "$claim_server_describe"
+swift package dump-package > "$claim_server_dump"
+"$claim_server_gate" --claim-server-package-contract-only \
+    "$claim_server_describe" "$claim_server_dump" \
+    >"$contract_root/claim-server-package-canonical.log"
+python3 - "$claim_server_describe" "$claim_server_dump" \
+    "$contract_root/claim-server-package-mutations" <<'PY'
+import copy, json
+from pathlib import Path
+import sys
+
+describe_path, dump_path, root = map(Path, sys.argv[1:])
+describe = json.loads(describe_path.read_text(encoding="utf-8"))
+dump = json.loads(dump_path.read_text(encoding="utf-8"))
+root.mkdir()
+mutations = {}
+value = copy.deepcopy(describe)
+next(t for t in value["targets"] if t["name"] == "StornautInvestigationMachineClaimServer")["target_dependencies"].append("StornautCore")
+mutations["dependency"] = (value, dump)
+value = copy.deepcopy(dump)
+next(p for p in value["products"] if p["name"] == "StornautInvestigationMachineClaimServer")["type"] = {"library": ["dynamic"]}
+mutations["product"] = (describe, value)
+value = copy.deepcopy(describe)
+next(t for t in value["targets"] if t["name"] == "StornautCore")["target_dependencies"].append("StornautInvestigationMachineClaimServer")
+mutations["consumer"] = (value, dump)
+value = copy.deepcopy(describe)
+next(t for t in value["targets"] if t["name"] == "StornautLifecycle")["target_dependencies"].append("StornautInvestigationHandoffContract")
+mutations["reverse"] = (value, dump)
+for name, (description, manifest) in mutations.items():
+    (root / f"{name}-describe.json").write_text(json.dumps(description))
+    (root / f"{name}-dump.json").write_text(json.dumps(manifest))
+PY
+for fixture diagnostic in \
+    dependency 'machine claim server dependencies drifted' \
+    product 'machine claim server static product drifted' \
+    consumer 'machine claim server consumers drifted' \
+    reverse 'Lifecycle gained HandoffContract dependency'; do
+    output="$contract_root/claim-server-package-$fixture.log"
+    if "$claim_server_gate" --claim-server-package-contract-only \
+        "$contract_root/claim-server-package-mutations/$fixture-describe.json" \
+        "$contract_root/claim-server-package-mutations/$fixture-dump.json" \
+        >"$output" 2>&1
+    then
+        fail_contract "Machine claim server package mutation accepted: $fixture"
+    fi
+    require_fixed_text "$output" "$diagnostic"
+done
 
 typeset -a source_boundaries=(
     verify-activity-boundaries
