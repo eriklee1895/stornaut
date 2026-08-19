@@ -30,11 +30,12 @@
 > authority gates, 1,059-test clean staged-only serial and independent post-fix
 > review passed. L3c3b-i diagnostic-only native packaging, final-artifact gates,
 > 1,060-test clean staged-only serial and post-fix/cross-group review also passed.
-> L3c3b-ii installer/L2 admission is complete. L3c3c-i-a transport/identity/
-> protocol/lifecycle, i-b1 root-to-UID implementation/non-root/cleanup/static
-> review and i-b2a reproducibility contract are complete; privileged i-b2b did
-> not execute, ADR 0018 remains
-> Proposed, L3c3c-i is incomplete and L3c3c-ii is blocked. The authoritative
+> L3c3b-ii installer/L2 admission is complete. L3c3c-i transport/root-launch
+> audit is also complete: B3/B4 algorithm evidence is retained, while `sudo -v`
+> and UID-staged no-cache external root paths are NO-GO. i-b2b-0b/i-b2b-1 were
+> superseded before execution; B4 root count is zero. ADR 0018 remains Proposed.
+> L3c3c-ii-a authority-closed live DriverSupport is the current frontier,
+> followed by ii-b fixed handoff and ii-c one no-model privileged gate. The authoritative
 > real-model run and readiness verdict remain unimplemented.
 > Production Deep Dive remains unavailable until Task 44 admission.
 >
@@ -886,10 +887,9 @@ Checkpoint status:
   native packaging is also complete after its diagnostic-only Xcode graph,
   final-artifact identity/authority gates, 1,060-test clean staged-only serial
   and independent post-fix/cross-group review. L3c3b-ii installer/L2 is complete.
-  L3c3c-i-a transport/identity/protocol/lifecycle, i-b1 root-to-UID
-  implementation/non-root/cleanup/static review and i-b2a reproducibility are
-  complete; privileged i-b2b did not execute, ADR 0018 remains Proposed, L3c3c-i is incomplete and
-  L3c3c-ii is blocked.
+  L3c3c-i transport/root-launch audit is complete and rejects the external
+  branch; i-b2b-0b/i-b2b-1 were superseded before execution. ADR 0018 remains
+  Proposed and L3c3c-ii-a is the current frontier.
   See the
   [L3c1b-i Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
   and
@@ -919,8 +919,11 @@ Checkpoint status:
   are recorded in the
   [Parent-Owned Handoff Study](../../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md),
   [Proposed ADR 0018](../../adr/0018-parent-owned-investigation-handoff.md),
-  [L3c3c-i Conditional Review](../../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md) and
-  [L3c3c-i-b2a Reproducibility Review](../../reports/phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md).
+  [L3c3c-i Final Review](../../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md),
+  [L3c3c-i-b2a Reproducibility Review](../../reports/phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md) and
+  [L3c3c-i-b2b-0a Root Provenance Review](../../reports/phase-d-task-39b2c-l3c3c-i-b2b-0a-root-provenance-review.md).
+  The revised implementation split is frozen by the
+  [Installed-Driver Preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-installed-driver-path-cost-preflight.md).
   Only L3c4 owns
   real-model signed-App machine readiness, the complete failure matrix, exact
   zero-residue proof and the remaining authoritative full verifier. Task 39 and

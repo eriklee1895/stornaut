@@ -194,8 +194,9 @@ attempt-binding prerequisite 已绑定 raw capability evidence 到 exact nonce
 root topology observer 也已完成，L2 通过 981-test clean staged-only serial
 regression 与 post-fix review；L3c2 deterministic machine driver/failure
 matrix、L3c3a driver-bound attempt 与 L3c3b native packaging/installer admission
-均已完成。L3c3c-i-a/i-b1/i-b2a 已完成；唯一 privileged i-b2b 尚未执行，
-ADR 0018 仍 Proposed，L3c3c-ii blocked。39B2c 仍未作 machine readiness claim。
+均已完成。L3c3c-i transport/root-launch audit 已完成并拒绝 external root
+branch；i-b2b-0b/i-b2b-1 在执行前 superseded，B4 root execution count 为 0。
+ADR 0018 仍 Proposed，L3c3c-ii-a 是当前 frontier。39B2c 仍未作 machine readiness claim。
 L3 preflight 已把余下范围拆为 L3a trusted target extraction、L3b root
 collection 与 L3c failure matrix/final admission。L3a 已把 machine-only
 contract/assembler 迁入非产品 target，并通过 151-test focused、targeted Debug
@@ -218,8 +219,8 @@ independent post-fix review；L3c2a-ii non-product root host/topology、resolved
 authority gates、targeted builds/release boundary、1046-test clean staged-only
 serial 与 independent post-fix review 也已完成；L3c2b eight-scenario driver
 已完成并通过 1055-test clean staged-only serial 与 independent review，L3c2
-已关闭；L3c3a/L3c3b 与 L3c3c-i-a/i-b1/i-b2a 也已完成，当前仅 privileged
-i-b2b 未执行，ADR 0018 仍 Proposed 且 L3c3c-ii blocked。
+已关闭；L3c3a/L3c3b 与 L3c3c-i root-launch audit 也已完成，external branch
+为 NO-GO，ADR 0018 仍 Proposed 且 L3c3c-ii-a 是当前 frontier。
 L3c2b preflight 的 real-plan matrix contradiction 已由 3-path plan-freshness
 prerequisite 关闭，affected/Investigation/structural/review gates 通过；
 只有 L3c4 可作 readiness claim 并运行
@@ -237,8 +238,10 @@ Task 36 [review](../reports/phase-d-task-36-review.md)、Task 37
 L3c3c 当前证据见
 [parent-owned handoff study](../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md)、
 [Proposed ADR 0018](../adr/0018-parent-owned-investigation-handoff.md)、
-[conditional review](../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md)
-与 [i-b2a reproducibility review](../reports/phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md)。
+[final review](../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md)
+、[i-b2a reproducibility review](../reports/phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md)
+、[i-b2b-0a root-launch audit](../reports/phase-d-task-39b2c-l3c3c-i-b2b-0a-root-provenance-review.md)
+与 [installed-driver preflight](../reports/phase-d-task-39b2c-l3c3c-ii-installed-driver-path-cost-preflight.md)。
 
 **范围：** Epic 5–6；仅在 ADR 0004 capability-first runtime gate 允许时进入。
 
@@ -395,8 +398,9 @@ L3c3c 当前证据见
 	  与 independent post-fix review；L3c2a-ii root host/topology 也已通过
 	  1046-test clean staged-only serial 与 independent post-fix review；L3c2b
 	  eight-scenario driver 也已完成，L3c2 已关闭。L3c3a/L3c3b 与
-	  L3c3c-i-a/i-b1/i-b2a 已完成；privileged i-b2b 未执行，ADR 0018 仍
-	  Proposed，L3c3c-ii blocked。L3c4 才拥有
+	  L3c3c-i root-launch audit 已完成并拒绝 external branch；i-b2b-0b/
+	  i-b2b-1 在执行前 superseded，B4 root execution count 为 0。ADR 0018 仍
+	  Proposed，L3c3c-ii-a 是当前 frontier。L3c4 才拥有
 	  final admission/full。
 	  39B2c 才是 machine admission，Task 39 尚未完成。
 - Epic 0 Foundation Upstream Study：已完成，选择 checked-in Xcode App/Test host + local Swift packages。

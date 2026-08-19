@@ -1,7 +1,7 @@
 # Phase D Task 39B2c-L3c3 Scope and Trust Preflight
 
-> Status: Split frozen; L3c3a/L3c3b and L3c3c-i-a/i-b1/i-b2a complete;
-> privileged i-b2b not executed; ADR 0018 Proposed; L3c3c-ii blocked
+> Status: Split revised; L3c3a/L3c3b and L3c3c-i audit complete; external
+> root-launch branch rejected; L3c3c-ii-a is the current frontier
 >
 > Date: 2026-08-18
 >
@@ -23,10 +23,12 @@ repository's fourteen-path ceiling:
 4. one real Task 38 success joined to capability, L1/L2 and owner-retirement
    evidence without promoting readiness.
 
-L3c3 is therefore split before coding into `L3c3a -> L3c3b -> L3c3c-i ->
-L3c3c-ii -> L3c3d`. L3c3d alone may call the real authenticated model, and it
-may emit only a machine-admission-pending candidate. L3c4 remains the sole
-readiness and final-full gate.
+L3c3 was first split into `L3c3a -> L3c3b -> L3c3c-i -> L3c3c-ii ->
+L3c3d`. The root-launch audit then returned NO-GO for external staging and
+execution. The current split is `L3c3a -> L3c3b -> L3c3c-i ->
+L3c3c-ii-a -> L3c3c-ii-b -> L3c3c-ii-c -> L3c3d`. L3c3d alone may
+call the real authenticated model and may emit only a machine-admission-pending
+candidate. L3c4 remains the sole readiness and final-full gate.
 
 ## 2. Current-Checkout Evidence
 
@@ -120,33 +122,56 @@ Prove, outside product code, one fixed topology that satisfies all of:
 
 Candidates include an inherited fixed file descriptor carrying a strict binary
 capsule or a parent-created anonymous XPC endpoint transferred only through a
-fixed inherited descriptor. Repository docs and an accepted ADR must select one
-candidate before L3c3c-ii. Spike code lives outside the repository and is not a
-product implementation checkpoint; only its ADR/study and reproducible evidence
-may be committed. This spike adds no product launcher authority.
+fixed inherited descriptor. Repository docs and a Proposed ADR must select one
+candidate before implementation; machine behavior, not static study alone,
+decides final ADR acceptance. Spike code lives outside the repository and is not
+a product implementation checkpoint; only its ADR/study and reproducible
+evidence may be committed. This spike adds no product launcher authority.
 
-Current status: the external study rejected anonymous-XPC keyed transfer and
+Final status: the external study rejected anonymous-XPC keyed transfer and
 symmetric inherited peer-token authentication, then conditionally selected one
 asymmetrically identity-bound fixed socketpair topology. L3c3c-i-a transport/
 lifecycle evidence and i-b1 root-to-UID implementation, non-root gate, cleanup
 negative and static review are complete. i-b2a separately froze and satisfied
 the exact-execution plus normalized-unsigned plus signed-semantic reproducibility
-contract. The mandatory privileged i-b2b machine run did not execute;
-[ADR 0018](../adr/0018-parent-owned-investigation-handoff.md)
-therefore remains Proposed and L3c3c-ii remains blocked. See the
+contract. i-b2b-0a subsequently completed the root-launch audit with NO-GO for
+all UID-staged external root paths. i-b2b-0b staging and i-b2b-1 execution were
+superseded before execution; B4 root execution count is zero and no root
+artifact or receipt exists. L3c3c-i is complete as a study/audit, while
+[ADR 0018](../adr/0018-parent-owned-investigation-handoff.md) remains Proposed.
+See the
 [study](../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md)
-and [conditional review](phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md),
-plus the [i-b2a review](phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md).
+and [final review](phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md),
+plus the [i-b2a review](phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md)
+and [i-b2b-0a review](phase-d-task-39b2c-l3c3c-i-b2b-0a-root-provenance-review.md).
 
-### L3c3c-ii — Fixed Live Handoff and Transition Composition
+### L3c3c-ii — Installed-Driver Implementation and Machine Gate
 
-Implement only the accepted spike topology. Process-launch authority must live
-in a dedicated narrow module/target, not in the authority-free Machine domain.
+The rejected external branch cannot be used as an implementation shortcut. The
+fixed installed driver is conditionally selected and ii is split again:
+
+- **ii-a authority-closed live DriverSupport** adds fixed self-observation and the
+  minimum socketpair/launch/lifecycle primitives while preserving the
+  Debug/Release final-Mach-O prohibition on Core/Execution/Cleanup/Policy/Trash/
+  Executor/Registered Action authority. No install, App launch, sudo or model.
+- **ii-b fixed handoff composition** implements the exact App inherited-FD leaf,
+  root-to-UID transition, opaque handle, helper claim, installed-L2 barrier,
+  transition and retirement using fakes or non-privileged evidence only.
+- **ii-c one no-model outer installed-driver gate** builds and installs the exact
+  current-source topology, repeats static artifact/service admission, then
+  requires nonzero `sudo -kNnv`, the fixed manual prompt and only the fixed
+  root-owned driver with zero driver arguments. Full installed-L2 follows each
+  App launch before transition/`EXIT`; ii-c then uninstalls and proves zero
+  residue. One outer invocation contains the closed sequential scenario
+  epochs; a started failed outer attempt is not retried to repair implementation.
+
 The launcher accepts no caller executable, path, arguments, environment, UID,
-endpoint, PID, signal or action. It must linearize
-`driver ready -> App launch -> Task 38 retirement/escrow record -> parent
-handoff -> claim -> installed L2 -> driver transition -> App/helper/service
-teardown -> post-teardown L2`. It may return only opaque non-`Codable` authority.
+endpoint, PID, signal or action. The live flow linearizes `driver ready -> App
+launch -> Task 38 retirement/escrow record -> parent handoff -> claim ->
+installed L2 -> driver transition -> App/helper/service teardown ->
+post-teardown L2` and may return only opaque non-`Codable` authority. Exact path
+and cost ceilings are frozen in the
+[installed-driver preflight](phase-d-task-39b2c-l3c3c-ii-installed-driver-path-cost-preflight.md).
 
 ### L3c3d — One Real-Success Three-Plane Pending Candidate
 
@@ -164,13 +189,14 @@ Each implementation checkpoint follows structural -> focused -> affected suites
 -> one staged serial (or approved headless owner) -> targeted App/binary gate ->
 independent review. No checkpoint uses `scripts/verify --full`. L3c3d owns at
 most one real model attempt and may not retry it to repair implementation bugs.
-L3c3a, L3c3b, L3c3c-i and L3c3c-ii must not authenticate Codex or call a model.
+L3c3a, L3c3b, L3c3c-i and L3c3c-ii-a/b/c must not authenticate Codex or call a model.
 
 ## 5. Safety Boundary
 
 This preflight made no repository code change, installed nothing, launched no
 model and did not alter `~/.codex/config.toml`. Production Deep Dive remains
-unavailable. L3c3a, L3c3b and i-b2a are now complete. L3c3c-i remains incomplete
-because privileged i-b2b did not execute; L3c3c-ii is blocked until that gate
-succeeds and ADR 0018 becomes Accepted. Any path beyond a frozen ceiling still
+unavailable. L3c3a, L3c3b and L3c3c-i are complete; the latter closed the
+external root branch with NO-GO and did not accept ADR 0018. L3c3c-ii-a is the
+current frontier. ADR 0018 may become Accepted only after ii-c succeeds. Any
+path beyond a frozen ceiling still
 requires another split before coding.

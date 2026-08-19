@@ -1,6 +1,7 @@
 # Phase D Task 39B2c-L3c3c-i-b2a Reproducibility Contract Review
 
-> Status: Complete; three-layer signed-projection reproducibility contract frozen
+> Status: Complete; historical B4 reproducibility frozen, external execution
+> branch later rejected
 >
 > Date: 2026-08-19
 >
@@ -12,25 +13,30 @@
 
 ## 1. Outcome
 
-L3c3c-i-b2 is split into two explicit gates:
+L3c3c-i-b2 produced four historical checkpoints:
 
 - **i-b2a — signed-projection reproducibility contract: complete.** A fresh
   `-O2` / `FIXED_TARGET_UID=501` rebuild independently reproduces the reviewed
   executable's normalized unsigned projections and signed semantic projection.
-- **i-b2b — one privileged B4 root-to-UID run: not executed.** The only allowed
-  execution artifact remains the exact reviewed full-file SHA-256
-  `d157241035e9bdda8bd5ed139509fcb23ae45528ae79b89e3d22b98d614e760d`.
+- **i-b2b-0a — root-launch trust-anchor audit: complete with NO-GO.** The
+  final7 topology passed synthetic rc75/negative checks, but subsequent reviews
+  rejected every UID-staged external root-launch path.
+- **i-b2b-0b — external immutable staging: superseded before execution.**
+- **i-b2b-1 — external privileged B4 run: superseded before execution.** B4
+  root execution count remains zero and no root artifact or receipt exists.
 
 Independent preflight correctly returned **NO-GO** under the former literal
 “fresh rebuild must reproduce the whole signed-file SHA” wording. The measured
 difference is codesign padding after the declared SuperBlob, not source, object,
 CodeDirectory, parsed signature blob or behavior. This amendment
-fixes the gate definition; it is not evidence of a code difference and does not
-weaken the exact identity required for the actual run.
+fixes the historical comparison definition; it is not evidence of a code
+difference. It does not admit the external root-launch branch and does not
+define the future installed-driver execution identity.
 
-ADR 0018 remains Proposed. L3c3c-i remains incomplete, L3c3c-ii remains blocked,
-Task 39 remains incomplete, production Deep Dive remains unavailable and the
-final authoritative full verifier remains unconsumed.
+ADR 0018 remains Proposed. L3c3c-i later completed as a study/root-launch audit
+with NO-GO. L3c3c-ii-a is the current implementation frontier. Task 39 remains
+incomplete, production Deep Dive remains unavailable and the final authoritative
+full verifier remains unconsumed.
 
 ## 2. Cause of the Literal Whole-File Mismatch
 
@@ -55,17 +61,15 @@ reproducing the signed program. That is forbidden.
 All three layers are mandatory and fail closed. A projection hash never replaces
 the exact full-file execution hash.
 
-### Layer 1 — Exact execution-artifact identity
+### Layer 1 — Exact historical-artifact identity
 
-The sole i-b2b input is the already reviewed formal B4 executable with full-file
-SHA-256
+The reviewed formal B4 executable has full-file SHA-256
 `d157241035e9bdda8bd5ed139509fcb23ae45528ae79b89e3d22b98d614e760d`,
 derived from source SHA-256
 `e683480689d72118d494270b72ded3a8baa448ba5026d5cf63780990ca64bb25`.
-The privileged driver must verify and record the full SHA immediately before and
-after execution, and the result JSONL, stderr and return-code receipt must bind
-that exact value. A rebuilt file, even one that passes Layers 2 and 3, may not be
-substituted for the run artifact.
+It was never root-executed and may not be substituted for the future installed
+current-source driver. The exact hash remains frozen so no later report can
+silently recast another file as the historical candidate.
 
 ### Layer 2 — Independently reproducible normalized unsigned projections
 
@@ -114,7 +118,7 @@ explicitly prohibited.
 | Evidence | Required value | Result |
 | --- | --- | --- |
 | reviewed source SHA-256 | `e683480689d72118d494270b72ded3a8baa448ba5026d5cf63780990ca64bb25` | matched |
-| exact execution full SHA-256 | `d157241035e9bdda8bd5ed139509fcb23ae45528ae79b89e3d22b98d614e760d` | frozen; run not executed |
+| historical B4 full SHA-256 | `d157241035e9bdda8bd5ed139509fcb23ae45528ae79b89e3d22b98d614e760d` | frozen; root count 0 |
 | final normalizer source / binary | `d83a517faeb6fe1f3c5d73fa8054b2464499edb92720c646356559afd7517056` / `65cf14251be13fb54682b541458c7f185c0c2ffd170573b56bcc50b2f86a03ce` | matched |
 | fresh object SHA-256 | `bd8e2b055d008569df27ef804a4d2476f4bfa07379cc7a5c7743f61999d17e16` | matched |
 | zero-UUID unsigned projection | `acc2fdcc8ae72a2a8af2bb5f7dfb52fbdc52e8066ef6bb69b9eb1fa0d70183b7` | rebuilt = reviewed |
@@ -124,24 +128,23 @@ explicitly prohibited.
 | parsed signed prefix | end `57304`; SHA-256 `9afc1e08796096a98795afc8a85ee334283cf8ebbf657995f79264ffbd484aac` | byte-identical |
 | residual full-file delta | exactly 193 bytes, all post-SuperBlob padding | bounded and explained |
 | circular padding copy | forbidden | not used |
-| privileged result JSONL / err / rc | must be absent before i-b2b | absent |
+| external root staging path | must remain absent | absent; branch superseded |
+| external privileged JSONL / err / rc | must remain absent | absent; branch superseded |
 
 The source/object/normalizer and both projection comparisons are complete. The
-old literal whole-file rebuild check is superseded only by this stricter layered
-contract; Layer 1 continues to require the exact reviewed whole file for the
-actual run.
+old literal whole-file rebuild check is superseded by this stricter historical
+comparison. No projection or historical whole-file hash can admit a root run.
 
 ## 5. Safety and Next Gate
 
 This checkpoint changed documentation only and performed no privileged, product,
-install, model, serial or full action. It does not accept ADR 0018 or authorize
-product handoff implementation.
+install, model, serial or full action. It does not accept ADR 0018. The external
+branch was subsequently rejected by the
+[root-launch trust-anchor audit](phase-d-task-39b2c-l3c3c-i-b2b-0a-root-provenance-review.md).
 
-The next gate is **i-b2b**: exactly one explicitly authorized disposable B4
-root-to-UID invocation of the Layer-1 artifact. Before launch, after process
-exit and in the privacy-safe result, the driver must bind full SHA-256 `d157…`;
-it must then prove the previously specified scenario matrix, exact UID/groups,
-irreversible drop, strict EOF, bounded cleanup and zero exact PID/PGID residue.
-There is no retry to repair an implementation and no substitution by a rebuilt
-projection. Only a green i-b2b review may support accepting ADR 0018 and
-unblocking L3c3c-ii.
+The current next gate is **L3c3c-ii-a** authority-closed live DriverSupport,
+followed by ii-b fixed installed-driver handoff composition and ii-c exactly one
+no-model current-source privileged machine gate. Their exact scope and cost are
+frozen in the
+[installed-driver preflight](phase-d-task-39b2c-l3c3c-ii-installed-driver-path-cost-preflight.md).
+Only a green ii-c gate may support accepting ADR 0018.

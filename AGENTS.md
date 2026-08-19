@@ -246,11 +246,15 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   clean staged-only serial 与 independent grouped/post-fix/cross-group review 已
   完成；accepted implementation tree 为
   `1c4a665151e6bca44d784c94b2a9c461217f83e2`。L3c3b-ii 已完成。
-  L3c3c-i 已拆为 i-a/i-b1/i-b2a/i-b2b：external i-a transport/identity/
-  protocol/lifecycle、i-b1 root-to-UID implementation/non-root/cleanup/static
-  review 与 i-b2a 三层 signed-projection reproducibility contract 已完成；
-  唯一 privileged i-b2b machine run 未执行，ADR 0018 仍为
-  Proposed，L3c3c-i 尚未完成且 L3c3c-ii blocked。
+  L3c3c-i transport/root-launch audit 已完成：i-a/i-b1/i-b2a 保留 B3/B4
+  algorithm 与 historical reproducibility evidence；i-b2b-0a 证明 `sudo -v`
+  会产生 ambient authority，且 separate no-cache stock root commands 也无法
+  构成不可跳过的 verify-and-act，外置 root-launch branch 因此 NO-GO。
+  i-b2b-0b/i-b2b-1 在执行前 superseded；B4 root execution count 为 0，无 root
+  artifact/receipt，固定 external paths 保持 absent。ADR 0018 仍 Proposed。
+  当前 frontier 为 L3c3c-ii-a authority-closed live DriverSupport，随后严格为
+  ii-b fixed installed-driver/App handoff composition、ii-c 唯一 no-model
+  privileged machine gate；只有 ii-c 可接受 ADR 0018。
   只有 L3c4
   可作 readiness claim，
   final full 尚未消耗。
@@ -370,8 +374,10 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c L3c3b-i native driver packaging review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3b-i-native-driver-packaging-review.md](docs/reports/phase-d-task-39b2c-l3c3b-i-native-driver-packaging-review.md) |
 | Phase D Task 39B2c L3c3b-ii installer/L2 admission review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3b-ii-installer-l2-admission-review.md](docs/reports/phase-d-task-39b2c-l3c3b-ii-installer-l2-admission-review.md) |
 | Phase D Task 39B2c L3c3c parent-owned handoff study / Proposed ADR | [docs/upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md](docs/upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md) / [ADR 0018](docs/adr/0018-parent-owned-investigation-handoff.md) |
-| Phase D Task 39B2c L3c3c-i conditional review | [docs/reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md](docs/reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md) |
+| Phase D Task 39B2c L3c3c-i final review | [docs/reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md](docs/reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md) |
 | Phase D Task 39B2c L3c3c-i-b2a reproducibility review | [docs/reports/phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md](docs/reports/phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md) |
+| Phase D Task 39B2c L3c3c-i-b2b-0a root provenance review | [docs/reports/phase-d-task-39b2c-l3c3c-i-b2b-0a-root-provenance-review.md](docs/reports/phase-d-task-39b2c-l3c3c-i-b2b-0a-root-provenance-review.md) |
+| Phase D Task 39B2c L3c3c-ii installed-driver path/cost preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-installed-driver-path-cost-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-installed-driver-path-cost-preflight.md) |
 | Phase D Task 39B2c-L1 residue observation review | [docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md](docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md) |
 | Phase D Task 39B2c-L2 root topology observation review | [docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md](docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md) |
 | Phase D Task 39B2c-L3a trusted machine target review | [docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md](docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md) |
@@ -487,9 +493,10 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   b-i diagnostic-only native packaging、1060-test clean staged-only serial 与
   independent post-fix/cross-group review 也已完成；b-ii installer/L2 admission、
   ACL fail-closed、whole-installer seal、1067-test clean staged-only serial 与
-  independent grouped/post-fix/cross-group review 已完成。L3c3c-i-a/i-b1/i-b2a
-  已完成，privileged i-b2b 未执行，ADR 0018 仍 Proposed，L3c3c-ii blocked；L3c4
-  独占 final admission 与剩余 full。
+  independent grouped/post-fix/cross-group review 已完成。L3c3c-i root-launch
+  audit 已完成并拒绝 external branch；i-b2b-0b/i-b2b-1 在执行前 superseded，
+  B4 root execution count 为 0。ADR 0018 仍 Proposed，L3c3c-ii-a 是当前
+  frontier；L3c4 独占 final admission 与剩余 full。
   Task 39 尚未完成。
 Deep Dive 的旧 Broker-only no-go 已被 ADR 0004 的 capability-first 边界取代；
 当前仍不可用的原因是生产 Deep Dive 尚未实现，而非 R6 或 Codex 工具能力。

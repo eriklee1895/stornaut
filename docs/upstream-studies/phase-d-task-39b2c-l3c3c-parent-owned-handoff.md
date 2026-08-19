@@ -1,6 +1,7 @@
 # Phase D Task 39B2c-L3c3c Parent-Owned Handoff Study
 
-> Status: Transport and i-b2a reproducibility complete; privileged i-b2b pending
+> Status: external study complete; socketpair candidate retained, external
+> root-launch branch rejected, installed-driver implementation pending
 >
 > Date: 2026-08-19
 >
@@ -206,7 +207,7 @@ signing comparison at every trust transition. The subject was terminated and
 reaped by exact PID. Result SHA-256:
 `d58750f16c97b364ece59bedf1d0aa03706f7645984129c8ffd5df058c09f6c9`.
 
-## 7. B4 Root-to-UID Candidate and Remaining Gate
+## 7. B4 Root-to-UID Candidate and Root-Launch Audit
 
 B4 adds a compile-time-fixed UID 501, a root gate before any launch, closed
 path/argv/environment, the two-stage identity protocol, kernel-bounded
@@ -229,19 +230,37 @@ non-root result fd09e37772edaab4ce2ea78fae768b5520cf7755614d5903b9bf8bac777f25d6
 forced drain    f42d0885d64181f06742f37a09062384f6ffaeea1860c1f76799d88567c4147f
 ```
 
-The privileged machine run has **not executed**. Two standard macOS
-administrator prompts remained pending without starting the binary and were
-explicitly cancelled. No result/stdout/stderr/return-code artifact was created,
-the formal binary had no open process, no system install path changed and the
-repository stayed clean. This is an authorization/evidence gap, not a passing or
-failing runtime result.
+The privileged machine run did **not** execute. B4 root execution count is zero
+and no root attempt receipt exists. The Terminal authentication request was
+cancelled before staging; this is neither a staging pass nor failure. No
+result/stdout/stderr/return-code artifact was created and the repository stayed
+clean.
 
-The former i-b2 gate is split into i-b2a reproducibility and i-b2b privileged
-execution. The non-privileged i-b2a evidence is complete; the exact run remains
-unexecuted. Until one authorized i-b2b run proves the exact root-to-UID happy
-and failure matrix, ADR 0018 remains Proposed and L3c3c-ii remains blocked.
+The later i-b2b-0a audit initially tried to close provenance with a root-owned
+stager and evidence driver. That branch is now complete with a NO-GO decision:
 
-## 8. Three-Layer Reproducible Privileged Gate
+- `sudo -v` creates ambient cached root authority broader than one diagnostic
+  action;
+- replacing it with separate `sudo -kN` stock commands removes cache reuse but
+  does not make root hash/signature verification an unskippable prerequisite to
+  a later root command;
+- macOS exposes no public `fexecve`/`execveat` path that would atomically execute
+  a held verified descriptor; and
+- a sudoers digest rule could supply a root-owned predicate, but installing
+  persistent system policy is outside this prerequisite and would still need to
+  override broad administrator fallback policy.
+
+Two independent reviews rejected the current no-cache WIP. Therefore i-b2b-0b
+external staging and i-b2b-1 external privileged execution are **superseded
+before execution**, not pending gates. The B4 source, binary, driver and verifier
+hashes remain historical, non-admitting evidence for the transport, transition
+and failure taxonomy. They must never be root-executed.
+
+The audit conditionally selects the exact root-owned installed diagnostic driver
+as the only remaining trust-anchor candidate. This is a plan selection, not an
+accepted design or machine result.
+
+## 8. Historical Three-Layer Reproducibility Evidence
 
 Independent preflight returned NO-GO under the former literal requirement that
 a fresh `codesign` reproduce the entire reviewed signed-file SHA. The measured
@@ -250,11 +269,9 @@ file-backed `__LINKEDIT` / allocated `LC_CODE_SIGNATURE` range but outside all
 parsed signature blobs and CodeDirectory coverage. It is not a source, object or
 parsed-signature difference. The amended gate has three mandatory layers:
 
-1. **Exact execution artifact:** the sole privileged input remains the reviewed
-   formal binary with full SHA-256
+1. **Exact historical artifact:** the reviewed formal binary has full SHA-256
    `d157241035e9bdda8bd5ed139509fcb23ae45528ae79b89e3d22b98d614e760d`.
-   Its exact whole-file SHA must match immediately before and after execution and
-   be bound by the result artifacts. A rebuilt file cannot replace it.
+   It was never root-executed and cannot become the installed-driver run input.
 2. **Normalized unsigned projections:** a fresh `-O2` /
    `FIXED_TARGET_UID=501` build from source SHA-256
    `e683480689d72118d494270b72ded3a8baa448ba5026d5cf63780990ca64bb25`
@@ -268,23 +285,33 @@ parsed-signature difference. The amended gate has three mandatory layers:
    padding; any parsed-blob, CodeDirectory, other-offset or additional difference
    fails closed.
 
-Exact hashes, offsets, projection procedure and checklist are frozen in the
+Exact hashes, offsets, projection procedure and checklist remain frozen in the
 [i-b2a reproducibility contract review](../reports/phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md).
-i-b2a is complete. i-b2b remains exactly one explicit administrator-
-authenticated invocation; it must require all scenario rows to be contained,
-all child identities to show EUID 501, exact kernel groups, the three irreversible
-drop probes, strict EOF, bounded cleanup and no retained PID/PGID. It may not
-install files, call launchd, run a product binary, call a model or retry a failed
-implementation.
+i-b2a is complete only as historical reproducibility evidence. It cannot admit
+the rejected external branch or substitute for current-source installed-driver
+identity. See the
+[root-launch trust-anchor audit](../reports/phase-d-task-39b2c-l3c3c-i-b2b-0a-root-provenance-review.md).
 
-The exact formal invocation has no arguments:
+## 9. Revised Installed-Driver Gate
 
-```text
-/tmp/stornaut-l3c3ci.zzGX7U/root-uid-b4/b4-privileged
-```
+The current-source product route is split before implementation:
 
-Before and after the run, the verifier must bind the exact full execution file
-to the reviewed source/binary, bind the output to that same full SHA, confirm
-zero exact-process and exact-PGID residue, and only then promote ADR 0018 from
-Proposed to Accepted. The privileged result JSONL, stderr and return-code
-artifacts remain absent.
+1. **L3c3c-ii-a** extracts an authority-closed live runtime into the existing
+   zero-dependency DriverSupport graph and repeats Debug/Release final-Mach-O
+   authority gates.
+2. **L3c3c-ii-b** composes the fixed installed driver, socketpair, fixed App,
+   root-to-UID transition, opaque handle, installed-L2 barrier and exact
+   retirement using only non-privileged/fake validation.
+3. **L3c3c-ii-c** builds and installs the exact current-source diagnostic
+   topology and repeats static installed-artifact/service-bootstrap admission.
+   It then requires nonzero `sudo -kNnv`, the fixed manual prompt and exactly one
+   no-model outer invocation of the fixed root-owned driver with zero driver
+   arguments. Full installed-L2 follows each App launch before transition/`EXIT`;
+   ii-c must uninstall and prove zero residue.
+
+The exact path, invocation, path/line ceilings and validation funnel are frozen
+in the
+[installed-driver preflight](../reports/phase-d-task-39b2c-l3c3c-ii-installed-driver-path-cost-preflight.md).
+Only a green ii-c gate may move ADR 0018 from Proposed to Accepted. L3c3d then
+owns one real-model pending candidate; L3c4 alone owns readiness and the
+remaining authoritative full verifier.
