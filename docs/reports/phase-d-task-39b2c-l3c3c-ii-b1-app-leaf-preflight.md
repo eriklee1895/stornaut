@@ -11,6 +11,17 @@
 > handoff state machine; no concrete credential drop, configuration adapter,
 > lifecycle/helper claim, driver composition, install, privilege, model/auth,
 > readiness or full verifier
+>
+> Post-RED topology correction frozen: two independent targeted Release artifact
+> runs proved that a Release-only source branch and a Debug-only leaf source do
+> not prevent the unconditionally linked static Diagnostic package product from
+> pulling HandoffContract into the final Release Mach-O. SwiftPM 6.3 target
+> dependency conditions support platform/trait, not build configuration, and the
+> measured Debug App link list expands the Diagnostic product plus all transitive
+> package objects. Manual object linking is rejected. ii-b1 therefore uses one
+> Debug-only diagnostic native target plus one dependency-free Release-shell
+> native target, both compiling the same physical harness source. The verifier
+> must not be weakened.
 
 ## 1. Decisions Closed Before Coding
 
@@ -30,7 +41,8 @@ XCTest host check, but no production environment variable activates the path.
 ### 1.2 The SwiftPM leaf is state, not system authority
 
 The package target `StornautInvestigationDiagnostic` gains a dependency only on
-`StornautInvestigationHandoffContract`. Its new source owns a package-scoped
+`StornautInvestigationHandoffContract`. Its Debug-only new source owns a
+package-scoped
 state machine over already-admitted values and injected operations. It does not
 open, inspect, read or write a descriptor; read a clock; inspect a process; use
 Security/XPC; read argv/environment; or create filesystem/network/cleanup state.
@@ -107,12 +119,42 @@ reference to `StornautInvestigationDiagnostic`, HandoffContract, FD 7 or any
 diagnostic symbol and returns/shows only an empty inert App.
 
 This shell exists solely so Release can be built and inspected. Missing Debug
-implementation is never called runtime rejection. The exact matrix becomes:
+implementation is never called runtime rejection. Artifact testing then proved
+that source guards alone are insufficient: Xcode links the complete static
+`StornautInvestigationDiagnostic` product into both configurations when one
+native target owns that Frameworks entry. Even after the new leaf source was
+entirely wrapped in `#if DEBUG`, the Release Mach-O still contained
+`StornautInvestigationHandoffContract`.
+
+The accepted topology is therefore exact:
+
+- existing native target `StornautInvestigationDiagnosticApp` has only its
+  Debug configuration, continues to compile the one harness source, owns the
+  Diagnostic package product, helper/driver target dependencies and copy phases,
+  and hosts the existing Debug tests;
+- new native target `StornautInvestigationDiagnosticReleaseShell` has only one
+  Release configuration, compiles a second PBX build-file membership referring
+  to that same harness source, has empty Frameworks/Resources phases, and has no
+  package product, native dependency or Copy Files phase;
+- the new target has a unique product/module/bundle identity so its output cannot
+  collide with the Debug diagnostic product; and
+- no checked-in scheme is added. Xcode's target-generated scheme is used only by
+  the targeted verifier; the existing shared diagnostic scheme remains Debug
+  and continues to own Debug tests/helper/driver.
+
+The exact matrix becomes:
 
 - ordinary Debug/Release: no inherited-handoff symbols;
 - dedicated Debug: public entry + package state machine present;
-- dedicated Release: builds successfully, entry/state-machine symbols absent; and
-- native diagnostic App target remains exactly one source.
+- dedicated Release shell: builds successfully, contains exactly its native main
+  Mach-O, and has no Diagnostic/Handoff/leaf/helper/driver symbol or artifact; and
+- both native targets compile exactly the same one physical harness source.
+
+The Release boundary is not accepted from source intent, dead stripping or a
+verifier-selected happy path. Structural gates require the old diagnostic target
+to have no Release configuration and the new shell target to have no dependency
+edge. The final shell Mach-O scan independently proves the leaf and contract are
+absent.
 
 ## 2. Frozen State Machine
 
@@ -157,7 +199,7 @@ claim installed-L2, helper claim/release, driver cleanup or readiness.
 
 ## 3. Exact Implementation Surface and Budget
 
-ii-b1 may change exactly these eight non-document paths and at most 1,900
+ii-b1 may change exactly these nine non-document paths and at most 1,900
 added-or-changed lines:
 
 1. `Package.swift` — add only Diagnostic -> HandoffContract;
@@ -165,12 +207,14 @@ added-or-changed lines:
 3. `StornautApp/Diagnostics/InvestigationRuntimeDiagnosticHarness.swift`;
 4. `StornautAppTests/InvestigationRuntimeDiagnosticTests.swift`;
 5. `Tests/StornautInvestigationTests/InvestigationHandoffAppLeafTests.swift`;
-6. `scripts/verify-investigation-boundaries`;
-7. `scripts/verify-app-release-boundaries`; and
-8. `scripts/verify-contract`.
+6. `Stornaut.xcodeproj/project.pbxproj` — only the exact single-configuration
+   Release-shell target and removal of the old target's Release configuration;
+7. `scripts/verify-investigation-boundaries`;
+8. `scripts/verify-app-release-boundaries`; and
+9. `scripts/verify-contract`.
 
-Xcode project/schemes remain unchanged. The dedicated App and test targets
-continue to use the existing one-source harness/test files. Existing config-path
+No scheme file changes. The dedicated Debug App, Release shell and test targets
+continue to reuse the existing one-source harness/test files. Existing config-path
 composition, Runtime, Lifecycle, Machine, DriverSupport and helper sources remain
 unchanged. Approaching the ceiling requires another split before coding.
 
@@ -189,12 +233,14 @@ The initial RED suite must exist before business implementation and cover:
 - proof that the no-argument b1 public entry cannot receive admission facts and
   always returns `concreteAdapterUnavailable`;
 - Release inert shell/source condition; and
-- structural absence of public state/operations, concrete lifecycle/auth/model/
-  cleanup/driver authority and Xcode membership drift.
+- exact Debug-only diagnostic versus dependency-free Release-shell Xcode graph;
+  and structural absence of public state/operations, concrete lifecycle/auth/
+  model/cleanup/driver authority and Xcode membership drift.
 
 Validation order is: tests-first RED -> focused SwiftPM leaf tests -> dedicated
 App tests -> exact structural/source gates -> affected Investigation/App suites ->
-Debug dedicated App build/test -> dedicated Release build and symbol absence ->
+Debug dedicated App build/test -> dependency-free Release-shell build, exact
+single-Mach-O topology and symbol absence ->
 ordinary Debug/Release absence -> one clean staged-only serial -> independent
 review -> commit/push.
 
