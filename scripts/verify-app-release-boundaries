@@ -591,6 +591,24 @@ for marker in "${authority_object_markers[@]}"; do
     exit 1
 done
 
+for app_binary in \
+    "$debug_app/Contents/MacOS/Stornaut" \
+    "$release_app/Contents/MacOS/Stornaut" \
+    "$diagnostic_debug_app/Contents/MacOS/StornautInvestigationDiagnostic"
+do
+    if mach_o_has_demangled_symbol \
+        "$app_binary" 'StornautInvestigationHandoffContract.'
+    then
+        print -u2 "Handoff contract leaked into an App binary: $app_binary"
+        exit 1
+    else
+        symbol_scan_status=$?
+    fi
+    if (( symbol_scan_status == 2 )); then
+        exit 1
+    fi
+done
+
 if ! mach_o_contains \
     "$diagnostic_debug_app" \
     'InvestigationRuntimeDiagnosticAppLeaf'; then

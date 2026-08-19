@@ -1504,6 +1504,47 @@ import sys
 package = json.loads(sys.argv[1])
 manifest = json.loads(sys.argv[2])
 targets = {target["name"]: target for target in package["targets"]}
+handoff = targets.get("StornautInvestigationHandoffContract")
+if handoff is None:
+    raise SystemExit("missing StornautInvestigationHandoffContract target")
+if set(handoff.get("target_dependencies", [])):
+    raise SystemExit("handoff contract gained a target dependency")
+if Path(handoff.get("path", "")) != Path(
+    "Sources/StornautInvestigationHandoffContract"
+):
+    raise SystemExit("handoff contract target path drifted")
+expected_handoff_sources = {
+    "HandoffBinaryTranscript.swift",
+    "InvestigationHandoffFrameContract.swift",
+    "InvestigationCohortCapsuleContract.swift",
+}
+if set(handoff.get("sources", [])) != expected_handoff_sources:
+    raise SystemExit("handoff contract source allowlist drifted")
+if any("StornautInvestigationHandoffContract" in product.get("targets", [])
+       for product in package.get("products", [])):
+    raise SystemExit("handoff contract became a package product")
+consumers = {target["name"] for target in package["targets"]
+             if "StornautInvestigationHandoffContract"
+             in target.get("target_dependencies", [])}
+if consumers != {"StornautInvestigationTests"}:
+    raise SystemExit(f"handoff contract consumers drifted: {sorted(consumers)}")
+expected_imports = {
+    "HandoffBinaryTranscript.swift": {"CryptoKit", "Foundation"},
+    "InvestigationHandoffFrameContract.swift": {"Foundation"},
+    "InvestigationCohortCapsuleContract.swift": {"Foundation"},
+}
+handoff_forbidden = re.compile(
+    r"\b(?:Codable|NSXPC|Process|FileManager|URLSession|posix_spawn|"
+    r"O_WRONLY|O_RDWR|O_CREAT|Darwin\.write)\b|import\s+Stornaut"
+)
+for source_name in expected_handoff_sources:
+    text = (Path(handoff["path"]) / source_name).read_text(encoding="utf-8")
+    imports = set(re.findall(r"(?m)^import\s+([A-Za-z0-9_]+)\s*$", text))
+    if imports != expected_imports[source_name] or "public " in text:
+        raise SystemExit(f"handoff contract surface drifted: {source_name}")
+    match = handoff_forbidden.search(text)
+    if match:
+        raise SystemExit(f"handoff contract gained authority: {source_name}: {match.group(0)!r}")
 core = targets["StornautCore"]
 dependencies = set(core.get("target_dependencies", []))
 forbidden = {"StornautCodex", "StornautLifecycle"}

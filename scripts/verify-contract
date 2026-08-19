@@ -112,6 +112,12 @@ require_fixed_text scripts/verify-investigation-boundaries \
     'required_removed=$(print -r -- "$undefined_symbols"'
 require_fixed_text scripts/verify-investigation-boundaries \
     'security_added=$(print -r -- "$undefined_symbols"'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'handoff contract consumers drifted'
+require_fixed_text scripts/verify-app-release-boundaries \
+    'Handoff contract leaked into an App binary'
+require_fixed_text Package.swift \
+    'name: "StornautInvestigationHandoffContract"'
 require_fixed_text scripts/verify-app-release-boundaries \
     'expected_diagnostic_mach_o_paths='
 require_fixed_text scripts/verify-app-release-boundaries \
@@ -693,9 +699,9 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "0575ccfad580b658b75b6ed5fdcac026e32f7fc6e64a248ba304ab71a6a3e455",
+        "7884823783a3aabef297020cd2c814f994d2a3c0d554572051b815e74c85789b",
     Path("scripts/verify-app-release-boundaries"):
-        "a59527062d4e07106400de364357f04bc4cd9e9eec954b79971fbecf1c16dd95",
+        "52f5a3faa50102fc100235450b73abe03fb6b4b496bc2454894795c3f6236724",
 }
 for path, expected_sha in expected.items():
     observed_sha = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -778,7 +784,7 @@ if (
     )
 symbol_gate_calls = source.count("mach_o_has_demangled_symbol") - 1
 symbol_gate_error_checks = source.count("(( symbol_scan_status == 2 ))")
-if symbol_gate_calls != 5 or symbol_gate_error_checks != symbol_gate_calls:
+if symbol_gate_calls != 6 or symbol_gate_error_checks != symbol_gate_calls:
     raise SystemExit(
         "every demangled-symbol gate must handle scan errors: "
         f"calls={symbol_gate_calls} checks={symbol_gate_error_checks}"

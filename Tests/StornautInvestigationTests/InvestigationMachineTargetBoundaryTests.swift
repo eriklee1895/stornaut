@@ -3,6 +3,38 @@ import Testing
 
 @Suite("Task 39 trusted machine target boundary")
 struct InvestigationMachineTargetBoundaryTests {
+    @Test
+    func handoffContractTargetRemainsAuthorityFreeAndNonProduct() throws {
+        let root = URL(filePath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let package = try String(
+            contentsOf: root.appending(path: "Package.swift"),
+            encoding: .utf8
+        )
+        let marker = ".target(\n            name: \"StornautInvestigationHandoffContract\""
+        let start = try #require(package.range(of: marker))
+        let suffix = package[start.lowerBound...]
+        let end = try #require(suffix.range(of: "\n        ),"))
+        let target = String(suffix[..<end.upperBound])
+        #expect(target.contains("dependencies: []"))
+        #expect(!package[..<start.lowerBound].contains("StornautInvestigationHandoffContract"))
+
+        let sourceRoot = root.appending(path: "Sources/StornautInvestigationHandoffContract")
+        let names = try Set(FileManager.default.contentsOfDirectory(atPath: sourceRoot.path))
+        #expect(names == ["HandoffBinaryTranscript.swift", "InvestigationHandoffFrameContract.swift", "InvestigationCohortCapsuleContract.swift"])
+        for name in names {
+            let source = try String(
+                contentsOf: sourceRoot.appending(path: name),
+                encoding: .utf8
+            )
+            #expect(!source.contains("public "))
+            for forbidden in ["Codable", "NSXPC", "Process(", "FileManager", "URLSession", "posix_spawn", "Darwin.write", "O_WRONLY", "import Stornaut"] {
+                #expect(!source.contains(forbidden))
+            }
+        }
+    }
+
     private func l3c3biiSource(
         _ path: String,
         repositoryRoot: URL
