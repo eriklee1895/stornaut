@@ -25,6 +25,7 @@ struct InvestigationMachineTargetBoundaryTests {
         #expect(names == [
             "HandoffBinaryTranscript.swift",
             "InvestigationCohortCapsuleContract.swift",
+            "InvestigationHandoffEpochBootstrapContract.swift",
             "InvestigationHandoffFrameContract.swift",
             "InvestigationMachineClaimContract.swift",
         ])
@@ -43,7 +44,10 @@ struct InvestigationMachineTargetBoundaryTests {
                 #expect(source.contains(
                     "@objc(StornautInvestigationMachineClaimXPCWire)"
                 ))
-                for forbidden in [
+            } else {
+                #expect(!source.contains("public "))
+            }
+            for forbidden in [
                     "NSXPCConnection", "NSXPCListener", "Timer(",
                     "DispatchSource", "DispatchQueue", "RunLoop",
                     "Task.sleep", "Task.detached", "ContinuousClock",
@@ -61,11 +65,8 @@ struct InvestigationMachineTargetBoundaryTests {
                     "opendir(", "readdir(", "closedir(",
                     "NSLock", "actor ", "class ", "static var ",
                     "import Security",
-                ] {
-                    #expect(!source.contains(forbidden))
-                }
-            } else {
-                #expect(!source.contains("public "))
+            ] {
+                #expect(!source.contains(forbidden))
             }
             for forbidden in ["Codable", "NSXPC", "Process(", "FileManager", "URLSession", "posix_spawn", "Darwin.write", "O_WRONLY", "import Stornaut"] {
                 #expect(!source.contains(forbidden))

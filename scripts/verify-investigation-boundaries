@@ -1515,6 +1515,7 @@ if Path(handoff.get("path", "")) != Path(
     raise SystemExit("handoff contract target path drifted")
 expected_handoff_sources = {
     "HandoffBinaryTranscript.swift",
+    "InvestigationHandoffEpochBootstrapContract.swift",
     "InvestigationHandoffFrameContract.swift",
     "InvestigationCohortCapsuleContract.swift",
     "InvestigationMachineClaimContract.swift",
@@ -1531,6 +1532,7 @@ if consumers != {"StornautInvestigationTests"}:
     raise SystemExit(f"handoff contract consumers drifted: {sorted(consumers)}")
 expected_imports = {
     "HandoffBinaryTranscript.swift": {"CryptoKit", "Foundation"},
+    "InvestigationHandoffEpochBootstrapContract.swift": {"Foundation"},
     "InvestigationHandoffFrameContract.swift": {"Foundation"},
     "InvestigationCohortCapsuleContract.swift": {"Foundation"},
     "InvestigationMachineClaimContract.swift": {"Foundation"},
@@ -1555,8 +1557,7 @@ for source_name in expected_handoff_sources:
     match = handoff_forbidden.search(text)
     if match:
         raise SystemExit(f"handoff contract gained authority: {source_name}: {match.group(0)!r}")
-    if source_name == "InvestigationMachineClaimContract.swift":
-        forbidden_runtime = re.search(
+    forbidden_runtime = re.search(
             r"\b(?:NSXPCConnection|NSXPCListener|DispatchSource|"
             r"DispatchQueue|RunLoop|ContinuousClock|SuspendingClock|"
             r"CFAbsoluteTimeGetCurrent|mach_continuous_time|mach_wait_until|"
@@ -1572,13 +1573,13 @@ for source_name in expected_handoff_sources:
             r"\b(?:pread|stat|lstat|fstat|readlink|opendir|readdir|closedir)"
             r"\s*\(|\bactor\s+|\bclass\s+|\bstatic\s+var\s+|"
             r"import\s+Security",
-            text,
+        text,
+    )
+    if forbidden_runtime:
+        raise SystemExit(
+            "handoff contract gained runtime ownership: "
+            f"{source_name}: {forbidden_runtime.group(0)!r}"
         )
-        if forbidden_runtime:
-            raise SystemExit(
-                "handoff claim contract gained runtime ownership: "
-                f"{forbidden_runtime.group(0)!r}"
-            )
 core = targets["StornautCore"]
 dependencies = set(core.get("target_dependencies", []))
 forbidden = {"StornautCodex", "StornautLifecycle"}

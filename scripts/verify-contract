@@ -117,7 +117,9 @@ require_fixed_text scripts/verify-investigation-boundaries \
 require_fixed_text scripts/verify-investigation-boundaries \
     'InvestigationMachineClaimContract.swift'
 require_fixed_text scripts/verify-investigation-boundaries \
-    'handoff claim contract gained runtime ownership'
+    'InvestigationHandoffEpochBootstrapContract.swift'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'handoff contract gained runtime ownership'
 require_fixed_text scripts/verify-app-release-boundaries \
     'Handoff contract leaked into an App bundle'
 require_fixed_text scripts/verify-app-release-boundaries \
@@ -705,7 +707,7 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "81d1c9ff077586f4fefdf549e0c11c0d815073544714aee5c859662e19097679",
+        "c4f4d41524fc7319e895f02a9924192c0cf1d80a0eb61d7c173af591bd130e54",
     Path("scripts/verify-app-release-boundaries"):
         "7a55c2a2c1e137c8671f068cc291b54eb108ece3adab9954ab1652438f905b5b",
 }
