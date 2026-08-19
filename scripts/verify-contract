@@ -120,6 +120,10 @@ require_fixed_text scripts/verify-investigation-boundaries \
     'InvestigationHandoffEpochBootstrapContract.swift'
 require_fixed_text scripts/verify-investigation-boundaries \
     'handoff contract gained runtime ownership'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'claim evidence helper ASID join drifted'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'claim evidence regained invalid App/helper ASID join'
 require_fixed_text scripts/verify-app-release-boundaries \
     'Handoff contract leaked into an App bundle'
 require_fixed_text scripts/verify-app-release-boundaries \
@@ -717,7 +721,7 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "55c94f91867c4d60430553d72bd4b8777c558fb9f4c5655d51c7fce8a83edc6d",
+        "fbf5b75ee6ef577d05265108c049c6f8aed761ceec5db1bc6b38786b2fc15b67",
     Path("scripts/verify-app-release-boundaries"):
         "5a74abe27334dd2d7aaf2243ddcbc5789a590e7700dd12f1a602b6e0b52ddaa6",
 }
@@ -1215,6 +1219,81 @@ if rg -q 'START ui-automation-readiness' "$diagnostic_contract_output"; then
     fail_contract \
         "Full verifier entered UI readiness after a broken Trash diagnostic contract"
 fi
+
+claim_contract_source=Sources/StornautInvestigationHandoffContract/InvestigationMachineClaimContract.swift
+claim_asid_gate=scripts/verify-investigation-boundaries
+"$claim_asid_gate" --claim-asid-contract-only \
+    "$claim_contract_source" \
+    >"$contract_root/claim-asid-canonical.log"
+function require_claim_asid_mutation_rejected() {
+    local fixture_name=$1
+    local fixture_path=$2
+    local output="$contract_root/$fixture_name.log"
+    if "$claim_asid_gate" --claim-asid-contract-only \
+        "$fixture_path" >"$output" 2>&1
+    then
+        fail_contract "Claim ASID mutation was accepted: $fixture_name"
+    fi
+}
+python3 - \
+    "$claim_contract_source" \
+    "$contract_root/claim-asid-comment.swift" \
+    "$contract_root/claim-asid-string.swift" \
+    "$contract_root/claim-asid-reversed.swift" <<'PY'
+from pathlib import Path
+import sys
+
+source_path, comment_path, string_path, reversed_path = map(Path, sys.argv[1:])
+source = source_path.read_text(encoding="utf-8")
+
+
+def mutate_once(value, old, new, name):
+    if value.count(old) != 1:
+        raise SystemExit(f"cannot construct {name} mutation")
+    return value.replace(old, new, 1)
+
+
+comment_path.write_text(
+    mutate_once(
+        source,
+        "            l1Residue.auditSessionID == "
+        "helperIdentity.auditSessionID,",
+        "            // l1Residue.auditSessionID == "
+        "helperIdentity.auditSessionID,",
+        "comment-only required join",
+    ),
+    encoding="utf-8",
+)
+string_path.write_text(
+    mutate_once(
+        source,
+        "        helperAuditSessionID = helperIdentity.auditSessionID",
+        "        let ignoredASIDContract = \"helperAuditSessionID = "
+        "helperIdentity.auditSessionID\"",
+        "string-only required assignment",
+    ),
+    encoding="utf-8",
+)
+reversed_path.write_text(
+    mutate_once(
+        source,
+        "            helperIdentity.effectiveUserID == 0\n"
+        "        else {",
+        "            helperIdentity.effectiveUserID == 0,\n"
+        "            helperIdentity.auditSessionID == "
+        "appIdentity.auditSessionID\n"
+        "        else {",
+        "reversed invalid ASID equality",
+    ),
+    encoding="utf-8",
+)
+PY
+require_claim_asid_mutation_rejected \
+    claim-asid-comment "$contract_root/claim-asid-comment.swift"
+require_claim_asid_mutation_rejected \
+    claim-asid-string "$contract_root/claim-asid-string.swift"
+require_claim_asid_mutation_rejected \
+    claim-asid-reversed "$contract_root/claim-asid-reversed.swift"
 
 typeset -a source_boundaries=(
     verify-activity-boundaries

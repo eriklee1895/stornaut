@@ -241,8 +241,8 @@ struct InvestigationMachineClaimContractTests {
                 + "00000000002e73746f726e6175742e7461736b33392e6d616368696e652d"
                 + "636c61696d2e70726f636573732d6964656e746974790001000000040000"
                 + "0001000200000001010003000000040000002a0004000000040000000700"
-                + "050000000400000009000600000004000001f5000700000020000001f500"
-                + "0001f500000014000001f5000000140000002a0000000900000007000600"
+                + "050000000400000007000600000004000001f5000700000020000001f500"
+                + "0001f500000014000001f5000000140000002a0000000700000007000600"
                 + "00009753544e4300000000002e73746f726e6175742e7461736b33392e6d"
                 + "616368696e652d636c61696d2e70726f636573732d6964656e7469747900"
                 + "010000000400000001000200000001020003000000040000005400040000"
@@ -271,6 +271,86 @@ struct InvestigationMachineClaimContractTests {
         #expect(decoded.l1Residue.matchingLeases == 0)
         #expect(decoded.l1Residue.leaseRootEntries == 0)
         #expect(decoded.l1Residue.investigationArtifacts == 0)
+    }
+
+    @Test
+    func evidenceAcceptsIndependentAppAndHelperAuditSessions() throws {
+        let request = try claimRequest()
+        let app = try appIdentity(auditSessionID: 7)
+        let helper = try helperIdentity(auditSessionID: 9)
+        let evidence = try claimEvidence(
+            request: request,
+            appIdentity: app,
+            helperIdentity: helper
+        )
+        let expected = try expectation(
+            request: request,
+            appIdentity: app,
+            helperIdentity: helper
+        )
+
+        #expect(evidence.appIdentity.auditSessionID == 7)
+        #expect(evidence.helperIdentity.auditSessionID == 9)
+        #expect(evidence.l1Residue.auditSessionID == 9)
+        try evidence.validate(against: expected)
+        let decoded = try InvestigationMachineClaimEvidence.decode(
+            evidence.encoded()
+        )
+        #expect(decoded.appIdentity.auditSessionID == 7)
+        #expect(decoded.helperIdentity.auditSessionID == 9)
+        #expect(decoded.l1Residue.auditSessionID == 9)
+    }
+
+    @Test
+    func expectationAcceptsIndependentAppAndHelperAuditSessions() throws {
+        let expected = try expectation(
+            appIdentity: appIdentity(auditSessionID: 7),
+            helperIdentity: helperIdentity(auditSessionID: 9)
+        )
+
+        #expect(expected.appIdentity.auditSessionID == 7)
+        #expect(expected.helperIdentity.auditSessionID == 9)
+    }
+
+    @Test
+    func evidenceDecoderAcceptsResidueBoundToHelperAuditSession() throws {
+        let request = try claimRequest()
+        let app = try appIdentity(auditSessionID: 7)
+        let helper = try helperIdentity(auditSessionID: 9)
+        let encoded = try HandoffBinaryTranscript.encode(
+            domain: InvestigationMachineClaimEvidence.domain,
+            businessFields: [
+                request.bindingSHA256().rawBytes,
+                uuidBytes(request.claimChallenge),
+                uuidBytes(request.claimConnectionEpoch),
+                app.encoded(),
+                helper.encoded(),
+                handoffData(UInt32(501)),
+                handoffData(Int64(950_000)),
+                handoffData(Int64(1_300_000)),
+                InvestigationMachineOwnerRetirement().encoded(),
+                l1Residue(auditSessionID: 9).encoded(),
+                handoffData(UInt64(0x1112_1314_1516_1718)),
+            ],
+            maximumByteCount:
+                InvestigationMachineClaimEvidence.maximumByteCount
+        )
+
+        let decoded = try InvestigationMachineClaimEvidence.decode(encoded)
+        #expect(decoded.appIdentity.auditSessionID == 7)
+        #expect(decoded.helperIdentity.auditSessionID == 9)
+        #expect(decoded.l1Residue.auditSessionID == 9)
+    }
+
+    @Test
+    func evidenceRejectsResidueBoundToAppInsteadOfHelperSession() throws {
+        #expect(throws: (any Error).self) {
+            _ = try claimEvidence(
+                appIdentity: appIdentity(auditSessionID: 7),
+                helperIdentity: helperIdentity(auditSessionID: 9),
+                residueAuditSessionID: 7
+            )
+        }
     }
 
     @Test
@@ -322,13 +402,14 @@ struct InvestigationMachineClaimContractTests {
         let evidence = try claimEvidence(request: request)
         try evidence.validate(against: expectation(request: request))
 
-        let alternateSessionApp = try appIdentity(auditSessionID: 10)
-        let alternateSessionHelper = try helperIdentity(auditSessionID: 10)
         let identityMutations = [
             try expectation(
                 request: request,
-                appIdentity: alternateSessionApp,
-                helperIdentity: alternateSessionHelper
+                appIdentity: appIdentity(auditSessionID: 10)
+            ),
+            try expectation(
+                request: request,
+                helperIdentity: helperIdentity(auditSessionID: 10)
             ),
             try expectation(request: request, appIdentity: alternateAppIdentity()),
             try expectation(request: request, helperIdentity: alternateHelperIdentity()),
@@ -784,7 +865,7 @@ private extension InvestigationMachineClaimContractTests {
     func appIdentity(
         processID: UInt32 = 42,
         processIDVersion: UInt32 = 7,
-        auditSessionID: UInt32 = 9
+        auditSessionID: UInt32 = 7
     ) throws -> InvestigationMachineProcessIdentity {
         try InvestigationMachineProcessIdentity(
             role: .app,
@@ -850,6 +931,7 @@ private extension InvestigationMachineClaimContractTests {
         claimConnectionEpoch: UUID? = nil,
         appIdentity: InvestigationMachineProcessIdentity? = nil,
         helperIdentity: InvestigationMachineProcessIdentity? = nil,
+        residueAuditSessionID: UInt32 = 9,
         recordedAt: Int64 = 950_000,
         claimedAt: Int64 = 1_300_000,
         releaseDeadlineNanoseconds: UInt64 = 0x1112_1314_1516_1718
@@ -868,7 +950,9 @@ private extension InvestigationMachineClaimContractTests {
             recordedAt: utc(recordedAt),
             claimedAt: utc(claimedAt),
             ownerRetirement: InvestigationMachineOwnerRetirement(),
-            l1Residue: l1Residue(),
+            l1Residue: l1Residue(
+                auditSessionID: residueAuditSessionID
+            ),
             releaseDeadlineNanoseconds: releaseDeadlineNanoseconds
         )
     }

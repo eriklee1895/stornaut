@@ -384,8 +384,7 @@ package struct InvestigationMachineClaimEvidence:
             appUserID == 501,
             appIdentity.effectiveUserID == appUserID,
             helperIdentity.effectiveUserID == 0,
-            appIdentity.auditSessionID == helperIdentity.auditSessionID,
-            l1Residue.auditSessionID == appIdentity.auditSessionID,
+            l1Residue.auditSessionID == helperIdentity.auditSessionID,
             l1Residue.userID == appUserID,
             l1Residue.observedAt <= recordedAt,
             recordedAt <= claimedAt,
@@ -479,7 +478,8 @@ package struct InvestigationMachineClaimEvidence:
             appIdentity == expectation.appIdentity,
             helperIdentity == expectation.helperIdentity,
             l1Residue.investigationUUID == expectation.investigationUUID,
-            l1Residue.auditSessionID == expectation.auditSessionID,
+            l1Residue.auditSessionID
+                == expectation.helperAuditSessionID,
             l1Residue.userID == expectation.appUserID,
             recordedAt <= expectation.issuedAt,
             expectation.issuedAt <= claimedAt,
@@ -498,7 +498,7 @@ package struct InvestigationMachineClaimExpectation:
     package let originalClaimChallenge: UUID
     package let claimConnectionEpoch: UUID
     package let investigationUUID: UUID
-    package let auditSessionID: UInt32
+    package let helperAuditSessionID: UInt32
     package let appUserID: UInt32
     package let appIdentity: InvestigationMachineProcessIdentity
     package let helperIdentity: InvestigationMachineProcessIdentity
@@ -516,8 +516,7 @@ package struct InvestigationMachineClaimExpectation:
             appIdentity.role == .app,
             helperIdentity.role == .helper,
             appIdentity.effectiveUserID == appUserID,
-            helperIdentity.effectiveUserID == 0,
-            appIdentity.auditSessionID == helperIdentity.auditSessionID
+            helperIdentity.effectiveUserID == 0
         else {
             throw InvestigationHandoffContractError.invalidValue
         }
@@ -525,7 +524,7 @@ package struct InvestigationMachineClaimExpectation:
         originalClaimChallenge = request.claimChallenge
         claimConnectionEpoch = request.claimConnectionEpoch
         investigationUUID = request.handle.investigationUUID
-        auditSessionID = appIdentity.auditSessionID
+        helperAuditSessionID = helperIdentity.auditSessionID
         self.appUserID = appUserID
         self.appIdentity = appIdentity
         self.helperIdentity = helperIdentity
