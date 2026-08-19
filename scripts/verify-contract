@@ -124,6 +124,16 @@ require_fixed_text scripts/verify-investigation-boundaries \
     'claim evidence helper ASID join drifted'
 require_fixed_text scripts/verify-investigation-boundaries \
     'claim evidence regained invalid App/helper ASID join'
+require_fixed_text scripts/verify-investigation-boundaries \
+    '--deadline-state-contract-only'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'deadline stale arm success no longer cancels timer'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'deadline stale arm failure clears pending cancellation'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'deadline pending/armed callback drifted'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'reply dispatch regained deadline extension authority'
 require_fixed_text scripts/verify-app-release-boundaries \
     'Handoff contract leaked into an App bundle'
 require_fixed_text scripts/verify-app-release-boundaries \
@@ -721,7 +731,7 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "fbf5b75ee6ef577d05265108c049c6f8aed761ceec5db1bc6b38786b2fc15b67",
+        "e5312f6e10b95dac5d3f3bd255016fa8139ed47b435a550f8277afe5eff61ea7",
     Path("scripts/verify-app-release-boundaries"):
         "5a74abe27334dd2d7aaf2243ddcbc5789a590e7700dd12f1a602b6e0b52ddaa6",
 }
@@ -1294,6 +1304,137 @@ require_claim_asid_mutation_rejected \
     claim-asid-string "$contract_root/claim-asid-string.swift"
 require_claim_asid_mutation_rejected \
     claim-asid-reversed "$contract_root/claim-asid-reversed.swift"
+
+deadline_state_source=Sources/StornautLifecycle/LifecycleMachineRetirementEscrowDeadlineState.swift
+deadline_state_gate=scripts/verify-investigation-boundaries
+"$deadline_state_gate" --deadline-state-contract-only \
+    "$deadline_state_source" \
+    >"$contract_root/deadline-state-canonical.log"
+function require_deadline_state_mutation_rejected() {
+    local fixture_name=$1
+    local fixture_path=$2
+    local expected_diagnostic=$3
+    local output="$contract_root/$fixture_name.log"
+    if "$deadline_state_gate" --deadline-state-contract-only \
+        "$fixture_path" >"$output" 2>&1
+    then
+        fail_contract "Deadline state mutation was accepted: $fixture_name"
+    fi
+    require_fixed_text "$output" "$expected_diagnostic"
+}
+python3 - \
+    "$deadline_state_source" \
+    "$contract_root/deadline-comment.swift" \
+    "$contract_root/deadline-arm-failure.swift" \
+    "$contract_root/deadline-armed-early.swift" \
+    "$contract_root/deadline-reply-extension.swift" \
+    "$contract_root/deadline-regex.swift" \
+    "$contract_root/deadline-public.swift" <<'PY'
+from pathlib import Path
+import sys
+
+source_path, comment_path, failure_path, early_path, reply_path, regex_path, public_path = map(
+    Path, sys.argv[1:]
+)
+source = source_path.read_text(encoding="utf-8")
+
+
+def mutate_once(value, old, new, name):
+    if value.count(old) != 1:
+        raise SystemExit(f"cannot construct deadline mutation: {name}")
+    return value.replace(old, new, 1)
+
+
+comment_path.write_text(
+    mutate_once(
+        source,
+        "                        effects: [.cancel(ticket)]",
+        "                        // effects: [.cancel(ticket)]",
+        "comment-only stale arm cancel",
+    ),
+    encoding="utf-8",
+)
+failure_path.write_text(
+    mutate_once(
+        source,
+        "            guard pendingTicketLocked == ticket else {\n"
+        "                return transitionLocked(.stale)\n",
+        "            guard pendingTicketLocked == ticket else {\n"
+        "                lateArmCancellation.remove(ticket)\n"
+        "                return transitionLocked(.stale)\n",
+        "stale arm failure clears cancel",
+    ),
+    encoding="utf-8",
+)
+early_path.write_text(
+    mutate_once(
+        source,
+        "                    cancelCurrent: !isPending,",
+        "                    cancelCurrent: false,",
+        "armed early callback lost self cancel",
+    ),
+    encoding="utf-8",
+)
+reply_path.write_text(
+    mutate_once(
+        source,
+        "            guard let ticket = makeTicketLocked(\n"
+        "                kind: .postReplyExit,",
+        "            _ = checkedAdd(\n"
+        "                observation.monotonicNanoseconds,\n"
+        "                Self.maximumPostReplyExitWindowNanoseconds\n"
+        "            )\n"
+        "            guard let ticket = makeTicketLocked(\n"
+        "                kind: .postReplyExit,",
+        "reply dispatch regained deadline extension",
+    ),
+    encoding="utf-8",
+)
+regex_path.write_text(
+    mutate_once(
+        source,
+        "                if lateArmCancellation.remove(ticket) != nil {\n"
+        "                    return transitionLocked(\n"
+        "                        .stale,\n"
+        "                        effects: [.cancel(ticket)]\n"
+        "                    )\n"
+        "                }",
+        "                let ignored = "
+        "/lateArmCancellation.remove(ticket) != nil effects: [.cancel(ticket)]/\n"
+        "                _ = ignored",
+        "regex-only stale arm markers",
+    ),
+    encoding="utf-8",
+)
+public_path.write_text(
+    mutate_once(
+        source,
+        "package final class LifecycleMachineRetirementEscrowDeadlineState:",
+        "@available(macOS 26, *) public final class "
+        "LifecycleMachineRetirementEscrowDeadlineState:",
+        "attributed public state owner",
+    ),
+    encoding="utf-8",
+)
+PY
+require_deadline_state_mutation_rejected \
+    deadline-comment "$contract_root/deadline-comment.swift" \
+    "deadline stale arm success no longer cancels timer"
+require_deadline_state_mutation_rejected \
+    deadline-arm-failure "$contract_root/deadline-arm-failure.swift" \
+    "deadline stale arm failure clears pending cancellation"
+require_deadline_state_mutation_rejected \
+    deadline-armed-early "$contract_root/deadline-armed-early.swift" \
+    "deadline pending/armed callback drifted"
+require_deadline_state_mutation_rejected \
+    deadline-reply-extension "$contract_root/deadline-reply-extension.swift" \
+    "reply dispatch regained deadline extension authority"
+require_deadline_state_mutation_rejected \
+    deadline-regex "$contract_root/deadline-regex.swift" \
+    "deadline state gained regex-literal spoofing surface"
+require_deadline_state_mutation_rejected \
+    deadline-public "$contract_root/deadline-public.swift" \
+    "deadline state exposed public surface"
 
 typeset -a source_boundaries=(
     verify-activity-boundaries

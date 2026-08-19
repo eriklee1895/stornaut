@@ -7,13 +7,18 @@ cd "$repo_root"
 
 claim_asid_contract_only=false
 claim_asid_contract_source=
+deadline_state_contract_only=false
+deadline_state_contract_source=
 if (( $# > 0 )); then
     if (( $# == 2 )) && [[ $1 == --claim-asid-contract-only ]]; then
         claim_asid_contract_only=true
         claim_asid_contract_source=$2
+    elif (( $# == 2 )) && [[ $1 == --deadline-state-contract-only ]]; then
+        deadline_state_contract_only=true
+        deadline_state_contract_source=$2
     else
         print -u2 \
-            "Usage: scripts/verify-investigation-boundaries [--claim-asid-contract-only <source>]"
+            "Usage: scripts/verify-investigation-boundaries [--claim-asid-contract-only <source> | --deadline-state-contract-only <source>]"
         exit 64
     fi
 fi
@@ -161,9 +166,269 @@ for pattern in (
 PY
 }
 
+function verify_deadline_state_contract() {
+    local source=$1
+    python3 - "$source" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+
+def code_only(source):
+    output = list(source)
+    index = 0
+    block_depth = 0
+    delimiter = None
+    while index < len(source):
+        if block_depth:
+            if source.startswith("/*", index):
+                output[index:index + 2] = "  "
+                block_depth += 1
+                index += 2
+            elif source.startswith("*/", index):
+                output[index:index + 2] = "  "
+                block_depth -= 1
+                index += 2
+            else:
+                if source[index] != "\n":
+                    output[index] = " "
+                index += 1
+            continue
+        if delimiter is not None:
+            if source.startswith(delimiter, index):
+                width = len(delimiter)
+                output[index:index + width] = " " * width
+                delimiter = None
+                index += width
+            elif delimiter == '"' and source[index] == "\\":
+                output[index] = " "
+                if index + 1 < len(source):
+                    output[index + 1] = " "
+                index += 2
+            else:
+                if source[index] != "\n":
+                    output[index] = " "
+                index += 1
+            continue
+        if source.startswith("//", index):
+            end = source.find("\n", index)
+            end = len(source) if end < 0 else end
+            output[index:end] = " " * (end - index)
+            index = end
+        elif source.startswith("/*", index):
+            output[index:index + 2] = "  "
+            block_depth = 1
+            index += 2
+        elif source.startswith('\"\"\"', index):
+            output[index:index + 3] = "   "
+            delimiter = '"""'
+            index += 3
+        elif source[index] == '"':
+            output[index] = " "
+            delimiter = '"'
+            index += 1
+        else:
+            index += 1
+    if block_depth or delimiter is not None:
+        raise SystemExit("deadline state has unterminated comment or string")
+    return "".join(output)
+
+
+def body(source, pattern):
+    match = re.search(pattern, source)
+    if match is None:
+        raise SystemExit(f"deadline state declaration drifted: {pattern}")
+    opening = source.find("{", match.end())
+    if opening < 0:
+        raise SystemExit(f"deadline state declaration has no body: {pattern}")
+    depth = 0
+    for index in range(opening, len(source)):
+        if source[index] == "{":
+            depth += 1
+        elif source[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return source[match.start():index + 1]
+    raise SystemExit(f"deadline state declaration is unterminated: {pattern}")
+
+
+source = Path(sys.argv[1]).read_text(encoding="utf-8")
+code = code_only(source)
+imports = re.findall(r"(?m)^\s*import\s+([A-Za-z0-9_]+)\s*$", code)
+if imports != ["Foundation"]:
+    raise SystemExit(f"deadline state imports drifted: {imports}")
+for import_line in re.findall(r"(?m)^\s*.*\bimport\b.*$", code):
+    if import_line.strip() != "import Foundation":
+        raise SystemExit(f"deadline state import surface drifted: {import_line!r}")
+declaration_prefix = (
+    r"(?m)^\s*(?:@[A-Za-z_][A-Za-z0-9_.]*(?:\([^\n]*\))?\s+)*"
+    r"(?:(?:final|nonisolated|distributed|indirect|static|class|"
+    r"mutating|nonmutating|borrowing|consuming)\s+)*"
+)
+if re.search(declaration_prefix + r"(?:public|open)\s+", code):
+    raise SystemExit("deadline state exposed public surface")
+if re.search(r"(?m)(?:^|[^/])/(?![/*])[^\n/]+/(?:[A-Za-z]*)", code) \
+        or re.search(r"\b(?:Regex|RegexBuilder)\b", code):
+    raise SystemExit("deadline state gained regex-literal spoofing surface")
+required_types = (
+    "LifecycleMachineRetirementDeadlineValueError",
+    "LifecycleMachineRetirementDeadlineDigest",
+    "LifecycleMachineRetirementDeadlineObservation",
+    "LifecycleMachineRetirementDeadlineReservation",
+    "LifecycleMachineRetirementDeadlineClaim",
+    "LifecycleMachineRetirementDeadlineRelease",
+    "LifecycleMachineRetirementDeadlineKind",
+    "LifecycleMachineRetirementDeadlineTicket",
+    "LifecycleMachineRetirementDeadlineTerminalReason",
+    "LifecycleMachineRetirementDeadlinePhase",
+    "LifecycleMachineRetirementDeadlineDisposition",
+    "LifecycleMachineRetirementDeadlineEffect",
+    "LifecycleMachineRetirementDeadlineTransition",
+)
+for name in required_types:
+    if not re.search(rf"(?m)^package\s+(?:enum|struct)\s+{name}\b", code):
+        raise SystemExit(f"deadline state package type drifted: {name}")
+class_body = body(
+    code,
+    r"(?m)^package\s+final\s+class\s+"
+    r"LifecycleMachineRetirementEscrowDeadlineState\b",
+)
+required_methods = (
+    "reserve", "armSucceeded", "armFailed", "claim", "release",
+    "replyDidDispatch", "replyDispatchFailed", "deadlineFired",
+    "cancel", "invalidate",
+)
+methods = {}
+for name in required_methods:
+    methods[name] = body(class_body, rf"package\s+func\s+{name}\s*\(")
+for marker in (
+    "maximumClaimRequestWindowMicroseconds",
+    "maximumReleaseWindowNanoseconds",
+    "maximumPostReplyExitWindowNanoseconds",
+    "lateArmCancellation",
+    "NSLock()",
+):
+    if marker not in class_body:
+        raise SystemExit(f"deadline state owner marker drifted: {marker}")
+authority = re.compile(
+    r"\b(?:Codable|Encodable|Decodable|NSXPC\w*|Dispatch\w*|Task|"
+    r"FileManager|URLSession|Process|Security|ActionExecutor|Policy|Cleanup|"
+    r"Executor|StornautInvestigationHandoffContract)\b|"
+    r"\b(?:exit|kill|posix_spawn|unlink|rename)\s*\("
+)
+match = authority.search(code)
+if match:
+    raise SystemExit(f"deadline state gained authority: {match.group(0)!r}")
+arm_success = methods["armSucceeded"]
+if not (
+    re.search(r"lateArmCancellation\.remove\(ticket\)\s*!=\s*nil", arm_success)
+    and re.search(r"effects:\s*\[\.cancel\(ticket\)\]", arm_success)
+):
+    raise SystemExit("deadline stale arm success no longer cancels timer")
+if "lateArmCancellation" in methods["armFailed"]:
+    raise SystemExit("deadline stale arm failure clears pending cancellation")
+deadline_fired = methods["deadlineFired"]
+for pattern in (
+    r"let\s+isPending\s*=\s*pendingTicketLocked\s*==\s*ticket",
+    r"cancelCurrent:\s*!isPending",
+    r"rememberLateArm:\s*isPending\s*\?\s*ticket\s*:\s*nil",
+):
+    if not re.search(pattern, deadline_fired):
+        raise SystemExit(f"deadline pending/armed callback drifted: {pattern}")
+reply = methods["replyDidDispatch"]
+if "checkedAdd" in reply or "maximumPostReplyExitWindowNanoseconds" in reply:
+    raise SystemExit("reply dispatch regained deadline extension authority")
+if not re.search(
+    r"observation\.monotonicNanoseconds\s*<\s*"
+    r"context\.postReplyExitDeadlineNanoseconds",
+    reply,
+):
+    raise SystemExit("reply dispatch no longer checks retained deadline")
+PY
+}
+
+function verify_deadline_state_scope() {
+    python3 - <<'PY'
+from pathlib import Path
+import json
+import subprocess
+
+baseline = "354ff3bd4602c5595811513fb9aefa5b8e5e8adb"
+allowed = {
+    "Sources/StornautLifecycle/LifecycleMachineRetirementEscrowDeadlineState.swift",
+    "Tests/StornautLifecycleTests/LifecycleMachineRetirementEscrowDeadlineStateTests.swift",
+    "scripts/verify-investigation-boundaries",
+    "scripts/verify-contract",
+}
+changed = subprocess.check_output(
+    ["git", "diff", "--name-only", baseline, "--"], text=True
+).splitlines()
+non_document = {path for path in changed if not path.startswith("docs/")}
+if non_document != allowed:
+    raise SystemExit(
+        f"deadline state non-document paths drifted: {sorted(non_document)}"
+    )
+counts = {path: 0 for path in allowed}
+for row in subprocess.check_output(
+    ["git", "diff", "--numstat", baseline, "--"], text=True
+).splitlines():
+    added, deleted, path = row.split("\t")
+    if path in counts:
+        counts[path] = int(added) + int(deleted)
+source_test = sum(
+    counts[path] for path in counts if path.startswith(("Sources/", "Tests/"))
+)
+scripts = sum(counts[path] for path in counts if path.startswith("scripts/"))
+if source_test > 1900 or scripts > 700 or source_test + scripts > 2600:
+    raise SystemExit(
+        f"deadline state budget drifted: source/tests={source_test}, scripts={scripts}"
+    )
+protected = [
+    "Package.swift",
+    "Sources/StornautLifecycle/LifecycleMachineRetirementEscrow.swift",
+    "Sources/StornautLifecycle/LifecycleSupervisorXPC.swift",
+    "StornautLifecycleHelper/main.swift",
+    "Sources/StornautInvestigationMachine",
+    "Sources/StornautInvestigationMachineDriverSupport",
+    "StornautApp",
+    "Stornaut.xcodeproj/project.pbxproj",
+    "Stornaut.xcodeproj/xcshareddata/xcschemes",
+]
+if subprocess.run(
+    ["git", "diff", "--quiet", baseline, "--", *protected]
+).returncode != 0:
+    raise SystemExit("deadline state protected product blobs drifted")
+symbol = "LifecycleMachineRetirementEscrowDeadlineState"
+owners = []
+for root in ("Sources", "StornautApp", "StornautLifecycleHelper", "Tools"):
+    for path in Path(root).rglob("*.swift"):
+        if symbol in path.read_text(encoding="utf-8"):
+            owners.append(str(path))
+expected = [
+    "Sources/StornautLifecycle/LifecycleMachineRetirementEscrowDeadlineState.swift"
+]
+if sorted(owners) != expected:
+    raise SystemExit(f"deadline state product consumers drifted: {owners}")
+package = json.loads(subprocess.check_output(
+    ["swift", "package", "dump-package"], text=True
+))
+target = next(
+    item for item in package["targets"] if item["name"] == "StornautLifecycle"
+)
+dependencies = [item.get("byName", [None])[0] for item in target["dependencies"]]
+if dependencies != ["CLifecycleSupport"]:
+    raise SystemExit(f"Lifecycle dependencies drifted: {dependencies}")
+PY
+}
+
 if $claim_asid_contract_only; then
     verify_claim_asid_contract "$claim_asid_contract_source"
     print "Claim evidence ASID contract verification passed."
+    exit 0
+fi
+if $deadline_state_contract_only; then
+    verify_deadline_state_contract "$deadline_state_contract_source"
+    print "Retirement deadline state contract verification passed."
     exit 0
 fi
 
@@ -1851,6 +2116,9 @@ PY
 
 verify_claim_asid_contract \
     Sources/StornautInvestigationHandoffContract/InvestigationMachineClaimContract.swift
+verify_deadline_state_contract \
+    Sources/StornautLifecycle/LifecycleMachineRetirementEscrowDeadlineState.swift
+verify_deadline_state_scope
 
 package_graph=$(swift package describe --type json)
 package_manifest=$(swift package dump-package)
