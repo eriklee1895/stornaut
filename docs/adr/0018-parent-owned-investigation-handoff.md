@@ -1,7 +1,8 @@
 # ADR 0018: Parent-Owned Investigation Handoff and Fixed App Launch
 
-> **Status:** Proposed; external root-launch branch rejected; ii-b0a/ii-b0b
-> complete; ii-b0c bootstrap complete; ii-b1 current
+> **Status:** Proposed; external root-launch branch rejected; ii-b0a/ii-b0b/
+> ii-b0c/ii-b1 and the ii-b2 ASID prerequisite complete; ii-b2a current,
+> followed by ii-b2b integration
 >
 > **Date:** 2026-08-19
 >
@@ -333,6 +334,9 @@ unconsumed.
 | ii-b0 wire preflight | b0a/b0b split frozen after iterative post-fix review |
 | ii-b0a frame/capsule contract | complete; non-product and non-admitting |
 | ii-b0b claim/release wire contract | complete; non-product and non-admitting |
-| ii-b0c epoch bootstrap prelude | complete; closes first-frame origin contradiction; ii-b1 current |
+| ii-b0c epoch bootstrap prelude | complete; closes first-frame origin contradiction |
+| ii-b1 authority-free App leaf | complete; non-admitting |
+| ii-b2 ASID cohort prerequisite | complete; App/helper independently bound, L1 residue bound to helper; non-admitting |
+| ii-b2a typed escrow/deadline state | current; ii-b2b integration follows |
 | ii-c no-model privileged machine gate | not executed |
 | ADR status | **Proposed** |

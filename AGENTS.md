@@ -279,8 +279,12 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   post-RED topology correction 拆成 Debug-only diagnostic target 与
   dependency-free Release-shell target，并通过 9/9 leaf、13/13 App、277
   affected、exact structural/final-artifact gates、唯一一次 1,138-test/56-suite
-  staged-only serial 与 independent post-fix review；ii-b2 是当前
-  implementation frontier。随后
+  staged-only serial 与 independent post-fix review。ii-b2 ASID prerequisite
+  随后修正错误的 App/helper 同 ASID join，并保持 L1 residue 绑定 helper；
+  implementation/verifier tree 的 1,142-test serial、独立 1,143-test
+  decoder-negative supplement 与 final review 均通过。ii-b2a typed
+  escrow/deadline state 是当前 implementation frontier，随后为 ii-b2b
+  XPC/helper/Machine integration。之后
   严格为 ii-c 唯一 no-model
   privileged machine gate，只有 ii-c 可接受 ADR 0018。
   只有 L3c4
@@ -540,7 +544,9 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   发现的 first-frame origin contradiction 已由 ii-b0c bootstrap prelude关闭。
   ii-b1 已完成 corrected Debug-only diagnostic/dependency-free Release-shell
   topology、layered gates、1,138-test staged-only serial 与 post-fix review；
-  ii-b2 是当前 frontier。ADR 0018 仍 Proposed；L3c4 独占 final admission 与
+  ii-b2 ASID prerequisite 也已完成并通过独立 implementation/supplement
+  serial 与 review；ii-b2a 是当前 frontier，随后为 ii-b2b integration。
+  ADR 0018 仍 Proposed；L3c4 独占 final admission 与
   剩余 full。
   Task 39 尚未完成。
 Deep Dive 的旧 Broker-only no-go 已被 ADR 0004 的 capability-first 边界取代；

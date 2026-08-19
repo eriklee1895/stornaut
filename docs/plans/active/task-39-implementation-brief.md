@@ -57,7 +57,12 @@
 > exposed a first-frame epoch-origin contradiction; ii-b0c bootstrap is complete.
 > ii-b1 is also complete after its post-RED topology correction, authority-free
 > leaf/fixed-FD implementation, exact artifact gates, one 1,138-test staged-only
-> serial and independent post-fix review; ii-b2 is current. Evidence:
+> serial and independent post-fix review. The ii-b2 ASID cohort prerequisite
+> then corrected the false App/helper same-ASID join while binding L1 residue to
+> the helper. Its 1,142-test implementation serial, structural mutation controls,
+> separate 1,143-test decoder-negative supplement and independent final review
+> passed. ii-b2a typed escrow/deadline state is current, followed by ii-b2b
+> XPC/helper/Machine integration. Evidence:
 > [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
 > [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md) and
 > [Task 39B1b-i Review](../../reports/phase-d-task-39b1b-i-review.md) and
@@ -159,6 +164,8 @@
 > [L3c3c-ii-a Installed-Driver Observation Review](../../reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md).
 > and
 > [L3c3c-ii-b1 Authority-Free App Leaf Review](../../reports/phase-d-task-39b2c-l3c3c-ii-b1-review.md).
+> and
+> [L3c3c-ii-b2 ASID Cohort Prerequisite Review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2-asid-prerequisite-review.md).
 >
 > **Parent plan:**
 > [Phase D Conditional Deep Dive](phase-d-conditional-deep-dive.md)
@@ -1073,8 +1080,8 @@ The remaining L3 work is split before driver coding:
    Therefore
    [ADR 0018](../../adr/0018-parent-owned-investigation-handoff.md) remains
    Proposed, while L3c3c-i is complete as a NO-GO audit, L3c3c-ii-a is complete,
-   and the nested exact-wire split is frozen; ii-b0a/ii-b0b/ii-b0c and ii-b1
-   are complete, and ii-b2 is current. See the
+   and the nested exact-wire split is frozen; ii-b0a/ii-b0b/ii-b0c, ii-b1 and
+   the ii-b2 ASID prerequisite are complete, and ii-b2a is current. See the
    [study](../../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md)
    and [final review](../../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md),
    plus the [i-b2a review](../../reports/phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md),
@@ -1094,6 +1101,10 @@ The remaining L3 work is split before driver coding:
    [ii-b1 preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b1-app-leaf-preflight.md)
    and
    [ii-b1 review](../../reports/phase-d-task-39b2c-l3c3c-ii-b1-review.md).
+   The ASID correction and completion evidence are recorded in the
+   [ii-b2 ASID preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b2-asid-prerequisite-preflight.md)
+   and
+   [ii-b2 ASID review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2-asid-prerequisite-review.md).
    ii-a implements only authority-closed self-observation/runtime primitives.
    ii-b is frozen as **ii-b0a frame/capsule contract**, **ii-b0b claim/release
    wire contract**, **ii-b1 authority-
@@ -1127,7 +1138,8 @@ L3c3c-ii-b4 -> L3c3c-ii-b5 -> L3c3c-ii-c0 -> L3c3c-ii-c -> L3c3d -> L3c4`.
 L3c1, L3c2, L3c3a,
 L3c3b-0, L3c3b-i, L3c3b-ii, L3c3c-i and L3c3c-ii-a are complete;
 i-b2b-0b/i-b2b-1 were superseded before execution. The ii-b split is frozen and
-ii-b0a/ii-b0b/ii-b0c/ii-b1 are complete and ii-b2 is current. ADR 0018
+ii-b0a/ii-b0b/ii-b0c/ii-b1 and the ii-b2 ASID prerequisite are complete;
+ii-b2a is current, followed by ii-b2b integration. ADR 0018
 remains Proposed until ii-c succeeds. L3c1 used focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean
 staged serial regression, targeted helper/diagnostic builds and independent

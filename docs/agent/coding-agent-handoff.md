@@ -246,7 +246,11 @@
 > authority-free App leaf 随后按 post-RED topology correction 拆成 Debug-only
 > diagnostic 与 dependency-free Release shell，并通过 9/9 leaf、13/13 App、
 > 277 affected、exact structural/final-artifact gates、1,138-test staged-only
-> serial 与 independent post-fix review；ii-b2 是当前 frontier。随后为
+> serial 与 independent post-fix review。ii-b2 ASID prerequisite 随后修正
+> false App/helper same-ASID join，保持完整 App/helper identity 独立绑定并将
+> L1 residue 绑定 helper；1,142-test implementation serial、独立 1,143-test
+> decoder-negative supplement 与 final review 均通过。ii-b2a typed escrow/
+> deadline state 是当前 frontier，随后为 ii-b2b integration。之后为
 > ii-c 唯一 no-model privileged installed-driver gate。只有
 > L3c4 可作 readiness claim，
 > L3c2b preflight 的 fresh-plan matrix contradiction 已由 plan-freshness
@@ -588,7 +592,8 @@ ACL fail-closed、whole-installer seal、1067-test clean staged-only serial 与
 independent grouped/post-fix/cross-group review 已完成。L3c3c-i root-launch
 audit 已完成并拒绝 external branch；i-b2b-0b/i-b2b-1 在执行前 superseded，
 B4 root execution count 为 0。L3c3c-ii-a 与 ii-b0a 已完成，当前 frontier 为
-L3c3c-ii-b2；ii-b0a/ii-b0b/ii-b0c/ii-b1 已完成，ii-b2 current，
+L3c3c-ii-b2；ii-b0a/ii-b0b/ii-b0c/ii-b1 与 ii-b2 ASID prerequisite 已完成，
+ii-b2a current，随后为 ii-b2b integration，
 ii-b 已拆为 ii-b0a/ii-b0b/ii-b0c 与
 ii-b1–ii-b5，并在 ii-c 前插入 ii-c0。
 ADR 0018 仍 Proposed，L3c4 独占 final admission 与剩余 full。
@@ -769,7 +774,9 @@ L3c2 deterministic machine driver/failure matrix 均已完成；L3c3c-i root-lau
 audit 已完成并给出 external NO-GO，i-b2b-0b/i-b2b-1 在执行前 superseded，
 B4 root execution count 为 0；L3c3c-ii-a 已完成，ii-b split preflight 已
 冻结 ii-b0a/ii-b0b、ii-b1–ii-b5 与 ii-c0；ii-b0a/ii-b0b/ii-b0c/ii-b1
-已完成，ii-b2 是当前 frontier。已完成部分均为
+已完成；ii-b2 ASID prerequisite 也已通过 1,142-test implementation serial、
+独立 1,143-test decoder-negative supplement 与 final review。ii-b2a 是当前
+frontier，随后为 ii-b2b integration。已完成部分均为
 non-admitting prerequisite，
 L3c4 才是 machine admission。该最终 gate
 要求证明完整调查能力和公共联网可用时，
