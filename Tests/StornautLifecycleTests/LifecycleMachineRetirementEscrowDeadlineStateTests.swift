@@ -31,16 +31,32 @@ struct LifecycleMachineRetirementEscrowDeadlineStateTests {
         #expect(releaseTicket.generation == 2)
         #expect(releaseTicket.deadlineNanoseconds == 7_000_000_000)
 
-        #expect(state.armSucceeded(releaseTicket).phase == .claimedAwaitingRelease)
+        #expect(
+            state.armSucceeded(releaseTicket).phase
+                == .claimResponsePendingCommit
+        )
+        #expect(
+            state.commitClaimResponse(
+                reservationID: fixture.reservationID,
+                connectionEpoch: fixture.connectionEpoch
+            ).phase == .claimedAwaitingRelease
+        )
 
         let release = state.release(
             try fixture.release(deadlineNanoseconds: 7_000_000_000)
         )
         #expect(release.disposition == .applied)
-        #expect(release.phase == .releasedAwaitingReplyDispatch)
+        #expect(release.phase == .releaseResponsePendingCommit)
         #expect(release.cancelledTickets == [releaseTicket])
         #expect(release.scheduledTicket == nil)
         #expect(release.postReplyExitDeadlineNanoseconds == 8_000_000_000)
+        #expect(
+            state.commitReleaseResponse(
+                reservationID: fixture.reservationID,
+                connectionEpoch: fixture.connectionEpoch,
+                releaseChallenge: fixture.releaseChallenge
+            ).phase == .releasedAwaitingReplyDispatch
+        )
 
         let replyCommitted = state.replyDidDispatch(
             reservationID: fixture.reservationID,
@@ -405,6 +421,11 @@ struct LifecycleMachineRetirementEscrowDeadlineStateTests {
                 deadlineNanoseconds: releaseFirst.releaseDeadline
             )
         )
+        let releaseCommitted = releaseFirst.state.commitReleaseResponse(
+            reservationID: fixture.reservationID,
+            connectionEpoch: fixture.connectionEpoch,
+            releaseChallenge: fixture.releaseChallenge
+        )
         let staleReleaseDeadline = releaseFirst.state.deadlineFired(
             releaseFirst.releaseTicket,
             observation: try fixture.observation(
@@ -413,6 +434,7 @@ struct LifecycleMachineRetirementEscrowDeadlineStateTests {
             )
         )
         #expect(releaseWon.cancelledTickets == [releaseFirst.releaseTicket])
+        #expect(releaseCommitted.phase == .releasedAwaitingReplyDispatch)
         #expect(staleReleaseDeadline.disposition == .stale)
         #expect(staleReleaseDeadline.scheduledTicket == nil)
         #expect(releaseFirst.state.phase == .releasedAwaitingReplyDispatch)
@@ -446,10 +468,16 @@ struct LifecycleMachineRetirementEscrowDeadlineStateTests {
                 deadlineNanoseconds: releaseThenCancel.releaseDeadline
             )
         )
+        let committedRelease = releaseThenCancel.state.commitReleaseResponse(
+            reservationID: fixture.reservationID,
+            connectionEpoch: fixture.connectionEpoch,
+            releaseChallenge: fixture.releaseChallenge
+        )
         let cancelledAfterRelease = releaseThenCancel.state.cancel(
             reservationID: fixture.reservationID
         )
-        #expect(released.phase == .releasedAwaitingReplyDispatch)
+        #expect(released.phase == .releaseResponsePendingCommit)
+        #expect(committedRelease.phase == .releasedAwaitingReplyDispatch)
         #expect(cancelledAfterRelease.disposition == .terminal(.cancelled))
         #expect(cancelledAfterRelease.effects.isEmpty)
 
@@ -582,6 +610,265 @@ struct LifecycleMachineRetirementEscrowDeadlineStateTests {
     }
 
     @Test
+    func bindingRejectionOwnsPendingArmedAndIdempotentCleanup() throws {
+        let fixture = DeadlineStateFixture()
+        let empty = LifecycleMachineRetirementEscrowDeadlineState()
+        #expect(
+            empty.rejectBinding(reservationID: fixture.reservationID)
+                .disposition == .stale
+        )
+
+        let pending = LifecycleMachineRetirementEscrowDeadlineState()
+        let pendingTicket = try #require(
+            pending.reserve(try fixture.reservation()).scheduledTicket
+        )
+        #expect(
+            pending.rejectBinding(reservationID: fixture.foreignUUID)
+                .disposition == .stale
+        )
+        let pendingRejected = pending.rejectBinding(
+            reservationID: fixture.reservationID
+        )
+        #expect(pendingRejected.disposition == .terminal(.bindingMismatch))
+        #expect(pendingRejected.cancelledTickets == [pendingTicket])
+        #expect(pendingRejected.scheduledTicket == nil)
+        #expect(pending.armSucceeded(pendingTicket).cancelledTickets == [pendingTicket])
+
+        let armed = try fixture.awaitingClaimState()
+        let armedRejected = armed.state.rejectBinding(
+            reservationID: fixture.reservationID
+        )
+        #expect(armedRejected.disposition == .terminal(.bindingMismatch))
+        #expect(armedRejected.cancelledTickets == [armed.claimTicket])
+        let repeated = armed.state.rejectBinding(
+            reservationID: fixture.reservationID
+        )
+        #expect(repeated.disposition == .stale)
+        #expect(repeated.effects.isEmpty)
+        #expect(armed.state.phase == .terminal(.bindingMismatch))
+    }
+
+    @Test
+    func observationRejectionIsBoundToTheExactCurrentTicket() throws {
+        let fixture = DeadlineStateFixture()
+        let pending = LifecycleMachineRetirementEscrowDeadlineState()
+        let pendingTicket = try #require(
+            pending.reserve(try fixture.reservation()).scheduledTicket
+        )
+        let foreign = LifecycleMachineRetirementDeadlineTicket(
+            kind: .claim, generation: pendingTicket.generation + 1,
+            reservationID: pendingTicket.reservationID,
+            deadlineNanoseconds: pendingTicket.deadlineNanoseconds
+        )
+        #expect(pending.rejectObservation(ticket: foreign).disposition == .stale)
+        let pendingRejected = pending.rejectObservation(ticket: pendingTicket)
+        #expect(
+            pendingRejected.disposition == .terminal(.invalidTimeObservation)
+        )
+        #expect(pendingRejected.cancelledTickets == [pendingTicket])
+        #expect(pendingRejected.scheduledTicket == nil)
+        #expect(pending.armSucceeded(pendingTicket).cancelledTickets == [pendingTicket])
+
+        let replaced = try fixture.awaitingClaimState()
+        let oldTicket = replaced.claimTicket
+        let claim = replaced.state.claim(try fixture.claim())
+        let releaseTicket = try #require(claim.scheduledTicket)
+        #expect(replaced.state.rejectObservation(ticket: oldTicket).disposition == .stale)
+        #expect(replaced.state.phase == .releaseDeadlinePendingArm)
+        let currentRejected = replaced.state.rejectObservation(
+            ticket: releaseTicket
+        )
+        #expect(
+            currentRejected.disposition == .terminal(.invalidTimeObservation)
+        )
+        #expect(currentRejected.cancelledTickets == [releaseTicket])
+        #expect(
+            replaced.state.rejectObservation(ticket: releaseTicket).disposition
+                == .stale
+        )
+    }
+
+    @Test
+    func operationObservationRejectionOwnsOnlyTheExactLiveReservation() throws {
+        let fixture = DeadlineStateFixture()
+        let empty = LifecycleMachineRetirementEscrowDeadlineState()
+        #expect(
+            empty.rejectOperationObservation(
+                reservationID: fixture.reservationID
+            ).disposition == .stale
+        )
+
+        let pending = LifecycleMachineRetirementEscrowDeadlineState()
+        let pendingTicket = try #require(
+            pending.reserve(try fixture.reservation()).scheduledTicket
+        )
+        #expect(
+            pending.rejectOperationObservation(
+                reservationID: fixture.foreignUUID
+            ).disposition == .stale
+        )
+        let rejectedPending = pending.rejectOperationObservation(
+            reservationID: fixture.reservationID
+        )
+        #expect(
+            rejectedPending.disposition == .terminal(.invalidTimeObservation)
+        )
+        #expect(rejectedPending.cancelledTickets == [pendingTicket])
+        #expect(
+            pending.armSucceeded(pendingTicket).cancelledTickets
+                == [pendingTicket]
+        )
+
+        let armed = try fixture.awaitingClaimState()
+        let rejectedArmed = armed.state.rejectOperationObservation(
+            reservationID: fixture.reservationID
+        )
+        #expect(
+            rejectedArmed.disposition == .terminal(.invalidTimeObservation)
+        )
+        #expect(rejectedArmed.cancelledTickets == [armed.claimTicket])
+        let repeated = armed.state.rejectOperationObservation(
+            reservationID: fixture.reservationID
+        )
+        #expect(repeated.disposition == .stale)
+        #expect(repeated.effects.isEmpty)
+        #expect(
+            armed.state.phase == .terminal(.invalidTimeObservation)
+        )
+    }
+
+    @Test
+    func claimResponseCommitLinearizesBothDeadlineOrders() throws {
+        let fixture = DeadlineStateFixture()
+
+        let callbackFirst = try fixture.claimResponsePendingState()
+        let expired = callbackFirst.state.deadlineFired(
+            callbackFirst.releaseTicket,
+            observation: try fixture.observation(
+                monotonic: callbackFirst.releaseTicket.deadlineNanoseconds,
+                wallOffsetMicroseconds: 6_000_000
+            )
+        )
+        #expect(expired.disposition == .terminal(.releaseDeadlineExpired))
+        let rejectedCommit = callbackFirst.state.commitClaimResponse(
+            reservationID: fixture.reservationID,
+            connectionEpoch: fixture.connectionEpoch
+        )
+        #expect(
+            rejectedCommit.disposition
+                == .terminal(.releaseDeadlineExpired)
+        )
+
+        let commitFirst = try fixture.claimResponsePendingState()
+        let committed = commitFirst.state.commitClaimResponse(
+            reservationID: fixture.reservationID,
+            connectionEpoch: fixture.connectionEpoch
+        )
+        #expect(committed.disposition == .applied)
+        #expect(committed.phase == .claimedAwaitingRelease)
+        let laterExpiry = commitFirst.state.deadlineFired(
+            commitFirst.releaseTicket,
+            observation: try fixture.observation(
+                monotonic: commitFirst.releaseTicket.deadlineNanoseconds,
+                wallOffsetMicroseconds: 6_000_000
+            )
+        )
+        #expect(
+            laterExpiry.disposition == .terminal(.releaseDeadlineExpired)
+        )
+        #expect(
+            commitFirst.state.phase == .terminal(.releaseDeadlineExpired)
+        )
+    }
+
+    @Test
+    func releaseResponseCommitMustPrecedeReplyDispatch() throws {
+        let fixture = DeadlineStateFixture()
+        let replyFirst = try fixture.releaseResponsePendingState()
+        let prematureReply = replyFirst.state.replyDidDispatch(
+            reservationID: fixture.reservationID,
+            connectionEpoch: fixture.connectionEpoch,
+            observation: try fixture.observation(
+                monotonic: 3_500_000_000,
+                wallOffsetMicroseconds: 2_500_000
+            )
+        )
+        #expect(prematureReply.disposition == .terminal(.duplicateOrReplay))
+        #expect(
+            replyFirst.state.commitReleaseResponse(
+                reservationID: fixture.reservationID,
+                connectionEpoch: fixture.connectionEpoch,
+                releaseChallenge: fixture.releaseChallenge
+            ).disposition == .terminal(.duplicateOrReplay)
+        )
+
+        let commitFirst = try fixture.releaseResponsePendingState()
+        #expect(
+            commitFirst.state.commitReleaseResponse(
+                reservationID: fixture.reservationID,
+                connectionEpoch: fixture.connectionEpoch,
+                releaseChallenge: fixture.releaseChallenge
+            ).phase == .releasedAwaitingReplyDispatch
+        )
+        let reply = commitFirst.state.replyDidDispatch(
+            reservationID: fixture.reservationID,
+            connectionEpoch: fixture.connectionEpoch,
+            observation: try fixture.observation(
+                monotonic: 3_500_000_000,
+                wallOffsetMicroseconds: 2_500_000
+            )
+        )
+        #expect(reply.disposition == .applied)
+        #expect(reply.phase == .postReplyExitPendingArm)
+    }
+
+    @Test
+    func releaseResponseCommitLinearizesBothDeadlineOrders() throws {
+        let fixture = DeadlineStateFixture()
+
+        let callbackFirst = try fixture.releaseResponsePendingState()
+        let releaseTicket = callbackFirst.releaseTicket
+        let expired = callbackFirst.state.deadlineFired(
+            releaseTicket,
+            observation: try fixture.observation(
+                monotonic: releaseTicket.deadlineNanoseconds,
+                wallOffsetMicroseconds: 6_000_000
+            )
+        )
+        #expect(expired.disposition == .terminal(.releaseDeadlineExpired))
+        let rejectedCommit = callbackFirst.state.commitReleaseResponse(
+            reservationID: fixture.reservationID,
+            connectionEpoch: fixture.connectionEpoch,
+            releaseChallenge: fixture.releaseChallenge
+        )
+        #expect(
+            rejectedCommit.disposition
+                == .terminal(.releaseDeadlineExpired)
+        )
+
+        let commitFirst = try fixture.releaseResponsePendingState()
+        let committedTicket = commitFirst.releaseTicket
+        #expect(
+            commitFirst.state.commitReleaseResponse(
+                reservationID: fixture.reservationID,
+                connectionEpoch: fixture.connectionEpoch,
+                releaseChallenge: fixture.releaseChallenge
+            ).phase == .releasedAwaitingReplyDispatch
+        )
+        let laterExpiry = commitFirst.state.deadlineFired(
+            committedTicket,
+            observation: try fixture.observation(
+                monotonic: committedTicket.deadlineNanoseconds,
+                wallOffsetMicroseconds: 6_000_000
+            )
+        )
+        #expect(laterExpiry.disposition == .stale)
+        #expect(
+            commitFirst.state.phase == .releasedAwaitingReplyDispatch
+        )
+    }
+
+    @Test
     func releaseChallengeMustBeFreshAcrossEveryRetainedUUID() throws {
         let fixture = DeadlineStateFixture()
         for challenge in [
@@ -619,6 +906,10 @@ struct LifecycleMachineRetirementEscrowDeadlineStateTests {
         #expect(prepared.state.phase == .releaseDeadlinePendingArm)
 
         _ = prepared.state.armSucceeded(releaseTicket)
+        _ = prepared.state.commitClaimResponse(
+            reservationID: fixture.reservationID,
+            connectionEpoch: fixture.connectionEpoch
+        )
         let release = prepared.state.release(
             try fixture.release(
                 deadlineNanoseconds: try #require(
@@ -626,7 +917,14 @@ struct LifecycleMachineRetirementEscrowDeadlineStateTests {
                 )
             )
         )
-        #expect(release.phase == .releasedAwaitingReplyDispatch)
+        #expect(release.phase == .releaseResponsePendingCommit)
+        #expect(
+            prepared.state.commitReleaseResponse(
+                reservationID: fixture.reservationID,
+                connectionEpoch: fixture.connectionEpoch,
+                releaseChallenge: fixture.releaseChallenge
+            ).phase == .releasedAwaitingReplyDispatch
+        )
         let staleRelease = prepared.state.deadlineFired(
             releaseTicket,
             observation: try fixture.observation(
@@ -857,13 +1155,31 @@ private struct DeadlineStateFixture {
         releaseTicket: LifecycleMachineRetirementDeadlineTicket,
         releaseDeadline: UInt64
     ) {
+        let prepared = try claimResponsePendingState()
+        #expect(
+            prepared.state.commitClaimResponse(
+                reservationID: reservationID,
+                connectionEpoch: connectionEpoch
+            ).phase == .claimedAwaitingRelease
+        )
+        return (
+            prepared.state, prepared.releaseTicket,
+            prepared.releaseDeadline
+        )
+    }
+
+    func claimResponsePendingState() throws -> (
+        state: LifecycleMachineRetirementEscrowDeadlineState,
+        releaseTicket: LifecycleMachineRetirementDeadlineTicket,
+        releaseDeadline: UInt64
+    ) {
         let prepared = try awaitingClaimState()
         let transition = prepared.state.claim(try claim())
         let ticket = try #require(transition.scheduledTicket)
         let deadline = try #require(transition.releaseDeadlineNanoseconds)
         #expect(
             prepared.state.armSucceeded(ticket).phase
-                == .claimedAwaitingRelease
+                == .claimResponsePendingCommit
         )
         return (prepared.state, ticket, deadline)
     }
@@ -883,6 +1199,30 @@ private struct DeadlineStateFixture {
         postReplyDeadline: UInt64,
         releaseDeadline: UInt64
     ) {
+        let pending = try releaseResponsePendingState(
+            initialGeneration: initialGeneration
+        )
+        #expect(
+            pending.state.commitReleaseResponse(
+                reservationID: reservationID,
+                connectionEpoch: connectionEpoch,
+                releaseChallenge: releaseChallenge
+            ).phase == .releasedAwaitingReplyDispatch
+        )
+        return (
+            pending.state, pending.postReplyDeadline,
+            pending.releaseDeadline
+        )
+    }
+
+    func releaseResponsePendingState(
+        initialGeneration: UInt64 = 1
+    ) throws -> (
+        state: LifecycleMachineRetirementEscrowDeadlineState,
+        releaseTicket: LifecycleMachineRetirementDeadlineTicket,
+        postReplyDeadline: UInt64,
+        releaseDeadline: UInt64
+    ) {
         let awaiting = try awaitingClaimState(
             initialGeneration: initialGeneration
         )
@@ -893,7 +1233,13 @@ private struct DeadlineStateFixture {
         )
         #expect(
             awaiting.state.armSucceeded(releaseTicket).phase
-                == .claimedAwaitingRelease
+                == .claimResponsePendingCommit
+        )
+        #expect(
+            awaiting.state.commitClaimResponse(
+                reservationID: reservationID,
+                connectionEpoch: connectionEpoch
+            ).phase == .claimedAwaitingRelease
         )
         let transition = awaiting.state.release(
             try release(deadlineNanoseconds: releaseDeadline)
@@ -901,8 +1247,8 @@ private struct DeadlineStateFixture {
         let deadline = try #require(
             transition.postReplyExitDeadlineNanoseconds
         )
-        #expect(transition.phase == .releasedAwaitingReplyDispatch)
-        return (awaiting.state, deadline, releaseDeadline)
+        #expect(transition.phase == .releaseResponsePendingCommit)
+        return (awaiting.state, releaseTicket, deadline, releaseDeadline)
     }
 
     func exitPendingState() throws -> (

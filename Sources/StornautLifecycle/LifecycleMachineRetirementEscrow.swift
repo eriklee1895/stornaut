@@ -252,6 +252,51 @@ public struct LifecycleMachineRetirementHandle:
     }
 }
 
+package struct LifecycleMachineRetirementReservationTransfer:
+    Sendable,
+    Equatable
+{
+    package let tokenSHA256: Data
+    package let investigationID: LifecycleInvestigationID
+    package let retireOperationID: UUID
+    package let configurationSHA256: String
+    package let validBefore: Date
+    package let appIdentity: LifecycleMachineProcessIdentityRecord
+    package let helperIdentity: LifecycleMachineProcessIdentityRecord
+    package let userID: UInt32
+    package let recordedAt: Date
+    package let ownerRetirementObservation:
+        LifecycleInteractiveWorkerRetirementObservation
+    package let residueObservation: LifecycleInvestigationResidueObservation
+
+    init(
+        tokenSHA256: Data,
+        investigationID: LifecycleInvestigationID,
+        retireOperationID: UUID,
+        configurationSHA256: String,
+        validBefore: Date,
+        appIdentity: LifecycleMachineProcessIdentityRecord,
+        helperIdentity: LifecycleMachineProcessIdentityRecord,
+        userID: UInt32,
+        recordedAt: Date,
+        ownerRetirementObservation:
+            LifecycleInteractiveWorkerRetirementObservation,
+        residueObservation: LifecycleInvestigationResidueObservation
+    ) {
+        self.tokenSHA256 = tokenSHA256
+        self.investigationID = investigationID
+        self.retireOperationID = retireOperationID
+        self.configurationSHA256 = configurationSHA256
+        self.validBefore = validBefore
+        self.appIdentity = appIdentity
+        self.helperIdentity = helperIdentity
+        self.userID = userID
+        self.recordedAt = recordedAt
+        self.ownerRetirementObservation = ownerRetirementObservation
+        self.residueObservation = residueObservation
+    }
+}
+
 public struct LifecycleMachineRetirementClaimRequest:
     Codable,
     Sendable,
@@ -527,6 +572,37 @@ public final class LifecycleMachineRetirementEscrow: @unchecked Sendable {
     public func expire() {
         lock.withLock {
             state = .consumed
+        }
+    }
+
+    package func transferReservation() throws
+        -> LifecycleMachineRetirementReservationTransfer
+    {
+        try lock.withLock {
+            let entry: Entry
+            switch state {
+            case .empty:
+                throw LifecycleMachineRetirementEscrowError.empty
+            case let .recorded(value):
+                entry = value
+            case .consumed:
+                throw LifecycleMachineRetirementEscrowError.consumed
+            }
+            state = .consumed
+            return LifecycleMachineRetirementReservationTransfer(
+                tokenSHA256: entry.tokenSHA256,
+                investigationID: entry.investigationID,
+                retireOperationID: entry.retireOperationID,
+                configurationSHA256: entry.configurationSHA256,
+                validBefore: entry.validBefore,
+                appIdentity: entry.appIdentity,
+                helperIdentity: entry.helperIdentity,
+                userID: entry.userID,
+                recordedAt: entry.recordedAt,
+                ownerRetirementObservation:
+                    entry.ownerRetirementObservation,
+                residueObservation: entry.residueObservation
+            )
         }
     }
 

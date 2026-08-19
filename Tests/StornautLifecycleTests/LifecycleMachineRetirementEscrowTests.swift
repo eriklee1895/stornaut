@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Testing
 @testable import StornautLifecycle
@@ -333,6 +334,65 @@ struct LifecycleMachineRetirementEscrowTests {
         #expect(response.request == acceptedRequest)
         #expect(!accepted.isAwaitingClaim)
         #expect(allowed.identities == [fixture.machineDriverIdentity])
+    }
+
+    @Test
+    func sealedTransferPreservesTheExactRecordedEntryAndIsOneShot() throws {
+        let fixture = try MachineRetirementEscrowFixture()
+        let escrow = fixture.escrow()
+        let handle = try fixture.record(into: escrow)
+
+        let transfer = try escrow.transferReservation()
+
+        var tokenBytes = handle.token.uuid
+        let expectedTokenHash = withUnsafeBytes(of: &tokenBytes) {
+            Data(SHA256.hash(data: Data($0)))
+        }
+        #expect(transfer.tokenSHA256 == expectedTokenHash)
+        #expect(transfer.investigationID == fixture.investigationID)
+        #expect(transfer.retireOperationID == fixture.retireOperationID)
+        #expect(transfer.configurationSHA256 == fixture.configurationSHA256)
+        #expect(transfer.validBefore == handle.validBefore)
+        #expect(transfer.appIdentity == fixture.appRecord)
+        #expect(transfer.helperIdentity == fixture.helperRecord)
+        #expect(transfer.userID == fixture.userID)
+        #expect(transfer.recordedAt == fixture.now)
+        #expect(
+            transfer.ownerRetirementObservation == .retiredOwnedResources
+        )
+        let expectedResidue = try fixture.residue()
+        #expect(transfer.residueObservation == expectedResidue)
+        #expect(!escrow.isAwaitingClaim)
+        #expect(throws: LifecycleMachineRetirementEscrowError.consumed) {
+            _ = try escrow.transferReservation()
+        }
+        #expect(throws: LifecycleMachineRetirementEscrowError.consumed) {
+            _ = try escrow.claim(
+                fixture.request(handle: handle), authorized: true
+            )
+        }
+    }
+
+    @Test
+    func sealedTransferAndLegacyClaimHaveExactlyOneWinner() async throws {
+        let fixture = try MachineRetirementEscrowFixture()
+        let escrow = fixture.escrow()
+        let request = try fixture.request(
+            handle: try fixture.record(into: escrow)
+        )
+
+        let successes = await withTaskGroup(of: Bool.self) { group in
+            group.addTask { (try? escrow.transferReservation()) != nil }
+            group.addTask {
+                (try? escrow.claim(request, authorized: true)) != nil
+            }
+            var count = 0
+            for await success in group where success { count += 1 }
+            return count
+        }
+
+        #expect(successes == 1)
+        #expect(!escrow.isAwaitingClaim)
     }
 }
 

@@ -195,7 +195,9 @@ package enum LifecycleMachineRetirementDeadlinePhase: Sendable, Equatable {
     case claimDeadlinePendingArm
     case awaitingClaim
     case releaseDeadlinePendingArm
+    case claimResponsePendingCommit
     case claimedAwaitingRelease
+    case releaseResponsePendingCommit
     case releasedAwaitingReplyDispatch
     case postReplyExitPendingArm
     case releasedExitScheduled
@@ -259,7 +261,9 @@ package final class LifecycleMachineRetirementEscrowDeadlineState:
         case claimPending(ReservationContext, LifecycleMachineRetirementDeadlineTicket)
         case awaitingClaim(ReservationContext, LifecycleMachineRetirementDeadlineTicket)
         case releasePending(ClaimContext, LifecycleMachineRetirementDeadlineTicket)
+        case claimResponsePending(ClaimContext, LifecycleMachineRetirementDeadlineTicket)
         case claimed(ClaimContext, LifecycleMachineRetirementDeadlineTicket)
+        case releaseResponsePending(ReleasedContext, LifecycleMachineRetirementDeadlineTicket)
         case releasedWaiting(ReleasedContext)
         case exitPending(ReleasedContext, LifecycleMachineRetirementDeadlineTicket)
         case exitScheduled(ReleasedContext, LifecycleMachineRetirementDeadlineTicket)
@@ -330,7 +334,7 @@ package final class LifecycleMachineRetirementEscrowDeadlineState:
                 state = .awaitingClaim(context, ticket)
                 return transitionLocked(.applied)
             case let .releasePending(context, expected) where expected == ticket:
-                state = .claimed(context, ticket)
+                state = .claimResponsePending(context, ticket)
                 return transitionLocked(.applied)
             case let .exitPending(context, expected) where expected == ticket:
                 state = .exitScheduled(context, ticket)
@@ -496,13 +500,61 @@ package final class LifecycleMachineRetirementEscrowDeadlineState:
                 releaseChallenge: value.releaseChallenge,
                 postReplyExitDeadlineNanoseconds: deadline
             )
-            state = .releasedWaiting(released)
+            state = .releaseResponsePending(released, releaseTicket)
             return transitionLocked(
                 .applied,
                 effects: [.cancel(releaseTicket)],
                 releaseDeadline: context.releaseDeadlineNanoseconds,
                 postReplyDeadline: deadline
             )
+        }
+    }
+
+    package func commitClaimResponse(
+        reservationID: UUID,
+        connectionEpoch: UUID
+    ) -> LifecycleMachineRetirementDeadlineTransition {
+        lock.withLock {
+            switch state {
+            case let .claimResponsePending(context, ticket):
+                guard
+                    context.reservation.reservationID == reservationID,
+                    context.connectionEpoch == connectionEpoch
+                else {
+                    return terminalizeLocked(.bindingMismatch)
+                }
+                state = .claimed(context, ticket)
+                return transitionLocked(.applied)
+            case let .terminal(reason):
+                return transitionLocked(.terminal(reason))
+            default:
+                return terminalizeLocked(.duplicateOrReplay)
+            }
+        }
+    }
+
+    package func commitReleaseResponse(
+        reservationID: UUID,
+        connectionEpoch: UUID,
+        releaseChallenge: UUID
+    ) -> LifecycleMachineRetirementDeadlineTransition {
+        lock.withLock {
+            switch state {
+            case let .releaseResponsePending(context, _):
+                guard
+                    context.claim.reservation.reservationID == reservationID,
+                    context.claim.connectionEpoch == connectionEpoch,
+                    context.releaseChallenge == releaseChallenge
+                else {
+                    return terminalizeLocked(.bindingMismatch)
+                }
+                state = .releasedWaiting(context)
+                return transitionLocked(.applied)
+            case let .terminal(reason):
+                return transitionLocked(.terminal(reason))
+            default:
+                return terminalizeLocked(.duplicateOrReplay)
+            }
         }
     }
 
@@ -653,13 +705,63 @@ package final class LifecycleMachineRetirementEscrowDeadlineState:
         }
     }
 
+    package func rejectBinding(
+        reservationID: UUID
+    ) -> LifecycleMachineRetirementDeadlineTransition {
+        lock.withLock {
+            guard
+                let context = reservationContextLocked,
+                context.reservationID == reservationID
+            else {
+                return transitionLocked(.stale)
+            }
+            return terminalizeLocked(
+                .bindingMismatch,
+                rememberLateArm: pendingTicketLocked
+            )
+        }
+    }
+
+    package func rejectObservation(
+        ticket: LifecycleMachineRetirementDeadlineTicket
+    ) -> LifecycleMachineRetirementDeadlineTransition {
+        lock.withLock {
+            guard currentTicketLocked == ticket else {
+                return transitionLocked(.stale)
+            }
+            return terminalizeLocked(
+                .invalidTimeObservation,
+                rememberLateArm: pendingTicketLocked == ticket ? ticket : nil
+            )
+        }
+    }
+
+    package func rejectOperationObservation(
+        reservationID: UUID
+    ) -> LifecycleMachineRetirementDeadlineTransition {
+        lock.withLock {
+            guard
+                let context = reservationContextLocked,
+                context.reservationID == reservationID
+            else {
+                return transitionLocked(.stale)
+            }
+            return terminalizeLocked(
+                .invalidTimeObservation,
+                rememberLateArm: pendingTicketLocked
+            )
+        }
+    }
+
     private var phaseLocked: LifecycleMachineRetirementDeadlinePhase {
         switch state {
         case .empty: .empty
         case .claimPending: .claimDeadlinePendingArm
         case .awaitingClaim: .awaitingClaim
         case .releasePending: .releaseDeadlinePendingArm
+        case .claimResponsePending: .claimResponsePendingCommit
         case .claimed: .claimedAwaitingRelease
+        case .releaseResponsePending: .releaseResponsePendingCommit
         case .releasedWaiting: .releasedAwaitingReplyDispatch
         case .exitPending: .postReplyExitPendingArm
         case .exitScheduled: .releasedExitScheduled
@@ -674,7 +776,9 @@ package final class LifecycleMachineRetirementEscrowDeadlineState:
         case let .claimPending(_, ticket),
              let .awaitingClaim(_, ticket),
              let .releasePending(_, ticket),
+             let .claimResponsePending(_, ticket),
              let .claimed(_, ticket),
+             let .releaseResponsePending(_, ticket),
              let .exitPending(_, ticket),
              let .exitScheduled(_, ticket):
             ticket
@@ -702,9 +806,11 @@ package final class LifecycleMachineRetirementEscrowDeadlineState:
              let .awaitingClaim(context, _):
             context
         case let .releasePending(context, _),
+             let .claimResponsePending(context, _),
              let .claimed(context, _):
             context.reservation
-        case let .releasedWaiting(context),
+        case let .releaseResponsePending(context, _),
+             let .releasedWaiting(context),
              let .exitPending(context, _),
              let .exitScheduled(context, _):
             context.claim.reservation
@@ -716,9 +822,11 @@ package final class LifecycleMachineRetirementEscrowDeadlineState:
     private var claimContextLocked: ClaimContext? {
         switch state {
         case let .releasePending(context, _),
+             let .claimResponsePending(context, _),
              let .claimed(context, _):
             context
-        case let .releasedWaiting(context),
+        case let .releaseResponsePending(context, _),
+             let .releasedWaiting(context),
              let .exitPending(context, _),
              let .exitScheduled(context, _):
             context.claim

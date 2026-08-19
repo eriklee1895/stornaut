@@ -109,17 +109,60 @@ avoids publishing the token or an independently mintable reservation.
 
 ### 4.1 Exact scope and cost
 
-Exactly seven non-document paths, at most 2,800 added-or-changed lines:
+The post-review implementation plus honest mutation controls measured 2,924
+non-document lines and therefore crossed the frozen 2,900-line ceiling by 24.
+This is a mandatory pre-validation split, not permission to raise or compress
+the original budget:
+
+```text
+ii-b2b-i-a1 sealed Lifecycle transfer + response-commit state
+ii-b2b-i-a2 target/translation/effects + behavior/structural tests
+ii-b2b-i-b  boundary/scope verifier + mutation controls
+```
+
+The first i-a staged serial later exposed two review P1s and one P2: callbacks
+were outside actor ordering, injected external effects could synchronously wait
+for that actor, and the server target could mint its own raw seed. Validation
+tree `ec343a21011d0ec6a30f04402a2fcf0061c78ef4` is retained only as rejected
+historical evidence and cannot satisfy completion. Closing those findings also
+crossed the i-a review surface, so i-a is frozen as a1 then a2.
+
+ii-b2b-i-a1 owns exactly four non-document paths, at most 900
+added-or-changed lines:
+
+1. `Sources/StornautLifecycle/LifecycleMachineRetirementEscrow.swift`;
+2. `Sources/StornautLifecycle/LifecycleMachineRetirementEscrowDeadlineState.swift`;
+3. `Tests/StornautLifecycleTests/LifecycleMachineRetirementEscrowTests.swift`;
+4. `Tests/StornautLifecycleTests/LifecycleMachineRetirementEscrowDeadlineStateTests.swift`.
+
+It adds the sealed one-shot escrow transfer plus claim/release response-commit
+state only. It runs focused and Lifecycle affected tests plus independent review,
+but no staged-only serial.
+
+ii-b2b-i-a2 begins only from the pushed a1 completion tree and owns exactly five
+non-document paths, at most 2,650 added-or-changed lines:
 
 1. `Package.swift`;
 2. new `Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerAdapter.swift`;
 3. new `Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerEffects.swift`;
 4. new `Tests/StornautInvestigationTests/InvestigationMachineClaimServerAdapterTests.swift`;
-5. `Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift`;
-6. `scripts/verify-investigation-boundaries`;
-7. `scripts/verify-contract`.
+5. `Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift`.
 
-Approaching the ceiling requires another split before coding. No Xcode project,
+ii-b2b-i-b begins only from the pushed i-a2 completion tree and owns exactly two
+non-document paths, at most 800 added-or-changed lines:
+
+1. `scripts/verify-investigation-boundaries`;
+2. `scripts/verify-contract`.
+
+i-a2 owns server focused/affected tests, combined focused coverage and the
+parent's sole staged-only serial after a1 is present. i-b may run the canonical source-contract mode,
+the full boundary script, verifier mutation controls and independent review, but
+must not repeat the SwiftPM serial. The server source contract tests in i-a stay
+as a small independent positive control; i-b adds the parser-backed structural
+gate, exact package/scope graph and executable negative mutations. All three commits
+must be independently pushed before ii-b2b-i is complete.
+
+Approaching either ceiling requires another split before coding. No Xcode project,
 Lifecycle live escrow/XPC, helper main, Machine host/claimant, App, DriverSupport
 or app-release verifier changes here.
 
@@ -127,6 +170,98 @@ or app-release verifier changes here.
 
 The target adds the static library product, but no product target consumes it.
 An injected package initializer receives one opaque reservation seed for tests.
+The completed ii-b2a core gains one narrow package method,
+`rejectBinding(reservationID:)`, so an already-authorized server translation can
+terminally report a handle/token/seed mismatch without minting a fake reservation
+or maintaining a second terminal state. It accepts only the exact live
+reservation, is idempotent after terminal, schedules no work and returns the
+existing typed `.bindingMismatch` transition. An armed current ticket produces
+one cancel effect. A pending ticket produces that cancel and also records late-
+arm cleanup, so a later stale `armSucceeded(ticket)` returns the exact cancel
+again when the physical handle arrives. Empty/foreign reservation calls are
+stale and cannot create or alter state; a repeated terminal call is stale, has no
+effect and cannot replace the original terminal reason. No other ii-b2a state or
+public surface changes. The direct Lifecycle test owns pending/armed/foreign/
+terminal/effect semantics; server tests prove seed mismatch invokes this seam
+without a shadow terminal state; the structural gate freezes both ownerships.
+The same source gains one callback-bound package method,
+`rejectObservation(ticket:)`, for the executor case where the injected clock
+cannot produce any valid observation and therefore cannot legally call
+`deadlineFired`. Only the exact current complete ticket may terminate as
+`.invalidTimeObservation`: an armed ticket returns one cancel; a pending ticket
+returns cancel and records late-arm cleanup. Replaced, foreign and terminal
+tickets are stale with no effect and cannot kill a newer generation. The
+executor must pass the callback's captured complete ticket, never only a
+reservation ID. This keeps clock failure in the sole state owner without
+weakening ticket replay identity or creating an executor-side terminal truth.
+Direct Lifecycle and server executor tests freeze the seam.
+The same source also gains one distinct operation-bound package method,
+`rejectOperationObservation(reservationID:)`, for a clock failure while an
+adapter claim, release or reply-dispatch operation owns the exact live
+reservation but has no callback ticket to present. Only that exact nonterminal
+reservation may terminate as `.invalidTimeObservation`; pending/armed cleanup
+and late-arm memory are identical to `rejectBinding`. Empty, foreign and
+terminal calls are stale and cannot create or replace state. The adapter must
+apply this transition before returning `.unavailable` from any of those three
+operations. Callback failures remain exclusively ticket-bound through
+`rejectObservation(ticket:)`; the operation seam must never be used by a
+scheduler callback. Direct Lifecycle tests freeze exact/foreign/empty/terminal,
+pending/armed cancellation and late-arm behavior.
+
+Post-serial review rejected actor-stack serialization: synchronous external
+`schedule`, `cancel` or terminal callbacks could wait for the occupied adapter
+actor, and a deadline callback could terminalize Lifecycle after an adapter phase
+guard but before response bytes returned. The corrected adapter is therefore a
+package final class with no whole-session actor or mutex. A narrow evidence lock
+protects only immutable evidence publication/read/rollback and is never held
+across clock, scheduler, handle, terminal or Lifecycle calls.
+
+Lifecycle remains the sole session linearization owner. It adds two explicit
+response-commit transitions after the corresponding bytes are fully built:
+
+- arming a release ticket enters internal/public
+  `claimResponsePendingCommit`; `commitClaimResponse` binds the exact reservation
+  and connection epoch before release becomes legal;
+- accepting release enters `releaseResponsePendingCommit`;
+  `commitReleaseResponse` binds reservation, connection epoch and release
+  challenge before reply-dispatch becomes legal.
+
+Evidence is published before claim commit so an early concurrent release reaches
+the state owner; failed commit rolls back that exact evidence. Callback or
+reentrant operation first means the response commit is stale and no success bytes
+return. Commit first means any later timeout/invalidation is explicitly after the
+logical response commitment. `replyDidDispatch` itself is already called only
+after the physical reply closure returns, so its state transition is the logical
+commit; a post-reply due callback after that commit is valid, while synchronous
+arm failure still makes the method unavailable. Controlled two-order state and
+adapter tests cover claim-response/callback, release-response/reentry and
+reply/post-reply ordering. External terminal-handler reentry is a positive test,
+not a forbidden implementation convention. Sequential replay remains terminal
+and fail-closed.
+
+The opaque reservation seed carries the exact typed
+`LifecycleInteractiveWorkerRetirementObservation` and
+`LifecycleInvestigationResidueObservation` received from the escrow; it does not
+replace them with Boolean or count summaries. Seed admission requires the exact
+owned-retirement four-field tuple, `provedEmpty`, matching investigation UUID,
+helper audit-session ID and App UID, a checked floor conversion of the residue
+`Date` through `InvestigationHandoffUTCMicroseconds`, `observedAt <= recordedAt`,
+and the existing maximum 60-second residue-to-record freshness window. The seed
+stores the typed source observations and their one deterministic handoff
+projection. Evidence construction uses only that projection. It must not call a
+zero-argument owner projection or write literal zero residue counts without
+first deriving and validating every field from those source observations.
+Non-owned/prepared retirement, every nonzero residue dimension, foreign
+investigation/ASID/UID, future/stale timestamps and invalid Date conversion fail
+before reservation consumption.
+
+Release translation compares the request digest, recomputed helper-identity
+digest, connection epoch and release deadline directly against retained evidence
+before entering the Lifecycle state. It must not call the HandoffContract API
+with the received challenge as its own `expectedReleaseChallenge`; that is a
+self-authenticating check. The release challenge is only required to be a valid
+nonzero wire UUID at decode, while freshness against the claim challenge,
+connection epoch and reservation UUID remains exclusively in the ii-b2a state.
 The adapter must:
 
 - strictly decode claim/release Data with HandoffContract;
@@ -143,6 +278,16 @@ The adapter must:
 - implement a ticket-keyed cancellation slot where a callback/cancel may win
   before the concrete scheduled handle is returned.
 
+Each cancellation slot has four explicit facts: optional installed handle,
+`cancelRequested`, `cancelApplied` and `callbackFinished`. A completed callback
+removes a slot immediately when its handle is installed. If completion wins
+before `schedule` returns, the slot remains only until install, then cancels the
+late handle exactly once and removes itself. Cancellation follows the same
+pending-install rule. Scheduler failure removes the slot before applying
+`armFailed`. Normal due, early fire, clock failure, stale/replaced callbacks and
+callback-before-handle must all converge to zero slots; callback completion and
+handle cancellation are never inferred merely from a terminal state.
+
 The façade has injected clock/scheduler/terminal protocols only. It does not use
 `NSXPCConnection`, `NSXPCListener`, a Mach service, helper path/signing,
 filesystem, process observation, install, model/auth, cleanup or direct exit. It
@@ -155,16 +300,38 @@ does not yet consume a live Lifecycle escrow.
 - evidence/released contain no handle/token or reversible token projection;
 - release echo of digest/challenge/helper/connection/deadline;
 - wrong domain/version/tag/order/length/trailing/old JSON v2 rejection;
-- malformed request fails before state consumption;
+- malformed request fails before state consumption; decoded handle/token/seed
+  mismatch uses the exact `rejectBinding` transition;
+- direct rejectBinding tests cover pending/armed cancel, late arm success,
+  foreign/empty stale and terminal idempotence with no schedule effect;
+- clock failure invokes exact ticket-bound `rejectObservation`; pending/armed/
+  late-arm cleanup is preserved while stale/replaced tickets cannot terminate a
+  newer state;
+- claim/release/reply clock failure invokes exact operation-bound
+  `rejectOperationObservation`, terminalizes the matching live reservation and
+  cannot be retried; callback failure never uses that seam;
+- seed negatives cover both non-owned retirement values, every nonzero residue
+  count, foreign investigation/ASID/UID, future and over-60-second-old residue,
+  the exact 60-second positive boundary and sub-microsecond floor projection;
 - duplicate/replay/foreign epoch/helper/digest/deadline fail terminally;
+- release challenges equal to the original claim challenge, connection epoch or
+  reservation UUID reach the state and fail terminally; structural tests forbid
+  self-challenge validation;
 - cancellation-slot callback-before-handle, late handle, arm failure and stale
   callback matrix;
+- normal armed due, armed clock failure, replaced old-ticket clock failure and
+  callback-before-handle clock failure each prove one terminal delivery where
+  applicable, exact late-handle cancellation and `pendingSlotCount == 0`;
+- controlled concurrent claim/claim, claim/release and release/reply operations,
+  both response-commit orders and synchronous terminal-handler reentry prove no
+  pre-commit success/terminal window or callback-induced deadlock;
 - pending/armed early callback and reply-dispatch order;
 - package graph exactness, public-surface audit and no product consumer;
 - focused coverage, affected Investigation/Lifecycle tests, one staged-only
   serial and independent review.
 
-ii-b2b-i is non-connected/non-admitting and cannot complete ii-b2b.
+ii-b2b-i-a1, i-a2 and i-b are all non-connected/non-admitting. None alone completes
+ii-b2b-i, and ii-b2b-i cannot complete ii-b2b.
 
 ## 5. ii-b2b-ii — Legacy Client Quarantine and Machine Block
 
