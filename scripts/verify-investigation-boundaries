@@ -1517,6 +1517,7 @@ expected_handoff_sources = {
     "HandoffBinaryTranscript.swift",
     "InvestigationHandoffFrameContract.swift",
     "InvestigationCohortCapsuleContract.swift",
+    "InvestigationMachineClaimContract.swift",
 }
 if set(handoff.get("sources", [])) != expected_handoff_sources:
     raise SystemExit("handoff contract source allowlist drifted")
@@ -1532,6 +1533,7 @@ expected_imports = {
     "HandoffBinaryTranscript.swift": {"CryptoKit", "Foundation"},
     "InvestigationHandoffFrameContract.swift": {"Foundation"},
     "InvestigationCohortCapsuleContract.swift": {"Foundation"},
+    "InvestigationMachineClaimContract.swift": {"Foundation"},
 }
 handoff_forbidden = re.compile(
     r"\b(?:Codable|NSXPC|Process|FileManager|URLSession|posix_spawn|"
@@ -1540,11 +1542,43 @@ handoff_forbidden = re.compile(
 for source_name in expected_handoff_sources:
     text = (Path(handoff["path"]) / source_name).read_text(encoding="utf-8")
     imports = set(re.findall(r"(?m)^import\s+([A-Za-z0-9_]+)\s*$", text))
-    if imports != expected_imports[source_name] or "public " in text:
+    public_count = text.count("public ")
+    public_valid = (
+        source_name == "InvestigationMachineClaimContract.swift"
+        and public_count == 1
+        and "public protocol InvestigationMachineClaimXPCWire" in text
+        and "@objc(StornautInvestigationMachineClaimXPCWire)" in text
+    ) or (source_name != "InvestigationMachineClaimContract.swift"
+          and public_count == 0)
+    if imports != expected_imports[source_name] or not public_valid:
         raise SystemExit(f"handoff contract surface drifted: {source_name}")
     match = handoff_forbidden.search(text)
     if match:
         raise SystemExit(f"handoff contract gained authority: {source_name}: {match.group(0)!r}")
+    if source_name == "InvestigationMachineClaimContract.swift":
+        forbidden_runtime = re.search(
+            r"\b(?:NSXPCConnection|NSXPCListener|DispatchSource|"
+            r"DispatchQueue|RunLoop|ContinuousClock|SuspendingClock|"
+            r"CFAbsoluteTimeGetCurrent|mach_continuous_time|mach_wait_until|"
+            r"clock_gettime|gettimeofday|mach_absolute_time|FileHandle|"
+            r"InputStream|OutputStream|FileWrapper|NSData|NSLock)\b|"
+            r"\b(?:Timer|Date|nanosleep|usleep|sleep)\s*\(|"
+            r"\bDate\s*\.\s*now\b|"
+            r"\bTask\s*\.\s*(?:sleep|detached)\b|"
+            r"ProcessInfo\s*\.\s*processInfo\s*\.\s*systemUptime|"
+            r"\b(?:Data|String)\s*\(\s*contentsOf\s*:|"
+            r"\.\s*write\s*\(\s*to\s*:|"
+            r"\bDarwin\s*\.\s*(?:open|read)\b|"
+            r"\b(?:pread|stat|lstat|fstat|readlink|opendir|readdir|closedir)"
+            r"\s*\(|\bactor\s+|\bclass\s+|\bstatic\s+var\s+|"
+            r"import\s+Security",
+            text,
+        )
+        if forbidden_runtime:
+            raise SystemExit(
+                "handoff claim contract gained runtime ownership: "
+                f"{forbidden_runtime.group(0)!r}"
+            )
 core = targets["StornautCore"]
 dependencies = set(core.get("target_dependencies", []))
 forbidden = {"StornautCodex", "StornautLifecycle"}

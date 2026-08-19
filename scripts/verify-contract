@@ -114,8 +114,14 @@ require_fixed_text scripts/verify-investigation-boundaries \
     'security_added=$(print -r -- "$undefined_symbols"'
 require_fixed_text scripts/verify-investigation-boundaries \
     'handoff contract consumers drifted'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'InvestigationMachineClaimContract.swift'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'handoff claim contract gained runtime ownership'
 require_fixed_text scripts/verify-app-release-boundaries \
-    'Handoff contract leaked into an App binary'
+    'Handoff contract leaked into an App bundle'
+require_fixed_text scripts/verify-app-release-boundaries \
+    'StornautInvestigationMachineClaimXPCWire'
 require_fixed_text Package.swift \
     'name: "StornautInvestigationHandoffContract"'
 require_fixed_text scripts/verify-app-release-boundaries \
@@ -699,9 +705,9 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "7884823783a3aabef297020cd2c814f994d2a3c0d554572051b815e74c85789b",
+        "81d1c9ff077586f4fefdf549e0c11c0d815073544714aee5c859662e19097679",
     Path("scripts/verify-app-release-boundaries"):
-        "52f5a3faa50102fc100235450b73abe03fb6b4b496bc2454894795c3f6236724",
+        "7a55c2a2c1e137c8671f068cc291b54eb108ece3adab9954ab1652438f905b5b",
 }
 for path, expected_sha in expected.items():
     observed_sha = hashlib.sha256(path.read_bytes()).hexdigest()

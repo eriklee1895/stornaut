@@ -22,13 +22,51 @@ struct InvestigationMachineTargetBoundaryTests {
 
         let sourceRoot = root.appending(path: "Sources/StornautInvestigationHandoffContract")
         let names = try Set(FileManager.default.contentsOfDirectory(atPath: sourceRoot.path))
-        #expect(names == ["HandoffBinaryTranscript.swift", "InvestigationHandoffFrameContract.swift", "InvestigationCohortCapsuleContract.swift"])
+        #expect(names == [
+            "HandoffBinaryTranscript.swift",
+            "InvestigationCohortCapsuleContract.swift",
+            "InvestigationHandoffFrameContract.swift",
+            "InvestigationMachineClaimContract.swift",
+        ])
         for name in names {
             let source = try String(
                 contentsOf: sourceRoot.appending(path: name),
                 encoding: .utf8
             )
-            #expect(!source.contains("public "))
+            if name == "InvestigationMachineClaimContract.swift" {
+                #expect(
+                    source.components(separatedBy: "public " ).count == 2
+                )
+                #expect(source.contains(
+                    "public protocol InvestigationMachineClaimXPCWire"
+                ))
+                #expect(source.contains(
+                    "@objc(StornautInvestigationMachineClaimXPCWire)"
+                ))
+                for forbidden in [
+                    "NSXPCConnection", "NSXPCListener", "Timer(",
+                    "DispatchSource", "DispatchQueue", "RunLoop",
+                    "Task.sleep", "Task.detached", "ContinuousClock",
+                    "SuspendingClock", "Date()", "Date.now",
+                    "CFAbsoluteTimeGetCurrent",
+                    "ProcessInfo.processInfo.systemUptime",
+                    "mach_continuous_time", "mach_wait_until",
+                    "nanosleep(", "usleep(", "sleep(",
+                    "clock_gettime", "gettimeofday", "mach_absolute_time",
+                    "FileHandle", "InputStream", "OutputStream",
+                    "FileWrapper", "NSData", "Data(contentsOf:",
+                    "String(contentsOf:", ".write(to:",
+                    "Darwin.open", "Darwin.read", "pread(",
+                    "stat(", "lstat(", "fstat(", "readlink(",
+                    "opendir(", "readdir(", "closedir(",
+                    "NSLock", "actor ", "class ", "static var ",
+                    "import Security",
+                ] {
+                    #expect(!source.contains(forbidden))
+                }
+            } else {
+                #expect(!source.contains("public "))
+            }
             for forbidden in ["Codable", "NSXPC", "Process(", "FileManager", "URLSession", "posix_spawn", "Darwin.write", "O_WRONLY", "import Stornaut"] {
                 #expect(!source.contains(forbidden))
             }
