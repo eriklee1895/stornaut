@@ -1,7 +1,7 @@
 # ADR 0018: Parent-Owned Investigation Handoff and Fixed App Launch
 
-> **Status:** Proposed; external root-launch branch rejected, installed-driver
-> implementation and machine gate pending
+> **Status:** Proposed; external root-launch branch rejected; ii-b split frozen
+> after three independent review rounds; ii-b0 current
 >
 > **Date:** 2026-08-19
 >
@@ -94,14 +94,24 @@ claim provenance against a malicious administrator, malicious pre-install
 Coding Agent or arbitrary concurrent same-UID actor.
 
 The future machine-only ceremony first requires the non-executing `sudo -kNnv`
-policy probe to return nonzero, then uses the zero-driver-argument command:
+policy probe to return nonzero. The reviewed ii-c0 gate then maps only its held,
+sealed cohort capsule to standard input and execs `/usr/bin/sudo` with this exact
+inner argv:
 
 ```text
-/usr/bin/sudo -kN -p 'Stornaut Task 39 ii-c administrator authorization: ' -- /Library/Application\ Support/Stornaut/Stornaut-R5-Diagnostic.app/Contents/MacOS/StornautInvestigationMachineDriver
+sudo
+-kN
+-p
+"Stornaut Task 39 ii-c administrator authorization: "
+--
+/Library/Application Support/Stornaut/Stornaut-R5-Diagnostic.app/Contents/MacOS/StornautInvestigationMachineDriver
 ```
 
-No cache-creating `sudo -v`, environment override, configurable executable/path,
-driver argument, UID, endpoint, signal, action or cleanup input is allowed.
+No shell redirection, `-S`, askpass, cache-creating `sudo -v`, environment
+override, configurable executable/path, driver argument, UID, endpoint, signal,
+action or cleanup input is allowed. ii-c0 freezes the outer gate executable,
+source/binary identity, exact argv/env/FD set and controlling-TTY behavior before
+this inner argv may be used.
 Machine evidence cannot prove a prompt occurred: the trusted operator must
 observe the exact fixed prompt and record that manual fact; absence of that
 prompt is non-admitting.
@@ -116,6 +126,17 @@ collision with the fixed descriptor is relocated before file actions are
 constructed. No filesystem socket, Mach registration or persistent endpoint is
 created.
 
+The zero-argument driver receives its bounded cohort input only through the
+ii-c0 gate's pre-opened standard-input descriptor. That descriptor must be an
+owner-UID-501 regular file with mode `0600`, one link, bounded finite size, no ACL or
+unexpected xattrs, initial offset zero and stable initial/final metadata. Root
+DriverSupport sets close-on-exec, reads it to exact EOF, hashes it without
+opening a path, and repeats descriptor offset/metadata closure. Root code treats
+its strict configuration frames as opaque bytes and never uses their contents to select an
+executable, path, UID, endpoint, signal, action or cleanup operation. Each App
+may decode its frame only after irreversible credential drop is independently
+admitted. The capsule never contains a retirement handle or token.
+
 The authority-closed driver runtime accepts no executable, path, arguments,
 environment, UID, endpoint, PID, signal or action from a caller. The
 authority-free Machine domain receives only opaque non-Codable results.
@@ -128,8 +149,16 @@ sends `PRE_DROP_READY`; the root parent freezes the exact spawn PID, PID version
 ASID, path, SHA and signing identity while the child is still root, then sends
 `DROP_RELEASE`.
 
+Target UID `501` and primary GID `20` are compile-time constants. Root and App
+independently resolve only the exact local `getpwuid_r(501)` account, require
+GID 20, preserve the measured 17 unique `getgrouplist` return order and freeze
+its first kernel `NGROUPS_MAX == 16` entries. Only that selected set is sorted
+for comparison with sorted `getgroups(2)` output after `initgroups`. No identity
+or group input comes from capsule, argv or environment; a set mismatch blocks
+before `setgid`/`setuid` completion.
+
 The child executes exactly `initgroups -> setgid -> setuid`, proves real,
-effective and saved IDs, the exact kernel-bounded supplementary groups and
+effective and saved IDs, that exact kernel-bounded supplementary group set and
 failed root regain, then sends typed `DROP_EVIDENCE`. The parent independently
 verifies post-drop PID/PPID/PGID and IDs with libproc, ASID with BSM, live signing
 with `kSecGuestAttributePid`, and fixed path/SHA/static signing. Reported audit
@@ -141,15 +170,59 @@ cross-UID task-port lookup is used.
 
 ### 4. Use one strict, one-shot binary protocol
 
-The business epoch is `HELLO -> HANDLE -> ACK -> RELEASE -> ALIVE -> strict
-write EOF -> EXIT`. Every frame has an exact version, kind, sequence, random
+`CONFIGURATION -> CONFIGURATION_ACK` is a pre-business exchange after the
+irreversible drop. The product business epoch is App-to-driver `HELLO` and
+`HANDLE`, driver-to-App `ACK` and `RELEASE`, then App-to-driver `ALIVE` and
+strict write EOF. The historical B4 parent-to-child dummy `HANDLE` proved only
+the duplex algorithm and does not define the product direction. Every frame has
+an exact version, kind, sequence, random
 nonce, one monotonic deadline, bounded length and complete identity claims.
 Trailing bytes, duplicate frames, wrong versions, stale identity, timeout,
 partial EOF or unexpected closure permanently consume the epoch.
 
-The App remains alive after `ALIVE`; the root driver performs installed-L2
-observation and the final identity check before sending `EXIT`. No opaque handle
-is written to a file, configuration, receipt or helper claim response.
+After ALIVE/EOF, the driver presents the handle once to the fixed helper claim
+service, requires the handle-free claim evidence, performs an
+`installedL2ObservedAt` barrier and a repeated post-drop App identity join, then
+sends a handle-free `CLAIM_RELEASE` on the same attested connection epoch. A
+successful claim atomically cancels the original claim deadline and installs a
+release deadline. Claim evidence binds the request digest, fresh connection-
+epoch nonce, complete attested-helper identity digest and absolute monotonic
+deadline. `CLAIM_RELEASE` adds a fresh nonzero challenge and echoes all those
+facts; release atomically cancels that deadline. `CLAIM_RELEASED` echoes digest,
+challenge, helper digest and connection epoch, carries typed `exitScheduled` and
+the absolute post-reply exit deadline. The helper replies once, schedules exit
+only after reply dispatch, exits within a fixed bound and
+may be restarted by launchd for the next epoch. Timer races are terminal and no
+untracked exit work item remains. Only then does the driver send `EXIT`. Early
+claim-connection loss, release before installed-L2, foreign binding/challenge or
+helper survival beyond the bound fails closed. The App therefore remains alive
+through helper claim and installed-L2. No opaque handle
+is written to a file, configuration or receipt. A claim request presents the
+handle once to its original helper, but the helper response contains only a
+canonical request-binding digest, challenge/identity evidence and retirement
+facts; it never echoes the request, handle, token or a reversible token
+projection.
+
+The claim/release protocol uses system-wide `mach_continuous_time` converted to
+nanoseconds. The release window and post-reply exit window are each at most
+exactly five seconds and are capped by the epoch monotonic deadline plus the
+independently checked wall-clock handle/config validity. Release transcripts use
+separate domain separators, exact versioned tagged fields and contain no handle
+or token; zero/stale challenge, wrong connection/helper identity, digest or
+deadline drift and unknown fields fail closed.
+
+After helper exit the installed-L2 observation is historical, not continuously
+valid. The driver proves the exact claimed helper and all claim connection/
+escrow/listener state are gone. The launchd service remains registered and
+activatable but is not called process-loaded; the next epoch attests a different
+fresh helper identity and repeats full installed-L2.
+
+The App's no-model retirement path may use only one supervised lifecycle
+`start -> retire` pair and no App Server business line. Source review proves it
+does not call auth projection, initialize, login, thread, turn, write or read
+APIs; ii-c must additionally prove on the signed App that auth content/metadata
+remain unchanged and no admitted auth-read/model/network event occurred. Until
+that machine evidence exists, source shape alone is not an auth-read claim.
 
 ### 5. Keep lifecycle authority with the root parent
 
@@ -159,6 +232,14 @@ SIGKILL fallback runs before identity may be released. PID is cleared only after
 successful reap; otherwise exact PID/PGID remains in typed residue evidence and
 the result cannot be contained. No global same-UID discovery or coordination is
 permitted.
+
+Per-epoch completion proves exact channel, App, descendant and PGID retirement
+with leader reap-last while installed artifacts and launchd registration remain
+admitted; helper process identity is covered by the timestamp barrier and exact
+post-release exit above. After reap, the driver repeats its installed-path/
+static/live self-observation and requires exact equality with the initial typed observation.
+Global post-teardown L2 means final bootout/uninstall and occurs once
+after all epochs, not inside an epoch.
 
 The one outer installed-driver supervisor stays alive across closed, sequential,
 fresh scenario epochs. Each epoch has a disposable inner root scenario-parent
@@ -174,15 +255,20 @@ not a fault target and may not signal unrelated processes.
   non-admitting evidence and must never be root-executed.
 - L3c3c-i is complete as a research/root-launch audit with an external NO-GO; it
   does not accept this ADR or prove machine behavior.
-- Product work is split into ii-a authority-closed live driver runtime, ii-b
-  fixed handoff composition and ii-c one outer no-model privileged driver
-  invocation containing closed scenario epochs.
+- Product work is split into ii-a authority-closed live driver runtime;
+  ii-b0–ii-b5 shared contract/App/helper/client/single-epoch implementation;
+  ii-c0 TTY/capsule launcher evidence; and ii-c one outer no-model privileged
+  driver invocation containing closed scenario epochs.
 - No anonymous-XPC, filesystem mailbox, generic IPC, generic root launcher,
   helper launch operation or caller-configurable fallback remains.
 - The driver runtime owns only fixed process creation and lifecycle cleanup; it
   has no Cleanup/Policy/Trash/Executor/Registered Action authority.
 - Strict path/SHA plus live and static signing checks remain mandatory because
   running-vnode validity survives path replacement on the measured platform.
+- ii-c0 proves only gate-side exec/FD hygiene with a non-privileged stub plus
+  the local sudo manual. It does not prove real sudo preserves child stdin/TTY/
+  FDs. A mismatch in the unique ii-c attempt consumes and fails that gate with
+  no retry, readiness or ADR acceptance.
 - L3c3d may run one real authenticated model attempt only after ii-c is green.
 - L3c4 alone owns Task 39 readiness and the remaining full verifier.
 
@@ -198,13 +284,15 @@ the closed scenario epochs and prove:
 1. exact root-owned installed driver self-observation before App launch and
    independent equality with the installer/L2 frozen binding;
 2. root parent and exact fixed UID 501 child;
-3. the two-stage identity transition and exact 17-to-16 kernel group rule;
+3. the two-stage identity transition and exact returned-order-first 17-to-16
+   kernel group rule;
 4. irreversible credential drop;
 5. the strict happy/replay/deadline/cancellation/crash/hang matrix;
 6. zero child, descendant, channel and exact-PGID residue;
 7. exact installed current-source App/helper/driver/plist/service binding,
-   installer ACL proof, runtime ACL self-observation and full installed L2 after
-   App launch;
+   installer ACL proof, runtime ACL self-observation, per-epoch timestamped
+   installed L2, exact helper release/exit and fresh helper/full-L2 on the next
+   epoch;
 8. post-run uninstall and zero App/plist/service/runtime/lease/process residue;
    and
 9. independent validation of the raw evidence without retrying a started failed
@@ -231,7 +319,7 @@ unconsumed.
 | i-b2b-0b external staging | superseded before execution |
 | i-b2b-1 external privileged run | superseded before execution; root count 0 |
 | installed diagnostic driver | conditionally selected; currently absent |
-| ii-a live DriverSupport | not implemented |
-| ii-b fixed handoff composition | not implemented |
+| ii-a installed-driver self-observation | complete; non-admitting |
+| ii-b split preflight | frozen after three review rounds; ii-b0 current; no implementation admitted |
 | ii-c no-model privileged machine gate | not executed |
 | ADR status | **Proposed** |

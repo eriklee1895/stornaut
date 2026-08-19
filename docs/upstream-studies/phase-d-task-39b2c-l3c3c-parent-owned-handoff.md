@@ -143,6 +143,13 @@ parent creates channel
 -> bounded group drain -> reap-last
 ```
 
+The B3/B4 `HANDLE` in this measured spike was a parent-to-child dummy opaque
+payload. It proves framing, duplex identity and lifecycle behavior only. The
+later product split preflight owns business direction: the real helper-minted
+retirement handle travels App-to-driver after the App retires its lifecycle
+session; it never travels parent-to-App. The later pre-business
+`CONFIGURATION/ACK` exchange is likewise outside this historical spike.
+
 Every frame binds magic, version, message kind, monotonic sequence, random
 nonce, one shared monotonic deadline, claimed PID/PID-version/EUID/ASID and a
 hard payload limit. The claims do not establish identity; they must match the

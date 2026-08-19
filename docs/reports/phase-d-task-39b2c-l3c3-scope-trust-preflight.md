@@ -1,7 +1,7 @@
 # Phase D Task 39B2c-L3c3 Scope and Trust Preflight
 
 > Status: Split revised; L3c3a/L3c3b/L3c3c-i/L3c3c-ii-a complete; external
-> root-launch branch rejected; L3c3c-ii-b is the current frontier
+> root-launch branch rejected; L3c3c-ii-b split frozen; ii-b0 current
 >
 > Date: 2026-08-18
 >
@@ -154,22 +154,32 @@ fixed installed driver is conditionally selected and ii is split again:
   minimum socketpair/launch/lifecycle primitives while preserving the
   Debug/Release final-Mach-O prohibition on Core/Execution/Cleanup/Policy/Trash/
   Executor/Registered Action authority. No install, App launch, sudo or model.
-- **ii-b fixed handoff composition** implements the exact App inherited-FD leaf,
-  root-to-UID transition, opaque handle, helper claim, installed-L2 barrier,
-  transition and retirement using fakes or non-privileged evidence only.
-- **ii-c one no-model outer installed-driver gate** builds and installs the exact
+- **ii-b fixed handoff composition** is further split into ii-b0 shared
+  wire/capsule, ii-b1 App leaf, ii-b2 handle-free helper response, ii-b3 concrete
+  App adapter, ii-b4 fixed claim client and ii-b5 single-epoch composition;
+  ii-c0 separately proves the TTY/capsule launcher before privilege. This closes
+  the helper-response handle echo and distinguishes per-epoch process retirement
+  from final uninstall. See the
+  [ii-b split preflight](phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md).
+- **ii-c one no-model outer installed-driver gate** follows a fresh ii-c0
+  launcher-authoring preflight, then builds and installs the exact
   current-source topology, repeats static artifact/service admission, then
   requires nonzero `sudo -kNnv`, the fixed manual prompt and only the fixed
-  root-owned driver with zero driver arguments. Full installed-L2 follows each
-  App launch before transition/`EXIT`; ii-c then uninstalls and proves zero
+  root-owned driver with zero driver arguments. Timestamped full installed-L2
+  follows each App launch; claim release then proves exact helper exit, and the
+  next epoch requires a fresh helper identity/full L2 before transition/`EXIT`
+  as applicable. ii-c then uninstalls and proves zero
   residue. One outer invocation contains the closed sequential scenario
-  epochs; a started failed outer attempt is not retried to repair implementation.
+  epochs; a started failed outer attempt, including real-sudo stdin/TTY mismatch,
+  is not retried to repair implementation.
 
 The launcher accepts no caller executable, path, arguments, environment, UID,
 endpoint, PID, signal or action. The live flow linearizes `driver ready -> App
 launch -> Task 38 retirement/escrow record -> parent handoff -> claim ->
-installed L2 -> driver transition -> App/helper/service teardown ->
-post-teardown L2` and may return only opaque non-`Codable` authority. Exact path
+installed L2 -> driver EXIT transition -> exact epoch process retirement`.
+Final App/helper/service bootout/uninstall and post-teardown L2 occur once at
+the end of ii-c, not after every epoch. The flow may return only opaque
+non-`Codable` authority. Exact path
 and cost ceilings are frozen in the
 [installed-driver preflight](phase-d-task-39b2c-l3c3c-ii-installed-driver-path-cost-preflight.md).
 
@@ -197,7 +207,8 @@ This preflight made no repository code change, installed nothing, launched no
 model and did not alter `~/.codex/config.toml`. Production Deep Dive remains
 unavailable. L3c3a, L3c3b, L3c3c-i and L3c3c-ii-a are complete; the root-launch
 audit closed the external branch with NO-GO and did not accept ADR 0018.
-L3c3c-ii-b is the current frontier. ADR 0018 may become Accepted only after
+The ii-b split passed three independent review rounds and ii-b0 is current.
+ADR 0018 may become Accepted only after
 ii-c succeeds. Any
 path beyond a frozen ceiling still
 requires another split before coding.

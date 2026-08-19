@@ -48,7 +48,10 @@
 > UID-staged external root-launch path is NO-GO, and i-b2b-0b/i-b2b-1 were
 > superseded before execution. L3c3c-ii-a authority-closed installed-driver and
 > manifest observation is complete after exact source/final-Mach-O admission and
-> independent post-fix review; L3c3c-ii-b fixed handoff is current. Evidence:
+> independent post-fix review. The ii-b preflight identified helper-response
+> handle echo, per-epoch/final-uninstall ambiguity and a closed-input gap, then
+> froze ii-b as ii-b0–ii-b5 and inserted ii-c0 before privilege; three
+> independent review rounds have no unresolved P0–P2 and ii-b0 is current. Evidence:
 > [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
 > [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md) and
 > [Task 39B1b-i Review](../../reports/phase-d-task-39b1b-i-review.md) and
@@ -967,7 +970,9 @@ The remaining L3 work is split before driver coding:
    installed-L2 proof until the App has vanished: the live order remains driver
    ready, App retirement/record, driver claim while the exact App/helper/service
    topology is still observable, installed L2, transition, then post-teardown
-   L2. The opaque App-to-driver handle handoff is not smuggled through JSON, a
+   L2. That sequence is historical synthetic L3c2 evidence: live multi-epoch
+   composition replaces per-epoch global post-teardown with exact epoch process
+   retirement and reserves global post-teardown L2 for final uninstall. The opaque App-to-driver handle handoff is not smuggled through JSON, a
    filesystem mailbox or the helper claim response; its current-source live
    implementation is explicitly deferred to L3c3. The untracked verifier/CLI
    sketches in the user's separate main worktree are stale, outside this
@@ -1060,15 +1065,25 @@ The remaining L3 work is split before driver coding:
    Therefore
    [ADR 0018](../../adr/0018-parent-owned-investigation-handoff.md) remains
    Proposed, while L3c3c-i is complete as a NO-GO audit, L3c3c-ii-a is complete,
-   and L3c3c-ii-b is the current frontier. See the
+   and the nested split is frozen after three green review rounds; ii-b0 is current. See the
    [study](../../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md)
    and [final review](../../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md),
    plus the [i-b2a review](../../reports/phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md),
    [i-b2b-0a review](../../reports/phase-d-task-39b2c-l3c3c-i-b2b-0a-root-provenance-review.md)
    and [installed-driver preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-installed-driver-path-cost-preflight.md),
-   plus the [ii-a review](../../reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md).
-   ii-a implements only authority-closed self-observation/runtime primitives; ii-b
-   implements fixed handoff composition without privilege; ii-c alone rebuilds/
+   plus the [ii-a review](../../reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md)
+   and [ii-b split preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md).
+   ii-a implements only authority-closed self-observation/runtime primitives.
+   ii-b is frozen as **ii-b0 shared wire/capsule contract**, **ii-b1 authority-
+   free App leaf**, **ii-b2 handle-free helper response**, **ii-b3 concrete App
+   drop/no-auth retirement adapter**, **ii-b4 fixed claim client** and **ii-b5
+   single-epoch composition**; **ii-c0** requires its own fresh preflight and
+   proves only gate-side launcher/FD hygiene, not real-sudo child behavior. The split preserves a
+   zero-argument driver using only a pre-opened bounded stdin cohort capsule,
+   removes the opaque handle/token from the helper reply and reserves global
+   post-teardown L2 for final uninstall rather than every epoch. Per-epoch L2 is
+   a timestamp barrier followed by exact helper release/exit; the next epoch
+   attests a fresh helper. ii-c alone rebuilds/
    installs/re-admits and invokes the fixed installed driver once as an outer
    supervisor containing closed scenario epochs, with
    no model call. Only a green ii-c gate may accept ADR 0018.
@@ -1085,10 +1100,12 @@ The remaining L3 work is split before driver coding:
 The order is strict: `L3c1a -> L3c1b-i -> L3c1b-ii -> L3c2a-i -> L3c2a-ii ->
 L3c2b -> L3c3a -> L3c3b-0 -> L3c3b-i -> L3c3b-ii -> L3c3c-i-a ->
 L3c3c-i-b1 -> L3c3c-i-b2a -> L3c3c-i-b2b-0a -> L3c3c-ii-a ->
-L3c3c-ii-b -> L3c3c-ii-c -> L3c3d -> L3c4`. L3c1, L3c2, L3c3a,
+L3c3c-ii-b0 -> L3c3c-ii-b1 -> L3c3c-ii-b2 -> L3c3c-ii-b3 ->
+L3c3c-ii-b4 -> L3c3c-ii-b5 -> L3c3c-ii-c0 -> L3c3c-ii-c -> L3c3d -> L3c4`.
+L3c1, L3c2, L3c3a,
 L3c3b-0, L3c3b-i, L3c3b-ii, L3c3c-i and L3c3c-ii-a are complete;
-i-b2b-0b/i-b2b-1 were superseded before execution. L3c3c-ii-b is the current
-frontier. ADR 0018
+i-b2b-0b/i-b2b-1 were superseded before execution. The ii-b split is frozen and
+ii-b0 is current. ADR 0018
 remains Proposed until ii-c succeeds. L3c1 used focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean
 staged serial regression, targeted helper/diagnostic builds and independent

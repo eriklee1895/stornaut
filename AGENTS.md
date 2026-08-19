@@ -256,9 +256,16 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   source/final-Mach-O admission、20/7/11 focused gates 与 independent post-fix
   review 已完成并推送；唯一 staged-only serial 为 1086/1087，唯一失败是已由
   独立 prerequisite 4a0a8cb 修复且 exact case 绿色的 fixture-clock expiry，
-  serial 未重跑。当前 frontier 为 ii-b fixed installed-driver/App handoff
-  composition，随后严格为 ii-c 唯一 no-model
-  privileged machine gate；只有 ii-c 可接受 ADR 0018。
+  serial 未重跑。ii-b scope/cost preflight 随后发现 current helper response
+  回显 opaque handle、existing post-teardown L2 代表 final uninstall 而非
+  per-epoch retirement，且零参数 driver 缺少 closed configuration ingress；
+  ii-b 因此在编码前进一步拆为 ii-b0 shared wire/capsule contract、ii-b1
+  inherited-FD App leaf、ii-b2 handle-free helper response、ii-b3 concrete App
+  drop/no-auth retirement adapter、ii-b4 fixed helper-claim client 与 ii-b5
+  fixed single-epoch driver composition；ii-c 前另插 ii-c0 TTY/capsule
+  launcher spike。三轮 independent review findings 已逐项关闭，无 unresolved
+  P0–P2；split 已冻结，ii-b0 是当前 implementation frontier。随后严格为 ii-c 唯一 no-model
+  privileged machine gate，只有 ii-c 可接受 ADR 0018。
   只有 L3c4
   可作 readiness claim，
   final full 尚未消耗。
@@ -383,6 +390,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c L3c3c-i-b2b-0a root provenance review | [docs/reports/phase-d-task-39b2c-l3c3c-i-b2b-0a-root-provenance-review.md](docs/reports/phase-d-task-39b2c-l3c3c-i-b2b-0a-root-provenance-review.md) |
 | Phase D Task 39B2c L3c3c-ii installed-driver path/cost preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-installed-driver-path-cost-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-installed-driver-path-cost-preflight.md) |
 | Phase D Task 39B2c L3c3c-ii-a installed-driver observation review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b handoff composition split preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md) |
 | Phase D Task 39B2c-L1 residue observation review | [docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md](docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md) |
 | Phase D Task 39B2c-L2 root topology observation review | [docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md](docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md) |
 | Phase D Task 39B2c-L3a trusted machine target review | [docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md](docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md) |
@@ -501,8 +509,9 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   independent grouped/post-fix/cross-group review 已完成。L3c3c-i root-launch
   audit 已完成并拒绝 external branch；i-b2b-0b/i-b2b-1 在执行前 superseded，
   B4 root execution count 为 0。L3c3c-ii-a installed-driver/manifest observation、
-  exact source/final-Mach-O admission 与 post-fix review 已完成并推送；当前
-  frontier 为 L3c3c-ii-b。ADR 0018 仍 Proposed；L3c4 独占 final admission 与
+  exact source/final-Mach-O admission 与 post-fix review 已完成并推送；ii-b
+  已拆为 ii-b0 / ii-b1 / ii-b2 / ii-b3 / ii-b4 / ii-b5，并插入 ii-c0；当前
+  split 已通过三轮 review 并冻结，ii-b0 是当前 frontier。ADR 0018 仍 Proposed；L3c4 独占 final admission 与
   剩余 full。
   Task 39 尚未完成。
 Deep Dive 的旧 Broker-only no-go 已被 ADR 0004 的 capability-first 边界取代；
