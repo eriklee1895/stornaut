@@ -285,8 +285,10 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   decoder-negative supplement 与 final review 均通过。ii-b2a typed
   escrow/deadline state、19-test focused、167-test Lifecycle affected、
   structural/mutation gates、唯一 1,162-test/57-suite combined serial 与 final
-  review 均已完成；ii-b2b server-side adapter/live integration 是当前
-  implementation frontier。之后
+  review 均已完成；ii-b2b-i sealed transfer、non-actor shared-wire adapter、
+  injected effects、1,194-test staged-only serial、structural/mutation gates 与
+  independent post-fix reviews 已完成；ii-b2b-ii legacy-client quarantine /
+  Machine production block 是当前 implementation frontier。之后
   严格为 ii-c 唯一 no-model
   privileged machine gate，只有 ii-c 可接受 ADR 0018。
   只有 L3c4
@@ -421,6 +423,8 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c L3c3c-ii-b0c epoch bootstrap review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b0c-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b0c-review.md) |
 | Phase D Task 39B2c L3c3c-ii-b1 authority-free App leaf preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b1-app-leaf-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b1-app-leaf-preflight.md) |
 | Phase D Task 39B2c L3c3c-ii-b1 authority-free App leaf review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b1-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b1-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b2b server integration preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-server-integration-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-server-integration-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-b2b-i machine-claim server review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-i-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-i-review.md) |
 | Phase D Task 39B2c-L1 residue observation review | [docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md](docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md) |
 | Phase D Task 39B2c-L2 root topology observation review | [docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md](docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md) |
 | Phase D Task 39B2c-L3a trusted machine target review | [docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md](docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md) |
@@ -546,8 +550,9 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   发现的 first-frame origin contradiction 已由 ii-b0c bootstrap prelude关闭。
   ii-b1 已完成 corrected Debug-only diagnostic/dependency-free Release-shell
   topology、layered gates、1,138-test staged-only serial 与 post-fix review；
-  ii-b2 ASID prerequisite 与 ii-b2a typed deadline state 均已完成；ii-b2b
-  server-side adapter/live integration 是当前 frontier。
+  ii-b2 ASID prerequisite 与 ii-b2a typed deadline state 均已完成；ii-b2b-i
+  non-connected machine-claim server 已完成，ii-b2b-ii legacy-client
+  quarantine / Machine production block 是当前 frontier。
   ADR 0018 仍 Proposed；L3c4 独占 final admission 与
   剩余 full。
   Task 39 尚未完成。

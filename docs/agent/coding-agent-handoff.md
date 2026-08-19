@@ -252,7 +252,9 @@
 > decoder-negative supplement 与 final review 均通过。ii-b2a typed escrow/
 > deadline state、19-test focused、167-test Lifecycle affected、structural/
 > mutation gates、唯一 1,162-test/57-suite combined serial 与 final review 均已
-> 完成；ii-b2b server-side adapter/live integration 是当前 frontier。之后为
+> 完成；ii-b2b-i non-connected machine-claim server、唯一 1,194-test staged
+> serial、source/package/mutation gates 与 post-fix reviews 已完成；ii-b2b-ii
+> legacy-client quarantine / Machine production block 是当前 frontier。之后为
 > ii-c 唯一 no-model privileged installed-driver gate。只有
 > L3c4 可作 readiness claim，
 > L3c2b preflight 的 fresh-plan matrix contradiction 已由 plan-freshness
@@ -595,7 +597,8 @@ independent grouped/post-fix/cross-group review 已完成。L3c3c-i root-launch
 audit 已完成并拒绝 external branch；i-b2b-0b/i-b2b-1 在执行前 superseded，
 B4 root execution count 为 0。L3c3c-ii-a 与 ii-b0a 已完成，当前 frontier 为
 L3c3c-ii-b2；ii-b0a/ii-b0b/ii-b0c/ii-b1 与 ii-b2 ASID prerequisite 已完成，
-ii-b2a 已完成，ii-b2b server-side adapter/live integration current，
+ii-b2a 与 ii-b2b-i 已完成，ii-b2b-ii legacy-client quarantine / Machine
+production block current，
 ii-b 已拆为 ii-b0a/ii-b0b/ii-b0c 与
 ii-b1–ii-b5，并在 ii-c 前插入 ii-c0。
 ADR 0018 仍 Proposed，L3c4 独占 final admission 与剩余 full。
@@ -630,6 +633,10 @@ L3c3c-i 条件性证据见
 冻结 post-RED Debug-only diagnostic/dependency-free Release-shell correction；
 [ii-b1 review](../reports/phase-d-task-39b2c-l3c3c-ii-b1-review.md)
 记录 authority-free leaf completion 与 non-admitting evidence。
+[ii-b2b server integration preflight](../reports/phase-d-task-39b2c-l3c3c-ii-b2b-server-integration-preflight.md)
+冻结 i/ii/iii implementation order；
+[ii-b2b-i review](../reports/phase-d-task-39b2c-l3c3c-ii-b2b-i-review.md)
+记录 sealed non-connected server completion 与 non-admitting evidence。
 生产 Deep Dive 继续 unavailable，直到 Task 44 final admission。
 
 跨 Epic 的阶段依赖、no-go 分支和交付顺序由 [Delivery Roadmap](../plans/roadmap.md) 管理；新 active plan 不得另起一套宏观路线。
@@ -778,8 +785,9 @@ B4 root execution count 为 0；L3c3c-ii-a 已完成，ii-b split preflight 已
 冻结 ii-b0a/ii-b0b、ii-b1–ii-b5 与 ii-c0；ii-b0a/ii-b0b/ii-b0c/ii-b1
 已完成；ii-b2 ASID prerequisite 也已通过 1,142-test implementation serial、
 独立 1,143-test decoder-negative supplement 与 final review；ii-b2a typed
-deadline state 也已完成。ii-b2b server-side adapter/live integration 是当前
-frontier。已完成部分均为
+deadline state 与 ii-b2b-i non-connected machine-claim server 也已完成。
+ii-b2b-ii legacy-client quarantine / Machine production block 是当前 frontier。
+已完成部分均为
 non-admitting prerequisite，
 L3c4 才是 machine admission。该最终 gate
 要求证明完整调查能力和公共联网可用时，

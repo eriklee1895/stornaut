@@ -177,10 +177,13 @@ or app-release verifier changes here.
 ### 4.2 Responsibilities
 
 The target adds the static library product, but no product target consumes it.
-An injected package initializer receives one opaque reservation seed for tests.
+Its package initializer accepts only the sealed
+`LifecycleMachineRetirementReservationTransfer` produced by Lifecycle's
+one-shot `transferReservation()`; no raw/caller-mintable seed exists.
 The completed ii-b2a core gains one narrow package method,
 `rejectBinding(reservationID:)`, so an already-authorized server translation can
-terminally report a handle/token/seed mismatch without minting a fake reservation
+terminally report a decoded handle/token/transfer mismatch without minting a
+fake reservation
 or maintaining a second terminal state. It accepts only the exact live
 reservation, is idempotent after terminal, schedules no work and returns the
 existing typed `.bindingMismatch` transition. An armed current ticket produces
@@ -247,21 +250,22 @@ reply/post-reply ordering. External terminal-handler reentry is a positive test,
 not a forbidden implementation convention. Sequential replay remains terminal
 and fail-closed.
 
-The opaque reservation seed carries the exact typed
+The sealed Lifecycle transfer carries the exact typed
 `LifecycleInteractiveWorkerRetirementObservation` and
 `LifecycleInvestigationResidueObservation` received from the escrow; it does not
-replace them with Boolean or count summaries. Seed admission requires the exact
+replace them with Boolean or count summaries. Transfer projection requires the
+exact
 owned-retirement four-field tuple, `provedEmpty`, matching investigation UUID,
 helper audit-session ID and App UID, a checked floor conversion of the residue
 `Date` through `InvestigationHandoffUTCMicroseconds`, `observedAt <= recordedAt`,
-and the existing maximum 60-second residue-to-record freshness window. The seed
-stores the typed source observations and their one deterministic handoff
-projection. Evidence construction uses only that projection. It must not call a
+and the existing maximum 60-second residue-to-record freshness window. The server
+stores one deterministic handoff projection derived from those typed source
+observations. Evidence construction uses only that projection. It must not call a
 zero-argument owner projection or write literal zero residue counts without
 first deriving and validating every field from those source observations.
 Non-owned/prepared retirement, every nonzero residue dimension, foreign
 investigation/ASID/UID, future/stale timestamps and invalid Date conversion fail
-before reservation consumption.
+server construction after the one-shot transfer and cannot mint claim evidence.
 
 Release translation compares the request digest, recomputed helper-identity
 digest, connection epoch and release deadline directly against retained evidence
@@ -276,7 +280,7 @@ The adapter must:
 - independently recompute the complete request-binding digest and helper-
   identity digest;
 - compare token hash and all handle/investigation/retire/config/validity facts
-  to the opaque seed without retaining raw request bytes;
+  to the sealed transfer projection without retaining raw request bytes;
 - translate complete App/helper identity, owner retirement and L1 residue facts
   once into exact claim evidence;
 - translate exact UTC microseconds and monotonic observations into ii-b2a values;
@@ -308,7 +312,7 @@ does not yet consume a live Lifecycle escrow.
 - evidence/released contain no handle/token or reversible token projection;
 - release echo of digest/challenge/helper/connection/deadline;
 - wrong domain/version/tag/order/length/trailing/old JSON v2 rejection;
-- malformed request fails before state consumption; decoded handle/token/seed
+- malformed request fails before state consumption; decoded handle/token/transfer
   mismatch uses the exact `rejectBinding` transition;
 - direct rejectBinding tests cover pending/armed cancel, late arm success,
   foreign/empty stale and terminal idempotence with no schedule effect;
@@ -318,7 +322,7 @@ does not yet consume a live Lifecycle escrow.
 - claim/release/reply clock failure invokes exact operation-bound
   `rejectOperationObservation`, terminalizes the matching live reservation and
   cannot be retried; callback failure never uses that seam;
-- seed negatives cover both non-owned retirement values, every nonzero residue
+- transfer negatives cover both non-owned retirement values, every nonzero residue
   count, foreign investigation/ASID/UID, future and over-60-second-old residue,
   the exact 60-second positive boundary and sub-microsecond floor projection;
 - duplicate/replay/foreign epoch/helper/digest/deadline fail terminally;
