@@ -1,8 +1,8 @@
 # ADR 0018: Parent-Owned Investigation Handoff and Fixed App Launch
 
 > **Status:** Proposed; external root-launch branch rejected; ii-b0a/ii-b0b/
-> ii-b0c/ii-b1, the ii-b2 ASID prerequisite, ii-b2a and ii-b2b-i complete;
-> ii-b2b-ii legacy-client quarantine / Machine production block current
+> ii-b0c/ii-b1, the ii-b2 ASID prerequisite, ii-b2a, ii-b2b-i and ii-b2b-ii
+> complete; ii-b2b-iii live-helper server migration current
 >
 > **Date:** 2026-08-19
 >
@@ -339,6 +339,7 @@ unconsumed.
 | ii-b2 ASID cohort prerequisite | complete; App/helper independently bound, L1 residue bound to helper; non-admitting |
 | ii-b2a typed escrow/deadline state | complete; non-connected/non-admitting |
 | ii-b2b-i non-connected machine-claim server | complete; non-admitting |
-| ii-b2b-ii legacy-client quarantine / Machine production block | current |
+| ii-b2b-ii legacy-client quarantine / Machine production block | complete; non-admitting |
+| ii-b2b-iii live-helper server migration | current |
 | ii-c no-model privileged machine gate | not executed |
 | ADR status | **Proposed** |

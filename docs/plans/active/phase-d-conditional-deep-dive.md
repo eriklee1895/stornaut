@@ -45,7 +45,9 @@
 > deadline state is complete after its 1,162-test combined serial. ii-b2b-i
 > non-connected server integration is complete after its 1,194-test staged-only
 > serial and post-fix reviews; ii-b2b-ii legacy-client quarantine / Machine
-> production block is current, followed eventually by ii-c
+> production block is complete after its helper-private legacy server correction,
+> complete App/main-Mach-O gate and 1,196-test staged-only serial. ii-b2b-iii
+> live-helper server migration is current, followed eventually by ii-c
 > one no-model privileged gate. The authoritative
 > real-model run and readiness verdict remain unimplemented.
 > Production Deep Dive remains unavailable until Task 44 admission.
@@ -915,13 +917,17 @@ Checkpoint status:
   ii-b2b-i sealed/non-connected server integration is complete after 59 focused
   tests, sole 1,194-test staged-only serial, source/package/mutation gates and
   independent post-fix reviews. ii-b2b-ii legacy-client quarantine / Machine
-  production block is current.
+  production block is also complete after 34 focused, 175 Lifecycle affected,
+  308 Investigation affected, complete App/main-Mach-O, 1,196-test staged-only
+  serial and grouped/cross-group review gates. ii-b2b-iii is current.
   See the
   [ii-b2 ASID prerequisite review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2-asid-prerequisite-review.md),
   the
   [ii-b2a typed escrow/deadline review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2a-review.md),
   the
   [ii-b2b-i machine-claim server review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2b-i-review.md),
+  the
+  [ii-b2b-ii legacy-client quarantine review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2b-ii-review.md),
   the
   [L3c1b-i Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
   and
