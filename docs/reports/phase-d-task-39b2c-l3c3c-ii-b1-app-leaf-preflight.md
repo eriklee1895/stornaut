@@ -22,6 +22,14 @@
 > Debug-only diagnostic native target plus one dependency-free Release-shell
 > native target, both compiling the same physical harness source. The verifier
 > must not be weakened.
+>
+> Post-topology affected RED correction: the existing Swift structural test
+> correctly rejected the native-target count change. The original nine-path
+> list omitted that necessary contract owner. The frozen surface is therefore
+> corrected to ten non-document paths by adding only
+> `InvestigationMachineTargetBoundaryTests.swift`; the 1,900-line ceiling is
+> unchanged and the checkpoint remains below the mandatory fourteen-path split
+> threshold.
 
 ## 1. Decisions Closed Before Coding
 
@@ -199,7 +207,7 @@ claim installed-L2, helper claim/release, driver cleanup or readiness.
 
 ## 3. Exact Implementation Surface and Budget
 
-ii-b1 may change exactly these nine non-document paths and at most 1,900
+ii-b1 may change exactly these ten non-document paths and at most 1,900
 added-or-changed lines:
 
 1. `Package.swift` — add only Diagnostic -> HandoffContract;
@@ -209,9 +217,11 @@ added-or-changed lines:
 5. `Tests/StornautInvestigationTests/InvestigationHandoffAppLeafTests.swift`;
 6. `Stornaut.xcodeproj/project.pbxproj` — only the exact single-configuration
    Release-shell target and removal of the old target's Release configuration;
-7. `scripts/verify-investigation-boundaries`;
-8. `scripts/verify-app-release-boundaries`; and
-9. `scripts/verify-contract`.
+7. `Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift`
+   — update the existing native graph contract for the exact Debug/shell split;
+8. `scripts/verify-investigation-boundaries`;
+9. `scripts/verify-app-release-boundaries`; and
+10. `scripts/verify-contract`.
 
 No scheme file changes. The dedicated Debug App, Release shell and test targets
 continue to reuse the existing one-source harness/test files. Existing config-path
