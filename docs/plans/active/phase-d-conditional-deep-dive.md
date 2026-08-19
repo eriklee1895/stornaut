@@ -34,8 +34,9 @@
 > audit is also complete: B3/B4 algorithm evidence is retained, while `sudo -v`
 > and UID-staged no-cache external root paths are NO-GO. i-b2b-0b/i-b2b-1 were
 > superseded before execution; B4 root count is zero. ADR 0018 remains Proposed.
-> L3c3c-ii-a authority-closed live DriverSupport is the current frontier,
-> followed by ii-b fixed handoff and ii-c one no-model privileged gate. The authoritative
+> L3c3c-ii-a authority-closed installed-driver/manifest observation and exact
+> source/final-Mach-O admission are complete; ii-b fixed handoff is current,
+> followed by ii-c one no-model privileged gate. The authoritative
 > real-model run and readiness verdict remain unimplemented.
 > Production Deep Dive remains unavailable until Task 44 admission.
 >
@@ -889,7 +890,7 @@ Checkpoint status:
   and independent post-fix/cross-group review. L3c3b-ii installer/L2 is complete.
   L3c3c-i transport/root-launch audit is complete and rejects the external
   branch; i-b2b-0b/i-b2b-1 were superseded before execution. ADR 0018 remains
-  Proposed and L3c3c-ii-a is the current frontier.
+  Proposed. L3c3c-ii-a is complete and L3c3c-ii-b is the current frontier.
   See the
   [L3c1b-i Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
   and
@@ -924,6 +925,8 @@ Checkpoint status:
   [L3c3c-i-b2b-0a Root Provenance Review](../../reports/phase-d-task-39b2c-l3c3c-i-b2b-0a-root-provenance-review.md).
   The revised implementation split is frozen by the
   [Installed-Driver Preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-installed-driver-path-cost-preflight.md).
+  ii-a completion evidence is in the
+  [Installed-Driver Observation Review](../../reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md).
   Only L3c4 owns
   real-model signed-App machine readiness, the complete failure matrix, exact
   zero-residue proof and the remaining authoritative full verifier. Task 39 and

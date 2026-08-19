@@ -1,7 +1,7 @@
 # Phase D Task 39B2c-L3c3 Scope and Trust Preflight
 
-> Status: Split revised; L3c3a/L3c3b and L3c3c-i audit complete; external
-> root-launch branch rejected; L3c3c-ii-a is the current frontier
+> Status: Split revised; L3c3a/L3c3b/L3c3c-i/L3c3c-ii-a complete; external
+> root-launch branch rejected; L3c3c-ii-b is the current frontier
 >
 > Date: 2026-08-18
 >
@@ -195,8 +195,9 @@ L3c3a, L3c3b, L3c3c-i and L3c3c-ii-a/b/c must not authenticate Codex or call a m
 
 This preflight made no repository code change, installed nothing, launched no
 model and did not alter `~/.codex/config.toml`. Production Deep Dive remains
-unavailable. L3c3a, L3c3b and L3c3c-i are complete; the latter closed the
-external root branch with NO-GO and did not accept ADR 0018. L3c3c-ii-a is the
-current frontier. ADR 0018 may become Accepted only after ii-c succeeds. Any
+unavailable. L3c3a, L3c3b, L3c3c-i and L3c3c-ii-a are complete; the root-launch
+audit closed the external branch with NO-GO and did not accept ADR 0018.
+L3c3c-ii-b is the current frontier. ADR 0018 may become Accepted only after
+ii-c succeeds. Any
 path beyond a frozen ceiling still
 requires another split before coding.

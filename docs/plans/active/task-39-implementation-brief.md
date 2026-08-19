@@ -46,8 +46,9 @@
 > deterministic machine driver/failure matrix is complete. L3c3c-i is complete
 > as a transport/root-launch audit: B3/B4 algorithm evidence is retained, every
 > UID-staged external root-launch path is NO-GO, and i-b2b-0b/i-b2b-1 were
-> superseded before execution. The current frontier is L3c3c-ii-a
-> authority-closed live DriverSupport. Evidence:
+> superseded before execution. L3c3c-ii-a authority-closed installed-driver and
+> manifest observation is complete after exact source/final-Mach-O admission and
+> independent post-fix review; L3c3c-ii-b fixed handoff is current. Evidence:
 > [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
 > [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md) and
 > [Task 39B1b-i Review](../../reports/phase-d-task-39b1b-i-review.md) and
@@ -113,7 +114,8 @@
 > implementation/non-root/cleanup/static review and i-b2a historical
 > reproducibility are complete. i-b2b-0a closed the external root-launch audit
 > with NO-GO; i-b2b-0b/i-b2b-1 were superseded before execution. ADR 0018
-> remains Proposed while L3c3c-ii-a is authorized by the revised preflight.
+> remains Proposed. L3c3c-ii-a is complete while L3c3c-ii-b is authorized by
+> the revised preflight.
 > Evidence:
 > [39B2c-L3c1a Typed Owner Retirement Review](../../reports/phase-d-task-39b2c-l3c1a-typed-owner-retirement-review.md)
 > and
@@ -144,6 +146,8 @@
 > [L3c3c-i-b2b-0a Root Provenance Review](../../reports/phase-d-task-39b2c-l3c3c-i-b2b-0a-root-provenance-review.md).
 > and
 > [L3c3c-ii Installed-Driver Path/Cost Preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-installed-driver-path-cost-preflight.md).
+> and
+> [L3c3c-ii-a Installed-Driver Observation Review](../../reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md).
 >
 > **Parent plan:**
 > [Phase D Conditional Deep Dive](phase-d-conditional-deep-dive.md)
@@ -1055,13 +1059,14 @@ The remaining L3 work is split before driver coding:
    root execution count is zero and no root artifact or receipt exists.
    Therefore
    [ADR 0018](../../adr/0018-parent-owned-investigation-handoff.md) remains
-   Proposed, while L3c3c-i is complete as a NO-GO audit and L3c3c-ii-a
-   is the current frontier. See the
+   Proposed, while L3c3c-i is complete as a NO-GO audit, L3c3c-ii-a is complete,
+   and L3c3c-ii-b is the current frontier. See the
    [study](../../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md)
    and [final review](../../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md),
    plus the [i-b2a review](../../reports/phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md),
    [i-b2b-0a review](../../reports/phase-d-task-39b2c-l3c3c-i-b2b-0a-root-provenance-review.md)
-   and [installed-driver preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-installed-driver-path-cost-preflight.md).
+   and [installed-driver preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-installed-driver-path-cost-preflight.md),
+   plus the [ii-a review](../../reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md).
    ii-a implements only authority-closed self-observation/runtime primitives; ii-b
    implements fixed handoff composition without privilege; ii-c alone rebuilds/
    installs/re-admits and invokes the fixed installed driver once as an outer
@@ -1081,8 +1086,9 @@ The order is strict: `L3c1a -> L3c1b-i -> L3c1b-ii -> L3c2a-i -> L3c2a-ii ->
 L3c2b -> L3c3a -> L3c3b-0 -> L3c3b-i -> L3c3b-ii -> L3c3c-i-a ->
 L3c3c-i-b1 -> L3c3c-i-b2a -> L3c3c-i-b2b-0a -> L3c3c-ii-a ->
 L3c3c-ii-b -> L3c3c-ii-c -> L3c3d -> L3c4`. L3c1, L3c2, L3c3a,
-L3c3b-0, L3c3b-i, L3c3b-ii and L3c3c-i are complete; i-b2b-0b/i-b2b-1
-were superseded before execution. L3c3c-ii-a is the current frontier. ADR 0018
+L3c3b-0, L3c3b-i, L3c3b-ii, L3c3c-i and L3c3c-ii-a are complete;
+i-b2b-0b/i-b2b-1 were superseded before execution. L3c3c-ii-b is the current
+frontier. ADR 0018
 remains Proposed until ii-c succeeds. L3c1 used focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean
 staged serial regression, targeted helper/diagnostic builds and independent

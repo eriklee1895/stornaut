@@ -1,6 +1,6 @@
 # Phase D Task 39B2c-L3c3c-ii Installed-Driver Path and Cost Preflight
 
-> Status: Split frozen; external staging rejected, ii-a is the current frontier
+> Status: Split frozen; external staging rejected; ii-a complete, ii-b current
 >
 > Date: 2026-08-19
 >
@@ -232,3 +232,8 @@ This preflight does not implement or accept the candidate. It does not install
 or launch a product artifact, execute root code, call a model, enable Deep Dive,
 accept ADR 0018, claim readiness or consume a serial/full gate. Production Deep
 Dive remains unavailable.
+
+Post-preflight status: ii-a completed the authority-closed executable/manifest
+observation and exact source/final-Mach-O admission. Completion evidence is in
+the [ii-a review](phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md).
+ii-b is the current frontier; the remaining non-claims above still apply.

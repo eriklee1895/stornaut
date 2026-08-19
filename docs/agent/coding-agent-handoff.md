@@ -234,8 +234,9 @@
 > reproducibility evidence；i-b2b-0a 以独立 reviews 证明 `sudo -v` 与
 > separate no-cache stock root commands 均不能形成可接受的 external root
 > trust anchor。i-b2b-0b/i-b2b-1 在执行前 superseded；B4 root count 为 0，
-> 无 root artifact/receipt。ADR 0018 仍 Proposed。当前 frontier 是 L3c3c-ii-a
-> authority-closed live DriverSupport，随后为 ii-b fixed handoff composition
+> 无 root artifact/receipt。ADR 0018 仍 Proposed。L3c3c-ii-a authority-closed
+> installed-driver/manifest observation 与 exact source/final-Mach-O admission
+> 已完成；当前 frontier 是 ii-b fixed handoff composition，随后为
 > 和 ii-c 唯一 no-model privileged installed-driver gate。只有
 > L3c4 可作 readiness claim，
 > L3c2b preflight 的 fresh-plan matrix contradiction 已由 plan-freshness
@@ -572,8 +573,8 @@ post-fix review 已完成；b-i native packaging、1060-test clean staged-only s
 ACL fail-closed、whole-installer seal、1067-test clean staged-only serial 与
 independent grouped/post-fix/cross-group review 已完成。L3c3c-i root-launch
 audit 已完成并拒绝 external branch；i-b2b-0b/i-b2b-1 在执行前 superseded，
-B4 root execution count 为 0。ADR 0018 仍 Proposed，L3c3c-ii-a 是当前
-frontier；L3c4 独占 final admission 与剩余 full。
+B4 root execution count 为 0。L3c3c-ii-a 已完成，当前 frontier 为
+L3c3c-ii-b；ADR 0018 仍 Proposed，L3c4 独占 final admission 与剩余 full。
 L3c1b-i/ii 证据见
 [i review](../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
 与
@@ -735,7 +736,8 @@ full 以 23/23 stages、898-test serialized regression、981 秒 wall time
 attempt-binding prerequisite、L1 helper residue、L2 root topology observer 与
 L3c2 deterministic machine driver/failure matrix 均已完成；L3c3c-i root-launch
 audit 已完成并给出 external NO-GO，i-b2b-0b/i-b2b-1 在执行前 superseded，
-B4 root execution count 为 0；L3c3c-ii-a 是当前 frontier。已完成部分均为
+B4 root execution count 为 0；L3c3c-ii-a 已完成，L3c3c-ii-b 是当前
+frontier。已完成部分均为
 non-admitting prerequisite，
 L3c4 才是 machine admission。该最终 gate
 要求证明完整调查能力和公共联网可用时，
