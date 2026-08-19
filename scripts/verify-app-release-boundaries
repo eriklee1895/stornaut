@@ -69,6 +69,27 @@ test -f "$machine_driver_product"
 test -x "$diagnostic_machine_driver"
 test ! -L "$machine_driver_product"
 test ! -L "$diagnostic_machine_driver"
+diagnostic_mach_o_paths=$(
+    find "$diagnostic_debug_app" -type f -print0 \
+        | while IFS= read -r -d '' candidate; do
+            if file "$candidate" 2>/dev/null | grep -q 'Mach-O'; then
+                print -r -- "${candidate#$diagnostic_debug_app/}"
+            fi
+        done \
+        | LC_ALL=C sort
+)
+expected_diagnostic_mach_o_paths=$'Contents/MacOS/StornautInvestigationDiagnostic\nContents/MacOS/StornautInvestigationDiagnostic.debug.dylib\nContents/MacOS/StornautInvestigationMachineDriver\nContents/MacOS/StornautLifecycleHelper\nContents/MacOS/__preview.dylib'
+if [[ "$diagnostic_mach_o_paths" != "$expected_diagnostic_mach_o_paths" ]]; then
+    print -u2 "Investigation diagnostic Mach-O allowlist drifted."
+    exit 1
+fi
+if find "$diagnostic_debug_app" -type f \
+    \( -name '*.a' -o -name '*.o' -o -name '*.bundle' -o -name '*.plugin' \) \
+    -print -quit | grep -q .
+then
+    print -u2 "Investigation diagnostic contains a prohibited packaged binary."
+    exit 1
+fi
 machine_driver_product_node=$(/usr/bin/stat -f '%d:%i' "$machine_driver_product")
 diagnostic_machine_driver_node=$(/usr/bin/stat -f '%d:%i' "$diagnostic_machine_driver")
 test "$(/usr/bin/find "$diagnostic_debug_app" -type f \
@@ -700,6 +721,55 @@ machine_driver_authority_forbidden_markers=(
     'signedRuntimeReady'
     'Readiness'
     'readiness'
+    'Darwin.write'
+    'Darwin.pwrite'
+    'Darwin.unlink'
+    'Darwin.rename'
+    'Darwin.truncate'
+    'Darwin.ftruncate'
+    'Darwin.fork'
+    'Darwin.exec'
+    'Darwin.kill'
+    'Darwin.socket'
+    'Darwin.connect'
+)
+machine_driver_authority_forbidden_imports=(
+    _fork _vfork _execv _execve _execvp _execvP _execl _execlp
+    _posix_spawn _system _popen _dlopen _dlsym _syscall _fcntl _ioctl
+    _setuid _seteuid _setreuid _setresuid _setgid _setegid _setregid
+    _setresgid _initgroups _setgroups _setlogin _pthread_setugid_np
+    _setsid _setpgid _daemon _chdir _fchdir _chroot _umask _nice
+    _setpriority _setrlimit
+    _mmap _msync _write _writev _pwrite _pwritev _unlink _unlinkat
+    _rename _renameat _mkdir _mkdirat _rmdir _truncate _ftruncate
+    _chmod _fchmod _fchmodat _chown _fchown _lchown _fchownat
+    _chflags _fchflags _lchflags _setxattr _fsetxattr _removexattr
+    _fremovexattr _acl_set_fd _acl_set_fd_np _acl_set_file
+    _link _linkat _symlink _symlinkat _utime _utimes _futimes
+    _setattrlist _fsetattrlist _copyfile _fcopyfile _clonefile
+    _socket _socketpair _connect _bind _listen _accept _accept4
+    _send _sendto _sendmsg _recv _recvfrom _recvmsg _getaddrinfo
+    _kill _killpg _pthread_kill _raise
+)
+machine_driver_required_readonly_imports=(
+    _pread _fstat _lstat _flistxattr _acl_get_fd_np
+    _proc_pidpath _SecCodeCopySelf _SecStaticCodeCreateWithPath
+)
+expected_machine_driver_security_imports=$(
+    print -rl -- \
+        _SecCodeCheckValidity \
+        _SecCodeCopySelf \
+        _SecCodeCopySigningInformation \
+        _SecCodeCopyStaticCode \
+        _SecRequirementCopyData \
+        _SecRequirementGetTypeID \
+        _SecStaticCodeCheckValidity \
+        _SecStaticCodeCreateWithPath \
+        _kSecCodeInfoDesignatedRequirement \
+        _kSecCodeInfoFlags \
+        _kSecCodeInfoIdentifier \
+        _kSecCodeInfoUnique \
+        | LC_ALL=C sort
 )
 if mach_o_has_demangled_symbol \
     "$diagnostic_machine_driver" \
@@ -726,6 +796,96 @@ for marker in "${machine_driver_authority_forbidden_markers[@]}"; do
         exit 1
     fi
 done
+machine_driver_undefined_symbols=$(
+    xcrun nm -u -j "$diagnostic_machine_driver" 2>/dev/null \
+        | LC_ALL=C sort -u
+) || {
+    print -u2 "Machine driver undefined-symbol scan failed."
+    exit 1
+}
+machine_driver_loaded_libraries=$(
+    otool -L "$diagnostic_machine_driver" 2>/dev/null \
+        | tail -n +2 \
+        | sed 's/^[[:space:]]*//' \
+        | LC_ALL=C sort -u
+) || {
+    print -u2 "Machine driver load-command scan failed."
+    exit 1
+}
+machine_driver_owned_symbols=$(
+    xcrun nm -j "$diagnostic_machine_driver" 2>/dev/null \
+        | xcrun swift-demangle 2>/dev/null \
+        | rg 'StornautInvestigationMachineDriver(Support)?' \
+        | LC_ALL=C sort -u
+) || {
+    print -u2 "Machine driver owned-symbol scan failed."
+    exit 1
+}
+function require_projection() {
+    local value=$1 expected_sha=$2 expected_lines=$3 label=$4
+    local observed_sha observed_lines
+    observed_sha=$(print -rn -- "$value" | shasum -a 256 | awk '{print $1}')
+    observed_lines=$(print -r -- "$value" | awk 'END {print NR}')
+    if [[ "$observed_sha" != "$expected_sha" \
+        || "$observed_lines" != "$expected_lines" ]]
+    then
+        print -u2 "Machine driver $label projection drifted."
+        exit 1
+    fi
+}
+require_projection \
+    "$machine_driver_undefined_symbols" \
+    d9ede342877a7c2bae9edb3cc6795b0284ed69d43b251a4ea8f55a99c3b27b61 \
+    336 \
+    undefined
+require_projection \
+    "$machine_driver_loaded_libraries" \
+    e3c05d8766d8aa37e87a834a3f37fd71d925f1d34ac349528cee4970db9d3841 \
+    16 \
+    load-command
+require_projection \
+    "$machine_driver_owned_symbols" \
+    d1ba2a7e19f07e2ebee198bb603fe516d3eee9148460563ebf3e6b6aa9eaf2f7 \
+    637 \
+    owned-symbol
+if ! mach_o_has_demangled_symbol \
+    "$diagnostic_machine_driver" \
+    'Darwin.open(Swift.UnsafePointer<Swift.Int8>, Swift.Int32)'
+then
+    symbol_scan_status=$?
+    if (( symbol_scan_status == 2 )); then
+        exit 1
+    fi
+    print -u2 "Machine driver read-only Darwin.open is missing."
+    exit 1
+fi
+for marker in "${machine_driver_authority_forbidden_imports[@]}"; do
+    if print -r -- "$machine_driver_undefined_symbols" \
+        | grep -Fxq -- "$marker"
+    then
+        print -u2 "Machine driver imports prohibited authority: $marker"
+        exit 1
+    fi
+done
+for marker in "${machine_driver_required_readonly_imports[@]}"; do
+    if ! print -r -- "$machine_driver_undefined_symbols" \
+        | grep -Fxq -- "$marker"
+    then
+        print -u2 "Machine driver read-only import is missing: $marker"
+        exit 1
+    fi
+done
+observed_machine_driver_security_imports=$(
+    print -r -- "$machine_driver_undefined_symbols" \
+        | grep -E '^_(Sec|kSec|Authorization|CSSM)' \
+        | LC_ALL=C sort
+)
+if [[ "$observed_machine_driver_security_imports" != \
+    "$expected_machine_driver_security_imports" ]]
+then
+    print -u2 "Machine driver Security import allowlist drifted."
+    exit 1
+fi
 
 if mach_o_has_demangled_symbol \
     "$diagnostic_debug_app" \

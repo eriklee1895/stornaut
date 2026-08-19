@@ -1496,6 +1496,7 @@ python3 - \
     "$diagnostic_root/InvestigationRuntimeDiagnosticAppLeaf.swift" \
     "$machine_root/SignedInvestigationRuntimeMachineContract.swift" <<'PY'
 import json
+import hashlib
 from pathlib import Path
 import re
 import sys
@@ -1689,20 +1690,132 @@ if Path(driver_support.get("path", "")) != Path(
     raise SystemExit("Machine driver support target path drifted")
 driver_support_source_root = Path(driver_support.get("path", ""))
 driver_support_sources = driver_support.get("sources", [])
-if not driver_support_source_root.is_dir() or not driver_support_sources:
-    raise SystemExit("Machine driver support has no resolved source graph")
+expected_driver_support_sources = {
+    "DarwinInvestigationMachineInstalledDriverSystem.swift",
+    "InvestigationMachineDriverSupport.swift",
+    "InvestigationMachineInstalledDriverObservation.swift",
+    "InvestigationMachineInstalledDriverSystemSource.swift",
+}
+if (
+    not driver_support_source_root.is_dir()
+    or set(driver_support_sources) != expected_driver_support_sources
+):
+    raise SystemExit(
+        "Machine driver support source allowlist drifted: "
+        f"{sorted(driver_support_sources)}"
+    )
+driver_support_authority_pattern = re.compile(
+    machine_authority_pattern.pattern
+    + r"|\b(?:socketpair|posix_spawn|setuid|seteuid|setreuid|"
+    + r"setresuid|setgid|setegid|setregid|setresgid|initgroups|"
+    + r"setgroups|setlogin|pthread_setugid_np|setsid|setpgid|"
+    + r"daemon|chdir|fchdir|chroot|umask|nice|setpriority|"
+    + r"setrlimit|chflags|setxattr|fsetxattr|"
+    + r"removexattr|fremovexattr|acl_set_fd|acl_set_fd_np|"
+    + r"acl_set_file|acl_delete_def_file|fork|vfork|execv|execve|"
+    + r"execvp|execvP|execl|execlp|system|popen|dlopen|dlsym|"
+    + r"syscall|fcntl|ioctl|mmap|msync|openat|creat|mkstemp|"
+    + r"mkdtemp|unlinkat|renameat|mkdirat|ftruncate|fchmod|"
+    + r"fchown|fchflags|lchflags|linkat|symlinkat|utime|utimes|"
+    + r"futimes|setattrlist|fsetattrlist|copyfile|fcopyfile|"
+    + r"clonefile|bind|listen|accept|accept4|getaddrinfo|killpg|"
+    + r"pthread_kill|raise)\s*\("
+    + r"|\bOutputStream\s*\("
+    + r"|\b(?:CFStream|InputStream|NWConnection|WebSocket)\b"
+)
+expected_driver_support_imports = {
+    "DarwinInvestigationMachineInstalledDriverSystem.swift": {
+        "CryptoKit", "Darwin", "Foundation", "Security",
+    },
+    "InvestigationMachineDriverSupport.swift": {"Darwin"},
+    "InvestigationMachineInstalledDriverObservation.swift": {"Darwin"},
+    "InvestigationMachineInstalledDriverSystemSource.swift": {"Darwin"},
+}
+expected_driver_support_sha256 = {
+    "DarwinInvestigationMachineInstalledDriverSystem.swift":
+        "d75072a5d3d93c1bf149db3df2fee1fc9fc2480686d84a009ec7762e3888fb73",
+    "InvestigationMachineDriverSupport.swift":
+        "94bd3f2009759a4e095ccbd759f5e8c0f96955923d23e4da706c531efbe72a71",
+    "InvestigationMachineInstalledDriverObservation.swift":
+        "0d6d477336cd99fb7279a74bb0b63d63a362bf36fe6b98fae9a2978e289e4a4f",
+    "InvestigationMachineInstalledDriverSystemSource.swift":
+        "3166ff4e53d66207194546800d96fb659105fb8307e759b9e37083d575117e18",
+}
 for source_name in driver_support_sources:
     source_path = driver_support_source_root / source_name
     if not source_path.is_file():
         raise SystemExit(
             f"Resolved Machine driver support source is missing: {source_path}"
         )
-    source_text = source_path.read_text(encoding="utf-8")
-    match = machine_authority_pattern.search(source_text)
+    source_bytes = source_path.read_bytes()
+    observed_source_sha256 = hashlib.sha256(source_bytes).hexdigest()
+    if observed_source_sha256 != expected_driver_support_sha256[source_name]:
+        raise SystemExit(
+            "Machine driver support source seal drifted: "
+            f"{source_path}: {observed_source_sha256}"
+        )
+    source_text = source_bytes.decode("utf-8")
+    imports = set(re.findall(r"(?m)^import\s+([A-Za-z0-9_]+)\s*$", source_text))
+    if imports != expected_driver_support_imports[source_name]:
+        raise SystemExit(
+            "Machine driver support import allowlist drifted: "
+            f"{source_path}: {sorted(imports)}"
+        )
+    match = driver_support_authority_pattern.search(source_text)
     if match:
         raise SystemExit(
             "Machine driver support gained prohibited authority: "
             f"{source_path}: {match.group(0)!r}"
+        )
+    open_call_count = len(re.findall(r"\b(?:Darwin\.)?open\s*\(", source_text))
+    if source_name == "DarwinInvestigationMachineInstalledDriverSystem.swift":
+        expected_open_call = (
+            "let descriptor = open(\n"
+            "            Self.manifestPath,\n"
+            "            O_RDONLY | O_CLOEXEC | O_NOFOLLOW_ANY | O_UNIQUE | "
+            "O_NONBLOCK\n"
+            "        )"
+        )
+        expected_executable_open_call = (
+            "let descriptor = open(\n"
+            "            Self.path,\n"
+            "            O_RDONLY | O_CLOEXEC | O_NOFOLLOW_ANY | O_UNIQUE | "
+            "O_NONBLOCK\n"
+            "        )"
+        )
+        if (
+            open_call_count != 2
+            or source_text.count(expected_open_call) != 1
+            or source_text.count(expected_executable_open_call) != 1
+        ):
+            raise SystemExit(
+                "Machine driver support read-only open contract drifted: "
+                f"{source_path}"
+            )
+        allowed_security_symbols = {
+            "SecCSFlags", "SecCode", "SecCodeCheckValidity",
+            "SecCodeCopySelf", "SecCodeCopySigningInformation",
+            "SecCodeCopyStaticCode", "SecRequirement",
+            "SecRequirementCopyData", "SecRequirementGetTypeID",
+            "SecStaticCode", "SecStaticCodeCheckValidity",
+            "SecStaticCodeCreateWithPath", "kSecCSRequirementInformation",
+            "kSecCSSigningInformation", "kSecCSStrictValidate",
+            "kSecCodeInfoDesignatedRequirement", "kSecCodeInfoFlags",
+            "kSecCodeInfoIdentifier", "kSecCodeInfoUnique",
+        }
+        observed_security_symbols = set(re.findall(
+            r"\b(?:(?:Sec|kSec)[A-Z]|Authorization|CSSM)[A-Za-z0-9_]*\b",
+            source_text,
+        ))
+        if observed_security_symbols != allowed_security_symbols:
+            raise SystemExit(
+                "Machine driver Security symbol allowlist drifted: "
+                f"{sorted(observed_security_symbols)}"
+            )
+    elif open_call_count:
+        raise SystemExit(
+            "Machine driver support gained an unexpected open call: "
+            f"{source_path}"
         )
     match = machine_readiness_pattern.search(source_text)
     if match:
@@ -1771,6 +1884,31 @@ if manifest_driver_dependencies != [
     raise SystemExit(
         "Manifest Machine driver dependencies drifted: "
         f"{manifest_driver_dependencies!r}"
+    )
+manifest_driver_support = manifest_targets.get(
+    "StornautInvestigationMachineDriverSupport"
+)
+if manifest_driver_support is None:
+    raise SystemExit(
+        "Machine driver support is missing from resolved manifest"
+    )
+if manifest_driver_support.get("dependencies", []):
+    raise SystemExit(
+        "Manifest Machine driver support gained a dependency"
+    )
+expected_driver_support_settings = [
+    {
+        "tool": "linker",
+        "kind": {"linkedFramework": {"_0": "Security"}},
+    }
+]
+if (
+    manifest_driver_support.get("settings", [])
+    != expected_driver_support_settings
+):
+    raise SystemExit(
+        "Manifest Machine driver support linker settings drifted: "
+        f"{manifest_driver_support.get('settings', [])!r}"
     )
 if any(
     product.get("name") == "StornautInvestigationMachineDriver"
@@ -2660,10 +2798,122 @@ for path in Path("StornautApp").rglob("*.swift"):
             )
 PY
 
-if [[ "${STORNAUT_VERIFY_MACHINE_DRIVER_BINARY:-0}" == 1 ]]; then
-    machine_driver_scratch=$(mktemp -d \
-        "${TMPDIR:-/tmp}/stornaut-machine-driver-binary.XXXXXX")
-    trap 'rm -rf "$machine_driver_scratch"' EXIT
+machine_driver_scratch=$(mktemp -d \
+    "${TMPDIR:-/tmp}/stornaut-machine-driver-binary.XXXXXX")
+trap 'rm -rf "$machine_driver_scratch"' EXIT
+
+function machine_driver_projection_sha256() {
+    print -rn -- "$1" | shasum -a 256 | awk '{print $1}'
+}
+
+function machine_driver_projection_lines() {
+    if [[ -z "$1" ]]; then
+        print 0
+    else
+        print -r -- "$1" | awk 'END { print NR }'
+    fi
+}
+
+function machine_driver_projection_matches() {
+    local undefined_symbols=$1
+    local loaded_libraries=$2
+    local owned_symbols=$3
+    local expected_undefined_sha=$4
+    local expected_undefined_lines=$5
+    local expected_loads_sha=$6
+    local expected_loads_lines=$7
+    local expected_owned_sha=$8
+    local expected_owned_lines=$9
+
+    [[ "$(machine_driver_projection_sha256 "$undefined_symbols")" \
+        == "$expected_undefined_sha" \
+        && "$(machine_driver_projection_lines "$undefined_symbols")" \
+        == "$expected_undefined_lines" \
+        && "$(machine_driver_projection_sha256 "$loaded_libraries")" \
+        == "$expected_loads_sha" \
+        && "$(machine_driver_projection_lines "$loaded_libraries")" \
+        == "$expected_loads_lines" \
+        && "$(machine_driver_projection_sha256 "$owned_symbols")" \
+        == "$expected_owned_sha" \
+        && "$(machine_driver_projection_lines "$owned_symbols")" \
+        == "$expected_owned_lines" ]]
+}
+
+function require_exact_machine_driver_projection() {
+    local configuration=$1
+    local undefined_symbols=$2
+    local loaded_libraries=$3
+    local owned_symbols=$4
+    local expected_undefined_sha expected_undefined_lines
+    local expected_loads_sha expected_loads_lines
+    local expected_owned_sha expected_owned_lines
+
+    case "$configuration" in
+        debug)
+            expected_undefined_sha=d9ede342877a7c2bae9edb3cc6795b0284ed69d43b251a4ea8f55a99c3b27b61
+            expected_undefined_lines=336
+            expected_loads_sha=e3c05d8766d8aa37e87a834a3f37fd71d925f1d34ac349528cee4970db9d3841
+            expected_loads_lines=16
+            expected_owned_sha=607f929eac1ae219fccfd6597bbe7412cd44926167b55ac1d53e7d5db02e86d3
+            expected_owned_lines=638
+            ;;
+        release)
+            expected_undefined_sha=c99220c70fc124f54f9d28547a2b2f4a905333f624d632521923255b4743e4a6
+            expected_undefined_lines=214
+            expected_loads_sha=e3c05d8766d8aa37e87a834a3f37fd71d925f1d34ac349528cee4970db9d3841
+            expected_loads_lines=16
+            expected_owned_sha=7634be449f2c1c932d36470e0bdef22bdc8bf138a23d0f258417ae9b600b298c
+            expected_owned_lines=265
+            ;;
+        *)
+            print -u2 "Unknown Machine driver projection: $configuration"
+            return 64
+            ;;
+    esac
+
+    machine_driver_projection_matches \
+        "$undefined_symbols" \
+        "$loaded_libraries" \
+        "$owned_symbols" \
+        "$expected_undefined_sha" \
+        "$expected_undefined_lines" \
+        "$expected_loads_sha" \
+        "$expected_loads_lines" \
+        "$expected_owned_sha" \
+        "$expected_owned_lines"
+}
+
+function verify_machine_driver_projection_mutations() {
+    local configuration=$1
+    local undefined_symbols=$2
+    local loaded_libraries=$3
+    local owned_symbols=$4
+    local forbidden_added required_removed security_added
+
+    forbidden_added=$(print -r -- "$undefined_symbols"$'\n''_write' \
+        | LC_ALL=C sort -u)
+    required_removed=$(print -r -- "$undefined_symbols" \
+        | grep -Fxv -- _pread | LC_ALL=C sort -u)
+    security_added=$(print -r -- "$undefined_symbols"$'\n''_SecItemCopyMatching' \
+        | LC_ALL=C sort -u)
+    for mutation in \
+        "$forbidden_added" \
+        "$required_removed" \
+        "$security_added"
+    do
+        if require_exact_machine_driver_projection \
+            "$configuration" \
+            "$mutation" \
+            "$loaded_libraries" \
+            "$owned_symbols"
+        then
+            print -u2 \
+                "Machine driver projection mutation was accepted: $configuration"
+            return 1
+        fi
+    done
+}
+
     authority_markers=(
         'StornautExecution.'
         'StornautCore.ActionExecutor'
@@ -2675,6 +2925,55 @@ if [[ "${STORNAUT_VERIFY_MACHINE_DRIVER_BINARY:-0}" == 1 ]]; then
         'StornautCore.RegisteredAction'
         'StornautCore.MoveToTrash'
         'StornautCore.ProposedCleanupAction'
+        'Darwin.write'
+        'Darwin.pwrite'
+        'Darwin.unlink'
+        'Darwin.rename'
+        'Darwin.truncate'
+        'Darwin.ftruncate'
+        'Darwin.fork'
+        'Darwin.exec'
+        'Darwin.kill'
+        'Darwin.socket'
+        'Darwin.connect'
+    )
+    authority_imports=(
+        _fork _vfork _execv _execve _execvp _execvP _execl _execlp
+        _posix_spawn _system _popen _dlopen _dlsym _syscall _fcntl _ioctl
+        _setuid _seteuid _setreuid _setresuid _setgid _setegid _setregid
+        _setresgid _initgroups _setgroups _setlogin _pthread_setugid_np
+        _setsid _setpgid _daemon _chdir _fchdir _chroot _umask _nice
+        _setpriority _setrlimit
+        _mmap _msync _write _writev _pwrite _pwritev _unlink _unlinkat
+        _rename _renameat _mkdir _mkdirat _rmdir _truncate _ftruncate
+        _chmod _fchmod _fchmodat _chown _fchown _lchown _fchownat
+        _chflags _fchflags _lchflags _setxattr _fsetxattr _removexattr
+        _fremovexattr _acl_set_fd _acl_set_fd_np _acl_set_file
+        _link _linkat _symlink _symlinkat _utime _utimes _futimes
+        _setattrlist _fsetattrlist _copyfile _fcopyfile _clonefile
+        _socket _socketpair _connect _bind _listen _accept _accept4
+        _send _sendto _sendmsg _recv _recvfrom _recvmsg _getaddrinfo
+        _kill _killpg _pthread_kill _raise
+    )
+    required_readonly_imports=(
+        _pread _fstat _lstat _flistxattr _acl_get_fd_np
+        _proc_pidpath _SecCodeCopySelf _SecStaticCodeCreateWithPath
+    )
+    expected_security_imports=$(
+        print -rl -- \
+            _SecCodeCheckValidity \
+            _SecCodeCopySelf \
+            _SecCodeCopySigningInformation \
+            _SecCodeCopyStaticCode \
+            _SecRequirementCopyData \
+            _SecRequirementGetTypeID \
+            _SecStaticCodeCheckValidity \
+            _SecStaticCodeCreateWithPath \
+            _kSecCodeInfoDesignatedRequirement \
+            _kSecCodeInfoFlags \
+            _kSecCodeInfoIdentifier \
+            _kSecCodeInfoUnique \
+            | LC_ALL=C sort
     )
     for configuration in debug release; do
         scratch_path="$machine_driver_scratch/$configuration"
@@ -2708,6 +3007,45 @@ if [[ "${STORNAUT_VERIFY_MACHINE_DRIVER_BINARY:-0}" == 1 ]]; then
             print -u2 "Machine driver symbol scan failed: $driver"
             exit 1
         }
+        driver_undefined_symbols=$(xcrun nm -u -j "$driver" 2>/dev/null \
+            | LC_ALL=C sort -u) || {
+            print -u2 "Machine driver undefined-symbol scan failed: $driver"
+            exit 1
+        }
+        driver_loaded_libraries=$(otool -L "$driver" 2>/dev/null \
+            | tail -n +2 \
+            | sed 's/^[[:space:]]*//' \
+            | LC_ALL=C sort -u) || {
+            print -u2 "Machine driver load-command scan failed: $driver"
+            exit 1
+        }
+        driver_owned_symbols=$(print -r -- "$driver_symbols" \
+            | rg 'StornautInvestigationMachineDriver(Support)?' \
+            | LC_ALL=C sort -u) || {
+            print -u2 "Machine driver owned-symbol scan failed: $driver"
+            exit 1
+        }
+        if ! require_exact_machine_driver_projection \
+            "$configuration" \
+            "$driver_undefined_symbols" \
+            "$driver_loaded_libraries" \
+            "$driver_owned_symbols"
+        then
+            print -u2 \
+                "Machine driver exact projection drifted: $configuration"
+            exit 1
+        fi
+        verify_machine_driver_projection_mutations \
+            "$configuration" \
+            "$driver_undefined_symbols" \
+            "$driver_loaded_libraries" \
+            "$driver_owned_symbols" || exit 1
+        if [[ "$driver_symbols" != \
+            *'Darwin.open(Swift.UnsafePointer<Swift.Int8>, Swift.Int32)'* ]]
+        then
+            print -u2 "Machine driver read-only Darwin.open is missing."
+            exit 1
+        fi
         for marker in "${authority_markers[@]}"; do
             if [[ "$driver_symbols" == *"$marker"* ]]; then
                 print -u2 \
@@ -2715,13 +3053,36 @@ if [[ "${STORNAUT_VERIFY_MACHINE_DRIVER_BINARY:-0}" == 1 ]]; then
                 exit 1
             fi
         done
+        for marker in "${authority_imports[@]}"; do
+            if print -r -- "$driver_undefined_symbols" \
+                | grep -Fxq -- "$marker"
+            then
+                print -u2 \
+                    "Machine driver imports prohibited authority: $marker"
+                exit 1
+            fi
+        done
+        for marker in "${required_readonly_imports[@]}"; do
+            if ! print -r -- "$driver_undefined_symbols" \
+                | grep -Fxq -- "$marker"
+            then
+                print -u2 \
+                    "Machine driver read-only import is missing: $marker"
+                exit 1
+            fi
+        done
+        observed_security_imports=$(
+            print -r -- "$driver_undefined_symbols" \
+                | grep -E '^_(Sec|kSec|Authorization|CSSM)' \
+                | LC_ALL=C sort
+        )
+        if [[ "$observed_security_imports" != "$expected_security_imports" ]]; then
+            print -u2 "Machine driver Security import allowlist drifted."
+            exit 1
+        fi
     done
-    rm -rf "$machine_driver_scratch"
-    trap - EXIT
-    print "Authority-closed Debug/Release Machine driver binaries passed."
-elif [[ "${STORNAUT_VERIFY_MACHINE_DRIVER_BINARY:-0}" != 0 ]]; then
-    print -u2 "Invalid STORNAUT_VERIFY_MACHINE_DRIVER_BINARY value."
-    exit 64
-fi
+rm -rf "$machine_driver_scratch"
+trap - EXIT
+print "Authority-closed Debug/Release Machine driver binaries passed."
 
 print "Investigation Core and coordinator boundary verification passed."

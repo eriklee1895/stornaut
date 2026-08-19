@@ -95,6 +95,18 @@ struct InvestigationMachineTargetBoundaryTests {
             path: "Sources/StornautInvestigationMachineDriverSupport/"
                 + "InvestigationMachineDriverSupport.swift"
         )
+        let supportRoot = supportURL.deletingLastPathComponent()
+        let supportSourceNames = try Set(
+            FileManager.default.contentsOfDirectory(
+                atPath: supportRoot.path
+            ).filter { $0.hasSuffix(".swift") }
+        )
+        #expect(supportSourceNames == [
+            "DarwinInvestigationMachineInstalledDriverSystem.swift",
+            "InvestigationMachineDriverSupport.swift",
+            "InvestigationMachineInstalledDriverObservation.swift",
+            "InvestigationMachineInstalledDriverSystemSource.swift",
+        ])
         #expect(FileManager.default.fileExists(atPath: supportURL.path))
         let supportSource = try String(
             contentsOf: supportURL,
@@ -120,7 +132,7 @@ struct InvestigationMachineTargetBoundaryTests {
             "RegisteredAction",
             "Process(",
             "posix_spawn",
-            "CommandLine",
+            "CommandLine.arguments",
             "ProcessInfo.processInfo.environment",
             "NSXPC",
             "URLSession",
@@ -164,6 +176,200 @@ struct InvestigationMachineTargetBoundaryTests {
             supportTargetSuffix[..<supportTargetEnd.upperBound]
         )
         #expect(supportTarget.contains("dependencies: []"))
+        #expect(supportTarget.contains(
+            ".linkedFramework(\"Security\")"
+        ))
+
+        let expectedImports: [String: Set<String>] = [
+            "DarwinInvestigationMachineInstalledDriverSystem.swift": [
+                "import CryptoKit",
+                "import Darwin",
+                "import Foundation",
+                "import Security",
+            ],
+            "InvestigationMachineDriverSupport.swift": ["import Darwin"],
+            "InvestigationMachineInstalledDriverObservation.swift": [
+                "import Darwin",
+            ],
+            "InvestigationMachineInstalledDriverSystemSource.swift": [
+                "import Darwin",
+            ],
+        ]
+        for sourceName in supportSourceNames {
+            let source = try String(
+                contentsOf: supportRoot.appending(path: sourceName),
+                encoding: .utf8
+            )
+            let imports = Set(
+                source.split(separator: "\n").map(String.init).filter {
+                    $0.hasPrefix("import ")
+                }
+            )
+            let expectedSourceImports = try #require(
+                expectedImports[sourceName]
+            )
+            #expect(imports == expectedSourceImports)
+            for forbidden in [
+                "import StornautCore",
+                "import StornautExecution",
+                "import StornautInvestigation",
+                "import StornautLifecycle",
+                "Cleanup",
+                "Policy",
+                "Trash",
+                "Executor",
+                "RegisteredAction",
+                "FileManager.default",
+                "FileHandle",
+                "O_WRONLY",
+                "O_RDWR",
+                "O_CREAT",
+                "O_TRUNC",
+                "O_APPEND",
+                "Darwin.write",
+                "pwrite",
+                "unlink(",
+                "rename(",
+                "mkdir(",
+                "chmod(",
+                "chown(",
+                "chflags(",
+                "setxattr",
+                "removexattr",
+                "acl_set",
+                "Process(",
+                "OutputStream(",
+                "posix_spawn",
+                "setuid(",
+                "seteuid(",
+                "setreuid(",
+                "setresuid(",
+                "setgid(",
+                "setegid(",
+                "setregid(",
+                "setresgid(",
+                "initgroups(",
+                "setgroups(",
+                "setlogin(",
+                "pthread_setugid_np(",
+                "setsid(",
+                "setpgid(",
+                "daemon(",
+                "chdir(",
+                "fchdir(",
+                "chroot(",
+                "umask(",
+                "nice(",
+                "setpriority(",
+                "setrlimit(",
+                "fork(",
+                "vfork(",
+                "execv",
+                "execl",
+                "system(",
+                "popen(",
+                "dlopen(",
+                "dlsym(",
+                "syscall(",
+                "fcntl(",
+                "ioctl(",
+                "mmap(",
+                "msync(",
+                "openat(",
+                "creat(",
+                "mkstemp(",
+                "mkdtemp(",
+                "unlinkat(",
+                "renameat(",
+                "mkdirat(",
+                "ftruncate(",
+                "fchmod(",
+                "fchown(",
+                "fchflags(",
+                "lchflags(",
+                "linkat(",
+                "symlinkat(",
+                "utime(",
+                "utimes(",
+                "futimes(",
+                "setattrlist(",
+                "fsetattrlist(",
+                "copyfile(",
+                "fcopyfile(",
+                "clonefile(",
+                "socketpair",
+                "bind(",
+                "listen(",
+                "accept(",
+                "accept4(",
+                "getaddrinfo(",
+                "CFStream",
+                "InputStream(",
+                "NWConnection",
+                "WebSocket",
+                "URLSession",
+                "NSXPC",
+                "kill(",
+                "killpg(",
+                "pthread_kill(",
+                "raise(",
+                "CommandLine.arguments",
+                "ProcessInfo.processInfo.environment",
+                "readLine(",
+                "signedInvestigationRuntimeReady",
+            ] {
+                #expect(!source.contains(forbidden))
+            }
+            if sourceName
+                == "DarwinInvestigationMachineInstalledDriverSystem.swift"
+            {
+                let openCalls = source.matches(
+                    of: /\b(?:Darwin\.)?open\s*\(/
+                )
+                #expect(openCalls.count == 2)
+                for path in ["Self.path", "Self.manifestPath"] {
+                    #expect(source.contains(
+                        "let descriptor = open(\n"
+                            + "            \(path),\n"
+                            + "            O_RDONLY | O_CLOEXEC | "
+                            + "O_NOFOLLOW_ANY | O_UNIQUE | O_NONBLOCK\n"
+                            + "        )"
+                    ))
+                }
+                let allowedSecuritySymbols: Set<String> = [
+                    "SecCSFlags",
+                    "SecCode",
+                    "SecCodeCheckValidity",
+                    "SecCodeCopySelf",
+                    "SecCodeCopySigningInformation",
+                    "SecCodeCopyStaticCode",
+                    "SecRequirement",
+                    "SecRequirementCopyData",
+                    "SecRequirementGetTypeID",
+                    "SecStaticCode",
+                    "SecStaticCodeCheckValidity",
+                    "SecStaticCodeCreateWithPath",
+                    "kSecCSRequirementInformation",
+                    "kSecCSSigningInformation",
+                    "kSecCSStrictValidate",
+                    "kSecCodeInfoDesignatedRequirement",
+                    "kSecCodeInfoFlags",
+                    "kSecCodeInfoIdentifier",
+                    "kSecCodeInfoUnique",
+                ]
+                let observedSecuritySymbols = Set(
+                    source.matches(
+                        of: /\b(?:(?:Sec|kSec)[A-Z]|Authorization|CSSM)[A-Za-z0-9_]*\b/
+                    )
+                        .map { String($0.output) }
+                )
+                #expect(observedSecuritySymbols == allowedSecuritySymbols)
+            } else {
+                #expect(source.matches(
+                    of: /\b(?:Darwin\.)?open\s*\(/
+                ).isEmpty)
+            }
+        }
 
         let driverTargetStart = try #require(packageSource.range(
             of: ".executableTarget(\n            name: \"StornautInvestigationMachineDriver\""

@@ -131,7 +131,10 @@ let package = Package(
         ),
         .target(
             name: "StornautInvestigationMachineDriverSupport",
-            dependencies: []
+            dependencies: [],
+            linkerSettings: [
+                .linkedFramework("Security"),
+            ]
         ),
         .target(
             name: "StornautInvestigationRuntime",
