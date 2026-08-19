@@ -197,8 +197,8 @@ matrix、L3c3a driver-bound attempt 与 L3c3b native packaging/installer admissi
 均已完成。L3c3c-i transport/root-launch audit 已完成并拒绝 external root
 branch；i-b2b-0b/i-b2b-1 在执行前 superseded，B4 root execution count 为 0。
 ADR 0018 仍 Proposed；L3c3c-ii-a 已完成，ii-b 已拆为 ii-b0a/ii-b0b 与
-ii-b1–ii-b5 并插入 ii-c0；ii-b0a exact frame/capsule implementation、1,107-test
-staged-only serial 与 independent review 已完成，ii-b0b 是当前 frontier。
+ii-b1–ii-b5 并插入 ii-c0；ii-b0a frame/capsule 与 ii-b0b claim/release wire、
+各自 staged-only serial 与 independent review 已完成，ii-b1 是当前 frontier。
 39B2c 仍未作 machine readiness claim。
 L3 preflight 已把余下范围拆为 L3a trusted target extraction、L3b root
 collection 与 L3c failure matrix/final admission。L3a 已把 machine-only
@@ -224,7 +224,7 @@ serial 与 independent post-fix review 也已完成；L3c2b eight-scenario drive
 已完成并通过 1055-test clean staged-only serial 与 independent review，L3c2
 已关闭；L3c3a/L3c3b 与 L3c3c-i root-launch audit 也已完成，external branch
 为 NO-GO，ADR 0018 仍 Proposed；L3c3c-ii-a 已完成，ii-b 已进一步拆分，
-ii-b0a 已完成，ii-b0b 是当前 frontier。
+ii-b0a/ii-b0b 已完成，ii-b1 是当前 frontier。
 L3c2b preflight 的 real-plan matrix contradiction 已由 3-path plan-freshness
 prerequisite 关闭，affected/Investigation/structural/review gates 通过；
 只有 L3c4 可作 readiness claim 并运行
@@ -246,7 +246,8 @@ L3c3c 当前证据见
 、[i-b2a reproducibility review](../reports/phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md)
 、[i-b2b-0a root-launch audit](../reports/phase-d-task-39b2c-l3c3c-i-b2b-0a-root-provenance-review.md)
 、[installed-driver preflight](../reports/phase-d-task-39b2c-l3c3c-ii-installed-driver-path-cost-preflight.md)
-与 [ii-b0a frame/capsule review](../reports/phase-d-task-39b2c-l3c3c-ii-b0a-review.md)。
+、[ii-b0a frame/capsule review](../reports/phase-d-task-39b2c-l3c3c-ii-b0a-review.md)
+与 [ii-b0b claim/release review](../reports/phase-d-task-39b2c-l3c3c-ii-b0b-review.md)。
 
 **范围：** Epic 5–6；仅在 ADR 0004 capability-first runtime gate 允许时进入。
 
@@ -405,7 +406,7 @@ L3c3c 当前证据见
 	  eight-scenario driver 也已完成，L3c2 已关闭。L3c3a/L3c3b 与
 	  L3c3c-i root-launch audit 已完成并拒绝 external branch；i-b2b-0b/
 	  i-b2b-1 在执行前 superseded，B4 root execution count 为 0。ADR 0018 仍
-	  Proposed；L3c3c-ii-a 与 ii-b0a 已完成，ii-b0b 是当前 frontier。
+	  Proposed；L3c3c-ii-a 与 ii-b0a/ii-b0b 已完成，ii-b1 是当前 frontier。
 	  L3c4 才拥有
 	  final admission/full。
 	  39B2c 才是 machine admission，Task 39 尚未完成。

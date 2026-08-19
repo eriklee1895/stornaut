@@ -135,9 +135,9 @@ i-b2b-0b/i-b2b-1 were superseded before execution; B4 root count is zero.
 Proposed. L3c3c-ii-a is complete after authority-closed installed-driver and
 manifest observation, exact source/final-Mach-O admission and independent
 post-fix review; ii-b is frozen as ii-b0a, ii-b0b and ii-b1 through ii-b5 with
-ii-c0 before the privileged gate. ii-b0a frame/capsule implementation is complete
-after focused/affected/structural gates, one 1,107-test staged-only serial and
-independent review; ii-b0b is the current frontier. See the
+ii-c0 before the privileged gate. ii-b0a frame/capsule and ii-b0b claim/release
+wire implementations are complete after their focused/affected/structural gates,
+single staged-only serials and independent reviews; ii-b1 is the current frontier. See the
 [study](../../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md),
 [final review](../../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md)
 and [i-b2a review](../../reports/phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md),
@@ -148,7 +148,8 @@ The narrower budgets and protocol/topology corrections are frozen in the
 [ii-b split preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md)
 and [ii-b0 wire preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b0-wire-contract-preflight.md).
 Completion evidence is in the
-[ii-b0a review](../../reports/phase-d-task-39b2c-l3c3c-ii-b0a-review.md).
+[ii-b0a review](../../reports/phase-d-task-39b2c-l3c3c-ii-b0a-review.md) and
+[ii-b0b review](../../reports/phase-d-task-39b2c-l3c3c-ii-b0b-review.md).
 Only L3c4 owns machine readiness and the remaining full verifier.
 The L3c2b preflight's
 [plan-freshness prerequisite](../../reports/phase-d-task-39b2c-l3c2b-plan-freshness-prerequisite-review.md)
@@ -172,7 +173,7 @@ the sole normal-product admission gate.
 | [36](task-36-implementation-brief.md) | Domain, canonical projection, planner, budget and stop contracts | complete; [review](../../reports/phase-d-task-36-review.md) |
 | [37](task-37-implementation-brief.md) | Store v4, retention and source rejoin | complete; [review](../../reports/phase-d-task-37-review.md) |
 | [38](task-38-implementation-brief.md) | Closed coordinator with fake runtime | complete; [review](../../reports/phase-d-task-38-review.md) |
-| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; external root launch NO-GO; ii-a/ii-b0a complete; ii-b0b current; ADR 0018 Proposed |
+| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; external root launch NO-GO; ii-a/ii-b0a/ii-b0b complete; ii-b1 current; ADR 0018 Proposed |
 | [40](task-40-implementation-brief.md) | Evidence report and conservative Review projection | blocked on Task 39 |
 | [41](task-41-implementation-brief.md) | First-use disclosure and typed availability | blocked on Task 40 |
 | [42](task-42-implementation-brief.md) | App workflow and recovery state | blocked on Task 41 |

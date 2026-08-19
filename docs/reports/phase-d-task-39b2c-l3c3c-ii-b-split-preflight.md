@@ -1,7 +1,7 @@
 # Phase D Task 39B2c-L3c3c-ii-b Handoff Composition Split Preflight
 
 > Status: Parent split frozen; ii-b0 wire/budget details superseded; ii-b0a
-> complete; ii-b0b current
+> and ii-b0b complete; ii-b1 current
 >
 > Date: 2026-08-19
 >
