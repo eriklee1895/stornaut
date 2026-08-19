@@ -303,8 +303,13 @@ Tests-first implementation must directly prove all of the following.
 
 ## 5. Exact Scope and Cost
 
-ii-b2a may change exactly four non-document paths and at most 1,800 added-or-
-changed lines:
+The later mandatory
+[budget split](phase-d-task-39b2c-l3c3c-ii-b2a-budget-split-preflight.md)
+supersedes only this paragraph's 1,800-line aggregate ceiling. It preserves the
+exact four paths and every semantic/validation/non-claim requirement while
+splitting source/tests from structural admission.
+
+ii-b2a may change exactly four non-document paths:
 
 1. new `Sources/StornautLifecycle/LifecycleMachineRetirementEscrowDeadlineState.swift`;
 2. new `Tests/StornautLifecycleTests/LifecycleMachineRetirementEscrowDeadlineStateTests.swift`;
