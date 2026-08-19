@@ -70,7 +70,9 @@
 > also complete after its helper-private legacy server correction, 34 focused,
 > 175 Lifecycle affected, 308 Investigation affected, complete App/main-Mach-O
 > gate, sole 1,196-test staged-only serial and grouped/cross-group review.
-> ii-b2b-iii live-helper server migration is current. Evidence:
+> ii-b2b-iii is split by fresh preflight into iii-a handle-v3/single-quantized
+> transfer and iii-b public live façade/helper integration; iii-a is current.
+> Evidence:
 > [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
 > [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md) and
 > [Task 39B1b-i Review](../../reports/phase-d-task-39b1b-i-review.md) and
@@ -1094,7 +1096,7 @@ The remaining L3 work is split before driver coding:
    Proposed, while L3c3c-i is complete as a NO-GO audit, L3c3c-ii-a is complete,
    and the nested exact-wire split is frozen; ii-b0a/ii-b0b/ii-b0c, ii-b1,
    the ii-b2 ASID prerequisite, ii-b2a, ii-b2b-i and ii-b2b-ii are complete;
-   ii-b2b-iii is current. See the
+   ii-b2b-iii is split into iii-a/iii-b; iii-a is current. See the
    [study](../../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md)
    and [final review](../../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md),
    plus the [i-b2a review](../../reports/phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md),
@@ -1124,6 +1126,8 @@ The remaining L3 work is split before driver coding:
    [ii-b2b-i review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2b-i-review.md).
    ii-b2b-ii evidence is in the
    [legacy-client quarantine review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2b-ii-review.md).
+   The current split is frozen by the
+   [iii-a/iii-b preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-split-preflight.md).
    ii-a implements only authority-closed self-observation/runtime primitives.
    ii-b is frozen as **ii-b0a frame/capsule contract**, **ii-b0b claim/release
    wire contract**, **ii-b1 authority-
@@ -1154,13 +1158,14 @@ L3c2b -> L3c3a -> L3c3b-0 -> L3c3b-i -> L3c3b-ii -> L3c3c-i-a ->
 L3c3c-i-b1 -> L3c3c-i-b2a -> L3c3c-i-b2b-0a -> L3c3c-ii-a ->
 L3c3c-ii-b0a -> L3c3c-ii-b0b -> L3c3c-ii-b0c -> L3c3c-ii-b1 ->
 L3c3c-ii-b2 ASID prerequisite -> L3c3c-ii-b2a -> L3c3c-ii-b2b-i ->
-L3c3c-ii-b2b-ii -> L3c3c-ii-b2b-iii -> L3c3c-ii-b3 ->
+L3c3c-ii-b2b-ii -> L3c3c-ii-b2b-iii-a -> L3c3c-ii-b2b-iii-b -> L3c3c-ii-b3 ->
 L3c3c-ii-b4 -> L3c3c-ii-b5 -> L3c3c-ii-c0 -> L3c3c-ii-c -> L3c3d -> L3c4`.
 L3c1, L3c2, L3c3a,
 L3c3b-0, L3c3b-i, L3c3b-ii, L3c3c-i and L3c3c-ii-a are complete;
 i-b2b-0b/i-b2b-1 were superseded before execution. The ii-b split is frozen and
 ii-b0a/ii-b0b/ii-b0c/ii-b1, the ii-b2 ASID prerequisite, ii-b2a, ii-b2b-i and
-ii-b2b-ii are complete; ii-b2b-iii live-helper server migration is current.
+ii-b2b-ii are complete; ii-b2b-iii-a handle-v3/single-quantized transfer is
+current and iii-b follows.
 ADR 0018
 remains Proposed until ii-c succeeds. L3c1 used focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean

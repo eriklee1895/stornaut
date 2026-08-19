@@ -412,6 +412,13 @@ ii-b2b-ii remains non-admitting; the helper still uses the old server until iii.
 
 ## 6. ii-b2b-iii — Live Helper Server, Single Escrow and Timers
 
+> **Fresh 2026-08-20 split:** the original exact-fourteen-path checkpoint is
+> superseded before coding by
+> [the iii-a/iii-b split preflight](phase-d-task-39b2c-l3c3c-ii-b2b-iii-split-preflight.md).
+> iii-a handle-v3/single-quantized transfer is current; iii-b public live façade/
+> helper integration follows. The responsibilities below remain the parent
+> semantic contract and are not weakened by the split.
+
 ### 6.1 Exact scope and cost
 
 Exactly fourteen non-document paths, at most 4,000 added-or-changed lines:

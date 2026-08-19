@@ -292,7 +292,9 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   legacy selector/service 声明下沉为 helper-private，34 focused、175
   Lifecycle affected、308 Investigation affected、完整 App/main-Mach-O gate、
   1,196-test/58-suite staged-only serial 与 grouped/cross-group review 均通过。
-  ii-b2b-iii live-helper server migration 是当前 implementation frontier。之后
+  ii-b2b-iii 已在 fresh preflight 中拆为 iii-a handle-v3/single-quantized
+  transfer 与 iii-b public live façade/helper integration；iii-a 是当前
+  implementation frontier。之后
   严格为 ii-c 唯一 no-model
   privileged machine gate，只有 ii-c 可接受 ADR 0018。
   只有 L3c4
@@ -430,6 +432,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c L3c3c-ii-b2b server integration preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-server-integration-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-server-integration-preflight.md) |
 | Phase D Task 39B2c L3c3c-ii-b2b-i machine-claim server review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-i-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-i-review.md) |
 | Phase D Task 39B2c L3c3c-ii-b2b-ii legacy client quarantine review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-ii-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-ii-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b2b-iii split preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-split-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-split-preflight.md) |
 | Phase D Task 39B2c-L1 residue observation review | [docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md](docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md) |
 | Phase D Task 39B2c-L2 root topology observation review | [docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md](docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md) |
 | Phase D Task 39B2c-L3a trusted machine target review | [docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md](docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md) |
@@ -557,8 +560,8 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   topology、layered gates、1,138-test staged-only serial 与 post-fix review；
   ii-b2 ASID prerequisite 与 ii-b2a typed deadline state 均已完成；ii-b2b-i
   non-connected machine-claim server 与 ii-b2b-ii legacy-client quarantine /
-  Machine production block 均已完成，ii-b2b-iii live-helper server migration
-  是当前 frontier。
+  Machine production block 均已完成；ii-b2b-iii 已拆为 iii-a/iii-b，iii-a
+  handle-v3/single-quantized transfer 是当前 frontier。
   ADR 0018 仍 Proposed；L3c4 独占 final admission 与
   剩余 full。
   Task 39 尚未完成。

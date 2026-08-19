@@ -210,7 +210,8 @@ server、59 focused、唯一 1,194-test staged-only serial、source/package/muta
 gates 与 post-fix reviews 已完成；ii-b2b-ii legacy-client quarantine / Machine
 production block 也已通过 helper-private legacy server correction、完整
 App/main-Mach-O gate、1,196-test staged-only serial 与 grouped/cross-group
-review，ii-b2b-iii live-helper server migration 是当前 frontier。
+review；ii-b2b-iii 已拆为 iii-a/iii-b，iii-a handle-v3/single-quantized
+transfer 是当前 frontier。
 39B2c 仍未作 machine readiness claim。
 L3 preflight 已把余下范围拆为 L3a trusted target extraction、L3b root
 collection 与 L3c failure matrix/final admission。L3a 已把 machine-only
@@ -237,7 +238,7 @@ serial 与 independent post-fix review 也已完成；L3c2b eight-scenario drive
 已关闭；L3c3a/L3c3b 与 L3c3c-i root-launch audit 也已完成，external branch
 为 NO-GO，ADR 0018 仍 Proposed；L3c3c-ii-a 已完成，ii-b 已进一步拆分，
 ii-b0a/ii-b0b/ii-b0c/ii-b1、ii-b2 ASID prerequisite、ii-b2a、ii-b2b-i 与
-ii-b2b-ii 均已完成，ii-b2b-iii live-helper server migration 是当前 frontier。
+ii-b2b-ii 均已完成；ii-b2b-iii 已拆为 iii-a/iii-b，iii-a 是当前 frontier。
 L3c2b preflight 的 real-plan matrix contradiction 已由 3-path plan-freshness
 prerequisite 关闭，affected/Investigation/structural/review gates 通过；
 只有 L3c4 可作 readiness claim 并运行
@@ -422,8 +423,8 @@ L3c3c 当前证据见
 	  L3c3c-i root-launch audit 已完成并拒绝 external branch；i-b2b-0b/
 	  i-b2b-1 在执行前 superseded，B4 root execution count 为 0。ADR 0018 仍
 	  Proposed；L3c3c-ii-a、ii-b0a/ii-b0b/ii-b0c/ii-b1 与 ii-b2 ASID
-  prerequisite、ii-b2a、ii-b2b-i 与 ii-b2b-ii 已完成，ii-b2b-iii
-  live-helper server migration 是当前 frontier。
+  prerequisite、ii-b2a、ii-b2b-i 与 ii-b2b-ii 已完成；ii-b2b-iii 已拆为
+  iii-a/iii-b，iii-a 是当前 frontier。
 	  L3c4 才拥有
 	  final admission/full。
 	  39B2c 才是 machine admission，Task 39 尚未完成。
