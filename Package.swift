@@ -39,6 +39,11 @@ let package = Package(
             targets: ["StornautInvestigationMachineDriverSupport"]
         ),
         .library(
+            name: "StornautInvestigationMachineClaimServer",
+            type: .static,
+            targets: ["StornautInvestigationMachineClaimServer"]
+        ),
+        .library(
             name: "StornautProbeBridge",
             targets: ["StornautProbeBridge"]
         ),
@@ -139,6 +144,13 @@ let package = Package(
         .target(
             name: "StornautInvestigationHandoffContract",
             dependencies: []
+        ),
+        .target(
+            name: "StornautInvestigationMachineClaimServer",
+            dependencies: [
+                "StornautInvestigationHandoffContract",
+                "StornautLifecycle",
+            ]
         ),
         .target(
             name: "StornautInvestigationRuntime",
@@ -243,6 +255,7 @@ let package = Package(
                 "StornautInvestigation",
                 "StornautInvestigationMachine",
                 "StornautInvestigationMachineDriverSupport",
+                "StornautInvestigationMachineClaimServer",
                 "StornautInvestigationHandoffContract",
                 "StornautInvestigationRuntime",
                 "StornautCore",

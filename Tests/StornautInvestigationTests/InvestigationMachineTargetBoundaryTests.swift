@@ -4,6 +4,69 @@ import Testing
 @Suite("Task 39 trusted machine target boundary")
 struct InvestigationMachineTargetBoundaryTests {
     @Test
+    func machineClaimServerOwnsStrictTypedStateTranslationOnly() throws {
+        let root = URL(filePath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let adapter = try String(
+            contentsOf: root.appending(
+                path: "Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerAdapter.swift"
+            ),
+            encoding: .utf8
+        )
+        let effects = try String(
+            contentsOf: root.appending(
+                path: "Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerEffects.swift"
+            ),
+            encoding: .utf8
+        )
+        let deadlineState = try String(
+            contentsOf: root.appending(
+                path: "Sources/StornautLifecycle/LifecycleMachineRetirementEscrowDeadlineState.swift"
+            ),
+            encoding: .utf8
+        )
+
+        #expect(adapter.contains(
+            "package final class InvestigationMachineClaimServerAdapter:"
+        ))
+        #expect(adapter.contains(
+            "transfer: LifecycleMachineRetirementReservationTransfer"
+        ))
+        #expect(!adapter.contains(
+            "InvestigationMachineClaimServerReservationSeed"
+        ))
+        #expect(adapter.contains(
+            "LifecycleInteractiveWorkerRetirementObservation"
+        ))
+        #expect(adapter.contains(
+            "LifecycleInvestigationResidueObservation"
+        ))
+        #expect(adapter.contains("transfer.ownerRetirementObservation"))
+        #expect(adapter.contains("transfer.residueObservation"))
+        #expect(!adapter.contains(
+            "LifecycleMachineRetirementReservationTransfer("
+        ))
+        #expect(!adapter.contains(
+            "expectedReleaseChallenge: release.releaseChallenge"
+        ))
+        #expect(adapter.contains("state.commitClaimResponse("))
+        #expect(adapter.contains("state.commitReleaseResponse("))
+        #expect(adapter.contains("private let evidenceLock = NSLock()"))
+        #expect(effects.contains("callbackFinished"))
+        let armTransition = try #require(
+            effects.range(of: "let armed = state.armSucceeded(ticket)")
+        )
+        let handleInstall = try #require(
+            effects.range(of: "perform(slot.install(handle), ticket: ticket)")
+        )
+        #expect(armTransition.lowerBound < handleInstall.lowerBound)
+        #expect(deadlineState.contains(
+            "package func rejectOperationObservation("
+        ))
+    }
+
+    @Test
     func handoffContractTargetRemainsAuthorityFreeAndNonProduct() throws {
         let root = URL(filePath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
