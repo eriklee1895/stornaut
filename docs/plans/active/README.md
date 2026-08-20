@@ -145,9 +145,9 @@ diagnostic target from one dependency-free Release-shell target, with 9/9 leaf,
 staged-only serial and independent post-fix review. The ii-b2 ASID prerequisite
 and ii-b2a are complete. ii-b2b-i sealed/non-connected server integration and
 ii-b2b-ii legacy-client quarantine / Machine production block, iii-a strict
-handle-v3/single-quantized transfer, iii-b-i semantic/live integration and
-iii-b-ii executable physical-adapter closure are complete; iii-b/ii-b2b are
-closed; ii-b3 is split into b3a/b3b/b3c and ii-b3a is current. See the
+handle-v3/single-quantized transfer, iii-b-i semantic/live integration,
+iii-b-ii executable physical-adapter closure and ii-b3a fixed handoff adapter
+are complete; iii-b/ii-b2b are closed; ii-b3b is current. See the
 [study](../../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md),
 [final review](../../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md)
 and [i-b2a review](../../reports/phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md),
@@ -220,7 +220,7 @@ the sole normal-product admission gate.
 | [36](task-36-implementation-brief.md) | Domain, canonical projection, planner, budget and stop contracts | complete; [review](../../reports/phase-d-task-36-review.md) |
 | [37](task-37-implementation-brief.md) | Store v4, retention and source rejoin | complete; [review](../../reports/phase-d-task-37-review.md) |
 | [38](task-38-implementation-brief.md) | Closed coordinator with fake runtime | complete; [review](../../reports/phase-d-task-38-review.md) |
-| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; external root launch NO-GO; ii-a/ii-b0a/ii-b0b/ii-b0c/ii-b1, ii-b2 ASID prerequisite, ii-b2a/ii-b2b-i/ii-b2b-ii/ii-b2b-iii-a/iii-b complete; ii-b3 split frozen, ii-b3a current; ADR 0018 Proposed |
+| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; external root launch NO-GO; ii-a/ii-b0a/ii-b0b/ii-b0c/ii-b1, ii-b2 ASID prerequisite, ii-b2a/ii-b2b-i/ii-b2b-ii/ii-b2b-iii-a/iii-b/ii-b3a complete; ii-b3b current; ADR 0018 Proposed |
 | [40](task-40-implementation-brief.md) | Evidence report and conservative Review projection | blocked on Task 39 |
 | [41](task-41-implementation-brief.md) | First-use disclosure and typed availability | blocked on Task 40 |
 | [42](task-42-implementation-brief.md) | App workflow and recovery state | blocked on Task 41 |

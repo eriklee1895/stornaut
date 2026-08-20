@@ -1,6 +1,6 @@
 # Phase D Task 39B2c-L3c3c-ii-b3 App Adapter Split Preflight
 
-> Status: Split frozen; ii-b3a is the implementation frontier
+> Status: Split frozen; ii-b3a complete; ii-b3b is the implementation frontier
 >
 > Date: 2026-08-20
 >
@@ -440,7 +440,10 @@ authenticity, and preserves ii-c's existing installer/static-binding requirement
 as the first admitting trust anchor. The current Boolean admission policy must not
 be described as an expected-SHA pin.
 
-ii-b3a is next. After ii-b3a, ii-b3b and ii-b3c complete independently, the strict
+ii-b3a is complete; its fixed channel/root peer/drop adapter, exact gates, sole
+1,234-test serial and final reviews are recorded in the
+[ii-b3a review](phase-d-task-39b2c-l3c3c-ii-b3a-review.md). ii-b3b is next.
+After ii-b3b and ii-b3c complete independently, the strict
 Task 39 order resumes at ii-b4, ii-b5, ii-c0, ii-c, L3c3d and L3c4. ADR 0018
 remains Proposed; Task 39 remains incomplete; production Deep Dive and real Trash
 remain closed; and L3c4 alone owns machine readiness and the remaining
