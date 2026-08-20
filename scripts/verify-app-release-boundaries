@@ -74,6 +74,11 @@ required_fragments = (
     "start_retire_seam_closed_images=(",
     'for forbidden_image in "${start_retire_seam_closed_images[@]}"; do',
     "Start-retire seam leaked into a closed image",
+    "b3c_concrete_markers=(",
+    "b3c_closed_images=(",
+    'for marker in "${b3c_concrete_markers[@]}"; do',
+    "ii-b3c concrete entry missing from diagnostic Debug image",
+    "ii-b3c concrete entry leaked into a closed image",
 )
 missing = [
     fragment for fragment in required_fragments
@@ -129,6 +134,24 @@ expected_arrays = {
             "$diagnostic_debug_app/Contents/MacOS/"
             "StornautInvestigationDiagnostic"
         ),
+        "$diagnostic_debug_app/Contents/MacOS/__preview.dylib",
+        (
+            "$diagnostic_release_app/Contents/MacOS/"
+            "StornautInvestigationDiagnosticReleaseShell"
+        ),
+    ],
+    "b3c_concrete_markers": [
+        "InvestigationHandoffAppLeafEntryAdmission",
+        "InvestigationHandoffConcreteAppLeafOperations",
+        "InvestigationHandoffNoAuthRetirement",
+        "startAndRetireWithEvidence",
+    ],
+    "b3c_closed_images": [
+        "$debug_app/Contents/MacOS/Stornaut",
+        "$debug_app/Contents/MacOS/Stornaut.debug.dylib",
+        "$debug_app/Contents/MacOS/__preview.dylib",
+        "$release_app/Contents/MacOS/Stornaut",
+        "$diagnostic_debug_app/Contents/MacOS/StornautInvestigationDiagnostic",
         "$diagnostic_debug_app/Contents/MacOS/__preview.dylib",
         (
             "$diagnostic_release_app/Contents/MacOS/"
@@ -226,7 +249,7 @@ seam_start = runtime_source.index(
     'for marker in "${start_retire_seam_forbidden_markers[@]}"; do'
 )
 seam_end = runtime_source.index(
-    '\nfor marker in "${handoff_debug_markers[@]}"; do', seam_start
+    '\nverify_b3c_concrete_macho() {', seam_start
 )
 seam_loop = runtime_source[seam_start:seam_end]
 for required in (
@@ -237,6 +260,40 @@ for required in (
 ):
     if seam_loop.count(required) != 1:
         raise SystemExit("start-retire seam image scan drifted")
+
+b3c_start = runtime_source.index(
+    'verify_b3c_concrete_macho() {'
+)
+b3c_end = runtime_source.index(
+    '\nfor marker in "${handoff_debug_markers[@]}"; do', b3c_start
+)
+b3c_loop = runtime_source[b3c_start:b3c_end].strip()
+expected_b3c_loop = r'''verify_b3c_concrete_macho() {
+    for marker in "${b3c_concrete_markers[@]}"; do
+        if ! mach_o_image_has_demangled_symbol \
+            "$diagnostic_debug_app/Contents/MacOS/StornautInvestigationDiagnostic.debug.dylib" \
+            "$marker"
+        then
+            raw_scan_status=$?
+            (( raw_scan_status != 2 )) || return 1
+            print -u2 "ii-b3c concrete entry missing from diagnostic Debug image: $marker"
+            return 1
+        fi
+        for forbidden_image in "${b3c_closed_images[@]}"; do
+            if mach_o_image_has_demangled_symbol "$forbidden_image" "$marker"; then
+                print -u2 "ii-b3c concrete entry leaked into a closed image: $forbidden_image: $marker"
+                return 1
+            else
+                raw_scan_status=$?
+            fi
+            (( raw_scan_status != 2 )) || return 1
+        done
+    done
+}'''
+if b3c_loop != expected_b3c_loop:
+    raise SystemExit("ii-b3c demangled symbol scan drifted")
+if runtime_source.count("\nverify_b3c_concrete_macho\n") != 1:
+    raise SystemExit("ii-b3c artifact gate invocation drifted")
 
 selector_literal = (
     "claim_server_selectors=$'claimMachineRetirement:withReply:"
@@ -435,6 +492,21 @@ start_retire_seam_closed_images=(
     "$diagnostic_debug_app/Contents/MacOS/__preview.dylib"
     "$diagnostic_release_app/Contents/MacOS/StornautInvestigationDiagnosticReleaseShell"
 )
+b3c_concrete_markers=(
+    'InvestigationHandoffAppLeafEntryAdmission'
+    'InvestigationHandoffConcreteAppLeafOperations'
+    'InvestigationHandoffNoAuthRetirement'
+    'startAndRetireWithEvidence'
+)
+b3c_closed_images=(
+    "$debug_app/Contents/MacOS/Stornaut"
+    "$debug_app/Contents/MacOS/Stornaut.debug.dylib"
+    "$debug_app/Contents/MacOS/__preview.dylib"
+    "$release_app/Contents/MacOS/Stornaut"
+    "$diagnostic_debug_app/Contents/MacOS/StornautInvestigationDiagnostic"
+    "$diagnostic_debug_app/Contents/MacOS/__preview.dylib"
+    "$diagnostic_release_app/Contents/MacOS/StornautInvestigationDiagnosticReleaseShell"
+)
 for marker in "${app_peer_adapter_forbidden_markers[@]}"; do
     for forbidden_image in "${app_peer_adapter_closed_images[@]}"; do
         if mach_o_image_has_raw_string "$forbidden_image" "$marker"; then
@@ -461,6 +533,28 @@ for marker in "${start_retire_seam_forbidden_markers[@]}"; do
         fi
     done
 done
+verify_b3c_concrete_macho() {
+    for marker in "${b3c_concrete_markers[@]}"; do
+        if ! mach_o_image_has_demangled_symbol \
+            "$diagnostic_debug_app/Contents/MacOS/StornautInvestigationDiagnostic.debug.dylib" \
+            "$marker"
+        then
+            raw_scan_status=$?
+            (( raw_scan_status != 2 )) || return 1
+            print -u2 "ii-b3c concrete entry missing from diagnostic Debug image: $marker"
+            return 1
+        fi
+        for forbidden_image in "${b3c_closed_images[@]}"; do
+            if mach_o_image_has_demangled_symbol "$forbidden_image" "$marker"; then
+                print -u2 "ii-b3c concrete entry leaked into a closed image: $forbidden_image: $marker"
+                return 1
+            else
+                raw_scan_status=$?
+            fi
+            (( raw_scan_status != 2 )) || return 1
+        done
+    done
+}
 for marker in "${handoff_debug_markers[@]}"; do
     for forbidden_image in \
         "$debug_app/Contents/MacOS/Stornaut" \
@@ -1115,6 +1209,8 @@ mach_o_image_has_demangled_symbol() {
     fi
     [[ "$symbols" == *"$marker"* ]]
 }
+
+verify_b3c_concrete_macho
 
 claim_server_module_symbols=(
     'StornautInvestigationMachineClaimServer.InvestigationMachineClaimServer'

@@ -211,9 +211,104 @@ struct InvestigationHandoffAppLeafTests {
     }
 
     @Test
-    func publicEntryIsNoArgumentAndFailsClosedUntilB3() {
-        #expect(InvestigationHandoffAppLeafEntryPoint.run() == 78)
+    func publicEntryIsTheSoleNoArgumentAsyncEntry() throws {
+        let repositoryRoot = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: repositoryRoot.appending(
+                path:
+                    "Sources/StornautInvestigationDiagnostic/"
+                        + "InvestigationHandoffAppLeaf.swift"
+            ),
+            encoding: .utf8
+        )
+        let entryType =
+            "public enum InvestigationHandoffAppLeafEntryPoint {"
+        #expect(source.components(separatedBy: entryType).count == 2)
+        let entryStart = try #require(source.range(of: entryType))
+        let entrySuffix = source[entryStart.lowerBound...]
+        let entryEnd = try #require(entrySuffix.range(of: "\n}\n#endif"))
+        let entrySurface = String(entrySuffix[..<entryEnd.upperBound])
+        let publicFunction = try NSRegularExpression(
+            pattern:
+                #"(?m)^[ \t]*public[ \t]+static[ \t]+func[ \t]+[^{]+\{"#
+        )
+        let matches = publicFunction.matches(
+            in: entrySurface,
+            range: NSRange(entrySurface.startIndex..., in: entrySurface)
+        )
+
+        #expect(matches.count == 1)
+        let declarationRange = try #require(
+            matches.first.flatMap { Range($0.range, in: entrySurface) }
+        )
+        let declaration = entrySurface[declarationRange]
+            .split(whereSeparator: { $0.isWhitespace })
+            .joined(separator: " ")
+        #expect(
+            declaration ==
+                "public static func run() async -> Int32 {"
+        )
     }
+
+    @Test
+    func concreteEntryAdmissionIsOneShotAcrossConcurrentAndFailedCalls() async {
+        let directAdmission = InvestigationHandoffAppLeafEntryAdmission()
+        let directClaims = await withTaskGroup(of: Bool.self) { group in
+            for _ in 0..<128 {
+                group.addTask { directAdmission.claim() }
+            }
+            var values: [Bool] = []
+            for await value in group { values.append(value) }
+            return values
+        }
+        #expect(directClaims.filter { $0 }.count == 1)
+        #expect(directClaims.filter { !$0 }.count == 127)
+
+        let admission = InvestigationHandoffAppLeafEntryAdmission()
+        let probe = AppLeafEntryProbe()
+        let statuses = await withTaskGroup(of: Int32.self) { group in
+            for _ in 0..<2 {
+                group.addTask {
+                    await InvestigationHandoffAppLeafEntryPoint.run(
+                        admission: admission
+                    ) {
+                        await probe.record()
+                        return .completed
+                    }
+                }
+            }
+            var values: [Int32] = []
+            for await status in group { values.append(status) }
+            return values.sorted()
+        }
+        #expect(statuses == [0, 78])
+        #expect(await probe.count == 1)
+        #expect(
+            await InvestigationHandoffAppLeafEntryPoint.run(
+                admission: admission
+            ) { .completed } == 78
+        )
+
+        let failed = InvestigationHandoffAppLeafEntryAdmission()
+        #expect(
+            await InvestigationHandoffAppLeafEntryPoint.run(admission: failed) {
+                throw AppLeafInjectedFailure()
+            } == 78
+        )
+        #expect(
+            await InvestigationHandoffAppLeafEntryPoint.run(admission: failed) {
+                .completed
+            } == 78
+        )
+    }
+}
+
+private actor AppLeafEntryProbe {
+    private(set) var count = 0
+    func record() { count += 1 }
 }
 
 private enum AppLeafCallKind: String, CaseIterable, Sendable {

@@ -4,6 +4,7 @@ import Foundation
 import StornautCodex
 import StornautCore
 import StornautInvestigation
+import StornautInvestigationHandoffContract
 import StornautInvestigationRuntime
 import StornautLifecycle
 
@@ -24,6 +25,515 @@ public enum InvestigationRuntimeDiagnosticCompositionRetirement:
     case retiredWithoutStarting
     case retiredAfterUse
     case retirementFailed
+}
+
+package enum InvestigationHandoffConcreteAppLeafError:
+    Error,
+    Sendable,
+    Equatable
+{
+    case invalidConfiguration
+    case bindingMismatch
+    case invalidState
+    case retirementFailed
+}
+
+package actor InvestigationHandoffConcreteAppLeafOperations:
+    InvestigationHandoffAppLeafOperations
+{
+    private enum Phase: Equatable {
+        case idle
+        case operation(UUID)
+        case retiring(UUID)
+        case terminal
+    }
+
+    package typealias RetirementHandle = @Sendable (
+        SignedInvestigationRuntimeDiagnosticConfiguration,
+        String
+    ) async throws -> InvestigationHandoffRetirementHandle
+
+    private let adapter: any InvestigationHandoffAppLeafAdapting
+    private let peer: InvestigationHandoffAppLeafPeerObservation
+    private let now: @Sendable () -> Date
+    private let retirementHandleFactory: RetirementHandle
+    private var configuration:
+        SignedInvestigationRuntimeDiagnosticConfiguration?
+    private var configurationSHA256: String?
+    private var didRetire = false
+    private var phase = Phase.idle
+
+    package init(
+        adapter: any InvestigationHandoffAppLeafAdapting,
+        peer: InvestigationHandoffAppLeafPeerObservation,
+        now: @escaping @Sendable () -> Date = Date.init,
+        retirementHandle: @escaping RetirementHandle = { configuration, digest in
+            try await InvestigationHandoffNoAuthRetirement.live(
+                configuration: configuration,
+                configurationSHA256: digest
+            )
+        }
+    ) throws {
+        guard
+            peer.driverIdentity.effectiveUserID == 0,
+            UInt32(exactly: peer.driverIdentity.processID)
+                == peer.driverClaim.processID,
+            UInt32(exactly: peer.driverIdentity.processIDVersion)
+                == peer.driverClaim.processIDVersion,
+            UInt32(exactly: peer.driverIdentity.auditSessionID)
+                == peer.driverClaim.auditSessionID,
+            UInt32(exactly: peer.driverIdentity.effectiveUserID)
+                == peer.driverClaim.effectiveUserID,
+            peer.driverIdentity.auditToken.words.count
+                == LifecycleAuditToken.wordCount,
+            peer.driverIdentity.auditToken.words[1]
+                == peer.driverClaim.effectiveUserID,
+            peer.driverIdentity.auditToken.words[5]
+                == peer.driverClaim.processID,
+            peer.driverIdentity.auditToken.words[6]
+                == peer.driverClaim.auditSessionID,
+            peer.driverIdentity.auditToken.words[7]
+                == peer.driverClaim.processIDVersion,
+            peer.signingEvidence.isAdHoc
+        else {
+            throw InvestigationHandoffConcreteAppLeafError.bindingMismatch
+        }
+        self.adapter = adapter
+        self.peer = peer
+        self.now = now
+        retirementHandleFactory = retirementHandle
+    }
+
+    package func preDropClaim() async throws
+        -> InvestigationHandoffProcessClaim
+    {
+        let adapter = self.adapter
+        return try await performOperation {
+            try await adapter.preDropClaim()
+        }
+    }
+
+    package func sendPreDropReady(
+        _ frame: InvestigationHandoffFrame
+    ) async throws {
+        try await write(frame)
+    }
+
+    package func receiveDropRelease() async throws
+        -> InvestigationHandoffFrame
+    {
+        try await read()
+    }
+
+    package func performIdentityDrop() async throws
+        -> InvestigationHandoffAppLeafDropResult
+    {
+        let adapter = self.adapter
+        return try await performOperation {
+            try await adapter.performIdentityDrop()
+        }
+    }
+
+    package func sendDropEvidence(
+        _ frame: InvestigationHandoffFrame
+    ) async throws {
+        try await write(frame)
+    }
+
+    package func receiveConfiguration() async throws
+        -> InvestigationHandoffFrame
+    {
+        try await read()
+    }
+
+    package func acknowledgeConfiguration(
+        _ bytes: Data
+    ) async throws -> InvestigationHandoffConfigurationAcknowledgement {
+        let ticket = try beginOperation()
+        guard configuration == nil else {
+            return try fail(.invalidState)
+        }
+        let decoded: SignedInvestigationRuntimeDiagnosticConfiguration
+        do {
+            decoded = try SignedInvestigationRuntimeDiagnosticConfiguration
+                .decodeValidated(from: bytes, now: now())
+            guard try decoded.canonicalJSONData() == bytes else {
+                return try fail(.invalidConfiguration)
+            }
+        } catch let error as InvestigationHandoffConcreteAppLeafError {
+            throw error
+        } catch {
+            return try fail(.invalidConfiguration)
+        }
+        guard machineDriverMatchesPeer(decoded.binding.machineDriver) else {
+            return try fail(.bindingMismatch)
+        }
+        let wireSHA = InvestigationHandoffSHA256.hashing(bytes)
+        let machineSHA: String
+        let bindingSHA: String
+        do {
+            machineSHA = try decoded.machineConfigurationSHA256()
+            bindingSHA = try decoded.capabilityEvidenceBindingSHA256()
+        } catch {
+            return try fail(.invalidConfiguration)
+        }
+        guard wireSHA.lowercaseHex == machineSHA else {
+            return try fail(.invalidConfiguration)
+        }
+        let scenario = handoffScenario(decoded.scenario)
+        let acknowledgement: InvestigationHandoffConfigurationAcknowledgement
+        do {
+            acknowledgement = try .init(
+                epochUUID: peer.bootstrap.epochUUID,
+                ordinal: scenario.rawValue - 1,
+                configurationNonce: decoded.nonce,
+                scenario: scenario,
+                configurationSHA256: wireSHA,
+                signedRuntimeBindingSHA256: try .init(
+                    lowercaseHex: bindingSHA
+                )
+            )
+        } catch {
+            return try fail(.invalidConfiguration)
+        }
+        try finishOperation(ticket)
+        configuration = decoded
+        configurationSHA256 = machineSHA
+        return acknowledgement
+    }
+
+    package func sendConfigurationAcknowledgement(
+        _ frame: InvestigationHandoffFrame
+    ) async throws {
+        try await write(frame)
+    }
+
+    package func sendHello(
+        _ frame: InvestigationHandoffFrame
+    ) async throws {
+        try await write(frame)
+    }
+
+    package func retirementHandle() async throws
+        -> InvestigationHandoffRetirementHandle
+    {
+        let ticket = try beginOperation(retiring: true)
+        guard
+            !didRetire,
+            let configuration,
+            let configurationSHA256
+        else {
+            return try fail(.invalidState)
+        }
+        didRetire = true
+        let startedAt = now()
+        do {
+            let handle = try await retirementHandleFactory(
+                configuration,
+                configurationSHA256
+            )
+            guard validRetirementHandle(
+                handle,
+                configuration: configuration,
+                configurationSHA256: configurationSHA256,
+                startedAt: startedAt,
+                completedAt: now()
+            ) else {
+                return try fail(.retirementFailed)
+            }
+            try finishOperation(ticket, retiring: true)
+            return handle
+        } catch {
+            return try fail(.retirementFailed)
+        }
+    }
+
+    package func sendRetirementHandle(
+        _ frame: InvestigationHandoffFrame
+    ) async throws {
+        try await write(frame)
+    }
+
+    package func receiveHandleAcknowledgement() async throws
+        -> InvestigationHandoffFrame
+    {
+        try await read()
+    }
+
+    package func receiveRelease() async throws
+        -> InvestigationHandoffFrame
+    {
+        try await read()
+    }
+
+    package func sendAlive(
+        _ frame: InvestigationHandoffFrame
+    ) async throws {
+        try await write(frame)
+    }
+
+    package func halfCloseAndProveEOF() async throws {
+        let adapter = self.adapter
+        _ = try await performOperation {
+            try await adapter.halfCloseWrite()
+            return true
+        }
+    }
+
+    package func receiveExit() async throws -> InvestigationHandoffFrame {
+        let adapter = self.adapter
+        return try await performOperation(terminalOnSuccess: true) {
+            try await adapter.readFrame()
+        }
+    }
+
+    private func read() async throws -> InvestigationHandoffFrame {
+        let adapter = self.adapter
+        return try await performOperation {
+            return try await adapter.readFrame()
+        }
+    }
+
+    private func write(_ frame: InvestigationHandoffFrame) async throws {
+        let adapter = self.adapter
+        _ = try await performOperation {
+            try await adapter.writeFrame(frame)
+            return true
+        }
+    }
+
+    private func performOperation<T: Sendable>(
+        terminalOnSuccess: Bool = false,
+        _ body: @escaping @Sendable () async throws -> T
+    ) async throws -> T {
+        let ticket = try beginOperation()
+        do {
+            let result = try await body()
+            try finishOperation(
+                ticket,
+                terminalOnSuccess: terminalOnSuccess
+            )
+            return result
+        } catch {
+            return try fail(.invalidState)
+        }
+    }
+
+    private func beginOperation(retiring: Bool = false) throws -> UUID {
+        do {
+            try Task.checkCancellation()
+        } catch {
+            return try fail(.invalidState)
+        }
+        guard phase == .idle else {
+            return try fail(.invalidState)
+        }
+        let ticket = UUID()
+        phase = retiring ? .retiring(ticket) : .operation(ticket)
+        return ticket
+    }
+
+    private func finishOperation(
+        _ ticket: UUID,
+        retiring: Bool = false,
+        terminalOnSuccess: Bool = false
+    ) throws {
+        do {
+            try Task.checkCancellation()
+        } catch {
+            return try fail(.invalidState)
+        }
+        let expected = retiring ? Phase.retiring(ticket) : .operation(ticket)
+        guard phase == expected else {
+            return try fail(.invalidState)
+        }
+        phase = terminalOnSuccess ? .terminal : .idle
+    }
+
+    private func fail<T>(
+        _ error: InvestigationHandoffConcreteAppLeafError
+    ) throws -> T {
+        phase = .terminal
+        throw error
+    }
+
+    private func machineDriverMatchesPeer(
+        _ binding: SignedInvestigationRuntimeMachineDriverBinding
+    ) -> Bool {
+        peer.signingEvidence.executableSHA256 == binding.executableSHA256
+            && peer.signingEvidence.identity.signingIdentifier
+                == binding.signingIdentifier
+            && peer.signingEvidence.identity.designatedRequirementSHA256
+                == binding.designatedRequirementSHA256
+            && peer.signingEvidence.identity.codeDirectoryHash
+                == binding.codeDirectoryHash
+    }
+
+    private func validRetirementHandle(
+        _ handle: InvestigationHandoffRetirementHandle,
+        configuration: SignedInvestigationRuntimeDiagnosticConfiguration,
+        configurationSHA256: String,
+        startedAt: Date,
+        completedAt: Date
+    ) -> Bool {
+        handle.investigationUUID == configuration.nonce
+            && handle.configurationSHA256.lowercaseHex
+                == configurationSHA256
+            && validRetirementDeadline(
+                handle.validBefore.rawValue,
+                configurationValidBefore: configuration.validBefore,
+                startedAt: startedAt,
+                completedAt: completedAt
+            )
+    }
+
+    private func handoffScenario(
+        _ scenario: SignedInvestigationRuntimeDiagnosticScenario
+    ) -> InvestigationHandoffScenario {
+        switch scenario {
+        case .success: .success
+        case .cancellation: .cancellation
+        case .timeout: .timeout
+        case .invalidEnvelope: .invalidEnvelope
+        case .identityMismatch: .identityMismatch
+        case .transportLoss: .transportLoss
+        case .lifecycleRecovery: .lifecycleRecovery
+        case .artifactCleanupFailure: .artifactCleanupFailure
+        }
+    }
+}
+
+package enum InvestigationHandoffNoAuthRetirement {
+    package static func live(
+        configuration: SignedInvestigationRuntimeDiagnosticConfiguration,
+        configurationSHA256: String
+    ) async throws -> InvestigationHandoffRetirementHandle {
+        let contract = try LifecycleLocalInstallationContract()
+        guard
+            configuration.binding.helperServiceIdentifier
+                == contract.machServiceName,
+            configuration.binding.machineDriver.signingIdentifier
+                == contract.machineDriverSigningIdentifier,
+            configuration.binding.machineDriver.machineClaimServiceIdentifier
+                == contract.machineClaimMachServiceName
+        else {
+            throw InvestigationHandoffConcreteAppLeafError.bindingMismatch
+        }
+        let session = LifecycleInteractiveSessionXPCClient(
+            helperBundleURL: contract.helperExecutableURL
+        )
+        do {
+            let handle = try await run(
+                configuration: configuration,
+                configurationSHA256: configurationSHA256,
+                session: session
+            )
+            await session.invalidate()
+            return handle
+        } catch {
+            await session.invalidate()
+            throw error
+        }
+    }
+
+    package static func run(
+        configuration: SignedInvestigationRuntimeDiagnosticConfiguration,
+        configurationSHA256: String,
+        session: any LifecycleInteractiveSessionSending,
+        now: @escaping @Sendable () -> Date = Date.init,
+        operationID: @escaping @Sendable () throws -> UUID = UUID.init
+    ) async throws -> InvestigationHandoffRetirementHandle {
+        guard
+            try configuration.canonicalJSONData()
+                .handoffSHA256Hex == configurationSHA256,
+            try configuration.machineConfigurationSHA256()
+                == configurationSHA256
+        else {
+            throw InvestigationHandoffConcreteAppLeafError.invalidConfiguration
+        }
+        let evidenceStore = InvestigationLifecycleRetirementEvidenceStore()
+        let transport = try InvestigationLifecycleAppServerTransport(
+            investigationID: LifecycleInvestigationID(
+                rawValue: configuration.nonce
+            ),
+            configurationSHA256: configurationSHA256,
+            validBefore: configuration.validBefore,
+            maximumLineBytes:
+                LifecycleInteractiveSessionRequest.maximumAllowedLineBytes,
+            maximumSessionBytes:
+                LifecycleInteractiveSessionRequest.maximumAllowedSessionBytes,
+            expectedUserID: 501,
+            now: now,
+            operationID: operationID,
+            session: session,
+            retirementEvidenceStore: evidenceStore
+        )
+        let retirementStartedAt = now()
+        let returned = try await transport.startAndRetireWithEvidence()
+        let retirementCompletedAt = now()
+        guard let stored = await evidenceStore.consume(), stored == returned else {
+            throw InvestigationHandoffConcreteAppLeafError.retirementFailed
+        }
+        let lifecycle = returned.machineRetirementHandle
+        guard
+            lifecycle.investigationID.rawValue == configuration.nonce,
+            lifecycle.configurationSHA256 == configurationSHA256,
+            validRetirementDeadline(
+                lifecycle.validBeforeUTCMicroseconds,
+                configurationValidBefore: configuration.validBefore,
+                startedAt: retirementStartedAt,
+                completedAt: retirementCompletedAt
+            )
+        else {
+            throw InvestigationHandoffConcreteAppLeafError.retirementFailed
+        }
+        return try InvestigationHandoffRetirementHandle(
+            token: lifecycle.token,
+            investigationUUID: configuration.nonce,
+            retireOperationUUID: lifecycle.retireOperationID,
+            configurationSHA256: .init(
+                lowercaseHex: lifecycle.configurationSHA256
+            ),
+            validBefore: .init(
+                rawValue: lifecycle.validBeforeUTCMicroseconds
+            )
+        )
+    }
+}
+
+private func validRetirementDeadline(
+    _ validBeforeMicroseconds: Int64,
+    configurationValidBefore: Date,
+    startedAt: Date,
+    completedAt: Date
+) -> Bool {
+    guard
+        let configuration = exactUTCMicroseconds(configurationValidBefore),
+        let started = exactUTCMicroseconds(startedAt),
+        let completed = exactUTCMicroseconds(completedAt),
+        completed >= started
+    else { return false }
+    let maximum = completed.addingReportingOverflow(30_000_000)
+    return !maximum.overflow
+        && validBeforeMicroseconds > completed
+        && validBeforeMicroseconds <= configuration
+        && validBeforeMicroseconds <= maximum.partialValue
+}
+
+private func exactUTCMicroseconds(_ value: Date) -> Int64? {
+    let seconds = value.timeIntervalSince1970
+    guard seconds.isFinite, seconds > 0 else { return nil }
+    let scaled = seconds * 1_000_000
+    guard scaled.isFinite, scaled >= 1, scaled < Double(Int64.max) else {
+        return nil
+    }
+    return Int64(scaled.rounded(.down))
+}
+
+private extension Data {
+    var handoffSHA256Hex: String {
+        InvestigationHandoffSHA256.hashing(self).lowercaseHex
+    }
 }
 
 public final class InvestigationRuntimeDiagnosticComposition:

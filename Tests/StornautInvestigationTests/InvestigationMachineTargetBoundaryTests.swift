@@ -4,6 +4,52 @@ import Testing
 @Suite("Task 39 trusted machine target boundary")
 struct InvestigationMachineTargetBoundaryTests {
     @Test
+    func concreteEntryRemainsPackageClosedNoAuthAndScopeBounded() throws {
+        let root = URL(filePath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let boundaries = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"),
+            encoding: .utf8
+        )
+        let release = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-app-release-boundaries"),
+            encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        for marker in [
+            "--iib3c-concrete-entry-contract-only",
+            "--iib3c-staged-scope-contract-only",
+            "ii-b3c concrete authority widened",
+            "ii-b3c staged checkpoint paths drifted",
+            "ii-b3c staged checkpoint budget drifted",
+        ] {
+            #expect(boundaries.contains(marker))
+        }
+        for marker in [
+            "b3c_concrete_markers=(",
+            "b3c_closed_images=(",
+            "ii-b3c concrete entry missing from diagnostic Debug image",
+            "ii-b3c concrete entry leaked into a closed image",
+        ] {
+            #expect(release.contains(marker))
+        }
+        for marker in [
+            "b3c-public", "b3c-auth", "b3c-business-io",
+            "b3c-digest", "b3c-peer-binding", "b3c-store",
+            "for fixture in extra-path over-budget deleted-path",
+            "b3c-$fixture.index",
+        ] {
+            #expect(contract.contains(marker))
+        }
+    }
+
+    @Test
     func startRetireSeamRemainsPackageClosedAndUnreachable() throws {
         let root = URL(filePath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()

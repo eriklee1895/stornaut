@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=d371ba2cd9a65c62f7f4c97596b14e6106d86a1d1dd06a375270aeaea30f6d0a
+ib2_self_sha=c911d0c5caadfc628cda6c6fb780d831e7b819ef2a867cfcc45cf71edb9c4cfc
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -864,9 +864,9 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "d714fe3f43fbb94b40ef4154dfcd8f5e2afab8fac23853dc25698b93bce1bde5",
+        "14a9e4017cd721246286d3cfb49670fe29642554544f69d7463c11a98169b998",
     Path("scripts/verify-app-release-boundaries"):
-        "585aa61bda997e0cadd6ba9be41d1f2fb8a435a820449d4f1dab227715cbbb0c",
+        "e54f727b2d7fa174c71b4f7672f9b01880e56a46a069e3b171274347fd1cc9e2",
 }
 for path, expected_sha in expected.items():
     observed_sha = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -2791,30 +2791,180 @@ require_start_retire_mutation_rejected start-retire-backtick \
     "$contract_root/start-retire-backtick.swift" \
     'start-retire seam gained prohibited surface'
 
-"$start_retire_gate" --iib3b-staged-scope-contract-only
-real_index=$(git rev-parse --git-path index)
+b3b_commit=e60d4e05724314a10792066ad3df8300ff279303
+b3b_parent=a7f827403ee532a5eab335b5f18d6b8103730b1b
+b3b_index="$contract_root/start-retire-canonical.index"
+rm -f "$b3b_index"
+GIT_INDEX_FILE="$b3b_index" git read-tree "$b3b_commit^{tree}"
+GIT_INDEX_FILE="$b3b_index" "$start_retire_gate" \
+    --iib3b-staged-scope-contract-only "$b3b_parent"
 for fixture in extra-path over-budget deleted-path; do
     temporary_index="$contract_root/start-retire-$fixture.index"
-    cp "$real_index" "$temporary_index"
+    cp "$b3b_index" "$temporary_index"
     if [[ $fixture == extra-path ]]; then
-        blob=$(git rev-parse HEAD:AGENTS.md)
+        blob=$(git rev-parse "${b3b_parent}:AGENTS.md")
         GIT_INDEX_FILE="$temporary_index" git update-index --add \
             --cacheinfo "100644,$blob,iib3b-extra.swift"
         expected='ii-b3b staged checkpoint paths drifted'
     elif [[ $fixture == over-budget ]]; then
-        blob=$(git rev-parse HEAD:docs/plans/active/task-39-implementation-brief.md)
+        blob=$(git rev-parse "${b3b_parent}:docs/plans/active/task-39-implementation-brief.md")
         GIT_INDEX_FILE="$temporary_index" git update-index \
             --cacheinfo "100644,$blob,Sources/StornautInvestigationRuntime/InvestigationLifecycleAppServerTransport.swift"
         expected='ii-b3b staged checkpoint budget drifted'
     else
-        GIT_INDEX_FILE="$temporary_index" git rm --cached -q AGENTS.md
-        expected='ii-b3b staged checkpoint paths drifted'
+        GIT_INDEX_FILE="$temporary_index" git rm --cached -q \
+            Sources/StornautInvestigationRuntime/InvestigationLifecycleAppServerTransport.swift
+        expected='ii-b3b staged checkpoint deleted a required path'
     fi
     output="$contract_root/start-retire-$fixture.log"
     if GIT_INDEX_FILE="$temporary_index" "$start_retire_gate" \
-        --iib3b-staged-scope-contract-only >"$output" 2>&1
+        --iib3b-staged-scope-contract-only "$b3b_parent" >"$output" 2>&1
     then
         fail_contract "Start-retire staged scope mutation accepted: $fixture"
+    fi
+    require_fixed_text "$output" "$expected"
+done
+
+b3c_gate=scripts/verify-investigation-boundaries
+b3c_leaf=Sources/StornautInvestigationDiagnostic/InvestigationHandoffAppLeaf.swift
+b3c_adapter=Sources/StornautInvestigationDiagnostic/InvestigationHandoffAppLeafAdapter.swift
+b3c_composition=Sources/StornautInvestigationDiagnostic/InvestigationRuntimeDiagnosticComposition.swift
+b3c_harness=StornautApp/Diagnostics/InvestigationRuntimeDiagnosticHarness.swift
+"$b3c_gate" --iib3c-concrete-entry-contract-only \
+    "$b3c_leaf" "$b3c_adapter" "$b3c_composition" "$b3c_harness" \
+    >"$contract_root/b3c-canonical.log"
+function require_b3c_mutation_rejected() {
+    local fixture_name=$1 leaf=$2 adapter=$3 composition=$4 harness=$5 expected=$6
+    local output="$contract_root/$fixture_name.log"
+    if "$b3c_gate" --iib3c-concrete-entry-contract-only \
+        "$leaf" "$adapter" "$composition" "$harness" >"$output" 2>&1
+    then
+        fail_contract "ii-b3c mutation was accepted: $fixture_name"
+    fi
+    require_fixed_text "$output" "$expected"
+}
+python3 - "$b3c_leaf" "$b3c_composition" "$contract_root" <<'PY'
+from pathlib import Path
+import sys
+leaf_path, composition_path, root = map(Path, sys.argv[1:])
+leaf = leaf_path.read_text(encoding="utf-8")
+composition = composition_path.read_text(encoding="utf-8")
+
+def mutate(source, old, new, name):
+    if source.count(old) != 1:
+        raise SystemExit(f"cannot construct ii-b3c mutation: {name}")
+    (root / f"{name}.swift").write_text(
+        source.replace(old, new, 1), encoding="utf-8"
+    )
+
+mutate(leaf, "public static func run() async -> Int32",
+       "public static func run() -> Int32", "b3c-public")
+mutate(leaf, "lock.withLock {",
+       "if !consumed {", "b3c-admission-lock")
+mutate(leaf,
+       "        lock.withLock {\n            guard !consumed else { return false }\n            consumed = true\n            return true\n        }",
+       "        lock.withLock {}\n        guard !consumed else { return false }\n        consumed = true\n        return true",
+       "b3c-admission-relocated")
+mutate(composition, "package enum InvestigationHandoffNoAuthRetirement",
+       "public enum InvestigationHandoffNoAuthRetirement", "b3c-auth")
+mutate(composition, "let returned = try await transport.startAndRetireWithEvidence()",
+       "try await transport.writeLine(Data())\n        let returned = try await transport.startAndRetireWithEvidence()",
+       "b3c-business-io")
+mutate(composition, "let returned = try await transport.startAndRetireWithEvidence()",
+       'let hidden = "\\(try await transport.writeLine(Data()))"\n        _ = hidden\n        let returned = try await transport.startAndRetireWithEvidence()',
+       "b3c-interpolation")
+mutate(composition, "guard wireSHA.lowercaseHex == machineSHA else {",
+       "guard true else { // guard wireSHA.lowercaseHex == machineSHA else {",
+       "b3c-digest")
+mutate(composition,
+       "guard machineDriverMatchesPeer(decoded.binding.machineDriver) else {",
+       "guard true else { // guard machineDriverMatchesPeer(decoded.binding.machineDriver) else {",
+       "b3c-peer-binding")
+mutate(composition,
+       "guard let stored = await evidenceStore.consume(), stored == returned else {",
+       "guard true else { // guard let stored = await evidenceStore.consume(), stored == returned else {",
+       "b3c-store")
+mutate(composition,
+       "let maximum = completed.addingReportingOverflow(30_000_000)",
+       "let maximum = started.addingReportingOverflow(30_000_000)",
+       "b3c-deadline-edge")
+PY
+require_b3c_mutation_rejected b3c-public \
+    "$contract_root/b3c-public.swift" "$b3c_adapter" "$b3c_composition" "$b3c_harness" \
+    'ii-b3c public async entry surface drifted'
+require_b3c_mutation_rejected b3c-admission-lock \
+    "$contract_root/b3c-admission-lock.swift" "$b3c_adapter" "$b3c_composition" "$b3c_harness" \
+    'ii-b3c entry admission claim linearization drifted'
+require_b3c_mutation_rejected b3c-admission-relocated \
+    "$contract_root/b3c-admission-relocated.swift" "$b3c_adapter" "$b3c_composition" "$b3c_harness" \
+    'ii-b3c entry admission claim linearization drifted'
+require_b3c_mutation_rejected b3c-auth \
+    "$b3c_leaf" "$b3c_adapter" "$contract_root/b3c-auth.swift" "$b3c_harness" \
+    'ii-b3c concrete contract drifted: package enum InvestigationHandoffNoAuthRetirement'
+require_b3c_mutation_rejected b3c-business-io \
+    "$b3c_leaf" "$b3c_adapter" "$contract_root/b3c-business-io.swift" "$b3c_harness" \
+    'ii-b3c concrete authority widened'
+require_b3c_mutation_rejected b3c-interpolation \
+    "$b3c_leaf" "$b3c_adapter" "$contract_root/b3c-interpolation.swift" "$b3c_harness" \
+    'ii-b3c concrete region contains Swift string interpolation'
+require_b3c_mutation_rejected b3c-digest \
+    "$b3c_leaf" "$b3c_adapter" "$contract_root/b3c-digest.swift" "$b3c_harness" \
+    'ii-b3c concrete contract drifted: guard wireSHA.lowercaseHex == machineSHA else'
+require_b3c_mutation_rejected b3c-peer-binding \
+    "$b3c_leaf" "$b3c_adapter" "$contract_root/b3c-peer-binding.swift" "$b3c_harness" \
+    'ii-b3c concrete peer binding guard drifted'
+require_b3c_mutation_rejected b3c-store \
+    "$b3c_leaf" "$b3c_adapter" "$contract_root/b3c-store.swift" "$b3c_harness" \
+    'ii-b3c concrete contract drifted: evidenceStore.consume()'
+require_b3c_mutation_rejected b3c-deadline-edge \
+    "$b3c_leaf" "$b3c_adapter" "$contract_root/b3c-deadline-edge.swift" "$b3c_harness" \
+    'ii-b3c concrete contract drifted: let maximum = completed.addingReportingOverflow(30_000_000)'
+
+b3c_index="$contract_root/b3c-canonical.index"
+if ! git diff --cached --quiet HEAD -- . ':(exclude)docs/**'; then
+    "$b3c_gate" --iib3c-staged-scope-contract-only
+fi
+rm -f "$b3c_index"
+GIT_INDEX_FILE="$b3c_index" git read-tree HEAD
+for source_path in \
+    "$b3c_leaf" "$b3c_adapter" "$b3c_composition" "$b3c_harness" \
+    StornautAppTests/InvestigationRuntimeDiagnosticTests.swift \
+    Tests/StornautInvestigationTests/InvestigationHandoffAppLeafTests.swift \
+    Tests/StornautInvestigationTests/InvestigationHandoffConcreteCompositionTests.swift \
+    Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift \
+    scripts/verify-app-release-boundaries scripts/verify-contract \
+    scripts/verify-investigation-boundaries
+do
+    GIT_INDEX_FILE="$b3c_index" git add -f "$source_path"
+done
+GIT_INDEX_FILE="$b3c_index" "$b3c_gate" --iib3c-staged-scope-contract-only
+docs_deleted_index="$contract_root/b3c-docs-deleted.index"
+cp "$b3c_index" "$docs_deleted_index"
+GIT_INDEX_FILE="$docs_deleted_index" git rm --cached -q docs/README.md
+GIT_INDEX_FILE="$docs_deleted_index" "$b3c_gate" \
+    --iib3c-staged-scope-contract-only
+for fixture in extra-path over-budget deleted-path; do
+    index="$contract_root/b3c-$fixture.index"
+    cp "$b3c_index" "$index"
+    if [[ $fixture == extra-path ]]; then
+        blob=$(git rev-parse HEAD:AGENTS.md)
+        GIT_INDEX_FILE="$index" git update-index --add \
+            --cacheinfo "100644,$blob,b3c-extra.swift"
+        expected='ii-b3c staged checkpoint paths drifted'
+    elif [[ $fixture == over-budget ]]; then
+        blob=$(git rev-parse HEAD:docs/plans/active/task-39-implementation-brief.md)
+        GIT_INDEX_FILE="$index" git update-index \
+            --cacheinfo "100644,$blob,$b3c_composition"
+        expected='ii-b3c staged checkpoint budget drifted'
+    else
+        GIT_INDEX_FILE="$index" git rm --cached -q "$b3c_leaf"
+        expected='ii-b3c staged checkpoint deleted a required path'
+    fi
+    output="$contract_root/b3c-$fixture-scope.log"
+    if GIT_INDEX_FILE="$index" "$b3c_gate" \
+        --iib3c-staged-scope-contract-only >"$output" 2>&1
+    then
+        fail_contract "ii-b3c staged scope mutation accepted: $fixture"
     fi
     require_fixed_text "$output" "$expected"
 done
@@ -2873,14 +3023,16 @@ python3 - "$claim_server_macho_gate" \
     "$contract_root/app-peer-preview.swift" \
     "$contract_root/start-retire-diagnostic-main.swift" \
     "$contract_root/start-retire-preview.swift" \
-    "$contract_root/start-retire-marker-loop.swift" <<'PY'
+    "$contract_root/start-retire-marker-loop.swift" \
+    "$contract_root/b3c-marker-loop.swift" <<'PY'
 from pathlib import Path
 import sys
 
 source_path, helper_path, negative_path, selector_path, fail_open_path, \
     physical_path, physical_negative_path, app_peer_dylib_path, \
     app_peer_preview_path, start_retire_main_path, \
-    start_retire_preview_path, start_retire_loop_path = map(
+    start_retire_preview_path, start_retire_loop_path, \
+    b3c_loop_path = map(
     Path, sys.argv[1:]
 )
 source = source_path.read_text(encoding="utf-8")
@@ -2965,6 +3117,16 @@ start_retire_loop_path.write_text(mutate_runtime(
     '            print -u2 "Start-retire seam leaked into a closed image: $forbidden_image: $marker"\n',
     "start-retire marker loop fixed"
 ), encoding="utf-8")
+b3c_loop_path.write_text(mutate_runtime(
+    '            "$marker"\n'
+    '        then\n',
+    '            "${b3c_concrete_markers[1]}"\n'
+    '            # mach_o_image_has_demangled_symbol '
+    '"$diagnostic_debug_app/Contents/MacOS/'
+    'StornautInvestigationDiagnostic.debug.dylib" "$marker"\n'
+    '        then\n',
+    "ii-b3c positive marker fixed with comment camouflage"
+), encoding="utf-8")
 start = runtime.index("mach_o_image_has_demangled_symbol() {")
 end = runtime.index("\n}\n", start) + 3
 function = runtime[start:end]
@@ -3009,6 +3171,9 @@ require_claim_server_macho_mutation_rejected start-retire-preview \
 require_claim_server_macho_mutation_rejected start-retire-marker-loop \
     "$contract_root/start-retire-marker-loop.swift" \
     'start-retire seam image scan drifted'
+require_claim_server_macho_mutation_rejected b3c-marker-loop \
+    "$contract_root/b3c-marker-loop.swift" \
+    'ii-b3c demangled symbol scan drifted'
 
 # Scope/cost anti-spoofing stays executable without touching the real worktree.
 python3 - scripts/verify-investigation-boundaries <<'PY'

@@ -108,8 +108,8 @@ enum InvestigationRuntimeDiagnosticHarness {
         now: Date = Date(),
         handoffDescriptorSystem:
             InvestigationHandoffDescriptorSystem = .system,
-        handoffEntry: @escaping @Sendable () -> Int32 = {
-            InvestigationHandoffAppLeafEntryPoint.run()
+        handoffEntry: @escaping @Sendable () async -> Int32 = {
+            await InvestigationHandoffAppLeafEntryPoint.run()
         },
         compositionPrepare:
             @escaping @Sendable (Data, Date) async throws -> UUID = {
@@ -147,7 +147,7 @@ enum InvestigationRuntimeDiagnosticHarness {
             ) else {
                 return 64
             }
-            return handoffEntry()
+            return await handoffEntry()
         case let .request(request):
             let receipt = await prepare(
                 request: request,

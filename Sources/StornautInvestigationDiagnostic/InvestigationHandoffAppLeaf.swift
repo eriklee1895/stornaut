@@ -295,9 +295,58 @@ package actor InvestigationHandoffAppLeaf {
     }
 }
 
+package final class InvestigationHandoffAppLeafEntryAdmission:
+    @unchecked Sendable
+{
+    private let lock = NSLock()
+    private var consumed = false
+
+    package init() {}
+
+    package func claim() -> Bool {
+        lock.withLock {
+            guard !consumed else { return false }
+            consumed = true
+            return true
+        }
+    }
+}
+
 public enum InvestigationHandoffAppLeafEntryPoint {
-    public static func run() -> Int32 {
-        InvestigationHandoffAppLeaf.concreteAdapterUnavailableExitStatus
+    private static let admission = InvestigationHandoffAppLeafEntryAdmission()
+
+    public static func run() async -> Int32 {
+        await run(admission: admission) {
+            let adapter = InvestigationHandoffAppLeafAdapter(system: .system)
+            let peer = try await adapter.admitPeerAndBootstrap()
+            let operations = try InvestigationHandoffConcreteAppLeafOperations(
+                adapter: adapter,
+                peer: peer
+            )
+            let leaf = InvestigationHandoffAppLeaf(
+                bootstrap: peer.bootstrap,
+                driverClaim: peer.driverClaim,
+                operations: operations
+            )
+            return try await leaf.run()
+        }
+    }
+
+    package static func run(
+        admission: InvestigationHandoffAppLeafEntryAdmission,
+        operation: @escaping @Sendable () async throws
+            -> InvestigationHandoffAppLeafResult
+    ) async -> Int32 {
+        guard admission.claim() else {
+            return InvestigationHandoffAppLeaf.concreteAdapterUnavailableExitStatus
+        }
+        do {
+            return try await operation() == .completed
+                ? 0
+                : InvestigationHandoffAppLeaf.concreteAdapterUnavailableExitStatus
+        } catch {
+            return InvestigationHandoffAppLeaf.concreteAdapterUnavailableExitStatus
+        }
     }
 }
 #endif

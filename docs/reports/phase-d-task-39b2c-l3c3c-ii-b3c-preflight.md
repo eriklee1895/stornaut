@@ -126,9 +126,11 @@ Before implementation, focused tests must fail for the missing concrete surface:
     ordinary Debug/Release, preview and dependency-free release shell remain
     negative.
 
-No independent binding-digest field or copied private hashing algorithm is added:
-the existing ACK/handle contract binds the complete canonical configuration,
-while peer consistency is the direct four-field machine-driver comparison. The
+No new binding-digest field or copied private hashing algorithm is added. The
+existing ACK/capsule `signedRuntimeBindingSHA256` field is filled with the
+existing `capabilityEvidenceBindingSHA256()` algorithm, while configuration and
+handle use the canonical configuration SHA and peer consistency is the direct
+four-field machine-driver comparison. The
 adapter's half-close completes the local EOF action; the following exact EXIT
 frame is the remote causal proof. Requiring either a new digest wire field or a
 standalone remote-EOF proof inside `halfCloseAndProveEOF()` is scope drift and
@@ -172,7 +174,7 @@ call Codex/model/auth/public network, touch Trash/Executor or claim readiness.
 | b3a peer/bootstrap/drop join | concrete operations tests and Debug artifact positive | pending |
 | strict configuration reuse | existing decoder plus unknown-field and mismatch tests | pending |
 | epoch driver consistency | complete four-field comparison before acknowledgement | pending |
-| canonical configuration commitment | canonical wire bytes equal machine config digest; binding mutations change it | pending |
+| canonical configuration and attempt commitments | canonical wire bytes equal machine config digest; ACK uses existing capability binding digest | pending |
 | no-auth/no-business-line retirement | exact `[start, retire]`, zero line bytes, API/body negatives | pending |
 | exact retirement/handle join | behavior negatives and one-shot evidence consumption | pending |
 | complete pure-leaf sequence | focused concrete factory transcript | pending |

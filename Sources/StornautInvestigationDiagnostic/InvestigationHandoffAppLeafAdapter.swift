@@ -208,7 +208,18 @@
     package let saved: gid_t
   }
 
-  package actor InvestigationHandoffAppLeafAdapter {
+  package protocol InvestigationHandoffAppLeafAdapting: Sendable {
+    func preDropClaim() async throws -> InvestigationHandoffProcessClaim
+    func readFrame() async throws -> InvestigationHandoffFrame
+    func writeFrame(_ frame: InvestigationHandoffFrame) async throws
+    func performIdentityDrop() async throws
+      -> InvestigationHandoffAppLeafDropResult
+    func halfCloseWrite() async throws
+  }
+
+  package actor InvestigationHandoffAppLeafAdapter:
+    InvestigationHandoffAppLeafAdapting
+  {
     package static let fixedDescriptor: Int32 = 7
     package static let bootstrapWindowNanoseconds: UInt64 = 5_000_000_000
     package static let maximumEpochWindowNanoseconds: UInt64 = 140_000_000_000

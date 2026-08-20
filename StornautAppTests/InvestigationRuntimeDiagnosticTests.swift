@@ -641,6 +641,14 @@ func investigationRuntimeDiagnosticLeafIsAClosedDebugTerminal() throws {
     ] {
         #expect(!harness.contains(prohibited))
     }
+    let normalizedHarness = harness
+        .split(whereSeparator: { $0.isWhitespace })
+        .joined(separator: " ")
+    #expect(
+        normalizedHarness.contains(
+            "handoffEntry: @escaping @Sendable () async -> Int32"
+        )
+    )
     #expect(
         app.contains(
             "InvestigationRuntimeDiagnosticHarness.swift in Sources"
@@ -682,13 +690,84 @@ func investigationInheritedHandoffAdmitsOnlyFixedDuplexUnixDescriptor() {
 }
 
 @Test
-func investigationInheritedHandoffShellReturnsUnavailableWithoutAdapter() async {
+func investigationInheritedHandoffRejectsInvalidActivationWithoutCallingEntry()
+    async
+{
+    for arguments: [String] in [
+        [],
+        ["StornautInvestigationDiagnostic", "--unexpected"],
+    ] {
+        let probe = InvestigationHandoffAsyncEntryProbe(status: 91)
+        let handoffEntry: @Sendable () async -> Int32 = {
+            await probe.run()
+        }
+        let result = await InvestigationRuntimeDiagnosticHarness.run(
+            arguments: arguments,
+            handoffDescriptorSystem: admittedHandoffDescriptorSystem(),
+            handoffEntry: handoffEntry
+        )
+
+        #expect(result == 64)
+        #expect(await probe.invocationCount() == 0)
+    }
+}
+
+@Test
+func investigationInheritedHandoffRejectsInvalidDescriptorWithoutCallingEntry()
+    async
+{
+    for mutation in InvestigationHandoffDescriptorMutation.allCases {
+        let probe = InvestigationHandoffAsyncEntryProbe(status: 91)
+        let handoffEntry: @Sendable () async -> Int32 = {
+            await probe.run()
+        }
+        let result = await InvestigationRuntimeDiagnosticHarness.run(
+            arguments: ["StornautInvestigationDiagnostic"],
+            handoffDescriptorSystem: admittedHandoffDescriptorSystem(
+                mutation: mutation
+            ),
+            handoffEntry: handoffEntry
+        )
+
+        #expect(result == 64)
+        #expect(await probe.invocationCount() == 0)
+    }
+}
+
+@Test
+func investigationInheritedHandoffAwaitsEntryOnceAndReturnsItsStatus() async {
+    let expectedStatus: Int32 = 91
+    let probe = InvestigationHandoffAsyncEntryProbe(status: expectedStatus)
+    let handoffEntry: @Sendable () async -> Int32 = {
+        await probe.run()
+    }
     let result = await InvestigationRuntimeDiagnosticHarness.run(
         arguments: ["StornautInvestigationDiagnostic"],
         handoffDescriptorSystem: admittedHandoffDescriptorSystem(),
-        handoffEntry: { 78 }
+        handoffEntry: handoffEntry
     )
-    #expect(result == 78)
+
+    #expect(result == expectedStatus)
+    #expect(await probe.invocationCount() == 1)
+}
+
+private actor InvestigationHandoffAsyncEntryProbe {
+    private let status: Int32
+    private var calls = 0
+
+    init(status: Int32) {
+        self.status = status
+    }
+
+    func run() async -> Int32 {
+        calls += 1
+        await Task.yield()
+        return status
+    }
+
+    func invocationCount() -> Int {
+        calls
+    }
 }
 
 private enum InvestigationHandoffDescriptorMutation: CaseIterable, Sendable {

@@ -42,6 +42,13 @@ iib3b_start_retire_contract_only=false
 iib3b_start_retire_source=
 iib3b_staged_scope_contract_only=false
 iib3b_staged_scope_baseline=HEAD
+iib3c_concrete_entry_contract_only=false
+iib3c_leaf_source=
+iib3c_adapter_source=
+iib3c_composition_source=
+iib3c_harness_source=
+iib3c_staged_scope_contract_only=false
+iib3c_staged_scope_baseline=HEAD
 if (( $# > 0 )); then
     if (( $# == 2 )) && [[ $1 == --claim-asid-contract-only ]]; then
         claim_asid_contract_only=true
@@ -98,9 +105,20 @@ if (( $# > 0 )); then
         && [[ $1 == --iib3b-staged-scope-contract-only ]]; then
         iib3b_staged_scope_contract_only=true
         iib3b_staged_scope_baseline=${2:-HEAD}
+    elif (( $# == 5 )) \
+        && [[ $1 == --iib3c-concrete-entry-contract-only ]]; then
+        iib3c_concrete_entry_contract_only=true
+        iib3c_leaf_source=$2
+        iib3c_adapter_source=$3
+        iib3c_composition_source=$4
+        iib3c_harness_source=$5
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iib3c-staged-scope-contract-only ]]; then
+        iib3c_staged_scope_contract_only=true
+        iib3c_staged_scope_baseline=${2:-HEAD}
     else
         print -u2 \
-            "Usage: scripts/verify-investigation-boundaries [--claim-asid-contract-only <source> | --deadline-state-contract-only <source> | --claim-server-contract-only <adapter> <effects> <deadline-state> | --claim-server-package-contract-only <describe-json> <dump-json> | --legacy-machine-claim-contract-only <lifecycle-xpc> <helper> <machine-host> <machine-claim> | --retirement-handle-v3-contract-only <lifecycle> <adapter> | --live-claim-server-contract-only <project.pbxproj> <Package.swift> <handoff-root> <scheme-root> <lifecycle-escrow> <adapter> <effects> <helper> | --app-peer-admission-contract-only <policy> <adapter> | --iib3a-staged-scope-contract-only [baseline] | --iib3b-start-retire-contract-only <transport> | --iib3b-staged-scope-contract-only [baseline]]"
+            "Usage: scripts/verify-investigation-boundaries [--claim-asid-contract-only <source> | --deadline-state-contract-only <source> | --claim-server-contract-only <adapter> <effects> <deadline-state> | --claim-server-package-contract-only <describe-json> <dump-json> | --legacy-machine-claim-contract-only <lifecycle-xpc> <helper> <machine-host> <machine-claim> | --retirement-handle-v3-contract-only <lifecycle> <adapter> | --live-claim-server-contract-only <project.pbxproj> <Package.swift> <handoff-root> <scheme-root> <lifecycle-escrow> <adapter> <effects> <helper> | --app-peer-admission-contract-only <policy> <adapter> | --iib3a-staged-scope-contract-only [baseline] | --iib3b-start-retire-contract-only <transport> | --iib3b-staged-scope-contract-only [baseline] | --iib3c-concrete-entry-contract-only <leaf> <adapter> <composition> <harness> | --iib3c-staged-scope-contract-only [baseline]]"
         exit 64
     fi
 fi
@@ -368,6 +386,12 @@ function verify_iib3b_staged_scope() {
         scripts/verify-investigation-boundaries
     )
     local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD "$baseline")"})
+    if git diff --cached --name-status "$baseline" \
+        | awk '$1 == "D" { found = 1 } END { exit !found }'
+    then
+        print -u2 "ii-b3b staged checkpoint deleted a required path"
+        return 1
+    fi
     [[ "${(j:\n:)${(on)observed}}" == "${(j:\n:)${(on)expected}}" ]] || {
         print -u2 "ii-b3b staged checkpoint paths drifted"
         return 1
@@ -376,6 +400,241 @@ function verify_iib3b_staged_scope() {
     changed=$(git diff --cached --numstat "$baseline" | awk '{total += $1 + $2} END {print total + 0}')
     (( changed <= 1500 )) || {
         print -u2 "ii-b3b staged checkpoint budget drifted"
+        return 1
+    }
+}
+
+function verify_iib3c_concrete_entry_contract() {
+    local leaf_path=$1 adapter_path=$2 composition_path=$3 harness_path=$4
+    python3 - "$leaf_path" "$adapter_path" "$composition_path" "$harness_path" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+leaf_path, adapter_path, composition_path, harness_path = map(Path, sys.argv[1:])
+leaf = leaf_path.read_text(encoding="utf-8")
+adapter = adapter_path.read_text(encoding="utf-8")
+composition = composition_path.read_text(encoding="utf-8")
+harness = harness_path.read_text(encoding="utf-8")
+
+def code_only(value, label):
+    output = list(value)
+    index = 0
+    block_depth = 0
+    delimiter = None
+    while index < len(value):
+        if block_depth:
+            if value.startswith("/*", index):
+                output[index:index + 2] = "  "
+                block_depth += 1
+                index += 2
+            elif value.startswith("*/", index):
+                output[index:index + 2] = "  "
+                block_depth -= 1
+                index += 2
+            else:
+                if value[index] != "\n":
+                    output[index] = " "
+                index += 1
+            continue
+        if delimiter is not None:
+            if value.startswith(delimiter, index):
+                width = len(delimiter)
+                output[index:index + width] = " " * width
+                delimiter = None
+                index += width
+            elif delimiter == '"' and value[index] == "\\":
+                output[index] = " "
+                if index + 1 < len(value):
+                    output[index + 1] = " "
+                index += 2
+            else:
+                if value[index] != "\n":
+                    output[index] = " "
+                index += 1
+            continue
+        if value.startswith("//", index):
+            end = value.find("\n", index)
+            end = len(value) if end < 0 else end
+            output[index:end] = " " * (end - index)
+            index = end
+        elif value.startswith("/*", index):
+            output[index:index + 2] = "  "
+            block_depth = 1
+            index += 2
+        elif value.startswith('"""', index):
+            output[index:index + 3] = "   "
+            delimiter = '"""'
+            index += 3
+        elif value[index] == '"':
+            output[index] = " "
+            delimiter = '"'
+            index += 1
+        else:
+            index += 1
+    if block_depth or delimiter is not None:
+        raise SystemExit(f"ii-b3c {label} has unterminated text")
+    return "".join(output)
+
+def compact(value):
+    return re.sub(r"\s+", "", value)
+
+leaf_code = code_only(leaf, "leaf")
+adapter_code = code_only(adapter, "adapter")
+raw_concrete_end = composition.find(
+    "public final class InvestigationRuntimeDiagnosticComposition"
+)
+if raw_concrete_end < 0:
+    raise SystemExit("ii-b3c concrete region delimiter is missing")
+if "\\(" in composition[:raw_concrete_end]:
+    raise SystemExit(
+        "ii-b3c concrete region contains Swift string interpolation"
+    )
+composition_code = code_only(composition, "composition")
+harness_code = code_only(harness, "harness")
+
+entry_start = leaf_code.find("package final class InvestigationHandoffAppLeafEntryAdmission")
+if entry_start < 0:
+    raise SystemExit("ii-b3c entry admission is missing")
+entry = leaf_code[entry_start:]
+if len(re.findall(r"(?m)^\s*public\s+static\s+func\s+run\(\)\s+async\s+->\s+Int32", entry)) != 1:
+    raise SystemExit("ii-b3c public async entry surface drifted")
+if len(re.findall(r"(?m)^\s*public\s+", entry)) != 2:
+    raise SystemExit("ii-b3c public entry surface widened")
+entry_compact = compact(entry)
+claim_contract = compact("""
+package func claim() -> Bool {
+    lock.withLock {
+        guard !consumed else { return false }
+        consumed = true
+        return true
+    }
+}
+""")
+if entry_compact.count(claim_contract) != 1:
+    raise SystemExit(
+        "ii-b3c entry admission claim linearization drifted"
+    )
+for required in (
+    "private let lock = NSLock()",
+    "package func claim() -> Bool",
+    "lock.withLock {",
+    "guard !consumed else { return false }",
+    "consumed = true",
+    "private static let admission = InvestigationHandoffAppLeafEntryAdmission()",
+    "guard admission.claim() else",
+    "let adapter = InvestigationHandoffAppLeafAdapter(system: .system)",
+    "let peer = try await adapter.admitPeerAndBootstrap()",
+    "let operations = try InvestigationHandoffConcreteAppLeafOperations(",
+    "return try await leaf.run()",
+):
+    if compact(required) not in entry_compact:
+        raise SystemExit(f"ii-b3c entry contract drifted: {required}")
+
+adapter_compact = compact(adapter_code)
+for required in (
+    "package protocol InvestigationHandoffAppLeafAdapting: Sendable",
+    "package actor InvestigationHandoffAppLeafAdapter: InvestigationHandoffAppLeafAdapting",
+):
+    if compact(required) not in adapter_compact:
+        raise SystemExit(f"ii-b3c adapter seam drifted: {required}")
+if "public protocol InvestigationHandoffAppLeafAdapting" in adapter_code:
+    raise SystemExit("ii-b3c adapter seam became public")
+
+concrete_end = composition_code.find("public final class InvestigationRuntimeDiagnosticComposition")
+if concrete_end < 0:
+    raise SystemExit("ii-b3c concrete region delimiter is missing")
+concrete = composition_code[:concrete_end]
+concrete_compact = compact(concrete)
+for required in (
+    "package actor InvestigationHandoffConcreteAppLeafOperations",
+    "package enum InvestigationHandoffNoAuthRetirement",
+    "decoded.canonicalJSONData() == bytes",
+    "guard wireSHA.lowercaseHex == machineSHA else",
+    "decoded.capabilityEvidenceBindingSHA256()",
+    "peer.signingEvidence.executableSHA256 == binding.executableSHA256",
+    "peer.signingEvidence.identity.signingIdentifier == binding.signingIdentifier",
+    "peer.signingEvidence.identity.designatedRequirementSHA256 == binding.designatedRequirementSHA256",
+    "peer.signingEvidence.identity.codeDirectoryHash == binding.codeDirectoryHash",
+    "transport.startAndRetireWithEvidence()",
+    "evidenceStore.consume()",
+    "guard let stored = await evidenceStore.consume(), stored == returned else",
+    "session.invalidate()",
+    "private enum Phase: Equatable",
+    "case operation(UUID)",
+    "case retiring(UUID)",
+    "try Task.checkCancellation()",
+    "guard phase == expected else",
+    "validRetirementDeadline(",
+    "let maximum = completed.addingReportingOverflow(30_000_000)",
+    "validBeforeMicroseconds > completed",
+    "validBeforeMicroseconds <= configuration",
+    "validBeforeMicroseconds <= maximum.partialValue",
+):
+    if compact(required) not in concrete_compact:
+        raise SystemExit(f"ii-b3c concrete contract drifted: {required}")
+if concrete_compact.count(compact(
+    "guard machineDriverMatchesPeer(decoded.binding.machineDriver) else"
+)) != 1:
+    raise SystemExit("ii-b3c concrete peer binding guard drifted")
+for forbidden in (
+    "prepareRoot", "writeLine", "readLine",
+    "CodexInteractiveAppServerClient", "currentAuthSourceURL",
+    "InvestigationRuntimeDiagnosticFacade", "ProbeBroker",
+    "ActionExecutor", "MoveToTrash", "RegisteredAction",
+    "DispatchSemaphore", "dispatch_semaphore",
+):
+    if re.search(rf"(?<![A-Za-z0-9_]){re.escape(forbidden)}(?![A-Za-z0-9_])", concrete):
+        raise SystemExit(f"ii-b3c concrete authority widened: {forbidden}")
+for public_type in (
+    "InvestigationHandoffConcreteAppLeafOperations",
+    "InvestigationHandoffNoAuthRetirement",
+    "InvestigationHandoffAppLeafEntryAdmission",
+):
+    if re.search(rf"(?m)^\s*public\s+(?:actor|class|final class|enum|struct)\s+{public_type}\b", leaf_code + concrete):
+        raise SystemExit(f"ii-b3c concrete type became public: {public_type}")
+
+harness_compact = compact(harness_code)
+for required in (
+    "handoffEntry: @escaping @Sendable () async -> Int32",
+    "return await handoffEntry()",
+    "InvestigationHandoffDescriptorAdmission.admits(",
+):
+    if compact(required) not in harness_compact:
+        raise SystemExit(f"ii-b3c async harness drifted: {required}")
+PY
+}
+
+function verify_iib3c_staged_scope() {
+    local baseline=${1:-HEAD}
+    local expected=(
+        Sources/StornautInvestigationDiagnostic/InvestigationHandoffAppLeaf.swift
+        Sources/StornautInvestigationDiagnostic/InvestigationHandoffAppLeafAdapter.swift
+        Sources/StornautInvestigationDiagnostic/InvestigationRuntimeDiagnosticComposition.swift
+        StornautApp/Diagnostics/InvestigationRuntimeDiagnosticHarness.swift
+        StornautAppTests/InvestigationRuntimeDiagnosticTests.swift
+        Tests/StornautInvestigationTests/InvestigationHandoffAppLeafTests.swift
+        Tests/StornautInvestigationTests/InvestigationHandoffConcreteCompositionTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-app-release-boundaries
+        scripts/verify-contract
+        scripts/verify-investigation-boundaries
+    )
+    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" | awk 'index($0, "docs/") != 1')"})
+    if git diff --cached --name-status "$baseline" \
+        | awk '$1 == "D" && index($2, "docs/") != 1 { found = 1 } END { exit !found }'
+    then
+        print -u2 "ii-b3c staged checkpoint deleted a required path"
+        return 1
+    fi
+    [[ "${(j:\n:)${(on)observed}}" == "${(j:\n:)${(on)expected}}" ]] || {
+        print -u2 "ii-b3c staged checkpoint paths drifted"
+        return 1
+    }
+    local changed
+    changed=$(git diff --cached --numstat "$baseline" | awk 'index($3, "docs/") != 1 {total += $1 + $2} END {print total + 0}')
+    (( changed <= 2800 )) || {
+        print -u2 "ii-b3c staged checkpoint budget drifted"
         return 1
     }
 }
@@ -2918,6 +3177,18 @@ if $iib3b_staged_scope_contract_only; then
     print "ii-b3b staged scope verification passed."
     exit 0
 fi
+if $iib3c_concrete_entry_contract_only; then
+    verify_iib3c_concrete_entry_contract \
+        "$iib3c_leaf_source" "$iib3c_adapter_source" \
+        "$iib3c_composition_source" "$iib3c_harness_source"
+    print "ii-b3c concrete entry contract verification passed."
+    exit 0
+fi
+if $iib3c_staged_scope_contract_only; then
+    verify_iib3c_staged_scope "$iib3c_staged_scope_baseline"
+    print "ii-b3c staged scope verification passed."
+    exit 0
+fi
 
 investigation_root=Sources/StornautCore/Investigation
 evidence_root=Sources/StornautCore/Evidence
@@ -4622,6 +4893,11 @@ verify_app_peer_admission_contract \
     Sources/StornautInvestigationDiagnostic/InvestigationHandoffAppLeafAdapter.swift
 verify_iib3b_start_retire_contract \
     Sources/StornautInvestigationRuntime/InvestigationLifecycleAppServerTransport.swift
+verify_iib3c_concrete_entry_contract \
+    Sources/StornautInvestigationDiagnostic/InvestigationHandoffAppLeaf.swift \
+    Sources/StornautInvestigationDiagnostic/InvestigationHandoffAppLeafAdapter.swift \
+    Sources/StornautInvestigationDiagnostic/InvestigationRuntimeDiagnosticComposition.swift \
+    StornautApp/Diagnostics/InvestigationRuntimeDiagnosticHarness.swift
 verify_claim_server_scope
 verify_legacy_machine_claim_scope
 verify_retirement_handle_v3_scope
@@ -5249,7 +5525,7 @@ required_handoff_leaf = (
     "package actor InvestigationHandoffAppLeaf",
     "package protocol InvestigationHandoffAppLeafOperations",
     "public enum InvestigationHandoffAppLeafEntryPoint",
-    "public static func run() -> Int32",
+    "public static func run() async -> Int32",
     "concreteAdapterUnavailableExitStatus: Int32 = 78",
 )
 if not all(marker in handoff_leaf_source for marker in required_handoff_leaf):
