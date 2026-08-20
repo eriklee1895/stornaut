@@ -1,6 +1,7 @@
 # Phase D Task 39B2c-L3c3c-ii-b3 App Adapter Split Preflight
 
-> Status: Split frozen; ii-b3a complete; ii-b3b is the implementation frontier
+> Status: Split frozen; ii-b3a complete; ii-b3b implementation committed; its
+> test-infrastructure prerequisite is current before completion and ii-b3c
 >
 > Date: 2026-08-20
 >
@@ -442,7 +443,12 @@ be described as an expected-SHA pin.
 
 ii-b3a is complete; its fixed channel/root peer/drop adapter, exact gates, sole
 1,234-test serial and final reviews are recorded in the
-[ii-b3a review](phase-d-task-39b2c-l3c3c-ii-b3a-review.md). ii-b3b is next.
+[ii-b3a review](phase-d-task-39b2c-l3c3c-ii-b3a-review.md). The ii-b3b
+implementation is committed at `e60d4e0...`, but its consumed serial passed
+1,244 of 1,245 tests because an unchanged Codex PID-file fixture timed out before
+the retirement assertion. The narrow
+[fixture prerequisite](phase-d-task-39b2c-l3c3c-ii-b3b-fixture-prerequisite-preflight.md)
+must close that test-infrastructure gate before ii-b3b completion and ii-b3c.
 After ii-b3b and ii-b3c complete independently, the strict
 Task 39 order resumes at ii-b4, ii-b5, ii-c0, ii-c, L3c3d and L3c4. ADR 0018
 remains Proposed; Task 39 remains incomplete; production Deep Dive and real Trash
