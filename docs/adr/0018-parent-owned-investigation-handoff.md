@@ -345,8 +345,8 @@ unconsumed.
 | ii-b2b-iii-a handle-v3/single-quantized transfer | complete; non-admitting |
 | ii-b2b-iii-b-i semantic/live integration closure | complete; non-admitting |
 | ii-b2b-iii-b-ii executable physical-adapter closure | complete; non-admitting |
-| ii-b3a fixed-channel/root-peer/drop adapter | current |
-| ii-b3b start-to-retire-only Lifecycle seam | pending after ii-b3a |
+| ii-b3a fixed-channel/root-peer/drop adapter | complete; non-admitting |
+| ii-b3b start-to-retire-only Lifecycle seam | current |
 | ii-b3c concrete leaf/native entry | pending after ii-b3b |
 | ii-c no-model privileged machine gate | not executed |
 | ADR status | **Proposed** |
