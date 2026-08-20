@@ -44,6 +44,12 @@ struct InvestigationMachineTargetBoundaryTests {
         ))
         #expect(adapter.contains("transfer.ownerRetirementObservation"))
         #expect(adapter.contains("transfer.residueObservation"))
+        #expect(adapter.contains(
+            "transfer.validBeforeUTCMicroseconds"
+        ))
+        #expect(!adapter.contains(
+            "transfer.validBefore.timeIntervalSince1970"
+        ))
         #expect(!adapter.contains(
             "LifecycleMachineRetirementReservationTransfer("
         ))

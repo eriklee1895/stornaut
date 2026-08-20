@@ -6,6 +6,171 @@ import Testing
 @Suite("Lifecycle machine retirement escrow")
 struct LifecycleMachineRetirementEscrowTests {
     @Test
+    func retirementHandleUsesStrictV3CanonicalMicrosecondsJSON() throws {
+        let fixture = try MachineRetirementEscrowFixture()
+        let input = Date(
+            timeIntervalSince1970: 2_000_000_030.000_249_9
+        )
+        let expectedMicroseconds = Int64(
+            (input.timeIntervalSince1970 * 1_000_000).rounded(.down)
+        )
+        #expect(expectedMicroseconds == 2_000_000_030_000_249)
+        let handle = try LifecycleMachineRetirementHandle(
+            token: fixture.token,
+            investigationID: fixture.investigationID,
+            retireOperationID: fixture.retireOperationID,
+            configurationSHA256: fixture.configurationSHA256,
+            validBefore: input
+        )
+
+        let encoded = try JSONEncoder().encode(handle)
+        let object = try #require(
+            JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+        )
+        #expect(Set(object.keys) == [
+            "protocolVersion",
+            "token",
+            "investigationID",
+            "retireOperationID",
+            "configurationSHA256",
+            "validBeforeUTCMicroseconds",
+        ])
+        #expect(object["protocolVersion"] as? Int == 3)
+        #expect(
+            (object["validBeforeUTCMicroseconds"] as? NSNumber)?.int64Value
+                == expectedMicroseconds
+        )
+        #expect(object["validBefore"] == nil)
+
+        var canonical = object
+        canonical["protocolVersion"] = 3
+        canonical.removeValue(forKey: "validBefore")
+        canonical["validBeforeUTCMicroseconds"] = expectedMicroseconds
+
+        var legacy = object
+        legacy["protocolVersion"] = 2
+        legacy.removeValue(forKey: "validBeforeUTCMicroseconds")
+        legacy["validBefore"] = input.timeIntervalSinceReferenceDate
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(
+                LifecycleMachineRetirementHandle.self,
+                from: try JSONSerialization.data(withJSONObject: legacy)
+            )
+        }
+
+        var mixed = canonical
+        mixed["validBefore"] = input.timeIntervalSinceReferenceDate
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(
+                LifecycleMachineRetirementHandle.self,
+                from: try JSONSerialization.data(withJSONObject: mixed)
+            )
+        }
+
+        var unknown = canonical
+        unknown["unexpected"] = true
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(
+                LifecycleMachineRetirementHandle.self,
+                from: try JSONSerialization.data(withJSONObject: unknown)
+            )
+        }
+
+        for invalid in [Int64(0), -1] {
+            var invalidInteger = canonical
+            invalidInteger["validBeforeUTCMicroseconds"] = invalid
+            #expect(throws: DecodingError.self) {
+                _ = try JSONDecoder().decode(
+                    LifecycleMachineRetirementHandle.self,
+                    from: try JSONSerialization.data(
+                        withJSONObject: invalidInteger
+                    )
+                )
+            }
+        }
+        var noninteger = canonical
+        noninteger["validBeforeUTCMicroseconds"] =
+            "9223372036854775808"
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(
+                LifecycleMachineRetirementHandle.self,
+                from: try JSONSerialization.data(withJSONObject: noninteger)
+            )
+        }
+    }
+
+    @Test
+    func retirementHandleQuantizesDateExactlyOnceAndReencodesStably() throws {
+        let fixture = try MachineRetirementEscrowFixture()
+        let input = Date(
+            timeIntervalSince1970: 2_000_000_030.000_249_9
+        )
+        let expectedMicroseconds = Int64(
+            (input.timeIntervalSince1970 * 1_000_000).rounded(.down)
+        )
+        let expectedDate = Date(
+            timeIntervalSince1970: TimeInterval(expectedMicroseconds) / 1_000_000
+        )
+        let handle = try LifecycleMachineRetirementHandle(
+            token: fixture.token,
+            investigationID: fixture.investigationID,
+            retireOperationID: fixture.retireOperationID,
+            configurationSHA256: fixture.configurationSHA256,
+            validBefore: input
+        )
+
+        #expect(
+            storedInt64(
+                named: "validBeforeUTCMicroseconds",
+                in: handle
+            ) == expectedMicroseconds
+        )
+        #expect(
+            !storedLabels(in: handle).contains("validBefore")
+        )
+        #expect(handle.validBefore == expectedDate)
+
+        let encoded = try JSONEncoder().encode(handle)
+        let decoded = try JSONDecoder().decode(
+            LifecycleMachineRetirementHandle.self,
+            from: encoded
+        )
+        #expect(decoded == handle)
+        #expect(decoded.validBefore == expectedDate)
+        #expect(
+            try JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(decoded)
+            ) as? NSDictionary
+                == JSONSerialization.jsonObject(with: encoded) as? NSDictionary
+        )
+    }
+
+    @Test
+    func retirementHandleRejectsNonpositiveNonfiniteAndOverflowingDates() throws {
+        let fixture = try MachineRetirementEscrowFixture()
+        let overflowing = TimeInterval(Int64.max) / 1_000_000 + 1_000_000
+        for invalid in [
+            Date(timeIntervalSince1970: 0),
+            Date(timeIntervalSince1970: -0.000_001),
+            Date(timeIntervalSince1970: .infinity),
+            Date(timeIntervalSince1970: .nan),
+            Date(timeIntervalSince1970: overflowing),
+        ] {
+            #expect(
+                throws: LifecycleMachineRetirementEscrowError.invalidRequest
+            ) {
+                _ = try LifecycleMachineRetirementHandle(
+                    token: fixture.token,
+                    investigationID: fixture.investigationID,
+                    retireOperationID: fixture.retireOperationID,
+                    configurationSHA256: fixture.configurationSHA256,
+                    validBefore: invalid
+                )
+            }
+        }
+    }
+
+    @Test
     func strictRecordsRoundTripAndRejectUnknownOrInconsistentIdentity() throws {
         let fixture = try MachineRetirementEscrowFixture()
         let encoded = try JSONEncoder().encode(fixture.appRecord)
@@ -374,6 +539,73 @@ struct LifecycleMachineRetirementEscrowTests {
     }
 
     @Test
+    func escrowHandleAndTransferShareOneCanonicalMicrosecondValue() throws {
+        let fixture = try MachineRetirementEscrowFixture()
+        let input = Date(
+            timeIntervalSince1970: 2_000_000_030.000_249_9
+        )
+        let expectedMicroseconds = Int64(
+            (input.timeIntervalSince1970 * 1_000_000).rounded(.down)
+        )
+        let escrow = fixture.escrow()
+        let handle = try fixture.record(
+            into: escrow,
+            validBefore: input
+        )
+
+        let transfer = try escrow.transferReservation()
+
+        #expect(
+            storedInt64(
+                named: "validBeforeUTCMicroseconds",
+                in: handle
+            ) == expectedMicroseconds
+        )
+        #expect(
+            storedInt64(
+                named: "validBeforeUTCMicroseconds",
+                in: transfer
+            ) == expectedMicroseconds
+        )
+        #expect(!storedLabels(in: transfer).contains("validBefore"))
+        #expect(transfer.validBefore == handle.validBefore)
+    }
+
+    @Test
+    func legacyClaimComparesTheCanonicalMicrosecondValue() throws {
+        let fixture = try MachineRetirementEscrowFixture()
+        let input = Date(
+            timeIntervalSince1970: 2_000_000_030.000_249_9
+        )
+        let expectedMicroseconds = Int64(
+            (input.timeIntervalSince1970 * 1_000_000).rounded(.down)
+        )
+        let canonicalDate = Date(
+            timeIntervalSince1970: TimeInterval(expectedMicroseconds) / 1_000_000
+        )
+        #expect(input != canonicalDate)
+        let escrow = fixture.escrow()
+        let recorded = try fixture.record(
+            into: escrow,
+            validBefore: input
+        )
+        let equivalent = try LifecycleMachineRetirementHandle(
+            token: recorded.token,
+            investigationID: recorded.investigationID,
+            retireOperationID: recorded.retireOperationID,
+            configurationSHA256: recorded.configurationSHA256,
+            validBefore: canonicalDate
+        )
+
+        let response = try escrow.claim(
+            fixture.request(handle: equivalent),
+            authorized: true
+        )
+
+        #expect(response.request.handle == recorded)
+    }
+
+    @Test
     func sealedTransferAndLegacyClaimHaveExactlyOneWinner() async throws {
         let fixture = try MachineRetirementEscrowFixture()
         let escrow = fixture.escrow()
@@ -515,13 +747,14 @@ private struct MachineRetirementEscrowFixture {
         owner: LifecycleInteractiveWorkerRetirementObservation =
             .retiredOwnedResources,
         residue: LifecycleInvestigationResidueObservation? = nil,
-        appIdentity: LifecycleMachineProcessIdentityRecord? = nil
+        appIdentity: LifecycleMachineProcessIdentityRecord? = nil,
+        validBefore: Date? = nil
     ) throws -> LifecycleMachineRetirementHandle {
         try escrow.record(
             investigationID: investigationID,
             retireOperationID: retireOperationID,
             configurationSHA256: configurationSHA256,
-            validBefore: now.addingTimeInterval(30),
+            validBefore: validBefore ?? now.addingTimeInterval(30),
             appIdentity: appIdentity ?? appRecord,
             helperIdentity: helperRecord,
             userID: userID,
@@ -549,6 +782,16 @@ private struct MachineRetirementEscrowFixture {
             ]
         )
     }
+}
+
+private func storedLabels(in value: Any) -> Set<String> {
+    Set(Mirror(reflecting: value).children.compactMap(\.label))
+}
+
+private func storedInt64(named label: String, in value: Any) -> Int64? {
+    Mirror(reflecting: value).children.first { child in
+        child.label == label
+    }?.value as? Int64
 }
 
 private final class MutableMachineEscrowClock: @unchecked Sendable {

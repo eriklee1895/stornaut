@@ -46,8 +46,7 @@ private struct InvestigationMachineClaimServerProjection: Sendable {
                 lowercaseHex: transfer.configurationSHA256
             )
             validBefore = try InvestigationHandoffUTCMicroseconds(
-                timeIntervalSince1970:
-                    transfer.validBefore.timeIntervalSince1970
+                rawValue: transfer.validBeforeUTCMicroseconds
             )
             recordedAt = try InvestigationHandoffUTCMicroseconds(
                 timeIntervalSince1970:

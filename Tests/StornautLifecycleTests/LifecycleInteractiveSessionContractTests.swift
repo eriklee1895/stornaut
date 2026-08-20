@@ -102,6 +102,53 @@ struct LifecycleInteractiveSessionContractTests {
     }
 
     @Test
+    func retiredResponsePreservesExactV3RetirementHandleJSON() throws {
+        let fixture = LifecycleInteractiveSessionFixture()
+        let input = Date(
+            timeIntervalSince1970: 2_000_000_030.000_249_9
+        )
+        let expectedMicroseconds = Int64(
+            (input.timeIntervalSince1970 * 1_000_000).rounded(.down)
+        )
+        let handle = try LifecycleMachineRetirementHandle(
+            token: UUID(
+                uuidString: "93939393-9393-4393-8393-939393939393"
+            )!,
+            investigationID: fixture.investigationID,
+            retireOperationID: fixture.operationID,
+            configurationSHA256: fixture.configurationSHA256,
+            validBefore: input
+        )
+        let response = LifecycleInteractiveSessionResponse.retired(
+            investigationID: fixture.investigationID,
+            operationID: fixture.operationID,
+            drained: true,
+            ownerRetirementObservation: .retiredOwnedResources,
+            machineRetirementHandle: handle
+        )
+
+        let encoded = try JSONEncoder().encode(response)
+        let object = try #require(
+            JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+        )
+        let nested = try #require(
+            object["machineRetirementHandle"] as? [String: Any]
+        )
+        #expect(nested["protocolVersion"] as? Int == 3)
+        #expect(nested["validBefore"] == nil)
+        #expect(
+            (nested["validBeforeUTCMicroseconds"] as? NSNumber)?.int64Value
+                == expectedMicroseconds
+        )
+        #expect(
+            try JSONDecoder().decode(
+                LifecycleInteractiveSessionResponse.self,
+                from: encoded
+            ) == response
+        )
+    }
+
+    @Test
     func ownerRetirementObservationRejectsInconsistentWireFacts() throws {
         let fixture = LifecycleInteractiveSessionFixture()
         for observation in [

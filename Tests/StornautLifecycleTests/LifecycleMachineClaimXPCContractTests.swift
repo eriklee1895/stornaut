@@ -12,6 +12,30 @@ struct LifecycleMachineClaimXPCContractTests {
 
         #expect(encodedRequest.count <= 16 * 1_024)
         #expect(encodedResponse.count <= 32 * 1_024)
+        let requestObject = try #require(
+            JSONSerialization.jsonObject(with: encodedRequest)
+                as? [String: Any]
+        )
+        let requestHandle = try #require(
+            requestObject["handle"] as? [String: Any]
+        )
+        #expect(requestHandle["protocolVersion"] as? Int == 3)
+        #expect(requestHandle["validBefore"] == nil)
+        #expect(
+            (requestHandle["validBeforeUTCMicroseconds"] as? NSNumber)?
+                .int64Value == 2_000_000_030_000_000
+        )
+        let responseObject = try #require(
+            JSONSerialization.jsonObject(with: encodedResponse)
+                as? [String: Any]
+        )
+        let echoedRequest = try #require(
+            responseObject["request"] as? [String: Any]
+        )
+        #expect(
+            echoedRequest["handle"] as? NSDictionary
+                == requestHandle as NSDictionary
+        )
         #expect(
             try JSONDecoder().decode(
                 LifecycleMachineRetirementClaimRequest.self,

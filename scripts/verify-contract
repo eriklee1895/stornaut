@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=5d7ed1045dd4b57a60d0686f472b130250f1ee85ecdb7ca1ee0e706c597f9cdb
+ib2_self_sha=391af97dc2151bbeffcbea6a88bab7e30afaef0a4ae7043b3c2edcaeb62e0299
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -149,6 +149,22 @@ require_fixed_text scripts/verify-investigation-boundaries \
     '--claim-server-package-contract-only'
 require_fixed_text scripts/verify-investigation-boundaries \
     '--legacy-machine-claim-contract-only'
+require_fixed_text scripts/verify-investigation-boundaries \
+    '--retirement-handle-v3-contract-only'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'retirement handle protocol version drifted'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'retirement handle coding keys drifted'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'retirement escrow entry canonical deadline drifted'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'retirement reservation transfer canonical deadline drifted'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'claim server valid-before direct projection drifted'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'retirement handle v3 checkpoint paths drifted'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'retirement handle v3 checkpoint budget drifted'
 require_fixed_text scripts/verify-investigation-boundaries \
     'legacy machine claim concrete client remains'
 require_fixed_text scripts/verify-investigation-boundaries \
@@ -806,7 +822,7 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "dae5f988aead366919ee8726722e900a1f4b33c011163ee395828051c4543a7e",
+        "40344be79976ae9ec0721cfdbbe8f78309978505c4fb7b3382132a79c262a391",
     Path("scripts/verify-app-release-boundaries"):
         "4db61fb90277399d6088ac85c4f79553ce6a21b7aaa584d981b6abf8520c2b5c",
 }
@@ -1513,6 +1529,205 @@ require_deadline_state_mutation_rejected \
 require_deadline_state_mutation_rejected \
     deadline-public "$contract_root/deadline-public.swift" \
     "deadline state exposed public surface"
+
+retirement_handle_lifecycle=Sources/StornautLifecycle/LifecycleMachineRetirementEscrow.swift
+retirement_handle_adapter=Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerAdapter.swift
+retirement_handle_gate=scripts/verify-investigation-boundaries
+"$retirement_handle_gate" --retirement-handle-v3-contract-only \
+    "$retirement_handle_lifecycle" \
+    "$retirement_handle_adapter" \
+    >"$contract_root/retirement-handle-v3-canonical.log"
+function require_retirement_handle_v3_mutation_rejected() {
+    local fixture_name=$1
+    local lifecycle_fixture=$2
+    local adapter_fixture=$3
+    local expected_diagnostic=$4
+    local output="$contract_root/$fixture_name.log"
+    if "$retirement_handle_gate" \
+        --retirement-handle-v3-contract-only \
+        "$lifecycle_fixture" "$adapter_fixture" \
+        >"$output" 2>&1
+    then
+        fail_contract \
+            "Retirement handle v3 mutation was accepted: $fixture_name"
+    fi
+    require_fixed_text "$output" "$expected_diagnostic"
+}
+python3 - \
+    "$retirement_handle_lifecycle" \
+    "$retirement_handle_adapter" \
+    "$contract_root/retirement-handle-version.swift" \
+    "$contract_root/retirement-handle-hidden-date.swift" \
+    "$contract_root/retirement-handle-attributed-date.swift" \
+    "$contract_root/retirement-handle-setter-date.swift" \
+    "$contract_root/retirement-handle-date-codec.swift" \
+    "$contract_root/retirement-handle-entry-date.swift" \
+    "$contract_root/retirement-handle-transfer-date.swift" \
+    "$contract_root/retirement-handle-record-requantize.swift" \
+    "$contract_root/retirement-handle-server-requantize.swift" <<'PY'
+from pathlib import Path
+import sys
+
+(
+    lifecycle_path, adapter_path, version_path, hidden_date_path,
+    attributed_date_path, setter_date_path, date_codec_path,
+    entry_date_path, transfer_date_path, record_requantize_path,
+    server_requantize_path,
+) = map(Path, sys.argv[1:])
+lifecycle = lifecycle_path.read_text(encoding="utf-8")
+adapter = adapter_path.read_text(encoding="utf-8")
+
+
+def mutate_once(value, old, new, name):
+    if value.count(old) != 1:
+        raise SystemExit(
+            f"cannot construct retirement handle v3 mutation: {name}"
+        )
+    return value.replace(old, new, 1)
+
+
+version_path.write_text(
+    mutate_once(
+        lifecycle,
+        "    public static let protocolVersion = 3\n",
+        "    public static let protocolVersion = 2\n",
+        "protocol version",
+    ),
+    encoding="utf-8",
+)
+hidden_date_path.write_text(
+    mutate_once(
+        lifecycle,
+        "    public let validBeforeUTCMicroseconds: Int64\n",
+        "    public let validBeforeUTCMicroseconds: Int64\n"
+        "    private let legacyValidBefore: Date = .distantFuture\n",
+        "hidden Date storage",
+    ),
+    encoding="utf-8",
+)
+attributed_date_path.write_text(
+    mutate_once(
+        lifecycle,
+        "    public let validBeforeUTCMicroseconds: Int64\n",
+        "    public let validBeforeUTCMicroseconds: Int64\n"
+        "    @available(*, deprecated)\n"
+        "    private let legacyValidBefore: Date = .distantFuture\n",
+        "attributed hidden Date storage",
+    ),
+    encoding="utf-8",
+)
+setter_date_path.write_text(
+    mutate_once(
+        lifecycle,
+        "    public let validBeforeUTCMicroseconds: Int64\n",
+        "    public let validBeforeUTCMicroseconds: Int64\n"
+        "    private(set) var legacyValidBefore: Date = .distantFuture\n",
+        "setter-scoped hidden Date storage",
+    ),
+    encoding="utf-8",
+)
+date_codec_path.write_text(
+    mutate_once(
+        lifecycle,
+        "        case validBeforeUTCMicroseconds\n",
+        "        case validBefore\n",
+        "Date coding key",
+    ),
+    encoding="utf-8",
+)
+entry_date_path.write_text(
+    mutate_once(
+        lifecycle,
+        "        let validBeforeUTCMicroseconds: Int64\n\n"
+        "        var validBefore: Date {",
+        "        let validBefore: Date\n\n"
+        "        var projectedValidBefore: Date {",
+        "Entry Date storage",
+    ),
+    encoding="utf-8",
+)
+transfer_date_path.write_text(
+    mutate_once(
+        lifecycle,
+        "    package let validBeforeUTCMicroseconds: Int64\n\n"
+        "    package var validBefore: Date {",
+        "    package let validBefore: Date\n\n"
+        "    package var projectedValidBefore: Date {",
+        "transfer Date storage",
+    ),
+    encoding="utf-8",
+)
+record_requantize_path.write_text(
+    mutate_once(
+        lifecycle,
+        "                validBeforeUTCMicroseconds:\n"
+        "                    validBeforeUTCMicroseconds,\n",
+        "                validBeforeUTCMicroseconds:\n"
+        "                    try machineUTCMicroseconds(validBefore),\n",
+        "record second quantization",
+    ),
+    encoding="utf-8",
+)
+server_requantize_path.write_text(
+    mutate_once(
+        adapter,
+        "            validBefore = try InvestigationHandoffUTCMicroseconds(\n"
+        "                rawValue: transfer.validBeforeUTCMicroseconds\n"
+        "            )\n",
+        "            validBefore = try InvestigationHandoffUTCMicroseconds(\n"
+        "                timeIntervalSince1970:\n"
+        "                    transfer.validBefore.timeIntervalSince1970\n"
+        "            )\n",
+        "server Date requantization",
+    ),
+    encoding="utf-8",
+)
+PY
+require_retirement_handle_v3_mutation_rejected \
+    retirement-handle-version \
+    "$contract_root/retirement-handle-version.swift" \
+    "$retirement_handle_adapter" \
+    "retirement handle protocol version drifted"
+require_retirement_handle_v3_mutation_rejected \
+    retirement-handle-hidden-date \
+    "$contract_root/retirement-handle-hidden-date.swift" \
+    "$retirement_handle_adapter" \
+    "retirement handle canonical storage drifted"
+require_retirement_handle_v3_mutation_rejected \
+    retirement-handle-attributed-date \
+    "$contract_root/retirement-handle-attributed-date.swift" \
+    "$retirement_handle_adapter" \
+    "retirement handle canonical storage drifted"
+require_retirement_handle_v3_mutation_rejected \
+    retirement-handle-setter-date \
+    "$contract_root/retirement-handle-setter-date.swift" \
+    "$retirement_handle_adapter" \
+    "retirement handle canonical storage drifted"
+require_retirement_handle_v3_mutation_rejected \
+    retirement-handle-date-codec \
+    "$contract_root/retirement-handle-date-codec.swift" \
+    "$retirement_handle_adapter" \
+    "retirement handle coding keys drifted"
+require_retirement_handle_v3_mutation_rejected \
+    retirement-handle-entry-date \
+    "$contract_root/retirement-handle-entry-date.swift" \
+    "$retirement_handle_adapter" \
+    "retirement escrow entry canonical deadline drifted"
+require_retirement_handle_v3_mutation_rejected \
+    retirement-handle-transfer-date \
+    "$contract_root/retirement-handle-transfer-date.swift" \
+    "$retirement_handle_adapter" \
+    "retirement reservation transfer canonical deadline drifted"
+require_retirement_handle_v3_mutation_rejected \
+    retirement-handle-record-requantize \
+    "$contract_root/retirement-handle-record-requantize.swift" \
+    "$retirement_handle_adapter" \
+    "retirement escrow single quantization drifted"
+require_retirement_handle_v3_mutation_rejected \
+    retirement-handle-server-requantize \
+    "$retirement_handle_lifecycle" \
+    "$contract_root/retirement-handle-server-requantize.swift" \
+    "claim server valid-before direct projection drifted"
 
 claim_server_adapter=Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerAdapter.swift
 claim_server_effects=Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerEffects.swift

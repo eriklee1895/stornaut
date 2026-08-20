@@ -21,6 +21,9 @@ legacy_machine_claim_lifecycle_source=
 legacy_machine_claim_helper_source=
 legacy_machine_claim_host_source=
 legacy_machine_claim_source=
+retirement_handle_v3_contract_only=false
+retirement_handle_v3_lifecycle_source=
+retirement_handle_v3_adapter_source=
 if (( $# > 0 )); then
     if (( $# == 2 )) && [[ $1 == --claim-asid-contract-only ]]; then
         claim_asid_contract_only=true
@@ -44,12 +47,339 @@ if (( $# > 0 )); then
         legacy_machine_claim_helper_source=$3
         legacy_machine_claim_host_source=$4
         legacy_machine_claim_source=$5
+    elif (( $# == 3 )) \
+        && [[ $1 == --retirement-handle-v3-contract-only ]]; then
+        retirement_handle_v3_contract_only=true
+        retirement_handle_v3_lifecycle_source=$2
+        retirement_handle_v3_adapter_source=$3
     else
         print -u2 \
-            "Usage: scripts/verify-investigation-boundaries [--claim-asid-contract-only <source> | --deadline-state-contract-only <source> | --claim-server-contract-only <adapter> <effects> <deadline-state> | --claim-server-package-contract-only <describe-json> <dump-json> | --legacy-machine-claim-contract-only <lifecycle-xpc> <helper> <machine-host> <machine-claim>]"
+            "Usage: scripts/verify-investigation-boundaries [--claim-asid-contract-only <source> | --deadline-state-contract-only <source> | --claim-server-contract-only <adapter> <effects> <deadline-state> | --claim-server-package-contract-only <describe-json> <dump-json> | --legacy-machine-claim-contract-only <lifecycle-xpc> <helper> <machine-host> <machine-claim> | --retirement-handle-v3-contract-only <lifecycle> <adapter>]"
         exit 64
     fi
 fi
+
+function verify_retirement_handle_v3_contract() {
+    local lifecycle_source=$1
+    local adapter_source=$2
+    python3 - "$lifecycle_source" "$adapter_source" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+
+def code_only(source, label):
+    output = list(source)
+    index = 0
+    block_depth = 0
+    delimiter = None
+    while index < len(source):
+        if block_depth:
+            if source.startswith("/*", index):
+                output[index:index + 2] = "  "
+                block_depth += 1
+                index += 2
+            elif source.startswith("*/", index):
+                output[index:index + 2] = "  "
+                block_depth -= 1
+                index += 2
+            else:
+                if source[index] != "\n":
+                    output[index] = " "
+                index += 1
+            continue
+        if delimiter is not None:
+            if source.startswith(delimiter, index):
+                width = len(delimiter)
+                output[index:index + width] = " " * width
+                delimiter = None
+                index += width
+            elif delimiter == '"' and source[index] == "\\":
+                output[index] = " "
+                if index + 1 < len(source):
+                    output[index + 1] = " "
+                index += 2
+            else:
+                if source[index] != "\n":
+                    output[index] = " "
+                index += 1
+            continue
+        if source.startswith("//", index):
+            end = source.find("\n", index)
+            end = len(source) if end < 0 else end
+            output[index:end] = " " * (end - index)
+            index = end
+        elif source.startswith("/*", index):
+            output[index:index + 2] = "  "
+            block_depth = 1
+            index += 2
+        elif source.startswith('"""', index):
+            output[index:index + 3] = "   "
+            delimiter = '"""'
+            index += 3
+        elif source[index] == '"':
+            output[index] = " "
+            delimiter = '"'
+            index += 1
+        else:
+            index += 1
+    if block_depth or delimiter is not None:
+        raise SystemExit(
+            f"retirement handle {label} has unterminated text"
+        )
+    return "".join(output)
+
+
+def declaration(source, pattern, label):
+    match = re.search(pattern, source, re.MULTILINE)
+    if match is None:
+        raise SystemExit(f"retirement handle {label} missing")
+    opening = source.find("{", match.end())
+    if opening < 0:
+        raise SystemExit(f"retirement handle {label} has no body")
+    depth = 0
+    for index in range(opening, len(source)):
+        if source[index] == "{":
+            depth += 1
+        elif source[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return source[match.start():index + 1]
+    raise SystemExit(f"retirement handle {label} is unterminated")
+
+
+def compact(source):
+    return re.sub(r"\s+", "", source)
+
+
+lifecycle_path, adapter_path = map(Path, sys.argv[1:])
+lifecycle = code_only(
+    lifecycle_path.read_text(encoding="utf-8"), "Lifecycle source"
+)
+adapter = code_only(
+    adapter_path.read_text(encoding="utf-8"), "server adapter"
+)
+handle = declaration(
+    lifecycle,
+    r"^public\s+struct\s+LifecycleMachineRetirementHandle\s*:",
+    "v3 declaration",
+)
+if not re.search(
+    r"public\s+static\s+let\s+protocolVersion\s*=\s*3\b",
+    handle,
+):
+    raise SystemExit("retirement handle protocol version drifted")
+top_level_property_lines = []
+depth = 0
+property_keyword = re.compile(r"(?<![A-Za-z0-9_])(?:let|var)(?![A-Za-z0-9_])")
+for line in handle.splitlines():
+    stripped = line.strip()
+    if depth == 1 and stripped.startswith("@"):
+        raise SystemExit(
+            "retirement handle canonical storage drifted: "
+            f"top-level attribute {stripped!r}"
+        )
+    if depth == 1 and property_keyword.search(stripped):
+        top_level_property_lines.append(re.sub(r"\s+", "", stripped))
+    depth += line.count("{") - line.count("}")
+expected_property_lines = [
+    "publicstaticletprotocolVersion=3",
+    "publiclettoken:UUID",
+    "publicletinvestigationID:LifecycleInvestigationID",
+    "publicletretireOperationID:UUID",
+    "publicletconfigurationSHA256:String",
+    "publicletvalidBeforeUTCMicroseconds:Int64",
+    "publicvarvalidBefore:Date{",
+]
+if top_level_property_lines != expected_property_lines:
+    raise SystemExit(
+        "retirement handle canonical storage drifted: "
+        f"{top_level_property_lines!r}"
+    )
+projection = declaration(
+    handle, r"public\s+var\s+validBefore\s*:\s*Date",
+    "computed Date projection",
+)
+if "TimeInterval(validBeforeUTCMicroseconds)/1_000_000" not in compact(
+    projection
+):
+    raise SystemExit("retirement handle Date projection drifted")
+coding_keys = declaration(
+    handle, r"private\s+enum\s+CodingKeys\s*:", "CodingKeys"
+)
+observed_keys = re.findall(r"(?m)^\s*case\s+(\w+)\s*$", coding_keys)
+expected_keys = [
+    "protocolVersion",
+    "token",
+    "investigationID",
+    "retireOperationID",
+    "configurationSHA256",
+    "validBeforeUTCMicroseconds",
+]
+if observed_keys != expected_keys:
+    raise SystemExit(
+        f"retirement handle coding keys drifted: {observed_keys!r}"
+    )
+decoder = declaration(
+    handle, r"public\s+init\s*\(\s*from\s+decoder", "decoder"
+)
+decoder_compact = compact(decoder)
+if (
+    "container.decode(Int64.self,forKey:.init(CodingKeys."
+    "validBeforeUTCMicroseconds.rawValue))" not in decoder_compact
+    or "container.decode(Date.self" in decoder_compact
+):
+    raise SystemExit("retirement handle integer decoder drifted")
+if r"machineStrictContainer(decoder,keys:Set(CodingKeys.allCases.map(\.rawValue)))" \
+        not in decoder_compact:
+    raise SystemExit("retirement handle strict decoder drifted")
+encoder = declaration(
+    handle, r"public\s+func\s+encode\s*\(", "encoder"
+)
+encoder_compact = compact(encoder)
+if (
+    "container.encode(validBeforeUTCMicroseconds,forKey:.init("
+    "CodingKeys.validBeforeUTCMicroseconds.rawValue))" not in encoder_compact
+    or re.search(
+        r"container\.encode\(validBefore(?!UTCMicroseconds)",
+        encoder_compact,
+    )
+):
+    raise SystemExit("retirement handle integer encoder drifted")
+date_initializer = declaration(
+    handle, r"public\s+init\s*\(\s*token\s*:",
+    "Date initializer",
+)
+if compact(date_initializer).count(
+    "machineUTCMicroseconds(validBefore)"
+) != 1:
+    raise SystemExit("retirement handle Date quantization drifted")
+integer_initializer = declaration(
+    handle, r"fileprivate\s+init\s*\(\s*token\s*:",
+    "integer initializer",
+)
+if (
+    "validBeforeUTCMicroseconds>0" not in compact(integer_initializer)
+    or "self.validBeforeUTCMicroseconds=validBeforeUTCMicroseconds"
+        not in compact(integer_initializer)
+):
+    raise SystemExit("retirement handle integer initializer drifted")
+
+quantizer = declaration(
+    lifecycle, r"^private\s+func\s+machineUTCMicroseconds\s*\(",
+    "Date quantizer",
+)
+quantizer_compact = compact(quantizer)
+for marker in (
+    "seconds.isFinite",
+    "seconds>0",
+    "scaled.isFinite",
+    "scaled>=1",
+    "scaled<Double(Int64.max)",
+    "Int64(scaled.rounded(.down))",
+):
+    if marker not in quantizer_compact:
+        raise SystemExit(
+            f"retirement handle checked quantizer drifted: {marker}"
+        )
+
+transfer = declaration(
+    lifecycle,
+    r"^package\s+struct\s+LifecycleMachineRetirementReservationTransfer",
+    "reservation transfer",
+)
+if not re.search(
+    r"(?m)^\s*package\s+let\s+validBeforeUTCMicroseconds"
+    r"\s*:\s*Int64\s*$",
+    transfer,
+) or re.search(
+    r"(?m)^\s*package\s+let\s+validBefore\s*:\s*Date\s*$",
+    transfer,
+):
+    raise SystemExit(
+        "retirement reservation transfer canonical deadline drifted"
+    )
+transfer_initializer = declaration(
+    transfer, r"init\s*\(\s*tokenSHA256\s*:",
+    "reservation transfer initializer",
+)
+if (
+    "validBeforeUTCMicroseconds:Int64"
+        not in compact(transfer_initializer)
+    or "self.validBeforeUTCMicroseconds=validBeforeUTCMicroseconds"
+        not in compact(transfer_initializer)
+):
+    raise SystemExit(
+        "retirement reservation transfer initializer drifted"
+    )
+escrow = declaration(
+    lifecycle,
+    r"^public\s+final\s+class\s+LifecycleMachineRetirementEscrow",
+    "escrow owner",
+)
+entry = declaration(escrow, r"fileprivate\s+struct\s+Entry", "Entry")
+if not re.search(
+    r"(?m)^\s*let\s+validBeforeUTCMicroseconds\s*:\s*Int64\s*$",
+    entry,
+) or re.search(
+    r"(?m)^\s*let\s+validBefore\s*:\s*Date\s*$", entry
+):
+    raise SystemExit(
+        "retirement escrow entry canonical deadline drifted"
+    )
+transfer_method = declaration(
+    escrow, r"package\s+func\s+transferReservation\s*\(",
+    "one-shot transfer",
+)
+transfer_compact = compact(transfer_method)
+if (
+    "validBeforeUTCMicroseconds:entry.validBeforeUTCMicroseconds"
+        not in transfer_compact
+    or "validBefore:entry.validBefore" in transfer_compact
+):
+    raise SystemExit("retirement escrow transfer deadline drifted")
+record = declaration(
+    escrow, r"public\s+func\s+record\s*\(", "record"
+)
+record_compact = compact(record)
+if (
+    record_compact.count("machineUTCMicroseconds(validBefore)") != 1
+    or record_compact.count(
+        "validBeforeUTCMicroseconds:validBeforeUTCMicroseconds"
+    ) != 2
+):
+    raise SystemExit("retirement escrow single quantization drifted")
+claim = declaration(
+    escrow, r"private\s+func\s+claimLocked\s*\(", "legacy claim"
+)
+claim_compact = compact(claim)
+if (
+    "request.handle.validBeforeUTCMicroseconds=="
+    "entry.validBeforeUTCMicroseconds" not in claim_compact
+    or "request.handle.validBefore==entry.validBefore" in claim_compact
+):
+    raise SystemExit("retirement legacy claim integer binding drifted")
+
+server_projection = declaration(
+    adapter,
+    r"private\s+struct\s+InvestigationMachineClaimServerProjection",
+    "server projection",
+)
+server_initializer = declaration(
+    server_projection, r"init\s*\(\s*transfer\s*:",
+    "server projection initializer",
+)
+server_compact = compact(server_initializer)
+if (
+    "validBefore=tryInvestigationHandoffUTCMicroseconds("
+    "rawValue:transfer.validBeforeUTCMicroseconds)" not in server_compact
+    or re.search(r"transfer\.validBefore\b", server_initializer)
+):
+    raise SystemExit(
+        "claim server valid-before direct projection drifted"
+    )
+PY
+}
 
 function verify_legacy_machine_claim_contract() {
     local lifecycle_source=$1
@@ -1180,6 +1510,123 @@ if changed_lines > 3_000:
 PY
 }
 
+function verify_retirement_handle_v3_scope() {
+    python3 - <<'PY'
+from pathlib import Path
+import subprocess
+
+semantic_baseline = "b375fe4030fd99af7c3762b43782275365419ffa"
+implementation_base = "e351054a14f1448f41cf0a1d56155cdc91a85153"
+implementation_base_tree = "7c918ee7e1c685187859315d1ded9b3ccca6bcd0"
+expected_bridge_paths = {
+    "AGENTS.md",
+    "docs/README.md",
+    "docs/adr/0018-parent-owned-investigation-handoff.md",
+    "docs/adr/README.md",
+    "docs/agent/coding-agent-handoff.md",
+    "docs/plans/active/README.md",
+    "docs/plans/active/phase-d-conditional-deep-dive.md",
+    "docs/plans/active/task-39-implementation-brief.md",
+    "docs/plans/roadmap.md",
+    "docs/reports/README.md",
+    "docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-split-preflight.md",
+    "docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-server-integration-preflight.md",
+}
+if subprocess.check_output(
+    ["git", "show", "-s", "--format=%P", implementation_base],
+    text=True,
+).strip() != semantic_baseline:
+    raise SystemExit("retirement handle v3 docs bridge parent drifted")
+if subprocess.check_output(
+    ["git", "show", "-s", "--format=%T", implementation_base],
+    text=True,
+).strip() != implementation_base_tree:
+    raise SystemExit("retirement handle v3 docs bridge tree drifted")
+bridge_paths = set(subprocess.check_output(
+    ["git", "diff-tree", "--no-commit-id", "--name-only",
+     "-r", implementation_base],
+    text=True,
+).splitlines())
+if bridge_paths != expected_bridge_paths:
+    raise SystemExit(
+        f"retirement handle v3 docs bridge paths drifted: {sorted(bridge_paths)}"
+    )
+
+expected = {
+    "Sources/StornautLifecycle/LifecycleMachineRetirementEscrow.swift",
+    "Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerAdapter.swift",
+    "Tests/StornautLifecycleTests/LifecycleMachineRetirementEscrowTests.swift",
+    "Tests/StornautLifecycleTests/LifecycleMachineClaimXPCContractTests.swift",
+    "Tests/StornautLifecycleTests/LifecycleInteractiveSessionContractTests.swift",
+    "Tests/StornautInvestigationTests/InvestigationLifecycleAppServerTransportTests.swift",
+    "Tests/StornautInvestigationTests/InvestigationMachineClaimServerAdapterTests.swift",
+    "Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift",
+    "scripts/verify-investigation-boundaries",
+    "scripts/verify-contract",
+}
+descendants = subprocess.check_output(
+    ["git", "rev-list", "--ancestry-path", "--reverse",
+     f"{implementation_base}..HEAD"],
+    text=True,
+).splitlines()
+if descendants:
+    checkpoint = descendants[0]
+    parent = subprocess.check_output(
+        ["git", "show", "-s", "--format=%P", checkpoint],
+        text=True,
+    ).strip()
+    if parent != implementation_base:
+        raise SystemExit(
+            "retirement handle v3 checkpoint is not the direct base child"
+        )
+    diff_command = [
+        "git", "diff", "--numstat", implementation_base, checkpoint, "--",
+    ]
+    name_command = [
+        "git", "diff", "--name-only", implementation_base, checkpoint, "--",
+    ]
+    untracked = set()
+else:
+    diff_command = [
+        "git", "diff", "--numstat", implementation_base, "--",
+    ]
+    name_command = [
+        "git", "diff", "--name-only", implementation_base, "--",
+    ]
+    untracked = set(subprocess.check_output(
+        ["git", "ls-files", "--others", "--exclude-standard"],
+        text=True,
+    ).splitlines())
+paths = set(subprocess.check_output(name_command, text=True).splitlines()) | untracked
+non_document = {path for path in paths if not path.startswith("docs/")}
+if non_document != expected:
+    raise SystemExit(
+        "retirement handle v3 checkpoint paths drifted: "
+        f"{sorted(non_document)}"
+    )
+changed_lines = 0
+counted = set()
+for row in subprocess.check_output(diff_command, text=True).splitlines():
+    added, deleted, path = row.split("\t")
+    if path in expected and added != "-" and deleted != "-":
+        changed_lines += int(added) + int(deleted)
+        counted.add(path)
+for path in expected & untracked:
+    changed_lines += len(Path(path).read_text(encoding="utf-8").splitlines())
+    counted.add(path)
+if counted != expected:
+    raise SystemExit(
+        "retirement handle v3 checkpoint numstat drifted: "
+        f"{sorted(counted)}"
+    )
+if changed_lines > 1_800:
+    raise SystemExit(
+        f"retirement handle v3 checkpoint budget drifted: "
+        f"{changed_lines} > 1800"
+    )
+PY
+}
+
 function verify_claim_server_package_contract() {
     local describe_json=$1
     local dump_json=$2
@@ -1269,6 +1716,13 @@ if $legacy_machine_claim_contract_only; then
         "$legacy_machine_claim_host_source" \
         "$legacy_machine_claim_source"
     print "Legacy machine claim quarantine contract verification passed."
+    exit 0
+fi
+if $retirement_handle_v3_contract_only; then
+    verify_retirement_handle_v3_contract \
+        "$retirement_handle_v3_lifecycle_source" \
+        "$retirement_handle_v3_adapter_source"
+    print "Retirement handle v3 contract verification passed."
     exit 0
 fi
 
@@ -2953,8 +3407,12 @@ verify_claim_server_contract \
     Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerAdapter.swift \
     Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerEffects.swift \
     Sources/StornautLifecycle/LifecycleMachineRetirementEscrowDeadlineState.swift
+verify_retirement_handle_v3_contract \
+    Sources/StornautLifecycle/LifecycleMachineRetirementEscrow.swift \
+    Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerAdapter.swift
 verify_claim_server_scope
 verify_legacy_machine_claim_scope
+verify_retirement_handle_v3_scope
 
 package_graph=$(swift package describe --type json)
 package_manifest=$(swift package dump-package)

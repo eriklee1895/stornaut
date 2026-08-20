@@ -164,12 +164,19 @@ public struct LifecycleMachineRetirementHandle:
     Sendable,
     Equatable
 {
-    public static let protocolVersion = 2
+    public static let protocolVersion = 3
     public let token: UUID
     public let investigationID: LifecycleInvestigationID
     public let retireOperationID: UUID
     public let configurationSHA256: String
-    public let validBefore: Date
+    public let validBeforeUTCMicroseconds: Int64
+
+    public var validBefore: Date {
+        Date(
+            timeIntervalSince1970:
+                TimeInterval(validBeforeUTCMicroseconds) / 1_000_000
+        )
+    }
 
     public init(
         token: UUID,
@@ -178,17 +185,39 @@ public struct LifecycleMachineRetirementHandle:
         configurationSHA256: String,
         validBefore: Date
     ) throws {
+        let validBeforeUTCMicroseconds = try machineUTCMicroseconds(
+            validBefore
+        )
         guard
             !token.machineIsZero,
             !retireOperationID.machineIsZero,
-            machineValidSHA256(configurationSHA256),
-            validBefore.timeIntervalSince1970.isFinite
+            machineValidSHA256(configurationSHA256)
         else { throw LifecycleMachineRetirementEscrowError.invalidRequest }
         self.token = token
         self.investigationID = investigationID
         self.retireOperationID = retireOperationID
         self.configurationSHA256 = configurationSHA256
-        self.validBefore = validBefore
+        self.validBeforeUTCMicroseconds = validBeforeUTCMicroseconds
+    }
+
+    fileprivate init(
+        token: UUID,
+        investigationID: LifecycleInvestigationID,
+        retireOperationID: UUID,
+        configurationSHA256: String,
+        validBeforeUTCMicroseconds: Int64
+    ) throws {
+        guard
+            !token.machineIsZero,
+            !retireOperationID.machineIsZero,
+            machineValidSHA256(configurationSHA256),
+            validBeforeUTCMicroseconds > 0
+        else { throw LifecycleMachineRetirementEscrowError.invalidRequest }
+        self.token = token
+        self.investigationID = investigationID
+        self.retireOperationID = retireOperationID
+        self.configurationSHA256 = configurationSHA256
+        self.validBeforeUTCMicroseconds = validBeforeUTCMicroseconds
     }
 
     public init(from decoder: Decoder) throws {
@@ -215,7 +244,12 @@ public struct LifecycleMachineRetirementHandle:
                     String.self,
                     forKey: .init(CodingKeys.configurationSHA256.rawValue)
                 ),
-                validBefore: container.decode(Date.self, forKey: .init(CodingKeys.validBefore.rawValue))
+                validBeforeUTCMicroseconds: container.decode(
+                    Int64.self,
+                    forKey: .init(
+                        CodingKeys.validBeforeUTCMicroseconds.rawValue
+                    )
+                )
             )
         } catch {
             throw DecodingError.dataCorruptedError(
@@ -239,7 +273,12 @@ public struct LifecycleMachineRetirementHandle:
             configurationSHA256,
             forKey: .init(CodingKeys.configurationSHA256.rawValue)
         )
-        try container.encode(validBefore, forKey: .init(CodingKeys.validBefore.rawValue))
+        try container.encode(
+            validBeforeUTCMicroseconds,
+            forKey: .init(
+                CodingKeys.validBeforeUTCMicroseconds.rawValue
+            )
+        )
     }
 
     private enum CodingKeys: String, CodingKey, CaseIterable {
@@ -248,7 +287,7 @@ public struct LifecycleMachineRetirementHandle:
         case investigationID
         case retireOperationID
         case configurationSHA256
-        case validBefore
+        case validBeforeUTCMicroseconds
     }
 }
 
@@ -260,7 +299,14 @@ package struct LifecycleMachineRetirementReservationTransfer:
     package let investigationID: LifecycleInvestigationID
     package let retireOperationID: UUID
     package let configurationSHA256: String
-    package let validBefore: Date
+    package let validBeforeUTCMicroseconds: Int64
+
+    package var validBefore: Date {
+        Date(
+            timeIntervalSince1970:
+                TimeInterval(validBeforeUTCMicroseconds) / 1_000_000
+        )
+    }
     package let appIdentity: LifecycleMachineProcessIdentityRecord
     package let helperIdentity: LifecycleMachineProcessIdentityRecord
     package let userID: UInt32
@@ -274,7 +320,7 @@ package struct LifecycleMachineRetirementReservationTransfer:
         investigationID: LifecycleInvestigationID,
         retireOperationID: UUID,
         configurationSHA256: String,
-        validBefore: Date,
+        validBeforeUTCMicroseconds: Int64,
         appIdentity: LifecycleMachineProcessIdentityRecord,
         helperIdentity: LifecycleMachineProcessIdentityRecord,
         userID: UInt32,
@@ -287,7 +333,8 @@ package struct LifecycleMachineRetirementReservationTransfer:
         self.investigationID = investigationID
         self.retireOperationID = retireOperationID
         self.configurationSHA256 = configurationSHA256
-        self.validBefore = validBefore
+        precondition(validBeforeUTCMicroseconds > 0)
+        self.validBeforeUTCMicroseconds = validBeforeUTCMicroseconds
         self.appIdentity = appIdentity
         self.helperIdentity = helperIdentity
         self.userID = userID
@@ -529,7 +576,14 @@ public final class LifecycleMachineRetirementEscrow: @unchecked Sendable {
         let investigationID: LifecycleInvestigationID
         let retireOperationID: UUID
         let configurationSHA256: String
-        let validBefore: Date
+        let validBeforeUTCMicroseconds: Int64
+
+        var validBefore: Date {
+            Date(
+                timeIntervalSince1970:
+                    TimeInterval(validBeforeUTCMicroseconds) / 1_000_000
+            )
+        }
         let appIdentity: LifecycleMachineProcessIdentityRecord
         let helperIdentity: LifecycleMachineProcessIdentityRecord
         let userID: UInt32
@@ -594,7 +648,8 @@ public final class LifecycleMachineRetirementEscrow: @unchecked Sendable {
                 investigationID: entry.investigationID,
                 retireOperationID: entry.retireOperationID,
                 configurationSHA256: entry.configurationSHA256,
-                validBefore: entry.validBefore,
+                validBeforeUTCMicroseconds:
+                    entry.validBeforeUTCMicroseconds,
                 appIdentity: entry.appIdentity,
                 helperIdentity: entry.helperIdentity,
                 userID: entry.userID,
@@ -623,10 +678,22 @@ public final class LifecycleMachineRetirementEscrow: @unchecked Sendable {
                 throw LifecycleMachineRetirementEscrowError.alreadyRecorded
             }
             let recordedAt = now()
+            let validBeforeUTCMicroseconds: Int64
+            do {
+                validBeforeUTCMicroseconds = try machineUTCMicroseconds(
+                    validBefore
+                )
+            } catch {
+                throw LifecycleMachineRetirementEscrowError.invalidRecord
+            }
+            let canonicalValidBefore = Date(
+                timeIntervalSince1970:
+                    TimeInterval(validBeforeUTCMicroseconds) / 1_000_000
+            )
             guard
                 recordedAt.timeIntervalSince1970.isFinite,
-                validBefore > recordedAt,
-                validBefore.timeIntervalSince(recordedAt) <= 60,
+                canonicalValidBefore > recordedAt,
+                canonicalValidBefore.timeIntervalSince(recordedAt) <= 60,
                 machineValidSHA256(configurationSHA256),
                 userID > 0,
                 appIdentity.effectiveUserID == userID,
@@ -645,14 +712,16 @@ public final class LifecycleMachineRetirementEscrow: @unchecked Sendable {
                 investigationID: investigationID,
                 retireOperationID: retireOperationID,
                 configurationSHA256: configurationSHA256,
-                validBefore: validBefore
+                validBeforeUTCMicroseconds:
+                    validBeforeUTCMicroseconds
             )
             state = .recorded(Entry(
                 tokenSHA256: machineTokenSHA256(handle.token),
                 investigationID: investigationID,
                 retireOperationID: retireOperationID,
                 configurationSHA256: configurationSHA256,
-                validBefore: validBefore,
+                validBeforeUTCMicroseconds:
+                    validBeforeUTCMicroseconds,
                 appIdentity: appIdentity,
                 helperIdentity: helperIdentity,
                 userID: userID,
@@ -728,7 +797,8 @@ public final class LifecycleMachineRetirementEscrow: @unchecked Sendable {
             request.handle.retireOperationID == entry.retireOperationID,
             request.handle.configurationSHA256
                 == entry.configurationSHA256,
-            request.handle.validBefore == entry.validBefore,
+            request.handle.validBeforeUTCMicroseconds
+                == entry.validBeforeUTCMicroseconds,
             machineTokenSHA256(request.handle.token)
                 == entry.tokenSHA256
         else {
@@ -755,6 +825,22 @@ private func machineValidSHA256(_ value: String) -> Bool {
             (0x30...0x39).contains($0.value)
                 || (0x61...0x66).contains($0.value)
         }
+}
+
+private func machineUTCMicroseconds(_ value: Date) throws -> Int64 {
+    let seconds = value.timeIntervalSince1970
+    guard seconds.isFinite, seconds > 0 else {
+        throw LifecycleMachineRetirementEscrowError.invalidRequest
+    }
+    let scaled = seconds * 1_000_000
+    guard
+        scaled.isFinite,
+        scaled >= 1,
+        scaled < Double(Int64.max)
+    else {
+        throw LifecycleMachineRetirementEscrowError.invalidRequest
+    }
+    return Int64(scaled.rounded(.down))
 }
 
 private struct MachineCodingKey: CodingKey, Hashable {

@@ -386,6 +386,19 @@ struct InvestigationLifecycleAppServerTransportTests {
             evidence.machineRetirementHandle.retireOperationID
                 == fixture.operationIDs[0]
         )
+        let handleJSON = try #require(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(
+                    evidence.machineRetirementHandle
+                )
+            ) as? [String: Any]
+        )
+        #expect(handleJSON["protocolVersion"] as? Int == 3)
+        #expect(handleJSON["validBefore"] == nil)
+        #expect(
+            (handleJSON["validBeforeUTCMicroseconds"] as? NSNumber)?
+                .int64Value == 1_900_000_120_000_000
+        )
         #expect(evidence.residueObservation == residue)
         #expect(evidence.helperProcessIdentity == helperIdentity)
         #expect(

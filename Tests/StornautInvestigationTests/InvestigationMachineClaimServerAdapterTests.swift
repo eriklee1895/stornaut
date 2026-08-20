@@ -50,6 +50,38 @@ struct InvestigationMachineClaimServerAdapterTests {
     }
 
     @Test
+    func serverConsumesTheCanonicalTransferMicrosecondsWithoutReprojection()
+        throws
+    {
+        let canonicalValidBefore: Int64 = 1_098_290_087_000_249
+        let lossyDate = Date(
+            timeIntervalSince1970:
+                TimeInterval(canonicalValidBefore) / 1_000_000
+        )
+        let reprojected = Int64(
+            (lossyDate.timeIntervalSince1970 * 1_000_000).rounded(.down)
+        )
+        #expect(reprojected == canonicalValidBefore - 1)
+        let fixture = ClaimServerFixture(
+            baseWall: canonicalValidBefore - 30_000_000
+        )
+        let transfer = try fixture.transfer(
+            validBeforeUTCMicroseconds: canonicalValidBefore,
+            recordedAtUTCMicroseconds: fixture.baseWall + 500_000,
+            ownerRetirementObservation: .retiredOwnedResources,
+            residueObservation: fixture.residueObservation()
+        )
+        let runtime = try fixture.runtime(transfer: transfer)
+        let request = try fixture.request(
+            handleValidBeforeUTCMicroseconds: canonicalValidBefore
+        )
+
+        _ = try runtime.adapter.claim(try request.encoded())
+
+        #expect(runtime.state.phase == .claimedAwaitingRelease)
+    }
+
+    @Test
     func helperAndRequestDigestsAreIndependentlyRecomputed() async throws {
         let fixture = ClaimServerFixture()
         let runtime = try fixture.runtime()
@@ -868,7 +900,7 @@ private struct ClaimServerFixture {
     let configDigest = try! InvestigationHandoffSHA256(
         rawBytes: Data(repeating: 0x13, count: 32)
     )
-    let baseWall: Int64 = 2_000_000_000_000_000
+    let baseWall: Int64
     let helperASID: UInt32 = 9
     let releaseDeadline: UInt64 = 7_000_000_000
     let postReplyDeadline: UInt64 = 8_000_000_000
@@ -877,6 +909,10 @@ private struct ClaimServerFixture {
     let reservationID = UUID(
         uuidString: "30303030-3030-4030-8030-303030303030"
     )!
+
+    init(baseWall: Int64 = 2_000_000_000_000_000) {
+        self.baseWall = baseWall
+    }
 
     func runtime(
         observations: [LifecycleMachineRetirementDeadlineObservation]? = nil,
@@ -961,6 +997,7 @@ private struct ClaimServerFixture {
     }
 
     func transfer(
+        validBeforeUTCMicroseconds: Int64? = nil,
         recordedAtUTCMicroseconds: Int64? = nil,
         ownerRetirementObservation:
             LifecycleInteractiveWorkerRetirementObservation,
@@ -971,10 +1008,8 @@ private struct ClaimServerFixture {
             investigationID: LifecycleInvestigationID(rawValue: investigation),
             retireOperationID: retireOperation,
             configurationSHA256: String(repeating: "13", count: 32),
-            validBefore: Date(
-                timeIntervalSince1970:
-                    TimeInterval(baseWall + 30_000_000) / 1_000_000
-            ),
+            validBeforeUTCMicroseconds:
+                validBeforeUTCMicroseconds ?? baseWall + 30_000_000,
             appIdentity: try lifecycleIdentity(role: .app),
             helperIdentity: try lifecycleIdentity(role: .helper),
             userID: 501,
@@ -1019,7 +1054,8 @@ private struct ClaimServerFixture {
 
     func request(
         token: UUID? = nil,
-        drift: ClaimDrift? = nil
+        drift: ClaimDrift? = nil,
+        handleValidBeforeUTCMicroseconds: Int64? = nil
     ) throws
         -> InvestigationMachineRetirementClaimRequest
     {
@@ -1035,7 +1071,9 @@ private struct ClaimServerFixture {
                         rawBytes: Data(repeating: 0x55, count: 32)
                     ) : configDigest,
                 validBefore: InvestigationHandoffUTCMicroseconds(
-                    rawValue: baseWall + 30_000_000
+                    rawValue:
+                        handleValidBeforeUTCMicroseconds
+                        ?? baseWall + 30_000_000
                         + (drift == .validBefore ? 1 : 0)
                 )
             ),
