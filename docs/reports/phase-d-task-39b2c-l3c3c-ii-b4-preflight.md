@@ -28,8 +28,10 @@ epoch, release challenge or deadline from a caller. Compile-time constants bind:
 - helper `/Library/Application Support/Stornaut/Stornaut-R5-Diagnostic.app/Contents/MacOS/StornautLifecycleHelper`; and
 - helper signing identifier `com.eriklee.stornaut.lifecycle.helper`.
 
-The driver supplies only the already-validated typed claim request. DriverSupport
-generates the connection epoch and release challenge, performs the XPC calls,
+ii-b5 supplies only the already-validated typed retirement handle, exact App
+identity, shared outer-epoch deadline and explicit previous-helper identity.
+DriverSupport constructs the claim request, generates the connection epoch and
+release challenge, performs the XPC calls,
 returns the opaque typed claim evidence with one retained claimed-session token,
 and later accepts only that token to release. ii-b5 inserts installed-L2 between
 those two package calls but receives no transport-selection authority.
@@ -90,7 +92,7 @@ required because launchd may create the next fresh helper.
 
 ## 4. Frozen Scope and Cost
 
-At most ten non-document paths and 2,800 added-or-changed lines:
+At most ten non-document paths and 3,200 added-or-changed lines:
 
 1. `Package.swift`;
 2. one new `Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineClaimClient.swift`;
@@ -103,7 +105,8 @@ At most ten non-document paths and 2,800 added-or-changed lines:
 9. `Stornaut.xcodeproj/project.pbxproj` only if an unexpected explicit link is proven necessary; and
 10. one existing DriverSupport test/source only if the package-only entry seam cannot be tested through the focused file.
 
-Current estimate is 7–8 paths and 1,400–2,100 lines. Xcode is expected to remain
+Current estimate is 7–8 paths and 2,700–3,100 lines after independent review
+required the full concurrency, ambiguity, identity and deadline matrix. Xcode is expected to remain
 unchanged because the native target already links the DriverSupport product and
 that product already links Security. Requiring `StornautLifecycle`, a public wire
 change, helper/server change, Machine-host transport code, a caller-provided

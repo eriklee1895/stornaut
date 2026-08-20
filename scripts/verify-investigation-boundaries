@@ -36,6 +36,11 @@ live_claim_server_helper_source=
 app_peer_admission_contract_only=false
 app_peer_admission_policy_source=
 app_peer_admission_adapter_source=
+iib4_driver_support_contract_only=false
+iib4_driver_support_package_manifest=
+iib4_driver_support_client_source=
+iib4_staged_scope_contract_only=false
+iib4_staged_scope_baseline=HEAD
 iib3a_staged_scope_contract_only=false
 iib3a_staged_scope_baseline=HEAD
 iib3b_start_retire_contract_only=false
@@ -93,6 +98,15 @@ if (( $# > 0 )); then
         app_peer_admission_contract_only=true
         app_peer_admission_policy_source=$2
         app_peer_admission_adapter_source=$3
+    elif (( $# == 3 )) \
+        && [[ $1 == --iib4-driver-support-contract-only ]]; then
+        iib4_driver_support_contract_only=true
+        iib4_driver_support_package_manifest=$2
+        iib4_driver_support_client_source=$3
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iib4-staged-scope-contract-only ]]; then
+        iib4_staged_scope_contract_only=true
+        iib4_staged_scope_baseline=${2:-HEAD}
     elif (( $# == 1 || $# == 2 )) \
         && [[ $1 == --iib3a-staged-scope-contract-only ]]; then
         iib3a_staged_scope_contract_only=true
@@ -118,7 +132,7 @@ if (( $# > 0 )); then
         iib3c_staged_scope_baseline=${2:-HEAD}
     else
         print -u2 \
-            "Usage: scripts/verify-investigation-boundaries [--claim-asid-contract-only <source> | --deadline-state-contract-only <source> | --claim-server-contract-only <adapter> <effects> <deadline-state> | --claim-server-package-contract-only <describe-json> <dump-json> | --legacy-machine-claim-contract-only <lifecycle-xpc> <helper> <machine-host> <machine-claim> | --retirement-handle-v3-contract-only <lifecycle> <adapter> | --live-claim-server-contract-only <project.pbxproj> <Package.swift> <handoff-root> <scheme-root> <lifecycle-escrow> <adapter> <effects> <helper> | --app-peer-admission-contract-only <policy> <adapter> | --iib3a-staged-scope-contract-only [baseline] | --iib3b-start-retire-contract-only <transport> | --iib3b-staged-scope-contract-only [baseline] | --iib3c-concrete-entry-contract-only <leaf> <adapter> <composition> <harness> | --iib3c-staged-scope-contract-only [baseline]]"
+            "Usage: scripts/verify-investigation-boundaries [--claim-asid-contract-only <source> | --deadline-state-contract-only <source> | --claim-server-contract-only <adapter> <effects> <deadline-state> | --claim-server-package-contract-only <describe-json> <dump-json> | --legacy-machine-claim-contract-only <lifecycle-xpc> <helper> <machine-host> <machine-claim> | --retirement-handle-v3-contract-only <lifecycle> <adapter> | --live-claim-server-contract-only <project.pbxproj> <Package.swift> <handoff-root> <scheme-root> <lifecycle-escrow> <adapter> <effects> <helper> | --app-peer-admission-contract-only <policy> <adapter> | --iib4-driver-support-contract-only <package-manifest> <client-source> | --iib4-staged-scope-contract-only [baseline] | --iib3a-staged-scope-contract-only [baseline] | --iib3b-start-retire-contract-only <transport> | --iib3b-staged-scope-contract-only [baseline] | --iib3c-concrete-entry-contract-only <leaf> <adapter> <composition> <harness> | --iib3c-staged-scope-contract-only [baseline]]"
         exit 64
     fi
 fi
@@ -227,6 +241,203 @@ if peer < 0 or first_read < 0 or peer >= first_read:
 if not adapter.endswith("#endif\n"):
     raise SystemExit("App peer adapter Debug guard drifted")
 PY
+}
+
+function verify_iib4_driver_support_contract() {
+    local package_manifest=$1
+    local client_source=$2
+    python3 - "$package_manifest" "$client_source" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+package_manifest = Path(sys.argv[1]).read_text(encoding="utf-8")
+source = Path(sys.argv[2]).read_text(encoding="utf-8")
+if re.search(r"//|/\*|\*/", source):
+    raise SystemExit("ii-b4 driver support source contains comment camouflage")
+
+target_match = re.search(
+    r'(?ms)\.target\(\s*name:\s*"StornautInvestigationMachineDriverSupport"\s*,'
+    r'(?P<body>.*?)\n\s*\)',
+    package_manifest,
+)
+if target_match is None:
+    raise SystemExit("ii-b4 driver support package dependency drifted")
+target_body = target_match.group("body")
+dependencies = re.search(
+    r'(?ms)dependencies:\s*\[(?P<body>.*?)\]', target_body
+)
+if dependencies is None or re.findall(
+    r'"([^"]+)"', dependencies.group("body")
+) != ["StornautInvestigationHandoffContract"]:
+    raise SystemExit("ii-b4 driver support package dependency drifted")
+if '.linkedFramework("Security")' not in target_body:
+    raise SystemExit("ii-b4 static/dynamic audit-token binding drifted")
+
+required_markers = (
+    'fixedLifecycleProgram',
+    '"com.eriklee.stornaut.lifecycle.helper"',
+    'transport.connect(',
+    'serviceName: Constants.machineClaimServiceIdentifier',
+    'codeSigningRequirement:',
+    'let connection = NSXPCConnection(',
+    'connection.setCodeSigningRequirement(codeSigningRequirement)',
+    'proxy.claimMachineRetirement(request)',
+    'proxy.releaseMachineRetirement(request)',
+    'func invalidate() async',
+    'await session.invalidate()',
+    'auditTokenWords: [UInt32]',
+    'guard auditTokenWords.count == 8 else',
+    'kSecGuestAttributeAudit',
+    'kSecGuestAttributeAudit: tokenData as CFData',
+    'SecCodeCopyGuestWithAttributes(',
+    'SecCodeCopyPath(',
+    'currentConnectionIdentity()',
+    'helperEpochObserver.observe(',
+    '.originalHelperAbsent',
+    'connection.invalidationHandler =',
+    'connection.interruptionHandler =',
+    'withTaskCancellationHandler',
+    'guard epoch.beginDispatch(resolver) else',
+    'previousHelperIdentity != evidence.helperIdentity',
+    'replyObservation.continuousNanoseconds\n                    < claimedState.evidence.releaseDeadlineNanoseconds,',
+    'try released.validateEcho(of: release)',
+    'try await confirmHelperEpochTransition(',
+    'await claimedState.session.invalidate()',
+    'throw InvestigationMachineClaimClientError.outcomeUnknown',
+    'try machineClaimContinuousNanoseconds()',
+)
+missing = [marker for marker in required_markers if marker not in source]
+if missing:
+    raise SystemExit(f"ii-b4 driver support contract drifted: {missing!r}")
+
+if source.count('serviceName: Constants.machineClaimServiceIdentifier') != 2:
+    raise SystemExit("ii-b4 fixed helper service drifted")
+if 'InvestigationMachineInstalledDriverObservation.fixedLifecycleProgram' not in source:
+    raise SystemExit("ii-b4 fixed helper path drifted")
+if 'import StornautLifecycle' in source or 'LifecycleSupervisorXPCClient' in source:
+    raise SystemExit("ii-b4 broad lifecycle machine-claim client remains")
+if source.count('proxy.claimMachineRetirement(request)') != 1 or source.count('proxy.releaseMachineRetirement(request)') != 1:
+    raise SystemExit("ii-b4 exact claim/release selector drifted")
+if source.count('let connection = NSXPCConnection(') != 1:
+    raise SystemExit("ii-b4 fixed claim connection cardinality drifted")
+if 'observation.signingIdentifier == Constants.helperSigningIdentifier' not in source:
+    raise SystemExit("ii-b4 fixed helper signing identifier drifted")
+if source.count(
+    'let dynamicObservation = try dynamicHelperIdentityReader.readHelperIdentity(\n'
+    '            auditTokenWords: evidence.helperIdentity.auditTokenWords\n'
+    '        )'
+) != 1:
+    raise SystemExit("ii-b4 static/dynamic audit-token binding drifted")
+for marker in (
+    'processIDVersion',
+    'auditSessionID',
+    'executablePath',
+    'isAdHoc',
+):
+    if marker not in source:
+        raise SystemExit("ii-b4 static/dynamic audit-token binding drifted")
+if (
+    'while current < deadline' not in source
+    or 'afterObservation < deadline' not in source
+    or 'if observation == .originalHelperAbsent { return }' not in source
+    or 'afterObservation.addingReportingOverflow(100_000_000)' not in source
+    or 'sampled <= deadline' not in source
+):
+    raise SystemExit("ii-b4 helper absence handling drifted")
+if source.count('throw InvestigationMachineClaimClientError.outcomeUnknown') < 20:
+    raise SystemExit("ii-b4 outcomeUnknown priority drifted")
+if source.count('await session.invalidate()') < 1 or source.count('await claimedState.session.invalidate()') < 2:
+    raise SystemExit("ii-b4 delayed invalidation drifted")
+claim_dispatch = source.find('reply = try await session.claim(')
+claim_publish = source.find('state = .claimed(', claim_dispatch)
+first_claim_invalidation = source.find('await session.invalidate()')
+release_identity = source.find(
+    'try await validateConnectionIdentity(\n'
+    '                    session: claimedState.session,',
+    claim_publish
+)
+release_observation = source.find(
+    'let releaseObservation = try clock.observe()',
+    release_identity
+)
+release_dispatch = source.find(
+    'reply = try await claimedState.session.release(', release_observation
+)
+release_echo = source.find('try released.validateEcho(of: release)', release_dispatch)
+reply_observation = source.find('replyObservation = try clock.observe()', release_echo)
+absence = source.find('try await confirmHelperEpochTransition(', reply_observation)
+success_invalidation = source.find(
+    'await claimedState.session.invalidate()', absence
+)
+if (
+    min(claim_dispatch, claim_publish, first_claim_invalidation,
+        release_identity, release_observation, release_dispatch,
+        release_echo, reply_observation, absence, success_invalidation) < 0
+    or not (claim_dispatch < claim_publish < release_identity
+        < release_observation < release_dispatch < release_echo
+        < reply_observation < absence < success_invalidation)
+    or first_claim_invalidation < claim_publish
+    or source.find('await session.invalidate()', claim_dispatch, claim_publish) >= 0
+):
+    raise SystemExit("ii-b4 delayed invalidation drifted")
+connect_index = source.find('let connection = NSXPCConnection(')
+requirement_index = source.find(
+    'connection.setCodeSigningRequirement(codeSigningRequirement)',
+    connect_index
+)
+activate_index = source.find('connection.activate()', requirement_index)
+if min(connect_index, requirement_index, activate_index) < 0 or not (
+    connect_index < requirement_index < activate_index
+):
+    raise SystemExit("ii-b4 static/dynamic audit-token binding drifted")
+
+for forbidden in (
+    'import StornautLifecycle',
+    'LifecycleSupervisorXPCClient',
+    'LifecycleInteractiveSessionXPCClient',
+    'ProcessInfo.processInfo.environment',
+    'URLSession',
+    'socket(',
+    'Darwin.write(',
+    'kill(',
+    'posix_spawn',
+    'FileManager.default',
+    'signedInvestigationRuntimeReady',
+):
+    if forbidden in source:
+        raise SystemExit(f"ii-b4 driver support regained prohibited authority: {forbidden}")
+PY
+}
+
+function verify_iib4_staged_scope() {
+    local baseline=${1:-HEAD}
+    local expected=(
+        Package.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineClaimClient.swift
+        Tests/StornautInvestigationTests/InvestigationMachineClaimClientTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-app-release-boundaries
+        scripts/verify-contract
+        scripts/verify-investigation-boundaries
+    )
+    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" | awk 'index($0, "docs/") != 1')"})
+    if git diff --cached --name-status "$baseline" \
+        | awk '$1 == "D" && index($2, "docs/") != 1 { found = 1 } END { exit !found }'
+    then
+        print -u2 "ii-b4 staged checkpoint deleted a required path"
+        return 1
+    fi
+    [[ "${(j:\n:)${(on)observed}}" == "${(j:\n:)${(on)expected}}" ]] || {
+        print -u2 "ii-b4 checkpoint paths drifted"
+        return 1
+    }
+    local changed
+    changed=$(git diff --cached --numstat "$baseline" | awk 'index($3, "docs/") != 1 {total += $1 + $2} END {print total + 0}')
+    (( changed <= 3200 )) || {
+        print -u2 "ii-b4 checkpoint budget drifted"
+        return 1
+    }
 }
 
 function verify_iib3a_staged_scope() {
@@ -2435,7 +2646,7 @@ def digest(path):
 
 
 expected_frozen = {
-    package_path: "1b1cb7bcefd05501b9b28e6be90224326156a2ef0e632091657728d244c0b57f",
+    package_path: "798247d986c73adb09f7b975b2ffc7793cdd04803fb4ec3bd1f41000cce7cb20",
     scheme_root / "Stornaut.xcscheme": "5d0d87082e3c0efed4165566e13f4fa560906137785c61a55b25d63a8ab2d987",
     scheme_root / "StornautInvestigationDiagnosticApp.xcscheme": "deb1b2fe0db76a7981759fcff865da270ceedc990ad78858e444f9eed3fe96b5",
     handoff_root / "HandoffBinaryTranscript.swift": "dd286134478b715f51f190ec4cdbc3cf10449b330ddb60b11cc06777a4a5a7c9",
@@ -3160,6 +3371,18 @@ if $app_peer_admission_contract_only; then
         "$app_peer_admission_policy_source" \
         "$app_peer_admission_adapter_source"
     print "App peer admission contract verification passed."
+    exit 0
+fi
+if $iib4_driver_support_contract_only; then
+    verify_iib4_driver_support_contract \
+        "$iib4_driver_support_package_manifest" \
+        "$iib4_driver_support_client_source"
+    print "ii-b4 driver support source contract verification passed."
+    exit 0
+fi
+if $iib4_staged_scope_contract_only; then
+    verify_iib4_staged_scope "$iib4_staged_scope_baseline"
+    print "ii-b4 staged scope verification passed."
     exit 0
 fi
 if $iib3a_staged_scope_contract_only; then
@@ -4964,6 +5187,7 @@ consumers = {target["name"] for target in package["targets"]
 if consumers != {
     "StornautInvestigationDiagnostic",
     "StornautInvestigationMachineClaimServer",
+    "StornautInvestigationMachineDriverSupport",
     "StornautInvestigationTests",
 }:
     raise SystemExit(f"handoff contract consumers drifted: {sorted(consumers)}")
@@ -5195,8 +5419,10 @@ driver_support = targets.get(
 )
 if driver_support is None:
     raise SystemExit("missing authority-closed Machine driver support")
-if set(driver_support.get("target_dependencies", [])):
-    raise SystemExit("Machine driver support gained a target dependency")
+if set(driver_support.get("target_dependencies", [])) != {
+    "StornautInvestigationHandoffContract"
+}:
+    raise SystemExit("Machine driver support dependency allowlist drifted")
 if Path(driver_support.get("path", "")) != Path(
     "Sources/StornautInvestigationMachineDriverSupport"
 ):
@@ -5205,6 +5431,7 @@ driver_support_source_root = Path(driver_support.get("path", ""))
 driver_support_sources = driver_support.get("sources", [])
 expected_driver_support_sources = {
     "DarwinInvestigationMachineInstalledDriverSystem.swift",
+    "InvestigationMachineClaimClient.swift",
     "InvestigationMachineDriverSupport.swift",
     "InvestigationMachineInstalledDriverObservation.swift",
     "InvestigationMachineInstalledDriverSystemSource.swift",
@@ -5241,6 +5468,10 @@ expected_driver_support_imports = {
         "CryptoKit", "Darwin", "Foundation", "Security",
     },
     "InvestigationMachineDriverSupport.swift": {"Darwin"},
+    "InvestigationMachineClaimClient.swift": {
+        "CryptoKit", "Darwin", "Foundation", "Security",
+        "StornautInvestigationHandoffContract",
+    },
     "InvestigationMachineInstalledDriverObservation.swift": {"Darwin"},
     "InvestigationMachineInstalledDriverSystemSource.swift": {"Darwin"},
 }
@@ -5253,6 +5484,8 @@ expected_driver_support_sha256 = {
         "0d6d477336cd99fb7279a74bb0b63d63a362bf36fe6b98fae9a2978e289e4a4f",
     "InvestigationMachineInstalledDriverSystemSource.swift":
         "3166ff4e53d66207194546800d96fb659105fb8307e759b9e37083d575117e18",
+    "InvestigationMachineClaimClient.swift":
+        "77834e0deb69437292615fb45554b62781b494ad9db2164d28c49877960bda6f",
 }
 for source_name in driver_support_sources:
     source_path = driver_support_source_root / source_name
@@ -5274,7 +5507,21 @@ for source_name in driver_support_sources:
             "Machine driver support import allowlist drifted: "
             f"{source_path}: {sorted(imports)}"
         )
-    match = driver_support_authority_pattern.search(source_text)
+    authority_source = source_text
+    if source_name == "InvestigationMachineClaimClient.swift":
+        if len(re.findall(r"\bconnect\s*\(", source_text)) != 3:
+            raise SystemExit(
+                "ii-b4 fixed claim connection cardinality drifted"
+            )
+        authority_source = authority_source.replace(
+            "NSXPCConnection", "FixedMachineClaimConnection"
+        )
+        authority_source = re.sub(
+            r"\bconnect(?=\s*\()",
+            "fixedMachineClaimConnect",
+            authority_source,
+        )
+    match = driver_support_authority_pattern.search(authority_source)
     if match:
         raise SystemExit(
             "Machine driver support gained prohibited authority: "
@@ -5405,9 +5652,11 @@ if manifest_driver_support is None:
     raise SystemExit(
         "Machine driver support is missing from resolved manifest"
     )
-if manifest_driver_support.get("dependencies", []):
+if manifest_driver_support.get("dependencies", []) != [
+    {"byName": ["StornautInvestigationHandoffContract", None]}
+]:
     raise SystemExit(
-        "Manifest Machine driver support gained a dependency"
+        "Manifest Machine driver support dependency allowlist drifted"
     )
 expected_driver_support_settings = [
     {
@@ -6416,20 +6665,20 @@ function require_exact_machine_driver_projection() {
 
     case "$configuration" in
         debug)
-            expected_undefined_sha=d9ede342877a7c2bae9edb3cc6795b0284ed69d43b251a4ea8f55a99c3b27b61
-            expected_undefined_lines=336
+            expected_undefined_sha=aaf705a9b4d2bb802907b7bd5f892fad988564fa237732592f36cf6bc88f075d
+            expected_undefined_lines=517
             expected_loads_sha=e3c05d8766d8aa37e87a834a3f37fd71d925f1d34ac349528cee4970db9d3841
             expected_loads_lines=16
-            expected_owned_sha=607f929eac1ae219fccfd6597bbe7412cd44926167b55ac1d53e7d5db02e86d3
-            expected_owned_lines=638
+            expected_owned_sha=6b9d563178c2252114ba7081d0b0699f031ee52c305516fa864f92510d41f6fb
+            expected_owned_lines=1446
             ;;
         release)
-            expected_undefined_sha=c99220c70fc124f54f9d28547a2b2f4a905333f624d632521923255b4743e4a6
-            expected_undefined_lines=214
+            expected_undefined_sha=976eceef0b2461d60f3aa0a635f5b64598963b7ddee6cd6be4d92fafbf1bafd0
+            expected_undefined_lines=369
             expected_loads_sha=e3c05d8766d8aa37e87a834a3f37fd71d925f1d34ac349528cee4970db9d3841
             expected_loads_lines=16
-            expected_owned_sha=7634be449f2c1c932d36470e0bdef22bdc8bf138a23d0f258417ae9b600b298c
-            expected_owned_lines=265
+            expected_owned_sha=aa821ec12da0f7fd1a88d8068004c5dc33d6db4bdee5654d1a7dcb3d2cf61964
+            expected_owned_lines=867
             ;;
         *)
             print -u2 "Unknown Machine driver projection: $configuration"
@@ -6528,6 +6777,8 @@ function verify_machine_driver_projection_mutations() {
     expected_security_imports=$(
         print -rl -- \
             _SecCodeCheckValidity \
+            _SecCodeCopyGuestWithAttributes \
+            _SecCodeCopyPath \
             _SecCodeCopySelf \
             _SecCodeCopySigningInformation \
             _SecCodeCopyStaticCode \
@@ -6539,6 +6790,7 @@ function verify_machine_driver_projection_mutations() {
             _kSecCodeInfoFlags \
             _kSecCodeInfoIdentifier \
             _kSecCodeInfoUnique \
+            _kSecGuestAttributeAudit \
             | LC_ALL=C sort
     )
     for configuration in debug release; do

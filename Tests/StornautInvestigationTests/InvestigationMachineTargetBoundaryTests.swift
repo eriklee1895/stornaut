@@ -332,7 +332,11 @@ struct InvestigationMachineTargetBoundaryTests {
         let end = try #require(suffix.range(of: "\n        ),"))
         let target = String(suffix[..<end.upperBound])
         #expect(target.contains("dependencies: []"))
-        #expect(!package[..<start.lowerBound].contains("StornautInvestigationHandoffContract"))
+        #expect(
+            package.components(
+                separatedBy: "\"StornautInvestigationHandoffContract\""
+            ).count == 6
+        )
 
         let sourceRoot = root.appending(path: "Sources/StornautInvestigationHandoffContract")
         let names = try Set(FileManager.default.contentsOfDirectory(atPath: sourceRoot.path))
@@ -488,6 +492,7 @@ struct InvestigationMachineTargetBoundaryTests {
         )
         #expect(supportSourceNames == [
             "DarwinInvestigationMachineInstalledDriverSystem.swift",
+            "InvestigationMachineClaimClient.swift",
             "InvestigationMachineDriverSupport.swift",
             "InvestigationMachineInstalledDriverObservation.swift",
             "InvestigationMachineInstalledDriverSystemSource.swift",
@@ -560,7 +565,10 @@ struct InvestigationMachineTargetBoundaryTests {
         let supportTarget = String(
             supportTargetSuffix[..<supportTargetEnd.upperBound]
         )
-        #expect(supportTarget.contains("dependencies: []"))
+        #expect(supportTarget.contains("dependencies: ["))
+        #expect(supportTarget.contains(
+            "\"StornautInvestigationHandoffContract\""
+        ))
         #expect(supportTarget.contains(
             ".linkedFramework(\"Security\")"
         ))
@@ -573,6 +581,13 @@ struct InvestigationMachineTargetBoundaryTests {
                 "import Security",
             ],
             "InvestigationMachineDriverSupport.swift": ["import Darwin"],
+            "InvestigationMachineClaimClient.swift": [
+                "import CryptoKit",
+                "import Darwin",
+                "import Foundation",
+                "import Security",
+                "import StornautInvestigationHandoffContract",
+            ],
             "InvestigationMachineInstalledDriverObservation.swift": [
                 "import Darwin",
             ],
@@ -693,7 +708,6 @@ struct InvestigationMachineTargetBoundaryTests {
                 "NWConnection",
                 "WebSocket",
                 "URLSession",
-                "NSXPC",
                 "kill(",
                 "killpg(",
                 "pthread_kill(",
@@ -703,7 +717,24 @@ struct InvestigationMachineTargetBoundaryTests {
                 "readLine(",
                 "signedInvestigationRuntimeReady",
             ] {
-                #expect(!source.contains(forbidden))
+                if sourceName != "InvestigationMachineClaimClient.swift"
+                    || ![
+                        "connect(",
+                        "import StornautInvestigation",
+                    ].contains(forbidden)
+                {
+                    #expect(!source.contains(forbidden))
+                }
+            }
+            if sourceName != "InvestigationMachineClaimClient.swift" {
+                #expect(!source.contains("NSXPC"))
+            } else {
+                #expect(source.contains("NSXPCConnection"))
+                #expect(source.contains("setCodeSigningRequirement"))
+                #expect(!source.split(separator: "\n").contains(
+                    "import StornautInvestigation"
+                ))
+                #expect(!source.contains("kill("))
             }
             if sourceName
                 == "DarwinInvestigationMachineInstalledDriverSystem.swift"
@@ -771,6 +802,40 @@ struct InvestigationMachineTargetBoundaryTests {
         ))
         #expect(!driverTarget.contains("\"StornautInvestigationMachine\""))
 
+    }
+
+    @Test
+    func iiB4VerifierPinsDriverSupportMarkersWithoutReplacingHistoricalGate()
+        throws
+    {
+        let repositoryRoot = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let boundaries = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ),
+            encoding: .utf8
+        )
+        for marker in [
+            "--iib4-driver-support-contract-only <package-manifest> <client-source>",
+            "--iib4-staged-scope-contract-only [baseline]",
+            "ii-b4 driver support source contains comment camouflage",
+            "ii-b4 driver support package dependency drifted",
+            "ii-b4 fixed helper service drifted",
+            "ii-b4 static/dynamic audit-token binding drifted",
+            "ii-b4 delayed invalidation drifted",
+            "ii-b4 helper absence handling drifted",
+            "ii-b4 outcomeUnknown priority drifted",
+            "ii-b4 broad lifecycle machine-claim client remains",
+            "ii-b4 driver support regained prohibited authority",
+            "ii-b4 checkpoint paths drifted",
+            "ii-b4 checkpoint budget drifted",
+            "ii-b4 staged checkpoint deleted a required path",
+        ] {
+            #expect(boundaries.contains(marker))
+        }
     }
 
     @Test

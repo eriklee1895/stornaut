@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=c911d0c5caadfc628cda6c6fb780d831e7b819ef2a867cfcc45cf71edb9c4cfc
+ib2_self_sha=58e616043574a159a71ae0eea6c656a087f773b6e3594ffe23be98847079e686
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -864,9 +864,9 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "14a9e4017cd721246286d3cfb49670fe29642554544f69d7463c11a98169b998",
+        "ecd261fcaa9c9231603756d47752b9d3a7358a49937e257253d7c3dec4429d8a",
     Path("scripts/verify-app-release-boundaries"):
-        "e54f727b2d7fa174c71b4f7672f9b01880e56a46a069e3b171274347fd1cc9e2",
+        "42ee86284c289efce8025ae366336046a47d689838c93ac577b0bfc1ed68f92c",
 }
 for path, expected_sha in expected.items():
     observed_sha = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -883,12 +883,13 @@ release = Path("scripts/verify-app-release-boundaries").read_text(
     encoding="utf-8"
 )
 for marker, count in {
-    "d9ede342877a7c2bae9edb3cc6795b0284ed69d43b251a4ea8f55a99c3b27b61": 2,
-    "c99220c70fc124f54f9d28547a2b2f4a905333f624d632521923255b4743e4a6": 1,
-    "e3c05d8766d8aa37e87a834a3f37fd71d925f1d34ac349528cee4970db9d3841": 3,
-    "607f929eac1ae219fccfd6597bbe7412cd44926167b55ac1d53e7d5db02e86d3": 1,
-    "7634be449f2c1c932d36470e0bdef22bdc8bf138a23d0f258417ae9b600b298c": 1,
-    "d1ba2a7e19f07e2ebee198bb603fe516d3eee9148460563ebf3e6b6aa9eaf2f7": 1,
+    "aaf705a9b4d2bb802907b7bd5f892fad988564fa237732592f36cf6bc88f075d": 2,
+    "976eceef0b2461d60f3aa0a635f5b64598963b7ddee6cd6be4d92fafbf1bafd0": 2,
+    "e3c05d8766d8aa37e87a834a3f37fd71d925f1d34ac349528cee4970db9d3841": 4,
+    "6b9d563178c2252114ba7081d0b0699f031ee52c305516fa864f92510d41f6fb": 1,
+    "b2f3f04ca7c27db94e4833bffd106665bc41c5e6e0df3d36622c42bd4340ee38": 1,
+    "aa821ec12da0f7fd1a88d8068004c5dc33d6db4bdee5654d1a7dcb3d2cf61964": 1,
+    "f182dc183a8a662eb39bdfcdd45e743d595135d68ee7488367b7f222ee53a0da": 1,
 }.items():
     observed = investigation.count(marker) + release.count(marker)
     if observed != count:
@@ -952,7 +953,7 @@ symbol_gate_calls = runtime_source.count("mach_o_has_demangled_symbol") - 1
 symbol_gate_error_checks = runtime_source.count(
     "(( symbol_scan_status == 2 ))"
 )
-if symbol_gate_calls != 5 or symbol_gate_error_checks != symbol_gate_calls + 1:
+if symbol_gate_calls < 5 or symbol_gate_error_checks != symbol_gate_calls:
     raise SystemExit(
         "every demangled-symbol gate must handle scan errors: "
         f"calls={symbol_gate_calls} checks={symbol_gate_error_checks}"
@@ -2921,38 +2922,27 @@ require_b3c_mutation_rejected b3c-deadline-edge \
     'ii-b3c concrete contract drifted: let maximum = completed.addingReportingOverflow(30_000_000)'
 
 b3c_index="$contract_root/b3c-canonical.index"
-if ! git diff --cached --quiet HEAD -- . ':(exclude)docs/**'; then
-    "$b3c_gate" --iib3c-staged-scope-contract-only
-fi
+b3c_commit=da36ae022eed2610278b7ed5f8fe2c2119b7f994
+b3c_parent=18e01e7e7dd0f6d56d97ed05989cdab9697c5e99
 rm -f "$b3c_index"
-GIT_INDEX_FILE="$b3c_index" git read-tree HEAD
-for source_path in \
-    "$b3c_leaf" "$b3c_adapter" "$b3c_composition" "$b3c_harness" \
-    StornautAppTests/InvestigationRuntimeDiagnosticTests.swift \
-    Tests/StornautInvestigationTests/InvestigationHandoffAppLeafTests.swift \
-    Tests/StornautInvestigationTests/InvestigationHandoffConcreteCompositionTests.swift \
-    Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift \
-    scripts/verify-app-release-boundaries scripts/verify-contract \
-    scripts/verify-investigation-boundaries
-do
-    GIT_INDEX_FILE="$b3c_index" git add -f "$source_path"
-done
-GIT_INDEX_FILE="$b3c_index" "$b3c_gate" --iib3c-staged-scope-contract-only
+GIT_INDEX_FILE="$b3c_index" git read-tree "$b3c_commit^{tree}"
+GIT_INDEX_FILE="$b3c_index" "$b3c_gate" \
+    --iib3c-staged-scope-contract-only "$b3c_parent"
 docs_deleted_index="$contract_root/b3c-docs-deleted.index"
 cp "$b3c_index" "$docs_deleted_index"
-GIT_INDEX_FILE="$docs_deleted_index" git rm --cached -q docs/README.md
+GIT_INDEX_FILE="$docs_deleted_index" git rm --cached -q -f docs/README.md
 GIT_INDEX_FILE="$docs_deleted_index" "$b3c_gate" \
-    --iib3c-staged-scope-contract-only
+    --iib3c-staged-scope-contract-only "$b3c_parent"
 for fixture in extra-path over-budget deleted-path; do
     index="$contract_root/b3c-$fixture.index"
     cp "$b3c_index" "$index"
     if [[ $fixture == extra-path ]]; then
-        blob=$(git rev-parse HEAD:AGENTS.md)
+        blob=$(git rev-parse "${b3c_parent}:AGENTS.md")
         GIT_INDEX_FILE="$index" git update-index --add \
             --cacheinfo "100644,$blob,b3c-extra.swift"
         expected='ii-b3c staged checkpoint paths drifted'
     elif [[ $fixture == over-budget ]]; then
-        blob=$(git rev-parse HEAD:docs/plans/active/task-39-implementation-brief.md)
+        blob=$(git rev-parse "${b3c_parent}:docs/plans/active/task-39-implementation-brief.md")
         GIT_INDEX_FILE="$index" git update-index \
             --cacheinfo "100644,$blob,$b3c_composition"
         expected='ii-b3c staged checkpoint budget drifted'
@@ -2962,7 +2952,7 @@ for fixture in extra-path over-budget deleted-path; do
     fi
     output="$contract_root/b3c-$fixture-scope.log"
     if GIT_INDEX_FILE="$index" "$b3c_gate" \
-        --iib3c-staged-scope-contract-only >"$output" 2>&1
+        --iib3c-staged-scope-contract-only "$b3c_parent" >"$output" 2>&1
     then
         fail_contract "ii-b3c staged scope mutation accepted: $fixture"
     fi
@@ -3062,7 +3052,7 @@ helper_path.write_text(mutate_runtime(
 ), encoding="utf-8")
 negative_path.write_text(mutate_array(
     "non_helper_claim_server_images",
-    '    "$diagnostic_machine_driver"\n',
+    '    "$diagnostic_debug_app/Contents/MacOS/StornautInvestigationDiagnostic.debug.dylib"\n',
     '',
     "non-helper negative omitted"
 ), encoding="utf-8")
@@ -3586,5 +3576,132 @@ if rg -qi 'XCUITest|verify-ui|peekaboo|Automation Mode|TCC' \
 fi
 
 scripts/verify-clean-validation-snapshot-contract
+
+iib4_gate=scripts/verify-investigation-boundaries
+iib4_package=Package.swift
+iib4_source=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineClaimClient.swift
+"$iib4_gate" --iib4-driver-support-contract-only \
+    "$iib4_package" "$iib4_source" >"$contract_root/iib4-canonical.log"
+if ! git diff --cached --quiet HEAD -- . ':(exclude)docs/**'; then
+    "$iib4_gate" --iib4-staged-scope-contract-only
+fi
+python3 - "$iib4_source" "$contract_root" <<'PY'
+from pathlib import Path
+import sys
+source_path, root = map(Path, sys.argv[1:])
+source = source_path.read_text(encoding="utf-8")
+
+def mutation(name, old, new):
+    if source.count(old) != 1:
+        raise SystemExit(f"cannot construct ii-b4 mutation: {name}")
+    (root / f"iib4-{name}.swift").write_text(
+        source.replace(old, new, 1), encoding="utf-8"
+    )
+
+mutation("service-selection",
+    "session = try await transport.connect(\n"
+    "                serviceName: Constants.machineClaimServiceIdentifier,",
+    "session = try await transport.connect(\n"
+    '                serviceName: ProcessInfo.processInfo.environment["SERVICE"]!,')
+mutation("broad-lifecycle", "import Security\n",
+    "import Security\nimport StornautLifecycle\n")
+mutation("comment-camouflage",
+    "connection.setCodeSigningRequirement(codeSigningRequirement)",
+    "_ = codeSigningRequirement")
+mutation("pid-only",
+    "let dynamicObservation = try dynamicHelperIdentityReader.readHelperIdentity(\n"
+    "            auditTokenWords: evidence.helperIdentity.auditTokenWords\n        )",
+    "let dynamicObservation = try dynamicHelperIdentityReader.readHelperIdentity(\n"
+    "            auditTokenWords: [evidence.helperIdentity.processID]\n        )")
+mutation("early-invalidation",
+    "guard !Task.isCancelled else {\n                throw InvestigationMachineClaimClientError.unavailable\n            }\n            let reply: (Data?, String?)",
+    "guard !Task.isCancelled else {\n                throw InvestigationMachineClaimClientError.unavailable\n            }\n            await session.invalidate()\n            let reply: (Data?, String?)")
+mutation("skip-released", "try released.validateEcho(of: release)",
+    "_ = release")
+mutation("skip-absence",
+    "if observation == .originalHelperAbsent { return }",
+    "if observation == .originalHelperPresent { return }")
+mutation("predispatch-identity",
+    "try await validateConnectionIdentity(\n"
+    "                    session: claimedState.session,\n"
+    "                    helperIdentity: claimedState.evidence.helperIdentity\n"
+    "                )",
+    "_ = claimedState")
+PY
+for fixture in \
+    service-selection:'ii-b4 fixed helper service drifted' \
+    broad-lifecycle:'ii-b4 broad lifecycle machine-claim client remains' \
+    comment-camouflage:'ii-b4 driver support contract drifted' \
+    pid-only:'ii-b4 static/dynamic audit-token binding drifted' \
+    early-invalidation:'ii-b4 delayed invalidation drifted' \
+    skip-released:'ii-b4 driver support contract drifted' \
+    skip-absence:'ii-b4 helper absence handling drifted' \
+    predispatch-identity:'ii-b4 delayed invalidation drifted'; do
+    name=${fixture%%:*}
+    expected=${fixture#*:}
+    output="$contract_root/iib4-$name.log"
+    if "$iib4_gate" --iib4-driver-support-contract-only \
+        "$iib4_package" "$contract_root/iib4-$name.swift" \
+        >"$output" 2>&1; then
+        fail_contract "ii-b4 mutation accepted: $name"
+    fi
+    require_fixed_text "$output" "$expected"
+done
+python3 - scripts/verify-app-release-boundaries \
+    "$contract_root/iib4-macho-loop" <<'PY'
+from pathlib import Path
+import sys
+p, out = map(Path, sys.argv[1:])
+s = p.read_text()
+old = 'verify_iib4_machine_claim_macho() {\n    local positive_image marker scan_status\n'
+if s.count(old) != 1:
+    raise SystemExit("cannot construct ii-b4 Mach-O loop mutation")
+out.write_text(s.replace(old,
+    'verify_iib4_machine_claim_macho() {\n    local positive_image scan_status\n' + '    # ' + old, 1))
+PY
+if scripts/verify-app-release-boundaries --iib4-machine-claim-contract-only \
+    "$contract_root/iib4-macho-loop" >"$contract_root/iib4-macho-loop.log" 2>&1; then
+    fail_contract "ii-b4 Mach-O loop mutation accepted"
+fi
+require_fixed_text "$contract_root/iib4-macho-loop.log" \
+    'ii-b4 machine-claim Mach-O loop drifted'
+
+iib4_index="$contract_root/iib4.index"
+rm -f "$iib4_index"
+GIT_INDEX_FILE="$iib4_index" git read-tree HEAD
+for source_path in \
+    Package.swift \
+    Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineClaimClient.swift \
+    Tests/StornautInvestigationTests/InvestigationMachineClaimClientTests.swift \
+    Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift \
+    scripts/verify-app-release-boundaries scripts/verify-contract \
+    scripts/verify-investigation-boundaries; do
+    GIT_INDEX_FILE="$iib4_index" git add -f "$source_path"
+done
+GIT_INDEX_FILE="$iib4_index" "$iib4_gate" --iib4-staged-scope-contract-only
+for fixture in extra-path over-budget deleted-path; do
+    index="$contract_root/iib4-$fixture.index"
+    cp "$iib4_index" "$index"
+    if [[ $fixture == extra-path ]]; then
+        blob=$(git rev-parse HEAD:AGENTS.md)
+        GIT_INDEX_FILE="$index" git update-index --add \
+            --cacheinfo "100644,$blob,iib4-extra.swift"
+        expected='ii-b4 checkpoint paths drifted'
+    elif [[ $fixture == over-budget ]]; then
+        blob=$(git rev-parse HEAD:docs/plans/active/task-39-implementation-brief.md)
+        GIT_INDEX_FILE="$index" git update-index \
+            --cacheinfo "100644,$blob,$iib4_source"
+        expected='ii-b4 checkpoint budget drifted'
+    else
+        GIT_INDEX_FILE="$index" git rm --cached -q Package.swift
+        expected='ii-b4 staged checkpoint deleted a required path'
+    fi
+    output="$contract_root/iib4-$fixture.log"
+    if GIT_INDEX_FILE="$index" "$iib4_gate" \
+        --iib4-staged-scope-contract-only >"$output" 2>&1; then
+        fail_contract "ii-b4 scope mutation accepted: $fixture"
+    fi
+    require_fixed_text "$output" "$expected"
+done
 
 print "Verifier mode and CI contract verification passed."

@@ -8,14 +8,19 @@ cd "$repo_root"
 handoff_only=false
 legacy_machine_claim_contract_only=false
 legacy_machine_claim_contract_source=
+iib4_machine_claim_contract_only=false
+iib4_machine_claim_contract_source=
 if [[ $# == 1 && $1 == --investigation-handoff-only ]]; then
     handoff_only=true
 elif [[ $# == 2 && $1 == --legacy-machine-claim-contract-only ]]; then
     legacy_machine_claim_contract_only=true
     legacy_machine_claim_contract_source=$2
+elif [[ $# == 2 && $1 == --iib4-machine-claim-contract-only ]]; then
+    iib4_machine_claim_contract_only=true
+    iib4_machine_claim_contract_source=$2
 elif (( $# != 0 )); then
     print -u2 \
-        "Usage: scripts/verify-app-release-boundaries [--investigation-handoff-only | --legacy-machine-claim-contract-only <source>]"
+        "Usage: scripts/verify-app-release-boundaries [--investigation-handoff-only | --legacy-machine-claim-contract-only <source> | --iib4-machine-claim-contract-only <source>]"
     exit 64
 fi
 
@@ -218,8 +223,6 @@ expected_arrays = {
             "$diagnostic_release_app/Contents/MacOS/"
             "StornautInvestigationDiagnosticReleaseShell"
         ),
-        "$machine_driver_product",
-        "$diagnostic_machine_driver",
     ],
     "claim_server_handoff_negative_images": [
         "$debug_app/Contents/MacOS/Stornaut",
@@ -235,8 +238,6 @@ expected_arrays = {
             "$diagnostic_release_app/Contents/MacOS/"
             "StornautInvestigationDiagnosticReleaseShell"
         ),
-        "$machine_driver_product",
-        "$diagnostic_machine_driver",
     ],
 }
 for name, expected in expected_arrays.items():
@@ -349,10 +350,149 @@ for required in (
 PY
 }
 
+function verify_iib4_machine_claim_source_contract() {
+    local source_path=$1
+    python3 - "$source_path" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+source = Path(sys.argv[1]).read_text(encoding="utf-8")
+runtime_source = source[source.index("\nscripts/verify-contract\n"):]
+
+for fragment in (
+    "iib4_machine_claim_positive_images=(",
+    "iib4_machine_claim_positive_symbols=(",
+    "iib4_machine_claim_positive_raw_markers=(",
+    "iib4_machine_claim_required_security_imports=(",
+    "iib4_machine_claim_closed_images=(",
+    "verify_iib4_machine_claim_macho() {",
+    'ii-b4 machine-claim Mach-O positive drifted',
+    'ii-b4 machine-claim raw marker positive drifted',
+    'ii-b4 machine-claim import positive drifted',
+    'ii-b4 machine-claim leaked into a closed image',
+    "\nverify_iib4_machine_claim_macho\n",
+):
+    if fragment not in runtime_source:
+        raise SystemExit(
+            f"ii-b4 machine-claim source contract drifted: {[fragment]!r}"
+        )
+if "--iib4-machine-claim-contract-only <source>" not in source:
+    raise SystemExit(
+        "ii-b4 machine-claim source contract drifted: "
+        "['--iib4-machine-claim-contract-only <source>']"
+    )
+
+def array_values(name):
+    match = re.search(
+        rf"(?ms)^{re.escape(name)}=\(\n(?P<body>.*?)^\)\n",
+        runtime_source,
+    )
+    if match is None:
+        raise SystemExit(f"ii-b4 machine-claim array missing: {name}")
+    values = []
+    for line in match.group("body").splitlines():
+        quoted = re.fullmatch(r"\s+(['\"])(.*?)\1\s*", line)
+        bare = re.fullmatch(r"\s+([A-Za-z0-9_.$:/-]+)\s*", line)
+        if quoted is not None:
+            values.append(quoted.group(2))
+        elif bare is not None:
+            values.append(bare.group(1))
+        else:
+            raise SystemExit(f"ii-b4 machine-claim array malformed: {name}")
+    return values
+
+expected_arrays = {
+    "iib4_machine_claim_positive_images": [
+        "$machine_driver_product",
+        "$diagnostic_machine_driver",
+        "$release_machine_driver",
+    ],
+    "iib4_machine_claim_positive_symbols": [
+        "StornautInvestigationMachineDriverSupport.InvestigationMachineClaimClient",
+        "withTaskCancellationHandler",
+        "InvestigationMachineClaimClientConnectionEpoch",
+        "InvestigationMachineClaimClientReplyResolver",
+        "beginDispatch",
+    ],
+    "iib4_machine_claim_positive_raw_markers": [
+        "com.eriklee.stornaut.lifecycle.machine-claim",
+        "claimMachineRetirement:withReply:",
+        "releaseMachineRetirement:withReply:",
+    ],
+    "iib4_machine_claim_required_security_imports": [
+        "_SecCodeCheckValidity",
+        "_SecCodeCopyGuestWithAttributes",
+        "_SecCodeCopyPath",
+        "_SecCodeCopySelf",
+        "_SecCodeCopySigningInformation",
+        "_SecCodeCopyStaticCode",
+        "_SecStaticCodeCheckValidity",
+        "_SecStaticCodeCreateWithPath",
+        "_kSecGuestAttributeAudit",
+    ],
+    "iib4_machine_claim_closed_images": [
+        "$debug_app/Contents/MacOS/Stornaut",
+        "$debug_app/Contents/MacOS/Stornaut.debug.dylib",
+        "$debug_app/Contents/MacOS/__preview.dylib",
+        "$release_app/Contents/MacOS/Stornaut",
+        "$diagnostic_debug_app/Contents/MacOS/StornautInvestigationDiagnostic",
+        "$diagnostic_debug_app/Contents/MacOS/StornautInvestigationDiagnostic.debug.dylib",
+        "$diagnostic_debug_app/Contents/MacOS/__preview.dylib",
+        "$diagnostic_release_app/Contents/MacOS/StornautInvestigationDiagnosticReleaseShell",
+    ],
+}
+for name, expected in expected_arrays.items():
+    observed = array_values(name)
+    if observed != expected:
+        raise SystemExit(
+            f"ii-b4 machine-claim array drifted: {name}: {observed!r}"
+        )
+start = runtime_source.index("verify_iib4_machine_claim_macho() {")
+end = runtime_source.index("\nif mach_o_has_demangled_symbol", start)
+import hashlib
+if hashlib.sha256(runtime_source[start:end].encode()).hexdigest() != (
+    "8f2dc9384215f3dfdca982412dad9724156014a7148cd1c2382e2da93142257a"
+):
+    raise SystemExit("ii-b4 machine-claim Mach-O loop drifted")
+for marker in (
+    'mach_o_image_has_demangled_symbol "$positive_image" "$marker"',
+    'mach_o_image_has_raw_string "$positive_image" "$marker"',
+    'grep -Fxq -- "$marker"',
+    'for marker in "${iib4_machine_claim_positive_symbols[@]}"; do',
+    'for marker in "${iib4_machine_claim_positive_raw_markers[@]}"; do',
+    'for marker in "${iib4_machine_claim_required_security_imports[@]}"; do',
+    'for closed_image in "${iib4_machine_claim_closed_images[@]}"; do',
+):
+    if marker not in runtime_source[start:end]:
+        raise SystemExit(f"ii-b4 machine-claim source contract drifted: {[marker]!r}")
+
+for forbidden in (
+    "$machine_driver_product",
+    "$diagnostic_machine_driver",
+    "$debug_app/Contents/MacOS/StornautLifecycleHelper",
+    "$release_app/Contents/MacOS/StornautLifecycleHelper",
+    "$diagnostic_debug_app/Contents/MacOS/StornautLifecycleHelper",
+):
+    if forbidden in array_values("iib4_machine_claim_closed_images"):
+        raise SystemExit(
+            "ii-b4 machine-claim negative-image scope drifted: "
+            f"{forbidden}"
+        )
+PY
+}
+
 if $legacy_machine_claim_contract_only; then
     verify_claim_server_macho_source_contract \
         "$legacy_machine_claim_contract_source"
     print "Claim-server final-Mach-O source contract verification passed."
+    exit 0
+fi
+
+if $iib4_machine_claim_contract_only; then
+    verify_iib4_machine_claim_source_contract \
+        "$iib4_machine_claim_contract_source"
+    print "ii-b4 final-Mach-O source contract verification passed."
     exit 0
 fi
 
@@ -392,6 +532,13 @@ xcodebuild -quiet \
     build
 xcodebuild -quiet \
     -project Stornaut.xcodeproj \
+    -scheme StornautInvestigationMachineDriverNative \
+    -configuration Release \
+    -destination 'platform=macOS,arch=arm64' \
+    -derivedDataPath "$diagnostic_derived_data" \
+    build
+xcodebuild -quiet \
+    -project Stornaut.xcodeproj \
     -scheme "$release_shell_scheme" \
     -configuration Release \
     -destination 'platform=macOS,arch=arm64' \
@@ -405,6 +552,7 @@ diagnostic_release_app="$diagnostic_derived_data/Build/Products/Release/Stornaut
 legacy_diagnostic_release_app="$diagnostic_derived_data/Build/Products/Release/StornautInvestigationDiagnostic.app"
 machine_driver_product="$diagnostic_derived_data/Build/Products/Debug/StornautInvestigationMachineDriver"
 diagnostic_machine_driver="$diagnostic_debug_app/Contents/MacOS/StornautInvestigationMachineDriver"
+release_machine_driver="$diagnostic_derived_data/Build/Products/Release/StornautInvestigationMachineDriver"
 machine_driver_max_bytes=$((16 * 1024 * 1024))
 authority_object="$derived_data/Build/Products/Debug/StornautExecution.o"
 test -x "$debug_app/Contents/MacOS/Stornaut"
@@ -413,6 +561,7 @@ test -x \
     "$diagnostic_debug_app/Contents/MacOS/StornautInvestigationDiagnostic"
 test -x \
     "$diagnostic_release_app/Contents/MacOS/StornautInvestigationDiagnosticReleaseShell"
+test -x "$release_machine_driver"
 test ! -e "$legacy_diagnostic_release_app"
 test ! -L "$legacy_diagnostic_release_app"
 
@@ -1249,8 +1398,6 @@ non_helper_claim_server_images=(
     "$diagnostic_debug_app/Contents/MacOS/StornautInvestigationDiagnostic.debug.dylib"
     "$diagnostic_debug_app/Contents/MacOS/__preview.dylib"
     "$diagnostic_release_app/Contents/MacOS/StornautInvestigationDiagnosticReleaseShell"
-    "$machine_driver_product"
-    "$diagnostic_machine_driver"
 )
 claim_server_handoff_negative_images=(
     "$debug_app/Contents/MacOS/Stornaut"
@@ -1260,8 +1407,6 @@ claim_server_handoff_negative_images=(
     "$diagnostic_debug_app/Contents/MacOS/StornautInvestigationDiagnostic"
     "$diagnostic_debug_app/Contents/MacOS/__preview.dylib"
     "$diagnostic_release_app/Contents/MacOS/StornautInvestigationDiagnosticReleaseShell"
-    "$machine_driver_product"
-    "$diagnostic_machine_driver"
 )
 
 verify_helper_claim_server_macho() {
@@ -1583,6 +1728,8 @@ machine_driver_required_readonly_imports=(
 expected_machine_driver_security_imports=$(
     print -rl -- \
         _SecCodeCheckValidity \
+        _SecCodeCopyGuestWithAttributes \
+        _SecCodeCopyPath \
         _SecCodeCopySelf \
         _SecCodeCopySigningInformation \
         _SecCodeCopyStaticCode \
@@ -1594,8 +1741,105 @@ expected_machine_driver_security_imports=$(
         _kSecCodeInfoFlags \
         _kSecCodeInfoIdentifier \
         _kSecCodeInfoUnique \
+        _kSecGuestAttributeAudit \
         | LC_ALL=C sort
 )
+iib4_machine_claim_positive_images=(
+    "$machine_driver_product"
+    "$diagnostic_machine_driver"
+    "$release_machine_driver"
+)
+iib4_machine_claim_positive_symbols=(
+    'StornautInvestigationMachineDriverSupport.InvestigationMachineClaimClient'
+    'withTaskCancellationHandler'
+    'InvestigationMachineClaimClientConnectionEpoch'
+    'InvestigationMachineClaimClientReplyResolver'
+    'beginDispatch'
+)
+iib4_machine_claim_positive_raw_markers=(
+    'com.eriklee.stornaut.lifecycle.machine-claim'
+    'claimMachineRetirement:withReply:'
+    'releaseMachineRetirement:withReply:'
+)
+iib4_machine_claim_required_security_imports=(
+    _SecCodeCheckValidity
+    _SecCodeCopyGuestWithAttributes
+    _SecCodeCopyPath
+    _SecCodeCopySelf
+    _SecCodeCopySigningInformation
+    _SecCodeCopyStaticCode
+    _SecStaticCodeCheckValidity
+    _SecStaticCodeCreateWithPath
+    _kSecGuestAttributeAudit
+)
+iib4_machine_claim_closed_images=(
+    "$debug_app/Contents/MacOS/Stornaut"
+    "$debug_app/Contents/MacOS/Stornaut.debug.dylib"
+    "$debug_app/Contents/MacOS/__preview.dylib"
+    "$release_app/Contents/MacOS/Stornaut"
+    "$diagnostic_debug_app/Contents/MacOS/StornautInvestigationDiagnostic"
+    "$diagnostic_debug_app/Contents/MacOS/StornautInvestigationDiagnostic.debug.dylib"
+    "$diagnostic_debug_app/Contents/MacOS/__preview.dylib"
+    "$diagnostic_release_app/Contents/MacOS/StornautInvestigationDiagnosticReleaseShell"
+)
+verify_iib4_machine_claim_macho() {
+    local positive_image marker scan_status
+
+    for positive_image in "${iib4_machine_claim_positive_images[@]}"; do
+        for marker in "${iib4_machine_claim_positive_symbols[@]}"; do
+            if mach_o_image_has_demangled_symbol "$positive_image" "$marker"; then
+                continue
+            else
+                scan_status=$?
+            fi
+            if (( scan_status == 2 )); then
+                exit 1
+            fi
+            print -u2 \
+                "ii-b4 machine-claim Mach-O positive drifted: $positive_image: $marker"
+            exit 1
+        done
+        for marker in "${iib4_machine_claim_positive_raw_markers[@]}"; do
+            if mach_o_image_has_raw_string "$positive_image" "$marker"; then
+                continue
+            else
+                scan_status=$?
+            fi
+            if (( scan_status == 2 )); then
+                exit 1
+            fi
+            print -u2 \
+                "ii-b4 machine-claim raw marker positive drifted: $positive_image: $marker"
+            exit 1
+        done
+    done
+    for marker in "${iib4_machine_claim_required_security_imports[@]}"; do
+        if ! print -r -- "$machine_driver_undefined_symbols" \
+            | grep -Fxq -- "$marker"
+        then
+            print -u2 "ii-b4 machine-claim import positive drifted: $marker"
+            exit 1
+        fi
+    done
+    for closed_image in "${iib4_machine_claim_closed_images[@]}"; do
+        for marker in \
+            'StornautInvestigationMachineDriverSupport.InvestigationMachineClaimClient' \
+            'InvestigationMachineClaimClientConnectionEpoch' \
+            'InvestigationMachineClaimClientReplyResolver'
+        do
+            if mach_o_image_has_demangled_symbol "$closed_image" "$marker"; then
+                print -u2 \
+                    "ii-b4 machine-claim leaked into a closed image: $closed_image: $marker"
+                exit 1
+            else
+                scan_status=$?
+            fi
+            if (( scan_status == 2 )); then
+                exit 1
+            fi
+        done
+    done
+}
 if mach_o_has_demangled_symbol \
     "$diagnostic_machine_driver" \
     'InvestigationMachineDriverSupport.run() async -> Swift.Int32'
@@ -1660,8 +1904,8 @@ function require_projection() {
 }
 require_projection \
     "$machine_driver_undefined_symbols" \
-    d9ede342877a7c2bae9edb3cc6795b0284ed69d43b251a4ea8f55a99c3b27b61 \
-    336 \
+    aaf705a9b4d2bb802907b7bd5f892fad988564fa237732592f36cf6bc88f075d \
+    517 \
     undefined
 require_projection \
     "$machine_driver_loaded_libraries" \
@@ -1670,8 +1914,8 @@ require_projection \
     load-command
 require_projection \
     "$machine_driver_owned_symbols" \
-    d1ba2a7e19f07e2ebee198bb603fe516d3eee9148460563ebf3e6b6aa9eaf2f7 \
-    637 \
+    b2f3f04ca7c27db94e4833bffd106665bc41c5e6e0df3d36622c42bd4340ee38 \
+    1445 \
     owned-symbol
 if ! mach_o_has_demangled_symbol \
     "$diagnostic_machine_driver" \
@@ -1711,6 +1955,49 @@ then
     print -u2 "Machine driver Security import allowlist drifted."
     exit 1
 fi
+release_machine_driver_undefined_symbols=$(
+    xcrun nm -u -j "$release_machine_driver" 2>/dev/null | LC_ALL=C sort -u
+)
+release_machine_driver_loaded_libraries=$(
+    otool -L "$release_machine_driver" 2>/dev/null \
+        | tail -n +2 | sed 's/^[[:space:]]*//' | LC_ALL=C sort -u
+)
+release_machine_driver_owned_symbols=$(
+    xcrun nm -j "$release_machine_driver" 2>/dev/null \
+        | xcrun swift-demangle 2>/dev/null \
+        | rg 'StornautInvestigationMachineDriver(Support)?' | LC_ALL=C sort -u
+)
+require_projection "$release_machine_driver_undefined_symbols" \
+    976eceef0b2461d60f3aa0a635f5b64598963b7ddee6cd6be4d92fafbf1bafd0 369 release-undefined
+require_projection "$release_machine_driver_loaded_libraries" \
+    e3c05d8766d8aa37e87a834a3f37fd71d925f1d34ac349528cee4970db9d3841 16 release-load-command
+require_projection "$release_machine_driver_owned_symbols" \
+    f182dc183a8a662eb39bdfcdd45e743d595135d68ee7488367b7f222ee53a0da 866 release-owned-symbol
+for marker in "${machine_driver_authority_forbidden_markers[@]}"; do
+    if mach_o_has_demangled_symbol "$release_machine_driver" "$marker"; then
+        print -u2 "Authority or readiness leaked into Release Machine driver: $marker"
+        exit 1
+    else
+        symbol_scan_status=$?
+    fi
+    (( symbol_scan_status != 2 )) || exit 1
+done
+for marker in "${machine_driver_authority_forbidden_imports[@]}"; do
+    ! print -r -- "$release_machine_driver_undefined_symbols" | grep -Fxq -- "$marker" || {
+        print -u2 "Release Machine driver imports prohibited authority: $marker"; exit 1
+    }
+done
+for marker in "${machine_driver_required_readonly_imports[@]}"; do
+    print -r -- "$release_machine_driver_undefined_symbols" | grep -Fxq -- "$marker" || {
+        print -u2 "Release Machine driver read-only import is missing: $marker"; exit 1
+    }
+done
+[[ "$(print -r -- "$release_machine_driver_undefined_symbols" \
+    | grep -E '^_(Sec|kSec|Authorization|CSSM)' | LC_ALL=C sort)" \
+    == "$expected_machine_driver_security_imports" ]] || {
+    print -u2 "Release Machine driver Security import allowlist drifted."; exit 1
+}
+verify_iib4_machine_claim_macho
 
 if mach_o_has_demangled_symbol \
     "$diagnostic_debug_app" \
