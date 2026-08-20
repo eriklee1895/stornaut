@@ -48,9 +48,10 @@
 > production block is complete after its helper-private legacy server correction,
 > complete App/main-Mach-O gate and 1,196-test staged-only serial. ii-b2b-iii
 > live-helper server migration has been split into iii-a handle-v3/single-
-> quantized transfer and iii-b public live façade/helper integration; iii-a and
-> iii-b-i semantic/live integration are complete/non-admitting, and iii-b-ii
-> executable physical-adapter closure is current, followed eventually by ii-c
+> quantized transfer and iii-b public live façade/helper integration; iii-a,
+> iii-b-i semantic/live integration and iii-b-ii executable physical-adapter
+> closure are complete/non-admitting; iii-b/ii-b2b are closed and ii-b3 is
+> current, followed eventually by ii-c
 > one no-model privileged gate. The authoritative
 > real-model run and readiness verdict remain unimplemented.
 > Production Deep Dive remains unavailable until Task 44 admission.
@@ -928,7 +929,9 @@ Checkpoint status:
   and post-fix/cross-group review. iii-b-i semantic/live integration closure is
   complete after 83 focused, 499 affected, one 1,212-test staged-only serial,
   helper/final-Mach-O gates and fresh cross-group review. iii-b-ii executable
-  physical-adapter closure is current.
+  physical-adapter closure is also complete after 51 focused, 504 affected, one
+  1,223-test staged-only serial, physical/five-symbol final-Mach-O gates and
+  post-fix review. iii-b/ii-b2b are closed; ii-b3 is current.
   See the
   [ii-b2 ASID prerequisite review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2-asid-prerequisite-review.md),
   the
@@ -943,6 +946,8 @@ Checkpoint status:
   [iii-a handle v3 review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-a-review.md),
   the
   [iii-b-i live integration review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-b-i-review.md),
+  the
+  [iii-b-ii physical adapter review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-b-ii-review.md),
   the
   [L3c1b-i Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
   and

@@ -3,7 +3,7 @@
 > **Status:** Proposed; external root-launch branch rejected; ii-b0a/ii-b0b/
 > ii-b0c/ii-b1, the ii-b2 ASID prerequisite, ii-b2a, ii-b2b-i and ii-b2b-ii
 > complete; ii-b2b-iii split into iii-a/iii-b and iii-b into iii-b-i/iii-b-ii;
-> iii-a and iii-b-i complete/non-admitting, iii-b-ii current
+> iii-a/iii-b-i/iii-b-ii complete/non-admitting, ii-b3 current
 >
 > **Date:** 2026-08-19
 >
@@ -343,6 +343,7 @@ unconsumed.
 | ii-b2b-ii legacy-client quarantine / Machine production block | complete; non-admitting |
 | ii-b2b-iii-a handle-v3/single-quantized transfer | complete; non-admitting |
 | ii-b2b-iii-b-i semantic/live integration closure | complete; non-admitting |
-| ii-b2b-iii-b-ii executable physical-adapter closure | current |
+| ii-b2b-iii-b-ii executable physical-adapter closure | complete; non-admitting |
+| ii-b3 concrete App drop/no-auth retirement adapter | current |
 | ii-c no-model privileged machine gate | not executed |
 | ADR status | **Proposed** |

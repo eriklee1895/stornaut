@@ -215,7 +215,9 @@ transfer 已通过 91 focused、181 Lifecycle、309 Investigation、唯一
 1,208-test staged-only serial 与 post-fix/cross-group review；iii-b 又拆为
 iii-b-i/iii-b-ii，iii-b-i 已通过 83 focused、499 affected、唯一 1,212-test
 staged-only serial、helper/final-Mach-O gates 与 fresh cross-group review，
-iii-b-ii 是当前 frontier。
+iii-b-ii 也已通过 51 focused、504 affected、唯一 1,223-test staged-only
+serial、physical/five-symbol final-Mach-O gates 与 post-fix review；iii-b/
+ii-b2b 已关闭，ii-b3 是当前 frontier。
 39B2c 仍未作 machine readiness claim。
 L3 preflight 已把余下范围拆为 L3a trusted target extraction、L3b root
 collection 与 L3c failure matrix/final admission。L3a 已把 machine-only
@@ -242,8 +244,8 @@ serial 与 independent post-fix review 也已完成；L3c2b eight-scenario drive
 已关闭；L3c3a/L3c3b 与 L3c3c-i root-launch audit 也已完成，external branch
 为 NO-GO，ADR 0018 仍 Proposed；L3c3c-ii-a 已完成，ii-b 已进一步拆分，
 ii-b0a/ii-b0b/ii-b0c/ii-b1、ii-b2 ASID prerequisite、ii-b2a、ii-b2b-i 与
-ii-b2b-ii、iii-a 与 iii-b-i 均已完成；iii-b-ii executable physical-adapter
-closure 是当前 frontier。
+ii-b2b-ii、iii-a、iii-b-i 与 iii-b-ii 均已完成；iii-b/ii-b2b 已关闭，ii-b3
+concrete App drop/no-auth retirement adapter 是当前 frontier。
 L3c2b preflight 的 real-plan matrix contradiction 已由 3-path plan-freshness
 prerequisite 关闭，affected/Investigation/structural/review gates 通过；
 只有 L3c4 可作 readiness claim 并运行

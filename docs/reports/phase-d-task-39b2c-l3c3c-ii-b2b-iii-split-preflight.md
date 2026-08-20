@@ -3,7 +3,8 @@
 > Status: Approved implementation split; iii-a handle-v3/single-quantized
 > transfer is complete; post-implementation review split iii-b into iii-b-i
 > semantic/live integration closure and iii-b-ii executable physical-adapter
-> closure; iii-b-i is complete/non-admitting and iii-b-ii is current
+> closure; iii-a/iii-b-i/iii-b-ii are complete/non-admitting; iii-b/ii-b2b
+> are closed and ii-b3 is current
 >
 > Date: 2026-08-20
 >
@@ -15,6 +16,8 @@
 > iii-a completion: [Handle v3 Review](phase-d-task-39b2c-l3c3c-ii-b2b-iii-a-review.md)
 >
 > iii-b-i completion: [Live Integration Review](phase-d-task-39b2c-l3c3c-ii-b2b-iii-b-i-review.md)
+>
+> iii-b-ii completion: [Physical Adapter Review](phase-d-task-39b2c-l3c3c-ii-b2b-iii-b-ii-review.md)
 
 ## 1. Why the Existing Fourteen-Path Checkpoint Is Split
 
@@ -231,9 +234,10 @@ checked continuous conversion and cancellable physical scheduler directly
 testable without launching a helper; tests cover conversion overflow, exact
 relative deadline, cancel-before-fire, callback-before-handle/already-fired,
 fresh callback observation, terminal once and zero slots. The fixed helper exit
-mapping remains closed and non-caller-selectable. It reruns the affected,
-coverage, structural and final-Mach-O gates, one staged-only serial and final
-independent review. Only iii-b-ii completion closes iii-b and ii-b2b.
+mapping remains closed and non-caller-selectable. It passed 51 focused, 504
+affected, coverage, structural/final-Mach-O gates, one 1,223-test staged-only
+serial and final independent review. iii-b-ii is complete/non-admitting and
+closes iii-b and ii-b2b.
 
 ## 5. Strict Order and Non-Admission
 

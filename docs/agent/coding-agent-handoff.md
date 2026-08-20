@@ -264,7 +264,9 @@
 > iii-b-i semantic/live integration 与 iii-b-ii executable physical-adapter；
 > iii-b-i 已完成并通过 83 focused、499 affected、唯一 1,212-test/58-suite
 > staged-only serial、完整 helper/final-Mach-O gate 与 fresh cross-group review，
-> iii-b-ii 是当前 frontier。之后为
+> iii-b-ii 也已完成并通过 51 focused、504 affected、唯一 1,223-test/58-suite
+> staged-only serial、physical/five-symbol final-Mach-O gates 与 post-fix review。
+> iii-b/ii-b2b 已关闭，ii-b3 是当前 frontier。之后为
 > ii-c 唯一 no-model privileged installed-driver gate。只有
 > L3c4 可作 readiness claim，
 > L3c2b preflight 的 fresh-plan matrix contradiction 已由 plan-freshness
@@ -608,7 +610,7 @@ audit 已完成并拒绝 external branch；i-b2b-0b/i-b2b-1 在执行前 superse
 B4 root execution count 为 0。L3c3c-ii-a 与 ii-b0a 已完成，当前 frontier 为
 L3c3c-ii-b2；ii-b0a/ii-b0b/ii-b0c/ii-b1 与 ii-b2 ASID prerequisite 已完成，
 ii-b2a、ii-b2b-i 与 ii-b2b-ii legacy-client quarantine / Machine production
-block、iii-a 与 iii-b-i 均已完成，iii-b-ii current，
+block、iii-a、iii-b-i 与 iii-b-ii 均已完成，ii-b3 current，
 ii-b 已拆为 ii-b0a/ii-b0b/ii-b0c 与
 ii-b1–ii-b5，并在 ii-c 前插入 ii-c0。
 ADR 0018 仍 Proposed，L3c4 独占 final admission 与剩余 full。
@@ -798,8 +800,8 @@ B4 root execution count 为 0；L3c3c-ii-a 已完成，ii-b split preflight 已
 deadline state 与 ii-b2b-i non-connected machine-claim server 也已完成。
 ii-b2b-ii legacy-client quarantine / Machine production block 已完成，
 ii-b2b-iii 已拆为 iii-a/iii-b，iii-a handle-v3/single-quantized transfer
-已完成；iii-b 又拆为 iii-b-i/iii-b-ii，iii-b-i semantic/live integration
-closure 已完成，iii-b-ii executable physical-adapter closure 是当前 frontier。
+已完成；iii-b 又拆为 iii-b-i/iii-b-ii，两者均已完成，iii-b/ii-b2b 已关闭；
+ii-b3 concrete App drop/no-auth retirement adapter 是当前 frontier。
 已完成部分均为
 non-admitting prerequisite，
 L3c4 才是 machine admission。该最终 gate
