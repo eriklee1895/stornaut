@@ -100,6 +100,7 @@ package actor InvestigationLifecycleAppServerTransport:
         LifecycleInvestigationResidueObservation?
     private var retirementEvidence:
         InvestigationLifecycleRetirementEvidence?
+    private var startRequestDispatched = false
     private var operationInProgress = false
     private var operationWaiters: [
         (
@@ -238,6 +239,46 @@ package actor InvestigationLifecycleAppServerTransport:
     {
         try await acquireOperation(cancellationSensitive: false)
         defer { releaseOperation() }
+        return try await retireWithEvidenceCore()
+    }
+
+    package func startAndRetireWithEvidence() async throws
+        -> InvestigationLifecycleRetirementEvidence
+    {
+        try await acquireOperation(cancellationSensitive: false)
+        defer { releaseOperation() }
+        guard state == .ready else {
+            fail()
+            throw InvestigationLifecycleAppServerTransportError.invalidState
+        }
+        var startFailure: InvestigationLifecycleAppServerTransportError?
+        do {
+            try Task.checkCancellation()
+            try await startIfNeeded()
+        } catch {
+            startFailure = map(error)
+        }
+        if let startFailure, !startRequestDispatched {
+            fail()
+            throw startFailure
+        }
+        let cancelledAfterStart = Task.isCancelled
+        let retirement = Task {
+            try await self.retireWithEvidenceCore()
+        }
+        let evidence = try await retirement.value
+        if let startFailure {
+            throw startFailure
+        }
+        guard !cancelledAfterStart, !Task.isCancelled else {
+            throw InvestigationLifecycleAppServerTransportError.transportFailed
+        }
+        return evidence
+    }
+
+    private func retireWithEvidenceCore() async throws
+        -> InvestigationLifecycleRetirementEvidence
+    {
         guard state != .retired, state != .retiring else {
             throw InvestigationLifecycleAppServerTransportError
                 .invalidState
@@ -363,6 +404,7 @@ package actor InvestigationLifecycleAppServerTransport:
                 maximumSessionBytes: maximumSessionBytes
             )
             try Task.checkCancellation()
+            startRequestDispatched = true
             let response = try await session.send(request)
             try requireUnexpired()
             let validated = try response.validated(for: request)

@@ -4,6 +4,64 @@ import Testing
 @Suite("Task 39 trusted machine target boundary")
 struct InvestigationMachineTargetBoundaryTests {
     @Test
+    func startRetireSeamRemainsPackageClosedAndUnreachable() throws {
+        let root = URL(filePath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let transport = try String(
+            contentsOf: root.appending(path:
+                "Sources/StornautInvestigationRuntime/InvestigationLifecycleAppServerTransport.swift"),
+            encoding: .utf8
+        )
+        let boundaries = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"),
+            encoding: .utf8
+        )
+        let release = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-app-release-boundaries"),
+            encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        #expect(transport.contains(
+            "package func startAndRetireWithEvidence() async throws"))
+        #expect(!transport.contains(
+            "public func startAndRetireWithEvidence() async throws"))
+        for marker in [
+            "--iib3b-start-retire-contract-only",
+            "--iib3b-staged-scope-contract-only",
+            "start-retire seam gained prohibited surface",
+            "ii-b3b staged checkpoint paths drifted",
+            "ii-b3b staged checkpoint budget drifted",
+        ] {
+            #expect(boundaries.contains(marker))
+        }
+        for marker in [
+            "start_retire_seam_forbidden_markers=(",
+            "start_retire_seam_closed_images=(",
+            "Start-retire seam leaked into a closed image",
+        ] {
+            #expect(release.contains(marker))
+        }
+        for marker in [
+            "start-retire-public", "start-retire-write",
+            "start-retire-caller-cleanup",
+            "start-retire-forwarding",
+            "start-retire-comment-brace",
+            "start-retire-alias",
+            "start-retire-backtick",
+            "for fixture in extra-path over-budget deleted-path",
+            "start-retire-$fixture.index",
+        ] {
+            #expect(contract.contains(marker))
+        }
+    }
+
+    @Test
     func appPeerAdmissionReturnsOnlyPackageScopedStableObservation() throws {
         let root = URL(filePath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()

@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=3b18677cbf3a5df4ecf0d2a561a9e0c9c6f507134cccafbce1d7fed9ba671588
+ib2_self_sha=d371ba2cd9a65c62f7f4c97596b14e6106d86a1d1dd06a375270aeaea30f6d0a
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -179,6 +179,14 @@ require_fixed_text scripts/verify-app-release-boundaries \
     'app_peer_adapter_forbidden_markers=('
 require_fixed_text scripts/verify-app-release-boundaries \
     'App peer adapter leaked into a closed image'
+require_fixed_text scripts/verify-investigation-boundaries \
+    '--iib3b-start-retire-contract-only'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'start-retire seam gained prohibited surface'
+require_fixed_text scripts/verify-app-release-boundaries \
+    'start_retire_seam_closed_images=('
+require_fixed_text scripts/verify-app-release-boundaries \
+    'Start-retire seam leaked into a closed image'
 require_fixed_text scripts/verify-investigation-boundaries \
     'retirement handle protocol version drifted'
 require_fixed_text scripts/verify-investigation-boundaries \
@@ -856,9 +864,9 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "5f3e38284d321de3b55755f6d0c779ffb5e626998eec1603dd08bd5b741a0506",
+        "d714fe3f43fbb94b40ef4154dfcd8f5e2afab8fac23853dc25698b93bce1bde5",
     Path("scripts/verify-app-release-boundaries"):
-        "9e1ecb771ef3e35eba71a509a307d809771e7f9c98a11b2bd2122df050de0211",
+        "585aa61bda997e0cadd6ba9be41d1f2fb8a435a820449d4f1dab227715cbbb0c",
 }
 for path, expected_sha in expected.items():
     observed_sha = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -2668,30 +2676,145 @@ do
         "$app_peer_policy" "$contract_root/$fixture.swift"
 done
 
-real_index=$(git rev-parse --git-path index)
-"$app_peer_gate" --iib3a-staged-scope-contract-only
+b3a_commit=62f8b0fe8a7c60106bfbbc3caf65f2585c7d0ac7
+b3a_parent=59d82511c3fbafc0a167fd72b41186213a16f440
+b3a_index="$contract_root/app-peer-canonical.index"
+rm -f "$b3a_index"
+GIT_INDEX_FILE="$b3a_index" git read-tree "$b3a_commit^{tree}"
+GIT_INDEX_FILE="$b3a_index" "$app_peer_gate" \
+    --iib3a-staged-scope-contract-only "$b3a_parent"
 for fixture in extra-path over-budget deleted-path; do
     temporary_index="$contract_root/app-peer-$fixture.index"
-    cp "$real_index" "$temporary_index"
+    cp "$b3a_index" "$temporary_index"
     if [[ $fixture == extra-path ]]; then
-        blob=$(git rev-parse HEAD:AGENTS.md)
+        blob=$(git rev-parse "${b3a_parent}:AGENTS.md")
         GIT_INDEX_FILE="$temporary_index" git update-index --add \
             --cacheinfo "100644,$blob,iib3a-extra.swift"
         expected='ii-b3a staged checkpoint paths drifted'
     elif [[ $fixture == over-budget ]]; then
-        blob=$(git rev-parse HEAD:docs/plans/active/task-39-implementation-brief.md)
+        blob=$(git rev-parse "${b3a_parent}:docs/plans/active/task-39-implementation-brief.md")
         GIT_INDEX_FILE="$temporary_index" git update-index \
             --cacheinfo "100644,$blob,Sources/StornautInvestigationDiagnostic/InvestigationHandoffAppLeafAdapter.swift"
         expected='ii-b3a staged checkpoint budget drifted'
     else
-        GIT_INDEX_FILE="$temporary_index" git rm --cached -q AGENTS.md
+        blob=$(git rev-parse "${b3a_parent}:AGENTS.md")
+        GIT_INDEX_FILE="$temporary_index" git update-index --add \
+            --cacheinfo "100644,$blob,AGENTS.md"
+        GIT_INDEX_FILE="$temporary_index" git rm --cached -q -f AGENTS.md
         expected='ii-b3a staged checkpoint paths drifted'
     fi
     output="$contract_root/app-peer-$fixture.log"
     if GIT_INDEX_FILE="$temporary_index" "$app_peer_gate" \
-        --iib3a-staged-scope-contract-only >"$output" 2>&1
+        --iib3a-staged-scope-contract-only "$b3a_parent" >"$output" 2>&1
     then
         fail_contract "App peer staged scope mutation accepted: $fixture"
+    fi
+    require_fixed_text "$output" "$expected"
+done
+
+start_retire_gate=scripts/verify-investigation-boundaries
+start_retire_source=Sources/StornautInvestigationRuntime/InvestigationLifecycleAppServerTransport.swift
+"$start_retire_gate" --iib3b-start-retire-contract-only \
+    "$start_retire_source" >"$contract_root/start-retire-canonical.log"
+function require_start_retire_mutation_rejected() {
+    local fixture_name=$1 fixture_path=$2 expected_diagnostic=$3
+    local output="$contract_root/$fixture_name.log"
+    if "$start_retire_gate" --iib3b-start-retire-contract-only \
+        "$fixture_path" >"$output" 2>&1
+    then
+        fail_contract "Start-retire seam mutation accepted: $fixture_name"
+    fi
+    require_fixed_text "$output" "$expected_diagnostic"
+}
+python3 - "$start_retire_source" "$contract_root" <<'PY'
+from pathlib import Path
+import sys
+
+source_path, output_root = map(Path, sys.argv[1:])
+source = source_path.read_text(encoding="utf-8")
+mutations = {
+    "start-retire-public.swift": (
+        "package func startAndRetireWithEvidence() async throws",
+        "public func startAndRetireWithEvidence() async throws",
+    ),
+    "start-retire-write.swift": (
+        "try Task.checkCancellation()\n            try await startIfNeeded()",
+        "try Task.checkCancellation()\n            try await startIfNeeded(); try await writeLine(Data())",
+    ),
+    "start-retire-caller-cleanup.swift": (
+        "let retirement = Task {\n            try await self.retireWithEvidenceCore()\n        }\n        let evidence = try await retirement.value",
+        "let evidence = try await retireWithEvidenceCore()",
+    ),
+    "start-retire-forwarding.swift": (
+        "private func retireWithEvidenceCore() async throws",
+        "public func forwardStartRetire() async throws { try await startAndRetireWithEvidence() }\n\n    private func retireWithEvidenceCore() async throws",
+    ),
+    "start-retire-comment-brace.swift": (
+        "let cancelledAfterStart = Task.isCancelled",
+        "let cancelledAfterStart = Task.isCancelled // }\n        try await writeLine(Data())",
+    ),
+    "start-retire-alias.swift": (
+        "let cancelledAfterStart = Task.isCancelled",
+        "let send = writeLine\n        let cancelledAfterStart = Task.isCancelled",
+    ),
+    "start-retire-backtick.swift": (
+        "let cancelledAfterStart = Task.isCancelled",
+        "try await `writeLine`(Data())\n        let cancelledAfterStart = Task.isCancelled",
+    ),
+}
+for name, (old, new) in mutations.items():
+    if source.count(old) != 1:
+        raise SystemExit(f"cannot construct start-retire mutation: {name}")
+    (output_root / name).write_text(
+        source.replace(old, new, 1), encoding="utf-8"
+    )
+PY
+require_start_retire_mutation_rejected start-retire-public \
+    "$contract_root/start-retire-public.swift" \
+    'start-retire seam package API drifted'
+require_start_retire_mutation_rejected start-retire-write \
+    "$contract_root/start-retire-write.swift" \
+    'start-retire seam gained prohibited surface'
+require_start_retire_mutation_rejected start-retire-caller-cleanup \
+    "$contract_root/start-retire-caller-cleanup.swift" \
+    'start-retire seam contract drifted'
+require_start_retire_mutation_rejected start-retire-forwarding \
+    "$contract_root/start-retire-forwarding.swift" \
+    'start-retire seam forwarding surface drifted'
+require_start_retire_mutation_rejected start-retire-comment-brace \
+    "$contract_root/start-retire-comment-brace.swift" \
+    'start-retire seam gained prohibited surface'
+require_start_retire_mutation_rejected start-retire-alias \
+    "$contract_root/start-retire-alias.swift" \
+    'start-retire seam gained prohibited surface'
+require_start_retire_mutation_rejected start-retire-backtick \
+    "$contract_root/start-retire-backtick.swift" \
+    'start-retire seam gained prohibited surface'
+
+"$start_retire_gate" --iib3b-staged-scope-contract-only
+real_index=$(git rev-parse --git-path index)
+for fixture in extra-path over-budget deleted-path; do
+    temporary_index="$contract_root/start-retire-$fixture.index"
+    cp "$real_index" "$temporary_index"
+    if [[ $fixture == extra-path ]]; then
+        blob=$(git rev-parse HEAD:AGENTS.md)
+        GIT_INDEX_FILE="$temporary_index" git update-index --add \
+            --cacheinfo "100644,$blob,iib3b-extra.swift"
+        expected='ii-b3b staged checkpoint paths drifted'
+    elif [[ $fixture == over-budget ]]; then
+        blob=$(git rev-parse HEAD:docs/plans/active/task-39-implementation-brief.md)
+        GIT_INDEX_FILE="$temporary_index" git update-index \
+            --cacheinfo "100644,$blob,Sources/StornautInvestigationRuntime/InvestigationLifecycleAppServerTransport.swift"
+        expected='ii-b3b staged checkpoint budget drifted'
+    else
+        GIT_INDEX_FILE="$temporary_index" git rm --cached -q AGENTS.md
+        expected='ii-b3b staged checkpoint paths drifted'
+    fi
+    output="$contract_root/start-retire-$fixture.log"
+    if GIT_INDEX_FILE="$temporary_index" "$start_retire_gate" \
+        --iib3b-staged-scope-contract-only >"$output" 2>&1
+    then
+        fail_contract "Start-retire staged scope mutation accepted: $fixture"
     fi
     require_fixed_text "$output" "$expected"
 done
@@ -2747,13 +2870,17 @@ python3 - "$claim_server_macho_gate" \
     "$contract_root/claim-server-physical-positive.swift" \
     "$contract_root/claim-server-physical-negative.swift" \
     "$contract_root/app-peer-debug-dylib.swift" \
-    "$contract_root/app-peer-preview.swift" <<'PY'
+    "$contract_root/app-peer-preview.swift" \
+    "$contract_root/start-retire-diagnostic-main.swift" \
+    "$contract_root/start-retire-preview.swift" \
+    "$contract_root/start-retire-marker-loop.swift" <<'PY'
 from pathlib import Path
 import sys
 
 source_path, helper_path, negative_path, selector_path, fail_open_path, \
     physical_path, physical_negative_path, app_peer_dylib_path, \
-    app_peer_preview_path = map(
+    app_peer_preview_path, start_retire_main_path, \
+    start_retire_preview_path, start_retire_loop_path = map(
     Path, sys.argv[1:]
 )
 source = source_path.read_text(encoding="utf-8")
@@ -2816,6 +2943,28 @@ app_peer_preview_path.write_text(mutate_array(
     '    "$debug_app/Contents/MacOS/__preview.dylib"\n', '',
     "App peer preview negative omitted"
 ), encoding="utf-8")
+start_retire_main_path.write_text(mutate_array(
+    "start_retire_seam_closed_images",
+    '    "$diagnostic_debug_app/Contents/MacOS/StornautInvestigationDiagnostic"\n',
+    '', "start-retire diagnostic main omitted"
+), encoding="utf-8")
+start_retire_preview_path.write_text(mutate_array(
+    "start_retire_seam_closed_images",
+    '    "$diagnostic_debug_app/Contents/MacOS/__preview.dylib"\n',
+    '', "start-retire preview omitted"
+), encoding="utf-8")
+start_retire_loop_path.write_text(mutate_runtime(
+    'for marker in "${start_retire_seam_forbidden_markers[@]}"; do\n'
+    '    for forbidden_image in "${start_retire_seam_closed_images[@]}"; do\n'
+    '        if mach_o_image_has_raw_string "$forbidden_image" "$marker"; then\n'
+    '            print -u2 "Start-retire seam leaked into a closed image: $forbidden_image: $marker"\n',
+    'for marker in "${start_retire_seam_forbidden_markers[@]}"; do\n'
+    '    for forbidden_image in "${start_retire_seam_closed_images[@]}"; do\n'
+    '        if mach_o_image_has_raw_string "$forbidden_image" '
+    '"${start_retire_seam_forbidden_markers[1]}"; then\n'
+    '            print -u2 "Start-retire seam leaked into a closed image: $forbidden_image: $marker"\n',
+    "start-retire marker loop fixed"
+), encoding="utf-8")
 start = runtime.index("mach_o_image_has_demangled_symbol() {")
 end = runtime.index("\n}\n", start) + 3
 function = runtime[start:end]
@@ -2851,6 +3000,15 @@ require_claim_server_macho_mutation_rejected app-peer-debug-dylib \
 require_claim_server_macho_mutation_rejected app-peer-preview \
     "$contract_root/app-peer-preview.swift" \
     'claim-server Mach-O array drifted: app_peer_adapter_closed_images'
+require_claim_server_macho_mutation_rejected start-retire-diagnostic-main \
+    "$contract_root/start-retire-diagnostic-main.swift" \
+    'claim-server Mach-O array drifted: start_retire_seam_closed_images'
+require_claim_server_macho_mutation_rejected start-retire-preview \
+    "$contract_root/start-retire-preview.swift" \
+    'claim-server Mach-O array drifted: start_retire_seam_closed_images'
+require_claim_server_macho_mutation_rejected start-retire-marker-loop \
+    "$contract_root/start-retire-marker-loop.swift" \
+    'start-retire seam image scan drifted'
 
 # Scope/cost anti-spoofing stays executable without touching the real worktree.
 python3 - scripts/verify-investigation-boundaries <<'PY'

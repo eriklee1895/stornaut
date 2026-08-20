@@ -37,6 +37,11 @@ app_peer_admission_contract_only=false
 app_peer_admission_policy_source=
 app_peer_admission_adapter_source=
 iib3a_staged_scope_contract_only=false
+iib3a_staged_scope_baseline=HEAD
+iib3b_start_retire_contract_only=false
+iib3b_start_retire_source=
+iib3b_staged_scope_contract_only=false
+iib3b_staged_scope_baseline=HEAD
 if (( $# > 0 )); then
     if (( $# == 2 )) && [[ $1 == --claim-asid-contract-only ]]; then
         claim_asid_contract_only=true
@@ -81,12 +86,21 @@ if (( $# > 0 )); then
         app_peer_admission_contract_only=true
         app_peer_admission_policy_source=$2
         app_peer_admission_adapter_source=$3
-    elif (( $# == 1 )) \
+    elif (( $# == 1 || $# == 2 )) \
         && [[ $1 == --iib3a-staged-scope-contract-only ]]; then
         iib3a_staged_scope_contract_only=true
+        iib3a_staged_scope_baseline=${2:-HEAD}
+    elif (( $# == 2 )) \
+        && [[ $1 == --iib3b-start-retire-contract-only ]]; then
+        iib3b_start_retire_contract_only=true
+        iib3b_start_retire_source=$2
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iib3b-staged-scope-contract-only ]]; then
+        iib3b_staged_scope_contract_only=true
+        iib3b_staged_scope_baseline=${2:-HEAD}
     else
         print -u2 \
-            "Usage: scripts/verify-investigation-boundaries [--claim-asid-contract-only <source> | --deadline-state-contract-only <source> | --claim-server-contract-only <adapter> <effects> <deadline-state> | --claim-server-package-contract-only <describe-json> <dump-json> | --legacy-machine-claim-contract-only <lifecycle-xpc> <helper> <machine-host> <machine-claim> | --retirement-handle-v3-contract-only <lifecycle> <adapter> | --live-claim-server-contract-only <project.pbxproj> <Package.swift> <handoff-root> <scheme-root> <lifecycle-escrow> <adapter> <effects> <helper> | --app-peer-admission-contract-only <policy> <adapter> | --iib3a-staged-scope-contract-only]"
+            "Usage: scripts/verify-investigation-boundaries [--claim-asid-contract-only <source> | --deadline-state-contract-only <source> | --claim-server-contract-only <adapter> <effects> <deadline-state> | --claim-server-package-contract-only <describe-json> <dump-json> | --legacy-machine-claim-contract-only <lifecycle-xpc> <helper> <machine-host> <machine-claim> | --retirement-handle-v3-contract-only <lifecycle> <adapter> | --live-claim-server-contract-only <project.pbxproj> <Package.swift> <handoff-root> <scheme-root> <lifecycle-escrow> <adapter> <effects> <helper> | --app-peer-admission-contract-only <policy> <adapter> | --iib3a-staged-scope-contract-only [baseline] | --iib3b-start-retire-contract-only <transport> | --iib3b-staged-scope-contract-only [baseline]]"
         exit 64
     fi
 fi
@@ -198,6 +212,7 @@ PY
 }
 
 function verify_iib3a_staged_scope() {
+    local baseline=${1:-HEAD}
     local expected=(
         Sources/StornautInvestigationDiagnostic/InvestigationHandoffAppLeafAdapter.swift
         Sources/StornautLifecycle/LifecycleAppAuthorization.swift
@@ -208,15 +223,159 @@ function verify_iib3a_staged_scope() {
         scripts/verify-contract
         scripts/verify-investigation-boundaries
     )
-    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD)"})
+    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD "$baseline")"})
     [[ "${(j:\n:)${(on)observed}}" == "${(j:\n:)${(on)expected}}" ]] || {
         print -u2 "ii-b3a staged checkpoint paths drifted"
         return 1
     }
     local changed
-    changed=$(git diff --cached --numstat | awk '{total += $1 + $2} END {print total + 0}')
+    changed=$(git diff --cached --numstat "$baseline" | awk '{total += $1 + $2} END {print total + 0}')
     (( changed <= 2200 )) || {
         print -u2 "ii-b3a staged checkpoint budget drifted"
+        return 1
+    }
+}
+
+function verify_iib3b_start_retire_contract() {
+    local source_path=$1
+    python3 - "$source_path" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+source = Path(sys.argv[1]).read_text(encoding="utf-8")
+def code_only(value):
+    output = list(value)
+    index = 0
+    block_depth = 0
+    delimiter = None
+    while index < len(value):
+        if block_depth:
+            if value.startswith("/*", index):
+                output[index:index + 2] = "  "
+                block_depth += 1
+                index += 2
+            elif value.startswith("*/", index):
+                output[index:index + 2] = "  "
+                block_depth -= 1
+                index += 2
+            else:
+                if value[index] != "\n":
+                    output[index] = " "
+                index += 1
+            continue
+        if delimiter is not None:
+            if value.startswith(delimiter, index):
+                width = len(delimiter)
+                output[index:index + width] = " " * width
+                delimiter = None
+                index += width
+            elif delimiter == '"' and value[index] == "\\":
+                output[index] = " "
+                if index + 1 < len(value):
+                    output[index + 1] = " "
+                index += 2
+            else:
+                if value[index] != "\n":
+                    output[index] = " "
+                index += 1
+            continue
+        if value.startswith("//", index):
+            end = value.find("\n", index)
+            end = len(value) if end < 0 else end
+            output[index:end] = " " * (end - index)
+            index = end
+        elif value.startswith("/*", index):
+            output[index:index + 2] = "  "
+            block_depth = 1
+            index += 2
+        elif value.startswith('"""', index):
+            output[index:index + 3] = "   "
+            delimiter = '"""'
+            index += 3
+        elif value[index] == '"':
+            output[index] = " "
+            delimiter = '"'
+            index += 1
+        else:
+            index += 1
+    if block_depth or delimiter is not None:
+        raise SystemExit("start-retire source has unterminated text")
+    return "".join(output)
+
+code = code_only(source)
+match = re.search(
+    r"(?m)^\s*package func startAndRetireWithEvidence\(\) async throws\s*$",
+    code,
+)
+if match is None:
+    raise SystemExit("start-retire seam package API drifted")
+if code.count("startAndRetireWithEvidence") != 1:
+    raise SystemExit("start-retire seam forwarding surface drifted")
+opening = code.find("{", match.end())
+depth = 0
+closing = -1
+for index in range(opening, len(code)):
+    if code[index] == "{":
+        depth += 1
+    elif code[index] == "}":
+        depth -= 1
+        if depth == 0:
+            closing = index + 1
+            break
+if opening < 0 or closing < 0:
+    raise SystemExit("start-retire seam body is unterminated")
+projected_body = code[match.start():closing]
+body = re.sub(r"\s+", "", projected_body)
+required = (
+    "acquireOperation(cancellationSensitive:false)",
+    "guardstate==.ready",
+    "startIfNeeded()",
+    "startRequestDispatched",
+    "Task{tryawaitself.retireWithEvidenceCore()}",
+    "letevidence=tryawaitretirement.value",
+    "ifletstartFailure",
+    "guard!cancelledAfterStart,!Task.isCancelled",
+    "returnevidence",
+)
+missing = [value for value in required if value not in body]
+if missing:
+    raise SystemExit(f"start-retire seam contract drifted: {missing!r}")
+for forbidden in (
+    "writeLine", "readLine", "CodexInteractiveAppServerClient",
+    "prepareRoot", "authProjection", "initialize", "login",
+    "thread", "turn", "capabilityEvidence", "modelEvidence",
+    "networkEvidence", "Process", "NSXPCConnection",
+    "DispatchSemaphore",
+):
+    if re.search(
+        rf"(?<![A-Za-z0-9_]){re.escape(forbidden)}(?![A-Za-z0-9_])",
+        projected_body,
+        re.IGNORECASE,
+    ):
+        raise SystemExit(f"start-retire seam gained prohibited surface: {forbidden}")
+PY
+}
+
+function verify_iib3b_staged_scope() {
+    local baseline=${1:-HEAD}
+    local expected=(
+        Sources/StornautInvestigationRuntime/InvestigationLifecycleAppServerTransport.swift
+        Tests/StornautInvestigationTests/InvestigationLifecycleAppServerTransportTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-app-release-boundaries
+        scripts/verify-contract
+        scripts/verify-investigation-boundaries
+    )
+    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD "$baseline")"})
+    [[ "${(j:\n:)${(on)observed}}" == "${(j:\n:)${(on)expected}}" ]] || {
+        print -u2 "ii-b3b staged checkpoint paths drifted"
+        return 1
+    }
+    local changed
+    changed=$(git diff --cached --numstat "$baseline" | awk '{total += $1 + $2} END {print total + 0}')
+    (( changed <= 1500 )) || {
+        print -u2 "ii-b3b staged checkpoint budget drifted"
         return 1
     }
 }
@@ -2745,8 +2904,18 @@ if $app_peer_admission_contract_only; then
     exit 0
 fi
 if $iib3a_staged_scope_contract_only; then
-    verify_iib3a_staged_scope
+    verify_iib3a_staged_scope "$iib3a_staged_scope_baseline"
     print "ii-b3a staged scope verification passed."
+    exit 0
+fi
+if $iib3b_start_retire_contract_only; then
+    verify_iib3b_start_retire_contract "$iib3b_start_retire_source"
+    print "ii-b3b start-retire seam contract verification passed."
+    exit 0
+fi
+if $iib3b_staged_scope_contract_only; then
+    verify_iib3b_staged_scope "$iib3b_staged_scope_baseline"
+    print "ii-b3b staged scope verification passed."
     exit 0
 fi
 
@@ -4451,6 +4620,8 @@ verify_live_claim_server_contract \
 verify_app_peer_admission_contract \
     Sources/StornautLifecycle/LifecycleAppAuthorization.swift \
     Sources/StornautInvestigationDiagnostic/InvestigationHandoffAppLeafAdapter.swift
+verify_iib3b_start_retire_contract \
+    Sources/StornautInvestigationRuntime/InvestigationLifecycleAppServerTransport.swift
 verify_claim_server_scope
 verify_legacy_machine_claim_scope
 verify_retirement_handle_v3_scope

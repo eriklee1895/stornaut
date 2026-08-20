@@ -839,6 +839,352 @@ struct InvestigationLifecycleAppServerTransportTests {
             .retire,
         ])
     }
+
+    @Test
+    func startAndRetireUsesOnlyControlRequestsAndStoresEvidence()
+        async throws
+    {
+        let fixture = InvestigationLifecycleTransportFixture()
+        let store = InvestigationLifecycleRetirementEvidenceStore()
+        let session = FakeLifecycleInteractiveSession(responses: [
+            .started(
+                investigationID: fixture.investigationID,
+                operationID: fixture.operationIDs[0]
+            ),
+            try fixture.retiredResponse(
+                operationID: fixture.operationIDs[1]
+            ),
+        ])
+        let transport = try fixture.transport(
+            session: session,
+            operationIDs: Array(fixture.operationIDs.prefix(2)),
+            retirementEvidenceStore: store
+        )
+
+        let evidence = try await transport.startAndRetireWithEvidence()
+
+        let requests = await session.requests
+        #expect(requests.map(\.kind) == [.start, .retire])
+        #expect(requests.allSatisfy { $0.line == nil })
+        #expect(requests[0].validBefore == fixture.validBefore)
+        #expect(requests[1].validBefore == nil)
+        #expect(await store.consume() == evidence)
+        #expect(try await transport.acceptedRetirementEvidence() == evidence)
+    }
+
+    @Test
+    func dispatchedStartFailureStillRetiresAndPreservesFailure() async throws {
+        let fixture = InvestigationLifecycleTransportFixture()
+        let session = FakeLifecycleInteractiveSession(responses: [
+            .started(
+                investigationID: fixture.investigationID,
+                operationID: UUID()
+            ),
+            try fixture.retiredResponse(
+                operationID: fixture.operationIDs[1]
+            ),
+        ])
+        let transport = try fixture.transport(
+            session: session,
+            operationIDs: Array(fixture.operationIDs.prefix(2))
+        )
+
+        await #expect(
+            throws: InvestigationLifecycleAppServerTransportError
+                .identityMismatch
+        ) {
+            _ = try await transport.startAndRetireWithEvidence()
+        }
+        #expect(await session.requests.map(\.kind) == [.start, .retire])
+        _ = try await transport.acceptedRetirementEvidence()
+    }
+
+    @Test
+    func unprovedRetirementReplacesDispatchedStartFailure() async throws {
+        let fixture = InvestigationLifecycleTransportFixture()
+        let session = FakeLifecycleInteractiveSession(responses: [
+            .started(
+                investigationID: fixture.investigationID,
+                operationID: UUID()
+            ),
+            .retired(
+                investigationID: fixture.investigationID,
+                operationID: fixture.operationIDs[1],
+                drained: true,
+                ownerRetirementObservation: .noOwnedResources
+            ),
+        ])
+        let transport = try fixture.transport(
+            session: session,
+            operationIDs: Array(fixture.operationIDs.prefix(2))
+        )
+
+        await #expect(
+            throws: InvestigationLifecycleAppServerTransportError
+                .drainUnconfirmed
+        ) {
+            _ = try await transport.startAndRetireWithEvidence()
+        }
+        #expect(await session.requests.map(\.kind) == [.start, .retire])
+    }
+
+    @Test
+    func expiryAfterStartStillRetiresBeforeReturningFailure() async throws {
+        let fixture = InvestigationLifecycleTransportFixture()
+        let clock = MutableTransportClock(now: fixture.now)
+        let session = FakeLifecycleInteractiveSession(
+            responses: [
+                .started(
+                    investigationID: fixture.investigationID,
+                    operationID: fixture.operationIDs[0]
+                ),
+                try fixture.retiredResponse(
+                    operationID: fixture.operationIDs[1],
+                    observedAt: fixture.validBefore
+                ),
+            ],
+            helperAttestedAt: { clock.read() },
+            beforeResponse: { request in
+                if request.kind == .start {
+                    clock.set(fixture.validBefore)
+                }
+            }
+        )
+        let transport = try fixture.transport(
+            session: session,
+            operationIDs: Array(fixture.operationIDs.prefix(2)),
+            now: { clock.read() }
+        )
+
+        await #expect(
+            throws: InvestigationLifecycleAppServerTransportError
+                .invalidConfiguration
+        ) {
+            _ = try await transport.startAndRetireWithEvidence()
+        }
+        #expect(await session.requests.map(\.kind) == [.start, .retire])
+        _ = try await transport.acceptedRetirementEvidence()
+    }
+
+    @Test
+    func expiryBeforeStartDispatchesNothingAndIsTerminal() async throws {
+        let fixture = InvestigationLifecycleTransportFixture()
+        let clock = MutableTransportClock(now: fixture.now)
+        let session = FakeLifecycleInteractiveSession(responses: [])
+        let transport = try fixture.transport(
+            session: session,
+            now: { clock.read() }
+        )
+        clock.set(fixture.validBefore)
+
+        await #expect(
+            throws: InvestigationLifecycleAppServerTransportError
+                .invalidConfiguration
+        ) {
+            _ = try await transport.startAndRetireWithEvidence()
+        }
+        #expect(await session.requests.isEmpty)
+        await #expect(
+            throws: InvestigationLifecycleAppServerTransportError.invalidState
+        ) {
+            _ = try await transport.startAndRetireWithEvidence()
+        }
+    }
+
+    @Test
+    func successfulStartWithFailedRetirementNeverBecomesSuccess() async throws {
+        let fixture = InvestigationLifecycleTransportFixture()
+        let session = FakeLifecycleInteractiveSession(responses: [
+            .started(
+                investigationID: fixture.investigationID,
+                operationID: fixture.operationIDs[0]
+            ),
+            .retired(
+                investigationID: fixture.investigationID,
+                operationID: fixture.operationIDs[1],
+                drained: true,
+                ownerRetirementObservation: .noOwnedResources
+            ),
+        ])
+        let transport = try fixture.transport(
+            session: session,
+            operationIDs: Array(fixture.operationIDs.prefix(2))
+        )
+
+        await #expect(
+            throws: InvestigationLifecycleAppServerTransportError
+                .drainUnconfirmed
+        ) {
+            _ = try await transport.startAndRetireWithEvidence()
+        }
+        #expect(await session.requests.map(\.kind) == [.start, .retire])
+        await #expect(
+            throws: InvestigationLifecycleAppServerTransportError
+                .drainUnconfirmed
+        ) {
+            _ = try await transport.acceptedRetirementEvidence()
+        }
+    }
+
+    @Test
+    func occupiedEvidenceStoreMakesTheWholeSeamFail() async throws {
+        let fixture = InvestigationLifecycleTransportFixture()
+        let store = InvestigationLifecycleRetirementEvidenceStore()
+        let seedSession = FakeLifecycleInteractiveSession(responses: [
+            try fixture.retiredResponse(
+                operationID: fixture.operationIDs[0]
+            ),
+        ])
+        let seed = try InvestigationLifecycleAppServerTransport(
+            investigationID: fixture.investigationID,
+            configurationSHA256: fixture.configurationSHA256,
+            validBefore: fixture.validBefore,
+            maximumLineBytes: 1_024,
+            maximumSessionBytes: 8_192,
+            expectedUserID: 501,
+            now: { fixture.now },
+            operationID: { fixture.operationIDs[0] },
+            session: seedSession,
+            retirementEvidenceStore: store
+        )
+        _ = try await seed.retireWithEvidence()
+        let session = FakeLifecycleInteractiveSession(responses: [
+            .started(
+                investigationID: fixture.investigationID,
+                operationID: fixture.operationIDs[0]
+            ),
+            try fixture.retiredResponse(
+                operationID: fixture.operationIDs[1]
+            ),
+        ])
+        let transport = try fixture.transport(
+            session: session,
+            operationIDs: Array(fixture.operationIDs.prefix(2)),
+            retirementEvidenceStore: store
+        )
+
+        await #expect(
+            throws: InvestigationLifecycleAppServerTransportError.invalidState
+        ) {
+            _ = try await transport.startAndRetireWithEvidence()
+        }
+        #expect(await session.requests.map(\.kind) == [.start, .retire])
+        await #expect(
+            throws: InvestigationLifecycleAppServerTransportError
+                .drainUnconfirmed
+        ) {
+            _ = try await transport.acceptedRetirementEvidence()
+        }
+    }
+
+    @Test(arguments: [false, true])
+    func cancellationAfterDispatchStillCompletesRetirement(
+        duringRetire: Bool
+    ) async throws {
+        let fixture = InvestigationLifecycleTransportFixture()
+        let ids = [
+            fixture.operationIDs[0],
+            fixture.operationIDs[1],
+            fixture.operationIDs[1],
+        ]
+        let session = SuspendedLifecycleInteractiveSession(
+            investigationID: fixture.investigationID,
+            operationIDs: ids,
+            suspendRetire: duringRetire,
+            checkRetireCancellation: true
+        )
+        let transport = try fixture.transport(
+            session: session,
+            operationIDs: Array(ids.prefix(2))
+        )
+        let operation = Task {
+            try await transport.startAndRetireWithEvidence()
+        }
+        await session.waitUntilStartIsSuspended()
+        if duringRetire {
+            await session.resumeStart()
+            await session.waitUntilRetireIsSuspended()
+        }
+        operation.cancel()
+        if duringRetire {
+            await session.resumeRetire()
+        } else {
+            await session.resumeStart()
+        }
+
+        await #expect(
+            throws: InvestigationLifecycleAppServerTransportError
+                .transportFailed
+        ) {
+            _ = try await operation.value
+        }
+        #expect(await session.requests.map(\.kind) == [.start, .retire])
+        _ = try await transport.acceptedRetirementEvidence()
+    }
+
+    @Test
+    func cancellationBeforeStartIsTerminalAndDispatchesNothing() async throws {
+        let fixture = InvestigationLifecycleTransportFixture()
+        let session = FakeLifecycleInteractiveSession(responses: [])
+        let transport = try fixture.transport(session: session)
+        let operation = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return try await transport.startAndRetireWithEvidence()
+        }
+
+        await #expect(
+            throws: InvestigationLifecycleAppServerTransportError
+                .transportFailed
+        ) {
+            _ = try await operation.value
+        }
+        #expect(await session.requests.isEmpty)
+        await #expect(
+            throws: InvestigationLifecycleAppServerTransportError.invalidState
+        ) {
+            _ = try await transport.startAndRetireWithEvidence()
+        }
+    }
+
+    @Test
+    func concurrentAndRepeatedStartRetireCallsHaveOneWinner() async throws {
+        let fixture = InvestigationLifecycleTransportFixture()
+        let ids = [
+            fixture.operationIDs[0],
+            fixture.operationIDs[1],
+            fixture.operationIDs[1],
+        ]
+        let session = SuspendedLifecycleInteractiveSession(
+            investigationID: fixture.investigationID,
+            operationIDs: ids
+        )
+        let transport = try fixture.transport(
+            session: session,
+            operationIDs: Array(ids.prefix(2))
+        )
+        let first = Task {
+            try await transport.startAndRetireWithEvidence()
+        }
+        await session.waitUntilStartIsSuspended()
+        let second = Task {
+            try await transport.startAndRetireWithEvidence()
+        }
+        await Task.yield()
+        await session.resumeStart()
+
+        _ = try await first.value
+        await #expect(
+            throws: InvestigationLifecycleAppServerTransportError.invalidState
+        ) {
+            _ = try await second.value
+        }
+        await #expect(
+            throws: InvestigationLifecycleAppServerTransportError.invalidState
+        ) {
+            _ = try await transport.startAndRetireWithEvidence()
+        }
+        #expect(await session.requests.map(\.kind) == [.start, .retire])
+    }
 }
 
 private struct InvestigationLifecycleTransportFixture {
@@ -929,7 +1275,9 @@ private struct InvestigationLifecycleTransportFixture {
     func transport(
         session: any LifecycleInteractiveSessionSending,
         operationIDs: [UUID]? = nil,
-        now: (@Sendable () -> Date)? = nil
+        now: (@Sendable () -> Date)? = nil,
+        retirementEvidenceStore:
+            InvestigationLifecycleRetirementEvidenceStore? = nil
     ) throws -> InvestigationLifecycleAppServerTransport {
         let provider = SequentialOperationIDProvider(
             values: operationIDs ?? self.operationIDs
@@ -943,7 +1291,8 @@ private struct InvestigationLifecycleTransportFixture {
             expectedUserID: 501,
             now: now ?? { self.now },
             operationID: { try provider.next() },
-            session: session
+            session: session,
+            retirementEvidenceStore: retirementEvidenceStore
         )
     }
 }
@@ -954,15 +1303,23 @@ private actor SuspendedLifecycleInteractiveSession:
     private(set) var requests: [LifecycleInteractiveSessionRequest] = []
     private let investigationID: LifecycleInvestigationID
     private let operationIDs: [UUID]
+    private let suspendRetire: Bool
+    private let checkRetireCancellation: Bool
     private var startContinuation: CheckedContinuation<Void, Never>?
     private var startWaiter: CheckedContinuation<Void, Never>?
+    private var retireContinuation: CheckedContinuation<Void, Never>?
+    private var retireWaiter: CheckedContinuation<Void, Never>?
 
     init(
         investigationID: LifecycleInvestigationID,
-        operationIDs: [UUID]
+        operationIDs: [UUID],
+        suspendRetire: Bool = false,
+        checkRetireCancellation: Bool = false
     ) {
         self.investigationID = investigationID
         self.operationIDs = operationIDs
+        self.suspendRetire = suspendRetire
+        self.checkRetireCancellation = checkRetireCancellation
     }
 
     func send(
@@ -989,6 +1346,16 @@ private actor SuspendedLifecycleInteractiveSession:
                 operationID: operationIDs[1]
             )
         case .retire:
+            if suspendRetire {
+                retireWaiter?.resume()
+                retireWaiter = nil
+                await withCheckedContinuation {
+                    retireContinuation = $0
+                }
+            }
+            if checkRetireCancellation {
+                try Task.checkCancellation()
+            }
             return .retired(
                 investigationID: investigationID,
                 operationID: operationIDs[2],
@@ -1048,6 +1415,20 @@ private actor SuspendedLifecycleInteractiveSession:
     func resumeStart() {
         startContinuation?.resume()
         startContinuation = nil
+    }
+
+    func waitUntilRetireIsSuspended() async {
+        if retireContinuation != nil {
+            return
+        }
+        await withCheckedContinuation {
+            retireWaiter = $0
+        }
+    }
+
+    func resumeRetire() {
+        retireContinuation?.resume()
+        retireContinuation = nil
     }
 }
 
