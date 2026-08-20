@@ -3,7 +3,8 @@
 > **Status:** Proposed; external root-launch branch rejected; ii-b0a/ii-b0b/
 > ii-b0c/ii-b1, the ii-b2 ASID prerequisite, ii-b2a, ii-b2b-i and ii-b2b-ii
 > complete; ii-b2b-iii split into iii-a/iii-b and iii-b into iii-b-i/iii-b-ii;
-> iii-a/iii-b-i/iii-b-ii complete/non-admitting, ii-b3 current
+> iii-a/iii-b-i/iii-b-ii complete/non-admitting; ii-b3 split into b3a/b3b/b3c;
+> ii-b3a current
 >
 > **Date:** 2026-08-19
 >
@@ -344,6 +345,8 @@ unconsumed.
 | ii-b2b-iii-a handle-v3/single-quantized transfer | complete; non-admitting |
 | ii-b2b-iii-b-i semantic/live integration closure | complete; non-admitting |
 | ii-b2b-iii-b-ii executable physical-adapter closure | complete; non-admitting |
-| ii-b3 concrete App drop/no-auth retirement adapter | current |
+| ii-b3a fixed-channel/root-peer/drop adapter | current |
+| ii-b3b start-to-retire-only Lifecycle seam | pending after ii-b3a |
+| ii-b3c concrete leaf/native entry | pending after ii-b3b |
 | ii-c no-model privileged machine gate | not executed |
 | ADR status | **Proposed** |

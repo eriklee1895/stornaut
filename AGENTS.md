@@ -301,8 +301,10 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   58-suite staged-only serial、完整 helper/final-Mach-O gate 与 fresh
   cross-group review；iii-b-ii 已完成并通过 51 focused、504 affected、
   唯一 1,223-test/58-suite staged-only serial、physical mutation 与五符号
-  final-Mach-O gates，五项 review P1 已关闭。iii-b 与 ii-b2b 已完成，ii-b3
-  是当前 implementation frontier。之后
+  final-Mach-O gates，五项 review P1 已关闭。iii-b 与 ii-b2b 已完成；ii-b3
+  已按 fresh preflight 拆为 ii-b3a fixed-channel/root-peer/drop adapter、ii-b3b
+  start-to-retire-only Lifecycle seam 与 ii-b3c concrete leaf/native entry；
+  ii-b3a 是当前 implementation frontier。之后
   严格为 ii-c 唯一 no-model
   privileged machine gate，只有 ii-c 可接受 ADR 0018。
   只有 L3c4
@@ -444,6 +446,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c L3c3c-ii-b2b-iii-a handle v3 review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-a-review.md) |
 | Phase D Task 39B2c L3c3c-ii-b2b-iii-b-i live integration review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-b-i-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-b-i-review.md) |
 | Phase D Task 39B2c L3c3c-ii-b2b-iii-b-ii physical adapter review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-b-ii-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-b-ii-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b3 App adapter split preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b3-split-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b3-split-preflight.md) |
 | Phase D Task 39B2c-L1 residue observation review | [docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md](docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md) |
 | Phase D Task 39B2c-L2 root topology observation review | [docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md](docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md) |
 | Phase D Task 39B2c-L3a trusted machine target review | [docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md](docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md) |
@@ -574,8 +577,8 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   Machine production block 均已完成；ii-b2b-iii 已拆为 iii-a/iii-b，iii-a
   handle-v3/single-quantized transfer 已完成；iii-b 又拆为 iii-b-i/iii-b-ii，
   iii-b-i semantic/live integration 与 iii-b-ii executable physical-adapter
-  closure 均已完成，iii-b 与 ii-b2b 已关闭；ii-b3 concrete App drop/no-auth
-  retirement adapter 是当前 frontier。
+  closure 均已完成，iii-b 与 ii-b2b 已关闭；ii-b3 已拆为 ii-b3a/b3b/b3c，
+  ii-b3a fixed-channel/root-peer/drop adapter 是当前 frontier。
   ADR 0018 仍 Proposed；L3c4 独占 final admission 与
   剩余 full。
   Task 39 尚未完成。

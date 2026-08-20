@@ -73,7 +73,8 @@
 > ii-b2b-iii is split by fresh preflight into iii-a handle-v3/single-quantized
 > transfer and iii-b public live façade/helper integration; iii-a and iii-b-i
 > semantic/live integration and iii-b-ii executable physical-adapter closure
-> are complete and non-admitting; iii-b/ii-b2b are closed and ii-b3 is current.
+> are complete and non-admitting; iii-b/ii-b2b are closed; ii-b3 is split into
+> ii-b3a/b3b/b3c and ii-b3a is current.
 > Evidence:
 > [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
 > [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md) and
@@ -1098,7 +1099,8 @@ The remaining L3 work is split before driver coding:
    Proposed, while L3c3c-i is complete as a NO-GO audit, L3c3c-ii-a is complete,
    and the nested exact-wire split is frozen; ii-b0a/ii-b0b/ii-b0c, ii-b1,
    the ii-b2 ASID prerequisite, ii-b2a, ii-b2b-i, ii-b2b-ii, iii-a, iii-b-i and
-   iii-b-ii are complete; ii-b3 is current. See the
+   iii-b-ii are complete; ii-b3 is split into b3a/b3b/b3c and ii-b3a is current.
+   See the
    [study](../../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md)
    and [final review](../../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md),
    plus the [i-b2a review](../../reports/phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md),
@@ -1136,11 +1138,14 @@ The remaining L3 work is split before driver coding:
    [live integration review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-b-i-review.md).
    iii-b-ii completion evidence is in the
    [physical adapter review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-b-ii-review.md).
+   The ii-b3 trust/cost split is frozen by the
+   [ii-b3 preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b3-split-preflight.md).
    ii-a implements only authority-closed self-observation/runtime primitives.
    ii-b is frozen as **ii-b0a frame/capsule contract**, **ii-b0b claim/release
    wire contract**, **ii-b1 authority-
-   free App leaf**, **ii-b2 handle-free helper response**, **ii-b3 concrete App
-   drop/no-auth retirement adapter**, **ii-b4 fixed claim client** and **ii-b5
+   free App leaf**, **ii-b2 handle-free helper response**, **ii-b3a fixed channel/
+   root peer/drop adapter**, **ii-b3b start-to-retire-only Lifecycle seam**,
+   **ii-b3c concrete leaf/native entry**, **ii-b4 fixed claim client** and **ii-b5
    single-epoch composition**; **ii-c0** requires its own fresh preflight and
    proves only gate-side launcher/FD hygiene, not real-sudo child behavior. The split preserves a
    zero-argument driver using only a pre-opened bounded stdin cohort capsule,
@@ -1167,14 +1172,15 @@ L3c3c-i-b1 -> L3c3c-i-b2a -> L3c3c-i-b2b-0a -> L3c3c-ii-a ->
 L3c3c-ii-b0a -> L3c3c-ii-b0b -> L3c3c-ii-b0c -> L3c3c-ii-b1 ->
 L3c3c-ii-b2 ASID prerequisite -> L3c3c-ii-b2a -> L3c3c-ii-b2b-i ->
 L3c3c-ii-b2b-ii -> L3c3c-ii-b2b-iii-a -> L3c3c-ii-b2b-iii-b-i ->
-L3c3c-ii-b2b-iii-b-ii -> L3c3c-ii-b3 ->
+L3c3c-ii-b2b-iii-b-ii -> L3c3c-ii-b3a -> L3c3c-ii-b3b ->
+L3c3c-ii-b3c ->
 L3c3c-ii-b4 -> L3c3c-ii-b5 -> L3c3c-ii-c0 -> L3c3c-ii-c -> L3c3d -> L3c4`.
 L3c1, L3c2, L3c3a,
 L3c3b-0, L3c3b-i, L3c3b-ii, L3c3c-i and L3c3c-ii-a are complete;
 i-b2b-0b/i-b2b-1 were superseded before execution. The ii-b split is frozen and
 ii-b0a/ii-b0b/ii-b0c/ii-b1, the ii-b2 ASID prerequisite, ii-b2a, ii-b2b-i and
-ii-b2b-ii, ii-b2b-iii-a, iii-b-i and iii-b-ii are complete; ii-b3 concrete App
-drop/no-auth retirement adapter is current.
+ii-b2b-ii, ii-b2b-iii-a, iii-b-i and iii-b-ii are complete; ii-b3 is split into
+b3a/b3b/b3c and ii-b3a fixed-channel/root-peer/drop adapter is current.
 ADR 0018
 remains Proposed until ii-c succeeds. L3c1 used focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean
