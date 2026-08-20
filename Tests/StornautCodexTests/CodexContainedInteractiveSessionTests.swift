@@ -170,7 +170,7 @@ struct CodexContainedInteractiveSessionTests {
             mode: "escaped-stderr"
         )
         defer {
-            fixture.killRecordedProcess("escaped.pid")
+            fixture.killRecordedProcess("escaped-cleanup.pid")
             fixture.remove()
         }
         let session = CodexContainedInteractiveSession(
@@ -178,9 +178,7 @@ struct CodexContainedInteractiveSessionTests {
             planBuilder: { _ in fixture.plan }
         )
         try await session.start(fixture.configuration)
-        _ = try fixture.waitForRecordedPID(name: "escaped.pid")
-
-        let start = ContinuousClock.now
+        let (_, start) = try fixture.waitForEscapedPID()
         #expect(try await session.retire() == .retiredOwnedResources)
         let duration = start.duration(to: .now)
 
@@ -625,10 +623,22 @@ private struct ContainedInteractiveSessionFixture {
         try waitForRecordedPID(name: "child.pid")
     }
 
-    func waitForRecordedPID(name: String) throws -> pid_t {
+    func waitForEscapedPID() throws -> (pid_t, ContinuousClock.Instant) {
+        try Data().write(to: recordURL.appending(path: "escaped.publish"))
+        let pid = try waitForRecordedPID(
+            name: "escaped.pid", timeout: .seconds(5))
+        let start = ContinuousClock.now
+        try Data().write(to: recordURL.appending(path: "escaped.hold"))
+        return (pid, start)
+    }
+
+    func waitForRecordedPID(
+        name: String, timeout: Duration = .seconds(2)
+    ) throws -> pid_t {
         let url = recordURL.appending(path: name)
-        let deadline = Date().addingTimeInterval(2)
-        while Date() < deadline {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: timeout)
+        while clock.now < deadline {
             if
                 let value = try? String(
                     contentsOf: url,
@@ -766,18 +776,27 @@ private func containedInteractiveScript(
         print -r -- "$!" > "$record_root/child.pid"
     fi
     if [[ "$mode" == "escaped-stderr" ]]; then
-        /usr/bin/python3 - "$record_root/escaped.pid" <<'PY'
+        /usr/bin/python3 - "$record_root/escaped.pid" "$record_root/escaped.publish" "$record_root/escaped.hold" <<'PY'
     import os
     import sys
     import time
 
     pid = os.fork()
     if pid > 0:
-        with open(sys.argv[1], "w", encoding="utf-8") as handle:
-            handle.write(str(pid))
+        os.waitpid(pid, 0)
         raise SystemExit(0)
     os.setsid()
-    time.sleep(4)
+    if os.fork() > 0: raise SystemExit(0)
+    with open(os.path.join(os.path.dirname(sys.argv[1]), "escaped-cleanup.pid"), "w") as handle:
+        handle.write(str(os.getpid()))
+    while not os.path.exists(sys.argv[2]):
+        time.sleep(0.005)
+    time.sleep(2.25)
+    with open(sys.argv[1], "w", encoding="utf-8") as handle:
+        handle.write(str(os.getpid()))
+    while not os.path.exists(sys.argv[3]):
+        time.sleep(0.005)
+    time.sleep(6); os.close(2); time.sleep(24)
     PY
         /bin/sleep 30
         exit 0
