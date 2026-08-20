@@ -71,8 +71,9 @@
 > 175 Lifecycle affected, 308 Investigation affected, complete App/main-Mach-O
 > gate, sole 1,196-test staged-only serial and grouped/cross-group review.
 > ii-b2b-iii is split by fresh preflight into iii-a handle-v3/single-quantized
-> transfer and iii-b public live façade/helper integration; iii-a is complete
-> and non-admitting, and iii-b is current.
+> transfer and iii-b public live façade/helper integration; iii-a and iii-b-i
+> semantic/live integration are complete and non-admitting, and iii-b-ii
+> executable physical-adapter closure is current.
 > Evidence:
 > [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
 > [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md) and
@@ -1096,8 +1097,8 @@ The remaining L3 work is split before driver coding:
    [ADR 0018](../../adr/0018-parent-owned-investigation-handoff.md) remains
    Proposed, while L3c3c-i is complete as a NO-GO audit, L3c3c-ii-a is complete,
    and the nested exact-wire split is frozen; ii-b0a/ii-b0b/ii-b0c, ii-b1,
-   the ii-b2 ASID prerequisite, ii-b2a, ii-b2b-i, ii-b2b-ii and iii-a are
-   complete; iii-b is current. See the
+   the ii-b2 ASID prerequisite, ii-b2a, ii-b2b-i, ii-b2b-ii, iii-a and iii-b-i
+   are complete; iii-b-ii is current. See the
    [study](../../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md)
    and [final review](../../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md),
    plus the [i-b2a review](../../reports/phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md),
@@ -1131,6 +1132,8 @@ The remaining L3 work is split before driver coding:
    [iii-a/iii-b preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-split-preflight.md).
    iii-a completion evidence is in the
    [handle v3 review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-a-review.md).
+   iii-b-i completion evidence is in the
+   [live integration review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-b-i-review.md).
    ii-a implements only authority-closed self-observation/runtime primitives.
    ii-b is frozen as **ii-b0a frame/capsule contract**, **ii-b0b claim/release
    wire contract**, **ii-b1 authority-
@@ -1161,14 +1164,15 @@ L3c2b -> L3c3a -> L3c3b-0 -> L3c3b-i -> L3c3b-ii -> L3c3c-i-a ->
 L3c3c-i-b1 -> L3c3c-i-b2a -> L3c3c-i-b2b-0a -> L3c3c-ii-a ->
 L3c3c-ii-b0a -> L3c3c-ii-b0b -> L3c3c-ii-b0c -> L3c3c-ii-b1 ->
 L3c3c-ii-b2 ASID prerequisite -> L3c3c-ii-b2a -> L3c3c-ii-b2b-i ->
-L3c3c-ii-b2b-ii -> L3c3c-ii-b2b-iii-a -> L3c3c-ii-b2b-iii-b -> L3c3c-ii-b3 ->
+L3c3c-ii-b2b-ii -> L3c3c-ii-b2b-iii-a -> L3c3c-ii-b2b-iii-b-i ->
+L3c3c-ii-b2b-iii-b-ii -> L3c3c-ii-b3 ->
 L3c3c-ii-b4 -> L3c3c-ii-b5 -> L3c3c-ii-c0 -> L3c3c-ii-c -> L3c3d -> L3c4`.
 L3c1, L3c2, L3c3a,
 L3c3b-0, L3c3b-i, L3c3b-ii, L3c3c-i and L3c3c-ii-a are complete;
 i-b2b-0b/i-b2b-1 were superseded before execution. The ii-b split is frozen and
 ii-b0a/ii-b0b/ii-b0c/ii-b1, the ii-b2 ASID prerequisite, ii-b2a, ii-b2b-i and
-ii-b2b-ii and ii-b2b-iii-a are complete; iii-b public live façade/helper
-integration is current.
+ii-b2b-ii, ii-b2b-iii-a and iii-b-i are complete; iii-b-ii executable physical-
+adapter closure is current.
 ADR 0018
 remains Proposed until ii-c succeeds. L3c1 used focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean

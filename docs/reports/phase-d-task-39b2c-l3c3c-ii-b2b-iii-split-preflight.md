@@ -3,7 +3,7 @@
 > Status: Approved implementation split; iii-a handle-v3/single-quantized
 > transfer is complete; post-implementation review split iii-b into iii-b-i
 > semantic/live integration closure and iii-b-ii executable physical-adapter
-> closure; iii-b-i is current
+> closure; iii-b-i is complete/non-admitting and iii-b-ii is current
 >
 > Date: 2026-08-20
 >
@@ -13,6 +13,8 @@
 > fixed client, readiness claim or authoritative full verifier
 >
 > iii-a completion: [Handle v3 Review](phase-d-task-39b2c-l3c3c-ii-b2b-iii-a-review.md)
+>
+> iii-b-i completion: [Live Integration Review](phase-d-task-39b2c-l3c3c-ii-b2b-iii-b-i-review.md)
 
 ## 1. Why the Existing Fourteen-Path Checkpoint Is Split
 
@@ -206,9 +208,9 @@ in section 4.1, at most 3,700 changed lines from `17d9f1f`. It closes:
 - the already-implemented public façade, Lifecycle-owned reservation ID, helper
   live route, Xcode linkage, contract/structural/final-Mach-O gates.
 
-It receives focused/affected tests, coverage, exact scope/mutation/artifact gates,
-one staged-only serial and independent review. It remains non-admitting and does
-not claim the physical-adapter matrix complete.
+It passed 83 focused tests, 499 affected tests, coverage, exact scope/mutation/
+artifact gates, one 1,212-test staged-only serial and independent review. It is
+complete/non-admitting and does not claim the physical-adapter matrix complete.
 
 **iii-b-ii executable physical-adapter closure** starts only from the pushed
 iii-b-i tree. It owns at most nine non-document paths and 2,200 changed lines:
