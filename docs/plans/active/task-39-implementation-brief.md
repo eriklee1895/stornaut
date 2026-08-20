@@ -73,8 +73,8 @@
 > ii-b2b-iii is split by fresh preflight into iii-a handle-v3/single-quantized
 > transfer and iii-b public live façade/helper integration; iii-a and iii-b-i
 > semantic/live integration, iii-b-ii executable physical-adapter closure and
-> ii-b3a fixed handoff adapter are complete and non-admitting; iii-b/ii-b2b are
-> closed; ii-b3b is current.
+> ii-b3a fixed handoff adapter and ii-b3b start-to-retire seam are complete and
+> non-admitting; iii-b/ii-b2b are closed; ii-b3c is current.
 > Evidence:
 > [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
 > [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md) and
@@ -1099,7 +1099,7 @@ The remaining L3 work is split before driver coding:
    Proposed, while L3c3c-i is complete as a NO-GO audit, L3c3c-ii-a is complete,
    and the nested exact-wire split is frozen; ii-b0a/ii-b0b/ii-b0c, ii-b1,
    the ii-b2 ASID prerequisite, ii-b2a, ii-b2b-i, ii-b2b-ii, iii-a, iii-b-i and
-   iii-b-ii and ii-b3a are complete; ii-b3b is current.
+   iii-b-ii, ii-b3a and ii-b3b are complete; ii-b3c is current.
    See the
    [study](../../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md)
    and [final review](../../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md),
@@ -1179,8 +1179,8 @@ L3c1, L3c2, L3c3a,
 L3c3b-0, L3c3b-i, L3c3b-ii, L3c3c-i and L3c3c-ii-a are complete;
 i-b2b-0b/i-b2b-1 were superseded before execution. The ii-b split is frozen and
 ii-b0a/ii-b0b/ii-b0c/ii-b1, the ii-b2 ASID prerequisite, ii-b2a, ii-b2b-i and
-ii-b2b-ii, ii-b2b-iii-a, iii-b-i, iii-b-ii and ii-b3a are complete;
-ii-b3b start-to-retire-only Lifecycle seam is current.
+ii-b2b-ii, ii-b2b-iii-a, iii-b-i, iii-b-ii, ii-b3a and ii-b3b are complete;
+ii-b3c concrete leaf/native entry is current.
 ADR 0018
 remains Proposed until ii-c succeeds. L3c1 used focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean

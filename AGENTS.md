@@ -306,7 +306,10 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   start-to-retire-only Lifecycle seam 与 ii-b3c concrete leaf/native entry；
   ii-b3a 已完成并通过 35 focused、521 affected、exact contract/structural/
   artifact gates、唯一 1,234-test/59-suite staged-only serial 与 independent
-  post-fix review；ii-b3b 是当前 implementation frontier。之后
+  post-fix review；ii-b3b start-to-retire-only seam 与独立 PID-fixture
+  prerequisite 已完成，后者以唯一 1,245-test/59-suite staged-only serial
+  关闭原 1,244/1,245 setup-side test-infra issue；ii-b3c concrete leaf/native
+  entry 是当前 implementation frontier。之后
   严格为 ii-c 唯一 no-model
   privileged machine gate，只有 ii-c 可接受 ADR 0018。
   只有 L3c4
@@ -450,6 +453,8 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c L3c3c-ii-b2b-iii-b-ii physical adapter review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-b-ii-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-b-ii-review.md) |
 | Phase D Task 39B2c L3c3c-ii-b3 App adapter split preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b3-split-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b3-split-preflight.md) |
 | Phase D Task 39B2c L3c3c-ii-b3a fixed handoff adapter review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b3a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b3a-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b3b fixture prerequisite review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b3b-fixture-prerequisite-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b3b-fixture-prerequisite-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b3b start-to-retire seam review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b3b-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b3b-review.md) |
 | Phase D Task 39B2c-L1 residue observation review | [docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md](docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md) |
 | Phase D Task 39B2c-L2 root topology observation review | [docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md](docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md) |
 | Phase D Task 39B2c-L3a trusted machine target review | [docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md](docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md) |
@@ -581,8 +586,9 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   handle-v3/single-quantized transfer 已完成；iii-b 又拆为 iii-b-i/iii-b-ii，
   iii-b-i semantic/live integration 与 iii-b-ii executable physical-adapter
   closure 均已完成，iii-b 与 ii-b2b 已关闭；ii-b3 已拆为 ii-b3a/b3b/b3c，
-  ii-b3a fixed-channel/root-peer/drop adapter 已完成；ii-b3b
-  start-to-retire-only Lifecycle seam 是当前 frontier。
+  ii-b3a fixed-channel/root-peer/drop adapter、ii-b3b start-to-retire-only
+  Lifecycle seam 与 test-only fixture prerequisite 已完成；ii-b3c concrete
+  leaf/native entry 是当前 frontier。
   ADR 0018 仍 Proposed；L3c4 独占 final admission 与
   剩余 full。
   Task 39 尚未完成。

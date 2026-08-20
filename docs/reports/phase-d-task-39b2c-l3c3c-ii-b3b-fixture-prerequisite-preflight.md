@@ -1,6 +1,7 @@
 # Phase D Task 39B2c-L3c3c-ii-b3b Fixture Prerequisite Preflight
 
-> Status: Split frozen; test-infrastructure prerequisite current; non-admitting
+> Status: Complete; implementation, clean serial and independent review recorded
+> in the fixture prerequisite review; test-only and non-admitting
 >
 > Date: 2026-08-20
 >
@@ -91,16 +92,18 @@ privilege, model/auth, public network, Trash/Executor, readiness claim or
 
 ## 5. Prompt-to-Artifact Checklist
 
-| Requirement | Direct evidence | Result before implementation |
+| Requirement | Direct evidence | Result |
 | --- | --- | --- |
-| preserve consumed ii-b3b truth | validation commit `e8d093d...`, tree `069c53c...`, 1,244/1,245 result | frozen |
-| deterministic setup-side RED | delayed PID publication fails at `.missingPID` before retirement | pending |
-| bounded fixture readiness | explicit per-call startup timeout; no unbounded loop | pending |
-| preserve product performance gate | retirement timer begins after PID readiness and remains `< .seconds(2)` | pending |
-| exact cleanup | final child immediately records a dedicated cleanup PID and remains alive until killed; fixture root removed | pending |
-| test-only scope | one allowed path, no product/source/script changes | pending |
-| independent clean evidence | focused, Codex affected, review and prerequisite-owned serial | pending |
+| preserve consumed ii-b3b truth | validation commit `e8d093d...`, tree `069c53c...`, 1,244/1,245 result | satisfied |
+| deterministic setup-side RED | delayed PID publication fails at `.missingPID` before retirement | satisfied |
+| bounded fixture readiness | explicit per-call startup timeout; no unbounded loop | satisfied |
+| preserve product performance gate | retirement timer begins before hold release and remains `< .seconds(2)` | satisfied |
+| exact cleanup | final child immediately records a dedicated cleanup PID and remains alive until killed; fixture root removed | satisfied |
+| test-only scope | one allowed path, no product/source/script changes | satisfied |
+| independent clean evidence | focused, Codex affected, review and prerequisite-owned serial | satisfied |
 | no premature admission | no runtime/report/readiness/full change; ADR 0018 remains Proposed | satisfied by scope |
 
-ii-b3b, ii-b3c, Task 39 and production Deep Dive remain incomplete. L3c4 alone
-owns machine readiness and Task 39's remaining authoritative full verifier.
+Implementation and validation evidence is recorded in the
+[fixture prerequisite review](phase-d-task-39b2c-l3c3c-ii-b3b-fixture-prerequisite-review.md).
+ii-b3c, Task 39 and production Deep Dive remain incomplete. L3c4 alone owns
+machine readiness and Task 39's remaining authoritative full verifier.

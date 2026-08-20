@@ -50,8 +50,8 @@
 > live-helper server migration has been split into iii-a handle-v3/single-
 > quantized transfer and iii-b public live façade/helper integration; iii-a,
 > iii-b-i semantic/live integration, iii-b-ii executable physical-adapter
-> closure and ii-b3a fixed handoff adapter are complete/non-admitting;
-> iii-b/ii-b2b are closed; ii-b3b is current, followed eventually by ii-c
+> closure and ii-b3a/ii-b3b are complete/non-admitting; iii-b/ii-b2b are
+> closed; ii-b3c is current, followed eventually by ii-c
 > one no-model privileged gate. The authoritative
 > real-model run and readiness verdict remain unimplemented.
 > Production Deep Dive remains unavailable until Task 44 admission.
@@ -933,7 +933,8 @@ Checkpoint status:
   1,223-test staged-only serial, physical/five-symbol final-Mach-O gates and
   post-fix review. iii-b/ii-b2b are closed; ii-b3a fixed handoff adapter is
   complete after 35 focused, 521 affected, one 1,234-test staged-only serial,
-  exact contract/structural/artifact gates and final review; ii-b3b is current.
+  exact contract/structural/artifact gates and final review; ii-b3b and its
+  test-only fixture prerequisite are complete; ii-b3c is current.
   See the
   [ii-b2 ASID prerequisite review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2-asid-prerequisite-review.md),
   the
