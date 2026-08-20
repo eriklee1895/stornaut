@@ -459,6 +459,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c L3c3c-ii-b3b start-to-retire seam review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b3b-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b3b-review.md) |
 | Phase D Task 39B2c L3c3c-ii-b3c concrete leaf/entry preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b3c-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b3c-preflight.md) |
 | Phase D Task 39B2c L3c3c-ii-b3c concrete leaf/entry review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b3c-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b3c-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b4 fixed helper-claim client preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b4-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b4-preflight.md) |
 | Phase D Task 39B2c-L1 residue observation review | [docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md](docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md) |
 | Phase D Task 39B2c-L2 root topology observation review | [docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md](docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md) |
 | Phase D Task 39B2c-L3a trusted machine target review | [docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md](docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md) |
