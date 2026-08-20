@@ -51,7 +51,8 @@
 > quantized transfer and iii-b public live façade/helper integration; iii-a,
 > iii-b-i semantic/live integration, iii-b-ii executable physical-adapter
 > closure and ii-b3a/ii-b3b are complete/non-admitting; iii-b/ii-b2b are
-> closed; ii-b3c is complete and ii-b4 is current, followed eventually by ii-c
+> closed; ii-b3c and ii-b4 are complete/non-admitting and ii-b5 is current,
+> followed eventually by ii-c
 > one no-model privileged gate. The authoritative
 > real-model run and readiness verdict remain unimplemented.
 > Production Deep Dive remains unavailable until Task 44 admission.
@@ -934,7 +935,8 @@ Checkpoint status:
   post-fix review. iii-b/ii-b2b are closed; ii-b3a fixed handoff adapter is
   complete after 35 focused, 521 affected, one 1,234-test staged-only serial,
   exact contract/structural/artifact gates and final review; ii-b3b and its
-  test-only fixture prerequisite and ii-b3c are complete; ii-b4 is current.
+  test-only fixture prerequisite, ii-b3c and ii-b4 are complete/non-admitting;
+  ii-b5 is current.
   See the
   [ii-b2 ASID prerequisite review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2-asid-prerequisite-review.md),
   the
@@ -951,6 +953,18 @@ Checkpoint status:
   [iii-b-i live integration review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-b-i-review.md),
   the
   [iii-b-ii physical adapter review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-b-ii-review.md),
+  the
+  [ii-b3a review](../../reports/phase-d-task-39b2c-l3c3c-ii-b3a-review.md),
+  the
+  [ii-b3b fixture review](../../reports/phase-d-task-39b2c-l3c3c-ii-b3b-fixture-prerequisite-review.md),
+  the
+  [ii-b3b seam review](../../reports/phase-d-task-39b2c-l3c3c-ii-b3b-review.md),
+  the
+  [ii-b3c review](../../reports/phase-d-task-39b2c-l3c3c-ii-b3c-review.md),
+  the
+  [ii-b4 preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b4-preflight.md),
+  the
+  [ii-b4 review](../../reports/phase-d-task-39b2c-l3c3c-ii-b4-review.md),
   the
   [L3c1b-i Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
   and

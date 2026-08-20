@@ -272,8 +272,10 @@
 > start-to-retire-only seam 与独立 test-only fixture prerequisite 也已完成，
 > 原 1,244/1,245 setup-side issue 由 prerequisite 的唯一 1,245-test clean
 > serial 精确关闭；ii-b3c 已完成并通过 1,257-test/60-suite serial 与 grouped
-> post-fix review；ii-b4 是当前 frontier。之后为
-> ii-c 唯一 no-model privileged installed-driver gate。只有
+> post-fix review；ii-b4 已完成并保持 non-admitting，ii-b5 是当前
+> frontier。之后为
+> ii-c0 fresh privilege-launcher preflight，再到 ii-c 唯一 no-model
+> privileged installed-driver gate。只有
 > L3c4 可作 readiness claim，
 > L3c2b preflight 的 fresh-plan matrix contradiction 已由 plan-freshness
 > prerequisite 关闭：八个 actual plan fingerprints 全唯一、一个 exact
@@ -613,11 +615,11 @@ post-fix review 已完成；b-i native packaging、1060-test clean staged-only s
 ACL fail-closed、whole-installer seal、1067-test clean staged-only serial 与
 independent grouped/post-fix/cross-group review 已完成。L3c3c-i root-launch
 audit 已完成并拒绝 external branch；i-b2b-0b/i-b2b-1 在执行前 superseded，
-B4 root execution count 为 0。L3c3c-ii-a 与 ii-b0a 已完成，当前 frontier 为
-L3c3c-ii-b2；ii-b0a/ii-b0b/ii-b0c/ii-b1 与 ii-b2 ASID prerequisite 已完成，
+B4 root execution count 为 0。L3c3c-ii-a 与 ii-b0a 已完成；
+ii-b0a/ii-b0b/ii-b0c/ii-b1 与 ii-b2 ASID prerequisite 已完成，
 ii-b2a、ii-b2b-i 与 ii-b2b-ii legacy-client quarantine / Machine production
 block、iii-a、iii-b-i 与 iii-b-ii 均已完成；ii-b3 已拆为 b3a/b3b/b3c，
-ii-b3a/ii-b3b/ii-b3c complete，ii-b4 current，
+ii-b3a/ii-b3b/ii-b3c/ii-b4 complete，ii-b5 current，
 ii-b 已拆为 ii-b0a/ii-b0b/ii-b0c 与
 ii-b1–ii-b5，并在 ii-c 前插入 ii-c0。
 ADR 0018 仍 Proposed，L3c4 独占 final admission 与剩余 full。
@@ -656,6 +658,12 @@ L3c3c-i 条件性证据见
 冻结 i/ii/iii implementation order；
 [ii-b2b-i review](../reports/phase-d-task-39b2c-l3c3c-ii-b2b-i-review.md)
 记录 sealed non-connected server completion 与 non-admitting evidence。
+[ii-b4 preflight](../reports/phase-d-task-39b2c-l3c3c-ii-b4-preflight.md)
+冻结 fixed helper-claim client contract；
+[ii-b4 review](../reports/phase-d-task-39b2c-l3c3c-ii-b4-review.md)
+记录 7-path/3,153-line implementation、47 focused cases、102 affected tests、
+1,269-test staged-only serial、Debug/Release final-Mach-O gates 与 final
+no-unresolved-P0–P2 review。ii-b4 complete/non-admitting；ii-b5 current。
 生产 Deep Dive 继续 unavailable，直到 Task 44 final admission。
 
 跨 Epic 的阶段依赖、no-go 分支和交付顺序由 [Delivery Roadmap](../plans/roadmap.md) 管理；新 active plan 不得另起一套宏观路线。
@@ -810,7 +818,8 @@ ii-b2b-iii 已拆为 iii-a/iii-b，iii-a handle-v3/single-quantized transfer
 已完成；iii-b 又拆为 iii-b-i/iii-b-ii，两者均已完成，iii-b/ii-b2b 已关闭；
 ii-b3 已拆为 b3a/b3b/b3c，ii-b3a fixed-channel/root-peer/drop adapter 与
 ii-b3b start-to-retire-only Lifecycle seam 与 ii-b3c concrete leaf/native
-entry 已完成；ii-b4 fixed helper-claim client 是当前 frontier。
+entry 已完成；ii-b4 fixed helper-claim client 也已完成并保持
+non-admitting；ii-b5 fixed single-epoch composition 是当前 frontier。
 已完成部分均为
 non-admitting prerequisite，
 L3c4 才是 machine admission。该最终 gate

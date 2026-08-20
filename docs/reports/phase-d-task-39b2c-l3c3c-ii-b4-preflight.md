@@ -1,7 +1,8 @@
 # Phase D Task 39B2c-L3c3c-ii-b4 Fixed Helper-Claim Client Preflight
 
-> Status: Scope/cost, dependency, state-machine and tests-first contract frozen;
-> implementation current; non-admitting
+> Status: Complete; scope/cost, dependency, state-machine and tests-first
+> contract frozen; implementation evidence recorded in the
+> [ii-b4 review](phase-d-task-39b2c-l3c3c-ii-b4-review.md); non-admitting
 >
 > Date: 2026-08-20
 >
@@ -13,7 +14,8 @@
 
 ## 1. Decision
 
-L3c3c-ii-b4 remains one bounded implementation checkpoint. It adds the only
+L3c3c-ii-b4 was frozen as one bounded implementation checkpoint and completed
+within that boundary. It adds the only
 concrete root-driver machine-claim client inside
 `StornautInvestigationMachineDriverSupport`. The target gains one one-way
 dependency on `StornautInvestigationHandoffContract`; package-scoped wire types
@@ -62,8 +64,11 @@ ii-b5 performs installed-L2 using the returned helper identity
   -> released
 ```
 
-Any failure before dispatch is `unavailable`. Once claim or release dispatch may
-have crossed the external boundary, missing/malformed reply, interruption,
+Strict local validation and strict server negative replies preserve their typed
+reasons, including `invalidDeadline`, `signingIdentityMismatch`,
+`protocolViolation`, `invalidPeer` and `expired`. Only transport failure or
+cancellation before dispatch is `unavailable`. Once claim or release dispatch
+may have crossed the external boundary, missing/malformed reply, interruption,
 invalidation, cancellation, helper-exit ambiguity or deadline ambiguity is
 `outcomeUnknown`. No retry or second connection is possible. A future epoch must
 construct a new client, observe a different complete helper identity and repeat
@@ -105,8 +110,11 @@ At most ten non-document paths and 3,200 added-or-changed lines:
 9. `Stornaut.xcodeproj/project.pbxproj` only if an unexpected explicit link is proven necessary; and
 10. one existing DriverSupport test/source only if the package-only entry seam cannot be tested through the focused file.
 
-Current estimate is 7–8 paths and 2,700–3,100 lines after independent review
-required the full concurrency, ambiguity, identity and deadline matrix. Xcode is expected to remain
+The pre-implementation estimate was 7–8 paths and 2,700–3,100 lines after
+independent review required the full concurrency, ambiguity, identity and
+deadline matrix. The accepted implementation used 7 non-document paths and
+3,153 changed lines; exact evidence is in the
+[completion review](phase-d-task-39b2c-l3c3c-ii-b4-review.md). Xcode remained
 unchanged because the native target already links the DriverSupport product and
 that product already links Security. Requiring `StornautLifecycle`, a public wire
 change, helper/server change, Machine-host transport code, a caller-provided
@@ -123,7 +131,7 @@ Focused injected tests must prove:
 4. release success requires exact `CLAIM_RELEASED`, post-reply deadline and bounded original-helper absence;
 5. static helper path/signing, dynamic audit-token signing and connection PID/EUID/ASID all join exactly;
 6. every helper identity, signing, path, digest, challenge, epoch and deadline drift fails terminally;
-7. pre-dispatch failure is unavailable, while every post-dispatch ambiguity or cancellation is `outcomeUnknown`;
+7. strict local/server typed rejection is preserved, pre-dispatch transport/cancellation is `unavailable`, and every post-dispatch ambiguity or cancellation is `outcomeUnknown`;
 8. invalidation is delayed until the released/exit outcome and occurs exactly once;
 9. repeated/concurrent claim or release has one winner and no replay;
 10. a next epoch rejects reused helper identity and succeeds only with a different fresh identity after terminal cleanup; and
@@ -173,9 +181,9 @@ RED focused client tests
 -> completion audit/docs commit/push
 ```
 
-`scripts/verify --full` remains forbidden before L3c4. ii-b4 does not run the
+`scripts/verify --full` remains forbidden before L3c4. ii-b4 did not run the
 real fixed client, launch or install the App/helper, use sudo/root, perform L2,
-call Codex/model/auth/network, create a report/receipt or claim readiness. ADR
-0018 remains Proposed, Task 39 remains incomplete and production Deep Dive stays
-`.implementationUnavailable`. The strict next checkpoint after completion is
-ii-b5 fixed single-epoch composition.
+call Codex/model/auth/network, create a report/receipt or claim readiness. ii-b4
+remains non-admitting. ADR 0018 remains Proposed, Task 39 remains incomplete and
+production Deep Dive stays `.implementationUnavailable`. ii-b5 fixed
+single-epoch composition is the current strict checkpoint.
