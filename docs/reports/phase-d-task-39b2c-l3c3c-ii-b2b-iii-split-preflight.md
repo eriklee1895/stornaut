@@ -1,7 +1,9 @@
 # Phase D Task 39B2c-L3c3c-ii-b2b-iii Split Preflight
 
 > Status: Approved implementation split; iii-a handle-v3/single-quantized
-> transfer is complete, iii-b live-helper server integration is current
+> transfer is complete; post-implementation review split iii-b into iii-b-i
+> semantic/live integration closure and iii-b-ii executable physical-adapter
+> closure; iii-b-i is current
 >
 > Date: 2026-08-20
 >
@@ -116,7 +118,7 @@ coverage, structural and executable mutation gates, one staged-only serial and
 independent review. No App build is required because no App/Xcode/helper source
 changes. No authoritative full verifier is permitted.
 
-## 4. iii-b — Public Live Façade and Helper Integration
+## 4. iii-b Parent — Public Live Façade and Helper Integration
 
 ### 4.1 Exact scope and cost
 
@@ -166,10 +168,15 @@ path or more than 3,200 changed lines forces another split before coding.
 ### 4.3 Tests-first and gates
 
 RED tests first cover unauthorized-before-decode, same-session claim/release,
-foreign/reconnect/replay, old JSON rejection before transfer, single-owner
-transfer, physical scheduler races, timer replacement, reply ordering, terminal
-once and zero pending slots. Structural gates then prove exact public surface,
-helper-only product linkage, no authority expansion and no legacy route.
+foreign/reconnect/replay, strict old-JSON rejection before claim-state
+consumption, single-owner transfer, physical scheduler races, timer replacement,
+reply ordering, terminal once and zero pending slots. Structural gates then prove
+exact public surface, helper-only product linkage, no authority expansion and no
+legacy route. The phrase "before transfer" is superseded: the independently
+required `record -> activate/one-shot transfer -> retired App reply` ordering
+necessarily precedes any later Machine claim request. Old JSON is therefore
+rejected after activation transfer but before it can consume or mutate the
+reserved claim state.
 
 Targeted Debug/Release helper builds and final-Mach-O gates must prove helper
 positive for server/Handoff/two selectors and all ordinary/diagnostic/Release
@@ -178,12 +185,60 @@ focused/affected suites, coverage, one staged-only serial and independent review
 Do not launch the helper/App or invoke real XPC. No authoritative full verifier
 is permitted.
 
+### 4.4 Mandatory post-review split of iii-b
+
+The first implementation reached thirteen paths and 3,121 changed lines before
+independent review. Tests review found that helper-private physical clock,
+scheduler and terminal types had only source assertions, while production review
+found activation/cancel and session-invalidation linearization gaps. Adding the
+required executable physical matrix to the remaining 79-line margin would exceed
+the frozen review surface. iii-b is therefore split before further production
+coding; this does not raise the parent budget or weaken any acceptance row.
+
+**iii-b-i semantic/live integration closure** owns the same thirteen paths listed
+in section 4.1, at most 3,700 changed lines from `17d9f1f`. It closes:
+
+- cancel-versus-activation publication and session-factory linearization;
+- claim/release-versus-session-invalidation response commitment;
+- App invalidation/retirement ownership guards;
+- rejection of every `public extension` surface escape;
+- an executable unauthorized-before-session mutation; and
+- the already-implemented public façade, Lifecycle-owned reservation ID, helper
+  live route, Xcode linkage, contract/structural/final-Mach-O gates.
+
+It receives focused/affected tests, coverage, exact scope/mutation/artifact gates,
+one staged-only serial and independent review. It remains non-admitting and does
+not claim the physical-adapter matrix complete.
+
+**iii-b-ii executable physical-adapter closure** starts only from the pushed
+iii-b-i tree. It owns at most nine non-document paths and 2,200 changed lines:
+
+1. `Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerAdapter.swift`;
+2. `Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerEffects.swift`;
+3. `StornautLifecycleHelper/main.swift`;
+4. `Tests/StornautInvestigationTests/InvestigationMachineClaimServerAdapterTests.swift`;
+5. `Tests/StornautLifecycleTests/LifecycleMachineClaimXPCContractTests.swift`;
+6. `Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift`;
+7. `scripts/verify-investigation-boundaries`;
+8. `scripts/verify-app-release-boundaries`;
+9. `scripts/verify-contract`.
+
+`Package.swift`, HandoffContract, Xcode project/schemes, App/runtime/DriverSupport/
+native-driver sources and every new file remain frozen. iii-b-ii makes the
+checked continuous conversion and cancellable physical scheduler directly
+testable without launching a helper; tests cover conversion overflow, exact
+relative deadline, cancel-before-fire, callback-before-handle/already-fired,
+fresh callback observation, terminal once and zero slots. The fixed helper exit
+mapping remains closed and non-caller-selectable. It reruns the affected,
+coverage, structural and final-Mach-O gates, one staged-only serial and final
+independent review. Only iii-b-ii completion closes iii-b and ii-b2b.
+
 ## 5. Strict Order and Non-Admission
 
 The order is strict:
 
 ```text
-ii-b2b-iii-a -> ii-b2b-iii-b -> ii-b3 -> ii-b4 -> ii-b5
+ii-b2b-iii-a -> ii-b2b-iii-b-i -> ii-b2b-iii-b-ii -> ii-b3 -> ii-b4 -> ii-b5
 -> ii-c0 -> ii-c -> L3c3d -> L3c4
 ```
 

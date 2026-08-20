@@ -9,6 +9,294 @@ import Testing
 @Suite("Investigation Machine claim server adapter")
 struct InvestigationMachineClaimServerAdapterTests {
     @Test
+    func publicFacadeExposesOnlyClosedScalarDataAndLifecycleSurfaces() throws {
+        let root = URL(filePath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let adapter = try String(
+            contentsOf: root.appending(
+                path: "Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerAdapter.swift"
+            ),
+            encoding: .utf8
+        )
+        let effects = try String(
+            contentsOf: root.appending(
+                path: "Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerEffects.swift"
+            ),
+            encoding: .utf8
+        )
+        for marker in [
+            "public final class InvestigationMachineClaimServer:",
+            "public final class InvestigationMachineClaimServerSession:",
+            "public func activate() throws",
+            "public func makeSession() throws",
+            "public func isPending() -> Bool",
+            "InvestigationMachineClaimXPCWire",
+        ] {
+            #expect(adapter.contains(marker))
+        }
+        for marker in [
+            "public struct InvestigationMachineClaimServerObservation:",
+            "public struct InvestigationMachineClaimServerDeadline:",
+            "public protocol InvestigationMachineClaimServerClock:",
+            "public protocol InvestigationMachineClaimServerScheduling:",
+            "public protocol InvestigationMachineClaimServerScheduledHandle:",
+            "public protocol InvestigationMachineClaimServerTerminalHandling:",
+            "public enum InvestigationMachineClaimServerTerminalReason:",
+        ] {
+            #expect(effects.contains(marker))
+        }
+        let publicSurface = (adapter + "\n" + effects)
+            .split(separator: "\n")
+            .filter { $0.contains("public " ) }
+            .joined(separator: "\n")
+        for forbidden in [
+            "LifecycleMachineRetirementReservationTransfer",
+            "LifecycleMachineRetirementDeadlineTicket",
+            "LifecycleMachineRetirementDeadlineObservation",
+            "LifecycleMachineRetirementDeadlineTerminalReason",
+            "tokenSHA256", "authorization", "executable", "signal",
+            "Cleanup", "Policy", "Executor",
+        ] {
+            #expect(!publicSurface.contains(forbidden))
+        }
+    }
+
+    @Test
+    func publicSessionOwnsActivationConnectionAndReplyCommitOrdering() throws {
+        let root = URL(filePath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: root.appending(
+                path: "Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerAdapter.swift"
+            ),
+            encoding: .utf8
+        )
+        #expect(source.contains("retirementEscrow.transferReservation()"))
+        #expect(source.contains("func claimMachineRetirement("))
+        #expect(source.contains("func releaseMachineRetirement("))
+        #expect(source.contains("adapter.invalidate()"))
+        #expect(source.contains("adapter.cancel()"))
+        #expect(source.contains("guard !invalidated else"))
+        #expect(source.contains("guard activeSession == nil else"))
+        let releaseStart = try #require(
+            source.range(of: "func releaseMachineRetirement(")
+        )
+        let releaseSuffix = source[releaseStart.lowerBound...]
+        let reply = try #require(releaseSuffix.range(of: "reply(data, nil)"))
+        let commit = try #require(
+            releaseSuffix.range(of: "adapter.replyDidDispatch()")
+        )
+        #expect(reply.lowerBound < commit.lowerBound)
+        let afterReply = String(releaseSuffix[reply.lowerBound...])
+        #expect(afterReply.components(separatedBy: "reply(").count == 2)
+    }
+
+    @Test
+    func publicServerTransfersOneLifecycleReservationAndIssuesOneSession()
+        throws
+    {
+        let fixture = ClaimServerFixture()
+        let escrow = try fixture.recordedEscrow()
+        let clock = PublicClaimServerClock([
+            try fixture.publicObservation(
+                monotonic: 1_000_000_000, wallOffset: 0
+            ),
+        ])
+        let scheduler = PublicClaimServerScheduler()
+        let terminal = PublicClaimServerTerminal()
+        let server = InvestigationMachineClaimServer(
+            retirementEscrow: escrow,
+            clock: clock, scheduler: scheduler, terminal: terminal
+        )
+
+        #expect(server.isPending())
+        try server.activate()
+        #expect(server.isPending())
+        let session = try server.makeSession()
+        #expect(throws: Error.self) { _ = try server.makeSession() }
+        #expect(throws: Error.self) { try server.activate() }
+
+        session.invalidate()
+        session.invalidate()
+        #expect(!server.isPending())
+        #expect(terminal.reasons == [.cancelled])
+        #expect(scheduler.handles.count == 1)
+        #expect(scheduler.handles[0].cancelCount == 1)
+    }
+
+    @Test
+    func publicReleaseRepliesOnceBeforePostReplyArmFailure() throws {
+        let fixture = ClaimServerFixture()
+        let clock = PublicClaimServerClock([
+            try fixture.publicObservation(
+                monotonic: 1_000_000_000, wallOffset: 0
+            ),
+            try fixture.publicObservation(
+                monotonic: 2_000_000_000, wallOffset: 1_000_000
+            ),
+            try fixture.publicObservation(
+                monotonic: 3_000_000_000, wallOffset: 2_000_000
+            ),
+            try fixture.publicObservation(
+                monotonic: 3_500_000_000, wallOffset: 2_500_000
+            ),
+        ])
+        let scheduler = PublicClaimServerScheduler(failOnSchedule: 3)
+        let terminal = PublicClaimServerTerminal()
+        let server = InvestigationMachineClaimServer(
+            retirementEscrow: try fixture.recordedEscrow(),
+            clock: clock, scheduler: scheduler, terminal: terminal
+        )
+        try server.activate()
+        let session = try server.makeSession()
+
+        let claimReply = PublicClaimServerReplyRecorder()
+        session.claimMachineRetirement(
+            try fixture.request().encoded(),
+            withReply: claimReply.call
+        )
+        let claimData = try #require(claimReply.values.first?.0)
+        let evidence = try InvestigationMachineClaimEvidence.decode(claimData)
+        let releaseReply = PublicClaimServerReplyRecorder()
+
+        session.releaseMachineRetirement(
+            try fixture.release(evidence: evidence).encoded(),
+            withReply: releaseReply.call
+        )
+
+        #expect(releaseReply.values.count == 1)
+        #expect(releaseReply.values[0].0 != nil)
+        #expect(releaseReply.values[0].1 == nil)
+        #expect(terminal.reasons == [.deadlineArmFailure])
+        #expect(!server.isPending())
+    }
+
+    @Test
+    func cancelledActivationNeverPublishesAClaimSession() async throws {
+        let fixture = ClaimServerFixture()
+        let clock = BlockingPublicClaimServerClock(
+            try fixture.publicObservation(
+                monotonic: 1_000_000_000, wallOffset: 0
+            )
+        )
+        let scheduler = PublicClaimServerScheduler()
+        let terminal = PublicClaimServerTerminal()
+        let server = InvestigationMachineClaimServer(
+            retirementEscrow: try fixture.recordedEscrow(),
+            clock: clock, scheduler: scheduler, terminal: terminal
+        )
+        let activation = Task.detached {
+            do {
+                try server.activate()
+                return true
+            } catch {
+                return false
+            }
+        }
+        #expect(clock.waitUntilObservationEntered())
+
+        server.cancel()
+        #expect(throws: Error.self) { _ = try server.makeSession() }
+        clock.allowObservationToReturn()
+        #expect(!(await activation.value))
+
+        #expect(throws: Error.self) { _ = try server.makeSession() }
+        #expect(!server.isPending())
+        #expect(terminal.reasons == [.cancelled])
+    }
+
+    @Test
+    func claimReplyWinsBeforeReentrantSessionInvalidation() throws {
+        let fixture = ClaimServerFixture()
+        let events = PublicClaimServerEventLog()
+        let terminal = PublicClaimServerTerminal { _ in
+            events.append("terminal")
+        }
+        let server = InvestigationMachineClaimServer(
+            retirementEscrow: try fixture.recordedEscrow(),
+            clock: PublicClaimServerClock([
+                try fixture.publicObservation(
+                    monotonic: 1_000_000_000, wallOffset: 0
+                ),
+                try fixture.publicObservation(
+                    monotonic: 2_000_000_000, wallOffset: 1_000_000
+                ),
+            ]),
+            scheduler: PublicClaimServerScheduler(),
+            terminal: terminal
+        )
+        try server.activate()
+        let session = try server.makeSession()
+
+        session.claimMachineRetirement(
+            try fixture.request().encoded()
+        ) { data, reason in
+            session.invalidate()
+            #expect(data != nil)
+            #expect(reason == nil)
+            events.append("reply")
+        }
+
+        #expect(events.values == ["reply", "terminal"])
+        #expect(terminal.reasons == [.connectionInvalidated])
+    }
+
+    @Test
+    func releaseReplyArmsExitBeforeReentrantSessionInvalidation() throws {
+        let fixture = ClaimServerFixture()
+        let events = PublicClaimServerEventLog()
+        let scheduler = PublicClaimServerScheduler()
+        let terminal = PublicClaimServerTerminal { _ in
+            events.append("terminal")
+        }
+        let server = InvestigationMachineClaimServer(
+            retirementEscrow: try fixture.recordedEscrow(),
+            clock: PublicClaimServerClock([
+                try fixture.publicObservation(
+                    monotonic: 1_000_000_000, wallOffset: 0
+                ),
+                try fixture.publicObservation(
+                    monotonic: 2_000_000_000, wallOffset: 1_000_000
+                ),
+                try fixture.publicObservation(
+                    monotonic: 3_000_000_000, wallOffset: 2_000_000
+                ),
+                try fixture.publicObservation(
+                    monotonic: 3_500_000_000, wallOffset: 2_500_000
+                ),
+            ]),
+            scheduler: scheduler,
+            terminal: terminal
+        )
+        try server.activate()
+        let session = try server.makeSession()
+        let claimReply = PublicClaimServerReplyRecorder()
+        session.claimMachineRetirement(
+            try fixture.request().encoded(),
+            withReply: claimReply.call
+        )
+        let evidence = try InvestigationMachineClaimEvidence.decode(
+            try #require(claimReply.values.first?.0)
+        )
+
+        session.releaseMachineRetirement(
+            try fixture.release(evidence: evidence).encoded()
+        ) { data, reason in
+            session.invalidate()
+            #expect(data != nil)
+            #expect(reason == nil)
+            events.append("reply")
+        }
+
+        #expect(events.values == ["reply", "terminal"])
+        #expect(terminal.reasons == [.connectionInvalidated])
+        #expect(scheduler.totalScheduleCount == 3)
+        #expect(!server.isPending())
+    }
+
+    @Test
     func claimAndReleaseTranslateToExactHandleFreeBytes() async throws {
         let fixture = ClaimServerFixture()
         let runtime = try fixture.runtime()
@@ -368,7 +656,7 @@ struct InvestigationMachineClaimServerAdapterTests {
             clock: clock, scheduler: scheduler, terminal: terminal
         )
         let adapter = try InvestigationMachineClaimServerAdapter(
-            transfer: fixture.transfer(), reservationID: fixture.reservationID,
+            transfer: fixture.transfer(),
             clock: clock, state: state, executor: executor
         )
         let requestData = try fixture.request().encoded()
@@ -604,7 +892,7 @@ struct InvestigationMachineClaimServerAdapterTests {
             clock: clock, scheduler: scheduler, terminal: terminal
         )
         let adapter = try InvestigationMachineClaimServerAdapter(
-            transfer: fixture.transfer(), reservationID: fixture.reservationID,
+            transfer: fixture.transfer(),
             clock: clock, state: state, executor: executor
         )
         let requestData = try fixture.request().encoded()
@@ -658,7 +946,7 @@ struct InvestigationMachineClaimServerAdapterTests {
             clock: clock, scheduler: scheduler, terminal: terminal
         )
         let adapter = try InvestigationMachineClaimServerAdapter(
-            transfer: fixture.transfer(), reservationID: fixture.reservationID,
+            transfer: fixture.transfer(),
             clock: clock, state: state, executor: executor
         )
         let evidence = try InvestigationMachineClaimEvidence.decode(
@@ -729,7 +1017,7 @@ struct InvestigationMachineClaimServerAdapterTests {
             clock: clock, scheduler: scheduler, terminal: terminal
         )
         let adapter = try InvestigationMachineClaimServerAdapter(
-            transfer: fixture.transfer(), reservationID: fixture.reservationID,
+            transfer: fixture.transfer(),
             clock: clock, state: state, executor: executor
         )
         let evidence = try InvestigationMachineClaimEvidence.decode(
@@ -941,7 +1229,6 @@ private struct ClaimServerFixture {
         )
         let adapter = try InvestigationMachineClaimServerAdapter(
             transfer: transfer ?? self.transfer(),
-            reservationID: reservationID,
             clock: clock,
             state: state,
             executor: executor
@@ -953,8 +1240,8 @@ private struct ClaimServerFixture {
     }
 
     func runtime(
-        scheduler: any InvestigationMachineClaimServerScheduling,
-        terminal: any InvestigationMachineClaimServerTerminalHandling
+        scheduler: any InvestigationMachineClaimServerCoreScheduling,
+        terminal: any InvestigationMachineClaimServerCoreTerminalHandling
     ) throws -> InjectedClaimServerRuntime {
         let clock = SequenceClaimServerClock([
             try observation(monotonic: 1_000_000_000, wallOffset: 0),
@@ -970,7 +1257,7 @@ private struct ClaimServerFixture {
             clock: clock, scheduler: scheduler, terminal: terminal
         )
         let adapter = try InvestigationMachineClaimServerAdapter(
-            transfer: transfer(), reservationID: reservationID,
+            transfer: transfer(),
             clock: clock, state: state, executor: executor
         )
         return InjectedClaimServerRuntime(
@@ -984,6 +1271,36 @@ private struct ClaimServerFixture {
             ownerRetirementObservation: .retiredOwnedResources,
             residueObservation: residueObservation()
         )
+    }
+
+    func recordedEscrow() throws -> LifecycleMachineRetirementEscrow {
+        let escrow = LifecycleMachineRetirementEscrow(
+            now: {
+                Date(
+                    timeIntervalSince1970:
+                        TimeInterval(baseWall + 500_000) / 1_000_000
+                )
+            },
+            token: { token },
+            reservationID: { reservationID }
+        )
+        _ = try escrow.record(
+            investigationID: LifecycleInvestigationID(
+                rawValue: investigation
+            ),
+            retireOperationID: retireOperation,
+            configurationSHA256: String(repeating: "13", count: 32),
+            validBefore: Date(
+                timeIntervalSince1970:
+                    TimeInterval(baseWall + 30_000_000) / 1_000_000
+            ),
+            appIdentity: lifecycleIdentity(role: .app),
+            helperIdentity: lifecycleIdentity(role: .helper),
+            userID: 501,
+            ownerRetirementObservation: .retiredOwnedResources,
+            residueObservation: residueObservation()
+        )
+        return escrow
     }
 
     func transfer(
@@ -1004,6 +1321,7 @@ private struct ClaimServerFixture {
         residueObservation: LifecycleInvestigationResidueObservation
     ) throws -> LifecycleMachineRetirementReservationTransfer {
         LifecycleMachineRetirementReservationTransfer(
+            reservationID: reservationID,
             tokenSHA256: tokenDigest(token),
             investigationID: LifecycleInvestigationID(rawValue: investigation),
             retireOperationID: retireOperation,
@@ -1173,6 +1491,15 @@ private struct ClaimServerFixture {
         )
     }
 
+    func publicObservation(
+        monotonic: UInt64, wallOffset: Int64 = 0
+    ) throws -> InvestigationMachineClaimServerObservation {
+        try InvestigationMachineClaimServerObservation(
+            continuousNanoseconds: monotonic,
+            wallUTCMicroseconds: baseWall + wallOffset
+        )
+    }
+
     func lifecycleIdentity(role: InvestigationMachineProcessRole) throws
         -> LifecycleMachineProcessIdentityRecord
     {
@@ -1330,7 +1657,7 @@ private func replyCallResult(
 }
 
 private final class SequenceClaimServerClock:
-    InvestigationMachineClaimServerClock,
+    InvestigationMachineClaimServerCoreClock,
     @unchecked Sendable
 {
     private let lock = NSLock()
@@ -1350,7 +1677,7 @@ private final class SequenceClaimServerClock:
 }
 
 private final class CountingClaimServerClock:
-    InvestigationMachineClaimServerClock,
+    InvestigationMachineClaimServerCoreClock,
     @unchecked Sendable
 {
     private let lock = NSLock()
@@ -1380,7 +1707,7 @@ private final class CountingClaimServerClock:
 }
 
 private final class BlockingObservationClaimServerClock:
-    InvestigationMachineClaimServerClock,
+    InvestigationMachineClaimServerCoreClock,
     @unchecked Sendable
 {
     private let lock = NSLock()
@@ -1441,7 +1768,7 @@ private final class BlockingObservationClaimServerClock:
 }
 
 private final class RecordingClaimServerHandle:
-    InvestigationMachineClaimServerScheduledHandle,
+    InvestigationMachineClaimServerCoreScheduledHandle,
     @unchecked Sendable
 {
     private let lock = NSLock()
@@ -1493,7 +1820,7 @@ private final class ReentrantClaimServerProbe: @unchecked Sendable {
 }
 
 private final class ReentrantClaimServerHandle:
-    InvestigationMachineClaimServerScheduledHandle,
+    InvestigationMachineClaimServerCoreScheduledHandle,
     @unchecked Sendable
 {
     private let shouldReenter: Bool
@@ -1510,7 +1837,7 @@ private final class ReentrantClaimServerHandle:
 }
 
 private final class ReentrantClaimServerScheduler:
-    InvestigationMachineClaimServerScheduling,
+    InvestigationMachineClaimServerCoreScheduling,
     @unchecked Sendable
 {
     private let reenterOnSchedule: LifecycleMachineRetirementDeadlineKind?
@@ -1530,7 +1857,7 @@ private final class ReentrantClaimServerScheduler:
     func schedule(
         ticket: LifecycleMachineRetirementDeadlineTicket,
         callback _: @escaping @Sendable () -> Void
-    ) throws -> any InvestigationMachineClaimServerScheduledHandle {
+    ) throws -> any InvestigationMachineClaimServerCoreScheduledHandle {
         if ticket.kind == reenterOnSchedule { probe.run() }
         return ReentrantClaimServerHandle(
             shouldReenter: ticket.kind == reenterOnCancel,
@@ -1540,7 +1867,7 @@ private final class ReentrantClaimServerScheduler:
 }
 
 private final class RecordingClaimServerScheduler:
-    InvestigationMachineClaimServerScheduling,
+    InvestigationMachineClaimServerCoreScheduling,
     @unchecked Sendable
 {
     enum Mode { case manual, fireBeforeReturn, fail }
@@ -1561,7 +1888,7 @@ private final class RecordingClaimServerScheduler:
     func schedule(
         ticket: LifecycleMachineRetirementDeadlineTicket,
         callback: @escaping @Sendable () -> Void
-    ) throws -> any InvestigationMachineClaimServerScheduledHandle {
+    ) throws -> any InvestigationMachineClaimServerCoreScheduledHandle {
         if mode == .fail { throw ClaimServerTestError.schedulerFailure }
         let handle = RecordingClaimServerHandle()
         lock.withLock {
@@ -1591,7 +1918,7 @@ private final class RecordingClaimServerScheduler:
 }
 
 private final class BlockingReleaseClaimServerScheduler:
-    InvestigationMachineClaimServerScheduling,
+    InvestigationMachineClaimServerCoreScheduling,
     @unchecked Sendable
 {
     private let releaseScheduleEntered = DispatchSemaphore(value: 0)
@@ -1600,7 +1927,7 @@ private final class BlockingReleaseClaimServerScheduler:
     func schedule(
         ticket: LifecycleMachineRetirementDeadlineTicket,
         callback _: @escaping @Sendable () -> Void
-    ) throws -> any InvestigationMachineClaimServerScheduledHandle {
+    ) throws -> any InvestigationMachineClaimServerCoreScheduledHandle {
         let handle = RecordingClaimServerHandle()
         if ticket.kind == .release {
             releaseScheduleEntered.signal()
@@ -1619,7 +1946,7 @@ private final class BlockingReleaseClaimServerScheduler:
 }
 
 private final class KindFailingClaimServerScheduler:
-    InvestigationMachineClaimServerScheduling,
+    InvestigationMachineClaimServerCoreScheduling,
     @unchecked Sendable
 {
     private let failingKind: LifecycleMachineRetirementDeadlineKind
@@ -1631,7 +1958,7 @@ private final class KindFailingClaimServerScheduler:
     func schedule(
         ticket: LifecycleMachineRetirementDeadlineTicket,
         callback _: @escaping @Sendable () -> Void
-    ) throws -> any InvestigationMachineClaimServerScheduledHandle {
+    ) throws -> any InvestigationMachineClaimServerCoreScheduledHandle {
         if ticket.kind == failingKind {
             throw ClaimServerTestError.schedulerFailure
         }
@@ -1640,7 +1967,7 @@ private final class KindFailingClaimServerScheduler:
 }
 
 private final class RecordingClaimServerTerminal:
-    InvestigationMachineClaimServerTerminalHandling,
+    InvestigationMachineClaimServerCoreTerminalHandling,
     @unchecked Sendable
 {
     private let lock = NSLock()
@@ -1651,7 +1978,7 @@ private final class RecordingClaimServerTerminal:
 }
 
 private final class ReentrantClaimServerTerminal:
-    InvestigationMachineClaimServerTerminalHandling,
+    InvestigationMachineClaimServerCoreTerminalHandling,
     @unchecked Sendable
 {
     private let lock = NSLock()
@@ -1667,6 +1994,135 @@ private final class ReentrantClaimServerTerminal:
     func handle(_ reason: LifecycleMachineRetirementDeadlineTerminalReason) {
         lock.withLock { reasons.append(reason) }
         probe.run()
+    }
+}
+
+private final class PublicClaimServerClock:
+    InvestigationMachineClaimServerClock,
+    @unchecked Sendable
+{
+    private let lock = NSLock()
+    private var values: [InvestigationMachineClaimServerObservation]
+
+    init(_ values: [InvestigationMachineClaimServerObservation]) {
+        self.values = values
+    }
+
+    func observation() throws -> InvestigationMachineClaimServerObservation {
+        try lock.withLock {
+            guard !values.isEmpty else {
+                throw ClaimServerTestError.noClockValue
+            }
+            return values.removeFirst()
+        }
+    }
+}
+
+private final class BlockingPublicClaimServerClock:
+    InvestigationMachineClaimServerClock,
+    @unchecked Sendable
+{
+    private let value: InvestigationMachineClaimServerObservation
+    private let entered = DispatchSemaphore(value: 0)
+    private let mayReturn = DispatchSemaphore(value: 0)
+
+    init(_ value: InvestigationMachineClaimServerObservation) {
+        self.value = value
+    }
+
+    func observation() throws -> InvestigationMachineClaimServerObservation {
+        entered.signal()
+        mayReturn.wait()
+        return value
+    }
+
+    func waitUntilObservationEntered() -> Bool {
+        entered.wait(timeout: .now() + 1) == .success
+    }
+
+    func allowObservationToReturn() { mayReturn.signal() }
+}
+
+private final class PublicClaimServerHandle:
+    InvestigationMachineClaimServerScheduledHandle,
+    @unchecked Sendable
+{
+    private let lock = NSLock()
+    private(set) var cancelCount = 0
+
+    func cancel() { lock.withLock { cancelCount += 1 } }
+}
+
+private final class PublicClaimServerScheduler:
+    InvestigationMachineClaimServerScheduling,
+    @unchecked Sendable
+{
+    private let lock = NSLock()
+    private let failOnSchedule: Int?
+    private var scheduleCount = 0
+    private(set) var handles: [PublicClaimServerHandle] = []
+
+    init(failOnSchedule: Int? = nil) {
+        self.failOnSchedule = failOnSchedule
+    }
+
+    var totalScheduleCount: Int { lock.withLock { scheduleCount } }
+
+    func schedule(
+        deadline _: InvestigationMachineClaimServerDeadline,
+        callback _: @escaping @Sendable () -> Void
+    ) throws -> any InvestigationMachineClaimServerScheduledHandle {
+        try lock.withLock {
+            scheduleCount += 1
+            if scheduleCount == failOnSchedule {
+                throw ClaimServerTestError.schedulerFailure
+            }
+            let handle = PublicClaimServerHandle()
+            handles.append(handle)
+            return handle
+        }
+    }
+}
+
+private final class PublicClaimServerTerminal:
+    InvestigationMachineClaimServerTerminalHandling,
+    @unchecked Sendable
+{
+    private let lock = NSLock()
+    private(set) var reasons: [
+        InvestigationMachineClaimServerTerminalReason
+    ] = []
+    private let onReason: @Sendable (
+        InvestigationMachineClaimServerTerminalReason
+    ) -> Void
+
+    init(
+        onReason: @escaping @Sendable (
+            InvestigationMachineClaimServerTerminalReason
+        ) -> Void = { _ in }
+    ) {
+        self.onReason = onReason
+    }
+
+    func handle(_ reason: InvestigationMachineClaimServerTerminalReason) {
+        lock.withLock { reasons.append(reason) }
+        onReason(reason)
+    }
+}
+
+private final class PublicClaimServerEventLog: @unchecked Sendable {
+    private let lock = NSLock()
+    private(set) var values: [String] = []
+
+    func append(_ value: String) { lock.withLock { values.append(value) } }
+}
+
+private final class PublicClaimServerReplyRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private(set) var values: [(Data?, String?)] = []
+
+    func call(_ data: Data?, _ reason: String?) {
+        lock.withLock { values.append((data, reason)) }
     }
 }
 

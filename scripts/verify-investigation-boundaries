@@ -24,6 +24,15 @@ legacy_machine_claim_source=
 retirement_handle_v3_contract_only=false
 retirement_handle_v3_lifecycle_source=
 retirement_handle_v3_adapter_source=
+live_claim_server_contract_only=false
+live_claim_server_project_source=
+live_claim_server_package_source=
+live_claim_server_handoff_root=
+live_claim_server_scheme_root=
+live_claim_server_lifecycle_source=
+live_claim_server_adapter_source=
+live_claim_server_effects_source=
+live_claim_server_helper_source=
 if (( $# > 0 )); then
     if (( $# == 2 )) && [[ $1 == --claim-asid-contract-only ]]; then
         claim_asid_contract_only=true
@@ -52,9 +61,20 @@ if (( $# > 0 )); then
         retirement_handle_v3_contract_only=true
         retirement_handle_v3_lifecycle_source=$2
         retirement_handle_v3_adapter_source=$3
+    elif (( $# == 9 )) \
+        && [[ $1 == --live-claim-server-contract-only ]]; then
+        live_claim_server_contract_only=true
+        live_claim_server_project_source=$2
+        live_claim_server_package_source=$3
+        live_claim_server_handoff_root=$4
+        live_claim_server_scheme_root=$5
+        live_claim_server_lifecycle_source=$6
+        live_claim_server_adapter_source=$7
+        live_claim_server_effects_source=$8
+        live_claim_server_helper_source=$9
     else
         print -u2 \
-            "Usage: scripts/verify-investigation-boundaries [--claim-asid-contract-only <source> | --deadline-state-contract-only <source> | --claim-server-contract-only <adapter> <effects> <deadline-state> | --claim-server-package-contract-only <describe-json> <dump-json> | --legacy-machine-claim-contract-only <lifecycle-xpc> <helper> <machine-host> <machine-claim> | --retirement-handle-v3-contract-only <lifecycle> <adapter>]"
+            "Usage: scripts/verify-investigation-boundaries [--claim-asid-contract-only <source> | --deadline-state-contract-only <source> | --claim-server-contract-only <adapter> <effects> <deadline-state> | --claim-server-package-contract-only <describe-json> <dump-json> | --legacy-machine-claim-contract-only <lifecycle-xpc> <helper> <machine-host> <machine-claim> | --retirement-handle-v3-contract-only <lifecycle> <adapter> | --live-claim-server-contract-only <project.pbxproj> <Package.swift> <handoff-root> <scheme-root> <lifecycle-escrow> <adapter> <effects> <helper>]"
         exit 64
     fi
 fi
@@ -300,14 +320,18 @@ if not re.search(
         "retirement reservation transfer canonical deadline drifted"
     )
 transfer_initializer = declaration(
-    transfer, r"init\s*\(\s*tokenSHA256\s*:",
+    transfer, r"init\s*\(\s*reservationID\s*:",
     "reservation transfer initializer",
 )
+transfer_initializer_compact = compact(transfer_initializer)
 if (
-    "validBeforeUTCMicroseconds:Int64"
-        not in compact(transfer_initializer)
+    "reservationID:UUID" not in transfer_initializer_compact
+    or "self.reservationID=reservationID"
+        not in transfer_initializer_compact
+    or "validBeforeUTCMicroseconds:Int64"
+        not in transfer_initializer_compact
     or "self.validBeforeUTCMicroseconds=validBeforeUTCMicroseconds"
-        not in compact(transfer_initializer)
+        not in transfer_initializer_compact
 ):
     raise SystemExit(
         "retirement reservation transfer initializer drifted"
@@ -481,27 +505,21 @@ helper = code_only(helper_raw, "helper source")
 host = code_only(host_raw, "Machine host")
 claim = code_only(claim_raw, "Machine claim source")
 
-_, wire_body = declaration(
+if re.search(
+    r"@objc\s+private\s+protocol\s+LifecycleMachineClaimXPCWire\b",
     helper,
-    r"@objc\s+private\s+protocol\s+LifecycleMachineClaimXPCWire\s*",
-    "server-only wire",
-)
-selectors = re.findall(r"^\s*func\s+(\w+)\s*\(", wire_body, re.MULTILINE)
-if selectors != ["claimMachineRetirement"]:
-    raise SystemExit(
-        f"legacy machine claim server-only selector drifted: {selectors!r}"
-    )
-
+):
+    raise SystemExit("legacy machine claim server-only wire remains")
 if helper_raw.count(
-    'private let legacyMachineClaimServiceName =\n'
+    'private let machineClaimServiceName =\n'
     '    "com.eriklee.stornaut.lifecycle.machine-claim"'
 ) != 1:
     raise SystemExit(
-        "legacy machine claim fixed helper service drifted"
+        "live machine claim fixed helper service drifted"
     )
-if helper.count("legacyMachineClaimServiceName") != 2:
+if helper.count("machineClaimServiceName") != 2:
     raise SystemExit(
-        "legacy machine claim helper service selection cardinality drifted"
+        "live machine claim helper service selection cardinality drifted"
     )
 
 for marker in (
@@ -776,8 +794,6 @@ if effects_imports != ["Foundation", "StornautLifecycle"]:
     raise SystemExit(f"claim server effects imports drifted: {effects_imports}")
 
 for source_name, source in (("adapter", adapter), ("effects", effects)):
-    if re.search(r"(?m)^\s*(?:public|open)\s+", source):
-        raise SystemExit(f"claim server {source_name} exposed public surface")
     authority = re.search(
         r"\b(?:NSXPCConnection|NSXPCListener|NSXPCListenerEndpoint|"
         r"FileManager|URLSession|Process|Security|ActionExecutor|Policy|"
@@ -856,6 +872,8 @@ allowed_lock_bodies = [
     "evidenceLock.withLock{evidence=value}",
     "evidenceLock.withLock{ifevidence==value{evidence=nil}}",
     "evidenceLock.withLock({evidence}",
+    "evidenceLock.withLock({evidence}",
+    "evidenceLock.withLock{evidence!=nil}",
     "evidenceLock.withLock({evidence}",
 ]
 if sorted(normalized_lock_bodies) != sorted(allowed_lock_bodies):
@@ -1684,6 +1702,621 @@ if "StornautInvestigationHandoffContract" in set(
 PY
 }
 
+function verify_live_claim_server_contract() {
+    local project_source=$1
+    local package_source=$2
+    local handoff_root=$3
+    local scheme_root=$4
+    local lifecycle_source=$5
+    local adapter_source=$6
+    local effects_source=$7
+    local helper_source=$8
+    python3 - "$project_source" "$package_source" \
+        "$handoff_root" "$scheme_root" "$lifecycle_source" \
+        "$adapter_source" "$effects_source" "$helper_source" <<'PY'
+import hashlib
+from pathlib import Path
+import re
+import sys
+
+project_path, package_path, handoff_root, scheme_root, lifecycle_path, \
+    adapter_path, effects_path, helper_path = map(Path, sys.argv[1:])
+
+
+def read(path):
+    return path.read_text(encoding="utf-8")
+
+
+def code_only(source, label):
+    output = list(source)
+    index = 0
+    block_depth = 0
+    delimiter = None
+    while index < len(source):
+        if block_depth:
+            if source.startswith("/*", index):
+                output[index:index + 2] = "  "
+                block_depth += 1
+                index += 2
+            elif source.startswith("*/", index):
+                output[index:index + 2] = "  "
+                block_depth -= 1
+                index += 2
+            else:
+                if source[index] != "\n":
+                    output[index] = " "
+                index += 1
+            continue
+        if delimiter is not None:
+            if source.startswith(delimiter, index):
+                width = len(delimiter)
+                output[index:index + width] = " " * width
+                delimiter = None
+                index += width
+            elif delimiter == '"' and source[index] == "\\":
+                output[index] = " "
+                if index + 1 < len(source):
+                    output[index + 1] = " "
+                index += 2
+            else:
+                if source[index] != "\n":
+                    output[index] = " "
+                index += 1
+            continue
+        if source.startswith("//", index):
+            end = source.find("\n", index)
+            end = len(source) if end < 0 else end
+            output[index:end] = " " * (end - index)
+            index = end
+        elif source.startswith("/*", index):
+            output[index:index + 2] = "  "
+            block_depth = 1
+            index += 2
+        elif source.startswith('"""', index):
+            output[index:index + 3] = "   "
+            delimiter = '"""'
+            index += 3
+        elif source[index] == '"':
+            output[index] = " "
+            delimiter = '"'
+            index += 1
+        else:
+            index += 1
+    if block_depth or delimiter is not None:
+        raise SystemExit(f"live claim server {label} has unterminated text")
+    return "".join(output)
+
+
+def declaration(source, pattern, label, flags=re.MULTILINE | re.DOTALL):
+    match = re.search(pattern, source, flags)
+    if match is None:
+        raise SystemExit(f"live claim server {label} drifted")
+    opening = source.find("{", match.end())
+    if opening < 0:
+        raise SystemExit(f"live claim server {label} has no body")
+    depth = 0
+    for index in range(opening, len(source)):
+        if source[index] == "{":
+            depth += 1
+        elif source[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return source[match.start():index + 1]
+    raise SystemExit(f"live claim server {label} is unterminated")
+
+
+def require(source, patterns, label):
+    for pattern in patterns:
+        if re.search(pattern, source, re.MULTILINE | re.DOTALL) is None:
+            raise SystemExit(f"live claim server {label} drifted: {pattern}")
+
+
+def compact(source):
+    return re.sub(r"\s+", "", source)
+
+
+def digest(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+expected_frozen = {
+    package_path: "1b1cb7bcefd05501b9b28e6be90224326156a2ef0e632091657728d244c0b57f",
+    scheme_root / "Stornaut.xcscheme": "5d0d87082e3c0efed4165566e13f4fa560906137785c61a55b25d63a8ab2d987",
+    scheme_root / "StornautInvestigationDiagnosticApp.xcscheme": "deb1b2fe0db76a7981759fcff865da270ceedc990ad78858e444f9eed3fe96b5",
+    handoff_root / "HandoffBinaryTranscript.swift": "dd286134478b715f51f190ec4cdbc3cf10449b330ddb60b11cc06777a4a5a7c9",
+    handoff_root / "InvestigationCohortCapsuleContract.swift": "d08046025cbebe320161732883d89dbaf710f1073d0a41ca3254e4eea828e437",
+    handoff_root / "InvestigationHandoffEpochBootstrapContract.swift": "c295fdefeea11ffc767fc45865a87b5b399cf2ca51b877c5425ed30ed86100fd",
+    handoff_root / "InvestigationHandoffFrameContract.swift": "33bf13d57d4acfc621cf7a5baf7ca3deaa8819d1c723573039ae91f07a21b4d9",
+    handoff_root / "InvestigationMachineClaimContract.swift": "1b01315aaf822ac126d7d4a7391d7af3c93efcf444892d73ac0f88642dc4f352",
+}
+if set(handoff_root.glob("*")) != {
+    path for path in expected_frozen if path.parent == handoff_root
+}:
+    raise SystemExit("live claim server frozen Handoff files drifted")
+if set(scheme_root.glob("*.xcscheme")) != {
+    path for path in expected_frozen if path.parent == scheme_root
+}:
+    raise SystemExit("live claim server frozen schemes drifted")
+for path, expected in expected_frozen.items():
+    if not path.is_file() or digest(path) != expected:
+        raise SystemExit(f"live claim server frozen input drifted: {path}")
+
+project = read(project_path)
+object_id = r"[A-F0-9]{24}"
+
+
+def section(name):
+    match = re.search(
+        rf"/\* Begin {re.escape(name)} section \*/(.*?)/\* End "
+        rf"{re.escape(name)} section \*/",
+        project,
+        re.DOTALL,
+    )
+    if match is None:
+        raise SystemExit(f"live claim server Xcode section drifted: {name}")
+    return match.group(1)
+
+
+def matching_brace(source, opening):
+    depth = 0
+    quoted = False
+    escaped = False
+    comment = False
+    index = opening
+    while index < len(source):
+        value = source[index]
+        following = source[index + 1] if index + 1 < len(source) else ""
+        if comment:
+            if value == "*" and following == "/":
+                comment = False
+                index += 2
+                continue
+        elif quoted:
+            if escaped:
+                escaped = False
+            elif value == "\\":
+                escaped = True
+            elif value == '"':
+                quoted = False
+        elif value == "/" and following == "*":
+            comment = True
+            index += 2
+            continue
+        elif value == '"':
+            quoted = True
+        elif value == "{":
+            depth += 1
+        elif value == "}":
+            depth -= 1
+            if depth == 0:
+                return index
+        index += 1
+    raise SystemExit("live claim server Xcode object is unterminated")
+
+
+def objects(name):
+    source = section(name)
+    header = re.compile(
+        rf"^[ \t]*({object_id}) /\* (.*?) \*/ = \{{",
+        re.MULTILINE,
+    )
+    parsed = {}
+    for match in header.finditer(source):
+        opening = match.end() - 1
+        closing = matching_brace(source, opening)
+        parsed[match.group(1)] = (
+            match.group(2), source[opening + 1:closing]
+        )
+    return parsed
+
+
+def value(body, key):
+    match = re.search(
+        rf"(?:^|;)[ \t]*{re.escape(key)} = (.*?);",
+        body,
+        re.MULTILINE | re.DOTALL,
+    )
+    if match is None:
+        raise SystemExit(f"live claim server Xcode field drifted: {key}")
+    result = match.group(1).strip()
+    return result[1:-1] if result.startswith('"') and result.endswith('"') else result
+
+
+def references(body, key):
+    match = re.search(
+        rf"^[ \t]*{re.escape(key)} = \((.*?)^[ \t]*\);",
+        body,
+        re.MULTILINE | re.DOTALL,
+    )
+    if match is None:
+        raise SystemExit(f"live claim server Xcode list drifted: {key}")
+    return re.findall(rf"({object_id}) /\* (.*?) \*/", match.group(1))
+
+
+native = objects("PBXNativeTarget")
+build_files = objects("PBXBuildFile")
+frameworks = objects("PBXFrameworksBuildPhase")
+sources = objects("PBXSourcesBuildPhase")
+resources = objects("PBXResourcesBuildPhase")
+copies = objects("PBXCopyFilesBuildPhase")
+products = objects("XCSwiftPackageProductDependency")
+native_by_name = {value(body, "name"): (key, body) for key, (_, body) in native.items()}
+server_products = [
+    key for key, (_, body) in products.items()
+    if value(body, "productName") == "StornautInvestigationMachineClaimServer"
+]
+if len(server_products) != 1:
+    raise SystemExit("live claim server helper-only linkage drifted: product reference")
+server_product = server_products[0]
+server_build_files = [
+    key for key, (_, body) in build_files.items()
+    if re.search(
+        rf"(?:^|;)[ \t]*productRef = {server_product} /\* "
+        r"StornautInvestigationMachineClaimServer \*/;",
+        body,
+        re.MULTILINE,
+    )
+]
+if len(server_build_files) != 1:
+    raise SystemExit("live claim server helper-only linkage drifted: build file")
+server_build_file = server_build_files[0]
+product_owners = []
+framework_owners = []
+for name, (_, body) in native_by_name.items():
+    package_ids = {key for key, _ in references(body, "packageProductDependencies")}
+    if server_product in package_ids:
+        product_owners.append(name)
+    phase_ids = {key for key, _ in references(body, "buildPhases")}
+    member_ids = {
+        key
+        for phase_id in phase_ids & set(frameworks)
+        for key, _ in references(frameworks[phase_id][1], "files")
+    }
+    if server_build_file in member_ids:
+        framework_owners.append(name)
+if product_owners != ["StornautLifecycleHelper"] or framework_owners != [
+    "StornautLifecycleHelper"
+]:
+    raise SystemExit(
+        "live claim server helper-only linkage drifted: "
+        f"products={product_owners}, frameworks={framework_owners}"
+    )
+helper_body = native_by_name["StornautLifecycleHelper"][1]
+helper_products = [
+    value(products[key][1], "productName")
+    for key, _ in references(helper_body, "packageProductDependencies")
+]
+if helper_products != [
+    "StornautCodex",
+    "StornautInvestigationMachineClaimServer",
+    "StornautLifecycle",
+]:
+    raise SystemExit(
+        f"live claim server helper package dependencies drifted: {helper_products}"
+    )
+helper_phase_ids = {key for key, _ in references(helper_body, "buildPhases")}
+helper_framework_phases = helper_phase_ids & set(frameworks)
+if len(helper_framework_phases) != 1:
+    raise SystemExit("live claim server helper Frameworks phase drifted")
+server_phase_memberships = [
+    (kind, phase_id)
+    for kind, phases in (
+        ("PBXFrameworksBuildPhase", frameworks),
+        ("PBXSourcesBuildPhase", sources),
+        ("PBXResourcesBuildPhase", resources),
+        ("PBXCopyFilesBuildPhase", copies),
+    )
+    for phase_id, (_, body) in phases.items()
+    if server_build_file in {key for key, _ in references(body, "files")}
+]
+if server_phase_memberships != [
+    ("PBXFrameworksBuildPhase", next(iter(helper_framework_phases)))
+]:
+    raise SystemExit(
+        "live claim server helper-only linkage drifted: phase memberships="
+        f"{server_phase_memberships}"
+    )
+helper_framework_names = [
+    comment
+    for key, comment in references(
+        frameworks[next(iter(helper_framework_phases))][1], "files"
+    )
+]
+if helper_framework_names != [
+    "StornautCodex in Frameworks",
+    "StornautInvestigationMachineClaimServer in Frameworks",
+    "StornautLifecycle in Frameworks",
+]:
+    raise SystemExit(
+        "StornautInvestigationMachineClaimServer in Frameworks drifted: "
+        f"{helper_framework_names}"
+    )
+
+lifecycle = code_only(read(lifecycle_path), "Lifecycle escrow")
+adapter = code_only(read(adapter_path), "adapter")
+effects = code_only(read(effects_path), "effects")
+helper_raw = read(helper_path)
+helper = code_only(helper_raw, "helper")
+
+escrow = declaration(
+    lifecycle,
+    r"public\s+final\s+class\s+LifecycleMachineRetirementEscrow\b",
+    "Lifecycle escrow owner",
+)
+entry = declaration(escrow, r"fileprivate\s+struct\s+Entry\b", "Lifecycle entry")
+record = declaration(escrow, r"public\s+func\s+record\s*\(", "Lifecycle record")
+transfer = declaration(
+    escrow, r"package\s+func\s+transferReservation\s*\(", "Lifecycle transfer"
+)
+require(escrow, (
+    r"private\s+let\s+reservationID:\s*@Sendable\s*\(\)\s*->\s*UUID",
+    r"reservationID:\s*UUID\.init",
+), "Lifecycle-owned reservation seed")
+require(entry, (r"let\s+reservationID:\s*UUID",), "Lifecycle entry reservation")
+record_compact = compact(record)
+for marker in (
+    "letrawToken=token()",
+    "letrawReservationID=reservationID()",
+    "!rawReservationID.machineIsZero",
+    "rawToken!=rawReservationID",
+    "reservationID:rawReservationID",
+):
+    if marker not in record_compact:
+        raise SystemExit(f"live claim server Lifecycle-owned reservation ID drifted: {marker}")
+if "reservationID:entry.reservationID" not in compact(transfer):
+    raise SystemExit("live claim server Lifecycle reservation transfer drifted")
+
+server = declaration(
+    adapter, r"public\s+final\s+class\s+InvestigationMachineClaimServer\b",
+    "public server",
+)
+activate = declaration(server, r"public\s+func\s+activate\s*\(", "activation")
+make_session = declaration(
+    server, r"public\s+func\s+makeSession\s*\(", "session factory"
+)
+adapter_core = declaration(
+    adapter, r"package\s+final\s+class\s+InvestigationMachineClaimServerAdapter\b",
+    "package adapter",
+)
+adapter_init = declaration(
+    adapter_core, r"package\s+init\s*\(", "package adapter initializer"
+)
+require(activate, (
+    r"let\s+transfer\s*=\s*try\s+retirementEscrow\.transferReservation\s*\(\s*\)",
+    r"InvestigationMachineClaimServerAdapter\s*\(\s*transfer:\s*transfer,",
+), "activation transfer")
+if re.search(r"\bUUID\s*\(|UUID\.init", activate + adapter_init):
+    raise SystemExit("live claim server adapter re-minted reservation UUID")
+if re.search(r"reservationID\s*:\s*UUID", adapter_init):
+    raise SystemExit("live claim server adapter accepts caller reservation ID")
+require(adapter_init, (
+    r"guard\s+!transfer\.reservationID\.claimServerIsZero",
+    r"reservationID\s*=\s*transfer\.reservationID",
+), "Lifecycle-owned reservation consumption")
+require(make_session, (
+    r"guard\s+activeSession\s*==\s*nil",
+    r"guard\s+let\s+activeRuntime",
+    r"activeSession\s*=\s*session",
+), "one-session factory")
+
+session = declaration(
+    adapter,
+    r"public\s+final\s+class\s+InvestigationMachineClaimServerSession\b",
+    "public session",
+)
+release = declaration(
+    session, r"public\s+func\s+releaseMachineRetirement\s*\(",
+    "release selector",
+)
+release_compact = compact(release)
+reply_index = release_compact.find("reply(data,nil)")
+dispatch_index = release_compact.find("adapter.replyDidDispatch()")
+if reply_index < 0 or dispatch_index <= reply_index:
+    raise SystemExit("live claim server reply ordering drifted")
+if release_compact[reply_index:].count("reply(") != 1:
+    raise SystemExit("live claim server release gained post-reply retry")
+
+public_declarations = []
+for source in (adapter, effects):
+    if re.search(r"(?m)^\s*public\s+extension\b", source):
+        raise SystemExit("live claim server public extension drifted")
+    public_declarations.extend(re.findall(
+        r"(?m)^public\s+(?:final\s+)?"
+        r"(?:class|struct|enum|protocol|typealias)\s+"
+        r"([A-Za-z0-9_]+)",
+        source,
+    ))
+expected_public_declarations = [
+    "InvestigationMachineClaimServer",
+    "InvestigationMachineClaimServerSession",
+    "InvestigationMachineClaimServerObservation",
+    "InvestigationMachineClaimServerDeadline",
+    "InvestigationMachineClaimServerClock",
+    "InvestigationMachineClaimServerScheduledHandle",
+    "InvestigationMachineClaimServerScheduling",
+    "InvestigationMachineClaimServerTerminalReason",
+    "InvestigationMachineClaimServerTerminalHandling",
+]
+if public_declarations != expected_public_declarations:
+    raise SystemExit(
+        f"live claim server public facade allowlist drifted: {public_declarations}"
+    )
+public_surface = "\n".join(
+    match.group(0)
+    for source in (adapter, effects)
+    for match in re.finditer(
+        r"(?ms)^\s*public\s+.*?(?:\{|$)", source
+    )
+)
+for forbidden in (
+    "LifecycleMachineRetirementReservationTransfer",
+    "LifecycleMachineRetirementDeadlineTicket",
+    "LifecycleMachineRetirementDeadlineObservation",
+    "LifecycleMachineRetirementDeadlineTerminalReason",
+    "tokenSHA256", "authorization", "executable", "signal",
+    "Cleanup", "Policy", "Executor",
+):
+    if forbidden in public_surface:
+        raise SystemExit(f"live claim server public facade exposes forbidden type: {forbidden}")
+observation = declaration(
+    effects, r"public\s+struct\s+InvestigationMachineClaimServerObservation\b",
+    "public observation",
+)
+deadline = declaration(
+    effects, r"public\s+struct\s+InvestigationMachineClaimServerDeadline\b",
+    "public deadline",
+)
+if re.findall(r"public\s+let\s+(\w+):\s*([A-Za-z0-9_]+)", observation) != [
+    ("continuousNanoseconds", "UInt64"),
+    ("wallUTCMicroseconds", "Int64"),
+]:
+    raise SystemExit("live claim server public observation scalar allowlist drifted")
+if re.findall(r"public\s+let\s+(\w+):\s*([A-Za-z0-9_]+)", deadline) != [
+    ("deadlineNanoseconds", "UInt64")
+]:
+    raise SystemExit("live claim server public deadline scalar allowlist drifted")
+
+for forbidden in (
+    "legacyMachineClaimServiceName",
+    "LifecycleMachineClaimXPCWire",
+    "LifecycleMachineClaimHelperService",
+    "retirementEscrow.claim(",
+    "retirementEscrow.isAwaitingClaim",
+    "scheduleRetirementClaimDeadline(",
+    "machineClaimPending",
+    "machineClaimWorkItem",
+    "retirementClaimWorkItem",
+):
+    if forbidden in helper:
+        raise SystemExit(f"live claim server legacy helper route drifted: {forbidden}")
+require(helper, (
+    r"import\s+StornautInvestigationHandoffContract",
+    r"import\s+StornautInvestigationMachineClaimServer",
+    r"with:\s*InvestigationMachineClaimXPCWire\.self",
+), "helper live wire")
+physical = helper[:helper.find("private func writeAll(")]
+require(physical, (
+    r"mach_continuous_time\s*\(",
+    r"mach_timebase_info\s*\(",
+    r"continuousNanoseconds:\s*continuous\.partialValue",
+    r"Task\.detached",
+    r"ContinuousClock\s*\(\s*\)\.sleep",
+    r"let\s+status:\s*Int32\s*=\s*reason\s*==\s*"
+        r"\.postReplyExitDue\s*\?\s*0\s*:\s*71",
+), "helper physical scheduler")
+listener = declaration(
+    helper, r"private\s+final\s+class\s+LifecycleMachineClaimListenerDelegate\b",
+    "helper listener",
+)
+for forbidden in (
+    "DispatchQueue", "asyncAfter", "Timer",
+    "scheduleSuccessfulExitAfterReply", "scheduleFailureExitAfterReply",
+    "acceptedConnection", "retirementEscrow",
+    "LifecycleMachineRetirementClaimRequest",
+    "JSONDecoder", "JSONEncoder",
+):
+    if forbidden in listener:
+        raise SystemExit(f"live claim server legacy listener timer drifted: {forbidden}")
+accept = declaration(
+    listener, r"func\s+listener\s*\(", "helper listener admission"
+)
+accept_compact = compact(accept)
+admission_markers = [
+    "listener===expectedListener",
+    "connection.setCodeSigningRequirement(",
+    "connection.processIdentifier>1",
+    "connection.effectiveUserIdentifier==0",
+    "LifecycleMachineDriverAdmissionPolicy().authorize(",
+]
+for marker in admission_markers:
+    if marker not in accept_compact:
+        raise SystemExit(f"live claim server helper peer admission drifted: {marker}")
+session_index = accept_compact.find("machineClaimServer.makeSession()")
+if session_index < 0 or any(
+    accept_compact.find(marker) > session_index for marker in admission_markers
+):
+    raise SystemExit("live claim server admission-before-session drifted")
+
+service = declaration(
+    helper, r"private\s+final\s+class\s+LifecycleHelperService\b",
+    "interactive helper service",
+)
+receive = declaration(
+    service, r"private\s+func\s+receiveInteractiveReply\s*\(",
+    "interactive retirement reply",
+)
+receive_compact = compact(receive)
+record_index = receive_compact.find("recordMachineRetirementEscrow(")
+activate_index = receive_compact.find("machineClaimServer.activate()")
+retired_index = receive_compact.find("LifecycleInteractiveSessionResponse.retired(")
+reply_index = receive_compact.find("pending.reply(", retired_index)
+if not (0 <= record_index < activate_index < retired_index < reply_index):
+    raise SystemExit("live claim server record-activate-reply ordering drifted")
+PY
+}
+
+function verify_live_claim_server_scope() {
+    python3 - <<'PY'
+from pathlib import Path
+import subprocess
+
+baseline = "17d9f1fecd670eb4ca7b7ddd92a27303c0c4bdb0"
+expected = {
+    "Stornaut.xcodeproj/project.pbxproj",
+    "StornautLifecycleHelper/main.swift",
+    "Sources/StornautLifecycle/LifecycleMachineRetirementEscrow.swift",
+    "Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerAdapter.swift",
+    "Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerEffects.swift",
+    "Tests/StornautLifecycleTests/LifecycleMachineRetirementEscrowTests.swift",
+    "Tests/StornautLifecycleTests/LifecycleMachineClaimXPCContractTests.swift",
+    "Tests/StornautLifecycleTests/LifecycleInteractiveSessionContractTests.swift",
+    "Tests/StornautInvestigationTests/InvestigationMachineClaimServerAdapterTests.swift",
+    "Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift",
+    "scripts/verify-app-release-boundaries",
+    "scripts/verify-investigation-boundaries",
+    "scripts/verify-contract",
+}
+descendants = subprocess.check_output(
+    ["git", "rev-list", "--ancestry-path", "--reverse", f"{baseline}..HEAD"],
+    text=True,
+).splitlines()
+if descendants:
+    checkpoint = descendants[0]
+    parent = subprocess.check_output(
+        ["git", "show", "-s", "--format=%P", checkpoint], text=True
+    ).strip()
+    if parent != baseline:
+        raise SystemExit("iii-b checkpoint is not the direct baseline child")
+    diff_command = ["git", "diff", "--numstat", baseline, checkpoint, "--"]
+    name_command = ["git", "diff", "--name-only", baseline, checkpoint, "--"]
+    untracked = set()
+else:
+    diff_command = ["git", "diff", "--numstat", baseline, "--"]
+    name_command = ["git", "diff", "--name-only", baseline, "--"]
+    untracked = set(subprocess.check_output(
+        ["git", "ls-files", "--others", "--exclude-standard"], text=True
+    ).splitlines())
+paths = set(subprocess.check_output(name_command, text=True).splitlines()) | untracked
+non_document = {path for path in paths if not path.startswith("docs/")}
+if non_document != expected:
+    raise SystemExit(f"iii-b checkpoint paths drifted: {sorted(non_document)}")
+changed_lines = 0
+counted = set()
+for row in subprocess.check_output(diff_command, text=True).splitlines():
+    added, deleted, path = row.split("\t")
+    if path in expected and added != "-" and deleted != "-":
+        changed_lines += int(added) + int(deleted)
+        counted.add(path)
+for path in expected & untracked:
+    changed_lines += len(Path(path).read_text(encoding="utf-8").splitlines())
+    counted.add(path)
+if counted != expected:
+    raise SystemExit(f"iii-b checkpoint numstat drifted: {sorted(counted)}")
+if changed_lines > 3_700:
+    raise SystemExit(f"iii-b-i checkpoint budget drifted: {changed_lines} > 3700")
+PY
+}
+
 if $claim_asid_contract_only; then
     verify_claim_asid_contract "$claim_asid_contract_source"
     print "Claim evidence ASID contract verification passed."
@@ -1723,6 +2356,19 @@ if $retirement_handle_v3_contract_only; then
         "$retirement_handle_v3_lifecycle_source" \
         "$retirement_handle_v3_adapter_source"
     print "Retirement handle v3 contract verification passed."
+    exit 0
+fi
+if $live_claim_server_contract_only; then
+    verify_live_claim_server_contract \
+        "$live_claim_server_project_source" \
+        "$live_claim_server_package_source" \
+        "$live_claim_server_handoff_root" \
+        "$live_claim_server_scheme_root" \
+        "$live_claim_server_lifecycle_source" \
+        "$live_claim_server_adapter_source" \
+        "$live_claim_server_effects_source" \
+        "$live_claim_server_helper_source"
+    print "Live claim server helper-only contract verification passed."
     exit 0
 fi
 
@@ -2830,11 +3476,11 @@ verify_legacy_machine_claim_contract \
     "$machine_claim_source"
 for marker in \
     'LifecycleMachineClaimListenerDelegate' \
-    'LifecycleMachineClaimHelperService' \
     'listener === expectedListener' \
     'connection.effectiveUserIdentifier == 0' \
     'LifecycleMachineDriverAdmissionPolicy().authorize(' \
-    'machineDriverIdentity: callerIdentity'; do
+    'machineClaimServer.makeSession()' \
+    'with: InvestigationMachineClaimXPCWire.self'; do
     rg -q --fixed-strings -- "$marker" "$lifecycle_helper" || {
         print -u2 "Machine claim helper marker missing: $marker"
         exit 1
@@ -3410,9 +4056,19 @@ verify_claim_server_contract \
 verify_retirement_handle_v3_contract \
     Sources/StornautLifecycle/LifecycleMachineRetirementEscrow.swift \
     Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerAdapter.swift
+verify_live_claim_server_contract \
+    Stornaut.xcodeproj/project.pbxproj \
+    Package.swift \
+    Sources/StornautInvestigationHandoffContract \
+    Stornaut.xcodeproj/xcshareddata/xcschemes \
+    Sources/StornautLifecycle/LifecycleMachineRetirementEscrow.swift \
+    Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerAdapter.swift \
+    Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerEffects.swift \
+    StornautLifecycleHelper/main.swift
 verify_claim_server_scope
 verify_legacy_machine_claim_scope
 verify_retirement_handle_v3_scope
+verify_live_claim_server_scope
 
 package_graph=$(swift package describe --type json)
 package_manifest=$(swift package dump-package)

@@ -513,6 +513,8 @@ struct LifecycleMachineRetirementEscrowTests {
         let expectedTokenHash = withUnsafeBytes(of: &tokenBytes) {
             Data(SHA256.hash(data: Data($0)))
         }
+        #expect(transfer.reservationID == fixture.reservationID)
+        #expect(transfer.reservationID != handle.token)
         #expect(transfer.tokenSHA256 == expectedTokenHash)
         #expect(transfer.investigationID == fixture.investigationID)
         #expect(transfer.retireOperationID == fixture.retireOperationID)
@@ -658,6 +660,9 @@ private struct MachineRetirementEscrowFixture {
     let token = UUID(
         uuidString: "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
     )!
+    let reservationID = UUID(
+        uuidString: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+    )!
     let challenge = UUID(
         uuidString: "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
     )!
@@ -699,7 +704,8 @@ private struct MachineRetirementEscrowFixture {
         )
         return LifecycleMachineRetirementEscrow(
             now: now ?? sequence.read,
-            token: { token }
+            token: { token },
+            reservationID: { reservationID }
         )
     }
 

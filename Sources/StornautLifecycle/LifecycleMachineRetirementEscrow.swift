@@ -295,6 +295,7 @@ package struct LifecycleMachineRetirementReservationTransfer:
     Sendable,
     Equatable
 {
+    package let reservationID: UUID
     package let tokenSHA256: Data
     package let investigationID: LifecycleInvestigationID
     package let retireOperationID: UUID
@@ -316,6 +317,7 @@ package struct LifecycleMachineRetirementReservationTransfer:
     package let residueObservation: LifecycleInvestigationResidueObservation
 
     init(
+        reservationID: UUID,
         tokenSHA256: Data,
         investigationID: LifecycleInvestigationID,
         retireOperationID: UUID,
@@ -329,6 +331,8 @@ package struct LifecycleMachineRetirementReservationTransfer:
             LifecycleInteractiveWorkerRetirementObservation,
         residueObservation: LifecycleInvestigationResidueObservation
     ) {
+        precondition(!reservationID.machineIsZero)
+        self.reservationID = reservationID
         self.tokenSHA256 = tokenSHA256
         self.investigationID = investigationID
         self.retireOperationID = retireOperationID
@@ -572,6 +576,7 @@ public struct LifecycleMachineRetirementClaimResponse:
 
 public final class LifecycleMachineRetirementEscrow: @unchecked Sendable {
     fileprivate struct Entry {
+        let reservationID: UUID
         let tokenSHA256: Data
         let investigationID: LifecycleInvestigationID
         let retireOperationID: UUID
@@ -602,18 +607,25 @@ public final class LifecycleMachineRetirementEscrow: @unchecked Sendable {
     private let lock = NSLock()
     private let now: @Sendable () -> Date
     private let token: @Sendable () -> UUID
+    private let reservationID: @Sendable () -> UUID
     private var state = State.empty
 
     public convenience init() {
-        self.init(now: Date.init, token: UUID.init)
+        self.init(
+            now: Date.init,
+            token: UUID.init,
+            reservationID: UUID.init
+        )
     }
 
     init(
         now: @escaping @Sendable () -> Date,
-        token: @escaping @Sendable () -> UUID
+        token: @escaping @Sendable () -> UUID,
+        reservationID: @escaping @Sendable () -> UUID = UUID.init
     ) {
         self.now = now
         self.token = token
+        self.reservationID = reservationID
     }
 
     public var isAwaitingClaim: Bool {
@@ -644,6 +656,7 @@ public final class LifecycleMachineRetirementEscrow: @unchecked Sendable {
             }
             state = .consumed
             return LifecycleMachineRetirementReservationTransfer(
+                reservationID: entry.reservationID,
                 tokenSHA256: entry.tokenSHA256,
                 investigationID: entry.investigationID,
                 retireOperationID: entry.retireOperationID,
@@ -707,8 +720,17 @@ public final class LifecycleMachineRetirementEscrow: @unchecked Sendable {
                 residueObservation.observedAt <= recordedAt,
                 recordedAt.timeIntervalSince(residueObservation.observedAt) <= 60
             else { throw LifecycleMachineRetirementEscrowError.invalidRecord }
+            let rawToken = token()
+            let rawReservationID = reservationID()
+            guard
+                !rawToken.machineIsZero,
+                !rawReservationID.machineIsZero,
+                rawToken != rawReservationID
+            else {
+                throw LifecycleMachineRetirementEscrowError.invalidRecord
+            }
             let handle = try LifecycleMachineRetirementHandle(
-                token: token(),
+                token: rawToken,
                 investigationID: investigationID,
                 retireOperationID: retireOperationID,
                 configurationSHA256: configurationSHA256,
@@ -716,6 +738,7 @@ public final class LifecycleMachineRetirementEscrow: @unchecked Sendable {
                     validBeforeUTCMicroseconds
             )
             state = .recorded(Entry(
+                reservationID: rawReservationID,
                 tokenSHA256: machineTokenSHA256(handle.token),
                 investigationID: investigationID,
                 retireOperationID: retireOperationID,

@@ -512,7 +512,10 @@ one fixed bounded failure-exit path.
 
 - unauthorized listener peer never decodes or consumes state;
 - same-service claim/release and foreign/reconnect/duplicate negatives;
-- malformed/old JSON rejected before transfer/claim;
+- malformed/old JSON rejected after the required activation transfer but before
+  claim-state consumption; the earlier "before transfer" wording is superseded
+  because `record -> activate/transfer -> retired App reply` must complete before
+  a Machine claim request can exist;
 - claim -> release timer replacement; release -> post-reply timer ordering;
 - callback-before-handle, arm failure, cancellation/invalidation and already-
   fired races through the physical adapter;

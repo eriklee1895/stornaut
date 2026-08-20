@@ -342,7 +342,7 @@ struct LifecycleInteractiveSessionContractTests {
     }
 
     @Test
-    func rootHelperRecordsRetirementBeforeReplyAndAwaitsClaimAfterDisconnect()
+    func rootHelperActivatesServerBeforeReplyAndPreservesItAfterDisconnect()
         throws
     {
         let repositoryRoot = URL(filePath: #filePath)
@@ -378,14 +378,16 @@ struct LifecycleInteractiveSessionContractTests {
                 range: sealedResponse.lowerBound..<retireBody.endIndex
             )
         )
-        #expect(record.lowerBound < reply.lowerBound)
+        let activate = try #require(
+            retireBody.range(of: "machineClaimServer.activate()")
+        )
+        #expect(record.lowerBound < activate.lowerBound)
+        #expect(activate.lowerBound < reply.lowerBound)
         #expect(source.contains("let handle = try retirementEscrow.record("))
         #expect(source.contains("guard !invalidated else"))
         #expect(source.contains("interactiveRouteClosed = true"))
         #expect(source.contains("!interactiveRouteClosed"))
-        #expect(
-            retireBody.contains("scheduleRetirementClaimDeadline(")
-        )
+        #expect(!retireBody.contains("scheduleRetirementClaimDeadline("))
         #expect(retireBody.contains("machineRetirementHandle: handle"))
         #expect(!retireBody.contains("scheduleSuccessfulExitAfterReply()"))
 
@@ -400,10 +402,10 @@ struct LifecycleInteractiveSessionContractTests {
             invalidationSuffix[..<invalidationEnd.upperBound]
         )
         #expect(
-            invalidationBody.contains("retirementEscrow.isAwaitingClaim")
+            invalidationBody.contains("machineClaimServer.isPending")
         )
         #expect(
-            invalidationBody.contains("preserveRetirementEscrow")
+            invalidationBody.contains("preserveRetirementServer")
         )
 
         let legacyStart = try #require(
@@ -422,7 +424,9 @@ struct LifecycleInteractiveSessionContractTests {
         )
         let legacyBody = String(legacySuffix[..<legacyEnd.upperBound])
         #expect(legacyBody.contains("interactiveRouteClosed"))
-        #expect(legacyBody.contains("retirementEscrow.isAwaitingClaim"))
+        #expect(legacyBody.contains("machineClaimServer.isPending"))
+        #expect(!source.contains("retirementEscrow.isAwaitingClaim"))
+        #expect(!source.contains("scheduleRetirementClaimDeadline("))
     }
 
     @Test

@@ -4,6 +4,87 @@ import Testing
 @Suite("Task 39 trusted machine target boundary")
 struct InvestigationMachineTargetBoundaryTests {
     @Test
+    func liveClaimServerLinksOnlyTheHelperAndFreezesTheArtifactMatrix() throws {
+        let root = URL(filePath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let project = try String(
+            contentsOf: root.appending(
+                path: "Stornaut.xcodeproj/project.pbxproj"
+            ),
+            encoding: .utf8
+        )
+        #expect(
+            project.components(
+                separatedBy: "productName = StornautInvestigationMachineClaimServer;"
+            ).count == 2
+        )
+        #expect(
+            project.components(
+                separatedBy: "StornautInvestigationMachineClaimServer in Frameworks"
+            ).count == 3
+        )
+        let helperStart = try #require(
+            project.range(
+                of: "A00000000000000000000004 /* StornautLifecycleHelper */ = {"
+            )
+        )
+        let helperSuffix = project[helperStart.lowerBound...]
+        let helperEnd = try #require(
+            helperSuffix.range(of: "\n\t\t};")
+        )
+        let helper = String(helperSuffix[..<helperEnd.upperBound])
+        #expect(helper.contains("StornautInvestigationMachineClaimServer"))
+        #expect(
+            project.components(
+                separatedBy: "/* StornautInvestigationMachineClaimServer */"
+            ).count == 4
+        )
+
+        let release = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-app-release-boundaries"
+            ),
+            encoding: .utf8
+        )
+        let boundaries = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ),
+            encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        for marker in [
+            "helper claim-server Mach-O positive drifted",
+            "non-helper claim-server Mach-O leakage",
+            "claim-server two-selector surface drifted",
+        ] {
+            #expect(release.contains(marker))
+        }
+        for marker in [
+            "live claim server helper-only linkage drifted",
+            "StornautInvestigationMachineClaimServer in Frameworks",
+            "live claim server public extension drifted",
+            "iii-b checkpoint paths drifted",
+            "iii-b-i checkpoint budget drifted",
+        ] {
+            #expect(boundaries.contains(marker))
+        }
+        for marker in [
+            "helper-claim-server-linkage",
+            "helper-claim-server-positive",
+            "non-helper-claim-server-leak",
+            "live-claim-server-public-extension",
+            "live-claim-server-admission-order",
+        ] {
+            #expect(contract.contains(marker))
+        }
+    }
+
+    @Test
     func machineClaimServerOwnsStrictTypedStateTranslationOnly() throws {
         let root = URL(filePath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
@@ -1508,28 +1589,34 @@ struct InvestigationMachineTargetBoundaryTests {
             ),
             encoding: .utf8
         )
-        #expect(
-            helperSource.contains(
-                "@objc private protocol LifecycleMachineClaimXPCWire"
-            )
-        )
+        #expect(!helperSource.contains(
+            "@objc private protocol LifecycleMachineClaimXPCWire"
+        ))
+        #expect(helperSource.contains(
+            "import StornautInvestigationHandoffContract"
+        ))
+        #expect(helperSource.contains(
+            "with: InvestigationMachineClaimXPCWire.self"
+        ))
         for method in [
             "func attestHelper(",
             "func handle(",
             "func handleInteractive(",
-            "func claimMachineRetirement(",
         ] {
-            let owner = method == "func claimMachineRetirement("
-                ? helperSource
-                : xpcSource
-            let expectedCount = method == "func claimMachineRetirement("
-                ? 3
-                : 2
             #expect(
-                owner.components(separatedBy: method).count
-                    == expectedCount
+                xpcSource.components(separatedBy: method).count == 2
             )
         }
+        #expect(
+            helperSource.components(
+                separatedBy: "func claimMachineRetirement("
+            ).count == 1
+        )
+        #expect(
+            helperSource.components(
+                separatedBy: "func releaseMachineRetirement("
+            ).count == 1
+        )
         let exportedMethodCount = xpcSource
             .components(separatedBy: "@objc public protocol")
             .dropFirst()

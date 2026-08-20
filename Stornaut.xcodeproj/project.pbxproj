@@ -23,6 +23,7 @@
 		B0000000000000000000001C /* StornautInvestigationMachineDriverSupport in Frameworks */ = {isa = PBXBuildFile; productRef = F00000000000000000000008 /* StornautInvestigationMachineDriverSupport */; };
 		B0000000000000000000001D /* StornautInvestigationMachineDriver in Copy Investigation Driver */ = {isa = PBXBuildFile; fileRef = D0000000000000000000000A /* StornautInvestigationMachineDriver */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		B0000000000000000000001E /* InvestigationRuntimeDiagnosticHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = D00000000000000000000009 /* InvestigationRuntimeDiagnosticHarness.swift */; };
+		B0000000000000000000001F /* StornautInvestigationMachineClaimServer in Frameworks */ = {isa = PBXBuildFile; productRef = F00000000000000000000009 /* StornautInvestigationMachineClaimServer */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -216,6 +217,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B00000000000000000000007 /* StornautCodex in Frameworks */,
+				B0000000000000000000001F /* StornautInvestigationMachineClaimServer in Frameworks */,
 				B00000000000000000000003 /* StornautLifecycle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -377,6 +379,7 @@
 			name = StornautLifecycleHelper;
 			packageProductDependencies = (
 				F00000000000000000000003 /* StornautCodex */,
+				F00000000000000000000009 /* StornautInvestigationMachineClaimServer */,
 				F00000000000000000000004 /* StornautLifecycle */,
 			);
 			productName = StornautLifecycleHelper;
@@ -1166,6 +1169,10 @@
 		F00000000000000000000008 /* StornautInvestigationMachineDriverSupport */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = StornautInvestigationMachineDriverSupport;
+		};
+		F00000000000000000000009 /* StornautInvestigationMachineClaimServer */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = StornautInvestigationMachineClaimServer;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

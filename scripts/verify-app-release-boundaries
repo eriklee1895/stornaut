@@ -19,7 +19,7 @@ elif (( $# != 0 )); then
     exit 64
 fi
 
-function verify_ordinary_machine_claim_macho_source_contract() {
+function verify_claim_server_macho_source_contract() {
     local source_path=$1
     python3 - "$source_path" <<'PY'
 from pathlib import Path
@@ -27,114 +27,182 @@ import re
 import sys
 
 source = Path(sys.argv[1]).read_text(encoding="utf-8")
+runtime_source = source[source.index("\nscripts/verify-contract\n"):]
 
-array_match = re.search(
-    r"ordinary_machine_claim_forbidden_symbols=\(\n"
-    r"(?P<body>.*?)^\)\n",
-    source,
-    re.MULTILINE | re.DOTALL,
+required_fragments = (
+    "claim_server_module_symbol='StornautInvestigationMachineClaimServer.InvestigationMachineClaimServer'",
+    "claim_server_handoff_markers=(",
+    "claim_server_lifecycle_support_symbols=(",
+    "helper_claim_server_forbidden_symbols=(",
+    "'StornautInvestigationMachineClaimXPCWire'",
+    "'claimMachineRetirement:withReply:'",
+    "'releaseMachineRetirement:withReply:'",
+    "helper_claim_server_images=(",
+    '"$debug_app/Contents/MacOS/StornautLifecycleHelper"',
+    '"$release_app/Contents/MacOS/StornautLifecycleHelper"',
+    '"$diagnostic_debug_app/Contents/MacOS/StornautLifecycleHelper"',
+    "non_helper_claim_server_images=(",
+    '"$debug_app/Contents/MacOS/Stornaut"',
+    '"$debug_app/Contents/MacOS/Stornaut.debug.dylib"',
+    '"$debug_app/Contents/MacOS/__preview.dylib"',
+    '"$release_app/Contents/MacOS/Stornaut"',
+    '"$diagnostic_debug_app/Contents/MacOS/StornautInvestigationDiagnostic"',
+    '"$diagnostic_debug_app/Contents/MacOS/StornautInvestigationDiagnostic.debug.dylib"',
+    '"$diagnostic_debug_app/Contents/MacOS/__preview.dylib"',
+    '"$diagnostic_release_app/Contents/MacOS/StornautInvestigationDiagnosticReleaseShell"',
+    '"$machine_driver_product"',
+    '"$diagnostic_machine_driver"',
+    "claim_server_handoff_negative_images=(",
+    "mach_o_image_has_demangled_symbol()",
+    "mach_o_image_has_raw_string()",
+    "mach_o_image_machine_retirement_selectors()",
+    "verify_helper_claim_server_macho()",
+    "verify_non_helper_claim_server_macho()",
+    "helper claim-server Mach-O positive drifted",
+    "helper claim-server Mach-O gained forbidden dependency",
+    "non-helper claim-server Mach-O leakage",
+    "claim-server two-selector surface drifted",
+    "scan_status=$?",
+    "if (( scan_status == 2 )); then",
 )
-if array_match is None:
-    raise SystemExit(
-        "ordinary App machine-claim Mach-O symbol allowlist is missing"
-    )
-observed_symbols = re.findall(
-    r"^\s+'([^']+)'\s*$", array_match.group("body"), re.MULTILINE
-)
-expected_symbols = [
-    "StornautLifecycle.LifecycleMachineClaimXPCWire",
-    "StornautLifecycle.LifecycleMachineClaimXPCClient.init",
-    "StornautLifecycle.LifecycleMachineClaimXPCClient.claim",
-    "StornautLifecycle.LifecycleMachineClaimXPCClient.activeConnection",
-    "StornautLifecycle.LifecycleMachineClaimXPCClient.serviceName",
-    "StornautLifecycle.LifecycleMachineClaimXPCReplyResolver",
-    "StornautLifecycle.LifecycleMachineClaimResult",
-    "StornautLifecycle.LifecycleMachineClaimXPCError",
-    "StornautLifecycle.LifecycleMachineClaimXPCServerNamespace",
+missing = [
+    fragment for fragment in required_fragments
+    if fragment not in runtime_source
 ]
-if observed_symbols != expected_symbols:
+if missing:
+    raise SystemExit(f"claim-server Mach-O source contract drifted: {missing!r}")
+
+if "bundle_mach_o_contains" in runtime_source:
     raise SystemExit(
-        "ordinary App machine-claim Mach-O symbol allowlist drifted: "
-        f"{observed_symbols!r}"
+        "claim-server Mach-O gate became bundle-recursive: "
+        "bundle_mach_o_contains"
     )
 
-function_match = re.search(
-    r"verify_ordinary_machine_claim_main_macho\(\) \{\n"
-    r"(?P<body>.*?)^\}\n",
-    source,
-    re.MULTILINE | re.DOTALL,
-)
-if function_match is None:
-    raise SystemExit(
-        "ordinary App machine-claim Mach-O verifier is missing"
+def array_values(name):
+    match = re.search(
+        rf"(?ms)^{re.escape(name)}=\(\n(?P<body>.*?)^\)\n",
+        runtime_source,
     )
-body = function_match.group("body")
-required_body_fragments = (
-    "local executable=$1",
-    "local label=$2",
-    'local debug_dylib="${executable:h}/${executable:t:r}.debug.dylib"',
-    'local main_images=("$executable")',
-    'if [[ -e "$debug_dylib" ]]; then',
-    'test -f "$debug_dylib"',
-    'test ! -L "$debug_dylib"',
-    'main_images+=("$debug_dylib")',
-    'for marker in "${ordinary_machine_claim_forbidden_symbols[@]}"; do',
-    'for image in "${main_images[@]}"; do',
-    'if mach_o_has_demangled_symbol "$image" "$marker"; then',
-    "Legacy machine-claim authority leaked into ordinary "
-    "$label main Mach-O: $marker",
-    "symbol_scan_status=$?",
-    "if (( symbol_scan_status == 2 )); then",
-    "exit 1",
-)
-missing_body = [marker for marker in required_body_fragments if marker not in body]
-if missing_body:
-    raise SystemExit(
-        "ordinary App machine-claim Mach-O verifier body drifted: "
-        f"{missing_body!r}"
-    )
-if body.count("mach_o_has_demangled_symbol") != 1 or body.count("exit 1") != 2:
-    raise SystemExit(
-        "ordinary App machine-claim Mach-O verifier cardinality drifted"
-    )
+    if match is None:
+        raise SystemExit(f"claim-server Mach-O array missing: {name}")
+    values = []
+    for line in match.group("body").splitlines():
+        value = re.fullmatch(r"\s+(['\"])(.*?)\1\s*", line)
+        if value is None:
+            raise SystemExit(f"claim-server Mach-O array malformed: {name}")
+        values.append(value.group(2))
+    return values
 
-normalized_source = " ".join(
-    source.replace(chr(92) + chr(10), " " ).split()
-)
-expected_calls = (
-    'verify_ordinary_machine_claim_main_macho '
-    '"$debug_app/Contents/MacOS/Stornaut" Debug',
-    'verify_ordinary_machine_claim_main_macho '
-    '"$release_app/Contents/MacOS/Stornaut" Release',
-)
-for call in expected_calls:
-    if normalized_source.count(call) != 1:
+expected_arrays = {
+    "claim_server_handoff_markers": [
+        "StornautInvestigationMachineClaimXPCWire",
+        "stornaut.task39.machine-claim.request",
+        "stornaut.task39.machine-claim.evidence",
+        "stornaut.task39.machine-claim.release",
+        "stornaut.task39.machine-claim.released",
+    ],
+    "claim_server_lifecycle_support_symbols": [
+        "StornautLifecycle.LifecycleMachineRetirementEscrowDeadlineState",
+        (
+            "StornautInvestigationMachineClaimServer."
+            "InvestigationMachineClaimServerEffectExecutor"
+        ),
+    ],
+    "helper_claim_server_forbidden_symbols": [
+        "StornautInvestigationMachine.",
+        "StornautCore.",
+        "StornautExecution.",
+    ],
+    "helper_claim_server_images": [
+        "$debug_app/Contents/MacOS/StornautLifecycleHelper",
+        "$release_app/Contents/MacOS/StornautLifecycleHelper",
+        "$diagnostic_debug_app/Contents/MacOS/StornautLifecycleHelper",
+    ],
+    "non_helper_claim_server_images": [
+        "$debug_app/Contents/MacOS/Stornaut",
+        "$debug_app/Contents/MacOS/Stornaut.debug.dylib",
+        "$debug_app/Contents/MacOS/__preview.dylib",
+        "$release_app/Contents/MacOS/Stornaut",
+        (
+            "$diagnostic_debug_app/Contents/MacOS/"
+            "StornautInvestigationDiagnostic"
+        ),
+        (
+            "$diagnostic_debug_app/Contents/MacOS/"
+            "StornautInvestigationDiagnostic.debug.dylib"
+        ),
+        "$diagnostic_debug_app/Contents/MacOS/__preview.dylib",
+        (
+            "$diagnostic_release_app/Contents/MacOS/"
+            "StornautInvestigationDiagnosticReleaseShell"
+        ),
+        "$machine_driver_product",
+        "$diagnostic_machine_driver",
+    ],
+    "claim_server_handoff_negative_images": [
+        "$debug_app/Contents/MacOS/Stornaut",
+        "$debug_app/Contents/MacOS/Stornaut.debug.dylib",
+        "$debug_app/Contents/MacOS/__preview.dylib",
+        "$release_app/Contents/MacOS/Stornaut",
+        (
+            "$diagnostic_debug_app/Contents/MacOS/"
+            "StornautInvestigationDiagnostic"
+        ),
+        "$diagnostic_debug_app/Contents/MacOS/__preview.dylib",
+        (
+            "$diagnostic_release_app/Contents/MacOS/"
+            "StornautInvestigationDiagnosticReleaseShell"
+        ),
+        "$machine_driver_product",
+        "$diagnostic_machine_driver",
+    ],
+}
+for name, expected in expected_arrays.items():
+    observed = array_values(name)
+    if observed != expected:
         raise SystemExit(
-            "ordinary App machine-claim main-Mach-O call drifted: "
-            f"{call!r}"
+            f"claim-server Mach-O array drifted: {name}: {observed!r}"
         )
-runtime_source = source[array_match.end():]
-normalized_runtime = " ".join(
-    runtime_source.replace(chr(92) + chr(10), " " ).split()
+
+selector_literal = (
+    "claim_server_selectors=$'claimMachineRetirement:withReply:"
+    "\\nreleaseMachineRetirement:withReply:'"
 )
-for forbidden in (
-    'verify_ordinary_machine_claim_main_macho "$debug_app" Debug',
-    'verify_ordinary_machine_claim_main_macho "$release_app" Release',
-    'bundle_mach_o_contains "$debug_app"',
-    'bundle_mach_o_contains "$release_app"',
+if runtime_source.count(selector_literal) != 1:
+    raise SystemExit("claim-server two-selector source contract drifted")
+
+for obsolete in (
+    "ordinary_machine_claim_forbidden_symbols",
+    "verify_ordinary_machine_claim_main_macho",
+    "StornautLifecycle.LifecycleMachineClaimXPCWire",
+    "StornautLifecycle.LifecycleMachineClaimXPCClient",
+    "Legacy machine-claim authority",
 ):
-    if forbidden in normalized_runtime:
+    if obsolete in runtime_source:
         raise SystemExit(
-            "ordinary App machine-claim gate became bundle-recursive: "
-            f"{forbidden}"
+            f"claim-server Mach-O contract retained old private wire: {obsolete}"
+        )
+
+for function_name in (
+    "mach_o_image_has_demangled_symbol",
+    "mach_o_image_has_raw_string",
+    "mach_o_image_machine_retirement_selectors",
+):
+    match = re.search(
+        rf"(?ms)^{function_name}\(\) \{{\n(?P<body>.*?)(?=^\}}\n)",
+        source,
+    )
+    if match is None or match.group("body").count("return 2") != 3:
+        raise SystemExit(
+            f"claim-server fail-closed scanner drifted: {function_name}"
         )
 PY
 }
 
 if $legacy_machine_claim_contract_only; then
-    verify_ordinary_machine_claim_macho_source_contract \
+    verify_claim_server_macho_source_contract \
         "$legacy_machine_claim_contract_source"
-    print "Ordinary App machine-claim main-Mach-O contract verification passed."
+    print "Claim-server final-Mach-O source contract verification passed."
     exit 0
 fi
 
@@ -198,48 +266,93 @@ test -x \
 test ! -e "$legacy_diagnostic_release_app"
 test ! -L "$legacy_diagnostic_release_app"
 
-bundle_mach_o_contains() {
-    local bundle=$1
+mach_o_image_has_raw_string() {
+    local image=$1
     local marker=$2
-    local candidate
+    local kind strings
 
-    while IFS= read -r -d '' candidate; do
-        if file "$candidate" 2>/dev/null | grep -q 'Mach-O' \
-            && rg -a -q --fixed-strings -- "$marker" "$candidate"; then
-            return 0
-        fi
-    done < <(find "$bundle" -path '*/Contents/PlugIns' -prune \
-        -o -type f -print0)
-    return 1
+    if [[ ! -f "$image" || -L "$image" ]]; then
+        print -u2 "Mach-O raw-string scan target is invalid: $image"
+        return 2
+    fi
+    if ! kind=$(file "$image" 2>/dev/null) \
+        || [[ "$kind" != *'Mach-O'* ]]
+    then
+        print -u2 "Mach-O raw-string scan target is not Mach-O: $image"
+        return 2
+    fi
+    if ! strings=$(xcrun strings -a "$image" 2>/dev/null); then
+        print -u2 "Mach-O raw-string scan failed: $image"
+        return 2
+    fi
+    [[ "$strings" == *"$marker"* ]]
+}
+
+mach_o_image_machine_retirement_selectors() {
+    local image=$1
+    local kind strings
+
+    if [[ ! -f "$image" || -L "$image" ]]; then
+        print -u2 "Mach-O selector scan target is invalid: $image"
+        return 2
+    fi
+    if ! kind=$(file "$image" 2>/dev/null) \
+        || [[ "$kind" != *'Mach-O'* ]]
+    then
+        print -u2 "Mach-O selector scan target is not Mach-O: $image"
+        return 2
+    fi
+    if ! strings=$(xcrun strings -a "$image" 2>/dev/null); then
+        print -u2 "Mach-O selector scan failed: $image"
+        return 2
+    fi
+    print -r -- "$strings" \
+        | awk \
+            '$0 ~ /^[[:alpha:]_][[:alnum:]_]*MachineRetirement:withReply:$/' \
+        | LC_ALL=C sort -u
 }
 
 handoff_debug_markers=(
-    'StornautInvestigationHandoffContract.'
-    'StornautInvestigationMachineClaimXPCWire'
     'InvestigationHandoffAppLeaf'
     'InvestigationHandoffAppLeafEntryPoint'
     'InvestigationHandoffDescriptorAdmission'
 )
 for marker in "${handoff_debug_markers[@]}"; do
-    for forbidden_bundle in \
-        "$debug_app" \
-        "$release_app" \
-        "$diagnostic_release_app"
+    for forbidden_image in \
+        "$debug_app/Contents/MacOS/Stornaut" \
+        "$release_app/Contents/MacOS/Stornaut" \
+        "$diagnostic_release_app/Contents/MacOS/StornautInvestigationDiagnosticReleaseShell"
     do
-        if bundle_mach_o_contains "$forbidden_bundle" "$marker"; then
-            print -u2 "Handoff contract leaked into an App bundle: $forbidden_bundle: $marker"
+        if mach_o_image_has_raw_string "$forbidden_image" "$marker"; then
+            print -u2 "Handoff contract leaked into an App main image: $forbidden_image: $marker"
+            exit 1
+        else
+            raw_scan_status=$?
+        fi
+        if (( raw_scan_status == 2 )); then
             exit 1
         fi
     done
-    if ! bundle_mach_o_contains "$diagnostic_debug_app" "$marker"; then
+    if ! mach_o_image_has_raw_string \
+        "$diagnostic_debug_app/Contents/MacOS/StornautInvestigationDiagnostic.debug.dylib" \
+        "$marker"
+    then
+        raw_scan_status=$?
+        if (( raw_scan_status == 2 )); then
+            exit 1
+        fi
         print -u2 "Investigation handoff Debug marker is missing: $marker"
         exit 1
     fi
 done
-if ! bundle_mach_o_contains \
-    "$diagnostic_release_app" \
+if ! mach_o_image_has_raw_string \
+    "$diagnostic_release_app/Contents/MacOS/StornautInvestigationDiagnosticReleaseShell" \
     'StornautInvestigationDiagnosticReleaseShell'
 then
+    raw_scan_status=$?
+    if (( raw_scan_status == 2 )); then
+        exit 1
+    fi
     print -u2 "Investigation diagnostic Release shell is missing."
     exit 1
 fi
@@ -551,10 +664,16 @@ rg -q 'getsid\(child\) == child' "$helper_source"
 rg -q 'getpgid\(child\) == child' "$helper_source"
 rg -q 'crashDescendantReadyLine' "$helper_source"
 rg -q 'LifecycleMachineClaimListenerDelegate' "$helper_source"
-rg -q 'LifecycleMachineClaimHelperService' "$helper_source"
+rg -q 'InvestigationMachineClaimServerSession' "$helper_source"
+rg -q 'with: InvestigationMachineClaimXPCWire.self' "$helper_source"
 rg -q 'listener === expectedListener' "$helper_source"
 rg -q 'connection.effectiveUserIdentifier == 0' "$helper_source"
-rg -q 'machineDriverIdentity: callerIdentity' "$helper_source"
+rg -q --fixed-strings 'LifecycleMachineDriverAdmissionPolicy().authorize' "$helper_source"
+if rg -q --fixed-strings 'LifecycleMachineClaimHelperService' "$helper_source" \
+    || rg -q --fixed-strings 'retirementEscrow.claim(' "$helper_source"; then
+    print -u2 "Root helper retained the legacy Machine claim service."
+    exit 1
+fi
 if rg -q 'authorized: true' "$helper_source"; then
     print -u2 "Root helper bypasses fixed Machine driver admission."
     exit 1
@@ -828,51 +947,179 @@ mach_o_has_demangled_symbol() {
     return 1
 }
 
-ordinary_machine_claim_forbidden_symbols=(
-    'StornautLifecycle.LifecycleMachineClaimXPCWire'
-    'StornautLifecycle.LifecycleMachineClaimXPCClient.init'
-    'StornautLifecycle.LifecycleMachineClaimXPCClient.claim'
-    'StornautLifecycle.LifecycleMachineClaimXPCClient.activeConnection'
-    'StornautLifecycle.LifecycleMachineClaimXPCClient.serviceName'
-    'StornautLifecycle.LifecycleMachineClaimXPCReplyResolver'
-    'StornautLifecycle.LifecycleMachineClaimResult'
-    'StornautLifecycle.LifecycleMachineClaimXPCError'
-    'StornautLifecycle.LifecycleMachineClaimXPCServerNamespace'
-)
+mach_o_image_has_demangled_symbol() {
+    local image=$1
+    local marker=$2
+    local kind symbols
 
-verify_ordinary_machine_claim_main_macho() {
-    local executable=$1
-    local label=$2
-    local debug_dylib="${executable:h}/${executable:t:r}.debug.dylib"
-    local main_images=("$executable")
-    local image
-    local marker
-    local symbol_scan_status
-    if [[ -e "$debug_dylib" ]]; then
-        test -f "$debug_dylib"
-        test ! -L "$debug_dylib"
-        main_images+=("$debug_dylib")
+    if [[ ! -f "$image" || -L "$image" ]]; then
+        print -u2 "Mach-O symbol scan target is invalid: $image"
+        return 2
     fi
-    for marker in "${ordinary_machine_claim_forbidden_symbols[@]}"; do
-        for image in "${main_images[@]}"; do
-            if mach_o_has_demangled_symbol "$image" "$marker"; then
-                print -u2 \
-                    "Legacy machine-claim authority leaked into ordinary $label main Mach-O: $marker"
-                exit 1
-            else
-                symbol_scan_status=$?
-            fi
-            if (( symbol_scan_status == 2 )); then
-                exit 1
-            fi
-        done
-    done
+    if ! kind=$(file "$image" 2>/dev/null) \
+        || [[ "$kind" != *'Mach-O'* ]]
+    then
+        print -u2 "Mach-O symbol scan target is not Mach-O: $image"
+        return 2
+    fi
+    if ! symbols=$(
+        xcrun nm -j "$image" 2>/dev/null \
+            | xcrun swift-demangle 2>/dev/null
+    ); then
+        print -u2 "Mach-O symbol scan failed: $image"
+        return 2
+    fi
+    [[ "$symbols" == *"$marker"* ]]
 }
 
-verify_ordinary_machine_claim_main_macho \
-    "$debug_app/Contents/MacOS/Stornaut" Debug
-verify_ordinary_machine_claim_main_macho \
-    "$release_app/Contents/MacOS/Stornaut" Release
+claim_server_module_symbol='StornautInvestigationMachineClaimServer.InvestigationMachineClaimServer'
+claim_server_handoff_markers=(
+    'StornautInvestigationMachineClaimXPCWire'
+    'stornaut.task39.machine-claim.request'
+    'stornaut.task39.machine-claim.evidence'
+    'stornaut.task39.machine-claim.release'
+    'stornaut.task39.machine-claim.released'
+)
+claim_server_lifecycle_support_symbols=(
+    'StornautLifecycle.LifecycleMachineRetirementEscrowDeadlineState'
+    'StornautInvestigationMachineClaimServer.InvestigationMachineClaimServerEffectExecutor'
+)
+helper_claim_server_forbidden_symbols=(
+    'StornautInvestigationMachine.'
+    'StornautCore.'
+    'StornautExecution.'
+)
+claim_server_selectors=$'claimMachineRetirement:withReply:\nreleaseMachineRetirement:withReply:'
+helper_claim_server_images=(
+    "$debug_app/Contents/MacOS/StornautLifecycleHelper"
+    "$release_app/Contents/MacOS/StornautLifecycleHelper"
+    "$diagnostic_debug_app/Contents/MacOS/StornautLifecycleHelper"
+)
+non_helper_claim_server_images=(
+    "$debug_app/Contents/MacOS/Stornaut"
+    "$debug_app/Contents/MacOS/Stornaut.debug.dylib"
+    "$debug_app/Contents/MacOS/__preview.dylib"
+    "$release_app/Contents/MacOS/Stornaut"
+    "$diagnostic_debug_app/Contents/MacOS/StornautInvestigationDiagnostic"
+    "$diagnostic_debug_app/Contents/MacOS/StornautInvestigationDiagnostic.debug.dylib"
+    "$diagnostic_debug_app/Contents/MacOS/__preview.dylib"
+    "$diagnostic_release_app/Contents/MacOS/StornautInvestigationDiagnosticReleaseShell"
+    "$machine_driver_product"
+    "$diagnostic_machine_driver"
+)
+claim_server_handoff_negative_images=(
+    "$debug_app/Contents/MacOS/Stornaut"
+    "$debug_app/Contents/MacOS/Stornaut.debug.dylib"
+    "$debug_app/Contents/MacOS/__preview.dylib"
+    "$release_app/Contents/MacOS/Stornaut"
+    "$diagnostic_debug_app/Contents/MacOS/StornautInvestigationDiagnostic"
+    "$diagnostic_debug_app/Contents/MacOS/__preview.dylib"
+    "$diagnostic_release_app/Contents/MacOS/StornautInvestigationDiagnosticReleaseShell"
+    "$machine_driver_product"
+    "$diagnostic_machine_driver"
+)
+
+verify_helper_claim_server_macho() {
+    local image=$1 marker selectors scan_status
+
+    for marker in \
+        "$claim_server_module_symbol" \
+        "${claim_server_lifecycle_support_symbols[@]}"
+    do
+        if mach_o_image_has_demangled_symbol "$image" "$marker"; then
+            continue
+        else
+            scan_status=$?
+        fi
+        if (( scan_status == 2 )); then
+            exit 1
+        fi
+        print -u2 \
+            "helper claim-server Mach-O positive drifted: $image: $marker"
+        exit 1
+    done
+    for marker in "${claim_server_handoff_markers[@]}"; do
+        if mach_o_image_has_raw_string "$image" "$marker"; then
+            continue
+        else
+            scan_status=$?
+        fi
+        if (( scan_status == 2 )); then
+            exit 1
+        fi
+        print -u2 \
+            "helper claim-server Mach-O positive drifted: $image: $marker"
+        exit 1
+    done
+    for marker in "${helper_claim_server_forbidden_symbols[@]}"; do
+        if mach_o_image_has_demangled_symbol "$image" "$marker"; then
+            print -u2 \
+                "helper claim-server Mach-O gained forbidden dependency: $image: $marker"
+            exit 1
+        else
+            scan_status=$?
+        fi
+        if (( scan_status == 2 )); then
+            exit 1
+        fi
+    done
+    if ! selectors=$(mach_o_image_machine_retirement_selectors "$image"); then
+        print -u2 "claim-server selector scan failed: $image"
+        exit 1
+    fi
+    if [[ "$selectors" != "$claim_server_selectors" ]]; then
+        print -u2 \
+            "claim-server two-selector surface drifted: $image: ${(qqq)selectors}"
+        exit 1
+    fi
+}
+
+verify_non_helper_claim_server_macho() {
+    local image=$1 scan_status
+
+    if mach_o_image_has_demangled_symbol \
+        "$image" "$claim_server_module_symbol"
+    then
+        print -u2 \
+            "non-helper claim-server Mach-O leakage: $image: $claim_server_module_symbol"
+        exit 1
+    else
+        scan_status=$?
+    fi
+    if (( scan_status == 2 )); then
+        exit 1
+    fi
+}
+
+for helper_claim_server_image in "${helper_claim_server_images[@]}"; do
+    verify_helper_claim_server_macho "$helper_claim_server_image"
+done
+for non_helper_claim_server_image in "${non_helper_claim_server_images[@]}"; do
+    verify_non_helper_claim_server_macho "$non_helper_claim_server_image"
+done
+for claim_server_handoff_negative_image \
+    in "${claim_server_handoff_negative_images[@]}"
+do
+    for claim_server_handoff_marker in \
+        "${claim_server_handoff_markers[@]}" \
+        'claimMachineRetirement:withReply:' \
+        'releaseMachineRetirement:withReply:'
+    do
+        if mach_o_image_has_raw_string \
+            "$claim_server_handoff_negative_image" \
+            "$claim_server_handoff_marker"
+        then
+            print -u2 \
+                "non-helper claim-server Mach-O leakage: $claim_server_handoff_negative_image: $claim_server_handoff_marker"
+            exit 1
+        else
+            scan_status=$?
+        fi
+        if (( scan_status == 2 )); then
+            exit 1
+        fi
+    done
+done
 
 authority_object_markers=(
     'StornautExecution.ActionExecutor'
@@ -898,17 +1145,22 @@ for marker in "${authority_object_markers[@]}"; do
     exit 1
 done
 
-for app_bundle in \
-    "$debug_app" \
-    "$release_app" \
-    "$diagnostic_release_app"
+for app_handoff_negative_image in \
+    "$debug_app/Contents/MacOS/Stornaut" \
+    "$debug_app/Contents/MacOS/Stornaut.debug.dylib" \
+    "$debug_app/Contents/MacOS/__preview.dylib" \
+    "$release_app/Contents/MacOS/Stornaut" \
+    "$diagnostic_release_app/Contents/MacOS/StornautInvestigationDiagnosticReleaseShell"
 do
     for handoff_symbol in \
         'StornautInvestigationHandoffContract.' \
         'StornautInvestigationMachineClaimXPCWire'
     do
-        if mach_o_has_demangled_symbol "$app_bundle" "$handoff_symbol"; then
-            print -u2 "Handoff contract leaked into an App bundle: $app_bundle"
+        if mach_o_image_has_demangled_symbol \
+            "$app_handoff_negative_image" "$handoff_symbol"
+        then
+            print -u2 \
+                "Handoff contract leaked into an App bundle main image: $app_handoff_negative_image"
             exit 1
         else
             symbol_scan_status=$?

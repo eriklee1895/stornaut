@@ -1,18 +1,13 @@
 import Darwin
 import Foundation
 import StornautCodex
+import StornautInvestigationHandoffContract
+import StornautInvestigationMachineClaimServer
 import StornautLifecycle
 
 private let serviceName = LifecycleSupervisorXPCClient.serviceName
-private let legacyMachineClaimServiceName =
+private let machineClaimServiceName =
     "com.eriklee.stornaut.lifecycle.machine-claim"
-
-@objc private protocol LifecycleMachineClaimXPCWire {
-    func claimMachineRetirement(
-        _ request: Data,
-        withReply reply: @escaping (Data?, String?) -> Void
-    )
-}
 
 #if DEBUG
 private let workerMode = "--stornaut-r5-worker"
@@ -55,6 +50,162 @@ private enum LifecycleHelperFailure: Error {
     case workerFailed
     case evidenceFailed
     case drainFailed(reasonKey: String)
+}
+
+private struct DarwinInvestigationMachineClaimServerClock:
+    InvestigationMachineClaimServerClock
+{
+    func observation() throws
+        -> InvestigationMachineClaimServerObservation
+    {
+        var timebase = mach_timebase_info_data_t()
+        guard
+            mach_timebase_info(&timebase) == KERN_SUCCESS,
+            timebase.numer > 0,
+            timebase.denom > 0
+        else {
+            throw LifecycleHelperFailure.evidenceFailed
+        }
+        let ticks = mach_continuous_time()
+        let denominator = UInt64(timebase.denom)
+        let numerator = UInt64(timebase.numer)
+        let whole = (ticks / denominator).multipliedReportingOverflow(
+            by: numerator
+        )
+        let fractionalProduct = (ticks % denominator)
+            .multipliedReportingOverflow(by: numerator)
+        guard !whole.overflow, !fractionalProduct.overflow else {
+            throw LifecycleHelperFailure.evidenceFailed
+        }
+        let continuous = whole.partialValue.addingReportingOverflow(
+            fractionalProduct.partialValue / denominator
+        )
+        let wallScaled = Date().timeIntervalSince1970 * 1_000_000
+        let wallRounded = wallScaled.rounded(.down)
+        guard
+            !continuous.overflow,
+            continuous.partialValue > 0,
+            wallScaled.isFinite,
+            let wallUTCMicroseconds = Int64(exactly: wallRounded),
+            wallUTCMicroseconds > 0
+        else {
+            throw LifecycleHelperFailure.evidenceFailed
+        }
+        return try InvestigationMachineClaimServerObservation(
+            continuousNanoseconds: continuous.partialValue,
+            wallUTCMicroseconds: wallUTCMicroseconds
+        )
+    }
+}
+
+private final class DarwinInvestigationMachineClaimServerScheduledHandle:
+    InvestigationMachineClaimServerScheduledHandle,
+    @unchecked Sendable
+{
+    private let lock = NSLock()
+    private var task: Task<Void, Never>?
+    private var cancelled = false
+    private var callbackStarted = false
+
+    func install(_ task: Task<Void, Never>) -> Bool {
+        lock.withLock {
+            guard self.task == nil else { return false }
+            self.task = task
+            return !cancelled
+        }
+    }
+
+    func beginCallback() -> Bool {
+        lock.withLock {
+            guard !cancelled, !callbackStarted else { return false }
+            callbackStarted = true
+            return true
+        }
+    }
+
+    func cancel() {
+        let task = lock.withLock {
+            guard !cancelled else { return nil as Task<Void, Never>? }
+            cancelled = true
+            return self.task
+        }
+        task?.cancel()
+    }
+}
+
+private final class DarwinInvestigationMachineClaimServerScheduler:
+    InvestigationMachineClaimServerScheduling,
+    @unchecked Sendable
+{
+    private let clock: DarwinInvestigationMachineClaimServerClock
+
+    init(clock: DarwinInvestigationMachineClaimServerClock) {
+        self.clock = clock
+    }
+
+    func schedule(
+        deadline: InvestigationMachineClaimServerDeadline,
+        callback: @escaping @Sendable () -> Void
+    ) throws -> any InvestigationMachineClaimServerScheduledHandle {
+        let now = try clock.observation().continuousNanoseconds
+        let deadlineNanoseconds = deadline.deadlineNanoseconds
+        guard deadlineNanoseconds > now else {
+            throw LifecycleHelperFailure.evidenceFailed
+        }
+        let remaining = deadlineNanoseconds - now
+        guard remaining <= UInt64(Int64.max) else {
+            throw LifecycleHelperFailure.evidenceFailed
+        }
+        let handle = DarwinInvestigationMachineClaimServerScheduledHandle()
+        let duration = Duration.nanoseconds(Int64(remaining))
+        let task = Task.detached { [weak handle] in
+            do {
+                try await ContinuousClock().sleep(for: duration)
+            } catch {
+                return
+            }
+            if handle?.beginCallback() == true { callback() }
+        }
+        guard handle.install(task) else {
+            task.cancel()
+            throw LifecycleHelperFailure.evidenceFailed
+        }
+        return handle
+    }
+}
+
+private enum DarwinInvestigationMachineClaimServerTerminal {
+    static func make() -> any InvestigationMachineClaimServerTerminalHandling {
+        Handler()
+    }
+
+    private final class Handler:
+        InvestigationMachineClaimServerTerminalHandling,
+        @unchecked Sendable
+    {
+        private let lock = NSLock()
+        private let queue = DispatchQueue(
+            label: "com.eriklee.stornaut.lifecycle.machine-claim.terminal"
+        )
+        private var delivered = false
+
+        func handle(_ reason: InvestigationMachineClaimServerTerminalReason) {
+            let shouldDeliver = lock.withLock {
+                guard !delivered else { return false }
+                delivered = true
+                return true
+            }
+            guard shouldDeliver else { return }
+            let status: Int32 = reason == .postReplyExitDue ? 0 : 71
+            if status == 0 {
+                queue.async { exit(status) }
+            } else {
+                queue.asyncAfter(deadline: .now() + .milliseconds(100)) {
+                    exit(status)
+                }
+            }
+        }
+    }
 }
 
 private func writeAll(
@@ -999,20 +1150,30 @@ private func runLifecycleHelper() {
         exit(78)
     }
     let retirementEscrow = LifecycleMachineRetirementEscrow()
+    let machineClaimClock = DarwinInvestigationMachineClaimServerClock()
+    let machineClaimServer = InvestigationMachineClaimServer(
+        retirementEscrow: retirementEscrow,
+        clock: machineClaimClock,
+        scheduler: DarwinInvestigationMachineClaimServerScheduler(
+            clock: machineClaimClock
+        ),
+        terminal: DarwinInvestigationMachineClaimServerTerminal.make()
+    )
     let appListener = NSXPCListener(
         machServiceName: serviceName
     )
     let machineClaimListener = NSXPCListener(
-        machServiceName: legacyMachineClaimServiceName
+        machServiceName: machineClaimServiceName
     )
     let appDelegate = LifecycleHelperListenerDelegate(
         appIdentity: appIdentity,
         helperExecutableURL: executableURL,
         recoveredInvestigations: recoveredInvestigations,
-        retirementEscrow: retirementEscrow
+        retirementEscrow: retirementEscrow,
+        machineClaimServer: machineClaimServer
     )
     let machineClaimDelegate = LifecycleMachineClaimListenerDelegate(
-        retirementEscrow: retirementEscrow,
+        machineClaimServer: machineClaimServer,
         expectedListener: machineClaimListener
     )
     appListener.delegate = appDelegate
@@ -1032,18 +1193,21 @@ private final class LifecycleHelperListenerDelegate:
         Set<LifecycleInvestigationID>
     private let lock = NSLock()
     private let retirementEscrow: LifecycleMachineRetirementEscrow
+    private let machineClaimServer: InvestigationMachineClaimServer
     private var acceptedConnection = false
 
     init(
         appIdentity: LifecycleSigningIdentity,
         helperExecutableURL: URL,
         recoveredInvestigations: Set<LifecycleInvestigationID>,
-        retirementEscrow: LifecycleMachineRetirementEscrow
+        retirementEscrow: LifecycleMachineRetirementEscrow,
+        machineClaimServer: InvestigationMachineClaimServer
     ) {
         self.appIdentity = appIdentity
         self.helperExecutableURL = helperExecutableURL
         self.recoveredInvestigations = recoveredInvestigations
         self.retirementEscrow = retirementEscrow
+        self.machineClaimServer = machineClaimServer
     }
 
     func listener(
@@ -1098,7 +1262,8 @@ private final class LifecycleHelperListenerDelegate:
             helperIdentity: helperIdentity,
             helperExecutableURL: helperExecutableURL,
             recoveredInvestigations: recoveredInvestigations,
-            retirementEscrow: retirementEscrow
+            retirementEscrow: retirementEscrow,
+            machineClaimServer: machineClaimServer
         )
         connection.exportedInterface = NSXPCInterface(
             with: LifecycleInteractiveSessionXPCWire.self
@@ -1119,16 +1284,14 @@ private final class LifecycleMachineClaimListenerDelegate:
     NSObject,
     NSXPCListenerDelegate
 {
-    private let retirementEscrow: LifecycleMachineRetirementEscrow
+    private let machineClaimServer: InvestigationMachineClaimServer
     private weak var expectedListener: NSXPCListener?
-    private let lock = NSLock()
-    private var acceptedConnection = false
 
     init(
-        retirementEscrow: LifecycleMachineRetirementEscrow,
+        machineClaimServer: InvestigationMachineClaimServer,
         expectedListener: NSXPCListener
     ) {
-        self.retirementEscrow = retirementEscrow
+        self.machineClaimServer = machineClaimServer
         self.expectedListener = expectedListener
     }
 
@@ -1166,99 +1329,28 @@ private final class LifecycleMachineClaimListenerDelegate:
                 == Int32(connection.auditSessionIdentifier),
             LifecycleMachineDriverAdmissionPolicy().authorize(
                 callerIdentity
-            ),
-            lock.withLock({
-                guard !acceptedConnection else { return false }
-                acceptedConnection = true
-                return true
-            })
+            )
         else {
             return false
         }
-        let service = LifecycleMachineClaimHelperService(
-            callerIdentity: callerIdentity,
-            retirementEscrow: retirementEscrow
-        )
+        guard
+            let session: InvestigationMachineClaimServerSession =
+                try? machineClaimServer.makeSession()
+        else {
+            return false
+        }
         connection.exportedInterface = NSXPCInterface(
-            with: LifecycleMachineClaimXPCWire.self
+            with: InvestigationMachineClaimXPCWire.self
         )
-        connection.exportedObject = service
+        connection.exportedObject = session
         connection.invalidationHandler = {
-            service.invalidate()
+            session.invalidate()
         }
         connection.interruptionHandler = {
-            service.invalidate()
+            session.invalidate()
         }
         connection.resume()
         return true
-    }
-}
-
-private final class LifecycleMachineClaimHelperService:
-    NSObject,
-    LifecycleMachineClaimXPCWire,
-    @unchecked Sendable
-{
-    private let callerIdentity: LifecycleProcessIdentity
-    private let retirementEscrow: LifecycleMachineRetirementEscrow
-    private let lock = NSLock()
-    private var invalidated = false
-    private var invoked = false
-
-    init(
-        callerIdentity: LifecycleProcessIdentity,
-        retirementEscrow: LifecycleMachineRetirementEscrow
-    ) {
-        self.callerIdentity = callerIdentity
-        self.retirementEscrow = retirementEscrow
-    }
-
-    func claimMachineRetirement(
-        _ request: Data,
-        withReply reply: @escaping (Data?, String?) -> Void
-    ) {
-        guard
-            request.count <= 16 * 1_024,
-            let decoded = try? JSONDecoder().decode(
-                LifecycleMachineRetirementClaimRequest.self,
-                from: request
-            ),
-            lock.withLock({
-                guard !invalidated, !invoked else { return false }
-                invoked = true
-                return true
-            })
-        else {
-            reply(
-                nil,
-                "runtime.lifecycle.machine-claim.invalid-request"
-            )
-            return
-        }
-        do {
-            let response = try retirementEscrow.claim(
-                decoded,
-                machineDriverIdentity: callerIdentity
-            )
-            let data = try JSONEncoder().encode(response)
-            guard data.count <= 32 * 1_024 else {
-                throw LifecycleMachineRetirementEscrowError.invalidRecord
-            }
-            reply(data, nil)
-        } catch let error as LifecycleMachineRetirementEscrowError {
-            reply(nil, machineClaimFailureReasonKey(error))
-            scheduleFailureExitAfterReply()
-        } catch {
-            reply(
-                nil,
-                "runtime.lifecycle.machine-claim.unavailable"
-            )
-            scheduleFailureExitAfterReply()
-        }
-    }
-
-    func invalidate() {
-        lock.withLock { invalidated = true }
     }
 }
 
@@ -1275,6 +1367,7 @@ private final class LifecycleHelperService:
     private let recoveredInvestigations:
         Set<LifecycleInvestigationID>
     private let retirementEscrow: LifecycleMachineRetirementEscrow
+    private let machineClaimServer: InvestigationMachineClaimServer
     private let operationQueue = DispatchQueue(
         label: "com.eriklee.stornaut.lifecycle.operation"
     )
@@ -1299,7 +1392,8 @@ private final class LifecycleHelperService:
         helperIdentity: LifecycleProcessIdentity,
         helperExecutableURL: URL,
         recoveredInvestigations: Set<LifecycleInvestigationID>,
-        retirementEscrow: LifecycleMachineRetirementEscrow
+        retirementEscrow: LifecycleMachineRetirementEscrow,
+        machineClaimServer: InvestigationMachineClaimServer
     ) {
         self.callerIdentity = callerIdentity
         callerProcessID = callerIdentity.processID
@@ -1308,6 +1402,7 @@ private final class LifecycleHelperService:
         self.helperExecutableURL = helperExecutableURL
         self.recoveredInvestigations = recoveredInvestigations
         self.retirementEscrow = retirementEscrow
+        self.machineClaimServer = machineClaimServer
     }
 
     func attestHelper(
@@ -1362,7 +1457,7 @@ private final class LifecycleHelperService:
         let supervisorRouteAvailable = lock.withLock {
             !invalidated
                 && !interactiveRouteClosed
-                && !retirementEscrow.isAwaitingClaim
+                && !machineClaimServer.isPending()
         }
         guard supervisorRouteAvailable else {
             reply(nil, "runtime.lifecycle.session-unavailable")
@@ -1400,7 +1495,7 @@ private final class LifecycleHelperService:
             let canCancelLegacySession = lock.withLock {
                 !invalidated
                     && !interactiveRouteClosed
-                    && !retirementEscrow.isAwaitingClaim
+                    && !machineClaimServer.isPending()
                     && activeInvestigationID == investigationID
                     && activeReply != nil
             }
@@ -1428,7 +1523,7 @@ private final class LifecycleHelperService:
             guard
                 !invalidated,
                 !interactiveRouteClosed,
-                !retirementEscrow.isAwaitingClaim,
+                !machineClaimServer.isPending(),
                 activeInvestigationID == nil,
                 activeEvidenceBindingSHA256 == nil,
                 activeReply == nil
@@ -1559,15 +1654,15 @@ private final class LifecycleHelperService:
             lock.withLock {
             guard !invalidated else { return .alreadyInvalidated }
             invalidated = true
-            if retirementEscrow.isAwaitingClaim {
-                return .preserveRetirementEscrow
+            if machineClaimServer.isPending() {
+                return .preserveRetirementServer
             }
             return activeInvestigationID != nil
                 ? .drainActive
                 : .exitCleanly
         }
         switch disposition {
-        case .alreadyInvalidated, .preserveRetirementEscrow:
+        case .alreadyInvalidated, .preserveRetirementServer:
             return
         case .drainActive:
             operationQueue.async { [weak self] in
@@ -1900,6 +1995,7 @@ private final class LifecycleHelperService:
                     "runtime.lifecycle.interactive.session-unavailable"
                 )
             }
+            var retirementServerOwnsFailure = false
             do {
                 let residueObservation =
                     try finishInteractiveSession()
@@ -1934,6 +2030,8 @@ private final class LifecycleHelperService:
                         ownerRetirementObservation,
                     residueObservation: residueObservation
                 )
+                retirementServerOwnsFailure = true
+                try machineClaimServer.activate()
                 let sealedResponse =
                     LifecycleInteractiveSessionResponse.retired(
                         investigationID:
@@ -1949,10 +2047,6 @@ private final class LifecycleHelperService:
                     try JSONEncoder().encode(sealedResponse),
                     nil
                 )
-                scheduleRetirementClaimDeadline(
-                    handle.validBefore,
-                    retirementEscrow: retirementEscrow
-                )
             } catch {
                 pending.reply(
                     nil,
@@ -1963,7 +2057,11 @@ private final class LifecycleHelperService:
                 } catch {
                     exit(71)
                 }
-                scheduleFailureExitAfterReply()
+                if retirementServerOwnsFailure {
+                    machineClaimServer.cancel()
+                } else {
+                    scheduleFailureExitAfterReply()
+                }
             }
             return
         }
@@ -2360,7 +2458,7 @@ private final class LifecycleHelperService:
         lock.withLock {
             !invalidated
                 && !interactiveRouteClosed
-                && !retirementEscrow.isAwaitingClaim
+                && !machineClaimServer.isPending()
                 && activeInvestigationID == investigationID
                 && activeEvidenceBindingSHA256
                     == evidenceBindingSHA256
@@ -2689,7 +2787,7 @@ private final class LifecycleHelperService:
 
 private enum LifecycleHelperInvalidationDisposition {
     case alreadyInvalidated
-    case preserveRetirementEscrow
+    case preserveRetirementServer
     case drainActive
     case exitCleanly
 }
@@ -3049,38 +3147,6 @@ private func scheduleSuccessfulExitAfterReply() {
         deadline: .now() + .seconds(5)
     ) {
         exit(0)
-    }
-}
-
-private func scheduleRetirementClaimDeadline(
-    _ deadline: Date,
-    retirementEscrow: LifecycleMachineRetirementEscrow
-) {
-    let interval = max(0, deadline.timeIntervalSinceNow)
-    DispatchQueue.global().asyncAfter(deadline: .now() + interval) {
-        if retirementEscrow.isAwaitingClaim {
-            retirementEscrow.expire()
-        }
-        exit(0)
-    }
-}
-
-private func machineClaimFailureReasonKey(
-    _ error: LifecycleMachineRetirementEscrowError
-) -> String {
-    switch error {
-    case .invalidRecord, .invalidRequest:
-        "runtime.lifecycle.machine-claim.invalid-request"
-    case .empty:
-        "runtime.lifecycle.machine-claim.empty"
-    case .alreadyRecorded, .consumed:
-        "runtime.lifecycle.machine-claim.consumed"
-    case .unauthorized:
-        "runtime.lifecycle.machine-claim.invalid-peer"
-    case .claimMismatch:
-        "runtime.lifecycle.machine-claim.mismatch"
-    case .expired:
-        "runtime.lifecycle.machine-claim.expired"
     }
 }
 

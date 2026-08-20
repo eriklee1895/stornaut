@@ -3,6 +3,222 @@ import Foundation
 import StornautInvestigationHandoffContract
 import StornautLifecycle
 
+public final class InvestigationMachineClaimServer: @unchecked Sendable {
+    private struct ActiveRuntime {
+        let adapter: InvestigationMachineClaimServerAdapter
+        let state: LifecycleMachineRetirementEscrowDeadlineState
+    }
+
+    private let retirementEscrow: LifecycleMachineRetirementEscrow
+    private let runtime: InvestigationMachineClaimServerRuntime
+    private let lock = NSLock()
+    private var activationAttempted = false
+    private var activationInProgress = false
+    private var activeRuntime: ActiveRuntime?
+    private var activeSession: InvestigationMachineClaimServerSession?
+    private var cancellationRequested = false
+
+    public init(
+        retirementEscrow: LifecycleMachineRetirementEscrow,
+        clock: any InvestigationMachineClaimServerClock,
+        scheduler: any InvestigationMachineClaimServerScheduling,
+        terminal: any InvestigationMachineClaimServerTerminalHandling
+    ) {
+        self.retirementEscrow = retirementEscrow
+        runtime = InvestigationMachineClaimServerRuntime(
+            clock: clock, scheduler: scheduler, terminal: terminal
+        )
+    }
+
+    public func activate() throws {
+        guard lock.withLock({
+            guard !activationAttempted else { return false }
+            activationAttempted = true
+            activationInProgress = true
+            return true
+        }) else {
+            throw InvestigationMachineClaimServerError.unavailable
+        }
+
+        do {
+            let transfer = try retirementEscrow.transferReservation()
+            let state = LifecycleMachineRetirementEscrowDeadlineState()
+            let executor = InvestigationMachineClaimServerEffectExecutor(
+                clock: runtime.clock,
+                scheduler: runtime.scheduler,
+                terminal: runtime.terminal
+            )
+            let adapter = try InvestigationMachineClaimServerAdapter(
+                transfer: transfer,
+                clock: runtime.clock,
+                state: state,
+                executor: executor
+            )
+            let didPublish = lock.withLock {
+                activationInProgress = false
+                guard !cancellationRequested else { return false }
+                activeRuntime = ActiveRuntime(adapter: adapter, state: state)
+                return true
+            }
+            guard didPublish else {
+                adapter.cancel()
+                throw InvestigationMachineClaimServerError.unavailable
+            }
+        } catch {
+            lock.withLock { activationInProgress = false }
+            runtime.terminalGate.handle(.cancelled)
+            throw error
+        }
+    }
+
+    public func makeSession() throws
+        -> InvestigationMachineClaimServerSession
+    {
+        try lock.withLock {
+            guard !cancellationRequested else {
+                throw InvestigationMachineClaimServerError.unavailable
+            }
+            guard activeSession == nil else {
+                throw InvestigationMachineClaimServerError.duplicateOrReplay
+            }
+            guard let activeRuntime else {
+                throw InvestigationMachineClaimServerError.unavailable
+            }
+            if case .terminal = activeRuntime.state.phase {
+                throw InvestigationMachineClaimServerError.unavailable
+            }
+            let session = InvestigationMachineClaimServerSession(
+                adapter: activeRuntime.adapter
+            )
+            activeSession = session
+            return session
+        }
+    }
+
+    public func isPending() -> Bool {
+        let snapshot = lock.withLock {
+            (activationAttempted, activationInProgress, activeRuntime?.state)
+        }
+        if snapshot.1 { return true }
+        if let state = snapshot.2 {
+            let phase = state.phase
+            if case .terminal = phase { return false }
+            return phase != .empty
+        }
+        if !snapshot.0 {
+            return retirementEscrow.isAwaitingClaim
+        }
+        return false
+    }
+
+    public func cancel() {
+        let adapter: InvestigationMachineClaimServerAdapter? = lock.withLock {
+            activationAttempted = true
+            cancellationRequested = true
+            return activeRuntime?.adapter
+        }
+        if let adapter {
+            adapter.cancel()
+        } else {
+            runtime.terminalGate.handle(.cancelled)
+        }
+    }
+}
+
+public final class InvestigationMachineClaimServerSession:
+    NSObject,
+    InvestigationMachineClaimXPCWire,
+    @unchecked Sendable
+{
+    private let adapter: InvestigationMachineClaimServerAdapter
+    private let lock = NSLock()
+    private var invalidated = false
+    private var operationInProgress = false
+    private var invalidationDeferred = false
+
+    fileprivate init(adapter: InvestigationMachineClaimServerAdapter) {
+        self.adapter = adapter
+    }
+
+    public func claimMachineRetirement(
+        _ request: Data,
+        withReply reply: @escaping (Data?, String?) -> Void
+    ) {
+        guard beginOperation() else {
+            reply(
+                nil,
+                machineClaimServerReasonKey(
+                    InvestigationMachineClaimServerError.unavailable
+                )
+            )
+            return
+        }
+        do {
+            reply(try adapter.claim(request), nil)
+        } catch {
+            reply(nil, machineClaimServerReasonKey(error))
+        }
+        finishOperation()
+    }
+
+    public func releaseMachineRetirement(
+        _ request: Data,
+        withReply reply: @escaping (Data?, String?) -> Void
+    ) {
+        guard beginOperation() else {
+            reply(
+                nil,
+                machineClaimServerReasonKey(
+                    InvestigationMachineClaimServerError.unavailable
+                )
+            )
+            return
+        }
+        let data: Data
+        do {
+            data = try adapter.release(request)
+        } catch {
+            reply(nil, machineClaimServerReasonKey(error))
+            finishOperation()
+            return
+        }
+        reply(data, nil)
+        try? adapter.replyDidDispatch()
+        finishOperation()
+    }
+
+    public func invalidate() {
+        let shouldInvalidateNow = lock.withLock {
+            guard !invalidated else { return false }
+            invalidated = true
+            if operationInProgress {
+                invalidationDeferred = true
+                return false
+            }
+            return true
+        }
+        if shouldInvalidateNow { adapter.invalidate() }
+    }
+
+    private func beginOperation() -> Bool {
+        lock.withLock {
+            guard !invalidated, !operationInProgress else { return false }
+            operationInProgress = true
+            return true
+        }
+    }
+
+    private func finishOperation() {
+        let shouldInvalidate = lock.withLock {
+            operationInProgress = false
+            guard invalidationDeferred else { return false }
+            invalidationDeferred = false
+            return true
+        }
+        if shouldInvalidate { adapter.invalidate() }
+    }
+}
+
 package enum InvestigationMachineClaimServerError:
     Error,
     Sendable,
@@ -118,7 +334,7 @@ package final class InvestigationMachineClaimServerAdapter:
 {
     private let projection: InvestigationMachineClaimServerProjection
     private let reservationID: UUID
-    private let clock: any InvestigationMachineClaimServerClock
+    private let clock: any InvestigationMachineClaimServerCoreClock
     private let state: LifecycleMachineRetirementEscrowDeadlineState
     private let executor: InvestigationMachineClaimServerEffectExecutor
     private let evidenceLock = NSLock()
@@ -126,18 +342,17 @@ package final class InvestigationMachineClaimServerAdapter:
 
     package init(
         transfer: LifecycleMachineRetirementReservationTransfer,
-        reservationID: UUID,
-        clock: any InvestigationMachineClaimServerClock,
+        clock: any InvestigationMachineClaimServerCoreClock,
         state: LifecycleMachineRetirementEscrowDeadlineState,
         executor: InvestigationMachineClaimServerEffectExecutor
     ) throws {
-        guard !reservationID.claimServerIsZero else {
+        guard !transfer.reservationID.claimServerIsZero else {
             throw InvestigationMachineClaimServerError.invalidRequest
         }
         projection = try InvestigationMachineClaimServerProjection(
             transfer: transfer
         )
-        self.reservationID = reservationID
+        reservationID = transfer.reservationID
         self.clock = clock
         self.state = state
         self.executor = executor
@@ -317,6 +532,31 @@ package final class InvestigationMachineClaimServerAdapter:
         try requireApplied(transition)
     }
 
+    package var hasBoundConnection: Bool {
+        evidenceLock.withLock { evidence != nil }
+    }
+
+    package func cancel() {
+        try? executor.apply(
+            state.cancel(reservationID: reservationID),
+            to: state
+        )
+    }
+
+    package func invalidate() {
+        guard let evidence = evidenceLock.withLock({ evidence }) else {
+            cancel()
+            return
+        }
+        try? executor.apply(
+            state.invalidate(
+                reservationID: reservationID,
+                connectionEpoch: evidence.claimConnectionEpoch
+            ),
+            to: state
+        )
+    }
+
     private func claimMatchesProjection(
         _ request: InvestigationMachineRetirementClaimRequest
     ) -> Bool {
@@ -471,4 +711,22 @@ private func requireValue<T>(_ value: T?) throws -> T {
         throw InvestigationMachineClaimServerError.unavailable
     }
     return value
+}
+
+private func machineClaimServerReasonKey(_ error: Error) -> String {
+    guard let error = error as? InvestigationMachineClaimServerError else {
+        return "runtime.lifecycle.machine-claim.unavailable"
+    }
+    return switch error {
+    case .invalidRequest:
+        "runtime.lifecycle.machine-claim.invalid-request"
+    case .bindingMismatch:
+        "runtime.lifecycle.machine-claim.mismatch"
+    case .duplicateOrReplay:
+        "runtime.lifecycle.machine-claim.consumed"
+    case .expired:
+        "runtime.lifecycle.machine-claim.expired"
+    case .unavailable:
+        "runtime.lifecycle.machine-claim.unavailable"
+    }
 }

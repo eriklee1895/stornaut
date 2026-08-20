@@ -1,28 +1,242 @@
 import Foundation
 import StornautLifecycle
 
-package protocol InvestigationMachineClaimServerClock: Sendable {
+public struct InvestigationMachineClaimServerObservation:
+    Sendable,
+    Equatable
+{
+    public let continuousNanoseconds: UInt64
+    public let wallUTCMicroseconds: Int64
+
+    public init(
+        continuousNanoseconds: UInt64,
+        wallUTCMicroseconds: Int64
+    ) throws {
+        guard continuousNanoseconds > 0, wallUTCMicroseconds > 0 else {
+            throw InvestigationMachineClaimServerPublicValueError.invalidValue
+        }
+        self.continuousNanoseconds = continuousNanoseconds
+        self.wallUTCMicroseconds = wallUTCMicroseconds
+    }
+}
+
+public struct InvestigationMachineClaimServerDeadline:
+    Sendable,
+    Equatable
+{
+    public let deadlineNanoseconds: UInt64
+
+    public init(deadlineNanoseconds: UInt64) throws {
+        guard deadlineNanoseconds > 0 else {
+            throw InvestigationMachineClaimServerPublicValueError.invalidValue
+        }
+        self.deadlineNanoseconds = deadlineNanoseconds
+    }
+}
+
+public protocol InvestigationMachineClaimServerClock: Sendable {
+    func observation() throws -> InvestigationMachineClaimServerObservation
+}
+
+public protocol InvestigationMachineClaimServerScheduledHandle: Sendable {
+    func cancel()
+}
+
+public protocol InvestigationMachineClaimServerScheduling: Sendable {
+    func schedule(
+        deadline: InvestigationMachineClaimServerDeadline,
+        callback: @escaping @Sendable () -> Void
+    ) throws -> any InvestigationMachineClaimServerScheduledHandle
+}
+
+public enum InvestigationMachineClaimServerTerminalReason:
+    Sendable,
+    Equatable
+{
+    case claimDeadlineExpired
+    case releaseDeadlineExpired
+    case postReplyExitDue
+    case cancelled
+    case connectionInvalidated
+    case bindingMismatch
+    case duplicateOrReplay
+    case invalidTimeObservation
+    case arithmeticOverflow
+    case deadlineArmFailure
+    case schedulerFiredEarly
+    case replyDispatchFailed
+    case postReplyDeadlineExpiredBeforeDispatch
+}
+
+public protocol InvestigationMachineClaimServerTerminalHandling: Sendable {
+    func handle(_ reason: InvestigationMachineClaimServerTerminalReason)
+}
+
+private enum InvestigationMachineClaimServerPublicValueError: Error {
+    case invalidValue
+}
+
+package protocol InvestigationMachineClaimServerCoreClock: Sendable {
     func observation() throws
         -> LifecycleMachineRetirementDeadlineObservation
 }
 
-package protocol InvestigationMachineClaimServerScheduledHandle:
+package protocol InvestigationMachineClaimServerCoreScheduledHandle:
     Sendable
 {
     func cancel()
 }
 
-package protocol InvestigationMachineClaimServerScheduling: Sendable {
+package protocol InvestigationMachineClaimServerCoreScheduling: Sendable {
     func schedule(
         ticket: LifecycleMachineRetirementDeadlineTicket,
         callback: @escaping @Sendable () -> Void
-    ) throws -> any InvestigationMachineClaimServerScheduledHandle
+    ) throws -> any InvestigationMachineClaimServerCoreScheduledHandle
 }
 
-package protocol InvestigationMachineClaimServerTerminalHandling:
+package protocol InvestigationMachineClaimServerCoreTerminalHandling:
     Sendable
 {
     func handle(_ reason: LifecycleMachineRetirementDeadlineTerminalReason)
+}
+
+package struct InvestigationMachineClaimServerRuntime: Sendable {
+    let clock: any InvestigationMachineClaimServerCoreClock
+    let scheduler: any InvestigationMachineClaimServerCoreScheduling
+    let terminal: any InvestigationMachineClaimServerCoreTerminalHandling
+    let terminalGate: InvestigationMachineClaimServerTerminalGate
+
+    package init(
+        clock: any InvestigationMachineClaimServerClock,
+        scheduler: any InvestigationMachineClaimServerScheduling,
+        terminal: any InvestigationMachineClaimServerTerminalHandling
+    ) {
+        let terminalGate = InvestigationMachineClaimServerTerminalGate(
+            destination: terminal
+        )
+        self.clock = InvestigationMachineClaimServerClockBridge(clock)
+        self.scheduler = InvestigationMachineClaimServerSchedulerBridge(
+            scheduler
+        )
+        self.terminal = InvestigationMachineClaimServerTerminalBridge(
+            terminalGate
+        )
+        self.terminalGate = terminalGate
+    }
+}
+
+package final class InvestigationMachineClaimServerTerminalGate:
+    InvestigationMachineClaimServerTerminalHandling,
+    @unchecked Sendable
+{
+    private let destination: any InvestigationMachineClaimServerTerminalHandling
+    private let lock = NSLock()
+    private var delivered = false
+
+    init(destination: any InvestigationMachineClaimServerTerminalHandling) {
+        self.destination = destination
+    }
+
+    package func handle(
+        _ reason: InvestigationMachineClaimServerTerminalReason
+    ) {
+        let shouldDeliver = lock.withLock {
+            guard !delivered else { return false }
+            delivered = true
+            return true
+        }
+        if shouldDeliver { destination.handle(reason) }
+    }
+}
+
+private struct InvestigationMachineClaimServerClockBridge:
+    InvestigationMachineClaimServerCoreClock
+{
+    let source: any InvestigationMachineClaimServerClock
+
+    init(_ source: any InvestigationMachineClaimServerClock) {
+        self.source = source
+    }
+
+    func observation() throws
+        -> LifecycleMachineRetirementDeadlineObservation
+    {
+        let value = try source.observation()
+        return try LifecycleMachineRetirementDeadlineObservation(
+            monotonicNanoseconds: value.continuousNanoseconds,
+            wallUTCMicroseconds: value.wallUTCMicroseconds
+        )
+    }
+}
+
+private struct InvestigationMachineClaimServerSchedulerBridge:
+    InvestigationMachineClaimServerCoreScheduling
+{
+    let source: any InvestigationMachineClaimServerScheduling
+
+    init(_ source: any InvestigationMachineClaimServerScheduling) {
+        self.source = source
+    }
+
+    func schedule(
+        ticket: LifecycleMachineRetirementDeadlineTicket,
+        callback: @escaping @Sendable () -> Void
+    ) throws -> any InvestigationMachineClaimServerCoreScheduledHandle {
+        let handle = try source.schedule(
+            deadline: InvestigationMachineClaimServerDeadline(
+                deadlineNanoseconds: ticket.deadlineNanoseconds
+            ),
+            callback: callback
+        )
+        return InvestigationMachineClaimServerScheduledHandleBridge(handle)
+    }
+}
+
+private struct InvestigationMachineClaimServerScheduledHandleBridge:
+    InvestigationMachineClaimServerCoreScheduledHandle
+{
+    let source: any InvestigationMachineClaimServerScheduledHandle
+
+    init(_ source: any InvestigationMachineClaimServerScheduledHandle) {
+        self.source = source
+    }
+
+    func cancel() { source.cancel() }
+}
+
+private struct InvestigationMachineClaimServerTerminalBridge:
+    InvestigationMachineClaimServerCoreTerminalHandling
+{
+    let destination: any InvestigationMachineClaimServerTerminalHandling
+
+    init(_ destination: any InvestigationMachineClaimServerTerminalHandling) {
+        self.destination = destination
+    }
+
+    func handle(_ reason: LifecycleMachineRetirementDeadlineTerminalReason) {
+        destination.handle(InvestigationMachineClaimServerTerminalReason(reason))
+    }
+}
+
+private extension InvestigationMachineClaimServerTerminalReason {
+    init(_ reason: LifecycleMachineRetirementDeadlineTerminalReason) {
+        self = switch reason {
+        case .claimDeadlineExpired: .claimDeadlineExpired
+        case .releaseDeadlineExpired: .releaseDeadlineExpired
+        case .postReplyExitDue: .postReplyExitDue
+        case .cancelled: .cancelled
+        case .connectionInvalidated: .connectionInvalidated
+        case .bindingMismatch: .bindingMismatch
+        case .duplicateOrReplay: .duplicateOrReplay
+        case .invalidTimeObservation: .invalidTimeObservation
+        case .arithmeticOverflow: .arithmeticOverflow
+        case .deadlineArmFailure: .deadlineArmFailure
+        case .schedulerFiredEarly: .schedulerFiredEarly
+        case .replyDispatchFailed: .replyDispatchFailed
+        case .postReplyDeadlineExpiredBeforeDispatch:
+            .postReplyDeadlineExpiredBeforeDispatch
+        }
+    }
 }
 
 package enum InvestigationMachineClaimServerEffectError: Error, Sendable {
@@ -35,24 +249,24 @@ package final class InvestigationMachineClaimServerEffectExecutor:
     private final class Slot: @unchecked Sendable {
         struct Action {
             let handleToCancel:
-                (any InvestigationMachineClaimServerScheduledHandle)?
+                (any InvestigationMachineClaimServerCoreScheduledHandle)?
             let removeSlot: Bool
         }
 
         private let lock = NSLock()
         private var handle:
-            (any InvestigationMachineClaimServerScheduledHandle)?
+            (any InvestigationMachineClaimServerCoreScheduledHandle)?
         private var cancelRequested = false
         private var cancelApplied = false
         private var callbackFinished = false
 
         func install(
-            _ handle: any InvestigationMachineClaimServerScheduledHandle
+            _ handle: any InvestigationMachineClaimServerCoreScheduledHandle
         ) -> Action {
             lock.withLock {
                 self.handle = handle
                 let handleToCancel: (any
-                    InvestigationMachineClaimServerScheduledHandle)?
+                    InvestigationMachineClaimServerCoreScheduledHandle)?
                 if cancelRequested, !cancelApplied {
                     cancelApplied = true
                     handleToCancel = handle
@@ -70,7 +284,7 @@ package final class InvestigationMachineClaimServerEffectExecutor:
             lock.withLock {
                 cancelRequested = true
                 let handleToCancel: (any
-                    InvestigationMachineClaimServerScheduledHandle)?
+                    InvestigationMachineClaimServerCoreScheduledHandle)?
                 if !cancelApplied, let handle {
                     cancelApplied = true
                     handleToCancel = handle
@@ -96,17 +310,17 @@ package final class InvestigationMachineClaimServerEffectExecutor:
         }
     }
 
-    private let clock: any InvestigationMachineClaimServerClock
-    private let scheduler: any InvestigationMachineClaimServerScheduling
-    private let terminal: any InvestigationMachineClaimServerTerminalHandling
+    private let clock: any InvestigationMachineClaimServerCoreClock
+    private let scheduler: any InvestigationMachineClaimServerCoreScheduling
+    private let terminal: any InvestigationMachineClaimServerCoreTerminalHandling
     private let lock = NSLock()
     private var slots: [LifecycleMachineRetirementDeadlineTicket: Slot] = [:]
     private var terminalDelivered = false
 
     package init(
-        clock: any InvestigationMachineClaimServerClock,
-        scheduler: any InvestigationMachineClaimServerScheduling,
-        terminal: any InvestigationMachineClaimServerTerminalHandling
+        clock: any InvestigationMachineClaimServerCoreClock,
+        scheduler: any InvestigationMachineClaimServerCoreScheduling,
+        terminal: any InvestigationMachineClaimServerCoreTerminalHandling
     ) {
         self.clock = clock
         self.scheduler = scheduler
@@ -138,7 +352,7 @@ package final class InvestigationMachineClaimServerEffectExecutor:
     ) throws {
         let slot = Slot()
         lock.withLock { slots[ticket] = slot }
-        let handle: (any InvestigationMachineClaimServerScheduledHandle)
+        let handle: (any InvestigationMachineClaimServerCoreScheduledHandle)
         do {
             handle = try scheduler.schedule(ticket: ticket) {
                 [weak self, weak state] in

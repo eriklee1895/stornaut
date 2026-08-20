@@ -5,7 +5,7 @@ import Testing
 @Suite("Lifecycle Machine claim XPC contract")
 struct LifecycleMachineClaimXPCContractTests {
     @Test
-    func claimWireHasOneStrictSelectorAndBoundedEcho() throws {
+    func legacyJSONTypesRemainBoundedButAreNotTheLiveWire() throws {
         let fixture = try MachineClaimXPCFixture()
         let encodedRequest = try JSONEncoder().encode(fixture.request)
         let encodedResponse = try JSONEncoder().encode(fixture.response)
@@ -77,27 +77,19 @@ struct LifecycleMachineClaimXPCContractTests {
                 "com.eriklee.stornaut.lifecycle.machine-claim"
             )
         )
-        #expect(
-            helper.contains(
-                "@objc private protocol LifecycleMachineClaimXPCWire"
-            )
-        )
-        #expect(helper.contains("func claimMachineRetirement("))
+        #expect(helper.contains("import StornautInvestigationHandoffContract"))
+        #expect(helper.contains("import StornautInvestigationMachineClaimServer"))
+        #expect(!helper.contains("@objc private protocol LifecycleMachineClaimXPCWire"))
+        #expect(helper.contains("InvestigationMachineClaimXPCWire.self"))
+        #expect(helper.contains("InvestigationMachineClaimServerSession"))
         #expect(helper.contains("LifecycleMachineClaimListenerDelegate"))
-        #expect(helper.contains("LifecycleMachineClaimHelperService"))
+        #expect(!helper.contains("LifecycleMachineClaimHelperService"))
         #expect(helper.contains("LifecycleMachineDriverAdmissionPolicy"))
         #expect(helper.contains("machineClaimListener"))
         #expect(helper.contains("appListener"))
         #expect(!helper.contains("authorized: true"))
-        let claimStart = try #require(
-            helper.range(of: "func claimMachineRetirement(")
-        )
-        let claimSuffix = helper[claimStart.lowerBound...]
-        let claimEnd = try #require(
-            claimSuffix.range(of: "\n    func invalidate()")
-        )
-        let claimBody = claimSuffix[..<claimEnd.lowerBound]
-        #expect(!claimBody.contains("scheduleSuccessfulExitAfterReply"))
+        #expect(helper.contains("machineClaimServer.makeSession()"))
+        #expect(helper.contains("session.invalidate()"))
         #expect(!xpc.contains("contract.helperExecutableURL"))
         #expect(!xpc.contains("public actor LifecycleMachineClaimXPCClient"))
         #expect(!xpc.contains("LifecycleMachineClaimXPCReplyResolver"))
@@ -107,7 +99,7 @@ struct LifecycleMachineClaimXPCContractTests {
     }
 
     @Test
-    func legacyServerContractIsHelperOwnedAndHasNoClientAuthority() throws {
+    func liveServerContractIsHelperOwnedAndHasNoClientAuthority() throws {
         let root = URL(filePath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
@@ -126,14 +118,55 @@ struct LifecycleMachineClaimXPCContractTests {
         )
         #expect(!lifecycle.contains("LifecycleMachineClaimXPCWire"))
         #expect(!lifecycle.contains("LifecycleMachineClaimXPCClient"))
-        #expect(
-            helper.components(
-                separatedBy: "@objc private protocol LifecycleMachineClaimXPCWire"
-            ).count == 2
-        )
+        #expect(!helper.contains("legacyMachineClaimServiceName"))
+        #expect(!helper.contains("LifecycleMachineClaimXPCWire"))
+        #expect(!helper.contains("JSONDecoder().decode(\n                LifecycleMachineRetirementClaimRequest.self"))
+        #expect(!helper.contains("retirementEscrow.claim("))
         #expect(!helper.contains("LifecycleMachineClaimXPCClient"))
         #expect(!helper.contains("LifecycleMachineClaimXPCReplyResolver"))
         #expect(!helper.contains("remoteObjectProxy"))
+    }
+
+    @Test
+    func helperOwnsCheckedContinuousClockCancellableSchedulerAndTerminalAction()
+        throws
+    {
+        let root = URL(filePath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let helper = try String(
+            contentsOf: root.appending(
+                path: "StornautLifecycleHelper/main.swift"
+            ),
+            encoding: .utf8
+        )
+        for marker in [
+            "struct DarwinInvestigationMachineClaimServerClock",
+            "mach_continuous_time()",
+            "mach_timebase_info(",
+            "multipliedReportingOverflow",
+            "addingReportingOverflow",
+            "InvestigationMachineClaimServerObservation(",
+            "final class DarwinInvestigationMachineClaimServerScheduler",
+            "deadlineNanoseconds",
+            "final class DarwinInvestigationMachineClaimServerScheduledHandle",
+            "func cancel()",
+            "enum DarwinInvestigationMachineClaimServerTerminal",
+        ] {
+            #expect(helper.contains(marker))
+        }
+        #expect(!helper.contains("scheduleRetirementClaimDeadline("))
+        let machineClaimStart = try #require(
+            helper.range(of: "private final class LifecycleMachineClaimListenerDelegate")
+        )
+        let suffix = helper[machineClaimStart.lowerBound...]
+        let machineClaimEnd = try #require(
+            suffix.range(of: "\nprivate final class LifecycleHelperService")
+        )
+        let machineClaim = String(suffix[..<machineClaimEnd.lowerBound])
+        #expect(!machineClaim.contains("scheduleSuccessfulExitAfterReply"))
+        #expect(!machineClaim.contains("scheduleFailureExitAfterReply"))
+        #expect(!machineClaim.contains("DispatchQueue.global().asyncAfter"))
     }
 }
 
