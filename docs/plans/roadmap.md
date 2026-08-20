@@ -219,7 +219,7 @@ iii-b-ii 也已通过 51 focused、504 affected、唯一 1,223-test staged-only
 serial、physical/five-symbol final-Mach-O gates 与 post-fix review；iii-b/
 ii-b2b 已关闭；ii-b3a 已通过 35 focused、521 affected、唯一 1,234-test
 staged-only serial、exact contract/structural/artifact gates 与 final review；
-ii-b3b 与独立 fixture prerequisite 已完成；ii-b3c 是当前 frontier。
+ii-b3b、独立 fixture prerequisite 与 ii-b3c 已完成；ii-b4 是当前 frontier。
 39B2c 仍未作 machine readiness claim。
 L3 preflight 已把余下范围拆为 L3a trusted target extraction、L3b root
 collection 与 L3c failure matrix/final admission。L3a 已把 machine-only
@@ -248,8 +248,8 @@ serial 与 independent post-fix review 也已完成；L3c2b eight-scenario drive
 ii-b0a/ii-b0b/ii-b0c/ii-b1、ii-b2 ASID prerequisite、ii-b2a、ii-b2b-i 与
 ii-b2b-ii、iii-a、iii-b-i 与 iii-b-ii 均已完成；iii-b/ii-b2b 已关闭；ii-b3
 已拆为 b3a/b3b/b3c，ii-b3a fixed-channel/root-peer/drop adapter 与 ii-b3b
-start-to-retire-only Lifecycle seam 已完成；ii-b3c concrete leaf/native entry
-是当前 frontier。
+start-to-retire-only Lifecycle seam 与 ii-b3c concrete leaf/native entry
+已完成；ii-b4 fixed helper-claim client 是当前 frontier。
 L3c2b preflight 的 real-plan matrix contradiction 已由 3-path plan-freshness
 prerequisite 关闭，affected/Investigation/structural/review gates 通过；
 只有 L3c4 可作 readiness claim 并运行
@@ -435,7 +435,7 @@ L3c3c 当前证据见
 	  i-b2b-1 在执行前 superseded，B4 root execution count 为 0。ADR 0018 仍
 	  Proposed；L3c3c-ii-a、ii-b0a/ii-b0b/ii-b0c/ii-b1 与 ii-b2 ASID
   prerequisite、ii-b2a、ii-b2b-i、ii-b2b-ii、iii-a 与 iii-b 已完成；ii-b3
-  已拆为 b3a/b3b/b3c，ii-b3a/ii-b3b 已完成；ii-b3c 是当前 frontier。
+  已拆为 b3a/b3b/b3c，ii-b3a/ii-b3b/ii-b3c 已完成；ii-b4 是当前 frontier。
 	  L3c4 才拥有
 	  final admission/full。
 	  39B2c 才是 machine admission，Task 39 尚未完成。

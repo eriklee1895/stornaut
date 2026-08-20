@@ -1,7 +1,7 @@
 # Phase D Task 39B2c-L3c3c-ii-b3c Concrete Leaf/Entry Preflight
 
-> Status: Scope/cost and tests-first contract frozen; implementation current;
-> non-admitting
+> Status: Complete; implementation and completion evidence recorded in the
+> [ii-b3c review](phase-d-task-39b2c-l3c3c-ii-b3c-review.md); non-admitting
 >
 > Date: 2026-08-20
 >
@@ -170,17 +170,17 @@ call Codex/model/auth/public network, touch Trash/Executor or claim readiness.
 
 | Obligation | Direct evidence required | Status |
 | --- | --- | --- |
-| public direct-async no-argument entry | source/API structural gate and App harness tests | pending |
-| b3a peer/bootstrap/drop join | concrete operations tests and Debug artifact positive | pending |
-| strict configuration reuse | existing decoder plus unknown-field and mismatch tests | pending |
-| epoch driver consistency | complete four-field comparison before acknowledgement | pending |
-| canonical configuration and attempt commitments | canonical wire bytes equal machine config digest; ACK uses existing capability binding digest | pending |
-| no-auth/no-business-line retirement | exact `[start, retire]`, zero line bytes, API/body negatives | pending |
-| exact retirement/handle join | behavior negatives and one-shot evidence consumption | pending |
-| complete pure-leaf sequence | focused concrete factory transcript | pending |
-| native FD activation only | dedicated App tests | pending |
-| product/release boundaries closed | source recursion and final-Mach-O matrix | pending |
-| scope/cost | real staged index plus extra/over/deletion mutations | pending |
+| public direct-async no-argument entry | source/API structural gate and App harness tests | satisfied |
+| b3a peer/bootstrap/drop join | concrete operations tests and Debug artifact positive | satisfied |
+| strict configuration reuse | existing decoder plus unknown-field and mismatch tests | satisfied |
+| epoch driver consistency | complete four-field comparison before acknowledgement | satisfied |
+| canonical configuration and attempt commitments | canonical wire bytes equal machine config digest; ACK uses existing capability binding digest | satisfied |
+| no-auth/no-business-line retirement | exact `[start, retire]`, zero line bytes, API/body negatives | satisfied |
+| exact retirement/handle join | behavior negatives and one-shot evidence consumption | satisfied |
+| complete pure-leaf sequence | focused concrete factory transcript | satisfied |
+| native FD activation only | dedicated App tests | satisfied |
+| product/release boundaries closed | source recursion and final-Mach-O matrix | satisfied |
+| scope/cost | real staged index plus extra/over/deletion mutations | satisfied |
 | no premature admission | no report/receipt/readiness/full; ADR 0018 Proposed | required |
 
 ADR 0018 remains Proposed. Task 39 remains incomplete. Production Deep Dive and

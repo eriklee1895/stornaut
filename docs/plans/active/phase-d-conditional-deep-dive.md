@@ -51,7 +51,7 @@
 > quantized transfer and iii-b public live façade/helper integration; iii-a,
 > iii-b-i semantic/live integration, iii-b-ii executable physical-adapter
 > closure and ii-b3a/ii-b3b are complete/non-admitting; iii-b/ii-b2b are
-> closed; ii-b3c is current, followed eventually by ii-c
+> closed; ii-b3c is complete and ii-b4 is current, followed eventually by ii-c
 > one no-model privileged gate. The authoritative
 > real-model run and readiness verdict remain unimplemented.
 > Production Deep Dive remains unavailable until Task 44 admission.
@@ -934,7 +934,7 @@ Checkpoint status:
   post-fix review. iii-b/ii-b2b are closed; ii-b3a fixed handoff adapter is
   complete after 35 focused, 521 affected, one 1,234-test staged-only serial,
   exact contract/structural/artifact gates and final review; ii-b3b and its
-  test-only fixture prerequisite are complete; ii-b3c is current.
+  test-only fixture prerequisite and ii-b3c are complete; ii-b4 is current.
   See the
   [ii-b2 ASID prerequisite review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2-asid-prerequisite-review.md),
   the

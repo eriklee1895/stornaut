@@ -4,7 +4,7 @@
 > ii-b0c/ii-b1, the ii-b2 ASID prerequisite, ii-b2a, ii-b2b-i and ii-b2b-ii
 > complete; ii-b2b-iii split into iii-a/iii-b and iii-b into iii-b-i/iii-b-ii;
 > iii-a/iii-b-i/iii-b-ii complete/non-admitting; ii-b3 split into b3a/b3b/b3c;
-> ii-b3a/ii-b3b complete/non-admitting; ii-b3c current
+> ii-b3a/ii-b3b/ii-b3c complete/non-admitting; ii-b4 current
 >
 > **Date:** 2026-08-19
 >
@@ -347,6 +347,7 @@ unconsumed.
 | ii-b2b-iii-b-ii executable physical-adapter closure | complete; non-admitting |
 | ii-b3a fixed-channel/root-peer/drop adapter | complete; non-admitting |
 | ii-b3b start-to-retire-only Lifecycle seam | complete; non-admitting |
-| ii-b3c concrete leaf/native entry | current |
+| ii-b3c concrete leaf/native entry | complete; non-admitting |
+| ii-b4 fixed helper-claim client | current |
 | ii-c no-model privileged machine gate | not executed |
 | ADR status | **Proposed** |

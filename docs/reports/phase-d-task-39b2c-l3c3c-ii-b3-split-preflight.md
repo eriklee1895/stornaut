@@ -450,9 +450,10 @@ the retirement assertion. The narrow
 [fixture prerequisite](phase-d-task-39b2c-l3c3c-ii-b3b-fixture-prerequisite-preflight.md)
 closed that test-infrastructure gate with an independent 1,245-test clean serial.
 The exact implementation and completion accounting is recorded in the
-[ii-b3b review](phase-d-task-39b2c-l3c3c-ii-b3b-review.md). ii-b3c is next.
-After ii-b3b and ii-b3c complete independently, the strict
-Task 39 order resumes at ii-b4, ii-b5, ii-c0, ii-c, L3c3d and L3c4. ADR 0018
+[ii-b3b review](phase-d-task-39b2c-l3c3c-ii-b3b-review.md). ii-b3c is also
+complete and non-admitting; its evidence is recorded in the
+[ii-b3c review](phase-d-task-39b2c-l3c3c-ii-b3c-review.md). The strict Task 39
+order resumes at ii-b4, ii-b5, ii-c0, ii-c, L3c3d and L3c4. ADR 0018
 remains Proposed; Task 39 remains incomplete; production Deep Dive and real Trash
 remain closed; and L3c4 alone owns machine readiness and the remaining
 authoritative full verifier.
