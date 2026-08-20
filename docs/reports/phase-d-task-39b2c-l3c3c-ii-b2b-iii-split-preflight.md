@@ -1,7 +1,7 @@
 # Phase D Task 39B2c-L3c3c-ii-b2b-iii Split Preflight
 
 > Status: Approved implementation split; iii-a handle-v3/single-quantized
-> transfer is current, iii-b live-helper server integration follows
+> transfer is complete, iii-b live-helper server integration is current
 >
 > Date: 2026-08-20
 >
@@ -9,6 +9,8 @@
 >
 > Admission: non-admitting; no App/helper launch, install, privilege, model/auth,
 > fixed client, readiness claim or authoritative full verifier
+>
+> iii-a completion: [Handle v3 Review](phase-d-task-39b2c-l3c3c-ii-b2b-iii-a-review.md)
 
 ## 1. Why the Existing Fourteen-Path Checkpoint Is Split
 

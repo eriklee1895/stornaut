@@ -49,7 +49,7 @@
 > complete App/main-Mach-O gate and 1,196-test staged-only serial. ii-b2b-iii
 > live-helper server migration has been split into iii-a handle-v3/single-
 > quantized transfer and iii-b public live façade/helper integration; iii-a is
-> current, followed eventually by ii-c
+> complete/non-admitting and iii-b is current, followed eventually by ii-c
 > one no-model privileged gate. The authoritative
 > real-model run and readiness verdict remain unimplemented.
 > Production Deep Dive remains unavailable until Task 44 admission.
@@ -922,7 +922,9 @@ Checkpoint status:
   production block is also complete after 34 focused, 175 Lifecycle affected,
   308 Investigation affected, complete App/main-Mach-O, 1,196-test staged-only
   serial and grouped/cross-group review gates. ii-b2b-iii is split into iii-a/
-  iii-b; iii-a is current.
+  iii-b; iii-a strict handle-v3/single-quantized transfer is complete after 91
+  focused, 181 Lifecycle, 309 Investigation, one 1,208-test staged-only serial
+  and post-fix/cross-group review. iii-b is current.
   See the
   [ii-b2 ASID prerequisite review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2-asid-prerequisite-review.md),
   the
@@ -933,6 +935,8 @@ Checkpoint status:
   [ii-b2b-ii legacy-client quarantine review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2b-ii-review.md),
   the
   [ii-b2b-iii split preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-split-preflight.md),
+  the
+  [iii-a handle v3 review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-a-review.md),
   the
   [L3c1b-i Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
   and

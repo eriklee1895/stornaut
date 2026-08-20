@@ -2,7 +2,8 @@
 
 > **Status:** Proposed; external root-launch branch rejected; ii-b0a/ii-b0b/
 > ii-b0c/ii-b1, the ii-b2 ASID prerequisite, ii-b2a, ii-b2b-i and ii-b2b-ii
-> complete; ii-b2b-iii split into iii-a/iii-b, iii-a current
+> complete; ii-b2b-iii split into iii-a/iii-b, iii-a complete/non-admitting,
+> iii-b current
 >
 > **Date:** 2026-08-19
 >
@@ -340,7 +341,7 @@ unconsumed.
 | ii-b2a typed escrow/deadline state | complete; non-connected/non-admitting |
 | ii-b2b-i non-connected machine-claim server | complete; non-admitting |
 | ii-b2b-ii legacy-client quarantine / Machine production block | complete; non-admitting |
-| ii-b2b-iii-a handle-v3/single-quantized transfer | current |
-| ii-b2b-iii-b public live façade/helper integration | follows iii-a |
+| ii-b2b-iii-a handle-v3/single-quantized transfer | complete; non-admitting |
+| ii-b2b-iii-b public live façade/helper integration | current |
 | ii-c no-model privileged machine gate | not executed |
 | ADR status | **Proposed** |
