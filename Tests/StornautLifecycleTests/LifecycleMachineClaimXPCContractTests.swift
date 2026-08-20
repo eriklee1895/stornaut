@@ -128,7 +128,7 @@ struct LifecycleMachineClaimXPCContractTests {
     }
 
     @Test
-    func helperOwnsCheckedContinuousClockCancellableSchedulerAndTerminalAction()
+    func claimServerOwnsCheckedPhysicalAdaptersAndHelperUsesFixedComposition()
         throws
     {
         let root = URL(filePath: #filePath)
@@ -140,20 +140,49 @@ struct LifecycleMachineClaimXPCContractTests {
             ),
             encoding: .utf8
         )
+        let effects = try String(
+            contentsOf: root.appending(
+                path: "Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerEffects.swift"
+            ),
+            encoding: .utf8
+        )
+        let adapter = try String(
+            contentsOf: root.appending(
+                path: "Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerAdapter.swift"
+            ),
+            encoding: .utf8
+        )
         for marker in [
-            "struct DarwinInvestigationMachineClaimServerClock",
+            "struct InvestigationMachineClaimServerPhysicalClock",
             "mach_continuous_time()",
             "mach_timebase_info(",
             "multipliedReportingOverflow",
             "addingReportingOverflow",
             "InvestigationMachineClaimServerObservation(",
-            "final class DarwinInvestigationMachineClaimServerScheduler",
-            "deadlineNanoseconds",
-            "final class DarwinInvestigationMachineClaimServerScheduledHandle",
+            "final class InvestigationMachineClaimServerPhysicalScheduler",
+            "ContinuousClock().sleep",
+            "final class InvestigationMachineClaimServerPhysicalTerminal",
+            "scheduleExit(status: 0, delayNanoseconds: 0)",
+            "scheduleExit(status: 71, delayNanoseconds: 100_000_000)",
             "func cancel()",
-            "enum DarwinInvestigationMachineClaimServerTerminal",
         ] {
-            #expect(helper.contains(marker))
+            #expect(effects.contains(marker))
+        }
+        #expect(adapter.contains(
+            "public convenience init(\n        retirementEscrow: LifecycleMachineRetirementEscrow"
+        ))
+        #expect(helper.contains(
+            "InvestigationMachineClaimServer(\n        retirementEscrow: retirementEscrow\n    )"
+        ))
+        for forbidden in [
+            "DarwinInvestigationMachineClaimServer",
+            "InvestigationMachineClaimServerPhysicalClock",
+            "InvestigationMachineClaimServerPhysicalScheduler",
+            "InvestigationMachineClaimServerPhysicalTerminal",
+            "mach_continuous_time()",
+            "mach_timebase_info(",
+        ] {
+            #expect(!helper.contains(forbidden))
         }
         #expect(!helper.contains("scheduleRetirementClaimDeadline("))
         let machineClaimStart = try #require(

@@ -30,7 +30,7 @@ source = Path(sys.argv[1]).read_text(encoding="utf-8")
 runtime_source = source[source.index("\nscripts/verify-contract\n"):]
 
 required_fragments = (
-    "claim_server_module_symbol='StornautInvestigationMachineClaimServer.InvestigationMachineClaimServer'",
+    "claim_server_module_symbols=(",
     "claim_server_handoff_markers=(",
     "claim_server_lifecycle_support_symbols=(",
     "helper_claim_server_forbidden_symbols=(",
@@ -94,6 +94,28 @@ def array_values(name):
     return values
 
 expected_arrays = {
+    "claim_server_module_symbols": [
+        (
+            "StornautInvestigationMachineClaimServer."
+            "InvestigationMachineClaimServer"
+        ),
+        (
+            "StornautInvestigationMachineClaimServer."
+            "InvestigationMachineClaimServerEffectExecutor"
+        ),
+        (
+            "StornautInvestigationMachineClaimServer."
+            "InvestigationMachineClaimServerPhysicalClock"
+        ),
+        (
+            "StornautInvestigationMachineClaimServer."
+            "InvestigationMachineClaimServerPhysicalScheduler"
+        ),
+        (
+            "StornautInvestigationMachineClaimServer."
+            "InvestigationMachineClaimServerPhysicalTerminal"
+        ),
+    ],
     "claim_server_handoff_markers": [
         "StornautInvestigationMachineClaimXPCWire",
         "stornaut.task39.machine-claim.request",
@@ -103,10 +125,6 @@ expected_arrays = {
     ],
     "claim_server_lifecycle_support_symbols": [
         "StornautLifecycle.LifecycleMachineRetirementEscrowDeadlineState",
-        (
-            "StornautInvestigationMachineClaimServer."
-            "InvestigationMachineClaimServerEffectExecutor"
-        ),
     ],
     "helper_claim_server_forbidden_symbols": [
         "StornautInvestigationMachine.",
@@ -195,6 +213,25 @@ for function_name in (
     if match is None or match.group("body").count("return 2") != 3:
         raise SystemExit(
             f"claim-server fail-closed scanner drifted: {function_name}"
+        )
+non_helper = re.search(
+    r"(?ms)^verify_non_helper_claim_server_macho\(\) \{\n"
+    r"(?P<body>.*?)(?=^\}\n)",
+    runtime_source,
+)
+if non_helper is None:
+    raise SystemExit(
+        "claim-server non-helper physical symbol scan drifted"
+    )
+non_helper_body = non_helper.group("body")
+for required in (
+    'for marker in "${claim_server_module_symbols[@]}"; do',
+    'mach_o_image_has_demangled_symbol "$image" "$marker"',
+    '"non-helper claim-server Mach-O leakage: $image: $marker"',
+):
+    if non_helper_body.count(required) != 1:
+        raise SystemExit(
+            "claim-server non-helper physical symbol scan drifted"
         )
 PY
 }
@@ -972,7 +1009,13 @@ mach_o_image_has_demangled_symbol() {
     [[ "$symbols" == *"$marker"* ]]
 }
 
-claim_server_module_symbol='StornautInvestigationMachineClaimServer.InvestigationMachineClaimServer'
+claim_server_module_symbols=(
+    'StornautInvestigationMachineClaimServer.InvestigationMachineClaimServer'
+    'StornautInvestigationMachineClaimServer.InvestigationMachineClaimServerEffectExecutor'
+    'StornautInvestigationMachineClaimServer.InvestigationMachineClaimServerPhysicalClock'
+    'StornautInvestigationMachineClaimServer.InvestigationMachineClaimServerPhysicalScheduler'
+    'StornautInvestigationMachineClaimServer.InvestigationMachineClaimServerPhysicalTerminal'
+)
 claim_server_handoff_markers=(
     'StornautInvestigationMachineClaimXPCWire'
     'stornaut.task39.machine-claim.request'
@@ -982,7 +1025,6 @@ claim_server_handoff_markers=(
 )
 claim_server_lifecycle_support_symbols=(
     'StornautLifecycle.LifecycleMachineRetirementEscrowDeadlineState'
-    'StornautInvestigationMachineClaimServer.InvestigationMachineClaimServerEffectExecutor'
 )
 helper_claim_server_forbidden_symbols=(
     'StornautInvestigationMachine.'
@@ -1023,7 +1065,7 @@ verify_helper_claim_server_macho() {
     local image=$1 marker selectors scan_status
 
     for marker in \
-        "$claim_server_module_symbol" \
+        "${claim_server_module_symbols[@]}" \
         "${claim_server_lifecycle_support_symbols[@]}"
     do
         if mach_o_image_has_demangled_symbol "$image" "$marker"; then
@@ -1075,20 +1117,20 @@ verify_helper_claim_server_macho() {
 }
 
 verify_non_helper_claim_server_macho() {
-    local image=$1 scan_status
+    local image=$1 marker scan_status
 
-    if mach_o_image_has_demangled_symbol \
-        "$image" "$claim_server_module_symbol"
-    then
-        print -u2 \
-            "non-helper claim-server Mach-O leakage: $image: $claim_server_module_symbol"
-        exit 1
-    else
-        scan_status=$?
-    fi
-    if (( scan_status == 2 )); then
-        exit 1
-    fi
+    for marker in "${claim_server_module_symbols[@]}"; do
+        if mach_o_image_has_demangled_symbol "$image" "$marker"; then
+            print -u2 \
+                "non-helper claim-server Mach-O leakage: $image: $marker"
+            exit 1
+        else
+            scan_status=$?
+        fi
+        if (( scan_status == 2 )); then
+            exit 1
+        fi
+    done
 }
 
 for helper_claim_server_image in "${helper_claim_server_images[@]}"; do

@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=ad9faa90b48435b4ca1b40f8cfe0253289a20df70732222e17105891a4a93cf1
+ib2_self_sha=de15307d5413f1d1df605db8787906d699ae162af4e84d3981df1f3eb25f3ea4
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -160,9 +160,17 @@ require_fixed_text scripts/verify-investigation-boundaries \
 require_fixed_text scripts/verify-investigation-boundaries \
     'live claim server public facade exposes forbidden type'
 require_fixed_text scripts/verify-investigation-boundaries \
-    'iii-b checkpoint paths drifted'
+    'iii-b-ii checkpoint paths drifted'
 require_fixed_text scripts/verify-investigation-boundaries \
-    'iii-b-i checkpoint budget drifted'
+    'iii-b-ii checkpoint budget drifted'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'live claim server physical clock drifted'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'live claim server physical scheduler drifted'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'live claim server physical terminal drifted'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'live claim server helper retained physical adapter'
 require_fixed_text scripts/verify-investigation-boundaries \
     'retirement handle protocol version drifted'
 require_fixed_text scripts/verify-investigation-boundaries \
@@ -840,9 +848,9 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "19437cd2f2013fc8971a5669ff5d48cba4c6aabd9fb2d9285680423d246fdfa8",
+        "1c4e2993bc12ee287490dbf7ca30351fbc619192229e767ed854a54d2f00978a",
     Path("scripts/verify-app-release-boundaries"):
-        "4b2f5b2a6c2a0624a0376d4751f5a8ec9b60ae62b23cc27991d81bec3df01075",
+        "6e74384710c8768c01593db0943e855e8b8dad59ceaef72a3d51a95087be742c",
 }
 for path, expected_sha in expected.items():
     observed_sha = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -2399,14 +2407,19 @@ python3 - \
     "$contract_root/live-claim-server-public-leak.swift" \
     "$contract_root/live-claim-server-public-extension.swift" \
     "$contract_root/live-claim-server-admission-order.swift" \
-    "$contract_root/live-claim-server-legacy-pending.swift" <<'PY'
+    "$contract_root/live-claim-server-legacy-pending.swift" \
+    "$contract_root/live-claim-server-physical-clock.swift" \
+    "$contract_root/live-claim-server-physical-scheduler.swift" \
+    "$contract_root/live-claim-server-physical-terminal.swift" \
+    "$contract_root/live-claim-server-helper-composition.swift" <<'PY'
 from pathlib import Path
 import sys
 
 (
     project_path, adapter_path, effects_path, helper_path, project_out,
     adapter_out, transfer_out, effects_out, extension_out, admission_out,
-    helper_out,
+    helper_out, physical_clock_out, physical_scheduler_out, physical_terminal_out,
+    helper_composition_out,
 ) = map(Path, sys.argv[1:])
 
 
@@ -2485,6 +2498,44 @@ helper_out.write_text(
     ),
     encoding="utf-8",
 )
+physical_clock_out.write_text(
+    mutate_once(
+        effects_path.read_text(encoding="utf-8"),
+        "ticks % timebase.denominator",
+        "ticks / timebase.denominator",
+        "physical clock fractional conversion changed",
+    ),
+    encoding="utf-8",
+)
+physical_scheduler_out.write_text(
+    mutate_once(
+        effects_path.read_text(encoding="utf-8"),
+        "let remaining = deadlineNanoseconds - now",
+        "let remaining = deadlineNanoseconds + now",
+        "physical scheduler relative deadline changed",
+    ),
+    encoding="utf-8",
+)
+physical_terminal_out.write_text(
+    mutate_once(
+        effects_path.read_text(encoding="utf-8"),
+        "action.scheduleExit(status: 71, delayNanoseconds: 100_000_000)",
+        "action.scheduleExit(status: 0, delayNanoseconds: 0)",
+        "physical terminal failure mapping changed",
+    ),
+    encoding="utf-8",
+)
+helper_composition_out.write_text(
+    mutate_once(
+        helper_path.read_text(encoding="utf-8"),
+        "InvestigationMachineClaimServer(\n        retirementEscrow: retirementEscrow\n    )",
+        "InvestigationMachineClaimServer(\n"
+        "        retirementEscrow: LifecycleMachineRetirementEscrow()\n"
+        "    )",
+        "helper uses a different retirement escrow",
+    ),
+    encoding="utf-8",
+)
 PY
 require_live_claim_server_mutation_rejected helper-claim-server-linkage \
     "$contract_root/live-claim-server-unlinked.pbxproj" \
@@ -2522,6 +2573,58 @@ require_live_claim_server_mutation_rejected live-claim-server-legacy-pending \
     "$live_claim_server_adapter" "$live_claim_server_effects" \
     "$contract_root/live-claim-server-legacy-pending.swift" \
     'live claim server legacy helper route drifted: retirementEscrow.isAwaitingClaim'
+require_live_claim_server_mutation_rejected live-claim-server-physical-clock \
+    "$live_claim_server_project" "$live_claim_server_lifecycle" \
+    "$live_claim_server_adapter" \
+    "$contract_root/live-claim-server-physical-clock.swift" \
+    "$live_claim_server_helper" \
+    'live claim server physical clock drifted'
+require_live_claim_server_mutation_rejected live-claim-server-physical-scheduler \
+    "$live_claim_server_project" "$live_claim_server_lifecycle" \
+    "$live_claim_server_adapter" \
+    "$contract_root/live-claim-server-physical-scheduler.swift" \
+    "$live_claim_server_helper" \
+    'live claim server physical scheduler drifted'
+require_live_claim_server_mutation_rejected live-claim-server-physical-terminal \
+    "$live_claim_server_project" "$live_claim_server_lifecycle" \
+    "$live_claim_server_adapter" \
+    "$contract_root/live-claim-server-physical-terminal.swift" \
+    "$live_claim_server_helper" \
+    'live claim server physical terminal drifted'
+require_live_claim_server_mutation_rejected live-claim-server-helper-composition \
+    "$live_claim_server_project" "$live_claim_server_lifecycle" \
+    "$live_claim_server_adapter" "$live_claim_server_effects" \
+    "$contract_root/live-claim-server-helper-composition.swift" \
+    'live claim server helper physical composition drifted'
+
+python3 - \
+    "$live_claim_server_effects" \
+    "$contract_root/claim-server-terminal-authority.swift" <<'PY'
+from pathlib import Path
+import sys
+
+source_path, output_path = map(Path, sys.argv[1:])
+source = source_path.read_text(encoding="utf-8")
+old = "        if delayNanoseconds == 0 {\n"
+new = (
+    "        _ = system(\"/usr/bin/true\")\n"
+    "        if delayNanoseconds == 0 {\n"
+)
+if source.count(old) != 1:
+    raise SystemExit("cannot construct terminal authority mutation")
+output_path.write_text(source.replace(old, new, 1), encoding="utf-8")
+PY
+if "$live_claim_server_gate" --claim-server-contract-only \
+    "$live_claim_server_adapter" \
+    "$contract_root/claim-server-terminal-authority.swift" \
+    Sources/StornautLifecycle/LifecycleMachineRetirementEscrowDeadlineState.swift \
+    >"$contract_root/claim-server-terminal-authority.log" 2>&1
+then
+    fail_contract "Claim-server terminal authority mutation was accepted"
+fi
+require_fixed_text \
+    "$contract_root/claim-server-terminal-authority.log" \
+    'claim server physical terminal authority drifted'
 
 claim_server_macho_gate=scripts/verify-app-release-boundaries
 "$claim_server_macho_gate" --legacy-machine-claim-contract-only \
@@ -2541,11 +2644,14 @@ python3 - "$claim_server_macho_gate" \
     "$contract_root/helper-claim-server-positive.swift" \
     "$contract_root/non-helper-claim-server-leak.swift" \
     "$contract_root/claim-server-selector.swift" \
-    "$contract_root/claim-server-fail-open.swift" <<'PY'
+    "$contract_root/claim-server-fail-open.swift" \
+    "$contract_root/claim-server-physical-positive.swift" \
+    "$contract_root/claim-server-physical-negative.swift" <<'PY'
 from pathlib import Path
 import sys
 
-source_path, helper_path, negative_path, selector_path, fail_open_path = map(
+source_path, helper_path, negative_path, selector_path, fail_open_path, \
+    physical_path, physical_negative_path = map(
     Path, sys.argv[1:]
 )
 source = source_path.read_text(encoding="utf-8")
@@ -2584,6 +2690,20 @@ selector_path.write_text(mutate_array(
     '    "$diagnostic_debug_app/Contents/MacOS/StornautLifecycleHelper"\n',
     '', "helper positive image omitted"
 ), encoding="utf-8")
+physical_path.write_text(mutate_array(
+    "claim_server_module_symbols",
+    "    'StornautInvestigationMachineClaimServer."
+    "InvestigationMachineClaimServerPhysicalTerminal'\n",
+    '', "physical helper positive omitted"
+), encoding="utf-8")
+physical_negative_path.write_text(mutate_runtime(
+    '    for marker in "${claim_server_module_symbols[@]}"; do\n'
+    '        if mach_o_image_has_demangled_symbol "$image" "$marker"; then\n',
+    '    for marker in "${claim_server_module_symbols[@]}"; do\n'
+    '        if mach_o_image_has_demangled_symbol "$image" '
+    '"${claim_server_module_symbols[1]}"; then\n',
+    "non-helper physical symbol argument fixed"
+), encoding="utf-8")
 start = runtime.index("mach_o_image_has_demangled_symbol() {")
 end = runtime.index("\n}\n", start) + 3
 function = runtime[start:end]
@@ -2607,6 +2727,12 @@ require_claim_server_macho_mutation_rejected claim-server-selector \
 require_claim_server_macho_mutation_rejected claim-server-fail-open \
     "$contract_root/claim-server-fail-open.swift" \
     'claim-server fail-closed scanner drifted'
+require_claim_server_macho_mutation_rejected claim-server-physical-positive \
+    "$contract_root/claim-server-physical-positive.swift" \
+    'claim-server Mach-O array drifted: claim_server_module_symbols'
+require_claim_server_macho_mutation_rejected claim-server-physical-negative \
+    "$contract_root/claim-server-physical-negative.swift" \
+    'claim-server non-helper physical symbol scan drifted'
 
 # Scope/cost anti-spoofing stays executable without touching the real worktree.
 python3 - scripts/verify-investigation-boundaries <<'PY'
@@ -2619,7 +2745,7 @@ end = source.find("\nPY\n}\n", start)
 if start < 0 or end < 0:
     raise SystemExit("iii-b scope verifier missing")
 scope = source[start:end + len("\nPY\n}\n")]
-expected_paths = {
+iii_b_i_expected_paths = {
     "Stornaut.xcodeproj/project.pbxproj",
     "StornautLifecycleHelper/main.swift",
     "Sources/StornautLifecycle/LifecycleMachineRetirementEscrow.swift",
@@ -2634,25 +2760,41 @@ expected_paths = {
     "scripts/verify-investigation-boundaries",
     "scripts/verify-contract",
 }
+iii_b_ii_expected_paths = {
+    "Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerAdapter.swift",
+    "Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerEffects.swift",
+    "StornautLifecycleHelper/main.swift",
+    "Tests/StornautInvestigationTests/InvestigationMachineClaimServerAdapterTests.swift",
+    "Tests/StornautLifecycleTests/LifecycleMachineClaimXPCContractTests.swift",
+    "Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift",
+    "scripts/verify-investigation-boundaries",
+    "scripts/verify-app-release-boundaries",
+    "scripts/verify-contract",
+}
 
 
 def verify_scope_contract(value):
-    expected_match = re.search(
-        r"expected = \{\n(?P<body>.*?)^\}\n",
-        value,
-        re.MULTILINE | re.DOTALL,
-    )
-    if expected_match is None:
-        raise ValueError("iii-b scope contract missing")
-    observed_paths = set(re.findall(
-        r'^\s+"([^"]+)",$',
-        expected_match.group("body"),
-        re.MULTILINE,
-    ))
-    if observed_paths != expected_paths:
-        raise ValueError("iii-b scope contract drifted")
-    if value.count("if changed_lines > 3_700:") != 1:
-        raise ValueError("iii-b budget contract drifted")
+    for name, expected_paths in (
+        ("iii_b_i_expected", iii_b_i_expected_paths),
+        ("iii_b_ii_expected", iii_b_ii_expected_paths),
+    ):
+        expected_match = re.search(
+            rf"{name} = \{{\n(?P<body>.*?)^\}}\n",
+            value,
+            re.MULTILINE | re.DOTALL,
+        )
+        if expected_match is None:
+            raise ValueError(f"{name} scope contract missing")
+        observed_paths = set(re.findall(
+            r'^\s+"([^"]+)",$',
+            expected_match.group("body"),
+            re.MULTILINE,
+        ))
+        if observed_paths != expected_paths:
+            raise ValueError(f"{name} scope contract drifted")
+    for ceiling in ("3_700", "2_200"):
+        if value.count(f"    {ceiling},\n") != 1:
+            raise ValueError(f"iii-b ceiling {ceiling} contract drifted")
 
 
 verify_scope_contract(scope)
@@ -2666,19 +2808,21 @@ def mutate_once(value, old, new, name):
 
 scope_spoof = mutate_once(
     scope,
-    '    "scripts/verify-contract",\n',
-    "",
+    'iii_b_ii_expected = {\n'
+    '    "Sources/StornautInvestigationMachineClaimServer/'
+    'InvestigationMachineClaimServerAdapter.swift",\n',
+    'iii_b_ii_expected = {\n',
     "scope",
 )
 budget_spoof = mutate_once(
     scope,
-    "if changed_lines > 3_700:",
-    "if changed_lines > 37_000:",
+    "    2_200,\n",
+    "    22_000,\n",
     "budget",
 )
 for label, fixture, diagnostic in (
-    ("scope", scope_spoof, "iii-b scope contract drifted"),
-    ("budget", budget_spoof, "iii-b budget contract drifted"),
+    ("scope", scope_spoof, "iii_b_ii_expected scope contract drifted"),
+    ("budget", budget_spoof, "iii-b ceiling 2_200 contract drifted"),
 ):
     try:
         verify_scope_contract(fixture)

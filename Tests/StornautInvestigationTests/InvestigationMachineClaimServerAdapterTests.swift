@@ -9,6 +9,270 @@ import Testing
 @Suite("Investigation Machine claim server adapter")
 struct InvestigationMachineClaimServerAdapterTests {
     @Test
+    func physicalClockUsesCheckedFloorConversions() throws {
+        let timebase = try InvestigationMachineClaimServerPhysicalTimebase(
+            numerator: 3,
+            denominator: 2
+        )
+        #expect(
+            try InvestigationMachineClaimServerPhysicalClock
+                .continuousNanoseconds(ticks: 11, timebase: timebase) == 16
+        )
+        #expect(
+            try InvestigationMachineClaimServerPhysicalClock
+                .wallUTCMicroseconds(secondsSince1970: 12.3456789)
+                == 12_345_678
+        )
+        #expect(throws: InvestigationMachineClaimServerPhysicalEffectError.self) {
+            _ = try InvestigationMachineClaimServerPhysicalTimebase(
+                numerator: 0,
+                denominator: 1
+            )
+        }
+        #expect(throws: InvestigationMachineClaimServerPhysicalEffectError.self) {
+            _ = try InvestigationMachineClaimServerPhysicalClock
+                .continuousNanoseconds(
+                    ticks: UInt64.max,
+                    timebase: InvestigationMachineClaimServerPhysicalTimebase(
+                        numerator: 2,
+                        denominator: 1
+                    )
+                )
+        }
+        for invalidWall in [
+            -1.0, 0.0, Double.infinity, Double.nan, Double(Int64.max),
+        ] {
+            #expect(
+                throws: InvestigationMachineClaimServerPhysicalEffectError.self
+            ) {
+                _ = try InvestigationMachineClaimServerPhysicalClock
+                    .wallUTCMicroseconds(secondsSince1970: invalidWall)
+            }
+        }
+
+        let source = PhysicalClaimServerClockSource(
+            timebase: timebase,
+            continuousTicks: 11,
+            wallSecondsSince1970: 12.3456789
+        )
+        let observation = try InvestigationMachineClaimServerPhysicalClock(
+            source: source
+        ).observation()
+        #expect(observation.continuousNanoseconds == 16)
+        #expect(observation.wallUTCMicroseconds == 12_345_678)
+        #expect(source.observationCount == 1)
+    }
+
+    @Test
+    func physicalSchedulerUsesExactRelativeDeadlineAndRejectsInvalidRanges()
+        throws
+    {
+        let clock = PublicClaimServerClock([
+            try InvestigationMachineClaimServerObservation(
+                continuousNanoseconds: 100,
+                wallUTCMicroseconds: 1
+            ),
+            try InvestigationMachineClaimServerObservation(
+                continuousNanoseconds: 100,
+                wallUTCMicroseconds: 2
+            ),
+            try InvestigationMachineClaimServerObservation(
+                continuousNanoseconds: 1,
+                wallUTCMicroseconds: 3
+            ),
+        ])
+        let tasks = PhysicalClaimServerTaskFactory(mode: .manual)
+        let scheduler = InvestigationMachineClaimServerPhysicalScheduler(
+            clock: clock,
+            taskFactory: tasks
+        )
+
+        _ = try scheduler.schedule(
+            deadline: InvestigationMachineClaimServerDeadline(
+                deadlineNanoseconds: 150
+            ),
+            callback: {}
+        )
+        #expect(tasks.delays == [50])
+        #expect(throws: InvestigationMachineClaimServerPhysicalEffectError.self) {
+            _ = try scheduler.schedule(
+                deadline: InvestigationMachineClaimServerDeadline(
+                    deadlineNanoseconds: 100
+                ),
+                callback: {}
+            )
+        }
+        #expect(throws: InvestigationMachineClaimServerPhysicalEffectError.self) {
+            _ = try scheduler.schedule(
+                deadline: InvestigationMachineClaimServerDeadline(
+                    deadlineNanoseconds: UInt64.max
+                ),
+                callback: {}
+            )
+        }
+    }
+
+    @Test
+    func physicalDefaultsObserveAndCancelWithoutFiring() async throws {
+        let clock = InvestigationMachineClaimServerPhysicalClock()
+        let observation = try clock.observation()
+        #expect(observation.continuousNanoseconds > 0)
+        #expect(observation.wallUTCMicroseconds > 0)
+
+        let schedulerClock = PublicClaimServerClock([
+            try InvestigationMachineClaimServerObservation(
+                continuousNanoseconds: 100,
+                wallUTCMicroseconds: 1
+            ),
+        ])
+        let callbacks = PhysicalClaimServerCallbackRecorder()
+        let scheduler = InvestigationMachineClaimServerPhysicalScheduler(
+            clock: schedulerClock
+        )
+        let handle = try scheduler.schedule(
+            deadline: InvestigationMachineClaimServerDeadline(
+                deadlineNanoseconds: 100_000_100
+            )
+        ) {
+            callbacks.record()
+        }
+
+        handle.cancel()
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(callbacks.count == 0)
+        withExtendedLifetime(
+            InvestigationMachineClaimServerPhysicalTerminal()
+        ) {}
+    }
+
+    @Test
+    func physicalScheduledHandleSuppressesCancelledAndDuplicateCallbacks()
+        throws
+    {
+        let cancelledClock = PublicClaimServerClock([
+            try InvestigationMachineClaimServerObservation(
+                continuousNanoseconds: 100,
+                wallUTCMicroseconds: 1
+            ),
+        ])
+        let cancelledTasks = PhysicalClaimServerTaskFactory(mode: .manual)
+        let cancelledCallbacks = PhysicalClaimServerCallbackRecorder()
+        let cancelledScheduler = InvestigationMachineClaimServerPhysicalScheduler(
+            clock: cancelledClock,
+            taskFactory: cancelledTasks
+        )
+        let cancelledHandle = try cancelledScheduler.schedule(
+            deadline: InvestigationMachineClaimServerDeadline(
+                deadlineNanoseconds: 200
+            )
+        ) {
+            cancelledCallbacks.record()
+        }
+
+        cancelledHandle.cancel()
+        cancelledTasks.fire(0)
+        cancelledTasks.fire(0)
+        #expect(cancelledCallbacks.count == 0)
+        #expect(cancelledTasks.tasks[0].cancelCount == 1)
+
+        let duplicateClock = PublicClaimServerClock([
+            try InvestigationMachineClaimServerObservation(
+                continuousNanoseconds: 100,
+                wallUTCMicroseconds: 1
+            ),
+        ])
+        let duplicateTasks = PhysicalClaimServerTaskFactory(mode: .manual)
+        let duplicateCallbacks = PhysicalClaimServerCallbackRecorder()
+        let duplicateScheduler = InvestigationMachineClaimServerPhysicalScheduler(
+            clock: duplicateClock,
+            taskFactory: duplicateTasks
+        )
+        let duplicateHandle = try duplicateScheduler.schedule(
+            deadline: InvestigationMachineClaimServerDeadline(
+                deadlineNanoseconds: 200
+            )
+        ) {
+            duplicateCallbacks.record()
+        }
+
+        duplicateTasks.fire(0)
+        duplicateTasks.fire(0)
+        #expect(duplicateCallbacks.count == 1)
+        withExtendedLifetime(duplicateHandle) {}
+    }
+
+    @Test
+    func physicalCallbackBeforeTaskReturnReobservesAndClearsTheEffectSlot()
+        throws
+    {
+        let fixture = ClaimServerFixture()
+        let clock = PublicClaimServerClock([
+            try fixture.publicObservation(monotonic: 1_000_000_000),
+            try fixture.publicObservation(
+                monotonic: fixture.handleMonotonicDeadline,
+                wallOffset: 30_000_000_000
+            ),
+        ])
+        let tasks = PhysicalClaimServerTaskFactory(mode: .fireBeforeReturn)
+        let scheduler = InvestigationMachineClaimServerPhysicalScheduler(
+            clock: clock,
+            taskFactory: tasks
+        )
+        let terminal = PublicClaimServerTerminal()
+        let runtime = InvestigationMachineClaimServerRuntime(
+            clock: clock,
+            scheduler: scheduler,
+            terminal: terminal
+        )
+        let state = LifecycleMachineRetirementEscrowDeadlineState()
+        let executor = InvestigationMachineClaimServerEffectExecutor(
+            clock: runtime.clock,
+            scheduler: runtime.scheduler,
+            terminal: runtime.terminal
+        )
+
+        try executor.apply(
+            state.reserve(try fixture.semanticReservation()),
+            to: state
+        )
+
+        #expect(clock.observationCount == 2)
+        #expect(state.phase == .terminal(.claimDeadlineExpired))
+        #expect(terminal.reasons == [.claimDeadlineExpired])
+        #expect(tasks.tasks.count == 1)
+        #expect(tasks.tasks[0].cancelCount == 1)
+        #expect(executor.pendingSlotCount == 0)
+    }
+
+    @Test
+    func physicalTerminalMapsEveryReasonToOneFixedExitAction() {
+        let reasons: [InvestigationMachineClaimServerTerminalReason] = [
+            .claimDeadlineExpired, .releaseDeadlineExpired, .postReplyExitDue,
+            .cancelled, .connectionInvalidated, .bindingMismatch,
+            .duplicateOrReplay, .invalidTimeObservation, .arithmeticOverflow,
+            .deadlineArmFailure, .schedulerFiredEarly, .replyDispatchFailed,
+            .postReplyDeadlineExpiredBeforeDispatch,
+        ]
+
+        for reason in reasons {
+            let action = PhysicalClaimServerTerminalActionRecorder()
+            let terminal = InvestigationMachineClaimServerPhysicalTerminal(
+                action: action
+            )
+            terminal.handle(reason)
+            terminal.handle(reason == .postReplyExitDue ? .cancelled : .postReplyExitDue)
+
+            let expected = reason == .postReplyExitDue
+                ? PhysicalClaimServerExitAction(status: 0, delayNanoseconds: 0)
+                : PhysicalClaimServerExitAction(
+                    status: 71,
+                    delayNanoseconds: 100_000_000
+                )
+            #expect(action.actions == [expected])
+        }
+    }
+
+    @Test
     func publicFacadeExposesOnlyClosedScalarDataAndLifecycleSurfaces() throws {
         let root = URL(filePath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
@@ -2003,6 +2267,7 @@ private final class PublicClaimServerClock:
 {
     private let lock = NSLock()
     private var values: [InvestigationMachineClaimServerObservation]
+    private(set) var observationCount = 0
 
     init(_ values: [InvestigationMachineClaimServerObservation]) {
         self.values = values
@@ -2013,7 +2278,113 @@ private final class PublicClaimServerClock:
             guard !values.isEmpty else {
                 throw ClaimServerTestError.noClockValue
             }
+            observationCount += 1
             return values.removeFirst()
+        }
+    }
+}
+
+private final class PhysicalClaimServerClockSource:
+    InvestigationMachineClaimServerPhysicalClockSource,
+    @unchecked Sendable
+{
+    private let lock = NSLock()
+    private let storedTimebase: InvestigationMachineClaimServerPhysicalTimebase
+    private let storedContinuousTicks: UInt64
+    private let storedWallSecondsSince1970: TimeInterval
+    private(set) var observationCount = 0
+
+    init(
+        timebase: InvestigationMachineClaimServerPhysicalTimebase,
+        continuousTicks: UInt64,
+        wallSecondsSince1970: TimeInterval
+    ) {
+        storedTimebase = timebase
+        storedContinuousTicks = continuousTicks
+        storedWallSecondsSince1970 = wallSecondsSince1970
+    }
+
+    func timebase() throws -> InvestigationMachineClaimServerPhysicalTimebase {
+        lock.withLock { observationCount += 1 }
+        return storedTimebase
+    }
+
+    func continuousTicks() -> UInt64 { storedContinuousTicks }
+
+    func wallSecondsSince1970() -> TimeInterval {
+        storedWallSecondsSince1970
+    }
+}
+
+private final class PhysicalClaimServerTask:
+    InvestigationMachineClaimServerPhysicalTask,
+    @unchecked Sendable
+{
+    private let lock = NSLock()
+    private(set) var cancelCount = 0
+
+    func cancel() { lock.withLock { cancelCount += 1 } }
+}
+
+private final class PhysicalClaimServerTaskFactory:
+    InvestigationMachineClaimServerPhysicalTaskFactory,
+    @unchecked Sendable
+{
+    enum Mode { case manual, fireBeforeReturn }
+
+    private let lock = NSLock()
+    private let mode: Mode
+    private var callbacks: [@Sendable () -> Void] = []
+    private(set) var delays: [UInt64] = []
+    private(set) var tasks: [PhysicalClaimServerTask] = []
+
+    init(mode: Mode) { self.mode = mode }
+
+    func makeTask(
+        delayNanoseconds: UInt64,
+        callback: @escaping @Sendable () -> Void
+    ) throws -> any InvestigationMachineClaimServerPhysicalTask {
+        let task = PhysicalClaimServerTask()
+        lock.withLock {
+            delays.append(delayNanoseconds)
+            callbacks.append(callback)
+            tasks.append(task)
+        }
+        if mode == .fireBeforeReturn { callback() }
+        return task
+    }
+
+    func fire(_ index: Int) {
+        let callback = lock.withLock { callbacks[index] }
+        callback()
+    }
+}
+
+private final class PhysicalClaimServerCallbackRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private(set) var count = 0
+
+    func record() { lock.withLock { count += 1 } }
+}
+
+private struct PhysicalClaimServerExitAction: Sendable, Equatable {
+    let status: Int32
+    let delayNanoseconds: UInt64
+}
+
+private final class PhysicalClaimServerTerminalActionRecorder:
+    InvestigationMachineClaimServerPhysicalTerminalAction,
+    @unchecked Sendable
+{
+    private let lock = NSLock()
+    private(set) var actions: [PhysicalClaimServerExitAction] = []
+
+    func scheduleExit(status: Int32, delayNanoseconds: UInt64) {
+        lock.withLock {
+            actions.append(PhysicalClaimServerExitAction(
+                status: status,
+                delayNanoseconds: delayNanoseconds
+            ))
         }
     }
 }

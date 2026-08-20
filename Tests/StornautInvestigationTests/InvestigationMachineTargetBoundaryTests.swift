@@ -68,8 +68,14 @@ struct InvestigationMachineTargetBoundaryTests {
             "live claim server helper-only linkage drifted",
             "StornautInvestigationMachineClaimServer in Frameworks",
             "live claim server public extension drifted",
-            "iii-b checkpoint paths drifted",
-            "iii-b-i checkpoint budget drifted",
+            "iii-b-ii checkpoint paths drifted",
+            "iii-b-ii checkpoint budget drifted",
+            "live claim server physical clock drifted",
+            "live claim server physical scheduler drifted",
+            "live claim server physical terminal drifted",
+            "claim server physical terminal authority drifted",
+            "live claim server helper physical composition drifted",
+            "live claim server helper retained physical adapter",
         ] {
             #expect(boundaries.contains(marker))
         }
@@ -79,8 +85,19 @@ struct InvestigationMachineTargetBoundaryTests {
             "non-helper-claim-server-leak",
             "live-claim-server-public-extension",
             "live-claim-server-admission-order",
+            "live-claim-server-physical-clock",
+            "live-claim-server-physical-scheduler",
+            "live-claim-server-physical-terminal",
+            "live-claim-server-helper-composition",
+            "claim-server-terminal-authority",
         ] {
             #expect(contract.contains(marker))
+        }
+        for marker in [
+            "claim_server_module_symbols=(",
+            "for marker in \"${claim_server_module_symbols[@]}\"",
+        ] {
+            #expect(release.contains(marker))
         }
     }
 
@@ -141,6 +158,16 @@ struct InvestigationMachineTargetBoundaryTests {
         #expect(adapter.contains("state.commitReleaseResponse("))
         #expect(adapter.contains("private let evidenceLock = NSLock()"))
         #expect(effects.contains("callbackFinished"))
+        for marker in [
+            "InvestigationMachineClaimServerPhysicalClock",
+            "InvestigationMachineClaimServerPhysicalScheduler",
+            "InvestigationMachineClaimServerPhysicalTerminal",
+            "DarwinInvestigationMachineClaimServerPhysicalClockSource",
+            "ContinuousInvestigationMachineClaimServerTaskFactory",
+            "DarwinInvestigationMachineClaimServerPhysicalTerminalAction",
+        ] {
+            #expect(effects.contains(marker))
+        }
         let armTransition = try #require(
             effects.range(of: "let armed = state.armSucceeded(ticket)")
         )

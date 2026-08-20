@@ -790,10 +790,60 @@ if adapter_imports != [
 effects_imports = re.findall(
     r"(?m)^import\s+([A-Za-z0-9_]+)\s*$", effects
 )
-if effects_imports != ["Foundation", "StornautLifecycle"]:
+if effects_imports != ["Darwin", "Foundation", "StornautLifecycle"]:
     raise SystemExit(f"claim server effects imports drifted: {effects_imports}")
 
-for source_name, source in (("adapter", adapter), ("effects", effects)):
+terminal_action = body(
+    effects,
+    r"private\s+final\s+class\s+"
+        r"DarwinInvestigationMachineClaimServerPhysicalTerminalAction\s*:\s*"
+        r"InvestigationMachineClaimServerPhysicalTerminalAction\s*,\s*"
+        r"@unchecked\s+Sendable",
+    "physical terminal authority",
+)
+require_patterns(terminal_action, (
+    r"private\s+let\s+queue\s*=\s*DispatchQueue\s*\(",
+    r"func\s+scheduleExit\s*\(\s*status:\s*Int32\s*,\s*"
+        r"delayNanoseconds:\s*UInt64\s*\)",
+    r"if\s+delayNanoseconds\s*==\s*0",
+    r"queue\.async\s*\{\s*exit\s*\(\s*status\s*\)\s*\}",
+    r"queue\.asyncAfter",
+    r"\.nanoseconds\s*\(\s*Int\s*\(\s*delayNanoseconds\s*\)\s*\)",
+), "physical terminal authority")
+if terminal_action.count("exit(status)") != 2:
+    raise SystemExit("claim server physical terminal exit cardinality drifted")
+terminal_properties = re.findall(
+    r"(?m)^\s*private\s+let\s+([A-Za-z_][A-Za-z0-9_]*)\s*=",
+    terminal_action,
+)
+terminal_functions = re.findall(
+    r"(?m)^\s*func\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(",
+    terminal_action,
+)
+terminal_calls = re.findall(
+    r"(?<![A-Za-z0-9_])([A-Za-z_][A-Za-z0-9_.]*)\s*\(",
+    terminal_action,
+)
+if terminal_properties != ["queue"] or terminal_functions != ["scheduleExit"]:
+    raise SystemExit(
+        "claim server physical terminal authority drifted: "
+        f"properties={terminal_properties}, functions={terminal_functions}"
+    )
+if terminal_calls != [
+    "DispatchQueue", "scheduleExit", "exit", "queue.asyncAfter",
+    "now", "nanoseconds", "Int", "exit",
+]:
+    raise SystemExit(
+        f"claim server physical terminal authority drifted: calls={terminal_calls}"
+    )
+effects_without_terminal_action = effects.replace(
+    terminal_action, " " * len(terminal_action), 1
+)
+
+for source_name, source in (
+    ("adapter", adapter),
+    ("effects", effects_without_terminal_action),
+):
     authority = re.search(
         r"\b(?:NSXPCConnection|NSXPCListener|NSXPCListenerEndpoint|"
         r"FileManager|URLSession|Process|Security|ActionExecutor|Policy|"
@@ -1806,9 +1856,14 @@ def declaration(source, pattern, label, flags=re.MULTILINE | re.DOTALL):
 
 
 def require(source, patterns, label):
+    diagnostic = {
+        "physical clock": "live claim server physical clock drifted",
+        "physical scheduler": "live claim server physical scheduler drifted",
+        "physical terminal": "live claim server physical terminal drifted",
+    }.get(label, f"live claim server {label} drifted")
     for pattern in patterns:
         if re.search(pattern, source, re.MULTILINE | re.DOTALL) is None:
-            raise SystemExit(f"live claim server {label} drifted: {pattern}")
+            raise SystemExit(f"{diagnostic}: {pattern}")
 
 
 def compact(source):
@@ -2194,16 +2249,137 @@ require(helper, (
     r"import\s+StornautInvestigationMachineClaimServer",
     r"with:\s*InvestigationMachineClaimXPCWire\.self",
 ), "helper live wire")
-physical = helper[:helper.find("private func writeAll(")]
-require(physical, (
-    r"mach_continuous_time\s*\(",
+run_helper = declaration(
+    helper, r"private\s+func\s+runLifecycleHelper\s*\(",
+    "helper runtime composition",
+)
+run_helper_compact = compact(run_helper)
+if run_helper_compact.count(
+    "letretirementEscrow=LifecycleMachineRetirementEscrow()"
+) != 1 or run_helper_compact.count(
+    "letmachineClaimServer=InvestigationMachineClaimServer("
+    "retirementEscrow:retirementEscrow)"
+) != 1:
+    raise SystemExit("live claim server helper physical composition drifted")
+physical_init = declaration(
+    server,
+    r"public\s+convenience\s+init\s*\(\s*"
+        r"retirementEscrow:\s*LifecycleMachineRetirementEscrow\s*\)",
+    "fixed physical composition",
+)
+physical_init_compact = compact(physical_init)
+for marker in (
+    "letclock=InvestigationMachineClaimServerPhysicalClock()",
+    "scheduler:InvestigationMachineClaimServerPhysicalScheduler(clock:clock)",
+    "terminal:InvestigationMachineClaimServerPhysicalTerminal()",
+):
+    if marker not in physical_init_compact:
+        raise SystemExit(f"live claim server physical composition drifted: {marker}")
+for forbidden in (
+    "taskFactory:", "action:", "status:", "delayNanoseconds:",
+):
+    if forbidden in physical_init_compact:
+        raise SystemExit(
+            f"live claim server physical composition became selectable: {forbidden}"
+        )
+
+physical_clock = declaration(
+    effects,
+    r"package\s+struct\s+InvestigationMachineClaimServerPhysicalClock\b",
+    "physical clock",
+)
+require(physical_clock, (
+    r"static\s+func\s+continuousNanoseconds\s*\(",
+    r"ticks\s*/\s*timebase\.denominator",
+    r"ticks\s*%\s*timebase\.denominator",
+    r"multipliedReportingOverflow\s*\(\s*by:\s*timebase\.numerator",
+    r"addingReportingOverflow\s*\(",
+    r"!result\.overflow\s*,\s*result\.partialValue\s*>\s*0",
+    r"static\s+func\s+wallUTCMicroseconds\s*\(",
+    r"secondsSince1970\s*\*\s*1_000_000",
+    r"rounded\s*\(\s*\.down\s*\)",
+    r"scaled\.isFinite",
+    r"Int64\s*\(\s*exactly:\s*rounded\s*\)",
+), "physical clock")
+physical_source = declaration(
+    effects,
+    r"private\s+struct\s+"
+        r"DarwinInvestigationMachineClaimServerPhysicalClockSource\b",
+    "Darwin physical clock source",
+)
+require(physical_source, (
     r"mach_timebase_info\s*\(",
-    r"continuousNanoseconds:\s*continuous\.partialValue",
+    r"mach_continuous_time\s*\(\s*\)",
+    r"Date\s*\(\s*\)\.timeIntervalSince1970",
+), "physical clock")
+
+physical_scheduler = declaration(
+    effects,
+    r"package\s+final\s+class\s+"
+        r"InvestigationMachineClaimServerPhysicalScheduler\b",
+    "physical scheduler",
+)
+require(physical_scheduler, (
+    r"guard\s+deadlineNanoseconds\s*>\s*now",
+    r"let\s+remaining\s*=\s*deadlineNanoseconds\s*-\s*now",
+    r"remaining\s*<=\s*UInt64\s*\(\s*Int64\.max\s*\)",
+    r"delayNanoseconds:\s*remaining",
+    r"\[weak\s+handle\]",
+    r"handle\?\.beginCallback\s*\(\s*\)\s*==\s*true",
+    r"guard\s+handle\.install\s*\(\s*task\s*\)",
+    r"task\.cancel\s*\(\s*\)",
+), "physical scheduler")
+physical_task_factory = declaration(
+    effects,
+    r"private\s+final\s+class\s+"
+        r"ContinuousInvestigationMachineClaimServerTaskFactory\b",
+    "continuous task factory",
+)
+require(physical_task_factory, (
+    r"Duration\.nanoseconds\s*\(\s*Int64\s*\(\s*delayNanoseconds\s*\)\s*\)",
     r"Task\.detached",
-    r"ContinuousClock\s*\(\s*\)\.sleep",
-    r"let\s+status:\s*Int32\s*=\s*reason\s*==\s*"
-        r"\.postReplyExitDue\s*\?\s*0\s*:\s*71",
-), "helper physical scheduler")
+    r"ContinuousClock\s*\(\s*\)\.sleep\s*\(\s*for:\s*duration\s*\)",
+), "physical scheduler")
+
+physical_terminal = declaration(
+    effects,
+    r"package\s+final\s+class\s+"
+        r"InvestigationMachineClaimServerPhysicalTerminal\b",
+    "physical terminal",
+)
+require(physical_terminal, (
+    r"guard\s+!delivered",
+    r"if\s+reason\s*==\s*\.postReplyExitDue",
+    r"scheduleExit\s*\(\s*status:\s*0\s*,\s*"
+        r"delayNanoseconds:\s*0\s*\)",
+    r"scheduleExit\s*\(\s*status:\s*71\s*,\s*"
+        r"delayNanoseconds:\s*100_000_000\s*\)",
+), "physical terminal")
+terminal_action = declaration(
+    effects,
+    r"private\s+final\s+class\s+"
+        r"DarwinInvestigationMachineClaimServerPhysicalTerminalAction\b",
+    "Darwin physical terminal action",
+)
+require(terminal_action, (
+    r"if\s+delayNanoseconds\s*==\s*0",
+    r"queue\.async\s*\{\s*exit\s*\(\s*status\s*\)\s*\}",
+    r"queue\.asyncAfter",
+    r"exit\s*\(\s*status\s*\)",
+), "physical terminal")
+
+for forbidden in (
+    "DarwinInvestigationMachineClaimServer",
+    "InvestigationMachineClaimServerPhysicalClock",
+    "InvestigationMachineClaimServerPhysicalScheduler",
+    "InvestigationMachineClaimServerPhysicalTerminal",
+    "mach_continuous_time(",
+    "mach_timebase_info(",
+):
+    if forbidden in helper:
+        raise SystemExit(
+            f"live claim server helper retained physical adapter: {forbidden}"
+        )
 listener = declaration(
     helper, r"private\s+final\s+class\s+LifecycleMachineClaimListenerDelegate\b",
     "helper listener",
@@ -2260,8 +2436,64 @@ function verify_live_claim_server_scope() {
 from pathlib import Path
 import subprocess
 
-baseline = "17d9f1fecd670eb4ca7b7ddd92a27303c0c4bdb0"
-expected = {
+
+def verify_checkpoint(
+    baseline, expected, ceiling, label, paths_diagnostic, budget_diagnostic,
+    expected_commit=None, expected_tree=None
+):
+    descendants = subprocess.check_output(
+        ["git", "rev-list", "--ancestry-path", "--reverse", f"{baseline}..HEAD"],
+        text=True,
+    ).splitlines()
+    if descendants:
+        checkpoint = descendants[0]
+        parent = subprocess.check_output(
+            ["git", "show", "-s", "--format=%P", checkpoint], text=True
+        ).strip()
+        if parent != baseline:
+            raise SystemExit(f"{label} checkpoint is not the direct baseline child")
+        if expected_commit is not None and checkpoint != expected_commit:
+            raise SystemExit(f"{label} checkpoint commit drifted: {checkpoint}")
+        if expected_tree is not None:
+            tree = subprocess.check_output(
+                ["git", "show", "-s", "--format=%T", checkpoint],
+                text=True,
+            ).strip()
+            if tree != expected_tree:
+                raise SystemExit(f"{label} checkpoint tree drifted: {tree}")
+        diff_command = ["git", "diff", "--numstat", baseline, checkpoint, "--"]
+        name_command = ["git", "diff", "--name-only", baseline, checkpoint, "--"]
+        untracked = set()
+    else:
+        diff_command = ["git", "diff", "--numstat", baseline, "--"]
+        name_command = ["git", "diff", "--name-only", baseline, "--"]
+        untracked = set(subprocess.check_output(
+            ["git", "ls-files", "--others", "--exclude-standard"],
+            text=True,
+        ).splitlines())
+    paths = set(subprocess.check_output(name_command, text=True).splitlines()) | untracked
+    non_document = {path for path in paths if not path.startswith("docs/")}
+    if non_document != expected:
+        raise SystemExit(f"{paths_diagnostic}: {sorted(non_document)}")
+    changed_lines = 0
+    counted = set()
+    for row in subprocess.check_output(diff_command, text=True).splitlines():
+        added, deleted, path = row.split("\t")
+        if path in expected and added != "-" and deleted != "-":
+            changed_lines += int(added) + int(deleted)
+            counted.add(path)
+    for path in expected & untracked:
+        changed_lines += len(Path(path).read_text(encoding="utf-8").splitlines())
+        counted.add(path)
+    if counted != expected:
+        raise SystemExit(f"{label} checkpoint numstat drifted: {sorted(counted)}")
+    if changed_lines > ceiling:
+        raise SystemExit(
+            f"{budget_diagnostic}: {changed_lines} > {ceiling}"
+        )
+
+
+iii_b_i_expected = {
     "Stornaut.xcodeproj/project.pbxproj",
     "StornautLifecycleHelper/main.swift",
     "Sources/StornautLifecycle/LifecycleMachineRetirementEscrow.swift",
@@ -2276,44 +2508,36 @@ expected = {
     "scripts/verify-investigation-boundaries",
     "scripts/verify-contract",
 }
-descendants = subprocess.check_output(
-    ["git", "rev-list", "--ancestry-path", "--reverse", f"{baseline}..HEAD"],
-    text=True,
-).splitlines()
-if descendants:
-    checkpoint = descendants[0]
-    parent = subprocess.check_output(
-        ["git", "show", "-s", "--format=%P", checkpoint], text=True
-    ).strip()
-    if parent != baseline:
-        raise SystemExit("iii-b checkpoint is not the direct baseline child")
-    diff_command = ["git", "diff", "--numstat", baseline, checkpoint, "--"]
-    name_command = ["git", "diff", "--name-only", baseline, checkpoint, "--"]
-    untracked = set()
-else:
-    diff_command = ["git", "diff", "--numstat", baseline, "--"]
-    name_command = ["git", "diff", "--name-only", baseline, "--"]
-    untracked = set(subprocess.check_output(
-        ["git", "ls-files", "--others", "--exclude-standard"], text=True
-    ).splitlines())
-paths = set(subprocess.check_output(name_command, text=True).splitlines()) | untracked
-non_document = {path for path in paths if not path.startswith("docs/")}
-if non_document != expected:
-    raise SystemExit(f"iii-b checkpoint paths drifted: {sorted(non_document)}")
-changed_lines = 0
-counted = set()
-for row in subprocess.check_output(diff_command, text=True).splitlines():
-    added, deleted, path = row.split("\t")
-    if path in expected and added != "-" and deleted != "-":
-        changed_lines += int(added) + int(deleted)
-        counted.add(path)
-for path in expected & untracked:
-    changed_lines += len(Path(path).read_text(encoding="utf-8").splitlines())
-    counted.add(path)
-if counted != expected:
-    raise SystemExit(f"iii-b checkpoint numstat drifted: {sorted(counted)}")
-if changed_lines > 3_700:
-    raise SystemExit(f"iii-b-i checkpoint budget drifted: {changed_lines} > 3700")
+verify_checkpoint(
+    "17d9f1fecd670eb4ca7b7ddd92a27303c0c4bdb0",
+    iii_b_i_expected,
+    3_700,
+    "iii-b-i",
+    "iii-b-i checkpoint paths drifted",
+    "iii-b-i checkpoint budget drifted",
+    expected_commit="9d80821a591f4d331e66575d310cd63a3c0340e8",
+    expected_tree="c0bbf8cd95b5c8e00f63deae0ca6fa22af84d853",
+)
+
+iii_b_ii_expected = {
+    "Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerAdapter.swift",
+    "Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerEffects.swift",
+    "StornautLifecycleHelper/main.swift",
+    "Tests/StornautInvestigationTests/InvestigationMachineClaimServerAdapterTests.swift",
+    "Tests/StornautLifecycleTests/LifecycleMachineClaimXPCContractTests.swift",
+    "Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift",
+    "scripts/verify-investigation-boundaries",
+    "scripts/verify-app-release-boundaries",
+    "scripts/verify-contract",
+}
+verify_checkpoint(
+    "520bd1006bc2d9ae4aed6da129184aa664300b82",
+    iii_b_ii_expected,
+    2_200,
+    "iii-b-ii",
+    "iii-b-ii checkpoint paths drifted",
+    "iii-b-ii checkpoint budget drifted",
+)
 PY
 }
 

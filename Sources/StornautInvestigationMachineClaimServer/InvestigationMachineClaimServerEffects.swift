@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import StornautLifecycle
 
@@ -74,6 +75,335 @@ public protocol InvestigationMachineClaimServerTerminalHandling: Sendable {
 
 private enum InvestigationMachineClaimServerPublicValueError: Error {
     case invalidValue
+}
+
+package enum InvestigationMachineClaimServerPhysicalEffectError:
+    Error,
+    Sendable
+{
+    case invalidTimebase
+    case invalidContinuousTime
+    case invalidWallTime
+    case invalidDeadline
+    case taskRejected
+}
+
+package struct InvestigationMachineClaimServerPhysicalTimebase:
+    Sendable,
+    Equatable
+{
+    package let numerator: UInt64
+    package let denominator: UInt64
+
+    package init(numerator: UInt64, denominator: UInt64) throws {
+        guard numerator > 0, denominator > 0 else {
+            throw InvestigationMachineClaimServerPhysicalEffectError
+                .invalidTimebase
+        }
+        self.numerator = numerator
+        self.denominator = denominator
+    }
+}
+
+package protocol InvestigationMachineClaimServerPhysicalClockSource:
+    Sendable
+{
+    func timebase() throws -> InvestigationMachineClaimServerPhysicalTimebase
+    func continuousTicks() -> UInt64
+    func wallSecondsSince1970() -> TimeInterval
+}
+
+package struct InvestigationMachineClaimServerPhysicalClock:
+    InvestigationMachineClaimServerClock
+{
+    private let source: any InvestigationMachineClaimServerPhysicalClockSource
+
+    package init() {
+        source = DarwinInvestigationMachineClaimServerPhysicalClockSource()
+    }
+
+    package init(
+        source: any InvestigationMachineClaimServerPhysicalClockSource
+    ) {
+        self.source = source
+    }
+
+    package func observation() throws
+        -> InvestigationMachineClaimServerObservation
+    {
+        let timebase = try source.timebase()
+        let continuousNanoseconds = try Self.continuousNanoseconds(
+            ticks: source.continuousTicks(),
+            timebase: timebase
+        )
+        let wallUTCMicroseconds = try Self.wallUTCMicroseconds(
+            secondsSince1970: source.wallSecondsSince1970()
+        )
+        return try InvestigationMachineClaimServerObservation(
+            continuousNanoseconds: continuousNanoseconds,
+            wallUTCMicroseconds: wallUTCMicroseconds
+        )
+    }
+
+    package static func continuousNanoseconds(
+        ticks: UInt64,
+        timebase: InvestigationMachineClaimServerPhysicalTimebase
+    ) throws -> UInt64 {
+        let whole = (ticks / timebase.denominator)
+            .multipliedReportingOverflow(by: timebase.numerator)
+        let fractionalProduct = (ticks % timebase.denominator)
+            .multipliedReportingOverflow(by: timebase.numerator)
+        guard !whole.overflow, !fractionalProduct.overflow else {
+            throw InvestigationMachineClaimServerPhysicalEffectError
+                .invalidContinuousTime
+        }
+        let result = whole.partialValue.addingReportingOverflow(
+            fractionalProduct.partialValue / timebase.denominator
+        )
+        guard !result.overflow, result.partialValue > 0 else {
+            throw InvestigationMachineClaimServerPhysicalEffectError
+                .invalidContinuousTime
+        }
+        return result.partialValue
+    }
+
+    package static func wallUTCMicroseconds(
+        secondsSince1970: TimeInterval
+    ) throws -> Int64 {
+        let scaled = secondsSince1970 * 1_000_000
+        let rounded = scaled.rounded(.down)
+        guard
+            scaled.isFinite,
+            let value = Int64(exactly: rounded),
+            value > 0
+        else {
+            throw InvestigationMachineClaimServerPhysicalEffectError
+                .invalidWallTime
+        }
+        return value
+    }
+}
+
+private struct DarwinInvestigationMachineClaimServerPhysicalClockSource:
+    InvestigationMachineClaimServerPhysicalClockSource
+{
+    func timebase() throws
+        -> InvestigationMachineClaimServerPhysicalTimebase
+    {
+        var value = mach_timebase_info_data_t()
+        guard mach_timebase_info(&value) == KERN_SUCCESS else {
+            throw InvestigationMachineClaimServerPhysicalEffectError
+                .invalidTimebase
+        }
+        return try InvestigationMachineClaimServerPhysicalTimebase(
+            numerator: UInt64(value.numer),
+            denominator: UInt64(value.denom)
+        )
+    }
+
+    func continuousTicks() -> UInt64 { mach_continuous_time() }
+
+    func wallSecondsSince1970() -> TimeInterval {
+        Date().timeIntervalSince1970
+    }
+}
+
+package protocol InvestigationMachineClaimServerPhysicalTask: Sendable {
+    func cancel()
+}
+
+package protocol InvestigationMachineClaimServerPhysicalTaskFactory: Sendable {
+    func makeTask(
+        delayNanoseconds: UInt64,
+        callback: @escaping @Sendable () -> Void
+    ) throws -> any InvestigationMachineClaimServerPhysicalTask
+}
+
+package final class InvestigationMachineClaimServerPhysicalScheduler:
+    InvestigationMachineClaimServerScheduling,
+    @unchecked Sendable
+{
+    private final class Handle:
+        InvestigationMachineClaimServerScheduledHandle,
+        @unchecked Sendable
+    {
+        private let lock = NSLock()
+        private var task: (any InvestigationMachineClaimServerPhysicalTask)?
+        private var cancelled = false
+        private var callbackStarted = false
+
+        func install(
+            _ task: any InvestigationMachineClaimServerPhysicalTask
+        ) -> Bool {
+            lock.withLock {
+                guard self.task == nil else { return false }
+                self.task = task
+                return !cancelled
+            }
+        }
+
+        func beginCallback() -> Bool {
+            lock.withLock {
+                guard !cancelled, !callbackStarted else { return false }
+                callbackStarted = true
+                return true
+            }
+        }
+
+        func cancel() {
+            let task = lock.withLock {
+                guard !cancelled else {
+                    return nil as (any
+                        InvestigationMachineClaimServerPhysicalTask)?
+                }
+                cancelled = true
+                return self.task
+            }
+            task?.cancel()
+        }
+    }
+
+    private let clock: any InvestigationMachineClaimServerClock
+    private let taskFactory: any InvestigationMachineClaimServerPhysicalTaskFactory
+
+    package init(clock: any InvestigationMachineClaimServerClock) {
+        self.clock = clock
+        taskFactory = ContinuousInvestigationMachineClaimServerTaskFactory()
+    }
+
+    package init(
+        clock: any InvestigationMachineClaimServerClock,
+        taskFactory: any InvestigationMachineClaimServerPhysicalTaskFactory
+    ) {
+        self.clock = clock
+        self.taskFactory = taskFactory
+    }
+
+    package func schedule(
+        deadline: InvestigationMachineClaimServerDeadline,
+        callback: @escaping @Sendable () -> Void
+    ) throws -> any InvestigationMachineClaimServerScheduledHandle {
+        let now = try clock.observation().continuousNanoseconds
+        let deadlineNanoseconds = deadline.deadlineNanoseconds
+        guard deadlineNanoseconds > now else {
+            throw InvestigationMachineClaimServerPhysicalEffectError
+                .invalidDeadline
+        }
+        let remaining = deadlineNanoseconds - now
+        guard remaining <= UInt64(Int64.max) else {
+            throw InvestigationMachineClaimServerPhysicalEffectError
+                .invalidDeadline
+        }
+        let handle = Handle()
+        let task = try taskFactory.makeTask(
+            delayNanoseconds: remaining
+        ) { [weak handle] in
+            if handle?.beginCallback() == true { callback() }
+        }
+        guard handle.install(task) else {
+            task.cancel()
+            throw InvestigationMachineClaimServerPhysicalEffectError.taskRejected
+        }
+        return handle
+    }
+}
+
+private final class ContinuousInvestigationMachineClaimServerTaskFactory:
+    InvestigationMachineClaimServerPhysicalTaskFactory,
+    @unchecked Sendable
+{
+    func makeTask(
+        delayNanoseconds: UInt64,
+        callback: @escaping @Sendable () -> Void
+    ) throws -> any InvestigationMachineClaimServerPhysicalTask {
+        guard delayNanoseconds <= UInt64(Int64.max) else {
+            throw InvestigationMachineClaimServerPhysicalEffectError
+                .invalidDeadline
+        }
+        let duration = Duration.nanoseconds(Int64(delayNanoseconds))
+        let task = Task.detached {
+            do {
+                try await ContinuousClock().sleep(for: duration)
+            } catch {
+                return
+            }
+            callback()
+        }
+        return ContinuousInvestigationMachineClaimServerTask(task: task)
+    }
+}
+
+private final class ContinuousInvestigationMachineClaimServerTask:
+    InvestigationMachineClaimServerPhysicalTask,
+    @unchecked Sendable
+{
+    private let task: Task<Void, Never>
+
+    init(task: Task<Void, Never>) {
+        self.task = task
+    }
+
+    func cancel() { task.cancel() }
+}
+
+package protocol InvestigationMachineClaimServerPhysicalTerminalAction:
+    Sendable
+{
+    func scheduleExit(status: Int32, delayNanoseconds: UInt64)
+}
+
+package final class InvestigationMachineClaimServerPhysicalTerminal:
+    InvestigationMachineClaimServerTerminalHandling,
+    @unchecked Sendable
+{
+    private let action: any InvestigationMachineClaimServerPhysicalTerminalAction
+    private let lock = NSLock()
+    private var delivered = false
+
+    package init() {
+        action = DarwinInvestigationMachineClaimServerPhysicalTerminalAction()
+    }
+
+    package init(
+        action: any InvestigationMachineClaimServerPhysicalTerminalAction
+    ) {
+        self.action = action
+    }
+
+    package func handle(_ reason: InvestigationMachineClaimServerTerminalReason) {
+        let shouldDeliver = lock.withLock {
+            guard !delivered else { return false }
+            delivered = true
+            return true
+        }
+        guard shouldDeliver else { return }
+        if reason == .postReplyExitDue {
+            action.scheduleExit(status: 0, delayNanoseconds: 0)
+        } else {
+            action.scheduleExit(status: 71, delayNanoseconds: 100_000_000)
+        }
+    }
+}
+
+private final class DarwinInvestigationMachineClaimServerPhysicalTerminalAction:
+    InvestigationMachineClaimServerPhysicalTerminalAction,
+    @unchecked Sendable
+{
+    private let queue = DispatchQueue(
+        label: "com.eriklee.stornaut.lifecycle.machine-claim.terminal"
+    )
+
+    func scheduleExit(status: Int32, delayNanoseconds: UInt64) {
+        if delayNanoseconds == 0 {
+            queue.async { exit(status) }
+            return
+        }
+        queue.asyncAfter(
+            deadline: .now() + .nanoseconds(Int(delayNanoseconds))
+        ) {
+            exit(status)
+        }
+    }
 }
 
 package protocol InvestigationMachineClaimServerCoreClock: Sendable {

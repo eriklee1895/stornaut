@@ -30,6 +30,20 @@ public final class InvestigationMachineClaimServer: @unchecked Sendable {
         )
     }
 
+    public convenience init(
+        retirementEscrow: LifecycleMachineRetirementEscrow
+    ) {
+        let clock = InvestigationMachineClaimServerPhysicalClock()
+        self.init(
+            retirementEscrow: retirementEscrow,
+            clock: clock,
+            scheduler: InvestigationMachineClaimServerPhysicalScheduler(
+                clock: clock
+            ),
+            terminal: InvestigationMachineClaimServerPhysicalTerminal()
+        )
+    }
+
     public func activate() throws {
         guard lock.withLock({
             guard !activationAttempted else { return false }
