@@ -45,15 +45,18 @@ The prerequisite must separate those contracts:
 - fixture readiness gets an explicit, longer but bounded timeout;
 - a deterministic delayed-PID fixture proves the old two-second setup budget is
   insufficient;
-- the timer for the product retirement assertion starts only after the PID file
-  is observed and remains strictly below two seconds;
-- timeout still throws `.missingPID`; cleanup still kills only the exact recorded
-  fixture PID; and
+- a second observation handshake starts the product timer before allowing the
+  escaped owner to begin its six-second standard-error hold;
+- timeout still throws `.missingPID`; an independently and immediately published
+  cleanup PID identifies the still-live exact owner on every exit path; and
 - no production source, runtime timeout or containment behavior changes.
 
 ## 3. Frozen Scope and Cost
 
-Exactly one non-document path and at most 30 added-or-changed lines:
+Exactly one non-document path and at most 45 added-or-changed lines. The original
+30-line estimate was raised after independent review proved that fixed sleeps
+alone could not causally order PID publication, the retirement timer and exact
+cleanup without false-green or stale-PID windows:
 
 1. `Tests/StornautCodexTests/CodexContainedInteractiveSessionTests.swift`.
 
@@ -63,11 +66,13 @@ forces a new preflight before implementation.
 
 ## 4. Tests-First and Validation Funnel
 
-1. RED: make the escaped-standard-error fixture delay PID publication beyond two
-   seconds while retaining the existing two-second readiness helper; the exact
-   test must fail with `.missingPID` before `retire()`.
-2. GREEN: give only that readiness call an explicit longer bounded timeout and
-   keep the product retirement bound unchanged; the exact test must pass.
+1. RED: after an explicit trigger, make the escaped-standard-error fixture delay
+   PID publication beyond two seconds while retaining the existing two-second
+   readiness helper; the exact test must fail with `.missingPID` before
+   `retire()`.
+2. GREEN: give only that readiness call an explicit longer bounded timeout, then
+   start the monotonic retirement timer before a second trigger begins a
+   six-second standard-error hold. Keep the product retirement bound unchanged.
 3. Run the serialized `CodexContainedInteractiveSessionTests` suite.
 4. Run the affected serialized `StornautCodexTests` target.
 5. Obtain independent review of timeout separation, deterministic failure
@@ -92,7 +97,7 @@ privilege, model/auth, public network, Trash/Executor, readiness claim or
 | deterministic setup-side RED | delayed PID publication fails at `.missingPID` before retirement | pending |
 | bounded fixture readiness | explicit per-call startup timeout; no unbounded loop | pending |
 | preserve product performance gate | retirement timer begins after PID readiness and remains `< .seconds(2)` | pending |
-| exact cleanup | only recorded escaped PID is killed; fixture root removed | pending |
+| exact cleanup | final child immediately records a dedicated cleanup PID and remains alive until killed; fixture root removed | pending |
 | test-only scope | one allowed path, no product/source/script changes | pending |
 | independent clean evidence | focused, Codex affected, review and prerequisite-owned serial | pending |
 | no premature admission | no runtime/report/readiness/full change; ADR 0018 remains Proposed | satisfied by scope |
