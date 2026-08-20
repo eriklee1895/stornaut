@@ -4,6 +4,39 @@ import Testing
 @Suite("Task 39 trusted machine target boundary")
 struct InvestigationMachineTargetBoundaryTests {
     @Test
+    func appPeerAdmissionReturnsOnlyPackageScopedStableObservation() throws {
+        let root = URL(filePath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: root.appending(
+                path: "Sources/StornautLifecycle/LifecycleAppAuthorization.swift"
+            ),
+            encoding: .utf8
+        )
+        let boundaries = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ),
+            encoding: .utf8
+        )
+        for marker in [
+            "package struct LifecycleMachineDriverPeerAdmissionEvidence",
+            "package func authorizeAndObserveStableEvidence(",
+            "authorizeAndObserveStableEvidence(identity) != nil",
+            "This is current-peer evidence, not installer-authenticated provenance.",
+            "signingEvidence: staticEvidence",
+            "--app-peer-admission-contract-only",
+        ] {
+            #expect(source.contains(marker) || boundaries.contains(marker))
+        }
+        #expect(!source.contains(
+            "public struct LifecycleMachineDriverPeerAdmissionEvidence"
+        ))
+        #expect(!source.contains("expectedExecutableSHA256"))
+    }
+
+    @Test
     func liveClaimServerLinksOnlyTheHelperAndFreezesTheArtifactMatrix() throws {
         let root = URL(filePath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()

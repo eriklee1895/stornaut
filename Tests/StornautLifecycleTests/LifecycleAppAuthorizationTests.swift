@@ -282,7 +282,9 @@ struct LifecycleAppAuthorizationTests {
             codeSigningVerifier: verifier
         )
 
-        #expect(policy.authorize(identity))
+        let admitted = policy.authorizeAndObserveStableEvidence(identity)
+        #expect(admitted?.processIdentity == identity)
+        #expect(admitted?.signingEvidence == observation.evidence)
         #expect(
             observation.identityRequests
                 == [identity.processID, identity.processID]
@@ -301,6 +303,27 @@ struct LifecycleAppAuthorizationTests {
         #expect(
             verifier.auditTokens
                 == [identity.auditToken, identity.auditToken]
+        )
+
+        #expect(policy.authorize(identity))
+        #expect(
+            observation.identityRequests
+                == Array(repeating: identity.processID, count: 4)
+        )
+        #expect(
+            observation.executableRequests
+                == Array(repeating: identity.processID, count: 4)
+        )
+        #expect(
+            observation.signingRequests
+                == Array(
+                    repeating: contract.machineDriverExecutableURL,
+                    count: 4
+                )
+        )
+        #expect(
+            verifier.auditTokens
+                == Array(repeating: identity.auditToken, count: 4)
         )
     }
 
@@ -367,6 +390,83 @@ struct LifecycleAppAuthorizationTests {
             #expect(!policy.authorize(identity))
         }
     }
+
+    @Test
+    func machineDriverAdmissionRejectsEverySecondObservationDrift()
+        throws
+    {
+        let contract = try LifecycleLocalInstallationContract()
+        let identity = try machineDriverIdentity()
+        let signingIdentity = try LifecycleSigningIdentity(
+            signingIdentifier: contract.machineDriverSigningIdentifier,
+            designatedRequirementSHA256: digest("d"),
+            codeDirectoryHash: cdhash("4")
+        )
+        let evidence = try LifecycleBundleSigningEvidence(
+            identity: signingIdentity,
+            executableSHA256: digest("e"),
+            isAdHoc: true
+        )
+        let driftedEvidence = try LifecycleBundleSigningEvidence(
+            identity: signingIdentity,
+            executableSHA256: digest("f"),
+            isAdHoc: true
+        )
+        let validVerification = LifecycleCodeSigningVerification.verified(
+            processID: identity.processID,
+            effectiveUserID: 0,
+            signingIdentifier: signingIdentity.signingIdentifier,
+            designatedRequirementSHA256:
+                signingIdentity.designatedRequirementSHA256,
+            codeDirectoryHash: signingIdentity.codeDirectoryHash
+        )
+        let driftedIdentity = try machineDriverIdentity(processIDVersion: 99)
+        let foreignURL = URL(filePath: "/tmp/foreign-driver")
+        let fixtures = [
+            SequencedMachineDriverAdmissionFixture(
+                identities: [identity, driftedIdentity],
+                executableURLs: Array(
+                    repeating: contract.machineDriverExecutableURL,
+                    count: 2
+                ),
+                signingEvidence: Array(repeating: evidence, count: 2),
+                verifications: Array(repeating: validVerification, count: 2)
+            ),
+            SequencedMachineDriverAdmissionFixture(
+                identities: Array(repeating: identity, count: 2),
+                executableURLs: [
+                    contract.machineDriverExecutableURL,
+                    foreignURL,
+                ],
+                signingEvidence: Array(repeating: evidence, count: 2),
+                verifications: Array(repeating: validVerification, count: 2)
+            ),
+            SequencedMachineDriverAdmissionFixture(
+                identities: Array(repeating: identity, count: 2),
+                executableURLs: Array(
+                    repeating: contract.machineDriverExecutableURL,
+                    count: 2
+                ),
+                signingEvidence: [evidence, driftedEvidence],
+                verifications: Array(repeating: validVerification, count: 2)
+            ),
+            SequencedMachineDriverAdmissionFixture(
+                identities: Array(repeating: identity, count: 2),
+                executableURLs: Array(
+                    repeating: contract.machineDriverExecutableURL,
+                    count: 2
+                ),
+                signingEvidence: Array(repeating: evidence, count: 2),
+                verifications: [validVerification, .unresolved]
+            ),
+        ]
+        for fixture in fixtures {
+            #expect(
+                fixture.policy.authorizeAndObserveStableEvidence(identity)
+                    == nil
+            )
+        }
+    }
 }
 
 private final class RecordingLifecycleCodeSigningVerifier:
@@ -428,7 +528,7 @@ private final class RecordingMachineDriverObservation:
     private let lock = NSLock()
     private let identity: LifecycleProcessIdentity
     private let executableURL: URL
-    private let evidence: LifecycleBundleSigningEvidence
+    let evidence: LifecycleBundleSigningEvidence
     private(set) var identityRequests: [pid_t] = []
     private(set) var executableRequests: [pid_t] = []
     private(set) var signingRequests: [URL] = []
@@ -456,6 +556,64 @@ private final class RecordingMachineDriverObservation:
     func signingEvidence(_ url: URL) -> LifecycleBundleSigningEvidence? {
         lock.withLock { signingRequests.append(url) }
         return evidence
+    }
+}
+
+private final class LockedSequence<Value: Sendable>: @unchecked Sendable {
+    private let lock = NSLock()
+    private let values: [Value]
+    private var index = 0
+
+    init(_ values: [Value]) {
+        precondition(!values.isEmpty)
+        self.values = values
+    }
+
+    func next() -> Value {
+        lock.withLock {
+            let value = values[min(index, values.count - 1)]
+            index += 1
+            return value
+        }
+    }
+}
+
+private final class SequencedLifecycleCodeSigningVerifier:
+    LifecycleCodeSigningVerifying,
+    @unchecked Sendable
+{
+    private let results: LockedSequence<LifecycleCodeSigningVerification>
+
+    init(_ results: [LifecycleCodeSigningVerification]) {
+        self.results = LockedSequence(results)
+    }
+
+    func verify(
+        auditToken _: LifecycleAuditToken
+    ) -> LifecycleCodeSigningVerification {
+        results.next()
+    }
+}
+
+private struct SequencedMachineDriverAdmissionFixture {
+    let policy: LifecycleMachineDriverAdmissionPolicy
+
+    init(
+        identities: [LifecycleProcessIdentity],
+        executableURLs: [URL],
+        signingEvidence: [LifecycleBundleSigningEvidence],
+        verifications: [LifecycleCodeSigningVerification]
+    ) {
+        let identitySequence = LockedSequence(identities)
+        let executableSequence = LockedSequence(executableURLs)
+        let signingSequence = LockedSequence(signingEvidence)
+        policy = LifecycleMachineDriverAdmissionPolicy(
+            processIdentity: { _ in identitySequence.next() },
+            processExecutableURL: { _ in executableSequence.next() },
+            signingEvidence: { _ in signingSequence.next() },
+            codeSigningVerifier:
+                SequencedLifecycleCodeSigningVerifier(verifications)
+        )
     }
 }
 

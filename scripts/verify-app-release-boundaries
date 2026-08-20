@@ -64,6 +64,12 @@ required_fragments = (
     "claim-server two-selector surface drifted",
     "scan_status=$?",
     "if (( scan_status == 2 )); then",
+    "app_peer_adapter_forbidden_markers=(",
+    "app_peer_adapter_closed_images=(",
+    '"$debug_app/Contents/MacOS/Stornaut.debug.dylib"',
+    '"$debug_app/Contents/MacOS/__preview.dylib"',
+    'for forbidden_image in "${app_peer_adapter_closed_images[@]}"; do',
+    "App peer adapter leaked into a closed image",
 )
 missing = [
     fragment for fragment in required_fragments
@@ -94,6 +100,19 @@ def array_values(name):
     return values
 
 expected_arrays = {
+    "app_peer_adapter_forbidden_markers": [
+        "InvestigationHandoffAppLeafAdapter",
+        "InvestigationHandoffPhysicalIO",
+        "com.eriklee.stornaut.investigation-handoff-io",
+        "LOCAL_PEERTOKEN",
+    ],
+    "app_peer_adapter_closed_images": [
+        "$debug_app/Contents/MacOS/Stornaut",
+        "$debug_app/Contents/MacOS/Stornaut.debug.dylib",
+        "$debug_app/Contents/MacOS/__preview.dylib",
+        "$release_app/Contents/MacOS/Stornaut",
+        "$diagnostic_release_app/Contents/MacOS/StornautInvestigationDiagnosticReleaseShell",
+    ],
     "claim_server_module_symbols": [
         (
             "StornautInvestigationMachineClaimServer."
@@ -354,6 +373,32 @@ handoff_debug_markers=(
     'InvestigationHandoffAppLeafEntryPoint'
     'InvestigationHandoffDescriptorAdmission'
 )
+app_peer_adapter_forbidden_markers=(
+    'InvestigationHandoffAppLeafAdapter'
+    'InvestigationHandoffPhysicalIO'
+    'com.eriklee.stornaut.investigation-handoff-io'
+    'LOCAL_PEERTOKEN'
+)
+app_peer_adapter_closed_images=(
+    "$debug_app/Contents/MacOS/Stornaut"
+    "$debug_app/Contents/MacOS/Stornaut.debug.dylib"
+    "$debug_app/Contents/MacOS/__preview.dylib"
+    "$release_app/Contents/MacOS/Stornaut"
+    "$diagnostic_release_app/Contents/MacOS/StornautInvestigationDiagnosticReleaseShell"
+)
+for marker in "${app_peer_adapter_forbidden_markers[@]}"; do
+    for forbidden_image in "${app_peer_adapter_closed_images[@]}"; do
+        if mach_o_image_has_raw_string "$forbidden_image" "$marker"; then
+            print -u2 "App peer adapter leaked into a closed image: $forbidden_image: $marker"
+            exit 1
+        else
+            raw_scan_status=$?
+        fi
+        if (( raw_scan_status == 2 )); then
+            exit 1
+        fi
+    done
+done
 for marker in "${handoff_debug_markers[@]}"; do
     for forbidden_image in \
         "$debug_app/Contents/MacOS/Stornaut" \

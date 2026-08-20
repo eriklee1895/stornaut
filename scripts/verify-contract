@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=de15307d5413f1d1df605db8787906d699ae162af4e84d3981df1f3eb25f3ea4
+ib2_self_sha=3b18677cbf3a5df4ecf0d2a561a9e0c9c6f507134cccafbce1d7fed9ba671588
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -171,6 +171,14 @@ require_fixed_text scripts/verify-investigation-boundaries \
     'live claim server physical terminal drifted'
 require_fixed_text scripts/verify-investigation-boundaries \
     'live claim server helper retained physical adapter'
+require_fixed_text scripts/verify-investigation-boundaries \
+    '--app-peer-admission-contract-only'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'App peer admission policy drifted'
+require_fixed_text scripts/verify-app-release-boundaries \
+    'app_peer_adapter_forbidden_markers=('
+require_fixed_text scripts/verify-app-release-boundaries \
+    'App peer adapter leaked into a closed image'
 require_fixed_text scripts/verify-investigation-boundaries \
     'retirement handle protocol version drifted'
 require_fixed_text scripts/verify-investigation-boundaries \
@@ -848,9 +856,9 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "1c4e2993bc12ee287490dbf7ca30351fbc619192229e767ed854a54d2f00978a",
+        "5f3e38284d321de3b55755f6d0c779ffb5e626998eec1603dd08bd5b741a0506",
     Path("scripts/verify-app-release-boundaries"):
-        "6e74384710c8768c01593db0943e855e8b8dad59ceaef72a3d51a95087be742c",
+        "9e1ecb771ef3e35eba71a509a307d809771e7f9c98a11b2bd2122df050de0211",
 }
 for path, expected_sha in expected.items():
     observed_sha = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -2597,6 +2605,97 @@ require_live_claim_server_mutation_rejected live-claim-server-helper-composition
     "$contract_root/live-claim-server-helper-composition.swift" \
     'live claim server helper physical composition drifted'
 
+app_peer_gate=scripts/verify-investigation-boundaries
+app_peer_policy=Sources/StornautLifecycle/LifecycleAppAuthorization.swift
+app_peer_adapter=Sources/StornautInvestigationDiagnostic/InvestigationHandoffAppLeafAdapter.swift
+"$app_peer_gate" --app-peer-admission-contract-only \
+    "$app_peer_policy" "$app_peer_adapter" \
+    >"$contract_root/app-peer-admission-canonical.log"
+function require_app_peer_mutation_rejected() {
+    local fixture_name=$1
+    local policy_fixture=$2
+    local adapter_fixture=$3
+    local output="$contract_root/$fixture_name.log"
+    if "$app_peer_gate" --app-peer-admission-contract-only \
+        "$policy_fixture" "$adapter_fixture" >"$output" 2>&1
+    then
+        fail_contract "App peer admission mutation was accepted: $fixture_name"
+    fi
+}
+python3 - \
+    "$app_peer_policy" "$app_peer_adapter" "$contract_root" <<'PY'
+from pathlib import Path
+import sys
+
+policy_path, adapter_path, output_root = map(Path, sys.argv[1:])
+policy = policy_path.read_text(encoding="utf-8")
+adapter = adapter_path.read_text(encoding="utf-8")
+
+def mutate_once(value, old, new, name):
+    if value.count(old) != 1:
+        raise SystemExit(f"cannot construct App peer mutation: {name}")
+    return value.replace(old, new, 1)
+
+mutations = {
+    "app-peer-public.swift": (policy, "package struct LifecycleMachineDriverPeerAdmissionEvidence", "public struct LifecycleMachineDriverPeerAdmissionEvidence"),
+    "app-peer-wrapper.swift": (policy, "authorizeAndObserveStableEvidence(identity) != nil", "identity.effectiveUserID == 0"),
+    "app-peer-provenance.swift": (policy, "This is current-peer evidence, not installer-authenticated provenance.", "Stable evidence."),
+    "app-peer-second-signing.swift": (policy, "signingEvidence(contract.machineDriverExecutableURL)\n                == staticEvidence", "staticEvidence == staticEvidence"),
+    "app-peer-fd.swift": (adapter, "package static let fixedDescriptor: Int32 = 7", "package static let fixedDescriptor: Int32 = 8"),
+    "app-peer-bootstrap-window.swift": (adapter, "bootstrapWindowNanoseconds: UInt64 = 5_000_000_000", "bootstrapWindowNanoseconds: UInt64 = 6_000_000_000"),
+    "app-peer-epoch-window.swift": (adapter, "maximumEpochWindowNanoseconds: UInt64 = 140_000_000_000", "maximumEpochWindowNanoseconds: UInt64 = 141_000_000_000"),
+    "app-peer-order.swift": (adapter, "identity = try system.peerIdentity(Self.fixedDescriptor)", "identity = try system.peerIdentity(0)"),
+    "app-peer-drop-order.swift": (adapter, "system.setGroupID(identity.groupID) == 0,\n          system.setUserID(identity.userID) == 0", "system.setUserID(identity.userID) == 0,\n          system.setGroupID(identity.groupID) == 0"),
+    "app-peer-regain.swift": (adapter, "system.attemptSetEffectiveUserID(0)", "system.attemptSetEffectiveUserID(501)"),
+    "app-peer-blocking.swift": (adapter, "private static let queue = DispatchQueue(", "private static let queue = DispatchSemaphore("),
+}
+for name, (source, old, new) in mutations.items():
+    (output_root / name).write_text(
+        mutate_once(source, old, new, name), encoding="utf-8"
+    )
+PY
+for fixture in \
+    app-peer-public app-peer-wrapper app-peer-provenance app-peer-second-signing
+do
+    require_app_peer_mutation_rejected "$fixture" \
+        "$contract_root/$fixture.swift" "$app_peer_adapter"
+done
+for fixture in \
+    app-peer-fd app-peer-bootstrap-window app-peer-epoch-window app-peer-order \
+    app-peer-drop-order app-peer-regain app-peer-blocking
+do
+    require_app_peer_mutation_rejected "$fixture" \
+        "$app_peer_policy" "$contract_root/$fixture.swift"
+done
+
+real_index=$(git rev-parse --git-path index)
+"$app_peer_gate" --iib3a-staged-scope-contract-only
+for fixture in extra-path over-budget deleted-path; do
+    temporary_index="$contract_root/app-peer-$fixture.index"
+    cp "$real_index" "$temporary_index"
+    if [[ $fixture == extra-path ]]; then
+        blob=$(git rev-parse HEAD:AGENTS.md)
+        GIT_INDEX_FILE="$temporary_index" git update-index --add \
+            --cacheinfo "100644,$blob,iib3a-extra.swift"
+        expected='ii-b3a staged checkpoint paths drifted'
+    elif [[ $fixture == over-budget ]]; then
+        blob=$(git rev-parse HEAD:docs/plans/active/task-39-implementation-brief.md)
+        GIT_INDEX_FILE="$temporary_index" git update-index \
+            --cacheinfo "100644,$blob,Sources/StornautInvestigationDiagnostic/InvestigationHandoffAppLeafAdapter.swift"
+        expected='ii-b3a staged checkpoint budget drifted'
+    else
+        GIT_INDEX_FILE="$temporary_index" git rm --cached -q AGENTS.md
+        expected='ii-b3a staged checkpoint paths drifted'
+    fi
+    output="$contract_root/app-peer-$fixture.log"
+    if GIT_INDEX_FILE="$temporary_index" "$app_peer_gate" \
+        --iib3a-staged-scope-contract-only >"$output" 2>&1
+    then
+        fail_contract "App peer staged scope mutation accepted: $fixture"
+    fi
+    require_fixed_text "$output" "$expected"
+done
+
 python3 - \
     "$live_claim_server_effects" \
     "$contract_root/claim-server-terminal-authority.swift" <<'PY'
@@ -2646,12 +2745,15 @@ python3 - "$claim_server_macho_gate" \
     "$contract_root/claim-server-selector.swift" \
     "$contract_root/claim-server-fail-open.swift" \
     "$contract_root/claim-server-physical-positive.swift" \
-    "$contract_root/claim-server-physical-negative.swift" <<'PY'
+    "$contract_root/claim-server-physical-negative.swift" \
+    "$contract_root/app-peer-debug-dylib.swift" \
+    "$contract_root/app-peer-preview.swift" <<'PY'
 from pathlib import Path
 import sys
 
 source_path, helper_path, negative_path, selector_path, fail_open_path, \
-    physical_path, physical_negative_path = map(
+    physical_path, physical_negative_path, app_peer_dylib_path, \
+    app_peer_preview_path = map(
     Path, sys.argv[1:]
 )
 source = source_path.read_text(encoding="utf-8")
@@ -2704,6 +2806,16 @@ physical_negative_path.write_text(mutate_runtime(
     '"${claim_server_module_symbols[1]}"; then\n',
     "non-helper physical symbol argument fixed"
 ), encoding="utf-8")
+app_peer_dylib_path.write_text(mutate_array(
+    "app_peer_adapter_closed_images",
+    '    "$debug_app/Contents/MacOS/Stornaut.debug.dylib"\n', '',
+    "App peer Debug dylib negative omitted"
+), encoding="utf-8")
+app_peer_preview_path.write_text(mutate_array(
+    "app_peer_adapter_closed_images",
+    '    "$debug_app/Contents/MacOS/__preview.dylib"\n', '',
+    "App peer preview negative omitted"
+), encoding="utf-8")
 start = runtime.index("mach_o_image_has_demangled_symbol() {")
 end = runtime.index("\n}\n", start) + 3
 function = runtime[start:end]
@@ -2733,6 +2845,12 @@ require_claim_server_macho_mutation_rejected claim-server-physical-positive \
 require_claim_server_macho_mutation_rejected claim-server-physical-negative \
     "$contract_root/claim-server-physical-negative.swift" \
     'claim-server non-helper physical symbol scan drifted'
+require_claim_server_macho_mutation_rejected app-peer-debug-dylib \
+    "$contract_root/app-peer-debug-dylib.swift" \
+    'claim-server Mach-O array drifted: app_peer_adapter_closed_images'
+require_claim_server_macho_mutation_rejected app-peer-preview \
+    "$contract_root/app-peer-preview.swift" \
+    'claim-server Mach-O array drifted: app_peer_adapter_closed_images'
 
 # Scope/cost anti-spoofing stays executable without touching the real worktree.
 python3 - scripts/verify-investigation-boundaries <<'PY'

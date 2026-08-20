@@ -257,6 +257,22 @@ protocol LifecycleMachineDriverClaimAdmitting: Sendable {
     func authorize(_ identity: LifecycleProcessIdentity) -> Bool
 }
 
+package struct LifecycleMachineDriverPeerAdmissionEvidence:
+    Sendable,
+    Equatable
+{
+    package let processIdentity: LifecycleProcessIdentity
+    package let signingEvidence: LifecycleBundleSigningEvidence
+
+    package init(
+        processIdentity: LifecycleProcessIdentity,
+        signingEvidence: LifecycleBundleSigningEvidence
+    ) {
+        self.processIdentity = processIdentity
+        self.signingEvidence = signingEvidence
+    }
+}
+
 public struct LifecycleMachineDriverAdmissionPolicy:
     LifecycleMachineDriverClaimAdmitting,
     Sendable
@@ -303,6 +319,14 @@ public struct LifecycleMachineDriverAdmissionPolicy:
     public func authorize(
         _ identity: LifecycleProcessIdentity
     ) -> Bool {
+        authorizeAndObserveStableEvidence(identity) != nil
+    }
+
+    /// Admits one fixed root peer and returns its stable observed evidence.
+    /// This is current-peer evidence, not installer-authenticated provenance.
+    package func authorizeAndObserveStableEvidence(
+        _ identity: LifecycleProcessIdentity
+    ) -> LifecycleMachineDriverPeerAdmissionEvidence? {
         guard
             lifecycleMachineIdentityMatchesAuditToken(identity),
             identity.processID > 1,
@@ -360,9 +384,12 @@ public struct LifecycleMachineDriverAdmissionPolicy:
                     staticEvidence.identity.codeDirectoryHash
             )
         else {
-            return false
+            return nil
         }
-        return true
+        return LifecycleMachineDriverPeerAdmissionEvidence(
+            processIdentity: identity,
+            signingEvidence: staticEvidence
+        )
     }
 }
 
