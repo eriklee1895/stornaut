@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=759cdc62e29bcdb5e56f6e8b237309f270e3c6e79f9d4616e51ee8ed90ef9f12
+ib2_self_sha=74832139f7856b7912e04818925cfe5cce5791f9dde8c49a226779b923fad713
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -864,7 +864,7 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "c0a6e82245da95ff562a296366abbead8b8c20bd84d88a6781996787761530d9",
+        "b11e602911f5d83b8b2a8bdc8b053b18f3f75085bc4fe9b786bb31e04db60ec3",
     Path("scripts/verify-app-release-boundaries"):
         "42ee86284c289efce8025ae366336046a47d689838c93ac577b0bfc1ed68f92c",
 }
@@ -883,12 +883,12 @@ release = Path("scripts/verify-app-release-boundaries").read_text(
     encoding="utf-8"
 )
 for marker, count in {
-    "10369b75c15386c3ef8b9f10ca90a83cef3bcec1327455ab28394794172e011a": 1,
+    "9d9ea8f3fce000526fe65f28e424ef7fff0f6aba5cf9812bba2c55b320a709e7": 1,
     "c79ddaede80ba12941fc7acef4077756efde6c1257ea9e331c70a232b4d6cb91": 1,
     "e3c05d8766d8aa37e87a834a3f37fd71d925f1d34ac349528cee4970db9d3841": 4,
-    "e8f8fb957de87b374de5b161c3988b0b1e2f3d918d22c68c5ad6151743e6f973": 1,
+    "803a1c4fde0ff8ccf98833466d60b306a901f1e64ff5fcc034937ccf55d53c72": 1,
     "b2f3f04ca7c27db94e4833bffd106665bc41c5e6e0df3d36622c42bd4340ee38": 1,
-    "acaf77889829745673f9c1c19ff7ed1303e31a6be421099b1e6b083bce180d76": 1,
+    "37ed1c2826ecc885a692a62ea214c756546d61bff6358d232610e001120255b8": 1,
     "f182dc183a8a662eb39bdfcdd45e743d595135d68ee7488367b7f222ee53a0da": 1,
 }.items():
     observed = investigation.count(marker) + release.count(marker)
@@ -3699,9 +3699,6 @@ done
 iib5a0_source=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineClaimClient.swift
 "$iib4_gate" --iib5a0-claim-abort-contract-only \
     "$iib5a0_source" >"$contract_root/iib5a0-canonical.log"
-if ! git diff --cached --quiet HEAD -- . ':(exclude)docs/**'; then
-    "$iib4_gate" --iib5a0-staged-scope-contract-only
-fi
 python3 - "$iib5a0_source" "$contract_root" <<'PY'
 from pathlib import Path
 import sys
@@ -3752,15 +3749,12 @@ done
 
 iib5a0_index="$contract_root/iib5a0.index"
 rm -f "$iib5a0_index"
+iib5a0_commit=953d14935e9f9a19a303b92d1b6eeeb1b8619f73
 iib5a0_parent=ce048e16f5b97de694ccd5928bd940d93950aec1
-GIT_INDEX_FILE="$iib5a0_index" git read-tree "$iib5a0_parent^{tree}"
-for source_path in \
-    Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineClaimClient.swift \
-    Tests/StornautInvestigationTests/InvestigationMachineClaimClientTests.swift \
-    Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift \
-    scripts/verify-contract scripts/verify-investigation-boundaries; do
-    GIT_INDEX_FILE="$iib5a0_index" git add -f "$source_path"
-done
+iib5a0_tree=e904766917494fd34f6e3e373478a6ca3ad88054
+[[ "$(git show -s --format=%P "$iib5a0_commit")" == "$iib5a0_parent" ]]
+[[ "$(git show -s --format=%T "$iib5a0_commit")" == "$iib5a0_tree" ]]
+GIT_INDEX_FILE="$iib5a0_index" git read-tree "$iib5a0_commit^{tree}"
 GIT_INDEX_FILE="$iib5a0_index" "$iib4_gate" \
     --iib5a0-staged-scope-contract-only "$iib5a0_parent"
 for fixture in extra-path over-budget deleted-path; do
@@ -3786,6 +3780,111 @@ for fixture in extra-path over-budget deleted-path; do
         --iib5a0-staged-scope-contract-only "$iib5a0_parent" \
         >"$output" 2>&1; then
         fail_contract "ii-b5a0 scope mutation accepted: $fixture"
+    fi
+    require_fixed_text "$output" "$expected"
+done
+
+iib5a_gate=scripts/verify-investigation-boundaries
+iib5a_source=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpoch.swift
+iib5a_test=Tests/StornautInvestigationTests/InvestigationMachineSingleEpochTests.swift
+"$iib5a_gate" --iib5a-single-epoch-contract-only \
+    "$iib5a_source" "$iib5a_test" >"$contract_root/iib5a-canonical.log"
+if ! git diff --cached --quiet HEAD -- . ':(exclude)docs/**'; then
+    "$iib5a_gate" --iib5a-staged-scope-contract-only
+fi
+python3 - "$iib5a_source" "$iib5a_test" "$contract_root" <<'PY'
+from pathlib import Path
+import sys
+source_path, test_path, root = map(Path, sys.argv[1:])
+source = source_path.read_text(encoding="utf-8")
+test = test_path.read_text(encoding="utf-8")
+
+def mutation(name, old, new, text=source):
+    if text.count(old) != 1:
+        raise SystemExit(f"cannot construct ii-b5a mutation: {name}")
+    (root / f"iib5a-{name}.swift").write_text(
+        text.replace(old, new, 1), encoding="utf-8"
+    )
+
+mutation("public-owner", "package actor InvestigationMachineSingleEpochComposer",
+    "public actor InvestigationMachineSingleEpochComposer")
+mutation("codable-result", "InvestigationMachineSingleEpochResult: Sendable, Equatable {",
+    "InvestigationMachineSingleEpochResult: Sendable, Equatable, Codable {")
+mutation("dependency", "import Foundation\n",
+    "import Foundation\nimport StornautLifecycle\n")
+mutation("physical-authority", "import Foundation\n",
+    "import Foundation\nprivate let forbidden = socketpair(0, 0, 0, nil)\n")
+mutation("caller-deadline", "package func run() async throws",
+    "package func run(deadline: UInt64) async throws")
+mutation("alias-factory", "let createdClaimClient = claimClientFactory.make()",
+    "let make = claimClientFactory.make\n            let createdClaimClient = make()")
+mutation("string-camouflage", "do { try await claimClient.abortAfterClaimAndProveTerminal() }",
+    "do { _ = \"try await claimClient.abortAfterClaimAndProveTerminal()\" }")
+mutation("sender-resample", "sender: sender, payload: payload",
+    "sender: session.driverClaim, payload: payload")
+mutation("post-await-cancel", "frame = try await session.receive()\n            try Task.checkCancellation()",
+    "frame = try await session.receive()")
+mutation("self-oracle-test", "#expect(runtime.trace.events == SingleEpochEvent.successOrder)",
+    "#expect(true)", text=test)
+PY
+for fixture in \
+    public-owner:'ii-b5a public surface drifted' \
+    codable-result:'ii-b5a authority or non-admission surface drifted' \
+    dependency:'ii-b5a dependency surface drifted' \
+    physical-authority:'ii-b5a authority or non-admission surface drifted' \
+    caller-deadline:'ii-b5a canonical composer source drifted' \
+    alias-factory:'ii-b5a canonical composer source drifted' \
+    string-camouflage:'ii-b5a canonical composer source drifted' \
+    sender-resample:'ii-b5a canonical composer source drifted' \
+    post-await-cancel:'ii-b5a canonical composer source drifted' \
+    self-oracle-test:'ii-b5a canonical focused test source drifted'; do
+    name=${fixture%%:*}; expected=${fixture#*:}
+    output="$contract_root/iib5a-$name.log"
+    target="$contract_root/iib5a-$name.swift"
+    xcrun swiftc -frontend -parse "$target"
+    composer="$iib5a_source"; focused="$iib5a_test"
+    [[ $name == self-oracle-test ]] && focused="$target" || composer="$target"
+    if "$iib5a_gate" --iib5a-single-epoch-contract-only \
+        "$composer" "$focused" >"$output" 2>&1; then
+        fail_contract "ii-b5a mutation accepted: $name"
+    fi
+    require_fixed_text "$output" "$expected"
+done
+
+iib5a_commit=f9e8c802ff9543c1d0d6bdcdcc42a2f2ba0a7a4d
+iib5a_tree=1f8fe98c9b622da8cd4ed9cc42177cb0138b84e0
+[[ "$(git show -s --format=%T "$iib5a_commit")" == "$iib5a_tree" ]]
+iib5a_index="$contract_root/iib5a.index"
+GIT_INDEX_FILE="$iib5a_index" git read-tree "$iib5a_commit^{tree}"
+for checkpoint_path in "$iib5a_source" "$iib5a_test" \
+    Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift \
+    scripts/verify-contract scripts/verify-investigation-boundaries; do
+    GIT_INDEX_FILE="$iib5a_index" git add -f "$checkpoint_path"
+done
+GIT_INDEX_FILE="$iib5a_index" "$iib5a_gate" \
+    --iib5a-staged-scope-contract-only "$iib5a_commit"
+for fixture in extra-path over-budget deleted-path binary-numstat; do
+    index="$contract_root/iib5a-$fixture.index"; cp "$iib5a_index" "$index"
+    if [[ $fixture == extra-path ]]; then
+        blob=$(git rev-parse "${iib5a_commit}:AGENTS.md")
+        GIT_INDEX_FILE="$index" git update-index --add --cacheinfo "100644,$blob,iib5a-extra.swift"
+        expected='ii-b5a checkpoint paths drifted'
+    elif [[ $fixture == over-budget ]]; then
+        blob=$(git rev-parse "${iib5a_commit}:docs/plans/active/task-39-implementation-brief.md")
+        GIT_INDEX_FILE="$index" git update-index --cacheinfo "100644,$blob,$iib5a_source"
+        expected='ii-b5a checkpoint budget drifted'
+    elif [[ $fixture == deleted-path ]]; then
+        GIT_INDEX_FILE="$index" git rm --cached -q "$iib5a_test"
+        expected='ii-b5a staged checkpoint deleted a required path'
+    else
+        blob=$(git rev-parse "${iib5a_commit}:Tests/Fixtures/Snapshots/design-system.empty-state.dark.en.png")
+        GIT_INDEX_FILE="$index" git update-index --add --cacheinfo "100644,$blob,$iib5a_source"
+        expected='ii-b5a binary checkpoint path rejected'
+    fi
+    output="$contract_root/iib5a-$fixture.log"
+    if GIT_INDEX_FILE="$index" "$iib5a_gate" \
+        --iib5a-staged-scope-contract-only "$iib5a_commit" >"$output" 2>&1; then
+        fail_contract "ii-b5a scope mutation accepted: $fixture"
     fi
     require_fixed_text "$output" "$expected"
 done
