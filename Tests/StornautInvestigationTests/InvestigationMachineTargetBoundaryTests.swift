@@ -1019,6 +1019,32 @@ struct InvestigationMachineTargetBoundaryTests {
         }
     }
 
+    @Test func iiB5BIB3PinsAuthorityClosedInstalledObserverComposition() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let sources = try [
+            "scripts/verify-investigation-boundaries", "scripts/verify-contract",
+        ].map { try String(contentsOf: root.appending(path: $0), encoding: .utf8) }
+        for marker in [
+            "--iib5bib3-observer-contract-only",
+            "--iib5bib3-staged-scope-contract-only",
+            "ii-b5b-i-b3 observer authority drifted",
+            "ii-b5b-i-b3 composition order drifted",
+            "ii-b5b-i-b3 checkpoint budget drifted",
+        ] {
+            #expect(sources[0].contains(marker))
+        }
+        for marker in [
+            "claim-input:'ii-b5b-i-b3",
+            "reader-order:'ii-b5b-i-b3",
+            "clock-order:'ii-b5b-i-b3",
+            "vacuous-test:'ii-b5b-i-b3",
+            "binary-numstat",
+        ] {
+            #expect(sources[1].contains(marker))
+        }
+    }
+
     @Test
     func nativeMachineDriverPackagingIsDiagnosticOnly() throws {
         let repositoryRoot = URL(filePath: #filePath)

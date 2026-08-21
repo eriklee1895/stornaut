@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=f3d265e0754bd857bfb35f94087934777107ff62a601602575616188702bbff1
+ib2_self_sha=91e5513f67e314cb03c31b416d82b0add8a06434e735a652876276d79fed5e50
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -864,7 +864,7 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "d31ba5c02bc479cd723174466104d394eb6b64d8267c7abe88a0d4aba9efd156",
+        "f9d6f9aae902293759210388fe5bfaac1d880c0a1a5fa20467e5f550c5f242fb",
     Path("scripts/verify-app-release-boundaries"):
         "42ee86284c289efce8025ae366336046a47d689838c93ac577b0bfc1ed68f92c",
 }
@@ -4288,6 +4288,50 @@ for fixture in extra-path over-budget existing-deleted-path binary-numstat; do
  elif [[ $fixture == existing-deleted-path ]]; then GIT_INDEX_FILE="$index" git rm --cached -q -f Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift; expected='ii-b5b-i-b2b-b checkpoint deleted an existing path'
  else blob=$(git rev-parse "${iib5bib2bb_baseline}:Tests/Fixtures/Snapshots/design-system.empty-state.dark.en.png"); GIT_INDEX_FILE="$index" git update-index --cacheinfo "100644,$blob,Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift"; expected='ii-b5b-i-b2b-b binary checkpoint path rejected'; fi
  output="$contract_root/iib5bib2bb-scope-$fixture.log"; if GIT_INDEX_FILE="$index" "$iib5bib2bb_gate" --iib5bib2bb-staged-scope-contract-only "$iib5bib2bb_baseline" >"$output" 2>&1; then fail_contract "ii-b5b-i-b2b-b scope mutation accepted: $fixture"; fi; require_fixed_text "$output" "$expected"
+done
+
+iib5bib3_gate=scripts/verify-investigation-boundaries
+iib5bib3_source=Sources/StornautInvestigationInstalledL2/InstalledL2Observer.swift
+iib5bib3_test=Tests/StornautInvestigationTests/InstalledL2ObserverTests.swift
+"$iib5bib3_gate" --iib5bib3-observer-contract-only "$iib5bib3_source" "$iib5bib3_test"
+python3 - "$iib5bib3_source" "$iib5bib3_test" "$contract_root" <<'PY'
+from pathlib import Path
+import sys
+source_path,test_path,root=map(Path,sys.argv[1:]); source=source_path.read_text(); test=test_path.read_text()
+def emit(name,old,new,text=source):
+    if text.count(old)!=1: raise SystemExit(f"cannot construct ii-b5b-i-b3 mutation: {name}")
+    (root/f"iib5bib3-{name}.swift").write_text(text.replace(old,new,1))
+emit("claim-input","expectedHelper: InvestigationMachineProcessIdentity\n    ) throws","expectedHelper: InvestigationMachineProcessIdentity,\n        claimEvidence: InvestigationMachineClaimEvidence\n    ) throws")
+emit("reader-order","processReader.observeApp(expected: expectedApp)","processReader.observeHelper(expected: expectedHelper)")
+emit("clock-order","let observed = try sampleClock()","let observed = started")
+emit("process-authority","import Foundation\n","import Foundation\nprivate let forbiddenProcess = Process()\n")
+emit("public-surface","package struct InvestigationInstalledL2Observer: Sendable","public struct InvestigationInstalledL2Observer: Sendable")
+emit("vacuous-test","#expect(trace.events == [\n            .clock, .artifacts, .app, .helper, .driver, .service, .clock,\n        ])","#expect(true)",test)
+PY
+for fixture in \
+    claim-input:'ii-b5b-i-b3 observer authority drifted' \
+    reader-order:'ii-b5b-i-b3 composition order drifted' \
+    clock-order:'ii-b5b-i-b3 composition order drifted' \
+    process-authority:'ii-b5b-i-b3 observer authority drifted' \
+    public-surface:'ii-b5b-i-b3 observer surface widened' \
+    vacuous-test:'ii-b5b-i-b3 canonical source drifted'; do
+    name=${fixture%%:*}; expected=${fixture#*:}; source="$iib5bib3_source"; test="$iib5bib3_test"
+    [[ $name == vacuous-test ]] && test="$contract_root/iib5bib3-$name.swift" || source="$contract_root/iib5bib3-$name.swift"
+    output="$contract_root/iib5bib3-$name.log"
+    if "$iib5bib3_gate" --iib5bib3-observer-contract-only "$source" "$test" >"$output" 2>&1; then fail_contract "ii-b5b-i-b3 mutation accepted: $name"; fi
+    require_fixed_text "$output" "$expected"
+done
+iib5bib3_baseline=f233263
+iib5bib3_index="$contract_root/iib5bib3.index"; GIT_INDEX_FILE="$iib5bib3_index" git read-tree "$iib5bib3_baseline^{tree}"
+for p in "$iib5bib3_source" "$iib5bib3_test" Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift scripts/verify-contract scripts/verify-investigation-boundaries; do GIT_INDEX_FILE="$iib5bib3_index" git add -f "$p"; done
+GIT_INDEX_FILE="$iib5bib3_index" "$iib5bib3_gate" --iib5bib3-staged-scope-contract-only "$iib5bib3_baseline"
+for fixture in extra-path over-budget existing-deleted-path binary-numstat; do
+ index="$contract_root/iib5bib3-$fixture.index"; cp "$iib5bib3_index" "$index"
+ if [[ $fixture == extra-path ]]; then blob=$(git rev-parse "${iib5bib3_baseline}:AGENTS.md"); GIT_INDEX_FILE="$index" git update-index --add --cacheinfo "100644,$blob,iib5bib3-extra.swift"; expected='ii-b5b-i-b3 checkpoint paths drifted'
+ elif [[ $fixture == over-budget ]]; then blob=$(git hash-object -w Sources/StornautCore/Evidence/EvidenceStore.swift); GIT_INDEX_FILE="$index" git update-index --cacheinfo "100644,$blob,$iib5bib3_source"; expected='ii-b5b-i-b3 checkpoint budget drifted'
+ elif [[ $fixture == existing-deleted-path ]]; then GIT_INDEX_FILE="$index" git rm --cached -q -f Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift; expected='ii-b5b-i-b3 checkpoint deleted an existing path'
+ else blob=$(git rev-parse "${iib5bib3_baseline}:Tests/Fixtures/Snapshots/design-system.empty-state.dark.en.png"); GIT_INDEX_FILE="$index" git update-index --cacheinfo "100644,$blob,Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift"; expected='ii-b5b-i-b3 binary checkpoint path rejected'; fi
+ output="$contract_root/iib5bib3-scope-$fixture.log"; if GIT_INDEX_FILE="$index" "$iib5bib3_gate" --iib5bib3-staged-scope-contract-only "$iib5bib3_baseline" >"$output" 2>&1; then fail_contract "ii-b5b-i-b3 scope mutation accepted: $fixture"; fi; require_fixed_text "$output" "$expected"
 done
 
 print "Verifier mode and CI contract verification passed."

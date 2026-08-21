@@ -81,6 +81,11 @@ iib5bib2bb_service_source=
 iib5bib2bb_focused_test_source=
 iib5bib2bb_staged_scope_contract_only=false
 iib5bib2bb_staged_scope_baseline=HEAD
+iib5bib3_observer_contract_only=false
+iib5bib3_observer_source=
+iib5bib3_focused_test_source=
+iib5bib3_staged_scope_contract_only=false
+iib5bib3_staged_scope_baseline=HEAD
 iib3a_staged_scope_contract_only=false
 iib3a_staged_scope_baseline=HEAD
 iib3b_start_retire_contract_only=false
@@ -215,6 +220,15 @@ if (( $# > 0 )); then
         && [[ $1 == --iib5bib2bb-staged-scope-contract-only ]]; then
         iib5bib2bb_staged_scope_contract_only=true
         iib5bib2bb_staged_scope_baseline=${2:-HEAD}
+    elif (( $# == 3 )) \
+        && [[ $1 == --iib5bib3-observer-contract-only ]]; then
+        iib5bib3_observer_contract_only=true
+        iib5bib3_observer_source=$2
+        iib5bib3_focused_test_source=$3
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iib5bib3-staged-scope-contract-only ]]; then
+        iib5bib3_staged_scope_contract_only=true
+        iib5bib3_staged_scope_baseline=${2:-HEAD}
     elif (( $# == 1 || $# == 2 )) \
         && [[ $1 == --iib3a-staged-scope-contract-only ]]; then
         iib3a_staged_scope_contract_only=true
@@ -1083,6 +1097,46 @@ function verify_iib5bib2bb_staged_scope() {
     [[ "${(j:\n:)${(on)observed}}" == "${(j:\n:)${(on)expected}}" ]] || { print -u2 "ii-b5b-i-b2b-b checkpoint paths drifted"; return 1; }
     local changed=$(git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1 {n+=$1+$2} END {print n+0}')
     (( changed <= 1300 )) || { print -u2 "ii-b5b-i-b2b-b checkpoint budget drifted"; return 1; }
+}
+
+function verify_iib5bib3_observer_contract() {
+    local observer_source=$1 focused_test=$2
+    xcrun swiftc -frontend -parse "$observer_source"
+    xcrun swiftc -frontend -parse "$focused_test"
+    python3 - "$observer_source" "$focused_test" <<'PY'
+from pathlib import Path
+import hashlib,re,sys
+source_path,test_path=map(Path,sys.argv[1:])
+source,test=[p.read_text(encoding="utf-8") for p in (source_path,test_path)]
+if set(re.findall(r'(?m)^import\s+([A-Za-z0-9_]+)\s*$',source)) != {"Darwin","Foundation","StornautInvestigationHandoffContract"}: raise SystemExit("ii-b5b-i-b3 observer imports drifted")
+package_declarations=re.findall(r'(?m)^package\s+(?:struct|enum|protocol|actor|class|func|extension)\s+([A-Za-z0-9_]+)',source)
+if package_declarations != ["InvestigationInstalledL2Observer"]: raise SystemExit("ii-b5b-i-b3 observer surface widened")
+for forbidden in ("InvestigationMachineClaimEvidence","InvestigationHandoffRetirementHandle","deadlineNanoseconds","releaseDeadline","NSXPC","URLSession","FileHandle","FileManager","posix_spawn","kill(","signal(","write(","socket(","connect(","Task {","Task.detached","async ","await "):
+    if forbidden in source: raise SystemExit("ii-b5b-i-b3 observer authority drifted")
+if re.search(r'(?<![A-Za-z0-9_])Process\s*\(',source): raise SystemExit("ii-b5b-i-b3 observer authority drifted")
+for required in ("package struct InvestigationInstalledL2Observer: Sendable","package init()","package func observe(","InvestigationInstalledL2ArtifactReader()","InvestigationInstalledL2ProcessReader()","InvestigationInstalledL2FixedServiceReader()","InvestigationInstalledL2DarwinClock()","mach_continuous_time()","mach_timebase_info(&timebase)","InvestigationInstalledL2SemanticContract.evaluate("):
+    if required not in source: raise SystemExit("ii-b5b-i-b3 observer contract drifted")
+order=["let started = try sampleClock()","let artifacts = try readArtifacts(projection: projection)","processReader.observeApp(expected: expectedApp)","processReader.observeHelper(expected: expectedHelper)","processReader.observeCurrentMachineDriverSigning()","serviceReader.observe(expectedHelper: expectedHelper)","let observed = try sampleClock()","InvestigationInstalledL2SemanticContract.evaluate("]
+positions=[source.find(marker) for marker in order]
+if any(position < 0 for position in positions) or positions != sorted(positions): raise SystemExit("ii-b5b-i-b3 composition order drifted")
+if source.count("processReader.observeApp(expected: expectedApp)") != 1 or source.count("processReader.observeHelper(expected: expectedHelper)") != 1 or source.count("processReader.observeCurrentMachineDriverSigning()") != 1 or source.count("serviceReader.observe(expectedHelper: expectedHelper)") != 1: raise SystemExit("ii-b5b-i-b3 reader cardinality drifted")
+for required in ("darwinClockProducesOrderedPositiveSamples","composesEachFixedReaderOnceBetweenPairedClockSamples","everyPhysicalFailureStopsBeforeLaterReaders","processIdentityAndFixedPathAreRecheckedAtComposition","semanticDriftNeverProducesAnInstalledObservation","wrongInputRolesAreRejectedBeforeClockOrPhysicalReads"):
+    if required not in test: raise SystemExit("ii-b5b-i-b3 focused coverage drifted")
+expected={source_path:"05da8bd10712f769137c6c73158755e46fce17cc18650dce4508b31edc8c04b5",test_path:"740e80d5b23a2d3bbf75acb61fef6e6bc9dab9e7d0af03cb42245eb1dde4aefa"}
+for path,digest in expected.items():
+    if hashlib.sha256(path.read_bytes()).hexdigest()!=digest: raise SystemExit("ii-b5b-i-b3 canonical source drifted")
+PY
+}
+
+function verify_iib5bib3_staged_scope() {
+    local baseline=${1:-HEAD}
+    local expected=(Sources/StornautInvestigationInstalledL2/InstalledL2Observer.swift Tests/StornautInvestigationTests/InstalledL2ObserverTests.swift Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift scripts/verify-contract scripts/verify-investigation-boundaries)
+    if git diff --cached --name-only --diff-filter=D "$baseline" | grep -q .; then print -u2 "ii-b5b-i-b3 checkpoint deleted an existing path"; return 1; fi
+    if git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1 && ($1=="-" || $2=="-") {found=1} END {exit !found}'; then print -u2 "ii-b5b-i-b3 binary checkpoint path rejected"; return 1; fi
+    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" | awk 'index($0,"docs/")!=1')"})
+    [[ "${(j:\n:)${(on)observed}}" == "${(j:\n:)${(on)expected}}" ]] || { print -u2 "ii-b5b-i-b3 checkpoint paths drifted"; return 1; }
+    local changed=$(git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1 {n+=$1+$2} END {print n+0}')
+    (( changed <= 1600 )) || { print -u2 "ii-b5b-i-b3 checkpoint budget drifted"; return 1; }
 }
 
 function verify_iib4_staged_scope() {
@@ -4177,6 +4231,16 @@ fi
 if $iib5bib2bb_staged_scope_contract_only; then
     verify_iib5bib2bb_staged_scope "$iib5bib2bb_staged_scope_baseline"
     print "ii-b5b-i-b2b-b staged scope verification passed."
+    exit 0
+fi
+if $iib5bib3_observer_contract_only; then
+    verify_iib5bib3_observer_contract "$iib5bib3_observer_source" "$iib5bib3_focused_test_source"
+    print "ii-b5b-i-b3 observer contract verification passed."
+    exit 0
+fi
+if $iib5bib3_staged_scope_contract_only; then
+    verify_iib5bib3_staged_scope "$iib5bib3_staged_scope_baseline"
+    print "ii-b5b-i-b3 staged scope verification passed."
     exit 0
 fi
 if $iib3a_staged_scope_contract_only; then
