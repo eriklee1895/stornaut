@@ -13,7 +13,6 @@ final class LifecycleTopologyCollectorFixture: @unchecked Sendable {
     let userID: UInt32 = 501
     let appIdentity: LifecycleProcessIdentity
     let helperIdentity: LifecycleProcessIdentity
-    let binding: LifecycleRootTopologyBinding
     let signedBinding: SignedInvestigationRuntimeBinding
     let root: URL
     let configuration: SignedInvestigationRuntimeDiagnosticConfiguration
@@ -54,47 +53,6 @@ final class LifecycleTopologyCollectorFixture: @unchecked Sendable {
             processIDVersion: 12,
             auditSessionID: 33_001,
             effectiveUserID: 0
-        )
-        let appSigning = try LifecycleSigningIdentity(
-            signingIdentifier: contract.appBundleIdentifier,
-            designatedRequirementSHA256:
-                String(repeating: "a", count: 64),
-            codeDirectoryHash: String(repeating: "1", count: 40)
-        )
-        let helperSigning = try LifecycleSigningIdentity(
-            signingIdentifier:
-                "com.eriklee.stornaut.lifecycle.helper",
-            designatedRequirementSHA256:
-                String(repeating: "b", count: 64),
-            codeDirectoryHash: String(repeating: "2", count: 40)
-        )
-        let machineDriverSigning = try LifecycleSigningIdentity(
-            signingIdentifier:
-                contract.machineDriverSigningIdentifier,
-            designatedRequirementSHA256:
-                String(repeating: "9", count: 64),
-            codeDirectoryHash: String(repeating: "3", count: 40)
-        )
-        binding = try LifecycleRootTopologyBinding(
-            appSigningEvidence: try LifecycleBundleSigningEvidence(
-                identity: appSigning,
-                executableSHA256: String(repeating: "c", count: 64),
-                isAdHoc: true
-            ),
-            helperSigningEvidence: try LifecycleBundleSigningEvidence(
-                identity: helperSigning,
-                executableSHA256: String(repeating: "d", count: 64),
-                isAdHoc: true
-            ),
-            machineDriverSigningEvidence:
-                try LifecycleBundleSigningEvidence(
-                    identity: machineDriverSigning,
-                    executableSHA256:
-                        String(repeating: "8", count: 64),
-                    isAdHoc: true
-                ),
-            appBundleIdentifier: contract.appBundleIdentifier,
-            helperServiceIdentifier: contract.label
         )
         signedBinding = SignedInvestigationRuntimeBinding(
             repositoryHEAD: String(repeating: "1", count: 40),
@@ -158,7 +116,9 @@ final class LifecycleTopologyCollectorFixture: @unchecked Sendable {
         )
     }
 
-    func retirementClaimStore() async throws
+    func retirementClaimStore(
+        helperPeerIdentityOverride: LifecycleProcessIdentity? = nil
+    ) async throws
         -> InvestigationMachineRetirementClaimStore
     {
         let now = clock.read()
@@ -205,21 +165,31 @@ final class LifecycleTopologyCollectorFixture: @unchecked Sendable {
                 investigationArtifactCount: 0
             )
         )
-        let claimant = try InvestigationMachineRetirementClaimant(
-            source: CollectorMachineClaimSource(
+        let claim: InvestigationMachineRetirementClaim
+        if let helperPeerIdentityOverride {
+            claim = InvestigationMachineRetirementClaim(
                 response: response,
-                helperIdentity: helperIdentity
-            ),
-            signingVerifier: CollectorHelperSigningVerifier(),
-            effectiveUserID: { 0 },
-            now: { claimIssuedAt },
-            challenge: { request.challengeNonce },
-            configuration: configuration,
-            expectedAppIdentity: try machineRecord(appIdentity),
-            expectedUserID: userID
-        )
+                helperPeerIdentity: helperPeerIdentityOverride,
+                helperPeerAttestedAt: claimIssuedAt
+            )
+        } else {
+            let claimant = try InvestigationMachineRetirementClaimant(
+                source: CollectorMachineClaimSource(
+                    response: response,
+                    helperIdentity: helperIdentity
+                ),
+                signingVerifier: CollectorHelperSigningVerifier(),
+                effectiveUserID: { 0 },
+                now: { claimIssuedAt },
+                challenge: { request.challengeNonce },
+                configuration: configuration,
+                expectedAppIdentity: try machineRecord(appIdentity),
+                expectedUserID: userID
+            )
+            claim = try await claimant.claim(handle: handle)
+        }
         let store = InvestigationMachineRetirementClaimStore()
-        try await store.record(try await claimant.claim(handle: handle))
+        try await store.record(claim)
         return store
     }
 
@@ -320,7 +290,7 @@ final class LifecycleTopologyCollectorFixture: @unchecked Sendable {
     }
 
     private func topologyObservation(
-        processResults: [LifecycleRootTopologyProcessReadResult] = [
+        processResults: [LifecycleRootTopologyProcessObservation] = [
             .absent, .absent,
         ],
         serviceResult: LifecycleRootTopologyServiceProbeResult = .absent
@@ -329,7 +299,7 @@ final class LifecycleTopologyCollectorFixture: @unchecked Sendable {
         return try LifecycleRootTopologyObserver(
             artifactReader: FixedTopologyArtifactReader(),
             processReader: ScriptedTopologyProcessReader(
-                results: processResults
+                observations: processResults
             ),
             serviceProbe: FixedTopologyServiceProbe(
                 result: serviceResult
@@ -337,7 +307,6 @@ final class LifecycleTopologyCollectorFixture: @unchecked Sendable {
             now: { now }
         ).observe(
             try LifecycleRootTopologyObservationRequest(
-                binding: binding,
                 appProcessIdentity: appIdentity,
                 helperProcessIdentity: helperIdentity,
                 window: LifecycleRootTopologyObservationWindow(
@@ -370,32 +339,32 @@ final class LifecycleTopologyCollectorFixture: @unchecked Sendable {
 }
 
 private struct FixedTopologyArtifactReader:
-    LifecycleRootTopologyArtifactReading
+    LifecycleRootTopologyArtifactAbsenceReading
 {
-    func observe(
+    func observeAbsence(
         _ role: LifecycleRootTopologyArtifactRole,
-        contract _: LifecycleLocalInstallationContract,
-        binding _: LifecycleRootTopologyBinding
+        contract _: LifecycleLocalInstallationContract
     ) -> LifecycleRootTopologyArtifactObservation {
         .absent
     }
 }
 
 private final class ScriptedTopologyProcessReader:
-    LifecycleRootTopologyProcessReading,
+    LifecycleRootTopologyProcessAbsenceReading,
     @unchecked Sendable
 {
     private let lock = NSLock()
-    private var results: [LifecycleRootTopologyProcessReadResult]
+    private var observations: [LifecycleRootTopologyProcessObservation]
 
-    init(results: [LifecycleRootTopologyProcessReadResult]) {
-        self.results = results
+    init(observations: [LifecycleRootTopologyProcessObservation]) {
+        self.observations = observations
     }
 
-    func read(
-        processID _: pid_t
-    ) -> LifecycleRootTopologyProcessReadResult {
-        lock.withLock { results.removeFirst() }
+    func observeAbsence(
+        of expectedIdentity: LifecycleProcessIdentity
+    ) -> LifecycleRootTopologyProcessObservation {
+        let _ = expectedIdentity
+        return lock.withLock { observations.removeFirst() }
     }
 }
 

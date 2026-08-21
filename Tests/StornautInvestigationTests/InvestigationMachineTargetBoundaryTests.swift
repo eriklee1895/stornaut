@@ -1128,7 +1128,7 @@ struct InvestigationMachineTargetBoundaryTests {
             "struct DarwinInvestigationLifecyclePostTeardownObserver"
         ))
         #expect(collector.contains(
-            "struct PostTeardownExpectedTopologyBindingReader"
+            "protocol InvestigationLifecyclePostTeardownObserving"
         ))
         #expect(serviceProbe.contains(
             "struct DarwinPostTeardownLifecycleServiceProbe"
@@ -1202,6 +1202,112 @@ struct InvestigationMachineTargetBoundaryTests {
             separatedBy: "InvestigationInstalledL2Observer()"
         ).count == 2)
         #expect(installedJoin.contains("InvestigationInstalledL2Observer()"))
+    }
+
+    @Test func iiB5BIC2BLeavesOnePhysicalInstalledEvidenceOwner() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let lifecycle = try String(
+            contentsOf: root.appending(
+                path: "Sources/StornautLifecycle/"
+                    + "LifecycleRootTopologyObservation.swift"
+            ),
+            encoding: .utf8
+        )
+        let darwin = try String(
+            contentsOf: root.appending(
+                path: "Sources/StornautLifecycle/"
+                    + "DarwinRootTopologySupport.swift"
+            ),
+            encoding: .utf8
+        )
+        let collector = try String(
+            contentsOf: root.appending(
+                path: "Sources/StornautInvestigationMachine/"
+                    + "InvestigationLifecycleTopologyCollector.swift"
+            ),
+            encoding: .utf8
+        )
+
+        for required in [
+            "case present",
+            "protocol LifecycleRootTopologyArtifactAbsenceReading",
+            "protocol LifecycleRootTopologyProcessAbsenceReading",
+            "artifactReader.observeAbsence(",
+            "processReader.observeAbsence(",
+        ] {
+            #expect(lifecycle.contains(required))
+        }
+        for forbidden in [
+            "LifecycleRootTopologyBinding",
+            "LifecycleRootTopologyProcessSnapshot",
+            "LifecycleRootTopologyProcessReadResult",
+            "presentValid",
+            "case invalid(reasonKey:",
+            "rootTopologyIdentifier",
+            "binding:",
+        ] {
+            #expect(!lifecycle.contains(forbidden))
+        }
+
+        for required in [
+            "struct DarwinRootTopologyArtifactAbsenceReader:",
+            "struct DarwinRootTopologyProcessAbsenceReader:",
+            "case .failure(let error) where error.errno == ENOENT:",
+            "case .failure(.identityUnavailable(let code)) where code == ESRCH:",
+            "case .success(let identity) where identity == expectedIdentity:",
+        ] {
+            #expect(darwin.contains(required))
+        }
+        for forbidden in [
+            "import CryptoKit",
+            "DarwinRootTopologyArtifactReader",
+            "DarwinRootTopologyProcessReader",
+            "LifecycleRootTopologySigningEvidenceReading",
+            "LifecycleRootTopologyManifestReading",
+            "LifecycleRootTopologyProcessExecutableReading",
+            "proc_pidpath",
+            "SecurityLifecycleCodeSigningVerifier",
+        ] {
+            #expect(!darwin.contains(forbidden))
+        }
+
+        for required in [
+            "postTeardownObserver.observePostTeardown(",
+            "appProcessIdentity: request.appProcessIdentity",
+            "helperProcessIdentity:",
+            "retirementClaim.helperPeerIdentity",
+            "post.startedAt >= transitionedAt",
+        ] {
+            #expect(collector.contains(required))
+        }
+        for forbidden in [
+            "bindingMismatch",
+            "InvestigationLifecyclePostTeardownBindingReading",
+            "PostTeardownExpectedTopologyBindingReader",
+            "expectedBindingReader",
+            "topologyBinding",
+            "LifecycleBundleSigningIdentityReader",
+        ] {
+            #expect(!collector.contains(forbidden))
+        }
+
+        let production = try (FileManager.default.enumerator(
+            at: root.appending(path: "Sources"),
+            includingPropertiesForKeys: nil
+        )?.allObjects as? [URL] ?? [])
+            .filter { $0.pathExtension == "swift" }
+            .map { try String(contentsOf: $0, encoding: .utf8) }
+            .joined(separator: "\n")
+        for constructor in [
+            "InvestigationInstalledL2ArtifactReader()",
+            "InvestigationInstalledL2ProcessReader()",
+            "InvestigationInstalledL2FixedServiceReader()",
+            "InvestigationInstalledL2SemanticContract.evaluate(",
+            "InvestigationInstalledL2Observer()",
+        ] {
+            #expect(production.components(separatedBy: constructor).count == 2)
+        }
     }
 
     @Test

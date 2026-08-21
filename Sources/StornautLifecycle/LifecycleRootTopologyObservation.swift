@@ -18,8 +18,7 @@ package enum LifecycleRootTopologyArtifactRole:
 
 package enum LifecycleRootTopologyArtifactObservation: Sendable, Equatable {
     case absent
-    case presentValid
-    case invalid(reasonKey: String)
+    case present
     case unavailable(reasonKey: String)
 }
 
@@ -40,29 +39,17 @@ package enum LifecycleRootTopologyProcessObservation: Sendable, Equatable {
     case unresolved(reasonKey: String)
 }
 
-struct LifecycleRootTopologyProcessSnapshot: Sendable, Equatable {
-    let identity: LifecycleProcessIdentity
-    let executableURL: URL
-    let signingIdentity: LifecycleSigningIdentity
-}
-
-enum LifecycleRootTopologyProcessReadResult: Sendable, Equatable {
-    case absent
-    case identityReused
-    case observed(LifecycleRootTopologyProcessSnapshot)
-    case unresolved(reasonKey: String)
-}
-
-protocol LifecycleRootTopologyArtifactReading: Sendable {
-    func observe(
+protocol LifecycleRootTopologyArtifactAbsenceReading: Sendable {
+    func observeAbsence(
         _ role: LifecycleRootTopologyArtifactRole,
-        contract: LifecycleLocalInstallationContract,
-        binding: LifecycleRootTopologyBinding
+        contract: LifecycleLocalInstallationContract
     ) -> LifecycleRootTopologyArtifactObservation
 }
 
-protocol LifecycleRootTopologyProcessReading: Sendable {
-    func read(processID: pid_t) -> LifecycleRootTopologyProcessReadResult
+protocol LifecycleRootTopologyProcessAbsenceReading: Sendable {
+    func observeAbsence(
+        of expectedIdentity: LifecycleProcessIdentity
+    ) -> LifecycleRootTopologyProcessObservation
 }
 
 package protocol LifecycleRootTopologyServiceProbing: Sendable {
@@ -78,49 +65,6 @@ package enum LifecycleRootTopologyObservationError:
 {
     case invalidRequest
     case observationOutsideWindow
-}
-
-package struct LifecycleRootTopologyBinding: Sendable, Equatable {
-    package let appSigningEvidence: LifecycleBundleSigningEvidence
-    package let helperSigningEvidence: LifecycleBundleSigningEvidence
-    package let machineDriverSigningEvidence:
-        LifecycleBundleSigningEvidence
-    package let appBundleIdentifier: String
-    package let helperServiceIdentifier: String
-
-    package init(
-        appSigningEvidence: LifecycleBundleSigningEvidence,
-        helperSigningEvidence: LifecycleBundleSigningEvidence,
-        machineDriverSigningEvidence: LifecycleBundleSigningEvidence,
-        appBundleIdentifier: String,
-        helperServiceIdentifier: String
-    ) throws {
-        let contract = try LifecycleLocalInstallationContract()
-        guard
-            appSigningEvidence.identity.signingIdentifier
-                == appBundleIdentifier,
-            helperSigningEvidence.identity.signingIdentifier
-                == helperServiceIdentifier + ".helper",
-            machineDriverSigningEvidence.identity.signingIdentifier
-                == contract.machineDriverSigningIdentifier,
-            machineDriverSigningEvidence.isAdHoc,
-            appSigningEvidence.identity != helperSigningEvidence.identity,
-            appSigningEvidence.identity
-                != machineDriverSigningEvidence.identity,
-            helperSigningEvidence.identity
-                != machineDriverSigningEvidence.identity,
-            rootTopologyIdentifier(appBundleIdentifier),
-            rootTopologyIdentifier(helperServiceIdentifier)
-        else {
-            throw LifecycleRootTopologyObservationError.invalidRequest
-        }
-        self.appSigningEvidence = appSigningEvidence
-        self.helperSigningEvidence = helperSigningEvidence
-        self.machineDriverSigningEvidence =
-            machineDriverSigningEvidence
-        self.appBundleIdentifier = appBundleIdentifier
-        self.helperServiceIdentifier = helperServiceIdentifier
-    }
 }
 
 package struct LifecycleRootTopologyObservationWindow: Sendable, Equatable {
@@ -149,13 +93,11 @@ package struct LifecycleRootTopologyObservationWindow: Sendable, Equatable {
 }
 
 package struct LifecycleRootTopologyObservationRequest: Sendable, Equatable {
-    package let binding: LifecycleRootTopologyBinding
     package let appProcessIdentity: LifecycleProcessIdentity
     package let helperProcessIdentity: LifecycleProcessIdentity
     package let window: LifecycleRootTopologyObservationWindow
 
     package init(
-        binding: LifecycleRootTopologyBinding,
         appProcessIdentity: LifecycleProcessIdentity,
         helperProcessIdentity: LifecycleProcessIdentity,
         window: LifecycleRootTopologyObservationWindow
@@ -174,7 +116,6 @@ package struct LifecycleRootTopologyObservationRequest: Sendable, Equatable {
         else {
             throw LifecycleRootTopologyObservationError.invalidRequest
         }
-        self.binding = binding
         self.appProcessIdentity = appProcessIdentity
         self.helperProcessIdentity = helperProcessIdentity
         self.window = window
@@ -182,7 +123,6 @@ package struct LifecycleRootTopologyObservationRequest: Sendable, Equatable {
 }
 
 package struct LifecycleRootTopologyObservation: Sendable, Equatable {
-    package let binding: LifecycleRootTopologyBinding
     package let appProcessIdentity: LifecycleProcessIdentity
     package let helperProcessIdentity: LifecycleProcessIdentity
     package let artifacts: [
@@ -196,7 +136,6 @@ package struct LifecycleRootTopologyObservation: Sendable, Equatable {
     package let observedAt: Date
 
     fileprivate init(
-        binding: LifecycleRootTopologyBinding,
         appProcessIdentity: LifecycleProcessIdentity,
         helperProcessIdentity: LifecycleProcessIdentity,
         artifacts: [
@@ -209,7 +148,6 @@ package struct LifecycleRootTopologyObservation: Sendable, Equatable {
         startedAt: Date,
         observedAt: Date
     ) {
-        self.binding = binding
         self.appProcessIdentity = appProcessIdentity
         self.helperProcessIdentity = helperProcessIdentity
         self.artifacts = artifacts
@@ -235,14 +173,16 @@ package struct LifecycleRootTopologyObservation: Sendable, Equatable {
 }
 
 package struct LifecycleRootTopologyObserver: Sendable {
-    private let artifactReader: any LifecycleRootTopologyArtifactReading
-    private let processReader: any LifecycleRootTopologyProcessReading
+    private let artifactReader:
+        any LifecycleRootTopologyArtifactAbsenceReading
+    private let processReader:
+        any LifecycleRootTopologyProcessAbsenceReading
     private let serviceProbe: any LifecycleRootTopologyServiceProbing
     private let now: @Sendable () -> Date
 
     init(
-        artifactReader: any LifecycleRootTopologyArtifactReading,
-        processReader: any LifecycleRootTopologyProcessReading,
+        artifactReader: any LifecycleRootTopologyArtifactAbsenceReading,
+        processReader: any LifecycleRootTopologyProcessAbsenceReading,
         serviceProbe: any LifecycleRootTopologyServiceProbing,
         now: @escaping @Sendable () -> Date = Date.init
     ) {
@@ -256,8 +196,8 @@ package struct LifecycleRootTopologyObserver: Sendable {
         serviceProbe: any LifecycleRootTopologyServiceProbing
     ) {
         self.init(
-            artifactReader: DarwinRootTopologyArtifactReader(),
-            processReader: DarwinRootTopologyProcessReader(),
+            artifactReader: DarwinRootTopologyArtifactAbsenceReader(),
+            processReader: DarwinRootTopologyProcessAbsenceReader(),
             serviceProbe: serviceProbe
         )
     }
@@ -271,40 +211,23 @@ package struct LifecycleRootTopologyObserver: Sendable {
                 .observationOutsideWindow
         }
         let contract = try LifecycleLocalInstallationContract()
-        guard request.binding.matches(contract) else {
-            throw LifecycleRootTopologyObservationError.invalidRequest
-        }
-
         let artifacts = Dictionary(
             uniqueKeysWithValues:
                 LifecycleRootTopologyArtifactRole.allCases.map { role in
                     (
                         role,
-                        artifactReader.observe(
+                        artifactReader.observeAbsence(
                             role,
-                            contract: contract,
-                            binding: request.binding
+                            contract: contract
                         )
                     )
                 }
         )
-        let appProcess = classify(
-            processReader.read(
-                processID: request.appProcessIdentity.processID
-            ),
-            expectedIdentity: request.appProcessIdentity,
-            expectedExecutableURL: contract.appExecutableURL,
-            expectedSigningIdentity:
-                request.binding.appSigningEvidence.identity
+        let appProcess = processReader.observeAbsence(
+            of: request.appProcessIdentity
         )
-        let helperProcess = classify(
-            processReader.read(
-                processID: request.helperProcessIdentity.processID
-            ),
-            expectedIdentity: request.helperProcessIdentity,
-            expectedExecutableURL: contract.helperExecutableURL,
-            expectedSigningIdentity:
-                request.binding.helperSigningEvidence.identity
+        let helperProcess = processReader.observeAbsence(
+            of: request.helperProcessIdentity
         )
         let service = classify(
             serviceProbe.observeFixedService(label: contract.label)
@@ -316,7 +239,6 @@ package struct LifecycleRootTopologyObserver: Sendable {
         }
 
         return LifecycleRootTopologyObservation(
-            binding: request.binding,
             appProcessIdentity: request.appProcessIdentity,
             helperProcessIdentity: request.helperProcessIdentity,
             artifacts: artifacts,
@@ -326,41 +248,6 @@ package struct LifecycleRootTopologyObserver: Sendable {
             startedAt: startedAt,
             observedAt: observedAt
         )
-    }
-
-    private func classify(
-        _ result: LifecycleRootTopologyProcessReadResult,
-        expectedIdentity: LifecycleProcessIdentity,
-        expectedExecutableURL: URL,
-        expectedSigningIdentity: LifecycleSigningIdentity
-    ) -> LifecycleRootTopologyProcessObservation {
-        switch result {
-        case .absent:
-            return .absent
-        case .identityReused:
-            return .identityReused
-        case let .unresolved(reasonKey):
-            return .unresolved(reasonKey: reasonKey)
-        case let .observed(snapshot):
-            guard snapshot.identity.processID == expectedIdentity.processID else {
-                return .unresolved(
-                    reasonKey: "runtime.topology.process-binding-mismatch"
-                )
-            }
-            guard snapshot.identity == expectedIdentity else {
-                return .identityReused
-            }
-            guard
-                snapshot.executableURL.standardizedFileURL
-                    == expectedExecutableURL.standardizedFileURL,
-                snapshot.signingIdentity == expectedSigningIdentity
-            else {
-                return .unresolved(
-                    reasonKey: "runtime.topology.process-binding-mismatch"
-                )
-            }
-            return .sameIdentityAlive
-        }
     }
 
     private func classify(
@@ -375,34 +262,8 @@ package struct LifecycleRootTopologyObserver: Sendable {
     }
 }
 
-private extension LifecycleRootTopologyBinding {
-    func matches(_ contract: LifecycleLocalInstallationContract) -> Bool {
-        appBundleIdentifier == contract.appBundleIdentifier
-            && helperServiceIdentifier == contract.label
-            && appSigningEvidence.identity.signingIdentifier
-                == contract.appBundleIdentifier
-            && helperSigningEvidence.identity.signingIdentifier
-                == contract.helperSigningIdentifier
-            && machineDriverSigningEvidence.identity.signingIdentifier
-                == contract.machineDriverSigningIdentifier
-    }
-}
-
 private extension LifecycleRootTopologyProcessObservation {
     var provesOriginalIdentityAbsent: Bool {
         self == .absent || self == .identityReused
     }
-}
-
-private func rootTopologyIdentifier(_ value: String) -> Bool {
-    !value.isEmpty
-        && value.utf8.count <= 256
-        && value.unicodeScalars.allSatisfy {
-            (0x30...0x39).contains($0.value)
-                || (0x41...0x5A).contains($0.value)
-                || (0x61...0x7A).contains($0.value)
-                || $0.value == 0x2D
-                || $0.value == 0x2E
-                || $0.value == 0x5F
-        }
 }

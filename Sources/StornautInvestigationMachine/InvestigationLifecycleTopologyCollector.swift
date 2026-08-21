@@ -12,7 +12,6 @@ enum InvestigationLifecycleTopologyCollectorError:
     case invalidRequest
     case rootAuthorityRequired
     case collectorConsumed
-    case bindingMismatch
     case retirementEvidenceMismatch
     case transitionFailed
     case postTeardownTopologyUnproved
@@ -79,79 +78,8 @@ struct InvestigationLifecycleTopologyCollectionRequest:
     }
 }
 
-protocol InvestigationLifecyclePostTeardownBindingReading: Sendable {
-    func readBinding(
-        signedBinding: SignedInvestigationRuntimeBinding
-    ) throws -> LifecycleRootTopologyBinding
-}
-
-struct PostTeardownExpectedTopologyBindingReader:
-    InvestigationLifecyclePostTeardownBindingReading,
-    Sendable
-{
-    private let signingReader: LifecycleBundleSigningIdentityReader
-
-    init(
-        signingReader: LifecycleBundleSigningIdentityReader = .init()
-    ) {
-        self.signingReader = signingReader
-    }
-
-    func readBinding(
-        signedBinding: SignedInvestigationRuntimeBinding
-    ) throws -> LifecycleRootTopologyBinding {
-        let contract = try LifecycleLocalInstallationContract()
-        let appEvidence = try signingReader.evidence(
-            bundleURL: contract.installedAppURL
-        )
-        let helperEvidence = try signingReader.evidence(
-            bundleURL: contract.helperExecutableURL
-        )
-        let machineDriverEvidence = try signingReader.evidence(
-            bundleURL: contract.machineDriverExecutableURL
-        )
-        guard
-            signedBinding.isValid,
-            signedBinding.appExecutableSHA256
-                == appEvidence.executableSHA256,
-            signedBinding.helperExecutableSHA256
-                == helperEvidence.executableSHA256,
-            signedBinding.appBundleIdentifier
-                == contract.appBundleIdentifier,
-            signedBinding.helperServiceIdentifier == contract.label,
-            signedBinding.machineDriver.executableSHA256
-                == machineDriverEvidence.executableSHA256,
-            signedBinding.machineDriver.signingIdentifier
-                == machineDriverEvidence.identity.signingIdentifier,
-            signedBinding.machineDriver.designatedRequirementSHA256
-                == machineDriverEvidence.identity
-                    .designatedRequirementSHA256,
-            signedBinding.machineDriver.codeDirectoryHash
-                == machineDriverEvidence.identity.codeDirectoryHash,
-            signedBinding.machineDriver.machineClaimServiceIdentifier
-                == contract.machineClaimMachServiceName
-        else {
-            throw InvestigationLifecycleTopologyCollectorError
-                .bindingMismatch
-        }
-        do {
-            return try LifecycleRootTopologyBinding(
-                appSigningEvidence: appEvidence,
-                helperSigningEvidence: helperEvidence,
-                machineDriverSigningEvidence: machineDriverEvidence,
-                appBundleIdentifier: contract.appBundleIdentifier,
-                helperServiceIdentifier: contract.label
-            )
-        } catch {
-            throw InvestigationLifecycleTopologyCollectorError
-                .bindingMismatch
-        }
-    }
-}
-
 protocol InvestigationLifecyclePostTeardownObserving: Sendable {
     func observePostTeardown(
-        binding: LifecycleRootTopologyBinding,
         appProcessIdentity: LifecycleProcessIdentity,
         helperProcessIdentity: LifecycleProcessIdentity,
         window: LifecycleRootTopologyObservationWindow
@@ -163,7 +91,6 @@ struct DarwinInvestigationLifecyclePostTeardownObserver:
     Sendable
 {
     func observePostTeardown(
-        binding: LifecycleRootTopologyBinding,
         appProcessIdentity: LifecycleProcessIdentity,
         helperProcessIdentity: LifecycleProcessIdentity,
         window: LifecycleRootTopologyObservationWindow
@@ -172,7 +99,6 @@ struct DarwinInvestigationLifecyclePostTeardownObserver:
             serviceProbe: DarwinPostTeardownLifecycleServiceProbe()
         ).observe(
             LifecycleRootTopologyObservationRequest(
-                binding: binding,
                 appProcessIdentity: appProcessIdentity,
                 helperProcessIdentity: helperProcessIdentity,
                 window: window
@@ -231,8 +157,6 @@ actor InvestigationLifecycleTopologyCollector {
 
     private let postTeardownObserver:
         any InvestigationLifecyclePostTeardownObserving
-    private let expectedBindingReader:
-        any InvestigationLifecyclePostTeardownBindingReading
     private let effectiveUserID: @Sendable () -> uid_t
     private let now: @Sendable () -> Date
     private var state = State.ready
@@ -240,13 +164,10 @@ actor InvestigationLifecycleTopologyCollector {
     init(
         postTeardownObserver:
             any InvestigationLifecyclePostTeardownObserving,
-        expectedBindingReader:
-            any InvestigationLifecyclePostTeardownBindingReading,
         effectiveUserID: @escaping @Sendable () -> uid_t = geteuid,
         now: @escaping @Sendable () -> Date = Date.init
     ) {
         self.postTeardownObserver = postTeardownObserver
-        self.expectedBindingReader = expectedBindingReader
         self.effectiveUserID = effectiveUserID
         self.now = now
     }
@@ -278,19 +199,9 @@ actor InvestigationLifecycleTopologyCollector {
             throw InvestigationLifecycleTopologyCollectorError
                 .retirementEvidenceMismatch
         }
-        let topologyBinding: LifecycleRootTopologyBinding
-        do {
-            topologyBinding = try expectedBindingReader.readBinding(
-                signedBinding: request.signedBinding
-            )
-        } catch {
-            throw InvestigationLifecycleTopologyCollectorError
-                .bindingMismatch
-        }
         try validateRetirementClaim(
             retirementClaim,
-            request: request,
-            topologyBinding: topologyBinding
+            request: request
         )
         let window = try LifecycleRootTopologyObservationWindow(
             openedAt: request.openedAt,
@@ -324,7 +235,6 @@ actor InvestigationLifecycleTopologyCollector {
         let post: LifecycleRootTopologyObservation
         do {
             post = try await postTeardownObserver.observePostTeardown(
-                binding: topologyBinding,
                 appProcessIdentity: request.appProcessIdentity,
                 helperProcessIdentity:
                     retirementClaim.helperPeerIdentity,
@@ -343,7 +253,6 @@ actor InvestigationLifecycleTopologyCollector {
         }
         guard
             post.provesPostTeardownTopology,
-            post.binding == topologyBinding,
             post.appProcessIdentity == request.appProcessIdentity,
             post.helperProcessIdentity
                 == retirementClaim.helperPeerIdentity,
@@ -364,8 +273,7 @@ actor InvestigationLifecycleTopologyCollector {
 
     private func validateRetirementClaim(
         _ claim: InvestigationMachineRetirementClaim,
-        request: InvestigationLifecycleTopologyCollectionRequest,
-        topologyBinding: LifecycleRootTopologyBinding
+        request: InvestigationLifecycleTopologyCollectionRequest
     ) throws {
         let residue = claim.residueObservation
         guard
@@ -381,6 +289,16 @@ actor InvestigationLifecycleTopologyCollector {
             claim.helperPeerIdentity.processID > 1,
             claim.helperPeerIdentity.processIDVersion > 0,
             claim.helperPeerIdentity.effectiveUserID == 0,
+            claim.helperIdentity.processID
+                == claim.helperPeerIdentity.processID,
+            claim.helperIdentity.processIDVersion
+                == claim.helperPeerIdentity.processIDVersion,
+            claim.helperIdentity.auditSessionID
+                == claim.helperPeerIdentity.auditSessionID,
+            claim.helperIdentity.effectiveUserID
+                == claim.helperPeerIdentity.effectiveUserID,
+            claim.helperIdentity.auditTokenWords
+                == claim.helperPeerIdentity.auditToken.words,
             claim.helperPeerIdentity.auditSessionID
                 == residue.auditSessionID,
             claim.helperPeerIdentity.processID
@@ -400,32 +318,7 @@ actor InvestigationLifecycleTopologyCollector {
             residue.observedAt <= claim.recordedAt,
             claim.recordedAt <= claim.request.issuedAt,
             claim.request.issuedAt <= claim.claimedAt,
-            residue.observedAt <= request.validBefore,
-            topologyBinding.appSigningEvidence.executableSHA256
-                == request.signedBinding.appExecutableSHA256,
-            topologyBinding.helperSigningEvidence.executableSHA256
-                == request.signedBinding.helperExecutableSHA256,
-            topologyBinding.machineDriverSigningEvidence
-                .executableSHA256
-                == request.signedBinding.machineDriver.executableSHA256,
-            topologyBinding.machineDriverSigningEvidence.identity
-                .signingIdentifier
-                == request.signedBinding.machineDriver.signingIdentifier,
-            topologyBinding.machineDriverSigningEvidence.identity
-                .designatedRequirementSHA256
-                == request.signedBinding.machineDriver
-                    .designatedRequirementSHA256,
-            topologyBinding.machineDriverSigningEvidence.identity
-                .codeDirectoryHash
-                == request.signedBinding.machineDriver.codeDirectoryHash,
-            request.signedBinding.machineDriver
-                .machineClaimServiceIdentifier
-                == SignedInvestigationRuntimeMachineDriverBinding
-                    .requiredMachineClaimServiceIdentifier,
-            topologyBinding.appBundleIdentifier
-                == request.signedBinding.appBundleIdentifier,
-            topologyBinding.helperServiceIdentifier
-                == request.signedBinding.helperServiceIdentifier
+            residue.observedAt <= request.validBefore
         else {
             throw InvestigationLifecycleTopologyCollectorError
                 .retirementEvidenceMismatch

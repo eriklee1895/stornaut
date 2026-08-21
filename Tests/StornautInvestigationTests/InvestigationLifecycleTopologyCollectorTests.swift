@@ -9,7 +9,7 @@ import StornautLifecycle
 @Suite("Investigation lifecycle topology collector")
 struct InvestigationLifecycleTopologyCollectorTests {
     @Test
-    func fixedBindingAndRetirementValidationJoinMachineDriverEvidence()
+    func collectorRemainsBindlessAndRetirementValidationStaysFocused()
         throws
     {
         let repositoryRoot = URL(filePath: #filePath)
@@ -22,23 +22,6 @@ struct InvestigationLifecycleTopologyCollectorTests {
                     + "InvestigationLifecycleTopologyCollector.swift"
             ),
             encoding: .utf8
-        )
-        let installedReaderStart = try #require(source.range(
-            of: "struct PostTeardownExpectedTopologyBindingReader:"
-        ))
-        let installedReaderSuffix =
-            source[installedReaderStart.lowerBound...]
-        let readBindingStart = try #require(installedReaderSuffix.range(
-            of: "    func readBinding("
-        ))
-        let readBindingSuffix =
-            installedReaderSuffix[readBindingStart.lowerBound...]
-        let readBindingEnd = try #require(readBindingSuffix.range(
-            of: "\n    }\n}\n\nprotocol "
-                + "InvestigationLifecyclePostTeardownObserving"
-        ))
-        let readBindingSource = String(
-            readBindingSuffix[..<readBindingEnd.lowerBound]
         )
         let retirementValidationStart = try #require(source.range(
             of: "    private func validateRetirementClaim("
@@ -55,11 +38,6 @@ struct InvestigationLifecycleTopologyCollectorTests {
                 ..<retirementValidationEnd.lowerBound
             ]
         )
-        let compactReadBinding = readBindingSource.replacingOccurrences(
-            of: #"\s+"#,
-            with: "",
-            options: .regularExpression
-        )
         let compactRetirementValidation =
             retirementValidationSource.replacingOccurrences(
                 of: #"\s+"#,
@@ -67,53 +45,60 @@ struct InvestigationLifecycleTopologyCollectorTests {
                 options: .regularExpression
             )
 
-        #expect(readBindingSource.contains(
-            "contract.machineDriverExecutableURL"
-        ))
-        for comparison in [
-            "signedBinding.machineDriver.executableSHA256"
-                + "==machineDriverEvidence.executableSHA256",
-            "signedBinding.machineDriver.signingIdentifier"
-                + "==machineDriverEvidence.identity.signingIdentifier",
-            "signedBinding.machineDriver.designatedRequirementSHA256"
-                + "==machineDriverEvidence.identity"
-                + ".designatedRequirementSHA256",
-            "signedBinding.machineDriver.codeDirectoryHash"
-                + "==machineDriverEvidence.identity.codeDirectoryHash",
-            "signedBinding.machineDriver.machineClaimServiceIdentifier"
-                + "==contract.machineClaimMachServiceName",
+        for required in [
+            "protocol InvestigationLifecyclePostTeardownObserving",
+            "func observePostTeardown(",
+            "appProcessIdentity: LifecycleProcessIdentity",
+            "helperProcessIdentity: LifecycleProcessIdentity",
+            "window: LifecycleRootTopologyObservationWindow",
+            "post = try await postTeardownObserver.observePostTeardown(",
+            "appProcessIdentity: request.appProcessIdentity",
+            "helperProcessIdentity:",
+            "retirementClaim.helperPeerIdentity",
         ] {
-            #expect(compactReadBinding.contains(comparison))
+            #expect(source.contains(required))
         }
-        #expect(compactReadBinding.contains(
-            "machineDriverSigningEvidence:machineDriverEvidence"
-        ))
-
         for comparison in [
-            "topologyBinding.machineDriverSigningEvidence"
-                + ".executableSHA256"
-                + "==request.signedBinding.machineDriver.executableSHA256",
-            "topologyBinding.machineDriverSigningEvidence.identity"
-                + ".signingIdentifier"
-                + "==request.signedBinding.machineDriver.signingIdentifier",
-            "topologyBinding.machineDriverSigningEvidence.identity"
-                + ".designatedRequirementSHA256"
-                + "==request.signedBinding.machineDriver"
-                + ".designatedRequirementSHA256",
-            "topologyBinding.machineDriverSigningEvidence.identity"
-                + ".codeDirectoryHash"
-                + "==request.signedBinding.machineDriver.codeDirectoryHash",
-            "request.signedBinding.machineDriver"
-                + ".machineClaimServiceIdentifier"
-                + "==SignedInvestigationRuntimeMachineDriverBinding"
-                + ".requiredMachineClaimServiceIdentifier",
+            "claim.request.handle.investigationID==request.investigationID",
+            "claim.configurationSHA256==request.configurationSHA256",
+            "claim.ownerRetirementObservation==.retiredOwnedResources",
+            "residue.investigationID==request.investigationID",
+            "residue.userID==request.userID",
+            "residue.provedEmpty",
+            "claim.helperPeerIdentity.processID>1",
+            "claim.helperPeerIdentity.processIDVersion>0",
+            "claim.helperPeerIdentity.effectiveUserID==0",
+            "claim.helperIdentity.processID==claim.helperPeerIdentity.processID",
+            "claim.helperIdentity.processIDVersion==claim.helperPeerIdentity.processIDVersion",
+            "claim.helperIdentity.auditSessionID==claim.helperPeerIdentity.auditSessionID",
+            "claim.helperIdentity.effectiveUserID==claim.helperPeerIdentity.effectiveUserID",
+            "claim.helperIdentity.auditTokenWords==claim.helperPeerIdentity.auditToken.words",
+            "claim.helperPeerIdentity.auditSessionID==residue.auditSessionID",
+            "claim.helperPeerIdentity.processID!=request.appProcessIdentity.processID",
+            "claim.appIdentity.processID==request.appProcessIdentity.processID",
+            "claim.appIdentity.processIDVersion==request.appProcessIdentity.processIDVersion",
+            "claim.appIdentity.auditSessionID==request.appProcessIdentity.auditSessionID",
+            "claim.appIdentity.effectiveUserID==request.userID",
+            "claim.appIdentity.auditTokenWords==request.appProcessIdentity.auditToken.words",
+            "claim.claimedAt<=request.openedAt",
+            "claim.request.validBefore>=request.openedAt",
+            "claim.request.validBefore>=claim.claimedAt",
+            "residue.observedAt<=claim.recordedAt",
+            "claim.recordedAt<=claim.request.issuedAt",
+            "claim.request.issuedAt<=claim.claimedAt",
+            "residue.observedAt<=request.validBefore",
         ] {
             #expect(compactRetirementValidation.contains(comparison))
         }
 
-        let closedSlices = readBindingSource
-            + "\n" + retirementValidationSource
+        let closedSlices = source + "\n" + retirementValidationSource
         for forbidden in [
+            "bindingMismatch",
+            "InvestigationLifecyclePostTeardownBindingReading",
+            "PostTeardownExpectedTopologyBindingReader",
+            "expectedBindingReader",
+            "topologyBinding",
+            "LifecycleBundleSigningIdentityReader",
             "Codable",
             "JSONEncoder",
             "JSONDecoder",
@@ -146,9 +131,6 @@ struct InvestigationLifecycleTopologyCollectorTests {
         let transition = RecordingTopologyTransition()
         let collector = InvestigationLifecycleTopologyCollector(
             postTeardownObserver: topology,
-            expectedBindingReader: FixedTopologyBindingReader(
-                binding: fixture.binding
-            ),
             effectiveUserID: { 0 },
             now: fixture.clock.read
         )
@@ -174,7 +156,6 @@ struct InvestigationLifecycleTopologyCollectorTests {
         #expect(await transition.invocationCount == 1)
         #expect(await topology.invocationCount == 1)
         #expect(await topology.calls == [PostTeardownObservationCall(
-            binding: fixture.binding,
             appProcessIdentity: fixture.appIdentity,
             helperProcessIdentity: fixture.helperIdentity,
             window: try LifecycleRootTopologyObservationWindow(
@@ -197,9 +178,6 @@ struct InvestigationLifecycleTopologyCollectorTests {
         let transition = RecordingTopologyTransition()
         let nonRoot = InvestigationLifecycleTopologyCollector(
             postTeardownObserver: topology,
-            expectedBindingReader: FixedTopologyBindingReader(
-                binding: fixture.binding
-            ),
             effectiveUserID: { 501 },
             now: fixture.clock.read
         )
@@ -220,9 +198,6 @@ struct InvestigationLifecycleTopologyCollectorTests {
 
         let foreign = InvestigationLifecycleTopologyCollector(
             postTeardownObserver: topology,
-            expectedBindingReader: FixedTopologyBindingReader(
-                binding: fixture.binding
-            ),
             effectiveUserID: { 0 },
             now: fixture.clock.read
         )
@@ -246,6 +221,43 @@ struct InvestigationLifecycleTopologyCollectorTests {
     }
 
     @Test
+    func mismatchedRecordedAndPeerHelperIdentityFailsBeforeTransition()
+        async throws
+    {
+        let fixture = try LifecycleTopologyCollectorFixture()
+        let topology = ScriptedPostTeardownObserver(results: [])
+        let transition = RecordingTopologyTransition()
+        let collector = InvestigationLifecycleTopologyCollector(
+            postTeardownObserver: topology,
+            effectiveUserID: { 0 },
+            now: fixture.clock.read
+        )
+        let mismatchedPeer = fixture.processIdentity(
+            processID: fixture.helperIdentity.processID,
+            processIDVersion:
+                fixture.helperIdentity.processIDVersion + 1,
+            auditSessionID: fixture.helperIdentity.auditSessionID,
+            effectiveUserID: fixture.helperIdentity.effectiveUserID
+        )
+
+        await #expect(
+            throws: InvestigationLifecycleTopologyCollectorError
+                .retirementEvidenceMismatch
+        ) {
+            _ = try await collector.collect(
+                request: fixture.collectionRequest(),
+                retirementClaimStore: try await fixture
+                    .retirementClaimStore(
+                        helperPeerIdentityOverride: mismatchedPeer
+                    ),
+                transition: transition
+            )
+        }
+        #expect(await transition.invocationCount == 0)
+        #expect(await topology.invocationCount == 0)
+    }
+
+    @Test
     func transitionFailureAndDeadlineAreTerminal() async throws {
         let fixture = try LifecycleTopologyCollectorFixture()
         let transition = RecordingTopologyTransition(
@@ -255,9 +267,6 @@ struct InvestigationLifecycleTopologyCollectorTests {
         let topology = ScriptedPostTeardownObserver(results: [])
         let collector = InvestigationLifecycleTopologyCollector(
             postTeardownObserver: topology,
-            expectedBindingReader: FixedTopologyBindingReader(
-                binding: fixture.binding
-            ),
             effectiveUserID: { 0 },
             now: fixture.clock.read
         )
@@ -287,53 +296,14 @@ struct InvestigationLifecycleTopologyCollectorTests {
     }
 
     @Test
-    func bindingDriftAndExpiredWindowFailClosedBeforeTransition()
+    func expiredWindowFailsClosedBeforeTransition()
         async throws
     {
         let fixture = try LifecycleTopologyCollectorFixture()
-        let mismatched = try LifecycleRootTopologyBinding(
-            appSigningEvidence: try LifecycleBundleSigningEvidence(
-                identity: fixture.binding.appSigningEvidence.identity,
-                executableSHA256: String(repeating: "e", count: 64),
-                isAdHoc: true
-            ),
-            helperSigningEvidence:
-                fixture.binding.helperSigningEvidence,
-            machineDriverSigningEvidence:
-                fixture.binding.machineDriverSigningEvidence,
-            appBundleIdentifier: fixture.binding.appBundleIdentifier,
-            helperServiceIdentifier:
-                fixture.binding.helperServiceIdentifier
-        )
         let topology = ScriptedPostTeardownObserver(results: [])
         let transition = RecordingTopologyTransition()
-        let bindingCollector = InvestigationLifecycleTopologyCollector(
-            postTeardownObserver: topology,
-            expectedBindingReader: FixedTopologyBindingReader(
-                binding: mismatched
-            ),
-            effectiveUserID: { 0 },
-            now: fixture.clock.read
-        )
-        await #expect(
-            throws: InvestigationLifecycleTopologyCollectorError
-                .retirementEvidenceMismatch
-        ) {
-            _ = try await bindingCollector.collect(
-                request: fixture.collectionRequest(),
-                retirementClaimStore:
-                    try await fixture.retirementClaimStore(),
-                transition: transition
-            )
-        }
-        #expect(await topology.invocationCount == 0)
-        #expect(await transition.invocationCount == 0)
-
         let deadlineCollector = InvestigationLifecycleTopologyCollector(
             postTeardownObserver: topology,
-            expectedBindingReader: FixedTopologyBindingReader(
-                binding: fixture.binding
-            ),
             effectiveUserID: { 0 },
             now: fixture.clock.read
         )
@@ -386,9 +356,6 @@ struct InvestigationLifecycleTopologyCollectorTests {
         let transition = RecordingTopologyTransition()
         let collector = InvestigationLifecycleTopologyCollector(
             postTeardownObserver: topology,
-            expectedBindingReader: FixedTopologyBindingReader(
-                binding: fixture.binding
-            ),
             effectiveUserID: { 0 },
             now: fixture.clock.read
         )
@@ -423,9 +390,6 @@ struct InvestigationLifecycleTopologyCollectorTests {
         let rootTopology = ScriptedPostTeardownObserver(results: [])
         let rootCollector = InvestigationLifecycleTopologyCollector(
             postTeardownObserver: rootTopology,
-            expectedBindingReader: FixedTopologyBindingReader(
-                binding: fixture.binding
-            ),
             effectiveUserID: rootReads.read,
             now: fixture.clock.read
         )
@@ -450,9 +414,6 @@ struct InvestigationLifecycleTopologyCollectorTests {
         ])
         let deadlineCollector = InvestigationLifecycleTopologyCollector(
             postTeardownObserver: deadlineTopology,
-            expectedBindingReader: FixedTopologyBindingReader(
-                binding: fixture.binding
-            ),
             effectiveUserID: { 0 },
             now: deadlineClock.read
         )
@@ -480,9 +441,6 @@ struct InvestigationLifecycleTopologyCollectorTests {
         let rootTransition = RecordingTopologyTransition()
         let rootCollector = InvestigationLifecycleTopologyCollector(
             postTeardownObserver: rootTopology,
-            expectedBindingReader: FixedTopologyBindingReader(
-                binding: fixture.binding
-            ),
             effectiveUserID: ScriptedEffectiveUserID(
                 values: [0, 0, 501]
             ).read,
@@ -512,9 +470,6 @@ struct InvestigationLifecycleTopologyCollectorTests {
         ])
         let deadlineCollector = InvestigationLifecycleTopologyCollector(
             postTeardownObserver: deadlineTopology,
-            expectedBindingReader: FixedTopologyBindingReader(
-                binding: fixture.binding
-            ),
             effectiveUserID: { 0 },
             now: deadlineClock.read
         )
@@ -545,9 +500,6 @@ struct InvestigationLifecycleTopologyCollectorTests {
         let transition = RecordingTopologyTransition()
         let collector = InvestigationLifecycleTopologyCollector(
             postTeardownObserver: topology,
-            expectedBindingReader: FixedTopologyBindingReader(
-                binding: fixture.binding
-            ),
             effectiveUserID: { 0 },
             now: fixture.clock.read
         )
@@ -587,9 +539,6 @@ struct InvestigationLifecycleTopologyCollectorTests {
         let transition = AdvancingTopologyTransition(clock: fixture.clock)
         let collector = InvestigationLifecycleTopologyCollector(
             postTeardownObserver: brokenTopology,
-            expectedBindingReader: FixedTopologyBindingReader(
-                binding: fixture.binding
-            ),
             effectiveUserID: { 0 },
             now: fixture.clock.read
         )
@@ -616,9 +565,6 @@ struct InvestigationLifecycleTopologyCollectorTests {
         ])
         let collector = InvestigationLifecycleTopologyCollector(
             postTeardownObserver: topology,
-            expectedBindingReader: FixedTopologyBindingReader(
-                binding: fixture.binding
-            ),
             effectiveUserID: { 0 },
             now: fixture.clock.read
         )
@@ -647,9 +593,6 @@ struct InvestigationLifecycleTopologyCollectorTests {
 
         let replayCollector = InvestigationLifecycleTopologyCollector(
             postTeardownObserver: ScriptedPostTeardownObserver(results: []),
-            expectedBindingReader: FixedTopologyBindingReader(
-                binding: fixture.binding
-            ),
             effectiveUserID: { 0 },
             now: fixture.clock.read
         )
@@ -675,9 +618,6 @@ struct InvestigationLifecycleTopologyCollectorTests {
             postTeardownObserver: ScriptedPostTeardownObserver(results: [
                 .success(try fixture.postTeardownObservation()),
             ]),
-            expectedBindingReader: FixedTopologyBindingReader(
-                binding: fixture.binding
-            ),
             effectiveUserID: { 0 },
             now: fixture.clock.read
         )
@@ -709,20 +649,7 @@ struct InvestigationLifecycleTopologyCollectorTests {
     }
 }
 
-private struct FixedTopologyBindingReader:
-    InvestigationLifecyclePostTeardownBindingReading
-{
-    let binding: LifecycleRootTopologyBinding
-
-    func readBinding(
-        signedBinding _: SignedInvestigationRuntimeBinding
-    ) throws -> LifecycleRootTopologyBinding {
-        binding
-    }
-}
-
 private struct PostTeardownObservationCall: Sendable, Equatable {
-    let binding: LifecycleRootTopologyBinding
     let appProcessIdentity: LifecycleProcessIdentity
     let helperProcessIdentity: LifecycleProcessIdentity
     let window: LifecycleRootTopologyObservationWindow
@@ -752,14 +679,12 @@ private actor ScriptedPostTeardownObserver:
     }
 
     func observePostTeardown(
-        binding: LifecycleRootTopologyBinding,
         appProcessIdentity: LifecycleProcessIdentity,
         helperProcessIdentity: LifecycleProcessIdentity,
         window: LifecycleRootTopologyObservationWindow
     ) async throws -> LifecycleRootTopologyObservation {
         invocationCount += 1
         calls.append(PostTeardownObservationCall(
-            binding: binding,
             appProcessIdentity: appProcessIdentity,
             helperProcessIdentity: helperProcessIdentity,
             window: window

@@ -507,9 +507,6 @@ private final class DriverHostFixture: @unchecked Sendable {
                         events: events,
                         postTeardownError: postTeardownError
                     ),
-                    expectedBindingReader: DriverHostBindingReader(
-                        binding: self.topology.binding
-                    ),
                     effectiveUserID: effectiveUserID,
                     now: self.topology.clock.read
                 )
@@ -717,18 +714,6 @@ private actor DriverPhaseLatch {
     }
 }
 
-private struct DriverHostBindingReader:
-    InvestigationLifecyclePostTeardownBindingReading
-{
-    let binding: LifecycleRootTopologyBinding
-
-    func readBinding(
-        signedBinding _: SignedInvestigationRuntimeBinding
-    ) throws -> LifecycleRootTopologyBinding {
-        binding
-    }
-}
-
 private actor DriverHostPostTeardownObserver:
     InvestigationLifecyclePostTeardownObserving
 {
@@ -747,7 +732,6 @@ private actor DriverHostPostTeardownObserver:
     }
 
     func observePostTeardown(
-        binding _: LifecycleRootTopologyBinding,
         appProcessIdentity _: LifecycleProcessIdentity,
         helperProcessIdentity _: LifecycleProcessIdentity,
         window _: LifecycleRootTopologyObservationWindow

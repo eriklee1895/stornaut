@@ -297,9 +297,6 @@ final class InvestigationMachineScenarioAttemptFixture:
                             try! topology.postTeardownObservation(),
                         eventLog: eventLog
                     ),
-                    expectedBindingReader: ScenarioBindingReader(
-                        binding: topology.binding
-                    ),
                     effectiveUserID: { 0 },
                     now: topology.clock.read
                 )
@@ -1285,18 +1282,6 @@ private struct ScenarioClaimant: InvestigationMachineRetirementClaiming {
     }
 }
 
-private struct ScenarioBindingReader:
-    InvestigationLifecyclePostTeardownBindingReading
-{
-    let binding: LifecycleRootTopologyBinding
-
-    func readBinding(
-        signedBinding _: SignedInvestigationRuntimeBinding
-    ) throws -> LifecycleRootTopologyBinding {
-        binding
-    }
-}
-
 private actor ScenarioPostTeardownObserver:
     InvestigationLifecyclePostTeardownObserving
 {
@@ -1312,7 +1297,6 @@ private actor ScenarioPostTeardownObserver:
     }
 
     func observePostTeardown(
-        binding _: LifecycleRootTopologyBinding,
         appProcessIdentity _: LifecycleProcessIdentity,
         helperProcessIdentity _: LifecycleProcessIdentity,
         window _: LifecycleRootTopologyObservationWindow
