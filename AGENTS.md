@@ -462,6 +462,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c L3c3c-ii-b3c concrete leaf/entry review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b3c-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b3c-review.md) |
 | Phase D Task 39B2c L3c3c-ii-b4 fixed helper-claim client preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b4-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b4-preflight.md) |
 | Phase D Task 39B2c L3c3c-ii-b4 fixed helper-claim client review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b4-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b4-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b5 single-epoch composition split preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5-split-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5-split-preflight.md) |
 | Phase D Task 39B2c-L1 residue observation review | [docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md](docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md) |
 | Phase D Task 39B2c-L2 root topology observation review | [docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md](docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md) |
 | Phase D Task 39B2c-L3a trusted machine target review | [docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md](docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md) |
@@ -596,7 +597,10 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   ii-b3a fixed-channel/root-peer/drop adapter、ii-b3b start-to-retire-only
   Lifecycle seam、test-only fixture prerequisite 与 ii-b3c concrete
   leaf/native entry 均已完成；ii-b3 已关闭；ii-b4 已完成并保持
-  non-admitting，ii-b5 是当前 frontier。
+  non-admitting；ii-b5 已按 fresh scope/cost preflight 拆为 b5a0 same-client
+  claim-abort、b5a typed/injected composer、b5b-i L2/projection、b5b-ii fixed
+  Darwin runtime 与 b5b-iii production/artifact composition，b5a0 是当前
+  frontier。
   ADR 0018 仍 Proposed；L3c4 独占 final admission 与
   剩余 full。
   Task 39 尚未完成。
