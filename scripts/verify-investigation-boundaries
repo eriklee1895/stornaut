@@ -61,6 +61,12 @@ iib5bib1_semantic_source=
 iib5bib1_focused_test_source=
 iib5bib1_staged_scope_contract_only=false
 iib5bib1_staged_scope_baseline=HEAD
+iib5bib2a_artifact_contract_only=false
+iib5bib2a_package_source=
+iib5bib2a_artifact_source=
+iib5bib2a_focused_test_source=
+iib5bib2a_staged_scope_contract_only=false
+iib5bib2a_staged_scope_baseline=HEAD
 iib3a_staged_scope_contract_only=false
 iib3a_staged_scope_baseline=HEAD
 iib3b_start_retire_contract_only=false
@@ -163,6 +169,16 @@ if (( $# > 0 )); then
         && [[ $1 == --iib5bib1-staged-scope-contract-only ]]; then
         iib5bib1_staged_scope_contract_only=true
         iib5bib1_staged_scope_baseline=${2:-HEAD}
+    elif (( $# == 4 )) \
+        && [[ $1 == --iib5bib2a-artifact-contract-only ]]; then
+        iib5bib2a_artifact_contract_only=true
+        iib5bib2a_package_source=$2
+        iib5bib2a_artifact_source=$3
+        iib5bib2a_focused_test_source=$4
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iib5bib2a-staged-scope-contract-only ]]; then
+        iib5bib2a_staged_scope_contract_only=true
+        iib5bib2a_staged_scope_baseline=${2:-HEAD}
     elif (( $# == 1 || $# == 2 )) \
         && [[ $1 == --iib3a-staged-scope-contract-only ]]; then
         iib3a_staged_scope_contract_only=true
@@ -745,7 +761,33 @@ expected = {
     test_path: "82fb444b3d99a27414829b8ce959ccf3042f1d83267fe60fb1b7da12336d8e78",
 }
 for path, expected_sha in expected.items():
-    if hashlib.sha256(path.read_bytes()).hexdigest() != expected_sha:
+    data = path.read_bytes()
+    if path == package_path:
+        current = (
+            b'        .target(\n'
+            b'            name: "StornautInvestigationInstalledL2",\n'
+            b'            dependencies: [\n'
+            b'                "StornautInvestigationHandoffContract",\n'
+            b'            ],\n'
+            b'            linkerSettings: [\n'
+            b'                .linkedFramework("Security"),\n'
+            b'            ]\n'
+            b'        ),\n'
+        )
+        historical = (
+            b'        .target(\n'
+            b'            name: "StornautInvestigationInstalledL2",\n'
+            b'            dependencies: [\n'
+            b'                "StornautInvestigationHandoffContract",\n'
+            b'            ]\n'
+            b'        ),\n'
+        )
+        if data.count(current) != 1:
+            raise SystemExit(
+                "ii-b5b-i-b1 historical Package normalization drifted"
+            )
+        data = data.replace(current, historical, 1)
+    if hashlib.sha256(data).hexdigest() != expected_sha:
         label = "package" if path == package_path else (
             "semantic" if path == semantic_path else "focused test"
         )
@@ -782,6 +824,118 @@ function verify_iib5bib1_staged_scope() {
     local changed
     changed=$(git diff --cached --numstat "$baseline" | awk 'index($3, "docs/") != 1 {total += $1 + $2} END {print total + 0}')
     (( changed <= 1800 )) || { print -u2 "ii-b5b-i-b1 checkpoint budget drifted"; return 1; }
+}
+
+function verify_iib5bib2a_artifact_contract() {
+    local package_source=$1 artifact_source=$2 focused_test_source=$3
+    xcrun swiftc -frontend -parse "$artifact_source"
+    xcrun swiftc -frontend -parse "$focused_test_source"
+    python3 - "$package_source" "$artifact_source" "$focused_test_source" <<'PY'
+from pathlib import Path
+import re
+import sys
+package_path, source_path, test_path = map(Path, sys.argv[1:])
+package = package_path.read_text(encoding="utf-8")
+source = source_path.read_text(encoding="utf-8")
+test = test_path.read_text(encoding="utf-8")
+target = re.search(
+    r'\.target\(\s*name: "StornautInvestigationInstalledL2",(.*?)\n\s*\),',
+    package, re.DOTALL,
+)
+if target is None:
+    raise SystemExit("ii-b5b-i-b2a package target missing")
+body = target.group(1)
+dependencies = set(re.findall(r'"(Stornaut[A-Za-z0-9]+)"', body))
+frameworks = re.findall(r'\.linkedFramework\("([^"]+)"\)', body)
+if dependencies != {"StornautInvestigationHandoffContract"} or frameworks != ["Security"]:
+    raise SystemExit("ii-b5b-i-b2a dependency or framework surface drifted")
+if set(re.findall(r'(?m)^import\s+([A-Za-z0-9_]+)\s*$', source)) != {
+    "Darwin", "Foundation", "Security", "StornautInvestigationHandoffContract",
+}:
+    raise SystemExit("ii-b5b-i-b2a imports drifted")
+if re.search(r'(?m)^\s*(?:public|open)\s+', source):
+    raise SystemExit("ii-b5b-i-b2a public surface drifted")
+for forbidden in (
+    "FileManager", "FileHandle", "Process(", "NSXPC", "URLSession",
+    "ServiceManagement", "posix_spawn", "Darwin.write", "unlink(",
+    "rename(", "removeItem", "moveItem", "socket(", "connect(",
+    "O_NOFOLLOW_ANY", "O_UNIQUE", "format == .xml",
+):
+    if forbidden in source:
+        raise SystemExit("ii-b5b-i-b2a authority or contract surface drifted")
+if re.search(
+    r'\b(?:write|writev|pwrite|pwritev|creat|truncate|ftruncate)\s*\('
+    r'|\bO_(?:WRONLY|RDWR|CREAT|TRUNC|APPEND)\b', source,
+):
+    raise SystemExit("ii-b5b-i-b2a write authority drifted")
+safe_open = re.compile(
+    r'var flags = O_RDONLY \| O_CLOEXEC \| O_NOFOLLOW \| O_NONBLOCK\s*'
+    r'if kind == \.directory \{\s*flags \|= O_DIRECTORY\s*\}\s*'
+    r'let descriptor = Darwin\.open\(url\.path, flags\)', re.DOTALL,
+)
+all_open = re.findall(r'(?<![A-Za-z0-9_])(?:Darwin\.)?open\s*\(', source)
+if len(safe_open.findall(source)) != 1 or len(all_open) != 1:
+    raise SystemExit("ii-b5b-i-b2a safe open binding drifted")
+for required in (
+    "O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK",
+    "flags |= O_DIRECTORY",
+    "InvestigationHandoffSHA256.hashing(value) != expectedSHA256",
+    "SecStaticCodeCreateWithPath(", "SecStaticCodeCheckValidity(",
+    "kSecCSStrictValidate", "kSecCSSigningInformation",
+    "kSecCSRequirementInformation", "kSecCodeInfoDesignatedRequirement",
+    "SecRequirementCopyData(", "CFBooleanGetTypeID()", "CFNumberGetTypeID()",
+    "package struct InvestigationInstalledL2ArtifactFacts:",
+    "package struct InvestigationInstalledL2ArtifactReader: Sendable",
+    "defer { system.close(descriptor) }",
+    "/Library/Application Support/Stornaut",
+    "/Library/LaunchDaemons/com.eriklee.stornaut.lifecycle.plist",
+    "/private/var/db/com.eriklee.stornaut.r5",
+):
+    if required not in source:
+        raise SystemExit("ii-b5b-i-b2a artifact contract drifted")
+if source.count("system.metadata(for: descriptor)") != 2:
+    raise SystemExit("ii-b5b-i-b2a descriptor revalidation drifted")
+if source.count("system.metadata(at: expectation.url)") != 2:
+    raise SystemExit("ii-b5b-i-b2a path revalidation drifted")
+for required in (
+    "everySignedNodeDriftAfterSigningFailsClosed",
+    "syscallVanishAndSizeFailuresNeverBecomeValid",
+    "stornaut-iib2a-\\(UUID().uuidString)",
+    'wrongType["ThrottleInterval"] = true',
+    "nodes.expectations == expectedNodeExpectations",
+    "staticSigningReaderObservesSignedCodeAndRejectsUnsignedFile",
+    "expectInstalledL2DescriptorClosed(system)",
+    "system.closedDescriptors == [91]",
+):
+    if required not in test:
+        raise SystemExit("ii-b5b-i-b2a focused coverage drifted")
+if __import__("hashlib").sha256(test_path.read_bytes()).hexdigest() != "57c7fb18a09d819e9b3f864ca6902bb4bbeec6402511f574e1daedfb3f2857b0":
+    raise SystemExit("ii-b5b-i-b2a focused test seal drifted")
+PY
+}
+
+function verify_iib5bib2a_staged_scope() {
+    local baseline=${1:-HEAD}
+    local expected=(
+        Package.swift
+        Sources/StornautInvestigationInstalledL2/InstalledL2ArtifactReader.swift
+        Tests/StornautInvestigationTests/InstalledL2ArtifactReaderTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-contract
+        scripts/verify-investigation-boundaries
+    )
+    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" | awk 'index($0, "docs/") != 1')"})
+    if git diff --cached --name-only --diff-filter=D "$baseline" | grep -q .; then
+        print -u2 "ii-b5b-i-b2a checkpoint deleted an existing path"; return 1
+    fi
+    [[ "${(j:\n:)${(on)observed}}" == "${(j:\n:)${(on)expected}}" ]] || {
+        print -u2 "ii-b5b-i-b2a checkpoint paths drifted"; return 1
+    }
+    if git diff --cached --numstat "$baseline" | awk 'index($3, "docs/") != 1 && ($1 == "-" || $2 == "-") {found=1} END {exit !found}'; then
+        print -u2 "ii-b5b-i-b2a binary checkpoint path rejected"; return 1
+    fi
+    local changed=$(git diff --cached --numstat "$baseline" | awk 'index($3, "docs/") != 1 {n += $1 + $2} END {print n + 0}')
+    (( changed <= 2200 )) || { print -u2 "ii-b5b-i-b2a checkpoint budget drifted"; return 1; }
 }
 
 function verify_iib4_staged_scope() {
@@ -3033,6 +3187,9 @@ later_installed_l2_target = '''        .target(
             name: "StornautInvestigationInstalledL2",
             dependencies: [
                 "StornautInvestigationHandoffContract",
+            ],
+            linkerSettings: [
+                .linkedFramework("Security"),
             ]
         ),
 '''
@@ -3823,6 +3980,19 @@ fi
 if $iib5bib1_staged_scope_contract_only; then
     verify_iib5bib1_staged_scope "$iib5bib1_staged_scope_baseline"
     print "ii-b5b-i-b1 staged scope verification passed."
+    exit 0
+fi
+if $iib5bib2a_artifact_contract_only; then
+    verify_iib5bib2a_artifact_contract \
+        "$iib5bib2a_package_source" \
+        "$iib5bib2a_artifact_source" \
+        "$iib5bib2a_focused_test_source"
+    print "ii-b5b-i-b2a artifact reader contract verification passed."
+    exit 0
+fi
+if $iib5bib2a_staged_scope_contract_only; then
+    verify_iib5bib2a_staged_scope "$iib5bib2a_staged_scope_baseline"
+    print "ii-b5b-i-b2a staged scope verification passed."
     exit 0
 fi
 if $iib3a_staged_scope_contract_only; then

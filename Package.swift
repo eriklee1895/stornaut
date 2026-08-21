@@ -151,6 +151,9 @@ let package = Package(
             name: "StornautInvestigationInstalledL2",
             dependencies: [
                 "StornautInvestigationHandoffContract",
+            ],
+            linkerSettings: [
+                .linkedFramework("Security"),
             ]
         ),
         .target(

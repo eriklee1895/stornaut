@@ -941,6 +941,32 @@ struct InvestigationMachineTargetBoundaryTests {
         }
     }
 
+    @Test func iiB5BIB2AVerifierPinsFixedArtifactAndStaticSigningReader() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let sources = try [
+            "scripts/verify-investigation-boundaries", "scripts/verify-contract",
+        ].map { try String(contentsOf: root.appending(path: $0), encoding: .utf8) }
+        for marker in [
+            "--iib5bib2a-artifact-contract-only",
+            "--iib5bib2a-staged-scope-contract-only",
+            "ii-b5b-i-b2a authority or contract surface drifted",
+            "ii-b5b-i-b2a descriptor revalidation drifted",
+            "ii-b5b-i-b2a checkpoint budget drifted",
+        ] {
+            #expect(sources[0].contains(marker))
+        }
+        for marker in [
+            "dependency:'ii-b5b-i-b2a",
+            "blocking-read:'ii-b5b-i-b2a",
+            "descriptor-revalidation:'ii-b5b-i-b2a",
+            "manifest-type:'ii-b5b-i-b2a",
+            "signing-requirement:'ii-b5b-i-b2a",
+        ] {
+            #expect(sources[1].contains(marker))
+        }
+    }
+
     @Test
     func nativeMachineDriverPackagingIsDiagnosticOnly() throws {
         let repositoryRoot = URL(filePath: #filePath)
