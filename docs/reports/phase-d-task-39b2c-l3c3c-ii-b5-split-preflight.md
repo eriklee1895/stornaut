@@ -1,7 +1,7 @@
 # Phase D Task 39B2c-L3c3c-ii-b5 Single-Epoch Composition Split Preflight
 
 > Status: Split, ownership, scope and tests-first contracts frozen; ii-b5a0,
-> ii-b5a, ii-b5b-i-a and i-b1 complete/non-admitting; i-b2a current
+> ii-b5a, ii-b5b-i-a, i-b1 and i-b2a complete/non-admitting; i-b2b current
 >
 > Date: 2026-08-21
 >
@@ -203,8 +203,8 @@ cost split before coding.
 
 ## 5. ii-b5b-i — Installed-L2 Contract and Projection Extraction
 
-> Split before coding. ii-b5b-i-a and i-b1 are complete; i-b2a is the current
-> frontier. The
+> Split before coding. ii-b5b-i-a, i-b1 and i-b2a are complete/non-admitting;
+> i-b2b is the current frontier. The
 > exact split, paths, budgets and clock contract are frozen in the
 > [ii-b5b-i exact-path preflight](phase-d-task-39b2c-l3c3c-ii-b5b-i-exact-path-preflight.md).
 > ii-b5a completion evidence is recorded in the
@@ -213,6 +213,8 @@ cost split before coding.
 > [projection review](phase-d-task-39b2c-l3c3c-ii-b5b-i-a-review.md).
 > i-b1 completion evidence is in the
 > [semantic-target review](phase-d-task-39b2c-l3c3c-ii-b5b-i-b1-review.md).
+> i-b2a completion evidence is in the
+> [artifact-reader review](phase-d-task-39b2c-l3c3c-ii-b5b-i-b2a-review.md).
 
 The existing full installed-L2 semantic/physical implementation spans broad
 Lifecycle and Machine targets and cannot be linked into the native driver or
@@ -319,14 +321,15 @@ terminal. After the final epoch the store destroys the value. No outer caller
 reconstructs continuity from a raw PID.
 
 This preflight itself was documentation-only and consumed no serial. Completed
-b5a0/b5a/i-a and all remaining b5 substeps are non-admitting prerequisites. ADR
+b5a0/b5a/i-a/i-b1/i-b2a and all remaining b5 substeps are non-admitting
+prerequisites. ADR
 0018 stays Proposed, Task 39 remains incomplete and production Deep Dive remains
 `.implementationUnavailable`.
 
 The strict remaining order is:
 
 ```text
-ii-b5b-i-b2a -> ii-b5b-i-b2b -> ii-b5b-i-b3
+ii-b5b-i-b2b -> ii-b5b-i-b3
 -> ii-b5b-i-c
 -> ii-b5b-ii -> ii-b5b-iii
 -> ii-c0 -> ii-c -> L3c3d -> L3c4

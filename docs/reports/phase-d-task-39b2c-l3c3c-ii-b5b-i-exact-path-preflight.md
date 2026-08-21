@@ -1,7 +1,8 @@
 # Phase D Task 39B2c-L3c3c-ii-b5b-i Exact-Path Preflight
 
-> Status: ii-b5b-i-a and i-b1 complete/non-admitting; fresh cost/authority
-> audit split i-b into i-b1/i-b2a/i-b2b/i-b3 before coding; i-b2a current
+> Status: ii-b5b-i-a, i-b1 and i-b2a complete/non-admitting; fresh
+> cost/authority audit split i-b into i-b1/i-b2a/i-b2b/i-b3 before coding;
+> i-b2b current
 >
 > Date: 2026-08-21
 >
@@ -172,9 +173,13 @@ and tests in one diff would exceed 4,000 changed lines, while the existing
    `Package.swift`, new `InstalledL2SemanticContract.swift`, new focused tests,
    TargetBoundary and the two structural verifiers. It creates the non-product
    target and installed-only roles/predicate/value contract; no physical reader.
-2. **i-b2a artifact/static readers** — 5 paths / at most 2,200 changed lines:
-   new artifact reader and focused tests plus TargetBoundary/two verifiers. It
-   owns fixed role mapping, descriptor/node/hash/plist and static signing checks.
+2. **i-b2a artifact/static readers** — completed in 6 paths / 2,061 changed
+   lines (2,057 insertions and 4 deletions), below the 2,200-line ceiling. The
+   original five-path estimate is corrected because `Package.swift` required
+   explicit Security.framework linkage. The checkpoint added the artifact
+   reader and focused tests plus TargetBoundary/two verifiers. It owns fixed
+   role mapping, descriptor/node/hash/plist and static signing checks. See the
+   [completion review](phase-d-task-39b2c-l3c3c-ii-b5b-i-b2a-review.md).
 3. **i-b2b process/service readers** — 10 paths / at most 2,600 changed lines:
    `Package.swift`, new narrow `CInvestigationIdentitySupport` header/source,
    new process and fixed-service readers, two focused tests, TargetBoundary and
@@ -249,18 +254,21 @@ external execution, model/auth/network or `scripts/verify --full`.
 
 ## 7. Non-Admission and Remaining Order
 
-This preflight is documentation-only. i-a and i-b1 are complete; i-b1's only
+This preflight was documentation-only. i-a, i-b1 and i-b2a are complete and
+non-admitting; i-b1's only
 staged serial was non-green and was not rerun, with its exact failures closed as
 recorded in the
 [semantic-target review](phase-d-task-39b2c-l3c3c-ii-b5b-i-b1-review.md).
-i-b2a/i-b2b/i-b3/i-c remain non-admitting prerequisites. ADR 0018 remains
+[Artifact/static reader completion evidence](phase-d-task-39b2c-l3c3c-ii-b5b-i-b2a-review.md)
+records the corrected six-path scope. i-b2b/i-b3/i-c remain non-admitting
+prerequisites. ADR 0018 remains
 Proposed, Task 39 remains incomplete and production Deep Dive remains
 `.implementationUnavailable`.
 
 The strict remaining order is:
 
 ```text
-ii-b5b-i-b2a -> ii-b5b-i-b2b -> ii-b5b-i-b3
+ii-b5b-i-b2b -> ii-b5b-i-b3
 -> ii-b5b-i-c
 -> ii-b5b-ii -> ii-b5b-iii -> ii-c0 -> ii-c -> L3c3d -> L3c4
 ```
