@@ -20,6 +20,7 @@ package enum InvestigationMachineClaimClientError:
     case helperIdentityMismatch
     case signingIdentityMismatch
     case outcomeUnknown
+    case terminalResidueUncertain
 }
 package struct InvestigationMachineClaimClientSharedDeadline:
     Sendable,
@@ -193,7 +194,7 @@ package actor InvestigationMachineClaimClient {
         self.clock = clock
         self.uuid = uuid
     }
-    package func claim(
+    package func claimOrProveTerminal(
         handle: InvestigationHandoffRetirementHandle,
         appIdentity: InvestigationMachineProcessIdentity,
         sharedDeadline: InvestigationMachineClaimClientSharedDeadline,
@@ -204,6 +205,9 @@ package actor InvestigationMachineClaimClient {
         let staticObservation: InvestigationMachineClaimClientStaticIdentityObservation
         let claimObservation: InvestigationMachineClaimClientClockObservation
         let request: InvestigationMachineRetirementClaimRequest
+        var trustedHelperIdentity: InvestigationMachineProcessIdentity?
+        var knownServerRejection = false
+        var replyReceived = false
         do {
             try Task.checkCancellation()
             staticObservation = try staticHelperIdentityObservation()
@@ -240,6 +244,7 @@ package actor InvestigationMachineClaimClient {
                     deadlineNanoseconds:
                         sharedDeadline.epochDeadlineNanoseconds
                 )
+                replyReceived = true
             } catch let error as InvestigationMachineClaimClientError
                 where error == .unavailable
             {
@@ -257,7 +262,15 @@ package actor InvestigationMachineClaimClient {
                 throw InvestigationMachineClaimClientError.outcomeUnknown
             }
             let replyData: Data
-            replyData = try requiredSuccessData(replyValue)
+            do {
+                replyData = try requiredSuccessData(replyValue)
+            } catch {
+                knownServerRejection = reply.0 == nil
+                    && reply.1.flatMap(InvestigationMachineClaimXPCReason.init(
+                        rawValue:
+                    )) != nil
+                throw error
+            }
             let evidence: InvestigationMachineClaimEvidence
             do {
                 evidence = try InvestigationMachineClaimEvidence.decode(replyData)
@@ -268,6 +281,7 @@ package actor InvestigationMachineClaimClient {
                     session: session,
                     staticObservation: staticObservation
                 )
+                trustedHelperIdentity = evidence.helperIdentity
             } catch {
                 throw InvestigationMachineClaimClientError.outcomeUnknown
             }
@@ -319,8 +333,37 @@ package actor InvestigationMachineClaimClient {
             return evidence
         } catch {
             await session.invalidate()
+            if knownServerRejection { throw error }
+            if
+                !replyReceived,
+                error as? InvestigationMachineClaimClientError == .unavailable
+            {
+                throw error
+            }
+            guard let trustedHelperIdentity else {
+                throw InvestigationMachineClaimClientError
+                    .terminalResidueUncertain
+            }
+            try await proveTerminalAfterInvalidation(
+                helperIdentity: trustedHelperIdentity,
+                deadlineNanoseconds: sharedDeadline.epochDeadlineNanoseconds
+            )
             throw error
         }
+    }
+    package func abortAfterClaimAndProveTerminal() async throws {
+        try beginOperationForRelease()
+        defer { operationInProgress = false }
+        guard case let .claimed(claimedState) = state else {
+            throw InvestigationMachineClaimClientError.oneShotConsumed
+        }
+        state = .consumed
+        await claimedState.session.invalidate()
+        try await proveTerminalAfterInvalidation(
+            helperIdentity: claimedState.evidence.helperIdentity,
+            deadlineNanoseconds:
+                claimedState.sharedDeadline.epochDeadlineNanoseconds
+        )
     }
     package func release() async throws -> InvestigationMachineClaimReleased {
         try beginOperationForRelease()
@@ -455,6 +498,51 @@ package actor InvestigationMachineClaimClient {
             throw InvestigationMachineClaimClientError.oneShotConsumed
         }
         operationInProgress = true
+    }
+    private func proveTerminalAfterInvalidation(
+        helperIdentity: InvestigationMachineProcessIdentity,
+        deadlineNanoseconds: UInt64
+    ) async throws {
+        let helperEpochObserver = helperEpochObserver
+        let clock = clock
+        do {
+            try await Task.detached {
+                var current = try clock.observe().continuousNanoseconds
+                while current < deadlineNanoseconds {
+                    let observation = try await helperEpochObserver.observe(
+                        serviceName: Constants.machineClaimServiceIdentifier,
+                        claimedHelperIdentity: helperIdentity
+                    )
+                    let observedAt = try clock.observe().continuousNanoseconds
+                    guard observedAt >= current, observedAt < deadlineNanoseconds else {
+                        throw InvestigationMachineClaimClientError
+                            .terminalResidueUncertain
+                    }
+                    if observation == .originalHelperAbsent { return }
+                    let next = observedAt.addingReportingOverflow(100_000_000)
+                    guard
+                        !next.overflow, next.partialValue < deadlineNanoseconds
+                    else {
+                        throw InvestigationMachineClaimClientError
+                            .terminalResidueUncertain
+                    }
+                    await clock.sleep(untilNanoseconds: next.partialValue)
+                    let sampled = try clock.observe().continuousNanoseconds
+                    guard
+                        sampled >= next.partialValue,
+                        sampled < deadlineNanoseconds
+                    else {
+                        throw InvestigationMachineClaimClientError
+                            .terminalResidueUncertain
+                    }
+                    current = sampled
+                }
+                throw InvestigationMachineClaimClientError
+                    .terminalResidueUncertain
+            }.value
+        } catch {
+            throw InvestigationMachineClaimClientError.terminalResidueUncertain
+        }
     }
     private func makeClaimRequest(
         handle: InvestigationHandoffRetirementHandle,

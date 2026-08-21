@@ -41,6 +41,10 @@ iib4_driver_support_package_manifest=
 iib4_driver_support_client_source=
 iib4_staged_scope_contract_only=false
 iib4_staged_scope_baseline=HEAD
+iib5a0_claim_abort_contract_only=false
+iib5a0_claim_abort_client_source=
+iib5a0_staged_scope_contract_only=false
+iib5a0_staged_scope_baseline=HEAD
 iib3a_staged_scope_contract_only=false
 iib3a_staged_scope_baseline=HEAD
 iib3b_start_retire_contract_only=false
@@ -107,6 +111,14 @@ if (( $# > 0 )); then
         && [[ $1 == --iib4-staged-scope-contract-only ]]; then
         iib4_staged_scope_contract_only=true
         iib4_staged_scope_baseline=${2:-HEAD}
+    elif (( $# == 2 )) \
+        && [[ $1 == --iib5a0-claim-abort-contract-only ]]; then
+        iib5a0_claim_abort_contract_only=true
+        iib5a0_claim_abort_client_source=$2
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iib5a0-staged-scope-contract-only ]]; then
+        iib5a0_staged_scope_contract_only=true
+        iib5a0_staged_scope_baseline=${2:-HEAD}
     elif (( $# == 1 || $# == 2 )) \
         && [[ $1 == --iib3a-staged-scope-contract-only ]]; then
         iib3a_staged_scope_contract_only=true
@@ -132,7 +144,7 @@ if (( $# > 0 )); then
         iib3c_staged_scope_baseline=${2:-HEAD}
     else
         print -u2 \
-            "Usage: scripts/verify-investigation-boundaries [--claim-asid-contract-only <source> | --deadline-state-contract-only <source> | --claim-server-contract-only <adapter> <effects> <deadline-state> | --claim-server-package-contract-only <describe-json> <dump-json> | --legacy-machine-claim-contract-only <lifecycle-xpc> <helper> <machine-host> <machine-claim> | --retirement-handle-v3-contract-only <lifecycle> <adapter> | --live-claim-server-contract-only <project.pbxproj> <Package.swift> <handoff-root> <scheme-root> <lifecycle-escrow> <adapter> <effects> <helper> | --app-peer-admission-contract-only <policy> <adapter> | --iib4-driver-support-contract-only <package-manifest> <client-source> | --iib4-staged-scope-contract-only [baseline] | --iib3a-staged-scope-contract-only [baseline] | --iib3b-start-retire-contract-only <transport> | --iib3b-staged-scope-contract-only [baseline] | --iib3c-concrete-entry-contract-only <leaf> <adapter> <composition> <harness> | --iib3c-staged-scope-contract-only [baseline]]"
+            "Usage: scripts/verify-investigation-boundaries [--claim-asid-contract-only <source> | --deadline-state-contract-only <source> | --claim-server-contract-only <adapter> <effects> <deadline-state> | --claim-server-package-contract-only <describe-json> <dump-json> | --legacy-machine-claim-contract-only <lifecycle-xpc> <helper> <machine-host> <machine-claim> | --retirement-handle-v3-contract-only <lifecycle> <adapter> | --live-claim-server-contract-only <project.pbxproj> <Package.swift> <handoff-root> <scheme-root> <lifecycle-escrow> <adapter> <effects> <helper> | --app-peer-admission-contract-only <policy> <adapter> | --iib4-driver-support-contract-only <package-manifest> <client-source> | --iib4-staged-scope-contract-only [baseline] | --iib5a0-claim-abort-contract-only <client-source> | --iib5a0-staged-scope-contract-only [baseline] | --iib3a-staged-scope-contract-only [baseline] | --iib3b-start-retire-contract-only <transport> | --iib3b-staged-scope-contract-only [baseline] | --iib3c-concrete-entry-contract-only <leaf> <adapter> <composition> <harness> | --iib3c-staged-scope-contract-only [baseline]]"
         exit 64
     fi
 fi
@@ -142,6 +154,7 @@ function verify_app_peer_admission_contract() {
     local adapter_source=$2
     python3 - "$policy_source" "$adapter_source" <<'PY'
 from pathlib import Path
+import hashlib
 import re
 import sys
 
@@ -248,6 +261,7 @@ function verify_iib4_driver_support_contract() {
     local client_source=$2
     python3 - "$package_manifest" "$client_source" <<'PY'
 from pathlib import Path
+import hashlib
 import re
 import sys
 
@@ -311,7 +325,7 @@ missing = [marker for marker in required_markers if marker not in source]
 if missing:
     raise SystemExit(f"ii-b4 driver support contract drifted: {missing!r}")
 
-if source.count('serviceName: Constants.machineClaimServiceIdentifier') != 2:
+if source.count('serviceName: Constants.machineClaimServiceIdentifier') not in (2, 3):
     raise SystemExit("ii-b4 fixed helper service drifted")
 if 'InvestigationMachineInstalledDriverObservation.fixedLifecycleProgram' not in source:
     raise SystemExit("ii-b4 fixed helper path drifted")
@@ -340,7 +354,7 @@ for marker in (
 if (
     'while current < deadline' not in source
     or 'afterObservation < deadline' not in source
-    or 'if observation == .originalHelperAbsent { return }' not in source
+    or 'if observation == .originalHelperAbsent { return }\n            let next = min(' not in source
     or 'afterObservation.addingReportingOverflow(100_000_000)' not in source
     or 'sampled <= deadline' not in source
 ):
@@ -408,6 +422,63 @@ for forbidden in (
     if forbidden in source:
         raise SystemExit(f"ii-b4 driver support regained prohibited authority: {forbidden}")
 PY
+}
+
+function verify_iib5a0_claim_abort_contract() {
+    local client_source=$1
+    python3 - "$client_source" <<'PY'
+from pathlib import Path
+import hashlib
+import re
+import sys
+
+source = Path(sys.argv[1]).read_text(encoding="utf-8")
+imports = set(re.findall(r"(?m)^import\s+([A-Za-z0-9_]+)\s*$", source))
+expected_imports = {
+    "Darwin", "CryptoKit", "Foundation", "Security",
+    "StornautInvestigationHandoffContract",
+}
+if imports != expected_imports:
+    raise SystemExit("ii-b5a0 dependency surface drifted")
+for forbidden in (
+    "socketpair(", "posix_spawn", "posix_spawnp", "fork(",
+    "kill(", "waitpid(", "setuid(", "setgid(", "initgroups(",
+    "dup2(", "Darwin.write(", "FileManager.default", "Process(",
+    "Authorization", "launchctl",
+):
+    if forbidden in source:
+        raise SystemExit("ii-b5a0 regained physical authority")
+if hashlib.sha256(source.encode()).hexdigest() != "ee373ff00fce08853fccb4c2087a0a47eed2feae6efc300fbd4c74e01f242a0a":
+    raise SystemExit("ii-b5a0 canonical client source drifted")
+PY
+}
+
+function verify_iib5a0_staged_scope() {
+    local baseline=${1:-HEAD}
+    local expected=(
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineClaimClient.swift
+        Tests/StornautInvestigationTests/InvestigationMachineClaimClientTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-contract
+        scripts/verify-investigation-boundaries
+    )
+    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" | awk 'index($0, "docs/") != 1')"})
+    if git diff --cached --name-status "$baseline" \
+        | awk '$1 == "D" && index($2, "docs/") != 1 { found = 1 } END { exit !found }'
+    then
+        print -u2 "ii-b5a0 staged checkpoint deleted a required path"
+        return 1
+    fi
+    [[ "${(j:\n:)${(on)observed}}" == "${(j:\n:)${(on)expected}}" ]] || {
+        print -u2 "ii-b5a0 checkpoint paths drifted"
+        return 1
+    }
+    local changed
+    changed=$(git diff --cached --numstat "$baseline" | awk 'index($3, "docs/") != 1 {total += $1 + $2} END {print total + 0}')
+    (( changed <= 800 )) || {
+        print -u2 "ii-b5a0 checkpoint budget drifted"
+        return 1
+    }
 }
 
 function verify_iib4_staged_scope() {
@@ -3385,6 +3456,16 @@ if $iib4_staged_scope_contract_only; then
     print "ii-b4 staged scope verification passed."
     exit 0
 fi
+if $iib5a0_claim_abort_contract_only; then
+    verify_iib5a0_claim_abort_contract "$iib5a0_claim_abort_client_source"
+    print "ii-b5a0 claim-abort source contract verification passed."
+    exit 0
+fi
+if $iib5a0_staged_scope_contract_only; then
+    verify_iib5a0_staged_scope "$iib5a0_staged_scope_baseline"
+    print "ii-b5a0 staged scope verification passed."
+    exit 0
+fi
 if $iib3a_staged_scope_contract_only; then
     verify_iib3a_staged_scope "$iib3a_staged_scope_baseline"
     print "ii-b3a staged scope verification passed."
@@ -5485,7 +5566,7 @@ expected_driver_support_sha256 = {
     "InvestigationMachineInstalledDriverSystemSource.swift":
         "3166ff4e53d66207194546800d96fb659105fb8307e759b9e37083d575117e18",
     "InvestigationMachineClaimClient.swift":
-        "77834e0deb69437292615fb45554b62781b494ad9db2164d28c49877960bda6f",
+        "ee373ff00fce08853fccb4c2087a0a47eed2feae6efc300fbd4c74e01f242a0a",
 }
 for source_name in driver_support_sources:
     source_path = driver_support_source_root / source_name
@@ -6665,20 +6746,20 @@ function require_exact_machine_driver_projection() {
 
     case "$configuration" in
         debug)
-            expected_undefined_sha=aaf705a9b4d2bb802907b7bd5f892fad988564fa237732592f36cf6bc88f075d
-            expected_undefined_lines=517
+            expected_undefined_sha=10369b75c15386c3ef8b9f10ca90a83cef3bcec1327455ab28394794172e011a
+            expected_undefined_lines=519
             expected_loads_sha=e3c05d8766d8aa37e87a834a3f37fd71d925f1d34ac349528cee4970db9d3841
             expected_loads_lines=16
-            expected_owned_sha=6b9d563178c2252114ba7081d0b0699f031ee52c305516fa864f92510d41f6fb
-            expected_owned_lines=1446
+            expected_owned_sha=e8f8fb957de87b374de5b161c3988b0b1e2f3d918d22c68c5ad6151743e6f973
+            expected_owned_lines=1480
             ;;
         release)
-            expected_undefined_sha=976eceef0b2461d60f3aa0a635f5b64598963b7ddee6cd6be4d92fafbf1bafd0
-            expected_undefined_lines=369
+            expected_undefined_sha=c79ddaede80ba12941fc7acef4077756efde6c1257ea9e331c70a232b4d6cb91
+            expected_undefined_lines=371
             expected_loads_sha=e3c05d8766d8aa37e87a834a3f37fd71d925f1d34ac349528cee4970db9d3841
             expected_loads_lines=16
-            expected_owned_sha=aa821ec12da0f7fd1a88d8068004c5dc33d6db4bdee5654d1a7dcb3d2cf61964
-            expected_owned_lines=867
+            expected_owned_sha=acaf77889829745673f9c1c19ff7ed1303e31a6be421099b1e6b083bce180d76
+            expected_owned_lines=894
             ;;
         *)
             print -u2 "Unknown Machine driver projection: $configuration"

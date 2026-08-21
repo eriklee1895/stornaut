@@ -839,6 +839,45 @@ struct InvestigationMachineTargetBoundaryTests {
     }
 
     @Test
+    func iiB5A0VerifierPinsClaimAbortWithoutReplacingIIB4Gate() throws {
+        let repositoryRoot = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let boundaries = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ), encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: repositoryRoot.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        for marker in [
+            "--iib5a0-claim-abort-contract-only <client-source>",
+            "--iib5a0-staged-scope-contract-only [baseline]",
+            "ii-b5a0 canonical client source drifted",
+            "ii-b5a0 dependency surface drifted",
+            "ii-b5a0 regained physical authority",
+            "ii-b5a0 checkpoint paths drifted", "ii-b5a0 checkpoint budget drifted",
+            "ii-b5a0 staged checkpoint deleted a required path",
+        ] {
+            #expect(boundaries.contains(marker))
+        }
+        for marker in [
+            "alias-release", "alias-connect", "string-invalidation",
+            "for fixture in extra-path over-budget deleted-path",
+            "--iib4-staged-scope-contract-only \"$iib4_parent\"",
+        ] {
+            #expect(contract.contains(marker))
+        }
+        #expect(boundaries.contains(
+            "--iib4-driver-support-contract-only <package-manifest> <client-source>"
+        ))
+        #expect(boundaries.contains("(( changed <= 800 ))"))
+    }
+
+    @Test
     func nativeMachineDriverPackagingIsDiagnosticOnly() throws {
         let repositoryRoot = URL(filePath: #filePath)
             .deletingLastPathComponent()

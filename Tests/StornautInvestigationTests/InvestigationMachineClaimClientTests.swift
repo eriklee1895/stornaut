@@ -2,6 +2,8 @@ import Foundation
 import Testing
 @testable import StornautInvestigationHandoffContract
 @testable import StornautInvestigationMachineDriverSupport
+@testable import StornautInvestigationMachineClaimServer
+@testable import StornautLifecycle
 
 @Suite("Investigation machine claim client")
 struct InvestigationMachineClaimClientTests {
@@ -62,7 +64,10 @@ struct InvestigationMachineClaimClientTests {
         let client = fixture.client(
             session: session, clock: ClaimClientClockDouble([
                 fixture.claimClockObservation, fixture.claimReplyClockObservation,
-            ]), staticReader: staticReader, dynamicReader: dynamicReader
+                fixture.clockObservation(1_200_000_000),
+                fixture.clockObservation(1_300_000_000),
+            ]), staticReader: staticReader, dynamicReader: dynamicReader,
+            helperEpochs: [.originalHelperAbsent]
         )
         await fixture.configure(
             session, connectionIdentity: fixture.connectionIdentity(for: drift)
@@ -88,7 +93,9 @@ struct InvestigationMachineClaimClientTests {
         let client = fixture.client(
             session: session, clock: ClaimClientClockDouble([
                 fixture.claimClockObservation, fixture.claimReplyClockObservation,
-            ])
+                fixture.clockObservation(1_200_000_000),
+                fixture.clockObservation(1_300_000_000),
+            ]), helperEpochs: [.originalHelperAbsent]
         )
         await fixture.configure(session)
         let firstClaim = Task { try await fixture.claim(client) }
@@ -155,7 +162,7 @@ struct InvestigationMachineClaimClientTests {
         )
 
         await #expect(throws: InvestigationMachineClaimClientError.invalidDeadline) {
-            _ = try await client.claim(
+            _ = try await client.claimOrProveTerminal(
                 handle: input.handle, appIdentity: fixture.appIdentity,
                 sharedDeadline: input.deadline, previousHelperIdentity: nil
             )
@@ -174,7 +181,9 @@ struct InvestigationMachineClaimClientTests {
         let client = fixture.client(
             session: session, clock: ClaimClientClockDouble([
                 fixture.claimClockObservation, fixture.claimReplyClockObservation,
-            ])
+                fixture.clockObservation(1_200_000_000),
+                fixture.clockObservation(1_300_000_000),
+            ]), helperEpochs: [.originalHelperAbsent]
         )
         await fixture.configure(session) { data in
             let request = try InvestigationMachineRetirementClaimRequest.decode(data)
@@ -244,13 +253,262 @@ struct InvestigationMachineClaimClientTests {
     }
 
     @Test
+    func abortBeforeClaimIsRejectedWithoutTransportActivity() async throws {
+        let fixture = try ClaimClientFixture()
+        let session = ClaimClientSessionDouble()
+        let transport = ClaimClientTransportDouble(session: session)
+        let client = fixture.client(
+            session: session, clock: ClaimClientClockDouble([]),
+            transport: transport
+        )
+
+        await #expect(
+            throws: InvestigationMachineClaimClientError.oneShotConsumed
+        ) {
+            try await client.abortAfterClaimAndProveTerminal()
+        }
+        #expect(transport.connectCount == 0)
+    }
+    @Test(arguments: ClaimClientAmbiguousClaimScenario.allCases)
+    func ambiguousAcceptedClaimWithoutTrustedHelperIsUncertain(
+        _ scenario: ClaimClientAmbiguousClaimScenario
+    ) async throws {
+        let fixture = try ClaimClientFixture()
+        let trace = ClaimClientCallTrace()
+        let gate = scenario == .cancelledAfterDispatch
+            ? ClaimClientAsyncGate() : nil
+        let session = ClaimClientSessionDouble(
+            claimGate: gate, sessionID: "primary", trace: trace
+        )
+        let transport = ClaimClientTransportDouble(
+            session: session, trace: trace
+        )
+        let observer = ClaimClientHelperEpochObserverDouble(
+            [.originalHelperAbsent], trace: trace
+        )
+        let client = fixture.client(
+            session: session, clock: ClaimClientClockDouble([
+                fixture.claimClockObservation,
+            ]), transport: transport, epochObserver: observer
+        )
+        await fixture.configure(session) { data in
+            _ = try fixture.acceptedClaimReply(for: data)
+            await trace.record("server-accepted:primary")
+            switch scenario {
+            case .replyLost:
+                throw ClaimClientInjectedFailure()
+            case .malformedReply:
+                return (Data([0x00]), nil)
+            case .unknownReason:
+                return (nil, "runtime.lifecycle.machine-claim.future")
+            case .cancelledAfterDispatch:
+                try Task.checkCancellation()
+                throw ClaimClientInjectedFailure()
+            }
+        }
+        if let gate {
+            let task = Task { try await fixture.claim(client) }
+            await gate.waitUntilEntered()
+            task.cancel()
+            gate.open()
+            await #expect(
+                throws: InvestigationMachineClaimClientError
+                    .terminalResidueUncertain
+            ) {
+                _ = try await task.value
+            }
+        } else {
+            await #expect(
+                throws: InvestigationMachineClaimClientError
+                    .terminalResidueUncertain
+            ) {
+                _ = try await fixture.claim(client)
+            }
+        }
+        #expect(await trace.events == [
+            "connect:primary", "claim:primary",
+            "server-accepted:primary", "invalidate:primary",
+        ])
+    }
+    @Test(arguments: [true, false])
+    func trustedHelperPostValidationFailureUsesTerminalProof(
+        _ proofSucceeds: Bool
+    ) async throws {
+        let fixture = try ClaimClientFixture()
+        let trace = ClaimClientCallTrace()
+        let session = ClaimClientSessionDouble(
+            sessionID: "primary", trace: trace
+        )
+        let observer = ClaimClientHelperEpochObserverDouble(
+            [.originalHelperAbsent],
+            failureAtObservation: proofSucceeds ? nil : 0, trace: trace
+        )
+        let client = fixture.client(
+            session: session, clock: ClaimClientClockDouble([
+                fixture.claimClockObservation, fixture.claimReplyClockObservation,
+                fixture.clockObservation(1_200_000_000),
+                fixture.clockObservation(1_300_000_000),
+            ]), transport: .init(session: session, trace: trace),
+            epochObserver: observer
+        )
+        await fixture.configure(session) { data in
+            let request = try InvestigationMachineRetirementClaimRequest.decode(data)
+            return (try fixture.claimReply(
+                for: request, releaseDeadline: fixture.sharedDeadlineValue + 1
+            ), nil)
+        }
+        let expected: InvestigationMachineClaimClientError = proofSucceeds
+            ? .outcomeUnknown : .terminalResidueUncertain
+        await #expect(throws: expected) {
+            _ = try await fixture.claim(client)
+        }
+        #expect(await trace.events.prefix(3) == [
+            "connect:primary", "claim:primary", "invalidate:primary",
+        ])
+    }
+    @Test
+    func abortInvalidatesClaimConnectionBeforeProvingExactHelperAbsent() async throws {
+        let fixture = try ClaimClientFixture()
+        let trace = ClaimClientCallTrace()
+        let session = ClaimClientSessionDouble(
+            sessionID: "primary", trace: trace
+        )
+        let observer = ClaimClientHelperEpochObserverDouble(
+            [.originalHelperPresent, .originalHelperAbsent], trace: trace
+        )
+        let clock = ClaimClientClockDouble([
+            fixture.claimClockObservation, fixture.claimReplyClockObservation,
+            fixture.clockObservation(2_100_000_000),
+            fixture.clockObservation(2_200_000_000),
+            fixture.clockObservation(2_300_000_000),
+            fixture.clockObservation(2_400_000_000),
+        ], trace: trace)
+        let client = fixture.client(
+            session: session, clock: clock,
+            transport: .init(session: session, trace: trace),
+            epochObserver: observer
+        )
+        await fixture.configure(session)
+        _ = try await fixture.claim(client)
+        try await client.abortAfterClaimAndProveTerminal()
+        #expect(await trace.events == [
+            "connect:primary", "claim:primary", "invalidate:primary",
+            "observe:702:present", "sleep:2300000000",
+            "observe:702:absent",
+        ])
+        await #expect(
+            throws: InvestigationMachineClaimClientError.oneShotConsumed
+        ) {
+            _ = try await client.release()
+        }
+    }
+    @Test
+    func callerCancellationDoesNotCancelAbortTerminalProof() async throws {
+        let fixture = try ClaimClientFixture(), start = ClaimClientAsyncGate()
+        let trace = ClaimClientCallTrace()
+        let session = ClaimClientSessionDouble(trace: trace)
+        let client = fixture.client(
+            session: session, clock: ClaimClientClockDouble([
+                fixture.claimClockObservation, fixture.claimReplyClockObservation,
+                fixture.clockObservation(2_100_000_000),
+                fixture.clockObservation(2_200_000_000),
+            ]), transport: .init(session: session, trace: trace), epochObserver: .init([.originalHelperAbsent], trace: trace)
+        )
+        await fixture.configure(session)
+        _ = try await fixture.claim(client)
+        let task = Task { await start.waitUntilOpen(); try await client.abortAfterClaimAndProveTerminal() }
+        task.cancel()
+        start.open()
+        try await task.value
+        #expect(await trace.events == ["connect:primary", "claim:primary", "invalidate:primary", "observe:702:absent"])
+    }
+    @Test(arguments: ClaimClientAbortFailureScenario.allCases)
+    func abortNeverUpgradesUncertainTerminalStateToSuccess(
+        _ scenario: ClaimClientAbortFailureScenario
+    ) async throws {
+        let fixture = try ClaimClientFixture()
+        let session = ClaimClientSessionDouble()
+        let observer = ClaimClientHelperEpochObserverDouble(
+            scenario.helperEpochs, failureAtObservation: scenario.failureAtObservation
+        )
+        let client = fixture.client(
+            session: session,
+            clock: ClaimClientClockDouble(scenario.clocks(fixture)),
+            epochObserver: observer
+        )
+        await fixture.configure(session)
+        _ = try await fixture.claim(client)
+        await #expect(
+            throws: InvestigationMachineClaimClientError.terminalResidueUncertain
+        ) {
+            try await client.abortAfterClaimAndProveTerminal()
+        }
+    }
+    @Test
+    func concurrentAbortExcludesReleaseAndRemainsOneShot() async throws {
+        let fixture = try ClaimClientFixture()
+        let gate = ClaimClientAsyncGate()
+        let session = ClaimClientSessionDouble()
+        let observer = ClaimClientHelperEpochObserverDouble(
+            [.originalHelperAbsent], gate: gate
+        )
+        let client = fixture.client(
+            session: session, clock: ClaimClientClockDouble([
+                fixture.claimClockObservation, fixture.claimReplyClockObservation,
+                fixture.clockObservation(2_100_000_000),
+                fixture.clockObservation(2_200_000_000),
+            ]), epochObserver: observer
+        )
+        await fixture.configure(session)
+        _ = try await fixture.claim(client)
+        let abort = Task { try await client.abortAfterClaimAndProveTerminal() }
+        await gate.waitUntilEntered()
+        await #expect(
+            throws: InvestigationMachineClaimClientError.concurrentOperation
+        ) {
+            _ = try await client.release()
+        }
+        gate.open()
+        try await abort.value
+        await #expect(
+            throws: InvestigationMachineClaimClientError.oneShotConsumed
+        ) {
+            try await client.abortAfterClaimAndProveTerminal()
+        }
+    }
+    @Test
+    func inFlightReleaseExcludesAbort() async throws {
+        let fixture = try ClaimClientFixture()
+        let gate = ClaimClientAsyncGate()
+        let session = ClaimClientSessionDouble(releaseGate: gate)
+        let client = fixture.client(
+            session: session,
+            clock: ClaimClientClockDouble(
+                fixture.immediateReleaseClockObservations
+            ), helperEpochs: [.originalHelperAbsent]
+        )
+        await fixture.configure(session)
+        _ = try await fixture.claim(client)
+        let release = Task { try await client.release() }
+        await gate.waitUntilEntered()
+        await #expect(
+            throws: InvestigationMachineClaimClientError.concurrentOperation
+        ) {
+            try await client.abortAfterClaimAndProveTerminal()
+        }
+        gate.open()
+        _ = try await release.value
+    }
+    @Test
     func nextEpochRejectsReusedHelperIdentity() async throws {
         let fixture = try ClaimClientFixture()
         let session = ClaimClientSessionDouble()
         let client = fixture.client(
             session: session, clock: ClaimClientClockDouble([
                 fixture.claimClockObservation, fixture.claimReplyClockObservation,
-            ])
+                fixture.clockObservation(1_200_000_000),
+                fixture.clockObservation(1_300_000_000),
+            ]), helperEpochs: [.originalHelperAbsent]
         )
         await fixture.configure(session)
         await #expect(throws: InvestigationMachineClaimClientError.outcomeUnknown) {
@@ -258,7 +516,6 @@ struct InvestigationMachineClaimClientTests {
                 client, previousHelperIdentity: fixture.helperIdentity
             )
         }
-        #expect(await session.invalidatedCount == 1)
     }
 
     @Test(arguments: ClaimClientReleaseBoundary.allCases)
@@ -277,7 +534,6 @@ struct InvestigationMachineClaimClientTests {
         await #expect(throws: InvestigationMachineClaimClientError.outcomeUnknown) {
             _ = try await client.release()
         }
-        #expect(await session.invalidatedCount == 1)
     }
 
     @Test(arguments: ClaimClientEpochTerminalScenario.allCases)
@@ -353,8 +609,36 @@ enum ClaimClientFailureScenario: CaseIterable {
     var expectedError: InvestigationMachineClaimClientError {
         switch self {
         case .claimReason, .releaseReason: .protocolViolation
+        case .claimTransport, .wrongRequestBinding: .terminalResidueUncertain
         default: .outcomeUnknown
         }
+    }
+}
+enum ClaimClientAmbiguousClaimScenario: CaseIterable {
+    case replyLost, malformedReply, unknownReason, cancelledAfterDispatch
+}
+enum ClaimClientAbortFailureScenario: CaseIterable {
+    case persistentHelper, observerFailure, clockFailure
+    var helperEpochs: [InvestigationMachineClaimClientHelperEpoch] {
+        self == .persistentHelper ? [.originalHelperPresent] : [.originalHelperAbsent]
+    }
+    var failureAtObservation: Int? { self == .observerFailure ? 0 : nil }
+    fileprivate func clocks(
+        _ fixture: ClaimClientFixture
+    ) -> [InvestigationMachineClaimClientClockObservation] {
+        var values = [
+            fixture.claimClockObservation, fixture.claimReplyClockObservation,
+        ]
+        switch self {
+        case .persistentHelper:
+            values += [fixture.clockObservation(3_800_000_000),
+                       fixture.clockObservation(3_900_000_000)]
+        case .observerFailure:
+            values += [fixture.clockObservation(2_100_000_000)]
+        case .clockFailure:
+            break
+        }
+        return values
     }
 }
 enum ClaimClientCancellationPhase: CaseIterable {
@@ -380,7 +664,7 @@ enum ClaimClientIdentityDrift: CaseIterable {
                 .contains(self)
     }
     var expectedError: InvestigationMachineClaimClientError {
-        isPreDispatch ? .signingIdentityMismatch : .outcomeUnknown
+        isPreDispatch ? .signingIdentityMismatch : .terminalResidueUncertain
     }
 }
 enum ClaimClientReleaseBoundary: CaseIterable {
@@ -568,11 +852,16 @@ private struct ClaimClientFixture {
         sharedDeadline: InvestigationMachineClaimClientSharedDeadline? = nil,
         previousHelperIdentity: InvestigationMachineProcessIdentity? = nil
     ) async throws -> InvestigationMachineClaimEvidence {
-        try await client.claim(
+        try await client.claimOrProveTerminal(
             handle: handle, appIdentity: appIdentity,
             sharedDeadline: sharedDeadline ?? self.sharedDeadline,
             previousHelperIdentity: previousHelperIdentity
         )
+    }
+    func clockObservation(
+        _ monotonic: UInt64
+    ) -> InvestigationMachineClaimClientClockObservation {
+        clock(monotonic)
     }
 
     func claimReply(
@@ -593,6 +882,51 @@ private struct ClaimClientFixture {
         #expect(value.helperIdentity == helperIdentity)
         #expect(value.l1Residue.investigationUUID == request.handle.investigationUUID)
         return try value.encoded()
+    }
+    func acceptedClaimReply(for request: Data) throws -> Data {
+        let escrow = LifecycleMachineRetirementEscrow(
+            now: { Date(timeIntervalSince1970: 2_000_000_000.5) }, token: { handle.token },
+            reservationID: { UUID(uuidString: "abababab-abab-4bab-8bab-abababababab")! }
+        )
+        let helper = try lifecycleIdentity(helperIdentity)
+        _ = try escrow.record(
+            investigationID: .init(rawValue: handle.investigationUUID),
+            retireOperationID: handle.retireOperationUUID,
+            configurationSHA256: String(repeating: "a", count: 64),
+            validBefore: Date(timeIntervalSince1970: 2_000_000_030),
+            appIdentity: try lifecycleIdentity(appIdentity), helperIdentity: helper,
+            userID: 501,
+            ownerRetirementObservation: .retiredOwnedResources,
+            residueObservation: try .init(
+                investigationID: .init(rawValue: handle.investigationUUID),
+                auditSessionID: helper.auditSessionID, userID: 501,
+                observedAt: Date(timeIntervalSince1970: 2_000_000_000.25),
+                remainingAuditSessionMemberCount: 0, matchingLeaseCount: 0,
+                leaseRootEntryCount: 0, investigationArtifactCount: 0)
+        )
+        let effects = ClaimClientServerEffects([
+            try .init(monotonicNanoseconds: 500_000_000, wallUTCMicroseconds: 2_000_000_000_500_000),
+            try .init(monotonicNanoseconds: 1_100_000_000, wallUTCMicroseconds: 2_000_000_002_000_000),
+        ])
+        let executor = InvestigationMachineClaimServerEffectExecutor(
+            clock: effects, scheduler: effects, terminal: effects
+        )
+        let state = LifecycleMachineRetirementEscrowDeadlineState()
+        let adapter = try InvestigationMachineClaimServerAdapter(
+            transfer: escrow.transferReservation(), clock: effects, state: state,
+            executor: executor)
+        let reply = try adapter.claim(request)
+        #expect(state.phase == .claimedAwaitingRelease)
+        return reply
+    }
+    private func lifecycleIdentity(_ value: InvestigationMachineProcessIdentity) throws
+        -> LifecycleMachineProcessIdentityRecord {
+        try .init(
+            processID: Int32(value.processID),
+            processIDVersion: Int32(value.processIDVersion),
+            auditSessionID: Int32(value.auditSessionID), effectiveUserID: value.effectiveUserID,
+            auditTokenWords: value.auditTokenWords
+        )
     }
 
     func releaseReply(for release: InvestigationMachineClaimRelease) throws -> Data {
@@ -781,17 +1115,25 @@ private final class ClaimClientTransportDouble:
     private(set) var connectCount = 0
     private(set) var serviceNames: [String] = []
     private(set) var codeSigningRequirements: [String] = []
-    init(session: ClaimClientSessionDouble) { self.session = session }
+    private let trace: ClaimClientCallTrace?
+    init(
+        session: ClaimClientSessionDouble, trace: ClaimClientCallTrace? = nil
+    ) {
+        self.session = session
+        self.trace = trace
+    }
     func connect(
         serviceName: String, codeSigningRequirement: String
     ) async throws -> any InvestigationMachineClaimClientSession {
         connectCount += 1
         serviceNames.append(serviceName)
         codeSigningRequirements.append(codeSigningRequirement)
+        await trace?.record("connect:\(session.sessionID)")
         return session
     }
 }
 private actor ClaimClientSessionDouble: InvestigationMachineClaimClientSession {
+    nonisolated let sessionID: String
     var connectionIdentity = InvestigationMachineClaimClientConnectionIdentity(
         serviceName: "", processID: 0, auditSessionID: 0, effectiveUserID: 0
     )
@@ -803,14 +1145,19 @@ private actor ClaimClientSessionDouble: InvestigationMachineClaimClientSession {
     private var invalidated = false
     private let claimGate: ClaimClientAsyncGate?
     private let releaseGate: ClaimClientAsyncGate?
+    private let trace: ClaimClientCallTrace?
     private var claimHandler: ClaimClientHandler?
     private var releaseHandler: ClaimClientHandler?
     init(
         claimGate: ClaimClientAsyncGate? = nil,
-        releaseGate: ClaimClientAsyncGate? = nil
+        releaseGate: ClaimClientAsyncGate? = nil,
+        sessionID: String = "primary",
+        trace: ClaimClientCallTrace? = nil
     ) {
         self.claimGate = claimGate
         self.releaseGate = releaseGate
+        self.sessionID = sessionID
+        self.trace = trace
     }
     func configure(
         connectionIdentity: InvestigationMachineClaimClientConnectionIdentity,
@@ -832,6 +1179,7 @@ private actor ClaimClientSessionDouble: InvestigationMachineClaimClientSession {
         guard !invalidated else { throw ClaimClientInjectedFailure() }
         claimRequests.append(request)
         claimDeadlines.append(deadlineNanoseconds)
+        await trace?.record("claim:\(sessionID)")
         if let claimGate { claimGate.arrive(); await claimGate.waitUntilOpen() }
         let handler = try #require(claimHandler)
         return try await handler(request)
@@ -842,6 +1190,7 @@ private actor ClaimClientSessionDouble: InvestigationMachineClaimClientSession {
         guard !invalidated else { throw ClaimClientInjectedFailure() }
         releaseRequests.append(request)
         releaseDeadlines.append(deadlineNanoseconds)
+        await trace?.record("release:\(sessionID)")
         if let releaseGate { releaseGate.arrive(); await releaseGate.waitUntilOpen() }
         let handler = try #require(releaseHandler)
         return try await handler(request)
@@ -849,6 +1198,7 @@ private actor ClaimClientSessionDouble: InvestigationMachineClaimClientSession {
     func invalidate() async {
         invalidatedCount += 1
         invalidated = true
+        await trace?.record("invalidate:\(sessionID)")
     }
 }
 private final class ClaimClientStaticIdentityReaderDouble:
@@ -889,23 +1239,40 @@ private actor ClaimClientHelperEpochObserverDouble:
 {
     private let epochs: [InvestigationMachineClaimClientHelperEpoch]
     private let absenceRequiresSleepFrom: ClaimClientClockDouble?
+    private let failureAtObservation: Int?
+    private let trace: ClaimClientCallTrace?
+    private let gate: ClaimClientAsyncGate?
     private var index = 0
     private(set) var observations: [InvestigationMachineProcessIdentity] = []
     private(set) var serviceNames: [String] = []
     init(
         _ epochs: [InvestigationMachineClaimClientHelperEpoch],
-        absenceRequiresSleepFrom: ClaimClientClockDouble? = nil
+        absenceRequiresSleepFrom: ClaimClientClockDouble? = nil,
+        failureAtObservation: Int? = nil,
+        trace: ClaimClientCallTrace? = nil,
+        gate: ClaimClientAsyncGate? = nil
     ) {
         self.epochs = epochs
         self.absenceRequiresSleepFrom = absenceRequiresSleepFrom
+        self.failureAtObservation = failureAtObservation
+        self.trace = trace
+        self.gate = gate
     }
     func observe(
         serviceName: String, claimedHelperIdentity: InvestigationMachineProcessIdentity
     ) async throws -> InvestigationMachineClaimClientHelperEpoch {
         observations.append(claimedHelperIdentity)
         serviceNames.append(serviceName)
+        if let gate { gate.arrive(); await gate.waitUntilOpen() }
+        if failureAtObservation == index {
+            await trace?.record("observe:\(claimedHelperIdentity.processID):failure")
+            index += 1
+            throw ClaimClientInjectedFailure()
+        }
         let value = index < epochs.count ? epochs[index] : .originalHelperPresent
         index += 1
+        let label = value == .originalHelperAbsent ? "absent" : "present"
+        await trace?.record("observe:\(claimedHelperIdentity.processID):\(label)")
         if value == .originalHelperAbsent, let clock = absenceRequiresSleepFrom {
             #expect(clock.sleepDeadlines == [2_300_000_000])
         }
@@ -918,8 +1285,13 @@ private final class ClaimClientClockDouble:
     private let lock = NSLock()
     private var observations: [InvestigationMachineClaimClientClockObservation]
     private(set) var sleepDeadlines: [UInt64] = []
-    init(_ observations: [InvestigationMachineClaimClientClockObservation]) {
+    private let trace: ClaimClientCallTrace?
+    init(
+        _ observations: [InvestigationMachineClaimClientClockObservation],
+        trace: ClaimClientCallTrace? = nil
+    ) {
         self.observations = observations
+        self.trace = trace
     }
     func observe() throws -> InvestigationMachineClaimClientClockObservation {
         try lock.withLock {
@@ -929,7 +1301,34 @@ private final class ClaimClientClockDouble:
     }
     func sleep(untilNanoseconds deadlineNanoseconds: UInt64) async {
         lock.withLock { sleepDeadlines.append(deadlineNanoseconds) }
+        await trace?.record("sleep:\(deadlineNanoseconds)")
     }
+}
+private actor ClaimClientCallTrace {
+    private(set) var events: [String] = []
+    func record(_ event: String) { events.append(event) }
+}
+private final class ClaimClientServerEffects: InvestigationMachineClaimServerCoreClock,
+    InvestigationMachineClaimServerCoreScheduling,
+    InvestigationMachineClaimServerCoreTerminalHandling,
+    InvestigationMachineClaimServerCoreScheduledHandle, @unchecked Sendable
+{
+    private let lock = NSLock()
+    private var values: [LifecycleMachineRetirementDeadlineObservation]
+    init(_ values: [LifecycleMachineRetirementDeadlineObservation]) { self.values = values }
+    func observation() throws -> LifecycleMachineRetirementDeadlineObservation {
+        try lock.withLock {
+            guard !values.isEmpty else { throw ClaimClientInjectedFailure() }
+            return values.removeFirst()
+        }
+    }
+    func schedule(ticket _: LifecycleMachineRetirementDeadlineTicket,
+        callback _: @escaping @Sendable () -> Void
+    ) throws -> any InvestigationMachineClaimServerCoreScheduledHandle {
+        self
+    }
+    func cancel() {}
+    func handle(_ reason: LifecycleMachineRetirementDeadlineTerminalReason) {}
 }
 private final class ClaimClientAsyncGate: @unchecked Sendable {
     private let lock = NSLock()
