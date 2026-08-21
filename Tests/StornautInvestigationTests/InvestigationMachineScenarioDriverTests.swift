@@ -283,7 +283,7 @@ struct InvestigationMachineScenarioDriverTests {
     }
 
     @Test
-    func hostOrdersInstalledTopologyBeforeOneTransitionAndPostTeardown()
+    func hostOrdersOneTransitionBeforePostTeardown()
         async throws
     {
         let fixture = try InvestigationMachineScenarioAttemptFixture(
@@ -299,7 +299,6 @@ struct InvestigationMachineScenarioDriverTests {
         #expect(
             fixture.eventLog.snapshot()
                 == [
-                    "installed",
                     "transition",
                     "postTeardown",
                     "hostReturn",

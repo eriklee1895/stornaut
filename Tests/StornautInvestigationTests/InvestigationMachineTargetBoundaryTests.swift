@@ -1078,6 +1078,132 @@ struct InvestigationMachineTargetBoundaryTests {
         ] { #expect(sources[1].contains(marker)) }
     }
 
+    @Test func iiB5BIC2AClosesLegacyInstalledSemanticOwner() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let sourceRoot = root.appending(
+            path: "Sources/StornautInvestigationMachine"
+        )
+        let collector = try String(
+            contentsOf: sourceRoot.appending(
+                path: "InvestigationLifecycleTopologyCollector.swift"
+            ),
+            encoding: .utf8
+        )
+        let serviceProbe = try String(
+            contentsOf: sourceRoot.appending(
+                path: "FixedLifecycleServiceProbe.swift"
+            ),
+            encoding: .utf8
+        )
+        let scenarioDriver = try String(
+            contentsOf: sourceRoot.appending(
+                path: "InvestigationMachineScenarioDriver.swift"
+            ),
+            encoding: .utf8
+        )
+        let lifecycle = try String(
+            contentsOf: root.appending(
+                path: "Sources/StornautLifecycle/"
+                    + "LifecycleRootTopologyObservation.swift"
+            ),
+            encoding: .utf8
+        )
+        let installedOwner = try String(
+            contentsOf: root.appending(
+                path: "Sources/StornautInvestigationInstalledL2/"
+                    + "InstalledL2Observer.swift"
+            ),
+            encoding: .utf8
+        )
+        let installedJoin = try String(
+            contentsOf: root.appending(
+                path: "Sources/StornautInvestigationMachineDriverSupport/"
+                    + "InvestigationMachineSingleEpochInstalledL2Join.swift"
+            ),
+            encoding: .utf8
+        )
+
+        #expect(collector.contains(
+            "struct DarwinInvestigationLifecyclePostTeardownObserver"
+        ))
+        #expect(collector.contains(
+            "struct PostTeardownExpectedTopologyBindingReader"
+        ))
+        #expect(serviceProbe.contains(
+            "struct DarwinPostTeardownLifecycleServiceProbe"
+        ))
+        for forbidden in [
+            "DarwinInvestigationLifecycleTopologyObserver",
+            "case installedTopologyUnproved",
+            "phase: .installed",
+            "provesInstalledTopology",
+            "installedTopology",
+            "DarwinFixedLifecycleServiceProbe",
+            "InstalledLifecycleTopologyBindingReader",
+        ] {
+            #expect(!collector.contains(forbidden))
+        }
+        for forbidden in [
+            "LifecycleFixedServiceIdentityReading",
+            "DarwinFixedServiceIdentityReader",
+            "InstalledLifecycleTopologyBindingReader",
+            "expectedIdentity",
+            ".loaded(identity:",
+        ] {
+            #expect(!serviceProbe.contains(forbidden))
+        }
+        #expect(!scenarioDriver.contains("cohort.installedTopology"))
+        for forbidden in [
+            "LifecycleRootTopologyPhase",
+            "provesInstalledTopology",
+            "installedContractSatisfied",
+            "case loaded(identity:",
+            "case loadedValid",
+        ] {
+            #expect(!lifecycle.contains(forbidden))
+        }
+
+        let sourceEnumerator = FileManager.default.enumerator(
+            at: root.appending(path: "Sources"),
+            includingPropertiesForKeys: nil
+        )
+        let sourceURLs = (sourceEnumerator?.allObjects as? [URL] ?? [])
+            .filter { $0.pathExtension == "swift" }
+        let production = try sourceURLs.map {
+            try String(contentsOf: $0, encoding: .utf8)
+        }.joined(separator: "\n")
+        for retiredMarker in [
+            "LifecycleRootTopologyPhase",
+            "phase: .installed",
+            "provesInstalledTopology",
+            "installedContractSatisfied",
+            "installedTopologyUnproved",
+            "DarwinFixedLifecycleServiceProbe",
+            "DarwinFixedServiceIdentityReader",
+            "LifecycleFixedServiceIdentityReading",
+            "InvestigationLifecycleTopologyObserving",
+            "cohort.installedTopology",
+        ] {
+            #expect(!production.contains(retiredMarker))
+        }
+        #expect(installedOwner.components(
+            separatedBy: "InvestigationInstalledL2SemanticContract.evaluate("
+        ).count == 2)
+        for constructor in [
+            "InvestigationInstalledL2ArtifactReader()",
+            "InvestigationInstalledL2ProcessReader()",
+            "InvestigationInstalledL2FixedServiceReader()",
+        ] {
+            #expect(production.components(separatedBy: constructor).count == 2)
+            #expect(installedOwner.contains(constructor))
+        }
+        #expect(production.components(
+            separatedBy: "InvestigationInstalledL2Observer()"
+        ).count == 2)
+        #expect(installedJoin.contains("InvestigationInstalledL2Observer()"))
+    }
+
     @Test
     func nativeMachineDriverPackagingIsDiagnosticOnly() throws {
         let repositoryRoot = URL(filePath: #filePath)

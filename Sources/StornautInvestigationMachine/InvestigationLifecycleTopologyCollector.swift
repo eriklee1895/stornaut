@@ -14,7 +14,6 @@ enum InvestigationLifecycleTopologyCollectorError:
     case collectorConsumed
     case bindingMismatch
     case retirementEvidenceMismatch
-    case installedTopologyUnproved
     case transitionFailed
     case postTeardownTopologyUnproved
     case observationOutsideWindow
@@ -80,14 +79,14 @@ struct InvestigationLifecycleTopologyCollectionRequest:
     }
 }
 
-protocol InvestigationLifecycleTopologyBindingReading: Sendable {
+protocol InvestigationLifecyclePostTeardownBindingReading: Sendable {
     func readBinding(
         signedBinding: SignedInvestigationRuntimeBinding
     ) throws -> LifecycleRootTopologyBinding
 }
 
-struct InstalledLifecycleTopologyBindingReader:
-    InvestigationLifecycleTopologyBindingReading,
+struct PostTeardownExpectedTopologyBindingReader:
+    InvestigationLifecyclePostTeardownBindingReading,
     Sendable
 {
     private let signingReader: LifecycleBundleSigningIdentityReader
@@ -150,30 +149,35 @@ struct InstalledLifecycleTopologyBindingReader:
     }
 }
 
-protocol InvestigationLifecycleTopologyObserving: Sendable {
-    func observe(
-        _ request: LifecycleRootTopologyObservationRequest
+protocol InvestigationLifecyclePostTeardownObserving: Sendable {
+    func observePostTeardown(
+        binding: LifecycleRootTopologyBinding,
+        appProcessIdentity: LifecycleProcessIdentity,
+        helperProcessIdentity: LifecycleProcessIdentity,
+        window: LifecycleRootTopologyObservationWindow
     ) async throws -> LifecycleRootTopologyObservation
 }
 
-struct DarwinInvestigationLifecycleTopologyObserver:
-    InvestigationLifecycleTopologyObserving,
+struct DarwinInvestigationLifecyclePostTeardownObserver:
+    InvestigationLifecyclePostTeardownObserving,
     Sendable
 {
-    private let expectedHelperIdentity: LifecycleProcessIdentity
-
-    init(expectedHelperIdentity: LifecycleProcessIdentity) {
-        self.expectedHelperIdentity = expectedHelperIdentity
-    }
-
-    func observe(
-        _ request: LifecycleRootTopologyObservationRequest
+    func observePostTeardown(
+        binding: LifecycleRootTopologyBinding,
+        appProcessIdentity: LifecycleProcessIdentity,
+        helperProcessIdentity: LifecycleProcessIdentity,
+        window: LifecycleRootTopologyObservationWindow
     ) async throws -> LifecycleRootTopologyObservation {
         try LifecycleRootTopologyObserver(
-            serviceProbe: DarwinFixedLifecycleServiceProbe(
-                expectedIdentity: expectedHelperIdentity
+            serviceProbe: DarwinPostTeardownLifecycleServiceProbe()
+        ).observe(
+            LifecycleRootTopologyObservationRequest(
+                binding: binding,
+                appProcessIdentity: appProcessIdentity,
+                helperProcessIdentity: helperProcessIdentity,
+                window: window
             )
-        ).observe(request)
+        )
     }
 }
 
@@ -193,14 +197,12 @@ struct InvestigationLifecycleTopologyCohort: Sendable, Equatable {
         LifecycleInvestigationResidueObservation
     let ownerRetirementObservation:
         LifecycleInteractiveWorkerRetirementObservation
-    let installedTopology: LifecycleRootTopologyObservation
     let postTeardownTopology: LifecycleRootTopologyObservation
     let observedAt: Date
 
     fileprivate init(
         request: InvestigationLifecycleTopologyCollectionRequest,
         retirementClaim: InvestigationMachineRetirementClaim,
-        installedTopology: LifecycleRootTopologyObservation,
         postTeardownTopology: LifecycleRootTopologyObservation
     ) {
         investigationID = request.investigationID
@@ -215,7 +217,6 @@ struct InvestigationLifecycleTopologyCohort: Sendable, Equatable {
             retirementClaim.residueObservation
         ownerRetirementObservation =
             retirementClaim.ownerRetirementObservation
-        self.installedTopology = installedTopology
         self.postTeardownTopology = postTeardownTopology
         observedAt = postTeardownTopology.observedAt
     }
@@ -228,22 +229,24 @@ actor InvestigationLifecycleTopologyCollector {
         case consumed
     }
 
-    private let topologyObserver:
-        any InvestigationLifecycleTopologyObserving
-    private let bindingReader:
-        any InvestigationLifecycleTopologyBindingReading
+    private let postTeardownObserver:
+        any InvestigationLifecyclePostTeardownObserving
+    private let expectedBindingReader:
+        any InvestigationLifecyclePostTeardownBindingReading
     private let effectiveUserID: @Sendable () -> uid_t
     private let now: @Sendable () -> Date
     private var state = State.ready
 
     init(
-        topologyObserver: any InvestigationLifecycleTopologyObserving,
-        bindingReader: any InvestigationLifecycleTopologyBindingReading,
+        postTeardownObserver:
+            any InvestigationLifecyclePostTeardownObserving,
+        expectedBindingReader:
+            any InvestigationLifecyclePostTeardownBindingReading,
         effectiveUserID: @escaping @Sendable () -> uid_t = geteuid,
         now: @escaping @Sendable () -> Date = Date.init
     ) {
-        self.topologyObserver = topologyObserver
-        self.bindingReader = bindingReader
+        self.postTeardownObserver = postTeardownObserver
+        self.expectedBindingReader = expectedBindingReader
         self.effectiveUserID = effectiveUserID
         self.now = now
     }
@@ -277,7 +280,7 @@ actor InvestigationLifecycleTopologyCollector {
         }
         let topologyBinding: LifecycleRootTopologyBinding
         do {
-            topologyBinding = try bindingReader.readBinding(
+            topologyBinding = try expectedBindingReader.readBinding(
                 signedBinding: request.signedBinding
             )
         } catch {
@@ -293,47 +296,6 @@ actor InvestigationLifecycleTopologyCollector {
             openedAt: request.openedAt,
             validBefore: request.validBefore
         )
-        let installedRequest = try LifecycleRootTopologyObservationRequest(
-            phase: .installed,
-            binding: topologyBinding,
-            appProcessIdentity: request.appProcessIdentity,
-            helperProcessIdentity:
-                retirementClaim.helperPeerIdentity,
-            window: window
-        )
-        let installed: LifecycleRootTopologyObservation
-        do {
-            installed = try await topologyObserver.observe(
-                installedRequest
-            )
-        } catch is CancellationError {
-            throw CancellationError()
-        } catch {
-            throw InvestigationLifecycleTopologyCollectorError
-                .installedTopologyUnproved
-        }
-        try Task.checkCancellation()
-        guard
-            state == .collecting,
-            installed.provesInstalledTopology,
-            installed.binding == topologyBinding,
-            installed.appProcessIdentity == request.appProcessIdentity,
-            installed.helperProcessIdentity
-                == retirementClaim.helperPeerIdentity,
-            installed.startedAt >= request.openedAt,
-            installed.observedAt >= installed.startedAt,
-            installed.observedAt <= request.validBefore,
-            retirementClaim.residueObservation.observedAt
-                <= retirementClaim.recordedAt,
-            retirementClaim.recordedAt
-                <= retirementClaim.request.issuedAt,
-            retirementClaim.request.issuedAt
-                <= retirementClaim.claimedAt,
-            retirementClaim.claimedAt <= installed.startedAt
-        else {
-            throw InvestigationLifecycleTopologyCollectorError
-                .installedTopologyUnproved
-        }
         try Task.checkCancellation()
         guard effectiveUserID() == 0 else {
             throw InvestigationLifecycleTopologyCollectorError
@@ -353,18 +315,21 @@ actor InvestigationLifecycleTopologyCollector {
             throw InvestigationLifecycleTopologyCollectorError
                 .collectorConsumed
         }
-        try requireWindow(request, at: now())
-        let postRequest = try LifecycleRootTopologyObservationRequest(
-            phase: .postTeardown,
-            binding: topologyBinding,
-            appProcessIdentity: request.appProcessIdentity,
-            helperProcessIdentity:
-                retirementClaim.helperPeerIdentity,
-            window: window
-        )
+        guard effectiveUserID() == 0 else {
+            throw InvestigationLifecycleTopologyCollectorError
+                .rootAuthorityRequired
+        }
+        let transitionedAt = now()
+        try requireWindow(request, at: transitionedAt)
         let post: LifecycleRootTopologyObservation
         do {
-            post = try await topologyObserver.observe(postRequest)
+            post = try await postTeardownObserver.observePostTeardown(
+                binding: topologyBinding,
+                appProcessIdentity: request.appProcessIdentity,
+                helperProcessIdentity:
+                    retirementClaim.helperPeerIdentity,
+                window: window
+            )
         } catch is CancellationError {
             throw CancellationError()
         } catch {
@@ -372,14 +337,17 @@ actor InvestigationLifecycleTopologyCollector {
                 .postTeardownTopologyUnproved
         }
         try Task.checkCancellation()
+        guard state == .collecting else {
+            throw InvestigationLifecycleTopologyCollectorError
+                .collectorConsumed
+        }
         guard
-            state == .collecting,
             post.provesPostTeardownTopology,
             post.binding == topologyBinding,
             post.appProcessIdentity == request.appProcessIdentity,
             post.helperProcessIdentity
                 == retirementClaim.helperPeerIdentity,
-            post.startedAt >= installed.observedAt,
+            post.startedAt >= transitionedAt,
             post.observedAt >= post.startedAt,
             post.observedAt <= request.validBefore
         else {
@@ -390,7 +358,6 @@ actor InvestigationLifecycleTopologyCollector {
         return InvestigationLifecycleTopologyCohort(
             request: request,
             retirementClaim: retirementClaim,
-            installedTopology: installed,
             postTeardownTopology: post
         )
     }
@@ -430,6 +397,9 @@ actor InvestigationLifecycleTopologyCollector {
             claim.claimedAt <= request.openedAt,
             claim.request.validBefore >= request.openedAt,
             claim.request.validBefore >= claim.claimedAt,
+            residue.observedAt <= claim.recordedAt,
+            claim.recordedAt <= claim.request.issuedAt,
+            claim.request.issuedAt <= claim.claimedAt,
             residue.observedAt <= request.validBefore,
             topologyBinding.appSigningEvidence.executableSHA256
                 == request.signedBinding.appExecutableSHA256,

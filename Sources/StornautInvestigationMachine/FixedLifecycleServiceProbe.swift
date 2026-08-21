@@ -38,56 +38,21 @@ struct DarwinFixedLifecycleServiceRegistry:
     }
 }
 
-protocol LifecycleFixedServiceIdentityReading: Sendable {
-    func readIdentity(
-        processID: pid_t
-    ) -> Result<LifecycleProcessIdentity, DarwinLifecycleSupportError>
-}
-
-struct DarwinFixedServiceIdentityReader:
-    LifecycleFixedServiceIdentityReading,
-    Sendable
-{
-    func readIdentity(
-        processID: pid_t
-    ) -> Result<LifecycleProcessIdentity, DarwinLifecycleSupportError> {
-        do {
-            return .success(
-                try DarwinLifecycleInventory(
-                    privilegedProcessID: getpid()
-                ).identity(for: processID)
-            )
-        } catch let error as DarwinLifecycleSupportError {
-            return .failure(error)
-        } catch {
-            return .failure(.invalidIdentity)
-        }
-    }
-}
-
-struct DarwinFixedLifecycleServiceProbe:
+struct DarwinPostTeardownLifecycleServiceProbe:
     LifecycleRootTopologyServiceProbing,
     Sendable
 {
     private let registry: any LifecycleFixedServiceRegistryReading
-    private let identityReader: any LifecycleFixedServiceIdentityReading
-    private let expectedIdentity: LifecycleProcessIdentity
 
     init(
-        registry: any LifecycleFixedServiceRegistryReading,
-        identityReader: any LifecycleFixedServiceIdentityReading,
-        expectedIdentity: LifecycleProcessIdentity
+        registry: any LifecycleFixedServiceRegistryReading
     ) {
         self.registry = registry
-        self.identityReader = identityReader
-        self.expectedIdentity = expectedIdentity
     }
 
-    init(expectedIdentity: LifecycleProcessIdentity) {
+    init() {
         self.init(
-            registry: DarwinFixedLifecycleServiceRegistry(),
-            identityReader: DarwinFixedServiceIdentityReader(),
-            expectedIdentity: expectedIdentity
+            registry: DarwinFixedLifecycleServiceRegistry()
         )
     }
 
@@ -106,34 +71,10 @@ struct DarwinFixedLifecycleServiceProbe:
             return .absent
         case let .unavailable(reasonKey):
             return .unavailable(reasonKey: reasonKey)
-        case let .registered(processID):
-            guard let processID else {
-                return .unavailable(
-                    reasonKey: "runtime.topology.service-not-running"
-                )
-            }
-            guard processID == expectedIdentity.processID else {
-                return .unavailable(
-                    reasonKey:
-                        "runtime.topology.service-identity-mismatch"
-                )
-            }
-            switch identityReader.readIdentity(
-                processID: processID
-            ) {
-            case let .success(identity) where identity == expectedIdentity:
-                return .loaded(identity: identity)
-            case .success:
-                return .unavailable(
-                    reasonKey:
-                        "runtime.topology.service-identity-mismatch"
-                )
-            case .failure:
-                return .unavailable(
-                    reasonKey:
-                        "runtime.topology.service-identity-unavailable"
-                )
-            }
+        case .registered:
+            return .unavailable(
+                reasonKey: "runtime.topology.service-still-registered"
+            )
         }
     }
 }

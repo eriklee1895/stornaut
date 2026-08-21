@@ -93,7 +93,7 @@ struct InvestigationMachineDriverHostTests {
     }
 
     @Test
-    func successfulRunPreservesClaimInstalledTransitionPostOrder()
+    func successfulRunPreservesClaimTransitionPostTeardownOrder()
         async throws
     {
         let fixture = try DriverHostFixture()
@@ -117,7 +117,6 @@ struct InvestigationMachineDriverHostTests {
         #expect(await events.snapshot == [
             "handoff",
             "claim",
-            "installed",
             "transition",
             "postTeardown",
         ])
@@ -125,7 +124,6 @@ struct InvestigationMachineDriverHostTests {
             authority.cohort.investigationID
                 == fixture.topology.investigationID
         )
-        #expect(authority.cohort.installedTopology.provesInstalledTopology)
         #expect(
             authority.cohort.postTeardownTopology
                 .provesPostTeardownTopology
@@ -245,37 +243,7 @@ struct InvestigationMachineDriverHostTests {
     }
 
     @Test
-    func topologyAndTransitionFailuresNeverEmitAuthority() async throws {
-        let installedFixture = try DriverHostFixture()
-        let installedEvents = DriverHostEventRecorder()
-        let installedHost = installedFixture.host(
-            handoff: RecordingDriverHandoff(
-                handle: installedFixture.handle,
-                events: installedEvents
-            ),
-            claimant: RecordingDriverClaimant(
-                claim: installedFixture.claim,
-                events: installedEvents
-            ),
-            events: installedEvents,
-            installedError: LifecycleRootTopologyObservationError
-                .invalidRequest
-        )
-        await #expect(
-            throws: InvestigationLifecycleTopologyCollectorError
-                .installedTopologyUnproved
-        ) {
-            _ = try await installedHost.run()
-        }
-        #expect(await installedEvents.snapshot == [
-            "handoff", "claim", "installed",
-        ])
-        await #expect(
-            throws: InvestigationMachineDriverHostError.hostConsumed
-        ) {
-            _ = try await installedHost.run()
-        }
-
+    func transitionAndPostTeardownFailuresNeverEmitAuthority() async throws {
         let transitionFixture = try DriverHostFixture()
         let transitionEvents = DriverHostEventRecorder()
         let transitionHost = transitionFixture.host(
@@ -297,7 +265,7 @@ struct InvestigationMachineDriverHostTests {
             _ = try await transitionHost.run()
         }
         #expect(await transitionEvents.snapshot == [
-            "handoff", "claim", "installed", "transition",
+            "handoff", "claim", "transition",
         ])
         await #expect(
             throws: InvestigationMachineDriverHostError.hostConsumed
@@ -329,7 +297,6 @@ struct InvestigationMachineDriverHostTests {
         #expect(await postEvents.snapshot == [
             "handoff",
             "claim",
-            "installed",
             "transition",
             "postTeardown",
         ])
@@ -523,7 +490,6 @@ private final class DriverHostFixture: @unchecked Sendable {
         claimant: any InvestigationMachineRetirementClaiming,
         events: DriverHostEventRecorder,
         effectiveUserID: @escaping @Sendable () -> uid_t = { 0 },
-        installedError: LifecycleRootTopologyObservationError? = nil,
         transitionError: (any Error)? = nil,
         postTeardownError: LifecycleRootTopologyObservationError? = nil
     ) -> InvestigationMachineDriverHost {
@@ -535,16 +501,13 @@ private final class DriverHostFixture: @unchecked Sendable {
             claimant: claimant,
             collectorFactory: { _ in
                 InvestigationLifecycleTopologyCollector(
-                    topologyObserver: DriverHostTopologyObserver(
-                        installed: try! self.topology
-                            .installedObservation(),
+                    postTeardownObserver: DriverHostPostTeardownObserver(
                         postTeardown: try! self.topology
                             .postTeardownObservation(),
                         events: events,
-                        installedError: installedError,
                         postTeardownError: postTeardownError
                     ),
-                    bindingReader: DriverHostBindingReader(
+                    expectedBindingReader: DriverHostBindingReader(
                         binding: self.topology.binding
                     ),
                     effectiveUserID: effectiveUserID,
@@ -755,7 +718,7 @@ private actor DriverPhaseLatch {
 }
 
 private struct DriverHostBindingReader:
-    InvestigationLifecycleTopologyBindingReading
+    InvestigationLifecyclePostTeardownBindingReading
 {
     let binding: LifecycleRootTopologyBinding
 
@@ -766,42 +729,32 @@ private struct DriverHostBindingReader:
     }
 }
 
-private actor DriverHostTopologyObserver:
-    InvestigationLifecycleTopologyObserving
+private actor DriverHostPostTeardownObserver:
+    InvestigationLifecyclePostTeardownObserving
 {
-    let installed: LifecycleRootTopologyObservation
     let postTeardown: LifecycleRootTopologyObservation
     let events: DriverHostEventRecorder
-    let installedError: LifecycleRootTopologyObservationError?
     let postTeardownError: LifecycleRootTopologyObservationError?
 
     init(
-        installed: LifecycleRootTopologyObservation,
         postTeardown: LifecycleRootTopologyObservation,
         events: DriverHostEventRecorder,
-        installedError: LifecycleRootTopologyObservationError?,
         postTeardownError: LifecycleRootTopologyObservationError?
     ) {
-        self.installed = installed
         self.postTeardown = postTeardown
         self.events = events
-        self.installedError = installedError
         self.postTeardownError = postTeardownError
     }
 
-    func observe(
-        _ request: LifecycleRootTopologyObservationRequest
+    func observePostTeardown(
+        binding _: LifecycleRootTopologyBinding,
+        appProcessIdentity _: LifecycleProcessIdentity,
+        helperProcessIdentity _: LifecycleProcessIdentity,
+        window _: LifecycleRootTopologyObservationWindow
     ) async throws -> LifecycleRootTopologyObservation {
-        switch request.phase {
-        case .installed:
-            await events.record("installed")
-            if let installedError { throw installedError }
-            return installed
-        case .postTeardown:
-            await events.record("postTeardown")
-            if let postTeardownError { throw postTeardownError }
-            return postTeardown
-        }
+        await events.record("postTeardown")
+        if let postTeardownError { throw postTeardownError }
+        return postTeardown
     }
 }
 

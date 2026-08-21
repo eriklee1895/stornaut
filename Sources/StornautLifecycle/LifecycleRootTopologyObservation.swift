@@ -1,11 +1,6 @@
 import Darwin
 import Foundation
 
-package enum LifecycleRootTopologyPhase: Sendable, Equatable, CaseIterable {
-    case installed
-    case postTeardown
-}
-
 package enum LifecycleRootTopologyArtifactRole:
     Sendable,
     Hashable,
@@ -30,14 +25,11 @@ package enum LifecycleRootTopologyArtifactObservation: Sendable, Equatable {
 
 package enum LifecycleRootTopologyServiceProbeResult: Sendable, Equatable {
     case absent
-    case loaded(identity: LifecycleProcessIdentity)
     case unavailable(reasonKey: String)
 }
 
 package enum LifecycleRootTopologyServiceObservation: Sendable, Equatable {
     case absent
-    case loadedValid
-    case invalid(reasonKey: String)
     case unavailable(reasonKey: String)
 }
 
@@ -157,14 +149,12 @@ package struct LifecycleRootTopologyObservationWindow: Sendable, Equatable {
 }
 
 package struct LifecycleRootTopologyObservationRequest: Sendable, Equatable {
-    package let phase: LifecycleRootTopologyPhase
     package let binding: LifecycleRootTopologyBinding
     package let appProcessIdentity: LifecycleProcessIdentity
     package let helperProcessIdentity: LifecycleProcessIdentity
     package let window: LifecycleRootTopologyObservationWindow
 
     package init(
-        phase: LifecycleRootTopologyPhase,
         binding: LifecycleRootTopologyBinding,
         appProcessIdentity: LifecycleProcessIdentity,
         helperProcessIdentity: LifecycleProcessIdentity,
@@ -184,7 +174,6 @@ package struct LifecycleRootTopologyObservationRequest: Sendable, Equatable {
         else {
             throw LifecycleRootTopologyObservationError.invalidRequest
         }
-        self.phase = phase
         self.binding = binding
         self.appProcessIdentity = appProcessIdentity
         self.helperProcessIdentity = helperProcessIdentity
@@ -193,7 +182,6 @@ package struct LifecycleRootTopologyObservationRequest: Sendable, Equatable {
 }
 
 package struct LifecycleRootTopologyObservation: Sendable, Equatable {
-    package let phase: LifecycleRootTopologyPhase
     package let binding: LifecycleRootTopologyBinding
     package let appProcessIdentity: LifecycleProcessIdentity
     package let helperProcessIdentity: LifecycleProcessIdentity
@@ -208,7 +196,6 @@ package struct LifecycleRootTopologyObservation: Sendable, Equatable {
     package let observedAt: Date
 
     fileprivate init(
-        phase: LifecycleRootTopologyPhase,
         binding: LifecycleRootTopologyBinding,
         appProcessIdentity: LifecycleProcessIdentity,
         helperProcessIdentity: LifecycleProcessIdentity,
@@ -222,7 +209,6 @@ package struct LifecycleRootTopologyObservation: Sendable, Equatable {
         startedAt: Date,
         observedAt: Date
     ) {
-        self.phase = phase
         self.binding = binding
         self.appProcessIdentity = appProcessIdentity
         self.helperProcessIdentity = helperProcessIdentity
@@ -234,34 +220,8 @@ package struct LifecycleRootTopologyObservation: Sendable, Equatable {
         self.observedAt = observedAt
     }
 
-    package var provesInstalledTopology: Bool {
-        phase == .installed && installedContractSatisfied
-    }
-
     package var provesPostTeardownTopology: Bool {
-        phase == .postTeardown && postTeardownContractSatisfied
-    }
-
-    package var satisfiesPhaseContract: Bool {
-        provesInstalledTopology || provesPostTeardownTopology
-    }
-
-    private var installedContractSatisfied: Bool {
-        let required: [LifecycleRootTopologyArtifactRole] = [
-            .installedRoot,
-            .installedApp,
-            .appExecutable,
-            .helperExecutable,
-            .machineDriverExecutable,
-            .launchDaemonPlist,
-        ]
-        return required.allSatisfy { artifacts[$0] == .presentValid }
-            && [.runtimeRoot, .leaseRoot].allSatisfy {
-                artifacts[$0] == .presentValid || artifacts[$0] == .absent
-            }
-            && appProcess == .sameIdentityAlive
-            && helperProcess == .sameIdentityAlive
-            && service == .loadedValid
+        postTeardownContractSatisfied
     }
 
     private var postTeardownContractSatisfied: Bool {
@@ -347,8 +307,7 @@ package struct LifecycleRootTopologyObserver: Sendable {
                 request.binding.helperSigningEvidence.identity
         )
         let service = classify(
-            serviceProbe.observeFixedService(label: contract.label),
-            expectedIdentity: request.helperProcessIdentity
+            serviceProbe.observeFixedService(label: contract.label)
         )
         let observedAt = now()
         guard request.window.contains(observedAt), observedAt >= startedAt else {
@@ -357,7 +316,6 @@ package struct LifecycleRootTopologyObserver: Sendable {
         }
 
         return LifecycleRootTopologyObservation(
-            phase: request.phase,
             binding: request.binding,
             appProcessIdentity: request.appProcessIdentity,
             helperProcessIdentity: request.helperProcessIdentity,
@@ -406,20 +364,11 @@ package struct LifecycleRootTopologyObserver: Sendable {
     }
 
     private func classify(
-        _ result: LifecycleRootTopologyServiceProbeResult,
-        expectedIdentity: LifecycleProcessIdentity
+        _ result: LifecycleRootTopologyServiceProbeResult
     ) -> LifecycleRootTopologyServiceObservation {
         switch result {
         case .absent:
             return .absent
-        case let .loaded(identity):
-            guard identity == expectedIdentity else {
-                return .invalid(
-                    reasonKey:
-                        "runtime.topology.service-identity-mismatch"
-                )
-            }
-            return .loadedValid
         case let .unavailable(reasonKey):
             return .unavailable(reasonKey: reasonKey)
         }

@@ -7,85 +7,58 @@ import StornautLifecycle
 @Suite("Fixed lifecycle service probe")
 struct FixedLifecycleServiceProbeTests {
     @Test
-    func fixedRegistryLookupBindsTheExactExpectedHelper() throws {
+    func onlyTheStructuredMissingStateProvesPostTeardownAbsence() throws {
         let fixture = try LifecycleTopologyCollectorFixture()
         let registry = ScriptedFixedServiceRegistry(
-            results: [.registered(
-                processID: fixture.helperIdentity.processID
-            )]
+            results: [.absent]
         )
-        let probe = DarwinFixedLifecycleServiceProbe(
-            registry: registry,
-            identityReader: FixedServiceIdentityReader(
-                result: .success(fixture.helperIdentity)
-            ),
-            expectedIdentity: fixture.helperIdentity
+        let probe = DarwinPostTeardownLifecycleServiceProbe(
+            registry: registry
         )
 
         #expect(
             probe.observeFixedService(
                 label: fixture.contract.label
-            ) == .loaded(identity: fixture.helperIdentity)
+            ) == .absent
         )
         #expect(registry.labels == [fixture.contract.label])
     }
 
     @Test
-    func onlyTheStructuredUnknownServiceResultProvesAbsence() throws {
+    func registeredOrUnavailableServiceNeverProvesPostTeardown() throws {
         let fixture = try LifecycleTopologyCollectorFixture()
+        let registry = ScriptedFixedServiceRegistry(results: [
+            .registered(processID: nil),
+            .registered(processID: fixture.helperIdentity.processID),
+            .unavailable(reasonKey: "probe.denied"),
+        ])
+        let probe = DarwinPostTeardownLifecycleServiceProbe(
+            registry: registry
+        )
 
         #expect(
-            DarwinFixedLifecycleServiceProbe(
-                registry: ScriptedFixedServiceRegistry(
-                    results: [.absent]
-                ),
-                identityReader: FixedServiceIdentityReader(
-                    result: .failure(.invalidIdentity)
-                ),
-                expectedIdentity: fixture.helperIdentity
-            ).observeFixedService(label: fixture.contract.label)
-                == .absent
+            probe.observeFixedService(label: fixture.contract.label)
+                == .unavailable(
+                    reasonKey: "runtime.topology.service-still-registered"
+                )
         )
         #expect(
-            DarwinFixedLifecycleServiceProbe(
-                registry: ScriptedFixedServiceRegistry(
-                    results: [.unavailable(reasonKey: "probe.denied")]
-                ),
-                identityReader: FixedServiceIdentityReader(
-                    result: .success(fixture.helperIdentity)
-                ),
-                expectedIdentity: fixture.helperIdentity
-            ).observeFixedService(label: fixture.contract.label)
+            probe.observeFixedService(label: fixture.contract.label)
+                == .unavailable(
+                    reasonKey: "runtime.topology.service-still-registered"
+                )
+        )
+        #expect(
+            probe.observeFixedService(label: fixture.contract.label)
                 == .unavailable(reasonKey: "probe.denied")
         )
     }
 
     @Test
-    func foreignLabelIdentityReuseAndLookupFailureStayUnavailable() throws {
-        let fixture = try LifecycleTopologyCollectorFixture()
-        let reused = fixture.processIdentity(
-            processID: fixture.helperIdentity.processID,
-            processIDVersion: fixture.helperIdentity.processIDVersion + 1,
-            auditSessionID: fixture.helperIdentity.auditSessionID,
-            effectiveUserID: 0
-        )
-        let probe = DarwinFixedLifecycleServiceProbe(
-            registry: ScriptedFixedServiceRegistry(
-                results: [
-                    .registered(processID: reused.processID + 100),
-                    .registered(processID: reused.processID),
-                    .registered(
-                        processID: fixture.helperIdentity.processID
-                    ),
-                ]
-            ),
-            identityReader: FixedServiceIdentityReader(
-                results: [
-                    .success(reused),
-                    .failure(.invalidIdentity),
-                ]
-            ),
-            expectedIdentity: fixture.helperIdentity
+    func foreignLabelFailsBeforeRegistryLookup() throws {
+        let registry = ScriptedFixedServiceRegistry(results: [.absent])
+        let probe = DarwinPostTeardownLifecycleServiceProbe(
+            registry: registry
         )
 
         #expect(
@@ -94,24 +67,7 @@ struct FixedLifecycleServiceProbeTests {
                     reasonKey: "runtime.topology.service-label-mismatch"
                 )
         )
-        #expect(
-            probe.observeFixedService(label: fixture.contract.label)
-                == .unavailable(
-                    reasonKey: "runtime.topology.service-identity-mismatch"
-                )
-        )
-        #expect(
-            probe.observeFixedService(label: fixture.contract.label)
-                == .unavailable(
-                    reasonKey: "runtime.topology.service-identity-mismatch"
-                )
-        )
-        #expect(
-            probe.observeFixedService(label: fixture.contract.label)
-                == .unavailable(
-                    reasonKey: "runtime.topology.service-identity-unavailable"
-                )
-        )
+        #expect(registry.labels.isEmpty)
     }
 }
 
@@ -136,55 +92,6 @@ private final class ScriptedFixedServiceRegistry:
                 return .unavailable(
                     reasonKey: "runtime.topology.service-registry-unavailable"
                 )
-            }
-            return results.removeFirst()
-        }
-    }
-}
-
-private final class FixedServiceIdentityReader:
-    LifecycleFixedServiceIdentityReading,
-    @unchecked Sendable
-{
-    private let lock = NSLock()
-    private var results: [
-        Result<LifecycleProcessIdentity, DarwinLifecycleSupportError>
-    ]
-
-    init(
-        result: Result<
-            LifecycleProcessIdentity,
-            DarwinLifecycleSupportError
-        >
-    ) {
-        results = [result]
-    }
-
-    init(
-        results: [
-            Result<
-                LifecycleProcessIdentity,
-                DarwinLifecycleSupportError
-            >
-        ]
-    ) {
-        self.results = results
-    }
-
-    func readExpectedIdentity()
-        -> Result<LifecycleProcessIdentity, DarwinLifecycleSupportError>
-    {
-        readIdentity(processID: 2)
-    }
-
-    func readIdentity(
-        processID _: pid_t
-    )
-        -> Result<LifecycleProcessIdentity, DarwinLifecycleSupportError>
-    {
-        lock.withLock {
-            guard !results.isEmpty else {
-                return .failure(.invalidIdentity)
             }
             return results.removeFirst()
         }

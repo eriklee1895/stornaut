@@ -292,13 +292,12 @@ final class InvestigationMachineScenarioAttemptFixture:
             claimant: ScenarioClaimant(claim: claim),
             collectorFactory: { _ in
                 InvestigationLifecycleTopologyCollector(
-                    topologyObserver: ScenarioTopologyObserver(
-                        installed: try! topology.installedObservation(),
+                    postTeardownObserver: ScenarioPostTeardownObserver(
                         postTeardown:
                             try! topology.postTeardownObservation(),
                         eventLog: eventLog
                     ),
-                    bindingReader: ScenarioBindingReader(
+                    expectedBindingReader: ScenarioBindingReader(
                         binding: topology.binding
                     ),
                     effectiveUserID: { 0 },
@@ -1287,7 +1286,7 @@ private struct ScenarioClaimant: InvestigationMachineRetirementClaiming {
 }
 
 private struct ScenarioBindingReader:
-    InvestigationLifecycleTopologyBindingReading
+    InvestigationLifecyclePostTeardownBindingReading
 {
     let binding: LifecycleRootTopologyBinding
 
@@ -1298,31 +1297,28 @@ private struct ScenarioBindingReader:
     }
 }
 
-private actor ScenarioTopologyObserver:
-    InvestigationLifecycleTopologyObserving
+private actor ScenarioPostTeardownObserver:
+    InvestigationLifecyclePostTeardownObserving
 {
-    let installed: LifecycleRootTopologyObservation
     let postTeardown: LifecycleRootTopologyObservation
     let eventLog: ScenarioEventLog
 
     init(
-        installed: LifecycleRootTopologyObservation,
         postTeardown: LifecycleRootTopologyObservation,
         eventLog: ScenarioEventLog
     ) {
-        self.installed = installed
         self.postTeardown = postTeardown
         self.eventLog = eventLog
     }
 
-    func observe(
-        _ request: LifecycleRootTopologyObservationRequest
+    func observePostTeardown(
+        binding _: LifecycleRootTopologyBinding,
+        appProcessIdentity _: LifecycleProcessIdentity,
+        helperProcessIdentity _: LifecycleProcessIdentity,
+        window _: LifecycleRootTopologyObservationWindow
     ) async throws -> LifecycleRootTopologyObservation {
-        eventLog.append(
-            request.phase == .installed
-                ? "installed" : "postTeardown"
-        )
-        return request.phase == .installed ? installed : postTeardown
+        eventLog.append("postTeardown")
+        return postTeardown
     }
 }
 

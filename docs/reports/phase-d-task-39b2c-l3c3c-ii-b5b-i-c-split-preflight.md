@@ -1,6 +1,7 @@
 # Phase D Task 39B2c L3c3c-ii-b5b-i-c Split Preflight
 
-> Status: i-c1 complete/non-admitting; i-c2 current
+> Status: i-c1 complete/non-admitting; i-c2 split into i-c2a/i-c2b;
+> i-c2a current
 > Date: 2026-08-22
 > Order: i-c1 DriverSupport join/proof -> i-c2 legacy-owner closure
 >
@@ -48,29 +49,65 @@ shape, raw authority and public/`Codable` widening.
 
 ## 3. i-c2 Legacy Installed-Owner Closure
 
-Frozen ceiling: at most ten non-document paths and 2,200 changed lines:
+The first i-c2 RED and independent semantic review found two separable closure
+surfaces. Removing the old phase/schema/predicate owner requires the fourteen
+paths below. Removing the remaining legacy physical signing/artifact readers
+also requires `DarwinRootTopologySupport.swift` and its focused tests, which
+would exceed the repository's fourteen-path checkpoint limit. Therefore i-c2 is
+split before final validation:
 
-1. `InvestigationMachineDriverHost.swift`;
-2. `InvestigationLifecycleTopologyCollector.swift`;
-3. `FixedLifecycleServiceProbe.swift` or its deletion;
-4. host tests;
-5. topology-collector tests;
-6. fixed-service-probe tests;
-7. scenario test support;
-8. `InvestigationMachineTargetBoundaryTests.swift`; and
-9. the two structural verifiers.
+- **i-c2a semantic-owner closure** removes the old Lifecycle phase schema,
+  installed predicate, Machine collector branch, service loaded-state schema
+  and ScenarioDriver consumer; and
+- **i-c2b physical-owner closure** receives a fresh post-i-c2a preflight and
+  converts the remaining Lifecycle teardown path to absence-only reads, deleting
+  the legacy pre-transition signing/binding reader before any exactly-one
+  physical-owner claim.
 
-i-c2 removes or de-owns the old Machine/Lifecycle installed-phase branch. The
+The i-c2a ceiling after the pre-implementation call-graph and independent
+semantic audits is at most fourteen
+non-document paths and 2,200 changed lines. The original ten-path estimate
+mistakenly listed the composition-only `InvestigationMachineDriverHost.swift`
+while omitting the behavior test that directly asserts the legacy installed
+event. The first RED then proved that deleting only the Machine call still left
+the old installed schema/predicate owner in `StornautLifecycle`; the corrected
+exact set therefore is:
+
+1. `LifecycleRootTopologyObservation.swift`;
+2. its Lifecycle tests;
+3. `InvestigationLifecycleTopologyCollector.swift`;
+4. `FixedLifecycleServiceProbe.swift` or its deletion;
+5. `InvestigationMachineScenarioDriver.swift`;
+6. host tests;
+7. topology-collector tests;
+8. fixed-service-probe tests;
+9. scenario-driver tests;
+10. scenario test support;
+11. `InvestigationMachineTargetBoundaryTests.swift`; and
+12. shared topology test support; and
+13. the two structural verifiers.
+
+`InvestigationMachineDriverHost.swift` remains unchanged: it only constructs
+and invokes the collector and does not inspect or validate installed evidence.
+The corrected fourteen-path scope is at, but does not exceed, the repository-wide
+fourteen-path split threshold and does not add a fourth responsibility surface.
+No further non-document path may be added without another split.
+
+i-c2a removes the old Machine/Lifecycle installed-phase semantic branch. The
 collector may retain only transition and post-teardown responsibilities; the
 old fixed service probe cannot survive as a parallel installed evidence owner.
 Existing host, collector, service and scenario support is retargeted rather than
-duplicated. i-c2 does not change i-c1 proof or join semantics.
+duplicated. i-c2a does not change i-c1 proof or join semantics. Its remaining
+`PostTeardownExpectedTopologyBindingReader` is explicitly non-admitting but
+still performs physical signing reads; i-c2b must remove it before the combined
+i-c2 checkpoint may claim exactly-one physical ownership.
 
-The exactly-one-owner gate rejects remaining authoritative `phase: .installed`
+The i-c2a semantic-owner gate rejects remaining authoritative `phase: .installed`
 validation in the old collector, live installed use of
 `FixedLifecycleServiceProbe`, or copied schema/predicate/physical readers in
-Machine or Lifecycle. RED and mutation tests prove the old path fails before
-closure and cannot be reintroduced.
+Machine or Lifecycle. RED and mutation tests prove the old semantic path fails
+before closure and cannot be reintroduced. The final exactly-one physical-owner
+gate is reserved for i-c2b.
 
 ## 4. Validation and Non-Claims
 
@@ -78,6 +115,7 @@ Each checkpoint independently follows tests-first RED, structural and mutation
 gates, focused/affected regression, one staged-only serial and independent
 review. Neither checkpoint runs `scripts/verify --full`, installs or invokes the
 App/helper, uses sudo/root, invokes real XPC, calls a model, reads auth or
-accesses a network. Both remain non-admitting. i-c1 precedes i-c2; after i-c2,
-b5b-ii fixed Darwin runtime is next. ADR 0018 remains Proposed, production Deep
-Dive remains unavailable, and L3c4 alone owns readiness and final admission.
+accesses a network. All remain non-admitting. The order is i-c1 -> i-c2a ->
+i-c2b; after i-c2b, b5b-ii fixed Darwin runtime is next. ADR 0018 remains
+Proposed, production Deep Dive remains unavailable, and L3c4 alone owns
+readiness and final admission.

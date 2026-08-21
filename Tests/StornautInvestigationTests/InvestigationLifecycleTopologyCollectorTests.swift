@@ -9,7 +9,7 @@ import StornautLifecycle
 @Suite("Investigation lifecycle topology collector")
 struct InvestigationLifecycleTopologyCollectorTests {
     @Test
-    func installedBindingAndRetirementValidationJoinMachineDriverEvidence()
+    func fixedBindingAndRetirementValidationJoinMachineDriverEvidence()
         throws
     {
         let repositoryRoot = URL(filePath: #filePath)
@@ -24,7 +24,7 @@ struct InvestigationLifecycleTopologyCollectorTests {
             encoding: .utf8
         )
         let installedReaderStart = try #require(source.range(
-            of: "struct InstalledLifecycleTopologyBindingReader:"
+            of: "struct PostTeardownExpectedTopologyBindingReader:"
         ))
         let installedReaderSuffix =
             source[installedReaderStart.lowerBound...]
@@ -35,7 +35,7 @@ struct InvestigationLifecycleTopologyCollectorTests {
             installedReaderSuffix[readBindingStart.lowerBound...]
         let readBindingEnd = try #require(readBindingSuffix.range(
             of: "\n    }\n}\n\nprotocol "
-                + "InvestigationLifecycleTopologyObserving"
+                + "InvestigationLifecyclePostTeardownObserving"
         ))
         let readBindingSource = String(
             readBindingSuffix[..<readBindingEnd.lowerBound]
@@ -137,27 +137,25 @@ struct InvestigationLifecycleTopologyCollectorTests {
     }
 
     @Test
-    func collectsOneOrderedOpaqueL1L2Cohort() async throws {
+    func collectsOneOrderedOpaquePostTeardownCohort() async throws {
         let fixture = try LifecycleTopologyCollectorFixture()
         let retirementStore = try await fixture.retirementClaimStore()
-        let topology = ScriptedTopologyObserver(
-            results: [
-                .success(try fixture.installedObservation()),
-                .success(try fixture.postTeardownObservation()),
-            ]
-        )
+        let topology = ScriptedPostTeardownObserver(results: [
+            .success(try fixture.postTeardownObservation()),
+        ])
         let transition = RecordingTopologyTransition()
         let collector = InvestigationLifecycleTopologyCollector(
-            topologyObserver: topology,
-            bindingReader: FixedTopologyBindingReader(
+            postTeardownObserver: topology,
+            expectedBindingReader: FixedTopologyBindingReader(
                 binding: fixture.binding
             ),
             effectiveUserID: { 0 },
             now: fixture.clock.read
         )
 
+        let request = try fixture.collectionRequest()
         let cohort = try await collector.collect(
-            request: fixture.collectionRequest(),
+            request: request,
             retirementClaimStore: retirementStore,
             transition: transition
         )
@@ -170,12 +168,20 @@ struct InvestigationLifecycleTopologyCollectorTests {
             cohort.ownerRetirementObservation
                 == .retiredOwnedResources
         )
-        #expect(cohort.installedTopology.provesInstalledTopology)
         #expect(
             cohort.postTeardownTopology.provesPostTeardownTopology
         )
         #expect(await transition.invocationCount == 1)
-        #expect(await topology.phases == [.installed, .postTeardown])
+        #expect(await topology.invocationCount == 1)
+        #expect(await topology.calls == [PostTeardownObservationCall(
+            binding: fixture.binding,
+            appProcessIdentity: fixture.appIdentity,
+            helperProcessIdentity: fixture.helperIdentity,
+            window: try LifecycleRootTopologyObservationWindow(
+                openedAt: request.openedAt,
+                validBefore: request.validBefore
+            )
+        )])
         #expect(
             !((InvestigationLifecycleTopologyCohort.self as Any.Type)
                 is any Codable.Type)
@@ -187,11 +193,11 @@ struct InvestigationLifecycleTopologyCollectorTests {
         async throws
     {
         let fixture = try LifecycleTopologyCollectorFixture()
-        let topology = ScriptedTopologyObserver(results: [])
+        let topology = ScriptedPostTeardownObserver(results: [])
         let transition = RecordingTopologyTransition()
         let nonRoot = InvestigationLifecycleTopologyCollector(
-            topologyObserver: topology,
-            bindingReader: FixedTopologyBindingReader(
+            postTeardownObserver: topology,
+            expectedBindingReader: FixedTopologyBindingReader(
                 binding: fixture.binding
             ),
             effectiveUserID: { 501 },
@@ -209,12 +215,12 @@ struct InvestigationLifecycleTopologyCollectorTests {
                 transition: transition
             )
         }
-        #expect(await topology.phases.isEmpty)
+        #expect(await topology.invocationCount == 0)
         #expect(await transition.invocationCount == 0)
 
         let foreign = InvestigationLifecycleTopologyCollector(
-            topologyObserver: topology,
-            bindingReader: FixedTopologyBindingReader(
+            postTeardownObserver: topology,
+            expectedBindingReader: FixedTopologyBindingReader(
                 binding: fixture.binding
             ),
             effectiveUserID: { 0 },
@@ -235,23 +241,21 @@ struct InvestigationLifecycleTopologyCollectorTests {
                 transition: transition
             )
         }
-        #expect(await topology.phases.isEmpty)
+        #expect(await topology.invocationCount == 0)
         #expect(await transition.invocationCount == 0)
     }
 
     @Test
-    func invalidPhaseTransitionFailureAndDeadlineAreTerminal() async throws {
+    func transitionFailureAndDeadlineAreTerminal() async throws {
         let fixture = try LifecycleTopologyCollectorFixture()
         let transition = RecordingTopologyTransition(
             error: InvestigationLifecycleTopologyCollectorError
                 .transitionFailed
         )
-        let topology = ScriptedTopologyObserver(results: [
-            .success(try fixture.installedObservation()),
-        ])
+        let topology = ScriptedPostTeardownObserver(results: [])
         let collector = InvestigationLifecycleTopologyCollector(
-            topologyObserver: topology,
-            bindingReader: FixedTopologyBindingReader(
+            postTeardownObserver: topology,
+            expectedBindingReader: FixedTopologyBindingReader(
                 binding: fixture.binding
             ),
             effectiveUserID: { 0 },
@@ -301,11 +305,13 @@ struct InvestigationLifecycleTopologyCollectorTests {
             helperServiceIdentifier:
                 fixture.binding.helperServiceIdentifier
         )
-        let topology = ScriptedTopologyObserver(results: [])
+        let topology = ScriptedPostTeardownObserver(results: [])
         let transition = RecordingTopologyTransition()
         let bindingCollector = InvestigationLifecycleTopologyCollector(
-            topologyObserver: topology,
-            bindingReader: FixedTopologyBindingReader(binding: mismatched),
+            postTeardownObserver: topology,
+            expectedBindingReader: FixedTopologyBindingReader(
+                binding: mismatched
+            ),
             effectiveUserID: { 0 },
             now: fixture.clock.read
         )
@@ -320,12 +326,12 @@ struct InvestigationLifecycleTopologyCollectorTests {
                 transition: transition
             )
         }
-        #expect(await topology.phases.isEmpty)
+        #expect(await topology.invocationCount == 0)
         #expect(await transition.invocationCount == 0)
 
         let deadlineCollector = InvestigationLifecycleTopologyCollector(
-            topologyObserver: topology,
-            bindingReader: FixedTopologyBindingReader(
+            postTeardownObserver: topology,
+            expectedBindingReader: FixedTopologyBindingReader(
                 binding: fixture.binding
             ),
             effectiveUserID: { 0 },
@@ -344,7 +350,7 @@ struct InvestigationLifecycleTopologyCollectorTests {
                 transition: transition
             )
         }
-        #expect(await topology.phases.isEmpty)
+        #expect(await topology.invocationCount == 0)
         #expect(await transition.invocationCount == 0)
     }
 
@@ -374,14 +380,15 @@ struct InvestigationLifecycleTopologyCollectorTests {
                 fixture.signedBinding.helperServiceIdentifier,
             machineDriver: fixture.signedBinding.machineDriver
         )
-        let topology = ScriptedTopologyObserver(results: [
-            .success(try fixture.installedObservation()),
+        let topology = ScriptedPostTeardownObserver(results: [
             .success(try fixture.postTeardownObservation()),
         ])
         let transition = RecordingTopologyTransition()
         let collector = InvestigationLifecycleTopologyCollector(
-            topologyObserver: topology,
-            bindingReader: FixedTopologyBindingReader(binding: fixture.binding),
+            postTeardownObserver: topology,
+            expectedBindingReader: FixedTopologyBindingReader(
+                binding: fixture.binding
+            ),
             effectiveUserID: { 0 },
             now: fixture.clock.read
         )
@@ -402,7 +409,7 @@ struct InvestigationLifecycleTopologyCollectorTests {
                 transition: transition
             )
         }
-        #expect(await topology.phases.isEmpty)
+        #expect(await topology.invocationCount == 0)
         #expect(await transition.invocationCount == 0)
     }
 
@@ -411,18 +418,15 @@ struct InvestigationLifecycleTopologyCollectorTests {
         async throws
     {
         let fixture = try LifecycleTopologyCollectorFixture()
-        let root = MutableEffectiveUserID(value: 0)
         let rootTransition = RecordingTopologyTransition()
-        let rootTopology = ScriptedTopologyObserver(
-            results: [.success(try fixture.installedObservation())],
-            afterObservation: { root.set(501) }
-        )
+        let rootReads = ScriptedEffectiveUserID(values: [0, 501])
+        let rootTopology = ScriptedPostTeardownObserver(results: [])
         let rootCollector = InvestigationLifecycleTopologyCollector(
-            topologyObserver: rootTopology,
-            bindingReader: FixedTopologyBindingReader(
+            postTeardownObserver: rootTopology,
+            expectedBindingReader: FixedTopologyBindingReader(
                 binding: fixture.binding
             ),
-            effectiveUserID: root.read,
+            effectiveUserID: rootReads.read,
             now: fixture.clock.read
         )
         await #expect(
@@ -439,17 +443,18 @@ struct InvestigationLifecycleTopologyCollectorTests {
         #expect(await rootTransition.invocationCount == 0)
 
         let deadlineTransition = RecordingTopologyTransition()
-        let deadlineTopology = ScriptedTopologyObserver(
-            results: [.success(try fixture.installedObservation())],
-            afterObservation: { fixture.clock.advance(31) }
-        )
+        let deadlineTopology = ScriptedPostTeardownObserver(results: [])
+        let deadlineClock = ScriptedTopologyClock(values: [
+            fixture.clock.read(),
+            fixture.clock.read().addingTimeInterval(31),
+        ])
         let deadlineCollector = InvestigationLifecycleTopologyCollector(
-            topologyObserver: deadlineTopology,
-            bindingReader: FixedTopologyBindingReader(
+            postTeardownObserver: deadlineTopology,
+            expectedBindingReader: FixedTopologyBindingReader(
                 binding: fixture.binding
             ),
             effectiveUserID: { 0 },
-            now: fixture.clock.read
+            now: deadlineClock.read
         )
         let deadlineRequest = try fixture.collectionRequest()
         await #expect(
@@ -467,18 +472,80 @@ struct InvestigationLifecycleTopologyCollectorTests {
     }
 
     @Test
+    func rootAndDeadlineAreRevalidatedAfterTransitionBeforeObservation()
+        async throws
+    {
+        let fixture = try LifecycleTopologyCollectorFixture()
+        let rootTopology = ScriptedPostTeardownObserver(results: [])
+        let rootTransition = RecordingTopologyTransition()
+        let rootCollector = InvestigationLifecycleTopologyCollector(
+            postTeardownObserver: rootTopology,
+            expectedBindingReader: FixedTopologyBindingReader(
+                binding: fixture.binding
+            ),
+            effectiveUserID: ScriptedEffectiveUserID(
+                values: [0, 0, 501]
+            ).read,
+            now: fixture.clock.read
+        )
+
+        await #expect(
+            throws: InvestigationLifecycleTopologyCollectorError
+                .rootAuthorityRequired
+        ) {
+            _ = try await rootCollector.collect(
+                request: fixture.collectionRequest(),
+                retirementClaimStore:
+                    try await fixture.retirementClaimStore(),
+                transition: rootTransition
+            )
+        }
+        #expect(await rootTransition.invocationCount == 1)
+        #expect(await rootTopology.invocationCount == 0)
+
+        let deadlineTopology = ScriptedPostTeardownObserver(results: [])
+        let deadlineTransition = RecordingTopologyTransition()
+        let deadlineClock = ScriptedTopologyClock(values: [
+            fixture.clock.read(),
+            fixture.clock.read(),
+            fixture.clock.read().addingTimeInterval(31),
+        ])
+        let deadlineCollector = InvestigationLifecycleTopologyCollector(
+            postTeardownObserver: deadlineTopology,
+            expectedBindingReader: FixedTopologyBindingReader(
+                binding: fixture.binding
+            ),
+            effectiveUserID: { 0 },
+            now: deadlineClock.read
+        )
+
+        await #expect(
+            throws: InvestigationLifecycleTopologyCollectorError
+                .observationOutsideWindow
+        ) {
+            _ = try await deadlineCollector.collect(
+                request: fixture.collectionRequest(),
+                retirementClaimStore:
+                    try await fixture.retirementClaimStore(),
+                transition: deadlineTransition
+            )
+        }
+        #expect(await deadlineTransition.invocationCount == 1)
+        #expect(await deadlineTopology.invocationCount == 0)
+    }
+
+    @Test
     func postTeardownFailureIsTerminalAndNeverReturnsZeroResidue()
         async throws
     {
         let fixture = try LifecycleTopologyCollectorFixture()
-        let topology = ScriptedTopologyObserver(results: [
-            .success(try fixture.installedObservation()),
-            .success(try fixture.installedObservation()),
+        let topology = ScriptedPostTeardownObserver(results: [
+            .success(try fixture.nonAbsentPostTeardownObservation()),
         ])
         let transition = RecordingTopologyTransition()
         let collector = InvestigationLifecycleTopologyCollector(
-            topologyObserver: topology,
-            bindingReader: FixedTopologyBindingReader(
+            postTeardownObserver: topology,
+            expectedBindingReader: FixedTopologyBindingReader(
                 binding: fixture.binding
             ),
             effectiveUserID: { 0 },
@@ -511,14 +578,16 @@ struct InvestigationLifecycleTopologyCollectorTests {
     }
 
     @Test
-    func nonzeroRetirementAndBrokenTopologyNeverProduceResidue() async throws {
+    func observationStartedBeforeTransitionNeverProducesResidue() async throws {
         let fixture = try LifecycleTopologyCollectorFixture()
-        let brokenTopology = ScriptedTopologyObserver(results: [
-            .success(try fixture.postTeardownObservation()),
+        let stalePostTeardown = try fixture.postTeardownObservation()
+        let brokenTopology = ScriptedPostTeardownObserver(results: [
+            .success(stalePostTeardown),
         ])
+        let transition = AdvancingTopologyTransition(clock: fixture.clock)
         let collector = InvestigationLifecycleTopologyCollector(
-            topologyObserver: brokenTopology,
-            bindingReader: FixedTopologyBindingReader(
+            postTeardownObserver: brokenTopology,
+            expectedBindingReader: FixedTopologyBindingReader(
                 binding: fixture.binding
             ),
             effectiveUserID: { 0 },
@@ -527,13 +596,13 @@ struct InvestigationLifecycleTopologyCollectorTests {
 
         await #expect(
             throws: InvestigationLifecycleTopologyCollectorError
-                .installedTopologyUnproved
+                .postTeardownTopologyUnproved
         ) {
             _ = try await collector.collect(
                 request: fixture.collectionRequest(),
                 retirementClaimStore:
                     try await fixture.retirementClaimStore(),
-                transition: RecordingTopologyTransition()
+                transition: transition
             )
         }
     }
@@ -542,13 +611,12 @@ struct InvestigationLifecycleTopologyCollectorTests {
     func concurrentCollectionHasExactlyOneAdmission() async throws {
         let fixture = try LifecycleTopologyCollectorFixture()
         let transition = SuspendedTopologyTransition()
-        let topology = ScriptedTopologyObserver(results: [
-            .success(try fixture.installedObservation()),
+        let topology = ScriptedPostTeardownObserver(results: [
             .success(try fixture.postTeardownObservation()),
         ])
         let collector = InvestigationLifecycleTopologyCollector(
-            topologyObserver: topology,
-            bindingReader: FixedTopologyBindingReader(
+            postTeardownObserver: topology,
+            expectedBindingReader: FixedTopologyBindingReader(
                 binding: fixture.binding
             ),
             effectiveUserID: { 0 },
@@ -578,8 +646,8 @@ struct InvestigationLifecycleTopologyCollectorTests {
         _ = try await first.value
 
         let replayCollector = InvestigationLifecycleTopologyCollector(
-            topologyObserver: ScriptedTopologyObserver(results: []),
-            bindingReader: FixedTopologyBindingReader(
+            postTeardownObserver: ScriptedPostTeardownObserver(results: []),
+            expectedBindingReader: FixedTopologyBindingReader(
                 binding: fixture.binding
             ),
             effectiveUserID: { 0 },
@@ -598,17 +666,16 @@ struct InvestigationLifecycleTopologyCollectorTests {
     }
 
     @Test
-    func cancellationAfterInstalledObservationConsumesTheCollector()
+    func cancellationAfterTransitionStartsConsumesTheCollector()
         async throws
     {
         let fixture = try LifecycleTopologyCollectorFixture()
         let transition = SuspendedTopologyTransition()
         let collector = InvestigationLifecycleTopologyCollector(
-            topologyObserver: ScriptedTopologyObserver(results: [
-                .success(try fixture.installedObservation()),
+            postTeardownObserver: ScriptedPostTeardownObserver(results: [
                 .success(try fixture.postTeardownObservation()),
             ]),
-            bindingReader: FixedTopologyBindingReader(
+            expectedBindingReader: FixedTopologyBindingReader(
                 binding: fixture.binding
             ),
             effectiveUserID: { 0 },
@@ -643,7 +710,7 @@ struct InvestigationLifecycleTopologyCollectorTests {
 }
 
 private struct FixedTopologyBindingReader:
-    InvestigationLifecycleTopologyBindingReading
+    InvestigationLifecyclePostTeardownBindingReading
 {
     let binding: LifecycleRootTopologyBinding
 
@@ -654,8 +721,15 @@ private struct FixedTopologyBindingReader:
     }
 }
 
-private actor ScriptedTopologyObserver:
-    InvestigationLifecycleTopologyObserving
+private struct PostTeardownObservationCall: Sendable, Equatable {
+    let binding: LifecycleRootTopologyBinding
+    let appProcessIdentity: LifecycleProcessIdentity
+    let helperProcessIdentity: LifecycleProcessIdentity
+    let window: LifecycleRootTopologyObservationWindow
+}
+
+private actor ScriptedPostTeardownObserver:
+    InvestigationLifecyclePostTeardownObserving
 {
     private var results: [
         Result<
@@ -663,8 +737,8 @@ private actor ScriptedTopologyObserver:
             LifecycleRootTopologyObservationError
         >
     ]
-    private(set) var phases: [LifecycleRootTopologyPhase] = []
-    private let afterObservation: @Sendable () -> Void
+    private(set) var invocationCount = 0
+    private(set) var calls: [PostTeardownObservationCall] = []
 
     init(
         results: [
@@ -672,40 +746,60 @@ private actor ScriptedTopologyObserver:
                 LifecycleRootTopologyObservation,
                 LifecycleRootTopologyObservationError
             >
-        ],
-        afterObservation: @escaping @Sendable () -> Void = {}
+        ]
     ) {
         self.results = results
-        self.afterObservation = afterObservation
     }
 
-    func observe(
-        _ request: LifecycleRootTopologyObservationRequest
+    func observePostTeardown(
+        binding: LifecycleRootTopologyBinding,
+        appProcessIdentity: LifecycleProcessIdentity,
+        helperProcessIdentity: LifecycleProcessIdentity,
+        window: LifecycleRootTopologyObservationWindow
     ) async throws -> LifecycleRootTopologyObservation {
-        phases.append(request.phase)
+        invocationCount += 1
+        calls.append(PostTeardownObservationCall(
+            binding: binding,
+            appProcessIdentity: appProcessIdentity,
+            helperProcessIdentity: helperProcessIdentity,
+            window: window
+        ))
         guard !results.isEmpty else {
             throw LifecycleRootTopologyObservationError.invalidRequest
         }
-        let value = try results.removeFirst().get()
-        afterObservation()
-        return value
+        return try results.removeFirst().get()
     }
 }
 
-private final class MutableEffectiveUserID: @unchecked Sendable {
+private final class ScriptedEffectiveUserID: @unchecked Sendable {
     private let lock = NSLock()
-    private var value: uid_t
+    private var values: [uid_t]
 
-    init(value: uid_t) {
-        self.value = value
+    init(values: [uid_t]) {
+        self.values = values
     }
 
     func read() -> uid_t {
-        lock.withLock { value }
+        lock.withLock {
+            guard values.count > 1 else { return values[0] }
+            return values.removeFirst()
+        }
+    }
+}
+
+private final class ScriptedTopologyClock: @unchecked Sendable {
+    private let lock = NSLock()
+    private var values: [Date]
+
+    init(values: [Date]) {
+        self.values = values
     }
 
-    func set(_ value: uid_t) {
-        lock.withLock { self.value = value }
+    func read() -> Date {
+        lock.withLock {
+            guard values.count > 1 else { return values[0] }
+            return values.removeFirst()
+        }
     }
 }
 
@@ -724,6 +818,16 @@ private actor RecordingTopologyTransition:
         if let error {
             throw error
         }
+    }
+}
+
+private struct AdvancingTopologyTransition:
+    InvestigationLifecycleTopologyTransitioning
+{
+    let clock: TopologyCollectorClock
+
+    func transition() async {
+        clock.advance(1)
     }
 }
 

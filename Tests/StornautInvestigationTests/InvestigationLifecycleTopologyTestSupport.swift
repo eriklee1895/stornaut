@@ -302,46 +302,32 @@ final class LifecycleTopologyCollectorFixture: @unchecked Sendable {
         )
     }
 
-    func installedObservation() throws
-        -> LifecycleRootTopologyObservation
-    {
-        try topologyObservation(phase: .installed)
-    }
-
     func postTeardownObservation() throws
         -> LifecycleRootTopologyObservation
     {
-        try topologyObservation(phase: .postTeardown)
+        try topologyObservation()
+    }
+
+    func nonAbsentPostTeardownObservation() throws
+        -> LifecycleRootTopologyObservation
+    {
+        try topologyObservation(
+            processResults: [.absent, .absent],
+            serviceResult: .unavailable(
+                reasonKey: "runtime.topology.fixture-service-present"
+            )
+        )
     }
 
     private func topologyObservation(
-        phase: LifecycleRootTopologyPhase
+        processResults: [LifecycleRootTopologyProcessReadResult] = [
+            .absent, .absent,
+        ],
+        serviceResult: LifecycleRootTopologyServiceProbeResult = .absent
     ) throws -> LifecycleRootTopologyObservation {
-        let processResults: [LifecycleRootTopologyProcessReadResult]
-        let serviceResult: LifecycleRootTopologyServiceProbeResult
-        if phase == .installed {
-            processResults = [
-                .observed(LifecycleRootTopologyProcessSnapshot(
-                    identity: appIdentity,
-                    executableURL: contract.appExecutableURL,
-                    signingIdentity:
-                        binding.appSigningEvidence.identity
-                )),
-                .observed(LifecycleRootTopologyProcessSnapshot(
-                    identity: helperIdentity,
-                    executableURL: contract.helperExecutableURL,
-                    signingIdentity:
-                        binding.helperSigningEvidence.identity
-                )),
-            ]
-            serviceResult = .loaded(identity: helperIdentity)
-        } else {
-            processResults = [.absent, .absent]
-            serviceResult = .absent
-        }
         let now = clock.read()
         return try LifecycleRootTopologyObserver(
-            artifactReader: FixedTopologyArtifactReader(phase: phase),
+            artifactReader: FixedTopologyArtifactReader(),
             processReader: ScriptedTopologyProcessReader(
                 results: processResults
             ),
@@ -351,7 +337,6 @@ final class LifecycleTopologyCollectorFixture: @unchecked Sendable {
             now: { now }
         ).observe(
             try LifecycleRootTopologyObservationRequest(
-                phase: phase,
                 binding: binding,
                 appProcessIdentity: appIdentity,
                 helperProcessIdentity: helperIdentity,
@@ -387,22 +372,12 @@ final class LifecycleTopologyCollectorFixture: @unchecked Sendable {
 private struct FixedTopologyArtifactReader:
     LifecycleRootTopologyArtifactReading
 {
-    let phase: LifecycleRootTopologyPhase
-
     func observe(
         _ role: LifecycleRootTopologyArtifactRole,
         contract _: LifecycleLocalInstallationContract,
         binding _: LifecycleRootTopologyBinding
     ) -> LifecycleRootTopologyArtifactObservation {
-        if phase == .postTeardown {
-            return .absent
-        }
-        switch role {
-        case .runtimeRoot, .leaseRoot:
-            return .absent
-        default:
-            return .presentValid
-        }
+        .absent
     }
 }
 

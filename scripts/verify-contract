@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=10297d79e3a1baf5173476ca369e3b6d300fcb5ba89ee90379edd7f3bbef7d49
+ib2_self_sha=01c131c4769b63cf7e27f8af967bfd641fff7b82d1bc40926f0b60092b1ad837
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -173,6 +173,12 @@ require_fixed_text scripts/verify-investigation-boundaries \
     'live claim server helper retained physical adapter'
 require_fixed_text scripts/verify-investigation-boundaries \
     '--app-peer-admission-contract-only'
+require_fixed_text scripts/verify-investigation-boundaries \
+    '--iib5bic2a-legacy-owner-contract-only'
+require_fixed_text scripts/verify-investigation-boundaries \
+    '--iib5bic2a-staged-scope-contract-only'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'ii-b5b-i-c2a installed semantic-owner cardinality drifted'
 require_fixed_text scripts/verify-investigation-boundaries \
     'App peer admission policy drifted'
 require_fixed_text scripts/verify-app-release-boundaries \
@@ -864,7 +870,7 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "7e3eaa53d2fb98de784d646b2cf80c9300748ada8e59dac2dcae940de380d88e",
+        "f144fabcd67ecc978180830dabaf56638b5901934796da16da96401dee750246",
     Path("scripts/verify-app-release-boundaries"):
         "42ee86284c289efce8025ae366336046a47d689838c93ac577b0bfc1ed68f92c",
 }
@@ -4417,6 +4423,106 @@ for fixture in extra-path over-budget existing-deleted-path binary-numstat; do
  elif [[ $fixture == existing-deleted-path ]]; then GIT_INDEX_FILE="$index" git rm --cached -q -f Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift; expected='ii-b5b-i-c1 checkpoint deleted an existing path'
  else blob=$(git rev-parse "${iib5bic1_baseline}:Tests/Fixtures/Snapshots/design-system.empty-state.dark.en.png"); GIT_INDEX_FILE="$index" git update-index --cacheinfo "100644,$blob,Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift"; expected='ii-b5b-i-c1 binary checkpoint path rejected'; fi
  output="$contract_root/iib5bic1-scope-$fixture.log"; if GIT_INDEX_FILE="$index" "$iib5bic1_gate" --iib5bic1-staged-scope-contract-only "$iib5bic1_baseline" >"$output" 2>&1; then fail_contract "ii-b5b-i-c1 scope mutation accepted: $fixture"; fi; require_fixed_text "$output" "$expected"
+done
+
+iib5bic2a_gate=scripts/verify-investigation-boundaries
+iib5bic2a_baseline=6e794274c8a427422e47df326231010b07f3413c
+iib5bic2a_lifecycle=Sources/StornautLifecycle/LifecycleRootTopologyObservation.swift
+iib5bic2a_collector=Sources/StornautInvestigationMachine/InvestigationLifecycleTopologyCollector.swift
+iib5bic2a_probe=Sources/StornautInvestigationMachine/FixedLifecycleServiceProbe.swift
+iib5bic2a_scenario=Sources/StornautInvestigationMachine/InvestigationMachineScenarioDriver.swift
+iib5bic2a_owner=Sources/StornautInvestigationInstalledL2/InstalledL2Observer.swift
+iib5bic2a_join=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochInstalledL2Join.swift
+iib5bic2a_test=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+"$iib5bic2a_gate" --iib5bic2a-legacy-owner-contract-only \
+    "$iib5bic2a_lifecycle" "$iib5bic2a_collector" "$iib5bic2a_probe" \
+    "$iib5bic2a_scenario" "$iib5bic2a_owner" "$iib5bic2a_join" \
+    "$iib5bic2a_test"
+python3 - "$iib5bic2a_lifecycle" "$iib5bic2a_collector" "$iib5bic2a_probe" "$iib5bic2a_scenario" "$iib5bic2a_owner" "$iib5bic2a_join" "$iib5bic2a_test" "$contract_root" <<'PY'
+from pathlib import Path
+import sys
+lifecycle_path,collector_path,probe_path,scenario_path,owner_path,join_path,test_path,root=map(Path,sys.argv[1:])
+lifecycle,collector,probe,scenario,owner,join,test=[p.read_text() for p in (lifecycle_path,collector_path,probe_path,scenario_path,owner_path,join_path,test_path)]
+def emit(name,old,new,text):
+    if text.count(old)!=1: raise SystemExit(f"cannot construct ii-b5b-i-c2a mutation: {name}")
+    (root/f"iib5bic2a-{name}.swift").write_text(text.replace(old,new,1))
+emit("lifecycle-phase","import Foundation\n","import Foundation\npackage enum LifecycleRootTopologyPhase { case installed, postTeardown }\n",lifecycle)
+emit("lifecycle-artifacts","artifacts[$0] == .absent","artifacts[$0] != .unavailable(reasonKey: \"x\")",lifecycle)
+emit("lifecycle-vacuous","&& service == .absent","&& service == .absent || true",lifecycle)
+emit("collector-installed","case transitionFailed","case installedTopologyUnproved\n    case transitionFailed",collector)
+emit("collector-installed-reader","PostTeardownExpectedTopologyBindingReader","InstalledLifecycleTopologyBindingReader",collector)
+emit("transition-order","try await transition.transition()","_ = try await postTeardownObserver.observePostTeardown(binding: topologyBinding, appProcessIdentity: request.appProcessIdentity, helperProcessIdentity: retirementClaim.helperPeerIdentity, window: window)\n        try await transition.transition()",collector)
+emit("transition-time","post.startedAt >= transitionedAt","post.startedAt >= request.openedAt",collector)
+emit("collector-parenthesized-vacuous","post.provesPostTeardownTopology,","post.provesPostTeardownTopology || (true),",collector)
+emit("probe-identity","private let registry: any LifecycleFixedServiceRegistryReading","private let registry: any LifecycleFixedServiceRegistryReading\n    private let expectedIdentity: LifecycleProcessIdentity",probe)
+emit("probe-registered","case .registered:\n            return .unavailable(\n                reasonKey: \"runtime.topology.service-still-registered\"\n            )","case .registered:\n            return .absent",probe)
+emit("probe-vacuous","case .registered:\n            return .unavailable(\n                reasonKey: \"runtime.topology.service-still-registered\"\n            )","case .registered:\n            return true ? .absent : .unavailable(reasonKey: \"runtime.topology.service-still-registered\")",probe)
+emit("probe-early-alias","    ) -> LifecycleRootTopologyServiceProbeResult {\n        guard let contract = try? LifecycleLocalInstallationContract(),","    ) -> LifecycleRootTopologyServiceProbeResult {\n        let accepted: LifecycleRootTopologyServiceProbeResult = .absent\n        return accepted\n        guard let contract = try? LifecycleLocalInstallationContract(),",probe)
+emit("scenario-installed","cohort.postTeardownTopology.provesPostTeardownTopology,","cohort.installedTopology.provesInstalledTopology,\n            cohort.postTeardownTopology.provesPostTeardownTopology,",scenario)
+emit("scenario-vacuous","cohort.postTeardownTopology.provesPostTeardownTopology,","cohort.postTeardownTopology.provesPostTeardownTopology || true,",scenario)
+emit("scenario-parenthesized-vacuous","cohort.postTeardownTopology.provesPostTeardownTopology,","cohort.postTeardownTopology.provesPostTeardownTopology || (true),",scenario)
+emit("duplicate-owner","import Foundation\n","import Foundation\nprivate let duplicate = InvestigationInstalledL2ArtifactReader()\n",join)
+emit("owner-cardinality","import Foundation\n","import Foundation\nprivate let duplicateOwner = InvestigationInstalledL2ArtifactReader()\n",owner)
+emit("vacuous-test","#expect(!production.contains(retiredMarker))","#expect(true)",test)
+emit("unreachable-test","let sourceEnumerator = FileManager.default.enumerator(","if true { return }\n        let sourceEnumerator = FileManager.default.enumerator(",test)
+PY
+for fixture in \
+ lifecycle-phase:'ii-b5b-i-c2a lifecycle phase surface remains' \
+ lifecycle-artifacts:'ii-b5b-i-c2a lifecycle post-teardown contract drifted' \
+ lifecycle-vacuous:'ii-b5b-i-c2a lifecycle post-teardown contract drifted' \
+ collector-installed:'ii-b5b-i-c2a collector installed branch remains' \
+ collector-installed-reader:'ii-b5b-i-c2a legacy installed owner remains' \
+ transition-order:'ii-b5b-i-c2a transition observation order drifted' \
+ transition-time:'ii-b5b-i-c2a transition observation order drifted' \
+ collector-parenthesized-vacuous:'ii-b5b-i-c2a collector state machine drifted' \
+ probe-identity:'ii-b5b-i-c2a fixed service identity owner remains' \
+ probe-registered:'ii-b5b-i-c2a fixed service absence contract drifted' \
+ probe-vacuous:'ii-b5b-i-c2a fixed service absence contract drifted' \
+ probe-early-alias:'ii-b5b-i-c2a fixed service absence contract drifted' \
+ scenario-installed:'ii-b5b-i-c2a scenario installed evidence consumer remains' \
+ scenario-vacuous:'ii-b5b-i-c2a scenario post-teardown contract drifted' \
+ scenario-parenthesized-vacuous:'ii-b5b-i-c2a scenario post-teardown contract drifted' \
+ duplicate-owner:'ii-b5b-i-c2a installed semantic-owner cardinality drifted' \
+ owner-cardinality:'ii-b5b-i-c2a installed semantic-owner cardinality drifted' \
+ vacuous-test:'ii-b5b-i-c2a focused coverage drifted' \
+ unreachable-test:'ii-b5b-i-c2a focused coverage drifted'; do
+ name=${fixture%%:*}; expected=${fixture#*:}
+ lifecycle="$iib5bic2a_lifecycle"; collector="$iib5bic2a_collector"; probe="$iib5bic2a_probe"; scenario="$iib5bic2a_scenario"; owner="$iib5bic2a_owner"; join="$iib5bic2a_join"; test="$iib5bic2a_test"
+ case $name in
+   lifecycle-*) lifecycle="$contract_root/iib5bic2a-$name.swift";;
+   collector-*|transition-*) collector="$contract_root/iib5bic2a-$name.swift";;
+   probe-*) probe="$contract_root/iib5bic2a-$name.swift";;
+   scenario-*) scenario="$contract_root/iib5bic2a-$name.swift";;
+   owner-cardinality) owner="$contract_root/iib5bic2a-$name.swift";;
+   duplicate-owner) join="$contract_root/iib5bic2a-$name.swift";;
+   vacuous-test|unreachable-test) test="$contract_root/iib5bic2a-$name.swift";;
+ esac
+ output="$contract_root/iib5bic2a-$name.log"
+ if "$iib5bic2a_gate" --iib5bic2a-legacy-owner-contract-only "$lifecycle" "$collector" "$probe" "$scenario" "$owner" "$join" "$test" >"$output" 2>&1; then fail_contract "ii-b5b-i-c2a mutation accepted: $name"; fi
+ require_fixed_text "$output" "$expected"
+done
+
+iib5bic2a_index="$contract_root/iib5bic2a.index"
+GIT_INDEX_FILE="$iib5bic2a_index" git read-tree "$iib5bic2a_baseline^{tree}"
+iib5bic2a_paths=(
+    "$iib5bic2a_lifecycle" Tests/StornautLifecycleTests/LifecycleRootTopologyObservationTests.swift
+    "$iib5bic2a_collector" "$iib5bic2a_probe" "$iib5bic2a_scenario"
+    Tests/StornautInvestigationTests/InvestigationMachineDriverHostTests.swift Tests/StornautInvestigationTests/InvestigationLifecycleTopologyCollectorTests.swift Tests/StornautInvestigationTests/FixedLifecycleServiceProbeTests.swift Tests/StornautInvestigationTests/InvestigationMachineScenarioDriverTests.swift Tests/StornautInvestigationTests/InvestigationMachineScenarioTestSupport.swift Tests/StornautInvestigationTests/InvestigationLifecycleTopologyTestSupport.swift Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+    scripts/verify-contract scripts/verify-investigation-boundaries
+)
+for p in "${iib5bic2a_paths[@]}"; do GIT_INDEX_FILE="$iib5bic2a_index" git add -f "$p"; done
+GIT_INDEX_FILE="$iib5bic2a_index" "$iib5bic2a_gate" --iib5bic2a-staged-scope-contract-only
+for fixture in extra-path over-budget existing-deleted-path binary-numstat wrong-baseline staged-semantic-drift; do
+ index="$contract_root/iib5bic2a-$fixture.index"; cp "$iib5bic2a_index" "$index"
+ if [[ $fixture == extra-path ]]; then blob=$(git rev-parse "${iib5bic2a_baseline}:AGENTS.md"); GIT_INDEX_FILE="$index" git update-index --add --cacheinfo "100644,$blob,iib5bic2a-extra.swift"; expected='ii-b5b-i-c2a checkpoint paths drifted'
+ elif [[ $fixture == over-budget ]]; then blob=$(git hash-object -w Sources/StornautCore/Evidence/EvidenceStore.swift); GIT_INDEX_FILE="$index" git update-index --cacheinfo "100644,$blob,$iib5bic2a_scenario"; expected='ii-b5b-i-c2a checkpoint budget drifted'
+ elif [[ $fixture == existing-deleted-path ]]; then GIT_INDEX_FILE="$index" git rm --cached -q -f Tests/StornautInvestigationTests/InvestigationLifecycleTopologyTestSupport.swift; expected='ii-b5b-i-c2a checkpoint deleted an existing path'
+ elif [[ $fixture == binary-numstat ]]; then blob=$(git rev-parse "${iib5bic2a_baseline}:Tests/Fixtures/Snapshots/design-system.empty-state.dark.en.png"); GIT_INDEX_FILE="$index" git update-index --cacheinfo "100644,$blob,Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift"; expected='ii-b5b-i-c2a binary checkpoint path rejected'
+ elif [[ $fixture == staged-semantic-drift ]]; then blob=$(git hash-object -w "$contract_root/iib5bic2a-probe-registered.swift"); GIT_INDEX_FILE="$index" git update-index --cacheinfo "100644,$blob,$iib5bic2a_probe"; expected='ii-b5b-i-c2a fixed service absence contract drifted'
+ else expected='ii-b5b-i-c2a baseline drifted'; fi
+ output="$contract_root/iib5bic2a-scope-$fixture.log"; baseline="$iib5bic2a_baseline"; [[ $fixture == wrong-baseline ]] && baseline="$iib5bic2a_baseline^"
+ if GIT_INDEX_FILE="$index" "$iib5bic2a_gate" --iib5bic2a-staged-scope-contract-only "$baseline" >"$output" 2>&1; then fail_contract "ii-b5b-i-c2a scope mutation accepted: $fixture"; fi
+ require_fixed_text "$output" "$expected"
 done
 
 print "Verifier mode and CI contract verification passed."

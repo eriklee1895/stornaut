@@ -330,7 +330,6 @@ actor InvestigationMachineScenarioDriver {
             cohort.ownerRetirementObservation
                 == .retiredOwnedResources,
             cohort.lifecycleResidueObservation.provedEmpty,
-            cohort.installedTopology.provesInstalledTopology,
             cohort.postTeardownTopology.provesPostTeardownTopology,
             cohort.observedAt >= observation.completedAt,
             observation.scenario == configuration.scenario,

@@ -6,7 +6,7 @@ import Testing
 @Suite("Lifecycle root topology observation")
 struct LifecycleRootTopologyObservationTests {
     @Test
-    func closedArtifactRolesRequireInstalledMachineDriverEvidence() throws {
+    func closedArtifactRolesRequireMachineDriverAbsenceAfterTeardown() throws {
         #expect(LifecycleRootTopologyArtifactRole.allCases.count == 8)
 
         let repositoryRoot = URL(filePath: #filePath)
@@ -40,16 +40,20 @@ struct LifecycleRootTopologyObservationTests {
             source[bindingStart.lowerBound..<bindingEnd.lowerBound]
         #expect(bindingDeclaration.contains("machineDriverSigningEvidence"))
 
-        let installedStart = try #require(source.range(
-            of: "private var installedContractSatisfied: Bool {"
+        let postTeardownStart = try #require(source.range(
+            of: "private var postTeardownContractSatisfied: Bool {"
         ))
-        let installedEnd = try #require(source.range(
-            of: "private var postTeardownContractSatisfied: Bool {",
-            range: installedStart.upperBound..<source.endIndex
+        let observerStart = try #require(source.range(
+            of: "package struct LifecycleRootTopologyObserver:",
+            range: postTeardownStart.upperBound..<source.endIndex
         ))
-        let installedContract =
-            source[installedStart.lowerBound..<installedEnd.lowerBound]
-        #expect(installedContract.contains(".machineDriverExecutable,"))
+        let postTeardownContract = source[
+            postTeardownStart.lowerBound..<observerStart.lowerBound
+        ]
+        #expect(postTeardownContract.contains(
+            "LifecycleRootTopologyArtifactRole.allCases"
+        ))
+        #expect(postTeardownContract.contains("artifacts[$0] == .absent"))
     }
 
     @Test
@@ -100,31 +104,8 @@ struct LifecycleRootTopologyObservationTests {
     }
 
     @Test
-    func exactInstalledObservationProvesOnlyInstalledPhase() throws {
-        let fixture = try RootTopologyFixture(phase: .installed)
-        let observation = try fixture.observe(
-            artifactStates: .all(.presentValid),
-            serviceResult: .loaded(identity: fixture.helperIdentity),
-            processResults: fixture.liveProcessResults
-        )
-
-        #expect(observation.phase == .installed)
-        #expect(observation.binding == fixture.binding)
-        #expect(observation.appProcessIdentity == fixture.appIdentity)
-        #expect(observation.helperProcessIdentity == fixture.helperIdentity)
-        #expect(observation.startedAt == RootTopologyFixture.observedAt)
-        #expect(observation.observedAt == RootTopologyFixture.observedAt)
-        #expect(observation.satisfiesPhaseContract)
-        #expect(observation.provesInstalledTopology)
-        #expect(!observation.provesPostTeardownTopology)
-        #expect(observation.appProcess == .sameIdentityAlive)
-        #expect(observation.helperProcess == .sameIdentityAlive)
-        #expect(observation.service == .loadedValid)
-    }
-
-    @Test
-    func exactAbsentObservationProvesOnlyPostTeardownPhase() throws {
-        let fixture = try RootTopologyFixture(phase: .postTeardown)
+    func exactAbsentObservationProvesPostTeardown() throws {
+        let fixture = try RootTopologyFixture()
         let observation = try fixture.observe(
             artifactStates: .all(.absent),
             serviceResult: .absent,
@@ -134,33 +115,19 @@ struct LifecycleRootTopologyObservationTests {
             ]
         )
 
-        #expect(observation.phase == .postTeardown)
-        #expect(observation.satisfiesPhaseContract)
-        #expect(!observation.provesInstalledTopology)
+        #expect(observation.binding == fixture.binding)
+        #expect(observation.appProcessIdentity == fixture.appIdentity)
+        #expect(observation.helperProcessIdentity == fixture.helperIdentity)
+        #expect(observation.startedAt == RootTopologyFixture.observedAt)
+        #expect(observation.observedAt == RootTopologyFixture.observedAt)
         #expect(observation.provesPostTeardownTopology)
         #expect(observation.appProcess == .absent)
         #expect(observation.helperProcess == .absent)
         #expect(observation.service == .absent)
     }
 
-    @Test
-    func installedPhaseAllowsOnlyValidOrAbsentRuntimeRoots() throws {
-        let fixture = try RootTopologyFixture(phase: .installed)
-        var states = RootTopologyArtifactStates.all(.presentValid)
-        states[.runtimeRoot] = .absent
-        states[.leaseRoot] = .absent
-
-        let observation = try fixture.observe(
-            artifactStates: states,
-            serviceResult: .loaded(identity: fixture.helperIdentity),
-            processResults: fixture.liveProcessResults
-        )
-
-        #expect(observation.provesInstalledTopology)
-        #expect(observation.satisfiesPhaseContract)
-    }
-
     @Test(arguments: [
+        LifecycleRootTopologyArtifactObservation.presentValid,
         LifecycleRootTopologyArtifactObservation.invalid(
             reasonKey: "runtime.topology.symlink"
         ),
@@ -168,73 +135,57 @@ struct LifecycleRootTopologyObservationTests {
             reasonKey: "runtime.topology.permission-denied"
         ),
     ])
-    func invalidAndUnavailableArtifactsNeverProveEitherPhase(
+    func presentInvalidAndUnavailableArtifactsNeverProvePostTeardown(
         state: LifecycleRootTopologyArtifactObservation
     ) throws {
-        for phase in LifecycleRootTopologyPhase.allCases {
-            let fixture = try RootTopologyFixture(phase: phase)
-            var states = RootTopologyArtifactStates.all(
-                phase == .installed ? .presentValid : .absent
-            )
-            states[.installedRoot] = state
-            let observation = try fixture.observe(
-                artifactStates: states,
-                serviceResult: phase == .installed
-                    ? .loaded(identity: fixture.helperIdentity)
-                    : .absent,
-                processResults: phase == .installed
-                    ? fixture.liveProcessResults
-                    : [
-                        fixture.appIdentity.processID: .absent,
-                        fixture.helperIdentity.processID: .absent,
-                    ]
-            )
+        let fixture = try RootTopologyFixture()
+        var states = RootTopologyArtifactStates.all(.absent)
+        states[.installedRoot] = state
+        let observation = try fixture.observe(
+            artifactStates: states,
+            serviceResult: .absent,
+            processResults: [
+                fixture.appIdentity.processID: .absent,
+                fixture.helperIdentity.processID: .absent,
+            ]
+        )
 
-            #expect(!observation.satisfiesPhaseContract)
-            #expect(!observation.provesInstalledTopology)
-            #expect(!observation.provesPostTeardownTopology)
-        }
+        #expect(!observation.provesPostTeardownTopology)
     }
 
     @Test
-    func loadedForeignHelperAndUnavailableServiceFailClosed() throws {
-        let fixture = try RootTopologyFixture(phase: .installed)
-        let foreignHelper = processIdentity(
-            processID: fixture.helperIdentity.processID,
-            processIDVersion: fixture.helperIdentity.processIDVersion + 1,
-            auditSessionID: fixture.helperIdentity.auditSessionID,
-            effectiveUserID: fixture.helperIdentity.effectiveUserID,
-            tokenSeed: 90
-        )
-
-        let mismatched = try fixture.observe(
-            artifactStates: .all(.presentValid),
-            serviceResult: .loaded(identity: foreignHelper),
+    func survivingProcessesAndUnavailableServiceFailClosed() throws {
+        let fixture = try RootTopologyFixture()
+        let surviving = try fixture.observe(
+            artifactStates: .all(.absent),
+            serviceResult: .absent,
             processResults: fixture.liveProcessResults
         )
         let unavailable = try fixture.observe(
-            artifactStates: .all(.presentValid),
+            artifactStates: .all(.absent),
             serviceResult: .unavailable(
                 reasonKey: "runtime.topology.service-lookup-failed"
             ),
-            processResults: fixture.liveProcessResults
+            processResults: [
+                fixture.appIdentity.processID: .absent,
+                fixture.helperIdentity.processID: .absent,
+            ]
         )
 
-        #expect(mismatched.service == .invalid(
-            reasonKey: "runtime.topology.service-identity-mismatch"
-        ))
-        #expect(!mismatched.satisfiesPhaseContract)
+        #expect(surviving.appProcess == .sameIdentityAlive)
+        #expect(surviving.helperProcess == .sameIdentityAlive)
+        #expect(!surviving.provesPostTeardownTopology)
         #expect(unavailable.service == .unavailable(
             reasonKey: "runtime.topology.service-lookup-failed"
         ))
-        #expect(!unavailable.satisfiesPhaseContract)
+        #expect(!unavailable.provesPostTeardownTopology)
     }
 
     @Test
     func processClassificationDistinguishesReuseAndUnresolvedEvidence()
         throws
     {
-        let fixture = try RootTopologyFixture(phase: .postTeardown)
+        let fixture = try RootTopologyFixture()
         let reused = processIdentity(
             processID: fixture.appIdentity.processID,
             processIDVersion: fixture.appIdentity.processIDVersion + 1,
@@ -273,7 +224,7 @@ struct LifecycleRootTopologyObservationTests {
 
     @Test
     func vanishedMidObservationIsUnresolvedRatherThanAbsent() throws {
-        let fixture = try RootTopologyFixture(phase: .postTeardown)
+        let fixture = try RootTopologyFixture()
         let observation = try fixture.observe(
             artifactStates: .all(.absent),
             serviceResult: .absent,
@@ -321,7 +272,6 @@ struct LifecycleRootTopologyObservationTests {
             ),
         ] {
             let request = try LifecycleRootTopologyObservationRequest(
-                phase: .postTeardown,
                 binding: binding,
                 appProcessIdentity: app,
                 helperProcessIdentity: helper,
@@ -347,13 +297,12 @@ struct LifecycleRootTopologyObservationTests {
 
     @Test
     func collectionThatFinishesAfterTheWindowFailsClosed() throws {
-        let fixture = try RootTopologyFixture(phase: .postTeardown)
+        let fixture = try RootTopologyFixture()
         let clock = ScriptedRootTopologyClock([
             RootTopologyFixture.observedAt,
             RootTopologyFixture.observedAt.addingTimeInterval(31),
         ])
         let request = try LifecycleRootTopologyObservationRequest(
-            phase: .postTeardown,
             binding: fixture.binding,
             appProcessIdentity: fixture.appIdentity,
             helperProcessIdentity: fixture.helperIdentity,
@@ -397,7 +346,6 @@ struct LifecycleRootTopologyObservationTests {
 
         #expect(throws: LifecycleRootTopologyObservationError.invalidRequest) {
             _ = try LifecycleRootTopologyObservationRequest(
-                phase: .installed,
                 binding: rootTopologyBinding(),
                 appProcessIdentity: app,
                 helperProcessIdentity: app,
@@ -463,7 +411,6 @@ struct LifecycleRootTopologyObservationTests {
                 throws: LifecycleRootTopologyObservationError.invalidRequest
             ) {
                 _ = try LifecycleRootTopologyObservationRequest(
-                    phase: .installed,
                     binding: rootTopologyBinding(),
                     appProcessIdentity: invalidApp,
                     helperProcessIdentity: invalidHelper,
@@ -543,7 +490,7 @@ struct LifecycleRootTopologyObservationTests {
             observationStart.lowerBound..<observerStart.lowerBound
         ]
         #expect(observationSource.contains(
-            "fileprivate init(\n        phase: LifecycleRootTopologyPhase"
+            "fileprivate init(\n        binding: LifecycleRootTopologyBinding"
         ))
         #expect(!observationSource.contains("package init("))
         #expect(!contractSource.contains(
@@ -558,14 +505,12 @@ struct LifecycleRootTopologyObservationTests {
 private struct RootTopologyFixture {
     static let observedAt = Date(timeIntervalSince1970: 1_800_000_000)
 
-    let phase: LifecycleRootTopologyPhase
     let contract: LifecycleLocalInstallationContract
     let binding: LifecycleRootTopologyBinding
     let appIdentity: LifecycleProcessIdentity
     let helperIdentity: LifecycleProcessIdentity
 
-    init(phase: LifecycleRootTopologyPhase) throws {
-        self.phase = phase
+    init() throws {
         contract = try LifecycleLocalInstallationContract()
         binding = try rootTopologyBinding()
         appIdentity = processIdentity(
@@ -611,7 +556,6 @@ private struct RootTopologyFixture {
         processResults: [pid_t: LifecycleRootTopologyProcessReadResult]
     ) throws -> LifecycleRootTopologyObservation {
         let request = try LifecycleRootTopologyObservationRequest(
-            phase: phase,
             binding: binding,
             appProcessIdentity: appIdentity,
             helperProcessIdentity: helperIdentity,

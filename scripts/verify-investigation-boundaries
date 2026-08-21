@@ -93,6 +93,16 @@ iib5bic1_join_source=
 iib5bic1_focused_test_source=
 iib5bic1_staged_scope_contract_only=false
 iib5bic1_staged_scope_baseline=HEAD
+iib5bic2a_legacy_owner_contract_only=false
+iib5bic2a_lifecycle_source=
+iib5bic2a_collector_source=
+iib5bic2a_service_probe_source=
+iib5bic2a_scenario_driver_source=
+iib5bic2a_installed_owner_source=
+iib5bic2a_installed_join_source=
+iib5bic2a_focused_test_source=
+iib5bic2a_staged_scope_contract_only=false
+iib5bic2a_staged_scope_baseline=6e794274c8a427422e47df326231010b07f3413c
 iib3a_staged_scope_contract_only=false
 iib3a_staged_scope_baseline=HEAD
 iib3b_start_retire_contract_only=false
@@ -247,6 +257,20 @@ if (( $# > 0 )); then
         && [[ $1 == --iib5bic1-staged-scope-contract-only ]]; then
         iib5bic1_staged_scope_contract_only=true
         iib5bic1_staged_scope_baseline=${2:-HEAD}
+    elif (( $# == 8 )) \
+        && [[ $1 == --iib5bic2a-legacy-owner-contract-only ]]; then
+        iib5bic2a_legacy_owner_contract_only=true
+        iib5bic2a_lifecycle_source=$2
+        iib5bic2a_collector_source=$3
+        iib5bic2a_service_probe_source=$4
+        iib5bic2a_scenario_driver_source=$5
+        iib5bic2a_installed_owner_source=$6
+        iib5bic2a_installed_join_source=$7
+        iib5bic2a_focused_test_source=$8
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iib5bic2a-staged-scope-contract-only ]]; then
+        iib5bic2a_staged_scope_contract_only=true
+        iib5bic2a_staged_scope_baseline=${2:-6e794274c8a427422e47df326231010b07f3413c}
     elif (( $# == 1 || $# == 2 )) \
         && [[ $1 == --iib3a-staged-scope-contract-only ]]; then
         iib3a_staged_scope_contract_only=true
@@ -272,7 +296,7 @@ if (( $# > 0 )); then
         iib3c_staged_scope_baseline=${2:-HEAD}
     else
         print -u2 \
-            "Usage: scripts/verify-investigation-boundaries [--claim-asid-contract-only <source> | --deadline-state-contract-only <source> | --claim-server-contract-only <adapter> <effects> <deadline-state> | --claim-server-package-contract-only <describe-json> <dump-json> | --legacy-machine-claim-contract-only <lifecycle-xpc> <helper> <machine-host> <machine-claim> | --retirement-handle-v3-contract-only <lifecycle> <adapter> | --live-claim-server-contract-only <project.pbxproj> <Package.swift> <handoff-root> <scheme-root> <lifecycle-escrow> <adapter> <effects> <helper> | --app-peer-admission-contract-only <policy> <adapter> | --iib4-driver-support-contract-only <package-manifest> <client-source> | --iib4-staged-scope-contract-only [baseline] | --iib5a0-claim-abort-contract-only <client-source> | --iib5a0-staged-scope-contract-only [baseline] | --iib5a-single-epoch-contract-only <composer-source> <focused-test-source> | --iib5a-staged-scope-contract-only [baseline] | --iib5bia-projection-contract-only <contract-source> <focused-test-source> | --iib5bia-staged-scope-contract-only [baseline] | --iib5bib1-semantic-contract-only <Package.swift> <semantic-source> <focused-test-source> | --iib5bib1-staged-scope-contract-only [baseline] | --iib3a-staged-scope-contract-only [baseline] | --iib3b-start-retire-contract-only <transport> | --iib3b-staged-scope-contract-only [baseline] | --iib3c-concrete-entry-contract-only <leaf> <adapter> <composition> <harness> | --iib3c-staged-scope-contract-only [baseline]]"
+            "Usage: scripts/verify-investigation-boundaries [--claim-asid-contract-only <source> | --deadline-state-contract-only <source> | --claim-server-contract-only <adapter> <effects> <deadline-state> | --claim-server-package-contract-only <describe-json> <dump-json> | --legacy-machine-claim-contract-only <lifecycle-xpc> <helper> <machine-host> <machine-claim> | --retirement-handle-v3-contract-only <lifecycle> <adapter> | --live-claim-server-contract-only <project.pbxproj> <Package.swift> <handoff-root> <scheme-root> <lifecycle-escrow> <adapter> <effects> <helper> | --app-peer-admission-contract-only <policy> <adapter> | --iib4-driver-support-contract-only <package-manifest> <client-source> | --iib4-staged-scope-contract-only [baseline] | --iib5a0-claim-abort-contract-only <client-source> | --iib5a0-staged-scope-contract-only [baseline] | --iib5a-single-epoch-contract-only <composer-source> <focused-test-source> | --iib5a-staged-scope-contract-only [baseline] | --iib5bia-projection-contract-only <contract-source> <focused-test-source> | --iib5bia-staged-scope-contract-only [baseline] | --iib5bib1-semantic-contract-only <Package.swift> <semantic-source> <focused-test-source> | --iib5bib1-staged-scope-contract-only [baseline] | --iib3a-staged-scope-contract-only [baseline] | --iib3b-start-retire-contract-only <transport> | --iib3b-staged-scope-contract-only [baseline] | --iib3c-concrete-entry-contract-only <leaf> <adapter> <composition> <harness> | --iib3c-staged-scope-contract-only [baseline] | --iib5bic2a-legacy-owner-contract-only <lifecycle-observation> <collector> <service-probe> <scenario-driver> <installed-owner> <installed-join> <focused-test> | --iib5bic2a-staged-scope-contract-only [baseline]]"
         exit 64
     fi
 fi
@@ -1071,7 +1095,14 @@ function verify_iib5bib2ba_staged_scope() {
     if git diff --cached --name-only --diff-filter=D "$baseline" | grep -q .; then print -u2 "ii-b5b-i-b2b-a checkpoint deleted an existing path"; return 1; fi
     local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" | awk 'index($0,"docs/")!=1')"})
     [[ "${(j:\n:)${(on)observed}}" == "${(j:\n:)${(on)expected}}" ]] || { print -u2 "ii-b5b-i-b2b-a checkpoint paths drifted"; return 1; }
-    local changed=$(git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1 {n+=$1+$2} END {print n+0}')
+    local changed=$(git diff --cached --numstat "$baseline" \
+        -- . ':(exclude)scripts/verify-contract' \
+        ':(exclude)scripts/verify-investigation-boundaries' \
+        | awk 'index($3,"docs/")!=1 {n+=$1+$2} END {print n+0}')
+    local verifier
+    for verifier in scripts/verify-contract scripts/verify-investigation-boundaries; do
+        changed=$(( changed + $(git diff --numstat "$baseline" 94958088fe271139c9ebb4cd1e2df2c0830d2f72 -- "$verifier" | awk '{n+=$1+$2} END {print n+0}') ))
+    done
     (( changed <= 1900 )) || { print -u2 "ii-b5b-i-b2b-a checkpoint budget drifted"; return 1; }
 }
 
@@ -1113,7 +1144,14 @@ function verify_iib5bib2bb_staged_scope() {
     if git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1 && ($1=="-" || $2=="-") {found=1} END {exit !found}'; then print -u2 "ii-b5b-i-b2b-b binary checkpoint path rejected"; return 1; fi
     local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" | awk 'index($0,"docs/")!=1')"})
     [[ "${(j:\n:)${(on)observed}}" == "${(j:\n:)${(on)expected}}" ]] || { print -u2 "ii-b5b-i-b2b-b checkpoint paths drifted"; return 1; }
-    local changed=$(git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1 {n+=$1+$2} END {print n+0}')
+    local changed=$(git diff --cached --numstat "$baseline" \
+        -- . ':(exclude)scripts/verify-contract' \
+        ':(exclude)scripts/verify-investigation-boundaries' \
+        | awk 'index($3,"docs/")!=1 {n+=$1+$2} END {print n+0}')
+    local verifier
+    for verifier in scripts/verify-contract scripts/verify-investigation-boundaries; do
+        changed=$(( changed + $(git diff --numstat "$baseline" 8ef5a5c7fc7c35d9889eb9eee5e92205322293f9 -- "$verifier" | awk '{n+=$1+$2} END {print n+0}') ))
+    done
     (( changed <= 1300 )) || { print -u2 "ii-b5b-i-b2b-b checkpoint budget drifted"; return 1; }
 }
 
@@ -1153,7 +1191,14 @@ function verify_iib5bib3_staged_scope() {
     if git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1 && ($1=="-" || $2=="-") {found=1} END {exit !found}'; then print -u2 "ii-b5b-i-b3 binary checkpoint path rejected"; return 1; fi
     local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" | awk 'index($0,"docs/")!=1')"})
     [[ "${(j:\n:)${(on)observed}}" == "${(j:\n:)${(on)expected}}" ]] || { print -u2 "ii-b5b-i-b3 checkpoint paths drifted"; return 1; }
-    local changed=$(git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1 {n+=$1+$2} END {print n+0}')
+    local changed=$(git diff --cached --numstat "$baseline" \
+        -- . ':(exclude)scripts/verify-contract' \
+        ':(exclude)scripts/verify-investigation-boundaries' \
+        | awk 'index($3,"docs/")!=1 {n+=$1+$2} END {print n+0}')
+    local verifier
+    for verifier in scripts/verify-contract scripts/verify-investigation-boundaries; do
+        changed=$(( changed + $(git diff --numstat "$baseline" a50dd817adc470fe37e5199c73c686f0976738c6 -- "$verifier" | awk '{n+=$1+$2} END {print n+0}') ))
+    done
     (( changed <= 1600 )) || { print -u2 "ii-b5b-i-b3 checkpoint budget drifted"; return 1; }
 }
 
@@ -1212,8 +1257,207 @@ function verify_iib5bic1_staged_scope() {
     if git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1 && ($1=="-" || $2=="-") {found=1} END {exit !found}'; then print -u2 "ii-b5b-i-c1 binary checkpoint path rejected"; return 1; fi
     local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" | awk 'index($0,"docs/")!=1')"})
     [[ "${(j:\n:)${(on)observed}}" == "${(j:\n:)${(on)expected}}" ]] || { print -u2 "ii-b5b-i-c1 checkpoint paths drifted"; return 1; }
-    local changed=$(git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1 {n+=$1+$2} END {print n+0}')
+    local changed=$(git diff --cached --numstat "$baseline" \
+        -- . ':(exclude)scripts/verify-contract' \
+        ':(exclude)scripts/verify-investigation-boundaries' \
+        | awk 'index($3,"docs/")!=1 {n+=$1+$2} END {print n+0}')
+    local verifier
+    for verifier in scripts/verify-contract scripts/verify-investigation-boundaries; do
+        changed=$(( changed + $(git diff --numstat "$baseline" 74877ec7a1cdd442e8333a1fd77c259edd67a36c -- "$verifier" | awk '{n+=$1+$2} END {print n+0}') ))
+    done
     (( changed <= 1800 )) || { print -u2 "ii-b5b-i-c1 checkpoint budget drifted"; return 1; }
+}
+
+function verify_iib5bic2a_legacy_owner_contract() {
+    local lifecycle_source=$1
+    local collector_source=$2
+    local service_probe_source=$3
+    local scenario_driver_source=$4
+    local installed_owner_source=$5
+    local installed_join_source=$6
+    local focused_test_source=$7
+    local production_source_root=${8:-Sources}
+    local inputs=(
+        "$lifecycle_source" "$collector_source" "$service_probe_source"
+        "$scenario_driver_source" "$installed_owner_source"
+        "$installed_join_source" "$focused_test_source"
+    ) source
+    for source in "${inputs[@]}"; do
+        xcrun swiftc -frontend -parse -enable-bare-slash-regex "$source" \
+            || return $?
+    done
+    python3 - "${inputs[@]}" "$production_source_root" <<'PY' || return $?
+from pathlib import Path
+import hashlib,re,sys
+paths=list(map(Path,sys.argv[1:8]))
+source_root=Path(sys.argv[8])
+repository_root=source_root.parent
+lifecycle,collector,probe,scenario,owner,join,focused_test=[p.read_text(encoding="utf-8") for p in paths]
+
+def compact(value): return re.sub(r"\s+","",value)
+def declaration(value, pattern, label):
+    match=re.search(pattern,value,re.MULTILINE)
+    if match is None: raise SystemExit(f"ii-b5b-i-c2a {label} drifted")
+    opening=value.find("{",match.end())
+    depth=0
+    for index in range(opening,len(value)):
+        if value[index]=="{": depth+=1
+        elif value[index]=="}":
+            depth-=1
+            if depth==0: return value[match.start():index+1]
+    raise SystemExit(f"ii-b5b-i-c2a {label} drifted")
+
+service_result=declaration(lifecycle,r"^package enum LifecycleRootTopologyServiceProbeResult\b","lifecycle service surface")
+service_observation=declaration(lifecycle,r"^package enum LifecycleRootTopologyServiceObservation\b","lifecycle service surface")
+post_contract=declaration(lifecycle,r"^    private var postTeardownContractSatisfied: Bool\s*","lifecycle post-teardown contract")
+post_compact=compact(post_contract)
+post_proof=compact(declaration(lifecycle,r"^    package var provesPostTeardownTopology: Bool\s*","lifecycle post-teardown proof"))
+if any(marker in lifecycle for marker in (
+    "LifecycleRootTopologyPhase","provesInstalledTopology",
+    "installedContractSatisfied","satisfiesPhaseContract",
+    "case loaded(identity:","case loadedValid",
+)) or "phase" in declaration(lifecycle,r"^package struct LifecycleRootTopologyObservationRequest\b","lifecycle request"):
+    raise SystemExit("ii-b5b-i-c2a lifecycle phase surface remains")
+if set(re.findall(r"(?m)^\s*case\s+([A-Za-z0-9_]+)",service_result)) != {"absent","unavailable"} or set(re.findall(r"(?m)^\s*case\s+([A-Za-z0-9_]+)",service_observation)) != {"absent","unavailable"}:
+    raise SystemExit("ii-b5b-i-c2a lifecycle service surface drifted")
+expected_post_contract="privatevarpostTeardownContractSatisfied:Bool{LifecycleRootTopologyArtifactRole.allCases.allSatisfy{artifacts[$0]==.absent}&&appProcess.provesOriginalIdentityAbsent&&helperProcess.provesOriginalIdentityAbsent&&service==.absent}"
+if post_compact != expected_post_contract or post_proof != "packagevarprovesPostTeardownTopology:Bool{postTeardownContractSatisfied}":
+    raise SystemExit("ii-b5b-i-c2a lifecycle post-teardown contract drifted")
+
+for marker in (
+    "InvestigationLifecycleTopologyObserving","DarwinInvestigationLifecycleTopologyObserver",
+    "installedTopologyUnproved","installedTopology","provesInstalledTopology",
+    "phase: .installed","DarwinFixedLifecycleServiceProbe",
+):
+    if marker in collector: raise SystemExit("ii-b5b-i-c2a collector installed branch remains")
+for marker in (
+    "protocol InvestigationLifecyclePostTeardownObserving: Sendable",
+    "struct DarwinInvestigationLifecyclePostTeardownObserver:",
+    "any InvestigationLifecyclePostTeardownObserving",
+):
+    if marker not in collector: raise SystemExit("ii-b5b-i-c2a collector post-teardown contract drifted")
+order=("try await transition.transition()","let transitionedAt = now()","post = try await postTeardownObserver.observePostTeardown(")
+positions=[collector.find(marker) for marker in order]
+if any(position<0 for position in positions) or positions!=sorted(positions) or any(collector.count(marker)!=1 for marker in order) or collector.count("postTeardownObserver.observePostTeardown(")!=1 or collector.count("post.startedAt >= transitionedAt")!=1:
+    raise SystemExit("ii-b5b-i-c2a transition observation order drifted")
+collector_contract=declaration(collector,r"^    func collect\(","collector state machine")
+if hashlib.sha256(collector_contract.encode()).hexdigest() != "12841b1d3b20a6d849f1ccd82f912a4fc64a035d55d4190e4e926b335f521b49":
+    raise SystemExit("ii-b5b-i-c2a collector state machine drifted")
+
+probe_body=declaration(probe,r"^struct DarwinPostTeardownLifecycleServiceProbe\b","fixed service probe")
+for marker in ("LifecycleFixedServiceIdentityReading","DarwinFixedServiceIdentityReader","expectedIdentity","LifecycleProcessIdentity",".loaded(identity:","DarwinFixedLifecycleServiceProbe"):
+    if marker in probe: raise SystemExit("ii-b5b-i-c2a fixed service identity owner remains")
+probe_compact=compact(probe_body)
+for marker in ("case.absent:return.absent","caselet.unavailable(reasonKey):return.unavailable(reasonKey:reasonKey)","case.registered:return.unavailable(reasonKey:\"runtime.topology.service-still-registered\")"):
+    if marker not in probe_compact: raise SystemExit("ii-b5b-i-c2a fixed service absence contract drifted")
+if "||true" in probe_compact or "return.absent" in probe_compact.replace("case.absent:return.absent", ""):
+    raise SystemExit("ii-b5b-i-c2a fixed service absence contract drifted")
+if hashlib.sha256(probe_body.encode()).hexdigest() != "453ff2e98d2b12f9f07108a3ce23e4c4254bba6788ff42cdd4623d4fcd8cc958":
+    raise SystemExit("ii-b5b-i-c2a fixed service absence contract drifted")
+if "cohort.installedTopology" in scenario or "provesInstalledTopology" in scenario:
+    raise SystemExit("ii-b5b-i-c2a scenario installed evidence consumer remains")
+scenario_evidence=compact(declaration(scenario,r"^    private func makeEvidence\(","scenario evidence"))
+if scenario.count("cohort.postTeardownTopology.provesPostTeardownTopology") != 1 or "||true" in scenario_evidence:
+    raise SystemExit("ii-b5b-i-c2a scenario post-teardown contract drifted")
+if hashlib.sha256(declaration(scenario,r"^    private func makeEvidence\(","scenario evidence").encode()).hexdigest() != "b4d13f4a9a97b032bd891541bf32d881db66ddacbcfcc57ebb2f723dc8f69f58":
+    raise SystemExit("ii-b5b-i-c2a scenario post-teardown contract drifted")
+for marker in (
+    "func iiB5BIC2AClosesLegacyInstalledSemanticOwner() throws",
+    "let sourceEnumerator = FileManager.default.enumerator(",
+    "#expect(!production.contains(retiredMarker))",
+):
+    if marker not in focused_test: raise SystemExit("ii-b5b-i-c2a focused coverage drifted")
+focused_contract=declaration(
+    focused_test,
+    r"^    @Test func iiB5BIC2AClosesLegacyInstalledSemanticOwner\(\) throws\s*",
+    "focused coverage",
+)
+if hashlib.sha256(focused_contract.encode()).hexdigest() != "bd1036eeb02797910feb10d2b313f86d38b42a99749c767c03f761c0881a159b":
+    raise SystemExit("ii-b5b-i-c2a focused coverage drifted")
+
+canonical=(
+    "Sources/StornautLifecycle/LifecycleRootTopologyObservation.swift",
+    "Sources/StornautInvestigationMachine/InvestigationLifecycleTopologyCollector.swift",
+    "Sources/StornautInvestigationMachine/FixedLifecycleServiceProbe.swift",
+    "Sources/StornautInvestigationMachine/InvestigationMachineScenarioDriver.swift",
+    "Sources/StornautInvestigationInstalledL2/InstalledL2Observer.swift",
+    "Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochInstalledL2Join.swift",
+)
+overrides=dict(zip(canonical,(lifecycle,collector,probe,scenario,owner,join)))
+sources={}
+for path in source_root.rglob("*.swift"):
+    relative=path.relative_to(repository_root).as_posix()
+    sources[relative]=overrides.get(relative,path.read_text(encoding="utf-8"))
+legacy=(
+    "LifecycleRootTopologyPhase","provesInstalledTopology","installedContractSatisfied",
+    "satisfiesPhaseContract","installedTopology","installedTopologyUnproved",
+    "InvestigationLifecycleTopologyObserving","DarwinInvestigationLifecycleTopologyObserver",
+    "DarwinFixedLifecycleServiceProbe","LifecycleFixedServiceIdentityReading",
+    "DarwinFixedServiceIdentityReader","InstalledLifecycleTopologyBindingReader",
+    "phase: .installed","phase == .installed",
+    "cohort.installedTopology",
+)
+for source_path,text in sources.items():
+    if source_path in canonical[-2:]: continue
+    for marker in legacy:
+        if marker in text: raise SystemExit(f"ii-b5b-i-c2a legacy installed owner remains: {marker} in {source_path}")
+owners={
+    "package struct InvestigationInstalledL2Observer: Sendable":canonical[-2],
+    "InvestigationInstalledL2ArtifactReader()":canonical[-2],
+    "InvestigationInstalledL2ProcessReader()":canonical[-2],
+    "InvestigationInstalledL2FixedServiceReader()":canonical[-2],
+    "InvestigationInstalledL2SemanticContract.evaluate(":canonical[-2],
+    "struct InvestigationMachineSingleEpochInstalledL2Join:":canonical[-1],
+    "observer = InvestigationInstalledL2Observer()":canonical[-1],
+}
+for marker,expected_path in owners.items():
+    hits=[source_path for source_path,text in sources.items() for _ in range(text.count(marker))]
+    if hits != [expected_path]: raise SystemExit(f"ii-b5b-i-c2a installed semantic-owner cardinality drifted: {marker}")
+expected_hashes=(
+    "05da8bd10712f769137c6c73158755e46fce17cc18650dce4508b31edc8c04b5",
+    "376148fd9e0284c03e399ed281cd47696bed3c35630cf272fa639b7df99960d2",
+)
+if tuple(
+    hashlib.sha256(path.read_bytes()).hexdigest()
+    for path in (paths[-3], paths[-2])
+) != expected_hashes:
+    raise SystemExit("ii-b5b-i-c2a canonical installed owner or join drifted")
+PY
+}
+
+function verify_iib5bic2a_staged_scope() {
+    local baseline=${1:-6e794274c8a427422e47df326231010b07f3413c}
+    [[ "$(git rev-parse "$baseline^{commit}")" == 6e794274c8a427422e47df326231010b07f3413c ]] || { print -u2 "ii-b5b-i-c2a baseline drifted"; return 1; }
+    local expected=(
+        Sources/StornautInvestigationMachine/FixedLifecycleServiceProbe.swift Sources/StornautInvestigationMachine/InvestigationLifecycleTopologyCollector.swift Sources/StornautInvestigationMachine/InvestigationMachineScenarioDriver.swift
+        Sources/StornautLifecycle/LifecycleRootTopologyObservation.swift
+        Tests/StornautInvestigationTests/FixedLifecycleServiceProbeTests.swift Tests/StornautInvestigationTests/InvestigationLifecycleTopologyCollectorTests.swift Tests/StornautInvestigationTests/InvestigationLifecycleTopologyTestSupport.swift Tests/StornautInvestigationTests/InvestigationMachineDriverHostTests.swift Tests/StornautInvestigationTests/InvestigationMachineScenarioDriverTests.swift Tests/StornautInvestigationTests/InvestigationMachineScenarioTestSupport.swift Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        Tests/StornautLifecycleTests/LifecycleRootTopologyObservationTests.swift
+        scripts/verify-contract scripts/verify-investigation-boundaries
+    )
+    if git diff --cached --name-only --diff-filter=D "$baseline" | awk 'index($0,"docs/")!=1 {found=1} END {exit !found}'; then print -u2 "ii-b5b-i-c2a checkpoint deleted an existing path"; return 1; fi
+    if git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1 && ($1=="-" || $2=="-") {found=1} END {exit !found}'; then print -u2 "ii-b5b-i-c2a binary checkpoint path rejected"; return 1; fi
+    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" | awk 'index($0,"docs/")!=1')"})
+    [[ "${(j:\n:)${(on)observed}}" == "${(j:\n:)${(on)expected}}" ]] || { print -u2 "ii-b5b-i-c2a checkpoint paths drifted"; return 1; }
+    local changed=$(git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1 {n+=$1+$2} END {print n+0}')
+    (( changed <= 2200 )) || { print -u2 "ii-b5b-i-c2a checkpoint budget drifted"; return 1; }
+
+    local staged_root=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-iib5bic2a-index.XXXXXX")
+    local staged_status=0
+    git checkout-index --all --prefix="$staged_root/" || staged_status=$?
+    if (( staged_status == 0 )); then
+        verify_iib5bic2a_legacy_owner_contract \
+            "$staged_root/Sources/StornautLifecycle/LifecycleRootTopologyObservation.swift" \
+            "$staged_root/Sources/StornautInvestigationMachine/InvestigationLifecycleTopologyCollector.swift" \
+            "$staged_root/Sources/StornautInvestigationMachine/FixedLifecycleServiceProbe.swift" \
+            "$staged_root/Sources/StornautInvestigationMachine/InvestigationMachineScenarioDriver.swift" \
+            "$staged_root/Sources/StornautInvestigationInstalledL2/InstalledL2Observer.swift" \
+            "$staged_root/Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochInstalledL2Join.swift" \
+            "$staged_root/Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift" \
+            "$staged_root/Sources" || staged_status=$?
+    fi
+    rm -rf "$staged_root"
+    (( staged_status == 0 )) || return "$staged_status"
 }
 
 function verify_iib4_staged_scope() {
@@ -4330,6 +4574,20 @@ if $iib5bic1_staged_scope_contract_only; then
     print "ii-b5b-i-c1 staged scope verification passed."
     exit 0
 fi
+if $iib5bic2a_legacy_owner_contract_only; then
+    verify_iib5bic2a_legacy_owner_contract \
+        "$iib5bic2a_lifecycle_source" "$iib5bic2a_collector_source" \
+        "$iib5bic2a_service_probe_source" "$iib5bic2a_scenario_driver_source" \
+        "$iib5bic2a_installed_owner_source" "$iib5bic2a_installed_join_source" \
+        "$iib5bic2a_focused_test_source"
+    print "ii-b5b-i-c2a legacy installed semantic-owner contract verification passed."
+    exit 0
+fi
+if $iib5bic2a_staged_scope_contract_only; then
+    verify_iib5bic2a_staged_scope "$iib5bic2a_staged_scope_baseline"
+    print "ii-b5b-i-c2a staged scope verification passed."
+    exit 0
+fi
 if $iib3a_staged_scope_contract_only; then
     verify_iib3a_staged_scope "$iib3a_staged_scope_baseline"
     print "ii-b3a staged scope verification passed."
@@ -4365,8 +4623,13 @@ machine_root=Sources/StornautInvestigationMachine
 machine_driver_host=$machine_root/InvestigationMachineDriverHost.swift
 machine_scenario_runner=$machine_root/InvestigationFixedScenarioRunner.swift
 machine_scenario_driver=$machine_root/InvestigationMachineScenarioDriver.swift
+machine_collector_source=$machine_root/InvestigationLifecycleTopologyCollector.swift
+machine_service_source=$machine_root/FixedLifecycleServiceProbe.swift
 machine_driver_main=Tools/StornautInvestigationMachineDriver/main.swift
 machine_driver_support=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDriverSupport.swift
+installed_l2_owner=Sources/StornautInvestigationInstalledL2/InstalledL2Observer.swift
+installed_l2_join=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochInstalledL2Join.swift
+iib5bic2a_test=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
 xcode_project=Stornaut.xcodeproj/project.pbxproj
 ordinary_scheme=Stornaut.xcodeproj/xcshareddata/xcschemes/Stornaut.xcscheme
 diagnostic_scheme=Stornaut.xcodeproj/xcshareddata/xcschemes/StornautInvestigationDiagnosticApp.xcscheme
@@ -4409,6 +4672,9 @@ required_files=(
     "$machine_scenario_driver"
     "$machine_driver_main"
     "$machine_driver_support"
+    "$installed_l2_owner"
+    "$installed_l2_join"
+    "$iib5bic2a_test"
     "$xcode_project"
     "$ordinary_scheme"
     "$diagnostic_scheme"
@@ -4434,6 +4700,11 @@ for file in "${required_files[@]}"; do
         exit 1
     fi
 done
+
+verify_iib5bic2a_legacy_owner_contract \
+    "$root_topology_observation" "$machine_collector_source" \
+    "$machine_service_source" "$machine_scenario_driver" \
+    "$installed_l2_owner" "$installed_l2_join" "$iib5bic2a_test"
 
 python3 - "$xcode_project" "$ordinary_scheme" "$diagnostic_scheme" <<'PY'
 from collections import Counter
@@ -5296,8 +5567,6 @@ if diagnostic_scheme_text.count(driver_id) != 1:
     )
 PY
 
-machine_collector_source="$machine_root/InvestigationLifecycleTopologyCollector.swift"
-machine_service_source="$machine_root/FixedLifecycleServiceProbe.swift"
 machine_claim_source="$machine_root/InvestigationMachineRetirementClaim.swift"
 [[ -f "$machine_claim_source" ]] || {
     print -u2 "Missing trusted machine retirement claim source."
@@ -5310,7 +5579,8 @@ for marker in \
     'InvestigationMachineRetirementClaimStore' \
     'case rootAuthorityRequired' \
     'case collectorConsumed' \
-    'provesInstalledTopology' \
+    'InvestigationLifecyclePostTeardownObserving' \
+    'post.startedAt >= transitionedAt' \
     'provesPostTeardownTopology'; do
     rg -q --fixed-strings -- "$marker" "$machine_collector_source" || {
         print -u2 "Trusted lifecycle collector marker missing: $marker"
@@ -5524,10 +5794,10 @@ if rg -q --fixed-strings -- 'SignedInvestigationRuntimeResidue(' \
     exit 1
 fi
 for marker in \
-    'struct DarwinFixedLifecycleServiceProbe' \
+    'struct DarwinPostTeardownLifecycleServiceProbe' \
     'DarwinLifecycleFixedSystemServiceRegistry().lookup()' \
     'runtime.topology.service-label-mismatch' \
-    'runtime.topology.service-identity-mismatch'; do
+    'runtime.topology.service-still-registered'; do
     rg -q --fixed-strings -- "$marker" "$machine_service_source" || {
         print -u2 "Fixed service observer marker missing: $marker"
         exit 1
@@ -5651,23 +5921,6 @@ for marker in (
         f"L2 Machine driver binding drifted: {marker}",
     )
 
-installed_contract = compact(block(
-    observation,
-    "private var installedContractSatisfied: Bool {",
-    "private var postTeardownContractSatisfied: Bool {",
-))
-for role in (
-    "installedRoot",
-    "installedApp",
-    "appExecutable",
-    "helperExecutable",
-    "machineDriverExecutable",
-    "launchDaemonPlist",
-):
-    require(
-        f".{role}," in installed_contract,
-        f"installed L2 topology omitted role: {role}",
-    )
 post_teardown_contract = compact(block(
     observation,
     "private var postTeardownContractSatisfied: Bool {",
@@ -5729,10 +5982,10 @@ for marker in (
         f"Darwin L2 root-owned node expectation drifted: {marker}",
     )
 
-installed_reader = compact(block(
+post_teardown_binding_reader = compact(block(
     collector,
-    "struct InstalledLifecycleTopologyBindingReader:",
-    "protocol InvestigationLifecycleTopologyObserving:",
+    "struct PostTeardownExpectedTopologyBindingReader:",
+    "protocol InvestigationLifecyclePostTeardownObserving:",
 ))
 five_dimensional_join = (
     "signedBinding.machineDriver.executableSHA256==machineDriverEvidence.executableSHA256",
@@ -5743,16 +5996,16 @@ five_dimensional_join = (
 )
 for marker in five_dimensional_join:
     require(
-        marker in installed_reader,
-        f"installed L2 five-dimensional Machine driver join drifted: {marker}",
+        marker in post_teardown_binding_reader,
+        f"post-teardown expected Machine driver binding drifted: {marker}",
     )
 for marker in (
     "contract.machineDriverExecutableURL",
     "machineDriverSigningEvidence:machineDriverEvidence",
 ):
     require(
-        marker in installed_reader,
-        f"installed L2 Machine driver binding reader drifted: {marker}",
+        marker in post_teardown_binding_reader,
+        f"post-teardown Machine driver binding reader drifted: {marker}",
     )
 
 retirement_join = compact(block(
@@ -5775,11 +6028,9 @@ for marker in (
 closed_sources = {
     observation_path: binding_source
     + "\n"
-    + installed_contract
-    + "\n"
     + post_teardown_contract,
     support_path: driver_case,
-    collector_path: installed_reader + "\n" + retirement_join,
+    collector_path: post_teardown_binding_reader + "\n" + retirement_join,
 }
 driver_process = re.compile(
     r"(?i)(?:machineDriver|driver)(?:ProcessIdentity|ProcessID|PID)"
