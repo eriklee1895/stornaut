@@ -335,7 +335,7 @@ struct InvestigationMachineTargetBoundaryTests {
         #expect(
             package.components(
                 separatedBy: "\"StornautInvestigationHandoffContract\""
-            ).count == 6
+            ).count == 7
         )
 
         let sourceRoot = root.appending(path: "Sources/StornautInvestigationHandoffContract")
@@ -909,6 +909,33 @@ struct InvestigationMachineTargetBoundaryTests {
             "codable:'ii-b5b-i-a", "projection-epoch:'ii-b5b-i-a",
             "claim-projection:'ii-b5b-i-a", "cross-clock:'ii-b5b-i-a",
             "digest-bypass:'ii-b5b-i-a",
+        ] {
+            #expect(sources[1].contains(marker))
+        }
+    }
+
+    @Test func iiB5BIB1VerifierPinsAuthorityFreeInstalledSemanticTarget() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let sources = try [
+            "scripts/verify-investigation-boundaries", "scripts/verify-contract",
+        ].map { try String(contentsOf: root.appending(path: $0), encoding: .utf8) }
+        for marker in [
+            "--iib5bib1-semantic-contract-only <Package.swift> <semantic-source> <focused-test-source>",
+            "--iib5bib1-staged-scope-contract-only [baseline]",
+            "ii-b5b-i-b1 authority or schema surface drifted",
+            "ii-b5b-i-b1 checkpoint budget drifted",
+        ] {
+            #expect(sources[0].contains(marker))
+        }
+        for marker in [
+            "public-observation:'ii-b5b-i-b1",
+            "codable-observation:'ii-b5b-i-b1",
+            "artifact-closure:'ii-b5b-i-b1",
+            "signing-join:'ii-b5b-i-b1",
+            "driver-signing-join:'ii-b5b-i-b1",
+            "service-join:'ii-b5b-i-b1",
+            "cross-clock:'ii-b5b-i-b1",
         ] {
             #expect(sources[1].contains(marker))
         }
