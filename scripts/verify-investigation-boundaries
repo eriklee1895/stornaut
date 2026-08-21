@@ -86,6 +86,13 @@ iib5bib3_observer_source=
 iib5bib3_focused_test_source=
 iib5bib3_staged_scope_contract_only=false
 iib5bib3_staged_scope_baseline=HEAD
+iib5bic1_installed_join_contract_only=false
+iib5bic1_package_source=
+iib5bic1_composer_source=
+iib5bic1_join_source=
+iib5bic1_focused_test_source=
+iib5bic1_staged_scope_contract_only=false
+iib5bic1_staged_scope_baseline=HEAD
 iib3a_staged_scope_contract_only=false
 iib3a_staged_scope_baseline=HEAD
 iib3b_start_retire_contract_only=false
@@ -229,6 +236,17 @@ if (( $# > 0 )); then
         && [[ $1 == --iib5bib3-staged-scope-contract-only ]]; then
         iib5bib3_staged_scope_contract_only=true
         iib5bib3_staged_scope_baseline=${2:-HEAD}
+    elif (( $# == 5 )) \
+        && [[ $1 == --iib5bic1-installed-join-contract-only ]]; then
+        iib5bic1_installed_join_contract_only=true
+        iib5bic1_package_source=$2
+        iib5bic1_composer_source=$3
+        iib5bic1_join_source=$4
+        iib5bic1_focused_test_source=$5
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iib5bic1-staged-scope-contract-only ]]; then
+        iib5bic1_staged_scope_contract_only=true
+        iib5bic1_staged_scope_baseline=${2:-HEAD}
     elif (( $# == 1 || $# == 2 )) \
         && [[ $1 == --iib3a-staged-scope-contract-only ]]; then
         iib3a_staged_scope_contract_only=true
@@ -812,7 +830,7 @@ expected = {
 }
 for path, expected_sha in expected.items():
     data = path.read_bytes()
-    if path == package_path:
+    if path == package_path and hashlib.sha256(data).hexdigest() != expected_sha:
         current = (
             b'        .target(\n'
             b'            name: "StornautInvestigationInstalledL2",\n'
@@ -1137,6 +1155,65 @@ function verify_iib5bib3_staged_scope() {
     [[ "${(j:\n:)${(on)observed}}" == "${(j:\n:)${(on)expected}}" ]] || { print -u2 "ii-b5b-i-b3 checkpoint paths drifted"; return 1; }
     local changed=$(git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1 {n+=$1+$2} END {print n+0}')
     (( changed <= 1600 )) || { print -u2 "ii-b5b-i-b3 checkpoint budget drifted"; return 1; }
+}
+
+function verify_iib5bic1_installed_join_contract() {
+    local package_source=$1 composer_source=$2 join_source=$3 focused_test=$4
+    xcrun swiftc -frontend -parse "$composer_source"
+    xcrun swiftc -frontend -parse "$join_source"
+    xcrun swiftc -frontend -parse "$focused_test"
+    python3 - "$package_source" "$composer_source" "$join_source" "$focused_test" <<'PY'
+from pathlib import Path
+import hashlib,re,sys
+package_path,composer_path,join_path,test_path=map(Path,sys.argv[1:])
+package,composer,join,test=[p.read_text(encoding="utf-8") for p in (package_path,composer_path,join_path,test_path)]
+target=re.search(r'\.target\(\s*name: "StornautInvestigationMachineDriverSupport",(.*?)\n\s*\),',package,re.DOTALL)
+if target is None: raise SystemExit("ii-b5b-i-c1 DriverSupport target missing")
+dependency_block=re.search(r'dependencies:\s*\[(.*?)\]\s*,',target.group(1),re.DOTALL)
+if dependency_block is None: raise SystemExit("ii-b5b-i-c1 DriverSupport dependencies missing")
+deps=set(re.findall(r'"([^"]+)"',dependency_block.group(1)))
+if deps != {"StornautInvestigationHandoffContract","StornautInvestigationInstalledL2"}: raise SystemExit("ii-b5b-i-c1 dependency direction drifted")
+installed=re.search(r'\.target\(\s*name: "StornautInvestigationInstalledL2",(.*?)\n\s*\),',package,re.DOTALL)
+if installed is None: raise SystemExit("ii-b5b-i-c1 InstalledL2 target missing")
+installed_dependency_block=re.search(r'dependencies:\s*\[(.*?)\]\s*,',installed.group(1),re.DOTALL)
+if installed_dependency_block is None: raise SystemExit("ii-b5b-i-c1 InstalledL2 dependencies missing")
+installed_deps=set(re.findall(r'"([^"]+)"',installed_dependency_block.group(1)))
+if installed_deps != {"CInvestigationIdentitySupport","StornautInvestigationHandoffContract"}: raise SystemExit("ii-b5b-i-c1 dependency direction drifted")
+if set(re.findall(r'(?m)^import\s+([A-Za-z0-9_]+)\s*$',composer)) != {"Foundation","StornautInvestigationHandoffContract","StornautInvestigationInstalledL2"}: raise SystemExit("ii-b5b-i-c1 composer imports drifted")
+if set(re.findall(r'(?m)^import\s+([A-Za-z0-9_]+)\s*$',join)) != {"Foundation","StornautInvestigationHandoffContract","StornautInvestigationInstalledL2"}: raise SystemExit("ii-b5b-i-c1 join imports drifted")
+for text in (composer,join):
+    for forbidden in ("StornautLifecycle","StornautInvestigationMachine","NSXPC","Process(","FileManager","FileHandle","URLSession","posix_spawn","kill(","write(","socket(","signedInvestigationRuntimeReady","Codable","JSONEncoder","JSONDecoder"):
+        if forbidden in text: raise SystemExit("ii-b5b-i-c1 authority or admission drifted")
+if "package struct InvestigationMachineSingleEpochInstalledL2Proof:" not in join: raise SystemExit("ii-b5b-i-c1 proof surface drifted")
+proof=re.search(r'package struct InvestigationMachineSingleEpochInstalledL2Proof:(.*?)\n}',join,re.DOTALL)
+if proof is None or re.search(r'(?m)^\s*(?:package|public|internal)\s+(?:let|var|func|init)',proof.group(1)): raise SystemExit("ii-b5b-i-c1 proof surface drifted")
+if join.count("InvestigationMachineSingleEpochInstalledL2Proof(") != 1 or join.count("fileprivate init(") != 1: raise SystemExit("ii-b5b-i-c1 proof construction drifted")
+for required in ("projection.epochUUID == epoch.epochUUID","projection.configurationNonce == epoch.configurationNonce","projection.configurationSHA256 == epoch.configurationSHA256","projection.signedRuntimeBindingSHA256","claimEvidence.claimedAt <= semantic.started.wallUTC","semantic.observed.continuousNanoseconds","claimEvidence.releaseDeadlineNanoseconds <= deadlineNanoseconds","repeatedAppIdentity == claimEvidence.appIdentity"):
+    if required not in composer+join: raise SystemExit("ii-b5b-i-c1 join binding drifted")
+observe="semanticObservation = try await installedL2.observe("
+repeat="let repeatedIdentity = try await observeAppIdentity(session)"
+repeat_guard="guard repeatedIdentity == appIdentity else"
+prove="InvestigationMachineSingleEpochInstalledL2Join.prove("
+positions=[composer.find(x) for x in (observe,repeat,repeat_guard,prove)]
+if any(x<0 for x in positions) or positions!=sorted(positions): raise SystemExit("ii-b5b-i-c1 proof order drifted")
+if any(composer.count(marker)!=1 for marker in (observe,repeat,repeat_guard,prove)): raise SystemExit("ii-b5b-i-c1 join cardinality drifted")
+for required in ("exactTypedJoinObservesOnceAndMintsOpaqueProof","commitmentRejectsEveryProjectionEpochDrift","claimEvidenceMustMatchProjectionAppHelperAndDeadline","semanticObservationMustMatchEveryTypedJoinAxis","observerFailureNeverCreatesJoinEvidence","repeatedAppMismatchCannotMintProof"):
+    if required not in test: raise SystemExit("ii-b5b-i-c1 focused coverage drifted")
+expected={composer_path:"6fd10da713174ae60e1b39f3cac9a560e1cd20eca3a17c0f354a990d5f1ed362",join_path:"376148fd9e0284c03e399ed281cd47696bed3c35630cf272fa639b7df99960d2",test_path:"b9b6bf566a08b93ab9d945b3c71377433d0b8aeac98bff3ab5106a63b938fb0b"}
+for path,digest in expected.items():
+    if hashlib.sha256(path.read_bytes()).hexdigest()!=digest: raise SystemExit("ii-b5b-i-c1 canonical source drifted")
+PY
+}
+
+function verify_iib5bic1_staged_scope() {
+    local baseline=${1:-HEAD}
+    local expected=(Package.swift Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpoch.swift Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochInstalledL2Join.swift Tests/StornautInvestigationTests/InvestigationMachineSingleEpochInstalledL2JoinTests.swift Tests/StornautInvestigationTests/InvestigationMachineSingleEpochTests.swift Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift scripts/verify-contract scripts/verify-investigation-boundaries)
+    if git diff --cached --name-only --diff-filter=D "$baseline" | grep -q .; then print -u2 "ii-b5b-i-c1 checkpoint deleted an existing path"; return 1; fi
+    if git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1 && ($1=="-" || $2=="-") {found=1} END {exit !found}'; then print -u2 "ii-b5b-i-c1 binary checkpoint path rejected"; return 1; fi
+    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" | awk 'index($0,"docs/")!=1')"})
+    [[ "${(j:\n:)${(on)observed}}" == "${(j:\n:)${(on)expected}}" ]] || { print -u2 "ii-b5b-i-c1 checkpoint paths drifted"; return 1; }
+    local changed=$(git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1 {n+=$1+$2} END {print n+0}')
+    (( changed <= 1800 )) || { print -u2 "ii-b5b-i-c1 checkpoint budget drifted"; return 1; }
 }
 
 function verify_iib4_staged_scope() {
@@ -3411,10 +3488,10 @@ later_c_target = '''        .target(
 if historical_package.count(later_c_target) != 1:
     raise SystemExit("live claim server later C identity target drifted")
 historical_package = historical_package.replace(later_c_target, "", 1)
-later_test_dependency = '                "StornautInvestigationInstalledL2",\n'
-if historical_package.count(later_test_dependency) != 1:
+later_installed_dependency = '                "StornautInvestigationInstalledL2",\n'
+if historical_package.count(later_installed_dependency) != 2:
     raise SystemExit("live claim server later InstalledL2 test dependency drifted")
-historical_package = historical_package.replace(later_test_dependency, "", 1)
+historical_package = historical_package.replace(later_installed_dependency, "", 2)
 if hashlib.sha256(historical_package.encode("utf-8")).hexdigest() != (
     "798247d986c73adb09f7b975b2ffc7793cdd04803fb4ec3bd1f41000cce7cb20"
 ):
@@ -4241,6 +4318,16 @@ fi
 if $iib5bib3_staged_scope_contract_only; then
     verify_iib5bib3_staged_scope "$iib5bib3_staged_scope_baseline"
     print "ii-b5b-i-b3 staged scope verification passed."
+    exit 0
+fi
+if $iib5bic1_installed_join_contract_only; then
+    verify_iib5bic1_installed_join_contract "$iib5bic1_package_source" "$iib5bic1_composer_source" "$iib5bic1_join_source" "$iib5bic1_focused_test_source"
+    print "ii-b5b-i-c1 installed join contract verification passed."
+    exit 0
+fi
+if $iib5bic1_staged_scope_contract_only; then
+    verify_iib5bic1_staged_scope "$iib5bic1_staged_scope_baseline"
+    print "ii-b5b-i-c1 staged scope verification passed."
     exit 0
 fi
 if $iib3a_staged_scope_contract_only; then
@@ -6281,7 +6368,8 @@ driver_support = targets.get(
 if driver_support is None:
     raise SystemExit("missing authority-closed Machine driver support")
 if set(driver_support.get("target_dependencies", [])) != {
-    "StornautInvestigationHandoffContract"
+    "StornautInvestigationHandoffContract",
+    "StornautInvestigationInstalledL2",
 }:
     raise SystemExit("Machine driver support dependency allowlist drifted")
 if Path(driver_support.get("path", "")) != Path(
@@ -6297,6 +6385,7 @@ expected_driver_support_sources = {
     "InvestigationMachineInstalledDriverObservation.swift",
     "InvestigationMachineInstalledDriverSystemSource.swift",
     "InvestigationMachineSingleEpoch.swift",
+    "InvestigationMachineSingleEpochInstalledL2Join.swift",
 }
 if (
     not driver_support_source_root.is_dir()
@@ -6338,6 +6427,11 @@ expected_driver_support_imports = {
     "InvestigationMachineInstalledDriverSystemSource.swift": {"Darwin"},
     "InvestigationMachineSingleEpoch.swift": {
         "Foundation", "StornautInvestigationHandoffContract",
+        "StornautInvestigationInstalledL2",
+    },
+    "InvestigationMachineSingleEpochInstalledL2Join.swift": {
+        "Foundation", "StornautInvestigationHandoffContract",
+        "StornautInvestigationInstalledL2",
     },
 }
 expected_driver_support_sha256 = {
@@ -6352,7 +6446,9 @@ expected_driver_support_sha256 = {
     "InvestigationMachineClaimClient.swift":
         "ee373ff00fce08853fccb4c2087a0a47eed2feae6efc300fbd4c74e01f242a0a",
     "InvestigationMachineSingleEpoch.swift":
-        "c6cc195f447dbe660139be5a0bec14c07342bc35bbdd24f737455c7c0a699291",
+        "6fd10da713174ae60e1b39f3cac9a560e1cd20eca3a17c0f354a990d5f1ed362",
+    "InvestigationMachineSingleEpochInstalledL2Join.swift":
+        "376148fd9e0284c03e399ed281cd47696bed3c35630cf272fa639b7df99960d2",
 }
 for source_name in driver_support_sources:
     source_path = driver_support_source_root / source_name
@@ -6532,7 +6628,8 @@ if manifest_driver_support is None:
         "Machine driver support is missing from resolved manifest"
     )
 if manifest_driver_support.get("dependencies", []) != [
-    {"byName": ["StornautInvestigationHandoffContract", None]}
+    {"byName": ["StornautInvestigationHandoffContract", None]},
+    {"byName": ["StornautInvestigationInstalledL2", None]},
 ]:
     raise SystemExit(
         "Manifest Machine driver support dependency allowlist drifted"
@@ -7544,20 +7641,20 @@ function require_exact_machine_driver_projection() {
 
     case "$configuration" in
         debug)
-            expected_undefined_sha=15ee8d8adbfb66c5465a290e567c677cab55fe34f3080dd6cfb604a36fd28218
-            expected_undefined_lines=521
-            expected_loads_sha=e3c05d8766d8aa37e87a834a3f37fd71d925f1d34ac349528cee4970db9d3841
-            expected_loads_lines=16
-            expected_owned_sha=803a1c4fde0ff8ccf98833466d60b306a901f1e64ff5fcc034937ccf55d53c72
-            expected_owned_lines=1917
+            expected_undefined_sha=eb33b8f1730d52926606175ef6472f47fc17782c4cad5ff76a56272570fb25b2
+            expected_undefined_lines=551
+            expected_loads_sha=9053e60819e57a62ee9acb9db4854705fa2ed0ade20ec3683f13b9e854f86c41
+            expected_loads_lines=18
+            expected_owned_sha=53d1cf04307ba4e6019bcd94f4d324471dce346d690e95b22bd98f9237a79d9d
+            expected_owned_lines=1977
             ;;
         release)
-            expected_undefined_sha=77676a7ec64235ee6e1a5cf4ce060b634e9d0fd9c57cfd070d406c0c6ea0cd1d
-            expected_undefined_lines=372
-            expected_loads_sha=e3c05d8766d8aa37e87a834a3f37fd71d925f1d34ac349528cee4970db9d3841
-            expected_loads_lines=16
-            expected_owned_sha=37ed1c2826ecc885a692a62ea214c756546d61bff6358d232610e001120255b8
-            expected_owned_lines=1279
+            expected_undefined_sha=534c6bb01fa151a98d0554684d13b1b27f233ddfe8cde24d63a9008fe0bde9ae
+            expected_undefined_lines=399
+            expected_loads_sha=9053e60819e57a62ee9acb9db4854705fa2ed0ade20ec3683f13b9e854f86c41
+            expected_loads_lines=18
+            expected_owned_sha=ead614054c51095da16673e5c485a6feaecba5e3203b2ae25479fd6998e6e411
+            expected_owned_lines=1324
             ;;
         *)
             print -u2 "Unknown Machine driver projection: $configuration"
@@ -7652,6 +7749,11 @@ function verify_machine_driver_projection_mutations() {
     required_readonly_imports=(
         _pread _fstat _lstat _flistxattr _acl_get_fd_np
         _proc_pidpath _SecCodeCopySelf _SecStaticCodeCreateWithPath
+        _SMJobCopyDictionary _kSMDomainSystemLaunchd
+        _proc_pidinfo _task_name_for_pid _task_info
+        _mach_continuous_time _mach_timebase_info
+        _audit_token_to_asid _audit_token_to_euid
+        _audit_token_to_pid _audit_token_to_pidversion
     )
     expected_security_imports=$(
         print -rl -- \

@@ -1,5 +1,6 @@
 import Foundation
 import StornautInvestigationHandoffContract
+import StornautInvestigationInstalledL2
 package enum InvestigationMachineSingleEpochError: Error, Sendable, Equatable {
     case alreadyConsumed, invalidCommitment, deadlineInvalid
     case driverObservationFailed, protocolViolation, identityMismatch
@@ -10,7 +11,6 @@ package enum InvestigationMachineSingleEpochError: Error, Sendable, Equatable {
 package enum InvestigationMachineSingleEpochResult: Sendable, Equatable { case completedNonAdmitting }
 package struct InvestigationMachineSingleEpochRetirementProof: Sendable, Equatable { package init() {} }
 package struct InvestigationMachineSingleEpochTerminalStartProof: Sendable, Equatable { package init() {} }
-package struct InvestigationMachineSingleEpochInstalledL2Proof: Sendable, Equatable { package init() {} }
 package struct InvestigationMachineSingleEpochAppObservation: Sendable, Equatable {
     fileprivate let identity: InvestigationMachineProcessIdentity
     init(identity: InvestigationMachineProcessIdentity) { self.identity = identity }
@@ -21,7 +21,24 @@ package struct InvestigationMachineSingleEpochDriverObservation: Sendable, Equat
 }
 package struct InvestigationMachineSingleEpochCommitment: Sendable {
     fileprivate let epoch: InvestigationCohortEpoch
-    init(epoch: InvestigationCohortEpoch) { self.epoch = epoch }
+    fileprivate let projection: InvestigationInstalledL2IdentityProjection
+
+    package init(
+        epoch: InvestigationCohortEpoch,
+        projection: InvestigationInstalledL2IdentityProjection
+    ) throws {
+        guard
+            projection.epochUUID == epoch.epochUUID,
+            projection.configurationNonce == epoch.configurationNonce,
+            projection.configurationSHA256 == epoch.configurationSHA256,
+            projection.signedRuntimeBindingSHA256
+                == epoch.signedRuntimeBindingSHA256
+        else {
+            throw InvestigationMachineSingleEpochError.invalidCommitment
+        }
+        self.epoch = epoch
+        self.projection = projection
+    }
 }
 package enum InvestigationMachineSingleEpochClaimingError: Error, Sendable { case terminalUncertain }
 package protocol InvestigationMachineSingleEpochInstalledDriverObserving: Sendable {
@@ -57,14 +74,6 @@ package protocol InvestigationMachineSingleEpochClaiming: Sendable {
 package protocol InvestigationMachineSingleEpochClaimClientFactory: Sendable {
     func make() -> any InvestigationMachineSingleEpochClaiming
 }
-package protocol InvestigationMachineSingleEpochInstalledL2Observing: Sendable {
-    func observe(
-        appIdentity: InvestigationMachineProcessIdentity,
-        claimEvidence: InvestigationMachineClaimEvidence,
-        epochUUID: UUID,
-        deadlineNanoseconds: UInt64
-    ) async throws -> InvestigationMachineSingleEpochInstalledL2Proof
-}
 extension InvestigationMachineInstalledDriverObserver:
     InvestigationMachineSingleEpochInstalledDriverObserving {
     func observeDriver() throws -> InvestigationMachineSingleEpochDriverObservation {
@@ -98,6 +107,21 @@ package actor InvestigationMachineSingleEpochComposer {
     private let claimClientFactory: any InvestigationMachineSingleEpochClaimClientFactory
     private let installedL2: any InvestigationMachineSingleEpochInstalledL2Observing
     private var consumed = false
+    package init(
+        commitment: InvestigationMachineSingleEpochCommitment,
+        observer: any InvestigationMachineSingleEpochInstalledDriverObserving,
+        clock: any InvestigationMachineSingleEpochClocking,
+        sessionFactory: any InvestigationMachineSingleEpochSessionFactory,
+        claimClientFactory: any InvestigationMachineSingleEpochClaimClientFactory
+    ) {
+        self.init(
+            commitment: commitment, observer: observer, clock: clock,
+            sessionFactory: sessionFactory,
+            claimClientFactory: claimClientFactory,
+            installedL2: InvestigationMachineSingleEpochInstalledL2Join()
+        )
+    }
+
     init(
         commitment: InvestigationMachineSingleEpochCommitment,
         observer: any InvestigationMachineSingleEpochInstalledDriverObserving,
@@ -275,9 +299,11 @@ package actor InvestigationMachineSingleEpochComposer {
             guard evidence.appIdentity == appIdentity else {
                 throw InvestigationMachineSingleEpochError.identityMismatch
             }
+            let semanticObservation: InvestigationInstalledL2SemanticObservation
             do {
                 try Task.checkCancellation()
-                _ = try await installedL2.observe(
+                semanticObservation = try await installedL2.observe(
+                    projection: commitment.projection,
                     appIdentity: appIdentity, claimEvidence: evidence,
                     epochUUID: epoch.epochUUID,
                     deadlineNanoseconds: deadline.partialValue
@@ -291,6 +317,18 @@ package actor InvestigationMachineSingleEpochComposer {
             let repeatedIdentity = try await observeAppIdentity(session)
             guard repeatedIdentity == appIdentity else {
                 throw InvestigationMachineSingleEpochError.identityMismatch
+            }
+            do {
+                _ = try InvestigationMachineSingleEpochInstalledL2Join.prove(
+                    projection: commitment.projection,
+                    claimEvidence: evidence,
+                    semanticObservation: semanticObservation,
+                    repeatedAppIdentity: repeatedIdentity,
+                    epochUUID: epoch.epochUUID,
+                    deadlineNanoseconds: deadline.partialValue
+                )
+            } catch {
+                throw InvestigationMachineSingleEpochError.installedL2Failed
             }
             try Task.checkCancellation()
             claimReleaseAttempted = true

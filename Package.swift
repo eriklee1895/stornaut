@@ -138,6 +138,7 @@ let package = Package(
             name: "StornautInvestigationMachineDriverSupport",
             dependencies: [
                 "StornautInvestigationHandoffContract",
+                "StornautInvestigationInstalledL2",
             ],
             linkerSettings: [
                 .linkedFramework("Security"),

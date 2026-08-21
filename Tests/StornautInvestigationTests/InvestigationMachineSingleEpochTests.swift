@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import StornautInvestigationHandoffContract
+@testable import StornautInvestigationInstalledL2
 @testable import StornautInvestigationMachineDriverSupport
 @Suite("Investigation machine single epoch")
 struct InvestigationMachineSingleEpochTests {
@@ -248,6 +249,7 @@ private struct SingleEpochClaimCall: Sendable, Equatable {
     let sharedDeadline: InvestigationMachineClaimClientSharedDeadline
 }
 private struct SingleEpochL2Call: Sendable, Equatable {
+    let projection: InvestigationInstalledL2IdentityProjection
     let appIdentity: InvestigationMachineProcessIdentity; let evidence: InvestigationMachineClaimEvidence
     let epochUUID: UUID; let deadlineNanoseconds: UInt64
 }
@@ -270,9 +272,13 @@ private final class SingleEpochCancellationProbe: @unchecked Sendable {
 }
 private struct SingleEpochFixture {
     static let now: UInt64 = 1_000_000_000, deadline: UInt64 = 141_000_000_000
-    let epoch: InvestigationCohortEpoch; let driverClaim: InvestigationHandoffProcessClaim
+    let epoch: InvestigationCohortEpoch
+    let projection: InvestigationInstalledL2IdentityProjection
+    let commitment: InvestigationMachineSingleEpochCommitment
+    let driverClaim: InvestigationHandoffProcessClaim
     let appIdentity, helperIdentity: InvestigationMachineProcessIdentity
     let claimEvidence: InvestigationMachineClaimEvidence
+    let semanticObservation: InvestigationInstalledL2SemanticObservation
     let installedObservation: InvestigationMachineSingleEpochDriverObservation
     let handle: InvestigationHandoffRetirementHandle; let incoming: [InvestigationHandoffFrame]
     init(
@@ -287,6 +293,31 @@ private struct SingleEpochFixture {
             configurationSHA256: .hashing(configuration),
             signedRuntimeBindingSHA256: Self.digest(0x13)
         )
+        let driverSigning = try Self.signing(
+            identifier: "com.eriklee.stornaut.investigation.machine-driver",
+            byte: 0x43, adHoc: true
+        )
+        projection = try InvestigationInstalledL2IdentityProjection(
+            epochUUID: epoch.epochUUID,
+            configurationNonce: epoch.configurationNonce,
+            configurationValidBefore: .init(
+                rawValue: 2_000_000_030_000_000
+            ),
+            configurationSHA256: epoch.configurationSHA256,
+            signedRuntimeBindingSHA256: epoch.signedRuntimeBindingSHA256,
+            appExecutableSHA256: Self.digest(0x31),
+            appBundleIdentifier: "com.eriklee.stornaut",
+            helperExecutableSHA256: Self.digest(0x32),
+            helperServiceIdentifier: "com.eriklee.stornaut.lifecycle",
+            machineDriverExecutableSHA256: Self.digest(0x33),
+            machineDriverSigningIdentifier: driverSigning.signingIdentifier,
+            machineDriverDesignatedRequirementSHA256:
+                driverSigning.designatedRequirementSHA256,
+            machineDriverCodeDirectoryHash: driverSigning.codeDirectoryHash,
+            machineClaimServiceIdentifier:
+                "com.eriklee.stornaut.lifecycle.machine-claim"
+        )
+        commitment = try .init(epoch: epoch, projection: projection)
         driverClaim = try Self.claim(pid: 84, version: 8, uid: 0, asid: 10)
         let preDrop = try Self.claim(pid: 42, version: 7, uid: 0, asid: 9)
         let postDrop = try Self.claim(
@@ -363,6 +394,44 @@ private struct SingleEpochFixture {
                 leaseRootEntries: 0, investigationArtifacts: 0
             ), releaseDeadlineNanoseconds: 140_000_000_000
         )
+        let appSigning = try Self.signing(
+            identifier: "com.eriklee.stornaut", byte: 0x51, adHoc: false
+        )
+        let helperSigning = try Self.signing(
+            identifier: "com.eriklee.stornaut.lifecycle.helper",
+            byte: 0x52, adHoc: false
+        )
+        semanticObservation = try InvestigationInstalledL2SemanticContract.evaluate(
+            projection: projection,
+            artifacts: Dictionary(uniqueKeysWithValues:
+                InvestigationInstalledL2ArtifactRole.allCases.map {
+                    ($0, InvestigationInstalledL2ArtifactObservation.presentValid)
+                }
+            ),
+            app: try .init(
+                identity: appIdentity,
+                executableSHA256: projection.appExecutableSHA256,
+                staticSigning: appSigning, liveSigning: appSigning
+            ),
+            helper: try .init(
+                identity: helperIdentity,
+                executableSHA256: projection.helperExecutableSHA256,
+                staticSigning: helperSigning, liveSigning: helperSigning
+            ),
+            machineDriver: try .init(
+                executableSHA256: projection.machineDriverExecutableSHA256,
+                staticSigning: driverSigning, liveSigning: driverSigning
+            ),
+            service: .loaded(identity: helperIdentity),
+            started: try .init(
+                wallUTC: .init(rawValue: 2_000_000_003_000_000),
+                continuousNanoseconds: 130_000_000_000
+            ),
+            observed: try .init(
+                wallUTC: .init(rawValue: 2_000_000_004_000_000),
+                continuousNanoseconds: 131_000_000_000
+            )
+        )
         installedObservation = .init(.singleEpochFixture())
     }
     var bootstrap: InvestigationHandoffEpochBootstrap {
@@ -410,7 +479,7 @@ private struct SingleEpochFixture {
     }
     var expectedL2Call: SingleEpochL2Call {
         .init(
-            appIdentity: appIdentity, evidence: claimEvidence,
+            projection: projection, appIdentity: appIdentity, evidence: claimEvidence,
             epochUUID: epoch.epochUUID, deadlineNanoseconds: Self.deadline
         )
     }
@@ -458,6 +527,7 @@ private struct SingleEpochFixture {
             claimFactory: .init(trace: trace, claim: claim),
             l2: .init(
                 trace: trace, cancellation: cancellationProbe,
+                semanticObservation: semanticObservation,
                 fails: afterClaimFailure == .installedL2
             )
         )
@@ -465,7 +535,8 @@ private struct SingleEpochFixture {
     func composer(runtime: SingleEpochRuntime)
         -> InvestigationMachineSingleEpochComposer {
         .init(
-            commitment: .init(epoch: epoch), observer: runtime.observer,
+            commitment: commitment,
+            observer: runtime.observer,
             clock: runtime.clock, sessionFactory: runtime.sessionFactory,
             claimClientFactory: runtime.claimFactory, installedL2: runtime.l2
         )
@@ -493,6 +564,16 @@ private struct SingleEpochFixture {
         try .init(
             role: role, processID: pid, processIDVersion: version,
             auditSessionID: asid, effectiveUserID: uid, auditTokenWords: words
+        )
+    }
+    private static func signing(
+        identifier: String, byte: UInt8, adHoc: Bool
+    ) throws -> InvestigationInstalledL2SigningIdentity {
+        try .init(
+            signingIdentifier: identifier,
+            designatedRequirementSHA256: digest(byte),
+            codeDirectoryHash: Data(repeating: byte, count: 20),
+            isAdHoc: adHoc
         )
     }
     private static func dropEvidence(pid: UInt32) throws
@@ -706,27 +787,34 @@ private final class ScriptedSingleEpochClaim:
 private final class ScriptedSingleEpochL2:
     InvestigationMachineSingleEpochInstalledL2Observing, @unchecked Sendable {
     let trace: SingleEpochTrace; let cancellation: SingleEpochCancellationProbe
+    let semanticObservation: InvestigationInstalledL2SemanticObservation
     let fails: Bool; private let lock = NSLock()
     private var storedCalls: [SingleEpochL2Call] = []
     var calls: [SingleEpochL2Call] { lock.withLock { storedCalls } }
     init(
         trace: SingleEpochTrace, cancellation: SingleEpochCancellationProbe,
+        semanticObservation: InvestigationInstalledL2SemanticObservation,
         fails: Bool
-    ) { self.trace = trace; self.cancellation = cancellation; self.fails = fails }
+    ) {
+        self.trace = trace; self.cancellation = cancellation
+        self.semanticObservation = semanticObservation; self.fails = fails
+    }
     func observe(
+        projection: InvestigationInstalledL2IdentityProjection,
         appIdentity: InvestigationMachineProcessIdentity,
         claimEvidence: InvestigationMachineClaimEvidence,
         epochUUID: UUID, deadlineNanoseconds: UInt64
-    ) async throws -> InvestigationMachineSingleEpochInstalledL2Proof {
+    ) async throws -> InvestigationInstalledL2SemanticObservation {
         lock.withLock {
             storedCalls.append(.init(
-                appIdentity: appIdentity, evidence: claimEvidence,
+                projection: projection, appIdentity: appIdentity,
+                evidence: claimEvidence,
                 epochUUID: epochUUID, deadlineNanoseconds: deadlineNanoseconds
             ))
         }
         trace.record(.installedL2); await cancellation.hit(.installedL2)
         if fails { throw SingleEpochInjectedFailure() }
-        return .init()
+        return semanticObservation
     }
 }
 private final class SingleEpochGate: @unchecked Sendable {

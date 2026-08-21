@@ -1045,6 +1045,29 @@ struct InvestigationMachineTargetBoundaryTests {
         }
     }
 
+    @Test func iiB5BIC1PinsOpaqueJoinAfterRepeatedAppIdentity() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let sources = try [
+            "scripts/verify-investigation-boundaries", "scripts/verify-contract",
+        ].map { try String(contentsOf: root.appending(path: $0), encoding: .utf8) }
+        for marker in [
+            "--iib5bic1-installed-join-contract-only",
+            "--iib5bic1-staged-scope-contract-only",
+            "ii-b5b-i-c1 dependency direction drifted",
+            "ii-b5b-i-c1 proof construction drifted",
+            "ii-b5b-i-c1 proof order drifted",
+            "ii-b5b-i-c1 checkpoint budget drifted",
+        ] { #expect(sources[0].contains(marker)) }
+        for marker in [
+            "projection-binding:'ii-b5b-i-c1",
+            "proof-before-repeat:'ii-b5b-i-c1",
+            "codable-proof:'ii-b5b-i-c1",
+            "parallel-observer:'ii-b5b-i-c1",
+            "vacuous-test:'ii-b5b-i-c1",
+        ] { #expect(sources[1].contains(marker)) }
+    }
+
     @Test
     func nativeMachineDriverPackagingIsDiagnosticOnly() throws {
         let repositoryRoot = URL(filePath: #filePath)
