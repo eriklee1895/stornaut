@@ -1,7 +1,7 @@
 # Phase D Task 39B2c-L3c3c-ii-b5 Single-Epoch Composition Split Preflight
 
-> Status: Split, ownership, scope and tests-first contracts frozen; ii-b5a0 is
-> the current implementation checkpoint; non-admitting
+> Status: Split, ownership, scope and tests-first contracts frozen; ii-b5a0
+> complete/non-admitting; ii-b5a is current
 >
 > Date: 2026-08-21
 >
