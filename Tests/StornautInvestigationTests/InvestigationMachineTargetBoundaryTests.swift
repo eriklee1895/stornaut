@@ -345,6 +345,7 @@ struct InvestigationMachineTargetBoundaryTests {
             "InvestigationCohortCapsuleContract.swift",
             "InvestigationHandoffEpochBootstrapContract.swift",
             "InvestigationHandoffFrameContract.swift",
+            "InvestigationInstalledL2ProjectionContract.swift",
             "InvestigationMachineClaimContract.swift",
         ])
         for name in names {
@@ -890,8 +891,27 @@ struct InvestigationMachineTargetBoundaryTests {
             "ii-b5a checkpoint budget drifted",
         ] { #expect(sources[0].contains(marker)) }
         for marker in [
-            "iib5a0_commit=953d149", "iib5a_commit=f9e8c80", "sender-resample", "post-await-cancel",
+            "iib5a0_commit=953d149", "iib5a_commit=43a2c83", "sender-resample", "post-await-cancel",
         ] { #expect(sources[1].contains(marker)) }
+    }
+
+    @Test func iiB5BIAProjectionVerifierPinsPureBinaryAndTemporalContract() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let sources = try ["scripts/verify-investigation-boundaries", "scripts/verify-contract"].map {
+            try String(contentsOf: root.appending(path: $0), encoding: .utf8)
+        }
+        for marker in [
+            "--iib5bia-projection-contract-only <contract-source> <focused-test-source>",
+            "--iib5bia-staged-scope-contract-only [baseline]",
+            "ii-b5b-i-a canonical {label} source drifted", "ii-b5b-i-a checkpoint budget drifted",
+        ] { #expect(sources[0].contains(marker)) }
+        for marker in [
+            "codable:'ii-b5b-i-a", "projection-epoch:'ii-b5b-i-a",
+            "claim-projection:'ii-b5b-i-a", "cross-clock:'ii-b5b-i-a",
+            "digest-bypass:'ii-b5b-i-a",
+        ] {
+            #expect(sources[1].contains(marker))
+        }
     }
 
     @Test

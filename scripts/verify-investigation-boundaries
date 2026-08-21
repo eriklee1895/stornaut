@@ -50,6 +50,11 @@ iib5a_composer_source=
 iib5a_focused_test_source=
 iib5a_staged_scope_contract_only=false
 iib5a_staged_scope_baseline=HEAD
+iib5bia_projection_contract_only=false
+iib5bia_contract_source=
+iib5bia_focused_test_source=
+iib5bia_staged_scope_contract_only=false
+iib5bia_staged_scope_baseline=HEAD
 iib3a_staged_scope_contract_only=false
 iib3a_staged_scope_baseline=HEAD
 iib3b_start_retire_contract_only=false
@@ -133,6 +138,15 @@ if (( $# > 0 )); then
         && [[ $1 == --iib5a-staged-scope-contract-only ]]; then
         iib5a_staged_scope_contract_only=true
         iib5a_staged_scope_baseline=${2:-HEAD}
+    elif (( $# == 3 )) \
+        && [[ $1 == --iib5bia-projection-contract-only ]]; then
+        iib5bia_projection_contract_only=true
+        iib5bia_contract_source=$2
+        iib5bia_focused_test_source=$3
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iib5bia-staged-scope-contract-only ]]; then
+        iib5bia_staged_scope_contract_only=true
+        iib5bia_staged_scope_baseline=${2:-HEAD}
     elif (( $# == 1 || $# == 2 )) \
         && [[ $1 == --iib3a-staged-scope-contract-only ]]; then
         iib3a_staged_scope_contract_only=true
@@ -158,7 +172,7 @@ if (( $# > 0 )); then
         iib3c_staged_scope_baseline=${2:-HEAD}
     else
         print -u2 \
-            "Usage: scripts/verify-investigation-boundaries [--claim-asid-contract-only <source> | --deadline-state-contract-only <source> | --claim-server-contract-only <adapter> <effects> <deadline-state> | --claim-server-package-contract-only <describe-json> <dump-json> | --legacy-machine-claim-contract-only <lifecycle-xpc> <helper> <machine-host> <machine-claim> | --retirement-handle-v3-contract-only <lifecycle> <adapter> | --live-claim-server-contract-only <project.pbxproj> <Package.swift> <handoff-root> <scheme-root> <lifecycle-escrow> <adapter> <effects> <helper> | --app-peer-admission-contract-only <policy> <adapter> | --iib4-driver-support-contract-only <package-manifest> <client-source> | --iib4-staged-scope-contract-only [baseline] | --iib5a0-claim-abort-contract-only <client-source> | --iib5a0-staged-scope-contract-only [baseline] | --iib5a-single-epoch-contract-only <composer-source> <focused-test-source> | --iib5a-staged-scope-contract-only [baseline] | --iib3a-staged-scope-contract-only [baseline] | --iib3b-start-retire-contract-only <transport> | --iib3b-staged-scope-contract-only [baseline] | --iib3c-concrete-entry-contract-only <leaf> <adapter> <composition> <harness> | --iib3c-staged-scope-contract-only [baseline]]"
+            "Usage: scripts/verify-investigation-boundaries [--claim-asid-contract-only <source> | --deadline-state-contract-only <source> | --claim-server-contract-only <adapter> <effects> <deadline-state> | --claim-server-package-contract-only <describe-json> <dump-json> | --legacy-machine-claim-contract-only <lifecycle-xpc> <helper> <machine-host> <machine-claim> | --retirement-handle-v3-contract-only <lifecycle> <adapter> | --live-claim-server-contract-only <project.pbxproj> <Package.swift> <handoff-root> <scheme-root> <lifecycle-escrow> <adapter> <effects> <helper> | --app-peer-admission-contract-only <policy> <adapter> | --iib4-driver-support-contract-only <package-manifest> <client-source> | --iib4-staged-scope-contract-only [baseline] | --iib5a0-claim-abort-contract-only <client-source> | --iib5a0-staged-scope-contract-only [baseline] | --iib5a-single-epoch-contract-only <composer-source> <focused-test-source> | --iib5a-staged-scope-contract-only [baseline] | --iib5bia-projection-contract-only <contract-source> <focused-test-source> | --iib5bia-staged-scope-contract-only [baseline] | --iib3a-staged-scope-contract-only [baseline] | --iib3b-start-retire-contract-only <transport> | --iib3b-staged-scope-contract-only [baseline] | --iib3c-concrete-entry-contract-only <leaf> <adapter> <composition> <harness> | --iib3c-staged-scope-contract-only [baseline]]"
         exit 64
     fi
 fi
@@ -568,6 +582,86 @@ function verify_iib5a_staged_scope() {
     local changed
     changed=$(git diff --cached --numstat "$baseline" | awk 'index($3, "docs/") != 1 {total += $1 + $2} END {print total + 0}')
     (( changed <= 1500 )) || { print -u2 "ii-b5a checkpoint budget drifted"; return 1; }
+}
+
+function verify_iib5bia_projection_contract() {
+    local contract_source=$1 focused_test_source=$2
+    xcrun swiftc -frontend -parse "$contract_source"
+    xcrun swiftc -frontend -parse "$focused_test_source"
+    python3 - "$contract_source" "$focused_test_source" <<'PY'
+from pathlib import Path
+import hashlib
+import re
+import sys
+contract_path, test_path = map(Path, sys.argv[1:])
+contract = contract_path.read_text(encoding="utf-8")
+test = test_path.read_text(encoding="utf-8")
+if set(re.findall(r"(?m)^import\s+([A-Za-z0-9_]+)\s*$", contract)) != {"Foundation"}:
+    raise SystemExit("ii-b5b-i-a dependency surface drifted")
+if re.search(r"(?m)^\s*(?:public|open)\s+", contract):
+    raise SystemExit("ii-b5b-i-a public surface drifted")
+for forbidden in (
+    "Codable", "Encodable", "Decodable", "JSONDecoder", "JSONEncoder",
+    "SignedInvestigationRuntime", "diagnosticRootPath", "expectedModel",
+    "FileManager", "Process(", "NSXPC", "URLSession", "Darwin.",
+    "socketpair(", "posix_spawn", "kill(", "readiness", "receipt",
+):
+    if forbidden in contract:
+        raise SystemExit("ii-b5b-i-a authority or schema surface drifted")
+for required in (
+    "stornaut.task39.installed-l2.identity-projection",
+    "projectionSHA256 = InvestigationHandoffSHA256.hashing(",
+    "rawBytes: Data(repeating: 0, count: 32)",
+    "try projection.encoded() == data",
+    "projection.epochUUID == epochBootstrap.epochUUID",
+    "claimEvidence.l1Residue.investigationUUID\n                == projection.configurationNonce",
+    "claimEvidence.claimedAt <= started.wallUTC",
+    "observed.wallUTC < projection.configurationValidBefore",
+    "< claimEvidence.releaseDeadlineNanoseconds",
+    "<= epochBootstrap.epochDeadlineNanoseconds",
+    "try claimEvidence.encoded()",
+):
+    if required not in contract:
+        raise SystemExit("ii-b5b-i-a projection or temporal contract drifted")
+expected = {
+    contract_path: "ee5dac16fc6075008fd8b4cdd85a8ebafd45ba15a014fac16daff551453a1f4b",
+    test_path: "7d947df4bf9a992ad409945eedf3bd43684fc29ee19e118895a2ff226384c344",
+}
+for path, digest in expected.items():
+    if hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+        label = "contract" if path == contract_path else "focused test"
+        raise SystemExit(f"ii-b5b-i-a canonical {label} source drifted")
+PY
+}
+
+function verify_iib5bia_staged_scope() {
+    local baseline=${1:-HEAD}
+    local expected=(
+        Sources/StornautInvestigationHandoffContract/InvestigationInstalledL2ProjectionContract.swift
+        Tests/StornautInvestigationTests/InvestigationInstalledL2ProjectionContractTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-contract
+        scripts/verify-investigation-boundaries
+    )
+    if git diff --cached --name-only --diff-filter=D "$baseline" \
+        | awk 'index($0, "docs/") != 1 { found = 1 } END { exit !found }'
+    then
+        print -u2 "ii-b5b-i-a checkpoint deleted an existing path"; return 1
+    fi
+    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" | awk 'index($0, "docs/") != 1')"})
+    if git diff --cached --numstat "$baseline" | awk 'index($3, "docs/") != 1 && ($1 == "-" || $2 == "-") { found = 1 } END { exit !found }'; then
+        print -u2 "ii-b5b-i-a binary checkpoint path rejected"; return 1
+    fi
+    local required
+    for required in "${expected[@]}"; do
+        (( ${observed[(Ie)$required]} )) || { print -u2 "ii-b5b-i-a staged checkpoint deleted a required path"; return 1; }
+    done
+    [[ "${(j:\n:)${(on)observed}}" == "${(j:\n:)${(on)expected}}" ]] || {
+        print -u2 "ii-b5b-i-a checkpoint paths drifted"; return 1
+    }
+    local changed
+    changed=$(git diff --cached --numstat "$baseline" | awk 'index($3, "docs/") != 1 {total += $1 + $2} END {print total + 0}')
+    (( changed <= 1200 )) || { print -u2 "ii-b5b-i-a checkpoint budget drifted"; return 1; }
 }
 
 function verify_iib4_staged_scope() {
@@ -2815,9 +2909,13 @@ expected_frozen = {
     handoff_root / "InvestigationHandoffFrameContract.swift": "33bf13d57d4acfc621cf7a5baf7ca3deaa8819d1c723573039ae91f07a21b4d9",
     handoff_root / "InvestigationMachineClaimContract.swift": "1b01315aaf822ac126d7d4a7391d7af3c93efcf444892d73ac0f88642dc4f352",
 }
-if set(handoff_root.glob("*")) != {
+historical_handoff = {
     path for path in expected_frozen if path.parent == handoff_root
-}:
+}
+later_handoff = {
+    handoff_root / "InvestigationInstalledL2ProjectionContract.swift"
+}
+if set(handoff_root.glob("*")) != historical_handoff | later_handoff:
     raise SystemExit("live claim server frozen Handoff files drifted")
 if set(scheme_root.glob("*.xcscheme")) != {
     path for path in expected_frozen if path.parent == scheme_root
@@ -3564,6 +3662,16 @@ fi
 if $iib5a_staged_scope_contract_only; then
     verify_iib5a_staged_scope "$iib5a_staged_scope_baseline"
     print "ii-b5a staged scope verification passed."
+    exit 0
+fi
+if $iib5bia_projection_contract_only; then
+    verify_iib5bia_projection_contract "$iib5bia_contract_source" "$iib5bia_focused_test_source"
+    print "ii-b5b-i-a projection contract verification passed."
+    exit 0
+fi
+if $iib5bia_staged_scope_contract_only; then
+    verify_iib5bia_staged_scope "$iib5bia_staged_scope_baseline"
+    print "ii-b5b-i-a staged scope verification passed."
     exit 0
 fi
 if $iib3a_staged_scope_contract_only; then
@@ -5352,6 +5460,7 @@ if Path(handoff.get("path", "")) != Path(
     raise SystemExit("handoff contract target path drifted")
 expected_handoff_sources = {
     "HandoffBinaryTranscript.swift",
+    "InvestigationInstalledL2ProjectionContract.swift",
     "InvestigationHandoffEpochBootstrapContract.swift",
     "InvestigationHandoffFrameContract.swift",
     "InvestigationCohortCapsuleContract.swift",
@@ -5374,6 +5483,7 @@ if consumers != {
     raise SystemExit(f"handoff contract consumers drifted: {sorted(consumers)}")
 expected_imports = {
     "HandoffBinaryTranscript.swift": {"CryptoKit", "Foundation"},
+    "InvestigationInstalledL2ProjectionContract.swift": {"Foundation"},
     "InvestigationHandoffEpochBootstrapContract.swift": {"Foundation"},
     "InvestigationHandoffFrameContract.swift": {"Foundation"},
     "InvestigationCohortCapsuleContract.swift": {"Foundation"},
@@ -6864,16 +6974,16 @@ function require_exact_machine_driver_projection() {
 
     case "$configuration" in
         debug)
-            expected_undefined_sha=9d9ea8f3fce000526fe65f28e424ef7fff0f6aba5cf9812bba2c55b320a709e7
-            expected_undefined_lines=520
+            expected_undefined_sha=15ee8d8adbfb66c5465a290e567c677cab55fe34f3080dd6cfb604a36fd28218
+            expected_undefined_lines=521
             expected_loads_sha=e3c05d8766d8aa37e87a834a3f37fd71d925f1d34ac349528cee4970db9d3841
             expected_loads_lines=16
             expected_owned_sha=803a1c4fde0ff8ccf98833466d60b306a901f1e64ff5fcc034937ccf55d53c72
             expected_owned_lines=1917
             ;;
         release)
-            expected_undefined_sha=c79ddaede80ba12941fc7acef4077756efde6c1257ea9e331c70a232b4d6cb91
-            expected_undefined_lines=371
+            expected_undefined_sha=77676a7ec64235ee6e1a5cf4ce060b634e9d0fd9c57cfd070d406c0c6ea0cd1d
+            expected_undefined_lines=372
             expected_loads_sha=e3c05d8766d8aa37e87a834a3f37fd71d925f1d34ac349528cee4970db9d3841
             expected_loads_lines=16
             expected_owned_sha=37ed1c2826ecc885a692a62ea214c756546d61bff6358d232610e001120255b8
