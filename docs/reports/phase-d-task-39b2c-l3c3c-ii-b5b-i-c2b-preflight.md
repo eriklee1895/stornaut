@@ -1,10 +1,9 @@
 # Phase D Task 39B2c L3c3c-ii-b5b-i-c2b Preflight
 
-> Status: frozen / current
+> Status: split before validation; i-c2b-i current
 > Date: 2026-08-22
 > Baseline: `58332ccb9f78da203fb2380ca006c49f0f371c2b`
-> Scope ceiling: exactly twelve non-document paths and at most 3,800 changed
-> non-document lines
+> Aggregate scope: exactly twelve non-document paths
 > Admission: non-admitting; i-c2 aggregate closes only after this checkpoint
 
 ## 1. Decision
@@ -19,7 +18,23 @@ hash/signing/manifest/executable-path machinery.
 i-c2b removes that physical duplication. Post-teardown evidence becomes strictly
 absence-only. The only installed physical-evidence owner then remains the
 extracted `StornautInvestigationInstalledL2` observer consumed by the i-c1
-DriverSupport join. No further split is required by the current call graph.
+DriverSupport join.
+
+The first complete implementation tree measured 4,113 changed non-document
+lines because deleting the obsolete positive-reader implementation and tests
+alone accounts for more than 3,000 lines. This exceeds the preflight's 3,800
+changed-line ceiling even though the tree adds only 1,092 lines and remains far
+below the repository's roughly 4,000-added-line split threshold. The checkpoint
+is therefore split before staged validation rather than raising its frozen
+ceiling or retaining dead code:
+
+- **i-c2b-i absence-only implementation/tests** owns paths 1-10 below, with a
+  ceiling of ten non-document paths and 3,800 changed lines; and
+- **i-c2b-ii verifier closure** owns paths 11-12 below, with a ceiling of two
+  non-document paths and 800 changed lines.
+
+The aggregate i-c2b contract closes only after both commits are reviewed and
+pushed.
 
 ## 2. Frozen Scope
 
@@ -38,10 +53,10 @@ The exact non-document path set is:
 11. `scripts/verify-investigation-boundaries`; and
 12. `scripts/verify-contract`.
 
-The ceiling is exactly twelve non-document paths and at most 3,800 changed
-non-document lines. A thirteenth non-document path, any required change to the
-fixed service probe, or any new responsibility surface requires another
-preflight split before coding. `Package.swift`, the production DriverHost and
+The aggregate scope is exactly twelve non-document paths. The i-c2b-i and
+i-c2b-ii ceilings are frozen above. A thirteenth aggregate non-document path,
+any required change to the fixed service probe, or any new responsibility
+surface requires another preflight split before coding. `Package.swift`, the production DriverHost and
 ScenarioDriver, all `StornautInvestigationInstalledL2` sources, and all
 DriverSupport installed-proof sources remain unchanged.
 
@@ -155,12 +170,13 @@ baseline, extra/deleted/binary/over-budget paths and staged semantic drift.
 Validation order is:
 
 1. tests-first focused RED;
-2. structural and mutation gates;
-3. focused Lifecycle/Darwin and Machine collector/host/scenario tests;
-4. affected Lifecycle and Investigation suites;
-5. one staged-only serialized SwiftPM regression;
-6. applicable Debug/Release diagnostic-driver/final-Mach-O gates; and
-7. independent post-fix and cross-group review.
+2. i-c2b-i focused Lifecycle/Darwin and Machine collector/host/scenario tests;
+3. i-c2b-i affected Lifecycle and Investigation suites;
+4. one i-c2b-i staged-only serialized SwiftPM regression;
+5. i-c2b-i independent production/test review and commit;
+6. i-c2b-ii structural, mutation, historical-replay and staged-scope gates;
+7. applicable Debug/Release diagnostic-driver/final-Mach-O gates; and
+8. independent verifier and aggregate cross-group review.
 
 This checkpoint does not run `scripts/verify --full`, install, bootout, invoke
 sudo/root or real XPC, call a model, read auth, access a network, or emit
