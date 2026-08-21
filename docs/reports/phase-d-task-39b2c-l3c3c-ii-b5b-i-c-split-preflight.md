@@ -1,8 +1,10 @@
 # Phase D Task 39B2c L3c3c-ii-b5b-i-c Split Preflight
 
-> Status: approved-plan refinement / pre-implementation / non-admitting
+> Status: i-c1 complete/non-admitting; i-c2 current
 > Date: 2026-08-22
 > Order: i-c1 DriverSupport join/proof -> i-c2 legacy-owner closure
+>
+> i-c1 completion evidence: [review](phase-d-task-39b2c-l3c3c-ii-b5b-i-c1-review.md)
 
 ## 1. Decision
 

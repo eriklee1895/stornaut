@@ -2,8 +2,7 @@
 
 > Status: Split, ownership, scope and tests-first contracts frozen; ii-b5a0,
 > ii-b5a, ii-b5b-i-a, i-b1, i-b2a, i-b2b-a and i-b2b-b
-> complete/non-admitting; i-b3 complete/non-admitting; i-c split into i-c1/i-c2;
-> i-c1 current
+> complete/non-admitting; i-b3/i-c1 complete/non-admitting; i-c2 current
 >
 > Date: 2026-08-21
 >
@@ -206,8 +205,8 @@ cost split before coding.
 ## 5. ii-b5b-i — Installed-L2 Contract and Projection Extraction
 
 > Split before coding. ii-b5b-i-a, i-b1 and i-b2a are complete/non-admitting;
-> i-b2b-a/i-b2b-b/i-b3 are complete/non-admitting; i-c1 is the current frontier
-> and i-c2 follows. The
+> i-b2b-a/i-b2b-b/i-b3/i-c1 are complete/non-admitting; i-c2 is the current
+> frontier. The
 > exact split, paths, budgets and clock contract are frozen in the
 > [ii-b5b-i exact-path preflight](phase-d-task-39b2c-l3c3c-ii-b5b-i-exact-path-preflight.md).
 > ii-b5a completion evidence is recorded in the

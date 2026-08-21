@@ -52,8 +52,8 @@
 > iii-b-i semantic/live integration, iii-b-ii executable physical-adapter
 > closure and ii-b3a/ii-b3b are complete/non-admitting; iii-b/ii-b2b are
 > closed; ii-b3c, ii-b4, ii-b5a0, ii-b5a, ii-b5b-i-a, i-b1 and i-b2a are
-> complete/non-admitting; i-b2b-a, i-b2b-b and i-b3 are complete/non-admitting;
-> i-c1 is current and i-c2 follows,
+> complete/non-admitting; i-b2b-a, i-b2b-b, i-b3 and i-c1 are
+> complete/non-admitting; i-c2 is current,
 > followed eventually by ii-c
 > one no-model privileged gate. The authoritative
 > real-model run and readiness verdict remain unimplemented.
@@ -938,7 +938,7 @@ Checkpoint status:
   complete after 35 focused, 521 affected, one 1,234-test staged-only serial,
   exact contract/structural/artifact gates and final review; ii-b3b and its
   test-only fixture prerequisite, ii-b3c and ii-b4 are complete/non-admitting;
-  ii-b5 is split into b5a0/b5a/b5b-i/b5b-ii/b5b-iii; b5a0/b5a/i-a/i-b1/i-b2a/i-b2b-a/i-b2b-b/i-b3 are complete/non-admitting; i-c1 is current and i-c2 follows.
+  ii-b5 is split into b5a0/b5a/b5b-i/b5b-ii/b5b-iii; b5a0/b5a/i-a/i-b1/i-b2a/i-b2b-a/i-b2b-b/i-b3/i-c1 are complete/non-admitting; i-c2 is current.
   See the
   [ii-b2 ASID prerequisite review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2-asid-prerequisite-review.md),
   the
@@ -971,6 +971,8 @@ Checkpoint status:
   [i-b2b-b review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2b-b-review.md),
   the
   [i-b3 review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b3-review.md),
+  the
+  [i-c1 review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-c1-review.md),
   the
   [L3c1b-i Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
   and

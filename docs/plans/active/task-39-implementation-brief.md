@@ -79,8 +79,8 @@
 > i-b2a artifact/static readers are also complete/non-admitting. The remaining
 > cost/authority split is i-b2b process/service + narrow C identity and i-b3
 > observer composition. i-b2b-a identity/process, i-b2b-b fixed service and
-> i-b3 are complete/non-admitting; i-c is split into i-c1 join/proof and i-c2
-> legacy-owner closure; i-c1 is current.
+> i-b3 and i-c1 are complete/non-admitting; i-c2 legacy-owner closure is
+> current.
 > Evidence:
 > [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
 > [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md) and
@@ -1108,9 +1108,9 @@ The remaining L3 work is split before driver coding:
    iii-b-ii, ii-b3a, ii-b3b, ii-b3c and ii-b4 are complete; ii-b5 is split
    into b5a0/b5a/b5b-i/b5b-ii/b5b-iii; b5a0, b5a, b5b-i-a, i-b1 and i-b2a are
    complete/non-admitting. The fresh i-b2b split leaves i-b2b-a/i-b2b-b/i-b3;
-   i-b2b-a, i-b2b-b and i-b3 are complete/non-admitting. Fresh preflight splits
-   i-c into i-c1 DriverSupport join/opaque proof and i-c2 legacy-owner closure;
-   i-c1 is current.
+   i-b2b-a, i-b2b-b, i-b3 and i-c1 are complete/non-admitting. Fresh preflight
+   splits i-c into i-c1 DriverSupport join/opaque proof and i-c2 legacy-owner
+   closure; i-c2 is current.
    See the
    [study](../../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md)
    and [final review](../../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md),
@@ -1163,6 +1163,8 @@ The remaining L3 work is split before driver coding:
    [fixed service reader review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2b-b-review.md).
    i-b3 completion evidence is in the
    [observer composition review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b3-review.md).
+   i-c1 completion evidence is in the
+   [DriverSupport join/proof review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-c1-review.md).
    The b5 split, claim-abort completion and typed composer completion evidence
    are in the
    [ii-b5 preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b5-split-preflight.md),
@@ -1218,8 +1220,8 @@ i-b2b-0b/i-b2b-1 were superseded before execution. The ii-b split is frozen and
 ii-b0a/ii-b0b/ii-b0c/ii-b1, the ii-b2 ASID prerequisite, ii-b2a, ii-b2b-i and
 ii-b2b-ii, ii-b2b-iii-a, iii-b-i, iii-b-ii, ii-b3a and ii-b3b are complete;
 ii-b3c concrete leaf/native entry, ii-b4 fixed helper-claim client, ii-b5a0 and
-ii-b5a, ii-b5b-i-a, i-b1, i-b2a, i-b2b-a, i-b2b-b and i-b3 are complete and
-non-admitting; i-c1 is current and i-c2 follows.
+ii-b5a, ii-b5b-i-a, i-b1, i-b2a, i-b2b-a, i-b2b-b, i-b3 and i-c1 are complete
+and non-admitting; i-c2 is current.
 ADR 0018
 remains Proposed until ii-c succeeds. L3c1 used focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean

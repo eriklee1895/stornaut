@@ -3,7 +3,7 @@
 > Status: ii-b5b-i-a, i-b1 and i-b2a complete/non-admitting; fresh
 > cost/authority audit split i-b into i-b1/i-b2a/i-b2b/i-b3 before coding;
 > i-b2b split by fresh preflight; i-b2b-a/i-b2b-b/i-b3
-> complete/non-admitting; i-c split into i-c1/i-c2; i-c1 current
+> complete/non-admitting; i-c1 complete/non-admitting; i-c2 current
 >
 > Date: 2026-08-21
 >
