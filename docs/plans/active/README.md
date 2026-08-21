@@ -147,8 +147,8 @@ and ii-b2a are complete. ii-b2b-i sealed/non-connected server integration and
 ii-b2b-ii legacy-client quarantine / Machine production block, iii-a strict
 handle-v3/single-quantized transfer, iii-b-i semantic/live integration,
 iii-b-ii executable physical-adapter closure and ii-b3a/ii-b3b are complete;
-iii-b/ii-b2b are closed; ii-b3c and ii-b4 are complete and non-admitting; ii-b5
-is current. See the
+iii-b/ii-b2b are closed; ii-b3c, ii-b4, ii-b5a0 and ii-b5a are complete and
+non-admitting; ii-b5b-i is current. See the
 [study](../../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md),
 [final review](../../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md)
 and [i-b2a review](../../reports/phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md),
@@ -208,7 +208,8 @@ The current ii-b5 contract is split by the
 [ii-b5 preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b5-split-preflight.md)
 into ii-b5a0 claim-abort, ii-b5a typed composition, ii-b5b-i L2/projection,
 ii-b5b-ii fixed Darwin runtime and ii-b5b-iii production/artifact composition;
-ii-b5a0 is complete/non-admitting and ii-b5a is current.
+ii-b5a0 and ii-b5a are complete/non-admitting, and ii-b5b-i is current. See the
+[ii-b5a review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5a-review.md).
 The preceding ii-b2b-iii split is frozen by the
 [ii-b2b-iii preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-split-preflight.md).
 Only L3c4 owns machine readiness and the remaining full verifier.
@@ -234,7 +235,7 @@ the sole normal-product admission gate.
 | [36](task-36-implementation-brief.md) | Domain, canonical projection, planner, budget and stop contracts | complete; [review](../../reports/phase-d-task-36-review.md) |
 | [37](task-37-implementation-brief.md) | Store v4, retention and source rejoin | complete; [review](../../reports/phase-d-task-37-review.md) |
 | [38](task-38-implementation-brief.md) | Closed coordinator with fake runtime | complete; [review](../../reports/phase-d-task-38-review.md) |
-| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; external root launch NO-GO; ii-b4/ii-b5a0 complete/non-admitting; ii-b5 split, b5a current; ADR 0018 Proposed |
+| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; external root launch NO-GO; ii-b4/ii-b5a0/ii-b5a complete/non-admitting; ii-b5b-i current; ADR 0018 Proposed |
 | [40](task-40-implementation-brief.md) | Evidence report and conservative Review projection | blocked on Task 39 |
 | [41](task-41-implementation-brief.md) | First-use disclosure and typed availability | blocked on Task 40 |
 | [42](task-42-implementation-brief.md) | App workflow and recovery state | blocked on Task 41 |
