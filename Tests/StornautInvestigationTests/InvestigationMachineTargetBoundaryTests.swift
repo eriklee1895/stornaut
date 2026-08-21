@@ -498,6 +498,7 @@ struct InvestigationMachineTargetBoundaryTests {
             "InvestigationMachineInstalledDriverObservation.swift",
             "InvestigationMachineInstalledDriverSystemSource.swift",
             "InvestigationMachineSingleEpoch.swift",
+            "InvestigationMachineSingleEpochInstalledL2Join.swift",
         ])
         #expect(FileManager.default.fileExists(atPath: supportURL.path))
         let supportSource = try String(
@@ -572,6 +573,9 @@ struct InvestigationMachineTargetBoundaryTests {
             "\"StornautInvestigationHandoffContract\""
         ))
         #expect(supportTarget.contains(
+            "\"StornautInvestigationInstalledL2\""
+        ))
+        #expect(supportTarget.contains(
             ".linkedFramework(\"Security\")"
         ))
 
@@ -599,6 +603,12 @@ struct InvestigationMachineTargetBoundaryTests {
             "InvestigationMachineSingleEpoch.swift": [
                 "import Foundation",
                 "import StornautInvestigationHandoffContract",
+                "import StornautInvestigationInstalledL2",
+            ],
+            "InvestigationMachineSingleEpochInstalledL2Join.swift": [
+                "import Foundation",
+                "import StornautInvestigationHandoffContract",
+                "import StornautInvestigationInstalledL2",
             ],
         ]
         for sourceName in supportSourceNames {
@@ -618,7 +628,7 @@ struct InvestigationMachineTargetBoundaryTests {
             for forbidden in [
                 "import StornautCore",
                 "import StornautExecution",
-                "import StornautInvestigation",
+                "import StornautInvestigation\n",
                 "import StornautLifecycle",
                 "Cleanup",
                 "Policy",
@@ -723,8 +733,8 @@ struct InvestigationMachineTargetBoundaryTests {
                 "readLine(",
                 "signedInvestigationRuntimeReady",
             ] {
-                let semanticException = (sourceName == "InvestigationMachineClaimClient.swift" && ["connect(", "import StornautInvestigation"].contains(forbidden))
-                    || (sourceName == "InvestigationMachineSingleEpoch.swift" && ["send(", "import StornautInvestigation"].contains(forbidden))
+                let semanticException = (sourceName == "InvestigationMachineClaimClient.swift" && forbidden == "connect(")
+                    || (sourceName == "InvestigationMachineSingleEpoch.swift" && forbidden == "send(")
                 if !semanticException {
                     #expect(!source.contains(forbidden))
                 }
