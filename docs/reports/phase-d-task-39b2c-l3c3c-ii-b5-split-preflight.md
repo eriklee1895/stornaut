@@ -1,7 +1,7 @@
 # Phase D Task 39B2c-L3c3c-ii-b5 Single-Epoch Composition Split Preflight
 
-> Status: Split, ownership, scope and tests-first contracts frozen; ii-b5a0 and
-> ii-b5a complete/non-admitting; ii-b5b-i is split and ii-b5b-i-a is current
+> Status: Split, ownership, scope and tests-first contracts frozen; ii-b5a0,
+> ii-b5a and ii-b5b-i-a complete/non-admitting; i-b split, i-b1 current
 >
 > Date: 2026-08-21
 >
@@ -203,11 +203,13 @@ cost split before coding.
 
 ## 5. ii-b5b-i — Installed-L2 Contract and Projection Extraction
 
-> Split before coding. ii-b5b-i-a is the current implementation frontier. The
+> Split before coding. ii-b5b-i-a is complete; i-b1 is the current frontier. The
 > exact split, paths, budgets and clock contract are frozen in the
 > [ii-b5b-i exact-path preflight](phase-d-task-39b2c-l3c3c-ii-b5b-i-exact-path-preflight.md).
 > ii-b5a completion evidence is recorded in the
 > [ii-b5a review](phase-d-task-39b2c-l3c3c-ii-b5a-review.md).
+> ii-b5b-i-a completion evidence is in the
+> [projection review](phase-d-task-39b2c-l3c3c-ii-b5b-i-a-review.md).
 
 The existing full installed-L2 semantic/physical implementation spans broad
 Lifecycle and Machine targets and cannot be linked into the native driver or
@@ -313,14 +315,15 @@ terminal. After the final epoch the store destroys the value. No outer caller
 reconstructs continuity from a raw PID.
 
 This preflight itself was documentation-only and consumed no serial. Completed
-b5a0/b5a and all remaining b5 substeps are non-admitting prerequisites. ADR
+b5a0/b5a/i-a and all remaining b5 substeps are non-admitting prerequisites. ADR
 0018 stays Proposed, Task 39 remains incomplete and production Deep Dive remains
 `.implementationUnavailable`.
 
 The strict remaining order is:
 
 ```text
-ii-b5b-i-a -> ii-b5b-i-b -> ii-b5b-i-c
+ii-b5b-i-b1 -> ii-b5b-i-b2a -> ii-b5b-i-b2b -> ii-b5b-i-b3
+-> ii-b5b-i-c
 -> ii-b5b-ii -> ii-b5b-iii
 -> ii-c0 -> ii-c -> L3c3d -> L3c4
 ```

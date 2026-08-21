@@ -1,7 +1,7 @@
 # Phase D Task 39B2c-L3c3c-ii-b5b-i Exact-Path Preflight
 
-> Status: Trust, clock-domain and cost audit complete; ii-b5b-i split before
-> coding; ii-b5b-i-a projection/temporal contract is current
+> Status: ii-b5b-i-a complete/non-admitting; fresh cost/authority audit split
+> i-b into i-b1/i-b2a/i-b2b/i-b3 before coding; i-b1 current
 >
 > Date: 2026-08-21
 >
@@ -162,27 +162,42 @@ structural/mutation/scope gates; it makes no final-Mach-O claim.
 
 ## 4. ii-b5b-i-b — Authority-Closed Observer Extraction
 
-ii-b5b-i-b will receive its own fresh implementation preflight after i-a. Its
-provisional ceiling is 12 non-document paths and 3,500 changed lines. The
-candidate surface is:
+Fresh current-source audit measured 1,607 implementation lines and 2,073 direct
+test lines before new target/C/verifier work. Relocating the physical sources
+and tests in one diff would exceed 4,000 changed lines, while the existing
+`CLifecycleSupport` object co-locates audit-token identity reads with
+`proc_signal_with_audittoken`. i-b therefore freezes as four checkpoints:
 
-- `Package.swift`;
-- a new non-product `StornautInvestigationInstalledL2` target;
-- an optional new `CInvestigationIdentitySupport` source/header containing only
-  read-only identity operations;
-- separate semantic, artifact and process/service observer sources;
-- one DriverSupport installed-L2 adapter source;
-- focused tests plus TargetBoundary and the two structural verifiers; and
-- at most one compatibility/removal path.
+1. **i-b1 semantic target** — 6 paths / at most 1,800 changed lines:
+   `Package.swift`, new `InstalledL2SemanticContract.swift`, new focused tests,
+   TargetBoundary and the two structural verifiers. It creates the non-product
+   target and installed-only roles/predicate/value contract; no physical reader.
+2. **i-b2a artifact/static readers** — 5 paths / at most 2,200 changed lines:
+   new artifact reader and focused tests plus TargetBoundary/two verifiers. It
+   owns fixed role mapping, descriptor/node/hash/plist and static signing checks.
+3. **i-b2b process/service readers** — 10 paths / at most 2,600 changed lines:
+   `Package.swift`, new narrow `CInvestigationIdentitySupport` header/source,
+   new process and fixed-service readers, two focused tests, TargetBoundary and
+   two verifiers. The C object exports only fixed identity extraction and must
+   contain no signal/process-control surface.
+4. **i-b3 observer composition** — 5 paths / at most 1,600 changed lines:
+   new installed observer and focused tests plus TargetBoundary/two verifiers.
+   It composes exact artifacts/processes/service and paired clock samples but
+   accepts no claim evidence or repeated-App join.
 
-i-b must prove fixed paths/services, race-resistant descriptor/node/hash reads,
+The old Lifecycle/Machine physical implementation remains a migration reference
+during these checkpoints. i-c owns its final delegation/removal and the
+structural exactly-one-owner proof; no earlier checkpoint may claim global
+single ownership.
+
+i-b1–i-b3 must prove fixed paths/services, race-resistant descriptor/node/hash reads,
 static/live Security identity, exact App/helper process identity, the eight
 artifact roles, installed-phase predicates and dual-clock sampling. It accepts no
 caller-selected path, PID, label, descriptor, signing requirement or syscall. It
 performs no install, bootout, launch, signal, cleanup, XPC, model or network work.
 
-If a single compatibility/removal path is insufficient, i-b must split before
-coding rather than temporarily claiming there is one L2 owner.
+No subcheckpoint may borrow i-c's projection + claim + repeated-App join or
+opaque proof minting.
 
 ## 5. ii-b5b-i-c — Driver Join and Legacy Owner Closure
 
@@ -232,14 +247,16 @@ external execution, model/auth/network or `scripts/verify --full`.
 
 ## 7. Non-Admission and Remaining Order
 
-This preflight is documentation-only and consumes no serial. ii-b5b-i-a/b/c are
+This preflight is documentation-only. i-a consumed its single clean staged
+serial and is complete; i-b1/i-b2a/i-b2b/i-b3/i-c remain
 non-admitting prerequisites. ADR 0018 remains Proposed, Task 39 remains
 incomplete and production Deep Dive remains `.implementationUnavailable`.
 
 The strict remaining order is:
 
 ```text
-ii-b5b-i-a -> ii-b5b-i-b -> ii-b5b-i-c
+ii-b5b-i-b1 -> ii-b5b-i-b2a -> ii-b5b-i-b2b -> ii-b5b-i-b3
+-> ii-b5b-i-c
 -> ii-b5b-ii -> ii-b5b-iii -> ii-c0 -> ii-c -> L3c3d -> L3c4
 ```
 
