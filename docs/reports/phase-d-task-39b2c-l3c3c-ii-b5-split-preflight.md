@@ -1,7 +1,8 @@
 # Phase D Task 39B2c-L3c3c-ii-b5 Single-Epoch Composition Split Preflight
 
 > Status: Split, ownership, scope and tests-first contracts frozen; ii-b5a0,
-> ii-b5a, ii-b5b-i-a, i-b1, i-b2a and i-b2b-a complete/non-admitting; i-b2b-b current
+> ii-b5a, ii-b5b-i-a, i-b1, i-b2a, i-b2b-a and i-b2b-b
+> complete/non-admitting; i-b3 current
 >
 > Date: 2026-08-21
 >
@@ -204,7 +205,7 @@ cost split before coding.
 ## 5. ii-b5b-i — Installed-L2 Contract and Projection Extraction
 
 > Split before coding. ii-b5b-i-a, i-b1 and i-b2a are complete/non-admitting;
-> i-b2b is the current frontier. The
+> i-b2b-a/i-b2b-b are complete/non-admitting; i-b3 is the current frontier. The
 > exact split, paths, budgets and clock contract are frozen in the
 > [ii-b5b-i exact-path preflight](phase-d-task-39b2c-l3c3c-ii-b5b-i-exact-path-preflight.md).
 > ii-b5a completion evidence is recorded in the

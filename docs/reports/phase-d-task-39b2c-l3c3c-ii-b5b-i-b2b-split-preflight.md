@@ -1,6 +1,7 @@
 # Phase D Task 39B2c L3c3c-ii-b5b-i-b2b Split Preflight
 
-> Status: i-b2b-a complete/non-admitting; i-b2b-b current
+> Status: i-b2b-a/i-b2b-b complete/non-admitting; i-b3 current; completion
+> evidence: [i-b2b-b review](phase-d-task-39b2c-l3c3c-ii-b5b-i-b2b-b-review.md)
 > Date: 2026-08-21
 > Parent scope: i-b2b process/service readers plus narrow C identity support
 
