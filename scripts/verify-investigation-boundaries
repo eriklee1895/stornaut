@@ -1010,9 +1010,9 @@ PY
     xcrun clang -std=c11 -I "${header_source:h}" -c "$c_source" -o "$object_dir/identity.o"
     local exports=$(xcrun nm -g -j "$object_dir/identity.o" | grep '^_stornaut' || true)
     [[ "$exports" == _stornaut_investigation_identity_for_pid ]] || { rm -rf "$object_dir"; print -u2 "ii-b5b-i-b2b-a object export drifted"; return 1; }
-    local undefined=$(xcrun nm -u -j "$object_dir/identity.o")
-    if print -r -- "$undefined" | grep -Eq '^_(proc_signal_with_audittoken|kill|killpg|raise|posix_spawn|fork|exec|waitpid|write|socket|connect)$'; then rm -rf "$object_dir"; print -u2 "ii-b5b-i-b2b-a object authority drifted"; return 1; fi
-    for required in _task_name_for_pid _task_info _mach_port_deallocate; do print -r -- "$undefined" | grep -Fxq "$required" || { rm -rf "$object_dir"; print -u2 "ii-b5b-i-b2b-a object identity import missing"; return 1; }; done
+    local undefined=$(xcrun nm -u -j "$object_dir/identity.o" | LC_ALL=C sort -u)
+    local expected_undefined=$(print -rl -- ___error ___memcpy_chk ___memset_chk ___stack_chk_fail ___stack_chk_guard _audit_token_to_asid _audit_token_to_euid _audit_token_to_pid _audit_token_to_pidversion _mach_port_deallocate _mach_task_self_ _memset _proc_pidinfo _task_info _task_name_for_pid | LC_ALL=C sort)
+    [[ "$undefined" == "$expected_undefined" ]] || { rm -rf "$object_dir"; print -u2 "ii-b5b-i-b2b-a object authority drifted"; return 1; }
     rm -rf "$object_dir"
 }
 

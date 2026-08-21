@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=8877a3c55055210c4834fec5723b7692ad5c2db0f6a800430a582c05c45f3b71
+ib2_self_sha=1622c4d072de876c75ac61988c6a2395458a64687afcf26676c5072d43bc88da
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -864,7 +864,7 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "b8ab0a23401a5fab37d5612ffa358c45043244e04c545d5d084bfcd3e2d96a35",
+        "42843553e5dba2513d5b789141938cd18b194192baae3e6721a50bc0119fd126",
     Path("scripts/verify-app-release-boundaries"):
         "42ee86284c289efce8025ae366336046a47d689838c93ac577b0bfc1ed68f92c",
 }
@@ -4204,6 +4204,7 @@ def emit(name, old, new, text=source, suffix="swift"):
     if text.count(old) != 1: raise SystemExit(f"cannot construct ii-b5b-i-b2b-a mutation: {name}")
     (root/f"iib5bib2ba-{name}.{suffix}").write_text(text.replace(old,new,1),encoding="utf-8")
 emit("c-signal", "#include <sys/proc.h>\n", "#include <sys/proc.h>\nextern int proc_signal_with_audittoken(void *, int);\nstatic void forbidden(void) { (void)proc_signal_with_audittoken(0, 9); }\n", c, "c")
+emit("c-ptrace", "    if (process_id <= 1 || identity == NULL) {\n        return EINVAL;\n    }\n    memset(identity, 0, sizeof(*identity));\n", "    if (process_id <= 1 || identity == NULL) {\n        return EINVAL;\n    }\n    memset(identity, 0, sizeof(*identity));\n    extern int ptrace(int, pid_t, void *, int);\n    (void)ptrace(0, process_id, 0, 0);\n", c, "c")
 emit("identity-reread", "let finalKernel: InvestigationInstalledL2KernelIdentity\n        switch identityReader.read(processID: expected.processID) {\n        case .success(let identity): finalKernel = identity\n        case .failure: return .unavailable\n        }", "let finalKernel = initialKernel")
 emit("path-reread", "let finalPath: URL\n        switch pathReader.read(processID: expected.processID) {\n        case .success(let value): finalPath = value.standardizedFileURL\n        case .failure: return .unavailable\n        }", "let finalPath = initialPath")
 emit("audit-token", "kSecGuestAttributeAudit: tokenData as CFData", "kSecGuestAttributeAudit: Data() as CFData")
@@ -4212,6 +4213,7 @@ emit("vacuous-test", "#expect(signing.auditTokens == [expected.auditTokenWords])
 PY
 for fixture in \
     c-signal:'ii-b5b-i-b2b-a C authority drifted' \
+    c-ptrace:'ii-b5b-i-b2b-a object authority drifted' \
     identity-reread:'ii-b5b-i-b2b-a identity reread drifted' \
     path-reread:'ii-b5b-i-b2b-a path reread drifted' \
     audit-token:'ii-b5b-i-b2b-a process contract drifted' \
@@ -4219,7 +4221,7 @@ for fixture in \
     vacuous-test:'ii-b5b-i-b2b-a focused coverage drifted'; do
     name=${fixture%%:*}; expected=${fixture#*:}
     c="$iib5bib2ba_c"; source="$iib5bib2ba_source"; test="$iib5bib2ba_test"
-    [[ $name == c-signal ]] && c="$contract_root/iib5bib2ba-$name.c"
+    [[ $name == c-signal || $name == c-ptrace ]] && c="$contract_root/iib5bib2ba-$name.c"
     gate="$iib5bib2ba_gate"
     [[ $name == identity-reread || $name == path-reread || $name == audit-token || $name == flags ]] && source="$contract_root/iib5bib2ba-$name.swift"
     [[ $name == vacuous-test ]] && test="$contract_root/iib5bib2ba-$name.swift"

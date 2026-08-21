@@ -1,7 +1,7 @@
 # Phase D Task 39B2c-L3c3c-ii-b5 Single-Epoch Composition Split Preflight
 
 > Status: Split, ownership, scope and tests-first contracts frozen; ii-b5a0,
-> ii-b5a, ii-b5b-i-a, i-b1 and i-b2a complete/non-admitting; i-b2b-a current
+> ii-b5a, ii-b5b-i-a, i-b1, i-b2a and i-b2b-a complete/non-admitting; i-b2b-b current
 >
 > Date: 2026-08-21
 >

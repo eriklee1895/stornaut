@@ -1,6 +1,6 @@
 # Phase D Task 39B2c L3c3c-ii-b5b-i-b2b Split Preflight
 
-> Status: approved execution split; i-b2b-a current
+> Status: i-b2b-a complete/non-admitting; i-b2b-b current
 > Date: 2026-08-21
 > Parent scope: i-b2b process/service readers plus narrow C identity support
 
