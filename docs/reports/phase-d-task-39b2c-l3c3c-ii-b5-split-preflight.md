@@ -1,7 +1,7 @@
 # Phase D Task 39B2c-L3c3c-ii-b5 Single-Epoch Composition Split Preflight
 
 > Status: Split, ownership, scope and tests-first contracts frozen; ii-b5a0,
-> ii-b5a and ii-b5b-i-a complete/non-admitting; i-b split, i-b1 current
+> ii-b5a, ii-b5b-i-a and i-b1 complete/non-admitting; i-b2a current
 >
 > Date: 2026-08-21
 >
@@ -203,13 +203,16 @@ cost split before coding.
 
 ## 5. ii-b5b-i — Installed-L2 Contract and Projection Extraction
 
-> Split before coding. ii-b5b-i-a is complete; i-b1 is the current frontier. The
+> Split before coding. ii-b5b-i-a and i-b1 are complete; i-b2a is the current
+> frontier. The
 > exact split, paths, budgets and clock contract are frozen in the
 > [ii-b5b-i exact-path preflight](phase-d-task-39b2c-l3c3c-ii-b5b-i-exact-path-preflight.md).
 > ii-b5a completion evidence is recorded in the
 > [ii-b5a review](phase-d-task-39b2c-l3c3c-ii-b5a-review.md).
 > ii-b5b-i-a completion evidence is in the
 > [projection review](phase-d-task-39b2c-l3c3c-ii-b5b-i-a-review.md).
+> i-b1 completion evidence is in the
+> [semantic-target review](phase-d-task-39b2c-l3c3c-ii-b5b-i-b1-review.md).
 
 The existing full installed-L2 semantic/physical implementation spans broad
 Lifecycle and Machine targets and cannot be linked into the native driver or
@@ -294,10 +297,11 @@ pre/post-drop identity races, waitable-leader/descendant/reuse races and
 TERM/KILL/reap ordering. ii-b5b-iii owns source/package mutations and native
 Debug/Release final-Mach-O positive/negative controls.
 
-Each sub-checkpoint uses structural -> focused -> affected -> one clean staged
-serial -> applicable artifact gate -> independent review. ii-b5a/b5b-i-a/i-b/i-c/b5b-ii
-have no final-Mach-O claim; ii-b5b-iii owns the complete driver/App artifact
-gate. None runs
+Each sub-checkpoint uses structural -> focused -> affected -> one staged serial
+attempt -> exact failure closure when needed -> applicable artifact gate ->
+independent review. A non-green serial remains non-green and is never rewritten
+as clean by exact-case reruns. ii-b5a/b5b-i-a/i-b/i-c/b5b-ii have no final-
+Mach-O claim; ii-b5b-iii owns the complete driver/App artifact gate. None runs
 the real installed App/helper, real XPC, install, sudo/root external execution,
 model/auth/network or authoritative full verifier.
 
@@ -322,7 +326,7 @@ b5a0/b5a/i-a and all remaining b5 substeps are non-admitting prerequisites. ADR
 The strict remaining order is:
 
 ```text
-ii-b5b-i-b1 -> ii-b5b-i-b2a -> ii-b5b-i-b2b -> ii-b5b-i-b3
+ii-b5b-i-b2a -> ii-b5b-i-b2b -> ii-b5b-i-b3
 -> ii-b5b-i-c
 -> ii-b5b-ii -> ii-b5b-iii
 -> ii-c0 -> ii-c -> L3c3d -> L3c4

@@ -1,7 +1,7 @@
 # Phase D Task 39B2c-L3c3c-ii-b5b-i Exact-Path Preflight
 
-> Status: ii-b5b-i-a complete/non-admitting; fresh cost/authority audit split
-> i-b into i-b1/i-b2a/i-b2b/i-b3 before coding; i-b1 current
+> Status: ii-b5b-i-a and i-b1 complete/non-admitting; fresh cost/authority
+> audit split i-b into i-b1/i-b2a/i-b2b/i-b3 before coding; i-b2a current
 >
 > Date: 2026-08-21
 >
@@ -241,21 +241,26 @@ minting and single-owner migration. Existing Lifecycle physical tests are moved
 or retargeted, not duplicated.
 
 Each implementation checkpoint follows structural -> focused -> affected -> one
-clean staged-only serial -> applicable artifact gate -> independent review. No
+staged-only serial attempt -> exact failure closure when needed -> applicable
+artifact gate -> independent review. A non-green serial remains non-green and
+is not upgraded by exact-case reruns. No
 b5b-i subcheckpoint runs the installed App/helper, real XPC, install, root
 external execution, model/auth/network or `scripts/verify --full`.
 
 ## 7. Non-Admission and Remaining Order
 
-This preflight is documentation-only. i-a consumed its single clean staged
-serial and is complete; i-b1/i-b2a/i-b2b/i-b3/i-c remain
-non-admitting prerequisites. ADR 0018 remains Proposed, Task 39 remains
-incomplete and production Deep Dive remains `.implementationUnavailable`.
+This preflight is documentation-only. i-a and i-b1 are complete; i-b1's only
+staged serial was non-green and was not rerun, with its exact failures closed as
+recorded in the
+[semantic-target review](phase-d-task-39b2c-l3c3c-ii-b5b-i-b1-review.md).
+i-b2a/i-b2b/i-b3/i-c remain non-admitting prerequisites. ADR 0018 remains
+Proposed, Task 39 remains incomplete and production Deep Dive remains
+`.implementationUnavailable`.
 
 The strict remaining order is:
 
 ```text
-ii-b5b-i-b1 -> ii-b5b-i-b2a -> ii-b5b-i-b2b -> ii-b5b-i-b3
+ii-b5b-i-b2a -> ii-b5b-i-b2b -> ii-b5b-i-b3
 -> ii-b5b-i-c
 -> ii-b5b-ii -> ii-b5b-iii -> ii-c0 -> ii-c -> L3c3d -> L3c4
 ```

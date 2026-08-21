@@ -75,10 +75,10 @@
 > semantic/live integration, iii-b-ii executable physical-adapter closure and
 > ii-b3a fixed handoff adapter and ii-b3b start-to-retire seam are complete and
 > non-admitting; iii-b/ii-b2b/ii-b3 are closed; ii-b3c and ii-b4 are
-> complete/non-admitting; ii-b5a0, ii-b5a and ii-b5b-i-a are also complete/
-> non-admitting. Fresh cost/authority audit split i-b into i-b1 semantic target,
-> i-b2a artifact/static readers, i-b2b process/service + narrow C identity and
-> i-b3 observer composition; i-b1 is current.
+> complete/non-admitting; ii-b5a0, ii-b5a, ii-b5b-i-a and i-b1 semantic target
+> are also complete/non-admitting. The remaining cost/authority split is i-b2a
+> artifact/static readers, i-b2b process/service + narrow C identity and i-b3
+> observer composition; i-b2a is current.
 > Evidence:
 > [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
 > [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md) and
@@ -1104,9 +1104,9 @@ The remaining L3 work is split before driver coding:
    and the nested exact-wire split is frozen; ii-b0a/ii-b0b/ii-b0c, ii-b1,
    the ii-b2 ASID prerequisite, ii-b2a, ii-b2b-i, ii-b2b-ii, iii-a, iii-b-i and
    iii-b-ii, ii-b3a, ii-b3b, ii-b3c and ii-b4 are complete; ii-b5 is split
-   into b5a0/b5a/b5b-i/b5b-ii/b5b-iii; b5a0, b5a and b5b-i-a are complete/
-   non-admitting. The b5b-i exact-path preflight split i-b again into i-b1/i-b2a/
-   i-b2b/i-b3; i-b1 is current, while i-c retains the DriverSupport join and
+   into b5a0/b5a/b5b-i/b5b-ii/b5b-iii; b5a0, b5a, b5b-i-a and i-b1 are
+   complete/non-admitting. The b5b-i exact-path preflight leaves i-b2a/i-b2b/
+   i-b3; i-b2a is current, while i-c retains the DriverSupport join and
    legacy-owner closure.
    See the
    [study](../../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md)
@@ -1159,9 +1159,10 @@ The remaining L3 work is split before driver coding:
    The b5 split, claim-abort completion and typed composer completion evidence
    are in the
    [ii-b5 preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b5-split-preflight.md),
-   [ii-b5a0 review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5a0-review.md)
+   [ii-b5a0 review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5a0-review.md),
    [ii-b5a review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5a-review.md)
-   and [ii-b5b-i-a review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-a-review.md).
+   and [ii-b5b-i-a review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-a-review.md)
+   and [ii-b5b-i-b1 review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b1-review.md).
    The projection/observer/legacy-owner split is frozen in the
    [ii-b5b-i exact-path preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-exact-path-preflight.md).
    ii-a implements only authority-closed self-observation/runtime primitives.
@@ -1208,8 +1209,8 @@ i-b2b-0b/i-b2b-1 were superseded before execution. The ii-b split is frozen and
 ii-b0a/ii-b0b/ii-b0c/ii-b1, the ii-b2 ASID prerequisite, ii-b2a, ii-b2b-i and
 ii-b2b-ii, ii-b2b-iii-a, iii-b-i, iii-b-ii, ii-b3a and ii-b3b are complete;
 ii-b3c concrete leaf/native entry, ii-b4 fixed helper-claim client, ii-b5a0 and
-ii-b5a and ii-b5b-i-a are complete and non-admitting; i-b is split into i-b1/
-i-b2a/i-b2b/i-b3 and i-b1 is current.
+ii-b5a, ii-b5b-i-a and i-b1 are complete and non-admitting; i-b2a is current,
+followed by i-b2b/i-b3.
 ADR 0018
 remains Proposed until ii-c succeeds. L3c1 used focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean

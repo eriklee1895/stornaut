@@ -274,10 +274,14 @@
 > serial 精确关闭；ii-b3c 已完成并通过 1,257-test/60-suite serial 与 grouped
 > post-fix review；ii-b4 已完成并保持 non-admitting；ii-b5 已拆为
 > b5a0/b5a/b5b-i/b5b-ii/b5b-iii；b5a0/b5a 已完成并保持 non-admitting，
-> b5b-i-a projection/dual-clock contract 已完成并保持 non-admitting；i-b 的
-> fresh cost/authority audit 又拆为 i-b1 semantic target、i-b2a artifact/static、
-> i-b2b process/service + narrow C identity 与 i-b3 observer composition，i-b1
-> 是当前 frontier；i-c 仍独占 DriverSupport join/legacy-owner closure。之后按序
+> b5b-i-a projection/dual-clock contract 与 i-b1 authority-closed semantic
+> target 已完成并保持 non-admitting；i-b1 的 6-path/979-line scope、8 focused、
+> 26 affected、contract/structural/Mach-O gates 与 final review 已收口。唯一
+> 1,311-test/64-suite serial 记录 4 issues、未绿色且未重跑；同 validation tree
+> 的 3 个 exact cases 通过，consumer-count 静态 case 由 final tree 唯一一行
+> `6 → 7` 修复并精确通过。i-b 的余下顺序是 i-b2a artifact/static、i-b2b
+> process/service + narrow C identity 与 i-b3 observer composition，i-b2a 是当前
+> frontier；i-c 仍独占 DriverSupport join/legacy-owner closure。之后按序
 > 为 b5b-ii fixed Darwin runtime、b5b-iii
 > production/artifact composition、ii-c0 fresh privilege-launcher preflight，
 > 再到 ii-c 唯一 no-model
@@ -626,8 +630,8 @@ ii-b0a/ii-b0b/ii-b0c/ii-b1 与 ii-b2 ASID prerequisite 已完成，
 ii-b2a、ii-b2b-i 与 ii-b2b-ii legacy-client quarantine / Machine production
 block、iii-a、iii-b-i 与 iii-b-ii 均已完成；ii-b3 已拆为 b3a/b3b/b3c，
 ii-b3a/ii-b3b/ii-b3c/ii-b4/ii-b5a0/ii-b5a complete/non-admitting，
-ii-b5 split；b5b-i-a complete/non-admitting，i-b split into i-b1/i-b2a/i-b2b/
-i-b3，i-b1 current，i-c retains DriverSupport join/legacy closure，
+ii-b5 split；b5b-i-a/i-b1 complete/non-admitting，i-b2a current，随后
+i-b2b/i-b3；i-c retains DriverSupport join/legacy closure，
 ii-b 已拆为 ii-b0a/ii-b0b/ii-b0c 与
 ii-b1–ii-b5，并在 ii-c 前插入 ii-c0。
 ADR 0018 仍 Proposed，L3c4 独占 final admission 与剩余 full。
@@ -677,8 +681,11 @@ no-unresolved-P0–P2 review。ii-b5a typed composer completion 见
 no-unresolved-P0–P2 review。ii-b5b-i-a completion 见
 [projection review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-a-review.md)：
 5-path/1,086-line implementation、1,302-test/63-suite clean staged-only serial 与
-final no-unresolved-P0–P2 review。ii-b4/ii-b5a0/ii-b5a/i-a complete/
-non-admitting；i-b split into i-b1/i-b2a/i-b2b/i-b3，i-b1 current。
+final no-unresolved-P0–P2 review。i-b1 completion 见
+[semantic-target review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b1-review.md)：
+6-path/979-line implementation、honest non-green 1,311-test/64-suite serial、
+exact-case closure 与 final no-unresolved-P0–P2 review。ii-b4/ii-b5a0/ii-b5a/
+i-a/i-b1 complete/non-admitting；i-b2a current。
 生产 Deep Dive 继续 unavailable，直到 Task 44 final admission。
 
 跨 Epic 的阶段依赖、no-go 分支和交付顺序由 [Delivery Roadmap](../plans/roadmap.md) 管理；新 active plan 不得另起一套宏观路线。
@@ -836,8 +843,8 @@ ii-b3b start-to-retire-only Lifecycle seam 与 ii-b3c concrete leaf/native
 entry 已完成；ii-b4 fixed helper-claim client 也已完成并保持
 non-admitting；ii-b5 已拆为 b5a0 claim-abort、b5a typed composer、b5b-i
 L2/projection、b5b-ii Darwin runtime 与 b5b-iii production/artifact；b5a0/
-b5a 与 b5b-i-a 已完成并保持 non-admitting；b5b-i-b 已拆为 i-b1/i-b2a/
-i-b2b/i-b3，i-b1 是当前 frontier；i-c 仍独占 DriverSupport join/legacy closure。
+b5a、b5b-i-a 与 i-b1 已完成并保持 non-admitting；b5b-i-b 余下 i-b2a/
+i-b2b/i-b3，i-b2a 是当前 frontier；i-c 仍独占 DriverSupport join/legacy closure。
 已完成部分均为
 non-admitting prerequisite，
 L3c4 才是 machine admission。该最终 gate
