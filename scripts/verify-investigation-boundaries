@@ -67,6 +67,14 @@ iib5bib2a_artifact_source=
 iib5bib2a_focused_test_source=
 iib5bib2a_staged_scope_contract_only=false
 iib5bib2a_staged_scope_baseline=HEAD
+iib5bib2ba_process_contract_only=false
+iib5bib2ba_package_source=
+iib5bib2ba_c_source=
+iib5bib2ba_header_source=
+iib5bib2ba_process_source=
+iib5bib2ba_focused_test_source=
+iib5bib2ba_staged_scope_contract_only=false
+iib5bib2ba_staged_scope_baseline=HEAD
 iib3a_staged_scope_contract_only=false
 iib3a_staged_scope_baseline=HEAD
 iib3b_start_retire_contract_only=false
@@ -179,6 +187,18 @@ if (( $# > 0 )); then
         && [[ $1 == --iib5bib2a-staged-scope-contract-only ]]; then
         iib5bib2a_staged_scope_contract_only=true
         iib5bib2a_staged_scope_baseline=${2:-HEAD}
+    elif (( $# == 6 )) \
+        && [[ $1 == --iib5bib2ba-process-contract-only ]]; then
+        iib5bib2ba_process_contract_only=true
+        iib5bib2ba_package_source=$2
+        iib5bib2ba_c_source=$3
+        iib5bib2ba_header_source=$4
+        iib5bib2ba_process_source=$5
+        iib5bib2ba_focused_test_source=$6
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iib5bib2ba-staged-scope-contract-only ]]; then
+        iib5bib2ba_staged_scope_contract_only=true
+        iib5bib2ba_staged_scope_baseline=${2:-HEAD}
     elif (( $# == 1 || $# == 2 )) \
         && [[ $1 == --iib3a-staged-scope-contract-only ]]; then
         iib3a_staged_scope_contract_only=true
@@ -767,6 +787,7 @@ for path, expected_sha in expected.items():
             b'        .target(\n'
             b'            name: "StornautInvestigationInstalledL2",\n'
             b'            dependencies: [\n'
+            b'                "CInvestigationIdentitySupport",\n'
             b'                "StornautInvestigationHandoffContract",\n'
             b'            ],\n'
             b'            linkerSettings: [\n'
@@ -787,6 +808,21 @@ for path, expected_sha in expected.items():
                 "ii-b5b-i-b1 historical Package normalization drifted"
             )
         data = data.replace(current, historical, 1)
+        later_c_target = (
+            b'        .target(\n'
+            b'            name: "CInvestigationIdentitySupport",\n'
+            b'            path: "Sources/CInvestigationIdentitySupport",\n'
+            b'            publicHeadersPath: "include",\n'
+            b'            linkerSettings: [\n'
+            b'                .linkedLibrary("bsm"),\n'
+            b'            ]\n'
+            b'        ),\n'
+        )
+        if data.count(later_c_target) != 1:
+            raise SystemExit(
+                "ii-b5b-i-b1 historical C target normalization drifted"
+            )
+        data = data.replace(later_c_target, b'', 1)
     if hashlib.sha256(data).hexdigest() != expected_sha:
         label = "package" if path == package_path else (
             "semantic" if path == semantic_path else "focused test"
@@ -845,9 +881,9 @@ target = re.search(
 if target is None:
     raise SystemExit("ii-b5b-i-b2a package target missing")
 body = target.group(1)
-dependencies = set(re.findall(r'"(Stornaut[A-Za-z0-9]+)"', body))
+dependencies = set(re.findall(r'"(CInvestigationIdentitySupport|Stornaut[A-Za-z0-9]+)"', body))
 frameworks = re.findall(r'\.linkedFramework\("([^"]+)"\)', body)
-if dependencies != {"StornautInvestigationHandoffContract"} or frameworks != ["Security"]:
+if dependencies != {"CInvestigationIdentitySupport", "StornautInvestigationHandoffContract"} or frameworks != ["Security"]:
     raise SystemExit("ii-b5b-i-b2a dependency or framework surface drifted")
 if set(re.findall(r'(?m)^import\s+([A-Za-z0-9_]+)\s*$', source)) != {
     "Darwin", "Foundation", "Security", "StornautInvestigationHandoffContract",
@@ -936,6 +972,58 @@ function verify_iib5bib2a_staged_scope() {
     fi
     local changed=$(git diff --cached --numstat "$baseline" | awk 'index($3, "docs/") != 1 {n += $1 + $2} END {print n + 0}')
     (( changed <= 2200 )) || { print -u2 "ii-b5b-i-b2a checkpoint budget drifted"; return 1; }
+}
+
+function verify_iib5bib2ba_process_contract() {
+    local package_source=$1 c_source=$2 header_source=$3 process_source=$4 focused_test=$5
+    xcrun swiftc -frontend -parse "$process_source"
+    xcrun swiftc -frontend -parse "$focused_test"
+    python3 - "$package_source" "$c_source" "$header_source" "$process_source" "$focused_test" <<'PY'
+from pathlib import Path
+import re, sys
+package_path, c_path, header_path, swift_path, test_path = map(Path, sys.argv[1:])
+package, c, header, swift, test = [p.read_text(encoding="utf-8") for p in (package_path,c_path,header_path,swift_path,test_path)]
+target = re.search(r'\.target\(\s*name: "StornautInvestigationInstalledL2",(.*?)\n\s*\),', package, re.DOTALL)
+if target is None: raise SystemExit("ii-b5b-i-b2b-a package target missing")
+deps=set(re.findall(r'"(CInvestigationIdentitySupport|Stornaut[A-Za-z0-9]+)"',target.group(1)))
+if deps != {"CInvestigationIdentitySupport","StornautInvestigationHandoffContract"}: raise SystemExit("ii-b5b-i-b2b-a dependency surface drifted")
+if package.count('name: "CInvestigationIdentitySupport"') != 1 or '.linkedLibrary("bsm")' not in package: raise SystemExit("ii-b5b-i-b2b-a C target drifted")
+if re.search(r'(?m)^\s*(?:public|open|package)\s+', swift): raise SystemExit("ii-b5b-i-b2b-a Swift surface widened")
+if set(re.findall(r'(?m)^import\s+([A-Za-z0-9_]+)\s*$',swift)) != {"CInvestigationIdentitySupport","Darwin","Foundation","Security","StornautInvestigationHandoffContract"}: raise SystemExit("ii-b5b-i-b2b-a Swift imports drifted")
+for forbidden in ("CLifecycleSupport","StornautLifecycle","ServiceManagement","FileManager","FileHandle","Process(","NSXPC","URLSession","posix_spawn","kill(","write(","socket("):
+    if forbidden in swift: raise SystemExit("ii-b5b-i-b2b-a Swift authority drifted")
+for forbidden in ("proc_signal_with_audittoken","kill(","killpg(","signal(","waitpid(","posix_spawn","fork(","exec","write(","socket(","connect("):
+    if forbidden in c or forbidden in header: raise SystemExit("ii-b5b-i-b2b-a C authority drifted")
+if c.count("stornaut_investigation_identity_for_pid") != 1 or header.count("stornaut_investigation_identity_for_pid") != 1: raise SystemExit("ii-b5b-i-b2b-a C export drifted")
+for required in ("task_name_for_pid(","TASK_AUDIT_TOKEN","mach_port_deallocate(","PROC_PIDT_SHORTBSDINFO","audit_token_words[8]"):
+    if required not in c+header: raise SystemExit("ii-b5b-i-b2b-a identity extraction drifted")
+for required in ("SecCodeCopyGuestWithAttributes(","kSecGuestAttributeAudit: tokenData as CFData","SecCodeCheckValidity(","SecStaticCodeCheckValidity(","kSecCodeInfoFlags","finalKernel == initialKernel","finalPath == initialPath"):
+    if required not in swift: raise SystemExit("ii-b5b-i-b2b-a process contract drifted")
+if swift.count("identityReader.read(processID: expected.processID)") != 2: raise SystemExit("ii-b5b-i-b2b-a identity reread drifted")
+if swift.count("pathReader.read(processID: expected.processID)") != 2: raise SystemExit("ii-b5b-i-b2b-a path reread drifted")
+for required in ("exactTypedProcessUsesTwoIdentityAndPathSamples","onlyInitialESRCHCanBecomeAbsent","currentMachineDriverSigningIsRootOnlyAndCallerCannotChoosePID","concreteReadersObserveTheCurrentSignedTestProcess"):
+    if required not in test: raise SystemExit("ii-b5b-i-b2b-a focused coverage drifted")
+if __import__("hashlib").sha256(test_path.read_bytes()).hexdigest() != "fb3e89367fe028881d2dbf9891685cc3f7b52a0f5137ffb3c887a56c894332cd":
+    raise SystemExit("ii-b5b-i-b2b-a focused coverage drifted")
+PY
+    local object_dir=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-iib5bib2ba-object.XXXXXX")
+    xcrun clang -std=c11 -I "${header_source:h}" -c "$c_source" -o "$object_dir/identity.o"
+    local exports=$(xcrun nm -g -j "$object_dir/identity.o" | grep '^_stornaut' || true)
+    [[ "$exports" == _stornaut_investigation_identity_for_pid ]] || { rm -rf "$object_dir"; print -u2 "ii-b5b-i-b2b-a object export drifted"; return 1; }
+    local undefined=$(xcrun nm -u -j "$object_dir/identity.o")
+    if print -r -- "$undefined" | grep -Eq '^_(proc_signal_with_audittoken|kill|killpg|raise|posix_spawn|fork|exec|waitpid|write|socket|connect)$'; then rm -rf "$object_dir"; print -u2 "ii-b5b-i-b2b-a object authority drifted"; return 1; fi
+    for required in _task_name_for_pid _task_info _mach_port_deallocate; do print -r -- "$undefined" | grep -Fxq "$required" || { rm -rf "$object_dir"; print -u2 "ii-b5b-i-b2b-a object identity import missing"; return 1; }; done
+    rm -rf "$object_dir"
+}
+
+function verify_iib5bib2ba_staged_scope() {
+    local baseline=${1:-HEAD}
+    local expected=(Package.swift Sources/CInvestigationIdentitySupport/CInvestigationIdentitySupport.c Sources/CInvestigationIdentitySupport/include/CInvestigationIdentitySupport.h Sources/StornautInvestigationInstalledL2/InstalledL2ProcessReader.swift Tests/StornautInvestigationTests/InstalledL2ProcessReaderTests.swift Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift scripts/verify-contract scripts/verify-investigation-boundaries)
+    if git diff --cached --name-only --diff-filter=D "$baseline" | grep -q .; then print -u2 "ii-b5b-i-b2b-a checkpoint deleted an existing path"; return 1; fi
+    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" | awk 'index($0,"docs/")!=1')"})
+    [[ "${(j:\n:)${(on)observed}}" == "${(j:\n:)${(on)expected}}" ]] || { print -u2 "ii-b5b-i-b2b-a checkpoint paths drifted"; return 1; }
+    local changed=$(git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1 {n+=$1+$2} END {print n+0}')
+    (( changed <= 1900 )) || { print -u2 "ii-b5b-i-b2b-a checkpoint budget drifted"; return 1; }
 }
 
 function verify_iib4_staged_scope() {
@@ -3186,6 +3274,7 @@ package = read(package_path)
 later_installed_l2_target = '''        .target(
             name: "StornautInvestigationInstalledL2",
             dependencies: [
+                "CInvestigationIdentitySupport",
                 "StornautInvestigationHandoffContract",
             ],
             linkerSettings: [
@@ -3196,6 +3285,18 @@ later_installed_l2_target = '''        .target(
 if package.count(later_installed_l2_target) != 1:
     raise SystemExit("live claim server later InstalledL2 target drifted")
 historical_package = package.replace(later_installed_l2_target, "", 1)
+later_c_target = '''        .target(
+            name: "CInvestigationIdentitySupport",
+            path: "Sources/CInvestigationIdentitySupport",
+            publicHeadersPath: "include",
+            linkerSettings: [
+                .linkedLibrary("bsm"),
+            ]
+        ),
+'''
+if historical_package.count(later_c_target) != 1:
+    raise SystemExit("live claim server later C identity target drifted")
+historical_package = historical_package.replace(later_c_target, "", 1)
 later_test_dependency = '                "StornautInvestigationInstalledL2",\n'
 if historical_package.count(later_test_dependency) != 1:
     raise SystemExit("live claim server later InstalledL2 test dependency drifted")
@@ -3993,6 +4094,19 @@ fi
 if $iib5bib2a_staged_scope_contract_only; then
     verify_iib5bib2a_staged_scope "$iib5bib2a_staged_scope_baseline"
     print "ii-b5b-i-b2a staged scope verification passed."
+    exit 0
+fi
+if $iib5bib2ba_process_contract_only; then
+    verify_iib5bib2ba_process_contract \
+        "$iib5bib2ba_package_source" "$iib5bib2ba_c_source" \
+        "$iib5bib2ba_header_source" "$iib5bib2ba_process_source" \
+        "$iib5bib2ba_focused_test_source"
+    print "ii-b5b-i-b2b-a process reader contract verification passed."
+    exit 0
+fi
+if $iib5bib2ba_staged_scope_contract_only; then
+    verify_iib5bib2ba_staged_scope "$iib5bib2ba_staged_scope_baseline"
+    print "ii-b5b-i-b2b-a staged scope verification passed."
     exit 0
 fi
 if $iib3a_staged_scope_contract_only; then

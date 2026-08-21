@@ -150,6 +150,7 @@ let package = Package(
         .target(
             name: "StornautInvestigationInstalledL2",
             dependencies: [
+                "CInvestigationIdentitySupport",
                 "StornautInvestigationHandoffContract",
             ],
             linkerSettings: [
@@ -186,6 +187,14 @@ let package = Package(
         .target(
             name: "CLifecycleSupport",
             path: "Sources/CLifecycleSupport",
+            publicHeadersPath: "include",
+            linkerSettings: [
+                .linkedLibrary("bsm"),
+            ]
+        ),
+        .target(
+            name: "CInvestigationIdentitySupport",
+            path: "Sources/CInvestigationIdentitySupport",
             publicHeadersPath: "include",
             linkerSettings: [
                 .linkedLibrary("bsm"),

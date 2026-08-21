@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=fc4dbf452a5aeb3d8c1b51eb22d644de2b6c0be057b74c92c70c73782aad5feb
+ib2_self_sha=8877a3c55055210c4834fec5723b7692ad5c2db0f6a800430a582c05c45f3b71
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -864,7 +864,7 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "8b6364bbdca052736a89d2070cf399b276c7b1b43d31dd619096431976408d81",
+        "b8ab0a23401a5fab37d5612ffa358c45043244e04c545d5d084bfcd3e2d96a35",
     Path("scripts/verify-app-release-boundaries"):
         "42ee86284c289efce8025ae366336046a47d689838c93ac577b0bfc1ed68f92c",
 }
@@ -3998,8 +3998,8 @@ def mutation(name, old, new, text=source, suffix="swift"):
     )
 
 mutation("dependency",
-    'name: "StornautInvestigationInstalledL2",\n            dependencies: [\n                "StornautInvestigationHandoffContract",\n            ]',
-    'name: "StornautInvestigationInstalledL2",\n            dependencies: [\n                "StornautInvestigationHandoffContract",\n                "StornautLifecycle",\n            ]',
+    'name: "StornautInvestigationInstalledL2",\n            dependencies: [\n                "CInvestigationIdentitySupport",\n                "StornautInvestigationHandoffContract",\n            ]',
+    'name: "StornautInvestigationInstalledL2",\n            dependencies: [\n                "CInvestigationIdentitySupport",\n                "StornautInvestigationHandoffContract",\n                "StornautLifecycle",\n            ]',
     text=package)
 mutation("public-observation",
     "package struct InvestigationInstalledL2SemanticObservation:",
@@ -4110,8 +4110,8 @@ def emit(name, old, new, text=source):
         text.replace(old, new, 1), encoding="utf-8"
     )
 emit("dependency",
-    'name: "StornautInvestigationInstalledL2",\n            dependencies: [\n                "StornautInvestigationHandoffContract",\n            ],\n            linkerSettings:',
-    'name: "StornautInvestigationInstalledL2",\n            dependencies: [\n                "StornautInvestigationHandoffContract",\n                "StornautLifecycle",\n            ],\n            linkerSettings:', package)
+    'name: "StornautInvestigationInstalledL2",\n            dependencies: [\n                "CInvestigationIdentitySupport",\n                "StornautInvestigationHandoffContract",\n            ],\n            linkerSettings:',
+    'name: "StornautInvestigationInstalledL2",\n            dependencies: [\n                "CInvestigationIdentitySupport",\n                "StornautInvestigationHandoffContract",\n                "StornautLifecycle",\n            ],\n            linkerSettings:', package)
 emit("blocking-read", "import Foundation\n",
     "import Foundation\nprivate let forbidden: FileHandle? = nil\n")
 emit("manifest-type", "CFBooleanGetTypeID()", "CFNumberGetTypeID()")
@@ -4154,13 +4154,12 @@ for fixture in \
 done
 
 iib5bib2a_baseline=a0ede63d9c25341147efa174e1097b8a23604440
+iib5bib2a_commit=e85b402a170c56df285d58facf630be383cca611
+iib5bib2a_tree=0532f1f53bb4b7f55cd1363b75adc2ae61904167
+[[ "$(git show -s --format=%P "$iib5bib2a_commit")" == "$iib5bib2a_baseline" ]]
+[[ "$(git show -s --format=%T "$iib5bib2a_commit")" == "$iib5bib2a_tree" ]]
 iib5bib2a_index="$contract_root/iib5bib2a.index"
-GIT_INDEX_FILE="$iib5bib2a_index" git read-tree "$iib5bib2a_baseline^{tree}"
-for checkpoint_path in "$iib5bib2a_package" "$iib5bib2a_source" "$iib5bib2a_test" \
-    Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift \
-    scripts/verify-contract scripts/verify-investigation-boundaries; do
-    GIT_INDEX_FILE="$iib5bib2a_index" git add -f "$checkpoint_path"
-done
+GIT_INDEX_FILE="$iib5bib2a_index" git read-tree "$iib5bib2a_commit^{tree}"
 GIT_INDEX_FILE="$iib5bib2a_index" "$iib5bib2a_gate" \
     --iib5bib2a-staged-scope-contract-only "$iib5bib2a_baseline"
 for fixture in extra-path over-budget existing-deleted-path; do
@@ -4186,6 +4185,61 @@ for fixture in extra-path over-budget existing-deleted-path; do
         >"$output" 2>&1; then
         fail_contract "ii-b5b-i-b2a scope mutation accepted: $fixture"
     fi
+    require_fixed_text "$output" "$expected"
+done
+
+iib5bib2ba_gate=scripts/verify-investigation-boundaries
+iib5bib2ba_package=Package.swift
+iib5bib2ba_c=Sources/CInvestigationIdentitySupport/CInvestigationIdentitySupport.c
+iib5bib2ba_header=Sources/CInvestigationIdentitySupport/include/CInvestigationIdentitySupport.h
+iib5bib2ba_source=Sources/StornautInvestigationInstalledL2/InstalledL2ProcessReader.swift
+iib5bib2ba_test=Tests/StornautInvestigationTests/InstalledL2ProcessReaderTests.swift
+"$iib5bib2ba_gate" --iib5bib2ba-process-contract-only "$iib5bib2ba_package" "$iib5bib2ba_c" "$iib5bib2ba_header" "$iib5bib2ba_source" "$iib5bib2ba_test"
+python3 - "$iib5bib2ba_c" "$iib5bib2ba_source" "$iib5bib2ba_test" "$contract_root" <<'PY'
+from pathlib import Path
+import sys
+c_path, source_path, test_path, root = map(Path, sys.argv[1:])
+c, source, test = [p.read_text(encoding="utf-8") for p in (c_path,source_path,test_path)]
+def emit(name, old, new, text=source, suffix="swift"):
+    if text.count(old) != 1: raise SystemExit(f"cannot construct ii-b5b-i-b2b-a mutation: {name}")
+    (root/f"iib5bib2ba-{name}.{suffix}").write_text(text.replace(old,new,1),encoding="utf-8")
+emit("c-signal", "#include <sys/proc.h>\n", "#include <sys/proc.h>\nextern int proc_signal_with_audittoken(void *, int);\nstatic void forbidden(void) { (void)proc_signal_with_audittoken(0, 9); }\n", c, "c")
+emit("identity-reread", "let finalKernel: InvestigationInstalledL2KernelIdentity\n        switch identityReader.read(processID: expected.processID) {\n        case .success(let identity): finalKernel = identity\n        case .failure: return .unavailable\n        }", "let finalKernel = initialKernel")
+emit("path-reread", "let finalPath: URL\n        switch pathReader.read(processID: expected.processID) {\n        case .success(let value): finalPath = value.standardizedFileURL\n        case .failure: return .unavailable\n        }", "let finalPath = initialPath")
+emit("audit-token", "kSecGuestAttributeAudit: tokenData as CFData", "kSecGuestAttributeAudit: Data() as CFData")
+emit("flags", "let signatureFlags = dictionary[kSecCodeInfoFlags] as? NSNumber", "let signatureFlags = NSNumber(value: 0)")
+emit("vacuous-test", "#expect(signing.auditTokens == [expected.auditTokenWords])", "#expect(true)", test)
+PY
+for fixture in \
+    c-signal:'ii-b5b-i-b2b-a C authority drifted' \
+    identity-reread:'ii-b5b-i-b2b-a identity reread drifted' \
+    path-reread:'ii-b5b-i-b2b-a path reread drifted' \
+    audit-token:'ii-b5b-i-b2b-a process contract drifted' \
+    flags:'ii-b5b-i-b2b-a process contract drifted' \
+    vacuous-test:'ii-b5b-i-b2b-a focused coverage drifted'; do
+    name=${fixture%%:*}; expected=${fixture#*:}
+    c="$iib5bib2ba_c"; source="$iib5bib2ba_source"; test="$iib5bib2ba_test"
+    [[ $name == c-signal ]] && c="$contract_root/iib5bib2ba-$name.c"
+    gate="$iib5bib2ba_gate"
+    [[ $name == identity-reread || $name == path-reread || $name == audit-token || $name == flags ]] && source="$contract_root/iib5bib2ba-$name.swift"
+    [[ $name == vacuous-test ]] && test="$contract_root/iib5bib2ba-$name.swift"
+    output="$contract_root/iib5bib2ba-$name.log"
+    if zsh "$gate" --iib5bib2ba-process-contract-only "$iib5bib2ba_package" "$c" "$iib5bib2ba_header" "$source" "$test" >"$output" 2>&1; then fail_contract "ii-b5b-i-b2b-a mutation accepted: $name"; fi
+    require_fixed_text "$output" "$expected"
+done
+
+iib5bib2ba_baseline=fbda613
+iib5bib2ba_index="$contract_root/iib5bib2ba.index"
+GIT_INDEX_FILE="$iib5bib2ba_index" git read-tree "$iib5bib2ba_baseline^{tree}"
+for checkpoint_path in "$iib5bib2ba_package" "$iib5bib2ba_c" "$iib5bib2ba_header" "$iib5bib2ba_source" "$iib5bib2ba_test" Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift scripts/verify-contract scripts/verify-investigation-boundaries; do GIT_INDEX_FILE="$iib5bib2ba_index" git add -f "$checkpoint_path"; done
+GIT_INDEX_FILE="$iib5bib2ba_index" "$iib5bib2ba_gate" --iib5bib2ba-staged-scope-contract-only "$iib5bib2ba_baseline"
+for fixture in extra-path over-budget existing-deleted-path; do
+    index="$contract_root/iib5bib2ba-$fixture.index"; cp "$iib5bib2ba_index" "$index"
+    if [[ $fixture == extra-path ]]; then blob=$(git rev-parse "${iib5bib2ba_baseline}:AGENTS.md"); GIT_INDEX_FILE="$index" git update-index --add --cacheinfo "100644,$blob,iib5bib2ba-extra.swift"; expected='ii-b5b-i-b2b-a checkpoint paths drifted'
+    elif [[ $fixture == over-budget ]]; then blob=$(git hash-object -w Sources/StornautCore/Evidence/EvidenceStore.swift); GIT_INDEX_FILE="$index" git update-index --cacheinfo "100644,$blob,$iib5bib2ba_source"; expected='ii-b5b-i-b2b-a checkpoint budget drifted'
+    else GIT_INDEX_FILE="$index" git rm --cached -q -f Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift; expected='ii-b5b-i-b2b-a checkpoint deleted an existing path'; fi
+    output="$contract_root/iib5bib2ba-scope-$fixture.log"
+    if GIT_INDEX_FILE="$index" "$iib5bib2ba_gate" --iib5bib2ba-staged-scope-contract-only "$iib5bib2ba_baseline" >"$output" 2>&1; then fail_contract "ii-b5b-i-b2b-a scope mutation accepted: $fixture"; fi
     require_fixed_text "$output" "$expected"
 done
 
