@@ -2,7 +2,7 @@
 
 > Status: ii-b5b-i-a, i-b1 and i-b2a complete/non-admitting; fresh
 > cost/authority audit split i-b into i-b1/i-b2a/i-b2b/i-b3 before coding;
-> i-b2b current
+> i-b2b split by fresh preflight; i-b2b-a current
 >
 > Date: 2026-08-21
 >
@@ -180,11 +180,14 @@ and tests in one diff would exceed 4,000 changed lines, while the existing
    reader and focused tests plus TargetBoundary/two verifiers. It owns fixed
    role mapping, descriptor/node/hash/plist and static signing checks. See the
    [completion review](phase-d-task-39b2c-l3c3c-ii-b5b-i-b2a-review.md).
-3. **i-b2b process/service readers** — 10 paths / at most 2,600 changed lines:
+3. **i-b2b process/service readers** — historical parent scope: 10 paths / at
+   most 2,600 changed lines, superseded before coding by the
+   [i-b2b split preflight](phase-d-task-39b2c-l3c3c-ii-b5b-i-b2b-split-preflight.md):
    `Package.swift`, new narrow `CInvestigationIdentitySupport` header/source,
    new process and fixed-service readers, two focused tests, TargetBoundary and
    two verifiers. The C object exports only fixed identity extraction and must
-   contain no signal/process-control surface.
+   contain no signal/process-control surface. Execution is now i-b2b-a
+   identity/process followed by i-b2b-b fixed service.
 4. **i-b3 observer composition** — 5 paths / at most 1,600 changed lines:
    new installed observer and focused tests plus TargetBoundary/two verifiers.
    It composes exact artifacts/processes/service and paired clock samples but

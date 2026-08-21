@@ -78,7 +78,8 @@
 > complete/non-admitting; ii-b5a0, ii-b5a, ii-b5b-i-a, i-b1 semantic target and
 > i-b2a artifact/static readers are also complete/non-admitting. The remaining
 > cost/authority split is i-b2b process/service + narrow C identity and i-b3
-> observer composition; i-b2b is current.
+> observer composition. i-b2b is split into i-b2b-a identity/process and
+> i-b2b-b fixed service; i-b2b-a is current.
 > Evidence:
 > [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
 > [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md) and
@@ -1105,8 +1106,8 @@ The remaining L3 work is split before driver coding:
    the ii-b2 ASID prerequisite, ii-b2a, ii-b2b-i, ii-b2b-ii, iii-a, iii-b-i and
    iii-b-ii, ii-b3a, ii-b3b, ii-b3c and ii-b4 are complete; ii-b5 is split
    into b5a0/b5a/b5b-i/b5b-ii/b5b-iii; b5a0, b5a, b5b-i-a, i-b1 and i-b2a are
-   complete/non-admitting. The b5b-i exact-path preflight leaves i-b2b/i-b3;
-   i-b2b is current, while i-c retains the DriverSupport join and
+   complete/non-admitting. The fresh i-b2b split leaves i-b2b-a/i-b2b-b/i-b3;
+   i-b2b-a is current, while i-c retains the DriverSupport join and
    legacy-owner closure.
    See the
    [study](../../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md)
