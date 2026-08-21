@@ -321,9 +321,9 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   count 则由 final tree 唯一一行 `6 → 7` 修复并精确通过。ii-b5b-i-b 的 fresh
   cost/authority audit 将余下 observer extraction 拆为 i-b2a artifact/static
   readers、i-b2b process/service + narrow C identity 与 i-b3 observer
-  composition；i-b2a、i-b2b-a 与 i-b2b-b 已完成并保持 non-admitting，i-b3
-  observer composition 是当前 implementation frontier；i-c 仍独占
-  DriverSupport join/legacy-owner closure。
+  composition；i-b2a、i-b2b-a、i-b2b-b 与 i-b3 已完成并保持 non-admitting。
+  fresh preflight 已把 i-c 拆为 i-c1 DriverSupport join/opaque proof 与 i-c2
+  legacy-owner closure/exactly-one-owner gate；i-c1 是当前 frontier。
   之后按序为 ii-b5b-ii fixed Darwin runtime、
   ii-b5b-iii production/artifact composition、ii-c0 fresh privilege-launcher
   preflight，再到 ii-c 唯一 no-model
@@ -485,6 +485,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c L3c3c-ii-b5b-i-b2b process/service split preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2b-split-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2b-split-preflight.md) |
 | Phase D Task 39B2c L3c3c-ii-b5b-i-b2b-a identity/process review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2b-a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2b-a-review.md) |
 | Phase D Task 39B2c L3c3c-ii-b5b-i-b2b-b fixed service reader review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2b-b-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2b-b-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-i-b3 observer composition review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b3-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b3-review.md) |
 | Phase D Task 39B2c-L1 residue observation review | [docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md](docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md) |
 | Phase D Task 39B2c-L2 root topology observation review | [docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md](docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md) |
 | Phase D Task 39B2c-L3a trusted machine target review | [docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md](docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md) |
@@ -623,9 +624,9 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   claim-abort、b5a typed/injected composer、b5b-i L2/projection、b5b-ii fixed
   Darwin runtime 与 b5b-iii production/artifact composition；b5a0/b5a 已完成并
   保持 non-admitting；b5b-i-a 与 i-b1 semantic target 已完成，b5b-i-b 余下
-  i-b2a、i-b2b-a 与 i-b2b-b 已完成并保持 non-admitting；i-b3 是当前
-  frontier，i-c 仍负责 DriverSupport
-  join/legacy closure。
+  i-b2a、i-b2b-a、i-b2b-b 与 i-b3 已完成并保持 non-admitting；i-c 已拆为
+  i-c1 DriverSupport join/opaque proof 与 i-c2 legacy-owner closure，i-c1 是当前
+  frontier。
   ADR 0018 仍 Proposed；L3c4 独占 final admission 与
   剩余 full。
   Task 39 尚未完成。
