@@ -105,7 +105,8 @@ access a network, create a machine report/receipt, claim readiness or run
 `scripts/verify --full`. ADR 0018 remains Proposed, Task 39 remains incomplete
 and production Deep Dive remains `.implementationUnavailable`.
 
-ii-b5b-i is the current frontier. It requires its own fresh exact-path preflight
-for the authority-free identity projection and installed-L2 extraction. ii-c
+ii-b5b-i was split by its fresh exact-path preflight into i-a projection/clock
+contract, i-b observer extraction and i-c DriverSupport join/legacy closure;
+ii-b5b-i-a is the current frontier. ii-c
 alone may accept ADR 0018, and L3c4 alone owns machine readiness and Task 39's
 remaining authoritative full verifier.

@@ -1,7 +1,7 @@
 # Phase D Task 39B2c-L3c3c-ii-b5 Single-Epoch Composition Split Preflight
 
 > Status: Split, ownership, scope and tests-first contracts frozen; ii-b5a0 and
-> ii-b5a complete/non-admitting; ii-b5b-i is current
+> ii-b5a complete/non-admitting; ii-b5b-i is split and ii-b5b-i-a is current
 >
 > Date: 2026-08-21
 >
@@ -40,7 +40,9 @@ surfaces. ii-b5 is therefore frozen as:
 ii-b5a0 same-client claim-abort terminal proof
 ->
 ii-b5a typed/injected single-epoch composer
--> ii-b5b-i authority-free identity projection + installed-L2 extraction
+-> ii-b5b-i-a strict identity projection + dual-clock contract
+-> ii-b5b-i-b authority-closed installed observer extraction
+-> ii-b5b-i-c DriverSupport join + legacy-owner closure
 -> ii-b5b-ii fixed Darwin epoch runtime
 -> ii-b5b-iii production entry + artifact composition
 -> ii-c0 fresh launcher/TTY/capsule preflight
@@ -201,8 +203,11 @@ cost split before coding.
 
 ## 5. ii-b5b-i — Installed-L2 Contract and Projection Extraction
 
-> Current implementation frontier. ii-b5a completion evidence is recorded in
-> the [ii-b5a review](phase-d-task-39b2c-l3c3c-ii-b5a-review.md).
+> Split before coding. ii-b5b-i-a is the current implementation frontier. The
+> exact split, paths, budgets and clock contract are frozen in the
+> [ii-b5b-i exact-path preflight](phase-d-task-39b2c-l3c3c-ii-b5b-i-exact-path-preflight.md).
+> ii-b5a completion evidence is recorded in the
+> [ii-b5a review](phase-d-task-39b2c-l3c3c-ii-b5a-review.md).
 
 The existing full installed-L2 semantic/physical implementation spans broad
 Lifecycle and Machine targets and cannot be linked into the native driver or
@@ -214,14 +219,18 @@ DriverSupport.
 It also defines the closed binary identity projection described above without
 parsing configuration JSON. Typed L2 evidence is non-Codable and mintable only
 by the concrete observer. It binds exact claimed-helper identity, repeated App
-identity, projection/binding commitments and observation window, and proves
-`claimedAt <= startedAt <= observedAt <= epochDeadline`. It performs no bootout,
-install, process launch, signal or cleanup.
+identity, projection/binding commitments and observation window. The exact-path
+audit supersedes the earlier mixed-clock shorthand with two independent chains:
+`claimedAtUTC <= startedAtUTC <= observedAtUTC < wallValidBeforeUTC` and
+`startedContinuous <= observedContinuous < releaseDeadlineContinuous <=
+epochDeadlineContinuous`. It performs no bootout, install, process launch,
+signal or cleanup.
 
-The live L2 implementation is about 1,607 lines before extraction. This split
-document does not invent a path/line ceiling for b5b-i; its fresh exact-path
-preflight must choose move-versus-target extraction, prove no second L2
-implementation and remain below repository hard thresholds before coding.
+The live L2 implementation is 1,607 lines before extraction. The exact-path
+preflight found a 13–15-path combined surface and split b5b-i into i-a
+projection/temporal contract, i-b observer extraction and i-c DriverSupport
+join/legacy-owner closure. Their respective frozen or provisional ceilings are
+5 paths / 1,200 lines, 12 paths / 3,500 lines and 10 paths / 2,500 lines.
 
 ## 6. ii-b5b-ii — Fixed Darwin Epoch Runtime
 
@@ -274,16 +283,17 @@ The matrix includes every failure after claim: abort-before-App-retire ordering,
 abort ambiguity overriding the original error, no release before L2, and proof
 that a claim error cannot leave an unobserved helper terminal state.
 
-ii-b5b-i covers strict binary projection shape/digest/join, all installed-L2
-axes and a structural negative proving HandoffContract/DriverSupport contain no
-product JSON decoder or copied Diagnostic schema. ii-b5b-ii covers FD-7
+ii-b5b-i-a covers strict binary projection shape/digest and dual-clock semantics;
+i-b extracts all installed-L2 axes into an authority-closed target; i-c owns the
+one-shot DriverSupport join and structural proof that no product JSON decoder,
+copied Diagnostic schema or second L2 owner remains. ii-b5b-ii covers FD-7
 collisions, descriptor inheritance, fixed path/argv/env, partial I/O/EOF,
 pre/post-drop identity races, waitable-leader/descendant/reuse races and
 TERM/KILL/reap ordering. ii-b5b-iii owns source/package mutations and native
 Debug/Release final-Mach-O positive/negative controls.
 
 Each sub-checkpoint uses structural -> focused -> affected -> one clean staged
-serial -> applicable artifact gate -> independent review. ii-b5a/b5b-i/b5b-ii
+serial -> applicable artifact gate -> independent review. ii-b5a/b5b-i-a/i-b/i-c/b5b-ii
 have no final-Mach-O claim; ii-b5b-iii owns the complete driver/App artifact
 gate. None runs
 the real installed App/helper, real XPC, install, sudo/root external execution,
@@ -310,7 +320,8 @@ b5a0/b5a and all remaining b5 substeps are non-admitting prerequisites. ADR
 The strict remaining order is:
 
 ```text
-ii-b5b-i -> ii-b5b-ii -> ii-b5b-iii
+ii-b5b-i-a -> ii-b5b-i-b -> ii-b5b-i-c
+-> ii-b5b-ii -> ii-b5b-iii
 -> ii-c0 -> ii-c -> L3c3d -> L3c4
 ```
 
