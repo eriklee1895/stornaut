@@ -155,6 +155,7 @@ let package = Package(
             ],
             linkerSettings: [
                 .linkedFramework("Security"),
+                .linkedFramework("ServiceManagement"),
             ]
         ),
         .target(

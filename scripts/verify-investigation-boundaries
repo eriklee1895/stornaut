@@ -75,6 +75,12 @@ iib5bib2ba_process_source=
 iib5bib2ba_focused_test_source=
 iib5bib2ba_staged_scope_contract_only=false
 iib5bib2ba_staged_scope_baseline=HEAD
+iib5bib2bb_service_contract_only=false
+iib5bib2bb_package_source=
+iib5bib2bb_service_source=
+iib5bib2bb_focused_test_source=
+iib5bib2bb_staged_scope_contract_only=false
+iib5bib2bb_staged_scope_baseline=HEAD
 iib3a_staged_scope_contract_only=false
 iib3a_staged_scope_baseline=HEAD
 iib3b_start_retire_contract_only=false
@@ -199,6 +205,16 @@ if (( $# > 0 )); then
         && [[ $1 == --iib5bib2ba-staged-scope-contract-only ]]; then
         iib5bib2ba_staged_scope_contract_only=true
         iib5bib2ba_staged_scope_baseline=${2:-HEAD}
+    elif (( $# == 4 )) \
+        && [[ $1 == --iib5bib2bb-service-contract-only ]]; then
+        iib5bib2bb_service_contract_only=true
+        iib5bib2bb_package_source=$2
+        iib5bib2bb_service_source=$3
+        iib5bib2bb_focused_test_source=$4
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iib5bib2bb-staged-scope-contract-only ]]; then
+        iib5bib2bb_staged_scope_contract_only=true
+        iib5bib2bb_staged_scope_baseline=${2:-HEAD}
     elif (( $# == 1 || $# == 2 )) \
         && [[ $1 == --iib3a-staged-scope-contract-only ]]; then
         iib3a_staged_scope_contract_only=true
@@ -792,6 +808,7 @@ for path, expected_sha in expected.items():
             b'            ],\n'
             b'            linkerSettings: [\n'
             b'                .linkedFramework("Security"),\n'
+            b'                .linkedFramework("ServiceManagement"),\n'
             b'            ]\n'
             b'        ),\n'
         )
@@ -883,7 +900,7 @@ if target is None:
 body = target.group(1)
 dependencies = set(re.findall(r'"(CInvestigationIdentitySupport|Stornaut[A-Za-z0-9]+)"', body))
 frameworks = re.findall(r'\.linkedFramework\("([^"]+)"\)', body)
-if dependencies != {"CInvestigationIdentitySupport", "StornautInvestigationHandoffContract"} or frameworks != ["Security"]:
+if dependencies != {"CInvestigationIdentitySupport", "StornautInvestigationHandoffContract"} or frameworks != ["Security", "ServiceManagement"]:
     raise SystemExit("ii-b5b-i-b2a dependency or framework surface drifted")
 if set(re.findall(r'(?m)^import\s+([A-Za-z0-9_]+)\s*$', source)) != {
     "Darwin", "Foundation", "Security", "StornautInvestigationHandoffContract",
@@ -1024,6 +1041,48 @@ function verify_iib5bib2ba_staged_scope() {
     [[ "${(j:\n:)${(on)observed}}" == "${(j:\n:)${(on)expected}}" ]] || { print -u2 "ii-b5b-i-b2b-a checkpoint paths drifted"; return 1; }
     local changed=$(git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1 {n+=$1+$2} END {print n+0}')
     (( changed <= 1900 )) || { print -u2 "ii-b5b-i-b2b-a checkpoint budget drifted"; return 1; }
+}
+
+function verify_iib5bib2bb_service_contract() {
+    local package_source=$1 service_source=$2 focused_test=$3
+    xcrun swiftc -frontend -parse "$service_source"
+    xcrun swiftc -frontend -parse "$focused_test"
+    python3 - "$package_source" "$service_source" "$focused_test" <<'PY'
+from pathlib import Path
+import hashlib,re,sys
+package_path,source_path,test_path=map(Path,sys.argv[1:])
+package,source,test=[p.read_text(encoding="utf-8") for p in (package_path,source_path,test_path)]
+target=re.search(r'\.target\(\s*name: "StornautInvestigationInstalledL2",(.*?)\n\s*\),',package,re.DOTALL)
+if target is None: raise SystemExit("ii-b5b-i-b2b-b package target missing")
+frameworks=re.findall(r'\.linkedFramework\("([^"]+)"\)',target.group(1))
+if frameworks != ["Security","ServiceManagement"]: raise SystemExit("ii-b5b-i-b2b-b framework surface drifted")
+if set(re.findall(r'(?m)^import\s+([A-Za-z0-9_]+)\s*$',source)) != {"Foundation","ServiceManagement","StornautInvestigationHandoffContract"}: raise SystemExit("ii-b5b-i-b2b-b imports drifted")
+if re.search(r'(?m)^\s*(?:public|open|package)\s+',source): raise SystemExit("ii-b5b-i-b2b-b surface widened")
+service_management_symbols=set(re.findall(r'\b(?:SM|kSM)[A-Za-z0-9_]+\b',source))
+if service_management_symbols != {"SMAppService","SMJobCopyDictionary","kSMDomainSystemLaunchd"}: raise SystemExit("ii-b5b-i-b2b-b service mutation authority drifted")
+if re.findall(r'\bSMAppService\.([A-Za-z_][A-Za-z0-9_]*)',source) != ["statusForLegacyPlist"]: raise SystemExit("ii-b5b-i-b2b-b service mutation authority drifted")
+for forbidden in ("register(","unregister(","launchctl","bootstrap","bootout","kickstart","Process(","NSXPC","URLSession","posix_spawn","kill(","write("):
+    if forbidden in source: raise SystemExit("ii-b5b-i-b2b-b service mutation authority drifted")
+for required in ("SMAppService.statusForLegacyPlist","SMJobCopyDictionary(","paths.launchDaemonPlist","com.eriklee.stornaut.lifecycle","readExpectedIdentity(expectedHelper)","CFNumberIsFloatType(number)","CFNumberGetValue(number, .sInt64Type"):
+    if required not in source: raise SystemExit("ii-b5b-i-b2b-b service contract drifted")
+if source.count("registry.sample()") != 3: raise SystemExit("ii-b5b-i-b2b-b registry resample drifted")
+if source.count("readExpectedIdentity(expectedHelper)") != 2: raise SystemExit("ii-b5b-i-b2b-b identity resample drifted")
+if "status == .notRegistered || status == .notFound" not in source: raise SystemExit("ii-b5b-i-b2b-b absence contract drifted")
+for required in ("onlyConsistentStructuredMissingStateIsAbsent","loadedServiceRequiresTwoRegistryAndTwoCompleteIdentitySamples","registryIdentityAndRestartDriftRemainUnavailable","wrongRoleIsRejectedBeforeRegistryOrIdentityRead"):
+    if required not in test: raise SystemExit("ii-b5b-i-b2b-b focused coverage drifted")
+if hashlib.sha256(test_path.read_bytes()).hexdigest() != "131e01aba3e7e5afcd64082d4a29c60d05e796724db57473610e1ef045a536e4": raise SystemExit("ii-b5b-i-b2b-b focused coverage drifted")
+PY
+}
+
+function verify_iib5bib2bb_staged_scope() {
+    local baseline=${1:-HEAD}
+    local expected=(Package.swift Sources/StornautInvestigationInstalledL2/InstalledL2FixedServiceReader.swift Tests/StornautInvestigationTests/InstalledL2FixedServiceReaderTests.swift Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift scripts/verify-contract scripts/verify-investigation-boundaries)
+    if git diff --cached --name-only --diff-filter=D "$baseline" | grep -q .; then print -u2 "ii-b5b-i-b2b-b checkpoint deleted an existing path"; return 1; fi
+    if git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1 && ($1=="-" || $2=="-") {found=1} END {exit !found}'; then print -u2 "ii-b5b-i-b2b-b binary checkpoint path rejected"; return 1; fi
+    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" | awk 'index($0,"docs/")!=1')"})
+    [[ "${(j:\n:)${(on)observed}}" == "${(j:\n:)${(on)expected}}" ]] || { print -u2 "ii-b5b-i-b2b-b checkpoint paths drifted"; return 1; }
+    local changed=$(git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1 {n+=$1+$2} END {print n+0}')
+    (( changed <= 1300 )) || { print -u2 "ii-b5b-i-b2b-b checkpoint budget drifted"; return 1; }
 }
 
 function verify_iib4_staged_scope() {
@@ -3279,6 +3338,7 @@ later_installed_l2_target = '''        .target(
             ],
             linkerSettings: [
                 .linkedFramework("Security"),
+                .linkedFramework("ServiceManagement"),
             ]
         ),
 '''
@@ -4107,6 +4167,16 @@ fi
 if $iib5bib2ba_staged_scope_contract_only; then
     verify_iib5bib2ba_staged_scope "$iib5bib2ba_staged_scope_baseline"
     print "ii-b5b-i-b2b-a staged scope verification passed."
+    exit 0
+fi
+if $iib5bib2bb_service_contract_only; then
+    verify_iib5bib2bb_service_contract "$iib5bib2bb_package_source" "$iib5bib2bb_service_source" "$iib5bib2bb_focused_test_source"
+    print "ii-b5b-i-b2b-b fixed service contract verification passed."
+    exit 0
+fi
+if $iib5bib2bb_staged_scope_contract_only; then
+    verify_iib5bib2bb_staged_scope "$iib5bib2bb_staged_scope_baseline"
+    print "ii-b5b-i-b2b-b staged scope verification passed."
     exit 0
 fi
 if $iib3a_staged_scope_contract_only; then
