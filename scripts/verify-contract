@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=72f4c02cf77f65fc750cca33f7a43f77207db72e982bd4b5051f79ef4e60c95b
+ib2_self_sha=6f918d0c92ca1612a2ed7ede6822dde28001bc167b3fd07380c14e1f536777f5
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -103,13 +103,19 @@ require_fixed_text scripts/verify-app-release-boundaries \
 require_fixed_text scripts/verify-app-release-boundaries \
     'iib5biic_release_forbidden_imports=('
 require_fixed_text scripts/verify-app-release-boundaries \
+    '--iib5biid-machine-driver-contract-only <source>'
+require_fixed_text scripts/verify-app-release-boundaries \
+    'iib5biid_debug_introduced_imports=('
+require_fixed_text scripts/verify-app-release-boundaries \
+    'iib5biid_release_forbidden_imports=('
+require_fixed_text scripts/verify-app-release-boundaries \
     'expected_machine_driver_security_imports=$('
 require_fixed_text scripts/verify-app-release-boundaries \
     '_kSecGuestAttributePid'
 require_fixed_text scripts/verify-app-release-boundaries \
-    'ca94c349f514e0e2a57c71203d4fe02ac2976b87210437e023278d7ffb307e11'
+    '31b23e31e12b7f80442c319d47f71bfde3e7509f4c233c5b7d29a5520781aca6'
 require_fixed_text scripts/verify-app-release-boundaries \
-    'a2784b1406597a19a3f8bf004cdb230dd1d8466254a9ea66941ce013d503cf4f'
+    '30404041877153ce1ef03b5d47d694ccbb0e0688eb91383e4d30f2c023f58207'
 require_fixed_text scripts/verify-app-release-boundaries \
     'xcrun swift-demangle'
 require_fixed_text scripts/verify-app-release-boundaries \
@@ -923,9 +929,9 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "6a1418fd86f44c397f2f25706ac698d8bfa42e354d4f7f229b8a900a33bd3caf",
+        "e6743f59bea8b09d06aad632cb8fbbd1dae3ef18c110f22f606c4f431d99d7f2",
     Path("scripts/verify-app-release-boundaries"):
-        "9829a01c19fb7466ade6205b4c9fd34f8289a3824b0f7af99e232ea48940e478",
+        "12cdb5be053ea90cc01f6289b6a9228fbf809674818a38e0264d75d21d2d5ea5",
 }
 for path, expected_sha in expected.items():
     observed_sha = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -942,15 +948,14 @@ release = Path("scripts/verify-app-release-boundaries").read_text(
     encoding="utf-8"
 )
 for marker, count in {
-    "ca94c349f514e0e2a57c71203d4fe02ac2976b87210437e023278d7ffb307e11": 2,
-    "dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9": 2,
-    "79b87d43bdd44cf38eb81ac48dd72104d0c14c64cddeefdcd69a7ee42aa4512f": 1,
-    "b75e46b4de9a9742c63439670d66c6c488adb2ce73de47c381a4a80fbb635656": 1,
-    "a2784b1406597a19a3f8bf004cdb230dd1d8466254a9ea66941ce013d503cf4f": 1,
-    "9053e60819e57a62ee9acb9db4854705fa2ed0ade20ec3683f13b9e854f86c41": 2,
-    "634e0e7a0ff4db34b6452dc29d413621ffc5986fb9acd80799f95981d3b4593c": 1,
-    "2f88f8707eed520fcd865e49dfd3295bdc44f35a0295bc9ef540cf18bc41c591": 1,
-    "8fd92d8f9835ac8eff2d8aa76032fa0847bb448016282dbed740d24da20fbcf3": 1,
+    "31b23e31e12b7f80442c319d47f71bfde3e7509f4c233c5b7d29a5520781aca6": 2,
+    "dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9": 4,
+    "30404041877153ce1ef03b5d47d694ccbb0e0688eb91383e4d30f2c023f58207": 1,
+    "f97fadfdcc44255803fe69fbb95fdfab8ab7c173d695e34040631d0d9561b78a": 1,
+    "b60d2b4a72706d29b638c195ed6b39071972458979356ebe784587e18378f053": 1,
+    "245ee9f49d53e201479a0a47cdb653a11a3a900422b2b9d6e894926a42883656": 1,
+    "565d7d25a78db45de3987df41345e047f213c0c05aa622991dc9745205614f27": 1,
+    "2777198ace01ce8984f42f56c211f48367e2486d74a7a7927e6818ee2dfbd6ec": 1,
 }.items():
     observed = investigation.count(marker) + release.count(marker)
     if observed != count:
@@ -5380,6 +5385,7 @@ done
 
 iib5biic_index="$contract_root/iib5biic.index"
 GIT_INDEX_FILE="$iib5biic_index" git read-tree "$iib5biic_baseline^{tree}"
+iib5biic_completed_commit=d93542283fe5f3c4591b162abbcc69fbd361aa03
 iib5biic_paths=(
     Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpoch.swift
     Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinEpochSession.swift
@@ -5391,8 +5397,11 @@ iib5biic_paths=(
     scripts/verify-contract
 )
 for checkpoint_path in "${iib5biic_paths[@]}"; do
-    blob=$(git hash-object -w -- "$checkpoint_path")
-    mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
+    entry=$(git ls-tree "$iib5biic_completed_commit" -- "$checkpoint_path")
+    [[ -n "$entry" ]] \
+        || fail_contract "ii-b5b-ii-c completed snapshot omitted: $checkpoint_path"
+    mode=$(print -r -- "$entry" | awk '{print $1}')
+    blob=$(print -r -- "$entry" | awk '{print $3}')
     GIT_INDEX_FILE="$iib5biic_index" git update-index --add \
         --cacheinfo "$mode,$blob,$checkpoint_path"
 done
@@ -5434,6 +5443,168 @@ for fixture in extra-path over-budget deleted binary wrong-baseline mode; do
         --iib5biic-staged-scope-contract-only "$baseline" >"$output" 2>&1
     then
         fail_contract "ii-b5b-ii-c scope mutation accepted: $fixture"
+    fi
+    require_fixed_text "$output" "$expected"
+done
+
+iib5biid_gate=scripts/verify-investigation-boundaries
+iib5biid_app_gate=scripts/verify-app-release-boundaries
+iib5biid_baseline=efe079f95a9f15a360d280ea656bf9548bfaa3c3
+iib5biid_session=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinEpochSession.swift
+iib5biid_retirement=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinEpochRetirement.swift
+iib5biid_session_test=Tests/StornautInvestigationTests/InvestigationMachineDarwinEpochSessionTests.swift
+iib5biid_retirement_test=Tests/StornautInvestigationTests/InvestigationMachineDarwinEpochRetirementTests.swift
+iib5biid_boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+"$iib5biid_gate" --iib5biid-darwin-retirement-contract-only \
+    "$iib5biid_session" "$iib5biid_retirement" "$iib5biid_session_test" \
+    "$iib5biid_retirement_test" "$iib5biid_boundary" \
+    >"$contract_root/iib5biid-canonical.log"
+python3 - "$iib5biid_session" "$iib5biid_retirement" \
+    "$iib5biid_retirement_test" "$contract_root" <<'PY'
+from pathlib import Path
+import sys
+session_path, retirement_path, test_path, root = map(Path, sys.argv[1:])
+session= session_path.read_text(encoding="utf-8")
+retirement=retirement_path.read_text(encoding="utf-8")
+test=test_path.read_text(encoding="utf-8")
+def emit(name, old, new, text=retirement, suffix="swift"):
+    if text.count(old) != 1: raise SystemExit(f"cannot construct ii-b5b-ii-d mutation: {name}")
+    (root/f"iib5biid-{name}.{suffix}").write_text(text.replace(old,new,1),encoding="utf-8")
+emit("leader-guard", "            epoch.processID > 1,\n", "")
+emit("pgid-guard", "            epoch.processGroupID > 1,\n", "")
+emit("same-group-guard", "            epoch.processGroupID == epoch.processID,\n", "")
+emit("current-group-guard", "            epoch.processGroupID != system.currentProcessGroup()\n", "            true\n")
+emit("wnowait", "WEXITED | WNOHANG | WNOWAIT", "WEXITED | WNOHANG")
+emit("term", "try signal(-epoch.processGroupID, SIGTERM)", "termSent = true")
+emit("kill", "try signal(-epoch.processGroupID, SIGKILL)", "killSent = true")
+emit("positive-group", "try signal(-epoch.processGroupID, SIGTERM)", "try signal(epoch.processGroupID, SIGTERM)")
+emit("blocking-reap", "system.waitPID(processID, Int32(WNOHANG))", "system.waitPID(processID, 0)")
+emit("saturated-empty", "data.count < Self.maximumInventoryEntries * width", "data.count <= Self.maximumInventoryEntries * width")
+emit("missing-post-reap", "guard postReapMembers.isEmpty else", "guard true else")
+emit(
+    "ignore-close",
+    "                guard !descriptorFailure else {\n"
+    "                    throw InvestigationMachineDarwinEpochRetirementError\n"
+    "                        .descriptorCloseFailed\n"
+    "                }\n                return .init()",
+    "                guard true else {\n"
+    "                    throw InvestigationMachineDarwinEpochRetirementError\n"
+    "                        .descriptorCloseFailed\n"
+    "                }\n                return .init()",
+)
+emit("vacuous-test", "physicalNaturalExitIsWaitableReapedAndLeavesNoGroup", "physicalNaturalExitIsVacuous", test)
+emit("spawned-proof", "    ) async throws\n\n    func retireOwnedProcessGroup(", "    ) async throws -> InvestigationMachineSingleEpochRetirementProof\n\n    func retireOwnedProcessGroup(", session)
+emit("spawned-terminal", "        return terminal(.terminalUncertain)\n    }\n\n    private func retireOwnedStartup", "        return terminal(.terminal(.init()))\n    }\n\n    private func retireOwnedStartup", session)
+PY
+for fixture in \
+    leader-guard pgid-guard same-group-guard current-group-guard wnowait term kill \
+    positive-group blocking-reap saturated-empty missing-post-reap ignore-close \
+    vacuous-test spawned-proof spawned-terminal
+do
+    session="$iib5biid_session"; retirement="$iib5biid_retirement"
+    retirement_test="$iib5biid_retirement_test"
+    [[ $fixture == spawned-* ]] && session="$contract_root/iib5biid-$fixture.swift"
+    [[ $fixture == vacuous-test ]] \
+        && retirement_test="$contract_root/iib5biid-$fixture.swift"
+    [[ $fixture != spawned-* && $fixture != vacuous-test ]] \
+        && retirement="$contract_root/iib5biid-$fixture.swift"
+    output="$contract_root/iib5biid-$fixture.log"
+    if "$iib5biid_gate" --iib5biid-darwin-retirement-contract-only \
+        "$session" "$retirement" "$iib5biid_session_test" \
+        "$retirement_test" "$iib5biid_boundary" >"$output" 2>&1
+    then
+        fail_contract "ii-b5b-ii-d mutation accepted: $fixture"
+    fi
+    require_fixed_text "$output" 'ii-b5b-ii-d'
+done
+
+"$iib5biid_app_gate" --iib5biid-machine-driver-contract-only \
+    "$iib5biid_app_gate" >"$contract_root/iib5biid-app-canonical.log"
+python3 - "$iib5biid_app_gate" "$contract_root" <<'PY'
+from pathlib import Path
+import sys
+path, root = map(Path, sys.argv[1:]); source=path.read_text(encoding="utf-8")
+def mutate_array(name, old, new, mutation):
+    start=source.index(name+"=(\n"); end=source.index("\n)\n",start)+3
+    section=source[start:end]
+    if section.count(old)!=1: raise SystemExit(f"cannot construct ii-b5b-ii-d App mutation: {mutation}")
+    (root/f"iib5biid-app-{mutation}").write_text(source[:start]+section.replace(old,new,1)+source[end:],encoding="utf-8")
+def emit(name, old, new):
+    if source.count(old) != 1: raise SystemExit(f"cannot construct ii-b5b-ii-d App mutation: {name}")
+    (root/f"iib5biid-app-{name}").write_text(source.replace(old,new,1),encoding="utf-8")
+mutate_array("iib5biid_debug_introduced_imports", "    _kill _nanosleep _proc_listpids _waitid _waitpid\n", "    _nanosleep _proc_listpids _waitid _waitpid\n", "debug-missing-kill")
+mutate_array("iib5biid_release_forbidden_imports", "    _kill _nanosleep _proc_listpids _waitid _waitpid\n", "    _kill _nanosleep _proc_listpids _waitpid\n", "release-missing-waitid")
+emit("sibling-killpg", "    _killpg _pthread_kill _raise\n", "    _pthread_kill _raise\n")
+emit("weak-scanner", 'print -r -- "$machine_driver_undefined_symbols" | grep -Fxq -- "$marker" || {\n        print -u2 "ii-b5b-ii-d Debug retirement import is missing: $marker"', 'print -r -- "$machine_driver_undefined_symbols" | grep -Fq -- "$marker" || {\n        print -u2 "ii-b5b-ii-d Debug retirement import is missing: $marker"')
+PY
+for fixture in debug-missing-kill release-missing-waitid sibling-killpg weak-scanner; do
+    output="$contract_root/iib5biid-app-$fixture.log"
+    if "$iib5biid_app_gate" --iib5biid-machine-driver-contract-only \
+        "$contract_root/iib5biid-app-$fixture" >"$output" 2>&1
+    then
+        fail_contract "ii-b5b-ii-d App mutation accepted: $fixture"
+    fi
+    require_fixed_text "$output" 'ii-b5b-ii-d'
+done
+
+iib5biid_index="$contract_root/iib5biid.index"
+GIT_INDEX_FILE="$iib5biid_index" git read-tree "$iib5biid_baseline^{tree}"
+iib5biid_paths=(
+    "$iib5biid_session"
+    "$iib5biid_retirement"
+    "$iib5biid_session_test"
+    "$iib5biid_retirement_test"
+    "$iib5biid_boundary"
+    scripts/verify-app-release-boundaries
+    scripts/verify-contract
+    scripts/verify-investigation-boundaries
+)
+for checkpoint_path in "${iib5biid_paths[@]}"; do
+    blob=$(git hash-object -w -- "$checkpoint_path")
+    mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
+    GIT_INDEX_FILE="$iib5biid_index" git update-index --add \
+        --cacheinfo "$mode,$blob,$checkpoint_path"
+done
+GIT_INDEX_FILE="$iib5biid_index" "$iib5biid_gate" \
+    --iib5biid-staged-scope-contract-only "$iib5biid_baseline"
+for line in {1..3300}; do print -r -- "// ii-b5b-ii-d over-budget $line"; done \
+    >"$contract_root/iib5biid-over-budget.swift"
+for fixture in extra-path over-budget deleted binary wrong-baseline mode; do
+    index="$contract_root/iib5biid-$fixture.index"; cp "$iib5biid_index" "$index"
+    if [[ $fixture == extra-path ]]; then
+        blob=$(git rev-parse "${iib5biid_baseline}:AGENTS.md")
+        GIT_INDEX_FILE="$index" git update-index --add --cacheinfo \
+            "100644,$blob,iib5biid-extra.swift"
+        expected='ii-b5b-ii-d checkpoint paths drifted'
+    elif [[ $fixture == over-budget ]]; then
+        blob=$(git hash-object -w -- "$contract_root/iib5biid-over-budget.swift")
+        GIT_INDEX_FILE="$index" git update-index --add --cacheinfo \
+            "100644,$blob,$iib5biid_retirement"
+        expected='ii-b5b-ii-d checkpoint budget drifted'
+    elif [[ $fixture == deleted ]]; then
+        GIT_INDEX_FILE="$index" git rm --cached -q -f "$iib5biid_session"
+        expected='ii-b5b-ii-d checkpoint deleted an existing path'
+    elif [[ $fixture == binary ]]; then
+        blob=$(git rev-parse "${iib5biid_baseline}:Tests/Fixtures/Snapshots/design-system.empty-state.dark.en.png")
+        GIT_INDEX_FILE="$index" git update-index --add --cacheinfo \
+            "100644,$blob,$iib5biid_retirement"
+        expected='ii-b5b-ii-d binary checkpoint path rejected'
+    elif [[ $fixture == mode ]]; then
+        entry=$(GIT_INDEX_FILE="$index" git ls-files -s -- scripts/verify-contract)
+        blob=$(print -r -- "$entry" | awk '{print $2}')
+        GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+            "100644,$blob,scripts/verify-contract"
+        expected='ii-b5b-ii-d checkpoint mode drifted: scripts/verify-contract'
+    else
+        expected='ii-b5b-ii-d checkpoint baseline drifted'
+    fi
+    output="$contract_root/iib5biid-scope-$fixture.log"
+    baseline="$iib5biid_baseline"
+    [[ $fixture == wrong-baseline ]] && baseline="$iib5biid_baseline^"
+    if GIT_INDEX_FILE="$index" "$iib5biid_gate" \
+        --iib5biid-staged-scope-contract-only "$baseline" >"$output" 2>&1
+    then
+        fail_contract "ii-b5b-ii-d scope mutation accepted: $fixture"
     fi
     require_fixed_text "$output" "$expected"
 done

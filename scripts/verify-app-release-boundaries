@@ -12,6 +12,8 @@ iib4_machine_claim_contract_only=false
 iib4_machine_claim_contract_source=
 iib5biic_machine_driver_contract_only=false
 iib5biic_machine_driver_contract_source=
+iib5biid_machine_driver_contract_only=false
+iib5biid_machine_driver_contract_source=
 if [[ $# == 1 && $1 == --investigation-handoff-only ]]; then
     handoff_only=true
 elif [[ $# == 2 && $1 == --legacy-machine-claim-contract-only ]]; then
@@ -23,9 +25,12 @@ elif [[ $# == 2 && $1 == --iib4-machine-claim-contract-only ]]; then
 elif [[ $# == 2 && $1 == --iib5biic-machine-driver-contract-only ]]; then
     iib5biic_machine_driver_contract_only=true
     iib5biic_machine_driver_contract_source=$2
+elif [[ $# == 2 && $1 == --iib5biid-machine-driver-contract-only ]]; then
+    iib5biid_machine_driver_contract_only=true
+    iib5biid_machine_driver_contract_source=$2
 elif (( $# != 0 )); then
     print -u2 \
-        "Usage: scripts/verify-app-release-boundaries [--investigation-handoff-only | --legacy-machine-claim-contract-only <source> | --iib4-machine-claim-contract-only <source> | --iib5biic-machine-driver-contract-only <source>]"
+        "Usage: scripts/verify-app-release-boundaries [--investigation-handoff-only | --legacy-machine-claim-contract-only <source> | --iib4-machine-claim-contract-only <source> | --iib5biic-machine-driver-contract-only <source> | --iib5biid-machine-driver-contract-only <source>]"
     exit 64
 fi
 
@@ -539,6 +544,7 @@ expected_arrays = {
     ],
     "iib5biic_release_forbidden_imports": introduced,
 }
+
 for name, expected in expected_arrays.items():
     observed = array_values(name)
     if observed != expected:
@@ -555,7 +561,7 @@ for exempt in ("_posix_spawn", "_socketpair", "_send", "_recv"):
         )
 for retained in (
     "_posix_spawnp", "_execve", "_connect", "_bind", "_listen",
-    "_sendto", "_recvfrom", "_kill", "_write",
+    "_sendto", "_recvfrom", "_write",
 ):
     if retained not in forbidden:
         raise SystemExit(
@@ -600,6 +606,42 @@ for body, image, message in (
 PY
 }
 
+function verify_iib5biid_machine_driver_source_contract() {
+    local source_path=$1
+    python3 - "$source_path" <<'PY'
+from pathlib import Path
+import re, sys
+source = Path(sys.argv[1]).read_text(encoding="utf-8")
+runtime = source[source.index("\nscripts/verify-contract\n"):]
+def values(name):
+    match = re.search(rf"(?ms)^{name}=\(\n(?P<body>.*?)^\)\n", runtime)
+    if match is None: raise SystemExit(f"ii-b5b-ii-d array missing: {name}")
+    result=[]
+    for line in match.group("body").splitlines():
+        value=line.strip().strip("'\"")
+        if value: result.extend(value.split())
+    return result
+expected=["_kill", "_nanosleep", "_proc_listpids", "_waitid", "_waitpid"]
+for name in ("iib5biid_debug_introduced_imports", "iib5biid_release_forbidden_imports"):
+    if values(name) != expected: raise SystemExit(f"ii-b5b-ii-d Machine driver array drifted: {name}")
+for exempt in expected:
+    if exempt in values("machine_driver_authority_forbidden_imports"):
+        raise SystemExit(f"ii-b5b-ii-d fixed import remains categorically forbidden: {exempt}")
+for retained in ("_killpg", "_pthread_kill", "_raise", "_write", "_posix_spawnp"):
+    if retained not in values("machine_driver_authority_forbidden_imports"):
+        raise SystemExit(f"ii-b5b-ii-d sibling authority prohibition drifted: {retained}")
+for name, image, message in (
+    ("iib5biid_debug_introduced_imports", "$machine_driver_undefined_symbols", "ii-b5b-ii-d Debug retirement import is missing: $marker"),
+    ("iib5biid_release_forbidden_imports", "$release_machine_driver_undefined_symbols", "ii-b5b-ii-d retirement import leaked into Release: $marker"),
+):
+    match=re.search(rf'(?ms)^for marker in "\$\{{{name}\[@\]\}}"; do\n(?P<body>.*?)^done$',runtime)
+    if match is None: raise SystemExit(f"ii-b5b-ii-d Machine driver scanner drifted: {name}")
+    body=match.group("body")
+    for marker in (image, 'grep -Fxq -- "$marker"', message):
+        if body.count(marker)!=1: raise SystemExit(f"ii-b5b-ii-d Machine driver scanner drifted: {marker}")
+PY
+}
+
 if $legacy_machine_claim_contract_only; then
     verify_claim_server_macho_source_contract \
         "$legacy_machine_claim_contract_source"
@@ -618,6 +660,12 @@ if $iib5biic_machine_driver_contract_only; then
     verify_iib5biic_machine_driver_source_contract \
         "$iib5biic_machine_driver_contract_source"
     print "ii-b5b-ii-c Machine driver source contract verification passed."
+    exit 0
+fi
+if $iib5biid_machine_driver_contract_only; then
+    verify_iib5biid_machine_driver_source_contract \
+        "$iib5biid_machine_driver_contract_source"
+    print "ii-b5b-ii-d Machine driver source contract verification passed."
     exit 0
 fi
 
@@ -1844,7 +1892,7 @@ machine_driver_authority_forbidden_imports=(
     _setattrlist _fsetattrlist _copyfile _fcopyfile _clonefile
     _socket _connect _bind _listen _accept _accept4
     _sendto _sendmsg _recvfrom _recvmsg _getaddrinfo
-    _kill _killpg _pthread_kill _raise
+    _killpg _pthread_kill _raise
 )
 iib5biic_debug_introduced_imports=(
     _free
@@ -1889,6 +1937,12 @@ iib5biic_release_forbidden_imports=(
     _shutdown
     _socketpair
     _strdup
+)
+iib5biid_debug_introduced_imports=(
+    _kill _nanosleep _proc_listpids _waitid _waitpid
+)
+iib5biid_release_forbidden_imports=(
+    _kill _nanosleep _proc_listpids _waitid _waitpid
 )
 machine_driver_required_readonly_imports=(
     _pread _fstat _lstat _flistxattr _acl_get_fd_np
@@ -2074,8 +2128,8 @@ function require_projection() {
 }
 require_projection \
     "$machine_driver_undefined_symbols" \
-    ca94c349f514e0e2a57c71203d4fe02ac2976b87210437e023278d7ffb307e11 \
-    628 \
+    31b23e31e12b7f80442c319d47f71bfde3e7509f4c233c5b7d29a5520781aca6 \
+    658 \
     undefined
 require_projection \
     "$machine_driver_loaded_libraries" \
@@ -2084,8 +2138,8 @@ require_projection \
     load-command
 require_projection \
     "$machine_driver_owned_symbols" \
-    2f88f8707eed520fcd865e49dfd3295bdc44f35a0295bc9ef540cf18bc41c591 \
-    3404 \
+    b60d2b4a72706d29b638c195ed6b39071972458979356ebe784587e18378f053 \
+    3670 \
     owned-symbol
 if ! mach_o_has_demangled_symbol \
     "$diagnostic_machine_driver" \
@@ -2129,6 +2183,11 @@ for marker in "${iib5biic_debug_required_fcntl_imports[@]}"; do
         exit 1
     }
 done
+for marker in "${iib5biid_debug_introduced_imports[@]}"; do
+    print -r -- "$machine_driver_undefined_symbols" | grep -Fxq -- "$marker" || {
+        print -u2 "ii-b5b-ii-d Debug retirement import is missing: $marker"; exit 1
+    }
+done
 observed_machine_driver_security_imports=$(
     print -r -- "$machine_driver_undefined_symbols" \
         | grep -E '^_(Sec|kSec|Authorization|CSSM)' \
@@ -2153,11 +2212,11 @@ release_machine_driver_owned_symbols=$(
         | rg 'StornautInvestigationMachineDriver(Support)?' | LC_ALL=C sort -u
 )
 require_projection "$release_machine_driver_undefined_symbols" \
-    a2784b1406597a19a3f8bf004cdb230dd1d8466254a9ea66941ce013d503cf4f 424 release-undefined
+    30404041877153ce1ef03b5d47d694ccbb0e0688eb91383e4d30f2c023f58207 442 release-undefined
 require_projection "$release_machine_driver_loaded_libraries" \
-    9053e60819e57a62ee9acb9db4854705fa2ed0ade20ec3683f13b9e854f86c41 18 release-load-command
+    dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9 18 release-load-command
 require_projection "$release_machine_driver_owned_symbols" \
-    8fd92d8f9835ac8eff2d8aa76032fa0847bb448016282dbed740d24da20fbcf3 2079 release-owned-symbol
+    565d7d25a78db45de3987df41345e047f213c0c05aa622991dc9745205614f27 2277 release-owned-symbol
 for marker in "${machine_driver_authority_forbidden_markers[@]}"; do
     if mach_o_has_demangled_symbol "$release_machine_driver" "$marker"; then
         print -u2 "Authority or readiness leaked into Release Machine driver: $marker"
@@ -2184,6 +2243,11 @@ for marker in "${iib5biic_release_forbidden_imports[@]}"; do
         print -u2 \
             "ii-b5b-ii-c fixed-session import leaked into Release: $marker"
         exit 1
+    fi
+done
+for marker in "${iib5biid_release_forbidden_imports[@]}"; do
+    if print -r -- "$release_machine_driver_undefined_symbols" | grep -Fxq -- "$marker"; then
+        print -u2 "ii-b5b-ii-d retirement import leaked into Release: $marker"; exit 1
     fi
 done
 [[ "$(print -r -- "$release_machine_driver_undefined_symbols" \

@@ -56,13 +56,32 @@ struct InvestigationMachineDarwinEpochSessionTests {
         #expect(owner.owned == nil)
     }
 
-    @Test func invalidProcessGroupRetiresExactlyOnceWhenRetirementSucceeds() async throws {
+    @Test func invalidProcessGroupRemainsUncertainAfterDirectCleanup() async throws {
         let recorder = StartRecorder(processGroup: 99)
         let owner = TestRetirementOwner()
         let factory = TestFixture.factory(recorder: recorder, owner: owner)
         let outcome = await factory.start(bootstrap: TestFixture.bootstrap)
-        guard case .terminal = outcome else { Issue.record("expected terminal"); return }
+        guard case .terminalUncertain = outcome else {
+            Issue.record("expected terminal uncertainty")
+            return
+        }
         #expect(owner.calls == 1)
+        #expect(owner.spawned?.processID == 42)
+        #expect(owner.owned == nil)
+    }
+
+    @Test func postSpawnCloseFailureDoesNotTransferAttemptedDescriptor() async throws {
+        let recorder = StartRecorder(closeFailure: [4])
+        let owner = TestRetirementOwner()
+        let factory = TestFixture.factory(recorder: recorder, owner: owner)
+        let outcome = await factory.start(bootstrap: TestFixture.bootstrap)
+        guard case .terminalUncertain = outcome else {
+            Issue.record("expected terminal uncertainty")
+            return
+        }
+        #expect(owner.calls == 1)
+        #expect(owner.spawned?.descriptors == [3])
+        #expect(recorder.closed.filter { $0 == 4 }.count == 1)
     }
 
     @Test func bootstrapWriteFailureRetiresOnce() async throws {
@@ -558,13 +577,12 @@ private final class TestRetirementOwner: @unchecked Sendable, InvestigationMachi
     init(shouldFail: Bool = false) { self.shouldFail = shouldFail }
     func retireSpawnedProcess(
         _ spawnedEpoch: InvestigationMachineDarwinSpawnedEpoch
-    ) async throws -> InvestigationMachineSingleEpochRetirementProof {
+    ) async throws {
         lock.withLock {
             calls += 1
             spawned = spawnedEpoch
         }
         if shouldFail { throw TestFailure.retirement }
-        return .init()
     }
     func retireOwnedProcessGroup(_ ownedEpoch: InvestigationMachineDarwinOwnedEpoch) async throws -> InvestigationMachineSingleEpochRetirementProof {
         lock.withLock { calls += 1; owned = ownedEpoch }

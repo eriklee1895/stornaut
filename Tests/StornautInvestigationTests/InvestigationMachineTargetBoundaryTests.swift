@@ -496,6 +496,7 @@ struct InvestigationMachineTargetBoundaryTests {
             "InvestigationMachineClaimClient.swift",
             "InvestigationMachineDarwinAppIdentityObservation.swift",
             "InvestigationMachineDarwinEpochSession.swift",
+            "InvestigationMachineDarwinEpochRetirement.swift",
             "InvestigationMachineDriverSupport.swift",
             "InvestigationMachineFixedCapsuleIntake.swift",
             "InvestigationMachineInstalledDriverObservation.swift",
@@ -618,6 +619,11 @@ struct InvestigationMachineTargetBoundaryTests {
                 "import StornautInvestigationHandoffContract",
                 "import StornautInvestigationInstalledL2",
             ],
+            "InvestigationMachineDarwinEpochRetirement.swift": [
+                "import Darwin",
+                "import Dispatch",
+                "import Foundation",
+            ],
             "InvestigationMachineInstalledDriverObservation.swift": [
                 "import Darwin",
             ],
@@ -696,6 +702,51 @@ struct InvestigationMachineTargetBoundaryTests {
                     "proc_signal", "CommandLine.arguments",
                     "ProcessInfo.processInfo.environment", "posix_spawnp",
                     "Codable", "public ",
+                ] {
+                    #expect(!source.contains(forbidden))
+                }
+            }
+            if sourceName == "InvestigationMachineDarwinEpochRetirement.swift" {
+                let allowedCalls: [String: Int] = [
+                    "proc_listpids": 1,
+                    "waitid": 1,
+                    "waitpid": 1,
+                    "nanosleep": 1,
+                ]
+                for (name, count) in allowedCalls {
+                    let observedCount = source.matches(
+                        of: try Regex("\\b" + name + "\\s*\\(")
+                    ).count
+                    #expect(
+                        observedCount == count,
+                        "\(name): \(observedCount) != \(count)"
+                    )
+                    authoritySource = authoritySource.replacing(
+                        try Regex("\\b" + name + "\\s*\\("),
+                        with: "allowedRetirementCall("
+                    )
+                }
+                for name in ["kill", "close"] {
+                    let qualified = "Darwin." + name + "("
+                    #expect(source.components(separatedBy: qualified).count - 1 == 1)
+                    authoritySource = authoritySource.replacingOccurrences(
+                        of: qualified, with: "allowedRetirementCall("
+                    )
+                }
+                for marker in [
+                    "maximumInventoryEntries = 4_096",
+                    "WEXITED | WNOHANG | WNOWAIT",
+                    "signal(-epoch.processGroupID, SIGTERM)",
+                    "signal(-epoch.processGroupID, SIGKILL)",
+                    "signal(epoch.processID, SIGKILL)",
+                    "postReapMembers.isEmpty",
+                ] {
+                    #expect(source.contains(marker))
+                }
+                for forbidden in [
+                    "killpg(", "SIGINT", "posix_spawn",
+                    "CommandLine.arguments",
+                    "ProcessInfo.processInfo.environment",
                 ] {
                     #expect(!source.contains(forbidden))
                 }
@@ -828,6 +879,9 @@ struct InvestigationMachineTargetBoundaryTests {
                 "WebSocket",
                 "URLSession",
                 "kill(",
+                "proc_listpids(",
+                "waitid(",
+                "waitpid(",
                 "killpg(",
                 "pthread_kill(",
                 "raise(",
@@ -840,6 +894,9 @@ struct InvestigationMachineTargetBoundaryTests {
                     || (sourceName == "InvestigationMachineSingleEpoch.swift" && forbidden == "send(")
                     || (sourceName == "InvestigationMachineDarwinEpochSession.swift"
                         && ["socketpair", "posix_spawn", "fcntl("].contains(forbidden))
+                    || (sourceName == "InvestigationMachineDarwinEpochRetirement.swift"
+                        && ["kill(", "proc_listpids(", "waitid(",
+                            "waitpid("].contains(forbidden))
                 if !semanticException {
                     if forbidden == "Process(" {
                         #expect(authoritySource.matches(

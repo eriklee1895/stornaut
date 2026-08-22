@@ -141,6 +141,14 @@ iib5biic_composer_test_source=
 iib5biic_boundary_test_source=
 iib5biic_staged_scope_contract_only=false
 iib5biic_staged_scope_baseline=30dc76c450517a3b7a887a7802132087beda147f
+iib5biid_retirement_contract_only=false
+iib5biid_session_source=
+iib5biid_retirement_source=
+iib5biid_session_test_source=
+iib5biid_retirement_test_source=
+iib5biid_boundary_test_source=
+iib5biid_staged_scope_contract_only=false
+iib5biid_staged_scope_baseline=efe079f95a9f15a360d280ea656bf9548bfaa3c3
 iib3a_staged_scope_contract_only=false
 iib3a_staged_scope_baseline=HEAD
 iib3b_start_retire_contract_only=false
@@ -367,6 +375,18 @@ if (( $# > 0 )); then
         && [[ $1 == --iib5biic-staged-scope-contract-only ]]; then
         iib5biic_staged_scope_contract_only=true
         iib5biic_staged_scope_baseline=${2:-30dc76c450517a3b7a887a7802132087beda147f}
+    elif (( $# == 6 )) \
+        && [[ $1 == --iib5biid-darwin-retirement-contract-only ]]; then
+        iib5biid_retirement_contract_only=true
+        iib5biid_session_source=$2
+        iib5biid_retirement_source=$3
+        iib5biid_session_test_source=$4
+        iib5biid_retirement_test_source=$5
+        iib5biid_boundary_test_source=$6
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iib5biid-staged-scope-contract-only ]]; then
+        iib5biid_staged_scope_contract_only=true
+        iib5biid_staged_scope_baseline=${2:-efe079f95a9f15a360d280ea656bf9548bfaa3c3}
     elif (( $# == 1 || $# == 2 )) \
         && [[ $1 == --iib3a-staged-scope-contract-only ]]; then
         iib3a_staged_scope_contract_only=true
@@ -392,7 +412,7 @@ if (( $# > 0 )); then
         iib3c_staged_scope_baseline=${2:-HEAD}
     else
         print -u2 \
-            "Usage: scripts/verify-investigation-boundaries [--claim-asid-contract-only <source> | --deadline-state-contract-only <source> | --claim-server-contract-only <adapter> <effects> <deadline-state> | --claim-server-package-contract-only <describe-json> <dump-json> | --legacy-machine-claim-contract-only <lifecycle-xpc> <helper> <machine-host> <machine-claim> | --retirement-handle-v3-contract-only <lifecycle> <adapter> | --live-claim-server-contract-only <project.pbxproj> <Package.swift> <handoff-root> <scheme-root> <lifecycle-escrow> <adapter> <effects> <helper> | --app-peer-admission-contract-only <policy> <adapter> | --iib4-driver-support-contract-only <package-manifest> <client-source> | --iib4-staged-scope-contract-only [baseline] | --iib5a0-claim-abort-contract-only <client-source> | --iib5a0-staged-scope-contract-only [baseline] | --iib5a-single-epoch-contract-only <composer-source> <focused-test-source> | --iib5a-staged-scope-contract-only [baseline] | --iib5bia-projection-contract-only <contract-source> <focused-test-source> | --iib5bia-staged-scope-contract-only [baseline] | --iib5bib1-semantic-contract-only <Package.swift> <semantic-source> <focused-test-source> | --iib5bib1-staged-scope-contract-only [baseline] | --iib5biia-fixed-capsule-contract-only <source> <test> | --iib5biia-staged-scope-contract-only [baseline] | --iib5biib-app-identity-contract-only <Package.swift> <c-source> <header> <observer> <test> | --iib5biib-staged-scope-contract-only [baseline] | --iib5biic-darwin-session-contract-only <composer> <session> <session-test> <composer-test> <boundary-test> | --iib5biic-staged-scope-contract-only [baseline] | --iib3a-staged-scope-contract-only [baseline] | --iib3b-start-retire-contract-only <transport> | --iib3b-staged-scope-contract-only [baseline] | --iib3c-concrete-entry-contract-only <leaf> <adapter> <composition> <harness> | --iib3c-staged-scope-contract-only [baseline] | --iib5bic2a-legacy-owner-contract-only <lifecycle-observation> <collector> <service-probe> <scenario-driver> <installed-owner> <installed-join> <focused-test> | --iib5bic2a-staged-scope-contract-only [baseline] | --iib5bic2b-absence-only-contract-only <lifecycle-observation> <darwin-support> <collector> <service-probe> <installed-owner> <installed-join> <focused-test> <collector-test> [source-root] | --iib5bic2b-boundary-staged-scope-contract-only [baseline] | --iib5bic2b-contract-staged-scope-contract-only [baseline] | --iib5bic2b-aggregate-scope-contract-only [baseline]]"
+            "Usage: scripts/verify-investigation-boundaries [--claim-asid-contract-only <source> | --deadline-state-contract-only <source> | --claim-server-contract-only <adapter> <effects> <deadline-state> | --claim-server-package-contract-only <describe-json> <dump-json> | --legacy-machine-claim-contract-only <lifecycle-xpc> <helper> <machine-host> <machine-claim> | --retirement-handle-v3-contract-only <lifecycle> <adapter> | --live-claim-server-contract-only <project.pbxproj> <Package.swift> <handoff-root> <scheme-root> <lifecycle-escrow> <adapter> <effects> <helper> | --app-peer-admission-contract-only <policy> <adapter> | --iib4-driver-support-contract-only <package-manifest> <client-source> | --iib4-staged-scope-contract-only [baseline] | --iib5a0-claim-abort-contract-only <client-source> | --iib5a0-staged-scope-contract-only [baseline] | --iib5a-single-epoch-contract-only <composer-source> <focused-test-source> | --iib5a-staged-scope-contract-only [baseline] | --iib5bia-projection-contract-only <contract-source> <focused-test-source> | --iib5bia-staged-scope-contract-only [baseline] | --iib5bib1-semantic-contract-only <Package.swift> <semantic-source> <focused-test-source> | --iib5bib1-staged-scope-contract-only [baseline] | --iib5biia-fixed-capsule-contract-only <source> <test> | --iib5biia-staged-scope-contract-only [baseline] | --iib5biib-app-identity-contract-only <Package.swift> <c-source> <header> <observer> <test> | --iib5biib-staged-scope-contract-only [baseline] | --iib5biic-darwin-session-contract-only <composer> <session> <session-test> <composer-test> <boundary-test> | --iib5biic-staged-scope-contract-only [baseline] | --iib5biid-darwin-retirement-contract-only <session> <retirement> <session-test> <retirement-test> <boundary-test> | --iib5biid-staged-scope-contract-only [baseline] | --iib3a-staged-scope-contract-only [baseline] | --iib3b-start-retire-contract-only <transport> | --iib3b-staged-scope-contract-only [baseline] | --iib3c-concrete-entry-contract-only <leaf> <adapter> <composition> <harness> | --iib3c-staged-scope-contract-only [baseline] | --iib5bic2a-legacy-owner-contract-only <lifecycle-observation> <collector> <service-probe> <scenario-driver> <installed-owner> <installed-join> <focused-test> | --iib5bic2a-staged-scope-contract-only [baseline] | --iib5bic2b-absence-only-contract-only <lifecycle-observation> <darwin-support> <collector> <service-probe> <installed-owner> <installed-join> <focused-test> <collector-test> [source-root] | --iib5bic2b-boundary-staged-scope-contract-only [baseline] | --iib5bic2b-contract-staged-scope-contract-only [baseline] | --iib5bic2b-aggregate-scope-contract-only [baseline]]"
         exit 64
     fi
 fi
@@ -3055,6 +3075,7 @@ function verify_iib5biic_index_semantics() {
     local staged_root
     staged_root=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-iib5biic-index.XXXXXX")
     local staged_status=0
+    local completed_commit=d93542283fe5f3c4591b162abbcc69fbd361aa03
     git checkout-index --all --prefix="$staged_root/" || staged_status=$?
     local semantic_path
     for semantic_path in \
@@ -3068,8 +3089,8 @@ function verify_iib5biic_index_semantics() {
         scripts/verify-contract
     do
         if (( staged_status == 0 )) \
-            && ! cmp -s \
-                "$repo_root/$semantic_path" "$staged_root/$semantic_path"
+            && ! git show "$completed_commit:$semantic_path" \
+                | cmp -s - "$staged_root/$semantic_path"
         then
             print -u2 \
                 "ii-b5b-ii-c staged content drifted: $semantic_path"
@@ -3124,6 +3145,240 @@ function verify_iib5biic_staged_scope() {
     local changed=$(git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1 && $3!="AGENTS.md" && $3!="README.md" {n+=$1+$2} END {print n+0}')
     (( changed <= 3600 )) || { print -u2 "ii-b5b-ii-c checkpoint budget drifted"; return 1; }
     verify_iib5biic_index_semantics
+}
+
+function verify_iib5biid_darwin_retirement_contract() {
+    local session_source=$1 retirement_source=$2 session_test=$3
+    local retirement_test=$4 boundary_test=$5
+    xcrun swiftc -frontend -parse -enable-bare-slash-regex "$session_source"
+    xcrun swiftc -frontend -parse -enable-bare-slash-regex "$retirement_source"
+    xcrun swiftc -frontend -parse -enable-bare-slash-regex "$session_test"
+    xcrun swiftc -frontend -parse -enable-bare-slash-regex "$retirement_test"
+    xcrun swiftc -frontend -parse -enable-bare-slash-regex "$boundary_test"
+    python3 - "$session_source" "$retirement_source" "$session_test" \
+        "$retirement_test" "$boundary_test" <<'PY'
+from pathlib import Path
+import re, sys
+session_path, retirement_path, session_test_path, retirement_test_path, boundary_path = map(Path, sys.argv[1:])
+session, retirement, session_test, retirement_test, boundary = [
+    path.read_text(encoding="utf-8") for path in (
+        session_path, retirement_path, session_test_path, retirement_test_path, boundary_path
+    )
+]
+
+def declaration(source, pattern, label):
+    match = re.search(pattern, source, re.MULTILINE)
+    if match is None:
+        raise SystemExit(f"ii-b5b-ii-d declaration missing: {label}")
+    opening = source.find("{", match.end())
+    depth = 0
+    for index in range(opening, len(source)):
+        if source[index] == "{": depth += 1
+        elif source[index] == "}":
+            depth -= 1
+            if depth == 0: return source[match.start():index + 1]
+    raise SystemExit(f"ii-b5b-ii-d declaration malformed: {label}")
+
+if set(re.findall(r"(?m)^import\s+([A-Za-z0-9_]+)\s*$", retirement)) != {"Darwin", "Dispatch", "Foundation"}:
+    raise SystemExit("ii-b5b-ii-d retirement import surface drifted")
+for source in (session, retirement):
+    if re.search(r"(?m)^\s*(?:public|open)\s+", source):
+        raise SystemExit("ii-b5b-ii-d public surface drifted")
+    for marker in ("StornautCore", "StornautExecution", "StornautLifecycle", "StornautInvestigationDiagnostic", "Codable", "signedInvestigationRuntimeReady", "signedRuntimeReady"):
+        if marker in source: raise SystemExit(f"ii-b5b-ii-d authority or admission drifted: {marker}")
+protocol = declaration(session, r"^protocol InvestigationMachineDarwinEpochRetirementOwning", "retirement protocol")
+spawned_match = re.search(r"func retireSpawnedProcess\(.*?\)\s*async throws(?P<tail>.*?)func retireOwnedProcessGroup", protocol, re.DOTALL)
+if spawned_match is None:
+    raise SystemExit("ii-b5b-ii-d spawned protocol method drifted")
+if "InvestigationMachineSingleEpochRetirementProof" in spawned_match.group("tail"):
+    raise SystemExit("ii-b5b-ii-d spawned-only proof drifted")
+if protocol.count("InvestigationMachineSingleEpochRetirementProof") != 1:
+    raise SystemExit("ii-b5b-ii-d owned proof cardinality drifted")
+untrusted = declaration(session, r"^    private func retireUntrustedGroup\(", "untrusted retirement")
+if untrusted.count("retirementOwner.retireSpawnedProcess(spawned)") != 1 or "retireOwnedProcessGroup" in untrusted or "terminal(.terminal(.init()))" in untrusted or untrusted.count("terminal(.terminalUncertain)") != 1:
+    raise SystemExit("ii-b5b-ii-d spawned-only uncertainty drifted")
+for forbidden in ("proc_listpids(", "waitid(", "waitpid(", "kill(", "killpg("):
+    if forbidden in session: raise SystemExit(f"ii-b5b-ii-d syscall source path drifted: {forbidden}")
+owned = declaration(
+    retirement,
+    r"^    private func retireOwnedProcessGroupSynchronously\(",
+    "owned process-group retirement",
+)
+spawned = declaration(
+    retirement,
+    r"^    private func retireSpawnedProcessSynchronously\(",
+    "spawned process retirement",
+)
+inventory = declaration(
+    retirement, r"^    private func inventory\(", "inventory"
+)
+waitable = declaration(
+    retirement, r"^    private func waitableLeader\(", "waitable leader"
+)
+reap = declaration(
+    retirement, r"^    private func reapLeader\(", "leader reap"
+)
+
+required = (
+    "static let maximumInventoryEntries = 4_096",
+    "static let totalWindowNanoseconds: UInt64 = 5_000_000_000",
+    "static let termWindowNanoseconds: UInt64 = 1_000_000_000",
+    "private static let pollNanoseconds: UInt64 = 10_000_000",
+    "epoch.processID > 1", "epoch.processGroupID > 1",
+    "epoch.processGroupID == epoch.processID",
+    "epoch.processGroupID != system.currentProcessGroup()",
+    "UInt32(PROC_PGRP_ONLY)", "data.count.isMultiple(of: width)",
+    "data.count < Self.maximumInventoryEntries * width",
+    "values.allSatisfy({ $0 > 1 })", "Set(values).count == values.count",
+    "Int32(WEXITED | WNOHANG | WNOWAIT)",
+    "try signal(-epoch.processGroupID, SIGTERM)",
+    "try signal(-epoch.processGroupID, SIGKILL)",
+    "try signal(epoch.processID, SIGKILL)",
+    "system.waitPID(processID, Int32(WNOHANG))",
+    "let postReapMembers = try inventory(epoch.processGroupID)",
+    "guard postReapMembers.isEmpty else",
+    "let descriptorFailure = closeExactlyOnce(epoch.descriptors)",
+    "return try await withTaskCancellationHandler",
+    "Self.queue.async", "cancellationRequested",
+    "proc_listpids(", "waitid(", "waitpid(", "Darwin.kill(",
+    "Darwin.close(", "nanosleep(",
+)
+for marker in required:
+    if marker not in retirement:
+        raise SystemExit(f"ii-b5b-ii-d retirement contract drifted: {marker}")
+for marker in (
+    "epoch.processID > 1", "epoch.processGroupID > 1",
+    "epoch.processGroupID == epoch.processID",
+    "epoch.processGroupID != system.currentProcessGroup()",
+    "try signal(-epoch.processGroupID, SIGTERM)",
+    "try signal(-epoch.processGroupID, SIGKILL)",
+    "let postReapMembers = try inventory(epoch.processGroupID)",
+    "guard postReapMembers.isEmpty else",
+    "guard !descriptorFailure else", "return .init()",
+):
+    if marker not in owned:
+        raise SystemExit(f"ii-b5b-ii-d owned retirement drifted: {marker}")
+for marker in (
+    "epoch.processID > 1", "try signal(epoch.processID, SIGKILL)",
+    "guard !descriptorFailure else",
+):
+    if marker not in spawned:
+        raise SystemExit(f"ii-b5b-ii-d spawned retirement drifted: {marker}")
+for marker in (
+    "data.count.isMultiple(of: width)",
+    "data.count < Self.maximumInventoryEntries * width",
+    "values.allSatisfy({ $0 > 1 })",
+    "Set(values).count == values.count",
+):
+    if marker not in inventory:
+        raise SystemExit(f"ii-b5b-ii-d inventory drifted: {marker}")
+if "Int32(WEXITED | WNOHANG | WNOWAIT)" not in waitable:
+    raise SystemExit("ii-b5b-ii-d waitable leader drifted")
+if "system.waitPID(processID, Int32(WNOHANG))" not in reap:
+    raise SystemExit("ii-b5b-ii-d leader reap drifted")
+if retirement.count("return .init()") != 1:
+    raise SystemExit("ii-b5b-ii-d owned proof cardinality drifted")
+for marker in ("killpg(", "SIGINT", "posix_spawn", "CommandLine.arguments", "ProcessInfo.processInfo.environment"):
+    if marker in retirement: raise SystemExit(f"ii-b5b-ii-d retirement authority drifted: {marker}")
+if re.search(r"(?<![A-Za-z0-9_])Process\s*\(", retirement):
+    raise SystemExit("ii-b5b-ii-d retirement authority drifted: Process")
+for name, count in {"proc_listpids": 1, "waitid": 1, "waitpid": 1, "kill": 1, "close": 1, "nanosleep": 1}.items():
+    if len(re.findall(r"\b" + name + r"\s*\(", retirement)) != count:
+        raise SystemExit(f"ii-b5b-ii-d syscall cardinality drifted: {name}")
+
+test_markers = (
+    "naturalExitUsesWaitableProofReapsLastAndMintsOneProof",
+    "termDrainSignalsExactGroupAndNeverReapsBeforeDescendantsLeave",
+    "termIgnoringDescendantEscalatesOnceToExactNegativeGroup",
+    "retirementUsesFreshFixedWindowAtAnyMonotonicOrigin",
+    "invalidOwnedAuthorityNeverInventoriesOrSignals",
+    "malformedOrUnavailableInventoryNeverBecomesEmptyProof",
+    "waitIDRetriesOnlyEINTRAndRequiresTheExactLeader",
+    "waitPIDRetriesOnlyEINTRAndRejectsZeroWrongPIDAndErrors",
+    "signalErrorsIncludingESRCHNeverMintProof",
+    "postReapPGIDReuseWithholdsProofWithoutAnotherSignal",
+    "descriptorFailureContinuesCleanupWithholdsProofAndNeverRetries",
+    "cancellationWaitsForBlockingWorkerBeforeReturning",
+    "duplicateAndConcurrentRetirementAreOneShot",
+    "spawnedFallbackUsesPositivePIDOnlyAndCannotMintProof",
+    "physicalNaturalExitIsWaitableReapedAndLeavesNoGroup",
+    "physicalTermIgnoringDescendantIsKilledReapedLastAndLeavesNoGroup",
+)
+if any(marker not in retirement_test for marker in test_markers) or retirement_test.count("@Test") < len(test_markers) or "#expect" not in retirement_test:
+    raise SystemExit("ii-b5b-ii-d focused retirement coverage drifted")
+for marker in (
+    "InvestigationMachineDarwinEpochRetirement.swift", "proc_listpids",
+    "waitid", "waitpid", 'for name in ["kill", "close"]',
+):
+    if marker not in boundary: raise SystemExit(f"ii-b5b-ii-d boundary test drifted: {marker}")
+if "invalidProcessGroupRemainsUncertainAfterDirectCleanup" not in session_test:
+    raise SystemExit("ii-b5b-ii-d session uncertainty coverage drifted")
+PY
+}
+
+function verify_iib5biid_index_semantics() {
+    local staged_root
+    staged_root=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-iib5biid-index.XXXXXX")
+    local staged_status=0
+    git checkout-index --all --prefix="$staged_root/" || staged_status=$?
+    local semantic_path
+    for semantic_path in \
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinEpochSession.swift \
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinEpochRetirement.swift \
+        Tests/StornautInvestigationTests/InvestigationMachineDarwinEpochSessionTests.swift \
+        Tests/StornautInvestigationTests/InvestigationMachineDarwinEpochRetirementTests.swift \
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift \
+        scripts/verify-investigation-boundaries \
+        scripts/verify-app-release-boundaries \
+        scripts/verify-contract
+    do
+        if (( staged_status == 0 )) && ! cmp -s "$repo_root/$semantic_path" "$staged_root/$semantic_path"; then
+            print -u2 "ii-b5b-ii-d staged content drifted: $semantic_path"
+            staged_status=1
+        fi
+    done
+    if (( staged_status == 0 )); then
+        (cd "$staged_root"; scripts/verify-investigation-boundaries \
+            --iib5biid-darwin-retirement-contract-only \
+            Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinEpochSession.swift \
+            Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinEpochRetirement.swift \
+            Tests/StornautInvestigationTests/InvestigationMachineDarwinEpochSessionTests.swift \
+            Tests/StornautInvestigationTests/InvestigationMachineDarwinEpochRetirementTests.swift \
+            Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift) || staged_status=$?
+    fi
+    rm -rf "$staged_root"
+    return $staged_status
+}
+
+function verify_iib5biid_staged_scope() {
+    local baseline=${1:-efe079f95a9f15a360d280ea656bf9548bfaa3c3}
+    local expected=(
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinEpochSession.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinEpochRetirement.swift
+        Tests/StornautInvestigationTests/InvestigationMachineDarwinEpochSessionTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineDarwinEpochRetirementTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-app-release-boundaries
+        scripts/verify-contract
+        scripts/verify-investigation-boundaries
+    )
+    (( ${#expected} == 8 )) || { print -u2 "ii-b5b-ii-d checkpoint path ceiling drifted"; return 1; }
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" == efe079f95a9f15a360d280ea656bf9548bfaa3c3 ]] || { print -u2 "ii-b5b-ii-d checkpoint baseline drifted"; return 1; }
+    if git diff --cached --name-only --diff-filter=D "$baseline" | grep -q .; then print -u2 "ii-b5b-ii-d checkpoint deleted an existing path"; return 1; fi
+    if git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1 && ($1=="-" || $2=="-") {f=1} END {exit !f}'; then print -u2 "ii-b5b-ii-d binary checkpoint path rejected"; return 1; fi
+    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" | awk 'index($0,"docs/")!=1 && $0!="AGENTS.md" && $0!="README.md"')"})
+    local observed_sorted=("${(@on)observed}")
+    local expected_sorted=("${(@on)expected}")
+    [[ "${(j:\n:)observed_sorted}" == "${(j:\n:)expected_sorted}" ]] || { print -u2 "ii-b5b-ii-d checkpoint paths drifted"; return 1; }
+    local expected_path expected_mode observed_entry
+    for expected_path in "${expected[@]}"; do
+        expected_mode=100644; [[ $expected_path == scripts/* ]] && expected_mode=100755
+        observed_entry=$(git ls-files -s -- "$expected_path")
+        [[ "$(print -r -- "$observed_entry" | awk '{print $1, $3, $4}')" == "$expected_mode 0 $expected_path" ]] || { print -u2 "ii-b5b-ii-d checkpoint mode drifted: $expected_path"; return 1; }
+    done
+    local changed=$(git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1 && $3!="AGENTS.md" && $3!="README.md" {n+=$1+$2} END {print n+0}')
+    (( changed <= 3200 )) || { print -u2 "ii-b5b-ii-d checkpoint budget drifted"; return 1; }
+    verify_iib5biid_index_semantics
 }
 
 function verify_iib4_staged_scope() {
@@ -6334,6 +6589,19 @@ if $iib5biic_staged_scope_contract_only; then
     print "ii-b5b-ii-c staged scope verification passed."
     exit 0
 fi
+if $iib5biid_retirement_contract_only; then
+    verify_iib5biid_darwin_retirement_contract \
+        "$iib5biid_session_source" "$iib5biid_retirement_source" \
+        "$iib5biid_session_test_source" "$iib5biid_retirement_test_source" \
+        "$iib5biid_boundary_test_source"
+    print "ii-b5b-ii-d Darwin retirement contract verification passed."
+    exit 0
+fi
+if $iib5biid_staged_scope_contract_only; then
+    verify_iib5biid_staged_scope "$iib5biid_staged_scope_baseline"
+    print "ii-b5b-ii-d staged scope verification passed."
+    exit 0
+fi
 if $iib3a_staged_scope_contract_only; then
     verify_iib3a_staged_scope "$iib3a_staged_scope_baseline"
     print "ii-b3a staged scope verification passed."
@@ -6375,6 +6643,8 @@ machine_driver_main=Tools/StornautInvestigationMachineDriver/main.swift
 machine_driver_support=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDriverSupport.swift
 machine_fixed_capsule=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineFixedCapsuleIntake.swift
 machine_fixed_capsule_test=Tests/StornautInvestigationTests/InvestigationMachineFixedCapsuleIntakeTests.swift
+machine_epoch_retirement=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinEpochRetirement.swift
+machine_epoch_retirement_test=Tests/StornautInvestigationTests/InvestigationMachineDarwinEpochRetirementTests.swift
 installed_l2_owner=Sources/StornautInvestigationInstalledL2/InstalledL2Observer.swift
 installed_l2_join=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochInstalledL2Join.swift
 iib5bic2a_test=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
@@ -6423,6 +6693,8 @@ required_files=(
     "$machine_driver_support"
     "$machine_fixed_capsule"
     "$machine_fixed_capsule_test"
+    "$machine_epoch_retirement"
+    "$machine_epoch_retirement_test"
     "$installed_l2_owner"
     "$installed_l2_join"
     "$iib5bic2a_test"
@@ -6472,6 +6744,12 @@ verify_iib5biic_darwin_session_contract \
     Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinEpochSession.swift \
     Tests/StornautInvestigationTests/InvestigationMachineDarwinEpochSessionTests.swift \
     Tests/StornautInvestigationTests/InvestigationMachineSingleEpochTests.swift \
+    Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+verify_iib5biid_darwin_retirement_contract \
+    Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinEpochSession.swift \
+    Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinEpochRetirement.swift \
+    Tests/StornautInvestigationTests/InvestigationMachineDarwinEpochSessionTests.swift \
+    Tests/StornautInvestigationTests/InvestigationMachineDarwinEpochRetirementTests.swift \
     Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
 
 python3 - "$xcode_project" "$ordinary_scheme" "$diagnostic_scheme" <<'PY'
@@ -8188,6 +8466,7 @@ expected_driver_support_sources = {
     "DarwinInvestigationMachineInstalledDriverSystem.swift",
     "InvestigationMachineClaimClient.swift",
     "InvestigationMachineDarwinAppIdentityObservation.swift",
+    "InvestigationMachineDarwinEpochRetirement.swift",
     "InvestigationMachineDarwinEpochSession.swift",
     "InvestigationMachineDriverSupport.swift",
     "InvestigationMachineFixedCapsuleIntake.swift",
@@ -8246,6 +8525,9 @@ expected_driver_support_imports = {
         "Foundation", "StornautInvestigationHandoffContract",
         "StornautInvestigationInstalledL2",
     },
+    "InvestigationMachineDarwinEpochRetirement.swift": {
+        "Darwin", "Dispatch", "Foundation",
+    },
     "InvestigationMachineInstalledDriverObservation.swift": {"Darwin"},
     "InvestigationMachineInstalledDriverSystemSource.swift": {"Darwin"},
     "InvestigationMachineSingleEpoch.swift": {
@@ -8273,7 +8555,9 @@ expected_driver_support_sha256 = {
     "InvestigationMachineDarwinAppIdentityObservation.swift":
         "2102c17f2f656b6cee197fb66ff0b2b019fb1c49477123d0123c4fddaeeb754a",
     "InvestigationMachineDarwinEpochSession.swift":
-        "3bfdf13654511e06ae4da881f70eb2edb5dd18cd35c0a34af8f007c6b85aff20",
+        "22b8ed4e85519694e0761ab0fcffef22d692fe1c86e39023d3fba2173e4ccdf5",
+    "InvestigationMachineDarwinEpochRetirement.swift":
+        "574fe7df157c04b573602a222df40fe08bc4759d41fc88b56e8695b636ce38a8",
     "InvestigationMachineSingleEpoch.swift":
         "8c316f5196ada01bb4a812536fb7653218dfe9fc9b079cb90dfd6d2a5c18b338",
     "InvestigationMachineSingleEpochInstalledL2Join.swift":
@@ -8361,6 +8645,23 @@ for source_name in driver_support_sources:
         authority_source = re.sub(
             r"\bsend(?=\s*\()", "typedFrameSend", authority_source
         )
+    elif source_name == "InvestigationMachineDarwinEpochRetirement.swift":
+        exact_calls = {
+            "proc_listpids": 1, "waitid": 1, "waitpid": 1,
+            "kill": 1, "close": 1, "nanosleep": 1,
+        }
+        for name, expected_count in exact_calls.items():
+            pattern = rf"\b{re.escape(name)}\s*\("
+            observed_count = len(re.findall(pattern, source_text))
+            if observed_count != expected_count:
+                raise SystemExit(
+                    "ii-b5b-ii-d fixed Darwin call shape drifted: "
+                    f"{name}: {observed_count}"
+                )
+            authority_source = re.sub(
+                rf"\b{re.escape(name)}(?=\s*\()",
+                "fixedRetirementCall", authority_source,
+            )
     elif source_name == "InvestigationMachineFixedCapsuleIntake.swift":
         compact_source = re.sub(r"\s+", "", source_text)
         fcntl_shapes = (
@@ -9557,20 +9858,20 @@ function require_exact_machine_driver_projection() {
 
     case "$configuration" in
         debug)
-            expected_undefined_sha=ca94c349f514e0e2a57c71203d4fe02ac2976b87210437e023278d7ffb307e11
-            expected_undefined_lines=628
+            expected_undefined_sha=31b23e31e12b7f80442c319d47f71bfde3e7509f4c233c5b7d29a5520781aca6
+            expected_undefined_lines=658
             expected_loads_sha=dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9
             expected_loads_lines=18
-            expected_owned_sha=79b87d43bdd44cf38eb81ac48dd72104d0c14c64cddeefdcd69a7ee42aa4512f
-            expected_owned_lines=3405
+            expected_owned_sha=245ee9f49d53e201479a0a47cdb653a11a3a900422b2b9d6e894926a42883656
+            expected_owned_lines=3671
             ;;
         release)
-            expected_undefined_sha=b75e46b4de9a9742c63439670d66c6c488adb2ce73de47c381a4a80fbb635656
-            expected_undefined_lines=423
-            expected_loads_sha=9053e60819e57a62ee9acb9db4854705fa2ed0ade20ec3683f13b9e854f86c41
+            expected_undefined_sha=f97fadfdcc44255803fe69fbb95fdfab8ab7c173d695e34040631d0d9561b78a
+            expected_undefined_lines=441
+            expected_loads_sha=dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9
             expected_loads_lines=18
-            expected_owned_sha=634e0e7a0ff4db34b6452dc29d413621ffc5986fb9acd80799f95981d3b4593c
-            expected_owned_lines=2080
+            expected_owned_sha=2777198ace01ce8984f42f56c211f48367e2486d74a7a7927e6818ee2dfbd6ec
+            expected_owned_lines=2278
             ;;
         *)
             print -u2 "Unknown Machine driver projection: $configuration"
@@ -9679,7 +9980,7 @@ function verify_machine_driver_projection_mutations() {
         _setattrlist _fsetattrlist _copyfile _fcopyfile _clonefile
         _socket _connect _bind _listen _accept _accept4
         _sendto _sendmsg _recvfrom _recvmsg _getaddrinfo
-        _kill _killpg _pthread_kill _raise
+        _killpg _pthread_kill _raise
     )
     iib5biic_debug_introduced_imports=(
         _free
@@ -9724,6 +10025,12 @@ function verify_machine_driver_projection_mutations() {
         _shutdown
         _socketpair
         _strdup
+    )
+    iib5biid_debug_introduced_imports=(
+        _kill _nanosleep _proc_listpids _waitid _waitpid
+    )
+    iib5biid_release_forbidden_imports=(
+        _kill _nanosleep _proc_listpids _waitid _waitpid
     )
     required_readonly_imports=(
         '_$s6Darwin5fcntlys5Int32VAD_A2DtF'
@@ -9872,6 +10179,15 @@ function verify_machine_driver_projection_mutations() {
                     exit 1
                 fi
             done
+            for marker in "${iib5biid_debug_introduced_imports[@]}"; do
+                if ! print -r -- "$driver_undefined_symbols" \
+                    | grep -Fxq -- "$marker"
+                then
+                    print -u2 \
+                        "ii-b5b-ii-d Debug retirement import is missing: $marker"
+                    exit 1
+                fi
+            done
         else
             for marker in "${iib5biic_release_forbidden_imports[@]}"; do
                 if print -r -- "$driver_undefined_symbols" \
@@ -9879,6 +10195,15 @@ function verify_machine_driver_projection_mutations() {
                 then
                     print -u2 \
                         "ii-b5b-ii-c fixed-session import leaked into Release: $marker"
+                    exit 1
+                fi
+            done
+            for marker in "${iib5biid_release_forbidden_imports[@]}"; do
+                if print -r -- "$driver_undefined_symbols" \
+                    | grep -Fxq -- "$marker"
+                then
+                    print -u2 \
+                        "ii-b5b-ii-d retirement import leaked into Release: $marker"
                     exit 1
                 fi
             done

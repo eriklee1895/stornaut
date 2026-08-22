@@ -47,7 +47,7 @@ struct InvestigationMachineDarwinSpawnedEpoch: Sendable, Equatable {
 protocol InvestigationMachineDarwinEpochRetirementOwning: Sendable {
     func retireSpawnedProcess(
         _ spawnedEpoch: InvestigationMachineDarwinSpawnedEpoch
-    ) async throws -> InvestigationMachineSingleEpochRetirementProof
+    ) async throws
 
     func retireOwnedProcessGroup(
         _ ownedEpoch: InvestigationMachineDarwinOwnedEpoch
@@ -251,12 +251,12 @@ actor InvestigationMachineDarwinEpochSessionFactory:
         )
         let owned: InvestigationMachineDarwinOwnedEpoch
         do {
-            try system.closeDescriptor(channel.childDescriptor)
             openDescriptors.remove(channel.childDescriptor)
             spawned = .init(
                 processID: processID,
                 descriptors: openDescriptors.sorted()
             )
+            try system.closeDescriptor(channel.childDescriptor)
             let processGroup = try system.processGroup(processID)
             guard
                 processGroup == processID,
@@ -373,11 +373,9 @@ actor InvestigationMachineDarwinEpochSessionFactory:
         _ spawned: InvestigationMachineDarwinSpawnedEpoch
     ) async -> InvestigationMachineSingleEpochStartOutcome {
         do {
-            _ = try await retirementOwner.retireSpawnedProcess(spawned)
-            return terminal(.terminal(.init()))
-        } catch {
-            return terminal(.terminalUncertain)
-        }
+            try await retirementOwner.retireSpawnedProcess(spawned)
+        } catch {}
+        return terminal(.terminalUncertain)
     }
 
     private func retireOwnedStartup(
