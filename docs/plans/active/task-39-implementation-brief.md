@@ -83,7 +83,8 @@
 > complete/non-admitting; ii-b5b-ii-a fixed FD-0 capsule intake,
 > ii-b5b-ii-b independent Darwin App identity observation, ii-b5b-ii-c fixed
 > FD-7 session and ii-b5b-ii-d exact owned-PGID retirement are complete/non-
-> admitting; ii-b5b-iii production/artifact composition is current.
+> admitting. Dependency inversion split ii-c0 into c0a/c0b and moved ii-c0a
+> projection-in-capsule contract before ii-b5b-iii; c0a is current.
 > Evidence:
 > [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
 > [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md) and
@@ -1117,8 +1118,8 @@ The remaining L3 work is split before driver coding:
    physical-owner closure. Aggregate i-c2, ii-b5b-ii-a fixed FD-0 capsule
    intake, ii-b5b-ii-b independent Darwin App identity observation,
    ii-b5b-ii-c fixed FD-7 session and ii-b5b-ii-d exact owned-PGID retirement
-   are complete/non-admitting; ii-b5b-iii production/artifact composition is
-   current.
+   are complete/non-admitting. The c0 dependency preflight split c0a/c0b and
+   froze `ii-c0a -> ii-b5b-iii -> ii-c0b -> ii-c -> L3c3d -> L3c4`; c0a is current.
    See the
    [study](../../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md)
    and [final review](../../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md),
@@ -1189,7 +1190,9 @@ The remaining L3 work is split before driver coding:
    [ii-c review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-c-review.md),
    and ii-b5b-ii-d completion is recorded in the
    [ii-d review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-d-review.md).
-   ii-b5b-iii production/artifact composition is current.
+   ii-c0a projection-in-capsule preflight is frozen/current before ii-b5b-iii;
+   see the
+   [c0a preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md).
    The b5 split, claim-abort completion and typed composer completion evidence
    are in the
    [ii-b5 preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b5-split-preflight.md),
@@ -1207,8 +1210,11 @@ The remaining L3 work is split before driver coding:
    free App leaf**, **ii-b2 handle-free helper response**, **ii-b3a fixed channel/
    root peer/drop adapter**, **ii-b3b start-to-retire-only Lifecycle seam**,
    **ii-b3c concrete leaf/native entry**, **ii-b4 fixed claim client** and **ii-b5
-   single-epoch composition**; **ii-c0** requires its own fresh preflight and
-   proves only gate-side launcher/FD hygiene, not real-sudo child behavior. The split preserves a
+   single-epoch composition**. Dependency inversion splits **ii-c0a** package-
+   only projection-in-capsule contract from **ii-c0b** non-root capsule author +
+   launcher/TTY/FD hygiene. c0a preserves v1 capsule/epoch bytes and adds an
+   enclosing projected-cohort input; c0b is the producer and still does not
+   prove real-sudo child behavior. The split preserves a
    zero-argument driver using only a pre-opened bounded stdin cohort capsule,
    removes the opaque handle/token from the helper reply and reserves global
    post-teardown L2 for final uninstall rather than every epoch. Per-epoch L2 is
@@ -1239,7 +1245,8 @@ L3c3c-ii-b4 -> L3c3c-ii-b5a0 -> L3c3c-ii-b5a -> L3c3c-ii-b5b-i-a ->
 L3c3c-ii-b5b-i-b1 -> L3c3c-ii-b5b-i-b2a -> L3c3c-ii-b5b-i-b2b ->
 L3c3c-ii-b5b-i-b3 -> L3c3c-ii-b5b-i-c ->
 L3c3c-ii-b5b-ii-a -> L3c3c-ii-b5b-ii-b -> L3c3c-ii-b5b-ii-c ->
-L3c3c-ii-b5b-ii-d -> L3c3c-ii-b5b-iii -> L3c3c-ii-c0 ->
+L3c3c-ii-b5b-ii-d -> L3c3c-ii-c0a -> L3c3c-ii-b5b-iii ->
+L3c3c-ii-c0b ->
 L3c3c-ii-c -> L3c3d -> L3c4`.
 L3c1, L3c2, L3c3a,
 L3c3b-0, L3c3b-i, L3c3b-ii, L3c3c-i and L3c3c-ii-a are complete;
@@ -1249,7 +1256,8 @@ ii-b2b-ii, ii-b2b-iii-a, iii-b-i, iii-b-ii, ii-b3a and ii-b3b are complete;
 ii-b3c concrete leaf/native entry, ii-b4 fixed helper-claim client, ii-b5a0 and
 ii-b5a, ii-b5b-i-a, i-b1, i-b2a, i-b2b-a, i-b2b-b, i-b3, i-c1 and i-c2a
 are complete and non-admitting; aggregate i-c2 and ii-b5b-ii-a/ii-b/ii-c/ii-d
-are complete/non-admitting, and ii-b5b-iii is current.
+are complete/non-admitting; ii-c0a preflight is frozen/current and ii-b5b-iii
+follows it.
 ADR 0018
 remains Proposed until ii-c succeeds. L3c1 used focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean

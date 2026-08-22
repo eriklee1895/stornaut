@@ -6,7 +6,8 @@
 > iii-a/iii-b-i/iii-b-ii complete/non-admitting; ii-b3 split into b3a/b3b/b3c;
 > ii-b3a/ii-b3b/ii-b3c/ii-b4/ii-b5a0 complete/non-admitting; ii-b5 split;
 > b5a and all b5b-i checkpoints through aggregate i-c2 complete/non-admitting;
-> ii-b5b-ii-a/ii-b/ii-c/ii-d complete/non-admitting; ii-b5b-iii current
+> ii-b5b-ii-a/ii-b/ii-c/ii-d complete/non-admitting; ii-c0a projection-in-
+> capsule preflight frozen/current before ii-b5b-iii
 >
 > **Date:** 2026-08-19
 >
@@ -57,7 +58,10 @@ freezes B4's non-admitting reproducibility evidence. The
 records why the external branch is NO-GO and conditionally selects the installed
 driver path. The
 [installed-driver preflight](../reports/phase-d-task-39b2c-l3c3c-ii-installed-driver-path-cost-preflight.md)
-freezes the implementation split and validation funnel. Important measured
+freezes the implementation split and validation funnel. The later
+[ii-c0a projection-in-capsule preflight](../reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md)
+corrects the remaining dependency order without changing accepted v1 capsule
+bytes. Important measured
 conclusions are:
 
 - an inherited socket's peer token does not rebind to the child;
@@ -99,8 +103,8 @@ claim provenance against a malicious administrator, malicious pre-install
 Coding Agent or arbitrary concurrent same-UID actor.
 
 The future machine-only ceremony first requires the non-executing `sudo -kNnv`
-policy probe to return nonzero. The reviewed ii-c0 gate then maps only its held,
-sealed cohort capsule to standard input and execs `/usr/bin/sudo` with this exact
+policy probe to return nonzero. The future ii-c0b launcher then maps only its
+held, sealed projected-cohort input to standard input and execs `/usr/bin/sudo` with this exact
 inner argv:
 
 ```text
@@ -114,7 +118,7 @@ sudo
 
 No shell redirection, `-S`, askpass, cache-creating `sudo -v`, environment
 override, configurable executable/path, driver argument, UID, endpoint, signal,
-action or cleanup input is allowed. ii-c0 freezes the outer gate executable,
+action or cleanup input is allowed. ii-c0b freezes the outer gate executable,
 source/binary identity, exact argv/env/FD set and controlling-TTY behavior before
 this inner argv may be used.
 Machine evidence cannot prove a prompt occurred: the trusted operator must
@@ -138,8 +142,8 @@ The child strictly decodes it and must echo those exact values in
 `PRE_DROP_READY`; the driver joins that frame to both the sent prelude and the
 capsule row. The prelude is not an STNH frame and does not consume sequence zero.
 
-The zero-argument driver receives its bounded cohort input only through the
-ii-c0 gate's pre-opened standard-input descriptor. That descriptor must be an
+The zero-argument driver receives its bounded projected-cohort input only through
+the ii-c0b gate's pre-opened standard-input descriptor. That descriptor must be an
 owner-UID-501 regular file with mode `0600`, one link, bounded finite size, no ACL or
 unexpected xattrs, initial offset zero and stable initial/final metadata. Root
 DriverSupport sets close-on-exec, reads it to exact EOF, hashes it without
@@ -271,16 +275,20 @@ not a fault target and may not signal unrelated processes.
 - Product work is split into ii-a authority-closed live driver runtime;
   ii-b0a/ii-b0b/ii-b0c/ii-b1–ii-b5 shared contract/bootstrap/App/helper/client/single-epoch
   implementation;
-  ii-c0 TTY/capsule launcher evidence; and ii-c one outer no-model privileged
-  driver invocation containing closed scenario epochs.
+  ii-c0a package-only projected-cohort binary contract before ii-b5b-iii;
+  ii-c0b non-root capsule author plus TTY/FD launcher evidence; and ii-c one
+  outer no-model privileged driver invocation containing closed scenario epochs.
 - No anonymous-XPC, filesystem mailbox, generic IPC, generic root launcher,
   helper launch operation or caller-configurable fallback remains.
 - The driver runtime owns only fixed process creation and lifecycle cleanup; it
   has no Cleanup/Policy/Trash/Executor/Registered Action authority.
 - Strict path/SHA plus live and static signing checks remain mandatory because
   running-vnode validity survives path replacement on the measured platform.
-- ii-c0 proves only gate-side exec/FD hygiene with a non-privileged stub plus
-  the local sudo manual. It does not prove real sudo preserves child stdin/TTY/
+- ii-c0a preserves v1 capsule/epoch bytes and adds only a strict enclosing
+  projected-cohort binary contract and paired intake; it is not a producer.
+- ii-c0b proves only non-root capsule authoring and gate-side exec/FD hygiene
+  with a non-privileged stub plus the local sudo manual. It does not prove real
+  sudo preserves child stdin/TTY/
   FDs. A mismatch in the unique ii-c attempt consumes and fails that gate with
   no retry, readiness or ADR acceptance.
 - L3c3d may run one real authenticated model attempt only after ii-c is green.
@@ -358,6 +366,8 @@ unconsumed.
 | ii-b5b-ii-b independent Darwin App identity observation | complete; non-admitting |
 | ii-b5b-ii-c fixed FD-7 bounded session | complete; non-admitting |
 | ii-b5b-ii-d exact owned-PGID retirement | complete; non-admitting |
-| ii-b5b-iii production/artifact composition | current |
+| ii-c0a projection-in-capsule contract | preflight frozen; current |
+| ii-b5b-iii production/artifact composition | blocked on ii-c0a |
+| ii-c0b non-root capsule author and launcher hygiene | not started |
 | ii-c no-model privileged machine gate | not executed |
 | ADR status | **Proposed** |

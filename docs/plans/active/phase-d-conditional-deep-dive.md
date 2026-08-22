@@ -56,8 +56,9 @@
 > complete/non-admitting; aggregate i-c2 semantic/physical-owner closure and
 > ii-b5b-ii-a fixed FD-0 capsule intake, ii-b5b-ii-b independent Darwin App
 > identity observation, ii-b5b-ii-c fixed FD-7 session and ii-b5b-ii-d exact
-> owned-PGID retirement are complete/non-admitting; ii-b5b-iii production/
-> artifact composition is current, followed eventually by ii-c
+> owned-PGID retirement are complete/non-admitting. Dependency inversion split
+> ii-c0 into c0a/c0b and moved ii-c0a projection-in-capsule contract before
+> ii-b5b-iii; c0a is current, followed by ii-b5b-iii, ii-c0b and then ii-c
 > one no-model privileged gate. The authoritative
 > real-model run and readiness verdict remain unimplemented.
 > Production Deep Dive remains unavailable until Task 44 admission.
@@ -941,7 +942,7 @@ Checkpoint status:
   complete after 35 focused, 521 affected, one 1,234-test staged-only serial,
   exact contract/structural/artifact gates and final review; ii-b3b and its
   test-only fixture prerequisite, ii-b3c and ii-b4 are complete/non-admitting;
-  ii-b5 is split into b5a0/b5a/b5b-i/b5b-ii/b5b-iii; b5a0/b5a, all b5b-i checkpoints through aggregate i-c2 and ii-b5b-ii-a/ii-b/ii-c/ii-d are complete/non-admitting; ii-b5b-iii production/artifact composition is current.
+  ii-b5 is split into b5a0/b5a/b5b-i/b5b-ii/b5b-iii; b5a0/b5a, all b5b-i checkpoints through aggregate i-c2 and ii-b5b-ii-a/ii-b/ii-c/ii-d are complete/non-admitting. The c0 dependency preflight splits c0a/c0b and freezes the corrected order `ii-c0a -> ii-b5b-iii -> ii-c0b -> ii-c -> L3c3d -> L3c4`; c0a is current.
   See the
   [ii-b2 ASID prerequisite review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2-asid-prerequisite-review.md),
   the
@@ -984,6 +985,7 @@ Checkpoint status:
   the [ii-b5b-ii preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-preflight.md),
   the [ii-b5b-ii-b review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-b-review.md),
   the [ii-b5b-ii-c review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-c-review.md),
+  the [ii-c0a preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md),
   the
   [L3c1b-i Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
   and

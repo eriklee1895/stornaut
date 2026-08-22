@@ -287,12 +287,14 @@
 > closure；i-c1 与 aggregate i-c2 semantic/physical-owner closure 已完成并
 > 保持 non-admitting；b5b-ii-a fixed FD-0 capsule intake、b5b-ii-b independent
 > Darwin App identity observation、b5b-ii-c fixed FD-7 session 与 b5b-ii-d
-> exact owned-PGID retirement 已完成并保持 non-admitting，b5b-iii production/
-> artifact composition 是当前 frontier。该
+> exact owned-PGID retirement 已完成并保持 non-admitting。dependency inversion
+> preflight 已把 ii-c0 拆为 c0a/c0b；c0a 保留 v1 capsule/epoch bytes，新增
+> package-only enclosing projected-cohort input 与 paired intake，并前移为当前
+> frontier。其后严格按 b5b-iii → c0b → ii-c → L3c3d → L3c4 推进。该
 > b5b-ii-c checkpoint 以 8 个 non-document paths / 3,104 changed lines、35
 > focused tests、1,396-test staged-only serial、三个 verifier gates 与 final
-> no-unresolved-P0–P2 review 收口；未运行 full。之后按序为 b5b-iii
-> production/artifact composition、ii-c0 fresh privilege-launcher preflight，
+> no-unresolved-P0–P2 review 收口；未运行 full。c0a 完成后按序为 b5b-iii
+> production/artifact composition、ii-c0b non-root capsule-author/launcher preflight，
 > 再到 ii-c 唯一 no-model
 > privileged installed-driver gate。只有
 > L3c4 可作 readiness claim，
@@ -642,9 +644,9 @@ ii-b3a/ii-b3b/ii-b3c/ii-b4/ii-b5a0/ii-b5a complete/non-admitting，
 ii-b5 split；b5b-i-a/i-b1/i-b2a/i-b2b-a/i-b2b-b/i-b3
 complete/non-admitting；i-c 已拆为 i-c1 join/proof 与 i-c2 legacy closure，
 i-c1 与 aggregate i-c2 complete/non-admitting；ii-b5b-ii-a/ii-b/ii-c/ii-d
-complete/non-admitting，ii-b5b-iii current，
-ii-b 已拆为 ii-b0a/ii-b0b/ii-b0c 与
-ii-b1–ii-b5，并在 ii-c 前插入 ii-c0。
+complete/non-admitting；ii-c0 已拆为 c0a/c0b，c0a preflight frozen/current。
+ii-b 已拆为 ii-b0a/ii-b0b/ii-b0c 与 ii-b1–ii-b5；剩余严格顺序为
+ii-c0a → ii-b5b-iii → ii-c0b → ii-c → L3c3d → L3c4。
 ADR 0018 仍 Proposed，L3c4 独占 final admission 与剩余 full。
 L3c1b-i/ii 证据见
 [i review](../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
@@ -697,7 +699,8 @@ final no-unresolved-P0–P2 review。i-b1 completion 见
 6-path/979-line implementation、honest non-green 1,311-test/64-suite serial、
 exact-case closure 与 final no-unresolved-P0–P2 review。ii-b4/ii-b5a0/ii-b5a/
 i-a/i-b1/i-b2a/i-b2b-a/i-b2b-b/i-b3/i-c1、aggregate i-c2 与
-ii-b5b-ii-a/ii-b/ii-c/ii-d complete/non-admitting；ii-b5b-iii current。i-b2a completion 见
+ii-b5b-ii-a/ii-b/ii-c/ii-d complete/non-admitting；ii-c0a preflight frozen/
+current，ii-b5b-iii follows it。i-b2a completion 见
 [artifact/static reader review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2a-review.md)。
 [fixed service reader review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2b-b-review.md)
 记录 6-path/709-line scope、46 affected tests、1,341-test clean serial 与
@@ -720,7 +723,7 @@ closure。
 [ii-b5b-ii preflight](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-preflight.md)
 将 fixed Darwin runtime 拆为 FD-0 capsule、Darwin identity、FD-7 session 与
 PGID retirement 四个 bounded checkpoints；ii-a/ii-b/ii-c/ii-d 已完成并保持
-non-admitting，ii-b5b-iii current。ii-a completion 见
+non-admitting；ii-c0a preflight frozen/current，ii-b5b-iii follows it。ii-a completion 见
 [review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-a-review.md)，ii-b
 completion 见
 [review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-b-review.md)。
@@ -728,6 +731,9 @@ ii-c completion 见
 [review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-c-review.md)。
 ii-d completion 见
 [review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-d-review.md)。
+[ii-c0a preflight](../reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md)
+冻结 v1-preserving enclosing projected-cohort contract、8-path/2,600-line
+scope 与 corrected remaining order。
 生产 Deep Dive 继续 unavailable，直到 Task 44 final admission。
 
 跨 Epic 的阶段依赖、no-go 分支和交付顺序由 [Delivery Roadmap](../plans/roadmap.md) 管理；新 active plan 不得另起一套宏观路线。
@@ -890,8 +896,8 @@ non-admitting；i-c 已拆为 i-c1 DriverSupport join/opaque proof 与 i-c2
 legacy-owner closure；i-c1 与 aggregate i-c2 已完成并保持 non-admitting；
 ii-b5b-ii-a fixed FD-0 capsule intake、ii-b5b-ii-b independent Darwin App
 identity observation、ii-b5b-ii-c fixed FD-7 session 与 ii-b5b-ii-d exact
-owned-PGID retirement 已完成并保持 non-admitting，ii-b5b-iii production/
-artifact composition 是当前 frontier。
+owned-PGID retirement 已完成并保持 non-admitting；ii-c0a preflight 已冻结并
+成为当前 frontier，之后为 ii-b5b-iii、ii-c0b、ii-c、L3c3d、L3c4。
 已完成部分均为
 non-admitting prerequisite，
 L3c4 才是 machine admission。该最终 gate
