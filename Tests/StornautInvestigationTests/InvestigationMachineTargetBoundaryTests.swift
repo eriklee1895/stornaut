@@ -495,6 +495,7 @@ struct InvestigationMachineTargetBoundaryTests {
             "DarwinInvestigationMachineInstalledDriverSystem.swift",
             "InvestigationMachineClaimClient.swift",
             "InvestigationMachineDriverSupport.swift",
+            "InvestigationMachineFixedCapsuleIntake.swift",
             "InvestigationMachineInstalledDriverObservation.swift",
             "InvestigationMachineInstalledDriverSystemSource.swift",
             "InvestigationMachineSingleEpoch.swift",
@@ -587,6 +588,11 @@ struct InvestigationMachineTargetBoundaryTests {
                 "import Security",
             ],
             "InvestigationMachineDriverSupport.swift": ["import Darwin"],
+            "InvestigationMachineFixedCapsuleIntake.swift": [
+                "import Darwin",
+                "import Foundation",
+                "import StornautInvestigationHandoffContract",
+            ],
             "InvestigationMachineClaimClient.swift": [
                 "import CryptoKit",
                 "import Darwin",
@@ -625,6 +631,35 @@ struct InvestigationMachineTargetBoundaryTests {
                 expectedImports[sourceName]
             )
             #expect(imports == expectedSourceImports)
+            var authoritySource = source
+            if sourceName == "InvestigationMachineFixedCapsuleIntake.swift" {
+                let compactSource = source.filter { !$0.isWhitespace }
+                #expect(source.matches(of: /\bfcntl\s*\(/).count == 3)
+                for shape in [
+                    "fcntl(descriptor,F_GETFD)",
+                    "fcntl(descriptor,F_GETFL)",
+                    "fcntl(descriptor,F_SETFD,flags)",
+                ] {
+                    #expect(
+                        compactSource.components(separatedBy: shape).count == 2
+                    )
+                }
+                #expect(compactSource.components(
+                    separatedBy: "flags:initialFlags|FD_CLOEXEC"
+                ).count == 2)
+                #expect(compactSource.components(
+                    separatedBy: "&FD_CLOEXEC==FD_CLOEXEC"
+                ).count == 3)
+                #expect(compactSource.components(
+                    separatedBy: "&O_ACCMODE==O_RDONLY"
+                ).count == 3)
+                #expect(compactSource.components(
+                    separatedBy: "return.success(result==0)"
+                ).count == 2)
+                authoritySource = source.replacing(
+                    /\bfcntl\s*\(/, with: "fixedCapsuleFcntl("
+                )
+            }
             for forbidden in [
                 "import StornautCore",
                 "import StornautExecution",
@@ -736,7 +771,7 @@ struct InvestigationMachineTargetBoundaryTests {
                 let semanticException = (sourceName == "InvestigationMachineClaimClient.swift" && forbidden == "connect(")
                     || (sourceName == "InvestigationMachineSingleEpoch.swift" && forbidden == "send(")
                 if !semanticException {
-                    #expect(!source.contains(forbidden))
+                    #expect(!authoritySource.contains(forbidden))
                 }
             }
             if sourceName != "InvestigationMachineClaimClient.swift" {
@@ -748,6 +783,14 @@ struct InvestigationMachineTargetBoundaryTests {
                     "import StornautInvestigation"
                 ))
                 #expect(!source.contains("kill("))
+            }
+            if sourceName
+                == "DarwinInvestigationMachineInstalledDriverSystem.swift"
+            {
+                let compactSource = source.filter { !$0.isWhitespace }
+                #expect(compactSource.components(
+                    separatedBy: "returnresult==0"
+                ).count == 3)
             }
             if sourceName
                 == "DarwinInvestigationMachineInstalledDriverSystem.swift"
@@ -1307,6 +1350,50 @@ struct InvestigationMachineTargetBoundaryTests {
             "InvestigationInstalledL2Observer()",
         ] {
             #expect(production.components(separatedBy: constructor).count == 2)
+        }
+    }
+
+    @Test
+    func iiB5BIIAVerifierPinsFixedCapsuleAndNarrowFcntlContract() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundaries = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ),
+            encoding: .utf8
+        )
+        for marker in [
+            "--iib5biia-fixed-capsule-contract-only <source> <test>",
+            "--iib5biia-staged-scope-contract-only [baseline]",
+            "ii-b5b-ii-a exact fcntl shape drifted",
+            "ii-b5b-ii-a FD_CLOEXEC shape drifted",
+            "ii-b5b-ii-a O_RDONLY shape drifted",
+            "stable metadata and canonical decode",
+            "ii-b5b-ii-a ACL or xattr semantics drifted",
+            "actor consumption order",
+            "ii-b5b-ii-a focused mutation drifted",
+            "darwinSystemRecognizesARealExtendedACL",
+            ".valid(deviceID: 0)",
+            ".valid(inode: 0)",
+            ".valid(flags: 1)",
+            "case .initialACL:",
+            "case .finalACL:",
+            "Machine fixed capsule exact fcntl contract drifted",
+            "Machine driver installed ACL semantics drifted",
+            "Machine fixed capsule ACL semantics drifted",
+            "ii-b5b-ii-a checkpoint paths drifted",
+            "ii-b5b-ii-a checkpoint baseline drifted",
+            "ii-b5b-ii-a checkpoint budget drifted",
+            "ii-b5b-ii-a checkpoint deleted an existing path",
+            "ii-b5b-ii-a binary checkpoint path rejected",
+            "scripts/verify-contract",
+            "verify_iib5biia_index_semantics",
+            "ii-b5b-ii-a staged content drifted",
+            "(( changed <= 2000 ))",
+            "_fcntl _ioctl",
+        ] {
+            #expect(boundaries.contains(marker))
         }
     }
 

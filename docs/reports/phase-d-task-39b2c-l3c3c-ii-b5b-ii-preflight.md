@@ -16,7 +16,12 @@ repository limit of fourteen paths or roughly 4,000 added lines.
 The work is therefore split before coding:
 
 1. **ii-b5b-ii-a — fixed FD-0 capsule intake and internal epoch selection**:
-   at most five non-document paths and about 1,600 added lines.
+   at most seven non-document paths and 2,000 changed lines. The implementation
+   review found that the existing installed-driver reader had the same
+   `acl_get_entry` return-value defect and that its source-seal verifier was an
+   atomic dependency of the new source. The checkpoint therefore includes the
+   existing Darwin reader/test and `scripts/verify-contract`, rather than
+   leaving either ACL path or verifier replay knowingly inconsistent.
 2. **ii-b5b-ii-b — independent Darwin App identity observation**:
    at most eight non-document paths and about 2,800 added lines.
 3. **ii-b5b-ii-c — fixed FD-7 spawn and bounded duplex session**:
@@ -65,9 +70,13 @@ privileged authority.
 ## 4. Tests-First and Validation
 
 ii-b5b-ii-a starts with a focused RED proving the concrete fixed capsule reader
-and internal selector do not exist. Its matrix covers wrong offset, owner, mode,
-type, link count, ACL/xattrs, oversize, short read, trailing growth, descriptor
-or offset drift, malformed/non-canonical capsule and caller-selected ordinal.
+and internal selector do not exist. Its matrix covers wrong offset, read/write
+descriptor mode, owner, mode, type, link count, device/inode/file flags,
+ACL/xattrs, oversize, short read, trailing growth, descriptor or offset drift,
+malformed/non-canonical capsule and caller-selected ordinal. The exact allowed
+non-document paths are the new intake source/test, the existing Darwin installed
+reader and its focused test, the shared target-boundary test, and the two
+structural verifier scripts.
 
 Later subcheckpoints add injected syscall matrices plus bounded same-UID child
 integration for identity, socket/FD inheritance, EOF and PGID/reap ordering.

@@ -204,7 +204,7 @@ struct DarwinInvestigationMachineInstalledDriverSystem:
             &entry
         )
         guard result >= 0 else { throw SystemError() }
-        return result == 1
+        return result == 0
     }
 
     func hasUnexpectedExtendedAttributes(_ descriptor: Int32) throws -> Bool {
@@ -518,7 +518,7 @@ struct DarwinInvestigationMachineInstalledDriverSystem:
             &entry
         )
         guard result >= 0 else { throw SystemError() }
-        return result == 1
+        return result == 0
     }
 
     private static func signing(

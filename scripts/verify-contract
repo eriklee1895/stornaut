@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=b6f2475a78b82b7aa360ed5d6a63412b6eecfbe7b05057ef28ffd8280f9bed8c
+ib2_self_sha=8e9d675876b477e0064daef209c29fb5b1fc9ca6a45aae99c40df761d838afbf
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -187,6 +187,12 @@ require_fixed_text scripts/verify-investigation-boundaries \
     '--iib5bic2b-contract-staged-scope-contract-only'
 require_fixed_text scripts/verify-investigation-boundaries \
     '--iib5bic2b-aggregate-scope-contract-only'
+require_fixed_text scripts/verify-investigation-boundaries \
+    '--iib5biia-fixed-capsule-contract-only'
+require_fixed_text scripts/verify-investigation-boundaries \
+    '--iib5biia-staged-scope-contract-only'
+require_fixed_text scripts/verify-investigation-boundaries \
+    '(( changed <= 2000 ))'
 require_fixed_text scripts/verify-investigation-boundaries \
     'ii-b5b-i-c2b installed physical-owner cardinality drifted'
 require_fixed_text scripts/verify-investigation-boundaries \
@@ -882,7 +888,7 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "8bbc825f7df2a98ebeb5e03a1de904380c92a3a201815a8100c2a89df7af6d31",
+        "7e091ff7774ee4dddf1341ea54a50255b27c48db1418e3ee209380f1ad2f0d62",
     Path("scripts/verify-app-release-boundaries"):
         "42ee86284c289efce8025ae366336046a47d689838c93ac577b0bfc1ed68f92c",
 }
@@ -901,12 +907,12 @@ release = Path("scripts/verify-app-release-boundaries").read_text(
     encoding="utf-8"
 )
 for marker, count in {
-    "eb33b8f1730d52926606175ef6472f47fc17782c4cad5ff76a56272570fb25b2": 1,
-    "534c6bb01fa151a98d0554684d13b1b27f233ddfe8cde24d63a9008fe0bde9ae": 1,
+    "0387d98750bcc609dd1cf0df602bd677c5eeaabd1e58985c6f2b7de6f7cab8e6": 1,
+    "74881c5f75665cb158b672a05a959366566bed34aa71c4e21b473ba76fc22735": 1,
     "9053e60819e57a62ee9acb9db4854705fa2ed0ade20ec3683f13b9e854f86c41": 2,
-    "53d1cf04307ba4e6019bcd94f4d324471dce346d690e95b22bd98f9237a79d9d": 1,
+    "6e80acdf3ef114b889856e0b63505a59caec2a346cf7cf450e0505fcbee7f0d8": 1,
     "b2f3f04ca7c27db94e4833bffd106665bc41c5e6e0df3d36622c42bd4340ee38": 1,
-    "ead614054c51095da16673e5c485a6feaecba5e3203b2ae25479fd6998e6e411": 1,
+    "74fa8c8511fecbe291bf2184db32156ff27231fc59097a75efaf29b06e1dab2f": 1,
     "f182dc183a8a662eb39bdfcdd45e743d595135d68ee7488367b7f222ee53a0da": 1,
 }.items():
     observed = investigation.count(marker) + release.count(marker)
@@ -3795,6 +3801,9 @@ iib5a0_tree=e904766917494fd34f6e3e373478a6ca3ad88054
 [[ "$(git show -s --format=%P "$iib5a0_commit")" == "$iib5a0_parent" ]]
 [[ "$(git show -s --format=%T "$iib5a0_commit")" == "$iib5a0_tree" ]]
 GIT_INDEX_FILE="$iib5a0_index" git read-tree "$iib5a0_commit^{tree}"
+blob=$(git rev-parse "${iib5a0_parent}:scripts/verify-contract")
+GIT_INDEX_FILE="$iib5a0_index" git update-index \
+    --cacheinfo "100755,$blob,scripts/verify-contract"
 GIT_INDEX_FILE="$iib5a0_index" "$iib4_gate" \
     --iib5a0-staged-scope-contract-only "$iib5a0_parent"
 for fixture in extra-path over-budget deleted-path; do
@@ -4802,6 +4811,265 @@ for fixture in extra-path existing-deleted-path binary-numstat wrong-baseline st
         --iib5bic2b-aggregate-scope-contract-only "$baseline" \
         >"$output" 2>&1; then
         fail_contract "ii-b5b-i-c2b aggregate mutation accepted: $fixture"
+    fi
+    require_fixed_text "$output" "$expected"
+done
+
+iib5biia_gate=scripts/verify-investigation-boundaries
+iib5biia_baseline=ddbc4a0be3ea059c7de239b85ef60c40c09affbb
+iib5biia_source_path=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineFixedCapsuleIntake.swift
+iib5biia_test_path=Tests/StornautInvestigationTests/InvestigationMachineFixedCapsuleIntakeTests.swift
+"$iib5biia_gate" --iib5biia-fixed-capsule-contract-only \
+    "$iib5biia_source_path" "$iib5biia_test_path" \
+    >"$contract_root/iib5biia-canonical.log"
+python3 - "$iib5biia_source_path" "$iib5biia_test_path" \
+    Sources/StornautInvestigationMachineDriverSupport/DarwinInvestigationMachineInstalledDriverSystem.swift \
+    Tests/StornautInvestigationTests/InvestigationMachineDriverSupportTests.swift \
+    Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift \
+    scripts/verify-contract "$contract_root" <<'PY'
+from pathlib import Path
+import sys
+
+source_path, test_path, installed_path, installed_test_path, boundary_path, \
+    contract_path, root = map(Path, sys.argv[1:])
+source = source_path.read_text(encoding="utf-8")
+test = test_path.read_text(encoding="utf-8")
+installed = installed_path.read_text(encoding="utf-8")
+installed_test = installed_test_path.read_text(encoding="utf-8")
+boundary = boundary_path.read_text(encoding="utf-8")
+contract = contract_path.read_text(encoding="utf-8")
+
+
+def mutation(name, old, new, text=source):
+    if text.count(old) != 1:
+        raise SystemExit(f"cannot construct ii-b5b-ii-a mutation: {name}")
+    (root / f"iib5biia-{name}.swift").write_text(
+        text.replace(old, new, 1), encoding="utf-8"
+    )
+
+
+mutation(
+    "public-surface",
+    "package struct InvestigationMachineFixedCapsuleIntake: Sendable {",
+    "public struct InvestigationMachineFixedCapsuleIntake: Sendable {",
+)
+mutation(
+    "path-open",
+    "import StornautInvestigationHandoffContract\n",
+    "import StornautInvestigationHandoffContract\n"
+    "private func forbiddenCapsuleOpen("
+    "_ path: UnsafePointer<CChar>) -> Int32 {\n"
+    "    Darwin.open(path, O_RDONLY)\n"
+    "}\n",
+)
+mutation(
+    "extra-fcntl",
+    "        let flags = fcntl(descriptor, F_GETFD)",
+    "        _ = fcntl(descriptor, F_GETFD)\n"
+    "        let flags = fcntl(descriptor, F_GETFD)",
+)
+mutation(
+    "remove-final-readonly",
+    "            try value(system.descriptorStatusFlags(descriptor)) & O_ACCMODE\n"
+    "                == O_RDONLY,\n"
+    "            try value(system.snapshot(descriptor)) == initial,",
+    "            try value(system.snapshot(descriptor)) == initial,",
+)
+mutation(
+    "remove-final-descriptor-validation",
+    "            try value(system.offset(descriptor)) == Int64(encoded.count),\n"
+    "            try value(system.descriptorFlags(descriptor)) & FD_CLOEXEC\n"
+    "                == FD_CLOEXEC,\n"
+    "            try value(system.descriptorStatusFlags(descriptor))",
+    "            try value(system.offset(descriptor)) == Int64(encoded.count),\n"
+    "            try value(system.descriptorStatusFlags(descriptor))",
+)
+mutation(
+    "acl-result-one",
+    "        return .success(result == 0)",
+    "        return .success(result == 1)",
+)
+mutation(
+    "caller-ordinal-scenario",
+    "    package init() {\n"
+    "        system = DarwinInvestigationMachineFixedCapsuleSystem()\n"
+    "    }\n\n"
+    "    init(system: any InvestigationMachineFixedCapsuleSystem) {",
+    "    package init() {\n"
+    "        system = DarwinInvestigationMachineFixedCapsuleSystem()\n"
+    "    }\n\n"
+    "    package init(ordinal: UInt32, scenario: UInt32) {\n"
+    "        _ = ordinal\n"
+    "        _ = scenario\n"
+    "        system = DarwinInvestigationMachineFixedCapsuleSystem()\n"
+    "    }\n\n"
+    "    init(system: any InvestigationMachineFixedCapsuleSystem) {",
+)
+mutation(
+    "vacuous-focused-test",
+    "        #expect(system.descriptors.allSatisfy { $0 == STDIN_FILENO })",
+    "        #expect(true)",
+    text=test,
+)
+mutation(
+    "staged-semantic-drift",
+    "        snapshot.deviceID > 0",
+    "        snapshot.deviceID >= 0",
+)
+mutation(
+    "staged-installed-source-drift",
+    "        return result == 0\n"
+    "    }\n\n"
+    "    func hasUnexpectedExtendedAttributes",
+    "        return result == 1\n"
+    "    }\n\n"
+    "    func hasUnexpectedExtendedAttributes",
+    text=installed,
+)
+mutation(
+    "staged-installed-test-drift",
+    "        #expect(try system.hasExtendedACL(descriptor))",
+    "        #expect(true)",
+    text=installed_test,
+)
+mutation(
+    "staged-boundary-test-drift",
+    '            "Machine fixed capsule exact fcntl contract drifted",',
+    '            "Machine fixed capsule contract removed",',
+    text=boundary,
+)
+mutation(
+    "staged-contract-drift",
+    "\niib5biia_baseline=ddbc4a0be3ea059c7de239b85ef60c40c09affbb\n",
+    "\niib5biia_baseline=06269bca03a5a7b2ca2319b8e029f3cecf7cc6de\n",
+    text=contract,
+)
+
+(root / "iib5biia-over-budget.swift").write_text(
+    "".join(f"// ii-b5b-ii-a budget line {line}\n" for line in range(2_101)),
+    encoding="utf-8",
+)
+PY
+for fixture in \
+    public-surface:'ii-b5b-ii-a public surface drifted' \
+    path-open:'ii-b5b-ii-a authority or admission surface drifted: (?<![A-Za-z0-9_])(?:Darwin\.)?open(?:at)?\s*\(' \
+    extra-fcntl:'ii-b5b-ii-a exact fcntl shape drifted' \
+    remove-final-readonly:'ii-b5b-ii-a F_GETFL validation cardinality drifted' \
+    remove-final-descriptor-validation:'ii-b5b-ii-a F_GETFD validation cardinality drifted' \
+    acl-result-one:'ii-b5b-ii-a ACL or xattr semantics drifted: return.success(result==0)' \
+    caller-ordinal-scenario:'ii-b5b-ii-a caller-selected input surface drifted' \
+    vacuous-focused-test:'ii-b5b-ii-a canonical focused test drifted'; do
+    name=${fixture%%:*}
+    expected=${fixture#*:}
+    target="$contract_root/iib5biia-$name.swift"
+    xcrun swiftc -frontend -parse "$target"
+    source="$iib5biia_source_path"
+    test="$iib5biia_test_path"
+    if [[ $name == vacuous-focused-test ]]; then
+        test=$target
+    else
+        source=$target
+    fi
+    output="$contract_root/iib5biia-$name.log"
+    if "$iib5biia_gate" --iib5biia-fixed-capsule-contract-only \
+        "$source" "$test" >"$output" 2>&1; then
+        fail_contract "ii-b5b-ii-a mutation accepted: $name"
+    fi
+    require_fixed_text "$output" "$expected"
+done
+
+iib5biia_index="$contract_root/iib5biia.index"
+GIT_INDEX_FILE="$iib5biia_index" git read-tree \
+    "$iib5biia_baseline^{tree}"
+iib5biia_paths=(
+    Sources/StornautInvestigationMachineDriverSupport/DarwinInvestigationMachineInstalledDriverSystem.swift
+    Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineFixedCapsuleIntake.swift
+    Tests/StornautInvestigationTests/InvestigationMachineDriverSupportTests.swift
+    Tests/StornautInvestigationTests/InvestigationMachineFixedCapsuleIntakeTests.swift
+    Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+    scripts/verify-contract
+    scripts/verify-investigation-boundaries
+)
+for checkpoint_path in "${iib5biia_paths[@]}"; do
+    blob=$(git hash-object -w -- "$checkpoint_path")
+    mode=100644
+    if [[ $checkpoint_path == scripts/verify-investigation-boundaries \
+        || $checkpoint_path == scripts/verify-contract ]]; then
+        mode=100755
+    fi
+    GIT_INDEX_FILE="$iib5biia_index" git update-index --add \
+        --cacheinfo "$mode,$blob,$checkpoint_path"
+done
+GIT_INDEX_FILE="$iib5biia_index" "$iib5biia_gate" \
+    --iib5biia-staged-scope-contract-only "$iib5biia_baseline"
+for fixture in extra-path over-budget deleted binary \
+    staged-semantic-drift staged-installed-source-drift \
+    staged-installed-test-drift staged-boundary-test-drift \
+    staged-contract-drift
+do
+    index="$contract_root/iib5biia-$fixture.index"
+    cp "$iib5biia_index" "$index"
+    if [[ $fixture == extra-path ]]; then
+        blob=$(git rev-parse "${iib5biia_baseline}:AGENTS.md")
+        GIT_INDEX_FILE="$index" git update-index --add \
+            --cacheinfo "100644,$blob,iib5biia-extra.swift"
+        expected='ii-b5b-ii-a checkpoint paths drifted'
+    elif [[ $fixture == over-budget ]]; then
+        blob=$(git hash-object -w -- \
+            "$contract_root/iib5biia-over-budget.swift")
+        GIT_INDEX_FILE="$index" git update-index --add \
+            --cacheinfo "100644,$blob,$iib5biia_source_path"
+        expected='ii-b5b-ii-a checkpoint budget drifted'
+    elif [[ $fixture == deleted ]]; then
+        GIT_INDEX_FILE="$index" git rm --cached -q -f \
+            Sources/StornautInvestigationMachineDriverSupport/DarwinInvestigationMachineInstalledDriverSystem.swift
+        expected='ii-b5b-ii-a checkpoint deleted an existing path'
+    elif [[ $fixture == binary ]]; then
+        blob=$(git rev-parse \
+            "${iib5biia_baseline}:Tests/Fixtures/Snapshots/design-system.empty-state.dark.en.png")
+        GIT_INDEX_FILE="$index" git update-index --add \
+            --cacheinfo "100644,$blob,$iib5biia_source_path"
+        expected='ii-b5b-ii-a binary checkpoint path rejected'
+    elif [[ $fixture == staged-semantic-drift ]]; then
+        blob=$(git hash-object -w -- \
+            "$contract_root/iib5biia-staged-semantic-drift.swift")
+        GIT_INDEX_FILE="$index" git update-index --add \
+            --cacheinfo "100644,$blob,$iib5biia_source_path"
+        expected="ii-b5b-ii-a staged content drifted: $iib5biia_source_path"
+    elif [[ $fixture == staged-installed-source-drift ]]; then
+        mutation_path=Sources/StornautInvestigationMachineDriverSupport/DarwinInvestigationMachineInstalledDriverSystem.swift
+        blob=$(git hash-object -w -- \
+            "$contract_root/iib5biia-$fixture.swift")
+        GIT_INDEX_FILE="$index" git update-index --add \
+            --cacheinfo "100644,$blob,$mutation_path"
+        expected="ii-b5b-ii-a staged content drifted: $mutation_path"
+    elif [[ $fixture == staged-installed-test-drift ]]; then
+        mutation_path=Tests/StornautInvestigationTests/InvestigationMachineDriverSupportTests.swift
+        blob=$(git hash-object -w -- \
+            "$contract_root/iib5biia-$fixture.swift")
+        GIT_INDEX_FILE="$index" git update-index --add \
+            --cacheinfo "100644,$blob,$mutation_path"
+        expected="ii-b5b-ii-a staged content drifted: $mutation_path"
+    elif [[ $fixture == staged-boundary-test-drift ]]; then
+        mutation_path=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        blob=$(git hash-object -w -- \
+            "$contract_root/iib5biia-$fixture.swift")
+        GIT_INDEX_FILE="$index" git update-index --add \
+            --cacheinfo "100644,$blob,$mutation_path"
+        expected="ii-b5b-ii-a staged content drifted: $mutation_path"
+    else
+        mutation_path=scripts/verify-contract
+        blob=$(git hash-object -w -- \
+            "$contract_root/iib5biia-$fixture.swift")
+        GIT_INDEX_FILE="$index" git update-index --add \
+            --cacheinfo "100755,$blob,$mutation_path"
+        expected="ii-b5b-ii-a staged content drifted: $mutation_path"
+    fi
+    output="$contract_root/iib5biia-scope-$fixture.log"
+    if GIT_INDEX_FILE="$index" "$iib5biia_gate" \
+        --iib5biia-staged-scope-contract-only "$iib5biia_baseline" \
+        >"$output" 2>&1; then
+        fail_contract "ii-b5b-ii-a scope mutation accepted: $fixture"
     fi
     require_fixed_text "$output" "$expected"
 done

@@ -229,6 +229,55 @@ struct InvestigationMachineDriverSupportTests {
     }
 
     @Test
+    func darwinSourceRecognizesARealExtendedACL() throws {
+        let root = FileManager.default.temporaryDirectory.appending(
+            path: "stornaut-installed-driver-acl-\(UUID().uuidString)",
+            directoryHint: .isDirectory
+        )
+        let file = root.appending(path: "artifact")
+        try FileManager.default.createDirectory(
+            at: root,
+            withIntermediateDirectories: false
+        )
+        defer {
+            let removeACL = Process()
+            removeACL.executableURL = URL(filePath: "/bin/chmod")
+            removeACL.arguments = ["-N", file.path]
+            do {
+                try removeACL.run()
+                removeACL.waitUntilExit()
+            } catch {}
+            try? FileManager.default.removeItem(at: root)
+        }
+        try Data([0x01]).write(to: file)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o600],
+            ofItemAtPath: file.path
+        )
+        let system = DarwinInvestigationMachineInstalledDriverSystem()
+        let initialDescriptor = Darwin.open(
+            file.path,
+            O_RDONLY | O_CLOEXEC
+        )
+        try #require(initialDescriptor >= 0)
+        #expect(try !system.hasExtendedACL(initialDescriptor))
+        Darwin.close(initialDescriptor)
+
+        let addACL = Process()
+        addACL.executableURL = URL(filePath: "/bin/chmod")
+        addACL.arguments = ["+a", "everyone allow read", file.path]
+        try addACL.run()
+        addACL.waitUntilExit()
+        try #require(addACL.terminationStatus == 0)
+
+        let descriptor = Darwin.open(file.path, O_RDONLY | O_CLOEXEC)
+        try #require(descriptor >= 0)
+        defer { Darwin.close(descriptor) }
+
+        #expect(try system.hasExtendedACL(descriptor))
+    }
+
+    @Test
     func darwinSourceStrictlyParsesTheFrozenLaunchDaemonManifest() throws {
         let repositoryRoot = URL(filePath: #filePath)
             .deletingLastPathComponent()

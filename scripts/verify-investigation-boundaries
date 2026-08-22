@@ -120,6 +120,11 @@ iib5bic2b_contract_staged_scope_contract_only=false
 iib5bic2b_contract_staged_scope_baseline=HEAD
 iib5bic2b_aggregate_scope_contract_only=false
 iib5bic2b_aggregate_scope_baseline=58332ccb9f78da203fb2380ca006c49f0f371c2b
+iib5biia_fixed_capsule_contract_only=false
+iib5biia_capsule_source=
+iib5biia_focused_test_source=
+iib5biia_staged_scope_contract_only=false
+iib5biia_staged_scope_baseline=ddbc4a0be3ea059c7de239b85ef60c40c09affbb
 iib3a_staged_scope_contract_only=false
 iib3a_staged_scope_baseline=HEAD
 iib3b_start_retire_contract_only=false
@@ -313,6 +318,15 @@ if (( $# > 0 )); then
         && [[ $1 == --iib5bic2b-aggregate-scope-contract-only ]]; then
         iib5bic2b_aggregate_scope_contract_only=true
         iib5bic2b_aggregate_scope_baseline=${2:-58332ccb9f78da203fb2380ca006c49f0f371c2b}
+    elif (( $# == 3 )) \
+        && [[ $1 == --iib5biia-fixed-capsule-contract-only ]]; then
+        iib5biia_fixed_capsule_contract_only=true
+        iib5biia_capsule_source=$2
+        iib5biia_focused_test_source=$3
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iib5biia-staged-scope-contract-only ]]; then
+        iib5biia_staged_scope_contract_only=true
+        iib5biia_staged_scope_baseline=${2:-ddbc4a0be3ea059c7de239b85ef60c40c09affbb}
     elif (( $# == 1 || $# == 2 )) \
         && [[ $1 == --iib3a-staged-scope-contract-only ]]; then
         iib3a_staged_scope_contract_only=true
@@ -338,7 +352,7 @@ if (( $# > 0 )); then
         iib3c_staged_scope_baseline=${2:-HEAD}
     else
         print -u2 \
-            "Usage: scripts/verify-investigation-boundaries [--claim-asid-contract-only <source> | --deadline-state-contract-only <source> | --claim-server-contract-only <adapter> <effects> <deadline-state> | --claim-server-package-contract-only <describe-json> <dump-json> | --legacy-machine-claim-contract-only <lifecycle-xpc> <helper> <machine-host> <machine-claim> | --retirement-handle-v3-contract-only <lifecycle> <adapter> | --live-claim-server-contract-only <project.pbxproj> <Package.swift> <handoff-root> <scheme-root> <lifecycle-escrow> <adapter> <effects> <helper> | --app-peer-admission-contract-only <policy> <adapter> | --iib4-driver-support-contract-only <package-manifest> <client-source> | --iib4-staged-scope-contract-only [baseline] | --iib5a0-claim-abort-contract-only <client-source> | --iib5a0-staged-scope-contract-only [baseline] | --iib5a-single-epoch-contract-only <composer-source> <focused-test-source> | --iib5a-staged-scope-contract-only [baseline] | --iib5bia-projection-contract-only <contract-source> <focused-test-source> | --iib5bia-staged-scope-contract-only [baseline] | --iib5bib1-semantic-contract-only <Package.swift> <semantic-source> <focused-test-source> | --iib5bib1-staged-scope-contract-only [baseline] | --iib3a-staged-scope-contract-only [baseline] | --iib3b-start-retire-contract-only <transport> | --iib3b-staged-scope-contract-only [baseline] | --iib3c-concrete-entry-contract-only <leaf> <adapter> <composition> <harness> | --iib3c-staged-scope-contract-only [baseline] | --iib5bic2a-legacy-owner-contract-only <lifecycle-observation> <collector> <service-probe> <scenario-driver> <installed-owner> <installed-join> <focused-test> | --iib5bic2a-staged-scope-contract-only [baseline] | --iib5bic2b-absence-only-contract-only <lifecycle-observation> <darwin-support> <collector> <service-probe> <installed-owner> <installed-join> <focused-test> <collector-test> [source-root] | --iib5bic2b-boundary-staged-scope-contract-only [baseline] | --iib5bic2b-contract-staged-scope-contract-only [baseline] | --iib5bic2b-aggregate-scope-contract-only [baseline]]"
+            "Usage: scripts/verify-investigation-boundaries [--claim-asid-contract-only <source> | --deadline-state-contract-only <source> | --claim-server-contract-only <adapter> <effects> <deadline-state> | --claim-server-package-contract-only <describe-json> <dump-json> | --legacy-machine-claim-contract-only <lifecycle-xpc> <helper> <machine-host> <machine-claim> | --retirement-handle-v3-contract-only <lifecycle> <adapter> | --live-claim-server-contract-only <project.pbxproj> <Package.swift> <handoff-root> <scheme-root> <lifecycle-escrow> <adapter> <effects> <helper> | --app-peer-admission-contract-only <policy> <adapter> | --iib4-driver-support-contract-only <package-manifest> <client-source> | --iib4-staged-scope-contract-only [baseline] | --iib5a0-claim-abort-contract-only <client-source> | --iib5a0-staged-scope-contract-only [baseline] | --iib5a-single-epoch-contract-only <composer-source> <focused-test-source> | --iib5a-staged-scope-contract-only [baseline] | --iib5bia-projection-contract-only <contract-source> <focused-test-source> | --iib5bia-staged-scope-contract-only [baseline] | --iib5bib1-semantic-contract-only <Package.swift> <semantic-source> <focused-test-source> | --iib5bib1-staged-scope-contract-only [baseline] | --iib5biia-fixed-capsule-contract-only <source> <test> | --iib5biia-staged-scope-contract-only [baseline] | --iib3a-staged-scope-contract-only [baseline] | --iib3b-start-retire-contract-only <transport> | --iib3b-staged-scope-contract-only [baseline] | --iib3c-concrete-entry-contract-only <leaf> <adapter> <composition> <harness> | --iib3c-staged-scope-contract-only [baseline] | --iib5bic2a-legacy-owner-contract-only <lifecycle-observation> <collector> <service-probe> <scenario-driver> <installed-owner> <installed-join> <focused-test> | --iib5bic2a-staged-scope-contract-only [baseline] | --iib5bic2b-absence-only-contract-only <lifecycle-observation> <darwin-support> <collector> <service-probe> <installed-owner> <installed-join> <focused-test> <collector-test> [source-root] | --iib5bic2b-boundary-staged-scope-contract-only [baseline] | --iib5bic2b-contract-staged-scope-contract-only [baseline] | --iib5bic2b-aggregate-scope-contract-only [baseline]]"
         exit 64
     fi
 fi
@@ -653,7 +667,6 @@ function verify_iib5a0_staged_scope() {
         Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineClaimClient.swift
         Tests/StornautInvestigationTests/InvestigationMachineClaimClientTests.swift
         Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
-        scripts/verify-contract
         scripts/verify-investigation-boundaries
     )
     local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" | awk 'index($0, "docs/") != 1')"})
@@ -1927,6 +1940,593 @@ function verify_iib5bic2b_aggregate_scope() {
     local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" | awk 'index($0,"docs/")!=1 && $0!="AGENTS.md"')"})
     [[ "${(j:\n:)${(on)observed}}" == "${(j:\n:)${(on)expected}}" ]] || { print -u2 "ii-b5b-i-c2b aggregate paths drifted"; return 1; }
     verify_iib5bic2b_index_semantics
+}
+
+function verify_iib5biia_fixed_capsule_contract() {
+    local capsule_source=$1 focused_test_source=$2
+    local installed_source=Sources/StornautInvestigationMachineDriverSupport/DarwinInvestigationMachineInstalledDriverSystem.swift
+    local installed_test=Tests/StornautInvestigationTests/InvestigationMachineDriverSupportTests.swift
+    local boundary_test=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+    xcrun swiftc -frontend -parse "$capsule_source"
+    xcrun swiftc -frontend -parse "$focused_test_source"
+    python3 - "$capsule_source" "$focused_test_source" \
+        "$installed_source" "$installed_test" "$boundary_test" <<'PY'
+from pathlib import Path
+import hashlib
+import re
+import sys
+
+source_path, test_path, installed_path, installed_test_path, boundary_path = (
+    map(Path, sys.argv[1:])
+)
+source = source_path.read_text(encoding="utf-8")
+test = test_path.read_text(encoding="utf-8")
+installed = installed_path.read_text(encoding="utf-8")
+installed_test = installed_test_path.read_text(encoding="utf-8")
+boundary = boundary_path.read_text(encoding="utf-8")
+
+
+def code_only(value, label):
+    output = list(value)
+    index = 0
+    block_depth = 0
+    delimiter = None
+    while index < len(value):
+        if block_depth:
+            if value.startswith("/*", index):
+                output[index:index + 2] = "  "
+                block_depth += 1
+                index += 2
+            elif value.startswith("*/", index):
+                output[index:index + 2] = "  "
+                block_depth -= 1
+                index += 2
+            else:
+                if value[index] != "\n":
+                    output[index] = " "
+                index += 1
+            continue
+        if delimiter is not None:
+            if value.startswith(delimiter, index):
+                width = len(delimiter)
+                output[index:index + width] = " " * width
+                delimiter = None
+                index += width
+            elif delimiter == '"' and value[index] == "\\":
+                output[index] = " "
+                if index + 1 < len(value):
+                    output[index + 1] = " "
+                index += 2
+            else:
+                if value[index] != "\n":
+                    output[index] = " "
+                index += 1
+            continue
+        if value.startswith("//", index):
+            end = value.find("\n", index)
+            end = len(value) if end < 0 else end
+            output[index:end] = " " * (end - index)
+            index = end
+        elif value.startswith("/*", index):
+            output[index:index + 2] = "  "
+            block_depth = 1
+            index += 2
+        elif value.startswith('"""', index):
+            output[index:index + 3] = "   "
+            delimiter = '"""'
+            index += 3
+        elif value[index] == '"':
+            output[index] = " "
+            delimiter = '"'
+            index += 1
+        else:
+            index += 1
+    if block_depth or delimiter is not None:
+        raise SystemExit(f"ii-b5b-ii-a {label} contains unterminated text")
+    return "".join(output)
+
+
+def declaration(value, pattern, label):
+    match = re.search(pattern, value, re.MULTILINE)
+    if match is None:
+        raise SystemExit(f"ii-b5b-ii-a {label} drifted")
+    opening = value.find("{", match.end())
+    if opening < 0:
+        raise SystemExit(f"ii-b5b-ii-a {label} has no body")
+    depth = 0
+    for index in range(opening, len(value)):
+        if value[index] == "{":
+            depth += 1
+        elif value[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return value[match.start():index + 1]
+    raise SystemExit(f"ii-b5b-ii-a {label} is unterminated")
+
+
+def compact(value):
+    return re.sub(r"\s+", "", value)
+
+
+def require_order(value, markers, label):
+    cursor = 0
+    for marker in markers:
+        position = value.find(marker, cursor)
+        if position < 0:
+            raise SystemExit(
+                f"ii-b5b-ii-a {label} missing ordered marker: {marker}"
+            )
+        cursor = position + len(marker)
+
+
+code = code_only(source, "source")
+imports = set(re.findall(
+    r"(?m)^import\s+([A-Za-z0-9_]+)\s*$", source
+))
+if imports != {
+    "Darwin", "Foundation",
+    "StornautInvestigationHandoffContract",
+}:
+    raise SystemExit("ii-b5b-ii-a dependency surface drifted")
+if re.search(r"(?m)^\s*(?:public|open)\s+", code):
+    raise SystemExit("ii-b5b-ii-a public surface drifted")
+package_types = re.findall(
+    r"(?m)^package\s+(?:final\s+)?"
+    r"(?:struct|class|actor|enum|protocol|typealias)\s+"
+    r"([A-Za-z0-9_]+)",
+    code,
+)
+if package_types != [
+    "InvestigationMachineFixedCapsuleIntakeError",
+    "InvestigationMachineFixedEpochSelection",
+    "InvestigationMachineFixedEpochPlan",
+    "InvestigationMachineFixedCapsuleIntake",
+]:
+    raise SystemExit(
+        f"ii-b5b-ii-a package surface drifted: {package_types!r}"
+    )
+if re.findall(
+    r"\bpackage\s+func\s+([A-Za-z0-9_]+)\s*\(", code
+) != ["takeNext", "read"]:
+    raise SystemExit("ii-b5b-ii-a package callable surface drifted")
+
+error_body = declaration(
+    code,
+    r"^package\s+enum\s+InvestigationMachineFixedCapsuleIntakeError\b",
+    "error surface",
+)
+if re.findall(r"(?m)^\s*case\s+([A-Za-z0-9_]+)", error_body) != [
+    "invalidStandardInput", "invalidCapsule", "exhausted",
+]:
+    raise SystemExit("ii-b5b-ii-a error surface drifted")
+
+snapshot = declaration(
+    code,
+    r"^struct\s+InvestigationMachineFixedCapsuleDescriptorSnapshot\b",
+    "descriptor snapshot",
+)
+snapshot_fields = re.findall(
+    r"(?m)^\s*let\s+([A-Za-z0-9_]+):", snapshot
+)
+if snapshot_fields != [
+    "deviceID", "inode", "generation", "isRegularFile",
+    "ownerUserID", "ownerGroupID", "mode", "linkCount",
+    "size", "flags", "modificationSeconds",
+    "modificationNanoseconds", "statusChangeSeconds",
+    "statusChangeNanoseconds",
+]:
+    raise SystemExit("ii-b5b-ii-a descriptor metadata surface drifted")
+
+selection = declaration(
+    code,
+    r"^package\s+struct\s+InvestigationMachineFixedEpochSelection\b",
+    "epoch selection",
+)
+if re.findall(
+    r"(?m)^\s*package\s+let\s+([A-Za-z0-9_]+):", selection
+) != ["outerAttemptUUID", "wholeCapsuleSHA256", "epoch"]:
+    raise SystemExit("ii-b5b-ii-a selection surface drifted")
+
+plan = declaration(
+    code,
+    r"^package\s+actor\s+InvestigationMachineFixedEpochPlan\b",
+    "actor plan",
+)
+take_next = declaration(
+    plan, r"^\s*package\s+func\s+takeNext\s*\(\s*\)\s+throws\b",
+    "actor takeNext",
+)
+compact_plan = compact(plan)
+if compact_plan.count("privatevarnextIndex=0") != 1:
+    raise SystemExit("ii-b5b-ii-a actor cursor ownership drifted")
+if len(re.findall(r"\bpackage\s+func\b", plan)) != 1:
+    raise SystemExit("ii-b5b-ii-a actor callable surface drifted")
+if re.search(r"\b(?:subscript|reset|rewind)\b", plan):
+    raise SystemExit("ii-b5b-ii-a actor replay surface drifted")
+compact_take_next = compact(take_next)
+require_order(compact_take_next, (
+    "guardnextIndex<epochs.countelse{",
+    "letepoch=epochs[nextIndex]",
+    "epoch.ordinal==UInt32(nextIndex)",
+    "epoch.scenario.rawValue==epoch.ordinal+1",
+    "nextIndex+=1",
+    "returnInvestigationMachineFixedEpochSelection(",
+), "actor consumption order")
+for marker in (
+    "letepoch=epochs[nextIndex]",
+    "epoch.ordinal==UInt32(nextIndex)",
+    "epoch.scenario.rawValue==epoch.ordinal+1",
+    "nextIndex+=1",
+    "returnInvestigationMachineFixedEpochSelection(",
+):
+    if compact_take_next.count(marker) != 1:
+        raise SystemExit("ii-b5b-ii-a actor cardinality drifted")
+
+intake = declaration(
+    code,
+    r"^package\s+struct\s+InvestigationMachineFixedCapsuleIntake\b",
+    "fixed capsule intake",
+)
+if len(re.findall(r"(?m)^\s*package\s+init\s*\(\s*\)", intake)) != 1:
+    raise SystemExit("ii-b5b-ii-a package initializer drifted")
+if len(re.findall(r"(?m)^\s*package\s+func\s+read\s*\(\s*\)", intake)) != 1:
+    raise SystemExit("ii-b5b-ii-a zero-argument read surface drifted")
+if re.search(
+    r"\bpackage\s+(?:func|init)\b[^\n{]*(?:ordinal|scenario|path|url)\s*:",
+    intake + plan, re.IGNORECASE,
+):
+    raise SystemExit("ii-b5b-ii-a caller-selected input surface drifted")
+read_body = declaration(
+    intake, r"^\s*package\s+func\s+read\s*\(\s*\)\s+throws\b",
+    "fixed read",
+)
+finish = declaration(intake, r"^\s*private\s+func\s+finish\s*\(", "finish")
+trailing_read = declaration(
+    intake, r"^\s*private\s+func\s+readTrailingByte\s*\(",
+    "exact EOF probe",
+)
+valid = declaration(
+    intake, r"^\s*private\s+static\s+func\s+valid\s*\(",
+    "metadata policy",
+)
+compact_read = compact(read_body)
+compact_finish = compact(finish)
+compact_trailing_read = compact(trailing_read)
+compact_intake = compact(intake)
+if compact_intake.count("STDIN_FILENO") != 1:
+    raise SystemExit("ii-b5b-ii-a fixed STDIN_FILENO ownership drifted")
+if compact_intake.count("system.descriptorFlags(descriptor)") != 3:
+    raise SystemExit("ii-b5b-ii-a F_GETFD validation cardinality drifted")
+if compact_intake.count("system.descriptorStatusFlags(descriptor)") != 2:
+    raise SystemExit("ii-b5b-ii-a F_GETFL validation cardinality drifted")
+for marker, count in (
+    ("system.setDescriptorFlags(", 1),
+    ("system.offset(descriptor)", 2),
+    ("system.snapshot(descriptor)", 2),
+    ("system.hasExtendedACL(descriptor)", 2),
+    ("system.hasExtendedAttributes(descriptor)", 2),
+    ("readTrailingByte(descriptor)", 1),
+    ("InvestigationCohortCapsule.decode(encoded)", 1),
+):
+    if compact_intake.count(marker) != count:
+        raise SystemExit(
+            f"ii-b5b-ii-a fixed intake cardinality drifted: {marker}"
+        )
+if compact_intake.count("FD_CLOEXEC") != 5:
+    raise SystemExit("ii-b5b-ii-a FD_CLOEXEC shape drifted")
+if compact_intake.count("&O_ACCMODE==O_RDONLY") != 2:
+    raise SystemExit("ii-b5b-ii-a O_RDONLY shape drifted")
+require_order(compact_read, (
+    "letdescriptor=STDIN_FILENO",
+    "system.offset(descriptor))==0",
+    "letinitialFlags=tryvalue(system.descriptorFlags(descriptor))",
+    "system.setDescriptorFlags(descriptor,flags:initialFlags|FD_CLOEXEC)",
+    "system.descriptorFlags(descriptor))&FD_CLOEXEC==FD_CLOEXEC",
+    "system.descriptorStatusFlags(descriptor))&O_ACCMODE==O_RDONLY",
+    "letinitial=tryvalue(system.snapshot(descriptor))",
+    "guardSelf.valid(initial)else{",
+    "system.hasExtendedACL(descriptor)",
+    "system.hasExtendedAttributes(descriptor)",
+    "letexpectedByteCount=Int(exactly:initial.size)",
+    "whileencoded.count<expectedByteCount",
+    "lettrailing=tryreadTrailingByte(descriptor)",
+    "guardtrailing.isEmptyelse{",
+    "returntryfinish(",
+), "FD-0 read order")
+require_order(compact_finish, (
+    "system.offset(descriptor))==Int64(encoded.count)",
+    "system.descriptorFlags(descriptor))&FD_CLOEXEC==FD_CLOEXEC",
+    "system.descriptorStatusFlags(descriptor))&O_ACCMODE==O_RDONLY",
+    "system.snapshot(descriptor))==initial",
+    "system.hasExtendedACL(descriptor)",
+    "system.hasExtendedAttributes(descriptor)",
+    "capsule:tryInvestigationCohortCapsule.decode(encoded)",
+), "stable metadata and canonical decode")
+if (
+    compact_trailing_read.count(
+        "system.read(descriptor,maximumByteCount:1)"
+    ) != 1
+    or "case.failure(leterror)whereerror.errno==EINTR:continue"
+        not in compact_trailing_read
+    or "case.success(lettrailing):returntrailing"
+        not in compact_trailing_read
+):
+    raise SystemExit("ii-b5b-ii-a exact EOF probe drifted")
+compact_valid = compact(valid)
+for marker in (
+    "snapshot.deviceID>0", "snapshot.inode>0",
+    "snapshot.isRegularFile",
+    "snapshot.ownerUserID==requiredOwnerUserID",
+    "snapshot.mode==0o600", "snapshot.linkCount==1",
+    "snapshot.size>0",
+    "snapshot.size<=InvestigationCohortCapsule.maximumByteCount",
+    "snapshot.flags==0",
+):
+    if compact_valid.count(marker) != 1:
+        raise SystemExit(f"ii-b5b-ii-a metadata policy drifted: {marker}")
+if compact_intake.count("requiredOwnerUserID:uid_t=501") != 1:
+    raise SystemExit("ii-b5b-ii-a fixed owner drifted")
+if compact_intake.count("readChunkByteCount=16*1_024") != 1:
+    raise SystemExit("ii-b5b-ii-a read bound drifted")
+if compact_intake.count("maximumExtendedAttributeListBytes=4*1_024") != 1:
+    raise SystemExit("ii-b5b-ii-a xattr bound drifted")
+
+darwin = declaration(
+    code,
+    r"^struct\s+DarwinInvestigationMachineFixedCapsuleSystem\b",
+    "Darwin adapter",
+)
+compact_darwin = compact(darwin)
+fcntl_shapes = (
+    "fcntl(descriptor,F_GETFD)",
+    "fcntl(descriptor,F_GETFL)",
+    "fcntl(descriptor,F_SETFD,flags)",
+)
+if len(re.findall(r"\bfcntl\s*\(", darwin)) != 3 or any(
+    compact_darwin.count(shape) != 1 for shape in fcntl_shapes
+):
+    raise SystemExit("ii-b5b-ii-a exact fcntl shape drifted")
+for marker in (
+    "deviceID:UInt64(status.st_dev)",
+    "inode:UInt64(status.st_ino)",
+    "generation:status.st_gen",
+    "isRegularFile:status.st_mode&S_IFMT==S_IFREG",
+    "ownerUserID:status.st_uid", "ownerGroupID:status.st_gid",
+    "mode:status.st_mode&0o7777",
+    "linkCount:UInt64(status.st_nlink)", "size:status.st_size",
+    "flags:status.st_flags",
+    "modificationSeconds:Int64(status.st_mtimespec.tv_sec)",
+    "modificationNanoseconds:Int64(status.st_mtimespec.tv_nsec)",
+    "statusChangeSeconds:Int64(status.st_ctimespec.tv_sec)",
+    "statusChangeNanoseconds:Int64(status.st_ctimespec.tv_nsec)",
+):
+    if compact_darwin.count(marker) != 1:
+        raise SystemExit(f"ii-b5b-ii-a Darwin metadata mapping drifted: {marker}")
+for marker in (
+    "acl_get_fd_np(descriptor,ACL_TYPE_EXTENDED)",
+    "Darwin.errno==ENOENT?.success(false):.failure(.init(errno:Darwin.errno))",
+    "acl_get_entry(acl,Int32(ACL_FIRST_ENTRY.rawValue),&entry)",
+    "guardresult>=0else{", "return.success(result==0)",
+    "flistxattr(descriptor,nil,0,0)", "return.success(count>0)",
+):
+    if compact_darwin.count(marker) != 1:
+        raise SystemExit(f"ii-b5b-ii-a ACL or xattr semantics drifted: {marker}")
+
+forbidden_patterns = (
+    r"(?<![A-Za-z0-9_])(?:Darwin\.)?open(?:at)?\s*\(",
+    r"\b(?:path|fileURL|root)\b",
+    r"\b(?:func|init)\s*\([^)]*(?:ordinal|scenario)\s*:",
+    r"\b(?:URL|URLComponents|FilePath|FileHandle|FileManager)\b",
+    r"\b(?:JSONDecoder|JSONEncoder|JSONSerialization|Codable|Encodable|Decodable)\b",
+    r"\b(?:Process|URLSession|NSXPCConnection|NWConnection|WebSocket)\s*\(",
+    r"\b(?:socket|socketpair|connect|bind|listen|accept|accept4)\s*\(",
+    r"\b(?:posix_spawnp?|fork|vfork|execv|execve|execvp|execvP|execl|execlp|system|popen|syscall|ioctl|mmap|msync)\s*\(",
+    r"\b(?:Darwin\.)?(?:write|writev|pwrite|pwritev|truncate|ftruncate|creat|unlink|rename|mkdir|chmod|chown|setxattr|fsetxattr|acl_set_fd|acl_set_fd_np)\s*\(",
+    r"\b(?:O_WRONLY|O_RDWR|O_CREAT|O_TRUNC|O_APPEND)\b",
+    r"\b(?:Cleanup|Executor|MoveToTrash|TrashMoving|RegisteredAction|StornautExecution)\b",
+    r"\b(?:readiness|signedRuntimeReady|signedInvestigationRuntimeReady|machineReport|receipt)\b",
+    r"\b(?:CommandLine|ProcessInfo\.processInfo\.environment)\b",
+    r"@main\b|#if\b|Task\s*\{|Task\.detached",
+)
+for pattern in forbidden_patterns:
+    if re.search(pattern, code, re.IGNORECASE):
+        raise SystemExit(
+            f"ii-b5b-ii-a authority or admission surface drifted: {pattern}"
+        )
+
+required_tests = (
+    "fixedCapsuleIntakeProvidesClosedFDZeroSurface",
+    "validCapsuleReadsOnlyFDZeroAndYieldsCanonicalRows",
+    "invalidDescriptorProvenanceFailsClosed",
+    "interruptedReadRetriesAndMalformedCapsuleIsRejected",
+    "darwinSystemRecognizesARealExtendedACL",
+    "planAliasesShareOneNonReplayableCursor",
+)
+for marker in required_tests:
+    if test.count(marker) != 1:
+        raise SystemExit(f"ii-b5b-ii-a focused coverage drifted: {marker}")
+required_mutations = (
+    "case initialOffset, flagsRead, flagsWrite, flagsNotSet",
+    "case statusFlagsRead, writableDescriptor, finalDescriptorFlagsDrift",
+    "case zeroDevice, zeroInode, nonRegular, wrongOwner, wrongMode",
+    "case multipleLinks, unexpectedFileFlags",
+    "case empty, oversized, initialACL, initialXattr",
+    "case prematureEOF, trailingGrowth, finalOffset, metadataDrift",
+    "case finalACL, finalXattr, readFailure",
+    ".valid(deviceID: 0)", ".valid(inode: 0)",
+    ".valid(flags: 1)",
+    "case .initialACL:", "case .finalACL:",
+    "case .finalDescriptorFlagsDrift:",
+    "#expect(try !system.hasExtendedACL(initialDescriptor).get())",
+    "#expect(hasACL)",
+)
+for marker in required_mutations:
+    if marker not in test:
+        raise SystemExit(f"ii-b5b-ii-a focused mutation drifted: {marker}")
+if "@Test(arguments: FixedCapsuleInputMutation.allCases)" not in test:
+    raise SystemExit("ii-b5b-ii-a focused mutation matrix drifted")
+if re.sub(r"\s+", "", installed).count("returnresult==0") != 2:
+    raise SystemExit("ii-b5b-ii-a installed ACL semantics drifted")
+for marker in (
+    "darwinSourceRecognizesARealExtendedACL",
+    "#expect(try !system.hasExtendedACL(initialDescriptor))",
+    "#expect(try system.hasExtendedACL(descriptor))",
+    '"everyone allow read"',
+):
+    if marker not in installed_test:
+        raise SystemExit(
+            f"ii-b5b-ii-a installed ACL regression drifted: {marker}"
+        )
+for marker in (
+    "InvestigationMachineFixedCapsuleIntake.swift",
+    "iiB5BIIAVerifierPinsFixedCapsuleAndNarrowFcntlContract",
+    "Machine fixed capsule exact fcntl contract drifted",
+    "Machine driver installed ACL semantics drifted",
+):
+    if marker not in boundary:
+        raise SystemExit(
+            f"ii-b5b-ii-a boundary regression drifted: {marker}"
+        )
+
+expected = {
+    source_path: "9f3a33cd0f5792e28d2c5c69b28250463509883114196fa4530141ea048c799d",
+    test_path: "5524411c895237fbd28983e91d8eb6b5a57c03881b175556b908e9b9fa7d0f87",
+}
+for path, digest in expected.items():
+    if hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+        label = "source" if path == source_path else "focused test"
+        raise SystemExit(f"ii-b5b-ii-a canonical {label} drifted")
+PY
+}
+
+function verify_iib5biia_index_semantics() {
+    local staged_root
+    staged_root=$(mktemp -d \
+        "${TMPDIR:-/tmp}/stornaut-iib5biia-index.XXXXXX")
+    local staged_status=0
+    git checkout-index --all --prefix="$staged_root/" \
+        || staged_status=$?
+    local semantic_path
+    for semantic_path in \
+        Sources/StornautInvestigationMachineDriverSupport/DarwinInvestigationMachineInstalledDriverSystem.swift \
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineFixedCapsuleIntake.swift \
+        Tests/StornautInvestigationTests/InvestigationMachineDriverSupportTests.swift \
+        Tests/StornautInvestigationTests/InvestigationMachineFixedCapsuleIntakeTests.swift \
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift \
+        scripts/verify-contract \
+        scripts/verify-investigation-boundaries
+    do
+        if (( staged_status == 0 )) \
+            && ! cmp -s \
+                "$repo_root/$semantic_path" \
+                "$staged_root/$semantic_path"
+        then
+            print -u2 \
+                "ii-b5b-ii-a staged content drifted: $semantic_path"
+            staged_status=1
+        fi
+    done
+    if (( staged_status == 0 )); then
+        (
+            cd "$staged_root"
+            scripts/verify-investigation-boundaries \
+                --iib5biia-fixed-capsule-contract-only \
+                Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineFixedCapsuleIntake.swift \
+                Tests/StornautInvestigationTests/InvestigationMachineFixedCapsuleIntakeTests.swift
+        ) || staged_status=$?
+    fi
+    if (( staged_status == 0 )); then
+        python3 - \
+            "$staged_root/scripts/verify-contract" \
+            "$staged_root/scripts/verify-investigation-boundaries" <<'PY' \
+            || staged_status=$?
+from pathlib import Path
+import hashlib
+import re
+import sys
+
+contract_path, boundary_path = map(Path, sys.argv[1:])
+contract = contract_path.read_text(encoding="utf-8")
+boundary = boundary_path.read_bytes()
+self_match = re.findall(
+    r"(?m)^ib2_self_sha=([0-9a-f]{64})$", contract
+)
+if len(self_match) != 1:
+    raise SystemExit("ii-b5b-ii-a staged verifier self-seal drifted")
+normalized = re.sub(
+    r"(?m)^ib2_self_sha=.*$", "ib2_self_sha=SELF", contract
+).encode("utf-8")
+if hashlib.sha256(normalized).hexdigest() != self_match[0]:
+    raise SystemExit("ii-b5b-ii-a staged verifier self-seal drifted")
+boundary_match = re.findall(
+    r'Path\("scripts/verify-investigation-boundaries"\):\s*'
+    r'"([0-9a-f]{64})"',
+    contract,
+)
+if (
+    len(boundary_match) != 1
+    or hashlib.sha256(boundary).hexdigest() != boundary_match[0]
+):
+    raise SystemExit("ii-b5b-ii-a staged boundary seal drifted")
+for marker in (
+    "iib5biia_baseline=ddbc4a0be3ea059c7de239b85ef60c40c09affbb",
+    "--iib5biia-fixed-capsule-contract-only",
+    "--iib5biia-staged-scope-contract-only",
+    "staged-semantic-drift",
+    "ii-b5b-ii-a mutation accepted: $name",
+    "ii-b5b-ii-a scope mutation accepted: $fixture",
+):
+    if marker not in contract:
+        raise SystemExit(
+            f"ii-b5b-ii-a staged verifier contract drifted: {marker}"
+        )
+PY
+    fi
+    rm -rf "$staged_root"
+    (( staged_status == 0 )) || return "$staged_status"
+}
+
+function verify_iib5biia_staged_scope() {
+    local baseline=${1:-ddbc4a0be3ea059c7de239b85ef60c40c09affbb}
+    [[ "$(git rev-parse "$baseline^{commit}")" \
+        == ddbc4a0be3ea059c7de239b85ef60c40c09affbb ]] || {
+        print -u2 "ii-b5b-ii-a checkpoint baseline drifted"
+        return 1
+    }
+    local expected=(
+        Sources/StornautInvestigationMachineDriverSupport/DarwinInvestigationMachineInstalledDriverSystem.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineFixedCapsuleIntake.swift
+        Tests/StornautInvestigationTests/InvestigationMachineDriverSupportTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineFixedCapsuleIntakeTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-contract
+        scripts/verify-investigation-boundaries
+    )
+    if git diff --cached --name-only --diff-filter=D "$baseline" \
+        | awk 'index($0,"docs/")!=1 {found=1} END {exit !found}'
+    then
+        print -u2 "ii-b5b-ii-a checkpoint deleted an existing path"
+        return 1
+    fi
+    if git diff --cached --numstat "$baseline" \
+        | awk 'index($3,"docs/")!=1 && ($1=="-" || $2=="-") {found=1} END {exit !found}'
+    then
+        print -u2 "ii-b5b-ii-a binary checkpoint path rejected"
+        return 1
+    fi
+    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" | awk 'index($0,"docs/")!=1')"})
+    [[ "${(j:\n:)${(on)observed}}" == "${(j:\n:)${(on)expected}}" ]] || {
+        print -u2 "ii-b5b-ii-a checkpoint paths drifted"
+        return 1
+    }
+    local changed
+    changed=$(git diff --cached --numstat "$baseline" \
+        | awk 'index($3,"docs/")!=1 {n+=$1+$2} END {print n+0}')
+    (( changed <= 2000 )) || {
+        print -u2 "ii-b5b-ii-a checkpoint budget drifted"
+        return 1
+    }
+    verify_iib5biia_index_semantics
 }
 
 function verify_iib4_staged_scope() {
@@ -5085,6 +5685,17 @@ if $iib5bic2b_aggregate_scope_contract_only; then
     print "ii-b5b-i-c2b aggregate scope verification passed."
     exit 0
 fi
+if $iib5biia_fixed_capsule_contract_only; then
+    verify_iib5biia_fixed_capsule_contract \
+        "$iib5biia_capsule_source" "$iib5biia_focused_test_source"
+    print "ii-b5b-ii-a fixed capsule contract verification passed."
+    exit 0
+fi
+if $iib5biia_staged_scope_contract_only; then
+    verify_iib5biia_staged_scope "$iib5biia_staged_scope_baseline"
+    print "ii-b5b-ii-a staged scope verification passed."
+    exit 0
+fi
 if $iib3a_staged_scope_contract_only; then
     verify_iib3a_staged_scope "$iib3a_staged_scope_baseline"
     print "ii-b3a staged scope verification passed."
@@ -5124,6 +5735,8 @@ machine_collector_source=$machine_root/InvestigationLifecycleTopologyCollector.s
 machine_service_source=$machine_root/FixedLifecycleServiceProbe.swift
 machine_driver_main=Tools/StornautInvestigationMachineDriver/main.swift
 machine_driver_support=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDriverSupport.swift
+machine_fixed_capsule=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineFixedCapsuleIntake.swift
+machine_fixed_capsule_test=Tests/StornautInvestigationTests/InvestigationMachineFixedCapsuleIntakeTests.swift
 installed_l2_owner=Sources/StornautInvestigationInstalledL2/InstalledL2Observer.swift
 installed_l2_join=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochInstalledL2Join.swift
 iib5bic2a_test=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
@@ -5170,6 +5783,8 @@ required_files=(
     "$machine_scenario_driver"
     "$machine_driver_main"
     "$machine_driver_support"
+    "$machine_fixed_capsule"
+    "$machine_fixed_capsule_test"
     "$installed_l2_owner"
     "$installed_l2_join"
     "$iib5bic2a_test"
@@ -5206,6 +5821,8 @@ verify_iib5bic2b_absence_only_contract \
     "$installed_l2_owner" \
     "$installed_l2_join" "$iib5bic2a_test" \
     "$iib5bic2b_collector_test"
+verify_iib5biia_fixed_capsule_contract \
+    "$machine_fixed_capsule" "$machine_fixed_capsule_test"
 
 python3 - "$xcode_project" "$ordinary_scheme" "$diagnostic_scheme" <<'PY'
 from collections import Counter
@@ -6920,6 +7537,7 @@ expected_driver_support_sources = {
     "DarwinInvestigationMachineInstalledDriverSystem.swift",
     "InvestigationMachineClaimClient.swift",
     "InvestigationMachineDriverSupport.swift",
+    "InvestigationMachineFixedCapsuleIntake.swift",
     "InvestigationMachineInstalledDriverObservation.swift",
     "InvestigationMachineInstalledDriverSystemSource.swift",
     "InvestigationMachineSingleEpoch.swift",
@@ -6957,6 +7575,10 @@ expected_driver_support_imports = {
         "CryptoKit", "Darwin", "Foundation", "Security",
     },
     "InvestigationMachineDriverSupport.swift": {"Darwin"},
+    "InvestigationMachineFixedCapsuleIntake.swift": {
+        "Darwin", "Foundation",
+        "StornautInvestigationHandoffContract",
+    },
     "InvestigationMachineClaimClient.swift": {
         "CryptoKit", "Darwin", "Foundation", "Security",
         "StornautInvestigationHandoffContract",
@@ -6974,9 +7596,11 @@ expected_driver_support_imports = {
 }
 expected_driver_support_sha256 = {
     "DarwinInvestigationMachineInstalledDriverSystem.swift":
-        "d75072a5d3d93c1bf149db3df2fee1fc9fc2480686d84a009ec7762e3888fb73",
+        "67a6e9edca7084fc754216bd28410cff9db155760511d6665dd870513d05b1b0",
     "InvestigationMachineDriverSupport.swift":
         "94bd3f2009759a4e095ccbd759f5e8c0f96955923d23e4da706c531efbe72a71",
+    "InvestigationMachineFixedCapsuleIntake.swift":
+        "9f3a33cd0f5792e28d2c5c69b28250463509883114196fa4530141ea048c799d",
     "InvestigationMachineInstalledDriverObservation.swift":
         "0d6d477336cd99fb7279a74bb0b63d63a362bf36fe6b98fae9a2978e289e4a4f",
     "InvestigationMachineInstalledDriverSystemSource.swift":
@@ -7029,6 +7653,47 @@ for source_name in driver_support_sources:
         if send_shape != (8, 5, 2, 1):
             raise SystemExit(f"ii-b5a typed frame send shape drifted: {send_shape}")
         authority_source = re.sub(r"\bsend(?=\s*\()", "typedFrameSend", authority_source)
+    elif source_name == "InvestigationMachineFixedCapsuleIntake.swift":
+        compact_source = re.sub(r"\s+", "", source_text)
+        fcntl_shapes = (
+            "fcntl(descriptor,F_GETFD)",
+            "fcntl(descriptor,F_GETFL)",
+            "fcntl(descriptor,F_SETFD,flags)",
+        )
+        if (
+            len(re.findall(r"\bfcntl\s*\(", source_text)) != 3
+            or any(compact_source.count(shape) != 1 for shape in fcntl_shapes)
+            or compact_source.count(
+                "flags:initialFlags|FD_CLOEXEC"
+            ) != 1
+            or compact_source.count(
+                "&FD_CLOEXEC==FD_CLOEXEC"
+            ) != 2
+            or compact_source.count(
+                "&O_ACCMODE==O_RDONLY"
+            ) != 2
+        ):
+            raise SystemExit(
+                "Machine fixed capsule exact fcntl contract drifted"
+            )
+        authority_source = re.sub(
+            r"\bfcntl(?=\s*\()", "fixedCapsuleFcntl",
+            authority_source,
+        )
+    if source_name == "DarwinInvestigationMachineInstalledDriverSystem.swift":
+        if re.sub(r"\s+", "", source_text).count(
+            "returnresult==0"
+        ) != 2:
+            raise SystemExit(
+                "Machine driver installed ACL semantics drifted"
+            )
+    elif source_name == "InvestigationMachineFixedCapsuleIntake.swift":
+        if re.sub(r"\s+", "", source_text).count(
+            "return.success(result==0)"
+        ) != 1:
+            raise SystemExit(
+                "Machine fixed capsule ACL semantics drifted"
+            )
     match = driver_support_authority_pattern.search(authority_source)
     if match:
         raise SystemExit(
@@ -8179,20 +8844,20 @@ function require_exact_machine_driver_projection() {
 
     case "$configuration" in
         debug)
-            expected_undefined_sha=eb33b8f1730d52926606175ef6472f47fc17782c4cad5ff76a56272570fb25b2
-            expected_undefined_lines=551
+            expected_undefined_sha=0387d98750bcc609dd1cf0df602bd677c5eeaabd1e58985c6f2b7de6f7cab8e6
+            expected_undefined_lines=554
             expected_loads_sha=9053e60819e57a62ee9acb9db4854705fa2ed0ade20ec3683f13b9e854f86c41
             expected_loads_lines=18
-            expected_owned_sha=53d1cf04307ba4e6019bcd94f4d324471dce346d690e95b22bd98f9237a79d9d
-            expected_owned_lines=1977
+            expected_owned_sha=6e80acdf3ef114b889856e0b63505a59caec2a346cf7cf450e0505fcbee7f0d8
+            expected_owned_lines=2218
             ;;
         release)
-            expected_undefined_sha=534c6bb01fa151a98d0554684d13b1b27f233ddfe8cde24d63a9008fe0bde9ae
-            expected_undefined_lines=399
+            expected_undefined_sha=74881c5f75665cb158b672a05a959366566bed34aa71c4e21b473ba76fc22735
+            expected_undefined_lines=402
             expected_loads_sha=9053e60819e57a62ee9acb9db4854705fa2ed0ade20ec3683f13b9e854f86c41
             expected_loads_lines=18
-            expected_owned_sha=ead614054c51095da16673e5c485a6feaecba5e3203b2ae25479fd6998e6e411
-            expected_owned_lines=1324
+            expected_owned_sha=74fa8c8511fecbe291bf2184db32156ff27231fc59097a75efaf29b06e1dab2f
+            expected_owned_lines=1467
             ;;
         *)
             print -u2 "Unknown Machine driver projection: $configuration"
@@ -8285,7 +8950,10 @@ function verify_machine_driver_projection_mutations() {
         _kill _killpg _pthread_kill _raise
     )
     required_readonly_imports=(
-        _pread _fstat _lstat _flistxattr _acl_get_fd_np
+        '_$s6Darwin5fcntlys5Int32VAD_A2DtF'
+        '_$s6Darwin5fcntlys5Int32VAD_ADtF'
+        _read _pread _lseek _fstat _lstat _flistxattr
+        _acl_free _acl_get_entry _acl_get_fd_np
         _proc_pidpath _SecCodeCopySelf _SecStaticCodeCreateWithPath
         _SMJobCopyDictionary _kSMDomainSystemLaunchd
         _proc_pidinfo _task_name_for_pid _task_info
