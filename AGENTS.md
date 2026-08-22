@@ -325,10 +325,13 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   fresh preflight 已把 i-c 拆为 i-c1 DriverSupport join/opaque proof 与 i-c2
   legacy-owner closure/exactly-one-owner gate；i-c1 已完成，i-c2 又拆为
   i-c2a semantic-owner closure 与 i-c2b physical-owner closure；aggregate
-  i-c2 已完成并保持 non-admitting；ii-b5b-ii-a fixed FD-0 capsule intake 与
-  ii-b5b-ii-b independent Darwin App identity observation 已完成并保持
-  non-admitting，ii-b5b-ii-c fixed FD-7 session 是当前 frontier。之后按序为
-  ii-b5b-ii-d exact owned-PGID retirement、
+  i-c2 已完成并保持 non-admitting；ii-b5b-ii-a fixed FD-0 capsule intake、
+  ii-b5b-ii-b independent Darwin App identity observation 与 ii-b5b-ii-c fixed
+  FD-7 session 已完成并保持 non-admitting，ii-b5b-ii-d exact owned-PGID
+  retirement 是当前 frontier。该 ii-b5b-ii-c checkpoint 以 8 个
+  non-document paths / 3,104 changed lines、35 focused tests、
+  1,396-test staged-only serial、三个 verifier gates 与 final
+  no-unresolved-P0–P2 review 收口；未运行 full。之后按序为
   ii-b5b-iii production/artifact composition、ii-c0 fresh privilege-launcher
   preflight，再到 ii-c 唯一 no-model
   privileged machine gate，只有 ii-c 可接受 ADR 0018。
@@ -498,6 +501,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c L3c3c-ii-b5b-ii-a fixed capsule intake review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-a-review.md) |
 | Phase D Task 39B2c L3c3c-ii-b5b-ii-b Darwin App identity review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-b-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-b-review.md) |
 | Phase D Task 39B2c L3c3c-ii-b5b-ii-c fixed FD-7 session preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-c-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-c-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-ii-c fixed FD-7 session review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-c-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-c-review.md) |
 | Phase D Task 39B2c-L1 residue observation review | [docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md](docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md) |
 | Phase D Task 39B2c-L2 root topology observation review | [docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md](docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md) |
 | Phase D Task 39B2c-L3a trusted machine target review | [docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md](docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md) |
@@ -639,8 +643,9 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   i-b2a、i-b2b-a、i-b2b-b 与 i-b3 已完成并保持 non-admitting；i-c 已拆为
   i-c1 DriverSupport join/opaque proof 与 i-c2 legacy-owner closure；i-c1 与
   aggregate i-c2 已完成并保持 non-admitting；ii-b5b-ii-a fixed FD-0 capsule
-  intake 与 ii-b5b-ii-b independent Darwin App identity observation 已完成并
-  保持 non-admitting，ii-b5b-ii-c fixed FD-7 session 是当前 frontier。
+  intake、ii-b5b-ii-b independent Darwin App identity observation 与
+  ii-b5b-ii-c fixed FD-7 session 已完成并保持 non-admitting，ii-b5b-ii-d exact
+  owned-PGID retirement 是当前 frontier。
   ADR 0018 仍 Proposed；L3c4 独占 final admission 与
   剩余 full。
   Task 39 尚未完成。

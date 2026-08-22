@@ -1,6 +1,6 @@
 # Phase D Task 39B2c L3c3c-ii-b5b-ii Preflight
 
-- Status: ii-b5b-ii-a/ii-b complete/non-admitting; ii-b5b-ii-c current
+- Status: ii-b5b-ii-a/ii-b/ii-c complete/non-admitting; ii-b5b-ii-d current
 - Date: 2026-08-22
 - Baseline: `06269bca03a5a7b2ca2319b8e029f3cecf7cc6de`
 - Admission: non-admitting
@@ -35,7 +35,9 @@ The work is therefore split before coding:
    at most eight non-document paths and about 3,600 added lines. Its exact
    seven-path candidate, typed startup uncertainty and injected ii-d retirement
    boundary are frozen in the
-   [ii-c preflight](phase-d-task-39b2c-l3c3c-ii-b5b-ii-c-preflight.md).
+   [ii-c preflight](phase-d-task-39b2c-l3c3c-ii-b5b-ii-c-preflight.md). This
+   checkpoint is complete and non-admitting; completion evidence is recorded
+   in the [ii-c review](phase-d-task-39b2c-l3c3c-ii-b5b-ii-c-review.md).
 4. **ii-b5b-ii-d — exact owned-PGID retirement and aggregate physical proof**:
    at most six non-document paths and about 2,600 added lines.
 
@@ -101,8 +103,7 @@ these non-admitting checkpoints.
 ## 5. Remaining Order
 
 ```text
-ii-b5b-ii-c -> ii-b5b-ii-d
--> ii-b5b-iii -> ii-c0 -> ii-c -> L3c3d -> L3c4
+ii-b5b-ii-d -> ii-b5b-iii -> ii-c0 -> ii-c -> L3c3d -> L3c4
 ```
 
 ii-b5b-iii owns native production/artifact composition. ii-c0 owns the

@@ -33,7 +33,7 @@
 | Agent、双模式与治理设计 | [Agent Disk Governance](design/agent-disk-governance.md) |
 | UI、品牌、状态与交互 | [UI/UX](design/ui-ux.md) |
 | 宏观交付顺序与阶段 Gate | [Delivery Roadmap](plans/roadmap.md) |
-| 当前计划状态 | [Active Plans](plans/active/README.md) — Phase D approved；Task 39 in progress；aggregate i-c2 与 ii-b5b-ii-a/ii-b complete/non-admitting；ii-b5b-ii-c current；ADR 0018 Proposed |
+| 当前计划状态 | [Active Plans](plans/active/README.md) — Phase D approved；Task 39 in progress；aggregate i-c2 与 ii-b5b-ii-a/ii-b/ii-c complete/non-admitting；ii-b5b-ii-d current；ADR 0018 Proposed |
 | Capability-first Codex Runtime Gate | [Runtime Evidence Gate](plans/completed/capability-first-codex-runtime-gate.md) — complete / archived |
 | R2 tests-first brief | [R2 Implementation Brief](plans/completed/task-r2-implementation-brief.md) — complete |
 | R3 lifecycle hard-gate brief | [R3 Implementation Brief](plans/completed/task-r3-implementation-brief.md) — behaviorReady candidate |
@@ -64,7 +64,7 @@
 | Phase D Task 37 Review | [Code Review and Completion Audit](reports/phase-d-task-37-review.md) |
 | Phase D Task 38 | [Implementation Brief](plans/active/task-38-implementation-brief.md) — complete |
 | Phase D Task 38 Review | [Code Review and Completion Audit](reports/phase-d-task-38-review.md) |
-| Phase D Task 39 | [Implementation Brief](plans/active/task-39-implementation-brief.md) — in progress；aggregate i-c2 与 ii-b5b-ii-a/ii-b complete/non-admitting；current order ii-b5b-ii-c → ii-b5b-ii-d → ii-b5b-iii → ii-c0 → ii-c → L3c3d → L3c4 |
+| Phase D Task 39 | [Implementation Brief](plans/active/task-39-implementation-brief.md) — in progress；aggregate i-c2 与 ii-b5b-ii-a/ii-b/ii-c complete/non-admitting；current order ii-b5b-ii-d → ii-b5b-iii → ii-c0 → ii-c → L3c3d → L3c4 |
 | Phase D Task 39A Review | [Code Review and Completion Audit](reports/phase-d-task-39a-review.md) |
 | Phase D Task 39B1a Review | [Code Review and Completion Audit](reports/phase-d-task-39b1a-review.md) |
 | Phase D Task 39B1b-i Review | [Code Review and Completion Audit](reports/phase-d-task-39b1b-i-review.md) |
@@ -91,10 +91,10 @@
 | Phase D Task 39B2c L3c3c-i Final Review | [Study and Root-Launch Audit](reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md) — complete；external branch rejected |
 | Phase D Task 39B2c L3c3c-i-b2a Reproducibility | [Historical Three-Layer Contract Review](reports/phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md) — complete；non-admitting B4 evidence |
 | Phase D Task 39B2c L3c3c-i-b2b-0a Root-Launch Audit | [Trust-Anchor Audit](reports/phase-d-task-39b2c-l3c3c-i-b2b-0a-root-provenance-review.md) — complete；all UID-staged external root paths NO-GO |
-| Phase D Task 39B2c L3c3c-ii Installed-Driver Preflight | [Path and Cost Preflight](reports/phase-d-task-39b2c-l3c3c-ii-installed-driver-path-cost-preflight.md) — historical split；aggregate i-c2 与 ii-b5b-ii-a/ii-b complete/non-admitting；ii-b5b-ii-c current |
+| Phase D Task 39B2c L3c3c-ii Installed-Driver Preflight | [Path and Cost Preflight](reports/phase-d-task-39b2c-l3c3c-ii-installed-driver-path-cost-preflight.md) — historical split；aggregate i-c2 与 ii-b5b-ii-a/ii-b/ii-c complete/non-admitting；ii-b5b-ii-d current |
 | Phase D Task 39B2c L3c3c-ii-a Review | [Installed-Driver Observation Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md) — complete；non-admitting |
 | Phase D Task 39B2c L3c3c-ii-b Split Preflight | [Handoff Composition Split](reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md) — parent split frozen；ii-b0 superseded by b0a/b0b；non-admitting |
-| Phase D Task 39B2c L3c3c-ii-b0 Wire Contract Preflight | [Exact Wire Split](reports/phase-d-task-39b2c-l3c3c-ii-b0-wire-contract-preflight.md) — historical split；aggregate i-c2 与 ii-b5b-ii-a/ii-b complete/non-admitting；ii-b5b-ii-c current |
+| Phase D Task 39B2c L3c3c-ii-b0 Wire Contract Preflight | [Exact Wire Split](reports/phase-d-task-39b2c-l3c3c-ii-b0-wire-contract-preflight.md) — historical split；aggregate i-c2 与 ii-b5b-ii-a/ii-b/ii-c complete/non-admitting；ii-b5b-ii-d current |
 | Phase D Task 39B2c L3c3c-ii-b0a Review | [Frame/Capsule Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b0a-review.md) — complete；1,107-test staged-only serial；non-admitting |
 | Phase D Task 39B2c L3c3c-ii-b0b Review | [Claim/Release Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b0b-review.md) — complete；1,122-test staged-only serial；non-admitting |
 | Phase D Task 39B2c L3c3c-ii-b0c Preflight | [Epoch Bootstrap Prelude](reports/phase-d-task-39b2c-l3c3c-ii-b0c-epoch-bootstrap-preflight.md) — closes PRE_DROP_READY epoch-origin contradiction；pre-implementation/non-admitting |
@@ -111,14 +111,14 @@
 | Phase D Task 39B2c L3c3c-ii-b2b-iii-a Review | [Handle v3 Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-a-review.md) — complete；91 focused、181 Lifecycle、309 Investigation、1,208-test staged-only serial；non-admitting |
 | Phase D Task 39B2c L3c3c-ii-b2b-iii-b-i Review | [Live Integration Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-b-i-review.md) — complete；83 focused、499 affected、1,212-test staged-only serial、helper/final-Mach-O gates；non-admitting |
 | Phase D Task 39B2c L3c3c-ii-b2b-iii-b-ii Review | [Physical Adapter Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-b-ii-review.md) — complete；51 focused、504 affected、1,223-test staged-only serial、physical/final-Mach-O gates；non-admitting |
-| Phase D Task 39B2c L3c3c-ii-b3 Preflight | [App Adapter Split](reports/phase-d-task-39b2c-l3c3c-ii-b3-split-preflight.md) — historical split；aggregate i-c2 与 ii-b5b-ii-a/ii-b complete/non-admitting；ii-b5b-ii-c current |
+| Phase D Task 39B2c L3c3c-ii-b3 Preflight | [App Adapter Split](reports/phase-d-task-39b2c-l3c3c-ii-b3-split-preflight.md) — historical split；aggregate i-c2 与 ii-b5b-ii-a/ii-b/ii-c complete/non-admitting；ii-b5b-ii-d current |
 | Phase D Task 39B2c L3c3c-ii-b3c Review | [Concrete Leaf/Entry Completion](reports/phase-d-task-39b2c-l3c3c-ii-b3c-review.md) — 1,257-test serial、exact mutation/final-Mach-O gates 与 grouped post-fix review 通过；complete/non-admitting |
 | Phase D Task 39B2c L3c3c-ii-b3a Review | [Fixed Handoff Adapter Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b3a-review.md) — complete；35 focused、521 affected、1,234-test staged-only serial、contract/structural/final-artifact gates；non-admitting |
 | Phase D Task 39B2c L3c3c-ii-b3b Fixture Review | [Test-Infrastructure Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b3b-fixture-prerequisite-review.md) — complete；deterministic RED、259-test Codex target、1,245-test staged-only serial；test-only/non-admitting |
 | Phase D Task 39B2c L3c3c-ii-b3b Review | [Start-to-Retire Seam Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b3b-review.md) — complete；27 focused、532 affected、exact structural/mutation/artifact gates、honest 1,244/1,245 plus independent fixture closure；non-admitting |
 | Phase D Task 39B2c L3c3c-ii-b4 Preflight | [Fixed Helper-Claim Client Contract](reports/phase-d-task-39b2c-l3c3c-ii-b4-preflight.md) — contract frozen；implementation complete/non-admitting |
-| Phase D Task 39B2c L3c3c-ii-b4 Review | [Fixed Helper-Claim Client Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b4-review.md) — complete；aggregate i-c2 与 ii-b5b-ii-a/ii-b complete/non-admitting；ii-b5b-ii-c current |
-| Phase D Task 39B2c L3c3c-ii-b5 Preflight | [Single-Epoch Composition Split](reports/phase-d-task-39b2c-l3c3c-ii-b5-split-preflight.md) — aggregate i-c2 与 ii-b5b-ii-a/ii-b complete/non-admitting；ii-b5b-ii-c current |
+| Phase D Task 39B2c L3c3c-ii-b4 Review | [Fixed Helper-Claim Client Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b4-review.md) — complete；aggregate i-c2 与 ii-b5b-ii-a/ii-b/ii-c complete/non-admitting；ii-b5b-ii-d current |
+| Phase D Task 39B2c L3c3c-ii-b5 Preflight | [Single-Epoch Composition Split](reports/phase-d-task-39b2c-l3c3c-ii-b5-split-preflight.md) — aggregate i-c2 与 ii-b5b-ii-a/ii-b/ii-c complete/non-admitting；ii-b5b-ii-d current |
 | Phase D Task 39B2c L3c3c-ii-b5a0 Review | [Same-Client Claim-Abort Completion](reports/phase-d-task-39b2c-l3c3c-ii-b5a0-review.md) — 5 paths / 799 lines、real-server acceptance、exact terminal proof、honest non-green serial + same-tree exact-case closure；complete/non-admitting |
 | Phase D Task 39B2c L3c3c-ii-b5a Review | [Typed Single-Epoch Composer Completion](reports/phase-d-task-39b2c-l3c3c-ii-b5a-review.md) — complete/non-admitting |
 | Phase D Task 39B2c L3c3c-ii-b5b-i Preflight | [Projection and Observer Split](reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-exact-path-preflight.md) — i-a complete；i-b split into i-b1/i-b2a/i-b2b/i-b3 |
@@ -129,15 +129,16 @@
 | Phase D Task 39B2c L3c3c-ii-b5b-i-b2b-a Review | [Identity/Process Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2b-a-review.md) — 8 paths / 1,246 lines、1,337-test clean serial；complete/non-admitting |
 | Phase D Task 39B2c L3c3c-ii-b5b-i-b2b-b Review | [Fixed Service Reader Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2b-b-review.md) — 6 paths / 709 scope lines、46 affected tests、1,341-test clean serial；complete/non-admitting |
 | Phase D Task 39B2c L3c3c-ii-b5b-i-b3 Review | [Installed-L2 Observer Composition Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b3-review.md) — 5 paths / 863 scope lines、52 affected tests、1,348-test clean serial；complete/non-admitting |
-| Phase D Task 39B2c L3c3c-ii-b5b-i-c Preflight | [Driver Join and Legacy Closure Split](reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-c-split-preflight.md) — aggregate i-c2 与 ii-b5b-ii-a/ii-b complete/non-admitting；ii-b5b-ii-c current |
+| Phase D Task 39B2c L3c3c-ii-b5b-i-c Preflight | [Driver Join and Legacy Closure Split](reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-c-split-preflight.md) — aggregate i-c2 与 ii-b5b-ii-a/ii-b/ii-c complete/non-admitting；ii-b5b-ii-d current |
 | Phase D Task 39B2c L3c3c-ii-b5b-i-c1 Review | [DriverSupport Join/Proof Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-c1-review.md) — implementation tree 1,355-test serial plus final test-only 1/1 closure；complete/non-admitting |
 | Phase D Task 39B2c L3c3c-ii-b5b-i-c2a Review | [Legacy Semantic-Owner Closure](reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-c2a-review.md) — 14 paths / 1,614 lines；honest non-green 642-test serial + exact six-case closure；complete/non-admitting |
 | Phase D Task 39B2c L3c3c-ii-b5b-i-c2b Preflight | [Absence-Only Physical-Owner Closure](reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-c2b-preflight.md) — historical split；complete/non-admitting |
-| Phase D Task 39B2c L3c3c-ii-b5b-i-c2b Review | [Absence-Only Physical-Owner Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-c2b-review.md) — 10-path implementation plus one-file boundary/contract checkpoints；complete/non-admitting；ii-b5b-ii-a/ii-b complete；ii-c current |
-| Phase D Task 39B2c L3c3c-ii-b5b-ii Preflight | [Fixed Darwin Runtime Split](reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-preflight.md) — split into ii-a/ii-b/ii-c/ii-d；ii-a/ii-b complete/non-admitting；ii-c current |
-| Phase D Task 39B2c L3c3c-ii-b5b-ii-a Review | [Fixed FD-0 Capsule Intake Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-a-review.md) — 7 non-document paths / 1,975 changed lines、1,353-test serial、exact structural/Mach-O gates；complete/non-admitting；ii-b complete；ii-c current |
-| Phase D Task 39B2c L3c3c-ii-b5b-ii-b Review | [Darwin App Identity Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-b-review.md) — 9 non-document paths / 2,790 changed lines、42 focused、1,374-test serial、exact C/source/final-Mach-O gates；complete/non-admitting；ii-c current |
-| Phase D Task 39B2c L3c3c-ii-b5b-ii-c Preflight | [Fixed FD-7 Session Contract](reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-c-preflight.md) — 7-path candidate / 3,600-line ceiling；current/non-admitting |
+| Phase D Task 39B2c L3c3c-ii-b5b-i-c2b Review | [Absence-Only Physical-Owner Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-c2b-review.md) — 10-path implementation plus one-file boundary/contract checkpoints；complete/non-admitting；ii-b5b-ii-a/ii-b/ii-c complete；ii-d current |
+| Phase D Task 39B2c L3c3c-ii-b5b-ii Preflight | [Fixed Darwin Runtime Split](reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-preflight.md) — split into ii-a/ii-b/ii-c/ii-d；ii-a/ii-b/ii-c complete/non-admitting；ii-d current |
+| Phase D Task 39B2c L3c3c-ii-b5b-ii-a Review | [Fixed FD-0 Capsule Intake Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-a-review.md) — 7 non-document paths / 1,975 changed lines、1,353-test serial、exact structural/Mach-O gates；complete/non-admitting；ii-b/ii-c complete；ii-d current |
+| Phase D Task 39B2c L3c3c-ii-b5b-ii-b Review | [Darwin App Identity Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-b-review.md) — 9 non-document paths / 2,790 changed lines、42 focused、1,374-test serial、exact C/source/final-Mach-O gates；complete/non-admitting；ii-c complete；ii-d current |
+| Phase D Task 39B2c L3c3c-ii-b5b-ii-c Preflight | [Fixed FD-7 Session Contract](reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-c-preflight.md) — exact 8-path / 3,600-line ceiling；complete/non-admitting |
+| Phase D Task 39B2c L3c3c-ii-b5b-ii-c Review | [Fixed FD-7 Session Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-c-review.md) — 8 non-document paths / 3,104 changed lines、35 focused、1,396-test serial、contract/structural/final-Mach-O gates；complete/non-admitting；ii-d current |
 | Epic 2–4 历史计划 | [Deterministic Product Core](plans/completed/epic-2-4-deterministic-product-core.md) — Tasks 9–26 已完成并归档 |
 | 已完成计划 | [Completed Plans](plans/completed/README.md) — Epic 0–1 |
 | 上游学习与许可证门禁 | [Upstream Reference Matrix](research/upstream-reference-matrix.md) |

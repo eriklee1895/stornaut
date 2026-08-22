@@ -222,8 +222,9 @@ staged-only serial、exact contract/structural/artifact gates 与 final review�
 ii-b3b、独立 fixture prerequisite、ii-b3c 与 ii-b4 已完成并保持
 non-admitting；ii-b5 已拆为 b5a0/b5a/b5b-i/b5b-ii/b5b-iii，b5a 与 b5b-i
 through aggregate i-c2 已完成并保持 non-admitting；b5b-ii-a fixed FD-0
-capsule intake 已完成并保持 non-admitting，b5b-ii-b independent Darwin App
-identity observation 是当前 frontier。
+capsule intake、b5b-ii-b independent Darwin App identity observation 与
+b5b-ii-c fixed FD-7 session 已完成并保持 non-admitting，b5b-ii-d exact
+owned-PGID retirement 是当前 frontier。
 39B2c 仍未作 machine readiness claim。
 L3 preflight 已把余下范围拆为 L3a trusted target extraction、L3b root
 collection 与 L3c failure matrix/final admission。L3a 已把 machine-only
@@ -256,8 +257,8 @@ start-to-retire-only Lifecycle seam 与 ii-b3c concrete leaf/native entry
 已完成；ii-b4 fixed helper-claim client 也已完成并保持 non-admitting；
 ii-b5 已拆为 b5a0 claim-abort、b5a typed composer、b5b-i L2/projection、
 b5b-ii Darwin runtime 与 b5b-iii production/artifact；b5a 与 b5b-i through
-aggregate i-c2 已完成并保持 non-admitting；b5b-ii-a 已完成并保持
-non-admitting，b5b-ii-b 是当前 frontier。
+aggregate i-c2 已完成并保持 non-admitting；b5b-ii-a/b/c 已完成并保持
+non-admitting，b5b-ii-d 是当前 frontier。
 L3c2b preflight 的 real-plan matrix contradiction 已由 3-path plan-freshness
 prerequisite 关闭，affected/Investigation/structural/review gates 通过；
 只有 L3c4 可作 readiness claim 并运行
@@ -447,8 +448,8 @@ L3c3c 当前证据见
   prerequisite、ii-b2a、ii-b2b-i、ii-b2b-ii、iii-a 与 iii-b 已完成；ii-b3
   已拆为 b3a/b3b/b3c，ii-b3a/ii-b3b/ii-b3c/ii-b4 已完成并保持
   non-admitting；ii-b5 已拆为 b5a0/b5a/b5b-i/b5b-ii/b5b-iii，b5a 与 b5b-i
-  through aggregate i-c2 已完成并保持 non-admitting；b5b-ii-a/b 已完成并保持
-  non-admitting，b5b-ii-c fixed FD-7 session 是当前 frontier。
+  through aggregate i-c2 已完成并保持 non-admitting；b5b-ii-a/b/c 已完成并
+  保持 non-admitting，b5b-ii-d exact owned-PGID retirement 是当前 frontier。
 	  L3c4 才拥有
 	  final admission/full。
 	  39B2c 才是 machine admission，Task 39 尚未完成。

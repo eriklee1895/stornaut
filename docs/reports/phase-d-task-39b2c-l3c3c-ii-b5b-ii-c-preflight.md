@@ -1,10 +1,11 @@
 # Phase D Task 39B2c L3c3c-ii-b5b-ii-c Preflight
 
-> Status: approved for tests-first implementation / non-admitting
+> Status: complete / non-admitting
 > Date: 2026-08-22
 > Frozen source baseline: `ec5c3120b5017aa0a85bff1ec827117c56e9f9a0`
 > Admission: none
 > Next checkpoint: ii-b5b-ii-d exact owned-PGID retirement
+> Completion evidence: [ii-c review](phase-d-task-39b2c-l3c3c-ii-b5b-ii-c-review.md)
 
 ## 1. Decision
 

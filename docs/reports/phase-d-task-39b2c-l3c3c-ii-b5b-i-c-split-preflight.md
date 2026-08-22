@@ -1,6 +1,6 @@
 # Phase D Task 39B2c L3c3c-ii-b5b-i-c Split Preflight
 
-- Status: i-c1, aggregate i-c2 and ii-b5b-ii-a/ii-b complete/non-admitting; ii-b5b-ii-c current
+- Status: i-c1, aggregate i-c2 and ii-b5b-ii-a/ii-b/ii-c complete/non-admitting; ii-b5b-ii-d current
 - Date: 2026-08-22
 - Order: i-c1 DriverSupport join/proof -> i-c2 legacy-owner closure
 - Completion evidence: [i-c1 review](phase-d-task-39b2c-l3c3c-ii-b5b-i-c1-review.md)
