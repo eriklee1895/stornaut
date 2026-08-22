@@ -1,9 +1,9 @@
 # Phase D Task 39B2c L3c3c-ii-b5b-ii Preflight
 
-> Status: split before coding; ii-b5b-ii-a current
-> Date: 2026-08-22
-> Baseline: `06269bca03a5a7b2ca2319b8e029f3cecf7cc6de`
-> Admission: non-admitting
+- Status: ii-b5b-ii-a complete/non-admitting; ii-b5b-ii-b current
+- Date: 2026-08-22
+- Baseline: `06269bca03a5a7b2ca2319b8e029f3cecf7cc6de`
+- Admission: non-admitting
 
 ## 1. Decision
 
@@ -69,14 +69,18 @@ privileged authority.
 
 ## 4. Tests-First and Validation
 
-ii-b5b-ii-a starts with a focused RED proving the concrete fixed capsule reader
-and internal selector do not exist. Its matrix covers wrong offset, read/write
-descriptor mode, owner, mode, type, link count, device/inode/file flags,
-ACL/xattrs, oversize, short read, trailing growth, descriptor or offset drift,
-malformed/non-canonical capsule and caller-selected ordinal. The exact allowed
-non-document paths are the new intake source/test, the existing Darwin installed
-reader and its focused test, the shared target-boundary test, and the two
-structural verifier scripts.
+ii-b5b-ii-a completed in
+`ea9d2a237ab8e8d1b900f603f54233c94c86ecc0`. Its focused matrix covers wrong
+offset, read/write descriptor mode, owner, mode, type, link count,
+device/inode/file flags, ACL/xattrs, oversize, short read, trailing growth,
+descriptor or offset drift, malformed/non-canonical capsule and
+caller-selected ordinal. The exact seven non-document paths are the new intake
+source/test, the existing Darwin installed reader and its focused test, the
+shared target-boundary test, and the two structural verifier scripts. The
+checkpoint passed its one staged-only 1,353-test serial and focused, affected,
+structural, Debug/Release projection and independent-review gates without a
+full verifier or production runtime invocation. See the
+[completion audit](phase-d-task-39b2c-l3c3c-ii-b5b-ii-a-review.md).
 
 Later subcheckpoints add injected syscall matrices plus bounded same-UID child
 integration for identity, socket/FD inheritance, EOF and PGID/reap ordering.
@@ -87,7 +91,7 @@ these non-admitting checkpoints.
 ## 5. Remaining Order
 
 ```text
-ii-b5b-ii-a -> ii-b5b-ii-b -> ii-b5b-ii-c -> ii-b5b-ii-d
+ii-b5b-ii-b -> ii-b5b-ii-c -> ii-b5b-ii-d
 -> ii-b5b-iii -> ii-c0 -> ii-c -> L3c3d -> L3c4
 ```
 
