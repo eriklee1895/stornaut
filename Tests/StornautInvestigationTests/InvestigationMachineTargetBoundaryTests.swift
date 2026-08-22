@@ -494,6 +494,7 @@ struct InvestigationMachineTargetBoundaryTests {
         #expect(supportSourceNames == [
             "DarwinInvestigationMachineInstalledDriverSystem.swift",
             "InvestigationMachineClaimClient.swift",
+            "InvestigationMachineDarwinAppIdentityObservation.swift",
             "InvestigationMachineDriverSupport.swift",
             "InvestigationMachineFixedCapsuleIntake.swift",
             "InvestigationMachineInstalledDriverObservation.swift",
@@ -599,6 +600,14 @@ struct InvestigationMachineTargetBoundaryTests {
                 "import Foundation",
                 "import Security",
                 "import StornautInvestigationHandoffContract",
+            ],
+            "InvestigationMachineDarwinAppIdentityObservation.swift": [
+                "import CInvestigationIdentitySupport",
+                "import Darwin",
+                "import Foundation",
+                "import Security",
+                "import StornautInvestigationHandoffContract",
+                "import StornautInvestigationInstalledL2",
             ],
             "InvestigationMachineInstalledDriverObservation.swift": [
                 "import Darwin",
@@ -1392,6 +1401,39 @@ struct InvestigationMachineTargetBoundaryTests {
             "ii-b5b-ii-a staged content drifted",
             "(( changed <= 2000 ))",
             "_fcntl _ioctl",
+        ] {
+            #expect(boundaries.contains(marker))
+        }
+    }
+
+    @Test
+    func iiB5BIIBVerifierPinsIndependentCompleteAppIdentity() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundaries = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ),
+            encoding: .utf8
+        )
+        for marker in [
+            "--iib5biib-app-identity-contract-only",
+            "--iib5biib-staged-scope-contract-only",
+            "ii-b5b-ii-b dependency surface drifted",
+            "ii-b5b-ii-b complete C snapshot drifted",
+            "ii-b5b-ii-b C object import drifted",
+            "ii-b5b-ii-b observer contract drifted",
+            "ii-b5b-ii-b focused coverage drifted",
+            "ii-b5b-ii-b checkpoint paths drifted",
+            "ii-b5b-ii-b checkpoint baseline drifted",
+            "ii-b5b-ii-b checkpoint budget drifted",
+            "ii-b5b-ii-b checkpoint path ceiling drifted",
+            "ii-b5b-ii-b checkpoint deleted an existing path",
+            "ii-b5b-ii-b binary checkpoint path rejected",
+            "ii-b5b-ii-b staged content drifted",
+            "verify_iib5biib_index_semantics",
+            "(( changed <= 2800 ))",
+            "_audit_get_pinfo_addr", "_proc_pidinfo", "_sysctl",
         ] {
             #expect(boundaries.contains(marker))
         }

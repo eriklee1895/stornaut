@@ -1742,6 +1742,7 @@ expected_machine_driver_security_imports=$(
         _kSecCodeInfoIdentifier \
         _kSecCodeInfoUnique \
         _kSecGuestAttributeAudit \
+        _kSecGuestAttributePid \
         | LC_ALL=C sort
 )
 iib4_machine_claim_positive_images=(
@@ -1904,18 +1905,18 @@ function require_projection() {
 }
 require_projection \
     "$machine_driver_undefined_symbols" \
-    aaf705a9b4d2bb802907b7bd5f892fad988564fa237732592f36cf6bc88f075d \
-    517 \
+    bbd9564b5121b705b78df9ca088cf2ae0c5d5bc825d699d515afd4529bc4b7b4 \
+    563 \
     undefined
 require_projection \
     "$machine_driver_loaded_libraries" \
-    e3c05d8766d8aa37e87a834a3f37fd71d925f1d34ac349528cee4970db9d3841 \
-    16 \
+    9053e60819e57a62ee9acb9db4854705fa2ed0ade20ec3683f13b9e854f86c41 \
+    18 \
     load-command
 require_projection \
     "$machine_driver_owned_symbols" \
-    b2f3f04ca7c27db94e4833bffd106665bc41c5e6e0df3d36622c42bd4340ee38 \
-    1445 \
+    bd0064540e69cbdac75d9d5f848fdfa6b7a675f8cff9b2c2a641aa4817448195 \
+    2626 \
     owned-symbol
 if ! mach_o_has_demangled_symbol \
     "$diagnostic_machine_driver" \
@@ -1968,11 +1969,11 @@ release_machine_driver_owned_symbols=$(
         | rg 'StornautInvestigationMachineDriver(Support)?' | LC_ALL=C sort -u
 )
 require_projection "$release_machine_driver_undefined_symbols" \
-    976eceef0b2461d60f3aa0a635f5b64598963b7ddee6cd6be4d92fafbf1bafd0 369 release-undefined
+    ca971d67a70ced6f94b7ce3d90e0c6ae03b4ed53cad475f96d725ade28012951 412 release-undefined
 require_projection "$release_machine_driver_loaded_libraries" \
-    e3c05d8766d8aa37e87a834a3f37fd71d925f1d34ac349528cee4970db9d3841 16 release-load-command
+    9053e60819e57a62ee9acb9db4854705fa2ed0ade20ec3683f13b9e854f86c41 18 release-load-command
 require_projection "$release_machine_driver_owned_symbols" \
-    f182dc183a8a662eb39bdfcdd45e743d595135d68ee7488367b7f222ee53a0da 866 release-owned-symbol
+    8a1e846961a0a5dfdba1782f0f3d27a4fae6906babf9814826c0ebba718329c2 1659 release-owned-symbol
 for marker in "${machine_driver_authority_forbidden_markers[@]}"; do
     if mach_o_has_demangled_symbol "$release_machine_driver" "$marker"; then
         print -u2 "Authority or readiness leaked into Release Machine driver: $marker"

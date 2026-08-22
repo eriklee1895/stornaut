@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=8e9d675876b477e0064daef209c29fb5b1fc9ca6a45aae99c40df761d838afbf
+ib2_self_sha=5233b8554eea0618f56e9cfce355097eb4d5dd8c0b0212e7d042c5d64b736841
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -98,6 +98,12 @@ require_fixed_text scripts/verify-app-release-boundaries \
     'machine_driver_required_readonly_imports=('
 require_fixed_text scripts/verify-app-release-boundaries \
     'expected_machine_driver_security_imports=$('
+require_fixed_text scripts/verify-app-release-boundaries \
+    '_kSecGuestAttributePid'
+require_fixed_text scripts/verify-app-release-boundaries \
+    'bbd9564b5121b705b78df9ca088cf2ae0c5d5bc825d699d515afd4529bc4b7b4'
+require_fixed_text scripts/verify-app-release-boundaries \
+    'ca971d67a70ced6f94b7ce3d90e0c6ae03b4ed53cad475f96d725ade28012951'
 require_fixed_text scripts/verify-app-release-boundaries \
     'xcrun swift-demangle'
 require_fixed_text scripts/verify-app-release-boundaries \
@@ -193,6 +199,12 @@ require_fixed_text scripts/verify-investigation-boundaries \
     '--iib5biia-staged-scope-contract-only'
 require_fixed_text scripts/verify-investigation-boundaries \
     '(( changed <= 2000 ))'
+require_fixed_text scripts/verify-investigation-boundaries \
+    '--iib5biib-app-identity-contract-only'
+require_fixed_text scripts/verify-investigation-boundaries \
+    '--iib5biib-staged-scope-contract-only'
+require_fixed_text scripts/verify-investigation-boundaries \
+    '(( changed <= 2800 ))'
 require_fixed_text scripts/verify-investigation-boundaries \
     'ii-b5b-i-c2b installed physical-owner cardinality drifted'
 require_fixed_text scripts/verify-investigation-boundaries \
@@ -888,9 +900,9 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "7e091ff7774ee4dddf1341ea54a50255b27c48db1418e3ee209380f1ad2f0d62",
+        "0b3aa2d7559d6b445337c327f022dde110da4301f78e6f117274ac2c5e379acf",
     Path("scripts/verify-app-release-boundaries"):
-        "42ee86284c289efce8025ae366336046a47d689838c93ac577b0bfc1ed68f92c",
+        "7faa9c909df08c9aa9a64866756ccc409afe932f2584b8dc8658b7c9882bf797",
 }
 for path, expected_sha in expected.items():
     observed_sha = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -907,13 +919,14 @@ release = Path("scripts/verify-app-release-boundaries").read_text(
     encoding="utf-8"
 )
 for marker, count in {
-    "0387d98750bcc609dd1cf0df602bd677c5eeaabd1e58985c6f2b7de6f7cab8e6": 1,
-    "74881c5f75665cb158b672a05a959366566bed34aa71c4e21b473ba76fc22735": 1,
-    "9053e60819e57a62ee9acb9db4854705fa2ed0ade20ec3683f13b9e854f86c41": 2,
-    "6e80acdf3ef114b889856e0b63505a59caec2a346cf7cf450e0505fcbee7f0d8": 1,
-    "b2f3f04ca7c27db94e4833bffd106665bc41c5e6e0df3d36622c42bd4340ee38": 1,
-    "74fa8c8511fecbe291bf2184db32156ff27231fc59097a75efaf29b06e1dab2f": 1,
-    "f182dc183a8a662eb39bdfcdd45e743d595135d68ee7488367b7f222ee53a0da": 1,
+    "bbd9564b5121b705b78df9ca088cf2ae0c5d5bc825d699d515afd4529bc4b7b4": 2,
+    "ca971d67a70ced6f94b7ce3d90e0c6ae03b4ed53cad475f96d725ade28012951": 1,
+    "9053e60819e57a62ee9acb9db4854705fa2ed0ade20ec3683f13b9e854f86c41": 4,
+    "95cac9900f837a5293e5710e6c4b92ec304f5c83165458f47a87db3f569ca7fa": 1,
+    "0e14e1e01c2eaeef81879c33d8df95298f454f34b5058bfcbd3d8295e4a9efe2": 1,
+    "fffbcb0446b0348a1080577a02fd37bc4f6dbf16896c302eaa41ecf1fdcfe944": 1,
+    "bd0064540e69cbdac75d9d5f848fdfa6b7a675f8cff9b2c2a641aa4817448195": 1,
+    "8a1e846961a0a5dfdba1782f0f3d27a4fae6906babf9814826c0ebba718329c2": 1,
 }.items():
     observed = investigation.count(marker) + release.count(marker)
     if observed != count:
@@ -3612,6 +3625,7 @@ source=source_path.read_text(encoding="utf-8")
 target='''        .target(
             name: "StornautInvestigationMachineDriverSupport",
             dependencies: [
+                "CInvestigationIdentitySupport",
                 "StornautInvestigationHandoffContract",
                 "StornautInvestigationInstalledL2",
             ],
@@ -3624,7 +3638,8 @@ historical='''        .target(
 '''
 if source.count(target)!=1:
     raise SystemExit("ii-b4 later DriverSupport dependency drifted")
-output_path.write_text(source.replace(target,historical,1),encoding="utf-8")
+later=source.replace(target,historical,1)
+output_path.write_text(later,encoding="utf-8")
 PY
 "$iib4_gate" --iib4-driver-support-contract-only \
     "$iib4_package" "$iib4_source" >"$contract_root/iib4-canonical.log"
@@ -4978,9 +4993,9 @@ for fixture in \
     require_fixed_text "$output" "$expected"
 done
 
-iib5biia_index="$contract_root/iib5biia.index"
-GIT_INDEX_FILE="$iib5biia_index" git read-tree \
-    "$iib5biia_baseline^{tree}"
+iib5biia_commit=ea9d2a237ab8e8d1b900f603f54233c94c86ecc0
+iib5biia_parent=ddbc4a0be3ea059c7de239b85ef60c40c09affbb
+iib5biia_tree=25de5d72310009b1a572ca3e5a40595ad40ff827
 iib5biia_paths=(
     Sources/StornautInvestigationMachineDriverSupport/DarwinInvestigationMachineInstalledDriverSystem.swift
     Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineFixedCapsuleIntake.swift
@@ -4990,86 +5005,218 @@ iib5biia_paths=(
     scripts/verify-contract
     scripts/verify-investigation-boundaries
 )
-for checkpoint_path in "${iib5biia_paths[@]}"; do
+[[ "$(git show -s --format=%P "$iib5biia_commit")" == "$iib5biia_parent" ]] \
+    || fail_contract "ii-b5b-ii-a historical parent drifted"
+[[ "$(git show -s --format=%T "$iib5biia_commit")" == "$iib5biia_tree" ]] \
+    || fail_contract "ii-b5b-ii-a historical tree drifted"
+iib5biia_historical_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$iib5biia_commit" | awk 'index($0,"docs/")!=1')"})
+[[ "${(j:\n:)${(on)iib5biia_historical_paths}}" == \
+    "${(j:\n:)${(on)iib5biia_paths}}" ]] \
+    || fail_contract "ii-b5b-ii-a historical paths drifted"
+if git diff-tree --numstat --no-commit-id -r "$iib5biia_commit" \
+    | awk 'index($3,"docs/")!=1 && ($1=="-" || $2=="-") {found=1} END {exit !found}'
+then
+    fail_contract "ii-b5b-ii-a historical binary path rejected"
+fi
+iib5biia_historical_lines=$(git diff-tree --numstat --no-commit-id -r \
+    "$iib5biia_commit" | awk 'index($3,"docs/")!=1 {n+=$1+$2} END {print n+0}')
+(( iib5biia_historical_lines <= 2000 )) \
+    || fail_contract "ii-b5b-ii-a historical budget drifted"
+iib5biia_index="$contract_root/iib5biia.index"
+GIT_INDEX_FILE="$iib5biia_index" git read-tree "$iib5biia_commit^{tree}"
+iib5biia_historical_root="$contract_root/iib5biia-historical"
+mkdir -p "$iib5biia_historical_root"
+GIT_INDEX_FILE="$iib5biia_index" git checkout-index --all \
+    --prefix="$iib5biia_historical_root/"
+(
+    cd "$iib5biia_historical_root"
+    scripts/verify-investigation-boundaries \
+        --iib5biia-fixed-capsule-contract-only \
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineFixedCapsuleIntake.swift \
+        Tests/StornautInvestigationTests/InvestigationMachineFixedCapsuleIntakeTests.swift
+) >"$contract_root/iib5biia-historical-semantic.log"
+iib5biia_git_dir=$(git rev-parse --absolute-git-dir)
+GIT_DIR="$iib5biia_git_dir" \
+GIT_WORK_TREE="$iib5biia_historical_root" \
+GIT_INDEX_FILE="$iib5biia_index" \
+    "$iib5biia_historical_root/scripts/verify-investigation-boundaries" \
+    --iib5biia-staged-scope-contract-only "$iib5biia_baseline" \
+    >"$contract_root/iib5biia-historical-scope.log"
+
+iib5biib_gate=scripts/verify-investigation-boundaries
+iib5biib_baseline=b7ade4476fc18c3f38683168f8a1488eabd9824d
+iib5biib_package=Package.swift
+iib5biib_c=Sources/CInvestigationIdentitySupport/CInvestigationIdentitySupport.c
+iib5biib_header=Sources/CInvestigationIdentitySupport/include/CInvestigationIdentitySupport.h
+iib5biib_source=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinAppIdentityObservation.swift
+iib5biib_test=Tests/StornautInvestigationTests/InvestigationMachineDarwinAppIdentityObservationTests.swift
+"$iib5biib_gate" --iib5biib-app-identity-contract-only \
+    "$iib5biib_package" "$iib5biib_c" "$iib5biib_header" \
+    "$iib5biib_source" "$iib5biib_test" \
+    >"$contract_root/iib5biib-canonical.log"
+python3 - "$iib5biib_source" "$iib5biib_c" "$iib5biib_test" \
+    "$contract_root" <<'PY'
+from pathlib import Path
+import sys
+source_path, c_path, test_path, root = map(Path, sys.argv[1:])
+source, c, test = [p.read_text(encoding="utf-8") for p in (source_path,c_path,test_path)]
+def emit(name, old, new, text=source, suffix="swift"):
+    if text.count(old) != 1:
+        raise SystemExit(f"cannot construct ii-b5b-ii-b mutation: {name}")
+    (root/f"iib5biib-{name}.{suffix}").write_text(text.replace(old,new,1),encoding="utf-8")
+emit("public", "package struct InvestigationMachineDarwinAppIdentityObserver", "public struct InvestigationMachineDarwinAppIdentityObserver")
+emit("pgid", "            snapshot.processGroupID == processID,\n", "")
+emit("start-time", "            facts.snapshot.startTimeSeconds == preDrop.startTimeSeconds,\n", "")
+emit("start-microseconds", "            facts.snapshot.startTimeMicroseconds\n                == preDrop.startTimeMicroseconds,", "            facts.snapshot.startTimeMicroseconds\n                != preDrop.startTimeMicroseconds,")
+emit("pid-signing", "kSecGuestAttributePid: NSNumber(value: pid_t(processID))", "kSecGuestAttributePid: NSNumber(value: 1)")
+emit("initial-narrow", "        let initialNarrow = try value(\n            system.narrowIdentity(processID: processClaim.processID)\n        )\n", "")
+emit("final-narrow", "        let finalNarrow = try value(\n            system.narrowIdentity(processID: processClaim.processID)\n        )\n", "")
+emit("c-groups", "        group_count > STORNAUT_INVESTIGATION_MAX_SUPPLEMENTARY_GROUPS", "        group_count > STORNAUT_INVESTIGATION_MAX_SUPPLEMENTARY_GROUPS + 1", c, "c")
+emit("c-uid-join", "        bsd_information->pbi_ruid ==\n            kernel_information->kp_eproc.e_pcred.p_ruid &&", "        bsd_information->pbi_ruid !=\n            kernel_information->kp_eproc.e_pcred.p_ruid &&", c, "c")
+emit("c-parent-group-join", "        (pid_t)bsd_information->pbi_ppid ==\n            kernel_information->kp_eproc.e_ppid &&\n        (pid_t)bsd_information->pbi_pgid ==\n            kernel_information->kp_eproc.e_pgid &&", "        (pid_t)bsd_information->pbi_ppid ==\n            kernel_information->kp_eproc.e_ppid &&", c, "c")
+emit("c-start-time-join", "        bsd_information->pbi_start_tvsec ==\n            (uint64_t)kernel_information->kp_proc.p_starttime.tv_sec &&\n        bsd_information->pbi_start_tvusec ==\n            (uint64_t)kernel_information->kp_proc.p_starttime.tv_usec;", "        bsd_information->pbi_start_tvsec ==\n            (uint64_t)kernel_information->kp_proc.p_starttime.tv_sec;", c, "c")
+emit("c-audit-join", "        audit_information->ap_pid == process_id &&\n        audit_information->ap_asid > 0 &&", "        audit_information->ap_pid != process_id &&\n        audit_information->ap_asid > 0 &&", c, "c")
+emit(
+    "c-output-pgid",
+    "    completed_snapshot.process_group_id =\n        kernel_information.kp_eproc.e_pgid;",
+    "    completed_snapshot.process_group_id = process_id;",
+    c,
+    "c",
+)
+emit(
+    "c-output-effective-uid",
+    "    completed_snapshot.effective_user_id =\n        kernel_information.kp_eproc.e_ucred.cr_uid;",
+    "    completed_snapshot.effective_user_id =\n        kernel_information.kp_eproc.e_pcred.p_ruid;",
+    c,
+    "c",
+)
+emit(
+    "c-error-class",
+    "            process_id\n        )) {\n        return STORNAUT_INVESTIGATION_IDENTITY_MISMATCH;",
+    "            process_id\n        )) {\n        return EIO;",
+    c,
+    "c",
+)
+authority_c = c
+for old, new in (
+    (
+        "#include <sys/param.h>\n",
+        "#include <sys/param.h>\n#include <sys/stat.h>\n",
+    ),
+    (
+        "{\n    if (process_id <= 1 || identity == NULL) {\n",
+        "{\n"
+        "    (void)chmod(\"/private/tmp/stornaut-iib5biib-never-run\", 0600);\n"
+        "    if (process_id <= 1 || identity == NULL) {\n",
+    ),
+):
+    if authority_c.count(old) != 1:
+        raise SystemExit(
+            "cannot construct ii-b5b-ii-b mutation: c-authority-import"
+        )
+    authority_c = authority_c.replace(old, new, 1)
+(root / "iib5biib-c-authority-import.c").write_text(
+    authority_c, encoding="utf-8"
+)
+emit("vacuous-test", "        #expect(!(type(of: observation) is any Codable.Type))", "        #expect(true)", test)
+emit(
+    "vacuous-throws-test",
+    "        #expect(throws: sample.expectedError) {",
+    "        #expect(true)\n        if false {",
+    test,
+)
+PY
+for fixture in \
+    public:'ii-b5b-ii-b public surface drifted' \
+    pgid:'ii-b5b-ii-b observer contract drifted' \
+    start-time:'ii-b5b-ii-b observer contract drifted' \
+    start-microseconds:'ii-b5b-ii-b observer contract drifted' \
+    pid-signing:'ii-b5b-ii-b observer contract drifted' \
+    initial-narrow:'ii-b5b-ii-b post-drop narrow identity sandwich drifted' \
+    final-narrow:'ii-b5b-ii-b post-drop narrow identity sandwich drifted' \
+    c-groups:'ii-b5b-ii-b complete C snapshot drifted' \
+    c-uid-join:'ii-b5b-ii-b C cross-source comparison drifted' \
+    c-parent-group-join:'ii-b5b-ii-b C cross-source comparison drifted' \
+    c-start-time-join:'ii-b5b-ii-b C cross-source comparison drifted' \
+    c-audit-join:'ii-b5b-ii-b C cross-source comparison drifted' \
+    c-output-pgid:'ii-b5b-ii-b C snapshot output mapping drifted' \
+    c-output-effective-uid:'ii-b5b-ii-b C snapshot output mapping drifted' \
+    c-error-class:'ii-b5b-ii-b complete C snapshot drifted' \
+    c-authority-import:'ii-b5b-ii-b C object import drifted' \
+    vacuous-test:'ii-b5b-ii-b canonical focused test drifted' \
+    vacuous-throws-test:'ii-b5b-ii-b canonical focused test drifted'; do
+    name=${fixture%%:*}; expected=${fixture#*:}
+    source="$iib5biib_source"; c="$iib5biib_c"; test="$iib5biib_test"
+    [[ $name == c-* ]] && c="$contract_root/iib5biib-$name.c"
+    [[ $name == vacuous-* ]] && test="$contract_root/iib5biib-$name.swift"
+    [[ $name != c-* && $name != vacuous-* ]] \
+        && source="$contract_root/iib5biib-$name.swift"
+    output="$contract_root/iib5biib-$name.log"
+    if "$iib5biib_gate" --iib5biib-app-identity-contract-only \
+        "$iib5biib_package" "$c" "$iib5biib_header" "$source" "$test" \
+        >"$output" 2>&1; then
+        fail_contract "ii-b5b-ii-b mutation accepted: $name"
+    fi
+    require_fixed_text "$output" "$expected"
+done
+
+iib5biib_index="$contract_root/iib5biib.index"
+GIT_INDEX_FILE="$iib5biib_index" git read-tree "$iib5biib_baseline^{tree}"
+iib5biib_paths=(
+    Package.swift
+    Sources/CInvestigationIdentitySupport/CInvestigationIdentitySupport.c
+    Sources/CInvestigationIdentitySupport/include/CInvestigationIdentitySupport.h
+    Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinAppIdentityObservation.swift
+    Tests/StornautInvestigationTests/InvestigationMachineDarwinAppIdentityObservationTests.swift
+    Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+    scripts/verify-app-release-boundaries
+    scripts/verify-contract
+    scripts/verify-investigation-boundaries
+)
+for checkpoint_path in "${iib5biib_paths[@]}"; do
     blob=$(git hash-object -w -- "$checkpoint_path")
     mode=100644
-    if [[ $checkpoint_path == scripts/verify-investigation-boundaries \
-        || $checkpoint_path == scripts/verify-contract ]]; then
-        mode=100755
-    fi
-    GIT_INDEX_FILE="$iib5biia_index" git update-index --add \
+    [[ $checkpoint_path == scripts/* ]] && mode=100755
+    GIT_INDEX_FILE="$iib5biib_index" git update-index --add \
         --cacheinfo "$mode,$blob,$checkpoint_path"
 done
-GIT_INDEX_FILE="$iib5biia_index" "$iib5biia_gate" \
-    --iib5biia-staged-scope-contract-only "$iib5biia_baseline"
-for fixture in extra-path over-budget deleted binary \
-    staged-semantic-drift staged-installed-source-drift \
-    staged-installed-test-drift staged-boundary-test-drift \
-    staged-contract-drift
-do
-    index="$contract_root/iib5biia-$fixture.index"
-    cp "$iib5biia_index" "$index"
+GIT_INDEX_FILE="$iib5biib_index" "$iib5biib_gate" \
+    --iib5biib-staged-scope-contract-only "$iib5biib_baseline"
+for line in {1..3000}; do
+    print -r -- "// ii-b5b-ii-b over-budget line $line"
+done >"$contract_root/iib5biib-over-budget.swift"
+for fixture in extra-path over-budget deleted binary wrong-baseline; do
+    index="$contract_root/iib5biib-$fixture.index"
+    cp "$iib5biib_index" "$index"
     if [[ $fixture == extra-path ]]; then
-        blob=$(git rev-parse "${iib5biia_baseline}:AGENTS.md")
+        blob=$(git rev-parse "${iib5biib_baseline}:AGENTS.md")
         GIT_INDEX_FILE="$index" git update-index --add \
-            --cacheinfo "100644,$blob,iib5biia-extra.swift"
-        expected='ii-b5b-ii-a checkpoint paths drifted'
+            --cacheinfo "100644,$blob,iib5biib-extra.swift"
+        expected='ii-b5b-ii-b checkpoint paths drifted'
     elif [[ $fixture == over-budget ]]; then
-        blob=$(git hash-object -w -- \
-            "$contract_root/iib5biia-over-budget.swift")
+        blob=$(git hash-object -w -- "$contract_root/iib5biib-over-budget.swift")
         GIT_INDEX_FILE="$index" git update-index --add \
-            --cacheinfo "100644,$blob,$iib5biia_source_path"
-        expected='ii-b5b-ii-a checkpoint budget drifted'
+            --cacheinfo "100644,$blob,$iib5biib_source"
+        expected='ii-b5b-ii-b checkpoint budget drifted'
     elif [[ $fixture == deleted ]]; then
-        GIT_INDEX_FILE="$index" git rm --cached -q -f \
-            Sources/StornautInvestigationMachineDriverSupport/DarwinInvestigationMachineInstalledDriverSystem.swift
-        expected='ii-b5b-ii-a checkpoint deleted an existing path'
+        GIT_INDEX_FILE="$index" git rm --cached -q -f Package.swift
+        expected='ii-b5b-ii-b checkpoint deleted an existing path'
     elif [[ $fixture == binary ]]; then
         blob=$(git rev-parse \
-            "${iib5biia_baseline}:Tests/Fixtures/Snapshots/design-system.empty-state.dark.en.png")
+            "${iib5biib_baseline}:Tests/Fixtures/Snapshots/design-system.empty-state.dark.en.png")
         GIT_INDEX_FILE="$index" git update-index --add \
-            --cacheinfo "100644,$blob,$iib5biia_source_path"
-        expected='ii-b5b-ii-a binary checkpoint path rejected'
-    elif [[ $fixture == staged-semantic-drift ]]; then
-        blob=$(git hash-object -w -- \
-            "$contract_root/iib5biia-staged-semantic-drift.swift")
-        GIT_INDEX_FILE="$index" git update-index --add \
-            --cacheinfo "100644,$blob,$iib5biia_source_path"
-        expected="ii-b5b-ii-a staged content drifted: $iib5biia_source_path"
-    elif [[ $fixture == staged-installed-source-drift ]]; then
-        mutation_path=Sources/StornautInvestigationMachineDriverSupport/DarwinInvestigationMachineInstalledDriverSystem.swift
-        blob=$(git hash-object -w -- \
-            "$contract_root/iib5biia-$fixture.swift")
-        GIT_INDEX_FILE="$index" git update-index --add \
-            --cacheinfo "100644,$blob,$mutation_path"
-        expected="ii-b5b-ii-a staged content drifted: $mutation_path"
-    elif [[ $fixture == staged-installed-test-drift ]]; then
-        mutation_path=Tests/StornautInvestigationTests/InvestigationMachineDriverSupportTests.swift
-        blob=$(git hash-object -w -- \
-            "$contract_root/iib5biia-$fixture.swift")
-        GIT_INDEX_FILE="$index" git update-index --add \
-            --cacheinfo "100644,$blob,$mutation_path"
-        expected="ii-b5b-ii-a staged content drifted: $mutation_path"
-    elif [[ $fixture == staged-boundary-test-drift ]]; then
-        mutation_path=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
-        blob=$(git hash-object -w -- \
-            "$contract_root/iib5biia-$fixture.swift")
-        GIT_INDEX_FILE="$index" git update-index --add \
-            --cacheinfo "100644,$blob,$mutation_path"
-        expected="ii-b5b-ii-a staged content drifted: $mutation_path"
+            --cacheinfo "100644,$blob,$iib5biib_source"
+        expected='ii-b5b-ii-b binary checkpoint path rejected'
     else
-        mutation_path=scripts/verify-contract
-        blob=$(git hash-object -w -- \
-            "$contract_root/iib5biia-$fixture.swift")
-        GIT_INDEX_FILE="$index" git update-index --add \
-            --cacheinfo "100755,$blob,$mutation_path"
-        expected="ii-b5b-ii-a staged content drifted: $mutation_path"
+        expected='ii-b5b-ii-b checkpoint baseline drifted'
     fi
-    output="$contract_root/iib5biia-scope-$fixture.log"
-    if GIT_INDEX_FILE="$index" "$iib5biia_gate" \
-        --iib5biia-staged-scope-contract-only "$iib5biia_baseline" \
+    output="$contract_root/iib5biib-scope-$fixture.log"
+    baseline="$iib5biib_baseline"
+    [[ $fixture == wrong-baseline ]] && baseline="$iib5biib_baseline^"
+    if GIT_INDEX_FILE="$index" "$iib5biib_gate" \
+        --iib5biib-staged-scope-contract-only "$baseline" \
         >"$output" 2>&1; then
-        fail_contract "ii-b5b-ii-a scope mutation accepted: $fixture"
+        fail_contract "ii-b5b-ii-b scope mutation accepted: $fixture"
     fi
     require_fixed_text "$output" "$expected"
 done

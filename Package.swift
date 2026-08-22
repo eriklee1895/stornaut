@@ -137,6 +137,7 @@ let package = Package(
         .target(
             name: "StornautInvestigationMachineDriverSupport",
             dependencies: [
+                "CInvestigationIdentitySupport",
                 "StornautInvestigationHandoffContract",
                 "StornautInvestigationInstalledL2",
             ],

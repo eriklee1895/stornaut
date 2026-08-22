@@ -125,6 +125,14 @@ iib5biia_capsule_source=
 iib5biia_focused_test_source=
 iib5biia_staged_scope_contract_only=false
 iib5biia_staged_scope_baseline=ddbc4a0be3ea059c7de239b85ef60c40c09affbb
+iib5biib_app_identity_contract_only=false
+iib5biib_package_source=
+iib5biib_c_source=
+iib5biib_header_source=
+iib5biib_observer_source=
+iib5biib_focused_test_source=
+iib5biib_staged_scope_contract_only=false
+iib5biib_staged_scope_baseline=b7ade4476fc18c3f38683168f8a1488eabd9824d
 iib3a_staged_scope_contract_only=false
 iib3a_staged_scope_baseline=HEAD
 iib3b_start_retire_contract_only=false
@@ -327,6 +335,18 @@ if (( $# > 0 )); then
         && [[ $1 == --iib5biia-staged-scope-contract-only ]]; then
         iib5biia_staged_scope_contract_only=true
         iib5biia_staged_scope_baseline=${2:-ddbc4a0be3ea059c7de239b85ef60c40c09affbb}
+    elif (( $# == 6 )) \
+        && [[ $1 == --iib5biib-app-identity-contract-only ]]; then
+        iib5biib_app_identity_contract_only=true
+        iib5biib_package_source=$2
+        iib5biib_c_source=$3
+        iib5biib_header_source=$4
+        iib5biib_observer_source=$5
+        iib5biib_focused_test_source=$6
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iib5biib-staged-scope-contract-only ]]; then
+        iib5biib_staged_scope_contract_only=true
+        iib5biib_staged_scope_baseline=${2:-b7ade4476fc18c3f38683168f8a1488eabd9824d}
     elif (( $# == 1 || $# == 2 )) \
         && [[ $1 == --iib3a-staged-scope-contract-only ]]; then
         iib3a_staged_scope_contract_only=true
@@ -352,7 +372,7 @@ if (( $# > 0 )); then
         iib3c_staged_scope_baseline=${2:-HEAD}
     else
         print -u2 \
-            "Usage: scripts/verify-investigation-boundaries [--claim-asid-contract-only <source> | --deadline-state-contract-only <source> | --claim-server-contract-only <adapter> <effects> <deadline-state> | --claim-server-package-contract-only <describe-json> <dump-json> | --legacy-machine-claim-contract-only <lifecycle-xpc> <helper> <machine-host> <machine-claim> | --retirement-handle-v3-contract-only <lifecycle> <adapter> | --live-claim-server-contract-only <project.pbxproj> <Package.swift> <handoff-root> <scheme-root> <lifecycle-escrow> <adapter> <effects> <helper> | --app-peer-admission-contract-only <policy> <adapter> | --iib4-driver-support-contract-only <package-manifest> <client-source> | --iib4-staged-scope-contract-only [baseline] | --iib5a0-claim-abort-contract-only <client-source> | --iib5a0-staged-scope-contract-only [baseline] | --iib5a-single-epoch-contract-only <composer-source> <focused-test-source> | --iib5a-staged-scope-contract-only [baseline] | --iib5bia-projection-contract-only <contract-source> <focused-test-source> | --iib5bia-staged-scope-contract-only [baseline] | --iib5bib1-semantic-contract-only <Package.swift> <semantic-source> <focused-test-source> | --iib5bib1-staged-scope-contract-only [baseline] | --iib5biia-fixed-capsule-contract-only <source> <test> | --iib5biia-staged-scope-contract-only [baseline] | --iib3a-staged-scope-contract-only [baseline] | --iib3b-start-retire-contract-only <transport> | --iib3b-staged-scope-contract-only [baseline] | --iib3c-concrete-entry-contract-only <leaf> <adapter> <composition> <harness> | --iib3c-staged-scope-contract-only [baseline] | --iib5bic2a-legacy-owner-contract-only <lifecycle-observation> <collector> <service-probe> <scenario-driver> <installed-owner> <installed-join> <focused-test> | --iib5bic2a-staged-scope-contract-only [baseline] | --iib5bic2b-absence-only-contract-only <lifecycle-observation> <darwin-support> <collector> <service-probe> <installed-owner> <installed-join> <focused-test> <collector-test> [source-root] | --iib5bic2b-boundary-staged-scope-contract-only [baseline] | --iib5bic2b-contract-staged-scope-contract-only [baseline] | --iib5bic2b-aggregate-scope-contract-only [baseline]]"
+            "Usage: scripts/verify-investigation-boundaries [--claim-asid-contract-only <source> | --deadline-state-contract-only <source> | --claim-server-contract-only <adapter> <effects> <deadline-state> | --claim-server-package-contract-only <describe-json> <dump-json> | --legacy-machine-claim-contract-only <lifecycle-xpc> <helper> <machine-host> <machine-claim> | --retirement-handle-v3-contract-only <lifecycle> <adapter> | --live-claim-server-contract-only <project.pbxproj> <Package.swift> <handoff-root> <scheme-root> <lifecycle-escrow> <adapter> <effects> <helper> | --app-peer-admission-contract-only <policy> <adapter> | --iib4-driver-support-contract-only <package-manifest> <client-source> | --iib4-staged-scope-contract-only [baseline] | --iib5a0-claim-abort-contract-only <client-source> | --iib5a0-staged-scope-contract-only [baseline] | --iib5a-single-epoch-contract-only <composer-source> <focused-test-source> | --iib5a-staged-scope-contract-only [baseline] | --iib5bia-projection-contract-only <contract-source> <focused-test-source> | --iib5bia-staged-scope-contract-only [baseline] | --iib5bib1-semantic-contract-only <Package.swift> <semantic-source> <focused-test-source> | --iib5bib1-staged-scope-contract-only [baseline] | --iib5biia-fixed-capsule-contract-only <source> <test> | --iib5biia-staged-scope-contract-only [baseline] | --iib5biib-app-identity-contract-only <Package.swift> <c-source> <header> <observer> <test> | --iib5biib-staged-scope-contract-only [baseline] | --iib3a-staged-scope-contract-only [baseline] | --iib3b-start-retire-contract-only <transport> | --iib3b-staged-scope-contract-only [baseline] | --iib3c-concrete-entry-contract-only <leaf> <adapter> <composition> <harness> | --iib3c-staged-scope-contract-only [baseline] | --iib5bic2a-legacy-owner-contract-only <lifecycle-observation> <collector> <service-probe> <scenario-driver> <installed-owner> <installed-join> <focused-test> | --iib5bic2a-staged-scope-contract-only [baseline] | --iib5bic2b-absence-only-contract-only <lifecycle-observation> <darwin-support> <collector> <service-probe> <installed-owner> <installed-join> <focused-test> <collector-test> [source-root] | --iib5bic2b-boundary-staged-scope-contract-only [baseline] | --iib5bic2b-contract-staged-scope-contract-only [baseline] | --iib5bic2b-aggregate-scope-contract-only [baseline]]"
         exit 64
     fi
 fi
@@ -1108,7 +1128,7 @@ function verify_iib5bib2ba_process_contract() {
     xcrun swiftc -frontend -parse "$focused_test"
     python3 - "$package_source" "$c_source" "$header_source" "$process_source" "$focused_test" <<'PY'
 from pathlib import Path
-import re, sys
+import hashlib, re, sys
 package_path, c_path, header_path, swift_path, test_path = map(Path, sys.argv[1:])
 package, c, header, swift, test = [p.read_text(encoding="utf-8") for p in (package_path,c_path,header_path,swift_path,test_path)]
 target = re.search(r'\.target\(\s*name: "StornautInvestigationInstalledL2",(.*?)\n\s*\),', package, re.DOTALL)
@@ -1137,10 +1157,18 @@ PY
     local object_dir=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-iib5bib2ba-object.XXXXXX")
     xcrun clang -std=c11 -I "${header_source:h}" -c "$c_source" -o "$object_dir/identity.o"
     local exports=$(xcrun nm -g -j "$object_dir/identity.o" | grep '^_stornaut' || true)
-    [[ "$exports" == _stornaut_investigation_identity_for_pid ]] || { rm -rf "$object_dir"; print -u2 "ii-b5b-i-b2b-a object export drifted"; return 1; }
+    local expected_exports=$(print -rl -- \
+        _stornaut_investigation_identity_for_pid \
+        _stornaut_investigation_process_snapshot_for_pid \
+        | LC_ALL=C sort)
+    [[ "$exports" == "$expected_exports" ]] || { rm -rf "$object_dir"; print -u2 "ii-b5b-i-b2b-a object export drifted"; return 1; }
     local undefined=$(xcrun nm -u -j "$object_dir/identity.o" | LC_ALL=C sort -u)
     local expected_undefined=$(print -rl -- ___error ___memcpy_chk ___memset_chk ___stack_chk_fail ___stack_chk_guard _audit_token_to_asid _audit_token_to_euid _audit_token_to_pid _audit_token_to_pidversion _mach_port_deallocate _mach_task_self_ _memset _proc_pidinfo _task_info _task_name_for_pid | LC_ALL=C sort)
-    [[ "$undefined" == "$expected_undefined" ]] || { rm -rf "$object_dir"; print -u2 "ii-b5b-i-b2b-a object authority drifted"; return 1; }
+    local later_undefined=$(print -rl -- _audit_get_pinfo_addr _bzero _memcpy _sysctl | LC_ALL=C sort)
+    local normalized_undefined=$(comm -23 \
+        <(print -r -- "$undefined" | LC_ALL=C sort) \
+        <(print -r -- "$later_undefined" | LC_ALL=C sort))
+    [[ "$normalized_undefined" == "$expected_undefined" ]] || { rm -rf "$object_dir"; print -u2 "ii-b5b-i-b2b-a object authority drifted"; return 1; }
     rm -rf "$object_dir"
 }
 
@@ -1153,7 +1181,18 @@ function verify_iib5bib2ba_staged_scope() {
     local changed=$(git diff --cached --numstat "$baseline" \
         -- . ':(exclude)scripts/verify-contract' \
         ':(exclude)scripts/verify-investigation-boundaries' \
+        ':(exclude)Package.swift' \
+        ':(exclude)Sources/CInvestigationIdentitySupport/CInvestigationIdentitySupport.c' \
+        ':(exclude)Sources/CInvestigationIdentitySupport/include/CInvestigationIdentitySupport.h' \
         | awk 'index($3,"docs/")!=1 {n+=$1+$2} END {print n+0}')
+    local historical_path
+    for historical_path in \
+        Package.swift \
+        Sources/CInvestigationIdentitySupport/CInvestigationIdentitySupport.c \
+        Sources/CInvestigationIdentitySupport/include/CInvestigationIdentitySupport.h
+    do
+        changed=$(( changed + $(git diff --numstat "$baseline" 94958088fe271139c9ebb4cd1e2df2c0830d2f72 -- "$historical_path" | awk '{n+=$1+$2} END {print n+0}') ))
+    done
     local verifier
     for verifier in scripts/verify-contract scripts/verify-investigation-boundaries; do
         changed=$(( changed + $(git diff --numstat "$baseline" 94958088fe271139c9ebb4cd1e2df2c0830d2f72 -- "$verifier" | awk '{n+=$1+$2} END {print n+0}') ))
@@ -1272,7 +1311,7 @@ if target is None: raise SystemExit("ii-b5b-i-c1 DriverSupport target missing")
 dependency_block=re.search(r'dependencies:\s*\[(.*?)\]\s*,',target.group(1),re.DOTALL)
 if dependency_block is None: raise SystemExit("ii-b5b-i-c1 DriverSupport dependencies missing")
 deps=set(re.findall(r'"([^"]+)"',dependency_block.group(1)))
-if deps != {"StornautInvestigationHandoffContract","StornautInvestigationInstalledL2"}: raise SystemExit("ii-b5b-i-c1 dependency direction drifted")
+if deps != {"CInvestigationIdentitySupport","StornautInvestigationHandoffContract","StornautInvestigationInstalledL2"}: raise SystemExit("ii-b5b-i-c1 dependency direction drifted")
 installed=re.search(r'\.target\(\s*name: "StornautInvestigationInstalledL2",(.*?)\n\s*\),',package,re.DOTALL)
 if installed is None: raise SystemExit("ii-b5b-i-c1 InstalledL2 target missing")
 installed_dependency_block=re.search(r'dependencies:\s*\[(.*?)\]\s*,',installed.group(1),re.DOTALL)
@@ -2527,6 +2566,219 @@ function verify_iib5biia_staged_scope() {
         return 1
     }
     verify_iib5biia_index_semantics
+}
+
+function verify_iib5biib_app_identity_contract() {
+    local package_source=$1 c_source=$2 header_source=$3 observer_source=$4 focused_test=$5
+    xcrun swiftc -frontend -parse "$observer_source"
+    xcrun swiftc -frontend -parse "$focused_test"
+    python3 - "$package_source" "$c_source" "$header_source" "$observer_source" "$focused_test" <<'PY'
+from pathlib import Path
+import hashlib, re, sys
+package, c, header, source, test = [Path(p).read_text(encoding="utf-8") for p in sys.argv[1:]]
+compact_c = re.sub(r"\s+", "", c)
+target = re.search(r'\.target\(\s*name: "StornautInvestigationMachineDriverSupport",(.*?)\n\s*\),', package, re.DOTALL)
+if target is None: raise SystemExit("ii-b5b-ii-b package target missing")
+deps=set(re.findall(r'"(CInvestigationIdentitySupport|Stornaut[A-Za-z0-9]+)"',target.group(1)))
+if deps != {"CInvestigationIdentitySupport","StornautInvestigationHandoffContract","StornautInvestigationInstalledL2"}: raise SystemExit("ii-b5b-ii-b dependency surface drifted")
+imports=set(re.findall(r'(?m)^import\s+([A-Za-z0-9_]+)\s*$',source))
+if imports != {"CInvestigationIdentitySupport","Darwin","Foundation","Security","StornautInvestigationHandoffContract","StornautInvestigationInstalledL2"}: raise SystemExit("ii-b5b-ii-b import surface drifted")
+if re.search(r'(?m)^\s*(?:public|open)\s+',source): raise SystemExit("ii-b5b-ii-b public surface drifted")
+package_types=re.findall(r'(?m)^package\s+(?:final\s+)?(?:struct|class|actor|enum|protocol|typealias)\s+([A-Za-z0-9_]+)',source)
+if package_types != ["InvestigationMachineDarwinAppIdentityObservationError","InvestigationMachineDarwinAppPreDropObservation","InvestigationMachineDarwinAppIdentityObserver"]: raise SystemExit("ii-b5b-ii-b package surface drifted")
+for forbidden in ("StornautLifecycle","StornautInvestigationDiagnostic","Process(","NSXPC","URLSession","posix_spawn","socketpair","kill(","write(","unlink(","rename(","Executor","Cleanup","readiness"):
+    if forbidden in source: raise SystemExit("ii-b5b-ii-b authority or admission surface drifted")
+for forbidden in ("proc_signal_with_audittoken","kill(","killpg(","signal(","waitpid(","posix_spawn","fork(","exec","write(","socket(","connect("):
+    if forbidden in c or forbidden in header: raise SystemExit("ii-b5b-ii-b C authority drifted")
+for marker in ("PROC_PIDTBSDINFO","KERN_PROC_PID","audit_get_pinfo_addr","pbi_ppid","pbi_pgid","pbi_ruid","pbi_uid","pbi_svuid","pbi_rgid","pbi_gid","pbi_svgid","cr_ngroups","cr_groups","start_time_seconds","start_time_microseconds","audit_user_id","STORNAUT_INVESTIGATION_IDENTITY_MISMATCH"):
+    if marker not in c+header: raise SystemExit(f"ii-b5b-ii-b complete C snapshot drifted: {marker}")
+if compact_c.count("group_count>STORNAUT_INVESTIGATION_MAX_SUPPLEMENTARY_GROUPS)") != 1:
+    raise SystemExit("ii-b5b-ii-b complete C snapshot drifted: group ceiling")
+if compact_c.count("returnSTORNAUT_INVESTIGATION_IDENTITY_MISMATCH;") != 2:
+    raise SystemExit("ii-b5b-ii-b complete C snapshot drifted: identity mismatch")
+if source.count("system.narrowIdentity(processID: processClaim.processID)") != 2:
+    raise SystemExit("ii-b5b-ii-b post-drop narrow identity sandwich drifted")
+cross_source = re.search(
+    r"(?ms)^static int\n"
+    r"stornaut_investigation_bsd_matches_kernel_and_audit\(.*?^\}\n",
+    c,
+)
+if cross_source is None or c.count(
+    "stornaut_investigation_bsd_matches_kernel_and_audit("
+) != 3:
+    raise SystemExit("ii-b5b-ii-b C cross-source comparison drifted")
+normalized_cross_source = re.sub(r"\s+", "", cross_source.group(0))
+if hashlib.sha256(normalized_cross_source.encode()).hexdigest() != (
+    "beebdb641bb8900a010b7312937d778b8b8894833f2c4a0f0bb978972c140207"
+):
+    raise SystemExit("ii-b5b-ii-b C cross-source comparison drifted")
+for marker in ("package func prepare(","package func observe(","kSecGuestAttributePid: NSNumber(value: pid_t(processID))","InvestigationInstalledL2NodeReader()","InvestigationInstalledL2StaticSigningReader()","expectedParentProcessID: system.currentProcessID()","snapshot.processGroupID == processID","facts.snapshot.startTimeSeconds == preDrop.startTimeSeconds","facts.snapshot.startTimeMicroseconds\n                == preDrop.startTimeMicroseconds","dropEvidence.auditTokenWords[0] == preDrop.auditTokenWords[0]","facts.staticSigning == preDrop.staticSigning","InvestigationMachineSingleEpochAppObservation(identity: identity)"):
+    if marker not in source: raise SystemExit(f"ii-b5b-ii-b observer contract drifted: {marker}")
+for marker in ("exactRootToAppObservationUsesIndependentStableEvidence","everyIndependentPostDropIdentityAxisFailsClosed","everyIndependentPreDropIdentityAxisFailsClosed","everyObservationRaceAndEvidenceFailureFailsClosed","reportedAuditIdentityAndProjectionCannotReplaceIndependentFacts","reportedGroupsMustExactlyMatchIndependentKernelGroups","reportedAndKernelGroupsCannotReplaceIndependentDirectoryGroups","unavailablePhysicalEvidenceHasExactError","invalidPhysicalEvidenceHasExactError","resolvedIdentityFailureHasPhaseExactError","preDropNarrowIdentityMustRemainStableAcrossObservation","concreteReadOnlySystemObservesCurrentExecutableAndSigning","sourceAndDarwinABIStayClosedAndComplete"):
+    if marker not in test: raise SystemExit(f"ii-b5b-ii-b focused coverage drifted: {marker}")
+if hashlib.sha256(Path(sys.argv[5]).read_bytes()).hexdigest() != (
+    "5b2957448d187cdfd3f4b3b628015e2b529758158d0e2e8520120b92f84cb12e"
+):
+    raise SystemExit("ii-b5b-ii-b canonical focused test drifted")
+if hashlib.sha256(Path(sys.argv[4]).read_bytes()).hexdigest() != "2102c17f2f656b6cee197fb66ff0b2b019fb1c49477123d0123c4fddaeeb754a": raise SystemExit("ii-b5b-ii-b canonical observer drifted")
+PY
+    local object_dir=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-iib5biib-object.XXXXXX")
+    xcrun clang -std=c11 -I "${header_source:h}" -c "$c_source" -o "$object_dir/identity.o"
+    local exports=$(xcrun nm -g -j "$object_dir/identity.o" | grep '^_stornaut' | LC_ALL=C sort)
+    local expected_exports=$(print -rl -- _stornaut_investigation_identity_for_pid _stornaut_investigation_process_snapshot_for_pid | LC_ALL=C sort)
+    [[ "$exports" == "$expected_exports" ]] || { rm -rf "$object_dir"; print -u2 "ii-b5b-ii-b C export drifted"; return 1; }
+    local undefined=$(xcrun nm -u -j "$object_dir/identity.o" | LC_ALL=C sort -u)
+    local expected_undefined=$(print -rl -- \
+        ___error \
+        ___memcpy_chk \
+        ___memset_chk \
+        ___stack_chk_fail \
+        ___stack_chk_guard \
+        _audit_get_pinfo_addr \
+        _audit_token_to_asid \
+        _audit_token_to_euid \
+        _audit_token_to_pid \
+        _audit_token_to_pidversion \
+        _bzero \
+        _mach_port_deallocate \
+        _mach_task_self_ \
+        _memcpy \
+        _memset \
+        _proc_pidinfo \
+        _sysctl \
+        _task_info \
+        _task_name_for_pid \
+        | LC_ALL=C sort -u)
+    [[ "$undefined" == "$expected_undefined" ]] || {
+        rm -rf "$object_dir"
+        print -u2 "ii-b5b-ii-b C object import drifted"
+        return 1
+    }
+    local c_sha header_sha
+    c_sha=$(shasum -a 256 "$c_source" | awk '{ print $1 }')
+    header_sha=$(shasum -a 256 "$header_source" | awk '{ print $1 }')
+    [[ "$c_sha" == ee50e6c3c79e19dacdb3c45e39eca68b24b739970b930b8e1110a78d6e6ddb4c \
+        && "$header_sha" == f58e2ae64440b8061c86b579bdaa207bd27e2a88b3e70350a889ec19687f625e ]] || {
+        rm -rf "$object_dir"
+        print -u2 "ii-b5b-ii-b C snapshot output mapping drifted"
+        return 1
+    }
+    rm -rf "$object_dir"
+}
+
+function verify_iib5biib_index_semantics() {
+    local staged_root
+    staged_root=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-iib5biib-index.XXXXXX")
+    local staged_status=0
+    git checkout-index --all --prefix="$staged_root/" || staged_status=$?
+    local semantic_path
+    for semantic_path in \
+        Package.swift \
+        Sources/CInvestigationIdentitySupport/CInvestigationIdentitySupport.c \
+        Sources/CInvestigationIdentitySupport/include/CInvestigationIdentitySupport.h \
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinAppIdentityObservation.swift \
+        Tests/StornautInvestigationTests/InvestigationMachineDarwinAppIdentityObservationTests.swift \
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift \
+        scripts/verify-app-release-boundaries \
+        scripts/verify-contract \
+        scripts/verify-investigation-boundaries
+    do
+        if (( staged_status == 0 )) \
+            && ! cmp -s "$repo_root/$semantic_path" "$staged_root/$semantic_path"
+        then
+            print -u2 "ii-b5b-ii-b staged content drifted: $semantic_path"
+            staged_status=1
+        fi
+    done
+    if (( staged_status == 0 )); then
+        (
+            cd "$staged_root"
+            scripts/verify-investigation-boundaries \
+                --iib5biib-app-identity-contract-only \
+                Package.swift \
+                Sources/CInvestigationIdentitySupport/CInvestigationIdentitySupport.c \
+                Sources/CInvestigationIdentitySupport/include/CInvestigationIdentitySupport.h \
+                Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinAppIdentityObservation.swift \
+                Tests/StornautInvestigationTests/InvestigationMachineDarwinAppIdentityObservationTests.swift
+        ) || staged_status=$?
+    fi
+    if (( staged_status == 0 )); then
+        python3 - \
+            "$staged_root/scripts/verify-contract" \
+            "$staged_root/scripts/verify-investigation-boundaries" \
+            "$staged_root/scripts/verify-app-release-boundaries" <<'PY' \
+            || staged_status=$?
+from pathlib import Path
+import hashlib, re, sys
+contract_path, boundary_path, release_path = map(Path, sys.argv[1:])
+contract = contract_path.read_text(encoding="utf-8")
+self_match = re.findall(r"(?m)^ib2_self_sha=([0-9a-f]{64})$", contract)
+if len(self_match) != 1:
+    raise SystemExit("ii-b5b-ii-b staged verifier self-seal drifted")
+normalized = re.sub(
+    r"(?m)^ib2_self_sha=.*$", "ib2_self_sha=SELF", contract
+).encode("utf-8")
+if hashlib.sha256(normalized).hexdigest() != self_match[0]:
+    raise SystemExit("ii-b5b-ii-b staged verifier self-seal drifted")
+for path, label in (
+    (boundary_path, "boundary"),
+    (release_path, "App release boundary"),
+):
+    matches = re.findall(
+        rf'Path\("{re.escape(str(path.relative_to(path.parents[1])))}"\):\s*'
+        r'"([0-9a-f]{64})"',
+        contract,
+    )
+    if (
+        len(matches) != 1
+        or hashlib.sha256(path.read_bytes()).hexdigest() != matches[0]
+    ):
+        raise SystemExit(f"ii-b5b-ii-b staged {label} seal drifted")
+for marker in (
+    "iib5biib_staged_scope_baseline=b7ade4476fc18c3f38683168f8a1488eabd9824d",
+    "--iib5biib-app-identity-contract-only",
+    "--iib5biib-staged-scope-contract-only",
+    "ii-b5b-ii-b mutation accepted: $name",
+    "ii-b5b-ii-b scope mutation accepted: $fixture",
+    "over-budget",
+    "iib5biia_historical_root",
+):
+    if marker not in contract + boundary_path.read_text(encoding="utf-8"):
+        raise SystemExit(f"ii-b5b-ii-b staged verifier contract drifted: {marker}")
+PY
+    fi
+    rm -rf "$staged_root"
+    return $staged_status
+}
+
+function verify_iib5biib_staged_scope() {
+    local baseline=${1:-b7ade4476fc18c3f38683168f8a1488eabd9824d}
+    local expected=(
+        Package.swift
+        Sources/CInvestigationIdentitySupport/CInvestigationIdentitySupport.c
+        Sources/CInvestigationIdentitySupport/include/CInvestigationIdentitySupport.h
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinAppIdentityObservation.swift
+        Tests/StornautInvestigationTests/InvestigationMachineDarwinAppIdentityObservationTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-app-release-boundaries
+        scripts/verify-contract
+        scripts/verify-investigation-boundaries
+    )
+    (( ${#expected} == 9 )) || { print -u2 "ii-b5b-ii-b checkpoint path ceiling drifted"; return 1; }
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" \
+        == b7ade4476fc18c3f38683168f8a1488eabd9824d ]] || { print -u2 "ii-b5b-ii-b checkpoint baseline drifted"; return 1; }
+    if git diff --cached --name-only --diff-filter=D "$baseline" | grep -q .; then print -u2 "ii-b5b-ii-b checkpoint deleted an existing path"; return 1; fi
+    if git diff --cached --numstat "$baseline" \
+        | awk 'index($3,"docs/")!=1 && ($1=="-" || $2=="-") {found=1} END {exit !found}'
+    then
+        print -u2 "ii-b5b-ii-b binary checkpoint path rejected"
+        return 1
+    fi
+    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" | awk 'index($0,"docs/")!=1 && $0!="AGENTS.md" && $0!="README.md"')"})
+    [[ "${(j:\n:)${(on)observed}}" == "${(j:\n:)${(on)expected}}" ]] || { print -u2 "ii-b5b-ii-b checkpoint paths drifted"; return 1; }
+    local changed=$(git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1 && $3!="AGENTS.md" && $3!="README.md" {n+=$1+$2} END {print n+0}')
+    (( changed <= 2800 )) || { print -u2 "ii-b5b-ii-b checkpoint budget drifted"; return 1; }
+    verify_iib5biib_index_semantics
 }
 
 function verify_iib4_staged_scope() {
@@ -4774,6 +5026,21 @@ expected_frozen = {
     handoff_root / "InvestigationMachineClaimContract.swift": "1b01315aaf822ac126d7d4a7391d7af3c93efcf444892d73ac0f88642dc4f352",
 }
 package = read(package_path)
+later_driver_support_dependency = '                "CInvestigationIdentitySupport",\n'
+driver_support_target = re.search(
+    r'        \.target\(\n            name: "StornautInvestigationMachineDriverSupport",'
+    r'(.*?)\n        \),',
+    package,
+    re.DOTALL,
+)
+if (
+    driver_support_target is None
+    or driver_support_target.group(1).count(later_driver_support_dependency) != 1
+):
+    raise SystemExit(
+        "live claim server later DriverSupport C dependency drifted"
+    )
+historical_package = package.replace(later_driver_support_dependency, "", 1)
 later_installed_l2_target = '''        .target(
             name: "StornautInvestigationInstalledL2",
             dependencies: [
@@ -4786,9 +5053,9 @@ later_installed_l2_target = '''        .target(
             ]
         ),
 '''
-if package.count(later_installed_l2_target) != 1:
+if historical_package.count(later_installed_l2_target) != 1:
     raise SystemExit("live claim server later InstalledL2 target drifted")
-historical_package = package.replace(later_installed_l2_target, "", 1)
+historical_package = historical_package.replace(later_installed_l2_target, "", 1)
 later_c_target = '''        .target(
             name: "CInvestigationIdentitySupport",
             path: "Sources/CInvestigationIdentitySupport",
@@ -5696,6 +5963,19 @@ if $iib5biia_staged_scope_contract_only; then
     print "ii-b5b-ii-a staged scope verification passed."
     exit 0
 fi
+if $iib5biib_app_identity_contract_only; then
+    verify_iib5biib_app_identity_contract \
+        "$iib5biib_package_source" "$iib5biib_c_source" \
+        "$iib5biib_header_source" "$iib5biib_observer_source" \
+        "$iib5biib_focused_test_source"
+    print "ii-b5b-ii-b App identity contract verification passed."
+    exit 0
+fi
+if $iib5biib_staged_scope_contract_only; then
+    verify_iib5biib_staged_scope "$iib5biib_staged_scope_baseline"
+    print "ii-b5b-ii-b staged scope verification passed."
+    exit 0
+fi
 if $iib3a_staged_scope_contract_only; then
     verify_iib3a_staged_scope "$iib3a_staged_scope_baseline"
     print "ii-b3a staged scope verification passed."
@@ -5823,6 +6103,12 @@ verify_iib5bic2b_absence_only_contract \
     "$iib5bic2b_collector_test"
 verify_iib5biia_fixed_capsule_contract \
     "$machine_fixed_capsule" "$machine_fixed_capsule_test"
+verify_iib5biib_app_identity_contract \
+    Package.swift \
+    Sources/CInvestigationIdentitySupport/CInvestigationIdentitySupport.c \
+    Sources/CInvestigationIdentitySupport/include/CInvestigationIdentitySupport.h \
+    Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinAppIdentityObservation.swift \
+    Tests/StornautInvestigationTests/InvestigationMachineDarwinAppIdentityObservationTests.swift
 
 python3 - "$xcode_project" "$ordinary_scheme" "$diagnostic_scheme" <<'PY'
 from collections import Counter
@@ -7523,6 +7809,7 @@ driver_support = targets.get(
 if driver_support is None:
     raise SystemExit("missing authority-closed Machine driver support")
 if set(driver_support.get("target_dependencies", [])) != {
+    "CInvestigationIdentitySupport",
     "StornautInvestigationHandoffContract",
     "StornautInvestigationInstalledL2",
 }:
@@ -7536,6 +7823,7 @@ driver_support_sources = driver_support.get("sources", [])
 expected_driver_support_sources = {
     "DarwinInvestigationMachineInstalledDriverSystem.swift",
     "InvestigationMachineClaimClient.swift",
+    "InvestigationMachineDarwinAppIdentityObservation.swift",
     "InvestigationMachineDriverSupport.swift",
     "InvestigationMachineFixedCapsuleIntake.swift",
     "InvestigationMachineInstalledDriverObservation.swift",
@@ -7583,6 +7871,11 @@ expected_driver_support_imports = {
         "CryptoKit", "Darwin", "Foundation", "Security",
         "StornautInvestigationHandoffContract",
     },
+    "InvestigationMachineDarwinAppIdentityObservation.swift": {
+        "CInvestigationIdentitySupport", "Darwin", "Foundation",
+        "Security", "StornautInvestigationHandoffContract",
+        "StornautInvestigationInstalledL2",
+    },
     "InvestigationMachineInstalledDriverObservation.swift": {"Darwin"},
     "InvestigationMachineInstalledDriverSystemSource.swift": {"Darwin"},
     "InvestigationMachineSingleEpoch.swift": {
@@ -7607,6 +7900,8 @@ expected_driver_support_sha256 = {
         "3166ff4e53d66207194546800d96fb659105fb8307e759b9e37083d575117e18",
     "InvestigationMachineClaimClient.swift":
         "ee373ff00fce08853fccb4c2087a0a47eed2feae6efc300fbd4c74e01f242a0a",
+    "InvestigationMachineDarwinAppIdentityObservation.swift":
+        "2102c17f2f656b6cee197fb66ff0b2b019fb1c49477123d0123c4fddaeeb754a",
     "InvestigationMachineSingleEpoch.swift":
         "6fd10da713174ae60e1b39f3cac9a560e1cd20eca3a17c0f354a990d5f1ed362",
     "InvestigationMachineSingleEpochInstalledL2Join.swift":
@@ -7831,6 +8126,7 @@ if manifest_driver_support is None:
         "Machine driver support is missing from resolved manifest"
     )
 if manifest_driver_support.get("dependencies", []) != [
+    {"byName": ["CInvestigationIdentitySupport", None]},
     {"byName": ["StornautInvestigationHandoffContract", None]},
     {"byName": ["StornautInvestigationInstalledL2", None]},
 ]:
@@ -8844,20 +9140,20 @@ function require_exact_machine_driver_projection() {
 
     case "$configuration" in
         debug)
-            expected_undefined_sha=0387d98750bcc609dd1cf0df602bd677c5eeaabd1e58985c6f2b7de6f7cab8e6
-            expected_undefined_lines=554
+            expected_undefined_sha=bbd9564b5121b705b78df9ca088cf2ae0c5d5bc825d699d515afd4529bc4b7b4
+            expected_undefined_lines=563
             expected_loads_sha=9053e60819e57a62ee9acb9db4854705fa2ed0ade20ec3683f13b9e854f86c41
             expected_loads_lines=18
-            expected_owned_sha=6e80acdf3ef114b889856e0b63505a59caec2a346cf7cf450e0505fcbee7f0d8
-            expected_owned_lines=2218
+            expected_owned_sha=0e14e1e01c2eaeef81879c33d8df95298f454f34b5058bfcbd3d8295e4a9efe2
+            expected_owned_lines=2627
             ;;
         release)
-            expected_undefined_sha=74881c5f75665cb158b672a05a959366566bed34aa71c4e21b473ba76fc22735
-            expected_undefined_lines=402
+            expected_undefined_sha=95cac9900f837a5293e5710e6c4b92ec304f5c83165458f47a87db3f569ca7fa
+            expected_undefined_lines=411
             expected_loads_sha=9053e60819e57a62ee9acb9db4854705fa2ed0ade20ec3683f13b9e854f86c41
             expected_loads_lines=18
-            expected_owned_sha=74fa8c8511fecbe291bf2184db32156ff27231fc59097a75efaf29b06e1dab2f
-            expected_owned_lines=1467
+            expected_owned_sha=fffbcb0446b0348a1080577a02fd37bc4f6dbf16896c302eaa41ecf1fdcfe944
+            expected_owned_lines=1660
             ;;
         *)
             print -u2 "Unknown Machine driver projection: $configuration"
@@ -8978,6 +9274,7 @@ function verify_machine_driver_projection_mutations() {
             _kSecCodeInfoIdentifier \
             _kSecCodeInfoUnique \
             _kSecGuestAttributeAudit \
+            _kSecGuestAttributePid \
             | LC_ALL=C sort
     )
     for configuration in debug release; do
