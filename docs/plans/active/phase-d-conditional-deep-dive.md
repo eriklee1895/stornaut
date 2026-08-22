@@ -53,8 +53,8 @@
 > closure and ii-b3a/ii-b3b are complete/non-admitting; iii-b/ii-b2b are
 > closed; ii-b3c, ii-b4, ii-b5a0, ii-b5a, ii-b5b-i-a, i-b1 and i-b2a are
 > complete/non-admitting; i-b2b-a, i-b2b-b, i-b3 and i-c1 are
-> complete/non-admitting; i-c2a semantic-owner closure is complete/non-admitting;
-> i-c2b physical-owner closure is current,
+> complete/non-admitting; aggregate i-c2 semantic/physical-owner closure is
+> complete/non-admitting; ii-b5b-ii fixed Darwin runtime is current,
 > followed eventually by ii-c
 > one no-model privileged gate. The authoritative
 > real-model run and readiness verdict remain unimplemented.
@@ -939,7 +939,7 @@ Checkpoint status:
   complete after 35 focused, 521 affected, one 1,234-test staged-only serial,
   exact contract/structural/artifact gates and final review; ii-b3b and its
   test-only fixture prerequisite, ii-b3c and ii-b4 are complete/non-admitting;
-  ii-b5 is split into b5a0/b5a/b5b-i/b5b-ii/b5b-iii; b5a0/b5a/i-a/i-b1/i-b2a/i-b2b-a/i-b2b-b/i-b3/i-c1/i-c2a are complete/non-admitting; i-c2b is current.
+  ii-b5 is split into b5a0/b5a/b5b-i/b5b-ii/b5b-iii; b5a0/b5a and all b5b-i checkpoints through aggregate i-c2 are complete/non-admitting; ii-b5b-ii fixed Darwin runtime is current.
   See the
   [ii-b2 ASID prerequisite review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2-asid-prerequisite-review.md),
   the
@@ -978,6 +978,8 @@ Checkpoint status:
   [i-c2a review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-c2a-review.md),
   the
   [i-c2b preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-c2b-preflight.md),
+  the [i-c2b review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-c2b-review.md),
+  the [ii-b5b-ii preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-preflight.md),
   the
   [L3c1b-i Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
   and

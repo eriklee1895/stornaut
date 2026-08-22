@@ -1,6 +1,6 @@
 # Phase D Task 39B2c L3c3c-ii-b5b-i-c2b Preflight
 
-> Status: split before validation; i-c2b-i current
+> Status: complete / non-admitting; see the completion review
 > Date: 2026-08-22
 > Baseline: `58332ccb9f78da203fb2380ca006c49f0f371c2b`
 > Aggregate scope: exactly twelve non-document paths
@@ -30,8 +30,9 @@ ceiling or retaining dead code:
 
 - **i-c2b-i absence-only implementation/tests** owns paths 1-10 below, with a
   ceiling of ten non-document paths and 3,800 changed lines; and
-- **i-c2b-ii verifier closure** owns paths 11-12 below, with a ceiling of two
-  non-document paths and 800 changed lines.
+- **i-c2b-ii verifier closure** owns paths 11-12 below and was further split
+  before commit into one-path ii-a/ii-b checkpoints, each capped at 800 changed
+  lines.
 
 The aggregate i-c2b contract closes only after both commits are reviewed and
 pushed.
