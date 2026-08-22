@@ -32,7 +32,10 @@ The work is therefore split before coding:
    non-admitting; completion evidence is recorded in the
    [ii-b review](phase-d-task-39b2c-l3c3c-ii-b5b-ii-b-review.md).
 3. **ii-b5b-ii-c — fixed FD-7 spawn and bounded duplex session**:
-   at most eight non-document paths and about 3,600 added lines.
+   at most eight non-document paths and about 3,600 added lines. Its exact
+   seven-path candidate, typed startup uncertainty and injected ii-d retirement
+   boundary are frozen in the
+   [ii-c preflight](phase-d-task-39b2c-l3c3c-ii-b5b-ii-c-preflight.md).
 4. **ii-b5b-ii-d — exact owned-PGID retirement and aggregate physical proof**:
    at most six non-document paths and about 2,600 added lines.
 
@@ -98,7 +101,7 @@ these non-admitting checkpoints.
 ## 5. Remaining Order
 
 ```text
-ii-b5b-ii-b -> ii-b5b-ii-c -> ii-b5b-ii-d
+ii-b5b-ii-c -> ii-b5b-ii-d
 -> ii-b5b-iii -> ii-c0 -> ii-c -> L3c3d -> L3c4
 ```
 

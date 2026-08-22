@@ -137,6 +137,7 @@
 | Phase D Task 39B2c L3c3c-ii-b5b-ii Preflight | [Fixed Darwin Runtime Split](reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-preflight.md) — split into ii-a/ii-b/ii-c/ii-d；ii-a/ii-b complete/non-admitting；ii-c current |
 | Phase D Task 39B2c L3c3c-ii-b5b-ii-a Review | [Fixed FD-0 Capsule Intake Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-a-review.md) — 7 non-document paths / 1,975 changed lines、1,353-test serial、exact structural/Mach-O gates；complete/non-admitting；ii-b complete；ii-c current |
 | Phase D Task 39B2c L3c3c-ii-b5b-ii-b Review | [Darwin App Identity Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-b-review.md) — 9 non-document paths / 2,790 changed lines、42 focused、1,374-test serial、exact C/source/final-Mach-O gates；complete/non-admitting；ii-c current |
+| Phase D Task 39B2c L3c3c-ii-b5b-ii-c Preflight | [Fixed FD-7 Session Contract](reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-c-preflight.md) — 7-path candidate / 3,600-line ceiling；current/non-admitting |
 | Epic 2–4 历史计划 | [Deterministic Product Core](plans/completed/epic-2-4-deterministic-product-core.md) — Tasks 9–26 已完成并归档 |
 | 已完成计划 | [Completed Plans](plans/completed/README.md) — Epic 0–1 |
 | 上游学习与许可证门禁 | [Upstream Reference Matrix](research/upstream-reference-matrix.md) |
