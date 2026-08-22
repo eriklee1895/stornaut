@@ -6,7 +6,7 @@
 > iii-a/iii-b-i/iii-b-ii complete/non-admitting; ii-b3 split into b3a/b3b/b3c;
 > ii-b3a/ii-b3b/ii-b3c/ii-b4/ii-b5a0 complete/non-admitting; ii-b5 split;
 > b5a and all b5b-i checkpoints through aggregate i-c2 complete/non-admitting;
-> ii-b5b-ii-a complete/non-admitting; ii-b5b-ii-b current
+> ii-b5b-ii-a/ii-b complete/non-admitting; ii-b5b-ii-c current
 >
 > **Date:** 2026-08-19
 >
@@ -355,8 +355,8 @@ unconsumed.
 | ii-b5a typed/injected single-epoch composer | complete; non-admitting |
 | ii-b5b-i L2/projection extraction through aggregate i-c2 | complete; non-admitting |
 | ii-b5b-ii-a fixed FD-0 capsule intake | complete; non-admitting |
-| ii-b5b-ii-b independent Darwin App identity observation | current |
-| ii-b5b-ii-c fixed FD-7 bounded session | pending |
+| ii-b5b-ii-b independent Darwin App identity observation | complete; non-admitting |
+| ii-b5b-ii-c fixed FD-7 bounded session | current |
 | ii-b5b-ii-d exact owned-PGID retirement | pending |
 | ii-b5b-iii production/artifact composition | pending |
 | ii-c no-model privileged machine gate | not executed |

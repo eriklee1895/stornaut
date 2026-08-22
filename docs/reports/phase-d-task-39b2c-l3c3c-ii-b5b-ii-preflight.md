@@ -1,6 +1,6 @@
 # Phase D Task 39B2c L3c3c-ii-b5b-ii Preflight
 
-- Status: ii-b5b-ii-a complete/non-admitting; ii-b5b-ii-b current
+- Status: ii-b5b-ii-a/ii-b complete/non-admitting; ii-b5b-ii-c current
 - Date: 2026-08-22
 - Baseline: `06269bca03a5a7b2ca2319b8e029f3cecf7cc6de`
 - Admission: non-admitting
@@ -23,7 +23,14 @@ The work is therefore split before coding:
    existing Darwin reader/test and `scripts/verify-contract`, rather than
    leaving either ACL path or verifier replay knowingly inconsistent.
 2. **ii-b5b-ii-b — independent Darwin App identity observation**:
-   at most eight non-document paths and about 2,800 added lines.
+   initially at most eight non-document paths and about 2,800 added lines. A
+   post-implementation verifier review required the existing Xcode final-Mach-O
+   gate as a ninth atomic path because the new Security/process imports change
+   both SwiftPM and Xcode binary projections. The reviewed ceiling is therefore
+   exactly nine non-document paths while the 2,800-line ceiling remains
+   unchanged; the scope gate pins both limits. This checkpoint is complete and
+   non-admitting; completion evidence is recorded in the
+   [ii-b review](phase-d-task-39b2c-l3c3c-ii-b5b-ii-b-review.md).
 3. **ii-b5b-ii-c — fixed FD-7 spawn and bounded duplex session**:
    at most eight non-document paths and about 3,600 added lines.
 4. **ii-b5b-ii-d — exact owned-PGID retirement and aggregate physical proof**:

@@ -54,8 +54,9 @@
 > closed; ii-b3c, ii-b4, ii-b5a0, ii-b5a, ii-b5b-i-a, i-b1 and i-b2a are
 > complete/non-admitting; i-b2b-a, i-b2b-b, i-b3 and i-c1 are
 > complete/non-admitting; aggregate i-c2 semantic/physical-owner closure and
-> ii-b5b-ii-a fixed FD-0 capsule intake are complete/non-admitting; ii-b5b-ii-b
-> independent Darwin App identity observation is current,
+> ii-b5b-ii-a fixed FD-0 capsule intake and ii-b5b-ii-b independent Darwin App
+> identity observation are complete/non-admitting; ii-b5b-ii-c fixed FD-7
+> session is current,
 > followed eventually by ii-c
 > one no-model privileged gate. The authoritative
 > real-model run and readiness verdict remain unimplemented.
@@ -940,7 +941,7 @@ Checkpoint status:
   complete after 35 focused, 521 affected, one 1,234-test staged-only serial,
   exact contract/structural/artifact gates and final review; ii-b3b and its
   test-only fixture prerequisite, ii-b3c and ii-b4 are complete/non-admitting;
-  ii-b5 is split into b5a0/b5a/b5b-i/b5b-ii/b5b-iii; b5a0/b5a and all b5b-i checkpoints through aggregate i-c2 are complete/non-admitting; ii-b5b-ii-a fixed FD-0 capsule intake is complete/non-admitting and ii-b5b-ii-b independent Darwin App identity observation is current.
+  ii-b5 is split into b5a0/b5a/b5b-i/b5b-ii/b5b-iii; b5a0/b5a and all b5b-i checkpoints through aggregate i-c2 are complete/non-admitting; ii-b5b-ii-a fixed FD-0 capsule intake and ii-b5b-ii-b independent Darwin App identity observation are complete/non-admitting, and ii-b5b-ii-c fixed FD-7 session is current.
   See the
   [ii-b2 ASID prerequisite review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2-asid-prerequisite-review.md),
   the
@@ -981,6 +982,7 @@ Checkpoint status:
   [i-c2b preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-c2b-preflight.md),
   the [i-c2b review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-c2b-review.md),
   the [ii-b5b-ii preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-preflight.md),
+  the [ii-b5b-ii-b review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-b-review.md),
   the
   [L3c1b-i Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
   and

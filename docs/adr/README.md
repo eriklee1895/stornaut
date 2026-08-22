@@ -19,7 +19,7 @@
 15. [`0015-headless-ci-verification.md`](0015-headless-ci-verification.md) — Accepted; ordinary GitHub Actions run deterministic build/test gates while XCUITest, host UI evidence and performance remain in the local full verifier
 16. [`0016-investigation-lifecycle-supervisor.md`](0016-investigation-lifecycle-supervisor.md) — Accepted; privileged audit-session supervisor closes descendant escape and proves lifecycle drain/recovery
 17. [`0017-investigation-planning-and-stop-semantics.md`](0017-investigation-planning-and-stop-semantics.md) — Accepted for Phase D Task 36; planning, budget, stop and no-Executor semantics
-18. [`0018-parent-owned-investigation-handoff.md`](0018-parent-owned-investigation-handoff.md) — Proposed for Task 39 L3c3c; external root launch rejected; aggregate i-c2 and ii-b5b-ii-a complete/non-admitting; ii-b5b-ii-b current
+18. [`0018-parent-owned-investigation-handoff.md`](0018-parent-owned-investigation-handoff.md) — Proposed for Task 39 L3c3c; external root launch rejected; aggregate i-c2 and ii-b5b-ii-a/ii-b complete/non-admitting; ii-b5b-ii-c current
 
 每份 ADR 至少记录 Status、Context、Evidence、Decision、Consequences、Residual Risks 和 Validation。安全假设没有测量证据时不得标记 Accepted。
 

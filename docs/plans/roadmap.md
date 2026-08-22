@@ -447,8 +447,8 @@ L3c3c 当前证据见
   prerequisite、ii-b2a、ii-b2b-i、ii-b2b-ii、iii-a 与 iii-b 已完成；ii-b3
   已拆为 b3a/b3b/b3c，ii-b3a/ii-b3b/ii-b3c/ii-b4 已完成并保持
   non-admitting；ii-b5 已拆为 b5a0/b5a/b5b-i/b5b-ii/b5b-iii，b5a 与 b5b-i
-  through aggregate i-c2 已完成并保持 non-admitting；b5b-ii-a 已完成并保持
-  non-admitting，b5b-ii-b 是当前 frontier。
+  through aggregate i-c2 已完成并保持 non-admitting；b5b-ii-a/b 已完成并保持
+  non-admitting，b5b-ii-c fixed FD-7 session 是当前 frontier。
 	  L3c4 才拥有
 	  final admission/full。
 	  39B2c 才是 machine admission，Task 39 尚未完成。
