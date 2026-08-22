@@ -495,6 +495,7 @@ struct InvestigationMachineTargetBoundaryTests {
             "DarwinInvestigationMachineInstalledDriverSystem.swift",
             "InvestigationMachineClaimClient.swift",
             "InvestigationMachineDarwinAppIdentityObservation.swift",
+            "InvestigationMachineDarwinEpochSession.swift",
             "InvestigationMachineDriverSupport.swift",
             "InvestigationMachineFixedCapsuleIntake.swift",
             "InvestigationMachineInstalledDriverObservation.swift",
@@ -609,6 +610,14 @@ struct InvestigationMachineTargetBoundaryTests {
                 "import StornautInvestigationHandoffContract",
                 "import StornautInvestigationInstalledL2",
             ],
+            "InvestigationMachineDarwinEpochSession.swift": [
+                "import CInvestigationIdentitySupport",
+                "import Darwin",
+                "import Dispatch",
+                "import Foundation",
+                "import StornautInvestigationHandoffContract",
+                "import StornautInvestigationInstalledL2",
+            ],
             "InvestigationMachineInstalledDriverObservation.swift": [
                 "import Darwin",
             ],
@@ -641,6 +650,56 @@ struct InvestigationMachineTargetBoundaryTests {
             )
             #expect(imports == expectedSourceImports)
             var authoritySource = source
+            if sourceName == "InvestigationMachineDarwinEpochSession.swift" {
+                let allowedCalls: [String: Int] = [
+                    "socketpair": 1,
+                    "posix_spawn": 1,
+                    "posix_spawn_file_actions_init": 1,
+                    "posix_spawn_file_actions_destroy": 1,
+                    "posix_spawn_file_actions_adddup2": 1,
+                    "posix_spawn_file_actions_addclose": 2,
+                    "posix_spawnattr_init": 1,
+                    "posix_spawnattr_destroy": 1,
+                    "posix_spawnattr_setflags": 1,
+                    "posix_spawnattr_setpgroup": 1,
+                    "fcntl": 3,
+                    "shutdown": 2,
+                    "getpgid": 1,
+                ]
+                for (name, count) in allowedCalls {
+                    #expect(
+                        source.matches(
+                            of: try Regex("\\b" + name + "\\s*\\(")
+                        ).count == count
+                    )
+                    authoritySource = authoritySource.replacing(
+                        try Regex("\\b" + name + "\\s*\\("),
+                        with: "allowedDarwinCall("
+                    )
+                }
+                for marker in [
+                    "InvestigationInstalledL2FixedPaths().appExecutable.path",
+                    "arguments: [",
+                    "environment: []",
+                    "POSIX_SPAWN_SETPGROUP | POSIX_SPAWN_CLOEXEC_DEFAULT",
+                    "childTargetDescriptor: Self.fixedDescriptor",
+                    "terminalProven, terminalUncertain",
+                    "InvestigationMachineDarwinEpochRetirementOwning",
+                    "InvestigationMachineDarwinEpochPreparedAppIdentity",
+                ] {
+                    #expect(source.contains(marker))
+                }
+                #expect(source.matches(of: /Darwin\.send\s*\(/).count == 1)
+                #expect(source.matches(of: /Darwin\.recv\s*\(/).count == 1)
+                for forbidden in [
+                    "waitpid(", "waitid(", "kill(", "killpg(",
+                    "proc_signal", "CommandLine.arguments",
+                    "ProcessInfo.processInfo.environment", "posix_spawnp",
+                    "Codable", "public ",
+                ] {
+                    #expect(!source.contains(forbidden))
+                }
+            }
             if sourceName == "InvestigationMachineFixedCapsuleIntake.swift" {
                 let compactSource = source.filter { !$0.isWhitespace }
                 #expect(source.matches(of: /\bfcntl\s*\(/).count == 3)
@@ -779,8 +838,16 @@ struct InvestigationMachineTargetBoundaryTests {
             ] {
                 let semanticException = (sourceName == "InvestigationMachineClaimClient.swift" && forbidden == "connect(")
                     || (sourceName == "InvestigationMachineSingleEpoch.swift" && forbidden == "send(")
+                    || (sourceName == "InvestigationMachineDarwinEpochSession.swift"
+                        && ["socketpair", "posix_spawn", "fcntl("].contains(forbidden))
                 if !semanticException {
-                    #expect(!authoritySource.contains(forbidden))
+                    if forbidden == "Process(" {
+                        #expect(authoritySource.matches(
+                            of: /(?:^|[^A-Za-z0-9_])Process\s*\(/
+                        ).isEmpty)
+                    } else {
+                        #expect(!authoritySource.contains(forbidden))
+                    }
                 }
             }
             if sourceName != "InvestigationMachineClaimClient.swift" {

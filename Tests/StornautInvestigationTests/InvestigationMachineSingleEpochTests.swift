@@ -132,6 +132,18 @@ struct InvestigationMachineSingleEpochTests {
         }
         #expect(!runtime.trace.events.contains(.retire))
     }
+    @Test
+    func uncertainTerminalStartDominatesWithoutSessionRetirement() async throws {
+        let fixture = try SingleEpochFixture()
+        let runtime = fixture.runtime(startTerminalUncertain: true)
+        await #expect(
+            throws: InvestigationMachineSingleEpochError.retirementUncertain
+        ) {
+            _ = try await fixture.composer(runtime: runtime).run()
+        }
+        #expect(!runtime.trace.events.contains(.retire))
+        #expect(!runtime.trace.events.contains(.receive(.preDropReady)))
+    }
     @Test(arguments: SingleEpochFinalObservationFailure.allCases)
     fileprivate func finalObservationFailsAfterSuccessfulRetirement(
         _ failure: SingleEpochFinalObservationFailure) async throws {
@@ -491,6 +503,7 @@ private struct SingleEpochFixture {
         retirementFails: Bool = false,
         startGate: SingleEpochGate? = nil,
         startTerminal: Bool = false,
+        startTerminalUncertain: Bool = false,
         finalObservationFailure: SingleEpochFinalObservationFailure? = nil,
         cancellation: SingleEpochAsyncSeam? = nil,
         driverClaims: [InvestigationHandoffProcessClaim]? = nil
@@ -522,7 +535,8 @@ private struct SingleEpochFixture {
             clock: .init(trace: trace, now: Self.now),
             sessionFactory: .init(
                 trace: trace, cancellation: cancellationProbe,
-                session: session, startGate: startGate, terminal: startTerminal
+                session: session, startGate: startGate, terminal: startTerminal,
+                terminalUncertain: startTerminalUncertain
             ),
             claimFactory: .init(trace: trace, claim: claim),
             l2: .init(
@@ -618,17 +632,21 @@ private final class ScriptedSingleEpochSessionFactory:
     InvestigationMachineSingleEpochSessionFactory, @unchecked Sendable {
     let trace: SingleEpochTrace; let cancellation: SingleEpochCancellationProbe
     let session: ScriptedSingleEpochSession; let startGate: SingleEpochGate?
-    let terminal: Bool; private let lock = NSLock()
+    let terminal: Bool
+    let terminalUncertain: Bool
+    private let lock = NSLock()
     private var storedBootstraps: [InvestigationHandoffEpochBootstrap] = []
     var bootstraps: [InvestigationHandoffEpochBootstrap] {
         lock.withLock { storedBootstraps }
     }
     init(
         trace: SingleEpochTrace, cancellation: SingleEpochCancellationProbe,
-        session: ScriptedSingleEpochSession, startGate: SingleEpochGate?, terminal: Bool
+        session: ScriptedSingleEpochSession, startGate: SingleEpochGate?,
+        terminal: Bool, terminalUncertain: Bool
     ) {
         self.trace = trace; self.cancellation = cancellation
-        self.session = session; self.startGate = startGate; self.terminal = terminal
+        self.session = session; self.startGate = startGate
+        self.terminal = terminal; self.terminalUncertain = terminalUncertain
     }
     func start(bootstrap: InvestigationHandoffEpochBootstrap) async
         -> InvestigationMachineSingleEpochStartOutcome {
@@ -636,6 +654,7 @@ private final class ScriptedSingleEpochSessionFactory:
         trace.record(.start)
         if let startGate { startGate.enter(); await startGate.waitUntilOpen() }
         await cancellation.hit(.start)
+        if terminalUncertain { return .terminalUncertain }
         return terminal ? .terminal(.init()) : .started(session)
     }
 }

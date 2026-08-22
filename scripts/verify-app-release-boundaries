@@ -10,6 +10,8 @@ legacy_machine_claim_contract_only=false
 legacy_machine_claim_contract_source=
 iib4_machine_claim_contract_only=false
 iib4_machine_claim_contract_source=
+iib5biic_machine_driver_contract_only=false
+iib5biic_machine_driver_contract_source=
 if [[ $# == 1 && $1 == --investigation-handoff-only ]]; then
     handoff_only=true
 elif [[ $# == 2 && $1 == --legacy-machine-claim-contract-only ]]; then
@@ -18,9 +20,12 @@ elif [[ $# == 2 && $1 == --legacy-machine-claim-contract-only ]]; then
 elif [[ $# == 2 && $1 == --iib4-machine-claim-contract-only ]]; then
     iib4_machine_claim_contract_only=true
     iib4_machine_claim_contract_source=$2
+elif [[ $# == 2 && $1 == --iib5biic-machine-driver-contract-only ]]; then
+    iib5biic_machine_driver_contract_only=true
+    iib5biic_machine_driver_contract_source=$2
 elif (( $# != 0 )); then
     print -u2 \
-        "Usage: scripts/verify-app-release-boundaries [--investigation-handoff-only | --legacy-machine-claim-contract-only <source> | --iib4-machine-claim-contract-only <source>]"
+        "Usage: scripts/verify-app-release-boundaries [--investigation-handoff-only | --legacy-machine-claim-contract-only <source> | --iib4-machine-claim-contract-only <source> | --iib5biic-machine-driver-contract-only <source>]"
     exit 64
 fi
 
@@ -482,6 +487,119 @@ for forbidden in (
 PY
 }
 
+function verify_iib5biic_machine_driver_source_contract() {
+    local source_path=$1
+    python3 - "$source_path" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+source = Path(sys.argv[1]).read_text(encoding="utf-8")
+runtime_source = source[source.index("\nscripts/verify-contract\n"):]
+
+def array_values(name):
+    match = re.search(
+        rf"(?ms)^{re.escape(name)}=\(\n(?P<body>.*?)^\)\n",
+        runtime_source,
+    )
+    if match is None:
+        raise SystemExit(f"ii-b5b-ii-c Machine driver array missing: {name}")
+    values = []
+    for line in match.group("body").splitlines():
+        quoted = re.fullmatch(r"\s+(['\"])(.*?)\1\s*", line)
+        bare = re.fullmatch(
+            r"\s+([A-Za-z0-9_.$:/-]+(?:\s+[A-Za-z0-9_.$:/-]+)*)\s*",
+            line,
+        )
+        if quoted is not None:
+            values.append(quoted.group(2))
+        elif bare is not None:
+            values.extend(bare.group(1).split())
+        else:
+            raise SystemExit(
+                f"ii-b5b-ii-c Machine driver array malformed: {name}"
+            )
+    return values
+
+introduced = [
+    "_free", "_getpgid", "_getpgrp", "_poll", "_posix_spawn",
+    "_posix_spawn_file_actions_addclose",
+    "_posix_spawn_file_actions_adddup2",
+    "_posix_spawn_file_actions_destroy",
+    "_posix_spawn_file_actions_init",
+    "_posix_spawnattr_destroy", "_posix_spawnattr_init",
+    "_posix_spawnattr_setflags", "_posix_spawnattr_setpgroup",
+    "_recv", "_send", "_shutdown", "_socketpair", "_strdup",
+]
+expected_arrays = {
+    "iib5biic_debug_introduced_imports": introduced,
+    "iib5biic_debug_required_fcntl_imports": [
+        "_$s6Darwin5fcntlys5Int32VAD_A2DtF",
+        "_$s6Darwin5fcntlys5Int32VAD_ADtF",
+    ],
+    "iib5biic_release_forbidden_imports": introduced,
+}
+for name, expected in expected_arrays.items():
+    observed = array_values(name)
+    if observed != expected:
+        raise SystemExit(
+            f"ii-b5b-ii-c Machine driver array drifted: {name}: "
+            f"{observed!r}"
+        )
+
+forbidden = set(array_values("machine_driver_authority_forbidden_imports"))
+for exempt in ("_posix_spawn", "_socketpair", "_send", "_recv"):
+    if exempt in forbidden:
+        raise SystemExit(
+            f"ii-b5b-ii-c fixed import remains categorically forbidden: {exempt}"
+        )
+for retained in (
+    "_posix_spawnp", "_execve", "_connect", "_bind", "_listen",
+    "_sendto", "_recvfrom", "_kill", "_write",
+):
+    if retained not in forbidden:
+        raise SystemExit(
+            f"ii-b5b-ii-c sibling authority prohibition drifted: {retained}"
+        )
+
+def loop_body(header, label):
+    loop_header = f'for marker in "${{{header}[@]}}"; do'
+    if runtime_source.count(loop_header) != 1:
+        raise SystemExit(f"ii-b5b-ii-c {label} loop drifted")
+    match = re.search(
+        rf'(?ms)^for marker in "\$\{{{re.escape(header)}\[@\]\}}"; do\n'
+        rf'(?P<body>.*?)^done$',
+        runtime_source,
+    )
+    if match is None:
+        raise SystemExit(f"ii-b5b-ii-c {label} loop drifted")
+    return re.sub(r"\s+", " ", match.group("body")).strip()
+
+debug_body = loop_body(
+    "iib5biic_debug_introduced_imports", "Debug positive-import"
+)
+fcntl_body = loop_body(
+    "iib5biic_debug_required_fcntl_imports", "Debug fcntl-import"
+)
+release_body = loop_body(
+    "iib5biic_release_forbidden_imports", "Release negative-import"
+)
+for body, image, message in (
+    (debug_body, "$machine_driver_undefined_symbols",
+     "ii-b5b-ii-c Debug fixed-session import is missing: $marker"),
+    (fcntl_body, "$machine_driver_undefined_symbols",
+     "ii-b5b-ii-c Debug fcntl import is missing: $marker"),
+    (release_body, "$release_machine_driver_undefined_symbols",
+     "ii-b5b-ii-c fixed-session import leaked into Release: $marker"),
+):
+    for required in (image, "grep -Fxq -- \"$marker\"", message):
+        if body.count(required) != 1:
+            raise SystemExit(
+                f"ii-b5b-ii-c Machine driver scanner drifted: {required}"
+            )
+PY
+}
+
 if $legacy_machine_claim_contract_only; then
     verify_claim_server_macho_source_contract \
         "$legacy_machine_claim_contract_source"
@@ -493,6 +611,13 @@ if $iib4_machine_claim_contract_only; then
     verify_iib4_machine_claim_source_contract \
         "$iib4_machine_claim_contract_source"
     print "ii-b4 final-Mach-O source contract verification passed."
+    exit 0
+fi
+
+if $iib5biic_machine_driver_contract_only; then
+    verify_iib5biic_machine_driver_source_contract \
+        "$iib5biic_machine_driver_contract_source"
+    print "ii-b5b-ii-c Machine driver source contract verification passed."
     exit 0
 fi
 
@@ -1705,7 +1830,7 @@ machine_driver_authority_forbidden_markers=(
 )
 machine_driver_authority_forbidden_imports=(
     _fork _vfork _execv _execve _execvp _execvP _execl _execlp
-    _posix_spawn _system _popen _dlopen _dlsym _syscall _fcntl _ioctl
+    _posix_spawnp _system _popen _dlopen _dlsym _syscall _fcntl _ioctl
     _setuid _seteuid _setreuid _setresuid _setgid _setegid _setregid
     _setresgid _initgroups _setgroups _setlogin _pthread_setugid_np
     _setsid _setpgid _daemon _chdir _fchdir _chroot _umask _nice
@@ -1717,9 +1842,53 @@ machine_driver_authority_forbidden_imports=(
     _fremovexattr _acl_set_fd _acl_set_fd_np _acl_set_file
     _link _linkat _symlink _symlinkat _utime _utimes _futimes
     _setattrlist _fsetattrlist _copyfile _fcopyfile _clonefile
-    _socket _socketpair _connect _bind _listen _accept _accept4
-    _send _sendto _sendmsg _recv _recvfrom _recvmsg _getaddrinfo
+    _socket _connect _bind _listen _accept _accept4
+    _sendto _sendmsg _recvfrom _recvmsg _getaddrinfo
     _kill _killpg _pthread_kill _raise
+)
+iib5biic_debug_introduced_imports=(
+    _free
+    _getpgid
+    _getpgrp
+    _poll
+    _posix_spawn
+    _posix_spawn_file_actions_addclose
+    _posix_spawn_file_actions_adddup2
+    _posix_spawn_file_actions_destroy
+    _posix_spawn_file_actions_init
+    _posix_spawnattr_destroy
+    _posix_spawnattr_init
+    _posix_spawnattr_setflags
+    _posix_spawnattr_setpgroup
+    _recv
+    _send
+    _shutdown
+    _socketpair
+    _strdup
+)
+iib5biic_debug_required_fcntl_imports=(
+    '_$s6Darwin5fcntlys5Int32VAD_A2DtF'
+    '_$s6Darwin5fcntlys5Int32VAD_ADtF'
+)
+iib5biic_release_forbidden_imports=(
+    _free
+    _getpgid
+    _getpgrp
+    _poll
+    _posix_spawn
+    _posix_spawn_file_actions_addclose
+    _posix_spawn_file_actions_adddup2
+    _posix_spawn_file_actions_destroy
+    _posix_spawn_file_actions_init
+    _posix_spawnattr_destroy
+    _posix_spawnattr_init
+    _posix_spawnattr_setflags
+    _posix_spawnattr_setpgroup
+    _recv
+    _send
+    _shutdown
+    _socketpair
+    _strdup
 )
 machine_driver_required_readonly_imports=(
     _pread _fstat _lstat _flistxattr _acl_get_fd_np
@@ -1905,18 +2074,18 @@ function require_projection() {
 }
 require_projection \
     "$machine_driver_undefined_symbols" \
-    bbd9564b5121b705b78df9ca088cf2ae0c5d5bc825d699d515afd4529bc4b7b4 \
-    563 \
+    ca94c349f514e0e2a57c71203d4fe02ac2976b87210437e023278d7ffb307e11 \
+    628 \
     undefined
 require_projection \
     "$machine_driver_loaded_libraries" \
-    9053e60819e57a62ee9acb9db4854705fa2ed0ade20ec3683f13b9e854f86c41 \
+    dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9 \
     18 \
     load-command
 require_projection \
     "$machine_driver_owned_symbols" \
-    bd0064540e69cbdac75d9d5f848fdfa6b7a675f8cff9b2c2a641aa4817448195 \
-    2626 \
+    2f88f8707eed520fcd865e49dfd3295bdc44f35a0295bc9ef540cf18bc41c591 \
+    3404 \
     owned-symbol
 if ! mach_o_has_demangled_symbol \
     "$diagnostic_machine_driver" \
@@ -1945,6 +2114,21 @@ for marker in "${machine_driver_required_readonly_imports[@]}"; do
         exit 1
     fi
 done
+for marker in "${iib5biic_debug_introduced_imports[@]}"; do
+    print -r -- "$machine_driver_undefined_symbols" \
+        | grep -Fxq -- "$marker" || {
+        print -u2 \
+            "ii-b5b-ii-c Debug fixed-session import is missing: $marker"
+        exit 1
+    }
+done
+for marker in "${iib5biic_debug_required_fcntl_imports[@]}"; do
+    print -r -- "$machine_driver_undefined_symbols" \
+        | grep -Fxq -- "$marker" || {
+        print -u2 "ii-b5b-ii-c Debug fcntl import is missing: $marker"
+        exit 1
+    }
+done
 observed_machine_driver_security_imports=$(
     print -r -- "$machine_driver_undefined_symbols" \
         | grep -E '^_(Sec|kSec|Authorization|CSSM)' \
@@ -1969,11 +2153,11 @@ release_machine_driver_owned_symbols=$(
         | rg 'StornautInvestigationMachineDriver(Support)?' | LC_ALL=C sort -u
 )
 require_projection "$release_machine_driver_undefined_symbols" \
-    ca971d67a70ced6f94b7ce3d90e0c6ae03b4ed53cad475f96d725ade28012951 412 release-undefined
+    a2784b1406597a19a3f8bf004cdb230dd1d8466254a9ea66941ce013d503cf4f 424 release-undefined
 require_projection "$release_machine_driver_loaded_libraries" \
     9053e60819e57a62ee9acb9db4854705fa2ed0ade20ec3683f13b9e854f86c41 18 release-load-command
 require_projection "$release_machine_driver_owned_symbols" \
-    8a1e846961a0a5dfdba1782f0f3d27a4fae6906babf9814826c0ebba718329c2 1659 release-owned-symbol
+    8fd92d8f9835ac8eff2d8aa76032fa0847bb448016282dbed740d24da20fbcf3 2079 release-owned-symbol
 for marker in "${machine_driver_authority_forbidden_markers[@]}"; do
     if mach_o_has_demangled_symbol "$release_machine_driver" "$marker"; then
         print -u2 "Authority or readiness leaked into Release Machine driver: $marker"
@@ -1992,6 +2176,15 @@ for marker in "${machine_driver_required_readonly_imports[@]}"; do
     print -r -- "$release_machine_driver_undefined_symbols" | grep -Fxq -- "$marker" || {
         print -u2 "Release Machine driver read-only import is missing: $marker"; exit 1
     }
+done
+for marker in "${iib5biic_release_forbidden_imports[@]}"; do
+    if print -r -- "$release_machine_driver_undefined_symbols" \
+        | grep -Fxq -- "$marker"
+    then
+        print -u2 \
+            "ii-b5b-ii-c fixed-session import leaked into Release: $marker"
+        exit 1
+    fi
 done
 [[ "$(print -r -- "$release_machine_driver_undefined_symbols" \
     | grep -E '^_(Sec|kSec|Authorization|CSSM)' | LC_ALL=C sort)" \

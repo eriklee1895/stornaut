@@ -31,16 +31,20 @@ ownership after a failed start.
 
 ## 2. Frozen Scope and Cost
 
-The exact anticipated non-document path set is seven paths, with a hard ceiling
-of eight paths and 3,600 changed lines:
+The initial anticipated non-document path set was seven paths, with a hard
+ceiling of eight paths and 3,600 changed lines. The first production skeleton
+showed that the new startup-uncertainty outcome must be exercised through the
+existing composer rather than only at the factory boundary. The exact frozen
+set is therefore eight paths:
 
 1. `Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpoch.swift`;
 2. `Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinEpochSession.swift`;
 3. `Tests/StornautInvestigationTests/InvestigationMachineDarwinEpochSessionTests.swift`;
-4. `Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift`;
-5. `scripts/verify-investigation-boundaries`;
-6. `scripts/verify-app-release-boundaries`; and
-7. `scripts/verify-contract`.
+4. `Tests/StornautInvestigationTests/InvestigationMachineSingleEpochTests.swift`;
+5. `Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift`;
+6. `scripts/verify-investigation-boundaries`;
+7. `scripts/verify-app-release-boundaries`; and
+8. `scripts/verify-contract`.
 
 No `Package.swift` change is expected because SwiftPM automatically includes the
 new source and test files in their existing targets. No App leaf, native entry,

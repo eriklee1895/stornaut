@@ -41,6 +41,9 @@ package struct InvestigationMachineSingleEpochCommitment: Sendable {
     }
 }
 package enum InvestigationMachineSingleEpochClaimingError: Error, Sendable { case terminalUncertain }
+package enum InvestigationMachineSingleEpochSessionError: Error, Sendable {
+    case identityMismatch
+}
 package protocol InvestigationMachineSingleEpochInstalledDriverObserving: Sendable {
     func observeDriver() throws -> InvestigationMachineSingleEpochDriverObservation
 }
@@ -61,6 +64,7 @@ package protocol InvestigationMachineSingleEpochSessionFactory: Sendable {
 package enum InvestigationMachineSingleEpochStartOutcome: Sendable {
     case started(any InvestigationMachineSingleEpochSession)
     case terminal(InvestigationMachineSingleEpochTerminalStartProof)
+    case terminalUncertain
 }
 package protocol InvestigationMachineSingleEpochClaiming: Sendable {
     func claim(
@@ -178,6 +182,8 @@ package actor InvestigationMachineSingleEpochComposer {
         case .terminal:
             throw Task.isCancelled ? InvestigationMachineSingleEpochError.cancelled
                 : InvestigationMachineSingleEpochError.protocolViolation
+        case .terminalUncertain:
+            throw InvestigationMachineSingleEpochError.retirementUncertain
         }
         let driverClaim = session.driverClaim
         var claimClient: (any InvestigationMachineSingleEpochClaiming)?
@@ -383,6 +389,9 @@ package actor InvestigationMachineSingleEpochComposer {
             try Task.checkCancellation()
         }
         catch is CancellationError { throw InvestigationMachineSingleEpochError.cancelled }
+        catch InvestigationMachineSingleEpochSessionError.identityMismatch {
+            throw InvestigationMachineSingleEpochError.identityMismatch
+        }
         catch { throw InvestigationMachineSingleEpochError.protocolViolation }
         guard
             frame.kind == kind,
