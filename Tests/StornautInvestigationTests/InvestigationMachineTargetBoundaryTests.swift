@@ -1330,6 +1330,7 @@ struct InvestigationMachineTargetBoundaryTests {
             "iii-b1 checkpoint baseline drifted",
             "iii-b1 binary checkpoint path rejected",
             "iii-b1 checkpoint budget drifted",
+            "iii-b1 completed tree drifted",
         ] {
             #expect(boundaries.contains(marker))
         }
@@ -1360,6 +1361,16 @@ struct InvestigationMachineTargetBoundaryTests {
             "comment-only-tests",
             "vacuous-marker-tests",
             "focused-test-source-seal",
+            "iib5biii_b1_commit=5e2365d0c5f3fbeef8e015f5e9ad4252c484217e",
+            "iib5biii_b1_tree=b46d39bfcb4a24cee80b4be9562e281519450cb8",
+            "iii-b1 historical parent drifted",
+            "iii-b1 historical tree drifted",
+            "iii-b1 historical paths drifted",
+            "iii-b1 historical line count drifted",
+            "substitute-cohort",
+            "substitute-continuity",
+            "substitute-focused",
+            "substitute-boundary-test",
             "iii-b1 exact seven-path staged scope",
         ] {
             #expect(contract.contains(marker))

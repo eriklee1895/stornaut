@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=a3a2dd3a6e57f78fe9bfc49d4da68ab2c8dc091196419b051d60eacadcf07cf6
+ib2_self_sha=58267ec490519ba7a6a5221ceb9636c2fc47f744ebbe03beac4131bba5f80aab
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -1152,7 +1152,7 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "091adc47629b4c0f0baae34949a4335850e02dcb66b451211f15d6af59c9dbe1",
+        "97851358dcf72f4ecb895583a8ed045c66c1a503d56a516ab3a3c5990bd8eca8",
     Path("scripts/verify-app-release-boundaries"):
         "7597527b1e6ed702433a5e640c2b56d5df2bb8efedfff53627ac7258e5fb82ef",
 }
@@ -6787,9 +6787,6 @@ do
         "${fixture%%:*}" "${fixture#*:}"
 done
 
-iib5biii_b1_index="$contract_root/iib5biii-b1.index"
-GIT_INDEX_FILE="$iib5biii_b1_index" \
-    git read-tree "$iib5biii_b1_baseline^{tree}"
 iib5biii_b1_paths=(
     "$iib5biii_b1_cohort"
     "$iib5biii_b1_continuity"
@@ -6799,18 +6796,46 @@ iib5biii_b1_paths=(
     scripts/verify-contract
     scripts/verify-investigation-boundaries
 )
-for checkpoint_path in "${iib5biii_b1_paths[@]}"; do
-    blob=$(git hash-object -w -- "$checkpoint_path")
-    mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
-    GIT_INDEX_FILE="$iib5biii_b1_index" git update-index --add \
-        --cacheinfo "$mode,$blob,$checkpoint_path"
-done
+iib5biii_b1_commit=5e2365d0c5f3fbeef8e015f5e9ad4252c484217e
+iib5biii_b1_tree=b46d39bfcb4a24cee80b4be9562e281519450cb8
+[[ "$(git show -s --format=%P "$iib5biii_b1_commit")" == \
+    "$iib5biii_b1_baseline" ]] \
+    || fail_contract "iii-b1 historical parent drifted"
+[[ "$(git show -s --format=%T "$iib5biii_b1_commit")" == \
+    "$iib5biii_b1_tree" ]] \
+    || fail_contract "iii-b1 historical tree drifted"
+iib5biii_b1_observed_paths=(
+    ${(f)"$(git diff-tree --no-commit-id --name-only -r \
+        "$iib5biii_b1_commit" | LC_ALL=C sort)"}
+)
+iib5biii_b1_expected_paths=("${(@on)iib5biii_b1_paths}")
+[[ "${(j:\n:)iib5biii_b1_observed_paths}" == \
+    "${(j:\n:)iib5biii_b1_expected_paths}" ]] \
+    || fail_contract "iii-b1 historical paths drifted"
+iib5biii_b1_lines=$(
+    git diff-tree --numstat --no-commit-id -r "$iib5biii_b1_commit" \
+        | awk '{n += $1 + $2} END {print n + 0}'
+)
+(( iib5biii_b1_lines == 2438 )) \
+    || fail_contract "iii-b1 historical line count drifted"
+iib5biii_b1_index="$contract_root/iib5biii-b1.index"
+GIT_INDEX_FILE="$iib5biii_b1_index" \
+    git read-tree "$iib5biii_b1_commit^{tree}"
 GIT_INDEX_FILE="$iib5biii_b1_index" "$iib5biii_b1_gate" \
     --iib5biii-b1-staged-scope-contract-only "$iib5biii_b1_baseline"
 for line in {1..3300}; do print -r -- "// iii-b1 over-budget $line"; done \
     >"$contract_root/iib5biii-b1-over-budget.swift"
+function iib5biii_b1_tampered_blob() {
+    local checkpoint_path=$1
+    {
+        git show "${iib5biii_b1_commit}:$checkpoint_path"
+        print -r -- "unrelated iii-b1 tamper"
+    } | git hash-object -w --stdin
+}
 for fixture in extra-path over-budget deleted binary mode wrong-baseline \
-    substitute-contract substitute-boundary substitute-app
+    substitute-cohort substitute-continuity substitute-focused \
+    substitute-boundary-test substitute-contract substitute-boundary \
+    substitute-app
 do
     index="$contract_root/iib5biii-b1-$fixture.index"
     cp "$iib5biii_b1_index" "$index"
@@ -6845,24 +6870,43 @@ do
             expected='iii-b1 checkpoint mode drifted: scripts/verify-contract' ;;
         wrong-baseline)
             expected='iii-b1 checkpoint baseline drifted' ;;
+        substitute-cohort)
+            blob=$(iib5biii_b1_tampered_blob "$iib5biii_b1_cohort")
+            GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                "100644,$blob,$iib5biii_b1_cohort"
+            expected='iii-b1 completed tree drifted' ;;
+        substitute-continuity)
+            blob=$(iib5biii_b1_tampered_blob "$iib5biii_b1_continuity")
+            GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                "100644,$blob,$iib5biii_b1_continuity"
+            expected='iii-b1 completed tree drifted' ;;
+        substitute-focused)
+            blob=$(iib5biii_b1_tampered_blob "$iib5biii_b1_test")
+            GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                "100644,$blob,$iib5biii_b1_test"
+            expected='iii-b1 completed tree drifted' ;;
+        substitute-boundary-test)
+            blob=$(iib5biii_b1_tampered_blob "$iib5biii_b1_boundary")
+            GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                "100644,$blob,$iib5biii_b1_boundary"
+            expected='iii-b1 completed tree drifted' ;;
         substitute-contract)
-            blob=$(git rev-parse \
-                "${iib5biii_b1_baseline}:scripts/verify-contract")
+            blob=$(iib5biii_b1_tampered_blob scripts/verify-contract)
             GIT_INDEX_FILE="$index" git update-index --cacheinfo \
                 "100755,$blob,scripts/verify-contract"
-            expected='iii-b1 staged checkpoint paths drifted' ;;
+            expected='iii-b1 completed tree drifted' ;;
         substitute-boundary)
-            blob=$(git rev-parse \
-                "${iib5biii_b1_baseline}:scripts/verify-investigation-boundaries")
+            blob=$(iib5biii_b1_tampered_blob \
+                scripts/verify-investigation-boundaries)
             GIT_INDEX_FILE="$index" git update-index --cacheinfo \
                 "100755,$blob,scripts/verify-investigation-boundaries"
-            expected='iii-b1 staged checkpoint paths drifted' ;;
+            expected='iii-b1 completed tree drifted' ;;
         substitute-app)
-            blob=$(git rev-parse \
-                "${iib5biii_b1_baseline}:scripts/verify-app-release-boundaries")
+            blob=$(iib5biii_b1_tampered_blob \
+                scripts/verify-app-release-boundaries)
             GIT_INDEX_FILE="$index" git update-index --cacheinfo \
                 "100755,$blob,scripts/verify-app-release-boundaries"
-            expected='iii-b1 staged checkpoint paths drifted' ;;
+            expected='iii-b1 completed tree drifted' ;;
     esac
     output="$contract_root/iib5biii-b1-scope-$fixture.log"
     baseline=$iib5biii_b1_baseline
