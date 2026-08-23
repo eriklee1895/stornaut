@@ -749,6 +749,9 @@ parent-crash containment 与 iii-a/b1/b2a/b2b budgets。
 [ii-b5b-iii-a review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-a-review.md)
 记录 per-epoch completion/continuity、40 focused、559 affected、1,446-test
 serial、三项 boundary gates 与 no-unresolved-P0-P2 review。
+[ii-b5b-iii-b1 preflight](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b1-preflight.md)
+冻结 one-shot eight-epoch actor、final continuity destruction、7-path/3,200-line
+scope 与 tests-first matrix。
 生产 Deep Dive 继续 unavailable，直到 Task 44 final admission。
 
 跨 Epic 的阶段依赖、no-go 分支和交付顺序由 [Delivery Roadmap](../plans/roadmap.md) 管理；新 active plan 不得另起一套宏观路线。

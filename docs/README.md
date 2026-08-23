@@ -145,6 +145,7 @@
 | Phase D Task 39B2c L3c3c-ii-c0a Review | [Projection-in-Capsule Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md) — exact 8 paths / 1,863 changed lines；90 focused、536 affected、1,418-test/73-suite clean serial；three boundary gates and no-unresolved-P0–P2 review；complete/non-admitting |
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-b0 Preflight | [Outer/Inner Protocol and Split](reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md) — long-lived outer、disposable inner-led PGID、fixed FD contract、parent-crash overlay and iii-a/b1/b2a/b2b budgets；preflight complete/non-admitting |
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-a Review | [Per-Epoch Continuity Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-a-review.md) — exact 10 paths / 3,147 changed lines；40 focused、559 affected、1,446-test/74-suite clean serial；three boundary gates and no unresolved P0–P2；complete/non-admitting，iii-b1 current |
+| Phase D Task 39B2c L3c3c-ii-b5b-iii-b1 Preflight | [Injected Eight-Epoch Cohort](reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b1-preflight.md) — package-only one-shot actor、final continuity destruction、7 paths / 3,200 lines；RED confirmed/current/non-admitting |
 | Epic 2–4 历史计划 | [Deterministic Product Core](plans/completed/epic-2-4-deterministic-product-core.md) — Tasks 9–26 已完成并归档 |
 | 已完成计划 | [Completed Plans](plans/completed/README.md) — Epic 0–1 |
 | 上游学习与许可证门禁 | [Upstream Reference Matrix](research/upstream-reference-matrix.md) |
