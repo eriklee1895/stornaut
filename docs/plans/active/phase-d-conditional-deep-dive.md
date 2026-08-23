@@ -59,8 +59,8 @@
 > owned-PGID retirement and ii-c0a projection-in-capsule input/intake are
 > complete/non-admitting. A fresh source/topology audit split ii-b5b-iii into
 > b0 protocol, a per-epoch continuity, b1 injected cohort, b2a physical adapter
-> and b2b entry/artifact. b0 is frozen/non-admitting; iii-a is complete/non-
-> admitting and iii-b1 is current, followed by iii-b2a, iii-b2b, ii-c0b and
+> and b2b entry/artifact. b0 is frozen/non-admitting; iii-a and iii-b1 are
+> complete/non-admitting and iii-b2a is current, followed by iii-b2b, ii-c0b and
 > then ii-c one no-model
 > privileged gate. The authoritative
 > real-model run and readiness verdict remain unimplemented.
@@ -945,7 +945,7 @@ Checkpoint status:
   complete after 35 focused, 521 affected, one 1,234-test staged-only serial,
   exact contract/structural/artifact gates and final review; ii-b3b and its
   test-only fixture prerequisite, ii-b3c and ii-b4 are complete/non-admitting;
-  ii-b5 is split into b5a0/b5a/b5b-i/b5b-ii/b5b-iii; b5a0/b5a, all b5b-i checkpoints through aggregate i-c2, ii-b5b-ii-a/ii-b/ii-c/ii-d and ii-c0a are complete/non-admitting. A fresh source/topology audit further splits ii-b5b-iii as `iii-b0 -> iii-a -> iii-b1 -> iii-b2a -> iii-b2b`; b0 is frozen/non-admitting and iii-a is complete/non-admitting. The corrected remaining order is `iii-b1 -> iii-b2a -> iii-b2b -> ii-c0b -> ii-c -> L3c3d -> L3c4`; iii-b1 is current. iii-a closed at tree `2eeb307cfb2cf67a1b169e0a510c92ea2dc9dbb2` with exact 10 paths / 3,147 changed lines, 40 focused tests, 559 affected tests, a clean 1,446-test / 74-suite staged-only serial, all three boundary gates and no unresolved P0-P2.
+  ii-b5 is split into b5a0/b5a/b5b-i/b5b-ii/b5b-iii; b5a0/b5a, all b5b-i checkpoints through aggregate i-c2, ii-b5b-ii-a/ii-b/ii-c/ii-d and ii-c0a are complete/non-admitting. A fresh source/topology audit further splits ii-b5b-iii as `iii-b0 -> iii-a -> iii-b1 -> iii-b2a -> iii-b2b`; b0 is frozen/non-admitting and iii-a/iii-b1 are complete/non-admitting. The corrected remaining order is `iii-b2a -> iii-b2b -> ii-c0b -> ii-c -> L3c3d -> L3c4`; iii-b2a is current. iii-a closed at tree `2eeb307cfb2cf67a1b169e0a510c92ea2dc9dbb2` with exact 10 paths / 3,147 changed lines, 40 focused tests, 559 affected tests, a clean 1,446-test / 74-suite staged-only serial, all three boundary gates and no unresolved P0-P2. iii-b1 then closed at tree `b46d39bfcb4a24cee80b4be9562e281519450cb8` with exact 7 paths / 2,438 changed lines, 13 focused tests, 573 affected tests, a clean 1,455-test / 75-suite staged-only serial, all three boundary gates, immutable replay seal and no unresolved P0-P2.
   See the
   [ii-b2 ASID prerequisite review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2-asid-prerequisite-review.md),
   the
@@ -991,6 +991,8 @@ Checkpoint status:
   the [ii-c0a preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md),
   the [ii-c0a review](../../reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md),
   the [ii-b5b-iii-b0 preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md),
+  the [ii-b5b-iii-a review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-a-review.md),
+  the [ii-b5b-iii-b1 review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b1-review.md),
   the
   [L3c1b-i Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
   and

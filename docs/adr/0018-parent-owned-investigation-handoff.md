@@ -7,8 +7,8 @@
 > ii-b3a/ii-b3b/ii-b3c/ii-b4/ii-b5a0 complete/non-admitting; ii-b5 split;
 > b5a and all b5b-i checkpoints through aggregate i-c2 complete/non-admitting;
 > ii-b5b-ii-a/ii-b/ii-c/ii-d and ii-c0a projection-in-capsule complete/non-
-> admitting; ii-b5b-iii-b0 outer/inner protocol preflight frozen; iii-a
-> complete/non-admitting; iii-b1 current
+> admitting; ii-b5b-iii-b0 outer/inner protocol preflight frozen; iii-a and
+> iii-b1 complete/non-admitting; iii-b2a current
 >
 > **Date:** 2026-08-19
 >
@@ -372,8 +372,8 @@ unconsumed.
 | ii-c0a projection-in-capsule contract | complete; non-admitting |
 | ii-b5b-iii-b0 outer/inner protocol preflight | frozen; non-admitting |
 | ii-b5b-iii-a typed per-epoch completion and continuity | complete; non-admitting |
-| ii-b5b-iii-b1 injected eight-epoch cohort | current |
-| ii-b5b-iii-b2a Darwin outer/inner physical adapter | not started |
+| ii-b5b-iii-b1 injected eight-epoch cohort | complete; non-admitting |
+| ii-b5b-iii-b2a Darwin outer/inner physical adapter | current |
 | ii-b5b-iii-b2b zero-argument entry and final artifact | not started |
 | ii-c0b non-root capsule author and launcher hygiene | not started |
 | ii-c no-model privileged machine gate | not executed |

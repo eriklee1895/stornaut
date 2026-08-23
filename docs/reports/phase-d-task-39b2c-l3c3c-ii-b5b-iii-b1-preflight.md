@@ -1,7 +1,10 @@
 # Phase D Task 39B2c L3c3c-ii-b5b-iii-b1 Injected Cohort Preflight
 
-> Status: scope, trust boundary, tests-first matrix and budget frozen; RED
-> contract confirmed; production implementation not started
+> Preflight status at publication: scope, trust boundary, tests-first matrix and
+> budget frozen; RED contract confirmed; production implementation not started
+>
+> Current outcome: complete / non-admitting; see the
+> [iii-b1 completion review](phase-d-task-39b2c-l3c3c-ii-b5b-iii-b1-review.md)
 >
 > Date: 2026-08-23
 >
