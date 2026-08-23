@@ -588,9 +588,11 @@ struct InvestigationMachineTargetBoundaryTests {
             "InvestigationMachineDarwinEpochRetirement.swift",
             "InvestigationMachineDriverSupport.swift",
             "InvestigationMachineFixedCapsuleIntake.swift",
+            "InvestigationMachineHelperEpochContinuity.swift",
             "InvestigationMachineInstalledDriverObservation.swift",
             "InvestigationMachineInstalledDriverSystemSource.swift",
             "InvestigationMachineSingleEpoch.swift",
+            "InvestigationMachineSingleEpochComposition.swift",
             "InvestigationMachineSingleEpochInstalledL2Join.swift",
         ])
         #expect(FileManager.default.fileExists(atPath: supportURL.path))
@@ -723,6 +725,15 @@ struct InvestigationMachineTargetBoundaryTests {
                 "import Foundation",
                 "import StornautInvestigationHandoffContract",
                 "import StornautInvestigationInstalledL2",
+            ],
+            "InvestigationMachineSingleEpochComposition.swift": [
+                "import Foundation",
+                "import StornautInvestigationHandoffContract",
+                "import StornautInvestigationInstalledL2",
+            ],
+            "InvestigationMachineHelperEpochContinuity.swift": [
+                "import Foundation",
+                "import StornautInvestigationHandoffContract",
             ],
             "InvestigationMachineSingleEpochInstalledL2Join.swift": [
                 "import Foundation",
@@ -1096,9 +1107,15 @@ struct InvestigationMachineTargetBoundaryTests {
             ),
             encoding: .utf8
         )
+        let contract = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "scripts/verify-contract"
+            ),
+            encoding: .utf8
+        )
         for marker in [
-            "--iib4-driver-support-contract-only <package-manifest> <client-source>",
-            "--iib4-staged-scope-contract-only [baseline]",
+            "[[ $1 == --iib4-driver-support-contract-only ]]",
+            "[[ $1 == --iib4-staged-scope-contract-only ]]",
             "ii-b4 driver support source contains comment camouflage",
             "ii-b4 driver support package dependency drifted",
             "ii-b4 fixed helper service drifted",
@@ -1113,6 +1130,13 @@ struct InvestigationMachineTargetBoundaryTests {
             "ii-b4 staged checkpoint deleted a required path",
         ] {
             #expect(boundaries.contains(marker))
+        }
+        for marker in [
+            "iib4_commit=8ba49c1a02acab556df474d334cb2f9c01eb639f",
+            "iib4_parent=6367c3b4a0b98eeb2877706ef016612cfd59e6a1",
+            "--iib4-staged-scope-contract-only \"$iib4_parent\"",
+        ] {
+            #expect(contract.contains(marker))
         }
     }
 
@@ -1132,8 +1156,8 @@ struct InvestigationMachineTargetBoundaryTests {
             encoding: .utf8
         )
         for marker in [
-            "--iib5a0-claim-abort-contract-only <client-source>",
-            "--iib5a0-staged-scope-contract-only [baseline]",
+            "[[ $1 == --iib5a0-claim-abort-contract-only ]]",
+            "[[ $1 == --iib5a0-staged-scope-contract-only ]]",
             "ii-b5a0 canonical client source drifted",
             "ii-b5a0 dependency surface drifted",
             "ii-b5a0 regained physical authority",
@@ -1145,12 +1169,14 @@ struct InvestigationMachineTargetBoundaryTests {
         for marker in [
             "alias-release", "alias-connect", "string-invalidation",
             "for fixture in extra-path over-budget deleted-path",
+            "iib5a0_commit=953d14935e9f9a19a303b92d1b6eeeb1b8619f73",
+            "iib5a0_parent=ce048e16f5b97de694ccd5928bd940d93950aec1",
             "--iib4-staged-scope-contract-only \"$iib4_parent\"",
         ] {
             #expect(contract.contains(marker))
         }
         #expect(boundaries.contains(
-            "--iib4-driver-support-contract-only <package-manifest> <client-source>"
+            "[[ $1 == --iib4-driver-support-contract-only ]]"
         ))
         #expect(boundaries.contains("(( changed <= 800 ))"))
     }
@@ -1161,7 +1187,8 @@ struct InvestigationMachineTargetBoundaryTests {
             try String(contentsOf: root.appending(path: $0), encoding: .utf8)
         }
         for marker in [
-            "--iib5a-single-epoch-contract-only <composer-source> <focused-test-source>", "--iib5a-staged-scope-contract-only [baseline]",
+            "[[ $1 == --iib5a-single-epoch-contract-only ]]",
+            "[[ $1 == --iib5a-staged-scope-contract-only ]]",
             "label = \"composer\" if path == composer_path else \"focused test\"", "ii-b5a canonical {label} source drifted", "ii-b5a checkpoint paths drifted",
             "ii-b5a checkpoint budget drifted",
         ] { #expect(sources[0].contains(marker)) }
@@ -1170,17 +1197,101 @@ struct InvestigationMachineTargetBoundaryTests {
         ] { #expect(sources[1].contains(marker)) }
     }
 
+    @Test
+    func iiiASemanticEpochVerifierPinsContinuityAuthorityAndExactScope() throws {
+        let root = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let boundaries = try String(
+            contentsOf: root.appending(path: "scripts/verify-investigation-boundaries"),
+            encoding: .utf8
+        )
+        let release = try String(
+            contentsOf: root.appending(path: "scripts/verify-app-release-boundaries"),
+            encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        for marker in [
+            "--iib5biii-a-single-epoch-contract-only",
+            "--iib5biii-a-staged-scope-contract-only",
+            "InvestigationMachineHelperEpochContinuityTests.swift",
+            "function verify_iib5biii_a_single_epoch_contract()",
+            "function verify_iib5biii_a_staged_scope()",
+            "iii-a dependency surface drifted",
+            "iii-a public continuity or configuration surface drifted",
+            "iii-a authority or admission surface drifted",
+            "iii-a ownership suspension or completion ordering drifted",
+            "iii-a external containment outcome priority drifted",
+            "iii-a focused test source seal drifted",
+            "iii-a staged checkpoint paths drifted",
+            "iii-a checkpoint mode drifted",
+            "iii-a checkpoint baseline drifted",
+            "iii-a binary checkpoint path rejected",
+            "iii-a checkpoint budget drifted",
+        ] {
+            #expect(boundaries.contains(marker))
+        }
+        for marker in [
+            "--iib5biii-a-source-contract-only",
+            "function verify_iib5biii_a_source_contract()",
+            "iii-a source-only App boundary verification passed.",
+            "iii-a source-only App boundary gained physical authority",
+            "StornautInvestigationMachineDarwin",
+        ] {
+            #expect(release.contains(marker))
+        }
+        for marker in [
+            "iib5biii_a_gate=scripts/verify-investigation-boundaries",
+            "--iib5biii-a-single-epoch-contract-only",
+            "--iib5biii-a-staged-scope-contract-only",
+            "iii-a mutation accepted:",
+            "iii-a scope mutation accepted:",
+            "predecessor-nil-bypass",
+            "ordinal-genesis",
+            "same-helper",
+            "ownership-before-release",
+            "transfer-no-local-cleanup",
+            "local-completion-outer-proof",
+            "outer-join-successor",
+            "package-non-codable-private-init",
+            "foreign-replay-wrong-ordinal",
+            "cancellation-concurrency",
+            "cohort-binding",
+            "predecessor-digest",
+            "terminal-proof-zero",
+            "successor-terminal-proof-binding",
+            "physical-authority-fd0-spawn-pgid-entry-readiness", "comment-only-tests", "vacuous-marker-tests", "cancellation-assertions", "replay-assertion", "binding-assertion",
+            "InvestigationMachineSingleEpochInstalledL2JoinTests.swift",
+            "iii-a exact ten-path staged scope",
+        ] {
+            #expect(contract.contains(marker))
+        }
+        for marker in [
+            "1b2d1e792b3aaea094ff0c737adc23b700c0a62cfc3edc7a23cc9188ff8b3844",
+            "8c2b3e45a6a377d9ab13c418cdcd8b33501560cf3930b90bbe225d2b4f0bb2be",
+            "375a2265dcf42d9ea124f08945844203140542c7bf17362b964902d100524e58",
+        ] {
+            #expect(boundaries.contains(marker))
+        }
+    }
+
     @Test func iiB5BIAProjectionVerifierPinsPureBinaryAndTemporalContract() throws {
         let root = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let sources = try ["scripts/verify-investigation-boundaries", "scripts/verify-contract"].map {
             try String(contentsOf: root.appending(path: $0), encoding: .utf8)
         }
         for marker in [
-            "--iib5bia-projection-contract-only <contract-source> <focused-test-source>",
-            "--iib5bia-staged-scope-contract-only [baseline]",
+            "[[ $1 == --iib5bia-projection-contract-only ]]",
+            "[[ $1 == --iib5bia-staged-scope-contract-only ]]",
             "ii-b5b-i-a canonical {label} source drifted", "ii-b5b-i-a checkpoint budget drifted",
         ] { #expect(sources[0].contains(marker)) }
         for marker in [
+            "iib5bia_commit=434faecaeae1b7e08472baa2e1462da942326b85",
+            "iib5bia_baseline=1d8cf284a61d2a728f8ec99bb1b1f29ba0610612",
             "codable:'ii-b5b-i-a", "projection-epoch:'ii-b5b-i-a",
             "claim-projection:'ii-b5b-i-a", "cross-clock:'ii-b5b-i-a",
             "digest-bypass:'ii-b5b-i-a",
@@ -1196,14 +1307,16 @@ struct InvestigationMachineTargetBoundaryTests {
             "scripts/verify-investigation-boundaries", "scripts/verify-contract",
         ].map { try String(contentsOf: root.appending(path: $0), encoding: .utf8) }
         for marker in [
-            "--iib5bib1-semantic-contract-only <Package.swift> <semantic-source> <focused-test-source>",
-            "--iib5bib1-staged-scope-contract-only [baseline]",
+            "[[ $1 == --iib5bib1-semantic-contract-only ]]",
+            "[[ $1 == --iib5bib1-staged-scope-contract-only ]]",
             "ii-b5b-i-b1 authority or schema surface drifted",
             "ii-b5b-i-b1 checkpoint budget drifted",
         ] {
             #expect(sources[0].contains(marker))
         }
         for marker in [
+            "iib5bib1_commit=d47209e2fef268035504d884456b31c72af7737f",
+            "iib5bib1_baseline=89662d0d802760a85c6894b87127288a23bcbb2d",
             "public-observation:'ii-b5b-i-b1",
             "codable-observation:'ii-b5b-i-b1",
             "artifact-closure:'ii-b5b-i-b1",
@@ -1585,9 +1698,13 @@ struct InvestigationMachineTargetBoundaryTests {
             ),
             encoding: .utf8
         )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
         for marker in [
-            "--iib5biia-fixed-capsule-contract-only <source> <test>",
-            "--iib5biia-staged-scope-contract-only [baseline]",
+            "[[ $1 == --iib5biia-fixed-capsule-contract-only ]]",
+            "[[ $1 == --iib5biia-staged-scope-contract-only ]]",
             "ii-b5b-ii-a exact fcntl shape drifted",
             "ii-b5b-ii-a FD_CLOEXEC shape drifted",
             "ii-b5b-ii-a O_RDONLY shape drifted",
@@ -1616,6 +1733,14 @@ struct InvestigationMachineTargetBoundaryTests {
             "_fcntl _ioctl",
         ] {
             #expect(boundaries.contains(marker))
+        }
+        for marker in [
+            "iib5biia_commit=ea9d2a237ab8e8d1b900f603f54233c94c86ecc0",
+            "iib5biia_parent=ddbc4a0be3ea059c7de239b85ef60c40c09affbb",
+            "iib5biia-historical",
+            "--iib5biia-staged-scope-contract-only \"$iib5biia_baseline\"",
+        ] {
+            #expect(contract.contains(marker))
         }
     }
 

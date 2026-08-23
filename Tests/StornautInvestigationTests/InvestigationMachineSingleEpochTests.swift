@@ -9,16 +9,35 @@ struct InvestigationMachineSingleEpochTests {
     func successForEveryAdmittedRowUsesExactTypedInputs(
         _ scenario: InvestigationHandoffScenario) async throws {
         let fixture = try SingleEpochFixture(scenario: scenario)
-        let runtime = fixture.runtime()
+        let transferred = scenario == .lifecycleRecovery
+        let runtime = fixture.runtime(
+            ownership: transferred ? .outerOwnsTerminal : .resumeLocal
+        )
         let composer = fixture.composer(runtime: runtime)
         let expectedBootstrap = try fixture.bootstrap
         let expectedOutgoing = try fixture.expectedOutgoing
         let expectedClaimCall = try fixture.expectedClaimCall
-        #expect(try await composer.run() == .completedNonAdmitting)
-        #expect(runtime.trace.events == SingleEpochEvent.successOrder)
+        let result = try await composer.run(
+            previousHelperIdentity: fixture.previousHelperIdentity
+        )
+        if transferred {
+            guard case let .ownershipTransferred(ownership) = result else {
+                Issue.record("expected transferred ownership")
+                return
+            }
+            #expect(ownership.helperIdentity == fixture.helperIdentity)
+        } else {
+            #expect(try localCompletion(result).helperIdentity
+                == fixture.helperIdentity)
+        }
+        #expect(runtime.trace.events == SingleEpochEvent.successOrder(
+            ownershipTransferred: transferred
+        ))
         #expect(runtime.sessionFactory.bootstraps == [expectedBootstrap])
         #expect(runtime.session.receivedFrames == fixture.incoming)
-        #expect(runtime.session.sentFrames == expectedOutgoing)
+        #expect(runtime.session.sentFrames == (
+            transferred ? Array(expectedOutgoing.dropLast()) : expectedOutgoing
+        ))
         #expect(runtime.claim.calls == [expectedClaimCall])
         #expect(runtime.l2.calls == [fixture.expectedL2Call])
         #expect(!(InvestigationMachineSingleEpochResult.self is any Codable.Type))
@@ -26,6 +45,8 @@ struct InvestigationMachineSingleEpochTests {
         #expect(!(InvestigationMachineSingleEpochTerminalStartProof.self is any Codable.Type))
         #expect(!(InvestigationMachineSingleEpochInstalledL2Proof.self is any Codable.Type))
         #expect(!(InvestigationMachineSingleEpochAppObservation.self is any Codable.Type))
+        #expect(!(InvestigationMachineSingleEpochOwnershipCandidate.self is any Codable.Type))
+        #expect(!(InvestigationMachineSingleEpochLocalCompletionCandidate.self is any Codable.Type))
     }
     @Test(arguments: SingleEpochProtocolMutation.allCases)
     fileprivate func protocolOrCommitmentDriftFailsBeforeClaim(
@@ -33,7 +54,8 @@ struct InvestigationMachineSingleEpochTests {
         let fixture = try SingleEpochFixture(mutation: mutation)
         let runtime = fixture.runtime()
         await #expect(throws: mutation.expectedError) {
-            _ = try await fixture.composer(runtime: runtime).run()
+            _ = try await fixture.composer(runtime: runtime)
+                .run(previousHelperIdentity: nil)
         }
         #expect(!runtime.trace.events.contains(.claim))
         #expect(runtime.trace.events.last == .retire)
@@ -47,7 +69,8 @@ struct InvestigationMachineSingleEpochTests {
         let fixture = try SingleEpochFixture()
         let runtime = fixture.runtime(afterClaimFailure: failure)
         await #expect(throws: failure.expectedError) {
-            _ = try await fixture.composer(runtime: runtime).run()
+            _ = try await fixture.composer(runtime: runtime)
+                .run(previousHelperIdentity: nil)
         }
         let claim = try #require(runtime.trace.events.firstIndex(of: .claim))
         let abort = try #require(runtime.trace.events.firstIndex(of: .abort))
@@ -62,7 +85,8 @@ struct InvestigationMachineSingleEpochTests {
         let fixture = try SingleEpochFixture()
         let runtime = fixture.runtime(claimFailure: failure)
         await #expect(throws: failure.expectedError) {
-            _ = try await fixture.composer(runtime: runtime).run()
+            _ = try await fixture.composer(runtime: runtime)
+                .run(previousHelperIdentity: nil)
         }
         #expect(runtime.trace.events.filter { $0 == .makeClaim }.count == 1)
         #expect(runtime.trace.events.filter { $0 == .claim }.count == 1)
@@ -77,7 +101,8 @@ struct InvestigationMachineSingleEpochTests {
         await #expect(
             throws: InvestigationMachineSingleEpochError.releaseTerminalUncertain
         ) {
-            _ = try await fixture.composer(runtime: runtime).run()
+            _ = try await fixture.composer(runtime: runtime)
+                .run(previousHelperIdentity: nil)
         }
         #expect(runtime.trace.events.suffix(2) == [.claimRelease, .retire])
         #expect(!runtime.trace.events.contains(.abort))
@@ -93,7 +118,8 @@ struct InvestigationMachineSingleEpochTests {
             retirementFails: priority == .retirement
         )
         await #expect(throws: priority.expectedError) {
-            _ = try await fixture.composer(runtime: runtime).run()
+            _ = try await fixture.composer(runtime: runtime)
+                .run(previousHelperIdentity: nil)
         }
         #expect(runtime.trace.events.suffix(2) == [.abort, .retire])
     }
@@ -106,7 +132,9 @@ struct InvestigationMachineSingleEpochTests {
             cancellation: seam
         )
         let composer = fixture.composer(runtime: runtime)
-        let operation = Task { try await composer.run() }
+        let operation = Task {
+            try await composer.run(previousHelperIdentity: nil)
+        }
         await runtime.cancellation.waitUntilEntered()
         operation.cancel()
         runtime.cancellation.resume()
@@ -122,13 +150,17 @@ struct InvestigationMachineSingleEpochTests {
         #expect(runtime.trace.events.contains(.makeClaim) == seam.reachesClaimFactory)
         #expect(runtime.trace.events.contains(.send(.exit)) == seam.reachesExit)
         #expect(runtime.trace.events.filter { $0 == .observeDriver }.count == 1)
+        if seam == .ownership {
+            #expect(runtime.ownership.observedCancellation == [false])
+        }
     }
     @Test
     func terminalStartProofNeedsNoComposerRetirement() async throws {
         let fixture = try SingleEpochFixture()
         let runtime = fixture.runtime(startTerminal: true)
         await #expect(throws: InvestigationMachineSingleEpochError.protocolViolation) {
-            _ = try await fixture.composer(runtime: runtime).run()
+            _ = try await fixture.composer(runtime: runtime)
+                .run(previousHelperIdentity: nil)
         }
         #expect(!runtime.trace.events.contains(.retire))
     }
@@ -139,7 +171,8 @@ struct InvestigationMachineSingleEpochTests {
         await #expect(
             throws: InvestigationMachineSingleEpochError.retirementUncertain
         ) {
-            _ = try await fixture.composer(runtime: runtime).run()
+            _ = try await fixture.composer(runtime: runtime)
+                .run(previousHelperIdentity: nil)
         }
         #expect(!runtime.trace.events.contains(.retire))
         #expect(!runtime.trace.events.contains(.receive(.preDropReady)))
@@ -151,7 +184,10 @@ struct InvestigationMachineSingleEpochTests {
         let runtime = fixture.runtime(finalObservationFailure: failure)
         await #expect(
             throws: InvestigationMachineSingleEpochError.finalObservationMismatch
-        ) { _ = try await fixture.composer(runtime: runtime).run() }
+        ) {
+            _ = try await fixture.composer(runtime: runtime)
+                .run(previousHelperIdentity: nil)
+        }
         #expect(runtime.trace.events.suffix(2) == [.retire, .observeDriver])
     }
     @Test
@@ -161,8 +197,10 @@ struct InvestigationMachineSingleEpochTests {
             pid: 85, version: 9, uid: 0, asid: 11)
         let runtime = fixture.runtime(driverClaims: [fixture.driverClaim, driftingClaim])
         let expectedOutgoing = try fixture.expectedOutgoing
-        #expect(try await fixture.composer(runtime: runtime).run()
-            == .completedNonAdmitting)
+        _ = try localCompletion(
+            await fixture.composer(runtime: runtime)
+                .run(previousHelperIdentity: nil)
+        )
         #expect(runtime.session.driverClaimReadCount == 1)
         #expect(runtime.session.sentFrames == expectedOutgoing)
     }
@@ -172,17 +210,137 @@ struct InvestigationMachineSingleEpochTests {
         let startGate = SingleEpochGate()
         let runtime = fixture.runtime(startGate: startGate)
         let composer = fixture.composer(runtime: runtime)
-        let first = Task { try await composer.run() }
+        let first = Task {
+            try await composer.run(previousHelperIdentity: nil)
+        }
         await startGate.waitUntilEntered()
         await #expect(throws: InvestigationMachineSingleEpochError.alreadyConsumed) {
-            _ = try await composer.run()
+            _ = try await composer.run(previousHelperIdentity: nil)
         }
         startGate.open()
-        #expect(try await first.value == .completedNonAdmitting)
+        _ = try localCompletion(await first.value)
         await #expect(throws: InvestigationMachineSingleEpochError.alreadyConsumed) {
-            _ = try await composer.run()
+            _ = try await composer.run(previousHelperIdentity: nil)
         }
         #expect(runtime.trace.events.filter { $0 == .start }.count == 1)
+    }
+
+    @Test
+    func previousHelperIdentityFlowsUnchangedIntoClaim() async throws {
+        let fixture = try SingleEpochFixture(scenario: .cancellation)
+        let previous = try SingleEpochFixture.helperIdentity(
+            pid: 701, version: 11, asid: 33_000
+        )
+        let runtime = fixture.runtime()
+
+        _ = try localCompletion(
+            await fixture.composer(runtime: runtime)
+                .run(previousHelperIdentity: previous)
+        )
+
+        var expected = try fixture.expectedClaimCall
+        expected.previousHelperIdentity = previous
+        #expect(runtime.claim.calls == [expected])
+    }
+
+    @Test(arguments: SingleEpochPredecessorMutation.allCases)
+    fileprivate func ordinalAndHelperFreshnessFailClosed(
+        _ mutation: SingleEpochPredecessorMutation
+    ) async throws {
+        let fixture = try SingleEpochFixture(
+            scenario: mutation == .unexpectedGenesis
+                ? .success : .cancellation
+        )
+        let runtime = fixture.runtime()
+        let predecessor: InvestigationMachineProcessIdentity?
+        switch mutation {
+        case .unexpectedGenesis:
+            predecessor = try SingleEpochFixture.helperIdentity(
+                pid: 701, version: 11, asid: 33_000
+            )
+        case .missingSuccessor:
+            predecessor = nil
+        case .sameHelper:
+            predecessor = fixture.helperIdentity
+        }
+
+        await #expect(throws: mutation.expectedError) {
+            _ = try await fixture.composer(runtime: runtime)
+                .run(previousHelperIdentity: predecessor)
+        }
+        #expect(
+            runtime.trace.events.isEmpty
+                == (mutation != .sameHelper)
+        )
+        if mutation == .sameHelper {
+            #expect(runtime.trace.events.contains(.abort))
+            #expect(runtime.trace.events.last == .retire)
+        }
+    }
+
+    @Test
+    func transferredOwnershipStopsEveryLocalCleanupAuthority() async throws {
+        let fixture = try SingleEpochFixture(scenario: .lifecycleRecovery)
+        let runtime = fixture.runtime(ownership: .outerOwnsTerminal)
+
+        let result = try await fixture.composer(runtime: runtime)
+            .run(previousHelperIdentity: fixture.previousHelperIdentity)
+
+        guard case .ownershipTransferred = result else {
+            Issue.record("expected transferred ownership")
+            return
+        }
+        #expect(runtime.trace.events.contains(.ownership))
+        #expect(!runtime.trace.events.contains(.claimRelease))
+        #expect(!runtime.trace.events.contains(.send(.exit)))
+        #expect(!runtime.trace.events.contains(.abort))
+        #expect(!runtime.trace.events.contains(.retire))
+        #expect(runtime.trace.events.filter { $0 == .observeDriver }.count == 1)
+    }
+
+    @Test
+    func uncertainOwnershipStopsWithoutCompetingCleanup() async throws {
+        let fixture = try SingleEpochFixture(scenario: .lifecycleRecovery)
+        let runtime = fixture.runtime(ownership: .terminalUncertain)
+
+        await #expect(
+            throws: InvestigationMachineSingleEpochError
+                .ownershipTerminalUncertain
+        ) {
+            _ = try await fixture.composer(runtime: runtime)
+                .run(previousHelperIdentity: fixture.previousHelperIdentity)
+        }
+
+        #expect(runtime.trace.events.contains(.ownership))
+        #expect(!runtime.trace.events.contains(.claimRelease))
+        #expect(!runtime.trace.events.contains(.send(.exit)))
+        #expect(!runtime.trace.events.contains(.abort))
+        #expect(!runtime.trace.events.contains(.retire))
+    }
+
+    @Test(arguments: SingleEpochOwnershipModeMismatch.allCases)
+    fileprivate func ownershipModeMustMatchTheFixedBusinessRow(
+        _ mismatch: SingleEpochOwnershipModeMismatch
+    ) async throws {
+        let fixture = try SingleEpochFixture(scenario: mismatch.scenario)
+        let runtime = fixture.runtime(ownership: mismatch.directive)
+
+        await #expect(
+            throws: InvestigationMachineSingleEpochError
+                .ownershipTerminalUncertain
+        ) {
+            _ = try await fixture.composer(runtime: runtime).run(
+                previousHelperIdentity: fixture.previousHelperIdentity
+            )
+        }
+
+        #expect(runtime.trace.events.contains(.ownership))
+        #expect(!runtime.trace.events.contains(.claimRelease))
+        #expect(!runtime.trace.events.contains(.send(.exit)))
+        #expect(runtime.trace.events.contains(.abort)
+            == mismatch.retainsLocalAuthority)
+        #expect(runtime.trace.events.contains(.retire)
+            == mismatch.retainsLocalAuthority)
     }
 }
 private enum SingleEpochProtocolMutation: CaseIterable {
@@ -213,18 +371,40 @@ private enum SingleEpochTerminalPriority: CaseIterable {
 private enum SingleEpochFinalObservationFailure: CaseIterable {
     case read, mismatch
 }
+private enum SingleEpochPredecessorMutation: CaseIterable {
+    case unexpectedGenesis, missingSuccessor, sameHelper
+    var expectedError: InvestigationMachineSingleEpochError {
+        self == .sameHelper ? .claimFailed : .invalidCommitment
+    }
+}
+private enum SingleEpochOwnershipDirective: Sendable {
+    case resumeLocal, outerOwnsTerminal, terminalUncertain
+}
+private enum SingleEpochOwnershipModeMismatch: CaseIterable {
+    case localLifecycle
+    case outerNormal
+
+    var scenario: InvestigationHandoffScenario {
+        self == .localLifecycle ? .lifecycleRecovery : .success
+    }
+    var directive: SingleEpochOwnershipDirective {
+        self == .localLifecycle ? .resumeLocal : .outerOwnsTerminal
+    }
+    var retainsLocalAuthority: Bool { self == .localLifecycle }
+}
 private enum SingleEpochAsyncSeam: CaseIterable, Sendable {
     case start, receivePreDrop, sendDropRelease, receiveDropEvidence
     case observeAppInitial, sendConfiguration, receiveConfigurationAcknowledgement
     case receiveHello, receiveHandle, sendAcknowledgement, sendRelease, receiveAlive
-    case peerWriteEOF, claim, installedL2, observeAppRepeated, claimRelease
+    case peerWriteEOF, claim, installedL2, observeAppRepeated, ownership
+    case claimRelease
     case sendExit, retire, abort
     var expectedError: InvestigationMachineSingleEpochError {
         self == .abort ? .installedL2Failed : .cancelled
     }
     var requiresAbort: Bool {
         switch self {
-        case .claim, .installedL2, .observeAppRepeated, .abort: true
+        case .claim, .installedL2, .observeAppRepeated, .ownership, .abort: true
         default: false
         }
     }
@@ -236,7 +416,8 @@ private enum SingleEpochAsyncSeam: CaseIterable, Sendable {
     }
     var reachesClaimFactory: Bool {
         switch self {
-        case .claim, .installedL2, .observeAppRepeated, .claimRelease, .sendExit, .retire, .abort: true
+        case .claim, .installedL2, .observeAppRepeated, .ownership,
+             .claimRelease, .sendExit, .retire, .abort: true
         default: false
         }
     }
@@ -245,25 +426,41 @@ private enum SingleEpochAsyncSeam: CaseIterable, Sendable {
 private enum SingleEpochEvent: Sendable, Equatable {
     case observeDriver, clock, start
     case receive(InvestigationHandoffFrameKind), send(InvestigationHandoffFrameKind)
-    case observeApp, eof, makeClaim, claim, installedL2, claimRelease, abort, retire
-    static let successOrder: [Self] = [
-        .observeDriver, .clock, .start, .receive(.preDropReady),
-        .send(.dropRelease), .receive(.dropEvidence), .observeApp,
-        .send(.configuration), .receive(.configurationAcknowledgement),
-        .receive(.hello), .receive(.handle), .send(.acknowledgement),
-        .send(.release), .receive(.alive), .eof, .makeClaim, .claim,
-        .installedL2, .observeApp, .claimRelease, .send(.exit), .retire,
-        .observeDriver,
-    ]
+    case observeApp, eof, makeClaim, claim, installedL2, ownership
+    case claimRelease, abort, retire
+    static func successOrder(ownershipTransferred: Bool) -> [Self] {
+        var value: [Self] = [
+            .observeDriver, .clock, .start, .receive(.preDropReady),
+            .send(.dropRelease), .receive(.dropEvidence), .observeApp,
+            .send(.configuration), .receive(.configurationAcknowledgement),
+            .receive(.hello), .receive(.handle), .send(.acknowledgement),
+            .send(.release), .receive(.alive), .eof, .makeClaim, .claim,
+            .installedL2, .observeApp, .ownership,
+        ]
+        if !ownershipTransferred {
+            value += [.claimRelease, .send(.exit), .retire, .observeDriver]
+        }
+        return value
+    }
 }
 private struct SingleEpochClaimCall: Sendable, Equatable {
-    let handle: InvestigationHandoffRetirementHandle; let appIdentity: InvestigationMachineProcessIdentity
+    let handle: InvestigationHandoffRetirementHandle
+    let appIdentity: InvestigationMachineProcessIdentity
     let sharedDeadline: InvestigationMachineClaimClientSharedDeadline
+    var previousHelperIdentity: InvestigationMachineProcessIdentity?
 }
 private struct SingleEpochL2Call: Sendable, Equatable {
     let projection: InvestigationInstalledL2IdentityProjection
     let appIdentity: InvestigationMachineProcessIdentity; let evidence: InvestigationMachineClaimEvidence
     let epochUUID: UUID; let deadlineNanoseconds: UInt64
+}
+private func localCompletion(
+    _ result: InvestigationMachineSingleEpochResult
+) throws -> InvestigationMachineSingleEpochLocalCompletionCandidate {
+    guard case let .localCompletion(value) = result else {
+        throw SingleEpochInjectedFailure()
+    }
+    return value
 }
 private final class SingleEpochTrace: @unchecked Sendable {
     private let lock = NSLock()
@@ -286,10 +483,12 @@ private struct SingleEpochFixture {
     static let now: UInt64 = 1_000_000_000, deadline: UInt64 = 141_000_000_000
     let epoch: InvestigationCohortEpoch
     let projection: InvestigationInstalledL2IdentityProjection
+    let selection: InvestigationMachineFixedEpochSelection
     let commitment: InvestigationMachineSingleEpochCommitment
     let driverClaim: InvestigationHandoffProcessClaim
     let appIdentity, helperIdentity: InvestigationMachineProcessIdentity
     let claimEvidence: InvestigationMachineClaimEvidence
+    let claimReleased: InvestigationMachineClaimReleased
     let semanticObservation: InvestigationInstalledL2SemanticObservation
     let installedObservation: InvestigationMachineSingleEpochDriverObservation
     let handle: InvestigationHandoffRetirementHandle; let incoming: [InvestigationHandoffFrame]
@@ -329,7 +528,13 @@ private struct SingleEpochFixture {
             machineClaimServiceIdentifier:
                 "com.eriklee.stornaut.lifecycle.machine-claim"
         )
-        commitment = try .init(epoch: epoch, projection: projection)
+        selection = try .init(
+            outerAttemptUUID: Self.uuid(0x01),
+            wholeCapsuleSHA256: Self.digest(0x02),
+            wholeInputSHA256: Self.digest(0x03),
+            epoch: epoch, projection: projection
+        )
+        commitment = try .init(selection: selection)
         driverClaim = try Self.claim(pid: 84, version: 8, uid: 0, asid: 10)
         let preDrop = try Self.claim(pid: 42, version: 7, uid: 0, asid: 9)
         let postDrop = try Self.claim(
@@ -405,6 +610,14 @@ private struct SingleEpochFixture {
                 remainingAuditSessionMembers: 0, matchingLeases: 0,
                 leaseRootEntries: 0, investigationArtifacts: 0
             ), releaseDeadlineNanoseconds: 140_000_000_000
+        )
+        claimReleased = try .init(
+            requestBindingSHA256: claimEvidence.requestBindingSHA256,
+            releaseChallenge: Self.uuid(0x44),
+            claimedHelperIdentitySHA256: helperIdentity.helperIdentitySHA256(),
+            claimConnectionEpoch: claimEvidence.claimConnectionEpoch,
+            exitScheduled: true,
+            postReplyExitDeadlineNanoseconds: 140_500_000_000
         )
         let appSigning = try Self.signing(
             identifier: "com.eriklee.stornaut", byte: 0x51, adHoc: false
@@ -485,7 +698,16 @@ private struct SingleEpochFixture {
         get throws {
             .init(
                 handle: handle, appIdentity: appIdentity,
-                sharedDeadline: try .init(epochDeadlineNanoseconds: Self.deadline)
+                sharedDeadline: try .init(epochDeadlineNanoseconds: Self.deadline),
+                previousHelperIdentity: try previousHelperIdentity
+            )
+        }
+    }
+    var previousHelperIdentity: InvestigationMachineProcessIdentity? {
+        get throws {
+            guard epoch.ordinal > 0 else { return nil }
+            return try Self.helperIdentity(
+                pid: 701, version: 11, asid: 33_000
             )
         }
     }
@@ -506,7 +728,8 @@ private struct SingleEpochFixture {
         startTerminalUncertain: Bool = false,
         finalObservationFailure: SingleEpochFinalObservationFailure? = nil,
         cancellation: SingleEpochAsyncSeam? = nil,
-        driverClaims: [InvestigationHandoffProcessClaim]? = nil
+        driverClaims: [InvestigationHandoffProcessClaim]? = nil,
+        ownership: SingleEpochOwnershipDirective = .resumeLocal
     ) -> SingleEpochRuntime {
         let trace = SingleEpochTrace()
         let cancellationProbe = SingleEpochCancellationProbe(cancellation)
@@ -521,6 +744,7 @@ private struct SingleEpochFixture {
         )
         let claim = ScriptedSingleEpochClaim(
             trace: trace, cancellation: cancellationProbe, evidence: claimEvidence,
+            released: claimReleased,
             claimFailure: claimFailure, abortFails: abortFails,
             releaseFails: releaseFails
         )
@@ -543,6 +767,10 @@ private struct SingleEpochFixture {
                 trace: trace, cancellation: cancellationProbe,
                 semanticObservation: semanticObservation,
                 fails: afterClaimFailure == .installedL2
+            ),
+            ownership: .init(
+                trace: trace, cancellation: cancellationProbe,
+                resolution: ownership
             )
         )
     }
@@ -552,7 +780,8 @@ private struct SingleEpochFixture {
             commitment: commitment,
             observer: runtime.observer,
             clock: runtime.clock, sessionFactory: runtime.sessionFactory,
-            claimClientFactory: runtime.claimFactory, installedL2: runtime.l2
+            claimClientFactory: runtime.claimFactory, installedL2: runtime.l2,
+            ownershipSuspender: runtime.ownership
         )
     }
     fileprivate static func claim(
@@ -561,6 +790,14 @@ private struct SingleEpochFixture {
         try .init(
             processID: pid, processIDVersion: version,
             effectiveUserID: uid, auditSessionID: asid
+        )
+    }
+    fileprivate static func helperIdentity(
+        pid: UInt32, version: UInt32, asid: UInt32
+    ) throws -> InvestigationMachineProcessIdentity {
+        try identity(
+            role: .helper, pid: pid, version: version, uid: 0, asid: asid,
+            words: [9, 0, 8, 7, 6, pid, asid, version]
         )
     }
     private static func uuid(_ byte: UInt8) throws -> UUID {
@@ -607,6 +844,7 @@ private struct SingleEpochRuntime {
     let observer: ScriptedSingleEpochDriverObserver; let clock: ScriptedSingleEpochClock
     let sessionFactory: ScriptedSingleEpochSessionFactory
     let claimFactory: ScriptedSingleEpochClaimFactory; let l2: ScriptedSingleEpochL2
+    let ownership: ScriptedSingleEpochOwnershipSuspender
 }
 private final class ScriptedSingleEpochDriverObserver:
     InvestigationMachineSingleEpochInstalledDriverObserving, @unchecked Sendable {
@@ -762,6 +1000,7 @@ private final class ScriptedSingleEpochClaim:
     InvestigationMachineSingleEpochClaiming, @unchecked Sendable {
     let trace: SingleEpochTrace; let cancellation: SingleEpochCancellationProbe
     let evidence: InvestigationMachineClaimEvidence
+    let released: InvestigationMachineClaimReleased
     let claimFailure: SingleEpochClaimFailure?; let abortFails, releaseFails: Bool
     private let lock = NSLock()
     private var storedCalls: [SingleEpochClaimCall] = []
@@ -769,22 +1008,26 @@ private final class ScriptedSingleEpochClaim:
     init(
         trace: SingleEpochTrace, cancellation: SingleEpochCancellationProbe,
         evidence: InvestigationMachineClaimEvidence,
+        released: InvestigationMachineClaimReleased,
         claimFailure: SingleEpochClaimFailure?,
         abortFails: Bool, releaseFails: Bool
     ) {
         self.trace = trace; self.cancellation = cancellation
-        self.evidence = evidence; self.claimFailure = claimFailure
+        self.evidence = evidence; self.released = released
+        self.claimFailure = claimFailure
         self.abortFails = abortFails; self.releaseFails = releaseFails
     }
     func claim(
         handle: InvestigationHandoffRetirementHandle,
         appIdentity: InvestigationMachineProcessIdentity,
-        sharedDeadline: InvestigationMachineClaimClientSharedDeadline
+        sharedDeadline: InvestigationMachineClaimClientSharedDeadline,
+        previousHelperIdentity: InvestigationMachineProcessIdentity?
     ) async throws -> InvestigationMachineClaimEvidence {
         lock.withLock {
             storedCalls.append(.init(
                 handle: handle, appIdentity: appIdentity,
-                sharedDeadline: sharedDeadline
+                sharedDeadline: sharedDeadline,
+                previousHelperIdentity: previousHelperIdentity
             ))
         }
         trace.record(.claim); await cancellation.hit(.claim)
@@ -798,9 +1041,48 @@ private final class ScriptedSingleEpochClaim:
         trace.record(.abort); await cancellation.hit(.abort)
         if abortFails { throw SingleEpochInjectedFailure() }
     }
-    func releaseAndAwaitTerminal() async throws {
+    func releaseAndAwaitTerminal() async throws
+        -> InvestigationMachineClaimReleased
+    {
         trace.record(.claimRelease); await cancellation.hit(.claimRelease)
         if releaseFails { throw SingleEpochInjectedFailure() }
+        return released
+    }
+}
+private final class ScriptedSingleEpochOwnershipSuspender:
+    InvestigationMachineSingleEpochOwnershipSuspending, @unchecked Sendable
+{
+    let trace: SingleEpochTrace
+    let cancellation: SingleEpochCancellationProbe
+    let directive: SingleEpochOwnershipDirective
+    private let lock = NSLock()
+    private var storedCancellation: [Bool] = []
+    var observedCancellation: [Bool] {
+        lock.withLock { storedCancellation }
+    }
+
+    init(
+        trace: SingleEpochTrace,
+        cancellation: SingleEpochCancellationProbe,
+        resolution: SingleEpochOwnershipDirective
+    ) {
+        self.trace = trace
+        self.cancellation = cancellation
+        directive = resolution
+    }
+
+    func suspend(
+        _ candidate: InvestigationMachineSingleEpochOwnershipCandidate
+    ) async -> InvestigationMachineSingleEpochOwnershipResolution {
+        _ = candidate
+        lock.withLock { storedCancellation.append(Task.isCancelled) }
+        trace.record(.ownership)
+        await cancellation.hit(.ownership)
+        switch directive {
+        case .resumeLocal: return .resumeLocal(candidate)
+        case .outerOwnsTerminal: return .outerOwnsTerminal(candidate)
+        case .terminalUncertain: return .terminalUncertain
+        }
     }
 }
 private final class ScriptedSingleEpochL2:

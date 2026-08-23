@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=01967916838604fce759003ef0571b3e0ddb87aba5fb63169e7f9f6ef4899662
+ib2_self_sha=504aae9db3f74bffde23d7d7111e773231fadd6525408f82d522f9f7d0f7b31b
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -330,9 +330,9 @@ require_fixed_text scripts/verify-app-release-boundaries \
 require_fixed_text scripts/verify-app-release-boundaries \
     '_kSecGuestAttributePid'
 require_fixed_text scripts/verify-app-release-boundaries \
-    '7e2f489abf968390a64b5ec42e9ac75c0e31ce37cfe740a5a44ef506accee5d5'
+    '579203c9d83f5884f633261d17966662a9d265455b92b94378034c7551e8e069'
 require_fixed_text scripts/verify-app-release-boundaries \
-    '30404041877153ce1ef03b5d47d694ccbb0e0688eb91383e4d30f2c023f58207'
+    '2e140940810170e7a1db3bdfcfd34c08a9b5f8ee340c6ee747e48117ba481651'
 require_fixed_text scripts/verify-app-release-boundaries \
     'xcrun swift-demangle'
 require_fixed_text scripts/verify-app-release-boundaries \
@@ -1152,9 +1152,9 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "7e68e8054b6f8b366e986f5cb63b144586183585b477b095f8e2760699883c18",
+        "7291b46f6c44bb5d72605982f93bb0f512e2d253ded7ccfea1a58e5f86162be2",
     Path("scripts/verify-app-release-boundaries"):
-        "6509467e0ac5106d1a3bd6a8b5c1f1ffdbd4796fda77f894f1cbb4f79317ea3b",
+        "9536402fba6da94f4980704dcb81026ea4373dd91eaffede67d949717616801d",
 }
 for path, expected_sha in expected.items():
     observed_sha = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -1171,14 +1171,14 @@ release = Path("scripts/verify-app-release-boundaries").read_text(
     encoding="utf-8"
 )
 for marker, count in {
-    "7e2f489abf968390a64b5ec42e9ac75c0e31ce37cfe740a5a44ef506accee5d5": 2,
+    "579203c9d83f5884f633261d17966662a9d265455b92b94378034c7551e8e069": 2,
     "dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9": 4,
-    "30404041877153ce1ef03b5d47d694ccbb0e0688eb91383e4d30f2c023f58207": 1,
-    "f97fadfdcc44255803fe69fbb95fdfab8ab7c173d695e34040631d0d9561b78a": 1,
-    "ef0a9595ee3d05077ac6672193b60a0edd907fc4617c2e6fb6261aa5547383f3": 1,
-    "d0bfbcb8bb828174255bb8dddc7a231fa46f66710e1401d7e73831604d8432a7": 1,
-    "6b8be4c8f6e8cfe427ca74604b47a1597deec011509f9714087b178703a860f2": 1,
-    "9d88e7fe87a468f86f30bf8e95efbe32c5c4bf909e29432c8eca637072722ef8": 1,
+    "f2ba1744c095da4b71e7906c52030b4cdea7258ef90cfb87be489b6758eb3894": 1,
+    "f9a4938da7cfdf444715cd912d0728304d1021bed1d5ac9a7b6efe99321f3dcb": 1,
+    "2dfe1c3a4dcb5e659fb50d2df2bc14a341f4f1dfb6077cefa08bdd8fb0179fe7": 1,
+    "9a7516aec7a0e99d73b11df2337173f24a1abf1372c6e1110106aadf3d99f067": 1,
+    "2e140940810170e7a1db3bdfcfd34c08a9b5f8ee340c6ee747e48117ba481651": 1,
+    "2f06243b20b80607fa8ef3b097bdc56b0a4d3601ad6a8974609702cf00daf2d9": 1,
 }.items():
     observed = investigation.count(marker) + release.count(marker)
     if observed != count:
@@ -4685,11 +4685,26 @@ for fixture in extra-path over-budget existing-deleted-path binary-numstat; do
 done
 
 iib5bic1_gate=scripts/verify-investigation-boundaries
-iib5bic1_package=Package.swift
-iib5bic1_composer=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpoch.swift
-iib5bic1_join=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochInstalledL2Join.swift
-iib5bic1_test=Tests/StornautInvestigationTests/InvestigationMachineSingleEpochInstalledL2JoinTests.swift
-"$iib5bic1_gate" --iib5bic1-installed-join-contract-only "$iib5bic1_package" "$iib5bic1_composer" "$iib5bic1_join" "$iib5bic1_test"
+iib5bic1_baseline=ae9675dd1ce29faae67fd32c72a570bc7b247d3d
+iib5bic1_completed_commit=74877ec7a1cdd442e8333a1fd77c259edd67a36c
+iib5bic1_snapshot_index=$contract_root/iib5bic1-completed.index
+iib5bic1_snapshot_root=$contract_root/iib5bic1-completed
+iib5bic1_git_dir=$(git rev-parse --absolute-git-dir)
+mkdir -p "$iib5bic1_snapshot_root"
+GIT_INDEX_FILE="$iib5bic1_snapshot_index" \
+    git read-tree "$iib5bic1_completed_commit^{tree}"
+GIT_INDEX_FILE="$iib5bic1_snapshot_index" git checkout-index --all \
+    --prefix="$iib5bic1_snapshot_root/"
+iib5bic1_historical_gate=$iib5bic1_snapshot_root/scripts/verify-investigation-boundaries
+iib5bic1_package_path=Package.swift
+iib5bic1_composer_path=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpoch.swift
+iib5bic1_join_path=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochInstalledL2Join.swift
+iib5bic1_test_path=Tests/StornautInvestigationTests/InvestigationMachineSingleEpochInstalledL2JoinTests.swift
+iib5bic1_package=$iib5bic1_snapshot_root/$iib5bic1_package_path
+iib5bic1_composer=$iib5bic1_snapshot_root/$iib5bic1_composer_path
+iib5bic1_join=$iib5bic1_snapshot_root/$iib5bic1_join_path
+iib5bic1_test=$iib5bic1_snapshot_root/$iib5bic1_test_path
+"$iib5bic1_historical_gate" --iib5bic1-installed-join-contract-only "$iib5bic1_package" "$iib5bic1_composer" "$iib5bic1_join" "$iib5bic1_test"
 python3 - "$iib5bic1_package" "$iib5bic1_composer" "$iib5bic1_join" "$iib5bic1_test" "$contract_root" <<'PY'
 from pathlib import Path
 import sys
@@ -4724,12 +4739,10 @@ for fixture in \
    reverse-dependency) package="$contract_root/iib5bic1-$name.swift";;
    vacuous-test) test="$contract_root/iib5bic1-$name.swift";;
  esac
- output="$contract_root/iib5bic1-$name.log"; if "$iib5bic1_gate" --iib5bic1-installed-join-contract-only "$package" "$composer" "$join" "$test" >"$output" 2>&1; then fail_contract "ii-b5b-i-c1 mutation accepted: $name"; fi; require_fixed_text "$output" "$expected"
+ output="$contract_root/iib5bic1-$name.log"; if "$iib5bic1_historical_gate" --iib5bic1-installed-join-contract-only "$package" "$composer" "$join" "$test" >"$output" 2>&1; then fail_contract "ii-b5b-i-c1 mutation accepted: $name"; fi; require_fixed_text "$output" "$expected"
 done
-iib5bic1_baseline=ae9675d
-iib5bic1_completed_commit=74877ec7a1cdd442e8333a1fd77c259edd67a36c
 iib5bic1_index="$contract_root/iib5bic1.index"; GIT_INDEX_FILE="$iib5bic1_index" git read-tree "$iib5bic1_baseline^{tree}"
-for p in "$iib5bic1_package" "$iib5bic1_composer" "$iib5bic1_join" "$iib5bic1_test" Tests/StornautInvestigationTests/InvestigationMachineSingleEpochTests.swift Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift scripts/verify-contract scripts/verify-investigation-boundaries; do
+for p in "$iib5bic1_package_path" "$iib5bic1_composer_path" "$iib5bic1_join_path" "$iib5bic1_test_path" Tests/StornautInvestigationTests/InvestigationMachineSingleEpochTests.swift Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift scripts/verify-contract scripts/verify-investigation-boundaries; do
     entry=$(git ls-tree "$iib5bic1_completed_commit" -- "$p")
     [[ -n "$entry" ]] || fail_contract "ii-b5b-i-c1 completed snapshot omitted: $p"
     mode=$(print -r -- "$entry" | awk '{print $1}')
@@ -4737,14 +4750,16 @@ for p in "$iib5bic1_package" "$iib5bic1_composer" "$iib5bic1_join" "$iib5bic1_te
     GIT_INDEX_FILE="$iib5bic1_index" git update-index --add \
         --cacheinfo "$mode,$blob,$p"
 done
-GIT_INDEX_FILE="$iib5bic1_index" "$iib5bic1_gate" --iib5bic1-staged-scope-contract-only "$iib5bic1_baseline"
+GIT_DIR="$iib5bic1_git_dir" GIT_WORK_TREE="$iib5bic1_snapshot_root" \
+GIT_INDEX_FILE="$iib5bic1_index" "$iib5bic1_historical_gate" \
+    --iib5bic1-staged-scope-contract-only "$iib5bic1_baseline"
 for fixture in extra-path over-budget existing-deleted-path binary-numstat; do
  index="$contract_root/iib5bic1-$fixture.index"; cp "$iib5bic1_index" "$index"
  if [[ $fixture == extra-path ]]; then blob=$(git rev-parse "${iib5bic1_baseline}:AGENTS.md"); GIT_INDEX_FILE="$index" git update-index --add --cacheinfo "100644,$blob,iib5bic1-extra.swift"; expected='ii-b5b-i-c1 checkpoint paths drifted'
- elif [[ $fixture == over-budget ]]; then blob=$(git hash-object -w Sources/StornautCore/Evidence/EvidenceStore.swift); GIT_INDEX_FILE="$index" git update-index --cacheinfo "100644,$blob,$iib5bic1_join"; expected='ii-b5b-i-c1 checkpoint budget drifted'
+ elif [[ $fixture == over-budget ]]; then blob=$(git hash-object -w Sources/StornautCore/Evidence/EvidenceStore.swift); GIT_INDEX_FILE="$index" git update-index --cacheinfo "100644,$blob,$iib5bic1_join_path"; expected='ii-b5b-i-c1 checkpoint budget drifted'
  elif [[ $fixture == existing-deleted-path ]]; then GIT_INDEX_FILE="$index" git rm --cached -q -f Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift; expected='ii-b5b-i-c1 checkpoint deleted an existing path'
  else blob=$(git rev-parse "${iib5bic1_baseline}:Tests/Fixtures/Snapshots/design-system.empty-state.dark.en.png"); GIT_INDEX_FILE="$index" git update-index --cacheinfo "100644,$blob,Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift"; expected='ii-b5b-i-c1 binary checkpoint path rejected'; fi
- output="$contract_root/iib5bic1-scope-$fixture.log"; if GIT_INDEX_FILE="$index" "$iib5bic1_gate" --iib5bic1-staged-scope-contract-only "$iib5bic1_baseline" >"$output" 2>&1; then fail_contract "ii-b5b-i-c1 scope mutation accepted: $fixture"; fi; require_fixed_text "$output" "$expected"
+ output="$contract_root/iib5bic1-scope-$fixture.log"; if GIT_DIR="$iib5bic1_git_dir" GIT_WORK_TREE="$iib5bic1_snapshot_root" GIT_INDEX_FILE="$index" "$iib5bic1_historical_gate" --iib5bic1-staged-scope-contract-only "$iib5bic1_baseline" >"$output" 2>&1; then fail_contract "ii-b5b-i-c1 scope mutation accepted: $fixture"; fi; require_fixed_text "$output" "$expected"
 done
 
 iib5bic2a_gate=scripts/verify-investigation-boundaries
@@ -6221,7 +6236,7 @@ iic0a_paths=(
     scripts/verify-investigation-boundaries
 )
 for checkpoint_path in "${iic0a_paths[@]}"; do
-    blob=$(git hash-object -w -- "$checkpoint_path")
+    blob=$(git rev-parse "c7cab4dc265b4f31826e566a57f44c9f4f364d70:$checkpoint_path")
     mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
     GIT_INDEX_FILE="$iic0a_index" git update-index --add \
         --cacheinfo "$mode,$blob,$checkpoint_path"
@@ -6290,4 +6305,274 @@ do
     require_fixed_text "$output" "$expected"
 done
 
+# Task 39 iii-a semantic-only continuity and ownership gate.
+iib5biii_a_gate=scripts/verify-investigation-boundaries
+iib5biii_a_app_gate=scripts/verify-app-release-boundaries
+iib5biii_a_baseline=5933bd0590d5e1c9ab696445fa4475d180e5143e
+iib5biii_a_single=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpoch.swift
+iib5biii_a_composition=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochComposition.swift
+iib5biii_a_continuity=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineHelperEpochContinuity.swift
+iib5biii_a_continuity_test=Tests/StornautInvestigationTests/InvestigationMachineHelperEpochContinuityTests.swift
+iib5biii_a_single_test=Tests/StornautInvestigationTests/InvestigationMachineSingleEpochTests.swift
+iib5biii_a_installed_join_test=Tests/StornautInvestigationTests/InvestigationMachineSingleEpochInstalledL2JoinTests.swift
+iib5biii_a_boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+"$iib5biii_a_gate" --iib5biii-a-single-epoch-contract-only \
+    "$iib5biii_a_single" "$iib5biii_a_composition" \
+    "$iib5biii_a_continuity" "$iib5biii_a_continuity_test" \
+    "$iib5biii_a_single_test" "$iib5biii_a_installed_join_test" \
+    "$iib5biii_a_boundary" >"$contract_root/iib5biii-a-canonical.log"
+"$iib5biii_a_app_gate" --iib5biii-a-source-contract-only \
+    "$iib5biii_a_single" "$iib5biii_a_composition" \
+    "$iib5biii_a_continuity" \
+    >"$contract_root/iib5biii-a-app-canonical.log"
+
+python3 - "$iib5biii_a_single" "$iib5biii_a_composition" \
+    "$iib5biii_a_continuity" "$iib5biii_a_continuity_test" \
+    "$contract_root" <<'PY'
+from pathlib import Path
+import sys
+
+single_path, composition_path, continuity_path, continuity_test_path, output_root = map(
+    Path, sys.argv[1:]
+)
+sources = {
+    "single": single_path.read_text(encoding="utf-8"),
+    "composition": composition_path.read_text(encoding="utf-8"),
+    "continuity": continuity_path.read_text(encoding="utf-8"),
+    "continuity_test": continuity_test_path.read_text(encoding="utf-8"),
+}
+
+def mutate(name, source_name, old, new):
+    source = sources[source_name]
+    if source.count(old) != 1:
+        raise SystemExit(f"cannot construct iii-a mutation: {name}")
+    (output_root / f"iib5biii-a-{name}.swift").write_text(
+        source.replace(old, new, 1), encoding="utf-8"
+    )
+
+mutate("predecessor-nil-bypass", "single",
+    "sharedDeadline: sharedDeadline,\n"
+    "                    previousHelperIdentity: previousHelperIdentity\n"
+    "                )\n                claimSucceeded = true",
+    "sharedDeadline: sharedDeadline,\n"
+    "                    previousHelperIdentity: nil\n"
+    "                )\n                claimSucceeded = true")
+mutate("ordinal-genesis", "single",
+    "guard (epoch.ordinal == 0) == (previousHelperIdentity == nil) else {",
+    "guard true else {")
+mutate("same-helper", "single",
+    "previousHelperIdentity != evidence.helperIdentity",
+    "previousHelperIdentity == evidence.helperIdentity")
+mutate("ownership-before-release", "single",
+    "let ownershipResolution = await Task.detached {",
+    "claimReleaseAttempted = true\n"
+    "            let ownershipResolution = await Task.detached {")
+mutate("transfer-no-local-cleanup", "single",
+    "guard localTeardownAuthority else { throw terminalError }",
+    "guard true else { throw terminalError }")
+mutate("local-completion-outer-proof", "composition",
+    "return try await outerJoin.seal(",
+    "return try await outerJoin.sealWithoutProof(")
+mutate("outer-join-successor", "continuity",
+    "return try InvestigationMachineHelperEpochContinuity.successor(",
+    "return try InvestigationMachineHelperEpochContinuity.successorWithoutProof(")
+mutate("package-non-codable-private-init", "continuity",
+    "package final class InvestigationMachineHelperEpochContinuity:\n"
+    "    @unchecked Sendable",
+    "public final class InvestigationMachineHelperEpochContinuity:\n"
+    "    @unchecked Sendable, Codable")
+mutate("foreign-replay-wrong-ordinal", "continuity",
+    "try predecessor.consume(selection)", "_ = predecessor")
+mutate("cancellation-concurrency", "continuity", "guard case let .contained(proof) = outcome else {", "guard !Task.isCancelled else {\n            throw InvestigationMachineHelperEpochContinuityError.cancelled\n        }\n        guard case let .contained(proof) = outcome else {")
+mutate("cohort-binding", "composition",
+    "commitment.wholeInputSHA256.rawBytes.contains(\n"
+    "                where: { $0 != 0 }\n"
+    "            ),",
+    "true,")
+mutate("predecessor-digest", "continuity",
+    "predecessorSHA256 = predecessor.continuitySHA256",
+    "predecessorSHA256 = terminalProofSHA256")
+mutate("terminal-proof-zero", "continuity",
+    "guard terminalProofSHA256.rawBytes.contains(where: { $0 != 0 }) else {",
+    "guard true else {")
+mutate("successor-terminal-proof-binding", "continuity",
+    "predecessor.continuitySHA256.rawBytes,\n"
+    "                    proof.completionBindingSHA256.rawBytes,\n"
+    "                    proof.terminalProofSHA256.rawBytes,\n"
+    "                    Data([proof.mode.rawValue]),",
+    "predecessor.continuitySHA256.rawBytes,\n"
+    "                    proof.completionBindingSHA256.rawBytes,\n"
+    "                    proof.completionBindingSHA256.rawBytes,\n"
+    "                    Data([proof.mode.rawValue]),")
+mutate("physical-authority-fd0-spawn-pgid-entry-readiness", "composition",
+    "import Foundation\n",
+    "import Foundation\nprivate let forbidden = posix_spawn\n")
+(output_root / "iib5biii-a-comment-only-tests.swift").write_text(
+    "\n".join("// " + line for line in sources["continuity_test"].splitlines()) + "\n",
+    encoding="utf-8",
+)
+(output_root / "iib5biii-a-vacuous-marker-tests.swift").write_text(
+    'import Testing\n@Test func cancellationPreservesExternalFailurePriority() {'
+    ' #expect(1 == 1); _ = "task.cancel() await gate.release(outcome) '
+    'InvestigationMachineHelperEpochContinuityError.invalidCompletion '
+    ': .containmentUncertain gate.observedCancellation == [false]" }\n',
+    encoding="utf-8",
+)
+mutate("cancellation-assertions", "continuity_test",
+    "await #expect(throws: foreignProof\n"
+    "            ? InvestigationMachineHelperEpochContinuityError.invalidCompletion\n"
+    "            : .containmentUncertain) {\n"
+    "            _ = try await task.value\n        }",
+    "_ = try? await task.value")
+mutate("replay-assertion", "continuity_test",
+    "await #expect(throws: InvestigationMachineHelperEpochContinuityError\n"
+    "            .alreadyConsumed) {\n"
+    "            _ = try await second.seal(\n"
+    "                selection: fixture.selection, result: fixture.localResult,\n"
+    "                predecessor: predecessor\n"
+    "            )\n        }",
+    "_ = try? await second.seal(\n"
+    "            selection: fixture.selection, result: fixture.localResult,\n"
+    "            predecessor: predecessor\n        )")
+mutate("binding-assertion", "continuity_test",
+    "driverObservationSHA256\n                != altered.localCompletion.driverObservationSHA256",
+    "driverObservationSHA256\n                == altered.localCompletion.driverObservationSHA256")
+PY
+
+function require_iib5biii_a_mutation_rejected() {
+    local name=$1 source_kind=$2
+    local single=$iib5biii_a_single
+    local composition=$iib5biii_a_composition
+    local continuity=$iib5biii_a_continuity
+    local continuity_test=$iib5biii_a_continuity_test
+    local target="$contract_root/iib5biii-a-$name.swift"
+    [[ $source_kind == single ]] && single=$target
+    [[ $source_kind == composition ]] && composition=$target
+    [[ $source_kind == continuity ]] && continuity=$target
+    [[ $source_kind == continuity_test ]] && continuity_test=$target
+    xcrun swiftc -frontend -parse "$target"
+    local output="$contract_root/iib5biii-a-$name.log"
+    if "$iib5biii_a_gate" --iib5biii-a-single-epoch-contract-only \
+        "$single" "$composition" "$continuity" \
+        "$continuity_test" "$iib5biii_a_single_test" \
+        "$iib5biii_a_installed_join_test" "$iib5biii_a_boundary" \
+        >"$output" 2>&1
+    then
+        fail_contract "iii-a mutation accepted: $name"
+    fi
+    require_fixed_text "$output" 'iii-a'
+}
+
+for fixture in \
+    predecessor-nil-bypass:single ordinal-genesis:single same-helper:single \
+    ownership-before-release:single transfer-no-local-cleanup:single \
+    local-completion-outer-proof:composition \
+    outer-join-successor:continuity \
+    package-non-codable-private-init:continuity \
+    foreign-replay-wrong-ordinal:continuity \
+    cancellation-concurrency:continuity \
+    cohort-binding:composition predecessor-digest:continuity \
+    terminal-proof-zero:continuity successor-terminal-proof-binding:continuity \
+    physical-authority-fd0-spawn-pgid-entry-readiness:composition \
+    comment-only-tests:continuity_test vacuous-marker-tests:continuity_test \
+    cancellation-assertions:continuity_test \
+    replay-assertion:continuity_test binding-assertion:continuity_test
+do
+    require_iib5biii_a_mutation_rejected \
+        "${fixture%%:*}" "${fixture#*:}"
+done
+
+iib5biii_a_index="$contract_root/iib5biii-a.index"
+GIT_INDEX_FILE="$iib5biii_a_index" \
+    git read-tree "$iib5biii_a_baseline^{tree}"
+iib5biii_a_paths=(
+    "$iib5biii_a_single"
+    "$iib5biii_a_composition"
+    "$iib5biii_a_continuity"
+    "$iib5biii_a_continuity_test"
+    "$iib5biii_a_single_test"
+    "$iib5biii_a_installed_join_test"
+    "$iib5biii_a_boundary"
+    scripts/verify-app-release-boundaries
+    scripts/verify-contract
+    scripts/verify-investigation-boundaries
+)
+for checkpoint_path in "${iib5biii_a_paths[@]}"; do
+    blob=$(git hash-object -w -- "$checkpoint_path")
+    mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
+    GIT_INDEX_FILE="$iib5biii_a_index" git update-index --add \
+        --cacheinfo "$mode,$blob,$checkpoint_path"
+done
+GIT_INDEX_FILE="$iib5biii_a_index" "$iib5biii_a_gate" \
+    --iib5biii-a-staged-scope-contract-only "$iib5biii_a_baseline"
+for line in {1..3300}; do print -r -- "// iii-a over-budget $line"; done \
+    >"$contract_root/iib5biii-a-over-budget.swift"
+for fixture in extra-path over-budget deleted binary mode wrong-baseline \
+    substitute-contract substitute-boundary substitute-app
+do
+    index="$contract_root/iib5biii-a-$fixture.index"
+    cp "$iib5biii_a_index" "$index"
+    case $fixture in
+        extra-path)
+            blob=$(git rev-parse "${iib5biii_a_baseline}:AGENTS.md")
+            GIT_INDEX_FILE="$index" git update-index --add \
+                --cacheinfo "100644,$blob,iii-a-extra.swift"
+            expected='iii-a staged checkpoint paths drifted' ;;
+        over-budget)
+            blob=$(git hash-object -w -- \
+                "$contract_root/iib5biii-a-over-budget.swift")
+            GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                "100644,$blob,$iib5biii_a_composition"
+            expected='iii-a checkpoint budget drifted' ;;
+        deleted)
+            GIT_INDEX_FILE="$index" git rm --cached -q -f \
+                "$iib5biii_a_single"
+            expected='iii-a checkpoint deleted an existing path' ;;
+        binary)
+            blob=$(git rev-parse \
+                "${iib5biii_a_baseline}:Tests/Fixtures/Snapshots/design-system.empty-state.dark.en.png")
+            GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                "100644,$blob,$iib5biii_a_single"
+            expected='iii-a binary checkpoint path rejected' ;;
+        mode)
+            entry=$(GIT_INDEX_FILE="$index" git ls-files -s -- \
+                scripts/verify-contract)
+            blob=$(print -r -- "$entry" | awk '{print $2}')
+            GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                "100644,$blob,scripts/verify-contract"
+            expected='iii-a checkpoint mode drifted: scripts/verify-contract' ;;
+        wrong-baseline)
+            expected='iii-a checkpoint baseline drifted' ;;
+        substitute-contract)
+            blob=$(git rev-parse \
+                "${iib5biii_a_baseline}:scripts/verify-contract")
+            GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                "100755,$blob,scripts/verify-contract"
+            expected='iii-a staged checkpoint paths drifted' ;;
+        substitute-boundary)
+            blob=$(git rev-parse \
+                "${iib5biii_a_baseline}:scripts/verify-investigation-boundaries")
+            GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                "100755,$blob,scripts/verify-investigation-boundaries"
+            expected='iii-a staged checkpoint paths drifted' ;;
+        substitute-app)
+            blob=$(git rev-parse \
+                "${iib5biii_a_baseline}:scripts/verify-app-release-boundaries")
+            GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                "100755,$blob,scripts/verify-app-release-boundaries"
+            expected='iii-a staged checkpoint paths drifted' ;;
+    esac
+    output="$contract_root/iib5biii-a-scope-$fixture.log"
+    baseline=$iib5biii_a_baseline
+    [[ $fixture == wrong-baseline ]] && baseline="$iib5biii_a_baseline^"
+    if GIT_INDEX_FILE="$index" "$iib5biii_a_gate" \
+        --iib5biii-a-staged-scope-contract-only "$baseline" \
+        >"$output" 2>&1
+    then
+        fail_contract "iii-a scope mutation accepted: $fixture"
+    fi
+    require_fixed_text "$output" "$expected"
+done
+
+# iii-a exact ten-path staged scope.
 print "Verifier mode and CI contract verification passed."

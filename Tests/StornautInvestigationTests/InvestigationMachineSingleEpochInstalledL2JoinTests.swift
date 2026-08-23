@@ -49,8 +49,9 @@ struct InvestigationMachineSingleEpochInstalledL2JoinTests {
         let fixture = try InstalledL2JoinFixture()
         #expect(throws: (any Error).self) {
             _ = try InvestigationMachineSingleEpochCommitment(
-                epoch: fixture.epoch,
-                projection: try fixture.projection(drift: drift)
+                selection: fixture.selection(
+                    projection: try fixture.projection(drift: drift)
+                )
             )
         }
     }
@@ -279,6 +280,17 @@ private struct InstalledL2JoinFixture {
                 driver.designatedRequirementSHA256,
             machineDriverCodeDirectoryHash: driver.codeDirectoryHash,
             machineClaimServiceIdentifier: projection.machineClaimServiceIdentifier
+        )
+    }
+
+    func selection(
+        projection: InvestigationInstalledL2IdentityProjection
+    ) throws -> InvestigationMachineFixedEpochSelection {
+        .init(
+            outerAttemptUUID: Self.uuid(0x01),
+            wholeCapsuleSHA256: try Self.digest(0x02),
+            wholeInputSHA256: try Self.digest(0x03),
+            epoch: epoch, projection: projection
         )
     }
 

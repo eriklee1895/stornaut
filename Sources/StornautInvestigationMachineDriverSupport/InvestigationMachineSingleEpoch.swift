@@ -7,27 +7,57 @@ package enum InvestigationMachineSingleEpochError: Error, Sendable, Equatable {
     case commitmentMismatch, claimFailed, claimTerminalUncertain
     case installedL2Failed, releaseTerminalUncertain, cancelled
     case abortTerminalUncertain, retirementUncertain, finalObservationMismatch
+    case ownershipTerminalUncertain
 }
-package enum InvestigationMachineSingleEpochResult: Sendable, Equatable { case completedNonAdmitting }
-package struct InvestigationMachineSingleEpochRetirementProof: Sendable, Equatable { package init() {} }
+package enum InvestigationMachineSingleEpochResult: Sendable, Equatable {
+    case localCompletion(
+        InvestigationMachineSingleEpochLocalCompletionCandidate
+    )
+    case ownershipTransferred(
+        InvestigationMachineSingleEpochOwnershipCandidate
+    )
+}
+package struct InvestigationMachineSingleEpochRetirementProof: Sendable, Equatable { init() {} }
 package struct InvestigationMachineSingleEpochTerminalStartProof: Sendable, Equatable { package init() {} }
 package struct InvestigationMachineSingleEpochAppObservation: Sendable, Equatable {
     fileprivate let identity: InvestigationMachineProcessIdentity
     init(identity: InvestigationMachineProcessIdentity) { self.identity = identity }
 }
 package struct InvestigationMachineSingleEpochDriverObservation: Sendable, Equatable {
-    private let value: InvestigationMachineInstalledDriverObservation
+    let value: InvestigationMachineInstalledDriverObservation
     init(_ value: InvestigationMachineInstalledDriverObservation) { self.value = value }
 }
 package struct InvestigationMachineSingleEpochCommitment: Sendable {
-    fileprivate let epoch: InvestigationCohortEpoch
-    fileprivate let projection: InvestigationInstalledL2IdentityProjection
+    let outerAttemptUUID: UUID
+    let wholeCapsuleSHA256: InvestigationHandoffSHA256
+    let wholeInputSHA256: InvestigationHandoffSHA256
+    let epoch: InvestigationCohortEpoch
+    let projection: InvestigationInstalledL2IdentityProjection
 
     package init(
+        selection: InvestigationMachineFixedEpochSelection
+    ) throws {
+        try self.init(
+            outerAttemptUUID: selection.outerAttemptUUID,
+            wholeCapsuleSHA256: selection.wholeCapsuleSHA256,
+            wholeInputSHA256: selection.wholeInputSHA256,
+            epoch: selection.epoch, projection: selection.projection
+        )
+    }
+
+    private init(
+        outerAttemptUUID: UUID,
+        wholeCapsuleSHA256: InvestigationHandoffSHA256,
+        wholeInputSHA256: InvestigationHandoffSHA256,
         epoch: InvestigationCohortEpoch,
         projection: InvestigationInstalledL2IdentityProjection
     ) throws {
         guard
+            outerAttemptUUID != UUID(
+                uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+            ),
+            wholeCapsuleSHA256.rawBytes.contains(where: { $0 != 0 }),
+            wholeInputSHA256.rawBytes.contains(where: { $0 != 0 }),
             projection.epochUUID == epoch.epochUUID,
             projection.configurationNonce == epoch.configurationNonce,
             projection.configurationSHA256 == epoch.configurationSHA256,
@@ -36,6 +66,9 @@ package struct InvestigationMachineSingleEpochCommitment: Sendable {
         else {
             throw InvestigationMachineSingleEpochError.invalidCommitment
         }
+        self.outerAttemptUUID = outerAttemptUUID
+        self.wholeCapsuleSHA256 = wholeCapsuleSHA256
+        self.wholeInputSHA256 = wholeInputSHA256
         self.epoch = epoch
         self.projection = projection
     }
@@ -70,10 +103,12 @@ package protocol InvestigationMachineSingleEpochClaiming: Sendable {
     func claim(
         handle: InvestigationHandoffRetirementHandle,
         appIdentity: InvestigationMachineProcessIdentity,
-        sharedDeadline: InvestigationMachineClaimClientSharedDeadline
+        sharedDeadline: InvestigationMachineClaimClientSharedDeadline,
+        previousHelperIdentity: InvestigationMachineProcessIdentity?
     ) async throws -> InvestigationMachineClaimEvidence
     func abortAfterClaimAndProveTerminal() async throws
     func releaseAndAwaitTerminal() async throws
+        -> InvestigationMachineClaimReleased
 }
 package protocol InvestigationMachineSingleEpochClaimClientFactory: Sendable {
     func make() -> any InvestigationMachineSingleEpochClaiming
@@ -88,19 +123,25 @@ extension InvestigationMachineClaimClient: InvestigationMachineSingleEpochClaimi
     package func claim(
         handle: InvestigationHandoffRetirementHandle,
         appIdentity: InvestigationMachineProcessIdentity,
-        sharedDeadline: InvestigationMachineClaimClientSharedDeadline
+        sharedDeadline: InvestigationMachineClaimClientSharedDeadline,
+        previousHelperIdentity: InvestigationMachineProcessIdentity?
     ) async throws -> InvestigationMachineClaimEvidence {
         do {
             return try await claimOrProveTerminal(
                 handle: handle, appIdentity: appIdentity,
-                sharedDeadline: sharedDeadline, previousHelperIdentity: nil
+                sharedDeadline: sharedDeadline,
+                previousHelperIdentity: previousHelperIdentity
             )
         } catch let error as InvestigationMachineClaimClientError {
             guard error == .terminalResidueUncertain else { throw error }
             throw InvestigationMachineSingleEpochClaimingError.terminalUncertain
         }
     }
-    package func releaseAndAwaitTerminal() async throws { _ = try await release() }
+    package func releaseAndAwaitTerminal() async throws
+        -> InvestigationMachineClaimReleased
+    {
+        try await release()
+    }
 }
 package actor InvestigationMachineSingleEpochComposer {
     private static let maximumEpochWindowNanoseconds: UInt64 = 140_000_000_000
@@ -110,19 +151,24 @@ package actor InvestigationMachineSingleEpochComposer {
     private let sessionFactory: any InvestigationMachineSingleEpochSessionFactory
     private let claimClientFactory: any InvestigationMachineSingleEpochClaimClientFactory
     private let installedL2: any InvestigationMachineSingleEpochInstalledL2Observing
+    private let ownershipSuspender:
+        any InvestigationMachineSingleEpochOwnershipSuspending
     private var consumed = false
     package init(
         commitment: InvestigationMachineSingleEpochCommitment,
         observer: any InvestigationMachineSingleEpochInstalledDriverObserving,
         clock: any InvestigationMachineSingleEpochClocking,
         sessionFactory: any InvestigationMachineSingleEpochSessionFactory,
-        claimClientFactory: any InvestigationMachineSingleEpochClaimClientFactory
+        claimClientFactory: any InvestigationMachineSingleEpochClaimClientFactory,
+        ownershipSuspender:
+            any InvestigationMachineSingleEpochOwnershipSuspending
     ) {
         self.init(
             commitment: commitment, observer: observer, clock: clock,
             sessionFactory: sessionFactory,
             claimClientFactory: claimClientFactory,
-            installedL2: InvestigationMachineSingleEpochInstalledL2Join()
+            installedL2: InvestigationMachineSingleEpochInstalledL2Join(),
+            ownershipSuspender: ownershipSuspender
         )
     }
 
@@ -132,22 +178,44 @@ package actor InvestigationMachineSingleEpochComposer {
         clock: any InvestigationMachineSingleEpochClocking,
         sessionFactory: any InvestigationMachineSingleEpochSessionFactory,
         claimClientFactory: any InvestigationMachineSingleEpochClaimClientFactory,
-        installedL2: any InvestigationMachineSingleEpochInstalledL2Observing
+        installedL2: any InvestigationMachineSingleEpochInstalledL2Observing,
+        ownershipSuspender:
+            any InvestigationMachineSingleEpochOwnershipSuspending
     ) {
         self.commitment = commitment; self.observer = observer; self.clock = clock
         self.sessionFactory = sessionFactory; self.claimClientFactory = claimClientFactory
         self.installedL2 = installedL2
+        self.ownershipSuspender = ownershipSuspender
     }
-    package func run() async throws -> InvestigationMachineSingleEpochResult {
+    package nonisolated func isBound(
+        to selection: InvestigationMachineFixedEpochSelection
+    ) -> Bool {
+        commitment.epoch == selection.epoch
+            && commitment.projection == selection.projection
+            && commitment.outerAttemptUUID == selection.outerAttemptUUID
+            && commitment.wholeCapsuleSHA256
+                == selection.wholeCapsuleSHA256
+            && commitment.wholeInputSHA256 == selection.wholeInputSHA256
+    }
+    func run(
+        previousHelperIdentity: InvestigationMachineProcessIdentity?
+    ) async throws -> InvestigationMachineSingleEpochResult {
         guard !consumed else {
             throw InvestigationMachineSingleEpochError.alreadyConsumed
         }
         consumed = true
-        return try await execute()
+        return try await execute(
+            previousHelperIdentity: previousHelperIdentity
+        )
     }
-    private func execute() async throws -> InvestigationMachineSingleEpochResult {
+    private func execute(
+        previousHelperIdentity: InvestigationMachineProcessIdentity?
+    ) async throws -> InvestigationMachineSingleEpochResult {
         let epoch = commitment.epoch
         guard epoch.scenario.rawValue == epoch.ordinal + 1 else {
+            throw InvestigationMachineSingleEpochError.invalidCommitment
+        }
+        guard (epoch.ordinal == 0) == (previousHelperIdentity == nil) else {
             throw InvestigationMachineSingleEpochError.invalidCommitment
         }
         let initialObservation: InvestigationMachineSingleEpochDriverObservation
@@ -190,6 +258,7 @@ package actor InvestigationMachineSingleEpochComposer {
         var claimSucceeded = false
         var claimReleaseAttempted = false
         var retirementAttempted = false
+        var localTeardownAuthority = true
         do {
             try Task.checkCancellation()
             let preDrop = try await receive(
@@ -289,7 +358,8 @@ package actor InvestigationMachineSingleEpochComposer {
                 try Task.checkCancellation()
                 evidence = try await createdClaimClient.claim(
                     handle: handle, appIdentity: appIdentity,
-                    sharedDeadline: sharedDeadline
+                    sharedDeadline: sharedDeadline,
+                    previousHelperIdentity: previousHelperIdentity
                 )
                 claimSucceeded = true
                 try Task.checkCancellation()
@@ -304,6 +374,12 @@ package actor InvestigationMachineSingleEpochComposer {
             }
             guard evidence.appIdentity == appIdentity else {
                 throw InvestigationMachineSingleEpochError.identityMismatch
+            }
+            guard
+                previousHelperIdentity == nil
+                    || previousHelperIdentity != evidence.helperIdentity
+            else {
+                throw InvestigationMachineSingleEpochError.claimFailed
             }
             let semanticObservation: InvestigationInstalledL2SemanticObservation
             do {
@@ -324,8 +400,11 @@ package actor InvestigationMachineSingleEpochComposer {
             guard repeatedIdentity == appIdentity else {
                 throw InvestigationMachineSingleEpochError.identityMismatch
             }
+            let installedL2Proof:
+                InvestigationMachineSingleEpochInstalledL2Proof
             do {
-                _ = try InvestigationMachineSingleEpochInstalledL2Join.prove(
+                installedL2Proof = try
+                    InvestigationMachineSingleEpochInstalledL2Join.prove(
                     projection: commitment.projection,
                     claimEvidence: evidence,
                     semanticObservation: semanticObservation,
@@ -336,10 +415,55 @@ package actor InvestigationMachineSingleEpochComposer {
             } catch {
                 throw InvestigationMachineSingleEpochError.installedL2Failed
             }
+            let ownership: InvestigationMachineSingleEpochOwnershipCandidate
+            do {
+                ownership = try .init(
+                    commitment: commitment,
+                    appIdentity: appIdentity, claimEvidence: evidence,
+                    semanticObservation: semanticObservation,
+                    repeatedAppIdentity: repeatedIdentity,
+                    installedL2Proof: installedL2Proof,
+                    epochDeadlineNanoseconds: deadline.partialValue
+                )
+            } catch {
+                throw InvestigationMachineSingleEpochError.installedL2Failed
+            }
+            let suspender = ownershipSuspender
+            let ownershipResolution = await Task.detached {
+                await suspender.suspend(ownership)
+            }.value
+            switch ownershipResolution {
+            case let .resumeLocal(candidate):
+                guard
+                    candidate == ownership,
+                    epoch.scenario != .lifecycleRecovery
+                else {
+                    throw InvestigationMachineSingleEpochError
+                        .ownershipTerminalUncertain
+                }
+                try Task.checkCancellation()
+            case let .outerOwnsTerminal(candidate):
+                guard
+                    candidate == ownership,
+                    epoch.scenario == .lifecycleRecovery
+                else {
+                    localTeardownAuthority = false
+                    throw InvestigationMachineSingleEpochError
+                        .ownershipTerminalUncertain
+                }
+                localTeardownAuthority = false
+                return .ownershipTransferred(ownership)
+            case .terminalUncertain:
+                localTeardownAuthority = false
+                throw InvestigationMachineSingleEpochError
+                    .ownershipTerminalUncertain
+            }
             try Task.checkCancellation()
             claimReleaseAttempted = true
+            let claimRelease: InvestigationMachineClaimReleased
             do {
-                try await createdClaimClient.releaseAndAwaitTerminal()
+                claimRelease = try await
+                    createdClaimClient.releaseAndAwaitTerminal()
             } catch {
                 throw InvestigationMachineSingleEpochError
                     .releaseTerminalUncertain
@@ -350,7 +474,8 @@ package actor InvestigationMachineSingleEpochComposer {
                 sender: driverClaim, payload: .empty
             )
             retirementAttempted = true
-            do { _ = try await session.retireAndReap() }
+            let retirement: InvestigationMachineSingleEpochRetirementProof
+            do { retirement = try await session.retireAndReap() }
             catch { throw InvestigationMachineSingleEpochError.retirementUncertain }
             try Task.checkCancellation()
             let finalObservation: InvestigationMachineSingleEpochDriverObservation
@@ -361,9 +486,20 @@ package actor InvestigationMachineSingleEpochComposer {
             guard finalObservation == initialObservation else {
                 throw InvestigationMachineSingleEpochError.finalObservationMismatch
             }
-            return .completedNonAdmitting
+            do {
+                return .localCompletion(try .init(
+                    ownership: ownership, claimRelease: claimRelease,
+                    retirement: retirement,
+                    initialDriverObservation: initialObservation,
+                    finalDriverObservation: finalObservation
+                ))
+            } catch {
+                throw InvestigationMachineSingleEpochError
+                    .releaseTerminalUncertain
+            }
         } catch {
             var terminalError = normalized(error)
+            guard localTeardownAuthority else { throw terminalError }
             if claimSucceeded, !claimReleaseAttempted, let claimClient {
                 do { try await claimClient.abortAfterClaimAndProveTerminal() }
                 catch { terminalError = .abortTerminalUncertain }
@@ -461,3 +597,6 @@ package actor InvestigationMachineSingleEpochComposer {
         return .protocolViolation
     }
 }
+
+extension InvestigationMachineSingleEpochComposer:
+    InvestigationMachineSingleEpochComposing {}

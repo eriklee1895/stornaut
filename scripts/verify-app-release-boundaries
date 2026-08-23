@@ -17,6 +17,10 @@ iib5biid_machine_driver_contract_source=
 iic0a_source_contract_only=false
 iic0a_projection_contract_source=
 iic0a_intake_contract_source=
+iib5biii_a_source_contract_only=false
+iib5biii_a_single_epoch_source=
+iib5biii_a_composition_source=
+iib5biii_a_continuity_source=
 if [[ $# == 1 && $1 == --investigation-handoff-only ]]; then
     handoff_only=true
 elif [[ $# == 2 && $1 == --legacy-machine-claim-contract-only ]]; then
@@ -35,9 +39,14 @@ elif [[ $# == 3 && $1 == --iic0a-source-contract-only ]]; then
     iic0a_source_contract_only=true
     iic0a_projection_contract_source=$2
     iic0a_intake_contract_source=$3
+elif [[ $# == 4 && $1 == --iib5biii-a-source-contract-only ]]; then
+    iib5biii_a_source_contract_only=true
+    iib5biii_a_single_epoch_source=$2
+    iib5biii_a_composition_source=$3
+    iib5biii_a_continuity_source=$4
 elif (( $# != 0 )); then
     print -u2 \
-        "Usage: scripts/verify-app-release-boundaries [--investigation-handoff-only | --legacy-machine-claim-contract-only <source> | --iib4-machine-claim-contract-only <source> | --iib5biic-machine-driver-contract-only <source> | --iib5biid-machine-driver-contract-only <source> | --iic0a-source-contract-only <projection> <intake>]"
+        "Usage: scripts/verify-app-release-boundaries [--investigation-handoff-only | --legacy-machine-claim-contract-only <source> | --iib4-machine-claim-contract-only <source> | --iib5biic-machine-driver-contract-only <source> | --iib5biid-machine-driver-contract-only <source> | --iic0a-source-contract-only <projection> <intake> | --iib5biii-a-source-contract-only <single-epoch> <composition> <continuity>]"
     exit 64
 fi
 
@@ -725,6 +734,64 @@ for path, expected in expected_sha256.items():
 PY
 }
 
+function verify_iib5biii_a_source_contract() {
+    local single_epoch_path=$1
+    local composition_path=$2
+    local continuity_path=$3
+    xcrun swiftc -frontend -parse "$single_epoch_path"
+    xcrun swiftc -frontend -parse "$composition_path"
+    xcrun swiftc -frontend -parse "$continuity_path"
+    python3 - "$single_epoch_path" "$composition_path" "$continuity_path" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+single_path, composition_path, continuity_path = map(Path, sys.argv[1:])
+single = single_path.read_text(encoding="utf-8")
+composition = composition_path.read_text(encoding="utf-8")
+continuity = continuity_path.read_text(encoding="utf-8")
+
+def imports(source):
+    return set(re.findall(r"(?m)^import\s+([A-Za-z0-9_]+)\s*$", source))
+
+if imports(single) != {"Foundation", "StornautInvestigationHandoffContract", "StornautInvestigationInstalledL2"}:
+    raise SystemExit("iii-a source-only import surface drifted")
+if imports(composition) != {"Foundation", "StornautInvestigationHandoffContract", "StornautInvestigationInstalledL2"}:
+    raise SystemExit("iii-a source-only composition import surface drifted")
+if imports(continuity) != {"Foundation", "StornautInvestigationHandoffContract"}:
+    raise SystemExit("iii-a source-only continuity import surface drifted")
+source = single + composition + continuity
+if re.search(r"(?m)^\s*(?:public|open)\s+", source):
+    raise SystemExit("iii-a source-only public surface drifted")
+for forbidden in (
+    "Codable", "Encodable", "Decodable", "CommandLine.arguments",
+    "ProcessInfo.processInfo.environment", "posix_spawn", "posix_spawnp",
+    "fork(", "socketpair(", "kill(", "killpg(", "waitpid(", "waitid(",
+    "setuid(", "setgid(", "initgroups(", "FileManager", "FileHandle",
+    "Process(", "URLSession", "StornautExecution", "StornautLifecycle",
+    "StornautCodex", "StornautCore", "StornautInvestigationRuntime",
+    "StornautInvestigationDiagnostic", "signedRuntimeReady",
+    "signedInvestigationRuntimeReady", "readFD0", "FD 0", "FD 8", "FD 9",
+    "PGID", "StornautInvestigationMachineDarwin",
+):
+    if forbidden in source:
+        raise SystemExit("iii-a source-only App boundary gained physical authority")
+for marker in (
+    "previousHelperIdentity: InvestigationMachineProcessIdentity?",
+    "InvestigationMachineSingleEpochComposition",
+    "package static func genesis(",
+    "return try await outerJoin.seal(",
+    "InvestigationMachineOuterContainmentProof",
+    "InvestigationMachineHelperEpochPredecessor",
+    "predecessor: predecessorMaterial",
+    "terminalProofSHA256",
+    "Task.detached",
+):
+    if marker not in source:
+        raise SystemExit(f"iii-a source-only semantic marker drifted: {marker}")
+PY
+}
+
 if $legacy_machine_claim_contract_only; then
     verify_claim_server_macho_source_contract \
         "$legacy_machine_claim_contract_source"
@@ -756,6 +823,14 @@ if $iic0a_source_contract_only; then
         "$iic0a_projection_contract_source" \
         "$iic0a_intake_contract_source"
     print "ii-c0a source-only App boundary verification passed."
+    exit 0
+fi
+if $iib5biii_a_source_contract_only; then
+    verify_iib5biii_a_source_contract \
+        "$iib5biii_a_single_epoch_source" \
+        "$iib5biii_a_composition_source" \
+        "$iib5biii_a_continuity_source"
+    print "iii-a source-only App boundary verification passed."
     exit 0
 fi
 
@@ -2218,8 +2293,8 @@ function require_projection() {
 }
 require_projection \
     "$machine_driver_undefined_symbols" \
-    7e2f489abf968390a64b5ec42e9ac75c0e31ce37cfe740a5a44ef506accee5d5 \
-    664 \
+    579203c9d83f5884f633261d17966662a9d265455b92b94378034c7551e8e069 \
+    667 \
     undefined
 require_projection \
     "$machine_driver_loaded_libraries" \
@@ -2228,8 +2303,8 @@ require_projection \
     load-command
 require_projection \
     "$machine_driver_owned_symbols" \
-    ef0a9595ee3d05077ac6672193b60a0edd907fc4617c2e6fb6261aa5547383f3 \
-    3676 \
+    9a7516aec7a0e99d73b11df2337173f24a1abf1372c6e1110106aadf3d99f067 \
+    4266 \
     owned-symbol
 if ! mach_o_has_demangled_symbol \
     "$diagnostic_machine_driver" \
@@ -2302,11 +2377,11 @@ release_machine_driver_owned_symbols=$(
         | rg 'StornautInvestigationMachineDriver(Support)?' | LC_ALL=C sort -u
 )
 require_projection "$release_machine_driver_undefined_symbols" \
-    30404041877153ce1ef03b5d47d694ccbb0e0688eb91383e4d30f2c023f58207 442 release-undefined
+    2e140940810170e7a1db3bdfcfd34c08a9b5f8ee340c6ee747e48117ba481651 445 release-undefined
 require_projection "$release_machine_driver_loaded_libraries" \
     dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9 18 release-load-command
 require_projection "$release_machine_driver_owned_symbols" \
-    6b8be4c8f6e8cfe427ca74604b47a1597deec011509f9714087b178703a860f2 2283 release-owned-symbol
+    2f06243b20b80607fa8ef3b097bdc56b0a4d3601ad6a8974609702cf00daf2d9 2718 release-owned-symbol
 for marker in "${machine_driver_authority_forbidden_markers[@]}"; do
     if mach_o_has_demangled_symbol "$release_machine_driver" "$marker"; then
         print -u2 "Authority or readiness leaked into Release Machine driver: $marker"
