@@ -1582,6 +1582,8 @@ function verify_iib5biii_b2a0_scope() {
     done
     local changed=$(git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1 && $3!="AGENTS.md" && $3!="README.md" {n+=$1+$2} END {print n+0}')
     (( changed <= 2200 )) || { print -u2 "iii-b2a0 checkpoint budget drifted"; return 1; }
+    [[ "$(git write-tree)" == 7df0d5597f498e3588823885d226bdd02befc058 ]] \
+        || { print -u2 "iii-b2a0 completed tree drifted"; return 1; }
 }
 
 function verify_iib5bia_projection_contract() {

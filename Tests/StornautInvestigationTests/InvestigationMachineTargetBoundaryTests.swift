@@ -1407,6 +1407,11 @@ struct InvestigationMachineTargetBoundaryTests {
             "--iib5biii-b2a0-scope-contract-only",
             "iii-b2a0 physical result authority boundary drifted",
             "iii-b2a0 focused test vacuity or coverage drifted",
+            "iib5biii_b2a0_commit=65f85c5adbb01b41b1bf9a5f787951f9feb4660d",
+            "iib5biii_b2a0_tree=7df0d5597f498e3588823885d226bdd02befc058",
+            "iii-b2a0 completed tree drifted",
+            "substitute-bridge",
+            "substitute-preflight",
         ] {
             #expect(contract.contains(marker) || boundary.contains(marker))
         }
