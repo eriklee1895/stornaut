@@ -150,9 +150,13 @@ iii-b-ii executable physical-adapter closure and ii-b3a/ii-b3b are complete;
 iii-b/ii-b2b are closed; ii-b3c, ii-b4, ii-b5a0, ii-b5a, ii-b5b-i-a and
 i-b1, i-b2a, i-b2b-a, i-b2b-b, i-b3, i-c1 and i-c2a are
 complete/non-admitting; aggregate i-c2 and ii-b5b-ii-a/ii-b/ii-c are
-complete/non-admitting, including ii-b5b-ii-d exact owned-PGID retirement. A
-dependency-inversion preflight split ii-c0 into c0a/c0b and moved ii-c0a
-projection-in-capsule contract before ii-b5b-iii; c0a is current.
+complete/non-admitting, including ii-b5b-ii-d exact owned-PGID retirement and
+ii-c0a projection-in-capsule input/intake. ii-c0a closed at implementation tree
+`6064cccce400cd07f7ebdc4653a2496c67c83434`: exact 8 paths / 1,863 changed
+lines, 90 focused tests, 536 affected tests, a clean 1,418-test / 73-suite
+staged-only serial, all three boundary gates and no unresolved P0-P2 review
+findings. It ran no root, App/XPC, model/auth, network or authoritative full
+gate. ii-b5b-iii is current.
 See the
 [study](../../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md),
 [final review](../../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md)
@@ -218,8 +222,8 @@ ii-b5b-i-b is complete through i-b3; i-c1 join/proof and i-c2a semantic-owner
 closure are complete/non-admitting; aggregate i-c2, ii-b5b-ii-a fixed FD-0
 capsule intake, ii-b5b-ii-b independent Darwin App identity observation and
 ii-b5b-ii-c fixed FD-7 session and ii-b5b-ii-d exact owned-PGID retirement are
-complete/non-admitting. ii-c0a is preflight-frozen/current; the remaining order
-is ii-c0a -> ii-b5b-iii -> ii-c0b -> ii-c -> L3c3d -> L3c4.
+complete/non-admitting. ii-c0a is complete/non-admitting; the remaining order
+is ii-b5b-iii -> ii-c0b -> ii-c -> L3c3d -> L3c4.
 See the
 [ii-b5a review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5a-review.md) and
 [ii-b5b-i-a review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-a-review.md) and
@@ -237,8 +241,9 @@ See the
 [ii-b5b-ii-a review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-a-review.md),
 [ii-b5b-ii-b review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-b-review.md),
 [ii-b5b-ii-c review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-c-review.md),
-[ii-b5b-ii-d review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-d-review.md) and
-[ii-c0a preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md) and
+[ii-b5b-ii-d review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-d-review.md),
+[ii-c0a preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md),
+[ii-c0a review](../../reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md) and
 [ii-b5b-i preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-exact-path-preflight.md).
 The preceding ii-b2b-iii split is frozen by the
 [ii-b2b-iii preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-split-preflight.md).
@@ -265,7 +270,7 @@ the sole normal-product admission gate.
 | [36](task-36-implementation-brief.md) | Domain, canonical projection, planner, budget and stop contracts | complete; [review](../../reports/phase-d-task-36-review.md) |
 | [37](task-37-implementation-brief.md) | Store v4, retention and source rejoin | complete; [review](../../reports/phase-d-task-37-review.md) |
 | [38](task-38-implementation-brief.md) | Closed coordinator with fake runtime | complete; [review](../../reports/phase-d-task-38-review.md) |
-| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; aggregate i-c2 and ii-b5b-ii-a/ii-b/ii-c/ii-d complete/non-admitting; ii-c0a preflight frozen/current before ii-b5b-iii; ADR 0018 Proposed |
+| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; aggregate i-c2, ii-b5b-ii-a/ii-b/ii-c/ii-d and ii-c0a complete/non-admitting; ii-b5b-iii current; ADR 0018 Proposed |
 | [40](task-40-implementation-brief.md) | Evidence report and conservative Review projection | blocked on Task 39 |
 | [41](task-41-implementation-brief.md) | First-use disclosure and typed availability | blocked on Task 40 |
 | [42](task-42-implementation-brief.md) | App workflow and recovery state | blocked on Task 41 |

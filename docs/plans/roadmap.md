@@ -224,13 +224,16 @@ non-admitting；ii-b5 已拆为 b5a0/b5a/b5b-i/b5b-ii/b5b-iii，b5a 与 b5b-i
 through aggregate i-c2 已完成并保持 non-admitting；b5b-ii-a fixed FD-0
 capsule intake、b5b-ii-b independent Darwin App identity observation 与
 b5b-ii-c fixed FD-7 session 与 b5b-ii-d exact owned-PGID retirement 已完成并
-保持 non-admitting。dependency inversion preflight 已把 c0 拆为 c0a/c0b，并
-将 c0a projection-in-capsule contract 前移为当前 frontier；随后严格按
-b5b-iii → c0b → ii-c → L3c3d → L3c4 推进。
+保持 non-admitting。dependency inversion preflight 已把 c0 拆为 c0a/c0b；
+c0a projection-in-capsule contract 已完成并保持 non-admitting，当前
+frontier 为 b5b-iii；随后严格按 c0b → ii-c → L3c3d → L3c4 推进。
 39B2c 仍未作 machine readiness claim。
 [ii-c0a preflight](../reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md)
 冻结 v1-preserving enclosing projected-cohort binary contract、exact 8-path /
-2,600-line ceiling、ii-b0a 与 ii-d immutable replay，以及 corrected order。
+2,600-line ceiling、ii-b0a 与 ii-d immutable replay，以及 corrected order；
+[ii-c0a review](../reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md) 记录
+exact 8-path / 1,863-line completion、90 focused、536 affected、1,418-test
+serial、三项 boundary gates 与 no-unresolved-P0-P2 review。
 L3 preflight 已把余下范围拆为 L3a trusted target extraction、L3b root
 collection 与 L3c failure matrix/final admission。L3a 已把 machine-only
 contract/assembler 迁入非产品 target，并通过 151-test focused、targeted Debug
@@ -263,8 +266,9 @@ start-to-retire-only Lifecycle seam 与 ii-b3c concrete leaf/native entry
 ii-b5 已拆为 b5a0 claim-abort、b5a typed composer、b5b-i L2/projection、
 b5b-ii Darwin runtime 与 b5b-iii production/artifact；b5a 与 b5b-i through
 aggregate i-c2 已完成并保持 non-admitting；b5b-ii-a/b/c/d 已完成并保持
-non-admitting；c0a projection-in-capsule preflight 已冻结并成为当前 frontier，
-后续为 b5b-iii → c0b → ii-c → L3c3d → L3c4。
+non-admitting；c0a projection-in-capsule implementation 已完成并保持
+non-admitting，当前 frontier 为 b5b-iii，后续为 c0b → ii-c → L3c3d →
+L3c4。
 L3c2b preflight 的 real-plan matrix contradiction 已由 3-path plan-freshness
 prerequisite 关闭，affected/Investigation/structural/review gates 通过；
 只有 L3c4 可作 readiness claim 并运行
@@ -454,12 +458,11 @@ L3c3c 当前证据见
   prerequisite、ii-b2a、ii-b2b-i、ii-b2b-ii、iii-a 与 iii-b 已完成；ii-b3
   已拆为 b3a/b3b/b3c，ii-b3a/ii-b3b/ii-b3c/ii-b4 已完成并保持
   non-admitting；ii-b5 已拆为 b5a0/b5a/b5b-i/b5b-ii/b5b-iii，b5a 与 b5b-i
-  through aggregate i-c2 已完成并保持 non-admitting；b5b-ii-a/b/c/d 已完成并
-  保持 non-admitting；c0a projection-in-capsule preflight 已冻结并成为当前
-  frontier，后续为 b5b-iii → c0b → ii-c → L3c3d → L3c4。
-	  L3c4 才拥有
-	  final admission/full。
-	  39B2c 才是 machine admission，Task 39 尚未完成。
+  through aggregate i-c2 已完成并保持 non-admitting；b5b-ii-a/b/c/d 与 c0a
+  projection-in-capsule 已完成并保持 non-admitting；当前 frontier 为
+  b5b-iii，后续为 c0b → ii-c → L3c3d → L3c4。
+  L3c4 才拥有 final admission/full。39B2c 才是 machine admission，Task 39
+  尚未完成。
 - Epic 0 Foundation Upstream Study：已完成，选择 checked-in Xcode App/Test host + local Swift packages。
 - Epic 0 Task 1：SwiftPM Core/Codex、smoke tests、`scripts/verify`、manual-only CI 与 ThirdPartyNotices 骨架已完成。
 - Bundle identifier：已确认 `com.eriklee.stornaut`。

@@ -6,8 +6,8 @@
 > iii-a/iii-b-i/iii-b-ii complete/non-admitting; ii-b3 split into b3a/b3b/b3c;
 > ii-b3a/ii-b3b/ii-b3c/ii-b4/ii-b5a0 complete/non-admitting; ii-b5 split;
 > b5a and all b5b-i checkpoints through aggregate i-c2 complete/non-admitting;
-> ii-b5b-ii-a/ii-b/ii-c/ii-d complete/non-admitting; ii-c0a projection-in-
-> capsule preflight frozen/current before ii-b5b-iii
+> ii-b5b-ii-a/ii-b/ii-c/ii-d and ii-c0a projection-in-capsule complete/non-
+> admitting; ii-b5b-iii current
 >
 > **Date:** 2026-08-19
 >
@@ -61,7 +61,9 @@ driver path. The
 freezes the implementation split and validation funnel. The later
 [ii-c0a projection-in-capsule preflight](../reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md)
 corrects the remaining dependency order without changing accepted v1 capsule
-bytes. Important measured
+bytes. The
+[ii-c0a completion review](../reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md)
+records the green implementation and non-admitting boundary. Important measured
 conclusions are:
 
 - an inherited socket's peer token does not rebind to the child;
@@ -366,8 +368,8 @@ unconsumed.
 | ii-b5b-ii-b independent Darwin App identity observation | complete; non-admitting |
 | ii-b5b-ii-c fixed FD-7 bounded session | complete; non-admitting |
 | ii-b5b-ii-d exact owned-PGID retirement | complete; non-admitting |
-| ii-c0a projection-in-capsule contract | preflight frozen; current |
-| ii-b5b-iii production/artifact composition | blocked on ii-c0a |
+| ii-c0a projection-in-capsule contract | complete; non-admitting |
+| ii-b5b-iii production/artifact composition | current |
 | ii-c0b non-root capsule author and launcher hygiene | not started |
 | ii-c no-model privileged machine gate | not executed |
 | ADR status | **Proposed** |

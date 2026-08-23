@@ -44,11 +44,12 @@ package-closed transport/non-product composition 也已完成并通过独立审�
 23/23 authoritative full verifier。39B1b-ii strict DEBUG App leaf 的实现、
 11-test dedicated App target、pure-product Debug/Release boundary、846-test
 serialized regression、独立 post-fix review 与 23-stage authoritative full
-verifier 已通过。Task 39B2c 仍在实现：aggregate i-c2 与
-L3c3c-ii-b5b-ii-a/ii-b/ii-c/ii-d 均已完成并保持 non-admitting；dependency
-inversion preflight 已把 ii-c0 拆为 ii-c0a/ii-c0b，并将 ii-c0a
-projection-in-capsule contract 前移为当前 checkpoint。后续严格顺序为
-ii-b5b-iii → ii-c0b → ii-c → L3c3d → L3c4；machine admission 尚未发生。
+verifier 已通过。Task 39B2c 仍在实现：aggregate i-c2、
+L3c3c-ii-b5b-ii-a/ii-b/ii-c/ii-d 与 ii-c0a 均已完成并保持
+non-admitting。ii-c0a 的 exact 8-path / 1,863-line implementation、
+90 focused、536 affected、1,418-test/73-suite clean serial、三项 boundary
+gates 与 independent review 已通过。当前 checkpoint 为 ii-b5b-iii；后续
+严格顺序为 ii-c0b → ii-c → L3c3d → L3c4；machine admission 尚未发生。
 见文档：
 
 | 文档 | 内容 |
@@ -63,8 +64,9 @@ ii-b5b-iii → ii-c0b → ii-c → L3c3d → L3c4；machine admission 尚未发�
 | [docs/assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md](docs/assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md) | 权限受限、安全阻断、部分结果、stale preflight 与历史保留的恢复状态契约 |
 | [docs/reports/epic-2-4-validation-report.md](docs/reports/epic-2-4-validation-report.md) | Phase B domain/persistence、真实 Quick Scan benchmark、accounting、UI 与 scope gate |
 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) | 已归档的 Phase B Tasks 9–26 计划与逐 Task 证据 |
-| [docs/plans/active/README.md](docs/plans/active/README.md) | Phase D approved；Tasks 36–38 complete，Task 39B2c in progress；ii-b5b-ii-a/ii-b/ii-c/ii-d complete/non-admitting，ii-c0a preflight frozen/current；machine admission pending |
-| [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md) | v1 capsule bytes preserved；new enclosing projected-cohort binary contract、8-path/2,600-line ceiling and corrected remaining order |
+| [docs/plans/active/README.md](docs/plans/active/README.md) | Phase D approved；Tasks 36–38 complete，Task 39B2c in progress；ii-b5b-ii-a/ii-b/ii-c/ii-d 与 ii-c0a complete/non-admitting，ii-b5b-iii current；machine admission pending |
+| [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md) | v1 capsule bytes preserved；frozen enclosing projected-cohort binary contract、8-path/2,600-line ceiling and corrected remaining order |
+| [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md) | ii-c0a exact 8-path / 1,863-line completion、90 focused、536 affected、1,418-test serial、boundary gates 与 independent review |
 | [docs/reports/phase-d-task-36-review.md](docs/reports/phase-d-task-36-review.md) | Task 36 deterministic planning core、performance evidence 与 completion audit |
 | [docs/reports/phase-d-task-37-review.md](docs/reports/phase-d-task-37-review.md) | Task 37 Store v4、capacity/performance evidence 与 completion audit |
 | [docs/reports/phase-d-task-38-review.md](docs/reports/phase-d-task-38-review.md) | Task 38 closed coordinator、review repairs 与 completion audit |

@@ -83,8 +83,9 @@
 > complete/non-admitting; ii-b5b-ii-a fixed FD-0 capsule intake,
 > ii-b5b-ii-b independent Darwin App identity observation, ii-b5b-ii-c fixed
 > FD-7 session and ii-b5b-ii-d exact owned-PGID retirement are complete/non-
-> admitting. Dependency inversion split ii-c0 into c0a/c0b and moved ii-c0a
-> projection-in-capsule contract before ii-b5b-iii; c0a is current.
+> admitting. Dependency inversion split ii-c0 into c0a/c0b; ii-c0a
+> projection-in-capsule input/intake is complete/non-admitting and ii-b5b-iii
+> is current.
 > Evidence:
 > [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
 > [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md) and
@@ -1118,8 +1119,8 @@ The remaining L3 work is split before driver coding:
    physical-owner closure. Aggregate i-c2, ii-b5b-ii-a fixed FD-0 capsule
    intake, ii-b5b-ii-b independent Darwin App identity observation,
    ii-b5b-ii-c fixed FD-7 session and ii-b5b-ii-d exact owned-PGID retirement
-   are complete/non-admitting. The c0 dependency preflight split c0a/c0b and
-   froze `ii-c0a -> ii-b5b-iii -> ii-c0b -> ii-c -> L3c3d -> L3c4`; c0a is current.
+   and ii-c0a are complete/non-admitting. The corrected remaining order is
+   `ii-b5b-iii -> ii-c0b -> ii-c -> L3c3d -> L3c4`; ii-b5b-iii is current.
    See the
    [study](../../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md)
    and [final review](../../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md),
@@ -1190,9 +1191,16 @@ The remaining L3 work is split before driver coding:
    [ii-c review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-c-review.md),
    and ii-b5b-ii-d completion is recorded in the
    [ii-d review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-d-review.md).
-   ii-c0a projection-in-capsule preflight is frozen/current before ii-b5b-iii;
-   see the
-   [c0a preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md).
+   ii-c0a projection-in-capsule implementation is complete/non-admitting
+   before ii-b5b-iii; see the
+   [c0a preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md)
+   and [c0a review](../../reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md).
+   Its implementation commit `c7cab4dc265b4f31826e566a57f44c9f4f364d70`
+   has tree `6064cccce400cd07f7ebdc4653a2496c67c83434`, exact 8 paths /
+   1,863 changed lines, 90 focused tests, 536 affected tests, a clean
+   1,418-test / 73-suite staged-only serial, three green boundary gates and no
+   unresolved P0-P2 review findings. It consumed no root, App/XPC, model/auth,
+   network or authoritative full gate.
    The b5 split, claim-abort completion and typed composer completion evidence
    are in the
    [ii-b5 preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b5-split-preflight.md),
@@ -1256,8 +1264,7 @@ ii-b2b-ii, ii-b2b-iii-a, iii-b-i, iii-b-ii, ii-b3a and ii-b3b are complete;
 ii-b3c concrete leaf/native entry, ii-b4 fixed helper-claim client, ii-b5a0 and
 ii-b5a, ii-b5b-i-a, i-b1, i-b2a, i-b2b-a, i-b2b-b, i-b3, i-c1 and i-c2a
 are complete and non-admitting; aggregate i-c2 and ii-b5b-ii-a/ii-b/ii-c/ii-d
-are complete/non-admitting; ii-c0a preflight is frozen/current and ii-b5b-iii
-follows it.
+and ii-c0a are complete/non-admitting; ii-b5b-iii is the current checkpoint.
 ADR 0018
 remains Proposed until ii-c succeeds. L3c1 used focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean

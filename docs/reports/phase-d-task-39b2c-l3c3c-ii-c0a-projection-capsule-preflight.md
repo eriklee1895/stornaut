@@ -1,10 +1,19 @@
 # Phase D Task 39B2c L3c3c-ii-c0a Projection-in-Capsule Preflight
 
-> Status: scope and contract frozen; implementation not started
+> Preflight status at publication: scope and contract frozen; implementation
+> not started
 >
 > Date: 2026-08-23
 >
-> Baseline: `326c7d576d89236c18de61f39b18cc66b0f438d9`
+> Frozen source baseline: `326c7d576d89236c18de61f39b18cc66b0f438d9`
+>
+> Implementation commit: `c7cab4dc265b4f31826e566a57f44c9f4f364d70`
+>
+> Current outcome: complete / non-admitting; admission: none
+>
+> Next checkpoint: ii-b5b-iii production/artifact composition
+>
+> Completion evidence: [ii-c0a review](phase-d-task-39b2c-l3c3c-ii-c0a-review.md)
 >
 > Scope: package-only projected-cohort binary contract and fixed intake only;
 > no producer, product composition, launch, authentication, model, root or

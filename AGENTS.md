@@ -330,8 +330,11 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   FD-7 session 与 ii-b5b-ii-d exact owned-PGID retirement 已完成并保持
   non-admitting。dependency inversion preflight 已把 ii-c0 拆为 c0a/c0b：
   c0a 保留 v1 capsule/epoch bytes，新增 package-only enclosing projected-
-  cohort input 与 paired intake，并前移为当前 frontier；随后严格按
-  ii-b5b-iii → ii-c0b → ii-c → L3c3d → L3c4 推进。
+  cohort input 与 paired intake；其 exact 8-path / 1,863-line implementation、
+  90 focused、536 affected、1,418-test/73-suite clean staged-only serial、
+  contract/investigation/App-release boundary gates 与 independent final review
+  已通过，保持 non-admitting。当前 frontier 为 ii-b5b-iii；随后严格按
+  ii-c0b → ii-c → L3c3d → L3c4 推进。
   该 ii-b5b-ii-c checkpoint 以 8 个
   non-document paths / 3,104 changed lines、35 focused tests、
   1,396-test staged-only serial、三个 verifier gates 与 final
@@ -509,6 +512,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c L3c3c-ii-b5b-ii-d exact owned-PGID retirement preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-d-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-d-preflight.md) |
 | Phase D Task 39B2c L3c3c-ii-b5b-ii-d exact owned-PGID retirement review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-d-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-d-review.md) |
 | Phase D Task 39B2c L3c3c-ii-c0a projection-in-capsule preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-c0a projection-in-capsule review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md) |
 | Phase D Task 39B2c-L1 residue observation review | [docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md](docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md) |
 | Phase D Task 39B2c-L2 root topology observation review | [docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md](docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md) |
 | Phase D Task 39B2c-L3a trusted machine target review | [docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md](docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md) |
@@ -652,13 +656,14 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   aggregate i-c2 已完成并保持 non-admitting；ii-b5b-ii-a fixed FD-0 capsule
   intake、ii-b5b-ii-b independent Darwin App identity observation 与
   ii-b5b-ii-c fixed FD-7 session 与 ii-b5b-ii-d exact owned-PGID retirement
-  已完成并保持 non-admitting。最新 dependency-inversion preflight 发现 v1
+  已完成并保持 non-admitting。dependency-inversion preflight 发现 v1
   cohort capsule 不含 composer 所需完整 Installed-L2 projection，且 root
-  Driver 不得解析 product JSON；因此 ii-c0 拆为 ii-c0a/ii-c0b，ii-c0a
-  package-only projection-in-capsule contract 前移为当前 frontier。它保留 v1
+  Driver 不得解析 product JSON；因此 ii-c0 拆为 ii-c0a/ii-c0b。ii-c0a
+  package-only projection-in-capsule contract 已完成并保持 non-admitting。它保留 v1
   capsule/epoch bytes 不变，仅新增 enclosing projected-cohort binary contract
-  与 paired fixed intake；严格后续顺序为 ii-b5b-iii production/artifact
-  composition → ii-c0b non-root capsule author + launcher/TTY/FD hygiene → ii-c
+  与 paired fixed intake；当前 frontier 为 ii-b5b-iii production/artifact
+  composition，严格后续顺序为 ii-c0b non-root capsule author +
+  launcher/TTY/FD hygiene → ii-c
   privileged no-model gate → L3c3d → L3c4。
   ADR 0018 仍 Proposed；L3c4 独占 final admission 与
   剩余 full。
