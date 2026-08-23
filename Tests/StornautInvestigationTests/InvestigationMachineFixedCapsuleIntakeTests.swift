@@ -33,7 +33,13 @@ struct InvestigationMachineFixedCapsuleIntakeTests {
     @Test
     func validCapsuleReadsOnlyFDZeroAndYieldsCanonicalRows() async throws {
         let capsule = try fixedCapsule()
-        let encoded = try capsule.encoded()
+        let projections = try capsule.epochs.map {
+            try fixedProjection($0)
+        }
+        let input = try InvestigationProjectedCohortInput(
+            capsule: capsule, projections: projections
+        )
+        let encoded = try input.encoded()
         let system = ScriptedFixedCapsuleSystem(bytes: encoded)
         let plan = try InvestigationMachineFixedCapsuleIntake(
             system: system
@@ -59,16 +65,35 @@ struct InvestigationMachineFixedCapsuleIntakeTests {
             repeating: capsule.wholeCapsuleSHA256,
             count: 8
         ))
+        #expect(selections.map(\.wholeInputSHA256) == Array(
+            repeating: input.wholeInputSHA256,
+            count: 8
+        ))
         #expect(selections.map { $0.epoch.ordinal } == Array(UInt32(0)...7))
         #expect(
             selections.map { $0.epoch.scenario }
                 == InvestigationHandoffScenario.allCases
         )
+        #expect(selections.map(\.projection) == projections)
         #expect(system.descriptors.allSatisfy { $0 == STDIN_FILENO })
         #expect(system.setFlags == [FD_CLOEXEC])
         #expect(system.maximumReadCounts.allSatisfy {
             $0 > 0 && $0 <= 16 * 1_024
         })
+    }
+
+    @Test
+    func legacyCapsuleWithoutProjectionIsRejected() throws {
+        let encoded = try fixedCapsule().encoded()
+        let system = ScriptedFixedCapsuleSystem(bytes: encoded)
+
+        #expect(
+            throws: InvestigationMachineFixedCapsuleIntakeError.invalidCapsule
+        ) {
+            _ = try InvestigationMachineFixedCapsuleIntake(
+                system: system
+            ).read()
+        }
     }
 
     @Test(arguments: FixedCapsuleInputMutation.allCases)
@@ -101,7 +126,7 @@ struct InvestigationMachineFixedCapsuleIntakeTests {
 
     @Test
     func interruptedReadRetriesAndMalformedCapsuleIsRejected() throws {
-        let encoded = try fixedCapsule().encoded()
+        let encoded = try fixedProjectedInput().encoded()
         let interrupted = ScriptedFixedCapsuleSystem(
             bytes: encoded,
             scriptedReads: [.failure(.init(errno: EINTR))]
@@ -175,10 +200,10 @@ struct InvestigationMachineFixedCapsuleIntakeTests {
 
     @Test
     func planAliasesShareOneNonReplayableCursor() async throws {
-        let capsule = try fixedCapsule()
+        let input = try fixedProjectedInput()
         let plan = try InvestigationMachineFixedCapsuleIntake(
             system: ScriptedFixedCapsuleSystem(
-                bytes: try capsule.encoded()
+                bytes: try input.encoded()
             )
         ).read()
         let alias = plan
@@ -246,7 +271,9 @@ private enum FixedCapsuleInputMutation: CaseIterable {
             system.snapshots = [.success(.valid(size: 0))]
         case .oversized:
             system.snapshots = [.success(.valid(
-                size: Int64(InvestigationCohortCapsule.maximumByteCount + 1)
+                size: Int64(
+                    InvestigationProjectedCohortInput.maximumByteCount + 1
+                )
             ))]
         case .initialACL:
             system.aclResults = [.success(true)]
@@ -447,6 +474,52 @@ private func fixedCapsule() throws -> InvestigationCohortCapsule {
                 )
             )
         }
+    )
+}
+
+private func fixedProjectedInput() throws
+    -> InvestigationProjectedCohortInput
+{
+    let capsule = try fixedCapsule()
+    return try InvestigationProjectedCohortInput(
+        capsule: capsule,
+        projections: try capsule.epochs.map {
+            try fixedProjection($0)
+        }
+    )
+}
+
+private func fixedProjection(
+    _ epoch: InvestigationCohortEpoch
+) throws -> InvestigationInstalledL2IdentityProjection {
+    let ordinal = UInt8(epoch.ordinal)
+    func digest(_ byte: UInt8) throws -> InvestigationHandoffSHA256 {
+        try .init(rawBytes: Data(repeating: byte, count: 32))
+    }
+    return try InvestigationInstalledL2IdentityProjection(
+        epochUUID: epoch.epochUUID,
+        configurationNonce: epoch.configurationNonce,
+        configurationValidBefore: .init(
+            rawValue: 2_000_000_000_000_000 + Int64(ordinal)
+        ),
+        configurationSHA256: epoch.configurationSHA256,
+        signedRuntimeBindingSHA256: epoch.signedRuntimeBindingSHA256,
+        appExecutableSHA256: digest(0x51),
+        appBundleIdentifier:
+            InvestigationInstalledL2IdentityProjection.fixedAppBundleIdentifier,
+        helperExecutableSHA256: digest(0x52),
+        helperServiceIdentifier:
+            InvestigationInstalledL2IdentityProjection
+            .fixedHelperServiceIdentifier,
+        machineDriverExecutableSHA256: digest(0x53),
+        machineDriverSigningIdentifier:
+            InvestigationInstalledL2IdentityProjection
+            .fixedMachineDriverSigningIdentifier,
+        machineDriverDesignatedRequirementSHA256: digest(0x54),
+        machineDriverCodeDirectoryHash: Data(repeating: 0x55, count: 20),
+        machineClaimServiceIdentifier:
+            InvestigationInstalledL2IdentityProjection
+            .fixedMachineClaimServiceIdentifier
     )
 }
 

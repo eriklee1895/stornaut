@@ -347,6 +347,7 @@ struct InvestigationMachineTargetBoundaryTests {
             "InvestigationHandoffFrameContract.swift",
             "InvestigationInstalledL2ProjectionContract.swift",
             "InvestigationMachineClaimContract.swift",
+            "InvestigationProjectedCohortInput.swift",
         ])
         for name in names {
             let source = try String(
@@ -390,6 +391,94 @@ struct InvestigationMachineTargetBoundaryTests {
             for forbidden in ["Codable", "NSXPC", "Process(", "FileManager", "URLSession", "posix_spawn", "Darwin.write", "O_WRONLY", "import Stornaut"] {
                 #expect(!source.contains(forbidden))
             }
+        }
+    }
+
+    @Test
+    func iiC0AProjectionCapsuleVerifierPinsContractAndScope() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundaries = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ),
+            encoding: .utf8
+        )
+        let release = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-app-release-boundaries"
+            ),
+            encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        for marker in [
+            "--iic0a-projection-capsule-contract-only",
+            "--iic0a-staged-scope-contract-only",
+            "--iic0a-replay-source-contract-only",
+            "ii-c0a projection public surface drifted",
+            "ii-c0a projection gained Codable surface",
+            "ii-c0a paired selection surface drifted",
+            "ii-c0a checkpoint paths drifted",
+            "ii-c0a checkpoint mode drifted",
+            "ii-c0a checkpoint deleted an existing path",
+            "ii-c0a binary checkpoint path rejected",
+            "function verify_iic0a_index_semantics()",
+            "ii-c0a staged verifier source seal drifted:",
+            "replay.count(\"|| exit $?\") != 4",
+            "(( changed <= 2600 ))",
+        ] {
+            #expect(boundaries.contains(marker))
+        }
+        for marker in [
+            "--iic0a-source-contract-only",
+            "ii-c0a projection import surface drifted",
+            "ii-c0a intake import surface drifted",
+            "ii-c0a source-only App boundary verification passed.",
+        ] {
+            #expect(release.contains(marker))
+        }
+        for marker in [
+            "iic0a-public",
+            "iic0a-codable",
+            "iic0a-binding-epoch",
+            "iic0a-binding-nonce",
+            "iic0a-binding-configuration",
+            "iic0a-binding-runtime",
+            "iic0a-canonical-reencode",
+            "iic0a-intake-projection",
+            "iic0a-runtime-authority",
+            "iic0a-projection-data-write",
+            "iic0a-intake-data-write",
+            "iic0a-intake-file-manager",
+            "iic0a-projection-mutable-data",
+            "iic0a-projection-connection",
+            "iic0a-intake-system",
+            "iic0a-intake-spawnp",
+            "iic0a-projection-raw-open",
+            "iic0a-intake-socketpair",
+            "iic0a-projection-sendto",
+            "iic0a-intake-user-defaults",
+            "iib0a-boundary iib5biid-boundary iib5biid-app",
+            "iib0a-boundary-guard iib5biid-boundary-guard",
+            "iib5biid-app-guard iib5biid-scope-guard",
+            "substitute-contract substitute-boundary substitute-app",
+            "--historical-freeze-contract-only",
+            "35946583cfb286dd2ac20aab23fe12668f232d83",
+            "d89d201448a99281a554d9b3fca00512b4f0c0be",
+            "94958088fe271139c9ebb4cd1e2df2c0830d2f72",
+            "a50dd817adc470fe37e5199c73c686f0976738c6",
+            "74877ec7a1cdd442e8333a1fd77c259edd67a36c",
+            "c6905e2173b858550078ccc07ac915b67912c3d6",
+            "ii-b0a historical line count drifted",
+            "ii-b5b-ii-d historical line count drifted",
+            "ii-b0a historical script SHA drifted",
+            "ii-b5b-ii-d historical script SHA drifted",
+            "ii-c0a historical replay failure propagation drifted",
+        ] {
+            #expect(contract.contains(marker))
         }
     }
 

@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=6f918d0c92ca1612a2ed7ede6822dde28001bc167b3fd07380c14e1f536777f5
+ib2_self_sha=01967916838604fce759003ef0571b3e0ddb87aba5fb63169e7f9f6ef4899662
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -35,6 +35,221 @@ function require_fixed_text() {
         fail_contract "$target_file is missing verifier contract: $expected"
     fi
 }
+
+function verify_immutable_historical_checkpoints() {
+    local historical_root
+    historical_root=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-historical-contract.XXXXXX")
+    local historical_status=0
+
+    local iib0a_commit=35946583cfb286dd2ac20aab23fe12668f232d83
+    local iib0a_parent=376f451f8ceb693e8ef6ed27b18d961ea57cc051
+    local iib0a_tree=35883fc2c06be3c48c9e05f6cefeb6de40430dce
+    local iib0a_paths=(
+        Package.swift
+        Sources/StornautInvestigationHandoffContract/HandoffBinaryTranscript.swift
+        Sources/StornautInvestigationHandoffContract/InvestigationCohortCapsuleContract.swift
+        Sources/StornautInvestigationHandoffContract/InvestigationHandoffFrameContract.swift
+        Tests/StornautInvestigationTests/InvestigationHandoffTransportContractTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-app-release-boundaries
+        scripts/verify-contract
+        scripts/verify-investigation-boundaries
+    )
+    [[ "$(git show -s --format=%P "$iib0a_commit")" == "$iib0a_parent" ]] \
+        || { print -u2 "ii-b0a historical parent drifted"; historical_status=1; }
+    [[ "$(git show -s --format=%T "$iib0a_commit")" == "$iib0a_tree" ]] \
+        || { print -u2 "ii-b0a historical tree drifted"; historical_status=1; }
+    local iib0a_observed_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$iib0a_commit" | LC_ALL=C sort)"})
+    local iib0a_expected_paths=("${(@on)iib0a_paths}")
+    [[ "${(j:\n:)iib0a_observed_paths}" == "${(j:\n:)iib0a_expected_paths}" ]] \
+        || { print -u2 "ii-b0a historical paths drifted"; historical_status=1; }
+    local iib0a_lines
+    iib0a_lines=$(git diff-tree --numstat --no-commit-id -r "$iib0a_commit" \
+        | awk '{n += $1 + $2} END {print n + 0}')
+    (( iib0a_lines == 2366 )) \
+        || { print -u2 "ii-b0a historical line count drifted"; historical_status=1; }
+
+    local iib0a_index=$historical_root/iib0a.index
+    local iib0a_root=$historical_root/iib0a
+    mkdir -p "$iib0a_root"
+    GIT_INDEX_FILE="$iib0a_index" git read-tree "$iib0a_commit^{tree}" \
+        || historical_status=$?
+    GIT_INDEX_FILE="$iib0a_index" git checkout-index --all \
+        --prefix="$iib0a_root/" || historical_status=$?
+    if (( historical_status == 0 )); then
+        python3 - "$iib0a_root" "${iib0a_paths[@]}" <<'PY' \
+            || historical_status=$?
+from pathlib import Path
+import hashlib
+import re
+import stat
+import sys
+
+root = Path(sys.argv[1])
+paths = sys.argv[2:]
+if len(paths) != 9:
+    raise SystemExit("ii-b0a historical path cardinality drifted")
+for relative in paths:
+    path = root / relative
+    expected_mode = 0o755 if relative.startswith("scripts/") else 0o644
+    if stat.S_IMODE(path.stat().st_mode) != expected_mode:
+        raise SystemExit(f"ii-b0a historical mode drifted: {relative}")
+expected_scripts = {
+    "scripts/verify-contract":
+        "62af998814ff277766cdc506bb90089afbc87edbf0e466d3f0f33cdb73ad0b1a",
+    "scripts/verify-investigation-boundaries":
+        "7884823783a3aabef297020cd2c814f994d2a3c0d554572051b815e74c85789b",
+    "scripts/verify-app-release-boundaries":
+        "52f5a3faa50102fc100235450b73abe03fb6b4b496bc2454894795c3f6236724",
+}
+for relative, expected in expected_scripts.items():
+    observed = hashlib.sha256((root / relative).read_bytes()).hexdigest()
+    if observed != expected:
+        raise SystemExit(f"ii-b0a historical script SHA drifted: {relative}")
+
+package = (root / "Package.swift").read_text(encoding="utf-8")
+if package.count('name: "StornautInvestigationHandoffContract"') != 1:
+    raise SystemExit("ii-b0a historical package target drifted")
+if package.count('"StornautInvestigationHandoffContract"') != 2:
+    raise SystemExit("ii-b0a historical package consumer drifted")
+if '.product(name: "StornautInvestigationHandoffContract"' in package:
+    raise SystemExit("ii-b0a historical package product drifted")
+source_root = root / "Sources/StornautInvestigationHandoffContract"
+expected_sources = {
+    "HandoffBinaryTranscript.swift": {"CryptoKit", "Foundation"},
+    "InvestigationCohortCapsuleContract.swift": {"Foundation"},
+    "InvestigationHandoffFrameContract.swift": {"Foundation"},
+}
+if {path.name for path in source_root.iterdir()} != set(expected_sources):
+    raise SystemExit("ii-b0a historical source allowlist drifted")
+for name, expected_imports in expected_sources.items():
+    source = (source_root / name).read_text(encoding="utf-8")
+    imports = set(re.findall(r"(?m)^import\s+([A-Za-z0-9_]+)\s*$", source))
+    if imports != expected_imports or "public " in source:
+        raise SystemExit(f"ii-b0a historical source surface drifted: {name}")
+    forbidden = re.search(
+        r"\b(?:Codable|NSXPC|Process|FileManager|URLSession|posix_spawn|"
+        r"O_WRONLY|O_RDWR|O_CREAT|Darwin\.write)\b|import\s+Stornaut",
+        source,
+    )
+    if forbidden:
+        raise SystemExit(f"ii-b0a historical authority drifted: {name}")
+PY
+        zsh -n "$iib0a_root/scripts/verify-contract" \
+            "$iib0a_root/scripts/verify-investigation-boundaries" \
+            "$iib0a_root/scripts/verify-app-release-boundaries" \
+            || historical_status=$?
+        if (( historical_status == 0 )); then
+            (
+                cd "$iib0a_root"
+                scripts/verify-investigation-boundaries || exit $?
+            ) || historical_status=$?
+        fi
+    fi
+
+    local iib5biid_commit=d89d201448a99281a554d9b3fca00512b4f0c0be
+    local iib5biid_parent=47f2715f9dc1a835aa769290b1b581b38066f04c
+    local iib5biid_tree=6c82ece7639e4335dbbb40e25090abc8fc264913
+    local iib5biid_paths=(
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinEpochRetirement.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinEpochSession.swift
+        Tests/StornautInvestigationTests/InvestigationMachineDarwinEpochRetirementTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineDarwinEpochSessionTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-app-release-boundaries
+        scripts/verify-contract
+        scripts/verify-investigation-boundaries
+    )
+    [[ "$(git show -s --format=%P "$iib5biid_commit")" == "$iib5biid_parent" ]] \
+        || { print -u2 "ii-b5b-ii-d historical parent drifted"; historical_status=1; }
+    [[ "$(git show -s --format=%T "$iib5biid_commit")" == "$iib5biid_tree" ]] \
+        || { print -u2 "ii-b5b-ii-d historical tree drifted"; historical_status=1; }
+    local iib5biid_observed_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$iib5biid_commit" | LC_ALL=C sort)"})
+    local iib5biid_expected_paths=("${(@on)iib5biid_paths}")
+    [[ "${(j:\n:)iib5biid_observed_paths}" == "${(j:\n:)iib5biid_expected_paths}" ]] \
+        || { print -u2 "ii-b5b-ii-d historical paths drifted"; historical_status=1; }
+    local iib5biid_lines
+    iib5biid_lines=$(git diff-tree --numstat --no-commit-id -r "$iib5biid_commit" \
+        | awk '{n += $1 + $2} END {print n + 0}')
+    (( iib5biid_lines == 2253 )) \
+        || { print -u2 "ii-b5b-ii-d historical line count drifted"; historical_status=1; }
+
+    local iib5biid_index=$historical_root/iib5biid.index
+    local iib5biid_root=$historical_root/iib5biid
+    mkdir -p "$iib5biid_root"
+    GIT_INDEX_FILE="$iib5biid_index" git read-tree "$iib5biid_commit^{tree}" \
+        || historical_status=$?
+    GIT_INDEX_FILE="$iib5biid_index" git checkout-index --all \
+        --prefix="$iib5biid_root/" || historical_status=$?
+    if (( historical_status == 0 )); then
+        python3 - "$iib5biid_root" "${iib5biid_paths[@]}" <<'PY' \
+            || historical_status=$?
+from pathlib import Path
+import hashlib
+import stat
+import sys
+
+root = Path(sys.argv[1])
+paths = sys.argv[2:]
+if len(paths) != 8:
+    raise SystemExit("ii-b5b-ii-d historical path cardinality drifted")
+for relative in paths:
+    path = root / relative
+    expected_mode = 0o755 if relative.startswith("scripts/") else 0o644
+    if stat.S_IMODE(path.stat().st_mode) != expected_mode:
+        raise SystemExit(f"ii-b5b-ii-d historical mode drifted: {relative}")
+expected_scripts = {
+    "scripts/verify-contract":
+        "9ab5bbff99a1f13361049b7e5040b5ac12fe62bd64cb02cd32f6c656e6dd112e",
+    "scripts/verify-investigation-boundaries":
+        "e6743f59bea8b09d06aad632cb8fbbd1dae3ef18c110f22f606c4f431d99d7f2",
+    "scripts/verify-app-release-boundaries":
+        "12cdb5be053ea90cc01f6289b6a9228fbf809674818a38e0264d75d21d2d5ea5",
+}
+for relative, expected in expected_scripts.items():
+    observed = hashlib.sha256((root / relative).read_bytes()).hexdigest()
+    if observed != expected:
+        raise SystemExit(f"ii-b5b-ii-d historical script SHA drifted: {relative}")
+PY
+        local historical_git_dir
+        historical_git_dir=$(git rev-parse --absolute-git-dir)
+        (
+            cd "$iib5biid_root"
+            scripts/verify-investigation-boundaries \
+                --iib5biid-darwin-retirement-contract-only \
+                Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinEpochSession.swift \
+                Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinEpochRetirement.swift \
+                Tests/StornautInvestigationTests/InvestigationMachineDarwinEpochSessionTests.swift \
+                Tests/StornautInvestigationTests/InvestigationMachineDarwinEpochRetirementTests.swift \
+                Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift \
+                || exit $?
+            scripts/verify-app-release-boundaries \
+                --iib5biid-machine-driver-contract-only \
+                scripts/verify-app-release-boundaries \
+                || exit $?
+            GIT_DIR="$historical_git_dir" \
+            GIT_WORK_TREE="$iib5biid_root" \
+            GIT_INDEX_FILE="$iib5biid_index" \
+                scripts/verify-investigation-boundaries \
+                --iib5biid-staged-scope-contract-only \
+                efe079f95a9f15a360d280ea656bf9548bfaa3c3 \
+                || exit $?
+        ) || historical_status=$?
+    fi
+
+    rm -rf "$historical_root"
+    return $historical_status
+}
+
+if [[ ${1:-} == --historical-freeze-contract-only ]]; then
+    (( $# == 1 )) || fail_contract \
+        "Usage: scripts/verify-contract --historical-freeze-contract-only"
+    verify_immutable_historical_checkpoints
+    print "Immutable historical checkpoint verification passed."
+    exit 0
+fi
+
+verify_immutable_historical_checkpoints
 
 # Keep these source checks first. On a pre-refactor checkout they fail before
 # invoking the old verifier, whose unknown arguments were ignored.
@@ -105,6 +320,8 @@ require_fixed_text scripts/verify-app-release-boundaries \
 require_fixed_text scripts/verify-app-release-boundaries \
     '--iib5biid-machine-driver-contract-only <source>'
 require_fixed_text scripts/verify-app-release-boundaries \
+    '--iic0a-source-contract-only <projection> <intake>'
+require_fixed_text scripts/verify-app-release-boundaries \
     'iib5biid_debug_introduced_imports=('
 require_fixed_text scripts/verify-app-release-boundaries \
     'iib5biid_release_forbidden_imports=('
@@ -113,7 +330,7 @@ require_fixed_text scripts/verify-app-release-boundaries \
 require_fixed_text scripts/verify-app-release-boundaries \
     '_kSecGuestAttributePid'
 require_fixed_text scripts/verify-app-release-boundaries \
-    '31b23e31e12b7f80442c319d47f71bfde3e7509f4c233c5b7d29a5520781aca6'
+    '7e2f489abf968390a64b5ec42e9ac75c0e31ce37cfe740a5a44ef506accee5d5'
 require_fixed_text scripts/verify-app-release-boundaries \
     '30404041877153ce1ef03b5d47d694ccbb0e0688eb91383e4d30f2c023f58207'
 require_fixed_text scripts/verify-app-release-boundaries \
@@ -147,6 +364,12 @@ require_fixed_text scripts/verify-investigation-boundaries \
     '--iib5biic-darwin-session-contract-only'
 require_fixed_text scripts/verify-investigation-boundaries \
     '--iib5biic-staged-scope-contract-only'
+require_fixed_text scripts/verify-investigation-boundaries \
+    '--iic0a-projection-capsule-contract-only'
+require_fixed_text scripts/verify-investigation-boundaries \
+    '--iic0a-staged-scope-contract-only'
+require_fixed_text scripts/verify-investigation-boundaries \
+    '(( changed <= 2600 ))'
 require_fixed_text scripts/verify-investigation-boundaries \
     '(( changed <= 3600 ))'
 require_fixed_text scripts/verify-contract \
@@ -929,9 +1152,9 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "e6743f59bea8b09d06aad632cb8fbbd1dae3ef18c110f22f606c4f431d99d7f2",
+        "7e68e8054b6f8b366e986f5cb63b144586183585b477b095f8e2760699883c18",
     Path("scripts/verify-app-release-boundaries"):
-        "12cdb5be053ea90cc01f6289b6a9228fbf809674818a38e0264d75d21d2d5ea5",
+        "6509467e0ac5106d1a3bd6a8b5c1f1ffdbd4796fda77f894f1cbb4f79317ea3b",
 }
 for path, expected_sha in expected.items():
     observed_sha = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -948,14 +1171,14 @@ release = Path("scripts/verify-app-release-boundaries").read_text(
     encoding="utf-8"
 )
 for marker, count in {
-    "31b23e31e12b7f80442c319d47f71bfde3e7509f4c233c5b7d29a5520781aca6": 2,
+    "7e2f489abf968390a64b5ec42e9ac75c0e31ce37cfe740a5a44ef506accee5d5": 2,
     "dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9": 4,
     "30404041877153ce1ef03b5d47d694ccbb0e0688eb91383e4d30f2c023f58207": 1,
     "f97fadfdcc44255803fe69fbb95fdfab8ab7c173d695e34040631d0d9561b78a": 1,
-    "b60d2b4a72706d29b638c195ed6b39071972458979356ebe784587e18378f053": 1,
-    "245ee9f49d53e201479a0a47cdb653a11a3a900422b2b9d6e894926a42883656": 1,
-    "565d7d25a78db45de3987df41345e047f213c0c05aa622991dc9745205614f27": 1,
-    "2777198ace01ce8984f42f56c211f48367e2486d74a7a7927e6818ee2dfbd6ec": 1,
+    "ef0a9595ee3d05077ac6672193b60a0edd907fc4617c2e6fb6261aa5547383f3": 1,
+    "d0bfbcb8bb828174255bb8dddc7a231fa46f66710e1401d7e73831604d8432a7": 1,
+    "6b8be4c8f6e8cfe427ca74604b47a1597deec011509f9714087b178703a860f2": 1,
+    "9d88e7fe87a468f86f30bf8e95efbe32c5c4bf909e29432c8eca637072722ef8": 1,
 }.items():
     observed = investigation.count(marker) + release.count(marker)
     if observed != count:
@@ -4332,9 +4555,18 @@ for fixture in \
 done
 
 iib5bib2ba_baseline=fbda613
+iib5bib2ba_completed_commit=94958088fe271139c9ebb4cd1e2df2c0830d2f72
 iib5bib2ba_index="$contract_root/iib5bib2ba.index"
 GIT_INDEX_FILE="$iib5bib2ba_index" git read-tree "$iib5bib2ba_baseline^{tree}"
-for checkpoint_path in "$iib5bib2ba_package" "$iib5bib2ba_c" "$iib5bib2ba_header" "$iib5bib2ba_source" "$iib5bib2ba_test" Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift scripts/verify-contract scripts/verify-investigation-boundaries; do GIT_INDEX_FILE="$iib5bib2ba_index" git add -f "$checkpoint_path"; done
+for checkpoint_path in "$iib5bib2ba_package" "$iib5bib2ba_c" "$iib5bib2ba_header" "$iib5bib2ba_source" "$iib5bib2ba_test" Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift scripts/verify-contract scripts/verify-investigation-boundaries; do
+    entry=$(git ls-tree "$iib5bib2ba_completed_commit" -- "$checkpoint_path")
+    [[ -n "$entry" ]] \
+        || fail_contract "ii-b5b-i-b2b-a completed snapshot omitted: $checkpoint_path"
+    mode=$(print -r -- "$entry" | awk '{print $1}')
+    blob=$(print -r -- "$entry" | awk '{print $3}')
+    GIT_INDEX_FILE="$iib5bib2ba_index" git update-index --add \
+        --cacheinfo "$mode,$blob,$checkpoint_path"
+done
 GIT_INDEX_FILE="$iib5bib2ba_index" "$iib5bib2ba_gate" --iib5bib2ba-staged-scope-contract-only "$iib5bib2ba_baseline"
 for fixture in extra-path over-budget existing-deleted-path; do
     index="$contract_root/iib5bib2ba-$fixture.index"; cp "$iib5bib2ba_index" "$index"
@@ -4379,8 +4611,17 @@ for fixture in service-register:'ii-b5b-i-b2b-b service mutation authority drift
     require_fixed_text "$output" "$expected"
 done
 iib5bib2bb_baseline=bad515e
+iib5bib2bb_completed_commit=8ef5a5c7fc7c35d9889eb9eee5e92205322293f9
 iib5bib2bb_index="$contract_root/iib5bib2bb.index"; GIT_INDEX_FILE="$iib5bib2bb_index" git read-tree "$iib5bib2bb_baseline^{tree}"
-for p in "$iib5bib2bb_package" "$iib5bib2bb_source" "$iib5bib2bb_test" Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift scripts/verify-contract scripts/verify-investigation-boundaries; do GIT_INDEX_FILE="$iib5bib2bb_index" git add -f "$p"; done
+for p in "$iib5bib2bb_package" "$iib5bib2bb_source" "$iib5bib2bb_test" Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift scripts/verify-contract scripts/verify-investigation-boundaries; do
+    entry=$(git ls-tree "$iib5bib2bb_completed_commit" -- "$p")
+    [[ -n "$entry" ]] \
+        || fail_contract "ii-b5b-i-b2b-b completed snapshot omitted: $p"
+    mode=$(print -r -- "$entry" | awk '{print $1}')
+    blob=$(print -r -- "$entry" | awk '{print $3}')
+    GIT_INDEX_FILE="$iib5bib2bb_index" git update-index --add \
+        --cacheinfo "$mode,$blob,$p"
+done
 GIT_INDEX_FILE="$iib5bib2bb_index" "$iib5bib2bb_gate" --iib5bib2bb-staged-scope-contract-only "$iib5bib2bb_baseline"
 for fixture in extra-path over-budget existing-deleted-path binary-numstat; do
  index="$contract_root/iib5bib2bb-$fixture.index"; cp "$iib5bib2bb_index" "$index"
@@ -4423,8 +4664,16 @@ for fixture in \
     require_fixed_text "$output" "$expected"
 done
 iib5bib3_baseline=f233263
+iib5bib3_completed_commit=a50dd817adc470fe37e5199c73c686f0976738c6
 iib5bib3_index="$contract_root/iib5bib3.index"; GIT_INDEX_FILE="$iib5bib3_index" git read-tree "$iib5bib3_baseline^{tree}"
-for p in "$iib5bib3_source" "$iib5bib3_test" Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift scripts/verify-contract scripts/verify-investigation-boundaries; do GIT_INDEX_FILE="$iib5bib3_index" git add -f "$p"; done
+for p in "$iib5bib3_source" "$iib5bib3_test" Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift scripts/verify-contract scripts/verify-investigation-boundaries; do
+    entry=$(git ls-tree "$iib5bib3_completed_commit" -- "$p")
+    [[ -n "$entry" ]] || fail_contract "ii-b5b-i-b3 completed snapshot omitted: $p"
+    mode=$(print -r -- "$entry" | awk '{print $1}')
+    blob=$(print -r -- "$entry" | awk '{print $3}')
+    GIT_INDEX_FILE="$iib5bib3_index" git update-index --add \
+        --cacheinfo "$mode,$blob,$p"
+done
 GIT_INDEX_FILE="$iib5bib3_index" "$iib5bib3_gate" --iib5bib3-staged-scope-contract-only "$iib5bib3_baseline"
 for fixture in extra-path over-budget existing-deleted-path binary-numstat; do
  index="$contract_root/iib5bib3-$fixture.index"; cp "$iib5bib3_index" "$index"
@@ -4478,8 +4727,16 @@ for fixture in \
  output="$contract_root/iib5bic1-$name.log"; if "$iib5bic1_gate" --iib5bic1-installed-join-contract-only "$package" "$composer" "$join" "$test" >"$output" 2>&1; then fail_contract "ii-b5b-i-c1 mutation accepted: $name"; fi; require_fixed_text "$output" "$expected"
 done
 iib5bic1_baseline=ae9675d
+iib5bic1_completed_commit=74877ec7a1cdd442e8333a1fd77c259edd67a36c
 iib5bic1_index="$contract_root/iib5bic1.index"; GIT_INDEX_FILE="$iib5bic1_index" git read-tree "$iib5bic1_baseline^{tree}"
-for p in "$iib5bic1_package" "$iib5bic1_composer" "$iib5bic1_join" "$iib5bic1_test" Tests/StornautInvestigationTests/InvestigationMachineSingleEpochTests.swift Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift scripts/verify-contract scripts/verify-investigation-boundaries; do GIT_INDEX_FILE="$iib5bic1_index" git add -f "$p"; done
+for p in "$iib5bic1_package" "$iib5bic1_composer" "$iib5bic1_join" "$iib5bic1_test" Tests/StornautInvestigationTests/InvestigationMachineSingleEpochTests.swift Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift scripts/verify-contract scripts/verify-investigation-boundaries; do
+    entry=$(git ls-tree "$iib5bic1_completed_commit" -- "$p")
+    [[ -n "$entry" ]] || fail_contract "ii-b5b-i-c1 completed snapshot omitted: $p"
+    mode=$(print -r -- "$entry" | awk '{print $1}')
+    blob=$(print -r -- "$entry" | awk '{print $3}')
+    GIT_INDEX_FILE="$iib5bic1_index" git update-index --add \
+        --cacheinfo "$mode,$blob,$p"
+done
 GIT_INDEX_FILE="$iib5bic1_index" "$iib5bic1_gate" --iib5bic1-staged-scope-contract-only "$iib5bic1_baseline"
 for fixture in extra-path over-budget existing-deleted-path binary-numstat; do
  index="$contract_root/iib5bic1-$fixture.index"; cp "$iib5bic1_index" "$index"
@@ -4862,12 +5119,19 @@ done
 
 iib5biia_gate=scripts/verify-investigation-boundaries
 iib5biia_baseline=ddbc4a0be3ea059c7de239b85ef60c40c09affbb
+iib5biia_commit=ea9d2a237ab8e8d1b900f603f54233c94c86ecc0
 iib5biia_source_path=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineFixedCapsuleIntake.swift
 iib5biia_test_path=Tests/StornautInvestigationTests/InvestigationMachineFixedCapsuleIntakeTests.swift
+iib5biia_canonical_source=$contract_root/iib5biia-completed-source.swift
+iib5biia_canonical_test=$contract_root/iib5biia-completed-test.swift
+git show "$iib5biia_commit:$iib5biia_source_path" \
+    >"$iib5biia_canonical_source"
+git show "$iib5biia_commit:$iib5biia_test_path" \
+    >"$iib5biia_canonical_test"
 "$iib5biia_gate" --iib5biia-fixed-capsule-contract-only \
-    "$iib5biia_source_path" "$iib5biia_test_path" \
+    "$iib5biia_canonical_source" "$iib5biia_canonical_test" \
     >"$contract_root/iib5biia-canonical.log"
-python3 - "$iib5biia_source_path" "$iib5biia_test_path" \
+python3 - "$iib5biia_canonical_source" "$iib5biia_canonical_test" \
     Sources/StornautInvestigationMachineDriverSupport/DarwinInvestigationMachineInstalledDriverSystem.swift \
     Tests/StornautInvestigationTests/InvestigationMachineDriverSupportTests.swift \
     Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift \
@@ -5008,8 +5272,8 @@ for fixture in \
     expected=${fixture#*:}
     target="$contract_root/iib5biia-$name.swift"
     xcrun swiftc -frontend -parse "$target"
-    source="$iib5biia_source_path"
-    test="$iib5biia_test_path"
+    source="$iib5biia_canonical_source"
+    test="$iib5biia_canonical_test"
     if [[ $name == vacuous-focused-test ]]; then
         test=$target
     else
@@ -5023,7 +5287,6 @@ for fixture in \
     require_fixed_text "$output" "$expected"
 done
 
-iib5biia_commit=ea9d2a237ab8e8d1b900f603f54233c94c86ecc0
 iib5biia_parent=ddbc4a0be3ea059c7de239b85ef60c40c09affbb
 iib5biia_tree=25de5d72310009b1a572ca3e5a40595ad40ff827
 iib5biia_paths=(
@@ -5192,6 +5455,7 @@ done
 
 iib5biib_index="$contract_root/iib5biib.index"
 GIT_INDEX_FILE="$iib5biib_index" git read-tree "$iib5biib_baseline^{tree}"
+iib5biib_completed_commit=c6905e2173b858550078ccc07ac915b67912c3d6
 iib5biib_paths=(
     Package.swift
     Sources/CInvestigationIdentitySupport/CInvestigationIdentitySupport.c
@@ -5204,9 +5468,11 @@ iib5biib_paths=(
     scripts/verify-investigation-boundaries
 )
 for checkpoint_path in "${iib5biib_paths[@]}"; do
-    blob=$(git hash-object -w -- "$checkpoint_path")
-    mode=100644
-    [[ $checkpoint_path == scripts/* ]] && mode=100755
+    entry=$(git ls-tree "$iib5biib_completed_commit" -- "$checkpoint_path")
+    [[ -n "$entry" ]] \
+        || fail_contract "ii-b5b-ii-b completed snapshot omitted: $checkpoint_path"
+    mode=$(print -r -- "$entry" | awk '{print $1}')
+    blob=$(print -r -- "$entry" | awk '{print $3}')
     GIT_INDEX_FILE="$iib5biib_index" git update-index --add \
         --cacheinfo "$mode,$blob,$checkpoint_path"
 done
@@ -5450,6 +5716,7 @@ done
 iib5biid_gate=scripts/verify-investigation-boundaries
 iib5biid_app_gate=scripts/verify-app-release-boundaries
 iib5biid_baseline=efe079f95a9f15a360d280ea656bf9548bfaa3c3
+iib5biid_completed_commit=d89d201448a99281a554d9b3fca00512b4f0c0be
 iib5biid_session=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinEpochSession.swift
 iib5biid_retirement=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinEpochRetirement.swift
 iib5biid_session_test=Tests/StornautInvestigationTests/InvestigationMachineDarwinEpochSessionTests.swift
@@ -5560,8 +5827,11 @@ iib5biid_paths=(
     scripts/verify-investigation-boundaries
 )
 for checkpoint_path in "${iib5biid_paths[@]}"; do
-    blob=$(git hash-object -w -- "$checkpoint_path")
-    mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
+    entry=$(git ls-tree "$iib5biid_completed_commit" -- "$checkpoint_path")
+    [[ -n "$entry" ]] \
+        || fail_contract "ii-b5b-ii-d completed snapshot omitted: $checkpoint_path"
+    mode=$(print -r -- "$entry" | awk '{print $1}')
+    blob=$(print -r -- "$entry" | awk '{print $3}')
     GIT_INDEX_FILE="$iib5biid_index" git update-index --add \
         --cacheinfo "$mode,$blob,$checkpoint_path"
 done
@@ -5605,6 +5875,417 @@ for fixture in extra-path over-budget deleted binary wrong-baseline mode; do
         --iib5biid-staged-scope-contract-only "$baseline" >"$output" 2>&1
     then
         fail_contract "ii-b5b-ii-d scope mutation accepted: $fixture"
+    fi
+    require_fixed_text "$output" "$expected"
+done
+
+iic0a_gate=scripts/verify-investigation-boundaries
+iic0a_app_gate=scripts/verify-app-release-boundaries
+iic0a_baseline=e4a95d4916a55a6bc2854c1b2168c98f7245cd0f
+iic0a_projection=Sources/StornautInvestigationHandoffContract/InvestigationProjectedCohortInput.swift
+iic0a_intake=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineFixedCapsuleIntake.swift
+iic0a_transport_test=Tests/StornautInvestigationTests/InvestigationHandoffTransportContractTests.swift
+iic0a_intake_test=Tests/StornautInvestigationTests/InvestigationMachineFixedCapsuleIntakeTests.swift
+iic0a_boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+"$iic0a_gate" --iic0a-replay-source-contract-only scripts/verify-contract \
+    >"$contract_root/iic0a-replay-source.log"
+"$iic0a_gate" --iic0a-projection-capsule-contract-only \
+    "$iic0a_projection" "$iic0a_intake" "$iic0a_transport_test" \
+    "$iic0a_intake_test" "$iic0a_boundary" \
+    >"$contract_root/iic0a-canonical.log"
+"$iic0a_app_gate" --iic0a-source-contract-only \
+    "$iic0a_projection" "$iic0a_intake" \
+    >"$contract_root/iic0a-app-canonical.log"
+python3 - "$iic0a_projection" "$iic0a_intake" "$contract_root" <<'PY'
+from pathlib import Path
+import sys
+projection_path, intake_path, root = map(Path, sys.argv[1:])
+projection = projection_path.read_text(encoding="utf-8")
+intake = intake_path.read_text(encoding="utf-8")
+def emit(name, old, new, source=projection):
+    if source.count(old) != 1:
+        raise SystemExit(f"cannot construct ii-c0a mutation: {name}")
+    (root / f"{name}.swift").write_text(
+        source.replace(old, new, 1), encoding="utf-8"
+    )
+emit("iic0a-public", "package struct InvestigationProjectedCohortInput", "public struct InvestigationProjectedCohortInput")
+emit("iic0a-codable", "package struct InvestigationProjectedCohortInput:\n    Sendable,\n    Equatable\n{", "package struct InvestigationProjectedCohortInput:\n    Sendable,\n    Equatable, Codable\n{")
+emit("iic0a-binding-epoch", "projection.epochUUID == epoch.epochUUID", "projection.epochUUID != epoch.epochUUID")
+emit("iic0a-binding-nonce", "projection.configurationNonce == epoch.configurationNonce", "projection.configurationNonce != epoch.configurationNonce")
+emit("iic0a-binding-configuration", "projection.configurationSHA256 == epoch.configurationSHA256", "projection.configurationSHA256 != epoch.configurationSHA256")
+emit("iic0a-binding-runtime", "                    == epoch.signedRuntimeBindingSHA256", "                    != epoch.signedRuntimeBindingSHA256")
+emit("iic0a-canonical-reencode", "            try input.encoded() == data", "            true")
+emit("iic0a-outer-digest", "rawBytes: Data(repeating: 0, count: 32)", "rawBytes: Data(repeating: 1, count: 32)")
+emit("iic0a-nested-digest", "try InvestigationInstalledL2IdentityProjection.decode($0)", "try InvestigationInstalledL2IdentityProjection.decode($0 + Data([0]))")
+emit("iic0a-v1-bytes", "            try capsule.encoded(),", "            Data(),")
+emit("iic0a-remove-projections", "        fields.append(contentsOf: try projections.map { try $0.encoded() })", "        fields.append(contentsOf: [])")
+emit("iic0a-reorder-projections", "try projections.map { try $0.encoded() }", "try projections.reversed().map { try $0.encoded() }")
+emit("iic0a-runtime-authority", "import Foundation\n", "import Foundation\nimport StornautExecution\n")
+write_function = """
+private func iic0aWrite(_ data: Data, to url: URL) throws {
+    try data.write(to: url)
+}
+
+"""
+file_manager_function = """
+private func iic0aCreateFile(at path: String) {
+    _ = FileManager.default.createFile(atPath: path, contents: nil)
+}
+
+"""
+mutable_data_function = """
+private func iic0aMutableDataWrite(_ data: Data, to path: String) {
+    _ = NSMutableData(data: data).write(toFile: path, atomically: true)
+}
+
+"""
+system_function = """
+private func iic0aSystem() {
+    _ = system("/usr/bin/true")
+}
+
+"""
+spawn_function = """
+private func iic0aSpawn() {
+    _ = posix_spawnp(nil, nil, nil, nil, nil, nil)
+}
+
+"""
+connection_function = """
+private func iic0aConnection(_ request: URLRequest) throws {
+    _ = try NSURLConnection.sendSynchronousRequest(request, returning: nil)
+}
+
+"""
+raw_open_function = """
+private func iic0aRawOpen(_ path: UnsafePointer<CChar>) {
+    _ = open(path, 1)
+}
+
+"""
+socketpair_function = """
+private func iic0aSocketpair(_ descriptors: UnsafeMutablePointer<Int32>) {
+    _ = socketpair(AF_UNIX, SOCK_STREAM, 0, descriptors)
+}
+
+"""
+sendto_function = """
+private func iic0aSendto(_ descriptor: Int32) {
+    _ = sendto(descriptor, nil, 0, 0, nil, 0)
+}
+
+"""
+user_defaults_function = """
+private func iic0aPersistDefault() {
+    UserDefaults.standard.set(true, forKey: "stornaut-test")
+}
+
+"""
+emit(
+    "iic0a-projection-data-write",
+    "import Foundation\n",
+    "import Foundation\n" + write_function,
+)
+emit(
+    "iic0a-intake-data-write",
+    "import StornautInvestigationHandoffContract\n",
+    "import StornautInvestigationHandoffContract\n" + write_function,
+    intake,
+)
+emit(
+    "iic0a-intake-file-manager",
+    "import StornautInvestigationHandoffContract\n",
+    "import StornautInvestigationHandoffContract\n" + file_manager_function,
+    intake,
+)
+emit(
+    "iic0a-projection-mutable-data",
+    "import Foundation\n",
+    "import Foundation\n" + mutable_data_function,
+)
+emit(
+    "iic0a-projection-connection",
+    "import Foundation\n",
+    "import Foundation\n" + connection_function,
+)
+emit(
+    "iic0a-intake-system",
+    "import StornautInvestigationHandoffContract\n",
+    "import StornautInvestigationHandoffContract\n" + system_function,
+    intake,
+)
+emit(
+    "iic0a-intake-spawnp",
+    "import StornautInvestigationHandoffContract\n",
+    "import StornautInvestigationHandoffContract\n" + spawn_function,
+    intake,
+)
+emit(
+    "iic0a-projection-raw-open",
+    "import Foundation\n",
+    "import Foundation\n" + raw_open_function,
+)
+emit(
+    "iic0a-intake-socketpair",
+    "import StornautInvestigationHandoffContract\n",
+    "import StornautInvestigationHandoffContract\n" + socketpair_function,
+    intake,
+)
+emit(
+    "iic0a-projection-sendto",
+    "import Foundation\n",
+    "import Foundation\n" + sendto_function,
+)
+emit(
+    "iic0a-intake-user-defaults",
+    "import StornautInvestigationHandoffContract\n",
+    "import StornautInvestigationHandoffContract\n" + user_defaults_function,
+    intake,
+)
+emit("iic0a-intake-projection", "            projection: selected.projection", "            projection: input.projections[nextIndex - 1]", intake)
+PY
+for fixture in \
+    iic0a-public iic0a-codable iic0a-binding-epoch iic0a-binding-nonce \
+    iic0a-binding-configuration iic0a-binding-runtime \
+    iic0a-canonical-reencode iic0a-outer-digest iic0a-nested-digest \
+    iic0a-v1-bytes iic0a-remove-projections iic0a-reorder-projections \
+    iic0a-intake-projection
+do
+    projection="$iic0a_projection"; intake="$iic0a_intake"
+    [[ $fixture == iic0a-intake-projection ]] \
+        && intake="$contract_root/$fixture.swift" \
+        || projection="$contract_root/$fixture.swift"
+    output="$contract_root/$fixture.log"
+    if "$iic0a_gate" --iic0a-projection-capsule-contract-only \
+        "$projection" "$intake" "$iic0a_transport_test" \
+        "$iic0a_intake_test" "$iic0a_boundary" >"$output" 2>&1
+    then
+        fail_contract "ii-c0a mutation accepted: $fixture"
+    fi
+    require_fixed_text "$output" 'ii-c0a'
+done
+if "$iic0a_app_gate" --iic0a-source-contract-only \
+    "$contract_root/iic0a-runtime-authority.swift" "$iic0a_intake" \
+    >"$contract_root/iic0a-runtime-authority.log" 2>&1
+then
+    fail_contract "ii-c0a mutation accepted: iic0a-runtime-authority"
+fi
+require_fixed_text "$contract_root/iic0a-runtime-authority.log" 'ii-c0a'
+for fixture in \
+    iic0a-projection-data-write iic0a-intake-data-write \
+    iic0a-intake-file-manager iic0a-projection-mutable-data \
+    iic0a-projection-connection iic0a-intake-system iic0a-intake-spawnp \
+    iic0a-projection-raw-open iic0a-intake-socketpair \
+    iic0a-projection-sendto iic0a-intake-user-defaults
+do
+    projection="$iic0a_projection"; intake="$iic0a_intake"
+    [[ $fixture == iic0a-projection-* ]] \
+        && projection="$contract_root/$fixture.swift" \
+        || intake="$contract_root/$fixture.swift"
+    for gate in semantic app; do
+        output="$contract_root/$fixture-$gate.log"
+        if [[ $gate == semantic ]]; then
+            "$iic0a_gate" --iic0a-projection-capsule-contract-only \
+                "$projection" "$intake" "$iic0a_transport_test" \
+                "$iic0a_intake_test" "$iic0a_boundary" \
+                >"$output" 2>&1 && \
+                fail_contract "ii-c0a write mutation accepted: $fixture/$gate"
+        else
+            "$iic0a_app_gate" --iic0a-source-contract-only \
+                "$projection" "$intake" >"$output" 2>&1 && \
+                fail_contract "ii-c0a write mutation accepted: $fixture/$gate"
+        fi
+        require_fixed_text "$output" 'ii-c0a'
+    done
+done
+python3 - scripts/verify-contract "$contract_root" <<'PY'
+from pathlib import Path
+import sys
+
+source_path, destination_root = map(Path, sys.argv[1:])
+source = source_path.read_text(encoding="utf-8")
+line_continuation = chr(92) + "\n"
+mutations = {
+    "iib0a-boundary": (
+        'cd "$iib0a_root"\n                scripts/verify-investigation-boundaries',
+        'cd "$iib0a_root"\n                $repo_root/scripts/verify-investigation-boundaries',
+    ),
+    "iib5biid-boundary": (
+        'cd "$iib5biid_root"\n            scripts/verify-investigation-boundaries \\',
+        'cd "$iib5biid_root"\n            $repo_root/scripts/verify-investigation-boundaries \\',
+    ),
+    "iib5biid-app": (
+        '            scripts/verify-app-release-boundaries '
+        + line_continuation
+        + '                --iib5biid-machine-driver-contract-only',
+        '            $repo_root/scripts/verify-app-release-boundaries '
+        + line_continuation
+        + '                --iib5biid-machine-driver-contract-only',
+    ),
+}
+for name, (old, new) in mutations.items():
+    if source.count(old) != 1:
+        raise SystemExit(
+            f"cannot construct ii-c0a replay substitution mutation: {name}"
+        )
+    (destination_root / f"iic0a-replay-substitution-{name}").write_text(
+        source.replace(old, new, 1),
+        encoding="utf-8",
+    )
+PY
+for substitution in iib0a-boundary iib5biid-boundary iib5biid-app; do
+    if "$iic0a_gate" --iic0a-replay-source-contract-only \
+        "$contract_root/iic0a-replay-substitution-$substitution" \
+        >"$contract_root/iic0a-replay-substitution-$substitution.log" 2>&1
+    then
+        fail_contract \
+            "ii-c0a replay current-verifier substitution accepted: $substitution"
+    fi
+    require_fixed_text \
+        "$contract_root/iic0a-replay-substitution-$substitution.log" \
+        'ii-c0a historical replay'
+done
+python3 - scripts/verify-contract "$contract_root" <<'PY'
+from pathlib import Path
+import sys
+
+source_path, destination_root = map(Path, sys.argv[1:])
+source = source_path.read_text(encoding="utf-8")
+start = source.index("function verify_immutable_historical_checkpoints() {")
+end = source.index(
+    "\nif [[ ${1:-} == --historical-freeze-contract-only ]]",
+    start,
+)
+prefix, replay, suffix = source[:start], source[start:end], source[end:]
+continuation = chr(92) + "\n"
+mutations = {
+    "iib0a-boundary-guard": (
+        'scripts/verify-investigation-boundaries || exit $?',
+        'scripts/verify-investigation-boundaries',
+    ),
+    "iib5biid-boundary-guard": (
+        '                Tests/StornautInvestigationTests/'
+        'InvestigationMachineTargetBoundaryTests.swift '
+        + continuation
+        + '                || exit $?',
+        '                Tests/StornautInvestigationTests/'
+        'InvestigationMachineTargetBoundaryTests.swift',
+    ),
+    "iib5biid-app-guard": (
+        '                scripts/verify-app-release-boundaries '
+        + continuation
+        + '                || exit $?',
+        '                scripts/verify-app-release-boundaries',
+    ),
+    "iib5biid-scope-guard": (
+        '                efe079f95a9f15a360d280ea656bf9548bfaa3c3 '
+        + continuation
+        + '                || exit $?',
+        '                efe079f95a9f15a360d280ea656bf9548bfaa3c3',
+    ),
+}
+for name, (old, new) in mutations.items():
+    if replay.count(old) != 1:
+        raise SystemExit(
+            f"cannot construct ii-c0a replay guard mutation: {name}"
+        )
+    (destination_root / f"iic0a-replay-{name}").write_text(
+        prefix + replay.replace(old, new, 1) + suffix,
+        encoding="utf-8",
+    )
+PY
+for guard in \
+    iib0a-boundary-guard iib5biid-boundary-guard \
+    iib5biid-app-guard iib5biid-scope-guard
+do
+    output="$contract_root/iic0a-replay-$guard.log"
+    if "$iic0a_gate" --iic0a-replay-source-contract-only \
+        "$contract_root/iic0a-replay-$guard" >"$output" 2>&1
+    then
+        fail_contract "ii-c0a replay guard removal accepted: $guard"
+    fi
+    require_fixed_text "$output" \
+        'ii-c0a historical replay failure propagation drifted'
+done
+
+iic0a_index="$contract_root/iic0a.index"
+GIT_INDEX_FILE="$iic0a_index" git read-tree "$iic0a_baseline^{tree}"
+iic0a_paths=(
+    "$iic0a_projection"
+    "$iic0a_intake"
+    "$iic0a_transport_test"
+    "$iic0a_intake_test"
+    "$iic0a_boundary"
+    scripts/verify-app-release-boundaries
+    scripts/verify-contract
+    scripts/verify-investigation-boundaries
+)
+for checkpoint_path in "${iic0a_paths[@]}"; do
+    blob=$(git hash-object -w -- "$checkpoint_path")
+    mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
+    GIT_INDEX_FILE="$iic0a_index" git update-index --add \
+        --cacheinfo "$mode,$blob,$checkpoint_path"
+done
+GIT_INDEX_FILE="$iic0a_index" "$iic0a_gate" \
+    --iic0a-staged-scope-contract-only "$iic0a_baseline"
+for line in {1..2700}; do print -r -- "// ii-c0a over-budget $line"; done \
+    >"$contract_root/iic0a-over-budget.swift"
+for fixture in \
+    extra-path over-budget deleted binary mode wrong-baseline \
+    substitute-contract substitute-boundary substitute-app
+do
+    index="$contract_root/iic0a-$fixture.index"; cp "$iic0a_index" "$index"
+    if [[ $fixture == extra-path ]]; then
+        blob=$(git rev-parse "${iic0a_baseline}:AGENTS.md")
+        GIT_INDEX_FILE="$index" git update-index --add --cacheinfo \
+            "100644,$blob,iic0a-extra.swift"
+        expected='ii-c0a checkpoint paths drifted'
+    elif [[ $fixture == over-budget ]]; then
+        blob=$(git hash-object -w -- "$contract_root/iic0a-over-budget.swift")
+        GIT_INDEX_FILE="$index" git update-index --add --cacheinfo \
+            "100644,$blob,$iic0a_projection"
+        expected='ii-c0a checkpoint budget drifted'
+    elif [[ $fixture == deleted ]]; then
+        GIT_INDEX_FILE="$index" git rm --cached -q -f "$iic0a_intake"
+        expected='ii-c0a checkpoint deleted an existing path'
+    elif [[ $fixture == binary ]]; then
+        blob=$(git rev-parse "${iic0a_baseline}:Tests/Fixtures/Snapshots/design-system.empty-state.dark.en.png")
+        GIT_INDEX_FILE="$index" git update-index --add --cacheinfo \
+            "100644,$blob,$iic0a_projection"
+        expected='ii-c0a binary checkpoint path rejected'
+    elif [[ $fixture == mode ]]; then
+        entry=$(GIT_INDEX_FILE="$index" git ls-files -s -- scripts/verify-contract)
+        blob=$(print -r -- "$entry" | awk '{print $2}')
+        GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+            "100644,$blob,scripts/verify-contract"
+        expected='ii-c0a checkpoint mode drifted: scripts/verify-contract'
+    elif [[ $fixture == substitute-contract ]]; then
+        blob=$(git rev-parse "${iic0a_baseline}:scripts/verify-contract")
+        GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+            "100755,$blob,scripts/verify-contract"
+        expected='ii-c0a checkpoint paths drifted'
+    elif [[ $fixture == substitute-boundary ]]; then
+        blob=$(git rev-parse \
+            "${iic0a_baseline}:scripts/verify-investigation-boundaries")
+        GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+            "100755,$blob,scripts/verify-investigation-boundaries"
+        expected='ii-c0a checkpoint paths drifted'
+    elif [[ $fixture == substitute-app ]]; then
+        blob=$(git rev-parse \
+            "${iic0a_baseline}:scripts/verify-app-release-boundaries")
+        GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+            "100755,$blob,scripts/verify-app-release-boundaries"
+        expected='ii-c0a checkpoint paths drifted'
+    else
+        expected='ii-c0a checkpoint baseline drifted'
+    fi
+    output="$contract_root/iic0a-scope-$fixture.log"
+    baseline="$iic0a_baseline"
+    [[ $fixture == wrong-baseline ]] && baseline="$iic0a_baseline^"
+    if GIT_INDEX_FILE="$index" "$iic0a_gate" \
+        --iic0a-staged-scope-contract-only "$baseline" >"$output" 2>&1
+    then
+        fail_contract "ii-c0a scope mutation accepted: $fixture"
     fi
     require_fixed_text "$output" "$expected"
 done

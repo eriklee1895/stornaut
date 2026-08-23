@@ -518,6 +518,15 @@ struct InvestigationHandoffTransportContractTests {
         let decoded = try InvestigationCohortCapsule.decode(encoded)
 
         #expect(decoded == capsule)
+        #expect(encoded.count == 1_984)
+        #expect(
+            capsule.wholeCapsuleSHA256.lowercaseHex
+                == "a5096b18fc2741906a561bedcee18b3168c6d7472bad8e3167c7abbccf634801"
+        )
+        #expect(
+            Data(SHA256.hash(data: encoded)).hexString
+                == "47ce5039abd62cdd4e3c5fc011c42af84d9539cb4ccdd26b0723b0fb47df890f"
+        )
         #expect(decoded.epochs.count == 8)
         #expect(decoded.epochs.map(\.ordinal) == Array(UInt32(0)...UInt32(7)))
         #expect(
@@ -647,6 +656,208 @@ struct InvestigationHandoffTransportContractTests {
             }
         }
     }
+
+    @Test
+    func projectedCohortInputPreservesV1CapsuleAndPairsEveryProjection() throws {
+        let capsule = try cohortCapsule()
+        let capsuleBytes = try capsule.encoded()
+        let input = try projectedCohortInput(capsule: capsule)
+        let encoded = try input.encoded()
+        let decoded = try InvestigationProjectedCohortInput.decode(encoded)
+
+        #expect(try decoded.capsule.encoded() == capsuleBytes)
+        #expect(decoded.capsule == capsule)
+        #expect(decoded.projections.count == 8)
+        #expect(decoded.wholeInputSHA256 == input.wholeInputSHA256)
+        #expect(try decoded.encoded() == encoded)
+        #expect(
+            InvestigationProjectedCohortInput.maximumByteCount
+                == 1_069_056
+        )
+        #expect(!(InvestigationProjectedCohortInput.self is any Codable.Type))
+        for index in 0..<InvestigationCohortCapsule.epochCount {
+            let selection = try decoded.selection(at: index)
+            #expect(selection.epoch == capsule.epochs[index])
+            #expect(selection.projection == decoded.projections[index])
+            #expect(selection.projection.epochUUID == selection.epoch.epochUUID)
+            #expect(
+                selection.projection.configurationNonce
+                    == selection.epoch.configurationNonce
+            )
+            #expect(
+                selection.projection.configurationSHA256
+                    == selection.epoch.configurationSHA256
+            )
+            #expect(
+                selection.projection.signedRuntimeBindingSHA256
+                    == selection.epoch.signedRuntimeBindingSHA256
+            )
+        }
+        #expect(throws: (any Error).self) {
+            _ = try decoded.selection(at: 8)
+        }
+    }
+
+    @Test
+    func projectedCohortInputDigestUsesExactZeroBeforeHashRule() throws {
+        let encoded = try projectedCohortInput().encoded()
+        let digestRange = try transcriptPayloadRange(tag: 4, in: encoded)
+        var zeroed = encoded
+        zeroed.replaceSubrange(
+            digestRange,
+            with: repeatElement(UInt8(0), count: 32)
+        )
+
+        #expect(
+            Data(encoded[digestRange])
+                == Data(SHA256.hash(data: zeroed))
+        )
+    }
+
+    @Test(arguments: ProjectedCohortBindingMutation.allCases)
+    fileprivate func projectedCohortInputRejectsEveryBindingMismatch(
+        _ mutation: ProjectedCohortBindingMutation
+    ) throws {
+        let capsule = try cohortCapsule()
+        var projections = try capsule.epochs.map {
+            try projectedIdentity($0)
+        }
+        projections[3] = try projectedIdentity(
+            capsule.epochs[3],
+            mutation: mutation
+        )
+
+        #expect(throws: (any Error).self) {
+            _ = try InvestigationProjectedCohortInput(
+                capsule: capsule,
+                projections: projections
+            )
+        }
+    }
+
+    @Test
+    func projectedCohortInputRejectsCountOrderAndDigestDrift() throws {
+        let input = try projectedCohortInput()
+        let capsule = input.capsule
+        #expect(throws: (any Error).self) {
+            _ = try InvestigationProjectedCohortInput(
+                capsule: capsule,
+                projections: Array(input.projections.dropLast())
+            )
+        }
+        var reordered = input.projections
+        reordered.swapAt(0, 1)
+        #expect(throws: (any Error).self) {
+            _ = try InvestigationProjectedCohortInput(
+                capsule: capsule,
+                projections: reordered
+            )
+        }
+
+        let encoded = try input.encoded()
+        var digestDrift = encoded
+        let digestRange = try transcriptPayloadRange(tag: 4, in: encoded)
+        digestDrift[digestRange.lowerBound] ^= 0xff
+        for mutation in [
+            try capsule.encoded(),
+            digestDrift,
+            Data(encoded.dropLast()),
+            encoded + Data([0]),
+        ] {
+            #expect(throws: (any Error).self) {
+                _ = try InvestigationProjectedCohortInput.decode(mutation)
+            }
+        }
+    }
+
+    @Test
+    func projectedCohortInputRejectsNestedProjectionDrift() throws {
+        let encoded = try projectedCohortInput().encoded()
+        let firstProjection = try transcriptPayloadRange(tag: 5, in: encoded)
+        let firstProjectionDigest = try transcriptPayloadRange(
+            tag: 16,
+            in: Data(encoded[firstProjection])
+        )
+        var mutation = encoded
+        mutation[firstProjection.lowerBound + firstProjectionDigest.lowerBound]
+            ^= 0xff
+        let outerDigest = try transcriptPayloadRange(tag: 4, in: mutation)
+        mutation.replaceSubrange(
+            outerDigest,
+            with: repeatElement(UInt8(0), count: 32)
+        )
+        mutation.replaceSubrange(
+            outerDigest,
+            with: Data(SHA256.hash(data: mutation))
+        )
+
+        #expect(throws: (any Error).self) {
+            _ = try InvestigationProjectedCohortInput.decode(mutation)
+        }
+    }
+
+    @Test
+    func projectedCohortInputRejectsEveryOuterStructuralDrift() throws {
+        let valid = try projectedCohortInput().encoded()
+        let domain = try transcriptPayloadRange(tag: 0, in: valid)
+        let version = try transcriptPayloadRange(tag: 1, in: valid)
+        let capsule = try transcriptPayloadRange(tag: 2, in: valid)
+        let count = try transcriptPayloadRange(tag: 3, in: valid)
+
+        var wrongMagic = valid
+        wrongMagic[0] ^= 0xff
+        var wrongDomain = valid
+        wrongDomain[domain.lowerBound] ^= 0x01
+        var wrongVersion = valid
+        wrongVersion[version.upperBound - 1] = 2
+        var unknownTag = valid
+        unknownTag[capsule.lowerBound - 5] = 13
+        var lengthDrift = valid
+        lengthDrift[capsule.lowerBound - 1] ^= 0x01
+        var countDrift = valid
+        countDrift[count.upperBound - 1] = 7
+
+        for mutation in [
+            wrongMagic, wrongDomain, wrongVersion, unknownTag, lengthDrift,
+            countDrift,
+        ] {
+            #expect(throws: (any Error).self) {
+                _ = try InvestigationProjectedCohortInput.decode(mutation)
+            }
+        }
+    }
+
+    @Test
+    func projectedCohortInputRejectsNestedCapsuleDrift() throws {
+        let encoded = try projectedCohortInput().encoded()
+        let capsuleRange = try transcriptPayloadRange(tag: 2, in: encoded)
+        let capsuleDigest = try transcriptPayloadRange(
+            tag: 4,
+            in: Data(encoded[capsuleRange])
+        )
+        var mutation = encoded
+        mutation[capsuleRange.lowerBound + capsuleDigest.lowerBound] ^= 0xff
+        let outerDigest = try transcriptPayloadRange(tag: 4, in: mutation)
+        mutation.replaceSubrange(
+            outerDigest,
+            with: repeatElement(UInt8(0), count: 32)
+        )
+        mutation.replaceSubrange(
+            outerDigest,
+            with: Data(SHA256.hash(data: mutation))
+        )
+
+        #expect(throws: (any Error).self) {
+            _ = try InvestigationProjectedCohortInput.decode(mutation)
+        }
+    }
+}
+
+private enum ProjectedCohortBindingMutation: CaseIterable {
+    case epochUUID
+    case configurationNonce
+    case configurationSHA256
+    case signedRuntimeBindingSHA256
 }
 
 private extension InvestigationHandoffTransportContractTests {
@@ -742,6 +953,59 @@ private extension InvestigationHandoffTransportContractTests {
         try InvestigationCohortCapsule(
             outerAttemptUUID: fixedUUID(1),
             epochs: (0..<8).map { try cohortEpoch(ordinal: UInt32($0)) }
+        )
+    }
+
+    func projectedCohortInput(
+        capsule: InvestigationCohortCapsule? = nil
+    ) throws -> InvestigationProjectedCohortInput {
+        let capsule = try capsule ?? cohortCapsule()
+        return try InvestigationProjectedCohortInput(
+            capsule: capsule,
+            projections: capsule.epochs.map {
+                try projectedIdentity($0)
+            }
+        )
+    }
+
+    func projectedIdentity(
+        _ epoch: InvestigationCohortEpoch,
+        mutation: ProjectedCohortBindingMutation? = nil
+    ) throws -> InvestigationInstalledL2IdentityProjection {
+        let ordinal = UInt8(epoch.ordinal)
+        return try InvestigationInstalledL2IdentityProjection(
+            epochUUID: mutation == .epochUUID
+                ? fixedUUID(UInt8(0x70 + ordinal)) : epoch.epochUUID,
+            configurationNonce: mutation == .configurationNonce
+                ? fixedUUID(UInt8(0x78 + ordinal))
+                : epoch.configurationNonce,
+            configurationValidBefore: .init(
+                rawValue: 2_000_000_000_000_000 + Int64(ordinal)
+            ),
+            configurationSHA256: mutation == .configurationSHA256
+                ? digest(0x91) : epoch.configurationSHA256,
+            signedRuntimeBindingSHA256:
+                mutation == .signedRuntimeBindingSHA256
+                    ? digest(0x92) : epoch.signedRuntimeBindingSHA256,
+            appExecutableSHA256: digest(0x51),
+            appBundleIdentifier:
+                InvestigationInstalledL2IdentityProjection
+                .fixedAppBundleIdentifier,
+            helperExecutableSHA256: digest(0x52),
+            helperServiceIdentifier:
+                InvestigationInstalledL2IdentityProjection
+                .fixedHelperServiceIdentifier,
+            machineDriverExecutableSHA256: digest(0x53),
+            machineDriverSigningIdentifier:
+                InvestigationInstalledL2IdentityProjection
+                .fixedMachineDriverSigningIdentifier,
+            machineDriverDesignatedRequirementSHA256: digest(0x54),
+            machineDriverCodeDirectoryHash: Data(
+                repeating: 0x55, count: 20
+            ),
+            machineClaimServiceIdentifier:
+                InvestigationInstalledL2IdentityProjection
+                .fixedMachineClaimServiceIdentifier
         )
     }
 

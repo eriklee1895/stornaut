@@ -68,28 +68,38 @@ package struct InvestigationMachineFixedEpochSelection:
 {
     package let outerAttemptUUID: UUID
     package let wholeCapsuleSHA256: InvestigationHandoffSHA256
+    package let wholeInputSHA256: InvestigationHandoffSHA256
     package let epoch: InvestigationCohortEpoch
+    package let projection: InvestigationInstalledL2IdentityProjection
 }
 
 package actor InvestigationMachineFixedEpochPlan {
     private let outerAttemptUUID: UUID
     private let wholeCapsuleSHA256: InvestigationHandoffSHA256
-    private let epochs: [InvestigationCohortEpoch]
+    private let wholeInputSHA256: InvestigationHandoffSHA256
+    private let input: InvestigationProjectedCohortInput
     private var nextIndex = 0
 
-    init(capsule: InvestigationCohortCapsule) {
-        outerAttemptUUID = capsule.outerAttemptUUID
-        wholeCapsuleSHA256 = capsule.wholeCapsuleSHA256
-        epochs = capsule.epochs
+    init(input: InvestigationProjectedCohortInput) {
+        outerAttemptUUID = input.capsule.outerAttemptUUID
+        wholeCapsuleSHA256 = input.capsule.wholeCapsuleSHA256
+        wholeInputSHA256 = input.wholeInputSHA256
+        self.input = input
     }
 
     package func takeNext() throws
         -> InvestigationMachineFixedEpochSelection
     {
-        guard nextIndex < epochs.count else {
+        guard nextIndex < input.capsule.epochs.count else {
             throw InvestigationMachineFixedCapsuleIntakeError.exhausted
         }
-        let epoch = epochs[nextIndex]
+        let selected: InvestigationProjectedCohortSelection
+        do {
+            selected = try input.selection(at: nextIndex)
+        } catch {
+            throw InvestigationMachineFixedCapsuleIntakeError.invalidCapsule
+        }
+        let epoch = selected.epoch
         guard
             epoch.ordinal == UInt32(nextIndex),
             epoch.scenario.rawValue == epoch.ordinal + 1
@@ -100,7 +110,9 @@ package actor InvestigationMachineFixedEpochPlan {
         return InvestigationMachineFixedEpochSelection(
             outerAttemptUUID: outerAttemptUUID,
             wholeCapsuleSHA256: wholeCapsuleSHA256,
-            epoch: epoch
+            wholeInputSHA256: wholeInputSHA256,
+            epoch: epoch,
+            projection: selected.projection
         )
     }
 }
@@ -227,7 +239,7 @@ package struct InvestigationMachineFixedCapsuleIntake: Sendable {
         }
         do {
             return InvestigationMachineFixedEpochPlan(
-                capsule: try InvestigationCohortCapsule.decode(encoded)
+                input: try InvestigationProjectedCohortInput.decode(encoded)
             )
         } catch {
             throw InvestigationMachineFixedCapsuleIntakeError.invalidCapsule
@@ -244,7 +256,8 @@ package struct InvestigationMachineFixedCapsuleIntake: Sendable {
             && snapshot.mode == 0o600
             && snapshot.linkCount == 1
             && snapshot.size > 0
-            && snapshot.size <= InvestigationCohortCapsule.maximumByteCount
+            && snapshot.size
+                <= InvestigationProjectedCohortInput.maximumByteCount
             && snapshot.flags == 0
     }
 
