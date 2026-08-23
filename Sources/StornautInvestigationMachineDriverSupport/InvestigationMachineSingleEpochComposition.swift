@@ -326,6 +326,19 @@ protocol InvestigationMachineSingleEpochComposing: Sendable {
     func run(
         previousHelperIdentity: InvestigationMachineProcessIdentity?
     ) async throws -> InvestigationMachineSingleEpochResult
+    func run(
+        invocation: InvestigationMachineSingleEpochInvocation
+    ) async throws -> InvestigationMachineSingleEpochResult
+}
+
+extension InvestigationMachineSingleEpochComposing {
+    func run(
+        invocation: InvestigationMachineSingleEpochInvocation
+    ) async throws -> InvestigationMachineSingleEpochResult {
+        try await run(
+            previousHelperIdentity: invocation.previousHelperIdentity
+        )
+    }
 }
 
 package actor InvestigationMachineSingleEpochComposition {
@@ -362,10 +375,8 @@ package actor InvestigationMachineSingleEpochComposition {
         let predecessorMaterial = try predecessor.consume(
             for: selection
         )
-        let result = try await composer.run(
-            previousHelperIdentity:
-                predecessorMaterial.previousHelperIdentity
-        )
+        let invocation = try predecessorMaterial.invocation(for: selection)
+        let result = try await composer.run(invocation: invocation)
         let currentHelper: InvestigationMachineProcessIdentity
         switch result {
         case let .localCompletion(completion):

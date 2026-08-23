@@ -82,26 +82,32 @@ package final class InvestigationMachineHelperEpochPredecessor:
 {
     let previousHelperIdentity: InvestigationMachineProcessIdentity?
     let continuitySHA256: InvestigationHandoffSHA256
+    let continuityTranscript: Data
     private let outerAttemptUUID: UUID
     private let wholeCapsuleSHA256: InvestigationHandoffSHA256
     private let wholeInputSHA256: InvestigationHandoffSHA256
     private let ordinal: UInt32
     private let epochUUID: UUID
+    private let selection: InvestigationMachineFixedEpochSelection
     private let lock = NSLock()
     private var consumed = false
+    private var invocationIssued = false
 
     fileprivate init(
         previousHelperIdentity: InvestigationMachineProcessIdentity?,
         continuitySHA256: InvestigationHandoffSHA256,
+        continuityTranscript: Data,
         selection: InvestigationMachineFixedEpochSelection
     ) {
         self.previousHelperIdentity = previousHelperIdentity
         self.continuitySHA256 = continuitySHA256
+        self.continuityTranscript = continuityTranscript
         outerAttemptUUID = selection.outerAttemptUUID
         wholeCapsuleSHA256 = selection.wholeCapsuleSHA256
         wholeInputSHA256 = selection.wholeInputSHA256
         ordinal = selection.epoch.ordinal
         epochUUID = selection.epoch.epochUUID
+        self.selection = selection
     }
 
     fileprivate func consume(
@@ -126,6 +132,28 @@ package final class InvestigationMachineHelperEpochPredecessor:
             }
         }
     }
+
+    package func invocation(
+        for selection: InvestigationMachineFixedEpochSelection
+    ) throws -> InvestigationMachineSingleEpochInvocation {
+        try lock.withLock {
+            guard !invocationIssued else {
+                throw InvestigationMachineHelperEpochContinuityError
+                    .alreadyConsumed
+            }
+            guard self.selection == selection else {
+                throw InvestigationMachineHelperEpochContinuityError
+                    .invalidPredecessor
+            }
+            invocationIssued = true
+            return try InvestigationMachineSingleEpochInvocation(
+                selection: selection,
+                previousHelperIdentity: previousHelperIdentity,
+                predecessorSHA256: continuitySHA256,
+                predecessorTranscript: continuityTranscript
+            )
+        }
+    }
 }
 
 package final class InvestigationMachineHelperEpochContinuity:
@@ -146,6 +174,7 @@ package final class InvestigationMachineHelperEpochContinuity:
     private let kind: Kind
     private let completedSelection: InvestigationMachineFixedEpochSelection?
     private let continuitySHA256: InvestigationHandoffSHA256
+    private let continuityTranscript: Data
     private let lock = NSLock()
     private var consumed = false
 
@@ -155,7 +184,8 @@ package final class InvestigationMachineHelperEpochContinuity:
         wholeInputSHA256: InvestigationHandoffSHA256,
         kind: Kind,
         completedSelection: InvestigationMachineFixedEpochSelection?,
-        continuitySHA256: InvestigationHandoffSHA256
+        continuitySHA256: InvestigationHandoffSHA256,
+        continuityTranscript: Data
     ) {
         self.outerAttemptUUID = outerAttemptUUID
         self.wholeCapsuleSHA256 = wholeCapsuleSHA256
@@ -163,6 +193,7 @@ package final class InvestigationMachineHelperEpochContinuity:
         self.kind = kind
         self.completedSelection = completedSelection
         self.continuitySHA256 = continuitySHA256
+        self.continuityTranscript = continuityTranscript
     }
 
     package static func genesis(
@@ -172,26 +203,27 @@ package final class InvestigationMachineHelperEpochContinuity:
             throw InvestigationMachineHelperEpochContinuityError
                 .invalidPredecessor
         }
+        let continuityTranscript = try HandoffBinaryTranscript.encode(
+            domain: "stornaut.task39.machine.helper-continuity.genesis",
+            businessFields: [
+                continuityData(selection.outerAttemptUUID),
+                selection.wholeCapsuleSHA256.rawBytes,
+                selection.wholeInputSHA256.rawBytes,
+                continuityData(selection.epoch.ordinal),
+                continuityData(selection.epoch.epochUUID),
+            ],
+            maximumByteCount: 512
+        )
         let continuitySHA256 = InvestigationHandoffSHA256.hashing(
-            try HandoffBinaryTranscript.encode(
-                domain:
-                    "stornaut.task39.machine.helper-continuity.genesis",
-                businessFields: [
-                    continuityData(selection.outerAttemptUUID),
-                    selection.wholeCapsuleSHA256.rawBytes,
-                    selection.wholeInputSHA256.rawBytes,
-                    continuityData(selection.epoch.ordinal),
-                    continuityData(selection.epoch.epochUUID),
-                ],
-                maximumByteCount: 512
-            )
+            continuityTranscript
         )
         return Self(
             outerAttemptUUID: selection.outerAttemptUUID,
             wholeCapsuleSHA256: selection.wholeCapsuleSHA256,
             wholeInputSHA256: selection.wholeInputSHA256,
             kind: .genesis, completedSelection: nil,
-            continuitySHA256: continuitySHA256
+            continuitySHA256: continuitySHA256,
+            continuityTranscript: continuityTranscript
         )
     }
 
@@ -201,9 +233,12 @@ package final class InvestigationMachineHelperEpochContinuity:
         proof: InvestigationMachineOuterContainmentProof,
         predecessor: InvestigationMachineHelperEpochPredecessor
     ) throws -> InvestigationMachineHelperEpochContinuity {
-        let continuitySHA256 = try successorSHA256(
+        let continuityTranscript = try successorTranscript(
             selection: selection, helperIdentity: helperIdentity,
             predecessorSHA256: predecessor.continuitySHA256, proof: proof
+        )
+        let continuitySHA256 = InvestigationHandoffSHA256.hashing(
+            continuityTranscript
         )
         return Self(
             outerAttemptUUID: selection.outerAttemptUUID,
@@ -214,7 +249,8 @@ package final class InvestigationMachineHelperEpochContinuity:
                 helperIdentity: helperIdentity, proof: proof
             ),
             completedSelection: selection,
-            continuitySHA256: continuitySHA256
+            continuitySHA256: continuitySHA256,
+            continuityTranscript: continuityTranscript
         )
     }
 
@@ -296,8 +332,19 @@ package final class InvestigationMachineHelperEpochContinuity:
         predecessorSHA256: InvestigationHandoffSHA256,
         proof: InvestigationMachineOuterContainmentProof
     ) throws -> InvestigationHandoffSHA256 {
-        InvestigationHandoffSHA256.hashing(
-            try HandoffBinaryTranscript.encode(
+        InvestigationHandoffSHA256.hashing(try successorTranscript(
+            selection: selection, helperIdentity: helperIdentity,
+            predecessorSHA256: predecessorSHA256, proof: proof
+        ))
+    }
+
+    private static func successorTranscript(
+        selection: InvestigationMachineFixedEpochSelection,
+        helperIdentity: InvestigationMachineProcessIdentity,
+        predecessorSHA256: InvestigationHandoffSHA256,
+        proof: InvestigationMachineOuterContainmentProof
+    ) throws -> Data {
+        try HandoffBinaryTranscript.encode(
                 domain:
                     "stornaut.task39.machine.helper-continuity.successor",
                 businessFields: [
@@ -313,7 +360,6 @@ package final class InvestigationMachineHelperEpochContinuity:
                     Data([proof.mode.rawValue]),
                 ],
                 maximumByteCount: 4_096
-            )
         )
     }
 
@@ -343,6 +389,7 @@ package final class InvestigationMachineHelperEpochContinuity:
                 return .init(
                     previousHelperIdentity: nil,
                     continuitySHA256: continuitySHA256,
+                    continuityTranscript: continuityTranscript,
                     selection: selection
                 )
             case let .successor(completedOrdinal, helperIdentity, proof):
@@ -366,6 +413,7 @@ package final class InvestigationMachineHelperEpochContinuity:
                 return .init(
                     previousHelperIdentity: helperIdentity,
                     continuitySHA256: continuitySHA256,
+                    continuityTranscript: continuityTranscript,
                     selection: selection
                 )
             }

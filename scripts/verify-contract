@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=58267ec490519ba7a6a5221ceb9636c2fc47f744ebbe03beac4131bba5f80aab
+ib2_self_sha=7e16d9895bd727e459993d8563d40890014ebdcf6d9f463ad70505362f5e2255
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -1152,9 +1152,9 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "97851358dcf72f4ecb895583a8ed045c66c1a503d56a516ab3a3c5990bd8eca8",
+        "c490b0602357228f405b95d3826e320f1b37c271b1e6f990c4512664df9e88bb",
     Path("scripts/verify-app-release-boundaries"):
-        "7597527b1e6ed702433a5e640c2b56d5df2bb8efedfff53627ac7258e5fb82ef",
+        "10b663aff102854f19ae8ac633e344ef5cba00f9039e35313d0ac7c575661bbe",
 }
 for path, expected_sha in expected.items():
     observed_sha = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -1174,11 +1174,11 @@ for marker, count in {
     "b48874d79581a67338e17845790543cea936c1efb359bd7862baecca0f0c0371": 2,
     "dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9": 4,
     "e792e789e9979d979696e7075ea92d265115633e5c6b63b1152a73ef4d241078": 1,
-    "4d57478df75e4ac233479540b870084d7db8503b1053b8eb47858145caca28e0": 1,
-    "72cd1161b440aee9d4fd6482fa17235da5f9f6c9e6e3fe13e54b94e789ebef49": 1,
-    "c4d96232dc66befc46dd220b600cb6c6b381ecce8020435b8a2e6993e5ea167a": 1,
+    "1413cfb6aecf97d6b207a54604586c60ed724a147daef2ab665b1b7cbf98c388": 1,
+    "6c5139024303c41a2ae376f6442801effd226266da46e729b712a5eb8dbfab6c": 1,
+    "41d602ddafd48639080d4e327f04bd4d022ed268834f5949a926e69ed137813c": 1,
+    "cec61d8ab2eb0e8f5e07c2d61085e95c3a469b96c176b8cbb074441d4fe22f80": 1,
     "4b18e0c5b893d4c9a91e7fb7e2467bcbcc979fab8053102045233fd847b205c0": 1,
-    "c07a0d53561fd93e0b29b55e00eddd939914c786228cacd016d37884c6d522aa": 1,
 }.items():
     observed = investigation.count(marker) + release.count(marker)
     if observed != count:
@@ -6921,4 +6921,241 @@ do
 done
 
 # iii-b1 exact seven-path staged scope.
+
+# Task 39 iii-b2a0 typed physical bridge gate. This checkpoint is intentionally
+# staged-only: do not add a completion commit/tree seal until it is accepted.
+iib5biii_b2a0_gate=scripts/verify-investigation-boundaries
+iib5biii_b2a0_app_gate=scripts/verify-app-release-boundaries
+iib5biii_b2a0_baseline=7c114e09c915e2685545872101e7c5854ce2cffd
+iib5biii_b2a0_composition=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochComposition.swift
+iib5biii_b2a0_continuity=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineHelperEpochContinuity.swift
+iib5biii_b2a0_bridge=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochPhysicalBridge.swift
+iib5biii_b2a0_test=Tests/StornautInvestigationTests/InvestigationMachineSingleEpochPhysicalBridgeTests.swift
+iib5biii_b2a0_boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+
+"$iib5biii_b2a0_gate" \
+    --iib5biii-b2a0-physical-bridge-contract-only \
+    "$iib5biii_b2a0_composition" "$iib5biii_b2a0_continuity" \
+    "$iib5biii_b2a0_bridge" "$iib5biii_b2a0_test" \
+    "$iib5biii_b2a0_boundary" \
+    >"$contract_root/iib5biii-b2a0-canonical.log"
+"$iib5biii_b2a0_app_gate" \
+    --iib5biii-b2a0-source-contract-only \
+    "$iib5biii_b2a0_composition" "$iib5biii_b2a0_continuity" \
+    "$iib5biii_b2a0_bridge" \
+    >"$contract_root/iib5biii-b2a0-app-canonical.log"
+
+python3 - "$iib5biii_b2a0_composition" \
+    "$iib5biii_b2a0_continuity" "$iib5biii_b2a0_bridge" \
+    "$iib5biii_b2a0_test" "$contract_root" <<'PY'
+from pathlib import Path
+import sys
+
+composition_path, continuity_path, bridge_path, test_path, root = map(
+    Path, sys.argv[1:]
+)
+sources = {
+    "composition": composition_path.read_text(encoding="utf-8"),
+    "continuity": continuity_path.read_text(encoding="utf-8"),
+    "bridge": bridge_path.read_text(encoding="utf-8"),
+    "test": test_path.read_text(encoding="utf-8"),
+}
+
+
+def mutate(name, source_name, old, new):
+    source = sources[source_name]
+    if source.count(old) != 1:
+        raise SystemExit(f"cannot construct iii-b2a0 mutation: {name}")
+    (root / f"iib5biii-b2a0-{name}.swift").write_text(
+        source.replace(old, new, 1), encoding="utf-8"
+    )
+
+
+mutate(
+    "invocation-one-shot-guard",
+    "continuity",
+    """            guard !invocationIssued else {
+                throw InvestigationMachineHelperEpochContinuityError
+                    .alreadyConsumed
+            }""",
+    "",
+)
+mutate(
+    "invocation-selection-binding",
+    "continuity",
+    """            guard self.selection == selection else {
+                throw InvestigationMachineHelperEpochContinuityError
+                    .invalidPredecessor
+            }""",
+    "",
+)
+mutate(
+    "composition-legacy-call",
+    "composition",
+    "let result = try await composer.run(invocation: invocation)",
+    """let result = try await composer.run(
+            previousHelperIdentity: predecessorMaterial.previousHelperIdentity
+        )""",
+)
+mutate(
+    "previous-uuid-nonzero",
+    "bridge",
+    "bridgeUUIDIsNonzero(previousEpochUUID),",
+    "",
+)
+mutate(
+    "authority-injection-composition",
+    "composition",
+    "import Foundation\n",
+    "import Foundation\nimport StornautExecution\n",
+)
+completion_header = """private struct InvestigationMachineCompletionMaterial {
+    let helperIdentity: InvestigationMachineProcessIdentity
+    let bindingSHA256: InvestigationHandoffSHA256
+    let mode: InvestigationMachineOuterContainmentMode
+"""
+mutate(
+    "physical-completion-admission",
+    "continuity",
+    completion_header,
+    completion_header
+    + """
+    init(physical: InvestigationMachineSingleEpochPhysicalResult) {
+        helperIdentity = physical.helperIdentity
+        bindingSHA256 = physical.bindingSHA256
+        mode = physical.mode
+    }
+""",
+)
+mutate(
+    "vacuous-focused-test",
+    "test",
+    "#expect(await [first, second].filter { $0 }.count == 1)",
+    "#expect(true)",
+)
+(root / "iib5biii-b2a0-partial-vacuous-test.swift").write_text(
+    sources["test"].replace(
+        "        let fixture = try PhysicalBridgeFixture(ordinal: kind.ordinal)\n"
+        "        let predecessor = try await fixture.predecessor()\n"
+        "        let invocation = try predecessor.invocation(for: fixture.selection)",
+        "        #expect(true)\n        return",
+        1,
+    ),
+    encoding="utf-8",
+)
+(root / "iib5biii-b2a0-comment-only-test.swift").write_text(
+    "\n".join("// " + line for line in sources["test"].splitlines())
+    + "\n",
+    encoding="utf-8",
+)
+PY
+
+function require_iib5biii_b2a0_mutation_rejected() {
+    local name=$1 source_kind=$2 expected=$3
+    local composition=$iib5biii_b2a0_composition
+    local continuity=$iib5biii_b2a0_continuity
+    local bridge=$iib5biii_b2a0_bridge
+    local focused_test=$iib5biii_b2a0_test
+    local target="$contract_root/iib5biii-b2a0-$name.swift"
+    [[ $source_kind == composition ]] && composition=$target
+    [[ $source_kind == continuity ]] && continuity=$target
+    [[ $source_kind == bridge ]] && bridge=$target
+    [[ $source_kind == test ]] && focused_test=$target
+    local output="$contract_root/iib5biii-b2a0-$name.log"
+    if "$iib5biii_b2a0_gate" \
+        --iib5biii-b2a0-physical-bridge-contract-only \
+        "$composition" "$continuity" "$bridge" "$focused_test" \
+        "$iib5biii_b2a0_boundary" >"$output" 2>&1
+    then
+        fail_contract "iii-b2a0 mutation accepted: $name"
+    fi
+    require_fixed_text "$output" "$expected"
+}
+
+for fixture in \
+    invocation-one-shot-guard:continuity:'iii-b2a0 invocation one-shot guard drifted' \
+    invocation-selection-binding:continuity:'iii-b2a0 invocation exact selection binding drifted' \
+    composition-legacy-call:composition:'iii-b2a0 composition invocation binding drifted' \
+    previous-uuid-nonzero:bridge:'iii-b2a0 predecessor UUID binding drifted' \
+    authority-injection-composition:composition:'iii-b2a0 dependency surface drifted' \
+    physical-completion-admission:continuity:'iii-b2a0 physical result authority boundary drifted' \
+    vacuous-focused-test:test:'iii-b2a0 focused test vacuity or coverage drifted' \
+    partial-vacuous-test:test:'iii-b2a0 focused test source seal drifted' \
+    comment-only-test:test:'iii-b2a0 focused test vacuity or coverage drifted'
+do
+    name=${fixture%%:*}
+    remainder=${fixture#*:}
+    source_kind=${remainder%%:*}
+    expected=${remainder#*:}
+    require_iib5biii_b2a0_mutation_rejected \
+        "$name" "$source_kind" "$expected"
+done
+
+iib5biii_b2a0_paths=(
+    "$iib5biii_b2a0_composition"
+    "$iib5biii_b2a0_continuity"
+    "$iib5biii_b2a0_bridge"
+    "$iib5biii_b2a0_test"
+    "$iib5biii_b2a0_boundary"
+    scripts/verify-app-release-boundaries
+    scripts/verify-contract
+    scripts/verify-investigation-boundaries
+)
+(( ${#iib5biii_b2a0_paths} == 8 )) \
+    || fail_contract "iii-b2a0 checkpoint path ceiling drifted"
+iib5biii_b2a0_index="$contract_root/iib5biii-b2a0.index"
+cp "$(git rev-parse --git-path index)" "$iib5biii_b2a0_index"
+GIT_INDEX_FILE="$iib5biii_b2a0_index" "$iib5biii_b2a0_gate" \
+    --iib5biii-b2a0-scope-contract-only "$iib5biii_b2a0_baseline" \
+    >"$contract_root/iib5biii-b2a0-scope-canonical.log"
+for line in {1..2400}; do
+    print -r -- "// iii-b2a0 over-budget line $line"
+done >"$contract_root/iib5biii-b2a0-over-budget.swift"
+for fixture in extra-path over-budget deleted binary mode wrong-baseline; do
+    index="$contract_root/iib5biii-b2a0-scope-$fixture.index"
+    cp "$iib5biii_b2a0_index" "$index"
+    case $fixture in
+        extra-path)
+            blob=$(git rev-parse "${iib5biii_b2a0_baseline}:AGENTS.md")
+            GIT_INDEX_FILE="$index" git update-index --add \
+                --cacheinfo "100644,$blob,iii-b2a0-extra.swift"
+            expected='iii-b2a0 staged checkpoint paths drifted' ;;
+        over-budget)
+            blob=$(git hash-object -w -- \
+                "$contract_root/iib5biii-b2a0-over-budget.swift")
+            GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                "100644,$blob,$iib5biii_b2a0_bridge"
+            expected='iii-b2a0 checkpoint budget drifted' ;;
+        deleted)
+            GIT_INDEX_FILE="$index" git rm --cached -q -f \
+                "$iib5biii_b2a0_continuity"
+            expected='iii-b2a0 checkpoint deleted an existing path' ;;
+        binary)
+            blob=$(git rev-parse \
+                "${iib5biii_b2a0_baseline}:Tests/Fixtures/Snapshots/design-system.empty-state.dark.en.png")
+            GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                "100644,$blob,$iib5biii_b2a0_composition"
+            expected='iii-b2a0 binary checkpoint path rejected' ;;
+        mode)
+            entry=$(GIT_INDEX_FILE="$index" git ls-files -s -- \
+                scripts/verify-contract)
+            blob=$(print -r -- "$entry" | awk '{print $2}')
+            GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                "100644,$blob,scripts/verify-contract"
+            expected='iii-b2a0 checkpoint mode drifted: scripts/verify-contract' ;;
+        wrong-baseline)
+            expected='iii-b2a0 checkpoint baseline drifted' ;;
+    esac
+    output="$contract_root/iib5biii-b2a0-scope-$fixture.log"
+    baseline=$iib5biii_b2a0_baseline
+    [[ $fixture == wrong-baseline ]] && baseline="$iib5biii_b2a0_baseline^"
+    if GIT_INDEX_FILE="$index" "$iib5biii_b2a0_gate" \
+        --iib5biii-b2a0-scope-contract-only "$baseline" \
+        >"$output" 2>&1
+    then
+        fail_contract "iii-b2a0 scope mutation accepted: $fixture"
+    fi
+    require_fixed_text "$output" "$expected"
+done
+
 print "Verifier mode and CI contract verification passed."

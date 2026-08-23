@@ -595,6 +595,7 @@ struct InvestigationMachineTargetBoundaryTests {
             "InvestigationMachineSingleEpoch.swift",
             "InvestigationMachineSingleEpochComposition.swift",
             "InvestigationMachineSingleEpochInstalledL2Join.swift",
+            "InvestigationMachineSingleEpochPhysicalBridge.swift",
         ])
         #expect(FileManager.default.fileExists(atPath: supportURL.path))
         let supportSource = try String(
@@ -744,6 +745,10 @@ struct InvestigationMachineTargetBoundaryTests {
                 "import Foundation",
                 "import StornautInvestigationHandoffContract",
                 "import StornautInvestigationInstalledL2",
+            ],
+            "InvestigationMachineSingleEpochPhysicalBridge.swift": [
+                "import Foundation",
+                "import StornautInvestigationHandoffContract",
             ],
         ]
         for sourceName in supportSourceNames {
@@ -1375,6 +1380,39 @@ struct InvestigationMachineTargetBoundaryTests {
         ] {
             #expect(contract.contains(marker))
         }
+    }
+
+    @Test
+    func iiiB2A0PhysicalBridgeVerifierPinsTypedNonAuthorityBoundary() throws {
+        let repositoryRoot = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let contract = try String(
+            contentsOf: repositoryRoot.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        let boundary = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ), encoding: .utf8
+        )
+        let app = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "scripts/verify-app-release-boundaries"
+            ), encoding: .utf8
+        )
+        for marker in [
+            "--iib5biii-b2a0-physical-bridge-contract-only",
+            "--iib5biii-b2a0-scope-contract-only",
+            "iii-b2a0 physical result authority boundary drifted",
+            "iii-b2a0 focused test vacuity or coverage drifted",
+        ] {
+            #expect(contract.contains(marker) || boundary.contains(marker))
+        }
+        #expect(app.contains(
+            "--iib5biii-b2a0-source-contract-only"
+        ))
     }
 
     @Test func iiB5BIAProjectionVerifierPinsPureBinaryAndTemporalContract() throws {
