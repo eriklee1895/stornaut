@@ -1,11 +1,16 @@
 # Phase D Task 39B2c L3c3c-ii-b5b-iii-b2a0 Typed Physical Bridge Preflight
 
-> Status: implementation and post-fix validation complete / non-admitting;
-> completion commit seal pending
+> Status: complete / non-admitting; immutable completion seal recorded
 >
 > Date: 2026-08-23
 >
 > Baseline: `7c114e09c915e2685545872101e7c5854ce2cffd`
+>
+> Implementation commit: `65f85c5adbb01b41b1bf9a5f787951f9feb4660d`
+>
+> Implementation tree: `7df0d5597f498e3588823885d226bdd02befc058`
+>
+> Completion-seal commit: `3f62678306d982edf986acf8a2ef12c3c4081741`
 >
 > Scope: package-only invocation/result bridge between the iii-b1 cohort and
 > the future Darwin outer/inner adapter; no process launch, descriptor I/O,
@@ -195,11 +200,14 @@ No generic fixture result can substitute for it.
 
 ## 8. Non-Claims and Next Step
 
-This preflight changes documentation only. It does not launch a process, read FD
-0, connect App/helper/XPC, use administrator privileges, read Codex
-authentication, call a model, access the network or claim readiness. ADR 0018
+At preflight time this document changed documentation only and authorized the
+typed-bridge implementation and validation funnel. The completed prerequisite
+still did not launch a process, read FD 0, connect App/helper/XPC, use root, read
+Codex authentication, call a model, access the network or claim readiness. The
+immutable completion evidence is recorded in the
+[iii-b2a0 review](phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a0-review.md). ADR 0018
 remains Proposed, Task 39 remains incomplete and production Deep Dive remains
-`.implementationUnavailable`. The next action is the iii-b2a0 RED focused test.
+`.implementationUnavailable`.
 
 ## 9. Implementation Outcome
 
@@ -228,9 +236,10 @@ Final validation evidence:
   Release Machine Driver projections;
 - `scripts/verify-app-release-boundaries`: passed, including Xcode/App boundary
   checks;
-- clean staged-only serial: 1,462 tests in 76 suites passed, 94.420 seconds test
-  time and 155.498 seconds for the complete step;
-- targeted Xcode Debug diagnostic build: passed in 29.5 seconds; and
+- clean staged-only serial: 1,462 tests in 76 suites passed, 93.860 seconds test
+  time and 151.805 seconds for the complete step;
+- targeted Xcode Debug diagnostic build: passed in 29.6 seconds;
+- targeted Xcode Release Machine Driver build: passed in 19.2 seconds; and
 - independent semantic, verifier and cross-group post-fix review: no unresolved
   P0-P2 findings.
 
@@ -239,6 +248,8 @@ threshold for this workflow and the configured `utree` coverage parser does not
 support Swift. This does not replace the focused, affected and serialized
 regression evidence above.
 
-No authoritative full verifier or authenticated Codex App Server run was
-performed. After the immutable completion seal, the next implementation
+No authoritative full verifier, root operation, installed App/helper, real XPC,
+model, authentication or network flow was performed. No real Codex App Server
+run occurred on 2026-08-24. The immutable completion seal is
+`3f62678306d982edf986acf8a2ef12c3c4081741`; the current implementation
 checkpoint is iii-b2a Darwin outer/inner physical adaptation.

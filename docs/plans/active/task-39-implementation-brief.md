@@ -86,9 +86,9 @@
 > admitting. Dependency inversion split ii-c0 into c0a/c0b; ii-c0a
 > projection-in-capsule input/intake is complete/non-admitting. A fresh source/
 > topology audit split ii-b5b-iii into b0 protocol, a per-epoch continuity, b1
-> injected cohort, b2a physical adapter and b2b entry/artifact. b0 is frozen/
-> non-admitting; iii-a and iii-b1 are complete/non-admitting and iii-b2a is
-> current.
+> injected cohort, b2a0 typed physical bridge, b2a physical adapter and b2b
+> entry/artifact. b0 is frozen/non-admitting; iii-a, iii-b1 and iii-b2a0 are
+> complete/non-admitting and iii-b2a is current.
 > Evidence:
 > [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
 > [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md) and
@@ -197,6 +197,10 @@
 > [L3c3c-ii-b2a Typed Escrow/Deadline Review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2a-review.md).
 > and
 > [L3c3c-ii-b2b-i Machine-Claim Server Review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2b-i-review.md).
+> and
+> [L3c3c-ii-b5b-iii-b2a0 Typed Physical Bridge Preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a0-typed-physical-bridge-preflight.md)
+> and
+> [L3c3c-ii-b5b-iii-b2a0 Review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a0-review.md).
 >
 > **Parent plan:**
 > [Phase D Conditional Deep Dive](phase-d-conditional-deep-dive.md)
@@ -1123,8 +1127,9 @@ The remaining L3 work is split before driver coding:
    intake, ii-b5b-ii-b independent Darwin App identity observation,
    ii-b5b-ii-c fixed FD-7 session and ii-b5b-ii-d exact owned-PGID retirement
    and ii-c0a are complete/non-admitting. The further split is frozen as
-   `iii-b0 -> iii-a -> iii-b1 -> iii-b2a -> iii-b2b`; b0 is documentation-only/
-   non-admitting and iii-a/iii-b1 are complete/non-admitting. The corrected
+   `iii-b0 -> iii-a -> iii-b1 -> iii-b2a0 -> iii-b2a -> iii-b2b`; b0 is
+   documentation-only/non-admitting and iii-a/iii-b1/iii-b2a0 are complete/
+   non-admitting. The corrected
    remaining order is `iii-b2a -> iii-b2b -> ii-c0b -> ii-c -> L3c3d -> L3c4`;
    iii-b2a is current.
    See the
@@ -1214,6 +1219,19 @@ The remaining L3 work is split before driver coding:
    [iii-a review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-a-review.md).
    iii-b1 completion is recorded in the
    [iii-b1 review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b1-review.md).
+   iii-b2a0 typed-bridge scope and completion are recorded in the
+   [iii-b2a0 preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a0-typed-physical-bridge-preflight.md)
+   and
+   [iii-b2a0 review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a0-review.md).
+   It closed exact 8 non-document paths / 2,198 changed lines, 36 combined
+   bridge/continuity/cohort tests, 580 affected tests, a clean 1,462-test /
+   76-suite staged-only serial, three boundary gates, targeted Debug/Release
+   builds, immutable seal and independent semantic/verifier/cross-group review.
+   Its physical result is an untrusted DTO and cannot enter
+   `InvestigationMachineSingleEpochResult` or continuity. iii-b2a must bind the
+   exact request/response, acknowledgement, independently observed identity and
+   EOF/terminal evidence before one private call site mints an admitted token;
+   receiver-side replay rejection remains iii-b2a work.
    The b5 split, claim-abort completion and typed composer completion evidence
    are in the
    [ii-b5 preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b5-split-preflight.md),
@@ -1268,7 +1286,8 @@ L3c3c-ii-b5b-i-b3 -> L3c3c-ii-b5b-i-c ->
 L3c3c-ii-b5b-ii-a -> L3c3c-ii-b5b-ii-b -> L3c3c-ii-b5b-ii-c ->
 L3c3c-ii-b5b-ii-d -> L3c3c-ii-c0a -> L3c3c-ii-b5b-iii-b0 ->
 L3c3c-ii-b5b-iii-a -> L3c3c-ii-b5b-iii-b1 ->
-L3c3c-ii-b5b-iii-b2a -> L3c3c-ii-b5b-iii-b2b -> L3c3c-ii-c0b ->
+L3c3c-ii-b5b-iii-b2a0 -> L3c3c-ii-b5b-iii-b2a ->
+L3c3c-ii-b5b-iii-b2b -> L3c3c-ii-c0b ->
 L3c3c-ii-c -> L3c3d -> L3c4`.
 L3c1, L3c2, L3c3a,
 L3c3b-0, L3c3b-i, L3c3b-ii, L3c3c-i and L3c3c-ii-a are complete;
@@ -1279,7 +1298,7 @@ ii-b3c concrete leaf/native entry, ii-b4 fixed helper-claim client, ii-b5a0 and
 ii-b5a, ii-b5b-i-a, i-b1, i-b2a, i-b2b-a, i-b2b-b, i-b3, i-c1 and i-c2a
 are complete and non-admitting; aggregate i-c2 and ii-b5b-ii-a/ii-b/ii-c/ii-d
 and ii-c0a are complete/non-admitting; ii-b5b-iii-b0 is frozen/non-admitting
-and iii-a/iii-b1 are complete/non-admitting; iii-b2a is the current
+and iii-a/iii-b1/iii-b2a0 are complete/non-admitting; iii-b2a is the current
 implementation checkpoint.
 ADR 0018
 remains Proposed until ii-c succeeds. L3c1 used focused

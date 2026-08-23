@@ -7,10 +7,11 @@
 > ii-b3a/ii-b3b/ii-b3c/ii-b4/ii-b5a0 complete/non-admitting; ii-b5 split;
 > b5a and all b5b-i checkpoints through aggregate i-c2 complete/non-admitting;
 > ii-b5b-ii-a/ii-b/ii-c/ii-d and ii-c0a projection-in-capsule complete/non-
-> admitting; ii-b5b-iii-b0 outer/inner protocol preflight frozen; iii-a and
-> iii-b1 complete/non-admitting; iii-b2a current
+> admitting; ii-b5b-iii-b0 outer/inner protocol preflight frozen; iii-a,
+> iii-b1 and iii-b2a0 typed physical bridge complete/non-admitting; iii-b2a
+> current
 >
-> **Date:** 2026-08-19
+> **Date:** 2026-08-19; status evidence refreshed 2026-08-24
 >
 > **Decision owners:** Stornaut maintainers
 >
@@ -64,8 +65,12 @@ freezes the implementation split and validation funnel. The later
 corrects the remaining dependency order without changing accepted v1 capsule
 bytes. The
 [ii-c0a completion review](../reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md)
-records the green implementation and non-admitting boundary. Important measured
-conclusions are:
+records the green implementation and non-admitting boundary. The later
+[iii-b2a0 preflight](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a0-typed-physical-bridge-preflight.md)
+and
+[completion review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a0-review.md)
+freeze the package-only request/result bridge before the Darwin physical
+adapter. Important measured conclusions are:
 
 - an inherited socket's peer token does not rebind to the child;
 - an anonymous XPC endpoint cannot be converted to an ordinary byte archive;
@@ -79,7 +84,8 @@ conclusions are:
 - no public stock macOS `fexecve`/`execveat` path closes that relation; and
 - the root-owned installed diagnostic driver already has installer/L2 identity
   contracts, but its current zero-dependency runtime still returns unavailable
-  and has not implemented the live handoff.
+  and has not implemented the live physical handoff; iii-b2a0 supplies only an
+  untrusted typed DTO bridge and does not change that fact.
 
 ## Proposed Decision
 
@@ -289,6 +295,10 @@ not a fault target and may not signal unrelated processes.
   running-vnode validity survives path replacement on the measured platform.
 - ii-c0a preserves v1 capsule/epoch bytes and adds only a strict enclosing
   projected-cohort binary contract and paired intake; it is not a producer.
+- ii-b5b-iii is ordered as `iii-b0 -> iii-a -> iii-b1 -> iii-b2a0 ->
+  iii-b2a -> iii-b2b`. iii-b2a0 carries the canonical predecessor and physical
+  result bytes but cannot admit those bytes into the single-epoch result or
+  continuity chain.
 - ii-c0b proves only non-root capsule authoring and gate-side exec/FD hygiene
   with a non-privileged stub plus the local sudo manual. It does not prove real
   sudo preserves child stdin/TTY/
@@ -373,6 +383,7 @@ unconsumed.
 | ii-b5b-iii-b0 outer/inner protocol preflight | frozen; non-admitting |
 | ii-b5b-iii-a typed per-epoch completion and continuity | complete; non-admitting |
 | ii-b5b-iii-b1 injected eight-epoch cohort | complete; non-admitting |
+| ii-b5b-iii-b2a0 typed physical bridge | complete; non-admitting |
 | ii-b5b-iii-b2a Darwin outer/inner physical adapter | current |
 | ii-b5b-iii-b2b zero-argument entry and final artifact | not started |
 | ii-c0b non-root capsule author and launcher hygiene | not started |

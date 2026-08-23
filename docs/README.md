@@ -33,7 +33,7 @@
 | Agent、双模式与治理设计 | [Agent Disk Governance](design/agent-disk-governance.md) |
 | UI、品牌、状态与交互 | [UI/UX](design/ui-ux.md) |
 | 宏观交付顺序与阶段 Gate | [Delivery Roadmap](plans/roadmap.md) |
-| 当前计划状态 | [Active Plans](plans/active/README.md) — Phase D approved；Task 39 in progress；iii-a/iii-b1 complete/non-admitting，iii-b2a current；ADR 0018 Proposed |
+| 当前计划状态 | [Active Plans](plans/active/README.md) — Phase D approved；Task 39 in progress；iii-a/iii-b1/iii-b2a0 complete/non-admitting，iii-b2a current；ADR 0018 Proposed |
 | Capability-first Codex Runtime Gate | [Runtime Evidence Gate](plans/completed/capability-first-codex-runtime-gate.md) — complete / archived |
 | R2 tests-first brief | [R2 Implementation Brief](plans/completed/task-r2-implementation-brief.md) — complete |
 | R3 lifecycle hard-gate brief | [R3 Implementation Brief](plans/completed/task-r3-implementation-brief.md) — behaviorReady candidate |
@@ -64,7 +64,7 @@
 | Phase D Task 37 Review | [Code Review and Completion Audit](reports/phase-d-task-37-review.md) |
 | Phase D Task 38 | [Implementation Brief](plans/active/task-38-implementation-brief.md) — complete |
 | Phase D Task 38 Review | [Code Review and Completion Audit](reports/phase-d-task-38-review.md) |
-| Phase D Task 39 | [Implementation Brief](plans/active/task-39-implementation-brief.md) — in progress；iii-a/iii-b1 complete/non-admitting，iii-b2a current；remaining order iii-b2a → iii-b2b → ii-c0b → ii-c → L3c3d → L3c4 |
+| Phase D Task 39 | [Implementation Brief](plans/active/task-39-implementation-brief.md) — in progress；iii-a/iii-b1/iii-b2a0 complete/non-admitting，iii-b2a current；remaining order iii-b2a → iii-b2b → ii-c0b → ii-c → L3c3d → L3c4 |
 | Phase D Task 39A Review | [Code Review and Completion Audit](reports/phase-d-task-39a-review.md) |
 | Phase D Task 39B1a Review | [Code Review and Completion Audit](reports/phase-d-task-39b1a-review.md) |
 | Phase D Task 39B1b-i Review | [Code Review and Completion Audit](reports/phase-d-task-39b1b-i-review.md) |
@@ -146,7 +146,9 @@
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-b0 Preflight | [Outer/Inner Protocol and Split](reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md) — long-lived outer、disposable inner-led PGID、fixed FD contract、parent-crash overlay and iii-a/b1/b2a/b2b budgets；preflight complete/non-admitting |
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-a Review | [Per-Epoch Continuity Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-a-review.md) — exact 10 paths / 3,147 changed lines；40 focused、559 affected、1,446-test/74-suite clean serial；three boundary gates and no unresolved P0–P2；complete/non-admitting |
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-b1 Preflight | [Injected Eight-Epoch Cohort](reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b1-preflight.md) — package-only one-shot actor、final continuity destruction、7 paths / 3,200 lines；complete/non-admitting |
-| Phase D Task 39B2c L3c3c-ii-b5b-iii-b1 Review | [Injected Cohort Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b1-review.md) — exact 7 paths / 2,438 changed lines；13 focused、573 affected、1,455-test/75-suite clean serial；immutable replay seal and no unresolved P0–P2；complete/non-admitting，iii-b2a current |
+| Phase D Task 39B2c L3c3c-ii-b5b-iii-b1 Review | [Injected Cohort Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b1-review.md) — exact 7 paths / 2,438 changed lines；13 focused、573 affected、1,455-test/75-suite clean serial；immutable replay seal and no unresolved P0–P2；complete/non-admitting |
+| Phase D Task 39B2c L3c3c-ii-b5b-iii-b2a0 Preflight | [Typed Physical Bridge Contract](reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a0-typed-physical-bridge-preflight.md) — package-only invocation/result bytes、untrusted DTO boundary、8 paths / 2,200 lines；complete/non-admitting |
+| Phase D Task 39B2c L3c3c-ii-b5b-iii-b2a0 Review | [Typed Physical Bridge Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a0-review.md) — exact 8 paths / 2,198 changed lines；36 combined、580 affected、1,462-test/76-suite clean serial；three boundary gates、immutable seal and no unresolved P0–P2；complete/non-admitting，iii-b2a current |
 | Epic 2–4 历史计划 | [Deterministic Product Core](plans/completed/epic-2-4-deterministic-product-core.md) — Tasks 9–26 已完成并归档 |
 | 已完成计划 | [Completed Plans](plans/completed/README.md) — Epic 0–1 |
 | 上游学习与许可证门禁 | [Upstream Reference Matrix](research/upstream-reference-matrix.md) |
