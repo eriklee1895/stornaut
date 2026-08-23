@@ -60,6 +60,13 @@ iib5biii_a_installed_join_test_source=
 iib5biii_a_boundary_test_source=
 iib5biii_a_staged_scope_contract_only=false
 iib5biii_a_staged_scope_baseline=5933bd0590d5e1c9ab696445fa4475d180e5143e
+iib5biii_b1_cohort_contract_only=false
+iib5biii_b1_cohort_source=
+iib5biii_b1_continuity_source=
+iib5biii_b1_focused_test_source=
+iib5biii_b1_boundary_test_source=
+iib5biii_b1_staged_scope_contract_only=false
+iib5biii_b1_staged_scope_baseline=67306345f057398063aa20f6b9b2ae7f6175d9af
 iib5bia_projection_contract_only=false
 iib5bia_contract_source=
 iib5bia_focused_test_source=
@@ -266,6 +273,17 @@ if (( $# > 0 )); then
         && [[ $1 == --iib5biii-a-staged-scope-contract-only ]]; then
         iib5biii_a_staged_scope_contract_only=true
         iib5biii_a_staged_scope_baseline=${2:-5933bd0590d5e1c9ab696445fa4475d180e5143e}
+    elif (( $# == 5 )) \
+        && [[ $1 == --iib5biii-b1-cohort-contract-only ]]; then
+        iib5biii_b1_cohort_contract_only=true
+        iib5biii_b1_cohort_source=$2
+        iib5biii_b1_continuity_source=$3
+        iib5biii_b1_focused_test_source=$4
+        iib5biii_b1_boundary_test_source=$5
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iib5biii-b1-staged-scope-contract-only ]]; then
+        iib5biii_b1_staged_scope_contract_only=true
+        iib5biii_b1_staged_scope_baseline=${2:-67306345f057398063aa20f6b9b2ae7f6175d9af}
     elif (( $# == 3 )) \
         && [[ $1 == --iib5bia-projection-contract-only ]]; then
         iib5bia_projection_contract_only=true
@@ -462,7 +480,7 @@ if (( $# > 0 )); then
         iib3c_staged_scope_baseline=${2:-HEAD}
     else
         print -u2 \
-            "Usage: scripts/verify-investigation-boundaries [... | --iib5biii-a-single-epoch-contract-only <single-epoch> <composition> <continuity> <continuity-test> <single-epoch-test> <installed-join-test> <boundary-test> | --iib5biii-a-staged-scope-contract-only [baseline]]"
+            "Usage: scripts/verify-investigation-boundaries [... | --iib5biii-a-single-epoch-contract-only <single-epoch> <composition> <continuity> <continuity-test> <single-epoch-test> <installed-join-test> <boundary-test> | --iib5biii-a-staged-scope-contract-only [baseline] | --iib5biii-b1-cohort-contract-only <cohort> <continuity> <focused-test> <boundary-test> | --iib5biii-b1-staged-scope-contract-only [baseline]]"
         exit 64
     fi
 fi
@@ -996,7 +1014,7 @@ successor_transcript = (
     '                    continuityData(selection.epoch.ordinal),\n'
     '                    continuityData(selection.epoch.epochUUID),\n'
     '                    try helperIdentity.encoded(),\n'
-    '                    predecessor.continuitySHA256.rawBytes,\n'
+    '                    predecessorSHA256.rawBytes,\n'
     '                    proof.completionBindingSHA256.rawBytes,\n'
     '                    proof.terminalProofSHA256.rawBytes,\n'
     '                    Data([proof.mode.rawValue]),\n'
@@ -1005,6 +1023,11 @@ successor_transcript = (
 )
 if continuity.count(successor_transcript) != 1:
     fail("iii-a successor transcript binding drifted")
+if (
+    "predecessorSHA256: predecessor.continuitySHA256" not in continuity
+    or "predecessorSHA256: proof.predecessorSHA256" not in continuity
+):
+    fail("iii-a successor predecessor digest binding drifted")
 
 if not single.index("let ownershipResolution = await Task.detached {") < single.index("claimReleaseAttempted = true") < single.index("return .localCompletion(try .init("):
     fail("iii-a ownership suspension or completion ordering drifted")
@@ -1065,6 +1088,301 @@ function verify_iib5biii_a_staged_scope() {
     done
     local changed=$(git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1 && $3!="AGENTS.md" && $3!="README.md" {n+=$1+$2} END {print n+0}')
     (( changed <= 3200 )) || { print -u2 "iii-a checkpoint budget drifted"; return 1; }
+    [[ "$(git write-tree)" == 2eeb307cfb2cf67a1b169e0a510c92ea2dc9dbb2 ]] \
+        || { print -u2 "iii-a completed tree drifted"; return 1; }
+}
+
+function verify_iib5biii_b1_cohort_contract() {
+    local cohort_source=$1 continuity_source=$2 focused_test_source=$3
+    local boundary_test_source=$4
+    for source in "$cohort_source" "$continuity_source" \
+        "$focused_test_source" "$boundary_test_source"; do
+        xcrun swiftc -frontend -parse -enable-bare-slash-regex "$source"
+    done
+    python3 - "$cohort_source" "$continuity_source" \
+        "$focused_test_source" "$boundary_test_source" <<'PY'
+from pathlib import Path
+import hashlib
+import re
+import sys
+
+cohort_path, continuity_path, test_path, boundary_path = map(
+    Path, sys.argv[1:]
+)
+cohort = cohort_path.read_text(encoding="utf-8")
+continuity = continuity_path.read_text(encoding="utf-8")
+test = test_path.read_text(encoding="utf-8")
+boundary = boundary_path.read_text(encoding="utf-8")
+
+def fail(message):
+    raise SystemExit(message)
+
+def imports(source):
+    return set(re.findall(r"(?m)^import\s+([A-Za-z0-9_]+)\s*$", source))
+
+if imports(cohort) != {"Foundation", "StornautInvestigationHandoffContract"}:
+    fail("iii-b1 dependency surface drifted")
+if imports(continuity) != {"Foundation", "StornautInvestigationHandoffContract"}:
+    fail("iii-b1 continuity dependency surface drifted")
+semantic = cohort + continuity
+if re.search(r"(?m)^\s*(?:public|open)\s+", semantic):
+    fail("iii-b1 public surface drifted")
+for marker in (
+    "package enum InvestigationMachineEightEpochCohortError",
+    "protocol InvestigationMachineEightEpochPlan: Sendable",
+    "package protocol InvestigationMachineEightEpochExecutionFactory",
+    "package final class InvestigationMachineEightEpochExecution",
+    "package struct InvestigationMachineEightEpochCompletionSummary",
+    "package actor InvestigationMachineEightEpochCohort",
+    "package func run() async throws",
+    "package func destroyAfterFinal(",
+):
+    if marker not in semantic:
+        fail(f"iii-b1 package/internal surface drifted: {marker}")
+
+authority_patterns = (
+    r"\b(?:Codable|Encodable|Decodable)\b",
+    r"\b(?:Darwin|Glibc|AppKit|SwiftUI)\b",
+    r"\b(?:posix_spawn|posix_spawnp|fork|execve|system)\s*\(",
+    r"\b(?:FileManager|FileHandle|URL|URLRequest|Path|URLSession|NSXPCConnection|Process)\b",
+    r"\b(?:open|openat|creat|write|pwrite|truncate|ftruncate|rename|unlink|remove|mkdir|rmdir|chmod|chown|copyfile|clonefile|socket|socketpair|connect|bind|listen|accept|send|recv|kill|killpg|waitpid|waitid)\s*\(",
+    r"\b(?:O_WRONLY|O_RDWR|O_CREAT|O_TRUNC|O_APPEND)\b",
+    r"\b(?:fileDescriptor|descriptor|FD_CLOEXEC|STDIN_FILENO|PGID)\b",
+    r"\b(?:CommandLine\.arguments|ProcessInfo\.processInfo\.environment|readLine)\b",
+    r"\b(?:Executor|MoveToTrash|RegisteredAction|readiness|signedRuntimeReady|signedInvestigationRuntimeReady|implementationUnavailable)\b",
+    r"\bStornaut(?:Execution|Core|Lifecycle|Codex|InvestigationRuntime|InvestigationDiagnostic|ProbeBridge|ProcessSupport)\b",
+    r"(?m)^\s*@main\b",
+)
+for pattern in authority_patterns:
+    if re.search(pattern, semantic, re.IGNORECASE):
+        fail("iii-b1 authority or product reachability drifted")
+
+run_start = cohort.index("package func run() async throws")
+run_end = cohort.index("    private func validate(", run_start)
+run = cohort[run_start:run_end]
+for marker, message in (
+    ("guard case .ready = state else", "iii-b1 one-shot state ordering drifted"),
+    ("state = .running", "iii-b1 one-shot state ordering drifted"),
+    ("defer { state = .terminal }", "iii-b1 one-shot state ordering drifted"),
+    ("guard usedExecutions.insert(ObjectIdentifier(execution)).inserted", "iii-b1 fresh wrapper retention drifted"),
+    ("retainedExecutions.append(execution)", "iii-b1 fresh wrapper retention drifted"),
+    ("try finalContinuity.destroyAfterFinal(selection: finalSelection)", "iii-b1 final destroy/exhaustion ordering drifted"),
+    ("guard error == InvestigationMachineFixedCapsuleIntakeError.exhausted", "iii-b1 final destroy/exhaustion ordering drifted"),
+):
+    if marker not in run:
+        fail(message)
+ready = run.index("guard case .ready = state else")
+running = run.index("state = .running")
+terminal = run.index("defer { state = .terminal }")
+first_await = run.index("await")
+if not ready < running < terminal < first_await:
+    fail("iii-b1 one-shot state ordering drifted")
+if run.count("guard case .ready = state else") != 1 \
+        or run.count("state = .running") != 1 \
+        or run.count("defer { state = .terminal }") != 1:
+    fail("iii-b1 one-shot state ordering drifted")
+if run.count("for index in 0..<InvestigationCohortCapsule.epochCount {") != 1 \
+        or run.count("try await plan.takeNext()") != 2 \
+        or any(marker in run for marker in (
+            "async let", "withTaskGroup", "withThrowingTaskGroup",
+            "while ", "repeat {", "Task.detached", "Task {",
+        )):
+    fail("iii-b1 exact eight-loop or no-prefetch contract drifted")
+
+if run.count("guard !Task.isCancelled else") != 4:
+    fail("iii-b1 cancellation checks drifted")
+first_cancel = run.index("guard !Task.isCancelled else")
+selection = run.index("let selection = try await plan.takeNext()")
+second_cancel = run.index("guard !Task.isCancelled else", first_cancel + 1)
+validation = run.index("try validate(", selection)
+factory = run.index("try await executionFactory.makeExecution(", validation)
+third_cancel = run.index("guard !Task.isCancelled else", second_cancel + 1)
+fresh = run.index("usedExecutions.insert(ObjectIdentifier(execution)).inserted")
+retain = run.index("retainedExecutions.append(execution)")
+consume = run.index("let dependencies = try execution.consume(")
+compose = run.index("let composition = InvestigationMachineSingleEpochComposition(")
+execute = run.index("continuity = try await composition.run()")
+destroy = run.index("try finalContinuity.destroyAfterFinal(selection: finalSelection)")
+ninth = run.index("_ = try await plan.takeNext()", selection + 1)
+exhausted = run.index(
+    "guard error == InvestigationMachineFixedCapsuleIntakeError.exhausted",
+    ninth,
+)
+fourth_cancel = run.index("guard !Task.isCancelled else", third_cancel + 1)
+summary = run.index("return InvestigationMachineEightEpochCompletionSummary(")
+if not (
+    first_cancel < selection < second_cancel < validation < factory
+    < third_cancel < fresh < retain < consume < compose < execute
+    < destroy < ninth < exhausted < fourth_cancel < summary
+):
+    fail("iii-b1 cancellation or cohort operation ordering drifted")
+if run.count("executionFactory.makeExecution(") != 1 \
+        or run.count("retainedExecutions.append(execution)") != 1 \
+        or run.count("ObjectIdentifier(execution)") != 1:
+    fail("iii-b1 fresh wrapper retention drifted")
+
+overlay = re.sub(r"\s+", " ", cohort[cohort.index(
+    "private func containmentMode("
+):cohort.index("    private var zeroUUID")])
+expected_overlay = (
+    "private func containmentMode( for scenario: InvestigationHandoffScenario "
+    ") -> InvestigationMachineOuterContainmentMode { switch scenario { "
+    "case .lifecycleRecovery: .parentCrash case .success, .cancellation, "
+    ".timeout, .invalidEnvelope, .identityMismatch, .transportLoss, "
+    ".artifactCleanupFailure: .normal } } "
+)
+if overlay != expected_overlay:
+    fail("iii-b1 fixed overlay drifted")
+
+for marker in (
+    "selection == expectedSelection",
+    "mode == expectedMode",
+    "composer.isBound(to: expectedSelection)",
+    "selection.epoch.ordinal == UInt32(expectedIndex)",
+    "selection.epoch.scenario.rawValue",
+    "== selection.epoch.ordinal + 1",
+    "selection.projection.epochUUID == selection.epoch.epochUUID",
+    "selection.projection.configurationNonce",
+    "== selection.epoch.configurationNonce",
+    "selection.projection.configurationSHA256",
+    "== selection.epoch.configurationSHA256",
+    "selection.projection.signedRuntimeBindingSHA256",
+    "== selection.epoch.signedRuntimeBindingSHA256",
+    "selection.outerAttemptUUID != zeroUUID",
+    "selection.wholeCapsuleSHA256.rawBytes.contains(where: { $0 != 0 })",
+    "selection.wholeInputSHA256.rawBytes.contains(where: { $0 != 0 })",
+    "selection.outerAttemptUUID == expectedOuterAttemptUUID",
+    "selection.wholeCapsuleSHA256 == expectedCapsuleSHA256",
+    "selection.wholeInputSHA256 == expectedInputSHA256",
+    "cohortIdentifiers.insert(selection.outerAttemptUUID).inserted",
+    "cohortIdentifiers.insert(selection.epoch.epochUUID).inserted",
+    "cohortIdentifiers.insert(selection.epoch.configurationNonce).inserted",
+):
+    if marker not in cohort:
+        fail(f"iii-b1 selection or cohort binding drifted: {marker}")
+
+execution_start = cohort.index(
+    "package final class InvestigationMachineEightEpochExecution"
+)
+execution_end = cohort.index(
+    "package struct InvestigationMachineEightEpochCompletionSummary"
+)
+execution = cohort[execution_start:execution_end]
+if "package init(" in execution or "public init(" in execution:
+    fail("iii-b1 execution wrapper construction surface drifted")
+if not (
+    execution.index("guard !consumed else")
+    < execution.index("consumed = true")
+    < execution.index("selection == expectedSelection")
+    < execution.index("return (composer, prover)")
+):
+    fail("iii-b1 execution wrapper one-shot binding drifted")
+
+destroy_start = continuity.index("package func destroyAfterFinal(")
+destroy_end = continuity.index("    private static func successorSHA256(", destroy_start)
+destroy_body = continuity[destroy_start:destroy_end]
+if not (
+    destroy_body.index("guard !consumed else")
+    < destroy_body.index("consumed = true")
+    < destroy_body.index("completedSelection == selection")
+):
+    fail("iii-b1 final continuity destruction ordering drifted")
+for marker in (
+    "InvestigationCohortCapsule.epochCount - 1",
+    "selection.epoch.scenario.rawValue",
+    "selection.epoch.ordinal + 1",
+    "proof.completedOrdinal == completedOrdinal",
+    "proof.outerAttemptUUID == outerAttemptUUID",
+    "proof.wholeCapsuleSHA256 == wholeCapsuleSHA256",
+    "proof.wholeInputSHA256 == wholeInputSHA256",
+    "proof.helperIdentity == helperIdentity",
+    "proof.terminalProofSHA256.rawBytes.contains(",
+    "continuitySHA256 == (try Self.successorSHA256(",
+):
+    if marker not in destroy_body:
+        fail(f"iii-b1 final continuity binding drifted: {marker}")
+if not destroy < ninth < exhausted:
+    fail("iii-b1 final destroy/exhaustion ordering drifted")
+
+test_code = re.sub(
+    r'/\*.*?\*/|//.*$|#?"(?:\\.|[^"\\])*"',
+    ' ',
+    test,
+    flags=re.DOTALL | re.MULTILINE,
+)
+required_tests = (
+    "eightOrderedEpochsProduceExactSummaryAndExhaustion",
+    "ninthSelectionInsteadOfExhaustionFailsClosed",
+    "ninthPlanFailureIsPreservedAndCohortStaysTerminal",
+    "concurrentAndRepeatedRunHaveExactlyOneWinner",
+    "everyFailureIsTerminalAndDoesNotPrefetch",
+    "selectionBindingDriftStopsBeforeFactoryAndPrefetch",
+    "cancellationAfterSelectionStopsBeforeFactoryOrPrefetch",
+    "cancellationAfterFactoryStopsBeforeExecutionOrPrefetch",
+    "cancellationAfterExactExhaustionCannotReturnSuccess",
+    "externalContainmentFailureOutranksCallerCancellation",
+    "exactOrdinalSevenContinuityDestroysOnce",
+    "finalDestroyRejectsGenesisEarlierAndForeignSelection",
+    "#expect(await plan.readCount == 9)",
+    "Set(snapshot.executionIdentifiers).count == 8",
+    "snapshot.composerRunCounts == Array(repeating: 1, count: 8)",
+    "snapshot.proverCallCounts == Array(repeating: 1, count: 8)",
+    "duplicateEpochUUID",
+    "duplicateConfigurationNonce",
+)
+if test_code.count("@Test") != 13 or any(
+    marker not in test_code for marker in required_tests
+):
+    fail("iii-b1 focused test vacuity or coverage drifted")
+for marker in (
+    "iiiB1CohortVerifierPinsOneShotEightEpochAndExactScope",
+    "--iib5biii-b1-cohort-contract-only",
+    "--iib5biii-b1-staged-scope-contract-only",
+):
+    if marker not in boundary:
+        fail(f"iii-b1 boundary regression drifted: {marker}")
+
+expected_sha256 = {
+    cohort_path:
+        "822cecb3489e16b9713244ff45312726045ffcc235757d132a6d6ca13ea4c3e2",
+    continuity_path:
+        "89e21c75856601fccdbb4c6ff21fddc485b81407c11aebf9ee1cc202da318a61",
+    test_path:
+        "0300da3c92a1eed18c8ea15f6c6f99116f2c03a0383347a0b444c477fbd58449",
+}
+for path, expected in expected_sha256.items():
+    if hashlib.sha256(path.read_bytes()).hexdigest() != expected:
+        if path == test_path:
+            fail("iii-b1 focused test source seal drifted")
+        fail(f"iii-b1 canonical source seal drifted: {path}")
+PY
+}
+
+function verify_iib5biii_b1_staged_scope() {
+    local baseline=${1:-67306345f057398063aa20f6b9b2ae7f6175d9af}
+    local expected=(
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineEightEpochCohort.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineHelperEpochContinuity.swift
+        Tests/StornautInvestigationTests/InvestigationMachineEightEpochCohortTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-app-release-boundaries
+        scripts/verify-contract
+        scripts/verify-investigation-boundaries
+    )
+    (( ${#expected} == 7 )) || { print -u2 "iii-b1 checkpoint path ceiling drifted"; return 1; }
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" == 67306345f057398063aa20f6b9b2ae7f6175d9af ]] || { print -u2 "iii-b1 checkpoint baseline drifted"; return 1; }
+    if git diff --cached --name-only --diff-filter=D "$baseline" | grep -q .; then print -u2 "iii-b1 checkpoint deleted an existing path"; return 1; fi
+    if git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1 && ($1=="-" || $2=="-") {f=1} END {exit !f}'; then print -u2 "iii-b1 binary checkpoint path rejected"; return 1; fi
+    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" | awk 'index($0,"docs/")!=1 && $0!="AGENTS.md" && $0!="README.md"')"})
+    [[ "${(j:\n:)${(@on)observed}}" == "${(j:\n:)${(@on)expected}}" ]] || { print -u2 "iii-b1 staged checkpoint paths drifted"; return 1; }
+    local expected_path expected_mode observed_entry
+    for expected_path in "${expected[@]}"; do
+        expected_mode=100644; [[ $expected_path == scripts/* ]] && expected_mode=100755
+        observed_entry=$(git ls-files -s -- "$expected_path")
+        [[ "$(print -r -- "$observed_entry" | awk '{print $1, $3, $4}')" == "$expected_mode 0 $expected_path" ]] || { print -u2 "iii-b1 checkpoint mode drifted: $expected_path"; return 1; }
+    done
+    local changed=$(git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1 && $3!="AGENTS.md" && $3!="README.md" {n+=$1+$2} END {print n+0}')
+    (( changed <= 3200 )) || { print -u2 "iii-b1 checkpoint budget drifted"; return 1; }
 }
 
 function verify_iib5bia_projection_contract() {
@@ -6947,6 +7265,20 @@ if $iib5biii_a_staged_scope_contract_only; then
     print "iii-a staged scope verification passed."
     exit 0
 fi
+if $iib5biii_b1_cohort_contract_only; then
+    verify_iib5biii_b1_cohort_contract \
+        "$iib5biii_b1_cohort_source" \
+        "$iib5biii_b1_continuity_source" \
+        "$iib5biii_b1_focused_test_source" \
+        "$iib5biii_b1_boundary_test_source"
+    print "iii-b1 eight-epoch cohort source contract verification passed."
+    exit 0
+fi
+if $iib5biii_b1_staged_scope_contract_only; then
+    verify_iib5biii_b1_staged_scope "$iib5biii_b1_staged_scope_baseline"
+    print "iii-b1 staged scope verification passed."
+    exit 0
+fi
 if $iib5bia_projection_contract_only; then
     verify_iib5bia_projection_contract "$iib5bia_contract_source" "$iib5bia_focused_test_source"
     print "ii-b5b-i-a projection contract verification passed."
@@ -9011,6 +9343,7 @@ expected_driver_support_sources = {
     "InvestigationMachineDarwinEpochRetirement.swift",
     "InvestigationMachineDarwinEpochSession.swift",
     "InvestigationMachineDriverSupport.swift",
+    "InvestigationMachineEightEpochCohort.swift",
     "InvestigationMachineFixedCapsuleIntake.swift",
     "InvestigationMachineHelperEpochContinuity.swift",
     "InvestigationMachineInstalledDriverObservation.swift",
@@ -9085,6 +9418,9 @@ expected_driver_support_imports = {
     "InvestigationMachineHelperEpochContinuity.swift": {
         "Foundation", "StornautInvestigationHandoffContract",
     },
+    "InvestigationMachineEightEpochCohort.swift": {
+        "Foundation", "StornautInvestigationHandoffContract",
+    },
     "InvestigationMachineSingleEpochInstalledL2Join.swift": {
         "Foundation", "StornautInvestigationHandoffContract",
         "StornautInvestigationInstalledL2",
@@ -9114,7 +9450,9 @@ expected_driver_support_sha256 = {
     "InvestigationMachineSingleEpochComposition.swift":
         "2b32c2b4635cda55ab3abaa7097cd2a062f30fca05e603ab682ddcd9b366af14",
     "InvestigationMachineHelperEpochContinuity.swift":
-        "b4d48da904ff8868fa78da1175bb6507c26213fa83655e81d8b1de38e3c0ab80",
+        "89e21c75856601fccdbb4c6ff21fddc485b81407c11aebf9ee1cc202da318a61",
+    "InvestigationMachineEightEpochCohort.swift":
+        "822cecb3489e16b9713244ff45312726045ffcc235757d132a6d6ca13ea4c3e2",
     "InvestigationMachineSingleEpochInstalledL2Join.swift":
         "376148fd9e0284c03e399ed281cd47696bed3c35630cf272fa639b7df99960d2",
 }
@@ -10413,20 +10751,20 @@ function require_exact_machine_driver_projection() {
 
     case "$configuration" in
         debug)
-            expected_undefined_sha=579203c9d83f5884f633261d17966662a9d265455b92b94378034c7551e8e069
-            expected_undefined_lines=667
+            expected_undefined_sha=b48874d79581a67338e17845790543cea936c1efb359bd7862baecca0f0c0371
+            expected_undefined_lines=672
             expected_loads_sha=dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9
             expected_loads_lines=18
-            expected_owned_sha=f9a4938da7cfdf444715cd912d0728304d1021bed1d5ac9a7b6efe99321f3dcb
-            expected_owned_lines=4267
+            expected_owned_sha=4d57478df75e4ac233479540b870084d7db8503b1053b8eb47858145caca28e0
+            expected_owned_lines=4515
             ;;
         release)
-            expected_undefined_sha=f2ba1744c095da4b71e7906c52030b4cdea7258ef90cfb87be489b6758eb3894
-            expected_undefined_lines=444
+            expected_undefined_sha=e792e789e9979d979696e7075ea92d265115633e5c6b63b1152a73ef4d241078
+            expected_undefined_lines=449
             expected_loads_sha=dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9
             expected_loads_lines=18
-            expected_owned_sha=2dfe1c3a4dcb5e659fb50d2df2bc14a341f4f1dfb6077cefa08bdd8fb0179fe7
-            expected_owned_lines=2719
+            expected_owned_sha=72cd1161b440aee9d4fd6482fa17235da5f9f6c9e6e3fe13e54b94e789ebef49
+            expected_owned_lines=2911
             ;;
         *)
             print -u2 "Unknown Machine driver projection: $configuration"

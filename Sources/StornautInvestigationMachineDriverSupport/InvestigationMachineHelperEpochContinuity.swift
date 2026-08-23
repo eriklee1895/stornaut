@@ -144,6 +144,7 @@ package final class InvestigationMachineHelperEpochContinuity:
     private let wholeCapsuleSHA256: InvestigationHandoffSHA256
     private let wholeInputSHA256: InvestigationHandoffSHA256
     private let kind: Kind
+    private let completedSelection: InvestigationMachineFixedEpochSelection?
     private let continuitySHA256: InvestigationHandoffSHA256
     private let lock = NSLock()
     private var consumed = false
@@ -153,12 +154,14 @@ package final class InvestigationMachineHelperEpochContinuity:
         wholeCapsuleSHA256: InvestigationHandoffSHA256,
         wholeInputSHA256: InvestigationHandoffSHA256,
         kind: Kind,
+        completedSelection: InvestigationMachineFixedEpochSelection?,
         continuitySHA256: InvestigationHandoffSHA256
     ) {
         self.outerAttemptUUID = outerAttemptUUID
         self.wholeCapsuleSHA256 = wholeCapsuleSHA256
         self.wholeInputSHA256 = wholeInputSHA256
         self.kind = kind
+        self.completedSelection = completedSelection
         self.continuitySHA256 = continuitySHA256
     }
 
@@ -187,7 +190,8 @@ package final class InvestigationMachineHelperEpochContinuity:
             outerAttemptUUID: selection.outerAttemptUUID,
             wholeCapsuleSHA256: selection.wholeCapsuleSHA256,
             wholeInputSHA256: selection.wholeInputSHA256,
-            kind: .genesis, continuitySHA256: continuitySHA256
+            kind: .genesis, completedSelection: nil,
+            continuitySHA256: continuitySHA256
         )
     }
 
@@ -197,7 +201,102 @@ package final class InvestigationMachineHelperEpochContinuity:
         proof: InvestigationMachineOuterContainmentProof,
         predecessor: InvestigationMachineHelperEpochPredecessor
     ) throws -> InvestigationMachineHelperEpochContinuity {
-        let continuitySHA256 = InvestigationHandoffSHA256.hashing(
+        let continuitySHA256 = try successorSHA256(
+            selection: selection, helperIdentity: helperIdentity,
+            predecessorSHA256: predecessor.continuitySHA256, proof: proof
+        )
+        return Self(
+            outerAttemptUUID: selection.outerAttemptUUID,
+            wholeCapsuleSHA256: selection.wholeCapsuleSHA256,
+            wholeInputSHA256: selection.wholeInputSHA256,
+            kind: .successor(
+                completedOrdinal: selection.epoch.ordinal,
+                helperIdentity: helperIdentity, proof: proof
+            ),
+            completedSelection: selection,
+            continuitySHA256: continuitySHA256
+        )
+    }
+
+    package func destroyAfterFinal(
+        selection: InvestigationMachineFixedEpochSelection
+    ) throws {
+        try lock.withLock {
+            guard !consumed else {
+                throw InvestigationMachineHelperEpochContinuityError.alreadyConsumed
+            }
+            consumed = true
+            guard
+                completedSelection == selection,
+                selection.outerAttemptUUID == outerAttemptUUID,
+                selection.wholeCapsuleSHA256 == wholeCapsuleSHA256,
+                selection.wholeInputSHA256 == wholeInputSHA256,
+                Int(selection.epoch.ordinal)
+                    == InvestigationCohortCapsule.epochCount - 1,
+                selection.epoch.scenario.rawValue
+                    == selection.epoch.ordinal + 1,
+                selection.projection.epochUUID == selection.epoch.epochUUID,
+                selection.projection.configurationNonce
+                    == selection.epoch.configurationNonce,
+                selection.projection.configurationSHA256
+                    == selection.epoch.configurationSHA256,
+                selection.projection.signedRuntimeBindingSHA256
+                    == selection.epoch.signedRuntimeBindingSHA256,
+                selection.projection.projectionSHA256.rawBytes.contains(
+                    where: { $0 != 0 }
+                )
+            else {
+                throw InvestigationMachineHelperEpochContinuityError
+                    .invalidCompletion
+            }
+            guard case let .successor(completedOrdinal, helperIdentity, proof) = kind else {
+                throw InvestigationMachineHelperEpochContinuityError
+                    .invalidCompletion
+            }
+            let expectedMode: InvestigationMachineOuterContainmentMode =
+                switch selection.epoch.scenario {
+                case .lifecycleRecovery: .parentCrash
+                case .success, .cancellation, .timeout, .invalidEnvelope,
+                     .identityMismatch, .transportLoss,
+                     .artifactCleanupFailure: .normal
+                }
+            guard
+                Int(completedOrdinal)
+                    == InvestigationCohortCapsule.epochCount - 1,
+                proof.completedOrdinal == completedOrdinal,
+                proof.outerAttemptUUID == outerAttemptUUID,
+                proof.wholeCapsuleSHA256 == wholeCapsuleSHA256,
+                proof.wholeInputSHA256 == wholeInputSHA256,
+                proof.epochUUID == selection.epoch.epochUUID,
+                proof.helperIdentity == helperIdentity,
+                proof.predecessorSHA256.rawBytes.contains(
+                    where: { $0 != 0 }
+                ),
+                proof.completionBindingSHA256.rawBytes.contains(
+                    where: { $0 != 0 }
+                ),
+                proof.terminalProofSHA256.rawBytes.contains(
+                    where: { $0 != 0 }
+                ),
+                proof.mode == expectedMode,
+                continuitySHA256 == (try Self.successorSHA256(
+                    selection: selection, helperIdentity: helperIdentity,
+                    predecessorSHA256: proof.predecessorSHA256, proof: proof
+                ))
+            else {
+                throw InvestigationMachineHelperEpochContinuityError
+                    .invalidCompletion
+            }
+        }
+    }
+
+    private static func successorSHA256(
+        selection: InvestigationMachineFixedEpochSelection,
+        helperIdentity: InvestigationMachineProcessIdentity,
+        predecessorSHA256: InvestigationHandoffSHA256,
+        proof: InvestigationMachineOuterContainmentProof
+    ) throws -> InvestigationHandoffSHA256 {
+        InvestigationHandoffSHA256.hashing(
             try HandoffBinaryTranscript.encode(
                 domain:
                     "stornaut.task39.machine.helper-continuity.successor",
@@ -208,23 +307,13 @@ package final class InvestigationMachineHelperEpochContinuity:
                     continuityData(selection.epoch.ordinal),
                     continuityData(selection.epoch.epochUUID),
                     try helperIdentity.encoded(),
-                    predecessor.continuitySHA256.rawBytes,
+                    predecessorSHA256.rawBytes,
                     proof.completionBindingSHA256.rawBytes,
                     proof.terminalProofSHA256.rawBytes,
                     Data([proof.mode.rawValue]),
                 ],
                 maximumByteCount: 4_096
             )
-        )
-        return Self(
-            outerAttemptUUID: selection.outerAttemptUUID,
-            wholeCapsuleSHA256: selection.wholeCapsuleSHA256,
-            wholeInputSHA256: selection.wholeInputSHA256,
-            kind: .successor(
-                completedOrdinal: selection.epoch.ordinal,
-                helperIdentity: helperIdentity, proof: proof
-            ),
-            continuitySHA256: continuitySHA256
         )
     }
 

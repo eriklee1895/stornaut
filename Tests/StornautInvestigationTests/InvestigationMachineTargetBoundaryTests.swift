@@ -587,6 +587,7 @@ struct InvestigationMachineTargetBoundaryTests {
             "InvestigationMachineDarwinEpochSession.swift",
             "InvestigationMachineDarwinEpochRetirement.swift",
             "InvestigationMachineDriverSupport.swift",
+            "InvestigationMachineEightEpochCohort.swift",
             "InvestigationMachineFixedCapsuleIntake.swift",
             "InvestigationMachineHelperEpochContinuity.swift",
             "InvestigationMachineInstalledDriverObservation.swift",
@@ -735,6 +736,10 @@ struct InvestigationMachineTargetBoundaryTests {
                 "import Foundation",
                 "import StornautInvestigationHandoffContract",
             ],
+            "InvestigationMachineEightEpochCohort.swift": [
+                "import Foundation",
+                "import StornautInvestigationHandoffContract",
+            ],
             "InvestigationMachineSingleEpochInstalledL2Join.swift": [
                 "import Foundation",
                 "import StornautInvestigationHandoffContract",
@@ -755,7 +760,10 @@ struct InvestigationMachineTargetBoundaryTests {
                 expectedImports[sourceName]
             )
             #expect(imports == expectedSourceImports)
-            var authoritySource = source
+            var authoritySource = source.replacingOccurrences(
+                of: "artifactCleanupFailure",
+                with: "artifactTerminalFailure"
+            )
             if sourceName == "InvestigationMachineDarwinEpochSession.swift" {
                 let allowedCalls: [String: Int] = [
                     "socketpair": 1,
@@ -1276,6 +1284,85 @@ struct InvestigationMachineTargetBoundaryTests {
             "375a2265dcf42d9ea124f08945844203140542c7bf17362b964902d100524e58",
         ] {
             #expect(boundaries.contains(marker))
+        }
+    }
+
+    @Test
+    func iiiB1CohortVerifierPinsOneShotEightEpochAndExactScope() throws {
+        let root = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let boundaries = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ),
+            encoding: .utf8
+        )
+        let release = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-app-release-boundaries"
+            ),
+            encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        for marker in [
+            "--iib5biii-b1-cohort-contract-only",
+            "--iib5biii-b1-staged-scope-contract-only",
+            "function verify_iib5biii_b1_cohort_contract()",
+            "function verify_iib5biii_b1_staged_scope()",
+            "iii-b1 dependency surface drifted",
+            "iii-b1 public surface drifted",
+            "iii-b1 authority or product reachability drifted",
+            "iii-b1 one-shot state ordering drifted",
+            "iii-b1 exact eight-loop or no-prefetch contract drifted",
+            "iii-b1 fixed overlay drifted",
+            "iii-b1 fresh wrapper retention drifted",
+            "iii-b1 selection or cohort binding drifted",
+            "iii-b1 cancellation checks drifted",
+            "iii-b1 final destroy/exhaustion ordering drifted",
+            "iii-b1 focused test source seal drifted",
+            "iii-b1 staged checkpoint paths drifted",
+            "iii-b1 checkpoint mode drifted",
+            "iii-b1 checkpoint baseline drifted",
+            "iii-b1 binary checkpoint path rejected",
+            "iii-b1 checkpoint budget drifted",
+        ] {
+            #expect(boundaries.contains(marker))
+        }
+        for marker in [
+            "--iib5biii-b1-source-contract-only",
+            "function verify_iib5biii_b1_source_contract()",
+            "iii-b1 source-only App boundary verification passed.",
+            "iii-b1 source-only App boundary gained physical authority",
+        ] {
+            #expect(release.contains(marker))
+        }
+        for marker in [
+            "iib5biii_b1_gate=scripts/verify-investigation-boundaries",
+            "--iib5biii-b1-cohort-contract-only",
+            "--iib5biii-b1-staged-scope-contract-only",
+            "iii-b1 mutation accepted:",
+            "iii-b1 scope mutation accepted:",
+            "one-shot-bypass",
+            "prefetch-retry",
+            "overlay-drift",
+            "omit-final-destroy",
+            "ignore-exhaustion",
+            "reuse-wrapper",
+            "authority-injection",
+            "selection-binding",
+            "cohort-binding",
+            "cancellation-checks",
+            "comment-only-tests",
+            "vacuous-marker-tests",
+            "focused-test-source-seal",
+            "iii-b1 exact seven-path staged scope",
+        ] {
+            #expect(contract.contains(marker))
         }
     }
 
