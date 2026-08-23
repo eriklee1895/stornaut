@@ -648,8 +648,8 @@ i-c1 与 aggregate i-c2 complete/non-admitting；ii-b5b-ii-a/ii-b/ii-c/ii-d
 complete/non-admitting。ii-b 已拆为 ii-b0a/ii-b0b/ii-b0c 与
 ii-b1–ii-b5。fresh source/topology preflight 又把 ii-b5b-iii 拆为 b0
 protocol、a per-epoch continuity、b1 injected cohort、b2a physical adapter 与
-b2b entry/artifact；b0 已冻结，当前 frontier 为 iii-a。剩余严格顺序为
-iii-a → iii-b1 → iii-b2a → iii-b2b → ii-c0b → ii-c → L3c3d → L3c4。
+b2b entry/artifact；b0 已冻结，iii-a 已完成并保持 non-admitting。当前
+frontier 为 iii-b1，剩余严格顺序为 iii-b1 → iii-b2a → iii-b2b → ii-c0b → ii-c → L3c3d → L3c4。
 ADR 0018 仍 Proposed，L3c4 独占 final admission 与剩余 full。
 L3c1b-i/ii 证据见
 [i review](../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
@@ -703,7 +703,7 @@ final no-unresolved-P0–P2 review。i-b1 completion 见
 exact-case closure 与 final no-unresolved-P0–P2 review。ii-b4/ii-b5a0/ii-b5a/
 i-a/i-b1/i-b2a/i-b2b-a/i-b2b-b/i-b3/i-c1、aggregate i-c2 与
 ii-b5b-ii-a/ii-b/ii-c/ii-d 与 ii-c0a complete/non-admitting；ii-b5b-iii-b0
-preflight frozen/non-admitting，iii-a current。i-b2a completion 见
+preflight frozen/non-admitting，iii-a complete/non-admitting，iii-b1 current。i-b2a completion 见
 [artifact/static reader review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2a-review.md)。
 [fixed service reader review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2b-b-review.md)
 记录 6-path/709-line scope、46 affected tests、1,341-test clean serial 与
@@ -727,7 +727,7 @@ closure。
 将 fixed Darwin runtime 拆为 FD-0 capsule、Darwin identity、FD-7 session 与
 PGID retirement 四个 bounded checkpoints；ii-a/ii-b/ii-c/ii-d 已完成并保持
 non-admitting；ii-c0a complete/non-admitting，ii-b5b-iii-b0 preflight frozen/
-non-admitting，iii-a current。ii-a completion 见
+non-admitting，iii-a complete/non-admitting，iii-b1 current。ii-a completion 见
 [review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-a-review.md)，ii-b
 completion 见
 [review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-b-review.md)。
@@ -746,6 +746,9 @@ App/XPC、model/auth、network 或 authoritative full。
 [ii-b5b-iii-b0 preflight](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md)
 冻结 long-lived outer/disposable inner、FD 0/1/2/7/8/9、inner-led PGID、
 parent-crash containment 与 iii-a/b1/b2a/b2b budgets。
+[ii-b5b-iii-a review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-a-review.md)
+记录 per-epoch completion/continuity、40 focused、559 affected、1,446-test
+serial、三项 boundary gates 与 no-unresolved-P0-P2 review。
 生产 Deep Dive 继续 unavailable，直到 Task 44 final admission。
 
 跨 Epic 的阶段依赖、no-go 分支和交付顺序由 [Delivery Roadmap](../plans/roadmap.md) 管理；新 active plan 不得另起一套宏观路线。
@@ -909,7 +912,7 @@ legacy-owner closure；i-c1 与 aggregate i-c2 已完成并保持 non-admitting�
 ii-b5b-ii-a fixed FD-0 capsule intake、ii-b5b-ii-b independent Darwin App
 identity observation、ii-b5b-ii-c fixed FD-7 session 与 ii-b5b-ii-d exact
 owned-PGID retirement 与 ii-c0a 已完成并保持 non-admitting；ii-b5b-iii-b0
-preflight 已冻结，当前 frontier 为 iii-a，之后为 iii-b1、iii-b2a、iii-b2b、
+preflight 已冻结，iii-a 已完成并保持 non-admitting，当前 frontier 为 iii-b1，之后为 iii-b2a、iii-b2b、
 ii-c0b、ii-c、L3c3d、L3c4。
 已完成部分均为
 non-admitting prerequisite，

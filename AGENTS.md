@@ -335,8 +335,8 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   contract/investigation/App-release boundary gates 与 independent final review
   已通过，保持 non-admitting。fresh source/topology preflight 又把原
   ii-b5b-iii 拆为 b0 protocol、a per-epoch continuity、b1 injected cohort、
-  b2a physical adapter 与 b2b entry/artifact；b0 已冻结，当前 frontier 为
-  iii-a。随后严格按 iii-b1 → iii-b2a → iii-b2b → ii-c0b → ii-c → L3c3d
+  b2a physical adapter 与 b2b entry/artifact；b0 已冻结，iii-a 已完成并保持
+  non-admitting，当前 frontier 为 iii-b1。随后严格按 iii-b2a → iii-b2b → ii-c0b → ii-c → L3c3d
   → L3c4 推进。
   该 ii-b5b-ii-c checkpoint 以 8 个
   non-document paths / 3,104 changed lines、35 focused tests、
@@ -517,6 +517,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c L3c3c-ii-c0a projection-in-capsule preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md) |
 | Phase D Task 39B2c L3c3c-ii-c0a projection-in-capsule review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md) |
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-b0 outer/inner protocol preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-iii-a per-epoch continuity review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-a-review.md) |
 | Phase D Task 39B2c-L1 residue observation review | [docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md](docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md) |
 | Phase D Task 39B2c-L2 root topology observation review | [docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md](docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md) |
 | Phase D Task 39B2c-L3a trusted machine target review | [docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md](docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md) |
@@ -667,8 +668,8 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   capsule/epoch bytes 不变，仅新增 enclosing projected-cohort binary contract
   与 paired fixed intake；fresh source/topology preflight 又把 ii-b5b-iii 拆为
   b0 protocol、a per-epoch continuity、b1 injected cohort、b2a physical
-  adapter 与 b2b entry/artifact。b0 已冻结，当前 frontier 为 iii-a，严格
-  后续顺序为 iii-b1 → iii-b2a → iii-b2b → ii-c0b non-root capsule author +
+  adapter 与 b2b entry/artifact。b0 已冻结，iii-a 已完成并保持 non-admitting，
+  当前 frontier 为 iii-b1，严格后续顺序为 iii-b2a → iii-b2b → ii-c0b non-root capsule author +
   launcher/TTY/FD hygiene → ii-c
   privileged no-model gate → L3c3d → L3c4。
   ADR 0018 仍 Proposed；L3c4 独占 final admission 与

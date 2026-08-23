@@ -87,7 +87,7 @@
 > projection-in-capsule input/intake is complete/non-admitting. A fresh source/
 > topology audit split ii-b5b-iii into b0 protocol, a per-epoch continuity, b1
 > injected cohort, b2a physical adapter and b2b entry/artifact. b0 is frozen/
-> non-admitting and iii-a is current.
+> non-admitting; iii-a is complete/non-admitting and iii-b1 is current.
 > Evidence:
 > [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
 > [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md) and
@@ -1123,8 +1123,9 @@ The remaining L3 work is split before driver coding:
    ii-b5b-ii-c fixed FD-7 session and ii-b5b-ii-d exact owned-PGID retirement
    and ii-c0a are complete/non-admitting. The further split is frozen as
    `iii-b0 -> iii-a -> iii-b1 -> iii-b2a -> iii-b2b`; b0 is documentation-only/
-   non-admitting and iii-a is current. The corrected remaining order is
-   `iii-a -> iii-b1 -> iii-b2a -> iii-b2b -> ii-c0b -> ii-c -> L3c3d -> L3c4`.
+   non-admitting and iii-a is complete/non-admitting. The corrected remaining
+   order is `iii-b1 -> iii-b2a -> iii-b2b -> ii-c0b -> ii-c -> L3c3d -> L3c4`;
+   iii-b1 is current.
    See the
    [study](../../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md)
    and [final review](../../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md),
@@ -1208,6 +1209,8 @@ The remaining L3 work is split before driver coding:
    The source/topology correction and bounded implementation budgets are frozen
    in the
    [ii-b5b-iii-b0 preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md).
+   iii-a completion is recorded in the
+   [iii-a review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-a-review.md).
    The b5 split, claim-abort completion and typed composer completion evidence
    are in the
    [ii-b5 preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b5-split-preflight.md),
@@ -1273,7 +1276,8 @@ ii-b3c concrete leaf/native entry, ii-b4 fixed helper-claim client, ii-b5a0 and
 ii-b5a, ii-b5b-i-a, i-b1, i-b2a, i-b2b-a, i-b2b-b, i-b3, i-c1 and i-c2a
 are complete and non-admitting; aggregate i-c2 and ii-b5b-ii-a/ii-b/ii-c/ii-d
 and ii-c0a are complete/non-admitting; ii-b5b-iii-b0 is frozen/non-admitting
-and iii-a is the current implementation checkpoint.
+and iii-a is complete/non-admitting; iii-b1 is the current implementation
+checkpoint.
 ADR 0018
 remains Proposed until ii-c succeeds. L3c1 used focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean

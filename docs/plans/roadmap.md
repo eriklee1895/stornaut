@@ -227,9 +227,9 @@ b5b-ii-c fixed FD-7 session 与 b5b-ii-d exact owned-PGID retirement 已完成�
 保持 non-admitting。dependency inversion preflight 已把 c0 拆为 c0a/c0b；
 c0a projection-in-capsule contract 已完成并保持 non-admitting；b5b-iii 又按
 source/topology preflight 拆为 b0 protocol、a per-epoch continuity、b1 injected
-cohort、b2a physical adapter 与 b2b entry/artifact。b0 已冻结，当前 frontier
-为 iii-a；随后严格按 iii-b1 → iii-b2a → iii-b2b → c0b → ii-c → L3c3d →
-L3c4 推进。
+cohort、b2a physical adapter 与 b2b entry/artifact。b0 已冻结，
+iii-a 已完成并保持 non-admitting；当前 frontier 为 iii-b1，随后严格按
+iii-b2a → iii-b2b → c0b → ii-c → L3c3d → L3c4 推进。
 39B2c 仍未作 machine readiness claim。
 [ii-c0a preflight](../reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md)
 冻结 v1-preserving enclosing projected-cohort binary contract、exact 8-path /
@@ -273,8 +273,8 @@ ii-b5 已拆为 b5a0 claim-abort、b5a typed composer、b5b-i L2/projection、
 b5b-ii Darwin runtime 与 b5b-iii production/artifact；b5a 与 b5b-i through
 aggregate i-c2 已完成并保持 non-admitting；b5b-ii-a/b/c/d 已完成并保持
 non-admitting；c0a projection-in-capsule implementation 已完成并保持
-non-admitting；b5b-iii-b0 已冻结，当前 frontier 为 iii-a，后续为 iii-b1 →
-iii-b2a → iii-b2b → c0b → ii-c → L3c3d → L3c4。
+non-admitting；b5b-iii-b0 已冻结，iii-a 已完成并保持 non-admitting；当前
+frontier 为 iii-b1，后续为 iii-b2a → iii-b2b → c0b → ii-c → L3c3d → L3c4。
 L3c2b preflight 的 real-plan matrix contradiction 已由 3-path plan-freshness
 prerequisite 关闭，affected/Investigation/structural/review gates 通过；
 只有 L3c4 可作 readiness claim 并运行
@@ -465,8 +465,9 @@ L3c3c 当前证据见
   已拆为 b3a/b3b/b3c，ii-b3a/ii-b3b/ii-b3c/ii-b4 已完成并保持
   non-admitting；ii-b5 已拆为 b5a0/b5a/b5b-i/b5b-ii/b5b-iii，b5a 与 b5b-i
   through aggregate i-c2 已完成并保持 non-admitting；b5b-ii-a/b/c/d 与 c0a
-  projection-in-capsule 已完成并保持 non-admitting；b5b-iii-b0 已冻结，当前
-  frontier 为 iii-a，后续为 iii-b1 → iii-b2a → iii-b2b → c0b → ii-c →
+  projection-in-capsule 已完成并保持 non-admitting；b5b-iii-b0 已冻结，iii-a
+  已完成并保持 non-admitting；当前 frontier 为 iii-b1，后续为 iii-b2a →
+  iii-b2b → c0b → ii-c →
   L3c3d → L3c4。
   L3c4 才拥有 final admission/full。39B2c 才是 machine admission，Task 39
   尚未完成。
