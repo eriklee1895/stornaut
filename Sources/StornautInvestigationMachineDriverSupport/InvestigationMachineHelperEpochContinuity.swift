@@ -34,6 +34,7 @@ package struct InvestigationMachineOuterContainmentProof:
     fileprivate let completionBindingSHA256: InvestigationHandoffSHA256
     fileprivate let terminalProofSHA256: InvestigationHandoffSHA256
     fileprivate let mode: InvestigationMachineOuterContainmentMode
+    fileprivate let admissionOwner: UUID?
 
     init(
         selection: InvestigationMachineFixedEpochSelection,
@@ -45,17 +46,14 @@ package struct InvestigationMachineOuterContainmentProof:
             throw InvestigationMachineHelperEpochContinuityError
                 .invalidCompletion
         }
+        if case .admittedPhysical = result {
+            throw InvestigationMachineHelperEpochContinuityError
+                .invalidCompletion
+        }
         let material = try InvestigationMachineCompletionMaterial(
             selection: selection, result: result
         )
-        if case let .admittedPhysical(admitted) = result {
-            guard admitted.isBound(
-                to: selection, predecessor: predecessor
-            ) else {
-                throw InvestigationMachineHelperEpochContinuityError
-                    .invalidCompletion
-            }
-        }
+        admissionOwner = nil
         outerAttemptUUID = selection.outerAttemptUUID
         wholeCapsuleSHA256 = selection.wholeCapsuleSHA256
         wholeInputSHA256 = selection.wholeInputSHA256
@@ -66,6 +64,70 @@ package struct InvestigationMachineOuterContainmentProof:
         completionBindingSHA256 = material.bindingSHA256
         self.terminalProofSHA256 = terminalProofSHA256
         mode = material.mode
+    }
+
+    init(
+        selection: InvestigationMachineFixedEpochSelection,
+        result: InvestigationMachineSingleEpochResult,
+        predecessor: InvestigationMachineHelperEpochPredecessor,
+        terminalProofSHA256: InvestigationHandoffSHA256,
+        admittedBy admissionOwner: UUID
+    ) throws {
+        guard
+            case let .admittedPhysical(admitted) = result,
+            admitted.isBound(
+                to: selection, predecessor: predecessor,
+                admissionOwner: admissionOwner,
+                terminalProofSHA256: terminalProofSHA256
+            )
+        else {
+            throw InvestigationMachineHelperEpochContinuityError
+                .invalidCompletion
+        }
+        let material = try InvestigationMachineCompletionMaterial(
+            selection: selection, result: result
+        )
+        self.admissionOwner = admissionOwner
+        outerAttemptUUID = selection.outerAttemptUUID
+        wholeCapsuleSHA256 = selection.wholeCapsuleSHA256
+        wholeInputSHA256 = selection.wholeInputSHA256
+        predecessorSHA256 = predecessor.continuitySHA256
+        completedOrdinal = selection.epoch.ordinal
+        epochUUID = selection.epoch.epochUUID
+        helperIdentity = material.helperIdentity
+        completionBindingSHA256 = material.bindingSHA256
+        self.terminalProofSHA256 = terminalProofSHA256
+        mode = material.mode
+    }
+
+    fileprivate func isBound(
+        to selection: InvestigationMachineFixedEpochSelection,
+        result: InvestigationMachineSingleEpochResult,
+        predecessor: InvestigationMachineHelperEpochPredecessor
+    ) -> Bool {
+        guard
+            let material = try? InvestigationMachineCompletionMaterial(
+                selection: selection, result: result
+            ),
+            outerAttemptUUID == selection.outerAttemptUUID,
+            wholeCapsuleSHA256 == selection.wholeCapsuleSHA256,
+            wholeInputSHA256 == selection.wholeInputSHA256,
+            predecessorSHA256 == predecessor.continuitySHA256,
+            completedOrdinal == selection.epoch.ordinal,
+            epochUUID == selection.epoch.epochUUID,
+            helperIdentity == material.helperIdentity,
+            completionBindingSHA256 == material.bindingSHA256,
+            mode == material.mode
+        else { return false }
+        if case let .admittedPhysical(admitted) = result {
+            guard let admissionOwner else { return false }
+            return admitted.isBound(
+                to: selection, predecessor: predecessor,
+                admissionOwner: admissionOwner,
+                terminalProofSHA256: terminalProofSHA256
+            )
+        }
+        return admissionOwner == nil
     }
 }
 
@@ -464,12 +526,9 @@ package actor InvestigationMachineOuterCompletionJoin {
             throw InvestigationMachineHelperEpochContinuityError
                 .containmentUncertain
         }
-        let expected = try InvestigationMachineOuterContainmentProof(
-            selection: selection, result: result,
-            predecessor: predecessor,
-            terminalProofSHA256: proof.terminalProofSHA256
-        )
-        guard proof == expected else {
+        guard proof.isBound(
+            to: selection, result: result, predecessor: predecessor
+        ) else {
             throw InvestigationMachineHelperEpochContinuityError
                 .invalidCompletion
         }

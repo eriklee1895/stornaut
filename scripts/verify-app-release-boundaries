@@ -410,6 +410,7 @@ function verify_iib4_machine_claim_source_contract() {
     python3 - "$source_path" <<'PY'
 from pathlib import Path
 import re
+import subprocess
 import sys
 
 source = Path(sys.argv[1]).read_text(encoding="utf-8")
@@ -962,6 +963,7 @@ function verify_iib5biii_b2ai_source_contract() {
         "$bridge_path" "$protocol_path" <<'PY'
 from pathlib import Path
 import re
+import subprocess
 import sys
 
 single_path, composition_path, continuity_path, bridge_path, protocol_path = (
@@ -970,6 +972,83 @@ single_path, composition_path, continuity_path, bridge_path, protocol_path = (
 sources = {path: path.read_text(encoding="utf-8") for path in (
     single_path, composition_path, continuity_path, bridge_path, protocol_path
 )}
+
+def swift_code_only(source):
+    output = list(source)
+    index = 0
+    block_depth = 0
+    string_end = None
+    raw_hashes = ""
+    while index < len(source):
+        if block_depth:
+            if source.startswith("/*", index):
+                output[index:index + 2] = "  "
+                block_depth += 1
+                index += 2
+            elif source.startswith("*/", index):
+                output[index:index + 2] = "  "
+                block_depth -= 1
+                index += 2
+            else:
+                if source[index] != "\n":
+                    output[index] = " "
+                index += 1
+            continue
+        if string_end is not None:
+            if source.startswith(string_end, index):
+                width = len(string_end)
+                output[index:index + width] = " " * width
+                index += width
+                string_end = None
+                raw_hashes = ""
+            elif not raw_hashes and source[index] == "\\":
+                output[index] = " "
+                if index + 1 < len(source) and source[index + 1] != "\n":
+                    output[index + 1] = " "
+                index += 2
+            else:
+                if source[index] != "\n":
+                    output[index] = " "
+                index += 1
+            continue
+        if source.startswith("//", index):
+            end = source.find("\n", index)
+            end = len(source) if end < 0 else end
+            output[index:end] = " " * (end - index)
+            index = end
+        elif source.startswith("/*", index):
+            output[index:index + 2] = "  "
+            block_depth = 1
+            index += 2
+        else:
+            opener = re.match(r'(#+)?("""|")', source[index:])
+            if opener is None:
+                index += 1
+                continue
+            hashes = opener.group(1) or ""
+            quote = opener.group(2)
+            width = len(opener.group(0))
+            output[index:index + width] = " " * width
+            string_end = quote + hashes
+            raw_hashes = hashes
+            index += width
+    if block_depth or string_end is not None:
+        raise SystemExit("iii-b2a-i source-only Swift lexical scan drifted")
+    return "".join(output)
+
+code_sources = {path: swift_code_only(source) for path, source in sources.items()}
+def swift_parse_tree(path):
+    completed = subprocess.run(
+        ["xcrun", "swiftc", "-frontend", "-dump-parse", str(path)],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False,
+    )
+    if completed.returncode != 0:
+        raise SystemExit(
+            "iii-b2a-i source-only Swift lexical scan drifted"
+        )
+    return completed.stdout
+
+parse_trees = {path: swift_parse_tree(path) for path in sources}
 expected_imports = {
     single_path: {
         "Foundation", "StornautInvestigationHandoffContract",
@@ -991,14 +1070,15 @@ expected_imports = {
 }
 for path, source in sources.items():
     imports = set(re.findall(
-        r"(?m)^import\s+([A-Za-z0-9_]+)\s*$", source
+        r"(?m)^import\s+([A-Za-z0-9_]+)\s*$", code_sources[path]
     ))
     if imports != expected_imports[path]:
         raise SystemExit("iii-b2a-i source-only import surface drifted")
 semantic = "\n".join(sources.values())
-if re.search(r"(?m)^\s*(?:public|open)\s+", semantic):
+code_semantic = "\n".join(code_sources.values())
+if re.search(r"(?m)^\s*(?:public|open)\s+", code_semantic):
     raise SystemExit("iii-b2a-i source-only public surface drifted")
-if re.search(r"\b(?:Codable|Encodable|Decodable)\b", semantic):
+if re.search(r"\b(?:Codable|Encodable|Decodable)\b", code_semantic):
     raise SystemExit("iii-b2a-i source-only Codable surface drifted")
 for forbidden in (
     r"\b(?:Executor|MoveToTrash|RegisteredAction|readiness|"
@@ -1007,21 +1087,45 @@ for forbidden in (
     r"\bStornaut(?:Execution|Core|Lifecycle|Codex|InvestigationRuntime|"
     r"InvestigationDiagnostic|ProbeBridge|ProcessSupport)\b",
 ):
-    if re.search(forbidden, semantic, re.IGNORECASE):
+    if re.search(forbidden, code_semantic, re.IGNORECASE):
         raise SystemExit(
             "iii-b2a-i source-only App boundary gained physical authority"
         )
-for forbidden in (
-    r"\b(?:Darwin|Glibc|AppKit|SwiftUI|NSXPCConnection|URLSession|"
-    r"Process|FileManager|FileHandle|NWConnection|Network)\b",
-    r"\b(?:posix_spawn|fork|execve|open|openat|write|pwrite|socket|"
-    r"connect|send|recv|kill|killpg|waitpid|waitid|dup2|fcntl|close)\s*\(",
-    r"\b(?:fileDescriptor|STDIN_FILENO|STDOUT_FILENO|STDERR_FILENO|"
-    r"O_WRONLY|O_RDWR|O_CREAT|SIGTERM|SIGKILL)\b",
-):
-    if re.search(forbidden, sources[protocol_path], re.IGNORECASE):
+physical_authority_symbols = (
+    "Darwin", "Glibc", "AppKit", "SwiftUI", "NSXPCConnection",
+    "URLSession", "Process", "FileManager", "FileHandle",
+    "NWConnection", "Network", "posix_spawn", "fork", "execve",
+    "open", "openat", "write", "pwrite", "socket", "connect",
+    "recv", "kill", "killpg", "waitpid", "waitid", "dup2",
+    "fcntl", "close", "fileDescriptor", "STDIN_FILENO",
+    "STDOUT_FILENO", "STDERR_FILENO", "O_WRONLY", "O_RDWR",
+    "O_CREAT", "SIGTERM", "SIGKILL",
+)
+physical_authority = re.compile(
+    r'(?:name|id|field)="(?:'
+    + "|".join(map(re.escape, physical_authority_symbols))
+    + r')"'
+)
+for path, parse_tree in parse_trees.items():
+    if physical_authority.search(parse_tree):
         raise SystemExit(
-            "iii-b2a-i source-only protocol gained physical authority"
+            "iii-b2a-i source-only physical authority drifted"
+        )
+
+# `send` is also the name of the existing injected frame-transport method.
+# Pin its exact source-only shapes instead of globally allowing an unqualified
+# Darwin `send(2)` call to hide beside that abstraction.
+unqualified_send = re.compile(
+    r'\(unresolved_decl_ref_expr[^\n]*name="send" function_ref=unapplied\)'
+)
+if len(unqualified_send.findall(parse_trees[single_path])) != 5:
+    raise SystemExit(
+        "iii-b2a-i source-only physical authority drifted"
+    )
+for path in (composition_path, continuity_path, bridge_path, protocol_path):
+    if unqualified_send.search(parse_trees[path]):
+        raise SystemExit(
+            "iii-b2a-i source-only physical authority drifted"
         )
 for marker in (
     "package actor InvestigationMachineDarwinInnerProtocolState",
@@ -1034,6 +1138,12 @@ for marker in (
     "epochDeadlineNanoseconds: request.epochDeadlineNanoseconds",
     "evidence.appChild == exchange.appChild",
     "== exchange.physicalOwnership.helperIdentity",
+    "private static let maximumAdmissionByteCount = 192 * 1_024",
+    "normal.physicalResult.driverObservationSHA256",
+    "case let .admittedPhysical(admitted) = result",
+    "admittedBy admissionOwner: UUID",
+    "guard proof.isBound(",
+    "activeRequest == request, activeDecision.kind == .continue",
 ):
     if marker not in semantic:
         raise SystemExit(
@@ -2589,8 +2699,8 @@ require_projection \
     load-command
 require_projection \
     "$machine_driver_owned_symbols" \
-    7dccf4fb7960719cc9838612fec554c9d77bdfa059890c0d1c8dbf7802c1adab \
-    5514 \
+    a18e14a1ca48d7ee11c0f242cbf5d970353061907e892a599fd8458aa8a53376 \
+    5524 \
     owned-symbol
 if ! mach_o_has_demangled_symbol \
     "$diagnostic_machine_driver" \
@@ -2667,7 +2777,7 @@ require_projection "$release_machine_driver_undefined_symbols" \
 require_projection "$release_machine_driver_loaded_libraries" \
     dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9 18 release-load-command
 require_projection "$release_machine_driver_owned_symbols" \
-    aaae9d617d5a19390bfc3f1f2c70d7ff680511386039e56f782cd03c7ef0abca 3675 release-owned-symbol
+    a791dc8cc57403804f20d528dfb4a7842fc545068ab5dac7423b693f1e723cdf 3677 release-owned-symbol
 for marker in "${machine_driver_authority_forbidden_markers[@]}"; do
     if mach_o_has_demangled_symbol "$release_machine_driver" "$marker"; then
         print -u2 "Authority or readiness leaked into Release Machine driver: $marker"

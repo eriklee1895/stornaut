@@ -249,6 +249,9 @@ package struct InvestigationMachineSingleEpochPhysicalResult:
     package var bindingSHA256: InvestigationHandoffSHA256 {
         completion?.bindingSHA256 ?? ownership.bindingSHA256
     }
+    package var driverObservationSHA256: InvestigationHandoffSHA256? {
+        completion?.driverObservationSHA256
+    }
     package var physicalOwnership:
         InvestigationMachineSingleEpochPhysicalOwnership
     {

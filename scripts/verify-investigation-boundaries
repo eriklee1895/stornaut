@@ -85,6 +85,8 @@ iib5biii_b2ai_focused_test_source=
 iib5biii_b2ai_boundary_test_source=
 iib5biii_b2ai_scope_contract_only=false
 iib5biii_b2ai_scope_baseline=79cc78c5f1169faa0820a6377a0d512e2034b0ef
+iib5biii_b2ai_r1_scope_contract_only=false
+iib5biii_b2ai_r1_scope_baseline=2f3a116be4644829fc513bcc2287c6bd2a1ea0ec
 iib5bia_projection_contract_only=false
 iib5bia_contract_source=
 iib5bia_focused_test_source=
@@ -328,6 +330,10 @@ if (( $# > 0 )); then
         && [[ $1 == --iib5biii-b2a-i-scope-contract-only ]]; then
         iib5biii_b2ai_scope_contract_only=true
         iib5biii_b2ai_scope_baseline=${2:-79cc78c5f1169faa0820a6377a0d512e2034b0ef}
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iib5biii-b2a-i-r1-scope-contract-only ]]; then
+        iib5biii_b2ai_r1_scope_contract_only=true
+        iib5biii_b2ai_r1_scope_baseline=${2:-2f3a116be4644829fc513bcc2287c6bd2a1ea0ec}
     elif (( $# == 3 )) \
         && [[ $1 == --iib5bia-projection-contract-only ]]; then
         iib5bia_projection_contract_only=true
@@ -524,7 +530,7 @@ if (( $# > 0 )); then
         iib3c_staged_scope_baseline=${2:-HEAD}
     else
         print -u2 \
-            "Usage: scripts/verify-investigation-boundaries [... | --iib5biii-a-single-epoch-contract-only <single-epoch> <composition> <continuity> <continuity-test> <single-epoch-test> <installed-join-test> <boundary-test> | --iib5biii-a-staged-scope-contract-only [baseline] | --iib5biii-b1-cohort-contract-only <cohort> <continuity> <focused-test> <boundary-test> | --iib5biii-b1-staged-scope-contract-only [baseline] | --iib5biii-b2a0-physical-bridge-contract-only <composition> <continuity> <bridge> <focused-test> <boundary-test> | --iib5biii-b2a0-scope-contract-only [baseline] | --iib5biii-b2a-i-supervisor-contract-only <single-epoch> <composition> <continuity> <bridge> <protocol> <focused-test> <boundary-test> | --iib5biii-b2a-i-scope-contract-only [baseline]]"
+            "Usage: scripts/verify-investigation-boundaries [... | --iib5biii-a-single-epoch-contract-only <single-epoch> <composition> <continuity> <continuity-test> <single-epoch-test> <installed-join-test> <boundary-test> | --iib5biii-a-staged-scope-contract-only [baseline] | --iib5biii-b1-cohort-contract-only <cohort> <continuity> <focused-test> <boundary-test> | --iib5biii-b1-staged-scope-contract-only [baseline] | --iib5biii-b2a0-physical-bridge-contract-only <composition> <continuity> <bridge> <focused-test> <boundary-test> | --iib5biii-b2a0-scope-contract-only [baseline] | --iib5biii-b2a-i-supervisor-contract-only <single-epoch> <composition> <continuity> <bridge> <protocol> <focused-test> <boundary-test> | --iib5biii-b2a-i-scope-contract-only [baseline] | --iib5biii-b2a-i-r1-scope-contract-only [baseline]]"
         exit 64
     fi
 fi
@@ -1070,6 +1076,9 @@ if continuity.count(successor_transcript) != 1:
 if (
     "predecessorSHA256: predecessor.continuitySHA256" not in continuity
     or "predecessorSHA256: proof.predecessorSHA256" not in continuity
+    or continuity.count(
+        "predecessorSHA256 = predecessor.continuitySHA256"
+    ) != 2
 ):
     fail("iii-a successor predecessor digest binding drifted")
 
@@ -1089,7 +1098,14 @@ if "init(\n        epoch: InvestigationCohortEpoch" in single:
 if composition.index("composer.run(") > composition.index("return try await outerJoin.seal("):
     fail("iii-a successor mint moved before epoch composition")
 outcome = continuity.index("let outcome = await Task.detached {")
-if not outcome < continuity.index("guard case let .contained(proof) = outcome else {", outcome) < continuity.index("guard proof == expected else {", outcome) < continuity.index("guard !Task.isCancelled else {", outcome):
+proof_validation = min(
+    position for position in (
+        continuity.find("guard proof == expected else {", outcome),
+        continuity.find("guard proof.isBound(", outcome),
+    )
+    if position >= 0
+)
+if not outcome < continuity.index("guard case let .contained(proof) = outcome else {", outcome) < proof_validation < continuity.index("guard !Task.isCancelled else {", outcome):
     fail("iii-a external containment outcome priority drifted")
 
 for source, expected in (
@@ -1394,6 +1410,7 @@ expected_sha256 = {
         "89e21c75856601fccdbb4c6ff21fddc485b81407c11aebf9ee1cc202da318a61",
         "a856605429042778d2b5ad16de799e4f991d9c9a891f7fb5da9d6852373b387d",
         "0065efe1c429c87050e60e862db5d0c7ed6bfb1267826ec60dca8245bc45dbc3",
+        "b1e53776b5cec0b8742e2d074443008ffc6dd0b9b0a3756dd5b3849288b75601",
     },
     test_path: {
         "0300da3c92a1eed18c8ea15f6c6f99116f2c03a0383347a0b444c477fbd58449"
@@ -1789,6 +1806,32 @@ for marker in (
     if marker not in semantic:
         fail("iii-b2a-i opaque result consumption drifted")
 
+proof = declaration(
+    continuity, r"package struct InvestigationMachineOuterContainmentProof",
+    "outer containment proof",
+)
+for marker in (
+    "if case .admittedPhysical = result",
+    "case let .admittedPhysical(admitted) = result",
+    "admittedBy admissionOwner: UUID",
+    "admissionOwner: admissionOwner",
+    "terminalProofSHA256: terminalProofSHA256",
+):
+    if marker not in proof:
+        fail("iii-b2a-i admitted-only containment proof drifted")
+if (
+    proof.count("if case .admittedPhysical = result") != 1
+    or proof.count("admittedBy admissionOwner: UUID") != 1
+    or proof.count("admitted.isBound(") != 2
+    or proof.count("admissionOwner: admissionOwner") != 2
+    or proof.count("terminalProofSHA256: terminalProofSHA256") != 2
+    or proof.count("admissionOwner = nil") != 1
+    or proof.count("self.admissionOwner = admissionOwner") != 1
+):
+    fail("iii-b2a-i admitted-only containment proof drifted")
+if "guard proof.isBound(" not in continuity:
+    fail("iii-b2a-i completion join proof binding drifted")
+
 outer = declaration(
     protocol, r"package actor InvestigationMachineDarwinOuterAdmission",
     "outer admission",
@@ -1857,6 +1900,17 @@ for marker in (
     if marker not in outer:
         fail("iii-b2a-i terminal evidence binding drifted")
 if not all(marker in outer for marker in (
+    "private static let maximumAdmissionByteCount = 192 * 1_024",
+    "case let .decided(exchange) = state",
+    "else { return try failState() }\n        state = .terminal\n"
+    "        guard terminalEvidenceIsExact",
+    "normal.physicalResult.driverObservationSHA256",
+    "== terminalEvidence.initialDriverObservationSHA256",
+    "evidence.initialDriverObservationSHA256",
+    "== evidence.finalDriverObservationSHA256",
+)):
+    fail("iii-b2a-i admission terminal and driver digest binding drifted")
+if not all(marker in outer for marker in (
     "resultBytes.isEmpty, !terminalEvidence.innerExitedSuccessfully",
     "decision.kind == .crashNow",
     "guard terminalEvidence.innerExitedSuccessfully else",
@@ -1882,6 +1936,9 @@ for marker in (
     "guard composer.isBound(to: selection) else",
     "invocation: request.invocation,",
     "epochDeadlineNanoseconds: request.epochDeadlineNanoseconds",
+    "case let .decided(",
+    "activeRequest == request, activeDecision.kind == .continue",
+    "!Task.isCancelled",
 ):
     if marker not in inner:
         fail("iii-b2a-i request-bound composer deadline drifted")
@@ -1912,10 +1969,13 @@ required_tests = (
     "terminalEvidenceMustBindEveryExternalObservation",
     "parentCrashAlsoRequiresEveryAbsenceAndEOFProof",
     "normalResultWireIsBoundToTheExactOwnershipRecord",
+    "maximumConfigurationAdmitsOnceWithoutTranscriptOverflow",
+    "concurrentInvalidTransitionRevokesSuspendedInnerRun",
+    "admittedResultRejectsForeignGenericContainmentProver",
 )
 if "#expect(true)" in test_code or 'Issue.record("TODO' in focused:
     fail("iii-b2a-i focused test became vacuous")
-if test_code.count("@Test") != 9 or any(
+if test_code.count("@Test") != 12 or any(
     test_code.count(name) != 1 for name in required_tests
 ):
     fail("iii-b2a-i focused test names or cardinality drifted")
@@ -1932,6 +1992,11 @@ for marker in (
     "TerminalEvidenceMutation.controlEOF",
     "resultBytes: Data()",
     "resultBytes: mismatched.encoded()",
+    "InvestigationCohortEpoch.maximumConfigurationByteCount",
+    "case driverDrift, driverResultMismatch, expired",
+    "SuspendedPhysicalComposer",
+    "ForeignAdmittedResultProver",
+    "#expect(try await validRun.value == result)",
 ):
     if marker not in test_code:
         fail("iii-b2a-i focused test assertions drifted")
@@ -1942,10 +2007,66 @@ for marker in (
     "iii-b2a-i admitted token mint cardinality drifted",
     "iii-b2a-i request-bound composer deadline drifted",
     "iii-b2a-i focused test became vacuous",
+    "iii-b2a-i admission terminal and driver digest binding drifted",
+    "iii-b2a-i admitted-only containment proof drifted",
+    "iii-b2a-i completion join proof binding drifted",
 ):
     if marker not in boundary:
         fail(f"iii-b2a-i boundary regression drifted: {marker}")
 PY
+}
+
+function verify_iib5biii_b2ai_r1_scope() {
+    local baseline=${1:-2f3a116be4644829fc513bcc2287c6bd2a1ea0ec}
+    local expected=(
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerProtocol.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineHelperEpochContinuity.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochPhysicalBridge.swift
+        Tests/StornautInvestigationTests/InvestigationMachineDarwinOuterInnerProtocolTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-app-release-boundaries
+        scripts/verify-contract
+        scripts/verify-investigation-boundaries
+    )
+    (( ${#expected} == 8 )) \
+        || { print -u2 "iii-b2a-i-r1 checkpoint path ceiling drifted"; return 1; }
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" \
+        == 2f3a116be4644829fc513bcc2287c6bd2a1ea0ec ]] \
+        || { print -u2 "iii-b2a-i-r1 checkpoint baseline drifted"; return 1; }
+    if git diff --cached --name-only --diff-filter=D "$baseline" \
+        | awk 'index($0,"docs/")!=1 {found=1} END {exit !found}'
+    then
+        print -u2 "iii-b2a-i-r1 checkpoint deleted an existing path"
+        return 1
+    fi
+    if git diff --cached --numstat "$baseline" \
+        | awk 'index($3,"docs/")!=1 && ($1=="-" || $2=="-") {found=1} END {exit !found}'
+    then
+        print -u2 "iii-b2a-i-r1 binary checkpoint path rejected"
+        return 1
+    fi
+    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD \
+        "$baseline" | awk 'index($0,"docs/")!=1 && $0!="AGENTS.md" && $0!="README.md"')"})
+    [[ "${(j:\n:)${(@on)observed}}" == "${(j:\n:)${(@on)expected}}" ]] \
+        || { print -u2 "iii-b2a-i-r1 staged checkpoint paths drifted"; return 1; }
+    local expected_path expected_mode observed_entry
+    for expected_path in "${expected[@]}"; do
+        expected_mode=100644
+        [[ $expected_path == scripts/* ]] && expected_mode=100755
+        observed_entry=$(git ls-files -s -- "$expected_path")
+        [[ "$(print -r -- "$observed_entry" | awk '{print $1, $3, $4}')" \
+            == "$expected_mode 0 $expected_path" ]] \
+            || { print -u2 "iii-b2a-i-r1 checkpoint mode drifted: $expected_path"; return 1; }
+    done
+    local changed=$(git diff --cached --numstat "$baseline" \
+        | awk 'index($3,"docs/")!=1 && $3!="AGENTS.md" && $3!="README.md" {n+=$1+$2} END {print n+0}')
+    (( changed <= 1200 )) \
+        || { print -u2 "iii-b2a-i-r1 checkpoint budget drifted"; return 1; }
+    local documentation=(${(f)"$(git diff --cached --name-only \
+        --diff-filter=ACMRD "$baseline" | awk 'index($0,"docs/")==1')"})
+    local preflight=docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-i-r1-post-review-closure-preflight.md
+    (( ${documentation[(Ie)$preflight]} == 1 )) \
+        || { print -u2 "iii-b2a-i-r1 required preflight document missing"; return 1; }
 }
 
 function verify_iib5biii_b2ai_scope() {
@@ -2001,6 +2122,13 @@ function verify_iib5biii_b2ai_scope() {
     local preflight=docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-i-supervisor-admission-preflight.md
     (( ${documentation[(Ie)$preflight]} == 1 )) \
         || { print -u2 "iii-b2a-i required preflight document missing"; return 1; }
+    if git cat-file -e 2f3a116be4644829fc513bcc2287c6bd2a1ea0ec^{commit} \
+        2>/dev/null
+    then
+        [[ "$(git write-tree)" \
+            == dbe8e06f3e0c5bfb96e383348a0b870b8d7dad5f ]] \
+            || { print -u2 "iii-b2a-i completed tree drifted"; return 1; }
+    fi
 }
 
 function verify_iib5bia_projection_contract() {
@@ -7930,6 +8058,11 @@ if $iib5biii_b2ai_scope_contract_only; then
     print "iii-b2a-i staged scope verification passed."
     exit 0
 fi
+if $iib5biii_b2ai_r1_scope_contract_only; then
+    verify_iib5biii_b2ai_r1_scope "$iib5biii_b2ai_r1_scope_baseline"
+    print "iii-b2a-i-r1 staged scope verification passed."
+    exit 0
+fi
 if $iib5bia_projection_contract_only; then
     verify_iib5bia_projection_contract "$iib5bia_contract_source" "$iib5bia_focused_test_source"
     print "ii-b5b-i-a projection contract verification passed."
@@ -10105,19 +10238,19 @@ expected_driver_support_sha256 = {
     "InvestigationMachineDarwinEpochRetirement.swift":
         "574fe7df157c04b573602a222df40fe08bc4759d41fc88b56e8695b636ce38a8",
     "InvestigationMachineDarwinOuterInnerProtocol.swift":
-        "3b0954b4d426269af421ffc6957e807913bd08264aca386d10376c8050eac079",
+        "1607539374ce8a28978d5f051a61e5c996909d8b3dbb02e9a3435fc4be08c4ac",
     "InvestigationMachineSingleEpoch.swift":
         "07955234a0103c9a07d5289a258fabad68306d536ff7fe709de64123d109c953",
     "InvestigationMachineSingleEpochComposition.swift":
         "a2bad2ac774fe7dd8157e002bad8e988e96c4eb76ffd561c0f7cf3f944a1e162",
     "InvestigationMachineHelperEpochContinuity.swift":
-        "0065efe1c429c87050e60e862db5d0c7ed6bfb1267826ec60dca8245bc45dbc3",
+        "b1e53776b5cec0b8742e2d074443008ffc6dd0b9b0a3756dd5b3849288b75601",
     "InvestigationMachineEightEpochCohort.swift":
         "822cecb3489e16b9713244ff45312726045ffcc235757d132a6d6ca13ea4c3e2",
     "InvestigationMachineSingleEpochInstalledL2Join.swift":
         "376148fd9e0284c03e399ed281cd47696bed3c35630cf272fa639b7df99960d2",
     "InvestigationMachineSingleEpochPhysicalBridge.swift":
-        "09686e586e95bbccb5d115acc86501b1fb26e4074c4336e66704901f7bd8d344",
+        "752981f63405012fc249324bfaae898aeef5063e2efe5a3512531a37685ce697",
 }
 for source_name in driver_support_sources:
     source_path = driver_support_source_root / source_name
@@ -11427,16 +11560,16 @@ function require_exact_machine_driver_projection() {
             expected_undefined_lines=673
             expected_loads_sha=dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9
             expected_loads_lines=18
-            expected_owned_sha=4f8cf173e7a45045886e30cee6372ae8df6037cdd74a7309b6dfbd19e19425f3
-            expected_owned_lines=5515
+            expected_owned_sha=8a22a2bf44d82492fc1e2d8877f8eb22b17f7597ee835e921e7d281221cff173
+            expected_owned_lines=5525
             ;;
         release)
             expected_undefined_sha=200b958fb36101f258f67621035f80b89b26c465271ae6708cf5856de7bf573b
             expected_undefined_lines=450
             expected_loads_sha=dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9
             expected_loads_lines=18
-            expected_owned_sha=af58b5ab706a54d28e28bfe53121629ba92fdc6812802aa81f06c5362a7a922d
-            expected_owned_lines=3676
+            expected_owned_sha=cb140076d564983e8bcd78bf7cc274646cc133be07dcaab225312733a186234d
+            expected_owned_lines=3678
             ;;
         *)
             print -u2 "Unknown Machine driver projection: $configuration"

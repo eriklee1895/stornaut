@@ -57,6 +57,17 @@ package struct InvestigationMachineSingleEpochAdmittedPhysicalResult:
         isBound(to: expectedSelection)
             && predecessorSHA256 == predecessor.continuitySHA256
     }
+
+    func isBound(
+        to expectedSelection: InvestigationMachineFixedEpochSelection,
+        predecessor: InvestigationMachineHelperEpochPredecessor,
+        admissionOwner expectedOwner: UUID,
+        terminalProofSHA256 expectedTerminalProof: InvestigationHandoffSHA256
+    ) -> Bool {
+        isBound(to: expectedSelection, predecessor: predecessor)
+            && admissionOwner == expectedOwner
+            && terminalProofSHA256 == expectedTerminalProof
+    }
 }
 
 package struct InvestigationMachineDarwinEpochRequest: Sendable, Equatable {
@@ -752,10 +763,18 @@ package actor InvestigationMachineDarwinInnerProtocolState {
             return try failValue()
         }
         do {
-            return try await composer.run(
+            let result = try await composer.run(
                 invocation: request.invocation,
                 epochDeadlineNanoseconds: request.epochDeadlineNanoseconds
             )
+            guard
+                case let .decided(
+                    activeRequest, _, _, _, activeDecision
+                ) = state,
+                activeRequest == request, activeDecision.kind == .continue,
+                !Task.isCancelled
+            else { return try failState() }
+            return result
         } catch {
             state = .terminal
             throw error
@@ -881,6 +900,7 @@ package actor InvestigationMachineDarwinInnerProtocolState {
 package actor InvestigationMachineDarwinOuterAdmission:
     InvestigationMachineOuterContainmentProving
 {
+    private static let maximumAdmissionByteCount = 192 * 1_024
     private struct Exchange: Sendable {
         let request: InvestigationMachineDarwinEpochRequest
         let ownership: InvestigationMachineDarwinEpochOwnershipRecord
@@ -996,6 +1016,7 @@ package actor InvestigationMachineDarwinOuterAdmission:
             case let .decided(exchange) = state,
             let decision = exchange.decision, !Task.isCancelled
         else { return try failState() }
+        state = .terminal
         guard terminalEvidenceIsExact(terminalEvidence, exchange: exchange) else {
             return try failTerminalEvidence()
         }
@@ -1018,7 +1039,9 @@ package actor InvestigationMachineDarwinOuterAdmission:
                     == (try exchange.acknowledgement.digest()),
                 normal.decisionSHA256 == (try decision.digest()),
                 normal.physicalResult.physicalOwnership
-                    == exchange.physicalOwnership
+                    == exchange.physicalOwnership,
+                normal.physicalResult.driverObservationSHA256
+                    == terminalEvidence.initialDriverObservationSHA256
             else { return try failValue() }
             helper = normal.physicalResult.helperIdentity
             binding = normal.physicalResult.bindingSHA256
@@ -1032,8 +1055,10 @@ package actor InvestigationMachineDarwinOuterAdmission:
         }
 
         let terminalDigest = try terminalEvidence.digest()
-        let admissionDigest = try InvestigationHandoffSHA256.hashing(
-            HandoffBinaryTranscript.encode(
+        let admissionDigest: InvestigationHandoffSHA256
+        do {
+            admissionDigest = try InvestigationHandoffSHA256.hashing(
+                HandoffBinaryTranscript.encode(
                 domain: "stornaut.task39.machine.outer-inner.admission",
                 businessFields: [
                     try exchange.request.encoded(),
@@ -1042,9 +1067,10 @@ package actor InvestigationMachineDarwinOuterAdmission:
                     try decision.encoded(),
                     InvestigationHandoffSHA256.hashing(resultBytes).rawBytes,
                     terminalDigest.rawBytes, protocolData(owner),
-                ], maximumByteCount: 64 * 1_024
+                ], maximumByteCount: Self.maximumAdmissionByteCount
+                )
             )
-        )
+        } catch { return try failValue() }
         let token = InvestigationMachineSingleEpochAdmittedPhysicalResult(
             helperIdentity: helper, bindingSHA256: binding,
             mode: exchange.request.mode, selection: selection,
@@ -1074,7 +1100,8 @@ package actor InvestigationMachineDarwinOuterAdmission:
             !Task.isCancelled,
             let proof = try? InvestigationMachineOuterContainmentProof(
                 selection: selection, result: result, predecessor: predecessor,
-                terminalProofSHA256: token.terminalProofSHA256
+                terminalProofSHA256: token.terminalProofSHA256,
+                admittedBy: owner
             )
         else { return .terminalUncertain }
         return .contained(proof)

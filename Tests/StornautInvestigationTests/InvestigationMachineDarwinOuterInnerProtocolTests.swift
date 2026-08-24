@@ -377,12 +377,133 @@ struct InvestigationMachineDarwinOuterInnerProtocolTests {
             )
         }
     }
+
+    @Test
+    func maximumConfigurationAdmitsOnceWithoutTranscriptOverflow() async throws {
+        let fixture = try OuterInnerFixture(
+            scenario: .success,
+            configuration: Data(
+                repeating: 0xab,
+                count: InvestigationCohortEpoch.maximumConfigurationByteCount
+            )
+        )
+        let admission = fixture.makeOuterAdmission()
+        let exchange = try await completeExchange(fixture, admission)
+        let wire = try InvestigationMachineDarwinEpochNormalResult(
+            request: fixture.request, ownership: fixture.ownershipRecord,
+            acknowledgement: exchange.acknowledgement,
+            decision: exchange.decision,
+            physicalResult: fixture.physicalResult()
+        )
+
+        let result = try await admission.admit(
+            resultBytes: wire.encoded(),
+            terminalEvidence: try fixture.terminalEvidence(successfulExit: true)
+        )
+        guard case .admittedPhysical = result else {
+            Issue.record("expected maximum configuration admission")
+            return
+        }
+        await #expect(throws: (any Error).self) {
+            _ = try await admission.admit(
+                resultBytes: wire.encoded(),
+                terminalEvidence: try fixture.terminalEvidence(
+                    successfulExit: true
+                )
+            )
+        }
+    }
+
+    @Test
+    func concurrentInvalidTransitionRevokesSuspendedInnerRun() async throws {
+        let fixture = try OuterInnerFixture(scenario: .success)
+        let admission = fixture.makeOuterAdmission()
+        let exchange = try await completeExchange(fixture, admission)
+        let wire = try InvestigationMachineDarwinEpochNormalResult(
+            request: fixture.request, ownership: fixture.ownershipRecord,
+            acknowledgement: exchange.acknowledgement,
+            decision: exchange.decision,
+            physicalResult: fixture.physicalResult()
+        )
+        let result = try await admission.admit(
+            resultBytes: wire.encoded(),
+            terminalEvidence: try fixture.terminalEvidence(successfulExit: true)
+        )
+        let validComposer = SuspendedPhysicalComposer(
+            selection: fixture.selection, result: result
+        )
+        let validInner = InvestigationMachineDarwinInnerProtocolState(
+            selection: fixture.selection
+        )
+        let validRun = Task {
+            try await validInner.run(
+                composer: validComposer, request: fixture.request,
+                observedAtNanoseconds: fixture.observedAt
+            )
+        }
+        await validComposer.waitUntilStarted()
+        _ = try await validInner.emit(fixture.ownershipRecord)
+        try await validInner.accept(fixture.acknowledgement)
+        try await validInner.accept(fixture.decision)
+        await validComposer.release()
+        #expect(try await validRun.value == result)
+
+        let invalidComposer = SuspendedPhysicalComposer(
+            selection: fixture.selection, result: result
+        )
+        let invalidInner = InvestigationMachineDarwinInnerProtocolState(
+            selection: fixture.selection
+        )
+        let run = Task {
+            try await invalidInner.run(
+                composer: invalidComposer, request: fixture.request,
+                observedAtNanoseconds: fixture.observedAt
+            )
+        }
+        await invalidComposer.waitUntilStarted()
+        _ = try await invalidInner.emit(fixture.ownershipRecord)
+        try await invalidInner.accept(fixture.acknowledgement)
+        try await invalidInner.accept(fixture.decision)
+        await #expect(throws: (any Error).self) {
+            try await invalidInner.accept(fixture.decision)
+        }
+        await invalidComposer.release()
+        await #expect(throws: (any Error).self) { _ = try await run.value }
+    }
+
+    @Test
+    func admittedResultRejectsForeignGenericContainmentProver() async throws {
+        let fixture = try OuterInnerFixture(scenario: .success)
+        let admission = fixture.makeOuterAdmission()
+        let exchange = try await completeExchange(fixture, admission)
+        let wire = try InvestigationMachineDarwinEpochNormalResult(
+            request: fixture.request, ownership: fixture.ownershipRecord,
+            acknowledgement: exchange.acknowledgement,
+            decision: exchange.decision,
+            physicalResult: fixture.physicalResult()
+        )
+        let result = try await admission.admit(
+            resultBytes: wire.encoded(),
+            terminalEvidence: try fixture.terminalEvidence(successfulExit: true)
+        )
+        let predecessor = try #require(fixture.predecessor)
+        await #expect(throws:
+            InvestigationMachineHelperEpochContinuityError.containmentUncertain
+        ) {
+            _ = try await InvestigationMachineOuterCompletionJoin(
+                prover: ForeignAdmittedResultProver()
+            ).seal(
+                selection: fixture.selection, result: result,
+                predecessor: predecessor
+            )
+        }
+    }
 }
 
 private enum TerminalEvidenceMutation: CaseIterable {
     case controlEOF, resultEOF, driverIdentity, appIdentity, helperIdentity
     case appPresent, leaderNotLast, groupNotEmpty, helperPresent, l1Residue
-    case driverDrift, expired
+    case driverDrift, driverResultMismatch, expired
 }
 
 private final class DeadlineCapturingPhysicalComposer:
@@ -429,6 +550,74 @@ private final class DeadlineCapturingPhysicalComposer:
     }
 }
 
+private actor SuspendedPhysicalComposer:
+    InvestigationMachinePhysicalSingleEpochComposing
+{
+    nonisolated let selection: InvestigationMachineFixedEpochSelection
+    private let result: InvestigationMachineSingleEpochResult
+    private var started = false
+    private var released = false
+    private var startWaiters: [CheckedContinuation<Void, Never>] = []
+    private var releaseWaiters: [CheckedContinuation<Void, Never>] = []
+
+    init(
+        selection: InvestigationMachineFixedEpochSelection,
+        result: InvestigationMachineSingleEpochResult
+    ) {
+        self.selection = selection
+        self.result = result
+    }
+    nonisolated func isBound(
+        to value: InvestigationMachineFixedEpochSelection
+    ) -> Bool { value == selection }
+    func run(
+        previousHelperIdentity: InvestigationMachineProcessIdentity?
+    ) async throws -> InvestigationMachineSingleEpochResult {
+        throw InvestigationMachineDarwinOuterInnerProtocolError.invalidState
+    }
+    func run(
+        invocation: InvestigationMachineSingleEpochInvocation,
+        epochDeadlineNanoseconds: UInt64
+    ) async throws -> InvestigationMachineSingleEpochResult {
+        _ = invocation
+        _ = epochDeadlineNanoseconds
+        started = true
+        let waiting = startWaiters
+        startWaiters.removeAll()
+        waiting.forEach { $0.resume() }
+        if !released {
+            await withCheckedContinuation { releaseWaiters.append($0) }
+        }
+        return result
+    }
+    func waitUntilStarted() async {
+        if started { return }
+        await withCheckedContinuation { startWaiters.append($0) }
+    }
+    func release() {
+        released = true
+        let waiting = releaseWaiters
+        releaseWaiters.removeAll()
+        waiting.forEach { $0.resume() }
+    }
+}
+
+private struct ForeignAdmittedResultProver:
+    InvestigationMachineOuterContainmentProving
+{
+    func proveContainment(
+        selection: InvestigationMachineFixedEpochSelection,
+        result: InvestigationMachineSingleEpochResult,
+        predecessor: InvestigationMachineHelperEpochPredecessor
+    ) async -> InvestigationMachineOuterContainmentOutcome {
+        guard let proof = try? InvestigationMachineOuterContainmentProof(
+            selection: selection, result: result, predecessor: predecessor,
+            terminalProofSHA256: try OuterInnerFixture.digest(0xdd)
+        ) else { return .terminalUncertain }
+        return .contained(proof)
+    }
+}
+
 private func acceptsRequest(
     _ admission: InvestigationMachineDarwinOuterAdmission,
     _ request: InvestigationMachineDarwinEpochRequest
@@ -464,9 +653,12 @@ private struct OuterInnerFixture {
     let acknowledgement: InvestigationMachineDarwinEpochAcknowledgement
     let decision: InvestigationMachineDarwinEpochDecision
 
-    init(scenario: InvestigationHandoffScenario) throws {
+    init(
+        scenario: InvestigationHandoffScenario, configuration: Data? = nil
+    ) throws {
         let ordinal = scenario.rawValue - 1
-        let configuration = Data("outer-inner-\(ordinal)".utf8)
+        let configuration = configuration
+            ?? Data("outer-inner-\(ordinal)".utf8)
         let epoch = try InvestigationCohortEpoch(
             ordinal: ordinal, epochUUID: Self.uuid(UInt8(0x10 + ordinal)),
             scenario: scenario,
@@ -609,9 +801,12 @@ private struct OuterInnerFixture {
             postReapGroupEmpty: mutation != .groupNotEmpty,
             helperAbsent: mutation != .helperPresent,
             l1ResidueAbsent: mutation != .l1Residue,
-            initialDriverObservationSHA256: Self.digest(0x71),
+            initialDriverObservationSHA256: Self.digest(
+                mutation == .driverResultMismatch ? 0x71 : 0x62
+            ),
             finalDriverObservationSHA256: Self.digest(
-                mutation == .driverDrift ? 0x72 : 0x71
+                mutation == .driverDrift ? 0x72
+                    : (mutation == .driverResultMismatch ? 0x71 : 0x62)
             ),
             observedAtNanoseconds: mutation == .expired
                 ? request.epochDeadlineNanoseconds : observedAt + 1
