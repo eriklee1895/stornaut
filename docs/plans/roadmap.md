@@ -239,8 +239,9 @@ admission、same-owner containment proof、12 focused、593 affected、1,475-tes
 fixed transport/inner-role closure 也已以 7-path / 1,694-line implementation、
 1,485-test/78-suite serial、三项 boundary gates 与 immutable seal 收口。当前
 frontier 已按 scope/trust preflight 拆为 a2-0 untrusted decode、a2-i inherited-
-PGID App session 与 a2-ii terminal/admission join；当前 a2-0，随后严格按
-a2-i → a2-ii → iii-b2b → c0b → ii-c → L3c3d → L3c4 推进。
+PGID App session 与 a2-ii terminal/admission join；a2-0 已完成并保持
+non-admitting，当前 a2-i，随后严格按 a2-ii → iii-b2b → c0b → ii-c →
+L3c3d → L3c4 推进。
 39B2c 仍未作 machine readiness claim。
 [ii-c0a preflight](../reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md)
 冻结 v1-preserving enclosing projected-cohort binary contract、exact 8-path /
@@ -285,8 +286,8 @@ b5b-ii Darwin runtime 与 b5b-iii production/artifact；b5a 与 b5b-i through
 aggregate i-c2 已完成并保持 non-admitting；b5b-ii-a/b/c/d 已完成并保持
 non-admitting；c0a projection-in-capsule implementation 已完成并保持
 non-admitting；b5b-iii-b0 已冻结，iii-a/iii-b1/iii-b2a0/iii-b2a-i/
-iii-b2a-ii-a1 已完成并保持 non-admitting；a2 已冻结为 a2-0/a2-i/a2-ii，当前
-frontier 为 a2-0，后续为 a2-i → a2-ii → iii-b2b → c0b → ii-c → L3c3d →
+iii-b2a-ii-a1 与 a2-0 已完成并保持 non-admitting；a2 已冻结为
+a2-0/a2-i/a2-ii，当前 frontier 为 a2-i，后续为 a2-ii → iii-b2b → c0b → ii-c → L3c3d →
 L3c4。
 L3c2b preflight 的 real-plan matrix contradiction 已由 3-path plan-freshness
 prerequisite 关闭，affected/Investigation/structural/review gates 通过；
@@ -319,6 +320,9 @@ L3c3c 当前证据见
 [iii-b2a0 completion review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a0-review.md)
 、[iii-b2a-i completion review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-i-review.md)
 与 [iii-b2a-ii-a1-v completion review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a1-v-review.md)。
+[a2-0 completion review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-0-review.md)
+记录 self-contained untrusted decode、8-path/703-line scope、1,487-test serial
+与 no-unresolved-P0–P2 review。
 
 **范围：** Epic 5–6；仅在 ADR 0004 capability-first runtime gate 允许时进入。
 
@@ -483,8 +487,8 @@ L3c3c 当前证据见
   non-admitting；ii-b5 已拆为 b5a0/b5a/b5b-i/b5b-ii/b5b-iii，b5a 与 b5b-i
   through aggregate i-c2 已完成并保持 non-admitting；b5b-ii-a/b/c/d 与 c0a
   projection-in-capsule 已完成并保持 non-admitting；b5b-iii-b0 已冻结，iii-a、
-  iii-b1、iii-b2a0、iii-b2a-i 与 iii-b2a-ii-a1 已完成并保持 non-admitting；
-  a2 已冻结为 a2-0/a2-i/a2-ii，当前 frontier 为 a2-0，后续为 a2-i →
+  iii-b1、iii-b2a0、iii-b2a-i、iii-b2a-ii-a1 与 a2-0 已完成并保持
+  non-admitting；a2 已冻结为 a2-0/a2-i/a2-ii，当前 frontier 为 a2-i，后续为
   a2-ii → iii-b2b → c0b → ii-c →
   L3c3d → L3c4。
   L3c4 才拥有 final admission/full。39B2c 才是 machine admission，Task 39

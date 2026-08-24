@@ -92,7 +92,8 @@
 > complete/non-admitting. iii-b2a-ii-a1 fixed transport and inner-role closure
 > is complete/non-admitting. The a2 scope/trust preflight split the remaining
 > composition into a2-0 self-contained untrusted decode, a2-i inherited-PGID
-> App session and a2-ii terminal/admission join; a2-0 is current.
+> App session and a2-ii terminal/admission join; a2-0 is complete/non-admitting
+> and a2-i is current.
 > Evidence:
 > [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
 > [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md) and
@@ -118,6 +119,8 @@
 > [39B2c-L2 Root Topology Observation Review](../../reports/phase-d-task-39b2c-l2-root-topology-observation-review.md).
 > The current a2 split is frozen by the
 > [a2 scope/trust preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-scope-trust-preflight.md).
+> a2-0 completion evidence is in the
+> [a2-0 review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-0-review.md).
 > L3 preflight then split the remaining work into L3a trusted target extraction,
 > L3b root driver/L1+L2 collection and L3c failure matrix/final admission. L3a
 > moved the machine-only contract and assembler into the non-product
@@ -1135,9 +1138,9 @@ The remaining L3 work is split before driver coding:
    and ii-c0a are complete/non-admitting. The further split is frozen as
    `iii-b0 -> iii-a -> iii-b1 -> iii-b2a0 -> iii-b2a-i -> iii-b2a-ii-a ->
    iii-b2b`; b0 is documentation-only/non-admitting and iii-a/iii-b1/
-   iii-b2a0/iii-b2a-i/iii-b2a-ii-a1 are complete/non-admitting. The corrected
-   remaining order is `a2-0 -> a2-i -> a2-ii -> iii-b2b -> ii-c0b -> ii-c ->
-   L3c3d -> L3c4`; a2-0 is current.
+   iii-b2a0/iii-b2a-i/iii-b2a-ii-a1/a2-0 are complete/non-admitting. The
+   corrected remaining order is `a2-i -> a2-ii -> iii-b2b -> ii-c0b -> ii-c ->
+   L3c3d -> L3c4`; a2-i is current.
    See the
    [study](../../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md)
    and [final review](../../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md),
@@ -1251,6 +1254,8 @@ The remaining L3 work is split before driver coding:
    protocol-driving and terminal-evidence composition.
    Its exact implementation/seal identities and validation evidence are in the
    [iii-b2a-ii-a1-v review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a1-v-review.md).
+   a2-0 self-contained decode completion is recorded in the
+   [a2-0 review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-0-review.md).
    The b5 split, claim-abort completion and typed composer completion evidence
    are in the
    [ii-b5 preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b5-split-preflight.md),
@@ -1318,8 +1323,8 @@ ii-b3c concrete leaf/native entry, ii-b4 fixed helper-claim client, ii-b5a0 and
 ii-b5a, ii-b5b-i-a, i-b1, i-b2a, i-b2b-a, i-b2b-b, i-b3, i-c1 and i-c2a
 are complete and non-admitting; aggregate i-c2 and ii-b5b-ii-a/ii-b/ii-c/ii-d
 and ii-c0a are complete/non-admitting; ii-b5b-iii-b0 is frozen/non-admitting
-and iii-a/iii-b1/iii-b2a0/iii-b2a-i/iii-b2a-ii-a1 are complete/non-admitting;
-a2-0 is the current implementation checkpoint inside the frozen a2 split.
+and iii-a/iii-b1/iii-b2a0/iii-b2a-i/iii-b2a-ii-a1/a2-0 are complete/non-admitting;
+a2-i is the current implementation checkpoint inside the frozen a2 split.
 ADR 0018
 remains Proposed until ii-c succeeds. L3c1 used focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean

@@ -1,6 +1,6 @@
 # Phase D Task 39B2c L3c3c-ii-b5b-iii-b2a-ii-a2 Scope/Trust Preflight
 
-> Status: frozen; a2-0 current
+> Status: frozen; a2-0 complete/non-admitting; a2-i current
 >
 > Date: 2026-08-24
 >
