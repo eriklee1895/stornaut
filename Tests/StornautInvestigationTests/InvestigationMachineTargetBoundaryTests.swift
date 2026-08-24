@@ -621,7 +621,9 @@ struct InvestigationMachineTargetBoundaryTests {
             "StornautLifecycle",
             "StornautExecution",
             "Cleanup",
-            "Policy",
+            "ActionPolicyGate",
+            "CleanupPolicyGate",
+            "CanonicalPathPolicy",
             "RegisteredAction",
             "Process(",
             "posix_spawn",
@@ -839,7 +841,7 @@ struct InvestigationMachineTargetBoundaryTests {
                 let allowedCalls: [String: Int] = [
                     "proc_listpids": 1,
                     "waitid": 1,
-                    "waitpid": 1,
+                    "waitpid": 2,
                     "nanosleep": 1,
                 ]
                 for (name, count) in allowedCalls {
@@ -982,7 +984,9 @@ struct InvestigationMachineTargetBoundaryTests {
                 "import StornautInvestigation\n",
                 "import StornautLifecycle",
                 "Cleanup",
-                "Policy",
+                "ActionPolicyGate",
+                "CleanupPolicyGate",
+                "CanonicalPathPolicy",
                 "Trash",
                 "Executor",
                 "RegisteredAction",
@@ -1751,8 +1755,86 @@ struct InvestigationMachineTargetBoundaryTests {
         }
         for marker in [
             "8c1b72fec0b93ceda181412cb6909701d608e2eb39afe380477a95e3392cba94",
-            "f758503fde02deeb4dda8b8bb48b826bfad1b3405ecc905d568822efdb9c5cff",
-            "95be330898b63e980131417289c11ac11ccad9580f536885ea3e3c2e81238703",
+            "8eb81efeca787a56843a62ed12de91e5ae8bb67ac50992cbf5705498b39e19c2",
+            "d223c56c175cc1e779b61b5ffc9cdac8f91617135eddebc56ae082befb278e81",
+        ] {
+            #expect(app.contains(marker))
+        }
+    }
+
+    @Test
+    func iiiB2AIIA2IVerifierPinsInheritedPGIDAndDirectChildRetirement()
+        throws
+    {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ), encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        let app = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-app-release-boundaries"
+            ), encoding: .utf8
+        )
+        for marker in [
+            "--iib5biii-b2a-ii-a2i-contract-only",
+            "--iib5biii-b2a-ii-a2i-scope-contract-only",
+            "function verify_iib5biii_b2a_iia2i_contract()",
+            "function verify_iib5biii_b2a_iia2i_scope()",
+            "iii-b2a-ii-a2-i topology policy drifted",
+            "fail(\"spawn contract drifted\")",
+            "fail(\"App identity topology drifted\")",
+            "fail(\"inherited PGID stability drifted\")",
+            "iii-b2a-ii-a2-i direct-child retirement drifted",
+            "iii-b2a-ii-a2-i successful direct-child retirement drifted",
+            "fail(\"session tests became vacuous\")",
+            "fail(\"identity tests became vacuous\")",
+            "iii-b2a-ii-a2-i retirement tests became vacuous",
+            "iii-b2a-ii-a2-i staged checkpoint paths drifted",
+            "iii-b2a-ii-a2-i checkpoint budget drifted",
+            "8362b47351a7d3b3a141fc78ec03f9575199901d",
+            "(( ${#expected} == 10 ))",
+            "(( changed <= 3200 ))",
+            "ActionPolicyGate",
+            "CleanupPolicyGate",
+            "CanonicalPathPolicy",
+        ] {
+            #expect(boundary.contains(marker))
+        }
+        #expect(!boundary.contains(
+            "iii-b2a-ii-a2-i broad Policy authority drifted"
+        ))
+        for marker in [
+            "inherited-flags-setpgroup",
+            "unconditional-setpgroup",
+            "widened-setpgroup-condition",
+            "normal-reaper-to-fallback",
+            "remove-exit-status-zero",
+            "exit-status-disjunction",
+            "successful-reaper-add-signal",
+            "for fixture in extra-path over-budget deleted binary mode wrong-baseline",
+        ] {
+            #expect(contract.contains(marker))
+        }
+        for marker in [
+            "867b6e13c9000f3092a47ef36d8c789a5e1dd33a07dcc91d15ee271ebc806398",
+            "c7a67d49dbb80ae779a1c0efac192f96d0af1809a2516b9a4ec6ca5f74b40f26",
+            "expected_owned_lines=6988",
+            "expected_owned_lines=3788",
+        ] {
+            #expect(boundary.contains(marker))
+        }
+        for marker in [
+            "8eb81efeca787a56843a62ed12de91e5ae8bb67ac50992cbf5705498b39e19c2",
+            "d223c56c175cc1e779b61b5ffc9cdac8f91617135eddebc56ae082befb278e81",
+            "6987 \\",
+            "3787 release-owned-symbol",
         ] {
             #expect(app.contains(marker))
         }

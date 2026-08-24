@@ -110,10 +110,15 @@ instead of copying the STNP/STNH business state machine. It must:
   process group; on failure close FD 7 and use only direct-child fallback; and
 - return only existing opaque ownership/local-completion values.
 
-Maximum eight non-document paths and 3,200 changed lines: the existing Darwin
-epoch session and App identity sources, their two existing focused test files,
-the target-boundary test and three verifier scripts. A copied second business
-state machine, new target, C shim, App source or public entry is forbidden.
+Maximum ten non-document paths and 3,200 changed lines: the existing Darwin
+epoch session, App identity and retirement sources, their three existing
+focused test files, the target-boundary test and three verifier scripts. The
+original eight-path estimate was amended on 2026-08-25 after independent review
+proved that normal direct-child completion must validate and reap exit status
+without reusing the failure-only signalling fallback. This adds only the
+existing retirement source/test pair and does not change the frozen ownership
+model. A copied second business state machine, new target, C shim, App source or
+public entry remains forbidden.
 
 ## 4. a2-ii — Terminal evidence and sole admission join
 

@@ -117,6 +117,43 @@ package struct InvestigationMachineDarwinAppIdentityObserver: Sendable {
         processClaim: InvestigationHandoffProcessClaim,
         projection: InvestigationInstalledL2IdentityProjection
     ) throws -> InvestigationMachineDarwinAppPreDropObservation {
+        try prepare(
+            processClaim: processClaim,
+            projection: projection,
+            expectedTopology: nil
+        )
+    }
+    package func prepare(
+        processClaim: InvestigationHandoffProcessClaim,
+        projection: InvestigationInstalledL2IdentityProjection,
+        expectedParentProcessID: UInt32,
+        expectedProcessGroupID: UInt32
+    ) throws -> InvestigationMachineDarwinAppPreDropObservation {
+        guard
+            expectedParentProcessID > 1,
+            expectedProcessGroupID > 1
+        else {
+            throw InvestigationMachineDarwinAppIdentityObservationError
+                .invalidPreDropIdentity
+        }
+        return try prepare(
+            processClaim: processClaim,
+            projection: projection,
+            expectedTopology: ExpectedTopology(
+                parentProcessID: expectedParentProcessID,
+                processGroupID: expectedProcessGroupID
+            )
+        )
+    }
+    private struct ExpectedTopology {
+        let parentProcessID: UInt32
+        let processGroupID: UInt32
+    }
+    private func prepare(
+        processClaim: InvestigationHandoffProcessClaim,
+        projection: InvestigationInstalledL2IdentityProjection,
+        expectedTopology selectedTopology: ExpectedTopology?
+    ) throws -> InvestigationMachineDarwinAppPreDropObservation {
         guard
             processClaim.effectiveUserID == Self.rootUserID,
             processClaim.processID > 1,
@@ -134,9 +171,14 @@ package struct InvestigationMachineDarwinAppIdentityObserver: Sendable {
             throw InvestigationMachineDarwinAppIdentityObservationError
                 .invalidPreDropIdentity
         }
+        let expectedTopology = selectedTopology ?? ExpectedTopology(
+            parentProcessID: system.currentProcessID(),
+            processGroupID: processClaim.processID
+        )
         let facts = try stableFacts(
             processID: processClaim.processID,
-            expectedParentProcessID: system.currentProcessID(),
+            expectedParentProcessID: expectedTopology.parentProcessID,
+            expectedProcessGroupID: expectedTopology.processGroupID,
             projection: projection,
             phase: .preDrop
         )
@@ -206,6 +248,7 @@ package struct InvestigationMachineDarwinAppIdentityObserver: Sendable {
         let facts = try stableFacts(
             processID: processClaim.processID,
             expectedParentProcessID: preDrop.parentProcessID,
+            expectedProcessGroupID: preDrop.processGroupID,
             projection: projection,
             phase: .postDrop
         )
@@ -267,10 +310,14 @@ package struct InvestigationMachineDarwinAppIdentityObserver: Sendable {
     private func stableFacts(
         processID: UInt32,
         expectedParentProcessID: UInt32,
+        expectedProcessGroupID: UInt32,
         projection: InvestigationInstalledL2IdentityProjection,
         phase: Phase
     ) throws -> StableFacts {
-        guard expectedParentProcessID > 1 else {
+        guard
+            expectedParentProcessID > 1,
+            expectedProcessGroupID > 1
+        else {
             throw InvestigationMachineDarwinAppIdentityObservationError
                 .observationUnavailable
         }
@@ -279,6 +326,7 @@ package struct InvestigationMachineDarwinAppIdentityObserver: Sendable {
             initial,
             processID: processID,
             parentProcessID: expectedParentProcessID,
+            processGroupID: expectedProcessGroupID,
             phase: phase
         )
         else {
@@ -372,6 +420,7 @@ package struct InvestigationMachineDarwinAppIdentityObserver: Sendable {
             final,
             processID: processID,
             parentProcessID: expectedParentProcessID,
+            processGroupID: expectedProcessGroupID,
             phase: phase
         ) else {
             throw phaseIdentityError(phase)
@@ -382,12 +431,13 @@ package struct InvestigationMachineDarwinAppIdentityObserver: Sendable {
         _ snapshot: InvestigationMachineDarwinAppProcessSnapshot,
         processID: UInt32,
         parentProcessID: UInt32,
+        processGroupID: UInt32,
         phase: Phase
     ) -> Bool {
         guard
             snapshot.processID == processID,
             snapshot.parentProcessID == parentProcessID,
-            snapshot.processGroupID == processID,
+            snapshot.processGroupID == processGroupID,
             snapshot.auditSessionID > 0,
             snapshot.startTimeSeconds > 0,
             snapshot.startTimeMicroseconds < 1_000_000,

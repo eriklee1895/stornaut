@@ -57,6 +57,131 @@ struct InvestigationMachineDarwinAppIdentityObservationTests {
         #expect(!(type(of: observation) is any Codable.Type))
         #expect(!(type(of: preDrop) is any Codable.Type))
     }
+    @Test
+    func inheritedProcessGroupTopologyUsesFactoryOwnedExpectations() throws {
+        let fixture = try DarwinAppIdentityFixture()
+        let parentProcessID = fixture.inheritedParentProcessID
+        let processGroupID = fixture.inheritedProcessGroupID
+        let preDrop = try fixture.preDropObservation(
+            expectedParentProcessID: parentProcessID,
+            expectedProcessGroupID: processGroupID
+        )
+        let postDropSnapshot = fixture.makePostDropSnapshot(
+            parentProcessID: parentProcessID,
+            processGroupID: processGroupID
+        )
+
+        let observation = try fixture.observe(
+            system: fixture.system(snapshots: [
+                .success(postDropSnapshot), .success(postDropSnapshot),
+            ]),
+            preDrop: preDrop
+        )
+
+        #expect(fixture.processID != processGroupID)
+        #expect(observation == InvestigationMachineSingleEpochAppObservation(
+            identity: fixture.appIdentity
+        ))
+    }
+    @Test(arguments: DarwinAppExpectedTopologyMismatch.allCases)
+    fileprivate func inheritedTopologyRejectsWrongExpectedParentOrGroup(
+        _ mismatch: DarwinAppExpectedTopologyMismatch
+    ) throws {
+        let fixture = try DarwinAppIdentityFixture()
+        let snapshot = fixture.makePreDropSnapshot(
+            parentProcessID: fixture.inheritedParentProcessID,
+            processGroupID: fixture.inheritedProcessGroupID
+        )
+        let expectedParentProcessID = mismatch == .parentProcessID
+            ? fixture.inheritedParentProcessID + 1
+            : fixture.inheritedParentProcessID
+        let expectedProcessGroupID = mismatch == .processGroupID
+            ? fixture.inheritedProcessGroupID + 1
+            : fixture.inheritedProcessGroupID
+        let system = fixture.system(
+            narrows: [fixture.preDropNarrow, fixture.preDropNarrow],
+            snapshots: [.success(snapshot), .success(snapshot)],
+            liveSigning: fixture.liveSigning
+        )
+
+        #expect(
+            throws: InvestigationMachineDarwinAppIdentityObservationError
+                .invalidPreDropIdentity
+        ) {
+            _ = try InvestigationMachineDarwinAppIdentityObserver(
+                system: system
+            ).prepare(
+                processClaim: fixture.preDropClaim,
+                projection: fixture.projection,
+                expectedParentProcessID: expectedParentProcessID,
+                expectedProcessGroupID: expectedProcessGroupID
+            )
+        }
+    }
+    @Test(arguments: DarwinAppInheritedTopologyDrift.allCases)
+    fileprivate func inheritedTopologyRejectsPreAndPostObservationDrift(
+        _ drift: DarwinAppInheritedTopologyDrift
+    ) throws {
+        let fixture = try DarwinAppIdentityFixture()
+        let parentProcessID = fixture.inheritedParentProcessID
+        let processGroupID = fixture.inheritedProcessGroupID
+
+        switch drift {
+        case .preDropParent, .preDropGroup:
+            let initial = fixture.makePreDropSnapshot(
+                parentProcessID: parentProcessID,
+                processGroupID: processGroupID
+            )
+            let final = fixture.makePreDropSnapshot(
+                parentProcessID: drift == .preDropParent
+                    ? parentProcessID + 1 : parentProcessID,
+                processGroupID: drift == .preDropGroup
+                    ? processGroupID + 1 : processGroupID
+            )
+            let system = fixture.system(
+                narrows: [fixture.preDropNarrow, fixture.preDropNarrow],
+                snapshots: [.success(initial), .success(final)],
+                liveSigning: fixture.liveSigning
+            )
+            #expect(
+                throws: InvestigationMachineDarwinAppIdentityObservationError
+                    .invalidPreDropIdentity
+            ) {
+                _ = try InvestigationMachineDarwinAppIdentityObserver(
+                    system: system
+                ).prepare(
+                    processClaim: fixture.preDropClaim,
+                    projection: fixture.projection,
+                    expectedParentProcessID: parentProcessID,
+                    expectedProcessGroupID: processGroupID
+                )
+            }
+        case .postDropParent, .postDropGroup:
+            let preDrop = try fixture.preDropObservation(
+                expectedParentProcessID: parentProcessID,
+                expectedProcessGroupID: processGroupID
+            )
+            let initial = fixture.makePostDropSnapshot(
+                parentProcessID: parentProcessID,
+                processGroupID: processGroupID
+            )
+            let final = fixture.makePostDropSnapshot(
+                parentProcessID: drift == .postDropParent
+                    ? parentProcessID + 1 : parentProcessID,
+                processGroupID: drift == .postDropGroup
+                    ? processGroupID + 1 : processGroupID
+            )
+            let system = fixture.system(snapshots: [
+                .success(initial), .success(final),
+            ])
+            #expect(
+                throws: InvestigationMachineDarwinAppIdentityObservationError
+                    .invalidPostDropIdentity
+            ) {
+                _ = try fixture.observe(system: system, preDrop: preDrop)
+            }
+        }
+    }
     @Test(arguments: DarwinAppIdentitySnapshotMutation.allCases)
     fileprivate func everyIndependentPostDropIdentityAxisFailsClosed(
         _ mutation: DarwinAppIdentitySnapshotMutation
@@ -398,6 +523,12 @@ private enum DarwinAppIdentitySnapshotMutation: CaseIterable {
     case realGroupID, effectiveGroupID, savedGroupID
     case auditUserID, auditSessionID, startTime, groupCount, duplicateGroup
 }
+private enum DarwinAppExpectedTopologyMismatch: CaseIterable {
+    case parentProcessID, processGroupID
+}
+private enum DarwinAppInheritedTopologyDrift: CaseIterable {
+    case preDropParent, preDropGroup, postDropParent, postDropGroup
+}
 private enum DarwinAppPreDropSnapshotMutation: CaseIterable {
     case processID, parentProcessID, processGroupID
     case realUserID, effectiveUserID, savedUserID
@@ -585,6 +716,8 @@ private enum DarwinAppResolvedIdentityFailureSample: CaseIterable {
 }
 private struct DarwinAppIdentityFixture {
     let driverProcessID: UInt32 = 900
+    let inheritedParentProcessID: UInt32 = 702
+    let inheritedProcessGroupID: UInt32 = 702
     let processID: UInt32 = 701
     let processVersion: UInt32 = 11
     let auditSessionID: UInt32 = 44_001
@@ -676,6 +809,27 @@ private struct DarwinAppIdentityFixture {
             )
         ).prepare(processClaim: preDropClaim, projection: projection)
     }
+    func preDropObservation(
+        expectedParentProcessID: UInt32,
+        expectedProcessGroupID: UInt32
+    ) throws -> InvestigationMachineDarwinAppPreDropObservation {
+        let snapshot = makePreDropSnapshot(
+            parentProcessID: expectedParentProcessID,
+            processGroupID: expectedProcessGroupID
+        )
+        return try InvestigationMachineDarwinAppIdentityObserver(
+            system: system(
+                narrows: [preDropNarrow, preDropNarrow],
+                snapshots: [.success(snapshot), .success(snapshot)],
+                liveSigning: liveSigning
+            )
+        ).prepare(
+            processClaim: preDropClaim,
+            projection: projection,
+            expectedParentProcessID: expectedParentProcessID,
+            expectedProcessGroupID: expectedProcessGroupID
+        )
+    }
     func observe(
         system: RecordingDarwinAppIdentitySystem,
         preDrop: InvestigationMachineDarwinAppPreDropObservation,
@@ -755,6 +909,26 @@ private struct DarwinAppIdentityFixture {
             processID: processID, parent: driverProcessID, group: processID,
             userID: 501, groupID: 20, auditUserID: auditUserID,
             auditSessionID: auditSessionID, groups: groups
+        )
+    }
+    func makePreDropSnapshot(
+        parentProcessID: UInt32, processGroupID: UInt32
+    ) -> InvestigationMachineDarwinAppProcessSnapshot {
+        Self.snapshot(
+            processID: processID, parent: parentProcessID,
+            group: processGroupID, userID: 0, groupID: 0,
+            auditUserID: auditUserID, auditSessionID: auditSessionID,
+            groups: [0]
+        )
+    }
+    func makePostDropSnapshot(
+        parentProcessID: UInt32, processGroupID: UInt32
+    ) -> InvestigationMachineDarwinAppProcessSnapshot {
+        Self.snapshot(
+            processID: processID, parent: parentProcessID,
+            group: processGroupID, userID: 501, groupID: 20,
+            auditUserID: auditUserID, auditSessionID: auditSessionID,
+            groups: groups
         )
     }
     func preDropSnapshot(

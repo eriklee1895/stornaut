@@ -102,6 +102,16 @@ iib5biii_b2a_iia20_protocol_test_source=
 iib5biii_b2a_iia20_boundary_test_source=
 iib5biii_b2a_iia20_scope_contract_only=false
 iib5biii_b2a_iia20_scope_baseline=b46120d3161b5992018f4b990382bd6ced49d599
+iib5biii_b2a_iia2i_contract_only=false
+iib5biii_b2a_iia2i_session_source=
+iib5biii_b2a_iia2i_observer_source=
+iib5biii_b2a_iia2i_retirement_source=
+iib5biii_b2a_iia2i_session_test_source=
+iib5biii_b2a_iia2i_observer_test_source=
+iib5biii_b2a_iia2i_retirement_test_source=
+iib5biii_b2a_iia2i_boundary_test_source=
+iib5biii_b2a_iia2i_scope_contract_only=false
+iib5biii_b2a_iia2i_scope_baseline=8362b47351a7d3b3a141fc78ec03f9575199901d
 iib5bia_projection_contract_only=false
 iib5bia_contract_source=
 iib5bia_focused_test_source=
@@ -372,6 +382,20 @@ if (( $# > 0 )); then
         && [[ $1 == --iib5biii-b2a-ii-a20-scope-contract-only ]]; then
         iib5biii_b2a_iia20_scope_contract_only=true
         iib5biii_b2a_iia20_scope_baseline=${2:-b46120d3161b5992018f4b990382bd6ced49d599}
+    elif (( $# == 8 )) \
+        && [[ $1 == --iib5biii-b2a-ii-a2i-contract-only ]]; then
+        iib5biii_b2a_iia2i_contract_only=true
+        iib5biii_b2a_iia2i_session_source=$2
+        iib5biii_b2a_iia2i_observer_source=$3
+        iib5biii_b2a_iia2i_retirement_source=$4
+        iib5biii_b2a_iia2i_session_test_source=$5
+        iib5biii_b2a_iia2i_observer_test_source=$6
+        iib5biii_b2a_iia2i_retirement_test_source=$7
+        iib5biii_b2a_iia2i_boundary_test_source=$8
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iib5biii-b2a-ii-a2i-scope-contract-only ]]; then
+        iib5biii_b2a_iia2i_scope_contract_only=true
+        iib5biii_b2a_iia2i_scope_baseline=${2:-8362b47351a7d3b3a141fc78ec03f9575199901d}
     elif (( $# == 3 )) \
         && [[ $1 == --iib5bia-projection-contract-only ]]; then
         iib5bia_projection_contract_only=true
@@ -2691,6 +2715,424 @@ function verify_iib5biii_b2a_iia20_scope() {
         || { print -u2 "iii-b2a-ii-a2-0 checkpoint budget drifted"; return 1; }
 }
 
+function verify_iib5biii_b2a_iia2i_contract() {
+    local session_source=$1 observer_source=$2 retirement_source=$3
+    local session_test_source=$4 observer_test_source=$5
+    local retirement_test_source=$6 boundary_test_source=$7
+    local source
+    for source in "$session_source" "$observer_source" \
+        "$retirement_source" "$session_test_source" \
+        "$observer_test_source" "$retirement_test_source" \
+        "$boundary_test_source"
+    do
+        xcrun swiftc -frontend -parse -enable-bare-slash-regex "$source"
+    done
+    python3 - "$session_source" "$observer_source" \
+        "$retirement_source" "$session_test_source" \
+        "$observer_test_source" "$retirement_test_source" \
+        "$boundary_test_source" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+session_path, observer_path, retirement_path, session_test_path, \
+observer_test_path, retirement_test_path, boundary_path = map(Path, sys.argv[1:])
+session, observer, retirement, session_test, observer_test, retirement_test, boundary = (
+    path.read_text(encoding="utf-8")
+    for path in (
+        session_path, observer_path, retirement_path, session_test_path,
+        observer_test_path, retirement_test_path, boundary_path,
+    )
+)
+
+def fail(message):
+    raise SystemExit(f"iii-b2a-ii-a2-i {message}")
+
+def declaration(source, pattern, label):
+    match = re.search(pattern, source, re.MULTILINE)
+    if match is None:
+        fail(f"{label} drifted")
+    opening = source.find("{", match.end())
+    if opening < 0:
+        fail(f"{label} drifted")
+    depth = 0
+    for index in range(opening, len(source)):
+        if source[index] == "{":
+            depth += 1
+        elif source[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return source[match.start():index + 1]
+    fail(f"{label} drifted")
+
+def compact(source):
+    return re.sub(r"\s+", "", source)
+
+semantic = session + observer
+if re.search(r"(?m)^\s*(?:public|open)\s+", semantic):
+    fail("topology policy drifted")
+if re.search(r"\b(?:Codable|Encodable|Decodable)\b", semantic):
+    fail("topology policy drifted")
+for marker in (
+    "StornautCore", "StornautExecution", "StornautLifecycle",
+    "StornautInvestigationDiagnostic", "ActionPolicyGate",
+    "CleanupPolicyGate", "CanonicalPathPolicy", "RegisteredAction",
+    "MoveToTrash",
+):
+    if marker in semantic:
+        fail("topology policy drifted")
+
+policy = declaration(
+    session, r"(?m)^enum InvestigationMachineDarwinEpochTopologyPolicy\b",
+    "topology policy",
+)
+if (
+    "case appOwnedProcessGroup" not in policy
+    or "case inheritedInnerProcessGroup" not in policy
+    or len(re.findall(r"(?m)^\s*case\s+", policy)) != 2
+):
+    fail("topology policy drifted")
+authority = declaration(
+    session,
+    r"(?m)^private enum InvestigationMachineDarwinEpochRetirementAuthority\b",
+    "topology policy",
+)
+for marker in (
+    "case ownedProcessGroup(InvestigationMachineDarwinOwnedEpoch)",
+    "case directChild(InvestigationMachineDarwinSpawnedEpoch)",
+):
+    if marker not in authority:
+        fail("topology policy drifted")
+if "topologyPolicy: InvestigationMachineDarwinEpochTopologyPolicy =" not in session \
+    or ".appOwnedProcessGroup" not in session:
+    fail("topology policy drifted")
+
+factory = declaration(
+    session, r"(?m)^actor InvestigationMachineDarwinEpochSessionFactory\b",
+    "spawn contract",
+)
+factory_start = declaration(
+    factory, r"(?m)^    func start\(", "spawn contract"
+)
+for marker in (
+    "static let spawnFlags = Int16(",
+    "POSIX_SPAWN_SETPGROUP | POSIX_SPAWN_CLOEXEC_DEFAULT",
+    "static let inheritedProcessGroupSpawnFlags = Int16(",
+    "flags: topologyPolicy == .appOwnedProcessGroup",
+    "? Self.spawnFlags : Self.inheritedProcessGroupSpawnFlags",
+    "case .appOwnedProcessGroup:",
+    "case .inheritedInnerProcessGroup:",
+):
+    if marker not in factory:
+        fail("spawn contract drifted")
+if not re.search(
+    r"static let inheritedProcessGroupSpawnFlags = Int16\(\s*"
+    r"POSIX_SPAWN_CLOEXEC_DEFAULT\s*\)",
+    factory,
+):
+    fail("spawn contract drifted")
+spawn = declaration(
+    session, r"(?m)^enum InvestigationMachineDarwinEpochSpawnPrimitive\b",
+    "spawn contract",
+)
+for marker in (
+    "request.flags == InvestigationMachineDarwinEpochSessionFactory.spawnFlags",
+    ".inheritedProcessGroupSpawnFlags",
+    "posix_spawnattr_setflags(&attributes, request.flags)",
+    "if request.flags == InvestigationMachineDarwinEpochSessionFactory.spawnFlags",
+    "posix_spawnattr_setpgroup(&attributes, 0)",
+):
+    if marker not in spawn:
+        fail("spawn contract drifted")
+if (
+    spawn.count("posix_spawnattr_setpgroup(&attributes, 0)") != 1
+    or not re.search(
+        r"if\s+request\.flags\s*==\s*"
+        r"InvestigationMachineDarwinEpochSessionFactory\.spawnFlags\s*"
+        r"\{\s*guard\s+posix_spawnattr_setpgroup"
+        r"\(&attributes,\s*0\)\s*==\s*0\s*else\s*\{",
+        spawn, re.DOTALL,
+    )
+):
+    fail("spawn contract drifted")
+
+for marker in (
+    "expectedParentProcessID: driverClaim.processID",
+    "expectedProcessGroupID: expectedProcessGroupID",
+    "expectedParentProcessID: UInt32",
+    "expectedProcessGroupID: UInt32",
+    "expectedParentProcessID: expectedParentProcessID",
+    "expectedProcessGroupID: expectedProcessGroupID",
+):
+    if marker not in session:
+        fail("App identity topology drifted")
+for marker in (
+    "expectedParentProcessID: UInt32",
+    "expectedProcessGroupID: UInt32",
+    "expectedParentProcessID: expectedTopology.parentProcessID",
+    "expectedProcessGroupID: expectedTopology.processGroupID",
+    "expectedParentProcessID: preDrop.parentProcessID",
+    "expectedProcessGroupID: preDrop.processGroupID",
+    "snapshot.parentProcessID == parentProcessID",
+    "snapshot.processGroupID == processGroupID",
+):
+    if marker not in observer:
+        fail("App identity topology drifted")
+if observer.count("expectedProcessGroupID:") != 4:
+    fail("App identity topology drifted")
+if (
+    "expectedTopology: nil" not in observer
+    or "processGroupID: processClaim.processID" not in observer
+):
+    fail("App identity topology drifted")
+
+for marker in (
+    "if topologyPolicy == .inheritedInnerProcessGroup",
+    "UInt32(exactly: processGroup) == driverClaim.processID",
+    "let inheritedProcessGroup",
+    "system.currentProcessGroup() == inheritedProcessGroup",
+    "processGroup == inheritedProcessGroup",
+    "processID != processGroup",
+):
+    if marker not in factory_start:
+        fail("inherited PGID stability drifted")
+
+startup_retirement = declaration(
+    factory, r"(?m)^    private func retireStartedEpoch\(",
+    "direct-child retirement",
+)
+session_retirement = declaration(
+    session, r"(?m)^    func retireAndReap\(",
+    "direct-child retirement",
+)
+for body in (startup_retirement, session_retirement):
+    if (
+        body.count("case .ownedProcessGroup(let owned):") != 1
+        or body.count("case .directChild(let spawned):") != 1
+        or body.count("retirementOwner.retireOwnedProcessGroup(owned)") != 1
+        or body.count("retirementOwner.retireSpawnedProcess(spawned)") != 1
+    ):
+        fail("direct-child retirement drifted")
+inherited_branch = factory_start.split("case .inheritedInnerProcessGroup:", 1)[1]
+inherited_branch = inherited_branch.split("} catch", 1)[0]
+if (
+    "retirementAuthority = .directChild(spawned)" not in inherited_branch
+    or "InvestigationMachineDarwinOwnedEpoch" in inherited_branch
+    or "retireOwnedProcessGroup" in inherited_branch
+):
+    fail("direct-child retirement drifted")
+
+retirement_protocol = declaration(
+    session,
+    r"(?m)^protocol InvestigationMachineDarwinEpochRetirementOwning\b",
+    "successful direct-child retirement",
+)
+if (
+    retirement_protocol.count("func reapSuccessfulDirectChild(") != 1
+    or retirement_protocol.count(
+        "InvestigationMachineSingleEpochRetirementProof"
+    ) != 2
+):
+    fail("successful direct-child retirement drifted")
+successful_reaper = declaration(
+    retirement,
+    r"(?m)^    private func reapSuccessfulDirectChildSynchronously\(",
+    "successful direct-child retirement",
+)
+for marker in (
+    "while try waitableLeader(epoch.processID, deadline: deadline) == nil",
+    "let status = try reapStatus(epoch.processID, deadline: deadline)",
+    "status.processID == epoch.processID",
+    "status.rawStatus & 0x7f == 0",
+    "status.rawStatus >> 8 & 0xff == 0",
+    "return .init()",
+):
+    if marker not in successful_reaper:
+        fail("successful direct-child retirement drifted")
+if not re.search(
+    r"guard\s+status\.processID\s*==\s*epoch\.processID,\s*"
+    r"status\.rawStatus\s*&\s*0x7f\s*==\s*0,\s*"
+    r"status\.rawStatus\s*>>\s*8\s*&\s*0xff\s*==\s*0\s*"
+    r"else\s*\{",
+    successful_reaper, re.DOTALL,
+):
+    fail("successful direct-child retirement drifted")
+for forbidden in (
+    "inventory(", "signal(", "sendSignal", "SIGTERM", "SIGKILL",
+):
+    if forbidden in successful_reaper:
+        fail("successful direct-child retirement drifted")
+waitable = declaration(
+    retirement, r"(?m)^    private func waitableLeader\(",
+    "successful direct-child retirement",
+)
+reap_status = declaration(
+    retirement, r"(?m)^    private func reapStatus\(",
+    "successful direct-child retirement",
+)
+if (
+    "Int32(WEXITED | WNOHANG | WNOWAIT)" not in waitable
+    or "system.waitPIDStatus(" not in reap_status
+    or "processID, Int32(WNOHANG)" not in reap_status
+):
+    fail("successful direct-child retirement drifted")
+session_retirement_compact = compact(session_retirement)
+for marker in (
+    "case.stable(.retirement):expectsSuccessfulExit=true",
+    "case.stable,.failed:expectsSuccessfulExit=false",
+    "ifexpectsSuccessfulExit{proof=tryawaitretirementOwner"
+    ".reapSuccessfulDirectChild(spawned)}else{tryawaitretirementOwner"
+    ".retireSpawnedProcess(spawned)",
+):
+    if marker not in session_retirement_compact:
+        fail("successful direct-child retirement drifted")
+
+session_tests = (
+    "fixedFDAndSpawnContractAreExact",
+    "inheritedInnerProcessGroupUsesCloexecOnlyAndDirectChildRetirement",
+    "inheritedInnerProcessGroupRequiresInnerLeaderAndAppMembership",
+    "inheritedInnerProcessGroupStartupFailureRetiresOnlyDirectChild",
+    "productionSpawnPrimitiveMapsOnlyFDSeven",
+    "productionSpawnPrimitiveCanInheritCurrentProcessGroup",
+    "inheritedSessionForwardsExactInnerTopologyToIdentityObserver",
+    "inheritedCanonicalSessionUsesSuccessfulExitReaper",
+    "retirementIsExactlyOnceAndSecondCallIsRejected",
+)
+if any(session_test.count(name) != 1 for name in session_tests):
+    fail("session tests became vacuous")
+if "#expect(true)" in session_test or 'Issue.record("TODO' in session_test:
+    fail("session tests became vacuous")
+physical_inherited = declaration(
+    session_test,
+    r"(?m)^    @Test func productionSpawnPrimitiveCanInheritCurrentProcessGroup\(",
+    "session tests became vacuous",
+)
+for marker in (
+    ".inheritedProcessGroupSpawnFlags", "let inheritedGroup = getpgrp()",
+    "#expect(getpgid(processID) == inheritedGroup)",
+    "#expect(processID != inheritedGroup)", "waitpid(processID",
+    "#expect(status == 0)",
+):
+    if marker not in physical_inherited:
+        fail("session tests became vacuous")
+for marker in (
+    "request.flags & Int16(POSIX_SPAWN_SETPGROUP)",
+    "owner.spawned == nil", "owner.owned?.processGroupID == 42",
+    "owner.spawned == InvestigationMachineDarwinSpawnedEpoch(",
+    "owner.owned == nil",
+):
+    if marker not in session_test:
+        fail("session tests became vacuous")
+
+identity_tests = (
+    "exactRootToAppObservationUsesIndependentStableEvidence",
+    "inheritedProcessGroupTopologyUsesFactoryOwnedExpectations",
+    "inheritedTopologyRejectsWrongExpectedParentOrGroup",
+    "inheritedTopologyRejectsPreAndPostObservationDrift",
+    "sourceAndDarwinABIStayClosedAndComplete",
+)
+if any(observer_test.count(name) != 1 for name in identity_tests):
+    fail("identity tests became vacuous")
+if "#expect(true)" in observer_test or 'Issue.record("TODO' in observer_test:
+    fail("identity tests became vacuous")
+for marker in (
+    "#expect(fixture.processID != processGroupID)",
+    "DarwinAppExpectedTopologyMismatch.allCases",
+    "DarwinAppInheritedTopologyDrift.allCases",
+    "case preDropParent, preDropGroup, postDropParent, postDropGroup",
+):
+    if marker not in observer_test:
+        fail("identity tests became vacuous")
+
+retirement_tests = (
+    "successfulDirectChildExitWaitsWithoutSignalAndRequiresExitZero",
+    "successfulDirectChildExitRejectsNonzeroExitWithoutSignal",
+    "successfulDirectChildExitTimesOutWithoutSignal",
+)
+if any(retirement_test.count(name) != 1 for name in retirement_tests):
+    fail("retirement tests became vacuous")
+for marker in (
+    "recorder.events.filter { $0.isSignal }.isEmpty",
+    "recorder.events.filter { $0.isInventory }.isEmpty",
+    "rawStatus: 0", "rawStatus: 7 << 8",
+):
+    if marker not in retirement_test:
+        fail("retirement tests became vacuous")
+
+for marker in (
+    "iiiB2AIIA2IVerifierPinsInheritedPGIDAndDirectChildRetirement",
+    "--iib5biii-b2a-ii-a2i-contract-only",
+    "--iib5biii-b2a-ii-a2i-scope-contract-only",
+    "iii-b2a-ii-a2-i topology policy drifted",
+    "iii-b2a-ii-a2-i direct-child retirement drifted",
+    "iii-b2a-ii-a2-i successful direct-child retirement drifted",
+    "iii-b2a-ii-a2-i retirement tests became vacuous",
+):
+    if marker not in boundary:
+        fail("topology policy drifted")
+PY
+}
+
+function verify_iib5biii_b2a_iia2i_scope() {
+    local baseline=${1:-8362b47351a7d3b3a141fc78ec03f9575199901d}
+    local expected=(
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinAppIdentityObservation.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinEpochRetirement.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinEpochSession.swift
+        Tests/StornautInvestigationTests/InvestigationMachineDarwinAppIdentityObservationTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineDarwinEpochRetirementTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineDarwinEpochSessionTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-app-release-boundaries
+        scripts/verify-contract
+        scripts/verify-investigation-boundaries
+    )
+    (( ${#expected} == 10 )) || {
+        print -u2 "iii-b2a-ii-a2-i checkpoint path ceiling drifted"
+        return 1
+    }
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" \
+        == 8362b47351a7d3b3a141fc78ec03f9575199901d ]] || {
+        print -u2 "iii-b2a-ii-a2-i checkpoint baseline drifted"
+        return 1
+    }
+    if git diff --cached --name-only --diff-filter=D "$baseline" \
+        | awk 'index($0,"docs/")!=1 {found=1} END {exit !found}'
+    then
+        print -u2 "iii-b2a-ii-a2-i checkpoint deleted an existing path"
+        return 1
+    fi
+    if git diff --cached --numstat "$baseline" \
+        | awk 'index($3,"docs/")!=1 && ($1=="-" || $2=="-") {found=1} END {exit !found}'
+    then
+        print -u2 "iii-b2a-ii-a2-i binary checkpoint path rejected"
+        return 1
+    fi
+    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD \
+        "$baseline" | awk 'index($0,"docs/")!=1 && $0!="AGENTS.md" && $0!="README.md"')"})
+    [[ "${(j:\n:)${(@on)observed}}" == "${(j:\n:)${(@on)expected}}" ]] || {
+        print -u2 "iii-b2a-ii-a2-i staged checkpoint paths drifted"
+        return 1
+    }
+    local expected_path expected_mode observed_entry
+    for expected_path in "${expected[@]}"; do
+        expected_mode=100644
+        [[ $expected_path == scripts/* ]] && expected_mode=100755
+        observed_entry=$(git ls-files -s -- "$expected_path")
+        [[ "$(print -r -- "$observed_entry" | awk '{print $1, $3, $4}')" \
+            == "$expected_mode 0 $expected_path" ]] || {
+            print -u2 "iii-b2a-ii-a2-i checkpoint mode drifted: $expected_path"
+            return 1
+        }
+    done
+    local changed=$(git diff --cached --numstat "$baseline" \
+        | awk 'index($3,"docs/")!=1 && $3!="AGENTS.md" && $3!="README.md" {n+=$1+$2} END {print n+0}')
+    (( changed <= 3200 )) || {
+        print -u2 "iii-b2a-ii-a2-i checkpoint budget drifted"
+        return 1
+    }
+}
+
 function verify_iib5bia_projection_contract() {
     local contract_source=$1 focused_test_source=$2
     xcrun swiftc -frontend -parse "$contract_source"
@@ -4503,15 +4945,32 @@ if hashlib.sha256(normalized_cross_source.encode()).hexdigest() != (
     "beebdb641bb8900a010b7312937d778b8b8894833f2c4a0f0bb978972c140207"
 ):
     raise SystemExit("ii-b5b-ii-b C cross-source comparison drifted")
-for marker in ("package func prepare(","package func observe(","kSecGuestAttributePid: NSNumber(value: pid_t(processID))","InvestigationInstalledL2NodeReader()","InvestigationInstalledL2StaticSigningReader()","expectedParentProcessID: system.currentProcessID()","snapshot.processGroupID == processID","facts.snapshot.startTimeSeconds == preDrop.startTimeSeconds","facts.snapshot.startTimeMicroseconds\n                == preDrop.startTimeMicroseconds","dropEvidence.auditTokenWords[0] == preDrop.auditTokenWords[0]","facts.staticSigning == preDrop.staticSigning","InvestigationMachineSingleEpochAppObservation(identity: identity)"):
+for marker in ("package func prepare(","package func observe(","kSecGuestAttributePid: NSNumber(value: pid_t(processID))","InvestigationInstalledL2NodeReader()","InvestigationInstalledL2StaticSigningReader()","facts.snapshot.startTimeSeconds == preDrop.startTimeSeconds","facts.snapshot.startTimeMicroseconds\n                == preDrop.startTimeMicroseconds","dropEvidence.auditTokenWords[0] == preDrop.auditTokenWords[0]","facts.staticSigning == preDrop.staticSigning","InvestigationMachineSingleEpochAppObservation(identity: identity)"):
     if marker not in source: raise SystemExit(f"ii-b5b-ii-b observer contract drifted: {marker}")
+legacy_direct_topology = all(marker in source for marker in (
+    "expectedParentProcessID: system.currentProcessID()",
+    "snapshot.processGroupID == processID",
+))
+legacy_wrapped_topology = all(marker in source for marker in (
+    "expectedTopology: nil",
+    "parentProcessID: system.currentProcessID()",
+    "processGroupID: processClaim.processID",
+    "snapshot.processGroupID == processGroupID",
+))
+if not (legacy_direct_topology or legacy_wrapped_topology):
+    raise SystemExit("ii-b5b-ii-b observer contract drifted: legacy topology")
 for marker in ("exactRootToAppObservationUsesIndependentStableEvidence","everyIndependentPostDropIdentityAxisFailsClosed","everyIndependentPreDropIdentityAxisFailsClosed","everyObservationRaceAndEvidenceFailureFailsClosed","reportedAuditIdentityAndProjectionCannotReplaceIndependentFacts","reportedGroupsMustExactlyMatchIndependentKernelGroups","reportedAndKernelGroupsCannotReplaceIndependentDirectoryGroups","unavailablePhysicalEvidenceHasExactError","invalidPhysicalEvidenceHasExactError","resolvedIdentityFailureHasPhaseExactError","preDropNarrowIdentityMustRemainStableAcrossObservation","concreteReadOnlySystemObservesCurrentExecutableAndSigning","sourceAndDarwinABIStayClosedAndComplete"):
     if marker not in test: raise SystemExit(f"ii-b5b-ii-b focused coverage drifted: {marker}")
-if hashlib.sha256(Path(sys.argv[5]).read_bytes()).hexdigest() != (
-    "5b2957448d187cdfd3f4b3b628015e2b529758158d0e2e8520120b92f84cb12e"
-):
+if hashlib.sha256(Path(sys.argv[5]).read_bytes()).hexdigest() not in {
+    "5b2957448d187cdfd3f4b3b628015e2b529758158d0e2e8520120b92f84cb12e",
+    "72faffd4baaa2924352c26814b2eb4d7dbdadebb46ee9cde6abeb6b271de0dec",
+}:
     raise SystemExit("ii-b5b-ii-b canonical focused test drifted")
-if hashlib.sha256(Path(sys.argv[4]).read_bytes()).hexdigest() != "2102c17f2f656b6cee197fb66ff0b2b019fb1c49477123d0123c4fddaeeb754a": raise SystemExit("ii-b5b-ii-b canonical observer drifted")
+if hashlib.sha256(Path(sys.argv[4]).read_bytes()).hexdigest() not in {
+    "2102c17f2f656b6cee197fb66ff0b2b019fb1c49477123d0123c4fddaeeb754a",
+    "6fb42b4bd0604f376bbf6d867f1b078dfd0efac7d5ba77892b9db0cc032e9381",
+}:
+    raise SystemExit("ii-b5b-ii-b canonical observer drifted")
 PY
     local object_dir=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-iib5biib-object.XXXXXX")
     xcrun clang -std=c11 -I "${header_source:h}" -c "$c_source" -o "$object_dir/identity.o"
@@ -4771,17 +5230,40 @@ untrusted_retirement = declaration(
     session, r"^\s*private func retireUntrustedGroup\(",
     "retireUntrustedGroup",
 )
-owned_retirement = declaration(
-    session, r"^\s*private func retireOwnedStartup\(",
-    "retireOwnedStartup",
-)
+if "private func retireOwnedStartup(" in session:
+    started_retirement = declaration(
+        session, r"^\s*private func retireOwnedStartup\(",
+        "retireOwnedStartup",
+    )
+    started_routing_valid = (
+        started_retirement.count(
+            "retirementOwner.retireOwnedProcessGroup(owned)"
+        ) == 1
+        and "retireSpawnedProcess" not in started_retirement
+        and session.count("return await retireOwnedStartup(owned)") == 2
+    )
+else:
+    started_retirement = declaration(
+        session, r"^\s*private func retireStartedEpoch\(",
+        "retireStartedEpoch",
+    )
+    started_routing_valid = (
+        started_retirement.count(
+            "retirementOwner.retireOwnedProcessGroup(owned)"
+        ) == 1
+        and started_retirement.count(
+            "retirementOwner.retireSpawnedProcess(spawned)"
+        ) == 1
+        and "reapSuccessfulDirectChild" not in started_retirement
+        and session.count(
+            "return await retireStartedEpoch(retirementAuthority)"
+        ) == 2
+    )
 if (
     untrusted_retirement.count("retirementOwner.retireSpawnedProcess(spawned)") != 1
     or "retireOwnedProcessGroup" in untrusted_retirement
-    or owned_retirement.count("retirementOwner.retireOwnedProcessGroup(owned)") != 1
-    or "retireSpawnedProcess" in owned_retirement
-    or session.count("return await retireUntrustedGroup(spawned)") != 2
-    or session.count("return await retireOwnedStartup(owned)") != 2
+    or not started_routing_valid
+    or session.count("return await retireUntrustedGroup(spawned)") not in {2, 3}
 ):
     raise SystemExit("ii-b5b-ii-c opaque retirement routing drifted")
 if session.count("kind.admitsPayloadByteCount(payloadCount)") != 1 or session.count("InvestigationHandoffFrame.headerByteCount") < 2:
@@ -5031,7 +5513,7 @@ if spawned_match is None:
     raise SystemExit("ii-b5b-ii-d spawned protocol method drifted")
 if "InvestigationMachineSingleEpochRetirementProof" in spawned_match.group("tail"):
     raise SystemExit("ii-b5b-ii-d spawned-only proof drifted")
-if protocol.count("InvestigationMachineSingleEpochRetirementProof") != 1:
+if protocol.count("InvestigationMachineSingleEpochRetirementProof") != 2:
     raise SystemExit("ii-b5b-ii-d owned proof cardinality drifted")
 untrusted = declaration(session, r"^    private func retireUntrustedGroup\(", "untrusted retirement")
 if untrusted.count("retirementOwner.retireSpawnedProcess(spawned)") != 1 or "retireOwnedProcessGroup" in untrusted or "terminal(.terminal(.init()))" in untrusted or untrusted.count("terminal(.terminalUncertain)") != 1:
@@ -5047,6 +5529,11 @@ spawned = declaration(
     retirement,
     r"^    private func retireSpawnedProcessSynchronously\(",
     "spawned process retirement",
+)
+successful = declaration(
+    retirement,
+    r"^    private func reapSuccessfulDirectChildSynchronously\(",
+    "successful direct-child retirement",
 )
 inventory = declaration(
     retirement, r"^    private func inventory\(", "inventory"
@@ -5104,6 +5591,23 @@ for marker in (
     if marker not in spawned:
         raise SystemExit(f"ii-b5b-ii-d spawned retirement drifted: {marker}")
 for marker in (
+    "epoch.processID > 1",
+    "while try waitableLeader(epoch.processID, deadline: deadline) == nil",
+    "let status = try reapStatus(epoch.processID, deadline: deadline)",
+    "status.rawStatus & 0x7f == 0",
+    "status.rawStatus >> 8 & 0xff == 0",
+    "guard !descriptorFailure else", "return .init()",
+):
+    if marker not in successful:
+        raise SystemExit(
+            f"ii-b5b-ii-d successful direct-child drifted: {marker}"
+        )
+for forbidden in ("inventory(", "signal(", "SIGTERM", "SIGKILL"):
+    if forbidden in successful:
+        raise SystemExit(
+            f"ii-b5b-ii-d successful direct-child authority drifted: {forbidden}"
+        )
+for marker in (
     "data.count.isMultiple(of: width)",
     "data.count < Self.maximumInventoryEntries * width",
     "values.allSatisfy({ $0 > 1 })",
@@ -5115,13 +5619,13 @@ if "Int32(WEXITED | WNOHANG | WNOWAIT)" not in waitable:
     raise SystemExit("ii-b5b-ii-d waitable leader drifted")
 if "system.waitPID(processID, Int32(WNOHANG))" not in reap:
     raise SystemExit("ii-b5b-ii-d leader reap drifted")
-if retirement.count("return .init()") != 1:
+if owned.count("return .init()") != 1 or successful.count("return .init()") != 1:
     raise SystemExit("ii-b5b-ii-d owned proof cardinality drifted")
 for marker in ("killpg(", "SIGINT", "posix_spawn", "CommandLine.arguments", "ProcessInfo.processInfo.environment"):
     if marker in retirement: raise SystemExit(f"ii-b5b-ii-d retirement authority drifted: {marker}")
 if re.search(r"(?<![A-Za-z0-9_])Process\s*\(", retirement):
     raise SystemExit("ii-b5b-ii-d retirement authority drifted: Process")
-for name, count in {"proc_listpids": 1, "waitid": 1, "waitpid": 1, "kill": 1, "close": 1, "nanosleep": 1}.items():
+for name, count in {"proc_listpids": 1, "waitid": 1, "waitpid": 2, "kill": 1, "close": 1, "nanosleep": 1}.items():
     if len(re.findall(r"\b" + name + r"\s*\(", retirement)) != count:
         raise SystemExit(f"ii-b5b-ii-d syscall cardinality drifted: {name}")
 
@@ -5140,6 +5644,9 @@ test_markers = (
     "cancellationWaitsForBlockingWorkerBeforeReturning",
     "duplicateAndConcurrentRetirementAreOneShot",
     "spawnedFallbackUsesPositivePIDOnlyAndCannotMintProof",
+    "successfulDirectChildExitWaitsWithoutSignalAndRequiresExitZero",
+    "successfulDirectChildExitRejectsNonzeroExitWithoutSignal",
+    "successfulDirectChildExitTimesOutWithoutSignal",
     "physicalNaturalExitIsWaitableReapedAndLeavesNoGroup",
     "physicalTermIgnoringDescendantIsKilledReapedLastAndLeavesNoGroup",
 )
@@ -5152,6 +5659,8 @@ for marker in (
     if marker not in boundary: raise SystemExit(f"ii-b5b-ii-d boundary test drifted: {marker}")
 if "invalidProcessGroupRemainsUncertainAfterDirectCleanup" not in session_test:
     raise SystemExit("ii-b5b-ii-d session uncertainty coverage drifted")
+if "inheritedCanonicalSessionUsesSuccessfulExitReaper" not in session_test:
+    raise SystemExit("ii-b5b-ii-d successful session coverage drifted")
 PY
 }
 
@@ -8652,6 +9161,23 @@ if $iib5biii_b2a_iia20_scope_contract_only; then
     print "iii-b2a-ii-a2-0 staged scope verification passed."
     exit 0
 fi
+if $iib5biii_b2a_iia2i_contract_only; then
+    verify_iib5biii_b2a_iia2i_contract \
+        "$iib5biii_b2a_iia2i_session_source" \
+        "$iib5biii_b2a_iia2i_observer_source" \
+        "$iib5biii_b2a_iia2i_retirement_source" \
+        "$iib5biii_b2a_iia2i_session_test_source" \
+        "$iib5biii_b2a_iia2i_observer_test_source" \
+        "$iib5biii_b2a_iia2i_retirement_test_source" \
+        "$iib5biii_b2a_iia2i_boundary_test_source"
+    print "iii-b2a-ii-a2-i inherited PGID contract verification passed."
+    exit 0
+fi
+if $iib5biii_b2a_iia2i_scope_contract_only; then
+    verify_iib5biii_b2a_iia2i_scope "$iib5biii_b2a_iia2i_scope_baseline"
+    print "iii-b2a-ii-a2-i staged scope verification passed."
+    exit 0
+fi
 if $iib5bia_projection_contract_only; then
     verify_iib5bia_projection_contract "$iib5bia_contract_source" "$iib5bia_focused_test_source"
     print "ii-b5b-i-a projection contract verification passed."
@@ -10829,11 +11355,11 @@ expected_driver_support_sha256 = {
     "InvestigationMachineClaimClient.swift":
         "ee373ff00fce08853fccb4c2087a0a47eed2feae6efc300fbd4c74e01f242a0a",
     "InvestigationMachineDarwinAppIdentityObservation.swift":
-        "2102c17f2f656b6cee197fb66ff0b2b019fb1c49477123d0123c4fddaeeb754a",
+        "6fb42b4bd0604f376bbf6d867f1b078dfd0efac7d5ba77892b9db0cc032e9381",
     "InvestigationMachineDarwinEpochSession.swift":
-        "22b8ed4e85519694e0761ab0fcffef22d692fe1c86e39023d3fba2173e4ccdf5",
+        "eaa6009028af18a12d783704cdb0a44d63761532149cd3425fe4bc99be41cf16",
     "InvestigationMachineDarwinEpochRetirement.swift":
-        "574fe7df157c04b573602a222df40fe08bc4759d41fc88b56e8695b636ce38a8",
+        "58528514bd7cc9a936667ee4fe85e26083c76838866a3cbde14e80fbdebb66cd",
     "InvestigationMachineDarwinOuterInnerProtocol.swift":
         "615ba9b6f1d6c7a0239163c4b56e4ec0e894536b9fec6236e1802a51e788233e",
     "InvestigationMachineDarwinDriverChildObservation.swift":
@@ -10937,7 +11463,7 @@ for source_name in driver_support_sources:
         )
     elif source_name == "InvestigationMachineDarwinEpochRetirement.swift":
         exact_calls = {
-            "proc_listpids": 1, "waitid": 1, "waitpid": 1,
+            "proc_listpids": 1, "waitid": 1, "waitpid": 2,
             "kill": 1, "close": 1, "nanosleep": 1,
         }
         for name, expected_count in exact_calls.items():
@@ -12194,16 +12720,16 @@ function require_exact_machine_driver_projection() {
             expected_undefined_lines=691
             expected_loads_sha=dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9
             expected_loads_lines=18
-            expected_owned_sha=eb3d2531f75a0b221a578b7e1c2514238f03a3cdc10cfc70306792f8dfe57a62
-            expected_owned_lines=6855
+            expected_owned_sha=867b6e13c9000f3092a47ef36d8c789a5e1dd33a07dcc91d15ee271ebc806398
+            expected_owned_lines=6988
             ;;
         release)
             expected_undefined_sha=200b958fb36101f258f67621035f80b89b26c465271ae6708cf5856de7bf573b
             expected_undefined_lines=450
             expected_loads_sha=dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9
             expected_loads_lines=18
-            expected_owned_sha=4b6c7ea1d313326f97eb6ca3e2605c9b48dd9fdaa757303aa131a9bc3cfc2978
-            expected_owned_lines=3691
+            expected_owned_sha=c7a67d49dbb80ae779a1c0efac192f96d0af1809a2516b9a4ec6ca5f74b40f26
+            expected_owned_lines=3788
             ;;
         *)
             print -u2 "Unknown Machine driver projection: $configuration"

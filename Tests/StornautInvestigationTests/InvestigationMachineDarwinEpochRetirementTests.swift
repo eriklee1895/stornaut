@@ -438,6 +438,72 @@ struct InvestigationMachineDarwinEpochRetirementTests {
         #expect(recorder.events.contains(.waitPID(processID, Int32(WNOHANG))))
     }
 
+    @Test func successfulDirectChildExitWaitsWithoutSignalAndRequiresExitZero()
+        async throws
+    {
+        let processID: Int32 = 172
+        let recorder = RetirementSystemRecorder(
+            waitIDs: [.value(nil), .value(processID)],
+            waitPIDStatuses: [
+                .value(.init(processID: processID, rawStatus: 0)),
+            ]
+        )
+        let proof = try await InvestigationMachineDarwinEpochRetirementOwner(
+            system: recorder.system()
+        ).reapSuccessfulDirectChild(
+            .init(processID: processID, descriptors: [42])
+        )
+
+        #expect(proof == .init())
+        #expect(recorder.events.filter { $0.isSignal }.isEmpty)
+        #expect(recorder.events.filter { $0.isInventory }.isEmpty)
+        #expect(recorder.events.filter { $0.isWaitID }.count == 2)
+        #expect(recorder.events.filter { $0.isWaitPIDStatus }.count == 1)
+        #expect(recorder.events.filter { $0 == .close(42) }.count == 1)
+    }
+
+    @Test func successfulDirectChildExitRejectsNonzeroExitWithoutSignal()
+        async
+    {
+        let processID: Int32 = 182
+        let recorder = RetirementSystemRecorder(
+            waitIDs: [.value(processID)],
+            waitPIDStatuses: [
+                .value(.init(processID: processID, rawStatus: 7 << 8)),
+            ]
+        )
+
+        await expectFailure {
+            try await InvestigationMachineDarwinEpochRetirementOwner(
+                system: recorder.system()
+            ).reapSuccessfulDirectChild(
+                .init(processID: processID, descriptors: [43])
+            )
+        }
+        #expect(recorder.events.filter { $0.isSignal }.isEmpty)
+        #expect(recorder.events.filter { $0.isInventory }.isEmpty)
+        #expect(recorder.events.filter { $0.isWaitPIDStatus }.count == 1)
+    }
+
+    @Test func successfulDirectChildExitTimesOutWithoutSignal() async {
+        let processID: Int32 = 192
+        let recorder = RetirementSystemRecorder(
+            expireAfterWaitID: true,
+            waitIDs: [.value(nil)]
+        )
+
+        await expectFailure {
+            try await InvestigationMachineDarwinEpochRetirementOwner(
+                system: recorder.system()
+            ).reapSuccessfulDirectChild(
+                .init(processID: processID, descriptors: [44])
+            )
+        }
+        #expect(recorder.events.filter { $0.isSignal }.isEmpty)
+        #expect(recorder.events.filter { $0.isInventory }.isEmpty)
+        #expect(recorder.events.filter { $0.isWaitPIDStatus }.isEmpty)
+    }
+
     @Test func physicalNaturalExitIsWaitableReapedAndLeavesNoGroup() async throws {
         let fixture = try PhysicalRetirementFixture.make(mode: .natural)
         defer { fixture.forceCleanup() }
@@ -491,12 +557,16 @@ private enum RetirementSystemEvent: Equatable {
     case waitID(Int32, Int32)
     case signal(Int32, Int32)
     case waitPID(Int32, Int32)
+    case waitPIDStatus(Int32, Int32)
     case pause(UInt64)
 
     var isSignal: Bool { if case .signal = self { true } else { false } }
     var isInventory: Bool { if case .inventory = self { true } else { false } }
     var isWaitID: Bool { if case .waitID = self { true } else { false } }
     var isWaitPID: Bool { if case .waitPID = self { true } else { false } }
+    var isWaitPIDStatus: Bool {
+        if case .waitPIDStatus = self { true } else { false }
+    }
 }
 
 private final class RetirementSystemRecorder: @unchecked Sendable {
@@ -512,6 +582,8 @@ private final class RetirementSystemRecorder: @unchecked Sendable {
     private var waitIDScript: [Scripted<Int32?>]
     private var signalScript: [Scripted<Void>]
     private var waitPIDScript: [Scripted<Int32?>]
+    private var waitPIDStatusScript:
+        [Scripted<InvestigationMachineDarwinWaitPIDStatus?>]
     private var recordedEvents: [RetirementSystemEvent] = []
     private var recordedInventoryBeforeReap: [[Int32]] = []
     private var recordedClockValues: [UInt64] = []
@@ -527,7 +599,9 @@ private final class RetirementSystemRecorder: @unchecked Sendable {
         inventories: [Scripted<Data>] = [],
         waitIDs: [Scripted<Int32?>] = [],
         signals: [Scripted<Void>] = [],
-        waitPIDs: [Scripted<Int32?>] = []
+        waitPIDs: [Scripted<Int32?>] = [],
+        waitPIDStatuses:
+            [Scripted<InvestigationMachineDarwinWaitPIDStatus?>] = []
     ) {
         self.mode = mode
         currentGroup = currentProcessGroup
@@ -540,6 +614,7 @@ private final class RetirementSystemRecorder: @unchecked Sendable {
         waitIDScript = waitIDs
         signalScript = signals
         waitPIDScript = waitPIDs
+        waitPIDStatusScript = waitPIDStatuses
     }
 
     var events: [RetirementSystemEvent] {
@@ -563,6 +638,7 @@ private final class RetirementSystemRecorder: @unchecked Sendable {
             waitID: { try self.waitID($0, $1) },
             sendSignal: { try self.sendSignal($0, $1) },
             waitPID: { try self.waitPID($0, $1) },
+            waitPIDStatus: { try self.waitPIDStatus($0, $1) },
             pauseNanoseconds: { try self.pause($0) }
         )
     }
@@ -662,6 +738,15 @@ private final class RetirementSystemRecorder: @unchecked Sendable {
         try lock.withLock {
             recordedEvents.append(.waitPID(processID, options))
             return try next(&waitPIDScript)
+        }
+    }
+
+    private func waitPIDStatus(
+        _ processID: Int32, _ options: Int32
+    ) throws -> InvestigationMachineDarwinWaitPIDStatus? {
+        try lock.withLock {
+            recordedEvents.append(.waitPIDStatus(processID, options))
+            return try next(&waitPIDStatusScript)
         }
     }
 

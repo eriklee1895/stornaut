@@ -2969,8 +2969,8 @@ require_projection \
     load-command
 require_projection \
     "$machine_driver_owned_symbols" \
-    f758503fde02deeb4dda8b8bb48b826bfad1b3405ecc905d568822efdb9c5cff \
-    6854 \
+    8eb81efeca787a56843a62ed12de91e5ae8bb67ac50992cbf5705498b39e19c2 \
+    6987 \
     owned-symbol
 if ! mach_o_has_demangled_symbol \
     "$diagnostic_machine_driver" \
@@ -3050,7 +3050,7 @@ require_projection "$release_machine_driver_undefined_symbols" \
 require_projection "$release_machine_driver_loaded_libraries" \
     dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9 18 release-load-command
 require_projection "$release_machine_driver_owned_symbols" \
-    95be330898b63e980131417289c11ac11ccad9580f536885ea3e3c2e81238703 3690 release-owned-symbol
+    d223c56c175cc1e779b61b5ffc9cdac8f91617135eddebc56ae082befb278e81 3787 release-owned-symbol
 for marker in "${machine_driver_authority_forbidden_markers[@]}"; do
     if mach_o_has_demangled_symbol "$release_machine_driver" "$marker"; then
         print -u2 "Authority or readiness leaked into Release Machine driver: $marker"

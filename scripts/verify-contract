@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=43390f3aa31430e11f4f0ba6aa3123cf3a112d52885e54d0c06b8d9ce74f1b76
+ib2_self_sha=d37464749fb3b1584a4f62e5db7abd1beda4a2554e0720e88e7047ed5b0e36f9
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -1152,9 +1152,9 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "0226392583d1bb3da363b642bfd117f1591c248d023c1cbd13f03b959a21a7bf",
+        "2a085552f89575359168dfa3a2d503f228680be66647b37c4dba4838d3529eea",
     Path("scripts/verify-app-release-boundaries"):
-        "48f3a0a774434c2f86e37b5c3d6e4b761a5c0981a4d054e4583f2a3ce063b56b",
+        "0ad755b4b75b474173818c172469e1eefc5ecf00c6a629e6ae5222e43f6460d2",
 }
 for path, expected_sha in expected.items():
     observed_sha = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -1174,10 +1174,10 @@ for marker, count in {
     "8c1b72fec0b93ceda181412cb6909701d608e2eb39afe380477a95e3392cba94": 2,
     "dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9": 4,
     "200b958fb36101f258f67621035f80b89b26c465271ae6708cf5856de7bf573b": 1,
-    "eb3d2531f75a0b221a578b7e1c2514238f03a3cdc10cfc70306792f8dfe57a62": 1,
-    "f758503fde02deeb4dda8b8bb48b826bfad1b3405ecc905d568822efdb9c5cff": 1,
-    "4b6c7ea1d313326f97eb6ca3e2605c9b48dd9fdaa757303aa131a9bc3cfc2978": 1,
-    "95be330898b63e980131417289c11ac11ccad9580f536885ea3e3c2e81238703": 1,
+    "867b6e13c9000f3092a47ef36d8c789a5e1dd33a07dcc91d15ee271ebc806398": 1,
+    "8eb81efeca787a56843a62ed12de91e5ae8bb67ac50992cbf5705498b39e19c2": 1,
+    "c7a67d49dbb80ae779a1c0efac192f96d0af1809a2516b9a4ec6ca5f74b40f26": 1,
+    "d223c56c175cc1e779b61b5ffc9cdac8f91617135eddebc56ae082befb278e81": 1,
     "7c78e48e09da412dda28562f31c063cde5da02dfeed5d7fd2e0c74442d6ceb7c": 1,
 }.items():
     observed = investigation.count(marker) + release.count(marker)
@@ -5372,8 +5372,19 @@ def emit(name, old, new, text=source, suffix="swift"):
     if text.count(old) != 1:
         raise SystemExit(f"cannot construct ii-b5b-ii-b mutation: {name}")
     (root/f"iib5biib-{name}.{suffix}").write_text(text.replace(old,new,1),encoding="utf-8")
+def emit_one_of(name, replacements, text=source, suffix="swift"):
+    matches = [(old, new) for old, new in replacements if text.count(old) == 1]
+    if len(matches) != 1:
+        raise SystemExit(f"cannot construct ii-b5b-ii-b mutation: {name}")
+    old, new = matches[0]
+    (root/f"iib5biib-{name}.{suffix}").write_text(
+        text.replace(old, new, 1), encoding="utf-8"
+    )
 emit("public", "package struct InvestigationMachineDarwinAppIdentityObserver", "public struct InvestigationMachineDarwinAppIdentityObserver")
-emit("pgid", "            snapshot.processGroupID == processID,\n", "")
+emit_one_of("pgid", (
+    ("            snapshot.processGroupID == processID,\n", ""),
+    ("            processGroupID: processClaim.processID\n", ""),
+))
 emit("start-time", "            facts.snapshot.startTimeSeconds == preDrop.startTimeSeconds,\n", "")
 emit("start-microseconds", "            facts.snapshot.startTimeMicroseconds\n                == preDrop.startTimeMicroseconds,", "            facts.snapshot.startTimeMicroseconds\n                != preDrop.startTimeMicroseconds,")
 emit("pid-signing", "kSecGuestAttributePid: NSNumber(value: pid_t(processID))", "kSecGuestAttributePid: NSNumber(value: 1)")
@@ -5556,6 +5567,14 @@ def emit(name, old, new):
     (root / f"iib5biic-{name}.swift").write_text(
         session.replace(old, new, 1), encoding="utf-8"
     )
+def emit_one_of(name, replacements):
+    matches = [(old, new) for old, new in replacements if session.count(old) == 1]
+    if len(matches) != 1:
+        raise SystemExit(f"cannot construct ii-b5b-ii-c mutation: {name}")
+    old, new = matches[0]
+    (root / f"iib5biic-{name}.swift").write_text(
+        session.replace(old, new, 1), encoding="utf-8"
+    )
 
 emit("fixed-path", "executablePath: InvestigationInstalledL2FixedPaths()\n                .appExecutable.path", "executablePath: URL(fileURLWithPath: \"/tmp/stornaut-app\").path")
 emit("environment", "            environment: [],", "            environment: [\"PATH=/tmp\"],")
@@ -5565,8 +5584,39 @@ emit("kill-authority", "private func investigationMachineDarwinClose(_ descripto
 emit("waitpid-authority", "private func investigationMachineDarwinProcessGroup(_ processID: Int32) throws", "private func investigationMachineDarwinWaitProbe() { var status: Int32 = 0; _ = waitpid(2, &status, 0) }\n\nprivate func investigationMachineDarwinProcessGroup(_ processID: Int32) throws")
 emit("process-authority", "import Foundation\n", "import Foundation\nprivate let forbiddenProcess = Process()\n")
 emit("cached-repeated-identity", "                let observed = try preparedIdentity.observe(", "                let observed = firstIdentity!\n                _ = try preparedIdentity.observe(")
-emit("false-terminal-outcome", "    private func retireOwnedStartup(\n        _ owned: InvestigationMachineDarwinOwnedEpoch\n    ) async -> InvestigationMachineSingleEpochStartOutcome {\n        do {\n            _ = try await retirementOwner.retireOwnedProcessGroup(owned)\n            return terminal(.terminal(.init()))\n        } catch {\n            return terminal(.terminalUncertain)\n        }\n    }", "    private func retireOwnedStartup(\n        _ owned: InvestigationMachineDarwinOwnedEpoch\n    ) async -> InvestigationMachineSingleEpochStartOutcome {\n        do {\n            _ = try await retirementOwner.retireOwnedProcessGroup(owned)\n            return terminal(.terminal(.init()))\n        } catch {\n            return terminal(.terminal(.init()))\n        }\n    }")
-emit("untrusted-group-authority", "retirementOwner.retireSpawnedProcess(spawned)", "retirementOwner.retireOwnedProcessGroup(.init(processID: spawned.processID, processGroupID: spawned.processID, descriptors: spawned.descriptors))")
+emit_one_of("false-terminal-outcome", (
+    (
+        "    private func retireOwnedStartup(\n        _ owned: InvestigationMachineDarwinOwnedEpoch\n    ) async -> InvestigationMachineSingleEpochStartOutcome {\n        do {\n            _ = try await retirementOwner.retireOwnedProcessGroup(owned)\n            return terminal(.terminal(.init()))\n        } catch {\n            return terminal(.terminalUncertain)\n        }\n    }",
+        "    private func retireOwnedStartup(\n        _ owned: InvestigationMachineDarwinOwnedEpoch\n    ) async -> InvestigationMachineSingleEpochStartOutcome {\n        do {\n            _ = try await retirementOwner.retireOwnedProcessGroup(owned)\n            return terminal(.terminal(.init()))\n        } catch {\n            return terminal(.terminal(.init()))\n        }\n    }",
+    ),
+    (
+        "            return terminal(.terminalUncertain)\n        }\n    }\n\n    private func terminal(",
+        "            return terminal(.terminal(.init()))\n        }\n    }\n\n    private func terminal(",
+    ),
+))
+emit(
+    "untrusted-group-authority",
+    "    private func retireUntrustedGroup(\n"
+    "        _ spawned: InvestigationMachineDarwinSpawnedEpoch\n"
+    "    ) async -> InvestigationMachineSingleEpochStartOutcome {\n"
+    "        do {\n"
+    "            try await retirementOwner.retireSpawnedProcess(spawned)\n"
+    "        } catch {}\n"
+    "        return terminal(.terminalUncertain)\n"
+    "    }",
+    "    private func retireUntrustedGroup(\n"
+    "        _ spawned: InvestigationMachineDarwinSpawnedEpoch\n"
+    "    ) async -> InvestigationMachineSingleEpochStartOutcome {\n"
+    "        do {\n"
+    "            _ = try await retirementOwner.retireOwnedProcessGroup(\n"
+    "                .init(processID: spawned.processID,\n"
+    "                      processGroupID: spawned.processID,\n"
+    "                      descriptors: spawned.descriptors)\n"
+    "            )\n"
+    "        } catch {}\n"
+    "        return terminal(.terminalUncertain)\n"
+    "    }",
+)
 emit("read-final-deadline", "        try requireBeforeDeadline(deadlineNanoseconds, clock: clock)\n        return data\n", "        return data\n")
 emit("write-final-deadline", "        }\n        try requireBeforeDeadline(deadlineNanoseconds, clock: clock)\n    }\n\n    private static func wait(", "        }\n    }\n\n    private static func wait(")
 emit("operation-poison", "phase = .operation(ticket, poisoned: true)", "phase = .failed")
@@ -5776,7 +5826,26 @@ emit(
 )
 emit("vacuous-test", "physicalNaturalExitIsWaitableReapedAndLeavesNoGroup", "physicalNaturalExitIsVacuous", test)
 emit("spawned-proof", "    ) async throws\n\n    func retireOwnedProcessGroup(", "    ) async throws -> InvestigationMachineSingleEpochRetirementProof\n\n    func retireOwnedProcessGroup(", session)
-emit("spawned-terminal", "        return terminal(.terminalUncertain)\n    }\n\n    private func retireOwnedStartup", "        return terminal(.terminal(.init()))\n    }\n\n    private func retireOwnedStartup", session)
+emit(
+    "spawned-terminal",
+    "    private func retireUntrustedGroup(\n"
+    "        _ spawned: InvestigationMachineDarwinSpawnedEpoch\n"
+    "    ) async -> InvestigationMachineSingleEpochStartOutcome {\n"
+    "        do {\n"
+    "            try await retirementOwner.retireSpawnedProcess(spawned)\n"
+    "        } catch {}\n"
+    "        return terminal(.terminalUncertain)\n"
+    "    }",
+    "    private func retireUntrustedGroup(\n"
+    "        _ spawned: InvestigationMachineDarwinSpawnedEpoch\n"
+    "    ) async -> InvestigationMachineSingleEpochStartOutcome {\n"
+    "        do {\n"
+    "            try await retirementOwner.retireSpawnedProcess(spawned)\n"
+    "        } catch {}\n"
+    "        return terminal(.terminal(.init()))\n"
+    "    }",
+    session,
+)
 PY
 for fixture in \
     leader-guard pgid-guard same-group-guard current-group-guard wnowait term kill \
@@ -8250,6 +8319,290 @@ for fixture in extra-path over-budget deleted binary mode wrong-baseline; do
         >"$output" 2>&1
     then
         fail_contract "iii-b2a-ii-a2-0 scope mutation accepted: $fixture"
+    fi
+    require_fixed_text "$output" "$expected"
+done
+
+# Task 39 iii-b2a-ii-a2-i inherited-inner-PGID App session.
+iib5biii_b2a_iia2i_gate=scripts/verify-investigation-boundaries
+iib5biii_b2a_iia2i_session=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinEpochSession.swift
+iib5biii_b2a_iia2i_identity=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinAppIdentityObservation.swift
+iib5biii_b2a_iia2i_retirement=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinEpochRetirement.swift
+iib5biii_b2a_iia2i_session_test=Tests/StornautInvestigationTests/InvestigationMachineDarwinEpochSessionTests.swift
+iib5biii_b2a_iia2i_identity_test=Tests/StornautInvestigationTests/InvestigationMachineDarwinAppIdentityObservationTests.swift
+iib5biii_b2a_iia2i_retirement_test=Tests/StornautInvestigationTests/InvestigationMachineDarwinEpochRetirementTests.swift
+iib5biii_b2a_iia2i_boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+iib5biii_b2a_iia2i_baseline=8362b47351a7d3b3a141fc78ec03f9575199901d
+
+"$iib5biii_b2a_iia2i_gate" \
+    --iib5biii-b2a-ii-a2i-contract-only \
+    "$iib5biii_b2a_iia2i_session" "$iib5biii_b2a_iia2i_identity" \
+    "$iib5biii_b2a_iia2i_retirement" \
+    "$iib5biii_b2a_iia2i_session_test" \
+    "$iib5biii_b2a_iia2i_identity_test" \
+    "$iib5biii_b2a_iia2i_retirement_test" \
+    "$iib5biii_b2a_iia2i_boundary" \
+    >"$contract_root/iib5biii-b2a-ii-a2i-canonical.log"
+
+python3 - "$iib5biii_b2a_iia2i_session" \
+    "$iib5biii_b2a_iia2i_identity" \
+    "$iib5biii_b2a_iia2i_retirement" \
+    "$iib5biii_b2a_iia2i_session_test" \
+    "$iib5biii_b2a_iia2i_identity_test" \
+    "$iib5biii_b2a_iia2i_retirement_test" "$contract_root" <<'PY'
+from pathlib import Path
+import sys
+
+(
+    session_path, identity_path, retirement_path, session_test_path,
+    identity_test_path, retirement_test_path, output_root,
+) = map(Path, sys.argv[1:])
+sources = {
+    "session": session_path.read_text(encoding="utf-8"),
+    "identity": identity_path.read_text(encoding="utf-8"),
+    "retirement": retirement_path.read_text(encoding="utf-8"),
+    "session-test": session_test_path.read_text(encoding="utf-8"),
+    "identity-test": identity_test_path.read_text(encoding="utf-8"),
+    "retirement-test": retirement_test_path.read_text(encoding="utf-8"),
+}
+mutations = {
+    "inherited-policy-removal": (
+        "session",
+        "case inheritedInnerProcessGroup",
+        "case removedInheritedProcessGroup",
+    ),
+    "inherited-flags-setpgroup": (
+        "session",
+        "static let inheritedProcessGroupSpawnFlags = Int16(\n"
+        "        POSIX_SPAWN_CLOEXEC_DEFAULT\n"
+        "    )",
+        "static let inheritedProcessGroupSpawnFlags = Int16(\n"
+        "        POSIX_SPAWN_SETPGROUP | POSIX_SPAWN_CLOEXEC_DEFAULT\n"
+        "    )",
+    ),
+    "unconditional-setpgroup": (
+        "session",
+        "if request.flags == InvestigationMachineDarwinEpochSessionFactory.spawnFlags {",
+        "if true {",
+    ),
+    "widened-setpgroup-condition": (
+        "session",
+        "if request.flags == InvestigationMachineDarwinEpochSessionFactory.spawnFlags {",
+        "if request.flags == InvestigationMachineDarwinEpochSessionFactory.spawnFlags\n"
+        "        || request.flags == InvestigationMachineDarwinEpochSessionFactory\n"
+        "            .inheritedProcessGroupSpawnFlags {",
+    ),
+    "app-pgid-equals-pid": (
+        "identity",
+        "snapshot.processGroupID == processGroupID,",
+        "snapshot.processGroupID == processID,",
+    ),
+    "app-topology-binding-removal": (
+        "identity",
+        "snapshot.parentProcessID == parentProcessID,\n"
+        "            snapshot.processGroupID == processGroupID,",
+        "snapshot.parentProcessID > 1,\n"
+        "            snapshot.processGroupID > 1,",
+    ),
+    "inner-pgid-stability-removal": (
+        "session",
+        "system.currentProcessGroup() == inheritedProcessGroup,",
+        "inheritedProcessGroup > 1,",
+    ),
+    "group-retirement-substitution": (
+        "session",
+        "retirementAuthority = .directChild(spawned)",
+        "retirementAuthority = .ownedProcessGroup(.init(\n"
+        "                    processID: processID, processGroupID: processGroup,\n"
+        "                    descriptors: openDescriptors.sorted()\n"
+        "                ))",
+    ),
+    "session-test-vacuity": (
+        "session-test",
+        "inheritedInnerProcessGroupUsesCloexecOnlyAndDirectChildRetirement",
+        "inheritedInnerProcessGroupCoverageWasRemoved",
+    ),
+    "identity-test-vacuity": (
+        "identity-test",
+        "inheritedProcessGroupTopologyUsesFactoryOwnedExpectations",
+        "inheritedProcessGroupIdentityCoverageWasRemoved",
+    ),
+    "normal-reaper-to-fallback": (
+        "session",
+        "if expectsSuccessfulExit {\n"
+        "                    proof = try await retirementOwner\n"
+        "                        .reapSuccessfulDirectChild(spawned)\n"
+        "                } else {\n"
+        "                    try await retirementOwner.retireSpawnedProcess(spawned)\n"
+        "                    proof = .init()\n"
+        "                }",
+        "if expectsSuccessfulExit {\n"
+        "                    try await retirementOwner.retireSpawnedProcess(spawned)\n"
+        "                    proof = .init()\n"
+        "                } else {\n"
+        "                    proof = try await retirementOwner\n"
+        "                        .reapSuccessfulDirectChild(spawned)\n"
+        "                }",
+    ),
+    "remove-exit-status-zero": (
+        "retirement",
+        "status.rawStatus >> 8 & 0xff == 0",
+        "status.rawStatus >> 8 & 0xff >= 0",
+    ),
+    "exit-status-disjunction": (
+        "retirement",
+        "status.rawStatus >> 8 & 0xff == 0",
+        "status.rawStatus >> 8 & 0xff == 0 || true",
+    ),
+    "successful-reaper-add-signal": (
+        "retirement",
+        "let deadline = try adding(Self.totalWindowNanoseconds, to: started)\n"
+        "        while try waitableLeader(epoch.processID, deadline: deadline) == nil {",
+        "let deadline = try adding(Self.totalWindowNanoseconds, to: started)\n"
+        "        try signal(epoch.processID, SIGKILL)\n"
+        "        while try waitableLeader(epoch.processID, deadline: deadline) == nil {",
+    ),
+    "retirement-test-vacuity": (
+        "retirement-test",
+        "successfulDirectChildExitWaitsWithoutSignalAndRequiresExitZero",
+        "successfulDirectChildRetirementCoverageWasRemoved",
+    ),
+}
+for name, (kind, old, new) in mutations.items():
+    source = sources[kind]
+    if source.count(old) != 1:
+        raise SystemExit(
+            f"cannot construct iii-b2a-ii-a2-i mutation: {name}"
+        )
+    (output_root / f"iib5biii-b2a-ii-a2i-{name}.swift").write_text(
+        source.replace(old, new, 1), encoding="utf-8"
+    )
+PY
+
+function require_iib5biii_b2a_iia2i_mutation_rejected() {
+    local name=$1 kind=$2 expected=$3
+    local session=$iib5biii_b2a_iia2i_session
+    local identity=$iib5biii_b2a_iia2i_identity
+    local retirement=$iib5biii_b2a_iia2i_retirement
+    local session_test=$iib5biii_b2a_iia2i_session_test
+    local identity_test=$iib5biii_b2a_iia2i_identity_test
+    local retirement_test=$iib5biii_b2a_iia2i_retirement_test
+    local target="$contract_root/iib5biii-b2a-ii-a2i-$name.swift"
+    [[ $kind == session ]] && session=$target
+    [[ $kind == identity ]] && identity=$target
+    [[ $kind == retirement ]] && retirement=$target
+    [[ $kind == session-test ]] && session_test=$target
+    [[ $kind == identity-test ]] && identity_test=$target
+    [[ $kind == retirement-test ]] && retirement_test=$target
+    xcrun swiftc -frontend -parse -enable-bare-slash-regex "$target"
+    local output="$contract_root/iib5biii-b2a-ii-a2i-$name.log"
+    if "$iib5biii_b2a_iia2i_gate" \
+        --iib5biii-b2a-ii-a2i-contract-only \
+        "$session" "$identity" "$retirement" "$session_test" \
+        "$identity_test" "$retirement_test" \
+        "$iib5biii_b2a_iia2i_boundary" >"$output" 2>&1
+    then
+        fail_contract "iii-b2a-ii-a2-i mutation accepted: $name"
+    fi
+    require_fixed_text "$output" "$expected"
+}
+
+for fixture in \
+    inherited-policy-removal:session:'iii-b2a-ii-a2-i topology policy drifted' \
+    inherited-flags-setpgroup:session:'iii-b2a-ii-a2-i spawn contract drifted' \
+    unconditional-setpgroup:session:'iii-b2a-ii-a2-i spawn contract drifted' \
+    widened-setpgroup-condition:session:'iii-b2a-ii-a2-i spawn contract drifted' \
+    app-pgid-equals-pid:identity:'iii-b2a-ii-a2-i App identity topology drifted' \
+    app-topology-binding-removal:identity:'iii-b2a-ii-a2-i App identity topology drifted' \
+    inner-pgid-stability-removal:session:'iii-b2a-ii-a2-i inherited PGID stability drifted' \
+    group-retirement-substitution:session:'iii-b2a-ii-a2-i direct-child retirement drifted' \
+    session-test-vacuity:session-test:'iii-b2a-ii-a2-i session tests became vacuous' \
+    identity-test-vacuity:identity-test:'iii-b2a-ii-a2-i identity tests became vacuous' \
+    normal-reaper-to-fallback:session:'iii-b2a-ii-a2-i successful direct-child retirement drifted' \
+    remove-exit-status-zero:retirement:'iii-b2a-ii-a2-i successful direct-child retirement drifted' \
+    exit-status-disjunction:retirement:'iii-b2a-ii-a2-i successful direct-child retirement drifted' \
+    successful-reaper-add-signal:retirement:'iii-b2a-ii-a2-i successful direct-child retirement drifted' \
+    retirement-test-vacuity:retirement-test:'iii-b2a-ii-a2-i retirement tests became vacuous'
+do
+    name=${fixture%%:*}; remainder=${fixture#*:}
+    kind=${remainder%%:*}; expected=${remainder#*:}
+    require_iib5biii_b2a_iia2i_mutation_rejected \
+        "$name" "$kind" "$expected"
+done
+
+iib5biii_b2a_iia2i_paths=(
+    "$iib5biii_b2a_iia2i_session"
+    "$iib5biii_b2a_iia2i_identity"
+    "$iib5biii_b2a_iia2i_retirement"
+    "$iib5biii_b2a_iia2i_session_test"
+    "$iib5biii_b2a_iia2i_identity_test"
+    "$iib5biii_b2a_iia2i_retirement_test"
+    "$iib5biii_b2a_iia2i_boundary"
+    scripts/verify-app-release-boundaries
+    scripts/verify-contract
+    scripts/verify-investigation-boundaries
+)
+(( ${#iib5biii_b2a_iia2i_paths} == 10 )) \
+    || fail_contract "iii-b2a-ii-a2-i checkpoint path ceiling drifted"
+iib5biii_b2a_iia2i_index="$contract_root/iib5biii-b2a-ii-a2i.index"
+GIT_INDEX_FILE="$iib5biii_b2a_iia2i_index" \
+    git read-tree "$iib5biii_b2a_iia2i_baseline^{tree}"
+for checkpoint_path in "${iib5biii_b2a_iia2i_paths[@]}"; do
+    blob=$(git hash-object -w -- "$checkpoint_path")
+    mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
+    GIT_INDEX_FILE="$iib5biii_b2a_iia2i_index" git update-index --add \
+        --cacheinfo "$mode,$blob,$checkpoint_path"
+done
+GIT_INDEX_FILE="$iib5biii_b2a_iia2i_index" \
+    "$iib5biii_b2a_iia2i_gate" \
+    --iib5biii-b2a-ii-a2i-scope-contract-only \
+    "$iib5biii_b2a_iia2i_baseline" \
+    >"$contract_root/iib5biii-b2a-ii-a2i-scope-canonical.log"
+for fixture in extra-path over-budget deleted binary mode wrong-baseline; do
+    index="$contract_root/iib5biii-b2a-ii-a2i-scope-$fixture.index"
+    cp "$iib5biii_b2a_iia2i_index" "$index"
+    baseline=$iib5biii_b2a_iia2i_baseline
+    case $fixture in
+        extra-path)
+            blob=$(git rev-parse "${iib5biii_b2a_iia2i_baseline}:AGENTS.md")
+            GIT_INDEX_FILE="$index" git update-index --add --cacheinfo \
+                "100644,$blob,a2-i-extra.swift"
+            expected='iii-b2a-ii-a2-i staged checkpoint paths drifted' ;;
+        over-budget)
+            for line in {1..3300}; do print -r -- "// a2-i $line"; done \
+                >"$contract_root/iib5biii-b2a-ii-a2i-over-budget.swift"
+            blob=$(git hash-object -w -- \
+                "$contract_root/iib5biii-b2a-ii-a2i-over-budget.swift")
+            GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                "100644,$blob,$iib5biii_b2a_iia2i_session"
+            expected='iii-b2a-ii-a2-i checkpoint budget drifted' ;;
+        deleted)
+            GIT_INDEX_FILE="$index" git rm --cached -q -f \
+                "$iib5biii_b2a_iia2i_identity"
+            expected='iii-b2a-ii-a2-i checkpoint deleted an existing path' ;;
+        binary)
+            blob=$(git rev-parse \
+                "${iib5biii_b2a_iia2i_baseline}:Tests/Fixtures/Snapshots/design-system.empty-state.dark.en.png")
+            GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                "100644,$blob,$iib5biii_b2a_iia2i_session"
+            expected='iii-b2a-ii-a2-i binary checkpoint path rejected' ;;
+        mode)
+            entry=$(GIT_INDEX_FILE="$index" git ls-files -s -- \
+                scripts/verify-contract)
+            blob=$(print -r -- "$entry" | awk '{print $2}')
+            GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                "100644,$blob,scripts/verify-contract"
+            expected='iii-b2a-ii-a2-i checkpoint mode drifted: scripts/verify-contract' ;;
+        wrong-baseline)
+            baseline="$iib5biii_b2a_iia2i_baseline^"
+            expected='iii-b2a-ii-a2-i checkpoint baseline drifted' ;;
+    esac
+    output="$contract_root/iib5biii-b2a-ii-a2i-scope-$fixture.log"
+    if GIT_INDEX_FILE="$index" "$iib5biii_b2a_iia2i_gate" \
+        --iib5biii-b2a-ii-a2i-scope-contract-only "$baseline" \
+        >"$output" 2>&1
+    then
+        fail_contract "iii-b2a-ii-a2-i scope mutation accepted: $fixture"
     fi
     require_fixed_text "$output" "$expected"
 done

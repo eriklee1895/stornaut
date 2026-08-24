@@ -26,7 +26,114 @@ struct InvestigationMachineDarwinEpochSessionTests {
         #expect(request.arguments == [request.executablePath])
         #expect(request.environment.isEmpty)
         #expect(request.flags == InvestigationMachineDarwinEpochSessionFactory.spawnFlags)
+        #expect(
+            request.flags & Int16(POSIX_SPAWN_SETPGROUP)
+                == Int16(POSIX_SPAWN_SETPGROUP)
+        )
+        #expect(
+            request.flags & Int16(POSIX_SPAWN_CLOEXEC_DEFAULT)
+                == Int16(POSIX_SPAWN_CLOEXEC_DEFAULT)
+        )
         #expect(recorder.closed.contains(7) == false)
+    }
+
+    @Test
+    func inheritedInnerProcessGroupUsesCloexecOnlyAndDirectChildRetirement()
+        async throws
+    {
+        let recorder = StartRecorder(
+            processGroup: 21, spawnProcessID: 42, currentProcessGroup: 21
+        )
+        let owner = TestRetirementOwner()
+        let outcome = await TestFixture.inheritedInnerProcessGroupFactory(
+            recorder: recorder, owner: owner
+        ).start(bootstrap: TestFixture.bootstrap)
+        let session = try #require(outcome.startedSession)
+        let request = try #require(recorder.spawnRequest)
+
+        #expect(request.flags == Int16(POSIX_SPAWN_CLOEXEC_DEFAULT))
+        #expect(request.flags & Int16(POSIX_SPAWN_SETPGROUP) == 0)
+        #expect(recorder.spawnProcessID != recorder.currentProcessGroupValue)
+
+        _ = try await session.retireAndReap()
+
+        #expect(owner.calls == 1)
+        #expect(owner.spawned == InvestigationMachineDarwinSpawnedEpoch(
+            processID: 42, descriptors: [3]
+        ))
+        #expect(owner.successfulReap == nil)
+        #expect(owner.owned == nil)
+    }
+
+    @Test
+    func inheritedInnerProcessGroupRequiresInnerLeaderAndAppMembership()
+        async throws
+    {
+        let nonLeader = StartRecorder(
+            processGroup: 20, spawnProcessID: 42, currentProcessGroup: 20
+        )
+        let nonLeaderOwner = TestRetirementOwner()
+        let nonLeaderOutcome = await TestFixture
+            .inheritedInnerProcessGroupFactory(
+                recorder: nonLeader, owner: nonLeaderOwner
+            )
+            .start(bootstrap: TestFixture.bootstrap)
+
+        #expect(!nonLeaderOutcome.isStarted)
+        #expect(nonLeader.spawnRequest == nil)
+        #expect(nonLeaderOwner.calls == 0)
+
+        let foreignGroup = StartRecorder(
+            processGroup: 42, spawnProcessID: 42, currentProcessGroup: 21
+        )
+        let foreignGroupOwner = TestRetirementOwner()
+        let foreignGroupOutcome = await TestFixture
+            .inheritedInnerProcessGroupFactory(
+                recorder: foreignGroup, owner: foreignGroupOwner
+            )
+            .start(bootstrap: TestFixture.bootstrap)
+
+        #expect(!foreignGroupOutcome.isStarted)
+        #expect(foreignGroupOwner.calls == 1)
+        #expect(foreignGroupOwner.spawned?.processID == 42)
+        #expect(foreignGroupOwner.owned == nil)
+
+        let driftingInner = StartRecorder(
+            processGroup: 21, spawnProcessID: 42,
+            currentProcessGroups: [21, 22]
+        )
+        let driftingOwner = TestRetirementOwner()
+        let driftingOutcome = await TestFixture
+            .inheritedInnerProcessGroupFactory(
+                recorder: driftingInner, owner: driftingOwner
+            )
+            .start(bootstrap: TestFixture.bootstrap)
+
+        #expect(!driftingOutcome.isStarted)
+        #expect(driftingOwner.calls == 1)
+        #expect(driftingOwner.spawned?.processID == 42)
+        #expect(driftingOwner.owned == nil)
+    }
+
+    @Test
+    func inheritedInnerProcessGroupStartupFailureRetiresOnlyDirectChild()
+        async throws
+    {
+        let recorder = StartRecorder(
+            processGroup: 21, writeFailure: true, spawnProcessID: 42,
+            currentProcessGroup: 21
+        )
+        let owner = TestRetirementOwner()
+        let outcome = await TestFixture.inheritedInnerProcessGroupFactory(
+            recorder: recorder, owner: owner
+        ).start(bootstrap: TestFixture.bootstrap)
+
+        #expect(!outcome.isStarted)
+        #expect(owner.calls == 1)
+        #expect(owner.spawned == InvestigationMachineDarwinSpawnedEpoch(
+            processID: 42, descriptors: [3]
+        ))
+        #expect(owner.owned == nil)
     }
 
     @Test func reservedDescriptorsRelocateAndCloseOriginals() async throws {
@@ -284,6 +391,68 @@ struct InvestigationMachineDarwinEpochSessionTests {
         #expect(status == 0)
     }
 
+    @Test func productionSpawnPrimitiveCanInheritCurrentProcessGroup()
+        async throws
+    {
+        let fixtureURL = try compilePhysicalChildFixture()
+        defer { try? FileManager.default.removeItem(
+            at: fixtureURL.deletingLastPathComponent()
+        ) }
+        var descriptors: [Int32] = [-1, -1]
+        try #require(socketpair(AF_UNIX, SOCK_STREAM, 0, &descriptors) == 0)
+        let parent = descriptors[0]
+        let child = descriptors[1]
+        var childIsOpen = true
+        defer {
+            close(parent)
+            if childIsOpen { close(child) }
+        }
+        let processID = try InvestigationMachineDarwinEpochSpawnPrimitive.spawn(
+            .init(
+                executablePath: fixtureURL.path,
+                arguments: [fixtureURL.path], environment: [],
+                parentDescriptor: parent, childDescriptor: child,
+                childTargetDescriptor: 7,
+                flags: InvestigationMachineDarwinEpochSessionFactory
+                    .inheritedProcessGroupSpawnFlags
+            )
+        )
+        let inheritedGroup = getpgrp()
+        #expect(inheritedGroup > 1)
+        #expect(getpgid(processID) == inheritedGroup)
+        #expect(processID != inheritedGroup)
+        var reaped = false
+        defer {
+            if !reaped {
+                _ = Darwin.kill(processID, SIGKILL)
+                _ = waitpid(processID, nil, 0)
+            }
+        }
+        try #require(close(child) == 0)
+        childIsOpen = false
+        let deadline = UInt64.max
+        try await InvestigationMachineDarwinEpochSessionSystem.system
+            .writeExactly(parent, Data(repeating: 0xa5, count: 32), deadline)
+        #expect(
+            try await InvestigationMachineDarwinEpochSessionSystem.system
+                .readExactly(parent, 2, deadline) == Data("OK".utf8)
+        )
+        _ = try await InvestigationMachineDarwinEpochSessionSystem.system
+            .readExactly(parent, fixtureURL.path.utf8.count, deadline)
+        #expect(
+            try await InvestigationMachineDarwinEpochSessionSystem.system
+                .readUpToOne(parent, deadline).isEmpty
+        )
+        try await InvestigationMachineDarwinEpochSessionSystem.system
+            .writeExactly(parent, Data([0x7e]), deadline)
+        var status: Int32 = 0
+        while waitpid(processID, &status, 0) < 0 {
+            if errno != EINTR { throw TestFailure.io }
+        }
+        reaped = true
+        #expect(status == 0)
+    }
+
     @Test func sessionRejectsPreDropReadyFromWrongSpawnedPID() async throws {
         let recorder = StartRecorder()
         let encoded = try TestFixture.frame(.preDropReady, sender: TestFixture.claim(99, 1, 0, 2))
@@ -294,6 +463,28 @@ struct InvestigationMachineDarwinEpochSessionTests {
         await #expect(throws: InvestigationMachineSingleEpochSessionError.identityMismatch) {
             _ = try await session.receive()
         }
+    }
+
+    @Test func inheritedSessionForwardsExactInnerTopologyToIdentityObserver()
+        async throws
+    {
+        let recorder = StartRecorder(
+            processGroup: 21, spawnProcessID: 42, currentProcessGroup: 21
+        )
+        let bytes = try TestFixture.incomingFrames[0].encoded()
+        recorder.readChunks = [
+            Data(bytes.prefix(56)), Data(bytes.dropFirst(56)),
+        ]
+        let identity = SessionIdentityObserver(expectedProcessGroupID: 21)
+        let outcome = await TestFixture.inheritedInnerProcessGroupFactory(
+            recorder: recorder, identity: identity
+        ).start(bootstrap: TestFixture.bootstrap)
+        let session = try #require(outcome.startedSession)
+
+        #expect(try await session.receive().kind == .preDropReady)
+        #expect(identity.preparedParentProcessID == 21)
+        #expect(identity.preparedProcessGroupID == 21)
+        _ = try await session.retireAndReap()
     }
 
     @Test func kindSpecificPayloadBoundRejectsBeforePayloadRead() async throws {
@@ -414,6 +605,8 @@ struct InvestigationMachineDarwinEpochSessionTests {
             _ = try await session.retireAndReap()
         }
         #expect(owner.calls == 1)
+        #expect(owner.spawned == nil)
+        #expect(owner.owned?.processGroupID == 42)
     }
 
     @Test func canonicalSessionUsesCachedThenFreshIdentityAndRetires() async throws {
@@ -473,6 +666,53 @@ struct InvestigationMachineDarwinEpochSessionTests {
         #expect(Array(recorder.writes.dropFirst()) == expectedWrites)
     }
 
+    @Test func inheritedCanonicalSessionUsesSuccessfulExitReaper() async throws {
+        let recorder = StartRecorder(
+            processGroup: 21, spawnProcessID: 42, currentProcessGroup: 21
+        )
+        let owner = TestRetirementOwner()
+        let identity = SessionIdentityObserver(expectedProcessGroupID: 21)
+        recorder.readChunks = try TestFixture.incomingFrames.flatMap { frame in
+            let bytes = try frame.encoded()
+            return [Data(bytes.prefix(56)), Data(bytes.dropFirst(56))]
+        }
+        let outcome = await TestFixture.inheritedInnerProcessGroupFactory(
+            recorder: recorder, owner: owner, identity: identity
+        ).start(bootstrap: TestFixture.bootstrap)
+        let session = try #require(outcome.startedSession)
+
+        #expect(try await session.receive().kind == .preDropReady)
+        try await session.send(try TestFixture.outgoing(.dropRelease))
+        #expect(try await session.receive().kind == .dropEvidence)
+        _ = try await session.observeCompletePostDropAppIdentity()
+        try await session.send(try TestFixture.outgoing(
+            .configuration, .configuration(Data([0x01]))
+        ))
+        #expect(try await session.receive().kind == .configurationAcknowledgement)
+        #expect(try await session.receive().kind == .hello)
+        #expect(try await session.receive().kind == .handle)
+        try await session.send(try TestFixture.outgoing(
+            .acknowledgement,
+            .retirementHandleAcknowledgement(
+                .init(handleSHA256: TestFixture.digest(8))
+            )
+        ))
+        try await session.send(try TestFixture.outgoing(.release))
+        #expect(try await session.receive().kind == .alive)
+        try await session.provePeerWriteEOF()
+        _ = try await session.observeCompletePostDropAppIdentity()
+        try await session.send(try TestFixture.outgoing(.exit))
+
+        _ = try await session.retireAndReap()
+
+        #expect(owner.calls == 1)
+        #expect(owner.successfulReap == InvestigationMachineDarwinSpawnedEpoch(
+            processID: 42, descriptors: [3]
+        ))
+        #expect(owner.spawned == nil)
+        #expect(owner.owned == nil)
+    }
+
     @Test func trailingByteAtPeerEOFFailsAndStillRetiresOnce() async throws {
         let recorder = StartRecorder(eof: Data([0x7f]))
         let owner = TestRetirementOwner()
@@ -526,14 +766,16 @@ private final class StartRecorder: @unchecked Sendable {
     var readChunks: [Data] = []
     var eof: Data
     let readGate: TestAsyncGate?
+    let currentProcessGroupValue: Int32
     private(set) var writes: [Data] = []
     private(set) var spawnRequest: InvestigationMachineDarwinEpochSpawnRequest?
     private(set) var spawnCount = 0
     private(set) var duplicated: [Int32] = []
     private(set) var closed: [Int32] = []
     private(set) var readRequests: [Int] = []
-    init(channels: InvestigationMachineDarwinEpochChannel = .init(parentDescriptor: 3, childDescriptor: 4), closeFailure: Set<Int32> = [], processGroup: Int32 = 42, writeFailure: Bool = false, spawnProcessID: Int32 = 42, eof: Data = Data(), readGate: TestAsyncGate? = nil) {
-        self.channels = channels; self.closeFailure = closeFailure; processGroupValue = processGroup; self.writeFailure = writeFailure; self.spawnProcessID = spawnProcessID; self.eof = eof; self.readGate = readGate
+    private var currentProcessGroups: [Int32]
+    init(channels: InvestigationMachineDarwinEpochChannel = .init(parentDescriptor: 3, childDescriptor: 4), closeFailure: Set<Int32> = [], processGroup: Int32 = 42, writeFailure: Bool = false, spawnProcessID: Int32 = 42, eof: Data = Data(), readGate: TestAsyncGate? = nil, currentProcessGroup: Int32 = 21, currentProcessGroups: [Int32] = []) {
+        self.channels = channels; self.closeFailure = closeFailure; processGroupValue = processGroup; self.writeFailure = writeFailure; self.spawnProcessID = spawnProcessID; self.eof = eof; self.readGate = readGate; currentProcessGroupValue = currentProcessGroup; self.currentProcessGroups = currentProcessGroups
     }
     func system() -> InvestigationMachineDarwinEpochSessionSystem {
         .init(
@@ -544,7 +786,7 @@ private final class StartRecorder: @unchecked Sendable {
             closeDescriptor: { fd in try self.close(fd) },
             spawn: { request in self.lock.withLock { self.spawnRequest = request; self.spawnCount += 1 }; return self.spawnProcessID },
             processGroup: { _ in self.processGroupValue },
-            currentProcessGroup: { 21 },
+            currentProcessGroup: { self.nextCurrentProcessGroup() },
             continuousNanoseconds: { DispatchTime.now().uptimeNanoseconds },
             readExactly: { _, count, _ in
                 if let gate = self.readGate { await gate.blockOnce() }
@@ -566,6 +808,14 @@ private final class StartRecorder: @unchecked Sendable {
         )
     }
     private func close(_ fd: Int32) throws { lock.withLock { closed.append(fd) }; if closeFailure.contains(fd) { throw TestFailure.io } }
+    private func nextCurrentProcessGroup() -> Int32 {
+        lock.withLock {
+            guard !currentProcessGroups.isEmpty else {
+                return currentProcessGroupValue
+            }
+            return currentProcessGroups.removeFirst()
+        }
+    }
 }
 
 private final class TestRetirementOwner: @unchecked Sendable, InvestigationMachineDarwinEpochRetirementOwning {
@@ -573,6 +823,7 @@ private final class TestRetirementOwner: @unchecked Sendable, InvestigationMachi
     let shouldFail: Bool
     private(set) var calls = 0
     private(set) var spawned: InvestigationMachineDarwinSpawnedEpoch?
+    private(set) var successfulReap: InvestigationMachineDarwinSpawnedEpoch?
     private(set) var owned: InvestigationMachineDarwinOwnedEpoch?
     init(shouldFail: Bool = false) { self.shouldFail = shouldFail }
     func retireSpawnedProcess(
@@ -586,6 +837,16 @@ private final class TestRetirementOwner: @unchecked Sendable, InvestigationMachi
     }
     func retireOwnedProcessGroup(_ ownedEpoch: InvestigationMachineDarwinOwnedEpoch) async throws -> InvestigationMachineSingleEpochRetirementProof {
         lock.withLock { calls += 1; owned = ownedEpoch }
+        if shouldFail { throw TestFailure.retirement }
+        return .init()
+    }
+    func reapSuccessfulDirectChild(
+        _ spawnedEpoch: InvestigationMachineDarwinSpawnedEpoch
+    ) async throws -> InvestigationMachineSingleEpochRetirementProof {
+        lock.withLock {
+            calls += 1
+            successfulReap = spawnedEpoch
+        }
         if shouldFail { throw TestFailure.retirement }
         return .init()
     }
@@ -650,10 +911,27 @@ private enum TestFixture {
         if let channels { recorder.channels = channels }
         return .init(projection: projection, identityObserver: identity, retirementOwner: owner, system: recorder.system())
     }
+    static func inheritedInnerProcessGroupFactory(
+        recorder: StartRecorder,
+        owner: TestRetirementOwner = TestRetirementOwner(),
+        identity: any InvestigationMachineDarwinAppIdentityObserving =
+            TestIdentityObserver()
+    ) -> InvestigationMachineDarwinEpochSessionFactory {
+        .init(
+            projection: projection, identityObserver: identity,
+            retirementOwner: owner, system: recorder.system(),
+            topologyPolicy: .inheritedInnerProcessGroup
+        )
+    }
 }
 
 private struct TestIdentityObserver: InvestigationMachineDarwinAppIdentityObserving {
-    func prepareEpoch(processClaim: InvestigationHandoffProcessClaim, projection: InvestigationInstalledL2IdentityProjection) throws -> InvestigationMachineDarwinEpochPreparedAppIdentity {
+    func prepareEpoch(
+        processClaim: InvestigationHandoffProcessClaim,
+        projection: InvestigationInstalledL2IdentityProjection,
+        expectedParentProcessID: UInt32,
+        expectedProcessGroupID: UInt32
+    ) throws -> InvestigationMachineDarwinEpochPreparedAppIdentity {
         .init { _, _, _ in fatalError("not reached in factory tests") }
     }
 }
@@ -664,6 +942,9 @@ private final class SessionIdentityObserver:
     private let lock = NSLock()
     private(set) var prepareCount = 0
     private(set) var observeCount = 0
+    private(set) var preparedParentProcessID: UInt32?
+    private(set) var preparedProcessGroupID: UInt32?
+    private let expectedProcessGroupID: UInt32
     let appObservation = InvestigationMachineSingleEpochAppObservation(
         identity: try! InvestigationMachineProcessIdentity(
             role: .app, processID: 42, processIDVersion: 7, auditSessionID: 9,
@@ -672,12 +953,26 @@ private final class SessionIdentityObserver:
         )
     )
 
+    init(expectedProcessGroupID: UInt32 = 42) {
+        self.expectedProcessGroupID = expectedProcessGroupID
+    }
+
     func prepareEpoch(
         processClaim: InvestigationHandoffProcessClaim,
-        projection: InvestigationInstalledL2IdentityProjection
+        projection: InvestigationInstalledL2IdentityProjection,
+        expectedParentProcessID: UInt32,
+        expectedProcessGroupID: UInt32
     ) throws -> InvestigationMachineDarwinEpochPreparedAppIdentity {
-        lock.withLock { prepareCount += 1 }
-        guard processClaim == TestFixture.preDropClaim else {
+        lock.withLock {
+            prepareCount += 1
+            preparedParentProcessID = expectedParentProcessID
+            preparedProcessGroupID = expectedProcessGroupID
+        }
+        guard
+            processClaim == TestFixture.preDropClaim,
+            expectedParentProcessID == TestFixture.driverClaim.processID,
+            expectedProcessGroupID == self.expectedProcessGroupID
+        else {
             throw TestFailure.io
         }
         return .init { claim, evidence, projection in
@@ -693,6 +988,11 @@ private final class SessionIdentityObserver:
 }
 
 private extension InvestigationMachineSingleEpochStartOutcome {
+    var isStarted: Bool {
+        guard case .started = self else { return false }
+        return true
+    }
+
     var startedSession: (any InvestigationMachineSingleEpochSession)? {
         guard case let .started(session) = self else { return nil }
         return session

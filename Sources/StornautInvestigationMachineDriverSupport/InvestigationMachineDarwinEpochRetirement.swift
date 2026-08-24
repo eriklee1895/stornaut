@@ -23,6 +23,9 @@ struct InvestigationMachineDarwinEpochRetirementSystem: Sendable {
     let waitID: @Sendable (Int32, Int32) throws -> Int32?
     let sendSignal: @Sendable (Int32, Int32) throws -> Void
     let waitPID: @Sendable (Int32, Int32) throws -> Int32?
+    let waitPIDStatus:
+        @Sendable (Int32, Int32) throws
+            -> InvestigationMachineDarwinWaitPIDStatus?
     let pauseNanoseconds: @Sendable (UInt64) throws -> Void
 
     static let system = Self(
@@ -35,8 +38,14 @@ struct InvestigationMachineDarwinEpochRetirementSystem: Sendable {
         waitID: investigationMachineDarwinRetirementWaitID,
         sendSignal: investigationMachineDarwinRetirementSignal,
         waitPID: investigationMachineDarwinRetirementWaitPID,
+        waitPIDStatus: investigationMachineDarwinRetirementWaitPIDStatus,
         pauseNanoseconds: investigationMachineDarwinRetirementPause
     )
+}
+
+struct InvestigationMachineDarwinWaitPIDStatus: Sendable, Equatable {
+    let processID: Int32
+    let rawStatus: Int32
 }
 
 final class InvestigationMachineDarwinEpochRetirementOwner:
@@ -78,6 +87,16 @@ final class InvestigationMachineDarwinEpochRetirementOwner:
         try await perform {
             defer { self.finish() }
             try self.retireSpawnedProcessSynchronously(spawnedEpoch)
+        }
+    }
+
+    func reapSuccessfulDirectChild(
+        _ spawnedEpoch: InvestigationMachineDarwinSpawnedEpoch
+    ) async throws -> InvestigationMachineSingleEpochRetirementProof {
+        try beginOnce()
+        return try await perform {
+            defer { self.finish() }
+            return try self.reapSuccessfulDirectChildSynchronously(spawnedEpoch)
         }
     }
 
@@ -215,6 +234,35 @@ final class InvestigationMachineDarwinEpochRetirementOwner:
         }
     }
 
+    private func reapSuccessfulDirectChildSynchronously(
+        _ epoch: InvestigationMachineDarwinSpawnedEpoch
+    ) throws -> InvestigationMachineSingleEpochRetirementProof {
+        let descriptorFailure = closeExactlyOnce(epoch.descriptors)
+        guard epoch.processID > 1 else {
+            throw InvestigationMachineDarwinEpochRetirementError
+                .authorityInvalid
+        }
+        let started = try clock()
+        let deadline = try adding(Self.totalWindowNanoseconds, to: started)
+        while try waitableLeader(epoch.processID, deadline: deadline) == nil {
+            try pause(until: deadline, totalDeadline: deadline)
+        }
+        let status = try reapStatus(epoch.processID, deadline: deadline)
+        _ = try requireBefore(deadline)
+        guard
+            status.processID == epoch.processID,
+            status.rawStatus & 0x7f == 0,
+            status.rawStatus >> 8 & 0xff == 0
+        else {
+            throw InvestigationMachineDarwinEpochRetirementError.waitFailed
+        }
+        guard !descriptorFailure else {
+            throw InvestigationMachineDarwinEpochRetirementError
+                .descriptorCloseFailed
+        }
+        return .init()
+    }
+
     private func closeExactlyOnce(_ descriptors: [Int32]) -> Bool {
         var failed = false
         for descriptor in Set(descriptors).sorted() {
@@ -297,6 +345,30 @@ final class InvestigationMachineDarwinEpochRetirementOwner:
             }
             if observed == processID { return }
             throw InvestigationMachineDarwinEpochRetirementError.waitFailed
+        }
+    }
+
+    private func reapStatus(
+        _ processID: Int32, deadline: UInt64
+    ) throws -> InvestigationMachineDarwinWaitPIDStatus {
+        _ = try requireBefore(deadline)
+        while true {
+            do {
+                guard let observed = try system.waitPIDStatus(
+                    processID, Int32(WNOHANG)
+                ), observed.processID == processID else {
+                    throw InvestigationMachineDarwinEpochRetirementError
+                        .waitFailed
+                }
+                return observed
+            } catch let error as POSIXError where error.code == .EINTR {
+                _ = try requireBefore(deadline)
+                continue
+            } catch let error as InvestigationMachineDarwinEpochRetirementError {
+                throw error
+            } catch {
+                throw InvestigationMachineDarwinEpochRetirementError.waitFailed
+            }
         }
     }
 
@@ -434,6 +506,19 @@ private func investigationMachineDarwinRetirementWaitPID(
     errno = 0
     let result = waitpid(processID, nil, options)
     if result > 0 { return result }
+    if result == 0 { return nil }
+    throw POSIXError(.init(rawValue: errno) ?? .EIO)
+}
+
+private func investigationMachineDarwinRetirementWaitPIDStatus(
+    _ processID: Int32, _ options: Int32
+) throws -> InvestigationMachineDarwinWaitPIDStatus? {
+    var status: Int32 = 0
+    errno = 0
+    let result = waitpid(processID, &status, options)
+    if result > 0 {
+        return .init(processID: result, rawStatus: status)
+    }
     if result == 0 { return nil }
     throw POSIXError(.init(rawValue: errno) ?? .EIO)
 }
