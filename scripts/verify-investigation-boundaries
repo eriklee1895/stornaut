@@ -2460,6 +2460,7 @@ PY
 
 function verify_iib5biii_b2a_iia1v_scope() {
     local baseline=${1:-72d506de45deccb0cc0d6337b04a8f0e7ad751eb}
+    local implementation_tree=a66564f527004ea7065b5f6ffeca05a9c12e5fac
     local expected=(
         Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinDriverChildObservation.swift
         Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerSession.swift
@@ -2508,6 +2509,8 @@ function verify_iib5biii_b2a_iia1v_scope() {
     local preflight=docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a1-v-verifier-preflight.md
     (( ${documentation[(Ie)$preflight]} == 1 )) \
         || { print -u2 "iii-b2a-ii-a1-v required preflight document missing"; return 1; }
+    [[ "$(git write-tree)" == "$implementation_tree" ]] \
+        || { print -u2 "iii-b2a-ii-a1-v completed tree drifted"; return 1; }
 }
 
 function verify_iib5bia_projection_contract() {

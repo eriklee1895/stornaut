@@ -1654,7 +1654,9 @@ struct InvestigationMachineTargetBoundaryTests {
             "iii-b2a-ii-a1-v one-shot or shared retirement drifted",
             "iii-b2a-ii-a1-v staged checkpoint paths drifted",
             "iii-b2a-ii-a1-v checkpoint budget drifted",
+            "iii-b2a-ii-a1-v completed tree drifted",
             "72d506de45deccb0cc0d6337b04a8f0e7ad751eb",
+            "a66564f527004ea7065b5f6ffeca05a9c12e5fac",
             "(( ${#expected} == 7 ))",
             "(( changed <= 2400 ))",
         ] {
@@ -1674,15 +1676,26 @@ struct InvestigationMachineTargetBoundaryTests {
         for marker in [
             "iib5biii_b2a_iia1v_commit=72d506de45deccb0cc0d6337b04a8f0e7ad751eb",
             "iib5biii_b2a_iia1v_tree=f5b2ddaf731289866b956efbeaa2b817add3ecdd",
+            "iib5biii_b2a_iia1v_implementation_commit=9556367f4f29fc656d4dd45f90b8a61a2ea35f3c",
+            "iib5biii_b2a_iia1v_implementation_tree=a66564f527004ea7065b5f6ffeca05a9c12e5fac",
             "iii-b2a-ii-a1-v historical parent drifted",
             "iii-b2a-ii-a1-v historical tree drifted",
             "iii-b2a-ii-a1-v historical line count drifted",
+            "iii-b2a-ii-a1-v implementation parent drifted",
+            "iii-b2a-ii-a1-v implementation tree drifted",
+            "iii-b2a-ii-a1-v implementation paths drifted",
+            "iii-b2a-ii-a1-v implementation line count drifted",
             "iii-b2a-ii-a1-v mutation accepted:",
             "iii-b2a-ii-a1-v scope mutation accepted:",
             "substitute-session", "substitute-observer",
             "substitute-focused", "substitute-boundary-test",
             "substitute-contract", "substitute-boundary",
             "substitute-app", "substitute-preflight",
+            "GIT_INDEX_FILE=\"$iib5biii_b2a_iia1v_index\" git read-tree",
+            "\"$iib5biii_b2a_iia1v_implementation_commit^{tree}\"",
+            "\"${iib5biii_b2a_iia1v_implementation_commit}:$checkpoint_path\"",
+            "controlled iii-b2a-ii-a1-v same-path tamper",
+            "iii-b2a-ii-a1-v completed tree drifted",
         ] {
             #expect(contract.contains(marker))
         }
