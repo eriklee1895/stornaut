@@ -356,9 +356,11 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   self-contained untrusted decode、a2-i inherited-PGID App session 与 a2-ii
   terminal/admission join；a2-0 已以 8-path / 703-line implementation、19
   focused、605 affected、1,487-test/78-suite staged serial、三项 boundary gates
-  与 independent no-unresolved-P0–P2 review 完成并保持 non-admitting；当前
-  a2-i。随后严格按 a2-i → a2-ii → iii-b2b → ii-c0b → ii-c → L3c3d → L3c4
-  推进。
+  与 independent no-unresolved-P0–P2 review 完成并保持 non-admitting。a2-i
+  又以 10-path / 1,965-line implementation、66 focused、1,500-test/78-suite
+  staged serial、四组 Mach-O projections、complete contract replay 与 final
+  no-unresolved-P0–P2 review 收口；当前 a2-ii。随后严格按 a2-ii → iii-b2b →
+  ii-c0b → ii-c → L3c3d → L3c4 推进。
   该 ii-b5b-ii-c checkpoint 以 8 个
   non-document paths / 3,104 changed lines、35 focused tests、
   1,396-test staged-only serial、三个 verifier gates 与 final
@@ -549,6 +551,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-b2a-ii-a1-v transport verifier review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a1-v-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a1-v-review.md) |
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-b2a-ii-a2 scope/trust preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-scope-trust-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-scope-trust-preflight.md) |
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-b2a-ii-a2-0 untrusted decode review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-0-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-0-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-iii-b2a-ii-a2-i inherited-PGID App session review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-i-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-i-review.md) |
 | Phase D Task 39B2c-L1 residue observation review | [docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md](docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md) |
 | Phase D Task 39B2c-L2 root topology observation review | [docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md](docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md) |
 | Phase D Task 39B2c-L3a trusted machine target review | [docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md](docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md) |
@@ -701,8 +704,8 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   b0 protocol、a per-epoch continuity、b1 injected cohort、b2a0 typed physical
   bridge、b2a-i supervisor admission、b2a-ii-a Darwin physical session 与 b2b
   entry/artifact。b0 已冻结，iii-a、iii-b1、iii-b2a0、iii-b2a-i 与
-  iii-b2a-ii-a1 与 a2-0 已完成并保持 non-admitting，当前 frontier 为
-  a2-i inherited-PGID App session，严格后续顺序为 a2-ii → iii-b2b → ii-c0b non-root capsule author +
+  iii-b2a-ii-a1、a2-0 与 a2-i 已完成并保持 non-admitting，当前 frontier 为
+  a2-ii terminal/admission join，严格后续顺序为 iii-b2b → ii-c0b non-root capsule author +
   launcher/TTY/FD hygiene → ii-c
   privileged no-model gate → L3c3d → L3c4。
   ADR 0018 仍 Proposed；L3c4 独占 final admission 与

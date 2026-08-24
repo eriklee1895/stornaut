@@ -659,8 +659,8 @@ single-epoch result 或 continuity。iii-b2a-i 已关闭 canonical protocol、
 one-shot receiver、private admission 与 same-owner containment proof；
 iii-b2a-ii-a1 fixed transport/inner-role closure 也已完成并封印。a2 scope/trust
 preflight 将剩余工作封闭拆为 a2-0 untrusted decode、a2-i inherited-PGID App
-session 与 a2-ii terminal/admission join；a2-0 已完成并保持 non-admitting，
-当前 a2-i，随后为 a2-ii → iii-b2b → ii-c0b → ii-c → L3c3d → L3c4。
+session 与 a2-ii terminal/admission join；a2-0 与 a2-i 已完成并保持
+non-admitting，当前 a2-ii，随后为 iii-b2b → ii-c0b → ii-c → L3c3d → L3c4。
 ADR 0018 仍 Proposed，L3c4 独占 final admission 与剩余 full。
 L3c1b-i/ii 证据见
 [i review](../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
@@ -715,8 +715,8 @@ exact-case closure 与 final no-unresolved-P0–P2 review。ii-b4/ii-b5a0/ii-b5a
 i-a/i-b1/i-b2a/i-b2b-a/i-b2b-b/i-b3/i-c1、aggregate i-c2 与
 ii-b5b-ii-a/ii-b/ii-c/ii-d 与 ii-c0a complete/non-admitting；ii-b5b-iii-b0
 preflight frozen/non-admitting，iii-a/iii-b1/iii-b2a0/iii-b2a-i/
-iii-b2a-ii-a1/a2-0 complete/non-admitting；a2 已冻结为 a2-0/a2-i/a2-ii，
-a2-i current。i-b2a completion 见
+iii-b2a-ii-a1/a2-0/a2-i complete/non-admitting；a2 已冻结为
+a2-0/a2-i/a2-ii，a2-ii current。i-b2a completion 见
 [artifact/static reader review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2a-review.md)。
 [fixed service reader review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2b-b-review.md)
 记录 6-path/709-line scope、46 affected tests、1,341-test clean serial 与
@@ -741,8 +741,8 @@ closure。
 PGID retirement 四个 bounded checkpoints；ii-a/ii-b/ii-c/ii-d 已完成并保持
 non-admitting；ii-c0a complete/non-admitting，ii-b5b-iii-b0 preflight frozen/
 non-admitting，iii-a/iii-b1/iii-b2a0/iii-b2a-i/iii-b2a-ii-a1
-complete/non-admitting；a2 已冻结为 a2-0/a2-i/a2-ii，a2-0 complete/non-
-admitting，a2-i current。
+complete/non-admitting；a2 已冻结为 a2-0/a2-i/a2-ii，a2-0/a2-i
+complete/non-admitting，a2-ii current。
 ii-a completion 见
 [review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-a-review.md)，ii-b
 completion 见
@@ -789,7 +789,11 @@ gates、Debug/Release builds、immutable seal 与 no-unresolved-P0–P2 review�
 保持 non-admitting；
 [a2-0 review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-0-review.md)
 记录 8-path/703-line self-contained untrusted decode、1,487-test/78-suite
-serial 与 no-unresolved-P0–P2 review；a2-i 接续 inherited-PGID App session。
+serial 与 no-unresolved-P0–P2 review；
+[a2-i review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-i-review.md)
+记录 10-path/1,965-line inherited-PGID App session、1,500-test/78-suite serial、
+four Mach-O projections、complete contract replay 与 final no-unresolved-
+P0–P2 review；a2-ii 接续 terminal/admission join。
 生产 Deep Dive 继续 unavailable，直到 Task 44 final admission。
 
 跨 Epic 的阶段依赖、no-go 分支和交付顺序由 [Delivery Roadmap](../plans/roadmap.md) 管理；新 active plan 不得另起一套宏观路线。
@@ -953,9 +957,9 @@ legacy-owner closure；i-c1 与 aggregate i-c2 已完成并保持 non-admitting�
 ii-b5b-ii-a fixed FD-0 capsule intake、ii-b5b-ii-b independent Darwin App
 identity observation、ii-b5b-ii-c fixed FD-7 session 与 ii-b5b-ii-d exact
 owned-PGID retirement 与 ii-c0a 已完成并保持 non-admitting；ii-b5b-iii-b0
-preflight 已冻结，iii-a/iii-b1/iii-b2a0/iii-b2a-i/iii-b2a-ii-a1/a2-0 已完成并保持
-non-admitting；a2 已冻结为 a2-0/a2-i/a2-ii，当前 frontier 为 a2-i，之后为
-a2-ii、iii-b2b、
+preflight 已冻结，iii-a/iii-b1/iii-b2a0/iii-b2a-i/iii-b2a-ii-a1/a2-0/a2-i
+已完成并保持 non-admitting；a2 已冻结为 a2-0/a2-i/a2-ii，当前 frontier 为
+a2-ii，之后为 iii-b2b、
 ii-c0b、ii-c、L3c3d、L3c4。
 已完成部分均为
 non-admitting prerequisite，
