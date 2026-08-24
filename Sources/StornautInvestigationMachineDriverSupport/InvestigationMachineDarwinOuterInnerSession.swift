@@ -2,6 +2,7 @@ import Darwin
 import Foundation
 import StornautInvestigationInstalledL2
 
+#if DEBUG
 package enum InvestigationMachineDarwinOuterInnerSessionError:
     Error, Sendable, Equatable
 {
@@ -63,7 +64,7 @@ struct InvestigationMachineDarwinOuterInnerSpawnRequest:
     let flags: Int16
 }
 
-struct InvestigationMachineDarwinStandardErrorObservation:
+package struct InvestigationMachineDarwinStandardErrorObservation:
     Sendable, Equatable
 {
     let deviceID: UInt64
@@ -72,6 +73,176 @@ struct InvestigationMachineDarwinStandardErrorObservation:
     let statusFlags: Int32
     let isTTY: Bool
     let foregroundProcessGroup: Int32?
+}
+
+struct InvestigationMachineDarwinInnerRoleSystemError:
+    Error, Sendable, Equatable
+{
+    let errno: Int32
+}
+
+struct InvestigationMachineDarwinDescriptorNodeObservation:
+    Sendable, Equatable, Hashable
+{
+    let deviceID: UInt64
+    let inode: UInt64
+    let fileType: mode_t
+}
+
+struct InvestigationMachineDarwinSocketEndpointObservation:
+    Sendable, Equatable
+{
+    let localFamily: sa_family_t
+    let peerFamily: sa_family_t
+}
+
+struct InvestigationMachineDarwinInnerRoleSystem: Sendable {
+    let argumentCount: @Sendable () -> Int32
+    let currentProcessID: @Sendable () -> UInt32
+    let parentProcessID: @Sendable () -> UInt32
+    let currentProcessGroup: @Sendable () -> Int32
+    let descriptorFlags: @Sendable (Int32)
+        -> Result<Int32, InvestigationMachineDarwinInnerRoleSystemError>
+    let descriptorStatusFlags: @Sendable (Int32)
+        -> Result<Int32, InvestigationMachineDarwinInnerRoleSystemError>
+    let noSigpipe: @Sendable (Int32) -> Int32
+    let socketType: @Sendable (Int32)
+        -> Result<Int32, InvestigationMachineDarwinInnerRoleSystemError>
+    let socketEndpoints: @Sendable (Int32)
+        -> Result<
+            InvestigationMachineDarwinSocketEndpointObservation,
+            InvestigationMachineDarwinInnerRoleSystemError
+        >
+    let descriptorNode: @Sendable (Int32)
+        -> Result<
+            InvestigationMachineDarwinDescriptorNodeObservation,
+            InvestigationMachineDarwinInnerRoleSystemError
+        >
+    let standardErrorObservation:
+        @Sendable () throws -> InvestigationMachineDarwinStandardErrorObservation
+
+    static let system = Self(
+        argumentCount: { Int32(CommandLine.argc) },
+        currentProcessID: { UInt32(getpid()) },
+        parentProcessID: { UInt32(getppid()) },
+        currentProcessGroup: Darwin.getpgrp,
+        descriptorFlags: innerRoleDescriptorFlags,
+        descriptorStatusFlags: innerRoleDescriptorStatusFlags,
+        noSigpipe: { fcntl($0, F_GETNOSIGPIPE) },
+        socketType: innerRoleSocketType,
+        socketEndpoints: innerRoleSocketEndpoints,
+        descriptorNode: innerRoleDescriptorNode,
+        standardErrorObservation: outerInnerStandardErrorObservation
+    )
+}
+
+package struct InvestigationMachineDarwinInnerRoleObservation:
+    Sendable, Equatable
+{
+    package let driverChildIdentity:
+        InvestigationMachineDarwinDriverChildIdentity
+    package let standardError: InvestigationMachineDarwinStandardErrorObservation
+}
+
+package struct InvestigationMachineDarwinInnerRoleValidator: Sendable {
+    private let observer: any InvestigationMachineDarwinDriverChildObserving
+    private let system: InvestigationMachineDarwinInnerRoleSystem
+
+    package init() {
+        observer = InvestigationMachineDarwinDriverChildObserver()
+        system = .system
+    }
+
+    init(
+        observer: any InvestigationMachineDarwinDriverChildObserving,
+        system: InvestigationMachineDarwinInnerRoleSystem
+    ) {
+        self.observer = observer
+        self.system = system
+    }
+
+    package func validate() throws
+        -> InvestigationMachineDarwinInnerRoleObservation
+    {
+        let processID = system.currentProcessID()
+        let parentProcessID = system.parentProcessID()
+        let processGroupID = system.currentProcessGroup()
+        guard
+            system.argumentCount() == 1, processID > 1,
+            parentProcessID > 1, processGroupID > 1,
+            UInt32(processGroupID) == processID
+        else { throw sessionInvalid() }
+
+        let initialStandardError = try innerRoleStandardError(system)
+        guard validInnerStandardError(initialStandardError) else {
+            throw sessionInvalid()
+        }
+        for descriptor in Int32(0)...Int32(9) {
+            let result = system.descriptorFlags(descriptor)
+            if descriptor == STDERR_FILENO || descriptor == 8
+                || descriptor == 9
+            {
+                guard case .success = result else { throw sessionInvalid() }
+            } else {
+                guard case let .failure(error) = result, error.errno == EBADF
+                else { throw sessionInvalid() }
+            }
+        }
+        guard
+            try innerRoleDescriptor(system, STDERR_FILENO) & FD_CLOEXEC == 0,
+            try innerRoleDescriptor(system, 8) & FD_CLOEXEC == 0,
+            try innerRoleDescriptor(system, 9) & FD_CLOEXEC == 0,
+            try innerRoleStatus(system, STDERR_FILENO) & O_ACCMODE
+                == initialStandardError.statusFlags & O_ACCMODE,
+            try innerRoleStatus(system, 8) & O_ACCMODE == O_RDWR,
+            try innerRoleStatus(system, 9) & O_ACCMODE == O_WRONLY,
+            try innerRoleSocket(system, 8) == SOCK_STREAM,
+            try innerRoleSocketEndpoints(system, 8) == .init(
+                localFamily: sa_family_t(AF_UNIX),
+                peerFamily: sa_family_t(AF_UNIX)
+            ),
+            system.noSigpipe(8) == 1, system.noSigpipe(9) == 1
+        else { throw sessionInvalid() }
+        let descriptorNodes = try [
+            innerRoleNode(system, STDERR_FILENO),
+            innerRoleNode(system, 8),
+            innerRoleNode(system, 9),
+        ]
+        guard
+            descriptorNodes[0].deviceID == initialStandardError.deviceID,
+            descriptorNodes[0].inode == initialStandardError.inode,
+            descriptorNodes[0].fileType
+                == initialStandardError.mode & mode_t(S_IFMT),
+            descriptorNodes[1].fileType == mode_t(S_IFSOCK),
+            descriptorNodes[2].fileType == mode_t(S_IFIFO),
+            Set(descriptorNodes).count == descriptorNodes.count
+        else { throw sessionInvalid() }
+
+        let identity: InvestigationMachineDarwinDriverChildIdentity
+        do {
+            identity = try observer.observe(
+                processID: processID, expectedParentProcessID: parentProcessID
+            )
+        } catch {
+            throw InvestigationMachineDarwinOuterInnerSessionError
+                .identityInvalid
+        }
+        guard
+            identity.processID == processID,
+            identity.parentProcessID == parentProcessID,
+            identity.processGroupID == processID,
+            identity.effectiveUserID == 0
+        else { throw sessionInvalid() }
+        let finalStandardError = try innerRoleStandardError(system)
+        guard
+            initialStandardError == finalStandardError,
+            validInnerStandardError(finalStandardError)
+        else { throw sessionInvalid() }
+        return .init(
+            driverChildIdentity: identity,
+            standardError: finalStandardError
+        )
+    }
 }
 
 struct InvestigationMachineDarwinBoundedMessageSystem: Sendable {
@@ -562,11 +733,7 @@ package actor InvestigationMachineDarwinOuterInnerSessionFactory {
     private static func validStandardError(
         _ observation: InvestigationMachineDarwinStandardErrorObservation
     ) -> Bool {
-        let access = observation.statusFlags & O_ACCMODE
-        return observation.deviceID > 0 && observation.inode > 0
-            && (access == O_WRONLY || access == O_RDWR)
-            && (!observation.isTTY
-                || (observation.foregroundProcessGroup ?? 0) > 1)
+        validInnerStandardError(observation)
     }
 }
 
@@ -1272,6 +1439,147 @@ private func outerInnerDescriptorStatusFlags(
     return value
 }
 
+private func innerRoleDescriptorFlags(
+    _ descriptor: Int32
+) -> Result<Int32, InvestigationMachineDarwinInnerRoleSystemError> {
+    errno = 0
+    let value = fcntl(descriptor, F_GETFD)
+    guard value >= 0 else {
+        return .failure(.init(errno: errno == 0 ? EIO : errno))
+    }
+    return .success(value)
+}
+
+private func innerRoleDescriptorStatusFlags(
+    _ descriptor: Int32
+) -> Result<Int32, InvestigationMachineDarwinInnerRoleSystemError> {
+    errno = 0
+    let value = fcntl(descriptor, F_GETFL)
+    guard value >= 0 else {
+        return .failure(.init(errno: errno == 0 ? EIO : errno))
+    }
+    return .success(value)
+}
+
+private func innerRoleSocketType(
+    _ descriptor: Int32
+) -> Result<Int32, InvestigationMachineDarwinInnerRoleSystemError> {
+    do { return .success(try outerInnerSocketType(descriptor)) }
+    catch { return .failure(.init(errno: errno == 0 ? EIO : errno)) }
+}
+
+private func innerRoleStatus(
+    _ system: InvestigationMachineDarwinInnerRoleSystem, _ descriptor: Int32
+) throws -> Int32 {
+    do { return try system.descriptorStatusFlags(descriptor).get() }
+    catch { throw sessionInvalid() }
+}
+
+private func innerRoleDescriptor(
+    _ system: InvestigationMachineDarwinInnerRoleSystem, _ descriptor: Int32
+) throws -> Int32 {
+    do { return try system.descriptorFlags(descriptor).get() }
+    catch { throw sessionInvalid() }
+}
+
+private func innerRoleSocket(
+    _ system: InvestigationMachineDarwinInnerRoleSystem, _ descriptor: Int32
+) throws -> Int32 {
+    do { return try system.socketType(descriptor).get() }
+    catch { throw sessionInvalid() }
+}
+
+private func innerRoleSocketEndpoints(
+    _ system: InvestigationMachineDarwinInnerRoleSystem, _ descriptor: Int32
+) throws -> InvestigationMachineDarwinSocketEndpointObservation {
+    do { return try system.socketEndpoints(descriptor).get() }
+    catch { throw sessionInvalid() }
+}
+
+private func innerRoleNode(
+    _ system: InvestigationMachineDarwinInnerRoleSystem, _ descriptor: Int32
+) throws -> InvestigationMachineDarwinDescriptorNodeObservation {
+    do { return try system.descriptorNode(descriptor).get() }
+    catch { throw sessionInvalid() }
+}
+
+private func innerRoleStandardError(
+    _ system: InvestigationMachineDarwinInnerRoleSystem
+) throws -> InvestigationMachineDarwinStandardErrorObservation {
+    do { return try system.standardErrorObservation() }
+    catch { throw sessionInvalid() }
+}
+
+private func innerRoleDescriptorNode(
+    _ descriptor: Int32
+) -> Result<
+    InvestigationMachineDarwinDescriptorNodeObservation,
+    InvestigationMachineDarwinInnerRoleSystemError
+> {
+    errno = 0
+    var status = stat()
+    guard fstat(descriptor, &status) == 0 else {
+        return .failure(.init(errno: errno == 0 ? EIO : errno))
+    }
+    return .success(.init(
+        deviceID: UInt64(bitPattern: Int64(status.st_dev)),
+        inode: UInt64(status.st_ino),
+        fileType: status.st_mode & mode_t(S_IFMT)
+    ))
+}
+
+private func innerRoleSocketEndpoints(
+    _ descriptor: Int32
+) -> Result<
+    InvestigationMachineDarwinSocketEndpointObservation,
+    InvestigationMachineDarwinInnerRoleSystemError
+> {
+    func family(
+        _ operation: (Int32, UnsafeMutablePointer<sockaddr>,
+            UnsafeMutablePointer<socklen_t>) -> Int32
+    ) -> Result<sa_family_t, InvestigationMachineDarwinInnerRoleSystemError> {
+        var address = sockaddr_storage()
+        var length = socklen_t(MemoryLayout<sockaddr_storage>.size)
+        errno = 0
+        let status = withUnsafeMutablePointer(to: &address) { pointer in
+            pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                operation(descriptor, $0, &length)
+            }
+        }
+        guard
+            status == 0,
+            length >= socklen_t(MemoryLayout<sockaddr>.size),
+            length <= socklen_t(MemoryLayout<sockaddr_storage>.size)
+        else {
+            return .failure(.init(errno: errno == 0 ? EIO : errno))
+        }
+        return .success(address.ss_family)
+    }
+    let localFamily: sa_family_t
+    switch family(Darwin.getsockname) {
+    case let .success(value): localFamily = value
+    case let .failure(error): return .failure(error)
+    }
+    switch family(Darwin.getpeername) {
+    case let .success(peerFamily):
+        return .success(.init(
+            localFamily: localFamily, peerFamily: peerFamily
+        ))
+    case let .failure(error):
+        return .failure(error)
+    }
+}
+
+private func validInnerStandardError(
+    _ observation: InvestigationMachineDarwinStandardErrorObservation
+) -> Bool {
+    let access = observation.statusFlags & O_ACCMODE
+    return observation.inode > 0
+        && (access == O_WRONLY || access == O_RDWR)
+        && (!observation.isTTY
+            || (observation.foregroundProcessGroup ?? 0) > 1)
+}
+
 private func outerInnerSocketType(_ descriptor: Int32) throws -> Int32 {
     var value: Int32 = 0
     var length = socklen_t(MemoryLayout<Int32>.size)
@@ -1303,7 +1611,8 @@ private func outerInnerStandardErrorObservation() throws
         foreground = nil
     }
     return .init(
-        deviceID: UInt64(status.st_dev), inode: UInt64(status.st_ino),
+        deviceID: UInt64(bitPattern: Int64(status.st_dev)),
+        inode: UInt64(status.st_ino),
         mode: status.st_mode, statusFlags: flags, isTTY: tty,
         foregroundProcessGroup: foreground
     )
@@ -1381,3 +1690,4 @@ private func sessionConsumed()
 {
     .alreadyConsumed
 }
+#endif

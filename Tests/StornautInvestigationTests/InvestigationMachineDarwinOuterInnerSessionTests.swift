@@ -138,6 +138,28 @@ struct InvestigationMachineDarwinOuterInnerSessionTests {
         }
     }
 
+    @Test(arguments: InnerRoleMutation.allCases)
+    fileprivate func innerRoleRequiresExactProcessAndFixedDescriptorProvenance(
+        _ mutation: InnerRoleMutation
+    ) throws {
+        let fixture = InnerRoleFixture(mutation: mutation)
+        let validator = InvestigationMachineDarwinInnerRoleValidator(
+            observer: fixture.observer, system: fixture.system()
+        )
+        if mutation == .valid {
+            let observed = try validator.validate()
+            #expect(observed.driverChildIdentity == fixture.identity)
+            #expect(observed.standardError == fixture.standardError)
+            #expect(!(type(of: observed) is any Codable.Type))
+        } else {
+            #expect(
+                throws: InvestigationMachineDarwinOuterInnerSessionError.self
+            ) {
+                _ = try validator.validate()
+            }
+        }
+    }
+
     @Test
     func boundedControlTransportHandlesFragmentsAndRejectsInvalidLengths() async throws {
         let payload = Data([0x11, 0x22, 0x33])
@@ -236,6 +258,21 @@ struct InvestigationMachineDarwinOuterInnerSessionTests {
             at: fixture.deletingLastPathComponent()
         ) }
         let descriptors = try physicalDescriptorSet()
+        let productionNodes = InvestigationMachineDarwinInnerRoleSystem.system
+        let controlNode = try productionNodes.descriptorNode(
+            descriptors.outerControlDescriptor
+        ).get()
+        let resultNode = try productionNodes.descriptorNode(
+            descriptors.outerResultDescriptor
+        ).get()
+        let controlEndpoints = try productionNodes.socketEndpoints(
+            descriptors.outerControlDescriptor
+        ).get()
+        #expect(controlNode.fileType == mode_t(S_IFSOCK))
+        #expect(resultNode.fileType == mode_t(S_IFIFO))
+        #expect(controlNode != resultNode)
+        #expect(controlEndpoints.localFamily == sa_family_t(AF_UNIX))
+        #expect(controlEndpoints.peerFamily == sa_family_t(AF_UNIX))
         var openDescriptors = Set(descriptors.allDescriptors)
         var childPID: Int32 = -1
         defer {
@@ -357,6 +394,221 @@ private enum DriverChildObservationMutation: CaseIterable {
     case snapshotAuditSession, zeroStartTime, invalidStartMicroseconds
     case zeroProcessIDVersion, zeroAuditSession, invalidAuditToken
     case auditUserID, supplementaryGroups
+}
+
+private enum InnerRoleMutation: CaseIterable {
+    case valid, argumentCount, processID, parentProcessID, processGroupID
+    case identity, fd0Open, fd1Open, fd7Open, fd2Closed
+    case fd2CloseOnExec, fd8CloseOnExec, fd9CloseOnExec
+    case fd2ReadOnly, fd8Closed, fd8NotDuplex, fd8NotSocket
+    case fd8SocketEndpointsUnavailable, fd8NotUnix, fd8NotConnected
+    case fd9Closed, fd9NotWriteOnly, noSigpipe8, noSigpipe9
+    case descriptorNodeUnavailable, fd2NodeMismatch, fd8NotSocketNode
+    case fd8AliasesStandardError, fd9NotPipe, fd9AliasesStandardError
+    case fd9AliasesControl
+    case standardErrorUnavailable, standardErrorDrift, invalidTTYForeground
+}
+
+private final class InnerRoleFixture: @unchecked Sendable {
+    let identity: InvestigationMachineDarwinDriverChildIdentity
+    let standardError = InvestigationMachineDarwinStandardErrorObservation(
+        deviceID: 0, inode: 2, mode: mode_t(S_IFIFO) | 0o600,
+        statusFlags: O_WRONLY,
+        isTTY: false, foregroundProcessGroup: nil
+    )
+    let observer: RecordingDriverChildObserver
+    let systemRecorder: InnerRoleSystemRecorder
+
+    init(mutation: InnerRoleMutation) {
+        identity = try! .init(
+            processID: 42, processIDVersion: 7, parentProcessID: 21,
+            processGroupID: 42, auditSessionID: 9, effectiveUserID: 0,
+            auditTokenWords: [0, 0, 0, 0, 0, 42, 9, 7]
+        )
+        observer = RecordingDriverChildObserver(
+            result: mutation == .identity
+                ? .failure(.identityInvalid) : .success(identity)
+        )
+        systemRecorder = InnerRoleSystemRecorder(
+            mutation: mutation, standardError: standardError
+        )
+    }
+
+    func system() -> InvestigationMachineDarwinInnerRoleSystem {
+        systemRecorder.system()
+    }
+}
+
+private final class InnerRoleSystemRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private let mutation: InnerRoleMutation
+    private let expectedStandardError:
+        InvestigationMachineDarwinStandardErrorObservation
+    private var standardErrorReads = 0
+
+    init(
+        mutation: InnerRoleMutation,
+        standardError: InvestigationMachineDarwinStandardErrorObservation
+    ) {
+        self.mutation = mutation
+        expectedStandardError = standardError
+    }
+
+    func system() -> InvestigationMachineDarwinInnerRoleSystem {
+        .init(
+            argumentCount: { self.mutation == .argumentCount ? 2 : 1 },
+            currentProcessID: { self.mutation == .processID ? 43 : 42 },
+            parentProcessID: {
+                self.mutation == .parentProcessID ? 22 : 21
+            },
+            currentProcessGroup: {
+                self.mutation == .processGroupID ? 43 : 42
+            },
+            descriptorFlags: { descriptor in
+                let open: Bool
+                switch descriptor {
+                case 0: open = self.mutation == .fd0Open
+                case 1: open = self.mutation == .fd1Open
+                case 2: open = self.mutation != .fd2Closed
+                case 7: open = self.mutation == .fd7Open
+                case 8: open = self.mutation != .fd8Closed
+                case 9: open = self.mutation != .fd9Closed
+                default: open = false
+                }
+                guard open else { return .failure(.init(errno: EBADF)) }
+                if descriptor == 2, self.mutation == .fd2CloseOnExec {
+                    return .success(FD_CLOEXEC)
+                }
+                if descriptor == 8, self.mutation == .fd8CloseOnExec {
+                    return .success(FD_CLOEXEC)
+                }
+                if descriptor == 9, self.mutation == .fd9CloseOnExec {
+                    return .success(FD_CLOEXEC)
+                }
+                return .success(0)
+            },
+            descriptorStatusFlags: { descriptor in
+                switch descriptor {
+                case 2:
+                    return .success(
+                        self.mutation == .fd2ReadOnly ? O_RDONLY : O_WRONLY
+                    )
+                case 8:
+                    return .success(
+                        self.mutation == .fd8NotDuplex ? O_RDONLY : O_RDWR
+                    )
+                case 9:
+                    return .success(
+                        self.mutation == .fd9NotWriteOnly ? O_RDWR : O_WRONLY
+                    )
+                default:
+                    return .failure(.init(errno: EBADF))
+                }
+            },
+            noSigpipe: { descriptor in
+                if descriptor == 8, self.mutation == .noSigpipe8 { return 0 }
+                if descriptor == 9, self.mutation == .noSigpipe9 { return 0 }
+                return 1
+            },
+            socketType: { descriptor in
+                guard descriptor == 8 else {
+                    return .failure(.init(errno: ENOTSOCK))
+                }
+                return .success(
+                    self.mutation == .fd8NotSocket ? SOCK_DGRAM : SOCK_STREAM
+                )
+            },
+            socketEndpoints: { descriptor in
+                guard descriptor == 8,
+                    self.mutation != .fd8SocketEndpointsUnavailable,
+                    self.mutation != .fd8NotConnected
+                else { return .failure(.init(errno: ENOTCONN)) }
+                return .success(.init(
+                    localFamily: self.mutation == .fd8NotUnix
+                        ? sa_family_t(AF_INET) : sa_family_t(AF_UNIX),
+                    peerFamily: sa_family_t(AF_UNIX)
+                ))
+            },
+            descriptorNode: { descriptor in
+                if self.mutation == .descriptorNodeUnavailable, descriptor == 8 {
+                    return .failure(.init(errno: EIO))
+                }
+                let standardError =
+                    InvestigationMachineDarwinDescriptorNodeObservation(
+                        deviceID: 0, inode: 2, fileType: mode_t(S_IFIFO)
+                    )
+                switch descriptor {
+                case 2:
+                    return .success(
+                        self.mutation == .fd2NodeMismatch
+                            ? .init(
+                                deviceID: 1, inode: 3,
+                                fileType: mode_t(S_IFIFO)
+                            )
+                            : standardError
+                    )
+                case 8:
+                    if self.mutation == .fd8AliasesStandardError {
+                        return .success(standardError)
+                    }
+                    return .success(.init(
+                        deviceID: 2, inode: 8,
+                        fileType: self.mutation == .fd8NotSocketNode
+                            ? mode_t(S_IFIFO) : mode_t(S_IFSOCK)
+                    ))
+                case 9:
+                    if self.mutation == .fd9AliasesStandardError {
+                        return .success(standardError)
+                    }
+                    if self.mutation == .fd9AliasesControl {
+                        return .success(.init(
+                            deviceID: 2, inode: 8, fileType: mode_t(S_IFSOCK)
+                        ))
+                    }
+                    return .success(.init(
+                        deviceID: 3, inode: 9,
+                        fileType: self.mutation == .fd9NotPipe
+                            ? mode_t(S_IFREG) : mode_t(S_IFIFO)
+                    ))
+                default:
+                    return .failure(.init(errno: EBADF))
+                }
+            },
+            standardErrorObservation: {
+                try self.lock.withLock {
+                    self.standardErrorReads += 1
+                    if self.mutation == .standardErrorUnavailable {
+                        throw OuterInnerSessionTestFailure.io
+                    }
+                    var value = self.expectedStandardError
+                    if self.mutation == .standardErrorDrift,
+                        self.standardErrorReads == 2
+                    {
+                        value = .init(
+                            deviceID: value.deviceID, inode: value.inode + 1,
+                            mode: value.mode, statusFlags: value.statusFlags,
+                            isTTY: value.isTTY,
+                            foregroundProcessGroup: value.foregroundProcessGroup
+                        )
+                    }
+                    if self.mutation == .invalidTTYForeground {
+                        value = .init(
+                            deviceID: value.deviceID, inode: value.inode,
+                            mode: value.mode, statusFlags: value.statusFlags,
+                            isTTY: true, foregroundProcessGroup: nil
+                        )
+                    }
+                    return value
+                }
+            }
+        )
+    }
+}
+
+private struct InvestigationMachineDarwinInnerRoleSystemError:
+    Error, Sendable, Equatable
+{
+    let errno: Int32
 }
 
 private final class DriverChildObservationFixture: @unchecked Sendable {
@@ -796,6 +1048,7 @@ private func compileOuterInnerPhysicalChildFixture() throws -> URL {
         #include <stdlib.h>
         #include <string.h>
         #include <sys/socket.h>
+        #include <sys/stat.h>
         #include <unistd.h>
         static int read_exact(int fd, void *buffer, size_t count) {
           size_t offset = 0;
@@ -818,12 +1071,30 @@ private func compileOuterInnerPhysicalChildFixture() throws -> URL {
           if (argc != 1 || argv[0] == NULL || envp[0] != NULL) return 41;
           if (getppid() <= 1 || getpgrp() != getpid()) return 42;
           int type = 0; socklen_t length = sizeof(type);
-          if (fcntl(2, F_GETFD) < 0) return 43;
+          int stderr_flags = fcntl(2, F_GETFL);
+          if (stderr_flags < 0 ||
+              ((stderr_flags & O_ACCMODE) != O_WRONLY &&
+               (stderr_flags & O_ACCMODE) != O_RDWR)) return 43;
+          if ((fcntl(2, F_GETFD) & FD_CLOEXEC) != 0 ||
+              (fcntl(8, F_GETFD) & FD_CLOEXEC) != 0 ||
+              (fcntl(9, F_GETFD) & FD_CLOEXEC) != 0) return 56;
           if (getsockopt(8, SOL_SOCKET, SO_TYPE, &type, &length) != 0 ||
-              type != SOCK_STREAM) return 44;
+              type != SOCK_STREAM ||
+              (fcntl(8, F_GETFL) & O_ACCMODE) != O_RDWR) return 44;
           if ((fcntl(9, F_GETFL) & O_ACCMODE) != O_WRONLY) return 45;
           if (fcntl(8, F_GETNOSIGPIPE) != 1 || fcntl(9, F_GETNOSIGPIPE) != 1)
             return 52;
+          struct stat stderr_node, control_node, result_node;
+          if (fstat(2, &stderr_node) != 0 || fstat(8, &control_node) != 0 ||
+              fstat(9, &result_node) != 0) return 53;
+          if ((control_node.st_mode & S_IFMT) != S_IFSOCK ||
+              (result_node.st_mode & S_IFMT) != S_IFIFO) return 54;
+          if ((stderr_node.st_dev == control_node.st_dev &&
+               stderr_node.st_ino == control_node.st_ino) ||
+              (stderr_node.st_dev == result_node.st_dev &&
+               stderr_node.st_ino == result_node.st_ino) ||
+              (control_node.st_dev == result_node.st_dev &&
+               control_node.st_ino == result_node.st_ino)) return 55;
           for (int fd = 0; fd < 32; fd++) {
             if (fd == 2 || fd == 8 || fd == 9) continue;
             errno = 0;

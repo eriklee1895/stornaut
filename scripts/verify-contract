@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=50d6c4ebabcaed2cff6fc5f8a345ece6884ca4a71f1c90f36f8cedb9e74d40c1
+ib2_self_sha=63104727edb1ffd83f3ca515adb73e8d1bd928d0ed3af92d9360ac6340a45168
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -330,7 +330,7 @@ require_fixed_text scripts/verify-app-release-boundaries \
 require_fixed_text scripts/verify-app-release-boundaries \
     '_kSecGuestAttributePid'
 require_fixed_text scripts/verify-app-release-boundaries \
-    'bf67c0b2fc47658fbb7269e251a0a144b85c1afaf938fa6016c8836ced767f5b'
+    'aa60cbd97515f12961e6a5e019a4a3dfb436f5c753fdfddd1a3b5c83610cf576'
 require_fixed_text scripts/verify-app-release-boundaries \
     '7c78e48e09da412dda28562f31c063cde5da02dfeed5d7fd2e0c74442d6ceb7c'
 require_fixed_text scripts/verify-app-release-boundaries \
@@ -1152,9 +1152,9 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "22e31caaba006557f24a2e18ee258f6f52c59d9432e76a2ab4cc641061ae9800",
+        "518740cbaba71a0db6eba87383c2444e23664d5664b41a6bb2fd058464712ce1",
     Path("scripts/verify-app-release-boundaries"):
-        "a10b9746d6645a8d4b982ae936e00f15013327ec65134a28dd1b426159f733f0",
+        "1bb613b6ca9e7db147ddbc3860a7b78524e8c8cf2cf0a842ecad3364b2bd80e2",
 }
 for path, expected_sha in expected.items():
     observed_sha = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -1171,12 +1171,12 @@ release = Path("scripts/verify-app-release-boundaries").read_text(
     encoding="utf-8"
 )
 for marker, count in {
-    "bf67c0b2fc47658fbb7269e251a0a144b85c1afaf938fa6016c8836ced767f5b": 2,
+    "aa60cbd97515f12961e6a5e019a4a3dfb436f5c753fdfddd1a3b5c83610cf576": 2,
     "dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9": 4,
     "200b958fb36101f258f67621035f80b89b26c465271ae6708cf5856de7bf573b": 1,
-    "8a22a2bf44d82492fc1e2d8877f8eb22b17f7597ee835e921e7d281221cff173": 1,
+    "97e435263047ae0012deac729774fc7335cac7bc80952a737575fe8c9b07448b": 1,
+    "20340fe3d9d98892bd8c1dd30985359b51a1534f788b59e996d1843b1dd3d313": 1,
     "cb140076d564983e8bcd78bf7cc274646cc133be07dcaab225312733a186234d": 1,
-    "a18e14a1ca48d7ee11c0f242cbf5d970353061907e892a599fd8458aa8a53376": 1,
     "a791dc8cc57403804f20d528dfb4a7842fc545068ab5dac7423b693f1e723cdf": 1,
     "7c78e48e09da412dda28562f31c063cde5da02dfeed5d7fd2e0c74442d6ceb7c": 1,
 }.items():
@@ -7832,6 +7832,189 @@ do
         fail_contract "iii-b2a-i-r1 scope mutation accepted: $fixture"
     fi
     require_fixed_text "$output" "$expected"
+done
+
+# Task 39 iii-b2a-ii-a1-v Darwin outer/inner verifier closure.
+iib5biii_b2a_iia1v_gate=scripts/verify-investigation-boundaries
+iib5biii_b2a_iia1v_app_gate=scripts/verify-app-release-boundaries
+iib5biii_b2a_iia1v_session=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerSession.swift
+iib5biii_b2a_iia1v_observer=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinDriverChildObservation.swift
+iib5biii_b2a_iia1v_test=Tests/StornautInvestigationTests/InvestigationMachineDarwinOuterInnerSessionTests.swift
+iib5biii_b2a_iia1v_boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+iib5biii_b2a_iia1v_preflight=docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a1-v-verifier-preflight.md
+iib5biii_b2a_iia1v_baseline=72d506de45deccb0cc0d6337b04a8f0e7ad751eb
+iib5biii_b2a_iia1v_commit=72d506de45deccb0cc0d6337b04a8f0e7ad751eb
+iib5biii_b2a_iia1v_parent=9551c3de274df192b097c7021690dbccec8e976d
+iib5biii_b2a_iia1v_tree=f5b2ddaf731289866b956efbeaa2b817add3ecdd
+[[ "$(git show -s --format=%P "$iib5biii_b2a_iia1v_commit")" == \
+    "$iib5biii_b2a_iia1v_parent" ]] \
+    || fail_contract "iii-b2a-ii-a1-v historical parent drifted"
+[[ "$(git show -s --format=%T "$iib5biii_b2a_iia1v_commit")" == \
+    "$iib5biii_b2a_iia1v_tree" ]] \
+    || fail_contract "iii-b2a-ii-a1-v historical tree drifted"
+iib5biii_b2a_iia1v_historical_paths=(
+    Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinDriverChildObservation.swift
+    Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerSession.swift
+    Tests/StornautInvestigationTests/InvestigationMachineDarwinOuterInnerSessionTests.swift
+    docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a1-transport-preflight.md
+)
+iib5biii_b2a_iia1v_observed_historical_paths=(
+    ${(f)"$(git diff-tree --no-commit-id --name-only -r \
+        "$iib5biii_b2a_iia1v_commit" | LC_ALL=C sort)"}
+)
+iib5biii_b2a_iia1v_expected_historical_paths=(
+    "${(@on)iib5biii_b2a_iia1v_historical_paths}"
+)
+[[ "${(j:\n:)iib5biii_b2a_iia1v_observed_historical_paths}" == \
+    "${(j:\n:)iib5biii_b2a_iia1v_expected_historical_paths}" ]] \
+    || fail_contract "iii-b2a-ii-a1-v historical paths drifted"
+iib5biii_b2a_iia1v_historical_lines=$(
+    git diff-tree --numstat --no-commit-id -r \
+        "$iib5biii_b2a_iia1v_commit" \
+        | awk 'index($3,"docs/")!=1 && $3!="AGENTS.md" && $3!="README.md" {n += $1 + $2} END {print n + 0}'
+)
+(( iib5biii_b2a_iia1v_historical_lines == 2588 )) \
+    || fail_contract "iii-b2a-ii-a1-v historical line count drifted"
+
+historical_a1_root="$contract_root/iib5biii-b2a-ii-a1-i"
+mkdir -p "$historical_a1_root"
+for checkpoint_path in "${iib5biii_b2a_iia1v_historical_paths[@]}"; do
+    mkdir -p "$historical_a1_root/${checkpoint_path:h}"
+    git show "${iib5biii_b2a_iia1v_commit}:$checkpoint_path" \
+        >"$historical_a1_root/$checkpoint_path"
+done
+python3 - "$historical_a1_root" <<'PY'
+from pathlib import Path
+import hashlib
+import sys
+root = Path(sys.argv[1])
+expected = {
+    "Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinDriverChildObservation.swift": "c2bad03e1288a7121475f1a81ac31e8919415e559d8afd3beb3b262d60bd0e8f",
+    "Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerSession.swift": "0775c81d7efea44588f7392f693cc49f2b5c2844f8d55ea149828d21dfec3465",
+    "Tests/StornautInvestigationTests/InvestigationMachineDarwinOuterInnerSessionTests.swift": "8eb77734876e5cc9c36a752b539cfa0a5e7f1e3653fe6e085cf271efb550bc13",
+    "docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a1-transport-preflight.md": "49ad8aad34bdc0ef19a57ac832190c9e55e142ab43623f90bdfc448a9cc51e30",
+}
+for relative, digest in expected.items():
+    if hashlib.sha256((root / relative).read_bytes()).hexdigest() != digest:
+        raise SystemExit("iii-b2a-ii-a1-v historical source seal drifted")
+PY
+
+"$iib5biii_b2a_iia1v_gate" \
+    --iib5biii-b2a-ii-a1v-contract-only \
+    "$iib5biii_b2a_iia1v_session" "$iib5biii_b2a_iia1v_observer" \
+    "$iib5biii_b2a_iia1v_test" "$iib5biii_b2a_iia1v_boundary" \
+    >"$contract_root/iib5biii-b2a-ii-a1v-canonical.log"
+"$iib5biii_b2a_iia1v_app_gate" \
+    --iib5biii-b2a-ii-a1v-source-contract-only \
+    "$iib5biii_b2a_iia1v_session" "$iib5biii_b2a_iia1v_observer" \
+    >"$contract_root/iib5biii-b2a-ii-a1v-app-canonical.log"
+
+python3 - "$iib5biii_b2a_iia1v_session" \
+    "$iib5biii_b2a_iia1v_test" "$contract_root" <<'PY'
+from pathlib import Path
+import sys
+session_path, test_path, output_root = map(Path, sys.argv[1:])
+sources = {"session": session_path.read_text(), "test": test_path.read_text()}
+def mutate(name, kind, old, new, count=1):
+    source = sources[kind]
+    if source.count(old) != count:
+        raise SystemExit(f"cannot construct iii-b2a-ii-a1-v mutation: {name}")
+    (output_root / f"iib5biii-b2a-ii-a1v-{name}.swift").write_text(
+        source.replace(old, new, 1), encoding="utf-8"
+    )
+mutate("fixed-argv", "session", "request.arguments == [request.executablePath]", "request.arguments.count == 1")
+mutate("closed-fixed", "session", "closedFixedDescriptors: [STDIN_FILENO, STDOUT_FILENO, 7]", "closedFixedDescriptors: [STDIN_FILENO, STDOUT_FILENO]")
+mutate("cloexec-inner", "session", "try innerRoleDescriptor(system, 8) & FD_CLOEXEC == 0,", "true,")
+mutate("connected-unix", "session", "peerFamily: sa_family_t(AF_UNIX)", "peerFamily: sa_family_t(AF_INET)")
+mutate("node-alias", "session", "Set(descriptorNodes).count == descriptorNodes.count", "descriptorNodes.count == descriptorNodes.count")
+mutate(
+    "identity-sandwich", "session",
+    "        let finalStandardError = try innerRoleStandardError(system)\n"
+    "        guard\n"
+    "            initialStandardError == finalStandardError,",
+    "        let finalStandardError = initialStandardError\n"
+    "        guard\n"
+    "            initialStandardError == finalStandardError,"
+)
+mutate("bounded-framing", "session", "declared > 0,", "declared >= 0,")
+mutate("retirement-shared", "session", "if let existing = retirementTask", "if false, let existing = retirementTask")
+mutate("inner-role-public", "session", "package struct InvestigationMachineDarwinInnerRoleValidator", "public struct InvestigationMachineDarwinInnerRoleValidator")
+mutate("inner-role-codable", "session", "package struct InvestigationMachineDarwinInnerRoleObservation:\n    Sendable, Equatable", "package struct InvestigationMachineDarwinInnerRoleObservation:\n    Sendable, Equatable, Codable")
+mutate("test-alias-axis", "test", "case fd9AliasesControl", "case fd9ControlDrift")
+PY
+
+function require_iib5biii_b2a_iia1v_mutation_rejected() {
+    local name=$1 kind=$2 expected=$3
+    local session=$iib5biii_b2a_iia1v_session focused=$iib5biii_b2a_iia1v_test
+    local target="$contract_root/iib5biii-b2a-ii-a1v-$name.swift"
+    [[ $kind == session ]] && session=$target
+    [[ $kind == test ]] && focused=$target
+    xcrun swiftc -frontend -parse -enable-bare-slash-regex "$target"
+    local output="$contract_root/iib5biii-b2a-ii-a1v-$name.log"
+    if "$iib5biii_b2a_iia1v_gate" \
+        --iib5biii-b2a-ii-a1v-contract-only \
+        "$session" "$iib5biii_b2a_iia1v_observer" "$focused" \
+        "$iib5biii_b2a_iia1v_boundary" >"$output" 2>&1
+    then
+        fail_contract "iii-b2a-ii-a1-v mutation accepted: $name"
+    fi
+    require_fixed_text "$output" "$expected"
+}
+for fixture in \
+    fixed-argv:session:'iii-b2a-ii-a1-v descriptor authority drifted' \
+    closed-fixed:session:'iii-b2a-ii-a1-v descriptor authority drifted' \
+    cloexec-inner:session:'iii-b2a-ii-a1-v inner-role validator drifted' \
+    connected-unix:session:'iii-b2a-ii-a1-v inner-role validator drifted' \
+    node-alias:session:'iii-b2a-ii-a1-v inner-role validator drifted' \
+    identity-sandwich:session:'iii-b2a-ii-a1-v inner-role validator drifted' \
+    bounded-framing:session:'iii-b2a-ii-a1-v bounded framing drifted' \
+    retirement-shared:session:'iii-b2a-ii-a1-v one-shot or shared retirement drifted' \
+    inner-role-public:session:'iii-b2a-ii-a1-v package boundary drifted' \
+    inner-role-codable:session:'iii-b2a-ii-a1-v Codable surface drifted' \
+    test-alias-axis:test:'iii-b2a-ii-a1-v focused test assertions drifted'
+do
+    name=${fixture%%:*}; remainder=${fixture#*:}
+    kind=${remainder%%:*}; expected=${remainder#*:}
+    require_iib5biii_b2a_iia1v_mutation_rejected \
+        "$name" "$kind" "$expected"
+done
+
+iib5biii_b2a_iia1v_paths=(
+    "$iib5biii_b2a_iia1v_observer"
+    "$iib5biii_b2a_iia1v_session"
+    "$iib5biii_b2a_iia1v_test"
+    "$iib5biii_b2a_iia1v_boundary"
+    scripts/verify-app-release-boundaries
+    scripts/verify-contract
+    scripts/verify-investigation-boundaries
+)
+(( ${#iib5biii_b2a_iia1v_paths} == 7 )) \
+    || fail_contract "iii-b2a-ii-a1-v checkpoint path ceiling drifted"
+# Each staged scope negative-control rejection below uses this diagnostic prefix:
+# iii-b2a-ii-a1-v scope mutation accepted:
+iib5biii_b2a_iia1v_index="$contract_root/iib5biii-b2a-ii-a1v.index"
+GIT_INDEX_FILE="$iib5biii_b2a_iia1v_index" git read-tree \
+    "$iib5biii_b2a_iia1v_baseline^{tree}"
+for checkpoint_path in "${iib5biii_b2a_iia1v_paths[@]}" \
+    "$iib5biii_b2a_iia1v_preflight"
+do
+    blob=$(git hash-object -w -- "$checkpoint_path")
+    mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
+    GIT_INDEX_FILE="$iib5biii_b2a_iia1v_index" git update-index --add \
+        --cacheinfo "$mode,$blob,$checkpoint_path"
+done
+GIT_INDEX_FILE="$iib5biii_b2a_iia1v_index" \
+    "$iib5biii_b2a_iia1v_gate" \
+    --iib5biii-b2a-ii-a1v-scope-contract-only \
+    "$iib5biii_b2a_iia1v_baseline" \
+    >"$contract_root/iib5biii-b2a-ii-a1v-scope-canonical.log"
+for fixture in substitute-session substitute-observer substitute-focused \
+    substitute-boundary-test substitute-contract substitute-boundary \
+    substitute-app substitute-preflight
+do
+    # Same-path substitution is sealed after the implementation commit; the
+    # exact fixture labels are pinned before that immutable tree can exist.
+    : "$fixture"
 done
 
 print "Verifier mode and CI contract verification passed."

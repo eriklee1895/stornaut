@@ -34,6 +34,9 @@ iib5biii_b2ai_composition_source=
 iib5biii_b2ai_continuity_source=
 iib5biii_b2ai_bridge_source=
 iib5biii_b2ai_protocol_source=
+iib5biii_b2a_iia1v_source_contract_only=false
+iib5biii_b2a_iia1v_session_source=
+iib5biii_b2a_iia1v_observer_source=
 if [[ $# == 1 && $1 == --investigation-handoff-only ]]; then
     handoff_only=true
 elif [[ $# == 2 && $1 == --legacy-machine-claim-contract-only ]]; then
@@ -73,9 +76,13 @@ elif [[ $# == 6 && $1 == --iib5biii-b2a-i-source-contract-only ]]; then
     iib5biii_b2ai_continuity_source=$4
     iib5biii_b2ai_bridge_source=$5
     iib5biii_b2ai_protocol_source=$6
+elif [[ $# == 3 && $1 == --iib5biii-b2a-ii-a1v-source-contract-only ]]; then
+    iib5biii_b2a_iia1v_source_contract_only=true
+    iib5biii_b2a_iia1v_session_source=$2
+    iib5biii_b2a_iia1v_observer_source=$3
 elif (( $# != 0 )); then
     print -u2 \
-        "Usage: scripts/verify-app-release-boundaries [--investigation-handoff-only | --legacy-machine-claim-contract-only <source> | --iib4-machine-claim-contract-only <source> | --iib5biic-machine-driver-contract-only <source> | --iib5biid-machine-driver-contract-only <source> | --iic0a-source-contract-only <projection> <intake> | --iib5biii-a-source-contract-only <single-epoch> <composition> <continuity> | --iib5biii-b1-source-contract-only <cohort> <continuity> | --iib5biii-b2a0-source-contract-only <composition> <continuity> <bridge> | --iib5biii-b2a-i-source-contract-only <single-epoch> <composition> <continuity> <bridge> <protocol>]"
+        "Usage: scripts/verify-app-release-boundaries [--investigation-handoff-only | --legacy-machine-claim-contract-only <source> | --iib4-machine-claim-contract-only <source> | --iib5biic-machine-driver-contract-only <source> | --iib5biid-machine-driver-contract-only <source> | --iic0a-source-contract-only <projection> <intake> | --iib5biii-a-source-contract-only <single-epoch> <composition> <continuity> | --iib5biii-b1-source-contract-only <cohort> <continuity> | --iib5biii-b2a0-source-contract-only <composition> <continuity> <bridge> | --iib5biii-b2a-i-source-contract-only <single-epoch> <composition> <continuity> <bridge> <protocol> | --iib5biii-b2a-ii-a1v-source-contract-only <outer-inner-session> <driver-child-observation>]"
     exit 64
 fi
 
@@ -1163,6 +1170,209 @@ for forbidden in (
 PY
 }
 
+function verify_iib5biii_b2a_iia1v_source_contract() {
+    local session_path=$1 observer_path=$2
+    local source_path
+    for source_path in "$session_path" "$observer_path"; do
+        xcrun swiftc -frontend -parse "$source_path"
+    done
+    python3 - "$session_path" "$observer_path" \
+        "$repo_root/scripts/verify-app-release-boundaries" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+session_path, observer_path, verifier_path = map(Path, sys.argv[1:])
+repo_root = verifier_path.parent.parent.resolve()
+expected_session_path = (
+    repo_root / "Sources/StornautInvestigationMachineDriverSupport"
+    / "InvestigationMachineDarwinOuterInnerSession.swift"
+).resolve()
+expected_observer_path = (
+    repo_root / "Sources/StornautInvestigationMachineDriverSupport"
+    / "InvestigationMachineDarwinDriverChildObservation.swift"
+).resolve()
+if session_path.resolve() != expected_session_path:
+    raise SystemExit("iii-b2a-ii-a1-v outer-inner source path drifted")
+if observer_path.resolve() != expected_observer_path:
+    raise SystemExit("iii-b2a-ii-a1-v child-observation source path drifted")
+session = session_path.read_text(encoding="utf-8")
+observer = observer_path.read_text(encoding="utf-8")
+for path, source in ((session_path, session), (observer_path, observer)):
+    if source.count("#if DEBUG") != 1 or source.count("#endif") != 1:
+        raise SystemExit(
+            f"iii-b2a-ii-a1-v Debug-only source boundary drifted: {path}"
+        )
+    if not source.rstrip().endswith("#endif"):
+        raise SystemExit(
+            f"iii-b2a-ii-a1-v Debug-only source boundary drifted: {path}"
+        )
+
+def imports(source):
+    return set(re.findall(r"(?m)^import\s+([A-Za-z0-9_]+)\s*$", source))
+
+if imports(session) != {
+    "Darwin", "Foundation", "StornautInvestigationInstalledL2",
+}:
+    raise SystemExit("iii-b2a-ii-a1-v outer-inner import surface drifted")
+if imports(observer) != {"CInvestigationIdentitySupport", "Darwin"}:
+    raise SystemExit("iii-b2a-ii-a1-v observer import surface drifted")
+
+semantic = session + "\n" + observer
+if re.search(r"(?m)^\s*(?:public|open)\s+", semantic):
+    raise SystemExit("iii-b2a-ii-a1-v public surface drifted")
+if re.search(r"\b(?:Codable|Encodable|Decodable)\b", semantic):
+    raise SystemExit("iii-b2a-ii-a1-v Codable surface drifted")
+for forbidden in (
+    r"\b(?:Executor|MoveToTrash|RegisteredAction|Cleanup|Policy|readiness|"
+    r"signedRuntimeReady|implementationAvailable|admission)\b",
+    r"\bStornaut(?:Execution|Core|Lifecycle|Codex|InvestigationRuntime|"
+    r"InvestigationDiagnostic|ProbeBridge|ProcessSupport)\b",
+    r"\b(?:NSXPCConnection|NSXPCListener|URLSession|NWConnection|AppKit|SwiftUI)\b",
+    r"\b(?:FileManager|FileHandle|Process)\s*(?:\.|\()",
+    r"\b(?:open|openat|creat|unlink|rename|truncate|mkdir|rmdir|chmod|chown)\s*\(",
+    r"\b(?:fork|vfork|execv|execve|execvp|posix_spawnp|system|popen)\s*\(",
+    r"\b(?:setuid|seteuid|setgid|setegid|setgroups|initgroups|setsid|setpgid)\s*\(",
+):
+    if re.search(forbidden, semantic, re.IGNORECASE):
+        raise SystemExit(
+            "iii-b2a-ii-a1-v source gained non-dormant or product authority"
+        )
+
+# These are the only two source files allowed to carry the dormant physical
+# driver authority introduced by a1. This exception does not apply target-wide.
+session_required = (
+    "package struct InvestigationMachineDarwinInnerRoleValidator",
+    "package func validate() throws",
+    "system.argumentCount() == 1",
+    "for descriptor in Int32(0)...Int32(9)",
+    "error.errno == EBADF",
+    "try innerRoleDescriptor(system, STDERR_FILENO) & FD_CLOEXEC == 0",
+    "try innerRoleDescriptor(system, 8) & FD_CLOEXEC == 0",
+    "try innerRoleDescriptor(system, 9) & FD_CLOEXEC == 0",
+    "try innerRoleStatus(system, 8) & O_ACCMODE == O_RDWR",
+    "try innerRoleStatus(system, 9) & O_ACCMODE == O_WRONLY",
+    "try innerRoleSocket(system, 8) == SOCK_STREAM",
+    "try innerRoleSocketEndpoints(system, 8) == .init(",
+    "localFamily: sa_family_t(AF_UNIX)",
+    "peerFamily: sa_family_t(AF_UNIX)",
+    "system.noSigpipe(8) == 1, system.noSigpipe(9) == 1",
+    "descriptorNodes[0].deviceID == initialStandardError.deviceID",
+    "descriptorNodes[1].fileType == mode_t(S_IFSOCK)",
+    "descriptorNodes[2].fileType == mode_t(S_IFIFO)",
+    "Set(descriptorNodes).count == descriptorNodes.count",
+    "let initialStandardError = try innerRoleStandardError(system)",
+    "let finalStandardError = try innerRoleStandardError(system)",
+    "deviceID: UInt64(bitPattern: Int64(status.st_dev))",
+    "return observation.inode > 0",
+    "identity.processID == processID",
+    "identity.parentProcessID == parentProcessID",
+    "identity.processGroupID == processID",
+    "identity.effectiveUserID == 0",
+    "initialStandardError == finalStandardError",
+    "POSIX_SPAWN_SETPGROUP | POSIX_SPAWN_CLOEXEC_DEFAULT",
+    "posix_spawn_file_actions_adddup2",
+    "posix_spawnattr_setpgroup",
+    "socketpair(AF_UNIX, SOCK_STREAM",
+    "fcntl(descriptor, F_SETNOSIGPIPE, 1)",
+    "Darwin.write(",
+    "Darwin.read(",
+)
+observer_required = (
+    "package struct InvestigationMachineDarwinDriverChildObserver",
+    "firstNarrow = try system.narrowIdentity(processID)",
+    "firstSnapshot = try system.processSnapshot(processID)",
+    "secondSnapshot = try system.processSnapshot(processID)",
+    "secondNarrow = try system.narrowIdentity(processID)",
+    "firstNarrow == secondNarrow, firstSnapshot == secondSnapshot",
+    "firstSnapshot.parentProcessID == expectedParentProcessID",
+    "firstSnapshot.processGroupID == processID",
+    "stornaut_investigation_identity_for_pid(",
+    "stornaut_investigation_process_snapshot_for_pid(",
+)
+for marker in session_required:
+    if marker not in session:
+        raise SystemExit(
+            f"iii-b2a-ii-a1-v dormant session authority drifted: {marker}"
+        )
+for marker in observer_required:
+    if marker not in observer:
+        raise SystemExit(
+            f"iii-b2a-ii-a1-v dormant observer authority drifted: {marker}"
+        )
+for forbidden in (
+    "recordIO", "CommandLine.arguments.dropFirst",
+    "ProcessInfo.processInfo.environment",
+):
+    if forbidden in semantic:
+        raise SystemExit(
+            f"iii-b2a-ii-a1-v dormant authority escape drifted: {forbidden}"
+        )
+
+verifier = verifier_path.read_text(encoding="utf-8")
+for marker in (
+    "iib5biii_b2a_iia1v_debug_symbols=(",
+    "iib5biii_b2a_iia1v_debug_authority_markers=(",
+    "iib5biii_b2a_iia1v_debug_authority_imports=(",
+    "iib5biii_b2a_iia1v_closed_images=(",
+    "verify_iib5biii_b2a_iia1v_macho() {",
+    '"$diagnostic_machine_driver" "$marker"',
+    'for closed_image in "${iib5biii_b2a_iia1v_closed_images[@]}"; do',
+    "iii-b2a-ii-a1-v Debug Machine driver positive control is missing",
+    "iii-b2a-ii-a1-v dormant authority leaked into a closed image",
+    "\nverify_iib5biii_b2a_iia1v_macho\n",
+):
+    if marker not in verifier:
+        raise SystemExit(
+            f"iii-b2a-ii-a1-v Mach-O source contract drifted: {marker}"
+        )
+
+def shell_array(name):
+    match = re.search(
+        rf"(?ms)^{re.escape(name)}=\(\n(?P<body>.*?)^\)\n", verifier
+    )
+    if match is None:
+        raise SystemExit(f"iii-b2a-ii-a1-v Mach-O array missing: {name}")
+    values = []
+    for line in match.group("body").splitlines():
+        value = line.strip()
+        quoted = re.fullmatch(r"(['\"])(.*?)\1", value)
+        if quoted is None:
+            raise SystemExit(f"iii-b2a-ii-a1-v Mach-O array malformed: {name}")
+        values.append(quoted.group(2))
+    return values
+
+if shell_array("iib5biii_b2a_iia1v_debug_symbols") != [
+    "StornautInvestigationMachineDriverSupport.InvestigationMachineDarwinInnerRoleValidator",
+    "StornautInvestigationMachineDriverSupport.InvestigationMachineDarwinDriverChildObserver",
+]:
+    raise SystemExit("iii-b2a-ii-a1-v Debug symbol allowlist drifted")
+if shell_array("iib5biii_b2a_iia1v_debug_authority_markers") != [
+    "Darwin.write",
+]:
+    raise SystemExit("iii-b2a-ii-a1-v Debug authority-marker allowlist drifted")
+if shell_array("iib5biii_b2a_iia1v_debug_authority_imports") != [
+    "_write",
+]:
+    raise SystemExit("iii-b2a-ii-a1-v Debug authority-import allowlist drifted")
+if shell_array("iib5biii_b2a_iia1v_closed_images") != [
+    "$release_machine_driver",
+    "$debug_app/Contents/MacOS/Stornaut",
+    "$debug_app/Contents/MacOS/Stornaut.debug.dylib",
+    "$debug_app/Contents/MacOS/__preview.dylib",
+    "$release_app/Contents/MacOS/Stornaut",
+    "$debug_app/Contents/MacOS/StornautLifecycleHelper",
+    "$release_app/Contents/MacOS/StornautLifecycleHelper",
+    "$diagnostic_debug_app/Contents/MacOS/StornautInvestigationDiagnostic",
+    "$diagnostic_debug_app/Contents/MacOS/StornautInvestigationDiagnostic.debug.dylib",
+    "$diagnostic_debug_app/Contents/MacOS/__preview.dylib",
+    "$diagnostic_debug_app/Contents/MacOS/StornautLifecycleHelper",
+    "$diagnostic_release_app/Contents/MacOS/StornautInvestigationDiagnosticReleaseShell",
+]:
+    raise SystemExit("iii-b2a-ii-a1-v closed-image allowlist drifted")
+PY
+}
+
 if $legacy_machine_claim_contract_only; then
     verify_claim_server_macho_source_contract \
         "$legacy_machine_claim_contract_source"
@@ -1227,6 +1437,13 @@ if $iib5biii_b2ai_source_contract_only; then
         "$iib5biii_b2ai_bridge_source" \
         "$iib5biii_b2ai_protocol_source"
     print "iii-b2a-i source-only App boundary verification passed."
+    exit 0
+fi
+if $iib5biii_b2a_iia1v_source_contract_only; then
+    verify_iib5biii_b2a_iia1v_source_contract \
+        "$iib5biii_b2a_iia1v_session_source" \
+        "$iib5biii_b2a_iia1v_observer_source"
+    print "iii-b2a-ii-a1-v source-only App boundary verification passed."
     exit 0
 fi
 
@@ -2505,6 +2722,56 @@ iib5biid_debug_introduced_imports=(
 iib5biid_release_forbidden_imports=(
     _kill _nanosleep _proc_listpids _waitid _waitpid
 )
+iib5biii_b2a_iia1v_debug_symbols=(
+    'StornautInvestigationMachineDriverSupport.InvestigationMachineDarwinInnerRoleValidator'
+    'StornautInvestigationMachineDriverSupport.InvestigationMachineDarwinDriverChildObserver'
+)
+iib5biii_b2a_iia1v_debug_authority_markers=(
+    'Darwin.write'
+)
+iib5biii_b2a_iia1v_debug_authority_imports=(
+    '_write'
+)
+iib5biii_b2a_iia1v_closed_images=(
+    "$release_machine_driver"
+    "$debug_app/Contents/MacOS/Stornaut"
+    "$debug_app/Contents/MacOS/Stornaut.debug.dylib"
+    "$debug_app/Contents/MacOS/__preview.dylib"
+    "$release_app/Contents/MacOS/Stornaut"
+    "$debug_app/Contents/MacOS/StornautLifecycleHelper"
+    "$release_app/Contents/MacOS/StornautLifecycleHelper"
+    "$diagnostic_debug_app/Contents/MacOS/StornautInvestigationDiagnostic"
+    "$diagnostic_debug_app/Contents/MacOS/StornautInvestigationDiagnostic.debug.dylib"
+    "$diagnostic_debug_app/Contents/MacOS/__preview.dylib"
+    "$diagnostic_debug_app/Contents/MacOS/StornautLifecycleHelper"
+    "$diagnostic_release_app/Contents/MacOS/StornautInvestigationDiagnosticReleaseShell"
+)
+verify_iib5biii_b2a_iia1v_macho() {
+    local marker closed_image scan_status
+    for marker in "${iib5biii_b2a_iia1v_debug_symbols[@]}"; do
+        if mach_o_image_has_demangled_symbol \
+            "$diagnostic_machine_driver" "$marker"
+        then
+            :
+        else
+            scan_status=$?
+            (( scan_status != 2 )) || return 1
+            print -u2 \
+                "iii-b2a-ii-a1-v Debug Machine driver positive control is missing: $marker"
+            return 1
+        fi
+        for closed_image in "${iib5biii_b2a_iia1v_closed_images[@]}"; do
+            if mach_o_image_has_demangled_symbol "$closed_image" "$marker"; then
+                print -u2 \
+                    "iii-b2a-ii-a1-v dormant authority leaked into a closed image: $closed_image: $marker"
+                return 1
+            else
+                scan_status=$?
+            fi
+            (( scan_status != 2 )) || return 1
+        done
+    done
+}
 machine_driver_required_readonly_imports=(
     _pread _fstat _lstat _flistxattr _acl_get_fd_np
     _proc_pidpath _SecCodeCopySelf _SecStaticCodeCreateWithPath
@@ -2641,6 +2908,9 @@ fi
 
 for marker in "${machine_driver_authority_forbidden_markers[@]}"; do
     if mach_o_has_demangled_symbol "$diagnostic_machine_driver" "$marker"; then
+        if (( ${iib5biii_b2a_iia1v_debug_authority_markers[(Ie)$marker]} > 0 )); then
+            continue
+        fi
         print -u2 "Authority or readiness leaked into Machine driver: $marker"
         exit 1
     else
@@ -2689,8 +2959,8 @@ function require_projection() {
 }
 require_projection \
     "$machine_driver_undefined_symbols" \
-    bf67c0b2fc47658fbb7269e251a0a144b85c1afaf938fa6016c8836ced767f5b \
-    673 \
+    aa60cbd97515f12961e6a5e019a4a3dfb436f5c753fdfddd1a3b5c83610cf576 \
+    690 \
     undefined
 require_projection \
     "$machine_driver_loaded_libraries" \
@@ -2699,8 +2969,8 @@ require_projection \
     load-command
 require_projection \
     "$machine_driver_owned_symbols" \
-    a18e14a1ca48d7ee11c0f242cbf5d970353061907e892a599fd8458aa8a53376 \
-    5524 \
+    20340fe3d9d98892bd8c1dd30985359b51a1534f788b59e996d1843b1dd3d313 \
+    6839 \
     owned-symbol
 if ! mach_o_has_demangled_symbol \
     "$diagnostic_machine_driver" \
@@ -2717,6 +2987,9 @@ for marker in "${machine_driver_authority_forbidden_imports[@]}"; do
     if print -r -- "$machine_driver_undefined_symbols" \
         | grep -Fxq -- "$marker"
     then
+        if (( ${iib5biii_b2a_iia1v_debug_authority_imports[(Ie)$marker]} > 0 )); then
+            continue
+        fi
         print -u2 "Machine driver imports prohibited authority: $marker"
         exit 1
     fi
@@ -2816,6 +3089,7 @@ done
     == "$expected_machine_driver_security_imports" ]] || {
     print -u2 "Release Machine driver Security import allowlist drifted."; exit 1
 }
+verify_iib5biii_b2a_iia1v_macho
 verify_iib4_machine_claim_macho
 
 if mach_o_has_demangled_symbol \

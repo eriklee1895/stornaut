@@ -87,6 +87,13 @@ iib5biii_b2ai_scope_contract_only=false
 iib5biii_b2ai_scope_baseline=79cc78c5f1169faa0820a6377a0d512e2034b0ef
 iib5biii_b2ai_r1_scope_contract_only=false
 iib5biii_b2ai_r1_scope_baseline=2f3a116be4644829fc513bcc2287c6bd2a1ea0ec
+iib5biii_b2a_iia1v_contract_only=false
+iib5biii_b2a_iia1v_session_source=
+iib5biii_b2a_iia1v_observer_source=
+iib5biii_b2a_iia1v_focused_test_source=
+iib5biii_b2a_iia1v_boundary_test_source=
+iib5biii_b2a_iia1v_scope_contract_only=false
+iib5biii_b2a_iia1v_scope_baseline=72d506de45deccb0cc0d6337b04a8f0e7ad751eb
 iib5bia_projection_contract_only=false
 iib5bia_contract_source=
 iib5bia_focused_test_source=
@@ -334,6 +341,17 @@ if (( $# > 0 )); then
         && [[ $1 == --iib5biii-b2a-i-r1-scope-contract-only ]]; then
         iib5biii_b2ai_r1_scope_contract_only=true
         iib5biii_b2ai_r1_scope_baseline=${2:-2f3a116be4644829fc513bcc2287c6bd2a1ea0ec}
+    elif (( $# == 5 )) \
+        && [[ $1 == --iib5biii-b2a-ii-a1v-contract-only ]]; then
+        iib5biii_b2a_iia1v_contract_only=true
+        iib5biii_b2a_iia1v_session_source=$2
+        iib5biii_b2a_iia1v_observer_source=$3
+        iib5biii_b2a_iia1v_focused_test_source=$4
+        iib5biii_b2a_iia1v_boundary_test_source=$5
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iib5biii-b2a-ii-a1v-scope-contract-only ]]; then
+        iib5biii_b2a_iia1v_scope_contract_only=true
+        iib5biii_b2a_iia1v_scope_baseline=${2:-72d506de45deccb0cc0d6337b04a8f0e7ad751eb}
     elif (( $# == 3 )) \
         && [[ $1 == --iib5bia-projection-contract-only ]]; then
         iib5bia_projection_contract_only=true
@@ -2131,6 +2149,365 @@ function verify_iib5biii_b2ai_scope() {
             == dbe8e06f3e0c5bfb96e383348a0b870b8d7dad5f ]] \
             || { print -u2 "iii-b2a-i completed tree drifted"; return 1; }
     fi
+}
+
+function verify_iib5biii_b2a_iia1v_contract() {
+    local session_source=$1 observer_source=$2 focused_test_source=$3
+    local boundary_test_source=$4
+    local source
+    for source in "$session_source" "$observer_source" \
+        "$focused_test_source" "$boundary_test_source"
+    do
+        xcrun swiftc -frontend -parse -enable-bare-slash-regex "$source"
+    done
+    python3 - "$session_source" "$observer_source" \
+        "$focused_test_source" "$boundary_test_source" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+session_path, observer_path, focused_path, boundary_path = map(Path, sys.argv[1:])
+session, observer, focused, boundary = (
+    path.read_text(encoding="utf-8")
+    for path in (session_path, observer_path, focused_path, boundary_path)
+)
+
+def fail(message):
+    raise SystemExit(message)
+
+def imports(source):
+    return set(re.findall(r"(?m)^import\s+([A-Za-z0-9_]+)\s*$", source))
+
+def declaration(source, pattern, label):
+    match = re.search(pattern, source, re.MULTILINE)
+    if match is None:
+        fail(f"iii-b2a-ii-a1-v declaration missing: {label}")
+    opening = source.find("{", match.end())
+    if opening < 0:
+        fail(f"iii-b2a-ii-a1-v declaration malformed: {label}")
+    depth = 0
+    for index in range(opening, len(source)):
+        if source[index] == "{":
+            depth += 1
+        elif source[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return source[match.start():index + 1]
+    fail(f"iii-b2a-ii-a1-v declaration unterminated: {label}")
+
+expected_imports = {
+    session_path: {
+        "Darwin", "Foundation", "StornautInvestigationInstalledL2",
+    },
+    observer_path: {
+        "CInvestigationIdentitySupport", "Darwin",
+    },
+}
+for path, source in ((session_path, session), (observer_path, observer)):
+    if imports(source) != expected_imports[path]:
+        fail("iii-b2a-ii-a1-v import surface drifted")
+
+semantic = session + observer
+if re.search(r"(?m)^\s*(?:public|open)\s+", semantic):
+    fail("iii-b2a-ii-a1-v package boundary drifted")
+if re.search(r"\b(?:Codable|Encodable|Decodable)\b", semantic):
+    fail("iii-b2a-ii-a1-v Codable surface drifted")
+for pattern in (
+    r"\b(?:Executor|MoveToTrash|RegisteredAction|readiness|"
+    r"signedRuntimeReady|implementationAvailable|admission)\b",
+    r"\b(?:CommandLine\.arguments\.dropFirst|ProcessInfo\.processInfo\.environment)\b",
+    r"\bStornaut(?:Execution|Core|Lifecycle|Codex|InvestigationRuntime|"
+    r"InvestigationDiagnostic|ProbeBridge|ProcessSupport)\b",
+    r"\bNSXPC(?:Connection|Listener)?\b",
+    r"\b(?:URLSession|AppKit|SwiftUI|Network|NWConnection)\b",
+):
+    if re.search(pattern, semantic, re.IGNORECASE):
+        fail("iii-b2a-ii-a1-v authority or product reachability drifted")
+
+def require_markers(markers, diagnostic):
+    if any(marker not in semantic for marker in markers):
+        fail(diagnostic)
+
+require_markers((
+    "package struct InvestigationMachineDarwinInnerRoleObservation",
+    "package struct InvestigationMachineDarwinInnerRoleValidator",
+    "struct InvestigationMachineDarwinInnerRoleSystem",
+    "package actor InvestigationMachineDarwinOuterInnerSessionFactory",
+    "package actor InvestigationMachineDarwinOuterInnerSession",
+    "enum InvestigationMachineDarwinOuterInnerSpawnPrimitive",
+    "enum InvestigationMachineDarwinBoundedMessageIO",
+), "iii-b2a-ii-a1-v fixed spawn contract drifted")
+require_markers((
+    "static let controlTargetDescriptor: Int32 = 8",
+    "static let resultTargetDescriptor: Int32 = 9",
+    "static let minimumRelocatedDescriptor: Int32 = 10",
+    "POSIX_SPAWN_SETPGROUP | POSIX_SPAWN_CLOEXEC_DEFAULT",
+    "request.executablePath\n            == InvestigationMachineInstalledDriverObservation.fixedExecutablePath",
+    "arguments: [\n                InvestigationMachineInstalledDriverObservation\n                    .fixedExecutablePath\n            ]",
+    "environment: [], inheritedDescriptor: STDERR_FILENO",
+    "closedFixedDescriptors: [STDIN_FILENO, STDOUT_FILENO, 7]",
+    "request.arguments == [request.executablePath]",
+    "request.environment.isEmpty",
+    "request.inheritedDescriptor == STDERR_FILENO",
+    "request.controlTargetDescriptor == 8",
+    "request.resultTargetDescriptor == 9",
+    "request.closedFixedDescriptors == [0, 1, 7]",
+    "request.controlOuterDescriptor >= 10",
+    "request.controlChildSourceDescriptor >= 10",
+    "request.resultOuterDescriptor >= 10",
+    "request.resultChildSourceDescriptor >= 10",
+    "Set([\n                request.controlOuterDescriptor,",
+    "descriptors.allDescriptors.allSatisfy({",
+    "$0 >= Self.minimumRelocatedDescriptor",
+    "try system.setCloseOnExec(descriptor)",
+    "try system.setNoSigpipe(descriptor)",
+    "try system.descriptorFlags(descriptor) & FD_CLOEXEC != 0",
+    "try system.noSigpipe(descriptor) == 1",
+    "try system.socketType(descriptors.outerControlDescriptor)\n                == SOCK_STREAM",
+    "try system.socketType(descriptors.innerControlSourceDescriptor)\n                == SOCK_STREAM",
+    "try system.descriptorStatusFlags(\n                descriptors.outerResultDescriptor\n            ) & O_ACCMODE == O_RDONLY",
+    "try system.descriptorStatusFlags(\n                descriptors.innerResultSourceDescriptor\n            ) & O_ACCMODE == O_WRONLY",
+), "iii-b2a-ii-a1-v descriptor authority drifted")
+require_markers((
+    "system.argumentCount() == 1",
+    "for descriptor in Int32(0)...Int32(9)",
+    "descriptor == STDERR_FILENO || descriptor == 8",
+    "|| descriptor == 9",
+    "guard case let .failure(error) = result, error.errno == EBADF",
+    "try innerRoleStatus(system, STDERR_FILENO) & O_ACCMODE",
+    "try innerRoleDescriptor(system, STDERR_FILENO) & FD_CLOEXEC == 0",
+    "try innerRoleDescriptor(system, 8) & FD_CLOEXEC == 0",
+    "try innerRoleDescriptor(system, 9) & FD_CLOEXEC == 0",
+    "try innerRoleStatus(system, 8) & O_ACCMODE == O_RDWR",
+    "try innerRoleStatus(system, 9) & O_ACCMODE == O_WRONLY",
+    "try innerRoleSocket(system, 8) == SOCK_STREAM",
+    "try innerRoleSocketEndpoints(system, 8) == .init(",
+    "localFamily: sa_family_t(AF_UNIX)",
+    "peerFamily: sa_family_t(AF_UNIX)",
+    "system.noSigpipe(8) == 1, system.noSigpipe(9) == 1",
+    "descriptorNodes[0].deviceID == initialStandardError.deviceID",
+    "descriptorNodes[1].fileType == mode_t(S_IFSOCK)",
+    "descriptorNodes[2].fileType == mode_t(S_IFIFO)",
+    "Set(descriptorNodes).count == descriptorNodes.count",
+    "let initialStandardError = try innerRoleStandardError(system)",
+    "let finalStandardError = try innerRoleStandardError(system)",
+    "initialStandardError == finalStandardError",
+    "validInnerStandardError(finalStandardError)",
+), "iii-b2a-ii-a1-v inner-role validator drifted")
+require_markers((
+    "identity = try observer.observe(",
+    "identity.processID == processID",
+    "identity.parentProcessID == parentProcessID",
+    "identity.processGroupID == processID",
+    "identity.effectiveUserID == 0",
+    "firstNarrow == secondNarrow, firstSnapshot == secondSnapshot",
+    "firstNarrow.auditTokenWords.count == 8",
+    "firstSnapshot.parentProcessID == expectedParentProcessID",
+    "firstSnapshot.processGroupID == processID",
+    "firstSnapshot.effectiveUserID == 0",
+    "firstSnapshot.supplementaryGroups.count <= 16",
+    "firstSnapshot.supplementaryGroups.contains(0)",
+), "iii-b2a-ii-a1-v child identity sandwich drifted")
+require_markers((
+    "private static let headerByteCount = 4",
+    "private static let absoluteMaximumByteCount = 128 * 1_024",
+    "declared > 0,",
+    "count <= maximumByteCount",
+), "iii-b2a-ii-a1-v bounded framing drifted")
+require_markers((
+    "let ticket = try await beginOperationOrRetire(consumesResult: true)",
+    "guard !consumesResult || !resultConsumed else",
+    "if let existing = retirementTask",
+    "Task.detached",
+    "try? await owner.retireOwnedProcessGroup(epoch)",
+    "try await retireAfterFailure()",
+), "iii-b2a-ii-a1-v one-shot or shared retirement drifted")
+
+expected_counts = {
+    r"\bsocketpair\s*\(": 1,
+    r"\bpipe\s*\(": 2,
+    r"\bclose\s*\(": 4,
+    r"\bfcntl\s*\(": 12,
+    r"\bgetsockopt\s*\(": 1,
+    r"\bfstat\s*\(": 2,
+    r"\bisatty\s*\(": 1,
+    r"\btcgetpgrp\s*\(": 1,
+    r"\bpoll\s*\(": 1,
+    r"\bread\s*\(": 3,
+    r"\bwrite\s*\(": 3,
+    r"\bposix_spawn\s*\(": 1,
+    r"\bposix_spawn_file_actions_init\s*\(": 1,
+    r"\bposix_spawn_file_actions_destroy\s*\(": 1,
+    r"\bposix_spawn_file_actions_addinherit_np\s*\(": 1,
+    r"\bposix_spawn_file_actions_adddup2\s*\(": 2,
+    r"\bposix_spawn_file_actions_addclose\s*\(": 4,
+    r"\bposix_spawnattr_init\s*\(": 1,
+    r"\bposix_spawnattr_destroy\s*\(": 1,
+    r"\bposix_spawnattr_setflags\s*\(": 1,
+    r"\bposix_spawnattr_setpgroup\s*\(": 1,
+    r"\bgetpid\s*\(": 2,
+    r"\bgetppid\s*\(": 1,
+}
+for pattern, expected in expected_counts.items():
+    observed = len(re.findall(pattern, session))
+    if observed != expected:
+        fail("iii-b2a-ii-a1-v descriptor authority drifted")
+
+for forbidden in (
+    r"\b(?:posix_spawnp|fork|vfork|execv|execl|system|popen|kill|killpg|waitpid|waitid)\s*\(",
+    r"\b(?:sigaction|signal|setuid|seteuid|setgid|setegid|setgroups|setpgid|setsid)\s*\(",
+    r"\b(?:FileManager\.default|FileHandle|Process\s*\(|NSXPC|URLSession|NWConnection|Network)\b",
+    r"\b(?:admit|admission|readiness|signedRuntimeReady|implementationAvailable)\b",
+):
+    if re.search(forbidden, semantic, re.IGNORECASE):
+        fail("iii-b2a-ii-a1-v descriptor authority drifted")
+
+outer_inner = declaration(
+    session, r"(?m)^package actor InvestigationMachineDarwinOuterInnerSession\b",
+    "outer-inner session",
+)
+if not all(marker in outer_inner for marker in (
+    "case active",
+    "case operation(UUID, poisoned: Bool)",
+    "case retiring(UUID, poisoned: Bool)",
+    "case terminal",
+    "state = .operation(ticket, poisoned: false)",
+    "state = .operation(ticket, poisoned: true)",
+    "state = .retiring(ticket, poisoned: false)",
+    "state = .terminal",
+    "resultConsumed = true",
+)):
+    fail("iii-b2a-ii-a1-v one-shot or shared retirement drifted")
+
+test_code = re.sub(
+    r'/\*.*?\*/|//.*$|#?"(?:\\.|[^"\\])*"', ' ', focused,
+    flags=re.DOTALL | re.MULTILINE,
+)
+required_tests = (
+    "fixedSelfSpawnRequestTargetsInstalledDriverWithClosedInputs",
+    "fixedDescriptorCollisionsRelocateEveryEndpointAtLeastTen",
+    "relocationOrSpawnFailureClosesOwnedEndpointsAndRetiresAtMostOnce",
+    "driverChildObserverBindsStableIdentityParentAndProcessGroup",
+    "driverChildIdentityDriftFailsBeforeTransport",
+    "innerRoleRequiresExactProcessAndFixedDescriptorProvenance",
+    "boundedControlTransportHandlesFragmentsAndRejectsInvalidLengths",
+    "resultTransportDistinguishesOneResultFromZeroByteEOF",
+    "physicalChildReceivesOnlyStderrControlAndResultAndLeadsGroup",
+)
+if "#expect(true)" in test_code or 'Issue.record("TODO' in focused:
+    fail("iii-b2a-ii-a1-v focused test became vacuous")
+if test_code.count("@Test") != 9 or any(
+    test_code.count(name) != 1 for name in required_tests
+):
+    fail("iii-b2a-ii-a1-v focused test names or cardinality drifted")
+for marker in (
+    "request.executablePath\n                == InvestigationMachineInstalledDriverObservation",
+    "#expect(request.arguments == [request.executablePath])",
+    "#expect(request.environment.isEmpty)",
+    "#expect(request.inheritedDescriptor == STDERR_FILENO)",
+    "#expect(request.controlTargetDescriptor == 8)",
+    "#expect(request.resultTargetDescriptor == 9)",
+    "#expect(request.closedFixedDescriptors == [0, 1, 7])",
+    "#expect(fixture.system.noSigpipe == [10, 11, 12, 13])",
+    "#expect(descriptors.allDescriptors.allSatisfy { $0 >= 10 })",
+    "#expect(!(type(of: identity) is any Codable.Type))",
+    "#expect(!(type(of: observed) is any Codable.Type))",
+    "case fd2CloseOnExec, fd8CloseOnExec, fd9CloseOnExec",
+    "case fd8SocketEndpointsUnavailable, fd8NotUnix, fd8NotConnected",
+    "case fd8AliasesStandardError, fd9NotPipe, fd9AliasesStandardError",
+    "case fd9AliasesControl",
+    "#expect(controlNode.fileType == mode_t(S_IFSOCK))",
+    "#expect(resultNode.fileType == mode_t(S_IFIFO))",
+    "#expect(controlNode != resultNode)",
+    "#expect(controlEndpoints.localFamily == sa_family_t(AF_UNIX))",
+    "#expect(controlEndpoints.peerFamily == sa_family_t(AF_UNIX))",
+    "throws: InvestigationMachineDarwinOuterInnerSessionError.self",
+    "throws: InvestigationMachineDarwinDriverChildObservationError.self",
+    "Data([0, 0, 0, 0])",
+    "Data([0, 2, 0, 1])",
+    "#expect(owner.ownedCalls == 1)",
+    "#expect(getpgid(childPID) == childPID)",
+    "#expect(firstSnapshot.processGroupID == UInt32(childPID))",
+):
+    if marker not in focused:
+        fail("iii-b2a-ii-a1-v focused test assertions drifted")
+
+for marker in (
+    "--iib5biii-b2a-ii-a1v-contract-only",
+    "--iib5biii-b2a-ii-a1v-scope-contract-only",
+    "iii-b2a-ii-a1-v fixed spawn contract drifted",
+    "iii-b2a-ii-a1-v descriptor authority drifted",
+    "iii-b2a-ii-a1-v bounded framing drifted",
+    "iii-b2a-ii-a1-v child identity sandwich drifted",
+    "iii-b2a-ii-a1-v inner-role validator drifted",
+    "iii-b2a-ii-a1-v one-shot or shared retirement drifted",
+):
+    if marker not in boundary:
+        fail(f"iii-b2a-ii-a1-v boundary regression drifted: {marker}")
+
+driver_support_projection = (
+    "InvestigationMachineDarwinDriverChildObservation.swift",
+    "InvestigationMachineDarwinOuterInnerSession.swift",
+    "iii-b2a-ii-a1-v exact Darwin authority carve-out",
+    "iii-b2a-ii-a1-v Debug machine-driver positive gate",
+    "iii-b2a-ii-a1-v Release machine-driver dead-strip gate",
+)
+for marker in driver_support_projection:
+    if marker not in boundary:
+        fail("iii-b2a-ii-a1-v driver-support projection drifted")
+PY
+}
+
+function verify_iib5biii_b2a_iia1v_scope() {
+    local baseline=${1:-72d506de45deccb0cc0d6337b04a8f0e7ad751eb}
+    local expected=(
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinDriverChildObservation.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerSession.swift
+        Tests/StornautInvestigationTests/InvestigationMachineDarwinOuterInnerSessionTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-app-release-boundaries
+        scripts/verify-contract
+        scripts/verify-investigation-boundaries
+    )
+    (( ${#expected} == 7 )) \
+        || { print -u2 "iii-b2a-ii-a1-v checkpoint path ceiling drifted"; return 1; }
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" \
+        == 72d506de45deccb0cc0d6337b04a8f0e7ad751eb ]] \
+        || { print -u2 "iii-b2a-ii-a1-v checkpoint baseline drifted"; return 1; }
+    if git diff --cached --name-only --diff-filter=D "$baseline" \
+        | awk 'index($0,"docs/")!=1 {found=1} END {exit !found}'
+    then
+        print -u2 "iii-b2a-ii-a1-v checkpoint deleted an existing path"
+        return 1
+    fi
+    if git diff --cached --numstat "$baseline" \
+        | awk 'index($3,"docs/")!=1 && ($1=="-" || $2=="-") {found=1} END {exit !found}'
+    then
+        print -u2 "iii-b2a-ii-a1-v binary checkpoint path rejected"
+        return 1
+    fi
+    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD \
+        "$baseline" | awk 'index($0,"docs/")!=1 && $0!="AGENTS.md" && $0!="README.md"')"})
+    [[ "${(j:\n:)${(@on)observed}}" == "${(j:\n:)${(@on)expected}}" ]] \
+        || { print -u2 "iii-b2a-ii-a1-v staged checkpoint paths drifted"; return 1; }
+    local expected_path expected_mode observed_entry
+    for expected_path in "${expected[@]}"; do
+        expected_mode=100644
+        [[ $expected_path == scripts/* ]] && expected_mode=100755
+        observed_entry=$(git ls-files -s -- "$expected_path")
+        [[ "$(print -r -- "$observed_entry" | awk '{print $1, $3, $4}')" \
+            == "$expected_mode 0 $expected_path" ]] \
+            || { print -u2 "iii-b2a-ii-a1-v checkpoint mode drifted: $expected_path"; return 1; }
+    done
+    local changed=$(git diff --cached --numstat "$baseline" \
+        | awk 'index($3,"docs/")!=1 && $3!="AGENTS.md" && $3!="README.md" {n+=$1+$2} END {print n+0}')
+    (( changed <= 2400 )) \
+        || { print -u2 "iii-b2a-ii-a1-v checkpoint budget drifted"; return 1; }
+    local documentation=(${(f)"$(git diff --cached --name-only \
+        --diff-filter=ACMRD "$baseline" | awk 'index($0,"docs/")==1')"})
+    local preflight=docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a1-v-verifier-preflight.md
+    (( ${documentation[(Ie)$preflight]} == 1 )) \
+        || { print -u2 "iii-b2a-ii-a1-v required preflight document missing"; return 1; }
 }
 
 function verify_iib5bia_projection_contract() {
@@ -8065,6 +8442,20 @@ if $iib5biii_b2ai_r1_scope_contract_only; then
     print "iii-b2a-i-r1 staged scope verification passed."
     exit 0
 fi
+if $iib5biii_b2a_iia1v_contract_only; then
+    verify_iib5biii_b2a_iia1v_contract \
+        "$iib5biii_b2a_iia1v_session_source" \
+        "$iib5biii_b2a_iia1v_observer_source" \
+        "$iib5biii_b2a_iia1v_focused_test_source" \
+        "$iib5biii_b2a_iia1v_boundary_test_source"
+    print "iii-b2a-ii-a1-v verifier closure contract verification passed."
+    exit 0
+fi
+if $iib5biii_b2a_iia1v_scope_contract_only; then
+    verify_iib5biii_b2a_iia1v_scope "$iib5biii_b2a_iia1v_scope_baseline"
+    print "iii-b2a-ii-a1-v staged scope verification passed."
+    exit 0
+fi
 if $iib5bia_projection_contract_only; then
     verify_iib5bia_projection_contract "$iib5bia_contract_source" "$iib5bia_focused_test_source"
     print "ii-b5b-i-a projection contract verification passed."
@@ -10126,9 +10517,11 @@ expected_driver_support_sources = {
     "DarwinInvestigationMachineInstalledDriverSystem.swift",
     "InvestigationMachineClaimClient.swift",
     "InvestigationMachineDarwinAppIdentityObservation.swift",
+    "InvestigationMachineDarwinDriverChildObservation.swift",
     "InvestigationMachineDarwinEpochRetirement.swift",
     "InvestigationMachineDarwinEpochSession.swift",
     "InvestigationMachineDarwinOuterInnerProtocol.swift",
+    "InvestigationMachineDarwinOuterInnerSession.swift",
     "InvestigationMachineDriverSupport.swift",
     "InvestigationMachineEightEpochCohort.swift",
     "InvestigationMachineFixedCapsuleIntake.swift",
@@ -10193,8 +10586,14 @@ expected_driver_support_imports = {
     "InvestigationMachineDarwinEpochRetirement.swift": {
         "Darwin", "Dispatch", "Foundation",
     },
+    "InvestigationMachineDarwinDriverChildObservation.swift": {
+        "CInvestigationIdentitySupport", "Darwin",
+    },
     "InvestigationMachineDarwinOuterInnerProtocol.swift": {
         "Foundation", "StornautInvestigationHandoffContract",
+    },
+    "InvestigationMachineDarwinOuterInnerSession.swift": {
+        "Darwin", "Foundation", "StornautInvestigationInstalledL2",
     },
     "InvestigationMachineInstalledDriverObservation.swift": {"Darwin"},
     "InvestigationMachineInstalledDriverSystemSource.swift": {"Darwin"},
@@ -10241,6 +10640,10 @@ expected_driver_support_sha256 = {
         "574fe7df157c04b573602a222df40fe08bc4759d41fc88b56e8695b636ce38a8",
     "InvestigationMachineDarwinOuterInnerProtocol.swift":
         "1607539374ce8a28978d5f051a61e5c996909d8b3dbb02e9a3435fc4be08c4ac",
+    "InvestigationMachineDarwinDriverChildObservation.swift":
+        "af4a51c631fa2060426c1a4ebabd0260309a12a3a47629993c239674798411f3",
+    "InvestigationMachineDarwinOuterInnerSession.swift":
+        "5636c627cc8d7521192b7a125ca2e02c24c948a35c2a8ca511bb7df6eb0aef15",
     "InvestigationMachineSingleEpoch.swift":
         "07955234a0103c9a07d5289a258fabad68306d536ff7fe709de64123d109c953",
     "InvestigationMachineSingleEpochComposition.swift":
@@ -10362,6 +10765,39 @@ for source_name in driver_support_sources:
             r"\baccept(?=\s*\()", "typedProtocolAccept",
             authority_source,
         )
+    elif source_name == "InvestigationMachineDarwinOuterInnerSession.swift":
+        exact_calls = {
+            "socketpair": 1, "pipe": 2, "close": 4, "fcntl": 12,
+            "getsockopt": 1, "fstat": 2, "isatty": 1,
+            "tcgetpgrp": 1, "poll": 1, "read": 3, "write": 3,
+            "posix_spawn": 1, "posix_spawn_file_actions_init": 1,
+            "posix_spawn_file_actions_destroy": 1,
+            "posix_spawn_file_actions_addinherit_np": 1,
+            "posix_spawn_file_actions_adddup2": 2,
+            "posix_spawn_file_actions_addclose": 4,
+            "posix_spawnattr_init": 1, "posix_spawnattr_destroy": 1,
+            "posix_spawnattr_setflags": 1,
+            "posix_spawnattr_setpgroup": 1, "getpid": 2, "getppid": 1,
+        }
+        for name, expected_count in exact_calls.items():
+            observed_count = len(re.findall(
+                rf"\b{re.escape(name)}\s*\(", source_text
+            ))
+            if observed_count != expected_count:
+                raise SystemExit(
+                    "iii-b2a-ii-a1-v fixed Darwin call shape drifted: "
+                    f"{name}: {observed_count}"
+                )
+            authority_source = re.sub(
+                rf"\b{re.escape(name)}(?=\s*\()",
+                "fixedOuterInnerCall", authority_source,
+            )
+        for token in (
+            "O_WRONLY", "O_RDWR", "Darwin.write", "Darwin.read",
+        ):
+            authority_source = authority_source.replace(
+                token, "fixedOuterInnerAuthority"
+            )
     elif source_name == "InvestigationMachineFixedCapsuleIntake.swift":
         compact_source = re.sub(r"\s+", "", source_text)
         fcntl_shapes = (
@@ -11558,12 +11994,12 @@ function require_exact_machine_driver_projection() {
 
     case "$configuration" in
         debug)
-            expected_undefined_sha=bf67c0b2fc47658fbb7269e251a0a144b85c1afaf938fa6016c8836ced767f5b
-            expected_undefined_lines=673
+            expected_undefined_sha=aa60cbd97515f12961e6a5e019a4a3dfb436f5c753fdfddd1a3b5c83610cf576
+            expected_undefined_lines=690
             expected_loads_sha=dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9
             expected_loads_lines=18
-            expected_owned_sha=8a22a2bf44d82492fc1e2d8877f8eb22b17f7597ee835e921e7d281221cff173
-            expected_owned_lines=5525
+            expected_owned_sha=97e435263047ae0012deac729774fc7335cac7bc80952a737575fe8c9b07448b
+            expected_owned_lines=6840
             ;;
         release)
             expected_undefined_sha=200b958fb36101f258f67621035f80b89b26c465271ae6708cf5856de7bf573b
@@ -11599,7 +12035,7 @@ function verify_machine_driver_projection_mutations() {
     local forbidden_added required_removed security_added
     local load_added owned_added
 
-    forbidden_added=$(print -r -- "$undefined_symbols"$'\n''_write' \
+    forbidden_added=$(print -r -- "$undefined_symbols"$'\n''_unlink' \
         | LC_ALL=C sort -u)
     required_removed=$(print -r -- "$undefined_symbols" \
         | grep -Fxv -- _pread | LC_ALL=C sort -u)
@@ -11732,6 +12168,12 @@ function verify_machine_driver_projection_mutations() {
     iib5biid_release_forbidden_imports=(
         _kill _nanosleep _proc_listpids _waitid _waitpid
     )
+    iib5biii_b2a_iia1v_debug_authority_markers=(
+        'Darwin.write' 'Darwin.socket'
+    )
+    iib5biii_b2a_iia1v_debug_authority_imports=(
+        _write
+    )
     required_readonly_imports=(
         '_$s6Darwin5fcntlys5Int32VAD_A2DtF'
         '_$s6Darwin5fcntlys5Int32VAD_ADtF'
@@ -11837,6 +12279,12 @@ function verify_machine_driver_projection_mutations() {
         fi
         for marker in "${authority_markers[@]}"; do
             if [[ "$driver_symbols" == *"$marker"* ]]; then
+                if [[ $configuration == debug \
+                    && ${iib5biii_b2a_iia1v_debug_authority_markers[(Ie)$marker]} \
+                        -gt 0 ]]
+                then
+                    continue
+                fi
                 print -u2 \
                     "Machine driver contains prohibited authority: $marker"
                 exit 1
@@ -11846,6 +12294,12 @@ function verify_machine_driver_projection_mutations() {
             if print -r -- "$driver_undefined_symbols" \
                 | grep -Fxq -- "$marker"
             then
+                if [[ $configuration == debug \
+                    && ${iib5biii_b2a_iia1v_debug_authority_imports[(Ie)$marker]} \
+                        -gt 0 ]]
+                then
+                    continue
+                fi
                 print -u2 \
                     "Machine driver imports prohibited authority: $marker"
                 exit 1

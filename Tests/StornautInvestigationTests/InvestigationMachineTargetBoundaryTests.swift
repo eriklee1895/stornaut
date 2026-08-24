@@ -586,7 +586,9 @@ struct InvestigationMachineTargetBoundaryTests {
             "InvestigationMachineDarwinAppIdentityObservation.swift",
             "InvestigationMachineDarwinEpochSession.swift",
             "InvestigationMachineDarwinEpochRetirement.swift",
+            "InvestigationMachineDarwinDriverChildObservation.swift",
             "InvestigationMachineDarwinOuterInnerProtocol.swift",
+            "InvestigationMachineDarwinOuterInnerSession.swift",
             "InvestigationMachineDriverSupport.swift",
             "InvestigationMachineEightEpochCohort.swift",
             "InvestigationMachineFixedCapsuleIntake.swift",
@@ -718,9 +720,18 @@ struct InvestigationMachineTargetBoundaryTests {
                 "import Dispatch",
                 "import Foundation",
             ],
+            "InvestigationMachineDarwinDriverChildObservation.swift": [
+                "import CInvestigationIdentitySupport",
+                "import Darwin",
+            ],
             "InvestigationMachineDarwinOuterInnerProtocol.swift": [
                 "import Foundation",
                 "import StornautInvestigationHandoffContract",
+            ],
+            "InvestigationMachineDarwinOuterInnerSession.swift": [
+                "import Darwin",
+                "import Foundation",
+                "import StornautInvestigationInstalledL2",
             ],
             "InvestigationMachineInstalledDriverObservation.swift": [
                 "import Darwin",
@@ -868,6 +879,74 @@ struct InvestigationMachineTargetBoundaryTests {
                 ] {
                     #expect(!source.contains(forbidden))
                 }
+            }
+            if sourceName
+                == "InvestigationMachineDarwinOuterInnerSession.swift"
+            {
+                let allowedCalls: [String: Int] = [
+                    "socketpair": 1,
+                    "pipe": 1,
+                    "fcntl": 12,
+                    "getsockopt": 1,
+                    "fstat": 2,
+                    "isatty": 1,
+                    "tcgetpgrp": 1,
+                    "poll": 1,
+                    "posix_spawn": 1,
+                    "posix_spawn_file_actions_init": 1,
+                    "posix_spawn_file_actions_destroy": 1,
+                    "posix_spawn_file_actions_addinherit_np": 1,
+                    "posix_spawn_file_actions_adddup2": 2,
+                    "posix_spawn_file_actions_addclose": 4,
+                    "posix_spawnattr_init": 1,
+                    "posix_spawnattr_destroy": 1,
+                    "posix_spawnattr_setflags": 1,
+                    "posix_spawnattr_setpgroup": 1,
+                    "getpid": 2,
+                    "getppid": 1,
+                ]
+                for (name, count) in allowedCalls {
+                    let observedCount = source.matches(
+                        of: try Regex("\\b" + name + "\\s*\\(")
+                    ).count
+                    #expect(
+                        observedCount == count,
+                        "\(name): \(observedCount) != \(count)"
+                    )
+                    authoritySource = authoritySource.replacing(
+                        try Regex("\\b" + name + "\\s*\\("),
+                        with: "allowedOuterInnerCall("
+                    )
+                }
+                for name in ["close", "read", "write"] {
+                    let qualified = "Darwin." + name + "("
+                    #expect(source.components(separatedBy: qualified).count == 2)
+                    authoritySource = authoritySource.replacingOccurrences(
+                        of: qualified, with: "allowedOuterInnerCall("
+                    )
+                }
+                // iii-b2a-ii-a1-v exact Darwin authority carve-out.
+                // iii-b2a-ii-a1-v Debug machine-driver positive gate.
+                // iii-b2a-ii-a1-v Release machine-driver dead-strip gate.
+                for forbidden in [
+                    "kill(", "killpg(", "waitpid(", "waitid(",
+                    "setuid(", "setgid(", "setsid(", "setpgid(",
+                    "posix_spawnp", "CommandLine.arguments",
+                    "ProcessInfo.processInfo.environment", "public ",
+                    "Codable",
+                ] {
+                    #expect(!source.contains(forbidden))
+                }
+            }
+            if [
+                "InvestigationMachineDarwinDriverChildObservation.swift",
+                "InvestigationMachineDarwinOuterInnerSession.swift",
+            ].contains(sourceName) {
+                #expect(source.components(separatedBy: "#if DEBUG").count == 2)
+                #expect(source.components(separatedBy: "#endif").count == 2)
+                #expect(source.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                ).hasSuffix("#endif"))
             }
             if sourceName == "InvestigationMachineFixedCapsuleIntake.swift" {
                 let compactSource = source.filter { !$0.isWhitespace }
@@ -1017,6 +1096,10 @@ struct InvestigationMachineTargetBoundaryTests {
                     || (sourceName == "InvestigationMachineDarwinEpochRetirement.swift"
                         && ["kill(", "proc_listpids(", "waitid(",
                             "waitpid("].contains(forbidden))
+                    || (sourceName == "InvestigationMachineDarwinOuterInnerSession.swift"
+                        && ["O_WRONLY", "O_RDWR", "Darwin.write",
+                            "posix_spawn", "fcntl(", "socketpair"
+                        ].contains(forbidden))
                 if !semanticException {
                     if forbidden == "Process(" {
                         #expect(authoritySource.matches(
@@ -1535,6 +1618,71 @@ struct InvestigationMachineTargetBoundaryTests {
             "wrong-baseline",
             "missing-preflight",
             "iii-b2a-i exact ten-path staged scope",
+        ] {
+            #expect(contract.contains(marker))
+        }
+    }
+
+    @Test
+    func iiiB2AIIA1VVerifierPinsOuterInnerAuthorityClosureAndExactScope() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ), encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        let app = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-app-release-boundaries"
+            ), encoding: .utf8
+        )
+        for marker in [
+            "--iib5biii-b2a-ii-a1v-contract-only",
+            "--iib5biii-b2a-ii-a1v-scope-contract-only",
+            "function verify_iib5biii_b2a_iia1v_contract()",
+            "function verify_iib5biii_b2a_iia1v_scope()",
+            "iii-b2a-ii-a1-v fixed spawn contract drifted",
+            "iii-b2a-ii-a1-v descriptor authority drifted",
+            "iii-b2a-ii-a1-v bounded framing drifted",
+            "iii-b2a-ii-a1-v child identity sandwich drifted",
+            "iii-b2a-ii-a1-v inner-role validator drifted",
+            "iii-b2a-ii-a1-v one-shot or shared retirement drifted",
+            "iii-b2a-ii-a1-v staged checkpoint paths drifted",
+            "iii-b2a-ii-a1-v checkpoint budget drifted",
+            "72d506de45deccb0cc0d6337b04a8f0e7ad751eb",
+            "(( ${#expected} == 7 ))",
+            "(( changed <= 2400 ))",
+        ] {
+            #expect(boundary.contains(marker))
+        }
+        for marker in [
+            "--iib5biii-b2a-ii-a1v-source-contract-only",
+            "function verify_iib5biii_b2a_iia1v_source_contract()",
+            "iib5biii_b2a_iia1v_debug_symbols=(",
+            "iib5biii_b2a_iia1v_closed_images=(",
+            "verify_iib5biii_b2a_iia1v_macho()",
+            "iii-b2a-ii-a1-v Debug Machine driver positive control",
+            "iii-b2a-ii-a1-v dormant authority leaked into a closed image",
+        ] {
+            #expect(app.contains(marker))
+        }
+        for marker in [
+            "iib5biii_b2a_iia1v_commit=72d506de45deccb0cc0d6337b04a8f0e7ad751eb",
+            "iib5biii_b2a_iia1v_tree=f5b2ddaf731289866b956efbeaa2b817add3ecdd",
+            "iii-b2a-ii-a1-v historical parent drifted",
+            "iii-b2a-ii-a1-v historical tree drifted",
+            "iii-b2a-ii-a1-v historical line count drifted",
+            "iii-b2a-ii-a1-v mutation accepted:",
+            "iii-b2a-ii-a1-v scope mutation accepted:",
+            "substitute-session", "substitute-observer",
+            "substitute-focused", "substitute-boundary-test",
+            "substitute-contract", "substitute-boundary",
+            "substitute-app", "substitute-preflight",
         ] {
             #expect(contract.contains(marker))
         }
