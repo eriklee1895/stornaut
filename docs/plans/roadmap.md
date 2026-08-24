@@ -238,8 +238,9 @@ admission、same-owner containment proof、12 focused、593 affected、1,475-tes
 77-suite serial、三项 boundary gates 与 immutable seal 收口。iii-b2a-ii-a1
 fixed transport/inner-role closure 也已以 7-path / 1,694-line implementation、
 1,485-test/78-suite serial、三项 boundary gates 与 immutable seal 收口。当前
-frontier 为 iii-b2a-ii-a2，随后严格按 iii-b2b → c0b → ii-c → L3c3d →
-L3c4 推进。
+frontier 已按 scope/trust preflight 拆为 a2-0 untrusted decode、a2-i inherited-
+PGID App session 与 a2-ii terminal/admission join；当前 a2-0，随后严格按
+a2-i → a2-ii → iii-b2b → c0b → ii-c → L3c3d → L3c4 推进。
 39B2c 仍未作 machine readiness claim。
 [ii-c0a preflight](../reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md)
 冻结 v1-preserving enclosing projected-cohort binary contract、exact 8-path /
@@ -284,8 +285,9 @@ b5b-ii Darwin runtime 与 b5b-iii production/artifact；b5a 与 b5b-i through
 aggregate i-c2 已完成并保持 non-admitting；b5b-ii-a/b/c/d 已完成并保持
 non-admitting；c0a projection-in-capsule implementation 已完成并保持
 non-admitting；b5b-iii-b0 已冻结，iii-a/iii-b1/iii-b2a0/iii-b2a-i/
-iii-b2a-ii-a1 已完成并保持 non-admitting；当前 frontier 为 iii-b2a-ii-a2，
-后续为 iii-b2b → c0b → ii-c → L3c3d → L3c4。
+iii-b2a-ii-a1 已完成并保持 non-admitting；a2 已冻结为 a2-0/a2-i/a2-ii，当前
+frontier 为 a2-0，后续为 a2-i → a2-ii → iii-b2b → c0b → ii-c → L3c3d →
+L3c4。
 L3c2b preflight 的 real-plan matrix contradiction 已由 3-path plan-freshness
 prerequisite 关闭，affected/Investigation/structural/review gates 通过；
 只有 L3c4 可作 readiness claim 并运行
@@ -482,7 +484,8 @@ L3c3c 当前证据见
   through aggregate i-c2 已完成并保持 non-admitting；b5b-ii-a/b/c/d 与 c0a
   projection-in-capsule 已完成并保持 non-admitting；b5b-iii-b0 已冻结，iii-a、
   iii-b1、iii-b2a0、iii-b2a-i 与 iii-b2a-ii-a1 已完成并保持 non-admitting；
-  当前 frontier 为 iii-b2a-ii-a2，后续为 iii-b2b → c0b → ii-c →
+  a2 已冻结为 a2-0/a2-i/a2-ii，当前 frontier 为 a2-0，后续为 a2-i →
+  a2-ii → iii-b2b → c0b → ii-c →
   L3c3d → L3c4。
   L3c4 才拥有 final admission/full。39B2c 才是 machine admission，Task 39
   尚未完成。
