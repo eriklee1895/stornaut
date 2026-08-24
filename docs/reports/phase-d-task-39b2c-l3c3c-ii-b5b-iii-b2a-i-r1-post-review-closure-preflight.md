@@ -1,10 +1,16 @@
 # Phase D Task 39B2c L3c3c-ii-b5b-iii-b2a-i-r1 Post-Review Closure Preflight
 
-> Status: scope and tests-first correction boundary frozen; implementation in progress
+> Status: complete / non-admitting; immutable completion seal recorded
 >
 > Date: 2026-08-24
 >
 > Baseline: `2f3a116be4644829fc513bcc2287c6bd2a1ea0ec`
+>
+> Closure commit: `6f6579834b3f5a707ab7b35152e5425e4260c6ad`
+>
+> Accepted implementation tree: `62994279cc5a262dee3a490d845dc2f32a8fa4b6`
+>
+> Completion-seal commit: `30ee32e02fd1ce5fe45a55f64f083f9294c85695`
 >
 > Scope: close six independent-review findings in the package-only supervisor
 > and verifier surface. No Darwin spawn or descriptor I/O, App/helper/XPC
@@ -82,3 +88,13 @@ Run focused RED/GREEN, adjacent continuity/physical-bridge tests, affected
 Investigation tests, exact contract/structural/App gates, applicable
 Debug/Release builds, one final frozen-tree serialized SwiftPM regression and
 independent post-fix review. Do not run `scripts/verify --full`.
+
+The closure completed within its frozen eight-path / 1,200-line ceiling at
+exactly eight non-document paths and 977 changed lines. The accepted tree passed
+12 focused tests, 35 adjacent tests, 593 affected Investigation tests, all three
+boundary gates, Debug/Release Machine Driver builds and one 1,475-test /
+77-suite frozen-tree serial regression. Independent post-fix and seal review
+reported no unresolved P0-P2. The three-path immutable seal records the original
+implementation and r1 identities, exact scopes and same-path substitution
+failures. Completion details are in the
+[iii-b2a-i review](phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-i-review.md).

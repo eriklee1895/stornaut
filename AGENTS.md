@@ -335,15 +335,21 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   contract/investigation/App-release boundary gates 与 independent final review
   已通过，保持 non-admitting。fresh source/topology preflight 又把原
   ii-b5b-iii 拆为 b0 protocol、a per-epoch continuity、b1 injected cohort、
-  b2a0 typed physical bridge、b2a physical adapter 与 b2b entry/artifact；b0 已
-  冻结，iii-a、iii-b1 与 iii-b2a0 已完成并保持 non-admitting，当前 frontier
-  为 iii-b2a。iii-b2a0 以 exact 8 non-document paths / 2,198 changed lines、
+  b2a0 typed physical bridge、b2a-i canonical supervisor admission、b2a-ii-a
+  Darwin physical session 与 b2b entry/artifact；b0 已冻结，iii-a、iii-b1、
+  iii-b2a0 与 iii-b2a-i 已完成并保持 non-admitting，当前 frontier 为
+  iii-b2a-ii-a。iii-b2a0 以 exact 8 non-document paths / 2,198 changed lines、
   36-test/3-suite combined bridge+continuity+cohort、580-test/43-suite affected、
   1,462-test/76-suite clean staged serial、三项 boundary gates、Debug diagnostic /
   Release driver builds、immutable seal 与 independent semantic/verifier/
   cross-group review 收口；physical result 仍是 untrusted DTO，不能直接进入
-  single-epoch result 或 continuity。随后严格按 iii-b2b → ii-c0b → ii-c →
-  L3c3d → L3c4 推进。
+  single-epoch result 或 continuity。iii-b2a-i 又以 package-closed canonical
+  request/ownership/acknowledgement/decision/result、one-shot receiver、private
+  admitted token 与 same-owner containment proof 收口；原实现 10 paths /
+  3,236 lines、r1 closure 8 paths / 977 lines、12 focused、593 affected、
+  1,475-test/77-suite frozen-tree serial、三项 boundary gates、Debug/Release
+  builds、immutable seal 与 no-unresolved-P0–P2 review 已通过。随后严格按
+  iii-b2a-ii-a → iii-b2b → ii-c0b → ii-c → L3c3d → L3c4 推进。
   该 ii-b5b-ii-c checkpoint 以 8 个
   non-document paths / 3,104 changed lines、35 focused tests、
   1,396-test staged-only serial、三个 verifier gates 与 final
@@ -528,6 +534,9 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-b1 injected cohort review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b1-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b1-review.md) |
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-b2a0 typed physical bridge preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a0-typed-physical-bridge-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a0-typed-physical-bridge-preflight.md) |
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-b2a0 typed physical bridge review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a0-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a0-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-iii-b2a-i supervisor admission preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-i-supervisor-admission-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-i-supervisor-admission-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-iii-b2a-i r1 post-review closure preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-i-r1-post-review-closure-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-i-r1-post-review-closure-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-iii-b2a-i supervisor admission review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-i-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-i-review.md) |
 | Phase D Task 39B2c-L1 residue observation review | [docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md](docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md) |
 | Phase D Task 39B2c-L2 root topology observation review | [docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md](docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md) |
 | Phase D Task 39B2c-L3a trusted machine target review | [docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md](docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md) |
@@ -678,9 +687,10 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   capsule/epoch bytes 不变，仅新增 enclosing projected-cohort binary contract
   与 paired fixed intake；fresh source/topology preflight 又把 ii-b5b-iii 拆为
   b0 protocol、a per-epoch continuity、b1 injected cohort、b2a0 typed physical
-  bridge、b2a physical adapter 与 b2b entry/artifact。b0 已冻结，iii-a、iii-b1
-  与 iii-b2a0 已完成并保持 non-admitting，当前 frontier 为 iii-b2a，严格
-  后续顺序为 iii-b2b → ii-c0b non-root capsule author +
+  bridge、b2a-i supervisor admission、b2a-ii-a Darwin physical session 与 b2b
+  entry/artifact。b0 已冻结，iii-a、iii-b1、iii-b2a0 与 iii-b2a-i 已完成并
+  保持 non-admitting，当前 frontier 为 iii-b2a-ii-a，严格后续顺序为
+  iii-b2b → ii-c0b non-root capsule author +
   launcher/TTY/FD hygiene → ii-c
   privileged no-model gate → L3c3d → L3c4。
   ADR 0018 仍 Proposed；L3c4 独占 final admission 与

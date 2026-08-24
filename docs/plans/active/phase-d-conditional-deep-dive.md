@@ -59,9 +59,10 @@
 > owned-PGID retirement and ii-c0a projection-in-capsule input/intake are
 > complete/non-admitting. A fresh source/topology audit split ii-b5b-iii into
 > b0 protocol, a per-epoch continuity, b1 injected cohort, b2a0 typed physical
-> bridge, b2a physical adapter and b2b entry/artifact. b0 is frozen/non-admitting;
-> iii-a, iii-b1 and iii-b2a0 are complete/non-admitting and iii-b2a is current,
-> followed by iii-b2b, ii-c0b and
+> bridge, b2a-i canonical supervisor admission, b2a-ii-a Darwin physical session
+> and b2b entry/artifact. b0 is frozen/non-admitting; iii-a, iii-b1, iii-b2a0
+> and iii-b2a-i are complete/non-admitting and iii-b2a-ii-a is current, followed
+> by iii-b2b, ii-c0b and
 > then ii-c one no-model
 > privileged gate. The authoritative
 > real-model run and readiness verdict remain unimplemented.
@@ -946,7 +947,7 @@ Checkpoint status:
   complete after 35 focused, 521 affected, one 1,234-test staged-only serial,
   exact contract/structural/artifact gates and final review; ii-b3b and its
   test-only fixture prerequisite, ii-b3c and ii-b4 are complete/non-admitting;
-  ii-b5 is split into b5a0/b5a/b5b-i/b5b-ii/b5b-iii; b5a0/b5a, all b5b-i checkpoints through aggregate i-c2, ii-b5b-ii-a/ii-b/ii-c/ii-d and ii-c0a are complete/non-admitting. A fresh source/topology audit further splits ii-b5b-iii as `iii-b0 -> iii-a -> iii-b1 -> iii-b2a0 -> iii-b2a -> iii-b2b`; b0 is frozen/non-admitting and iii-a/iii-b1/iii-b2a0 are complete/non-admitting. The corrected remaining order is `iii-b2a -> iii-b2b -> ii-c0b -> ii-c -> L3c3d -> L3c4`; iii-b2a is current. iii-a closed at tree `2eeb307cfb2cf67a1b169e0a510c92ea2dc9dbb2` with exact 10 paths / 3,147 changed lines, 40 focused tests, 559 affected tests, a clean 1,446-test / 74-suite staged-only serial, all three boundary gates and no unresolved P0-P2. iii-b1 then closed at tree `b46d39bfcb4a24cee80b4be9562e281519450cb8` with exact 7 paths / 2,438 changed lines, 13 focused tests, 573 affected tests, a clean 1,455-test / 75-suite staged-only serial, all three boundary gates, immutable replay seal and no unresolved P0-P2. iii-b2a0 closed at commit `65f85c5adbb01b41b1bf9a5f787951f9feb4660d`, parent `7c114e09c915e2685545872101e7c5854ce2cffd`, tree `7df0d5597f498e3588823885d226bdd02befc058` and immutable seal `3f62678306d982edf986acf8a2ef12c3c4081741`, with exact 8 non-document paths / 2,198 changed lines, 36 combined tests / 3 suites, 580 affected tests / 43 suites, a clean 1,462-test / 76-suite staged-only serial, all three boundary gates, targeted Debug/Release builds and no unresolved P0-P2. Its physical result remains an untrusted DTO that cannot enter the single-epoch result or continuity join.
+  ii-b5 is split into b5a0/b5a/b5b-i/b5b-ii/b5b-iii; b5a0/b5a, all b5b-i checkpoints through aggregate i-c2, ii-b5b-ii-a/ii-b/ii-c/ii-d and ii-c0a are complete/non-admitting. A fresh source/topology audit further splits ii-b5b-iii as `iii-b0 -> iii-a -> iii-b1 -> iii-b2a0 -> iii-b2a-i -> iii-b2a-ii-a -> iii-b2b`; b0 is frozen/non-admitting and iii-a/iii-b1/iii-b2a0/iii-b2a-i are complete/non-admitting. The corrected remaining order is `iii-b2a-ii-a -> iii-b2b -> ii-c0b -> ii-c -> L3c3d -> L3c4`; iii-b2a-ii-a is current. iii-a closed at tree `2eeb307cfb2cf67a1b169e0a510c92ea2dc9dbb2` with exact 10 paths / 3,147 changed lines, 40 focused tests, 559 affected tests, a clean 1,446-test / 74-suite staged-only serial, all three boundary gates and no unresolved P0-P2. iii-b1 then closed at tree `b46d39bfcb4a24cee80b4be9562e281519450cb8` with exact 7 paths / 2,438 changed lines, 13 focused tests, 573 affected tests, a clean 1,455-test / 75-suite staged-only serial, all three boundary gates, immutable replay seal and no unresolved P0-P2. iii-b2a0 closed at commit `65f85c5adbb01b41b1bf9a5f787951f9feb4660d`, parent `7c114e09c915e2685545872101e7c5854ce2cffd`, tree `7df0d5597f498e3588823885d226bdd02befc058` and immutable seal `3f62678306d982edf986acf8a2ef12c3c4081741`, with exact 8 non-document paths / 2,198 changed lines, 36 combined tests / 3 suites, 580 affected tests / 43 suites, a clean 1,462-test / 76-suite staged-only serial, all three boundary gates, targeted Debug/Release builds and no unresolved P0-P2. Its physical result remains an untrusted DTO that cannot enter the single-epoch result or continuity join. iii-b2a-i then closed the canonical supervisor protocol and sole opaque admission seam at commits `2f3a116be4644829fc513bcc2287c6bd2a1ea0ec` and `6f6579834b3f5a707ab7b35152e5425e4260c6ad`, sealed by `30ee32e02fd1ce5fe45a55f64f083f9294c85695`; 12 focused, 593 affected and 1,475 serial tests, all three boundary gates, Debug/Release builds and independent review passed. It remains non-admitting and performed no Darwin spawn, descriptor I/O, privilege, model or authoritative full.
   See the
   [ii-b2 ASID prerequisite review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2-asid-prerequisite-review.md),
   the
@@ -996,6 +997,7 @@ Checkpoint status:
   the [ii-b5b-iii-b1 review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b1-review.md),
   the [ii-b5b-iii-b2a0 preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a0-typed-physical-bridge-preflight.md),
   the [ii-b5b-iii-b2a0 review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a0-review.md),
+  the [ii-b5b-iii-b2a-i review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-i-review.md),
   the
   [L3c1b-i Review](../../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
   and

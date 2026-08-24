@@ -1,11 +1,17 @@
 # Phase D Task 39B2c L3c3c-ii-b5b-iii-b2a-i Supervisor Admission Preflight
 
-> Status: scope, canonical protocol and tests-first boundary frozen;
-> implementation not started
+> Status: complete / non-admitting; post-review closure and immutable seal
+> recorded
 >
 > Date: 2026-08-24
 >
 > Baseline: `79cc78c5f1169faa0820a6377a0d512e2034b0ef`
+>
+> Implementation commit: `2f3a116be4644829fc513bcc2287c6bd2a1ea0ec`
+>
+> Accepted implementation tree: `62994279cc5a262dee3a490d845dc2f32a8fa4b6`
+>
+> Completion-seal commit: `30ee32e02fd1ce5fe45a55f64f083f9294c85695`
 >
 > Scope: package-closed canonical outer/inner protocol and opaque physical
 > admission seam only; no process spawn, descriptor I/O, App/helper/XPC launch,
@@ -28,14 +34,14 @@ The checkpoint is therefore split before coding:
 
 ```text
 iii-b2a-i canonical supervisor protocol and opaque admission seam
--> iii-b2a-ii Darwin self-spawn, FD and process-group adapter
+-> iii-b2a-ii-a Darwin physical session composition
 -> iii-b2b zero-argument entry and final artifact
 -> ii-c0b -> ii-c -> L3c3d -> L3c4
 ```
 
 iii-b2a-i is intentionally free of Darwin spawn, descriptor and signal calls.
 It makes the wire order, one-shot receiver state and proof boundary testable
-without conflating them with physical process lifecycle. iii-b2a-ii remains
+without conflating them with physical process lifecycle. iii-b2a-ii-a remains
 responsible for supplying independently observed evidence from same-UID
 disposable processes.
 
@@ -111,7 +117,7 @@ the three existing boundary verifiers.
 ```
 
 The direct-App process-group shape, App `PGID == PID` assumption, missing FD
-8/9 ABI and immediate group TERM are separately confirmed iii-b2a-ii defects.
+8/9 ABI and immediate group TERM are separately confirmed iii-b2a-ii-a defects.
 They are excluded from this BUG_MAP because their responsible Darwin methods
 are outside this narrowed checkpoint.
 
@@ -209,9 +215,9 @@ projections, one clean staged-only serialized SwiftPM regression and independent
 semantic/verifier/cross-boundary review. This prerequisite does not run
 `scripts/verify --full`.
 
-## 7. iii-b2a-ii retained work and non-claims
+## 7. iii-b2a-ii-a retained work and non-claims
 
-iii-b2a-ii exclusively owns fixed-path self-spawn, FD 2/7/8/9 inheritance and
+iii-b2a-ii-a exclusively owns fixed-path self-spawn, FD 2/7/8/9 inheritance and
 direction checks, collision-safe relocation to `>= 10`, inner/App process
 observation, App group inheritance, normal direct-child reap, bounded natural
 drain before exact-group TERM/KILL, exit-status observation, reap-last and

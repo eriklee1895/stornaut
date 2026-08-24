@@ -86,9 +86,10 @@
 > admitting. Dependency inversion split ii-c0 into c0a/c0b; ii-c0a
 > projection-in-capsule input/intake is complete/non-admitting. A fresh source/
 > topology audit split ii-b5b-iii into b0 protocol, a per-epoch continuity, b1
-> injected cohort, b2a0 typed physical bridge, b2a physical adapter and b2b
-> entry/artifact. b0 is frozen/non-admitting; iii-a, iii-b1 and iii-b2a0 are
-> complete/non-admitting and iii-b2a is current.
+> injected cohort, b2a0 typed physical bridge, b2a-i canonical supervisor
+> admission, b2a-ii-a Darwin physical session and b2b entry/artifact. b0 is
+> frozen/non-admitting; iii-a, iii-b1, iii-b2a0 and iii-b2a-i are
+> complete/non-admitting and iii-b2a-ii-a is current.
 > Evidence:
 > [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
 > [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md) and
@@ -1127,11 +1128,11 @@ The remaining L3 work is split before driver coding:
    intake, ii-b5b-ii-b independent Darwin App identity observation,
    ii-b5b-ii-c fixed FD-7 session and ii-b5b-ii-d exact owned-PGID retirement
    and ii-c0a are complete/non-admitting. The further split is frozen as
-   `iii-b0 -> iii-a -> iii-b1 -> iii-b2a0 -> iii-b2a -> iii-b2b`; b0 is
-   documentation-only/non-admitting and iii-a/iii-b1/iii-b2a0 are complete/
-   non-admitting. The corrected
-   remaining order is `iii-b2a -> iii-b2b -> ii-c0b -> ii-c -> L3c3d -> L3c4`;
-   iii-b2a is current.
+   `iii-b0 -> iii-a -> iii-b1 -> iii-b2a0 -> iii-b2a-i -> iii-b2a-ii-a ->
+   iii-b2b`; b0 is documentation-only/non-admitting and iii-a/iii-b1/
+   iii-b2a0/iii-b2a-i are complete/non-admitting. The corrected remaining order
+   is `iii-b2a-ii-a -> iii-b2b -> ii-c0b -> ii-c -> L3c3d -> L3c4`;
+   iii-b2a-ii-a is current.
    See the
    [study](../../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md)
    and [final review](../../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md),
@@ -1228,10 +1229,19 @@ The remaining L3 work is split before driver coding:
    76-suite staged-only serial, three boundary gates, targeted Debug/Release
    builds, immutable seal and independent semantic/verifier/cross-group review.
    Its physical result is an untrusted DTO and cannot enter
-   `InvestigationMachineSingleEpochResult` or continuity. iii-b2a must bind the
-   exact request/response, acknowledgement, independently observed identity and
-   EOF/terminal evidence before one private call site mints an admitted token;
-   receiver-side replay rejection remains iii-b2a work.
+   `InvestigationMachineSingleEpochResult` or continuity. iii-b2a-i then bound
+   exact request/ownership/acknowledgement/decision/result bytes, outer-created
+   deadline, independently observed identity, EOF/terminal evidence and
+   driver-observation digest in a one-shot receiver before its single private
+   admitted-token mint. It also binds containment proof to the same admission
+   owner and terminal digest. Its
+   [preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-i-supervisor-admission-preflight.md),
+   [r1 closure](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-i-r1-post-review-closure-preflight.md)
+   and [review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-i-review.md)
+   record its exact implementation/closure/seal identities, 12 focused,
+   593 affected, 1,475-test/77-suite serial, three boundary gates, builds and
+   no-unresolved-P0–P2 review. It remains non-admitting and supplies no Darwin
+   process or descriptor authority. iii-b2a-ii-a retains that physical work.
    The b5 split, claim-abort completion and typed composer completion evidence
    are in the
    [ii-b5 preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b5-split-preflight.md),
@@ -1286,7 +1296,8 @@ L3c3c-ii-b5b-i-b3 -> L3c3c-ii-b5b-i-c ->
 L3c3c-ii-b5b-ii-a -> L3c3c-ii-b5b-ii-b -> L3c3c-ii-b5b-ii-c ->
 L3c3c-ii-b5b-ii-d -> L3c3c-ii-c0a -> L3c3c-ii-b5b-iii-b0 ->
 L3c3c-ii-b5b-iii-a -> L3c3c-ii-b5b-iii-b1 ->
-L3c3c-ii-b5b-iii-b2a0 -> L3c3c-ii-b5b-iii-b2a ->
+L3c3c-ii-b5b-iii-b2a0 -> L3c3c-ii-b5b-iii-b2a-i ->
+L3c3c-ii-b5b-iii-b2a-ii-a ->
 L3c3c-ii-b5b-iii-b2b -> L3c3c-ii-c0b ->
 L3c3c-ii-c -> L3c3d -> L3c4`.
 L3c1, L3c2, L3c3a,
@@ -1298,8 +1309,8 @@ ii-b3c concrete leaf/native entry, ii-b4 fixed helper-claim client, ii-b5a0 and
 ii-b5a, ii-b5b-i-a, i-b1, i-b2a, i-b2b-a, i-b2b-b, i-b3, i-c1 and i-c2a
 are complete and non-admitting; aggregate i-c2 and ii-b5b-ii-a/ii-b/ii-c/ii-d
 and ii-c0a are complete/non-admitting; ii-b5b-iii-b0 is frozen/non-admitting
-and iii-a/iii-b1/iii-b2a0 are complete/non-admitting; iii-b2a is the current
-implementation checkpoint.
+and iii-a/iii-b1/iii-b2a0/iii-b2a-i are complete/non-admitting; iii-b2a-ii-a
+is the current implementation checkpoint.
 ADR 0018
 remains Proposed until ii-c succeeds. L3c1 used focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean
