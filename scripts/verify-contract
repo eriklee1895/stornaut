@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=9fb0878573ba95bb8a3f14b0a448406530a02e3bf8acdb77ee5db8e0f554aed5
+ib2_self_sha=50d6c4ebabcaed2cff6fc5f8a345ece6884ca4a71f1c90f36f8cedb9e74d40c1
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -1152,7 +1152,7 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "2af09ec2a06d64851e780cb3732f8b7d73fbe51c031b5772864f5f3ca4db867f",
+        "22e31caaba006557f24a2e18ee258f6f52c59d9432e76a2ab4cc641061ae9800",
     Path("scripts/verify-app-release-boundaries"):
         "a10b9746d6645a8d4b982ae936e00f15013327ec65134a28dd1b426159f733f0",
 }
@@ -7712,12 +7712,53 @@ done
 # iii-b2a-i exact ten-path staged scope; preflight is additional documentation.
 
 iib5biii_b2ai_r1_index="$contract_root/iib5biii-b2a-i-r1.index"
-cp "$(git rev-parse --git-path index)" "$iib5biii_b2ai_r1_index"
+iib5biii_b2ai_r1_commit=6f6579834b3f5a707ab7b35152e5425e4260c6ad
+iib5biii_b2ai_r1_tree=62994279cc5a262dee3a490d845dc2f32a8fa4b6
+[[ "$(git show -s --format=%P "$iib5biii_b2ai_r1_commit")" == \
+    "$iib5biii_b2ai_commit" ]] \
+    || fail_contract "iii-b2a-i-r1 historical parent drifted"
+[[ "$(git show -s --format=%T "$iib5biii_b2ai_r1_commit")" == \
+    "$iib5biii_b2ai_r1_tree" ]] \
+    || fail_contract "iii-b2a-i-r1 historical tree drifted"
+iib5biii_b2ai_r1_paths=(
+    "$iib5biii_b2ai_protocol"
+    "$iib5biii_b2ai_continuity"
+    "$iib5biii_b2ai_bridge"
+    "$iib5biii_b2ai_test"
+    "$iib5biii_b2ai_boundary"
+    scripts/verify-app-release-boundaries
+    scripts/verify-contract
+    scripts/verify-investigation-boundaries
+)
+iib5biii_b2ai_r1_commit_paths=(
+    "${iib5biii_b2ai_r1_paths[@]}"
+    docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-i-r1-post-review-closure-preflight.md
+)
+iib5biii_b2ai_r1_observed_paths=(
+    ${(f)"$(git diff-tree --no-commit-id --name-only -r \
+        "$iib5biii_b2ai_r1_commit" | LC_ALL=C sort)"}
+)
+iib5biii_b2ai_r1_expected_paths=(
+    "${(@on)iib5biii_b2ai_r1_commit_paths}"
+)
+[[ "${(j:\n:)iib5biii_b2ai_r1_observed_paths}" == \
+    "${(j:\n:)iib5biii_b2ai_r1_expected_paths}" ]] \
+    || fail_contract "iii-b2a-i-r1 historical paths drifted"
+iib5biii_b2ai_r1_lines=$(
+    git diff-tree --numstat --no-commit-id -r "$iib5biii_b2ai_r1_commit" \
+        | awk 'index($3,"docs/")!=1 && $3!="AGENTS.md" && $3!="README.md" {n += $1 + $2} END {print n + 0}'
+)
+(( iib5biii_b2ai_r1_lines == 977 )) \
+    || fail_contract "iii-b2a-i-r1 historical line count drifted"
+GIT_INDEX_FILE="$iib5biii_b2ai_r1_index" \
+    git read-tree "$iib5biii_b2ai_r1_commit^{tree}"
 GIT_INDEX_FILE="$iib5biii_b2ai_r1_index" "$iib5biii_b2ai_gate" \
     --iib5biii-b2a-i-r1-scope-contract-only "$iib5biii_b2ai_commit" \
     >"$contract_root/iib5biii-b2a-i-r1-scope-canonical.log"
 for fixture in extra-path over-budget deleted binary mode missing-preflight \
-    wrong-baseline
+    wrong-baseline substitute-protocol substitute-continuity substitute-bridge \
+    substitute-focused substitute-boundary-test substitute-app \
+    substitute-contract substitute-boundary substitute-preflight
 do
     index="$contract_root/iib5biii-b2a-i-r1-$fixture.index"
     cp "$iib5biii_b2ai_r1_index" "$index"
@@ -7760,7 +7801,29 @@ do
         wrong-baseline)
             baseline=$iib5biii_b2ai_baseline
             expected='iii-b2a-i-r1 checkpoint baseline drifted' ;;
+        substitute-protocol) checkpoint_path=$iib5biii_b2ai_protocol ;;
+        substitute-continuity) checkpoint_path=$iib5biii_b2ai_continuity ;;
+        substitute-bridge) checkpoint_path=$iib5biii_b2ai_bridge ;;
+        substitute-focused) checkpoint_path=$iib5biii_b2ai_test ;;
+        substitute-boundary-test) checkpoint_path=$iib5biii_b2ai_boundary ;;
+        substitute-app) checkpoint_path=scripts/verify-app-release-boundaries ;;
+        substitute-contract) checkpoint_path=scripts/verify-contract ;;
+        substitute-boundary) checkpoint_path=scripts/verify-investigation-boundaries ;;
+        substitute-preflight)
+            checkpoint_path=docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-i-r1-post-review-closure-preflight.md ;;
     esac
+    if [[ $fixture == substitute-* ]]; then
+        {
+            git show "${iib5biii_b2ai_r1_commit}:$checkpoint_path"
+            print -r -- "unrelated iii-b2a-i-r1 tamper"
+        } >"$contract_root/iib5biii-b2a-i-r1-tampered"
+        blob=$(git hash-object -w -- \
+            "$contract_root/iib5biii-b2a-i-r1-tampered")
+        mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
+        GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+            "$mode,$blob,$checkpoint_path"
+        expected='iii-b2a-i-r1 completed tree drifted'
+    fi
     output="$contract_root/iib5biii-b2a-i-r1-$fixture.log"
     if GIT_INDEX_FILE="$index" "$iib5biii_b2ai_gate" \
         --iib5biii-b2a-i-r1-scope-contract-only "$baseline" \

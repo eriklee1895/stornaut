@@ -2067,6 +2067,8 @@ function verify_iib5biii_b2ai_r1_scope() {
     local preflight=docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-i-r1-post-review-closure-preflight.md
     (( ${documentation[(Ie)$preflight]} == 1 )) \
         || { print -u2 "iii-b2a-i-r1 required preflight document missing"; return 1; }
+    [[ "$(git write-tree)" == 62994279cc5a262dee3a490d845dc2f32a8fa4b6 ]] \
+        || { print -u2 "iii-b2a-i-r1 completed tree drifted"; return 1; }
 }
 
 function verify_iib5biii_b2ai_scope() {
