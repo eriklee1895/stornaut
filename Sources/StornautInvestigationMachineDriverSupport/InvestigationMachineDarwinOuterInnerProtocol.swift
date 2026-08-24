@@ -107,20 +107,28 @@ package struct InvestigationMachineDarwinEpochRequest: Sendable, Equatable {
         _ data: Data,
         expectedSelection: InvestigationMachineFixedEpochSelection
     ) throws -> Self {
+        let value = try decodeUntrusted(data)
+        guard value.invocation.selection == expectedSelection else {
+            throw protocolInvalidEncoding()
+        }
+        return value
+    }
+
+    package static func decodeUntrusted(_ data: Data) throws -> Self {
         let fields = try protocolDecode(
             data, domain: domain, ranges: [
                 1...(96 * 1_024), 32...32, 8...8, 1...1,
             ], maximum: maximumByteCount
         )
-        let invocation = try InvestigationMachineSingleEpochInvocation.decode(
-            fields[0], expectedSelection: expectedSelection
-        )
+        let invocation = try InvestigationMachineSingleEpochInvocation
+            .decodeUntrusted(fields[0])
+        let selection = invocation.selection
         guard
             InvestigationHandoffSHA256.hashing(fields[0]).rawBytes == fields[1],
             let mode = InvestigationMachineOuterContainmentMode(
                 rawValue: fields[3][fields[3].startIndex]
             ),
-            mode == protocolMode(for: expectedSelection.epoch.scenario)
+            mode == protocolMode(for: selection.epoch.scenario)
         else { throw protocolInvalidEncoding() }
         let value = try Self(
             invocation: invocation,

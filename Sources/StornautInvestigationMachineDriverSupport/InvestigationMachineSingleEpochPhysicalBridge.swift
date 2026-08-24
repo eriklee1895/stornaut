@@ -75,7 +75,28 @@ package struct InvestigationMachineSingleEpochInvocation:
         expectedSelection: InvestigationMachineFixedEpochSelection
     ) throws -> Self {
         try bridgeValidateSelection(expectedSelection)
-        let successor = expectedSelection.epoch.ordinal > 0
+        let value = try decodeUntrusted(data)
+        guard value.selection == expectedSelection else {
+            throw InvestigationMachineSingleEpochPhysicalBridgeError
+                .invalidInvocation
+        }
+        return value
+    }
+
+    package static func decodeUntrusted(_ data: Data) throws -> Self {
+        let candidates = [false, true].compactMap { successor in
+            try? decodeCandidate(data, successor: successor)
+        }
+        guard candidates.count == 1, let value = candidates.first else {
+            throw InvestigationMachineSingleEpochPhysicalBridgeError
+                .invalidInvocation
+        }
+        return value
+    }
+
+    private static func decodeCandidate(
+        _ data: Data, successor: Bool
+    ) throws -> Self {
         let ranges: [ClosedRange<Int>] = [
             16...16, 32...32, 32...32,
             1...InvestigationCohortEpoch.maximumByteCount,
@@ -93,16 +114,22 @@ package struct InvestigationMachineSingleEpochInvocation:
         let epoch = try InvestigationCohortEpoch.decode(fields[3])
         let projection = try InvestigationInstalledL2IdentityProjection
             .decode(fields[4])
+        let selection = InvestigationMachineFixedEpochSelection(
+            outerAttemptUUID: try bridgeUUID(fields[0]),
+            wholeCapsuleSHA256: try InvestigationHandoffSHA256(
+                rawBytes: fields[1]
+            ),
+            wholeInputSHA256: try InvestigationHandoffSHA256(
+                rawBytes: fields[2]
+            ),
+            epoch: epoch,
+            projection: projection
+        )
+        try bridgeValidateSelection(selection)
         guard
             try epoch.encoded() == fields[3],
             try projection.encoded() == fields[4],
-            try bridgeUUID(fields[0]) == expectedSelection.outerAttemptUUID,
-            try InvestigationHandoffSHA256(rawBytes: fields[1])
-                == expectedSelection.wholeCapsuleSHA256,
-            try InvestigationHandoffSHA256(rawBytes: fields[2])
-                == expectedSelection.wholeInputSHA256,
-            epoch == expectedSelection.epoch,
-            projection == expectedSelection.projection
+            (epoch.ordinal > 0) == successor
         else {
             throw InvestigationMachineSingleEpochPhysicalBridgeError
                 .invalidInvocation
@@ -122,7 +149,7 @@ package struct InvestigationMachineSingleEpochInvocation:
             previousHelper = nil
         }
         let value = try Self(
-            selection: expectedSelection,
+            selection: selection,
             previousHelperIdentity: previousHelper,
             predecessorSHA256: InvestigationHandoffSHA256(
                 rawBytes: fields[6]

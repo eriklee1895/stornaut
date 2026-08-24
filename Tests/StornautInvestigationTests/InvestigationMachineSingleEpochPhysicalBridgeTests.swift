@@ -6,6 +6,36 @@ import Testing
 
 @Suite("Investigation machine single epoch physical bridge", .serialized)
 struct InvestigationMachineSingleEpochPhysicalBridgeTests {
+    @Test(arguments: InvestigationHandoffScenario.allCases)
+    func invocationSelfContainedDecodeRemainsUntrustedAndCanonical(
+        _ scenario: InvestigationHandoffScenario
+    ) async throws {
+        let fixture = try PhysicalBridgeFixture(
+            ordinal: scenario.rawValue - 1
+        )
+        let invocation = try await fixture.invocation()
+        let encoded = try invocation.encoded()
+
+        let decoded = try InvestigationMachineSingleEpochInvocation
+            .decodeUntrusted(encoded)
+
+        #expect(decoded == invocation)
+        #expect(decoded.selection == fixture.selection)
+        #expect(try decoded.encoded() == encoded)
+        #expect(!(type(of: decoded) is any Codable.Type))
+        let wrongDomain = scenario == .success
+            ? "stornaut.task39.machine.epoch-invocation.successor"
+            : "stornaut.task39.machine.epoch-invocation.genesis"
+        for mutation in try strictWireMutations(encoded) + [
+            invocationWithDomain(invocation, wrongDomain),
+        ] {
+            #expect(throws: (any Error).self) {
+                _ = try InvestigationMachineSingleEpochInvocation
+                    .decodeUntrusted(mutation)
+            }
+        }
+    }
+
     @Test(arguments: PhysicalBridgeInvocationKind.allCases)
     fileprivate func invocationRoundTripsCanonicalPredecessor(
         _ kind: PhysicalBridgeInvocationKind
@@ -43,6 +73,18 @@ struct InvestigationMachineSingleEpochPhysicalBridgeTests {
         let wrongOrdinal = try PhysicalBridgeFixture(
             ordinal: 2, cohort: fixture.cohort
         )
+        let foreignInvocation = try await foreign.invocation()
+        let foreignBytes = try foreignInvocation.encoded()
+        #expect(
+            try InvestigationMachineSingleEpochInvocation.decodeUntrusted(
+                foreignBytes
+            ) == foreignInvocation
+        )
+        #expect(throws: (any Error).self) {
+            _ = try InvestigationMachineSingleEpochInvocation.decode(
+                foreignBytes, expectedSelection: fixture.selection
+            )
+        }
 
         for selection in [foreign.selection, wrongOrdinal.selection] {
             #expect(throws: (any Error).self) {
@@ -75,8 +117,16 @@ struct InvestigationMachineSingleEpochPhysicalBridgeTests {
             + [
                 digestDrift, nestedTrailing, zeroPreviousEpoch, reusedAttempt,
                 reusedNonce, outerTrailing, Data(encoded.dropLast()),
+                invocationWithDomain(
+                    invocation,
+                    "stornaut.task39.machine.epoch-invocation.genesis"
+                ),
             ]
         for bytes in malformed {
+            #expect(throws: (any Error).self) {
+                _ = try InvestigationMachineSingleEpochInvocation
+                    .decodeUntrusted(bytes)
+            }
             #expect(throws: (any Error).self) {
                 _ = try InvestigationMachineSingleEpochInvocation.decode(
                     bytes, expectedSelection: fixture.selection
@@ -702,6 +752,16 @@ private func invocationWithPreviousEpochUUID(
         outer.fields[predecessorIndex]
     ).rawBytes
     return try outer.encoded()
+}
+
+private func invocationWithDomain(
+    _ invocation: InvestigationMachineSingleEpochInvocation, _ domain: String
+) throws -> Data {
+    let transcript = try PhysicalBridgeWireTranscript(invocation.encoded())
+    return try HandoffBinaryTranscript.encode(
+        domain: domain, businessFields: transcript.fields,
+        maximumByteCount: 96 * 1_024
+    )
 }
 
 private func strictWireMutations(_ encoded: Data) throws -> [Data] {

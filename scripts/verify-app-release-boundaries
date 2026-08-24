@@ -2959,8 +2959,8 @@ function require_projection() {
 }
 require_projection \
     "$machine_driver_undefined_symbols" \
-    aa60cbd97515f12961e6a5e019a4a3dfb436f5c753fdfddd1a3b5c83610cf576 \
-    690 \
+    8c1b72fec0b93ceda181412cb6909701d608e2eb39afe380477a95e3392cba94 \
+    691 \
     undefined
 require_projection \
     "$machine_driver_loaded_libraries" \
@@ -2969,8 +2969,8 @@ require_projection \
     load-command
 require_projection \
     "$machine_driver_owned_symbols" \
-    20340fe3d9d98892bd8c1dd30985359b51a1534f788b59e996d1843b1dd3d313 \
-    6839 \
+    f758503fde02deeb4dda8b8bb48b826bfad1b3405ecc905d568822efdb9c5cff \
+    6854 \
     owned-symbol
 if ! mach_o_has_demangled_symbol \
     "$diagnostic_machine_driver" \
@@ -3050,7 +3050,7 @@ require_projection "$release_machine_driver_undefined_symbols" \
 require_projection "$release_machine_driver_loaded_libraries" \
     dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9 18 release-load-command
 require_projection "$release_machine_driver_owned_symbols" \
-    a791dc8cc57403804f20d528dfb4a7842fc545068ab5dac7423b693f1e723cdf 3677 release-owned-symbol
+    95be330898b63e980131417289c11ac11ccad9580f536885ea3e3c2e81238703 3690 release-owned-symbol
 for marker in "${machine_driver_authority_forbidden_markers[@]}"; do
     if mach_o_has_demangled_symbol "$release_machine_driver" "$marker"; then
         print -u2 "Authority or readiness leaked into Release Machine driver: $marker"

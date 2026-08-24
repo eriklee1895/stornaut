@@ -12,6 +12,34 @@ struct InvestigationMachineDarwinOuterInnerProtocolTests {
         _ scenario: InvestigationHandoffScenario
     ) throws {
         let fixture = try OuterInnerFixture(scenario: scenario)
+        let selfDecoded = try InvestigationMachineDarwinEpochRequest
+            .decodeUntrusted(fixture.request.encoded())
+        #expect(selfDecoded == fixture.request)
+        #expect(selfDecoded.invocation.selection == fixture.selection)
+        #expect(try selfDecoded.encoded() == fixture.request.encoded())
+        let foreign = try OuterInnerFixture(
+            scenario: scenario,
+            configuration: Data("foreign-\(scenario.rawValue)".utf8)
+        )
+        let foreignBytes = try foreign.request.encoded()
+        #expect(
+            try InvestigationMachineDarwinEpochRequest.decodeUntrusted(
+                foreignBytes
+            ) == foreign.request
+        )
+        #expect(throws: (any Error).self) {
+            _ = try InvestigationMachineDarwinEpochRequest.decode(
+                foreignBytes, expectedSelection: fixture.selection
+            )
+        }
+        for mutation in try strictUntrustedRequestMutations(
+            fixture.request.encoded()
+        ) {
+            #expect(throws: (any Error).self) {
+                _ = try InvestigationMachineDarwinEpochRequest
+                    .decodeUntrusted(mutation)
+            }
+        }
         var values: [(Data, (Data) throws -> Void)] = [
             (try fixture.request.encoded(), {
                 _ = try InvestigationMachineDarwinEpochRequest.decode(
@@ -917,4 +945,81 @@ private func strictProtocolMutations(_ encoded: Data) -> [Data] {
     var trailing = encoded
     trailing.append(0x7f)
     return [changed, trailing, Data(encoded.dropLast())]
+}
+
+private struct OuterInnerWireTranscript {
+    let domain: String
+    var fields: [Data]
+
+    init(_ encoded: Data) throws {
+        var cursor = HandoffBinaryCursor(data: encoded)
+        guard try cursor.readUInt32() == HandoffBinaryTranscript.magic else {
+            throw InvestigationHandoffContractError.invalidEncoding
+        }
+        let domainBytes = try cursor.readTaggedField(
+            expectedTag: 0,
+            admittedByteCounts: 1...HandoffBinaryTranscript.maximumDomainByteCount
+        )
+        guard let domain = String(data: domainBytes, encoding: .utf8) else {
+            throw InvestigationHandoffContractError.invalidEncoding
+        }
+        let version = try cursor.readTaggedField(
+            expectedTag: 1, admittedByteCounts: 4...4
+        )
+        var versionCursor = HandoffBinaryCursor(data: version)
+        guard
+            try versionCursor.readUInt32() == HandoffBinaryTranscript.version,
+            versionCursor.isAtEnd
+        else {
+            throw InvestigationHandoffContractError.invalidEncoding
+        }
+        var fields: [Data] = []
+        var tag: UInt16 = 2
+        while !cursor.isAtEnd {
+            fields.append(try cursor.readTaggedField(
+                expectedTag: tag, admittedByteCounts: 1...encoded.count
+            ))
+            tag += 1
+        }
+        self.domain = domain
+        self.fields = fields
+    }
+
+    func encoded(domain requestedDomain: String? = nil) throws -> Data {
+        try HandoffBinaryTranscript.encode(
+            domain: requestedDomain ?? domain, businessFields: fields,
+            maximumByteCount: 128 * 1_024
+        )
+    }
+}
+
+private func strictUntrustedRequestMutations(_ encoded: Data) throws
+    -> [Data]
+{
+    let source = try OuterInnerWireTranscript(encoded)
+    guard source.fields.count == 4 else {
+        throw InvestigationHandoffContractError.invalidEncoding
+    }
+    var nested = source
+    nested.fields[0][nested.fields[0].startIndex] ^= 0x01
+    nested.fields[1] = InvestigationHandoffSHA256.hashing(
+        nested.fields[0]
+    ).rawBytes
+    var digest = source
+    digest.fields[1][digest.fields[1].startIndex] ^= 0x01
+    var zeroDeadline = source
+    zeroDeadline.fields[2] = Data(repeating: 0, count: 8)
+    var mode = source
+    mode.fields[3] = Data([
+        source.fields[3][source.fields[3].startIndex] == 0x01 ? 0x02 : 0x01
+    ])
+    var missing = source
+    missing.fields.removeLast()
+    var duplicate = source
+    duplicate.fields.append(source.fields.last!)
+    return try [
+        source.encoded(domain: source.domain + ".drift"),
+        nested.encoded(), digest.encoded(), zeroDeadline.encoded(),
+        mode.encoded(), missing.encoded(), duplicate.encoded(),
+    ] + strictProtocolMutations(encoded)
 }

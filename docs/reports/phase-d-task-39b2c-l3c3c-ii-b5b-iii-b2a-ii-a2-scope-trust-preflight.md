@@ -63,19 +63,21 @@ frozen ownership model impossible.
 
 ### Exact scope and budget
 
-At most seven non-document paths and 1,800 changed non-document lines:
+At most eight non-document paths and 1,800 changed non-document lines:
 
 1. `Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochPhysicalBridge.swift`;
 2. `Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerProtocol.swift`;
 3. `Tests/StornautInvestigationTests/InvestigationMachineSingleEpochPhysicalBridgeTests.swift`;
 4. `Tests/StornautInvestigationTests/InvestigationMachineDarwinOuterInnerProtocolTests.swift`;
 5. `Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift`;
-6. `scripts/verify-contract`; and
-7. `scripts/verify-investigation-boundaries`.
+6. `scripts/verify-contract`;
+7. `scripts/verify-investigation-boundaries`; and
+8. `scripts/verify-app-release-boundaries`.
 
-No App-release verifier, Package/Xcode graph, Darwin spawn/session/identity/
-retirement source, App/Diagnostic/Lifecycle/Machine target or public entry may
-change in a2-0.
+No Package/Xcode graph, Darwin spawn/session/identity/retirement source, App/
+Diagnostic/Lifecycle/Machine target or public entry may change in a2-0. The App-
+release verifier changes only to retain its exact independently measured Xcode
+Debug/Release Machine Driver projections.
 
 ### Tests-first gate
 

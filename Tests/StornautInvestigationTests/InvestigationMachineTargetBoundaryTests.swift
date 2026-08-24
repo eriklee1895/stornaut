@@ -1701,6 +1701,63 @@ struct InvestigationMachineTargetBoundaryTests {
         }
     }
 
+    @Test
+    func iiiB2AIIA20VerifierPinsSelfContainedUntrustedDecodeAndExactScope()
+        throws
+    {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ), encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        let app = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-app-release-boundaries"
+            ), encoding: .utf8
+        )
+        for marker in [
+            "--iib5biii-b2a-ii-a20-contract-only",
+            "--iib5biii-b2a-ii-a20-scope-contract-only",
+            "function verify_iib5biii_b2a_iia20_contract()",
+            "function verify_iib5biii_b2a_iia20_scope()",
+            "iii-b2a-ii-a2-0 invocation self-decode drifted",
+            "iii-b2a-ii-a2-0 request self-decode drifted",
+            "iii-b2a-ii-a2-0 authority surface drifted",
+            "iii-b2a-ii-a2-0 staged checkpoint paths drifted",
+            "iii-b2a-ii-a2-0 checkpoint budget drifted",
+            "b46120d3161b5992018f4b990382bd6ced49d599",
+            "(( ${#expected} == 8 ))",
+            "(( changed <= 1800 ))",
+        ] {
+            #expect(boundary.contains(marker))
+        }
+        for marker in [
+            "iib5biii_b2a_iia20_gate=scripts/verify-investigation-boundaries",
+            "iii-b2a-ii-a2-0 mutation accepted:",
+            "iii-b2a-ii-a2-0 scope mutation accepted:",
+            "invocation-candidate-count",
+            "invocation-selection-join",
+            "request-invocation-decode",
+            "request-selection-join",
+            "test-self-decode",
+        ] {
+            #expect(contract.contains(marker))
+        }
+        for marker in [
+            "8c1b72fec0b93ceda181412cb6909701d608e2eb39afe380477a95e3392cba94",
+            "f758503fde02deeb4dda8b8bb48b826bfad1b3405ecc905d568822efdb9c5cff",
+            "95be330898b63e980131417289c11ac11ccad9580f536885ea3e3c2e81238703",
+        ] {
+            #expect(app.contains(marker))
+        }
+    }
+
     @Test func iiB5BIAProjectionVerifierPinsPureBinaryAndTemporalContract() throws {
         let root = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let sources = try ["scripts/verify-investigation-boundaries", "scripts/verify-contract"].map {

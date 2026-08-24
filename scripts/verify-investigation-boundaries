@@ -94,6 +94,14 @@ iib5biii_b2a_iia1v_focused_test_source=
 iib5biii_b2a_iia1v_boundary_test_source=
 iib5biii_b2a_iia1v_scope_contract_only=false
 iib5biii_b2a_iia1v_scope_baseline=72d506de45deccb0cc0d6337b04a8f0e7ad751eb
+iib5biii_b2a_iia20_contract_only=false
+iib5biii_b2a_iia20_bridge_source=
+iib5biii_b2a_iia20_protocol_source=
+iib5biii_b2a_iia20_bridge_test_source=
+iib5biii_b2a_iia20_protocol_test_source=
+iib5biii_b2a_iia20_boundary_test_source=
+iib5biii_b2a_iia20_scope_contract_only=false
+iib5biii_b2a_iia20_scope_baseline=b46120d3161b5992018f4b990382bd6ced49d599
 iib5bia_projection_contract_only=false
 iib5bia_contract_source=
 iib5bia_focused_test_source=
@@ -352,6 +360,18 @@ if (( $# > 0 )); then
         && [[ $1 == --iib5biii-b2a-ii-a1v-scope-contract-only ]]; then
         iib5biii_b2a_iia1v_scope_contract_only=true
         iib5biii_b2a_iia1v_scope_baseline=${2:-72d506de45deccb0cc0d6337b04a8f0e7ad751eb}
+    elif (( $# == 6 )) \
+        && [[ $1 == --iib5biii-b2a-ii-a20-contract-only ]]; then
+        iib5biii_b2a_iia20_contract_only=true
+        iib5biii_b2a_iia20_bridge_source=$2
+        iib5biii_b2a_iia20_protocol_source=$3
+        iib5biii_b2a_iia20_bridge_test_source=$4
+        iib5biii_b2a_iia20_protocol_test_source=$5
+        iib5biii_b2a_iia20_boundary_test_source=$6
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iib5biii-b2a-ii-a20-scope-contract-only ]]; then
+        iib5biii_b2a_iia20_scope_contract_only=true
+        iib5biii_b2a_iia20_scope_baseline=${2:-b46120d3161b5992018f4b990382bd6ced49d599}
     elif (( $# == 3 )) \
         && [[ $1 == --iib5bia-projection-contract-only ]]; then
         iib5bia_projection_contract_only=true
@@ -1590,6 +1610,7 @@ test_code = re.sub(
     flags=re.DOTALL | re.MULTILINE,
 )
 required_tests = (
+    "invocationSelfContainedDecodeRemainsUntrustedAndCanonical",
     "invocationRoundTripsCanonicalPredecessor",
     "invocationRejectsForeignSelectionTamperAndTrailingBytes",
     "protocolDefaultForwardsLegacyHelperAndCompositionUsesFullInvocation",
@@ -1599,11 +1620,11 @@ required_tests = (
     "#expect(await [first, second].filter { $0 }.count == 1)",
     "selectionWithDifferentConfiguration",
 )
-if test_code.count("@Test") != 6 or any(
+if test_code.count("@Test") != 7 or any(
     marker not in test_code for marker in required_tests
 ):
     fail("iii-b2a0 focused test vacuity or coverage drifted")
-expected_test_sha256 = "89779c607e5bde6ffe9a3dda2513fd4b0268d1e3229d7c589720a7bf976128c4"
+expected_test_sha256 = "96cd6b903be68d023547f95b8b4945f02bf6fe7a6dfe9676ad9750f5921a6b28"
 if __import__("hashlib").sha256(test_path.read_bytes()).hexdigest() != expected_test_sha256:
     fail("iii-b2a0 focused test source seal drifted")
 for marker in (
@@ -2511,6 +2532,163 @@ function verify_iib5biii_b2a_iia1v_scope() {
         || { print -u2 "iii-b2a-ii-a1-v required preflight document missing"; return 1; }
     [[ "$(git write-tree)" == "$implementation_tree" ]] \
         || { print -u2 "iii-b2a-ii-a1-v completed tree drifted"; return 1; }
+}
+
+function verify_iib5biii_b2a_iia20_contract() {
+    local bridge_source=$1 protocol_source=$2 bridge_test_source=$3
+    local protocol_test_source=$4 boundary_test_source=$5
+    for source in "$bridge_source" "$protocol_source" \
+        "$bridge_test_source" "$protocol_test_source" \
+        "$boundary_test_source"
+    do
+        xcrun swiftc -frontend -parse -enable-bare-slash-regex "$source"
+    done
+    python3 - "$bridge_source" "$protocol_source" \
+        "$bridge_test_source" "$protocol_test_source" \
+        "$boundary_test_source" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+bridge_path, protocol_path, bridge_test_path, protocol_test_path, boundary_path = map(
+    Path, sys.argv[1:]
+)
+bridge = bridge_path.read_text(encoding="utf-8")
+protocol = protocol_path.read_text(encoding="utf-8")
+bridge_test = bridge_test_path.read_text(encoding="utf-8")
+protocol_test = protocol_test_path.read_text(encoding="utf-8")
+boundary = boundary_path.read_text(encoding="utf-8")
+
+def fail(message):
+    raise SystemExit(message)
+
+if bridge.count("package static func decodeUntrusted(_ data: Data) throws -> Self") != 1:
+    fail("iii-b2a-ii-a2-0 invocation decoder cardinality drifted")
+for marker in (
+    "let value = try decodeUntrusted(data)",
+    "guard value.selection == expectedSelection else",
+    "let candidates = [false, true].compactMap",
+    "try? decodeCandidate(data, successor: successor)",
+    "guard candidates.count == 1, let value = candidates.first else",
+    "let selection = InvestigationMachineFixedEpochSelection(",
+    "try bridgeValidateSelection(selection)",
+    "(epoch.ordinal > 0) == successor",
+    "selection: selection,",
+    "guard try value.encoded() == data else",
+):
+    if marker not in bridge:
+        fail("iii-b2a-ii-a2-0 invocation self-decode drifted")
+if protocol.count("package static func decodeUntrusted(_ data: Data) throws -> Self") != 1:
+    fail("iii-b2a-ii-a2-0 request decoder cardinality drifted")
+for marker in (
+    "let value = try decodeUntrusted(data)",
+    "guard value.invocation.selection == expectedSelection else",
+    "let invocation = try InvestigationMachineSingleEpochInvocation",
+    ".decodeUntrusted(fields[0])",
+    "InvestigationHandoffSHA256.hashing(fields[0]).rawBytes == fields[1]",
+    "mode == protocolMode(for: selection.epoch.scenario)",
+    "guard try value.encoded() == data else",
+):
+    if marker not in protocol:
+        fail("iii-b2a-ii-a2-0 request self-decode drifted")
+semantic = bridge + protocol
+if re.search(r"(?m)^\s*(?:public|open)\s+", semantic):
+    fail("iii-b2a-ii-a2-0 package boundary drifted")
+for source in (bridge, protocol):
+    imports = set(re.findall(
+        r"(?m)^import\s+([A-Za-z0-9_]+)\s*$", source
+    ))
+    if imports != {"Foundation", "StornautInvestigationHandoffContract"}:
+        fail("iii-b2a-ii-a2-0 dependency surface drifted")
+stripped = re.sub(
+    r'/\*.*?\*/|//.*$|#?"(?:\\.|[^"\\])*"', ' ', semantic,
+    flags=re.DOTALL | re.MULTILINE,
+)
+for pattern in (
+    r":\s*[^{}\n]*\b(?:Codable|Encodable|Decodable)\b",
+    r"\b(?:NSXPCConnection|URLSession|FileManager|Process)\b",
+    r"\b(?:posix_spawn|fork|execve|open|write|socket|connect|send|recv|kill|waitpid|waitid)\s*\(",
+    r"\b(?:StornautExecution|MoveToTrash|RegisteredAction)\b",
+):
+    if re.search(pattern, stripped):
+        fail("iii-b2a-ii-a2-0 authority surface drifted")
+for test_source, required in (
+    (bridge_test, (
+        "invocationSelfContainedDecodeRemainsUntrustedAndCanonical",
+        "InvestigationHandoffScenario.allCases",
+        "decodeUntrusted(encoded)",
+        "invocationWithDomain",
+        "strictWireMutations(encoded)",
+        "foreignBytes",
+        "expectedSelection: fixture.selection",
+    )),
+    (protocol_test, (
+        "canonicalMessagesRoundTripAllEightScenariosAndRejectWireMutation",
+        "decodeUntrusted(fixture.request.encoded())",
+        "strictUntrustedRequestMutations",
+        "nested.fields[0][nested.fields[0].startIndex] ^= 0x01",
+        "zeroDeadline.fields[2]",
+        "mode.fields[3]",
+    )),
+):
+    if any(marker not in test_source for marker in required):
+        fail("iii-b2a-ii-a2-0 focused tests became vacuous")
+for marker in (
+    "iiiB2AIIA20VerifierPinsSelfContainedUntrustedDecodeAndExactScope",
+    "--iib5biii-b2a-ii-a20-contract-only",
+    "--iib5biii-b2a-ii-a20-scope-contract-only",
+):
+    if marker not in boundary:
+        fail("iii-b2a-ii-a2-0 boundary regression drifted")
+PY
+}
+
+function verify_iib5biii_b2a_iia20_scope() {
+    local baseline=${1:-b46120d3161b5992018f4b990382bd6ced49d599}
+    local expected=(
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerProtocol.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochPhysicalBridge.swift
+        Tests/StornautInvestigationTests/InvestigationMachineDarwinOuterInnerProtocolTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineSingleEpochPhysicalBridgeTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-app-release-boundaries
+        scripts/verify-contract
+        scripts/verify-investigation-boundaries
+    )
+    (( ${#expected} == 8 )) \
+        || { print -u2 "iii-b2a-ii-a2-0 checkpoint path ceiling drifted"; return 1; }
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" \
+        == b46120d3161b5992018f4b990382bd6ced49d599 ]] \
+        || { print -u2 "iii-b2a-ii-a2-0 checkpoint baseline drifted"; return 1; }
+    if git diff --cached --name-only --diff-filter=D "$baseline" \
+        | awk 'index($0,"docs/")!=1 {found=1} END {exit !found}'
+    then
+        print -u2 "iii-b2a-ii-a2-0 checkpoint deleted an existing path"
+        return 1
+    fi
+    if git diff --cached --numstat "$baseline" \
+        | awk 'index($3,"docs/")!=1 && ($1=="-" || $2=="-") {found=1} END {exit !found}'
+    then
+        print -u2 "iii-b2a-ii-a2-0 binary checkpoint path rejected"
+        return 1
+    fi
+    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD \
+        "$baseline" | awk 'index($0,"docs/")!=1 && $0!="AGENTS.md" && $0!="README.md"')"})
+    [[ "${(j:\n:)${(@on)observed}}" == "${(j:\n:)${(@on)expected}}" ]] \
+        || { print -u2 "iii-b2a-ii-a2-0 staged checkpoint paths drifted"; return 1; }
+    local expected_path expected_mode observed_entry
+    for expected_path in "${expected[@]}"; do
+        expected_mode=100644
+        [[ $expected_path == scripts/* ]] && expected_mode=100755
+        observed_entry=$(git ls-files -s -- "$expected_path")
+        [[ "$(print -r -- "$observed_entry" | awk '{print $1, $3, $4}')" \
+            == "$expected_mode 0 $expected_path" ]] \
+            || { print -u2 "iii-b2a-ii-a2-0 checkpoint mode drifted: $expected_path"; return 1; }
+    done
+    local changed=$(git diff --cached --numstat "$baseline" \
+        | awk 'index($3,"docs/")!=1 && $3!="AGENTS.md" && $3!="README.md" {n+=$1+$2} END {print n+0}')
+    (( changed <= 1800 )) \
+        || { print -u2 "iii-b2a-ii-a2-0 checkpoint budget drifted"; return 1; }
 }
 
 function verify_iib5bia_projection_contract() {
@@ -8459,6 +8637,21 @@ if $iib5biii_b2a_iia1v_scope_contract_only; then
     print "iii-b2a-ii-a1-v staged scope verification passed."
     exit 0
 fi
+if $iib5biii_b2a_iia20_contract_only; then
+    verify_iib5biii_b2a_iia20_contract \
+        "$iib5biii_b2a_iia20_bridge_source" \
+        "$iib5biii_b2a_iia20_protocol_source" \
+        "$iib5biii_b2a_iia20_bridge_test_source" \
+        "$iib5biii_b2a_iia20_protocol_test_source" \
+        "$iib5biii_b2a_iia20_boundary_test_source"
+    print "iii-b2a-ii-a2-0 self-contained decode contract verification passed."
+    exit 0
+fi
+if $iib5biii_b2a_iia20_scope_contract_only; then
+    verify_iib5biii_b2a_iia20_scope "$iib5biii_b2a_iia20_scope_baseline"
+    print "iii-b2a-ii-a2-0 staged scope verification passed."
+    exit 0
+fi
 if $iib5bia_projection_contract_only; then
     verify_iib5bia_projection_contract "$iib5bia_contract_source" "$iib5bia_focused_test_source"
     print "ii-b5b-i-a projection contract verification passed."
@@ -10642,7 +10835,7 @@ expected_driver_support_sha256 = {
     "InvestigationMachineDarwinEpochRetirement.swift":
         "574fe7df157c04b573602a222df40fe08bc4759d41fc88b56e8695b636ce38a8",
     "InvestigationMachineDarwinOuterInnerProtocol.swift":
-        "1607539374ce8a28978d5f051a61e5c996909d8b3dbb02e9a3435fc4be08c4ac",
+        "615ba9b6f1d6c7a0239163c4b56e4ec0e894536b9fec6236e1802a51e788233e",
     "InvestigationMachineDarwinDriverChildObservation.swift":
         "af4a51c631fa2060426c1a4ebabd0260309a12a3a47629993c239674798411f3",
     "InvestigationMachineDarwinOuterInnerSession.swift":
@@ -10658,7 +10851,7 @@ expected_driver_support_sha256 = {
     "InvestigationMachineSingleEpochInstalledL2Join.swift":
         "376148fd9e0284c03e399ed281cd47696bed3c35630cf272fa639b7df99960d2",
     "InvestigationMachineSingleEpochPhysicalBridge.swift":
-        "752981f63405012fc249324bfaae898aeef5063e2efe5a3512531a37685ce697",
+        "844fcdb089b6749c96276b3a770ec4222ec58591ca74c08fed56f68ef88968ed",
 }
 for source_name in driver_support_sources:
     source_path = driver_support_source_root / source_name
@@ -11997,20 +12190,20 @@ function require_exact_machine_driver_projection() {
 
     case "$configuration" in
         debug)
-            expected_undefined_sha=aa60cbd97515f12961e6a5e019a4a3dfb436f5c753fdfddd1a3b5c83610cf576
-            expected_undefined_lines=690
+            expected_undefined_sha=8c1b72fec0b93ceda181412cb6909701d608e2eb39afe380477a95e3392cba94
+            expected_undefined_lines=691
             expected_loads_sha=dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9
             expected_loads_lines=18
-            expected_owned_sha=97e435263047ae0012deac729774fc7335cac7bc80952a737575fe8c9b07448b
-            expected_owned_lines=6840
+            expected_owned_sha=eb3d2531f75a0b221a578b7e1c2514238f03a3cdc10cfc70306792f8dfe57a62
+            expected_owned_lines=6855
             ;;
         release)
             expected_undefined_sha=200b958fb36101f258f67621035f80b89b26c465271ae6708cf5856de7bf573b
             expected_undefined_lines=450
             expected_loads_sha=dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9
             expected_loads_lines=18
-            expected_owned_sha=cb140076d564983e8bcd78bf7cc274646cc133be07dcaab225312733a186234d
-            expected_owned_lines=3678
+            expected_owned_sha=4b6c7ea1d313326f97eb6ca3e2605c9b48dd9fdaa757303aa131a9bc3cfc2978
+            expected_owned_lines=3691
             ;;
         *)
             print -u2 "Unknown Machine driver projection: $configuration"
