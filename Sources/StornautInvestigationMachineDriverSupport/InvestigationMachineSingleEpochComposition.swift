@@ -331,6 +331,15 @@ protocol InvestigationMachineSingleEpochComposing: Sendable {
     ) async throws -> InvestigationMachineSingleEpochResult
 }
 
+protocol InvestigationMachinePhysicalSingleEpochComposing:
+    InvestigationMachineSingleEpochComposing
+{
+    func run(
+        invocation: InvestigationMachineSingleEpochInvocation,
+        epochDeadlineNanoseconds: UInt64
+    ) async throws -> InvestigationMachineSingleEpochResult
+}
+
 extension InvestigationMachineSingleEpochComposing {
     func run(
         invocation: InvestigationMachineSingleEpochInvocation
@@ -383,6 +392,8 @@ package actor InvestigationMachineSingleEpochComposition {
             currentHelper = completion.helperIdentity
         case let .ownershipTransferred(ownership):
             currentHelper = ownership.helperIdentity
+        case let .admittedPhysical(admitted):
+            currentHelper = admitted.helperIdentity
         }
         guard
             predecessorMaterial.previousHelperIdentity == nil

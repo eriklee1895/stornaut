@@ -16,7 +16,11 @@ package enum InvestigationMachineSingleEpochResult: Sendable, Equatable {
     case ownershipTransferred(
         InvestigationMachineSingleEpochOwnershipCandidate
     )
+    case admittedPhysical(
+        InvestigationMachineSingleEpochAdmittedPhysicalResult
+    )
 }
+
 package struct InvestigationMachineSingleEpochRetirementProof: Sendable, Equatable { init() {} }
 package struct InvestigationMachineSingleEpochTerminalStartProof: Sendable, Equatable { package init() {} }
 package struct InvestigationMachineSingleEpochAppObservation: Sendable, Equatable {
@@ -144,7 +148,7 @@ extension InvestigationMachineClaimClient: InvestigationMachineSingleEpochClaimi
     }
 }
 package actor InvestigationMachineSingleEpochComposer {
-    private static let maximumEpochWindowNanoseconds: UInt64 = 140_000_000_000
+    static let maximumEpochWindowNanoseconds: UInt64 = 140_000_000_000
     private let commitment: InvestigationMachineSingleEpochCommitment
     private let observer: any InvestigationMachineSingleEpochInstalledDriverObserving
     private let clock: any InvestigationMachineSingleEpochClocking
@@ -200,16 +204,47 @@ package actor InvestigationMachineSingleEpochComposer {
     func run(
         previousHelperIdentity: InvestigationMachineProcessIdentity?
     ) async throws -> InvestigationMachineSingleEpochResult {
+        try beginRun()
+        return try await execute(
+            previousHelperIdentity: previousHelperIdentity,
+            requestedEpochDeadlineNanoseconds: nil
+        )
+    }
+
+    func run(
+        previousHelperIdentity: InvestigationMachineProcessIdentity?,
+        epochDeadlineNanoseconds: UInt64
+    ) async throws -> InvestigationMachineSingleEpochResult {
+        try beginRun()
+        return try await execute(
+            previousHelperIdentity: previousHelperIdentity,
+            requestedEpochDeadlineNanoseconds: epochDeadlineNanoseconds
+        )
+    }
+
+    func run(
+        invocation: InvestigationMachineSingleEpochInvocation,
+        epochDeadlineNanoseconds: UInt64
+    ) async throws -> InvestigationMachineSingleEpochResult {
+        guard isBound(to: invocation.selection) else {
+            throw InvestigationMachineSingleEpochError.invalidCommitment
+        }
+        return try await run(
+            previousHelperIdentity: invocation.previousHelperIdentity,
+            epochDeadlineNanoseconds: epochDeadlineNanoseconds
+        )
+    }
+
+    private func beginRun() throws {
         guard !consumed else {
             throw InvestigationMachineSingleEpochError.alreadyConsumed
         }
         consumed = true
-        return try await execute(
-            previousHelperIdentity: previousHelperIdentity
-        )
     }
+
     private func execute(
-        previousHelperIdentity: InvestigationMachineProcessIdentity?
+        previousHelperIdentity: InvestigationMachineProcessIdentity?,
+        requestedEpochDeadlineNanoseconds: UInt64?
     ) async throws -> InvestigationMachineSingleEpochResult {
         let epoch = commitment.epoch
         guard epoch.scenario.rawValue == epoch.ordinal + 1 else {
@@ -224,10 +259,18 @@ package actor InvestigationMachineSingleEpochComposer {
         let now: UInt64
         do { now = try clock.continuousNanoseconds() }
         catch { throw InvestigationMachineSingleEpochError.deadlineInvalid }
-        let deadline = now.addingReportingOverflow(
+        let maximum = now.addingReportingOverflow(
             Self.maximumEpochWindowNanoseconds
         )
-        guard !deadline.overflow, deadline.partialValue > now else {
+        guard !maximum.overflow else {
+            throw InvestigationMachineSingleEpochError.deadlineInvalid
+        }
+        let epochDeadlineNanoseconds = requestedEpochDeadlineNanoseconds
+            ?? maximum.partialValue
+        guard
+            epochDeadlineNanoseconds > now,
+            epochDeadlineNanoseconds <= maximum.partialValue
+        else {
             throw InvestigationMachineSingleEpochError.deadlineInvalid
         }
         let bootstrap: InvestigationHandoffEpochBootstrap
@@ -235,10 +278,10 @@ package actor InvestigationMachineSingleEpochComposer {
         do {
             bootstrap = try InvestigationHandoffEpochBootstrap(
                 epochUUID: epoch.epochUUID,
-                epochDeadlineNanoseconds: deadline.partialValue
+                epochDeadlineNanoseconds: epochDeadlineNanoseconds
             )
             sharedDeadline = try InvestigationMachineClaimClientSharedDeadline(
-                epochDeadlineNanoseconds: deadline.partialValue
+                epochDeadlineNanoseconds: epochDeadlineNanoseconds
             )
         } catch {
             throw InvestigationMachineSingleEpochError.deadlineInvalid
@@ -388,7 +431,7 @@ package actor InvestigationMachineSingleEpochComposer {
                     projection: commitment.projection,
                     appIdentity: appIdentity, claimEvidence: evidence,
                     epochUUID: epoch.epochUUID,
-                    deadlineNanoseconds: deadline.partialValue
+                    deadlineNanoseconds: epochDeadlineNanoseconds
                 )
                 try Task.checkCancellation()
             } catch is CancellationError {
@@ -410,7 +453,7 @@ package actor InvestigationMachineSingleEpochComposer {
                     semanticObservation: semanticObservation,
                     repeatedAppIdentity: repeatedIdentity,
                     epochUUID: epoch.epochUUID,
-                    deadlineNanoseconds: deadline.partialValue
+                    deadlineNanoseconds: epochDeadlineNanoseconds
                 )
             } catch {
                 throw InvestigationMachineSingleEpochError.installedL2Failed
@@ -423,7 +466,7 @@ package actor InvestigationMachineSingleEpochComposer {
                     semanticObservation: semanticObservation,
                     repeatedAppIdentity: repeatedIdentity,
                     installedL2Proof: installedL2Proof,
-                    epochDeadlineNanoseconds: deadline.partialValue
+                    epochDeadlineNanoseconds: epochDeadlineNanoseconds
                 )
             } catch {
                 throw InvestigationMachineSingleEpochError.installedL2Failed
@@ -599,4 +642,5 @@ package actor InvestigationMachineSingleEpochComposer {
 }
 
 extension InvestigationMachineSingleEpochComposer:
-    InvestigationMachineSingleEpochComposing {}
+    InvestigationMachineSingleEpochComposing,
+    InvestigationMachinePhysicalSingleEpochComposing {}

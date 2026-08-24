@@ -586,6 +586,7 @@ struct InvestigationMachineTargetBoundaryTests {
             "InvestigationMachineDarwinAppIdentityObservation.swift",
             "InvestigationMachineDarwinEpochSession.swift",
             "InvestigationMachineDarwinEpochRetirement.swift",
+            "InvestigationMachineDarwinOuterInnerProtocol.swift",
             "InvestigationMachineDriverSupport.swift",
             "InvestigationMachineEightEpochCohort.swift",
             "InvestigationMachineFixedCapsuleIntake.swift",
@@ -716,6 +717,10 @@ struct InvestigationMachineTargetBoundaryTests {
                 "import Darwin",
                 "import Dispatch",
                 "import Foundation",
+            ],
+            "InvestigationMachineDarwinOuterInnerProtocol.swift": [
+                "import Foundation",
+                "import StornautInvestigationHandoffContract",
             ],
             "InvestigationMachineInstalledDriverObservation.swift": [
                 "import Darwin",
@@ -1005,6 +1010,8 @@ struct InvestigationMachineTargetBoundaryTests {
             ] {
                 let semanticException = (sourceName == "InvestigationMachineClaimClient.swift" && forbidden == "connect(")
                     || (sourceName == "InvestigationMachineSingleEpoch.swift" && forbidden == "send(")
+                    || (sourceName == "InvestigationMachineDarwinOuterInnerProtocol.swift"
+                        && forbidden == "accept(")
                     || (sourceName == "InvestigationMachineDarwinEpochSession.swift"
                         && ["socketpair", "posix_spawn", "fcntl("].contains(forbidden))
                     || (sourceName == "InvestigationMachineDarwinEpochRetirement.swift"
@@ -1418,6 +1425,81 @@ struct InvestigationMachineTargetBoundaryTests {
         #expect(app.contains(
             "--iib5biii-b2a0-source-contract-only"
         ))
+    }
+
+    @Test
+    func iiiB2AISupervisorVerifierPinsCanonicalAdmissionAndExactScope() throws {
+        let repositoryRoot = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let boundary = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ), encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: repositoryRoot.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        let app = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "scripts/verify-app-release-boundaries"
+            ), encoding: .utf8
+        )
+        for marker in [
+            "--iib5biii-b2a-i-supervisor-contract-only",
+            "--iib5biii-b2a-i-scope-contract-only",
+            "function verify_iib5biii_b2ai_supervisor_contract()",
+            "function verify_iib5biii_b2ai_scope()",
+            "iii-b2a-i package boundary drifted",
+            "iii-b2a-i canonical decode or EOF contract drifted",
+            "iii-b2a-i admitted token mint cardinality drifted",
+            "iii-b2a-i raw physical DTO admission drifted",
+            "iii-b2a-i outer one-shot ordering drifted",
+            "iii-b2a-i independent identity or deadline binding drifted",
+            "iii-b2a-i terminal evidence binding drifted",
+            "iii-b2a-i request-bound composer deadline drifted",
+            "iii-b2a-i focused test names or cardinality drifted",
+            "iii-b2a-i focused test became vacuous",
+            "iii-b2a-i staged checkpoint paths drifted",
+            "iii-b2a-i checkpoint budget drifted",
+            "iii-b2a-i required preflight document missing",
+        ] {
+            #expect(boundary.contains(marker))
+        }
+        for marker in [
+            "--iib5biii-b2a-i-source-contract-only",
+            "function verify_iib5biii_b2ai_source_contract()",
+            "iii-b2a-i source-only App boundary gained physical authority",
+            "iii-b2a-i source-only raw DTO admission drifted",
+        ] {
+            #expect(app.contains(marker))
+        }
+        for marker in [
+            "iib5biii_b2ai_gate=scripts/verify-investigation-boundaries",
+            "--iib5biii-b2a-i-supervisor-contract-only",
+            "--iib5biii-b2a-i-scope-contract-only",
+            "iii-b2a-i mutation accepted:",
+            "iii-b2a-i scope mutation accepted:",
+            "canonical-request-domain",
+            "outer-replay-guard",
+            "raw-dto-admission",
+            "admitted-token-public-init",
+            "admitted-token-second-mint",
+            "terminal-app-binding",
+            "terminal-helper-binding",
+            "physical-deadline-forwarding",
+            "vacuous-focused-test",
+            "comment-only-focused-test",
+            "extra-path",
+            "over-budget",
+            "wrong-baseline",
+            "missing-preflight",
+            "iii-b2a-i exact ten-path staged scope",
+        ] {
+            #expect(contract.contains(marker))
+        }
     }
 
     @Test func iiB5BIAProjectionVerifierPinsPureBinaryAndTemporalContract() throws {

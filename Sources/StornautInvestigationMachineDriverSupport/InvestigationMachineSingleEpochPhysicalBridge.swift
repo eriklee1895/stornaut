@@ -249,6 +249,11 @@ package struct InvestigationMachineSingleEpochPhysicalResult:
     package var bindingSHA256: InvestigationHandoffSHA256 {
         completion?.bindingSHA256 ?? ownership.bindingSHA256
     }
+    package var physicalOwnership:
+        InvestigationMachineSingleEpochPhysicalOwnership
+    {
+        .init(storage: ownership)
+    }
 
     package init(projecting result: InvestigationMachineSingleEpochResult) throws {
         switch result {
@@ -266,7 +271,47 @@ package struct InvestigationMachineSingleEpochPhysicalResult:
             }
             ownership = try Ownership(projecting: candidate.ownership)
             completion = try Completion(projecting: candidate)
+        case .admittedPhysical:
+            throw InvestigationMachineSingleEpochPhysicalBridgeError
+                .invalidPhysicalResult
         }
+    }
+
+    package init(
+        completing ownership:
+            InvestigationMachineSingleEpochPhysicalOwnership,
+        claimReleaseSHA256: InvestigationHandoffSHA256,
+        driverObservationSHA256: InvestigationHandoffSHA256
+    ) throws {
+        guard
+            ownership.mode == .normal,
+            bridgeNonzero(claimReleaseSHA256),
+            bridgeNonzero(driverObservationSHA256)
+        else {
+            throw InvestigationMachineSingleEpochPhysicalBridgeError
+                .invalidPhysicalResult
+        }
+        let binding = InvestigationHandoffSHA256.hashing(
+            try HandoffBinaryTranscript.encode(
+                domain: InvestigationMachineSingleEpochLocalCompletionCandidate
+                    .domain,
+                businessFields: [
+                    ownership.bindingSHA256.rawBytes,
+                    claimReleaseSHA256.rawBytes,
+                    driverObservationSHA256.rawBytes,
+                    Data([0x01]),
+                ],
+                maximumByteCount:
+                    InvestigationMachineSingleEpochLocalCompletionCandidate
+                        .maximumByteCount
+            )
+        )
+        self.ownership = ownership.storage
+        completion = Completion(
+            claimReleaseSHA256: claimReleaseSHA256,
+            driverObservationSHA256: driverObservationSHA256,
+            bindingSHA256: binding
+        )
     }
 
     private init(ownership: Ownership, completion: Completion?) {
@@ -402,7 +447,7 @@ package struct InvestigationMachineSingleEpochPhysicalResult:
         }
     }
 
-    private struct Ownership: Sendable, Equatable {
+    fileprivate struct Ownership: Sendable, Equatable {
         let outerAttemptUUID: UUID
         let wholeCapsuleSHA256: InvestigationHandoffSHA256
         let wholeInputSHA256: InvestigationHandoffSHA256
@@ -576,7 +621,7 @@ package struct InvestigationMachineSingleEpochPhysicalResult:
             return expected == bindingSHA256
         }
 
-        private init(
+        fileprivate init(
             outerAttemptUUID: UUID,
             wholeCapsuleSHA256: InvestigationHandoffSHA256,
             wholeInputSHA256: InvestigationHandoffSHA256,
@@ -606,6 +651,126 @@ package struct InvestigationMachineSingleEpochPhysicalResult:
             self.epochDeadlineNanoseconds = epochDeadlineNanoseconds
             self.bindingSHA256 = bindingSHA256
         }
+    }
+}
+
+package struct InvestigationMachineSingleEpochPhysicalOwnership:
+    Sendable, Equatable
+{
+    fileprivate let storage:
+        InvestigationMachineSingleEpochPhysicalResult.Ownership
+
+    package var appIdentity: InvestigationMachineProcessIdentity {
+        storage.appIdentity
+    }
+    package var helperIdentity: InvestigationMachineProcessIdentity {
+        storage.helperIdentity
+    }
+    package var releaseDeadlineNanoseconds: UInt64 {
+        storage.releaseDeadlineNanoseconds
+    }
+    package var epochDeadlineNanoseconds: UInt64 {
+        storage.epochDeadlineNanoseconds
+    }
+    package var bindingSHA256: InvestigationHandoffSHA256 {
+        storage.bindingSHA256
+    }
+    package var mode: InvestigationMachineOuterContainmentMode {
+        storage.scenario == .lifecycleRecovery ? .parentCrash : .normal
+    }
+
+    fileprivate init(
+        storage: InvestigationMachineSingleEpochPhysicalResult.Ownership
+    ) {
+        self.storage = storage
+    }
+
+    package init(
+        projecting candidate: InvestigationMachineSingleEpochOwnershipCandidate
+    ) throws {
+        storage = try .init(projecting: candidate)
+    }
+
+    package init(
+        selection: InvestigationMachineFixedEpochSelection,
+        appIdentity: InvestigationMachineProcessIdentity,
+        helperIdentity: InvestigationMachineProcessIdentity,
+        claimEvidenceSHA256: InvestigationHandoffSHA256,
+        installedL2ProofSHA256: InvestigationHandoffSHA256,
+        releaseDeadlineNanoseconds: UInt64,
+        epochDeadlineNanoseconds: UInt64
+    ) throws {
+        try bridgeValidateSelection(selection)
+        guard
+            appIdentity.role == .app,
+            helperIdentity.role == .helper,
+            bridgeNonzero(claimEvidenceSHA256),
+            bridgeNonzero(installedL2ProofSHA256),
+            releaseDeadlineNanoseconds > 0,
+            releaseDeadlineNanoseconds <= epochDeadlineNanoseconds
+        else {
+            throw InvestigationMachineSingleEpochPhysicalBridgeError
+                .invalidPhysicalResult
+        }
+        let binding = InvestigationHandoffSHA256.hashing(
+            try HandoffBinaryTranscript.encode(
+                domain: InvestigationMachineSingleEpochOwnershipCandidate.domain,
+                businessFields: [
+                    bridgeData(selection.outerAttemptUUID),
+                    selection.wholeCapsuleSHA256.rawBytes,
+                    selection.wholeInputSHA256.rawBytes,
+                    bridgeData(selection.epoch.epochUUID),
+                    bridgeData(selection.epoch.ordinal),
+                    bridgeData(selection.epoch.scenario.rawValue),
+                    bridgeData(selection.epoch.configurationNonce),
+                    selection.epoch.configurationSHA256.rawBytes,
+                    selection.epoch.signedRuntimeBindingSHA256.rawBytes,
+                    selection.projection.projectionSHA256.rawBytes,
+                    try appIdentity.encoded(), try helperIdentity.encoded(),
+                    claimEvidenceSHA256.rawBytes,
+                    installedL2ProofSHA256.rawBytes,
+                    bridgeData(releaseDeadlineNanoseconds),
+                    bridgeData(epochDeadlineNanoseconds),
+                ],
+                maximumByteCount:
+                    InvestigationMachineSingleEpochOwnershipCandidate
+                        .maximumByteCount
+            )
+        )
+        storage = .init(
+            outerAttemptUUID: selection.outerAttemptUUID,
+            wholeCapsuleSHA256: selection.wholeCapsuleSHA256,
+            wholeInputSHA256: selection.wholeInputSHA256,
+            epochUUID: selection.epoch.epochUUID,
+            ordinal: selection.epoch.ordinal,
+            scenario: selection.epoch.scenario,
+            projectionSHA256: selection.projection.projectionSHA256,
+            appIdentity: appIdentity, helperIdentity: helperIdentity,
+            claimEvidenceSHA256: claimEvidenceSHA256,
+            installedL2ProofSHA256: installedL2ProofSHA256,
+            releaseDeadlineNanoseconds: releaseDeadlineNanoseconds,
+            epochDeadlineNanoseconds: epochDeadlineNanoseconds,
+            bindingSHA256: binding
+        )
+    }
+
+    package func encoded() throws -> Data {
+        try storage.encoded()
+    }
+
+    package static func decode(
+        _ data: Data,
+        expectedSelection: InvestigationMachineFixedEpochSelection
+    ) throws -> Self {
+        .init(storage: try .decode(
+            data, expectedSelection: expectedSelection
+        ))
+    }
+
+    package func isBound(
+        to selection: InvestigationMachineFixedEpochSelection
+    ) -> Bool {
+        storage.isBound(to: selection)
     }
 }
 

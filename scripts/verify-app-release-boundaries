@@ -28,6 +28,12 @@ iib5biii_b2a0_source_contract_only=false
 iib5biii_b2a0_composition_source=
 iib5biii_b2a0_continuity_source=
 iib5biii_b2a0_bridge_source=
+iib5biii_b2ai_source_contract_only=false
+iib5biii_b2ai_single_epoch_source=
+iib5biii_b2ai_composition_source=
+iib5biii_b2ai_continuity_source=
+iib5biii_b2ai_bridge_source=
+iib5biii_b2ai_protocol_source=
 if [[ $# == 1 && $1 == --investigation-handoff-only ]]; then
     handoff_only=true
 elif [[ $# == 2 && $1 == --legacy-machine-claim-contract-only ]]; then
@@ -60,9 +66,16 @@ elif [[ $# == 4 && $1 == --iib5biii-b2a0-source-contract-only ]]; then
     iib5biii_b2a0_composition_source=$2
     iib5biii_b2a0_continuity_source=$3
     iib5biii_b2a0_bridge_source=$4
+elif [[ $# == 6 && $1 == --iib5biii-b2a-i-source-contract-only ]]; then
+    iib5biii_b2ai_source_contract_only=true
+    iib5biii_b2ai_single_epoch_source=$2
+    iib5biii_b2ai_composition_source=$3
+    iib5biii_b2ai_continuity_source=$4
+    iib5biii_b2ai_bridge_source=$5
+    iib5biii_b2ai_protocol_source=$6
 elif (( $# != 0 )); then
     print -u2 \
-        "Usage: scripts/verify-app-release-boundaries [--investigation-handoff-only | --legacy-machine-claim-contract-only <source> | --iib4-machine-claim-contract-only <source> | --iib5biic-machine-driver-contract-only <source> | --iib5biid-machine-driver-contract-only <source> | --iic0a-source-contract-only <projection> <intake> | --iib5biii-a-source-contract-only <single-epoch> <composition> <continuity> | --iib5biii-b1-source-contract-only <cohort> <continuity> | --iib5biii-b2a0-source-contract-only <composition> <continuity> <bridge>]"
+        "Usage: scripts/verify-app-release-boundaries [--investigation-handoff-only | --legacy-machine-claim-contract-only <source> | --iib4-machine-claim-contract-only <source> | --iib5biic-machine-driver-contract-only <source> | --iib5biid-machine-driver-contract-only <source> | --iic0a-source-contract-only <projection> <intake> | --iib5biii-a-source-contract-only <single-epoch> <composition> <continuity> | --iib5biii-b1-source-contract-only <cohort> <continuity> | --iib5biii-b2a0-source-contract-only <composition> <continuity> <bridge> | --iib5biii-b2a-i-source-contract-only <single-epoch> <composition> <continuity> <bridge> <protocol>]"
     exit 64
 fi
 
@@ -936,6 +949,110 @@ for forbidden in (
 PY
 }
 
+function verify_iib5biii_b2ai_source_contract() {
+    local single_path=$1 composition_path=$2 continuity_path=$3
+    local bridge_path=$4 protocol_path=$5
+    local source_path
+    for source_path in "$single_path" "$composition_path" \
+        "$continuity_path" "$bridge_path" "$protocol_path"
+    do
+        xcrun swiftc -frontend -parse "$source_path"
+    done
+    python3 - "$single_path" "$composition_path" "$continuity_path" \
+        "$bridge_path" "$protocol_path" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+single_path, composition_path, continuity_path, bridge_path, protocol_path = (
+    map(Path, sys.argv[1:])
+)
+sources = {path: path.read_text(encoding="utf-8") for path in (
+    single_path, composition_path, continuity_path, bridge_path, protocol_path
+)}
+expected_imports = {
+    single_path: {
+        "Foundation", "StornautInvestigationHandoffContract",
+        "StornautInvestigationInstalledL2",
+    },
+    composition_path: {
+        "Foundation", "StornautInvestigationHandoffContract",
+        "StornautInvestigationInstalledL2",
+    },
+    continuity_path: {
+        "Foundation", "StornautInvestigationHandoffContract",
+    },
+    bridge_path: {
+        "Foundation", "StornautInvestigationHandoffContract",
+    },
+    protocol_path: {
+        "Foundation", "StornautInvestigationHandoffContract",
+    },
+}
+for path, source in sources.items():
+    imports = set(re.findall(
+        r"(?m)^import\s+([A-Za-z0-9_]+)\s*$", source
+    ))
+    if imports != expected_imports[path]:
+        raise SystemExit("iii-b2a-i source-only import surface drifted")
+semantic = "\n".join(sources.values())
+if re.search(r"(?m)^\s*(?:public|open)\s+", semantic):
+    raise SystemExit("iii-b2a-i source-only public surface drifted")
+if re.search(r"\b(?:Codable|Encodable|Decodable)\b", semantic):
+    raise SystemExit("iii-b2a-i source-only Codable surface drifted")
+for forbidden in (
+    r"\b(?:Executor|MoveToTrash|RegisteredAction|readiness|"
+    r"signedRuntimeReady|implementationAvailable)\b",
+    r"\b(?:CommandLine\.arguments|ProcessInfo\.processInfo\.environment)\b",
+    r"\bStornaut(?:Execution|Core|Lifecycle|Codex|InvestigationRuntime|"
+    r"InvestigationDiagnostic|ProbeBridge|ProcessSupport)\b",
+):
+    if re.search(forbidden, semantic, re.IGNORECASE):
+        raise SystemExit(
+            "iii-b2a-i source-only App boundary gained physical authority"
+        )
+for forbidden in (
+    r"\b(?:Darwin|Glibc|AppKit|SwiftUI|NSXPCConnection|URLSession|"
+    r"Process|FileManager|FileHandle|NWConnection|Network)\b",
+    r"\b(?:posix_spawn|fork|execve|open|openat|write|pwrite|socket|"
+    r"connect|send|recv|kill|killpg|waitpid|waitid|dup2|fcntl|close)\s*\(",
+    r"\b(?:fileDescriptor|STDIN_FILENO|STDOUT_FILENO|STDERR_FILENO|"
+    r"O_WRONLY|O_RDWR|O_CREAT|SIGTERM|SIGKILL)\b",
+):
+    if re.search(forbidden, sources[protocol_path], re.IGNORECASE):
+        raise SystemExit(
+            "iii-b2a-i source-only protocol gained physical authority"
+        )
+for marker in (
+    "package actor InvestigationMachineDarwinInnerProtocolState",
+    "package actor InvestigationMachineDarwinOuterAdmission",
+    "package struct InvestigationMachineSingleEpochAdmittedPhysicalResult",
+    "fileprivate init(",
+    "protocol InvestigationMachinePhysicalSingleEpochComposing:",
+    "case admittedPhysical(",
+    "case let .admittedPhysical(admitted):",
+    "epochDeadlineNanoseconds: request.epochDeadlineNanoseconds",
+    "evidence.appChild == exchange.appChild",
+    "== exchange.physicalOwnership.helperIdentity",
+):
+    if marker not in semantic:
+        raise SystemExit(
+            f"iii-b2a-i source-only semantic marker drifted: {marker}"
+        )
+if semantic.count("InvestigationMachineSingleEpochAdmittedPhysicalResult(") != 1:
+    raise SystemExit("iii-b2a-i source-only admitted token mint drifted")
+for forbidden in (
+    "case physical(InvestigationMachineSingleEpochPhysicalResult)",
+    "case admittedPhysical(InvestigationMachineSingleEpochPhysicalResult)",
+    "init(physical: InvestigationMachineSingleEpochPhysicalResult)",
+):
+    if forbidden in semantic:
+        raise SystemExit(
+            "iii-b2a-i source-only raw DTO admission drifted"
+        )
+PY
+}
+
 if $legacy_machine_claim_contract_only; then
     verify_claim_server_macho_source_contract \
         "$legacy_machine_claim_contract_source"
@@ -990,6 +1107,16 @@ if $iib5biii_b2a0_source_contract_only; then
         "$iib5biii_b2a0_continuity_source" \
         "$iib5biii_b2a0_bridge_source"
     print "iii-b2a0 source-only App boundary verification passed."
+    exit 0
+fi
+if $iib5biii_b2ai_source_contract_only; then
+    verify_iib5biii_b2ai_source_contract \
+        "$iib5biii_b2ai_single_epoch_source" \
+        "$iib5biii_b2ai_composition_source" \
+        "$iib5biii_b2ai_continuity_source" \
+        "$iib5biii_b2ai_bridge_source" \
+        "$iib5biii_b2ai_protocol_source"
+    print "iii-b2a-i source-only App boundary verification passed."
     exit 0
 fi
 
@@ -2452,8 +2579,8 @@ function require_projection() {
 }
 require_projection \
     "$machine_driver_undefined_symbols" \
-    b48874d79581a67338e17845790543cea936c1efb359bd7862baecca0f0c0371 \
-    672 \
+    bf67c0b2fc47658fbb7269e251a0a144b85c1afaf938fa6016c8836ced767f5b \
+    673 \
     undefined
 require_projection \
     "$machine_driver_loaded_libraries" \
@@ -2462,8 +2589,8 @@ require_projection \
     load-command
 require_projection \
     "$machine_driver_owned_symbols" \
-    41d602ddafd48639080d4e327f04bd4d022ed268834f5949a926e69ed137813c \
-    4761 \
+    7dccf4fb7960719cc9838612fec554c9d77bdfa059890c0d1c8dbf7802c1adab \
+    5514 \
     owned-symbol
 if ! mach_o_has_demangled_symbol \
     "$diagnostic_machine_driver" \
@@ -2536,11 +2663,11 @@ release_machine_driver_owned_symbols=$(
         | rg 'StornautInvestigationMachineDriver(Support)?' | LC_ALL=C sort -u
 )
 require_projection "$release_machine_driver_undefined_symbols" \
-    4b18e0c5b893d4c9a91e7fb7e2467bcbcc979fab8053102045233fd847b205c0 450 release-undefined
+    7c78e48e09da412dda28562f31c063cde5da02dfeed5d7fd2e0c74442d6ceb7c 451 release-undefined
 require_projection "$release_machine_driver_loaded_libraries" \
     dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9 18 release-load-command
 require_projection "$release_machine_driver_owned_symbols" \
-    cec61d8ab2eb0e8f5e07c2d61085e95c3a469b96c176b8cbb074441d4fe22f80 3076 release-owned-symbol
+    aaae9d617d5a19390bfc3f1f2c70d7ff680511386039e56f782cd03c7ef0abca 3675 release-owned-symbol
 for marker in "${machine_driver_authority_forbidden_markers[@]}"; do
     if mach_o_has_demangled_symbol "$release_machine_driver" "$marker"; then
         print -u2 "Authority or readiness leaked into Release Machine driver: $marker"

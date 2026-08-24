@@ -48,6 +48,14 @@ package struct InvestigationMachineOuterContainmentProof:
         let material = try InvestigationMachineCompletionMaterial(
             selection: selection, result: result
         )
+        if case let .admittedPhysical(admitted) = result {
+            guard admitted.isBound(
+                to: selection, predecessor: predecessor
+            ) else {
+                throw InvestigationMachineHelperEpochContinuityError
+                    .invalidCompletion
+            }
+        }
         outerAttemptUUID = selection.outerAttemptUUID
         wholeCapsuleSHA256 = selection.wholeCapsuleSHA256
         wholeInputSHA256 = selection.wholeInputSHA256
@@ -518,6 +526,21 @@ private struct InvestigationMachineCompletionMaterial {
             helperIdentity = candidate.helperIdentity
             bindingSHA256 = candidate.bindingSHA256
             mode = .parentCrash
+        case let .admittedPhysical(admitted):
+            let expectedMode: InvestigationMachineOuterContainmentMode =
+                selection.epoch.scenario == .lifecycleRecovery
+                    ? .parentCrash : .normal
+            guard
+                admitted.mode == expectedMode,
+                admitted.isBound(to: selection)
+            else {
+                throw InvestigationMachineHelperEpochContinuityError
+                    .invalidCompletion
+            }
+            helperIdentity = admitted.helperIdentity
+            bindingSHA256 = admitted.bindingSHA256
+            mode = admitted.mode
+            return
         }
         guard
             ownership.outerAttemptUUID == selection.outerAttemptUUID,
