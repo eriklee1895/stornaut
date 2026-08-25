@@ -660,8 +660,11 @@ one-shot receiver、private admission 与 same-owner containment proof；
 iii-b2a-ii-a1 fixed transport/inner-role closure 也已完成并封印。a2 scope/trust
 preflight 将剩余工作封闭拆为 a2-0 untrusted decode、a2-i inherited-PGID App
 session 与 a2-ii terminal/admission join；a2-0、a2-i 与 a2-ii 已完成并保持
-non-admitting，当前 iii-b2b，随后为 iii-b2b → ii-c0b → ii-c → L3c3d → L3c4。
+non-admitting；iii-b2b-0 已完成并保持 non-admitting，当前 iii-b2b-1a，随后为
+iii-b2b-1a → iii-b2b-1b → ii-c0b → ii-c → L3c3d → L3c4。
 ADR 0018 仍 Proposed，L3c4 独占 final admission 与剩余 full。
+iii-b2b-0 completion evidence 见
+[Release graph review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-0-review.md)。
 L3c1b-i/ii 证据见
 [i review](../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
 与
@@ -716,7 +719,7 @@ i-a/i-b1/i-b2a/i-b2b-a/i-b2b-b/i-b3/i-c1、aggregate i-c2 与
 ii-b5b-ii-a/ii-b/ii-c/ii-d 与 ii-c0a complete/non-admitting；ii-b5b-iii-b0
 preflight frozen/non-admitting，iii-a/iii-b1/iii-b2a0/iii-b2a-i/
 iii-b2a-ii-a1/a2-0/a2-i/a2-ii complete/non-admitting；a2 已冻结并关闭，
-iii-b2b current。i-b2a completion 见
+iii-b2b-0 complete/non-admitting，iii-b2b-1a current。i-b2a completion 见
 [artifact/static reader review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2a-review.md)。
 [fixed service reader review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2b-b-review.md)
 记录 6-path/709-line scope、46 affected tests、1,341-test clean serial 与
@@ -742,7 +745,7 @@ PGID retirement 四个 bounded checkpoints；ii-a/ii-b/ii-c/ii-d 已完成并保
 non-admitting；ii-c0a complete/non-admitting，ii-b5b-iii-b0 preflight frozen/
 non-admitting，iii-a/iii-b1/iii-b2a0/iii-b2a-i/iii-b2a-ii-a1
 complete/non-admitting；a2 已冻结为 a2-0/a2-i/a2-ii，三项均
-complete/non-admitting，iii-b2b current。
+complete/non-admitting，iii-b2b-0 complete/non-admitting，iii-b2b-1a current。
 ii-a completion 见
 [review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-a-review.md)，ii-b
 completion 见
@@ -962,8 +965,9 @@ ii-b5b-ii-a fixed FD-0 capsule intake、ii-b5b-ii-b independent Darwin App
 identity observation、ii-b5b-ii-c fixed FD-7 session 与 ii-b5b-ii-d exact
 owned-PGID retirement 与 ii-c0a 已完成并保持 non-admitting；ii-b5b-iii-b0
 preflight 已冻结，iii-a/iii-b1/iii-b2a0/iii-b2a-i/iii-b2a-ii-a1/a2-0/a2-i/a2-ii
-已完成并保持 non-admitting；a2 已关闭，当前 frontier 为 iii-b2b，之后为
-ii-c0b、ii-c、L3c3d、L3c4。
+已完成并保持 non-admitting；a2 已关闭，iii-b2b-0 已完成并保持
+non-admitting，当前 frontier 为 iii-b2b-1a，之后为 iii-b2b-1b、ii-c0b、
+ii-c、L3c3d、L3c4。
 已完成部分均为
 non-admitting prerequisite，
 L3c4 才是 machine admission。该最终 gate

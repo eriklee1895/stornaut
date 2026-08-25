@@ -163,8 +163,9 @@ entry/artifact. b0 is frozen/non-admitting; iii-a per-epoch continuity, iii-b1
 injected cohort, iii-b2a0 and iii-b2a-i are complete/non-admitting;
 iii-b2a-ii-a1 is complete/non-admitting. The a2 scope/trust preflight split its
 remaining work into a2-0 untrusted decode, a2-i inherited-PGID App session and
-a2-ii terminal/admission composition; a2-0, a2-i and a2-ii are complete/non-admitting
-and iii-b2b is current. a2-i closed at implementation commit `158f500` and tree
+a2-ii terminal/admission composition; a2-0, a2-i and a2-ii are complete/non-admitting.
+iii-b2b-0 Release graph closure is also complete/non-admitting and iii-b2b-1a is
+current. a2-i closed at implementation commit `158f500` and tree
 `c7a42ffd`: exact 10 non-document paths / 1,965 changed lines, 66 focused
 tests, a clean 1,500-test / 78-suite staged-only serial, exact SwiftPM/Xcode
 Debug/Release projections, complete contract replay and no unresolved P0-P2.
@@ -172,6 +173,11 @@ a2-ii closed at implementation commit `8eac2c4f` / tree `9e3bdefd`, sealed by
 `70603a0`: exact 12 non-document paths / 3,673 changed lines, 55 focused tests,
 a clean 1,516-test / 79-suite staged-only serial, global source boundary,
 complete contract/final-Mach-O gates and no unresolved P0-P2.
+iii-b2b-0 closed at implementation commit `c8cc514` / tree `d615795`, sealed by
+`6474016`: exact 7 non-document paths / 1,096 changed lines, 20 focused, 37
+target-boundary and 1,517 serial tests, Debug/Release graph gates, immutable
+8-path replay and no unresolved P0-P2. See the
+[iii-b2b-0 review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-0-review.md).
 iii-a closed at
 implementation
 commit `4538e52a4ceafded60df302903aec1877e66bc40` and tree
@@ -274,7 +280,7 @@ ii-b5b-ii-c fixed FD-7 session and ii-b5b-ii-d exact owned-PGID retirement are
 complete/non-admitting. ii-c0a is complete/non-admitting; ii-b5b-iii-b0 is
 frozen/non-admitting; iii-a, iii-b1, iii-b2a0, iii-b2a-i,
 iii-b2a-ii-a1, a2-0, a2-i and a2-ii are complete/non-admitting and the remaining
-order is iii-b2b -> ii-c0b -> ii-c -> L3c3d -> L3c4.
+order is iii-b2b-1a -> iii-b2b-1b -> ii-c0b -> ii-c -> L3c3d -> L3c4.
 See the
 [ii-b5a review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5a-review.md) and
 [ii-b5b-i-a review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-a-review.md) and
@@ -331,7 +337,7 @@ the sole normal-product admission gate.
 | [36](task-36-implementation-brief.md) | Domain, canonical projection, planner, budget and stop contracts | complete; [review](../../reports/phase-d-task-36-review.md) |
 | [37](task-37-implementation-brief.md) | Store v4, retention and source rejoin | complete; [review](../../reports/phase-d-task-37-review.md) |
 | [38](task-38-implementation-brief.md) | Closed coordinator with fake runtime | complete; [review](../../reports/phase-d-task-38-review.md) |
-| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; iii-b2a-ii-a1/a2-0/a2-i/a2-ii complete/non-admitting; iii-b2b current; ADR 0018 Proposed |
+| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; iii-b2b-0 complete/non-admitting; iii-b2b-1a current; ADR 0018 Proposed |
 | [40](task-40-implementation-brief.md) | Evidence report and conservative Review projection | blocked on Task 39 |
 | [41](task-41-implementation-brief.md) | First-use disclosure and typed availability | blocked on Task 40 |
 | [42](task-42-implementation-brief.md) | App workflow and recovery state | blocked on Task 41 |

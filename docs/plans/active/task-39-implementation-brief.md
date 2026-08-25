@@ -93,7 +93,9 @@
 > is complete/non-admitting. The a2 scope/trust preflight split the remaining
 > composition into a2-0 self-contained untrusted decode, a2-i inherited-PGID
 > App session and a2-ii terminal/admission join; a2-0, a2-i and a2-ii are
-> complete/non-admitting and iii-b2b is current. a2-i closed at commit
+> complete/non-admitting. iii-b2b-0 Release graph closure is also complete/
+> non-admitting and iii-b2b-1a production outer observation is current. a2-i
+> closed at commit
 > `158f500` / tree `c7a42ffd` with 10 non-document paths / 1,965 changed
 > lines, 66 focused tests, a 1,500-test serialized regression, exact
 > SwiftPM/Xcode projections, complete contract replay and final no-unresolved-
@@ -103,6 +105,11 @@
 > lines, 55 focused tests, a clean 1,516-test / 79-suite staged serial, global
 > source boundary, complete contract/final-Mach-O gates and final
 > no-unresolved-P0–P2 review.
+> iii-b2b-0 then closed Release graph reachability at implementation commit
+> `c8cc514` / tree `d615795`, sealed by `6474016`: exact 7 non-document paths /
+> 1,096 changed lines, 20 focused, 37 target-boundary and 1,517 serial tests,
+> complete contract/App-Release gates and no unresolved P0–P2. See the
+> [iii-b2b-0 review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-0-review.md).
 > Evidence:
 > [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
 > [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md) and
@@ -1149,9 +1156,10 @@ The remaining L3 work is split before driver coding:
    and ii-c0a are complete/non-admitting. The further split is frozen as
    `iii-b0 -> iii-a -> iii-b1 -> iii-b2a0 -> iii-b2a-i -> iii-b2a-ii-a ->
    iii-b2b`; b0 is documentation-only/non-admitting and iii-a/iii-b1/
-   iii-b2a0/iii-b2a-i/iii-b2a-ii-a1/a2-0/a2-i/a2-ii are complete/non-admitting.
-   The corrected remaining order is `iii-b2b -> ii-c0b -> ii-c -> L3c3d ->
-   L3c4`; iii-b2b is current.
+   iii-b2a0/iii-b2a-i/iii-b2a-ii-a1/a2-0/a2-i/a2-ii and iii-b2b-0 are
+   complete/non-admitting. The corrected remaining order is
+   `iii-b2b-1a -> iii-b2b-1b -> ii-c0b -> ii-c -> L3c3d -> L3c4`;
+   iii-b2b-1a is current.
    See the
    [study](../../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md)
    and [final review](../../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md),
@@ -1327,7 +1335,8 @@ L3c3c-ii-b5b-ii-d -> L3c3c-ii-c0a -> L3c3c-ii-b5b-iii-b0 ->
 L3c3c-ii-b5b-iii-a -> L3c3c-ii-b5b-iii-b1 ->
 L3c3c-ii-b5b-iii-b2a0 -> L3c3c-ii-b5b-iii-b2a-i ->
 L3c3c-ii-b5b-iii-b2a-ii-a1 -> L3c3c-ii-b5b-iii-b2a-ii-a2 ->
-L3c3c-ii-b5b-iii-b2b -> L3c3c-ii-c0b ->
+L3c3c-ii-b5b-iii-b2b-0 -> L3c3c-ii-b5b-iii-b2b-1a ->
+L3c3c-ii-b5b-iii-b2b-1b -> L3c3c-ii-c0b ->
 L3c3c-ii-c -> L3c3d -> L3c4`.
 L3c1, L3c2, L3c3a,
 L3c3b-0, L3c3b-i, L3c3b-ii, L3c3c-i and L3c3c-ii-a are complete;
@@ -1338,8 +1347,9 @@ ii-b3c concrete leaf/native entry, ii-b4 fixed helper-claim client, ii-b5a0 and
 ii-b5a, ii-b5b-i-a, i-b1, i-b2a, i-b2b-a, i-b2b-b, i-b3, i-c1 and i-c2a
 are complete and non-admitting; aggregate i-c2 and ii-b5b-ii-a/ii-b/ii-c/ii-d
 and ii-c0a are complete/non-admitting; ii-b5b-iii-b0 is frozen/non-admitting
-and iii-a/iii-b1/iii-b2a0/iii-b2a-i/iii-b2a-ii-a1/a2-0/a2-i/a2-ii are complete/non-admitting;
-iii-b2b is the current implementation checkpoint after the closed a2 split.
+and iii-a/iii-b1/iii-b2a0/iii-b2a-i/iii-b2a-ii-a1/a2-0/a2-i/a2-ii/
+iii-b2b-0 are complete/non-admitting; iii-b2b-1a is the current implementation
+checkpoint after the Release graph closure.
 ADR 0018
 remains Proposed until ii-c succeeds. L3c1 used focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean
