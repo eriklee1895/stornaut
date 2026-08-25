@@ -3564,6 +3564,7 @@ PY
 
 function verify_iib5biii_b2a_iia2ii_scope() {
     local baseline=${1:-f363fbb67cbfb355ae701a85bba51b92e6db283d}
+    local implementation_tree=9e3bdefd237bcd5bc9c616f54e456e7565f7b03a
     local expected=(
         Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinEpochRetirement.swift
         Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerComposition.swift
@@ -3616,9 +3617,13 @@ function verify_iib5biii_b2a_iia2ii_scope() {
             return 1
         }
     done
+    [[ "$(git write-tree)" == "$implementation_tree" ]] || {
+        print -u2 "iii-b2a-ii-a2-ii completed tree drifted"
+        return 1
+    }
     local changed=$(git diff --cached --numstat "$baseline" \
         | awk 'index($3,"docs/")!=1 && $3!="AGENTS.md" && $3!="README.md" {n+=$1+$2} END {print n+0}')
-    (( changed <= 3800 )) || {
+    (( changed == 3673 )) || {
         print -u2 "iii-b2a-ii-a2-ii checkpoint budget drifted"
         return 1
     }

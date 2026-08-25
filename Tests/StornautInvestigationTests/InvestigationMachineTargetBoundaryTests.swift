@@ -1891,16 +1891,26 @@ struct InvestigationMachineTargetBoundaryTests {
             "fail(\"retirement cancellation join drifted\")",
             "iii-b2a-ii-a2-ii staged checkpoint paths drifted",
             "iii-b2a-ii-a2-ii checkpoint budget drifted",
+            "iii-b2a-ii-a2-ii completed tree drifted",
             "f363fbb67cbfb355ae701a85bba51b92e6db283d",
+            "9e3bdefd237bcd5bc9c616f54e456e7565f7b03a",
             "(( ${#expected} == 12 ))",
-            "(( changed <= 3800 ))",
+            "(( changed == 3673 ))",
         ] {
             #expect(boundary.contains(marker))
         }
         for marker in [
             "iib5biii_b2a_iia2ii_gate=scripts/verify-investigation-boundaries",
+            "iib5biii_b2a_iia2ii_implementation_commit=8eac2c4f622055f6afc0bfe90b9fc7c982c4b6d0",
+            "iib5biii_b2a_iia2ii_implementation_tree=9e3bdefd237bcd5bc9c616f54e456e7565f7b03a",
+            "iii-b2a-ii-a2-ii implementation parent drifted",
+            "iii-b2a-ii-a2-ii implementation tree drifted",
+            "iii-b2a-ii-a2-ii implementation paths drifted",
+            "iii-b2a-ii-a2-ii implementation line count drifted",
             "iii-b2a-ii-a2-ii mutation accepted:",
             "iii-b2a-ii-a2-ii scope mutation accepted:",
+            "iii-b2a-ii-a2-ii same-path substitution accepted:",
+            "controlled iii-b2a-ii-a2-ii same-path tamper",
             "outer-order-observation",
             "outer-init-widening",
             "terminal-proof-to-bool",
