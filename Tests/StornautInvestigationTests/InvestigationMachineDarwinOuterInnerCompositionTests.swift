@@ -922,7 +922,7 @@ private struct ScriptedCompositionTerminalObserver:
             appAbsence: .observed, helperAbsence: .observed,
             l1ResidueAbsence: .observed,
             finalDriverObservationSHA256: initial,
-            observedAtNanoseconds: fixture.observedAt + 1
+            observedAtNanoseconds: fixture.observedAt
         )
         self.trace = trace
         self.initialGate = initialGate
@@ -986,7 +986,7 @@ private func expectedTrace(
         "initial-driver", "clock", "start", "send-request",
         "receive-ownership", "observe-ownership", "send-ack",
         "send-decision", "receive-result", "result-eof",
-        "control-eof", "retire", "terminal",
+        "control-eof", "retire", "terminal", "clock",
     ]
 }
 

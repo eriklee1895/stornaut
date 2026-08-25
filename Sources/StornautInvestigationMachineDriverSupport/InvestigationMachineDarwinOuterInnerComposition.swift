@@ -413,6 +413,45 @@ struct InvestigationMachineDarwinOuterExecutionDependencies: Sendable {
     let ownershipObserver: any InvestigationMachineDarwinOuterOwnershipObserving
     let terminalObserver: any InvestigationMachineDarwinOuterTerminalObserving
     let clock: any InvestigationMachineDarwinOuterInnerCompositionClocking
+    private let sharedProductionObserver:
+        InvestigationMachineDarwinOuterObserver?
+
+    init(
+        outerProcessID: UInt32,
+        sessionFactory:
+            any InvestigationMachineDarwinOuterInnerCompositionSessionStarting,
+        ownershipObserver:
+            any InvestigationMachineDarwinOuterOwnershipObserving,
+        terminalObserver:
+            any InvestigationMachineDarwinOuterTerminalObserving,
+        clock: any InvestigationMachineDarwinOuterInnerCompositionClocking
+    ) {
+        self.outerProcessID = outerProcessID
+        self.sessionFactory = sessionFactory
+        self.ownershipObserver = ownershipObserver
+        self.terminalObserver = terminalObserver
+        self.clock = clock
+        sharedProductionObserver = nil
+    }
+
+    init(
+        outerProcessID: UInt32,
+        sessionFactory:
+            any InvestigationMachineDarwinOuterInnerCompositionSessionStarting,
+        sharedObserver: InvestigationMachineDarwinOuterObserver,
+        clock: any InvestigationMachineDarwinOuterInnerCompositionClocking
+    ) {
+        self.outerProcessID = outerProcessID
+        self.sessionFactory = sessionFactory
+        ownershipObserver = sharedObserver
+        terminalObserver = sharedObserver
+        self.clock = clock
+        sharedProductionObserver = sharedObserver
+    }
+
+    var usesOneConcreteOuterObserver: Bool {
+        sharedProductionObserver != nil
+    }
 }
 
 struct InvestigationMachineDarwinOuterExecutionComponents: Sendable {
@@ -429,6 +468,25 @@ package struct InvestigationMachineDarwinOuterInnerExecutionFactory:
     ) throws -> Dependencies
 
     private let makeDependencies: MakeDependencies
+
+    package init() {
+        self.init { selection in
+            Self.productionDependencies(for: selection)
+        }
+    }
+
+    static func productionDependencies(
+        for selection: InvestigationMachineFixedEpochSelection
+    ) -> InvestigationMachineDarwinOuterExecutionDependencies {
+        _ = selection
+        let observer = InvestigationMachineDarwinOuterObserver()
+        return InvestigationMachineDarwinOuterExecutionDependencies(
+            outerProcessID: UInt32(getpid()),
+            sessionFactory: InvestigationMachineDarwinOuterInnerSessionFactory(),
+            sharedObserver: observer,
+            clock: InvestigationMachineDarwinCompositionClock()
+        )
+    }
 
     init(makeDependencies: @escaping MakeDependencies) {
         self.makeDependencies = makeDependencies
@@ -688,7 +746,7 @@ package actor InvestigationMachineDarwinOuterInnerComposition:
                     .terminalUncertain
             }
             try checkCancellation()
-        let terminal = try await terminalObserver.observeTerminal(
+            let terminal = try await terminalObserver.observeTerminal(
                 selection: selection, ownership: ownership,
                 retirement: retirement, deadlineNanoseconds: deadline
             )

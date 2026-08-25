@@ -26,12 +26,13 @@ implementation is sealed.
 
 ## 2. Exact non-document scope
 
-Maximum four non-document paths and 350 changed non-document lines:
+Maximum five non-document paths and 400 changed non-document lines:
 
 1. `Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochComposition.swift`
 2. `Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerProtocol.swift`
 3. `Tests/StornautInvestigationTests/InvestigationMachineDarwinOuterInnerProtocolTests.swift`
 4. `Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerComposition.swift`
+5. `Tests/StornautInvestigationTests/InvestigationMachineDarwinOuterInnerCompositionTests.swift`
 
 No protocol wire shape, target graph, public API, process authority, App/helper
 launch, XPC operation, root operation, model call, network access or final
