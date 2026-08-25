@@ -1,7 +1,6 @@
 import CInvestigationIdentitySupport
 import Darwin
 
-#if DEBUG
 package enum InvestigationMachineDarwinDriverChildObservationError:
     Error, Sendable, Equatable
 {
@@ -343,4 +342,3 @@ private func darwinDriverChildProcessSnapshot(_ processID: UInt32) throws
             startTimeMicroseconds: raw.start_time_microseconds
         )
 }
-#endif

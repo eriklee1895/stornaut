@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=869aa6a2a404029b02701c0d7c52e652f721dd3e69dd62d15fa3189ab473e1b5
+ib2_self_sha=57dda45e9f55fd8253c645eb5e37be0189b05f1d883d7fda348333e4d9b07bc4
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -1152,9 +1152,9 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "0401c0658c2734ac20246f3cfb9ae1a98f86b0d7ab683793a8cf1f888eb65b1e",
+        "67aa8d6c6c16a352e3d3a7846ede56fe329153e66bb9147d34849cfa097aeb3a",
     Path("scripts/verify-app-release-boundaries"):
-        "bc64919e85c64dfc52100e5c31eea518e9158a5bc594925e174e4c398a7e23c0",
+        "b937e90e1868c22c1ffa98ba38dd5f7ff324e123f2b54a7d0065383b1ce2df99",
 }
 for path, expected_sha in expected.items():
     observed_sha = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -8007,19 +8007,34 @@ for relative, digest in expected.items():
     if hashlib.sha256((root / relative).read_bytes()).hexdigest() != digest:
         raise SystemExit("iii-b2a-ii-a1-v historical source seal drifted")
 PY
-
-"$iib5biii_b2a_iia1v_gate" \
+historical_a1v_index="$contract_root/iib5biii-b2a-ii-a1-v-replay.index"
+historical_a1v_root="$contract_root/iib5biii-b2a-ii-a1-v-replay"
+mkdir -p "$historical_a1v_root"
+GIT_INDEX_FILE="$historical_a1v_index" \
+    git read-tree "$iib5biii_b2a_iia1v_implementation_commit^{tree}"
+GIT_INDEX_FILE="$historical_a1v_index" git checkout-index --all \
+    --prefix="$historical_a1v_root/"
+iib5biii_b2a_iia1v_semantic_gate="$historical_a1v_root/scripts/verify-investigation-boundaries"
+iib5biii_b2a_iia1v_semantic_app_gate="$historical_a1v_root/scripts/verify-app-release-boundaries"
+iib5biii_b2a_iia1v_semantic_session="$historical_a1v_root/$iib5biii_b2a_iia1v_session"
+iib5biii_b2a_iia1v_semantic_observer="$historical_a1v_root/$iib5biii_b2a_iia1v_observer"
+iib5biii_b2a_iia1v_semantic_test="$historical_a1v_root/$iib5biii_b2a_iia1v_test"
+iib5biii_b2a_iia1v_semantic_boundary="$historical_a1v_root/$iib5biii_b2a_iia1v_boundary"
+"$iib5biii_b2a_iia1v_semantic_gate" \
     --iib5biii-b2a-ii-a1v-contract-only \
-    "$iib5biii_b2a_iia1v_session" "$iib5biii_b2a_iia1v_observer" \
-    "$iib5biii_b2a_iia1v_test" "$iib5biii_b2a_iia1v_boundary" \
+    "$iib5biii_b2a_iia1v_semantic_session" \
+    "$iib5biii_b2a_iia1v_semantic_observer" \
+    "$iib5biii_b2a_iia1v_semantic_test" \
+    "$iib5biii_b2a_iia1v_semantic_boundary" \
     >"$contract_root/iib5biii-b2a-ii-a1v-canonical.log"
-"$iib5biii_b2a_iia1v_app_gate" \
+"$iib5biii_b2a_iia1v_semantic_app_gate" \
     --iib5biii-b2a-ii-a1v-source-contract-only \
-    "$iib5biii_b2a_iia1v_session" "$iib5biii_b2a_iia1v_observer" \
+    "$iib5biii_b2a_iia1v_semantic_session" \
+    "$iib5biii_b2a_iia1v_semantic_observer" \
     >"$contract_root/iib5biii-b2a-ii-a1v-app-canonical.log"
 
-python3 - "$iib5biii_b2a_iia1v_session" \
-    "$iib5biii_b2a_iia1v_test" "$contract_root" <<'PY'
+python3 - "$iib5biii_b2a_iia1v_semantic_session" \
+    "$iib5biii_b2a_iia1v_semantic_test" "$contract_root" <<'PY'
 from pathlib import Path
 import sys
 session_path, test_path, output_root = map(Path, sys.argv[1:])
@@ -8054,16 +8069,17 @@ PY
 
 function require_iib5biii_b2a_iia1v_mutation_rejected() {
     local name=$1 kind=$2 expected=$3
-    local session=$iib5biii_b2a_iia1v_session focused=$iib5biii_b2a_iia1v_test
+    local session=$iib5biii_b2a_iia1v_semantic_session
+    local focused=$iib5biii_b2a_iia1v_semantic_test
     local target="$contract_root/iib5biii-b2a-ii-a1v-$name.swift"
     [[ $kind == session ]] && session=$target
     [[ $kind == test ]] && focused=$target
     xcrun swiftc -frontend -parse -enable-bare-slash-regex "$target"
     local output="$contract_root/iib5biii-b2a-ii-a1v-$name.log"
-    if "$iib5biii_b2a_iia1v_gate" \
+    if "$iib5biii_b2a_iia1v_semantic_gate" \
         --iib5biii-b2a-ii-a1v-contract-only \
-        "$session" "$iib5biii_b2a_iia1v_observer" "$focused" \
-        "$iib5biii_b2a_iia1v_boundary" >"$output" 2>&1
+        "$session" "$iib5biii_b2a_iia1v_semantic_observer" "$focused" \
+        "$iib5biii_b2a_iia1v_semantic_boundary" >"$output" 2>&1
     then
         fail_contract "iii-b2a-ii-a1-v mutation accepted: $name"
     fi
@@ -8628,12 +8644,30 @@ iib5biii_b2a_iia2ii_boundary=Tests/StornautInvestigationTests/InvestigationMachi
 iib5biii_b2a_iia2ii_baseline=f363fbb67cbfb355ae701a85bba51b92e6db283d
 iib5biii_b2a_iia2ii_implementation_commit=8eac2c4f622055f6afc0bfe90b9fc7c982c4b6d0
 iib5biii_b2a_iia2ii_implementation_tree=9e3bdefd237bcd5bc9c616f54e456e7565f7b03a
+historical_a2ii_index="$contract_root/iib5biii-b2a-ii-a2ii-replay.index"
+historical_a2ii_root="$contract_root/iib5biii-b2a-ii-a2ii-replay"
+mkdir -p "$historical_a2ii_root"
+GIT_INDEX_FILE="$historical_a2ii_index" \
+    git read-tree "$iib5biii_b2a_iia2ii_implementation_commit^{tree}"
+GIT_INDEX_FILE="$historical_a2ii_index" git checkout-index --all \
+    --prefix="$historical_a2ii_root/"
+iib5biii_b2a_iia2ii_semantic_gate="$historical_a2ii_root/scripts/verify-investigation-boundaries"
+iib5biii_b2a_iia2ii_semantic_app_gate="$historical_a2ii_root/scripts/verify-app-release-boundaries"
+iib5biii_b2a_iia2ii_semantic_composition="$historical_a2ii_root/$iib5biii_b2a_iia2ii_composition"
+iib5biii_b2a_iia2ii_semantic_session="$historical_a2ii_root/$iib5biii_b2a_iia2ii_session"
+iib5biii_b2a_iia2ii_semantic_protocol="$historical_a2ii_root/$iib5biii_b2a_iia2ii_protocol"
+iib5biii_b2a_iia2ii_semantic_retirement="$historical_a2ii_root/$iib5biii_b2a_iia2ii_retirement"
+iib5biii_b2a_iia2ii_semantic_composition_test="$historical_a2ii_root/$iib5biii_b2a_iia2ii_composition_test"
+iib5biii_b2a_iia2ii_semantic_session_test="$historical_a2ii_root/$iib5biii_b2a_iia2ii_session_test"
+iib5biii_b2a_iia2ii_semantic_protocol_test="$historical_a2ii_root/$iib5biii_b2a_iia2ii_protocol_test"
+iib5biii_b2a_iia2ii_semantic_retirement_test="$historical_a2ii_root/$iib5biii_b2a_iia2ii_retirement_test"
+iib5biii_b2a_iia2ii_semantic_boundary="$historical_a2ii_root/$iib5biii_b2a_iia2ii_boundary"
 
 function run_iib5biii_b2a_iia2ii_contract() {
     local composition=$1 session=$2 protocol=$3 retirement=$4
     local composition_test=$5 session_test=$6 protocol_test=$7
     local retirement_test=$8 boundary=$9
-    "$iib5biii_b2a_iia2ii_gate" \
+    "$iib5biii_b2a_iia2ii_semantic_gate" \
         --iib5biii-b2a-ii-a2ii-contract-only \
         "$composition" "$session" "$protocol" "$retirement" \
         "$composition_test" "$session_test" "$protocol_test" \
@@ -8641,30 +8675,31 @@ function run_iib5biii_b2a_iia2ii_contract() {
 }
 
 run_iib5biii_b2a_iia2ii_contract \
-    "$iib5biii_b2a_iia2ii_composition" \
-    "$iib5biii_b2a_iia2ii_session" \
-    "$iib5biii_b2a_iia2ii_protocol" \
-    "$iib5biii_b2a_iia2ii_retirement" \
-    "$iib5biii_b2a_iia2ii_composition_test" \
-    "$iib5biii_b2a_iia2ii_session_test" \
-    "$iib5biii_b2a_iia2ii_protocol_test" \
-    "$iib5biii_b2a_iia2ii_retirement_test" \
-    "$iib5biii_b2a_iia2ii_boundary" \
+    "$iib5biii_b2a_iia2ii_semantic_composition" \
+    "$iib5biii_b2a_iia2ii_semantic_session" \
+    "$iib5biii_b2a_iia2ii_semantic_protocol" \
+    "$iib5biii_b2a_iia2ii_semantic_retirement" \
+    "$iib5biii_b2a_iia2ii_semantic_composition_test" \
+    "$iib5biii_b2a_iia2ii_semantic_session_test" \
+    "$iib5biii_b2a_iia2ii_semantic_protocol_test" \
+    "$iib5biii_b2a_iia2ii_semantic_retirement_test" \
+    "$iib5biii_b2a_iia2ii_semantic_boundary" \
     >"$contract_root/iib5biii-b2a-ii-a2ii-canonical.log"
 
-"$iib5biii_b2a_iia2ii_app_gate" \
+"$iib5biii_b2a_iia2ii_semantic_app_gate" \
     --iib5biii-b2a-ii-a2ii-source-contract-only \
-    "$iib5biii_b2a_iia2ii_composition" \
-    "$iib5biii_b2a_iia2ii_session" \
-    "$iib5biii_b2a_iia2ii_protocol" \
-    "$iib5biii_b2a_iia2ii_retirement" \
+    "$iib5biii_b2a_iia2ii_semantic_composition" \
+    "$iib5biii_b2a_iia2ii_semantic_session" \
+    "$iib5biii_b2a_iia2ii_semantic_protocol" \
+    "$iib5biii_b2a_iia2ii_semantic_retirement" \
     >"$contract_root/iib5biii-b2a-ii-a2ii-app-canonical.log"
 
-python3 - "$iib5biii_b2a_iia2ii_composition" \
-    "$iib5biii_b2a_iia2ii_session" \
-    "$iib5biii_b2a_iia2ii_protocol" \
-    "$iib5biii_b2a_iia2ii_retirement" \
-    "$iib5biii_b2a_iia2ii_composition_test" "$contract_root" <<'PY'
+python3 - "$iib5biii_b2a_iia2ii_semantic_composition" \
+    "$iib5biii_b2a_iia2ii_semantic_session" \
+    "$iib5biii_b2a_iia2ii_semantic_protocol" \
+    "$iib5biii_b2a_iia2ii_semantic_retirement" \
+    "$iib5biii_b2a_iia2ii_semantic_composition_test" \
+    "$contract_root" <<'PY'
 from pathlib import Path
 import sys
 
@@ -8764,11 +8799,11 @@ PY
 
 function require_iib5biii_b2a_iia2ii_mutation_rejected() {
     local name=$1 kind=$2 expected=$3
-    local composition=$iib5biii_b2a_iia2ii_composition
-    local session=$iib5biii_b2a_iia2ii_session
-    local protocol=$iib5biii_b2a_iia2ii_protocol
-    local retirement=$iib5biii_b2a_iia2ii_retirement
-    local composition_test=$iib5biii_b2a_iia2ii_composition_test
+    local composition=$iib5biii_b2a_iia2ii_semantic_composition
+    local session=$iib5biii_b2a_iia2ii_semantic_session
+    local protocol=$iib5biii_b2a_iia2ii_semantic_protocol
+    local retirement=$iib5biii_b2a_iia2ii_semantic_retirement
+    local composition_test=$iib5biii_b2a_iia2ii_semantic_composition_test
     local target="$contract_root/iib5biii-b2a-ii-a2ii-$name.swift"
     [[ $kind == composition ]] && composition=$target
     [[ $kind == session ]] && session=$target
@@ -8779,10 +8814,10 @@ function require_iib5biii_b2a_iia2ii_mutation_rejected() {
     local output="$contract_root/iib5biii-b2a-ii-a2ii-$name.log"
     if run_iib5biii_b2a_iia2ii_contract \
         "$composition" "$session" "$protocol" "$retirement" \
-        "$composition_test" "$iib5biii_b2a_iia2ii_session_test" \
-        "$iib5biii_b2a_iia2ii_protocol_test" \
-        "$iib5biii_b2a_iia2ii_retirement_test" \
-        "$iib5biii_b2a_iia2ii_boundary" >"$output" 2>&1
+        "$composition_test" "$iib5biii_b2a_iia2ii_semantic_session_test" \
+        "$iib5biii_b2a_iia2ii_semantic_protocol_test" \
+        "$iib5biii_b2a_iia2ii_semantic_retirement_test" \
+        "$iib5biii_b2a_iia2ii_semantic_boundary" >"$output" 2>&1
     then
         fail_contract "iii-b2a-ii-a2-ii mutation accepted: $name"
     fi
@@ -8935,6 +8970,228 @@ for checkpoint_path in "${iib5biii_b2a_iia2ii_paths[@]}"; do
     fi
     require_fixed_text "$output" \
         "iii-b2a-ii-a2-ii completed tree drifted"
+done
+
+# Task 39 iii-b2b-0 Release graph closure. This checkpoint deliberately has
+# no completion commit/tree seal; the enclosing completion commit adds it.
+iib5biii_b2b0_gate=scripts/verify-investigation-boundaries
+iib5biii_b2b0_app_gate=scripts/verify-app-release-boundaries
+iib5biii_b2b0_baseline=d6ab789ada2d87d0422fb8175d3d82c70381b47c
+iib5biii_b2b0_observer=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinDriverChildObservation.swift
+iib5biii_b2b0_session=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerSession.swift
+iib5biii_b2b0_composition=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerComposition.swift
+iib5biii_b2b0_boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+iib5biii_b2b0_preflight=docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-0-release-graph-preflight.md
+"$iib5biii_b2b0_gate" \
+    --iib5biii-b2b0-release-graph-contract-only \
+    "$iib5biii_b2b0_observer" "$iib5biii_b2b0_session" \
+    "$iib5biii_b2b0_composition" "$iib5biii_b2b0_boundary" \
+    >"$contract_root/iib5biii-b2b0-canonical.log"
+"$iib5biii_b2b0_app_gate" \
+    --iib5biii-b2b0-source-contract-only \
+    "$iib5biii_b2b0_observer" "$iib5biii_b2b0_session" \
+    "$iib5biii_b2b0_composition" \
+    >"$contract_root/iib5biii-b2b0-app-canonical.log"
+
+python3 - "$iib5biii_b2b0_observer" "$iib5biii_b2b0_session" \
+    "$iib5biii_b2b0_composition" "$iib5biii_b2b0_boundary" \
+    "$contract_root" <<'PY'
+from pathlib import Path
+import sys
+
+observer_path, session_path, composition_path, boundary_path, output = map(
+    Path, sys.argv[1:]
+)
+sources = {
+    "observer": observer_path.read_text(encoding="utf-8"),
+    "session": session_path.read_text(encoding="utf-8"),
+    "composition": composition_path.read_text(encoding="utf-8"),
+    "boundary": boundary_path.read_text(encoding="utf-8"),
+}
+
+def write(name, kind, value):
+    (output / f"iib5biii-b2b0-{name}.swift").write_text(
+        value, encoding="utf-8"
+    )
+
+def replace(name, kind, old, new):
+    source = sources[kind]
+    if source.count(old) != 1:
+        raise SystemExit(f"cannot construct iii-b2b-0 mutation: {name}")
+    write(name, kind, source.replace(old, new, 1))
+
+for name, kind in (
+    ("reintroduce-observer-debug-guard", "observer"),
+    ("reintroduce-session-debug-guard", "session"),
+    ("reintroduce-composition-debug-guard", "composition"),
+):
+    write(name, kind, "#if DEBUG\n" + sources[kind] + "#endif\n")
+replace(
+    "public-widening", "observer",
+    "package protocol InvestigationMachineDarwinDriverChildObserving",
+    "public protocol InvestigationMachineDarwinDriverChildObserving",
+)
+replace(
+    "codable-widening", "observer",
+    "package struct InvestigationMachineDarwinDriverChildNarrowIdentity:\n"
+    "    Sendable, Equatable\n{",
+    "package struct InvestigationMachineDarwinDriverChildNarrowIdentity:\n"
+    "    Sendable, Equatable, Codable\n{",
+)
+replace(
+    "authority-widening", "composition",
+    "package enum InvestigationMachineDarwinOuterInnerCompositionError:",
+    "private func forbiddenExecutionAuthority() { _ = Executor.self }\n\n"
+    "package enum InvestigationMachineDarwinOuterInnerCompositionError:",
+)
+replace(
+    "release-linkage", "composition",
+    "extension InvestigationMachineDarwinInnerRoleValidator:",
+    "extension InvestigationMachineDarwinInnerRoleValidatorMissing:",
+)
+replace(
+    "boundary-test-vacuity", "boundary",
+    "iiiB2B0VerifierPinsReleaseGraphClosureAndExactScope",
+    "iiiB2B0VerifierCoverageWasRemoved",
+)
+PY
+
+function require_iib5biii_b2b0_mutation_rejected() {
+    local name=$1 kind=$2 expected=$3
+    local observer=$iib5biii_b2b0_observer
+    local session=$iib5biii_b2b0_session
+    local composition=$iib5biii_b2b0_composition
+    local boundary=$iib5biii_b2b0_boundary
+    local target="$contract_root/iib5biii-b2b0-$name.swift"
+    [[ $kind == observer ]] && observer=$target
+    [[ $kind == session ]] && session=$target
+    [[ $kind == composition ]] && composition=$target
+    [[ $kind == boundary ]] && boundary=$target
+    xcrun swiftc -frontend -parse -enable-bare-slash-regex "$target"
+    local output="$contract_root/iib5biii-b2b0-$name.log"
+    if "$iib5biii_b2b0_gate" \
+        --iib5biii-b2b0-release-graph-contract-only \
+        "$observer" "$session" "$composition" "$boundary" \
+        >"$output" 2>&1
+    then
+        fail_contract "iii-b2b-0 mutation accepted: $name"
+    fi
+    require_fixed_text "$output" "$expected"
+}
+for fixture in \
+    reintroduce-observer-debug-guard:observer:'iii-b2b-0 Release graph guard drifted' \
+    reintroduce-session-debug-guard:session:'iii-b2b-0 Release graph guard drifted' \
+    reintroduce-composition-debug-guard:composition:'iii-b2b-0 Release graph guard drifted' \
+    public-widening:observer:'iii-b2b-0 Release graph public surface drifted' \
+    codable-widening:observer:'iii-b2b-0 Release graph Codable surface drifted' \
+    authority-widening:composition:'iii-b2b-0 Release graph authority surface drifted' \
+    release-linkage:composition:'iii-b2b-0 Release graph linkage drifted' \
+    boundary-test-vacuity:boundary:'iii-b2b-0 boundary test became vacuous'
+do
+    name=${fixture%%:*}
+    remainder=${fixture#*:}
+    kind=${remainder%%:*}
+    expected=${remainder#*:}
+    require_iib5biii_b2b0_mutation_rejected \
+        "$name" "$kind" "$expected"
+done
+
+iib5biii_b2b0_paths=(
+    "$iib5biii_b2b0_observer"
+    "$iib5biii_b2b0_composition"
+    "$iib5biii_b2b0_session"
+    "$iib5biii_b2b0_boundary"
+    scripts/verify-app-release-boundaries
+    scripts/verify-contract
+    scripts/verify-investigation-boundaries
+)
+(( ${#iib5biii_b2b0_paths} == 7 )) \
+    || fail_contract "iii-b2b-0 checkpoint path ceiling drifted"
+iib5biii_b2b0_index="$contract_root/iib5biii-b2b0.index"
+GIT_INDEX_FILE="$iib5biii_b2b0_index" \
+    git read-tree "$iib5biii_b2b0_baseline^{tree}"
+for checkpoint_path in "${iib5biii_b2b0_paths[@]}" \
+    "$iib5biii_b2b0_preflight"
+do
+    blob=$(git hash-object -w -- "$checkpoint_path")
+    mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
+    GIT_INDEX_FILE="$iib5biii_b2b0_index" git update-index --add \
+        --cacheinfo "$mode,$blob,$checkpoint_path"
+done
+GIT_INDEX_FILE="$iib5biii_b2b0_index" "$iib5biii_b2b0_gate" \
+    --iib5biii-b2b0-staged-scope-contract-only \
+    "$iib5biii_b2b0_baseline" \
+    >"$contract_root/iib5biii-b2b0-scope-canonical.log"
+for line in {1..1300}; do print -r -- "// iii-b2b-0 $line"; done \
+    >"$contract_root/iib5biii-b2b0-over-budget.swift"
+for fixture in extra-path over-budget deleted binary mode wrong-baseline \
+    missing-preflight substitute-observer substitute-session \
+    substitute-composition substitute-boundary-test substitute-contract \
+    substitute-boundary substitute-app
+do
+    index="$contract_root/iib5biii-b2b0-$fixture.index"
+    cp "$iib5biii_b2b0_index" "$index"
+    baseline=$iib5biii_b2b0_baseline
+    case $fixture in
+        extra-path)
+            blob=$(git rev-parse "${iib5biii_b2b0_baseline}:AGENTS.md")
+            GIT_INDEX_FILE="$index" git update-index --add \
+                --cacheinfo "100644,$blob,iii-b2b-0-extra.swift"
+            expected='iii-b2b-0 staged checkpoint paths drifted' ;;
+        over-budget)
+            blob=$(git hash-object -w -- \
+                "$contract_root/iib5biii-b2b0-over-budget.swift")
+            GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                "100644,$blob,$iib5biii_b2b0_observer"
+            expected='iii-b2b-0 checkpoint budget drifted' ;;
+        deleted)
+            GIT_INDEX_FILE="$index" git rm --cached -q -f \
+                "$iib5biii_b2b0_session"
+            expected='iii-b2b-0 checkpoint deleted an existing path' ;;
+        binary)
+            blob=$(git rev-parse \
+                "${iib5biii_b2b0_baseline}:Tests/Fixtures/Snapshots/design-system.empty-state.dark.en.png")
+            GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                "100644,$blob,$iib5biii_b2b0_observer"
+            expected='iii-b2b-0 binary checkpoint path rejected' ;;
+        mode)
+            entry=$(GIT_INDEX_FILE="$index" git ls-files -s -- \
+                scripts/verify-contract)
+            blob=$(print -r -- "$entry" | awk '{print $2}')
+            GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                "100644,$blob,scripts/verify-contract"
+            expected='iii-b2b-0 checkpoint mode drifted: scripts/verify-contract' ;;
+        wrong-baseline)
+            baseline="$iib5biii_b2b0_baseline^"
+            expected='iii-b2b-0 checkpoint baseline drifted' ;;
+        missing-preflight)
+            GIT_INDEX_FILE="$index" git rm --cached -q -f \
+                "$iib5biii_b2b0_preflight"
+            expected='iii-b2b-0 required preflight document missing' ;;
+        substitute-observer) checkpoint_path=$iib5biii_b2b0_observer ;;
+        substitute-session) checkpoint_path=$iib5biii_b2b0_session ;;
+        substitute-composition) checkpoint_path=$iib5biii_b2b0_composition ;;
+        substitute-boundary-test) checkpoint_path=$iib5biii_b2b0_boundary ;;
+        substitute-contract) checkpoint_path=scripts/verify-contract ;;
+        substitute-boundary) checkpoint_path=scripts/verify-investigation-boundaries ;;
+        substitute-app) checkpoint_path=scripts/verify-app-release-boundaries ;;
+    esac
+    if [[ $fixture == substitute-* ]]; then
+        blob=$(git rev-parse \
+            "${iib5biii_b2b0_baseline}:$checkpoint_path")
+        mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
+        GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+            "$mode,$blob,$checkpoint_path"
+        expected='iii-b2b-0 staged checkpoint paths drifted'
+    fi
+    output="$contract_root/iib5biii-b2b0-scope-$fixture.log"
+    if GIT_INDEX_FILE="$index" "$iib5biii_b2b0_gate" \
+        --iib5biii-b2b0-staged-scope-contract-only "$baseline" \
+        >"$output" 2>&1
+    then
+        fail_contract "iii-b2b-0 scope mutation accepted: $fixture"
+    fi
+    require_fixed_text "$output" "$expected"
 done
 
 print "Verifier mode and CI contract verification passed."

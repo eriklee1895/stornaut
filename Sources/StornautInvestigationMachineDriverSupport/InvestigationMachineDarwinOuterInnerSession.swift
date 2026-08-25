@@ -2,7 +2,6 @@ import Darwin
 import Foundation
 import StornautInvestigationInstalledL2
 
-#if DEBUG
 package enum InvestigationMachineDarwinOuterInnerSessionError:
     Error, Sendable, Equatable
 {
@@ -1756,4 +1755,3 @@ private func sessionConsumed()
 {
     .alreadyConsumed
 }
-#endif

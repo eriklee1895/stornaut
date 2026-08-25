@@ -951,11 +951,9 @@ struct InvestigationMachineTargetBoundaryTests {
                 "InvestigationMachineDarwinOuterInnerComposition.swift",
                 "InvestigationMachineDarwinOuterInnerSession.swift",
             ].contains(sourceName) {
-                #expect(source.components(separatedBy: "#if DEBUG").count == 2)
-                #expect(source.components(separatedBy: "#endif").count == 2)
-                #expect(source.trimmingCharacters(
-                    in: .whitespacesAndNewlines
-                ).hasSuffix("#endif"))
+                // iii-b2b-0 Release machine-driver graph closure.
+                #expect(!source.contains("#if DEBUG"))
+                #expect(!source.contains("#endif"))
             }
             if sourceName == "InvestigationMachineFixedCapsuleIntake.swift" {
                 let compactSource = source.filter { !$0.isWhitespace }
@@ -1937,6 +1935,67 @@ struct InvestigationMachineTargetBoundaryTests {
             "verify_iib5biii_b2a_iia2ii_macho()",
             "iii-b2a-ii-a2-ii Debug Machine driver positive control is missing",
             "iii-b2a-ii-a2-ii DEBUG symbol leaked into a closed image",
+        ] {
+            #expect(app.contains(marker))
+        }
+    }
+
+    @Test
+    func iiiB2B0VerifierPinsReleaseGraphClosureAndExactScope() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ), encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        let app = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-app-release-boundaries"
+            ), encoding: .utf8
+        )
+
+        for marker in [
+            "--iib5biii-b2b0-release-graph-contract-only",
+            "--iib5biii-b2b0-staged-scope-contract-only",
+            "function verify_iib5biii_b2b0_release_graph_contract()",
+            "function verify_iib5biii_b2b0_scope()",
+            "iii-b2b-0 Release graph guard drifted",
+            "iii-b2b-0 Release graph linkage drifted",
+            "iii-b2b-0 Release graph public surface drifted",
+            "iii-b2b-0 Release graph Codable surface drifted",
+            "iii-b2b-0 staged checkpoint paths drifted",
+            "iii-b2b-0 checkpoint budget drifted",
+            "d6ab789ada2d87d0422fb8175d3d82c70381b47c",
+            "(( ${#expected} == 7 ))",
+            "(( changed <= 1200 ))",
+        ] {
+            #expect(boundary.contains(marker))
+        }
+        for marker in [
+            "iib5biii_b2b0_baseline=d6ab789ada2d87d0422fb8175d3d82c70381b47c",
+            "iii-b2b-0 mutation accepted:",
+            "iii-b2b-0 scope mutation accepted:",
+            "reintroduce-observer-debug-guard",
+            "reintroduce-session-debug-guard",
+            "reintroduce-composition-debug-guard",
+            "boundary-test-vacuity",
+        ] {
+            #expect(contract.contains(marker))
+        }
+        for marker in [
+            "--iib5biii-b2b0-source-contract-only",
+            "function verify_iib5biii_b2b0_source_contract()",
+            "iib5biii_b2b0_symbols=(",
+            "iib5biii_b2b0_positive_drivers=(",
+            "iib5biii_b2b0_closed_images=(",
+            "verify_iib5biii_b2b0_macho()",
+            "iii-b2b-0 driver positive control is missing",
+            "iii-b2b-0 graph leaked into a closed image",
         ] {
             #expect(app.contains(marker))
         }

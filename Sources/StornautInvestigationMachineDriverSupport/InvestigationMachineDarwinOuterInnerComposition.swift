@@ -2,7 +2,6 @@ import Darwin
 import Foundation
 import StornautInvestigationHandoffContract
 
-#if DEBUG
 package enum InvestigationMachineDarwinOuterInnerCompositionError:
     Error, Sendable, Equatable
 {
@@ -851,4 +850,3 @@ package actor InvestigationMachineDarwinOuterInnerComposition:
         return .terminalUncertain
     }
 }
-#endif
