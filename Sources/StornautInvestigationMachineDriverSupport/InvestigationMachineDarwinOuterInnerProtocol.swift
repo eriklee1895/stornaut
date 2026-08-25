@@ -941,6 +941,7 @@ package actor InvestigationMachineDarwinOuterAdmission:
 
     private let selection: InvestigationMachineFixedEpochSelection
     private let outerProcessID: UInt32
+    private let clock: any InvestigationMachineDarwinOuterInnerCompositionClocking
     private let owner = UUID()
     private var state: State = .ready
 
@@ -948,8 +949,20 @@ package actor InvestigationMachineDarwinOuterAdmission:
         selection: InvestigationMachineFixedEpochSelection,
         outerProcessID: UInt32
     ) {
+        self.init(
+            selection: selection, outerProcessID: outerProcessID,
+            clock: InvestigationMachineDarwinCompositionClock()
+        )
+    }
+
+    init(
+        selection: InvestigationMachineFixedEpochSelection,
+        outerProcessID: UInt32,
+        clock: any InvestigationMachineDarwinOuterInnerCompositionClocking
+    ) {
         self.selection = selection
         self.outerProcessID = outerProcessID
+        self.clock = clock
     }
 
     package func accept(
@@ -1091,6 +1104,19 @@ package actor InvestigationMachineDarwinOuterAdmission:
                 )
             )
         } catch { return try failValue() }
+        let admittedAtNanoseconds: UInt64
+        guard !Task.isCancelled else { return try failState() }
+        do {
+            admittedAtNanoseconds = try clock.continuousNanoseconds()
+        } catch {
+            return try failTerminalEvidence()
+        }
+        guard
+            admittedAtNanoseconds >= terminalEvidence.observedAtNanoseconds,
+            admittedAtNanoseconds < exchange.request.epochDeadlineNanoseconds
+        else {
+            return try failTerminalEvidence()
+        }
         let token = InvestigationMachineSingleEpochAdmittedPhysicalResult(
             helperIdentity: helper, bindingSHA256: binding,
             mode: exchange.request.mode, selection: selection,

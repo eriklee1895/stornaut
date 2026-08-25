@@ -477,7 +477,7 @@ private func installedL2SigningData(
     )
 }
 
-private func singleEpochDriverObservationSHA256(
+func singleEpochDriverObservationSHA256(
     _ value: InvestigationMachineSingleEpochDriverObservation
 ) throws -> InvestigationHandoffSHA256 {
     let observation = value.value

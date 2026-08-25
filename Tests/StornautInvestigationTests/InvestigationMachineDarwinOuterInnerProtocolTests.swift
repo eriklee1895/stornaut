@@ -344,6 +344,50 @@ struct InvestigationMachineDarwinOuterInnerProtocolTests {
         }
     }
 
+    @Test
+    func outerAdmissionSamplesDeadlineInsideTheMintingCriticalSection() async throws {
+        let fixture = try OuterInnerFixture(scenario: .success)
+        let rejectedClock = FixedOuterInnerProtocolClock(
+            now: fixture.request.epochDeadlineNanoseconds
+        )
+        let admission = fixture.makeOuterAdmission(clock: rejectedClock)
+        let exchange = try await completeExchange(fixture, admission)
+        let normal = try InvestigationMachineDarwinEpochNormalResult(
+            request: fixture.request, ownership: fixture.ownershipRecord,
+            acknowledgement: exchange.acknowledgement,
+            decision: exchange.decision, physicalResult: fixture.physicalResult()
+        )
+        await #expect(throws:
+            InvestigationMachineDarwinOuterInnerProtocolError
+                .terminalEvidenceInvalid
+        ) {
+            _ = try await admission.admit(
+                resultBytes: normal.encoded(),
+                terminalEvidence: try fixture.terminalEvidence(
+                    successfulExit: true
+                )
+            )
+        }
+        #expect(rejectedClock.calls == 1)
+
+        let invalidClock = FixedOuterInnerProtocolClock(
+            now: fixture.observedAt + 2
+        )
+        let invalidAdmission = fixture.makeOuterAdmission(clock: invalidClock)
+        _ = try await completeExchange(fixture, invalidAdmission)
+        await #expect(throws:
+            InvestigationMachineDarwinOuterInnerProtocolError.invalidValue
+        ) {
+            _ = try await invalidAdmission.admit(
+                resultBytes: Data([0x00]),
+                terminalEvidence: try fixture.terminalEvidence(
+                    successfulExit: true
+                )
+            )
+        }
+        #expect(invalidClock.calls == 0)
+    }
+
     @Test(arguments: [
         TerminalEvidenceMutation.controlEOF,
         .resultEOF, .appPresent, .leaderNotLast, .groupNotEmpty,
@@ -800,8 +844,13 @@ struct OuterInnerFixture {
         )
     }
 
-    func makeOuterAdmission() -> InvestigationMachineDarwinOuterAdmission {
-        .init(selection: selection, outerProcessID: outerProcessID)
+    fileprivate func makeOuterAdmission(
+        clock: FixedOuterInnerProtocolClock? = nil
+    ) -> InvestigationMachineDarwinOuterAdmission {
+        .init(
+            selection: selection, outerProcessID: outerProcessID,
+            clock: clock ?? FixedOuterInnerProtocolClock(now: observedAt + 2)
+        )
     }
 
     func physicalResult() throws -> InvestigationMachineSingleEpochPhysicalResult {
@@ -951,6 +1000,23 @@ struct OuterInnerFixture {
     private static func data(_ value: UUID) -> Data {
         var bytes = value.uuid
         return withUnsafeBytes(of: &bytes) { Data($0) }
+    }
+}
+
+private final class FixedOuterInnerProtocolClock:
+    InvestigationMachineDarwinOuterInnerCompositionClocking, @unchecked Sendable
+{
+    let now: UInt64
+    private let lock = NSLock()
+    private var storedCalls = 0
+
+    init(now: UInt64) { self.now = now }
+
+    var calls: Int { lock.withLock { storedCalls } }
+
+    func continuousNanoseconds() throws -> UInt64 {
+        lock.withLock { storedCalls += 1 }
+        return now
     }
 }
 
