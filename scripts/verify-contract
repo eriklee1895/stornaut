@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=3970bb082874915674de783de2b62c422ac667906cfcfd42efbec550993c9a5c
+ib2_self_sha=133628df7595ed0dcc9c4b0a6ccd6ec31ea62e250dc55b3f1bda9c676826aacc
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -1152,7 +1152,7 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "891bd276fb2c17e9f3fe8696c562bf2a3d4ba6f40b87bd4a4b75b0a6b75c53c6",
+        "f9abb112a95170b1d58890a67c47e06644ffdb2f77c0781d9493f7457575f26b",
     Path("scripts/verify-app-release-boundaries"):
         "f8efaf206a1ffb6d61ceaa5945d16025fefd41cdd9f1c58724117160688418cd",
 }
@@ -1190,7 +1190,7 @@ projection_markers = {
     "iib5biii_b2b1a0_swiftpm_debug_owned_sha":
         "af92aa80c452f4d3b4b539a334d149e8f41b9f98633b4b4aed1728c568052870",
     "iib5biii_b2b1a0_swiftpm_release_owned_sha":
-        "c45d76940f5a95bd7f7119a84fbf27911e091857a6aebd6befd00cb49ce6a474",
+        "459abfb64cf21475780a79ed8dd7c6088603b386f8a196dac14c282b49fcc08c",
     "iib5biii_b2b1a0_xcode_debug_owned_sha256":
         "cdab4bac069437be33a167157569d915ca477594090344d2b1d0c3afe8f0e13e",
     "iib5biii_b2b1a0_xcode_release_owned_sha256":
@@ -9309,6 +9309,8 @@ done
 iib5biii_b2b1a0_gate=scripts/verify-investigation-boundaries
 iib5biii_b2b1a0_app_gate=scripts/verify-app-release-boundaries
 iib5biii_b2b1a0_baseline=d643b8fd500be29736a962dcd0c270304b490828
+iib5biii_b2b1a0_implementation_commit=53c5594da964ff3f6d5fdca4f2825a5e629b01c4
+iib5biii_b2b1a0_implementation_tree=f9322fa0c71910ca96a44cf6d3a7f70e3245f1fa
 iib5biii_b2b1a0_composition=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochComposition.swift
 iib5biii_b2b1a0_bridge=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochPhysicalBridge.swift
 iib5biii_b2b1a0_bridge_test=Tests/StornautInvestigationTests/InvestigationMachineSingleEpochPhysicalBridgeTests.swift
@@ -9327,6 +9329,37 @@ iib5biii_b2b1a0_paths=(
 )
 (( ${#iib5biii_b2b1a0_paths} == 8 )) \
     || fail_contract "iii-b2b-1a-0 checkpoint path ceiling drifted"
+iib5biii_b2b1a0_implementation_paths=(
+    "${iib5biii_b2b1a0_paths[@]}"
+    "$iib5biii_b2b1a0_preflight"
+)
+(( ${#iib5biii_b2b1a0_implementation_paths} == 9 )) \
+    || fail_contract "iii-b2b-1a-0 implementation path count drifted"
+[[ "$(git show -s --format=%P \
+    "$iib5biii_b2b1a0_implementation_commit")" == \
+    "$iib5biii_b2b1a0_baseline" ]] \
+    || fail_contract "iii-b2b-1a-0 implementation parent drifted"
+[[ "$(git show -s --format=%T \
+    "$iib5biii_b2b1a0_implementation_commit")" == \
+    "$iib5biii_b2b1a0_implementation_tree" ]] \
+    || fail_contract "iii-b2b-1a-0 implementation tree drifted"
+iib5biii_b2b1a0_observed_paths=(
+    ${(f)"$(git diff-tree --no-commit-id --name-only -r \
+        "$iib5biii_b2b1a0_implementation_commit" | LC_ALL=C sort)"}
+)
+iib5biii_b2b1a0_expected_paths=(
+    "${(@on)iib5biii_b2b1a0_implementation_paths}"
+)
+[[ "${(j:\n:)iib5biii_b2b1a0_observed_paths}" == \
+    "${(j:\n:)iib5biii_b2b1a0_expected_paths}" ]] \
+    || fail_contract "iii-b2b-1a-0 implementation paths drifted"
+iib5biii_b2b1a0_implementation_lines=$(
+    git diff-tree --numstat --no-commit-id -r \
+        "$iib5biii_b2b1a0_implementation_commit" \
+        | awk 'index($3,"docs/")!=1 && $3!="AGENTS.md" && $3!="README.md" {n += $1 + $2} END {print n + 0}'
+)
+(( iib5biii_b2b1a0_implementation_lines == 1336 )) \
+    || fail_contract "iii-b2b-1a-0 implementation line count drifted"
 
 function verify_iib5biii_b2b1a0_staged_worktree_identity() {
     local checkpoint_path entry staged_blob worktree_blob
@@ -9507,23 +9540,7 @@ done
 
 iib5biii_b2b1a0_index="$contract_root/iib5biii-b2b1a0.index"
 GIT_INDEX_FILE="$iib5biii_b2b1a0_index" \
-    git read-tree "$iib5biii_b2b1a0_baseline^{tree}"
-for checkpoint_path in "${iib5biii_b2b1a0_paths[@]}"; do
-    entry=$(git ls-files -s -- "$checkpoint_path")
-    mode=$(print -r -- "$entry" | awk '{print $1}')
-    blob=$(print -r -- "$entry" | awk '{print $2}')
-    [[ -n $mode && -n $blob ]] \
-        || fail_contract \
-            "iii-b2b-1a-0 staged source missing: $checkpoint_path"
-    GIT_INDEX_FILE="$iib5biii_b2b1a0_index" git update-index --add \
-        --cacheinfo "$mode,$blob,$checkpoint_path"
-done
-preflight_entry=$(git ls-files -s -- "$iib5biii_b2b1a0_preflight")
-preflight_blob=$(print -r -- "$preflight_entry" | awk '{print $2}')
-[[ -n $preflight_blob ]] \
-    || fail_contract "iii-b2b-1a-0 staged preflight missing"
-GIT_INDEX_FILE="$iib5biii_b2b1a0_index" git update-index --add \
-    --cacheinfo "100644,$preflight_blob,$iib5biii_b2b1a0_preflight"
+    git read-tree "$iib5biii_b2b1a0_implementation_commit^{tree}"
 GIT_INDEX_FILE="$iib5biii_b2b1a0_index" "$iib5biii_b2b1a0_gate" \
     --iib5biii-b2b1a0-staged-scope-contract-only \
     "$iib5biii_b2b1a0_baseline" \
@@ -9604,6 +9621,30 @@ do
         fail_contract "iii-b2b-1a-0 scope mutation accepted: $fixture"
     fi
     require_fixed_text "$output" "$expected"
+done
+
+for checkpoint_path in "${iib5biii_b2b1a0_implementation_paths[@]}"; do
+    index="$contract_root/iib5biii-b2b1a0-tamper-${checkpoint_path:t}.index"
+    cp "$iib5biii_b2b1a0_index" "$index"
+    {
+        git show \
+            "${iib5biii_b2b1a0_implementation_commit}:$checkpoint_path"
+        print -r -- "controlled iii-b2b-1a-0 same-path tamper"
+    } >"$contract_root/iib5biii-b2b1a0-tampered"
+    blob=$(git hash-object -w -- \
+        "$contract_root/iib5biii-b2b1a0-tampered")
+    mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
+    GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+        "$mode,$blob,$checkpoint_path"
+    output="$contract_root/iib5biii-b2b1a0-tamper-${checkpoint_path:t}.log"
+    if GIT_INDEX_FILE="$index" "$iib5biii_b2b1a0_gate" \
+        --iib5biii-b2b1a0-staged-scope-contract-only \
+        "$iib5biii_b2b1a0_baseline" >"$output" 2>&1
+    then
+        fail_contract \
+            "iii-b2b-1a-0 same-path substitution accepted: $checkpoint_path"
+    fi
+    require_fixed_text "$output" "iii-b2b-1a-0 completed tree drifted"
 done
 
 print "Verifier mode and CI contract verification passed."

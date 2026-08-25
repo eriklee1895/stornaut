@@ -1764,7 +1764,7 @@ struct InvestigationMachineTargetBoundaryTests {
         }
         for marker in [
             "574d07d1ceb6fbe04619f6abde040833c87b3ee0098a3458169aa0f6c484e36f",
-            "72c1a6244481a53270afcda6bcd5f2092019c4139aa543a55e9019920a1826f0",
+            "iib5biii_b2b1a0_xcode_debug_owned_sha256=cdab4bac069437be33a167157569d915ca477594090344d2b1d0c3afe8f0e13e",
             "2209e254bfe1a2fb2709ae48640206658e2903a5aca28bd0fdf8e34171050962",
         ] {
             #expect(app.contains(marker))
@@ -1832,17 +1832,21 @@ struct InvestigationMachineTargetBoundaryTests {
             #expect(contract.contains(marker))
         }
         for marker in [
-            "1730d1c220b7c0f9ce963bfe9d83df0435bc4c7ba27ae73d606f7a6d004c9096",
+            "iib5biii_b2b1a0_swiftpm_debug_owned_sha=af92aa80c452f4d3b4b539a334d149e8f41b9f98633b4b4aed1728c568052870",
+            "iib5biii_b2b1a0_swiftpm_release_owned_sha=459abfb64cf21475780a79ed8dd7c6088603b386f8a196dac14c282b49fcc08c",
             "2232cd8aede221e91439b6e3634bc7fc3b007fa5aa145b8b0e65f52e5f98666e",
-            "expected_owned_lines=7864",
+            "iib5biii_b2b1a0_swiftpm_debug_owned_lines=7874",
+            "iib5biii_b2b1a0_swiftpm_release_owned_lines=5503",
             "expected_owned_lines=3877",
         ] {
             #expect(boundary.contains(marker))
         }
         for marker in [
-            "72c1a6244481a53270afcda6bcd5f2092019c4139aa543a55e9019920a1826f0",
+            "iib5biii_b2b1a0_xcode_debug_owned_sha256=cdab4bac069437be33a167157569d915ca477594090344d2b1d0c3afe8f0e13e",
+            "iib5biii_b2b1a0_xcode_release_owned_sha256=574d84356b349a7c302d522697b9fe7c1ea60ce172c922f41c51a5ca8f0357f7",
             "2209e254bfe1a2fb2709ae48640206658e2903a5aca28bd0fdf8e34171050962",
-            "7863 \\",
+            "iib5biii_b2b1a0_xcode_debug_owned_lines=7873",
+            "iib5biii_b2b1a0_xcode_release_owned_lines=5502",
             "3876 release-owned-symbol",
         ] {
             #expect(app.contains(marker))
@@ -2041,16 +2045,29 @@ struct InvestigationMachineTargetBoundaryTests {
             "iii-b2b-1a-0 canonical provenance carriage drifted",
             "iii-b2b-1a-0 staged checkpoint paths drifted",
             "iii-b2b-1a-0 checkpoint budget drifted",
+            "iii-b2b-1a-0 completed tree drifted",
+            "iii-b2b-1a-0 implementation line count drifted",
             "d643b8fd500be29736a962dcd0c270304b490828",
+            "f9322fa0c71910ca96a44cf6d3a7f70e3245f1fa",
             "(( ${#expected} == 8 ))",
             "(( changed <= 2200 ))",
+            "(( changed == 1336 ))",
         ] {
             #expect(boundary.contains(marker))
         }
         for marker in [
             "iib5biii_b2b1a0_baseline=d643b8fd500be29736a962dcd0c270304b490828",
+            "iib5biii_b2b1a0_implementation_commit=53c5594da964ff3f6d5fdca4f2825a5e629b01c4",
+            "iib5biii_b2b1a0_implementation_tree=f9322fa0c71910ca96a44cf6d3a7f70e3245f1fa",
+            "iii-b2b-1a-0 implementation parent drifted",
+            "iii-b2b-1a-0 implementation tree drifted",
+            "iii-b2b-1a-0 implementation paths drifted",
+            "iii-b2b-1a-0 implementation line count drifted",
+            "(( ${#iib5biii_b2b1a0_implementation_paths} == 9 ))",
             "iii-b2b-1a-0 mutation accepted:",
             "iii-b2b-1a-0 scope mutation accepted:",
+            "iii-b2b-1a-0 same-path substitution accepted:",
+            "controlled iii-b2b-1a-0 same-path tamper",
             "claim-evidence-digest-bypass",
             "claim-evidence-nonce-bypass",
             "coordinated-claim-evidence-tamper",

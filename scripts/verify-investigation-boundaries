@@ -3907,7 +3907,7 @@ expected_test_sha256 = {
     protocol_test_path:
         "72fc8f5959c6178493e83a4b26a0dfa6e1b9351ecfadc3f4956d2d2b4a26e7a5",
     boundary_path:
-        "0ec407c15a1725b0a93b12354d88c9c498375f77ea539cb266ae8654355faf20",
+        "3a2981b00b587ee2922b5a50d58ee1950d27c3e13a0116c0fd837e84816cb6dc",
 }
 for path, expected_sha256 in expected_test_sha256.items():
     observed_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -4116,6 +4116,7 @@ PY
 
 function verify_iib5biii_b2b1a0_scope() {
     local baseline=${1:-d643b8fd500be29736a962dcd0c270304b490828}
+    local implementation_tree=f9322fa0c71910ca96a44cf6d3a7f70e3245f1fa
     local expected=(
         Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochComposition.swift
         Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochPhysicalBridge.swift
@@ -4168,6 +4169,14 @@ function verify_iib5biii_b2b1a0_scope() {
     git diff --cached --name-only --diff-filter=ACMRD "$baseline" \
         | grep -Fxq -- "$preflight" || {
         print -u2 "iii-b2b-1a-0 required preflight document missing"; return 1
+    }
+    [[ "$(git write-tree)" == "$implementation_tree" ]] || {
+        print -u2 "iii-b2b-1a-0 completed tree drifted"
+        return 1
+    }
+    (( changed == 1336 )) || {
+        print -u2 "iii-b2b-1a-0 implementation line count drifted"
+        return 1
     }
 }
 
@@ -13840,7 +13849,7 @@ function require_exact_machine_driver_projection() {
     # pinned by verify-app-release-boundaries; neither may stand in for the other.
     local iib5biii_b2b1a0_swiftpm_debug_owned_sha=af92aa80c452f4d3b4b539a334d149e8f41b9f98633b4b4aed1728c568052870
     local iib5biii_b2b1a0_swiftpm_debug_owned_lines=7874
-    local iib5biii_b2b1a0_swiftpm_release_owned_sha=c45d76940f5a95bd7f7119a84fbf27911e091857a6aebd6befd00cb49ce6a474
+    local iib5biii_b2b1a0_swiftpm_release_owned_sha=459abfb64cf21475780a79ed8dd7c6088603b386f8a196dac14c282b49fcc08c
     local iib5biii_b2b1a0_swiftpm_release_owned_lines=5503
 
     case "$configuration" in
