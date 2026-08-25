@@ -48,11 +48,47 @@ struct InvestigationMachineDarwinWaitPIDStatus: Sendable, Equatable {
     let rawStatus: Int32
 }
 
+enum InvestigationMachineDarwinDirectChildExitClassification:
+    Sendable, Equatable
+{
+    static let deliberateParentCrashExitStatus: Int32 = 72
+
+    case ordinaryZero
+    case deliberateParentCrash
+    case unexpectedNonSuccess
+}
+
+struct InvestigationMachineDarwinOuterRetirementOutcome:
+    Sendable, Equatable
+{
+    let retirementProof: InvestigationMachineSingleEpochRetirementProof
+    let directChildExit:
+        InvestigationMachineDarwinDirectChildExitClassification
+
+    fileprivate init(
+        retirementProof: InvestigationMachineSingleEpochRetirementProof,
+        directChildExit:
+            InvestigationMachineDarwinDirectChildExitClassification
+    ) {
+        self.retirementProof = retirementProof
+        self.directChildExit = directChildExit
+    }
+}
+
+protocol InvestigationMachineDarwinOuterRetirementOwning:
+    InvestigationMachineDarwinEpochRetirementOwning
+{
+    func retireOwnedProcessGroupWithOutcome(
+        _ ownedEpoch: InvestigationMachineDarwinOwnedEpoch
+    ) async throws -> InvestigationMachineDarwinOuterRetirementOutcome
+}
+
 final class InvestigationMachineDarwinEpochRetirementOwner:
-    @unchecked Sendable, InvestigationMachineDarwinEpochRetirementOwning
+    @unchecked Sendable, InvestigationMachineDarwinOuterRetirementOwning
 {
     static let maximumInventoryEntries = 4_096
     static let totalWindowNanoseconds: UInt64 = 5_000_000_000
+    static let naturalDrainWindowNanoseconds: UInt64 = 1_000_000_000
     static let termWindowNanoseconds: UInt64 = 1_000_000_000
     private static let pollNanoseconds: UInt64 = 10_000_000
     private static let queue = DispatchQueue(
@@ -73,6 +109,13 @@ final class InvestigationMachineDarwinEpochRetirementOwner:
     func retireOwnedProcessGroup(
         _ ownedEpoch: InvestigationMachineDarwinOwnedEpoch
     ) async throws -> InvestigationMachineSingleEpochRetirementProof {
+        try await retireOwnedProcessGroupWithOutcome(ownedEpoch)
+            .retirementProof
+    }
+
+    func retireOwnedProcessGroupWithOutcome(
+        _ ownedEpoch: InvestigationMachineDarwinOwnedEpoch
+    ) async throws -> InvestigationMachineDarwinOuterRetirementOutcome {
         try beginOnce()
         return try await perform {
             defer { self.finish() }
@@ -135,7 +178,7 @@ final class InvestigationMachineDarwinEpochRetirementOwner:
 
     private func retireOwnedProcessGroupSynchronously(
         _ epoch: InvestigationMachineDarwinOwnedEpoch
-    ) throws -> InvestigationMachineSingleEpochRetirementProof {
+    ) throws -> InvestigationMachineDarwinOuterRetirementOutcome {
         let descriptorFailure = closeExactlyOnce(epoch.descriptors)
         guard
             epoch.processID > 1,
@@ -148,7 +191,12 @@ final class InvestigationMachineDarwinEpochRetirementOwner:
         }
 
         let started = try clock()
-        let termDeadline = try adding(Self.termWindowNanoseconds, to: started)
+        let naturalDrainDeadline = try adding(
+            Self.naturalDrainWindowNanoseconds, to: started
+        )
+        let termDeadline = try adding(
+            Self.termWindowNanoseconds, to: naturalDrainDeadline
+        )
         let totalDeadline = try adding(Self.totalWindowNanoseconds, to: started)
         var termSent = false
         var killSent = false
@@ -167,7 +215,9 @@ final class InvestigationMachineDarwinEpochRetirementOwner:
             }
             let descendants = members.filter { $0 != epoch.processID }
             if waitable == epoch.processID, descendants.isEmpty {
-                try reapLeader(epoch.processID, deadline: totalDeadline)
+                let status = try reapStatus(
+                    epoch.processID, deadline: totalDeadline
+                )
                 _ = try requireBefore(totalDeadline)
                 let postReapMembers = try inventory(epoch.processGroupID)
                 guard postReapMembers.isEmpty else {
@@ -179,12 +229,24 @@ final class InvestigationMachineDarwinEpochRetirementOwner:
                     throw InvestigationMachineDarwinEpochRetirementError
                         .descriptorCloseFailed
                 }
-                return .init()
+                return .init(
+                    retirementProof: .init(),
+                    directChildExit: try classifyDirectChildExit(
+                        status.rawStatus
+                    )
+                )
             }
 
             if !termSent {
-                try signal(-epoch.processGroupID, SIGTERM)
-                termSent = true
+                if observationCompletedAt >= naturalDrainDeadline {
+                    try signal(-epoch.processGroupID, SIGTERM)
+                    termSent = true
+                    continue
+                }
+                try pause(
+                    until: naturalDrainDeadline,
+                    totalDeadline: totalDeadline
+                )
                 continue
             }
             if !killSent, observationCompletedAt >= termDeadline {
@@ -370,6 +432,38 @@ final class InvestigationMachineDarwinEpochRetirementOwner:
                 throw InvestigationMachineDarwinEpochRetirementError.waitFailed
             }
         }
+    }
+
+    private func classifyDirectChildExit(
+        _ rawStatus: Int32
+    ) throws -> InvestigationMachineDarwinDirectChildExitClassification {
+        guard rawStatus >= 0, rawStatus & ~0xffff == 0 else {
+            throw InvestigationMachineDarwinEpochRetirementError.waitFailed
+        }
+
+        let waitState = rawStatus & 0x7f
+        if waitState == 0 {
+            guard rawStatus & 0xff == 0 else {
+                throw InvestigationMachineDarwinEpochRetirementError.waitFailed
+            }
+            let exitStatus = rawStatus >> 8 & 0xff
+            if exitStatus == 0 { return .ordinaryZero }
+            if exitStatus == InvestigationMachineDarwinDirectChildExitClassification
+                .deliberateParentCrashExitStatus
+            {
+                return .deliberateParentCrash
+            }
+            return .unexpectedNonSuccess
+        }
+
+        guard
+            waitState != 0x7f,
+            waitState < Int32(NSIG),
+            rawStatus & ~0xff == 0
+        else {
+            throw InvestigationMachineDarwinEpochRetirementError.waitFailed
+        }
+        return .unexpectedNonSuccess
     }
 
     private func signal(_ target: Int32, _ signal: Int32) throws {

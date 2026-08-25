@@ -6,12 +6,172 @@ import Testing
 
 @Suite("Investigation machine Darwin epoch retirement", .serialized)
 struct InvestigationMachineDarwinEpochRetirementTests {
+    @Test func outerOutcomeClassifiesOrdinaryZeroAfterReapAndEmptyGroup()
+        async throws
+    {
+        let processID: Int32 = 32
+        let recorder = RetirementSystemRecorder(
+            inventories: [.value(pidBytes([processID])), .value(Data())],
+            waitIDs: [.value(processID)],
+            waitPIDStatuses: [
+                .value(.init(processID: processID, rawStatus: 0)),
+            ]
+        )
+        let owner = InvestigationMachineDarwinEpochRetirementOwner(
+            system: recorder.system()
+        )
+
+        let outcome = try await owner.retireOwnedProcessGroupWithOutcome(
+            owned(processID: processID, descriptors: [9])
+        )
+
+        #expect(outcome.retirementProof == .init())
+        #expect(outcome.directChildExit == .ordinaryZero)
+        #expect(recorder.events.filter { $0 == .close(9) }.count == 1)
+        #expect(recorder.events.filter(\.isSignal).isEmpty)
+        let events = recorder.events
+        let inventoryEvent = RetirementSystemEvent.inventory(
+            UInt32(PROC_PGRP_ONLY), processID,
+            InvestigationMachineDarwinEpochRetirementOwner
+                .maximumInventoryEntries
+        )
+        let firstInventory = try eventIndex(inventoryEvent, in: events)
+        let waitable = try eventIndex(
+            .waitID(processID, Int32(WEXITED | WNOHANG | WNOWAIT)),
+            in: events
+        )
+        let reap = try eventIndex(
+            .waitPIDStatus(processID, Int32(WNOHANG)), in: events
+        )
+        let postReapInventory = try #require(
+            events.lastIndex(of: inventoryEvent)
+        )
+        #expect(firstInventory < waitable)
+        #expect(waitable < reap)
+        #expect(reap < postReapInventory)
+        #expect(events.filter(\.isInventory).count == 2)
+        #expect(events.filter(\.isWaitPID).isEmpty)
+    }
+
+    @Test func outerOutcomeClassifiesDeliberateParentCrashExactly() async throws {
+        let cases: [(Int32, InvestigationMachineDarwinDirectChildExitClassification)] = [
+            (
+                InvestigationMachineDarwinDirectChildExitClassification
+                    .deliberateParentCrashExitStatus << 8,
+                .deliberateParentCrash
+            ),
+            (7 << 8, .unexpectedNonSuccess),
+            (SIGTERM, .unexpectedNonSuccess),
+            (SIGKILL, .unexpectedNonSuccess),
+            (SIGTERM | 0x80, .unexpectedNonSuccess),
+        ]
+
+        for (offset, item) in cases.enumerated() {
+            let (rawStatus, expected) = item
+            let processID = Int32(33 + offset)
+            let recorder = RetirementSystemRecorder(
+                inventories: [.value(pidBytes([processID])), .value(Data())],
+                waitIDs: [.value(processID)],
+                waitPIDStatuses: [
+                    .value(.init(
+                        processID: processID, rawStatus: rawStatus
+                    )),
+                ]
+            )
+
+            let outcome = try await
+                InvestigationMachineDarwinEpochRetirementOwner(
+                    system: recorder.system()
+                ).retireOwnedProcessGroupWithOutcome(
+                    owned(processID: processID)
+                )
+
+            #expect(outcome.retirementProof == .init())
+            #expect(outcome.directChildExit == expected)
+            let events = recorder.events
+            let reap = try eventIndex(
+                .waitPIDStatus(processID, Int32(WNOHANG)), in: events
+            )
+            let postReapInventory = try #require(
+                events.lastIndex { $0.isInventory }
+            )
+            #expect(reap < postReapInventory)
+            #expect(events.filter(\.isInventory).count == 2)
+        }
+    }
+
+    @Test func outerOutcomeRejectsNonTerminalAndMalformedWaitStatuses() async {
+        let invalidStatuses: [Int32] = [
+            SIGSTOP << 8 | 0x7f,
+            SIGCONT << 8 | 0x7f,
+            1 << 16,
+            Int32(NSIG),
+            0x80,
+            -1,
+        ]
+
+        for (offset, rawStatus) in invalidStatuses.enumerated() {
+            let processID = Int32(35 + offset)
+            let recorder = RetirementSystemRecorder(
+                inventories: [.value(pidBytes([processID])), .value(Data())],
+                waitIDs: [.value(processID)],
+                waitPIDStatuses: [
+                    .value(.init(
+                        processID: processID, rawStatus: rawStatus
+                    )),
+                ]
+            )
+
+            await #expect(throws:
+                InvestigationMachineDarwinEpochRetirementError.waitFailed
+            ) {
+                try await InvestigationMachineDarwinEpochRetirementOwner(
+                    system: recorder.system()
+                ).retireOwnedProcessGroupWithOutcome(
+                    owned(processID: processID)
+                )
+            }
+            #expect(recorder.events.filter(\.isWaitPIDStatus).count == 1)
+            #expect(recorder.events.filter(\.isInventory).count == 2)
+        }
+    }
+
+    @Test func outerOutcomeAllowsNaturalDrainBeforeAnyGroupSignal() async throws {
+        let processID: Int32 = 41
+        let descendant: Int32 = 40
+        let recorder = RetirementSystemRecorder(
+            mode: .naturalDrain(
+                processID: processID, descendant: descendant,
+                completedAtNanoseconds: 500_000_000
+            ),
+            waitPIDStatuses: [
+                .value(.init(processID: processID, rawStatus: 0)),
+            ]
+        )
+
+        let outcome = try await InvestigationMachineDarwinEpochRetirementOwner(
+            system: recorder.system()
+        ).retireOwnedProcessGroupWithOutcome(owned(processID: processID))
+
+        #expect(outcome.directChildExit == .ordinaryZero)
+        #expect(recorder.events.filter(\.isSignal).isEmpty)
+        #expect(
+            recorder.inventorySnapshotsBeforeReap.first
+                == [processID, descendant]
+        )
+        #expect(recorder.inventorySnapshotsBeforeReap.last == [processID])
+        #expect(recorder.clockValues.contains(500_000_000))
+        #expect(recorder.events.filter(\.isReap).count == 1)
+    }
+
     @Test func naturalExitUsesWaitableProofReapsLastAndMintsOneProof() async throws {
         let processID: Int32 = 42
         let recorder = RetirementSystemRecorder(
             inventories: [.value(pidBytes([processID])), .value(Data())],
             waitIDs: [.value(processID)],
-            waitPIDs: [.value(processID)]
+            waitPIDStatuses: [
+                .value(.init(processID: processID, rawStatus: 0)),
+            ]
         )
         let owner = InvestigationMachineDarwinEpochRetirementOwner(
             system: recorder.system()
@@ -41,15 +201,15 @@ struct InvestigationMachineDarwinEpochRetirementTests {
                 )
             )
         )
-        #expect(events.contains(.waitPID(processID, Int32(WNOHANG))))
+        #expect(events.contains(.waitPIDStatus(processID, Int32(WNOHANG))))
         let reap = try eventIndex(
-            .waitPID(processID, Int32(WNOHANG)), in: events
+            .waitPIDStatus(processID, Int32(WNOHANG)), in: events
         )
         #expect(
             events[events.index(after: reap)...].contains { $0.isInventory }
         )
         #expect(try eventIndex(.waitID(processID, Int32(WEXITED | WNOHANG | WNOWAIT)), in: events)
-            < eventIndex(.waitPID(processID, Int32(WNOHANG)), in: events))
+            < eventIndex(.waitPIDStatus(processID, Int32(WNOHANG)), in: events))
 
         await expectFailure {
             try await owner.retireOwnedProcessGroup(owned(processID: processID))
@@ -62,7 +222,9 @@ struct InvestigationMachineDarwinEpochRetirementTests {
         let descendant: Int32 = 53
         let recorder = RetirementSystemRecorder(
             mode: .drainAfterTerm(processID: processID, descendant: descendant),
-            waitPIDs: [.value(processID)]
+            waitPIDStatuses: [
+                .value(.init(processID: processID, rawStatus: SIGTERM)),
+            ]
         )
         let owner = InvestigationMachineDarwinEpochRetirementOwner(
             system: recorder.system()
@@ -72,8 +234,14 @@ struct InvestigationMachineDarwinEpochRetirementTests {
 
         let events = recorder.events
         #expect(events.filter(\.isSignal) == [.signal(-processID, SIGTERM)])
+        #expect(recorder.signalTimes == [
+            InvestigationMachineDarwinEpochRetirementOwner
+                .naturalDrainWindowNanoseconds,
+        ])
         let term = try eventIndex(.signal(-processID, SIGTERM), in: events)
-        let reap = try eventIndex(.waitPID(processID, Int32(WNOHANG)), in: events)
+        let reap = try eventIndex(
+            .waitPIDStatus(processID, Int32(WNOHANG)), in: events
+        )
         #expect(term < reap)
         #expect(
             events[..<reap].contains { event in
@@ -92,7 +260,9 @@ struct InvestigationMachineDarwinEpochRetirementTests {
         let processID: Int32 = 62
         let recorder = RetirementSystemRecorder(
             mode: .drainAfterKill(processID: processID, descendant: 63),
-            waitPIDs: [.value(processID)]
+            waitPIDStatuses: [
+                .value(.init(processID: processID, rawStatus: SIGKILL)),
+            ]
         )
         let owner = InvestigationMachineDarwinEpochRetirementOwner(
             system: recorder.system()
@@ -114,6 +284,18 @@ struct InvestigationMachineDarwinEpochRetirementTests {
             InvestigationMachineDarwinEpochRetirementOwner
                 .termWindowNanoseconds == 1_000_000_000
         )
+        #expect(
+            InvestigationMachineDarwinEpochRetirementOwner
+                .naturalDrainWindowNanoseconds == 1_000_000_000
+        )
+        #expect(recorder.signalTimes == [
+            InvestigationMachineDarwinEpochRetirementOwner
+                .naturalDrainWindowNanoseconds,
+            InvestigationMachineDarwinEpochRetirementOwner
+                .naturalDrainWindowNanoseconds
+                + InvestigationMachineDarwinEpochRetirementOwner
+                    .termWindowNanoseconds,
+        ])
         let events = recorder.events
         let term = try eventIndex(.signal(-processID, SIGTERM), in: events)
         let kill = try eventIndex(.signal(-processID, SIGKILL), in: events)
@@ -125,7 +307,8 @@ struct InvestigationMachineDarwinEpochRetirementTests {
         #expect(
             events[events.index(after: term)..<kill].contains { $0.isWaitID }
         )
-        #expect(recorder.clockValues.contains(1_100_000_000))
+        #expect(recorder.clockValues.contains(1_000_000_000))
+        #expect(recorder.clockValues.contains(2_000_000_000))
     }
 
     @Test func retirementUsesFreshFixedWindowAtAnyMonotonicOrigin() async throws {
@@ -134,7 +317,9 @@ struct InvestigationMachineDarwinEpochRetirementTests {
             now: 9_000_000_000_000,
             inventories: [.value(pidBytes([processID])), .value(Data())],
             waitIDs: [.value(processID)],
-            waitPIDs: [.value(processID)]
+            waitPIDStatuses: [
+                .value(.init(processID: processID, rawStatus: 0)),
+            ]
         )
         let owner = InvestigationMachineDarwinEpochRetirementOwner(
             system: recorder.system()
@@ -142,7 +327,11 @@ struct InvestigationMachineDarwinEpochRetirementTests {
 
         _ = try await owner.retireOwnedProcessGroup(owned(processID: processID))
         #expect(recorder.events.contains(.clock))
-        #expect(recorder.events.contains(.waitPID(processID, Int32(WNOHANG))))
+        #expect(
+            recorder.events.contains(
+                .waitPIDStatus(processID, Int32(WNOHANG))
+            )
+        )
         #expect(recorder.events.filter(\.isSignal).isEmpty)
     }
 
@@ -196,7 +385,7 @@ struct InvestigationMachineDarwinEpochRetirementTests {
                 )
             }
             #expect(recorder.events.filter(\.isSignal).isEmpty)
-            #expect(recorder.events.filter(\.isWaitPID).isEmpty)
+            #expect(recorder.events.filter(\.isWaitPIDStatus).isEmpty)
         }
     }
 
@@ -205,7 +394,9 @@ struct InvestigationMachineDarwinEpochRetirementTests {
         let retry = RetirementSystemRecorder(
             inventories: [.value(pidBytes([processID])), .value(Data())],
             waitIDs: [.failure(EINTR), .value(processID)],
-            waitPIDs: [.value(processID)]
+            waitPIDStatuses: [
+                .value(.init(processID: processID, rawStatus: 0)),
+            ]
         )
         _ = try await InvestigationMachineDarwinEpochRetirementOwner(
             system: retry.system()
@@ -241,49 +432,58 @@ struct InvestigationMachineDarwinEpochRetirementTests {
             #expect(recorder.events.filter(\.isInventory).count == 1)
             #expect(recorder.events.filter(\.isWaitID).count == 1)
             #expect(recorder.events.filter(\.isSignal).isEmpty)
-            #expect(recorder.events.filter(\.isWaitPID).isEmpty)
+            #expect(recorder.events.filter(\.isWaitPIDStatus).isEmpty)
         }
     }
 
-    @Test func waitPIDRetriesOnlyEINTRAndRejectsZeroWrongPIDAndErrors() async throws {
+    @Test func waitPIDStatusRetriesOnlyEINTRAndRejectsNilWrongPIDAndErrors() async throws {
         let processID: Int32 = 102
         let retry = RetirementSystemRecorder(
             inventories: [.value(pidBytes([processID])), .value(Data())],
             waitIDs: [.value(processID)],
-            waitPIDs: [.failure(EINTR), .value(processID)]
+            waitPIDStatuses: [
+                .failure(EINTR),
+                .value(.init(processID: processID, rawStatus: 0)),
+            ]
         )
         _ = try await InvestigationMachineDarwinEpochRetirementOwner(
             system: retry.system()
         ).retireOwnedProcessGroup(owned(processID: processID))
-        #expect(retry.events.filter(\.isWaitPID).count == 2)
+        #expect(retry.events.filter(\.isWaitPIDStatus).count == 2)
 
         let expiredRetry = RetirementSystemRecorder(
             expireAfterNonReap: true,
             inventories: [.value(pidBytes([processID]))],
-            waitIDs: [.value(processID)], waitPIDs: [.failure(EINTR)]
+            waitIDs: [.value(processID)],
+            waitPIDStatuses: [.failure(EINTR)]
         )
         await expectFailure {
             try await InvestigationMachineDarwinEpochRetirementOwner(
                 system: expiredRetry.system()
             ).retireOwnedProcessGroup(owned(processID: processID))
         }
-        #expect(expiredRetry.events.filter(\.isWaitPID).count == 1)
+        #expect(expiredRetry.events.filter(\.isWaitPIDStatus).count == 1)
 
-        let failures: [Scripted<Int32?>] = [
-            .value(0), .value(processID + 1), .failure(ECHILD), .failure(EIO),
+        let failures: [
+            Scripted<InvestigationMachineDarwinWaitPIDStatus?>
+        ] = [
+            .value(nil),
+            .value(.init(processID: processID + 1, rawStatus: 0)),
+            .failure(ECHILD),
+            .failure(EIO),
         ]
         for result in failures {
             let recorder = RetirementSystemRecorder(
                 expireAfterNonReap: true,
                 inventories: [.value(pidBytes([processID]))],
-                waitIDs: [.value(processID)], waitPIDs: [result]
+                waitIDs: [.value(processID)], waitPIDStatuses: [result]
             )
             await expectFailure {
                 try await InvestigationMachineDarwinEpochRetirementOwner(
                     system: recorder.system()
                 ).retireOwnedProcessGroup(owned(processID: processID))
             }
-            #expect(recorder.events.filter(\.isWaitPID).count == 1)
+            #expect(recorder.events.filter(\.isWaitPIDStatus).count == 1)
         }
     }
 
@@ -291,14 +491,10 @@ struct InvestigationMachineDarwinEpochRetirementTests {
         let processID: Int32 = 112
         for errorNumber in [ESRCH, EPERM, EIO] {
             let recorder = RetirementSystemRecorder(
-                inventories: [
-                    .value(pidBytes([processID, processID + 1])),
-                    .value(pidBytes([processID])),
-                    .value(Data()),
-                ],
-                waitIDs: [.value(nil), .value(processID)],
-                signals: [.failure(errorNumber)],
-                waitPIDs: [.value(processID)]
+                mode: .drainAfterTerm(
+                    processID: processID, descendant: processID + 1
+                ),
+                signals: [.failure(errorNumber)]
             )
             await expectFailure {
                 try await InvestigationMachineDarwinEpochRetirementOwner(
@@ -309,9 +505,13 @@ struct InvestigationMachineDarwinEpochRetirementTests {
                 recorder.events.filter(\.isSignal)
                     == [.signal(-processID, SIGTERM)]
             )
-            #expect(recorder.events.filter(\.isInventory).count == 1)
-            #expect(recorder.events.filter(\.isWaitID).count == 1)
-            #expect(recorder.events.filter(\.isWaitPID).isEmpty)
+            #expect(recorder.signalTimes == [
+                InvestigationMachineDarwinEpochRetirementOwner
+                    .naturalDrainWindowNanoseconds,
+            ])
+            #expect(recorder.events.filter(\.isInventory).count > 1)
+            #expect(recorder.events.filter(\.isWaitID).count > 1)
+            #expect(recorder.events.filter(\.isWaitPIDStatus).isEmpty)
         }
     }
 
@@ -322,7 +522,10 @@ struct InvestigationMachineDarwinEpochRetirementTests {
                 .value(pidBytes([processID])),
                 .value(pidBytes([777])),
             ],
-            waitIDs: [.value(processID)], waitPIDs: [.value(processID)]
+            waitIDs: [.value(processID)],
+            waitPIDStatuses: [
+                .value(.init(processID: processID, rawStatus: 0)),
+            ]
         )
         await expectFailure {
             try await InvestigationMachineDarwinEpochRetirementOwner(
@@ -338,7 +541,10 @@ struct InvestigationMachineDarwinEpochRetirementTests {
         let recorder = RetirementSystemRecorder(
             closeFailures: [31: EIO],
             inventories: [.value(pidBytes([processID])), .value(Data())],
-            waitIDs: [.value(processID)], waitPIDs: [.value(processID)]
+            waitIDs: [.value(processID)],
+            waitPIDStatuses: [
+                .value(.init(processID: processID, rawStatus: 0)),
+            ]
         )
         await expectFailure {
             try await InvestigationMachineDarwinEpochRetirementOwner(
@@ -349,7 +555,11 @@ struct InvestigationMachineDarwinEpochRetirementTests {
         }
         #expect(recorder.events.filter { $0 == .close(31) }.count == 1)
         #expect(recorder.events.filter { $0 == .close(32) }.count == 1)
-        #expect(recorder.events.contains(.waitPID(processID, Int32(WNOHANG))))
+        #expect(
+            recorder.events.contains(
+                .waitPIDStatus(processID, Int32(WNOHANG))
+            )
+        )
         #expect(recorder.events.filter(\.isInventory).count == 2)
     }
 
@@ -360,7 +570,10 @@ struct InvestigationMachineDarwinEpochRetirementTests {
         let recorder = RetirementSystemRecorder(
             inventoryGate: gate,
             inventories: [.value(pidBytes([processID])), .value(Data())],
-            waitIDs: [.value(processID)], waitPIDs: [.value(processID)]
+            waitIDs: [.value(processID)],
+            waitPIDStatuses: [
+                .value(.init(processID: processID, rawStatus: 0)),
+            ]
         )
         let owner = InvestigationMachineDarwinEpochRetirementOwner(
             system: recorder.system()
@@ -386,7 +599,10 @@ struct InvestigationMachineDarwinEpochRetirementTests {
         let recorder = RetirementSystemRecorder(
             inventoryGate: gate,
             inventories: [.value(pidBytes([processID])), .value(Data())],
-            waitIDs: [.value(processID)], waitPIDs: [.value(processID)]
+            waitIDs: [.value(processID)],
+            waitPIDStatuses: [
+                .value(.init(processID: processID, rawStatus: 0)),
+            ]
         )
         let owner = InvestigationMachineDarwinEpochRetirementOwner(
             system: recorder.system()
@@ -507,12 +723,14 @@ struct InvestigationMachineDarwinEpochRetirementTests {
     @Test func physicalNaturalExitIsWaitableReapedAndLeavesNoGroup() async throws {
         let fixture = try PhysicalRetirementFixture.make(mode: .natural)
         defer { fixture.forceCleanup() }
-        try fixture.awaitLeaderWaitable()
 
-        _ = try await InvestigationMachineDarwinEpochRetirementOwner(
+        let outcome = try await InvestigationMachineDarwinEpochRetirementOwner(
             system: .system
-        ).retireOwnedProcessGroup(owned(processID: fixture.leader))
+        ).retireOwnedProcessGroupWithOutcome(
+            owned(processID: fixture.leader)
+        )
 
+        #expect(outcome.directChildExit == .ordinaryZero)
         #expect(fixture.leaderIsNoLongerAChild())
         #expect(fixture.groupIsAbsent())
     }
@@ -522,10 +740,13 @@ struct InvestigationMachineDarwinEpochRetirementTests {
         defer { fixture.forceCleanup() }
         let descendant = try fixture.readDescendant()
 
-        _ = try await InvestigationMachineDarwinEpochRetirementOwner(
+        let outcome = try await InvestigationMachineDarwinEpochRetirementOwner(
             system: .system
-        ).retireOwnedProcessGroup(owned(processID: fixture.leader))
+        ).retireOwnedProcessGroupWithOutcome(
+            owned(processID: fixture.leader)
+        )
 
+        #expect(outcome.directChildExit == .unexpectedNonSuccess)
         #expect(fixture.leaderIsNoLongerAChild())
         #expect(fixture.groupIsAbsent())
         #expect(try fixture.awaitProcessAbsent(descendant))
@@ -545,6 +766,10 @@ private enum Scripted<Value> {
 
 private enum RetirementSystemMode {
     case scripted
+    case naturalDrain(
+        processID: Int32, descendant: Int32,
+        completedAtNanoseconds: UInt64
+    )
     case drainAfterTerm(processID: Int32, descendant: Int32)
     case drainAfterKill(processID: Int32, descendant: Int32)
 }
@@ -567,6 +792,7 @@ private enum RetirementSystemEvent: Equatable {
     var isWaitPIDStatus: Bool {
         if case .waitPIDStatus = self { true } else { false }
     }
+    var isReap: Bool { isWaitPID || isWaitPIDStatus }
 }
 
 private final class RetirementSystemRecorder: @unchecked Sendable {
@@ -585,6 +811,7 @@ private final class RetirementSystemRecorder: @unchecked Sendable {
     private var waitPIDStatusScript:
         [Scripted<InvestigationMachineDarwinWaitPIDStatus?>]
     private var recordedEvents: [RetirementSystemEvent] = []
+    private var recordedSignalTimes: [UInt64] = []
     private var recordedInventoryBeforeReap: [[Int32]] = []
     private var recordedClockValues: [UInt64] = []
 
@@ -629,6 +856,10 @@ private final class RetirementSystemRecorder: @unchecked Sendable {
         lock.withLock { recordedClockValues }
     }
 
+    var signalTimes: [UInt64] {
+        lock.withLock { recordedSignalTimes }
+    }
+
     func system() -> InvestigationMachineDarwinEpochRetirementSystem {
         .init(
             currentProcessGroup: { self.readCurrentGroup() },
@@ -656,14 +887,9 @@ private final class RetirementSystemRecorder: @unchecked Sendable {
             if expireAfterWaitID, recordedEvents.contains(where: \.isWaitID) {
                 currentNanoseconds = currentNanoseconds &+ 6_000_000_000
             } else if expireAfterNonReap,
-                recordedEvents.contains(where: \.isWaitPID)
+                recordedEvents.contains(where: \.isReap)
             {
                 currentNanoseconds = currentNanoseconds &+ 6_000_000_000
-            } else if case .drainAfterKill = mode,
-                recordedEvents.contains(.signal(-mode.processID, SIGTERM)),
-                !recordedEvents.contains(.signal(-mode.processID, SIGKILL))
-            {
-                currentNanoseconds = currentNanoseconds &+ 1_100_000_000
             }
             recordedClockValues.append(currentNanoseconds)
             return currentNanoseconds
@@ -688,8 +914,16 @@ private final class RetirementSystemRecorder: @unchecked Sendable {
             switch mode {
             case .scripted:
                 data = try next(&inventoryScript)
+            case let .naturalDrain(processID, descendant, completedAt):
+                if recordedEvents.contains(where: \.isReap) {
+                    data = Data()
+                } else if currentNanoseconds >= completedAt {
+                    data = pidBytes([processID])
+                } else {
+                    data = pidBytes([processID, descendant])
+                }
             case let .drainAfterTerm(processID, descendant):
-                if recordedEvents.contains(where: \.isWaitPID) {
+                if recordedEvents.contains(where: \.isReap) {
                     data = Data()
                 } else if recordedEvents.contains(.signal(-processID, SIGTERM)) {
                     data = pidBytes([processID])
@@ -697,7 +931,7 @@ private final class RetirementSystemRecorder: @unchecked Sendable {
                     data = pidBytes([processID, descendant])
                 }
             case let .drainAfterKill(processID, descendant):
-                if recordedEvents.contains(where: \.isWaitPID) {
+                if recordedEvents.contains(where: \.isReap) {
                     data = Data()
                 } else if recordedEvents.contains(.signal(-processID, SIGKILL)) {
                     data = pidBytes([processID])
@@ -705,7 +939,7 @@ private final class RetirementSystemRecorder: @unchecked Sendable {
                     data = pidBytes([processID, descendant])
                 }
             }
-            if !recordedEvents.contains(where: \.isWaitPID) {
+            if !recordedEvents.contains(where: \.isReap) {
                 recordedInventoryBeforeReap.append(decodePIDs(data))
             }
             return data
@@ -717,6 +951,8 @@ private final class RetirementSystemRecorder: @unchecked Sendable {
             recordedEvents.append(.waitID(processID, options))
             switch mode {
             case .scripted: return try next(&waitIDScript)
+            case let .naturalDrain(leader, _, completedAt):
+                return currentNanoseconds >= completedAt ? leader : nil
             case let .drainAfterTerm(leader, _):
                 return recordedEvents.contains(.signal(-leader, SIGTERM))
                     ? leader : nil
@@ -730,6 +966,7 @@ private final class RetirementSystemRecorder: @unchecked Sendable {
     private func sendSignal(_ target: Int32, _ signal: Int32) throws {
         try lock.withLock {
             recordedEvents.append(.signal(target, signal))
+            recordedSignalTimes.append(currentNanoseconds)
             if !signalScript.isEmpty { _ = try next(&signalScript) }
         }
     }
@@ -770,6 +1007,7 @@ private extension RetirementSystemMode {
     var processID: Int32 {
         switch self {
         case .scripted: 0
+        case let .naturalDrain(processID, _, _): processID
         case let .drainAfterTerm(processID, _): processID
         case let .drainAfterKill(processID, _): processID
         }

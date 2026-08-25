@@ -587,6 +587,7 @@ struct InvestigationMachineTargetBoundaryTests {
             "InvestigationMachineDarwinEpochSession.swift",
             "InvestigationMachineDarwinEpochRetirement.swift",
             "InvestigationMachineDarwinDriverChildObservation.swift",
+            "InvestigationMachineDarwinOuterInnerComposition.swift",
             "InvestigationMachineDarwinOuterInnerProtocol.swift",
             "InvestigationMachineDarwinOuterInnerSession.swift",
             "InvestigationMachineDriverSupport.swift",
@@ -725,6 +726,11 @@ struct InvestigationMachineTargetBoundaryTests {
             "InvestigationMachineDarwinDriverChildObservation.swift": [
                 "import CInvestigationIdentitySupport",
                 "import Darwin",
+            ],
+            "InvestigationMachineDarwinOuterInnerComposition.swift": [
+                "import Darwin",
+                "import Foundation",
+                "import StornautInvestigationHandoffContract",
             ],
             "InvestigationMachineDarwinOuterInnerProtocol.swift": [
                 "import Foundation",
@@ -942,6 +948,7 @@ struct InvestigationMachineTargetBoundaryTests {
             }
             if [
                 "InvestigationMachineDarwinDriverChildObservation.swift",
+                "InvestigationMachineDarwinOuterInnerComposition.swift",
                 "InvestigationMachineDarwinOuterInnerSession.swift",
             ].contains(sourceName) {
                 #expect(source.components(separatedBy: "#if DEBUG").count == 2)
@@ -1103,6 +1110,10 @@ struct InvestigationMachineTargetBoundaryTests {
                     || (sourceName == "InvestigationMachineDarwinOuterInnerSession.swift"
                         && ["O_WRONLY", "O_RDWR", "Darwin.write",
                             "posix_spawn", "fcntl(", "socketpair"
+                        ].contains(forbidden))
+                    || (sourceName == "InvestigationMachineDarwinOuterInnerComposition.swift"
+                        && ["Darwin.write", "CommandLine.arguments",
+                            "accept("
                         ].contains(forbidden))
                 if !semanticException {
                     if forbidden == "Process(" {
@@ -1754,9 +1765,9 @@ struct InvestigationMachineTargetBoundaryTests {
             #expect(contract.contains(marker))
         }
         for marker in [
-            "8c1b72fec0b93ceda181412cb6909701d608e2eb39afe380477a95e3392cba94",
-            "8eb81efeca787a56843a62ed12de91e5ae8bb67ac50992cbf5705498b39e19c2",
-            "d223c56c175cc1e779b61b5ffc9cdac8f91617135eddebc56ae082befb278e81",
+            "574d07d1ceb6fbe04619f6abde040833c87b3ee0098a3458169aa0f6c484e36f",
+            "72c1a6244481a53270afcda6bcd5f2092019c4139aa543a55e9019920a1826f0",
+            "2209e254bfe1a2fb2709ae48640206658e2903a5aca28bd0fdf8e34171050962",
         ] {
             #expect(app.contains(marker))
         }
@@ -1823,18 +1834,99 @@ struct InvestigationMachineTargetBoundaryTests {
             #expect(contract.contains(marker))
         }
         for marker in [
-            "867b6e13c9000f3092a47ef36d8c789a5e1dd33a07dcc91d15ee271ebc806398",
-            "c7a67d49dbb80ae779a1c0efac192f96d0af1809a2516b9a4ec6ca5f74b40f26",
-            "expected_owned_lines=6988",
-            "expected_owned_lines=3788",
+            "1730d1c220b7c0f9ce963bfe9d83df0435bc4c7ba27ae73d606f7a6d004c9096",
+            "2232cd8aede221e91439b6e3634bc7fc3b007fa5aa145b8b0e65f52e5f98666e",
+            "expected_owned_lines=7864",
+            "expected_owned_lines=3877",
         ] {
             #expect(boundary.contains(marker))
         }
         for marker in [
-            "8eb81efeca787a56843a62ed12de91e5ae8bb67ac50992cbf5705498b39e19c2",
-            "d223c56c175cc1e779b61b5ffc9cdac8f91617135eddebc56ae082befb278e81",
-            "6987 \\",
-            "3787 release-owned-symbol",
+            "72c1a6244481a53270afcda6bcd5f2092019c4139aa543a55e9019920a1826f0",
+            "2209e254bfe1a2fb2709ae48640206658e2903a5aca28bd0fdf8e34171050962",
+            "7863 \\",
+            "3876 release-owned-symbol",
+        ] {
+            #expect(app.contains(marker))
+        }
+    }
+
+    @Test
+    func iiiB2AIIA2IIVerifierPinsTerminalAdmissionComposition() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ), encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        let app = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-app-release-boundaries"
+            ), encoding: .utf8
+        )
+        for marker in [
+            "--iib5biii-b2a-ii-a2ii-contract-only",
+            "--iib5biii-b2a-ii-a2ii-scope-contract-only",
+            "function verify_iib5biii_b2a_iia2ii_contract()",
+            "function verify_iib5biii_b2a_iia2ii_scope()",
+            "fail(\"one-shot state machine drifted\")",
+            "fail(\"outer composition initializer drifted\")",
+            "fail(\"terminal absence proof drifted\")",
+            "iii-b2a-ii-a2-ii outer protocol order drifted",
+            "\"inner protocol order\"",
+            "\"inner ownership-before-decision order\"",
+            "fail(\"outer exit classification drifted\")",
+            "iii-b2a-ii-a2-ii wait-status classification drifted",
+            "fail(\"retirement order drifted\")",
+            "fail(\"shared admission factory drifted\")",
+            "fail(\"admitted token initializer drifted\")",
+            "fail(\"continuity mint drifted\")",
+            "fail(\"post-admission cancellation barrier drifted\")",
+            "fail(\"terminal cleanup join drifted\")",
+            "fail(\"retirement cancellation join drifted\")",
+            "iii-b2a-ii-a2-ii staged checkpoint paths drifted",
+            "iii-b2a-ii-a2-ii checkpoint budget drifted",
+            "f363fbb67cbfb355ae701a85bba51b92e6db283d",
+            "(( ${#expected} == 12 ))",
+            "(( changed <= 3800 ))",
+        ] {
+            #expect(boundary.contains(marker))
+        }
+        for marker in [
+            "iib5biii_b2a_iia2ii_gate=scripts/verify-investigation-boundaries",
+            "iii-b2a-ii-a2-ii mutation accepted:",
+            "iii-b2a-ii-a2-ii scope mutation accepted:",
+            "outer-order-observation",
+            "outer-init-widening",
+            "terminal-proof-to-bool",
+            "outer-order-eof",
+            "inner-order-validation",
+            "inner-result-to-crash",
+            "wait-status-zero-bypass",
+            "natural-drain-removal",
+            "shared-admission-substitution",
+            "fileprivate-outcome-init",
+            "session-outcome-reuse-bypass",
+            "failure-retirement-downgrade",
+            "cleanup-cancellation-snapshot",
+            "real-session-test-vacuity",
+            "for fixture in extra-path over-budget deleted binary mode wrong-baseline",
+        ] {
+            #expect(contract.contains(marker))
+        }
+        for marker in [
+            "--iib5biii-b2a-ii-a2ii-source-contract-only",
+            "function verify_iib5biii_b2a_iia2ii_source_contract()",
+            "iib5biii_b2a_iia2ii_debug_symbols=(",
+            "iib5biii_b2a_iia2ii_closed_images=(",
+            "verify_iib5biii_b2a_iia2ii_macho()",
+            "iii-b2a-ii-a2-ii Debug Machine driver positive control is missing",
+            "iii-b2a-ii-a2-ii DEBUG symbol leaked into a closed image",
         ] {
             #expect(app.contains(marker))
         }

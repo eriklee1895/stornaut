@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=d37464749fb3b1584a4f62e5db7abd1beda4a2554e0720e88e7047ed5b0e36f9
+ib2_self_sha=c959dc58c9093c716dadbb3d56484f93f1c08bb3c017623ef2465fb5d619163d
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -330,7 +330,7 @@ require_fixed_text scripts/verify-app-release-boundaries \
 require_fixed_text scripts/verify-app-release-boundaries \
     '_kSecGuestAttributePid'
 require_fixed_text scripts/verify-app-release-boundaries \
-    '8c1b72fec0b93ceda181412cb6909701d608e2eb39afe380477a95e3392cba94'
+    '574d07d1ceb6fbe04619f6abde040833c87b3ee0098a3458169aa0f6c484e36f'
 require_fixed_text scripts/verify-app-release-boundaries \
     '7c78e48e09da412dda28562f31c063cde5da02dfeed5d7fd2e0c74442d6ceb7c'
 require_fixed_text scripts/verify-app-release-boundaries \
@@ -1152,9 +1152,9 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "2a085552f89575359168dfa3a2d503f228680be66647b37c4dba4838d3529eea",
+        "f6fec02d42465bccd75e412db164a967440188b53f02467f4649b9d157067af6",
     Path("scripts/verify-app-release-boundaries"):
-        "0ad755b4b75b474173818c172469e1eefc5ecf00c6a629e6ae5222e43f6460d2",
+        "bc64919e85c64dfc52100e5c31eea518e9158a5bc594925e174e4c398a7e23c0",
 }
 for path, expected_sha in expected.items():
     observed_sha = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -1171,13 +1171,13 @@ release = Path("scripts/verify-app-release-boundaries").read_text(
     encoding="utf-8"
 )
 for marker, count in {
-    "8c1b72fec0b93ceda181412cb6909701d608e2eb39afe380477a95e3392cba94": 2,
+    "574d07d1ceb6fbe04619f6abde040833c87b3ee0098a3458169aa0f6c484e36f": 2,
     "dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9": 4,
     "200b958fb36101f258f67621035f80b89b26c465271ae6708cf5856de7bf573b": 1,
-    "867b6e13c9000f3092a47ef36d8c789a5e1dd33a07dcc91d15ee271ebc806398": 1,
-    "8eb81efeca787a56843a62ed12de91e5ae8bb67ac50992cbf5705498b39e19c2": 1,
-    "c7a67d49dbb80ae779a1c0efac192f96d0af1809a2516b9a4ec6ca5f74b40f26": 1,
-    "d223c56c175cc1e779b61b5ffc9cdac8f91617135eddebc56ae082befb278e81": 1,
+    "1730d1c220b7c0f9ce963bfe9d83df0435bc4c7ba27ae73d606f7a6d004c9096": 1,
+    "72c1a6244481a53270afcda6bcd5f2092019c4139aa543a55e9019920a1826f0": 1,
+    "2232cd8aede221e91439b6e3634bc7fc3b007fa5aa145b8b0e65f52e5f98666e": 1,
+    "2209e254bfe1a2fb2709ae48640206658e2903a5aca28bd0fdf8e34171050962": 1,
     "7c78e48e09da412dda28562f31c063cde5da02dfeed5d7fd2e0c74442d6ceb7c": 1,
 }.items():
     observed = investigation.count(marker) + release.count(marker)
@@ -5818,11 +5818,13 @@ emit(
     "                guard !descriptorFailure else {\n"
     "                    throw InvestigationMachineDarwinEpochRetirementError\n"
     "                        .descriptorCloseFailed\n"
-    "                }\n                return .init()",
+    "                }\n                return .init(\n"
+    "                    retirementProof: .init(),",
     "                guard true else {\n"
     "                    throw InvestigationMachineDarwinEpochRetirementError\n"
     "                        .descriptorCloseFailed\n"
-    "                }\n                return .init()",
+    "                }\n                return .init(\n"
+    "                    retirementProof: .init(),",
 )
 emit("vacuous-test", "physicalNaturalExitIsWaitableReapedAndLeavesNoGroup", "physicalNaturalExitIsVacuous", test)
 emit("spawned-proof", "    ) async throws\n\n    func retireOwnedProcessGroup(", "    ) async throws -> InvestigationMachineSingleEpochRetirementProof\n\n    func retireOwnedProcessGroup(", session)
@@ -8152,6 +8154,14 @@ iib5biii_b2a_iia20_bridge_test=Tests/StornautInvestigationTests/InvestigationMac
 iib5biii_b2a_iia20_protocol_test=Tests/StornautInvestigationTests/InvestigationMachineDarwinOuterInnerProtocolTests.swift
 iib5biii_b2a_iia20_boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
 iib5biii_b2a_iia20_baseline=b46120d3161b5992018f4b990382bd6ced49d599
+iib5biii_b2a_iia20_implementation_commit=7817305be493e87531c76a4fd0b950f8077500e8
+iib5biii_b2a_iia20_implementation_tree=6f773007e047aa88b682fe9c44ee055c620dd30a
+[[ "$(git show -s --format=%P "$iib5biii_b2a_iia20_implementation_commit")" \
+    == "$iib5biii_b2a_iia20_baseline" ]] \
+    || fail_contract "iii-b2a-ii-a2-0 historical parent drifted"
+[[ "$(git show -s --format=%T "$iib5biii_b2a_iia20_implementation_commit")" \
+    == "$iib5biii_b2a_iia20_implementation_tree" ]] \
+    || fail_contract "iii-b2a-ii-a2-0 historical tree drifted"
 
 "$iib5biii_b2a_iia20_gate" \
     --iib5biii-b2a-ii-a20-contract-only \
@@ -8262,13 +8272,7 @@ iib5biii_b2a_iia20_paths=(
     || fail_contract "iii-b2a-ii-a2-0 checkpoint path ceiling drifted"
 iib5biii_b2a_iia20_index="$contract_root/iib5biii-b2a-ii-a20.index"
 GIT_INDEX_FILE="$iib5biii_b2a_iia20_index" \
-    git read-tree "$iib5biii_b2a_iia20_baseline^{tree}"
-for checkpoint_path in "${iib5biii_b2a_iia20_paths[@]}"; do
-    blob=$(git hash-object -w -- "$checkpoint_path")
-    mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
-    GIT_INDEX_FILE="$iib5biii_b2a_iia20_index" git update-index --add \
-        --cacheinfo "$mode,$blob,$checkpoint_path"
-done
+    git read-tree "$iib5biii_b2a_iia20_implementation_commit^{tree}"
 GIT_INDEX_FILE="$iib5biii_b2a_iia20_index" \
     "$iib5biii_b2a_iia20_gate" \
     --iib5biii-b2a-ii-a20-scope-contract-only \
@@ -8333,6 +8337,14 @@ iib5biii_b2a_iia2i_identity_test=Tests/StornautInvestigationTests/InvestigationM
 iib5biii_b2a_iia2i_retirement_test=Tests/StornautInvestigationTests/InvestigationMachineDarwinEpochRetirementTests.swift
 iib5biii_b2a_iia2i_boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
 iib5biii_b2a_iia2i_baseline=8362b47351a7d3b3a141fc78ec03f9575199901d
+iib5biii_b2a_iia2i_implementation_commit=158f500b558d6c1b6fae4a15fc1f8b7d9298f60d
+iib5biii_b2a_iia2i_implementation_tree=c7a42ffd4ac4d695f53b86256e033caca13f4ff9
+[[ "$(git show -s --format=%P "$iib5biii_b2a_iia2i_implementation_commit")" \
+    == "$iib5biii_b2a_iia2i_baseline" ]] \
+    || fail_contract "iii-b2a-ii-a2-i historical parent drifted"
+[[ "$(git show -s --format=%T "$iib5biii_b2a_iia2i_implementation_commit")" \
+    == "$iib5biii_b2a_iia2i_implementation_tree" ]] \
+    || fail_contract "iii-b2a-ii-a2-i historical tree drifted"
 
 "$iib5biii_b2a_iia2i_gate" \
     --iib5biii-b2a-ii-a2i-contract-only \
@@ -8546,13 +8558,7 @@ iib5biii_b2a_iia2i_paths=(
     || fail_contract "iii-b2a-ii-a2-i checkpoint path ceiling drifted"
 iib5biii_b2a_iia2i_index="$contract_root/iib5biii-b2a-ii-a2i.index"
 GIT_INDEX_FILE="$iib5biii_b2a_iia2i_index" \
-    git read-tree "$iib5biii_b2a_iia2i_baseline^{tree}"
-for checkpoint_path in "${iib5biii_b2a_iia2i_paths[@]}"; do
-    blob=$(git hash-object -w -- "$checkpoint_path")
-    mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
-    GIT_INDEX_FILE="$iib5biii_b2a_iia2i_index" git update-index --add \
-        --cacheinfo "$mode,$blob,$checkpoint_path"
-done
+    git read-tree "$iib5biii_b2a_iia2i_implementation_commit^{tree}"
 GIT_INDEX_FILE="$iib5biii_b2a_iia2i_index" \
     "$iib5biii_b2a_iia2i_gate" \
     --iib5biii-b2a-ii-a2i-scope-contract-only \
@@ -8603,6 +8609,284 @@ for fixture in extra-path over-budget deleted binary mode wrong-baseline; do
         >"$output" 2>&1
     then
         fail_contract "iii-b2a-ii-a2-i scope mutation accepted: $fixture"
+    fi
+    require_fixed_text "$output" "$expected"
+done
+
+# Task 39 iii-b2a-ii-a2-ii terminal evidence and sole admission join.
+iib5biii_b2a_iia2ii_gate=scripts/verify-investigation-boundaries
+iib5biii_b2a_iia2ii_app_gate=scripts/verify-app-release-boundaries
+iib5biii_b2a_iia2ii_composition=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerComposition.swift
+iib5biii_b2a_iia2ii_session=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerSession.swift
+iib5biii_b2a_iia2ii_protocol=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerProtocol.swift
+iib5biii_b2a_iia2ii_retirement=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinEpochRetirement.swift
+iib5biii_b2a_iia2ii_composition_test=Tests/StornautInvestigationTests/InvestigationMachineDarwinOuterInnerCompositionTests.swift
+iib5biii_b2a_iia2ii_session_test=Tests/StornautInvestigationTests/InvestigationMachineDarwinOuterInnerSessionTests.swift
+iib5biii_b2a_iia2ii_protocol_test=Tests/StornautInvestigationTests/InvestigationMachineDarwinOuterInnerProtocolTests.swift
+iib5biii_b2a_iia2ii_retirement_test=Tests/StornautInvestigationTests/InvestigationMachineDarwinEpochRetirementTests.swift
+iib5biii_b2a_iia2ii_boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+iib5biii_b2a_iia2ii_baseline=f363fbb67cbfb355ae701a85bba51b92e6db283d
+
+function run_iib5biii_b2a_iia2ii_contract() {
+    local composition=$1 session=$2 protocol=$3 retirement=$4
+    local composition_test=$5 session_test=$6 protocol_test=$7
+    local retirement_test=$8 boundary=$9
+    "$iib5biii_b2a_iia2ii_gate" \
+        --iib5biii-b2a-ii-a2ii-contract-only \
+        "$composition" "$session" "$protocol" "$retirement" \
+        "$composition_test" "$session_test" "$protocol_test" \
+        "$retirement_test" "$boundary"
+}
+
+run_iib5biii_b2a_iia2ii_contract \
+    "$iib5biii_b2a_iia2ii_composition" \
+    "$iib5biii_b2a_iia2ii_session" \
+    "$iib5biii_b2a_iia2ii_protocol" \
+    "$iib5biii_b2a_iia2ii_retirement" \
+    "$iib5biii_b2a_iia2ii_composition_test" \
+    "$iib5biii_b2a_iia2ii_session_test" \
+    "$iib5biii_b2a_iia2ii_protocol_test" \
+    "$iib5biii_b2a_iia2ii_retirement_test" \
+    "$iib5biii_b2a_iia2ii_boundary" \
+    >"$contract_root/iib5biii-b2a-ii-a2ii-canonical.log"
+
+"$iib5biii_b2a_iia2ii_app_gate" \
+    --iib5biii-b2a-ii-a2ii-source-contract-only \
+    "$iib5biii_b2a_iia2ii_composition" \
+    "$iib5biii_b2a_iia2ii_session" \
+    "$iib5biii_b2a_iia2ii_protocol" \
+    "$iib5biii_b2a_iia2ii_retirement" \
+    >"$contract_root/iib5biii-b2a-ii-a2ii-app-canonical.log"
+
+python3 - "$iib5biii_b2a_iia2ii_composition" \
+    "$iib5biii_b2a_iia2ii_session" \
+    "$iib5biii_b2a_iia2ii_protocol" \
+    "$iib5biii_b2a_iia2ii_retirement" \
+    "$iib5biii_b2a_iia2ii_composition_test" "$contract_root" <<'PY'
+from pathlib import Path
+import sys
+
+(
+    composition_path, session_path, protocol_path, retirement_path,
+    composition_test_path, output_root,
+) = map(Path, sys.argv[1:])
+sources = {
+    "composition": composition_path.read_text(encoding="utf-8"),
+    "session": session_path.read_text(encoding="utf-8"),
+    "protocol": protocol_path.read_text(encoding="utf-8"),
+    "retirement": retirement_path.read_text(encoding="utf-8"),
+    "composition-test": composition_test_path.read_text(encoding="utf-8"),
+}
+mutations = {
+    "outer-order-observation": (
+        "composition",
+        "let topology = try await ownershipObserver.observeOwnership(",
+        "let topology = try await terminalObserver.observeOwnership(",
+    ),
+    "outer-init-widening": (
+        "composition", "fileprivate init(\n        selection:",
+        "init(\n        selection:",
+    ),
+    "terminal-proof-to-bool": (
+        "composition",
+        "appAbsence: AbsenceProof, helperAbsence: AbsenceProof,",
+        "appAbsent: Bool, helperAbsence: AbsenceProof,",
+    ),
+    "outer-order-eof": (
+        "composition", "try await started.proveResultEOF(",
+        "try await started.proveControlEOF(",
+    ),
+    "inner-order-validation": (
+        "composition", "let role = try innerRoleValidator.validate()",
+        "let role = try innerRoleValidator.validateLater()",
+    ),
+    "inner-result-to-crash": (
+        "composition", "try innerCrash.crashNow()", "return .normal",
+    ),
+    "exit-mode-bypass": (
+        "composition", "default: false", "default: true",
+    ),
+    "wait-status-zero-bypass": (
+        "retirement", "if exitStatus == 0 { return .ordinaryZero }",
+        "if exitStatus >= 0 { return .ordinaryZero }",
+    ),
+    "natural-drain-removal": (
+        "retirement",
+        "Self.naturalDrainWindowNanoseconds, to: started",
+        "0, to: started",
+    ),
+    "shared-admission-substitution": (
+        "composition", "return .init(composer: composition, prover: admission)",
+        "return .init(composer: composition, prover: InvestigationMachineDarwinOuterAdmission(selection: selection, outerProcessID: dependencies.outerProcessID))",
+    ),
+    "fileprivate-outcome-init": (
+        "retirement", "fileprivate init(", "init(",
+    ),
+    "session-outcome-bypass": (
+        "session", "owner.retireOwnedProcessGroupWithOutcome(epoch)",
+        "owner.retireOwnedProcessGroupWithOutcome(.init(processID: 2, processGroupID: 2, descriptors: []))",
+    ),
+    "session-outcome-reuse-bypass": (
+        "session", "if case .none = outcomeRetirementTask {",
+        "if case .some = outcomeRetirementTask {",
+    ),
+    "failure-retirement-downgrade": (
+        "session", "do { _ = try await awaitRetirementOutcome() }",
+        "do { _ = try await awaitRetirement() }",
+    ),
+    "cleanup-cancellation-snapshot": (
+        "composition", "let cancellationRequested = Task.isCancelled",
+        "let cancellationRequested = false",
+    ),
+    "focused-test-vacuity": (
+        "composition-test",
+        "exactOuterExchangeAdmitsNormalAndParentCrashOnce",
+        "outerCompositionCoverageWasRemoved",
+    ),
+    "real-session-test-vacuity": (
+        "composition-test",
+        "realSessionCancellationRetiresOnceAndRemainsCancellation",
+        "realSessionCleanupCoverageWasRemoved",
+    ),
+}
+for name, (kind, old, new) in mutations.items():
+    source = sources[kind]
+    if source.count(old) != 1:
+        raise SystemExit(
+            f"cannot construct iii-b2a-ii-a2-ii mutation: {name}"
+        )
+    (output_root / f"iib5biii-b2a-ii-a2ii-{name}.swift").write_text(
+        source.replace(old, new, 1), encoding="utf-8"
+    )
+PY
+
+function require_iib5biii_b2a_iia2ii_mutation_rejected() {
+    local name=$1 kind=$2 expected=$3
+    local composition=$iib5biii_b2a_iia2ii_composition
+    local session=$iib5biii_b2a_iia2ii_session
+    local protocol=$iib5biii_b2a_iia2ii_protocol
+    local retirement=$iib5biii_b2a_iia2ii_retirement
+    local composition_test=$iib5biii_b2a_iia2ii_composition_test
+    local target="$contract_root/iib5biii-b2a-ii-a2ii-$name.swift"
+    [[ $kind == composition ]] && composition=$target
+    [[ $kind == session ]] && session=$target
+    [[ $kind == protocol ]] && protocol=$target
+    [[ $kind == retirement ]] && retirement=$target
+    [[ $kind == composition-test ]] && composition_test=$target
+    xcrun swiftc -frontend -parse -enable-bare-slash-regex "$target"
+    local output="$contract_root/iib5biii-b2a-ii-a2ii-$name.log"
+    if run_iib5biii_b2a_iia2ii_contract \
+        "$composition" "$session" "$protocol" "$retirement" \
+        "$composition_test" "$iib5biii_b2a_iia2ii_session_test" \
+        "$iib5biii_b2a_iia2ii_protocol_test" \
+        "$iib5biii_b2a_iia2ii_retirement_test" \
+        "$iib5biii_b2a_iia2ii_boundary" >"$output" 2>&1
+    then
+        fail_contract "iii-b2a-ii-a2-ii mutation accepted: $name"
+    fi
+    require_fixed_text "$output" "$expected"
+}
+
+for fixture in \
+    outer-order-observation:composition:'iii-b2a-ii-a2-ii outer protocol order drifted' \
+    outer-init-widening:composition:'iii-b2a-ii-a2-ii outer composition initializer drifted' \
+    terminal-proof-to-bool:composition:'iii-b2a-ii-a2-ii terminal absence proof drifted' \
+    outer-order-eof:composition:'iii-b2a-ii-a2-ii outer protocol order drifted' \
+    inner-order-validation:composition:'iii-b2a-ii-a2-ii inner protocol order drifted' \
+    inner-result-to-crash:composition:'iii-b2a-ii-a2-ii inner result-or-exit contract drifted' \
+    exit-mode-bypass:composition:'iii-b2a-ii-a2-ii outer exit classification drifted' \
+    wait-status-zero-bypass:retirement:'iii-b2a-ii-a2-ii wait-status classification drifted' \
+    natural-drain-removal:retirement:'iii-b2a-ii-a2-ii retirement order drifted' \
+    shared-admission-substitution:composition:'iii-b2a-ii-a2-ii shared admission factory drifted' \
+    fileprivate-outcome-init:retirement:'iii-b2a-ii-a2-ii retirement outcome opacity drifted' \
+    session-outcome-bypass:session:'iii-b2a-ii-a2-ii session outcome bridge drifted' \
+    session-outcome-reuse-bypass:session:'iii-b2a-ii-a2-ii session outcome bridge drifted' \
+    failure-retirement-downgrade:session:'iii-b2a-ii-a2-ii session outcome bridge drifted' \
+    cleanup-cancellation-snapshot:composition:'iii-b2a-ii-a2-ii terminal cleanup join drifted' \
+    focused-test-vacuity:composition-test:'iii-b2a-ii-a2-ii focused composition tests became vacuous' \
+    real-session-test-vacuity:composition-test:'iii-b2a-ii-a2-ii focused composition tests became vacuous'
+do
+    name=${fixture%%:*}; remainder=${fixture#*:}
+    kind=${remainder%%:*}; expected=${remainder#*:}
+    require_iib5biii_b2a_iia2ii_mutation_rejected \
+        "$name" "$kind" "$expected"
+done
+
+iib5biii_b2a_iia2ii_paths=(
+    "$iib5biii_b2a_iia2ii_composition"
+    "$iib5biii_b2a_iia2ii_session"
+    "$iib5biii_b2a_iia2ii_protocol"
+    "$iib5biii_b2a_iia2ii_retirement"
+    "$iib5biii_b2a_iia2ii_composition_test"
+    "$iib5biii_b2a_iia2ii_session_test"
+    "$iib5biii_b2a_iia2ii_protocol_test"
+    "$iib5biii_b2a_iia2ii_retirement_test"
+    "$iib5biii_b2a_iia2ii_boundary"
+    scripts/verify-app-release-boundaries
+    scripts/verify-contract
+    scripts/verify-investigation-boundaries
+)
+(( ${#iib5biii_b2a_iia2ii_paths} == 12 )) \
+    || fail_contract "iii-b2a-ii-a2-ii checkpoint path ceiling drifted"
+iib5biii_b2a_iia2ii_index="$contract_root/iib5biii-b2a-ii-a2ii.index"
+GIT_INDEX_FILE="$iib5biii_b2a_iia2ii_index" \
+    git read-tree "$iib5biii_b2a_iia2ii_baseline^{tree}"
+for checkpoint_path in "${iib5biii_b2a_iia2ii_paths[@]}"; do
+    blob=$(git hash-object -w -- "$checkpoint_path")
+    mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
+    GIT_INDEX_FILE="$iib5biii_b2a_iia2ii_index" git update-index --add \
+        --cacheinfo "$mode,$blob,$checkpoint_path"
+done
+GIT_INDEX_FILE="$iib5biii_b2a_iia2ii_index" \
+    "$iib5biii_b2a_iia2ii_gate" \
+    --iib5biii-b2a-ii-a2ii-scope-contract-only \
+    "$iib5biii_b2a_iia2ii_baseline" \
+    >"$contract_root/iib5biii-b2a-ii-a2ii-scope-canonical.log"
+for fixture in extra-path over-budget deleted binary mode wrong-baseline; do
+    index="$contract_root/iib5biii-b2a-ii-a2ii-scope-$fixture.index"
+    cp "$iib5biii_b2a_iia2ii_index" "$index"
+    baseline=$iib5biii_b2a_iia2ii_baseline
+    case $fixture in
+        extra-path)
+            blob=$(git rev-parse "${iib5biii_b2a_iia2ii_baseline}:AGENTS.md")
+            GIT_INDEX_FILE="$index" git update-index --add --cacheinfo \
+                "100644,$blob,a2-ii-extra.swift"
+            expected='iii-b2a-ii-a2-ii staged checkpoint paths drifted' ;;
+        over-budget)
+            for line in {1..3900}; do print -r -- "// a2-ii $line"; done \
+                >"$contract_root/iib5biii-b2a-ii-a2ii-over-budget.swift"
+            blob=$(git hash-object -w -- \
+                "$contract_root/iib5biii-b2a-ii-a2ii-over-budget.swift")
+            GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                "100644,$blob,$iib5biii_b2a_iia2ii_composition"
+            expected='iii-b2a-ii-a2-ii checkpoint budget drifted' ;;
+        deleted)
+            GIT_INDEX_FILE="$index" git rm --cached -q -f \
+                "$iib5biii_b2a_iia2ii_protocol"
+            expected='iii-b2a-ii-a2-ii checkpoint deleted an existing path' ;;
+        binary)
+            blob=$(git rev-parse \
+                "${iib5biii_b2a_iia2ii_baseline}:Tests/Fixtures/Snapshots/design-system.empty-state.dark.en.png")
+            GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                "100644,$blob,$iib5biii_b2a_iia2ii_composition"
+            expected='iii-b2a-ii-a2-ii binary checkpoint path rejected' ;;
+        mode)
+            entry=$(GIT_INDEX_FILE="$index" git ls-files -s -- \
+                scripts/verify-contract)
+            blob=$(print -r -- "$entry" | awk '{print $2}')
+            GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                "100644,$blob,scripts/verify-contract"
+            expected='iii-b2a-ii-a2-ii checkpoint mode drifted: scripts/verify-contract' ;;
+        wrong-baseline)
+            baseline="$iib5biii_b2a_iia2ii_baseline^"
+            expected='iii-b2a-ii-a2-ii checkpoint baseline drifted' ;;
+    esac
+    output="$contract_root/iib5biii-b2a-ii-a2ii-scope-$fixture.log"
+    if GIT_INDEX_FILE="$index" "$iib5biii_b2a_iia2ii_gate" \
+        --iib5biii-b2a-ii-a2ii-scope-contract-only "$baseline" \
+        >"$output" 2>&1
+    then
+        fail_contract "iii-b2a-ii-a2-ii scope mutation accepted: $fixture"
     fi
     require_fixed_text "$output" "$expected"
 done

@@ -667,7 +667,7 @@ private func completeExchange(
     return (acknowledgement, decision)
 }
 
-private struct OuterInnerFixture {
+struct OuterInnerFixture {
     let outerProcessID: UInt32 = 88
     let observedAt: UInt64 = 1_000_000_000
     let selection: InvestigationMachineFixedEpochSelection
@@ -797,7 +797,7 @@ private struct OuterInnerFixture {
         )
     }
 
-    func terminalEvidence(
+    fileprivate func terminalEvidence(
         successfulExit: Bool, mutation: TerminalEvidenceMutation? = nil,
         driverChild requestedDriverChild:
             InvestigationMachineDarwinDriverChildIdentity? = nil,

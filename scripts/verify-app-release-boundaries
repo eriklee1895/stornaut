@@ -37,6 +37,11 @@ iib5biii_b2ai_protocol_source=
 iib5biii_b2a_iia1v_source_contract_only=false
 iib5biii_b2a_iia1v_session_source=
 iib5biii_b2a_iia1v_observer_source=
+iib5biii_b2a_iia2ii_source_contract_only=false
+iib5biii_b2a_iia2ii_composition_source=
+iib5biii_b2a_iia2ii_session_source=
+iib5biii_b2a_iia2ii_protocol_source=
+iib5biii_b2a_iia2ii_retirement_source=
 if [[ $# == 1 && $1 == --investigation-handoff-only ]]; then
     handoff_only=true
 elif [[ $# == 2 && $1 == --legacy-machine-claim-contract-only ]]; then
@@ -80,9 +85,15 @@ elif [[ $# == 3 && $1 == --iib5biii-b2a-ii-a1v-source-contract-only ]]; then
     iib5biii_b2a_iia1v_source_contract_only=true
     iib5biii_b2a_iia1v_session_source=$2
     iib5biii_b2a_iia1v_observer_source=$3
+elif [[ $# == 5 && $1 == --iib5biii-b2a-ii-a2ii-source-contract-only ]]; then
+    iib5biii_b2a_iia2ii_source_contract_only=true
+    iib5biii_b2a_iia2ii_composition_source=$2
+    iib5biii_b2a_iia2ii_session_source=$3
+    iib5biii_b2a_iia2ii_protocol_source=$4
+    iib5biii_b2a_iia2ii_retirement_source=$5
 elif (( $# != 0 )); then
     print -u2 \
-        "Usage: scripts/verify-app-release-boundaries [--investigation-handoff-only | --legacy-machine-claim-contract-only <source> | --iib4-machine-claim-contract-only <source> | --iib5biic-machine-driver-contract-only <source> | --iib5biid-machine-driver-contract-only <source> | --iic0a-source-contract-only <projection> <intake> | --iib5biii-a-source-contract-only <single-epoch> <composition> <continuity> | --iib5biii-b1-source-contract-only <cohort> <continuity> | --iib5biii-b2a0-source-contract-only <composition> <continuity> <bridge> | --iib5biii-b2a-i-source-contract-only <single-epoch> <composition> <continuity> <bridge> <protocol> | --iib5biii-b2a-ii-a1v-source-contract-only <outer-inner-session> <driver-child-observation>]"
+        "Usage: scripts/verify-app-release-boundaries [--investigation-handoff-only | --legacy-machine-claim-contract-only <source> | --iib4-machine-claim-contract-only <source> | --iib5biic-machine-driver-contract-only <source> | --iib5biid-machine-driver-contract-only <source> | --iic0a-source-contract-only <projection> <intake> | --iib5biii-a-source-contract-only <single-epoch> <composition> <continuity> | --iib5biii-b1-source-contract-only <cohort> <continuity> | --iib5biii-b2a0-source-contract-only <composition> <continuity> <bridge> | --iib5biii-b2a-i-source-contract-only <single-epoch> <composition> <continuity> <bridge> <protocol> | --iib5biii-b2a-ii-a1v-source-contract-only <outer-inner-session> <driver-child-observation> | --iib5biii-b2a-ii-a2ii-source-contract-only <composition> <outer-inner-session> <outer-inner-protocol> <retirement>]"
     exit 64
 fi
 
@@ -1373,6 +1384,154 @@ if shell_array("iib5biii_b2a_iia1v_closed_images") != [
 PY
 }
 
+function verify_iib5biii_b2a_iia2ii_source_contract() {
+    local composition_path=$1 session_path=$2 protocol_path=$3
+    local retirement_path=$4 source_path
+    for source_path in "$composition_path" "$session_path" \
+        "$protocol_path" "$retirement_path"
+    do
+        xcrun swiftc -frontend -parse -enable-bare-slash-regex "$source_path"
+    done
+    python3 - "$composition_path" "$session_path" "$protocol_path" \
+        "$retirement_path" \
+        "$repo_root/scripts/verify-app-release-boundaries" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+composition_path, session_path, protocol_path, retirement_path, verifier_path = (
+    map(Path, sys.argv[1:])
+)
+repo_root = verifier_path.parent.parent.resolve()
+expected = {
+    composition_path: repo_root / "Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerComposition.swift",
+    session_path: repo_root / "Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerSession.swift",
+    protocol_path: repo_root / "Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerProtocol.swift",
+    retirement_path: repo_root / "Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinEpochRetirement.swift",
+}
+for path, canonical in expected.items():
+    if path.resolve() != canonical.resolve():
+        raise SystemExit(f"iii-b2a-ii-a2-ii source path drifted: {path}")
+composition, session, protocol, retirement = (
+    path.read_text(encoding="utf-8")
+    for path in (composition_path, session_path, protocol_path, retirement_path)
+)
+if composition.count("#if DEBUG") != 1 \
+        or composition.count("#endif") != 1 \
+        or not composition.rstrip().endswith("#endif"):
+    raise SystemExit("iii-b2a-ii-a2-ii Debug-only source boundary drifted")
+imports = set(re.findall(
+    r"(?m)^import\s+([A-Za-z0-9_]+)\s*$", composition
+))
+if imports != {
+    "Darwin", "Foundation", "StornautInvestigationHandoffContract",
+}:
+    raise SystemExit("iii-b2a-ii-a2-ii composition import surface drifted")
+semantic = "\n".join((composition, session, protocol, retirement))
+if re.search(r"(?m)^\s*(?:public|open)\s+", semantic):
+    raise SystemExit("iii-b2a-ii-a2-ii public surface drifted")
+if re.search(r"\b(?:Codable|Encodable|Decodable)\b", semantic):
+    raise SystemExit("iii-b2a-ii-a2-ii Codable surface drifted")
+for marker in (
+    "import StornautCore", "import StornautExecution",
+    "import StornautLifecycle", "import StornautInvestigation\n",
+    "import StornautCodex", "ActionPolicyGate", "CleanupPolicyGate",
+    "CanonicalPathPolicy", "RegisteredAction", "MoveToTrash",
+    "TrashMoving", "Executor", "URLSession", "NWConnection",
+    "NSXPCConnection", "FileManager.default", "Foundation.Process(",
+    "pkill", "killall", "pgrep", "ps -U",
+):
+    if marker in semantic:
+        raise SystemExit(
+            f"iii-b2a-ii-a2-ii authority surface drifted: {marker}"
+        )
+for marker in (
+    "package actor InvestigationMachineDarwinOuterInnerComposition",
+    "package struct InvestigationMachineDarwinOuterInnerExecutionFactory",
+    "package struct InvestigationMachineDarwinInnerPhysicalRunner",
+    "package struct InvestigationMachineDarwinInnerOwnershipExchange",
+    "package struct InvestigationMachineDarwinFixedInnerChannel",
+    "Darwin._exit(Self.deliberateExitStatus)",
+):
+    if marker not in composition:
+        raise SystemExit(
+            f"iii-b2a-ii-a2-ii DEBUG composition marker drifted: {marker}"
+        )
+if composition.count("fileprivate init(") != 1 or not re.search(
+    r"fileprivate init\(\s*selection: "
+    r"InvestigationMachineFixedEpochSelection,\s*admission: "
+    r"InvestigationMachineDarwinOuterAdmission,", composition, re.DOTALL,
+):
+    raise SystemExit(
+        "iii-b2a-ii-a2-ii outer composition initializer drifted"
+    )
+for marker in (
+    "enum AbsenceProof: Sendable, Equatable",
+    "fileprivate let appAbsence: AbsenceProof",
+    "fileprivate let helperAbsence: AbsenceProof",
+    "fileprivate let l1ResidueAbsence: AbsenceProof",
+):
+    if marker not in composition:
+        raise SystemExit(
+            "iii-b2a-ii-a2-ii terminal absence proof drifted"
+        )
+if "package func physicalOwnership(" not in protocol:
+    raise SystemExit("iii-b2a-ii-a2-ii physical ownership boundary drifted")
+if "fileprivate init(" not in retirement \
+        or "InvestigationMachineDarwinOuterRetirementOutcome" not in retirement:
+    raise SystemExit("iii-b2a-ii-a2-ii retirement outcome opacity drifted")
+if "retireOwnedProcessGroupWithOutcome()" not in session:
+    raise SystemExit("iii-b2a-ii-a2-ii session outcome bridge drifted")
+
+verifier = verifier_path.read_text(encoding="utf-8")
+for marker in (
+    "iib5biii_b2a_iia2ii_debug_symbols=(",
+    "iib5biii_b2a_iia2ii_debug_imports=(",
+    "iib5biii_b2a_iia2ii_closed_images=(",
+    "verify_iib5biii_b2a_iia2ii_macho() {",
+    '"$diagnostic_machine_driver" "$marker"',
+    'for closed_image in "${iib5biii_b2a_iia2ii_closed_images[@]}"; do',
+    "iii-b2a-ii-a2-ii Debug Machine driver positive control is missing",
+    "iii-b2a-ii-a2-ii DEBUG symbol leaked into a closed image",
+    "iii-b2a-ii-a2-ii Debug import is missing",
+    "iii-b2a-ii-a2-ii DEBUG import leaked into Release",
+    "\nverify_iib5biii_b2a_iia2ii_macho\n",
+):
+    if marker not in verifier:
+        raise SystemExit(
+            f"iii-b2a-ii-a2-ii Mach-O source contract drifted: {marker}"
+        )
+
+def shell_array(name):
+    match = re.search(
+        rf"(?ms)^{re.escape(name)}=\(\n(?P<body>.*?)^\)\n", verifier
+    )
+    if match is None:
+        raise SystemExit(f"iii-b2a-ii-a2-ii Mach-O array missing: {name}")
+    values = []
+    for line in match.group("body").splitlines():
+        value = line.strip()
+        quoted = re.fullmatch(r"(['\"])(.*?)\1", value)
+        if quoted is None:
+            raise SystemExit(
+                f"iii-b2a-ii-a2-ii Mach-O array malformed: {name}"
+            )
+        values.append(quoted.group(2))
+    return values
+
+if shell_array("iib5biii_b2a_iia2ii_debug_symbols") != [
+    "StornautInvestigationMachineDriverSupport.InvestigationMachineDarwinOuterInnerComposition",
+    "StornautInvestigationMachineDriverSupport.InvestigationMachineDarwinOuterInnerExecutionFactory",
+    "StornautInvestigationMachineDriverSupport.InvestigationMachineDarwinInnerPhysicalRunner",
+    "StornautInvestigationMachineDriverSupport.InvestigationMachineDarwinInnerOwnershipExchange",
+    "StornautInvestigationMachineDriverSupport.InvestigationMachineDarwinFixedInnerChannel",
+]:
+    raise SystemExit("iii-b2a-ii-a2-ii Debug symbol allowlist drifted")
+if shell_array("iib5biii_b2a_iia2ii_debug_imports") != ["__exit"]:
+    raise SystemExit("iii-b2a-ii-a2-ii Debug import allowlist drifted")
+PY
+}
+
 if $legacy_machine_claim_contract_only; then
     verify_claim_server_macho_source_contract \
         "$legacy_machine_claim_contract_source"
@@ -1444,6 +1603,15 @@ if $iib5biii_b2a_iia1v_source_contract_only; then
         "$iib5biii_b2a_iia1v_session_source" \
         "$iib5biii_b2a_iia1v_observer_source"
     print "iii-b2a-ii-a1-v source-only App boundary verification passed."
+    exit 0
+fi
+if $iib5biii_b2a_iia2ii_source_contract_only; then
+    verify_iib5biii_b2a_iia2ii_source_contract \
+        "$iib5biii_b2a_iia2ii_composition_source" \
+        "$iib5biii_b2a_iia2ii_session_source" \
+        "$iib5biii_b2a_iia2ii_protocol_source" \
+        "$iib5biii_b2a_iia2ii_retirement_source"
+    print "iii-b2a-ii-a2-ii source-only App boundary verification passed."
     exit 0
 fi
 
@@ -2772,6 +2940,70 @@ verify_iib5biii_b2a_iia1v_macho() {
         done
     done
 }
+iib5biii_b2a_iia2ii_debug_symbols=(
+    'StornautInvestigationMachineDriverSupport.InvestigationMachineDarwinOuterInnerComposition'
+    'StornautInvestigationMachineDriverSupport.InvestigationMachineDarwinOuterInnerExecutionFactory'
+    'StornautInvestigationMachineDriverSupport.InvestigationMachineDarwinInnerPhysicalRunner'
+    'StornautInvestigationMachineDriverSupport.InvestigationMachineDarwinInnerOwnershipExchange'
+    'StornautInvestigationMachineDriverSupport.InvestigationMachineDarwinFixedInnerChannel'
+)
+iib5biii_b2a_iia2ii_debug_imports=(
+    '__exit'
+)
+iib5biii_b2a_iia2ii_closed_images=(
+    "$release_machine_driver"
+    "$debug_app/Contents/MacOS/Stornaut"
+    "$debug_app/Contents/MacOS/Stornaut.debug.dylib"
+    "$debug_app/Contents/MacOS/__preview.dylib"
+    "$release_app/Contents/MacOS/Stornaut"
+    "$debug_app/Contents/MacOS/StornautLifecycleHelper"
+    "$release_app/Contents/MacOS/StornautLifecycleHelper"
+    "$diagnostic_debug_app/Contents/MacOS/StornautInvestigationDiagnostic"
+    "$diagnostic_debug_app/Contents/MacOS/StornautInvestigationDiagnostic.debug.dylib"
+    "$diagnostic_debug_app/Contents/MacOS/__preview.dylib"
+    "$diagnostic_debug_app/Contents/MacOS/StornautLifecycleHelper"
+    "$diagnostic_release_app/Contents/MacOS/StornautInvestigationDiagnosticReleaseShell"
+)
+verify_iib5biii_b2a_iia2ii_macho() {
+    local marker closed_image scan_status
+    for marker in "${iib5biii_b2a_iia2ii_debug_symbols[@]}"; do
+        if mach_o_image_has_demangled_symbol \
+            "$diagnostic_machine_driver" "$marker"
+        then
+            :
+        else
+            scan_status=$?
+            (( scan_status != 2 )) || return 1
+            print -u2 \
+                "iii-b2a-ii-a2-ii Debug Machine driver positive control is missing: $marker"
+            return 1
+        fi
+        for closed_image in "${iib5biii_b2a_iia2ii_closed_images[@]}"; do
+            if mach_o_image_has_demangled_symbol "$closed_image" "$marker"; then
+                print -u2 \
+                    "iii-b2a-ii-a2-ii DEBUG symbol leaked into a closed image: $closed_image: $marker"
+                return 1
+            else
+                scan_status=$?
+            fi
+            (( scan_status != 2 )) || return 1
+        done
+    done
+    for marker in "${iib5biii_b2a_iia2ii_debug_imports[@]}"; do
+        print -r -- "$machine_driver_undefined_symbols" \
+            | grep -Fxq -- "$marker" || {
+            print -u2 "iii-b2a-ii-a2-ii Debug import is missing: $marker"
+            return 1
+        }
+        if print -r -- "$release_machine_driver_undefined_symbols" \
+            | grep -Fxq -- "$marker"
+        then
+            print -u2 \
+                "iii-b2a-ii-a2-ii DEBUG import leaked into Release: $marker"
+            return 1
+        fi
+    done
+}
 machine_driver_required_readonly_imports=(
     _pread _fstat _lstat _flistxattr _acl_get_fd_np
     _proc_pidpath _SecCodeCopySelf _SecStaticCodeCreateWithPath
@@ -2959,8 +3191,8 @@ function require_projection() {
 }
 require_projection \
     "$machine_driver_undefined_symbols" \
-    8c1b72fec0b93ceda181412cb6909701d608e2eb39afe380477a95e3392cba94 \
-    691 \
+    574d07d1ceb6fbe04619f6abde040833c87b3ee0098a3458169aa0f6c484e36f \
+    692 \
     undefined
 require_projection \
     "$machine_driver_loaded_libraries" \
@@ -2969,8 +3201,8 @@ require_projection \
     load-command
 require_projection \
     "$machine_driver_owned_symbols" \
-    8eb81efeca787a56843a62ed12de91e5ae8bb67ac50992cbf5705498b39e19c2 \
-    6987 \
+    72c1a6244481a53270afcda6bcd5f2092019c4139aa543a55e9019920a1826f0 \
+    7863 \
     owned-symbol
 if ! mach_o_has_demangled_symbol \
     "$diagnostic_machine_driver" \
@@ -3050,7 +3282,7 @@ require_projection "$release_machine_driver_undefined_symbols" \
 require_projection "$release_machine_driver_loaded_libraries" \
     dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9 18 release-load-command
 require_projection "$release_machine_driver_owned_symbols" \
-    d223c56c175cc1e779b61b5ffc9cdac8f91617135eddebc56ae082befb278e81 3787 release-owned-symbol
+    2209e254bfe1a2fb2709ae48640206658e2903a5aca28bd0fdf8e34171050962 3876 release-owned-symbol
 for marker in "${machine_driver_authority_forbidden_markers[@]}"; do
     if mach_o_has_demangled_symbol "$release_machine_driver" "$marker"; then
         print -u2 "Authority or readiness leaked into Release Machine driver: $marker"
@@ -3090,6 +3322,7 @@ done
     print -u2 "Release Machine driver Security import allowlist drifted."; exit 1
 }
 verify_iib5biii_b2a_iia1v_macho
+verify_iib5biii_b2a_iia2ii_macho
 verify_iib4_machine_claim_macho
 
 if mach_o_has_demangled_symbol \

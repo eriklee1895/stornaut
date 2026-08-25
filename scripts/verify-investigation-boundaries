@@ -112,6 +112,18 @@ iib5biii_b2a_iia2i_retirement_test_source=
 iib5biii_b2a_iia2i_boundary_test_source=
 iib5biii_b2a_iia2i_scope_contract_only=false
 iib5biii_b2a_iia2i_scope_baseline=8362b47351a7d3b3a141fc78ec03f9575199901d
+iib5biii_b2a_iia2ii_contract_only=false
+iib5biii_b2a_iia2ii_composition_source=
+iib5biii_b2a_iia2ii_session_source=
+iib5biii_b2a_iia2ii_protocol_source=
+iib5biii_b2a_iia2ii_retirement_source=
+iib5biii_b2a_iia2ii_composition_test_source=
+iib5biii_b2a_iia2ii_session_test_source=
+iib5biii_b2a_iia2ii_protocol_test_source=
+iib5biii_b2a_iia2ii_retirement_test_source=
+iib5biii_b2a_iia2ii_boundary_test_source=
+iib5biii_b2a_iia2ii_scope_contract_only=false
+iib5biii_b2a_iia2ii_scope_baseline=f363fbb67cbfb355ae701a85bba51b92e6db283d
 iib5bia_projection_contract_only=false
 iib5bia_contract_source=
 iib5bia_focused_test_source=
@@ -396,6 +408,22 @@ if (( $# > 0 )); then
         && [[ $1 == --iib5biii-b2a-ii-a2i-scope-contract-only ]]; then
         iib5biii_b2a_iia2i_scope_contract_only=true
         iib5biii_b2a_iia2i_scope_baseline=${2:-8362b47351a7d3b3a141fc78ec03f9575199901d}
+    elif (( $# == 10 )) \
+        && [[ $1 == --iib5biii-b2a-ii-a2ii-contract-only ]]; then
+        iib5biii_b2a_iia2ii_contract_only=true
+        iib5biii_b2a_iia2ii_composition_source=$2
+        iib5biii_b2a_iia2ii_session_source=$3
+        iib5biii_b2a_iia2ii_protocol_source=$4
+        iib5biii_b2a_iia2ii_retirement_source=$5
+        iib5biii_b2a_iia2ii_composition_test_source=$6
+        iib5biii_b2a_iia2ii_session_test_source=$7
+        iib5biii_b2a_iia2ii_protocol_test_source=$8
+        iib5biii_b2a_iia2ii_retirement_test_source=$9
+        iib5biii_b2a_iia2ii_boundary_test_source=${10}
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iib5biii-b2a-ii-a2ii-scope-contract-only ]]; then
+        iib5biii_b2a_iia2ii_scope_contract_only=true
+        iib5biii_b2a_iia2ii_scope_baseline=${2:-f363fbb67cbfb355ae701a85bba51b92e6db283d}
     elif (( $# == 3 )) \
         && [[ $1 == --iib5bia-projection-contract-only ]]; then
         iib5bia_projection_contract_only=true
@@ -3133,6 +3161,469 @@ function verify_iib5biii_b2a_iia2i_scope() {
     }
 }
 
+function verify_iib5biii_b2a_iia2ii_contract() {
+    local composition_source=$1 session_source=$2 protocol_source=$3
+    local retirement_source=$4 composition_test_source=$5
+    local session_test_source=$6 protocol_test_source=$7
+    local retirement_test_source=$8 boundary_test_source=$9
+    local source
+    for source in "$composition_source" "$session_source" \
+        "$protocol_source" "$retirement_source" \
+        "$composition_test_source" "$session_test_source" \
+        "$protocol_test_source" "$retirement_test_source" \
+        "$boundary_test_source"
+    do
+        xcrun swiftc -frontend -parse -enable-bare-slash-regex "$source"
+    done
+    python3 - "$composition_source" "$session_source" \
+        "$protocol_source" "$retirement_source" \
+        "$composition_test_source" "$session_test_source" \
+        "$protocol_test_source" "$retirement_test_source" \
+        "$boundary_test_source" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+(
+    composition_path, session_path, protocol_path, retirement_path,
+    composition_test_path, session_test_path, protocol_test_path,
+    retirement_test_path, boundary_path,
+) = map(Path, sys.argv[1:])
+composition, session, protocol, retirement, composition_test, session_test, \
+protocol_test, retirement_test, boundary = (
+    path.read_text(encoding="utf-8")
+    for path in (
+        composition_path, session_path, protocol_path, retirement_path,
+        composition_test_path, session_test_path, protocol_test_path,
+        retirement_test_path, boundary_path,
+    )
+)
+
+def fail(message):
+    raise SystemExit(f"iii-b2a-ii-a2-ii {message}")
+
+def declaration(source, pattern, label):
+    match = re.search(pattern, source, re.MULTILINE)
+    if match is None:
+        fail(f"{label} drifted")
+    opening = source.find("{", match.end())
+    if opening < 0:
+        fail(f"{label} drifted")
+    depth = 0
+    for index in range(opening, len(source)):
+        if source[index] == "{":
+            depth += 1
+        elif source[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return source[match.start():index + 1]
+    fail(f"{label} drifted")
+
+def require_order(source, markers, label):
+    cursor = 0
+    for marker in markers:
+        found = source.find(marker, cursor)
+        if found < 0:
+            fail(f"{label} drifted")
+        cursor = found + len(marker)
+
+semantic = "\n".join((composition, session, protocol, retirement))
+if re.search(r"(?m)^\s*(?:public|open)\s+", semantic):
+    fail("package-only surface drifted")
+if re.search(r"\b(?:Codable|Encodable|Decodable)\b", semantic):
+    fail("Codable surface drifted")
+for marker in (
+    "import StornautCore", "import StornautExecution",
+    "import StornautLifecycle", "import StornautInvestigation\n",
+    "import StornautCodex", "ActionPolicyGate", "CleanupPolicyGate",
+    "CanonicalPathPolicy", "RegisteredAction", "MoveToTrash",
+    "TrashMoving", "Executor", "URLSession", "NWConnection",
+    "NSXPCConnection", "FileManager.default", "Foundation.Process(",
+    "CommandLine.arguments", "ProcessInfo.processInfo.environment",
+    "pkill", "killall", "pgrep", "ps -U",
+):
+    if marker in semantic:
+        fail("authority surface drifted")
+
+if composition.count("#if DEBUG") != 1 \
+        or composition.count("#endif") != 1 \
+        or not composition.rstrip().endswith("#endif"):
+    fail("Debug-only composition boundary drifted")
+if set(re.findall(r"(?m)^import\s+([A-Za-z0-9_]+)\s*$", composition)) != {
+    "Darwin", "Foundation", "StornautInvestigationHandoffContract",
+}:
+    fail("composition import surface drifted")
+for forbidden in (
+    "posix_spawn", "Darwin.kill", "kill(", "killpg(",
+    "waitpid(", "waitid(", "socket(", "connect(", "open(",
+    "unlink(", "rename(", "mkdir(", "chmod(", "chown(",
+):
+    if forbidden in composition:
+        fail("composition authority drifted")
+terminal_observation = declaration(
+    composition,
+    r"(?m)^struct InvestigationMachineDarwinOuterTerminalObservation\b",
+    "terminal absence proof",
+)
+for marker in (
+    "enum AbsenceProof: Sendable, Equatable",
+    "fileprivate let appAbsence: AbsenceProof",
+    "fileprivate let helperAbsence: AbsenceProof",
+    "fileprivate let l1ResidueAbsence: AbsenceProof",
+    "appAbsence: AbsenceProof, helperAbsence: AbsenceProof",
+    "l1ResidueAbsence: AbsenceProof",
+):
+    if marker not in terminal_observation:
+        fail("terminal absence proof drifted")
+for forbidden in ("appAbsent: Bool", "helperAbsent: Bool", "l1ResidueAbsent: Bool"):
+    if forbidden in terminal_observation:
+        fail("terminal absence proof drifted")
+
+actor = declaration(
+    composition,
+    r"(?m)^package actor InvestigationMachineDarwinOuterInnerComposition\b",
+    "one-shot state machine",
+)
+state = declaration(actor, r"(?m)^    private enum State\b", "one-shot state machine")
+if re.findall(r"(?m)^\s*case\s+([A-Za-z][A-Za-z0-9_]*)", state) != [
+    "ready", "running", "terminal",
+]:
+    fail("one-shot state machine drifted")
+if actor.count("try beginRun()") != 3 \
+        or actor.count("defer { state = .terminal }") != 3 \
+        or "state = .running" not in declaration(
+            actor, r"(?m)^    private func beginRun\(\)",
+            "one-shot state machine",
+        ):
+    fail("one-shot state machine drifted")
+if actor.count("fileprivate init(") != 1 or not re.search(
+    r"fileprivate init\(\s*selection: "
+    r"InvestigationMachineFixedEpochSelection,\s*admission: "
+    r"InvestigationMachineDarwinOuterAdmission,", actor, re.DOTALL,
+):
+    fail("outer composition initializer drifted")
+
+outer = declaration(
+    actor,
+    r"(?m)^    func run\(\n        invocation: InvestigationMachineSingleEpochInvocation",
+    "outer protocol order",
+)
+require_order(outer, (
+    "let request = try InvestigationMachineDarwinEpochRequest(",
+    "try await admission.accept(request)",
+    "startSession(",
+    "started.sendControl(",
+    "InvestigationMachineDarwinEpochOwnershipRecord",
+    "ownershipObserver.observeOwnership(",
+    "admission.acceptOwnership(",
+    "started.sendControl(\n                acknowledgement.encoded()",
+    "admission.issueDecision(acknowledgement)",
+    "started.sendControl(\n                decision.encoded()",
+    "switch request.mode",
+    "started.proveResultEOF",
+    "started.proveControlEOF",
+    "retireOwnedProcessGroupWithOutcome()",
+    "Self.exitMatches(",
+    "terminalObserver.observeTerminal(",
+    "InvestigationMachineDarwinEpochTerminalEvidence(",
+    "admission.admit(",
+), "outer protocol order")
+if outer.count("admission.admit(") != 1:
+    fail("sole admission call drifted")
+if not re.search(
+    r"let admitted = try await admission\.admit\(.*?\)\s*"
+    r"try checkCancellation\(\)\s*return admitted", outer, re.DOTALL,
+):
+    fail("post-admission cancellation barrier drifted")
+if not re.search(
+    r"catch \{\s*let cancellationRequested = Task\.isCancelled\s*"
+    r"if let session, !retired \{\s*"
+    r"let cleaned = await Task\.detached \{\s*"
+    r"try\? await session\.retireOwnedProcessGroupWithOutcome\(\).*?"
+    r"if cancellationRequested \{\s*throw "
+    r"InvestigationMachineDarwinOuterInnerCompositionError\s*\.cancelled",
+    outer, re.DOTALL,
+):
+    fail("terminal cleanup join drifted")
+if not re.search(
+    r"case \.normal:\s*guard let bytes = try await started\.receiveResult"
+    r".*?case \.parentCrash:\s*guard try await started\.receiveResult"
+    r"\([^)]*\) == nil", outer, re.DOTALL,
+):
+    fail("result-or-zero-EOF contract drifted")
+
+inner = declaration(
+    actor, r"(?m)^    package func runInner\(\) async throws",
+    "inner protocol order",
+)
+require_order(inner, (
+    "innerRoleValidator.validate()",
+    "InvestigationMachineDarwinEpochRequest.decodeUntrusted(",
+    "request.epochDeadlineNanoseconds > observedAt",
+    "innerState.accept(",
+    "innerPhysicalRunner.run(",
+    "switch outcome",
+), "inner protocol order")
+normal_branch, crash_branch = inner.split("case .parentCrash:", 1)
+if "innerChannel.sendResult(" not in normal_branch \
+        or "innerCrash.crashNow()" in normal_branch \
+        or "innerChannel.sendResult(" in crash_branch \
+        or crash_branch.count("innerCrash.crashNow()") != 1:
+    fail("inner result-or-exit contract drifted")
+if "Darwin._exit(Self.deliberateExitStatus)" not in composition \
+        or "deliberateParentCrashExitStatus" not in composition:
+    fail("deliberate exit status drifted")
+ownership_exchange = declaration(
+    composition,
+    r"(?m)^package struct InvestigationMachineDarwinInnerOwnershipExchange\b",
+    "inner ownership-before-decision order",
+)
+exchange_decision = declaration(
+    ownership_exchange, r"(?m)^    private func exchangeDecision\(",
+    "inner ownership-before-decision order",
+)
+require_order(exchange_decision, (
+    "InvestigationMachineDarwinEpochOwnershipRecord(",
+    "state.emit(record)", "channel.sendControl(",
+    "InvestigationMachineDarwinEpochAcknowledgement",
+    "state.accept(acknowledgement)",
+    "InvestigationMachineDarwinEpochDecision.decode(",
+    "state.accept(decision)", "return decision",
+), "inner ownership-before-decision order")
+exit_matches = declaration(
+    actor, r"(?m)^    private static func exitMatches\(",
+    "outer exit classification",
+)
+if not re.search(
+    r"case \(\.normal, \.ordinaryZero\),\s*"
+    r"\(\.parentCrash, \.deliberateParentCrash\):\s*true\s*"
+    r"default: false", exit_matches, re.DOTALL,
+):
+    fail("outer exit classification drifted")
+
+factory = declaration(
+    composition,
+    r"(?m)^package struct InvestigationMachineDarwinOuterInnerExecutionFactory\b",
+    "shared admission factory",
+)
+if factory.count("InvestigationMachineDarwinOuterAdmission(") != 1 \
+        or not re.search(
+            r"let admission = InvestigationMachineDarwinOuterAdmission\(.*?"
+            r"InvestigationMachineDarwinOuterInnerComposition\(.*?"
+            r"admission: admission.*?"
+            r"return \.init\(composer: composition, prover: admission\)",
+            factory, re.DOTALL,
+        ):
+    fail("shared admission factory drifted")
+if semantic.count("InvestigationMachineDarwinOuterAdmission(") != 1:
+    fail("sole admission initializer drifted")
+if protocol.count("InvestigationMachineSingleEpochAdmittedPhysicalResult(") != 1:
+    fail("admitted token initializer drifted")
+continuity_path = composition_path.parent / (
+    "InvestigationMachineHelperEpochContinuity.swift"
+)
+continuity = continuity_path.read_text(encoding="utf-8")
+if (semantic + "\n" + continuity).count(
+    "InvestigationMachineHelperEpochContinuity.successor("
+) != 1:
+    fail("continuity mint drifted")
+
+outcome = declaration(
+    retirement,
+    r"(?m)^struct InvestigationMachineDarwinOuterRetirementOutcome\b",
+    "retirement outcome opacity",
+)
+if "fileprivate init(" not in outcome:
+    fail("retirement outcome opacity drifted")
+classification = declaration(
+    retirement,
+    r"(?m)^enum InvestigationMachineDarwinDirectChildExitClassification\b",
+    "wait-status classification",
+)
+for marker in (
+    "case ordinaryZero", "case deliberateParentCrash",
+    "case unexpectedNonSuccess",
+    "static let deliberateParentCrashExitStatus: Int32 = 72",
+):
+    if marker not in classification:
+        fail("wait-status classification drifted")
+classifier = declaration(
+    retirement, r"(?m)^    private func classifyDirectChildExit\(",
+    "wait-status classification",
+)
+for marker in (
+    "rawStatus >= 0", "rawStatus & ~0xffff == 0",
+    "rawStatus & 0xff == 0", "rawStatus >> 8 & 0xff",
+    "if exitStatus == 0 { return .ordinaryZero }",
+    "waitState != 0x7f", "waitState < Int32(NSIG)",
+    "rawStatus & ~0xff == 0",
+):
+    if marker not in classifier:
+        fail("wait-status classification drifted")
+retire = declaration(
+    retirement,
+    r"(?m)^    private func retireOwnedProcessGroupSynchronously\(",
+    "retirement order",
+)
+require_order(retire, (
+    "let naturalDrainDeadline", "let termDeadline",
+    "let totalDeadline", "if waitable == epoch.processID",
+    "let status = try reapStatus(", "let postReapMembers",
+    "guard postReapMembers.isEmpty", "return .init(",
+    "observationCompletedAt >= naturalDrainDeadline",
+    "signal(-epoch.processGroupID, SIGTERM)",
+    "observationCompletedAt >= termDeadline",
+    "signal(-epoch.processGroupID, SIGKILL)",
+), "retirement order")
+if not re.search(
+    r"let naturalDrainDeadline = try adding\(\s*"
+    r"Self\.naturalDrainWindowNanoseconds, to: started\s*\)",
+    retire, re.DOTALL,
+):
+    fail("retirement order drifted")
+for marker in (
+    "return try await withTaskCancellationHandler",
+    "if Task.isCancelled { resolution.requestCancellation() }",
+    "resolution.requestCancellation()",
+):
+    if marker not in retirement:
+        fail("retirement cancellation join drifted")
+if retire.count("signal(-epoch.processGroupID, SIGTERM)") != 1 \
+        or retire.count("signal(-epoch.processGroupID, SIGKILL)") != 1:
+    fail("retirement order drifted")
+
+for marker in (
+    "InvestigationMachineDarwinOuterInnerCompositionSessionStarting",
+    "InvestigationMachineDarwinOuterInnerCompositionSession",
+    "retireOwnedProcessGroupWithOutcome()",
+    "owner.retireOwnedProcessGroupWithOutcome(epoch)",
+):
+    if marker not in session:
+        fail("session outcome bridge drifted")
+outcome_retirement = declaration(
+    session,
+    r"(?m)^    func retireOwnedProcessGroupWithOutcome\(\) async throws",
+    "session outcome bridge",
+)
+if "if case .none = outcomeRetirementTask" not in outcome_retirement \
+        or "_ = try beginOutcomeRetirement()" not in outcome_retirement \
+        or "return try await awaitRetirementOutcome()" not in outcome_retirement:
+    fail("session outcome bridge drifted")
+failure_retirement = declaration(
+    session, r"(?m)^    private func retireAfterFailure\(\) async throws",
+    "session outcome bridge",
+)
+if "try await awaitRetirementOutcome()" not in failure_retirement \
+        or "try await awaitRetirement()" in failure_retirement:
+    fail("session outcome bridge drifted")
+if "package func physicalOwnership(" not in protocol:
+    fail("physical ownership gate drifted")
+if "expectedSelection: InvestigationMachineFixedEpochSelection" not in protocol:
+    fail("physical ownership gate drifted")
+
+test_names = (
+    "exactOuterExchangeAdmitsNormalAndParentCrashOnce",
+    "executionFactoryUsesTheSameAdmissionForComposerAndContinuity",
+    "runningStateIsSetBeforeFirstAwaitAndCancellationIsTerminal",
+    "cancellationAfterSessionStartJoinsCleanupAndCleanupFailureWins",
+    "realSessionCancellationRetiresOnceAndRemainsCancellation",
+    "transportFailureRetiresOnceAndCannotBeRetried",
+    "exitClassificationMustMatchTheClosedMode",
+    "foreignInvocationConsumesTheCompositionBeforeAnyExternalEffect",
+    "innerRoleSendsOwnershipBeforeDecisionAndOnlyNormalWritesResult",
+    "innerCancellationAfterDecisionNeverWritesResultOrCrashes",
+    "innerRejectsARequestThatExpiresWhileItIsBeingRead",
+)
+if any(composition_test.count(name) != 1 for name in test_names):
+    fail("focused composition tests became vacuous")
+for marker in (
+    "outerOutcomeClassifiesOrdinaryZeroAfterReapAndEmptyGroup",
+    "outerOutcomeClassifiesDeliberateParentCrashExactly",
+    "outerOutcomeRejectsNonTerminalAndMalformedWaitStatuses",
+    "outerOutcomeAllowsNaturalDrainBeforeAnyGroupSignal",
+):
+    if retirement_test.count(marker) != 1:
+        fail("focused retirement tests became vacuous")
+if "RecordingOuterInnerRetirementOwner:" not in session_test \
+        or "InvestigationMachineDarwinOuterRetirementOwning" not in session_test:
+    fail("session outcome tests became vacuous")
+for marker in ("enum TerminalEvidenceMutation", "struct OuterInnerFixture"):
+    if protocol_test.count(marker) != 1:
+        fail("shared protocol fixtures drifted")
+for marker in (
+    "iiiB2AIIA2IIVerifierPinsTerminalAdmissionComposition",
+    "--iib5biii-b2a-ii-a2ii-contract-only",
+    "--iib5biii-b2a-ii-a2ii-scope-contract-only",
+    "iii-b2a-ii-a2-ii outer protocol order drifted",
+    "iii-b2a-ii-a2-ii wait-status classification drifted",
+):
+    if marker not in boundary:
+        fail("boundary self-test drifted")
+PY
+}
+
+function verify_iib5biii_b2a_iia2ii_scope() {
+    local baseline=${1:-f363fbb67cbfb355ae701a85bba51b92e6db283d}
+    local expected=(
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinEpochRetirement.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerComposition.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerProtocol.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerSession.swift
+        Tests/StornautInvestigationTests/InvestigationMachineDarwinEpochRetirementTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineDarwinOuterInnerCompositionTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineDarwinOuterInnerProtocolTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineDarwinOuterInnerSessionTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-app-release-boundaries
+        scripts/verify-contract
+        scripts/verify-investigation-boundaries
+    )
+    (( ${#expected} == 12 )) || {
+        print -u2 "iii-b2a-ii-a2-ii checkpoint path ceiling drifted"
+        return 1
+    }
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" \
+        == f363fbb67cbfb355ae701a85bba51b92e6db283d ]] || {
+        print -u2 "iii-b2a-ii-a2-ii checkpoint baseline drifted"
+        return 1
+    }
+    if git diff --cached --name-only --diff-filter=D "$baseline" \
+        | awk 'index($0,"docs/")!=1 {found=1} END {exit !found}'
+    then
+        print -u2 "iii-b2a-ii-a2-ii checkpoint deleted an existing path"
+        return 1
+    fi
+    if git diff --cached --numstat "$baseline" \
+        | awk 'index($3,"docs/")!=1 && ($1=="-" || $2=="-") {found=1} END {exit !found}'
+    then
+        print -u2 "iii-b2a-ii-a2-ii binary checkpoint path rejected"
+        return 1
+    fi
+    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD \
+        "$baseline" | awk 'index($0,"docs/")!=1 && $0!="AGENTS.md" && $0!="README.md"')"})
+    [[ "${(j:\n:)${(@on)observed}}" == "${(j:\n:)${(@on)expected}}" ]] || {
+        print -u2 "iii-b2a-ii-a2-ii staged checkpoint paths drifted"
+        return 1
+    }
+    local expected_path expected_mode observed_entry
+    for expected_path in "${expected[@]}"; do
+        expected_mode=100644
+        [[ $expected_path == scripts/* ]] && expected_mode=100755
+        observed_entry=$(git ls-files -s -- "$expected_path")
+        [[ "$(print -r -- "$observed_entry" | awk '{print $1, $3, $4}')" \
+            == "$expected_mode 0 $expected_path" ]] || {
+            print -u2 "iii-b2a-ii-a2-ii checkpoint mode drifted: $expected_path"
+            return 1
+        }
+    done
+    local changed=$(git diff --cached --numstat "$baseline" \
+        | awk 'index($3,"docs/")!=1 && $3!="AGENTS.md" && $3!="README.md" {n+=$1+$2} END {print n+0}')
+    (( changed <= 3800 )) || {
+        print -u2 "iii-b2a-ii-a2-ii checkpoint budget drifted"
+        return 1
+    }
+}
+
 function verify_iib5bia_projection_contract() {
     local contract_source=$1 focused_test_source=$2
     xcrun swiftc -frontend -parse "$contract_source"
@@ -5580,7 +6071,9 @@ for marker in (
     "try signal(-epoch.processGroupID, SIGKILL)",
     "let postReapMembers = try inventory(epoch.processGroupID)",
     "guard postReapMembers.isEmpty else",
-    "guard !descriptorFailure else", "return .init()",
+    "guard !descriptorFailure else",
+    "retirementProof: .init()",
+    "directChildExit: try classifyDirectChildExit(",
 ):
     if marker not in owned:
         raise SystemExit(f"ii-b5b-ii-d owned retirement drifted: {marker}")
@@ -5619,7 +6112,8 @@ if "Int32(WEXITED | WNOHANG | WNOWAIT)" not in waitable:
     raise SystemExit("ii-b5b-ii-d waitable leader drifted")
 if "system.waitPID(processID, Int32(WNOHANG))" not in reap:
     raise SystemExit("ii-b5b-ii-d leader reap drifted")
-if owned.count("return .init()") != 1 or successful.count("return .init()") != 1:
+if owned.count("retirementProof: .init()") != 1 \
+        or successful.count("return .init()") != 1:
     raise SystemExit("ii-b5b-ii-d owned proof cardinality drifted")
 for marker in ("killpg(", "SIGINT", "posix_spawn", "CommandLine.arguments", "ProcessInfo.processInfo.environment"):
     if marker in retirement: raise SystemExit(f"ii-b5b-ii-d retirement authority drifted: {marker}")
@@ -5637,7 +6131,7 @@ test_markers = (
     "invalidOwnedAuthorityNeverInventoriesOrSignals",
     "malformedOrUnavailableInventoryNeverBecomesEmptyProof",
     "waitIDRetriesOnlyEINTRAndRequiresTheExactLeader",
-    "waitPIDRetriesOnlyEINTRAndRejectsZeroWrongPIDAndErrors",
+    "waitPIDStatusRetriesOnlyEINTRAndRejectsNilWrongPIDAndErrors",
     "signalErrorsIncludingESRCHNeverMintProof",
     "postReapPGIDReuseWithholdsProofWithoutAnotherSignal",
     "descriptorFailureContinuesCleanupWithholdsProofAndNeverRetries",
@@ -9178,6 +9672,26 @@ if $iib5biii_b2a_iia2i_scope_contract_only; then
     print "iii-b2a-ii-a2-i staged scope verification passed."
     exit 0
 fi
+if $iib5biii_b2a_iia2ii_contract_only; then
+    verify_iib5biii_b2a_iia2ii_contract \
+        "$iib5biii_b2a_iia2ii_composition_source" \
+        "$iib5biii_b2a_iia2ii_session_source" \
+        "$iib5biii_b2a_iia2ii_protocol_source" \
+        "$iib5biii_b2a_iia2ii_retirement_source" \
+        "$iib5biii_b2a_iia2ii_composition_test_source" \
+        "$iib5biii_b2a_iia2ii_session_test_source" \
+        "$iib5biii_b2a_iia2ii_protocol_test_source" \
+        "$iib5biii_b2a_iia2ii_retirement_test_source" \
+        "$iib5biii_b2a_iia2ii_boundary_test_source"
+    print "iii-b2a-ii-a2-ii terminal/admission contract verification passed."
+    exit 0
+fi
+if $iib5biii_b2a_iia2ii_scope_contract_only; then
+    verify_iib5biii_b2a_iia2ii_scope \
+        "$iib5biii_b2a_iia2ii_scope_baseline"
+    print "iii-b2a-ii-a2-ii staged scope verification passed."
+    exit 0
+fi
 if $iib5bia_projection_contract_only; then
     verify_iib5bia_projection_contract "$iib5bia_contract_source" "$iib5bia_focused_test_source"
     print "ii-b5b-i-a projection contract verification passed."
@@ -11242,6 +11756,7 @@ expected_driver_support_sources = {
     "InvestigationMachineDarwinDriverChildObservation.swift",
     "InvestigationMachineDarwinEpochRetirement.swift",
     "InvestigationMachineDarwinEpochSession.swift",
+    "InvestigationMachineDarwinOuterInnerComposition.swift",
     "InvestigationMachineDarwinOuterInnerProtocol.swift",
     "InvestigationMachineDarwinOuterInnerSession.swift",
     "InvestigationMachineDriverSupport.swift",
@@ -11308,6 +11823,10 @@ expected_driver_support_imports = {
     "InvestigationMachineDarwinEpochRetirement.swift": {
         "Darwin", "Dispatch", "Foundation",
     },
+    "InvestigationMachineDarwinOuterInnerComposition.swift": {
+        "Darwin", "Foundation",
+        "StornautInvestigationHandoffContract",
+    },
     "InvestigationMachineDarwinDriverChildObservation.swift": {
         "CInvestigationIdentitySupport", "Darwin",
     },
@@ -11359,13 +11878,15 @@ expected_driver_support_sha256 = {
     "InvestigationMachineDarwinEpochSession.swift":
         "eaa6009028af18a12d783704cdb0a44d63761532149cd3425fe4bc99be41cf16",
     "InvestigationMachineDarwinEpochRetirement.swift":
-        "58528514bd7cc9a936667ee4fe85e26083c76838866a3cbde14e80fbdebb66cd",
+        "441e1001f40d0a9055ac55b019a85964fc8a5032170376e97d91388227e18f76",
+    "InvestigationMachineDarwinOuterInnerComposition.swift":
+        "5f73fcc1504103226bfd5be754d4bba22c0b876fb3172f91ae2b6363ca3ecd1d",
     "InvestigationMachineDarwinOuterInnerProtocol.swift":
-        "615ba9b6f1d6c7a0239163c4b56e4ec0e894536b9fec6236e1802a51e788233e",
+        "ac023ecd4e895ee7dc69d3f9af2c154fe65bf09bd25310b2dd89a06927e6ab8b",
     "InvestigationMachineDarwinDriverChildObservation.swift":
         "af4a51c631fa2060426c1a4ebabd0260309a12a3a47629993c239674798411f3",
     "InvestigationMachineDarwinOuterInnerSession.swift":
-        "5636c627cc8d7521192b7a125ca2e02c24c948a35c2a8ca511bb7df6eb0aef15",
+        "548f70da51e14d48731d64e714ca0df8807702f7445c38c56c5d833cfa17b1f3",
     "InvestigationMachineSingleEpoch.swift":
         "07955234a0103c9a07d5289a258fabad68306d536ff7fe709de64123d109c953",
     "InvestigationMachineSingleEpochComposition.swift":
@@ -11485,6 +12006,26 @@ for source_name in driver_support_sources:
             )
         authority_source = re.sub(
             r"\baccept(?=\s*\()", "typedProtocolAccept",
+            authority_source,
+        )
+    elif source_name == "InvestigationMachineDarwinOuterInnerComposition.swift":
+        if source_text.count(
+            "InvestigationMachineDarwinBoundedMessageIO.write("
+        ) != 2 or source_text.count(
+            "Darwin._exit(Self.deliberateExitStatus)"
+        ) != 1 or len(re.findall(r"\baccept\s*\(", source_text)) != 4:
+            raise SystemExit(
+                "iii-b2a-ii-a2-ii fixed composition authority drifted"
+            )
+        authority_source = authority_source.replace(
+            "InvestigationMachineDarwinBoundedMessageIO.write(",
+            "fixedCompositionWrite(",
+        ).replace(
+            "Darwin._exit(Self.deliberateExitStatus)",
+            "fixedCompositionExit(Self.deliberateExitStatus)",
+        )
+        authority_source = re.sub(
+            r"\baccept(?=\s*\()", "typedCompositionAccept",
             authority_source,
         )
     elif source_name == "InvestigationMachineDarwinOuterInnerSession.swift":
@@ -12716,20 +13257,20 @@ function require_exact_machine_driver_projection() {
 
     case "$configuration" in
         debug)
-            expected_undefined_sha=8c1b72fec0b93ceda181412cb6909701d608e2eb39afe380477a95e3392cba94
-            expected_undefined_lines=691
+            expected_undefined_sha=574d07d1ceb6fbe04619f6abde040833c87b3ee0098a3458169aa0f6c484e36f
+            expected_undefined_lines=692
             expected_loads_sha=dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9
             expected_loads_lines=18
-            expected_owned_sha=867b6e13c9000f3092a47ef36d8c789a5e1dd33a07dcc91d15ee271ebc806398
-            expected_owned_lines=6988
+            expected_owned_sha=1730d1c220b7c0f9ce963bfe9d83df0435bc4c7ba27ae73d606f7a6d004c9096
+            expected_owned_lines=7864
             ;;
         release)
             expected_undefined_sha=200b958fb36101f258f67621035f80b89b26c465271ae6708cf5856de7bf573b
             expected_undefined_lines=450
             expected_loads_sha=dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9
             expected_loads_lines=18
-            expected_owned_sha=c7a67d49dbb80ae779a1c0efac192f96d0af1809a2516b9a4ec6ca5f74b40f26
-            expected_owned_lines=3788
+            expected_owned_sha=2232cd8aede221e91439b6e3634bc7fc3b007fa5aa145b8b0e65f52e5f98666e
+            expected_owned_lines=3877
             ;;
         *)
             print -u2 "Unknown Machine driver projection: $configuration"

@@ -519,7 +519,7 @@ package actor InvestigationMachineDarwinOuterInnerSessionFactory {
     private enum State { case idle, starting, started, terminal }
 
     private let observer: any InvestigationMachineDarwinDriverChildObserving
-    private let retirementOwner: any InvestigationMachineDarwinEpochRetirementOwning
+    private let retirementOwner: any InvestigationMachineDarwinOuterRetirementOwning
     private let system: InvestigationMachineDarwinOuterInnerSessionSystem
     private var state = State.idle
 
@@ -531,7 +531,7 @@ package actor InvestigationMachineDarwinOuterInnerSessionFactory {
 
     init(
         observer: any InvestigationMachineDarwinDriverChildObserving,
-        retirementOwner: any InvestigationMachineDarwinEpochRetirementOwning,
+        retirementOwner: any InvestigationMachineDarwinOuterRetirementOwning,
         system: InvestigationMachineDarwinOuterInnerSessionSystem
     ) {
         self.observer = observer
@@ -737,7 +737,24 @@ package actor InvestigationMachineDarwinOuterInnerSessionFactory {
     }
 }
 
-package actor InvestigationMachineDarwinOuterInnerSession {
+extension InvestigationMachineDarwinOuterInnerSessionFactory:
+    InvestigationMachineDarwinOuterInnerCompositionSessionStarting
+{
+    func startSession(deadlineNanoseconds: UInt64) async throws
+        -> any InvestigationMachineDarwinOuterInnerCompositionSession
+    {
+        switch await start(deadlineNanoseconds: deadlineNanoseconds) {
+        case let .started(session): return session
+        case .terminal, .terminalUncertain:
+            throw InvestigationMachineDarwinOuterInnerSessionError
+                .retirementUncertain
+        }
+    }
+}
+
+package actor InvestigationMachineDarwinOuterInnerSession:
+    InvestigationMachineDarwinOuterInnerCompositionSession
+{
     nonisolated package let driverChildIdentity:
         InvestigationMachineDarwinDriverChildIdentity
     nonisolated let descriptors:
@@ -749,18 +766,21 @@ package actor InvestigationMachineDarwinOuterInnerSession {
         case retiring(UUID, poisoned: Bool)
         case terminal
     }
-    private let retirementOwner: any InvestigationMachineDarwinEpochRetirementOwning
+    private let retirementOwner: any InvestigationMachineDarwinOuterRetirementOwning
     private let messageSystem: InvestigationMachineDarwinBoundedMessageSystem
     private var state = State.active
     private var resultConsumed = false
     private var retirementTask: Task<
         InvestigationMachineSingleEpochRetirementProof?, Never
     >?
+    private var outcomeRetirementTask: Task<
+        InvestigationMachineDarwinOuterRetirementOutcome?, Never
+    >?
 
     init(
         driverChildIdentity: InvestigationMachineDarwinDriverChildIdentity,
         descriptors: InvestigationMachineDarwinOuterInnerDescriptorSet,
-        retirementOwner: any InvestigationMachineDarwinEpochRetirementOwning,
+        retirementOwner: any InvestigationMachineDarwinOuterRetirementOwning,
         messageSystem: InvestigationMachineDarwinBoundedMessageSystem
     ) {
         self.driverChildIdentity = driverChildIdentity
@@ -860,6 +880,15 @@ package actor InvestigationMachineDarwinOuterInnerSession {
         return try await awaitRetirement()
     }
 
+    func retireOwnedProcessGroupWithOutcome() async throws
+        -> InvestigationMachineDarwinOuterRetirementOutcome
+    {
+        if case .none = outcomeRetirementTask {
+            _ = try beginOutcomeRetirement()
+        }
+        return try await awaitRetirementOutcome()
+    }
+
     private func beginOperation(consumesResult: Bool) throws -> UUID {
         if Task.isCancelled {
             switch state {
@@ -931,6 +960,16 @@ package actor InvestigationMachineDarwinOuterInnerSession {
         return ticket
     }
 
+    private func beginOutcomeRetirement() throws -> UUID {
+        guard case .active = state else {
+            poisonCurrentState()
+            throw sessionConsumed()
+        }
+        let ticket = UUID()
+        state = .retiring(ticket, poisoned: false)
+        return ticket
+    }
+
     private func poisonCurrentState() {
         switch state {
         case let .operation(ticket, _):
@@ -951,11 +990,38 @@ package actor InvestigationMachineDarwinOuterInnerSession {
     }
 
     private func retireAfterFailure() async throws {
-        do { _ = try await awaitRetirement() }
+        do { _ = try await awaitRetirementOutcome() }
         catch {
             throw InvestigationMachineDarwinOuterInnerSessionError
                 .retirementUncertain
         }
+    }
+
+    private func awaitRetirementOutcome() async throws
+        -> InvestigationMachineDarwinOuterRetirementOutcome
+    {
+        let task: Task<InvestigationMachineDarwinOuterRetirementOutcome?, Never>
+        if let existing = outcomeRetirementTask {
+            task = existing
+        } else {
+            state = .terminal
+            let owner = retirementOwner
+            let epoch = InvestigationMachineDarwinOwnedEpoch(
+                processID: Int32(driverChildIdentity.processID),
+                processGroupID: Int32(driverChildIdentity.processGroupID),
+                descriptors: descriptors.outerDescriptors
+            )
+            let created = Task.detached {
+                try? await owner.retireOwnedProcessGroupWithOutcome(epoch)
+            }
+            outcomeRetirementTask = created
+            task = created
+        }
+        guard let outcome = await task.value else {
+            throw InvestigationMachineDarwinOuterInnerSessionError
+                .retirementUncertain
+        }
+        return outcome
     }
 
     private func awaitRetirement() async throws

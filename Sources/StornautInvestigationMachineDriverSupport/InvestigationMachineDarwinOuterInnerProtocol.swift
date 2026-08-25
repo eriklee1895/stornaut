@@ -358,6 +358,18 @@ package struct InvestigationMachineDarwinEpochOwnershipRecord:
         return value
     }
 
+    package func physicalOwnership(
+        expectedSelection: InvestigationMachineFixedEpochSelection
+    ) throws -> InvestigationMachineSingleEpochPhysicalOwnership {
+        let value = try InvestigationMachineSingleEpochPhysicalOwnership.decode(
+            physicalOwnershipBytes, expectedSelection: expectedSelection
+        )
+        guard physicalOwnershipSHA256 == .hashing(physicalOwnershipBytes) else {
+            throw protocolInvalidValue()
+        }
+        return value
+    }
+
     fileprivate func digest() throws -> InvestigationHandoffSHA256 {
         .hashing(try encoded())
     }

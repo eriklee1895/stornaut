@@ -793,7 +793,7 @@ private final class RecordingDriverChildObserver:
 }
 
 private final class RecordingOuterInnerRetirementOwner:
-    @unchecked Sendable, InvestigationMachineDarwinEpochRetirementOwning
+    @unchecked Sendable, InvestigationMachineDarwinOuterRetirementOwning
 {
     private let lock = NSLock()
     private(set) var spawnedCalls = 0
@@ -818,6 +818,16 @@ private final class RecordingOuterInnerRetirementOwner:
             owned = ownedEpoch
         }
         return .init()
+    }
+
+    func retireOwnedProcessGroupWithOutcome(
+        _ ownedEpoch: InvestigationMachineDarwinOwnedEpoch
+    ) async throws -> InvestigationMachineDarwinOuterRetirementOutcome {
+        lock.withLock {
+            ownedCalls += 1
+            owned = ownedEpoch
+        }
+        throw OuterInnerSessionTestFailure.io
     }
 }
 
