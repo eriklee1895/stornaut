@@ -338,8 +338,9 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   b2a0 typed physical bridge、b2a-i canonical supervisor admission、b2a-ii-a
   Darwin physical session 与 b2b entry/artifact；b0 已冻结，iii-a、iii-b1、
   iii-b2a0 与 iii-b2a-i 已完成并保持 non-admitting；iii-b2a-ii-a1 fixed
-  transport/inner-role closure 也已完成并保持 non-admitting，当前 frontier 为
-  iii-b2a-ii-a2。iii-b2a0 以 exact 8 non-document paths / 2,198 changed lines、
+  transport/inner-role closure 也已完成并保持 non-admitting，a2-0/a2-i/a2-ii
+  随后全部完成并保持 non-admitting，当前 frontier 为 iii-b2b。iii-b2a0 以
+  exact 8 non-document paths / 2,198 changed lines、
   36-test/3-suite combined bridge+continuity+cohort、580-test/43-suite affected、
   1,462-test/76-suite clean staged serial、三项 boundary gates、Debug diagnostic /
   Release driver builds、immutable seal 与 independent semantic/verifier/
@@ -359,7 +360,10 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   与 independent no-unresolved-P0–P2 review 完成并保持 non-admitting。a2-i
   又以 10-path / 1,965-line implementation、66 focused、1,500-test/78-suite
   staged serial、四组 Mach-O projections、complete contract replay 与 final
-  no-unresolved-P0–P2 review 收口；当前 a2-ii。随后严格按 a2-ii → iii-b2b →
+  no-unresolved-P0–P2 review 收口；a2-ii 又以 12-path / 3,673-line
+  implementation、55 focused、1,516-test/79-suite staged serial、global source
+  boundary、complete contract/final-Mach-O gates、immutable seal 与 final
+  no-unresolved-P0–P2 review 收口。当前 iii-b2b，随后严格按 iii-b2b →
   ii-c0b → ii-c → L3c3d → L3c4 推进。
   该 ii-b5b-ii-c checkpoint 以 8 个
   non-document paths / 3,104 changed lines、35 focused tests、
@@ -552,6 +556,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-b2a-ii-a2 scope/trust preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-scope-trust-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-scope-trust-preflight.md) |
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-b2a-ii-a2-0 untrusted decode review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-0-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-0-review.md) |
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-b2a-ii-a2-i inherited-PGID App session review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-i-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-i-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-iii-b2a-ii-a2-ii terminal/admission review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-ii-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-ii-review.md) |
 | Phase D Task 39B2c-L1 residue observation review | [docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md](docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md) |
 | Phase D Task 39B2c-L2 root topology observation review | [docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md](docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md) |
 | Phase D Task 39B2c-L3a trusted machine target review | [docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md](docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md) |
@@ -704,8 +709,8 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   b0 protocol、a per-epoch continuity、b1 injected cohort、b2a0 typed physical
   bridge、b2a-i supervisor admission、b2a-ii-a Darwin physical session 与 b2b
   entry/artifact。b0 已冻结，iii-a、iii-b1、iii-b2a0、iii-b2a-i 与
-  iii-b2a-ii-a1、a2-0 与 a2-i 已完成并保持 non-admitting，当前 frontier 为
-  a2-ii terminal/admission join，严格后续顺序为 iii-b2b → ii-c0b non-root capsule author +
+  iii-b2a-ii-a1、a2-0、a2-i 与 a2-ii 已完成并保持 non-admitting，当前
+  frontier 为 iii-b2b，严格后续顺序为 iii-b2b → ii-c0b non-root capsule author +
   launcher/TTY/FD hygiene → ii-c
   privileged no-model gate → L3c3d → L3c4。
   ADR 0018 仍 Proposed；L3c4 独占 final admission 与

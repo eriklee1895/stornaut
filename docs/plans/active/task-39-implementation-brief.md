@@ -92,12 +92,17 @@
 > complete/non-admitting. iii-b2a-ii-a1 fixed transport and inner-role closure
 > is complete/non-admitting. The a2 scope/trust preflight split the remaining
 > composition into a2-0 self-contained untrusted decode, a2-i inherited-PGID
-> App session and a2-ii terminal/admission join; a2-0 and a2-i are
-> complete/non-admitting and a2-ii is current. a2-i closed at commit
+> App session and a2-ii terminal/admission join; a2-0, a2-i and a2-ii are
+> complete/non-admitting and iii-b2b is current. a2-i closed at commit
 > `158f500` / tree `c7a42ffd` with 10 non-document paths / 1,965 changed
 > lines, 66 focused tests, a 1,500-test serialized regression, exact
 > SwiftPM/Xcode projections, complete contract replay and final no-unresolved-
 > P0–P2 review.
+> a2-ii closed at implementation commit `8eac2c4f` / tree `9e3bdefd`,
+> with immutable seal `70603a0`: exact 12 non-document paths / 3,673 changed
+> lines, 55 focused tests, a clean 1,516-test / 79-suite staged serial, global
+> source boundary, complete contract/final-Mach-O gates and final
+> no-unresolved-P0–P2 review.
 > Evidence:
 > [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
 > [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md) and
@@ -126,6 +131,7 @@
 > a2-0 completion evidence is in the
 > [a2-0 review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-0-review.md).
 > [a2-i review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-i-review.md).
+> [a2-ii review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-ii-review.md).
 > L3 preflight then split the remaining work into L3a trusted target extraction,
 > L3b root driver/L1+L2 collection and L3c failure matrix/final admission. L3a
 > moved the machine-only contract and assembler into the non-product
@@ -1143,9 +1149,9 @@ The remaining L3 work is split before driver coding:
    and ii-c0a are complete/non-admitting. The further split is frozen as
    `iii-b0 -> iii-a -> iii-b1 -> iii-b2a0 -> iii-b2a-i -> iii-b2a-ii-a ->
    iii-b2b`; b0 is documentation-only/non-admitting and iii-a/iii-b1/
-   iii-b2a0/iii-b2a-i/iii-b2a-ii-a1/a2-0/a2-i are complete/non-admitting. The
-   corrected remaining order is `a2-ii -> iii-b2b -> ii-c0b -> ii-c ->
-   L3c3d -> L3c4`; a2-ii is current.
+   iii-b2a0/iii-b2a-i/iii-b2a-ii-a1/a2-0/a2-i/a2-ii are complete/non-admitting.
+   The corrected remaining order is `iii-b2b -> ii-c0b -> ii-c -> L3c3d ->
+   L3c4`; iii-b2b is current.
    See the
    [study](../../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md)
    and [final review](../../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md),
@@ -1263,6 +1269,8 @@ The remaining L3 work is split before driver coding:
    [a2-0 review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-0-review.md).
    The inherited-PGID App session closure is recorded in the
    [a2-i review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-i-review.md).
+   The terminal/admission composition closure is recorded in the
+   [a2-ii review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-ii-review.md).
    The b5 split, claim-abort completion and typed composer completion evidence
    are in the
    [ii-b5 preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b5-split-preflight.md),
@@ -1330,8 +1338,8 @@ ii-b3c concrete leaf/native entry, ii-b4 fixed helper-claim client, ii-b5a0 and
 ii-b5a, ii-b5b-i-a, i-b1, i-b2a, i-b2b-a, i-b2b-b, i-b3, i-c1 and i-c2a
 are complete and non-admitting; aggregate i-c2 and ii-b5b-ii-a/ii-b/ii-c/ii-d
 and ii-c0a are complete/non-admitting; ii-b5b-iii-b0 is frozen/non-admitting
-and iii-a/iii-b1/iii-b2a0/iii-b2a-i/iii-b2a-ii-a1/a2-0/a2-i are complete/non-admitting;
-a2-ii is the current implementation checkpoint inside the frozen a2 split.
+and iii-a/iii-b1/iii-b2a0/iii-b2a-i/iii-b2a-ii-a1/a2-0/a2-i/a2-ii are complete/non-admitting;
+iii-b2b is the current implementation checkpoint after the closed a2 split.
 ADR 0018
 remains Proposed until ii-c succeeds. L3c1 used focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean
