@@ -462,7 +462,8 @@ package struct InvestigationMachineDarwinOuterInnerExecutionFactory:
                 .invalidSelection
         }
         let admission = InvestigationMachineDarwinOuterAdmission(
-            selection: selection, outerProcessID: dependencies.outerProcessID
+            selection: selection, outerProcessID: dependencies.outerProcessID,
+            clock: dependencies.clock
         )
         let composition = InvestigationMachineDarwinOuterInnerComposition(
             selection: selection, admission: admission,

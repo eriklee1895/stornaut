@@ -26,11 +26,12 @@ implementation is sealed.
 
 ## 2. Exact non-document scope
 
-Maximum three non-document paths and 300 changed non-document lines:
+Maximum four non-document paths and 350 changed non-document lines:
 
 1. `Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochComposition.swift`
 2. `Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerProtocol.swift`
 3. `Tests/StornautInvestigationTests/InvestigationMachineDarwinOuterInnerProtocolTests.swift`
+4. `Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerComposition.swift`
 
 No protocol wire shape, target graph, public API, process authority, App/helper
 launch, XPC operation, root operation, model call, network access or final
@@ -43,6 +44,8 @@ readiness claim is allowed.
   size limits.
 - Inject a monotonic clock into the existing package-closed admission actor for
   tests while retaining the fixed production clock in its package initializer.
+- Route the outer composition's exact epoch clock into its admission actor; an
+  injected or production execution must never compare different clock sources.
 - Perform the final clock read after all result/evidence decoding and admission
   digest construction and immediately before the sole admitted-token mint.
 - Require `terminalEvidence.observedAtNanoseconds <= admittedAt < epochDeadline`.
