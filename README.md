@@ -62,8 +62,8 @@ serial、三项 boundary gates 与 independent semantic/verifier/cross-group rev
 已通过。physical result 仍是 untrusted DTO，不能直接进入 single-epoch result
 或 continuity；iii-b2a-i 已关闭 canonical protocol、one-shot receiver、private
 admission 与 same-owner containment proof；iii-b2a-ii-a1、a2-0、a2-i、
-a2-ii 与 iii-b2b-0 已完成并保持 non-admitting，当前 checkpoint 为
-iii-b2b-1a production outer observation closure。其后为 iii-b2b-1b →
+a2-ii、iii-b2b-0 与 iii-b2b-1a-0 已完成并保持 non-admitting，当前 checkpoint
+为 iii-b2b-1a-1 concrete outer ownership/terminal observers。其后为 iii-b2b-1b →
 ii-c0b → ii-c → L3c3d → L3c4；machine admission 尚未发生。
 见文档：
 
@@ -79,13 +79,14 @@ ii-c0b → ii-c → L3c3d → L3c4；machine admission 尚未发生。
 | [docs/assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md](docs/assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md) | 权限受限、安全阻断、部分结果、stale preflight 与历史保留的恢复状态契约 |
 | [docs/reports/epic-2-4-validation-report.md](docs/reports/epic-2-4-validation-report.md) | Phase B domain/persistence、真实 Quick Scan benchmark、accounting、UI 与 scope gate |
 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) | 已归档的 Phase B Tasks 9–26 计划与逐 Task 证据 |
-| [docs/plans/active/README.md](docs/plans/active/README.md) | Phase D approved；Tasks 36–38 complete，Task 39B2c in progress；iii-b2b-0 complete/non-admitting，iii-b2b-1a current；machine admission pending |
+| [docs/plans/active/README.md](docs/plans/active/README.md) | Phase D approved；Tasks 36–38 complete，Task 39B2c in progress；iii-b2b-1a-0 complete/non-admitting，iii-b2b-1a-1 current；machine admission pending |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md) | v1 capsule bytes preserved；frozen enclosing projected-cohort binary contract、8-path/2,600-line ceiling and corrected remaining order |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md) | ii-c0a exact 8-path / 1,863-line completion、90 focused、536 affected、1,418-test serial、boundary gates 与 independent review |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md) | outer/inner protocol、FD 0/1/2/7/8/9、inner-led PGID、parent-crash containment 与五段 bounded split |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-a-review.md) | iii-a per-epoch completion/continuity、40 focused、559 affected、1,446-test serial 与 independent review |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b1-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b1-review.md) | iii-b1 injected eight-epoch cohort、13 focused、573 affected、1,455-test serial、immutable replay seal 与 independent review |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-0-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-0-review.md) | iii-b2b-0 Release graph closure、Debug/Release positive controls、1,517-test serial、immutable replay 与 independent review |
+| [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1a0-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1a0-review.md) | iii-b2b-1a-0 canonical helper-provenance carriage、1,525-test serial、clean-build projection、immutable replay 与 independent review |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a0-typed-physical-bridge-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a0-typed-physical-bridge-preflight.md) | iii-b2a0 typed invocation/result bridge、untrusted DTO boundary、8-path/2,200-line ceiling 与 validation funnel |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a0-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a0-review.md) | iii-b2a0 exact 8-path / 2,198-line completion、36 combined、580 affected、1,462-test serial、immutable seal 与 no unresolved P0–P2；complete/non-admitting |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-i-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-i-review.md) | iii-b2a-i canonical supervisor admission、12 focused、593 affected、1,475-test serial、three boundary gates、immutable seal 与 no unresolved P0–P2；complete/non-admitting |

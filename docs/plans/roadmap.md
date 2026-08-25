@@ -240,8 +240,8 @@ fixed transport/inner-role closure 也已以 7-path / 1,694-line implementation�
 1,485-test/78-suite serial、三项 boundary gates 与 immutable seal 收口。当前
 frontier 已按 scope/trust preflight 拆为 a2-0 untrusted decode、a2-i inherited-
 PGID App session 与 a2-ii terminal/admission join；a2-0、a2-i 与 a2-ii 已完成并保持
-non-admitting；iii-b2b-0 已完成并保持 non-admitting，当前 iii-b2b-1a，随后
-严格按 iii-b2b-1a → iii-b2b-1b → c0b → ii-c →
+non-admitting；iii-b2b-0 与 iii-b2b-1a-0 已完成并保持 non-admitting，当前
+iii-b2b-1a-1，随后严格按 iii-b2b-1a-1 → iii-b2b-1b → c0b → ii-c →
 L3c3d → L3c4 推进。
 39B2c 仍未作 machine readiness claim。
 [ii-c0a preflight](../reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md)
@@ -288,8 +288,8 @@ aggregate i-c2 已完成并保持 non-admitting；b5b-ii-a/b/c/d 已完成并保
 non-admitting；c0a projection-in-capsule implementation 已完成并保持
 non-admitting；b5b-iii-b0 已冻结，iii-a/iii-b1/iii-b2a0/iii-b2a-i/
 iii-b2a-ii-a1、a2-0、a2-i 与 a2-ii 已完成并保持 non-admitting；a2 已关闭，
-iii-b2b-0 已完成并保持 non-admitting，当前 frontier 为 iii-b2b-1a，后续为
-iii-b2b-1a → iii-b2b-1b → c0b → ii-c → L3c3d →
+iii-b2b-0 与 iii-b2b-1a-0 已完成并保持 non-admitting，当前 frontier 为
+iii-b2b-1a-1，后续为 iii-b2b-1a-1 → iii-b2b-1b → c0b → ii-c → L3c3d →
 L3c4。
 L3c2b preflight 的 real-plan matrix contradiction 已由 3-path plan-freshness
 prerequisite 关闭，affected/Investigation/structural/review gates 通过；
@@ -493,8 +493,9 @@ four Mach-O projections 与 final no-unresolved-P0–P2 review。
   through aggregate i-c2 已完成并保持 non-admitting；b5b-ii-a/b/c/d 与 c0a
   projection-in-capsule 已完成并保持 non-admitting；b5b-iii-b0 已冻结，iii-a、
   iii-b1、iii-b2a0、iii-b2a-i、iii-b2a-ii-a1、a2-0、a2-i 与 a2-ii 已完成并保持
-  non-admitting；a2 已关闭，iii-b2b-0 已完成并保持 non-admitting，当前
-  frontier 为 iii-b2b-1a，后续为 iii-b2b-1a → iii-b2b-1b → c0b → ii-c →
+  non-admitting；a2 已关闭，iii-b2b-0 与 iii-b2b-1a-0 已完成并保持
+  non-admitting，当前 frontier 为 iii-b2b-1a-1，后续为 iii-b2b-1a-1 →
+  iii-b2b-1b → c0b → ii-c →
   L3c3d → L3c4。
   L3c4 才拥有 final admission/full。39B2c 才是 machine admission，Task 39
   尚未完成。
