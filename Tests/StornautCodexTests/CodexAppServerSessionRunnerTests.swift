@@ -198,16 +198,28 @@ struct CodexAppServerSessionRunnerTests {
         )
         defer { fixture.remove() }
         let started = ContinuousClock.now
-
-        await #expect(throws: CodexAppServerSessionError.timedOut) {
-            _ = try await CodexAppServerSessionRunner().run(
-                fixture.request(timeout: .seconds(1))
+        let task = Task {
+            try await CodexAppServerSessionRunner().run(
+                fixture.request(timeout: .seconds(3))
             )
         }
-        #expect(started.duration(to: .now) < .seconds(3))
+        let parentPID: pid_t
+        let childPID: pid_t
+        do {
+            _ = try fixture.waitForRecord(named: "child.pid")
+            parentPID = try fixture.recordedPID(named: "parent.pid")
+            childPID = try fixture.recordedPID(named: "child.pid")
+        } catch {
+            task.cancel()
+            _ = try? await task.value
+            throw error
+        }
 
-        let parentPID = try fixture.recordedPID(named: "parent.pid")
-        let childPID = try fixture.recordedPID(named: "child.pid")
+        await #expect(throws: CodexAppServerSessionError.timedOut) {
+            _ = try await task.value
+        }
+        #expect(started.duration(to: .now) < .seconds(5))
+
         #expect(waitForSessionProcessExit(parentPID))
         #expect(waitForSessionProcessExit(childPID))
     }
