@@ -197,6 +197,75 @@ struct InvestigationMachineSingleEpochPhysicalBridgeTests {
     }
 
     @Test(arguments: PhysicalBridgeResultKind.allCases)
+    fileprivate func physicalOwnershipCarriesCanonicalClaimEvidenceForOuterValidation(
+        _ kind: PhysicalBridgeResultKind
+    ) throws {
+        let fixture = try PhysicalBridgeFixture(ordinal: kind.ordinal)
+        let projected = try InvestigationMachineSingleEpochPhysicalResult(
+            projecting: kind.localResult(from: fixture)
+        )
+        let decoded = try InvestigationMachineSingleEpochPhysicalResult.decode(
+            projected.encoded(), expectedSelection: fixture.selection
+        )
+        let ownership = decoded.physicalOwnership
+        let evidenceBytes = try fixture.claimEvidence.encoded()
+
+        #expect(try ownership.encoded().range(of: evidenceBytes) != nil)
+        #expect(ownership.claimEvidence == fixture.claimEvidence)
+        #expect(
+            ownership.claimEvidenceSHA256
+                == InvestigationHandoffSHA256.hashing(evidenceBytes)
+        )
+    }
+
+    @Test
+    func physicalOwnershipRejectsCoordinatedForeignClaimEvidence() throws {
+        let fixture = try PhysicalBridgeFixture(ordinal: 0)
+        let ownership = try InvestigationMachineSingleEpochPhysicalOwnership(
+            projecting: fixture.ownership
+        )
+        let encoded = try ownership.encoded()
+        let foreignApp = try PhysicalBridgeFixture.identity(
+            role: .app, pid: 911, version: 31, asid: 61_001, euid: 501
+        )
+        let foreignHelper = try PhysicalBridgeFixture.identity(
+            role: .helper, pid: 912, version: 32, asid: 62_001, euid: 0
+        )
+        let evidenceMutations = try [
+            fixture.replacingClaimEvidence(
+                investigationUUID: PhysicalBridgeFixture.uuid(0xee)
+            ),
+            fixture.replacingClaimEvidence(appIdentity: foreignApp),
+            fixture.replacingClaimEvidence(helperIdentity: foreignHelper),
+            fixture.replacingClaimEvidence(releaseDeadlineNanoseconds: 399),
+        ].map { try $0.encoded() }
+        let canonicalEvidence = try fixture.claimEvidence.encoded()
+        let nestedTranscript = try PhysicalBridgeWireTranscript(
+            canonicalEvidence
+        )
+        let wrongDomain = try HandoffBinaryTranscript.encode(
+            domain: InvestigationMachineClaimEvidence.domain + ".foreign",
+            businessFields: nestedTranscript.fields,
+            maximumByteCount: InvestigationMachineClaimEvidence.maximumByteCount
+        )
+        let structuralMutations = Array(
+            try strictWireMutations(canonicalEvidence).suffix(5)
+        ) + [wrongDomain]
+
+        for evidenceBytes in evidenceMutations + structuralMutations {
+            let mutation = try physicalOwnershipReplacingClaimEvidence(
+                in: encoded, evidenceBytes: evidenceBytes,
+                selection: fixture.selection
+            )
+            #expect(throws: (any Error).self) {
+                _ = try InvestigationMachineSingleEpochPhysicalOwnership.decode(
+                    mutation, expectedSelection: fixture.selection
+                )
+            }
+        }
+    }
+
+    @Test(arguments: PhysicalBridgeResultKind.allCases)
     fileprivate func physicalResultRejectsMismatchForeignSelectionAndTamper(
         _ kind: PhysicalBridgeResultKind
     ) throws {
@@ -400,6 +469,7 @@ private struct PhysicalBridgeFixture {
     let cohort: PhysicalBridgeCohort
     let selection: InvestigationMachineFixedEpochSelection
     let helperIdentity: InvestigationMachineProcessIdentity
+    let claimEvidence: InvestigationMachineClaimEvidence
     let ownership: InvestigationMachineSingleEpochOwnershipCandidate
     let localCompletion:
         InvestigationMachineSingleEpochLocalCompletionCandidate
@@ -477,6 +547,37 @@ private struct PhysicalBridgeFixture {
         )
     }
 
+    func replacingClaimEvidence(
+        investigationUUID: UUID? = nil,
+        appIdentity selectedApp: InvestigationMachineProcessIdentity? = nil,
+        helperIdentity selectedHelper: InvestigationMachineProcessIdentity? = nil,
+        releaseDeadlineNanoseconds: UInt64? = nil
+    ) throws -> InvestigationMachineClaimEvidence {
+        let app = selectedApp ?? claimEvidence.appIdentity
+        let helper = selectedHelper ?? claimEvidence.helperIdentity
+        return try InvestigationMachineClaimEvidence(
+            requestBindingSHA256: claimEvidence.requestBindingSHA256,
+            originalClaimChallenge: claimEvidence.originalClaimChallenge,
+            claimConnectionEpoch: claimEvidence.claimConnectionEpoch,
+            appIdentity: app, helperIdentity: helper,
+            appUserID: app.effectiveUserID,
+            recordedAt: claimEvidence.recordedAt,
+            claimedAt: claimEvidence.claimedAt,
+            ownerRetirement: claimEvidence.ownerRetirement,
+            l1Residue: .init(
+                investigationUUID: investigationUUID
+                    ?? claimEvidence.l1Residue.investigationUUID,
+                auditSessionID: helper.auditSessionID,
+                userID: app.effectiveUserID,
+                observedAt: claimEvidence.l1Residue.observedAt,
+                remainingAuditSessionMembers: 0, matchingLeases: 0,
+                leaseRootEntries: 0, investigationArtifacts: 0
+            ),
+            releaseDeadlineNanoseconds: releaseDeadlineNanoseconds
+                ?? claimEvidence.releaseDeadlineNanoseconds
+        )
+    }
+
     init(ordinal: UInt32, cohort: PhysicalBridgeCohort? = nil) throws {
         let scenario = try #require(InvestigationHandoffScenario(
             rawValue: ordinal + 1
@@ -530,7 +631,7 @@ private struct PhysicalBridgeFixture {
             role: .helper, pid: 801 + ordinal, version: 21 + ordinal,
             asid: 55_001 + ordinal, euid: 0
         )
-        let claim = try InvestigationMachineClaimEvidence(
+        claimEvidence = try InvestigationMachineClaimEvidence(
             requestBindingSHA256: Self.digest(UInt8(0x61 + ordinal)),
             originalClaimChallenge: Self.uuid(UInt8(0x62 + ordinal)),
             claimConnectionEpoch: Self.uuid(UInt8(0x63 + ordinal)),
@@ -581,22 +682,22 @@ private struct PhysicalBridgeFixture {
         )
         let installedProof = try InvestigationMachineSingleEpochInstalledL2Join
             .prove(
-                projection: projection, claimEvidence: claim,
+                projection: projection, claimEvidence: claimEvidence,
                 semanticObservation: semantic,
                 repeatedAppIdentity: appIdentity, epochUUID: epoch.epochUUID,
                 deadlineNanoseconds: 500
             )
         ownership = try .init(
             commitment: try .init(selection: selection),
-            appIdentity: appIdentity, claimEvidence: claim,
+            appIdentity: appIdentity, claimEvidence: claimEvidence,
             semanticObservation: semantic, repeatedAppIdentity: appIdentity,
             installedL2Proof: installedProof, epochDeadlineNanoseconds: 500
         )
         let released = try InvestigationMachineClaimReleased(
-            requestBindingSHA256: claim.requestBindingSHA256,
+            requestBindingSHA256: claimEvidence.requestBindingSHA256,
             releaseChallenge: Self.uuid(UInt8(0x64 + ordinal)),
             claimedHelperIdentitySHA256: helperIdentity.helperIdentitySHA256(),
-            claimConnectionEpoch: claim.claimConnectionEpoch,
+            claimConnectionEpoch: claimEvidence.claimConnectionEpoch,
             exitScheduled: true, postReplyExitDeadlineNanoseconds: 450
         )
         let driver = InvestigationMachineSingleEpochDriverObservation(
@@ -637,6 +738,45 @@ private struct PhysicalBridgeFixture {
             isAdHoc: adHoc
         )
     }
+}
+
+private func physicalOwnershipReplacingClaimEvidence(
+    in encoded: Data,
+    evidenceBytes: Data,
+    selection: InvestigationMachineFixedEpochSelection
+) throws -> Data {
+    var ownership = try PhysicalBridgeWireTranscript(encoded)
+    guard ownership.fields.count == 15 else {
+        throw PhysicalBridgeFixtureError.invalidTranscript
+    }
+    ownership.fields[9] = evidenceBytes
+    ownership.fields[10] = InvestigationHandoffSHA256.hashing(
+        evidenceBytes
+    ).rawBytes
+    ownership.fields[14] = InvestigationHandoffSHA256.hashing(
+        try HandoffBinaryTranscript.encode(
+            domain: InvestigationMachineSingleEpochOwnershipCandidate.domain,
+            businessFields: [
+                ownership.fields[0], ownership.fields[1], ownership.fields[2],
+                ownership.fields[3], ownership.fields[4], ownership.fields[5],
+                physicalBridgeUUIDData(selection.epoch.configurationNonce),
+                selection.epoch.configurationSHA256.rawBytes,
+                selection.epoch.signedRuntimeBindingSHA256.rawBytes,
+                ownership.fields[6], ownership.fields[7], ownership.fields[8],
+                ownership.fields[9], ownership.fields[10], ownership.fields[11],
+                ownership.fields[12], ownership.fields[13],
+            ],
+            maximumByteCount:
+                InvestigationMachineSingleEpochOwnershipCandidate
+                    .maximumByteCount
+        )
+    ).rawBytes
+    return try ownership.encoded()
+}
+
+private func physicalBridgeUUIDData(_ value: UUID) -> Data {
+    var bytes = value.uuid
+    return withUnsafeBytes(of: &bytes) { Data($0) }
 }
 
 private struct PhysicalBridgeWireTranscript {

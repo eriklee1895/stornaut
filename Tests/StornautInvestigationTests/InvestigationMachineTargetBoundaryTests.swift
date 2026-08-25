@@ -2014,6 +2014,58 @@ struct InvestigationMachineTargetBoundaryTests {
         }
     }
 
+    @Test
+    func iiiB2B1A0VerifierPinsCanonicalHelperProvenanceAndExactScope() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ), encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        let app = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-app-release-boundaries"
+            ), encoding: .utf8
+        )
+
+        for marker in [
+            "--iib5biii-b2b1a0-provenance-contract-only",
+            "--iib5biii-b2b1a0-staged-scope-contract-only",
+            "function verify_iib5biii_b2b1a0_provenance_contract()",
+            "function verify_iib5biii_b2b1a0_scope()",
+            "iii-b2b-1a-0 canonical provenance carriage drifted",
+            "iii-b2b-1a-0 staged checkpoint paths drifted",
+            "iii-b2b-1a-0 checkpoint budget drifted",
+            "d643b8fd500be29736a962dcd0c270304b490828",
+            "(( ${#expected} == 8 ))",
+            "(( changed <= 2200 ))",
+        ] {
+            #expect(boundary.contains(marker))
+        }
+        for marker in [
+            "iib5biii_b2b1a0_baseline=d643b8fd500be29736a962dcd0c270304b490828",
+            "iii-b2b-1a-0 mutation accepted:",
+            "iii-b2b-1a-0 scope mutation accepted:",
+            "claim-evidence-digest-bypass",
+            "claim-evidence-nonce-bypass",
+            "coordinated-claim-evidence-tamper",
+        ] {
+            #expect(contract.contains(marker))
+        }
+        for marker in [
+            "--iib5biii-b2b1a0-source-contract-only",
+            "function verify_iib5biii_b2b1a0_source_contract()",
+            "iii-b2b-1a-0 source-only App boundary verification passed.",
+        ] {
+            #expect(app.contains(marker))
+        }
+    }
+
     @Test func iiB5BIAProjectionVerifierPinsPureBinaryAndTemporalContract() throws {
         let root = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let sources = try ["scripts/verify-investigation-boundaries", "scripts/verify-contract"].map {

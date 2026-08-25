@@ -14,6 +14,7 @@ package struct InvestigationMachineSingleEpochOwnershipCandidate:
     let wholeCapsuleSHA256: InvestigationHandoffSHA256
     let wholeInputSHA256: InvestigationHandoffSHA256
     let epochUUID: UUID
+    let configurationNonce: UUID
     let ordinal: UInt32
     let scenario: InvestigationHandoffScenario
     let projectionSHA256: InvestigationHandoffSHA256
@@ -29,6 +30,7 @@ package struct InvestigationMachineSingleEpochOwnershipCandidate:
 
     private let installedL2Proof:
         InvestigationMachineSingleEpochInstalledL2Proof
+    let claimEvidence: InvestigationMachineClaimEvidence
 
     init(
         commitment: InvestigationMachineSingleEpochCommitment,
@@ -58,6 +60,15 @@ package struct InvestigationMachineSingleEpochOwnershipCandidate:
                 == epoch.signedRuntimeBindingSHA256,
             claimEvidence.appIdentity == appIdentity,
             claimEvidence.helperIdentity.role == .helper,
+            claimEvidence.l1Residue.investigationUUID
+                == epoch.configurationNonce,
+            claimEvidence.l1Residue.auditSessionID
+                == claimEvidence.helperIdentity.auditSessionID,
+            claimEvidence.l1Residue.userID == appIdentity.effectiveUserID,
+            claimEvidence.l1Residue.remainingAuditSessionMembers == 0,
+            claimEvidence.l1Residue.matchingLeases == 0,
+            claimEvidence.l1Residue.leaseRootEntries == 0,
+            claimEvidence.l1Residue.investigationArtifacts == 0,
             claimEvidence.releaseDeadlineNanoseconds > 0,
             claimEvidence.releaseDeadlineNanoseconds
                 <= epochDeadlineNanoseconds
@@ -89,8 +100,9 @@ package struct InvestigationMachineSingleEpochOwnershipCandidate:
         else {
             throw InvestigationMachineSingleEpochError.installedL2Failed
         }
+        let claimEvidenceBytes = try claimEvidence.encoded()
         let claimEvidenceSHA256 = InvestigationHandoffSHA256.hashing(
-            try claimEvidence.encoded()
+            claimEvidenceBytes
         )
         let installedL2ProofSHA256 = try Self.installedL2ProofSHA256(
             projection: projection, claimEvidence: claimEvidence,
@@ -114,6 +126,7 @@ package struct InvestigationMachineSingleEpochOwnershipCandidate:
                     projection.projectionSHA256.rawBytes,
                     try appIdentity.encoded(),
                     try claimEvidence.helperIdentity.encoded(),
+                    claimEvidenceBytes,
                     claimEvidenceSHA256.rawBytes,
                     installedL2ProofSHA256.rawBytes,
                     singleEpochData(
@@ -128,6 +141,7 @@ package struct InvestigationMachineSingleEpochOwnershipCandidate:
         wholeCapsuleSHA256 = commitment.wholeCapsuleSHA256
         wholeInputSHA256 = commitment.wholeInputSHA256
         epochUUID = epoch.epochUUID
+        configurationNonce = epoch.configurationNonce
         ordinal = epoch.ordinal
         scenario = epoch.scenario
         projectionSHA256 = projection.projectionSHA256
@@ -135,6 +149,7 @@ package struct InvestigationMachineSingleEpochOwnershipCandidate:
         helperIdentity = claimEvidence.helperIdentity
         claimRequestBindingSHA256 = claimEvidence.requestBindingSHA256
         claimConnectionEpoch = claimEvidence.claimConnectionEpoch
+        self.claimEvidence = claimEvidence
         self.claimEvidenceSHA256 = claimEvidenceSHA256
         self.installedL2ProofSHA256 = installedL2ProofSHA256
         releaseDeadlineNanoseconds =

@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=59711551db8f0464e634d3356f6b88bf47d8886072f8e57c264c6b86d9214180
+ib2_self_sha=3970bb082874915674de783de2b62c422ac667906cfcfd42efbec550993c9a5c
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -1152,9 +1152,9 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "b1a14dc89bee1e7989167937974ae599833afe30ade22be26a1973de25e3f8e1",
+        "891bd276fb2c17e9f3fe8696c562bf2a3d4ba6f40b87bd4a4b75b0a6b75c53c6",
     Path("scripts/verify-app-release-boundaries"):
-        "b937e90e1868c22c1ffa98ba38dd5f7ff324e123f2b54a7d0065383b1ce2df99",
+        "f8efaf206a1ffb6d61ceaa5945d16025fefd41cdd9f1c58724117160688418cd",
 }
 for path, expected_sha in expected.items():
     observed_sha = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -1174,8 +1174,8 @@ for marker, count in {
     "574d07d1ceb6fbe04619f6abde040833c87b3ee0098a3458169aa0f6c484e36f": 2,
     "dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9": 4,
     "200b958fb36101f258f67621035f80b89b26c465271ae6708cf5856de7bf573b": 1,
-    "1730d1c220b7c0f9ce963bfe9d83df0435bc4c7ba27ae73d606f7a6d004c9096": 1,
-    "72c1a6244481a53270afcda6bcd5f2092019c4139aa543a55e9019920a1826f0": 1,
+    "af92aa80c452f4d3b4b539a334d149e8f41b9f98633b4b4aed1728c568052870": 1,
+    "cdab4bac069437be33a167157569d915ca477594090344d2b1d0c3afe8f0e13e": 1,
     "2232cd8aede221e91439b6e3634bc7fc3b007fa5aa145b8b0e65f52e5f98666e": 1,
     "2209e254bfe1a2fb2709ae48640206658e2903a5aca28bd0fdf8e34171050962": 1,
     "7c78e48e09da412dda28562f31c063cde5da02dfeed5d7fd2e0c74442d6ceb7c": 1,
@@ -1186,6 +1186,22 @@ for marker, count in {
             f"Machine driver exact projection marker drifted: {marker}: "
             f"{observed} != {count}"
         )
+projection_markers = {
+    "iib5biii_b2b1a0_swiftpm_debug_owned_sha":
+        "af92aa80c452f4d3b4b539a334d149e8f41b9f98633b4b4aed1728c568052870",
+    "iib5biii_b2b1a0_swiftpm_release_owned_sha":
+        "c45d76940f5a95bd7f7119a84fbf27911e091857a6aebd6befd00cb49ce6a474",
+    "iib5biii_b2b1a0_xcode_debug_owned_sha256":
+        "cdab4bac069437be33a167157569d915ca477594090344d2b1d0c3afe8f0e13e",
+    "iib5biii_b2b1a0_xcode_release_owned_sha256":
+        "574d84356b349a7c302d522697b9fe7c1ea60ce172c922f41c51a5ca8f0357f7",
+}
+for name, value in projection_markers.items():
+    source = investigation if "swiftpm" in name else release
+    if source.count(f"{name}={value}") != 1:
+        raise SystemExit(f"Machine driver named projection drifted: {name}")
+if len(set(projection_markers.values())) != len(projection_markers):
+    raise SystemExit("SwiftPM and Xcode Machine driver projections collapsed")
 for forbidden in (
     "STORNAUT_VERIFY_MACHINE_DRIVER_BINARY",
     "elif [[",
@@ -7005,11 +7021,27 @@ done
 iib5biii_b2a0_gate=scripts/verify-investigation-boundaries
 iib5biii_b2a0_app_gate=scripts/verify-app-release-boundaries
 iib5biii_b2a0_baseline=7c114e09c915e2685545872101e7c5854ce2cffd
+iib5biii_b2a0_commit=65f85c5adbb01b41b1bf9a5f787951f9feb4660d
+iib5biii_b2a0_tree=7df0d5597f498e3588823885d226bdd02befc058
 iib5biii_b2a0_composition=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochComposition.swift
 iib5biii_b2a0_continuity=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineHelperEpochContinuity.swift
 iib5biii_b2a0_bridge=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochPhysicalBridge.swift
 iib5biii_b2a0_test=Tests/StornautInvestigationTests/InvestigationMachineSingleEpochPhysicalBridgeTests.swift
 iib5biii_b2a0_boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+iib5biii_b2a0_semantic_index="$contract_root/iib5biii-b2a0-semantic.index"
+iib5biii_b2a0_semantic_root="$contract_root/iib5biii-b2a0-semantic"
+mkdir -p "$iib5biii_b2a0_semantic_root"
+GIT_INDEX_FILE="$iib5biii_b2a0_semantic_index" \
+    git read-tree "$iib5biii_b2a0_commit^{tree}"
+GIT_INDEX_FILE="$iib5biii_b2a0_semantic_index" \
+    git checkout-index --all --prefix="$iib5biii_b2a0_semantic_root/"
+iib5biii_b2a0_gate="$iib5biii_b2a0_semantic_root/scripts/verify-investigation-boundaries"
+iib5biii_b2a0_app_gate="$iib5biii_b2a0_semantic_root/scripts/verify-app-release-boundaries"
+iib5biii_b2a0_composition="$iib5biii_b2a0_semantic_root/$iib5biii_b2a0_composition"
+iib5biii_b2a0_continuity="$iib5biii_b2a0_semantic_root/$iib5biii_b2a0_continuity"
+iib5biii_b2a0_bridge="$iib5biii_b2a0_semantic_root/$iib5biii_b2a0_bridge"
+iib5biii_b2a0_test="$iib5biii_b2a0_semantic_root/$iib5biii_b2a0_test"
+iib5biii_b2a0_boundary="$iib5biii_b2a0_semantic_root/$iib5biii_b2a0_boundary"
 
 "$iib5biii_b2a0_gate" \
     --iib5biii-b2a0-physical-bridge-contract-only \
@@ -7169,6 +7201,13 @@ do
         "$name" "$source_kind" "$expected"
 done
 
+iib5biii_b2a0_gate=scripts/verify-investigation-boundaries
+iib5biii_b2a0_app_gate=scripts/verify-app-release-boundaries
+iib5biii_b2a0_composition=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochComposition.swift
+iib5biii_b2a0_continuity=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineHelperEpochContinuity.swift
+iib5biii_b2a0_bridge=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochPhysicalBridge.swift
+iib5biii_b2a0_test=Tests/StornautInvestigationTests/InvestigationMachineSingleEpochPhysicalBridgeTests.swift
+iib5biii_b2a0_boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
 iib5biii_b2a0_paths=(
     "$iib5biii_b2a0_composition"
     "$iib5biii_b2a0_continuity"
@@ -7181,8 +7220,6 @@ iib5biii_b2a0_paths=(
 )
 (( ${#iib5biii_b2a0_paths} == 8 )) \
     || fail_contract "iii-b2a0 checkpoint path ceiling drifted"
-iib5biii_b2a0_commit=65f85c5adbb01b41b1bf9a5f787951f9feb4660d
-iib5biii_b2a0_tree=7df0d5597f498e3588823885d226bdd02befc058
 [[ "$(git show -s --format=%P "$iib5biii_b2a0_commit")" == \
     "$iib5biii_b2a0_baseline" ]] \
     || fail_contract "iii-b2a0 historical parent drifted"
@@ -7294,6 +7331,8 @@ done
 iib5biii_b2ai_gate=scripts/verify-investigation-boundaries
 iib5biii_b2ai_app_gate=scripts/verify-app-release-boundaries
 iib5biii_b2ai_baseline=79cc78c5f1169faa0820a6377a0d512e2034b0ef
+iib5biii_b2ai_commit=2f3a116be4644829fc513bcc2287c6bd2a1ea0ec
+iib5biii_b2ai_tree=dbe8e06f3e0c5bfb96e383348a0b870b8d7dad5f
 iib5biii_b2ai_single=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpoch.swift
 iib5biii_b2ai_composition=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochComposition.swift
 iib5biii_b2ai_continuity=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineHelperEpochContinuity.swift
@@ -7302,6 +7341,23 @@ iib5biii_b2ai_protocol=Sources/StornautInvestigationMachineDriverSupport/Investi
 iib5biii_b2ai_test=Tests/StornautInvestigationTests/InvestigationMachineDarwinOuterInnerProtocolTests.swift
 iib5biii_b2ai_boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
 iib5biii_b2ai_preflight=docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-i-supervisor-admission-preflight.md
+iib5biii_b2ai_semantic_commit=6f6579834b3f5a707ab7b35152e5425e4260c6ad
+iib5biii_b2ai_semantic_index="$contract_root/iib5biii-b2a-i-semantic.index"
+iib5biii_b2ai_semantic_root="$contract_root/iib5biii-b2a-i-semantic"
+mkdir -p "$iib5biii_b2ai_semantic_root"
+GIT_INDEX_FILE="$iib5biii_b2ai_semantic_index" \
+    git read-tree "$iib5biii_b2ai_semantic_commit^{tree}"
+GIT_INDEX_FILE="$iib5biii_b2ai_semantic_index" \
+    git checkout-index --all --prefix="$iib5biii_b2ai_semantic_root/"
+iib5biii_b2ai_gate="$iib5biii_b2ai_semantic_root/scripts/verify-investigation-boundaries"
+iib5biii_b2ai_app_gate="$iib5biii_b2ai_semantic_root/scripts/verify-app-release-boundaries"
+iib5biii_b2ai_single="$iib5biii_b2ai_semantic_root/$iib5biii_b2ai_single"
+iib5biii_b2ai_composition="$iib5biii_b2ai_semantic_root/$iib5biii_b2ai_composition"
+iib5biii_b2ai_continuity="$iib5biii_b2ai_semantic_root/$iib5biii_b2ai_continuity"
+iib5biii_b2ai_bridge="$iib5biii_b2ai_semantic_root/$iib5biii_b2ai_bridge"
+iib5biii_b2ai_protocol="$iib5biii_b2ai_semantic_root/$iib5biii_b2ai_protocol"
+iib5biii_b2ai_test="$iib5biii_b2ai_semantic_root/$iib5biii_b2ai_test"
+iib5biii_b2ai_boundary="$iib5biii_b2ai_semantic_root/$iib5biii_b2ai_boundary"
 
 "$iib5biii_b2ai_gate" \
     --iib5biii-b2a-i-supervisor-contract-only \
@@ -7651,6 +7707,15 @@ do
         "$name" "$source_kind" "$expected"
 done
 
+iib5biii_b2ai_gate=scripts/verify-investigation-boundaries
+iib5biii_b2ai_app_gate=scripts/verify-app-release-boundaries
+iib5biii_b2ai_single=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpoch.swift
+iib5biii_b2ai_composition=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochComposition.swift
+iib5biii_b2ai_continuity=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineHelperEpochContinuity.swift
+iib5biii_b2ai_bridge=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochPhysicalBridge.swift
+iib5biii_b2ai_protocol=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerProtocol.swift
+iib5biii_b2ai_test=Tests/StornautInvestigationTests/InvestigationMachineDarwinOuterInnerProtocolTests.swift
+iib5biii_b2ai_boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
 iib5biii_b2ai_paths=(
     "$iib5biii_b2ai_single"
     "$iib5biii_b2ai_composition"
@@ -7665,8 +7730,6 @@ iib5biii_b2ai_paths=(
 )
 (( ${#iib5biii_b2ai_paths} == 10 )) \
     || fail_contract "iii-b2a-i checkpoint path ceiling drifted"
-iib5biii_b2ai_commit=2f3a116be4644829fc513bcc2287c6bd2a1ea0ec
-iib5biii_b2ai_tree=dbe8e06f3e0c5bfb96e383348a0b870b8d7dad5f
 [[ "$(git show -s --format=%P "$iib5biii_b2ai_commit")" == \
     "$iib5biii_b2ai_baseline" ]] \
     || fail_contract "iii-b2a-i historical parent drifted"
@@ -9240,6 +9303,307 @@ for checkpoint_path in "${iib5biii_b2b0_implementation_paths[@]}"; do
             "iii-b2b-0 same-path substitution accepted: $checkpoint_path"
     fi
     require_fixed_text "$output" "iii-b2b-0 completed tree drifted"
+done
+
+# Task 39 iii-b2b-1a-0 canonical helper-provenance carriage.
+iib5biii_b2b1a0_gate=scripts/verify-investigation-boundaries
+iib5biii_b2b1a0_app_gate=scripts/verify-app-release-boundaries
+iib5biii_b2b1a0_baseline=d643b8fd500be29736a962dcd0c270304b490828
+iib5biii_b2b1a0_composition=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochComposition.swift
+iib5biii_b2b1a0_bridge=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochPhysicalBridge.swift
+iib5biii_b2b1a0_bridge_test=Tests/StornautInvestigationTests/InvestigationMachineSingleEpochPhysicalBridgeTests.swift
+iib5biii_b2b1a0_protocol_test=Tests/StornautInvestigationTests/InvestigationMachineDarwinOuterInnerProtocolTests.swift
+iib5biii_b2b1a0_boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+iib5biii_b2b1a0_preflight=docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1a-outer-observation-preflight.md
+iib5biii_b2b1a0_paths=(
+    "$iib5biii_b2b1a0_composition"
+    "$iib5biii_b2b1a0_bridge"
+    "$iib5biii_b2b1a0_bridge_test"
+    "$iib5biii_b2b1a0_protocol_test"
+    "$iib5biii_b2b1a0_boundary"
+    scripts/verify-app-release-boundaries
+    scripts/verify-contract
+    scripts/verify-investigation-boundaries
+)
+(( ${#iib5biii_b2b1a0_paths} == 8 )) \
+    || fail_contract "iii-b2b-1a-0 checkpoint path ceiling drifted"
+
+function verify_iib5biii_b2b1a0_staged_worktree_identity() {
+    local checkpoint_path entry staged_blob worktree_blob
+    for checkpoint_path in "$@"; do
+        entry=$(git ls-files -s -- "$checkpoint_path")
+        staged_blob=$(print -r -- "$entry" | awk '{print $2}')
+        [[ -n $staged_blob ]] || {
+            print -u2 \
+                "iii-b2b-1a-0 staged source missing: $checkpoint_path"
+            return 1
+        }
+        worktree_blob=$(git hash-object -- "$checkpoint_path")
+        [[ "$staged_blob" == "$worktree_blob" ]] || {
+            print -u2 \
+                "iii-b2b-1a-0 staged/worktree source drifted: $checkpoint_path"
+            return 1
+        }
+    done
+}
+verify_iib5biii_b2b1a0_staged_worktree_identity \
+    "${iib5biii_b2b1a0_paths[@]}" "$iib5biii_b2b1a0_preflight"
+
+"$iib5biii_b2b1a0_gate" \
+    --iib5biii-b2b1a0-provenance-contract-only \
+    "$iib5biii_b2b1a0_composition" "$iib5biii_b2b1a0_bridge" \
+    "$iib5biii_b2b1a0_bridge_test" "$iib5biii_b2b1a0_protocol_test" \
+    "$iib5biii_b2b1a0_boundary" \
+    >"$contract_root/iib5biii-b2b1a0-canonical.log"
+"$iib5biii_b2b1a0_app_gate" \
+    --iib5biii-b2b1a0-source-contract-only \
+    "$iib5biii_b2b1a0_composition" "$iib5biii_b2b1a0_bridge" \
+    >"$contract_root/iib5biii-b2b1a0-app-canonical.log"
+
+python3 - "$iib5biii_b2b1a0_bridge" \
+    "$iib5biii_b2b1a0_bridge_test" "$contract_root" <<'PY'
+from pathlib import Path
+import sys
+
+bridge_path, test_path, root = map(Path, sys.argv[1:])
+sources = {
+    "bridge": bridge_path.read_text(encoding="utf-8"),
+    "test": test_path.read_text(encoding="utf-8"),
+}
+
+def mutate(name, source_name, old, new, count=None):
+    source = sources[source_name]
+    observed = source.count(old)
+    if observed == 0 or (count is not None and observed != count):
+        raise SystemExit(
+            f"cannot construct iii-b2b-1a-0 mutation: {name}"
+        )
+    (root / f"iib5biii-b2b1a0-{name}.swift").write_text(
+        source.replace(old, new, 1), encoding="utf-8"
+    )
+
+mutate(
+    "claim-evidence-digest-bypass", "bridge",
+    "                claimEvidenceSHA256\n"
+    "                    == .hashing(claimEvidenceBytes),",
+    "                true,",
+)
+mutate(
+    "claim-evidence-nonce-bypass", "bridge",
+    "evidence.l1Residue.investigationUUID == selectionNonce",
+    "true",
+)
+mutate(
+    "coordinated-claim-evidence-tamper", "test",
+    "physicalOwnershipRejectsCoordinatedForeignClaimEvidence",
+    "physicalOwnershipCoordinatedTamperCoverageWasRemoved",
+)
+assertion = "            #expect(throws: (any Error).self) {\n"
+if sources["test"].count(assertion) < 2:
+    raise SystemExit(
+        "cannot construct iii-b2b-1a-0 mutation: assertion-body-vacuity"
+    )
+(root / "iib5biii-b2b1a0-assertion-body-vacuity.swift").write_text(
+    sources["test"].replace(assertion, "            if false {\n", 1),
+    encoding="utf-8",
+)
+PY
+
+iib5biii_b2b1a0_harmless_root="$contract_root/iib5biii-b2b1a0-harmless"
+mkdir -p \
+    "$iib5biii_b2b1a0_harmless_root/scripts" \
+    "$iib5biii_b2b1a0_harmless_root/Sources/StornautInvestigationMachineDriverSupport"
+cp "$iib5biii_b2b1a0_app_gate" \
+    "$iib5biii_b2b1a0_harmless_root/scripts/verify-app-release-boundaries"
+chmod 755 \
+    "$iib5biii_b2b1a0_harmless_root/scripts/verify-app-release-boundaries"
+cp "$iib5biii_b2b1a0_composition" \
+    "$iib5biii_b2b1a0_harmless_root/$iib5biii_b2b1a0_composition"
+cp "$iib5biii_b2b1a0_bridge" \
+    "$iib5biii_b2b1a0_harmless_root/$iib5biii_b2b1a0_bridge"
+for source_kind in composition bridge; do
+    source_path="$iib5biii_b2b1a0_harmless_root/$iib5biii_b2b1a0_composition"
+    [[ $source_kind == bridge ]] \
+        && source_path="$iib5biii_b2b1a0_harmless_root/$iib5biii_b2b1a0_bridge"
+    {
+        print -r -- '// Process URLSession Executor readiness are documentation only.'
+        print -r -- 'private let harmlessAuthorityWords = "Process URLSession Executor readiness"'
+        print -r -- 'private enum HarmlessTransportState { case open, send, connect }'
+    } >>"$source_path"
+done
+"$iib5biii_b2b1a0_harmless_root/scripts/verify-app-release-boundaries" \
+    --iib5biii-b2b1a0-source-contract-only \
+    "$iib5biii_b2b1a0_harmless_root/$iib5biii_b2b1a0_composition" \
+    "$iib5biii_b2b1a0_harmless_root/$iib5biii_b2b1a0_bridge" \
+    >"$contract_root/iib5biii-b2b1a0-harmless-app.log" || \
+    fail_contract "iii-b2b-1a-0 harmless source was rejected: app"
+"$iib5biii_b2b1a0_gate" \
+    --iib5biii-b2b1a0-provenance-contract-only \
+    "$iib5biii_b2b1a0_harmless_root/$iib5biii_b2b1a0_composition" \
+    "$iib5biii_b2b1a0_harmless_root/$iib5biii_b2b1a0_bridge" \
+    "$iib5biii_b2b1a0_bridge_test" "$iib5biii_b2b1a0_protocol_test" \
+    "$iib5biii_b2b1a0_boundary" \
+    >"$contract_root/iib5biii-b2b1a0-harmless-boundary.log" || \
+    fail_contract "iii-b2b-1a-0 harmless source was rejected: boundary"
+print -r -- \
+    'private let forbiddenInterpolatedAuthority = "\(Process())"' \
+    >>"$iib5biii_b2b1a0_harmless_root/$iib5biii_b2b1a0_bridge"
+for gate in app boundary; do
+    output="$contract_root/iib5biii-b2b1a0-interpolation-$gate.log"
+    if [[ $gate == app ]]; then
+        "$iib5biii_b2b1a0_harmless_root/scripts/verify-app-release-boundaries" \
+            --iib5biii-b2b1a0-source-contract-only \
+            "$iib5biii_b2b1a0_harmless_root/$iib5biii_b2b1a0_composition" \
+            "$iib5biii_b2b1a0_harmless_root/$iib5biii_b2b1a0_bridge" \
+            >"$output" 2>&1 \
+            && fail_contract \
+                "iii-b2b-1a-0 interpolation mutation accepted: app"
+    else
+        "$iib5biii_b2b1a0_gate" \
+            --iib5biii-b2b1a0-provenance-contract-only \
+            "$iib5biii_b2b1a0_harmless_root/$iib5biii_b2b1a0_composition" \
+            "$iib5biii_b2b1a0_harmless_root/$iib5biii_b2b1a0_bridge" \
+            "$iib5biii_b2b1a0_bridge_test" \
+            "$iib5biii_b2b1a0_protocol_test" \
+            "$iib5biii_b2b1a0_boundary" >"$output" 2>&1 \
+            && fail_contract \
+                "iii-b2b-1a-0 interpolation mutation accepted: boundary"
+    fi
+    require_fixed_text "$output" \
+        "iii-b2b-1a-0 authority or product reachability drifted"
+done
+
+function require_iib5biii_b2b1a0_mutation_rejected() {
+    local name=$1 kind=$2 expected=$3
+    local composition=$iib5biii_b2b1a0_composition
+    local bridge=$iib5biii_b2b1a0_bridge
+    local bridge_test=$iib5biii_b2b1a0_bridge_test
+    local target="$contract_root/iib5biii-b2b1a0-$name.swift"
+    [[ $kind == bridge ]] && bridge=$target
+    [[ $kind == bridge-test ]] && bridge_test=$target
+    xcrun swiftc -frontend -parse -enable-bare-slash-regex "$target"
+    local output="$contract_root/iib5biii-b2b1a0-$name.log"
+    if "$iib5biii_b2b1a0_gate" \
+        --iib5biii-b2b1a0-provenance-contract-only \
+        "$composition" "$bridge" "$bridge_test" \
+        "$iib5biii_b2b1a0_protocol_test" "$iib5biii_b2b1a0_boundary" \
+        >"$output" 2>&1
+    then
+        fail_contract "iii-b2b-1a-0 mutation accepted: $name"
+    fi
+    require_fixed_text "$output" "$expected"
+}
+for fixture in \
+    claim-evidence-digest-bypass:bridge:'iii-b2b-1a-0 canonical provenance carriage drifted' \
+    claim-evidence-nonce-bypass:bridge:'iii-b2b-1a-0 canonical provenance carriage drifted' \
+    coordinated-claim-evidence-tamper:bridge-test:'iii-b2b-1a-0 focused test source seal drifted' \
+    assertion-body-vacuity:bridge-test:'iii-b2b-1a-0 focused test source seal drifted'
+do
+    name=${fixture%%:*}; remainder=${fixture#*:}
+    kind=${remainder%%:*}; expected=${remainder#*:}
+    require_iib5biii_b2b1a0_mutation_rejected \
+        "$name" "$kind" "$expected"
+done
+
+iib5biii_b2b1a0_index="$contract_root/iib5biii-b2b1a0.index"
+GIT_INDEX_FILE="$iib5biii_b2b1a0_index" \
+    git read-tree "$iib5biii_b2b1a0_baseline^{tree}"
+for checkpoint_path in "${iib5biii_b2b1a0_paths[@]}"; do
+    entry=$(git ls-files -s -- "$checkpoint_path")
+    mode=$(print -r -- "$entry" | awk '{print $1}')
+    blob=$(print -r -- "$entry" | awk '{print $2}')
+    [[ -n $mode && -n $blob ]] \
+        || fail_contract \
+            "iii-b2b-1a-0 staged source missing: $checkpoint_path"
+    GIT_INDEX_FILE="$iib5biii_b2b1a0_index" git update-index --add \
+        --cacheinfo "$mode,$blob,$checkpoint_path"
+done
+preflight_entry=$(git ls-files -s -- "$iib5biii_b2b1a0_preflight")
+preflight_blob=$(print -r -- "$preflight_entry" | awk '{print $2}')
+[[ -n $preflight_blob ]] \
+    || fail_contract "iii-b2b-1a-0 staged preflight missing"
+GIT_INDEX_FILE="$iib5biii_b2b1a0_index" git update-index --add \
+    --cacheinfo "100644,$preflight_blob,$iib5biii_b2b1a0_preflight"
+GIT_INDEX_FILE="$iib5biii_b2b1a0_index" "$iib5biii_b2b1a0_gate" \
+    --iib5biii-b2b1a0-staged-scope-contract-only \
+    "$iib5biii_b2b1a0_baseline" \
+    >"$contract_root/iib5biii-b2b1a0-scope-canonical.log"
+for line in {1..2300}; do
+    print -r -- "// iii-b2b-1a-0 over-budget $line"
+done >"$contract_root/iib5biii-b2b1a0-over-budget.swift"
+staged_divergence_index="$contract_root/iib5biii-b2b1a0-staged-worktree-divergence.index"
+cp "$iib5biii_b2b1a0_index" "$staged_divergence_index"
+{
+    print -r -- 'import Foundation'
+    print -r -- 'private let forbiddenStagedAuthority = Process()'
+} >"$contract_root/iib5biii-b2b1a0-staged-tamper.swift"
+blob=$(git hash-object -w -- \
+    "$contract_root/iib5biii-b2b1a0-staged-tamper.swift")
+GIT_INDEX_FILE="$staged_divergence_index" git update-index --cacheinfo \
+    "100644,$blob,$iib5biii_b2b1a0_bridge"
+output="$contract_root/iib5biii-b2b1a0-staged-worktree-divergence.log"
+if GIT_INDEX_FILE="$staged_divergence_index" \
+    verify_iib5biii_b2b1a0_staged_worktree_identity \
+        "${iib5biii_b2b1a0_paths[@]}" "$iib5biii_b2b1a0_preflight" \
+        >"$output" 2>&1
+then
+    fail_contract \
+        "iii-b2b-1a-0 scope mutation accepted: staged-worktree-divergence"
+fi
+require_fixed_text "$output" \
+    "iii-b2b-1a-0 staged/worktree source drifted: $iib5biii_b2b1a0_bridge"
+
+for fixture in extra-path over-budget deleted binary mode wrong-baseline \
+    missing-preflight
+do
+    index="$contract_root/iib5biii-b2b1a0-scope-$fixture.index"
+    cp "$iib5biii_b2b1a0_index" "$index"
+    baseline=$iib5biii_b2b1a0_baseline
+    case $fixture in
+        extra-path)
+            blob=$(git rev-parse "${iib5biii_b2b1a0_baseline}:AGENTS.md")
+            GIT_INDEX_FILE="$index" git update-index --add \
+                --cacheinfo "100644,$blob,iii-b2b-1a-0-extra.swift"
+            expected='iii-b2b-1a-0 staged checkpoint paths drifted' ;;
+        over-budget)
+            blob=$(git hash-object -w -- \
+                "$contract_root/iib5biii-b2b1a0-over-budget.swift")
+            GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                "100644,$blob,$iib5biii_b2b1a0_bridge"
+            expected='iii-b2b-1a-0 checkpoint budget drifted' ;;
+        deleted)
+            GIT_INDEX_FILE="$index" git rm --cached -q -f \
+                "$iib5biii_b2b1a0_composition"
+            expected='iii-b2b-1a-0 checkpoint deleted an existing path' ;;
+        binary)
+            blob=$(git rev-parse \
+                "${iib5biii_b2b1a0_baseline}:Tests/Fixtures/Snapshots/design-system.empty-state.dark.en.png")
+            GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                "100644,$blob,$iib5biii_b2b1a0_bridge"
+            expected='iii-b2b-1a-0 binary checkpoint path rejected' ;;
+        mode)
+            entry=$(GIT_INDEX_FILE="$index" git ls-files -s -- \
+                scripts/verify-contract)
+            blob=$(print -r -- "$entry" | awk '{print $2}')
+            GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                "100644,$blob,scripts/verify-contract"
+            expected='iii-b2b-1a-0 checkpoint mode drifted: scripts/verify-contract' ;;
+        wrong-baseline)
+            baseline="$iib5biii_b2b1a0_baseline^"
+            expected='iii-b2b-1a-0 checkpoint baseline drifted' ;;
+        missing-preflight)
+            GIT_INDEX_FILE="$index" git rm --cached -q -f \
+                "$iib5biii_b2b1a0_preflight"
+            expected='iii-b2b-1a-0 required preflight document missing' ;;
+    esac
+    output="$contract_root/iib5biii-b2b1a0-scope-$fixture.log"
+    if GIT_INDEX_FILE="$index" "$iib5biii_b2b1a0_gate" \
+        --iib5biii-b2b1a0-staged-scope-contract-only "$baseline" \
+        >"$output" 2>&1
+    then
+        fail_contract "iii-b2b-1a-0 scope mutation accepted: $fixture"
+    fi
+    require_fixed_text "$output" "$expected"
 done
 
 print "Verifier mode and CI contract verification passed."

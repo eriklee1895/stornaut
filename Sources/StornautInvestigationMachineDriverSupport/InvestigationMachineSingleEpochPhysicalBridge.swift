@@ -487,6 +487,7 @@ package struct InvestigationMachineSingleEpochPhysicalResult:
         let projectionSHA256: InvestigationHandoffSHA256
         let appIdentity: InvestigationMachineProcessIdentity
         let helperIdentity: InvestigationMachineProcessIdentity
+        let claimEvidence: InvestigationMachineClaimEvidence
         let claimEvidenceSHA256: InvestigationHandoffSHA256
         let installedL2ProofSHA256: InvestigationHandoffSHA256
         let releaseDeadlineNanoseconds: UInt64
@@ -506,7 +507,17 @@ package struct InvestigationMachineSingleEpochPhysicalResult:
                 bridgeNonzero(candidate.projectionSHA256),
                 candidate.appIdentity.role == .app,
                 candidate.helperIdentity.role == .helper,
+                bridgeClaimEvidenceIsBound(
+                    candidate.claimEvidence,
+                    selectionNonce: candidate.configurationNonce,
+                    appIdentity: candidate.appIdentity,
+                    helperIdentity: candidate.helperIdentity,
+                    releaseDeadlineNanoseconds:
+                        candidate.releaseDeadlineNanoseconds
+                ),
                 bridgeNonzero(candidate.claimEvidenceSHA256),
+                candidate.claimEvidenceSHA256
+                    == .hashing(try candidate.claimEvidence.encoded()),
                 bridgeNonzero(candidate.installedL2ProofSHA256),
                 candidate.releaseDeadlineNanoseconds > 0,
                 candidate.releaseDeadlineNanoseconds
@@ -525,6 +536,7 @@ package struct InvestigationMachineSingleEpochPhysicalResult:
             projectionSHA256 = candidate.projectionSHA256
             appIdentity = candidate.appIdentity
             helperIdentity = candidate.helperIdentity
+            claimEvidence = candidate.claimEvidence
             claimEvidenceSHA256 = candidate.claimEvidenceSHA256
             installedL2ProofSHA256 = candidate.installedL2ProofSHA256
             releaseDeadlineNanoseconds = candidate.releaseDeadlineNanoseconds
@@ -542,6 +554,7 @@ package struct InvestigationMachineSingleEpochPhysicalResult:
                     bridgeData(epochUUID), bridgeData(ordinal),
                     bridgeData(scenario.rawValue), projectionSHA256.rawBytes,
                     try appIdentity.encoded(), try helperIdentity.encoded(),
+                    try claimEvidence.encoded(),
                     claimEvidenceSHA256.rawBytes,
                     installedL2ProofSHA256.rawBytes,
                     bridgeData(releaseDeadlineNanoseconds),
@@ -566,6 +579,7 @@ package struct InvestigationMachineSingleEpochPhysicalResult:
                     4...4, 32...32,
                     1...InvestigationMachineProcessIdentity.maximumByteCount,
                     1...InvestigationMachineProcessIdentity.maximumByteCount,
+                    1...InvestigationMachineClaimEvidence.maximumByteCount,
                     32...32, 32...32, 8...8, 8...8, 32...32,
                 ],
                 maximumByteCount: InvestigationMachineSingleEpochPhysicalResult
@@ -588,15 +602,18 @@ package struct InvestigationMachineSingleEpochPhysicalResult:
                     .decode(fields[7]),
                 helperIdentity: try InvestigationMachineProcessIdentity
                     .decode(fields[8]),
-                claimEvidenceSHA256: try bridgeDigest(fields[9]),
-                installedL2ProofSHA256: try bridgeDigest(fields[10]),
-                releaseDeadlineNanoseconds: try bridgeUInt64(fields[11]),
-                epochDeadlineNanoseconds: try bridgeUInt64(fields[12]),
-                bindingSHA256: try bridgeDigest(fields[13])
+                claimEvidence: try InvestigationMachineClaimEvidence
+                    .decode(fields[9]),
+                claimEvidenceSHA256: try bridgeDigest(fields[10]),
+                installedL2ProofSHA256: try bridgeDigest(fields[11]),
+                releaseDeadlineNanoseconds: try bridgeUInt64(fields[12]),
+                epochDeadlineNanoseconds: try bridgeUInt64(fields[13]),
+                bindingSHA256: try bridgeDigest(fields[14])
             )
             guard
                 try value.appIdentity.encoded() == fields[7],
                 try value.helperIdentity.encoded() == fields[8],
+                try value.claimEvidence.encoded() == fields[9],
                 value.isBound(to: expectedSelection),
                 try value.encoded() == data
             else {
@@ -609,6 +626,9 @@ package struct InvestigationMachineSingleEpochPhysicalResult:
         func isBound(
             to selection: InvestigationMachineFixedEpochSelection
         ) -> Bool {
+            guard let claimEvidenceBytes = try? claimEvidence.encoded() else {
+                return false
+            }
             guard
                 outerAttemptUUID == selection.outerAttemptUUID,
                 wholeCapsuleSHA256 == selection.wholeCapsuleSHA256,
@@ -618,7 +638,16 @@ package struct InvestigationMachineSingleEpochPhysicalResult:
                 scenario == selection.epoch.scenario,
                 projectionSHA256 == selection.projection.projectionSHA256,
                 appIdentity.role == .app, helperIdentity.role == .helper,
+                bridgeClaimEvidenceIsBound(
+                    claimEvidence,
+                    selectionNonce: selection.epoch.configurationNonce,
+                    appIdentity: appIdentity,
+                    helperIdentity: helperIdentity,
+                    releaseDeadlineNanoseconds: releaseDeadlineNanoseconds
+                ),
                 bridgeNonzero(claimEvidenceSHA256),
+                claimEvidenceSHA256
+                    == .hashing(claimEvidenceBytes),
                 bridgeNonzero(installedL2ProofSHA256),
                 releaseDeadlineNanoseconds > 0,
                 releaseDeadlineNanoseconds <= epochDeadlineNanoseconds,
@@ -638,6 +667,7 @@ package struct InvestigationMachineSingleEpochPhysicalResult:
                         selection.epoch.signedRuntimeBindingSHA256.rawBytes,
                         projectionSHA256.rawBytes,
                         appIdentity.encoded(), helperIdentity.encoded(),
+                        claimEvidenceBytes,
                         claimEvidenceSHA256.rawBytes,
                         installedL2ProofSHA256.rawBytes,
                         bridgeData(releaseDeadlineNanoseconds),
@@ -660,6 +690,7 @@ package struct InvestigationMachineSingleEpochPhysicalResult:
             projectionSHA256: InvestigationHandoffSHA256,
             appIdentity: InvestigationMachineProcessIdentity,
             helperIdentity: InvestigationMachineProcessIdentity,
+            claimEvidence: InvestigationMachineClaimEvidence,
             claimEvidenceSHA256: InvestigationHandoffSHA256,
             installedL2ProofSHA256: InvestigationHandoffSHA256,
             releaseDeadlineNanoseconds: UInt64,
@@ -675,6 +706,7 @@ package struct InvestigationMachineSingleEpochPhysicalResult:
             self.projectionSHA256 = projectionSHA256
             self.appIdentity = appIdentity
             self.helperIdentity = helperIdentity
+            self.claimEvidence = claimEvidence
             self.claimEvidenceSHA256 = claimEvidenceSHA256
             self.installedL2ProofSHA256 = installedL2ProofSHA256
             self.releaseDeadlineNanoseconds = releaseDeadlineNanoseconds
@@ -695,6 +727,12 @@ package struct InvestigationMachineSingleEpochPhysicalOwnership:
     }
     package var helperIdentity: InvestigationMachineProcessIdentity {
         storage.helperIdentity
+    }
+    var claimEvidence: InvestigationMachineClaimEvidence {
+        storage.claimEvidence
+    }
+    var claimEvidenceSHA256: InvestigationHandoffSHA256 {
+        storage.claimEvidenceSHA256
     }
     package var releaseDeadlineNanoseconds: UInt64 {
         storage.releaseDeadlineNanoseconds
@@ -723,17 +761,29 @@ package struct InvestigationMachineSingleEpochPhysicalOwnership:
 
     package init(
         selection: InvestigationMachineFixedEpochSelection,
-        appIdentity: InvestigationMachineProcessIdentity,
-        helperIdentity: InvestigationMachineProcessIdentity,
-        claimEvidenceSHA256: InvestigationHandoffSHA256,
+        claimEvidence: InvestigationMachineClaimEvidence,
         installedL2ProofSHA256: InvestigationHandoffSHA256,
-        releaseDeadlineNanoseconds: UInt64,
         epochDeadlineNanoseconds: UInt64
     ) throws {
         try bridgeValidateSelection(selection)
+        let appIdentity = claimEvidence.appIdentity
+        let helperIdentity = claimEvidence.helperIdentity
+        let releaseDeadlineNanoseconds =
+            claimEvidence.releaseDeadlineNanoseconds
+        let claimEvidenceBytes = try claimEvidence.encoded()
+        let claimEvidenceSHA256 = InvestigationHandoffSHA256.hashing(
+            claimEvidenceBytes
+        )
         guard
             appIdentity.role == .app,
             helperIdentity.role == .helper,
+            bridgeClaimEvidenceIsBound(
+                claimEvidence,
+                selectionNonce: selection.epoch.configurationNonce,
+                appIdentity: appIdentity,
+                helperIdentity: helperIdentity,
+                releaseDeadlineNanoseconds: releaseDeadlineNanoseconds
+            ),
             bridgeNonzero(claimEvidenceSHA256),
             bridgeNonzero(installedL2ProofSHA256),
             releaseDeadlineNanoseconds > 0,
@@ -757,6 +807,7 @@ package struct InvestigationMachineSingleEpochPhysicalOwnership:
                     selection.epoch.signedRuntimeBindingSHA256.rawBytes,
                     selection.projection.projectionSHA256.rawBytes,
                     try appIdentity.encoded(), try helperIdentity.encoded(),
+                    claimEvidenceBytes,
                     claimEvidenceSHA256.rawBytes,
                     installedL2ProofSHA256.rawBytes,
                     bridgeData(releaseDeadlineNanoseconds),
@@ -776,6 +827,7 @@ package struct InvestigationMachineSingleEpochPhysicalOwnership:
             scenario: selection.epoch.scenario,
             projectionSHA256: selection.projection.projectionSHA256,
             appIdentity: appIdentity, helperIdentity: helperIdentity,
+            claimEvidence: claimEvidence,
             claimEvidenceSHA256: claimEvidenceSHA256,
             installedL2ProofSHA256: installedL2ProofSHA256,
             releaseDeadlineNanoseconds: releaseDeadlineNanoseconds,
@@ -802,6 +854,26 @@ package struct InvestigationMachineSingleEpochPhysicalOwnership:
     ) -> Bool {
         storage.isBound(to: selection)
     }
+}
+
+private func bridgeClaimEvidenceIsBound(
+    _ evidence: InvestigationMachineClaimEvidence,
+    selectionNonce: UUID,
+    appIdentity: InvestigationMachineProcessIdentity,
+    helperIdentity: InvestigationMachineProcessIdentity,
+    releaseDeadlineNanoseconds: UInt64
+) -> Bool {
+    evidence.appIdentity == appIdentity
+        && evidence.helperIdentity == helperIdentity
+        && evidence.l1Residue.investigationUUID == selectionNonce
+        && evidence.l1Residue.auditSessionID == helperIdentity.auditSessionID
+        && evidence.l1Residue.userID == appIdentity.effectiveUserID
+        && evidence.l1Residue.remainingAuditSessionMembers == 0
+        && evidence.l1Residue.matchingLeases == 0
+        && evidence.l1Residue.leaseRootEntries == 0
+        && evidence.l1Residue.investigationArtifacts == 0
+        && evidence.releaseDeadlineNanoseconds == releaseDeadlineNanoseconds
+        && releaseDeadlineNanoseconds > 0
 }
 
 private func bridgeValidateSelection(

@@ -674,6 +674,7 @@ struct OuterInnerFixture {
     let invocation: InvestigationMachineSingleEpochInvocation
     let predecessor: InvestigationMachineHelperEpochPredecessor?
     let request: InvestigationMachineDarwinEpochRequest
+    let claimEvidence: InvestigationMachineClaimEvidence
     let physicalOwnership: InvestigationMachineSingleEpochPhysicalOwnership
     let driverChild: InvestigationMachineDarwinDriverChildIdentity
     let appChild: InvestigationMachineDarwinAppChildIdentity
@@ -755,11 +756,25 @@ struct OuterInnerFixture {
         let helper = try Self.identity(
             role: .helper, pid: 903, version: 13, asid: 93
         )
+        claimEvidence = try .init(
+            requestBindingSHA256: Self.digest(0x51),
+            originalClaimChallenge: Self.uuid(0x52),
+            claimConnectionEpoch: Self.uuid(0x53),
+            appIdentity: app, helperIdentity: helper, appUserID: 501,
+            recordedAt: .init(rawValue: 200),
+            claimedAt: .init(rawValue: 300), ownerRetirement: .init(),
+            l1Residue: .init(
+                investigationUUID: epoch.configurationNonce,
+                auditSessionID: helper.auditSessionID, userID: 501,
+                observedAt: .init(rawValue: 100),
+                remainingAuditSessionMembers: 0, matchingLeases: 0,
+                leaseRootEntries: 0, investigationArtifacts: 0
+            ),
+            releaseDeadlineNanoseconds: observedAt + 100_000_000_000
+        )
         physicalOwnership = try .init(
-            selection: selection, appIdentity: app, helperIdentity: helper,
-            claimEvidenceSHA256: Self.digest(0x51),
+            selection: selection, claimEvidence: claimEvidence,
             installedL2ProofSHA256: Self.digest(0x52),
-            releaseDeadlineNanoseconds: observedAt + 100_000_000_000,
             epochDeadlineNanoseconds: request.epochDeadlineNanoseconds
         )
         driverChild = try .init(
