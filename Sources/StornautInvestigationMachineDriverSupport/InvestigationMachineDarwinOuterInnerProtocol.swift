@@ -1112,6 +1112,7 @@ package actor InvestigationMachineDarwinOuterAdmission:
             return try failTerminalEvidence()
         }
         guard
+            !Task.isCancelled,
             admittedAtNanoseconds >= terminalEvidence.observedAtNanoseconds,
             admittedAtNanoseconds < exchange.request.epochDeadlineNanoseconds
         else {

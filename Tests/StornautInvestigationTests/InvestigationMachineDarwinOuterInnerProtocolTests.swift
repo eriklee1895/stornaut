@@ -386,6 +386,38 @@ struct InvestigationMachineDarwinOuterInnerProtocolTests {
             )
         }
         #expect(invalidClock.calls == 0)
+
+        let cancellationClock = CancellingOuterInnerProtocolClock(
+            now: fixture.observedAt + 2
+        )
+        let cancelledAdmission = InvestigationMachineDarwinOuterAdmission(
+            selection: fixture.selection,
+            outerProcessID: fixture.outerProcessID,
+            clock: cancellationClock
+        )
+        let cancelledExchange = try await completeExchange(
+            fixture, cancelledAdmission
+        )
+        let cancelledNormal = try InvestigationMachineDarwinEpochNormalResult(
+            request: fixture.request, ownership: fixture.ownershipRecord,
+            acknowledgement: cancelledExchange.acknowledgement,
+            decision: cancelledExchange.decision,
+            physicalResult: fixture.physicalResult()
+        )
+        let cancelled = Task {
+            try await cancelledAdmission.admit(
+                resultBytes: cancelledNormal.encoded(),
+                terminalEvidence: try fixture.terminalEvidence(
+                    successfulExit: true
+                )
+            )
+        }
+        await #expect(throws:
+            InvestigationMachineDarwinOuterInnerProtocolError
+                .terminalEvidenceInvalid
+        ) {
+            _ = try await cancelled.value
+        }
     }
 
     @Test(arguments: [
@@ -1016,6 +1048,16 @@ private final class FixedOuterInnerProtocolClock:
 
     func continuousNanoseconds() throws -> UInt64 {
         lock.withLock { storedCalls += 1 }
+        return now
+    }
+}
+
+private struct CancellingOuterInnerProtocolClock:
+    InvestigationMachineDarwinOuterInnerCompositionClocking
+{
+    let now: UInt64
+    func continuousNanoseconds() throws -> UInt64 {
+        withUnsafeCurrentTask { $0?.cancel() }
         return now
     }
 }
