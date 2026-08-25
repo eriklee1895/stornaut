@@ -3790,6 +3790,7 @@ PY
 
 function verify_iib5biii_b2b0_scope() {
     local baseline=${1:-d6ab789ada2d87d0422fb8175d3d82c70381b47c}
+    local implementation_tree=d615795f2c9b2338fb7514607836cfb0b1780aa9
     local expected=(
         Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinDriverChildObservation.swift
         Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerComposition.swift
@@ -3843,6 +3844,14 @@ function verify_iib5biii_b2b0_scope() {
     local preflight=docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-0-release-graph-preflight.md
     (( ${documentation[(Ie)$preflight]} == 1 )) || {
         print -u2 "iii-b2b-0 required preflight document missing"; return 1
+    }
+    [[ "$(git write-tree)" == "$implementation_tree" ]] || {
+        print -u2 "iii-b2b-0 completed tree drifted"
+        return 1
+    }
+    (( changed == 1096 )) || {
+        print -u2 "iii-b2b-0 implementation line count drifted"
+        return 1
     }
 }
 

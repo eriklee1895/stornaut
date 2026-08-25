@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=57dda45e9f55fd8253c645eb5e37be0189b05f1d883d7fda348333e4d9b07bc4
+ib2_self_sha=59711551db8f0464e634d3356f6b88bf47d8886072f8e57c264c6b86d9214180
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -1152,7 +1152,7 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "67aa8d6c6c16a352e3d3a7846ede56fe329153e66bb9147d34849cfa097aeb3a",
+        "b1a14dc89bee1e7989167937974ae599833afe30ade22be26a1973de25e3f8e1",
     Path("scripts/verify-app-release-boundaries"):
         "b937e90e1868c22c1ffa98ba38dd5f7ff324e123f2b54a7d0065383b1ce2df99",
 }
@@ -8972,11 +8972,12 @@ for checkpoint_path in "${iib5biii_b2a_iia2ii_paths[@]}"; do
         "iii-b2a-ii-a2-ii completed tree drifted"
 done
 
-# Task 39 iii-b2b-0 Release graph closure. This checkpoint deliberately has
-# no completion commit/tree seal; the enclosing completion commit adds it.
+# Task 39 iii-b2b-0 Release graph closure.
 iib5biii_b2b0_gate=scripts/verify-investigation-boundaries
 iib5biii_b2b0_app_gate=scripts/verify-app-release-boundaries
 iib5biii_b2b0_baseline=d6ab789ada2d87d0422fb8175d3d82c70381b47c
+iib5biii_b2b0_implementation_commit=c8cc5140b2943f7408ec760d9e9526dcd2ca53f0
+iib5biii_b2b0_implementation_tree=d615795f2c9b2338fb7514607836cfb0b1780aa9
 iib5biii_b2b0_observer=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinDriverChildObservation.swift
 iib5biii_b2b0_session=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerSession.swift
 iib5biii_b2b0_composition=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerComposition.swift
@@ -9107,17 +9108,40 @@ iib5biii_b2b0_paths=(
 )
 (( ${#iib5biii_b2b0_paths} == 7 )) \
     || fail_contract "iii-b2b-0 checkpoint path ceiling drifted"
+iib5biii_b2b0_implementation_paths=(
+    "${iib5biii_b2b0_paths[@]}"
+    "$iib5biii_b2b0_preflight"
+)
+(( ${#iib5biii_b2b0_implementation_paths} == 8 )) \
+    || fail_contract "iii-b2b-0 implementation path count drifted"
+[[ "$(git show -s --format=%P \
+    "$iib5biii_b2b0_implementation_commit")" == \
+    "$iib5biii_b2b0_baseline" ]] \
+    || fail_contract "iii-b2b-0 implementation parent drifted"
+[[ "$(git show -s --format=%T \
+    "$iib5biii_b2b0_implementation_commit")" == \
+    "$iib5biii_b2b0_implementation_tree" ]] \
+    || fail_contract "iii-b2b-0 implementation tree drifted"
+iib5biii_b2b0_observed_paths=(
+    ${(f)"$(git diff-tree --no-commit-id --name-only -r \
+        "$iib5biii_b2b0_implementation_commit" | LC_ALL=C sort)"}
+)
+iib5biii_b2b0_expected_paths=(
+    "${(@on)iib5biii_b2b0_implementation_paths}"
+)
+[[ "${(j:\n:)iib5biii_b2b0_observed_paths}" == \
+    "${(j:\n:)iib5biii_b2b0_expected_paths}" ]] \
+    || fail_contract "iii-b2b-0 implementation paths drifted"
+iib5biii_b2b0_implementation_lines=$(
+    git diff-tree --numstat --no-commit-id -r \
+        "$iib5biii_b2b0_implementation_commit" \
+        | awk 'index($3,"docs/")!=1 && $3!="AGENTS.md" && $3!="README.md" {n += $1 + $2} END {print n + 0}'
+)
+(( iib5biii_b2b0_implementation_lines == 1096 )) \
+    || fail_contract "iii-b2b-0 implementation line count drifted"
 iib5biii_b2b0_index="$contract_root/iib5biii-b2b0.index"
 GIT_INDEX_FILE="$iib5biii_b2b0_index" \
-    git read-tree "$iib5biii_b2b0_baseline^{tree}"
-for checkpoint_path in "${iib5biii_b2b0_paths[@]}" \
-    "$iib5biii_b2b0_preflight"
-do
-    blob=$(git hash-object -w -- "$checkpoint_path")
-    mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
-    GIT_INDEX_FILE="$iib5biii_b2b0_index" git update-index --add \
-        --cacheinfo "$mode,$blob,$checkpoint_path"
-done
+    git read-tree "$iib5biii_b2b0_implementation_commit^{tree}"
 GIT_INDEX_FILE="$iib5biii_b2b0_index" "$iib5biii_b2b0_gate" \
     --iib5biii-b2b0-staged-scope-contract-only \
     "$iib5biii_b2b0_baseline" \
@@ -9192,6 +9216,30 @@ do
         fail_contract "iii-b2b-0 scope mutation accepted: $fixture"
     fi
     require_fixed_text "$output" "$expected"
+done
+
+for checkpoint_path in "${iib5biii_b2b0_implementation_paths[@]}"; do
+    index="$contract_root/iib5biii-b2b0-tamper-${checkpoint_path:t}.index"
+    cp "$iib5biii_b2b0_index" "$index"
+    {
+        git show \
+            "${iib5biii_b2b0_implementation_commit}:$checkpoint_path"
+        print -r -- "controlled iii-b2b-0 same-path tamper"
+    } >"$contract_root/iib5biii-b2b0-tampered"
+    blob=$(git hash-object -w -- \
+        "$contract_root/iib5biii-b2b0-tampered")
+    mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
+    GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+        "$mode,$blob,$checkpoint_path"
+    output="$contract_root/iib5biii-b2b0-tamper-${checkpoint_path:t}.log"
+    if GIT_INDEX_FILE="$index" "$iib5biii_b2b0_gate" \
+        --iib5biii-b2b0-staged-scope-contract-only \
+        "$iib5biii_b2b0_baseline" >"$output" 2>&1
+    then
+        fail_contract \
+            "iii-b2b-0 same-path substitution accepted: $checkpoint_path"
+    fi
+    require_fixed_text "$output" "iii-b2b-0 completed tree drifted"
 done
 
 print "Verifier mode and CI contract verification passed."
