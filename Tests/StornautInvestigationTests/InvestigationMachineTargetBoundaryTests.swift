@@ -2246,6 +2246,101 @@ struct InvestigationMachineTargetBoundaryTests {
         }
     }
 
+    @Test
+    func iiiB2B1BIIVerifierPinsZeroArgumentEntryAndMutableScope() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ), encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        let release = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-app-release-boundaries"
+            ), encoding: .utf8
+        )
+        let scope = try l3c3biiFunction(
+            "verify_iib5biii_b2b1b_scope", in: boundary
+        )
+
+        for marker in [
+            "--iib5biii-b2b1b-zero-entry-contract-only",
+            "--iib5biii-b2b1b-staged-scope-contract-only",
+            "function verify_iib5biii_b2b1b_zero_entry_contract()",
+            "function verify_iib5biii_b2b1b_scope()",
+            "iii-b2b-1b dependency surface drifted",
+            "iii-b2b-1b public or JSON surface drifted",
+            "iii-b2b-1b authority or selector surface drifted",
+            "iii-b2b-1b fixed production composition drifted",
+            "iii-b2b-1b outer operation ordering drifted",
+            "iii-b2b-1b facade tests became vacuous",
+            "iii-b2b-1b focused tests became vacuous",
+            "iib5biii_b2b1b_swiftpm_debug_undefined_sha=f267aa32579fa4fc216b603638eecbc2065741569bdc81bc713a449bb61b8a8c",
+            "iib5biii_b2b1b_swiftpm_release_undefined_sha=7c404634c3da87081f3cd2d716c61df7ad45c8583d22103b95d3e6e956e6f981",
+            "iib5biii_b2b1b_swiftpm_loads_sha=dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9",
+            "iib5biii_b2b1b_swiftpm_debug_owned_sha=09cbd025b5367b04fb8a762dab6b20739e77630fed36b21036129977588dbd92",
+            "iib5biii_b2b1b_swiftpm_release_owned_sha=8570228a2bb16262520142d397ecee0cd415f42a01b41e142abc983bf1a89270",
+            "iib5biii_b2b1b_swiftpm_debug_undefined_lines=696",
+            "iib5biii_b2b1b_swiftpm_release_undefined_lines=499",
+            "iib5biii_b2b1b_swiftpm_loads_lines=18",
+            "iib5biii_b2b1b_swiftpm_debug_owned_lines=8662",
+            "iib5biii_b2b1b_swiftpm_release_owned_lines=5997",
+        ] {
+            #expect(boundary.contains(marker))
+        }
+        for marker in [
+            "6b2608258d59787bca592012086a2377d647473e",
+            "(( ${#expected} == 4 ))",
+            "(( changed <= 1200 ))",
+            "iii-b2b-1b staged checkpoint paths drifted",
+            "iii-b2b-1b checkpoint budget drifted",
+        ] {
+            #expect(scope.contains(marker))
+        }
+        for marker in [
+            "iib5biii_b2b1b_baseline=6b2608258d59787bca592012086a2377d647473e",
+            "iii-b2b-1b mutation accepted:",
+            "iii-b2b-1b scope mutation accepted:",
+            "completion-digest-bypass",
+            "outer-order-bypass",
+            "focused-test-vacuity",
+            "pipe-device-bypass", "wait-deadline-bypass",
+            "partial-write-deadline-bypass",
+            "final-write-reclassification",
+            "cancellation-precedence-bypass",
+            "extra-path over-budget deleted binary mode wrong-baseline",
+        ] {
+            #expect(contract.contains(marker))
+        }
+        for marker in [
+            "--iib5biii-b2b1b-source-contract-only",
+            "function verify_iib5biii_b2b1b_source_contract()",
+            "iib5biii_b2b1b_symbols=(",
+            "iib5biii_b2b1b_positive_drivers=(",
+            "iib5biii_b2b1b_closed_images=(",
+            "verify_iib5biii_b2b1b_macho()",
+            "iii-b2b-1b driver positive control is missing",
+            "iii-b2b-1b zero-entry leaked into a closed image",
+            "iib5biii_b2b1b_xcode_debug_undefined_sha256=f267aa32579fa4fc216b603638eecbc2065741569bdc81bc713a449bb61b8a8c",
+            "iib5biii_b2b1b_xcode_release_undefined_sha256=7c404634c3da87081f3cd2d716c61df7ad45c8583d22103b95d3e6e956e6f981",
+            "iib5biii_b2b1b_xcode_loads_sha256=dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9",
+            "iib5biii_b2b1b_xcode_debug_owned_sha256=1046c7407fe71790270fc29576d1ff2d1ac0e29f1f8d3aa4c6a9cf0527e6f559",
+            "iib5biii_b2b1b_xcode_release_owned_sha256=a82a4909089c97d1f8d262d46c8dabbdd179713855b7485598369a72dd049d7d",
+            "iib5biii_b2b1b_xcode_debug_undefined_lines=696",
+            "iib5biii_b2b1b_xcode_release_undefined_lines=499",
+            "iib5biii_b2b1b_xcode_loads_lines=18",
+            "iib5biii_b2b1b_xcode_debug_owned_lines=8661",
+            "iib5biii_b2b1b_xcode_release_owned_lines=5996",
+        ] {
+            #expect(release.contains(marker))
+        }
+    }
+
     @Test func iiB5BIAProjectionVerifierPinsPureBinaryAndTemporalContract() throws {
         let root = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let sources = try ["scripts/verify-investigation-boundaries", "scripts/verify-contract"].map {

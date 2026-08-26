@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=97065e55b7b40f6443b6d78f30a0c99914e34028b97645cfc5764e3ef0ff969a
+ib2_self_sha=90f7ec666b1afe6473daf0ff76cd81efd6320f80a54ff791b75b50f2221052ac
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -1152,9 +1152,9 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "dd71a2f413f9b04ef1c846f882ba0f2706cdf67de3cdaa6836abba523561b93d",
+        "9c28eb37ec0d4c7386d50fae34ea6cee6410a3ebd71973cc026d2aab9a1bdacb",
     Path("scripts/verify-app-release-boundaries"):
-        "54d541372b4db339e1bcbbec56bc59a1440c03b55c7af56294afd8eec7da66ef",
+        "a29b85249cb6be507b756ee4d04d5cf3c45894ae9a20ed34966cccf4176672cb",
 }
 for path, expected_sha in expected.items():
     observed_sha = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -1172,7 +1172,7 @@ release = Path("scripts/verify-app-release-boundaries").read_text(
 )
 for marker, count in {
     "574d07d1ceb6fbe04619f6abde040833c87b3ee0098a3458169aa0f6c484e36f": 2,
-    "dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9": 4,
+    "dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9": 3,
     "200b958fb36101f258f67621035f80b89b26c465271ae6708cf5856de7bf573b": 1,
     "af92aa80c452f4d3b4b539a334d149e8f41b9f98633b4b4aed1728c568052870": 1,
     "cdab4bac069437be33a167157569d915ca477594090344d2b1d0c3afe8f0e13e": 1,
@@ -1203,6 +1203,14 @@ projection_markers = {
         "d7dea7fb7f2878d4c80180b7347a0b2a6acc4c9302c44a8484f466a362f0102e",
     "iib5biii_b2b1a1_xcode_release_owned_sha256":
         "ad34b88c0d364aec5568d8221f1eb7b72e63d2f49058695defec0743585217f6",
+    "iib5biii_b2b1b_swiftpm_debug_owned_sha":
+        "09cbd025b5367b04fb8a762dab6b20739e77630fed36b21036129977588dbd92",
+    "iib5biii_b2b1b_swiftpm_release_owned_sha":
+        "8570228a2bb16262520142d397ecee0cd415f42a01b41e142abc983bf1a89270",
+    "iib5biii_b2b1b_xcode_debug_owned_sha256":
+        "1046c7407fe71790270fc29576d1ff2d1ac0e29f1f8d3aa4c6a9cf0527e6f559",
+    "iib5biii_b2b1b_xcode_release_owned_sha256":
+        "a82a4909089c97d1f8d262d46c8dabbdd179713855b7485598369a72dd049d7d",
 }
 for name, value in projection_markers.items():
     source = investigation if "swiftpm" in name else release
@@ -1210,6 +1218,24 @@ for name, value in projection_markers.items():
         raise SystemExit(f"Machine driver named projection drifted: {name}")
 if len(set(projection_markers.values())) != len(projection_markers):
     raise SystemExit("SwiftPM and Xcode Machine driver projections collapsed")
+shared_projection_markers = {
+    "iib5biii_b2b1b_swiftpm_debug_undefined_sha":
+        "f267aa32579fa4fc216b603638eecbc2065741569bdc81bc713a449bb61b8a8c",
+    "iib5biii_b2b1b_swiftpm_release_undefined_sha":
+        "7c404634c3da87081f3cd2d716c61df7ad45c8583d22103b95d3e6e956e6f981",
+    "iib5biii_b2b1b_swiftpm_loads_sha":
+        "dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9",
+    "iib5biii_b2b1b_xcode_debug_undefined_sha256":
+        "f267aa32579fa4fc216b603638eecbc2065741569bdc81bc713a449bb61b8a8c",
+    "iib5biii_b2b1b_xcode_release_undefined_sha256":
+        "7c404634c3da87081f3cd2d716c61df7ad45c8583d22103b95d3e6e956e6f981",
+    "iib5biii_b2b1b_xcode_loads_sha256":
+        "dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9",
+}
+for name, value in shared_projection_markers.items():
+    source = investigation if "swiftpm" in name else release
+    if source.count(f"{name}={value}") != 1:
+        raise SystemExit(f"Machine driver shared projection drifted: {name}")
 for forbidden in (
     "STORNAUT_VERIFY_MACHINE_DRIVER_BINARY",
     "elif [[",
@@ -10010,6 +10036,235 @@ PY
             "iii-b2b-1a-1 same-path substitution accepted: $checkpoint_path"
     fi
     require_fixed_text "$output" "iii-b2b-1a-1 completed tree drifted"
+done
+
+# Task 39 iii-b2b-1b-ii verifier-only replay. The feature implementation is
+# immutable at the baseline; this checkpoint changes only three verifiers and
+# their target-boundary test.
+iib5biii_b2b1b_gate=scripts/verify-investigation-boundaries
+iib5biii_b2b1b_app_gate=scripts/verify-app-release-boundaries
+iib5biii_b2b1b_baseline=6b2608258d59787bca592012086a2377d647473e
+iib5biii_b2b1b_support=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDriverSupport.swift
+iib5biii_b2b1b_entry=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineZeroArgumentEntry.swift
+iib5biii_b2b1b_support_test=Tests/StornautInvestigationTests/InvestigationMachineDriverSupportTests.swift
+iib5biii_b2b1b_entry_test=Tests/StornautInvestigationTests/InvestigationMachineZeroArgumentEntryTests.swift
+iib5biii_b2b1b_boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+
+"$iib5biii_b2b1b_gate" \
+    --iib5biii-b2b1b-zero-entry-contract-only \
+    "$iib5biii_b2b1b_support" "$iib5biii_b2b1b_entry" \
+    "$iib5biii_b2b1b_support_test" "$iib5biii_b2b1b_entry_test" \
+    "$iib5biii_b2b1b_boundary" \
+    >"$contract_root/iib5biii-b2b1b-canonical.log"
+"$iib5biii_b2b1b_app_gate" \
+    --iib5biii-b2b1b-source-contract-only \
+    "$iib5biii_b2b1b_support" "$iib5biii_b2b1b_entry" \
+    >"$contract_root/iib5biii-b2b1b-app-canonical.log"
+
+python3 - "$iib5biii_b2b1b_support" "$iib5biii_b2b1b_entry" \
+    "$iib5biii_b2b1b_entry_test" "$contract_root" <<'PY'
+from pathlib import Path
+import sys
+
+support_path, entry_path, test_path, root = map(Path, sys.argv[1:])
+sources = {
+    "support": support_path.read_text(encoding="utf-8"),
+    "entry": entry_path.read_text(encoding="utf-8"),
+    "test": test_path.read_text(encoding="utf-8"),
+}
+
+def mutate(name, kind, old, new):
+    source = sources[kind]
+    if source.count(old) != 1:
+        raise SystemExit(f"cannot construct iii-b2b-1b mutation: {name}")
+    (root / f"iib5biii-b2b1b-{name}.swift").write_text(
+        source.replace(old, new, 1), encoding="utf-8"
+    )
+
+def mutate_all(name, kind, old, new, expected_count):
+    source = sources[kind]
+    if source.count(old) != expected_count:
+        raise SystemExit(f"cannot construct iii-b2b-1b mutation: {name}")
+    (root / f"iib5biii-b2b1b-{name}.swift").write_text(
+        source.replace(old, new), encoding="utf-8"
+    )
+
+mutate(
+    "completion-digest-bypass", "entry",
+    "guard InvestigationHandoffSHA256.hashing(zeroed)\n                == completionSHA256",
+    "guard completionSHA256 == completionSHA256",
+)
+mutate(
+    "outer-order-bypass", "entry",
+    "try dependencies.revalidateOuter(observation)",
+    "_ = observation",
+)
+mutate(
+    "public-entry", "entry",
+    "struct InvestigationMachineZeroArgumentEntry: Sendable",
+    "public struct InvestigationMachineZeroArgumentEntry: Sendable",
+)
+mutate(
+    "json-artifact", "entry",
+    "package struct InvestigationMachineDriverCompletionArtifact:\n"
+    "    Sendable, Equatable\n{",
+    "package struct InvestigationMachineDriverCompletionArtifact:\n"
+    "    Sendable, Equatable, Codable\n{",
+)
+mutate(
+    "selector-surface", "entry",
+    "import StornautInvestigationHandoffContract\n",
+    "import StornautInvestigationHandoffContract\n"
+    "private let forbiddenSelector = CommandLine.arguments\n",
+)
+mutate(
+    "status-collapse", "support",
+    "case .containmentUncertain:\n            containmentUncertainExitStatus",
+    "case .containmentUncertain:\n            protocolFailureExitStatus",
+)
+mutate(
+    "focused-test-vacuity", "test",
+    "completionArtifactMatchesIndependentGoldenAndZeroBeforeHash",
+    "completionArtifactGoldenCoverageWasRemoved",
+)
+mutate(
+    "pipe-device-bypass", "entry",
+    "node.inode > 0 && node.fileType != 0",
+    "node.deviceID > 0 && node.inode > 0 && node.fileType != 0",
+)
+mutate(
+    "wait-deadline-bypass", "entry",
+    "let waitResult = system.waitWritable(\n"
+    "                STDOUT_FILENO, deadline.partialValue\n"
+    "            )\n"
+    "            try requireBeforeDeadline(deadline.partialValue)",
+    "let waitResult = system.waitWritable(\n"
+    "                STDOUT_FILENO, deadline.partialValue\n"
+    "            )",
+)
+mutate(
+    "partial-write-deadline-bypass", "entry",
+    "if offset == data.count { return }\n"
+    "                try requireBeforeDeadline(deadline.partialValue)",
+    "if offset == data.count { return }",
+)
+mutate(
+    "final-write-reclassification", "entry",
+    "if offset == data.count { return }",
+    "if offset == data.count {\n"
+    "                    try requireBeforeDeadline(deadline.partialValue)\n"
+    "                    return\n"
+    "                }",
+)
+mutate_all(
+    "cancellation-precedence-bypass", "entry",
+    "case .cancelled: return .containmentUncertain",
+    "case .cancelled: return .cancelled",
+    2,
+)
+PY
+
+function require_iib5biii_b2b1b_mutation_rejected() {
+    local name=$1 kind=$2 expected=$3
+    local support=$iib5biii_b2b1b_support
+    local entry=$iib5biii_b2b1b_entry
+    local test=$iib5biii_b2b1b_entry_test
+    local target="$contract_root/iib5biii-b2b1b-$name.swift"
+    [[ $kind == support ]] && support=$target
+    [[ $kind == entry ]] && entry=$target
+    [[ $kind == test ]] && test=$target
+    xcrun swiftc -frontend -parse -enable-bare-slash-regex "$target"
+    local output="$contract_root/iib5biii-b2b1b-$name.log"
+    if "$iib5biii_b2b1b_gate" \
+        --iib5biii-b2b1b-zero-entry-contract-only \
+        "$support" "$entry" "$iib5biii_b2b1b_support_test" \
+        "$test" "$iib5biii_b2b1b_boundary" >"$output" 2>&1
+    then
+        fail_contract "iii-b2b-1b mutation accepted: $name"
+    fi
+    require_fixed_text "$output" "$expected"
+}
+for fixture in \
+    completion-digest-bypass:entry:'iii-b2b-1b fixed production composition drifted' \
+    outer-order-bypass:entry:'iii-b2b-1b outer operation ordering drifted' \
+    public-entry:entry:'iii-b2b-1b public or JSON surface drifted' \
+    json-artifact:entry:'iii-b2b-1b public or JSON surface drifted' \
+    selector-surface:entry:'iii-b2b-1b authority or selector surface drifted' \
+    status-collapse:support:'iii-b2b-1b status or facade mapping drifted' \
+    focused-test-vacuity:test:'iii-b2b-1b focused tests became vacuous' \
+    pipe-device-bypass:entry:'iii-b2b-1b fixed production composition drifted' \
+    wait-deadline-bypass:entry:'iii-b2b-1b output deadline drifted' \
+    partial-write-deadline-bypass:entry:'iii-b2b-1b output deadline drifted' \
+    final-write-reclassification:entry:'iii-b2b-1b final output commitment drifted' \
+    cancellation-precedence-bypass:entry:'iii-b2b-1b cancellation precedence drifted'
+do
+    name=${fixture%%:*}; remainder=${fixture#*:}
+    kind=${remainder%%:*}; expected=${remainder#*:}
+    require_iib5biii_b2b1b_mutation_rejected "$name" "$kind" "$expected"
+done
+
+# Verifier-only split scope: exact four paths and <= 1,200 changed lines.
+# The implementation is the baseline and is read-only here.
+iib5biii_b2b1b_paths=(
+    "$iib5biii_b2b1b_boundary"
+    scripts/verify-app-release-boundaries
+    scripts/verify-contract
+    scripts/verify-investigation-boundaries
+)
+(( ${#iib5biii_b2b1b_paths} == 4 )) \
+    || fail_contract "iii-b2b-1b checkpoint path ceiling drifted"
+for fixture in extra-path over-budget deleted binary mode wrong-baseline; do
+    index="$contract_root/iib5biii-b2b1b-scope-$fixture.index"
+    GIT_INDEX_FILE="$index" git read-tree "$iib5biii_b2b1b_baseline^{tree}"
+    baseline=$iib5biii_b2b1b_baseline
+    for checkpoint_path in "${iib5biii_b2b1b_paths[@]}"; do
+        mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
+        blob=$(git hash-object -w -- "$checkpoint_path")
+        GIT_INDEX_FILE="$index" git update-index --add --cacheinfo \
+            "$mode,$blob,$checkpoint_path"
+    done
+    case $fixture in
+        extra-path)
+            blob=$(git rev-parse "${iib5biii_b2b1b_baseline}:AGENTS.md")
+            GIT_INDEX_FILE="$index" git update-index --add --cacheinfo \
+                "100644,$blob,iii-b2b-1b-extra.swift"
+            expected='iii-b2b-1b staged checkpoint paths drifted' ;;
+        over-budget)
+            for line in {1..3000}; do
+                print -r -- "// iii-b2b-1b over-budget $line"
+            done >"$contract_root/iib5biii-b2b1b-over-budget.swift"
+            blob=$(git hash-object -w -- \
+                "$contract_root/iib5biii-b2b1b-over-budget.swift")
+            GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                "100644,$blob,$iib5biii_b2b1b_boundary"
+            expected='iii-b2b-1b checkpoint budget drifted' ;;
+        deleted)
+            GIT_INDEX_FILE="$index" git rm --cached -q -f \
+                "$iib5biii_b2b1b_boundary"
+            expected='iii-b2b-1b checkpoint deleted an existing path' ;;
+        binary)
+            blob=$(git rev-parse \
+                "${iib5biii_b2b1b_baseline}:Tests/Fixtures/Snapshots/design-system.empty-state.dark.en.png")
+            GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                "100644,$blob,$iib5biii_b2b1b_boundary"
+            expected='iii-b2b-1b binary checkpoint path rejected' ;;
+        mode)
+            blob=$(git hash-object -w -- scripts/verify-contract)
+            GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                "100644,$blob,scripts/verify-contract"
+            expected='iii-b2b-1b checkpoint mode drifted: scripts/verify-contract' ;;
+        wrong-baseline)
+            baseline="$iib5biii_b2b1b_baseline^"
+            expected='iii-b2b-1b checkpoint baseline drifted' ;;
+    esac
+    output="$contract_root/iib5biii-b2b1b-scope-$fixture.log"
+    if GIT_INDEX_FILE="$index" "$iib5biii_b2b1b_gate" \
+        --iib5biii-b2b1b-staged-scope-contract-only "$baseline" \
+        >"$output" 2>&1
+    then
+        fail_contract "iii-b2b-1b scope mutation accepted: $fixture"
+    fi
+    require_fixed_text "$output" "$expected"
 done
 
 print "Verifier mode and CI contract verification passed."

@@ -147,6 +147,14 @@ iib5biii_b2b1a1_focused_test_source=
 iib5biii_b2b1a1_boundary_test_source=
 iib5biii_b2b1a1_staged_scope_contract_only=false
 iib5biii_b2b1a1_scope_baseline=31347396b922537e7f11540e47c394fb873c28db
+iib5biii_b2b1b_zero_entry_contract_only=false
+iib5biii_b2b1b_support_source=
+iib5biii_b2b1b_entry_source=
+iib5biii_b2b1b_support_test_source=
+iib5biii_b2b1b_entry_test_source=
+iib5biii_b2b1b_boundary_test_source=
+iib5biii_b2b1b_staged_scope_contract_only=false
+iib5biii_b2b1b_scope_baseline=6b2608258d59787bca592012086a2377d647473e
 iib5bia_projection_contract_only=false
 iib5bia_contract_source=
 iib5bia_focused_test_source=
@@ -482,6 +490,18 @@ if (( $# > 0 )); then
         && [[ $1 == --iib5biii-b2b1a1-staged-scope-contract-only ]]; then
         iib5biii_b2b1a1_staged_scope_contract_only=true
         iib5biii_b2b1a1_scope_baseline=${2:-31347396b922537e7f11540e47c394fb873c28db}
+    elif (( $# == 6 )) \
+        && [[ $1 == --iib5biii-b2b1b-zero-entry-contract-only ]]; then
+        iib5biii_b2b1b_zero_entry_contract_only=true
+        iib5biii_b2b1b_support_source=$2
+        iib5biii_b2b1b_entry_source=$3
+        iib5biii_b2b1b_support_test_source=$4
+        iib5biii_b2b1b_entry_test_source=$5
+        iib5biii_b2b1b_boundary_test_source=$6
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iib5biii-b2b1b-staged-scope-contract-only ]]; then
+        iib5biii_b2b1b_staged_scope_contract_only=true
+        iib5biii_b2b1b_scope_baseline=${2:-6b2608258d59787bca592012086a2377d647473e}
     elif (( $# == 3 )) \
         && [[ $1 == --iib5bia-projection-contract-only ]]; then
         iib5bia_projection_contract_only=true
@@ -678,7 +698,7 @@ if (( $# > 0 )); then
         iib3c_staged_scope_baseline=${2:-HEAD}
     else
         print -u2 \
-            "Usage: scripts/verify-investigation-boundaries [... | --iib5biii-b2b1a0-provenance-contract-only <composition> <bridge> <bridge-test> <protocol-test> <boundary-test> | --iib5biii-b2b1a0-staged-scope-contract-only [baseline] | --iib5biii-b2b1a1-outer-observation-contract-only <app-identity> <outer-observation> <composition> <focused-test> <boundary-test> | --iib5biii-b2b1a1-staged-scope-contract-only [baseline]]"
+            "Usage: scripts/verify-investigation-boundaries [... | --iib5biii-b2b1a0-provenance-contract-only <composition> <bridge> <bridge-test> <protocol-test> <boundary-test> | --iib5biii-b2b1a0-staged-scope-contract-only [baseline] | --iib5biii-b2b1a1-outer-observation-contract-only <app-identity> <outer-observation> <composition> <focused-test> <boundary-test> | --iib5biii-b2b1a1-staged-scope-contract-only [baseline] | --iib5biii-b2b1b-zero-entry-contract-only <support> <entry> <support-test> <entry-test> <boundary-test> | --iib5biii-b2b1b-staged-scope-contract-only [baseline]]"
         exit 64
     fi
 fi
@@ -3932,6 +3952,8 @@ expected_test_sha256 = {
     boundary_path: {
         "3a2981b00b587ee2922b5a50d58ee1950d27c3e13a0116c0fd837e84816cb6dc",
         "91cc60ce1d48b8b78b2b0546e48eb8b985424bab6122f0e03f0202bbe97e7f92",
+        "eea2b35f3a6195b3a62bc8f1a6295a19b0b4dec55b723267ca2574258bf6da8f",
+        "e42cbe4a44a528a1660bf1abb93170c4556d84757d7d692cd1e9c4213276a4b8",
     },
 }
 for path, admitted_sha256 in expected_test_sha256.items():
@@ -4231,11 +4253,17 @@ sources = {
     "boundary": boundary_path.read_text(encoding="utf-8"),
 }
 expected_test_sha256 = {
-    test_path: "6915b679f49427a6801adcac5963debff8e0faf84c964c8aef68680124963f18",
-    boundary_path: "91cc60ce1d48b8b78b2b0546e48eb8b985424bab6122f0e03f0202bbe97e7f92",
+    test_path: {
+        "6915b679f49427a6801adcac5963debff8e0faf84c964c8aef68680124963f18",
+    },
+    boundary_path: {
+        "91cc60ce1d48b8b78b2b0546e48eb8b985424bab6122f0e03f0202bbe97e7f92",
+        "eea2b35f3a6195b3a62bc8f1a6295a19b0b4dec55b723267ca2574258bf6da8f",
+        "e42cbe4a44a528a1660bf1abb93170c4556d84757d7d692cd1e9c4213276a4b8",
+    },
 }
-for path, expected_sha256 in expected_test_sha256.items():
-    if hashlib.sha256(path.read_bytes()).hexdigest() != expected_sha256:
+for path, admitted_sha256 in expected_test_sha256.items():
+    if hashlib.sha256(path.read_bytes()).hexdigest() not in admitted_sha256:
         fail_label = "focused" if path == test_path else "boundary"
         raise SystemExit(
             f"iii-b2b-1a-1 {fail_label} test source seal drifted"
@@ -4439,6 +4467,258 @@ function verify_iib5biii_b2b1a1_scope() {
     (( changed == 2800 )) || {
         print -u2 "iii-b2b-1a-1 implementation line count drifted"
         return 1
+    }
+}
+
+function verify_iib5biii_b2b1b_zero_entry_contract() {
+    local support_path=$1 entry_path=$2 support_test_path=$3
+    local entry_test_path=$4 boundary_path=$5 source_path
+    for source_path in "$support_path" "$entry_path" "$support_test_path" \
+        "$entry_test_path" "$boundary_path"
+    do
+        xcrun swiftc -frontend -parse -enable-bare-slash-regex "$source_path"
+    done
+    python3 - "$support_path" "$entry_path" "$support_test_path" \
+        "$entry_test_path" "$boundary_path" <<'PY'
+from pathlib import Path
+import re
+import subprocess
+import sys
+
+support_path, entry_path, support_test_path, entry_test_path, boundary_path = \
+    map(Path, sys.argv[1:])
+support, entry, support_test, entry_test, boundary = (
+    path.read_text(encoding="utf-8") for path in (
+        support_path, entry_path, support_test_path, entry_test_path,
+        boundary_path,
+    )
+)
+
+def fail(message):
+    raise SystemExit(message)
+
+def imports(source):
+    return set(re.findall(r"(?m)^import\s+([A-Za-z0-9_]+)\s*$", source))
+
+def parse_tree(path):
+    result = subprocess.run(
+        ["xcrun", "swiftc", "-frontend", "-dump-parse", str(path)],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False,
+    )
+    if result.returncode != 0:
+        fail("iii-b2b-1b Swift parse-tree inspection failed")
+    return result.stdout
+
+if imports(support) != {"Darwin"} or imports(entry) != {
+    "Darwin", "Foundation", "StornautInvestigationHandoffContract",
+}:
+    fail("iii-b2b-1b dependency surface drifted")
+if "#if DEBUG" in support + entry or "#endif" in support + entry:
+    fail("iii-b2b-1b production source became Debug-gated")
+entry_tree = parse_tree(entry_path)
+if "access_level=public" in entry_tree or re.search(
+    r"\b(?:Codable|Encodable|Decodable|JSONEncoder|JSONDecoder)\b", entry
+):
+    fail("iii-b2b-1b public or JSON surface drifted")
+for forbidden in (
+    "StornautCore", "StornautExecution", "StornautLifecycle",
+    "StornautCodex", "StornautInvestigationRuntime",
+    "StornautInvestigationDiagnostic", "Executor", "MoveToTrash",
+    "RegisteredAction", "signedRuntimeReady", "NSXPCConnection",
+    "NSXPCListener", "URLSession", "NWConnection", "Process",
+    "FileManager", "FileHandle", "CommandLine", "ProcessInfo",
+):
+    if f'name="{forbidden}"' in entry_tree \
+        or f'field="{forbidden}"' in entry_tree:
+        fail("iii-b2b-1b authority or selector surface drifted")
+for forbidden_call in (
+    "open", "openat", "pwrite", "unlink", "rename", "mkdir",
+    "chmod", "chown", "socket", "connect", "send", "recv",
+    "posix_spawn", "fork", "execve", "kill", "killpg", "waitpid",
+):
+    if re.search(
+        rf'(?:name|field)="{forbidden_call}"[^\n]*function_ref=',
+        entry_tree,
+    ):
+        fail("iii-b2b-1b gained prohibited authority")
+
+support_required = (
+    "package static let completedExitStatus: Int32 = 0",
+    "package static let rootAuthorityRequiredExitStatus: Int32 = 77",
+    "package static let handoffUnavailableExitStatus: Int32 = 78",
+    "package static let installedObservationUnavailableExitStatus: Int32 = 79",
+    "package static let invalidInvocationExitStatus: Int32 = 80",
+    "package static let protocolFailureExitStatus: Int32 = 81",
+    "package static let containmentUncertainExitStatus: Int32 = 82",
+    "package static let cancelledExitStatus: Int32 = 83",
+    "InvestigationMachineZeroArgumentEntry.production(",
+    "try await entry.run()",
+    "case .rootAuthorityRequired:\n            rootAuthorityRequiredExitStatus",
+    "case .installedObservationUnavailable:\n"
+    "            installedObservationUnavailableExitStatus",
+    "case .invalidInvocation, .invalidInput, .invalidRole,\n"
+    "             .invalidOuterDescriptor:\n"
+    "            invalidInvocationExitStatus",
+    "case .protocolFailure, .outputUnavailable, .invalidCompletion:\n"
+    "            protocolFailureExitStatus",
+    "case .containmentUncertain:\n            containmentUncertainExitStatus",
+    "case .cancelled:\n            cancelledExitStatus",
+)
+if any(marker not in support for marker in support_required):
+    fail("iii-b2b-1b status or facade mapping drifted")
+if support.count("public static func run() async -> Int32") != 1:
+    fail("iii-b2b-1b zero-argument facade drifted")
+
+entry_required = (
+    "package enum InvestigationMachineZeroArgumentEntryError",
+    "package struct InvestigationMachineDriverCompletionArtifact",
+    "stornaut.task39.machine.driver-completion",
+    "package static let maximumByteCount = 512",
+    "HandoffBinaryTranscript.encode(", "HandoffBinaryTranscript.decode(",
+    "repeating: 0,", "try value.encoded() == data",
+    "guard InvestigationHandoffSHA256.hashing(zeroed)\n"
+    "                == completionSHA256",
+    "struct InvestigationMachineZeroArgumentRoleSelector",
+    "struct InvestigationMachineZeroArgumentOutputWriter",
+    "struct InvestigationMachineZeroArgumentEntry",
+    "static func production(", "func run() async throws",
+    "InvestigationMachineInstalledDriverObserver(",
+    "InvestigationMachineFixedCapsuleIntake().read()",
+    "InvestigationMachineEightEpochCohort(",
+    "InvestigationMachineDarwinOuterInnerExecutionFactory()",
+    "InvestigationMachineDarwinOuterInnerComposition()", ".runInner()",
+    "checkCancellation: {", "guard !Task.isCancelled else",
+    "Darwin.write(descriptor, bytes.baseAddress, bytes.count)",
+    "node.inode > 0 && node.fileType != 0",
+    "try requireBeforeDeadline(deadline.partialValue)",
+)
+if any(marker not in entry for marker in entry_required):
+    fail("iii-b2b-1b fixed production composition drifted")
+for call, count in {
+    "fcntl": 6, "fstat": 2, "isatty": 1, "tcgetpgrp": 1,
+    "poll": 1,
+}.items():
+    if len(re.findall(rf"\b{call}\s*\(", entry)) != count:
+        fail(f"iii-b2b-1b fixed Darwin call drifted: {call}")
+if entry.count("Darwin.write(") != 1:
+    fail("iii-b2b-1b bounded stdout authority drifted")
+if "node.deviceID > 0 && node.inode > 0" in entry:
+    fail("iii-b2b-1b fixed production composition drifted")
+if entry.count("case .cancelled: return .containmentUncertain") != 2:
+    fail("iii-b2b-1b cancellation precedence drifted")
+if entry.count("if offset == data.count { return }") != 1:
+    fail("iii-b2b-1b final output commitment drifted")
+if entry.count("try requireBeforeDeadline(deadline.partialValue)") != 2:
+    fail("iii-b2b-1b output deadline drifted")
+for descriptor in ("STDIN_FILENO", "STDOUT_FILENO", "STDERR_FILENO"):
+    if descriptor not in entry:
+        fail("iii-b2b-1b fixed descriptor admission drifted")
+for marker in ("requireAbsent(7)", "requireAbsent(8)", "requireAbsent(9)"):
+    if marker not in entry:
+        fail("iii-b2b-1b fixed descriptor admission drifted")
+run_start = entry.index("    func run() async throws")
+run_end = entry.index("    private static func knownOrUncertain(", run_start)
+run = entry[run_start:run_end]
+cursor = 0
+for marker in (
+    "dependencies.validateInvocation()", "dependencies.selectRole()",
+    "dependencies.observeInstalledDriver()", "dependencies.readPlan()",
+    "dependencies.runCohort(plan)",
+    "InvestigationMachineDriverCompletionArtifact(",
+    "dependencies.checkCancellation()",
+    "dependencies.revalidateOuter(observation)",
+    "dependencies.writeArtifact(encoded)",
+):
+    index = run.find(marker, cursor)
+    if index < 0:
+        fail("iii-b2b-1b outer operation ordering drifted")
+    cursor = index + len(marker)
+
+for marker in (
+    "exitStatusesMatchTheFrozenDriverContract",
+    "DriverSupportInvalidInvocation.allCases",
+    "runtimeMapsEveryEntryFailureWithoutInvokingTheDriver",
+    "DriverSupportStatusScenario.allCases",
+    "runtimeReturnsSuccessOnlyAfterTheInjectedEntryCompletes",
+):
+    if marker not in support_test:
+        fail("iii-b2b-1b facade tests became vacuous")
+for marker in (
+    "completionArtifactMatchesIndependentGoldenAndZeroBeforeHash",
+    "completionArtifactRejectsEveryEncodingMutation",
+    "CompletionEncodingMutation.allCases",
+    "roleSelectorPreparesAndRevalidatesExactOuterDescriptors",
+    "roleSelectorRejectsAmbiguousOrInvalidShape",
+    "InvalidRoleShape.allCases",
+    "failureBeforeOutputCommitsNoArtifact",
+    "outputWriterUsesFixedDescriptorAndDeadline",
+    "outputWriterRetriesWaitsAndShortWritesExactly",
+    "outputWriterRejectsDeadlineWaitAndWriteFailures",
+    "outputWriterDoesNotRecheckLateCancellation",
+    "darwinAnonymousPipeIdentityIsAdmittedAsOuterOutput",
+    "compositionCancellationCannotMaskContainmentUncertainty",
+    "completedFinalWriteIsNotReclassifiedByALateClockSample",
+    "deadlineAfterReadiness", "deadlineAfterPartialWrite",
+):
+    if marker not in entry_test:
+        fail("iii-b2b-1b focused tests became vacuous")
+for marker in (
+    "iiiB2B1BIIVerifierPinsZeroArgumentEntryAndMutableScope",
+    "--iib5biii-b2b1b-zero-entry-contract-only",
+    "--iib5biii-b2b1b-staged-scope-contract-only",
+    "--iib5biii-b2b1b-source-contract-only",
+):
+    if marker not in boundary:
+        fail("iii-b2b-1b boundary test became vacuous")
+PY
+}
+
+function verify_iib5biii_b2b1b_scope() {
+    local baseline=${1:-6b2608258d59787bca592012086a2377d647473e}
+    local expected=(
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-app-release-boundaries
+        scripts/verify-contract
+        scripts/verify-investigation-boundaries
+    )
+    (( ${#expected} == 4 )) || {
+        print -u2 "iii-b2b-1b checkpoint path ceiling drifted"; return 1
+    }
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" == \
+        6b2608258d59787bca592012086a2377d647473e ]] || {
+        print -u2 "iii-b2b-1b checkpoint baseline drifted"; return 1
+    }
+    if git diff --cached --name-only --diff-filter=D "$baseline" \
+        | awk 'index($0,"docs/")!=1 {found=1} END {exit !found}'
+    then
+        print -u2 "iii-b2b-1b checkpoint deleted an existing path"; return 1
+    fi
+    if git diff --cached --numstat "$baseline" \
+        | awk 'index($3,"docs/")!=1 && ($1=="-" || $2=="-") {found=1} END {exit !found}'
+    then
+        print -u2 "iii-b2b-1b binary checkpoint path rejected"; return 1
+    fi
+    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD \
+        "$baseline" | awk 'index($0,"docs/")!=1 && $0!="AGENTS.md" && $0!="README.md"')"})
+    [[ "${(j:\n:)${(@on)observed}}" == "${(j:\n:)${(@on)expected}}" ]] || {
+        print -u2 "iii-b2b-1b staged checkpoint paths drifted"; return 1
+    }
+    local checkpoint_path expected_mode entry
+    for checkpoint_path in "${expected[@]}"; do
+        expected_mode=100644
+        [[ $checkpoint_path == scripts/* ]] && expected_mode=100755
+        entry=$(git ls-files -s -- "$checkpoint_path")
+        [[ "$(print -r -- "$entry" | awk '{print $1, $3, $4}')" \
+            == "$expected_mode 0 $checkpoint_path" ]] || {
+            print -u2 \
+                "iii-b2b-1b checkpoint mode drifted: $checkpoint_path"
+            return 1
+        }
+    done
+    local changed=$(git diff --cached --numstat "$baseline" \
+        | awk 'index($3,"docs/")!=1 && $3!="AGENTS.md" && $3!="README.md" {n+=$1+$2} END {print n+0}')
+    (( changed <= 1200 )) || {
+        print -u2 "iii-b2b-1b checkpoint budget drifted"; return 1
     }
 }
 
@@ -10561,6 +10841,21 @@ if $iib5biii_b2b1a1_staged_scope_contract_only; then
     print "iii-b2b-1a-1 staged scope verification passed."
     exit 0
 fi
+if $iib5biii_b2b1b_zero_entry_contract_only; then
+    verify_iib5biii_b2b1b_zero_entry_contract \
+        "$iib5biii_b2b1b_support_source" \
+        "$iib5biii_b2b1b_entry_source" \
+        "$iib5biii_b2b1b_support_test_source" \
+        "$iib5biii_b2b1b_entry_test_source" \
+        "$iib5biii_b2b1b_boundary_test_source"
+    print "iii-b2b-1b zero-argument entry verification passed."
+    exit 0
+fi
+if $iib5biii_b2b1b_staged_scope_contract_only; then
+    verify_iib5biii_b2b1b_scope "$iib5biii_b2b1b_scope_baseline"
+    print "iii-b2b-1b staged scope verification passed."
+    exit 0
+fi
 if $iib5bia_projection_contract_only; then
     verify_iib5bia_projection_contract "$iib5bia_contract_source" "$iib5bia_focused_test_source"
     print "ii-b5b-i-a projection contract verification passed."
@@ -14147,23 +14442,41 @@ function require_exact_machine_driver_projection() {
     local iib5biii_b2b1a1_swiftpm_debug_owned_lines=8200
     local iib5biii_b2b1a1_swiftpm_release_owned_sha=b85e9d441260f2fc2cf193ad1fdb76c0f5957e40ff84d4d1443882a2fccf555b
     local iib5biii_b2b1a1_swiftpm_release_owned_lines=5758
+    # Preserve the completed iii-b2b-1a-1 projection as historical evidence.
+    # Current iii-b2b-1b-ii admission uses separately measured values below.
+    local iib5biii_b2b1a1_swiftpm_debug_undefined_sha=574d07d1ceb6fbe04619f6abde040833c87b3ee0098a3458169aa0f6c484e36f
+    local iib5biii_b2b1a1_swiftpm_debug_undefined_lines=692
+    local iib5biii_b2b1a1_swiftpm_release_undefined_sha=22beeec4664d72ad0809d4788f3574fdae93a239aba0055793245374a4549ba1
+    local iib5biii_b2b1a1_swiftpm_release_undefined_lines=494
+    # iii-b2b-1b-ii current-source projections were measured from a fresh
+    # SwiftPM scratch build; Xcode values remain independently pinned.
+    local iib5biii_b2b1b_swiftpm_debug_undefined_sha=f267aa32579fa4fc216b603638eecbc2065741569bdc81bc713a449bb61b8a8c
+    local iib5biii_b2b1b_swiftpm_debug_undefined_lines=696
+    local iib5biii_b2b1b_swiftpm_release_undefined_sha=7c404634c3da87081f3cd2d716c61df7ad45c8583d22103b95d3e6e956e6f981
+    local iib5biii_b2b1b_swiftpm_release_undefined_lines=499
+    local iib5biii_b2b1b_swiftpm_loads_sha=dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9
+    local iib5biii_b2b1b_swiftpm_loads_lines=18
+    local iib5biii_b2b1b_swiftpm_debug_owned_sha=09cbd025b5367b04fb8a762dab6b20739e77630fed36b21036129977588dbd92
+    local iib5biii_b2b1b_swiftpm_debug_owned_lines=8662
+    local iib5biii_b2b1b_swiftpm_release_owned_sha=8570228a2bb16262520142d397ecee0cd415f42a01b41e142abc983bf1a89270
+    local iib5biii_b2b1b_swiftpm_release_owned_lines=5997
 
     case "$configuration" in
         debug)
-            expected_undefined_sha=574d07d1ceb6fbe04619f6abde040833c87b3ee0098a3458169aa0f6c484e36f
-            expected_undefined_lines=692
-            expected_loads_sha=dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9
-            expected_loads_lines=18
-            expected_owned_sha=$iib5biii_b2b1a1_swiftpm_debug_owned_sha
-            expected_owned_lines=$iib5biii_b2b1a1_swiftpm_debug_owned_lines
+            expected_undefined_sha=$iib5biii_b2b1b_swiftpm_debug_undefined_sha
+            expected_undefined_lines=$iib5biii_b2b1b_swiftpm_debug_undefined_lines
+            expected_loads_sha=$iib5biii_b2b1b_swiftpm_loads_sha
+            expected_loads_lines=$iib5biii_b2b1b_swiftpm_loads_lines
+            expected_owned_sha=$iib5biii_b2b1b_swiftpm_debug_owned_sha
+            expected_owned_lines=$iib5biii_b2b1b_swiftpm_debug_owned_lines
             ;;
         release)
-            expected_undefined_sha=22beeec4664d72ad0809d4788f3574fdae93a239aba0055793245374a4549ba1
-            expected_undefined_lines=494
-            expected_loads_sha=dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9
-            expected_loads_lines=18
-            expected_owned_sha=$iib5biii_b2b1a1_swiftpm_release_owned_sha
-            expected_owned_lines=$iib5biii_b2b1a1_swiftpm_release_owned_lines
+            expected_undefined_sha=$iib5biii_b2b1b_swiftpm_release_undefined_sha
+            expected_undefined_lines=$iib5biii_b2b1b_swiftpm_release_undefined_lines
+            expected_loads_sha=$iib5biii_b2b1b_swiftpm_loads_sha
+            expected_loads_lines=$iib5biii_b2b1b_swiftpm_loads_lines
+            expected_owned_sha=$iib5biii_b2b1b_swiftpm_release_owned_sha
+            expected_owned_lines=$iib5biii_b2b1b_swiftpm_release_owned_lines
             ;;
         *)
             print -u2 "Unknown Machine driver projection: $configuration"
