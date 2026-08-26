@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=c9848645c7d40fe9a309bce6c6590a9371d7aa4e085c205197973b9d81438297
+ib2_self_sha=70a3f80f40ad9cb00c433a7e62e810f3aafb2eedc979c254634c14214c89c047
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -1152,9 +1152,9 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "83ac6ede823a4d259d1bcf6fc36cdc243731afd655e20bbfba8d0ec13ea2aeb0",
+        "5796f79dfc4b2105116da98b19c054b4b89faece7dd8375495e68409463ad4d3",
     Path("scripts/verify-app-release-boundaries"):
-        "a29b85249cb6be507b756ee4d04d5cf3c45894ae9a20ed34966cccf4176672cb",
+        "85d0f3fb465944421caaec0ea51bd5b385ae8d2228a966f5c0ec2799b192b5d6",
 }
 for path, expected_sha in expected.items():
     observed_sha = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -6422,6 +6422,308 @@ do
         --iic0a-staged-scope-contract-only "$baseline" >"$output" 2>&1
     then
         fail_contract "ii-c0a scope mutation accepted: $fixture"
+    fi
+    require_fixed_text "$output" "$expected"
+done
+
+# Task 39 ii-c0b-i DEBUG-only projected-cohort producer gate. This checkpoint
+# proves Debug SwiftPM object and diagnostic-image carriage while Release,
+# ordinary-App and Machine-driver images stay negative and non-reachable.
+iic0bi_gate=scripts/verify-investigation-boundaries
+iic0bi_app_gate=scripts/verify-app-release-boundaries
+iic0bi_baseline=e5ed33e27195d9252f02a89ab39664df3848f1ed
+iic0bi_author=Sources/StornautInvestigationDiagnostic/InvestigationProjectedCohortAuthor.swift
+iic0bi_composition=Sources/StornautInvestigationDiagnostic/InvestigationRuntimeDiagnosticComposition.swift
+iic0bi_focused_test=Tests/StornautInvestigationTests/InvestigationProjectedCohortAuthorTests.swift
+iic0bi_boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+for marker in 'swift build --scratch-path' 'xcodebuild -quiet -project' 'xcrun swift-demangle) || exit $?'; do
+    require_fixed_text "$iic0bi_app_gate" "$marker"
+done
+"$iic0bi_gate" --iic0b-i-producer-contract-only \
+    "$iic0bi_author" "$iic0bi_composition" "$iic0bi_focused_test" \
+    "$iic0bi_boundary" >"$contract_root/iic0bi-canonical.log"
+"$iic0bi_app_gate" --iic0b-i-source-contract-only \
+    "$iic0bi_author" "$iic0bi_composition" \
+    scripts/verify-app-release-boundaries \
+    >"$contract_root/iic0bi-app-canonical.log"
+"$iic0bi_app_gate" --iic0b-i-component-boundary-only \
+    >"$contract_root/iic0bi-component-canonical.log"
+iic0bi_failure_root=$contract_root/iic0bi-component-failure
+mkdir -p "$iic0bi_failure_root/bin" "$iic0bi_failure_root/tmp"
+printf '#!/bin/sh\nexit 97\n' >"$iic0bi_failure_root/bin/swift"
+chmod 755 "$iic0bi_failure_root/bin/swift"
+if PATH="$iic0bi_failure_root/bin:$PATH" TMPDIR="$iic0bi_failure_root/tmp" \
+    "$iic0bi_app_gate" --iic0b-i-component-boundary-only >/dev/null 2>&1
+then fail_contract "ii-c0b-i component command failure was accepted"; fi
+[[ -z "$(find "$iic0bi_failure_root/tmp" -mindepth 1 -print -quit)" ]] \
+    || fail_contract "ii-c0b-i component failure left scratch residue"
+python3 - "$iic0bi_author" "$iic0bi_composition" \
+    "$iic0bi_focused_test" "$contract_root" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+author_path, composition_path, test_path, root = map(Path, sys.argv[1:])
+sources = {
+    "author": author_path.read_text(encoding="utf-8"),
+    "composition": composition_path.read_text(encoding="utf-8"),
+    "test": test_path.read_text(encoding="utf-8"),
+}
+
+def emit(name, kind, source):
+    (root / f"iic0bi-{name}.swift").write_text(source, encoding="utf-8")
+
+def replace_once(name, kind, old, new):
+    source = sources[kind]
+    if source.count(old) != 1:
+        raise SystemExit(f"cannot construct ii-c0b-i mutation: {name}")
+    emit(name, kind, source.replace(old, new, 1))
+
+replace_once(
+    "public-author", "author",
+    "package struct InvestigationProjectedCohortAuthor",
+    "public struct InvestigationProjectedCohortAuthor",
+)
+author_without_end = sources["author"].rsplit("#endif", 1)
+if len(author_without_end) != 2:
+    raise SystemExit("cannot construct ii-c0b-i mutation: codable-binding")
+emit(
+    "codable-binding", "author",
+    author_without_end[0]
+    + "extension InvestigationProjectedCohortInstalledBinding: Codable {}\n"
+    + "#endif" + author_without_end[1],
+)
+replace_once(
+    "debug-guard-bypass", "author", "#if DEBUG", "#if true"
+)
+replace_once(
+    "injectable-production-constructor", "author",
+    "    init(now: @escaping Clock", "    package init(now: @escaping Clock",
+)
+replace_once(
+    "second-scenario-mapping", "composition",
+    "    ) -> InvestigationHandoffScenario {\n        switch scenario {",
+    "    ) -> InvestigationHandoffScenario {\n"
+    + "        switch scenario { case _: break }\n        switch scenario {",
+)
+composition_without_end = sources["composition"].rsplit("#endif", 1)
+if len(composition_without_end) != 2:
+    raise SystemExit("cannot construct ii-c0b-i mutation: production-call-site")
+emit(
+    "production-call-site", "composition",
+    composition_without_end[0]
+    + "private func iic0biPrematureCallSite(\n"
+    + "    _ author: InvestigationProjectedCohortAuthor,\n"
+    + "    data: [Data], binding: InvestigationProjectedCohortInstalledBinding\n"
+    + ") throws { _ = try author.author(configurationData: data, installedBinding: binding) }\n"
+    + "#endif" + composition_without_end[1],
+)
+for name, selector in (
+    ("command-line-selector", "CommandLine.arguments"),
+    ("command-line-argc-selector", "CommandLine.argc"),
+    ("command-line-unsafe-argv-selector", "CommandLine.unsafeArgv"),
+    ("process-arguments-selector", "ProcessInfo.processInfo.arguments"),
+    ("environment-selector", "ProcessInfo.processInfo.environment"),
+    ("user-defaults-selector", "UserDefaults.standard"),
+    ("libc-environment-selector", "getenv(\"PATH\")"),
+):
+    emit(
+        name, "author",
+        author_without_end[0]
+        + f"private let iic0biForbiddenSelector = {selector}\n"
+        + "#endif" + author_without_end[1],
+    )
+emit(
+    "extension-wrapper", "author",
+    author_without_end[0]
+    + "package extension InvestigationProjectedCohortAuthor { func iic0biWrapper() {} }\n"
+    + "#endif" + author_without_end[1],
+)
+emit(
+    "stored-wrapper-call-site", "author",
+    author_without_end[0]
+    + "package let iic0biStoredProducer = InvestigationProjectedCohortAuthor()\n"
+    + "#endif" + author_without_end[1],
+)
+emit(
+    "internal-wrapper-call-site", "author",
+    author_without_end[0]
+    + "let iic0biInternalProducer = InvestigationProjectedCohortAuthor()\n"
+    + "#endif" + author_without_end[1],
+)
+replace_once(
+    "data-extension-wrapper", "author",
+    "private extension Data {", "package extension Data {",
+)
+replace_once(
+    "data-static-wrapper", "author", "private extension Data {",
+    "private extension Data { static func iic0biBridge() { _ = InvestigationProjectedCohortAuthor() }",
+)
+replace_once(
+    "authority-import", "author", "#if DEBUG\n",
+    "#if DEBUG\nimport StornautExecution\n",
+)
+replace_once(
+    "focused-test-vacuity", "test",
+    "canonicalizesAdversarialScenarioOrderAndProjectsEveryField",
+    "canonicalOrderCoverageWasRemoved",
+)
+replace_once(
+    "installed-binding-test-vacuity", "test",
+    "rejectsEveryInvalidInstalledBindingField",
+    "installedBindingValidationCoverageWasRemoved",
+)
+replace_once(
+    "focused-assertion-vacuity", "test",
+    "#expect(output.capsule.outerAttemptUUID == identifiers.outerAttemptUUID)",
+    "#expect(true)",
+)
+PY
+
+function require_iic0bi_mutation_rejected() {
+    local name=$1 kind=$2 expected=$3
+    local author=$iic0bi_author composition=$iic0bi_composition
+    local focused_test=$iic0bi_focused_test
+    local target="$contract_root/iic0bi-$name.swift"
+    [[ $kind == author ]] && author=$target
+    [[ $kind == composition ]] && composition=$target
+    [[ $kind == test ]] && focused_test=$target
+    local output="$contract_root/iic0bi-$name.log"
+    if "$iic0bi_gate" --iic0b-i-producer-contract-only \
+        "$author" "$composition" "$focused_test" "$iic0bi_boundary" \
+        >"$output" 2>&1
+    then
+        fail_contract "ii-c0b-i mutation accepted: $name"
+    fi
+    require_fixed_text "$output" "$expected"
+    if [[ $kind == author || $kind == composition ]]; then
+        local app_root="$contract_root/iic0bi-$name-app-root"
+        mkdir -p \
+            "$app_root/Sources/StornautInvestigationDiagnostic" \
+            "$app_root/scripts"
+        cp "$iic0bi_author" \
+            "$app_root/Sources/StornautInvestigationDiagnostic/InvestigationProjectedCohortAuthor.swift"
+        cp "$iic0bi_composition" \
+            "$app_root/Sources/StornautInvestigationDiagnostic/InvestigationRuntimeDiagnosticComposition.swift"
+        cp scripts/verify-app-release-boundaries \
+            "$app_root/scripts/verify-app-release-boundaries"
+        if [[ $kind == author ]]; then
+            cp "$target" \
+                "$app_root/Sources/StornautInvestigationDiagnostic/InvestigationProjectedCohortAuthor.swift"
+        else
+            cp "$target" \
+                "$app_root/Sources/StornautInvestigationDiagnostic/InvestigationRuntimeDiagnosticComposition.swift"
+        fi
+        output="$contract_root/iic0bi-$name-app.log"
+        if (
+            cd "$app_root"
+            scripts/verify-app-release-boundaries \
+                --iic0b-i-source-contract-only \
+                Sources/StornautInvestigationDiagnostic/InvestigationProjectedCohortAuthor.swift \
+                Sources/StornautInvestigationDiagnostic/InvestigationRuntimeDiagnosticComposition.swift \
+                scripts/verify-app-release-boundaries
+        ) >"$output" 2>&1
+        then
+            fail_contract "ii-c0b-i App mutation accepted: $name"
+        fi
+        require_fixed_text "$output" "$expected"
+    fi
+}
+for fixture in \
+    public-author:author:'ii-c0b-i package-only or Codable surface drifted' \
+    codable-binding:author:'ii-c0b-i package-only or Codable surface drifted' \
+    debug-guard-bypass:author:'ii-c0b-i author DEBUG boundary drifted' \
+    injectable-production-constructor:author:'ii-c0b-i injectable production constructor drifted' \
+    second-scenario-mapping:composition:'ii-c0b-i scenario mapping ownership drifted' \
+    production-call-site:composition:'ii-c0b-i producer gained premature production call site' \
+    extension-wrapper:author:'ii-c0b-i producer gained premature production call site' \
+    stored-wrapper-call-site:author:'ii-c0b-i producer gained premature production call site' \
+    internal-wrapper-call-site:author:'ii-c0b-i producer gained premature production call site' \
+    data-extension-wrapper:author:'ii-c0b-i producer gained premature production call site' \
+    data-static-wrapper:author:'ii-c0b-i producer source seal drifted' \
+    authority-import:author:'ii-c0b-i dependency surface drifted' \
+    command-line-selector:author:'ii-c0b-i producer gained prohibited authority' \
+    command-line-argc-selector:author:'ii-c0b-i producer gained prohibited authority' \
+    command-line-unsafe-argv-selector:author:'ii-c0b-i producer gained prohibited authority' \
+    process-arguments-selector:author:'ii-c0b-i producer gained prohibited authority' \
+    environment-selector:author:'ii-c0b-i producer gained prohibited authority' \
+    user-defaults-selector:author:'ii-c0b-i producer gained prohibited authority' \
+    libc-environment-selector:author:'ii-c0b-i producer gained prohibited authority' \
+    focused-test-vacuity:test:'ii-c0b-i focused tests became vacuous' \
+    installed-binding-test-vacuity:test:'ii-c0b-i focused tests became vacuous' \
+    focused-assertion-vacuity:test:'ii-c0b-i focused test source seal drifted'
+do
+    name=${fixture%%:*}; remainder=${fixture#*:}
+    kind=${remainder%%:*}; expected=${remainder#*:}
+    require_iic0bi_mutation_rejected "$name" "$kind" "$expected"
+done
+
+iic0bi_paths=(
+    "$iic0bi_author"
+    "$iic0bi_composition"
+    "$iic0bi_focused_test"
+    "$iic0bi_boundary"
+    scripts/verify-app-release-boundaries
+    scripts/verify-contract
+    scripts/verify-investigation-boundaries
+)
+iic0bi_index="$contract_root/iic0bi.index"
+GIT_INDEX_FILE="$iic0bi_index" git read-tree "$iic0bi_baseline^{tree}"
+for checkpoint_path in "${iic0bi_paths[@]}"; do
+    blob=$(git hash-object -w -- "$checkpoint_path")
+    mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
+    GIT_INDEX_FILE="$iic0bi_index" git update-index --add \
+        --cacheinfo "$mode,$blob,$checkpoint_path"
+done
+GIT_INDEX_FILE="$iic0bi_index" "$iic0bi_gate" \
+    --iic0b-i-staged-scope-contract-only "$iic0bi_baseline" \
+    >"$contract_root/iic0bi-scope-canonical.log"
+for fixture in extra-path missing-path over-budget deleted binary mode wrong-baseline; do
+    index="$contract_root/iic0bi-scope-$fixture.index"
+    cp "$iic0bi_index" "$index"
+    baseline=$iic0bi_baseline
+    case $fixture in
+        extra-path)
+            blob=$(git rev-parse "${iic0bi_baseline}:AGENTS.md")
+            GIT_INDEX_FILE="$index" git update-index --add --cacheinfo \
+                "100644,$blob,iic0bi-extra.swift"
+            expected='ii-c0b-i checkpoint paths drifted' ;;
+        missing-path)
+            GIT_INDEX_FILE="$index" git rm --cached -q -f "$iic0bi_author"
+            expected='ii-c0b-i checkpoint paths drifted' ;;
+        over-budget)
+            for line in {1..2000}; do
+                print -r -- "// ii-c0b-i over-budget $line"
+            done >"$contract_root/iic0bi-over-budget.swift"
+            blob=$(git hash-object -w -- "$contract_root/iic0bi-over-budget.swift")
+            GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                "100644,$blob,$iic0bi_author"
+            expected='ii-c0b-i checkpoint budget drifted' ;;
+        deleted)
+            GIT_INDEX_FILE="$index" git rm --cached -q -f "$iic0bi_composition"
+            expected='ii-c0b-i checkpoint deleted an existing path' ;;
+        binary)
+            blob=$(git rev-parse \
+                "${iic0bi_baseline}:Tests/Fixtures/Snapshots/design-system.empty-state.dark.en.png")
+            GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                "100644,$blob,$iic0bi_author"
+            expected='ii-c0b-i binary checkpoint path rejected' ;;
+        mode)
+            entry=$(GIT_INDEX_FILE="$index" git ls-files -s -- scripts/verify-contract)
+            blob=$(print -r -- "$entry" | awk '{print $2}')
+            GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                "100644,$blob,scripts/verify-contract"
+            expected='ii-c0b-i checkpoint mode drifted: scripts/verify-contract' ;;
+        wrong-baseline)
+            baseline="$iic0bi_baseline^"
+            expected='ii-c0b-i checkpoint baseline drifted' ;;
+    esac
+    output="$contract_root/iic0bi-scope-$fixture.log"
+    if GIT_INDEX_FILE="$index" "$iic0bi_gate" \
+        --iic0b-i-staged-scope-contract-only "$baseline" \
+        >"$output" 2>&1
+    then
+        fail_contract "ii-c0b-i scope mutation accepted: $fixture"
     fi
     require_fixed_text "$output" "$expected"
 done

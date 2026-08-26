@@ -180,7 +180,9 @@ package actor InvestigationHandoffConcreteAppLeafOperations:
         guard wireSHA.lowercaseHex == machineSHA else {
             return try fail(.invalidConfiguration)
         }
-        let scenario = handoffScenario(decoded.scenario)
+        let scenario = InvestigationHandoffScenarioMapping.handoffScenario(
+            decoded.scenario
+        )
         let acknowledgement: InvestigationHandoffConfigurationAcknowledgement
         do {
             acknowledgement = try .init(
@@ -387,7 +389,10 @@ package actor InvestigationHandoffConcreteAppLeafOperations:
             )
     }
 
-    private func handoffScenario(
+}
+
+package enum InvestigationHandoffScenarioMapping {
+    package static func handoffScenario(
         _ scenario: SignedInvestigationRuntimeDiagnosticScenario
     ) -> InvestigationHandoffScenario {
         switch scenario {

@@ -482,6 +482,148 @@ struct InvestigationMachineTargetBoundaryTests {
         }
     }
 
+    @Test
+    func iiC0BICanonicalProducerVerifierPinsContractAndScope() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let author = try String(
+            contentsOf: root.appending(
+                path: "Sources/StornautInvestigationDiagnostic/InvestigationProjectedCohortAuthor.swift"
+            ),
+            encoding: .utf8
+        )
+        let composition = try String(
+            contentsOf: root.appending(
+                path: "Sources/StornautInvestigationDiagnostic/InvestigationRuntimeDiagnosticComposition.swift"
+            ),
+            encoding: .utf8
+        )
+        let boundaries = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ),
+            encoding: .utf8
+        )
+        let release = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-app-release-boundaries"
+            ),
+            encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        let scope = try l3c3biiFunction(
+            "verify_iic0bi_staged_scope", in: boundaries
+        )
+
+        for marker in [
+            "#if DEBUG",
+            "package struct InvestigationProjectedCohortInstalledBinding",
+            "struct InvestigationProjectedCohortGeneratedIdentifiers",
+            "package struct InvestigationProjectedCohortAuthor",
+            "package init()",
+            "package func author(",
+            "configurationData: [Data]",
+            "installedBinding: InvestigationProjectedCohortInstalledBinding",
+        ] {
+            #expect(author.contains(marker))
+        }
+        #expect(!author.contains("public "))
+        #expect(!author.contains("Codable"))
+        for marker in [
+            "package enum InvestigationHandoffScenarioMapping",
+            "package static func handoffScenario(",
+        ] {
+            #expect(composition.contains(marker))
+        }
+
+        for marker in [
+            "--iic0b-i-producer-contract-only",
+            "--iic0b-i-staged-scope-contract-only",
+            "function verify_iic0bi_producer_contract()",
+            "function verify_iic0bi_index_semantics()",
+            "function verify_iic0bi_staged_scope()",
+            "ii-c0b-i author DEBUG boundary drifted",
+            "ii-c0b-i package-only or Codable surface drifted",
+            "ii-c0b-i injectable production constructor drifted",
+            "ii-c0b-i scenario mapping ownership drifted",
+            "ii-c0b-i producer gained premature production call site",
+            "ii-c0b-i producer source seal drifted",
+            "ii-c0b-i producer gained prohibited authority",
+            "ii-c0b-i focused tests became vacuous",
+            "ii-c0b-i focused test source seal drifted",
+            "ii-c0b-i checkpoint path ceiling drifted",
+            "ii-c0b-i checkpoint baseline drifted",
+            "ii-c0b-i checkpoint deleted an existing path",
+            "ii-c0b-i binary checkpoint path rejected",
+            "ii-c0b-i checkpoint paths drifted",
+            "ii-c0b-i checkpoint mode drifted",
+            "ii-c0b-i checkpoint budget drifted",
+        ] {
+            #expect(boundaries.contains(marker))
+        }
+        for marker in [
+            "e5ed33e27195d9252f02a89ab39664df3848f1ed",
+            "(( ${#expected} == 7 ))",
+            "(( changed <= 1900 ))",
+        ] {
+            #expect(scope.contains(marker))
+        }
+
+        for marker in [
+            "--iic0b-i-source-contract-only",
+            "--iic0b-i-component-boundary-only",
+            "function verify_iic0bi_source_contract()",
+            "iic0bi_component_symbols=(",
+            "iic0bi_swiftpm_debug_object=",
+            "iic0bi_swiftpm_release_object=",
+            "iic0bi_debug_diagnostic_image=",
+            "iic0bi_debug_machine_drivers=(",
+            "iic0bi_closed_images=(",
+            "ii-c0b-i Debug SwiftPM object positive control is missing",
+            "ii-c0b-i Debug diagnostic carriage positive control is missing",
+            "ii-c0b-i Debug Machine driver negative control is missing",
+            "ii-c0b-i producer leaked into Release SwiftPM object",
+            "ii-c0b-i producer leaked into a final image",
+            "xcrun swift-demangle) || exit $?",
+        ] {
+            #expect(release.contains(marker))
+        }
+
+        for marker in [
+            "iic0bi_baseline=e5ed33e27195d9252f02a89ab39664df3848f1ed",
+            "\"$iic0bi_app_gate\" --iic0b-i-component-boundary-only",
+            "ii-c0b-i mutation accepted:",
+            "ii-c0b-i scope mutation accepted:",
+            "public-author", "codable-binding", "debug-guard-bypass",
+            "injectable-production-constructor",
+            "second-scenario-mapping", "production-call-site",
+            "extension-wrapper",
+            "stored-wrapper-call-site",
+            "internal-wrapper-call-site",
+            "data-extension-wrapper",
+            "data-static-wrapper",
+            "authority-import", "command-line-selector",
+            "command-line-argc-selector",
+            "command-line-unsafe-argv-selector",
+            "process-arguments-selector", "environment-selector",
+            "user-defaults-selector", "libc-environment-selector",
+            "focused-test-vacuity",
+            "installed-binding-test-vacuity",
+            "focused-assertion-vacuity",
+            "extra-path", "missing-path", "over-budget", "deleted",
+            "binary", "mode", "wrong-baseline",
+            "--iic0a-replay-source-contract-only",
+            "ii-c0a historical replay failure propagation drifted",
+            "ii-c0a replay current-verifier substitution accepted:",
+            "iib5biii_b2b1b_implementation_commit=1c8ab1d5c06f87f7d2af548228835adcd43a1ae9",
+        ] {
+            #expect(contract.contains(marker))
+        }
+    }
+
     private func l3c3biiSource(
         _ path: String,
         repositoryRoot: URL

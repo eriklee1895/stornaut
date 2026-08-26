@@ -264,6 +264,13 @@ iic0a_intake_test_source=
 iic0a_boundary_test_source=
 iic0a_staged_scope_contract_only=false
 iic0a_staged_scope_baseline=e4a95d4916a55a6bc2854c1b2168c98f7245cd0f
+iic0bi_producer_contract_only=false
+iic0bi_author_source=
+iic0bi_composition_source=
+iic0bi_focused_test_source=
+iic0bi_boundary_test_source=
+iic0bi_staged_scope_contract_only=false
+iic0bi_staged_scope_baseline=e5ed33e27195d9252f02a89ab39664df3848f1ed
 iib3a_staged_scope_contract_only=false
 iib3a_staged_scope_baseline=HEAD
 iib3b_start_retire_contract_only=false
@@ -673,6 +680,17 @@ if (( $# > 0 )); then
         && [[ $1 == --iic0a-staged-scope-contract-only ]]; then
         iic0a_staged_scope_contract_only=true
         iic0a_staged_scope_baseline=${2:-e4a95d4916a55a6bc2854c1b2168c98f7245cd0f}
+    elif (( $# == 5 )) \
+        && [[ $1 == --iic0b-i-producer-contract-only ]]; then
+        iic0bi_producer_contract_only=true
+        iic0bi_author_source=$2
+        iic0bi_composition_source=$3
+        iic0bi_focused_test_source=$4
+        iic0bi_boundary_test_source=$5
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iic0b-i-staged-scope-contract-only ]]; then
+        iic0bi_staged_scope_contract_only=true
+        iic0bi_staged_scope_baseline=${2:-e5ed33e27195d9252f02a89ab39664df3848f1ed}
     elif (( $# == 1 || $# == 2 )) \
         && [[ $1 == --iib3a-staged-scope-contract-only ]]; then
         iib3a_staged_scope_contract_only=true
@@ -3955,6 +3973,10 @@ expected_test_sha256 = {
         "eea2b35f3a6195b3a62bc8f1a6295a19b0b4dec55b723267ca2574258bf6da8f",
         "e42cbe4a44a528a1660bf1abb93170c4556d84757d7d692cd1e9c4213276a4b8",
         "21703fa66674a9c7b705345f04d454dd789865c694e2493afe32eec21e4e6aee",
+        "73694a494dea17ac490af849c821e911fc6156b81905e8797641ebbff6f8d640",
+        "ead096741e6899f0e469bf7c6881974b543121234b7dcae496c6837c11f3b22a",
+        "3a72e900c5c102c1317c1a371dea146126c36829176b810c34e85747d52aab0a",
+        "43e5f15a1fac2644934ecaa11207a182f8ac41c217d93bea56ad1a08b7d7bc1b",
     },
 }
 for path, admitted_sha256 in expected_test_sha256.items():
@@ -4262,6 +4284,10 @@ expected_test_sha256 = {
         "eea2b35f3a6195b3a62bc8f1a6295a19b0b4dec55b723267ca2574258bf6da8f",
         "e42cbe4a44a528a1660bf1abb93170c4556d84757d7d692cd1e9c4213276a4b8",
         "21703fa66674a9c7b705345f04d454dd789865c694e2493afe32eec21e4e6aee",
+        "73694a494dea17ac490af849c821e911fc6156b81905e8797641ebbff6f8d640",
+        "ead096741e6899f0e469bf7c6881974b543121234b7dcae496c6837c11f3b22a",
+        "3a72e900c5c102c1317c1a371dea146126c36829176b810c34e85747d52aab0a",
+        "43e5f15a1fac2644934ecaa11207a182f8ac41c217d93bea56ad1a08b7d7bc1b",
     },
 }
 for path, admitted_sha256 in expected_test_sha256.items():
@@ -7619,6 +7645,246 @@ function verify_iic0a_staged_scope() {
     local changed=$(git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1 && $3!="AGENTS.md" && $3!="README.md" {n+=$1+$2} END {print n+0}')
     (( changed <= 2600 )) || { print -u2 "ii-c0a checkpoint budget drifted"; return 1; }
     verify_iic0a_index_semantics
+}
+
+function verify_iic0bi_producer_contract() {
+    local author_path=$1 composition_path=$2 focused_test_path=$3
+    local boundary_path=$4 source_path
+    for source_path in "$author_path" "$composition_path" \
+        "$focused_test_path" "$boundary_path"
+    do
+        xcrun swiftc -frontend -parse -enable-bare-slash-regex "$source_path"
+    done
+    python3 - "$author_path" "$composition_path" \
+        "$focused_test_path" "$boundary_path" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+author_path, composition_path, test_path, boundary_path = map(
+    Path, sys.argv[1:]
+)
+author = author_path.read_text(encoding="utf-8")
+composition = composition_path.read_text(encoding="utf-8")
+focused_test = test_path.read_text(encoding="utf-8")
+boundary = boundary_path.read_text(encoding="utf-8")
+
+def fail(message):
+    raise SystemExit(message)
+
+lines = [line.strip() for line in author.splitlines() if line.strip()]
+if not lines or lines[0] != "#if DEBUG" or lines[-1] != "#endif" \
+        or lines.count("#if DEBUG") != 1 or lines.count("#endif") != 1:
+    fail("ii-c0b-i author DEBUG boundary drifted")
+imports = set(re.findall(r"(?m)^import\s+([A-Za-z0-9_]+)\s*$", author))
+if imports != {
+    "Foundation", "StornautInvestigation",
+    "StornautInvestigationHandoffContract",
+}:
+    fail("ii-c0b-i dependency surface drifted")
+if re.search(r"(?m)^\s*(?:public|open)\s+", author) or re.search(
+    r"\b(?:Codable|Encodable|Decodable)\b", author
+):
+    fail("ii-c0b-i package-only or Codable surface drifted")
+for marker in (
+    "package struct InvestigationProjectedCohortInstalledBinding",
+    "struct InvestigationProjectedCohortGeneratedIdentifiers",
+    "let outerAttemptUUID: UUID",
+    "let epochUUIDs: [UUID]",
+    "package struct InvestigationProjectedCohortAuthor",
+    "package init()",
+    "package func author(",
+    "configurationData: [Data]",
+    "installedBinding: InvestigationProjectedCohortInstalledBinding",
+    ".decodeValidated(from: bytes, now: now)",
+    "canonicalJSONData()",
+    "machineConfigurationSHA256()",
+    "capabilityEvidenceBindingSHA256()",
+    "InvestigationProjectedCohortInput(",
+    "InvestigationHandoffScenarioMapping.handoffScenario(",
+):
+    if marker not in author:
+        fail(f"ii-c0b-i producer semantic contract drifted: {marker}")
+for field in (
+    "appExecutableSHA256", "appBundleIdentifier",
+    "helperExecutableSHA256", "helperServiceIdentifier",
+    "machineDriverExecutableSHA256", "machineDriverSigningIdentifier",
+    "machineDriverDesignatedRequirementSHA256",
+    "machineDriverCodeDirectoryHash", "machineClaimServiceIdentifier",
+):
+    if author.count(field) < 2:
+        fail(f"ii-c0b-i installed binding projection drifted: {field}")
+binding = re.search(
+    r"(?ms)^package struct InvestigationProjectedCohortInstalledBinding.*?^}\n",
+    author,
+)
+if binding is None or re.search(r"\b(?:URL|path|descriptor)\b", binding.group(0), re.I):
+    fail("ii-c0b-i installed binding gained path or descriptor surface")
+top_level_types = re.findall(
+    r"(?m)^(?:package|internal|public|open|private)?\s*"
+    r"(?:enum|struct|class|actor)\s+([A-Za-z_][A-Za-z0-9_]*)", author
+)
+if top_level_types != [
+    "InvestigationProjectedCohortAuthorError",
+    "InvestigationProjectedCohortInstalledBinding",
+    "InvestigationProjectedCohortGeneratedIdentifiers",
+    "InvestigationProjectedCohortAuthor",
+]:
+    fail("ii-c0b-i producer gained premature production call site")
+if re.search(r"package\s+(?:struct InvestigationProjectedCohortGeneratedIdentifiers|typealias (?:Clock|IdentifierProvider)|init\(\s*now:)", author):
+    fail("ii-c0b-i injectable production constructor drifted")
+if re.search(r"(?m)^(?:(?:package|internal)\s+)?(?:let|var)\s+", author):
+    fail("ii-c0b-i producer gained premature production call site")
+top_level_functions = re.findall(
+    r"(?m)^(?:package|internal|public|open|private)?\s*func\s+"
+    r"([A-Za-z_][A-Za-z0-9_]*)", author
+)
+if top_level_functions != ["lowercaseHexNibble"]:
+    fail("ii-c0b-i producer gained premature production call site")
+if re.findall(
+    r"(?m)^(?:package|internal|public|open|private)?\s*extension\s+"
+    r"([A-Za-z_][A-Za-z0-9_]*)", author
+) != ["Data"] or author.count("private extension Data {") != 1:
+    fail("ii-c0b-i producer gained premature production call site")
+if "InvestigationProjectedCohortAuthor" in composition:
+    fail("ii-c0b-i producer gained premature production call site")
+mapping = re.findall(
+    r"(?ms)^package enum InvestigationHandoffScenarioMapping.*?^}\n",
+    composition,
+)
+if len(mapping) != 1 \
+        or mapping[0].count("package static func handoffScenario(") != 1 \
+        or mapping[0].count("switch scenario") != 1 \
+        or re.search(r"\bswitch\s+scenario\b", author):
+    fail("ii-c0b-i scenario mapping ownership drifted")
+for scenario in (
+    "success", "cancellation", "timeout", "invalidEnvelope",
+    "identityMismatch", "transportLoss", "lifecycleRecovery",
+    "artifactCleanupFailure",
+):
+    if mapping[0].count(f"case .{scenario}: .{scenario}") != 1:
+        fail(f"ii-c0b-i scenario mapping drifted: {scenario}")
+for forbidden in (
+    r"import\s+(?:StornautExecution|StornautLifecycle|StornautProcessSupport)",
+    r"\b(?:ActionExecutor|TrashMoving|RegisteredAction|CleanupExecutionRuntime)\b",
+    r"\b(?:NSXPCConnection|NSXPCListener|URLSession|NWConnection|Process|FileManager|FileHandle)\b",
+    r"\bCommandLine\b|\bProcessInfo\.processInfo\.(?:arguments|environment)\b|\bUserDefaults\b",
+    r"\b(?:getenv|environ|_NSGetArgc|_NSGetArgv)\b",
+    r"\b(?:posix_spawnp?|fork|execv|execve|system|popen|AuthorizationCreate)\s*\(",
+    r"\b(?:Darwin\.)?(?:open|openat|write|unlink|rename|mkdir|socket|connect|send|recv)\s*\(",
+    r"\b(?:O_WRONLY|O_RDWR|O_CREAT|O_TRUNC|O_APPEND)\b",
+    r"\b(?:signedRuntimeReady|readiness)\b",
+):
+    if re.search(forbidden, author, re.I):
+        fail("ii-c0b-i producer gained prohibited authority")
+if __import__("hashlib").sha256(author.encode()).hexdigest() != "33036861e4edbd52cd96f8de3acd4843550365105a55ce32d63ab39a25789ea5":
+    fail("ii-c0b-i producer source seal drifted")
+for marker in (
+    "canonicalizesAdversarialScenarioOrderAndProjectsEveryField",
+    "rejectsInvalidConfigurationsBeforeIdentifierGeneration",
+    "rejectsBindingAndIdentifierFailures",
+    "rejectsNonCanonicalDriverCodeDirectoryHashes",
+    "rejectsEveryInvalidInstalledBindingField",
+    "roundTripsAsCanonicalProjectedCohortInput",
+    "producerSurfaceRemainsPackageOnlyAndAuthorityFree",
+):
+    if marker not in focused_test:
+        fail("ii-c0b-i focused tests became vacuous")
+if __import__("hashlib").sha256(focused_test.encode()).hexdigest() != "95a8c01bb29e19020f56d29072ea991e95f3c96dca73fa8397a9bf8cb4454300":
+    fail("ii-c0b-i focused test source seal drifted")
+for marker in (
+    "iiC0BICanonicalProducerVerifierPinsContractAndScope",
+    "--iic0b-i-producer-contract-only",
+    "--iic0b-i-staged-scope-contract-only",
+    "--iic0b-i-source-contract-only",
+    "--iic0b-i-component-boundary-only",
+):
+    if marker not in boundary:
+        fail(f"ii-c0b-i boundary regression drifted: {marker}")
+PY
+}
+
+function verify_iic0bi_index_semantics() (
+    local staged_root staged_status=0
+    staged_root=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-iic0bi-index.XXXXXX") || return $?
+    trap 'rm -rf "$staged_root"' EXIT
+    trap 'exit 130' INT; trap 'exit 143' TERM
+    git checkout-index --all --prefix="$staged_root/" \
+        || staged_status=$?
+    if (( staged_status == 0 )); then
+        (
+            cd "$staged_root"
+            scripts/verify-investigation-boundaries \
+                --iic0b-i-producer-contract-only \
+                Sources/StornautInvestigationDiagnostic/InvestigationProjectedCohortAuthor.swift \
+                Sources/StornautInvestigationDiagnostic/InvestigationRuntimeDiagnosticComposition.swift \
+                Tests/StornautInvestigationTests/InvestigationProjectedCohortAuthorTests.swift \
+                Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift \
+                || exit $?
+            scripts/verify-app-release-boundaries \
+                --iic0b-i-source-contract-only \
+                Sources/StornautInvestigationDiagnostic/InvestigationProjectedCohortAuthor.swift \
+                Sources/StornautInvestigationDiagnostic/InvestigationRuntimeDiagnosticComposition.swift \
+                scripts/verify-app-release-boundaries \
+                || exit $?
+            scripts/verify-investigation-boundaries \
+                --iic0a-replay-source-contract-only scripts/verify-contract \
+                || exit $?
+        ) || staged_status=$?
+    fi
+    return $staged_status
+)
+
+function verify_iic0bi_staged_scope() {
+    local baseline=${1:-e5ed33e27195d9252f02a89ab39664df3848f1ed}
+    local expected=(
+        Sources/StornautInvestigationDiagnostic/InvestigationProjectedCohortAuthor.swift
+        Sources/StornautInvestigationDiagnostic/InvestigationRuntimeDiagnosticComposition.swift
+        Tests/StornautInvestigationTests/InvestigationProjectedCohortAuthorTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-app-release-boundaries
+        scripts/verify-contract
+        scripts/verify-investigation-boundaries
+    )
+    (( ${#expected} == 7 )) || {
+        print -u2 "ii-c0b-i checkpoint path ceiling drifted"; return 1
+    }
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" == \
+        e5ed33e27195d9252f02a89ab39664df3848f1ed ]] || {
+        print -u2 "ii-c0b-i checkpoint baseline drifted"; return 1
+    }
+    if git diff --cached --name-only --diff-filter=D "$baseline" \
+        | awk 'index($0,"docs/")!=1 {found=1} END {exit !found}'
+    then
+        print -u2 "ii-c0b-i checkpoint deleted an existing path"; return 1
+    fi
+    if git diff --cached --numstat "$baseline" \
+        | awk 'index($3,"docs/")!=1 && ($1=="-" || $2=="-") {found=1} END {exit !found}'
+    then
+        print -u2 "ii-c0b-i binary checkpoint path rejected"; return 1
+    fi
+    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD \
+        "$baseline" | awk 'index($0,"docs/")!=1 && $0!="AGENTS.md" && $0!="README.md"')"})
+    [[ "${(j:\n:)${(@on)observed}}" == "${(j:\n:)${(@on)expected}}" ]] || {
+        print -u2 "ii-c0b-i checkpoint paths drifted"; return 1
+    }
+    local checkpoint_path expected_mode entry
+    for checkpoint_path in "${expected[@]}"; do
+        expected_mode=100644
+        [[ $checkpoint_path == scripts/* ]] && expected_mode=100755
+        entry=$(git ls-files -s -- "$checkpoint_path")
+        [[ "$(print -r -- "$entry" | awk '{print $1, $3, $4}')" \
+            == "$expected_mode 0 $checkpoint_path" ]] || {
+            print -u2 "ii-c0b-i checkpoint mode drifted: $checkpoint_path"
+            return 1
+        }
+    done
+    local changed=$(git diff --cached --numstat "$baseline" \
+        | awk 'index($3,"docs/")!=1 && $3!="AGENTS.md" && $3!="README.md" {n+=$1+$2} END {print n+0}')
+    (( changed <= 1900 )) || {
+        print -u2 "ii-c0b-i checkpoint budget drifted"; return 1
+    }
+    verify_iic0bi_index_semantics
 }
 
 function verify_iib4_staged_scope() {
@@ -11054,6 +11320,18 @@ if $iic0a_staged_scope_contract_only; then
     print "ii-c0a staged scope verification passed."
     exit 0
 fi
+if $iic0bi_producer_contract_only; then
+    verify_iic0bi_producer_contract \
+        "$iic0bi_author_source" "$iic0bi_composition_source" \
+        "$iic0bi_focused_test_source" "$iic0bi_boundary_test_source"
+    print "ii-c0b-i canonical producer verification passed."
+    exit 0
+fi
+if $iic0bi_staged_scope_contract_only; then
+    verify_iic0bi_staged_scope "$iic0bi_staged_scope_baseline"
+    print "ii-c0b-i staged scope verification passed."
+    exit 0
+fi
 if $iib3a_staged_scope_contract_only; then
     verify_iib3a_staged_scope "$iib3a_staged_scope_baseline"
     print "ii-b3a staged scope verification passed."
@@ -11106,6 +11384,8 @@ ordinary_scheme=Stornaut.xcodeproj/xcshareddata/xcschemes/Stornaut.xcscheme
 diagnostic_scheme=Stornaut.xcodeproj/xcshareddata/xcschemes/StornautInvestigationDiagnosticApp.xcscheme
 runtime_root=Sources/StornautInvestigationRuntime
 diagnostic_root=Sources/StornautInvestigationDiagnostic
+iic0bi_author=$diagnostic_root/InvestigationProjectedCohortAuthor.swift
+iic0bi_focused_test=Tests/StornautInvestigationTests/InvestigationProjectedCohortAuthorTests.swift
 lifecycle_root=Sources/StornautLifecycle
 lifecycle_helper=StornautLifecycleHelper/main.swift
 root_topology_observation=$lifecycle_root/LifecycleRootTopologyObservation.swift
@@ -11161,6 +11441,8 @@ required_files=(
     "$runtime_root/InvestigationLifecycleAppServerTransport.swift"
     "$diagnostic_root/InvestigationRuntimeDiagnosticAppLeaf.swift"
     "$diagnostic_root/InvestigationRuntimeDiagnosticComposition.swift"
+    "$iic0bi_author"
+    "$iic0bi_focused_test"
     "$lifecycle_root/LifecycleInteractiveSessionContract.swift"
     "$lifecycle_root/DarwinFixedSystemServiceRegistry.swift"
     "$root_topology_observation"
@@ -11190,6 +11472,11 @@ verify_iic0a_projection_capsule_contract \
     "$machine_fixed_capsule" \
     Tests/StornautInvestigationTests/InvestigationHandoffTransportContractTests.swift \
     "$machine_fixed_capsule_test" \
+    Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+verify_iic0bi_producer_contract \
+    "$iic0bi_author" \
+    "$diagnostic_root/InvestigationRuntimeDiagnosticComposition.swift" \
+    "$iic0bi_focused_test" \
     Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
 verify_iib5biib_app_identity_contract \
     Package.swift \
@@ -12943,6 +13230,7 @@ expected_driver_support_sources = {
     "InvestigationMachineSingleEpochComposition.swift",
     "InvestigationMachineSingleEpochInstalledL2Join.swift",
     "InvestigationMachineSingleEpochPhysicalBridge.swift",
+    "InvestigationMachineZeroArgumentEntry.swift",
 }
 if (
     not driver_support_source_root.is_dir()
@@ -13038,12 +13326,15 @@ expected_driver_support_imports = {
     "InvestigationMachineSingleEpochPhysicalBridge.swift": {
         "Foundation", "StornautInvestigationHandoffContract",
     },
+    "InvestigationMachineZeroArgumentEntry.swift": {
+        "Darwin", "Foundation", "StornautInvestigationHandoffContract",
+    },
 }
 expected_driver_support_sha256 = {
     "DarwinInvestigationMachineInstalledDriverSystem.swift":
         "67a6e9edca7084fc754216bd28410cff9db155760511d6665dd870513d05b1b0",
     "InvestigationMachineDriverSupport.swift":
-        "94bd3f2009759a4e095ccbd759f5e8c0f96955923d23e4da706c531efbe72a71",
+        "a49bfecf70f23dec3cc905c6b63f4e37edd86052342a0c8e409b57cf6cff7fe9",
     "InvestigationMachineFixedCapsuleIntake.swift":
         "d4898e6f9196a169d29107a40063238adf52d9fd8842e2bacdf9b433e09c1dd6",
     "InvestigationMachineInstalledDriverObservation.swift":
@@ -13080,6 +13371,8 @@ expected_driver_support_sha256 = {
         "376148fd9e0284c03e399ed281cd47696bed3c35630cf272fa639b7df99960d2",
     "InvestigationMachineSingleEpochPhysicalBridge.swift":
         "56380d64e5e4519aa1df272c293894aba074c6613c812b3ffbd9dc5df26aa4f2",
+    "InvestigationMachineZeroArgumentEntry.swift":
+        "cc8f24261ab5efe2505b1a36a7ab8dc160cdf22c2a63686a386a756a268bb389",
 }
 for source_name in driver_support_sources:
     source_path = driver_support_source_root / source_name
@@ -13269,6 +13562,8 @@ for source_name in driver_support_sources:
             r"\bfcntl(?=\s*\()", "fixedCapsuleFcntl",
             authority_source,
         )
+    elif source_name == "InvestigationMachineZeroArgumentEntry.swift":
+        authority_source = ""  # exact SHA plus dedicated iii-b2b-1b call-shape gate
     if source_name == "DarwinInvestigationMachineInstalledDriverSystem.swift":
         if re.sub(r"\s+", "", source_text).count(
             "returnresult==0"
@@ -13534,6 +13829,7 @@ if len(matching_products) != 1 or set(
 expected_diagnostic_sources = {
     "InvestigationHandoffAppLeaf.swift",
     "InvestigationHandoffAppLeafAdapter.swift",
+    "InvestigationProjectedCohortAuthor.swift",
     "InvestigationRuntimeDiagnosticAppLeaf.swift",
     "InvestigationRuntimeDiagnosticComposition.swift",
 }

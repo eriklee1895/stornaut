@@ -138,9 +138,13 @@ or process-observation closure.
 
 The new source is entirely `#if DEBUG`, matching every existing source in the
 diagnostic target. c0b-i is component-only: it requires source and SwiftPM
-object/symbol positive evidence plus Release/final-image absence, but makes no
-claim that the producer is reachable from a diagnostic App Mach-O before
-c0b-iv adds its production consumer.
+object/symbol positive evidence. Because Xcode links the complete DEBUG static
+diagnostic target, the Debug diagnostic App dylib is also an expected carriage
+positive control, but source inspection must prove that no production call site
+invokes the producer before c0b-iv. Release objects, ordinary App images, the
+Release diagnostic shell and Machine driver remain negative controls. Binary
+presence in the isolated Debug diagnostic image is not a production-reachability
+or machine-admission claim.
 
 The installed binding initializer accepts only canonical lowercase hashes,
 fixed App/helper/driver/service identifiers and a 40- or 64-character machine
@@ -212,15 +216,15 @@ the ceiling requires another split before continuing.
 - no separate path/URL input, installation/signing/process observation closure,
   descriptor, XPC, model, network, cleanup, readiness or filesystem-write
   surface enters; and
-- source, scope and mutation gates plus Debug SwiftPM object/symbol evidence pin
-  the component; Release and final images must remain negative. c0b-i makes no
-  final-App Mach-O positive-presence claim because no production consumer is
-  added before c0b-iv.
+- source, scope and mutation gates plus Debug SwiftPM object/symbol and Debug
+  diagnostic-image carriage evidence pin the component; Release objects,
+  ordinary App images, the Release diagnostic shell and Machine driver remain
+  negative. Source gating proves there is no production call site before c0b-iv.
 
 Validation order: RED focused tests -> `scripts/verify-investigation-boundaries`
 source/scope gate -> focused and affected tests -> `scripts/verify-contract` ->
-`scripts/verify-app-release-boundaries` Debug SwiftPM component/object positive
-and Release/final-image absence gate -> independent implementation, verifier and
+`scripts/verify-app-release-boundaries` Debug SwiftPM object and diagnostic-image
+carriage positive controls plus Release/closed-image absence gate -> independent implementation, verifier and
 cross-boundary review. No serial or full verifier belongs to this component-only
 checkpoint; the accepted aggregate c0b tree receives one serial at c0b-iv.
 
@@ -505,8 +509,8 @@ contract and authorized c0b-i to start. Earlier findings were closed by:
   the existing configuration decoder's read-only path-metadata validation;
 - sampling one clock once and obtaining all nine generated UUIDs in one call,
   only after semantic and installed-binding validation;
-- limiting c0b-i evidence to its DEBUG component/object boundary and Release/
-  final-image absence;
+- limiting c0b-i evidence to DEBUG component/object and diagnostic-image
+  carriage, proving no call site, and requiring Release/closed-image absence;
 - separating gate transport evidence from later coordinator-owned capsule
   settlement and final receipt assembly; and
 - separating non-privileged stub behavior, production artifact inspection and
