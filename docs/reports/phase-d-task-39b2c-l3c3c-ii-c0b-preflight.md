@@ -181,7 +181,7 @@ producer. No second switch is accepted.
 
 ### 4.2 Exact scope and budget
 
-At most seven non-document paths and 1,900 changed lines:
+Exactly seven non-document paths and at most 1,900 changed lines:
 
 1. `Sources/StornautInvestigationDiagnostic/InvestigationProjectedCohortAuthor.swift` (new);
 2. `Sources/StornautInvestigationDiagnostic/InvestigationRuntimeDiagnosticComposition.swift`;
@@ -217,10 +217,12 @@ the ceiling requires another split before continuing.
   final-App Mach-O positive-presence claim because no production consumer is
   added before c0b-iv.
 
-Validation order: RED focused tests -> source/scope gates -> focused and affected
-tests -> `scripts/verify-contract` -> component/object boundary -> independent
-review. No serial or full verifier belongs to this component-only checkpoint;
-the accepted aggregate c0b tree receives one serial at c0b-iv.
+Validation order: RED focused tests -> `scripts/verify-investigation-boundaries`
+source/scope gate -> focused and affected tests -> `scripts/verify-contract` ->
+`scripts/verify-app-release-boundaries` Debug SwiftPM component/object positive
+and Release/final-image absence gate -> independent implementation, verifier and
+cross-boundary review. No serial or full verifier belongs to this component-only
+checkpoint; the accepted aggregate c0b tree receives one serial at c0b-iv.
 
 ## 5. ii-c0b-ii — Owner-Only Capsule Node
 
