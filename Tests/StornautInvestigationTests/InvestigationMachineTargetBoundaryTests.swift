@@ -2128,8 +2128,9 @@ struct InvestigationMachineTargetBoundaryTests {
             "iii-b2b-1a-1 terminal state machine drifted",
             "iii-b2b-1a-1 production observer factory drifted",
             "iii-b2b-1a-1 staged checkpoint paths drifted",
-            "iii-b2b-1a-1 staged/worktree source drifted",
             "iii-b2b-1a-1 checkpoint budget drifted",
+            "iii-b2b-1a-1 completed tree drifted",
+            "iii-b2b-1a-1 implementation line count drifted",
             "iib5biii_b2b1a1_swiftpm_debug_owned_sha=9eed7d1f1d064fa35bb75525a1dde998fd5f8ded763381381e99d698aea920db",
             "iib5biii_b2b1a1_swiftpm_release_owned_sha=b85e9d441260f2fc2cf193ad1fdb76c0f5957e40ff84d4d1443882a2fccf555b",
             "iib5biii_b2b1a1_swiftpm_debug_owned_lines=8200",
@@ -2139,8 +2140,10 @@ struct InvestigationMachineTargetBoundaryTests {
         }
         for marker in [
             "31347396b922537e7f11540e47c394fb873c28db",
+            "6bd6d38471b4fdfb6e0392d65d8d281b2bf62d28",
             "(( ${#expected} == 8 ))",
             "(( changed <= 2800 ))",
+            "(( changed == 2800 ))",
         ] {
             #expect(scope.contains(marker))
         }
@@ -2156,6 +2159,15 @@ struct InvestigationMachineTargetBoundaryTests {
             "empty-closed", "noop-body", "pre-call-exit",
             "iii-b2b-1a-1 mutation accepted:",
             "iii-b2b-1a-1 scope mutation accepted:",
+            "iib5biii_b2b1a1_implementation_commit=fe4f6add2d752e0241af9379fa67bbdf8d56b8a3",
+            "iib5biii_b2b1a1_implementation_tree=6bd6d38471b4fdfb6e0392d65d8d281b2bf62d28",
+            "iii-b2b-1a-1 implementation parent drifted",
+            "iii-b2b-1a-1 implementation tree drifted",
+            "iii-b2b-1a-1 implementation paths drifted",
+            "iii-b2b-1a-1 implementation line count drifted",
+            "iii-b2b-1a-1 staged/worktree source drifted:",
+            "iii-b2b-1a-1 same-path substitution accepted:",
+            "controlled iii-b2b-1a-1 same-path tamper",
         ] {
             #expect(contract.contains(marker))
         }

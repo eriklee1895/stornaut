@@ -3931,7 +3931,7 @@ expected_test_sha256 = {
     },
     boundary_path: {
         "3a2981b00b587ee2922b5a50d58ee1950d27c3e13a0116c0fd837e84816cb6dc",
-        "760ee87c549d5301115e3944af1085ddfa46bbec18681563b36bd4e35fb1a45a",
+        "91cc60ce1d48b8b78b2b0546e48eb8b985424bab6122f0e03f0202bbe97e7f92",
     },
 }
 for path, admitted_sha256 in expected_test_sha256.items():
@@ -4232,7 +4232,7 @@ sources = {
 }
 expected_test_sha256 = {
     test_path: "6915b679f49427a6801adcac5963debff8e0faf84c964c8aef68680124963f18",
-    boundary_path: "760ee87c549d5301115e3944af1085ddfa46bbec18681563b36bd4e35fb1a45a",
+    boundary_path: "91cc60ce1d48b8b78b2b0546e48eb8b985424bab6122f0e03f0202bbe97e7f92",
 }
 for path, expected_sha256 in expected_test_sha256.items():
     if hashlib.sha256(path.read_bytes()).hexdigest() != expected_sha256:
@@ -4383,6 +4383,7 @@ PY
 
 function verify_iib5biii_b2b1a1_scope() {
     local baseline=${1:-31347396b922537e7f11540e47c394fb873c28db}
+    local implementation_tree=6bd6d38471b4fdfb6e0392d65d8d281b2bf62d28
     local expected=(
         Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinAppIdentityObservation.swift
         Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterObservation.swift
@@ -4415,7 +4416,7 @@ function verify_iib5biii_b2b1a1_scope() {
     [[ "${(j:\n:)${(@on)observed}}" == "${(j:\n:)${(@on)expected}}" ]] || {
         print -u2 "iii-b2b-1a-1 staged checkpoint paths drifted"; return 1
     }
-    local expected_path expected_mode observed_entry staged_blob worktree_blob
+    local expected_path expected_mode observed_entry
     for expected_path in "${expected[@]}"; do
         expected_mode=100644
         [[ $expected_path == scripts/* ]] && expected_mode=100755
@@ -4431,15 +4432,14 @@ function verify_iib5biii_b2b1a1_scope() {
     (( changed <= 2800 )) || {
         print -u2 "iii-b2b-1a-1 checkpoint budget drifted"; return 1
     }
-    for expected_path in "${expected[@]}"; do
-        observed_entry=$(git ls-files -s -- "$expected_path")
-        staged_blob=$(print -r -- "$observed_entry" | awk '{print $2}')
-        worktree_blob=$(git hash-object -- "$expected_path")
-        [[ "$staged_blob" == "$worktree_blob" ]] || {
-            print -u2 "iii-b2b-1a-1 staged/worktree source drifted: $expected_path"
-            return 1
-        }
-    done
+    [[ "$(git write-tree)" == "$implementation_tree" ]] || {
+        print -u2 "iii-b2b-1a-1 completed tree drifted"
+        return 1
+    }
+    (( changed == 2800 )) || {
+        print -u2 "iii-b2b-1a-1 implementation line count drifted"
+        return 1
+    }
 }
 
 function verify_iib5bia_projection_contract() {

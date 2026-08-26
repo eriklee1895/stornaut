@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=2ac44f468c14ded604d0530e8b6b967098ead2b7747f2ede3afc8deb434f7ae4
+ib2_self_sha=97065e55b7b40f6443b6d78f30a0c99914e34028b97645cfc5764e3ef0ff969a
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -1152,7 +1152,7 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "90c0813b99bbf1430384a5f2d6174e04e643842f61bedc3baae1a71a917fa6b5",
+        "dd71a2f413f9b04ef1c846f882ba0f2706cdf67de3cdaa6836abba523561b93d",
     Path("scripts/verify-app-release-boundaries"):
         "54d541372b4db339e1bcbbec56bc59a1440c03b55c7af56294afd8eec7da66ef",
 }
@@ -9655,12 +9655,12 @@ for checkpoint_path in "${iib5biii_b2b1a0_implementation_paths[@]}"; do
     require_fixed_text "$output" "iii-b2b-1a-0 completed tree drifted"
 done
 
-# Task 39 iii-b2b-1a-1 concrete outer observation. The checkpoint is still
-# mutable, so this block pins the reviewed semantic boundary and mutation
-# response without inventing a future implementation commit/tree seal.
+# Task 39 iii-b2b-1a-1 concrete outer observation and immutable completion replay.
 iib5biii_b2b1a1_gate=scripts/verify-investigation-boundaries
 iib5biii_b2b1a1_app_gate=scripts/verify-app-release-boundaries
 iib5biii_b2b1a1_baseline=31347396b922537e7f11540e47c394fb873c28db
+iib5biii_b2b1a1_implementation_commit=fe4f6add2d752e0241af9379fa67bbdf8d56b8a3
+iib5biii_b2b1a1_implementation_tree=6bd6d38471b4fdfb6e0392d65d8d281b2bf62d28
 iib5biii_b2b1a1_app_identity=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinAppIdentityObservation.swift
 iib5biii_b2b1a1_outer=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterObservation.swift
 iib5biii_b2b1a1_composition=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerComposition.swift
@@ -9826,11 +9826,52 @@ iib5biii_b2b1a1_paths=(
 )
 (( ${#iib5biii_b2b1a1_paths} == 8 )) \
     || fail_contract "iii-b2b-1a-1 checkpoint path ceiling drifted"
+[[ "$(git show -s --format=%P \
+    "$iib5biii_b2b1a1_implementation_commit")" == \
+    "$iib5biii_b2b1a1_baseline" ]] \
+    || fail_contract "iii-b2b-1a-1 implementation parent drifted"
+[[ "$(git show -s --format=%T \
+    "$iib5biii_b2b1a1_implementation_commit")" == \
+    "$iib5biii_b2b1a1_implementation_tree" ]] \
+    || fail_contract "iii-b2b-1a-1 implementation tree drifted"
+iib5biii_b2b1a1_observed_paths=(
+    ${(f)"$(git diff-tree --no-commit-id --name-only -r \
+        "$iib5biii_b2b1a1_implementation_commit" | LC_ALL=C sort)"}
+)
+iib5biii_b2b1a1_expected_paths=("${(@on)iib5biii_b2b1a1_paths}")
+[[ "${(j:\n:)iib5biii_b2b1a1_observed_paths}" == \
+    "${(j:\n:)iib5biii_b2b1a1_expected_paths}" ]] \
+    || fail_contract "iii-b2b-1a-1 implementation paths drifted"
+iib5biii_b2b1a1_implementation_lines=$(
+    git diff-tree --numstat --no-commit-id -r \
+        "$iib5biii_b2b1a1_implementation_commit" \
+        | awk 'index($3,"docs/")!=1 && $3!="AGENTS.md" && $3!="README.md" {n += $1 + $2} END {print n + 0}'
+)
+(( iib5biii_b2b1a1_implementation_lines == 2800 )) \
+    || fail_contract "iii-b2b-1a-1 implementation line count drifted"
+
+function verify_iib5biii_b2b1a1_staged_worktree_identity() {
+    local checkpoint_path entry staged_blob worktree_blob
+    for checkpoint_path in "$@"; do
+        entry=$(git ls-files -s -- "$checkpoint_path")
+        staged_blob=$(print -r -- "$entry" | awk '{print $2}')
+        [[ -n $staged_blob ]] || {
+            print -u2 "iii-b2b-1a-1 staged source missing: $checkpoint_path"
+            return 1
+        }
+        worktree_blob=$(git hash-object -- "$checkpoint_path")
+        [[ "$staged_blob" == "$worktree_blob" ]] || {
+            print -u2 \
+                "iii-b2b-1a-1 staged/worktree source drifted: $checkpoint_path"
+            return 1
+        }
+    done
+}
+verify_iib5biii_b2b1a1_staged_worktree_identity \
+    "${iib5biii_b2b1a1_paths[@]}"
 iib5biii_b2b1a1_index="$contract_root/iib5biii-b2b1a1.index"
 GIT_INDEX_FILE="$iib5biii_b2b1a1_index" \
-    git read-tree "$iib5biii_b2b1a1_baseline^{tree}"
-GIT_INDEX_FILE="$iib5biii_b2b1a1_index" \
-    git add -- "${iib5biii_b2b1a1_paths[@]}"
+    git read-tree "$iib5biii_b2b1a1_implementation_commit^{tree}"
 GIT_INDEX_FILE="$iib5biii_b2b1a1_index" \
     "$iib5biii_b2b1a1_gate" \
     --iib5biii-b2b1a1-staged-scope-contract-only \
@@ -9839,10 +9880,27 @@ GIT_INDEX_FILE="$iib5biii_b2b1a1_index" \
 for line in {1..3000}; do
     print -r -- "// iii-b2b-1a-1 over-budget $line"
 done >"$contract_root/iib5biii-b2b1a1-over-budget.swift"
+staged_divergence_index="$contract_root/iib5biii-b2b1a1-staged-worktree-divergence.index"
+cp "$iib5biii_b2b1a1_index" "$staged_divergence_index"
 print -r -- 'import Foundation' \
     >"$contract_root/iib5biii-b2b1a1-staged-divergence.swift"
+blob=$(git hash-object -w -- \
+    "$contract_root/iib5biii-b2b1a1-staged-divergence.swift")
+GIT_INDEX_FILE="$staged_divergence_index" git update-index --cacheinfo \
+    "100644,$blob,$iib5biii_b2b1a1_outer"
+output="$contract_root/iib5biii-b2b1a1-staged-worktree-divergence.log"
+if GIT_INDEX_FILE="$staged_divergence_index" \
+    verify_iib5biii_b2b1a1_staged_worktree_identity \
+        "$iib5biii_b2b1a1_outer" >"$output" 2>&1
+then
+    fail_contract \
+        "iii-b2b-1a-1 scope mutation accepted: staged-worktree-divergence"
+fi
+require_fixed_text "$output" \
+    "iii-b2b-1a-1 staged/worktree source drifted: $iib5biii_b2b1a1_outer"
+
 for fixture in extra-path over-budget deleted binary mode wrong-baseline \
-    missing-required-path staged-worktree-divergence
+    missing-required-path
 do
     index="$contract_root/iib5biii-b2b1a1-$fixture.index"
     cp "$iib5biii_b2b1a1_index" "$index"
@@ -9883,12 +9941,6 @@ do
             GIT_INDEX_FILE="$index" git rm --cached -q -f \
                 "$iib5biii_b2b1a1_outer"
             expected='iii-b2b-1a-1 staged checkpoint paths drifted' ;;
-        staged-worktree-divergence)
-            blob=$(git hash-object -w -- \
-                "$contract_root/iib5biii-b2b1a1-staged-divergence.swift")
-            GIT_INDEX_FILE="$index" git update-index --cacheinfo \
-                "100644,$blob,$iib5biii_b2b1a1_outer"
-            expected="iii-b2b-1a-1 staged/worktree source drifted: $iib5biii_b2b1a1_outer" ;;
     esac
     output="$contract_root/iib5biii-b2b1a1-scope-$fixture.log"
     if GIT_INDEX_FILE="$index" "$iib5biii_b2b1a1_gate" \
@@ -9898,6 +9950,66 @@ do
         fail_contract "iii-b2b-1a-1 scope mutation accepted: $fixture"
     fi
     require_fixed_text "$output" "$expected"
+done
+
+# A controlled iii-b2b-1a-1 same-path tamper changes one byte in an
+# implementation-changed line, preserving the exact line-count budget.
+for checkpoint_path in "${iib5biii_b2b1a1_paths[@]}"; do
+    index="$contract_root/iib5biii-b2b1a1-tamper-${checkpoint_path:t}.index"
+    cp "$iib5biii_b2b1a1_index" "$index"
+    python3 - \
+        "$iib5biii_b2b1a1_baseline" \
+        "$iib5biii_b2b1a1_implementation_commit" \
+        "$checkpoint_path" \
+        "$contract_root/iib5biii-b2b1a1-tampered" <<'PY'
+import difflib
+from pathlib import Path
+import subprocess
+import sys
+
+baseline, implementation, path, output = sys.argv[1:]
+
+def show(revision):
+    completed = subprocess.run(
+        ["git", "show", f"{revision}:{path}"],
+        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False,
+    )
+    return completed.stdout if completed.returncode == 0 else b""
+
+before = show(baseline).splitlines(keepends=True)
+after = show(implementation).splitlines(keepends=True)
+matcher = difflib.SequenceMatcher(a=before, b=after, autojunk=False)
+changed_index = next(
+    (j1 for tag, _i1, _i2, j1, j2 in matcher.get_opcodes()
+     if tag != "equal" and j1 < j2),
+    None,
+)
+if changed_index is None:
+    raise SystemExit(f"cannot construct same-path tamper: {path}")
+line = bytearray(after[changed_index])
+for index, value in enumerate(line):
+    if 0x21 <= value <= 0x7E:
+        line[index] = 0x58 if value != 0x58 else 0x59
+        break
+else:
+    raise SystemExit(f"cannot mutate changed line: {path}")
+after[changed_index] = bytes(line)
+Path(output).write_bytes(b"".join(after))
+PY
+    blob=$(git hash-object -w -- \
+        "$contract_root/iib5biii-b2b1a1-tampered")
+    mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
+    GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+        "$mode,$blob,$checkpoint_path"
+    output="$contract_root/iib5biii-b2b1a1-tamper-${checkpoint_path:t}.log"
+    if GIT_INDEX_FILE="$index" "$iib5biii_b2b1a1_gate" \
+        --iib5biii-b2b1a1-staged-scope-contract-only \
+        "$iib5biii_b2b1a1_baseline" >"$output" 2>&1
+    then
+        fail_contract \
+            "iii-b2b-1a-1 same-path substitution accepted: $checkpoint_path"
+    fi
+    require_fixed_text "$output" "iii-b2b-1a-1 completed tree drifted"
 done
 
 print "Verifier mode and CI contract verification passed."
