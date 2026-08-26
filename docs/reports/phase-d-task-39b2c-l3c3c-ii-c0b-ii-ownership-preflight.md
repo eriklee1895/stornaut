@@ -1,7 +1,7 @@
 # Phase D Task 39B2c L3c3c-ii-c0b-ii Ownership Split Preflight
 
-> Status: ownership mechanism frozen; the ii-c0b-ii-a budget split into a1/a2
-> is frozen and ii-c0b-ii-a1 is the current frontier
+> Status: ownership mechanism and a1/a2 budget split frozen; ii-c0b-ii-a1 is
+> complete/non-admitting and ii-c0b-ii-a2 is the current frontier
 >
 > Date: 2026-08-27
 >
@@ -393,13 +393,13 @@ accept ADR 0018 or enable production Deep Dive.
 | kernel-released exclusive ownership candidate | disposable APFS probe, fixed-inode `flock`, death/exec/last-close cases | preflight complete |
 | unique and replacement-safe node operations | `O_UNIQUE`, safe rename collision/symlink/beneath controls | preflight complete |
 | target machine and bounded probe cleanup | APFS/501:20/0700 hard gates, monotonic IPC/reap, exact `rmdir` | preflight complete |
-| narrow ownership module | target + internal acquirer/final owner + focused tests | ii-c0b-ii-a1 current |
-| permanent lock inode and contention-only active state | a1 source/physical evidence + a2 mutation gates | a1 current; a2 pending |
+| narrow ownership module | target + internal acquirer/final owner + focused tests | ii-c0b-ii-a1 complete |
+| permanent lock inode and contention-only active state | a1 source/physical evidence + a2 mutation gates | a1 complete; a2 current |
 | exact capsule publication | canonical bytes, exclusive rename, fsync/reopen/pread proof | ii-c0b-ii-b pending |
 | one-shot path-free descriptor lease | owner/lease state tests and source gate | ii-c0b-ii-b pending |
 | replacement-safe settlement/recovery | identity-bound busy retry and residue matrix | ii-c0b-ii-b pending |
-| no premature product or privilege reachability | package/source/final-image negative controls | a1/a2/ii-b pending |
-| independent no-P0-P2 review and separate commits | review records and pushed commits | a1/a2/ii-b pending |
+| no premature product or privilege reachability | package/source/final-image negative controls | a1 complete; a2/ii-b pending |
+| independent no-P0-P2 review and separate commits | review records and pushed commits | a1 complete; a2/ii-b pending |
 | aggregate c0b serial | one staged-only run after c0b-iv | later |
 | machine readiness/full verifier | ii-c/L3c3d/L3c4 evidence | later |
 
@@ -422,5 +422,6 @@ no unresolved P0–P2.
 
 The follow-on budget split is frozen in
 [ii-c0b-ii-a Budget Split Preflight](phase-d-task-39b2c-l3c3c-ii-c0b-ii-a-budget-split-preflight.md);
-ii-c0b-ii-a1 is current. Task 39 remains incomplete, ADR 0018 remains Proposed
+ii-c0b-ii-a1 is complete at `d18354b` / tree `d6a4b0e`; ii-c0b-ii-a2 is
+current. Task 39 remains incomplete, ADR 0018 remains Proposed
 and production Deep Dive remains unavailable.

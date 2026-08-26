@@ -33,7 +33,7 @@
 | Agent、双模式与治理设计 | [Agent Disk Governance](design/agent-disk-governance.md) |
 | UI、品牌、状态与交互 | [UI/UX](design/ui-ux.md) |
 | 宏观交付顺序与阶段 Gate | [Delivery Roadmap](plans/roadmap.md) |
-| 当前计划状态 | [Active Plans](plans/active/README.md) — Phase D approved；Task 39 in progress；c0b-i complete/non-admitting，ii-c0b-ii-a1/a2 budget split frozen，ii-c0b-ii-a1 implementation current；ADR 0018 Proposed |
+| 当前计划状态 | [Active Plans](plans/active/README.md) — Phase D approved；Task 39 in progress；c0b-i 与 ii-c0b-ii-a1 complete/non-admitting，ii-c0b-ii-a2 current；ADR 0018 Proposed |
 | Capability-first Codex Runtime Gate | [Runtime Evidence Gate](plans/completed/capability-first-codex-runtime-gate.md) — complete / archived |
 | R2 tests-first brief | [R2 Implementation Brief](plans/completed/task-r2-implementation-brief.md) — complete |
 | R3 lifecycle hard-gate brief | [R3 Implementation Brief](plans/completed/task-r3-implementation-brief.md) — behaviorReady candidate |
@@ -64,7 +64,7 @@
 | Phase D Task 37 Review | [Code Review and Completion Audit](reports/phase-d-task-37-review.md) |
 | Phase D Task 38 | [Implementation Brief](plans/active/task-38-implementation-brief.md) — complete |
 | Phase D Task 38 Review | [Code Review and Completion Audit](reports/phase-d-task-38-review.md) |
-| Phase D Task 39 | [Implementation Brief](plans/active/task-39-implementation-brief.md) — in progress；c0b-i complete/non-admitting，ii-a budget split frozen，ii-c0b-ii-a1 implementation current；remaining order ii-c0b-ii-a1 → ii-c0b-ii-a2 → ii-c0b-ii-b → c0b-iii → c0b-iv → ii-c → L3c3d → L3c4 |
+| Phase D Task 39 | [Implementation Brief](plans/active/task-39-implementation-brief.md) — in progress；c0b-i 与 ii-c0b-ii-a1 complete/non-admitting；remaining order ii-c0b-ii-a2 → ii-c0b-ii-b → c0b-iii → c0b-iv → ii-c → L3c3d → L3c4 |
 | Phase D Task 39A Review | [Code Review and Completion Audit](reports/phase-d-task-39a-review.md) |
 | Phase D Task 39B1a Review | [Code Review and Completion Audit](reports/phase-d-task-39b1a-review.md) |
 | Phase D Task 39B1b-i Review | [Code Review and Completion Audit](reports/phase-d-task-39b1b-i-review.md) |
@@ -152,7 +152,8 @@
 | Phase D Task 39B2c L3c3c-ii-c0b Preflight | [Non-Root Capsule and Launcher Split](reports/phase-d-task-39b2c-l3c3c-ii-c0b-preflight.md) — c0b-i semantic producer → c0b-ii owner-only capsule node → c0b-iii fixed launcher/stub → c0b-iv zero-argument final composition；c0b-ii is further split into ii-c0b-ii-a/ii-c0b-ii-b |
 | Phase D Task 39B2c L3c3c-ii-c0b-i Review | [Semantic Producer Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-c0b-i-review.md) — exact 7 non-document paths / 1,900 changed lines、95 tests / 5 suites、three green gates and no-unresolved-P0–P2 review；complete/non-admitting |
 | Phase D Task 39B2c L3c3c-ii-c0b-ii Preflight | [Ownership Split and Physical Evidence](reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-ownership-preflight.md) — ii-c0b-ii-a kernel ownership → ii-c0b-ii-b capsule owner；ii-a budget split frozen |
-| Phase D Task 39B2c L3c3c-ii-c0b-ii-a Budget Split | [Behavior/Verifier Split Preflight](reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-a-budget-split-preflight.md) — original 7 paths / 2,600 lines → a1 exact 3 paths / 2,000 lines + a2 exact 4 paths / 1,200 lines；a1 current |
+| Phase D Task 39B2c L3c3c-ii-c0b-ii-a Budget Split | [Behavior/Verifier Split Preflight](reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-a-budget-split-preflight.md) — original 7 paths / 2,600 lines → a1 exact 3 paths / 2,000 lines + a2 exact 4 paths / 1,200 lines；a1 complete，a2 current |
+| Phase D Task 39B2c L3c3c-ii-c0b-ii-a1 Review | [Ownership Behavior Completion](reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-a1-review.md) — 3 paths / 1,981 lines、132 concrete cases、target/object/APFS evidence；complete/non-admitting |
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-b0 Preflight | [Outer/Inner Protocol and Split](reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md) — long-lived outer、disposable inner-led PGID、fixed FD contract、parent-crash overlay and iii-a/b1/b2a/b2b budgets；preflight complete/non-admitting |
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-a Review | [Per-Epoch Continuity Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-a-review.md) — exact 10 paths / 3,147 changed lines；40 focused、559 affected、1,446-test/74-suite clean serial；three boundary gates and no unresolved P0–P2；complete/non-admitting |
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-b1 Preflight | [Injected Eight-Epoch Cohort](reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b1-preflight.md) — package-only one-shot actor、final continuity destruction、7 paths / 3,200 lines；complete/non-admitting |

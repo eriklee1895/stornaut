@@ -78,8 +78,9 @@
 > final review. The c0b-ii fresh preflight split it into ii-c0b-ii-a kernel
 > ownership and ii-c0b-ii-b capsule owner. The ii-a budget trigger then froze
 > exact 3-path / 2,000-line a1 behavior and exact 4-path / 1,200-line a2 verifier
-> closure. The current frontier is ii-c0b-ii-a1, followed by ii-c0b-ii-a2,
-> ii-c0b-ii-b, c0b-iii, c0b-iv, ii-c, L3c3d and
+> closure. a1 is complete at `d18354b` / tree `d6a4b0e`, exact 3 paths /
+> 1,981 lines and 132 concrete cases; the current frontier is ii-c0b-ii-a2,
+> followed by ii-c0b-ii-b, c0b-iii, c0b-iv, ii-c, L3c3d and
 > L3c4. The authoritative
 > real-model run and readiness verdict remain unimplemented.
 > Production Deep Dive remains unavailable until Task 44 admission.

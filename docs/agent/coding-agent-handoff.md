@@ -297,8 +297,9 @@
 > serial/full/root/sudo、App/helper/driver launch、XPC、model/auth 或 network。
 > c0b-ii fresh preflight 已完成并拆为 ii-c0b-ii-a/ii-c0b-ii-b；ii-a 又因
 > 7-path / 2,600-line 预算漂移至预计 2,720–2,870 lines，拆为 exact 3-path /
-> 2,000-line a1 behavior 与 exact 4-path / 1,200-line a2 verifier closure。当前
-> frontier 为 ii-c0b-ii-a1，严格按 ii-c0b-ii-a1 → ii-c0b-ii-a2 → ii-c0b-ii-b → c0b-iii →
+> 2,000-line a1 behavior 与 exact 4-path / 1,200-line a2 verifier closure。a1
+> 已以 `d18354b` / tree `d6a4b0e`、3 paths / 1,981 lines、132 concrete cases
+> 与 no-unresolved-P0–P2 review 完成；当前严格按 ii-c0b-ii-a2 → ii-c0b-ii-b → c0b-iii →
 > c0b-iv → ii-c → L3c3d → L3c4 推进。该
 > b5b-ii-c checkpoint 以 8 个 non-document paths / 3,104 changed lines、35
 > focused tests、1,396-test staged-only serial、三个 verifier gates 与 final
@@ -673,8 +674,8 @@ non-admitting；iii-b2b-0、iii-b2b-1a-0 与 iii-b2b-1a-1 已完成并保持
 non-admitting；iii-b2b-1b 已拆为 1b-i/1b-ii 并全部完成、保持
 non-admitting；ii-c0b 已冻结，c0b-i 已完成并保持 non-admitting；c0b-ii
 fresh preflight 已拆为 ii-c0b-ii-a/ii-c0b-ii-b；ii-a budget split 已冻结为
-a1/a2，当前 frontier 为 ii-c0b-ii-a1，随后为 ii-c0b-ii-a1 →
-ii-c0b-ii-a2 → ii-c0b-ii-b → c0b-iii → c0b-iv →
+a1/a2；a1 已完成，当前 frontier 为 ii-c0b-ii-a2，随后为
+ii-c0b-ii-b → c0b-iii → c0b-iv →
 ii-c → L3c3d → L3c4。
 ADR 0018 仍 Proposed，L3c4 独占 final admission 与剩余 full。
 iii-b2b-0 completion evidence 见
@@ -748,7 +749,7 @@ iii-b2a-ii-a1/a2-0/a2-i/a2-ii complete/non-admitting；a2 已冻结并关闭，
 iii-b2b-0、iii-b2b-1a-0、iii-b2b-1a-1 与 iii-b2b-1b
 complete/non-admitting；ii-c0b split frozen，c0b-i complete/non-admitting，
 c0b-ii ownership split complete，ii-a budget split frozen，ii-c0b-ii-a1
-implementation current。
+complete/non-admitting，ii-c0b-ii-a2 current。
 i-b2a completion 见
 [artifact/static reader review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2a-review.md)。
 [fixed service reader review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2b-b-review.md)
@@ -778,7 +779,7 @@ complete/non-admitting；a2 已冻结为 a2-0/a2-i/a2-ii，三项均
 complete/non-admitting，iii-b2b-0、iii-b2b-1a-0、iii-b2b-1a-1 与
 iii-b2b-1b complete/non-admitting；ii-c0b four-way split frozen，c0b-i
 complete/non-admitting，c0b-ii ownership split complete，ii-a budget split
-frozen，ii-c0b-ii-a1 implementation current。
+frozen，ii-c0b-ii-a1 complete/non-admitting，ii-c0b-ii-a2 current。
 ii-a completion 见
 [review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-a-review.md)，ii-b
 completion 见
@@ -804,7 +805,9 @@ no-unresolved-P0–P2 review；c0b-i complete/non-admitting。
 记录 APFS physical evidence 与 ii-c0b-ii-a/ii-c0b-ii-b split；
 [ii-c0b-ii-a budget split](../reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-a-budget-split-preflight.md)
 冻结 exact 3-path / 2,000-line a1 behavior 与 exact 4-path / 1,200-line a2
-verifier closure；当前为 ii-c0b-ii-a1 tests-first implementation。
+verifier closure；a1 completion 见
+[review](../reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-a1-review.md)，当前为
+ii-c0b-ii-a2 verifier closure。
 [ii-b5b-iii-b0 preflight](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md)
 冻结 long-lived outer/disposable inner、FD 0/1/2/7/8/9、inner-led PGID、
 parent-crash containment 与 iii-a/b1/b2a/b2b budgets。
@@ -1011,7 +1014,7 @@ preflight 已冻结，iii-a/iii-b1/iii-b2a0/iii-b2a-i/iii-b2a-ii-a1/a2-0/a2-i/a2
 已完成并保持 non-admitting；a2 已关闭，iii-b2b-0、iii-b2b-1a-0 与
 iii-b2b-1a-1 与拆分后的 iii-b2b-1b-i/1b-ii 已完成并保持
 non-admitting；ii-c0b 已冻结为四段，c0b-i 已完成并保持 non-admitting；
-当前 frontier 为 ii-c0b-ii-a1，之后为 ii-c0b-ii-a2、ii-c0b-ii-b、c0b-iii、
+ii-c0b-ii-a1 已完成；当前 frontier 为 ii-c0b-ii-a2，之后为 ii-c0b-ii-b、c0b-iii、
 c0b-iv、ii-c、L3c3d、L3c4。
 已完成部分均为
 non-admitting prerequisite，

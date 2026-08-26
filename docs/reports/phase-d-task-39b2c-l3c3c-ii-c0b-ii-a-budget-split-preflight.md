@@ -1,14 +1,15 @@
 # Phase D Task 39B2c L3c3c-ii-c0b-ii-a Budget Split Preflight
 
-> Status: mandatory pre-implementation budget split frozen; ii-c0b-ii-a1 is
-> the current frontier
+> Status: mandatory budget split frozen; ii-c0b-ii-a1 complete/non-admitting;
+> ii-c0b-ii-a2 is the current frontier
 >
 > Date: 2026-08-27
 >
 > Preflight baseline: `53b1db4cbaebac0a093d482365c6f8ec4f630bc9`
 >
-> ii-c0b-ii-a2 baseline: **TBD — exact pushed ii-c0b-ii-a1 implementation
-> commit and tree must be recorded before any a2 non-document change**
+> ii-c0b-ii-a2 baseline: implementation commit
+> `d18354bc7ca7dd2ddb04180298f9fb4f2e7c60e3` / tree
+> `d6a4b0ea9f6ee53101fb986fdab5ac4b509de7ad`
 >
 > Scope: split only the already-frozen seven-path ii-c0b-ii-a kernel-ownership
 > checkpoint; preserve its ownership behavior, target boundary, physical
@@ -164,11 +165,11 @@ unavailable.
 | Requirement | Concrete artifact/evidence | Owner/status |
 | --- | --- | --- |
 | record the budget trigger | former 7-path / 2,600-line plan versus accepted 2,720–2,870 estimate and 2,870 aggregate ceiling | frozen here |
-| ownership behavior and target declaration | `Package.swift` + ownership source | ii-c0b-ii-a1 current |
-| tests-first behavioral evidence | focused ownership test file and affected selection | ii-c0b-ii-a1 current |
-| Darwin/APFS semantics | unchanged committed physical probe, run once from a1 | ii-c0b-ii-a1 current |
-| source/test review | independent no-unresolved-P0–P2 review | ii-c0b-ii-a1 pending |
-| immutable child baseline | exact pushed a1 commit/tree replaces `TBD` before a2 | pending |
+| ownership behavior and target declaration | `Package.swift` + ownership source | ii-c0b-ii-a1 complete |
+| tests-first behavioral evidence | 19 entries / 132 concrete cases | ii-c0b-ii-a1 complete |
+| Darwin/APFS semantics | unchanged committed physical probe, exit 0 | ii-c0b-ii-a1 complete |
+| source/test review | independent no-unresolved-P0–P2 review | ii-c0b-ii-a1 complete |
+| immutable child baseline | `d18354b` / tree `d6a4b0e` | recorded |
 | exact source and seven-path scope | target-boundary tests plus Investigation verifier | ii-c0b-ii-a2 pending |
 | component/final-image boundary | App/Release verifier positive and negative controls | ii-c0b-ii-a2 pending |
 | mutation and c0b-i replay | `verify-contract` fixtures and immutable historical replay | ii-c0b-ii-a2 pending |
