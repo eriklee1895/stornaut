@@ -63,8 +63,20 @@ serial、三项 boundary gates 与 independent semantic/verifier/cross-group rev
 或 continuity；iii-b2a-i 已关闭 canonical protocol、one-shot receiver、private
 admission 与 same-owner containment proof；iii-b2a-ii-a1、a2-0、a2-i、
 a2-ii、iii-b2b-0、iii-b2b-1a-0 与 iii-b2b-1a-1 已完成并保持
-non-admitting，当前 checkpoint 为 iii-b2b-1b zero-argument entry/final artifact。其后为
-ii-c0b → ii-c → L3c3d → L3c4；machine admission 尚未发生。
+non-admitting。iii-b2b-1b 因预算触发拆分：1b-i production/focused
+implementation `6b2608258d59787bca592012086a2377d647473e`（tree
+`462d40bfc36954ec60c533e946bbd0019470aa88`）以 5 paths / 2,434 changed
+lines 完成，1,550 tests / 81 suites 通过，4 个 P1 已修复且无 unresolved
+P0–P2；1b-ii verifier/Mach-O implementation
+`1c8ab1d5c06f87f7d2af548228835adcd43a1ae9`（tree
+`d7b6c05fdb90f0db693e8f506e45eae5b98a45f9`）以 4 paths / 971 changed
+lines 完成，`verify-contract` 与 App/Release gates 均 exit 0，独立审查无
+unresolved P0–P2；immutable seal
+`a314b855f9e5d15d3bf7789d95533369b7cb1349`（tree
+`aac9d81a7275e964999ebe1d0d9d057bd8db34a4`）已落盘。1b 整体
+complete/non-admitting，未运行 `verify --full`、root/App/XPC/model/network；
+当前 frontier 为 ii-c0b，后续严格顺序为 ii-c → L3c3d → L3c4；machine
+admission 尚未发生。
 见文档：
 
 | 文档 | 内容 |
@@ -79,7 +91,7 @@ ii-c0b → ii-c → L3c3d → L3c4；machine admission 尚未发生。
 | [docs/assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md](docs/assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md) | 权限受限、安全阻断、部分结果、stale preflight 与历史保留的恢复状态契约 |
 | [docs/reports/epic-2-4-validation-report.md](docs/reports/epic-2-4-validation-report.md) | Phase B domain/persistence、真实 Quick Scan benchmark、accounting、UI 与 scope gate |
 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) | 已归档的 Phase B Tasks 9–26 计划与逐 Task 证据 |
-| [docs/plans/active/README.md](docs/plans/active/README.md) | Phase D approved；Tasks 36–38 complete，Task 39B2c in progress；iii-b2b-1a-1 complete/non-admitting，iii-b2b-1b current；machine admission pending |
+| [docs/plans/active/README.md](docs/plans/active/README.md) | Phase D approved；Tasks 36–38 complete，Task 39B2c in progress；iii-b2b-1b complete/non-admitting，ii-c0b current；machine admission pending |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md) | v1 capsule bytes preserved；frozen enclosing projected-cohort binary contract、8-path/2,600-line ceiling and corrected remaining order |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md) | ii-c0a exact 8-path / 1,863-line completion、90 focused、536 affected、1,418-test serial、boundary gates 与 independent review |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md) | outer/inner protocol、FD 0/1/2/7/8/9、inner-led PGID、parent-crash containment 与五段 bounded split |
@@ -88,7 +100,8 @@ ii-c0b → ii-c → L3c3d → L3c4；machine admission 尚未发生。
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-0-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-0-review.md) | iii-b2b-0 Release graph closure、Debug/Release positive controls、1,517-test serial、immutable replay 与 independent review |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1a0-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1a0-review.md) | iii-b2b-1a-0 canonical helper-provenance carriage、1,525-test serial、clean-build projection、immutable replay 与 independent review |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1a1-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1a1-review.md) | iii-b2b-1a-1 concrete outer observation、1,535-test serial、App/Release gate、immutable replay 与 no unresolved P0–P2 |
-| [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1b-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1b-preflight.md) | iii-b2b-1b zero-argument entry、canonical completion artifact、8-path/2,800-line ceiling 与 tests-first matrix |
+| [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1b-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1b-preflight.md) | iii-b2b-1b historical zero-argument entry preflight、预算触发的 1b-i/1b-ii split 与 final non-admitting outcome |
+| [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1b-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1b-review.md) | iii-b2b-1b production/focused + verifier/Mach-O completion audit、1,550-test serial、App/Release gates、immutable seal 与 no unresolved P0–P2 |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a0-typed-physical-bridge-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a0-typed-physical-bridge-preflight.md) | iii-b2a0 typed invocation/result bridge、untrusted DTO boundary、8-path/2,200-line ceiling 与 validation funnel |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a0-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a0-review.md) | iii-b2a0 exact 8-path / 2,198-line completion、36 combined、580 affected、1,462-test serial、immutable seal 与 no unresolved P0–P2；complete/non-admitting |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-i-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-i-review.md) | iii-b2a-i canonical supervisor admission、12 focused、593 affected、1,475-test serial、three boundary gates、immutable seal 与 no unresolved P0–P2；complete/non-admitting |

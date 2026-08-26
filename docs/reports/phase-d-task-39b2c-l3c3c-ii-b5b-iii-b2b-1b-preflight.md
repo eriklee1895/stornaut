@@ -1,11 +1,22 @@
 # Phase D Task 39B2c iii-b2b-1b Zero-Argument Entry Preflight
 
-> Status: scope, trust boundary and tests-first matrix frozen; implementation
-> not started
+> Status: historical scope/trust preflight; implementation split into
+> iii-b2b-1b-i and iii-b2b-1b-ii; both complete / non-admitting
 >
 > Date: 2026-08-26
 >
 > Baseline: `9dfabc0ee666d3667cb6bb42cc888d3ac676d125`
+>
+> Production/focused implementation:
+> `6b2608258d59787bca592012086a2377d647473e` (tree
+> `462d40bfc36954ec60c533e946bbd0019470aa88`)
+>
+> Verifier/Mach-O implementation:
+> `1c8ab1d5c06f87f7d2af548228835adcd43a1ae9` (tree
+> `d7b6c05fdb90f0db693e8f506e45eae5b98a45f9`)
+>
+> Immutable verifier seal: `a314b855f9e5d15d3bf7789d95533369b7cb1349`
+> (tree `aac9d81a7275e964999ebe1d0d9d057bd8db34a4`)
 >
 > Scope: source, test and verifier inspection only. No driver execution, App or
 > helper launch, XPC, install, root/sudo, model/auth/network use, serialized
@@ -13,9 +24,24 @@
 
 ## 1. Decision
 
-iii-b2b-1b can remain one bounded checkpoint. The current DriverSupport target
-already contains every heavy component required by the final non-admitting
-driver join:
+The original preflight allowed iii-b2b-1b to remain one bounded checkpoint,
+but implementation reached its 2,800-line split condition. It was therefore
+closed as two independently reviewed checkpoints rather than allowing the
+original review surface to grow:
+
+- `iii-b2b-1b-i` owns production and focused tests: exact 5 paths / 2,434
+  changed lines, implementation commit
+  `6b2608258d59787bca592012086a2377d647473e`, tree
+  `462d40bfc36954ec60c533e946bbd0019470aa88`; and
+- `iii-b2b-1b-ii` owns verifier and final Mach-O admission: exact 4 paths /
+  971 changed lines, implementation commit
+  `1c8ab1d5c06f87f7d2af548228835adcd43a1ae9`, tree
+  `d7b6c05fdb90f0db693e8f506e45eae5b98a45f9`, followed by immutable verifier
+  seal `a314b855f9e5d15d3bf7789d95533369b7cb1349`, tree
+  `aac9d81a7275e964999ebe1d0d9d057bd8db34a4`.
+
+The DriverSupport target already contained every heavy component required by
+the final non-admitting driver join:
 
 - fixed FD-0 projected-cohort intake;
 - one-shot eight-epoch cohort execution;
@@ -30,10 +56,10 @@ The local Swift package automatically includes a new source in the existing
 target; the Xcode driver links that package product. `Package.swift`, the Xcode
 project and the executable `main.swift` therefore remain unchanged.
 
-The checkpoint stops and splits into `iii-b2b-1b-i` role/cohort entry and
-`iii-b2b-1b-ii` artifact/output if it needs a second new production source, a
-Package/Xcode/main change, a session/composition/intake/cohort change, more than
-eight non-document paths or more than 2,800 changed non-document lines.
+The preflight's stop rule was exercised: `iii-b2b-1b-i` closed the
+role/cohort/artifact production behavior and focused regression, while
+`iii-b2b-1b-ii` independently closed verifier and final-Mach-O coverage. The
+split did not widen the runtime contract or admit machine readiness.
 
 ## 2. Frozen Runtime Flow
 
@@ -127,7 +153,7 @@ to protocol failure or success.
 
 ## 5. Exact Non-Document Scope and Cost
 
-At most these eight paths may change:
+The original unsplit preflight allowed at most these eight paths to change:
 
 1. `Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDriverSupport.swift`
 2. `Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineZeroArgumentEntry.swift` (new)
@@ -138,7 +164,10 @@ At most these eight paths may change:
 7. `scripts/verify-investigation-boundaries`
 8. `scripts/verify-app-release-boundaries`
 
-The target range is 2,150–2,600 changed lines; the hard ceiling is 2,800.
+The original target range was 2,150–2,600 changed lines with a hard ceiling of
+2,800. The implementation correctly split instead of exceeding that single
+checkpoint budget: 1b-i closed at exact 5 paths / 2,434 changed lines and
+1b-ii closed at exact 4 paths / 971 changed lines.
 `Package.swift`, `Stornaut.xcodeproj`, `tools/StornautInvestigationMachineDriver/
 main.swift`, capsule/cohort/session/composition/observer sources and the
 HandoffContract target are explicitly excluded.
@@ -199,22 +228,37 @@ source/scope/behavior RED
 -> separate verifier-only immutable seal
 ```
 
+The completed outcome follows that split funnel:
+
+- 1b-i passed 1,550 tests across 81 suites. Independent review found four P1
+  issues; all four were fixed tests-first, and the post-fix review left no
+  unresolved P0–P2.
+- 1b-ii passed `scripts/verify-contract` and the App/Release boundary gate with
+  exit 0. Its independent review left no unresolved P0–P2.
+- The verifier-only immutable seal is commit
+  `a314b855f9e5d15d3bf7789d95533369b7cb1349` with tree
+  `aac9d81a7275e964999ebe1d0d9d057bd8db34a4`.
+- The detailed completion evidence is indexed by the
+  [iii-b2b-1b review](phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1b-review.md).
+
 This checkpoint does not run `scripts/verify --full`, install or launch the
 fixed App/helper, invoke real XPC, use root/sudo, call Codex/App Server, read
 subscription auth, access the network, accept ADR 0018, produce machine
-readiness or enable Deep Dive. Task 39 remains incomplete. After 1b the strict
-order remains `ii-c0b -> ii-c -> L3c3d -> L3c4`; only L3c4 owns the final
-authoritative full verifier.
+readiness or enable Deep Dive. It used no root/App/XPC/model/network execution.
+Task 39 remains incomplete and iii-b2b-1b is complete/non-admitting. The current
+frontier is `ii-c0b`; the strict remaining order is
+`ii-c0b -> ii-c -> L3c3d -> L3c4`. Only L3c4 owns the final authoritative full
+verifier.
 
 ## 8. Prompt-to-Artifact Checklist
 
-| Requirement | Evidence required | Preflight state |
+| Requirement | Completion evidence | State |
 | --- | --- | --- |
-| zero-argument fixed role selection | injected role/descriptor RED tests and fixed production adapter | frozen |
-| reuse existing trusted graph | source gate pins intake/cohort/factory/runInner calls | frozen |
-| canonical non-admitting artifact | golden bytes, mutation matrix and self-digest tests | frozen |
-| bounded exact stdout | injected short-write/EINTR/zero/error tests | frozen |
-| fixed error precedence | exhaustive injected error/status matrix | frozen |
-| Debug/Release reachability, product absence | exact final-Mach-O positive/negative controls | frozen |
-| scope/cost discipline | eight-path, 2,800-line staged gate | frozen |
-| no premature admission | no root/App/XPC/model/full/readiness execution | frozen |
+| zero-argument fixed role selection | 1b-i production/focused implementation and focused regression | complete |
+| reuse existing trusted graph | 1b-i source gate pins intake/cohort/factory/runInner calls | complete |
+| canonical non-admitting artifact | 1b-i golden bytes, mutation matrix and self-digest tests | complete |
+| bounded exact stdout | 1b-i short-write/EINTR/zero/error tests | complete |
+| fixed error precedence | 1b-i exhaustive injected error/status matrix | complete |
+| Debug/Release reachability, product absence | 1b-ii exact final-Mach-O controls plus immutable seal | complete |
+| scope/cost discipline | split at original 2,800-line ceiling; 5-path/2,434-line and 4-path/971-line checkpoints | complete |
+| no premature admission | no full/root/App/XPC/model/network/readiness execution | complete / non-admitting |

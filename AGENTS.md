@@ -342,7 +342,8 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   随后全部完成并保持 non-admitting；iii-b2b-0 Release graph closure 也已
   完成并保持 non-admitting；iii-b2b-1a-0 canonical helper-provenance
   carriage 与 iii-b2b-1a-1 concrete outer observation 也已完成并保持
-  non-admitting，当前 frontier 为 iii-b2b-1b。
+  non-admitting；iii-b2b-1b 已拆为 1b-i/1b-ii 并全部完成、保持
+  non-admitting，当前 frontier 为 ii-c0b。
   iii-b2a0 以
   exact 8 non-document paths / 2,198 changed lines、
   36-test/3-suite combined bridge+continuity+cohort、580-test/43-suite affected、
@@ -380,8 +381,14 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   `fe4f6ad` / tree `6bd6d384`、immutable seal `2c31a7c`、exact 8
   non-document paths / 2,800 changed lines、1,535-test/80-suite staged serial、
   complete App/Release and contract gates 与 no-unresolved-P0–P2 review
-  收口。当前 iii-b2b-1b，随后严格按 iii-b2b-1b → ii-c0b → ii-c →
-  L3c3d → L3c4 推进。
+  收口。iii-b2b-1b 随后按预算拆成 1b-i/1b-ii：1b-i 以 implementation
+  `6b26082` / tree `462d40b`、exact 5 paths / 2,434 changed lines、
+  1,550-test/81-suite serial 与 post-fix no-unresolved-P0–P2 review 收口；
+  1b-ii 以 implementation `1c8ab1d` / tree `d7b6c05`、exact 4 paths /
+  971 changed lines、contract/App-Release exit 0、immutable seal `a314b85` /
+  tree `aac9d81` 与 no-unresolved-P0–P2 review 收口。两者均
+  complete/non-admitting；当前 frontier 为 ii-c0b，随后严格按
+  ii-c0b → ii-c → L3c3d → L3c4 推进。
   该 ii-b5b-ii-c checkpoint 以 8 个
   non-document paths / 3,104 changed lines、35 focused tests、
   1,396-test staged-only serial、三个 verifier gates 与 final
@@ -577,6 +584,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c-L1 residue observation review | [docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md](docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md) |
 | Phase D Task 39B2c iii-b2b-1a-1 outer observation review | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1a1-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1a1-review.md) |
 | Phase D Task 39B2c iii-b2b-1b zero-argument entry preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1b-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1b-preflight.md) |
+| Phase D Task 39B2c iii-b2b-1b zero-argument entry review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1b-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1b-review.md) |
 | Phase D Task 39B2c-L2 root topology observation review | [docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md](docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md) |
 | Phase D Task 39B2c-L3a trusted machine target review | [docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md](docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md) |
 | Epic 2–4 历史计划 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) |
@@ -730,9 +738,9 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   entry/artifact。b0 已冻结，iii-a、iii-b1、iii-b2a0、iii-b2a-i 与
   iii-b2a-ii-a1、a2-0、a2-i 与 a2-ii 已完成并保持 non-admitting；iii-b2b-0
   Release graph closure、iii-b2b-1a-0 canonical helper-provenance carriage 与
-  iii-b2b-1a-1 concrete outer observation 也已完成并保持 non-admitting，当前
-  frontier 为 iii-b2b-1b，严格后续顺序为 iii-b2b-1b zero-argument
-  entry/final artifact → ii-c0b non-root capsule author +
+  iii-b2b-1a-1 concrete outer observation 与 iii-b2b-1b zero-argument
+  entry/final artifact 也已完成并保持 non-admitting；当前 frontier 为
+  ii-c0b，严格后续顺序为 ii-c0b non-root capsule author +
   launcher/TTY/FD hygiene → ii-c
   privileged no-model gate → L3c3d → L3c4。
   ADR 0018 仍 Proposed；L3c4 独占 final admission 与
