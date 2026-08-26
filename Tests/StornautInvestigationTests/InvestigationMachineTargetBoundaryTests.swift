@@ -587,6 +587,7 @@ struct InvestigationMachineTargetBoundaryTests {
             "InvestigationMachineDarwinEpochSession.swift",
             "InvestigationMachineDarwinEpochRetirement.swift",
             "InvestigationMachineDarwinDriverChildObservation.swift",
+            "InvestigationMachineDarwinOuterObservation.swift",
             "InvestigationMachineDarwinOuterInnerComposition.swift",
             "InvestigationMachineDarwinOuterInnerProtocol.swift",
             "InvestigationMachineDarwinOuterInnerSession.swift",
@@ -726,6 +727,12 @@ struct InvestigationMachineTargetBoundaryTests {
             "InvestigationMachineDarwinDriverChildObservation.swift": [
                 "import CInvestigationIdentitySupport",
                 "import Darwin",
+            ],
+            "InvestigationMachineDarwinOuterObservation.swift": [
+                "import Darwin",
+                "import Foundation",
+                "import StornautInvestigationHandoffContract",
+                "import StornautInvestigationInstalledL2",
             ],
             "InvestigationMachineDarwinOuterInnerComposition.swift": [
                 "import Darwin",
@@ -1734,6 +1741,9 @@ struct InvestigationMachineTargetBoundaryTests {
                 path: "scripts/verify-app-release-boundaries"
             ), encoding: .utf8
         )
+        let scope = try l3c3biiFunction(
+            "verify_iib5biii_b2a_iia20_scope", in: boundary
+        )
         for marker in [
             "--iib5biii-b2a-ii-a20-contract-only",
             "--iib5biii-b2a-ii-a20-scope-contract-only",
@@ -1744,11 +1754,15 @@ struct InvestigationMachineTargetBoundaryTests {
             "iii-b2a-ii-a2-0 authority surface drifted",
             "iii-b2a-ii-a2-0 staged checkpoint paths drifted",
             "iii-b2a-ii-a2-0 checkpoint budget drifted",
+        ] {
+            #expect(boundary.contains(marker))
+        }
+        for marker in [
             "b46120d3161b5992018f4b990382bd6ced49d599",
             "(( ${#expected} == 8 ))",
             "(( changed <= 1800 ))",
         ] {
-            #expect(boundary.contains(marker))
+            #expect(scope.contains(marker))
         }
         for marker in [
             "iib5biii_b2a_iia20_gate=scripts/verify-investigation-boundaries",
@@ -1962,7 +1976,6 @@ struct InvestigationMachineTargetBoundaryTests {
                 path: "scripts/verify-app-release-boundaries"
             ), encoding: .utf8
         )
-
         for marker in [
             "--iib5biii-b2b0-release-graph-contract-only",
             "--iib5biii-b2b0-staged-scope-contract-only",
@@ -2078,6 +2091,90 @@ struct InvestigationMachineTargetBoundaryTests {
             "--iib5biii-b2b1a0-source-contract-only",
             "function verify_iib5biii_b2b1a0_source_contract()",
             "iii-b2b-1a-0 source-only App boundary verification passed.",
+        ] {
+            #expect(app.contains(marker))
+        }
+    }
+
+    @Test
+    func iiiB2B1A1VerifierPinsConcreteOuterObservationAndExactScope() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ), encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        let app = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-app-release-boundaries"
+            ), encoding: .utf8
+        )
+        let scope = try l3c3biiFunction(
+            "verify_iib5biii_b2b1a1_scope", in: boundary
+        )
+
+        for marker in [
+            "--iib5biii-b2b1a1-outer-observation-contract-only",
+            "--iib5biii-b2b1a1-staged-scope-contract-only",
+            "function verify_iib5biii_b2b1a1_outer_observation_contract()",
+            "function verify_iib5biii_b2b1a1_scope()",
+            "iii-b2b-1a-1 same-version identity drift acceptance",
+            "iii-b2b-1a-1 canonical claim evidence binding drifted",
+            "iii-b2b-1a-1 terminal state machine drifted",
+            "iii-b2b-1a-1 production observer factory drifted",
+            "iii-b2b-1a-1 staged checkpoint paths drifted",
+            "iii-b2b-1a-1 staged/worktree source drifted",
+            "iii-b2b-1a-1 checkpoint budget drifted",
+            "iib5biii_b2b1a1_swiftpm_debug_owned_sha=9eed7d1f1d064fa35bb75525a1dde998fd5f8ded763381381e99d698aea920db",
+            "iib5biii_b2b1a1_swiftpm_release_owned_sha=b85e9d441260f2fc2cf193ad1fdb76c0f5957e40ff84d4d1443882a2fccf555b",
+            "iib5biii_b2b1a1_swiftpm_debug_owned_lines=8200",
+            "iib5biii_b2b1a1_swiftpm_release_owned_lines=5758",
+        ] {
+            #expect(boundary.contains(marker))
+        }
+        for marker in [
+            "31347396b922537e7f11540e47c394fb873c28db",
+            "(( ${#expected} == 8 ))",
+            "(( changed <= 2800 ))",
+        ] {
+            #expect(scope.contains(marker))
+        }
+        for marker in [
+            "same-version-identity-drift",
+            "canonical-evidence-bypass",
+            "zero-request-binding-bypass",
+            "shared-driver-digest-bypass",
+            "terminalizing-reentrancy-bypass",
+            "epoch-deadline-bypass",
+            "admission-pre-mint-cancellation-bypass",
+            "same-observer-factory-bypass",
+            "empty-closed", "noop-body", "pre-call-exit",
+            "iii-b2b-1a-1 mutation accepted:",
+            "iii-b2b-1a-1 scope mutation accepted:",
+        ] {
+            #expect(contract.contains(marker))
+        }
+        for marker in [
+            "--iib5biii-b2b1a1-source-contract-only",
+            "function verify_iib5biii_b2b1a1_source_contract()",
+            "iib5biii_b2b1a1_symbols=(",
+            "iib5biii_b2b1a1_positive_drivers=(",
+            "iib5biii_b2b1a1_closed_images=(",
+            "verify_iib5biii_b2b1a1_macho()",
+            "iii-b2b-1a-1 driver positive control is missing",
+            "iii-b2b-1a-1 observer leaked into a closed image",
+            "iii-b2b-1a-1 Mach-O symbol allowlist drifted",
+            "iii-b2b-1a-1 Mach-O function body drifted",
+            "iib5biii_b2b1a1_xcode_debug_owned_sha256=d7dea7fb7f2878d4c80180b7347a0b2a6acc4c9302c44a8484f466a362f0102e",
+            "iib5biii_b2b1a1_xcode_release_owned_sha256=ad34b88c0d364aec5568d8221f1eb7b72e63d2f49058695defec0743585217f6",
+            "iib5biii_b2b1a1_xcode_debug_owned_lines=8199",
+            "iib5biii_b2b1a1_xcode_release_owned_lines=5757",
+            "iii-b2b-1a-1 source-only App boundary verification passed.",
         ] {
             #expect(app.contains(marker))
         }

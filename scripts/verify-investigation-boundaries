@@ -139,6 +139,14 @@ iib5biii_b2b1a0_protocol_test_source=
 iib5biii_b2b1a0_boundary_test_source=
 iib5biii_b2b1a0_staged_scope_contract_only=false
 iib5biii_b2b1a0_scope_baseline=d643b8fd500be29736a962dcd0c270304b490828
+iib5biii_b2b1a1_outer_observation_contract_only=false
+iib5biii_b2b1a1_app_identity_source=
+iib5biii_b2b1a1_outer_observation_source=
+iib5biii_b2b1a1_composition_source=
+iib5biii_b2b1a1_focused_test_source=
+iib5biii_b2b1a1_boundary_test_source=
+iib5biii_b2b1a1_staged_scope_contract_only=false
+iib5biii_b2b1a1_scope_baseline=31347396b922537e7f11540e47c394fb873c28db
 iib5bia_projection_contract_only=false
 iib5bia_contract_source=
 iib5bia_focused_test_source=
@@ -462,6 +470,18 @@ if (( $# > 0 )); then
         && [[ $1 == --iib5biii-b2b1a0-staged-scope-contract-only ]]; then
         iib5biii_b2b1a0_staged_scope_contract_only=true
         iib5biii_b2b1a0_scope_baseline=${2:-d643b8fd500be29736a962dcd0c270304b490828}
+    elif (( $# == 6 )) \
+        && [[ $1 == --iib5biii-b2b1a1-outer-observation-contract-only ]]; then
+        iib5biii_b2b1a1_outer_observation_contract_only=true
+        iib5biii_b2b1a1_app_identity_source=$2
+        iib5biii_b2b1a1_outer_observation_source=$3
+        iib5biii_b2b1a1_composition_source=$4
+        iib5biii_b2b1a1_focused_test_source=$5
+        iib5biii_b2b1a1_boundary_test_source=$6
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iib5biii-b2b1a1-staged-scope-contract-only ]]; then
+        iib5biii_b2b1a1_staged_scope_contract_only=true
+        iib5biii_b2b1a1_scope_baseline=${2:-31347396b922537e7f11540e47c394fb873c28db}
     elif (( $# == 3 )) \
         && [[ $1 == --iib5bia-projection-contract-only ]]; then
         iib5bia_projection_contract_only=true
@@ -658,7 +678,7 @@ if (( $# > 0 )); then
         iib3c_staged_scope_baseline=${2:-HEAD}
     else
         print -u2 \
-            "Usage: scripts/verify-investigation-boundaries [... | --iib5biii-a-single-epoch-contract-only <single-epoch> <composition> <continuity> <continuity-test> <single-epoch-test> <installed-join-test> <boundary-test> | --iib5biii-a-staged-scope-contract-only [baseline] | --iib5biii-b1-cohort-contract-only <cohort> <continuity> <focused-test> <boundary-test> | --iib5biii-b1-staged-scope-contract-only [baseline] | --iib5biii-b2a0-physical-bridge-contract-only <composition> <continuity> <bridge> <focused-test> <boundary-test> | --iib5biii-b2a0-scope-contract-only [baseline] | --iib5biii-b2a-i-supervisor-contract-only <single-epoch> <composition> <continuity> <bridge> <protocol> <focused-test> <boundary-test> | --iib5biii-b2a-i-scope-contract-only [baseline] | --iib5biii-b2a-i-r1-scope-contract-only [baseline] | --iib5biii-b2b0-release-graph-contract-only <observer> <session> <composition> <boundary-test> | --iib5biii-b2b0-staged-scope-contract-only [baseline] | --iib5biii-b2b1a0-provenance-contract-only <composition> <bridge> <bridge-test> <protocol-test> <boundary-test> | --iib5biii-b2b1a0-staged-scope-contract-only [baseline]]"
+            "Usage: scripts/verify-investigation-boundaries [... | --iib5biii-b2b1a0-provenance-contract-only <composition> <bridge> <bridge-test> <protocol-test> <boundary-test> | --iib5biii-b2b1a0-staged-scope-contract-only [baseline] | --iib5biii-b2b1a1-outer-observation-contract-only <app-identity> <outer-observation> <composition> <focused-test> <boundary-test> | --iib5biii-b2b1a1-staged-scope-contract-only [baseline]]"
         exit 64
     fi
 fi
@@ -2944,7 +2964,7 @@ for marker in (
 ):
     if marker not in observer:
         fail("App identity topology drifted")
-if observer.count("expectedProcessGroupID:") != 4:
+if observer.count("expectedProcessGroupID:") != 6:
     fail("App identity topology drifted")
 if (
     "expectedTopology: nil" not in observer
@@ -3902,16 +3922,21 @@ bridge_test = bridge_test_path.read_text(encoding="utf-8")
 protocol_test = protocol_test_path.read_text(encoding="utf-8")
 boundary = boundary_path.read_text(encoding="utf-8")
 expected_test_sha256 = {
-    bridge_test_path:
+    bridge_test_path: {
         "313240bd03a5fc2949f566822453000bb5b78fe41f212aaab5e9068a9a7b7622",
-    protocol_test_path:
+    },
+    protocol_test_path: {
         "72fc8f5959c6178493e83a4b26a0dfa6e1b9351ecfadc3f4956d2d2b4a26e7a5",
-    boundary_path:
+        "81ec6365c2219a4faaa9d210667c9aade668645fee75244ff61267dd7aaac396",
+    },
+    boundary_path: {
         "3a2981b00b587ee2922b5a50d58ee1950d27c3e13a0116c0fd837e84816cb6dc",
+        "760ee87c549d5301115e3944af1085ddfa46bbec18681563b36bd4e35fb1a45a",
+    },
 }
-for path, expected_sha256 in expected_test_sha256.items():
+for path, admitted_sha256 in expected_test_sha256.items():
     observed_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
-    if observed_sha256 != expected_sha256:
+    if observed_sha256 not in admitted_sha256:
         raise SystemExit(
             f"iii-b2b-1a-0 focused test source seal drifted: {path}"
         )
@@ -4178,6 +4203,243 @@ function verify_iib5biii_b2b1a0_scope() {
         print -u2 "iii-b2b-1a-0 implementation line count drifted"
         return 1
     }
+}
+
+function verify_iib5biii_b2b1a1_outer_observation_contract() {
+    local app_identity_path=$1 outer_path=$2 composition_path=$3
+    local focused_test_path=$4 boundary_path=$5 source_path
+    for source_path in "$app_identity_path" "$outer_path" \
+        "$composition_path" "$focused_test_path" "$boundary_path"
+    do
+        xcrun swiftc -frontend -parse -enable-bare-slash-regex "$source_path"
+    done
+    python3 - "$app_identity_path" "$outer_path" "$composition_path" \
+        "$focused_test_path" "$boundary_path" <<'PY'
+from pathlib import Path
+import hashlib
+import re
+import sys
+
+app_path, outer_path, composition_path, test_path, boundary_path = map(
+    Path, sys.argv[1:]
+)
+sources = {
+    "app": app_path.read_text(encoding="utf-8"),
+    "outer": outer_path.read_text(encoding="utf-8"),
+    "composition": composition_path.read_text(encoding="utf-8"),
+    "test": test_path.read_text(encoding="utf-8"),
+    "boundary": boundary_path.read_text(encoding="utf-8"),
+}
+expected_test_sha256 = {
+    test_path: "6915b679f49427a6801adcac5963debff8e0faf84c964c8aef68680124963f18",
+    boundary_path: "760ee87c549d5301115e3944af1085ddfa46bbec18681563b36bd4e35fb1a45a",
+}
+for path, expected_sha256 in expected_test_sha256.items():
+    if hashlib.sha256(path.read_bytes()).hexdigest() != expected_sha256:
+        fail_label = "focused" if path == test_path else "boundary"
+        raise SystemExit(
+            f"iii-b2b-1a-1 {fail_label} test source seal drifted"
+        )
+
+def fail(message):
+    raise SystemExit(message)
+
+def imports(source):
+    return set(re.findall(r"(?m)^import\s+([A-Za-z0-9_]+)\s*$", source))
+
+expected_imports = {
+    "app": {
+        "CInvestigationIdentitySupport", "Darwin", "Foundation",
+        "Security", "StornautInvestigationHandoffContract",
+        "StornautInvestigationInstalledL2",
+    },
+    "outer": {
+        "Darwin", "Foundation", "StornautInvestigationHandoffContract",
+        "StornautInvestigationInstalledL2",
+    },
+    "composition": {
+        "Darwin", "Foundation", "StornautInvestigationHandoffContract",
+    },
+}
+for name, expected in expected_imports.items():
+    if imports(sources[name]) != expected:
+        fail("iii-b2b-1a-1 dependency surface drifted")
+production = "\n".join(sources[name] for name in expected_imports)
+if "#if DEBUG" in production or re.search(
+    r"(?m)^\s*(?:public|open)\s+", production
+):
+    fail("iii-b2b-1a-1 production surface drifted")
+for pattern in (
+    r"\b(?:Codable|Encodable|Decodable)\b",
+    r"\bStornaut(?:Execution|Core|Lifecycle|Codex|InvestigationRuntime|"
+    r"InvestigationDiagnostic|InvestigationMachine|ProbeBridge|"
+    r"ProcessSupport)\b",
+    r"\b(?:Executor|MoveToTrash|RegisteredAction|signedRuntimeReady|"
+    r"readiness|NSXPCConnection|NSXPCListener|URLSession|NWConnection)\b",
+):
+    if re.search(pattern, production, re.IGNORECASE):
+        fail("iii-b2b-1a-1 authority or product reachability drifted")
+
+app_required = (
+    "case .failure(let error) where error.errno == ESRCH:",
+    "if observed.processIDVersion != expected.processIDVersion",
+    "observed.auditSessionID == expected.auditSessionID",
+    "observed.effectiveUserID == expected.effectiveUserID",
+    "observed.auditTokenWords == expected.auditTokenWords",
+    "observed.auditTokenWords.count == 8",
+    "package func observePhysicalApp(",
+    "expectedParentProcessID: expectedParentProcessID",
+    "expectedProcessGroupID: expectedProcessGroupID",
+    "finalNarrow == initialNarrow",
+    "narrowMatches(finalNarrow, identity: identity)",
+)
+if any(marker not in sources["app"] for marker in app_required):
+    fail("iii-b2b-1a-1 same-version identity drift acceptance")
+
+ownership_required = (
+    "requestSHA256 = InvestigationHandoffSHA256.hashing(",
+    "record.requestSHA256 == requestSHA256",
+    "sessionDriverChild.parentProcessID == outerProcessID",
+    "sessionDriverChild.processID == sessionDriverChild.processGroupID",
+    "physical = try record.physicalOwnership(",
+    "expectedSelection: initial.selection",
+    "observedDriver == sessionDriverChild",
+    "observedDriver == record.driverChild",
+    "expectedParentProcessID: observedDriver.processID",
+    "expectedProcessGroupID: observedDriver.processGroupID",
+    "guard observedApp == record.appChild else",
+)
+if any(marker not in sources["outer"] for marker in ownership_required):
+    fail("iii-b2b-1a-1 ownership topology binding drifted")
+claim_required = (
+    "guard let evidenceBytes = try? evidence.encoded() else { return false }",
+    "physical.claimEvidenceSHA256",
+    "== InvestigationHandoffSHA256.hashing(evidenceBytes)",
+    "evidence.requestBindingSHA256.rawBytes.contains { $0 != 0 }",
+    "evidence.appIdentity == physical.appIdentity",
+    "evidence.helperIdentity == physical.helperIdentity",
+    "== selection.epoch.configurationNonce",
+    "== physical.helperIdentity.auditSessionID",
+    "evidence.l1Residue.userID == physical.appIdentity.effectiveUserID",
+    "evidence.l1Residue.remainingAuditSessionMembers == 0",
+    "evidence.l1Residue.matchingLeases == 0",
+    "evidence.l1Residue.leaseRootEntries == 0",
+    "evidence.l1Residue.investigationArtifacts == 0",
+    "== physical.releaseDeadlineNanoseconds",
+)
+if any(marker not in sources["outer"] for marker in claim_required):
+    fail("iii-b2b-1a-1 canonical claim evidence binding drifted")
+
+terminal_required = (
+    "case terminalizing", "state = .terminalizing",
+    "guard case .terminalizing = state else",
+    "finalDriver == owned.driver",
+    "singleEpochDriverObservationSHA256(",
+    "guard finalDigest == owned.driverSHA256 else",
+    "finalObservedAt >= absenceObservedAt",
+    "finalObservedAt < deadlineNanoseconds",
+    "try Task.checkCancellation()",
+    "let remaining = deadlineNanoseconds - observedAt",
+    "min(100_000_000, max(1, remaining / 2))",
+    "try ensureNotCancelled()\n        state = .terminal\n        return try .init(",
+    "state = .terminal",
+)
+if any(marker not in sources["outer"] for marker in terminal_required):
+    fail("iii-b2b-1a-1 terminal state machine drifted")
+factory_required = (
+    "let clock = InvestigationMachineDarwinCompositionClock()",
+    "let observer = InvestigationMachineDarwinOuterObserver(",
+    "clock: clock, outerProcessID: outerProcessID",
+    "sharedObserver: observer",
+    "sharedProductionObserver = sharedObserver",
+    "ownershipObserver = sharedObserver",
+    "terminalObserver = sharedObserver",
+    "var usesOneConcreteOuterObserver: Bool",
+)
+if any(marker not in sources["composition"] for marker in factory_required):
+    fail("iii-b2b-1a-1 production observer factory drifted")
+
+test_required = (
+    "originalIdentityReaderRejectsSameVersionIdentityDrift",
+    "physicalAppObservationRevalidatesExactIdentityAndTopology",
+    "ownershipObserverRejectsDriverAppSessionAndClaimMismatch",
+    "terminalObserverRequiresEqualCompleteDriverAndExactAbsence",
+    "suspendedTerminalObservationIsFailStopForReplayAndCancellation",
+    "productionFactoryConstructsTheReviewedOuterComposition",
+    "#expect(dependencies.usesOneConcreteOuterObserver)",
+)
+if any(marker not in sources["test"] for marker in test_required):
+    fail("iii-b2b-1a-1 focused test became vacuous")
+boundary_required = (
+    "iiiB2B1A1VerifierPinsConcreteOuterObservationAndExactScope",
+    "--iib5biii-b2b1a1-outer-observation-contract-only",
+    "--iib5biii-b2b1a1-staged-scope-contract-only",
+    "--iib5biii-b2b1a1-source-contract-only",
+)
+if any(marker not in sources["boundary"] for marker in boundary_required):
+    fail("iii-b2b-1a-1 boundary test became vacuous")
+PY
+}
+
+function verify_iib5biii_b2b1a1_scope() {
+    local baseline=${1:-31347396b922537e7f11540e47c394fb873c28db}
+    local expected=(
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinAppIdentityObservation.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterObservation.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerComposition.swift
+        Tests/StornautInvestigationTests/InvestigationMachineDarwinOuterObservationTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-app-release-boundaries
+        scripts/verify-contract
+        scripts/verify-investigation-boundaries
+    )
+    (( ${#expected} == 8 )) || {
+        print -u2 "iii-b2b-1a-1 checkpoint path ceiling drifted"; return 1
+    }
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" == \
+        31347396b922537e7f11540e47c394fb873c28db ]] || {
+        print -u2 "iii-b2b-1a-1 checkpoint baseline drifted"; return 1
+    }
+    if git diff --cached --name-only --diff-filter=D "$baseline" \
+        | awk 'index($0,"docs/")!=1 {found=1} END {exit !found}'
+    then
+        print -u2 "iii-b2b-1a-1 checkpoint deleted an existing path"; return 1
+    fi
+    if git diff --cached --numstat "$baseline" \
+        | awk 'index($3,"docs/")!=1 && ($1=="-" || $2=="-") {found=1} END {exit !found}'
+    then
+        print -u2 "iii-b2b-1a-1 binary checkpoint path rejected"; return 1
+    fi
+    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD \
+        "$baseline" | awk 'index($0,"docs/")!=1 && $0!="AGENTS.md" && $0!="README.md"')"})
+    [[ "${(j:\n:)${(@on)observed}}" == "${(j:\n:)${(@on)expected}}" ]] || {
+        print -u2 "iii-b2b-1a-1 staged checkpoint paths drifted"; return 1
+    }
+    local expected_path expected_mode observed_entry staged_blob worktree_blob
+    for expected_path in "${expected[@]}"; do
+        expected_mode=100644
+        [[ $expected_path == scripts/* ]] && expected_mode=100755
+        observed_entry=$(git ls-files -s -- "$expected_path")
+        [[ "$(print -r -- "$observed_entry" | awk '{print $1, $3, $4}')" \
+            == "$expected_mode 0 $expected_path" ]] || {
+            print -u2 "iii-b2b-1a-1 checkpoint mode drifted: $expected_path"
+            return 1
+        }
+    done
+    local changed=$(git diff --cached --numstat "$baseline" \
+        | awk 'index($3,"docs/")!=1 && $3!="AGENTS.md" && $3!="README.md" {n+=$1+$2} END {print n+0}')
+    (( changed <= 2800 )) || {
+        print -u2 "iii-b2b-1a-1 checkpoint budget drifted"; return 1
+    }
+    for expected_path in "${expected[@]}"; do
+        observed_entry=$(git ls-files -s -- "$expected_path")
+        staged_blob=$(print -r -- "$observed_entry" | awk '{print $2}')
+        worktree_blob=$(git hash-object -- "$expected_path")
+        [[ "$staged_blob" == "$worktree_blob" ]] || {
+            print -u2 "iii-b2b-1a-1 staged/worktree source drifted: $expected_path"
+            return 1
+        }
+    done
 }
 
 function verify_iib5bia_projection_contract() {
@@ -5965,7 +6227,13 @@ imports=set(re.findall(r'(?m)^import\s+([A-Za-z0-9_]+)\s*$',source))
 if imports != {"CInvestigationIdentitySupport","Darwin","Foundation","Security","StornautInvestigationHandoffContract","StornautInvestigationInstalledL2"}: raise SystemExit("ii-b5b-ii-b import surface drifted")
 if re.search(r'(?m)^\s*(?:public|open)\s+',source): raise SystemExit("ii-b5b-ii-b public surface drifted")
 package_types=re.findall(r'(?m)^package\s+(?:final\s+)?(?:struct|class|actor|enum|protocol|typealias)\s+([A-Za-z0-9_]+)',source)
-if package_types != ["InvestigationMachineDarwinAppIdentityObservationError","InvestigationMachineDarwinAppPreDropObservation","InvestigationMachineDarwinAppIdentityObserver"]: raise SystemExit("ii-b5b-ii-b package surface drifted")
+if package_types != [
+    "InvestigationMachineDarwinAppIdentityObservationError",
+    "InvestigationMachineDarwinOriginalIdentityObservation",
+    "InvestigationMachineDarwinOriginalIdentityReader",
+    "InvestigationMachineDarwinAppPreDropObservation",
+    "InvestigationMachineDarwinAppIdentityObserver",
+]: raise SystemExit("ii-b5b-ii-b package surface drifted")
 for forbidden in ("StornautLifecycle","StornautInvestigationDiagnostic","Process(","NSXPC","URLSession","posix_spawn","socketpair","kill(","write(","unlink(","rename(","Executor","Cleanup","readiness"):
     if forbidden in source: raise SystemExit("ii-b5b-ii-b authority or admission surface drifted")
 for forbidden in ("proc_signal_with_audittoken","kill(","killpg(","signal(","waitpid(","posix_spawn","fork(","exec","write(","socket(","connect("):
@@ -6016,6 +6284,7 @@ if hashlib.sha256(Path(sys.argv[5]).read_bytes()).hexdigest() not in {
 if hashlib.sha256(Path(sys.argv[4]).read_bytes()).hexdigest() not in {
     "2102c17f2f656b6cee197fb66ff0b2b019fb1c49477123d0123c4fddaeeb754a",
     "6fb42b4bd0604f376bbf6d867f1b078dfd0efac7d5ba77892b9db0cc032e9381",
+    "41624dbdb5fd3367dd34fde05c8a1720585d7dd44bcfd80ada851d846d4d919d",
 }:
     raise SystemExit("ii-b5b-ii-b canonical observer drifted")
 PY
@@ -10277,6 +10546,21 @@ if $iib5biii_b2b1a0_staged_scope_contract_only; then
     print "iii-b2b-1a-0 staged scope verification passed."
     exit 0
 fi
+if $iib5biii_b2b1a1_outer_observation_contract_only; then
+    verify_iib5biii_b2b1a1_outer_observation_contract \
+        "$iib5biii_b2b1a1_app_identity_source" \
+        "$iib5biii_b2b1a1_outer_observation_source" \
+        "$iib5biii_b2b1a1_composition_source" \
+        "$iib5biii_b2b1a1_focused_test_source" \
+        "$iib5biii_b2b1a1_boundary_test_source"
+    print "iii-b2b-1a-1 concrete outer observation verification passed."
+    exit 0
+fi
+if $iib5biii_b2b1a1_staged_scope_contract_only; then
+    verify_iib5biii_b2b1a1_scope "$iib5biii_b2b1a1_scope_baseline"
+    print "iii-b2b-1a-1 staged scope verification passed."
+    exit 0
+fi
 if $iib5bia_projection_contract_only; then
     verify_iib5bia_projection_contract "$iib5bia_contract_source" "$iib5bia_focused_test_source"
     print "ii-b5b-i-a projection contract verification passed."
@@ -12341,6 +12625,7 @@ expected_driver_support_sources = {
     "InvestigationMachineDarwinDriverChildObservation.swift",
     "InvestigationMachineDarwinEpochRetirement.swift",
     "InvestigationMachineDarwinEpochSession.swift",
+    "InvestigationMachineDarwinOuterObservation.swift",
     "InvestigationMachineDarwinOuterInnerComposition.swift",
     "InvestigationMachineDarwinOuterInnerProtocol.swift",
     "InvestigationMachineDarwinOuterInnerSession.swift",
@@ -12412,6 +12697,11 @@ expected_driver_support_imports = {
         "Darwin", "Foundation",
         "StornautInvestigationHandoffContract",
     },
+    "InvestigationMachineDarwinOuterObservation.swift": {
+        "Darwin", "Foundation",
+        "StornautInvestigationHandoffContract",
+        "StornautInvestigationInstalledL2",
+    },
     "InvestigationMachineDarwinDriverChildObservation.swift": {
         "CInvestigationIdentitySupport", "Darwin",
     },
@@ -12459,15 +12749,17 @@ expected_driver_support_sha256 = {
     "InvestigationMachineClaimClient.swift":
         "ee373ff00fce08853fccb4c2087a0a47eed2feae6efc300fbd4c74e01f242a0a",
     "InvestigationMachineDarwinAppIdentityObservation.swift":
-        "6fb42b4bd0604f376bbf6d867f1b078dfd0efac7d5ba77892b9db0cc032e9381",
+        "41624dbdb5fd3367dd34fde05c8a1720585d7dd44bcfd80ada851d846d4d919d",
     "InvestigationMachineDarwinEpochSession.swift":
         "eaa6009028af18a12d783704cdb0a44d63761532149cd3425fe4bc99be41cf16",
     "InvestigationMachineDarwinEpochRetirement.swift":
         "441e1001f40d0a9055ac55b019a85964fc8a5032170376e97d91388227e18f76",
     "InvestigationMachineDarwinOuterInnerComposition.swift":
-        "0cbfbb72a7a98a063e9443f9a65921235c86dea7d0a9d10ae024a60875b88ad7",
+        "369bf7188c9d367c5e6a55a4ac9c5ec91050b1adc23207d827727a3cd81e7cd5",
+    "InvestigationMachineDarwinOuterObservation.swift":
+        "84974a0341bf4d70e8dd50f9fbe28e2ca6b0c620f297df930e10a76278657811",
     "InvestigationMachineDarwinOuterInnerProtocol.swift":
-        "ac023ecd4e895ee7dc69d3f9af2c154fe65bf09bd25310b2dd89a06927e6ab8b",
+        "79a91d866e5c898f64d4b3b21aef1286cf447bc5fde1b4233fe1d0d5109a429c",
     "InvestigationMachineDarwinDriverChildObservation.swift":
         "c2bad03e1288a7121475f1a81ac31e8919415e559d8afd3beb3b262d60bd0e8f",
     "InvestigationMachineDarwinOuterInnerSession.swift":
@@ -12475,7 +12767,7 @@ expected_driver_support_sha256 = {
     "InvestigationMachineSingleEpoch.swift":
         "07955234a0103c9a07d5289a258fabad68306d536ff7fe709de64123d109c953",
     "InvestigationMachineSingleEpochComposition.swift":
-        "f25df245709716af84a0580d66538815c0f982ddd82e055f5ea20ae704c4a074",
+        "455854e085e81dc728050d6aa8de906d6f48be9b2457fc81e36a2f3d736dbdee",
     "InvestigationMachineHelperEpochContinuity.swift":
         "b1e53776b5cec0b8742e2d074443008ffc6dd0b9b0a3756dd5b3849288b75601",
     "InvestigationMachineEightEpochCohort.swift":
@@ -13851,6 +14143,10 @@ function require_exact_machine_driver_projection() {
     local iib5biii_b2b1a0_swiftpm_debug_owned_lines=7874
     local iib5biii_b2b1a0_swiftpm_release_owned_sha=459abfb64cf21475780a79ed8dd7c6088603b386f8a196dac14c282b49fcc08c
     local iib5biii_b2b1a0_swiftpm_release_owned_lines=5503
+    local iib5biii_b2b1a1_swiftpm_debug_owned_sha=9eed7d1f1d064fa35bb75525a1dde998fd5f8ded763381381e99d698aea920db
+    local iib5biii_b2b1a1_swiftpm_debug_owned_lines=8200
+    local iib5biii_b2b1a1_swiftpm_release_owned_sha=b85e9d441260f2fc2cf193ad1fdb76c0f5957e40ff84d4d1443882a2fccf555b
+    local iib5biii_b2b1a1_swiftpm_release_owned_lines=5758
 
     case "$configuration" in
         debug)
@@ -13858,16 +14154,16 @@ function require_exact_machine_driver_projection() {
             expected_undefined_lines=692
             expected_loads_sha=dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9
             expected_loads_lines=18
-            expected_owned_sha=$iib5biii_b2b1a0_swiftpm_debug_owned_sha
-            expected_owned_lines=$iib5biii_b2b1a0_swiftpm_debug_owned_lines
+            expected_owned_sha=$iib5biii_b2b1a1_swiftpm_debug_owned_sha
+            expected_owned_lines=$iib5biii_b2b1a1_swiftpm_debug_owned_lines
             ;;
         release)
             expected_undefined_sha=22beeec4664d72ad0809d4788f3574fdae93a239aba0055793245374a4549ba1
             expected_undefined_lines=494
             expected_loads_sha=dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9
             expected_loads_lines=18
-            expected_owned_sha=$iib5biii_b2b1a0_swiftpm_release_owned_sha
-            expected_owned_lines=$iib5biii_b2b1a0_swiftpm_release_owned_lines
+            expected_owned_sha=$iib5biii_b2b1a1_swiftpm_release_owned_sha
+            expected_owned_lines=$iib5biii_b2b1a1_swiftpm_release_owned_lines
             ;;
         *)
             print -u2 "Unknown Machine driver projection: $configuration"

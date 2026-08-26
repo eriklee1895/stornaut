@@ -21,6 +21,85 @@ struct InvestigationMachineDarwinAppNarrowIdentity: Sendable, Equatable {
     let effectiveUserID: UInt32
     let auditTokenWords: [UInt32]
 }
+
+package enum InvestigationMachineDarwinOriginalIdentityObservation:
+    Sendable, Equatable
+{
+    case originalPresent
+    case originalAbsent
+}
+
+struct InvestigationMachineDarwinOriginalIdentityReadError:
+    Error, Sendable, Equatable
+{
+    let errno: Int32
+}
+
+package struct InvestigationMachineDarwinOriginalIdentityReader: Sendable {
+    typealias RawResult = Result<
+        InvestigationMachineDarwinAppNarrowIdentity,
+        InvestigationMachineDarwinOriginalIdentityReadError
+    >
+    typealias Read = @Sendable (UInt32) -> RawResult
+
+    private let read: Read
+
+    init(readIdentity: @escaping Read) {
+        read = readIdentity
+    }
+
+    package init() {
+        read = darwinOriginalIdentityRead
+    }
+
+    package func observeAbsence(
+        of expected: InvestigationMachineProcessIdentity
+    ) throws -> InvestigationMachineDarwinOriginalIdentityObservation {
+        guard
+            expected.processID > 1,
+            expected.processID <= UInt32(Int32.max)
+        else {
+            throw InvestigationMachineDarwinAppIdentityObservationError
+                .observationUnavailable
+        }
+
+        let observed: InvestigationMachineDarwinAppNarrowIdentity
+        switch read(expected.processID) {
+        case .failure(let error) where error.errno == ESRCH:
+            return .originalAbsent
+        case .failure:
+            throw InvestigationMachineDarwinAppIdentityObservationError
+                .observationUnavailable
+        case .success(let value):
+            observed = value
+        }
+        guard
+            observed.processID == expected.processID,
+            observed.processIDVersion > 0,
+            observed.auditSessionID > 0,
+            observed.auditTokenWords.count == 8,
+            observed.auditTokenWords[1] == observed.effectiveUserID,
+            observed.auditTokenWords[5] == observed.processID,
+            observed.auditTokenWords[6] == observed.auditSessionID,
+            observed.auditTokenWords[7] == observed.processIDVersion
+        else {
+            throw InvestigationMachineDarwinAppIdentityObservationError
+                .observationUnavailable
+        }
+        if observed.processIDVersion != expected.processIDVersion {
+            return .originalAbsent
+        }
+        guard
+            observed.auditSessionID == expected.auditSessionID,
+            observed.effectiveUserID == expected.effectiveUserID,
+            observed.auditTokenWords == expected.auditTokenWords
+        else {
+            throw InvestigationMachineDarwinAppIdentityObservationError
+                .observationUnavailable
+        }
+        return .originalPresent
+    }
+}
 struct InvestigationMachineDarwinAppProcessSnapshot: Sendable, Equatable {
     let processID: UInt32
     let parentProcessID: UInt32
@@ -299,6 +378,69 @@ package struct InvestigationMachineDarwinAppIdentityObserver: Sendable {
         }
         return InvestigationMachineSingleEpochAppObservation(identity: identity)
     }
+
+    package func observePhysicalApp(
+        identity: InvestigationMachineProcessIdentity,
+        projection: InvestigationInstalledL2IdentityProjection,
+        expectedParentProcessID: UInt32,
+        expectedProcessGroupID: UInt32
+    ) throws -> InvestigationMachineDarwinAppChildIdentity {
+        guard
+            identity.role == .app,
+            identity.effectiveUserID == Self.appUserID,
+            expectedParentProcessID > 1,
+            expectedProcessGroupID > 1
+        else {
+            throw InvestigationMachineDarwinAppIdentityObservationError
+                .invalidPostDropIdentity
+        }
+        let initialNarrow = try value(
+            system.narrowIdentity(processID: identity.processID)
+        )
+        guard narrowMatches(initialNarrow, identity: identity) else {
+            throw InvestigationMachineDarwinAppIdentityObservationError
+                .invalidPostDropIdentity
+        }
+        let resolved = try resolvedAppIdentity(phase: .postDrop)
+        let facts = try stableFacts(
+            processID: identity.processID,
+            expectedParentProcessID: expectedParentProcessID,
+            expectedProcessGroupID: expectedProcessGroupID,
+            projection: projection,
+            phase: .postDrop
+        )
+        guard
+            facts.snapshot.auditSessionID == identity.auditSessionID,
+            facts.snapshot.effectiveUserID == identity.effectiveUserID,
+            facts.snapshot.supplementaryGroups == resolved.supplementaryGroups,
+            auditTokenMatches(
+                identity.auditTokenWords, snapshot: facts.snapshot
+            )
+        else {
+            throw InvestigationMachineDarwinAppIdentityObservationError
+                .invalidPostDropIdentity
+        }
+        let finalNarrow = try value(
+            system.narrowIdentity(processID: identity.processID)
+        )
+        guard
+            finalNarrow == initialNarrow,
+            narrowMatches(finalNarrow, identity: identity)
+        else {
+            throw InvestigationMachineDarwinAppIdentityObservationError
+                .invalidPostDropIdentity
+        }
+        do {
+            return try InvestigationMachineDarwinAppChildIdentity(
+                identity: identity,
+                parentProcessID: expectedParentProcessID,
+                processGroupID: expectedProcessGroupID
+            )
+        } catch {
+            throw InvestigationMachineDarwinAppIdentityObservationError
+                .invalidPostDropIdentity
+        }
+    }
     private enum Phase {
         case preDrop
         case postDrop
@@ -484,6 +626,17 @@ package struct InvestigationMachineDarwinAppIdentityObserver: Sendable {
             && identity.auditTokenWords[6] == claim.auditSessionID
             && identity.auditTokenWords[7] == claim.processIDVersion
     }
+    private func narrowMatches(
+        _ observed: InvestigationMachineDarwinAppNarrowIdentity,
+        identity: InvestigationMachineProcessIdentity
+    ) -> Bool {
+        observed.processID == identity.processID
+            && observed.processIDVersion == identity.processIDVersion
+            && observed.auditSessionID == identity.auditSessionID
+            && observed.effectiveUserID == identity.effectiveUserID
+            && observed.auditTokenWords == identity.auditTokenWords
+            && observed.auditTokenWords.count == 8
+    }
     private func auditTokenMatches(
         _ words: [UInt32],
         snapshot: InvestigationMachineDarwinAppProcessSnapshot
@@ -575,6 +728,41 @@ package struct InvestigationMachineDarwinAppIdentityObserver: Sendable {
         }
     }
 }
+
+private func darwinOriginalIdentityRead(
+    _ processID: UInt32
+) -> InvestigationMachineDarwinOriginalIdentityReader.RawResult {
+    guard processID > 1, processID <= UInt32(Int32.max) else {
+        return .failure(.init(errno: EINVAL))
+    }
+    var raw = stornaut_investigation_identity()
+    let status = stornaut_investigation_identity_for_pid(
+        pid_t(processID), &raw
+    )
+    guard status == 0 else {
+        return .failure(.init(errno: Int32(status)))
+    }
+    let words = withUnsafeBytes(of: raw.audit_token_words) { bytes in
+        stride(from: 0, to: bytes.count, by: MemoryLayout<UInt32>.size)
+            .map { bytes.loadUnaligned(fromByteOffset: $0, as: UInt32.self) }
+    }
+    guard
+        raw.process_id > 1,
+        raw.process_id_version > 0,
+        raw.audit_session_id > 0,
+        words.count == 8
+    else {
+        return .failure(.init(errno: EIO))
+    }
+    return .success(.init(
+            processID: UInt32(raw.process_id),
+            processIDVersion: UInt32(raw.process_id_version),
+            auditSessionID: UInt32(raw.audit_session_id),
+            effectiveUserID: UInt32(raw.effective_user_id),
+            auditTokenWords: words
+    ))
+}
+
 struct DarwinInvestigationMachineAppIdentitySystem:
     InvestigationMachineDarwinAppIdentitySystem,
     Sendable

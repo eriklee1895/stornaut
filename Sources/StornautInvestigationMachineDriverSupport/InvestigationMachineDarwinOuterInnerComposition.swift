@@ -479,12 +479,16 @@ package struct InvestigationMachineDarwinOuterInnerExecutionFactory:
         for selection: InvestigationMachineFixedEpochSelection
     ) -> InvestigationMachineDarwinOuterExecutionDependencies {
         _ = selection
-        let observer = InvestigationMachineDarwinOuterObserver()
+        let clock = InvestigationMachineDarwinCompositionClock()
+        let outerProcessID = UInt32(getpid())
+        let observer = InvestigationMachineDarwinOuterObserver(
+            clock: clock, outerProcessID: outerProcessID
+        )
         return InvestigationMachineDarwinOuterExecutionDependencies(
-            outerProcessID: UInt32(getpid()),
+            outerProcessID: outerProcessID,
             sessionFactory: InvestigationMachineDarwinOuterInnerSessionFactory(),
             sharedObserver: observer,
-            clock: InvestigationMachineDarwinCompositionClock()
+            clock: clock
         )
     }
 
