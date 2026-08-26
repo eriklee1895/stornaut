@@ -93,9 +93,10 @@
 > is complete/non-admitting. The a2 scope/trust preflight split the remaining
 > composition into a2-0 self-contained untrusted decode, a2-i inherited-PGID
 > App session and a2-ii terminal/admission join; a2-0, a2-i and a2-ii are
-> complete/non-admitting. iii-b2b-0 Release graph closure and iii-b2b-1a-0
-> canonical helper-provenance carriage are also complete/non-admitting;
-> iii-b2b-1a-1 concrete outer ownership/terminal observers are current. a2-i
+> complete/non-admitting. iii-b2b-0 Release graph closure, iii-b2b-1a-0
+> canonical helper-provenance carriage and iii-b2b-1a-1 concrete outer
+> ownership/terminal observers are also complete/non-admitting; iii-b2b-1b is
+> current. a2-i
 > closed at commit
 > `158f500` / tree `c7a42ffd` with 10 non-document paths / 1,965 changed
 > lines, 66 focused tests, a 1,500-test serialized regression, exact
@@ -117,6 +118,12 @@
 > changed lines, 38 target-boundary tests, 1,525-test / 79-suite staged serial,
 > complete contract/App-Release gates and no unresolved P0-P2. See the
 > [iii-b2b-1a-0 review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1a0-review.md).
+> iii-b2b-1a-1 then closed concrete outer ownership/terminal observation at
+> implementation `fe4f6ad` / tree `6bd6d384`, sealed by `2c31a7c`: exact 8
+> non-document paths / 2,800 changed lines, 1,535-test / 80-suite staged
+> serial, complete App/Release and contract gates and no unresolved P0-P2.
+> See the
+> [iii-b2b-1a-1 review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1a1-review.md).
 > Evidence:
 > [Task 39A Review](../../reports/phase-d-task-39a-review.md) and
 > [Task 39B1a Review](../../reports/phase-d-task-39b1a-review.md) and
@@ -1164,10 +1171,14 @@ The remaining L3 work is split before driver coding:
    `iii-b0 -> iii-a -> iii-b1 -> iii-b2a0 -> iii-b2a-i -> iii-b2a-ii-a ->
    iii-b2b`; b0 is documentation-only/non-admitting and iii-a/iii-b1/
    iii-b2a0/iii-b2a-i/iii-b2a-ii-a1/a2-0/a2-i/a2-ii and iii-b2b-0 are
-   complete/non-admitting. iii-b2b-1a-0 canonical helper-provenance carriage is
-   also complete/non-admitting. The corrected remaining order is
-   `iii-b2b-1a-1 -> iii-b2b-1b -> ii-c0b -> ii-c -> L3c3d -> L3c4`;
-   iii-b2b-1a-1 is current.
+   complete/non-admitting. iii-b2b-1a-0 canonical helper-provenance carriage
+   and iii-b2b-1a-1 concrete outer observation are also complete/non-admitting.
+   The corrected remaining order is
+   `iii-b2b-1b -> ii-c0b -> ii-c -> L3c3d -> L3c4`; iii-b2b-1b is current.
+   iii-b2b-1a-1 closed at implementation `fe4f6ad` / tree `6bd6d384`, sealed
+   by `2c31a7c`, with exact 8 non-document paths / 2,800 changed lines,
+   1,535 tests / 80 suites, complete App/Release and contract gates and no
+   unresolved P0-P2.
    See the
    [study](../../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md)
    and [final review](../../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md),
@@ -1356,8 +1367,9 @@ ii-b5a, ii-b5b-i-a, i-b1, i-b2a, i-b2b-a, i-b2b-b, i-b3, i-c1 and i-c2a
 are complete and non-admitting; aggregate i-c2 and ii-b5b-ii-a/ii-b/ii-c/ii-d
 and ii-c0a are complete/non-admitting; ii-b5b-iii-b0 is frozen/non-admitting
 and iii-a/iii-b1/iii-b2a0/iii-b2a-i/iii-b2a-ii-a1/a2-0/a2-i/a2-ii/
-iii-b2b-0 and iii-b2b-1a-0 are complete/non-admitting; iii-b2b-1a-1 is the
-current implementation checkpoint after canonical helper-provenance carriage.
+iii-b2b-0, iii-b2b-1a-0 and iii-b2b-1a-1 are complete/non-admitting;
+iii-b2b-1b is the current implementation checkpoint after concrete outer
+observation.
 ADR 0018
 remains Proposed until ii-c succeeds. L3c1 used focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean

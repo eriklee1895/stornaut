@@ -33,7 +33,7 @@
 | Agent、双模式与治理设计 | [Agent Disk Governance](design/agent-disk-governance.md) |
 | UI、品牌、状态与交互 | [UI/UX](design/ui-ux.md) |
 | 宏观交付顺序与阶段 Gate | [Delivery Roadmap](plans/roadmap.md) |
-| 当前计划状态 | [Active Plans](plans/active/README.md) — Phase D approved；Task 39 in progress；iii-b2b-1a-0 complete/non-admitting，iii-b2b-1a-1 current；ADR 0018 Proposed |
+| 当前计划状态 | [Active Plans](plans/active/README.md) — Phase D approved；Task 39 in progress；iii-b2b-1a-1 complete/non-admitting，iii-b2b-1b current；ADR 0018 Proposed |
 | Capability-first Codex Runtime Gate | [Runtime Evidence Gate](plans/completed/capability-first-codex-runtime-gate.md) — complete / archived |
 | R2 tests-first brief | [R2 Implementation Brief](plans/completed/task-r2-implementation-brief.md) — complete |
 | R3 lifecycle hard-gate brief | [R3 Implementation Brief](plans/completed/task-r3-implementation-brief.md) — behaviorReady candidate |
@@ -64,7 +64,7 @@
 | Phase D Task 37 Review | [Code Review and Completion Audit](reports/phase-d-task-37-review.md) |
 | Phase D Task 38 | [Implementation Brief](plans/active/task-38-implementation-brief.md) — complete |
 | Phase D Task 38 Review | [Code Review and Completion Audit](reports/phase-d-task-38-review.md) |
-| Phase D Task 39 | [Implementation Brief](plans/active/task-39-implementation-brief.md) — in progress；iii-b2b-1a-0 complete/non-admitting，iii-b2b-1a-1 current；remaining order iii-b2b-1a-1 → iii-b2b-1b → ii-c0b → ii-c → L3c3d → L3c4 |
+| Phase D Task 39 | [Implementation Brief](plans/active/task-39-implementation-brief.md) — in progress；iii-b2b-1a-1 complete/non-admitting，iii-b2b-1b current；remaining order iii-b2b-1b → ii-c0b → ii-c → L3c3d → L3c4 |
 | Phase D Task 39A Review | [Code Review and Completion Audit](reports/phase-d-task-39a-review.md) |
 | Phase D Task 39B1a Review | [Code Review and Completion Audit](reports/phase-d-task-39b1a-review.md) |
 | Phase D Task 39B1b-i Review | [Code Review and Completion Audit](reports/phase-d-task-39b1b-i-review.md) |
@@ -80,7 +80,8 @@
 | Phase D Task 39B2c Strict-Decoding Prerequisite Review | [Code Review and Completion Audit](reports/phase-d-task-39b2c-strict-capability-decoding-prerequisite-review.md) |
 | Phase D Task 39B2c a2-ii Review | [Terminal/Admission Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-ii-review.md) — complete / non-admitting |
 | Phase D Task 39B2c iii-b2b-0 Review | [Release Graph Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-0-review.md) — complete / non-admitting |
-| Phase D Task 39B2c iii-b2b-1a-0 Review | [Helper Provenance Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1a0-review.md) — complete / non-admitting；iii-b2b-1a-1 current |
+| Phase D Task 39B2c iii-b2b-1a-0 Review | [Helper Provenance Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1a0-review.md) — complete / non-admitting |
+| Phase D Task 39B2c iii-b2b-1a-1 Review | [Outer Observation Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1a1-review.md) — complete / non-admitting；iii-b2b-1b current |
 | Phase D Task 39B2c L3c2b Eight-Scenario Driver Review | [Code Review and Completion Audit](reports/phase-d-task-39b2c-l3c2b-eight-scenario-driver-review.md) |
 | Phase D Task 39B2c L3c3 Scope/Trust Preflight | [Pre-coding Split and Audit](reports/phase-d-task-39b2c-l3c3-scope-trust-preflight.md) |
 | Phase D Task 39B2c L3c3a Driver-Bound Attempt Review | [Code Review and Completion Audit](reports/phase-d-task-39b2c-l3c3a-driver-binding-review.md) |
