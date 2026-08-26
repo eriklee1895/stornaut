@@ -146,6 +146,12 @@ let package = Package(
             ]
         ),
         .target(
+            name: "StornautInvestigationMachineLaunchSupport",
+            dependencies: [
+                "StornautInvestigationHandoffContract",
+            ]
+        ),
+        .target(
             name: "StornautInvestigationHandoffContract",
             dependencies: []
         ),
@@ -278,6 +284,7 @@ let package = Package(
                 "StornautInvestigation",
                 "StornautInvestigationMachine",
                 "StornautInvestigationMachineDriverSupport",
+                "StornautInvestigationMachineLaunchSupport",
                 "StornautInvestigationMachineClaimServer",
                 "StornautInvestigationHandoffContract",
                 "StornautInvestigationInstalledL2",
