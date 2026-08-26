@@ -1,7 +1,7 @@
 # Stornaut Coding Agent Handoff
 
 > 面向接手实现的 Coding Agent  
-> 最近更新：2026-08-24
+> 最近更新：2026-08-27
 > 当前状态：产品、Agent、UI 功能交互与品牌基线完成；Epic 0–1 evidence
 > gate 已完成；Epic 2–4 Tasks 9–26 通过最终 unified verifier 并归档；
 > Phase C deterministic Epic 8 详尽 plan 已于 2026-08-11 获用户批准，
@@ -295,7 +295,8 @@
 > 1,900 changed lines、95 tests / 5 suites、three green gates 与 independent
 > final no-unresolved-P0–P2 review 完成并保持 non-admitting；按设计未运行
 > serial/full/root/sudo、App/helper/driver launch、XPC、model/auth 或 network。
-> 当前 frontier 为 c0b-ii fresh preflight，严格按 c0b-ii → c0b-iii →
+> c0b-ii fresh preflight 已完成并拆为 ii-c0b-ii-a/ii-c0b-ii-b；当前
+> frontier 为 ii-c0b-ii-a，严格按 ii-c0b-ii-a → ii-c0b-ii-b → c0b-iii →
 > c0b-iv → ii-c → L3c3d → L3c4 推进。该
 > b5b-ii-c checkpoint 以 8 个 non-document paths / 3,104 changed lines、35
 > focused tests、1,396-test staged-only serial、三个 verifier gates 与 final
@@ -668,9 +669,10 @@ preflight 将剩余工作封闭拆为 a2-0 untrusted decode、a2-i inherited-PGI
 session 与 a2-ii terminal/admission join；a2-0、a2-i 与 a2-ii 已完成并保持
 non-admitting；iii-b2b-0、iii-b2b-1a-0 与 iii-b2b-1a-1 已完成并保持
 non-admitting；iii-b2b-1b 已拆为 1b-i/1b-ii 并全部完成、保持
-non-admitting；ii-c0b 已冻结为四段，c0b-i 已完成并保持 non-admitting；
-当前 frontier 为 c0b-ii fresh preflight，随后为 c0b-ii → c0b-iii →
-c0b-iv → ii-c → L3c3d → L3c4。
+non-admitting；ii-c0b 已冻结，c0b-i 已完成并保持 non-admitting；c0b-ii
+fresh preflight 已拆为 ii-c0b-ii-a/ii-c0b-ii-b，当前 frontier 为
+ii-c0b-ii-a，随后为 ii-c0b-ii-a → ii-c0b-ii-b → c0b-iii → c0b-iv →
+ii-c → L3c3d → L3c4。
 ADR 0018 仍 Proposed，L3c4 独占 final admission 与剩余 full。
 iii-b2b-0 completion evidence 见
 [Release graph review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-0-review.md)。
@@ -741,8 +743,8 @@ ii-b5b-ii-a/ii-b/ii-c/ii-d 与 ii-c0a complete/non-admitting；ii-b5b-iii-b0
 preflight frozen/non-admitting，iii-a/iii-b1/iii-b2a0/iii-b2a-i/
 iii-b2a-ii-a1/a2-0/a2-i/a2-ii complete/non-admitting；a2 已冻结并关闭，
 iii-b2b-0、iii-b2b-1a-0、iii-b2b-1a-1 与 iii-b2b-1b
-complete/non-admitting；ii-c0b four-way split frozen，c0b-i complete/
-non-admitting，c0b-ii fresh preflight current。
+complete/non-admitting；ii-c0b split frozen，c0b-i complete/non-admitting，
+c0b-ii ownership split complete，ii-c0b-ii-a implementation current。
 i-b2a completion 见
 [artifact/static reader review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2a-review.md)。
 [fixed service reader review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2b-b-review.md)
@@ -771,7 +773,8 @@ non-admitting，iii-a/iii-b1/iii-b2a0/iii-b2a-i/iii-b2a-ii-a1
 complete/non-admitting；a2 已冻结为 a2-0/a2-i/a2-ii，三项均
 complete/non-admitting，iii-b2b-0、iii-b2b-1a-0、iii-b2b-1a-1 与
 iii-b2b-1b complete/non-admitting；ii-c0b four-way split frozen，c0b-i
-complete/non-admitting，c0b-ii fresh preflight current。
+complete/non-admitting，c0b-ii ownership split complete，ii-c0b-ii-a
+implementation current。
 ii-a completion 见
 [review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-a-review.md)，ii-b
 completion 见
@@ -792,8 +795,10 @@ App/XPC、model/auth、network 或 authoritative full。
 implementation `2493e0f` / parent `e5ed33e` / tree `8155d64`、exact 7
 non-document paths / 1,900 changed lines、95 tests / 5 suites、full
 Investigation boundary、exact staged scope、contract gates 与 final
-no-unresolved-P0–P2 review；c0b-i complete/non-admitting，c0b-ii fresh
-preflight current。
+no-unresolved-P0–P2 review；c0b-i complete/non-admitting。
+[ii-c0b-ii ownership preflight](../reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-ownership-preflight.md)
+记录 APFS physical evidence 与 ii-c0b-ii-a/ii-c0b-ii-b split；当前为
+ii-c0b-ii-a tests-first implementation。
 [ii-b5b-iii-b0 preflight](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md)
 冻结 long-lived outer/disposable inner、FD 0/1/2/7/8/9、inner-led PGID、
 parent-crash containment 与 iii-a/b1/b2a/b2b budgets。
@@ -1000,8 +1005,8 @@ preflight 已冻结，iii-a/iii-b1/iii-b2a0/iii-b2a-i/iii-b2a-ii-a1/a2-0/a2-i/a2
 已完成并保持 non-admitting；a2 已关闭，iii-b2b-0、iii-b2b-1a-0 与
 iii-b2b-1a-1 与拆分后的 iii-b2b-1b-i/1b-ii 已完成并保持
 non-admitting；ii-c0b 已冻结为四段，c0b-i 已完成并保持 non-admitting；
-当前 frontier 为 c0b-ii fresh preflight，之后为 c0b-ii、c0b-iii、c0b-iv、
-ii-c、L3c3d、L3c4。
+当前 frontier 为 ii-c0b-ii-a，之后为 ii-c0b-ii-b、c0b-iii、
+c0b-iv、ii-c、L3c3d、L3c4。
 已完成部分均为
 non-admitting prerequisite，
 L3c4 才是 machine admission。该最终 gate

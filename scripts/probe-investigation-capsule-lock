@@ -1,0 +1,793 @@
+#!/bin/zsh
+set -euo pipefail
+if (( EUID == 0 )); then
+    print -u2 "Capsule lock probe must run as a non-root user."
+    exit 1
+fi
+probe_root=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-capsule-lock.XXXXXX")
+trap 'rm -rf "$probe_root"' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+acl_fixture_parent="$probe_root/acl-parent"
+mkdir -m 700 "$acl_fixture_parent"
+probe_user=$(/usr/bin/id -un)
+/bin/chmod +a "$probe_user allow read,write,execute,file_inherit,directory_inherit" \
+    "$acl_fixture_parent"
+acl_fixture="$acl_fixture_parent/inherited-file"
+/usr/bin/touch "$acl_fixture"
+device=$(df -P "$probe_root" | awk 'NR == 2 {print $1}')
+filesystem=$(/usr/sbin/diskutil info "$device" \
+    | awk -F: '/File System Personality/ {gsub(/^[ \t]+/, "", $2); print tolower($2); exit}')
+[[ -n "$filesystem" ]] || { print -u2 "Unable to resolve probe filesystem."; exit 1; }
+probe_output=$(/usr/bin/python3 -I - "$probe_root" "$filesystem" "$acl_fixture" <<'PY'
+import errno
+import fcntl
+import ctypes
+import json
+import os
+import select
+import signal
+import stat
+import sys
+import time
+root, filesystem, acl_fixture = sys.argv[1:]
+base = os.path.join(root, "base")
+os.mkdir(base, 0o700)
+root_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW)
+base_fd = os.open(base, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW)
+children = set()
+libc = ctypes.CDLL(None, use_errno=True)
+libc.flistxattr.argtypes = [ctypes.c_int, ctypes.c_void_p, ctypes.c_size_t, ctypes.c_int]
+libc.flistxattr.restype = ctypes.c_ssize_t
+libc.acl_get_fd_np.argtypes = [ctypes.c_int, ctypes.c_int]
+libc.acl_get_fd_np.restype = ctypes.c_void_p
+libc.acl_get_entry.argtypes = [
+    ctypes.c_void_p, ctypes.c_int, ctypes.POINTER(ctypes.c_void_p)
+]
+libc.acl_get_entry.restype = ctypes.c_int
+libc.acl_free.argtypes = [ctypes.c_void_p]
+libc.acl_free.restype = ctypes.c_int
+libc.unlinkat.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int]
+libc.unlinkat.restype = ctypes.c_int
+libc.renameatx_np.argtypes = [
+    ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint
+]
+libc.renameatx_np.restype = ctypes.c_int
+O_RESOLVE_BENEATH = 0x00001000
+O_UNIQUE = 0x00002000
+O_NOFOLLOW_ANY = 0x20000000
+AT_SYMLINK_NOFOLLOW_ANY = 0x0800
+AT_RESOLVE_BENEATH = 0x2000
+AT_NODELETEBUSY = 0x4000
+AT_UNIQUE = 0x8000
+RENAME_EXCL = 0x00000004
+RENAME_NOFOLLOW_ANY = 0x00000010
+RENAME_RESOLVE_BENEATH = 0x00000020
+ENOTCAPABLE = getattr(errno, "ENOTCAPABLE", 107)
+ACL_TYPE_EXTENDED = 0x00000100
+ACL_FIRST_ENTRY = 0
+SAFE_UNLINK_FLAGS = (
+    AT_SYMLINK_NOFOLLOW_ANY | AT_RESOLVE_BENEATH | AT_NODELETEBUSY | AT_UNIQUE
+)
+SAFE_RENAME_FLAGS = RENAME_EXCL | RENAME_NOFOLLOW_ANY | RENAME_RESOLVE_BENEATH
+timeline = []
+WAIT_SECONDS = 5.0
+EXPECTED_USER_ID = 501
+EXPECTED_GROUP_ID = 20
+if sys.flags.optimize != 0:
+    raise RuntimeError("capsule probe refuses optimized Python execution")
+def require(condition, message):
+    if not condition:
+        raise RuntimeError(message)
+def mark(label):
+    observed = time.monotonic_ns()
+    while timeline and observed <= timeline[-1][1]:
+        observed = time.monotonic_ns()
+    timeline.append((label, observed))
+def lock_fd(create=True):
+    flags = (
+        os.O_RDWR
+        | os.O_CLOEXEC
+        | os.O_NONBLOCK
+        | O_RESOLVE_BENEATH
+        | O_UNIQUE
+        | O_NOFOLLOW_ANY
+    )
+    if create:
+        flags |= os.O_CREAT | os.O_EXCL
+    fd = os.open(".owner-lock-v1", flags, 0o600, dir_fd=base_fd)
+    return fd
+def extended_attribute_bytes(fd):
+    ctypes.set_errno(0)
+    count = libc.flistxattr(fd, None, 0, 0)
+    if count < 0:
+        raise OSError(ctypes.get_errno(), "flistxattr")
+    return count
+def has_extended_acl(fd):
+    ctypes.set_errno(0)
+    acl = libc.acl_get_fd_np(fd, ACL_TYPE_EXTENDED)
+    if not acl:
+        observed_errno = ctypes.get_errno()
+        if observed_errno == errno.ENOENT:
+            return False
+        raise OSError(observed_errno, "acl_get_fd_np")
+    entry = ctypes.c_void_p()
+    ctypes.set_errno(0)
+    entry_result = libc.acl_get_entry(acl, ACL_FIRST_ENTRY, ctypes.byref(entry))
+    entry_errno = ctypes.get_errno() if entry_result < 0 else 0
+    ctypes.set_errno(0)
+    free_result = libc.acl_free(acl)
+    free_errno = ctypes.get_errno() if free_result != 0 else 0
+    if entry_result < 0:
+        raise OSError(entry_errno, "acl_get_entry")
+    if free_result != 0:
+        raise OSError(free_errno, "acl_free")
+    require(
+        entry_result != 0 or bool(entry.value),
+        "ACL entry result did not carry an entry",
+    )
+    return entry_result == 0
+def acquire(fd):
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return 0
+    except OSError as error:
+        return error.errno
+def validate(fd):
+    descriptor = os.fstat(fd)
+    named = os.stat(".owner-lock-v1", dir_fd=base_fd, follow_symlinks=False)
+    require(stat.S_ISREG(descriptor.st_mode), "lock is not regular")
+    require(descriptor.st_uid == os.getuid(), "lock owner drifted")
+    require(descriptor.st_gid == os.getgid(), "lock group drifted")
+    require(stat.S_IMODE(descriptor.st_mode) == 0o600, "lock mode drifted")
+    require(
+        descriptor.st_nlink == 1 and descriptor.st_size == 0,
+        "lock link count or size drifted",
+    )
+    attribute_bytes = extended_attribute_bytes(fd)
+    require(
+        descriptor.st_flags == 0
+        and attribute_bytes == 0
+        and not has_extended_acl(fd),
+        "lock flags, xattrs or ACL are not empty",
+    )
+    require(
+        (descriptor.st_dev, descriptor.st_ino) == (named.st_dev, named.st_ino),
+        "held lock identity differs from named lock",
+    )
+    descriptor_flags = fcntl.fcntl(fd, fcntl.F_GETFD)
+    status_flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+    require(descriptor_flags & fcntl.FD_CLOEXEC, "lock lacks FD_CLOEXEC")
+    require(status_flags & os.O_NONBLOCK, "lock lacks O_NONBLOCK")
+    require(status_flags & os.O_ACCMODE == os.O_RDWR, "lock is not O_RDWR")
+    return descriptor.st_dev, descriptor.st_ino
+def expect_blocked(fd):
+    result = acquire(fd)
+    require(
+        result in (errno.EWOULDBLOCK, errno.EAGAIN),
+        f"lock contender returned unexpected errno {result}",
+    )
+    return result
+def read_exact(fd, expected, label):
+    deadline = time.monotonic() + WAIT_SECONDS
+    received = bytearray()
+    while len(received) < len(expected):
+        remaining = deadline - time.monotonic()
+        require(remaining > 0, f"{label} timed out")
+        readable, _, _ = select.select([fd], [], [], remaining)
+        require(bool(readable), f"{label} timed out")
+        chunk = os.read(fd, len(expected) - len(received))
+        require(bool(chunk), f"{label} reached EOF early")
+        received.extend(chunk)
+    require(bytes(received) == expected, f"{label} bytes differ")
+def expect_eof(fd, label):
+    deadline = time.monotonic() + WAIT_SECONDS
+    remaining = deadline - time.monotonic()
+    readable, _, _ = select.select([fd], [], [], remaining)
+    require(bool(readable), f"{label} timed out")
+    require(os.read(fd, 1) == b"", f"{label} did not reach EOF")
+def wait_child(pid, label, expected_exit=None, expected_signal=None):
+    deadline = time.monotonic() + WAIT_SECONDS
+    while True:
+        try:
+            waited, status = os.waitpid(pid, os.WNOHANG)
+        except ChildProcessError:
+            raise RuntimeError(f"{label} was not waitable")
+        if waited == pid:
+            children.discard(pid)
+            if expected_exit is not None:
+                require(
+                    os.WIFEXITED(status) and os.WEXITSTATUS(status) == expected_exit,
+                    f"{label} exit classification differs",
+                )
+            if expected_signal is not None:
+                require(
+                    os.WIFSIGNALED(status)
+                    and os.WTERMSIG(status) == expected_signal,
+                    f"{label} signal classification differs",
+                )
+            return status
+        require(time.monotonic() < deadline, f"{label} reap timed out")
+        time.sleep(0.01)
+def reap_until(pid, deadline):
+    while time.monotonic() < deadline:
+        try:
+            waited, status = os.waitpid(pid, os.WNOHANG)
+        except ChildProcessError:
+            children.discard(pid)
+            return None, True
+        if waited == pid:
+            children.discard(pid)
+            return status, True
+        time.sleep(0.01)
+    return None, False
+def kill_and_reap(pid, label):
+    if pid not in children:
+        return None
+    try:
+        os.kill(pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    status = wait_child(pid, label)
+    require(os.WIFSIGNALED(status), f"{label} was not signal-terminated")
+    return os.WTERMSIG(status)
+def force_cleanup_child(pid):
+    if pid not in children:
+        return
+    status, complete = reap_until(pid, time.monotonic())
+    if complete:
+        return
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    status, complete = reap_until(pid, time.monotonic() + 1.0)
+    if complete:
+        return
+    try:
+        os.kill(pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    status, complete = reap_until(pid, time.monotonic() + WAIT_SECONDS)
+    require(complete, f"cleanup child {pid} remained live or unreaped")
+def unlink_busy(name):
+    ctypes.set_errno(0)
+    result = libc.unlinkat(base_fd, name.encode(), SAFE_UNLINK_FLAGS)
+    observed_errno = ctypes.get_errno() if result == -1 else 0
+    return result, observed_errno
+def unlink_after_release(name, expected_identity):
+    deadline = time.monotonic() + WAIT_SECONDS
+    attempts = 0
+    while True:
+        attempts += 1
+        metadata = os.stat(name, dir_fd=base_fd, follow_symlinks=False)
+        require(
+            stat.S_ISREG(metadata.st_mode)
+            and (metadata.st_dev, metadata.st_ino) == expected_identity,
+            f"released fixture {name} identity drifted",
+        )
+        result, observed_errno = unlink_busy(name)
+        if result == 0:
+            require_missing(name, f"released fixture {name}")
+            return attempts
+        require(
+            observed_errno == errno.EBUSY,
+            f"released fixture {name} returned unexpected errno {observed_errno}",
+        )
+        require(
+            time.monotonic() < deadline,
+            f"released fixture {name} remained busy through deadline",
+        )
+        time.sleep(0.01)
+def create_file(name, contents):
+    descriptor = os.open(
+        name,
+        os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | os.O_NOFOLLOW,
+        0o600,
+        dir_fd=base_fd,
+    )
+    try:
+        require(os.write(descriptor, contents) == len(contents), f"short write for {name}")
+        os.fsync(descriptor)
+        metadata = os.fstat(descriptor)
+        return metadata.st_dev, metadata.st_ino
+    finally:
+        os.close(descriptor)
+def read_unique(name):
+    descriptor = os.open(
+        name,
+        os.O_RDONLY | os.O_CLOEXEC | O_RESOLVE_BENEATH | O_UNIQUE | O_NOFOLLOW_ANY,
+        dir_fd=base_fd,
+    )
+    try:
+        metadata = os.fstat(descriptor)
+        require(metadata.st_nlink == 1, f"{name} is not uniquely linked")
+        return os.pread(descriptor, metadata.st_size, 0), (metadata.st_dev, metadata.st_ino)
+    finally:
+        os.close(descriptor)
+def rename_exclusive(source, destination):
+    ctypes.set_errno(0)
+    result = libc.renameatx_np(
+        base_fd, source.encode(), base_fd, destination.encode(), SAFE_RENAME_FLAGS
+    )
+    observed_errno = ctypes.get_errno() if result == -1 else 0
+    return result, observed_errno
+def require_missing(name, label):
+    try:
+        os.stat(name, dir_fd=base_fd, follow_symlinks=False)
+    except FileNotFoundError:
+        return
+    raise RuntimeError(f"{label} unexpectedly exists")
+def unlink_exact_fixture(name, expected_identity):
+    metadata = os.stat(name, dir_fd=base_fd, follow_symlinks=False)
+    require(stat.S_ISREG(metadata.st_mode), f"cleanup fixture {name} is not regular")
+    require(
+        (metadata.st_dev, metadata.st_ino) == expected_identity,
+        f"cleanup fixture {name} identity drifted",
+    )
+    os.unlink(name, dir_fd=base_fd)
+    require_missing(name, f"cleanup fixture {name}")
+try:
+    require(filesystem == "apfs", f"probe requires APFS, observed {filesystem}")
+    require(
+        os.getuid() == EXPECTED_USER_ID,
+        f"probe requires UID {EXPECTED_USER_ID}, observed {os.getuid()}",
+    )
+    require(
+        os.geteuid() == EXPECTED_USER_ID,
+        f"probe requires EUID {EXPECTED_USER_ID}, observed {os.geteuid()}",
+    )
+    require(
+        os.getgid() == EXPECTED_GROUP_ID,
+        f"probe requires GID {EXPECTED_GROUP_ID}, observed {os.getgid()}",
+    )
+    require(
+        os.getegid() == EXPECTED_GROUP_ID,
+        f"probe requires EGID {EXPECTED_GROUP_ID}, observed {os.getegid()}",
+    )
+    initial_base_info = os.fstat(base_fd)
+    require(stat.S_ISDIR(initial_base_info.st_mode), "probe base is not a directory")
+    require(initial_base_info.st_uid == EXPECTED_USER_ID, "probe base owner drifted")
+    require(initial_base_info.st_gid == EXPECTED_GROUP_ID, "probe base group drifted")
+    require(
+        stat.S_IMODE(initial_base_info.st_mode) == 0o700,
+        "probe base mode is not 0700",
+    )
+    require(initial_base_info.st_dev > 0, "probe base has invalid device identity")
+    require(extended_attribute_bytes(base_fd) == 0, "probe base has xattrs")
+    require(not has_extended_acl(base_fd), "probe base has an extended ACL")
+    acl_fixture_fd = os.open(
+        "acl-parent/inherited-file",
+        os.O_RDONLY | os.O_CLOEXEC | O_RESOLVE_BENEATH | O_NOFOLLOW_ANY,
+        dir_fd=root_fd,
+    )
+    try:
+        require(
+            extended_attribute_bytes(acl_fixture_fd) == 0,
+            "ACL fixture unexpectedly appears as an xattr",
+        )
+        require(
+            has_extended_acl(acl_fixture_fd),
+            "inherited ACL negative control was not detected",
+        )
+    finally:
+        os.close(acl_fixture_fd)
+    os.unlink(acl_fixture)
+    os.rmdir(os.path.dirname(acl_fixture))
+    initial = lock_fd()
+    fcntl.flock(initial, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    original_identity = validate(initial)
+    require(
+        original_identity[0] == initial_base_info.st_dev,
+        "lock and base are on different devices",
+    )
+    initial_descriptor_flags = fcntl.fcntl(initial, fcntl.F_GETFD)
+    initial_status_flags = fcntl.fcntl(initial, fcntl.F_GETFL)
+    mark("initial-lock-acquired")
+    try:
+        duplicate_create = lock_fd(create=True)
+    except OSError as error:
+        existing_lock_create_errno = error.errno
+    else:
+        os.close(duplicate_create)
+        existing_lock_create_errno = 0
+    require(
+        existing_lock_create_errno == errno.EEXIST,
+        f"existing lock exclusive create returned errno {existing_lock_create_errno}",
+    )
+    reopened_lock = lock_fd(create=False)
+    try:
+        reopened_identity = validate(reopened_lock)
+    finally:
+        os.close(reopened_lock)
+    require(reopened_identity == original_identity, "existing lock reopen changed inode")
+    second = lock_fd(create=False)
+    same_process_errno = expect_blocked(second)
+    os.close(second)
+    duplicate = os.dup(initial)
+    os.close(initial)
+    contender = lock_fd(create=False)
+    duplicate_errno = expect_blocked(contender)
+    os.close(contender)
+    os.close(duplicate)
+    released = lock_fd(create=False)
+    require(acquire(released) == 0, "last-close did not release lock")
+    require(validate(released) == original_identity, "lock inode changed after last-close")
+    os.close(released)
+    ready_read, ready_write = os.pipe()
+    release_read, release_write = os.pipe()
+    normal_holder = os.fork()
+    if normal_holder == 0:
+        os.close(ready_read); os.close(release_write)
+        try:
+            held = lock_fd(create=False)
+            if acquire(held) != 0:
+                os._exit(113)
+            os.write(ready_write, b"ready")
+            read_exact(release_read, b"x", "normal holder release")
+            os._exit(0)
+        except BaseException:
+            os._exit(113)
+    children.add(normal_holder)
+    os.close(ready_write); os.close(release_read)
+    read_exact(ready_read, b"ready", "normal holder ready")
+    os.close(ready_read)
+    contender = lock_fd(create=False)
+    normal_exit_errno = expect_blocked(contender)
+    os.write(release_write, b"x"); os.close(release_write)
+    normal_exit_status = wait_child(normal_holder, "normal holder", expected_exit=0)
+    require(acquire(contender) == 0, "normal exit did not release lock")
+    os.close(contender)
+    ready_read, ready_write = os.pipe()
+    holder = os.fork()
+    if holder == 0:
+        os.close(ready_read)
+        try:
+            held = lock_fd(create=False)
+            if acquire(held) != 0:
+                os._exit(111)
+            os.write(ready_write, b"ready")
+            while True:
+                signal.pause()
+        except BaseException:
+            os._exit(111)
+    children.add(holder)
+    os.close(ready_write)
+    read_exact(ready_read, b"ready", "SIGKILL holder ready")
+    os.close(ready_read)
+    contender = lock_fd(create=False)
+    live_process_errno = expect_blocked(contender)
+    mark("independent-contender-blocked")
+    holder_signal = kill_and_reap(holder, "SIGKILL holder")
+    require(holder_signal == signal.SIGKILL, "holder wait signal was not SIGKILL")
+    mark("holder-reaped")
+    require(acquire(contender) == 0, "SIGKILL did not release lock")
+    require(validate(contender) == original_identity, "lock inode changed after SIGKILL")
+    mark("same-inode-reacquired")
+    os.close(contender)
+    inherited = lock_fd(create=False)
+    require(acquire(inherited) == 0, "inherited-FD setup could not acquire lock")
+    inherited_read, inherited_write = os.pipe()
+    inheritor = os.fork()
+    if inheritor == 0:
+        os.close(inherited_read)
+        os.write(inherited_write, b"ready")
+        while True:
+            signal.pause()
+    children.add(inheritor)
+    os.close(inherited_write)
+    read_exact(inherited_read, b"ready", "inherited holder ready")
+    os.close(inherited_read)
+    os.close(inherited)
+    contender = lock_fd(create=False)
+    inherited_errno = expect_blocked(contender)
+    inheritor_signal = kill_and_reap(inheritor, "inherited holder")
+    require(inheritor_signal == signal.SIGKILL, "inherited holder wait signal differed")
+    require(acquire(contender) == 0, "last inherited close did not release lock")
+    os.close(contender)
+    exec_lock = lock_fd(create=False)
+    require(acquire(exec_lock) == 0, "exec setup could not acquire lock")
+    exec_read, exec_write = os.pipe()
+    executable = os.fork()
+    if executable == 0:
+        os.close(exec_read)
+        try:
+            os.execve("/bin/sleep", ["sleep", "5"], {})
+        except BaseException:
+            os.write(exec_write, b"error")
+            os._exit(112)
+    children.add(executable)
+    os.close(exec_write)
+    expect_eof(exec_read, "exec close-on-exec pipe")
+    os.close(exec_read)
+    os.close(exec_lock)
+    contender = lock_fd(create=False)
+    require(acquire(contender) == 0, "CLOEXEC did not release lock while child lived")
+    os.close(contender)
+    executable_signal = kill_and_reap(executable, "exec child")
+    require(executable_signal == signal.SIGKILL, "exec child wait signal differed")
+    payload = os.open(
+        "payload.bin",
+        os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | os.O_NOFOLLOW,
+        0o600, dir_fd=base_fd,
+    )
+    os.write(payload, b"capsule"); os.fsync(payload)
+    payload_identity = (os.fstat(payload).st_dev, os.fstat(payload).st_ino)
+    require(
+        payload_identity[0] == initial_base_info.st_dev,
+        "payload and base are on different devices",
+    )
+    ready_read, ready_write = os.pipe()
+    payload_holder = os.fork()
+    if payload_holder == 0:
+        os.close(ready_read)
+        os.write(ready_write, b"ready")
+        while True:
+            signal.pause()
+    children.add(payload_holder)
+    os.close(ready_write)
+    read_exact(ready_read, b"ready", "payload holder ready")
+    os.close(ready_read); os.close(payload)
+    result, live_payload_errno = unlink_busy("payload.bin")
+    require(
+        result == -1 and live_payload_errno == errno.EBUSY,
+        f"live payload unlink returned {result}/{live_payload_errno}",
+    )
+    mark("live-payload-delete-blocked")
+    named = os.stat("payload.bin", dir_fd=base_fd, follow_symlinks=False)
+    require(
+        (named.st_dev, named.st_ino) == payload_identity,
+        "live payload identity changed after rejected unlink",
+    )
+    payload_holder_signal = kill_and_reap(payload_holder, "payload holder")
+    require(payload_holder_signal == signal.SIGKILL, "payload holder wait signal differed")
+    payload_release_unlink_attempts = unlink_after_release(
+        "payload.bin", payload_identity
+    )
+    mark("closed-payload-removed")
+    unique_identity = create_file("unique.bin", b"unique")
+    unique_contents, single_link_identity = read_unique("unique.bin")
+    require(
+        unique_contents == b"unique" and single_link_identity == unique_identity,
+        "single-link O_UNIQUE positive control differed",
+    )
+    os.link(
+        "unique.bin",
+        "unique-link.bin",
+        src_dir_fd=base_fd,
+        dst_dir_fd=base_fd,
+        follow_symlinks=False,
+    )
+    hard_linked = os.stat("unique.bin", dir_fd=base_fd, follow_symlinks=False)
+    linked_alias = os.stat("unique-link.bin", dir_fd=base_fd, follow_symlinks=False)
+    require(hard_linked.st_nlink == 2, "hard-link fixture did not reach link count two")
+    require(
+        (hard_linked.st_dev, hard_linked.st_ino) == (linked_alias.st_dev, linked_alias.st_ino),
+        "hard-link fixture aliases differ",
+    )
+    try:
+        rejected = os.open(
+            "unique.bin",
+            os.O_RDONLY
+            | os.O_CLOEXEC
+            | O_RESOLVE_BENEATH
+            | O_UNIQUE
+            | O_NOFOLLOW_ANY,
+            dir_fd=base_fd,
+        )
+    except OSError as error:
+        unique_hardlink_errno = error.errno
+    else:
+        os.close(rejected)
+        unique_hardlink_errno = 0
+    require(
+        unique_hardlink_errno == ENOTCAPABLE,
+        f"hard-linked O_UNIQUE returned errno {unique_hardlink_errno}",
+    )
+    linked_after = os.stat("unique.bin", dir_fd=base_fd, follow_symlinks=False)
+    alias_after = os.stat("unique-link.bin", dir_fd=base_fd, follow_symlinks=False)
+    require(
+        linked_after.st_nlink == 2
+        and (linked_after.st_dev, linked_after.st_ino)
+        == (alias_after.st_dev, alias_after.st_ino),
+        "rejected O_UNIQUE mutated hard-link identity",
+    )
+    os.unlink("unique-link.bin", dir_fd=base_fd)
+    unlink_exact_fixture("unique.bin", unique_identity)
+    mark("hardlink-rejected-by-open-unique")
+    rename_source_identity = create_file("capsule.pending", b"fresh")
+    rename_result, rename_errno = rename_exclusive(
+        "capsule.pending", "projected-cohort.bin"
+    )
+    require(
+        rename_result == 0 and rename_errno == 0,
+        f"fresh exclusive rename returned {rename_result}/{rename_errno}",
+    )
+    require_missing("capsule.pending", "renamed source")
+    published_contents, published_identity = read_unique("projected-cohort.bin")
+    require(
+        published_contents == b"fresh" and published_identity == rename_source_identity,
+        "fresh exclusive rename did not preserve bytes and inode",
+    )
+    mark("exclusive-rename-published")
+    collision_source_identity = create_file("capsule-collision.pending", b"new")
+    occupied_identity = create_file("occupied.bin", b"old")
+    collision_result, collision_errno = rename_exclusive(
+        "capsule-collision.pending", "occupied.bin"
+    )
+    require(
+        collision_result == -1 and collision_errno == errno.EEXIST,
+        f"exclusive rename collision returned {collision_result}/{collision_errno}",
+    )
+    collision_contents, collision_identity_after = read_unique(
+        "capsule-collision.pending"
+    )
+    occupied_contents, occupied_identity_after = read_unique("occupied.bin")
+    require(collision_contents == b"new", "collision mutated source bytes")
+    require(occupied_contents == b"old", "collision overwrote destination bytes")
+    require(
+        collision_identity_after == collision_source_identity,
+        "collision changed source identity",
+    )
+    require(
+        occupied_identity_after == occupied_identity,
+        "collision changed destination identity",
+    )
+    mark("exclusive-rename-refused-overwrite")
+    os.mkdir("rename-real", 0o700, dir_fd=base_fd)
+    linked_source = os.open(
+        "rename-real/source.bin",
+        os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | O_NOFOLLOW_ANY,
+        0o600,
+        dir_fd=base_fd,
+    )
+    os.write(linked_source, b"linked"); os.fsync(linked_source)
+    linked_source_identity = (os.fstat(linked_source).st_dev, os.fstat(linked_source).st_ino)
+    os.close(linked_source)
+    os.symlink("rename-real", "rename-link", dir_fd=base_fd)
+    symlink_result, symlink_errno = rename_exclusive(
+        "rename-link/source.bin", "symlink-destination.bin"
+    )
+    require(
+        symlink_result == -1 and symlink_errno == errno.ELOOP,
+        f"nofollow rename returned {symlink_result}/{symlink_errno}",
+    )
+    linked_source_after = os.stat(
+        "rename-real/source.bin", dir_fd=base_fd, follow_symlinks=False
+    )
+    require(
+        (linked_source_after.st_dev, linked_source_after.st_ino) == linked_source_identity,
+        "nofollow rename mutated source identity",
+    )
+    require_missing("symlink-destination.bin", "nofollow destination")
+    os.unlink("rename-link", dir_fd=base_fd)
+    os.unlink("rename-real/source.bin", dir_fd=base_fd)
+    os.rmdir("rename-real", dir_fd=base_fd)
+    mark("exclusive-rename-refused-symlink")
+    outside_path = os.path.join(root, "outside.bin")
+    outside = os.open(
+        outside_path, os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | os.O_NOFOLLOW, 0o600
+    )
+    os.write(outside, b"outside"); os.fsync(outside)
+    outside_identity = (os.fstat(outside).st_dev, os.fstat(outside).st_ino)
+    os.close(outside)
+    beneath_result, beneath_errno = rename_exclusive("../outside.bin", "escaped.bin")
+    require(
+        beneath_result == -1 and beneath_errno == ENOTCAPABLE,
+        f"beneath rename returned {beneath_result}/{beneath_errno}",
+    )
+    outside_after = os.stat(outside_path, follow_symlinks=False)
+    require(
+        (outside_after.st_dev, outside_after.st_ino) == outside_identity,
+        "beneath rename mutated outside identity",
+    )
+    outside_reader = os.open(outside_path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+    require(os.read(outside_reader, 8) == b"outside", "beneath rename mutated outside bytes")
+    os.close(outside_reader)
+    require_missing("escaped.bin", "beneath destination")
+    os.unlink(outside_path)
+    mark("exclusive-rename-refused-escape")
+    unlink_exact_fixture("projected-cohort.bin", published_identity)
+    unlink_exact_fixture("capsule-collision.pending", collision_identity_after)
+    unlink_exact_fixture("occupied.bin", occupied_identity_after)
+    old = lock_fd(create=False)
+    require(acquire(old) == 0, "replacement counterexample could not acquire old lock")
+    old_identity = validate(old)
+    os.unlink(".owner-lock-v1", dir_fd=base_fd)
+    new = lock_fd()
+    require(acquire(new) == 0, "replacement counterexample could not acquire new lock")
+    new_identity = validate(new)
+    require(old_identity != new_identity, "replacement counterexample reused one inode")
+    mark("lock-replacement-dual-owner-demonstrated")
+    os.close(new)
+    os.close(old)
+    base_info = os.fstat(base_fd)
+    require(
+        (base_info.st_dev, base_info.st_ino, base_info.st_uid, base_info.st_gid,
+         stat.S_IMODE(base_info.st_mode))
+        == (initial_base_info.st_dev, initial_base_info.st_ino, EXPECTED_USER_ID,
+            EXPECTED_GROUP_ID, 0o700),
+        "probe base identity or metadata drifted",
+    )
+    require(
+        sorted(os.listdir(base_fd)) == [".owner-lock-v1"],
+        "probe directory contains unexpected residue",
+    )
+    require(
+        all(earlier[1] < later[1] for earlier, later in zip(timeline, timeline[1:])),
+        "monotonic event ordering did not strictly increase",
+    )
+    print(json.dumps({
+        "schemaVersion": 1,
+        "filesystem": filesystem,
+        "uid": os.getuid(),
+        "euid": os.geteuid(),
+        "gid": os.getgid(),
+        "egid": os.getegid(),
+        "baseMode": oct(stat.S_IMODE(base_info.st_mode)),
+        "lockMode": "0o600",
+        "lockDevice": original_identity[0],
+        "lockInode": original_identity[1],
+        "lockDescriptorFlags": initial_descriptor_flags,
+        "lockStatusFlags": initial_status_flags,
+        "payloadDevice": payload_identity[0],
+        "payloadInode": payload_identity[1],
+        "sameProcessSecondOpenErrno": same_process_errno,
+        "existingLockExclusiveCreateErrno": existing_lock_create_errno,
+        "existingLockReopenedWithoutRepair": True,
+        "extendedACLNegativeControlDetected": True,
+        "extendedACLInvisibleToXattrs": True,
+        "liveProcessContenderErrno": live_process_errno,
+        "normalExitContenderErrno": normal_exit_errno,
+        "duplicateHeldUntilLastClose": duplicate_errno in (errno.EWOULDBLOCK, errno.EAGAIN),
+        "sameInodeReacquiredAfterNormalExit": True,
+        "sameInodeReacquiredAfterSIGKILL": True,
+        "normalHolderWaitExit": os.WEXITSTATUS(normal_exit_status),
+        "sigkillHolderWaitSignal": holder_signal,
+        "inheritedHolderWaitSignal": inheritor_signal,
+        "execChildWaitSignal": executable_signal,
+        "payloadHolderWaitSignal": payload_holder_signal,
+        "closeOnExecReleasedWhileChildLived": True,
+        "livePayloadUnlinkErrno": live_payload_errno,
+        "payloadRemovedAfterChildExit": True,
+        "payloadReleaseUnlinkAttempts": payload_release_unlink_attempts,
+        "unlinkRecreateAllowsDualExclusiveLocks": True,
+        "singleLinkOpenUniqueSucceeded": True,
+        "hardLinkedOpenUniqueErrno": unique_hardlink_errno,
+        "uniqueFixtureCleanupIdentityMatched": True,
+        "exclusiveRenameFreshSucceeded": True,
+        "exclusiveRenameCollisionErrno": collision_errno,
+        "exclusiveRenameCollisionPreservedBothFiles": True,
+        "exclusiveRenameSymlinkErrno": symlink_errno,
+        "exclusiveRenameEscapeErrno": beneath_errno,
+        "renameFixtureCleanupIdentityMatched": True,
+        "pythonOptimize": sys.flags.optimize,
+        "monotonicOrderingObserved": True,
+        "monotonicEventCount": len(timeline),
+        "probeDirectoryEmptyExceptPermanentLock": True,
+    }, sort_keys=True, separators=(",", ":")))
+finally:
+    cleanup_failures = []
+    for child in list(children):
+        try:
+            force_cleanup_child(child)
+        except (ChildProcessError, ProcessLookupError, RuntimeError) as error:
+            cleanup_failures.append(f"pid {child}: {error}")
+    try:
+        os.unlink(".owner-lock-v1", dir_fd=base_fd)
+    except FileNotFoundError:
+        pass
+    os.close(base_fd)
+    os.close(root_fd)
+    if children:
+        cleanup_failures.append(
+            "unreaped child PIDs: " + ",".join(str(pid) for pid in sorted(children))
+        )
+    if cleanup_failures:
+        raise RuntimeError("; ".join(cleanup_failures))
+PY
+)
+rmdir "$probe_root/base"
+rmdir "$probe_root"
+trap - EXIT
+print -r -- "$probe_output"

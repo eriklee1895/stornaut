@@ -105,7 +105,8 @@
 > 1,900 changed lines, 95 tests / 5 suites, three green gates and independent
 > final no-unresolved-P0–P2 review. By design it ran no serial/full/root/sudo,
 > App/helper/driver launch, XPC, model/auth or network. c0b-ii fresh preflight
-> is current. a2-i
+> split it into ii-c0b-ii-a kernel ownership and ii-c0b-ii-b capsule owner;
+> ii-c0b-ii-a tests-first implementation is current. a2-i
 > closed at commit
 > `158f500` / tree `c7a42ffd` with 10 non-document paths / 1,965 changed
 > lines, 66 focused tests, a 1,500-test serialized regression, exact
@@ -1191,13 +1192,17 @@ The remaining L3 work is split before driver coding:
    complete/non-admitting. iii-b2b-1a-0 canonical helper-provenance carriage,
    iii-b2b-1a-1 concrete outer observation and split iii-b2b-1b zero-argument
    entry/artifact and ii-c0b-i semantic producer are also complete/non-admitting.
-   The corrected remaining order is `ii-c0b-ii -> ii-c0b-iii -> ii-c0b-iv ->
-   ii-c -> L3c3d -> L3c4`; ii-c0b-ii fresh preflight is current. The fresh
+   The corrected remaining order is `ii-c0b-ii-a -> ii-c0b-ii-b ->
+   ii-c0b-iii -> ii-c0b-iv -> ii-c -> L3c3d -> L3c4`; c0b-ii fresh
+   preflight is complete and ii-c0b-ii-a is current. The fresh
    [ii-c0b preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-c0b-preflight.md)
    separates product-semantic production, capsule-file authority and launcher/
    TTY/FD authority before coding. The
    [ii-c0b-i review](../../reports/phase-d-task-39b2c-l3c3c-ii-c0b-i-review.md)
    records the completed semantic producer, exact scope/gates and non-claims.
+   The [ii-c0b-ii ownership preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-ownership-preflight.md)
+   records the APFS physical evidence, exact child budgets and last-close
+   ownership contract.
    iii-b2b-1a-1 closed at implementation `fe4f6ad` / tree `6bd6d384`, sealed
    by `2c31a7c`, with exact 8 non-document paths / 2,800 changed lines,
    1,535 tests / 80 suites, complete App/Release and contract gates and no
@@ -1393,8 +1398,8 @@ and iii-a/iii-b1/iii-b2a0/iii-b2a-i/iii-b2a-ii-a1/a2-0/a2-i/a2-ii/
 iii-b2b-0, iii-b2b-1a-0, iii-b2b-1a-1 and iii-b2b-1b are
 complete/non-admitting; ii-c0b is frozen as c0b-i semantic producer, c0b-ii
 owner-only capsule node, c0b-iii fixed launcher/stub and c0b-iv zero-argument
-final composition. ii-c0b-i is complete/non-admitting and ii-c0b-ii fresh
-preflight is the current checkpoint.
+final composition. ii-c0b-i is complete/non-admitting; c0b-ii is split into
+ii-c0b-ii-a/ii-c0b-ii-b and ii-c0b-ii-a is the current checkpoint.
 ADR 0018
 remains Proposed until ii-c succeeds. L3c1 used focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean
@@ -1630,8 +1635,12 @@ Required verdicts:
 - `signedInvestigationRuntimeBlocked`;
 - `signedInvestigationRuntimeFailed`.
 
-Ready requires all expected observations/controls/denials and zero residue.
-Partial evidence never yields Ready.
+Ready requires all expected observations/controls/denials and zero residue. For
+the ii-c0b filesystem namespace, the fixed base plus one independently validated
+`.owner-lock-v1` inode are persistent infrastructure, not attempt residue. Zero
+attempt residue means zero `attempt-*` roots, zero pending/final capsule nodes
+and no other base entry; L3c4 must observe this directly rather than infer it
+from lifecycle artifact counters. Partial evidence never yields Ready.
 
 The report explicitly does not prove:
 
@@ -1721,7 +1730,9 @@ Add a focused diagnostic verifier that:
 6. verifies the three evidence planes and report fingerprint;
 7. exercises failure cases with fresh nonces;
 8. drains/uninstalls fixed topology;
-9. proves zero residue.
+9. proves zero attempt residue, including direct observation that the fixed
+   same-UID gate base contains only its independently validated permanent
+   `.owner-lock-v1` inode.
 
 The script must:
 
@@ -1855,7 +1866,9 @@ Task 39 completes only when:
 - one current-source signed-App report is
   `signedInvestigationRuntimeReady`;
 - capability, control and denial planes independently pass;
-- cancellation/timeout/invalid-envelope paths drain with zero residue;
+- cancellation/timeout/invalid-envelope paths drain with zero attempt residue;
+  the fixed gate base contains only its independently validated permanent
+  `.owner-lock-v1` inode;
 - structural no-Executor and Release boundaries pass;
 - independent review has zero unresolved P0–P2;
 - one uninterrupted authoritative `scripts/verify --full` exits `0`;

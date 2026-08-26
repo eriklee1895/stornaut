@@ -171,7 +171,9 @@ iii-b2b-1b zero-argument entry/artifact is also complete/non-admitting after its
 c0b-i semantic producer, c0b-ii owner-only capsule node, c0b-iii fixed launcher/
 stub and c0b-iv zero-argument final composition. c0b-i is complete/non-admitting
 after its exact 7-path / 1,900-line implementation, 95 tests / 5 suites, three
-green gates and independent final review; c0b-ii fresh preflight is current.
+green gates and independent final review. The c0b-ii fresh preflight split it
+into ii-c0b-ii-a kernel ownership and ii-c0b-ii-b capsule owner; ii-c0b-ii-a
+tests-first implementation is current.
 a2-i closed at
 implementation commit `158f500` and tree
 `c7a42ffd`: exact 10 non-document paths / 1,965 changed lines, 66 focused
@@ -308,7 +310,8 @@ complete/non-admitting. ii-c0a is complete/non-admitting; ii-b5b-iii-b0 is
 frozen/non-admitting; iii-a, iii-b1, iii-b2a0, iii-b2a-i,
 iii-b2a-ii-a1, a2-0, a2-i, a2-ii, iii-b2b-0, iii-b2b-1a-0,
 iii-b2b-1a-1, iii-b2b-1b and ii-c0b-i are complete/non-admitting and the
-remaining order is ii-c0b-ii -> ii-c0b-iii -> ii-c0b-iv -> ii-c -> L3c3d -> L3c4.
+remaining order is ii-c0b-ii-a -> ii-c0b-ii-b -> ii-c0b-iii -> ii-c0b-iv ->
+ii-c -> L3c3d -> L3c4.
 See the
 [ii-b5a review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5a-review.md) and
 [ii-b5b-i-a review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-a-review.md) and
@@ -329,7 +332,8 @@ See the
 [ii-b5b-ii-d review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-d-review.md),
 [ii-c0a preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md),
 [ii-c0a review](../../reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md),
-[ii-c0b-i review](../../reports/phase-d-task-39b2c-l3c3c-ii-c0b-i-review.md) and
+[ii-c0b-i review](../../reports/phase-d-task-39b2c-l3c3c-ii-c0b-i-review.md),
+[ii-c0b-ii ownership preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-ownership-preflight.md) and
 [ii-b5b-iii-b0 preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md) and
 [ii-b5b-iii-a review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-a-review.md) and
 [ii-b5b-iii-b1 review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b1-review.md) and
@@ -366,7 +370,7 @@ the sole normal-product admission gate.
 | [36](task-36-implementation-brief.md) | Domain, canonical projection, planner, budget and stop contracts | complete; [review](../../reports/phase-d-task-36-review.md) |
 | [37](task-37-implementation-brief.md) | Store v4, retention and source rejoin | complete; [review](../../reports/phase-d-task-37-review.md) |
 | [38](task-38-implementation-brief.md) | Closed coordinator with fake runtime | complete; [review](../../reports/phase-d-task-38-review.md) |
-| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; iii-b2b-1b and c0b-i complete/non-admitting; ii-c0b four-way split frozen; c0b-ii fresh preflight current; ADR 0018 Proposed |
+| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; c0b-i complete/non-admitting; ii-c0b-ii-a/ii-c0b-ii-b split frozen; ii-c0b-ii-a implementation current; ADR 0018 Proposed |
 | [40](task-40-implementation-brief.md) | Evidence report and conservative Review projection | blocked on Task 39 |
 | [41](task-41-implementation-brief.md) | First-use disclosure and typed availability | blocked on Task 40 |
 | [42](task-42-implementation-brief.md) | App workflow and recovery state | blocked on Task 41 |

@@ -1,8 +1,9 @@
 # Phase D Task 39B2c L3c3c-ii-c0b Non-Root Capsule and Launcher Preflight
 
-> Status: four-checkpoint order frozen; c0b-i implementation complete/non-
-> admitting with no unresolved P0-P2; c0b-ii fresh preflight current; c0b-iii/
-> c0b-iv still require their own fresh preflights
+> Status: c0b-i implementation complete/non-admitting; c0b-ii fresh preflight
+> split the checkpoint into ii-c0b-ii-a/ii-c0b-ii-b and froze the ownership
+> contract; ii-c0b-ii-a tests-first implementation current; c0b-iii/c0b-iv still require
+> their own fresh preflights
 >
 > Date: 2026-08-26
 >
@@ -230,6 +231,12 @@ checkpoint; the accepted aggregate c0b tree receives one serial at c0b-iv.
 
 ## 5. ii-c0b-ii — Owner-Only Capsule Node
 
+The mandatory fresh preflight is complete and supersedes this section's former
+single-checkpoint candidate envelope. See
+[c0b-ii Ownership Split Preflight](phase-d-task-39b2c-l3c3c-ii-c0b-ii-ownership-preflight.md).
+The frozen order is ii-c0b-ii-a kernel last-close ownership prerequisite
+followed by ii-c0b-ii-b owner-only capsule node.
+
 This checkpoint introduces a narrow
 `StornautInvestigationMachineLaunchSupport` target depending only on the
 HandoffContract. It accepts canonical projected-input bytes, strict-decodes and
@@ -250,7 +257,7 @@ identity to c0b-iii. It retains cleanup authority until terminal settlement and
 unlinks only the exact identity-matched owned file/root. Path replacement or
 cleanup ambiguity fails closed and remains typed residue; it never falls back
 to broad recursive deletion. Before a new lease, it must hold one kernel-
-released exclusive ownership primitive for the fixed base; failure to acquire
+last-close-released exclusive ownership primitive for the fixed base; failure to acquire
 it is typed `activeAttempt` and performs no cleanup. Only while that ownership
 remains held may it enumerate immediate exact-format children beneath the base.
 An empty valid leaf, a valid `capsule.pending`, or a canonical digest-named stale
@@ -258,23 +265,16 @@ capsule is removed only after owner/node/digest verification. A symlink,
 unexpected entry, owner/mode/link/ACL/xattr/flag drift, malformed name or digest
 mismatch yields typed `staleResidueUncertain` and blocks the attempt. This owner
 is also the sole stale-recovery authority after a launcher crash; no second
-mailbox exists. Its mandatory fresh preflight must prove that the selected
-Darwin ownership primitive is automatically released on owner death and cannot
-mistake another live attempt for stale residue.
+mailbox exists. The completed fresh preflight proves that `flock` releases on
+last close and freezes a no-dup/no-borrow/no-child-inheritance invariant so owner
+death is equivalent to last close; it cannot mistake another live attempt for
+stale residue.
 
-Candidate seven-path / 2,100-line envelope, to be confirmed or split by the
-mandatory c0b-ii fresh preflight:
-
-1. `Package.swift`;
-2. `Sources/StornautInvestigationMachineLaunchSupport/InvestigationOwnerOnlyCapsule.swift` (new);
-3. `Tests/StornautInvestigationTests/InvestigationOwnerOnlyCapsuleTests.swift` (new);
-4. `Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift`;
-5. `scripts/verify-contract`;
-6. `scripts/verify-investigation-boundaries`; and
-7. `scripts/verify-app-release-boundaries`.
-
-No App/Xcode membership, second launch-support source, process spawn, sudo,
-shell or product-configuration dependency belongs here.
+The completed fresh preflight replaces that candidate with two exact envelopes:
+ii-c0b-ii-a is seven non-document paths / 2,600 lines after a separate one-path
+/ 800-line physical-probe checkpoint; ii-c0b-ii-b is six non-document paths /
+3,400 lines. No App/Xcode membership, process spawn, sudo, shell or product-
+configuration dependency belongs to either child.
 
 ## 6. ii-c0b-iii — Fixed Launcher and Physical Stub
 
@@ -531,4 +531,5 @@ staged-scope gate, contract gate and independent no-unresolved-P0–P2 review ar
 recorded in the
 [c0b-i completion audit](phase-d-task-39b2c-l3c3c-ii-c0b-i-review.md). By
 design it ran no serial/full/root/sudo, App/helper/driver launch, XPC, model/auth
-or network. c0b-ii fresh preflight is now current.
+or network. c0b-ii fresh preflight is complete; ii-c0b-ii-a tests-first
+implementation is now current.

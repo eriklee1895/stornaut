@@ -7,11 +7,11 @@
 > ii-b3a/ii-b3b/ii-b3c/ii-b4/ii-b5a0 complete/non-admitting; ii-b5 split;
 > b5a and all b5b-i checkpoints through aggregate i-c2 complete/non-admitting;
 > ii-b5b-ii-a/ii-b/ii-c/ii-d and ii-c0a projection-in-capsule complete/non-
-> admitting; ii-b5b-iii-b0 outer/inner protocol preflight frozen; iii-a,
-> iii-b1, iii-b2a0 typed physical bridge and iii-b2a-i supervisor admission
-> complete/non-admitting; iii-b2a-ii-a current
+> admitting; ii-b5b-iii-b0 through iii-b2b-1b and ii-c0b-i complete/non-
+> admitting; c0b-ii ownership preflight split it into ii-c0b-ii-a/ii-c0b-ii-b;
+> ii-c0b-ii-a implementation current
 >
-> **Date:** 2026-08-19; status evidence refreshed 2026-08-24
+> **Date:** 2026-08-19; status evidence refreshed 2026-08-27
 >
 > **Decision owners:** Stornaut maintainers
 >
@@ -310,6 +310,11 @@ not a fault target and may not signal unrelated processes.
   sudo preserves child stdin/TTY/
   FDs. A mismatch in the unique ii-c attempt consumes and fails that gate with
   no retry, readiness or ADR acceptance.
+- The fixed same-UID base and exact `.owner-lock-v1` inode are persistent
+  infrastructure, not attempt residue. Task 39 zero-residue evidence must
+  explicitly observe zero `attempt-*` roots and zero pending/final capsule nodes,
+  with no base entry other than that independently revalidated lock inode;
+  lifecycle artifact counters alone do not prove this filesystem baseline.
 - L3c3d may run one real authenticated model attempt only after ii-c is green.
 - L3c4 alone owns Task 39 readiness and the remaining full verifier.
 
@@ -317,8 +322,9 @@ not a fault target and may not signal unrelated processes.
 
 Within the explicit trusted-local-operator threat model, this ADR cannot become
 Accepted from static, same-UID, reproducibility,
-installer-only or synthetic evidence. ii-a and ii-b must first pass their
-focused, final-Mach-O, staged-serial and independent-review gates. Then ii-c
+installer-only or synthetic evidence. The remaining ii-c0b checkpoints must
+first pass their frozen focused/component/aggregate-serial and independent-
+review gates. Then ii-c
 must perform exactly one current-source, no-model outer driver invocation with
 the closed scenario epochs and prove:
 
@@ -335,6 +341,9 @@ the closed scenario epochs and prove:
    installed L2, exact helper release/exit and fresh helper/full-L2 on the next
    epoch;
 8. post-run uninstall and zero App/plist/service/runtime/lease/process residue;
+   the persistent same-UID gate base is separately admitted only when it has
+   zero `attempt-*` roots and no entry other than the exact validated
+   `.owner-lock-v1` inode;
    and
 9. independent validation of the raw evidence without retrying a started failed
    attempt.
@@ -391,8 +400,13 @@ unconsumed.
 | ii-b5b-iii-b1 injected eight-epoch cohort | complete; non-admitting |
 | ii-b5b-iii-b2a0 typed physical bridge | complete; non-admitting |
 | ii-b5b-iii-b2a-i canonical supervisor admission | complete; non-admitting |
-| ii-b5b-iii-b2a-ii-a Darwin physical session composition | current |
-| ii-b5b-iii-b2b zero-argument entry and final artifact | not started |
-| ii-c0b non-root capsule author and launcher hygiene | not started |
+| ii-b5b-iii-b2a-ii-a Darwin physical session composition | complete; non-admitting |
+| ii-b5b-iii-b2b zero-argument entry and final artifact | complete; non-admitting |
+| ii-c0b-i semantic producer | complete; non-admitting |
+| ii-c0b-ii ownership split/APFS physical evidence | complete; non-admitting |
+| ii-c0b-ii-a kernel ownership | current |
+| ii-c0b-ii-b capsule owner | pending |
+| ii-c0b-iii launcher/TTY/FD hygiene | pending |
+| ii-c0b-iv non-root composition | pending |
 | ii-c no-model privileged machine gate | not executed |
 | ADR status | **Proposed** |
