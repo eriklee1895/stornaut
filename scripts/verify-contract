@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=90f7ec666b1afe6473daf0ff76cd81efd6320f80a54ff791b75b50f2221052ac
+ib2_self_sha=c9848645c7d40fe9a309bce6c6590a9371d7aa4e085c205197973b9d81438297
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -1152,7 +1152,7 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "9c28eb37ec0d4c7386d50fae34ea6cee6410a3ebd71973cc026d2aab9a1bdacb",
+        "83ac6ede823a4d259d1bcf6fc36cdc243731afd655e20bbfba8d0ec13ea2aeb0",
     Path("scripts/verify-app-release-boundaries"):
         "a29b85249cb6be507b756ee4d04d5cf3c45894ae9a20ed34966cccf4176672cb",
 }
@@ -10038,12 +10038,12 @@ PY
     require_fixed_text "$output" "iii-b2b-1a-1 completed tree drifted"
 done
 
-# Task 39 iii-b2b-1b-ii verifier-only replay. The feature implementation is
-# immutable at the baseline; this checkpoint changes only three verifiers and
-# their target-boundary test.
+# Task 39 iii-b2b-1b-ii verifier-only implementation and immutable replay.
 iib5biii_b2b1b_gate=scripts/verify-investigation-boundaries
 iib5biii_b2b1b_app_gate=scripts/verify-app-release-boundaries
 iib5biii_b2b1b_baseline=6b2608258d59787bca592012086a2377d647473e
+iib5biii_b2b1b_implementation_commit=1c8ab1d5c06f87f7d2af548228835adcd43a1ae9
+iib5biii_b2b1b_implementation_tree=d7b6c05fdb90f0db693e8f506e45eae5b98a45f9
 iib5biii_b2b1b_support=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDriverSupport.swift
 iib5biii_b2b1b_entry=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineZeroArgumentEntry.swift
 iib5biii_b2b1b_support_test=Tests/StornautInvestigationTests/InvestigationMachineDriverSupportTests.swift
@@ -10204,7 +10204,7 @@ do
 done
 
 # Verifier-only split scope: exact four paths and <= 1,200 changed lines.
-# The implementation is the baseline and is read-only here.
+# The completed implementation commit is immutable and replayed below.
 iib5biii_b2b1b_paths=(
     "$iib5biii_b2b1b_boundary"
     scripts/verify-app-release-boundaries
@@ -10213,16 +10213,72 @@ iib5biii_b2b1b_paths=(
 )
 (( ${#iib5biii_b2b1b_paths} == 4 )) \
     || fail_contract "iii-b2b-1b checkpoint path ceiling drifted"
+[[ "$(git show -s --format=%P \
+    "$iib5biii_b2b1b_implementation_commit")" == \
+    "$iib5biii_b2b1b_baseline" ]] \
+    || fail_contract "iii-b2b-1b implementation parent drifted"
+[[ "$(git show -s --format=%T \
+    "$iib5biii_b2b1b_implementation_commit")" == \
+    "$iib5biii_b2b1b_implementation_tree" ]] \
+    || fail_contract "iii-b2b-1b implementation tree drifted"
+iib5biii_b2b1b_observed_paths=(
+    ${(f)"$(git diff-tree --no-commit-id --name-only -r \
+        "$iib5biii_b2b1b_implementation_commit" | LC_ALL=C sort)"}
+)
+iib5biii_b2b1b_expected_paths=("${(@on)iib5biii_b2b1b_paths}")
+[[ "${(j:\n:)iib5biii_b2b1b_observed_paths}" == \
+    "${(j:\n:)iib5biii_b2b1b_expected_paths}" ]] \
+    || fail_contract "iii-b2b-1b implementation paths drifted"
+iib5biii_b2b1b_implementation_lines=$(
+    git diff-tree --numstat --no-commit-id -r \
+        "$iib5biii_b2b1b_implementation_commit" \
+        | awk 'index($3,"docs/")!=1 && $3!="AGENTS.md" && $3!="README.md" {n += $1 + $2} END {print n + 0}'
+)
+(( iib5biii_b2b1b_implementation_lines == 971 )) \
+    || fail_contract "iii-b2b-1b implementation line count drifted"
+python3 - "$iib5biii_b2b1b_implementation_commit" <<'PY'
+from pathlib import Path
+import hashlib
+import subprocess
+import sys
+
+implementation = sys.argv[1]
+expected = {
+    "Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift":
+        "e42cbe4a44a528a1660bf1abb93170c4556d84757d7d692cd1e9c4213276a4b8",
+    "scripts/verify-app-release-boundaries":
+        "a29b85249cb6be507b756ee4d04d5cf3c45894ae9a20ed34966cccf4176672cb",
+    "scripts/verify-contract":
+        "6256c53076f65043e4b1d45576224c443cecfb44e37f20157064bffa28d656a2",
+    "scripts/verify-investigation-boundaries":
+        "9c28eb37ec0d4c7386d50fae34ea6cee6410a3ebd71973cc026d2aab9a1bdacb",
+}
+for path, expected_sha256 in expected.items():
+    completed = subprocess.run(
+        ["git", "show", f"{implementation}:{path}"],
+        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False,
+    )
+    if completed.returncode != 0:
+        raise SystemExit(
+            f"iii-b2b-1b implementation source missing: {path}"
+        )
+    if hashlib.sha256(completed.stdout).hexdigest() != expected_sha256:
+        raise SystemExit(
+            f"iii-b2b-1b implementation source seal drifted: {path}"
+        )
+PY
+iib5biii_b2b1b_index="$contract_root/iib5biii-b2b1b-implementation.index"
+GIT_INDEX_FILE="$iib5biii_b2b1b_index" \
+    git read-tree "$iib5biii_b2b1b_implementation_commit^{tree}"
+GIT_INDEX_FILE="$iib5biii_b2b1b_index" \
+    "$iib5biii_b2b1b_gate" \
+    --iib5biii-b2b1b-staged-scope-contract-only \
+    "$iib5biii_b2b1b_baseline" \
+    >"$contract_root/iib5biii-b2b1b-scope-canonical.log"
 for fixture in extra-path over-budget deleted binary mode wrong-baseline; do
     index="$contract_root/iib5biii-b2b1b-scope-$fixture.index"
-    GIT_INDEX_FILE="$index" git read-tree "$iib5biii_b2b1b_baseline^{tree}"
+    cp "$iib5biii_b2b1b_index" "$index"
     baseline=$iib5biii_b2b1b_baseline
-    for checkpoint_path in "${iib5biii_b2b1b_paths[@]}"; do
-        mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
-        blob=$(git hash-object -w -- "$checkpoint_path")
-        GIT_INDEX_FILE="$index" git update-index --add --cacheinfo \
-            "$mode,$blob,$checkpoint_path"
-    done
     case $fixture in
         extra-path)
             blob=$(git rev-parse "${iib5biii_b2b1b_baseline}:AGENTS.md")
@@ -10265,6 +10321,67 @@ for fixture in extra-path over-budget deleted binary mode wrong-baseline; do
         fail_contract "iii-b2b-1b scope mutation accepted: $fixture"
     fi
     require_fixed_text "$output" "$expected"
+done
+
+# A controlled iii-b2b-1b same-path tamper preserves the exact path and
+# line-count budget while changing one implementation-added byte. The
+# immutable tree must reject all four substitutions.
+for checkpoint_path in "${iib5biii_b2b1b_paths[@]}"; do
+    index="$contract_root/iib5biii-b2b1b-tamper-${checkpoint_path:t}.index"
+    cp "$iib5biii_b2b1b_index" "$index"
+    python3 - \
+        "$iib5biii_b2b1b_baseline" \
+        "$iib5biii_b2b1b_implementation_commit" \
+        "$checkpoint_path" \
+        "$contract_root/iib5biii-b2b1b-tampered" <<'PY'
+import difflib
+from pathlib import Path
+import subprocess
+import sys
+
+baseline, implementation, path, output = sys.argv[1:]
+
+def show(revision):
+    completed = subprocess.run(
+        ["git", "show", f"{revision}:{path}"],
+        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False,
+    )
+    return completed.stdout if completed.returncode == 0 else b""
+
+before = show(baseline).splitlines(keepends=True)
+after = show(implementation).splitlines(keepends=True)
+matcher = difflib.SequenceMatcher(a=before, b=after, autojunk=False)
+changed_index = next(
+    (j1 for tag, _i1, _i2, j1, j2 in matcher.get_opcodes()
+     if tag != "equal" and j1 < j2),
+    None,
+)
+if changed_index is None:
+    raise SystemExit(f"cannot construct same-path tamper: {path}")
+line = bytearray(after[changed_index])
+for index, value in enumerate(line):
+    if 0x21 <= value <= 0x7E:
+        line[index] = 0x58 if value != 0x58 else 0x59
+        break
+else:
+    raise SystemExit(f"cannot mutate changed line: {path}")
+after[changed_index] = bytes(line)
+Path(output).write_bytes(b"".join(after))
+PY
+    blob=$(git hash-object -w -- \
+        "$contract_root/iib5biii-b2b1b-tampered")
+    mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
+    GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+        "$mode,$blob,$checkpoint_path"
+    output="$contract_root/iib5biii-b2b1b-tamper-${checkpoint_path:t}.log"
+    if GIT_INDEX_FILE="$index" "$iib5biii_b2b1b_gate" \
+        --iib5biii-b2b1b-staged-scope-contract-only \
+        "$iib5biii_b2b1b_baseline" >"$output" 2>&1
+    then
+        fail_contract \
+            "iii-b2b-1b same-path substitution accepted: $checkpoint_path"
+    fi
+    require_fixed_text "$output" "iii-b2b-1b completed tree drifted"
 done
 
 print "Verifier mode and CI contract verification passed."

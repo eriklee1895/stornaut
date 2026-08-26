@@ -3954,6 +3954,7 @@ expected_test_sha256 = {
         "91cc60ce1d48b8b78b2b0546e48eb8b985424bab6122f0e03f0202bbe97e7f92",
         "eea2b35f3a6195b3a62bc8f1a6295a19b0b4dec55b723267ca2574258bf6da8f",
         "e42cbe4a44a528a1660bf1abb93170c4556d84757d7d692cd1e9c4213276a4b8",
+        "21703fa66674a9c7b705345f04d454dd789865c694e2493afe32eec21e4e6aee",
     },
 }
 for path, admitted_sha256 in expected_test_sha256.items():
@@ -4260,6 +4261,7 @@ expected_test_sha256 = {
         "91cc60ce1d48b8b78b2b0546e48eb8b985424bab6122f0e03f0202bbe97e7f92",
         "eea2b35f3a6195b3a62bc8f1a6295a19b0b4dec55b723267ca2574258bf6da8f",
         "e42cbe4a44a528a1660bf1abb93170c4556d84757d7d692cd1e9c4213276a4b8",
+        "21703fa66674a9c7b705345f04d454dd789865c694e2493afe32eec21e4e6aee",
     },
 }
 for path, admitted_sha256 in expected_test_sha256.items():
@@ -4675,6 +4677,7 @@ PY
 
 function verify_iib5biii_b2b1b_scope() {
     local baseline=${1:-6b2608258d59787bca592012086a2377d647473e}
+    local implementation_tree=d7b6c05fdb90f0db693e8f506e45eae5b98a45f9
     local expected=(
         Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
         scripts/verify-app-release-boundaries
@@ -4719,6 +4722,12 @@ function verify_iib5biii_b2b1b_scope() {
         | awk 'index($3,"docs/")!=1 && $3!="AGENTS.md" && $3!="README.md" {n+=$1+$2} END {print n+0}')
     (( changed <= 1200 )) || {
         print -u2 "iii-b2b-1b checkpoint budget drifted"; return 1
+    }
+    [[ "$(git write-tree)" == "$implementation_tree" ]] || {
+        print -u2 "iii-b2b-1b completed tree drifted"; return 1
+    }
+    (( changed == 971 )) || {
+        print -u2 "iii-b2b-1b implementation line count drifted"; return 1
     }
 }
 

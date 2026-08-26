@@ -2295,10 +2295,14 @@ struct InvestigationMachineTargetBoundaryTests {
         }
         for marker in [
             "6b2608258d59787bca592012086a2377d647473e",
+            "d7b6c05fdb90f0db693e8f506e45eae5b98a45f9",
             "(( ${#expected} == 4 ))",
             "(( changed <= 1200 ))",
+            "(( changed == 971 ))",
             "iii-b2b-1b staged checkpoint paths drifted",
             "iii-b2b-1b checkpoint budget drifted",
+            "iii-b2b-1b completed tree drifted",
+            "iii-b2b-1b implementation line count drifted",
         ] {
             #expect(scope.contains(marker))
         }
@@ -2314,6 +2318,15 @@ struct InvestigationMachineTargetBoundaryTests {
             "final-write-reclassification",
             "cancellation-precedence-bypass",
             "extra-path over-budget deleted binary mode wrong-baseline",
+            "iib5biii_b2b1b_implementation_commit=1c8ab1d5c06f87f7d2af548228835adcd43a1ae9",
+            "iib5biii_b2b1b_implementation_tree=d7b6c05fdb90f0db693e8f506e45eae5b98a45f9",
+            "iii-b2b-1b implementation parent drifted",
+            "iii-b2b-1b implementation tree drifted",
+            "iii-b2b-1b implementation paths drifted",
+            "iii-b2b-1b implementation line count drifted",
+            "iii-b2b-1b implementation source seal drifted:",
+            "iii-b2b-1b same-path substitution accepted:",
+            "controlled iii-b2b-1b same-path tamper",
         ] {
             #expect(contract.contains(marker))
         }
