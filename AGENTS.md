@@ -576,6 +576,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-b2a-ii-a2-ii terminal/admission review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-ii-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-ii-review.md) |
 | Phase D Task 39B2c-L1 residue observation review | [docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md](docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md) |
 | Phase D Task 39B2c iii-b2b-1a-1 outer observation review | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1a1-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1a1-review.md) |
+| Phase D Task 39B2c iii-b2b-1b zero-argument entry preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1b-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1b-preflight.md) |
 | Phase D Task 39B2c-L2 root topology observation review | [docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md](docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md) |
 | Phase D Task 39B2c-L3a trusted machine target review | [docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md](docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md) |
 | Epic 2–4 历史计划 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) |

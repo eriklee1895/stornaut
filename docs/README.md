@@ -82,6 +82,7 @@
 | Phase D Task 39B2c iii-b2b-0 Review | [Release Graph Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-0-review.md) — complete / non-admitting |
 | Phase D Task 39B2c iii-b2b-1a-0 Review | [Helper Provenance Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1a0-review.md) — complete / non-admitting |
 | Phase D Task 39B2c iii-b2b-1a-1 Review | [Outer Observation Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1a1-review.md) — complete / non-admitting；iii-b2b-1b current |
+| Phase D Task 39B2c iii-b2b-1b Preflight | [Zero-Argument Entry Scope and Test Matrix](reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1b-preflight.md) — frozen / implementation pending |
 | Phase D Task 39B2c L3c2b Eight-Scenario Driver Review | [Code Review and Completion Audit](reports/phase-d-task-39b2c-l3c2b-eight-scenario-driver-review.md) |
 | Phase D Task 39B2c L3c3 Scope/Trust Preflight | [Pre-coding Split and Audit](reports/phase-d-task-39b2c-l3c3-scope-trust-preflight.md) |
 | Phase D Task 39B2c L3c3a Driver-Bound Attempt Review | [Code Review and Completion Audit](reports/phase-d-task-39b2c-l3c3a-driver-binding-review.md) |
