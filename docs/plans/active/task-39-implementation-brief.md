@@ -105,8 +105,10 @@
 > 1,900 changed lines, 95 tests / 5 suites, three green gates and independent
 > final no-unresolved-P0–P2 review. By design it ran no serial/full/root/sudo,
 > App/helper/driver launch, XPC, model/auth or network. c0b-ii fresh preflight
-> split it into ii-c0b-ii-a kernel ownership and ii-c0b-ii-b capsule owner;
-> ii-c0b-ii-a tests-first implementation is current. a2-i
+> split it into ii-c0b-ii-a kernel ownership and ii-c0b-ii-b capsule owner.
+> The ii-a budget trigger split the original 7-path / 2,600-line envelope into
+> exact 3-path / 2,000-line ii-c0b-ii-a1 behavior and exact 4-path / 1,200-line
+> ii-c0b-ii-a2 verifier closure; a1 tests-first implementation is current. a2-i
 > closed at commit
 > `158f500` / tree `c7a42ffd` with 10 non-document paths / 1,965 changed
 > lines, 66 focused tests, a 1,500-test serialized regression, exact
@@ -1192,9 +1194,9 @@ The remaining L3 work is split before driver coding:
    complete/non-admitting. iii-b2b-1a-0 canonical helper-provenance carriage,
    iii-b2b-1a-1 concrete outer observation and split iii-b2b-1b zero-argument
    entry/artifact and ii-c0b-i semantic producer are also complete/non-admitting.
-   The corrected remaining order is `ii-c0b-ii-a -> ii-c0b-ii-b ->
+   The corrected remaining order is `ii-c0b-ii-a1 -> ii-c0b-ii-a2 -> ii-c0b-ii-b ->
    ii-c0b-iii -> ii-c0b-iv -> ii-c -> L3c3d -> L3c4`; c0b-ii fresh
-   preflight is complete and ii-c0b-ii-a is current. The fresh
+   preflight and the ii-a budget split are complete, and ii-c0b-ii-a1 is current. The fresh
    [ii-c0b preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-c0b-preflight.md)
    separates product-semantic production, capsule-file authority and launcher/
    TTY/FD authority before coding. The
@@ -1202,7 +1204,10 @@ The remaining L3 work is split before driver coding:
    records the completed semantic producer, exact scope/gates and non-claims.
    The [ii-c0b-ii ownership preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-ownership-preflight.md)
    records the APFS physical evidence, exact child budgets and last-close
-   ownership contract.
+   ownership contract. The
+   [ii-c0b-ii-a budget split](../../reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-a-budget-split-preflight.md)
+   preserves the exact seven-path union while separating a1 behavior/focused
+   evidence from a2 structural/mutation/aggregate closure.
    iii-b2b-1a-1 closed at implementation `fe4f6ad` / tree `6bd6d384`, sealed
    by `2c31a7c`, with exact 8 non-document paths / 2,800 changed lines,
    1,535 tests / 80 suites, complete App/Release and contract gates and no
@@ -1399,7 +1404,8 @@ iii-b2b-0, iii-b2b-1a-0, iii-b2b-1a-1 and iii-b2b-1b are
 complete/non-admitting; ii-c0b is frozen as c0b-i semantic producer, c0b-ii
 owner-only capsule node, c0b-iii fixed launcher/stub and c0b-iv zero-argument
 final composition. ii-c0b-i is complete/non-admitting; c0b-ii is split into
-ii-c0b-ii-a/ii-c0b-ii-b and ii-c0b-ii-a is the current checkpoint.
+ii-c0b-ii-a/ii-c0b-ii-b, ii-a is further split into a1/a2, and ii-c0b-ii-a1
+is the current checkpoint.
 ADR 0018
 remains Proposed until ii-c succeeds. L3c1 used focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean

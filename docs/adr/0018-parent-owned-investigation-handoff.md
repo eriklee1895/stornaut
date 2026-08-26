@@ -9,7 +9,8 @@
 > ii-b5b-ii-a/ii-b/ii-c/ii-d and ii-c0a projection-in-capsule complete/non-
 > admitting; ii-b5b-iii-b0 through iii-b2b-1b and ii-c0b-i complete/non-
 > admitting; c0b-ii ownership preflight split it into ii-c0b-ii-a/ii-c0b-ii-b;
-> ii-c0b-ii-a implementation current
+> ii-a budget split frozen as a1 behavior/a2 verifier closure; ii-c0b-ii-a1
+> implementation current
 >
 > **Date:** 2026-08-19; status evidence refreshed 2026-08-27
 >
@@ -404,7 +405,9 @@ unconsumed.
 | ii-b5b-iii-b2b zero-argument entry and final artifact | complete; non-admitting |
 | ii-c0b-i semantic producer | complete; non-admitting |
 | ii-c0b-ii ownership split/APFS physical evidence | complete; non-admitting |
-| ii-c0b-ii-a kernel ownership | current |
+| ii-c0b-ii-a budget split | frozen; non-admitting |
+| ii-c0b-ii-a1 kernel ownership behavior/focused evidence | current |
+| ii-c0b-ii-a2 verifier/aggregate closure | pending |
 | ii-c0b-ii-b capsule owner | pending |
 | ii-c0b-iii launcher/TTY/FD hygiene | pending |
 | ii-c0b-iv non-root composition | pending |

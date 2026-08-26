@@ -1,7 +1,7 @@
 # Phase D Task 39B2c L3c3c-ii-c0b-ii Ownership Split Preflight
 
-> Status: scope, cost and ownership mechanism frozen; ii-c0b-ii-a tests-first
-> implementation is the current frontier
+> Status: ownership mechanism frozen; the ii-c0b-ii-a budget split into a1/a2
+> is frozen and ii-c0b-ii-a1 is the current frontier
 >
 > Date: 2026-08-27
 >
@@ -21,7 +21,8 @@ would make a filesystem-liveness defect reopen canonical payload work. It is
 superseded by this strict order:
 
 ```text
-ii-c0b-ii-a  kernel last-close ownership prerequisite
+ii-c0b-ii-a1  kernel last-close ownership behavior and focused evidence
+-> ii-c0b-ii-a2  structural, component, mutation and replay closure
 -> ii-c0b-ii-b  owner-only capsule node and one-shot descriptor lease
 -> c0b-iii  retained-parent launcher / TTY / FD hygiene
 -> c0b-iv  zero-argument non-root composition
@@ -30,7 +31,8 @@ ii-c0b-ii-a  kernel last-close ownership prerequisite
 -> L3c4  final machine admission and authoritative full verifier
 ```
 
-Both ii-c0b-ii children remain non-root and non-admitting. Neither starts an App,
+Both ii-c0b-ii children and the a1/a2 ownership sub-checkpoints remain non-root
+and non-admitting. Neither starts an App,
 helper, driver, XPC connection, model, authentication flow or network request.
 Neither runs a staged serial or `scripts/verify --full`; c0b-iv owns the one
 aggregate c0b staged-only serial and L3c4 owns Task 39's remaining full run.
@@ -150,17 +152,24 @@ not count or modify the probe.
 
 ### 4.2 Exact Scope and Cost
 
-Exactly seven non-document paths and at most 2,600 added-or-changed lines:
+The original exactly seven-path / 2,600-line planning envelope was superseded before
+implementation continued: the source/test plus verifier surface is now
+estimated at 2,720–2,870 lines. The mandatory
+[ii-c0b-ii-a budget split](phase-d-task-39b2c-l3c3c-ii-c0b-ii-a-budget-split-preflight.md)
+preserves the exact seven-path union but freezes it as:
 
-1. `Package.swift`;
-2. `Sources/StornautInvestigationMachineLaunchSupport/InvestigationMachineGateOwnership.swift` (new);
-3. `Tests/StornautInvestigationTests/InvestigationMachineGateOwnershipTests.swift` (new);
-4. `Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift`;
-5. `scripts/verify-contract`;
-6. `scripts/verify-investigation-boundaries`; and
-7. `scripts/verify-app-release-boundaries`.
+- **ii-c0b-ii-a1:** exactly three non-document paths / 2,000 lines —
+  `Package.swift`, the ownership source and its focused tests; and
+- **ii-c0b-ii-a2:** exactly four non-document paths / 1,200 lines — the target-
+  boundary tests plus `verify-contract`, `verify-investigation-boundaries` and
+  `verify-app-release-boundaries`.
 
-The new `StornautInvestigationMachineLaunchSupport` target depends only on
+ii-c0b-ii-a2 may start only from the exact pushed a1 commit/tree recorded in
+the budget-split report. Each child must remain within its own ceiling and the
+exact seven-path union must remain at or below the stricter 2,870-line aggregate
+ceiling; neither child may add a non-document path without another split.
+
+In ii-c0b-ii-a1, the new `StornautInvestigationMachineLaunchSupport` target depends only on
 `StornautInvestigationHandoffContract`; the Investigation test target adds the
 new dependency. It is not a package product. No product, App or Xcode target
 gains this dependency in ii-c0b-ii-a.
@@ -220,14 +229,14 @@ reuse rejection, explicit close exactly once and close failure, deinit best
 effort, and zero enumeration/cleanup before or after failed acquisition. The
 real-filesystem cases use only random disposable APFS roots.
 
-The physical probe is a required focused gate and must retain its complete
+The physical probe is a required ii-c0b-ii-a1 focused gate and must retain its complete
 positive/negative controls, explicit checks, bounded waits, exact cleanup and
 machine constraints. Mutation gates must reject removal/replacement of
 `LOCK_NB`, `FD_CLOEXEC`, no-follow/beneath/unique checks, named-FD identity
 revalidation, permanent-lock prohibition, contention errno narrowing, explicit
 close reporting or probe target-machine assertions.
 
-The structural gates freeze exact paths/modes/budget, target dependency and
+ii-c0b-ii-a2 owns the structural gates that freeze exact paths/modes/budget, target dependency and
 source inventory, package-only/non-Codable surface, no App/Xcode/product call
 site, no process spawn/shell/sudo/network/Core/Lifecycle/Codex/Execution import,
 and no PID/mtime/process-name ownership heuristic. Debug SwiftPM object is the
@@ -245,10 +254,11 @@ The exact verifier entry points are:
 fixtures, but does not repeat the component build already owned by the last
 entry point. Every verifier command failure must fail closed.
 
-Validation order is RED focused tests, physical probe, source/scope gate,
-focused/affected tests, contract and App/Release boundary gates, then independent
-implementation/verifier/cross-boundary review. No serial or full run belongs to
-ii-c0b-ii-a. `verify-contract` must also replay the immutable c0b-i implementation
+Validation order is a1 RED/focused/affected tests, targeted target builds, the
+physical probe and independent source/test review; then a2 source/scope,
+contract and App/Release boundary gates plus independent verifier/cross-boundary
+review. No serial or full run belongs to a1, a2 or aggregate ii-c0b-ii-a.
+`verify-contract` must also replay the immutable c0b-i implementation
 commit `2493e0f28e0c8d406b4efcdbf17713bde3633449` with that commit's own verifier,
 tree, exact scope and source seals before accepting shared-verifier changes.
 
@@ -383,13 +393,13 @@ accept ADR 0018 or enable production Deep Dive.
 | kernel-released exclusive ownership candidate | disposable APFS probe, fixed-inode `flock`, death/exec/last-close cases | preflight complete |
 | unique and replacement-safe node operations | `O_UNIQUE`, safe rename collision/symlink/beneath controls | preflight complete |
 | target machine and bounded probe cleanup | APFS/501:20/0700 hard gates, monotonic IPC/reap, exact `rmdir` | preflight complete |
-| narrow ownership module | target + internal acquirer/final owner + focused tests | ii-c0b-ii-a pending |
-| permanent lock inode and contention-only active state | source, mutation and physical gates | ii-c0b-ii-a pending |
+| narrow ownership module | target + internal acquirer/final owner + focused tests | ii-c0b-ii-a1 current |
+| permanent lock inode and contention-only active state | a1 source/physical evidence + a2 mutation gates | a1 current; a2 pending |
 | exact capsule publication | canonical bytes, exclusive rename, fsync/reopen/pread proof | ii-c0b-ii-b pending |
 | one-shot path-free descriptor lease | owner/lease state tests and source gate | ii-c0b-ii-b pending |
 | replacement-safe settlement/recovery | identity-bound busy retry and residue matrix | ii-c0b-ii-b pending |
-| no premature product or privilege reachability | package/source/final-image negative controls | both pending |
-| independent no-P0-P2 review and separate commits | review records and pushed commits | both pending |
+| no premature product or privilege reachability | package/source/final-image negative controls | a1/a2/ii-b pending |
+| independent no-P0-P2 review and separate commits | review records and pushed commits | a1/a2/ii-b pending |
 | aggregate c0b serial | one staged-only run after c0b-iv | later |
 | machine readiness/full verifier | ii-c/L3c3d/L3c4 evidence | later |
 
@@ -410,5 +420,7 @@ external-`PYTHONOPTIMIZE=1` execution passed, with zero matching temporary roots
 or child processes afterward. Final probe, contract and cross-file reviews found
 no unresolved P0–P2.
 
-Task 39 remains incomplete, ADR 0018 remains Proposed and production Deep Dive
-remains unavailable.
+The follow-on budget split is frozen in
+[ii-c0b-ii-a Budget Split Preflight](phase-d-task-39b2c-l3c3c-ii-c0b-ii-a-budget-split-preflight.md);
+ii-c0b-ii-a1 is current. Task 39 remains incomplete, ADR 0018 remains Proposed
+and production Deep Dive remains unavailable.

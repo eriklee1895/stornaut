@@ -19,7 +19,7 @@
 15. [`0015-headless-ci-verification.md`](0015-headless-ci-verification.md) — Accepted; ordinary GitHub Actions run deterministic build/test gates while XCUITest, host UI evidence and performance remain in the local full verifier
 16. [`0016-investigation-lifecycle-supervisor.md`](0016-investigation-lifecycle-supervisor.md) — Accepted; privileged audit-session supervisor closes descendant escape and proves lifecycle drain/recovery
 17. [`0017-investigation-planning-and-stop-semantics.md`](0017-investigation-planning-and-stop-semantics.md) — Accepted for Phase D Task 36; planning, budget, stop and no-Executor semantics
-18. [`0018-parent-owned-investigation-handoff.md`](0018-parent-owned-investigation-handoff.md) — Proposed for Task 39 L3c3c; external root launch rejected; ii-b5b-ii, ii-c0a, iii-b2b through 1b, and c0b-i complete/non-admitting; [ii-c0b-ii ownership split](../reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-ownership-preflight.md) frozen; ii-c0b-ii-a current
+18. [`0018-parent-owned-investigation-handoff.md`](0018-parent-owned-investigation-handoff.md) — Proposed for Task 39 L3c3c; external root launch rejected; ii-b5b-ii, ii-c0a, iii-b2b through 1b, and c0b-i complete/non-admitting; [ii-c0b-ii ownership split](../reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-ownership-preflight.md) and [ii-a budget split](../reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-a-budget-split-preflight.md) frozen; ii-c0b-ii-a1 current
 
 每份 ADR 至少记录 Status、Context、Evidence、Decision、Consequences、Residual Risks 和 Validation。安全假设没有测量证据时不得标记 Accepted。
 

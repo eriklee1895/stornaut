@@ -354,8 +354,11 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   independent final no-unresolved-P0–P2 review 完成并保持 non-admitting；
   按设计未运行 serial/full/root/sudo、App/helper/driver launch、XPC、model/
   auth 或 network。c0b-ii fresh preflight 已完成并拆为 ii-c0b-ii-a kernel
-  last-close ownership 与 ii-c0b-ii-b capsule owner；当前 frontier 为
-  ii-c0b-ii-a tests-first implementation。
+  last-close ownership 与 ii-c0b-ii-b capsule owner；ii-a 又因原 7-path /
+  2,600-line 预算漂移至预计 2,720–2,870 lines，在继续编码前拆为 exact
+  3-path / 2,000-line ii-c0b-ii-a1 behavior/focused evidence 与 exact 4-path /
+  1,200-line ii-c0b-ii-a2 verifier/aggregate closure；当前 frontier 为
+  ii-c0b-ii-a1 tests-first implementation。
   iii-b2a0 以
   exact 8 non-document paths / 2,198 changed lines、
   36-test/3-suite combined bridge+continuity+cohort、580-test/43-suite affected、
@@ -400,8 +403,8 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   971 changed lines、contract/App-Release exit 0、immutable seal `a314b85` /
   tree `aac9d81` 与 no-unresolved-P0–P2 review 收口。两者均
   complete/non-admitting；c0b-i 也已完成并保持 non-admitting，c0b-ii fresh
-  preflight 已完成；当前 frontier 为 ii-c0b-ii-a，随后严格按
-  ii-c0b-ii-a → ii-c0b-ii-b → c0b-iii → c0b-iv →
+  preflight 已完成；ii-a budget split 已冻结，当前 frontier 为 ii-c0b-ii-a1，
+  随后严格按 ii-c0b-ii-a1 → ii-c0b-ii-a2 → ii-c0b-ii-b → c0b-iii → c0b-iv →
   ii-c → L3c3d → L3c4 推进。
   该 ii-b5b-ii-c checkpoint 以 8 个
   non-document paths / 3,104 changed lines、35 focused tests、
@@ -584,6 +587,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c L3c3c-ii-c0b non-root capsule/launcher preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-preflight.md) |
 | Phase D Task 39B2c L3c3c-ii-c0b-i semantic producer review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-i-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-i-review.md) |
 | Phase D Task 39B2c L3c3c-ii-c0b-ii ownership split preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-ownership-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-ownership-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-c0b-ii-a budget split preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-a-budget-split-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-a-budget-split-preflight.md) |
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-b0 outer/inner protocol preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md) |
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-a per-epoch continuity review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-a-review.md) |
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-b1 injected cohort preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b1-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b1-preflight.md) |
@@ -758,8 +762,9 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   iii-b2b-1a-1 concrete outer observation 与 iii-b2b-1b zero-argument
   entry/final artifact 也已完成并保持 non-admitting；ii-c0b 已冻结为四段。
   c0b-i semantic producer 已完成并保持 non-admitting；c0b-ii fresh preflight
-  已完成并拆为 ii-c0b-ii-a/ii-c0b-ii-b，当前 frontier 为 ii-c0b-ii-a。
-  严格后续顺序为 ii-c0b-ii-a kernel ownership → ii-c0b-ii-b capsule owner →
+  已完成并拆为 ii-c0b-ii-a/ii-c0b-ii-b；ii-a budget split 又冻结为 a1/a2，
+  当前 frontier 为 ii-c0b-ii-a1。严格后续顺序为 ii-c0b-ii-a1 behavior →
+  ii-c0b-ii-a2 verifier closure → ii-c0b-ii-b capsule owner →
   c0b-iii fixed launcher/stub → c0b-iv
   zero-argument final composition → ii-c
   privileged no-model gate → L3c3d → L3c4。
