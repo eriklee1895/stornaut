@@ -345,7 +345,15 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   non-admitting；iii-b2b-1b 已拆为 1b-i/1b-ii 并全部完成、保持
   non-admitting。ii-c0b 已冻结为 c0b-i semantic producer、c0b-ii
   owner-only capsule node、c0b-iii fixed launcher/stub 与 c0b-iv
-  zero-argument final composition；当前 frontier 为 c0b-i。
+  zero-argument final composition。c0b-i 已以 implementation commit
+  `2493e0f28e0c8d406b4efcdbf17713bde3633449`（parent
+  `e5ed33e27195d9252f02a89ab39664df3848f1ed`、tree
+  `8155d64c4966fb83c332f7d195a92095e0af2ba9`）、exact 7 non-document
+  paths / 1,900 changed lines、95 tests / 5 suites、full
+  `verify-investigation-boundaries`、exact staged scope、`verify-contract` 与
+  independent final no-unresolved-P0–P2 review 完成并保持 non-admitting；
+  按设计未运行 serial/full/root/sudo、App/helper/driver launch、XPC、model/
+  auth 或 network。当前 frontier 为 c0b-ii fresh preflight。
   iii-b2a0 以
   exact 8 non-document paths / 2,198 changed lines、
   36-test/3-suite combined bridge+continuity+cohort、580-test/43-suite affected、
@@ -389,8 +397,9 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   1b-ii 以 implementation `1c8ab1d` / tree `d7b6c05`、exact 4 paths /
   971 changed lines、contract/App-Release exit 0、immutable seal `a314b85` /
   tree `aac9d81` 与 no-unresolved-P0–P2 review 收口。两者均
-  complete/non-admitting；当前 frontier 为 c0b-i，随后严格按
-  c0b-ii → c0b-iii → c0b-iv → ii-c → L3c3d → L3c4 推进。
+  complete/non-admitting；c0b-i 也已完成并保持 non-admitting，当前 frontier
+  为 c0b-ii fresh preflight，随后严格按 c0b-ii → c0b-iii → c0b-iv →
+  ii-c → L3c3d → L3c4 推进。
   该 ii-b5b-ii-c checkpoint 以 8 个
   non-document paths / 3,104 changed lines、35 focused tests、
   1,396-test staged-only serial、三个 verifier gates 与 final
@@ -570,6 +579,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c L3c3c-ii-c0a projection-in-capsule preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md) |
 | Phase D Task 39B2c L3c3c-ii-c0a projection-in-capsule review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md) |
 | Phase D Task 39B2c L3c3c-ii-c0b non-root capsule/launcher preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-c0b-i semantic producer review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-i-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-i-review.md) |
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-b0 outer/inner protocol preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md) |
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-a per-epoch continuity review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-a-review.md) |
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-b1 injected cohort preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b1-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b1-preflight.md) |
@@ -742,9 +752,10 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   iii-b2a-ii-a1、a2-0、a2-i 与 a2-ii 已完成并保持 non-admitting；iii-b2b-0
   Release graph closure、iii-b2b-1a-0 canonical helper-provenance carriage 与
   iii-b2b-1a-1 concrete outer observation 与 iii-b2b-1b zero-argument
-  entry/final artifact 也已完成并保持 non-admitting；ii-c0b 已冻结为四段，
-  当前 frontier 为 c0b-i，严格后续顺序为 c0b-i semantic producer →
-  c0b-ii owner-only capsule node → c0b-iii fixed launcher/stub → c0b-iv
+  entry/final artifact 也已完成并保持 non-admitting；ii-c0b 已冻结为四段。
+  c0b-i semantic producer 已完成并保持 non-admitting，当前 frontier 为
+  c0b-ii fresh preflight，严格后续顺序为 c0b-ii owner-only capsule node →
+  c0b-iii fixed launcher/stub → c0b-iv
   zero-argument final composition → ii-c
   privileged no-model gate → L3c3d → L3c4。
   ADR 0018 仍 Proposed；L3c4 独占 final admission 与

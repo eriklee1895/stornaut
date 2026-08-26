@@ -1,8 +1,8 @@
 # Phase D Task 39B2c L3c3c-ii-c0b Non-Root Capsule and Launcher Preflight
 
-> Status: four-checkpoint order and c0b-i exact scope frozen and independently
-> reviewed with no unresolved P0-P2; c0b-ii/c0b-iii/c0b-iv require their own
-> fresh preflights; c0b-i implementation not started
+> Status: four-checkpoint order frozen; c0b-i implementation complete/non-
+> admitting with no unresolved P0-P2; c0b-ii fresh preflight current; c0b-iii/
+> c0b-iv still require their own fresh preflights
 >
 > Date: 2026-08-26
 >
@@ -502,8 +502,9 @@ requires otherwise.
 
 ## 10. Independent Preflight Review
 
-The final current-source review found no unresolved P0-P2 in the frozen c0b-i
-contract and authorized c0b-i to start. Earlier findings were closed by:
+The pre-implementation current-source review found no unresolved P0-P2 in the
+frozen c0b-i contract and authorized c0b-i to start. Earlier findings were
+closed by:
 
 - making the installed binding an explicit path-free typed input and recording
   the existing configuration decoder's read-only path-metadata validation;
@@ -520,3 +521,14 @@ The review also confirmed that unresolved c0b-ii/iii/iv mechanisms are explicit
 fatal stop-before-coding prerequisites rather than claims made by this preflight.
 No test, build, root operation, model call, network operation or full verifier
 was needed or run for this documentation-only checkpoint.
+
+The subsequent c0b-i implementation is complete/non-admitting at commit
+`2493e0f28e0c8d406b4efcdbf17713bde3633449`, parent
+`e5ed33e27195d9252f02a89ab39664df3848f1ed` and tree
+`8155d64c4966fb83c332f7d195a92095e0af2ba9`. Its exact 7 non-document paths /
+1,900 changed lines, 95 tests / 5 suites, full Investigation-boundary gate, exact
+staged-scope gate, contract gate and independent no-unresolved-P0–P2 review are
+recorded in the
+[c0b-i completion audit](phase-d-task-39b2c-l3c3c-ii-c0b-i-review.md). By
+design it ran no serial/full/root/sudo, App/helper/driver launch, XPC, model/auth
+or network. c0b-ii fresh preflight is now current.
