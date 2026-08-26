@@ -33,7 +33,7 @@
 | Agent、双模式与治理设计 | [Agent Disk Governance](design/agent-disk-governance.md) |
 | UI、品牌、状态与交互 | [UI/UX](design/ui-ux.md) |
 | 宏观交付顺序与阶段 Gate | [Delivery Roadmap](plans/roadmap.md) |
-| 当前计划状态 | [Active Plans](plans/active/README.md) — Phase D approved；Task 39 in progress；iii-b2b-1b complete/non-admitting，ii-c0b current；ADR 0018 Proposed |
+| 当前计划状态 | [Active Plans](plans/active/README.md) — Phase D approved；Task 39 in progress；iii-b2b-1b complete/non-admitting，ii-c0b four-way split frozen，c0b-i current；ADR 0018 Proposed |
 | Capability-first Codex Runtime Gate | [Runtime Evidence Gate](plans/completed/capability-first-codex-runtime-gate.md) — complete / archived |
 | R2 tests-first brief | [R2 Implementation Brief](plans/completed/task-r2-implementation-brief.md) — complete |
 | R3 lifecycle hard-gate brief | [R3 Implementation Brief](plans/completed/task-r3-implementation-brief.md) — behaviorReady candidate |
@@ -64,7 +64,7 @@
 | Phase D Task 37 Review | [Code Review and Completion Audit](reports/phase-d-task-37-review.md) |
 | Phase D Task 38 | [Implementation Brief](plans/active/task-38-implementation-brief.md) — complete |
 | Phase D Task 38 Review | [Code Review and Completion Audit](reports/phase-d-task-38-review.md) |
-| Phase D Task 39 | [Implementation Brief](plans/active/task-39-implementation-brief.md) — in progress；iii-b2b-1b complete/non-admitting，ii-c0b current；remaining order ii-c0b → ii-c → L3c3d → L3c4 |
+| Phase D Task 39 | [Implementation Brief](plans/active/task-39-implementation-brief.md) — in progress；iii-b2b-1b complete/non-admitting，c0b-i current；remaining order c0b-i → c0b-ii → c0b-iii → c0b-iv → ii-c → L3c3d → L3c4 |
 | Phase D Task 39A Review | [Code Review and Completion Audit](reports/phase-d-task-39a-review.md) |
 | Phase D Task 39B1a Review | [Code Review and Completion Audit](reports/phase-d-task-39b1a-review.md) |
 | Phase D Task 39B1b-i Review | [Code Review and Completion Audit](reports/phase-d-task-39b1b-i-review.md) |
@@ -149,6 +149,7 @@
 | Phase D Task 39B2c L3c3c-ii-b5b-ii-d Review | [Exact Owned-PGID Retirement Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-d-review.md) — 8 non-document paths / 2,253 changed lines、40 focused、527 affected、1,409-test serial、contract/structural/final-Mach-O gates；complete/non-admitting |
 | Phase D Task 39B2c L3c3c-ii-c0a Preflight | [Projection-in-Capsule Contract](reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md) — v1 capsule bytes unchanged；new package-only enclosing projected-cohort input；8 paths / 2,600 lines；implementation complete/non-admitting |
 | Phase D Task 39B2c L3c3c-ii-c0a Review | [Projection-in-Capsule Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md) — exact 8 paths / 1,863 changed lines；90 focused、536 affected、1,418-test/73-suite clean serial；three boundary gates and no-unresolved-P0–P2 review；complete/non-admitting |
+| Phase D Task 39B2c L3c3c-ii-c0b Preflight | [Non-Root Capsule and Launcher Split](reports/phase-d-task-39b2c-l3c3c-ii-c0b-preflight.md) — c0b-i semantic producer → c0b-ii owner-only capsule node → c0b-iii fixed launcher/stub → c0b-iv zero-argument final composition；all non-admitting |
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-b0 Preflight | [Outer/Inner Protocol and Split](reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md) — long-lived outer、disposable inner-led PGID、fixed FD contract、parent-crash overlay and iii-a/b1/b2a/b2b budgets；preflight complete/non-admitting |
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-a Review | [Per-Epoch Continuity Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-a-review.md) — exact 10 paths / 3,147 changed lines；40 focused、559 affected、1,446-test/74-suite clean serial；three boundary gates and no unresolved P0–P2；complete/non-admitting |
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-b1 Preflight | [Injected Eight-Epoch Cohort](reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b1-preflight.md) — package-only one-shot actor、final continuity destruction、7 paths / 3,200 lines；complete/non-admitting |

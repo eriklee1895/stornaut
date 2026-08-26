@@ -290,8 +290,9 @@
 > exact owned-PGID retirement 已完成并保持 non-admitting。dependency inversion
 > preflight 已把 ii-c0 拆为 c0a/c0b；c0a 保留 v1 capsule/epoch bytes，新增
 > package-only enclosing projected-cohort input 与 paired intake，并已完成、保持
-> non-admitting。b5b-iii 随后已关闭至 iii-b2b-1b；当前 frontier 为 c0b，
-> 严格按 c0b → ii-c → L3c3d → L3c4 推进。该
+> non-admitting。b5b-iii 随后已关闭至 iii-b2b-1b；ii-c0b 已冻结为
+> c0b-i/c0b-ii/c0b-iii/c0b-iv，当前 frontier 为 c0b-i，严格按
+> c0b-i → c0b-ii → c0b-iii → c0b-iv → ii-c → L3c3d → L3c4 推进。该
 > b5b-ii-c checkpoint 以 8 个 non-document paths / 3,104 changed lines、35
 > focused tests、1,396-test staged-only serial、三个 verifier gates 与 final
 > no-unresolved-P0–P2 review 收口；未运行 full。c0a 完成后按序为 b5b-iii
@@ -663,8 +664,8 @@ preflight 将剩余工作封闭拆为 a2-0 untrusted decode、a2-i inherited-PGI
 session 与 a2-ii terminal/admission join；a2-0、a2-i 与 a2-ii 已完成并保持
 non-admitting；iii-b2b-0、iii-b2b-1a-0 与 iii-b2b-1a-1 已完成并保持
 non-admitting；iii-b2b-1b 已拆为 1b-i/1b-ii 并全部完成、保持
-non-admitting，当前 frontier 为 ii-c0b，随后为 ii-c0b → ii-c → L3c3d →
-L3c4。
+non-admitting；ii-c0b 已冻结为四段，当前 frontier 为 c0b-i，随后为
+c0b-i → c0b-ii → c0b-iii → c0b-iv → ii-c → L3c3d → L3c4。
 ADR 0018 仍 Proposed，L3c4 独占 final admission 与剩余 full。
 iii-b2b-0 completion evidence 见
 [Release graph review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-0-review.md)。
@@ -735,7 +736,7 @@ ii-b5b-ii-a/ii-b/ii-c/ii-d 与 ii-c0a complete/non-admitting；ii-b5b-iii-b0
 preflight frozen/non-admitting，iii-a/iii-b1/iii-b2a0/iii-b2a-i/
 iii-b2a-ii-a1/a2-0/a2-i/a2-ii complete/non-admitting；a2 已冻结并关闭，
 iii-b2b-0、iii-b2b-1a-0、iii-b2b-1a-1 与 iii-b2b-1b
-complete/non-admitting；ii-c0b current。
+complete/non-admitting；ii-c0b four-way split frozen，c0b-i current。
 i-b2a completion 见
 [artifact/static reader review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2a-review.md)。
 [fixed service reader review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2b-b-review.md)
@@ -763,7 +764,7 @@ non-admitting；ii-c0a complete/non-admitting，ii-b5b-iii-b0 preflight frozen/
 non-admitting，iii-a/iii-b1/iii-b2a0/iii-b2a-i/iii-b2a-ii-a1
 complete/non-admitting；a2 已冻结为 a2-0/a2-i/a2-ii，三项均
 complete/non-admitting，iii-b2b-0、iii-b2b-1a-0、iii-b2b-1a-1 与
-iii-b2b-1b complete/non-admitting；ii-c0b current。
+iii-b2b-1b complete/non-admitting；ii-c0b four-way split frozen，c0b-i current。
 ii-a completion 见
 [review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-a-review.md)，ii-b
 completion 见
@@ -985,7 +986,8 @@ owned-PGID retirement 与 ii-c0a 已完成并保持 non-admitting；ii-b5b-iii-b
 preflight 已冻结，iii-a/iii-b1/iii-b2a0/iii-b2a-i/iii-b2a-ii-a1/a2-0/a2-i/a2-ii
 已完成并保持 non-admitting；a2 已关闭，iii-b2b-0、iii-b2b-1a-0 与
 iii-b2b-1a-1 与拆分后的 iii-b2b-1b-i/1b-ii 已完成并保持
-non-admitting，当前 frontier 为 ii-c0b，之后为 ii-c、L3c3d、L3c4。
+non-admitting；ii-c0b 已冻结为四段，当前 frontier 为 c0b-i，之后为
+c0b-ii、c0b-iii、c0b-iv、ii-c、L3c3d、L3c4。
 已完成部分均为
 non-admitting prerequisite，
 L3c4 才是 machine admission。该最终 gate
