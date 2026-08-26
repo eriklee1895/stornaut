@@ -1,12 +1,17 @@
 import Darwin
 
 public enum InvestigationMachineDriverSupport {
+    package static let completedExitStatus: Int32 = 0
     package static let rootAuthorityRequiredExitStatus: Int32 = 77
     package static let handoffUnavailableExitStatus: Int32 = 78
     package static let installedObservationUnavailableExitStatus: Int32 = 79
+    package static let invalidInvocationExitStatus: Int32 = 80
+    package static let protocolFailureExitStatus: Int32 = 81
+    package static let containmentUncertainExitStatus: Int32 = 82
+    package static let cancelledExitStatus: Int32 = 83
 
     public static func run() async -> Int32 {
-        run(
+        await run(
             realUserID: getuid,
             effectiveUserID: geteuid,
             realGroupID: getgid,
@@ -32,8 +37,8 @@ public enum InvestigationMachineDriverSupport {
         effectiveGroupID: @escaping @Sendable () -> gid_t,
         argumentCount: @escaping @Sendable () -> Int32,
         source: any InvestigationMachineInstalledDriverObservationSource
-    ) -> Int32 {
-        let observer = InvestigationMachineInstalledDriverObserver(
+    ) async -> Int32 {
+        let entry = InvestigationMachineZeroArgumentEntry.production(
             realUserID: realUserID,
             effectiveUserID: effectiveUserID,
             realGroupID: realGroupID,
@@ -41,15 +46,39 @@ public enum InvestigationMachineDriverSupport {
             argumentCount: argumentCount,
             source: source
         )
+        return await run(entry: entry)
+    }
+
+    static func run(
+        entry: InvestigationMachineZeroArgumentEntry
+    ) async -> Int32 {
         do {
-            _ = try observer.observe()
-            return handoffUnavailableExitStatus
-        } catch InvestigationMachineInstalledDriverObservationError
-            .rootAuthorityRequired
-        {
-            return rootAuthorityRequiredExitStatus
+            try await entry.run()
+            return completedExitStatus
         } catch {
-            return installedObservationUnavailableExitStatus
+            return status(for: error)
+        }
+    }
+
+    static func status(for error: any Error) -> Int32 {
+        guard let error = error as? InvestigationMachineZeroArgumentEntryError
+        else {
+            return containmentUncertainExitStatus
+        }
+        return switch error {
+        case .rootAuthorityRequired:
+            rootAuthorityRequiredExitStatus
+        case .installedObservationUnavailable:
+            installedObservationUnavailableExitStatus
+        case .invalidInvocation, .invalidInput, .invalidRole,
+             .invalidOuterDescriptor:
+            invalidInvocationExitStatus
+        case .protocolFailure, .outputUnavailable, .invalidCompletion:
+            protocolFailureExitStatus
+        case .containmentUncertain:
+            containmentUncertainExitStatus
+        case .cancelled:
+            cancelledExitStatus
         }
     }
 }

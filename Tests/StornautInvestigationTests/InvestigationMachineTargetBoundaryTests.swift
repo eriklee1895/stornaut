@@ -601,6 +601,7 @@ struct InvestigationMachineTargetBoundaryTests {
             "InvestigationMachineSingleEpochComposition.swift",
             "InvestigationMachineSingleEpochInstalledL2Join.swift",
             "InvestigationMachineSingleEpochPhysicalBridge.swift",
+            "InvestigationMachineZeroArgumentEntry.swift",
         ])
         #expect(FileManager.default.fileExists(atPath: supportURL.path))
         let supportSource = try String(
@@ -778,6 +779,11 @@ struct InvestigationMachineTargetBoundaryTests {
                 "import StornautInvestigationInstalledL2",
             ],
             "InvestigationMachineSingleEpochPhysicalBridge.swift": [
+                "import Foundation",
+                "import StornautInvestigationHandoffContract",
+            ],
+            "InvestigationMachineZeroArgumentEntry.swift": [
+                "import Darwin",
                 "import Foundation",
                 "import StornautInvestigationHandoffContract",
             ],
@@ -990,6 +996,50 @@ struct InvestigationMachineTargetBoundaryTests {
                     /\bfcntl\s*\(/, with: "fixedCapsuleFcntl("
                 )
             }
+            if sourceName == "InvestigationMachineZeroArgumentEntry.swift" {
+                let allowedCalls: [String: Int] = [
+                    "fcntl": 6,
+                    "fstat": 2,
+                    "isatty": 1,
+                    "tcgetpgrp": 1,
+                    "poll": 1,
+                ]
+                for (name, count) in allowedCalls {
+                    let observedCount = source.matches(
+                        of: try Regex("\\b" + name + "\\s*\\(")
+                    ).count
+                    #expect(
+                        observedCount == count,
+                        "\(name): \(observedCount) != \(count)"
+                    )
+                    authoritySource = authoritySource.replacing(
+                        try Regex("\\b" + name + "\\s*\\("),
+                        with: "allowedZeroArgumentCall("
+                    )
+                }
+                #expect(source.matches(of: /Darwin\.write\s*\(/).count == 1)
+                authoritySource = authoritySource.replacingOccurrences(
+                    of: "Darwin.write(", with: "allowedZeroArgumentCall("
+                )
+                for marker in [
+                    "InvestigationMachineFixedCapsuleIntake().read()",
+                    "InvestigationMachineEightEpochCohort(",
+                    "InvestigationMachineDarwinOuterInnerExecutionFactory()",
+                    "InvestigationMachineDarwinOuterInnerComposition()",
+                    ".runInner()",
+                ] {
+                    #expect(source.contains(marker))
+                }
+                for forbidden in [
+                    "public ", "Codable", "JSONEncoder", "JSONDecoder",
+                    "CommandLine.arguments",
+                    "ProcessInfo.processInfo.environment", "FileManager",
+                    "FileHandle", "URLSession", "NSXPC", "readiness",
+                    "signedRuntimeReady", "MoveToTrash", "RegisteredAction",
+                ] {
+                    #expect(!source.contains(forbidden))
+                }
+            }
             for forbidden in [
                 "import StornautCore",
                 "import StornautExecution",
@@ -1119,6 +1169,10 @@ struct InvestigationMachineTargetBoundaryTests {
                     || (sourceName == "InvestigationMachineDarwinOuterInnerComposition.swift"
                         && ["Darwin.write", "CommandLine.arguments",
                             "accept("
+                        ].contains(forbidden))
+                    || (sourceName == "InvestigationMachineZeroArgumentEntry.swift"
+                        && ["O_WRONLY", "O_RDWR", "Darwin.write",
+                            "fcntl("
                         ].contains(forbidden))
                 if !semanticException {
                     if forbidden == "Process(" {

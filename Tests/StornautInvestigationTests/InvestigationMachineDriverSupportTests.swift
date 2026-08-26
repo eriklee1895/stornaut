@@ -396,102 +396,102 @@ struct InvestigationMachineDriverSupportTests {
     }
 
     @Test
-    func nonRootStatusRequiresRootAuthority() {
+    func exitStatusesMatchTheFrozenDriverContract() {
         #expect(
-            InvestigationMachineDriverSupport.status(
-                effectiveUserID: 501
-            ) == InvestigationMachineDriverSupport
-                .rootAuthorityRequiredExitStatus
+            InvestigationMachineDriverSupport.completedExitStatus == 0
+        )
+        #expect(
+            InvestigationMachineDriverSupport
+                .rootAuthorityRequiredExitStatus == 77
+        )
+        #expect(
+            InvestigationMachineDriverSupport
+                .handoffUnavailableExitStatus == 78
+        )
+        #expect(
+            InvestigationMachineDriverSupport
+                .installedObservationUnavailableExitStatus == 79
+        )
+        #expect(
+            InvestigationMachineDriverSupport.invalidInvocationExitStatus
+                == 80
+        )
+        #expect(
+            InvestigationMachineDriverSupport.protocolFailureExitStatus
+                == 81
+        )
+        #expect(
+            InvestigationMachineDriverSupport
+                .containmentUncertainExitStatus == 82
+        )
+        #expect(
+            InvestigationMachineDriverSupport.cancelledExitStatus == 83
         )
     }
 
-    @Test
-    func rootStatusRemainsUnavailableWithoutLiveHandoff() {
-        #expect(
-            InvestigationMachineDriverSupport.status(
-                effectiveUserID: 0
-            ) == InvestigationMachineDriverSupport
-                .handoffUnavailableExitStatus
-        )
-    }
-
-    @Test
-    func publicRunUsesTheCurrentEffectiveUserID() async {
-        let status = await InvestigationMachineDriverSupport.run()
-
-        #expect(
-            status == InvestigationMachineDriverSupport.status(
-                effectiveUserID: geteuid()
-            )
-        )
-        #expect(status != 0)
-    }
-
-    @Test
-    func runtimeRejectsNonRootBeforeObservation() {
+    @Test(arguments: DriverSupportInvalidInvocation.allCases)
+    fileprivate func runtimeRejectsEveryInvalidAuthorityOrArgumentBeforeObservation(
+        _ invocation: DriverSupportInvalidInvocation
+    ) async {
         let source = RecordingInstalledDriverObservationSource(
             candidate: .validFixture()
         )
 
-        let status = InvestigationMachineDriverSupport.run(
-            realUserID: { 501 },
-            effectiveUserID: { 501 },
-            realGroupID: { 20 },
-            effectiveGroupID: { 20 },
-            argumentCount: { 1 },
+        let status = await InvestigationMachineDriverSupport.run(
+            realUserID: { invocation.realUserID },
+            effectiveUserID: { invocation.effectiveUserID },
+            realGroupID: { invocation.realGroupID },
+            effectiveGroupID: { invocation.effectiveGroupID },
+            argumentCount: { invocation.argumentCount },
             source: source
         )
 
-        #expect(
-            status == InvestigationMachineDriverSupport
-                .rootAuthorityRequiredExitStatus
-        )
+        #expect(status == invocation.expectedStatus)
         #expect(source.readCount == 0)
     }
 
-    @Test
-    func runtimeFailsClosedWhenObservationIsUnavailable() {
-        let source = RecordingInstalledDriverObservationSource(
-            error: .sourceUnavailable
+    @Test(arguments: DriverSupportStatusScenario.allCases)
+    fileprivate func runtimeMapsEveryEntryFailureWithoutInvokingTheDriver(
+        _ scenario: DriverSupportStatusScenario
+    ) async {
+        let trace = DriverSupportEntryTrace()
+        let entry = driverSupportEntry(
+            trace: trace,
+            validationError: scenario.error
         )
+        let status = await InvestigationMachineDriverSupport.run(entry: entry)
 
-        let status = InvestigationMachineDriverSupport.run(
-            realUserID: { 0 },
-            effectiveUserID: { 0 },
-            realGroupID: { 0 },
-            effectiveGroupID: { 0 },
-            argumentCount: { 1 },
-            source: source
-        )
-
-        #expect(
-            status == InvestigationMachineDriverSupport
-                .installedObservationUnavailableExitStatus
-        )
-        #expect(source.readCount == 1)
+        #expect(status == scenario.expectedStatus)
+        #expect(trace.snapshot() == ["validate"])
     }
 
     @Test
-    func runtimeKeepsHandoffUnavailableAfterValidObservation() {
-        let source = RecordingInstalledDriverObservationSource(
-            candidate: .validFixture()
+    func unclassifiedErrorsPreserveContainmentUncertainty() {
+        #expect(
+            InvestigationMachineDriverSupport.status(
+                for: CancellationError()
+            ) == InvestigationMachineDriverSupport
+                .containmentUncertainExitStatus
         )
+        #expect(
+            InvestigationMachineDriverSupport.status(
+                for: DriverSupportUnknownError.failure
+            ) == InvestigationMachineDriverSupport
+                .containmentUncertainExitStatus
+        )
+    }
 
-        let status = InvestigationMachineDriverSupport.run(
-            realUserID: { 0 },
-            effectiveUserID: { 0 },
-            realGroupID: { 0 },
-            effectiveGroupID: { 0 },
-            argumentCount: { 1 },
-            source: source
-        )
+    @Test
+    func runtimeReturnsSuccessOnlyAfterTheInjectedEntryCompletes() async {
+        let trace = DriverSupportEntryTrace()
+        let entry = driverSupportEntry(trace: trace)
+
+        let status = await InvestigationMachineDriverSupport.run(entry: entry)
 
         #expect(
-            status == InvestigationMachineDriverSupport
-                .handoffUnavailableExitStatus
+            status == InvestigationMachineDriverSupport.completedExitStatus
         )
-        #expect(status != 0)
-        #expect(source.readCount == 1)
+        #expect(trace.snapshot() == ["validate", "role", "inner"])
     }
 
     private func rootObserver(
@@ -506,6 +506,140 @@ struct InvestigationMachineDriverSupportTests {
             source: source
         )
     }
+}
+
+private enum DriverSupportInvalidInvocation: CaseIterable, Sendable {
+    case nonRootRealUser
+    case nonRootEffectiveUser
+    case nonRootRealGroup
+    case nonRootEffectiveGroup
+    case missingArgumentVector
+    case extraArgument
+
+    var realUserID: uid_t { self == .nonRootRealUser ? 501 : 0 }
+    var effectiveUserID: uid_t {
+        self == .nonRootEffectiveUser ? 501 : 0
+    }
+    var realGroupID: gid_t { self == .nonRootRealGroup ? 20 : 0 }
+    var effectiveGroupID: gid_t {
+        self == .nonRootEffectiveGroup ? 20 : 0
+    }
+    var argumentCount: Int32 {
+        switch self {
+        case .missingArgumentVector: 0
+        case .extraArgument: 2
+        default: 1
+        }
+    }
+    var expectedStatus: Int32 {
+        switch self {
+        case .nonRootRealUser, .nonRootEffectiveUser, .nonRootRealGroup,
+             .nonRootEffectiveGroup:
+            InvestigationMachineDriverSupport.rootAuthorityRequiredExitStatus
+        case .missingArgumentVector, .extraArgument:
+            InvestigationMachineDriverSupport.invalidInvocationExitStatus
+        }
+    }
+}
+
+private enum DriverSupportStatusScenario: CaseIterable, Sendable {
+    case rootAuthorityRequired
+    case installedObservationUnavailable
+    case invalidInvocation
+    case invalidInput
+    case invalidRole
+    case invalidOuterDescriptor
+    case protocolFailure
+    case outputUnavailable
+    case invalidCompletion
+    case containmentUncertain
+    case cancelled
+
+    var error: InvestigationMachineZeroArgumentEntryError {
+        switch self {
+        case .rootAuthorityRequired:
+            InvestigationMachineZeroArgumentEntryError.rootAuthorityRequired
+        case .installedObservationUnavailable:
+            InvestigationMachineZeroArgumentEntryError
+                .installedObservationUnavailable
+        case .invalidInvocation:
+            InvestigationMachineZeroArgumentEntryError.invalidInvocation
+        case .invalidInput:
+            InvestigationMachineZeroArgumentEntryError.invalidInput
+        case .invalidRole:
+            InvestigationMachineZeroArgumentEntryError.invalidRole
+        case .invalidOuterDescriptor:
+            InvestigationMachineZeroArgumentEntryError.invalidOuterDescriptor
+        case .protocolFailure:
+            InvestigationMachineZeroArgumentEntryError.protocolFailure
+        case .outputUnavailable:
+            InvestigationMachineZeroArgumentEntryError.outputUnavailable
+        case .invalidCompletion:
+            InvestigationMachineZeroArgumentEntryError.invalidCompletion
+        case .containmentUncertain:
+            InvestigationMachineZeroArgumentEntryError.containmentUncertain
+        case .cancelled:
+            InvestigationMachineZeroArgumentEntryError.cancelled
+        }
+    }
+
+    var expectedStatus: Int32 {
+        switch self {
+        case .rootAuthorityRequired:
+            InvestigationMachineDriverSupport.rootAuthorityRequiredExitStatus
+        case .installedObservationUnavailable:
+            InvestigationMachineDriverSupport
+                .installedObservationUnavailableExitStatus
+        case .invalidInvocation, .invalidInput, .invalidRole,
+             .invalidOuterDescriptor:
+            InvestigationMachineDriverSupport.invalidInvocationExitStatus
+        case .protocolFailure, .outputUnavailable, .invalidCompletion:
+            InvestigationMachineDriverSupport.protocolFailureExitStatus
+        case .containmentUncertain:
+            InvestigationMachineDriverSupport.containmentUncertainExitStatus
+        case .cancelled:
+            InvestigationMachineDriverSupport.cancelledExitStatus
+        }
+    }
+}
+
+private enum DriverSupportUnknownError: Error {
+    case failure
+}
+
+private final class DriverSupportEntryTrace: @unchecked Sendable {
+    private let lock = NSLock()
+    private var events: [String] = []
+
+    func append(_ event: String) {
+        lock.withLock { events.append(event) }
+    }
+
+    func snapshot() -> [String] {
+        lock.withLock { events }
+    }
+}
+
+private func driverSupportEntry(
+    trace: DriverSupportEntryTrace,
+    validationError: InvestigationMachineZeroArgumentEntryError? = nil
+) -> InvestigationMachineZeroArgumentEntry {
+    InvestigationMachineZeroArgumentEntry(
+        dependencies: .init(
+            validateInvocation: {
+                trace.append("validate")
+                if let validationError { throw validationError }
+            },
+            selectRole: { trace.append("role"); return .inner },
+            runInner: { trace.append("inner") },
+            observeInstalledDriver: { trace.append("installed") },
+            readPlan: { fatalError("outer path is unreachable") },
+            runCohort: { _ in fatalError("outer path is unreachable") },
+            checkCancellation: { trace.append("cancel") },
+            revalidateOuter: { _ in trace.append("revalidate") },
+            writeArtifact: { _ in trace.append("write") }
+        )
+    )
 }
 
 struct InstalledDriverAuthorityIdentity:
