@@ -178,15 +178,24 @@ in b2. More than 64 attempt roots is uncertainty.
 Through owner-internal typed high-level operations it creates exactly one
 `attempt-<lowercase UUID>` directory at 0700 and one exclusive 0600
 `capsule.pending`, performs bounded EINTR-aware writes, validates full metadata
-and identity, fsyncs the file, publishes with
+and identity, fsyncs the retained base immediately after creating and validating
+the attempt directory, fsyncs the file after the complete write, publishes with
 `RENAME_EXCL | RENAME_NOFOLLOW_ANY | RENAME_RESOLVE_BENEATH`, fsyncs the leaf,
 reopens the digest-named final file read-only/CLOEXEC/no-follow/beneath/unique,
 and verifies canonical bytes and digest with `pread` while preserving offset
 zero. Writers close before one opaque package-only lease is created.
+Ordinary `fsync` is a metadata-ordering requirement here, not a power-loss
+durability claim; `F_FULLFSYNC` is outside this checkpoint. `mkdirat`, exclusive
+pending creation and exclusive rename are single-attempt commit points and are
+never blindly retried. Rename success permanently changes residue from pending
+to published even if a later fsync, reopen or verification fails. Every `close`
+is attempted exactly once because an error does not prove that its numeric FD
+remains open.
 
-The lease exposes only immutable digest/node identity and one synchronous
-borrowed read-only descriptor operation. It exposes no path, URL or
-caller-selected FD. A second borrow is rejected, and the internal state records
+The lease exposes only immutable digest/node identity. b1 creates no package-
+callable raw descriptor getter, generic callback or caller-selected operation;
+c0b-iii later adds the sole zero-argument fixed-launch operation. A second
+launch/borrow is rejected, and the internal state records
 the exact close outcome for later settlement. If the lease is never borrowed or
 the borrow operation throws, its terminal path still closes the retained
 capsule descriptor exactly once before ownership release; uncertainty remains
@@ -199,6 +208,14 @@ the 64-root bound, names/flags/modes, partial/EINTR writes, both fsyncs, rename
 collision, symlink/escape/hard-link replacement, reopen/pread/EOF/digest/offset,
 one-shot borrow and close success/failure. Every error asserts exact residue and
 that unrelated entries were unchanged.
+
+The final read-only descriptor is admitted only after `lseek(..., SEEK_CUR)` is
+zero, bounded explicit-offset `pread` reproduces every canonical byte, a
+one-byte EOF probe at the exact length returns zero, metadata and named identity
+remain unchanged, and a final offset check is still zero. `st_gen` may be
+compared when observed but is not required to be nonzero and is never the sole
+identity proof; held/named device and inode, one link, complete metadata and the
+content digest remain authoritative.
 
 ## 5. ii-c0b-ii-b2 — Settlement and Stale Recovery
 
