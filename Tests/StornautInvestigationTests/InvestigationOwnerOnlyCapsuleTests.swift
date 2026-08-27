@@ -100,6 +100,39 @@ struct InvestigationOwnerOnlyCapsuleTests {
         #expect(ownership.everyOpenedDescriptorClosedOnce)
     }
 
+    @Test
+    func filesystemFlagsPinTheIndependentDarwinSafetyContract() {
+        #expect(InvestigationOwnerOnlyCapsulePublication.attemptDirectoryFlags
+            == Int32(
+                O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NONBLOCK
+                    | O_NOFOLLOW_ANY | O_RESOLVE_BENEATH | O_UNIQUE
+            ))
+        #expect(InvestigationOwnerOnlyCapsulePublication.pendingWriterFlags
+            == Int32(
+                O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NONBLOCK
+                    | O_NOFOLLOW_ANY | O_RESOLVE_BENEATH | O_UNIQUE
+            ))
+        #expect(InvestigationOwnerOnlyCapsulePublication.finalReaderFlags
+            == Int32(
+                O_RDONLY | O_CLOEXEC | O_NONBLOCK | O_NOFOLLOW_ANY
+                    | O_RESOLVE_BENEATH | O_UNIQUE
+            ))
+        #expect(InvestigationOwnerOnlyCapsulePublication.namedFlags
+            == Int32(
+                AT_SYMLINK_NOFOLLOW_ANY | AT_RESOLVE_BENEATH | AT_UNIQUE
+            ))
+        #expect(InvestigationOwnerOnlyCapsuleSettlement.fileUnlinkFlags
+            == Int32(
+                AT_NODELETEBUSY | AT_UNIQUE | AT_SYMLINK_NOFOLLOW_ANY
+                    | AT_RESOLVE_BENEATH
+            ))
+        #expect(InvestigationOwnerOnlyCapsuleSettlement.directoryUnlinkFlags
+            == Int32(
+                AT_NODELETEBUSY | AT_UNIQUE | AT_SYMLINK_NOFOLLOW_ANY
+                    | AT_RESOLVE_BENEATH | AT_REMOVEDIR
+            ))
+    }
+
     @Test(arguments: [
         CapsuleInventoryCase(
             entries: [fixedLockName, "unrelated"], reachedEnd: true,
@@ -110,8 +143,12 @@ struct InvestigationOwnerOnlyCapsuleTests {
             }, reachedEnd: true, error: .attemptRootLimitExceeded),
         CapsuleInventoryCase(
             entries: [fixedLockName], reachedEnd: false,
-            error: .publicationFailed(
-                stage: .inventory, residue: .none, closeFailures: [])),
+            error: .staleRecoveryFailed(
+                stage: .inventory,
+                residue: .stale(
+                    entries: [fixedLockName], observationComplete: false
+                ),
+                closeFailures: [])),
     ])
     fileprivate func inventoryCompletesBeforeMutation(
         _ value: CapsuleInventoryCase
@@ -248,6 +285,32 @@ struct InvestigationOwnerOnlyCapsuleTests {
         #expect(ownership.closeRoles.suffix(2) == [.base, .lock])
         #expect(system.closeDescriptors == [31, 30, 32])
         #expect(ownership.everyOpenedDescriptorClosedOnce)
+    }
+
+    @Test
+    func exactGateReapedProofSettlesPublishedNodeOnce() throws {
+        let bytes = try canonicalProjectedInput().encoded()
+        let request = try InvestigationOwnerOnlyCapsulePublicationRequest(
+            canonicalBytes: bytes
+        )
+        let ownership = CapsuleOwnershipSystem()
+        let system = CapsuleSemanticSystem(bytes: bytes)
+        let borrower = CapsuleFixedBorrower()
+        let lease = try InvestigationOwnerOnlyCapsulePublisher(
+            ownershipSystem: ownership, capsuleSystem: system, borrower: borrower
+        ).publish(bytes)
+        let proof = try lease.handoffOnce()
+
+        #expect(try lease.settle(exactGateReaped: proof) == .removed)
+        #expect(system.unlinkCalls.count == 1)
+        #expect(system.removeDirectoryCalls.count == 1)
+        #expect(system.entries == [fixedLockName])
+        #expect(ownership.closeRoles.suffix(2) == [.base, .lock])
+        #expect(throws: InvestigationOwnerOnlyCapsuleError.alreadyTerminal(
+            .published(attempt: request.attemptName, file: request.finalName)
+        )) {
+            _ = try lease.settle(exactGateReaped: proof)
+        }
     }
 
     @Test
@@ -413,12 +476,689 @@ struct InvestigationOwnerOnlyCapsuleTests {
         #expect(ownership.closeRoles.suffix(2) == [.base, .lock])
         #expect(ownership.everyOpenedDescriptorClosedOnce)
     }
+
+    @Test
+    func neverHandedOffProofSettlesPublishedNodeOnce() throws {
+        let fixture = try CapsuleSettlementFixture()
+        let proof = try fixture.lease.finishWithoutHandoff()
+        fixture.system.staleLeaves[fixture.request.attemptName] = .final(
+            fixture.request.finalName
+        )
+
+        let result = try fixture.lease.settle(neverHandedOff: proof)
+
+        #expect(result == .removed)
+        #expect(fixture.system.unlinkCalls.count == 1)
+        #expect(fixture.system.removeDirectoryCalls.count == 1)
+        #expect(fixture.system.entries == [fixedLockName])
+        #expect(fixture.ownership.closeRoles.suffix(2) == [.base, .lock])
+        #expect(throws: InvestigationOwnerOnlyCapsuleError.alreadyTerminal(
+            fixture.publishedResidue
+        )) {
+            _ = try fixture.lease.settle(neverHandedOff: proof)
+        }
+    }
+
+    @Test
+    func validEmptyStaleLeafRecoversBeforeFreshPublication() throws {
+        let bytes = try canonicalProjectedInput().encoded()
+        let stale = "attempt-00000000-0000-0000-0000-0000000000fe"
+        let ownership = CapsuleOwnershipSystem()
+        let system = CapsuleSemanticSystem(
+            bytes: bytes,
+            inventory: .init(entries: [fixedLockName, stale], reachedEnd: true)
+        )
+        system.staleLeaves[stale] = .empty
+
+        let lease = try InvestigationOwnerOnlyCapsulePublisher(
+            ownershipSystem: ownership, capsuleSystem: system
+        ).publish(bytes)
+
+        #expect(system.recoveredAttemptNames == [stale])
+        #expect(system.events.firstIndex(of: .unlink(15, stale,
+            InvestigationOwnerOnlyCapsuleSettlement.directoryUnlinkFlags))
+            != nil)
+        _ = try lease.finishWithoutHandoff()
+    }
+
+    @Test(arguments: CapsuleRecoverableStaleLeaf.allCases)
+    fileprivate func validStalePayloadRecoversBeforeFreshPublication(
+        _ value: CapsuleRecoverableStaleLeaf
+    ) throws {
+        let bytes = try canonicalProjectedInput().encoded()
+        let request = try InvestigationOwnerOnlyCapsulePublicationRequest(
+            canonicalBytes: bytes
+        )
+        let stale = request.attemptName
+        let ownership = CapsuleOwnershipSystem()
+        let system = CapsuleSemanticSystem(
+            bytes: bytes,
+            inventory: .init(entries: [fixedLockName, stale], reachedEnd: true)
+        )
+        let expectedFile = value.install(
+            in: system, attempt: stale, canonicalFinalName: request.finalName
+        )
+
+        let lease = try InvestigationOwnerOnlyCapsulePublisher(
+            ownershipSystem: ownership, capsuleSystem: system
+        ).publish(bytes)
+
+        #expect(system.unlinkCalls.contains {
+            $0.name == expectedFile
+                && $0.flags == InvestigationOwnerOnlyCapsuleSettlement.fileUnlinkFlags
+        })
+        #expect(system.removeDirectoryCalls.contains(.init(
+            parent: 15, name: stale,
+            flags: InvestigationOwnerOnlyCapsuleSettlement.directoryUnlinkFlags
+        )))
+        #expect(system.recoveredAttemptNames == [stale])
+        _ = try lease.finishWithoutHandoff()
+    }
+
+    @Test(arguments: CapsuleRecoverableStaleLeaf.allCases)
+    fileprivate func stalePayloadMustMatchAttemptDirectoryUUID(
+        _ value: CapsuleRecoverableStaleLeaf
+    ) throws {
+        let bytes = try canonicalProjectedInput().encoded()
+        let request = try InvestigationOwnerOnlyCapsulePublicationRequest(
+            canonicalBytes: bytes
+        )
+        let stale = "attempt-00000000-0000-0000-0000-0000000000fe"
+        let ownership = CapsuleOwnershipSystem()
+        let system = CapsuleSemanticSystem(
+            bytes: bytes,
+            inventory: .init(entries: [fixedLockName, stale], reachedEnd: true)
+        )
+        _ = value.install(
+            in: system, attempt: stale, canonicalFinalName: request.finalName
+        )
+
+        #expect(throws: InvestigationOwnerOnlyCapsuleError.staleRecoveryFailed(
+            stage: .classifyStale,
+            residue: .stale(entries: [stale], observationComplete: true),
+            closeFailures: []
+        )) {
+            _ = try InvestigationOwnerOnlyCapsulePublisher(
+                ownershipSystem: ownership, capsuleSystem: system
+            ).publish(bytes)
+        }
+        #expect(system.unlinkCalls.isEmpty)
+        #expect(system.removeDirectoryCalls.isEmpty)
+        #expect(system.everyOpenedDescriptorClosedOnce)
+        #expect(system.createCalls.isEmpty)
+    }
+
+    @Test
+    func allStaleRootsAreClassifiedBeforeMalformedSecondBlocksMutation() throws {
+        let bytes = try canonicalProjectedInput().encoded()
+        let request = try InvestigationOwnerOnlyCapsulePublicationRequest(
+            canonicalBytes: bytes
+        )
+        let first = request.attemptName
+        let second = "attempt-00000000-0000-0000-0000-0000000000fb"
+        let ownership = CapsuleOwnershipSystem()
+        let originalEntries = [fixedLockName, second, first]
+        let system = CapsuleSemanticSystem(
+            bytes: bytes,
+            inventory: .init(entries: originalEntries, reachedEnd: true)
+        )
+        system.staleLeaves[first] = .final(request.finalName)
+        system.staleLeaves[second] = .other("unexpected")
+
+        #expect(throws: InvestigationOwnerOnlyCapsuleError.staleRecoveryFailed(
+            stage: .classifyStale,
+            residue: .stale(
+                entries: [first, second], observationComplete: true
+            ),
+            closeFailures: []
+        )) {
+            _ = try InvestigationOwnerOnlyCapsulePublisher(
+                ownershipSystem: ownership, capsuleSystem: system
+            ).publish(bytes)
+        }
+
+        #expect(system.unlinkCalls.isEmpty)
+        #expect(system.removeDirectoryCalls.isEmpty)
+        #expect(system.everyOpenedDescriptorClosedOnce)
+        #expect(system.createCalls.isEmpty)
+        #expect(system.entries == originalEntries)
+        let firstClassified = try #require(
+            system.events.firstIndex(of: .close(30))
+        )
+        let secondInspected = try #require(
+            system.events.firstIndex(of: .inventory(32, 2))
+        )
+        #expect(firstClassified < secondInspected)
+    }
+
+    @Test
+    func transientBusyWaitsThenFullyRevalidatesBeforeOneRetry() throws {
+        let fixture = try CapsuleSettlementFixture()
+        let proof = try fixture.lease.finishWithoutHandoff()
+        fixture.system.unlinkScript = [.failure(EBUSY)]
+        let eventStart = fixture.system.events.count
+
+        let result = try fixture.lease.settle(neverHandedOff: proof)
+
+        #expect(result == .removed)
+        let events = Array(fixture.system.events[eventStart...])
+        let fileUnlinks = events.indices.filter { index in
+            if case .unlink(
+                _, fixture.request.finalName,
+                InvestigationOwnerOnlyCapsuleSettlement.fileUnlinkFlags
+            ) = events[index] { return true }
+            return false
+        }
+        #expect(fileUnlinks.count == 2)
+        let first = try #require(fileUnlinks.first)
+        let second = try #require(fileUnlinks.last)
+        let retryValidation = Array(events[(first + 1)..<second])
+        #expect(retryValidation.contains(.wait(1_000_000)))
+        #expect(retryValidation.contains { event in
+            if case .open(
+                _, fixture.request.finalName,
+                InvestigationOwnerOnlyCapsulePublication.finalReaderFlags, nil
+            ) = event { return true }
+            return false
+        })
+        #expect(retryValidation.contains {
+            if case .metadata = $0 { return true }; return false
+        })
+        #expect(retryValidation.contains { event in
+            if case .named(
+                _, fixture.request.finalName,
+                InvestigationOwnerOnlyCapsulePublication.namedFlags
+            ) = event { return true }
+            return false
+        })
+        #expect(retryValidation.contains {
+            if case .descriptorFlags = $0 { return true }; return false
+        })
+        #expect(retryValidation.contains {
+            if case .statusFlags = $0 { return true }; return false
+        })
+        #expect(retryValidation.contains {
+            if case .acl = $0 { return true }; return false
+        })
+        #expect(retryValidation.contains {
+            if case .xattr = $0 { return true }; return false
+        })
+        #expect(retryValidation.contains {
+            if case .read = $0 { return true }; return false
+        })
+        #expect(retryValidation.contains {
+            if case .close = $0 { return true }; return false
+        })
+    }
+
+    @Test
+    func directoryBusyRetryReopensAndFullyRevalidatesEmptyLeaf() throws {
+        let fixture = try CapsuleSettlementFixture()
+        let proof = try fixture.lease.finishWithoutHandoff()
+        fixture.system.unlinkScript = [.success, .failure(EBUSY), .success]
+        let eventStart = fixture.system.events.count
+
+        #expect(try fixture.lease.settle(neverHandedOff: proof) == .removed)
+
+        let events = Array(fixture.system.events[eventStart...])
+        let directoryUnlinks = events.indices.filter { index in
+            if case .unlink(
+                15, fixture.request.attemptName,
+                InvestigationOwnerOnlyCapsuleSettlement.directoryUnlinkFlags
+            ) = events[index] { return true }
+            return false
+        }
+        #expect(directoryUnlinks.count == 2)
+        let first = try #require(directoryUnlinks.first)
+        let second = try #require(directoryUnlinks.last)
+        let retryValidation = Array(events[(first + 1)..<second])
+        #expect(retryValidation.contains(.wait(1_000_000)))
+        #expect(retryValidation.contains { event in
+            if case .open(
+                15, fixture.request.attemptName,
+                InvestigationOwnerOnlyCapsulePublication.attemptDirectoryFlags, nil
+            ) = event { return true }
+            return false
+        })
+        #expect(retryValidation.contains {
+            if case .metadata = $0 { return true }; return false
+        })
+        #expect(retryValidation.contains(.named(
+            15, fixture.request.attemptName,
+            InvestigationOwnerOnlyCapsulePublication.namedFlags
+        )))
+        #expect(retryValidation.contains {
+            if case .descriptorFlags = $0 { return true }; return false
+        })
+        #expect(retryValidation.contains {
+            if case .statusFlags = $0 { return true }; return false
+        })
+        #expect(retryValidation.contains {
+            if case .acl = $0 { return true }; return false
+        })
+        #expect(retryValidation.contains {
+            if case .xattr = $0 { return true }; return false
+        })
+        #expect(retryValidation.contains { event in
+            if case .inventory(_, 1) = event { return true }; return false
+        })
+        #expect(retryValidation.contains {
+            if case .close = $0 { return true }; return false
+        })
+    }
+
+    @Test(arguments: CapsuleDirectoryRetryDrift.allCases)
+    fileprivate func directoryBusyRetryRejectsMetadataOrContentDrift(
+        _ drift: CapsuleDirectoryRetryDrift
+    ) throws {
+        let fixture = try CapsuleSettlementFixture()
+        let proof = try fixture.lease.finishWithoutHandoff()
+        fixture.system.directoryRetryDrift = drift
+        fixture.system.unlinkScript = [.success, .failure(EBUSY), .success]
+
+        let result = try fixture.lease.settle(neverHandedOff: proof)
+
+        #expect(result == .settledResidue(
+            stage: .removeDirectory,
+            residue: .stale(
+                entries: [fixture.request.attemptName], observationComplete: true
+            ),
+            closeFailures: [], ownershipReleaseUncertain: false
+        ))
+        #expect(fixture.system.removeDirectoryCalls.count == 1)
+        #expect(fixture.ownership.closeRoles.suffix(2) == [.base, .lock])
+    }
+
+    @Test
+    func staleRemovalOpenFailurePreservesLiveResidue() throws {
+        let bytes = try canonicalProjectedInput().encoded()
+        let request = try InvestigationOwnerOnlyCapsulePublicationRequest(
+            canonicalBytes: bytes
+        )
+        let ownership = CapsuleOwnershipSystem()
+        let system = CapsuleSemanticSystem(
+            bytes: bytes,
+            inventory: .init(
+                entries: [fixedLockName, request.attemptName], reachedEnd: true
+            )
+        )
+        system.staleLeaves[request.attemptName] = .final(request.finalName)
+        system.failAttemptOpenAtCount[request.attemptName] = 2
+
+        #expect(throws: InvestigationOwnerOnlyCapsuleError.staleRecoveryFailed(
+            stage: .classifyStale,
+            residue: .stale(
+                entries: [request.attemptName], observationComplete: true
+            ),
+            closeFailures: []
+        )) {
+            _ = try InvestigationOwnerOnlyCapsulePublisher(
+                ownershipSystem: ownership, capsuleSystem: system
+            ).publish(bytes)
+        }
+        #expect(system.unlinkCalls.isEmpty)
+        #expect(system.removeDirectoryCalls.isEmpty)
+        #expect(system.everyOpenedDescriptorClosedOnce)
+    }
+
+    @Test(arguments: [
+        CapsuleStaleCloseFailureCase(
+            descriptor: 31, stage: .closeStaleReader, role: .staleReader
+        ),
+        CapsuleStaleCloseFailureCase(
+            descriptor: 30, stage: .closeStaleDirectory, role: .staleDirectory
+        ),
+    ])
+    fileprivate func staleClassificationReportsExactCloseFailure(
+        _ value: CapsuleStaleCloseFailureCase
+    ) throws {
+        let bytes = try canonicalProjectedInput().encoded()
+        let request = try InvestigationOwnerOnlyCapsulePublicationRequest(
+            canonicalBytes: bytes
+        )
+        let ownership = CapsuleOwnershipSystem()
+        let system = CapsuleSemanticSystem(
+            bytes: bytes,
+            inventory: .init(
+                entries: [fixedLockName, request.attemptName], reachedEnd: true
+            )
+        )
+        system.staleLeaves[request.attemptName] = .final(request.finalName)
+        system.closeErrorDescriptors = [value.descriptor]
+
+        #expect(throws: InvestigationOwnerOnlyCapsuleError.staleRecoveryFailed(
+            stage: value.stage,
+            residue: .stale(
+                entries: [request.attemptName], observationComplete: true
+            ),
+            closeFailures: [value.role]
+        )) {
+            _ = try InvestigationOwnerOnlyCapsulePublisher(
+                ownershipSystem: ownership, capsuleSystem: system
+            ).publish(bytes)
+        }
+        #expect(system.closeDescriptors == [31, 30])
+        #expect(system.everyOpenedDescriptorClosedOnce)
+        #expect(system.unlinkCalls.isEmpty)
+        #expect(system.removeDirectoryCalls.isEmpty)
+    }
+
+    @Test
+    func deadlineEqualityReturnsResidueBeforeAnyUnlinkAttempt() throws {
+        let fixture = try CapsuleSettlementFixture()
+        let proof = try fixture.lease.finishWithoutHandoff()
+        let start: UInt64 = 10_000
+        fixture.system.monotonicValues = [start, start + 5_000_000_000]
+
+        let result = try fixture.lease.settle(neverHandedOff: proof)
+
+        #expect(result == .settledResidue(
+            stage: .unlinkFile,
+            residue: .stale(
+                entries: [fixture.request.attemptName], observationComplete: true
+            ),
+            closeFailures: [], ownershipReleaseUncertain: false
+        ))
+        #expect(fixture.system.unlinkCalls.isEmpty)
+        #expect(fixture.system.removeDirectoryCalls.isEmpty)
+        #expect(!fixture.system.events.contains {
+            if case .wait = $0 { return true }; return false
+        })
+    }
+
+    @Test
+    func deadlineEqualityAfterBusyWaitStopsBeforeRevalidation() throws {
+        let fixture = try CapsuleSettlementFixture()
+        let proof = try fixture.lease.finishWithoutHandoff()
+        let start: UInt64 = 10_000
+        fixture.system.monotonicValues = [
+            start, start + 1,
+            start + 5_000_000_000,
+        ]
+        fixture.system.unlinkScript = [.failure(EBUSY)]
+        let eventStart = fixture.system.events.count
+
+        let result = try fixture.lease.settle(neverHandedOff: proof)
+
+        #expect(result == .settledResidue(
+            stage: .unlinkFile,
+            residue: .stale(
+                entries: [fixture.request.attemptName], observationComplete: true
+            ),
+            closeFailures: [], ownershipReleaseUncertain: false
+        ))
+        let events = Array(fixture.system.events[eventStart...])
+        #expect(fixture.system.unlinkCalls.count == 1)
+        #expect(events.filter {
+            if case .wait = $0 { return true }; return false
+        }.count == 1)
+        let firstUnlink = try #require(events.firstIndex { event in
+            if case .unlink(
+                _, fixture.request.finalName,
+                InvestigationOwnerOnlyCapsuleSettlement.fileUnlinkFlags
+            ) = event { return true }
+            return false
+        })
+        let afterBusy = Array(events[(firstUnlink + 1)...])
+        #expect(!afterBusy.contains { event in
+            if case .open(
+                _, fixture.request.finalName,
+                InvestigationOwnerOnlyCapsulePublication.finalReaderFlags, nil
+            ) = event { return true }
+            return false
+        })
+        #expect(InvestigationOwnerOnlyCapsuleSettlement.deadlineNanoseconds
+            == 5_000_000_000)
+        #expect(InvestigationOwnerOnlyCapsuleSettlement.maximumBusyRetries == 64)
+    }
+
+    @Test
+    func busyRetryExhaustionIsBoundedAndReturnsResidue() throws {
+        let fixture = try CapsuleSettlementFixture()
+        let proof = try fixture.lease.finishWithoutHandoff()
+        fixture.system.monotonicValues = [10_000]
+        fixture.system.unlinkScript = Array(
+            repeating: .failure(EBUSY),
+            count: 65
+        )
+
+        let result = try fixture.lease.settle(neverHandedOff: proof)
+
+        #expect(result == .settledResidue(
+            stage: .unlinkFile,
+            residue: .stale(
+                entries: [fixture.request.attemptName], observationComplete: true
+            ),
+            closeFailures: [], ownershipReleaseUncertain: false
+        ))
+        #expect(fixture.system.unlinkCalls.count == 65)
+        #expect(fixture.system.events.filter {
+            if case .wait = $0 { return true }; return false
+        }.count == 64)
+        #expect(fixture.system.removeDirectoryCalls.isEmpty)
+    }
+
+    @Test
+    func proofCannotCrossLeasesAndSuccessfulProofCannotBeReused() throws {
+        let first = try CapsuleSettlementFixture()
+        let second = try CapsuleSettlementFixture()
+        _ = try first.lease.finishWithoutHandoff()
+        let secondProof = try second.lease.finishWithoutHandoff()
+
+        #expect(throws: InvestigationOwnerOnlyCapsuleError.proofRejected(
+            first.publishedResidue, ownershipReleaseUncertain: false
+        )) {
+            _ = try first.lease.settle(neverHandedOff: secondProof)
+        }
+        #expect(first.system.unlinkCalls.isEmpty)
+        #expect(first.system.removeDirectoryCalls.isEmpty)
+        #expect(first.ownership.closeRoles.suffix(2) == [.base, .lock])
+
+        #expect(try second.lease.settle(neverHandedOff: secondProof) == .removed)
+        let mutationCount = second.system.unlinkCalls.count
+            + second.system.removeDirectoryCalls.count
+        #expect(throws: InvestigationOwnerOnlyCapsuleError.alreadyTerminal(
+            second.publishedResidue
+        )) {
+            _ = try second.lease.settle(neverHandedOff: secondProof)
+        }
+        #expect(second.system.unlinkCalls.count
+            + second.system.removeDirectoryCalls.count == mutationCount)
+    }
+
+    @Test(arguments: CapsuleSettlementFailureCase.allCases)
+    fileprivate func settlementFailureMatrixPreservesExactResidueAndFlags(
+        _ value: CapsuleSettlementFailureCase
+    ) throws {
+        let fixture = try CapsuleSettlementFixture()
+        let proof = try fixture.lease.finishWithoutHandoff()
+        value.configure(fixture.system, attempt: fixture.request.attemptName)
+
+        let result = try fixture.lease.settle(neverHandedOff: proof)
+
+        guard case .settledResidue(
+            let stage, _, let closeFailures, let ownershipReleaseUncertain
+        ) = result else {
+            Issue.record("settlement unexpectedly removed all residue")
+            return
+        }
+        #expect(stage == value.expectedStage)
+        #expect(result == .settledResidue(
+            stage: value.expectedStage,
+            residue: value.expectedResidue(attempt: fixture.request.attemptName),
+            closeFailures: [], ownershipReleaseUncertain: false
+        ))
+        #expect(closeFailures.isEmpty)
+        #expect(!ownershipReleaseUncertain)
+        #expect(fixture.system.unlinkCalls.allSatisfy {
+            $0.flags == Int32(
+                AT_NODELETEBUSY | AT_UNIQUE | AT_SYMLINK_NOFOLLOW_ANY
+                    | AT_RESOLVE_BENEATH
+            )
+        })
+        #expect(fixture.system.removeDirectoryCalls.allSatisfy {
+            $0.flags == Int32(
+                AT_NODELETEBUSY | AT_UNIQUE | AT_SYMLINK_NOFOLLOW_ANY
+                    | AT_RESOLVE_BENEATH | AT_REMOVEDIR
+            )
+        })
+        #expect(fixture.system.unlinkCalls.count == 1)
+        #expect(fixture.system.removeDirectoryCalls.count
+            == (value == .baseSyncFailure ? 1 : 0))
+        #expect(fixture.ownership.closeRoles.suffix(2) == [.base, .lock])
+    }
+
+    @Test
+    func successfulSettlementHasExactObservableCleanupOrder() throws {
+        let fixture = try CapsuleSettlementFixture()
+        let eventStart = fixture.system.events.count
+        let proof = try fixture.lease.finishWithoutHandoff()
+
+        #expect(try fixture.lease.settle(neverHandedOff: proof) == .removed)
+
+        let events = Array(fixture.system.events[eventStart...])
+        let capsuleClose = try #require(events.firstIndex(of: .close(32)))
+        let classifiedReaderClose = try #require(
+            events.firstIndex(of: .close(34))
+        )
+        let classifiedDirectoryClose = try #require(
+            events.firstIndex(of: .close(33))
+        )
+        let revalidationReaderClose = try #require(
+            events.firstIndex(of: .close(36))
+        )
+        let fileUnlink = try #require(events.firstIndex(of: .unlink(
+            35, fixture.request.finalName,
+            InvestigationOwnerOnlyCapsuleSettlement.fileUnlinkFlags
+        )))
+        let fileAbsent = try #require(events[(fileUnlink + 1)...].firstIndex(
+            of: .named(
+                35, fixture.request.finalName,
+                InvestigationOwnerOnlyCapsulePublication.namedFlags
+            )
+        ))
+        let leafSync = try #require(events.firstIndex(of: .sync(35)))
+        let staleDirectoryClose = try #require(
+            events.firstIndex(of: .close(35))
+        )
+        let directoryUnlink = try #require(events.firstIndex(of: .unlink(
+            15, fixture.request.attemptName,
+            InvestigationOwnerOnlyCapsuleSettlement.directoryUnlinkFlags
+        )))
+        let directoryAbsent = try #require(
+            events[(directoryUnlink + 1)...].firstIndex(of: .named(
+                15, fixture.request.attemptName,
+                InvestigationOwnerOnlyCapsulePublication.namedFlags
+            ))
+        )
+        let baseSync = try #require(events.lastIndex(of: .sync(15)))
+
+        #expect(capsuleClose < classifiedReaderClose)
+        #expect(classifiedReaderClose < classifiedDirectoryClose)
+        #expect(classifiedDirectoryClose < revalidationReaderClose)
+        #expect(revalidationReaderClose < fileUnlink)
+        #expect(fileUnlink < fileAbsent)
+        #expect(fileAbsent < leafSync)
+        #expect(leafSync < staleDirectoryClose)
+        #expect(staleDirectoryClose < directoryUnlink)
+        #expect(directoryUnlink < directoryAbsent)
+        #expect(directoryAbsent < baseSync)
+        #expect(
+            fixture.system.closeDescriptors.suffix(6)
+                == [32, 34, 33, 36, 35, 37]
+        )
+        #expect(fixture.ownership.closeRoles.suffix(2) == [.base, .lock])
+    }
+}
+
+private struct CapsuleSettlementFixture {
+    let bytes: Data
+    let request: InvestigationOwnerOnlyCapsulePublicationRequest
+    let ownership: CapsuleOwnershipSystem
+    let system: CapsuleSemanticSystem
+    let lease: InvestigationOwnerOnlyCapsuleLease
+
+    init() throws {
+        bytes = try canonicalProjectedInput().encoded()
+        request = try InvestigationOwnerOnlyCapsulePublicationRequest(
+            canonicalBytes: bytes
+        )
+        ownership = CapsuleOwnershipSystem()
+        system = CapsuleSemanticSystem(bytes: bytes)
+        lease = try InvestigationOwnerOnlyCapsulePublisher(
+            ownershipSystem: ownership, capsuleSystem: system
+        ).publish(bytes)
+    }
+
+    var publishedResidue: InvestigationOwnerOnlyCapsuleResidue {
+        .published(attempt: request.attemptName, file: request.finalName)
+    }
 }
 
 private struct CapsuleInventoryCase: Sendable {
     let entries: [String]
     let reachedEnd: Bool
     let error: InvestigationOwnerOnlyCapsuleError
+}
+
+private enum CapsuleRecoverableStaleLeaf: CaseIterable, Sendable {
+    case pending, canonicalFinal
+
+    func install(
+        in system: CapsuleSemanticSystem, attempt: String,
+        canonicalFinalName: String
+    ) -> String {
+        switch self {
+        case .pending:
+            system.staleLeaves[attempt] = .pending
+            return InvestigationOwnerOnlyCapsulePublication.pendingName
+        case .canonicalFinal:
+            system.staleLeaves[attempt] = .final(canonicalFinalName)
+            return canonicalFinalName
+        }
+    }
+}
+
+private enum CapsuleSettlementFailureCase: CaseIterable, Equatable, Sendable {
+    case postUnlinkAbsence
+    case directoryNonempty
+    case directoryReplacement
+    case leafSyncFailure
+    case baseSyncFailure
+
+    var expectedStage: InvestigationOwnerOnlyCapsuleFailureStage {
+        switch self {
+        case .postUnlinkAbsence: .proveFileAbsent
+        case .directoryNonempty: .verifyLeafEmpty
+        case .directoryReplacement: .removeDirectory
+        case .leafSyncFailure: .syncLeafAfterUnlink
+        case .baseSyncFailure: .syncBaseAfterRemoval
+        }
+    }
+
+    func expectedResidue(
+        attempt: String
+    ) -> InvestigationOwnerOnlyCapsuleResidue {
+        .stale(
+            entries: self == .baseSyncFailure ? [] : [attempt],
+            observationComplete: true
+        )
+    }
+
+    func configure(_ system: CapsuleSemanticSystem, attempt: String) {
+        switch self {
+        case .postUnlinkAbsence:
+            system.unlinkScript = [.successKeepingNode]
+        case .directoryNonempty:
+            system.nonemptyAfterFileUnlinkAttempts.insert(attempt)
+        case .directoryReplacement:
+            system.replaceDirectoryAfterFileUnlinkAttempts.insert(attempt)
+        case .leafSyncFailure:
+            system.failNextStaleDirectorySync = true
+        case .baseSyncFailure:
+            system.armBaseSyncFailureAfterDirectoryRemoval = true
+        }
+    }
 }
 
 private enum CapsuleFailureCase: String, CaseIterable, Sendable {
@@ -573,6 +1313,39 @@ private enum CapsuleEvent: Equatable {
     case write(Int32, Int, Int64)
     case rename(Int32, String, String, Int32)
     case offset(Int32), read(Int32, Int, Int64), close(Int32)
+    case unlink(Int32, String, Int32)
+    case wait(UInt64)
+}
+
+private struct CapsuleUnlinkCall: Equatable {
+    let parent: Int32
+    let name: String
+    let flags: Int32
+}
+
+private enum CapsuleStaleLeaf {
+    case empty
+    case pending
+    case final(String)
+    case other(String)
+}
+
+private enum CapsuleDirectoryRetryDrift: CaseIterable, Sendable {
+    case acl
+    case xattr
+    case content
+}
+
+private struct CapsuleStaleCloseFailureCase: Sendable {
+    let descriptor: Int32
+    let stage: InvestigationOwnerOnlyCapsuleFailureStage
+    let role: InvestigationOwnerOnlyCapsuleCloseRole
+}
+
+private enum CapsuleUnlinkResult: Sendable {
+    case success
+    case successKeepingNode
+    case failure(Int32)
 }
 
 private struct CapsuleModeCall: Equatable {
@@ -606,6 +1379,7 @@ private final class CapsuleSemanticSystem:
     var generation: UInt64 = 0
     var events: [CapsuleEvent] = []
     var entries: [String]
+    private var baseEntries: [String]
     var createCalls: [CapsuleModeCall] = []
     var openCalls: [CapsuleOpenCall] = []
     var renameCalls: [CapsuleRenameCall] = []
@@ -615,13 +1389,38 @@ private final class CapsuleSemanticSystem:
     var readOffsets: [Int64] = []
     var offsetDescriptors: [Int32] = []
     var closeDescriptors: [Int32] = []
+    var everyOpenedDescriptorClosedOnce: Bool {
+        Set(roles.keys.filter { $0 != 15 }) == closedDescriptors
+            && closeDescriptors.count == closedDescriptors.count
+    }
     var writeScript: [CapsuleIOResult] = []
     var readScript: [CapsuleIOResult] = []
     var written = Data()
     var unlinkCount = 0
     var closeErrorDescriptors: Set<Int32> = []
+    var staleLeaves: [String: CapsuleStaleLeaf] = [:]
+    private var additionalLeafNames: [String: Set<String>] = [:]
+    var unlinkCalls: [CapsuleUnlinkCall] = []
+    var removeDirectoryCalls: [CapsuleUnlinkCall] = []
+    var recoveredAttemptNames: [String] = []
+    var monotonicValues: [UInt64] = [1_000_000]
+    var unlinkScript: [CapsuleUnlinkResult] = []
+    var nonemptyAfterFileUnlinkAttempts: Set<String> = []
+    var replaceDirectoryAfterFileUnlinkAttempts: Set<String> = []
+    var failNextStaleDirectorySync = false
+    var failNextBaseSync = false
+    var armBaseSyncFailureAfterDirectoryRemoval = false
+    var directoryRetryDrift: CapsuleDirectoryRetryDrift?
+    var failAttemptOpenAtCount: [String: Int] = [:]
     private var nextDescriptor: Int32 = 30
     private var roles: [Int32: Int] = [15: 0]
+    private var attemptByDescriptor: [Int32: String] = [:]
+    private var nameByDescriptor: [Int32: String] = [:]
+    private var replacementAttempts: Set<String> = []
+    private var attemptOpenCounts: [String: Int] = [:]
+    private var staleDirectoryHasACL = false
+    private var staleDirectoryHasXattr = false
+    private var closedDescriptors: Set<Int32> = []
     private var offsetCallCount = 0
     private(set) var finalMetadataCount = 0
     private(set) var finalNamedCount = 0
@@ -635,6 +1434,7 @@ private final class CapsuleSemanticSystem:
         self.bytes = bytes
         inventoryResult = inventory
         entries = inventory.entries
+        baseEntries = inventory.entries
         self.failure = failure
     }
 
@@ -642,6 +1442,27 @@ private final class CapsuleSemanticSystem:
         -> InvestigationOwnerOnlyCapsuleInventory
     {
         events.append(.inventory(baseDescriptor, maximumEntryCount))
+        if baseDescriptor == 15, !staleLeaves.isEmpty {
+            return .init(
+                entries: baseEntries, reachedEnd: inventoryResult.reachedEnd
+            )
+        }
+        if roles[baseDescriptor] == 1,
+           let attempt = attemptByDescriptor[baseDescriptor],
+           let stale = staleLeaves[attempt]
+        {
+            let primary: [String] = switch stale {
+            case .empty: []
+            case .pending: [InvestigationOwnerOnlyCapsulePublication.pendingName]
+            case .final(let name): [name]
+            case .other(let name): [name]
+            }
+            return .init(
+                entries: (primary + Array(additionalLeafNames[attempt, default: []]))
+                    .sorted(),
+                reachedEnd: true
+            )
+        }
         return inventoryResult
     }
 
@@ -653,9 +1474,11 @@ private final class CapsuleSemanticSystem:
         if failure == .createAttempt { throw systemError }
         if failure == .attemptCollision {
             entries.append(name)
+            baseEntries.append(name)
             throw InvestigationOwnerOnlyCapsuleSystemError.errno(EEXIST)
         }
         entries.append(name)
+        if parentDescriptor == 15 { baseEntries.append(name) }
     }
 
     func openComponent(
@@ -664,13 +1487,44 @@ private final class CapsuleSemanticSystem:
         let call = CapsuleOpenCall(
             parent: parentDescriptor, name: name, flags: flags, mode: mode)
         events.append(.open(parentDescriptor, name, flags, mode)); openCalls.append(call)
+        if name.hasPrefix("attempt-") {
+            attemptOpenCounts[name, default: 0] += 1
+            if attemptOpenCounts[name] == failAttemptOpenAtCount[name] {
+                throw systemError
+            }
+            guard parentDescriptor == 15, baseEntries.contains(name) else {
+                throw InvestigationOwnerOnlyCapsuleSystemError.errno(ENOENT)
+            }
+        }
         if failure == .openAttempt && name.hasPrefix("attempt-") { throw systemError }
         if failure == .createPending && name == "capsule.pending" { throw systemError }
         if failure == .pendingCollision && name == "capsule.pending" {
-            entries.append(name)
+            if let attempt = attemptByDescriptor[parentDescriptor] {
+                staleLeaves[attempt] = .pending
+            }
+            if !entries.contains(name) { entries.append(name) }
             throw InvestigationOwnerOnlyCapsuleSystemError.errno(EEXIST)
         }
-        if name == "capsule.pending" { entries.append(name) }
+        if name == InvestigationOwnerOnlyCapsulePublication.pendingName,
+           let attempt = attemptByDescriptor[parentDescriptor]
+        {
+            if mode != nil {
+                guard staleLeaves[attempt] == nil else {
+                    throw InvestigationOwnerOnlyCapsuleSystemError.errno(EEXIST)
+                }
+                staleLeaves[attempt] = .pending
+                if !entries.contains(name) { entries.append(name) }
+            } else {
+                guard containsNamedLeaf(attempt: attempt, name: name) else {
+                    throw InvestigationOwnerOnlyCapsuleSystemError.errno(ENOENT)
+                }
+            }
+        } else if name.hasPrefix("projected-cohort-"),
+                  let attempt = attemptByDescriptor[parentDescriptor],
+                  !containsNamedLeaf(attempt: attempt, name: name)
+        {
+            throw InvestigationOwnerOnlyCapsuleSystemError.errno(ENOENT)
+        }
         if (failure == .reopenFinal || failure == .reopenEscape),
            name.hasPrefix("projected-cohort-")
         {
@@ -679,14 +1533,23 @@ private final class CapsuleSemanticSystem:
             )
         }
         let value = nextDescriptor; nextDescriptor += 1
-        roles[value] = name == "capsule.pending" ? 2
+        roles[value] = name == "capsule.pending"
+            ? (mode == nil ? 3 : 2)
             : name.hasPrefix("projected-cohort-") ? 3 : 1
+        nameByDescriptor[value] = name
+        if name.hasPrefix("attempt-") { attemptByDescriptor[value] = name }
         return value
     }
 
     func metadata(descriptor: Int32) throws -> InvestigationMachineGateMetadataSnapshot {
         events.append(.metadata(descriptor))
         let role = roles[descriptor] ?? 0
+        if role == 1,
+           let attempt = attemptByDescriptor[descriptor],
+           replacementAttempts.contains(attempt)
+        {
+            return directory(inode: 99, containsLeaf: false)
+        }
         if failure == .validateAttempt && role == 1 { return directory(mode: 0o755) }
         if failure == .validateFinal && role == 3 { return file(inode: 99) }
         if failure == .finalSymlink && role == 3 { return file(type: .other) }
@@ -697,13 +1560,35 @@ private final class CapsuleSemanticSystem:
                 return file(inode: 99)
             }
         }
-        return role == 1 ? directory() : file()
+        if role == 1 {
+            let containsLeaf = attemptByDescriptor[descriptor]
+                .flatMap { staleLeaves[$0] }
+                .map(CapsuleSemanticSystem.containsLeaf) ?? false
+            return directory(containsLeaf: containsLeaf)
+        }
+        return file()
     }
 
     func namedMetadata(
         parentDescriptor: Int32, name: String, flags: Int32
     ) throws -> InvestigationMachineGateMetadataSnapshot {
         events.append(.named(parentDescriptor, name, flags))
+        let present: Bool
+        if parentDescriptor == 15 {
+            present = baseEntries.contains(name) || name == fixedLockName
+        } else if let attempt = attemptByDescriptor[parentDescriptor],
+                  staleLeaves[attempt] != nil
+        {
+            present = containsNamedLeaf(attempt: attempt, name: name)
+        } else {
+            present = entries.contains(name)
+        }
+        if !present {
+            throw InvestigationOwnerOnlyCapsuleSystemError.errno(ENOENT)
+        }
+        if parentDescriptor == 15, replacementAttempts.contains(name) {
+            return directory(inode: 99, containsLeaf: false)
+        }
         if name.hasPrefix("projected-cohort-") {
             finalNamedCount += 1
             if failure == .namedIdentityDrift && finalNamedCount == 2 {
@@ -712,7 +1597,13 @@ private final class CapsuleSemanticSystem:
             if failure == .finalSymlink { return file(type: .other) }
             if failure == .finalHardLink { return file(linkCount: 2) }
         }
-        return name.hasPrefix("attempt-") ? directory() : file()
+        if name.hasPrefix("attempt-") {
+            return directory(
+                containsLeaf: staleLeaves[name]
+                    .map(CapsuleSemanticSystem.containsLeaf) ?? false
+            )
+        }
+        return file()
     }
 
     func descriptorFlags(_ descriptor: Int32) throws -> Int32 {
@@ -726,13 +1617,24 @@ private final class CapsuleSemanticSystem:
         events.append(.permissions(descriptor, mode))
     }
     func extendedACLIsEmpty(descriptor: Int32) throws -> Bool {
-        events.append(.acl(descriptor)); return true
+        events.append(.acl(descriptor))
+        return !(roles[descriptor] == 1 && staleDirectoryHasACL)
     }
     func extendedAttributeNames(descriptor: Int32) throws -> [String] {
-        events.append(.xattr(descriptor)); return []
+        events.append(.xattr(descriptor))
+        return roles[descriptor] == 1 && staleDirectoryHasXattr
+            ? ["com.eriklee.stornaut.injected"] : []
     }
     func synchronize(descriptor: Int32) throws {
         events.append(.sync(descriptor)); syncDescriptors.append(descriptor)
+        if descriptor == 15, failNextBaseSync {
+            failNextBaseSync = false
+            throw systemError
+        }
+        if roles[descriptor] == 1, failNextStaleDirectorySync {
+            failNextStaleDirectorySync = false
+            throw systemError
+        }
         if failure == .syncBase && descriptor == 15 { throw systemError }
         if failure == .syncPending && descriptor == 31 { throw systemError }
         if failure == .syncLeaf && descriptor == 30 { throw systemError }
@@ -758,10 +1660,16 @@ private final class CapsuleSemanticSystem:
             parent: parentDescriptor, oldName: oldName, newName: newName, flags: flags))
         if failure == .renameFailure { throw systemError }
         if failure == .renameCollision {
-            entries.append(newName)
+            if let attempt = attemptByDescriptor[parentDescriptor] {
+                additionalLeafNames[attempt, default: []].insert(newName)
+            }
+            if !entries.contains(newName) { entries.append(newName) }
             throw InvestigationOwnerOnlyCapsuleSystemError.errno(EEXIST)
         }
         entries.removeAll { $0 == oldName }; entries.append(newName)
+        if let attempt = attemptByDescriptor[parentDescriptor] {
+            staleLeaves[attempt] = .final(newName)
+        }
     }
     func offset(descriptor: Int32) throws -> Int64 {
         events.append(.offset(descriptor)); offsetDescriptors.append(descriptor)
@@ -790,18 +1698,114 @@ private final class CapsuleSemanticSystem:
     }
     func close(descriptor: Int32) throws {
         events.append(.close(descriptor)); closeDescriptors.append(descriptor)
+        guard closedDescriptors.insert(descriptor).inserted else {
+            throw InvestigationOwnerOnlyCapsuleSystemError.errno(EBADF)
+        }
         if closeErrorDescriptors.contains(descriptor) { throw systemError }
         if failure == .closePendingWriter && descriptor == 31 { throw systemError }
         if failure == .closeAttemptDirectory && descriptor == 30 { throw systemError }
     }
+    func monotonicNanoseconds() throws -> UInt64 {
+        if monotonicValues.count > 1 { return monotonicValues.removeFirst() }
+        return monotonicValues.first ?? 1_000_000
+    }
+    func unlink(parentDescriptor: Int32, name: String, flags: Int32) throws {
+        let call = CapsuleUnlinkCall(parent: parentDescriptor, name: name, flags: flags)
+        events.append(.unlink(parentDescriptor, name, flags))
+        unlinkCount += 1
+        let result = unlinkScript.isEmpty ? .success : unlinkScript.removeFirst()
+        if case .failure(let value) = result {
+            if flags & AT_REMOVEDIR != 0 {
+                removeDirectoryCalls.append(call)
+                if value == EBUSY {
+                    applyDirectoryRetryDrift(attempt: name)
+                }
+            } else {
+                unlinkCalls.append(call)
+            }
+            throw InvestigationOwnerOnlyCapsuleSystemError.errno(value)
+        }
+        let keepNode: Bool = if case .successKeepingNode = result { true }
+            else { false }
+        if flags & AT_REMOVEDIR != 0 {
+            removeDirectoryCalls.append(call)
+            if !keepNode {
+                recoveredAttemptNames.append(name)
+                staleLeaves.removeValue(forKey: name)
+                additionalLeafNames.removeValue(forKey: name)
+                entries.removeAll { $0 == name }
+                baseEntries.removeAll { $0 == name }
+                if armBaseSyncFailureAfterDirectoryRemoval {
+                    failNextBaseSync = true
+                }
+            }
+        } else {
+            unlinkCalls.append(call)
+            if !keepNode { entries.removeAll { $0 == name } }
+            if let attempt = attemptByDescriptor[parentDescriptor] {
+                if nonemptyAfterFileUnlinkAttempts.contains(attempt) {
+                    staleLeaves[attempt] = .other("unexpected")
+                } else if !keepNode {
+                    staleLeaves[attempt] = .empty
+                }
+                if replaceDirectoryAfterFileUnlinkAttempts.contains(attempt) {
+                    replacementAttempts.insert(attempt)
+                }
+            } else if !keepNode {
+                entries.removeAll { $0 == name }
+            }
+        }
+    }
+    func waitForRetry(nanoseconds: UInt64) throws {
+        events.append(.wait(nanoseconds))
+    }
 
-    private func directory(mode: mode_t = 0o700)
+    // APFS reports ordinary empty directories with a positive link count and
+    // filesystem-defined storage (commonly nlink 2 and size 64).  Keep the
+    // fake realistic so settlement cannot accidentally require file semantics.
+    private func directory(
+        inode: UInt64 = 11, mode: mode_t = 0o700,
+        containsLeaf: Bool = false
+    )
         -> InvestigationMachineGateMetadataSnapshot
     {
         .init(
-            device: 1, inode: 11, generation: generation, fileType: .directory,
-            ownerUID: 501, ownerGID: 20, permissions: mode, linkCount: 1,
-            size: 0, flags: 0)
+            device: 1, inode: inode, generation: generation, fileType: .directory,
+            ownerUID: 501, ownerGID: 20, permissions: mode,
+            linkCount: containsLeaf ? 3 : 2,
+            size: containsLeaf ? 96 : 64, flags: 0)
+    }
+
+    private static func containsLeaf(_ leaf: CapsuleStaleLeaf) -> Bool {
+        if case .empty = leaf { return false }
+        return true
+    }
+
+    private func containsNamedLeaf(attempt: String, name: String) -> Bool {
+        let primary = staleLeaves[attempt].map { leaf in
+            switch leaf {
+            case .empty:
+                false
+            case .pending:
+                name == InvestigationOwnerOnlyCapsulePublication.pendingName
+            case .final(let existing), .other(let existing):
+                name == existing
+            }
+        } ?? false
+        return primary || additionalLeafNames[attempt, default: []].contains(name)
+    }
+
+    private func applyDirectoryRetryDrift(attempt: String) {
+        switch directoryRetryDrift {
+        case .acl:
+            staleDirectoryHasACL = true
+        case .xattr:
+            staleDirectoryHasXattr = true
+        case .content:
+            staleLeaves[attempt] = .other("injected")
+        case nil:
+            break
+        }
     }
     private func file(
         inode: UInt64 = 12,
@@ -944,15 +1948,15 @@ private final class CapsuleFixedBorrower:
     func handoffToFixedGate(
         descriptor: Int32, outerAttemptUUID: UUID,
         identity: InvestigationOwnerOnlyCapsuleNodeIdentity,
-        digest: InvestigationHandoffSHA256
+        digest: InvestigationHandoffSHA256,
+        settlementToken: InvestigationOwnerOnlyCapsuleSettlementToken
     ) throws -> InvestigationOwnerOnlyCapsuleExactGateReapedProof {
         descriptors.append(descriptor)
         outerAttemptUUIDs.append(outerAttemptUUID)
         if throwsOnHandoff { throw CapsuleFixedBorrowerError.failed }
         return .makeForFixedLauncher(
             outerAttemptUUID: mismatchesProof ? capsuleUUID(0xfe) : outerAttemptUUID,
-            digest: digest,
-            identity: identity
+            digest: digest, identity: identity, settlementToken: settlementToken
         )
     }
 }

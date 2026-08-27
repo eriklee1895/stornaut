@@ -504,6 +504,41 @@ final class InvestigationMachineGateOwnership: @unchecked Sendable {
         }
     }
 
+    func settleCanonicalCapsule(
+        _ request: InvestigationOwnerOnlyCapsuleSettlementRequest
+    ) -> InvestigationOwnerOnlyCapsuleSettlementResult {
+        lock.lock()
+        defer { lock.unlock() }
+        guard case .active(let active) = state, let capsuleSystem else {
+            return .settledResidue(
+                stage: .revalidateOwnership, residue: request.residue,
+                closeFailures: [], ownershipReleaseUncertain: true
+            )
+        }
+        let result: InvestigationOwnerOnlyCapsuleSettlementResult
+        do {
+            let base = try revalidateOwnedBaseAndLock(
+                baseDescriptor: active.baseDescriptor,
+                lockDescriptor: active.lockDescriptor,
+                baseRelativePath: active.baseRelativePath
+            )
+            result = InvestigationOwnerOnlyCapsuleSettlement.settlePublished(
+                request, baseDescriptor: active.baseDescriptor,
+                baseMetadata: base, system: capsuleSystem
+            )
+        } catch {
+            result = .settledResidue(
+                stage: .revalidateOwnership, residue: request.residue,
+                closeFailures: [], ownershipReleaseUncertain: false
+            )
+        }
+        let releaseSucceeded = closeRemainingDescriptorsBaseFirst()
+        guard releaseSucceeded else {
+            return result.addingOwnershipReleaseUncertainty()
+        }
+        return result
+    }
+
     deinit {
         lock.lock()
         _ = closeRemainingDescriptorsBaseFirst()

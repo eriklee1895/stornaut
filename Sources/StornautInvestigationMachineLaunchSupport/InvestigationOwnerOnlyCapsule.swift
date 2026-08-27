@@ -12,6 +12,7 @@ package enum InvestigationOwnerOnlyCapsuleResidue: Equatable, Sendable {
         attempt: String, pending: String?, final: String?,
         observed: [String], observationComplete: Bool
     )
+    case stale(entries: [String], observationComplete: Bool)
 }
 
 package enum InvestigationOwnerOnlyCapsuleFailureStage: Equatable, Sendable {
@@ -35,12 +36,27 @@ package enum InvestigationOwnerOnlyCapsuleFailureStage: Equatable, Sendable {
     case contentDigest
     case finalOffset
     case closeAttemptDirectory
+    case classifyStale
+    case clock
+    case wait
+    case closeStaleReader
+    case unlinkFile
+    case proveFileAbsent
+    case verifyLeafEmpty
+    case syncLeafAfterUnlink
+    case closeStaleDirectory
+    case removeDirectory
+    case proveDirectoryAbsent
+    case syncBaseAfterRemoval
+    case revalidateOwnership
 }
 
 package enum InvestigationOwnerOnlyCapsuleCloseRole: Equatable, Sendable {
     case pendingWriter
     case finalReader
     case attemptDirectory
+    case staleReader
+    case staleDirectory
 }
 
 package enum InvestigationOwnerOnlyCapsuleError: Error, Equatable, Sendable {
@@ -63,6 +79,44 @@ package enum InvestigationOwnerOnlyCapsuleError: Error, Equatable, Sendable {
         ownershipReleaseUncertain: Bool
     )
     case ownershipReleaseUncertain(InvestigationOwnerOnlyCapsuleResidue)
+    case proofRejected(
+        InvestigationOwnerOnlyCapsuleResidue,
+        ownershipReleaseUncertain: Bool
+    )
+    case staleRecoveryFailed(
+        stage: InvestigationOwnerOnlyCapsuleFailureStage,
+        residue: InvestigationOwnerOnlyCapsuleResidue,
+        closeFailures: [InvestigationOwnerOnlyCapsuleCloseRole]
+    )
+}
+
+package enum InvestigationOwnerOnlyCapsuleSettlementResult:
+    Equatable, Sendable
+{
+    case removed
+    case settledResidue(
+        stage: InvestigationOwnerOnlyCapsuleFailureStage,
+        residue: InvestigationOwnerOnlyCapsuleResidue,
+        closeFailures: [InvestigationOwnerOnlyCapsuleCloseRole],
+        ownershipReleaseUncertain: Bool
+    )
+}
+
+extension InvestigationOwnerOnlyCapsuleSettlementResult {
+    func addingOwnershipReleaseUncertainty() -> Self {
+        switch self {
+        case .removed:
+            .settledResidue(
+                stage: .revalidateOwnership, residue: .none,
+                closeFailures: [], ownershipReleaseUncertain: true
+            )
+        case .settledResidue(let stage, let residue, let closes, _):
+            .settledResidue(
+                stage: stage, residue: residue, closeFailures: closes,
+                ownershipReleaseUncertain: true
+            )
+        }
+    }
 }
 
 enum InvestigationOwnerOnlyCapsuleSystemError: Error, Equatable, Sendable {
@@ -115,14 +169,35 @@ protocol InvestigationOwnerOnlyCapsuleSystem: AnyObject, Sendable {
         descriptor: Int32, maximumByteCount: Int, offset: Int64
     ) throws -> Data
     func close(descriptor: Int32) throws
+    func monotonicNanoseconds() throws -> UInt64
+    func unlink(
+        parentDescriptor: Int32, name: String, flags: Int32
+    ) throws
+    func waitForRetry(nanoseconds: UInt64) throws
 }
 
 protocol InvestigationOwnerOnlyCapsuleBorrowing: AnyObject, Sendable {
     func handoffToFixedGate(
         descriptor: Int32, outerAttemptUUID: UUID,
         identity: InvestigationOwnerOnlyCapsuleNodeIdentity,
-        digest: InvestigationHandoffSHA256
+        digest: InvestigationHandoffSHA256,
+        settlementToken: InvestigationOwnerOnlyCapsuleSettlementToken
     ) throws -> InvestigationOwnerOnlyCapsuleExactGateReapedProof
+}
+
+final class InvestigationOwnerOnlyCapsuleSettlementToken: @unchecked Sendable {
+    private let lock = NSLock()
+    private var consumed = false
+
+    fileprivate init() {}
+
+    fileprivate func consume() -> Bool {
+        lock.withLock {
+            guard !consumed else { return false }
+            consumed = true
+            return true
+        }
+    }
 }
 
 package struct InvestigationOwnerOnlyCapsulePublisher: Sendable {
@@ -202,6 +277,19 @@ struct InvestigationOwnerOnlyCapsulePublicationRequest: Sendable {
     }
 }
 
+struct InvestigationOwnerOnlyCapsuleSettlementRequest: Sendable {
+    let canonicalBytes: Data
+    let outerAttemptUUID: UUID
+    let attemptName: String
+    let finalName: String
+    let identity: InvestigationOwnerOnlyCapsuleNodeIdentity
+    let digest: InvestigationHandoffSHA256
+
+    var residue: InvestigationOwnerOnlyCapsuleResidue {
+        .published(attempt: attemptName, file: finalName)
+    }
+}
+
 extension InvestigationOwnerOnlyCapsuleError {
     var residue: InvestigationOwnerOnlyCapsuleResidue {
         switch self {
@@ -218,6 +306,10 @@ extension InvestigationOwnerOnlyCapsuleError {
              .ownershipReleaseUncertain(let residue):
             residue
         case .capsuleCloseUncertain(let residue, _):
+            residue
+        case .proofRejected(let residue, _):
+            residue
+        case .staleRecoveryFailed(_, let residue, _):
             residue
         }
     }
@@ -262,7 +354,10 @@ enum InvestigationOwnerOnlyCapsulePublication {
                     maximumEntryCount: maximumAttemptRootCount + 2
                 )
             }
-            try validateInventory(inventory)
+            try InvestigationOwnerOnlyCapsuleSettlement.recoverStale(
+                inventory: inventory, baseDescriptor: baseDescriptor,
+                baseMetadata: baseMetadata, system: system
+            )
 
             do {
                 try system.createDirectory(
@@ -544,11 +639,20 @@ enum InvestigationOwnerOnlyCapsulePublication {
         }
     }
 
-    private static func isAttemptName(_ value: String) -> Bool {
+    fileprivate static func isAttemptName(_ value: String) -> Bool {
+        attemptUUID(from: value) != nil
+    }
+
+    fileprivate static func attemptUUID(from value: String) -> UUID? {
         let prefix = "attempt-"
-        guard value.hasPrefix(prefix) else { return false }
+        guard value.hasPrefix(prefix) else { return nil }
         let suffix = String(value.dropFirst(prefix.count))
-        return suffix == suffix.lowercased() && UUID(uuidString: suffix) != nil
+        guard
+            suffix == suffix.lowercased(),
+            let uuid = UUID(uuidString: suffix),
+            uuid.uuidString.lowercased() == suffix
+        else { return nil }
+        return uuid
     }
 
     private static func collisionResidue(
@@ -595,7 +699,7 @@ enum InvestigationOwnerOnlyCapsulePublication {
         return descriptor
     }
 
-    private static func validateDirectory(
+    fileprivate static func validateDirectory(
         descriptor: Int32, parent: Int32, name: String, baseDevice: UInt64,
         system: any InvestigationOwnerOnlyCapsuleSystem
     ) throws {
@@ -624,7 +728,7 @@ enum InvestigationOwnerOnlyCapsulePublication {
     }
 
     @discardableResult
-    private static func validateFile(
+    fileprivate static func validateFile(
         descriptor: Int32, parent: Int32, name: String, baseDevice: UInt64,
         expectedSize: Int64, accessMode: Int32,
         stage: InvestigationOwnerOnlyCapsuleFailureStage,
@@ -681,7 +785,7 @@ enum InvestigationOwnerOnlyCapsulePublication {
         }
     }
 
-    private static func readExactly(
+    fileprivate static func readExactly(
         descriptor: Int32, count: Int,
         system: any InvestigationOwnerOnlyCapsuleSystem
     ) throws -> Data {
@@ -701,7 +805,7 @@ enum InvestigationOwnerOnlyCapsulePublication {
         return result
     }
 
-    private static func readWithInterruptBound(
+    fileprivate static func readWithInterruptBound(
         descriptor: Int32, maximumByteCount: Int, offset: Int64,
         system: any InvestigationOwnerOnlyCapsuleSystem
     ) throws -> Data {
@@ -736,6 +840,7 @@ enum InvestigationOwnerOnlyCapsulePublication {
         case .pending: .writePending
         case .published: .syncLeaf
         case .collision: .inventory
+        case .stale: .classifyStale
         }
     }
 
@@ -771,6 +876,739 @@ enum InvestigationOwnerOnlyCapsulePublication {
     }
 }
 
+enum InvestigationOwnerOnlyCapsuleSettlement {
+    static let deadlineNanoseconds: UInt64 = 5_000_000_000
+    static let maximumBusyRetries = 64
+    static let fileUnlinkFlags = Int32(
+        AT_NODELETEBUSY | AT_UNIQUE | AT_SYMLINK_NOFOLLOW_ANY
+            | AT_RESOLVE_BENEATH
+    )
+    static let directoryUnlinkFlags = Int32(fileUnlinkFlags | AT_REMOVEDIR)
+
+    static func recoverStale(
+        inventory: InvestigationOwnerOnlyCapsuleInventory,
+        baseDescriptor: Int32,
+        baseMetadata: InvestigationMachineGateMetadataSnapshot,
+        system: any InvestigationOwnerOnlyCapsuleSystem
+    ) throws {
+        do {
+            try recoverStaleValidated(
+                inventory: inventory, baseDescriptor: baseDescriptor,
+                baseMetadata: baseMetadata, system: system
+            )
+        } catch let value as SettlementFailure {
+            throw InvestigationOwnerOnlyCapsuleError.staleRecoveryFailed(
+                stage: value.stage, residue: value.residue,
+                closeFailures: value.closeFailures
+            )
+        }
+    }
+
+    private static func recoverStaleValidated(
+        inventory: InvestigationOwnerOnlyCapsuleInventory,
+        baseDescriptor: Int32,
+        baseMetadata: InvestigationMachineGateMetadataSnapshot,
+        system: any InvestigationOwnerOnlyCapsuleSystem
+    ) throws {
+        guard inventory.reachedEnd else {
+            throw failure(.inventory, .stale(
+                entries: inventory.entries, observationComplete: false
+            ))
+        }
+        let lockCount = inventory.entries.filter {
+            $0 == InvestigationMachineGateOwnershipAcquirer.lockName
+        }.count
+        guard lockCount == 1 else {
+            throw failure(.inventory, .stale(
+                entries: inventory.entries.sorted(), observationComplete: true
+            ))
+        }
+        let entries = inventory.entries.filter {
+            $0 != InvestigationMachineGateOwnershipAcquirer.lockName
+        }
+        guard entries.count <= InvestigationOwnerOnlyCapsulePublication
+            .maximumAttemptRootCount
+        else { throw InvestigationOwnerOnlyCapsuleError.attemptRootLimitExceeded }
+        guard entries.allSatisfy(
+            InvestigationOwnerOnlyCapsulePublication.isAttemptName
+        ) else {
+            throw InvestigationOwnerOnlyCapsuleError.staleInventory(
+                entries.sorted()
+            )
+        }
+        guard !entries.isEmpty else { return }
+
+        let start: UInt64
+        do { start = try system.monotonicNanoseconds() }
+        catch { throw failure(.clock, .stale(
+            entries: entries.sorted(), observationComplete: true
+        )) }
+        let (deadline, overflow) = start.addingReportingOverflow(
+            deadlineNanoseconds
+        )
+        guard !overflow else {
+            throw failure(.clock, .stale(
+                entries: entries.sorted(), observationComplete: true
+            ))
+        }
+
+        var plans: [StalePlan] = []
+        for attempt in entries.sorted() {
+            do {
+                plans.append(try classify(
+                    attempt: attempt, baseDescriptor: baseDescriptor,
+                    baseMetadata: baseMetadata, system: system
+                ))
+            } catch let value as SettlementFailure {
+                throw failure(
+                    value.stage,
+                    observeBaseResidue(
+                        baseDescriptor: baseDescriptor, fallback: entries,
+                        system: system
+                    ),
+                    value.closeFailures
+                )
+            }
+        }
+        for plan in plans {
+            do {
+                try remove(
+                    plan, baseDescriptor: baseDescriptor,
+                    baseMetadata: baseMetadata, deadline: deadline, system: system
+                )
+            } catch let value as SettlementFailure {
+                throw failure(
+                    value.stage,
+                    observeBaseResidue(
+                        baseDescriptor: baseDescriptor, fallback: entries,
+                        system: system
+                    ),
+                    value.closeFailures
+                )
+            } catch {
+                throw failure(
+                    .classifyStale,
+                    observeBaseResidue(
+                        baseDescriptor: baseDescriptor, fallback: entries,
+                        system: system
+                    )
+                )
+            }
+        }
+        do { try system.synchronize(descriptor: baseDescriptor) }
+        catch {
+            throw failure(
+                .syncBaseAfterRemoval,
+                observeBaseResidue(
+                    baseDescriptor: baseDescriptor, fallback: entries,
+                    system: system
+                )
+            )
+        }
+    }
+
+    static func settlePublished(
+        _ request: InvestigationOwnerOnlyCapsuleSettlementRequest,
+        baseDescriptor: Int32,
+        baseMetadata: InvestigationMachineGateMetadataSnapshot,
+        system: any InvestigationOwnerOnlyCapsuleSystem
+    ) -> InvestigationOwnerOnlyCapsuleSettlementResult {
+        do {
+            let start = try system.monotonicNanoseconds()
+            let (deadline, overflow) = start.addingReportingOverflow(
+                deadlineNanoseconds
+            )
+            guard !overflow else { throw failure(.clock, request.residue) }
+            let plan = try classifyExpectedPublished(
+                request, baseDescriptor: baseDescriptor,
+                baseMetadata: baseMetadata, system: system
+            )
+            try remove(
+                plan, baseDescriptor: baseDescriptor,
+                baseMetadata: baseMetadata, deadline: deadline, system: system
+            )
+            do { try system.synchronize(descriptor: baseDescriptor) }
+            catch { throw failure(.syncBaseAfterRemoval, request.residue) }
+            return .removed
+        } catch let value as SettlementFailure {
+            return .settledResidue(
+                stage: value.stage,
+                residue: observeBaseResidue(
+                    baseDescriptor: baseDescriptor,
+                    fallback: [request.attemptName], system: system
+                ),
+                closeFailures: value.closeFailures,
+                ownershipReleaseUncertain: false
+            )
+        } catch {
+            return .settledResidue(
+                stage: .classifyStale,
+                residue: observeBaseResidue(
+                    baseDescriptor: baseDescriptor,
+                    fallback: [request.attemptName], system: system
+                ),
+                closeFailures: [], ownershipReleaseUncertain: false
+            )
+        }
+    }
+
+    private struct StalePlan {
+        let attempt: String
+        let leafIdentity: InvestigationMachineGateMetadataSnapshot
+        let file: FilePlan?
+    }
+
+    private struct FilePlan {
+        let name: String
+        let metadata: InvestigationMachineGateMetadataSnapshot
+        let bytes: Data
+        let digest: InvestigationHandoffSHA256
+    }
+
+    private struct SettlementFailure: Error {
+        let stage: InvestigationOwnerOnlyCapsuleFailureStage
+        let residue: InvestigationOwnerOnlyCapsuleResidue
+        let closeFailures: [InvestigationOwnerOnlyCapsuleCloseRole]
+    }
+
+    private static func failure(
+        _ stage: InvestigationOwnerOnlyCapsuleFailureStage,
+        _ residue: InvestigationOwnerOnlyCapsuleResidue,
+        _ closes: [InvestigationOwnerOnlyCapsuleCloseRole] = []
+    ) -> SettlementFailure {
+        .init(stage: stage, residue: residue, closeFailures: closes)
+    }
+
+    private static func classify(
+        attempt: String, baseDescriptor: Int32,
+        baseMetadata: InvestigationMachineGateMetadataSnapshot,
+        system: any InvestigationOwnerOnlyCapsuleSystem
+    ) throws -> StalePlan {
+        let residue = InvestigationOwnerOnlyCapsuleResidue.stale(
+            entries: [attempt], observationComplete: true
+        )
+        guard let attemptUUID = InvestigationOwnerOnlyCapsulePublication
+            .attemptUUID(from: attempt)
+        else { throw failure(.classifyStale, residue) }
+        let directory: Int32
+        do {
+            directory = try system.openComponent(
+                parentDescriptor: baseDescriptor, name: attempt,
+                flags: InvestigationOwnerOnlyCapsulePublication
+                    .attemptDirectoryFlags, mode: nil
+            )
+        } catch { throw failure(.classifyStale, residue) }
+        var directoryCloseAttempted = false
+        do {
+            let leaf = try validateDirectory(
+                descriptor: directory, parent: baseDescriptor, name: attempt,
+                baseDevice: baseMetadata.device, system: system
+            )
+            let inventory = try system.inventory(
+                baseDescriptor: directory, maximumEntryCount: 2
+            )
+            guard inventory.reachedEnd, inventory.entries.count <= 1 else {
+                throw failure(.classifyStale, residue)
+            }
+            let file: FilePlan?
+            if let name = inventory.entries.first {
+                let canonical = canonicalDigestName(name)
+                guard name == InvestigationOwnerOnlyCapsulePublication.pendingName
+                        || canonical != nil
+                else { throw failure(.classifyStale, residue) }
+                let descriptor = try system.openComponent(
+                    parentDescriptor: directory, name: name,
+                    flags: InvestigationOwnerOnlyCapsulePublication.finalReaderFlags,
+                    mode: nil
+                )
+                do {
+                    let held = try validateFile(
+                        descriptor: descriptor, parent: directory, name: name,
+                        baseDevice: baseMetadata.device, expectedDigest: canonical,
+                        system: system
+                    )
+                    let bytes = try readCanonicalBytes(
+                        descriptor: descriptor, size: held.size, system: system
+                    )
+                    let decoded = try InvestigationProjectedCohortInput.decode(
+                        bytes
+                    )
+                    guard decoded.capsule.outerAttemptUUID == attemptUUID else {
+                        throw failure(.classifyStale, residue)
+                    }
+                    if let canonical {
+                        guard decoded.wholeInputSHA256 == canonical else {
+                            throw failure(.classifyStale, residue)
+                        }
+                    }
+                    file = .init(
+                        name: name, metadata: held, bytes: bytes,
+                        digest: decoded.wholeInputSHA256
+                    )
+                } catch {
+                    do { try system.close(descriptor: descriptor) }
+                    catch {
+                        throw failure(
+                            .closeStaleReader, residue, [.staleReader]
+                        )
+                    }
+                    throw error
+                }
+                do { try system.close(descriptor: descriptor) }
+                catch {
+                    throw failure(.closeStaleReader, residue, [.staleReader])
+                }
+            } else {
+                file = nil
+            }
+            directoryCloseAttempted = true
+            do { try system.close(descriptor: directory) }
+            catch {
+                throw failure(.closeStaleDirectory, residue, [.staleDirectory])
+            }
+            return .init(attempt: attempt, leafIdentity: leaf, file: file)
+        } catch let value as SettlementFailure {
+            var closeFailures = value.closeFailures
+            if !directoryCloseAttempted {
+                directoryCloseAttempted = true
+                do { try system.close(descriptor: directory) }
+                catch { closeFailures.append(.staleDirectory) }
+            }
+            throw failure(value.stage, residue, closeFailures)
+        } catch {
+            var closeFailures: [InvestigationOwnerOnlyCapsuleCloseRole] = []
+            if !directoryCloseAttempted {
+                directoryCloseAttempted = true
+                do { try system.close(descriptor: directory) }
+                catch { closeFailures.append(.staleDirectory) }
+            }
+            throw failure(.classifyStale, residue, closeFailures)
+        }
+    }
+
+    private static func classifyExpectedPublished(
+        _ request: InvestigationOwnerOnlyCapsuleSettlementRequest,
+        baseDescriptor: Int32,
+        baseMetadata: InvestigationMachineGateMetadataSnapshot,
+        system: any InvestigationOwnerOnlyCapsuleSystem
+    ) throws -> StalePlan {
+        let plan = try classify(
+            attempt: request.attemptName, baseDescriptor: baseDescriptor,
+            baseMetadata: baseMetadata, system: system
+        )
+        guard
+            plan.file?.name == request.finalName,
+            plan.file?.metadata.device == request.identity.device,
+            plan.file?.metadata.inode == request.identity.inode,
+            plan.file?.metadata.generation == request.identity.generation,
+            plan.file?.metadata.size == request.identity.size,
+            plan.file?.digest == request.digest
+        else { throw failure(.classifyStale, request.residue) }
+        return plan
+    }
+
+    private static func validateDirectory(
+        descriptor: Int32, parent: Int32, name: String, baseDevice: UInt64,
+        system: any InvestigationOwnerOnlyCapsuleSystem
+    ) throws -> InvestigationMachineGateMetadataSnapshot {
+        let held = try system.metadata(descriptor: descriptor)
+        let named = try system.namedMetadata(
+            parentDescriptor: parent, name: name,
+            flags: InvestigationOwnerOnlyCapsulePublication.namedFlags
+        )
+        guard held == named, held.device == baseDevice, held.inode > 0,
+              held.fileType == .directory, held.ownerUID == 501,
+              held.ownerGID == 20, held.permissions == 0o700,
+              held.linkCount > 0, held.size >= 0, held.flags == 0,
+              try system.descriptorFlags(descriptor) & FD_CLOEXEC != 0,
+              try system.descriptorStatusFlags(descriptor) & O_ACCMODE == O_RDONLY,
+              try system.descriptorStatusFlags(descriptor) & O_NONBLOCK != 0,
+              try system.extendedACLIsEmpty(descriptor: descriptor),
+              try system.extendedAttributeNames(descriptor: descriptor).isEmpty
+        else { throw failure(.classifyStale, .stale(
+            entries: [name], observationComplete: true
+        )) }
+        return held
+    }
+
+    private static func validateFile(
+        descriptor: Int32, parent: Int32, name: String, baseDevice: UInt64,
+        expectedDigest: InvestigationHandoffSHA256?,
+        system: any InvestigationOwnerOnlyCapsuleSystem
+    ) throws -> InvestigationMachineGateMetadataSnapshot {
+        let held = try system.metadata(descriptor: descriptor)
+        let named = try system.namedMetadata(
+            parentDescriptor: parent, name: name,
+            flags: InvestigationOwnerOnlyCapsulePublication.namedFlags
+        )
+        guard held == named, held.device == baseDevice, held.inode > 0,
+              held.fileType == .regularFile, held.ownerUID == 501,
+              held.ownerGID == 20, held.permissions == 0o600,
+              held.linkCount == 1, held.size > 0,
+              held.size <= Int64(InvestigationProjectedCohortInput.maximumByteCount),
+              held.flags == 0,
+              try system.descriptorFlags(descriptor) & FD_CLOEXEC != 0,
+              try system.descriptorStatusFlags(descriptor) & O_ACCMODE == O_RDONLY,
+              try system.descriptorStatusFlags(descriptor) & O_NONBLOCK != 0,
+              try system.extendedACLIsEmpty(descriptor: descriptor),
+              try system.extendedAttributeNames(descriptor: descriptor).isEmpty,
+              expectedDigest != nil
+                || name == InvestigationOwnerOnlyCapsulePublication.pendingName
+        else { throw failure(.classifyStale, .stale(
+            entries: [name], observationComplete: true
+        )) }
+        return held
+    }
+
+    private static func canonicalDigestName(
+        _ name: String
+    ) -> InvestigationHandoffSHA256? {
+        let prefix = "projected-cohort-", suffix = ".bin"
+        guard name.hasPrefix(prefix), name.hasSuffix(suffix) else { return nil }
+        let encoded = String(
+            name.dropFirst(prefix.count).dropLast(suffix.count)
+        )
+        guard encoded == encoded.lowercased() else { return nil }
+        return try? .init(lowercaseHex: encoded)
+    }
+
+    private static func readCanonicalBytes(
+        descriptor: Int32, size: Int64,
+        system: any InvestigationOwnerOnlyCapsuleSystem
+    ) throws -> Data {
+        guard size > 0, let count = Int(exactly: size),
+              try system.offset(descriptor: descriptor) == 0
+        else { throw failure(.classifyStale, .none) }
+        let bytes = try InvestigationOwnerOnlyCapsulePublication.readExactly(
+            descriptor: descriptor, count: count, system: system
+        )
+        guard try system.read(
+            descriptor: descriptor, maximumByteCount: 1, offset: size
+        ).isEmpty, try system.offset(descriptor: descriptor) == 0 else {
+            throw failure(.classifyStale, .none)
+        }
+        _ = try InvestigationProjectedCohortInput.decode(bytes)
+        return bytes
+    }
+
+    private static func remove(
+        _ plan: StalePlan, baseDescriptor: Int32,
+        baseMetadata: InvestigationMachineGateMetadataSnapshot,
+        deadline: UInt64, system: any InvestigationOwnerOnlyCapsuleSystem
+    ) throws {
+        let residue = InvestigationOwnerOnlyCapsuleResidue.stale(
+            entries: [plan.attempt], observationComplete: true
+        )
+        let directory: Int32
+        do {
+            directory = try system.openComponent(
+                parentDescriptor: baseDescriptor, name: plan.attempt,
+                flags: InvestigationOwnerOnlyCapsulePublication
+                    .attemptDirectoryFlags,
+                mode: nil
+            )
+        } catch {
+            throw failure(.classifyStale, residue)
+        }
+        var directoryCloseAttempted = false
+        do {
+            let observedDirectory = try validateDirectory(
+                descriptor: directory, parent: baseDescriptor, name: plan.attempt,
+                baseDevice: baseMetadata.device, system: system
+            )
+            guard observedDirectory == plan.leafIdentity else {
+                throw failure(.classifyStale, residue)
+            }
+            if let file = plan.file {
+                try validateFilePlan(
+                    file, directory: directory, baseDevice: baseMetadata.device,
+                    system: system
+                )
+                try unlinkWithBusyRetry(
+                    parent: directory, name: file.name, flags: fileUnlinkFlags,
+                    deadline: deadline, revalidate: {
+                        try validateFilePlan(
+                            file, directory: directory,
+                            baseDevice: baseMetadata.device, system: system
+                        )
+                    }, system: system
+                )
+                try requireAbsent(
+                    parent: directory, name: file.name, system: system
+                )
+            }
+            let empty = try system.inventory(
+                baseDescriptor: directory, maximumEntryCount: 1
+            )
+            guard empty.reachedEnd, empty.entries.isEmpty else {
+                throw failure(.verifyLeafEmpty, residue)
+            }
+            do { try system.synchronize(descriptor: directory) }
+            catch { throw failure(.syncLeafAfterUnlink, residue) }
+        } catch let value as SettlementFailure {
+            var closeFailures = value.closeFailures
+            if !directoryCloseAttempted {
+                directoryCloseAttempted = true
+                do { try system.close(descriptor: directory) }
+                catch { closeFailures.append(.staleDirectory) }
+            }
+            throw failure(value.stage, value.residue, closeFailures)
+        } catch {
+            var closeFailures: [InvestigationOwnerOnlyCapsuleCloseRole] = []
+            if !directoryCloseAttempted {
+                directoryCloseAttempted = true
+                do { try system.close(descriptor: directory) }
+                catch { closeFailures.append(.staleDirectory) }
+            }
+            throw failure(.classifyStale, residue, closeFailures)
+        }
+        directoryCloseAttempted = true
+        do { try system.close(descriptor: directory) }
+        catch { throw failure(.closeStaleDirectory, residue, [.staleDirectory]) }
+        try revalidateEmptyDirectoryPlan(
+            plan, baseDescriptor: baseDescriptor,
+            baseMetadata: baseMetadata, system: system
+        )
+        try unlinkWithBusyRetry(
+            parent: baseDescriptor, name: plan.attempt,
+            flags: directoryUnlinkFlags, deadline: deadline,
+            revalidate: {
+                try revalidateEmptyDirectoryPlan(
+                    plan, baseDescriptor: baseDescriptor,
+                    baseMetadata: baseMetadata, system: system
+                )
+            }, system: system
+        )
+        try requireAbsent(
+            parent: baseDescriptor, name: plan.attempt,
+            stage: .proveDirectoryAbsent, system: system
+        )
+    }
+
+    private static func revalidateEmptyDirectoryPlan(
+        _ plan: StalePlan, baseDescriptor: Int32,
+        baseMetadata: InvestigationMachineGateMetadataSnapshot,
+        system: any InvestigationOwnerOnlyCapsuleSystem
+    ) throws {
+        let residue = InvestigationOwnerOnlyCapsuleResidue.stale(
+            entries: [plan.attempt], observationComplete: true
+        )
+        let directory: Int32
+        do {
+            directory = try system.openComponent(
+                parentDescriptor: baseDescriptor, name: plan.attempt,
+                flags: InvestigationOwnerOnlyCapsulePublication
+                    .attemptDirectoryFlags,
+                mode: nil
+            )
+        } catch {
+            throw failure(.removeDirectory, residue)
+        }
+
+        var validationFailure: SettlementFailure?
+        do {
+            let observed = try validateDirectory(
+                descriptor: directory, parent: baseDescriptor, name: plan.attempt,
+                baseDevice: baseMetadata.device, system: system
+            )
+            guard hasStableDirectoryIdentityAndSecurity(
+                observed, matching: plan.leafIdentity
+            ) else {
+                throw failure(.removeDirectory, residue)
+            }
+            let inventory = try system.inventory(
+                baseDescriptor: directory, maximumEntryCount: 1
+            )
+            guard inventory.reachedEnd, inventory.entries.isEmpty else {
+                throw failure(.removeDirectory, residue)
+            }
+        } catch let value as SettlementFailure {
+            validationFailure = failure(
+                .removeDirectory, residue, value.closeFailures
+            )
+        } catch {
+            validationFailure = failure(.removeDirectory, residue)
+        }
+
+        do {
+            try system.close(descriptor: directory)
+        } catch {
+            throw failure(
+                validationFailure?.stage ?? .closeStaleDirectory,
+                validationFailure?.residue ?? residue,
+                (validationFailure?.closeFailures ?? []) + [.staleDirectory]
+            )
+        }
+        if let validationFailure { throw validationFailure }
+    }
+
+    private static func hasStableDirectoryIdentityAndSecurity(
+        _ observed: InvestigationMachineGateMetadataSnapshot,
+        matching classified: InvestigationMachineGateMetadataSnapshot
+    ) -> Bool {
+        observed.device == classified.device
+            && observed.inode == classified.inode
+            && observed.generation == classified.generation
+            && observed.fileType == classified.fileType
+            && observed.ownerUID == classified.ownerUID
+            && observed.ownerGID == classified.ownerGID
+            && observed.permissions == classified.permissions
+            && observed.flags == classified.flags
+    }
+
+    private static func validateFilePlan(
+        _ plan: FilePlan, directory: Int32, baseDevice: UInt64,
+        system: any InvestigationOwnerOnlyCapsuleSystem
+    ) throws {
+        let descriptor = try system.openComponent(
+            parentDescriptor: directory, name: plan.name,
+            flags: InvestigationOwnerOnlyCapsulePublication.finalReaderFlags,
+            mode: nil
+        )
+        let residue = InvestigationOwnerOnlyCapsuleResidue.stale(
+            entries: [plan.name], observationComplete: true
+        )
+        do {
+            let expectedDigest = canonicalDigestName(plan.name)
+            let metadata = try validateFile(
+                descriptor: descriptor, parent: directory, name: plan.name,
+                baseDevice: baseDevice, expectedDigest: expectedDigest,
+                system: system
+            )
+            let bytes = try readCanonicalBytes(
+                descriptor: descriptor, size: metadata.size, system: system
+            )
+            let decoded = try InvestigationProjectedCohortInput.decode(bytes)
+            guard
+                metadata == plan.metadata, bytes == plan.bytes,
+                decoded.wholeInputSHA256 == plan.digest
+            else {
+                throw failure(.classifyStale, residue)
+            }
+        } catch {
+            do { try system.close(descriptor: descriptor) }
+            catch { throw failure(.closeStaleReader, residue, [.staleReader]) }
+            throw error
+        }
+        do { try system.close(descriptor: descriptor) }
+        catch { throw failure(.closeStaleReader, residue, [.staleReader]) }
+    }
+
+    private static func unlinkWithBusyRetry(
+        parent: Int32, name: String, flags: Int32, deadline: UInt64,
+        revalidate: () throws -> Void,
+        system: any InvestigationOwnerOnlyCapsuleSystem
+    ) throws {
+        var retries = 0
+        while true {
+            let now: UInt64
+            do { now = try system.monotonicNanoseconds() }
+            catch {
+                throw failure(
+                    .clock,
+                    .stale(entries: [name], observationComplete: true)
+                )
+            }
+            guard now < deadline else {
+                throw failure(
+                    flags & AT_REMOVEDIR == 0 ? .unlinkFile : .removeDirectory,
+                    .stale(entries: [name], observationComplete: true)
+                )
+            }
+            do { try system.unlink(
+                parentDescriptor: parent, name: name, flags: flags
+            ); return }
+            catch InvestigationOwnerOnlyCapsuleSystemError.errno(let value)
+                where value == EBUSY
+            {
+                retries += 1
+                guard retries <= maximumBusyRetries else {
+                    throw failure(
+                        flags & AT_REMOVEDIR == 0 ? .unlinkFile : .removeDirectory,
+                        .stale(entries: [name], observationComplete: true)
+                    )
+                }
+                do {
+                    try system.waitForRetry(
+                        nanoseconds: min(1_000_000, deadline - now)
+                    )
+                } catch {
+                    throw failure(
+                        .wait,
+                        .stale(entries: [name], observationComplete: true)
+                    )
+                }
+                let afterWait: UInt64
+                do { afterWait = try system.monotonicNanoseconds() }
+                catch {
+                    throw failure(
+                        .clock,
+                        .stale(entries: [name], observationComplete: true)
+                    )
+                }
+                guard afterWait < deadline else {
+                    throw failure(
+                        flags & AT_REMOVEDIR == 0 ? .unlinkFile : .removeDirectory,
+                        .stale(entries: [name], observationComplete: true)
+                    )
+                }
+                try revalidate()
+            } catch { throw failure(
+                flags & AT_REMOVEDIR == 0 ? .unlinkFile : .removeDirectory,
+                .stale(entries: [name], observationComplete: true)
+            ) }
+        }
+    }
+
+    private static func requireAbsent(
+        parent: Int32, name: String,
+        stage: InvestigationOwnerOnlyCapsuleFailureStage = .proveFileAbsent,
+        system: any InvestigationOwnerOnlyCapsuleSystem
+    ) throws {
+        do {
+            _ = try system.namedMetadata(
+                parentDescriptor: parent, name: name,
+                flags: InvestigationOwnerOnlyCapsulePublication.namedFlags
+            )
+            throw failure(stage, .stale(
+                entries: [name], observationComplete: true
+            ))
+        } catch InvestigationOwnerOnlyCapsuleSystemError.errno(let value)
+            where value == ENOENT
+        { return }
+        catch let value as SettlementFailure { throw value }
+        catch {
+            throw failure(
+                stage,
+                .stale(entries: [name], observationComplete: false)
+            )
+        }
+    }
+
+    private static func observeBaseResidue(
+        baseDescriptor: Int32, fallback: [String],
+        system: any InvestigationOwnerOnlyCapsuleSystem
+    ) -> InvestigationOwnerOnlyCapsuleResidue {
+        do {
+            let inventory = try system.inventory(
+                baseDescriptor: baseDescriptor,
+                maximumEntryCount: InvestigationOwnerOnlyCapsulePublication
+                    .maximumAttemptRootCount + 2
+            )
+            return .stale(
+                entries: inventory.entries.filter {
+                    $0 != InvestigationMachineGateOwnershipAcquirer.lockName
+                }.sorted(),
+                observationComplete: inventory.reachedEnd
+            )
+        } catch {
+            return .stale(
+                entries: fallback.sorted(), observationComplete: false
+            )
+        }
+    }
+}
+
 struct InvestigationOwnerOnlyCapsuleVerifiedReader: Sendable {
     fileprivate let descriptor: Int32
     let identity: InvestigationOwnerOnlyCapsuleNodeIdentity
@@ -782,10 +1620,16 @@ package final class InvestigationOwnerOnlyCapsuleLease: @unchecked Sendable {
         case available
         case handingOff
         case awaitingSettlement
+        case settling
         case terminal
         case capsuleCloseUncertain
         case ownershipReleaseUncertain
         case abandoned
+    }
+
+    private enum SettlementProof {
+        case exactGateReaped(InvestigationOwnerOnlyCapsuleExactGateReapedProof)
+        case neverHandedOff(InvestigationOwnerOnlyCapsuleNeverHandedOffProof)
     }
 
     package let outerAttemptUUID: UUID
@@ -797,6 +1641,8 @@ package final class InvestigationOwnerOnlyCapsuleLease: @unchecked Sendable {
     private let descriptor: Int32
     private let attemptName: String
     private let finalName: String
+    private let canonicalBytes: Data
+    private let settlementToken = InvestigationOwnerOnlyCapsuleSettlementToken()
     private let terminalLock = NSLock()
     private var state = State.available
 
@@ -814,6 +1660,7 @@ package final class InvestigationOwnerOnlyCapsuleLease: @unchecked Sendable {
         outerAttemptUUID = request.outerAttemptUUID
         attemptName = request.attemptName
         finalName = request.finalName
+        canonicalBytes = request.canonicalBytes
         identity = reader.identity
         digest = reader.digest
     }
@@ -849,7 +1696,8 @@ package final class InvestigationOwnerOnlyCapsuleLease: @unchecked Sendable {
             do {
                 proof = try borrower.handoffToFixedGate(
                     descriptor: descriptor, outerAttemptUUID: outerAttemptUUID,
-                    identity: identity, digest: digest
+                    identity: identity, digest: digest,
+                    settlementToken: settlementToken
                 )
             } catch {
                 try terminateAfterHandoffFailure(residue: residue)
@@ -867,7 +1715,7 @@ package final class InvestigationOwnerOnlyCapsuleLease: @unchecked Sendable {
             state = .awaitingSettlement
             terminalLock.unlock()
             return proof
-        case .handingOff, .awaitingSettlement:
+        case .handingOff, .awaitingSettlement, .settling:
             terminalLock.unlock()
             throw InvestigationOwnerOnlyCapsuleError.alreadyHandedOff(residue)
         case .terminal, .capsuleCloseUncertain,
@@ -905,8 +1753,54 @@ package final class InvestigationOwnerOnlyCapsuleLease: @unchecked Sendable {
         terminalLock.unlock()
         return InvestigationOwnerOnlyCapsuleNeverHandedOffProof.make(
             outerAttemptUUID: outerAttemptUUID, digest: digest,
-            identity: identity
+            identity: identity, settlementToken: settlementToken
         )
+    }
+
+    package func settle(
+        exactGateReaped proof: InvestigationOwnerOnlyCapsuleExactGateReapedProof
+    ) throws -> InvestigationOwnerOnlyCapsuleSettlementResult {
+        try settle(proof: .exactGateReaped(proof))
+    }
+
+    package func settle(
+        neverHandedOff proof: InvestigationOwnerOnlyCapsuleNeverHandedOffProof
+    ) throws -> InvestigationOwnerOnlyCapsuleSettlementResult {
+        try settle(proof: .neverHandedOff(proof))
+    }
+
+    private func settle(
+        proof: SettlementProof
+    ) throws -> InvestigationOwnerOnlyCapsuleSettlementResult {
+        let residue = publishedResidue
+        terminalLock.lock()
+        guard case .awaitingSettlement = state else {
+            terminalLock.unlock()
+            throw InvestigationOwnerOnlyCapsuleError.alreadyTerminal(residue)
+        }
+        let proofAccepted = switch proof {
+        case .exactGateReaped(let value):
+            value.consume(matching: settlementToken)
+        case .neverHandedOff(let value):
+            value.consume(matching: settlementToken)
+        }
+        state = .settling
+        terminalLock.unlock()
+        guard proofAccepted else {
+            let releaseUncertain = !releaseOwnership()
+            terminalLock.withLock { state = releaseUncertain
+                ? .ownershipReleaseUncertain : .terminal }
+            throw InvestigationOwnerOnlyCapsuleError.proofRejected(
+                residue, ownershipReleaseUncertain: releaseUncertain
+            )
+        }
+        let result = owner.settleCanonicalCapsule(.init(
+            canonicalBytes: canonicalBytes, outerAttemptUUID: outerAttemptUUID,
+            attemptName: attemptName, finalName: finalName, identity: identity,
+            digest: digest
+        ))
+        terminalLock.withLock { state = .terminal }
+        return result
     }
 
     deinit {
@@ -920,7 +1814,7 @@ package final class InvestigationOwnerOnlyCapsuleLease: @unchecked Sendable {
         case .awaitingSettlement:
             closeReader = false
             releaseOwner = true
-        case .handingOff, .terminal, .capsuleCloseUncertain,
+        case .handingOff, .settling, .terminal, .capsuleCloseUncertain,
              .ownershipReleaseUncertain, .abandoned:
             closeReader = false
             releaseOwner = false
@@ -992,25 +1886,33 @@ package final class InvestigationOwnerOnlyCapsuleExactGateReapedProof:
     package let digest: InvestigationHandoffSHA256
     package let identity: InvestigationOwnerOnlyCapsuleNodeIdentity
     private let seal = UUID()
+    private let settlementToken: InvestigationOwnerOnlyCapsuleSettlementToken
 
     private init(
         outerAttemptUUID: UUID, digest: InvestigationHandoffSHA256,
-        identity: InvestigationOwnerOnlyCapsuleNodeIdentity
+        identity: InvestigationOwnerOnlyCapsuleNodeIdentity,
+        settlementToken: InvestigationOwnerOnlyCapsuleSettlementToken
     ) {
         self.outerAttemptUUID = outerAttemptUUID
         self.digest = digest
         self.identity = identity
+        self.settlementToken = settlementToken
     }
 
     static func makeForFixedLauncher(
         outerAttemptUUID: UUID, digest: InvestigationHandoffSHA256,
-        identity: InvestigationOwnerOnlyCapsuleNodeIdentity
+        identity: InvestigationOwnerOnlyCapsuleNodeIdentity,
+        settlementToken: InvestigationOwnerOnlyCapsuleSettlementToken
     ) -> Self {
         Self(
             outerAttemptUUID: outerAttemptUUID, digest: digest,
-            identity: identity
+            identity: identity, settlementToken: settlementToken
         )
     }
+
+    fileprivate func consume(
+        matching token: InvestigationOwnerOnlyCapsuleSettlementToken
+    ) -> Bool { settlementToken === token && settlementToken.consume() }
 }
 
 package final class InvestigationOwnerOnlyCapsuleNeverHandedOffProof:
@@ -1020,25 +1922,33 @@ package final class InvestigationOwnerOnlyCapsuleNeverHandedOffProof:
     package let digest: InvestigationHandoffSHA256
     package let identity: InvestigationOwnerOnlyCapsuleNodeIdentity
     private let seal = UUID()
+    private let settlementToken: InvestigationOwnerOnlyCapsuleSettlementToken
 
     private init(
         outerAttemptUUID: UUID, digest: InvestigationHandoffSHA256,
-        identity: InvestigationOwnerOnlyCapsuleNodeIdentity
+        identity: InvestigationOwnerOnlyCapsuleNodeIdentity,
+        settlementToken: InvestigationOwnerOnlyCapsuleSettlementToken
     ) {
         self.outerAttemptUUID = outerAttemptUUID
         self.digest = digest
         self.identity = identity
+        self.settlementToken = settlementToken
     }
 
     fileprivate static func make(
         outerAttemptUUID: UUID, digest: InvestigationHandoffSHA256,
-        identity: InvestigationOwnerOnlyCapsuleNodeIdentity
+        identity: InvestigationOwnerOnlyCapsuleNodeIdentity,
+        settlementToken: InvestigationOwnerOnlyCapsuleSettlementToken
     ) -> Self {
         Self(
             outerAttemptUUID: outerAttemptUUID, digest: digest,
-            identity: identity
+            identity: identity, settlementToken: settlementToken
         )
     }
+
+    fileprivate func consume(
+        matching token: InvestigationOwnerOnlyCapsuleSettlementToken
+    ) -> Bool { settlementToken === token && settlementToken.consume() }
 }
 
 private struct InvestigationOwnerOnlyCapsuleDescriptorLedger {
@@ -1258,6 +2168,34 @@ final class DarwinInvestigationOwnerOnlyCapsuleSystem:
 
     func close(descriptor: Int32) throws {
         guard Darwin.close(descriptor) == 0 else { throw lastError() }
+    }
+
+    func monotonicNanoseconds() throws -> UInt64 {
+        var timebase = mach_timebase_info_data_t()
+        guard mach_timebase_info(&timebase) == KERN_SUCCESS, timebase.denom > 0
+        else { throw InvestigationOwnerOnlyCapsuleSystemError.errno(EIO) }
+        let product = mach_continuous_time()
+            .multipliedFullWidth(by: UInt64(timebase.numer))
+        guard product.high < UInt64(timebase.denom) else {
+            throw InvestigationOwnerOnlyCapsuleSystemError.errno(EOVERFLOW)
+        }
+        return UInt64(timebase.denom).dividingFullWidth(product).quotient
+    }
+
+    func unlink(
+        parentDescriptor: Int32, name: String, flags: Int32
+    ) throws {
+        guard unlinkat(parentDescriptor, name, flags) == 0 else {
+            throw lastError()
+        }
+    }
+
+    func waitForRetry(nanoseconds: UInt64) throws {
+        var requested = timespec(
+            tv_sec: Int(nanoseconds / 1_000_000_000),
+            tv_nsec: Int(nanoseconds % 1_000_000_000)
+        )
+        guard nanosleep(&requested, nil) == 0 else { throw lastError() }
     }
 
     private func lastError() -> InvestigationOwnerOnlyCapsuleSystemError {
