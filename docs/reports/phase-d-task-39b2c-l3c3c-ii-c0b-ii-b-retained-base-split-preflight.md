@@ -149,8 +149,23 @@ Exactly three non-document paths and at most 2,600 added-or-changed lines:
 2. `Sources/StornautInvestigationMachineLaunchSupport/InvestigationOwnerOnlyCapsule.swift` (new); and
 3. `Tests/StornautInvestigationTests/InvestigationOwnerOnlyCapsuleTests.swift` (new).
 
-A fourth path or line 2,601 requires a split. This child owns behavior and focused
-evidence only; shared verifier closure belongs to b3.
+A mandatory implementation preflight found that the complete publication
+failure ledger plus the opaque lease/proof state realistically requires
+2,700–3,550 changed lines. The original 2,600-line envelope is therefore split
+before coding, while preserving the same exact three-path union:
+
+- **ii-c0b-ii-b1a:** canonical intake, complete pre-mutation inventory,
+  publication ledger and verified retained read-only descriptor; at most 2,200
+  changed lines; and
+- **ii-c0b-ii-b1b:** opaque package lease, one-shot close state, package-closed
+  proof shapes and API-escape negatives; at most 1,500 changed lines against the
+  pushed b1a implementation.
+
+A fourth path, b1a line 2,201 or b1b line 1,501 requires another split. Both
+children own behavior and focused evidence only; shared verifier closure remains
+in b3. b1 exposes no package-callable generic descriptor closure or raw-FD
+borrow. c0b-iii later adds the sole fixed high-level launch operation, so a
+caller can never copy or retain the descriptor integer.
 
 ### 4.2 Frozen Behavior
 
