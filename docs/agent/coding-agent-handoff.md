@@ -304,7 +304,10 @@
 > `d0683495ea37d0692677c98f491f3037eaedba4c`、4 paths / 889 lines、aggregate
 > 7 paths / 2,870 lines、bare contract/component/App-Release exit 0 与双人
 > no-unresolved-P0–P2 review 完成并保持 non-admitting。a2 未运行 serial/full、
-> root、App、XPC、model 或 network；当前严格按 ii-c0b-ii-b → c0b-iii →
+> root、App、XPC、model 或 network。ii-b 实施 preflight 又发现 owner 未保留
+> acquisition-time validated base FD，已冻结 a3 retained-base → b1
+> publication/lease → b2 settlement/recovery → b3 verifier closure；当前严格按
+> ii-c0b-ii-a3 → ii-c0b-ii-b1 → ii-c0b-ii-b2 → ii-c0b-ii-b3 → c0b-iii →
 > c0b-iv → ii-c → L3c3d → L3c4 推进。该
 > b5b-ii-c checkpoint 以 8 个 non-document paths / 3,104 changed lines、35
 > focused tests、1,396-test staged-only serial、三个 verifier gates 与 final
@@ -754,7 +757,8 @@ iii-b2a-ii-a1/a2-0/a2-i/a2-ii complete/non-admitting；a2 已冻结并关闭，
 iii-b2b-0、iii-b2b-1a-0、iii-b2b-1a-1 与 iii-b2b-1b
 complete/non-admitting；ii-c0b split frozen，c0b-i complete/non-admitting，
 c0b-ii ownership split complete，ii-a budget split frozen，ii-c0b-ii-a1
-与 ii-c0b-ii-a2 complete/non-admitting；current frontier 为 ii-c0b-ii-b。
+与 ii-c0b-ii-a2 complete/non-admitting；ii-b retained-base split 已冻结，
+current frontier 为 ii-c0b-ii-a3。
 i-b2a completion 见
 [artifact/static reader review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2a-review.md)。
 [fixed service reader review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2b-b-review.md)
@@ -818,7 +822,9 @@ implementation `f11eea42ef295f49b20e1c0f3912d4b32448b968` / tree
 `d0683495ea37d0692677c98f491f3037eaedba4c`、exact 4 paths / 889 lines、
 aggregate 7 paths / 2,870 lines、bare contract/component/App-Release exit 0
 与双人 no-unresolved-P0–P2 review；未运行 serial/full/root/App/XPC/model/
-network。a2 complete/non-admitting，当前 frontier 为 ii-c0b-ii-b。
+network。a2 complete/non-admitting；ii-b retained-base split 已冻结，当前
+frontier 为 ii-c0b-ii-a3，随后为 ii-c0b-ii-b1 → ii-c0b-ii-b2 →
+ii-c0b-ii-b3。
 [ii-b5b-iii-b0 preflight](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md)
 冻结 long-lived outer/disposable inner、FD 0/1/2/7/8/9、inner-led PGID、
 parent-crash containment 与 iii-a/b1/b2a/b2b budgets。
@@ -1025,8 +1031,9 @@ preflight 已冻结，iii-a/iii-b1/iii-b2a0/iii-b2a-i/iii-b2a-ii-a1/a2-0/a2-i/a2
 已完成并保持 non-admitting；a2 已关闭，iii-b2b-0、iii-b2b-1a-0 与
 iii-b2b-1a-1 与拆分后的 iii-b2b-1b-i/1b-ii 已完成并保持
 non-admitting；ii-c0b 已冻结为四段，c0b-i 已完成并保持 non-admitting；
-ii-c0b-ii-a1 与 ii-c0b-ii-a2 已完成并保持 non-admitting；当前 frontier 为
-ii-c0b-ii-b，之后严格为 c0b-iii、c0b-iv、ii-c、L3c3d、L3c4。
+ii-c0b-ii-a1 与 ii-c0b-ii-a2 已完成并保持 non-admitting；ii-b retained-base
+split 已冻结，当前 frontier 为 ii-c0b-ii-a3，之后严格为 ii-c0b-ii-b1、
+ii-c0b-ii-b2、ii-c0b-ii-b3、c0b-iii、c0b-iv、ii-c、L3c3d、L3c4。
 已完成部分均为
 non-admitting prerequisite，
 L3c4 才是 machine admission。该最终 gate

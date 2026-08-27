@@ -248,7 +248,8 @@ non-admitting；iii-b2b-0、iii-b2b-1a-0 与 iii-b2b-1a-1 已完成并保持
    `d0683495ea37d0692677c98f491f3037eaedba4c`、4 paths / 889 lines、aggregate
    7 paths / 2,870 lines、bare contract/component/App-Release exit 0 与双人
    no-unresolved-P0–P2 review 完成并保持 non-admitting，且未运行 serial/full/
-   root/App/XPC/model/network。当前严格按 ii-c0b-ii-b → c0b-iii → c0b-iv →
+   root/App/XPC/model/network。ii-b retained-base split 已冻结，当前严格按
+   ii-c0b-ii-a3 → ii-c0b-ii-b1 → ii-c0b-ii-b2 → ii-c0b-ii-b3 → c0b-iii → c0b-iv →
    ii-c → L3c3d → L3c4 推进。
 39B2c 仍未作 machine readiness claim。
 [ii-c0a preflight](../reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md)
@@ -297,9 +298,10 @@ non-admitting；b5b-iii-b0 已冻结，iii-a/iii-b1/iii-b2a0/iii-b2a-i/
 iii-b2a-ii-a1、a2-0、a2-i 与 a2-ii 已完成并保持 non-admitting；a2 已关闭，
 iii-b2b-0、iii-b2b-1a-0、iii-b2b-1a-1、iii-b2b-1b 与 c0b-i 已完成并保持
 non-admitting。c0b-ii fresh preflight 已拆为 ii-c0b-ii-a/ii-c0b-ii-b；ii-a
-budget split 已冻结，ii-c0b-ii-a1/a2 已完成并保持 non-admitting，当前
-frontier 为 ii-c0b-ii-b，后续严格为 c0b-iii →
-c0b-iv → ii-c → L3c3d → L3c4。
+budget split 已冻结，ii-c0b-ii-a1/a2 已完成并保持 non-admitting；ii-b
+retained-base split 已冻结，当前 frontier 为 ii-c0b-ii-a3，后续严格为
+ii-c0b-ii-b1 → ii-c0b-ii-b2 → ii-c0b-ii-b3 → c0b-iii → c0b-iv → ii-c →
+L3c3d → L3c4。
 L3c2b preflight 的 real-plan matrix contradiction 已由 3-path plan-freshness
 prerequisite 关闭，affected/Investigation/structural/review gates 通过；
 只有 L3c4 可作 readiness claim 并运行
@@ -506,8 +508,9 @@ four Mach-O projections 与 final no-unresolved-P0–P2 review。
   non-admitting；a2 已关闭，iii-b2b-0、iii-b2b-1a-0 与 iii-b2b-1a-1 已完成
    并保持 non-admitting；iii-b2b-1b 与 c0b-i 也已完成。c0b-ii fresh preflight
    已拆为 ii-c0b-ii-a/ii-c0b-ii-b，ii-a budget split 已冻结，ii-c0b-ii-a1
-   与 ii-c0b-ii-a2 已完成并保持 non-admitting，当前 frontier 为 ii-c0b-ii-b，
-   后续严格为 c0b-iii → c0b-iv → ii-c → L3c3d → L3c4。
+   与 ii-c0b-ii-a2 已完成并保持 non-admitting；ii-b retained-base split 已冻结，
+   当前 frontier 为 ii-c0b-ii-a3，后续严格为 ii-c0b-ii-b1 → ii-c0b-ii-b2 →
+   ii-c0b-ii-b3 → c0b-iii → c0b-iv → ii-c → L3c3d → L3c4。
   L3c4 才拥有 final admission/full。39B2c 才是 machine admission，Task 39
   尚未完成。
 - Epic 0 Foundation Upstream Study：已完成，选择 checked-in Xcode App/Test host + local Swift packages。

@@ -184,4 +184,4 @@ unavailable.
 | mutation and c0b-i replay | `verify-contract` fixtures and immutable historical replay | ii-c0b-ii-a2 complete |
 | aggregate ii-a completion | exact a1 baseline + four a2 paths + independent reviews | ii-c0b-ii-a2 complete/non-admitting |
 | no serial/full in either child | validation logs and review reports | preserved |
-| later capsule and machine admission | ii-b/c0b-iii/c0b-iv/ii-c/L3c3d/L3c4 | ii-c0b-ii-b current; later stages pending |
+| later capsule and machine admission | a3/b1/b2/b3/c0b-iii/c0b-iv/ii-c/L3c3d/L3c4 | retained-base split frozen; ii-c0b-ii-a3 current |

@@ -114,7 +114,10 @@
 > tree `d0683495ea37d0692677c98f491f3037eaedba4c`, exact 4 paths / 889
 > lines and aggregate 7 paths / 2,870 lines; bare contract/component/App-Release
 > exited 0 and two independent reviews found no unresolved P0–P2. It ran no
-> serial/full/root/App/XPC/model/network; ii-c0b-ii-b is current. a2-i
+> serial/full/root/App/XPC/model/network. A fresh ii-b implementation audit
+> found that the owner does not retain the acquisition-time validated base FD;
+> the corrected split is a3 retained-base → b1 publication/lease → b2
+> settlement/recovery → b3 verifier closure, with ii-c0b-ii-a3 current. a2-i
 > closed at commit
 > `158f500` / tree `c7a42ffd` with 10 non-document paths / 1,965 changed
 > lines, 66 focused tests, a 1,500-test serialized regression, exact
@@ -1200,8 +1203,9 @@ The remaining L3 work is split before driver coding:
    complete/non-admitting. iii-b2b-1a-0 canonical helper-provenance carriage,
    iii-b2b-1a-1 concrete outer observation and split iii-b2b-1b zero-argument
    entry/artifact and ii-c0b-i semantic producer are also complete/non-admitting.
-   The corrected remaining order is `ii-c0b-ii-b -> ii-c0b-iii ->
-   ii-c0b-iv -> ii-c -> L3c3d -> L3c4`; c0b-ii fresh preflight and the ii-a
+   The corrected remaining order is `ii-c0b-ii-a3 -> ii-c0b-ii-b1 ->
+   ii-c0b-ii-b2 -> ii-c0b-ii-b3 -> ii-c0b-iii -> ii-c0b-iv -> ii-c ->
+   L3c3d -> L3c4`; c0b-ii fresh preflight and the ii-a
    budget split are complete, and ii-c0b-ii-a1/a2 are complete/non-admitting.
    a2 closed at implementation `f11eea42ef295f49b20e1c0f3912d4b32448b968` /
    tree `d0683495ea37d0692677c98f491f3037eaedba4c`, exact 4 paths / 889 lines
@@ -1418,8 +1422,8 @@ complete/non-admitting; ii-c0b is frozen as c0b-i semantic producer, c0b-ii
 owner-only capsule node, c0b-iii fixed launcher/stub and c0b-iv zero-argument
 final composition. ii-c0b-i is complete/non-admitting; c0b-ii is split into
 ii-c0b-ii-a/ii-c0b-ii-b, ii-a is further split into a1/a2, ii-c0b-ii-a1 is
-complete/non-admitting and ii-c0b-ii-a2 is complete/non-admitting;
-ii-c0b-ii-b is the current checkpoint.
+complete/non-admitting and ii-c0b-ii-a2 is complete/non-admitting. The ii-b
+retained-base split is frozen and ii-c0b-ii-a3 is the current checkpoint.
 ADR 0018
 remains Proposed until ii-c succeeds. L3c1 used focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean

@@ -1,7 +1,8 @@
 # Phase D Task 39B2c L3c3c-ii-c0b-ii Ownership Split Preflight
 
 > Status: ownership mechanism and a1/a2 budget split frozen; ii-c0b-ii-a1 and
-> ii-c0b-ii-a2 are complete/non-admitting; ii-c0b-ii-b is the current frontier
+> ii-c0b-ii-a2 are complete/non-admitting; retained-base correction split
+> frozen; ii-c0b-ii-a3 is the current frontier
 >
 > Date: 2026-08-27
 >
@@ -431,7 +432,9 @@ The follow-on budget split is frozen in
 ii-c0b-ii-a1 is complete at `d18354b` / tree `d6a4b0e`; ii-c0b-ii-a2 is
 complete/non-admitting at implementation `f11eea42ef295f49b20e1c0f3912d4b32448b968`
 / tree `d0683495ea37d0692677c98f491f3037eaedba4c`, with completion evidence in
-the [a2 review](phase-d-task-39b2c-l3c3c-ii-c0b-ii-a2-review.md). The current
-frontier is ii-c0b-ii-b, followed strictly by c0b-iii -> c0b-iv -> ii-c ->
+the [a2 review](phase-d-task-39b2c-l3c3c-ii-c0b-ii-a2-review.md). The
+[retained-base split](phase-d-task-39b2c-l3c3c-ii-c0b-ii-b-retained-base-split-preflight.md)
+is frozen; the current frontier is ii-c0b-ii-a3, followed strictly by
+ii-c0b-ii-b1 -> ii-c0b-ii-b2 -> ii-c0b-ii-b3 -> c0b-iii -> c0b-iv -> ii-c ->
 L3c3d -> L3c4. Task 39 remains incomplete, ADR 0018 remains Proposed
 and production Deep Dive remains unavailable.
