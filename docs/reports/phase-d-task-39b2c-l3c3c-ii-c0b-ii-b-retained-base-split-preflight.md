@@ -17,7 +17,7 @@ six-path / 3,400-line checkpoint. The frozen design requires capsule operations
 to execute beneath the **same held base directory descriptor** validated while
 the permanent lock was acquired. The completed owner currently transfers only
 the lock descriptor into `InvestigationMachineGateOwnership`; its acquisition
-ledger closes the base descriptor, and `withExclusiveOwnership` supplies no
+ledger closes the base descriptor, and the previous ownership API supplied no
 base capability. Reopening the base by pathname in ii-b would prove only the
 current pathname target, not continuity with the acquisition-time inode.
 
@@ -61,28 +61,30 @@ The correction strengthens the owner as follows:
 - the owner retains the acquisition-time base descriptor, encapsulated inside
   itself, across its full lifetime until explicit release; the descriptor is
   never returned, duplicated, encoded, converted to a path/URL or stored outside
-  the owner, while only the temporary scoped capability/descriptor view is
-  forbidden from escaping its dynamic call or crossing a suspension point;
-- a synchronous package-only owned-base operation executes under the same mutex
-  as release and receives a capability whose descriptor is usable only within
-  that dynamic call;
-- before every owned-base operation, the owner reopens/reobserves both the fixed
+  the owner;
+- the public package surface exposes only explicit release and synchronous
+  revalidation. It accepts no caller closure or capability; b1 must add only
+  typed high-level operations inside this ownership source when it needs to act
+  relative to the retained base;
+- before every revalidation or future typed owned operation, the owner
+  reopens/reobserves both the fixed
   home-relative base name and `.owner-lock-v1`; it proves held/named identity
   plus complete owner, mode, device, link, size, flags, ACL and xattr invariants
-  for every applicable node before exposing the scoped capability;
+  for every applicable node before continuing;
 - explicit release closes the base first and the lock last so kernel ownership
   remains held throughout all base work; both closes are exactly once; and
 - any revalidation or close uncertainty is terminal uncertainty. `deinit` is
   best-effort leak prevention only and never manufactures success.
 
-No a3 operation enumerates capsule entries, creates an attempt root, writes a
+No a3 operation exposes the retained base descriptor, enumerates capsule
+entries, creates an attempt root, writes a
 payload, renames/unlinks a node, retries busy deletion or performs recovery.
 
 ## 3. ii-c0b-ii-a3 — Retained-Base Capability
 
 ### 3.1 Exact Scope and Budget
 
-Exactly six non-document paths and at most 2,400 added-or-changed lines:
+Exactly six non-document paths and at most 2,750 added-or-changed lines:
 
 1. `Sources/StornautInvestigationMachineLaunchSupport/InvestigationMachineGateOwnership.swift`;
 2. `Tests/StornautInvestigationTests/InvestigationMachineGateOwnershipTests.swift`;
@@ -94,9 +96,11 @@ Exactly six non-document paths and at most 2,400 added-or-changed lines:
 A first implementation pass reached 1,444 changed lines across five of the six
 frozen paths before `verify-contract` orchestration and final test completion.
 The former 1,600-line estimate therefore left no credible repair margin. The
-ceiling is corrected before validation to 2,400 lines; this remains below the
+ceiling is corrected before validation to 2,500 lines. Final adversarial review
+then required character-depth declaration parsing and diagnostic-bound mutation
+evidence, so the ceiling is corrected to 2,750 lines; this remains below the
 repository's approximate 4,000-line mandatory split threshold and does not add
-a path or responsibility. A seventh non-document path or line 2,401 requires
+a path or responsibility. A seventh non-document path or line 2,751 requires
 another split before coding continues.
 This checkpoint intentionally supersedes the current-tree a1/a2 source and
 component seals. Its verifier must preserve the two historical layers
@@ -116,16 +120,16 @@ rewrite history by presenting the new source as old evidence.
 
 ### 3.2 Tests-First Matrix
 
-Tests must prove acquisition retains the exact base descriptor; the dynamic
-capability cannot escape; each operation revalidates held/named base and lock
-identity and complete metadata; named replacement and every metadata drift fail closed; release
-waits for an active owned-base operation; concurrent releases are one-shot;
+Tests must prove acquisition retains the exact base descriptor; the owner
+exposes no descriptor, capability or caller callback; each revalidation checks
+held/named base and lock identity and complete metadata; named replacement and
+every metadata drift fail closed; concurrent releases are one-shot;
 base closes before lock; either close failure is reported; partial release is
 terminal; deinitialization attempts only remaining descriptors once; and no
 capsule mutation or raw FD/path surface is introduced.
 
-Structural and mutation evidence must reject a raw descriptor return, escaping
-or async owned-base closure, reversed close order, missing revalidation,
+Structural and mutation evidence must reject any descriptor/capability or
+caller-closure API, a raw descriptor return, reversed close order, missing revalidation,
 duplicate/child-inheritable descriptors, lock mutation and any new product,
 process, root, network, Codex, Lifecycle, Core, Execution or readiness reach.
 Debug objects remain the positive component control; Release and all product or
@@ -139,12 +143,13 @@ remain byte-identical and must not touch the fixed product namespace.
 
 ### 4.1 Exact Scope and Budget
 
-Exactly two non-document paths and at most 2,600 added-or-changed lines:
+Exactly three non-document paths and at most 2,600 added-or-changed lines:
 
-1. `Sources/StornautInvestigationMachineLaunchSupport/InvestigationOwnerOnlyCapsule.swift` (new); and
-2. `Tests/StornautInvestigationTests/InvestigationOwnerOnlyCapsuleTests.swift` (new).
+1. `Sources/StornautInvestigationMachineLaunchSupport/InvestigationMachineGateOwnership.swift`;
+2. `Sources/StornautInvestigationMachineLaunchSupport/InvestigationOwnerOnlyCapsule.swift` (new); and
+3. `Tests/StornautInvestigationTests/InvestigationOwnerOnlyCapsuleTests.swift` (new).
 
-A third path or line 2,601 requires a split. This child owns behavior and focused
+A fourth path or line 2,601 requires a split. This child owns behavior and focused
 evidence only; shared verifier closure belongs to b3.
 
 ### 4.2 Frozen Behavior
@@ -155,7 +160,7 @@ the corrected owner and inventories every immediate base entry before mutation.
 For this child, any nonempty stale inventory fails closed; deletion begins only
 in b2. More than 64 attempt roots is uncertainty.
 
-Under the dynamic base capability it creates exactly one
+Through owner-internal typed high-level operations it creates exactly one
 `attempt-<lowercase UUID>` directory at 0700 and one exclusive 0600
 `capsule.pending`, performs bounded EINTR-aware writes, validates full metadata
 and identity, fsyncs the file, publishes with
@@ -184,13 +189,14 @@ that unrelated entries were unchanged.
 
 ### 5.1 Exact Scope and Budget
 
-Exactly the same two non-document paths as b1 and at most 2,200 changed lines
+Exactly the same three non-document paths as b1 and at most 2,200 changed lines
 against the pushed b1 implementation:
 
-1. `Sources/StornautInvestigationMachineLaunchSupport/InvestigationOwnerOnlyCapsule.swift`; and
-2. `Tests/StornautInvestigationTests/InvestigationOwnerOnlyCapsuleTests.swift`.
+1. `Sources/StornautInvestigationMachineLaunchSupport/InvestigationMachineGateOwnership.swift`;
+2. `Sources/StornautInvestigationMachineLaunchSupport/InvestigationOwnerOnlyCapsule.swift`; and
+3. `Tests/StornautInvestigationTests/InvestigationOwnerOnlyCapsuleTests.swift`.
 
-A third path or line 2,201 requires another split.
+A fourth path or line 2,201 requires another split.
 
 ### 5.2 Frozen Behavior
 
@@ -259,7 +265,7 @@ the new checks without repeating already-owned builds.
 ## 7. Validation Ownership
 
 a3 runs the source, scope, mutation and component gates owned by its six-path
-checkpoint. b1 and b2, while restricted to their exact two-path envelopes, run
+checkpoint. b1 and b2, while restricted to their exact three-path envelopes, run
 RED focused tests, directly affected tests, targeted Debug/Release
 `StornautInvestigationMachineLaunchSupport` builds, and record index-backed
 path, mode and numstat evidence against the exact pushed predecessor commit and
@@ -282,9 +288,9 @@ the precise failing case after repair.
 
 | Requirement | Concrete owner/evidence | Status |
 | --- | --- | --- |
-| preserve acquisition-time base inode | a3 retained base FD and dynamic capability | current |
-| serialize base work with release | a3 mutex and close-order tests | pending |
-| preserve historical a1/a2 truth | a3 immutable historical replay | pending |
+| preserve acquisition-time base inode | a3 owner-internal retained base FD | current |
+| serialize base work with release | a3 mutex and close-order tests | current |
+| preserve historical a1/a2 truth | a3 immutable historical replay | current |
 | canonical fresh publication | b1 source/tests | pending |
 | one-shot path-free lease | b1 source/tests | pending |
 | exact settlement and stale recovery | b2 source/tests | pending |

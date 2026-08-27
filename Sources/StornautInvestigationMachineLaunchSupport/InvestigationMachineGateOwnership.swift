@@ -114,6 +114,7 @@ struct InvestigationMachineGateOwnershipAcquirer: Sendable {
         let identity = try resolvedIdentity()
         let homeComponents = try canonicalHomeComponents(identity.homePath)
         var ledger = InvestigationMachineGateDescriptorLedger()
+        var transferredBase: Int32?
         var transferredLock: Int32?
         do {
             let root = try opened(
@@ -151,6 +152,14 @@ struct InvestigationMachineGateOwnershipAcquirer: Sendable {
             } catch {
                 throw InvestigationMachineGateOwnershipError.ownershipUncertain
             }
+            guard ledger.transfer(base) else {
+                throw InvestigationMachineGateOwnershipError.ownershipUncertain
+            }
+            transferredBase = base
+            guard ledger.transfer(lock) else {
+                throw InvestigationMachineGateOwnershipError.ownershipUncertain
+            }
+            transferredLock = lock
             guard
                 try baseSnapshot(
                     base, root: root, relativePath: baseRelativePath
@@ -163,19 +172,26 @@ struct InvestigationMachineGateOwnershipAcquirer: Sendable {
             }
             try requireDescriptorState(base, accessMode: O_RDONLY)
             try requireDescriptorState(lock, accessMode: O_RDWR)
-            guard ledger.transfer(lock) else {
-                throw InvestigationMachineGateOwnershipError.ownershipUncertain
-            }
-            transferredLock = lock
             guard ledger.closeAll(using: system) else {
                 throw InvestigationMachineGateOwnershipError.ownershipUncertain
             }
-            return InvestigationMachineGateOwnership(system: system, descriptor: lock,
-                mutex: system.makeOwnershipMutex())
+            return InvestigationMachineGateOwnership(
+                system: system, baseDescriptor: base, lockDescriptor: lock,
+                baseRelativePath: baseRelativePath,
+                mutex: system.makeOwnershipMutex()
+            )
         } catch {
             let cleanupSucceeded = ledger.closeAll(using: system)
-            if let transferredLock { try? system.close(descriptor: transferredLock) }
-            guard cleanupSucceeded else {
+            var transferredCleanupSucceeded = true
+            if let transferredBase {
+                do { try system.close(descriptor: transferredBase) }
+                catch { transferredCleanupSucceeded = false }
+            }
+            if let transferredLock {
+                do { try system.close(descriptor: transferredLock) }
+                catch { transferredCleanupSucceeded = false }
+            }
+            guard cleanupSucceeded, transferredCleanupSucceeded else {
                 throw InvestigationMachineGateOwnershipError.ownershipUncertain
             }
             if let error = error as? InvestigationMachineGateOwnershipError {
@@ -334,7 +350,8 @@ struct InvestigationMachineGateOwnershipAcquirer: Sendable {
             held == named, held.device > 0, held.inode > 0,
             held.fileType == .directory, held.ownerUID == Self.targetUID,
             held.ownerGID == Self.targetGID, held.permissions == 0o700,
-            held.flags == 0, try system.extendedACLIsEmpty(descriptor: descriptor),
+            held.linkCount > 0, held.size >= 0, held.flags == 0,
+            try system.extendedACLIsEmpty(descriptor: descriptor),
             try system.extendedAttributeNames(descriptor: descriptor).isEmpty
         else {
             throw InvestigationMachineGateOwnershipError.ownershipUncertain
@@ -365,55 +382,197 @@ struct InvestigationMachineGateOwnershipAcquirer: Sendable {
 }
 
 final class InvestigationMachineGateOwnership: @unchecked Sendable {
-    private enum State { case active(Int32); case terminal }
+    private struct ActiveState {
+        let baseDescriptor: Int32
+        let lockDescriptor: Int32
+        let baseRelativePath: String
+    }
+
+    private enum State {
+        case active(ActiveState)
+        case terminal
+    }
+
+    private static let rootDirectoryFlags = Int32(
+        O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NONBLOCK | O_NOFOLLOW_ANY
+    )
+    private static let baseNamedFlags = Int32(
+        AT_SYMLINK_NOFOLLOW_ANY | AT_RESOLVE_BENEATH | AT_UNIQUE
+    )
+    private static let lockNamedFlags = Int32(
+        AT_SYMLINK_NOFOLLOW_ANY | AT_RESOLVE_BENEATH | AT_UNIQUE
+    )
+
     private let system: any InvestigationMachineGateOwnershipSystem
     private let lock: any InvestigationMachineGateOwnershipMutex
     private var state: State
 
     fileprivate init(
-        system: any InvestigationMachineGateOwnershipSystem, descriptor: Int32,
+        system: any InvestigationMachineGateOwnershipSystem,
+        baseDescriptor: Int32, lockDescriptor: Int32,
+        baseRelativePath: String,
         mutex: any InvestigationMachineGateOwnershipMutex
     ) {
         self.system = system
         lock = mutex
-        state = .active(descriptor)
+        state = .active(ActiveState(
+            baseDescriptor: baseDescriptor, lockDescriptor: lockDescriptor,
+            baseRelativePath: baseRelativePath
+        ))
     }
 
     func release() throws {
-        lock.lock()
-        guard case .active(let descriptor) = state else {
-            lock.unlock()
-            throw InvestigationMachineGateOwnershipError.alreadyReleased
-        }
-        state = .terminal
-        lock.unlock()
-        do {
-            try system.close(descriptor: descriptor)
-        } catch {
-            throw InvestigationMachineGateOwnershipError.ownershipUncertain
-        }
-    }
-
-    func withExclusiveOwnership<T>(_ operation: () throws -> T) throws -> T {
         lock.lock()
         defer { lock.unlock() }
         guard case .active = state else {
             throw InvestigationMachineGateOwnershipError.alreadyReleased
         }
-        return try operation()
+        guard closeRemainingDescriptorsBaseFirst() else {
+            throw InvestigationMachineGateOwnershipError.ownershipUncertain
+        }
+    }
+
+    func revalidateOwnership() throws {
+        lock.lock()
+        defer { lock.unlock() }
+        guard case .active(let active) = state else {
+            throw InvestigationMachineGateOwnershipError.alreadyReleased
+        }
+        do {
+            try revalidateOwnedBaseAndLock(
+                baseDescriptor: active.baseDescriptor,
+                lockDescriptor: active.lockDescriptor,
+                baseRelativePath: active.baseRelativePath
+            )
+        } catch {
+            _ = closeRemainingDescriptorsBaseFirst()
+            throw InvestigationMachineGateOwnershipError.ownershipUncertain
+        }
     }
 
     deinit {
         lock.lock()
-        let descriptor: Int32?
-        if case .active(let value) = state {
-            descriptor = value
-            state = .terminal
-        } else {
-            descriptor = nil
-        }
+        _ = closeRemainingDescriptorsBaseFirst()
         lock.unlock()
-        if let descriptor { try? system.close(descriptor: descriptor) }
+    }
+
+    private func revalidateOwnedBaseAndLock(
+        baseDescriptor: Int32, lockDescriptor: Int32,
+        baseRelativePath: String
+    ) throws {
+        var rootDescriptor: Int32?
+        var validationSucceeded = false
+        do {
+            let root = try system.openComponent(
+                parentDescriptor: nil, name: "/",
+                flags: Self.rootDirectoryFlags, mode: nil
+            )
+            guard root >= 0, root != baseDescriptor, root != lockDescriptor else {
+                throw InvestigationMachineGateOwnershipError.ownershipUncertain
+            }
+            rootDescriptor = root
+            try requireDescriptorState(root, accessMode: O_RDONLY)
+            let rootMetadata = try system.metadata(descriptor: root)
+            guard
+                rootMetadata.device > 0, rootMetadata.inode > 0,
+                rootMetadata.fileType == .directory
+            else {
+                throw InvestigationMachineGateOwnershipError.ownershipUncertain
+            }
+            let baseMetadata = try baseSnapshot(
+                baseDescriptor, root: root, relativePath: baseRelativePath
+            )
+            _ = try lockSnapshot(
+                lockDescriptor, parent: baseDescriptor,
+                baseDevice: baseMetadata.device
+            )
+            try requireDescriptorState(baseDescriptor, accessMode: O_RDONLY)
+            try requireDescriptorState(lockDescriptor, accessMode: O_RDWR)
+            validationSucceeded = true
+        } catch {
+            validationSucceeded = false
+        }
+
+        var rootCloseSucceeded = true
+        if let rootDescriptor {
+            do { try system.close(descriptor: rootDescriptor) }
+            catch { rootCloseSucceeded = false }
+        }
+        guard validationSucceeded, rootCloseSucceeded else {
+            throw InvestigationMachineGateOwnershipError.ownershipUncertain
+        }
+    }
+
+    private func requireDescriptorState(
+        _ descriptor: Int32, accessMode: Int32
+    ) throws {
+        let descriptorFlags = try system.descriptorFlags(descriptor)
+        let statusFlags = try system.descriptorStatusFlags(descriptor)
+        guard
+            descriptorFlags & FD_CLOEXEC == FD_CLOEXEC,
+            statusFlags & O_NONBLOCK == O_NONBLOCK,
+            statusFlags & O_ACCMODE == accessMode
+        else {
+            throw InvestigationMachineGateOwnershipError.ownershipUncertain
+        }
+    }
+
+    private func baseSnapshot(
+        _ descriptor: Int32, root: Int32, relativePath: String
+    ) throws -> InvestigationMachineGateMetadataSnapshot {
+        let held = try system.metadata(descriptor: descriptor)
+        let named = try system.namedMetadata(
+            parentDescriptor: root, name: relativePath,
+            flags: Self.baseNamedFlags
+        )
+        guard
+            held == named, held.device > 0, held.inode > 0,
+            held.fileType == .directory,
+            held.ownerUID == InvestigationMachineGateOwnershipAcquirer.targetUID,
+            held.ownerGID == InvestigationMachineGateOwnershipAcquirer.targetGID,
+            held.permissions == 0o700, held.linkCount > 0, held.size >= 0,
+            held.flags == 0,
+            try system.extendedACLIsEmpty(descriptor: descriptor),
+            try system.extendedAttributeNames(descriptor: descriptor).isEmpty
+        else {
+            throw InvestigationMachineGateOwnershipError.ownershipUncertain
+        }
+        return held
+    }
+
+    private func lockSnapshot(
+        _ descriptor: Int32, parent: Int32, baseDevice: UInt64
+    ) throws -> InvestigationMachineGateMetadataSnapshot {
+        let held = try system.metadata(descriptor: descriptor)
+        let named = try system.namedMetadata(
+            parentDescriptor: parent,
+            name: InvestigationMachineGateOwnershipAcquirer.lockName,
+            flags: Self.lockNamedFlags
+        )
+        guard
+            held == named, held.device == baseDevice, held.inode > 0,
+            held.fileType == .regularFile,
+            held.ownerUID == InvestigationMachineGateOwnershipAcquirer.targetUID,
+            held.ownerGID == InvestigationMachineGateOwnershipAcquirer.targetGID,
+            held.permissions == 0o600, held.linkCount == 1, held.size == 0,
+            held.flags == 0,
+            try system.extendedACLIsEmpty(descriptor: descriptor),
+            try system.extendedAttributeNames(descriptor: descriptor).isEmpty
+        else {
+            throw InvestigationMachineGateOwnershipError.ownershipUncertain
+        }
+        return held
+    }
+
+    private func closeRemainingDescriptorsBaseFirst() -> Bool {
+        guard case .active(let active) = state else { return true }
+        state = .terminal
+        var succeeded = true
+        do { try system.close(descriptor: active.baseDescriptor) }
+        catch { succeeded = false }
+        do { try system.close(descriptor: active.lockDescriptor) }
+        catch { succeeded = false }
+        return succeeded
     }
 }
 

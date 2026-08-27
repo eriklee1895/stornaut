@@ -278,6 +278,12 @@ iic0biia_focused_test_source=
 iic0biia_boundary_test_source=
 iic0biia_staged_scope_contract_only=false
 iic0biia_staged_scope_baseline=d18354bc7ca7dd2ddb04180298f9fb4f2e7c60e3
+iic0biia3_retained_base_contract_only=false
+iic0biia3_ownership_source=
+iic0biia3_focused_test_source=
+iic0biia3_boundary_test_source=
+iic0biia3_staged_scope_contract_only=false
+iic0biia3_staged_scope_baseline=fe3ea757432c4dc9cf960f210c167916697ce601
 iib3a_staged_scope_contract_only=false
 iib3a_staged_scope_baseline=HEAD
 iib3b_start_retire_contract_only=false
@@ -709,6 +715,16 @@ if (( $# > 0 )); then
         && [[ $1 == --iic0b-ii-a-staged-scope-contract-only ]]; then
         iic0biia_staged_scope_contract_only=true
         iic0biia_staged_scope_baseline=${2:-d18354bc7ca7dd2ddb04180298f9fb4f2e7c60e3}
+    elif (( $# == 4 )) \
+        && [[ $1 == --iic0b-ii-a3-retained-base-contract-only ]]; then
+        iic0biia3_retained_base_contract_only=true
+        iic0biia3_ownership_source=$2
+        iic0biia3_focused_test_source=$3
+        iic0biia3_boundary_test_source=$4
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iic0b-ii-a3-staged-scope-contract-only ]]; then
+        iic0biia3_staged_scope_contract_only=true
+        iic0biia3_staged_scope_baseline=${2:-fe3ea757432c4dc9cf960f210c167916697ce601}
     elif (( $# == 1 || $# == 2 )) \
         && [[ $1 == --iib3a-staged-scope-contract-only ]]; then
         iib3a_staged_scope_contract_only=true
@@ -734,7 +750,7 @@ if (( $# > 0 )); then
         iib3c_staged_scope_baseline=${2:-HEAD}
     else
         print -u2 \
-            "Usage: scripts/verify-investigation-boundaries [... | --iib5biii-b2b1a0-provenance-contract-only <composition> <bridge> <bridge-test> <protocol-test> <boundary-test> | --iib5biii-b2b1a0-staged-scope-contract-only [baseline] | --iib5biii-b2b1a1-outer-observation-contract-only <app-identity> <outer-observation> <composition> <focused-test> <boundary-test> | --iib5biii-b2b1a1-staged-scope-contract-only [baseline] | --iib5biii-b2b1b-zero-entry-contract-only <support> <entry> <support-test> <entry-test> <boundary-test> | --iib5biii-b2b1b-staged-scope-contract-only [baseline]]"
+            "Usage: scripts/verify-investigation-boundaries [... | --iib5biii-b2b1a0-provenance-contract-only <composition> <bridge> <bridge-test> <protocol-test> <boundary-test> | --iib5biii-b2b1a0-staged-scope-contract-only [baseline] | --iib5biii-b2b1a1-outer-observation-contract-only <app-identity> <outer-observation> <composition> <focused-test> <boundary-test> | --iib5biii-b2b1a1-staged-scope-contract-only [baseline] | --iib5biii-b2b1b-zero-entry-contract-only <support> <entry> <support-test> <entry-test> <boundary-test> | --iib5biii-b2b1b-staged-scope-contract-only [baseline] | --iic0b-ii-a3-retained-base-contract-only <ownership> <focused-test> <boundary-test> | --iic0b-ii-a3-staged-scope-contract-only [baseline]]"
         exit 64
     fi
 fi
@@ -8195,6 +8211,580 @@ function verify_iic0biia_staged_scope() {
     verify_iic0biia_index_semantics
 }
 
+function verify_iic0biia3_retained_base_contract() {
+    local ownership_path=$1 focused_test_path=$2 boundary_path=$3 source_path
+    for source_path in "$ownership_path" "$focused_test_path" "$boundary_path"; do
+        xcrun swiftc -frontend -parse -enable-bare-slash-regex "$source_path"
+    done
+    python3 - "$ownership_path" "$focused_test_path" "$boundary_path" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+ownership_path, focused_test_path, boundary_path = map(Path, sys.argv[1:])
+ownership = ownership_path.read_text(encoding="utf-8")
+focused_test = focused_test_path.read_text(encoding="utf-8")
+boundary = boundary_path.read_text(encoding="utf-8")
+compact = re.sub(r"\s+", "", ownership)
+expected_sha256 = {
+    ownership_path: "3e8c1a586e692e705c14399acfcb637f1565da497a8e4b8cfdc2dfe7f3dd146a",
+    focused_test_path: "3d6ba434eab3703baa4881941853c8cd4fe56ed42d5827b7bb24db98d5acf4fa",
+}
+
+def fail(message):
+    raise SystemExit(message)
+
+for path, expected in expected_sha256.items():
+    observed = __import__("hashlib").sha256(path.read_bytes()).hexdigest()
+    if observed != expected:
+        fail("ii-c0b-ii-a3 source or focused-test seal drifted")
+print("ii-c0b-ii-a3 source seal admitted")
+
+def mask_swift_lexemes(source):
+    if '"""' in source or re.search(r'#+"', source) \
+            or "//" in source or "/*" in source or "*/" in source:
+        fail("ii-c0b-ii-a3 owner member allowlist drifted")
+    masked = list(source)
+    in_string = False
+    escaped = False
+    for index, character in enumerate(source):
+        if in_string:
+            if character == "\n":
+                fail("ii-c0b-ii-a3 owner member allowlist drifted")
+            masked[index] = " "
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == '"':
+                in_string = False
+        elif character == '"':
+            masked[index] = " "
+            in_string = True
+        elif character == "/":
+            fail("ii-c0b-ii-a3 owner member allowlist drifted")
+    if in_string:
+        fail("ii-c0b-ii-a3 owner member allowlist drifted")
+    return "".join(masked)
+
+lexical_ownership = mask_swift_lexemes(ownership)
+if re.search(r"\b(?:typealias|associatedtype)\b", lexical_ownership):
+    fail("ii-c0b-ii-a3 callback type alias drifted")
+
+def matching_delimiter(source, opening, left, right):
+    depth = 0
+    for index in range(opening, len(source)):
+        if source[index] == left:
+            depth += 1
+        elif source[index] == right:
+            depth -= 1
+            if depth == 0:
+                return index
+            if depth < 0:
+                break
+    fail("ii-c0b-ii-a3 declaration boundary drifted")
+
+def reject_callback_surface(source):
+    callable_declaration = re.compile(r"(?<!\.)\b(?:func|init|subscript)\b")
+    declarations = list(callable_declaration.finditer(source))
+    ordinary_return_arrows = set()
+    for position, declaration in enumerate(declarations):
+        boundary = declarations[position + 1].start() \
+            if position + 1 < len(declarations) else len(source)
+        opening = source.find("(", declaration.end(), boundary)
+        if opening < 0:
+            continue
+        closing = matching_delimiter(source, opening, "(", ")")
+        if re.search(r"->", source[opening + 1:closing]):
+            fail("ii-c0b-ii-a3 callback surface drifted")
+        body_opening = source.find("{", closing + 1, boundary)
+        header_end = body_opening if body_opening >= 0 else boundary
+        header_arrows = [
+            closing + 1 + match.start()
+            for match in re.finditer(r"->", source[closing + 1:header_end])
+        ]
+        if len(header_arrows) > 1:
+            fail("ii-c0b-ii-a3 callback surface drifted")
+        ordinary_return_arrows.update(header_arrows)
+    all_arrows = {match.start() for match in re.finditer(r"->", source)}
+    if all_arrows != ordinary_return_arrows:
+        fail("ii-c0b-ii-a3 callback surface drifted")
+
+reject_callback_surface(lexical_ownership)
+
+def direct_owner_declarations(body):
+    declaration = re.compile(
+        r"\b(struct|enum|class|actor|protocol|extension|typealias|"
+        r"associatedtype|let|var|init|deinit|func|subscript|macro|"
+        r"operator)\b"
+        r"(?:\s+([A-Za-z_][A-Za-z0-9_]*))?"
+    )
+    observed = []
+    depths = []
+    depth = 0
+    for character in body:
+        depths.append(depth)
+        depth += (character == "{") - (character == "}")
+        if depth < 0:
+            fail("ii-c0b-ii-a3 owner member allowlist drifted")
+    if depth != 0:
+        fail("ii-c0b-ii-a3 owner member allowlist drifted")
+    for match in declaration.finditer(body):
+        if depths[match.start()] != 0:
+            continue
+        kind, name = match.groups()
+        name = name if kind not in {"init", "deinit", "subscript"} else kind
+        prefix_start = max(
+            body.rfind("\n", 0, match.start()),
+            body.rfind(";", 0, match.start()),
+            body.rfind("}", 0, match.start()),
+        ) + 1
+        visibility = "private" if re.search(
+            r"\b(?:private|fileprivate)\b", body[prefix_start:match.start()]
+        ) else "internal"
+        observed.append({
+            "label": f"{visibility}:{kind}:{name}",
+            "kind": kind, "name": name, "start": match.start(),
+            "end": match.end(),
+        })
+    return observed
+
+def declaration_labels(declarations):
+    return [declaration["label"] for declaration in declarations]
+
+def unique_declaration(declarations, kind, name):
+    matches = [
+        declaration for declaration in declarations
+        if declaration["kind"] == kind and declaration["name"] == name
+    ]
+    if len(matches) != 1:
+        fail(f"ii-c0b-ii-a3 direct declaration drifted: {kind} {name}")
+    return matches[0]
+
+def direct_declaration_body(body, declaration, declarations, exact_body=None):
+    following = [
+        candidate["start"] for candidate in declarations
+        if candidate["start"] > declaration["start"]
+    ]
+    limit = min(following) if following else len(body)
+    opening = body.find("{", declaration["end"], limit)
+    if opening < 0:
+        fail("ii-c0b-ii-a3 direct declaration body drifted")
+    closing = matching_delimiter(body, opening, "{", "}")
+    if closing >= limit:
+        fail("ii-c0b-ii-a3 direct declaration body drifted")
+    return (exact_body or body)[opening + 1:closing]
+
+if re.search(
+    r"\b(?:InvestigationMachineGateOwnedBase|withUnsafeDescriptor)\b",
+    ownership,
+):
+    fail("ii-c0b-ii-a3 descriptor or capability exposure drifted")
+file_declarations = direct_owner_declarations(lexical_ownership)
+if declaration_labels(file_declarations) != [
+    "internal:enum:InvestigationMachineGateOwnershipError",
+    "internal:enum:InvestigationMachineGateSystemError",
+    "internal:enum:InvestigationMachineGateFileType",
+    "internal:protocol:InvestigationMachineGateOwnershipMutex",
+    "internal:struct:InvestigationMachineGateIdentitySnapshot",
+    "internal:struct:InvestigationMachineGateMetadataSnapshot",
+    "internal:protocol:InvestigationMachineGateOwnershipSystem",
+    "internal:struct:InvestigationMachineGateOwnershipAcquirer",
+    "internal:class:InvestigationMachineGateOwnership",
+    "private:struct:InvestigationMachineGateDescriptorLedger",
+    "private:class:DarwinInvestigationMachineGateOwnershipSystem",
+    "internal:extension:NSLock",
+]:
+    fail("ii-c0b-ii-a3 descriptor or capability declaration drifted")
+if re.search(
+    r"(?m)^\s*(?:(?:private|fileprivate|internal|package|public|open|"
+    r"final|static|class|nonisolated|mutating|nonmutating|required|"
+    r"convenience|override|dynamic|lazy|weak|unowned)\s+)*@",
+    lexical_ownership,
+):
+    fail("ii-c0b-ii-a3 owner member allowlist drifted")
+if re.search(
+    r"(?m)^\s*(?:public|open|package)\s+.*"
+    r"InvestigationMachineGateOwnership", ownership
+):
+    fail("ii-c0b-ii-a3 owner escaped package closure")
+if re.search(r"\b(?:Codable|Encodable|Decodable)\b", ownership):
+    fail("ii-c0b-ii-a3 owner became Codable")
+
+required_api = (
+    "func release() throws",
+    "func revalidateOwnership() throws",
+    "closeRemainingDescriptorsBaseFirst",
+    "baseDescriptor",
+    "lockDescriptor",
+)
+for marker in required_api:
+    if re.sub(r"\s+", "", marker) not in compact:
+        fail(f"ii-c0b-ii-a3 retained-base API drifted: {marker}")
+release_signatures = re.findall(
+    r"(?m)^    func\s+release\s*\(\s*\)\s+throws\s*\{",
+    ownership,
+)
+revalidate_signatures = re.findall(
+    r"(?m)^    func\s+revalidateOwnership\s*\(\s*\)"
+    r"\s+throws\s*\{",
+    ownership,
+)
+if len(release_signatures) != 1 or len(revalidate_signatures) != 1:
+    fail("ii-c0b-ii-a3 no-argument owned-base API drifted")
+if re.search(
+    r"\b(?:withOwnedBase|withExclusiveOwnership)\b", ownership
+):
+    fail("ii-c0b-ii-a3 owned-base operation exposed authority")
+for transferred in ("ledger.transfer(base)", "ledger.transfer(lock)"):
+    if compact.count(transferred) != 1:
+        fail(f"ii-c0b-ii-a3 descriptor transfer drifted: {transferred}")
+base_transfer = compact.index("ledger.transfer(base)")
+lock_transfer = compact.index("ledger.transfer(lock)")
+owner_construction = compact.find("InvestigationMachineGateOwnership(", lock_transfer)
+if not base_transfer < lock_transfer < owner_construction:
+    fail("ii-c0b-ii-a3 base and lock transfer order drifted")
+construction = compact[owner_construction:owner_construction + 500]
+for marker in (
+    "baseDescriptor:base", "lockDescriptor:lock",
+    "baseRelativePath:baseRelativePath",
+):
+    if marker not in construction:
+        fail("ii-c0b-ii-a3 retained descriptor construction drifted")
+acquirer_body = direct_declaration_body(
+    lexical_ownership,
+    unique_declaration(
+        file_declarations, "struct", "InvestigationMachineGateOwnershipAcquirer"
+    ),
+    file_declarations,
+)
+acquirer_declarations = direct_owner_declarations(acquirer_body)
+if declaration_labels(acquirer_declarations) != [
+    "internal:let:targetUID", "internal:let:targetGID",
+    "internal:let:baseName", "internal:let:lockName",
+    "private:let:identityBufferByteCounts",
+    "private:let:directoryFlags", "private:let:relativeDirectoryFlags",
+    "private:let:lockFlags", "private:let:directoryNamedFlags",
+    "private:let:lockNamedFlags", "private:let:system",
+    "internal:init:init", "internal:init:init", "internal:func:acquire",
+    "private:func:resolvedIdentity",
+    "private:func:canonicalHomeComponents", "private:func:opened",
+    "private:func:openBase", "private:func:openLock",
+    "private:func:requireDescriptorState", "private:func:requireDirectory",
+    "private:func:baseSnapshot", "private:func:lockSnapshot",
+]:
+    fail("ii-c0b-ii-a3 acquirer member allowlist drifted")
+acquirer_exact_body = direct_declaration_body(
+    lexical_ownership,
+    unique_declaration(
+        file_declarations, "struct", "InvestigationMachineGateOwnershipAcquirer"
+    ),
+    file_declarations, ownership,
+)
+if __import__("hashlib").sha256(acquirer_exact_body.encode()).hexdigest() != \
+        "a476ce7d12051d1c6d2a2b8e0c8f5ce82be3700adeb4a37adb49fe5c3b32067c":
+    fail("ii-c0b-ii-a3 acquirer security body drifted")
+acquisition_body = direct_declaration_body(
+    acquirer_body, unique_declaration(acquirer_declarations, "func", "acquire"),
+    acquirer_declarations,
+)
+acquisition_compact = re.sub(r"\s+", "", acquisition_body)
+transferred_base_close = acquisition_compact.find(
+    "system.close(descriptor:transferredBase)"
+)
+transferred_lock_close = acquisition_compact.find(
+    "system.close(descriptor:transferredLock)"
+)
+if transferred_base_close < 0 or transferred_lock_close < 0 \
+        or transferred_base_close >= transferred_lock_close:
+    fail("ii-c0b-ii-a3 acquisition cleanup close order drifted")
+
+owner_body = direct_declaration_body(
+    lexical_ownership,
+    unique_declaration(
+        file_declarations, "class", "InvestigationMachineGateOwnership"
+    ),
+    file_declarations,
+)
+owner_exact_body = direct_declaration_body(
+    lexical_ownership,
+    unique_declaration(
+        file_declarations, "class", "InvestigationMachineGateOwnership"
+    ),
+    file_declarations, ownership,
+)
+if __import__("hashlib").sha256(owner_exact_body.encode()).hexdigest() != \
+        "60b6b391c9bd31460d5daae1a0e4c156bc3b58e30fab5d801aa7ca811be95d01":
+    fail("ii-c0b-ii-a3 owner security body drifted")
+darwin_system_body = direct_declaration_body(
+    lexical_ownership, unique_declaration(
+        file_declarations, "class",
+        "DarwinInvestigationMachineGateOwnershipSystem",
+    ), file_declarations, ownership,
+)
+if __import__("hashlib").sha256(darwin_system_body.encode()).hexdigest() != \
+        "9e67f64aab80aaddc950b1b3a6a6f050a7c3a6e05b034e5f758d1528ef0847b3":
+    fail("ii-c0b-ii-a3 Darwin system security body drifted")
+top_level_body_transcript = b"".join(
+    declaration["label"].encode() + b"\0" + direct_declaration_body(
+        lexical_ownership, declaration, file_declarations, ownership,
+    ).encode() + b"\0"
+    for declaration in file_declarations
+)
+top_level_body_sha256 = __import__("hashlib").sha256(
+    top_level_body_transcript
+).hexdigest()
+if top_level_body_sha256 != "26e6c2cff2e830da594042f981a77e8c7f67b323c5ab602acea487ba23ff7730":
+    fail(f"ii-c0b-ii-a3 top-level security body drifted: {top_level_body_sha256}")
+owner_declarations = direct_owner_declarations(owner_body)
+def owner_declaration_body(kind, name):
+    return direct_declaration_body(
+        owner_body, unique_declaration(owner_declarations, kind, name),
+        owner_declarations, owner_exact_body,
+    )
+
+if declaration_labels(owner_declarations) != [
+    "private:struct:ActiveState",
+    "private:enum:State",
+    "private:let:rootDirectoryFlags",
+    "private:let:baseNamedFlags",
+    "private:let:lockNamedFlags",
+    "private:let:system",
+    "private:let:lock",
+    "private:var:state",
+    "private:init:init",
+    "internal:func:release",
+    "internal:func:revalidateOwnership",
+    "internal:deinit:deinit",
+    "private:func:revalidateOwnedBaseAndLock",
+    "private:func:requireDescriptorState",
+    "private:func:baseSnapshot",
+    "private:func:lockSnapshot",
+    "private:func:closeRemainingDescriptorsBaseFirst",
+]:
+    fail("ii-c0b-ii-a3 owner member allowlist drifted")
+owned_body = owner_declaration_body("func", "revalidateOwnership")
+owned_compact = re.sub(r"\s+", "", owned_body)
+if "lock.lock()defer{lock.unlock()}" not in owned_compact:
+    fail("ii-c0b-ii-a3 ownership mutex linearization drifted")
+revalidation_call = (
+    "tryrevalidateOwnedBaseAndLock("
+    "baseDescriptor:active.baseDescriptor,"
+    "lockDescriptor:active.lockDescriptor,"
+    "baseRelativePath:active.baseRelativePath)"
+)
+if owned_compact.count(revalidation_call) != 1:
+    fail("ii-c0b-ii-a3 per-operation revalidation drifted")
+revalidation_position = owned_compact.index(revalidation_call)
+if "operation()" in owned_compact:
+    fail("ii-c0b-ii-a3 owned-base operation exposed authority")
+if revalidation_position < 0:
+    fail("ii-c0b-ii-a3 revalidation-before-operation order drifted")
+
+revalidation_body = owner_declaration_body("func", "revalidateOwnedBaseAndLock")
+revalidation_compact = re.sub(r"\s+", "", revalidation_body)
+for marker in (
+    "baseDescriptor", "lockDescriptor", "baseRelativePath",
+    "baseSnapshot(", "lockSnapshot(",
+    "requireDescriptorState(baseDescriptor,accessMode:O_RDONLY)",
+    "requireDescriptorState(lockDescriptor,accessMode:O_RDWR)",
+    "rootDescriptor", "system.close(descriptor:rootDescriptor)",
+    "guardvalidationSucceeded,rootCloseSucceededelse",
+):
+    if marker not in revalidation_compact:
+        fail("ii-c0b-ii-a3 held and named revalidation drifted")
+if compact.count("privatefuncbaseSnapshot(") != 2 \
+        or compact.count("privatefunclockSnapshot(") != 2 \
+        or compact.count("held==named") != 4:
+    fail("ii-c0b-ii-a3 held and named revalidation drifted")
+if compact.count(
+    "rootDirectoryFlags=Int32(O_RDONLY|O_DIRECTORY|O_CLOEXEC|"
+    "O_NONBLOCK|O_NOFOLLOW_ANY)"
+) != 1:
+    fail("ii-c0b-ii-a3 revalidation root descriptor flags drifted")
+descriptor_state_body = owner_declaration_body("func", "requireDescriptorState")
+descriptor_state_compact = re.sub(r"\s+", "", descriptor_state_body)
+security_helper_seals = {
+    ("func", "release"):
+        "4b8171f758df6df2aedef7ef0a3f85dabf018e722074b6ff5dbdb94af19e0dba",
+    ("func", "revalidateOwnership"):
+        "ed302f32bbc08c55565d6e2487aad04b89d9b62cae8cd91e2fa94a0e5bb388c8",
+    ("func", "revalidateOwnedBaseAndLock"):
+        "4163fa8415fb62239117eff7cc4cb3af6170f7b7e493c8bf89c0287f6f6a84ed",
+    ("func", "requireDescriptorState"):
+        "722a882d43403f77f14db3bae6c81e5d88e061ef4478851039556fa9de651c76",
+    ("func", "baseSnapshot"):
+        "6e8ccd6b0d7d19ac5b1560f51776e9755ff294489c22313f9a3b6f43ceb66aef",
+    ("func", "lockSnapshot"):
+        "79b88039c6c33366c0c153a5cfa5db4d31a64bd47bf9b54b7e4ad46510ceb461",
+    ("func", "closeRemainingDescriptorsBaseFirst"):
+        "b1121574ed450ce1209b1085df151df84e839f1003e31f3a63fb0a98f2e8f87b",
+}
+for (kind, name), expected in security_helper_seals.items():
+    exact = owner_declaration_body(kind, name).encode()
+    if __import__("hashlib").sha256(exact).hexdigest() != expected:
+        fail("ii-c0b-ii-a3 security helper body drifted")
+if descriptor_state_compact.count(
+    "descriptorFlags&FD_CLOEXEC==FD_CLOEXEC"
+) != 1 or compact.count(
+    "descriptorFlags&FD_CLOEXEC==FD_CLOEXEC"
+) != 2:
+    fail("ii-c0b-ii-a3 child-inheritable descriptor accepted")
+
+close_body = owner_declaration_body("func", "closeRemainingDescriptorsBaseFirst")
+close_compact = re.sub(r"\s+", "", close_body)
+base_close_shape = "close(descriptor:active.baseDescriptor)"
+lock_close_shape = "close(descriptor:active.lockDescriptor)"
+base_close = close_compact.find(base_close_shape)
+lock_close = close_compact.find(lock_close_shape)
+if base_close < 0 or lock_close < 0 or base_close >= lock_close:
+    fail("ii-c0b-ii-a3 base-before-lock close order drifted")
+if close_compact.count(base_close_shape) != 1 \
+        or close_compact.count(lock_close_shape) != 1:
+    fail("ii-c0b-ii-a3 descriptor close cardinality drifted")
+base_failure_shape = (
+    "do{trysystem.close(descriptor:active.baseDescriptor)}"
+    "catch{succeeded=false}"
+)
+lock_failure_shape = (
+    "do{trysystem.close(descriptor:active.lockDescriptor)}"
+    "catch{succeeded=false}"
+)
+if close_compact.count(base_failure_shape) != 1 \
+        or close_compact.count(lock_failure_shape) != 1:
+    fail("ii-c0b-ii-a3 descriptor close failure was swallowed")
+terminal_position = close_compact.find("state=.terminal")
+if terminal_position < 0 or terminal_position >= base_close:
+    fail("ii-c0b-ii-a3 terminal-before-close order drifted")
+for kind, name in (("func", "release"), ("deinit", "deinit")):
+    body = re.sub(r"\s+", "", owner_declaration_body(kind, name))
+    if "lock.lock()" not in body \
+            or "closeRemainingDescriptorsBaseFirst()" not in body:
+        fail("ii-c0b-ii-a3 terminal close routing drifted")
+
+for forbidden in (
+    r"\b(?:attempt-[A-Za-z0-9_-]*|capsule\.pending|projected-cohort-)",
+    r"\b(?:unlink|unlinkat|rename|renameat|renameatx_np|rmdir|"
+    r"removeItem|replaceItem|moveItem|write|pwrite|fsync)\s*\(",
+    r"\b(?:FileManager|FileHandle|Process|NSXPCConnection|URLSession|"
+    r"NWConnection|CommandLine|UserDefaults)\b",
+    r"\b(?:posix_spawnp?|fork|execv|execve|system|popen|"
+    r"AuthorizationCreate)\s*\(",
+    r"\b(?:socket|socketpair|connect|bind|listen|accept|send|recv)\s*\(",
+    r"\b(?:sudo|setuid|seteuid|setgid|setegid|readiness|"
+    r"signedRuntimeReady|containment|ActionExecutor|TrashMoving|"
+    r"RegisteredAction)\b",
+    r"\b(?:dup|dup2|dup3|F_DUPFD|F_DUPFD_CLOEXEC)\b",
+    r"\b(?:async|await|Task|UnsafeContinuation|CheckedContinuation)\b",
+    r"import\s+Stornaut(?:Core|Codex|Lifecycle|Execution|ProcessSupport|"
+    r"InvestigationRuntime|InvestigationDiagnostic|ProbeBridge)",
+):
+    if re.search(forbidden, ownership, re.I):
+        fail("ii-c0b-ii-a3 gained capsule mutation or prohibited authority")
+
+focused_markers = (
+    "acquisitionRetainsBaseUntilExplicitRelease",
+    "revalidationExposesNoDescriptorOrCapability",
+    "revalidateOwnershipChecksBaseAndLockEveryTime",
+    "revalidationRejectsNamedBaseOrLockReplacement",
+    "revalidationRejectsEveryBaseMetadataDrift",
+    "revalidationRejectsEveryLockMetadataDrift",
+    "concurrentReleaseClosesBothDescriptorsExactlyOnce",
+    "releaseClosesBaseBeforeLock",
+    "baseCloseFailureStillAttemptsLockCloseAndIsTerminal",
+    "lockCloseFailureIsReportedAndTerminal",
+    "deinitClosesOnlyRemainingDescriptorsOnceInOrder",
+    "ownedBaseLifecycleDoesNotMutateCapsuleNamespace",
+)
+for marker in focused_markers:
+    if marker not in focused_test:
+        fail(f"ii-c0b-ii-a3 focused tests became vacuous: {marker}")
+for marker in (
+    "iiC0BIIA3RetainedBaseVerifierPinsContractAndScope",
+    "--iic0b-ii-a3-retained-base-contract-only",
+    "--iic0b-ii-a3-staged-scope-contract-only",
+    "verify_iic0biia3_retained_base_contract",
+    "verify_iic0biia3_staged_scope",
+):
+    if marker not in boundary:
+        fail(f"ii-c0b-ii-a3 boundary regression drifted: {marker}")
+PY
+}
+
+function verify_iic0biia3_index_semantics() (
+    local staged_root staged_status=0
+    staged_root=$(mktemp -d \
+        "${TMPDIR:-/tmp}/stornaut-iic0biia3-index.XXXXXX") || return $?
+    trap 'rm -rf "$staged_root"' EXIT
+    trap 'exit 130' INT; trap 'exit 143' TERM
+    git checkout-index --all --prefix="$staged_root/" \
+        || staged_status=$?
+    if (( staged_status == 0 )); then
+        (
+            cd "$staged_root"
+            scripts/verify-investigation-boundaries \
+                --iic0b-ii-a3-retained-base-contract-only \
+                Sources/StornautInvestigationMachineLaunchSupport/InvestigationMachineGateOwnership.swift \
+                Tests/StornautInvestigationTests/InvestigationMachineGateOwnershipTests.swift \
+                Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        ) || staged_status=$?
+    fi
+    return $staged_status
+)
+
+function verify_iic0biia3_staged_scope() {
+    local baseline=${1:-fe3ea757432c4dc9cf960f210c167916697ce601}
+    local expected=(
+        Sources/StornautInvestigationMachineLaunchSupport/InvestigationMachineGateOwnership.swift
+        Tests/StornautInvestigationTests/InvestigationMachineGateOwnershipTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-app-release-boundaries
+        scripts/verify-contract
+        scripts/verify-investigation-boundaries
+    )
+    (( ${#expected} == 6 )) || {
+        print -u2 "ii-c0b-ii-a3 checkpoint path ceiling drifted"; return 1
+    }
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" == \
+        fe3ea757432c4dc9cf960f210c167916697ce601 ]] \
+        && [[ "$(git rev-parse "$baseline^{tree}" 2>/dev/null)" == \
+        9533824602ff18b35581f191f9ff0140a52ec53c ]] || {
+        print -u2 "ii-c0b-ii-a3 checkpoint baseline drifted"; return 1
+    }
+    if git diff --cached --name-only --diff-filter=D "$baseline" \
+        | awk 'index($0,"docs/")!=1 {found=1} END {exit !found}'
+    then
+        print -u2 "ii-c0b-ii-a3 checkpoint deleted an existing path"; return 1
+    fi
+    if git diff --cached --numstat "$baseline" \
+        | awk 'index($3,"docs/")!=1 && ($1=="-" || $2=="-") {found=1} END {exit !found}'
+    then
+        print -u2 "ii-c0b-ii-a3 binary checkpoint path rejected"; return 1
+    fi
+    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD \
+        "$baseline" | awk 'index($0,"docs/")!=1 && $0!="AGENTS.md" && $0!="README.md"')"})
+    [[ "${(j:\n:)${(@on)observed}}" == "${(j:\n:)${(@on)expected}}" ]] || {
+        print -u2 "ii-c0b-ii-a3 checkpoint paths drifted"; return 1
+    }
+    local checkpoint_path expected_mode entry
+    for checkpoint_path in "${expected[@]}"; do
+        expected_mode=100644
+        [[ $checkpoint_path == scripts/* ]] && expected_mode=100755
+        entry=$(git ls-files -s -- "$checkpoint_path")
+        [[ "$(print -r -- "$entry" | awk '{print $1, $3, $4}')" \
+            == "$expected_mode 0 $checkpoint_path" ]] || {
+            print -u2 "ii-c0b-ii-a3 checkpoint mode drifted: $checkpoint_path"
+            return 1
+        }
+    done
+    local changed=$(git diff --cached --numstat "$baseline" \
+        | awk 'index($3,"docs/")!=1 && $3!="AGENTS.md" && $3!="README.md" {n+=$1+$2} END {print n+0}')
+    (( changed <= 2750 )) || {
+        print -u2 "ii-c0b-ii-a3 checkpoint budget drifted"; return 1
+    }
+    verify_iic0biia3_index_semantics
+}
+
 function verify_iib4_staged_scope() {
     local baseline=${1:-HEAD}
     local expected=(
@@ -11655,6 +12245,18 @@ fi
 if $iic0biia_staged_scope_contract_only; then
     verify_iic0biia_staged_scope "$iic0biia_staged_scope_baseline"
     print "ii-c0b-ii-a staged scope verification passed."
+    exit 0
+fi
+if $iic0biia3_retained_base_contract_only; then
+    verify_iic0biia3_retained_base_contract \
+        "$iic0biia3_ownership_source" "$iic0biia3_focused_test_source" \
+        "$iic0biia3_boundary_test_source"
+    print "ii-c0b-ii-a3 retained-base contract verification passed."
+    exit 0
+fi
+if $iic0biia3_staged_scope_contract_only; then
+    verify_iic0biia3_staged_scope "$iic0biia3_staged_scope_baseline"
+    print "ii-c0b-ii-a3 staged scope verification passed."
     exit 0
 fi
 if $iib3a_staged_scope_contract_only; then

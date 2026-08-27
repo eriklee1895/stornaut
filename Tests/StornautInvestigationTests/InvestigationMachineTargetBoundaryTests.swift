@@ -335,7 +335,7 @@ struct InvestigationMachineTargetBoundaryTests {
         #expect(
             package.components(
                 separatedBy: "\"StornautInvestigationHandoffContract\""
-            ).count == 7
+            ).count == 8
         )
 
         let sourceRoot = root.appending(path: "Sources/StornautInvestigationHandoffContract")
@@ -676,29 +676,176 @@ struct InvestigationMachineTargetBoundaryTests {
             "ii-c0b-ii-a target became a package product", "ii-c0b-ii-a target gained Xcode membership",
             "ii-c0b-ii-a source flag shape drifted", "ii-c0b-ii-a source flag count drifted",
             "xcrun swift-demangle) || exit $?",
-            #"verify_iic0biia_component_boundary "$derived_data" "$diagnostic_derived_data""#,
         ] {
             #expect(release.contains(marker))
         }
         for marker in [
-            "iic0biia_baseline=d18354bc7ca7dd2ddb04180298f9fb4f2e7c60e3",
+            "function verify_iic0biia_historical_contract()",
+            "local baseline=fe3ea757432c4dc9cf960f210c167916697ce601",
+            "local a1=d18354bc7ca7dd2ddb04180298f9fb4f2e7c60e3",
             "eedda4e3a843a76898ddea4bc8fd243b6357efcbf17a4ea9e8438fdc0d561007",
             "9ffdfa9d956655b05cf9813658a0d00449f38a075f991737f460b2864c8a1e21",
-            "iic0bi_implementation_commit=2493e0f28e0c8d406b4efcdbf17713bde3633449",
-            "--iic0b-i-producer-contract-only", "--iic0b-i-staged-scope-contract-only",
-            "ii-c0b-i historical replay failed",
-            "\"$iic0biia_app_gate\" --iic0b-ii-a-component-boundary-only",
-            "ii-c0b-ii-a mutation accepted:",
-            "ii-c0b-ii-a App mutation accepted:",
-            "ii-c0b-ii-a scope mutation accepted:", #"verify_iic0biia_contract "$contract_root""#,
-            "public-owner", "codable-owner", "path-exposure",
-            "descriptor-exposure", "spawn-authority",
-            "extra-flock-callsite", "held-named-comment-spoof",
-            "lock-nb-removal", "cloexec-removal",
-            "lock-repair", "lock-unlink",
-            "contention-widening", "pid-heuristic",
-            "mtime-heuristic", "process-name-heuristic",
-            "focused-test-vacuity", "extra-path", "missing-path", "over-budget", "deleted",
+            "local a2=f11eea42ef295f49b20e1c0f3912d4b32448b968",
+            "local a2_tree=d0683495ea37d0692677c98f491f3037eaedba4c",
+            "scripts/verify-contract --iic0b-ii-a-contract-only",
+            "ii-c0b-ii-a2 historical replay failed",
+            "a1-source-identity", "a1-focused-test-identity",
+            "a1-physical-probe-identity", "a2-historical-replay",
+            "ii-c0b-ii-a historical contract verification passed.",
+        ] {
+            #expect(contract.contains(marker))
+        }
+    }
+
+    @Test
+    func iiC0BIIA3RetainedBaseVerifierPinsContractAndScope() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundaries = try l3c3biiSource(
+            "scripts/verify-investigation-boundaries", repositoryRoot: root)
+        let release = try l3c3biiSource(
+            "scripts/verify-app-release-boundaries", repositoryRoot: root)
+        let contract = try l3c3biiSource(
+            "scripts/verify-contract", repositoryRoot: root)
+        let scope = try l3c3biiFunction(
+            "verify_iic0biia3_staged_scope", in: boundaries
+        )
+
+        for marker in [
+            "--iic0b-ii-a3-retained-base-contract-only",
+            "--iic0b-ii-a3-staged-scope-contract-only",
+            "function verify_iic0biia3_retained_base_contract()",
+            "function verify_iic0biia3_index_semantics()",
+            "function verify_iic0biia3_staged_scope()",
+            "ii-c0b-ii-a3 retained-base API drifted",
+            "ii-c0b-ii-a3 source or focused-test seal drifted",
+            "ii-c0b-ii-a3 descriptor or capability exposure drifted",
+            "ii-c0b-ii-a3 no-argument owned-base API drifted",
+            "ii-c0b-ii-a3 owned-base operation exposed authority",
+            "ii-c0b-ii-a3 callback surface drifted",
+            "ii-c0b-ii-a3 owner member allowlist drifted",
+            "ii-c0b-ii-a3 acquirer member allowlist drifted",
+            "ii-c0b-ii-a3 acquirer security body drifted",
+            "ii-c0b-ii-a3 base and lock transfer order drifted",
+            "ii-c0b-ii-a3 per-operation revalidation drifted",
+            "ii-c0b-ii-a3 revalidation-before-operation order drifted",
+            "ii-c0b-ii-a3 held and named revalidation drifted",
+            "ii-c0b-ii-a3 base-before-lock close order drifted",
+            "ii-c0b-ii-a3 descriptor close cardinality drifted",
+            "ii-c0b-ii-a3 terminal close routing drifted",
+            "ii-c0b-ii-a3 gained capsule mutation or prohibited authority",
+            "ii-c0b-ii-a3 focused tests became vacuous",
+            "ii-c0b-ii-a3 checkpoint path ceiling drifted",
+            "ii-c0b-ii-a3 checkpoint baseline drifted",
+            "ii-c0b-ii-a3 checkpoint deleted an existing path",
+            "ii-c0b-ii-a3 binary checkpoint path rejected",
+            "ii-c0b-ii-a3 checkpoint paths drifted",
+            "ii-c0b-ii-a3 checkpoint mode drifted",
+            "ii-c0b-ii-a3 checkpoint budget drifted",
+        ] {
+            #expect(boundaries.contains(marker))
+        }
+        for marker in [
+            "fe3ea757432c4dc9cf960f210c167916697ce601",
+            "9533824602ff18b35581f191f9ff0140a52ec53c",
+            "(( ${#expected} == 6 ))",
+            "(( changed <= 2750 ))",
+        ] {
+            #expect(scope.contains(marker))
+        }
+
+        for marker in [
+            "--iic0b-ii-a3-source-contract-only",
+            "--iic0b-ii-a3-component-boundary-only",
+            "function verify_iic0biia3_source_contract()",
+            "function verify_iic0biia3_component_boundary()",
+            "iic0biia3_component_symbols=(",
+            "iic0biia3_swiftpm_debug_objects=(",
+            "iic0biia3_swiftpm_release_objects=(",
+            "iic0biia3_closed_images=(",
+            "iic0biia3_required_executables=(",
+            "ii-c0b-ii-a3 Debug SwiftPM object positive control is missing",
+            "ii-c0b-ii-a3 Release SwiftPM object negative control is missing",
+            "ii-c0b-ii-a3 source leaked into Release SwiftPM object",
+            "ii-c0b-ii-a3 source leaked into a closed image",
+            "ii-c0b-ii-a3 target became a package product",
+            "ii-c0b-ii-a3 target gained Xcode membership",
+            #"verify_iic0biia3_component_boundary "$derived_data" "$diagnostic_derived_data""#,
+        ] {
+            #expect(release.contains(marker))
+        }
+
+        for marker in [
+            "function verify_iic0biia3_contract()",
+            "iic0biia3_baseline=fe3ea757432c4dc9cf960f210c167916697ce601",
+            "d18354bc7ca7dd2ddb04180298f9fb4f2e7c60e3",
+            "d6a4b0ea9f6ee53101fb986fdab5ac4b509de7ad",
+            "15bc5ce89b4a1c416df9c332cad2306cc26299f7903a0de15707f5e0cfbcab8f",
+            "eedda4e3a843a76898ddea4bc8fd243b6357efcbf17a4ea9e8438fdc0d561007",
+            "9ffdfa9d956655b05cf9813658a0d00449f38a075f991737f460b2864c8a1e21",
+            "731b613e4b8c1c5c09e34e412b5c7ea25630a8ac2f9e6549131482770bc0acf6",
+            "f11eea42ef295f49b20e1c0f3912d4b32448b968",
+            "d0683495ea37d0692677c98f491f3037eaedba4c",
+            "--iic0b-ii-a-ownership-contract-only",
+            "--iic0b-ii-a-staged-scope-contract-only",
+            "--iic0b-ii-a-source-contract-only",
+            "--iic0b-ii-a-component-boundary-only",
+            "--iic0b-ii-a3-retained-base-contract-only",
+            "--iic0b-ii-a3-staged-scope-contract-only",
+            "--iic0b-ii-a3-source-contract-only",
+            "--iic0b-ii-a3-component-boundary-only",
+            "ii-c0b-ii-a3 mutation accepted:",
+            "ii-c0b-ii-a3 App mutation accepted:",
+            "ii-c0b-ii-a3 scope mutation accepted:",
+            "a1-source-identity",
+            "a1-focused-test-identity",
+            "a1-physical-probe-identity",
+            "a2-historical-replay",
+            "raw-descriptor-return",
+            "raw-descriptor-property",
+            "raw-descriptor-alias-function",
+            "allowed-method-signature-drift",
+            "raw-descriptor-extension",
+            "internal extension InvestigationMachineGateOwnership",
+            "attributed-raw-descriptor-return",
+            "attributed-computed-property",
+            "raw-descriptor-typealias",
+            "same-line-extra-declaration",
+            "same-line-after-member-close",
+            "comment-brace-hidden-method",
+            "comment-prefixed-attribute",
+            "top-level-capability-typealias",
+            "top-level-computed-property",
+            "indented-top-level-typealias",
+            "source-seal",
+            "ii-c0b-ii-a3 source seal admitted",
+            "escaping-owned-base",
+            "async-owned-base",
+            "acquirer-cint-callback",
+            "acquirer-qualified-int32-callback",
+            "acquirer-alias-callback",
+            "acquirer-optional-callback",
+            "acquirer-inout-callback",
+            "acquirer-nonfirst-multiline-sendable-callback",
+            "acquirer-attributed-callback-return",
+            "acquirer-raw-descriptor-return",
+            "darwin-system-raw-descriptor-return",
+            "metadata-snapshot-raw-descriptor-return",
+            "acquirer-held-named-short-circuit",
+            "root-path-literal-drift",
+            "nested-release-decoy",
+            "nested-deinit-decoy",
+            "expected_diagnostic",
+            "reversed-close-order",
+            "missing-operation-revalidation",
+            "revalidate-early-return",
+            "release-early-return",
+            "duplicate-descriptor",
+            "child-inheritable-descriptor",
+            "held-named-short-circuit",
+            "cloexec-short-circuit",
+            "lock-mutation",
+            "extra-path", "missing-path", "over-budget", "deleted",
             "binary", "mode", "wrong-baseline",
         ] {
             #expect(contract.contains(marker))
