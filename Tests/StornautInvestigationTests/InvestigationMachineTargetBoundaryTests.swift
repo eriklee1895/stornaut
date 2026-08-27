@@ -624,6 +624,87 @@ struct InvestigationMachineTargetBoundaryTests {
         }
     }
 
+    @Test
+    func iiC0BIIAOwnershipVerifierPinsContractAndScope() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundaries = try l3c3biiSource(
+            "scripts/verify-investigation-boundaries", repositoryRoot: root)
+        let release = try l3c3biiSource(
+            "scripts/verify-app-release-boundaries", repositoryRoot: root)
+        let contract = try l3c3biiSource(
+            "scripts/verify-contract", repositoryRoot: root)
+        let scope = try l3c3biiFunction(
+            "verify_iic0biia_staged_scope", in: boundaries
+        )
+        for marker in [
+            "--iic0b-ii-a-ownership-contract-only", "--iic0b-ii-a-staged-scope-contract-only",
+            "function verify_iic0biia_ownership_contract()", "function verify_iic0biia_index_semantics()", "function verify_iic0biia_staged_scope()",
+            "ii-c0b-ii-a target dependency surface drifted", "ii-c0b-ii-a package-only or Codable surface drifted",
+            "ii-c0b-ii-a path or descriptor exposure drifted", "ii-c0b-ii-a fixed ownership path drifted",
+            "ii-c0b-ii-a lock acquisition flags drifted",
+            "ii-c0b-ii-a ownership flag shape drifted", "ii-c0b-ii-a ownership flag count drifted",
+            "ii-c0b-ii-a lock descriptor inheritance drifted", "ii-c0b-ii-a named descriptor identity revalidation drifted",
+            "ii-c0b-ii-a ownership mutex linearization drifted", "ii-c0b-ii-a explicit close reporting drifted",
+            "ii-c0b-ii-a permanent lock invariant drifted", "ii-c0b-ii-a contention classification drifted",
+            "ii-c0b-ii-a ownership heuristic drifted", "ii-c0b-ii-a source or focused-test seal drifted", "ii-c0b-ii-a compiled semantic surface drifted",
+            "ii-c0b-ii-a checkpoint path ceiling drifted", "ii-c0b-ii-a checkpoint baseline drifted",
+            "ii-c0b-ii-a checkpoint deleted an existing path", "ii-c0b-ii-a binary checkpoint path rejected",
+            "ii-c0b-ii-a checkpoint paths drifted", "ii-c0b-ii-a checkpoint mode drifted",
+            "ii-c0b-ii-a checkpoint budget drifted",
+        ] {
+            #expect(boundaries.contains(marker))
+        }
+        for marker in [
+            "d18354bc7ca7dd2ddb04180298f9fb4f2e7c60e3",
+            "d6a4b0ea9f6ee53101fb986fdab5ac4b509de7ad",
+            "(( ${#expected} == 4 ))",
+            "(( changed <= 1200 && 1981 + changed <= 2870 ))",
+        ] {
+            #expect(scope.contains(marker))
+        }
+        for marker in [
+            "--iic0b-ii-a-source-contract-only", "--iic0b-ii-a-component-boundary-only",
+            "function verify_iic0biia_source_contract()", "function verify_iic0biia_component_boundary()",
+            "iic0biia_component_symbols=(", "iic0biia_swiftpm_debug_objects=(",
+            "iic0biia_swiftpm_release_objects=(", "iic0biia_closed_images=(", "iic0biia_required_executables=(",
+            "ii-c0b-ii-a Debug SwiftPM object positive control is missing",
+            "ii-c0b-ii-a Release SwiftPM object negative control is missing", "ii-c0b-ii-a fixed ownership string boundary drifted",
+            "ii-c0b-ii-a source leaked into Release SwiftPM object", "ii-c0b-ii-a source leaked into a closed image",
+            "ii-c0b-ii-a fixed ownership string leaked into a closed image", "ii-c0b-ii-a required executable negative control is missing",
+            "ii-c0b-ii-a Machine object negative control is incomplete", "ii-c0b-ii-a closed-image enumeration failed",
+            "ii-c0b-ii-a target became a package product", "ii-c0b-ii-a target gained Xcode membership",
+            "ii-c0b-ii-a source flag shape drifted", "ii-c0b-ii-a source flag count drifted",
+            "xcrun swift-demangle) || exit $?",
+            #"verify_iic0biia_component_boundary "$derived_data" "$diagnostic_derived_data""#,
+        ] {
+            #expect(release.contains(marker))
+        }
+        for marker in [
+            "iic0biia_baseline=d18354bc7ca7dd2ddb04180298f9fb4f2e7c60e3",
+            "eedda4e3a843a76898ddea4bc8fd243b6357efcbf17a4ea9e8438fdc0d561007",
+            "9ffdfa9d956655b05cf9813658a0d00449f38a075f991737f460b2864c8a1e21",
+            "iic0bi_implementation_commit=2493e0f28e0c8d406b4efcdbf17713bde3633449",
+            "--iic0b-i-producer-contract-only", "--iic0b-i-staged-scope-contract-only",
+            "ii-c0b-i historical replay failed",
+            "\"$iic0biia_app_gate\" --iic0b-ii-a-component-boundary-only",
+            "ii-c0b-ii-a mutation accepted:",
+            "ii-c0b-ii-a App mutation accepted:",
+            "ii-c0b-ii-a scope mutation accepted:", #"verify_iic0biia_contract "$contract_root""#,
+            "public-owner", "codable-owner", "path-exposure",
+            "descriptor-exposure", "spawn-authority",
+            "extra-flock-callsite", "held-named-comment-spoof",
+            "lock-nb-removal", "cloexec-removal",
+            "lock-repair", "lock-unlink",
+            "contention-widening", "pid-heuristic",
+            "mtime-heuristic", "process-name-heuristic",
+            "focused-test-vacuity", "extra-path", "missing-path", "over-budget", "deleted",
+            "binary", "mode", "wrong-baseline",
+        ] {
+            #expect(contract.contains(marker))
+        }
+    }
+
     private func l3c3biiSource(
         _ path: String,
         repositoryRoot: URL

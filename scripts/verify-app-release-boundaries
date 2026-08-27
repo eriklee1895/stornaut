@@ -58,6 +58,11 @@ iic0bi_author_source=
 iic0bi_composition_source=
 iic0bi_verifier_source=
 iic0bi_component_boundary_only=false
+iic0biia_source_contract_only=false
+iic0biia_package_source=
+iic0biia_ownership_source=
+iic0biia_verifier_source=
+iic0biia_component_boundary_only=false
 iib5biii_a_source_contract_only=false
 iib5biii_a_single_epoch_source=
 iib5biii_a_composition_source=
@@ -123,6 +128,14 @@ elif [[ ($# == 3 || $# == 4) && $1 == --iic0b-i-source-contract-only ]]; then
     iic0bi_verifier_source=${4:-${ZSH_SCRIPT:A}}
 elif [[ $# == 1 && $1 == --iic0b-i-component-boundary-only ]]; then
     iic0bi_component_boundary_only=true
+elif [[ $# == 3 || $# == 4 ]] \
+    && [[ $1 == --iic0b-ii-a-source-contract-only ]]; then
+    iic0biia_source_contract_only=true
+    iic0biia_package_source=$2
+    iic0biia_ownership_source=$3
+    iic0biia_verifier_source=${4:-${ZSH_SCRIPT:A}}
+elif [[ $# == 1 && $1 == --iic0b-ii-a-component-boundary-only ]]; then
+    iic0biia_component_boundary_only=true
 elif [[ $# == 4 && $1 == --iib5biii-a-source-contract-only ]]; then
     iib5biii_a_source_contract_only=true
     iib5biii_a_single_epoch_source=$2
@@ -1102,6 +1115,311 @@ function verify_iic0bi_component_boundary() {
                     fi
                 done
             done < <(find "$image" -type f -print0)
+        done
+    ) || result_code=$?
+    rm -rf "$scratch"
+    return $result_code
+}
+
+function verify_iic0biia_source_contract() {
+    local package_path=$1 ownership_path=$2 verifier_path=$3 source_path
+    xcrun swiftc -frontend -parse -enable-bare-slash-regex "$package_path"
+    xcrun swiftc -frontend -parse -enable-bare-slash-regex "$ownership_path"
+    python3 - "$package_path" "$ownership_path" "$verifier_path" \
+        "${ZSH_SCRIPT:A}" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+package_path, ownership_path, verifier_path, canonical_path = map(
+    Path, sys.argv[1:]
+)
+if verifier_path.read_bytes() != canonical_path.read_bytes():
+    raise SystemExit("ii-c0b-ii-a component verifier source drifted")
+root = canonical_path.parent.parent.resolve()
+expected_paths = {
+    package_path: root / "Package.swift",
+    ownership_path: root / (
+        "Sources/StornautInvestigationMachineLaunchSupport/"
+        "InvestigationMachineGateOwnership.swift"
+    ),
+}
+for path, expected in expected_paths.items():
+    if path.resolve() != expected.resolve():
+        raise SystemExit(f"ii-c0b-ii-a source path drifted: {path}")
+package = package_path.read_text(encoding="utf-8")
+ownership = ownership_path.read_text(encoding="utf-8")
+lines = [line.strip() for line in ownership.splitlines() if line.strip()]
+if lines[:3] != ["import Darwin", "import Foundation", "#if DEBUG"] \
+        or lines[-1] != "#endif" \
+        or lines.count("#if DEBUG") != 1 or lines.count("#endif") != 1:
+    raise SystemExit("ii-c0b-ii-a source DEBUG boundary drifted")
+imports = set(re.findall(
+    r"(?m)^import\s+([A-Za-z0-9_]+)\s*$", ownership
+))
+if imports != {"Darwin", "Foundation"}:
+    raise SystemExit("ii-c0b-ii-a source import surface drifted")
+target = re.findall(
+    r'(?ms)\.target\(\s*name:\s*'
+    r'"StornautInvestigationMachineLaunchSupport"\s*,\s*'
+    r'dependencies:\s*\[(?P<dependencies>.*?)\]\s*\)',
+    package,
+)
+if len(target) != 1 or re.findall(r'"([^"]+)"', target[0]) != [
+    "StornautInvestigationHandoffContract"
+]:
+    raise SystemExit("ii-c0b-ii-a target dependency surface drifted")
+products_prefix = package.split("    targets: [", 1)[0]
+if "StornautInvestigationMachineLaunchSupport" in products_prefix:
+    raise SystemExit("ii-c0b-ii-a target became a package product")
+project_path = root / "Stornaut.xcodeproj/project.pbxproj"
+if not project_path.is_file():
+    raise SystemExit("ii-c0b-ii-a Xcode project boundary unavailable")
+if "StornautInvestigationMachineLaunchSupport" in project_path.read_text(
+    encoding="utf-8"
+):
+    raise SystemExit("ii-c0b-ii-a target gained Xcode membership")
+if re.search(
+    r"(?m)^\s*(?:public|open|package).*\b(?:URL|path|fileDescriptor|"
+    r"descriptor|Int32)\b", ownership
+):
+    raise SystemExit("ii-c0b-ii-a path or descriptor exposure drifted")
+if re.search(r"(?m)^\s*(?:public|open|package)\s+", ownership) \
+        or re.search(r"\b(?:Codable|Encodable|Decodable)\b", ownership):
+    raise SystemExit("ii-c0b-ii-a package-only or Codable surface drifted")
+for forbidden in (
+    r"import\s+Stornaut(?:Core|Codex|Lifecycle|Execution|ProcessSupport|"
+    r"InvestigationRuntime|InvestigationDiagnostic|ProbeBridge)",
+    r"\b(?:NSXPCConnection|URLSession|NWConnection|Process|FileManager|"
+    r"FileHandle|CommandLine|UserDefaults)\b",
+    r"\b(?:posix_spawnp?|fork|execv|execve|system|popen|"
+    r"AuthorizationCreate)\s*\(",
+    r"\b(?:socket|socketpair|connect|bind|listen|accept|send|recv)\s*\(",
+    r"\b(?:unlink|unlinkat|rename|renameat|renameatx_np|rmdir|"
+    r"removeItem|replaceItem|moveItem)\s*\(",
+    r"\b(?:dup|dup2|dup3|F_DUPFD|F_DUPFD_CLOEXEC)\b",
+    r"\b(?:PID|pidFile|mtime|modificationDate|processName)\b",
+    r"kill\s*\([^,]+,\s*0\s*\)",
+    r"\b(?:sudo|setuid|seteuid|setgid|setegid|readiness|signedRuntimeReady|containment|"
+    r"ActionExecutor|TrashMoving|RegisteredAction)\b",
+):
+    if re.search(forbidden, ownership, re.I):
+        raise SystemExit(
+            "ii-c0b-ii-a source gained prohibited authority or heuristic"
+        )
+compact = re.sub(r"\s+", "", ownership)
+flag_shapes = {
+    "directoryFlags": "directoryFlags=Int32(O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NONBLOCK|O_NOFOLLOW_ANY)",
+    "relativeDirectoryFlags": "relativeDirectoryFlags=Int32(directoryFlags|O_RESOLVE_BENEATH)",
+    "lockFlags": "lockFlags=Int32(O_RDWR|O_CLOEXEC|O_NONBLOCK|O_NOFOLLOW_ANY|O_RESOLVE_BENEATH|O_UNIQUE)",
+    "directoryNamedFlags": "directoryNamedFlags=Int32(AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH|AT_UNIQUE)",
+    "lockNamedFlags": "lockNamedFlags=Int32(directoryNamedFlags|AT_UNIQUE)",
+}
+for label, shape in flag_shapes.items():
+    if compact.count(shape) != 1:
+        raise SystemExit(f"ii-c0b-ii-a source flag shape drifted: {label}")
+for token, count in {"O_NOFOLLOW_ANY": 2, "O_RESOLVE_BENEATH": 2,
+                     "O_UNIQUE": 1, "AT_UNIQUE": 2}.items():
+    if compact.count(token) != count:
+        raise SystemExit(f"ii-c0b-ii-a source flag count drifted: {token}")
+for marker in (
+    "getpwuid_r(", "getuid()", "geteuid()", "getgid()",
+    "getegid()", "fcntl(descriptor,F_GETFD)",
+    "fcntl(descriptor,F_GETFL)",
+    "flock(descriptor,LOCK_EX|LOCK_NB)",
+    "descriptorFlags&FD_CLOEXEC==FD_CLOEXEC",
+    "statusFlags&O_NONBLOCK==O_NONBLOCK",
+    "statusFlags&O_ACCMODE==accessMode",
+    "flags:Self.lockFlags|O_CREAT|O_EXCL",
+    "flags:Self.lockFlags,mode:nil,accessMode:O_RDWR",
+    "acl_get_fd_np(descriptor,ACL_TYPE_EXTENDED)",
+    "flistxattr(descriptor,nil,0,0)",
+):
+    if marker not in compact:
+        raise SystemExit(f"ii-c0b-ii-a source semantic marker drifted: {marker}")
+for marker in (
+    "iic0biia_component_symbols=(",
+    "iic0biia_swiftpm_debug_objects=(",
+    "iic0biia_swiftpm_release_objects=(",
+    "iic0biia_closed_images=(",
+    "ii-c0b-ii-a Debug SwiftPM object positive control is missing",
+    "ii-c0b-ii-a source leaked into Release SwiftPM object",
+    "ii-c0b-ii-a source leaked into a closed image",
+    "verify_iic0biia_component_boundary",
+):
+    if marker not in verifier_path.read_text(encoding="utf-8"):
+        raise SystemExit(
+            f"ii-c0b-ii-a component boundary drifted: {marker}"
+        )
+PY
+    scripts/verify-investigation-boundaries --iic0b-ii-a-ownership-contract-only \
+        "$package_path" "$ownership_path" Tests/StornautInvestigationTests/InvestigationMachineGateOwnershipTests.swift Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+}
+
+function verify_iic0biia_component_boundary() {
+    (( $# == 0 || $# == 2 )) || return 64
+    local scratch result_code=0
+    scratch=$(mktemp -d \
+        "${TMPDIR:-/tmp}/stornaut-iic0biia-component.XXXXXX")
+    (
+        trap 'rm -rf "$scratch"' EXIT
+        trap 'exit 130' INT
+        trap 'exit 143' TERM
+        swift build --scratch-path "$scratch/swiftpm-debug" \
+            --configuration debug \
+            --target StornautInvestigationMachineLaunchSupport || exit $?
+        swift build --scratch-path "$scratch/swiftpm-release" \
+            --configuration release \
+            --target StornautInvestigationMachineLaunchSupport || exit $?
+
+        iic0biia_swiftpm_debug_objects=(
+            ${(f)"$(find "$scratch/swiftpm-debug" -type f \
+                -name 'InvestigationMachineGateOwnership.swift.o' -print)"}
+        )
+        iic0biia_swiftpm_release_objects=(
+            ${(f)"$(find "$scratch/swiftpm-release" -type f \
+                -name 'InvestigationMachineGateOwnership.swift.o' -print)"}
+        )
+        (( ${#iic0biia_swiftpm_debug_objects} == 1 )) || {
+            print -u2 \
+                "ii-c0b-ii-a Debug SwiftPM object positive control is missing"
+            exit 1
+        }
+        (( ${#iic0biia_swiftpm_release_objects} == 1 )) || {
+            print -u2 "ii-c0b-ii-a Release SwiftPM object negative control is missing"
+            exit 1
+        }
+        local debug_symbols release_symbols= debug_strings release_strings= marker object
+        debug_symbols=$(xcrun nm -j "$iic0biia_swiftpm_debug_objects[1]" | xcrun swift-demangle) || exit $?
+        debug_strings=$(xcrun strings -a "$iic0biia_swiftpm_debug_objects[1]") || exit $?
+        for object in "${iic0biia_swiftpm_release_objects[@]}"; do
+            release_symbols+="$(xcrun nm -j "$object" | xcrun swift-demangle)" || exit $?
+            release_strings+="$(xcrun strings -a "$object")" || exit $?
+        done
+        for marker in '.owner-lock-v1' 'com.eriklee.stornaut.task39-machine-gate'; do
+            [[ "$debug_strings" == *"$marker"* && "$release_strings" != *"$marker"* ]] || {
+                print -u2 "ii-c0b-ii-a fixed ownership string boundary drifted: $marker"; exit 1
+            }
+        done
+        iic0biia_component_symbols=(
+            'StornautInvestigationMachineLaunchSupport.InvestigationMachineGateOwnershipAcquirer'
+            'StornautInvestigationMachineLaunchSupport.InvestigationMachineGateOwnership'
+            'StornautInvestigationMachineLaunchSupport.InvestigationMachineGateOwnershipSystem'
+            'StornautInvestigationMachineLaunchSupport.InvestigationMachineGateOwnershipMutex'
+            'StornautInvestigationMachineLaunchSupport.InvestigationMachineGateOwnership.release()'
+            'StornautInvestigationMachineLaunchSupport.InvestigationMachineGateOwnership.withExclusiveOwnership'
+        )
+        for marker in "${iic0biia_component_symbols[@]}"; do
+            [[ "$debug_symbols" == *"$marker"* ]] || {
+                print -u2 \
+                    "ii-c0b-ii-a Debug SwiftPM object positive control is missing: $marker"
+                exit 1
+            }
+            [[ "$release_symbols" != *"$marker"* ]] || {
+                print -u2 \
+                    "ii-c0b-ii-a source leaked into Release SwiftPM object: $marker"
+                exit 1
+            }
+        done
+
+        swift build --scratch-path "$scratch/machine-debug" \
+            --configuration debug --target StornautInvestigationMachine \
+            || exit $?
+        swift build --scratch-path "$scratch/machine-release" \
+            --configuration release --target StornautInvestigationMachine \
+            || exit $?
+        if (( $# == 2 )); then
+            [[ -d $1 && -d $2 ]] || exit 1
+            ln -s "$1" "$scratch/xcode-product"; ln -s "$2" "$scratch/xcode-diagnostic"
+        else
+        xcodebuild -quiet -project Stornaut.xcodeproj -scheme Stornaut \
+            -configuration Debug -destination 'platform=macOS,arch=arm64' \
+            -derivedDataPath "$scratch/xcode-product" build || exit $?
+        xcodebuild -quiet -project Stornaut.xcodeproj -scheme Stornaut \
+            -configuration Release -destination 'platform=macOS,arch=arm64' \
+            -derivedDataPath "$scratch/xcode-product" build || exit $?
+        xcodebuild -quiet -project Stornaut.xcodeproj \
+            -scheme StornautInvestigationDiagnosticApp -configuration Debug \
+            -destination 'platform=macOS,arch=arm64' \
+            -derivedDataPath "$scratch/xcode-diagnostic" build || exit $?
+        xcodebuild -quiet -project Stornaut.xcodeproj \
+            -scheme StornautInvestigationDiagnosticReleaseShell \
+            -configuration Release -destination 'platform=macOS,arch=arm64' \
+            -derivedDataPath "$scratch/xcode-diagnostic" build || exit $?
+        xcodebuild -quiet -project Stornaut.xcodeproj \
+            -scheme StornautInvestigationMachineDriverNative \
+            -configuration Release -destination 'platform=macOS,arch=arm64' \
+            -derivedDataPath "$scratch/xcode-diagnostic" build || exit $?
+        fi
+        local -a machine_objects
+        for image in "$scratch/machine-debug" "$scratch/machine-release"; do
+            machine_objects=("$image"/**/StornautInvestigationMachine.build/*.swift.o(N))
+            (( ${#machine_objects} == 7 )) || {
+                print -u2 "ii-c0b-ii-a Machine object negative control is incomplete: $image"; exit 1
+            }
+        done
+        iic0biia_closed_images=(
+            "$scratch/machine-debug" "$scratch/machine-release"
+            "$scratch/xcode-product/Build/Products/Debug/Stornaut.app"
+            "$scratch/xcode-product/Build/Products/Release/Stornaut.app"
+            "$scratch/xcode-diagnostic/Build/Products/Debug/StornautInvestigationDiagnostic.app"
+            "$scratch/xcode-diagnostic/Build/Products/Release/StornautInvestigationDiagnosticReleaseShell.app"
+            "$scratch/xcode-diagnostic/Build/Products/Release/StornautInvestigationMachineDriver"
+        )
+        iic0biia_required_executables=(
+            "$scratch/xcode-product/Build/Products/Debug/Stornaut.app/Contents/MacOS/Stornaut"
+            "$scratch/xcode-product/Build/Products/Debug/Stornaut.app/Contents/MacOS/StornautLifecycleHelper"
+            "$scratch/xcode-product/Build/Products/Release/Stornaut.app/Contents/MacOS/Stornaut"
+            "$scratch/xcode-product/Build/Products/Release/Stornaut.app/Contents/MacOS/StornautLifecycleHelper"
+            "$scratch/xcode-diagnostic/Build/Products/Debug/StornautInvestigationDiagnostic.app/Contents/MacOS/StornautInvestigationDiagnostic"
+            "$scratch/xcode-diagnostic/Build/Products/Debug/StornautInvestigationDiagnostic.app/Contents/MacOS/StornautLifecycleHelper"
+            "$scratch/xcode-diagnostic/Build/Products/Debug/StornautInvestigationDiagnostic.app/Contents/MacOS/StornautInvestigationMachineDriver"
+            "$scratch/xcode-diagnostic/Build/Products/Release/StornautInvestigationDiagnosticReleaseShell.app/Contents/MacOS/StornautInvestigationDiagnosticReleaseShell"
+            "$scratch/xcode-diagnostic/Build/Products/Release/StornautInvestigationMachineDriver"
+        )
+        for image in "${iic0biia_required_executables[@]}"; do
+            [[ -f "$image" && ! -L "$image" ]] || {
+                print -u2 "ii-c0b-ii-a required executable negative control is missing: $image"; exit 1
+            }
+        done
+        local image file kind symbols strings inventory="$scratch/closed-image-files"
+        for image in "${iic0biia_closed_images[@]}"; do
+            [[ -e "$image" && ! -L "$image" ]] || {
+                print -u2 "ii-c0b-ii-a closed-image negative control is missing: $image"
+                exit 1
+            }
+            find "$image" -type f -print0 >"$inventory" || {
+                print -u2 "ii-c0b-ii-a closed-image enumeration failed: $image"; exit 1
+            }
+            while IFS= read -r -d '' file; do
+                kind=$(file "$file" 2>/dev/null) || {
+                    print -u2 "ii-c0b-ii-a closed-image type scan failed: $file"
+                    exit 1
+                }
+                [[ "$kind" == *'Mach-O'* ]] || continue
+                symbols=$(xcrun nm -j "$file" 2>/dev/null \
+                    | xcrun swift-demangle 2>/dev/null) || {
+                    print -u2 "ii-c0b-ii-a closed-image symbol scan failed: $file"
+                    exit 1
+                }
+                strings=$(xcrun strings -a "$file" 2>/dev/null) || {
+                    print -u2 "ii-c0b-ii-a closed-image string scan failed: $file"
+                    exit 1
+                }
+                for marker in "${iic0biia_component_symbols[@]}"; do
+                    if [[ "$symbols" == *"$marker"* \
+                        || "$strings" == *"$marker"* ]]
+                    then
+                        print -u2 \
+                            "ii-c0b-ii-a source leaked into a closed image: $file: $marker"
+                        exit 1
+                    fi
+                done
+                [[ "$strings" != *'.owner-lock-v1'* \
+                    && "$strings" != *'com.eriklee.stornaut.task39-machine-gate'* ]] || {
+                    print -u2 "ii-c0b-ii-a fixed ownership string leaked into a closed image: $file"; exit 1
+                }
+            done <"$inventory"
         done
     ) || result_code=$?
     rm -rf "$scratch"
@@ -2661,6 +2979,18 @@ fi
 if $iic0bi_component_boundary_only; then
     verify_iic0bi_component_boundary
     print "ii-c0b-i Debug component and final-image boundary verification passed."
+    exit 0
+fi
+if $iic0biia_source_contract_only; then
+    verify_iic0biia_source_contract \
+        "$iic0biia_package_source" "$iic0biia_ownership_source" \
+        "$iic0biia_verifier_source"
+    print "ii-c0b-ii-a source-only component boundary verification passed."
+    exit 0
+fi
+if $iic0biia_component_boundary_only; then
+    verify_iic0biia_component_boundary
+    print "ii-c0b-ii-a Debug component and closed-image boundary verification passed."
     exit 0
 fi
 if $iib5biii_a_source_contract_only; then
@@ -5196,5 +5526,6 @@ xcodebuild -quiet \
     -derivedDataPath "$diagnostic_derived_data" \
     -only-testing:StornautInvestigationDiagnosticAppTests \
     test
+verify_iic0biia_component_boundary "$derived_data" "$diagnostic_derived_data"
 
 print "Release App fixture boundary verification passed."

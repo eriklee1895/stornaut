@@ -271,6 +271,13 @@ iic0bi_focused_test_source=
 iic0bi_boundary_test_source=
 iic0bi_staged_scope_contract_only=false
 iic0bi_staged_scope_baseline=e5ed33e27195d9252f02a89ab39664df3848f1ed
+iic0biia_ownership_contract_only=false
+iic0biia_package_source=
+iic0biia_ownership_source=
+iic0biia_focused_test_source=
+iic0biia_boundary_test_source=
+iic0biia_staged_scope_contract_only=false
+iic0biia_staged_scope_baseline=d18354bc7ca7dd2ddb04180298f9fb4f2e7c60e3
 iib3a_staged_scope_contract_only=false
 iib3a_staged_scope_baseline=HEAD
 iib3b_start_retire_contract_only=false
@@ -691,6 +698,17 @@ if (( $# > 0 )); then
         && [[ $1 == --iic0b-i-staged-scope-contract-only ]]; then
         iic0bi_staged_scope_contract_only=true
         iic0bi_staged_scope_baseline=${2:-e5ed33e27195d9252f02a89ab39664df3848f1ed}
+    elif (( $# == 5 )) \
+        && [[ $1 == --iic0b-ii-a-ownership-contract-only ]]; then
+        iic0biia_ownership_contract_only=true
+        iic0biia_package_source=$2
+        iic0biia_ownership_source=$3
+        iic0biia_focused_test_source=$4
+        iic0biia_boundary_test_source=$5
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iic0b-ii-a-staged-scope-contract-only ]]; then
+        iic0biia_staged_scope_contract_only=true
+        iic0biia_staged_scope_baseline=${2:-d18354bc7ca7dd2ddb04180298f9fb4f2e7c60e3}
     elif (( $# == 1 || $# == 2 )) \
         && [[ $1 == --iib3a-staged-scope-contract-only ]]; then
         iib3a_staged_scope_contract_only=true
@@ -3977,6 +3995,7 @@ expected_test_sha256 = {
         "ead096741e6899f0e469bf7c6881974b543121234b7dcae496c6837c11f3b22a",
         "3a72e900c5c102c1317c1a371dea146126c36829176b810c34e85747d52aab0a",
         "43e5f15a1fac2644934ecaa11207a182f8ac41c217d93bea56ad1a08b7d7bc1b",
+        "ee0ee2918638c1289c7e136a0aa552c36d54c0a1b163f1b7eb281859d397d4bf",
     },
 }
 for path, admitted_sha256 in expected_test_sha256.items():
@@ -4288,6 +4307,7 @@ expected_test_sha256 = {
         "ead096741e6899f0e469bf7c6881974b543121234b7dcae496c6837c11f3b22a",
         "3a72e900c5c102c1317c1a371dea146126c36829176b810c34e85747d52aab0a",
         "43e5f15a1fac2644934ecaa11207a182f8ac41c217d93bea56ad1a08b7d7bc1b",
+        "ee0ee2918638c1289c7e136a0aa552c36d54c0a1b163f1b7eb281859d397d4bf",
     },
 }
 for path, admitted_sha256 in expected_test_sha256.items():
@@ -7887,6 +7907,294 @@ function verify_iic0bi_staged_scope() {
     verify_iic0bi_index_semantics
 }
 
+function verify_iic0biia_ownership_contract() {
+    local package_path=$1 ownership_path=$2 focused_test_path=$3
+    local boundary_path=$4 source_path
+    for source_path in "$package_path" "$ownership_path" \
+        "$focused_test_path" "$boundary_path"
+    do
+        xcrun swiftc -frontend -parse -enable-bare-slash-regex "$source_path"
+    done
+    python3 - "$package_path" "$ownership_path" \
+        "$focused_test_path" "$boundary_path" <<'PY'
+from pathlib import Path
+import hashlib
+import re
+import sys
+
+package_path, ownership_path, test_path, boundary_path = map(
+    Path, sys.argv[1:]
+)
+package = package_path.read_text(encoding="utf-8")
+ownership = ownership_path.read_text(encoding="utf-8")
+focused_test = test_path.read_text(encoding="utf-8")
+boundary = boundary_path.read_text(encoding="utf-8")
+
+def fail(message):
+    raise SystemExit(message)
+
+target = re.findall(
+    r'(?ms)\.target\(\s*name:\s*'
+    r'"StornautInvestigationMachineLaunchSupport"\s*,\s*'
+    r'dependencies:\s*\[(?P<dependencies>.*?)\]\s*\)',
+    package,
+)
+if len(target) != 1 or re.findall(r'"([^"]+)"', target[0]) != [
+    "StornautInvestigationHandoffContract"
+]:
+    fail("ii-c0b-ii-a target dependency surface drifted")
+products_prefix = package.split("    targets: [", 1)[0]
+if "StornautInvestigationMachineLaunchSupport" in products_prefix \
+        or package.count('"StornautInvestigationMachineLaunchSupport"') != 2:
+    fail("ii-c0b-ii-a target dependency surface drifted")
+test_target = re.findall(
+    r'(?ms)\.testTarget\(\s*name:\s*"StornautInvestigationTests"'
+    r'.*?dependencies:\s*\[(?P<dependencies>.*?)\]\s*\)',
+    package,
+)
+if len(test_target) != 1 or test_target[0].count(
+    '"StornautInvestigationMachineLaunchSupport"'
+) != 1:
+    fail("ii-c0b-ii-a target dependency surface drifted")
+
+imports = set(re.findall(
+    r"(?m)^import\s+([A-Za-z0-9_]+)\s*$", ownership
+))
+if imports != {"Darwin", "Foundation"}:
+    fail("ii-c0b-ii-a target dependency surface drifted")
+if re.search(
+    r"(?m)^\s*(?:public|open|package).*\b(?:URL|path|fileDescriptor|"
+    r"descriptor|Int32)\b", ownership
+):
+    fail("ii-c0b-ii-a path or descriptor exposure drifted")
+if re.search(r"(?m)^\s*(?:public|open|package)\s+", ownership) \
+        or re.search(r"\b(?:Codable|Encodable|Decodable)\b", ownership):
+    fail("ii-c0b-ii-a package-only or Codable surface drifted")
+for marker in (
+    "enum InvestigationMachineGateOwnershipError",
+    "case activeAttempt",
+    "case identityUnavailable",
+    "case ownershipUncertain",
+    "case alreadyReleased",
+    "protocol InvestigationMachineGateOwnershipSystem",
+    "struct InvestigationMachineGateIdentitySnapshot",
+    "struct InvestigationMachineGateMetadataSnapshot",
+    "enum InvestigationMachineGateFileType",
+    "enum InvestigationMachineGateSystemError",
+    "case errno(Int32)",
+    "struct InvestigationMachineGateOwnershipAcquirer",
+    "func acquire() throws -> InvestigationMachineGateOwnership",
+    "final class InvestigationMachineGateOwnership",
+    "@unchecked Sendable",
+    "func release() throws",
+    "func withExclusiveOwnership",
+    "protocol InvestigationMachineGateOwnershipMutex",
+    "func makeOwnershipMutex()",
+    "deinit",
+    "NSLock",
+):
+    if marker not in ownership:
+        fail(f"ii-c0b-ii-a ownership API drifted: {marker}")
+for marker in (
+    "Library", "Caches",
+    "com.eriklee.stornaut.task39-machine-gate", ".owner-lock-v1",
+):
+    if marker not in ownership:
+        fail(f"ii-c0b-ii-a fixed ownership path drifted: {marker}")
+compact = re.sub(r"\s+", "", ownership)
+for marker in (
+    "1_024", "2_048", "4_096", "8_192",
+    "16_384", "32_768", "65_536",
+    "O_CREAT", "O_EXCL", "O_RDWR", "O_CLOEXEC", "O_NONBLOCK", "O_ACCMODE",
+):
+    if marker not in ownership:
+        fail(f"ii-c0b-ii-a ownership primitive drifted: {marker}")
+flag_shapes = {
+    "directoryFlags": "directoryFlags=Int32(O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NONBLOCK|O_NOFOLLOW_ANY)",
+    "relativeDirectoryFlags": "relativeDirectoryFlags=Int32(directoryFlags|O_RESOLVE_BENEATH)",
+    "lockFlags": "lockFlags=Int32(O_RDWR|O_CLOEXEC|O_NONBLOCK|O_NOFOLLOW_ANY|O_RESOLVE_BENEATH|O_UNIQUE)",
+    "directoryNamedFlags": "directoryNamedFlags=Int32(AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH|AT_UNIQUE)",
+    "lockNamedFlags": "lockNamedFlags=Int32(directoryNamedFlags|AT_UNIQUE)",
+}
+for label, shape in flag_shapes.items():
+    if compact.count(shape) != 1:
+        fail(f"ii-c0b-ii-a ownership flag shape drifted: {label}")
+for token, count in {"O_NOFOLLOW_ANY": 2, "O_RESOLVE_BENEATH": 2,
+                     "O_UNIQUE": 1, "AT_UNIQUE": 2}.items():
+    if compact.count(token) != count:
+        fail(f"ii-c0b-ii-a ownership flag count drifted: {token}")
+if "LOCK_EX|LOCK_NB" not in compact:
+    fail("ii-c0b-ii-a lock acquisition flags drifted")
+if "descriptorFlags&FD_CLOEXEC==FD_CLOEXEC" not in compact:
+    fail("ii-c0b-ii-a lock descriptor inheritance drifted")
+if compact.count("held==named") != 2:
+    fail("ii-c0b-ii-a named descriptor identity revalidation drifted")
+if ("funcwithExclusiveOwnership<T>(_operation:()throws->T)throws->T{"
+        "lock.lock()defer{lock.unlock()}" not in compact):
+    fail("ii-c0b-ii-a ownership mutex linearization drifted")
+release_shape = ("trysystem.close(descriptor:descriptor)}catch{"
+                 "throwInvestigationMachineGateOwnershipError.ownershipUncertain}")
+if release_shape not in compact:
+    fail("ii-c0b-ii-a explicit close reporting drifted")
+if re.search(
+    r"\b(?:unlink|unlinkat|rename|renameat|renameatx_np|removeItem|"
+    r"replaceItem|moveItem|rmdir)\s*\(", ownership, re.I
+):
+    fail("ii-c0b-ii-a permanent lock invariant drifted")
+if re.search(
+    r"\b(?:chmod|chown|truncate|ftruncate)\s*\(", ownership
+):
+    fail("ii-c0b-ii-a existing lock repair drifted")
+if len(re.findall(r"\bfchmod\s*\(", ownership)) != 1:
+    fail("ii-c0b-ii-a existing lock repair drifted")
+for marker in (
+    "EWOULDBLOCK", "EAGAIN",
+    "acquireExclusiveNonblockingLock(descriptor:",
+):
+    if marker not in ownership:
+        fail("ii-c0b-ii-a contention classification drifted")
+for forbidden in (
+    r"\b(?:PID|pidFile|mtime|modificationDate|processName)\b",
+    r"kill\s*\([^,]+,\s*0\s*\)",
+    r"/(?:proc|var/run)/",
+):
+    if re.search(forbidden, ownership, re.I):
+        fail("ii-c0b-ii-a ownership heuristic drifted")
+for forbidden in (
+    r"import\s+Stornaut(?:Core|Codex|Lifecycle|Execution|ProcessSupport|"
+    r"InvestigationRuntime|InvestigationDiagnostic|ProbeBridge)",
+    r"\b(?:Process|NSXPCConnection|URLSession|NWConnection|FileManager|"
+    r"FileHandle|CommandLine|UserDefaults)\b",
+    r"\b(?:posix_spawnp?|fork|execv|execve|system|popen|AuthorizationCreate)\s*\(",
+    r"\b(?:socket|socketpair|connect|bind|listen|accept|send|recv)\s*\(",
+    r"\b(?:sudo|setuid|seteuid|setgid|setegid|readiness|signedRuntimeReady|containment|"
+    r"ActionExecutor|TrashMoving|RegisteredAction)\b",
+    r"\b(?:dup|dup2|dup3|F_DUPFD|F_DUPFD_CLOEXEC)\b",
+):
+    if re.search(forbidden, ownership, re.I):
+        fail("ii-c0b-ii-a gained prohibited authority or exposure")
+for marker in (
+    "acquireFreshOwnerWalksFromRootAndValidatesExactContract",
+    "acquireExistingOwnerReopensWithoutRepair",
+    "identityResolutionUsesTheExactBoundedCapacitySequence",
+    "onlyLockContentionMapsToActiveAttempt",
+    "namedIdentityReplacementBeforeOrAfterLockFailsClosed",
+    "explicitReleaseIsExactlyOnceAndTerminal",
+    "closeFailureIsReportedAsUncertainAndRemainsTerminal",
+    "releaseWaitsForAnInProgressExclusiveOperation",
+    "concurrentReleaseClosesTheLockExactlyOnce",
+    "heldOwnerForcesActiveAttemptAndReleaseAllowsReacquire",
+    "deinitPerformsOneBestEffortCloseWithoutRetryingExplicitFailure",
+):
+    if marker not in focused_test:
+        fail("ii-c0b-ii-a focused tests became vacuous")
+for marker in (
+    "iiC0BIIAOwnershipVerifierPinsContractAndScope",
+    "--iic0b-ii-a-ownership-contract-only",
+    "--iic0b-ii-a-staged-scope-contract-only",
+    "--iic0b-ii-a-source-contract-only",
+    "--iic0b-ii-a-component-boundary-only",
+):
+    if marker not in boundary:
+        fail(f"ii-c0b-ii-a boundary regression drifted: {marker}")
+expected_sha256 = {
+    package_path: "15bc5ce89b4a1c416df9c332cad2306cc26299f7903a0de15707f5e0cfbcab8f",
+    ownership_path: "eedda4e3a843a76898ddea4bc8fd243b6357efcbf17a4ea9e8438fdc0d561007",
+    test_path: "9ffdfa9d956655b05cf9813658a0d00449f38a075f991737f460b2864c8a1e21",
+}
+for path, expected in expected_sha256.items():
+    if hashlib.sha256(path.read_bytes()).hexdigest() != expected:
+        fail("ii-c0b-ii-a source or focused-test seal drifted")
+PY
+    local sil_sha
+    sil_sha=$(xcrun swiftc -D DEBUG -emit-silgen -parse-as-library \
+        -module-name StornautInvestigationMachineLaunchSupport "$ownership_path" \
+        | python3 -c 'import hashlib,re,sys;s=sys.stdin.buffer.read().replace(sys.argv[1].encode(),b"SOURCE");s=re.sub(rb"0x[0-9A-Fa-f]+",b"0xPTR",s);s=re.sub(rb"[0-9A-F]{8}(?:-[0-9A-F]{4}){3}-[0-9A-F]{12}",b"UUID",s);print(hashlib.sha256(s).hexdigest())' "$ownership_path") || return $?
+    [[ "$sil_sha" == 186a1e96dcf613b2285d6db9daefc6053bd8a49a56480beb42635e83aad0fc77 ]] || {
+        print -u2 "ii-c0b-ii-a compiled semantic surface drifted"; return 1
+    }
+}
+
+function verify_iic0biia_index_semantics() (
+    local staged_root staged_status=0
+    staged_root=$(mktemp -d \
+        "${TMPDIR:-/tmp}/stornaut-iic0biia-index.XXXXXX") || return $?
+    trap 'rm -rf "$staged_root"' EXIT
+    trap 'exit 130' INT; trap 'exit 143' TERM
+    git checkout-index --all --prefix="$staged_root/" \
+        || staged_status=$?
+    if (( staged_status == 0 )); then
+        (
+            cd "$staged_root"
+            scripts/verify-investigation-boundaries \
+                --iic0b-ii-a-ownership-contract-only \
+                Package.swift \
+                Sources/StornautInvestigationMachineLaunchSupport/InvestigationMachineGateOwnership.swift \
+                Tests/StornautInvestigationTests/InvestigationMachineGateOwnershipTests.swift \
+                Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift \
+                || exit $?
+            scripts/verify-app-release-boundaries \
+                --iic0b-ii-a-source-contract-only \
+                Package.swift \
+                Sources/StornautInvestigationMachineLaunchSupport/InvestigationMachineGateOwnership.swift \
+                scripts/verify-app-release-boundaries \
+                || exit $?
+        ) || staged_status=$?
+    fi
+    return $staged_status
+)
+
+function verify_iic0biia_staged_scope() {
+    local baseline=${1:-d18354bc7ca7dd2ddb04180298f9fb4f2e7c60e3}
+    local expected=(
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-app-release-boundaries
+        scripts/verify-contract
+        scripts/verify-investigation-boundaries
+    )
+    (( ${#expected} == 4 )) || {
+        print -u2 "ii-c0b-ii-a checkpoint path ceiling drifted"; return 1
+    }
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" == \
+        d18354bc7ca7dd2ddb04180298f9fb4f2e7c60e3 ]] \
+        && [[ "$(git rev-parse "$baseline^{tree}" 2>/dev/null)" == \
+        d6a4b0ea9f6ee53101fb986fdab5ac4b509de7ad ]] || {
+        print -u2 "ii-c0b-ii-a checkpoint baseline drifted"; return 1
+    }
+    if git diff --cached --name-only --diff-filter=D "$baseline" \
+        | awk 'index($0,"docs/")!=1 {found=1} END {exit !found}'
+    then
+        print -u2 "ii-c0b-ii-a checkpoint deleted an existing path"; return 1
+    fi
+    if git diff --cached --numstat "$baseline" \
+        | awk 'index($3,"docs/")!=1 && ($1=="-" || $2=="-") {found=1} END {exit !found}'
+    then
+        print -u2 "ii-c0b-ii-a binary checkpoint path rejected"; return 1
+    fi
+    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD \
+        "$baseline" | awk 'index($0,"docs/")!=1 && $0!="AGENTS.md" && $0!="README.md"')"})
+    [[ "${(j:\n:)${(@on)observed}}" == "${(j:\n:)${(@on)expected}}" ]] || {
+        print -u2 "ii-c0b-ii-a checkpoint paths drifted"; return 1
+    }
+    local checkpoint_path expected_mode entry
+    for checkpoint_path in "${expected[@]}"; do
+        expected_mode=100644
+        [[ $checkpoint_path == scripts/* ]] && expected_mode=100755
+        entry=$(git ls-files -s -- "$checkpoint_path")
+        [[ "$(print -r -- "$entry" | awk '{print $1, $3, $4}')" \
+            == "$expected_mode 0 $checkpoint_path" ]] || {
+            print -u2 "ii-c0b-ii-a checkpoint mode drifted: $checkpoint_path"
+            return 1
+        }
+    done
+    local changed=$(git diff --cached --numstat "$baseline" \
+        | awk 'index($3,"docs/")!=1 && $3!="AGENTS.md" && $3!="README.md" {n+=$1+$2} END {print n+0}')
+    (( changed <= 1200 && 1981 + changed <= 2870 )) || {
+        print -u2 "ii-c0b-ii-a checkpoint budget drifted"; return 1
+    }
+    verify_iic0biia_index_semantics
+}
+
 function verify_iib4_staged_scope() {
     local baseline=${1:-HEAD}
     local expected=(
@@ -10178,6 +10486,11 @@ later_installed_dependency = '                "StornautInvestigationInstalledL2"
 if historical_package.count(later_installed_dependency) != 2:
     raise SystemExit("live claim server later InstalledL2 test dependency drifted")
 historical_package = historical_package.replace(later_installed_dependency, "", 2)
+later_launch_target = '        .target(\n            name: "StornautInvestigationMachineLaunchSupport",\n            dependencies: [\n                "StornautInvestigationHandoffContract",\n            ]\n        ),\n'
+later_launch_dependency = '                "StornautInvestigationMachineLaunchSupport",\n'
+if historical_package.count(later_launch_target) != 1 or historical_package.count(later_launch_dependency) != 1:
+    raise SystemExit("live claim server later LaunchSupport projection drifted")
+historical_package = historical_package.replace(later_launch_target, "", 1).replace(later_launch_dependency, "", 1)
 if hashlib.sha256(historical_package.encode("utf-8")).hexdigest() != (
     "798247d986c73adb09f7b975b2ffc7793cdd04803fb4ec3bd1f41000cce7cb20"
 ):
@@ -11330,6 +11643,18 @@ fi
 if $iic0bi_staged_scope_contract_only; then
     verify_iic0bi_staged_scope "$iic0bi_staged_scope_baseline"
     print "ii-c0b-i staged scope verification passed."
+    exit 0
+fi
+if $iic0biia_ownership_contract_only; then
+    verify_iic0biia_ownership_contract \
+        "$iic0biia_package_source" "$iic0biia_ownership_source" \
+        "$iic0biia_focused_test_source" "$iic0biia_boundary_test_source"
+    print "ii-c0b-ii-a ownership contract verification passed."
+    exit 0
+fi
+if $iic0biia_staged_scope_contract_only; then
+    verify_iic0biia_staged_scope "$iic0biia_staged_scope_baseline"
+    print "ii-c0b-ii-a staged scope verification passed."
     exit 0
 fi
 if $iib3a_staged_scope_contract_only; then

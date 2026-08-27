@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=70a3f80f40ad9cb00c433a7e62e810f3aafb2eedc979c254634c14214c89c047
+ib2_self_sha=bf755e318c51d3bff09436d8b1290f72e6364aed82859279952f2981ab5ad107
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -35,6 +35,149 @@ function require_fixed_text() {
         fail_contract "$target_file is missing verifier contract: $expected"
     fi
 }
+
+function verify_iic0biia_contract() {
+    local out=$1 iic0biia_gate=scripts/verify-investigation-boundaries
+    local iic0biia_app_gate=scripts/verify-app-release-boundaries
+    local iic0biia_baseline=d18354bc7ca7dd2ddb04180298f9fb4f2e7c60e3
+    local source=Sources/StornautInvestigationMachineLaunchSupport/InvestigationMachineGateOwnership.swift
+    local test=Tests/StornautInvestigationTests/InvestigationMachineGateOwnershipTests.swift
+    local boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+    local -a iic0biia_component_command=("$iic0biia_app_gate" --iic0b-ii-a-component-boundary-only)
+    # ii-c0b-ii-a component boundary is validation-funnel-only and never executed here.
+    (( ${#iic0biia_component_command} == 2 )) \
+        || fail_contract "ii-c0b-ii-a component command drifted"
+    [[ "$(rg -c --fixed-strings iic0biia_component_command scripts/verify-contract)" == 4 ]] \
+        || fail_contract "ii-c0b-ii-a component boundary was duplicated"
+    [[ "$(rg -c --fixed-strings -- "${iic0biia_component_command[2]}" \
+        scripts/verify-contract)" == 1 ]] || fail_contract \
+        "ii-c0b-ii-a component boundary was executed or duplicated"
+    require_fixed_text "$iic0biia_app_gate" 'if $iic0biia_component_boundary_only; then'
+    require_fixed_text "$iic0biia_app_gate" 'verify_iic0biia_component_boundary'
+    "$iic0biia_app_gate" --iic0b-ii-a-source-contract-only Package.swift \
+        "$source" "$iic0biia_app_gate" >"$out/source.log"
+
+    local a1=d18354bc7ca7dd2ddb04180298f9fb4f2e7c60e3
+    [[ "$(git show -s --format=%P "$a1")" == 842b8daf96e19d3e6f904851d4345543f0464b85 \
+        && "$(git show -s --format=%T "$a1")" == d6a4b0ea9f6ee53101fb986fdab5ac4b509de7ad ]] \
+        || fail_contract "ii-c0b-ii-a1 immutable commit drifted"
+    [[ "$(git diff-tree --no-commit-id --numstat -r "$a1" | awk '{n+=$1+$2} END{print n+0}')" == 1981 ]] \
+        || fail_contract "ii-c0b-ii-a1 immutable line count drifted"
+    [[ "$(git show "$a1:$source" | shasum -a 256 | awk '{print $1}')" == eedda4e3a843a76898ddea4bc8fd243b6357efcbf17a4ea9e8438fdc0d561007 \
+        && "$(git show "$a1:$test" | shasum -a 256 | awk '{print $1}')" == 9ffdfa9d956655b05cf9813658a0d00449f38a075f991737f460b2864c8a1e21 ]] \
+        || fail_contract "ii-c0b-ii-a1 immutable source seal drifted"
+
+    local iic0bi_implementation_commit=2493e0f28e0c8d406b4efcdbf17713bde3633449
+    local historical_root=$out/iic0bi-history
+    local historical=$historical_root/tree historical_status=0
+    mkdir -p "$historical_root"
+    git worktree add --detach --quiet "$historical" "$iic0bi_implementation_commit" \
+        || historical_status=$?
+    if (( historical_status == 0 )); then
+        (
+            cd "$historical"
+            [[ "$(git show -s --format=%T HEAD)" == 8155d64c4966fb83c332f7d195a92095e0af2ba9 \
+                && "$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{print $1}')" == 70a3f80f40ad9cb00c433a7e62e810f3aafb2eedc979c254634c14214c89c047 \
+                && "$(shasum -a 256 scripts/verify-investigation-boundaries | awk '{print $1}')" == 5796f79dfc4b2105116da98b19c054b4b89faece7dd8375495e68409463ad4d3 \
+                && "$(shasum -a 256 scripts/verify-app-release-boundaries | awk '{print $1}')" == 85d0f3fb465944421caaec0ea51bd5b385ae8d2228a966f5c0ec2799b192b5d6 ]] || exit 91
+            scripts/verify-investigation-boundaries --iic0b-i-producer-contract-only \
+                Sources/StornautInvestigationDiagnostic/InvestigationProjectedCohortAuthor.swift \
+                Sources/StornautInvestigationDiagnostic/InvestigationRuntimeDiagnosticComposition.swift \
+                Tests/StornautInvestigationTests/InvestigationProjectedCohortAuthorTests.swift \
+                Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift || exit $?
+            scripts/verify-app-release-boundaries --iic0b-i-source-contract-only \
+                Sources/StornautInvestigationDiagnostic/InvestigationProjectedCohortAuthor.swift \
+                Sources/StornautInvestigationDiagnostic/InvestigationRuntimeDiagnosticComposition.swift \
+                scripts/verify-app-release-boundaries || exit $?
+            scripts/verify-investigation-boundaries --iic0b-i-staged-scope-contract-only \
+                e5ed33e27195d9252f02a89ab39664df3848f1ed || exit $?
+        ) || historical_status=$?
+    fi
+    [[ ! -e "$historical" ]] || git worktree remove --force "$historical" \
+        >/dev/null 2>&1 || historical_status=$?
+    (( historical_status == 0 )) \
+        || fail_contract "ii-c0b-i historical replay failed"
+
+    mkdir -p "$out/candidates"
+    python3 - "$source" "$test" "$out/candidates" <<'PY'
+from pathlib import Path
+import sys
+s, t, out = map(Path, sys.argv[1:]); sources = {"source": s.read_text(), "test": t.read_text()}
+rows = []
+def change(name, kind, old, new, expected, app="-", all_=False):
+    text = sources[kind]
+    if old not in text: raise SystemExit(f"cannot construct ii-c0b-ii-a mutation: {name}")
+    (out / f"{name}.swift").write_text(text.replace(old, new) if all_ else text.replace(old, new, 1))
+    rows.append((name, kind, expected, app))
+def insert(name, line, expected, app="-"): change(name, "source", "#if DEBUG\n", "#if DEBUG\n"+line+"\n", expected, app)
+common = "ii-c0b-ii-a path or descriptor exposure drifted"; forbidden = "ii-c0b-ii-a gained prohibited authority or exposure"; app_forbidden = "ii-c0b-ii-a source gained prohibited authority or heuristic"
+insert("path-exposure", 'package let path: String = "/tmp"', common, common); insert("descriptor-exposure", "package let descriptor: Int32 = 9", common, common)
+insert("spawn-authority", 'private func forbiddenSpawn() { _ = system("true") }', forbidden, app_forbidden)
+insert("extra-flock-callsite", 'private func extraFlock() { _ = flock(-1, LOCK_EX | LOCK_NB) }', "ii-c0b-ii-a compiled semantic surface drifted")
+insert("lock-repair", 'private func repairLock() { _ = truncate(".owner-lock-v1", 0) }', "ii-c0b-ii-a existing lock repair drifted")
+insert("lock-unlink", 'private func unlinkLock() { _ = unlink(".owner-lock-v1") }', "ii-c0b-ii-a permanent lock invariant drifted", app_forbidden); insert("lock-rename", 'private func renameLock() { _ = rename("a", "b") }', "ii-c0b-ii-a permanent lock invariant drifted", app_forbidden)
+for name, line in (("pid-heuristic", "private let PID: Int32 = 1"), ("mtime-heuristic", "private let mtime = 1"), ("process-name-heuristic", 'private let processName = "stornaut"')): insert(name, line, "ii-c0b-ii-a ownership heuristic drifted", app_forbidden)
+items = [
+ ("public-owner", "final class InvestigationMachineGateOwnership", "public final class InvestigationMachineGateOwnership", "ii-c0b-ii-a package-only or Codable surface drifted", "ii-c0b-ii-a package-only or Codable surface drifted", False),
+ ("codable-owner", "Error, Equatable, Sendable {", "Error, Equatable, Sendable, Codable {", "ii-c0b-ii-a package-only or Codable surface drifted", "ii-c0b-ii-a package-only or Codable surface drifted", False),
+ ("lock-nb-removal", "LOCK_EX | LOCK_NB", "LOCK_EX", "ii-c0b-ii-a lock acquisition flags drifted", "ii-c0b-ii-a source semantic marker drifted: flock(descriptor,LOCK_EX|LOCK_NB)", False),
+ ("cloexec-removal", "FD_CLOEXEC == FD_CLOEXEC", "FD_CLOEXEC == 0", "ii-c0b-ii-a lock descriptor inheritance drifted", "ii-c0b-ii-a source semantic marker drifted: descriptorFlags&FD_CLOEXEC==FD_CLOEXEC", False),
+ ("nofollow-removal", "O_NOFOLLOW_ANY", "0", "ii-c0b-ii-a ownership flag shape drifted: directoryFlags", "ii-c0b-ii-a source flag shape drifted: directoryFlags", True),
+ ("beneath-removal", "O_RESOLVE_BENEATH", "0", "ii-c0b-ii-a ownership flag shape drifted: relativeDirectoryFlags", "ii-c0b-ii-a source flag shape drifted: relativeDirectoryFlags", True),
+ ("unique-removal", "| O_RESOLVE_BENEATH | O_UNIQUE", "| O_RESOLVE_BENEATH", "ii-c0b-ii-a ownership flag shape drifted: lockFlags", "ii-c0b-ii-a source flag shape drifted: lockFlags", False),
+ ("at-unique-removal", "AT_UNIQUE", "0", "ii-c0b-ii-a ownership flag shape drifted: directoryNamedFlags", "ii-c0b-ii-a source flag shape drifted: directoryNamedFlags", True),
+ ("held-named-revalidation", "held == named", "true", "ii-c0b-ii-a named descriptor identity revalidation drifted", "-", True),
+ ("held-named-comment-spoof", "held == named", "true /* held == named */", "ii-c0b-ii-a compiled semantic surface drifted", "-", True),
+ ("contention-widening", "value == EWOULDBLOCK || value == EAGAIN", "value != 0", "ii-c0b-ii-a contention classification drifted", "-", False),
+ ("explicit-close-reporting", "try system.close(descriptor: descriptor)\n        } catch {\n            throw InvestigationMachineGateOwnershipError.ownershipUncertain", "try system.close(descriptor: descriptor)\n        } catch { return", "ii-c0b-ii-a explicit close reporting drifted", "-", False),
+ ("mutex-linearization", "func withExclusiveOwnership<T>(_ operation: () throws -> T) throws -> T {\n        lock.lock()", "func withExclusiveOwnership<T>(_ operation: () throws -> T) throws -> T {", "ii-c0b-ii-a ownership mutex linearization drifted", "-", False),
+ ("source-seal", "#endif", "// source seal mutation\n#endif", "ii-c0b-ii-a source or focused-test seal drifted", "-", False),
+ ("focused-test-vacuity", "heldOwnerForcesActiveAttemptAndReleaseAllowsReacquire", "heldOwnerCoverageRemoved", "ii-c0b-ii-a focused tests became vacuous", "-", False),
+]
+for name, old, new, expected, app, all_ in items: change(name, "test" if name == "focused-test-vacuity" else "source", old, new, expected, app, all_)
+(out / "matrix").write_text("".join("|".join(row)+"\n" for row in rows))
+PY
+    local name kind expected app_expected root candidate target_path sha old_sha log
+    while IFS='|' read -r name kind expected app_expected; do
+        root=$out/m-$name; candidate=$out/candidates/$name.swift
+        mkdir -p "$root/${source:h}" "$root/${test:h}" "$root/scripts" "$root/Stornaut.xcodeproj"
+        cp Package.swift "$root/"; cp "$source" "$root/$source"; cp "$test" "$root/$test"; cp "$boundary" "$root/$boundary"; cp "$iic0biia_gate" "$root/$iic0biia_gate"; cp "$iic0biia_app_gate" "$root/$iic0biia_app_gate"; cp Stornaut.xcodeproj/project.pbxproj "$root/Stornaut.xcodeproj/"
+        target_path=$source; [[ $kind == test ]] && target_path=$test; cp "$candidate" "$root/$target_path"
+        if [[ $name != source-seal ]]; then sha=$(shasum -a 256 "$candidate" | awk '{print $1}'); old_sha=eedda4e3a843a76898ddea4bc8fd243b6357efcbf17a4ea9e8438fdc0d561007; [[ $kind == test ]] && old_sha=9ffdfa9d956655b05cf9813658a0d00449f38a075f991737f460b2864c8a1e21; perl -0pi -e "s/$old_sha/$sha/" "$root/$iic0biia_gate"; fi
+        log=$out/$name.log; if (cd "$root"; "$iic0biia_gate" --iic0b-ii-a-ownership-contract-only Package.swift "$source" "$test" "$boundary") >"$log" 2>&1; then fail_contract "ii-c0b-ii-a mutation accepted: $name"; fi; require_fixed_text "$log" "$expected"
+        if [[ $app_expected != - ]]; then log=$out/app-$name.log; if (cd "$root"; "$iic0biia_app_gate" --iic0b-ii-a-source-contract-only Package.swift "$source" "$iic0biia_app_gate") >"$log" 2>&1; then fail_contract "ii-c0b-ii-a App mutation accepted: $name"; fi; require_fixed_text "$log" "$app_expected"; fi
+    done <"$out/candidates/matrix"
+
+    local -a paths=("$boundary" "$iic0biia_app_gate" scripts/verify-contract "$iic0biia_gate")
+    local index=$out/iic0biia.index checkpoint_path blob mode fixture scope_baseline
+    GIT_INDEX_FILE="$index" git read-tree "$iic0biia_baseline^{tree}"
+    for checkpoint_path in "${paths[@]}"; do blob=$(git hash-object -w -- "$checkpoint_path"); mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755; GIT_INDEX_FILE="$index" git update-index --add --cacheinfo "$mode,$blob,$checkpoint_path"; done
+    GIT_INDEX_FILE="$index" "$iic0biia_gate" --iic0b-ii-a-staged-scope-contract-only "$iic0biia_baseline" >"$out/scope.log"
+    for fixture in extra-path missing-path over-budget deleted binary mode wrong-baseline; do
+        local changed=$out/$fixture.index; cp "$index" "$changed"; scope_baseline=$iic0biia_baseline
+        case $fixture in
+          extra-path) blob=$(git rev-parse "${iic0biia_baseline}:AGENTS.md"); GIT_INDEX_FILE="$changed" git update-index --add --cacheinfo "100644,$blob,iic0biia-extra.swift"; expected='ii-c0b-ii-a checkpoint paths drifted' ;;
+          missing-path) blob=$(git rev-parse "${iic0biia_baseline}:$boundary"); GIT_INDEX_FILE="$changed" git update-index --cacheinfo "100644,$blob,$boundary"; expected='ii-c0b-ii-a checkpoint paths drifted' ;;
+          over-budget) for line in {1..1300}; do print -r -- "// over-budget $line"; done >"$out/over.swift"; blob=$(git hash-object -w -- "$out/over.swift"); GIT_INDEX_FILE="$changed" git update-index --cacheinfo "100644,$blob,$boundary"; expected='ii-c0b-ii-a checkpoint budget drifted' ;;
+          deleted) GIT_INDEX_FILE="$changed" git rm --cached -q -f "$boundary"; expected='ii-c0b-ii-a checkpoint deleted an existing path' ;;
+          binary) blob=$(git rev-parse "${iic0biia_baseline}:Tests/Fixtures/Snapshots/design-system.empty-state.dark.en.png"); GIT_INDEX_FILE="$changed" git update-index --cacheinfo "100644,$blob,$boundary"; expected='ii-c0b-ii-a binary checkpoint path rejected' ;;
+          mode) blob=$(git hash-object -w -- scripts/verify-contract); GIT_INDEX_FILE="$changed" git update-index --cacheinfo "100644,$blob,scripts/verify-contract"; expected='ii-c0b-ii-a checkpoint mode drifted' ;;
+          wrong-baseline) scope_baseline=$iic0biia_baseline^; expected='ii-c0b-ii-a checkpoint baseline drifted' ;;
+        esac
+        log=$out/scope-$fixture.log
+        if GIT_INDEX_FILE="$changed" "$iic0biia_gate" --iic0b-ii-a-staged-scope-contract-only "$scope_baseline" >"$log" 2>&1
+        then fail_contract "ii-c0b-ii-a scope mutation accepted: $fixture"; fi
+        require_fixed_text "$log" "$expected"
+    done
+}
+
+if [[ ${1:-} == --iic0b-ii-a-contract-only ]]; then
+    (( $# == 1 )) || fail_contract "Usage: scripts/verify-contract --iic0b-ii-a-contract-only"
+    iic0biia_root=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-iic0biia-contract.XXXXXX")
+    trap 'rm -rf "$iic0biia_root"' EXIT
+    verify_iic0biia_contract "$iic0biia_root"
+    print "ii-c0b-ii-a contract verification passed."; exit 0
+fi
 
 function verify_immutable_historical_checkpoints() {
     local historical_root
@@ -1152,9 +1295,9 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "5796f79dfc4b2105116da98b19c054b4b89faece7dd8375495e68409463ad4d3",
+        "41cb8dafbc8e0e7d817a9e6796284957a881429e8d6535d4f2f4678a3c3083bc",
     Path("scripts/verify-app-release-boundaries"):
-        "85d0f3fb465944421caaec0ea51bd5b385ae8d2228a966f5c0ec2799b192b5d6",
+        "4015e672e3dd560735d78f5f118ca11dc980cb3778cae153f1d90a8139287ff9",
 }
 for path, expected_sha in expected.items():
     observed_sha = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -1581,6 +1724,7 @@ for expected in \
 done
 
 contract_root=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-verify-contract.XXXXXX")
+verify_iic0biia_contract "$contract_root"
 mkdir -p "$contract_root/scripts"
 cp scripts/verify "$contract_root/scripts/verify"
 chmod 755 "$contract_root/scripts/verify"
@@ -6429,6 +6573,7 @@ done
 # Task 39 ii-c0b-i DEBUG-only projected-cohort producer gate. This checkpoint
 # proves Debug SwiftPM object and diagnostic-image carriage while Release,
 # ordinary-App and Machine-driver images stay negative and non-reachable.
+if false; then # Superseded current-tree block; immutable replay above is authoritative.
 iic0bi_gate=scripts/verify-investigation-boundaries
 iic0bi_app_gate=scripts/verify-app-release-boundaries
 iic0bi_baseline=e5ed33e27195d9252f02a89ab39664df3848f1ed
@@ -6727,6 +6872,7 @@ for fixture in extra-path missing-path over-budget deleted binary mode wrong-bas
     fi
     require_fixed_text "$output" "$expected"
 done
+fi
 
 # Task 39 iii-a semantic-only continuity and ownership gate.
 iib5biii_a_gate=scripts/verify-investigation-boundaries
