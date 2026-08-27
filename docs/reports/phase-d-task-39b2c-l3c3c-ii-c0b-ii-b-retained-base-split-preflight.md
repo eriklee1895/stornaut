@@ -82,7 +82,7 @@ payload, renames/unlinks a node, retries busy deletion or performs recovery.
 
 ### 3.1 Exact Scope and Budget
 
-Exactly six non-document paths and at most 1,600 added-or-changed lines:
+Exactly six non-document paths and at most 2,400 added-or-changed lines:
 
 1. `Sources/StornautInvestigationMachineLaunchSupport/InvestigationMachineGateOwnership.swift`;
 2. `Tests/StornautInvestigationTests/InvestigationMachineGateOwnershipTests.swift`;
@@ -91,7 +91,13 @@ Exactly six non-document paths and at most 1,600 added-or-changed lines:
 5. `scripts/verify-investigation-boundaries`; and
 6. `scripts/verify-app-release-boundaries`.
 
-A seventh non-document path or line 1,601 requires another split before coding.
+A first implementation pass reached 1,444 changed lines across five of the six
+frozen paths before `verify-contract` orchestration and final test completion.
+The former 1,600-line estimate therefore left no credible repair margin. The
+ceiling is corrected before validation to 2,400 lines; this remains below the
+repository's approximate 4,000-line mandatory split threshold and does not add
+a path or responsibility. A seventh non-document path or line 2,401 requires
+another split before coding continues.
 This checkpoint intentionally supersedes the current-tree a1/a2 source and
 component seals. Its verifier must preserve the two historical layers
 separately:
