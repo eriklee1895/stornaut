@@ -284,6 +284,14 @@ iic0biia3_focused_test_source=
 iic0biia3_boundary_test_source=
 iic0biia3_staged_scope_contract_only=false
 iic0biia3_staged_scope_baseline=fe3ea757432c4dc9cf960f210c167916697ce601
+iic0biib_capsule_contract_only=false
+iic0biib_package_source=
+iic0biib_ownership_source=
+iic0biib_capsule_source=
+iic0biib_focused_test_source=
+iic0biib_boundary_test_source=
+iic0biib_staged_scope_contract_only=false
+iic0biib_staged_scope_baseline=cbc469403f0ecfcdab17fb93baadd24d3c12f1ff
 iib3a_staged_scope_contract_only=false
 iib3a_staged_scope_baseline=HEAD
 iib3b_start_retire_contract_only=false
@@ -725,6 +733,18 @@ if (( $# > 0 )); then
         && [[ $1 == --iic0b-ii-a3-staged-scope-contract-only ]]; then
         iic0biia3_staged_scope_contract_only=true
         iic0biia3_staged_scope_baseline=${2:-fe3ea757432c4dc9cf960f210c167916697ce601}
+    elif (( $# == 6 )) \
+        && [[ $1 == --iic0b-ii-b-capsule-contract-only ]]; then
+        iic0biib_capsule_contract_only=true
+        iic0biib_package_source=$2
+        iic0biib_ownership_source=$3
+        iic0biib_capsule_source=$4
+        iic0biib_focused_test_source=$5
+        iic0biib_boundary_test_source=$6
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iic0b-ii-b-staged-scope-contract-only ]]; then
+        iic0biib_staged_scope_contract_only=true
+        iic0biib_staged_scope_baseline=${2:-cbc469403f0ecfcdab17fb93baadd24d3c12f1ff}
     elif (( $# == 1 || $# == 2 )) \
         && [[ $1 == --iib3a-staged-scope-contract-only ]]; then
         iib3a_staged_scope_contract_only=true
@@ -750,7 +770,7 @@ if (( $# > 0 )); then
         iib3c_staged_scope_baseline=${2:-HEAD}
     else
         print -u2 \
-            "Usage: scripts/verify-investigation-boundaries [... | --iib5biii-b2b1a0-provenance-contract-only <composition> <bridge> <bridge-test> <protocol-test> <boundary-test> | --iib5biii-b2b1a0-staged-scope-contract-only [baseline] | --iib5biii-b2b1a1-outer-observation-contract-only <app-identity> <outer-observation> <composition> <focused-test> <boundary-test> | --iib5biii-b2b1a1-staged-scope-contract-only [baseline] | --iib5biii-b2b1b-zero-entry-contract-only <support> <entry> <support-test> <entry-test> <boundary-test> | --iib5biii-b2b1b-staged-scope-contract-only [baseline] | --iic0b-ii-a3-retained-base-contract-only <ownership> <focused-test> <boundary-test> | --iic0b-ii-a3-staged-scope-contract-only [baseline]]"
+            "Usage: scripts/verify-investigation-boundaries [... | --iic0b-ii-a3-retained-base-contract-only <ownership> <focused-test> <boundary-test> | --iic0b-ii-a3-staged-scope-contract-only [baseline] | --iic0b-ii-b-capsule-contract-only <package> <ownership> <capsule> <focused-test> <boundary-test> | --iic0b-ii-b-staged-scope-contract-only [baseline]]"
         exit 64
     fi
 fi
@@ -3980,9 +4000,7 @@ function verify_iib5biii_b2b1a0_provenance_contract() {
         "$bridge_test_source" "$protocol_test_source" \
         "$boundary_test_source" <<'PY'
 from pathlib import Path
-import hashlib
 import re
-import subprocess
 import sys
 
 composition_path, bridge_path, bridge_test_path, protocol_test_path, boundary_path = map(
@@ -8785,6 +8803,331 @@ function verify_iic0biia3_staged_scope() {
     verify_iic0biia3_index_semantics
 }
 
+function verify_iic0biib_capsule_contract() {
+    local package_path=$1 ownership_path=$2 capsule_path=$3
+    local focused_test_path=$4 boundary_path=$5 source_path
+    for source_path in "$ownership_path" "$capsule_path" \
+        "$focused_test_path" "$boundary_path"
+    do
+        xcrun swiftc -frontend -parse -enable-bare-slash-regex \
+            "$source_path" || return $?
+    done
+    python3 - "$package_path" "$ownership_path" "$capsule_path" \
+        "$focused_test_path" "$boundary_path" <<'PY'
+from pathlib import Path
+import hashlib
+import re
+import subprocess
+import sys
+
+package_path, ownership_path, capsule_path, focused_path, boundary_path = map(
+    Path, sys.argv[1:]
+)
+package = package_path.read_text(encoding="utf-8")
+ownership = ownership_path.read_text(encoding="utf-8")
+capsule = capsule_path.read_text(encoding="utf-8")
+focused = focused_path.read_text(encoding="utf-8")
+boundary = boundary_path.read_text(encoding="utf-8")
+
+def fail(message):
+    raise SystemExit(message)
+
+for label, source, expected_prefix in (
+    ("ownership", ownership, ["import Darwin", "import Foundation", "#if DEBUG"]),
+    ("capsule", capsule, [
+        "import Darwin", "import Foundation",
+        "import StornautInvestigationHandoffContract", "#if DEBUG",
+    ]),
+):
+    lines = [line.strip() for line in source.splitlines() if line.strip()]
+    if lines[:len(expected_prefix)] != expected_prefix \
+            or lines[-1] != "#endif" \
+            or lines.count("#if DEBUG") != 1 \
+            or lines.count("#endif") != 1 \
+            or any(line.startswith(("#else", "#elseif")) for line in lines):
+        fail(f"ii-c0b-ii-b source DEBUG boundary drifted: {label}")
+
+target = re.findall(
+    r'(?ms)\.target\(\s*name:\s*'
+    r'"StornautInvestigationMachineLaunchSupport"\s*,\s*'
+    r'dependencies:\s*\[(?P<dependencies>.*?)\]\s*\)', package,
+)
+if len(target) != 1 or re.findall(r'"([^"]+)"', target[0]) != [
+    "StornautInvestigationHandoffContract"
+]:
+    fail("ii-c0b-ii-b target dependency surface drifted")
+if re.search(r"(?m)^\s*(?:public|open)\s+", ownership + capsule) \
+        or re.search(r"\b(?:Codable|Encodable|Decodable)\b", capsule):
+    fail("ii-c0b-ii-b package-only or Codable surface drifted")
+package_headers = []
+lines = capsule.splitlines()
+for index, line in enumerate(lines):
+    if not re.match(r"^\s*package\s+", line):
+        continue
+    header = line.strip()
+    if re.search(r"\b(?:func|init|subscript)\b", header):
+        cursor = index + 1
+        while "{" not in header and cursor < len(lines) \
+                and cursor <= index + 16:
+            header += " " + lines[cursor].strip()
+            cursor += 1
+    package_headers.append(header.split("{", 1)[0])
+package_declarations = "\n".join(package_headers)
+if re.search(r"\b(?:Int32|CInt|FileDescriptor|UnsafeFileHandle|URL)\b",
+             package_declarations) \
+        or re.search(r"\b(?:path|fileDescriptor|descriptor)\b",
+                     package_declarations, re.I) \
+        or re.search(r"@escaping|\bfunc\s+\w+\s*<",
+                     package_declarations):
+    fail("ii-c0b-ii-b raw descriptor, path, URL or callback surface drifted")
+if re.search(
+    r"\b(?:FileManager|removeItem|replaceItem|moveItem|"
+    r"removeItemRecursively|Darwin\.unlink)\b", capsule, re.I,
+) or re.search(
+    r"(?m)^(?!\s*func\s+unlink\b)[^\n]*"
+    r"(?<![A-Za-z0-9_.])unlink\s*\(", capsule,
+):
+    fail("ii-c0b-ii-b broad cleanup or lock mutation drifted")
+if re.search(
+    r"\b(?:Date|CFAbsoluteTimeGetCurrent|ProcessInfo|mtime|"
+    r"modificationDate|pid|processName|getpid|getppid)\b", capsule, re.I,
+):
+    fail("ii-c0b-ii-b retry or heuristic boundary drifted")
+for forbidden in (
+    "import StornautCore", "import StornautCodex",
+    "import StornautLifecycle", "import StornautExecution",
+    "import StornautInvestigationRuntime",
+    "import StornautInvestigationDiagnostic",
+    "import StornautProbeBridge", "NSXPCConnection",
+    "AuthorizationCreate", "Foundation.Process(", "URLSession",
+):
+    if forbidden in ownership + capsule:
+        fail(f"ii-c0b-ii-b product or privileged reachability drifted: {forbidden}")
+for marker in (
+    "InvestigationOwnerOnlyCapsuleSettlement",
+    "monotonicNanoseconds",
+    "EBUSY",
+    "AT_NODELETEBUSY",
+    "AT_UNIQUE",
+    "AT_SYMLINK_NOFOLLOW_ANY",
+    "AT_RESOLVE_BENEATH",
+    "decoded.capsule.outerAttemptUUID == attemptUUID",
+    "revalidateEmptyDirectoryPlan(",
+):
+    if marker not in capsule:
+        fail(f"ii-c0b-ii-b retry or heuristic boundary drifted: {marker}")
+for marker in (
+    "InvestigationOwnerOnlyCapsuleSettlementToken",
+    "InvestigationOwnerOnlyCapsuleExactGateReapedProof",
+    "InvestigationOwnerOnlyCapsuleNeverHandedOffProof",
+    "closeReaderForSettlement",
+    "releaseOwnership",
+    "private let settlementToken = InvestigationOwnerOnlyCapsuleSettlementToken()",
+):
+    if marker not in capsule:
+        fail(f"ii-c0b-ii-b close and reap binding drifted: {marker}")
+if capsule.count("private let settlementToken =") != 1 \
+        or capsule.count("settlementToken.consume()") != 2:
+    fail("ii-c0b-ii-b close and reap binding drifted")
+if "private let settlementToken = InvestigationOwnerOnlyCapsuleSettlementToken()" \
+        not in capsule:
+    fail("ii-c0b-ii-b close and reap binding drifted")
+if (ownership + capsule).count("InvestigationOwnerOnlyCapsuleLease.make(") != 1:
+    fail("ii-c0b-ii-b one-shot lease cardinality drifted")
+if "try? system.inventory" in capsule \
+        or "try! system.inventory" in capsule:
+    fail("ii-c0b-ii-b inventory failure was swallowed")
+inventory = capsule.find("let inventory = try at(.inventory")
+recovery = capsule.find(
+    "InvestigationOwnerOnlyCapsuleSettlement.recoverStale", inventory
+)
+first_mutation = capsule.find("try system.createDirectory(")
+if min(inventory, recovery, first_mutation) < 0 \
+        or not inventory < recovery < first_mutation:
+    fail("ii-c0b-ii-b mutation before complete inventory drifted")
+retry = capsule.find("private static func unlinkWithBusyRetry(")
+if retry < 0:
+    fail("ii-c0b-ii-b retry or heuristic boundary drifted")
+retry_end = capsule.find("\n    private static func requireAbsent(", retry)
+if retry_end < 0:
+    fail("ii-c0b-ii-b retry or heuristic boundary drifted")
+retry_body = capsule[retry:retry_end]
+for marker in (
+    "where value == EBUSY",
+    "retries <= maximumBusyRetries",
+    "now = try system.monotonicNanoseconds()",
+    "now < deadline",
+    "system.waitForRetry(",
+    "afterWait = try system.monotonicNanoseconds()",
+    "afterWait < deadline",
+    "try revalidate()",
+):
+    if marker not in retry_body:
+        fail(f"ii-c0b-ii-b retry or heuristic boundary drifted: {marker}")
+if "retries <= maximumBusyRetries" not in retry_body:
+    fail("ii-c0b-ii-b retry or heuristic boundary drifted")
+directory_revalidation = capsule.find(
+    "private static func revalidateEmptyDirectoryPlan("
+)
+directory_identity_helper = capsule.find(
+    "private static func hasStableDirectoryIdentityAndSecurity(",
+    directory_revalidation,
+)
+if min(directory_revalidation, directory_identity_helper) < 0:
+    fail("ii-c0b-ii-b directory retry revalidation drifted")
+directory_body = capsule[directory_revalidation:directory_identity_helper]
+for marker in (
+    "system.openComponent(",
+    "validateDirectory(",
+    "system.inventory(",
+    "inventory.reachedEnd",
+    "inventory.entries.isEmpty",
+    "system.close(descriptor: directory)",
+):
+    if marker not in directory_body:
+        fail(f"ii-c0b-ii-b directory retry revalidation drifted: {marker}")
+if directory_body.count("try system.close(descriptor: directory)") != 1:
+    fail(
+        "ii-c0b-ii-b directory retry revalidation drifted: "
+        "system.close(descriptor: directory)"
+    )
+settlement_start = capsule.find(
+    "enum InvestigationOwnerOnlyCapsuleSettlement {"
+)
+validate_directory = capsule.find(
+    "\n    private static func validateDirectory(", settlement_start
+)
+validate_file = capsule.find(
+    "private static func validateFile(", validate_directory
+)
+if min(settlement_start, validate_directory, validate_file) < 0:
+    fail("ii-c0b-ii-b directory retry revalidation drifted")
+validation_body = capsule[validate_directory:validate_file]
+for marker in (
+    "let held = try system.metadata(",
+    "let named = try system.namedMetadata(",
+    "held == named",
+    "system.extendedACLIsEmpty(",
+    "system.extendedAttributeNames(",
+):
+    if marker not in validation_body:
+        fail(f"ii-c0b-ii-b directory retry revalidation drifted: {marker}")
+remove_start = capsule.find("private static func remove(")
+directory_unlink = capsule.find("flags: directoryUnlinkFlags", remove_start)
+retry_start = capsule.rfind("try unlinkWithBusyRetry(", remove_start, directory_unlink)
+first_directory_revalidation = capsule.rfind(
+    "try revalidateEmptyDirectoryPlan(", remove_start, retry_start
+)
+retry_closure = capsule.find(
+    "try revalidateEmptyDirectoryPlan(", retry_start
+)
+if min(remove_start, directory_unlink, retry_start, \
+       first_directory_revalidation, retry_closure) < 0 \
+        or not remove_start < first_directory_revalidation < retry_start \
+        or not retry_start < directory_unlink < retry_closure:
+    fail("ii-c0b-ii-b directory retry revalidation order drifted")
+focused_markers = (
+    "neverHandedOffProofSettlesPublishedNodeOnce",
+    "validEmptyStaleLeafRecoversBeforeFreshPublication",
+    "stalePayloadMustMatchAttemptDirectoryUUID",
+    "directoryBusyRetryReopensAndFullyRevalidatesEmptyLeaf",
+    "directoryBusyRetryRejectsMetadataOrContentDrift",
+)
+for marker in focused_markers:
+    if marker not in focused:
+        fail(f"ii-c0b-ii-b focused tests became vacuous: {marker}")
+for marker in (
+    "iiC0BIIBCapsuleVerifierPinsAggregateContractAndScope",
+    "--iic0b-ii-b-capsule-contract-only",
+    "--iic0b-ii-b-staged-scope-contract-only",
+    "--iic0b-ii-b-source-contract-only",
+    "--iic0b-ii-b-component-boundary-only",
+):
+    if marker not in boundary:
+        fail(f"ii-c0b-ii-b boundary regression drifted: {marker}")
+PY
+}
+
+function verify_iic0biib_index_semantics() (
+    local staged_root staged_status=0
+    staged_root=$(mktemp -d \
+        "${TMPDIR:-/tmp}/stornaut-iic0biib-index.XXXXXX") || return $?
+    trap 'rm -rf "$staged_root"' EXIT
+    trap 'exit 130' INT; trap 'exit 143' TERM
+    git checkout-index --all --prefix="$staged_root/" \
+        || staged_status=$?
+    if (( staged_status == 0 )); then
+        (
+            cd "$staged_root"
+            scripts/verify-investigation-boundaries \
+                --iic0b-ii-b-capsule-contract-only \
+                Package.swift \
+                Sources/StornautInvestigationMachineLaunchSupport/InvestigationMachineGateOwnership.swift \
+                Sources/StornautInvestigationMachineLaunchSupport/InvestigationOwnerOnlyCapsule.swift \
+                Tests/StornautInvestigationTests/InvestigationOwnerOnlyCapsuleTests.swift \
+                Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+            scripts/verify-app-release-boundaries \
+                --iic0b-ii-b-source-contract-only \
+                Package.swift \
+                Sources/StornautInvestigationMachineLaunchSupport/InvestigationMachineGateOwnership.swift \
+                Sources/StornautInvestigationMachineLaunchSupport/InvestigationOwnerOnlyCapsule.swift \
+                scripts/verify-app-release-boundaries
+        ) || staged_status=$?
+    fi
+    return $staged_status
+)
+
+function verify_iic0biib_staged_scope() {
+    local baseline=${1:-cbc469403f0ecfcdab17fb93baadd24d3c12f1ff}
+    local expected=(
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-app-release-boundaries
+        scripts/verify-contract
+        scripts/verify-investigation-boundaries
+    )
+    (( ${#expected} == 4 )) || {
+        print -u2 "ii-c0b-ii-b aggregate checkpoint path ceiling drifted"; return 1
+    }
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" == \
+        cbc469403f0ecfcdab17fb93baadd24d3c12f1ff \
+        && "$(git rev-parse "$baseline^{tree}" 2>/dev/null)" == \
+        8ec89e24cece79ad7559a25c0fad9681442bae5d ]] || {
+        print -u2 "ii-c0b-ii-b aggregate checkpoint baseline drifted"; return 1
+    }
+    if git diff --cached --name-only --diff-filter=D "$baseline" \
+        | awk 'index($0,"docs/")!=1 {found=1} END {exit !found}'
+    then
+        print -u2 "ii-c0b-ii-b aggregate checkpoint deleted an existing path"; return 1
+    fi
+    if git diff --cached --numstat "$baseline" \
+        | awk 'index($3,"docs/")!=1 && ($1=="-" || $2=="-") {found=1} END {exit !found}'
+    then
+        print -u2 "ii-c0b-ii-b aggregate binary checkpoint path rejected"; return 1
+    fi
+    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD \
+        "$baseline" | awk 'index($0,"docs/")!=1 && $0!="AGENTS.md" && $0!="README.md"')"})
+    [[ "${(j:\n:)${(@on)observed}}" == "${(j:\n:)${(@on)expected}}" ]] || {
+        print -u2 "ii-c0b-ii-b aggregate checkpoint paths drifted"; return 1
+    }
+    local checkpoint_path expected_mode entry
+    for checkpoint_path in "${expected[@]}"; do
+        expected_mode=100644
+        [[ $checkpoint_path == scripts/* ]] && expected_mode=100755
+        entry=$(git ls-files -s -- "$checkpoint_path")
+        [[ "$(print -r -- "$entry" | awk '{print $1, $3, $4}')" \
+            == "$expected_mode 0 $checkpoint_path" ]] || {
+            print -u2 "ii-c0b-ii-b aggregate checkpoint mode drifted: $checkpoint_path"
+            return 1
+        }
+    done
+    local changed=$(git diff --cached --numstat "$baseline" \
+        | awk 'index($3,"docs/")!=1 && $3!="AGENTS.md" && $3!="README.md" {n+=$1+$2} END {print n+0}')
+    (( changed <= 1800 )) || {
+        print -u2 "ii-c0b-ii-b aggregate checkpoint budget drifted"; return 1
+    }
+    verify_iic0biib_index_semantics
+}
+
 function verify_iib4_staged_scope() {
     local baseline=${1:-HEAD}
     local expected=(
@@ -12257,6 +12600,19 @@ fi
 if $iic0biia3_staged_scope_contract_only; then
     verify_iic0biia3_staged_scope "$iic0biia3_staged_scope_baseline"
     print "ii-c0b-ii-a3 staged scope verification passed."
+    exit 0
+fi
+if $iic0biib_capsule_contract_only; then
+    verify_iic0biib_capsule_contract \
+        "$iic0biib_package_source" "$iic0biib_ownership_source" \
+        "$iic0biib_capsule_source" "$iic0biib_focused_test_source" \
+        "$iic0biib_boundary_test_source"
+    print "ii-c0b-ii-b capsule contract verification passed."
+    exit 0
+fi
+if $iic0biib_staged_scope_contract_only; then
+    verify_iic0biib_staged_scope "$iic0biib_staged_scope_baseline"
+    print "ii-c0b-ii-b staged scope verification passed."
     exit 0
 fi
 if $iib3a_staged_scope_contract_only; then

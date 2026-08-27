@@ -852,6 +852,128 @@ struct InvestigationMachineTargetBoundaryTests {
         }
     }
 
+    @Test
+    func iiC0BIIBCapsuleVerifierPinsAggregateContractAndScope() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundaries = try l3c3biiSource(
+            "scripts/verify-investigation-boundaries", repositoryRoot: root)
+        let release = try l3c3biiSource(
+            "scripts/verify-app-release-boundaries", repositoryRoot: root)
+        let contract = try l3c3biiSource(
+            "scripts/verify-contract", repositoryRoot: root)
+        let scope = try l3c3biiFunction(
+            "verify_iic0biib_staged_scope", in: boundaries
+        )
+
+        for marker in [
+            "--iic0b-ii-b-capsule-contract-only",
+            "--iic0b-ii-b-staged-scope-contract-only",
+            "function verify_iic0biib_capsule_contract()",
+            "function verify_iic0biib_index_semantics()",
+            "function verify_iic0biib_staged_scope()",
+            "ii-c0b-ii-b package-only or Codable surface drifted",
+            "ii-c0b-ii-b raw descriptor, path, URL or callback surface drifted",
+            "ii-c0b-ii-b broad cleanup or lock mutation drifted",
+            "ii-c0b-ii-b mutation before complete inventory drifted",
+            "ii-c0b-ii-b retry or heuristic boundary drifted",
+            "ii-c0b-ii-b close and reap binding drifted",
+            "ii-c0b-ii-b one-shot lease cardinality drifted",
+            "ii-c0b-ii-b inventory failure was swallowed",
+            "ii-c0b-ii-b product or privileged reachability drifted",
+            "ii-c0b-ii-b directory retry revalidation drifted",
+            "ii-c0b-ii-b directory retry revalidation order drifted",
+            "decoded.capsule.outerAttemptUUID == attemptUUID",
+            "stalePayloadMustMatchAttemptDirectoryUUID",
+            "directoryBusyRetryReopensAndFullyRevalidatesEmptyLeaf",
+            "directoryBusyRetryRejectsMetadataOrContentDrift",
+            "ii-c0b-ii-b focused tests became vacuous",
+            "ii-c0b-ii-b aggregate checkpoint paths drifted",
+            "ii-c0b-ii-b aggregate checkpoint mode drifted",
+            "ii-c0b-ii-b aggregate checkpoint budget drifted",
+        ] {
+            #expect(boundaries.contains(marker))
+        }
+        for marker in [
+            "30338abf8f179d2369f49d301045ebffea49237a",
+            "c4ca6ae2e9e262d30745e6b8548eeee10211722a",
+            "ii-c0b-ii-b child checkpoint drifted",
+        ] {
+            #expect(contract.contains(marker))
+        }
+        for marker in [
+            "cbc469403f0ecfcdab17fb93baadd24d3c12f1ff",
+            "8ec89e24cece79ad7559a25c0fad9681442bae5d",
+            "(( ${#expected} == 4 ))",
+            "(( changed <= 1800 ))",
+        ] {
+            #expect(scope.contains(marker) || boundaries.contains(marker))
+        }
+
+        for marker in [
+            "--iic0b-ii-b-source-contract-only",
+            "--iic0b-ii-b-component-boundary-only",
+            "function verify_iic0biib_source_contract()",
+            "function verify_iic0biib_component_boundary()",
+            "iic0biib_component_symbols=(",
+            "iic0biib_swiftpm_debug_objects=(",
+            "iic0biib_swiftpm_release_objects=(",
+            "iic0biib_closed_images=(",
+            "iic0biib_required_executables=(",
+            "iic0biib_module_namespace=",
+            "ii-c0b-ii-b Debug SwiftPM object positive control is missing",
+            "ii-c0b-ii-b Debug module namespace positive control is missing",
+            "ii-c0b-ii-b Release SwiftPM object negative control is missing",
+            "ii-c0b-ii-b source leaked into Release SwiftPM object",
+            "ii-c0b-ii-b module namespace leaked into Release SwiftPM object",
+            "ii-c0b-ii-b source leaked into a closed image",
+            "ii-c0b-ii-b module namespace leaked into a closed image",
+            "ii-c0b-ii-b source DEBUG boundary drifted",
+            "ii-c0b-ii-b target became a package product",
+            "ii-c0b-ii-b target gained Xcode membership",
+            "ii-c0b-ii-b target source inventory drifted",
+            "ii-c0b-ii-b existing component roots unavailable",
+            #"verify_iic0biib_component_boundary \"#,
+            #""$scratch/swiftpm-debug" "$scratch/swiftpm-release""#,
+        ] {
+            #expect(release.contains(marker))
+        }
+
+        for marker in [
+            "function verify_iic0biib_contract()",
+            "iic0biib_b1_commit=30338abf8f179d2369f49d301045ebffea49237a",
+            "iic0biib_b1_tree=c4ca6ae2e9e262d30745e6b8548eeee10211722a",
+            "iic0biib_b2_commit=cbc469403f0ecfcdab17fb93baadd24d3c12f1ff",
+            "iic0biib_b2_tree=8ec89e24cece79ad7559a25c0fad9681442bae5d",
+            "bf7cee7e2aa06458c7978f74887cf54d2199daff3153af6a81f2a531beb83b68",
+            "6039a0b344b952314139a72d70f4c8d5a70014deca3c493978fce744d7a721d9",
+            "942c39d646bde28e62351890ef07caa922fdeab1209b652dd351134316d36826",
+            "--iic0b-ii-b-capsule-contract-only",
+            "--iic0b-ii-b-staged-scope-contract-only",
+            "--iic0b-ii-b-source-contract-only",
+            "--iic0b-ii-b-component-boundary-only",
+            "ii-c0b-ii-b mutation accepted:",
+            "ii-c0b-ii-b generated mutation inventory drifted",
+            "ii-c0b-ii-b generated mutation inventory duplicated",
+            "ii-c0b-ii-b App mutation accepted:",
+            "ii-c0b-ii-b scope mutation accepted:",
+            "recursive-cleanup", "ordinary-unlink",
+            "raw-descriptor", "path-surface", "url-surface",
+            "generic-callback", "multiple-lease", "lock-mutation",
+            "mutation-before-inventory", "unbounded-retry",
+            "wall-clock", "pid-heuristic", "mtime-heuristic",
+            "missing-close-reap-binding", "product-authority",
+            "swallowed-inventory-failure", "swallowed-command-failure",
+            "release-renamed-authority",
+            "target-extra-source", "verifier-command-failure",
+            "ii-c0b-ii-b verifier command failure was swallowed",
+            "extra-path", "missing-path", "over-budget", "deleted",
+            "binary", "mode", "wrong-baseline",
+        ] {
+            #expect(contract.contains(marker))
+        }
+    }
+
     private func l3c3biiSource(
         _ path: String,
         repositoryRoot: URL

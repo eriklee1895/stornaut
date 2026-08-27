@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=8f806292f6dea6cfcf9b7d85430c5f1f0bbf7a0eae646cf3db96f8d8fff365c4
+ib2_self_sha=b66b542bb4cc4435002025b79f4ca4cf2ce4ba6782bd20c070ca891aa24fa7a5
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -735,6 +735,512 @@ PY
     done
 }
 
+function verify_iic0biib_contract() {
+    local out=$1
+    mkdir -p "$out"
+    local iic0biib_a3_commit=128e37a045e8c362b5a98bc4198acc3715e0b29d
+    local iic0biib_a3_tree=16fafcbd621201612c939deeef682417682f352a
+    local iic0biib_b1_commit=30338abf8f179d2369f49d301045ebffea49237a
+    local iic0biib_b1_tree=c4ca6ae2e9e262d30745e6b8548eeee10211722a
+    local iic0biib_b2_commit=cbc469403f0ecfcdab17fb93baadd24d3c12f1ff
+    local iic0biib_b2_tree=8ec89e24cece79ad7559a25c0fad9681442bae5d
+    local ownership=Sources/StornautInvestigationMachineLaunchSupport/InvestigationMachineGateOwnership.swift
+    local capsule=Sources/StornautInvestigationMachineLaunchSupport/InvestigationOwnerOnlyCapsule.swift
+    local focused=Tests/StornautInvestigationTests/InvestigationOwnerOnlyCapsuleTests.swift
+    local boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+    local gate=scripts/verify-investigation-boundaries
+    local app_gate=scripts/verify-app-release-boundaries
+    local -a iic0biib_component_command=(
+        "$app_gate" --iic0b-ii-b-component-boundary-only
+    )
+    local iic0biib_component_invocation="verify_iic0biib_component_boundary"
+    local -a iic0biib_mutations=(
+        recursive-cleanup ordinary-unlink raw-descriptor path-surface
+        url-surface generic-callback multiple-lease lock-mutation
+        mutation-before-inventory unbounded-retry wall-clock pid-heuristic
+        mtime-heuristic missing-close-reap-binding product-authority
+        swallowed-inventory-failure swallowed-command-failure
+        attempt-uuid-unbound directory-revalidation-missing
+        directory-retry-revalidation-missing directory-acl-bypass
+        directory-xattr-bypass directory-inventory-bypass
+        directory-close-bypass release-renamed-authority
+    )
+    local -a iic0biib_scope_mutations=(
+        extra-path missing-path over-budget deleted binary mode wrong-baseline
+    )
+    local -a iic0biib_infrastructure_mutations=(
+        target-extra-source verifier-command-failure
+    )
+    (( ${#iic0biib_mutations} == 25 \
+        && ${#iic0biib_scope_mutations} == 7 \
+        && ${#iic0biib_infrastructure_mutations} == 2 )) \
+        || fail_contract "ii-c0b-ii-b mutation inventory drifted"
+    [[ "$(git show -s --format=%P "$iic0biib_a3_commit")" == \
+        fe3ea757432c4dc9cf960f210c167916697ce601 \
+        && "$(git show -s --format=%T "$iic0biib_a3_commit")" == \
+        "$iic0biib_a3_tree" ]] \
+        || fail_contract "ii-c0b-ii-b child checkpoint drifted: a3"
+    local -a a3_paths=(
+        ${(f)"$(git diff-tree --no-commit-id --name-only -r \
+            "$iic0biib_a3_commit" | awk 'index($0,"docs/")!=1' \
+            | LC_ALL=C sort)"}
+    )
+    local -a expected_a3_paths=(
+        Sources/StornautInvestigationMachineLaunchSupport/InvestigationMachineGateOwnership.swift
+        Tests/StornautInvestigationTests/InvestigationMachineGateOwnershipTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-app-release-boundaries
+        scripts/verify-contract
+        scripts/verify-investigation-boundaries
+    )
+    [[ "${(j:\n:)a3_paths}" == "${(j:\n:)${(@on)expected_a3_paths}}" \
+        && "$(git diff-tree --numstat --no-commit-id -r \
+            "$iic0biib_a3_commit" \
+            | awk 'index($3,"docs/")!=1 {n+=$1+$2} END{print n+0}')" == 2722 ]] \
+        || fail_contract "ii-c0b-ii-b child checkpoint paths drifted: a3"
+    [[ "$(git show \
+        "${iic0biib_a3_commit}:Sources/StornautInvestigationMachineLaunchSupport/InvestigationMachineGateOwnership.swift" \
+        | shasum -a 256 | awk '{print $1}')" == \
+        3e8c1a586e692e705c14399acfcb637f1565da497a8e4b8cfdc2dfe7f3dd146a \
+        && "$(git show \
+        "${iic0biib_a3_commit}:Tests/StornautInvestigationTests/InvestigationMachineGateOwnershipTests.swift" \
+        | shasum -a 256 | awk '{print $1}')" == \
+        3d6ba434eab3703baa4881941853c8cd4fe56ed42d5827b7bb24db98d5acf4fa ]] \
+        || fail_contract "ii-c0b-ii-b child source or test identity drifted: a3"
+    local label commit tree parent expected_parent
+    for label commit tree parent expected_parent in \
+        b1 "$iic0biib_b1_commit" "$iic0biib_b1_tree" \
+            "$(git show -s --format=%P "$iic0biib_b1_commit")" \
+            87a19b301319422db3889d3739cc65c2d6a708bc
+    do
+        [[ "$parent" == "$expected_parent" \
+            && "$(git show -s --format=%T "$commit")" == "$tree" ]] \
+            || fail_contract "ii-c0b-ii-b child checkpoint drifted: $label"
+    done
+    local -a child_paths=("$ownership" "$capsule" "$focused")
+    local -a b1_paths=(
+        ${(f)"$(git diff-tree --no-commit-id --name-only -r \
+            "$iic0biib_b1_commit" | LC_ALL=C sort)"}
+    )
+    [[ "${(j:\n:)b1_paths}" == "${(j:\n:)${(@on)child_paths}}" ]] \
+        || fail_contract "ii-c0b-ii-b child checkpoint paths drifted"
+    [[ "$(git diff-tree --numstat --no-commit-id -r \
+        "$iic0biib_b1_commit" \
+        | awk '{n+=$1+$2} END{print n+0}')" == 2399 ]] \
+        || fail_contract "ii-c0b-ii-b child checkpoint budget drifted: b1"
+    for checkpoint_path expected_sha in \
+        "$ownership" 3d9bcbabf01df009eec4c6c0d6af2c8eb8877e02ba7b63c845730e73d5c23e0f \
+        "$capsule" d0ace5b5b6b4be33473174178e9808cff7b8a9072f8138e54aaa76bcc385c8d8 \
+        "$focused" d8a6a26420fd51b29993fed9f2e4658e70e07d9953d51badb1ec0a1bbc531fdd
+    do
+        [[ "$(git show \
+            "${iic0biib_b1_commit}:$checkpoint_path" \
+            | shasum -a 256 | awk '{print $1}')" == "$expected_sha" ]] \
+            || fail_contract \
+                "ii-c0b-ii-b child source or test identity drifted: b1: $checkpoint_path"
+    done
+    (( ${#iic0biib_component_command} == 2 )) \
+        || fail_contract "ii-c0b-ii-b component command drifted"
+    require_fixed_text "$app_gate" \
+        'if $iic0biib_component_boundary_only; then'
+    require_fixed_text "$app_gate" 'verify_iic0biib_component_boundary'
+    require_fixed_text "$app_gate" \
+        '# Reuse the exact artifacts built by the enclosing a3 component gate.'
+    local iic0biib_a3_body
+    iic0biib_a3_body=$(python3 - "$app_gate" <<'PY'
+from pathlib import Path
+import re
+import sys
+source = Path(sys.argv[1]).read_text(encoding="utf-8")
+matches = re.findall(
+    r"(?ms)^function verify_iic0biia3_component_boundary\(\) \{.*?^\}\n",
+    source,
+)
+if len(matches) != 1:
+    raise SystemExit("ii-c0b-ii-b shared component owner drifted")
+print(matches[0], end="")
+PY
+    ) || fail_contract "ii-c0b-ii-b shared component owner drifted"
+    [[ "$(print -r -- "$iic0biib_a3_body" \
+        | rg -c --fixed-strings -- "$iic0biib_component_invocation")" == 1 ]] \
+        || fail_contract "ii-c0b-ii-b component build reuse drifted"
+
+    "$gate" --iic0b-ii-b-capsule-contract-only \
+        Package.swift "$ownership" "$capsule" "$focused" "$boundary" \
+        >"$out/semantic.log"
+    "$app_gate" --iic0b-ii-b-source-contract-only \
+        Package.swift "$ownership" "$capsule" "$app_gate" \
+        >"$out/source.log"
+
+    mkdir -p "$out/candidates"
+    python3 - "$capsule" "$out/candidates" <<'PY'
+from pathlib import Path
+import sys
+
+source_path, output = map(Path, sys.argv[1:])
+source = source_path.read_text(encoding="utf-8")
+rows = []
+
+def mutate(name, old, new, diagnostic, count=1, app=True):
+    observed = source.count(old)
+    if observed != count:
+        raise SystemExit(
+            f"cannot construct ii-c0b-ii-b mutation: {name}: "
+            f"expected {count} anchors, observed {observed}"
+        )
+    (output / f"{name}.swift").write_text(
+        source.replace(old, new, count), encoding="utf-8"
+    )
+    rows.append((name, "app" if app else "semantic", diagnostic))
+
+surface = "ii-c0b-ii-b raw descriptor, path, URL or callback surface drifted"
+authority = "ii-c0b-ii-b product or privileged reachability drifted"
+cleanup = "ii-c0b-ii-b broad cleanup or lock mutation drifted"
+retry = "ii-c0b-ii-b retry or heuristic boundary drifted"
+binding = "ii-c0b-ii-b close and reap binding drifted"
+
+mutate("recursive-cleanup", "#if DEBUG\n",
+       "#if DEBUG\nprivate let recursiveCleanup = FileManager.default\n",
+       cleanup)
+mutate("ordinary-unlink", "#if DEBUG\n",
+       "#if DEBUG\nprivate func ordinaryUnlink() { _ = unlink(\"x\") }\n",
+       cleanup)
+mutate("raw-descriptor", "    package let size: Int64\n",
+       "    package let size: Int64\n    package let descriptor: Int32\n",
+       surface)
+mutate("path-surface", "    package let size: Int64\n",
+       "    package let size: Int64\n    package let path: String\n",
+       surface)
+mutate("url-surface", "    package let size: Int64\n",
+       "    package let size: Int64\n    package let location: URL\n",
+       surface)
+mutate("generic-callback",
+       "    package func publish(_ bytes: Data) throws\n",
+       "    package func withDescriptor<T>(_ body: @escaping (Int32) -> T) -> T { body(-1) }\n\n"
+       "    package func publish(_ bytes: Data) throws\n", surface)
+mutate("multiple-lease",
+       "#if DEBUG\n",
+       "#if DEBUG\n"
+       "private func duplicateLeaseForMutation(\n"
+       "    owner: InvestigationMachineGateOwnership,\n"
+       "    reader: InvestigationOwnerOnlyCapsuleVerifiedReader,\n"
+       "    request: InvestigationOwnerOnlyCapsulePublicationRequest,\n"
+       "    system: any InvestigationOwnerOnlyCapsuleSystem\n"
+       ") -> InvestigationOwnerOnlyCapsuleLease {\n"
+       "    InvestigationOwnerOnlyCapsuleLease.make(\n"
+       "        owner: owner, reader: reader, request: request,\n"
+       "        system: system, borrower: nil\n"
+       "    )\n"
+       "}\n",
+       "ii-c0b-ii-b one-shot lease cardinality drifted")
+mutate("lock-mutation", "#if DEBUG\n",
+       "#if DEBUG\nprivate func mutateLock() { _ = Darwin.unlink(\".owner-lock-v1\") }\n",
+       cleanup)
+mutate("mutation-before-inventory",
+       "            let inventory = try at(.inventory, residue: residue) {",
+       "            try system.createDirectory(parentDescriptor: baseDescriptor, "
+       "name: request.attemptName, mode: 0o700)\n"
+       "            let inventory = try at(.inventory, residue: residue) {",
+       "ii-c0b-ii-b mutation before complete inventory drifted")
+mutate("unbounded-retry", "guard retries <= maximumBusyRetries else {",
+       "guard true else {", retry)
+mutate("wall-clock", "let start = try system.monotonicNanoseconds()",
+       "let start = UInt64(Date().timeIntervalSince1970)", retry)
+mutate("pid-heuristic", "#if DEBUG\n",
+       "#if DEBUG\nprivate let stalePID = getpid()\n", retry)
+mutate("mtime-heuristic", "#if DEBUG\n",
+       "#if DEBUG\nprivate let mtime = modificationDate\n", retry)
+mutate("missing-close-reap-binding",
+       "private let settlementToken = InvestigationOwnerOnlyCapsuleSettlementToken()",
+       "private let replacementToken = InvestigationOwnerOnlyCapsuleSettlementToken()",
+       binding)
+mutate("product-authority", "#if DEBUG\n",
+       "#if DEBUG\nimport StornautExecution\n", authority)
+mutate("swallowed-inventory-failure",
+       "#if DEBUG\n",
+       "#if DEBUG\n"
+       "private func swallowedInventoryFailure(\n"
+       "    _ system: any InvestigationOwnerOnlyCapsuleSystem\n"
+       ") { _ = try? system.inventory(baseDescriptor: -1, maximumEntryCount: 1) }\n",
+       "ii-c0b-ii-b inventory failure was swallowed")
+mutate("swallowed-command-failure", "#if DEBUG\n",
+       "#if DEBUG\nprivate func swallowCommand() { try? Foundation.Process().run() }\n",
+       authority)
+mutate("attempt-uuid-unbound",
+       "decoded.capsule.outerAttemptUUID == attemptUUID",
+       "decoded.capsule.outerAttemptUUID != attemptUUID", retry)
+mutate("directory-revalidation-missing",
+       "        try revalidateEmptyDirectoryPlan(\n"
+       "            plan, baseDescriptor: baseDescriptor,\n"
+       "            baseMetadata: baseMetadata, system: system\n"
+       "        )\n"
+       "        try unlinkWithBusyRetry(",
+       "        _ = plan.leafIdentity\n"
+       "        try unlinkWithBusyRetry(",
+       "ii-c0b-ii-b directory retry revalidation order drifted")
+mutate("directory-retry-revalidation-missing",
+       "                try revalidateEmptyDirectoryPlan(\n"
+       "                    plan, baseDescriptor: baseDescriptor,\n"
+       "                    baseMetadata: baseMetadata, system: system\n"
+       "                )\n",
+       "                _ = plan.leafIdentity\n",
+       "ii-c0b-ii-b directory retry revalidation order drifted")
+mutate("directory-acl-bypass",
+       "              try system.extendedACLIsEmpty(descriptor: descriptor),\n"
+       "              try system.extendedAttributeNames(descriptor: descriptor).isEmpty\n"
+       "        else { throw failure(.classifyStale, .stale(",
+       "              true,\n"
+       "              try system.extendedAttributeNames(descriptor: descriptor).isEmpty\n"
+       "        else { throw failure(.classifyStale, .stale(",
+       "ii-c0b-ii-b directory retry revalidation drifted: system.extendedACLIsEmpty(",
+       count=1)
+mutate("directory-xattr-bypass",
+       "              try system.extendedACLIsEmpty(descriptor: descriptor),\n"
+       "              try system.extendedAttributeNames(descriptor: descriptor).isEmpty\n"
+       "        else { throw failure(.classifyStale, .stale(",
+       "              try system.extendedACLIsEmpty(descriptor: descriptor),\n"
+       "              true\n"
+       "        else { throw failure(.classifyStale, .stale(",
+       "ii-c0b-ii-b directory retry revalidation drifted: system.extendedAttributeNames(",
+       count=1)
+mutate("directory-inventory-bypass",
+       "inventory.reachedEnd, inventory.entries.isEmpty",
+       "true",
+       "ii-c0b-ii-b directory retry revalidation drifted: inventory.reachedEnd")
+mutate("directory-close-bypass",
+       "        do {\n"
+       "            try system.close(descriptor: directory)\n"
+       "        } catch {\n"
+       "            throw failure(\n"
+       "                validationFailure?.stage ?? .closeStaleDirectory,\n"
+       "                validationFailure?.residue ?? residue,\n"
+       "                (validationFailure?.closeFailures ?? []) + [.staleDirectory]\n"
+       "            )\n"
+       "        }",
+       "        _ = directory",
+       "ii-c0b-ii-b directory retry revalidation drifted: system.close(descriptor: directory)",
+       count=1)
+mutate(
+    "release-renamed-authority", "\n#endif\n",
+    "\n#else\npackage enum RenamedCapsuleAuthority {}\n#endif\n",
+    "ii-c0b-ii-b source DEBUG boundary drifted: capsule", count=1
+)
+(output / "matrix").write_text(
+    "".join("|".join(row) + "\n" for row in rows), encoding="utf-8"
+)
+PY
+    local -a generated_mutations=(
+        ${(f)"$(cut -d '|' -f 1 "$out/candidates/matrix" | LC_ALL=C sort)"}
+    )
+    local -a expected_mutations=(${(@on)iic0biib_mutations})
+    (( ${#generated_mutations} == ${#expected_mutations} )) \
+        || fail_contract "ii-c0b-ii-b generated mutation inventory drifted"
+    [[ "${(j:\n:)generated_mutations}" == "${(j:\n:)expected_mutations}" ]] \
+        || fail_contract "ii-c0b-ii-b generated mutation inventory drifted"
+    [[ "$(print -rl -- "${generated_mutations[@]}" | uniq -d)" == "" ]] \
+        || fail_contract "ii-c0b-ii-b generated mutation inventory duplicated"
+
+    local mutation app_expected expected_diagnostic candidate root log
+    while IFS='|' read -r mutation app_expected expected_diagnostic; do
+        candidate="$out/candidates/$mutation.swift"
+        root="$out/m-$mutation"
+        mkdir -p "$root/${ownership:h}" "$root/${focused:h}" \
+            "$root/${boundary:h}" "$root/scripts" "$root/Stornaut.xcodeproj"
+        cp Package.swift "$root/Package.swift"
+        cp "$ownership" "$root/$ownership"
+        cp "$candidate" "$root/$capsule"
+        cp "$focused" "$root/$focused"
+        cp "$boundary" "$root/$boundary"
+        cp "$gate" "$root/$gate"
+        cp "$app_gate" "$root/$app_gate"
+        cp Stornaut.xcodeproj/project.pbxproj \
+            "$root/Stornaut.xcodeproj/project.pbxproj"
+        chmod 755 "$root/$gate" "$root/$app_gate"
+        log="$out/$mutation.log"
+        if (
+            cd "$root"
+            "$gate" --iic0b-ii-b-capsule-contract-only \
+                Package.swift "$ownership" "$capsule" "$focused" "$boundary"
+        ) >"$log" 2>&1
+        then
+            fail_contract "ii-c0b-ii-b mutation accepted: $mutation"
+        fi
+        require_fixed_text "$log" "$expected_diagnostic"
+        if [[ $app_expected == app ]]; then
+            log="$out/app-$mutation.log"
+            if (
+                cd "$root"
+                "$app_gate" --iic0b-ii-b-source-contract-only \
+                    Package.swift "$ownership" "$capsule" "$app_gate"
+            ) >"$log" 2>&1
+            then
+                fail_contract "ii-c0b-ii-b App mutation accepted: $mutation"
+            fi
+            require_fixed_text "$log" "$expected_diagnostic"
+        fi
+    done <"$out/candidates/matrix"
+
+    root="$out/m-target-extra-source"
+    mkdir -p "$root/${ownership:h}" "$root/${focused:h}" \
+        "$root/${boundary:h}" "$root/scripts" "$root/Stornaut.xcodeproj"
+    cp Package.swift "$root/Package.swift"
+    cp "$ownership" "$root/$ownership"
+    cp "$capsule" "$root/$capsule"
+    cp "$focused" "$root/$focused"
+    cp "$boundary" "$root/$boundary"
+    cp "$gate" "$root/$gate"
+    cp "$app_gate" "$root/$app_gate"
+    cp Stornaut.xcodeproj/project.pbxproj \
+        "$root/Stornaut.xcodeproj/project.pbxproj"
+    print -r -- '#if DEBUG' '#endif' \
+        >"$root/${capsule:h}/UnexpectedCapsuleAuthority.swift"
+    chmod 755 "$root/$gate" "$root/$app_gate"
+    log="$out/target-extra-source.log"
+    if (
+        cd "$root"
+        "$app_gate" --iic0b-ii-b-source-contract-only \
+            Package.swift "$ownership" "$capsule" "$app_gate"
+    ) >"$log" 2>&1
+    then
+        fail_contract "ii-c0b-ii-b App mutation accepted: target-extra-source"
+    fi
+    require_fixed_text "$log" 'ii-c0b-ii-b target source inventory drifted'
+
+    local command_root="$out/verifier-command-failure" command_status=0
+    mkdir -p "$command_root/bin"
+    printf '%s\n' '#!/bin/sh' \
+        'echo "ii-c0b-ii-b injected xcrun failure" >&2' \
+        'exit 97' >"$command_root/bin/xcrun"
+    chmod 755 "$command_root/bin/xcrun"
+    PATH="$command_root/bin:$PATH" "$gate" \
+        --iic0b-ii-b-capsule-contract-only \
+        Package.swift "$ownership" "$capsule" "$focused" "$boundary" \
+        >"$command_root/output.log" 2>&1 || command_status=$?
+    (( command_status == 97 )) \
+        || fail_contract "ii-c0b-ii-b verifier command failure was swallowed"
+    require_fixed_text "$command_root/output.log" \
+        'ii-c0b-ii-b injected xcrun failure'
+
+    python3 - "$app_gate" <<'PY'
+from pathlib import Path
+import re
+import sys
+source = Path(sys.argv[1]).read_text(encoding="utf-8")
+matches = re.findall(
+    r"(?ms)^function verify_iic0biib_component_boundary\(\) \{.*?^\}\n",
+    source,
+)
+if len(matches) != 1:
+    raise SystemExit("ii-c0b-ii-b component command failure was swallowed")
+body = matches[0]
+required_guards = (
+    r"find .*\$swiftpm_debug.*\|\| exit \$\?",
+    r"find .*\$swiftpm_release.*\|\| exit \$\?",
+    r"xcrun nm .*\| xcrun swift-demangle\) \|\| exit \$\?",
+    r"xcrun strings -a .*\) \|\| exit \$\?",
+    r"find .* -type f -print0 >.* \|\| \{",
+)
+if any(re.search(pattern, body, re.DOTALL) is None for pattern in required_guards):
+    raise SystemExit("ii-c0b-ii-b component command failure was swallowed")
+PY
+    [[ "$(git show -s --format=%P "$iic0biib_b2_commit")" == \
+        "$iic0biib_b1_commit" \
+        && "$(git show -s --format=%T "$iic0biib_b2_commit")" == \
+        "$iic0biib_b2_tree" ]] \
+        || fail_contract "ii-c0b-ii-b child checkpoint drifted: b2"
+    local -a b2_paths=(
+        ${(f)"$(git diff-tree --no-commit-id --name-only -r \
+            "$iic0biib_b2_commit" | LC_ALL=C sort)"}
+    )
+    [[ "${(j:\n:)b2_paths}" == "${(j:\n:)${(@on)child_paths}}" ]] \
+        || fail_contract "ii-c0b-ii-b child checkpoint paths drifted"
+    (( $(git diff-tree --numstat --no-commit-id -r \
+        "$iic0biib_b2_commit" | awk '{n+=$1+$2} END{print n+0}') <= 2200 )) \
+        || fail_contract "ii-c0b-ii-b child checkpoint budget drifted"
+    local expected_sha observed_sha
+    for checkpoint_path expected_sha in \
+        "$ownership" bf7cee7e2aa06458c7978f74887cf54d2199daff3153af6a81f2a531beb83b68 \
+        "$capsule" 6039a0b344b952314139a72d70f4c8d5a70014deca3c493978fce744d7a721d9 \
+        "$focused" 942c39d646bde28e62351890ef07caa922fdeab1209b652dd351134316d36826
+    do
+        observed_sha=$(git show \
+            "${iic0biib_b2_commit}:$checkpoint_path" \
+            | shasum -a 256 | awk '{print $1}')
+        [[ "$observed_sha" == "$expected_sha" ]] \
+            || fail_contract \
+                "ii-c0b-ii-b child source or test identity drifted: $checkpoint_path"
+        [[ "$(shasum -a 256 "$checkpoint_path" | awk '{print $1}')" \
+            == "$expected_sha" ]] \
+            || fail_contract \
+                "ii-c0b-ii-b current source or test seal drifted: $checkpoint_path"
+    done
+
+    local -a paths=("$boundary" "$app_gate" scripts/verify-contract "$gate")
+    local index="$out/iic0biib.index" blob mode
+    GIT_INDEX_FILE="$index" git read-tree "$iic0biib_b2_commit^{tree}"
+    for checkpoint_path in "${paths[@]}"; do
+        blob=$(git hash-object -w -- "$checkpoint_path")
+        mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
+        GIT_INDEX_FILE="$index" git update-index --add --cacheinfo \
+            "$mode,$blob,$checkpoint_path"
+    done
+    GIT_INDEX_FILE="$index" "$gate" \
+        --iic0b-ii-b-staged-scope-contract-only "$iic0biib_b2_commit" \
+        >"$out/scope.log"
+
+    local changed scope_baseline expected
+    for mutation in "${iic0biib_scope_mutations[@]}"; do
+        changed="$out/scope-$mutation.index"
+        cp "$index" "$changed"
+        scope_baseline=$iic0biib_b2_commit
+        case $mutation in
+            extra-path)
+                blob=$(git rev-parse "${iic0biib_b2_commit}:AGENTS.md")
+                GIT_INDEX_FILE="$changed" git update-index --add --cacheinfo \
+                    "100644,$blob,iic0biib-extra.swift"
+                expected='ii-c0b-ii-b aggregate checkpoint paths drifted' ;;
+            missing-path)
+                blob=$(git rev-parse "${iic0biib_b2_commit}:$boundary")
+                GIT_INDEX_FILE="$changed" git update-index --cacheinfo \
+                    "100644,$blob,$boundary"
+                expected='ii-c0b-ii-b aggregate checkpoint paths drifted' ;;
+            over-budget)
+                for line in {1..1801}; do
+                    print -r -- "// ii-c0b-ii-b over-budget $line"
+                done >"$out/over-budget.swift"
+                blob=$(git hash-object -w -- "$out/over-budget.swift")
+                GIT_INDEX_FILE="$changed" git update-index --cacheinfo \
+                    "100644,$blob,$boundary"
+                expected='ii-c0b-ii-b aggregate checkpoint budget drifted' ;;
+            deleted)
+                GIT_INDEX_FILE="$changed" git rm --cached -q -f "$boundary"
+                expected='ii-c0b-ii-b aggregate checkpoint deleted an existing path' ;;
+            binary)
+                blob=$(git rev-parse \
+                    "${iic0biib_b2_commit}:Tests/Fixtures/Snapshots/design-system.empty-state.dark.en.png")
+                GIT_INDEX_FILE="$changed" git update-index --cacheinfo \
+                    "100644,$blob,$boundary"
+                expected='ii-c0b-ii-b aggregate binary checkpoint path rejected' ;;
+            mode)
+                blob=$(git hash-object -w -- scripts/verify-contract)
+                GIT_INDEX_FILE="$changed" git update-index --cacheinfo \
+                    "100644,$blob,scripts/verify-contract"
+                expected='ii-c0b-ii-b aggregate checkpoint mode drifted' ;;
+            wrong-baseline)
+                scope_baseline=$iic0biib_b2_commit^
+                expected='ii-c0b-ii-b aggregate checkpoint baseline drifted' ;;
+        esac
+        log="$out/scope-$mutation.log"
+        if GIT_INDEX_FILE="$changed" "$gate" \
+            --iic0b-ii-b-staged-scope-contract-only "$scope_baseline" \
+            >"$log" 2>&1
+        then
+            fail_contract "ii-c0b-ii-b scope mutation accepted: $mutation"
+        fi
+        require_fixed_text "$log" "$expected"
+    done
+}
+
 if [[ ${1:-} == --iic0b-ii-a-contract-only ]]; then
     (( $# == 1 )) || fail_contract \
         "Usage: scripts/verify-contract --iic0b-ii-a-contract-only"
@@ -754,6 +1260,17 @@ if [[ ${1:-} == --iic0b-ii-a3-contract-only ]]; then
     trap 'rm -rf "$iic0biia3_root"' EXIT
     verify_iic0biia3_contract "$iic0biia3_root"
     print "ii-c0b-ii-a3 contract verification passed."
+    exit 0
+fi
+
+if [[ ${1:-} == --iic0b-ii-b-contract-only ]]; then
+    (( $# == 1 )) || fail_contract \
+        "Usage: scripts/verify-contract --iic0b-ii-b-contract-only"
+    iic0biib_root=$(mktemp -d \
+        "${TMPDIR:-/tmp}/stornaut-iic0biib-contract.XXXXXX")
+    trap 'rm -rf "$iic0biib_root"' EXIT
+    verify_iic0biib_contract "$iic0biib_root"
+    print "ii-c0b-ii-b contract verification passed."
     exit 0
 fi
 
@@ -2303,6 +2820,7 @@ done
 
 contract_root=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-verify-contract.XXXXXX")
 verify_iic0biia3_contract "$contract_root"
+verify_iic0biib_contract "$contract_root/iic0biib"
 mkdir -p "$contract_root/scripts"
 cp scripts/verify "$contract_root/scripts/verify"
 chmod 755 "$contract_root/scripts/verify"
