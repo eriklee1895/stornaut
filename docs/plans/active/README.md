@@ -176,7 +176,14 @@ into ii-c0b-ii-a kernel ownership and ii-c0b-ii-b capsule owner. A budget
 trigger then split ii-a into exact 3-path / 2,000-line ii-c0b-ii-a1 behavior and
 exact 4-path / 1,200-line ii-c0b-ii-a2 verifier closure. a1 is complete at
 `d18354b` / tree `d6a4b0e`, exact 3 paths / 1,981 lines, with 132 concrete
-cases, target/object/APFS evidence and no unresolved P0-P2; a2 is current.
+cases, target/object/APFS evidence and no unresolved P0-P2. a2 is also
+complete/non-admitting at implementation
+`f11eea42ef295f49b20e1c0f3912d4b32448b968` / tree
+`d0683495ea37d0692677c98f491f3037eaedba4c`, exact 4 non-document paths /
+889 changed lines; the a1+a2 aggregate is 7 paths / 2,870 lines. Its bare
+verify-contract, component and App-Release gates exited 0, and two independent
+reviews found no unresolved P0-P2. It ran no serial/full/root/App/XPC/model/
+network gate. ii-c0b-ii-b is current.
 a2-i closed at
 implementation commit `158f500` and tree
 `c7a42ffd`: exact 10 non-document paths / 1,965 changed lines, 66 focused
@@ -312,8 +319,8 @@ ii-b5b-ii-c fixed FD-7 session and ii-b5b-ii-d exact owned-PGID retirement are
 complete/non-admitting. ii-c0a is complete/non-admitting; ii-b5b-iii-b0 is
 frozen/non-admitting; iii-a, iii-b1, iii-b2a0, iii-b2a-i,
 iii-b2a-ii-a1, a2-0, a2-i, a2-ii, iii-b2b-0, iii-b2b-1a-0,
-iii-b2b-1a-1, iii-b2b-1b, ii-c0b-i and ii-c0b-ii-a1 are complete/non-admitting and the
-remaining order is ii-c0b-ii-a2 -> ii-c0b-ii-b -> ii-c0b-iii -> ii-c0b-iv ->
+iii-b2b-1a-1, iii-b2b-1b, ii-c0b-i and ii-c0b-ii-a1/a2 are complete/non-admitting and the
+remaining order is ii-c0b-ii-b -> c0b-iii -> c0b-iv ->
 ii-c -> L3c3d -> L3c4.
 See the
 [ii-b5a review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5a-review.md) and
@@ -337,6 +344,7 @@ See the
 [ii-c0a review](../../reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md),
 [ii-c0b-i review](../../reports/phase-d-task-39b2c-l3c3c-ii-c0b-i-review.md),
 [ii-c0b-ii ownership preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-ownership-preflight.md) and
+[ii-c0b-ii-a2 review](../../reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-a2-review.md) and
 [ii-b5b-iii-b0 preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md) and
 [ii-b5b-iii-a review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-a-review.md) and
 [ii-b5b-iii-b1 review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b1-review.md) and
@@ -373,7 +381,7 @@ the sole normal-product admission gate.
 | [36](task-36-implementation-brief.md) | Domain, canonical projection, planner, budget and stop contracts | complete; [review](../../reports/phase-d-task-36-review.md) |
 | [37](task-37-implementation-brief.md) | Store v4, retention and source rejoin | complete; [review](../../reports/phase-d-task-37-review.md) |
 | [38](task-38-implementation-brief.md) | Closed coordinator with fake runtime | complete; [review](../../reports/phase-d-task-38-review.md) |
-| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; c0b-i and ii-c0b-ii-a1 complete/non-admitting; ii-c0b-ii-a2 current; ADR 0018 Proposed |
+| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; c0b-i and ii-c0b-ii-a1/a2 complete/non-admitting; ii-c0b-ii-b current; ADR 0018 Proposed |
 | [40](task-40-implementation-brief.md) | Evidence report and conservative Review projection | blocked on Task 39 |
 | [41](task-41-implementation-brief.md) | First-use disclosure and typed availability | blocked on Task 40 |
 | [42](task-42-implementation-brief.md) | App workflow and recovery state | blocked on Task 41 |

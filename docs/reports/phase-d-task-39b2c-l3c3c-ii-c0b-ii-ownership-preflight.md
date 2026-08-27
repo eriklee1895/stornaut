@@ -1,7 +1,7 @@
 # Phase D Task 39B2c L3c3c-ii-c0b-ii Ownership Split Preflight
 
-> Status: ownership mechanism and a1/a2 budget split frozen; ii-c0b-ii-a1 is
-> complete/non-admitting and ii-c0b-ii-a2 is the current frontier
+> Status: ownership mechanism and a1/a2 budget split frozen; ii-c0b-ii-a1 and
+> ii-c0b-ii-a2 are complete/non-admitting; ii-c0b-ii-b is the current frontier
 >
 > Date: 2026-08-27
 >
@@ -168,6 +168,12 @@ ii-c0b-ii-a2 may start only from the exact pushed a1 commit/tree recorded in
 the budget-split report. Each child must remain within its own ceiling and the
 exact seven-path union must remain at or below the stricter 2,870-line aggregate
 ceiling; neither child may add a non-document path without another split.
+ii-c0b-ii-a2 subsequently completed at implementation
+`f11eea42ef295f49b20e1c0f3912d4b32448b968` / tree
+`d0683495ea37d0692677c98f491f3037eaedba4c`: exact 4 paths / 889 lines and
+aggregate 7 paths / 2,870 lines. Bare contract/component/App-Release exited 0,
+two independent reviews found no unresolved P0–P2, and no serial/full/root/App/
+XPC/model/network run occurred.
 
 In ii-c0b-ii-a1, the new `StornautInvestigationMachineLaunchSupport` target depends only on
 `StornautInvestigationHandoffContract`; the Investigation test target adds the
@@ -394,12 +400,12 @@ accept ADR 0018 or enable production Deep Dive.
 | unique and replacement-safe node operations | `O_UNIQUE`, safe rename collision/symlink/beneath controls | preflight complete |
 | target machine and bounded probe cleanup | APFS/501:20/0700 hard gates, monotonic IPC/reap, exact `rmdir` | preflight complete |
 | narrow ownership module | target + internal acquirer/final owner + focused tests | ii-c0b-ii-a1 complete |
-| permanent lock inode and contention-only active state | a1 source/physical evidence + a2 mutation gates | a1 complete; a2 current |
+| permanent lock inode and contention-only active state | a1 source/physical evidence + a2 mutation gates | a1/a2 complete/non-admitting |
 | exact capsule publication | canonical bytes, exclusive rename, fsync/reopen/pread proof | ii-c0b-ii-b pending |
 | one-shot path-free descriptor lease | owner/lease state tests and source gate | ii-c0b-ii-b pending |
 | replacement-safe settlement/recovery | identity-bound busy retry and residue matrix | ii-c0b-ii-b pending |
-| no premature product or privilege reachability | package/source/final-image negative controls | a1 complete; a2/ii-b pending |
-| independent no-P0-P2 review and separate commits | review records and pushed commits | a1 complete; a2/ii-b pending |
+| no premature product or privilege reachability | package/source/final-image negative controls | a1/a2 complete; ii-b pending |
+| independent no-P0-P2 review and separate commits | review records and pushed commits | a1/a2 complete; ii-b pending |
 | aggregate c0b serial | one staged-only run after c0b-iv | later |
 | machine readiness/full verifier | ii-c/L3c3d/L3c4 evidence | later |
 
@@ -423,5 +429,9 @@ no unresolved P0–P2.
 The follow-on budget split is frozen in
 [ii-c0b-ii-a Budget Split Preflight](phase-d-task-39b2c-l3c3c-ii-c0b-ii-a-budget-split-preflight.md);
 ii-c0b-ii-a1 is complete at `d18354b` / tree `d6a4b0e`; ii-c0b-ii-a2 is
-current. Task 39 remains incomplete, ADR 0018 remains Proposed
+complete/non-admitting at implementation `f11eea42ef295f49b20e1c0f3912d4b32448b968`
+/ tree `d0683495ea37d0692677c98f491f3037eaedba4c`, with completion evidence in
+the [a2 review](phase-d-task-39b2c-l3c3c-ii-c0b-ii-a2-review.md). The current
+frontier is ii-c0b-ii-b, followed strictly by c0b-iii -> c0b-iv -> ii-c ->
+L3c3d -> L3c4. Task 39 remains incomplete, ADR 0018 remains Proposed
 and production Deep Dive remains unavailable.

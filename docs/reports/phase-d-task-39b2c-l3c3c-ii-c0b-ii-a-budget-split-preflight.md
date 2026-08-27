@@ -1,7 +1,7 @@
 # Phase D Task 39B2c L3c3c-ii-c0b-ii-a Budget Split Preflight
 
-> Status: mandatory budget split frozen; ii-c0b-ii-a1 complete/non-admitting;
-> ii-c0b-ii-a2 is the current frontier
+> Status: mandatory budget split frozen; ii-c0b-ii-a1 and ii-c0b-ii-a2
+> complete/non-admitting; ii-c0b-ii-b is the current frontier
 >
 > Date: 2026-08-27
 >
@@ -143,6 +143,15 @@ Neither a2 nor aggregate ii-a runs a staged serial or authoritative full
 verifier. c0b-iv retains the sole aggregate c0b staged-only serial and L3c4
 retains Task 39's remaining authoritative full verifier.
 
+ii-c0b-ii-a2 completed at implementation commit
+`f11eea42ef295f49b20e1c0f3912d4b32448b968` / tree
+`d0683495ea37d0692677c98f491f3037eaedba4c`. Its exact four-path / 889-line
+scope closes the exact seven-path / 2,870-line aggregate. Bare contract,
+component and App/Release entry points exited 0; independent verifier and
+cross-boundary reviewers found no unresolved P0–P2. No serial/full/root/App/
+XPC/model/network run occurred. Completion evidence is in the
+[ii-c0b-ii-a2 review](phase-d-task-39b2c-l3c3c-ii-c0b-ii-a2-review.md).
+
 ## 4. Preserved Requirements and Non-Claims
 
 This split supersedes only the parent ii-a 2,600-line planning envelope and its
@@ -170,9 +179,9 @@ unavailable.
 | Darwin/APFS semantics | unchanged committed physical probe, exit 0 | ii-c0b-ii-a1 complete |
 | source/test review | independent no-unresolved-P0–P2 review | ii-c0b-ii-a1 complete |
 | immutable child baseline | `d18354b` / tree `d6a4b0e` | recorded |
-| exact source and seven-path scope | target-boundary tests plus Investigation verifier | ii-c0b-ii-a2 pending |
-| component/final-image boundary | App/Release verifier positive and negative controls | ii-c0b-ii-a2 pending |
-| mutation and c0b-i replay | `verify-contract` fixtures and immutable historical replay | ii-c0b-ii-a2 pending |
-| aggregate ii-a completion | exact a1 baseline + four a2 paths + independent reviews | ii-c0b-ii-a2 pending |
+| exact source and seven-path scope | target-boundary tests plus Investigation verifier | ii-c0b-ii-a2 complete |
+| component/final-image boundary | App/Release verifier positive and negative controls | ii-c0b-ii-a2 complete |
+| mutation and c0b-i replay | `verify-contract` fixtures and immutable historical replay | ii-c0b-ii-a2 complete |
+| aggregate ii-a completion | exact a1 baseline + four a2 paths + independent reviews | ii-c0b-ii-a2 complete/non-admitting |
 | no serial/full in either child | validation logs and review reports | preserved |
-| later capsule and machine admission | ii-b/c0b-iii/c0b-iv/ii-c/L3c3d/L3c4 | later |
+| later capsule and machine admission | ii-b/c0b-iii/c0b-iv/ii-c/L3c3d/L3c4 | ii-c0b-ii-b current; later stages pending |

@@ -359,8 +359,13 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   3-path / 2,000-line ii-c0b-ii-a1 behavior/focused evidence 与 exact 4-path /
   1,200-line ii-c0b-ii-a2 verifier/aggregate closure；ii-c0b-ii-a1 已以
   `d18354b` / tree `d6a4b0e`、3 paths / 1,981 lines、132 concrete cases、
-  target/object/APFS gates 与 no-unresolved-P0–P2 review 完成；当前 frontier
-  为 ii-c0b-ii-a2。
+  target/object/APFS gates 与 no-unresolved-P0–P2 review 完成；ii-c0b-ii-a2
+  又以 implementation `f11eea42ef295f49b20e1c0f3912d4b32448b968` / tree
+  `d0683495ea37d0692677c98f491f3037eaedba4c`、exact 4 non-document paths /
+  889 changed lines 收口，a1+a2 aggregate 为 7 paths / 2,870 lines；bare
+  verify-contract、component 与 App-Release gates 均 exit 0，双人 review 无
+  unresolved P0–P2。按设计未运行 serial/full/root/App/XPC/model/network；
+  a2 complete/non-admitting，当前 frontier 为 ii-c0b-ii-b。
   iii-b2a0 以
   exact 8 non-document paths / 2,198 changed lines、
   36-test/3-suite combined bridge+continuity+cohort、580-test/43-suite affected、
@@ -405,9 +410,9 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   971 changed lines、contract/App-Release exit 0、immutable seal `a314b85` /
   tree `aac9d81` 与 no-unresolved-P0–P2 review 收口。两者均
   complete/non-admitting；c0b-i 也已完成并保持 non-admitting，c0b-ii fresh
-  preflight 已完成；ii-a budget split 已冻结，ii-c0b-ii-a1 已完成，当前
-  frontier 为 ii-c0b-ii-a2，随后严格按 ii-c0b-ii-a2 → ii-c0b-ii-b → c0b-iii → c0b-iv →
-  ii-c → L3c3d → L3c4 推进。
+  preflight 已完成；ii-a budget split 已冻结，ii-c0b-ii-a1/a2 均已完成并
+  保持 non-admitting，随后严格按 ii-c0b-ii-b → c0b-iii → c0b-iv → ii-c →
+  L3c3d → L3c4 推进。
   该 ii-b5b-ii-c checkpoint 以 8 个
   non-document paths / 3,104 changed lines、35 focused tests、
   1,396-test staged-only serial、三个 verifier gates 与 final
@@ -591,6 +596,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c L3c3c-ii-c0b-ii ownership split preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-ownership-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-ownership-preflight.md) |
 | Phase D Task 39B2c L3c3c-ii-c0b-ii-a budget split preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-a-budget-split-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-a-budget-split-preflight.md) |
 | Phase D Task 39B2c L3c3c-ii-c0b-ii-a1 review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-a1-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-a1-review.md) |
+| Phase D Task 39B2c L3c3c-ii-c0b-ii-a2 review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-a2-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-a2-review.md) |
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-b0 outer/inner protocol preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md) |
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-a per-epoch continuity review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-a-review.md) |
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-b1 injected cohort preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b1-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b1-preflight.md) |
@@ -766,8 +772,11 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   entry/final artifact 也已完成并保持 non-admitting；ii-c0b 已冻结为四段。
   c0b-i semantic producer 已完成并保持 non-admitting；c0b-ii fresh preflight
   已完成并拆为 ii-c0b-ii-a/ii-c0b-ii-b；ii-a budget split 又冻结为 a1/a2，
-  ii-c0b-ii-a1 已以 `d18354b` / tree `d6a4b0e` 完成；当前 frontier 为
-  ii-c0b-ii-a2 verifier closure，后续为 ii-c0b-ii-b capsule owner →
+  ii-c0b-ii-a1 已以 `d18354b` / tree `d6a4b0e` 完成；ii-c0b-ii-a2 已以
+  `f11eea42ef295f49b20e1c0f3912d4b32448b968` / tree
+  `d0683495ea37d0692677c98f491f3037eaedba4c`、exact 4 paths / 889 lines
+  完成，a1+a2 aggregate 为 7 paths / 2,870 lines；两者均
+  complete/non-admitting。当前 frontier 为 ii-c0b-ii-b capsule owner →
   c0b-iii fixed launcher/stub → c0b-iv
   zero-argument final composition → ii-c
   privileged no-model gate → L3c3d → L3c4。

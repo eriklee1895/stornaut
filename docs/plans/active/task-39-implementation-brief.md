@@ -109,7 +109,12 @@
 > The ii-a budget trigger split the original 7-path / 2,600-line envelope into
 > exact 3-path / 2,000-line ii-c0b-ii-a1 behavior and exact 4-path / 1,200-line
 > ii-c0b-ii-a2 verifier closure. a1 is complete at `d18354b` / tree `d6a4b0e`,
-> exact 3 paths / 1,981 lines and 132 concrete cases; a2 is current. a2-i
+> exact 3 paths / 1,981 lines and 132 concrete cases. a2 is complete/non-
+> admitting at implementation `f11eea42ef295f49b20e1c0f3912d4b32448b968` /
+> tree `d0683495ea37d0692677c98f491f3037eaedba4c`, exact 4 paths / 889
+> lines and aggregate 7 paths / 2,870 lines; bare contract/component/App-Release
+> exited 0 and two independent reviews found no unresolved P0–P2. It ran no
+> serial/full/root/App/XPC/model/network; ii-c0b-ii-b is current. a2-i
 > closed at commit
 > `158f500` / tree `c7a42ffd` with 10 non-document paths / 1,965 changed
 > lines, 66 focused tests, a 1,500-test serialized regression, exact
@@ -1195,10 +1200,14 @@ The remaining L3 work is split before driver coding:
    complete/non-admitting. iii-b2b-1a-0 canonical helper-provenance carriage,
    iii-b2b-1a-1 concrete outer observation and split iii-b2b-1b zero-argument
    entry/artifact and ii-c0b-i semantic producer are also complete/non-admitting.
-   The corrected remaining order is `ii-c0b-ii-a2 -> ii-c0b-ii-b ->
-   ii-c0b-iii -> ii-c0b-iv -> ii-c -> L3c3d -> L3c4`; c0b-ii fresh
-   preflight and the ii-a budget split are complete; ii-c0b-ii-a1 is complete
-   at `d18354b` / tree `d6a4b0e`, and ii-c0b-ii-a2 is current. The fresh
+   The corrected remaining order is `ii-c0b-ii-b -> ii-c0b-iii ->
+   ii-c0b-iv -> ii-c -> L3c3d -> L3c4`; c0b-ii fresh preflight and the ii-a
+   budget split are complete, and ii-c0b-ii-a1/a2 are complete/non-admitting.
+   a2 closed at implementation `f11eea42ef295f49b20e1c0f3912d4b32448b968` /
+   tree `d0683495ea37d0692677c98f491f3037eaedba4c`, exact 4 paths / 889 lines
+   and aggregate 7 paths / 2,870 lines, with bare contract/component/App-Release
+   exit 0 and two no-unresolved-P0–P2 reviews; no serial/full/root/App/XPC/model/
+   network was run. The fresh
    [ii-c0b preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-c0b-preflight.md)
    separates product-semantic production, capsule-file authority and launcher/
    TTY/FD authority before coding. The
@@ -1209,7 +1218,9 @@ The remaining L3 work is split before driver coding:
    ownership contract. The
    [ii-c0b-ii-a budget split](../../reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-a-budget-split-preflight.md)
    preserves the exact seven-path union while separating a1 behavior/focused
-   evidence from a2 structural/mutation/aggregate closure.
+   evidence from a2 structural/mutation/aggregate closure. The
+   [ii-c0b-ii-a2 review](../../reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-a2-review.md)
+   records the completed verifier closure and non-claims.
    iii-b2b-1a-1 closed at implementation `fe4f6ad` / tree `6bd6d384`, sealed
    by `2c31a7c`, with exact 8 non-document paths / 2,800 changed lines,
    1,535 tests / 80 suites, complete App/Release and contract gates and no
@@ -1407,7 +1418,8 @@ complete/non-admitting; ii-c0b is frozen as c0b-i semantic producer, c0b-ii
 owner-only capsule node, c0b-iii fixed launcher/stub and c0b-iv zero-argument
 final composition. ii-c0b-i is complete/non-admitting; c0b-ii is split into
 ii-c0b-ii-a/ii-c0b-ii-b, ii-a is further split into a1/a2, ii-c0b-ii-a1 is
-complete/non-admitting and ii-c0b-ii-a2 is the current checkpoint.
+complete/non-admitting and ii-c0b-ii-a2 is complete/non-admitting;
+ii-c0b-ii-b is the current checkpoint.
 ADR 0018
 remains Proposed until ii-c succeeds. L3c1 used focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean
