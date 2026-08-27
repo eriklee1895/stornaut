@@ -101,13 +101,24 @@ struct InvestigationMachineGateOwnershipAcquirer: Sendable {
     )
 
     private let system: any InvestigationMachineGateOwnershipSystem
+    private let capsuleSystem: (any InvestigationOwnerOnlyCapsuleSystem)?
 
     init() {
         system = DarwinInvestigationMachineGateOwnershipSystem()
+        capsuleSystem = DarwinInvestigationOwnerOnlyCapsuleSystem()
     }
 
     init(system: any InvestigationMachineGateOwnershipSystem) {
         self.system = system
+        capsuleSystem = nil
+    }
+
+    init(
+        ownershipSystem: any InvestigationMachineGateOwnershipSystem,
+        capsuleSystem: any InvestigationOwnerOnlyCapsuleSystem
+    ) {
+        system = ownershipSystem
+        self.capsuleSystem = capsuleSystem
     }
 
     func acquire() throws -> InvestigationMachineGateOwnership {
@@ -178,7 +189,7 @@ struct InvestigationMachineGateOwnershipAcquirer: Sendable {
             return InvestigationMachineGateOwnership(
                 system: system, baseDescriptor: base, lockDescriptor: lock,
                 baseRelativePath: baseRelativePath,
-                mutex: system.makeOwnershipMutex()
+                mutex: system.makeOwnershipMutex(), capsuleSystem: capsuleSystem
             )
         } catch {
             let cleanupSucceeded = ledger.closeAll(using: system)
@@ -404,6 +415,7 @@ final class InvestigationMachineGateOwnership: @unchecked Sendable {
     )
 
     private let system: any InvestigationMachineGateOwnershipSystem
+    private let capsuleSystem: (any InvestigationOwnerOnlyCapsuleSystem)?
     private let lock: any InvestigationMachineGateOwnershipMutex
     private var state: State
 
@@ -411,9 +423,11 @@ final class InvestigationMachineGateOwnership: @unchecked Sendable {
         system: any InvestigationMachineGateOwnershipSystem,
         baseDescriptor: Int32, lockDescriptor: Int32,
         baseRelativePath: String,
-        mutex: any InvestigationMachineGateOwnershipMutex
+        mutex: any InvestigationMachineGateOwnershipMutex,
+        capsuleSystem: (any InvestigationOwnerOnlyCapsuleSystem)?
     ) {
         self.system = system
+        self.capsuleSystem = capsuleSystem
         lock = mutex
         state = .active(ActiveState(
             baseDescriptor: baseDescriptor, lockDescriptor: lockDescriptor,
@@ -439,7 +453,7 @@ final class InvestigationMachineGateOwnership: @unchecked Sendable {
             throw InvestigationMachineGateOwnershipError.alreadyReleased
         }
         do {
-            try revalidateOwnedBaseAndLock(
+            _ = try revalidateOwnedBaseAndLock(
                 baseDescriptor: active.baseDescriptor,
                 lockDescriptor: active.lockDescriptor,
                 baseRelativePath: active.baseRelativePath
@@ -447,6 +461,46 @@ final class InvestigationMachineGateOwnership: @unchecked Sendable {
         } catch {
             _ = closeRemainingDescriptorsBaseFirst()
             throw InvestigationMachineGateOwnershipError.ownershipUncertain
+        }
+    }
+
+    func publishCanonicalCapsule(
+        _ request: InvestigationOwnerOnlyCapsulePublicationRequest,
+        borrower: (any InvestigationOwnerOnlyCapsuleBorrowing)?
+    ) throws -> InvestigationOwnerOnlyCapsuleLease {
+        lock.lock()
+        defer { lock.unlock() }
+        guard case .active(let active) = state else {
+            throw InvestigationOwnerOnlyCapsuleError.ownershipUncertain(.none)
+        }
+        guard let capsuleSystem else {
+            _ = closeRemainingDescriptorsBaseFirst()
+            throw InvestigationOwnerOnlyCapsuleError.ownershipUncertain(.none)
+        }
+        do {
+            let base = try revalidateOwnedBaseAndLock(
+                baseDescriptor: active.baseDescriptor,
+                lockDescriptor: active.lockDescriptor,
+                baseRelativePath: active.baseRelativePath
+            )
+            let reader = try InvestigationOwnerOnlyCapsulePublication.publish(
+                request, baseDescriptor: active.baseDescriptor,
+                baseMetadata: base, system: capsuleSystem
+            )
+            return InvestigationOwnerOnlyCapsuleLease.make(
+                owner: self, reader: reader, request: request,
+                system: capsuleSystem, borrower: borrower
+            )
+        } catch let error as InvestigationOwnerOnlyCapsuleError {
+            guard closeRemainingDescriptorsBaseFirst() else {
+                throw InvestigationOwnerOnlyCapsuleError.ownershipUncertain(
+                    error.residue
+                )
+            }
+            throw error
+        } catch {
+            _ = closeRemainingDescriptorsBaseFirst()
+            throw InvestigationOwnerOnlyCapsuleError.ownershipUncertain(.none)
         }
     }
 
@@ -459,9 +513,8 @@ final class InvestigationMachineGateOwnership: @unchecked Sendable {
     private func revalidateOwnedBaseAndLock(
         baseDescriptor: Int32, lockDescriptor: Int32,
         baseRelativePath: String
-    ) throws {
-        var rootDescriptor: Int32?
-        var validationSucceeded = false
+    ) throws -> InvestigationMachineGateMetadataSnapshot {
+        let rootDescriptor: Int32
         do {
             let root = try system.openComponent(
                 parentDescriptor: nil, name: "/",
@@ -471,6 +524,13 @@ final class InvestigationMachineGateOwnership: @unchecked Sendable {
                 throw InvestigationMachineGateOwnershipError.ownershipUncertain
             }
             rootDescriptor = root
+        } catch {
+            throw InvestigationMachineGateOwnershipError.ownershipUncertain
+        }
+        var baseMetadata: InvestigationMachineGateMetadataSnapshot?
+        var validationSucceeded = false
+        do {
+            let root = rootDescriptor
             try requireDescriptorState(root, accessMode: O_RDONLY)
             let rootMetadata = try system.metadata(descriptor: root)
             guard
@@ -479,28 +539,29 @@ final class InvestigationMachineGateOwnership: @unchecked Sendable {
             else {
                 throw InvestigationMachineGateOwnershipError.ownershipUncertain
             }
-            let baseMetadata = try baseSnapshot(
+            let observedBase = try baseSnapshot(
                 baseDescriptor, root: root, relativePath: baseRelativePath
             )
             _ = try lockSnapshot(
                 lockDescriptor, parent: baseDescriptor,
-                baseDevice: baseMetadata.device
+                baseDevice: observedBase.device
             )
             try requireDescriptorState(baseDescriptor, accessMode: O_RDONLY)
             try requireDescriptorState(lockDescriptor, accessMode: O_RDWR)
+            baseMetadata = observedBase
             validationSucceeded = true
         } catch {
             validationSucceeded = false
         }
 
-        var rootCloseSucceeded = true
-        if let rootDescriptor {
-            do { try system.close(descriptor: rootDescriptor) }
-            catch { rootCloseSucceeded = false }
-        }
-        guard validationSucceeded, rootCloseSucceeded else {
+        do { try system.close(descriptor: rootDescriptor) }
+        catch {
             throw InvestigationMachineGateOwnershipError.ownershipUncertain
         }
+        guard validationSucceeded, let baseMetadata else {
+            throw InvestigationMachineGateOwnershipError.ownershipUncertain
+        }
+        return baseMetadata
     }
 
     private func requireDescriptorState(
@@ -565,7 +626,13 @@ final class InvestigationMachineGateOwnership: @unchecked Sendable {
     }
 
     private func closeRemainingDescriptorsBaseFirst() -> Bool {
-        guard case .active(let active) = state else { return true }
+        let active: ActiveState
+        switch state {
+        case .active(let value):
+            active = value
+        case .terminal:
+            return true
+        }
         state = .terminal
         var succeeded = true
         do { try system.close(descriptor: active.baseDescriptor) }
