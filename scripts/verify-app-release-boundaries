@@ -74,6 +74,16 @@ iic0biib_ownership_source=
 iic0biib_capsule_source=
 iic0biib_verifier_source=
 iic0biib_component_boundary_only=false
+iic0biii2a_source_contract_only=false
+iic0biii2a_package_source=
+iic0biii2a_transport_source=
+iic0biii2a_launcher_source=
+iic0biii2a_darwin_source=
+iic0biii2a_entry_source=
+iic0biii2a_verifier_source=
+iic0biii2a_component_boundary_only=false
+iic0biii2a_closed_image_scan_contract_only=false
+iic0biii2a_closed_image_scan_source=
 iib5biii_a_source_contract_only=false
 iib5biii_a_single_epoch_source=
 iib5biii_a_composition_source=
@@ -164,6 +174,20 @@ elif [[ ($# == 4 || $# == 5) \
     iic0biib_verifier_source=${5:-${ZSH_SCRIPT:A}}
 elif [[ $# == 1 && $1 == --iic0b-ii-b-component-boundary-only ]]; then
     iic0biib_component_boundary_only=true
+elif [[ ($# == 6 || $# == 7) \
+    && $1 == --iic0b-iii-2a-source-contract-only ]]; then
+    iic0biii2a_source_contract_only=true
+    iic0biii2a_package_source=$2
+    iic0biii2a_transport_source=$3
+    iic0biii2a_launcher_source=$4
+    iic0biii2a_darwin_source=$5
+    iic0biii2a_entry_source=$6
+    iic0biii2a_verifier_source=${7:-${ZSH_SCRIPT:A}}
+elif [[ $# == 1 && $1 == --iic0b-iii-2a-component-boundary-only ]]; then
+    iic0biii2a_component_boundary_only=true
+elif [[ $# == 2 && $1 == --iic0b-iii-2a-closed-image-scan-contract-only ]]; then
+    iic0biii2a_closed_image_scan_contract_only=true
+    iic0biii2a_closed_image_scan_source=$2
 elif [[ $# == 4 && $1 == --iib5biii-a-source-contract-only ]]; then
     iib5biii_a_source_contract_only=true
     iib5biii_a_single_epoch_source=$2
@@ -216,7 +240,7 @@ elif [[ $# == 5 && $1 == --iib5biii-b2a-ii-a2ii-source-contract-only ]]; then
     iib5biii_b2a_iia2ii_retirement_source=$5
 elif (( $# != 0 )); then
     print -u2 \
-        "Usage: scripts/verify-app-release-boundaries [... | --iic0b-ii-a3-source-contract-only <package> <ownership> [verifier] | --iic0b-ii-a3-component-boundary-only | --iic0b-ii-b-source-contract-only <package> <ownership> <capsule> [verifier] | --iic0b-ii-b-component-boundary-only]"
+        "Usage: scripts/verify-app-release-boundaries [--investigation-handoff-only | --legacy-machine-claim-contract-only <source> | --iib4-machine-claim-contract-only <source> | --iib5biic-machine-driver-contract-only <source> | --iib5biid-machine-driver-contract-only <source> | --iic0a-source-contract-only <projection> <intake> | --iic0b-i-source-contract-only <author> <composition> [verifier] | --iic0b-i-component-boundary-only | --iic0b-ii-a-source-contract-only <package> <ownership> [verifier] | --iic0b-ii-a-component-boundary-only | --iic0b-ii-a3-source-contract-only <package> <ownership> [verifier] | --iic0b-ii-a3-component-boundary-only | --iic0b-ii-b-source-contract-only <package> <ownership> <capsule> [verifier] | --iic0b-ii-b-component-boundary-only | --iic0b-iii-2a-source-contract-only <package> <transport> <launcher> <darwin-system> <entry> [verifier] | --iic0b-iii-2a-component-boundary-only | --iib5biii-a-source-contract-only <single-epoch> <composition> <continuity> | --iib5biii-b1-source-contract-only <cohort> <continuity> | --iib5biii-b2a0-source-contract-only <composition> <continuity> <bridge> | --iib5biii-b2a-i-source-contract-only <single-epoch> <composition> <continuity> <bridge> <protocol> | --iib5biii-b2a-ii-a1v-source-contract-only <outer-inner-session> <driver-child-observation> | --iib5biii-b2b0-source-contract-only <observer> <session> <composition> | --iib5biii-b2b1a0-source-contract-only <composition> <bridge> | --iib5biii-b2b1a1-source-contract-only <app-identity> <outer-observation> <composition> | --iib5biii-b2b1b-source-contract-only <support> <entry> | --iib5biii-b2a-ii-a2ii-source-contract-only <composition> <outer-inner-session> <outer-inner-protocol> <retirement>]"
     exit 64
 fi
 
@@ -2186,6 +2210,416 @@ function verify_iic0biib_component_boundary() {
     return $result_code
 }
 
+function verify_iic0biii2a_source_contract() {
+    local package_path=$1 transport_path=$2 launcher_path=$3 darwin_path=$4
+    local entry_path=$5 verifier_path=$6 source_path
+    for source_path in "$package_path" "$transport_path" "$launcher_path" \
+        "$darwin_path" "$entry_path"
+    do
+        xcrun swiftc -frontend -parse -enable-bare-slash-regex "$source_path" \
+            || return $?
+    done
+    python3 - "$package_path" "$transport_path" "$launcher_path" \
+        "$darwin_path" "$entry_path" "$verifier_path" \
+        "${ZSH_SCRIPT:A}" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+package_path, transport_path, launcher_path, darwin_path, entry_path, verifier_path, canonical_path = map(Path, sys.argv[1:])
+if verifier_path.read_bytes() != canonical_path.read_bytes():
+    raise SystemExit("ii-c0b-iii-2a component verifier source drifted")
+root = canonical_path.parent.parent.resolve()
+expected_paths = {
+    package_path: root / "Package.swift",
+    transport_path: root / "Sources/StornautInvestigationMachineGateSupport/InvestigationMachineGateTransport.swift",
+    launcher_path: root / "Sources/StornautInvestigationMachineGateSupport/InvestigationMachineFixedGateLauncher.swift",
+    darwin_path: root / "Sources/StornautInvestigationMachineGateSupport/DarwinInvestigationMachineFixedGateSystem.swift",
+    entry_path: root / "Tools/StornautInvestigationMachineGate/main.swift",
+}
+for path, expected in expected_paths.items():
+    if path.resolve() != expected.resolve():
+        raise SystemExit(f"ii-c0b-iii-2a source path drifted: {path}")
+package = package_path.read_text(encoding="utf-8")
+transport = transport_path.read_text(encoding="utf-8")
+launcher = launcher_path.read_text(encoding="utf-8")
+darwin = darwin_path.read_text(encoding="utf-8")
+entry = entry_path.read_text(encoding="utf-8")
+
+def target(name):
+    matches = re.findall(
+        rf'(?ms)\.(?:executableT|t)arget\(\s*name:\s*"{re.escape(name)}"\s*,(?P<body>.*?)^\s*\),',
+        package,
+    )
+    if len(matches) != 1:
+        raise SystemExit(f"ii-c0b-iii-2a target cardinality drifted: {name}")
+    return matches[0]
+
+support = target("StornautInvestigationMachineGateSupport")
+gate = target("StornautInvestigationMachineGate")
+if re.search(r"\b(?:exclude|sources)\s*:", support):
+    raise SystemExit("ii-c0b-iii-2a GateSupport source inventory drifted")
+if re.findall(r'"([^"]+)"', re.search(r'(?ms)dependencies:\s*\[(.*?)\]', support).group(1)) != ["StornautInvestigationHandoffContract"]:
+    raise SystemExit("ii-c0b-iii-2a GateSupport target dependency surface drifted")
+if re.findall(r'"([^"]+)"', re.search(r'(?ms)dependencies:\s*\[(.*?)\]', gate).group(1)) != ["StornautInvestigationMachineGateSupport"]:
+    raise SystemExit("ii-c0b-iii-2a Gate target dependency surface drifted")
+if 'path: "Tools/StornautInvestigationMachineGate"' not in gate:
+    raise SystemExit("ii-c0b-iii-2a Gate target path drifted")
+if "StornautInvestigationMachineGateSupport" in package.split("    targets: [", 1)[0]:
+    raise SystemExit("ii-c0b-iii-2a GateSupport became an explicit product")
+if package.count('"StornautInvestigationMachineGateSupport"') != 3:
+    raise SystemExit("ii-c0b-iii-2a GateSupport consumer surface drifted")
+project = (root / "Stornaut.xcodeproj/project.pbxproj").read_text(encoding="utf-8")
+if "StornautInvestigationMachineGateSupport" in project \
+        or "StornautInvestigationMachineGate" in project:
+    raise SystemExit("ii-c0b-iii-2a Gate target gained Xcode membership")
+source_root = root / "Sources/StornautInvestigationMachineGateSupport"
+if sorted(path.name for path in source_root.glob("*.swift")) != [
+    "DarwinInvestigationMachineFixedGateSystem.swift",
+    "InvestigationMachineFixedGateLauncher.swift",
+    "InvestigationMachineGateTransport.swift",
+]:
+    raise SystemExit("ii-c0b-iii-2a GateSupport source inventory drifted")
+for label, source in (("transport", transport), ("launcher", launcher),
+                      ("darwin", darwin)):
+    imports = set(re.findall(r"(?m)^import\s+([A-Za-z0-9_]+)\s*$", source))
+    if imports != {"Darwin", "Foundation", "StornautInvestigationHandoffContract"}:
+        raise SystemExit("ii-c0b-iii-2a GateSupport import surface drifted")
+    if re.search(r"(?m)^\s*(?:public|open)\s+", source) \
+            or re.search(r"\b(?:Codable|Encodable|Decodable)\b", source):
+        raise SystemExit("ii-c0b-iii-2a package-only or Codable surface drifted")
+    debug_blocks = re.findall(r"(?ms)^#if DEBUG\n(.*?)^#endif$", source)
+    if label == "transport":
+        if len(debug_blocks) != 2 or any(
+            "extension InvestigationMachineGate" not in block
+            or block.count("throw InvestigationMachineGateError.invalid") != 1
+            for block in debug_blocks
+        ):
+            raise SystemExit("ii-c0b-iii-2a test-only constructor boundary drifted")
+    elif debug_blocks or "#if DEBUG" in source:
+        raise SystemExit("ii-c0b-iii-2a production source became Debug-gated")
+if [line.strip() for line in entry.splitlines() if line.strip()] != [
+    "import Darwin", "import StornautInvestigationMachineGateSupport",
+    "@main", "struct StornautInvestigationMachineGateCommand {",
+    "static func main() {",
+    "exit(InvestigationMachineGateSupport.run())", "}", "}",
+]:
+    raise SystemExit("ii-c0b-iii-2a entry surface drifted")
+if re.search(r"\b(?:CommandLine|ProcessInfo|getenv|environ|posix_spawn|Process)\b", entry):
+    raise SystemExit("ii-c0b-iii-2a entry selector or authority drifted")
+production = transport + launcher + darwin + entry
+for forbidden in (
+    r"(?m)^import\s+Stornaut(?:Core|Execution|Codex|Lifecycle|InvestigationRuntime|InvestigationDiagnostic|InvestigationMachine|InvestigationMachineDriverSupport|InvestigationMachineLaunchSupport|ProcessSupport)\s*$",
+    r"\b(?:ActionExecutor|TrashMoving|RegisteredAction|NSXPCConnection|URLSession|NWConnection|signedRuntimeReady|readiness)\b",
+    r"\b(?:unlink|unlinkat|rename|renameat|mkdir|mkdirat|rmdir|chmod|chown|setxattr|removexattr)\s*\(",
+):
+    if re.search(forbidden, production, re.I):
+        raise SystemExit("ii-c0b-iii-2a prohibited authority or readiness drifted")
+for marker in (
+    "iic0biii2a_gate_symbols=(", "iic0biii2a_positive_gates=(",
+    "iic0biii2a_closed_images=(",
+    "iic0biii2a_forbidden_gate_markers=(",
+    "expected_debug_undefined_sha=512c8ea1fbd27b9df403a5db438ba3352aa2e6ebb2a9cdcaf877cf27cc73bc15",
+    "expected_release_owned_sha=42a692726b9e81a3657e9c730288e5d183374ca69d26dee67fad1de960c76202",
+    "verify_iic0biii2a_component_boundary",
+):
+    if marker not in verifier_path.read_text(encoding="utf-8"):
+        raise SystemExit(f"ii-c0b-iii-2a component boundary drifted: {marker}")
+verifier = verifier_path.read_text(encoding="utf-8")
+component_start = verifier.index(
+    "\nfunction verify_iic0biii2a_component_boundary() {"
+) + 1
+component_end = verifier.index(
+    "\nfunction verify_iib5biii_a_source_contract() {",
+    component_start,
+)
+component = verifier[component_start:component_end]
+def shell_array(name):
+    match = re.search(
+        rf'(?ms)^\s*{re.escape(name)}=\(\n(?P<body>.*?)^\s*\)\n',
+        component,
+    )
+    if match is None:
+        raise SystemExit(f"ii-c0b-iii-2a component array missing: {name}")
+    return [line.strip().strip('\"\'') for line in match.group("body").splitlines()]
+if shell_array("iic0biii2a_gate_symbols") != [
+    "StornautInvestigationMachineGateSupport.InvestigationMachineGateSupport.run()",
+    "StornautInvestigationMachineGateSupport.InvestigationMachineFixedGateLauncher.run(inheritedCapsuleDescriptor:",
+    "StornautInvestigationMachineGateSupport.InvestigationMachineGateTransportReceipt.decode",
+]:
+    raise SystemExit("ii-c0b-iii-2a Gate symbol allowlist drifted")
+if shell_array("iic0biii2a_positive_gates") != [
+    "$debug_gate", "$release_gate",
+]:
+    raise SystemExit("ii-c0b-iii-2a positive Gate allowlist drifted")
+if shell_array("iic0biii2a_closed_images") != [
+    "$product_derived_data/Build/Products/Debug/Stornaut.app",
+    "$product_derived_data/Build/Products/Release/Stornaut.app",
+    "$diagnostic_derived_data/Build/Products/Debug/StornautInvestigationDiagnostic.app",
+    "$diagnostic_derived_data/Build/Products/Release/StornautInvestigationDiagnosticReleaseShell.app",
+    "$diagnostic_derived_data/Build/Products/Release/StornautInvestigationMachineDriver",
+]:
+    raise SystemExit("ii-c0b-iii-2a closed-image allowlist drifted")
+projection_guard = r'''        local index value expected expected_lines label
+        for index in {1..6}; do
+            value=$projection_values[$index]
+            expected=$projection_hashes[$index]
+            expected_lines=$projection_lines[$index]
+            label=$projection_labels[$index]
+            [[ "$(print -rn -- "$value" | shasum -a 256 | awk '{print $1}')" \
+                == "$expected" \
+                && "$(print -r -- "$value" | awk 'NF {n++} END {print n+0}')" \
+                    == "$expected_lines" ]] || {
+                print -u2 "ii-c0b-iii-2a exact projection drifted: $label"
+                exit 1
+            }
+        done
+'''
+if component.count(projection_guard) != 1:
+    raise SystemExit("ii-c0b-iii-2a projection guard drifted")
+PY
+}
+
+function verify_iic0biii2a_closed_image() (
+    local file=$1 kind symbols strings combined inventory
+    if [[ -d $file ]]; then
+        inventory=$(mktemp "${TMPDIR:-/tmp}/stornaut-iic0biii2a-inventory.XXXXXX")
+        trap 'rm -f "$inventory"' EXIT
+        find "$file" -type f -print0 >"$inventory" || {
+            print -u2 "ii-c0b-iii-2a closed-image enumeration failed: $file"
+            return 1
+        }
+        while IFS= read -r -d '' file; do
+            kind=$(file "$file" 2>/dev/null) || {
+                print -u2 "ii-c0b-iii-2a closed-image type scan failed: $file"
+                return 1
+            }
+            [[ $kind == *Mach-O* ]] || continue
+            verify_iic0biii2a_closed_image "$file" || return $?
+        done <"$inventory"
+        return 0
+    fi
+    symbols=$(xcrun nm -j "$file" 2>/dev/null \
+        | xcrun swift-demangle 2>/dev/null) || {
+        print -u2 "ii-c0b-iii-2a closed-image symbol scan failed: $file"
+        return 1
+    }
+    strings=$(xcrun strings -a "$file" 2>/dev/null) || {
+        print -u2 "ii-c0b-iii-2a closed-image string scan failed: $file"
+        return 1
+    }
+    combined="$symbols$strings"
+    [[ "$combined" != *'StornautInvestigationMachineGateSupport.'* ]] || {
+        print -u2 \
+            "ii-c0b-iii-2a GateSupport namespace leaked into a closed image: $file"
+        return 1
+    }
+)
+
+function verify_iic0biii2a_component_boundary() {
+    (( $# == 0 || $# == 2 )) || return 64
+    local scratch result_code=0
+    scratch=$(mktemp -d \
+        "${TMPDIR:-/tmp}/stornaut-iic0biii2a-component.XXXXXX")
+    (
+        trap 'rm -rf "$scratch"' EXIT
+        trap 'exit 130' INT; trap 'exit 143' TERM
+        local debug_root="$scratch/gate-debug"
+        local release_root="$scratch/gate-release"
+        local product_derived_data diagnostic_derived_data
+        if (( $# == 2 )); then
+            product_derived_data=$1; diagnostic_derived_data=$2
+            [[ -d $product_derived_data && -d $diagnostic_derived_data ]] || {
+                print -u2 "ii-c0b-iii-2a existing component roots unavailable"
+                exit 1
+            }
+        else
+            product_derived_data="$scratch/xcode-product"
+            diagnostic_derived_data="$scratch/xcode-diagnostic"
+            for configuration in Debug Release; do
+                xcodebuild -quiet -project Stornaut.xcodeproj -scheme Stornaut \
+                    -configuration "$configuration" \
+                    -destination 'platform=macOS,arch=arm64' \
+                    -derivedDataPath "$product_derived_data" build || exit $?
+            done
+            xcodebuild -quiet -project Stornaut.xcodeproj \
+                -scheme StornautInvestigationDiagnosticApp -configuration Debug \
+                -destination 'platform=macOS,arch=arm64' \
+                -derivedDataPath "$diagnostic_derived_data" build || exit $?
+            xcodebuild -quiet -project Stornaut.xcodeproj \
+                -scheme StornautInvestigationDiagnosticReleaseShell \
+                -configuration Release -destination 'platform=macOS,arch=arm64' \
+                -derivedDataPath "$diagnostic_derived_data" build || exit $?
+            xcodebuild -quiet -project Stornaut.xcodeproj \
+                -scheme StornautInvestigationMachineDriverNative \
+                -configuration Release -destination 'platform=macOS,arch=arm64' \
+                -derivedDataPath "$diagnostic_derived_data" build || exit $?
+        fi
+        swift build --scratch-path "$debug_root" \
+            --configuration debug --product StornautInvestigationMachineGate \
+            || exit $?
+        swift build --scratch-path "$release_root" \
+            --configuration release --product StornautInvestigationMachineGate \
+            || exit $?
+        local debug_gate release_gate
+        debug_gate=$(swift build --scratch-path "$debug_root" \
+            --configuration debug --show-bin-path)/StornautInvestigationMachineGate
+        release_gate=$(swift build --scratch-path "$release_root" \
+            --configuration release --show-bin-path)/StornautInvestigationMachineGate
+        iic0biii2a_positive_gates=(
+            "$debug_gate"
+            "$release_gate"
+        )
+        [[ -f $debug_gate && ! -L $debug_gate ]] || {
+            print -u2 "ii-c0b-iii-2a Debug Gate positive control is missing"
+            exit 1
+        }
+        [[ -f $release_gate && ! -L $release_gate ]] || {
+            print -u2 "ii-c0b-iii-2a Release Gate positive control is missing"
+            exit 1
+        }
+        iic0biii2a_gate_symbols=(
+            'StornautInvestigationMachineGateSupport.InvestigationMachineGateSupport.run()'
+            'StornautInvestigationMachineGateSupport.InvestigationMachineFixedGateLauncher.run(inheritedCapsuleDescriptor:'
+            'StornautInvestigationMachineGateSupport.InvestigationMachineGateTransportReceipt.decode'
+        )
+        iic0biii2a_forbidden_gate_markers=(
+            'StornautCore.' 'StornautExecution.' 'StornautCodex.'
+            'StornautLifecycle.' 'StornautInvestigationRuntime.'
+            'StornautInvestigationDiagnostic.'
+            'StornautInvestigationMachineDriverSupport.'
+            'StornautInvestigationMachineLaunchSupport.'
+            'StornautInvestigationMachineClaimServer.'
+            'ActionExecutor' 'TrashMoving' 'RegisteredAction'
+            'NSXPCConnection' 'URLSession' 'NWConnection'
+            'signedRuntimeReady' 'readiness'
+            'InvestigationMachineGateStub' '--coordinator' '--hold'
+            'stornaut-signal-physical-v1'
+        )
+        local configuration gate symbols strings marker
+        for configuration gate in debug "$debug_gate" release "$release_gate"; do
+            symbols=$(xcrun nm -j "$gate" | xcrun swift-demangle) || exit $?
+            strings=$(xcrun strings -a "$gate") || exit $?
+            for marker in "${iic0biii2a_gate_symbols[@]}"; do
+                [[ "$symbols" == *"$marker"* ]] || {
+                    print -u2 "ii-c0b-iii-2a ${configuration:u} Gate positive control is missing: $marker"
+                    exit 1
+                }
+            done
+            for marker in "${iic0biii2a_forbidden_gate_markers[@]}"; do
+                [[ "$symbols$strings" != *"$marker"* ]] || {
+                    print -u2 \
+                        "ii-c0b-iii-2a forbidden authority leaked into Gate: $configuration: $marker"
+                    exit 1
+                }
+            done
+            [[ "$strings" == *'/usr/bin/sudo'* \
+                && "$strings" == *'Stornaut Task 39 ii-c administrator authorization: '* \
+                && "$strings" == *'stornaut.task39.machine-gate.prepared-frame'* \
+                && "$strings" == *'stornaut.task39.machine-gate.transport-receipt'* ]] || {
+                print -u2 "ii-c0b-iii-2a fixed Gate string positive control is missing"
+                exit 1
+            }
+        done
+
+        local debug_undefined release_undefined debug_loads release_loads
+        local debug_owned release_owned
+        debug_undefined=$(xcrun nm -u -j "$debug_gate" | LC_ALL=C sort -u) || exit $?
+        release_undefined=$(xcrun nm -u -j "$release_gate" | LC_ALL=C sort -u) || exit $?
+        debug_loads=$(otool -L "$debug_gate" | tail -n +2 \
+            | sed 's/^[[:space:]]*//' | LC_ALL=C sort -u) || exit $?
+        release_loads=$(otool -L "$release_gate" | tail -n +2 \
+            | sed 's/^[[:space:]]*//' | LC_ALL=C sort -u) || exit $?
+        debug_owned=$(print -r -- "$(xcrun nm -j "$debug_gate" \
+            | xcrun swift-demangle)" | rg 'StornautInvestigationMachineGate(Support)?' \
+            | LC_ALL=C sort -u) || exit $?
+        release_owned=$(print -r -- "$(xcrun nm -j "$release_gate" \
+            | xcrun swift-demangle)" | rg 'StornautInvestigationMachineGate(Support)?' \
+            | LC_ALL=C sort -u) || exit $?
+        local expected_debug_undefined_sha=512c8ea1fbd27b9df403a5db438ba3352aa2e6ebb2a9cdcaf877cf27cc73bc15
+        local expected_debug_undefined_lines=397
+        local expected_release_undefined_sha=283d051cf84401d378cd29370e4045a1c053b03cfc4bbcf2ae600feb6ec8c761
+        local expected_release_undefined_lines=314
+        local expected_debug_loads_sha=a0c9d3ffb52720905af57106a895be6d7fc377ac5cf1fe2342919beeeb253c4c
+        local expected_debug_loads_lines=14
+        local expected_release_loads_sha=a0c9d3ffb52720905af57106a895be6d7fc377ac5cf1fe2342919beeeb253c4c
+        local expected_release_loads_lines=14
+        local expected_debug_owned_sha=7425ab957846c165b53d7c8ed3ffa26cbf71ddc08b1a15f2ca05b25da6db526e
+        local expected_debug_owned_lines=1374
+        local expected_release_owned_sha=42a692726b9e81a3657e9c730288e5d183374ca69d26dee67fad1de960c76202
+        local expected_release_owned_lines=860
+        local -a projection_values=(
+            "$debug_undefined" "$release_undefined"
+            "$debug_loads" "$release_loads"
+            "$debug_owned" "$release_owned"
+        )
+        local -a projection_hashes=(
+            "$expected_debug_undefined_sha" "$expected_release_undefined_sha"
+            "$expected_debug_loads_sha" "$expected_release_loads_sha"
+            "$expected_debug_owned_sha" "$expected_release_owned_sha"
+        )
+        local -a projection_lines=(
+            "$expected_debug_undefined_lines" "$expected_release_undefined_lines"
+            "$expected_debug_loads_lines" "$expected_release_loads_lines"
+            "$expected_debug_owned_lines" "$expected_release_owned_lines"
+        )
+        local -a projection_labels=(
+            debug-undefined release-undefined debug-loads release-loads
+            debug-owned release-owned
+        )
+        local index value expected expected_lines label
+        for index in {1..6}; do
+            value=$projection_values[$index]
+            expected=$projection_hashes[$index]
+            expected_lines=$projection_lines[$index]
+            label=$projection_labels[$index]
+            [[ "$(print -rn -- "$value" | shasum -a 256 | awk '{print $1}')" \
+                == "$expected" \
+                && "$(print -r -- "$value" | awk 'NF {n++} END {print n+0}')" \
+                    == "$expected_lines" ]] || {
+                print -u2 "ii-c0b-iii-2a exact projection drifted: $label"
+                exit 1
+            }
+        done
+
+        iic0biii2a_closed_images=(
+            "$product_derived_data/Build/Products/Debug/Stornaut.app"
+            "$product_derived_data/Build/Products/Release/Stornaut.app"
+            "$diagnostic_derived_data/Build/Products/Debug/StornautInvestigationDiagnostic.app"
+            "$diagnostic_derived_data/Build/Products/Release/StornautInvestigationDiagnosticReleaseShell.app"
+            "$diagnostic_derived_data/Build/Products/Release/StornautInvestigationMachineDriver"
+        )
+        local -a iic0biii2a_required_closed_executables=(
+            "$product_derived_data/Build/Products/Debug/Stornaut.app/Contents/MacOS/Stornaut"
+            "$product_derived_data/Build/Products/Debug/Stornaut.app/Contents/MacOS/StornautLifecycleHelper"
+            "$product_derived_data/Build/Products/Release/Stornaut.app/Contents/MacOS/Stornaut"
+            "$product_derived_data/Build/Products/Release/Stornaut.app/Contents/MacOS/StornautLifecycleHelper"
+            "$diagnostic_derived_data/Build/Products/Debug/StornautInvestigationDiagnostic.app/Contents/MacOS/StornautInvestigationDiagnostic"
+            "$diagnostic_derived_data/Build/Products/Debug/StornautInvestigationDiagnostic.app/Contents/MacOS/StornautLifecycleHelper"
+            "$diagnostic_derived_data/Build/Products/Debug/StornautInvestigationDiagnostic.app/Contents/MacOS/StornautInvestigationMachineDriver"
+            "$diagnostic_derived_data/Build/Products/Release/StornautInvestigationDiagnosticReleaseShell.app/Contents/MacOS/StornautInvestigationDiagnosticReleaseShell"
+            "$diagnostic_derived_data/Build/Products/Release/StornautInvestigationMachineDriver"
+        )
+        local closed_root required
+        for required in "${iic0biii2a_required_closed_executables[@]}"; do
+            [[ -f $required && ! -L $required ]] || {
+                print -u2 \
+                    "ii-c0b-iii-2a required closed-image control is missing: $required"
+                exit 1
+            }
+        done
+        for closed_root in "${iic0biii2a_closed_images[@]}"; do
+            [[ -e $closed_root && ! -L $closed_root ]] || {
+                print -u2 "ii-c0b-iii-2a closed image is missing: $closed_root"
+                exit 1
+            }
+            verify_iic0biii2a_closed_image "$closed_root" || exit $?
+        done
+    ) || result_code=$?
+    rm -rf "$scratch"
+    return $result_code
+}
+
 function verify_iib5biii_a_source_contract() {
     local single_epoch_path=$1
     local composition_path=$2
@@ -3775,6 +4209,24 @@ fi
 if $iic0biib_component_boundary_only; then
     verify_iic0biib_component_boundary
     print "ii-c0b-ii-b targeted component boundary verification passed."
+    exit 0
+fi
+if $iic0biii2a_source_contract_only; then
+    verify_iic0biii2a_source_contract \
+        "$iic0biii2a_package_source" "$iic0biii2a_transport_source" \
+        "$iic0biii2a_launcher_source" "$iic0biii2a_darwin_source" \
+        "$iic0biii2a_entry_source" "$iic0biii2a_verifier_source"
+    print "ii-c0b-iii-2a source-only Gate boundary verification passed."
+    exit 0
+fi
+if $iic0biii2a_component_boundary_only; then
+    verify_iic0biii2a_component_boundary
+    print "ii-c0b-iii-2a Gate final-Mach-O boundary verification passed."
+    exit 0
+fi
+if $iic0biii2a_closed_image_scan_contract_only; then
+    verify_iic0biii2a_closed_image "$iic0biii2a_closed_image_scan_source"
+    print "ii-c0b-iii-2a closed-image scan verification passed."
     exit 0
 fi
 if $iib5biii_a_source_contract_only; then
@@ -6311,5 +6763,6 @@ xcodebuild -quiet \
     -only-testing:StornautInvestigationDiagnosticAppTests \
     test
 verify_iic0biia3_component_boundary "$derived_data" "$diagnostic_derived_data"
+verify_iic0biii2a_component_boundary "$derived_data" "$diagnostic_derived_data"
 
 print "Release App fixture boundary verification passed."

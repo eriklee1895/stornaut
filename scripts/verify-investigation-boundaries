@@ -292,6 +292,18 @@ iic0biib_focused_test_source=
 iic0biib_boundary_test_source=
 iic0biib_staged_scope_contract_only=false
 iic0biib_staged_scope_baseline=cbc469403f0ecfcdab17fb93baadd24d3c12f1ff
+iic0biii2a_gate_contract_only=false
+iic0biii2a_package_source=
+iic0biii2a_transport_source=
+iic0biii2a_launcher_source=
+iic0biii2a_darwin_source=
+iic0biii2a_entry_source=
+iic0biii2a_launcher_test_source=
+iic0biii2a_physical_test_source=
+iic0biii2a_stub_source=
+iic0biii2a_boundary_test_source=
+iic0biii2a_staged_scope_contract_only=false
+iic0biii2a_staged_scope_baseline=e832e8433137f9777aba77daba2ca248a563404d
 iib3a_staged_scope_contract_only=false
 iib3a_staged_scope_baseline=HEAD
 iib3b_start_retire_contract_only=false
@@ -745,6 +757,22 @@ if (( $# > 0 )); then
         && [[ $1 == --iic0b-ii-b-staged-scope-contract-only ]]; then
         iic0biib_staged_scope_contract_only=true
         iic0biib_staged_scope_baseline=${2:-cbc469403f0ecfcdab17fb93baadd24d3c12f1ff}
+    elif (( $# == 10 )) \
+        && [[ $1 == --iic0b-iii-2a-gate-contract-only ]]; then
+        iic0biii2a_gate_contract_only=true
+        iic0biii2a_package_source=$2
+        iic0biii2a_transport_source=$3
+        iic0biii2a_launcher_source=$4
+        iic0biii2a_darwin_source=$5
+        iic0biii2a_entry_source=$6
+        iic0biii2a_launcher_test_source=$7
+        iic0biii2a_physical_test_source=$8
+        iic0biii2a_stub_source=$9
+        iic0biii2a_boundary_test_source=${10}
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iic0b-iii-2a-staged-scope-contract-only ]]; then
+        iic0biii2a_staged_scope_contract_only=true
+        iic0biii2a_staged_scope_baseline=${2:-e832e8433137f9777aba77daba2ca248a563404d}
     elif (( $# == 1 || $# == 2 )) \
         && [[ $1 == --iib3a-staged-scope-contract-only ]]; then
         iib3a_staged_scope_contract_only=true
@@ -770,7 +798,7 @@ if (( $# > 0 )); then
         iib3c_staged_scope_baseline=${2:-HEAD}
     else
         print -u2 \
-            "Usage: scripts/verify-investigation-boundaries [... | --iic0b-ii-a3-retained-base-contract-only <ownership> <focused-test> <boundary-test> | --iic0b-ii-a3-staged-scope-contract-only [baseline] | --iic0b-ii-b-capsule-contract-only <package> <ownership> <capsule> <focused-test> <boundary-test> | --iic0b-ii-b-staged-scope-contract-only [baseline]]"
+            "Usage: scripts/verify-investigation-boundaries [... | --iic0b-ii-b-capsule-contract-only <package> <ownership> <capsule> <focused-test> <boundary-test> | --iic0b-ii-b-staged-scope-contract-only [baseline] | --iic0b-iii-2a-gate-contract-only <package> <transport> <launcher> <darwin-system> <entry> <launcher-tests> <physical-tests> <stub> <boundary-test> | --iic0b-iii-2a-staged-scope-contract-only [baseline]]"
         exit 64
     fi
 fi
@@ -782,6 +810,7 @@ function verify_app_peer_admission_contract() {
 from pathlib import Path
 import hashlib
 import re
+import subprocess
 import sys
 
 policy_path, adapter_path = map(Path, sys.argv[1:])
@@ -1811,8 +1840,7 @@ test_code = re.sub(
     r'/\*.*?\*/|//.*$|#?"(?:\\.|[^"\\])*"', ' ', test,
     flags=re.DOTALL | re.MULTILINE,
 )
-required_tests = (
-    "invocationSelfContainedDecodeRemainsUntrustedAndCanonical",
+historical_required_tests = (
     "invocationRoundTripsCanonicalPredecessor",
     "invocationRejectsForeignSelectionTamperAndTrailingBytes",
     "protocolDefaultForwardsLegacyHelperAndCompositionUsesFullInvocation",
@@ -1822,12 +1850,21 @@ required_tests = (
     "#expect(await [first, second].filter { $0 }.count == 1)",
     "selectionWithDifferentConfiguration",
 )
-if test_code.count("@Test") != 7 or any(
-    marker not in test_code for marker in required_tests
-):
+current_required_test = "invocationSelfContainedDecodeRemainsUntrustedAndCanonical"
+observed_test_count = test_code.count("@Test")
+observed_test_sha256 = __import__("hashlib").sha256(
+    test_path.read_bytes()
+).hexdigest()
+admitted_test_shapes = {
+    6: "89779c607e5bde6ffe9a3dda2513fd4b0268d1e3229d7c589720a7bf976128c4",
+    7: "96cd6b903be68d023547f95b8b4945f02bf6fe7a6dfe9676ad9750f5921a6b28",
+}
+if any(marker not in test_code for marker in historical_required_tests) \
+        or observed_test_count not in admitted_test_shapes \
+        or (observed_test_count == 7 and current_required_test not in test_code) \
+        or (observed_test_count == 6 and current_required_test in test_code):
     fail("iii-b2a0 focused test vacuity or coverage drifted")
-expected_test_sha256 = "96cd6b903be68d023547f95b8b4945f02bf6fe7a6dfe9676ad9750f5921a6b28"
-if __import__("hashlib").sha256(test_path.read_bytes()).hexdigest() != expected_test_sha256:
+if observed_test_sha256 != admitted_test_shapes[observed_test_count]:
     fail("iii-b2a0 focused test source seal drifted")
 for marker in (
     "iiiB2A0PhysicalBridgeVerifierPinsTypedNonAuthorityBoundary",
@@ -4000,7 +4037,9 @@ function verify_iib5biii_b2b1a0_provenance_contract() {
         "$bridge_test_source" "$protocol_test_source" \
         "$boundary_test_source" <<'PY'
 from pathlib import Path
+import hashlib
 import re
+import subprocess
 import sys
 
 composition_path, bridge_path, bridge_test_path, protocol_test_path, boundary_path = map(
@@ -4030,6 +4069,8 @@ expected_test_sha256 = {
         "3a72e900c5c102c1317c1a371dea146126c36829176b810c34e85747d52aab0a",
         "43e5f15a1fac2644934ecaa11207a182f8ac41c217d93bea56ad1a08b7d7bc1b",
         "ee0ee2918638c1289c7e136a0aa552c36d54c0a1b163f1b7eb281859d397d4bf",
+        "3aeb382661bd115905936f5079aeecd41b7d3c177503f847b98fe4e0e42cce6a",
+        "586f58adabe748551dcef53be3e3746c445fe4127b967d10cce4ddd94760fd08",
     },
 }
 for path, admitted_sha256 in expected_test_sha256.items():
@@ -4342,6 +4383,8 @@ expected_test_sha256 = {
         "3a72e900c5c102c1317c1a371dea146126c36829176b810c34e85747d52aab0a",
         "43e5f15a1fac2644934ecaa11207a182f8ac41c217d93bea56ad1a08b7d7bc1b",
         "ee0ee2918638c1289c7e136a0aa552c36d54c0a1b163f1b7eb281859d397d4bf",
+        "3aeb382661bd115905936f5079aeecd41b7d3c177503f847b98fe4e0e42cce6a",
+        "586f58adabe748551dcef53be3e3746c445fe4127b967d10cce4ddd94760fd08",
     },
 }
 for path, admitted_sha256 in expected_test_sha256.items():
@@ -8954,18 +8997,21 @@ if retry_end < 0:
 retry_body = capsule[retry:retry_end]
 for marker in (
     "where value == EBUSY",
-    "retries <= maximumBusyRetries",
     "now = try system.monotonicNanoseconds()",
     "now < deadline",
+    "beforeWait = try system.monotonicNanoseconds()",
+    "beforeWait < deadline",
     "system.waitForRetry(",
+    "nanoseconds: min(1_000_000, deadline - beforeWait)",
     "afterWait = try system.monotonicNanoseconds()",
     "afterWait < deadline",
     "try revalidate()",
 ):
     if marker not in retry_body:
         fail(f"ii-c0b-ii-b retry or heuristic boundary drifted: {marker}")
-if "retries <= maximumBusyRetries" not in retry_body:
-    fail("ii-c0b-ii-b retry or heuristic boundary drifted")
+if "maximumBusyRetries" in capsule \
+        or re.search(r"\bretries?\s*(?:<=|<|==|>=|>)", retry_body):
+    fail("ii-c0b-ii-b retry count cap drifted")
 directory_revalidation = capsule.find(
     "private static func revalidateEmptyDirectoryPlan("
 )
@@ -9032,6 +9078,8 @@ focused_markers = (
     "stalePayloadMustMatchAttemptDirectoryUUID",
     "directoryBusyRetryReopensAndFullyRevalidatesEmptyLeaf",
     "directoryBusyRetryRejectsMetadataOrContentDrift",
+    "persistentBusyFailsOnlyWhenAbsoluteDeadlineIsReached",
+    "clockFailuresPreserveStagePriorityResidueAndCleanup",
 )
 for marker in focused_markers:
     if marker not in focused:
@@ -9126,6 +9174,465 @@ function verify_iic0biib_staged_scope() {
         print -u2 "ii-c0b-ii-b aggregate checkpoint budget drifted"; return 1
     }
     verify_iic0biib_index_semantics
+}
+
+function verify_iic0biii2a_gate_contract() {
+    local package_path=$1 transport_path=$2 launcher_path=$3 darwin_path=$4
+    local entry_path=$5 launcher_test_path=$6 physical_test_path=$7
+    local stub_path=$8 boundary_path=$9 source_path
+    for source_path in "$package_path" "$transport_path" "$launcher_path" \
+        "$darwin_path" "$entry_path" "$launcher_test_path" \
+        "$physical_test_path" "$stub_path" "$boundary_path"
+    do
+        xcrun swiftc -frontend -parse -enable-bare-slash-regex "$source_path" \
+            || return $?
+    done
+    python3 - "$package_path" "$transport_path" "$launcher_path" \
+        "$darwin_path" "$entry_path" "$launcher_test_path" \
+        "$physical_test_path" "$stub_path" "$boundary_path" <<'PY'
+from pathlib import Path
+import hashlib
+import re
+import sys
+
+(package_path, transport_path, launcher_path, darwin_path, entry_path,
+ launcher_test_path, physical_test_path, stub_path, boundary_path) = map(
+    Path, sys.argv[1:]
+)
+package = package_path.read_text(encoding="utf-8")
+transport = transport_path.read_text(encoding="utf-8")
+launcher = launcher_path.read_text(encoding="utf-8")
+darwin = darwin_path.read_text(encoding="utf-8")
+entry = entry_path.read_text(encoding="utf-8")
+launcher_test = launcher_test_path.read_text(encoding="utf-8")
+physical_test = physical_test_path.read_text(encoding="utf-8")
+stub = stub_path.read_text(encoding="utf-8")
+boundary = boundary_path.read_text(encoding="utf-8")
+
+def fail(message):
+    raise SystemExit(message)
+
+def target(name):
+    matches = re.findall(
+        rf'(?ms)\.(?:executableTarget|testTarget|target)\(\s*name:\s*"{re.escape(name)}"'
+        rf'\s*,(?P<body>.*?)^\s*\),', package
+    )
+    if len(matches) != 1:
+        fail(f"ii-c0b-iii-2a target cardinality drifted: {name}")
+    return matches[0]
+
+support = target("StornautInvestigationMachineGateSupport")
+gate = target("StornautInvestigationMachineGate")
+if re.search(r"\b(?:exclude|sources)\s*:", support):
+    fail("ii-c0b-iii-2a GateSupport source inventory drifted")
+if re.findall(r'"([^"]+)"', re.search(
+    r'(?ms)dependencies:\s*\[(.*?)\]', support
+).group(1)) != ["StornautInvestigationHandoffContract"]:
+    fail("ii-c0b-iii-2a GateSupport target dependency surface drifted")
+if re.findall(r'"([^"]+)"', re.search(
+    r'(?ms)dependencies:\s*\[(.*?)\]', gate
+).group(1)) != ["StornautInvestigationMachineGateSupport"]:
+    fail("ii-c0b-iii-2a Gate target dependency surface drifted")
+if 'path: "Tools/StornautInvestigationMachineGate"' not in gate:
+    fail("ii-c0b-iii-2a Gate target path drifted")
+products = package.split("    targets: [", 1)[0]
+if "StornautInvestigationMachineGateSupport" in products:
+    fail("ii-c0b-iii-2a GateSupport became an explicit product")
+test = target("StornautInvestigationTests")
+if test.count('"StornautInvestigationMachineGateSupport"') != 1:
+    fail("ii-c0b-iii-2a test dependency surface drifted")
+if package.count('"StornautInvestigationMachineGateSupport"') != 3:
+    fail("ii-c0b-iii-2a GateSupport consumer surface drifted")
+
+root = boundary_path.resolve().parents[2]
+source_root = root / "Sources/StornautInvestigationMachineGateSupport"
+observed_sources = sorted(
+    str(path.relative_to(source_root)) for path in source_root.rglob("*.swift")
+)
+expected_sources = [
+    "DarwinInvestigationMachineFixedGateSystem.swift",
+    "InvestigationMachineFixedGateLauncher.swift",
+    "InvestigationMachineGateTransport.swift",
+]
+if observed_sources != expected_sources:
+    fail("ii-c0b-iii-2a GateSupport source inventory drifted")
+if {transport_path.name, launcher_path.name, darwin_path.name} != set(expected_sources):
+    fail("ii-c0b-iii-2a GateSupport source inventory drifted")
+expected_imports = {
+    "Darwin", "Foundation", "StornautInvestigationHandoffContract",
+}
+for label, source in (("transport", transport), ("launcher", launcher),
+                      ("darwin", darwin)):
+    if set(re.findall(r"(?m)^import\s+([A-Za-z0-9_]+)\s*$", source)) != expected_imports:
+        fail("ii-c0b-iii-2a GateSupport import surface drifted")
+    if re.search(r"(?m)^\s*(?:public|open)\s+", source) \
+            or re.search(r"\b(?:Codable|Encodable|Decodable)\b", source):
+        fail("ii-c0b-iii-2a package-only or Codable surface drifted")
+    debug_blocks = re.findall(r"(?ms)^#if DEBUG\n(.*?)^#endif$", source)
+    if label == "transport":
+        if len(debug_blocks) != 2 or any(
+            "extension InvestigationMachineGate" not in block
+            or block.count("throw InvestigationMachineGateError.invalid") != 1
+            for block in debug_blocks
+        ):
+            fail("ii-c0b-iii-2a test-only constructor boundary drifted")
+    elif debug_blocks or "#if DEBUG" in source:
+        fail("ii-c0b-iii-2a production source became Debug-gated")
+
+entry_lines = [line.strip() for line in entry.splitlines() if line.strip()]
+if entry_lines != [
+    "import Darwin",
+    "import StornautInvestigationMachineGateSupport",
+    "@main",
+    "struct StornautInvestigationMachineGateCommand {",
+    "static func main() {",
+    "exit(InvestigationMachineGateSupport.run())",
+    "}",
+    "}",
+]:
+    fail("ii-c0b-iii-2a entry surface drifted")
+if re.search(r"\b(?:CommandLine|ProcessInfo|getenv|environ|posix_spawn|Process)\b", entry):
+    fail("ii-c0b-iii-2a entry selector or authority drifted")
+
+fixed_markers = (
+    'package static let launcherPath = "/usr/bin/sudo"',
+    '"Stornaut Task 39 ii-c administrator authorization: "',
+    '"--", driverPath',
+    'package static let environment: [String] = []',
+    'package static let requiredUserID: uid_t = 501',
+    'package static let requiredGroupID: gid_t = 20',
+    'package static let deadlineNanoseconds: UInt64 = 1_200_000_000_000',
+    'package static let maximumCapturedOutputByteCount = 512',
+    'package static let maximumReadOutputByteCount = 513',
+    'SIGHUP, SIGINT, SIGQUIT, SIGTERM',
+    'POSIX_SPAWN_START_SUSPENDED',
+    'package struct InvestigationMachineGatePreparedFrame',
+    'package struct InvestigationMachineGateTransportReceipt',
+    'stornaut.task39.machine-gate.prepared-frame',
+    'stornaut.task39.machine-gate.transport-receipt',
+)
+if any(marker not in transport for marker in fixed_markers):
+    fail("ii-c0b-iii-2a fixed command or transport contract drifted")
+if any(token in transport + launcher for token in (
+    "StornautCore", "StornautExecution", "StornautCodex",
+    "StornautLifecycle", "StornautInvestigationRuntime",
+    "StornautInvestigationDiagnostic", "NSXPC", "URLSession",
+    "NWConnection", "ActionExecutor", "TrashMoving",
+    "RegisteredAction", "signedRuntimeReady", "readiness",
+)):
+    fail("ii-c0b-iii-2a prohibited authority or readiness drifted")
+for token in (
+    "removeItem", "trashItem", "unlink(", "rename(", "mkdir(",
+    "rmdir(", "chmod(", "chown(", "setxattr(", "removexattr(",
+):
+    if token in transport + launcher + darwin:
+        fail("ii-c0b-iii-2a cleanup authority drifted")
+
+non_darwin_authority = re.compile(
+    r"\b(?:posix_spawn|tcsetpgrp|tcgetpgrp|waitpid|waitid|kill|pipe|poll|"
+    r"pread|open|write|pthread_sigmask|sigwait)\s*\("
+)
+if non_darwin_authority.search(transport + launcher):
+    fail("ii-c0b-iii-2a authority escaped Darwin system")
+exact_calls = {
+    "posix_spawn": 1, "posix_spawn_file_actions_init": 1,
+    "posix_spawn_file_actions_destroy": 1,
+    "posix_spawn_file_actions_addinherit_np": 2,
+    "posix_spawn_file_actions_adddup2": 1,
+    "posix_spawn_file_actions_addclose": 2,
+    "posix_spawnattr_init": 1, "posix_spawnattr_destroy": 1,
+    "posix_spawnattr_setflags": 1, "posix_spawnattr_setpgroup": 0,
+    "posix_spawnattr_setsigmask": 1,
+    "posix_spawnattr_setsigdefault": 1,
+    "tcgetpgrp": 4, "tcsetpgrp": 1, "waitpid": 3,
+    "waitid": 1, "proc_listpids": 1, "proc_pidinfo": 3,
+    "proc_pidpath": 1, "pthread_sigmask": 1, "sigwait": 1,
+    "setpgid": 2, "getpgid": 3, "getpgrp": 9,
+    "getsid": 2, "getpid": 8, "kill": 2, "raise": 1,
+    "socket": 0,
+    "nanosleep": 1, "pipe": 1, "poll": 1, "pread": 2,
+}
+for name, expected in exact_calls.items():
+    if len(re.findall(rf"(?<![A-Za-z0-9_]){re.escape(name)}\s*\(", darwin)) != expected:
+        fail(f"ii-c0b-iii-2a Darwin authority allowlist drifted: {name}")
+required_inherited_mask = (
+    "func verifyInheritedSignalMask() throws",
+    "pthread_sigmask(SIG_BLOCK, nil, &observed)",
+    "InvestigationMachineFixedGateContract.forwardedSignals",
+    "[SIGTTIN, SIGTTOU, SIGTSTP]",
+    "sigismember(&observed, signal) != 1",
+)
+if "SIG_SETMASK" in darwin:
+    fail("ii-c0b-iii-2a signal mask restoration drifted")
+if any(marker not in darwin for marker in required_inherited_mask):
+    fail("ii-c0b-iii-2a inherited signal mask validation drifted")
+invocation = re.search(
+    r"(?ms)func validateInvocation\(\) throws.*?"
+    r"(?=^    func environmentEntries\(\))",
+    darwin,
+)
+if invocation is None or (
+    "parent == session, session == foreground"
+    not in invocation.group(0)
+):
+    fail("ii-c0b-iii-2a bootstrap topology drifted")
+runtime_policy = re.search(
+    r"(?ms)enum InvestigationMachineGateRuntimePolicy \{.*?"
+    r"(?=^final class DarwinInvestigationMachineFixedGateSystem)",
+    darwin,
+)
+if runtime_policy is None:
+    fail("ii-c0b-iii-2a runtime policy drifted")
+compact_policy = re.sub(r"\s+", "", runtime_policy.group(0))
+if (
+    "case.stopped:falsecase.exited,.signaled:true"
+    not in compact_policy
+):
+    fail("ii-c0b-iii-2a noninitial stop reap classification drifted")
+for marker in (
+    "if !childReaped { return .reapExactChild }",
+    "return recoveryGroupMembers == [gateProcessID]",
+    "? .joinCoordinator : .reject",
+    "return recoveryGroupMembers.isEmpty",
+    "? .complete : .proveRecoveryGroupEmpty",
+):
+    if marker not in runtime_policy.group(0):
+        fail(f"ii-c0b-iii-2a pre-join policy drifted: {marker}")
+child_state = re.search(
+    r"(?ms)func observeChildState\(\) throws.*?"
+    r"(?=^    func waitForTerminationGrace\(\))",
+    darwin,
+)
+if child_state is None:
+    fail("ii-c0b-iii-2a child observation drifted")
+child_state_source = child_state.group(0)
+pending_index = child_state_source.find(
+    "try consumeAndForwardPendingSignal()"
+)
+terminal_index = child_state_source.find(
+    "if let terminal = try waitableChild(child)"
+)
+if min(pending_index, terminal_index) < 0 or pending_index > terminal_index:
+    fail("ii-c0b-iii-2a pending-before-terminal ordering drifted")
+prejoin_system = re.search(
+    r"(?ms)func finishPreJoinSettlement\(.*?"
+    r"(?=^    func boundedReapFailedInitialStop\()",
+    darwin,
+)
+if prejoin_system is None:
+    fail("ii-c0b-iii-2a pre-join settlement drifted")
+prejoin_system_source = prejoin_system.group(0)
+for marker in (
+    "let beforeJoin = try rawProcessGroupMembers(recoveryGroup)",
+    "case .joinCoordinator:",
+    "setpgid(0, coordinatorGroup) == 0",
+    "getpgrp() == coordinatorGroup",
+    "state.gateJoinedCoordinatorGroup = true",
+    "let afterJoin = try rawProcessGroupMembers(recoveryGroup)",
+    "return (true, action == .complete)",
+):
+    if marker not in prejoin_system_source:
+        fail(f"ii-c0b-iii-2a pre-join settlement drifted: {marker}")
+revalidate = re.search(
+    r"(?ms)private func revalidateRestoredForeground\(.*?^    }", launcher
+)
+if revalidate is None or "try restoreForeground(&state)" not in revalidate.group(0) \
+        or "if !state.foregroundRestored" in revalidate.group(0):
+    fail("ii-c0b-iii-2a post-reap foreground restoration drifted")
+cleanup = re.search(r"(?ms)private func cleanupAfterFailure\(.*?^    }", launcher)
+if cleanup is None or cleanup.group(0).rfind("revalidateRestoredForeground") \
+        < cleanup.group(0).rfind("observeEmptyChildGroup"):
+    fail("ii-c0b-iii-2a failure cleanup foreground restoration drifted")
+cleanup_source = cleanup.group(0)
+prejoin_index = cleanup_source.find(
+    "system.perform(.settleChildBeforeCoordinatorJoin)"
+)
+group_cleanup_index = cleanup_source.find(
+    "if let group = state.childProcessGroupID"
+)
+for marker in (
+    "state.childProcessID != nil, !state.childReaped",
+    "!state.gateJoinedCoordinatorGroup",
+    "state.childReaped = true",
+    "state.childGroupEmpty = true",
+    "state.gateJoinedCoordinatorGroup = true",
+):
+    if marker not in cleanup_source:
+        fail(f"ii-c0b-iii-2a pre-join settlement drifted: {marker}")
+if min(prejoin_index, group_cleanup_index) < 0 \
+        or prejoin_index > group_cleanup_index:
+    fail("ii-c0b-iii-2a pre-join settlement ordering drifted")
+
+if "InvestigationMachineGateStub" in transport + launcher + darwin + entry \
+        or "--coordinator" in transport + launcher + darwin + entry:
+    fail("ii-c0b-iii-2a test fixture entered production graph")
+if not all(marker in launcher_test for marker in (
+    "fixedContractHasNoCallerSelectedProcessAuthority",
+    "exactReapAlwaysRepeatsForegroundRestoration",
+    "failureCleanupRepeatsForegroundRestorationAfterRetirement",
+    "environmentNormalizationAcceptsOnlySystemInjection",
+)) or not all(marker in physical_test for marker in (
+    "normalRecoveryGroupHandoffBindsDescriptorsAndRestoresTTY",
+    "invalidForegroundRecoveryTopologyRejectsBeforeChildSpawn",
+    "everyForwardedGroupSignalHasOneForwarderAndCoordinatorSurvives",
+    "preFrameGateDeathUsesKnownRecoveryGroupAndReapsGateLast",
+    "postFrameGateDeathRevalidatesIdentityBeforeExactGroupSignals",
+)) or "@main\nprivate struct Main" not in stub:
+    fail("ii-c0b-iii-2a focused or physical coverage drifted")
+for marker in (
+    "runtimeSignalAndPreJoinRecoveryUseExactIdentities",
+    "preJoinSettlementRequiresReapThenJoinThenEmptyProof",
+    "nonInitialStoppedObservationIsNotAReap",
+):
+    if marker not in launcher_test:
+        fail(f"ii-c0b-iii-2a focused coverage drifted: {marker}")
+physical_parts = physical_test.split(
+    '@Suite("Investigation machine gate physical evidence", .serialized)',
+    1,
+)
+if len(physical_parts) != 2:
+    fail("ii-c0b-iii-2a physical 5-test/8-case matrix drifted")
+physical_suite = physical_parts[1].split("private struct Node:", 1)[0]
+top_level_count = len(re.findall(r"(?m)^    @Test(?:\(|$)", physical_suite))
+forwarded_match = re.search(
+    r"@Test\(arguments:\s*\[(.*?)\]\)", physical_suite, re.DOTALL
+)
+forwarded_cases = [] if forwarded_match is None else [
+    item.strip() for item in forwarded_match.group(1).split(",")
+    if item.strip()
+]
+expanded_count = top_level_count - 1 + len(forwarded_cases)
+if top_level_count != 5 or forwarded_cases != [
+    "SIGHUP", "SIGINT", "SIGQUIT", "SIGTERM"
+] or expanded_count != 8:
+    fail("ii-c0b-iii-2a physical 5-test/8-case matrix drifted")
+physical_evidence_markers = (
+    "let expectedArgumentsSHA256 = PhysicalFixture.digest(",
+    "PhysicalFixture.argumentTranscript(expectedArguments)",
+    "#expect(child.argumentsSHA256 == expectedArgumentsSHA256)",
+    "try Data(contentsOf: fixture.childSpawnAttemptMarker)",
+    "try PhysicalFixture.isAbsent(fixture.childSpawnAttemptMarker)",
+    "report.coordinatorInitialTerminal.foregroundProcessGroupID",
+    "gate.initialTerminal.device == report.coordinatorInitialTerminal.device",
+    "gate.initialTerminal.inode == report.coordinatorInitialTerminal.inode",
+    "gate.childTerminal.device == report.coordinatorInitialTerminal.device",
+    "gate.childTerminal.inode == report.coordinatorInitialTerminal.inode",
+    "gate.finalTerminal.device == report.coordinatorInitialTerminal.device",
+    "gate.finalTerminal.inode == report.coordinatorInitialTerminal.inode",
+)
+if any(marker not in physical_test for marker in physical_evidence_markers):
+    fail("ii-c0b-iii-2a independent argv or TTY evidence drifted")
+if "argumentsMatch" in physical_test or "argumentsMatch" in stub:
+    fail("ii-c0b-iii-2a argv evidence regained self-asserted boolean")
+if physical_test.count("try #require(geteuid() != 0)") != 5 \
+        or "#expect(geteuid() != 0)" in physical_test:
+    fail("ii-c0b-iii-2a non-root physical guard drifted")
+for marker in (
+    "iiC0BIII2AGateVerifierPinsNarrowTargetAndArtifactBoundary",
+    "--iic0b-iii-2a-gate-contract-only",
+    "--iic0b-iii-2a-staged-scope-contract-only",
+    "--iic0b-iii-2a-source-contract-only",
+    "--iic0b-iii-2a-component-boundary-only",
+):
+    if marker not in boundary:
+        fail(f"ii-c0b-iii-2a boundary regression drifted: {marker}")
+
+expected_sha256 = {
+    package_path: "a1baf4318a3aeed74dba0a3b61e99fe8f6e9fdf1b59f16c13b94cc4179fc0f99",
+    transport_path: "6c5694bc67a60c0af8f0df68ad438d249cca9046a96665c938b77e87fd8abfae",
+    launcher_path: "73818d0156467324e91caaa95290fe1a52bc1f6d5da6cd7e21711fce4cd62f30",
+    darwin_path: "75b1a51bfdbdaba16be1afbdc57b2523886a385de487ce0c9fba52e7f44de02f",
+    entry_path: "776da64fa6fb5477d7d8d84328687383c70c5c42a3fe7bf1922d675936660687",
+    launcher_test_path: "f9cfd550a0eb7644b8acca546046bf3e2bba5335ec61eacc3737426943ac037c",
+    physical_test_path: "b339c54793ab487bd02e707cf42ec873b5d0da5edab428e009f2bfc57553a827",
+    stub_path: "747df4e2df4840153c504f9a73ae590dfcae72542472caecf24750ae8b987be0",
+}
+if any(value.startswith("PENDING_A1_") for value in expected_sha256.values()):
+    fail("ii-c0b-iii-2a source SHA pending")
+for path, expected in expected_sha256.items():
+    if hashlib.sha256(path.read_bytes()).hexdigest() != expected:
+        fail(f"ii-c0b-iii-2a source SHA drifted: {path}")
+PY
+}
+
+function verify_iic0biii2a_staged_scope() {
+    local expected_baseline=e832e8433137f9777aba77daba2ca248a563404d
+    local baseline=${1:-$expected_baseline}
+    local budget=1800
+    local expected=(
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-app-release-boundaries
+        scripts/verify-contract
+        scripts/verify-investigation-boundaries
+    )
+    (( ${#expected} == 4 )) || {
+        print -u2 "ii-c0b-iii-2a checkpoint path ceiling drifted"; return 1
+    }
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" \
+        == "$expected_baseline" ]] || {
+        print -u2 "ii-c0b-iii-2a checkpoint baseline drifted"; return 1
+    }
+    if git diff --cached --name-only --diff-filter=D "$baseline" | grep -q .
+    then
+        print -u2 "ii-c0b-iii-2a checkpoint deleted an existing path"; return 1
+    fi
+    if git diff --cached --numstat "$baseline" \
+        | awk '$1=="-" || $2=="-" {found=1} END {exit !found}'
+    then
+        print -u2 "ii-c0b-iii-2a binary checkpoint path rejected"; return 1
+    fi
+    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD \
+        "$baseline")"})
+    [[ "${(j:\n:)${(@on)observed}}" == "${(j:\n:)${(@on)expected}}" ]] || {
+        print -u2 "ii-c0b-iii-2a checkpoint paths drifted"; return 1
+    }
+    local checkpoint_path mode entry
+    for checkpoint_path in "${expected[@]}"; do
+        mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
+        entry=$(git ls-files -s -- "$checkpoint_path")
+        [[ "$(print -r -- "$entry" | awk '{print $1, $3, $4}')" \
+            == "$mode 0 $checkpoint_path" ]] || {
+            print -u2 "ii-c0b-iii-2a checkpoint mode drifted: $checkpoint_path"
+            return 1
+        }
+    done
+    local changed=$(git diff --cached --numstat "$baseline" \
+        | awk '{n+=$1+$2} END {print n+0}')
+    (( changed <= budget )) || {
+        print -u2 "ii-c0b-iii-2a checkpoint budget drifted"; return 1
+    }
+    local observed_path allowed_path
+    local -a worktree_paths=(
+        ${(f)"$(git diff --name-only --diff-filter=ACMRD --)"}
+    )
+    for observed_path in "${worktree_paths[@]}"; do
+        allowed_path=false
+        for checkpoint_path in "${expected[@]}"; do
+            [[ $observed_path == $checkpoint_path ]] && allowed_path=true
+        done
+        $allowed_path || {
+            print -u2 "ii-c0b-iii-2a checkpoint worktree paths drifted"
+            return 1
+        }
+    done
+    local -a untracked_paths=(
+        ${(f)"$(git ls-files --others --exclude-standard --)"}
+    )
+    (( ${#untracked_paths} == 0 )) || {
+        print -u2 "ii-c0b-iii-2a checkpoint untracked paths drifted"
+        return 1
+    }
+    local staged_blob worktree_blob
+    for checkpoint_path in "${expected[@]}"; do
+        entry=$(git ls-files -s -- "$checkpoint_path")
+        staged_blob=$(print -r -- "$entry" | awk '{print $2}')
+        worktree_blob=$(git hash-object -- "$checkpoint_path")
+        [[ "$staged_blob" == "$worktree_blob" ]] || {
+            print -u2 \
+                "ii-c0b-iii-2a staged/worktree source drifted: $checkpoint_path"
+            return 1
+        }
+    done
 }
 
 function verify_iib4_staged_scope() {
@@ -11424,6 +11931,33 @@ later_launch_dependency = '                "StornautInvestigationMachineLaunchSu
 if historical_package.count(later_launch_target) != 1 or historical_package.count(later_launch_dependency) != 1:
     raise SystemExit("live claim server later LaunchSupport projection drifted")
 historical_package = historical_package.replace(later_launch_target, "", 1).replace(later_launch_dependency, "", 1)
+later_gate_support_target = '''        .target(
+            name: "StornautInvestigationMachineGateSupport",
+            dependencies: [
+                "StornautInvestigationHandoffContract",
+            ]
+        ),
+'''
+later_gate_target = '''        .executableTarget(
+            name: "StornautInvestigationMachineGate",
+            dependencies: [
+                "StornautInvestigationMachineGateSupport",
+            ],
+            path: "Tools/StornautInvestigationMachineGate"
+        ),
+'''
+later_gate_test_dependency = (
+    '                "StornautInvestigationMachineGateSupport",\n'
+)
+if historical_package.count(later_gate_support_target) != 1 \
+        or historical_package.count(later_gate_target) != 1 \
+        or historical_package.count(later_gate_test_dependency) != 2:
+    raise SystemExit("live claim server later Gate projection drifted")
+historical_package = historical_package.replace(
+    later_gate_support_target, "", 1
+).replace(later_gate_target, "", 1).replace(
+    later_gate_test_dependency, "", 1
+)
 if hashlib.sha256(historical_package.encode("utf-8")).hexdigest() != (
     "798247d986c73adb09f7b975b2ffc7793cdd04803fb4ec3bd1f41000cce7cb20"
 ):
@@ -12615,6 +13149,21 @@ if $iic0biib_staged_scope_contract_only; then
     print "ii-c0b-ii-b staged scope verification passed."
     exit 0
 fi
+if $iic0biii2a_gate_contract_only; then
+    verify_iic0biii2a_gate_contract \
+        "$iic0biii2a_package_source" "$iic0biii2a_transport_source" \
+        "$iic0biii2a_launcher_source" "$iic0biii2a_darwin_source" \
+        "$iic0biii2a_entry_source" "$iic0biii2a_launcher_test_source" \
+        "$iic0biii2a_physical_test_source" "$iic0biii2a_stub_source" \
+        "$iic0biii2a_boundary_test_source"
+    print "ii-c0b-iii-2a Gate source contract verification passed."
+    exit 0
+fi
+if $iic0biii2a_staged_scope_contract_only; then
+    verify_iic0biii2a_staged_scope "$iic0biii2a_staged_scope_baseline"
+    print "ii-c0b-iii-2a staged scope verification passed."
+    exit 0
+fi
 if $iib3a_staged_scope_contract_only; then
     verify_iib3a_staged_scope "$iib3a_staged_scope_baseline"
     print "ii-b3a staged scope verification passed."
@@ -12654,6 +13203,14 @@ machine_collector_source=$machine_root/InvestigationLifecycleTopologyCollector.s
 machine_service_source=$machine_root/FixedLifecycleServiceProbe.swift
 machine_driver_main=Tools/StornautInvestigationMachineDriver/main.swift
 machine_driver_support=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDriverSupport.swift
+machine_gate_root=Sources/StornautInvestigationMachineGateSupport
+machine_gate_transport=$machine_gate_root/InvestigationMachineGateTransport.swift
+machine_gate_launcher=$machine_gate_root/InvestigationMachineFixedGateLauncher.swift
+machine_gate_darwin=$machine_gate_root/DarwinInvestigationMachineFixedGateSystem.swift
+machine_gate_main=Tools/StornautInvestigationMachineGate/main.swift
+machine_gate_launcher_test=Tests/StornautInvestigationTests/InvestigationSudoShapedDriverLauncherTests.swift
+machine_gate_physical_test=Tests/StornautInvestigationTests/InvestigationMachineGatePhysicalTests.swift
+machine_gate_stub=Tests/Fixtures/InvestigationMachineGateStub/main.swift
 machine_fixed_capsule=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineFixedCapsuleIntake.swift
 machine_fixed_capsule_test=Tests/StornautInvestigationTests/InvestigationMachineFixedCapsuleIntakeTests.swift
 machine_epoch_retirement=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinEpochRetirement.swift
@@ -12706,6 +13263,13 @@ required_files=(
     "$machine_scenario_driver"
     "$machine_driver_main"
     "$machine_driver_support"
+    "$machine_gate_transport"
+    "$machine_gate_launcher"
+    "$machine_gate_darwin"
+    "$machine_gate_main"
+    "$machine_gate_launcher_test"
+    "$machine_gate_physical_test"
+    "$machine_gate_stub"
     Sources/StornautInvestigationHandoffContract/InvestigationProjectedCohortInput.swift
     "$machine_fixed_capsule"
     Tests/StornautInvestigationTests/InvestigationHandoffTransportContractTests.swift
@@ -12760,6 +13324,12 @@ verify_iic0bi_producer_contract \
     "$iic0bi_author" \
     "$diagnostic_root/InvestigationRuntimeDiagnosticComposition.swift" \
     "$iic0bi_focused_test" \
+    Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+verify_iic0biii2a_gate_contract \
+    Package.swift "$machine_gate_transport" "$machine_gate_launcher" \
+    "$machine_gate_darwin" "$machine_gate_main" \
+    "$machine_gate_launcher_test" "$machine_gate_physical_test" \
+    "$machine_gate_stub" \
     Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
 verify_iib5biib_app_identity_contract \
     Package.swift \
@@ -14247,6 +14817,8 @@ if consumers != {
     "StornautInvestigationInstalledL2",
     "StornautInvestigationMachineClaimServer",
     "StornautInvestigationMachineDriverSupport",
+    "StornautInvestigationMachineGateSupport",
+    "StornautInvestigationMachineLaunchSupport",
     "StornautInvestigationTests",
 }:
     raise SystemExit(f"handoff contract consumers drifted: {sorted(consumers)}")

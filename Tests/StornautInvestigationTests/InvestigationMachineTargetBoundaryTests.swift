@@ -335,7 +335,7 @@ struct InvestigationMachineTargetBoundaryTests {
         #expect(
             package.components(
                 separatedBy: "\"StornautInvestigationHandoffContract\""
-            ).count == 8
+            ).count == 9
         )
 
         let sourceRoot = root.appending(path: "Sources/StornautInvestigationHandoffContract")
@@ -945,9 +945,16 @@ struct InvestigationMachineTargetBoundaryTests {
             "iic0biib_b1_tree=c4ca6ae2e9e262d30745e6b8548eeee10211722a",
             "iic0biib_b2_commit=cbc469403f0ecfcdab17fb93baadd24d3c12f1ff",
             "iic0biib_b2_tree=8ec89e24cece79ad7559a25c0fad9681442bae5d",
+            "iic0biib_closure_commit=6ef304d2102121c9bee5fed363bd9a80c6d33bbc",
+            "iic0biib_closure_tree=8b1e7ae4a8c40bb0bce795d14477fd64864b4e18",
+            "ii-c0b-ii-b immutable closure replay failed",
+            "deadline_fix=bfb5d636c9eb1b6853d603c7e115f879ac6a5822",
+            "deadline_fix_tree=8b9e347dc29064ca0d2a0efae10de68e4244590a",
             "bf7cee7e2aa06458c7978f74887cf54d2199daff3153af6a81f2a531beb83b68",
             "6039a0b344b952314139a72d70f4c8d5a70014deca3c493978fce744d7a721d9",
             "942c39d646bde28e62351890ef07caa922fdeab1209b652dd351134316d36826",
+            "0dc5c7f09f0831f0ee74020aff53ef7c2c353c4069dcff624627006ae2dd606a",
+            "61edc0a9c266249f83475eaf73ae58c8b476e3b1ce04c070b0dca36041415290",
             "--iic0b-ii-b-capsule-contract-only",
             "--iic0b-ii-b-staged-scope-contract-only",
             "--iic0b-ii-b-source-contract-only",
@@ -956,22 +963,136 @@ struct InvestigationMachineTargetBoundaryTests {
             "ii-c0b-ii-b generated mutation inventory drifted",
             "ii-c0b-ii-b generated mutation inventory duplicated",
             "ii-c0b-ii-b App mutation accepted:",
-            "ii-c0b-ii-b scope mutation accepted:",
             "recursive-cleanup", "ordinary-unlink",
             "raw-descriptor", "path-surface", "url-surface",
             "generic-callback", "multiple-lease", "lock-mutation",
-            "mutation-before-inventory", "unbounded-retry",
+            "mutation-before-inventory", "deadline-bypass",
             "wall-clock", "pid-heuristic", "mtime-heuristic",
             "missing-close-reap-binding", "product-authority",
             "swallowed-inventory-failure", "swallowed-command-failure",
             "release-renamed-authority",
             "target-extra-source", "verifier-command-failure",
             "ii-c0b-ii-b verifier command failure was swallowed",
-            "extra-path", "missing-path", "over-budget", "deleted",
-            "binary", "mode", "wrong-baseline",
         ] {
             #expect(contract.contains(marker))
         }
+    }
+
+    @Test
+    func iiC0BIII2AGateVerifierPinsNarrowTargetAndArtifactBoundary() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let package = try l3c3biiSource(
+            "Package.swift", repositoryRoot: root)
+        let boundaries = try l3c3biiSource(
+            "scripts/verify-investigation-boundaries", repositoryRoot: root)
+        let release = try l3c3biiSource(
+            "scripts/verify-app-release-boundaries", repositoryRoot: root)
+        let contract = try l3c3biiSource(
+            "scripts/verify-contract", repositoryRoot: root)
+        let checkpointStart = try #require(contract.range(
+            of: "function verify_iic0biii2a_contract() {"
+        ))
+        let checkpointSuffix = contract[checkpointStart.lowerBound...]
+        let checkpointEnd = try #require(checkpointSuffix.range(
+            of: "\nif [[ ${1:-} == --iic0b-ii-a-contract-only ]]; then"
+        ))
+        let checkpointContract = String(
+            checkpointSuffix[..<checkpointEnd.lowerBound]
+        )
+        #expect(contract.contains("--iic0b-iii-2a-contract-only"))
+        #expect(contract.contains(
+            "verify_iic0biii2a_contract \"$contract_root/iic0biii2a\""
+        ))
+        #expect(!contract.contains(
+            "if [[ PENDING_A1_COMMIT != PENDING_A1_COMMIT ]]; then"
+        ))
+
+        for marker in [
+            "name: \"StornautInvestigationMachineGateSupport\"",
+            "name: \"StornautInvestigationMachineGate\"",
+            "\"StornautInvestigationMachineGateSupport\"",
+            "path: \"Tools/StornautInvestigationMachineGate\"",
+        ] {
+            #expect(package.contains(marker))
+        }
+
+        for marker in [
+            "--iic0b-iii-2a-gate-contract-only",
+            "--iic0b-iii-2a-staged-scope-contract-only",
+            "function verify_iic0biii2a_gate_contract()", "function verify_iic0biii2a_staged_scope()",
+            "ii-c0b-iii-2a GateSupport target dependency surface drifted",
+            "ii-c0b-iii-2a Gate target dependency surface drifted", "ii-c0b-iii-2a GateSupport source inventory drifted",
+            "ii-c0b-iii-2a entry surface drifted", "ii-c0b-iii-2a Darwin authority allowlist drifted",
+            "ii-c0b-iii-2a bootstrap topology drifted", "ii-c0b-iii-2a pre-join settlement drifted",
+            "ii-c0b-iii-2a pending-before-terminal ordering drifted", "ii-c0b-iii-2a noninitial stop reap classification drifted",
+            "ii-c0b-iii-2a physical 5-test/8-case matrix drifted", "ii-c0b-iii-2a independent argv or TTY evidence drifted",
+            "pthread_sigmask(SIG_BLOCK, nil, &observed)", "if \"SIG_SETMASK\" in darwin",
+            "ii-c0b-iii-2a test fixture entered production graph",
+            "normalRecoveryGroupHandoffBindsDescriptorsAndRestoresTTY",
+            "everyForwardedGroupSignalHasOneForwarderAndCoordinatorSurvives",
+            "preFrameGateDeathUsesKnownRecoveryGroupAndReapsGateLast",
+            "postFrameGateDeathRevalidatesIdentityBeforeExactGroupSignals",
+            "ii-c0b-iii-2a source SHA pending",
+            "e832e8433137f9777aba77daba2ca248a563404d",
+            "local budget=1800",
+            "a1baf4318a3aeed74dba0a3b61e99fe8f6e9fdf1b59f16c13b94cc4179fc0f99",
+            "747df4e2df4840153c504f9a73ae590dfcae72542472caecf24750ae8b987be0",
+            "(( ${#expected} == 4 ))",
+        ] {
+            #expect(boundaries.contains(marker))
+        }
+
+        for marker in [
+            "--iic0b-iii-2a-source-contract-only",
+            "--iic0b-iii-2a-component-boundary-only", "--iic0b-iii-2a-closed-image-scan-contract-only",
+            "function verify_iic0biii2a_source_contract()", "function verify_iic0biii2a_closed_image()",
+            "function verify_iic0biii2a_component_boundary()", "iic0biii2a_positive_gates=(",
+            "iic0biii2a_closed_images=(", "iic0biii2a_gate_symbols=(",
+            "ii-c0b-iii-2a Debug Gate positive control is missing",
+            "ii-c0b-iii-2a Release Gate positive control is missing", "ii-c0b-iii-2a GateSupport namespace leaked into a closed image",
+            "ii-c0b-iii-2a exact projection drifted",
+            "512c8ea1fbd27b9df403a5db438ba3352aa2e6ebb2a9cdcaf877cf27cc73bc15",
+            "42a692726b9e81a3657e9c730288e5d183374ca69d26dee67fad1de960c76202",
+        ] {
+            #expect(release.contains(marker))
+        }
+
+        for marker in [
+            "function verify_iic0biii2a_contract()", "ii-c0b-iii-2a replay cleanup left registration",
+            "ii-c0b-iii-2a mutation accepted:", "ii-c0b-iii-2a App mutation accepted:",
+            "ii-c0b-iii-2a scope mutation accepted:", "gate-extra-dependency",
+            "gatesupport-extra-source", "entry-selector", "production-stub",
+            "public-surface", "codable-receipt", "fixed-command-drift",
+            "darwin-authority-drift", "signal-mask-restoration",
+            "bootstrap-topology-bypass", "prejoin-settlement-bypass",
+            "pending-before-terminal-bypass", "noninitial-stop-reap-bypass",
+            "physical-matrix-vacuity", "argv-evidence-vacuity",
+            "tty-node-evidence-vacuity", "closed-image-removal", "projection-bypass",
+            "symbol-failure", "string-failure",
+            "find-failure", "file-failure",
+            "ii-c0b-iii-2a scanner mutation accepted:",
+            "extra-path", "extra-doc", "extra-agents", "extra-readme",
+            "missing-path", "over-budget", "deleted", "deleted-doc", "binary",
+            "mode", "wrong-baseline",
+            "staged-worktree-divergence", "worktree-path", "untracked-path",
+            "GIT_INDEX_FILE=\"$changed\" git update-index",
+            "require_fixed_text \"$log\" \"$expected\"",
+            "source-canonical.log",
+        ] {
+            #expect(checkpointContract.contains(marker))
+        }
+        for pending in [
+            "PENDING_A1_COMMIT",
+            "PENDING_2A_LINE_BUDGET",
+            "PENDING_2A_IMPLEMENTATION_TREE",
+            "ii-c0b-iii-2a implementation tree pending",
+        ] {
+            #expect(!boundaries.contains(pending))
+        }
+        #expect(!checkpointContract.contains(
+            "print -r -- \"ii-c0b-iii-2a scope mutation accepted:"
+        ))
     }
 
     private func l3c3biiSource(
