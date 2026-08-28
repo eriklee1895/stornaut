@@ -194,31 +194,34 @@ binary path or path outside the listed set is allowed.
 
 ### 4.1 iv-a — authoritative binding/configuration/source
 
-Exactly twelve non-document paths, at most 3,900 changed lines:
+Exactly thirteen non-document paths, at most 3,900 changed lines:
 
 1. `Package.swift`;
 2. `Plugins/StornautInvestigationBuildReceiptPlugin/plugin.swift` (new);
 3. `tools/StornautInvestigationBuildReceiptGenerator/main.swift` (new);
-4. `Sources/StornautInvestigationMachineGateCoordinatorSupport/Resources/InvestigationMachineBuildInputs.json` (new);
-5. `Sources/StornautCodex/Runtime/CodexNativeExecutableIdentity.swift` (new);
-6. `Sources/StornautCodex/Diagnostics/CapabilityRuntimeWorker.swift`;
-7. `Sources/StornautInvestigation/InvestigationRuntimeProtocols.swift`;
-8. `Sources/StornautInvestigationDiagnostic/InvestigationRuntimeDiagnosticComposition.swift`;
-9. `Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineCoordinatorBindingSource.swift` (new);
-10. `Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineCoordinatorConfigurationSet.swift` (new);
-11. `Tests/StornautCodexTests/CodexNativeExecutableIdentityTests.swift` (new); and
-12. `Tests/StornautInvestigationTests/InvestigationMachineCoordinatorBindingSourceTests.swift` (new).
+4. `scripts/with-clean-validation-snapshot`;
+5. `Sources/StornautInvestigationMachineGateCoordinatorSupport/Resources/InvestigationMachineBuildInputs.json` (new);
+6. `Sources/StornautCodex/Runtime/CodexNativeExecutableIdentity.swift` (new);
+7. `Sources/StornautCodex/Diagnostics/CapabilityRuntimeWorker.swift`;
+8. `Sources/StornautInvestigation/InvestigationRuntimeProtocols.swift`;
+9. `Sources/StornautInvestigationDiagnostic/InvestigationRuntimeDiagnosticComposition.swift`;
+10. `Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineCoordinatorBindingSource.swift` (new);
+11. `Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineCoordinatorConfigurationSet.swift` (new);
+12. `Tests/StornautCodexTests/CodexNativeExecutableIdentityTests.swift` (new); and
+13. `Tests/StornautInvestigationTests/InvestigationMachineCoordinatorBindingSourceTests.swift` (new).
 
-A thirteenth path or line 3,901 blocks implementation. iv-a owns the generated
+A fourteenth path or line 3,901 blocks implementation. iv-a owns the generated
 build-provenance contract, installed-native read-only identity shared with the
 worker, one deterministic cohort runtime receipt plus strict binding/admission
 join, one fixed disposable source fingerprint, one complete binding and eight
 fresh scenario-specific configurations. c0b-i authoring remains owned by
 iv-b2 after all three components exist. The checked-in input contains only
 canonical manifest rules and artifact-relative names, never a commit/hash claim.
-The plugin and generator may read only the exact clean validation snapshot plus
-that declared input and write only the plugin output directory; they add no
-runtime authority. Verifier
+After creating and checking its clean detached worktree, the snapshot wrapper
+derives the tree, raw Git-tree manifest digest and semantic artifact hashes and
+exports only the six named `STORNAUT_VALIDATION_*` values. The plugin forwards
+only those values plus the declared input to the generator, which writes only
+the plugin output directory; they add no runtime authority. Verifier
 implementation is intentionally deferred to iv-b2. iv-a must not publish a
 capsule or spawn a product/gate process.
 
