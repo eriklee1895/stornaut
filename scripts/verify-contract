@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=950eacdd8c3174eea5dbd7d56edc5d3637298c7483d4febabfd2bd654073bbee
+ib2_self_sha=3e6b662e7db2129955854872cbdc9fb6ec68ca9d6807399c06be7a7d6dde4783
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -1246,6 +1246,117 @@ function verify_iic0biii2a_contract() {
     local out=$1
     mkdir -p "$out"
     local gate=scripts/verify-investigation-boundaries
+    local implementation=396c845884a18767e43971875c58eff80740d325
+    local implementation_parent=e832e8433137f9777aba77daba2ca248a563404d
+    local implementation_tree=544209f3cd4682b1c4d720931498c8daa5ccc325
+    local -a implementation_paths=(
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-app-release-boundaries
+        scripts/verify-contract
+        scripts/verify-investigation-boundaries
+    )
+    (( ${#implementation_paths} == 4 )) \
+        || fail_contract "ii-c0b-iii-2a implementation path count drifted"
+    [[ "$(git show -s --format=%P "$implementation")" == \
+        "$implementation_parent" ]] \
+        || fail_contract "ii-c0b-iii-2a implementation parent drifted"
+    [[ "$(git show -s --format=%T "$implementation")" == \
+        "$implementation_tree" ]] \
+        || fail_contract "ii-c0b-iii-2a implementation tree drifted"
+    local -a observed_paths=(
+        ${(f)"$(git diff-tree --no-commit-id --name-only -r \
+            "$implementation" | LC_ALL=C sort)"}
+    )
+    [[ "${(j:\n:)observed_paths}" == \
+        "${(j:\n:)${(@on)implementation_paths}}" ]] \
+        || fail_contract "ii-c0b-iii-2a implementation paths drifted"
+    local implementation_lines=$(git diff-tree --no-commit-id --numstat -r \
+        "$implementation" | awk '{n+=$1+$2} END{print n+0}')
+    (( implementation_lines == 1797 )) \
+        || fail_contract "ii-c0b-iii-2a implementation line count drifted"
+    local checkpoint_path expected_mode observed_mode expected_sha observed_sha
+    for checkpoint_path expected_sha in \
+        "${implementation_paths[1]}" 586f58adabe748551dcef53be3e3746c445fe4127b967d10cce4ddd94760fd08 \
+        "${implementation_paths[2]}" f680802bc44b9a02d7b8af91ec9ed996f859cbe8fd5ae53c1ee1be310e502b0a \
+        "${implementation_paths[3]}" 449af3fbde599bf6a5fdad1668eedba441ca381c41a31ead6e1e90aa541858e1 \
+        "${implementation_paths[4]}" 43544e99add08781aa9a628d4db22e53f4befbcca99c07be4c4833247b55776a
+    do
+        expected_mode=100644; [[ $checkpoint_path == scripts/* ]] \
+            && expected_mode=100755
+        observed_mode=$(git ls-tree "$implementation" -- "$checkpoint_path" \
+            | awk '{print $1}')
+        [[ $observed_mode == $expected_mode ]] \
+            || fail_contract "ii-c0b-iii-2a implementation mode drifted: $checkpoint_path"
+        observed_sha=$(git show "${implementation}:$checkpoint_path" \
+            | shasum -a 256 | awk '{print $1}')
+        [[ $observed_sha == $expected_sha ]] \
+            || fail_contract "ii-c0b-iii-2a implementation source seal drifted: $checkpoint_path"
+    done
+    local replay_root="$out/implementation-replay" replay_status=0
+    replay_historical_contract "$replay_root" "$implementation" \
+        "$implementation_tree" --iic0b-iii-2a-contract-only \
+        '--iic0b-iii-2a-staged-scope-contract-only' || replay_status=$?
+    (( replay_status == 0 )) \
+        || fail_contract "ii-c0b-iii-2a historical contract replay failed"
+    local implementation_index="$out/implementation.index"
+    GIT_INDEX_FILE="$implementation_index" \
+        git read-tree "$implementation^{tree}"
+    GIT_INDEX_FILE="$implementation_index" "$gate" \
+        --iic0b-iii-2a-completed-tree-contract-only \
+        >"$out/completed-tree-canonical.log"
+    # Controlled same-path tamper: preserve path and mode, change one
+    # implementation-added byte, and require the immutable tree to reject it.
+    local index blob output tampered="$out/same-path-tampered"
+    for checkpoint_path in "${implementation_paths[@]}"; do
+        index="$out/tamper-${checkpoint_path:t}.index"
+        cp "$implementation_index" "$index"
+        python3 - "$implementation_parent" "$implementation" \
+            "$checkpoint_path" "$tampered" <<'PY'
+import difflib
+from pathlib import Path
+import subprocess
+import sys
+
+baseline, implementation, path, output = sys.argv[1:]
+def show(revision):
+    result = subprocess.run(
+        ["git", "show", f"{revision}:{path}"],
+        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False,
+    )
+    return result.stdout if result.returncode == 0 else b""
+before = show(baseline).splitlines(keepends=True)
+after = show(implementation).splitlines(keepends=True)
+changed = next((j1 for tag, _i1, _i2, j1, j2 in
+    difflib.SequenceMatcher(a=before, b=after, autojunk=False).get_opcodes()
+    if tag != "equal" and j1 < j2), None)
+if changed is None:
+    raise SystemExit(f"cannot construct same-path tamper: {path}")
+line = bytearray(after[changed])
+for offset, value in enumerate(line):
+    if 0x21 <= value <= 0x7e:
+        line[offset] = 0x58 if value != 0x58 else 0x59
+        break
+else:
+    raise SystemExit(f"cannot mutate changed line: {path}")
+after[changed] = bytes(line)
+Path(output).write_bytes(b"".join(after))
+PY
+        blob=$(git hash-object -w -- "$tampered")
+        expected_mode=100644; [[ $checkpoint_path == scripts/* ]] \
+            && expected_mode=100755
+        GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+            "$expected_mode,$blob,$checkpoint_path"
+        output="$out/tamper-${checkpoint_path:t}.log"
+        if GIT_INDEX_FILE="$index" "$gate" \
+            --iic0b-iii-2a-completed-tree-contract-only >"$output" 2>&1
+        then
+            fail_contract \
+                "ii-c0b-iii-2a same-path substitution accepted: $checkpoint_path"
+        fi
+        require_fixed_text "$output" "ii-c0b-iii-2a completed tree drifted"
+    done
+    return 0
+
     local app_gate=scripts/verify-app-release-boundaries
     local package=Package.swift
     local transport=Sources/StornautInvestigationMachineGateSupport/InvestigationMachineGateTransport.swift
@@ -2850,7 +2961,7 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "43544e99add08781aa9a628d4db22e53f4befbcca99c07be4c4833247b55776a",
+        "0b1b8f49d39a05099ba6945e695c8c5085b31fee9a8b1f9da5045300d36fd3a0",
     Path("scripts/verify-app-release-boundaries"):
         "f680802bc44b9a02d7b8af91ec9ed996f859cbe8fd5ae53c1ee1be310e502b0a",
 }

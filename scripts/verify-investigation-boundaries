@@ -304,6 +304,7 @@ iic0biii2a_stub_source=
 iic0biii2a_boundary_test_source=
 iic0biii2a_staged_scope_contract_only=false
 iic0biii2a_staged_scope_baseline=e832e8433137f9777aba77daba2ca248a563404d
+iic0biii2a_completed_tree_contract_only=false
 iib3a_staged_scope_contract_only=false
 iib3a_staged_scope_baseline=HEAD
 iib3b_start_retire_contract_only=false
@@ -773,6 +774,9 @@ if (( $# > 0 )); then
         && [[ $1 == --iic0b-iii-2a-staged-scope-contract-only ]]; then
         iic0biii2a_staged_scope_contract_only=true
         iic0biii2a_staged_scope_baseline=${2:-e832e8433137f9777aba77daba2ca248a563404d}
+    elif (( $# == 1 )) \
+        && [[ $1 == --iic0b-iii-2a-completed-tree-contract-only ]]; then
+        iic0biii2a_completed_tree_contract_only=true
     elif (( $# == 1 || $# == 2 )) \
         && [[ $1 == --iib3a-staged-scope-contract-only ]]; then
         iib3a_staged_scope_contract_only=true
@@ -798,7 +802,7 @@ if (( $# > 0 )); then
         iib3c_staged_scope_baseline=${2:-HEAD}
     else
         print -u2 \
-            "Usage: scripts/verify-investigation-boundaries [... | --iic0b-ii-b-capsule-contract-only <package> <ownership> <capsule> <focused-test> <boundary-test> | --iic0b-ii-b-staged-scope-contract-only [baseline] | --iic0b-iii-2a-gate-contract-only <package> <transport> <launcher> <darwin-system> <entry> <launcher-tests> <physical-tests> <stub> <boundary-test> | --iic0b-iii-2a-staged-scope-contract-only [baseline]]"
+            "Usage: scripts/verify-investigation-boundaries [... | --iic0b-ii-b-capsule-contract-only <package> <ownership> <capsule> <focused-test> <boundary-test> | --iic0b-ii-b-staged-scope-contract-only [baseline] | --iic0b-iii-2a-gate-contract-only <package> <transport> <launcher> <darwin-system> <entry> <launcher-tests> <physical-tests> <stub> <boundary-test> | --iic0b-iii-2a-staged-scope-contract-only [baseline] | --iic0b-iii-2a-completed-tree-contract-only]"
         exit 64
     fi
 fi
@@ -4071,6 +4075,7 @@ expected_test_sha256 = {
         "ee0ee2918638c1289c7e136a0aa552c36d54c0a1b163f1b7eb281859d397d4bf",
         "3aeb382661bd115905936f5079aeecd41b7d3c177503f847b98fe4e0e42cce6a",
         "586f58adabe748551dcef53be3e3746c445fe4127b967d10cce4ddd94760fd08",
+        "cfc0ef565b94157e1b066f88fc90ce438bac7830565f99c0b5ab4937803ac4ca",
     },
 }
 for path, admitted_sha256 in expected_test_sha256.items():
@@ -4385,6 +4390,7 @@ expected_test_sha256 = {
         "ee0ee2918638c1289c7e136a0aa552c36d54c0a1b163f1b7eb281859d397d4bf",
         "3aeb382661bd115905936f5079aeecd41b7d3c177503f847b98fe4e0e42cce6a",
         "586f58adabe748551dcef53be3e3746c445fe4127b967d10cce4ddd94760fd08",
+        "cfc0ef565b94157e1b066f88fc90ce438bac7830565f99c0b5ab4937803ac4ca",
     },
 }
 for path, admitted_sha256 in expected_test_sha256.items():
@@ -9635,6 +9641,13 @@ function verify_iic0biii2a_staged_scope() {
     done
 }
 
+function verify_iic0biii2a_completed_tree() {
+    local implementation_tree=544209f3cd4682b1c4d720931498c8daa5ccc325
+    [[ "$(git write-tree)" == "$implementation_tree" ]] || {
+        print -u2 "ii-c0b-iii-2a completed tree drifted"; return 1
+    }
+}
+
 function verify_iib4_staged_scope() {
     local baseline=${1:-HEAD}
     local expected=(
@@ -13162,6 +13175,11 @@ fi
 if $iic0biii2a_staged_scope_contract_only; then
     verify_iic0biii2a_staged_scope "$iic0biii2a_staged_scope_baseline"
     print "ii-c0b-iii-2a staged scope verification passed."
+    exit 0
+fi
+if $iic0biii2a_completed_tree_contract_only; then
+    verify_iic0biii2a_completed_tree
+    print "ii-c0b-iii-2a completed tree verification passed."
     exit 0
 fi
 if $iib3a_staged_scope_contract_only; then

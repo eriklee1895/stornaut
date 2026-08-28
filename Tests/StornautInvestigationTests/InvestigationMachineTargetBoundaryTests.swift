@@ -1000,6 +1000,9 @@ struct InvestigationMachineTargetBoundaryTests {
         let checkpointContract = String(
             checkpointSuffix[..<checkpointEnd.lowerBound]
         )
+        let completedTree = try l3c3biiFunction(
+            "verify_iic0biii2a_completed_tree", in: boundaries
+        )
         #expect(contract.contains("--iic0b-iii-2a-contract-only"))
         #expect(contract.contains(
             "verify_iic0biii2a_contract \"$contract_root/iic0biii2a\""
@@ -1020,7 +1023,9 @@ struct InvestigationMachineTargetBoundaryTests {
         for marker in [
             "--iic0b-iii-2a-gate-contract-only",
             "--iic0b-iii-2a-staged-scope-contract-only",
+            "--iic0b-iii-2a-completed-tree-contract-only",
             "function verify_iic0biii2a_gate_contract()", "function verify_iic0biii2a_staged_scope()",
+            "function verify_iic0biii2a_completed_tree()",
             "ii-c0b-iii-2a GateSupport target dependency surface drifted",
             "ii-c0b-iii-2a Gate target dependency surface drifted", "ii-c0b-iii-2a GateSupport source inventory drifted",
             "ii-c0b-iii-2a entry surface drifted", "ii-c0b-iii-2a Darwin authority allowlist drifted",
@@ -1079,9 +1084,27 @@ struct InvestigationMachineTargetBoundaryTests {
             "GIT_INDEX_FILE=\"$changed\" git update-index",
             "require_fixed_text \"$log\" \"$expected\"",
             "source-canonical.log",
+            "implementation=396c845884a18767e43971875c58eff80740d325",
+            "implementation_parent=e832e8433137f9777aba77daba2ca248a563404d",
+            "implementation_tree=544209f3cd4682b1c4d720931498c8daa5ccc325",
+            "implementation_lines == 1797",
+            "586f58adabe748551dcef53be3e3746c445fe4127b967d10cce4ddd94760fd08",
+            "f680802bc44b9a02d7b8af91ec9ed996f859cbe8fd5ae53c1ee1be310e502b0a",
+            "449af3fbde599bf6a5fdad1668eedba441ca381c41a31ead6e1e90aa541858e1",
+            "43544e99add08781aa9a628d4db22e53f4befbcca99c07be4c4833247b55776a",
+            "ii-c0b-iii-2a historical contract replay failed",
+            "ii-c0b-iii-2a same-path substitution accepted:",
+            "Controlled same-path tamper",
+            "same-path-tampered",
         ] {
             #expect(checkpointContract.contains(marker))
         }
+        #expect(completedTree.contains(
+            "544209f3cd4682b1c4d720931498c8daa5ccc325"
+        ))
+        #expect(!completedTree.contains("1800"))
+        #expect(!completedTree.contains("git diff --cached --numstat"))
+        #expect(!completedTree.contains("worktree"))
         for pending in [
             "PENDING_A1_COMMIT",
             "PENDING_2A_LINE_BUDGET",
