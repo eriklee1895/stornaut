@@ -152,6 +152,12 @@ let package = Package(
             ]
         ),
         .target(
+            name: "StornautInvestigationMachineGateSupport",
+            dependencies: [
+                "StornautInvestigationHandoffContract",
+            ]
+        ),
+        .target(
             name: "StornautInvestigationHandoffContract",
             dependencies: []
         ),
@@ -249,6 +255,13 @@ let package = Package(
             ],
             path: "Tools/StornautInvestigationMachineDriver"
         ),
+        .executableTarget(
+            name: "StornautInvestigationMachineGate",
+            dependencies: [
+                "StornautInvestigationMachineGateSupport",
+            ],
+            path: "Tools/StornautInvestigationMachineGate"
+        ),
         .testTarget(
             name: "StornautCoreTests",
             dependencies: [
@@ -284,6 +297,7 @@ let package = Package(
                 "StornautInvestigation",
                 "StornautInvestigationMachine",
                 "StornautInvestigationMachineDriverSupport",
+                "StornautInvestigationMachineGateSupport",
                 "StornautInvestigationMachineLaunchSupport",
                 "StornautInvestigationMachineClaimServer",
                 "StornautInvestigationHandoffContract",

@@ -1,9 +1,7 @@
 # Phase D Task 39B2c L3c3c-ii-c0b Non-Root Capsule and Launcher Preflight
 
-> Status: c0b-i implementation complete/non-admitting; c0b-ii fresh preflight
-> split the checkpoint into ii-c0b-ii-a/ii-c0b-ii-b and froze the ownership
-> contract; ii-c0b-ii-a tests-first implementation current; c0b-iii/c0b-iv still require
-> their own fresh preflights
+> Status: c0b-i and c0b-ii complete/non-admitting; c0b-iii implementation
+> current inside aggregate Checkpoint 2; c0b-iv follows in the same aggregate
 >
 > Date: 2026-08-26
 >
@@ -297,20 +295,36 @@ monotonic launcher deadline is 1,200 seconds. The exact forwarded signal set is
 `SIGHUP`, `SIGINT`, `SIGQUIT` and `SIGTERM`; `SIGKILL`/`SIGSTOP` are inherently
 unhandled, while terminal job-control signals target the foreground group.
 
-Before spawn, the gate requires fixed UID/GID 501/20, writable character-device
-FD 2, a positive inherited process group and
-`tcgetpgrp(2) == getpgrp()`. The gate is deliberately **not** required to be
-that group's leader: it inherits the coordinator's already-foreground process
-group, and `getpid() == getpgrp()` is rejected as a contract requirement. The
-coordinator performs no foreground-terminal handoff of its own. The gate is the
-single process authorized to call `tcsetpgrp` for this attempt. It records the
-inherited foreground PGID, blocks the forwarded set plus `SIGTTOU` across the
-transition, atomically creates a suspended child in a new process group whose
-PGID equals its PID, verifies that identity, sets only the child's group as the
-foreground terminal group and sends `SIGCONT`. It then restores its signal mask
-and enters the bounded poll/wait loop. A stopped child is not success: the gate
-restores the recorded inherited foreground group, resumes the child only to
-perform TERM/KILL cleanup, then reaps it.
+Before spawn, the coordinator is the session/process-group leader `C` and owns
+the controlling terminal with `tcgetpgrp(2) == C`. It atomically spawns the gate
+as a distinct known recovery-process-group leader `G == gate PID`; the gate
+therefore starts in the background while the terminal remains owned by `C`. At
+gate entry FD 2 must be the same writable character-device TTY, fixed UID/GID
+must be 501/20, `getpid() == getpgrp() == G`, and the observed foreground group
+must be positive and equal to `C`, not `G`.
+
+The gate blocks the complete forwarded set plus `SIGTTOU` before any transition
+and keeps that set blocked for its entire one-shot lifetime. This deliberately
+supersedes the former sentence requiring the original mask to be restored after
+handoff: without an async-signal-safe observer, restoring default dispositions
+would let a group-delivered signal kill the gate and strand the child. The gate
+uses bounded `sigpending`/`sigwait` consumption and remains the sole normal
+forwarder; the coordinator independently blocks its copy of the same
+group-delivered signal and consumes it only after gate terminal handling.
+
+The gate atomically creates the suspended fixed child **inside existing recovery
+group `G`**. The child PID differs from `G`, while its PGID is `G`; the child
+spawn therefore does not use `POSIX_SPAWN_SETPGROUP`. After exact suspended-child
+identity and group verification, the gate moves itself from `G` back into `C`
+with `setpgid(0, C)`, leaving `G` as the child-only recovery group. It revalidates
+gate group `C`, child group `G`, the child's stable PID/parent/start identity,
+the initial suspension and foreground TTY `C`, writes one atomic prepared frame,
+then stops itself exactly once. The coordinator strict-decodes the complete frame,
+joins it to an exact `WUNTRACED` gate stop and independent kernel topology, then
+continues the gate. Only after a second exact topology/pending-signal recheck may
+the gate set `G` foreground and send `SIGCONT` to the child. A stopped child is
+not success: the gate restores `C`, resumes the child only for TERM/KILL cleanup,
+then reaps it.
 
 Every normal exit, forwarded-signal, cancellation, timeout, stop or I/O failure
 first reaches a typed terminal child outcome, including TERM, bounded grace,
@@ -324,7 +338,8 @@ its PID for the saved PGID.
 Process-group or TTY restoration uncertainty dominates cancellation and yields
 non-admitting typed residue.
 
-The parent maps the one-shot capsule lease only to child FD 0, captures FD 1 as
+The coordinator maps the one-shot capsule lease only to gate FD 0, while the
+gate maps only that FD to child FD 0, captures child FD 1 as
 opaque bounded bytes, preserves FD 2, closes the original capsule descriptor and
 every non-allowlisted descriptor in the child, and proves FD 7/8/9 absent at the
 **stub child entry**. Real sudo/root-driver FD 0/1/2/7/8/9, same-node, EOF and
@@ -334,19 +349,27 @@ Tests use an internal injected system and a compile-time test-only,
 non-privileged sudo-shaped executable. Production source exposes no stub flag,
 environment selector or alternate executable. Physical tests create their own
 controlled `openpty`/`setsid`/`TIOCSCTTY` fixture rather than assuming the test
-runner has a controlling terminal. The positive fixture must make the gate a
-non-leader member of the coordinator's foreground process group; a separate
-negative fixture must reject a gate whose group is not foreground. Physical
+runner has a controlling terminal. The positive fixture must start the gate as
+the known background recovery-group leader, prove the child first joins that
+group suspended, then prove the gate alone rejoins the coordinator foreground
+group before the single prepared/stop handshake. A separate negative fixture
+must reject invalid recovery/foreground topology. Physical
 evidence must prove exact argv/env, FD-0 same-node offset-zero-to-EOF/digest,
 bounded FD-1 bytes, unchanged foreground TTY/FD-2 identity, the child-only PGID
 handoff, restoration of the exact saved coordinator group, no extra descriptor
-inheritance, signal/exit behavior and cleanup. It cannot interpret stdout as a
-valid completion artifact.
+inheritance, all four forwarded signals, signal/exit behavior and cleanup. It
+must also kill the gate both before and after prepared publication: before the
+frame, the coordinator holds the exact stopped/zombie gate identity so its PID
+cannot be reused, restores `C`, drains the already-known `G`, and reaps the gate
+last; after the frame it additionally revalidates the complete child identity.
+Emergency recovery never signals a bare stale PGID. It cannot interpret stdout
+as a valid completion artifact.
 
 The package-only, non-`Codable` gate transport receipt contains exactly: schema version;
 observed launcher executable SHA-256; outer-attempt UUID; whole-input SHA-256;
-capsule device/inode/size; gate PID and inherited process-group ID; stub child
-PID/PGID; FD-0 observed node, initial and final offsets, EOF and digest;
+capsule device/inode/size; gate PID, recovery PGID `G` and saved foreground
+coordinator PGID `C`; stub child PID/PGID and stable parent/start identity; FD-0
+observed node, initial and final offsets, EOF and digest;
 initial/child/final FD-2 node and foreground PGIDs; stdout byte count and
 SHA-256; raw wait classification; forwarded signal if any; monotonic
 start/completion; exact-saved-foreground-group-restored flag; and a typed
@@ -355,33 +378,35 @@ claims because the retained c0b-ii owner is settled later by c0b-iv. c0b-iv is
 the transport receipt's sole package-internal consumer. This receipt is
 transport evidence only and cannot satisfy root semantic admission.
 
-Candidate eight-path / 2,800-line envelope, to be confirmed, narrowed or split
-by the mandatory c0b-iii fresh preflight:
+The implementation is frozen as two internal commits under the same aggregate
+Checkpoint 2; they are review slices, not new product checkpoints. A1 owns the
+eight implementation/test paths and A2 owns the four verifier paths. The combined
+surface exceeds the old candidate line estimate, so each commit is reviewed
+independently while sharing one aggregate c0b exit gate at c0b-iv:
 
 1. `Package.swift`;
-2. `Sources/StornautInvestigationMachineLaunchSupport/InvestigationSudoShapedDriverLauncher.swift` (new);
-3. `Tools/StornautInvestigationMachineGate/main.swift` (new);
-4. `Tests/StornautInvestigationTests/InvestigationSudoShapedDriverLauncherTests.swift` (new, including its compiled PTY stub fixture);
-5. `Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift`;
-6. `scripts/verify-contract`;
-7. `scripts/verify-investigation-boundaries`; and
-8. `scripts/verify-app-release-boundaries`.
+2. `Sources/StornautInvestigationMachineGateSupport/InvestigationMachineGateTransport.swift` (new);
+3. `Sources/StornautInvestigationMachineGateSupport/InvestigationMachineFixedGateLauncher.swift` (new);
+4. `Sources/StornautInvestigationMachineGateSupport/DarwinInvestigationMachineFixedGateSystem.swift` (new);
+5. `Tools/StornautInvestigationMachineGate/main.swift` (new; Git records the existing case-insensitive `tools/` root);
+6. `Tests/StornautInvestigationTests/InvestigationSudoShapedDriverLauncherTests.swift` (new);
+7. `Tests/Fixtures/InvestigationMachineGateStub/main.swift` (new);
+8. `Tests/StornautInvestigationTests/InvestigationMachineGatePhysicalTests.swift` (new);
+9. `Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift`;
+10. `scripts/verify-contract`;
+11. `scripts/verify-investigation-boundaries`; and
+12. `scripts/verify-app-release-boundaries`.
 
 The gate executable must have exact Debug/Release owned/undefined/load
 projections and negative controls for Core, Codex, Lifecycle, Execution, cleanup
 and networking. No Xcode membership, alternate executable or production stub
 selector is allowed.
 
-Before c0b-iii coding, its fresh preflight must close two fatal recovery races
-rather than infer them from the happy-path PTY fixture: (1) gate death or
-`SIGKILL` after child foreground handoff, including how the retained coordinator
-learns the exact suspended/live child group before handoff and can restore the
-saved foreground group and retire that child without a second launcher; and
-(2) coordinator handling of group-delivered HUP/INT/QUIT/TERM while the gate
-owns normal forwarding, so the coordinator cannot independently die and strand
-receipt draining, gate reaping or capsule settlement. The normal gate remains
-the sole `tcsetpgrp` owner; any coordinator emergency recovery must be typed,
-limited to an already proved-dead gate and independently tested.
+The known recovery-group topology above is the resolved answer to the two former
+fatal recovery questions. The normal gate remains the sole `tcsetpgrp` owner;
+coordinator emergency recovery is typed, begins only after exact waitable gate
+death, preserves the unreaped gate identity until group drain completes, and is
+independently tested. No further nested preflight is permitted for these races.
 
 That preflight must not assume stock sudo retains the stub's direct child-PGID
 topology. Before ii-c, a separate real-sudo physical-topology preflight must
