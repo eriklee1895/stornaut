@@ -199,7 +199,7 @@ Exactly twelve non-document paths, at most 3,900 changed lines:
 1. `Package.swift`;
 2. `Plugins/StornautInvestigationBuildReceiptPlugin/plugin.swift` (new);
 3. `tools/StornautInvestigationBuildReceiptGenerator/main.swift` (new);
-4. `scripts/with-clean-validation-snapshot`;
+4. `Sources/StornautInvestigationMachineGateCoordinatorSupport/Resources/InvestigationMachineBuildInputs.json` (new);
 5. `Sources/StornautCodex/Runtime/CodexNativeExecutableIdentity.swift` (new);
 6. `Sources/StornautCodex/Diagnostics/CapabilityRuntimeWorker.swift`;
 7. `Sources/StornautInvestigation/InvestigationRuntimeProtocols.swift`;
@@ -214,9 +214,11 @@ build-provenance contract, installed-native read-only identity shared with the
 worker, one deterministic cohort runtime receipt plus strict binding/admission
 join, one fixed disposable source fingerprint, one complete binding and eight
 fresh scenario-specific configurations. c0b-i authoring remains owned by
-iv-b2 after all three components exist. The plugin and
-generator may read only the exact clean validation snapshot and write only the
-declared plugin output directory; they add no runtime authority. Verifier
+iv-b2 after all three components exist. The checked-in input contains only
+canonical manifest rules and artifact-relative names, never a commit/hash claim.
+The plugin and generator may read only the exact clean validation snapshot plus
+that declared input and write only the plugin output directory; they add no
+runtime authority. Verifier
 implementation is intentionally deferred to iv-b2. iv-a must not publish a
 capsule or spawn a product/gate process.
 
