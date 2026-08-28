@@ -69,11 +69,16 @@ config-file fields, arbitrary environment input and caller-supplied repository/
 source/build strings are forbidden. This receipt does not change the
 Investigation source schema and is never substituted for
 `sourceFingerprintSHA256`.
-`SignedInvestigationRuntimeBinding` advances to schema v3 with a distinct
-`repositorySourceSHA256` field equal to the validated build-provenance manifest
-SHA-256. The nested binding therefore carries both trust domains: repository
-source/build provenance and Investigation input projection. Existing v2 bytes
-are rejected by the current diagnostic path rather than silently reinterpreted.
+The existing binding schema v2 remains wire-compatible. `repositoryHEAD` is the
+exact clean validation-snapshot commit and therefore commits to its Git tree;
+`promptSHA256`, `envelopeSchemaSHA256` and `facadeSHA256` retain their direct
+artifact meanings and must equal the corresponding build-receipt entries. The
+iv-a output carries the complete build-provenance receipt and its canonical
+digest beside the binding, and iv-b2 includes that digest in the final
+coordinator receipt. This preserves both trust domains without overloading a
+legacy field or adding an unjoined sidecar: the binding identifies the source
+commit and exact semantic artifacts, while `sourceFingerprintSHA256` remains
+exclusively the Investigation input identity.
 
 ### 2.2 One Task 38 runtime receipt binds the cohort
 
@@ -89,10 +94,9 @@ by the Task 38 generic contract and tests but is not a c0b-iv runtime choice.
 The receipt ID is deterministically derived from a domain-separated projection
 of the binding's repository commit and shared Investigation source fingerprint;
 its canonical receipt hash then covers that ID, the selected schema and the
-complete capability set. The builder writes only the hash into binding schema
-v3. Every configuration and c0a projection re-encodes that nested v3 binding,
-and every current diagnostic consumer rejects v2 rather than reinterpreting it.
-The consumer reconstructs the same typed receipt from the binding, recomputes
+complete capability set. The builder writes that hash into the existing binding
+schema v2; every configuration and c0a projection preserves the same nested v2
+binding. The consumer reconstructs the same typed receipt from the binding, recomputes
 the hash and rejects a mismatch before creating a one-shot
 `InvestigationStartAdmissionV1`; no separate runtime-receipt transport is
 needed. A per-
@@ -190,24 +194,22 @@ binary path or path outside the listed set is allowed.
 
 ### 4.1 iv-a — authoritative binding/configuration/source
 
-Exactly fourteen non-document paths, at most 3,900 changed lines:
+Exactly twelve non-document paths, at most 3,900 changed lines:
 
 1. `Package.swift`;
 2. `Plugins/StornautInvestigationBuildReceiptPlugin/plugin.swift` (new);
 3. `tools/StornautInvestigationBuildReceiptGenerator/main.swift` (new);
-4. `Sources/StornautCodex/Runtime/CodexNativeExecutableIdentity.swift` (new);
-5. `Sources/StornautCodex/Diagnostics/CapabilityRuntimeWorker.swift`;
-6. `Sources/StornautInvestigation/InvestigationRuntimeProtocols.swift`;
-7. `Sources/StornautInvestigation/SignedInvestigationRuntimeContract.swift`;
-8. `Sources/StornautInvestigationDiagnostic/InvestigationRuntimeDiagnosticAppLeaf.swift`;
-9. `Sources/StornautInvestigationDiagnostic/InvestigationRuntimeDiagnosticComposition.swift`;
-10. `Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineCoordinatorBindingSource.swift` (new);
-11. `Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineCoordinatorConfigurationSet.swift` (new);
-12. `Tests/StornautCodexTests/CodexNativeExecutableIdentityTests.swift` (new);
-13. `Tests/StornautInvestigationTests/InvestigationMachineCoordinatorBindingSourceTests.swift` (new); and
-14. `Tests/StornautInvestigationTests/SignedRuntimeContractTests.swift`.
+4. `scripts/with-clean-validation-snapshot`;
+5. `Sources/StornautCodex/Runtime/CodexNativeExecutableIdentity.swift` (new);
+6. `Sources/StornautCodex/Diagnostics/CapabilityRuntimeWorker.swift`;
+7. `Sources/StornautInvestigation/InvestigationRuntimeProtocols.swift`;
+8. `Sources/StornautInvestigationDiagnostic/InvestigationRuntimeDiagnosticComposition.swift`;
+9. `Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineCoordinatorBindingSource.swift` (new);
+10. `Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineCoordinatorConfigurationSet.swift` (new);
+11. `Tests/StornautCodexTests/CodexNativeExecutableIdentityTests.swift` (new); and
+12. `Tests/StornautInvestigationTests/InvestigationMachineCoordinatorBindingSourceTests.swift` (new).
 
-A fifteenth path or line 3,901 blocks implementation. iv-a owns the generated
+A thirteenth path or line 3,901 blocks implementation. iv-a owns the generated
 build-provenance contract, installed-native read-only identity shared with the
 worker, one deterministic cohort runtime receipt plus strict binding/admission
 join, one fixed disposable source fingerprint, one complete binding and eight
@@ -264,7 +266,7 @@ already sealed gate sources.
 | Field/evidence | Authoritative source | Required observation/order | Rejected substitute |
 | --- | --- | --- | --- |
 | `sourceFingerprintSHA256` | one Task 36/38 `InvestigationSourceProjection` | before plan/config creation; identical across eight | Git/build/source receipt |
-| `repositoryHEAD` + `repositorySourceSHA256` | generated `InvestigationMachineBuildProvenanceReceiptV1` over the clean validation commit/tree/manifest | plugin generates in its declared work directory; binding schema v3 carries both values | runtime Git, install/runtime sidecar, caller/env fields, self-hash |
+| `repositoryHEAD` + build-source identity | generated `InvestigationMachineBuildProvenanceReceiptV1` over the clean validation commit/tree/manifest | binding v2 carries the commit and direct prompt/schema/facade hashes; iv-a output and final coordinator receipt carry the provenance-receipt digest | runtime Git, install/runtime sidecar, caller/env fields, self-hash |
 | App/helper/driver identities | one current installed binding observation | after build receipt, before configs | constants or stale report |
 | prompt/schema/facade hashes | exact current resources/source identities joined by the sealed build receipt | before binding construction | caller strings or independent mutable files |
 | Task 38 runtime receipt | one typed cohort receipt plus strict configuration projection | created once before binding; hash covers ID/schema/capabilities; exact projection reaches every App admission | per-config receipt, digest-only input or App-side replacement |
