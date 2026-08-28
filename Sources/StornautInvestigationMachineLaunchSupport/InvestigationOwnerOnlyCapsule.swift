@@ -878,7 +878,6 @@ enum InvestigationOwnerOnlyCapsulePublication {
 
 enum InvestigationOwnerOnlyCapsuleSettlement {
     static let deadlineNanoseconds: UInt64 = 5_000_000_000
-    static let maximumBusyRetries = 64
     static let fileUnlinkFlags = Int32(
         AT_NODELETEBUSY | AT_UNIQUE | AT_SYMLINK_NOFOLLOW_ANY
             | AT_RESOLVE_BENEATH
@@ -1014,7 +1013,9 @@ enum InvestigationOwnerOnlyCapsuleSettlement {
         system: any InvestigationOwnerOnlyCapsuleSystem
     ) -> InvestigationOwnerOnlyCapsuleSettlementResult {
         do {
-            let start = try system.monotonicNanoseconds()
+            let start: UInt64
+            do { start = try system.monotonicNanoseconds() }
+            catch { throw failure(.clock, request.residue) }
             let (deadline, overflow) = start.addingReportingOverflow(
                 deadlineNanoseconds
             )
@@ -1499,7 +1500,6 @@ enum InvestigationOwnerOnlyCapsuleSettlement {
         revalidate: () throws -> Void,
         system: any InvestigationOwnerOnlyCapsuleSystem
     ) throws {
-        var retries = 0
         while true {
             let now: UInt64
             do { now = try system.monotonicNanoseconds() }
@@ -1521,8 +1521,15 @@ enum InvestigationOwnerOnlyCapsuleSettlement {
             catch InvestigationOwnerOnlyCapsuleSystemError.errno(let value)
                 where value == EBUSY
             {
-                retries += 1
-                guard retries <= maximumBusyRetries else {
+                let beforeWait: UInt64
+                do { beforeWait = try system.monotonicNanoseconds() }
+                catch {
+                    throw failure(
+                        .clock,
+                        .stale(entries: [name], observationComplete: true)
+                    )
+                }
+                guard beforeWait < deadline else {
                     throw failure(
                         flags & AT_REMOVEDIR == 0 ? .unlinkFile : .removeDirectory,
                         .stale(entries: [name], observationComplete: true)
@@ -1530,7 +1537,7 @@ enum InvestigationOwnerOnlyCapsuleSettlement {
                 }
                 do {
                     try system.waitForRetry(
-                        nanoseconds: min(1_000_000, deadline - now)
+                        nanoseconds: min(1_000_000, deadline - beforeWait)
                     )
                 } catch {
                     throw failure(

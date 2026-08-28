@@ -843,6 +843,52 @@ struct InvestigationOwnerOnlyCapsuleTests {
         #expect(system.removeDirectoryCalls.isEmpty)
     }
 
+    @Test(arguments: CapsuleSettlementClockCase.allCases)
+    fileprivate func clockFailuresPreserveStagePriorityResidueAndCleanup(
+        _ value: CapsuleSettlementClockCase
+    ) throws {
+        let fixture = try CapsuleSettlementFixture()
+        let proof = try fixture.lease.finishWithoutHandoff()
+        value.configure(
+            fixture.system, attempt: fixture.request.attemptName
+        )
+        let eventStart = fixture.system.events.count
+
+        let result = try fixture.lease.settle(neverHandedOff: proof)
+
+        #expect(result == .settledResidue(
+            stage: value.expectedStage,
+            residue: .stale(
+                entries: [fixture.request.attemptName], observationComplete: true
+            ),
+            closeFailures: [], ownershipReleaseUncertain: false
+        ))
+        let events = Array(fixture.system.events[eventStart...])
+        #expect(events.filter { if case .clock = $0 { return true }; return false }
+            .count == value.expectedClockCount)
+        #expect(!events.contains { if case .wait = $0 { return true }; return false })
+        #expect(fixture.system.unlinkCalls.count == value.expectedFileUnlinkCount)
+        #expect(fixture.system.removeDirectoryCalls.count
+            == value.expectedDirectoryUnlinkCount)
+        #expect(fixture.system.closeDescriptors == value.expectedCloseDescriptors)
+        #expect(fixture.system.everyOpenedDescriptorClosedOnce)
+        #expect(fixture.ownership.closeRoles.suffix(2) == [.base, .lock])
+        #expect(fixture.ownership.everyOpenedDescriptorClosedOnce)
+
+        if let lastUnlink = events.lastIndex(where: {
+            if case .unlink = $0 { return true }; return false
+        }) {
+            let afterBusy = events[(lastUnlink + 1)...]
+            #expect(!afterBusy.contains { event in
+                if case .open = event { return true }; return false
+            })
+        } else {
+            #expect(!events.contains { event in
+                if case .open = event { return true }; return false
+            })
+        }
+    }
+
     @Test
     func deadlineEqualityReturnsResidueBeforeAnyUnlinkAttempt() throws {
         let fixture = try CapsuleSettlementFixture()
@@ -873,6 +919,7 @@ struct InvestigationOwnerOnlyCapsuleTests {
         let start: UInt64 = 10_000
         fixture.system.monotonicValues = [
             start, start + 1,
+            start + 2,
             start + 5_000_000_000,
         ]
         fixture.system.unlinkScript = [.failure(EBUSY)]
@@ -909,18 +956,60 @@ struct InvestigationOwnerOnlyCapsuleTests {
         })
         #expect(InvestigationOwnerOnlyCapsuleSettlement.deadlineNanoseconds
             == 5_000_000_000)
-        #expect(InvestigationOwnerOnlyCapsuleSettlement.maximumBusyRetries == 64)
     }
 
     @Test
-    func busyRetryExhaustionIsBoundedAndReturnsResidue() throws {
+    func busyRetryBeyondFormerCountSucceedsBeforeDeadlineAndRevalidatesEveryTime() throws {
         let fixture = try CapsuleSettlementFixture()
         let proof = try fixture.lease.finishWithoutHandoff()
-        fixture.system.monotonicValues = [10_000]
+        let start: UInt64 = 10_000
+        let busyCount = 65
+        fixture.system.monotonicValues = (0..<(busyCount * 2 + 4)).map {
+            start + UInt64($0)
+        }
         fixture.system.unlinkScript = Array(
             repeating: .failure(EBUSY),
-            count: 65
+            count: busyCount
         )
+        let eventStart = fixture.system.events.count
+
+        let result = try fixture.lease.settle(neverHandedOff: proof)
+
+        #expect(result == .removed)
+        let events = Array(fixture.system.events[eventStart...])
+        let fileUnlinks = events.indices.filter { index in
+            if case .unlink(
+                _, fixture.request.finalName,
+                InvestigationOwnerOnlyCapsuleSettlement.fileUnlinkFlags
+            ) = events[index] { return true }
+            return false
+        }
+        #expect(fileUnlinks.count == busyCount + 1)
+        #expect(events.filter {
+            if case .wait = $0 { return true }; return false
+        }.count == busyCount)
+        guard fileUnlinks.count == busyCount + 1 else { return }
+        for retry in 0..<busyCount {
+            let validation = events[(fileUnlinks[retry] + 1)..<fileUnlinks[retry + 1]]
+            #expect(fileRetryPerformedFullRevalidation(
+                validation, finalName: fixture.request.finalName
+            ))
+        }
+    }
+
+    @Test
+    func persistentBusyFailsOnlyWhenAbsoluteDeadlineIsReached() throws {
+        let fixture = try CapsuleSettlementFixture()
+        let proof = try fixture.lease.finishWithoutHandoff()
+        let start: UInt64 = 10_000
+        let busyCount = 66
+        fixture.system.monotonicValues = [start]
+            + (1..<(busyCount * 3)).map { start + UInt64($0) }
+            + [start + InvestigationOwnerOnlyCapsuleSettlement.deadlineNanoseconds]
+        fixture.system.unlinkScript = Array(
+            repeating: .failure(EBUSY), count: busyCount
+        )
+        let eventStart = fixture.system.events.count
 
         let result = try fixture.lease.settle(neverHandedOff: proof)
 
@@ -931,10 +1020,33 @@ struct InvestigationOwnerOnlyCapsuleTests {
             ),
             closeFailures: [], ownershipReleaseUncertain: false
         ))
-        #expect(fixture.system.unlinkCalls.count == 65)
-        #expect(fixture.system.events.filter {
+        let events = Array(fixture.system.events[eventStart...])
+        let fileUnlinks = events.indices.filter { index in
+            if case .unlink(
+                _, fixture.request.finalName,
+                InvestigationOwnerOnlyCapsuleSettlement.fileUnlinkFlags
+            ) = events[index] { return true }
+            return false
+        }
+        #expect(fileUnlinks.count == busyCount)
+        #expect(events.filter {
             if case .wait = $0 { return true }; return false
-        }.count == 64)
+        }.count == busyCount)
+        guard fileUnlinks.count == busyCount else { return }
+        for retry in 0..<(busyCount - 1) {
+            let validation = events[(fileUnlinks[retry] + 1)..<fileUnlinks[retry + 1]]
+            #expect(fileRetryPerformedFullRevalidation(
+                validation, finalName: fixture.request.finalName
+            ))
+        }
+        let afterLastBusy = events[(fileUnlinks[busyCount - 1] + 1)...]
+        #expect(!afterLastBusy.contains { event in
+            if case .open(
+                _, fixture.request.finalName,
+                InvestigationOwnerOnlyCapsulePublication.finalReaderFlags, nil
+            ) = event { return true }
+            return false
+        })
         #expect(fixture.system.removeDirectoryCalls.isEmpty)
     }
 
@@ -1301,6 +1413,7 @@ private enum CapsuleFailureCase: String, CaseIterable, Sendable {
 }
 
 private enum CapsuleEvent: Equatable {
+    case clock
     case inventory(Int32, Int)
     case create(Int32, String, mode_t)
     case open(Int32, String, Int32, mode_t?)
@@ -1315,6 +1428,37 @@ private enum CapsuleEvent: Equatable {
     case offset(Int32), read(Int32, Int, Int64), close(Int32)
     case unlink(Int32, String, Int32)
     case wait(UInt64)
+}
+
+private func fileRetryPerformedFullRevalidation(
+    _ events: ArraySlice<CapsuleEvent>, finalName: String
+) -> Bool {
+    events.contains(.wait(1_000_000))
+        && events.contains { event in
+            if case .open(
+                _, finalName,
+                InvestigationOwnerOnlyCapsulePublication.finalReaderFlags, nil
+            ) = event { return true }
+            return false
+        }
+        && events.contains { if case .metadata = $0 { return true }; return false }
+        && events.contains { event in
+            if case .named(
+                _, finalName,
+                InvestigationOwnerOnlyCapsulePublication.namedFlags
+            ) = event { return true }
+            return false
+        }
+        && events.contains {
+            if case .descriptorFlags = $0 { return true }; return false
+        }
+        && events.contains {
+            if case .statusFlags = $0 { return true }; return false
+        }
+        && events.contains { if case .acl = $0 { return true }; return false }
+        && events.contains { if case .xattr = $0 { return true }; return false }
+        && events.contains { if case .read = $0 { return true }; return false }
+        && events.contains { if case .close = $0 { return true }; return false }
 }
 
 private struct CapsuleUnlinkCall: Equatable {
@@ -1334,6 +1478,74 @@ private enum CapsuleDirectoryRetryDrift: CaseIterable, Sendable {
     case acl
     case xattr
     case content
+}
+
+private enum CapsuleSettlementClockCase: CaseIterable, Equatable, Sendable {
+    case initialClockFailure
+    case fileBusyCrossesDeadline
+    case directoryBusyCrossesDeadline
+    case busyFreshClockFailure
+
+    var expectedStage: InvestigationOwnerOnlyCapsuleFailureStage {
+        switch self {
+        case .initialClockFailure, .busyFreshClockFailure: .clock
+        case .fileBusyCrossesDeadline: .unlinkFile
+        case .directoryBusyCrossesDeadline: .removeDirectory
+        }
+    }
+
+    var expectedClockCount: Int {
+        switch self {
+        case .initialClockFailure: 1
+        case .fileBusyCrossesDeadline, .busyFreshClockFailure: 3
+        case .directoryBusyCrossesDeadline: 4
+        }
+    }
+
+    var expectedFileUnlinkCount: Int {
+        self == .initialClockFailure ? 0 : 1
+    }
+
+    var expectedDirectoryUnlinkCount: Int {
+        self == .directoryBusyCrossesDeadline ? 1 : 0
+    }
+
+    var expectedCloseDescriptors: [Int32] {
+        switch self {
+        case .initialClockFailure:
+            [31, 30, 32]
+        case .fileBusyCrossesDeadline, .busyFreshClockFailure:
+            [31, 30, 32, 34, 33, 36, 35]
+        case .directoryBusyCrossesDeadline:
+            [31, 30, 32, 34, 33, 36, 35, 37]
+        }
+    }
+
+    func configure(_ system: CapsuleSemanticSystem, attempt: String) {
+        let start: UInt64 = 10_000
+        switch self {
+        case .initialClockFailure:
+            system.failNextMonotonic = true
+            system.failAttemptOpenAtCount[attempt] = 2
+        case .fileBusyCrossesDeadline:
+            system.monotonicValues = [start, start + 1]
+            system.monotonicValueAfterBusyUnlink = start
+                + InvestigationOwnerOnlyCapsuleSettlement.deadlineNanoseconds
+            system.failNextRetryWait = true
+            system.unlinkScript = [.failure(EBUSY)]
+        case .directoryBusyCrossesDeadline:
+            system.monotonicValues = [start, start + 1, start + 2]
+            system.monotonicValueAfterBusyUnlink = start
+                + InvestigationOwnerOnlyCapsuleSettlement.deadlineNanoseconds
+            system.failNextRetryWait = true
+            system.unlinkScript = [.success, .failure(EBUSY)]
+        case .busyFreshClockFailure:
+            system.monotonicValues = [start, start + 1]
+            system.failMonotonicAfterBusyUnlink = true
+            system.failNextRetryWait = true
+            system.unlinkScript = [.failure(EBUSY)]
+        }
+    }
 }
 
 private struct CapsuleStaleCloseFailureCase: Sendable {
@@ -1404,6 +1616,10 @@ private final class CapsuleSemanticSystem:
     var removeDirectoryCalls: [CapsuleUnlinkCall] = []
     var recoveredAttemptNames: [String] = []
     var monotonicValues: [UInt64] = [1_000_000]
+    var failNextMonotonic = false
+    var monotonicValueAfterBusyUnlink: UInt64?
+    var failMonotonicAfterBusyUnlink = false
+    var failNextRetryWait = false
     var unlinkScript: [CapsuleUnlinkResult] = []
     var nonemptyAfterFileUnlinkAttempts: Set<String> = []
     var replaceDirectoryAfterFileUnlinkAttempts: Set<String> = []
@@ -1706,6 +1922,11 @@ private final class CapsuleSemanticSystem:
         if failure == .closeAttemptDirectory && descriptor == 30 { throw systemError }
     }
     func monotonicNanoseconds() throws -> UInt64 {
+        events.append(.clock)
+        if failNextMonotonic {
+            failNextMonotonic = false
+            throw systemError
+        }
         if monotonicValues.count > 1 { return monotonicValues.removeFirst() }
         return monotonicValues.first ?? 1_000_000
     }
@@ -1715,6 +1936,12 @@ private final class CapsuleSemanticSystem:
         unlinkCount += 1
         let result = unlinkScript.isEmpty ? .success : unlinkScript.removeFirst()
         if case .failure(let value) = result {
+            if value == EBUSY {
+                if let monotonicValueAfterBusyUnlink {
+                    monotonicValues = [monotonicValueAfterBusyUnlink]
+                }
+                if failMonotonicAfterBusyUnlink { failNextMonotonic = true }
+            }
             if flags & AT_REMOVEDIR != 0 {
                 removeDirectoryCalls.append(call)
                 if value == EBUSY {
@@ -1758,6 +1985,10 @@ private final class CapsuleSemanticSystem:
     }
     func waitForRetry(nanoseconds: UInt64) throws {
         events.append(.wait(nanoseconds))
+        if failNextRetryWait {
+            failNextRetryWait = false
+            throw systemError
+        }
     }
 
     // APFS reports ordinary empty directories with a positive link count and
