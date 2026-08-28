@@ -88,12 +88,12 @@ implementation `f11eea42ef295f49b20e1c0f3912d4b32448b968` / tree
 889 changed lines 完成；a1+a2 aggregate 为 7 paths / 2,870 lines，bare
 verify-contract/component/App-Release gates exit 0，双人 review 无 unresolved
 P0–P2，按设计未运行 serial/full/root/App/XPC/model/network。a2 保持
-non-admitting。ii-b preflight 又发现 acquisition-time validated base FD 未被
-持续持有，已在编码前修正拆为 ii-c0b-ii-a3 retained-base prerequisite →
-ii-c0b-ii-b1 publication/lease → ii-c0b-ii-b2 settlement/recovery →
-ii-c0b-ii-b3 verifier closure；随后为 c0b-iii fixed launcher/stub → c0b-iv
-zero-argument final composition → ii-c → L3c3d → L3c4 推进；machine
-admission 尚未发生。
+non-admitting。retained-base、capsule publication/settlement、fixed launcher 与
+verifier closure 随后全部完成并推送；当前 `ced4da2` 已关闭 c0b-i/c0b-ii/
+c0b-iii，均保持 non-admitting。c0b-iv fresh preflight 现冻结为 iv-a
+authoritative binding/configuration/source → iv-b1 contained handoff/settlement
+→ iv-b2 zero-argument executable/verifier closure；iv-a current。之后严格为
+ii-c → L3c3d → L3c4；machine admission 尚未发生。
 见文档：
 
 | 文档 | 内容 |
@@ -108,7 +108,7 @@ admission 尚未发生。
 | [docs/assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md](docs/assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md) | 权限受限、安全阻断、部分结果、stale preflight 与历史保留的恢复状态契约 |
 | [docs/reports/epic-2-4-validation-report.md](docs/reports/epic-2-4-validation-report.md) | Phase B domain/persistence、真实 Quick Scan benchmark、accounting、UI 与 scope gate |
 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) | 已归档的 Phase B Tasks 9–26 计划与逐 Task 证据 |
-| [docs/plans/active/README.md](docs/plans/active/README.md) | Phase D approved；Tasks 36–38 complete，Task 39B2c in progress；c0b-i 与 ii-c0b-ii-a1/a2 complete/non-admitting，ii-b retained-base split frozen，ii-c0b-ii-a3 current；machine admission pending |
+| [docs/plans/active/README.md](docs/plans/active/README.md) | Phase D approved；Tasks 36–38 complete，Task 39B2c in progress；c0b-i/c0b-ii/c0b-iii complete/non-admitting，c0b-iv frozen as iv-a → iv-b1 → iv-b2，iv-a current；machine admission pending |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md) | v1 capsule bytes preserved；frozen enclosing projected-cohort binary contract、8-path/2,600-line ceiling and corrected remaining order |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md) | ii-c0a exact 8-path / 1,863-line completion、90 focused、536 affected、1,418-test serial、boundary gates 与 independent review |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-i-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-i-review.md) | c0b-i semantic producer completion audit；exact 7 paths / 1,900 lines、95 tests / 5 suites；complete/non-admitting |

@@ -365,11 +365,12 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   889 changed lines 收口，a1+a2 aggregate 为 7 paths / 2,870 lines；bare
   verify-contract、component 与 App-Release gates 均 exit 0，双人 review 无
   unresolved P0–P2。按设计未运行 serial/full/root/App/XPC/model/network；
-  a2 complete/non-admitting。ii-b preflight 随后发现 owner 未持续持有
-  acquisition-time validated base FD，原 6-path / 3,400-line envelope 不再
-  可实施，已在编码前修正拆为 ii-c0b-ii-a3 retained-base prerequisite →
-  ii-c0b-ii-b1 publication/lease → ii-c0b-ii-b2 settlement/recovery →
-  ii-c0b-ii-b3 verifier closure；当前 frontier 为 ii-c0b-ii-a3。
+  a2 complete/non-admitting。retained-base、publication/lease、settlement/
+  recovery、verifier closure 与 c0b-iii fixed launcher/stub 随后均已完成并
+  推送；current HEAD `ced4da2` 已关闭 c0b-i/c0b-ii/c0b-iii。c0b-iv fresh
+  preflight 已冻结 iv-a authoritative binding/configuration/source → iv-b1
+  contained handoff/settlement → iv-b2 zero-argument executable/verifier
+  closure；当前 frontier 为 iv-a。
   iii-b2a0 以
   exact 8 non-document paths / 2,198 changed lines、
   36-test/3-suite combined bridge+continuity+cohort、580-test/43-suite affected、
@@ -413,11 +414,9 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   1b-ii 以 implementation `1c8ab1d` / tree `d7b6c05`、exact 4 paths /
   971 changed lines、contract/App-Release exit 0、immutable seal `a314b85` /
   tree `aac9d81` 与 no-unresolved-P0–P2 review 收口。两者均
-  complete/non-admitting；c0b-i 也已完成并保持 non-admitting，c0b-ii fresh
-  preflight 已完成；ii-a budget split 已冻结，ii-c0b-ii-a1/a2 均已完成并
-  保持 non-admitting；ii-b retained-base split 已冻结，随后严格按
-  ii-c0b-ii-a3 → ii-c0b-ii-b1 → ii-c0b-ii-b2 → ii-c0b-ii-b3 → c0b-iii →
-  c0b-iv → ii-c → L3c3d → L3c4 推进。
+  complete/non-admitting；c0b-i/c0b-ii/c0b-iii 均已完成并保持
+  non-admitting。c0b-iv fresh preflight 已冻结为 iv-a/iv-b1/iv-b2，随后严格
+  按 iv-a → iv-b1 → iv-b2 → ii-c → L3c3d → L3c4 推进。
   该 ii-b5b-ii-c checkpoint 以 8 个
   non-document paths / 3,104 changed lines、35 focused tests、
   1,396-test staged-only serial、三个 verifier gates 与 final
@@ -782,10 +781,12 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   `f11eea42ef295f49b20e1c0f3912d4b32448b968` / tree
   `d0683495ea37d0692677c98f491f3037eaedba4c`、exact 4 paths / 889 lines
   完成，a1+a2 aggregate 为 7 paths / 2,870 lines；两者均
-  complete/non-admitting。ii-b retained-base split 已冻结；当前 frontier 为
-  ii-c0b-ii-a3 retained-base prerequisite，后续为 ii-c0b-ii-b1 →
-  ii-c0b-ii-b2 → ii-c0b-ii-b3 → c0b-iii fixed launcher/stub → c0b-iv
-  zero-argument final composition → ii-c
+  complete/non-admitting。retained-base、publication/lease、settlement/
+  recovery、verifier closure 与 c0b-iii fixed launcher/stub 随后均已完成并
+  推送；current HEAD `ced4da2` 关闭 c0b-i/c0b-ii/c0b-iii。c0b-iv fresh
+  preflight 已冻结 iv-a authoritative binding/configuration/source → iv-b1
+  contained handoff/settlement → iv-b2 zero-argument executable/verifier
+  closure；当前 frontier 为 iv-a，后续为 ii-c
   privileged no-model gate → L3c3d → L3c4。
   ADR 0018 仍 Proposed；L3c4 独占 final admission 与
   剩余 full。

@@ -304,11 +304,13 @@
 > `d0683495ea37d0692677c98f491f3037eaedba4c`、4 paths / 889 lines、aggregate
 > 7 paths / 2,870 lines、bare contract/component/App-Release exit 0 与双人
 > no-unresolved-P0–P2 review 完成并保持 non-admitting。a2 未运行 serial/full、
-> root、App、XPC、model 或 network。ii-b 实施 preflight 又发现 owner 未保留
-> acquisition-time validated base FD，已冻结 a3 retained-base → b1
-> publication/lease → b2 settlement/recovery → b3 verifier closure；当前严格按
-> ii-c0b-ii-a3 → ii-c0b-ii-b1 → ii-c0b-ii-b2 → ii-c0b-ii-b3 → c0b-iii →
-> c0b-iv → ii-c → L3c3d → L3c4 推进。该
+> root、App、XPC、model 或 network。retained-base、publication/lease、
+> settlement/recovery、verifier closure 与 c0b-iii fixed launcher/stub 随后
+> 均已完成并推送；current HEAD `ced4da2` 已关闭 c0b-i/c0b-ii/c0b-iii。
+> c0b-iv fresh preflight 冻结 iv-a authoritative binding/configuration/source
+> → iv-b1 contained handoff/settlement → iv-b2 zero-argument executable/
+> verifier closure，当前严格按 iv-a → iv-b1 → iv-b2 → ii-c → L3c3d →
+> L3c4 推进。该
 > b5b-ii-c checkpoint 以 8 个 non-document paths / 3,104 changed lines、35
 > focused tests、1,396-test staged-only serial、三个 verifier gates 与 final
 > no-unresolved-P0–P2 review 收口；未运行 full。c0a 完成后按序为 b5b-iii
@@ -682,8 +684,8 @@ non-admitting；iii-b2b-0、iii-b2b-1a-0 与 iii-b2b-1a-1 已完成并保持
 non-admitting；iii-b2b-1b 已拆为 1b-i/1b-ii 并全部完成、保持
 non-admitting；ii-c0b 已冻结，c0b-i 已完成并保持 non-admitting；c0b-ii
 fresh preflight 已拆为 ii-c0b-ii-a/ii-c0b-ii-b；ii-a budget split 已冻结为
-a1/a2；a1/a2 均已完成并保持 non-admitting，当前 frontier 为
-ii-c0b-ii-b，随后为 c0b-iii → c0b-iv →
+a1/a2；a1/a2 及后续 c0b-ii/c0b-iii 均已完成并保持 non-admitting。c0b-iv
+fresh preflight 冻结 iv-a → iv-b1 → iv-b2；当前 frontier 为 iv-a，随后为
 ii-c → L3c3d → L3c4。
 ADR 0018 仍 Proposed，L3c4 独占 final admission 与剩余 full。
 iii-b2b-0 completion evidence 见
@@ -758,7 +760,8 @@ iii-b2b-0、iii-b2b-1a-0、iii-b2b-1a-1 与 iii-b2b-1b
 complete/non-admitting；ii-c0b split frozen，c0b-i complete/non-admitting，
 c0b-ii ownership split complete，ii-a budget split frozen，ii-c0b-ii-a1
 与 ii-c0b-ii-a2 complete/non-admitting；ii-b retained-base split 已冻结，
-current frontier 为 ii-c0b-ii-a3。
+current frontier 为 c0b-iv-a；c0b-ii/c0b-iii 已完成并保持 non-admitting，
+c0b-iv fresh preflight 冻结 iv-a/iv-b1/iv-b2。
 i-b2a completion 见
 [artifact/static reader review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2a-review.md)。
 [fixed service reader review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2b-b-review.md)
@@ -789,7 +792,7 @@ complete/non-admitting，iii-b2b-0、iii-b2b-1a-0、iii-b2b-1a-1 与
 iii-b2b-1b complete/non-admitting；ii-c0b four-way split frozen，c0b-i
 complete/non-admitting，c0b-ii ownership split complete，ii-a budget split
 frozen，ii-c0b-ii-a1 与 ii-c0b-ii-a2 complete/non-admitting；current frontier
-为 ii-c0b-ii-b。
+为 c0b-iv-a；c0b-ii/c0b-iii 已完成并保持 non-admitting。
 ii-a completion 见
 [review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-a-review.md)，ii-b
 completion 见
@@ -822,9 +825,9 @@ implementation `f11eea42ef295f49b20e1c0f3912d4b32448b968` / tree
 `d0683495ea37d0692677c98f491f3037eaedba4c`、exact 4 paths / 889 lines、
 aggregate 7 paths / 2,870 lines、bare contract/component/App-Release exit 0
 与双人 no-unresolved-P0–P2 review；未运行 serial/full/root/App/XPC/model/
-network。a2 complete/non-admitting；ii-b retained-base split 已冻结，当前
-frontier 为 ii-c0b-ii-a3，随后为 ii-c0b-ii-b1 → ii-c0b-ii-b2 →
-ii-c0b-ii-b3。
+network。a2 complete/non-admitting；retained-base/capsule/fixed-gate sequence
+随后已完成。current frontier 为 c0b-iv-a，随后为 iv-b1 → iv-b2 → ii-c →
+L3c3d → L3c4。
 [ii-b5b-iii-b0 preflight](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md)
 冻结 long-lived outer/disposable inner、FD 0/1/2/7/8/9、inner-led PGID、
 parent-crash containment 与 iii-a/b1/b2a/b2b budgets。
@@ -1031,9 +1034,10 @@ preflight 已冻结，iii-a/iii-b1/iii-b2a0/iii-b2a-i/iii-b2a-ii-a1/a2-0/a2-i/a2
 已完成并保持 non-admitting；a2 已关闭，iii-b2b-0、iii-b2b-1a-0 与
 iii-b2b-1a-1 与拆分后的 iii-b2b-1b-i/1b-ii 已完成并保持
 non-admitting；ii-c0b 已冻结为四段，c0b-i 已完成并保持 non-admitting；
-ii-c0b-ii-a1 与 ii-c0b-ii-a2 已完成并保持 non-admitting；ii-b retained-base
-split 已冻结，当前 frontier 为 ii-c0b-ii-a3，之后严格为 ii-c0b-ii-b1、
-ii-c0b-ii-b2、ii-c0b-ii-b3、c0b-iii、c0b-iv、ii-c、L3c3d、L3c4。
+ii-c0b-ii-a1 与 ii-c0b-ii-a2 已完成并保持 non-admitting；retained-base、
+publication/lease、settlement/recovery、verifier closure 与 c0b-iii fixed gate
+均已完成。c0b-iv 已冻结为 iv-a/iv-b1/iv-b2，当前 frontier 为 iv-a，之后
+严格为 iv-b1、iv-b2、ii-c、L3c3d、L3c4。
 已完成部分均为
 non-admitting prerequisite，
 L3c4 才是 machine admission。该最终 gate
