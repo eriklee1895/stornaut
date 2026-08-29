@@ -120,11 +120,20 @@
 > recovery → b3 verifier sequence is now complete/non-admitting. The c0b-iii
 > fixed-gate implementation and verifier seal are also complete. The mandatory
 > c0b-iv preflight freezes iv-a0 → iv-a-r → iv-b1a → iv-b1b-i → iv-b1b-ii →
-> iv-b2. iv-a0, iv-a-r, iv-b1a and iv-b1b-i are complete/non-admitting.
+> iv-b2. iv-a0, iv-a-r, iv-b1a, iv-b1b-i and iv-b1b-ii are
+> complete/non-admitting.
 > iv-b1b-i closed at implementation `41d34f26` / tree `8ab58932`, exact three
 > paths / 1,173 production changed lines, 806/806 affected tests, a clean
 > staged-only Release target build and two no-unresolved-P0-P2 final reviews.
-> iv-b1b-ii is current. The former `ii-c0b-ii-a3 current` text is superseded.
+> iv-b1b-ii closed at implementation `373431d4` / tree `b08342e5`, exact five
+> paths / 2,193 changed lines, seven physical scenarios, 808/808 clean serial,
+> three dedicated gates and three no-unresolved-P0-P2 review groups. iv-b2 is
+> current. The former `ii-c0b-ii-a3 current` text is superseded.
+> Task 39 closeout is fixed to three delivery packages from the correction point:
+> completed iv-b1b-ii, current iv-b2, and one frozen-source machine-evidence
+> campaign containing logically distinct ii-c, L3c3d and L3c4 phases. Local
+> findings remain in their owning package and do not create recursive
+> prerequisites. L3c4 alone owns final admission and the remaining full.
 > a2-i
 > closed at commit
 > `158f500` / tree `c7a42ffd` with 10 non-document paths / 1,965 changed
@@ -1212,14 +1221,18 @@ The remaining L3 work is split before driver coding:
    iii-b2b-1a-1 concrete outer observation and split iii-b2b-1b zero-argument
    entry/artifact and ii-c0b-i semantic producer are also complete/non-admitting.
    c0b-ii and c0b-iii are complete/non-admitting. The corrected remaining
-   order is `ii-c0b-iv-b1b-ii -> ii-c0b-iv-b2 -> ii-c -> L3c3d -> L3c4`;
+   order is `ii-c0b-iv-b2 -> ii-c -> L3c3d -> L3c4`;
    the mandatory
    [c0b-iv preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-preflight.md)
-   freezes the bounded children. iv-a0, iv-a-r, iv-b1a and iv-b1b-i are
+   freezes the bounded children. iv-a0, iv-a-r, iv-b1a, iv-b1b-i and
+   iv-b1b-ii are
    complete/non-admitting; iv-b1b-i closed at implementation `41d34f26` /
    tree `8ab58932` with exact three paths, 1,173 production changed lines,
    806/806 affected tests, a clean staged-only Release target build and two
-   no-unresolved-P0-P2 final reviews. iv-b1b-ii is current.
+   no-unresolved-P0-P2 final reviews. iv-b1b-ii closed at implementation
+   `373431d4` / tree `b08342e5`, exact five paths / 2,193 changed lines, seven
+   physical scenarios, 808/808 clean serial and three no-unresolved-P0-P2
+   review groups. iv-b2 is current.
    a2 closed at implementation `f11eea42ef295f49b20e1c0f3912d4b32448b968` /
    tree `d0683495ea37d0692677c98f491f3037eaedba4c`, exact 4 paths / 889 lines
    and aggregate 7 paths / 2,870 lines, with bare contract/component/App-Release

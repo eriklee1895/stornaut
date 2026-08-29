@@ -205,9 +205,13 @@ iv-b1 aggregate is exactly 14 non-document paths. iv-b1b-i closed at
 implementation `41d34f26` / tree `8ab58932`, exact three paths / 1,173
 production changed lines, 806/806 affected tests, a clean staged-only Release
 target build and two final review groups with no unresolved P0-P2. It is
-complete/non-admitting and iv-b1b-ii is current. The accepted c0b-iii PTY
-evidence cannot substitute for exercising the new outer adapter; iv-b1b-ii
-therefore owns dedicated non-product physical evidence. The former
+complete/non-admitting. iv-b1b-ii then closed at implementation `373431d4` /
+tree `b08342e5`, exact five paths / 2,193 changed lines, a passing seven-scenario
+physical matrix, 808/808 clean staged-only serial, three dedicated gates and
+physical/verifier/cross-group reviews with no unresolved P0-P2. The accepted
+c0b-iii PTY evidence cannot substitute for exercising the new outer adapter;
+iv-b1b-ii therefore owns the now-complete dedicated non-product physical
+evidence. The former
 `ii-c0b-ii-a3 current` text is superseded.
 a2-i closed at
 implementation commit `158f500` and tree
@@ -345,12 +349,19 @@ complete/non-admitting. ii-c0a is complete/non-admitting; ii-b5b-iii-b0 is
 frozen/non-admitting; iii-a, iii-b1, iii-b2a0, iii-b2a-i,
 iii-b2a-ii-a1, a2-0, a2-i, a2-ii, iii-b2b-0, iii-b2b-1a-0,
 iii-b2b-1a-1, iii-b2b-1b, c0b-i, c0b-ii and c0b-iii are complete/non-admitting.
-The remaining order is ii-c0b-iv-b1b-ii -> ii-c0b-iv-b2 -> ii-c -> L3c3d ->
-L3c4. iv-a0, iv-a-r, iv-b1a and iv-b1b-i are complete/non-admitting.
+The remaining order is ii-c0b-iv-b2 -> ii-c -> L3c3d -> L3c4. iv-a0, iv-a-r,
+iv-b1a, iv-b1b-i and iv-b1b-ii are complete/non-admitting.
 iv-b1b-i closed at implementation `41d34f26` / tree `8ab58932`, exact three
 paths / 1,173 production changed lines, 806/806 affected tests, a clean
 staged-only Release target build and two final review groups with no unresolved
-P0-P2. iv-b1b-ii is current.
+P0-P2. iv-b1b-ii closed at implementation `373431d4` / tree `b08342e5`, exact
+five paths / 2,193 changed lines, seven physical scenarios, 808/808 serial and
+three no-unresolved-P0-P2 review groups. iv-b2 is current.
+The Task 39 closeout is now fixed to three delivery packages from the correction
+point: completed iv-b1b-ii, current iv-b2, and one frozen-source machine-evidence
+campaign containing the logically distinct ii-c, L3c3d and L3c4 phases. Review
+findings and local repairs stay within their owning package; they do not create
+new recursive prerequisites. L3c4 alone owns the remaining authoritative full.
 See the
 [ii-b5a review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5a-review.md) and
 [ii-b5b-i-a review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-a-review.md) and
@@ -378,7 +389,8 @@ See the
 [ii-c0b-iv-a0 review](../../reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-a0-review.md),
 [ii-c0b-iv-a-r review](../../reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-a-r-review.md),
 [ii-c0b-iv-b1a review](../../reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1a-review.md),
-[ii-c0b-iv-b1b-i review](../../reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-i-review.md) and
+[ii-c0b-iv-b1b-i review](../../reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-i-review.md),
+[ii-c0b-iv-b1b-ii review](../../reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-ii-review.md) and
 [ii-b5b-iii-b0 preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md) and
 [ii-b5b-iii-a review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-a-review.md) and
 [ii-b5b-iii-b1 review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b1-review.md) and
@@ -415,7 +427,7 @@ the sole normal-product admission gate.
 | [36](task-36-implementation-brief.md) | Domain, canonical projection, planner, budget and stop contracts | complete; [review](../../reports/phase-d-task-36-review.md) |
 | [37](task-37-implementation-brief.md) | Store v4, retention and source rejoin | complete; [review](../../reports/phase-d-task-37-review.md) |
 | [38](task-38-implementation-brief.md) | Closed coordinator with fake runtime | complete; [review](../../reports/phase-d-task-38-review.md) |
-| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; c0b-i/ii/iii and iv-a0/iv-a-r/iv-b1a/iv-b1b-i complete/non-admitting; iv-b1b-ii exact 5-path physical/verifier closure current, followed by iv-b2; iv-b1 aggregate exact 14 paths; ADR 0018 Proposed |
+| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; c0b-i/ii/iii and iv-a0/iv-a-r/iv-b1a/iv-b1b-i/iv-b1b-ii complete/non-admitting; iv-b2 current; then ii-c -> L3c3d -> L3c4; iv-b1 aggregate exact 14 paths; ADR 0018 Proposed |
 | [40](task-40-implementation-brief.md) | Evidence report and conservative Review projection | blocked on Task 39 |
 | [41](task-41-implementation-brief.md) | First-use disclosure and typed availability | blocked on Task 40 |
 | [42](task-42-implementation-brief.md) | App workflow and recovery state | blocked on Task 41 |

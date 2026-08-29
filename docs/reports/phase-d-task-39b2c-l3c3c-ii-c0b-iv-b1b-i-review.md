@@ -83,3 +83,14 @@ The next frontier is ii-c0b-iv-b1b-ii: the frozen exact five-path dedicated
 non-product physical fixture, physical tests, target-boundary test and two
 verifiers. The accepted c0b-iii PTY suite remains corroborating inner-gate
 evidence and cannot substitute for this outer-adapter evidence.
+
+## 5. Successor note — 2026-08-29
+
+The next-frontier wording above is historical. iv-b1b-ii subsequently completed
+at implementation `373431d4d1c4022815eca3c0c5ac3dd9aa4c5f2d` / tree
+`b08342e5a17d678768309a2efd190ef33e37b3e8`, exact five non-document paths /
+2,193 changed lines. Its seven-scenario physical matrix, 808/808 clean serial,
+three dedicated gates and physical/verifier/cross-group final reviews passed
+with no unresolved P0-P2. The live frontier is now iv-b2, followed by ii-c,
+L3c3d and L3c4. Task 39 remains incomplete; only L3c4 may claim final admission
+or run the remaining authoritative full verifier.

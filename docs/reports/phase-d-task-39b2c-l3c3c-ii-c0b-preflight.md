@@ -558,3 +558,14 @@ recorded in the
 design it ran no serial/full/root/sudo, App/helper/driver launch, XPC, model/auth
 or network. c0b-ii fresh preflight is complete; ii-c0b-ii-a tests-first
 implementation is now current.
+
+## Successor note — 2026-08-29
+
+The contemporaneous frontier above is retained as historical evidence and is
+superseded. c0b-ii, c0b-iii, iv-a0, iv-a-r, iv-b1a, iv-b1b-i and iv-b1b-ii are
+now complete/non-admitting. iv-b1b-ii closed at implementation `373431d4` /
+tree `b08342e5`, exact five non-document paths / 2,193 changed lines, with a
+passing seven-scenario physical matrix, 808/808 clean staged-only serial, three
+dedicated gates and no unresolved P0-P2 in physical/verifier/cross-group final
+review. The live frontier is iv-b2, followed by ii-c, L3c3d and L3c4; only L3c4
+owns final admission and Task 39's remaining authoritative full verifier.

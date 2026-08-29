@@ -527,3 +527,23 @@ earlier active-plan wording that named ii-c0b-ii-a3 as current is superseded by
 the accepted implementation evidence and this preflight. ii-c remains blocked
 until all six children have been
 implemented, reviewed and pushed.
+
+## 9. Successor note — 2026-08-29
+
+The status and non-claims above are preserved as the preflight's contemporaneous
+record. iv-b1b-ii subsequently completed at implementation
+`373431d4d1c4022815eca3c0c5ac3dd9aa4c5f2d` / tree
+`b08342e5a17d678768309a2efd190ef33e37b3e8`, with exact five non-document paths
+and 2,193 changed lines. Its seven-scenario physical matrix, three dedicated
+gates, 808/808-test clean staged-only serial and physical/verifier/cross-group
+reviews passed with no unresolved P0-P2 and no matching post-test
+process/attempt/temp residue.
+
+iv-b1b-ii is therefore complete/non-admitting and iv-b2 is the current frontier.
+The remaining logical order is iv-b2 -> ii-c -> L3c3d -> L3c4. The completion
+correction fixes the remaining work to three delivery packages from the
+correction point: completed iv-b1b-ii, iv-b2, and one frozen-source machine-
+evidence campaign containing the logically distinct ii-c/L3c3d/L3c4 phases.
+Local findings and repairs must remain in their owning package rather than
+creating new recursive prerequisites. L3c4 alone owns final admission and the
+remaining authoritative full verifier.

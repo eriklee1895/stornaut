@@ -390,11 +390,16 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   `8ab58932cf67b5da81d0478968600181149c808f`、exact 3 non-document paths /
   1,173 production changed lines、806/806 affected tests / 56 suites、clean
   staged-only Release target build exit 0 与两组终审无 unresolved P0–P2
-  收口，并保持 non-admitting。当前 frontier 为 iv-b1b-ii exact 5-path
-  dedicated physical fixture/test/boundary/verifier closure。accepted c0b-iii PTY
-  suite 只覆盖 inner gate topology，未执行新 outer adapter，不能替代
-  iv-b1b-ii dedicated physical evidence；该证据使用 non-product fixture，而非
-  real production gate。
+  收口，并保持 non-admitting。iv-b1b-ii 又以 implementation
+  `373431d4d1c4022815eca3c0c5ac3dd9aa4c5f2d` / tree
+  `b08342e5a17d678768309a2efd190ef33e37b3e8`、exact 5 non-document paths /
+  2,193 changed lines 完成 dedicated non-product physical fixture/test、boundary
+  与 verifier closure；七场景 physical matrix、808-test/57-suite clean
+  staged-only serial、三项 dedicated gates 与 physical/verifier/cross-group
+  final reviews 均通过，无 unresolved P0–P2，测试后无匹配 process/attempt/temp
+  residue。accepted c0b-iii PTY suite 只覆盖 inner gate topology，不能替代这次
+  outer-adapter evidence。iv-b1b-ii complete/non-admitting；当前 frontier 为
+  iv-b2。
   spawn/transfer uncertainty 不得
   settlement/unlink 或释放 owner，必须进入 process-lifetime ownership
   quarantine。
@@ -444,9 +449,12 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   complete/non-admitting；c0b-i/c0b-ii/c0b-iii 均已完成并保持
   non-admitting。c0b-iv fresh preflight 已动态修正为
   iv-a0/iv-a-r/iv-b1a/iv-b1b/iv-b2；iv-a0/iv-a-r 已完成并保持
-  non-admitting，iv-b1a 与 iv-b1b-i 也已 complete/non-admitting；当前严格按
-  iv-b1b-ii exact 5-path physical/verifier closure → iv-b2 → ii-c → L3c3d →
-  L3c4 推进。
+  non-admitting，iv-b1a、iv-b1b-i 与 iv-b1b-ii 也已
+  complete/non-admitting；当前严格按 iv-b2 → ii-c → L3c3d → L3c4 推进。
+  为停止递归 prerequisite/证据重做循环，收尾从修正点固定为三个交付包：
+  iv-b1b-ii（现已完成）、iv-b2，以及源码冻结后连续执行但逻辑仍相互独立的
+  ii-c/L3c3d/L3c4 machine-evidence campaign；review finding 与局部修复不得再
+  产生新的命名 prerequisite。
   该 ii-b5b-ii-c checkpoint 以 8 个
   non-document paths / 3,104 changed lines、35 focused tests、
   1,396-test staged-only serial、三个 verifier gates 与 final
@@ -582,6 +590,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c L3c3c-ii-c0b-iv-a-r review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-a-r-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-a-r-review.md) |
 | Phase D Task 39B2c L3c3c-ii-c0b-iv-b1a review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1a-review.md) |
 | Phase D Task 39B2c L3c3c-ii-c0b-iv-b1b-i review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-i-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-i-review.md) |
+| Phase D Task 39B2c L3c3c-ii-c0b-iv-b1b-ii review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-ii-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-ii-review.md) |
 | Phase D Task 39B2c L3c3c-ii-a installed-driver observation review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md) |
 | Phase D Task 39B2c L3c3c-ii-b handoff composition split preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md) |
 | Phase D Task 39B2c L3c3c-ii-b0 exact wire contract preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b0-wire-contract-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b0-wire-contract-preflight.md) |
@@ -825,8 +834,10 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   closure；iv-a0、iv-a-r 与 iv-b1a 已完成并保持 non-admitting；iv-b1b 已拆为
   iv-b1b-i exact 3 paths / production ≤1,180 lines 与 iv-b1b-ii exact 5 paths，
   iv-b1 aggregate exact 14 paths；iv-b1b-i 已以 `41d34f2` / tree `8ab58932`、
-  806/806 affected、Release target 与两组终审完成；当前 frontier 为
-  iv-b1b-ii → iv-b2 → ii-c
+  806/806 affected、Release target 与两组终审完成；iv-b1b-ii 已以
+  `373431d4` / tree `b08342e5`、exact 5 paths / 2,193 changed lines、七场景
+  physical、808/808 serial、三项 dedicated gates 与无 unresolved P0–P2 的
+  final reviews 完成；当前 frontier 为 iv-b2 → ii-c
   privileged no-model gate → L3c3d → L3c4。
   ADR 0018 仍 Proposed；L3c4 独占 final admission 与
   剩余 full。
