@@ -108,6 +108,42 @@ package enum InvestigationHandoffConcreteAppLeafError:
     case retirementFailed
 }
 
+package struct InvestigationHandoffAcceptedRuntimeProjection:
+    Sendable,
+    Equatable
+{
+    package let configuration:
+        SignedInvestigationRuntimeDiagnosticConfiguration
+    package let configurationSHA256: String
+    package let runtimeReceipt: InvestigationRuntimeReceiptV1
+
+    package init(
+        configuration: SignedInvestigationRuntimeDiagnosticConfiguration,
+        configurationSHA256: String,
+        runtimeReceipt: InvestigationRuntimeReceiptV1
+    ) throws {
+        guard
+            try configuration.canonicalJSONData().handoffSHA256Hex
+                == configurationSHA256,
+            try configuration.machineConfigurationSHA256()
+                == configurationSHA256
+        else {
+            throw InvestigationHandoffConcreteAppLeafError.invalidConfiguration
+        }
+        do {
+            _ = try InvestigationRuntimeDiagnosticReceiptJoin.validate(
+                runtimeReceipt,
+                against: configuration.binding
+            )
+        } catch {
+            throw InvestigationHandoffConcreteAppLeafError.invalidConfiguration
+        }
+        self.configuration = configuration
+        self.configurationSHA256 = configurationSHA256
+        self.runtimeReceipt = runtimeReceipt
+    }
+}
+
 package actor InvestigationHandoffConcreteAppLeafOperations:
     InvestigationHandoffAppLeafOperations
 {
@@ -119,17 +155,15 @@ package actor InvestigationHandoffConcreteAppLeafOperations:
     }
 
     package typealias RetirementHandle = @Sendable (
-        SignedInvestigationRuntimeDiagnosticConfiguration,
-        String
+        InvestigationHandoffAcceptedRuntimeProjection
     ) async throws -> InvestigationHandoffRetirementHandle
 
     private let adapter: any InvestigationHandoffAppLeafAdapting
     private let peer: InvestigationHandoffAppLeafPeerObservation
     private let now: @Sendable () -> Date
     private let retirementHandleFactory: RetirementHandle
-    private var configuration:
-        SignedInvestigationRuntimeDiagnosticConfiguration?
-    private var configurationSHA256: String?
+    private var acceptedProjection:
+        InvestigationHandoffAcceptedRuntimeProjection?
     private var didRetire = false
     private var phase = Phase.idle
 
@@ -137,10 +171,9 @@ package actor InvestigationHandoffConcreteAppLeafOperations:
         adapter: any InvestigationHandoffAppLeafAdapting,
         peer: InvestigationHandoffAppLeafPeerObservation,
         now: @escaping @Sendable () -> Date = Date.init,
-        retirementHandle: @escaping RetirementHandle = { configuration, digest in
+        retirementHandle: @escaping RetirementHandle = { projection in
             try await InvestigationHandoffNoAuthRetirement.live(
-                configuration: configuration,
-                configurationSHA256: digest
+                projection: projection
             )
         }
     ) throws {
@@ -220,7 +253,7 @@ package actor InvestigationHandoffConcreteAppLeafOperations:
         _ bytes: Data
     ) async throws -> InvestigationHandoffConfigurationAcknowledgement {
         let ticket = try beginOperation()
-        guard configuration == nil else {
+        guard acceptedProjection == nil else {
             return try fail(.invalidState)
         }
         let decoded: SignedInvestigationRuntimeDiagnosticConfiguration
@@ -241,9 +274,12 @@ package actor InvestigationHandoffConcreteAppLeafOperations:
         let wireSHA = InvestigationHandoffSHA256.hashing(bytes)
         let machineSHA: String
         let bindingSHA: String
+        let runtimeReceipt: InvestigationRuntimeReceiptV1
         do {
             machineSHA = try decoded.machineConfigurationSHA256()
             bindingSHA = try decoded.capabilityEvidenceBindingSHA256()
+            runtimeReceipt = try InvestigationRuntimeDiagnosticReceiptJoin
+                .reconstruct(from: decoded.binding)
         } catch {
             return try fail(.invalidConfiguration)
         }
@@ -254,6 +290,7 @@ package actor InvestigationHandoffConcreteAppLeafOperations:
             decoded.scenario
         )
         let acknowledgement: InvestigationHandoffConfigurationAcknowledgement
+        let projection: InvestigationHandoffAcceptedRuntimeProjection
         do {
             acknowledgement = try .init(
                 epochUUID: peer.bootstrap.epochUUID,
@@ -265,12 +302,16 @@ package actor InvestigationHandoffConcreteAppLeafOperations:
                     lowercaseHex: bindingSHA
                 )
             )
+            projection = try .init(
+                configuration: decoded,
+                configurationSHA256: machineSHA,
+                runtimeReceipt: runtimeReceipt
+            )
         } catch {
             return try fail(.invalidConfiguration)
         }
         try finishOperation(ticket)
-        configuration = decoded
-        configurationSHA256 = machineSHA
+        acceptedProjection = projection
         return acknowledgement
     }
 
@@ -292,22 +333,19 @@ package actor InvestigationHandoffConcreteAppLeafOperations:
         let ticket = try beginOperation(retiring: true)
         guard
             !didRetire,
-            let configuration,
-            let configurationSHA256
+            let acceptedProjection
         else {
             return try fail(.invalidState)
         }
         didRetire = true
         let startedAt = now()
         do {
-            let handle = try await retirementHandleFactory(
-                configuration,
-                configurationSHA256
-            )
+            let handle = try await retirementHandleFactory(acceptedProjection)
             guard validRetirementHandle(
                 handle,
-                configuration: configuration,
-                configurationSHA256: configurationSHA256,
+                configuration: acceptedProjection.configuration,
+                configurationSHA256:
+                    acceptedProjection.configurationSHA256,
                 startedAt: startedAt,
                 completedAt: now()
             ) else {
@@ -480,9 +518,9 @@ package enum InvestigationHandoffScenarioMapping {
 
 package enum InvestigationHandoffNoAuthRetirement {
     package static func live(
-        configuration: SignedInvestigationRuntimeDiagnosticConfiguration,
-        configurationSHA256: String
+        projection: InvestigationHandoffAcceptedRuntimeProjection
     ) async throws -> InvestigationHandoffRetirementHandle {
+        let configuration = projection.configuration
         let contract = try LifecycleLocalInstallationContract()
         guard
             configuration.binding.helperServiceIdentifier
@@ -499,8 +537,7 @@ package enum InvestigationHandoffNoAuthRetirement {
         )
         do {
             let handle = try await run(
-                configuration: configuration,
-                configurationSHA256: configurationSHA256,
+                projection: projection,
                 session: session
             )
             await session.invalidate()
@@ -512,18 +549,19 @@ package enum InvestigationHandoffNoAuthRetirement {
     }
 
     package static func run(
-        configuration: SignedInvestigationRuntimeDiagnosticConfiguration,
-        configurationSHA256: String,
+        projection: InvestigationHandoffAcceptedRuntimeProjection,
         session: any LifecycleInteractiveSessionSending,
         now: @escaping @Sendable () -> Date = Date.init,
         operationID: @escaping @Sendable () throws -> UUID = UUID.init
     ) async throws -> InvestigationHandoffRetirementHandle {
-        guard
-            try configuration.canonicalJSONData()
-                .handoffSHA256Hex == configurationSHA256,
-            try configuration.machineConfigurationSHA256()
-                == configurationSHA256
-        else {
+        let configuration = projection.configuration
+        let configurationSHA256 = projection.configurationSHA256
+        do {
+            _ = try InvestigationRuntimeDiagnosticReceiptJoin.validate(
+                projection.runtimeReceipt,
+                against: configuration.binding
+            )
+        } catch {
             throw InvestigationHandoffConcreteAppLeafError.invalidConfiguration
         }
         let evidenceStore = InvestigationLifecycleRetirementEvidenceStore()

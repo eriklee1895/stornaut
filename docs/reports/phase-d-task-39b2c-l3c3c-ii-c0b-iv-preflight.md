@@ -1,6 +1,6 @@
 # Phase D Task 39B2c L3c3c-ii-c0b-iv Final Composition Preflight
 
-> Status: iv-a0 core implemented; iv-a-r acceptance closure frozen;
+> Status: iv-a0 and iv-a-r complete; iv-b1 current;
 > non-admitting
 >
 > Date: 2026-08-29
@@ -245,11 +245,15 @@ capsule or spawn a product/gate process.
 
 ### 4.1.1 iv-a-r — post-review acceptance closure
 
-At most three non-document paths and 900 changed lines:
+Originally frozen at three non-document paths and 900 changed lines. A RED
+unsupported-tree case exposed exact early-failure manifest residue, so the
+accepted completion scope is four non-document paths and remains within the
+same 900-line ceiling:
 
 1. `scripts/verify-clean-validation-snapshot-contract`;
 2. `Sources/StornautInvestigationDiagnostic/InvestigationRuntimeDiagnosticComposition.swift`; and
-3. `Tests/StornautInvestigationTests/InvestigationHandoffConcreteCompositionTests.swift`.
+3. `Tests/StornautInvestigationTests/InvestigationHandoffConcreteCompositionTests.swift`; and
+4. `scripts/with-clean-validation-snapshot`.
 
 This closure turns the provenance negative matrix into repeatable tests and
 makes the actual inherited-handoff App acknowledgement reconstruct, retain and
@@ -404,8 +408,8 @@ escape; the coordinator must duplicate gate process-group authority; or the gate
 artifact gains a forbidden dependency/symbol. The remedy is design review, not
 a recursive implementation split.
 
-This preflight records iv-a0 as implemented, reviewed and non-admitting. It does
-not claim iv-a-r, iv-b1 or iv-b2 is implemented. It does not
+This preflight records iv-a0 and iv-a-r as implemented, reviewed and
+non-admitting. It does not claim iv-b1 or iv-b2 is implemented. It does not
 prove real sudo/root FD, TTY, descendant or containment behavior; installed
 multi-epoch success; Codex capabilities; public networking; global zero residue;
 machine readiness; or ADR 0018 acceptance. It creates no cleanup/Trash/Executor
@@ -416,8 +420,9 @@ license decision.
 
 At baseline `ced4da2`, c0b-i, c0b-ii and c0b-iii implementation/verifier slices
 are complete and non-admitting. c0b-iv is now frozen as
-iv-a0 -> iv-a-r -> iv-b1 -> iv-b2. iv-a0 is complete/non-admitting and iv-a-r
-is the current implementation frontier. The earlier active-plan wording
-that named ii-c0b-ii-a3 as current is superseded by current staged-tree evidence and
-this preflight. ii-c remains blocked until all four children have been
+iv-a0 -> iv-a-r -> iv-b1 -> iv-b2. iv-a0 and iv-a-r are
+complete/non-admitting and iv-b1 is the current implementation frontier. The
+earlier active-plan wording that named ii-c0b-ii-a3 as current is superseded by
+the accepted implementation evidence and this preflight. ii-c remains blocked
+until all four children have been
 implemented, reviewed and pushed.

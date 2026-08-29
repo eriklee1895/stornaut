@@ -370,8 +370,8 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   推送；accepted checkpoint `ced4da2` 已关闭 c0b-i/c0b-ii/c0b-iii。c0b-iv fresh
   preflight 已冻结 iv-a0 authoritative binding/configuration/source → iv-a-r
   provenance/App admission closure → iv-b1 contained handoff/settlement →
-  iv-b2 zero-argument executable/verifier closure；iv-a0 已完成并保持
-  non-admitting，当前 frontier 为 iv-a-r。
+  iv-b2 zero-argument executable/verifier closure；iv-a0 与 iv-a-r 已完成并
+  保持 non-admitting，当前 frontier 为 iv-b1。
   iii-b2a0 以
   exact 8 non-document paths / 2,198 changed lines、
   36-test/3-suite combined bridge+continuity+cohort、580-test/43-suite affected、
@@ -417,7 +417,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   tree `aac9d81` 与 no-unresolved-P0–P2 review 收口。两者均
   complete/non-admitting；c0b-i/c0b-ii/c0b-iii 均已完成并保持
   non-admitting。c0b-iv fresh preflight 已冻结为 iv-a0/iv-a-r/iv-b1/iv-b2，
-  iv-a0 已完成并保持 non-admitting，随后严格按 iv-a-r → iv-b1 → iv-b2 →
+  iv-a0/iv-a-r 已完成并保持 non-admitting，随后严格按 iv-b1 → iv-b2 →
   ii-c → L3c3d → L3c4 推进。
   该 ii-b5b-ii-c checkpoint 以 8 个
   non-document paths / 3,104 changed lines、35 focused tests、
@@ -551,6 +551,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c L3c3c-ii installed-driver path/cost preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-installed-driver-path-cost-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-installed-driver-path-cost-preflight.md) |
 | Phase D Task 39B2c L3c3c-ii-c0b-iv final-composition preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-preflight.md) |
 | Phase D Task 39B2c L3c3c-ii-c0b-iv-a0 review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-a0-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-a0-review.md) |
+| Phase D Task 39B2c L3c3c-ii-c0b-iv-a-r review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-a-r-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-a-r-review.md) |
 | Phase D Task 39B2c L3c3c-ii-a installed-driver observation review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md) |
 | Phase D Task 39B2c L3c3c-ii-b handoff composition split preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md) |
 | Phase D Task 39B2c L3c3c-ii-b0 exact wire contract preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b0-wire-contract-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b0-wire-contract-preflight.md) |
@@ -790,8 +791,8 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   推送；accepted checkpoint `ced4da2` 关闭 c0b-i/c0b-ii/c0b-iii。c0b-iv fresh
   preflight 已冻结 iv-a0 authoritative binding/configuration/source → iv-a-r
   provenance/App admission closure → iv-b1 contained handoff/settlement →
-  iv-b2 zero-argument executable/verifier closure；iv-a0 已完成并保持
-  non-admitting，当前 frontier 为 iv-a-r，后续为 ii-c
+  iv-b2 zero-argument executable/verifier closure；iv-a0 与 iv-a-r 已完成并
+  保持 non-admitting，当前 frontier 为 iv-b1，后续为 ii-c
   privileged no-model gate → L3c3d → L3c4。
   ADR 0018 仍 Proposed；L3c4 独占 final admission 与
   剩余 full。

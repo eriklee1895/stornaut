@@ -165,6 +165,10 @@ function cleanup_snapshot() {
         validation_git -C "$repo_root" worktree remove --force -- \
             "$snapshot_root" >/dev/null 2>&1 || cleanup_rc=$?
     fi
+    if (( cleanup_rc == 0 )) && [[ -f "$container/manifest" ]]; then
+        rm -f -- "$container/manifest" >/dev/null 2>&1 \
+            || cleanup_rc=$?
+    fi
     if (( cleanup_rc == 0 )); then
         rmdir "$container" >/dev/null 2>&1 || cleanup_rc=$?
     fi

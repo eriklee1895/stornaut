@@ -20,8 +20,8 @@ struct InvestigationHandoffConcreteCompositionTests {
             adapter: adapter,
             peer: fixture.peer,
             now: { fixture.now },
-            retirementHandle: { configuration, digest in
-                await retirement.record(configuration, digest: digest)
+            retirementHandle: { projection in
+                await retirement.record(projection)
                 return fixture.handle
             }
         )
@@ -42,10 +42,23 @@ struct InvestigationHandoffConcreteCompositionTests {
         ])
         #expect(await adapter.didHalfClose)
         #expect(await retirement.callCount == 1)
-        #expect(await retirement.configuration == fixture.configuration)
         #expect(
-            await retirement.configurationSHA256
+            await retirement.projection?.configuration
+                == fixture.configuration
+        )
+        #expect(
+            await retirement.projection?.configurationSHA256
                 == fixture.configurationSHA256.lowercaseHex
+        )
+        #expect(
+            await retirement.projection?.runtimeReceipt
+                == fixture.runtimeReceipt
+        )
+        #expect(
+            fixture.configuration.binding.runtimeReceiptSHA256
+                == (try InvestigationRuntimeReceiptCanonicalV1.sha256(
+                    fixture.runtimeReceipt
+                ))
         )
         await #expect(throws: InvestigationHandoffAppLeafError.alreadyConsumed) {
             _ = try await leaf.run()
@@ -61,7 +74,7 @@ struct InvestigationHandoffConcreteCompositionTests {
             adapter: ConcreteFakeHandoffAdapter(fixture: fixture),
             peer: fixture.peer,
             now: { fixture.now },
-            retirementHandle: { _, _ in fixture.handle }
+            retirementHandle: { _ in fixture.handle }
         )
         let acknowledgement = try await accepted
             .acknowledgeConfiguration(fixture.configurationData)
@@ -89,7 +102,7 @@ struct InvestigationHandoffConcreteCompositionTests {
             adapter: ConcreteFakeHandoffAdapter(fixture: fixture),
             peer: fixture.peer,
             now: { fixture.now },
-            retirementHandle: { _, _ in fixture.handle }
+            retirementHandle: { _ in fixture.handle }
         )
         await #expect(throws: InvestigationHandoffConcreteAppLeafError.self) {
             _ = try await rejectsNoncanonical
@@ -103,12 +116,51 @@ struct InvestigationHandoffConcreteCompositionTests {
             adapter: ConcreteFakeHandoffAdapter(fixture: fixture),
             peer: foreign,
             now: { fixture.now },
-            retirementHandle: { _, _ in fixture.handle }
+            retirementHandle: { _ in fixture.handle }
         )
         await #expect(throws: InvestigationHandoffConcreteAppLeafError.self) {
             _ = try await rejectsForeignPeer
                 .acknowledgeConfiguration(fixture.configurationData)
         }
+    }
+
+    @Test(arguments: [
+        ConcreteBindingMutation.repositoryHEAD,
+        ConcreteBindingMutation.sourceFingerprintSHA256,
+        ConcreteBindingMutation.runtimeReceiptSHA256,
+    ])
+    func acknowledgementRejectsRuntimeReceiptDependencyDrift(
+        mutation: ConcreteBindingMutation
+    ) async throws {
+        let fixture = try ConcreteHandoffFixture()
+        defer { fixture.remove() }
+        let retirement = ConcreteRetirementProbe(handle: fixture.handle)
+        let operations = try InvestigationHandoffConcreteAppLeafOperations(
+            adapter: ConcreteFakeHandoffAdapter(fixture: fixture),
+            peer: fixture.peer,
+            now: { fixture.now },
+            retirementHandle: { projection in
+                await retirement.record(projection)
+                return fixture.handle
+            }
+        )
+        let foreignConfiguration = try fixture.configuration(
+            mutatingBinding: mutation
+        )
+
+        await #expect(
+            throws: InvestigationHandoffConcreteAppLeafError.invalidConfiguration
+        ) {
+            _ = try await operations.acknowledgeConfiguration(
+                foreignConfiguration.canonicalJSONData()
+            )
+        }
+        await #expect(
+            throws: InvestigationHandoffConcreteAppLeafError.invalidState
+        ) {
+            _ = try await operations.retirementHandle()
+        }
+        #expect(await retirement.callCount == 0)
     }
 
     @Test
@@ -124,7 +176,7 @@ struct InvestigationHandoffConcreteCompositionTests {
                 adapter: ConcreteFakeHandoffAdapter(fixture: fixture),
                 peer: fixture.peer,
                 now: { fixture.now },
-                retirementHandle: { _, _ in fixture.handle }
+                retirementHandle: { _ in fixture.handle }
             )
             let acknowledgement = try await operations
                 .acknowledgeConfiguration(fixture.configurationData)
@@ -143,7 +195,7 @@ struct InvestigationHandoffConcreteCompositionTests {
                 adapter: ConcreteFakeHandoffAdapter(fixture: fixture),
                 peer: try fixture.peer(mutation: mutation),
                 now: { fixture.now },
-                retirementHandle: { _, _ in fixture.handle }
+                retirementHandle: { _ in fixture.handle }
             )
             await #expect(throws: InvestigationHandoffConcreteAppLeafError.self) {
                 _ = try await operations
@@ -200,7 +252,7 @@ struct InvestigationHandoffConcreteCompositionTests {
                     adapter: ConcreteFakeHandoffAdapter(fixture: fixture),
                     peer: contradictory,
                     now: { fixture.now },
-                    retirementHandle: { _, _ in fixture.handle }
+                    retirementHandle: { _ in fixture.handle }
                 )
             }
         }
@@ -214,7 +266,7 @@ struct InvestigationHandoffConcreteCompositionTests {
             adapter: ConcreteFakeHandoffAdapter(fixture: fixture),
             peer: fixture.peer,
             now: { fixture.now },
-            retirementHandle: { _, _ in fixture.handle }
+            retirementHandle: { _ in fixture.handle }
         )
 
         await #expect(throws: InvestigationHandoffConcreteAppLeafError.self) {
@@ -224,7 +276,7 @@ struct InvestigationHandoffConcreteCompositionTests {
             adapter: ConcreteFakeHandoffAdapter(fixture: fixture),
             peer: fixture.peer,
             now: { fixture.now },
-            retirementHandle: { _, _ in fixture.handle }
+            retirementHandle: { _ in fixture.handle }
         )
         _ = try await operations
             .acknowledgeConfiguration(fixture.configurationData)
@@ -254,7 +306,7 @@ struct InvestigationHandoffConcreteCompositionTests {
                 adapter: ConcreteFakeHandoffAdapter(fixture: fixture),
                 peer: fixture.peer,
                 now: { fixture.now },
-                retirementHandle: { _, _ in handle }
+                retirementHandle: { _ in handle }
             )
             _ = try await operations
                 .acknowledgeConfiguration(fixture.configurationData)
@@ -281,7 +333,7 @@ struct InvestigationHandoffConcreteCompositionTests {
             adapter: ConcreteFakeHandoffAdapter(fixture: shortConfiguration),
             peer: shortConfiguration.peer,
             now: { shortConfiguration.now },
-            retirementHandle: { _, _ in tooLate }
+            retirementHandle: { _ in tooLate }
         )
         _ = try await operations
             .acknowledgeConfiguration(shortConfiguration.configurationData)
@@ -305,7 +357,7 @@ struct InvestigationHandoffConcreteCompositionTests {
                 adapter: ConcreteFakeHandoffAdapter(fixture: advancing),
                 peer: advancing.peer,
                 now: { clock.next() },
-                retirementHandle: { _, _ in completionRelativeHandle }
+                retirementHandle: { _ in completionRelativeHandle }
             )
         _ = try await acceptsHelperCompletionRelativeDeadline
             .acknowledgeConfiguration(advancing.configurationData)
@@ -337,7 +389,7 @@ struct InvestigationHandoffConcreteCompositionTests {
                     adapter: ConcreteFakeHandoffAdapter(fixture: fixture),
                     peer: fixture.peer,
                     now: { clock.next() },
-                    retirementHandle: { _, _ in handle }
+                    retirementHandle: { _ in handle }
                 )
             _ = try await rejectsInvalidCompletionEdge
                 .acknowledgeConfiguration(fixture.configurationData)
@@ -361,7 +413,7 @@ struct InvestigationHandoffConcreteCompositionTests {
             adapter: ConcreteFakeHandoffAdapter(fixture: fixture),
             peer: fixture.peer,
             now: { fixture.now },
-            retirementHandle: { _, _ in try await gate.run() }
+            retirementHandle: { _ in try await gate.run() }
         )
         _ = try await operations
             .acknowledgeConfiguration(fixture.configurationData)
@@ -395,7 +447,7 @@ struct InvestigationHandoffConcreteCompositionTests {
             adapter: failedAdapter,
             peer: fixture.peer,
             now: { fixture.now },
-            retirementHandle: { _, _ in fixture.handle }
+            retirementHandle: { _ in fixture.handle }
         )
         await #expect(throws: InvestigationHandoffConcreteAppLeafError.self) {
             _ = try await adapterFailure.preDropClaim()
@@ -408,7 +460,7 @@ struct InvestigationHandoffConcreteCompositionTests {
             adapter: ConcreteFakeHandoffAdapter(fixture: fixture),
             peer: fixture.peer,
             now: { fixture.now },
-            retirementHandle: { _, _ in
+            retirementHandle: { _ in
                 throw InvestigationHandoffConcreteAppLeafError.bindingMismatch
             }
         )
@@ -439,8 +491,7 @@ struct InvestigationHandoffConcreteCompositionTests {
         )
 
         let handle = try await InvestigationHandoffNoAuthRetirement.run(
-            configuration: fixture.configuration,
-            configurationSHA256: fixture.configurationSHA256.lowercaseHex,
+            projection: try fixture.acceptedProjection(),
             session: session,
             now: { fixture.now },
             operationID: { try provider.next() }
@@ -454,8 +505,9 @@ struct InvestigationHandoffConcreteCompositionTests {
         let wrongDigest = String(repeating: "0", count: 64)
         await #expect(throws: InvestigationHandoffConcreteAppLeafError.self) {
             _ = try await InvestigationHandoffNoAuthRetirement.run(
-                configuration: fixture.configuration,
-                configurationSHA256: wrongDigest,
+                projection: try fixture.acceptedProjection(
+                    configurationSHA256: wrongDigest
+                ),
                 session: ConcreteLifecycleSession(
                     fixture: fixture,
                     operationIDs: operationIDs
@@ -463,10 +515,19 @@ struct InvestigationHandoffConcreteCompositionTests {
                 now: { fixture.now }
             )
         }
+
+        let foreignReceipt = try InvestigationRuntimeReceiptCanonicalV1.receipt(
+            repositoryHEAD: String(repeating: "9", count: 40),
+            sourceFingerprintSHA256:
+                fixture.configuration.binding.sourceFingerprintSHA256
+        )
+        #expect(throws: InvestigationHandoffConcreteAppLeafError.self) {
+            _ = try fixture.acceptedProjection(runtimeReceipt: foreignReceipt)
+        }
     }
 }
 
-private enum ConcreteBindingMutation: CaseIterable {
+enum ConcreteBindingMutation: CaseIterable, Sendable {
     case repositoryHEAD
     case sourceFingerprintSHA256
     case appExecutableSHA256
@@ -509,6 +570,7 @@ private struct ConcreteHandoffFixture: Sendable {
     let preDropClaim: InvestigationHandoffProcessClaim
     let postDropClaim: InvestigationHandoffProcessClaim
     let dropEvidence: InvestigationHandoffDropEvidence
+    let runtimeReceipt: InvestigationRuntimeReceiptV1
     let configuration: SignedInvestigationRuntimeDiagnosticConfiguration
     let configurationData: Data
     let configurationSHA256: InvestigationHandoffSHA256
@@ -575,12 +637,22 @@ private struct ConcreteHandoffFixture: Sendable {
                 SignedInvestigationRuntimeMachineDriverBinding
                 .requiredMachineClaimServiceIdentifier
         )
+        let repositoryHEAD = String(repeating: "a", count: 40)
+        let sourceFingerprintSHA256 = String(repeating: "b", count: 64)
+        let receipt = try InvestigationRuntimeReceiptCanonicalV1.receipt(
+            repositoryHEAD: repositoryHEAD,
+            sourceFingerprintSHA256: sourceFingerprintSHA256
+        )
+        runtimeReceipt = receipt
         let binding = SignedInvestigationRuntimeBinding(
-            repositoryHEAD: String(repeating: "a", count: 40),
-            sourceFingerprintSHA256: String(repeating: "b", count: 64),
+            repositoryHEAD: repositoryHEAD,
+            sourceFingerprintSHA256: sourceFingerprintSHA256,
             appExecutableSHA256: String(repeating: "c", count: 64),
             helperExecutableSHA256: String(repeating: "d", count: 64),
-            runtimeReceiptSHA256: String(repeating: "e", count: 64),
+            runtimeReceiptSHA256:
+                try InvestigationRuntimeReceiptCanonicalV1.sha256(
+                    receipt
+                ),
             promptSHA256: String(repeating: "f", count: 64),
             envelopeSchemaSHA256: String(repeating: "1", count: 64),
             facadeSHA256: String(repeating: "2", count: 64),
@@ -816,6 +888,18 @@ private struct ConcreteHandoffFixture: Sendable {
         )
     }
 
+    func acceptedProjection(
+        configurationSHA256: String? = nil,
+        runtimeReceipt: InvestigationRuntimeReceiptV1? = nil
+    ) throws -> InvestigationHandoffAcceptedRuntimeProjection {
+        try InvestigationHandoffAcceptedRuntimeProjection(
+            configuration: configuration,
+            configurationSHA256: configurationSHA256
+                ?? self.configurationSHA256.lowercaseHex,
+            runtimeReceipt: runtimeReceipt ?? self.runtimeReceipt
+        )
+    }
+
     func incoming(
         kind: InvestigationHandoffFrameKind,
         payload: InvestigationHandoffFramePayload = .empty
@@ -1007,19 +1091,13 @@ private actor ConcreteFakeHandoffAdapter: InvestigationHandoffAppLeafAdapting {
 private actor ConcreteRetirementProbe {
     let handle: InvestigationHandoffRetirementHandle
     private(set) var callCount = 0
-    private(set) var configuration:
-        SignedInvestigationRuntimeDiagnosticConfiguration?
-    private(set) var configurationSHA256: String?
+    private(set) var projection: InvestigationHandoffAcceptedRuntimeProjection?
 
     init(handle: InvestigationHandoffRetirementHandle) { self.handle = handle }
 
-    func record(
-        _ configuration: SignedInvestigationRuntimeDiagnosticConfiguration,
-        digest: String
-    ) {
+    func record(_ projection: InvestigationHandoffAcceptedRuntimeProjection) {
         callCount += 1
-        self.configuration = configuration
-        configurationSHA256 = digest
+        self.projection = projection
     }
 }
 
