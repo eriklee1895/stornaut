@@ -1,7 +1,7 @@
 # Phase D Task 39B2c L3c3c-ii-c0b-iv Final Composition Preflight
 
-> Status: iv-a0, iv-a-r and iv-b1a complete; iv-b1b-i Steps 1-2 complete,
-> Step 3 scope frozen, Step 4 RED tests next;
+> Status: iv-a0, iv-a-r, iv-b1a and iv-b1b-i complete;
+> iv-b1b-ii dedicated physical evidence and verifier closure next/current;
 > non-admitting
 >
 > Date: 2026-08-29
@@ -304,8 +304,8 @@ four P1 defects: settlement before
 terminal admission, transport failure reaching success, settlement after close
 uncertainty, and ownership release after spawn/transfer uncertainty. All four
 were repaired tests-first in the same bounded scope. Three independent post-fix
-review groups found no unresolved P0-P2. iv-b1a is complete/non-admitting; iv-b1b
-is current.
+review groups found no unresolved P0-P2. iv-b1a is complete/non-admitting;
+iv-b1b-i is also complete/non-admitting and iv-b1b-ii is current.
 No global serial, `scripts/verify --full`, root/sudo, real App/helper/driver/gate
 launch, XPC, model/auth or network attempt was run for iv-b1a.
 
@@ -343,12 +343,14 @@ signal forwarding, TTY restoration and exact wait/reap. It does not reopen
 iv-b1a semantics, own the aggregate serial or claim physical execution. A fourth
 path or production line 1,181 blocks iv-b1b-i and requires re-preflight.
 
-The tests-first workflow state for iv-b1b-i is frozen as:
-
-1. Step 1 test preparation: complete;
-2. Step 2 Swift unit-test knowledge and global context: complete;
-3. Step 3 exact three-path scope and 1,180-line production ceiling: frozen; and
-4. Step 4 deterministic injected-lifecycle RED tests: next/current.
+All four tests-first workflow steps are complete. The implementation closed at
+commit `41d34f26a32b9740124bd5fdf3857a4520ebdfea` / tree
+`8ab58932cf67b5da81d0478968600181149c808f`, with exactly the frozen three
+non-document paths. The two production sources contain 1,173 changed lines,
+below the 1,180-line ceiling. The clean affected suite passed 806/806 tests in
+56 suites in 47.391 seconds; the clean staged-only Release target build exited
+0 in 15.30 seconds. Two final independent review groups found no unresolved
+P0-P2. iv-b1b-i is complete/non-admitting; iv-b1b-ii is current.
 
 ##### 4.2.2.2 iv-b1b-ii — dedicated physical evidence and verifiers
 
@@ -499,11 +501,12 @@ escape; the coordinator must duplicate gate process-group authority; or the gate
 artifact gains a forbidden dependency/symbol. The remedy is design review, not
 a recursive implementation split.
 
-This preflight records iv-a0, iv-a-r and iv-b1a as implemented, reviewed and
-complete/non-admitting. iv-b1a is accepted at snapshot `db4e936` / tree
-`412da586d13fae7fd53937231217778b5d9ffd52`; three independent post-fix review
-groups found no unresolved P0-P2.
-It does not claim iv-b1b-i, iv-b1b-ii or iv-b2 is implemented or accepted. It does not
+This preflight records iv-a0, iv-a-r, iv-b1a and iv-b1b-i as implemented,
+reviewed and complete/non-admitting. iv-b1b-i is accepted at implementation
+`41d34f26a32b9740124bd5fdf3857a4520ebdfea` / tree
+`8ab58932cf67b5da81d0478968600181149c808f`; two final review groups found no
+unresolved P0-P2. It does not claim iv-b1b-ii or iv-b2 is implemented or
+accepted. It does not
 prove real sudo/root FD, TTY, descendant or containment behavior; installed
 multi-epoch success; Codex capabilities; public networking; global zero residue;
 machine readiness; or ADR 0018 acceptance. It creates no cleanup/Trash/Executor
@@ -514,10 +517,12 @@ license decision.
 
 At baseline `ced4da2`, c0b-i, c0b-ii and c0b-iii implementation/verifier slices
 are complete and non-admitting. c0b-iv is now frozen as
-iv-a0 -> iv-a-r -> iv-b1a -> iv-b1b-i -> iv-b1b-ii -> iv-b2. iv-a0 and iv-a-r
-are complete/non-admitting; iv-b1a is also complete/non-admitting, and iv-b1b-i
-is the current frontier at Step 4 RED tests after Steps 1-2 completed and Step 3
-scope freeze. The iv-b1 aggregate is exactly fourteen non-document paths. The
+iv-a0 -> iv-a-r -> iv-b1a -> iv-b1b-i -> iv-b1b-ii -> iv-b2. iv-a0, iv-a-r,
+iv-b1a and iv-b1b-i are complete/non-admitting. iv-b1b-i closed at exact three
+paths and 1,173 production changed lines with 806/806 affected tests, a clean
+staged-only Release target build and two no-unresolved-P0-P2 final reviews.
+iv-b1b-ii is the current frontier, followed by iv-b2, ii-c, L3c3d and L3c4.
+The iv-b1 aggregate remains exactly fourteen non-document paths. The
 earlier active-plan wording that named ii-c0b-ii-a3 as current is superseded by
 the accepted implementation evidence and this preflight. ii-c remains blocked
 until all six children have been

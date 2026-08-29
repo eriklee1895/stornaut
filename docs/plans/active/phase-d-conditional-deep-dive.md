@@ -84,12 +84,13 @@
 > `d0683495ea37d0692677c98f491f3037eaedba4c`: exact 4 paths / 889 lines,
 > aggregate 7 paths / 2,870 lines, bare contract/component/App-Release exit 0
 > and two no-unresolved-P0-P2 reviews, with no serial/full/root/App/XPC/model/
-> network run. A fresh ii-b implementation audit found the missing retained
-> acquisition-time base FD and froze a3 retained-base, b1 publication/lease,
-> b2 settlement/recovery and b3 verifier closure. The current frontier is
-> ii-c0b-ii-a3, followed strictly by ii-c0b-ii-b1, ii-c0b-ii-b2,
-> ii-c0b-ii-b3, c0b-iii, c0b-iv, ii-c, L3c3d and
-> L3c4. The authoritative
+> network run. The corrected retained-base, publication/lease, settlement/
+> recovery, verifier and fixed-gate slices are complete. c0b-iv-a0, iv-a-r,
+> iv-b1a and iv-b1b-i are also complete/non-admitting. iv-b1b-i closed at
+> implementation `41d34f26` / tree `8ab58932`, exact three paths / 1,173
+> production changed lines, 806/806 affected tests, a clean staged-only Release
+> target build and two no-unresolved-P0-P2 final reviews. The current frontier
+> is iv-b1b-ii, followed strictly by iv-b2, ii-c, L3c3d and L3c4. The authoritative
 > real-model run and readiness verdict remain unimplemented.
 > Production Deep Dive remains unavailable until Task 44 admission.
 >

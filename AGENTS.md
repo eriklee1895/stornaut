@@ -385,8 +385,13 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   为 iv-b1b-i exact 3 paths / production ≤1,180 changed lines（Darwin adapter、
   injected lifecycle、deterministic tests），随后 iv-b1b-ii exact 5 paths
   （dedicated physical fixture、physical tests、boundary test 与两个 verifier）。
-  iv-b1 aggregate 为 exact 14 non-document paths。iv-b1b-i Step 1–2 complete、
-  Step 3 scope frozen，当前 frontier 为 Step 4 RED tests。accepted c0b-iii PTY
+  iv-b1 aggregate 为 exact 14 non-document paths。iv-b1b-i 又以 implementation
+  `41d34f26a32b9740124bd5fdf3857a4520ebdfea` / tree
+  `8ab58932cf67b5da81d0478968600181149c808f`、exact 3 non-document paths /
+  1,173 production changed lines、806/806 affected tests / 56 suites、clean
+  staged-only Release target build exit 0 与两组终审无 unresolved P0–P2
+  收口，并保持 non-admitting。当前 frontier 为 iv-b1b-ii exact 5-path
+  dedicated physical fixture/test/boundary/verifier closure。accepted c0b-iii PTY
   suite 只覆盖 inner gate topology，未执行新 outer adapter，不能替代
   iv-b1b-ii dedicated physical evidence；该证据使用 non-product fixture，而非
   real production gate。
@@ -439,8 +444,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   complete/non-admitting；c0b-i/c0b-ii/c0b-iii 均已完成并保持
   non-admitting。c0b-iv fresh preflight 已动态修正为
   iv-a0/iv-a-r/iv-b1a/iv-b1b/iv-b2；iv-a0/iv-a-r 已完成并保持
-  non-admitting，iv-b1a 也已 complete/non-admitting；iv-b1b-i Step 1–2
-  complete、Step 3 exact 3-path scope frozen，随后严格按 Step 4 RED tests →
+  non-admitting，iv-b1a 与 iv-b1b-i 也已 complete/non-admitting；当前严格按
   iv-b1b-ii exact 5-path physical/verifier closure → iv-b2 → ii-c → L3c3d →
   L3c4 推进。
   该 ii-b5b-ii-c checkpoint 以 8 个
@@ -577,6 +581,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c L3c3c-ii-c0b-iv-a0 review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-a0-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-a0-review.md) |
 | Phase D Task 39B2c L3c3c-ii-c0b-iv-a-r review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-a-r-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-a-r-review.md) |
 | Phase D Task 39B2c L3c3c-ii-c0b-iv-b1a review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1a-review.md) |
+| Phase D Task 39B2c L3c3c-ii-c0b-iv-b1b-i review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-i-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-i-review.md) |
 | Phase D Task 39B2c L3c3c-ii-a installed-driver observation review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md) |
 | Phase D Task 39B2c L3c3c-ii-b handoff composition split preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md) |
 | Phase D Task 39B2c L3c3c-ii-b0 exact wire contract preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b0-wire-contract-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b0-wire-contract-preflight.md) |
@@ -819,8 +824,9 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   iv-b1b Darwin/structural closure → iv-b2 zero-argument executable/verifier
   closure；iv-a0、iv-a-r 与 iv-b1a 已完成并保持 non-admitting；iv-b1b 已拆为
   iv-b1b-i exact 3 paths / production ≤1,180 lines 与 iv-b1b-ii exact 5 paths，
-  iv-b1 aggregate exact 14 paths；当前 frontier 为 iv-b1b-i Step 4 RED tests，
-  后续为 iv-b1b-ii → iv-b2 → ii-c
+  iv-b1 aggregate exact 14 paths；iv-b1b-i 已以 `41d34f2` / tree `8ab58932`、
+  806/806 affected、Release target 与两组终审完成；当前 frontier 为
+  iv-b1b-ii → iv-b2 → ii-c
   privileged no-model gate → L3c3d → L3c4。
   ADR 0018 仍 Proposed；L3c4 独占 final admission 与
   剩余 full。
