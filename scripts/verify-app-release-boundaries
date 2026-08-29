@@ -82,6 +82,7 @@ iic0biii2a_darwin_source=
 iic0biii2a_entry_source=
 iic0biii2a_verifier_source=
 iic0biii2a_component_boundary_only=false
+iic0bivb2_component_boundary_only=false
 iic0biii2a_closed_image_scan_contract_only=false
 iic0biii2a_closed_image_scan_source=
 iib5biii_a_source_contract_only=false
@@ -185,6 +186,8 @@ elif [[ ($# == 6 || $# == 7) \
     iic0biii2a_verifier_source=${7:-${ZSH_SCRIPT:A}}
 elif [[ $# == 1 && $1 == --iic0b-iii-2a-component-boundary-only ]]; then
     iic0biii2a_component_boundary_only=true
+elif [[ $# == 1 && $1 == --iic0b-iv-component-boundary-only ]]; then
+    iic0bivb2_component_boundary_only=true
 elif [[ $# == 2 && $1 == --iic0b-iii-2a-closed-image-scan-contract-only ]]; then
     iic0biii2a_closed_image_scan_contract_only=true
     iic0biii2a_closed_image_scan_source=$2
@@ -1948,7 +1951,7 @@ target = re.findall(
     r'dependencies:\s*\[(?P<dependencies>.*?)\]\s*\)', package,
 )
 if len(target) != 1 or re.findall(r'"([^"]+)"', target[0]) != [
-    "StornautInvestigationHandoffContract"
+    "StornautInvestigationHandoffContract", "StornautInvestigationMachineGateSupport"
 ]:
     raise SystemExit("ii-c0b-ii-b target dependency surface drifted")
 products = package.split("    targets: [", 1)[0]
@@ -1964,8 +1967,8 @@ observed_sources = sorted(
     str(path.relative_to(source_root)) for path in source_root.rglob("*.swift")
 )
 if observed_sources != [
-    "InvestigationMachineGateOwnership.swift",
-    "InvestigationOwnerOnlyCapsule.swift",
+    "DarwinInvestigationFixedGateHandoffSystem.swift", "InvestigationFixedGateDarwinLifecycle.swift", "InvestigationFixedGateHandoff.swift",
+    "InvestigationMachineGateHandoffReceipt.swift", "InvestigationMachineGateOwnership.swift", "InvestigationOwnerOnlyCapsule.swift",
 ]:
     raise SystemExit("ii-c0b-ii-b target source inventory drifted")
 if re.search(r"(?m)^\s*(?:public|open)\s+", capsule) \
@@ -2381,7 +2384,7 @@ PY
 }
 
 function verify_iic0biii2a_closed_image() (
-    local file=$1 kind symbols strings combined inventory
+    local file=$1 kind symbols strings combined inventory marker
     if [[ -d $file ]]; then
         inventory=$(mktemp "${TMPDIR:-/tmp}/stornaut-iic0biii2a-inventory.XXXXXX")
         trap 'rm -f "$inventory"' EXIT
@@ -2409,11 +2412,9 @@ function verify_iic0biii2a_closed_image() (
         return 1
     }
     combined="$symbols$strings"
-    [[ "$combined" != *'StornautInvestigationMachineGateSupport.'* ]] || {
-        print -u2 \
-            "ii-c0b-iii-2a GateSupport namespace leaked into a closed image: $file"
-        return 1
-    }
+    for marker in 'StornautInvestigationMachineGateSupport.' 'StornautInvestigationMachineGateCoordinatorSupport.' 'stornaut.task39.machine.gate-coordinator-receipt.v1'; do
+        [[ "$combined" != *"$marker"* ]] || { print -u2 "ii-c0b-iii-2a forbidden namespace or receipt domain leaked into a closed image: $file: $marker"; return 1; }
+    done
 )
 
 function verify_iic0biii2a_component_boundary() {
@@ -2619,6 +2620,43 @@ function verify_iic0biii2a_component_boundary() {
     rm -rf "$scratch"
     return $result_code
 }
+
+function verify_iic0bivb2_component_boundary() (
+    python3 - "${STORNAUT_IIC0BIVB2_COMPONENT_SOURCE:-${ZSH_SCRIPT:A}}" <<'PY'
+from pathlib import Path
+import sys
+s=Path(sys.argv[1]).read_text(); a=s.index('\nfunction verify_iic0bivb2_component_boundary() (')+1; c=s.index('\nfunction verify_iic0biii2a_closed_image() (')+1; body=s[a:s.index('\nfunction verify_iib5biii_a_source_contract()',a)]; scanner=s[c:s.index('\nfunction verify_iic0biii2a_component_boundary()',c)]
+required=['verify_iic0biii2a_'+'component_boundary || exit $?', 'StornautInvestigationMachineGateCoordinatorSupport.', 'stornaut.task39.machine.gate-coordinator-receipt.v1']
+if body.count(required[0]) != 1 or any(scanner.count(x) != 1 for x in required[1:]): raise SystemExit('ii-c0b-iv component call-edge drifted')
+PY
+    verify_iic0biii2a_component_boundary || exit $?
+    local scratch=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-iic0bivb2-component.XXXXXX")
+    trap 'rm -rf "$scratch"' EXIT
+    local configuration binary symbols strings marker
+    for configuration in debug release; do
+        swift build --scratch-path "$scratch/$configuration" --configuration "$configuration" --product StornautInvestigationMachineGateCoordinator || exit $?
+        binary=$(swift build --scratch-path "$scratch/$configuration" --configuration "$configuration" --show-bin-path)/StornautInvestigationMachineGateCoordinator
+        [[ -f $binary && ! -L $binary ]] || exit 1
+        symbols=$(xcrun nm -j "$binary" | xcrun swift-demangle) || exit $?
+        strings=$(xcrun strings -a "$binary") || exit $?
+        if [[ $configuration == debug ]]; then
+            for marker in 'InvestigationMachineGateCoordinatorSupport.run()' 'InvestigationMachineGateCoordinatorOwnedAttempt' 'InvestigationMachineGateCoordinatorReceiptV1'
+            do [[ "$symbols" == *"$marker"* ]] || {
+                print -u2 "ii-c0b-iv Debug coordinator positive control is missing: $marker"
+                exit 1
+            }; done
+        else
+            [[ "$symbols$strings" != *'InvestigationMachineGateCoordinatorOwnedAttempt'* \
+                && "$symbols$strings" != *'gate-coordinator-receipt.v1'* ]] || {
+                print -u2 "ii-c0b-iv coordinator implementation leaked into Release"
+                exit 1
+            }
+            local coordinator_exit=0
+            "$binary" >/dev/null 2>&1 || coordinator_exit=$?
+            [[ $coordinator_exit == 78 ]] || exit 1
+        fi
+    done
+)
 
 function verify_iib5biii_a_source_contract() {
     local single_epoch_path=$1
@@ -4222,6 +4260,11 @@ fi
 if $iic0biii2a_component_boundary_only; then
     verify_iic0biii2a_component_boundary
     print "ii-c0b-iii-2a Gate final-Mach-O boundary verification passed."
+    exit 0
+fi
+if $iic0bivb2_component_boundary_only; then
+    verify_iic0bivb2_component_boundary
+    print "ii-c0b-iv coordinator/Gate component boundary verification passed."
     exit 0
 fi
 if $iic0biii2a_closed_image_scan_contract_only; then
@@ -6763,6 +6806,6 @@ xcodebuild -quiet \
     -only-testing:StornautInvestigationDiagnosticAppTests \
     test
 verify_iic0biia3_component_boundary "$derived_data" "$diagnostic_derived_data"
-verify_iic0biii2a_component_boundary "$derived_data" "$diagnostic_derived_data"
+verify_iic0bivb2_component_boundary
 
 print "Release App fixture boundary verification passed."

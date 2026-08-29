@@ -373,7 +373,7 @@ re-preflight.
 
 ### 4.3 iv-b2 — zero-argument executable and verifier closure
 
-Exactly ten non-document paths, at most 3,800 changed lines:
+Exactly ten non-document paths, at most 4,000 changed lines:
 
 1. `Package.swift`;
 2. `Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift` (new);
@@ -386,7 +386,7 @@ Exactly ten non-document paths, at most 3,800 changed lines:
 9. `scripts/verify-investigation-boundaries`; and
 10. `scripts/verify-app-release-boundaries`.
 
-An eleventh path or line 3,801 blocks implementation. iv-b2 owns the sole executable
+An eleventh path or line 4,001 blocks implementation. iv-b2 owns the sole executable
 entry, aggregate source/scope/mutation/component/final-Mach-O closure, immutable
 replay of c0b-i/ii/iii and the one c0b staged-only serial. It may not modify the
 already sealed gate sources.
@@ -547,3 +547,16 @@ evidence campaign containing the logically distinct ii-c/L3c3d/L3c4 phases.
 Local findings and repairs must remain in their owning package rather than
 creating new recursive prerequisites. L3c4 alone owns final admission and the
 remaining authoritative full verifier.
+
+## 10. iv-b2 safety-budget amendment — 2026-08-30
+
+The original 3,800-line ceiling left only two lines after the required
+mutation-resistant verifier closure. Independent review then found two
+in-scope safety defects: the final receipt reused inner-gate timestamps instead
+of enclosing post-settlement retirement, and an outer attempt directory could
+be created before its rollback identity became available. The exact ten-path
+scope is unchanged, but the ceiling is raised by 200 changed lines to 4,000,
+still within the repository's mandatory split threshold. The additional budget
+is exclusively for coordinator-level monotonic evidence, identity-bound
+bootstrap rollback, fail-once tests and pathname-replacement negative evidence;
+it adds no product availability, root/model execution or cleanup authority.

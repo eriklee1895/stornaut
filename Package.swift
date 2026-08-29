@@ -165,6 +165,9 @@ let package = Package(
                 "StornautCore",
                 "StornautInvestigation",
                 "StornautInvestigationDiagnostic",
+                "StornautInvestigationHandoffContract",
+                "StornautInvestigationMachineGateSupport",
+                "StornautInvestigationMachineLaunchSupport",
             ],
             resources: [
                 .copy("Resources/InvestigationMachineBuildInputs.json"),
@@ -279,6 +282,13 @@ let package = Package(
                 "StornautInvestigationMachineGateSupport",
             ],
             path: "Tools/StornautInvestigationMachineGate"
+        ),
+        .executableTarget(
+            name: "StornautInvestigationMachineGateCoordinator",
+            dependencies: [
+                "StornautInvestigationMachineGateCoordinatorSupport",
+            ],
+            path: "tools/StornautInvestigationMachineGateCoordinator"
         ),
         .executableTarget(
             name: "StornautInvestigationBuildReceiptGenerator",

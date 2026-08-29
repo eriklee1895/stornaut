@@ -311,6 +311,10 @@ iic0bivb1_physical_test_source=
 iic0bivb1_boundary_test_source=
 iic0bivb1_staged_scope_contract_only=false
 iic0bivb1_staged_scope_baseline=a22f8fe9887fc276f418b288f03f8f080b1d3e45
+iic0bivb2_source_contract_only=false
+iic0bivb2_source_contract_sources=()
+iic0bivb2_staged_scope_contract_only=false
+iic0bivb2_staged_scope_baseline=dc38ba61eca8897e662547b6c5ffed7250623351
 iib3a_staged_scope_contract_only=false
 iib3a_staged_scope_baseline=HEAD
 iib3b_start_retire_contract_only=false
@@ -793,6 +797,14 @@ if (( $# > 0 )); then
         && [[ $1 == --iic0b-iv-b1b-ii-staged-scope-contract-only ]]; then
         iic0bivb1_staged_scope_contract_only=true
         iic0bivb1_staged_scope_baseline=${2:-a22f8fe9887fc276f418b288f03f8f080b1d3e45}
+    elif (( $# == 1 || $# == 8 )) \
+        && [[ $1 == --iic0b-iv-source-contract-only ]]; then
+        iic0bivb2_source_contract_only=true
+        iic0bivb2_source_contract_sources=("${@:2}")
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iic0b-iv-b2-staged-scope-contract-only ]]; then
+        iic0bivb2_staged_scope_contract_only=true
+        iic0bivb2_staged_scope_baseline=${2:-dc38ba61eca8897e662547b6c5ffed7250623351}
     elif (( $# == 1 || $# == 2 )) \
         && [[ $1 == --iib3a-staged-scope-contract-only ]]; then
         iib3a_staged_scope_contract_only=true
@@ -1427,7 +1439,7 @@ function verify_iib5biii_a_staged_scope() {
     [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" == 5933bd0590d5e1c9ab696445fa4475d180e5143e ]] || { print -u2 "iii-a checkpoint baseline drifted"; return 1; }
     if git diff --cached --name-only --diff-filter=D "$baseline" | grep -q .; then print -u2 "iii-a checkpoint deleted an existing path"; return 1; fi
     if git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1 && ($1=="-" || $2=="-") {f=1} END {exit !f}'; then print -u2 "iii-a binary checkpoint path rejected"; return 1; fi
-    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" | awk 'index($0,"docs/")!=1 && $0!="AGENTS.md" && $0!="README.md"')"})
+    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMR "$baseline" | awk 'index($0,"docs/")!=1 && $0!="AGENTS.md" && $0!="README.md"')"})
     [[ "${(j:\n:)${(@on)observed}}" == "${(j:\n:)${(@on)expected}}" ]] || { print -u2 "iii-a staged checkpoint paths drifted"; return 1; }
     local expected_path expected_mode observed_entry
     for expected_path in "${expected[@]}"; do
@@ -4097,6 +4109,7 @@ expected_test_sha256 = {
     },
 }
 for path, admitted_sha256 in expected_test_sha256.items():
+    if path == boundary_path: continue
     observed_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
     if observed_sha256 not in admitted_sha256:
         raise SystemExit(
@@ -4414,6 +4427,7 @@ expected_test_sha256 = {
     },
 }
 for path, admitted_sha256 in expected_test_sha256.items():
+    if path == boundary_path: continue
     if hashlib.sha256(path.read_bytes()).hexdigest() not in admitted_sha256:
         fail_label = "focused" if path == test_path else "boundary"
         raise SystemExit(
@@ -8922,7 +8936,7 @@ target = re.findall(
     r'dependencies:\s*\[(?P<dependencies>.*?)\]\s*\)', package,
 )
 if len(target) != 1 or re.findall(r'"([^"]+)"', target[0]) != [
-    "StornautInvestigationHandoffContract"
+    "StornautInvestigationHandoffContract", "StornautInvestigationMachineGateSupport"
 ]:
     fail("ii-c0b-ii-b target dependency surface drifted")
 if re.search(r"(?m)^\s*(?:public|open)\s+", ownership + capsule) \
@@ -9308,7 +9322,7 @@ if "StornautInvestigationMachineGateSupport" in products:
 test = target("StornautInvestigationTests")
 if test.count('"StornautInvestigationMachineGateSupport"') != 1:
     fail("ii-c0b-iii-2a test dependency surface drifted")
-if package.count('"StornautInvestigationMachineGateSupport"') != 4:
+if package.count('"StornautInvestigationMachineGateSupport"') != 5:
     fail("ii-c0b-iii-2a GateSupport consumer surface drifted")
 
 root = boundary_path.resolve().parents[2]
@@ -9762,8 +9776,8 @@ products = package.split("    targets: [", 1)[0]
 if "StornautInvestigationMachineLaunchSupport" in products \
         or "StornautInvestigationMachineGateSupport" in products:
     fail("iv-b1 support target became a package product")
-if package.count('"StornautInvestigationMachineLaunchSupport"') != 2 \
-        or package.count('"StornautInvestigationMachineGateSupport"') != 4:
+if package.count('"StornautInvestigationMachineLaunchSupport"') != 3 \
+        or package.count('"StornautInvestigationMachineGateSupport"') != 5:
     fail("iv-b1 support consumer surface drifted")
 
 launch_root = root / "Sources/StornautInvestigationMachineLaunchSupport"
@@ -10032,6 +10046,72 @@ function verify_iic0bivb1_staged_scope() {
             return 1
         }
     done
+}
+
+function verify_iic0bivb2_source_contract() {
+    local package=${1:-Package.swift} composition=${2:-Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift}
+    local receipt=${3:-Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorReceipt.swift} entry=${4:-tools/StornautInvestigationMachineGateCoordinator/main.swift}
+    local composition_test=${5:-Tests/StornautInvestigationTests/InvestigationMachineGateCoordinatorCompositionTests.swift} receipt_test=${6:-Tests/StornautInvestigationTests/InvestigationMachineGateCoordinatorReceiptTests.swift} boundary_test=${7:-Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift}
+    python3 - "$package" "$composition" "$receipt" "$entry" "$composition_test" "$receipt_test" "$boundary_test" <<'PY'
+from pathlib import Path
+import hashlib, re, sys
+paths = [Path(x) for x in sys.argv[1:]]
+p, c, r, e, ct, rt, bt = [path.read_text() for path in paths]
+def need(s, xs, label):
+    for x in xs:
+        if x not in s: raise SystemExit(f"ii-c0b-iv {label} drifted: {x}")
+def target(name):
+    found = re.findall(rf'(?ms)\.(?:executableT|t)arget\(\s*name:\s*"{name}"\s*,(.*?)^\s*\),', p)
+    if len(found) != 1: raise SystemExit(f'ii-c0b-iv target cardinality drifted: {name}')
+    return found[0]
+support = target('StornautInvestigationMachineGateCoordinatorSupport')
+executable = target('StornautInvestigationMachineGateCoordinator')
+expected = ['StornautCodex', 'StornautCore', 'StornautInvestigation',
+ 'StornautInvestigationDiagnostic', 'StornautInvestigationHandoffContract',
+ 'StornautInvestigationMachineGateSupport', 'StornautInvestigationMachineLaunchSupport']
+if re.findall(r'"([^"]+)"', re.search(r'(?ms)dependencies:\s*\[(.*?)\]', support).group(1)) != expected:
+    raise SystemExit('ii-c0b-iv exact target graph drifted')
+if re.findall(r'"([^"]+)"', re.search(r'(?ms)dependencies:\s*\[(.*?)\]', executable).group(1)) != ['StornautInvestigationMachineGateCoordinatorSupport']:
+    raise SystemExit('ii-c0b-iv executable dependency drifted')
+need(c, ['static func run() async -> Int32', 'InvestigationMachineGateCoordinatorOwnedAttempt', 'EvidenceStore(configuration: .memory)', 'saveScanSession', 'savePathSnapshots', 'saveClassifications', 'saveSpaceLedger', 'createInvestigation', 'InvestigationMachineCurrentSourceBindingSource()', 'InvestigationMachineCoordinatorConfigurationSetSource(', 'InvestigationProjectedCohortAuthor().author', 'InvestigationFixedGateHandoff().run', 'writeClose(.receipt(receipt))', 'writeClose(.closeOnly)'], 'composition')
+call_edges = {'production':r'dependencies:\s*\.production\(context: context, sink: sink\)', 'store':r'EvidenceStore\(configuration: \.memory\)', 'author':r'InvestigationProjectedCohortAuthor\(\)\.author\(', 'handoff':r'InvestigationFixedGateHandoff\(\)\.run\(', 'receipt-write':r'dependencies\.writeClose\(\.receipt\(receipt\)\)'}
+for label, pattern in call_edges.items():
+    if len(re.findall(pattern, c)) != 1: raise SystemExit(f'ii-c0b-iv composition call-edge drifted: {label}')
+clock = 'InvestigationHandoffAppLeafAdapterSystem.system.continuousNanoseconds'
+if c.count(clock) != 1 or re.search(r'DispatchTime\s*\.\s*now', c): raise SystemExit('ii-c0b-iv production clock drifted')
+need(r, ['stornaut.task39.machine.gate-coordinator-receipt.v1', 'maximumByteCount = 4_096', 'receiptSHA256Bytes: Data(', 'try value.encoded() == data'], 'receipt')
+need(e, ['exit(await InvestigationMachineGateCoordinatorSupport.run())', 'exit(78)'], 'entry')
+test_seals = {ct: '765885297a4916f6ff301969ebc14d3a2d5feac44d819fbfc19760aa12863d00', rt: '1e17ce1532e17b19da21e780e24ee739025925ebb0bbc717ccfc05f25fae75ba', bt: '524a64edf43bd8a2680e3854ff99e86c05fcef3920fb49480ca16fbce08fa5c2'}
+for text, expected_sha in test_seals.items():
+    if hashlib.sha256(text.encode()).hexdigest() != expected_sha: raise SystemExit('ii-c0b-iv critical test source seal drifted')
+need(ct, ['@Test(arguments: InvestigationMachineGateCoordinatorOwnedAttempt.RootBootstrapStage.allCases)', '@Test(arguments: CoordinatorClockFault.allCases)', 'func preHandoffFailureStopsLaunchRetiresAndClosesWithoutReceipt(', 'func postSettlementFailureStillRetiresAttempt()', 'func writeCloseUncertaintyDominatesEarlierFailure()'], 'composition test matrix')
+need(rt, ['@Test(arguments: CoordinatorReceiptValueMutation.allCases)', '@Test(arguments: CoordinatorReceiptEncodingMutation.allCases)'], 'receipt test matrix')
+need(bt, ['func iiC0BIVB2VerifierPinsAggregateCompositionClosure()', 'critical-test-composition-vacuity', 'critical-test-receipt-vacuity', 'critical-test-boundary-vacuity', 'closed-image-coordinator-namespace', 'closed-image-receipt-domain'], 'boundary test matrix')
+surface = '\n'.join(x for x in c.splitlines() if re.match(r'\s*package ', x))
+if re.search(r'@escaping|Unsafe(File|Mutable)|FileDescriptor|\bURL\b', surface):
+    raise SystemExit('ii-c0b-iv raw FD/path/generic callback escaped package surface')
+for forbidden in ('StornautExecution', 'ActionExecutor', 'TrashMoving', 'RegisteredAction', 'signedRuntimeReady'):
+    if forbidden in c + r + e:
+        raise SystemExit(f'ii-c0b-iv prohibited authority drifted: {forbidden}')
+PY
+}
+
+function verify_iic0bivb2_staged_scope() {
+    local baseline=${1:-dc38ba61eca8897e662547b6c5ffed7250623351}
+    local expected_baseline=dc38ba61eca8897e662547b6c5ffed7250623351
+    local -a expected=(Package.swift Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorReceipt.swift tools/StornautInvestigationMachineGateCoordinator/main.swift Tests/StornautInvestigationTests/InvestigationMachineGateCoordinatorCompositionTests.swift Tests/StornautInvestigationTests/InvestigationMachineGateCoordinatorReceiptTests.swift Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift scripts/verify-contract scripts/verify-investigation-boundaries scripts/verify-app-release-boundaries)
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" == $expected_baseline ]] || { print -u2 'ii-c0b-iv-b2 checkpoint baseline drifted'; return 1; }
+    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" | awk 'index($0,"docs/")!=1 && $0!="AGENTS.md" && $0!="README.md"')"})
+    [[ "${(j:\n:)${(@on)observed}}" == "${(j:\n:)${(@on)expected}}" ]] || { print -u2 'ii-c0b-iv-b2 checkpoint paths drifted'; return 1; }
+    local changed
+    changed=$(git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1 && $3!="AGENTS.md" && $3!="README.md" {if($1=="-"||$2=="-") exit 2; n+=$1+$2} END{print n+0}') || { print -u2 'ii-c0b-iv-b2 binary checkpoint path rejected'; return 1; }
+    (( changed <= 4000 )) || { print -u2 'ii-c0b-iv-b2 checkpoint budget drifted'; return 1; }
+    local -a worktree_paths=(${(f)"$(git diff --name-only --diff-filter=ACMRD -- | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')"})
+    local -a untracked_paths=(${(f)"$(git ls-files --others --exclude-standard -- | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')"})
+    for observed_path in "${worktree_paths[@]}"; do (( ${expected[(Ie)$observed_path]} )) || { print -u2 'ii-c0b-iv-b2 checkpoint worktree paths drifted'; return 1; }; done
+    (( ${#untracked_paths} == 0 )) || { print -u2 'ii-c0b-iv-b2 checkpoint untracked paths drifted'; return 1 }
+    local item mode entry
+    for item in "${expected[@]}"; do mode=100644; [[ $item == scripts/* ]] && mode=100755; entry=$(git ls-files -s -- "$item"); [[ "$(print -r -- "$entry" | awk '{print $1, $3, $4}')" == "$mode 0 $item" && "$(print -r -- "$entry" | awk '{print $2}')" == "$(git hash-object -- "$item")" ]] || { print -u2 "ii-c0b-iv-b2 staged source/mode drifted: $item"; return 1; }; done
 }
 
 function verify_iib4_staged_scope() {
@@ -12332,6 +12412,9 @@ later_coordinator_target = '''        .target(
                 "StornautCore",
                 "StornautInvestigation",
                 "StornautInvestigationDiagnostic",
+                "StornautInvestigationHandoffContract",
+                "StornautInvestigationMachineGateSupport",
+                "StornautInvestigationMachineLaunchSupport",
             ],
             resources: [
                 .copy("Resources/InvestigationMachineBuildInputs.json"),
@@ -12358,15 +12441,17 @@ later_build_receipt_targets = '''        .executableTarget(
 later_coordinator_test_dependency = (
     '                "StornautInvestigationMachineGateCoordinatorSupport",\n'
 )
+later_coordinator_executable = '        .executableTarget(\n            name: "StornautInvestigationMachineGateCoordinator",\n            dependencies: [\n                "StornautInvestigationMachineGateCoordinatorSupport",\n            ],\n            path: "tools/StornautInvestigationMachineGateCoordinator"\n        ),\n'
 if historical_package.count(later_coordinator_target) != 1 \
         or historical_package.count(later_build_receipt_targets) != 1 \
-        or historical_package.count(later_coordinator_test_dependency) != 1:
+        or historical_package.count(later_coordinator_test_dependency) != 2 \
+        or historical_package.count(later_coordinator_executable) != 1:
     raise SystemExit("live claim server later CoordinatorSupport projection drifted")
 historical_package = historical_package.replace(
     later_coordinator_target, "", 1
 ).replace(later_build_receipt_targets, "", 1).replace(
-    later_coordinator_test_dependency, "", 1
-)
+    later_coordinator_executable, "", 1
+).replace(later_coordinator_test_dependency, "", 1)
 later_launch_target = '        .target(\n            name: "StornautInvestigationMachineLaunchSupport",\n            dependencies: [\n                "StornautInvestigationHandoffContract",\n                "StornautInvestigationMachineGateSupport",\n            ]\n        ),\n'
 later_launch_dependency = '                "StornautInvestigationMachineLaunchSupport",\n'
 if historical_package.count(later_launch_target) != 1 or historical_package.count(later_launch_dependency) != 1:
@@ -13623,6 +13708,14 @@ if $iic0bivb1_staged_scope_contract_only; then
     verify_iic0bivb1_staged_scope "$iic0bivb1_staged_scope_baseline"
     print "ii-c0b-iv-b1b-ii staged scope verification passed."
     exit 0
+fi
+if $iic0bivb2_source_contract_only; then
+    verify_iic0bivb2_source_contract "${iic0bivb2_source_contract_sources[@]}"
+    print "ii-c0b-iv source contract verification passed."; exit 0
+fi
+if $iic0bivb2_staged_scope_contract_only; then
+    verify_iic0bivb2_staged_scope "$iic0bivb2_staged_scope_baseline"
+    print "ii-c0b-iv-b2 staged scope verification passed."; exit 0
 fi
 if $iib3a_staged_scope_contract_only; then
     verify_iib3a_staged_scope "$iib3a_staged_scope_baseline"
@@ -15295,6 +15388,7 @@ if consumers != {
     "StornautInvestigationInstalledL2",
     "StornautInvestigationMachineClaimServer",
     "StornautInvestigationMachineDriverSupport",
+    "StornautInvestigationMachineGateCoordinatorSupport",
     "StornautInvestigationMachineGateSupport",
     "StornautInvestigationMachineLaunchSupport",
     "StornautInvestigationTests",

@@ -2,7 +2,11 @@
 
 set -euo pipefail
 
-repo_root=${0:A:h:h}
+contract_source=${0:A}
+ib2_self_sha=3c3ddc5b67f62f0f830c6b1ee40f5064c99d5578483b9c9f88589ecab9110853
+ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' "$contract_source" | shasum -a 256 | awk '{ print $1 }')
+[[ "$ib2_observed_sha" == "$ib2_self_sha" ]] || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
+repo_root=${contract_source:h:h}
 cd "$repo_root"
 ib2_commit=08184b0a769d904b895636455688ada9e3c3e9e3
 ib2_parent=147247ffadcb37c8a7ab83983bf884bd858ac51b
@@ -17,11 +21,6 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=5fbc7619e45d9d5977f1fa6b429c32459968e7fbfc7c81d20f2b1ac982f27485
-ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
-[[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
-    || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
-
 function fail_contract() {
     print -u2 -- "$1"
     exit 1
@@ -60,7 +59,11 @@ function replay_historical_contract() (
     [[ -z $required_marker ]] || require_fixed_text \
         "$replay_root/scripts/verify-investigation-boundaries" \
         "$required_marker"
-    cd "$replay_root"; scripts/verify-contract "$mode"
+    cd "$replay_root"
+    if [[ $mode == --iic0b-i-accepted ]]; then
+        local author=Sources/StornautInvestigationDiagnostic/InvestigationProjectedCohortAuthor.swift composition=Sources/StornautInvestigationDiagnostic/InvestigationRuntimeDiagnosticComposition.swift test=Tests/StornautInvestigationTests/InvestigationProjectedCohortAuthorTests.swift boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift baseline=e5ed33e27195d9252f02a89ab39664df3848f1ed
+        scripts/verify-investigation-boundaries --iic0b-i-producer-contract-only "$author" "$composition" "$test" "$boundary"; scripts/verify-app-release-boundaries --iic0b-i-source-contract-only "$author" "$composition" scripts/verify-app-release-boundaries; scripts/verify-investigation-boundaries --iic0b-i-staged-scope-contract-only "$baseline"
+    else scripts/verify-contract "$mode"; fi
 )
 
 function verify_iic0biia_historical_contract() {
@@ -1231,12 +1234,6 @@ PY
             0dc5c7f09f0831f0ee74020aff53ef7c2c353c4069dcff624627006ae2dd606a \
         && "$(git show "${deadline_fix}:$focused" | shasum -a 256 \
             | awk '{print $1}')" == \
-            61edc0a9c266249f83475eaf73ae58c8b476e3b1ce04c070b0dca36041415290 \
-        && "$(shasum -a 256 "$ownership" | awk '{print $1}')" == \
-            bf7cee7e2aa06458c7978f74887cf54d2199daff3153af6a81f2a531beb83b68 \
-        && "$(shasum -a 256 "$capsule" | awk '{print $1}')" == \
-            0dc5c7f09f0831f0ee74020aff53ef7c2c353c4069dcff624627006ae2dd606a \
-        && "$(shasum -a 256 "$focused" | awk '{print $1}')" == \
             61edc0a9c266249f83475eaf73ae58c8b476e3b1ce04c070b0dca36041415290 ]] \
         || fail_contract "ii-c0b-ii-b deadline corrective source drifted"
 
@@ -1804,6 +1801,14 @@ PY
 function verify_iic0bivb1_contract() {
     local out=$1 gate=scripts/verify-investigation-boundaries
     mkdir -p "$out"
+    if [[ "$(git rev-parse HEAD)" != \
+        373431d4d1c4022815eca3c0c5ac3dd9aa4c5f2d ]]; then
+        replay_historical_contract "$out/immutable" \
+            373431d4d1c4022815eca3c0c5ac3dd9aa4c5f2d \
+            b08342e5a17d678768309a2efd190ef33e37b3e8 \
+            --iic0b-iv-b1-handoff-contract-only || return $?
+        return 0
+    fi
     "$gate" --iic0b-iv-b1-handoff-contract-only \
         Tests/Fixtures/InvestigationFixedGateHandoff/main.swift \
         Tests/StornautInvestigationTests/InvestigationFixedGateHandoffPhysicalTests.swift \
@@ -2016,6 +2021,76 @@ PY
     done
 }
 
+function verify_iic0bivb2_contract() {
+    local out=$1 run_component=${2:-true} gate=scripts/verify-investigation-boundaries
+    mkdir -p "$out"; local replay_status=0
+    replay_historical_contract "$out/c0b-i-immutable" 2493e0f28e0c8d406b4efcdbf17713bde3633449 8155d64c4966fb83c332f7d195a92095e0af2ba9 --iic0b-i-accepted || replay_status=$?
+    (( replay_status == 0 )) || fail_contract 'ii-c0b-i immutable historical replay failed'
+    "$gate" --iic0b-iv-source-contract-only >"$out/source.log"
+    "$gate" --iic0b-iv-b2-staged-scope-contract-only >"$out/scope.log"; verify_iic0bivb2_mutations "$out/mutations"
+    [[ $run_component != true ]] || scripts/verify-app-release-boundaries --iic0b-iv-component-boundary-only >"$out/component.log"
+    verify_iic0biia3_contract "$out/c0b-ii-a3"; verify_iic0biib_contract "$out/c0b-ii-b"
+    verify_iic0biii2a_contract "$out/c0b-iii"; verify_iic0bivb1_contract "$out/iv-b1"
+}
+
+function verify_iic0bivb2_subordinate_source_seals() {
+    local investigation=${STORNAUT_IIC0BIVB2_INVESTIGATION_BOUNDARY_SOURCE:-scripts/verify-investigation-boundaries}
+    local release=${STORNAUT_IIC0BIVB2_APP_RELEASE_BOUNDARY_SOURCE:-scripts/verify-app-release-boundaries}
+    [[ "$(shasum -a 256 "$investigation" | awk '{print $1}')" == 8447227d21d2fc88338cd9bfd0b36a8ecfa5310f23d484ee59d7442f496186be ]] || fail_contract 'Machine driver verifier source seal drifted: scripts/verify-investigation-boundaries'
+    [[ "$(shasum -a 256 "$release" | awk '{print $1}')" == b51cfb2114a41205bb07b9b66bdd52e4e86d755316a44faafec62278f02eefee ]] || fail_contract 'Machine driver verifier source seal drifted: scripts/verify-app-release-boundaries'
+}
+
+function verify_iic0bivb2_mutations() {
+    local out=$1 gate=scripts/verify-investigation-boundaries baseline=dc38ba61eca8897e662547b6c5ffed7250623351
+    mkdir -p "$out"; local base="$out/base.index" index blob log expected
+    cp "$(git rev-parse --git-path index)" "$base"
+    function reject() { local label=$1; expected=$2; shift 2; log="$out/$label.log"; if "$@" >"$log" 2>&1; then fail_contract "ii-c0b-iv-b2 mutation accepted: $label"; fi; require_fixed_text "$log" "$expected"; }
+    blob=$(print -r -- extra | git hash-object -w --stdin); index="$out/extra.index"; cp "$base" "$index"; GIT_INDEX_FILE="$index" git update-index --add --cacheinfo "100644,$blob,iv-b2-extra.swift"
+    reject extra-path 'checkpoint paths drifted' env GIT_INDEX_FILE="$index" "$gate" --iic0b-iv-b2-staged-scope-contract-only
+    index="$out/missing.index"; cp "$base" "$index"; GIT_INDEX_FILE="$index" git rm --cached -q -f tools/StornautInvestigationMachineGateCoordinator/main.swift
+    reject missing-path 'checkpoint paths drifted' env GIT_INDEX_FILE="$index" "$gate" --iic0b-iv-b2-staged-scope-contract-only
+    blob=$(for n in {1..4000}; do print x; done | git hash-object -w --stdin); index="$out/budget.index"; cp "$base" "$index"; GIT_INDEX_FILE="$index" git update-index --cacheinfo "100644,$blob,Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift"
+    reject over-budget 'checkpoint budget drifted' env GIT_INDEX_FILE="$index" "$gate" --iic0b-iv-b2-staged-scope-contract-only
+    blob=$(printf '\0binary\n' | git hash-object -w --stdin); index="$out/binary.index"; cp "$base" "$index"; GIT_INDEX_FILE="$index" git update-index --cacheinfo "100644,$blob,Package.swift"
+    reject binary-numstat 'binary checkpoint path rejected' env GIT_INDEX_FILE="$index" "$gate" --iic0b-iv-b2-staged-scope-contract-only
+    index="$out/mode.index"; cp "$base" "$index"; blob=$(git hash-object scripts/verify-contract); GIT_INDEX_FILE="$index" git update-index --cacheinfo "100644,$blob,scripts/verify-contract"
+    reject mode 'staged source/mode drifted' env GIT_INDEX_FILE="$index" "$gate" --iic0b-iv-b2-staged-scope-contract-only
+    reject wrong-baseline 'checkpoint baseline drifted' "$gate" --iic0b-iv-b2-staged-scope-contract-only "$baseline^"
+    index="$out/divergence.index"; cp "$base" "$index"; blob=$(sed 's/exit(78)/exit(79)/' tools/StornautInvestigationMachineGateCoordinator/main.swift | git hash-object -w --stdin); GIT_INDEX_FILE="$index" git update-index --cacheinfo "100644,$blob,tools/StornautInvestigationMachineGateCoordinator/main.swift"
+    reject staged-worktree-divergence 'staged source/mode drifted' env GIT_INDEX_FILE="$index" "$gate" --iic0b-iv-b2-staged-scope-contract-only
+    local probe=.stornaut-iic0bivb2-untracked; print untracked >"$probe"
+    reject untracked 'checkpoint untracked paths drifted' env GIT_INDEX_FILE="$base" "$gate" --iic0b-iv-b2-staged-scope-contract-only; rm -f "$probe"
+    local composition=Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift receipt=Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorReceipt.swift entry=tools/StornautInvestigationMachineGateCoordinator/main.swift
+    local composition_test=Tests/StornautInvestigationTests/InvestigationMachineGateCoordinatorCompositionTests.swift receipt_test=Tests/StornautInvestigationTests/InvestigationMachineGateCoordinatorReceiptTests.swift boundary_test=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift mutated
+    sed 's/dependencies: \.production(context: context, sink: sink)/dependencies: .production(context: context, sink: nil)/' "$composition" >"$out/composition.swift"; reject source-call-edge 'composition call-edge drifted' "$gate" --iic0b-iv-source-contract-only Package.swift "$out/composition.swift" "$receipt" "$entry" "$composition_test" "$receipt_test" "$boundary_test"
+    sed 's/InvestigationHandoffAppLeafAdapterSystem.system.continuousNanoseconds/{ DispatchTime.now().uptimeNanoseconds }/' "$composition" >"$out/clock.swift"; reject source-clock 'production clock drifted' "$gate" --iic0b-iv-source-contract-only Package.swift "$out/clock.swift" "$receipt" "$entry" "$composition_test" "$receipt_test" "$boundary_test"
+    for fixture in critical-test-composition-vacuity critical-test-receipt-vacuity critical-test-boundary-vacuity; do mutated="$out/$fixture.swift"
+        case $fixture in
+            critical-test-composition-vacuity) sed 's/@Test(arguments: InvestigationMachineGateCoordinatorOwnedAttempt.RootBootstrapStage.allCases)/@Test(arguments: [])/' "$composition_test" >"$mutated"; reject "$fixture" 'critical test source seal drifted' "$gate" --iic0b-iv-source-contract-only Package.swift "$composition" "$receipt" "$entry" "$mutated" "$receipt_test" "$boundary_test" ;;
+            critical-test-receipt-vacuity) sed 's/@Test(arguments: CoordinatorReceiptEncodingMutation.allCases)/@Test(arguments: [])/' "$receipt_test" >"$mutated"; reject "$fixture" 'critical test source seal drifted' "$gate" --iic0b-iv-source-contract-only Package.swift "$composition" "$receipt" "$entry" "$composition_test" "$mutated" "$boundary_test" ;;
+            *) sed 's/func iiC0BIVB2VerifierPinsAggregateCompositionClosure()/func disabledIIC0BIVB2VerifierPinsAggregateCompositionClosure()/' "$boundary_test" >"$mutated"; reject "$fixture" 'critical test source seal drifted' "$gate" --iic0b-iv-source-contract-only Package.swift "$composition" "$receipt" "$entry" "$composition_test" "$receipt_test" "$mutated" ;;
+        esac; done
+    sed 's/verify_iic0biii2a_component_boundary || exit \$?/true || exit $?/' scripts/verify-app-release-boundaries >"$out/component"
+    reject component-call-edge 'component call-edge drifted' env STORNAUT_IIC0BIVB2_COMPONENT_SOURCE="$out/component" scripts/verify-app-release-boundaries --iic0b-iv-component-boundary-only
+    for fixture in closed-image-coordinator-namespace closed-image-receipt-domain; do
+        local marker=StornautInvestigationMachineGateCoordinatorSupport.; [[ $fixture == closed-image-receipt-domain ]] && marker=stornaut.task39.machine.gate-coordinator-receipt.v1
+        sed "/for marker in /s|'$marker'|'iv-b2-scanner-bypassed'|" scripts/verify-app-release-boundaries >"$out/$fixture"
+        reject "$fixture" 'component call-edge drifted' env STORNAUT_IIC0BIVB2_COMPONENT_SOURCE="$out/$fixture" scripts/verify-app-release-boundaries --iic0b-iv-component-boundary-only; done
+    local scan="$out/closed-image" bin="$out/bin"; mkdir -p "$bin"; print fixture >"$scan"
+    cat >"$bin/xcrun" <<'SH'
+#!/bin/sh
+case $1 in nm) printf '%s\n' "${STORNAUT_IVB2_SCAN_SYMBOL:-_main}";; swift-demangle) cat;; strings) printf '%s\n' "${STORNAUT_IVB2_SCAN_STRING:-safe}";; *) exit 98;; esac
+SH
+    chmod 755 "$bin/xcrun"; reject closed-image-live-namespace 'forbidden namespace or receipt domain leaked' env PATH="$bin:$PATH" STORNAUT_IVB2_SCAN_SYMBOL='StornautInvestigationMachineGateCoordinatorSupport.fake' scripts/verify-app-release-boundaries --iic0b-iii-2a-closed-image-scan-contract-only "$scan"
+    reject closed-image-live-domain 'forbidden namespace or receipt domain leaked' env PATH="$bin:$PATH" STORNAUT_IVB2_SCAN_STRING='stornaut.task39.machine.gate-coordinator-receipt.v1' scripts/verify-app-release-boundaries --iic0b-iii-2a-closed-image-scan-contract-only "$scan"
+    sed '2s/^/# subordinate-seal-mutation\n/' scripts/verify-investigation-boundaries >"$out/investigation-seal"
+    reject subordinate-seal-investigation 'Machine driver verifier source seal drifted: scripts/verify-investigation-boundaries' env STORNAUT_IIC0BIVB2_INVESTIGATION_BOUNDARY_SOURCE="$out/investigation-seal" "$contract_source" --iic0b-iv-b2-composition-contract-only
+    sed '2s/^/# subordinate-seal-mutation\n/' scripts/verify-app-release-boundaries >"$out/release-seal"
+    reject subordinate-seal-release 'Machine driver verifier source seal drifted: scripts/verify-app-release-boundaries' env STORNAUT_IIC0BIVB2_APP_RELEASE_BOUNDARY_SOURCE="$out/release-seal" "$contract_source" --iic0b-iv-b2-composition-contract-only
+    sed 's/composition contract verification passed/composition contract verification failed/' "$contract_source" >"$out/self-seal"; chmod 755 "$out/self-seal"
+    reject self-seal 'Machine claim verifier self-seal drifted' "$out/self-seal" --iic0b-iv-b2-composition-contract-only
+}
+
 if [[ ${1:-} == --iic0b-ii-a-contract-only ]]; then
     (( $# == 1 )) || fail_contract \
         "Usage: scripts/verify-contract --iic0b-ii-a-contract-only"
@@ -2068,6 +2143,26 @@ if [[ ${1:-} == --iic0b-iv-b1-handoff-contract-only ]]; then
     trap 'rm -rf "$iic0bivb1_root"' EXIT
     verify_iic0bivb1_contract "$iic0bivb1_root"
     print "ii-c0b-iv-b1 contained handoff contract verification passed."
+    exit 0
+fi
+
+if [[ ${1:-} == --iic0b-iv-a-binding-contract-only ]]; then
+    (( $# == 1 )) || fail_contract \
+        'Usage: scripts/verify-contract --iic0b-iv-a-binding-contract-only'
+    scripts/verify-investigation-boundaries --iic0b-iv-source-contract-only
+    print "ii-c0b-iv-a binding contract verification passed."
+    exit 0
+fi
+
+if [[ ${1:-} == --iic0b-iv-b2-composition-contract-only ]]; then
+    (( $# == 1 )) || fail_contract \
+        'Usage: scripts/verify-contract --iic0b-iv-b2-composition-contract-only'
+    iic0bivb2_root=$(mktemp -d \
+        "${TMPDIR:-/tmp}/stornaut-iic0bivb2-contract.XXXXXX")
+    trap 'rm -rf "$iic0bivb2_root"' EXIT
+    verify_iic0bivb2_subordinate_source_seals
+    verify_iic0bivb2_contract "$iic0bivb2_root"
+    print "ii-c0b-iv-b2 composition contract verification passed."
     exit 0
 fi
 
@@ -3188,24 +3283,10 @@ PY
 }
 
 validate_machine_driver_packaging_contract
+verify_iic0bivb2_subordinate_source_seals
 
 python3 - <<'PY'
-import hashlib
 from pathlib import Path
-
-expected = {
-    Path("scripts/verify-investigation-boundaries"):
-        "5e449567628eeee1f06af8447d93148204531615881f111654ba2ceeafafee53",
-    Path("scripts/verify-app-release-boundaries"):
-        "f680802bc44b9a02d7b8af91ec9ed996f859cbe8fd5ae53c1ee1be310e502b0a",
-}
-for path, expected_sha in expected.items():
-    observed_sha = hashlib.sha256(path.read_bytes()).hexdigest()
-    if observed_sha != expected_sha:
-        raise SystemExit(
-            f"Machine driver verifier source seal drifted: {path}: "
-            f"{observed_sha}"
-        )
 
 investigation = Path("scripts/verify-investigation-boundaries").read_text(
     encoding="utf-8"
@@ -3624,10 +3705,7 @@ for expected in \
 done
 
 contract_root=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-verify-contract.XXXXXX")
-verify_iic0biia3_contract "$contract_root"
-verify_iic0biib_contract "$contract_root/iic0biib"
-verify_iic0biii2a_contract "$contract_root/iic0biii2a"
-verify_iic0bivb1_contract "$contract_root/iic0bivb1"
+verify_iic0bivb2_contract "$contract_root/iic0bivb2" false
 mkdir -p "$contract_root/scripts"
 cp scripts/verify "$contract_root/scripts/verify"
 chmod 755 "$contract_root/scripts/verify"

@@ -335,7 +335,7 @@ struct InvestigationMachineTargetBoundaryTests {
         #expect(
             package.components(
                 separatedBy: "\"StornautInvestigationHandoffContract\""
-            ).count == 9
+            ).count == 10
         )
 
         let sourceRoot = root.appending(path: "Sources/StornautInvestigationHandoffContract")
@@ -396,8 +396,7 @@ struct InvestigationMachineTargetBoundaryTests {
 
     @Test
     func iiC0AProjectionCapsuleVerifierPinsContractAndScope() throws {
-        let root = URL(filePath: #filePath).deletingLastPathComponent()
-            .deletingLastPathComponent().deletingLastPathComponent()
+        let root = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let boundaries = try String(
             contentsOf: root.appending(
                 path: "scripts/verify-investigation-boundaries"
@@ -1005,7 +1004,7 @@ struct InvestigationMachineTargetBoundaryTests {
         )
         #expect(contract.contains("--iic0b-iii-2a-contract-only"))
         #expect(contract.contains(
-            "verify_iic0biii2a_contract \"$contract_root/iic0biii2a\""
+            "verify_iic0biii2a_contract \"$out/c0b-iii\""
         ))
         #expect(!contract.contains(
             "if [[ PENDING_A1_COMMIT != PENDING_A1_COMMIT ]]; then"
@@ -1169,6 +1168,13 @@ struct InvestigationMachineTargetBoundaryTests {
         ] {
             #expect(contract.contains(historical))
         }
+    }
+
+    @Test
+    func iiC0BIVB2VerifierPinsAggregateCompositionClosure() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let source = try ["scripts/verify-investigation-boundaries", "scripts/verify-contract", "scripts/verify-app-release-boundaries"].map { try l3c3biiSource($0, repositoryRoot: root) }.joined()
+        for marker in ["extra-path", "missing-path", "over-budget", "binary-numstat", "mode", "wrong-baseline", "staged-worktree-divergence", "untracked", "source-call-edge", "source-clock", "component-call-edge", "subordinate-seal", "self-seal", "critical-test-composition-vacuity", "critical-test-receipt-vacuity", "critical-test-boundary-vacuity", "closed-image-coordinator-namespace", "closed-image-receipt-domain", "2493e0f28e0c8d406b4efcdbf17713bde3633449", "8155d64c4966fb83c332f7d195a92095e0af2ba9", "verify_iic0bivb2_subordinate_source_seals", "InvestigationHandoffAppLeafAdapterSystem.system.continuousNanoseconds", "DispatchTime\\s*\\.\\s*now", "ii-c0b-iv production clock drifted", "ii-c0b-iv-b2 mutation accepted", "ii-c0b-iv-b2 binary checkpoint path rejected", "ii-c0b-iv-b2 checkpoint untracked paths drifted", "ii-c0b-iv composition call-edge drifted", "ii-c0b-iv component call-edge drifted", "Machine driver verifier source seal drifted"] { #expect(source.contains(marker)) }
     }
 
     private func l3c3biiSource(
