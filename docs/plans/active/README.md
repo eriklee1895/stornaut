@@ -188,7 +188,8 @@ sequence and c0b-iii fixed gate are complete/non-admitting at accepted checkpoin
 `ced4da2`. The mandatory c0b-iv preflight freezes iv-a0 authoritative binding/
 configuration/source inputs and iv-a-r provenance/App admission closure, then
 dynamically splits the former iv-b1 into iv-b1a typed outcome/injected semantic
-closure and iv-b1b Darwin authority/structural closure before iv-b2's zero-
+closure, iv-b1b-i injected Darwin lifecycle/adapter, and iv-b1b-ii dedicated
+outer-adapter physical/verifier closure before iv-b2's zero-
 argument executable/verifier closure. iv-a0 and iv-a-r are complete/non-
 admitting. iv-b1a is complete/non-admitting at clean index-only snapshot
 `db4e936` / tree `412da586d13fae7fd53937231217778b5d9ffd52`: exactly 6
@@ -196,13 +197,14 @@ non-document paths / +2,113/-3, staged-
 only 48/48 focused and 785/785 affected tests, Debug via tests, Release target
 build exit 0, tests-first closure of four initial-review P1 findings, and three
 independent post-fix groups with no unresolved P0-P2. It ran no global serial,
-full, root, real App/XPC, model or network gate. iv-b1b design review froze
-exactly 6 non-document paths / at most 3,200 changed lines: the narrow Darwin
-adapter rewrite, new injected lifecycle, dedicated lifecycle tests, boundary
-test and two verifiers. Steps 1-2 are complete, Step 3 is frozen and Step 4 RED
-tests are current. No separate real-subprocess fixture is planned: accepted
-c0b-iii PTY tests already cover physical topology, while deterministic injected
-lifecycle tests own flags/deadline/metadata/FD/signal/TTY/reap. The former
+full, root, real App/XPC, model or network gate. iv-b1b design review now freezes
+iv-b1b-i at exact 3 paths with <=1,180 production changed lines (Darwin adapter,
+injected lifecycle and deterministic tests), followed by iv-b1b-ii exact 5 paths
+(dedicated physical fixture and tests, boundary test, and two verifiers). The
+iv-b1 aggregate is exactly 14 non-document paths. iv-b1b-i Steps 1-2 are
+complete, Step 3 is frozen and Step 4 RED tests are current. The accepted c0b-iii
+PTY evidence cannot substitute for exercising the new outer adapter; iv-b1b-ii
+therefore owns dedicated non-product physical evidence. The former
 `ii-c0b-ii-a3 current` text is superseded.
 a2-i closed at
 implementation commit `158f500` and tree
@@ -340,9 +342,10 @@ complete/non-admitting. ii-c0a is complete/non-admitting; ii-b5b-iii-b0 is
 frozen/non-admitting; iii-a, iii-b1, iii-b2a0, iii-b2a-i,
 iii-b2a-ii-a1, a2-0, a2-i, a2-ii, iii-b2b-0, iii-b2b-1a-0,
 iii-b2b-1a-1, iii-b2b-1b, c0b-i, c0b-ii and c0b-iii are complete/non-admitting.
-The remaining order is ii-c0b-iv-b1b Step 4 RED tests -> ii-c0b-iv-b2 -> ii-c
--> L3c3d -> L3c4. iv-a0, iv-a-r and iv-b1a are complete/non-admitting;
-iv-b1b Steps 1-2 are complete, Step 3 scope is frozen and Step 4 is current.
+The remaining order is ii-c0b-iv-b1b-i Step 4 RED tests -> ii-c0b-iv-b1b-ii ->
+ii-c0b-iv-b2 -> ii-c -> L3c3d -> L3c4. iv-a0, iv-a-r and iv-b1a are
+complete/non-admitting; iv-b1b-i Steps 1-2 are complete, Step 3 scope is frozen
+and Step 4 is current.
 See the
 [ii-b5a review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5a-review.md) and
 [ii-b5b-i-a review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-a-review.md) and
@@ -406,7 +409,7 @@ the sole normal-product admission gate.
 | [36](task-36-implementation-brief.md) | Domain, canonical projection, planner, budget and stop contracts | complete; [review](../../reports/phase-d-task-36-review.md) |
 | [37](task-37-implementation-brief.md) | Store v4, retention and source rejoin | complete; [review](../../reports/phase-d-task-37-review.md) |
 | [38](task-38-implementation-brief.md) | Closed coordinator with fake runtime | complete; [review](../../reports/phase-d-task-38-review.md) |
-| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; c0b-i/ii/iii and iv-a0/iv-a-r/iv-b1a complete/non-admitting; iv-b1b exact 6-path scope frozen and Step 4 RED tests current, followed by iv-b2; ADR 0018 Proposed |
+| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; c0b-i/ii/iii and iv-a0/iv-a-r/iv-b1a complete/non-admitting; iv-b1b-i exact 3-path scope frozen and Step 4 RED tests current, followed by iv-b1b-ii exact 5 paths and iv-b2; iv-b1 aggregate exact 14 paths; ADR 0018 Proposed |
 | [40](task-40-implementation-brief.md) | Evidence report and conservative Review projection | blocked on Task 39 |
 | [41](task-41-implementation-brief.md) | First-use disclosure and typed availability | blocked on Task 40 |
 | [42](task-42-implementation-brief.md) | App workflow and recovery state | blocked on Task 41 |

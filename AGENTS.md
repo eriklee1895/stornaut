@@ -381,14 +381,15 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   success、close-uncertainty settlement 与 uncertainty ownership release 四项
   P1 已 tests-first 修复，三组 independent post-fix review 无 unresolved
   P0–P2。按设计未运行 global serial/full/root、真实 App/XPC、model 或
-  network gate。iv-b1a 已 complete/non-admitting。iv-b1b design review 已把
-  tentative 4-path scope 修正为 exact 6 non-document paths / ≤3,200 lines：
-  Darwin adapter rewrite、new injected lifecycle、new dedicated lifecycle tests、
-  boundary test 与两个 verifier。Step 1–2 complete、Step 3 scope frozen，当前
-  frontier 为 Step 4 RED tests。accepted c0b-iii PTY suite 已覆盖 physical
-  topology，且 iv-b1 排除 real production-gate attempt，因此不另建真实子进程
-  fixture；deterministic injected lifecycle 覆盖 flags/deadline/metadata/FD/
-  signal/TTY/reap。
+  network gate。iv-b1a 已 complete/non-admitting。iv-b1b design review 又细分
+  为 iv-b1b-i exact 3 paths / production ≤1,180 changed lines（Darwin adapter、
+  injected lifecycle、deterministic tests），随后 iv-b1b-ii exact 5 paths
+  （dedicated physical fixture、physical tests、boundary test 与两个 verifier）。
+  iv-b1 aggregate 为 exact 14 non-document paths。iv-b1b-i Step 1–2 complete、
+  Step 3 scope frozen，当前 frontier 为 Step 4 RED tests。accepted c0b-iii PTY
+  suite 只覆盖 inner gate topology，未执行新 outer adapter，不能替代
+  iv-b1b-ii dedicated physical evidence；该证据使用 non-product fixture，而非
+  real production gate。
   spawn/transfer uncertainty 不得
   settlement/unlink 或释放 owner，必须进入 process-lifetime ownership
   quarantine。
@@ -438,9 +439,10 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   complete/non-admitting；c0b-i/c0b-ii/c0b-iii 均已完成并保持
   non-admitting。c0b-iv fresh preflight 已动态修正为
   iv-a0/iv-a-r/iv-b1a/iv-b1b/iv-b2；iv-a0/iv-a-r 已完成并保持
-  non-admitting，iv-b1a 也已 complete/non-admitting；iv-b1b Step 1–2 complete、
-  Step 3 exact 6-path scope frozen，随后严格按 Step 4 RED tests → iv-b2 →
-  ii-c → L3c3d → L3c4 推进。
+  non-admitting，iv-b1a 也已 complete/non-admitting；iv-b1b-i Step 1–2
+  complete、Step 3 exact 3-path scope frozen，随后严格按 Step 4 RED tests →
+  iv-b1b-ii exact 5-path physical/verifier closure → iv-b2 → ii-c → L3c3d →
+  L3c4 推进。
   该 ii-b5b-ii-c checkpoint 以 8 个
   non-document paths / 3,104 changed lines、35 focused tests、
   1,396-test staged-only serial、三个 verifier gates 与 final
@@ -815,9 +817,10 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   preflight 已冻结 iv-a0 authoritative binding/configuration/source → iv-a-r
   provenance/App admission closure → iv-b1a semantic outcome/state machine →
   iv-b1b Darwin/structural closure → iv-b2 zero-argument executable/verifier
-  closure；iv-a0、iv-a-r 与 iv-b1a 已完成并保持 non-admitting；iv-b1b 已冻结
-  exact 6-path / ≤3,200-line scope，当前 frontier 为 Step 4 RED tests，后续为
-  iv-b2 → ii-c
+  closure；iv-a0、iv-a-r 与 iv-b1a 已完成并保持 non-admitting；iv-b1b 已拆为
+  iv-b1b-i exact 3 paths / production ≤1,180 lines 与 iv-b1b-ii exact 5 paths，
+  iv-b1 aggregate exact 14 paths；当前 frontier 为 iv-b1b-i Step 4 RED tests，
+  后续为 iv-b1b-ii → iv-b2 → ii-c
   privileged no-model gate → L3c3d → L3c4。
   ADR 0018 仍 Proposed；L3c4 独占 final admission 与
   剩余 full。

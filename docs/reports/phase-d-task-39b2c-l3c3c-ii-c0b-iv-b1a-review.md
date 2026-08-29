@@ -11,7 +11,7 @@
 >
 > Snapshot tree: `412da586d13fae7fd53937231217778b5d9ffd52`
 >
-> Next frontier: ii-c0b-iv-b1b Step 4 deterministic lifecycle RED tests
+> Next frontier: ii-c0b-iv-b1b-i Step 4 deterministic lifecycle RED tests
 
 ## 1. Current Result
 
@@ -21,8 +21,9 @@ descriptor and process authority. It is now deliberately split into:
 
 - iv-b1a: typed borrowing outcome, ownership state machine, injected fixed-gate
   handoff semantics and non-forgeable typed receipt; and
-- iv-b1b: the concrete Darwin sibling/FD/spawn/drain/wait/reap adapter plus its
-  structural verifier closure.
+- iv-b1b-i: the injected Darwin sibling/FD/spawn/drain/wait/reap lifecycle and
+  narrow adapter; followed by iv-b1b-ii dedicated outer-adapter physical
+  evidence and structural verifier closure.
 
 The iv-b1a snapshot contains exactly six non-document paths and stays below its
 2,400-line ceiling. The clean staged-only focused run passed 48/48 tests in two
@@ -122,9 +123,14 @@ pipe liveness, signal forwarding, TTY restoration, bounded wait/reap or final
 target/source admission. It does not run the fixed gate, accept ADR 0018, claim
 machine readiness or enable production Deep Dive. Task 39 remains incomplete.
 
-The current frontier is iv-b1b Step 4 RED tests. Design review froze an exact
-six-path / 3,200-line Darwin and structural follow-up: a narrow adapter rewrite,
-new injected lifecycle and dedicated lifecycle tests, plus the boundary test and
-two verifiers. Steps 1-2 are complete and Step 3 is frozen. No separate real-
-subprocess fixture is added because the accepted c0b-iii PTY suite already owns
-physical topology evidence and iv-b1 excludes a real production-gate attempt.
+The current frontier is iv-b1b-i Step 4 RED tests. Design review split the
+remaining Darwin work into iv-b1b-i exact three paths, with at most 1,180
+production changed lines for the narrow adapter and injected lifecycle, followed
+by iv-b1b-ii exact five paths for a dedicated physical fixture, physical tests,
+the boundary test and two verifiers. Steps 1-2 are complete and Step 3 is frozen.
+The resulting iv-b1 aggregate is exactly fourteen non-document paths.
+
+The accepted c0b-iii PTY suite proves the inner fixed gate topology but never
+executes the new outer adapter. It therefore cannot substitute for iv-b1b-ii's
+dedicated physical evidence. That evidence remains non-product and does not
+launch the real production gate.
