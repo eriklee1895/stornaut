@@ -11,7 +11,7 @@
 >
 > Snapshot tree: `412da586d13fae7fd53937231217778b5d9ffd52`
 >
-> Next frontier: ii-c0b-iv-b1b Darwin authority and structural closure
+> Next frontier: ii-c0b-iv-b1b Step 4 deterministic lifecycle RED tests
 
 ## 1. Current Result
 
@@ -122,8 +122,9 @@ pipe liveness, signal forwarding, TTY restoration, bounded wait/reap or final
 target/source admission. It does not run the fixed gate, accept ADR 0018, claim
 machine readiness or enable production Deep Dive. Task 39 remains incomplete.
 
-The current frontier is iv-b1b, which owns a tentative exact four-path /
-1,800-line Darwin and structural follow-up. If its review demonstrates that a fifth
-dedicated Darwin test seam is required, that fifth path must be explicitly
-re-preflighted before implementation rather than silently exceeding the frozen
-scope.
+The current frontier is iv-b1b Step 4 RED tests. Design review froze an exact
+six-path / 3,200-line Darwin and structural follow-up: a narrow adapter rewrite,
+new injected lifecycle and dedicated lifecycle tests, plus the boundary test and
+two verifiers. Steps 1-2 are complete and Step 3 is frozen. No separate real-
+subprocess fixture is added because the accepted c0b-iii PTY suite already owns
+physical topology evidence and iv-b1 excludes a real production-gate attempt.
