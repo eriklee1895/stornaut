@@ -17,7 +17,7 @@ ib2_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$ib2_commit")"})
 ib2_lines=$(git diff-tree --numstat --no-commit-id -r "$ib2_commit" -- scripts/verify-contract | awk '{ total += $1 + $2 } END { print total + 0 }')
 (( ib2_lines <= 400 )) \
     || { print -u2 "Machine claim verifier historical budget drifted"; exit 1; }
-ib2_self_sha=3e6b662e7db2129955854872cbdc9fb6ec68ca9d6807399c06be7a7d6dde4783
+ib2_self_sha=5fbc7619e45d9d5977f1fa6b429c32459968e7fbfc7c81d20f2b1ac982f27485
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' scripts/verify-contract | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] \
     || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
@@ -1801,6 +1801,221 @@ PY
 
 }
 
+function verify_iic0bivb1_contract() {
+    local out=$1 gate=scripts/verify-investigation-boundaries
+    mkdir -p "$out"
+    "$gate" --iic0b-iv-b1-handoff-contract-only \
+        Tests/Fixtures/InvestigationFixedGateHandoff/main.swift \
+        Tests/StornautInvestigationTests/InvestigationFixedGateHandoffPhysicalTests.swift \
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift \
+        >"$out/canonical.log"
+    "$gate" --iic0b-iv-b1b-ii-staged-scope-contract-only \
+        >"$out/scope-canonical.log"
+
+    local baseline=a22f8fe9887fc276f418b288f03f8f080b1d3e45
+    local -a paths=(
+        Tests/Fixtures/InvestigationFixedGateHandoff/main.swift
+        Tests/StornautInvestigationTests/InvestigationFixedGateHandoffPhysicalTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-contract
+        scripts/verify-investigation-boundaries
+    )
+    local index="$out/scope.index" checkpoint_path mode blob
+    GIT_INDEX_FILE="$index" git read-tree "$baseline^{tree}"
+    for checkpoint_path in "${paths[@]}"; do
+        mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
+        blob=$(git hash-object -w -- "$checkpoint_path")
+        GIT_INDEX_FILE="$index" git update-index --add \
+            --cacheinfo "$mode,$blob,$checkpoint_path"
+    done
+    GIT_INDEX_FILE="$index" "$gate" \
+        --iic0b-iv-b1b-ii-staged-scope-contract-only "$baseline" \
+        >"$out/scope-index-canonical.log"
+
+    local over_budget="$out/over-budget.swift" line
+    for (( line = 0; line <= 2200; line++ )); do
+        print -r -- "// iv-b1b-ii over-budget $line"
+    done >"$over_budget"
+    local staged_divergence="$out/staged-divergence.swift"
+    {
+        cp Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift \
+            "$staged_divergence"
+        print -r -- '// iv-b1b-ii staged divergence' >>"$staged_divergence"
+    }
+    local no_facade="$out/no-facade.swift"
+    sed 's/InvestigationFixedGateHandoff()\.run(/physicalBypass(/' \
+        Tests/Fixtures/InvestigationFixedGateHandoff/main.swift >"$no_facade"
+    local no_assertion="$out/no-assertion.swift"
+    sed 's/#expect(report.gateProcessAbsent)/#expect(true)/' \
+        Tests/StornautInvestigationTests/InvestigationFixedGateHandoffPhysicalTests.swift \
+        >"$no_assertion"
+    local early_return_test="$out/early-return-test.swift"
+    sed '/func facadeExecutesPhysicalSuccessAndFailureMatrix() throws {/a\
+        return' \
+        Tests/StornautInvestigationTests/InvestigationFixedGateHandoffPhysicalTests.swift \
+        >"$early_return_test"
+    local empty_matrix="$out/empty-matrix.swift"
+    python3 - \
+        Tests/StornautInvestigationTests/InvestigationFixedGateHandoffPhysicalTests.swift \
+        "$empty_matrix" <<'PY'
+from pathlib import Path
+import re
+import sys
+source, output = map(Path, sys.argv[1:])
+data = source.read_text(encoding="utf-8")
+updated, count = re.subn(
+    r"for \(mode, expectedError\) in \[.*?\] \{",
+    "for (mode, expectedError) in [] {",
+    data, count=1, flags=re.S,
+)
+if count != 1:
+    raise SystemExit("cannot construct empty physical matrix")
+output.write_text(updated, encoding="utf-8")
+PY
+    local unreachable_fixture="$out/unreachable-fixture.swift"
+    python3 - Tests/Fixtures/InvestigationFixedGateHandoff/main.swift \
+        "$unreachable_fixture" <<'PY'
+from pathlib import Path
+import sys
+source, output = map(Path, sys.argv[1:])
+data = source.read_text(encoding="utf-8")
+needle = "    private static func coordinator(\n"
+if data.count(needle) != 1:
+    raise SystemExit("cannot relocate physical coordinator evidence")
+data = data.replace(
+    needle, "    private static func unusedCoordinatorEvidence(\n", 1
+)
+insertion = (
+    "    private static func coordinator(\n"
+    "        mode: FixtureMode, outerAttemptUUID: UUID\n"
+    "    ) throws {\n"
+    "        _ = mode\n"
+    "        _ = outerAttemptUUID\n"
+    "    }\n\n"
+)
+anchor = "    private static func gate() throws {\n"
+if data.count(anchor) != 1:
+    raise SystemExit("cannot insert empty physical coordinator")
+output.write_text(data.replace(anchor, insertion + anchor, 1), encoding="utf-8")
+PY
+    local unreachable_test="$out/unreachable-test.swift"
+    python3 - \
+        Tests/StornautInvestigationTests/InvestigationFixedGateHandoffPhysicalTests.swift \
+        "$unreachable_test" <<'PY'
+from pathlib import Path
+import sys
+source, output = map(Path, sys.argv[1:])
+data = source.read_text(encoding="utf-8")
+needle = (
+    "    @Test\n"
+    "    func facadeExecutesPhysicalSuccessAndFailureMatrix() throws {\n"
+)
+if data.count(needle) != 1:
+    raise SystemExit("cannot relocate executed physical test evidence")
+data = data.replace(needle, "    func unusedPhysicalEvidence() throws {\n", 1)
+anchor = "}\n\nprivate enum HandoffPhysicalMode: String {\n"
+replacement = (
+    "    @Test\n"
+    "    func facadeExecutesPhysicalSuccessAndFailureMatrix() throws {}\n"
+    "}\n\nprivate enum HandoffPhysicalMode: String {\n"
+)
+if data.count(anchor) != 1:
+    raise SystemExit("cannot insert empty executed physical test")
+output.write_text(data.replace(anchor, replacement, 1), encoding="utf-8")
+PY
+    local semantic_fixture mutated_log
+    for semantic_fixture in no-facade no-assertion early-return-test empty-matrix \
+        unreachable-fixture unreachable-test
+    do
+        case $semantic_fixture in
+            no-facade)
+                if "$gate" --iic0b-iv-b1-handoff-contract-only \
+                    "$no_facade" \
+                    Tests/StornautInvestigationTests/InvestigationFixedGateHandoffPhysicalTests.swift \
+                    Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift \
+                    >"$out/$semantic_fixture.log" 2>&1
+                then fail_contract \
+                    "ii-c0b-iv-b1b-ii semantic mutation accepted: $semantic_fixture"
+                fi ;;
+            no-assertion|early-return-test|empty-matrix|unreachable-test)
+                if [[ $semantic_fixture == no-assertion ]]; then
+                    semantic_test=$no_assertion
+                elif [[ $semantic_fixture == early-return-test ]]; then
+                    semantic_test=$early_return_test
+                elif [[ $semantic_fixture == empty-matrix ]]; then
+                    semantic_test=$empty_matrix
+                else
+                    semantic_test=$unreachable_test
+                fi
+                if "$gate" --iic0b-iv-b1-handoff-contract-only \
+                    Tests/Fixtures/InvestigationFixedGateHandoff/main.swift \
+                    "$semantic_test" \
+                    Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift \
+                    >"$out/$semantic_fixture.log" 2>&1
+                then fail_contract \
+                    "ii-c0b-iv-b1b-ii semantic mutation accepted: $semantic_fixture"
+                fi ;;
+            unreachable-fixture)
+                if "$gate" --iic0b-iv-b1-handoff-contract-only \
+                    "$unreachable_fixture" \
+                    Tests/StornautInvestigationTests/InvestigationFixedGateHandoffPhysicalTests.swift \
+                    Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift \
+                    >"$out/$semantic_fixture.log" 2>&1
+                then fail_contract \
+                    "ii-c0b-iv-b1b-ii semantic mutation accepted: $semantic_fixture"
+                fi ;;
+        esac
+    done
+
+    local fixture changed expected log staged_entry
+    for fixture in extra-path missing-path over-budget mode wrong-baseline \
+        staged-worktree-divergence
+    do
+        changed="$out/scope-$fixture.index"
+        cp "$index" "$changed"
+        local scope_baseline=$baseline
+        case $fixture in
+            extra-path)
+                blob=$(git hash-object -w -- AGENTS.md)
+                GIT_INDEX_FILE="$changed" git update-index --add \
+                    --cacheinfo "100644,$blob,iv-b1b-ii-extra.swift"
+                expected='ii-c0b-iv-b1b-ii checkpoint paths drifted' ;;
+            missing-path)
+                GIT_INDEX_FILE="$changed" git rm --cached -q -f \
+                    Tests/Fixtures/InvestigationFixedGateHandoff/main.swift
+                expected='ii-c0b-iv-b1b-ii checkpoint paths drifted' ;;
+            over-budget)
+                blob=$(git hash-object -w -- "$over_budget")
+                GIT_INDEX_FILE="$changed" git update-index \
+                    --cacheinfo "100644,$blob,Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift"
+                expected='ii-c0b-iv-b1b-ii checkpoint budget drifted' ;;
+            mode)
+                staged_entry=$(GIT_INDEX_FILE="$changed" git ls-files -s -- \
+                    scripts/verify-contract)
+                blob=$(print -r -- "$staged_entry" | awk '{print $2}')
+                GIT_INDEX_FILE="$changed" git update-index \
+                    --cacheinfo "100644,$blob,scripts/verify-contract"
+                expected='ii-c0b-iv-b1b-ii checkpoint mode drifted: scripts/verify-contract' ;;
+            wrong-baseline)
+                scope_baseline="$baseline^"
+                expected='ii-c0b-iv-b1b-ii checkpoint baseline drifted' ;;
+            staged-worktree-divergence)
+                blob=$(git hash-object -w -- "$staged_divergence")
+                GIT_INDEX_FILE="$changed" git update-index \
+                    --cacheinfo "100644,$blob,Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift"
+                expected='ii-c0b-iv-b1b-ii staged/worktree source drifted: Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift' ;;
+        esac
+        log="$out/scope-$fixture.log"
+        if GIT_INDEX_FILE="$changed" "$gate" \
+            --iic0b-iv-b1b-ii-staged-scope-contract-only \
+            "$scope_baseline" >"$log" 2>&1
+        then
+            fail_contract "ii-c0b-iv-b1b-ii scope mutation accepted: $fixture"
+        fi
+        require_fixed_text "$log" "$expected"
+    done
+}
+
 if [[ ${1:-} == --iic0b-ii-a-contract-only ]]; then
     (( $# == 1 )) || fail_contract \
         "Usage: scripts/verify-contract --iic0b-ii-a-contract-only"
@@ -1842,6 +2057,17 @@ if [[ ${1:-} == --iic0b-iii-2a-contract-only ]]; then
     trap 'rm -rf "$iic0biii2a_root"' EXIT
     verify_iic0biii2a_contract "$iic0biii2a_root"
     print "ii-c0b-iii-2a contract verification passed."
+    exit 0
+fi
+
+if [[ ${1:-} == --iic0b-iv-b1-handoff-contract-only ]]; then
+    (( $# == 1 )) || fail_contract \
+        "Usage: scripts/verify-contract --iic0b-iv-b1-handoff-contract-only"
+    iic0bivb1_root=$(mktemp -d \
+        "${TMPDIR:-/tmp}/stornaut-iic0bivb1-contract.XXXXXX")
+    trap 'rm -rf "$iic0bivb1_root"' EXIT
+    verify_iic0bivb1_contract "$iic0bivb1_root"
+    print "ii-c0b-iv-b1 contained handoff contract verification passed."
     exit 0
 fi
 
@@ -2261,6 +2487,14 @@ require_fixed_text scripts/verify-investigation-boundaries \
     '--iib5biib-app-identity-contract-only'
 require_fixed_text scripts/verify-investigation-boundaries \
     '--iib5biib-staged-scope-contract-only'
+require_fixed_text scripts/verify-investigation-boundaries \
+    '--iic0b-iv-b1-handoff-contract-only'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'iv-b1 LaunchSupport source inventory drifted'
+require_fixed_text scripts/verify-investigation-boundaries \
+    'iv-b1 GateSupport immutable source drifted'
+require_fixed_text scripts/verify-contract \
+    'verify_iic0bivb1_contract "$contract_root/iic0bivb1"'
 require_fixed_text scripts/verify-investigation-boundaries \
     '(( changed <= 2800 ))'
 require_fixed_text scripts/verify-investigation-boundaries \
@@ -2961,7 +3195,7 @@ from pathlib import Path
 
 expected = {
     Path("scripts/verify-investigation-boundaries"):
-        "0b1b8f49d39a05099ba6945e695c8c5085b31fee9a8b1f9da5045300d36fd3a0",
+        "5e449567628eeee1f06af8447d93148204531615881f111654ba2ceeafafee53",
     Path("scripts/verify-app-release-boundaries"):
         "f680802bc44b9a02d7b8af91ec9ed996f859cbe8fd5ae53c1ee1be310e502b0a",
 }
@@ -3393,6 +3627,7 @@ contract_root=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-verify-contract.XXXXXX")
 verify_iic0biia3_contract "$contract_root"
 verify_iic0biib_contract "$contract_root/iic0biib"
 verify_iic0biii2a_contract "$contract_root/iic0biii2a"
+verify_iic0bivb1_contract "$contract_root/iic0bivb1"
 mkdir -p "$contract_root/scripts"
 cp scripts/verify "$contract_root/scripts/verify"
 chmod 755 "$contract_root/scripts/verify"

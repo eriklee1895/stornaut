@@ -305,6 +305,12 @@ iic0biii2a_boundary_test_source=
 iic0biii2a_staged_scope_contract_only=false
 iic0biii2a_staged_scope_baseline=e832e8433137f9777aba77daba2ca248a563404d
 iic0biii2a_completed_tree_contract_only=false
+iic0bivb1_handoff_contract_only=false
+iic0bivb1_fixture_source=
+iic0bivb1_physical_test_source=
+iic0bivb1_boundary_test_source=
+iic0bivb1_staged_scope_contract_only=false
+iic0bivb1_staged_scope_baseline=a22f8fe9887fc276f418b288f03f8f080b1d3e45
 iib3a_staged_scope_contract_only=false
 iib3a_staged_scope_baseline=HEAD
 iib3b_start_retire_contract_only=false
@@ -777,6 +783,16 @@ if (( $# > 0 )); then
     elif (( $# == 1 )) \
         && [[ $1 == --iic0b-iii-2a-completed-tree-contract-only ]]; then
         iic0biii2a_completed_tree_contract_only=true
+    elif (( $# == 4 )) \
+        && [[ $1 == --iic0b-iv-b1-handoff-contract-only ]]; then
+        iic0bivb1_handoff_contract_only=true
+        iic0bivb1_fixture_source=$2
+        iic0bivb1_physical_test_source=$3
+        iic0bivb1_boundary_test_source=$4
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iic0b-iv-b1b-ii-staged-scope-contract-only ]]; then
+        iic0bivb1_staged_scope_contract_only=true
+        iic0bivb1_staged_scope_baseline=${2:-a22f8fe9887fc276f418b288f03f8f080b1d3e45}
     elif (( $# == 1 || $# == 2 )) \
         && [[ $1 == --iib3a-staged-scope-contract-only ]]; then
         iib3a_staged_scope_contract_only=true
@@ -802,7 +818,7 @@ if (( $# > 0 )); then
         iib3c_staged_scope_baseline=${2:-HEAD}
     else
         print -u2 \
-            "Usage: scripts/verify-investigation-boundaries [... | --iic0b-ii-b-capsule-contract-only <package> <ownership> <capsule> <focused-test> <boundary-test> | --iic0b-ii-b-staged-scope-contract-only [baseline] | --iic0b-iii-2a-gate-contract-only <package> <transport> <launcher> <darwin-system> <entry> <launcher-tests> <physical-tests> <stub> <boundary-test> | --iic0b-iii-2a-staged-scope-contract-only [baseline] | --iic0b-iii-2a-completed-tree-contract-only]"
+            "Usage: scripts/verify-investigation-boundaries [... | --iic0b-ii-b-capsule-contract-only <package> <ownership> <capsule> <focused-test> <boundary-test> | --iic0b-ii-b-staged-scope-contract-only [baseline] | --iic0b-iii-2a-gate-contract-only <package> <transport> <launcher> <darwin-system> <entry> <launcher-tests> <physical-tests> <stub> <boundary-test> | --iic0b-iii-2a-staged-scope-contract-only [baseline] | --iic0b-iii-2a-completed-tree-contract-only | --iic0b-iv-b1-handoff-contract-only <fixture> <physical-test> <boundary-test> | --iic0b-iv-b1b-ii-staged-scope-contract-only [baseline]]"
         exit 64
     fi
 fi
@@ -4076,6 +4092,8 @@ expected_test_sha256 = {
         "3aeb382661bd115905936f5079aeecd41b7d3c177503f847b98fe4e0e42cce6a",
         "586f58adabe748551dcef53be3e3746c445fe4127b967d10cce4ddd94760fd08",
         "cfc0ef565b94157e1b066f88fc90ce438bac7830565f99c0b5ab4937803ac4ca",
+        "c15df07d0006488ec683984ba1319282f41b7169bce79e9cbca6dddf563fdbce",
+        "a64aeab58f75a1e15db32ba347769923ae5f9c0b30fc7adbfe36083fa3a68cac",
     },
 }
 for path, admitted_sha256 in expected_test_sha256.items():
@@ -4391,6 +4409,8 @@ expected_test_sha256 = {
         "3aeb382661bd115905936f5079aeecd41b7d3c177503f847b98fe4e0e42cce6a",
         "586f58adabe748551dcef53be3e3746c445fe4127b967d10cce4ddd94760fd08",
         "cfc0ef565b94157e1b066f88fc90ce438bac7830565f99c0b5ab4937803ac4ca",
+        "c15df07d0006488ec683984ba1319282f41b7169bce79e9cbca6dddf563fdbce",
+        "a64aeab58f75a1e15db32ba347769923ae5f9c0b30fc7adbfe36083fa3a68cac",
     },
 }
 for path, admitted_sha256 in expected_test_sha256.items():
@@ -9218,6 +9238,47 @@ boundary = boundary_path.read_text(encoding="utf-8")
 def fail(message):
     raise SystemExit(message)
 
+def swift_code(source):
+    output = []
+    index = 0
+    block_depth = 0
+    while index < len(source):
+        if block_depth:
+            if source.startswith("/*", index):
+                block_depth += 1; index += 2
+            elif source.startswith("*/", index):
+                block_depth -= 1; index += 2
+            else:
+                output.append("\n" if source[index] == "\n" else " ")
+                index += 1
+            continue
+        if source.startswith("//", index):
+            end = source.find("\n", index)
+            if end < 0:
+                output.extend(" " * (len(source) - index)); break
+            output.extend(" " * (end - index)); index = end; continue
+        if source.startswith("/*", index):
+            block_depth = 1; output.extend("  " ); index += 2; continue
+        if source.startswith('"""', index):
+            end = source.find('"""', index + 3)
+            if end < 0: fail("iv-b1b-ii unterminated Swift multiline string")
+            raw = source[index:end + 3]
+            output.extend("\n" if char == "\n" else " " for char in raw)
+            index = end + 3; continue
+        if source[index] == '"':
+            output.append(" " ); index += 1
+            while index < len(source):
+                char = source[index]
+                output.append("\n" if char == "\n" else " ")
+                index += 1
+                if char == "\\" and index < len(source):
+                    output.append(" " ); index += 1
+                elif char == '"': break
+            continue
+        output.append(source[index]); index += 1
+    if block_depth: fail("iv-b1b-ii unterminated Swift block comment")
+    return "".join(output)
+
 def target(name):
     matches = re.findall(
         rf'(?ms)\.(?:executableTarget|testTarget|target)\(\s*name:\s*"{re.escape(name)}"'
@@ -9247,7 +9308,7 @@ if "StornautInvestigationMachineGateSupport" in products:
 test = target("StornautInvestigationTests")
 if test.count('"StornautInvestigationMachineGateSupport"') != 1:
     fail("ii-c0b-iii-2a test dependency surface drifted")
-if package.count('"StornautInvestigationMachineGateSupport"') != 3:
+if package.count('"StornautInvestigationMachineGateSupport"') != 4:
     fail("ii-c0b-iii-2a GateSupport consumer surface drifted")
 
 root = boundary_path.resolve().parents[2]
@@ -9544,7 +9605,8 @@ for marker in (
         fail(f"ii-c0b-iii-2a boundary regression drifted: {marker}")
 
 expected_sha256 = {
-    package_path: "a1baf4318a3aeed74dba0a3b61e99fe8f6e9fdf1b59f16c13b94cc4179fc0f99",
+    # Historical c0b-iii Package.swift SHA-256 is replayed by verify-contract:
+    # a1baf4318a3aeed74dba0a3b61e99fe8f6e9fdf1b59f16c13b94cc4179fc0f99
     transport_path: "6c5694bc67a60c0af8f0df68ad438d249cca9046a96665c938b77e87fd8abfae",
     launcher_path: "73818d0156467324e91caaa95290fe1a52bc1f6d5da6cd7e21711fce4cd62f30",
     darwin_path: "75b1a51bfdbdaba16be1afbdc57b2523886a385de487ce0c9fba52e7f44de02f",
@@ -9646,6 +9708,330 @@ function verify_iic0biii2a_completed_tree() {
     [[ "$(git write-tree)" == "$implementation_tree" ]] || {
         print -u2 "ii-c0b-iii-2a completed tree drifted"; return 1
     }
+}
+
+function verify_iic0bivb1_handoff_contract() {
+    local fixture_path=$1 physical_test_path=$2 boundary_path=$3 source_path
+    for source_path in "$fixture_path" "$physical_test_path" \
+        "$boundary_path"
+    do
+        xcrun swiftc -frontend -parse -enable-bare-slash-regex \
+            "$source_path" || return $?
+    done
+    python3 - "$fixture_path" "$physical_test_path" \
+        "$boundary_path" <<'PY'
+from pathlib import Path
+import hashlib
+import re
+import sys
+
+fixture_path, test_path, boundary_path = map(Path, sys.argv[1:])
+fixture = fixture_path.read_text(encoding="utf-8")
+physical = test_path.read_text(encoding="utf-8")
+boundary = boundary_path.read_text(encoding="utf-8")
+root = boundary_path.resolve().parents[2]
+package_path = root / "Package.swift"
+package = package_path.read_text(encoding="utf-8")
+
+def fail(message):
+    raise SystemExit(message)
+
+def target(name):
+    matches = re.findall(
+        rf'(?ms)\.target\(\s*name:\s*"{re.escape(name)}"\s*,'
+        rf'(?P<body>.*?)^\s*\),', package
+    )
+    if len(matches) != 1:
+        fail(f"iv-b1 target cardinality drifted: {name}")
+    return matches[0]
+
+launch = target("StornautInvestigationMachineLaunchSupport")
+gate = target("StornautInvestigationMachineGateSupport")
+if re.findall(r'"([^"]+)"', re.search(
+    r'(?ms)dependencies:\s*\[(.*?)\]', launch
+).group(1)) != [
+    "StornautInvestigationHandoffContract",
+    "StornautInvestigationMachineGateSupport",
+]:
+    fail("iv-b1 LaunchSupport dependency surface drifted")
+if re.findall(r'"([^"]+)"', re.search(
+    r'(?ms)dependencies:\s*\[(.*?)\]', gate
+).group(1)) != ["StornautInvestigationHandoffContract"]:
+    fail("iv-b1 reverse GateSupport dependency drifted")
+products = package.split("    targets: [", 1)[0]
+if "StornautInvestigationMachineLaunchSupport" in products \
+        or "StornautInvestigationMachineGateSupport" in products:
+    fail("iv-b1 support target became a package product")
+if package.count('"StornautInvestigationMachineLaunchSupport"') != 2 \
+        or package.count('"StornautInvestigationMachineGateSupport"') != 4:
+    fail("iv-b1 support consumer surface drifted")
+
+launch_root = root / "Sources/StornautInvestigationMachineLaunchSupport"
+gate_root = root / "Sources/StornautInvestigationMachineGateSupport"
+launch_names = [
+    "DarwinInvestigationFixedGateHandoffSystem.swift",
+    "InvestigationFixedGateDarwinLifecycle.swift",
+    "InvestigationFixedGateHandoff.swift",
+    "InvestigationMachineGateHandoffReceipt.swift",
+    "InvestigationMachineGateOwnership.swift",
+    "InvestigationOwnerOnlyCapsule.swift",
+]
+if sorted(path.name for path in launch_root.glob("*.swift")) != launch_names:
+    fail("iv-b1 LaunchSupport source inventory drifted")
+if sorted(path.name for path in gate_root.glob("*.swift")) != [
+    "DarwinInvestigationMachineFixedGateSystem.swift",
+    "InvestigationMachineFixedGateLauncher.swift",
+    "InvestigationMachineGateTransport.swift",
+]:
+    fail("iv-b1 GateSupport immutable source inventory drifted")
+
+launch_sources = {
+    path.name: path.read_text(encoding="utf-8")
+    for path in launch_root.glob("*.swift")
+}
+combined = "\n".join(launch_sources.values())
+capsule = launch_sources["InvestigationOwnerOnlyCapsule.swift"]
+handoff = launch_sources["InvestigationFixedGateHandoff.swift"]
+darwin = launch_sources["DarwinInvestigationFixedGateHandoffSystem.swift"]
+receipt = launch_sources["InvestigationMachineGateHandoffReceipt.swift"]
+lifecycle = launch_sources["InvestigationFixedGateDarwinLifecycle.swift"]
+ownership = launch_sources["InvestigationMachineGateOwnership.swift"]
+if re.search(r"(?m)^\s*(?:public|open)\s+", combined) \
+        or re.search(r"\b(?:Codable|Encodable|Decodable)\b", combined):
+    fail("iv-b1 package-only or Codable surface drifted")
+for label, source, imports in (
+    ("capsule", capsule, {
+        "Darwin", "Foundation", "StornautInvestigationHandoffContract",
+    }),
+    ("handoff", handoff, {
+        "Darwin", "Foundation", "StornautInvestigationHandoffContract",
+        "StornautInvestigationMachineGateSupport",
+    }),
+    ("darwin", darwin, {
+        "Darwin", "Foundation", "StornautInvestigationHandoffContract",
+        "StornautInvestigationMachineGateSupport",
+    }),
+    ("receipt", receipt, {
+        "Darwin", "Foundation", "StornautInvestigationHandoffContract",
+        "StornautInvestigationMachineGateSupport",
+    }),
+    ("lifecycle", lifecycle, {
+        "Darwin", "Foundation", "StornautInvestigationHandoffContract",
+        "StornautInvestigationMachineGateSupport",
+    }),
+    ("ownership", ownership, {"Darwin", "Foundation"}),
+):
+    if set(re.findall(r"(?m)^import\s+([A-Za-z0-9_]+)\s*$", source)) != imports \
+            or source.count("#if DEBUG") != 1 \
+            or source.count("#endif") != 1 \
+            or not source.rstrip().endswith("#endif"):
+        fail(f"iv-b1 source boundary drifted: {label}")
+package_lines = "\n".join(
+    line for line in combined.splitlines()
+    if re.match(r"^\s*package\s+", line)
+)
+if re.search(
+    r"\b(?:Int32|CInt|FileDescriptor|UnsafeFileHandle|URL|"
+    r"SettlementToken|ReapedProof)\b|@escaping|\bfunc\s+\w+\s*<",
+    package_lines, re.I
+):
+    fail("iv-b1 raw capability or generic callback surface drifted")
+if darwin.count("package convenience init()") != 1 \
+        or darwin.count(
+            "self.init(system: DarwinInvestigationFixedGateHandoffSystem())"
+        ) != 1 \
+        or handoff.count(
+            "init(system: any InvestigationFixedGateHandoffSystem)"
+        ) != 1 \
+        or re.search(
+            r"(?m)^\s*(?:package|public|open)\s+init\(system:", handoff
+        ) \
+        or darwin.count(
+            "private final class DarwinInvestigationFixedGateHandoffSystem"
+        ) != 1:
+    fail("iv-b1 facade construction boundary drifted")
+if receipt.count("protocol InvestigationFixedGateHandoffSystem") != 1 \
+        or re.search(
+            r"(?m)^\s*(?:package|public|open)\s+protocol "
+            r"InvestigationFixedGateHandoffSystem", receipt
+        ) \
+        or re.search(
+            r"(?m)^\s*(?:package|public|open)\s+init\s*\(", receipt
+        ):
+    fail("iv-b1 injected system or receipt initializer escaped target")
+for forbidden in (
+    "StornautCore", "StornautCodex", "StornautLifecycle",
+    "StornautExecution", "StornautInvestigationRuntime",
+    "StornautInvestigationDiagnostic", "ActionExecutor",
+    "TrashMoving", "RegisteredAction", "signedRuntimeReady",
+    "readiness", "NSXPC", "URLSession",
+):
+    if forbidden in combined:
+        fail(f"iv-b1 prohibited product authority drifted: {forbidden}")
+for marker in (
+    "package final class InvestigationFixedGateHandoff",
+    "package func run(",
+    "InvestigationFixedGateHandoffSystem",
+    "InvestigationOwnerOnlyCapsuleOutcomeBorrowing",
+    "package struct InvestigationMachineGateHandoffReceipt:",
+    "InvestigationMachineGatePreparedFrame.decode",
+    "InvestigationMachineGateTransportReceipt.decode",
+    ".waitForExactGate(processID:",
+    ".observeGateProcessGroupEmpty(",
+    ".settleExactGateReaped",
+    ".settleNeverHandedOff",
+):
+    if marker not in combined:
+        fail(f"iv-b1 fixed handoff contract drifted: {marker}")
+expected_launch_sha256 = {
+    "DarwinInvestigationFixedGateHandoffSystem.swift":
+        "e8bb77f7beb8f0a7051b04c875f4f642869b1c3cdab84beb87f0a620b0ad5919",
+    "InvestigationFixedGateDarwinLifecycle.swift":
+        "a1bc21327db4ce68f51a3b09d300fdace8a818f40ca8c7a3d59f6afde568a1aa",
+    "InvestigationFixedGateHandoff.swift":
+        "062540a7f7149c31d5fa4b48f33b4bde04e08661a14e7e4f70b2678197e6f590",
+    "InvestigationMachineGateHandoffReceipt.swift":
+        "9ff6af76a2e01d9920c1bdb1b7201d62648ba8f8a2bdde8c88d50fe67d3a3105",
+    "InvestigationMachineGateOwnership.swift":
+        "bf7cee7e2aa06458c7978f74887cf54d2199daff3153af6a81f2a531beb83b68",
+    "InvestigationOwnerOnlyCapsule.swift":
+        "8df6f38df3666900116baf8cd9d441c0a0f64b58cfb4e8949234fb83380deb8b",
+}
+for name, expected in expected_launch_sha256.items():
+    if hashlib.sha256((launch_root / name).read_bytes()).hexdigest() != expected:
+        fail(f"iv-b1 accepted production source drifted: {name}")
+expected_gate_sha256 = {
+    "DarwinInvestigationMachineFixedGateSystem.swift":
+        "75b1a51bfdbdaba16be1afbdc57b2523886a385de487ce0c9fba52e7f44de02f",
+    "InvestigationMachineFixedGateLauncher.swift":
+        "73818d0156467324e91caaa95290fe1a52bc1f6d5da6cd7e21711fce4cd62f30",
+    "InvestigationMachineGateTransport.swift":
+        "6c5694bc67a60c0af8f0df68ad438d249cca9046a96665c938b77e87fd8abfae",
+}
+for name, expected in expected_gate_sha256.items():
+    if __import__("hashlib").sha256((gate_root / name).read_bytes()).hexdigest() != expected:
+        fail(f"iv-b1 GateSupport immutable source drifted: {name}")
+expected_physical_sha256 = {
+    fixture_path: "3fe8fb37baad65fc4152ff9c81836fe452b6edac965e4bffe18f586bfc912cbb",
+    test_path: "5274e21bdafcd1d79531e8fe84981799014e9012e1c703fc0eed06c9cd62c8ce",
+}
+for path, expected in expected_physical_sha256.items():
+    if hashlib.sha256(path.read_bytes()).hexdigest() != expected:
+        fail(f"iv-b1b-ii physical source seal drifted: {path.name}")
+for marker in ("--coordinator", "StornautInvestigationMachineGate"):
+    if marker not in fixture:
+        fail(f"iv-b1b-ii fixed fixture spelling drifted: {marker}")
+for forbidden in ("/usr/bin/sudo", "NSXPC", "URLSession", "app-server"):
+    if forbidden in fixture:
+        fail(f"iv-b1b-ii fixture gained excluded authority: {forbidden}")
+if "copyItem(at: coordinator, to: gate)" not in physical:
+    fail("iv-b1b-ii fixed sibling fixture copy drifted")
+for marker in (
+    '@Suite("Investigation fixed gate handoff physical evidence"',
+    "/usr/bin/xcrun", "swiftc", "-package-name",
+    "description.json", "StornautInvestigationMachineLaunchSupport",
+    ".build/",
+):
+    if marker not in physical:
+        fail(f"iv-b1b-ii physical test contract drifted: {marker}")
+for marker in (
+    "iiC0BIVB1HandoffVerifierPinsPhysicalClosure",
+    "--iic0b-iv-b1-handoff-contract-only",
+    "--iic0b-iv-b1b-ii-staged-scope-contract-only",
+    "function verify_iic0bivb1_handoff_contract()",
+    "iv-b1b-ii checkpoint paths drifted",
+    "iv-b1 GateSupport immutable source inventory drifted",
+    "iv-b1 raw capability or generic callback surface drifted",
+    "iv-b1 facade construction boundary drifted",
+):
+    if marker not in boundary:
+        fail(f"iv-b1 boundary regression drifted: {marker}")
+PY
+}
+
+function verify_iic0bivb1_staged_scope() {
+    local expected_baseline=a22f8fe9887fc276f418b288f03f8f080b1d3e45
+    local baseline=${1:-$expected_baseline}
+    local budget=2200
+    local expected=(
+        Tests/Fixtures/InvestigationFixedGateHandoff/main.swift
+        Tests/StornautInvestigationTests/InvestigationFixedGateHandoffPhysicalTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-contract
+        scripts/verify-investigation-boundaries
+    )
+    (( ${#expected} == 5 )) || {
+        print -u2 "ii-c0b-iv-b1b-ii checkpoint path ceiling drifted"
+        return 1
+    }
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" == \
+        "$expected_baseline" ]] || {
+        print -u2 "ii-c0b-iv-b1b-ii checkpoint baseline drifted"
+        return 1
+    }
+    if git diff --cached --name-only --diff-filter=D "$baseline" \
+        | awk 'index($0,"docs/")!=1 {found=1} END {exit !found}'
+    then
+        print -u2 "ii-c0b-iv-b1b-ii checkpoint deleted an existing path"
+        return 1
+    fi
+    if git diff --cached --numstat "$baseline" \
+        | awk 'index($3,"docs/")!=1 && ($1=="-" || $2=="-") {found=1} END {exit !found}'
+    then
+        print -u2 "ii-c0b-iv-b1b-ii binary checkpoint path rejected"
+        return 1
+    fi
+    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD \
+        "$baseline" | awk 'index($0,"docs/")!=1 && $0!="AGENTS.md" && $0!="README.md"')"})
+    [[ "${(j:\n:)${(@on)observed}}" == "${(j:\n:)${(@on)expected}}" ]] || {
+        print -u2 "ii-c0b-iv-b1b-ii checkpoint paths drifted"
+        return 1
+    }
+    local changed=$(git diff --cached --numstat "$baseline" \
+        | awk 'index($3,"docs/")!=1 && $3!="AGENTS.md" && $3!="README.md" {n+=$1+$2} END {print n+0}')
+    (( changed <= budget )) || {
+        print -u2 "ii-c0b-iv-b1b-ii checkpoint budget drifted"
+        return 1
+    }
+    local checkpoint_path mode entry staged_blob worktree_blob
+    for checkpoint_path in "${expected[@]}"; do
+        mode=100644
+        [[ $checkpoint_path == scripts/* ]] && mode=100755
+        entry=$(git ls-files -s -- "$checkpoint_path")
+        [[ "$(print -r -- "$entry" | awk '{print $1, $3, $4}')" \
+            == "$mode 0 $checkpoint_path" ]] || {
+            print -u2 \
+                "ii-c0b-iv-b1b-ii checkpoint mode drifted: $checkpoint_path"
+            return 1
+        }
+        staged_blob=$(print -r -- "$entry" | awk '{print $2}')
+        worktree_blob=$(git hash-object -- "$checkpoint_path")
+        [[ "$staged_blob" == "$worktree_blob" ]] || {
+            print -u2 \
+                "ii-c0b-iv-b1b-ii staged/worktree source drifted: $checkpoint_path"
+            return 1
+        }
+    done
+    local observed_path allowed_path
+    local -a worktree_paths=(
+        ${(f)"$(git diff --name-only --diff-filter=ACMRD -- \
+            | awk 'index($0,"docs/")!=1 && $0!="AGENTS.md" && $0!="README.md"')"}
+    )
+    local -a untracked_paths=(
+        ${(f)"$(git ls-files --others --exclude-standard -- \
+            | awk 'index($0,"docs/")!=1 && $0!="AGENTS.md" && $0!="README.md"')"}
+    )
+    for observed_path in "${worktree_paths[@]}" "${untracked_paths[@]}"; do
+        [[ -z $observed_path ]] && continue
+        allowed_path=false
+        for checkpoint_path in "${expected[@]}"; do
+            [[ $observed_path == $checkpoint_path ]] && allowed_path=true
+        done
+        $allowed_path || {
+            print -u2 "ii-c0b-iv-b1b-ii checkpoint worktree paths drifted"
+            return 1
+        }
+    done
 }
 
 function verify_iib4_staged_scope() {
@@ -11939,11 +12325,55 @@ later_installed_dependency = '                "StornautInvestigationInstalledL2"
 if historical_package.count(later_installed_dependency) != 2:
     raise SystemExit("live claim server later InstalledL2 test dependency drifted")
 historical_package = historical_package.replace(later_installed_dependency, "", 2)
-later_launch_target = '        .target(\n            name: "StornautInvestigationMachineLaunchSupport",\n            dependencies: [\n                "StornautInvestigationHandoffContract",\n            ]\n        ),\n'
+later_coordinator_target = '''        .target(
+            name: "StornautInvestigationMachineGateCoordinatorSupport",
+            dependencies: [
+                "StornautCodex",
+                "StornautCore",
+                "StornautInvestigation",
+                "StornautInvestigationDiagnostic",
+            ],
+            resources: [
+                .copy("Resources/InvestigationMachineBuildInputs.json"),
+            ],
+            plugins: [
+                .plugin(
+                    name: "StornautInvestigationBuildReceiptPlugin"
+                ),
+            ]
+        ),
+'''
+later_build_receipt_targets = '''        .executableTarget(
+            name: "StornautInvestigationBuildReceiptGenerator",
+            path: "tools/StornautInvestigationBuildReceiptGenerator"
+        ),
+        .plugin(
+            name: "StornautInvestigationBuildReceiptPlugin",
+            capability: .buildTool(),
+            dependencies: [
+                "StornautInvestigationBuildReceiptGenerator",
+            ]
+        ),
+'''
+later_coordinator_test_dependency = (
+    '                "StornautInvestigationMachineGateCoordinatorSupport",\n'
+)
+if historical_package.count(later_coordinator_target) != 1 \
+        or historical_package.count(later_build_receipt_targets) != 1 \
+        or historical_package.count(later_coordinator_test_dependency) != 1:
+    raise SystemExit("live claim server later CoordinatorSupport projection drifted")
+historical_package = historical_package.replace(
+    later_coordinator_target, "", 1
+).replace(later_build_receipt_targets, "", 1).replace(
+    later_coordinator_test_dependency, "", 1
+)
+later_launch_target = '        .target(\n            name: "StornautInvestigationMachineLaunchSupport",\n            dependencies: [\n                "StornautInvestigationHandoffContract",\n                "StornautInvestigationMachineGateSupport",\n            ]\n        ),\n'
 later_launch_dependency = '                "StornautInvestigationMachineLaunchSupport",\n'
 if historical_package.count(later_launch_target) != 1 or historical_package.count(later_launch_dependency) != 1:
     raise SystemExit("live claim server later LaunchSupport projection drifted")
-historical_package = historical_package.replace(later_launch_target, "", 1).replace(later_launch_dependency, "", 1)
+historical_package = historical_package.replace(
+    later_launch_target, "", 1
+).replace(later_launch_dependency, "", 1)
 later_gate_support_target = '''        .target(
             name: "StornautInvestigationMachineGateSupport",
             dependencies: [
@@ -13182,6 +13612,18 @@ if $iic0biii2a_completed_tree_contract_only; then
     print "ii-c0b-iii-2a completed tree verification passed."
     exit 0
 fi
+if $iic0bivb1_handoff_contract_only; then
+    verify_iic0bivb1_handoff_contract \
+        "$iic0bivb1_fixture_source" "$iic0bivb1_physical_test_source" \
+        "$iic0bivb1_boundary_test_source"
+    print "ii-c0b-iv-b1 contained handoff contract verification passed."
+    exit 0
+fi
+if $iic0bivb1_staged_scope_contract_only; then
+    verify_iic0bivb1_staged_scope "$iic0bivb1_staged_scope_baseline"
+    print "ii-c0b-iv-b1b-ii staged scope verification passed."
+    exit 0
+fi
 if $iib3a_staged_scope_contract_only; then
     verify_iib3a_staged_scope "$iib3a_staged_scope_baseline"
     print "ii-b3a staged scope verification passed."
@@ -13229,6 +13671,13 @@ machine_gate_main=Tools/StornautInvestigationMachineGate/main.swift
 machine_gate_launcher_test=Tests/StornautInvestigationTests/InvestigationSudoShapedDriverLauncherTests.swift
 machine_gate_physical_test=Tests/StornautInvestigationTests/InvestigationMachineGatePhysicalTests.swift
 machine_gate_stub=Tests/Fixtures/InvestigationMachineGateStub/main.swift
+machine_launch_capsule=Sources/StornautInvestigationMachineLaunchSupport/InvestigationOwnerOnlyCapsule.swift
+machine_fixed_gate_handoff=Sources/StornautInvestigationMachineLaunchSupport/InvestigationFixedGateHandoff.swift
+machine_fixed_gate_handoff_darwin=Sources/StornautInvestigationMachineLaunchSupport/DarwinInvestigationFixedGateHandoffSystem.swift
+machine_gate_handoff_receipt=Sources/StornautInvestigationMachineLaunchSupport/InvestigationMachineGateHandoffReceipt.swift
+machine_gate_handoff_test=Tests/StornautInvestigationTests/InvestigationMachineGateCoordinatorHandoffTests.swift
+machine_gate_handoff_physical_fixture=Tests/Fixtures/InvestigationFixedGateHandoff/main.swift
+machine_gate_handoff_physical_test=Tests/StornautInvestigationTests/InvestigationFixedGateHandoffPhysicalTests.swift
 machine_fixed_capsule=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineFixedCapsuleIntake.swift
 machine_fixed_capsule_test=Tests/StornautInvestigationTests/InvestigationMachineFixedCapsuleIntakeTests.swift
 machine_epoch_retirement=Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinEpochRetirement.swift
@@ -13288,6 +13737,13 @@ required_files=(
     "$machine_gate_launcher_test"
     "$machine_gate_physical_test"
     "$machine_gate_stub"
+    "$machine_launch_capsule"
+    "$machine_fixed_gate_handoff"
+    "$machine_fixed_gate_handoff_darwin"
+    "$machine_gate_handoff_receipt"
+    "$machine_gate_handoff_test"
+    "$machine_gate_handoff_physical_fixture"
+    "$machine_gate_handoff_physical_test"
     Sources/StornautInvestigationHandoffContract/InvestigationProjectedCohortInput.swift
     "$machine_fixed_capsule"
     Tests/StornautInvestigationTests/InvestigationHandoffTransportContractTests.swift
@@ -13348,6 +13804,10 @@ verify_iic0biii2a_gate_contract \
     "$machine_gate_darwin" "$machine_gate_main" \
     "$machine_gate_launcher_test" "$machine_gate_physical_test" \
     "$machine_gate_stub" \
+    Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+verify_iic0bivb1_handoff_contract \
+    "$machine_gate_handoff_physical_fixture" \
+    "$machine_gate_handoff_physical_test" \
     Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
 verify_iib5biib_app_identity_contract \
     Package.swift \

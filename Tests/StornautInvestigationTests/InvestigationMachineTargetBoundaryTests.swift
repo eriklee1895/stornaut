@@ -1118,6 +1118,59 @@ struct InvestigationMachineTargetBoundaryTests {
         ))
     }
 
+    @Test
+    func iiC0BIVB1HandoffVerifierPinsPhysicalClosure() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let package = try l3c3biiSource(
+            "Package.swift", repositoryRoot: root)
+        let boundaries = try l3c3biiSource(
+            "scripts/verify-investigation-boundaries", repositoryRoot: root)
+        let contract = try l3c3biiSource(
+            "scripts/verify-contract", repositoryRoot: root)
+
+        for marker in [
+            "name: \"StornautInvestigationMachineLaunchSupport\"",
+            "\"StornautInvestigationHandoffContract\"",
+            "\"StornautInvestigationMachineGateSupport\"",
+        ] {
+            #expect(package.contains(marker))
+        }
+        for marker in [
+            "--iic0b-iv-b1-handoff-contract-only",
+            "--iic0b-iv-b1b-ii-staged-scope-contract-only",
+            "function verify_iic0bivb1_handoff_contract()",
+            "function verify_iic0bivb1_staged_scope()",
+            "iv-b1 LaunchSupport dependency surface drifted",
+            "iv-b1 reverse GateSupport dependency drifted",
+            "iv-b1 LaunchSupport source inventory drifted",
+            "iv-b1 GateSupport immutable source inventory drifted",
+            "iv-b1 package-only or Codable surface drifted",
+            "iv-b1 raw capability or generic callback surface drifted",
+            "iv-b1 facade construction boundary drifted",
+            "iv-b1 injected system or receipt initializer escaped target",
+            "iv-b1b-ii checkpoint paths drifted",
+            "iv-b1b-ii checkpoint mode drifted",
+            "iv-b1b-ii checkpoint budget drifted",
+            "iv-b1b-ii staged/worktree source drifted",
+            "StornautInvestigationMachineGate",
+            "expected_physical_sha256",
+            "iv-b1b-ii physical source seal drifted",
+        ] {
+            #expect(boundaries.contains(marker))
+        }
+        #expect(contract.contains(
+            "verify_iic0bivb1_contract \"$contract_root/iic0bivb1\""
+        ))
+        for historical in [
+            "implementation=396c845884a18767e43971875c58eff80740d325",
+            "implementation_tree=544209f3cd4682b1c4d720931498c8daa5ccc325",
+            "ii-c0b-iii-2a historical contract replay failed",
+        ] {
+            #expect(contract.contains(historical))
+        }
+    }
+
     private func l3c3biiSource(
         _ path: String,
         repositoryRoot: URL
