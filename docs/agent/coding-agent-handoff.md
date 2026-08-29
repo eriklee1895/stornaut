@@ -311,8 +311,12 @@
 > iv-b1b-ii 已完成并保持 non-admitting。iv-b1b-ii 以 implementation
 > `373431d4` / tree `b08342e5`、exact 5 paths / 2,193 changed lines、七场景
 > physical matrix、808-test/57-suite clean serial、三项 dedicated gates 与
-> no-unresolved-P0–P2 final reviews 收口；当前严格按 iv-b2 → ii-c → L3c3d →
-> L3c4 推进。该
+> no-unresolved-P0–P2 final reviews 收口；iv-b2 又以 implementation
+> `4e8d672d35e4416b0114c5c4dbebb1cb6a4d5089` / tree
+> `e02a515283225b0b19443a47fad0b90fe3d0ddfd` 完成并保持 non-admitting。当前
+> 严格按 shared-deadline repair → interactive-native binding repair → ii-c →
+> L3c3d → L3c4 推进；前两项是 machine-campaign prerequisite checkpoints，
+> 不是新的 Task。该
 > b5b-ii-c checkpoint 以 8 个 non-document paths / 3,104 changed lines、35
 > focused tests、1,396-test staged-only serial、三个 verifier gates 与 final
 > no-unresolved-P0–P2 review 收口；未运行 full。c0a 完成后按序为 b5b-iii
@@ -691,8 +695,12 @@ fresh preflight 冻结 iv-a0 → iv-a-r → iv-b1a → iv-b1b-i → iv-b1b-ii �
 iv-b2；iv-a0、iv-a-r、iv-b1a、iv-b1b-i 与 iv-b1b-ii 已完成并保持
 non-admitting。iv-b1b-ii exact 5-path physical/verifier closure 通过七场景
 physical、808/808 clean serial、三项 dedicated gates 与 independent
-physical/verifier/cross-group review；当前 frontier 为 iv-b2，随后为 ii-c →
-L3c3d → L3c4。
+physical/verifier/cross-group review；iv-b2 也已完成并保持 non-admitting，
+implementation 为 `4e8d672d35e4416b0114c5c4dbebb1cb6a4d5089` / tree
+`e02a515283225b0b19443a47fad0b90fe3d0ddfd`。当前 frontier 为
+shared-deadline repair，随后为 interactive-native binding repair → ii-c →
+L3c3d → L3c4；前两项是 machine-campaign prerequisite checkpoints，不是
+新的 Task。
 ADR 0018 仍 Proposed，L3c4 独占 final admission 与剩余 full。
 iii-b2b-0 completion evidence 见
 [Release graph review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-0-review.md)。
@@ -766,8 +774,9 @@ iii-b2b-0、iii-b2b-1a-0、iii-b2b-1a-1 与 iii-b2b-1b
 complete/non-admitting；ii-c0b split frozen，c0b-i complete/non-admitting，
 c0b-ii ownership split complete，ii-a budget split frozen，ii-c0b-ii-a1
 与 ii-c0b-ii-a2 complete/non-admitting；ii-b retained-base split 已冻结，
-c0b-ii/c0b-iii 以及 iv-a0/iv-a-r/iv-b1a/iv-b1b-i/iv-b1b-ii 已完成并保持
-non-admitting；current frontier 为 c0b-iv-b2。
+c0b-ii/c0b-iii 以及 iv-a0/iv-a-r/iv-b1a/iv-b1b-i/iv-b1b-ii/iv-b2 已完成并保持
+non-admitting；current frontier 为 shared-deadline repair，随后为
+interactive-native binding repair → ii-c → L3c3d → L3c4。
 iv-b1b-i completion evidence 见
 [review](../reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-i-review.md)：
 implementation `41d34f26` / tree `8ab58932`、exact 3 paths / 1,173
@@ -778,6 +787,10 @@ iv-b1b-ii completion evidence 见
 implementation `373431d4` / tree `b08342e5`、exact 5 paths / 2,193 changed
 lines、七场景 physical、808/808 clean serial、三项 dedicated gates 与三组
 no-unresolved-P0-P2 final review。
+iv-b2 completion evidence 见
+[review](../reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b2-review.md)：
+implementation `4e8d672d35e4416b0114c5c4dbebb1cb6a4d5089` / tree
+`e02a515283225b0b19443a47fad0b90fe3d0ddfd`；complete/non-admitting。
 i-b2a completion 见
 [artifact/static reader review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2a-review.md)。
 [fixed service reader review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2b-b-review.md)
@@ -808,8 +821,9 @@ complete/non-admitting，iii-b2b-0、iii-b2b-1a-0、iii-b2b-1a-1 与
 iii-b2b-1b complete/non-admitting；ii-c0b four-way split frozen，c0b-i
 complete/non-admitting，c0b-ii ownership split complete，ii-a budget split
 frozen，ii-c0b-ii-a1 与 ii-c0b-ii-a2 complete/non-admitting；c0b-ii/c0b-iii
-以及 iv-a0/iv-a-r/iv-b1a/iv-b1b-i/iv-b1b-ii 已完成并保持 non-admitting；
-current frontier 为 c0b-iv-b2。
+以及 iv-a0/iv-a-r/iv-b1a/iv-b1b-i/iv-b1b-ii/iv-b2 已完成并保持
+non-admitting；current frontier 为 shared-deadline repair，随后为
+interactive-native binding repair → ii-c → L3c3d → L3c4。
 ii-a completion 见
 [review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-a-review.md)，ii-b
 completion 见
@@ -843,8 +857,9 @@ implementation `f11eea42ef295f49b20e1c0f3912d4b32448b968` / tree
 aggregate 7 paths / 2,870 lines、bare contract/component/App-Release exit 0
 与双人 no-unresolved-P0–P2 review；未运行 serial/full/root/App/XPC/model/
 network。a2 complete/non-admitting；retained-base/capsule/fixed-gate sequence
-随后已完成；iv-a0/iv-a-r/iv-b1a/iv-b1b-i/iv-b1b-ii 也已完成并保持
-non-admitting。current frontier 为 c0b-iv-b2，随后为 ii-c → L3c3d → L3c4。
+随后已完成；iv-a0/iv-a-r/iv-b1a/iv-b1b-i/iv-b1b-ii/iv-b2 也已完成并保持
+non-admitting。current frontier 为 shared-deadline repair，随后为
+interactive-native binding repair → ii-c → L3c3d → L3c4。
 [ii-b5b-iii-b0 preflight](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md)
 冻结 long-lived outer/disposable inner、FD 0/1/2/7/8/9、inner-led PGID、
 parent-crash containment 与 iii-a/b1/b2a/b2b budgets。
@@ -1053,11 +1068,11 @@ iii-b2b-1a-1 与拆分后的 iii-b2b-1b-i/1b-ii 已完成并保持
 non-admitting；ii-c0b 已冻结为四段，c0b-i 已完成并保持 non-admitting；
 ii-c0b-ii-a1 与 ii-c0b-ii-a2 已完成并保持 non-admitting；retained-base、
 publication/lease、settlement/recovery、verifier closure 与 c0b-iii fixed gate
-均已完成。c0b-iv 的 iv-a0、iv-a-r、iv-b1a、iv-b1b-i 与 iv-b1b-ii 已完成并
-保持 non-admitting；当前 frontier 为 iv-b2，之后严格为 ii-c、L3c3d、L3c4。
-剩余工作固定为三个交付包：已完成的 iv-b1b-ii、当前 iv-b2，以及在源码冻结后
-连续执行但逻辑仍相互独立的 ii-c/L3c3d/L3c4 machine-evidence campaign；
-不得再把 review finding 或局部修复递归升级为新的命名 prerequisite。
+均已完成。c0b-iv 的 iv-a0、iv-a-r、iv-b1a、iv-b1b-i、iv-b1b-ii 与 iv-b2 已
+完成并保持 non-admitting；当前 frontier 为 shared-deadline repair，之后严格为
+interactive-native binding repair、ii-c、L3c3d、L3c4。前两项是
+machine-campaign prerequisite checkpoints，不是递归命名的新 Task；不得再把
+review finding 或局部修复升级为新的命名 Task。
 已完成部分均为
 non-admitting prerequisite，
 L3c4 才是 machine admission。该最终 gate

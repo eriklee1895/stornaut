@@ -127,13 +127,14 @@
 > staged-only Release target build and two no-unresolved-P0-P2 final reviews.
 > iv-b1b-ii closed at implementation `373431d4` / tree `b08342e5`, exact five
 > paths / 2,193 changed lines, seven physical scenarios, 808/808 clean serial,
-> three dedicated gates and three no-unresolved-P0-P2 review groups. iv-b2 is
-> current. The former `ii-c0b-ii-a3 current` text is superseded.
-> Task 39 closeout is fixed to three delivery packages from the correction point:
-> completed iv-b1b-ii, current iv-b2, and one frozen-source machine-evidence
-> campaign containing logically distinct ii-c, L3c3d and L3c4 phases. Local
-> findings remain in their owning package and do not create recursive
-> prerequisites. L3c4 alone owns final admission and the remaining full.
+> three dedicated gates and three no-unresolved-P0-P2 review groups. iv-b2
+> closed at implementation `4e8d672d35e4416b0114c5c4dbebb1cb6a4d5089` /
+> tree `e02a515283225b0b19443a47fad0b90fe3d0ddfd` and remains non-admitting.
+> The former `ii-c0b-ii-a3 current` text is superseded. The current frontier is
+> shared-deadline repair, followed by interactive-native binding repair → ii-c →
+> L3c3d → L3c4. The two repairs are machine-campaign prerequisite checkpoints,
+> not recursively named new Tasks. Local findings remain in their owning
+> checkpoint. L3c4 alone owns final admission and the remaining full.
 > a2-i
 > closed at commit
 > `158f500` / tree `c7a42ffd` with 10 non-document paths / 1,965 changed
@@ -1220,8 +1221,10 @@ The remaining L3 work is split before driver coding:
    complete/non-admitting. iii-b2b-1a-0 canonical helper-provenance carriage,
    iii-b2b-1a-1 concrete outer observation and split iii-b2b-1b zero-argument
    entry/artifact and ii-c0b-i semantic producer are also complete/non-admitting.
-   c0b-ii and c0b-iii are complete/non-admitting. The corrected remaining
-   order is `ii-c0b-iv-b2 -> ii-c -> L3c3d -> L3c4`;
+   c0b-ii, c0b-iii and c0b-iv through iv-b2 are complete/non-admitting. The
+   corrected remaining order is `shared-deadline repair -> interactive-native
+   binding repair -> ii-c -> L3c3d -> L3c4`; the first two are machine-campaign
+   prerequisite checkpoints rather than new Tasks;
    the mandatory
    [c0b-iv preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-preflight.md)
    freezes the bounded children. iv-a0, iv-a-r, iv-b1a, iv-b1b-i and
@@ -1232,7 +1235,9 @@ The remaining L3 work is split before driver coding:
    no-unresolved-P0-P2 final reviews. iv-b1b-ii closed at implementation
    `373431d4` / tree `b08342e5`, exact five paths / 2,193 changed lines, seven
    physical scenarios, 808/808 clean serial and three no-unresolved-P0-P2
-   review groups. iv-b2 is current.
+   review groups. iv-b2 closed at implementation
+   `4e8d672d35e4416b0114c5c4dbebb1cb6a4d5089` / tree
+   `e02a515283225b0b19443a47fad0b90fe3d0ddfd` and remains non-admitting.
    a2 closed at implementation `f11eea42ef295f49b20e1c0f3912d4b32448b968` /
    tree `d0683495ea37d0692677c98f491f3037eaedba4c`, exact 4 paths / 889 lines
    and aggregate 7 paths / 2,870 lines, with bare contract/component/App-Release
@@ -1447,12 +1452,19 @@ and iii-a/iii-b1/iii-b2a0/iii-b2a-i/iii-b2a-ii-a1/a2-0/a2-i/a2-ii/
 iii-b2b-0, iii-b2b-1a-0, iii-b2b-1a-1 and iii-b2b-1b are
 complete/non-admitting; ii-c0b is frozen as c0b-i semantic producer, c0b-ii
 owner-only capsule node, c0b-iii fixed launcher/stub and c0b-iv zero-argument
-final composition. Current HEAD `ced4da2` closes c0b-i, c0b-ii and c0b-iii as
-non-admitting prerequisites. The mandatory
+final composition. At the contemporaneous c0b-iv preflight baseline
+`ced4da2`, c0b-i, c0b-ii and c0b-iii were closed as non-admitting
+prerequisites. The mandatory
 [c0b-iv preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-preflight.md)
 freezes iv-a authoritative binding/configuration/source inputs, iv-b1 contained
-handoff/settlement and iv-b2 zero-argument executable/verifier closure. iv-a is
-the current checkpoint; none of the three iv children is implemented.
+handoff/settlement and iv-b2 zero-argument executable/verifier closure. This is
+the preflight's contemporaneous dependency record; all iv children subsequently
+completed and remain non-admitting, with iv-b2 accepted at
+`4e8d672d35e4416b0114c5c4dbebb1cb6a4d5089` / tree
+`e02a515283225b0b19443a47fad0b90fe3d0ddfd`. The live frontier is
+shared-deadline repair, then interactive-native binding repair → ii-c → L3c3d →
+L3c4. The two repairs are machine-campaign prerequisite checkpoints, not new
+Tasks.
 ADR 0018
 remains Proposed until ii-c succeeds. L3c1 used focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean

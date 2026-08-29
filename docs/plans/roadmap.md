@@ -249,11 +249,13 @@ non-admitting；iii-b2b-0、iii-b2b-1a-0 与 iii-b2b-1a-1 已完成并保持
    7 paths / 2,870 lines、bare contract/component/App-Release exit 0 与双人
    no-unresolved-P0–P2 review 完成并保持 non-admitting，且未运行 serial/full/
    root/App/XPC/model/network。ii-b retained-base、publication/settlement、
-   c0b-iii 与 c0b-iv 的 iv-a0/iv-a-r/iv-b1a/iv-b1b-i/iv-b1b-ii 均已完成并
-   保持 non-admitting；当前严格按 iv-b2 → ii-c → L3c3d → L3c4 推进。
-   Task 39 收尾从修正点固定为三个交付包：已完成的 iv-b1b-ii、当前 iv-b2，
-   以及源码冻结后连续执行但逻辑仍独立的 ii-c/L3c3d/L3c4 machine-evidence
-   campaign；局部 finding 不再递归生成新 prerequisite，L3c4 独占最终 full。
+   c0b-iii 与 c0b-iv 的 iv-a0/iv-a-r/iv-b1a/iv-b1b-i/iv-b1b-ii/iv-b2 均已完成
+   并保持 non-admitting；iv-b2 implementation 为
+   `4e8d672d35e4416b0114c5c4dbebb1cb6a4d5089` / tree
+   `e02a515283225b0b19443a47fad0b90fe3d0ddfd`。当前严格按 shared-deadline
+   repair → interactive-native binding repair → ii-c → L3c3d → L3c4 推进。
+   前两项是 machine-campaign prerequisite checkpoints，不是递归命名的新
+   Task；L3c4 独占最终 full。
 39B2c 仍未作 machine readiness claim。
 [ii-c0a preflight](../reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md)
 冻结 v1-preserving enclosing projected-cohort binary contract、exact 8-path /
@@ -302,8 +304,10 @@ iii-b2a-ii-a1、a2-0、a2-i 与 a2-ii 已完成并保持 non-admitting；a2 已�
 iii-b2b-0、iii-b2b-1a-0、iii-b2b-1a-1、iii-b2b-1b 与 c0b-i 已完成并保持
 non-admitting。c0b-ii fresh preflight 已拆为 ii-c0b-ii-a/ii-c0b-ii-b；ii-a
 budget split 已冻结，ii-c0b-ii-a1/a2、retained-base、publication/settlement、
-c0b-iii 与 c0b-iv 的 iv-a0/iv-a-r/iv-b1a/iv-b1b-i/iv-b1b-ii 已完成并保持
-non-admitting；当前 frontier 为 iv-b2，后续严格为 ii-c → L3c3d → L3c4。
+c0b-iii 与 c0b-iv 的 iv-a0/iv-a-r/iv-b1a/iv-b1b-i/iv-b1b-ii/iv-b2 已完成并
+保持 non-admitting；当前 frontier 为 shared-deadline repair，后续严格为
+interactive-native binding repair → ii-c → L3c3d → L3c4。前两项是
+machine-campaign prerequisite checkpoints，不是新的 Task。
 L3c2b preflight 的 real-plan matrix contradiction 已由 3-path plan-freshness
 prerequisite 关闭，affected/Investigation/structural/review gates 通过；
 只有 L3c4 可作 readiness claim 并运行
@@ -511,8 +515,10 @@ four Mach-O projections 与 final no-unresolved-P0–P2 review。
    并保持 non-admitting；iii-b2b-1b 与 c0b-i 也已完成。c0b-ii fresh preflight
    已拆为 ii-c0b-ii-a/ii-c0b-ii-b，ii-a budget split 已冻结，ii-c0b-ii-a1
    与 ii-c0b-ii-a2、retained-base、publication/settlement、c0b-iii 与 c0b-iv 的
-   iv-a0/iv-a-r/iv-b1a/iv-b1b-i/iv-b1b-ii 已完成并保持 non-admitting；当前
-   frontier 为 iv-b2，后续严格为 ii-c → L3c3d → L3c4。
+   iv-a0/iv-a-r/iv-b1a/iv-b1b-i/iv-b1b-ii/iv-b2 已完成并保持
+   non-admitting；当前 frontier 为 shared-deadline repair，后续严格为
+   interactive-native binding repair → ii-c → L3c3d → L3c4。前两项是
+   machine-campaign prerequisite checkpoints，不是新的 Task。
   L3c4 才拥有 final admission/full。39B2c 才是 machine admission，Task 39
   尚未完成。
 - Epic 0 Foundation Upstream Study：已完成，选择 checked-in Xcode App/Test host + local Swift packages。
