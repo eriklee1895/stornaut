@@ -27,6 +27,76 @@ public enum InvestigationRuntimeDiagnosticCompositionRetirement:
     case retirementFailed
 }
 
+package enum InvestigationRuntimeDiagnosticReceiptJoinError:
+    Error,
+    Sendable,
+    Equatable
+{
+    case invalidRuntimeReceipt
+}
+
+package enum InvestigationRuntimeDiagnosticReceiptJoin {
+    package static func reconstruct(
+        from binding: SignedInvestigationRuntimeBinding
+    ) throws -> InvestigationRuntimeReceiptV1 {
+        let receipt: InvestigationRuntimeReceiptV1
+        do {
+            receipt = try InvestigationRuntimeReceiptCanonicalV1.receipt(
+                repositoryHEAD: binding.repositoryHEAD,
+                sourceFingerprintSHA256:
+                    binding.sourceFingerprintSHA256
+            )
+        } catch {
+            throw InvestigationRuntimeDiagnosticReceiptJoinError
+                .invalidRuntimeReceipt
+        }
+        return try validateCanonical(receipt, against: binding)
+    }
+
+    static func validate(
+        _ receipt: InvestigationRuntimeReceiptV1,
+        against binding: SignedInvestigationRuntimeBinding
+    ) throws -> InvestigationRuntimeReceiptV1 {
+        let reconstructed: InvestigationRuntimeReceiptV1
+        do {
+            reconstructed =
+                try InvestigationRuntimeReceiptCanonicalV1.receipt(
+                    repositoryHEAD: binding.repositoryHEAD,
+                    sourceFingerprintSHA256:
+                        binding.sourceFingerprintSHA256
+                )
+        } catch {
+            throw InvestigationRuntimeDiagnosticReceiptJoinError
+                .invalidRuntimeReceipt
+        }
+        guard receipt == reconstructed else {
+            throw InvestigationRuntimeDiagnosticReceiptJoinError
+                .invalidRuntimeReceipt
+        }
+        return try validateCanonical(receipt, against: binding)
+    }
+
+    private static func validateCanonical(
+        _ receipt: InvestigationRuntimeReceiptV1,
+        against binding: SignedInvestigationRuntimeBinding
+    ) throws -> InvestigationRuntimeReceiptV1 {
+        let digest: String
+        do {
+            digest = try InvestigationRuntimeReceiptCanonicalV1.sha256(
+                receipt
+            )
+        } catch {
+            throw InvestigationRuntimeDiagnosticReceiptJoinError
+                .invalidRuntimeReceipt
+        }
+        guard digest == binding.runtimeReceiptSHA256 else {
+            throw InvestigationRuntimeDiagnosticReceiptJoinError
+                .invalidRuntimeReceipt
+        }
+        return receipt
+    }
+}
+
 package enum InvestigationHandoffConcreteAppLeafError:
     Error,
     Sendable,
@@ -623,6 +693,14 @@ public final class InvestigationRuntimeDiagnosticComposition:
             throw InvestigationRuntimeDiagnosticCompositionError
                 .bindingMismatch
         }
+        do {
+            _ = try InvestigationRuntimeDiagnosticReceiptJoin.reconstruct(
+                from: configuration.binding
+            )
+        } catch {
+            throw InvestigationRuntimeDiagnosticCompositionError
+                .invalidConfiguration
+        }
 
         do {
             let lifecycleID = LifecycleInvestigationID(
@@ -802,7 +880,7 @@ package struct InvestigationRuntimeDiagnosticBindingObservation:
     package let machineDriverCodeDirectoryHash: String
     package let machineClaimServiceIdentifier: String
 
-    package init(
+    init(
         installedAppURL: URL,
         helperExecutableURL: URL,
         appExecutableName: String,

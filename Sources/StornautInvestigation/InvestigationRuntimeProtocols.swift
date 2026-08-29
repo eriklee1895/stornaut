@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import StornautCore
 
@@ -42,6 +43,149 @@ public struct InvestigationRuntimeReceiptV1: Sendable, Equatable {
         self.id = id
         self.schema = schema
         self.capabilityTokens = capabilityTokens
+    }
+}
+
+package enum InvestigationRuntimeReceiptCanonicalV1 {
+    package static let productionSchema:
+        InvestigationCollaborationSchemaV1 = .collabToolCallV1
+
+    private static let receiptDomain =
+        "stornaut.investigation.runtime-receipt.v1"
+    private static let receiptIDDomain =
+        "stornaut.investigation.runtime-receipt-id.v1"
+    private static let schemaVersion: UInt64 = 1
+    private static let receiptIDPrefix = "runtime-receipt-"
+
+    package static func receiptID(
+        repositoryHEAD: String,
+        sourceFingerprintSHA256: String
+    ) throws -> DomainToken {
+        guard isCanonicalLowercaseHex(repositoryHEAD, count: 40) else {
+            throw Error.invalidRepositoryHEAD
+        }
+        guard isCanonicalLowercaseHex(
+            sourceFingerprintSHA256,
+            count: 64
+        ) else {
+            throw Error.invalidSourceFingerprintSHA256
+        }
+
+        var projection = Data()
+        appendFramed(receiptIDDomain, to: &projection)
+        appendBigEndian(schemaVersion, to: &projection)
+        appendFramed(repositoryHEAD, to: &projection)
+        appendFramed(sourceFingerprintSHA256, to: &projection)
+
+        guard let id = DomainToken(
+            rawValue: receiptIDPrefix + sha256Hex(projection)
+        ) else {
+            throw Error.invalidReceiptID
+        }
+        return id
+    }
+
+    package static func receipt(
+        repositoryHEAD: String,
+        sourceFingerprintSHA256: String
+    ) throws -> InvestigationRuntimeReceiptV1 {
+        InvestigationRuntimeReceiptV1(
+            id: try receiptID(
+                repositoryHEAD: repositoryHEAD,
+                sourceFingerprintSHA256: sourceFingerprintSHA256
+            ),
+            schema: productionSchema,
+            capabilityTokens: InvestigationCapability.required
+        )
+    }
+
+    package static func canonicalData(
+        _ receipt: InvestigationRuntimeReceiptV1
+    ) throws -> Data {
+        guard isCanonicalReceiptID(receipt.id) else {
+            throw Error.invalidReceiptID
+        }
+        guard receipt.schema == productionSchema else {
+            throw Error.invalidSchema
+        }
+        guard receipt.capabilityTokens == InvestigationCapability.required,
+              Set(receipt.capabilityTokens).count
+                  == receipt.capabilityTokens.count
+        else {
+            throw Error.invalidCapabilities
+        }
+
+        var data = Data()
+        appendFramed(receiptDomain, to: &data)
+        appendBigEndian(schemaVersion, to: &data)
+        appendFramed(receipt.id.rawValue, to: &data)
+        appendFramed(receipt.schema.rawValue, to: &data)
+        appendBigEndian(UInt64(receipt.capabilityTokens.count), to: &data)
+        for capability in receipt.capabilityTokens {
+            appendFramed(capability.rawValue, to: &data)
+        }
+        return data
+    }
+
+    package static func sha256(
+        _ receipt: InvestigationRuntimeReceiptV1
+    ) throws -> String {
+        sha256Hex(try canonicalData(receipt))
+    }
+
+    package enum Error: Swift.Error, Sendable, Equatable {
+        case invalidRepositoryHEAD
+        case invalidSourceFingerprintSHA256
+        case invalidReceiptID
+        case invalidSchema
+        case invalidCapabilities
+    }
+
+    private static func isCanonicalReceiptID(_ id: DomainToken) -> Bool {
+        let value = id.rawValue
+        guard value.hasPrefix(receiptIDPrefix) else {
+            return false
+        }
+        return isCanonicalLowercaseHex(
+            String(value.dropFirst(receiptIDPrefix.count)),
+            count: 64
+        )
+    }
+
+    private static func isCanonicalLowercaseHex(
+        _ value: String,
+        count: Int
+    ) -> Bool {
+        value.utf8.count == count
+            && value.utf8.allSatisfy { byte in
+                (48...57).contains(byte) || (97...102).contains(byte)
+            }
+    }
+
+    private static func appendFramed(
+        _ value: String,
+        to data: inout Data
+    ) {
+        let bytes = Data(value.utf8)
+        appendBigEndian(UInt64(bytes.count), to: &data)
+        data.append(bytes)
+    }
+
+    private static func appendBigEndian(
+        _ value: UInt64,
+        to data: inout Data
+    ) {
+        for shift in stride(from: 56, through: 0, by: -8) {
+            data.append(
+                UInt8(truncatingIfNeeded: value >> UInt64(shift))
+            )
+        }
+    }
+
+    private static func sha256Hex(_ data: Data) -> String {
+        SHA256.hash(data: data).map {
+            String(format: "%02x", $0)
+        }.joined()
     }
 }
 

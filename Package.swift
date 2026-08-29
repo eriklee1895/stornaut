@@ -158,6 +158,23 @@ let package = Package(
             ]
         ),
         .target(
+            name: "StornautInvestigationMachineGateCoordinatorSupport",
+            dependencies: [
+                "StornautCodex",
+                "StornautCore",
+                "StornautInvestigation",
+                "StornautInvestigationDiagnostic",
+            ],
+            resources: [
+                .copy("Resources/InvestigationMachineBuildInputs.json"),
+            ],
+            plugins: [
+                .plugin(
+                    name: "StornautInvestigationBuildReceiptPlugin"
+                ),
+            ]
+        ),
+        .target(
             name: "StornautInvestigationHandoffContract",
             dependencies: []
         ),
@@ -262,6 +279,17 @@ let package = Package(
             ],
             path: "Tools/StornautInvestigationMachineGate"
         ),
+        .executableTarget(
+            name: "StornautInvestigationBuildReceiptGenerator",
+            path: "tools/StornautInvestigationBuildReceiptGenerator"
+        ),
+        .plugin(
+            name: "StornautInvestigationBuildReceiptPlugin",
+            capability: .buildTool(),
+            dependencies: [
+                "StornautInvestigationBuildReceiptGenerator",
+            ]
+        ),
         .testTarget(
             name: "StornautCoreTests",
             dependencies: [
@@ -297,6 +325,7 @@ let package = Package(
                 "StornautInvestigation",
                 "StornautInvestigationMachine",
                 "StornautInvestigationMachineDriverSupport",
+                "StornautInvestigationMachineGateCoordinatorSupport",
                 "StornautInvestigationMachineGateSupport",
                 "StornautInvestigationMachineLaunchSupport",
                 "StornautInvestigationMachineClaimServer",

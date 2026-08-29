@@ -493,12 +493,24 @@ public enum CapabilityRuntimeWorker {
         let installation = try await locateCodex(
             environment: processEnvironment
         )
+        let installedNativeIdentity: CodexNativeExecutableIdentityLease
+        do {
+            installedNativeIdentity = try CodexNativeExecutableIdentitySource()
+                .resolve(
+                    installation: installation,
+                    expectedUserID: identity.userID
+                )
+        } catch {
+            throw CapabilityRuntimeWorkerError.incompatibleCodex
+        }
         let installedCodexPackage =
             try syntheticDiagnosticCodexPackage(
-                installation: installation
+                installation: installation,
+                nativeExecutableURL:
+                    installedNativeIdentity.canonicalURL
             )
         let version = try await codexVersion(
-            executableURL: installation.executableURL,
+            executableURL: installedNativeIdentity.canonicalURL,
             environment: processEnvironment,
             workingDirectoryURL: runRoot
         )
@@ -511,7 +523,7 @@ public enum CapabilityRuntimeWorker {
 
         let staticReport = try await CodexRuntimeCapabilityDetector()
             .report(
-                executableURL: installation.executableURL,
+                executableURL: installedNativeIdentity.canonicalURL,
                 environment: processEnvironment
             )
         guard staticReport.readiness == .configurationReady else {
@@ -543,9 +555,19 @@ public enum CapabilityRuntimeWorker {
             )
         let stagedCodexExecutableURL =
             stagedCodexPackage.executableURL
+        let stagedCodexExecutableIdentity: CodexNativeExecutableIdentity
+        do {
+            stagedCodexExecutableIdentity = try installedNativeIdentity
+                .verifyStagedExecutable(
+                at: stagedCodexExecutableURL
+            )
+        } catch {
+            throw CapabilityRuntimeWorkerError.incompatibleCodex
+        }
+        let stagedCodexExecutableSHA256 = stagedCodexExecutableIdentity.sha256
         let capabilitySessionTopology =
-            try syntheticCapabilitySessionTopology(
-                outerExecutableURL: installation.executableURL,
+            SyntheticCapabilitySessionTopology(
+                outerExecutableURL: stagedCodexExecutableURL,
                 appServerExecutableURL: stagedCodexExecutableURL
             )
         let networkProbeSourceURL = (
@@ -610,7 +632,7 @@ public enum CapabilityRuntimeWorker {
             forbiddenHomeURL: homeURL
         )
         try await runSyntheticDiagnosticPrivacyProbe(
-            outerExecutableURL: installation.executableURL,
+            outerExecutableURL: stagedCodexExecutableURL,
             probeExecutableURL: stagedCodexExecutableURL,
             workspace: workspace.paths,
             deniedURL: fixture.deniedReadURL,
@@ -823,9 +845,13 @@ public enum CapabilityRuntimeWorker {
             authSourceURL: authSourceURL,
             initialAuthSnapshot: initialAuthSnapshot
         )
-        let stagedCodexExecutableSHA256 = try sha256File(
-            stagedCodexExecutableURL
-        )
+        do {
+            try installedNativeIdentity.verifyStagedExecutable(
+                at: stagedCodexExecutableURL
+            )
+        } catch {
+            throw CapabilityRuntimeWorkerError.incompatibleCodex
+        }
         canary.stop()
         do {
             try workspace.remove()
@@ -2079,6 +2105,20 @@ func syntheticDiagnosticReadScope(
 func syntheticDiagnosticCodexPackage(
     installation: CodexInstallation
 ) throws -> SyntheticDiagnosticCodexPackage {
+    let nativeIdentity = try CodexNativeExecutableIdentitySource().resolve(
+        installation: installation,
+        expectedUserID: geteuid()
+    )
+    return try syntheticDiagnosticCodexPackage(
+        installation: installation,
+        nativeExecutableURL: nativeIdentity.canonicalURL
+    )
+}
+
+private func syntheticDiagnosticCodexPackage(
+    installation: CodexInstallation,
+    nativeExecutableURL: URL
+) throws -> SyntheticDiagnosticCodexPackage {
     let executable = installation.executableURL.standardizedFileURL
     let packageRoot = executable
         .deletingLastPathComponent()
@@ -2098,7 +2138,7 @@ func syntheticDiagnosticCodexPackage(
     ).standardizedFileURL
     let package = SyntheticDiagnosticCodexPackage(
         rootURL: root,
-        executableURL: root.appending(path: "bin/codex"),
+        executableURL: nativeExecutableURL.standardizedFileURL,
         codeModeHostURL: root.appending(
             path: "bin/codex-code-mode-host"
         ),
@@ -2107,6 +2147,9 @@ func syntheticDiagnosticCodexPackage(
     )
     guard
         package.rootURL.lastPathComponent == "aarch64-apple-darwin",
+        package.executableURL
+            == package.rootURL.appending(path: "bin/codex")
+                .standardizedFileURL,
         packageFileIsAdmitted(package.executableURL),
         packageFileIsAdmitted(package.codeModeHostURL),
         packageFileIsAdmitted(package.ripgrepURL),
@@ -3078,10 +3121,6 @@ private func readAll(
         }
         data.append(contentsOf: buffer.prefix(count))
     }
-}
-
-private func sha256File(_ url: URL) throws -> String {
-    sha256(try Data(contentsOf: url, options: .mappedIfSafe))
 }
 
 private func sha256(_ data: Data) -> String {

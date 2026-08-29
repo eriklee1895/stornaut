@@ -2902,16 +2902,25 @@ struct SignedRuntimeContractFixture {
         sourceFingerprintSHA256: String? = nil,
         runtimeReceiptSHA256: String? = nil
     ) -> SignedInvestigationRuntimeBinding {
-        SignedInvestigationRuntimeBinding(
-            repositoryHEAD: String(repeating: "1", count: 40),
-            sourceFingerprintSHA256:
-                sourceFingerprintSHA256
-                ?? String(repeating: "2", count: 64),
+        let repositoryHEAD = String(repeating: "1", count: 40)
+        let sourceFingerprintSHA256 =
+            sourceFingerprintSHA256
+            ?? String(repeating: "2", count: 64)
+        let canonicalRuntimeReceiptSHA256 = try!
+            InvestigationRuntimeReceiptCanonicalV1.sha256(
+                InvestigationRuntimeReceiptCanonicalV1.receipt(
+                    repositoryHEAD: repositoryHEAD,
+                    sourceFingerprintSHA256: sourceFingerprintSHA256
+                )
+            )
+        return SignedInvestigationRuntimeBinding(
+            repositoryHEAD: repositoryHEAD,
+            sourceFingerprintSHA256: sourceFingerprintSHA256,
             appExecutableSHA256: String(repeating: "a", count: 64),
             helperExecutableSHA256: String(repeating: "4", count: 64),
             runtimeReceiptSHA256:
                 runtimeReceiptSHA256
-                ?? String(repeating: "5", count: 64),
+                ?? canonicalRuntimeReceiptSHA256,
             promptSHA256: String(repeating: "6", count: 64),
             envelopeSchemaSHA256: String(repeating: "7", count: 64),
             facadeSHA256: String(repeating: "8", count: 64),

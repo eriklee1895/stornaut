@@ -8,6 +8,33 @@ snapshot_source=commit
 requested_revision=HEAD
 source_was_selected=false
 
+function validation_git() {
+    /usr/bin/env -i \
+        HOME=/var/empty \
+        XDG_CONFIG_HOME=/var/empty \
+        PATH=/usr/bin:/bin \
+        LC_ALL=C \
+        GIT_CONFIG_NOSYSTEM=1 \
+        GIT_CONFIG_SYSTEM=/dev/null \
+        GIT_CONFIG_GLOBAL=/dev/null \
+        GIT_NO_REPLACE_OBJECTS=1 \
+        GIT_NO_LAZY_FETCH=1 \
+        GIT_OPTIONAL_LOCKS=0 \
+        GIT_TERMINAL_PROMPT=0 \
+        /usr/bin/git -c core.hooksPath=/dev/null -c core.fsmonitor=false \
+            -c core.untrackedCache=false "$@"
+}
+
+function physical_path() {
+    local path=$1
+    local directory=${path:h}
+    local leaf=${path:t}
+    (
+        cd "$directory"
+        print -r -- "$(pwd -P)/$leaf"
+    )
+}
+
 function print_usage() {
     print \
         "Usage: scripts/with-clean-validation-snapshot [--commit <commit-ish>|--staged] -- <command> [args...]"
@@ -63,25 +90,35 @@ done
     || fail_usage "Validation snapshots reject symbolic-link repository paths."
 
 head_commit=$(
-    git -C "$repo_root" rev-parse --verify 'HEAD^{commit}' 2>/dev/null
+    validation_git -C "$repo_root" rev-parse --verify 'HEAD^{commit}' 2>/dev/null
 ) || fail_usage "The repository has no valid HEAD commit."
 
 if [[ "$snapshot_source" == staged ]]; then
-    index_tree=$(git -C "$repo_root" write-tree 2>/dev/null) \
+    index_tree=$(validation_git -C "$repo_root" write-tree 2>/dev/null) \
         || fail_usage "The staged index cannot be written as a clean tree."
     validation_commit=$(
         print -r -- 'Stornaut staged validation snapshot' \
-            | env \
+            | /usr/bin/env -i \
+                HOME=/var/empty \
+                XDG_CONFIG_HOME=/var/empty \
+                PATH=/usr/bin:/bin \
+                LC_ALL=C \
+                GIT_CONFIG_NOSYSTEM=1 \
+                GIT_CONFIG_SYSTEM=/dev/null \
+                GIT_CONFIG_GLOBAL=/dev/null \
+                GIT_NO_REPLACE_OBJECTS=1 \
+                GIT_OPTIONAL_LOCKS=0 \
+                GIT_TERMINAL_PROMPT=0 \
                 GIT_AUTHOR_NAME='Stornaut Validation' \
                 GIT_AUTHOR_EMAIL='stornaut-validation@example.invalid' \
                 GIT_COMMITTER_NAME='Stornaut Validation' \
                 GIT_COMMITTER_EMAIL='stornaut-validation@example.invalid' \
-                git -C "$repo_root" commit-tree \
+                /usr/bin/git -C "$repo_root" commit-tree \
                     "$index_tree" -p "$head_commit"
     ) || fail_usage "The staged tree could not be sealed as a validation commit."
 else
     validation_commit=$(
-        git -C "$repo_root" rev-parse \
+        validation_git -C "$repo_root" rev-parse \
             --verify "$requested_revision^{commit}" 2>/dev/null
     ) || fail_usage "Invalid validation commit: $requested_revision"
 fi
@@ -125,7 +162,7 @@ function cleanup_snapshot() {
 
     local cleanup_rc=0
     if [[ "$worktree_add_started" == true ]]; then
-        git -C "$repo_root" worktree remove --force -- \
+        validation_git -C "$repo_root" worktree remove --force -- \
             "$snapshot_root" >/dev/null 2>&1 || cleanup_rc=$?
     fi
     if (( cleanup_rc == 0 )); then
@@ -180,35 +217,107 @@ trap 'cleanup_snapshot_on_signal INT 130' INT
 trap 'cleanup_snapshot_on_signal TERM 143' TERM
 
 worktree_add_started=true
-git -C "$repo_root" worktree add --detach -- \
+validation_git -C "$repo_root" worktree add --no-checkout --detach -- \
     "$snapshot_root" "$validation_commit" >/dev/null
 
-observed_commit=$(git -C "$snapshot_root" rev-parse --verify HEAD)
+observed_commit=$(validation_git -C "$snapshot_root" rev-parse --verify HEAD)
 [[ "$observed_commit" == "$validation_commit" ]] \
     || { print -u2 "Validation snapshot commit drifted."; exit 70; }
-[[ -z "$(
-    git -C "$snapshot_root" status --porcelain=v1 --untracked-files=all
-)" ]] || { print -u2 "Validation snapshot is not clean."; exit 70; }
+validation_tree=$(
+    validation_git -C "$snapshot_root" rev-parse \
+        --verify "$validation_commit^{tree}"
+) || { print -u2 "Validation snapshot tree is unavailable."; exit 70; }
+validation_git -C "$snapshot_root" \
+    ls-tree -rz --full-tree --long "$validation_tree" \
+    > "$container/manifest" \
+    || { print -u2 "Validation snapshot manifest failed."; exit 70; }
+/usr/bin/python3 -I - "$snapshot_root" "$container/manifest" <<'PY' \
+    || { print -u2 "Validation snapshot materialization failed."; exit 70; }
+import hashlib, os, subprocess, sys, unicodedata
+root = os.path.realpath(sys.argv[1])
+with open(sys.argv[2], "rb") as source: records = source.read().split(b"\0")
+if len(records) < 2 or records[-1]: raise SystemExit(1)
+seen = set()
+for record in records[:-1]:
+    try: header, raw_path = record.split(b"\t", 1)
+    except ValueError: raise SystemExit(1)
+    fields = header.split()
+    try: path = raw_path.decode("utf-8")
+    except UnicodeDecodeError: raise SystemExit(1)
+    parts = path.split("/")
+    key = unicodedata.normalize("NFD", path).casefold()
+    if (len(fields) != 4 or fields[0] not in (b"100644", b"100755")
+        or fields[1] != b"blob" or len(fields[2]) != 40
+        or any(c not in b"0123456789abcdef" for c in fields[2])
+        or not fields[3].isdigit() or not raw_path or path.encode() != raw_path
+        or any(p in ("", ".", "..") for p in parts)
+        or parts[0] in (".git", ".build", ".derivedData")
+        or key in seen): raise SystemExit(1)
+    seen.add(key)
+    result = subprocess.run(
+        ["/usr/bin/git", "-C", root, "cat-file", "blob", fields[2]],
+        stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+        env={"HOME":"/var/empty", "PATH":"/usr/bin:/bin", "LC_ALL":"C",
+             "GIT_CONFIG_NOSYSTEM":"1", "GIT_CONFIG_SYSTEM":"/dev/null",
+             "GIT_CONFIG_GLOBAL":"/dev/null", "GIT_NO_REPLACE_OBJECTS":"1"})
+    data = result.stdout
+    framed = b"blob " + str(len(data)).encode() + b"\0" + data
+    if (result.returncode or len(data) != int(fields[3])
+        or hashlib.sha1(framed).hexdigest().encode() != fields[2]): raise SystemExit(1)
+    destination = os.path.join(root, path)
+    os.makedirs(os.path.dirname(destination), mode=0o755, exist_ok=True)
+    fd = os.open(destination, os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,
+                 0o755 if fields[0] == b"100755" else 0o644)
+    try:
+        os.fchmod(fd, 0o755 if fields[0] == b"100755" else 0o644)
+        with os.fdopen(fd, "wb", closefd=False) as output: output.write(data)
+    finally: os.close(fd)
+PY
+rm "$container/manifest"
+validation_git -C "$snapshot_root" read-tree "$validation_tree" \
+    || { print -u2 "Validation snapshot index creation failed."; exit 70; }
 
 source_common_dir=$(
     cd "$repo_root"
-    cd "$(git rev-parse --git-common-dir)"
+    cd "$(validation_git rev-parse --git-common-dir)"
     pwd -P
 )
+repo_root=$(physical_path "$repo_root")
+snapshot_root=$(physical_path "$snapshot_root")
+source_common_dir=$(physical_path "$source_common_dir")
+snapshot_build_root="$snapshot_root/.build"
+snapshot_derived_root="$snapshot_root/.derivedData"
+typeset -a protected_worktrees
+typeset worktree_record
+for worktree_record in \
+    "${(@0)$(validation_git -C "$repo_root" worktree list --porcelain -z)}"; do
+    [[ "$worktree_record" == 'worktree '* ]] \
+        && protected_worktrees+=("${worktree_record#worktree }")
+done
 snapshot_common_dir=$(
     cd "$snapshot_root"
-    cd "$(git rev-parse --git-common-dir)"
+    cd "$(validation_git rev-parse --git-common-dir)"
     pwd -P
 )
+snapshot_common_dir=$(physical_path "$snapshot_common_dir")
 [[ "$source_common_dir" == "$snapshot_common_dir" ]] \
     || { print -u2 "Validation snapshot belongs to a foreign repository."; exit 70; }
+mkdir -p "$snapshot_build_root" "$snapshot_derived_root"
+[[ ! -L "$snapshot_build_root" && ! -L "$snapshot_derived_root" ]] \
+    || { print -u2 "Validation output roots are unsafe."; exit 70; }
 
 command_rc=0
 trap 'record_pending_launch_signal HUP 129' HUP
 trap 'record_pending_launch_signal INT 130' INT
 trap 'record_pending_launch_signal TERM 143' TERM
-/usr/bin/python3 - \
+/usr/bin/python3 -I - \
     "$snapshot_root" \
+    "$repo_root" \
+    "$source_common_dir" \
+    "$snapshot_build_root" \
+    "$snapshot_derived_root" \
+    "${protected_worktrees[@]}" \
+    -- \
     "$validation_commit" \
     "$snapshot_source" \
     "$@" <<'PY' &
@@ -219,9 +328,109 @@ import sys
 import time
 
 
-snapshot_root, validation_commit, snapshot_source, *command = sys.argv[1:]
+separator_index = sys.argv.index("--")
+(
+    snapshot_root,
+    repository_root,
+    git_common_directory,
+    build_root,
+    derived_root,
+    *protected_worktrees,
+) = sys.argv[1:separator_index]
+validation_commit, snapshot_source, *command = sys.argv[separator_index + 1:]
 child = None
 pending_signal = None
+
+VALIDATION_ENVIRONMENT_NAMES = (
+    "STORNAUT_VALIDATION_TREE",
+    "STORNAUT_VALIDATION_MANIFEST_SHA256",
+    "STORNAUT_VALIDATION_PROMPT_SHA256",
+    "STORNAUT_VALIDATION_ENVELOPE_SCHEMA_SHA256",
+    "STORNAUT_VALIDATION_FACADE_SHA256",
+)
+SANDBOX_PROFILE = """
+(version 1)
+(allow default)
+(deny file-write* (subpath (param "SNAPSHOT_ROOT")))
+(deny file-write* (subpath (param "REPOSITORY_ROOT")))
+(deny file-write* (subpath (param "GIT_COMMON_DIRECTORY")))
+(allow file-write* (subpath (param "BUILD_ROOT")))
+(allow file-write* (subpath (param "DERIVED_ROOT")))
+(allow process-exec (literal "/bin/ps") (with no-sandbox))
+"""
+
+
+def validate_sandbox():
+    protected_probe = os.path.join(snapshot_root, ".stornaut-write-probe")
+    writable_probe = os.path.join(build_root, ".stornaut-write-probe")
+    denied = subprocess.run(
+        sandbox_command([
+            "/bin/sh",
+            "-c",
+            'printf denied > "$1"',
+            "stornaut-sandbox-probe",
+            protected_probe,
+        ]),
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if denied.returncode == 0 or os.path.lexists(protected_probe):
+        raise RuntimeError("validation sandbox did not protect source")
+    allowed = subprocess.run(
+        sandbox_command([
+            "/bin/sh",
+            "-c",
+            'printf allowed > "$1"',
+            "stornaut-sandbox-probe",
+            writable_probe,
+        ]),
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if allowed.returncode != 0:
+        raise RuntimeError("validation sandbox rejected build output")
+    os.unlink(writable_probe)
+    process_probe = subprocess.run(
+        sandbox_command([
+            "/bin/ps", "-o", "pgid=", "-p", str(os.getpid())
+        ]),
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if process_probe.returncode != 0 or not process_probe.stdout.strip():
+        raise RuntimeError("validation sandbox rejected process observation")
+def sandbox_command(arguments):
+    profile = SANDBOX_PROFILE
+    invocation = [
+        "/usr/bin/sandbox-exec",
+        "-D",
+        "SNAPSHOT_ROOT=" + snapshot_root,
+        "-D",
+        "REPOSITORY_ROOT=" + repository_root,
+        "-D",
+        "GIT_COMMON_DIRECTORY=" + git_common_directory,
+        "-D",
+        "BUILD_ROOT=" + build_root,
+        "-D",
+        "DERIVED_ROOT=" + derived_root,
+    ]
+    for index, path in enumerate(protected_worktrees):
+        canonical = os.path.realpath(path)
+        if canonical != snapshot_root:
+            profile += (
+                '\n(deny file-write* (subpath (param "WORKTREE_%d")))'
+                % index
+            )
+            invocation.extend([
+                "-D", "WORKTREE_%d=%s" % (index, canonical)
+            ])
+    return [*invocation, "-p", profile, "--", *arguments]
 
 
 def process_group_exists(process_group_id):
@@ -253,10 +462,28 @@ for handled_signal in (signal.SIGHUP, signal.SIGINT, signal.SIGTERM):
     signal.signal(handled_signal, record_signal)
 
 environment = os.environ.copy()
+for name in tuple(environment):
+    if name.startswith("GIT_"):
+        environment.pop(name, None)
 environment["STORNAUT_VALIDATION_COMMIT"] = validation_commit
 environment["STORNAUT_VALIDATION_SOURCE"] = snapshot_source
+for name in VALIDATION_ENVIRONMENT_NAMES:
+    environment.pop(name, None)
+environment["TMPDIR"] = build_root
+if (
+    len(command) >= 2
+    and os.path.basename(command[0]) == "swift"
+    and command[1] in ("build", "run", "test", "package")
+    and "--disable-sandbox" not in command
+):
+    command.append("--disable-sandbox")
+try:
+    validate_sandbox()
+except (OSError, RuntimeError):
+    print("Validation snapshot sandbox preflight failed.", file=sys.stderr)
+    raise SystemExit(70)
 child = subprocess.Popen(
-    command,
+    sandbox_command(command),
     cwd=snapshot_root,
     env=environment,
     start_new_session=True,

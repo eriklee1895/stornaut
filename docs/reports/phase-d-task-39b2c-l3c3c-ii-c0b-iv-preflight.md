@@ -1,6 +1,7 @@
 # Phase D Task 39B2c L3c3c-ii-c0b-iv Final Composition Preflight
 
-> Status: scope/authority split frozen; implementation not started; non-admitting
+> Status: iv-a0 core implemented; iv-a-r acceptance closure frozen;
+> non-admitting
 >
 > Date: 2026-08-29
 >
@@ -25,7 +26,8 @@ descriptor ownership plus post-reap settlement, and final executable/artifact
 admission. It is frozen, with no recursive prerequisite split permitted, as:
 
 ```text
-ii-c0b-iv-a   authoritative binding/configuration/source inputs
+ii-c0b-iv-a0  authoritative binding/configuration/source core
+-> ii-c0b-iv-a-r  provenance acceptance + App receipt admission closure
 -> ii-c0b-iv-b1  contained fixed-gate handoff, exact reap and settlement
 -> ii-c0b-iv-b2  zero-argument executable and aggregate verifier closure
 -> ii-c          unique real no-model privileged machine attempt
@@ -33,10 +35,11 @@ ii-c0b-iv-a   authoritative binding/configuration/source inputs
 -> L3c4          final admission and remaining authoritative full verifier
 ```
 
-Each child is below fourteen non-document paths and 4,000 changed lines. If a
-child cannot fit its frozen envelope, implementation stops and reports the
-blocker; it does not create iv-a1/iv-a2, iv-b1a/iv-b1b or another prerequisite.
-No child accepts ADR 0018 or makes a readiness claim.
+The iv-a0 implementation reached its 3,900-line ceiling margin before final
+review exposed two cross-path acceptance gaps. Under the user's explicit
+dynamic-planning authority, the remaining work is frozen as the narrow iv-a-r
+closure below instead of weakening tests or exceeding the review budget. No
+child accepts ADR 0018 or makes a readiness claim.
 
 ## 2. Resolved Semantic Ambiguities
 
@@ -60,20 +63,22 @@ Repository/build provenance is a separate package-only typed
 - prompt, Envelope-v2 schema and Task 38 facade artifact SHA-256 values.
 
 The manifest excludes generated plugin output and build products, so the
-receipt has no self-reference. The controlled build obtains the commit from the
-already sealed validation-snapshot environment, proves the snapshot is clean,
-derives the tree/manifest, and generates Swift source only in SwiftPM's declared
-plugin work directory. The coordinator validates the generated typed receipt
+receipt has no self-reference. The controlled build passes only the sealed
+validation commit into a commit-keyed SwiftPM command. Inside the write-
+protected validation snapshot, the generator independently derives and verifies
+the tree, complete tracked-file manifest, modes and semantic artifact hashes
+with fixed Git arguments and a closed environment, then writes only in the
+plugin output directory. The coordinator validates the generated typed receipt
 before binding construction. Runtime `git`, an install/runtime mutable sidecar,
-config-file fields, arbitrary environment input and caller-supplied repository/
-source/build strings are forbidden. This receipt does not change the
+config-file fields, arbitrary hash environment input and caller-supplied
+repository/source/build strings are forbidden. This receipt does not change the
 Investigation source schema and is never substituted for
 `sourceFingerprintSHA256`.
 The existing binding schema v2 remains wire-compatible. `repositoryHEAD` is the
 exact clean validation-snapshot commit and therefore commits to its Git tree;
 `promptSHA256`, `envelopeSchemaSHA256` and `facadeSHA256` retain their direct
 artifact meanings and must equal the corresponding build-receipt entries. The
-iv-a output carries the complete build-provenance receipt and its canonical
+iv-a0 output carries the complete build-provenance receipt and its canonical
 digest beside the binding, and iv-b2 includes that digest in the final
 coordinator receipt. This preserves both trust domains without overloading a
 legacy field or adding an unjoined sidecar: the binding identifies the source
@@ -111,7 +116,7 @@ gate transport receipt or the final coordinator receipt.
 from the existing capability-runtime package-layout logic; resolver logic may
 not be copied into the coordinator. The fixed closed runtime environment may
 locate the installed package's `codex.js` entry, but the identity is never the
-wrapper hash and never comes from a caller URL or report string. iv-a resolves
+wrapper hash and never comes from a caller URL or report string. iv-a0 resolves
 and opens the installed native
 `bin/codex` read-only and binds canonical path, held/named device+inode, regular
 file type, owner/mode/link/flags/ACL/xattrs, bounded size and complete SHA-256.
@@ -122,13 +127,21 @@ staged native copy's SHA-256 to equal this installed-native observation before
 producing evidence. Replacement, disappearance, metadata drift, a different
 resolver result or staged digest mismatch fails closed. The observation grants
 no execution or write authority.
+Like the already accepted installed-L2 Security observations, these held/named
+checks are a race-detecting sandwich rather than an atomic descriptor-bound
+exec claim. A malicious concurrent same-UID actor could replace, execute and
+restore a staged path between checks; that actor is outside ADR 0018's explicit
+serialized trusted-local-operator development threat model. Once the contained
+Codex worker starts, it and its descendants are denied writes to the staged
+package. Distribution-grade resistance to a hostile local account requires a
+root-owned installation or notarized update boundary and is not claimed here.
 
 ### 2.4 One fixed disposable source projection
 
-iv-a defines one fixed disposable source-fixture template and its canonical
+iv-a0 defines one fixed disposable source-fixture template and its canonical
 Task 36 projection contract. iv-b2 materializes the template beneath a fresh
 coordinator-owned attempt base, imports it once through the existing Store v4
-source-projection and Candidate Planner path, and only then calls the iv-a
+source-projection and Candidate Planner path, and only then calls the iv-a0
 receipt/binding/configuration factory with the resulting fingerprint. All eight
 plans reference
 that one canonical source fingerprint but carry distinct Investigation/run
@@ -148,7 +161,8 @@ StornautInvestigationDiagnostic
   -> StornautInvestigation + StornautInvestigationRuntime
   -> StornautCodex + StornautCore + StornautLifecycle
   -> StornautInvestigationHandoffContract
-  -> iv-a binding/configuration owner and sealed build-provenance join
+  -> iv-a0 binding/configuration owner and sealed build-provenance join
+  -> iv-a-r inherited-handoff App receipt admission join
 
 StornautInvestigationMachineLaunchSupport
   -> StornautInvestigationHandoffContract
@@ -192,9 +206,9 @@ Documentation paths do not count. Budgets are measured as added plus deleted
 non-document lines against each child's exact pushed predecessor. No deletion,
 binary path or path outside the listed set is allowed.
 
-### 4.1 iv-a — authoritative binding/configuration/source
+### 4.1 iv-a0 — authoritative binding/configuration/source core
 
-Exactly thirteen non-document paths, at most 3,900 changed lines:
+Exactly fourteen non-document paths, at most 3,900 changed lines:
 
 1. `Package.swift`;
 2. `Plugins/StornautInvestigationBuildReceiptPlugin/plugin.swift` (new);
@@ -208,22 +222,40 @@ Exactly thirteen non-document paths, at most 3,900 changed lines:
 10. `Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineCoordinatorBindingSource.swift` (new);
 11. `Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineCoordinatorConfigurationSet.swift` (new);
 12. `Tests/StornautCodexTests/CodexNativeExecutableIdentityTests.swift` (new); and
-13. `Tests/StornautInvestigationTests/InvestigationMachineCoordinatorBindingSourceTests.swift` (new).
+13. `Tests/StornautInvestigationTests/InvestigationMachineCoordinatorBindingSourceTests.swift` (new); and
+14. `Tests/StornautInvestigationTests/SignedRuntimeContractTests.swift`.
 
-A fourteenth path or line 3,901 blocks implementation. iv-a owns the generated
+A fifteenth path or line 3,901 blocks implementation. The fourteenth path is
+the existing Task 39 composition fixture whose former placeholder receipt hash
+must now be derived from the canonical receipt contract. iv-a0 owns the generated
 build-provenance contract, installed-native read-only identity shared with the
 worker, one deterministic cohort runtime receipt plus strict binding/admission
 join, one fixed disposable source fingerprint, one complete binding and eight
-fresh scenario-specific configurations. c0b-i authoring remains owned by
+fresh scenario-specific configurations. Configuration derivation is pure and
+does not create or remove caller paths; iv-b2 owns materialization and retained
+attempt-base identity. c0b-i authoring remains owned by
 iv-b2 after all three components exist. The checked-in input contains only
 canonical manifest rules and artifact-relative names, never a commit/hash claim.
 After creating and checking its clean detached worktree, the snapshot wrapper
-derives the tree, raw Git-tree manifest digest and semantic artifact hashes and
-exports only the six named `STORNAUT_VALIDATION_*` values. The plugin forwards
-only those values plus the declared input to the generator, which writes only
-the plugin output directory; they add no runtime authority. Verifier
-implementation is intentionally deferred to iv-b2. iv-a must not publish a
+passes only its sealed commit. The plugin uses that commit in its declared
+output path, and the generator independently reconstructs and byte-validates
+the remaining provenance as described in section 2.1. Verifier
+implementation is intentionally deferred to iv-b2. iv-a0 must not publish a
 capsule or spawn a product/gate process.
+
+### 4.1.1 iv-a-r — post-review acceptance closure
+
+At most three non-document paths and 900 changed lines:
+
+1. `scripts/verify-clean-validation-snapshot-contract`;
+2. `Sources/StornautInvestigationDiagnostic/InvestigationRuntimeDiagnosticComposition.swift`; and
+3. `Tests/StornautInvestigationTests/InvestigationHandoffConcreteCompositionTests.swift`.
+
+This closure turns the provenance negative matrix into repeatable tests and
+makes the actual inherited-handoff App acknowledgement reconstruct, retain and
+project the one canonical Task 38 receipt. A valid-shape foreign digest is
+rejected before acknowledgement. It adds no process, filesystem, root, model,
+network or readiness authority and completes before iv-b1.
 
 ### 4.2 iv-b1 — contained handoff and settlement
 
@@ -271,23 +303,24 @@ already sealed gate sources.
 | Field/evidence | Authoritative source | Required observation/order | Rejected substitute |
 | --- | --- | --- | --- |
 | `sourceFingerprintSHA256` | one Task 36/38 `InvestigationSourceProjection` | before plan/config creation; identical across eight | Git/build/source receipt |
-| `repositoryHEAD` + build-source identity | generated `InvestigationMachineBuildProvenanceReceiptV1` over the clean validation commit/tree/manifest | binding v2 carries the commit and direct prompt/schema/facade hashes; iv-a output and final coordinator receipt carry the provenance-receipt digest | runtime Git, install/runtime sidecar, caller/env fields, self-hash |
+| `repositoryHEAD` + build-source identity | generated `InvestigationMachineBuildProvenanceReceiptV1` over the clean validation commit/tree/manifest | binding v2 carries the commit and direct prompt/schema/facade hashes; iv-a0 output and final coordinator receipt carry the provenance-receipt digest | runtime Git, install/runtime sidecar, caller/env fields, self-hash |
 | App/helper/driver identities | one current installed binding observation | after build receipt, before configs | constants or stale report |
 | prompt/schema/facade hashes | exact current resources/source identities joined by the sealed build receipt | before binding construction | caller strings or independent mutable files |
 | Task 38 runtime receipt | one typed cohort receipt plus strict configuration projection | created once before binding; hash covers ID/schema/capabilities; exact projection reaches every App admission | per-config receipt, digest-only input or App-side replacement |
 | Codex native executable | shared installed-native resolver plus held read-only node | resolve/open/hash/revalidate before first config seal; later staged digest must match | wrapper hash/caller URL/old capability report |
 | source fixture/fingerprint | one fixed disposable fixture plus its canonical Task 36 projection contract | materialize once in iv-b2 before plans; reuse one fingerprint across eight | user repository, prior mutable session or eight snapshots |
-| complete signed binding | iv-a authoritative builder | only after all preceding joins agree | individual binding fields from caller |
-| eight roots/plans/configs | iv-a fixed scenario-set builder | fresh after complete binding; fixed scenario order | input files or scenario selector |
+| complete signed binding | iv-a0 authoritative builder | only after all preceding joins agree | individual binding fields from caller |
+| inherited-handoff App receipt admission | iv-a-r canonical receipt reconstruction and retained typed projection | after strict configuration decode and before acknowledgement | shape-valid foreign digest or App-side replacement |
+| eight roots/plans/configs | iv-a0 fixed scenario-set builder | fresh after complete binding; fixed scenario order | input files or scenario selector |
 | projected cohort | sealed c0b-i author | after all eight canonical configs validate | ad hoc encoder |
 | capsule identity/digest | sealed c0b-ii owner | after projected cohort, before gate spawn | pathname or copied FD integer |
 | gate transport receipt | sealed c0b-iii gate on FD 1 | concurrently drained, then strict-decoded after exact reap | stdout prose or semantic success |
 | settlement result | retained c0b-ii owner | only after one exact-gate-reaped proof | gate prediction or Boolean |
-| final coordinator receipt | iv-b2 CoordinatorSupport receipt | last; binds iv-a provenance/configuration, iv-b1 transport, exact wait/reap and settlement | root/readiness claim |
+| final coordinator receipt | iv-b2 CoordinatorSupport receipt | last; binds iv-a0 provenance/configuration, iv-a-r admission closure, iv-b1 transport, exact wait/reap and settlement | root/readiness claim |
 
 The runtime order is fixed: zero-argument/identity/TTY validation -> sealed
 build receipt -> installed identity -> installed-native identity -> iv-b2 fresh
-source projection -> one Task 38 receipt -> iv-a complete binding -> eight
+source projection -> one Task 38 receipt -> iv-a0 complete binding -> eight
 plans/configurations -> c0b-i author -> c0b-ii publish -> fixed gate handoff ->
 concurrent bounded
 receipt drain -> exact gate wait/reap -> strict receipt join -> capsule settle ->
@@ -329,9 +362,10 @@ caller-selected executable locations are forbidden.
 
 | Owner | Required RED/focused evidence | Structural/artifact evidence | Explicitly excluded |
 | --- | --- | --- | --- |
-| iv-a | every binding field source; source/build non-conflation; runtime receipt ID/schema/capability mutations and App reconstruction; eight shared receipt/source rows; native replacement before/during/after hash; caller/path/env rejection | focused Swift tests; generated receipt validation; no runtime Git/sidecar | capsule, product/gate spawn, root, serial/full |
+| iv-a0 | every binding field source; source/build non-conflation; canonical runtime receipt construction; eight shared receipt/source rows; native replacement before/during/after hash; caller/path/env rejection | focused Swift tests; generated receipt validation; clean validation snapshot contract; no runtime Git/sidecar | capsule, product/gate spawn, inherited-handoff App acknowledgement, root, serial/full |
+| iv-a-r | complete provenance negative matrix; actual inherited-handoff App receipt reconstruction, retention and acknowledgement; valid-shape foreign digest rejection | focused script/Swift tests and exact affected suite; no new process/filesystem authority | capsule, product/gate spawn, root, serial/full |
 | iv-b1 | pre-publication failure, publish failure, spawn/prepared failure, signal/death before and after prepared, empty/truncated/oversized/noncanonical/trailing/mismatched receipt, exact-reap mismatch, close uncertainty, settlement success/residue/failure, proof reuse and deadline precedence | no raw FD/path/generic callback; exact one-shot proof; gate source immutable; coordinator never claims root semantics | real gate/sudo chain, App/XPC, serial/full |
-| iv-b2 | zero/nonzero argv, activation environment, fixed eight-config call count/order, bounded final receipt, all iv-a/b1 failure mappings | exact target graph; Debug/Release coordinator and gate objects; gate narrow positive/forbidden negative controls; ordinary App/Release absence; historical c0b-i/ii/iii replay; exact scope/mutation gates | real root/model/network/App run, full |
+| iv-b2 | zero/nonzero argv, activation environment, fixed eight-config call count/order, bounded final receipt, all iv-a0/iv-a-r/iv-b1 failure mappings | exact target graph; Debug/Release coordinator and gate objects; gate narrow positive/forbidden negative controls; ordinary App/Release absence; historical c0b-i/ii/iii replay; exact scope/mutation gates | real root/model/network/App run, full |
 
 Named verifier modes, all implemented and owned by iv-b2, are reserved as:
 
@@ -342,8 +376,9 @@ Named verifier modes, all implemented and owned by iv-b2, are reserved as:
   `--iic0b-iv-source-contract-only` and
   `--iic0b-iv-component-boundary-only`.
 
-iv-a and iv-b1 run RED focused tests, exact affected suites and targeted builds,
-then receive independent implementation review. iv-b2 implements and runs all
+iv-a0, iv-a-r and iv-b1 run RED focused tests, exact affected suites and
+applicable targeted builds, then receive independent implementation review.
+iv-b2 implements and runs all
 reserved structural/scope/mutation/component modes and receives independent
 verifier/cross-boundary review. iv-b2 additionally runs bare
 `scripts/verify-contract`, `scripts/verify-investigation-boundaries`,
@@ -369,7 +404,8 @@ escape; the coordinator must duplicate gate process-group authority; or the gate
 artifact gains a forbidden dependency/symbol. The remedy is design review, not
 a recursive implementation split.
 
-This preflight does not claim iv-a, iv-b1 or iv-b2 is implemented. It does not
+This preflight records iv-a0 as implemented, reviewed and non-admitting. It does
+not claim iv-a-r, iv-b1 or iv-b2 is implemented. It does not
 prove real sudo/root FD, TTY, descendant or containment behavior; installed
 multi-epoch success; Codex capabilities; public networking; global zero residue;
 machine readiness; or ADR 0018 acceptance. It creates no cleanup/Trash/Executor
@@ -379,8 +415,9 @@ license decision.
 ## 8. Frozen Outcome
 
 At baseline `ced4da2`, c0b-i, c0b-ii and c0b-iii implementation/verifier slices
-are complete and non-admitting. c0b-iv is now frozen as iv-a -> iv-b1 -> iv-b2;
-iv-a is the current implementation frontier. The earlier active-plan wording
-that named ii-c0b-ii-a3 as current is superseded by current HEAD evidence and
-this preflight. ii-c remains blocked until all three children have been
+are complete and non-admitting. c0b-iv is now frozen as
+iv-a0 -> iv-a-r -> iv-b1 -> iv-b2. iv-a0 is complete/non-admitting and iv-a-r
+is the current implementation frontier. The earlier active-plan wording
+that named ii-c0b-ii-a3 as current is superseded by current staged-tree evidence and
+this preflight. ii-c remains blocked until all four children have been
 implemented, reviewed and pushed.
