@@ -185,6 +185,54 @@ protocol InvestigationOwnerOnlyCapsuleBorrowing: AnyObject, Sendable {
     ) throws -> InvestigationOwnerOnlyCapsuleExactGateReapedProof
 }
 
+enum InvestigationOwnerOnlyCapsuleBorrowingOutcome: Sendable {
+    case definitelyNotSpawned
+    case exactGateReaped(InvestigationOwnerOnlyCapsuleExactGateReapedProof)
+    case spawnOrTransferUncertain
+}
+
+protocol InvestigationOwnerOnlyCapsuleOutcomeBorrowing: AnyObject, Sendable {
+    func handoffToFixedGate(
+        descriptor: Int32, outerAttemptUUID: UUID,
+        identity: InvestigationOwnerOnlyCapsuleNodeIdentity,
+        digest: InvestigationHandoffSHA256,
+        settlementToken: InvestigationOwnerOnlyCapsuleSettlementToken
+    ) throws -> InvestigationOwnerOnlyCapsuleBorrowingOutcome
+}
+
+struct InvestigationOwnerOnlyCapsuleBorrowingUncertainty:
+    Equatable, Sendable
+{
+    let residue: InvestigationOwnerOnlyCapsuleResidue
+    let localReaderCloseUncertain: Bool
+    let ownershipRetained: Bool
+}
+
+private final class InvestigationOwnerOnlyCapsuleOwnershipQuarantine:
+    @unchecked Sendable
+{
+    static let shared = InvestigationOwnerOnlyCapsuleOwnershipQuarantine()
+
+    private let lock = NSLock()
+    private var owners: [InvestigationMachineGateOwnership] = []
+
+    private init() {}
+
+    func retain(_ owner: InvestigationMachineGateOwnership) {
+        lock.withLock { owners.append(owner) }
+    }
+}
+
+enum InvestigationOwnerOnlyCapsuleLeaseHandoffOutcome: Sendable {
+    case definitelyNotSpawned(
+        InvestigationOwnerOnlyCapsuleNeverHandedOffProof
+    )
+    case exactGateReaped(InvestigationOwnerOnlyCapsuleExactGateReapedProof)
+    case spawnOrTransferUncertain(
+        InvestigationOwnerOnlyCapsuleBorrowingUncertainty
+    )
+}
+
 final class InvestigationOwnerOnlyCapsuleSettlementToken: @unchecked Sendable {
     private let lock = NSLock()
     private var consumed = false
@@ -1631,6 +1679,9 @@ package final class InvestigationOwnerOnlyCapsuleLease: @unchecked Sendable {
         case terminal
         case capsuleCloseUncertain
         case ownershipReleaseUncertain
+        case spawnOrTransferUncertain(
+            InvestigationOwnerOnlyCapsuleBorrowingUncertainty
+        )
         case abandoned
     }
 
@@ -1726,9 +1777,71 @@ package final class InvestigationOwnerOnlyCapsuleLease: @unchecked Sendable {
             terminalLock.unlock()
             throw InvestigationOwnerOnlyCapsuleError.alreadyHandedOff(residue)
         case .terminal, .capsuleCloseUncertain,
-             .ownershipReleaseUncertain, .abandoned:
+             .ownershipReleaseUncertain, .spawnOrTransferUncertain,
+             .abandoned:
             terminalLock.unlock()
             throw InvestigationOwnerOnlyCapsuleError.alreadyTerminal(residue)
+        }
+    }
+
+    func handoffOutcomeOnce(
+        using borrower: any InvestigationOwnerOnlyCapsuleOutcomeBorrowing
+    ) throws -> InvestigationOwnerOnlyCapsuleLeaseHandoffOutcome {
+        let residue = publishedResidue
+        terminalLock.lock()
+        switch state {
+        case .available:
+            state = .handingOff
+            terminalLock.unlock()
+        case .handingOff, .awaitingSettlement, .settling:
+            terminalLock.unlock()
+            throw InvestigationOwnerOnlyCapsuleError.alreadyHandedOff(residue)
+        case .terminal, .capsuleCloseUncertain,
+             .ownershipReleaseUncertain, .spawnOrTransferUncertain,
+             .abandoned:
+            terminalLock.unlock()
+            throw InvestigationOwnerOnlyCapsuleError.alreadyTerminal(residue)
+        }
+
+        let outcome: InvestigationOwnerOnlyCapsuleBorrowingOutcome
+        do {
+            outcome = try borrower.handoffToFixedGate(
+                descriptor: descriptor, outerAttemptUUID: outerAttemptUUID,
+                identity: identity, digest: digest,
+                settlementToken: settlementToken
+            )
+        } catch {
+            return .spawnOrTransferUncertain(
+                retainSpawnOrTransferUncertainty(residue: residue)
+            )
+        }
+
+        switch outcome {
+        case .definitelyNotSpawned:
+            try closeReaderForSettlement(residue: residue)
+            terminalLock.withLock { state = .awaitingSettlement }
+            return .definitelyNotSpawned(
+                InvestigationOwnerOnlyCapsuleNeverHandedOffProof.make(
+                    outerAttemptUUID: outerAttemptUUID, digest: digest,
+                    identity: identity, settlementToken: settlementToken
+                )
+            )
+        case .exactGateReaped(let proof):
+            guard
+                proof.outerAttemptUUID == outerAttemptUUID,
+                proof.identity == identity, proof.digest == digest
+            else {
+                return .spawnOrTransferUncertain(
+                    retainSpawnOrTransferUncertainty(residue: residue)
+                )
+            }
+            try closeReaderForSettlement(residue: residue)
+            terminalLock.withLock { state = .awaitingSettlement }
+            return .exactGateReaped(proof)
+        case .spawnOrTransferUncertain:
+            return .spawnOrTransferUncertain(
+                retainSpawnOrTransferUncertainty(residue: residue)
+            )
         }
     }
 
@@ -1822,7 +1935,8 @@ package final class InvestigationOwnerOnlyCapsuleLease: @unchecked Sendable {
             closeReader = false
             releaseOwner = true
         case .handingOff, .settling, .terminal, .capsuleCloseUncertain,
-             .ownershipReleaseUncertain, .abandoned:
+             .ownershipReleaseUncertain, .spawnOrTransferUncertain,
+             .abandoned:
             closeReader = false
             releaseOwner = false
         }
@@ -1878,6 +1992,28 @@ package final class InvestigationOwnerOnlyCapsuleLease: @unchecked Sendable {
             throw InvestigationOwnerOnlyCapsuleError
                 .ownershipReleaseUncertain(residue)
         }
+    }
+
+    private func retainSpawnOrTransferUncertainty(
+        residue: InvestigationOwnerOnlyCapsuleResidue
+    ) -> InvestigationOwnerOnlyCapsuleBorrowingUncertainty {
+        let closeUncertain: Bool
+        do {
+            try system.close(descriptor: descriptor)
+            closeUncertain = false
+        } catch {
+            closeUncertain = true
+        }
+        InvestigationOwnerOnlyCapsuleOwnershipQuarantine.shared.retain(owner)
+        let uncertainty = InvestigationOwnerOnlyCapsuleBorrowingUncertainty(
+            residue: residue,
+            localReaderCloseUncertain: closeUncertain,
+            ownershipRetained: true
+        )
+        terminalLock.withLock {
+            state = .spawnOrTransferUncertain(uncertainty)
+        }
+        return uncertainty
     }
 
     private func releaseOwnership() -> Bool {

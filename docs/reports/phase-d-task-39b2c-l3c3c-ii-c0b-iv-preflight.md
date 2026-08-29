@@ -1,6 +1,6 @@
 # Phase D Task 39B2c L3c3c-ii-c0b-iv Final Composition Preflight
 
-> Status: iv-a0 and iv-a-r complete; iv-b1 current;
+> Status: iv-a0, iv-a-r and iv-b1a complete; iv-b1b current;
 > non-admitting
 >
 > Date: 2026-08-29
@@ -23,12 +23,16 @@ active-plan text naming `ii-c0b-ii-a3` as current is therefore superseded.
 The remaining c0b-iv work joins three different trust responsibilities: sealed
 source/build provenance plus Task 38 semantic configuration, same-UID process/
 descriptor ownership plus post-reap settlement, and final executable/artifact
-admission. It is frozen, with no recursive prerequisite split permitted, as:
+admission. The original eight-path iv-b1 mixed a semantic ownership state
+machine with independent Darwin process/descriptor authority. Scope/cost
+preflight therefore supersedes that shape with two separately reviewable
+children:
 
 ```text
 ii-c0b-iv-a0  authoritative binding/configuration/source core
 -> ii-c0b-iv-a-r  provenance acceptance + App receipt admission closure
--> ii-c0b-iv-b1  contained fixed-gate handoff, exact reap and settlement
+-> ii-c0b-iv-b1a  typed handoff outcome and injected settlement semantics
+-> ii-c0b-iv-b1b  Darwin fixed-gate authority and structural verifier closure
 -> ii-c0b-iv-b2  zero-argument executable and aggregate verifier closure
 -> ii-c          unique real no-model privileged machine attempt
 -> L3c3d         authenticated real Codex attempt
@@ -40,6 +44,9 @@ review exposed two cross-path acceptance gaps. Under the user's explicit
 dynamic-planning authority, the remaining work is frozen as the narrow iv-a-r
 closure below instead of weakening tests or exceeding the review budget. No
 child accepts ADR 0018 or makes a readiness claim.
+The same authority permits the iv-b1a/iv-b1b split without weakening the
+original contract: iv-b1a closes only the injected semantic boundary, while
+iv-b1b must independently close the Darwin authority and structural boundary.
 
 ## 2. Resolved Semantic Ambiguities
 
@@ -166,8 +173,9 @@ StornautInvestigationDiagnostic
 
 StornautInvestigationMachineLaunchSupport
   -> StornautInvestigationHandoffContract
-  -> StornautInvestigationMachineGateSupport (added only by iv-b1)
-  -> existing owner-only capsule plus one fixed high-level handoff facade
+  -> StornautInvestigationMachineGateSupport (added by iv-b1a)
+  -> iv-b1a owner-only capsule plus injected fixed high-level handoff semantics
+  -> iv-b1b Darwin sibling/descriptor/spawn/drain/wait/reap adapter
 
 StornautInvestigationMachineGateSupport
   -> StornautInvestigationHandoffContract
@@ -195,10 +203,11 @@ filesystem or process operation. Only the Debug build can be selected by ii-c.
 The gate remains the
 distinct narrow executable and must not gain Diagnostic, Core, Codex, Lifecycle,
 Execution, cleanup or networking dependencies. Neither executable gains Xcode/
-App membership. LaunchSupport owns iv-b1's fixed gate spawn/drain/reap/proof/
-settlement bridge so its internal descriptor and settlement-token capabilities
-never escape. No generic launcher, raw descriptor/path API or dependency edge
-from the gate back to LaunchSupport or the coordinator is allowed.
+App membership. LaunchSupport owns iv-b1a's typed handoff/settlement state
+machine and iv-b1b's fixed Darwin spawn/drain/reap bridge so its internal
+descriptor and settlement-token capabilities never escape. No generic launcher,
+raw descriptor/path API or dependency edge from the gate back to LaunchSupport
+or the coordinator is allowed.
 
 ## 4. Exact Child Budgets
 
@@ -261,26 +270,69 @@ project the one canonical Task 38 receipt. A valid-shape foreign digest is
 rejected before acknowledgement. It adds no process, filesystem, root, model,
 network or readiness authority and completes before iv-b1.
 
-### 4.2 iv-b1 — contained handoff and settlement
+### 4.2 iv-b1 — dynamically split handoff and settlement
 
-Exactly eight non-document paths, at most 3,600 changed lines:
+The former exact-eight-path / 3,600-line aggregate is superseded. Combining the
+injected semantic state machine with Darwin sibling discovery, executable
+identity, descriptor transport, spawn/wait/reap authority and structural
+verification would make one review result hide two distinct trust surfaces.
+The accepted order is now iv-b1a followed by iv-b1b.
+
+#### 4.2.1 iv-b1a — semantic outcome and ownership state machine
+
+Exactly six non-document paths, at most 2,400 changed lines:
 
 1. `Package.swift`;
 2. `Sources/StornautInvestigationMachineLaunchSupport/InvestigationOwnerOnlyCapsule.swift`;
 3. `Sources/StornautInvestigationMachineLaunchSupport/InvestigationFixedGateHandoff.swift` (new);
 4. `Sources/StornautInvestigationMachineLaunchSupport/InvestigationMachineGateHandoffReceipt.swift` (new);
-5. `Tests/StornautInvestigationTests/InvestigationMachineGateCoordinatorHandoffTests.swift` (new);
-6. `Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift`;
-7. `scripts/verify-investigation-boundaries`; and
-8. `scripts/verify-contract`.
+5. `Tests/StornautInvestigationTests/InvestigationMachineGateCoordinatorHandoffTests.swift` (new); and
+6. `Tests/StornautInvestigationTests/InvestigationOwnerOnlyCapsuleTests.swift`.
 
-A ninth path or line 3,601 blocks implementation. iv-b1 returns only a typed
-handoff/transport/settlement receipt; it cannot construct the broad final
-coordinator receipt. LaunchSupport may expose only
-one package-closed fixed high-level handoff result; the borrower protocol, raw
-FD, settlement token and proof factory remain target-internal. It must never
-expose a path, generic callback or forgeable proof. iv-b1 owns behavior/focused
-evidence only, not final image admission or serial.
+The index-only validation snapshot `db4e936` (tree
+`412da586d13fae7fd53937231217778b5d9ffd52`) contains exactly these six paths,
+with 2,113 additions and 3 deletions. Its clean staged-only
+focused run passed 48/48 tests in two suites; the clean staged-only affected
+suite passed 785/785 tests in 55 suites; Debug compiled through tests; and the
+clean staged-only Release target build exited 0. Initial independent review found
+four P1 defects: settlement before
+terminal admission, transport failure reaching success, settlement after close
+uncertainty, and ownership release after spawn/transfer uncertainty. All four
+were repaired tests-first in the same bounded scope. Three independent post-fix
+review groups found no unresolved P0-P2. iv-b1a is complete/non-admitting; iv-b1b
+is current.
+No global serial, `scripts/verify --full`, root/sudo, real App/helper/driver/gate
+launch, XPC, model/auth or network attempt was run for iv-b1a.
+
+iv-b1a returns only a typed handoff/transport/settlement receipt; it cannot
+construct the broad final coordinator receipt. Only a definite no-spawn outcome
+may mint a never-handed-off proof. Exact settlement requires the matching exact-
+gate-reaped proof after terminal transport admission. If spawn or descriptor
+transfer is uncertain, neither proof may be minted and settlement/unlink is
+forbidden. The live ownership object is retained in a process-lifetime
+quarantine, deliberately preserving ownership and possible residue until process
+exit rather than misclassifying uncertainty as safe release. This quarantine is
+a fail-closed terminal state, not success, recovery or zero-residue evidence.
+The borrower protocol, raw FD, settlement token and proof factory remain
+target-internal; no path, generic callback or forgeable proof may escape.
+
+#### 4.2.2 iv-b1b — Darwin authority and structural closure
+
+The follow-up is tentatively frozen at exactly four non-document paths and at
+most 1,800 changed lines:
+
+1. `Sources/StornautInvestigationMachineLaunchSupport/DarwinInvestigationFixedGateHandoffSystem.swift` (new);
+2. `Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift`;
+3. `scripts/verify-investigation-boundaries`; and
+4. `scripts/verify-contract`.
+
+iv-b1b owns sibling executable identity, one immutable deadline, descriptor
+hygiene, bounded frame drain, spawn classification, signal/TTY handling, exact
+wait/reap and structural target/source admission. It does not reopen iv-b1a
+semantics or own the aggregate serial. If independent review proves that an
+additional dedicated Darwin test seam is necessary, a fifth non-document path
+must be explicitly re-preflighted before editing; it may not silently violate
+this four-path scope.
 
 ### 4.3 iv-b2 — zero-argument executable and verifier closure
 
@@ -320,7 +372,7 @@ already sealed gate sources.
 | capsule identity/digest | sealed c0b-ii owner | after projected cohort, before gate spawn | pathname or copied FD integer |
 | gate transport receipt | sealed c0b-iii gate on FD 1 | concurrently drained, then strict-decoded after exact reap | stdout prose or semantic success |
 | settlement result | retained c0b-ii owner | only after one exact-gate-reaped proof | gate prediction or Boolean |
-| final coordinator receipt | iv-b2 CoordinatorSupport receipt | last; binds iv-a0 provenance/configuration, iv-a-r admission closure, iv-b1 transport, exact wait/reap and settlement | root/readiness claim |
+| final coordinator receipt | iv-b2 CoordinatorSupport receipt | last; binds iv-a0 provenance/configuration, iv-a-r admission closure, iv-b1a semantics, iv-b1b transport, exact wait/reap and settlement | root/readiness claim |
 
 The runtime order is fixed: zero-argument/identity/TTY validation -> sealed
 build receipt -> installed identity -> installed-native identity -> iv-b2 fresh
@@ -368,10 +420,12 @@ caller-selected executable locations are forbidden.
 | --- | --- | --- | --- |
 | iv-a0 | every binding field source; source/build non-conflation; canonical runtime receipt construction; eight shared receipt/source rows; native replacement before/during/after hash; caller/path/env rejection | focused Swift tests; generated receipt validation; clean validation snapshot contract; no runtime Git/sidecar | capsule, product/gate spawn, inherited-handoff App acknowledgement, root, serial/full |
 | iv-a-r | complete provenance negative matrix; actual inherited-handoff App receipt reconstruction, retention and acknowledgement; valid-shape foreign digest rejection | focused script/Swift tests and exact affected suite; no new process/filesystem authority | capsule, product/gate spawn, root, serial/full |
-| iv-b1 | pre-publication failure, publish failure, spawn/prepared failure, signal/death before and after prepared, empty/truncated/oversized/noncanonical/trailing/mismatched receipt, exact-reap mismatch, close uncertainty, settlement success/residue/failure, proof reuse and deadline precedence | no raw FD/path/generic callback; exact one-shot proof; gate source immutable; coordinator never claims root semantics | real gate/sudo chain, App/XPC, serial/full |
-| iv-b2 | zero/nonzero argv, activation environment, fixed eight-config call count/order, bounded final receipt, all iv-a0/iv-a-r/iv-b1 failure mappings | exact target graph; Debug/Release coordinator and gate objects; gate narrow positive/forbidden negative controls; ordinary App/Release absence; historical c0b-i/ii/iii replay; exact scope/mutation gates | real root/model/network/App run, full |
+| iv-b1a | pre-publication/publish failures; definite-no-spawn, exact-reap and transfer-uncertain outcomes; prepared/terminal admission; transport failure precedence; close uncertainty; settlement success/residue/failure; proof reuse and deadline precedence | no raw FD/path/generic callback; exact one-shot proofs; process-lifetime ownership quarantine on uncertainty | Darwin physical behavior, real gate/sudo chain, App/XPC, serial/full |
+| iv-b1b | fixed sibling identity/metadata drift; single-deadline spawn/drain/wait/reap; pipe/EOF/overflow; signal/TTY restoration; descriptor close uncertainty; exact empty process group | exact four-path source/target/verifier boundary; gate source immutable; coordinator never claims root semantics | semantic redesign, real sudo chain, App/XPC, aggregate serial/full |
+| iv-b2 | zero/nonzero argv, activation environment, fixed eight-config call count/order, bounded final receipt, all iv-a0/iv-a-r/iv-b1a/iv-b1b failure mappings | exact target graph; Debug/Release coordinator and gate objects; gate narrow positive/forbidden negative controls; ordinary App/Release absence; historical c0b-i/ii/iii replay; exact scope/mutation gates | real root/model/network/App run, full |
 
-Named verifier modes, all implemented and owned by iv-b2, are reserved as:
+Named verifier modes are reserved as follows. iv-b1b owns its handoff contract
+mode; iv-b2 owns the remaining aggregate modes:
 
 - `--iic0b-iv-a-binding-contract-only`;
 - `--iic0b-iv-b1-handoff-contract-only`;
@@ -380,8 +434,8 @@ Named verifier modes, all implemented and owned by iv-b2, are reserved as:
   `--iic0b-iv-source-contract-only` and
   `--iic0b-iv-component-boundary-only`.
 
-iv-a0, iv-a-r and iv-b1 run RED focused tests, exact affected suites and
-applicable targeted builds, then receive independent implementation review.
+iv-a0, iv-a-r, iv-b1a and iv-b1b run RED focused tests, exact affected suites
+and applicable targeted builds, then receive independent implementation review.
 iv-b2 implements and runs all
 reserved structural/scope/mutation/component modes and receives independent
 verifier/cross-boundary review. iv-b2 additionally runs bare
@@ -408,8 +462,11 @@ escape; the coordinator must duplicate gate process-group authority; or the gate
 artifact gains a forbidden dependency/symbol. The remedy is design review, not
 a recursive implementation split.
 
-This preflight records iv-a0 and iv-a-r as implemented, reviewed and
-non-admitting. It does not claim iv-b1 or iv-b2 is implemented. It does not
+This preflight records iv-a0, iv-a-r and iv-b1a as implemented, reviewed and
+complete/non-admitting. iv-b1a is accepted at snapshot `db4e936` / tree
+`412da586d13fae7fd53937231217778b5d9ffd52`; three independent post-fix review
+groups found no unresolved P0-P2.
+It does not claim iv-b1b or iv-b2 is implemented or accepted. It does not
 prove real sudo/root FD, TTY, descendant or containment behavior; installed
 multi-epoch success; Codex capabilities; public networking; global zero residue;
 machine readiness; or ADR 0018 acceptance. It creates no cleanup/Trash/Executor
@@ -420,9 +477,10 @@ license decision.
 
 At baseline `ced4da2`, c0b-i, c0b-ii and c0b-iii implementation/verifier slices
 are complete and non-admitting. c0b-iv is now frozen as
-iv-a0 -> iv-a-r -> iv-b1 -> iv-b2. iv-a0 and iv-a-r are
-complete/non-admitting and iv-b1 is the current implementation frontier. The
+iv-a0 -> iv-a-r -> iv-b1a -> iv-b1b -> iv-b2. iv-a0 and iv-a-r are
+complete/non-admitting; iv-b1a is also complete/non-admitting, and iv-b1b is the
+current frontier. The
 earlier active-plan wording that named ii-c0b-ii-a3 as current is superseded by
 the accepted implementation evidence and this preflight. ii-c remains blocked
-until all four children have been
+until all five children have been
 implemented, reviewed and pushed.

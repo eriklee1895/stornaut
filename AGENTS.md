@@ -369,9 +369,22 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   recovery、verifier closure 与 c0b-iii fixed launcher/stub 随后均已完成并
   推送；accepted checkpoint `ced4da2` 已关闭 c0b-i/c0b-ii/c0b-iii。c0b-iv fresh
   preflight 已冻结 iv-a0 authoritative binding/configuration/source → iv-a-r
-  provenance/App admission closure → iv-b1 contained handoff/settlement →
-  iv-b2 zero-argument executable/verifier closure；iv-a0 与 iv-a-r 已完成并
-  保持 non-admitting，当前 frontier 为 iv-b1。
+  provenance/App admission closure，并把原 iv-b1 动态拆为 iv-b1a typed
+  outcome/injected semantic state machine → iv-b1b Darwin authority/structural
+  closure → iv-b2 zero-argument executable/verifier closure。iv-a0 与 iv-a-r
+  已完成并保持 non-admitting；iv-b1a 当前 clean index-only snapshot
+  `db4e936` / tree `412da586d13fae7fd53937231217778b5d9ffd52` 为 exact
+  6 non-document paths、+2,113/-3，
+  clean staged-only 48/48 focused 与 785/785 affected tests 通过，Debug 经
+  tests 编译、clean staged-only Release target build exit 0；initial review 的
+  settlement-before-admission、transport-failure
+  success、close-uncertainty settlement 与 uncertainty ownership release 四项
+  P1 已 tests-first 修复，三组 independent post-fix review 无 unresolved
+  P0–P2。按设计未运行 global serial/full/root、真实 App/XPC、model 或
+  network gate。iv-b1a 已 complete/non-admitting，当前 frontier 为 iv-b1b。
+  spawn/transfer uncertainty 不得
+  settlement/unlink 或释放 owner，必须进入 process-lifetime ownership
+  quarantine。
   iii-b2a0 以
   exact 8 non-document paths / 2,198 changed lines、
   36-test/3-suite combined bridge+continuity+cohort、580-test/43-suite affected、
@@ -416,9 +429,10 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   971 changed lines、contract/App-Release exit 0、immutable seal `a314b85` /
   tree `aac9d81` 与 no-unresolved-P0–P2 review 收口。两者均
   complete/non-admitting；c0b-i/c0b-ii/c0b-iii 均已完成并保持
-  non-admitting。c0b-iv fresh preflight 已冻结为 iv-a0/iv-a-r/iv-b1/iv-b2，
-  iv-a0/iv-a-r 已完成并保持 non-admitting，随后严格按 iv-b1 → iv-b2 →
-  ii-c → L3c3d → L3c4 推进。
+  non-admitting。c0b-iv fresh preflight 已动态修正为
+  iv-a0/iv-a-r/iv-b1a/iv-b1b/iv-b2；iv-a0/iv-a-r 已完成并保持
+  non-admitting，iv-b1a 也已 complete/non-admitting，随后严格按 iv-b1b →
+  iv-b2 → ii-c → L3c3d → L3c4 推进。
   该 ii-b5b-ii-c checkpoint 以 8 个
   non-document paths / 3,104 changed lines、35 focused tests、
   1,396-test staged-only serial、三个 verifier gates 与 final
@@ -552,6 +566,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c L3c3c-ii-c0b-iv final-composition preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-preflight.md) |
 | Phase D Task 39B2c L3c3c-ii-c0b-iv-a0 review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-a0-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-a0-review.md) |
 | Phase D Task 39B2c L3c3c-ii-c0b-iv-a-r review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-a-r-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-a-r-review.md) |
+| Phase D Task 39B2c L3c3c-ii-c0b-iv-b1a review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1a-review.md) |
 | Phase D Task 39B2c L3c3c-ii-a installed-driver observation review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md) |
 | Phase D Task 39B2c L3c3c-ii-b handoff composition split preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md) |
 | Phase D Task 39B2c L3c3c-ii-b0 exact wire contract preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b0-wire-contract-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b0-wire-contract-preflight.md) |
@@ -790,9 +805,10 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   recovery、verifier closure 与 c0b-iii fixed launcher/stub 随后均已完成并
   推送；accepted checkpoint `ced4da2` 关闭 c0b-i/c0b-ii/c0b-iii。c0b-iv fresh
   preflight 已冻结 iv-a0 authoritative binding/configuration/source → iv-a-r
-  provenance/App admission closure → iv-b1 contained handoff/settlement →
-  iv-b2 zero-argument executable/verifier closure；iv-a0 与 iv-a-r 已完成并
-  保持 non-admitting，当前 frontier 为 iv-b1，后续为 ii-c
+  provenance/App admission closure → iv-b1a semantic outcome/state machine →
+  iv-b1b Darwin/structural closure → iv-b2 zero-argument executable/verifier
+  closure；iv-a0、iv-a-r 与 iv-b1a 已完成并保持 non-admitting；当前 frontier
+  为 iv-b1b，后续为 iv-b2 → ii-c
   privileged no-model gate → L3c3d → L3c4。
   ADR 0018 仍 Proposed；L3c4 独占 final admission 与
   剩余 full。

@@ -500,6 +500,77 @@ struct InvestigationOwnerOnlyCapsuleTests {
     }
 
     @Test
+    func typedBorrowingOutcomeAllowsOnlyDefiniteNoSpawnSettlement() throws {
+        let definite = try CapsuleSettlementFixture()
+        let definiteBorrower = CapsuleOutcomeBorrower(.definitelyNotSpawned)
+        let definiteOutcome = try definite.lease.handoffOutcomeOnce(
+            using: definiteBorrower
+        )
+        guard case .definitelyNotSpawned(let proof) = definiteOutcome else {
+            Issue.record("definite no-spawn outcome was not preserved")
+            return
+        }
+        #expect(try definite.lease.settle(neverHandedOff: proof) == .removed)
+        #expect(definite.system.unlinkCalls.count == 1)
+
+        var uncertain: CapsuleSettlementFixture? = try CapsuleSettlementFixture()
+        let uncertainOwnership = try #require(uncertain?.ownership)
+        let uncertainSystem = try #require(uncertain?.system)
+        let uncertainResidue = try #require(uncertain?.publishedResidue)
+        let uncertainOutcome = try #require(uncertain?.lease).handoffOutcomeOnce(
+            using: CapsuleOutcomeBorrower(.uncertain)
+        )
+        guard case .spawnOrTransferUncertain(let evidence) = uncertainOutcome
+        else {
+            Issue.record("uncertain transfer was promoted to a proof")
+            return
+        }
+        #expect(throws: InvestigationOwnerOnlyCapsuleError.alreadyTerminal(
+            uncertainResidue
+        )) {
+            _ = try #require(uncertain?.lease).finishWithoutHandoff()
+        }
+        uncertain = nil
+        #expect(evidence.residue == uncertainResidue)
+        #expect(!evidence.localReaderCloseUncertain)
+        #expect(evidence.ownershipRetained)
+        #expect(!uncertainOwnership.closeRoles.contains(.base))
+        #expect(!uncertainOwnership.closeRoles.contains(.lock))
+        #expect(throws: InvestigationMachineGateOwnershipError.activeAttempt) {
+            _ = try InvestigationMachineGateOwnershipAcquirer(
+                ownershipSystem: uncertainOwnership,
+                capsuleSystem: uncertainSystem
+            ).acquire()
+        }
+        #expect(uncertainSystem.unlinkCalls.isEmpty)
+        #expect(uncertainSystem.removeDirectoryCalls.isEmpty)
+    }
+
+    @Test
+    func typedExactReapProofMustMatchLeaseBeforeSettlement() throws {
+        let exact = try CapsuleSettlementFixture()
+        let exactOutcome = try exact.lease.handoffOutcomeOnce(
+            using: CapsuleOutcomeBorrower(.exact)
+        )
+        guard case .exactGateReaped(let proof) = exactOutcome else {
+            Issue.record("exact reap did not produce its sealed proof")
+            return
+        }
+        #expect(try exact.lease.settle(exactGateReaped: proof) == .removed)
+
+        let mismatched = try CapsuleSettlementFixture()
+        let mismatchedOutcome = try mismatched.lease.handoffOutcomeOnce(
+            using: CapsuleOutcomeBorrower(.mismatched)
+        )
+        guard case .spawnOrTransferUncertain = mismatchedOutcome else {
+            Issue.record("foreign exact-reap proof was accepted")
+            return
+        }
+        #expect(mismatched.system.unlinkCalls.isEmpty)
+        #expect(mismatched.system.removeDirectoryCalls.isEmpty)
+    }
+
+    @Test
     func validEmptyStaleLeafRecoversBeforeFreshPublication() throws {
         let bytes = try canonicalProjectedInput().encoded()
         let stale = "attempt-00000000-0000-0000-0000-0000000000fe"
@@ -2107,6 +2178,7 @@ private final class CapsuleOwnershipSystem:
     private var nextFD: Int32 = 10
     private var roleByFD: [Int32: GateRole] = [:]
     private var closed: Set<Int32> = []
+    private var lockedDescriptor: Int32?
     var identityCalls = 0
     var closeRoles: [GateRole] = []
     var closeErrorRoles: Set<GateRole> = []
@@ -2141,11 +2213,17 @@ private final class CapsuleOwnershipSystem:
     func setPermissions(descriptor: Int32, mode: mode_t) throws {}
     func extendedACLIsEmpty(descriptor: Int32) throws -> Bool { true }
     func extendedAttributeNames(descriptor: Int32) throws -> [String] { [] }
-    func acquireExclusiveNonblockingLock(descriptor: Int32) throws {}
+    func acquireExclusiveNonblockingLock(descriptor: Int32) throws {
+        guard lockedDescriptor == nil else {
+            throw InvestigationMachineGateSystemError.errno(EWOULDBLOCK)
+        }
+        lockedDescriptor = descriptor
+    }
     func close(descriptor: Int32) throws {
         guard closed.insert(descriptor).inserted else { throw InvestigationMachineGateSystemError.errno(EBADF) }
         let role = roleByFD[descriptor]!
         closeRoles.append(role)
+        if lockedDescriptor == descriptor { lockedDescriptor = nil }
         if closeErrorRoles.contains(role) {
             throw InvestigationMachineGateSystemError.errno(EIO)
         }
@@ -2193,6 +2271,39 @@ private final class CapsuleFixedBorrower:
 }
 
 private enum CapsuleFixedBorrowerError: Error { case failed }
+
+private final class CapsuleOutcomeBorrower:
+    InvestigationOwnerOnlyCapsuleOutcomeBorrowing, @unchecked Sendable
+{
+    enum Result { case definitelyNotSpawned, exact, mismatched, uncertain }
+    private let result: Result
+
+    init(_ result: Result) { self.result = result }
+
+    func handoffToFixedGate(
+        descriptor _: Int32, outerAttemptUUID: UUID,
+        identity: InvestigationOwnerOnlyCapsuleNodeIdentity,
+        digest: InvestigationHandoffSHA256,
+        settlementToken: InvestigationOwnerOnlyCapsuleSettlementToken
+    ) throws -> InvestigationOwnerOnlyCapsuleBorrowingOutcome {
+        switch result {
+        case .definitelyNotSpawned:
+            return .definitelyNotSpawned
+        case .exact:
+            return .exactGateReaped(.makeForFixedLauncher(
+                outerAttemptUUID: outerAttemptUUID, digest: digest,
+                identity: identity, settlementToken: settlementToken
+            ))
+        case .mismatched:
+            return .exactGateReaped(.makeForFixedLauncher(
+                outerAttemptUUID: capsuleUUID(0xfe), digest: digest,
+                identity: identity, settlementToken: settlementToken
+            ))
+        case .uncertain:
+            return .spawnOrTransferUncertain
+        }
+    }
+}
 
 private enum GateRole: String { case root, users, home, library, caches, base, lock }
 private let fixedBaseRelativePath = "Users/fixture/Library/Caches/"
