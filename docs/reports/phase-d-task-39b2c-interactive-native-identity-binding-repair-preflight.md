@@ -92,7 +92,7 @@ The implementation may change exactly these fourteen non-document paths:
 13. `Tests/StornautInvestigationTests/InvestigationHandoffConcreteCompositionTests.swift`; and
 14. `scripts/verify-investigation-boundaries`.
 
-The maximum changed-line budget is 2,300 non-document lines: production 900,
+The maximum changed-line budget is 2,400 non-document lines: production 900,
 tests 1,000 and verifier 500. These category ceilings are independent. The
 2026-08-30 implementation checkpoint rebalanced the production/test estimates
 before further coding after the dedicated suspended launcher, direct Mach-O
@@ -101,7 +101,7 @@ changed lines; the exact fourteen paths remain unchanged. A
 post-implementation independent review then required a non-token-only mutation
 matrix in the existing verifier; this raised only the aggregate/verifier ceiling
 while preserving the exact path set and production/test ceilings. A fifteenth
-path, line 2,301, a second wire field, a new package target/dependency,
+path, line 2,401, a second wire field, a new package target/dependency,
 or a change to an excluded path stops implementation for re-preflight.
 
 ## 4. Closed Contract
