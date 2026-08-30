@@ -190,3 +190,25 @@ readiness.
 
 After this repair is complete, the remaining order is
 `ii-c -> L3c3d -> L3c4`. Task 39 remains incomplete until L3c4.
+
+## 7. Verifier-Consumer Seal Follow-up
+
+The exact fourteen-path implementation closed at commit `531f79f` with 2,389
+changed non-document lines: production 886, tests 1,049 and verifier 454. The
+focused suites, one staged-only serialized regression, targeted Debug and
+Release App builds, source and staged-scope contracts, and two independent
+read-only reviews all completed without an unresolved P0--P2 finding.
+
+That implementation intentionally did not add a fifteenth path. Its changed
+`scripts/verify-investigation-boundaries` digest therefore makes the existing
+consumer seal in `scripts/verify-contract` fail closed. This is a separate,
+non-product verifier-consumer checkpoint based on `531f79f`. It may change
+exactly one non-document path, `scripts/verify-contract`, and at most eight
+changed lines. The only permitted semantic edits are updating the pinned
+SHA-256 of `scripts/verify-investigation-boundaries` and recomputing the
+normalized `ib2_self_sha`; the App Release boundary digest remains unchanged.
+
+Validation is limited to syntax, normalized self-seal, the subordinate source
+seal, bare Investigation boundary, App Release boundary and contract gates,
+plus independent read-only review. It does not rerun focused or serialized
+product tests, perform root or machine activity, or run `scripts/verify --full`.
