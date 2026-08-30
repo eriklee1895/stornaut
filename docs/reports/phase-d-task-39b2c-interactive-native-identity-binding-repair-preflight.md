@@ -49,9 +49,11 @@ The accepted launch sequence is:
 5. use deadline-bounded `waitpid(pid, ..., WUNTRACED | WNOHANG)` polling to
    observe the exact child PID's initial suspended stop and require raw status
    `0x7f`;
-6. identify exactly one main executable mapping through
-   `PROC_PIDREGIONPATHINFO` and compare its device, inode, generation and size
-   with the held lease;
+6. query the lowest-address mapped region with
+   `PROC_PIDREGIONPATHINFO`, require its executable vnode to match the held
+   device/inode/generation/size, and reject any later mapping with the same
+   executable path but a different vnode identity (one Mach-O normally has
+   multiple segments, so a single-region requirement would be incorrect);
 7. revalidate held and named identity, then send `SIGCONT` only after every
    check agrees; otherwise kill and exactly reap the child, close all owned
    descriptors and fail start; and
