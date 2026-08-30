@@ -305,6 +305,10 @@ iic0biii2a_boundary_test_source=
 iic0biii2a_staged_scope_contract_only=false
 iic0biii2a_staged_scope_baseline=e832e8433137f9777aba77daba2ca248a563404d
 iic0biii2a_completed_tree_contract_only=false
+iica_source_contract_only=false
+iica_source_contract_sources=()
+iica_staged_scope_contract_only=false
+iica_staged_scope_baseline=2b30a157c14bc507351b10bd521e710987860f71
 iic0bivb1_handoff_contract_only=false
 iic0bivb1_fixture_source=
 iic0bivb1_physical_test_source=
@@ -806,6 +810,14 @@ if (( $# > 0 )); then
     elif (( $# == 1 )) \
         && [[ $1 == --iic0b-iii-2a-completed-tree-contract-only ]]; then
         iic0biii2a_completed_tree_contract_only=true
+    elif (( $# == 1 || $# == 9 )) \
+        && [[ $1 == --iic-a-source-contract-only ]]; then
+        iica_source_contract_only=true
+        iica_source_contract_sources=("${@:2}")
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iic-a-staged-scope-contract-only ]]; then
+        iica_staged_scope_contract_only=true
+        iica_staged_scope_baseline=${2:-2b30a157c14bc507351b10bd521e710987860f71}
     elif (( $# == 4 )) \
         && [[ $1 == --iic0b-iv-b1-handoff-contract-only ]]; then
         iic0bivb1_handoff_contract_only=true
@@ -9274,6 +9286,185 @@ function verify_iic0biib_staged_scope() {
     verify_iic0biib_index_semantics
 }
 
+function verify_iica_source_contract() {
+    local -a sources=("$@")
+    local canonical_mode=false
+    if (( ${#sources} == 0 )); then
+        canonical_mode=true
+        sources=(
+            Package.swift
+            Sources/StornautInvestigationMachineGateSupport/InvestigationMachineFixedGateLauncher.swift
+            Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift
+            Stornaut.xcodeproj/project.pbxproj
+            Stornaut.xcodeproj/xcshareddata/xcschemes/StornautInvestigationDiagnosticApp.xcscheme
+            scripts/stornaut-r5-local-lifecycle
+            Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+            Tests/StornautInvestigationTests/InvestigationClosedMachineArtifactInstallerTests.swift
+        )
+    fi
+    (( ${#sources} == 8 )) || {
+        print -u2 "ii-c-a source path count drifted"; return 1
+    }
+    local source_path
+    for source_path in "${sources[@]}"; do
+        [[ -f $source_path && ! -L $source_path ]] || {
+            print -u2 "ii-c-a source path unavailable: $source_path"; return 1
+        }
+    done
+    xcrun swiftc -frontend -parse -enable-bare-slash-regex \
+        "${sources[2]}" "${sources[3]}" "${sources[7]}" \
+        "${sources[8]}" || return $?
+    zsh -n "${sources[6]}" || return $?
+    python3 - "$canonical_mode" "${sources[@]}" <<'PY'
+from pathlib import Path
+import re
+import sys
+import xml.etree.ElementTree as ET
+
+canonical_mode = sys.argv[1] == "true"
+paths = list(map(Path, sys.argv[2:]))
+root = Path.cwd().resolve()
+expected = [
+    root / "Package.swift",
+    root / "Sources/StornautInvestigationMachineGateSupport/InvestigationMachineFixedGateLauncher.swift",
+    root / "Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift",
+    root / "Stornaut.xcodeproj/project.pbxproj",
+    root / "Stornaut.xcodeproj/xcshareddata/xcschemes/StornautInvestigationDiagnosticApp.xcscheme",
+    root / "scripts/stornaut-r5-local-lifecycle",
+    root / "Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift",
+    root / "Tests/StornautInvestigationTests/InvestigationClosedMachineArtifactInstallerTests.swift",
+]
+if canonical_mode and [path.resolve() for path in paths] != expected:
+    raise SystemExit("ii-c-a source path identity drifted")
+package_path, gate_path, coordinator_path, project_path, scheme_path, installer_path, boundary_path, focused_path = paths
+package = package_path.read_text(encoding="utf-8")
+gate = gate_path.read_text(encoding="utf-8")
+coordinator = coordinator_path.read_text(encoding="utf-8")
+project = project_path.read_text(encoding="utf-8")
+scheme = scheme_path.read_text(encoding="utf-8")
+installer = installer_path.read_text(encoding="utf-8")
+boundary = boundary_path.read_text(encoding="utf-8")
+focused = focused_path.read_text(encoding="utf-8")
+if canonical_mode:
+    import subprocess
+    baseline = "2b30a157c14bc507351b10bd521e710987860f71"
+    def historical(path):
+        return subprocess.run(
+            ["git", "show", f"{baseline}:{path}"],
+            check=True, stdout=subprocess.PIPE, text=True,
+        ).stdout
+    expected_gate = historical(
+        "Sources/StornautInvestigationMachineGateSupport/"
+        "InvestigationMachineFixedGateLauncher.swift"
+    ).replace(
+        "package enum InvestigationMachineGateSupport",
+        "public enum InvestigationMachineGateSupport", 1,
+    ).replace(
+        "package static func run() -> Int32",
+        "public static func run() -> Int32", 1,
+    )
+    expected_coordinator = historical(
+        "Sources/StornautInvestigationMachineGateCoordinatorSupport/"
+        "InvestigationMachineGateCoordinatorComposition.swift"
+    ).replace(
+        "package enum InvestigationMachineGateCoordinatorSupport",
+        "public enum InvestigationMachineGateCoordinatorSupport", 1,
+    ).replace(
+        "package static func run() async -> Int32",
+        "public static func run() async -> Int32", 1,
+    )
+    if gate != expected_gate or coordinator != expected_coordinator:
+        raise SystemExit("ii-c-a support API exact delta drifted")
+
+tools = (
+    ("StornautInvestigationMachineDriverNative", "StornautInvestigationMachineDriver", "StornautInvestigationMachineDriverSupport", "com.eriklee.stornaut.investigation.machine-driver", "Tools/StornautInvestigationMachineDriver/main.swift"),
+    ("StornautInvestigationMachineGateNative", "StornautInvestigationMachineGate", "StornautInvestigationMachineGateSupport", "com.eriklee.stornaut.investigation.machine-gate", "tools/StornautInvestigationMachineGate/main.swift"),
+    ("StornautInvestigationMachineGateCoordinatorNative", "StornautInvestigationMachineGateCoordinator", "StornautInvestigationMachineGateCoordinatorSupport", "com.eriklee.stornaut.investigation.machine-gate-coordinator", "tools/StornautInvestigationMachineGateCoordinator/main.swift"),
+)
+products = package.split("\n    targets: [\n", 1)[0]
+for _target, _product, support, _identifier, _source in tools[1:]:
+    pattern = rf'(?ms)\.library\(\s*name:\s*"{re.escape(support)}"\s*,\s*type:\s*\.static\s*,\s*targets:\s*\["{re.escape(support)}"\]\s*\),?'
+    if len(re.findall(pattern, products)) != 1:
+        raise SystemExit(f"ii-c-a static support product drifted: {support}")
+if 'path: "tools/StornautInvestigationMachineGate"' not in package or 'path: "Tools/StornautInvestigationMachineGate"' in package:
+    raise SystemExit("ii-c-a Gate source path case drifted")
+for label, source, enum_name, run in (
+    ("Gate", gate, "InvestigationMachineGateSupport", "public static func run() -> Int32"),
+    ("Coordinator", coordinator, "InvestigationMachineGateCoordinatorSupport", "public static func run() async -> Int32"),
+):
+    if source.count("public ") != 2 or f"public enum {enum_name}" not in source or run not in source:
+        raise SystemExit(f"ii-c-a {label} public API surface drifted")
+
+native_section = project.split("/* Begin PBXNativeTarget section */", 1)[1].split("/* End PBXNativeTarget section */", 1)[0]
+if native_section.count("isa = PBXNativeTarget;") != 10:
+    raise SystemExit("ii-c-a native target count drifted")
+for target, product, support, identifier, source in tools:
+    for marker in (f"name = {target};", f"productName = {product};", f"productName = {support};", f"PRODUCT_BUNDLE_IDENTIFIER = {identifier};", f"path = {source};"):
+        if marker not in project:
+            raise SystemExit(f"ii-c-a tool graph drifted: {marker}")
+    copy = re.findall(rf'(?m)^.*{re.escape(product)} in Copy Investigation Machine Tools.*$', project)
+    if len(copy) != 2 or not any("CodeSignOnCopy" in row for row in copy):
+        raise SystemExit(f"ii-c-a CodeSignOnCopy membership drifted: {product}")
+    if scheme.count(f'BlueprintName = "{target}"') != 1 or scheme.count(f'BuildableName = "{product}"') != 1:
+        raise SystemExit(f"ii-c-a diagnostic scheme membership drifted: {target}")
+if project.count('name = "Copy Investigation Machine Tools";') != 1:
+    raise SystemExit("ii-c-a machine-tool copy phase drifted")
+copy_start = project.index("B00000000000000000000042 /* Copy Investigation Machine Tools */ = {")
+copy_end = project.index("\n\t\t};", copy_start)
+if project[copy_start:copy_end].count(" in Copy Investigation Machine Tools */") != 3:
+    raise SystemExit("ii-c-a machine-tool copy inventory drifted")
+for configuration_id, configuration_name in (
+    ("A00000000000000000000190", "Debug"),
+    ("A00000000000000000000191", "Release"),
+):
+    marker = f"{configuration_id} /* {configuration_name} */ = {{"
+    start = project.index(marker)
+    end = project.index("\n\t\t};", start)
+    configuration = project[start:end]
+    for setting in (
+        'CONFIGURATION_BUILD_DIR = "$(BUILD_DIR)/$(CONFIGURATION)/StornautInvestigationMachineGateCoordinatorNative";',
+        'SWIFT_INCLUDE_PATHS = "$(inherited) $(BUILD_DIR)/$(CONFIGURATION)";',
+        'LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";',
+    ):
+        if configuration.count(setting) != 1:
+            raise SystemExit(
+                f"ii-c-a Coordinator {configuration_name} isolation drifted: {setting}"
+            )
+ET.parse(scheme_path)
+for marker in (
+    "validate_closed_executable_identity() {",
+    "validate_closed_executable_artifact() {",
+    "validate_closed_app_artifacts() {",
+    "validate_closed_artifact_fixtures() {",
+    "machine_gate_max_bytes=$((64 * 1024 * 1024))",
+    "machine_coordinator_max_bytes=$((64 * 1024 * 1024))",
+):
+    if installer.count(marker) != 1:
+        raise SystemExit(f"ii-c-a installer closure drifted: {marker}")
+if installer.count("machineClaimServiceIdentifier=$machine_claim_service") != 1:
+    raise SystemExit("ii-c-a driver-only claim service association drifted")
+for _target, product, _support, identifier, _source in tools:
+    if f"Contents/MacOS/{product}" not in installer or identifier not in installer:
+        raise SystemExit(f"ii-c-a installer role drifted: {product}")
+for marker in (
+    "iiCAMachinePackagingVerifierPinsClosedTopologyAndScope",
+    "--iic-a-source-contract-only",
+    "--iic-a-staged-scope-contract-only",
+    "--iic-a-component-boundary-only",
+    "--iic-a-contract-only",
+):
+    if marker not in boundary:
+        raise SystemExit(f"ii-c-a boundary verifier coverage drifted: {marker}")
+for marker in (
+    "installerBindsEachRoleToItsOwnIdentity",
+    "installerRevalidatesClosedArtifactsBeforeStateChanges",
+    "validationActionKeepsMachineToolChecksReadOnly",
+):
+    if marker not in focused:
+        raise SystemExit(f"ii-c-a focused coverage drifted: {marker}")
+PY
+}
+
 function verify_iic0biii2a_gate_contract() {
     local package_path=$1 transport_path=$2 launcher_path=$3 darwin_path=$4
     local entry_path=$5 launcher_test_path=$6 physical_test_path=$7
@@ -9779,6 +9970,83 @@ function verify_iic0biii2a_completed_tree() {
     local implementation_tree=544209f3cd4682b1c4d720931498c8daa5ccc325
     [[ "$(git write-tree)" == "$implementation_tree" ]] || {
         print -u2 "ii-c0b-iii-2a completed tree drifted"; return 1
+    }
+}
+
+function verify_iica_staged_scope() {
+    local expected_baseline=2b30a157c14bc507351b10bd521e710987860f71
+    local baseline=${1:-$expected_baseline}
+    local -a expected=(
+        Package.swift
+        Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift
+        Sources/StornautInvestigationMachineGateSupport/InvestigationMachineFixedGateLauncher.swift
+        Stornaut.xcodeproj/project.pbxproj
+        Stornaut.xcodeproj/xcshareddata/xcschemes/StornautInvestigationDiagnosticApp.xcscheme
+        Tests/StornautInvestigationTests/InvestigationClosedMachineArtifactInstallerTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/stornaut-r5-local-lifecycle
+        scripts/verify-app-release-boundaries
+        scripts/verify-contract
+        scripts/verify-investigation-boundaries
+    )
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" == \
+        "$expected_baseline" ]] || {
+        print -u2 "ii-c-a checkpoint baseline drifted"; return 1
+    }
+    (( ${#expected} == 11 )) || {
+        print -u2 "ii-c-a checkpoint path ceiling drifted"; return 1
+    }
+    if git diff --cached --name-only --diff-filter=D "$baseline" \
+        | awk 'index($0,"docs/")!=1 {found=1} END {exit !found}'
+    then
+        print -u2 "ii-c-a checkpoint deleted an existing path"; return 1
+    fi
+    if git diff --cached --numstat "$baseline" \
+        | awk 'index($3,"docs/")!=1 && ($1=="-" || $2=="-") {found=1} END {exit !found}'
+    then
+        print -u2 "ii-c-a binary checkpoint path rejected"; return 1
+    fi
+    local -a observed=(
+        ${(f)"$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" \
+            | awk 'index($0,"docs/")!=1 && $0!="AGENTS.md" && $0!="README.md"' \
+            | LC_ALL=C sort)"}
+    )
+    [[ "${(j:\n:)observed}" == "${(j:\n:)${(@on)expected}}" ]] || {
+        print -u2 "ii-c-a checkpoint paths drifted"; return 1
+    }
+    local total package_api xcode installer tests verifiers
+    total=$(git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1 {n+=$1+$2} END {print n+0}')
+    package_api=$(git diff --cached --numstat "$baseline" -- Package.swift Sources/StornautInvestigationMachineGateSupport/InvestigationMachineFixedGateLauncher.swift Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift | awk '{n+=$1+$2} END {print n+0}')
+    xcode=$(git diff --cached --numstat "$baseline" -- Stornaut.xcodeproj/project.pbxproj Stornaut.xcodeproj/xcshareddata/xcschemes/StornautInvestigationDiagnosticApp.xcscheme | awk '{n+=$1+$2} END {print n+0}')
+    installer=$(git diff --cached --numstat "$baseline" -- scripts/stornaut-r5-local-lifecycle | awk '{n+=$1+$2} END {print n+0}')
+    tests=$(git diff --cached --numstat "$baseline" -- Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift Tests/StornautInvestigationTests/InvestigationClosedMachineArtifactInstallerTests.swift | awk '{n+=$1+$2} END {print n+0}')
+    verifiers=$(git diff --cached --numstat "$baseline" -- scripts/verify-investigation-boundaries scripts/verify-app-release-boundaries scripts/verify-contract | awk '{n+=$1+$2} END {print n+0}')
+    (( total <= 3800 )) || { print -u2 "ii-c-a checkpoint budget drifted"; return 1; }
+    (( package_api <= 120 )) || { print -u2 "ii-c-a Package/API budget drifted"; return 1; }
+    (( xcode <= 650 )) || { print -u2 "ii-c-a Xcode budget drifted"; return 1; }
+    (( installer <= 500 )) || { print -u2 "ii-c-a installer budget drifted"; return 1; }
+    (( tests <= 850 )) || { print -u2 "ii-c-a tests budget drifted"; return 1; }
+    (( verifiers <= 1680 )) || { print -u2 "ii-c-a verifier budget drifted"; return 1; }
+    local checkpoint_path mode entry staged_blob worktree_blob
+    for checkpoint_path in "${expected[@]}"; do
+        mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
+        entry=$(git ls-files -s -- "$checkpoint_path")
+        [[ "$(print -r -- "$entry" | awk '{print $1, $3, $4}')" == \
+            "$mode 0 $checkpoint_path" ]] || {
+            print -u2 "ii-c-a staged source/mode drifted: $checkpoint_path"; return 1
+        }
+        staged_blob=$(print -r -- "$entry" | awk '{print $2}')
+        worktree_blob=$(git hash-object -- "$checkpoint_path")
+        [[ "$staged_blob" == "$worktree_blob" ]] || {
+            print -u2 "ii-c-a staged source/mode drifted: $checkpoint_path"; return 1
+        }
+    done
+    local -a untracked=(
+        ${(f)"$(git ls-files --others --exclude-standard -- \
+            | awk 'index($0,"docs/")!=1')"}
+    )
+    (( ${#untracked} == 0 )) || {
+        print -u2 "ii-c-a checkpoint untracked paths drifted"; return 1
     }
 }
 
@@ -13186,13 +13454,38 @@ def digest(path):
 
 expected_frozen = {
     scheme_root / "Stornaut.xcscheme": "5d0d87082e3c0efed4165566e13f4fa560906137785c61a55b25d63a8ab2d987",
-    scheme_root / "StornautInvestigationDiagnosticApp.xcscheme": "deb1b2fe0db76a7981759fcff865da270ceedc990ad78858e444f9eed3fe96b5",
     handoff_root / "HandoffBinaryTranscript.swift": "dd286134478b715f51f190ec4cdbc3cf10449b330ddb60b11cc06777a4a5a7c9",
     handoff_root / "InvestigationCohortCapsuleContract.swift": "d08046025cbebe320161732883d89dbaf710f1073d0a41ca3254e4eea828e437",
     handoff_root / "InvestigationHandoffEpochBootstrapContract.swift": "c295fdefeea11ffc767fc45865a87b5b399cf2ca51b877c5425ed30ed86100fd",
     handoff_root / "InvestigationHandoffFrameContract.swift": "33bf13d57d4acfc621cf7a5baf7ca3deaa8819d1c723573039ae91f07a21b4d9",
     handoff_root / "InvestigationMachineClaimContract.swift": "1b01315aaf822ac126d7d4a7391d7af3c93efcf444892d73ac0f88642dc4f352",
 }
+diagnostic_scheme_path = scheme_root / "StornautInvestigationDiagnosticApp.xcscheme"
+historical_diagnostic_scheme = read(diagnostic_scheme_path)
+for identifier in (
+    "A00000000000000000000009",
+    "A0000000000000000000000A",
+):
+    identifier_position = historical_diagnostic_scheme.find(
+        f'BlueprintIdentifier = "{identifier}"'
+    )
+    start = historical_diagnostic_scheme.rfind(
+        "         <BuildActionEntry\n", 0, identifier_position
+    )
+    end = historical_diagnostic_scheme.find(
+        "         </BuildActionEntry>\n", identifier_position
+    )
+    if min(identifier_position, start, end) < 0:
+        raise SystemExit("live claim server later ii-c-a scheme entry drifted")
+    end += len("         </BuildActionEntry>\n")
+    historical_diagnostic_scheme = (
+        historical_diagnostic_scheme[:start]
+        + historical_diagnostic_scheme[end:]
+    )
+if hashlib.sha256(historical_diagnostic_scheme.encode("utf-8")).hexdigest() != (
+    "deb1b2fe0db76a7981759fcff865da270ceedc990ad78858e444f9eed3fe96b5"
+):
+    raise SystemExit("live claim server frozen diagnostic scheme drifted")
 package = read(package_path)
 later_driver_support_dependency = '                "CInvestigationIdentitySupport",\n'
 driver_support_target = re.search(
@@ -13209,6 +13502,23 @@ if (
         "live claim server later DriverSupport C dependency drifted"
     )
 historical_package = package.replace(later_driver_support_dependency, "", 1)
+iica_gate_product = '''        .library(
+            name: "StornautInvestigationMachineGateSupport",
+            type: .static,
+            targets: ["StornautInvestigationMachineGateSupport"]
+        ),
+'''
+iica_coordinator_product = '''        .library(
+            name: "StornautInvestigationMachineGateCoordinatorSupport",
+            type: .static,
+            targets: ["StornautInvestigationMachineGateCoordinatorSupport"]
+        ),
+'''
+if historical_package.count(iica_gate_product) != 1 or historical_package.count(iica_coordinator_product) != 1:
+    raise SystemExit("live claim server later ii-c-a products drifted")
+historical_package = historical_package.replace(
+    iica_gate_product, "", 1
+).replace(iica_coordinator_product, "", 1)
 later_installed_l2_target = '''        .target(
             name: "StornautInvestigationInstalledL2",
             dependencies: [
@@ -13263,7 +13573,8 @@ later_coordinator_target = '''        .target(
 '''
 later_build_receipt_targets = '''        .executableTarget(
             name: "StornautInvestigationBuildReceiptGenerator",
-            path: "tools/StornautInvestigationBuildReceiptGenerator"
+            path: "tools/StornautInvestigationBuildReceiptGenerator",
+            swiftSettings: [.unsafeFlags(["-parse-as-library"])]
         ),
         .plugin(
             name: "StornautInvestigationBuildReceiptPlugin",
@@ -13306,7 +13617,7 @@ later_gate_target = '''        .executableTarget(
             dependencies: [
                 "StornautInvestigationMachineGateSupport",
             ],
-            path: "Tools/StornautInvestigationMachineGate"
+            path: "tools/StornautInvestigationMachineGate"
         ),
 '''
 later_gate_test_dependency = (
@@ -13335,7 +13646,7 @@ later_handoff = {
 if set(handoff_root.glob("*")) != historical_handoff | later_handoff:
     raise SystemExit("live claim server frozen Handoff files drifted")
 if set(scheme_root.glob("*.xcscheme")) != {
-    path for path in expected_frozen if path.parent == scheme_root
+    scheme_root / "Stornaut.xcscheme", diagnostic_scheme_path
 }:
     raise SystemExit("live claim server frozen schemes drifted")
 for path, expected in expected_frozen.items():
@@ -14532,6 +14843,16 @@ if $iic0biii2a_completed_tree_contract_only; then
     print "ii-c0b-iii-2a completed tree verification passed."
     exit 0
 fi
+if $iica_source_contract_only; then
+    verify_iica_source_contract "${iica_source_contract_sources[@]}"
+    print "ii-c-a closed machine topology source verification passed."
+    exit 0
+fi
+if $iica_staged_scope_contract_only; then
+    verify_iica_staged_scope "$iica_staged_scope_baseline"
+    print "ii-c-a staged scope verification passed."
+    exit 0
+fi
 if $iic0bivb1_handoff_contract_only; then
     verify_iic0bivb1_handoff_contract \
         "$iic0bivb1_fixture_source" "$iic0bivb1_physical_test_source" \
@@ -14633,7 +14954,7 @@ machine_gate_root=Sources/StornautInvestigationMachineGateSupport
 machine_gate_transport=$machine_gate_root/InvestigationMachineGateTransport.swift
 machine_gate_launcher=$machine_gate_root/InvestigationMachineFixedGateLauncher.swift
 machine_gate_darwin=$machine_gate_root/DarwinInvestigationMachineFixedGateSystem.swift
-machine_gate_main=Tools/StornautInvestigationMachineGate/main.swift
+machine_gate_main=tools/StornautInvestigationMachineGate/main.swift
 machine_gate_launcher_test=Tests/StornautInvestigationTests/InvestigationSudoShapedDriverLauncherTests.swift
 machine_gate_physical_test=Tests/StornautInvestigationTests/InvestigationMachineGatePhysicalTests.swift
 machine_gate_stub=Tests/Fixtures/InvestigationMachineGateStub/main.swift
@@ -14766,18 +15087,7 @@ verify_iic0bi_producer_contract \
     "$iic0bi_focused_test" \
     Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
 verify_interactive_native_source_contract
-verify_shared_deadline_contract
-verify_fixed_gate_deadline_cleanup_contract
-verify_iic0biii2a_gate_contract \
-    Package.swift "$machine_gate_transport" "$machine_gate_launcher" \
-    "$machine_gate_darwin" "$machine_gate_main" \
-    "$machine_gate_launcher_test" "$machine_gate_physical_test" \
-    "$machine_gate_stub" \
-    Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
-verify_iic0bivb1_handoff_contract \
-    "$machine_gate_handoff_physical_fixture" \
-    "$machine_gate_handoff_physical_test" \
-    Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+verify_iica_source_contract
 verify_iib5biib_app_identity_contract \
     Package.swift \
     Sources/CInvestigationIdentitySupport/CInvestigationIdentitySupport.c \
@@ -14947,15 +15257,17 @@ expected_native_targets = {
     "StornautInvestigationDiagnosticAppTests",
     "StornautInvestigationDiagnosticReleaseShell",
     "StornautInvestigationMachineDriverNative",
+    "StornautInvestigationMachineGateNative",
+    "StornautInvestigationMachineGateCoordinatorNative",
 }
 if set(native_by_name) != expected_native_targets:
     raise SystemExit(
         "Xcode native target allowlist drifted: "
         f"{sorted(native_by_name)}"
     )
-if len(native_targets) != 8:
+if len(native_targets) != 10:
     raise SystemExit(
-        f"Expected exactly 8 Xcode native targets, found {len(native_targets)}"
+        f"Expected exactly 10 Xcode native targets, found {len(native_targets)}"
     )
 
 project_objects = objects("PBXProject")
@@ -14967,11 +15279,11 @@ _, project_body = next(iter(project_objects.values()))
 project_target_ids = [
     object_id for object_id, _ in references(project_body, "targets")
 ]
-if len(project_target_ids) != 8 or set(project_target_ids) != set(
+if len(project_target_ids) != 10 or set(project_target_ids) != set(
     native_targets
 ):
     raise SystemExit(
-        "PBXProject target membership does not equal the 8 native targets"
+        "PBXProject target membership does not equal the 10 native targets"
     )
 
 copy_phases = objects("PBXCopyFilesBuildPhase")
@@ -14984,7 +15296,7 @@ for phase_id, (comment, body) in copy_phases.items():
 expected_copy_phases = {
     "Copy Helper",
     "Copy Investigation Helper",
-    "Copy Investigation Driver",
+    "Copy Investigation Machine Tools",
 }
 if set(copy_by_name) != expected_copy_phases or len(copy_phases) != 3:
     raise SystemExit(
@@ -15223,6 +15535,94 @@ driver_proxies = [
 if driver_proxies != [driver_proxy]:
     raise SystemExit("Machine driver native dependency proxy is not unique")
 
+tool_specs = (
+    ("StornautInvestigationMachineDriverNative", "StornautInvestigationMachineDriver", "StornautInvestigationMachineDriverSupport", "Tools/StornautInvestigationMachineDriver/main.swift", "com.eriklee.stornaut.investigation.machine-driver"),
+    ("StornautInvestigationMachineGateNative", "StornautInvestigationMachineGate", "StornautInvestigationMachineGateSupport", "tools/StornautInvestigationMachineGate/main.swift", "com.eriklee.stornaut.investigation.machine-gate"),
+    ("StornautInvestigationMachineGateCoordinatorNative", "StornautInvestigationMachineGateCoordinator", "StornautInvestigationMachineGateCoordinatorSupport", "tools/StornautInvestigationMachineGateCoordinator/main.swift", "com.eriklee.stornaut.investigation.machine-gate-coordinator"),
+)
+tool_ids = {}
+tool_product_refs = {}
+tool_support_products = {}
+tool_dependency_objects = {}
+tool_artifact_build_files = set()
+for tool_name, product_name, support_name, main_path, signing_identifier in tool_specs:
+    tool_id, tool_body = native_by_name[tool_name]
+    tool_ids[tool_name] = tool_id
+    phase_ids = [key for key, _ in references(tool_body, "buildPhases")]
+    if Counter(phase_types.get(key, "other") for key in phase_ids) != Counter({"PBXSourcesBuildPhase": 1, "PBXFrameworksBuildPhase": 1}):
+        raise SystemExit(f"Machine tool native phase graph drifted: {tool_name}")
+    if references(tool_body, "dependencies"):
+        raise SystemExit(f"Machine tool gained native dependency: {tool_name}")
+    if value(tool_body, "productType") != "com.apple.product-type.tool" or value(tool_body, "productName") != product_name:
+        raise SystemExit(f"Machine tool product drifted: {tool_name}")
+    product_ref, _ = reference(tool_body, "productReference")
+    tool_product_refs[product_name] = product_ref
+    product_body = file_references[product_ref][1]
+    if value(product_body, "path") != product_name or value(product_body, "sourceTree") != "BUILT_PRODUCTS_DIR" or value(product_body, "explicitFileType") != "compiled.mach-o.executable":
+        raise SystemExit(f"Machine tool product reference drifted: {tool_name}")
+    source_refs = [key for key, (_, body) in file_references.items() if value(body, "path") == main_path]
+    if len(source_refs) != 1:
+        raise SystemExit(f"Machine tool main source drifted: {tool_name}")
+    source_builds = [key for key, (_, body) in build_files.items() if re.search(rf"(?:^|;)[ \t]*fileRef = {source_refs[0]} /\* .*? \*/;", body, re.MULTILINE)]
+    if len(source_builds) != 1:
+        raise SystemExit(f"Machine tool main build file drifted: {tool_name}")
+    source_phase = next(key for key in phase_ids if key in source_phases)
+    if [key for key, _ in references(source_phases[source_phase][1], "files")] != source_builds:
+        raise SystemExit(f"Machine tool source phase drifted: {tool_name}")
+    supports = [key for key, (_, body) in package_products.items() if value(body, "productName") == support_name]
+    if len(supports) != 1:
+        raise SystemExit(f"Machine tool support product drifted: {tool_name}")
+    tool_support_products[tool_name] = supports[0]
+    if [key for key, _ in references(tool_body, "packageProductDependencies")] != supports:
+        raise SystemExit(f"Machine tool package dependency drifted: {tool_name}")
+    support_builds = [key for key, (_, body) in build_files.items() if re.search(rf"(?:^|;)[ \t]*productRef = {supports[0]} /\* .*? \*/;", body, re.MULTILINE)]
+    if len(support_builds) != 1:
+        raise SystemExit(f"Machine tool support build file drifted: {tool_name}")
+    framework_phase = next(key for key in phase_ids if key in framework_phases)
+    if [key for key, _ in references(framework_phases[framework_phase][1], "files")] != support_builds:
+        raise SystemExit(f"Machine tool framework phase drifted: {tool_name}")
+    dependency_objects = [key for key, target in dependency_targets.items() if target == tool_id]
+    if len(dependency_objects) != 1:
+        raise SystemExit(f"Machine tool dependency object drifted: {tool_name}")
+    tool_dependency_objects[tool_name] = dependency_objects[0]
+    tool_artifact_build_files.update(source_builds + support_builds)
+    configuration_list, _ = reference(tool_body, "buildConfigurationList")
+    configurations = references(
+        configuration_lists[configuration_list][1], "buildConfigurations"
+    )
+    if [name for _, name in configurations] != ["Debug", "Release"]:
+        raise SystemExit(f"Machine tool configuration list drifted: {tool_name}")
+    for configuration_id, configuration_name in configurations:
+        configuration = build_configurations[configuration_id][1]
+        for marker in (
+            'ARCHS = arm64', 'CODE_SIGN_IDENTITY = "-"',
+            'CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO',
+            'CODE_SIGN_STYLE = Manual', 'ENABLE_HARDENED_RUNTIME = NO',
+            'OTHER_SWIFT_FLAGS = "$(inherited) -parse-as-library"',
+            f'PRODUCT_BUNDLE_IDENTIFIER = {signing_identifier}',
+            f'PRODUCT_MODULE_NAME = {tool_name}',
+            f'PRODUCT_NAME = {product_name}', 'SKIP_INSTALL = YES',
+        ):
+            if marker not in configuration:
+                raise SystemExit(
+                    f"Machine tool {configuration_name} setting drifted: {tool_name}: {marker}"
+                )
+        if 'CODE_SIGN_ENTITLEMENTS' in configuration:
+            raise SystemExit(f"Machine tool gained entitlements: {tool_name}")
+        coordinator_only_settings = (
+            'CONFIGURATION_BUILD_DIR = "$(BUILD_DIR)/$(CONFIGURATION)/StornautInvestigationMachineGateCoordinatorNative"',
+            'SWIFT_INCLUDE_PATHS = "$(inherited) $(BUILD_DIR)/$(CONFIGURATION)"',
+            'LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks"',
+        )
+        if tool_name == "StornautInvestigationMachineGateCoordinatorNative":
+            for setting in coordinator_only_settings:
+                if setting not in configuration:
+                    raise SystemExit(
+                        f"Coordinator native output isolation drifted: {setting}"
+                    )
+        elif any(setting in configuration for setting in coordinator_only_settings):
+            raise SystemExit(f"Unexpected Machine tool output isolation: {tool_name}")
+
 diagnostic_name = "StornautInvestigationDiagnosticApp"
 diagnostic_id, diagnostic_body = native_by_name[diagnostic_name]
 release_shell_name = "StornautInvestigationDiagnosticReleaseShell"
@@ -15236,15 +15636,14 @@ diagnostic_dependency_targets = [
 ]
 helper_id = native_by_name["StornautLifecycleHelper"][0]
 if Counter(diagnostic_dependency_targets) != Counter(
-    {helper_id: 1, driver_id: 1}
+    {helper_id: 1, **{value: 1 for value in tool_ids.values()}}
 ):
     raise SystemExit(
-        "Diagnostic App native dependencies must be exactly helper + driver"
+        "Diagnostic App native dependencies must be exactly helper plus three machine tools"
     )
-if diagnostic_dependency_ids.count(driver_dependency) != 1:
-    raise SystemExit(
-        "Diagnostic App must contain exactly one Machine driver dependency"
-    )
+for tool_name, dependency in tool_dependency_objects.items():
+    if diagnostic_dependency_ids.count(dependency) != 1:
+        raise SystemExit(f"Diagnostic App machine-tool dependency drifted: {tool_name}")
 if references(release_shell_body, "dependencies"):
     raise SystemExit("Release shell gained a native target dependency")
 if references(release_shell_body, "packageProductDependencies"):
@@ -15448,8 +15847,8 @@ for required in (
 if "STORNAUT_INVESTIGATION_DIAGNOSTIC" in release_configuration:
     raise SystemExit("Release shell gained the Debug diagnostic condition")
 
-driver_copy_phase = copy_by_name["Copy Investigation Driver"][0]
-driver_copy_body = copy_by_name["Copy Investigation Driver"][2]
+driver_copy_phase = copy_by_name["Copy Investigation Machine Tools"][0]
+driver_copy_body = copy_by_name["Copy Investigation Machine Tools"][2]
 if (
     value(driver_copy_body, "dstPath") != "Contents/MacOS"
     or value(driver_copy_body, "dstSubfolderSpec") != "1"
@@ -15458,30 +15857,31 @@ if (
 driver_copy_build_files = [
     object_id for object_id, _ in references(driver_copy_body, "files")
 ]
-if len(driver_copy_build_files) != 1:
+if len(driver_copy_build_files) != 3:
     raise SystemExit(
-        "Copy Investigation Driver must contain exactly one build file"
+        "Copy Investigation Machine Tools must contain exactly three build files"
     )
-driver_copy_build_file = driver_copy_build_files[0]
-driver_copy_build_body = build_files[driver_copy_build_file][1]
-if reference(driver_copy_build_body, "fileRef")[0] != driver_product_ref:
-    raise SystemExit("Machine driver copy phase references the wrong product")
-if re.search(
-    r"settings = \{[ \t]*ATTRIBUTES = \("
-    r"[ \t]*CodeSignOnCopy,[ \t]*\);[ \t]*\};",
-    driver_copy_build_body,
-) is None:
-    raise SystemExit(
-        "Machine driver copy member must have exactly CodeSignOnCopy"
-    )
+expected_product_refs = set(tool_product_refs.values())
+for copy_build_file in driver_copy_build_files:
+    copy_build_body = build_files[copy_build_file][1]
+    if reference(copy_build_body, "fileRef")[0] not in expected_product_refs:
+        raise SystemExit("Machine tool copy phase references a wrong product")
+    if re.search(
+        r"settings = \{[ \t]*ATTRIBUTES = \("
+        r"[ \t]*CodeSignOnCopy,[ \t]*\);[ \t]*\};",
+        copy_build_body,
+    ) is None:
+        raise SystemExit(
+            "Machine tool copy member must have exactly CodeSignOnCopy"
+        )
 code_sign_on_copy_build_files = [
     object_id
     for object_id, (_, body) in build_files.items()
     if "CodeSignOnCopy" in body
 ]
-if code_sign_on_copy_build_files != [driver_copy_build_file]:
+if set(code_sign_on_copy_build_files) != set(driver_copy_build_files):
     raise SystemExit(
-        "CodeSignOnCopy must belong only to the Machine driver copy member"
+        "CodeSignOnCopy must belong only to the three Machine tool copy members"
     )
 
 copy_phase_owners = {}
@@ -15506,17 +15906,13 @@ if diagnostic_phase_ids.count(driver_copy_phase) != 1:
     raise SystemExit(
         "Diagnostic App must contain one separate Machine driver copy phase"
     )
-driver_copy_memberships = [
-    phase_id
-    for phase_id, (_, body) in copy_phases.items()
-    if driver_copy_build_file in {
-        object_id for object_id, _ in references(body, "files")
-    }
-]
-if driver_copy_memberships != [driver_copy_phase]:
-    raise SystemExit(
-        "Machine driver copy member escaped its dedicated copy phase"
-    )
+for copy_build_file in driver_copy_build_files:
+    memberships = [
+        phase_id for phase_id, (_, body) in copy_phases.items()
+        if copy_build_file in {object_id for object_id, _ in references(body, "files")}
+    ]
+    if memberships != [driver_copy_phase]:
+        raise SystemExit("Machine tool copy member escaped its dedicated copy phase")
 
 driver_free_targets = (
     "StornautApp",
@@ -15526,19 +15922,15 @@ driver_free_targets = (
     "StornautInvestigationDiagnosticAppTests",
     "StornautInvestigationDiagnosticReleaseShell",
 )
-driver_artifact_build_files = {
-    main_build_file,
-    support_build_file,
-    driver_copy_build_file,
-}
+driver_artifact_build_files = tool_artifact_build_files | set(driver_copy_build_files)
 all_phase_objects = {**copy_phases, **source_phases, **framework_phases}
 for target_name in driver_free_targets:
     _, body = native_by_name[target_name]
     dependency_ids = {
         object_id for object_id, _ in references(body, "dependencies")
     }
-    if driver_dependency in dependency_ids:
-        raise SystemExit(f"{target_name} gained Machine driver dependency")
+    if dependency_ids & set(tool_dependency_objects.values()):
+        raise SystemExit(f"{target_name} gained Machine tool dependency")
     package_ids = {
         object_id
         for object_id, _ in references(
@@ -15546,8 +15938,8 @@ for target_name in driver_free_targets:
             "packageProductDependencies",
         )
     }
-    if support_product in package_ids:
-        raise SystemExit(f"{target_name} gained DriverSupport membership")
+    if package_ids & set(tool_support_products.values()):
+        raise SystemExit(f"{target_name} gained Machine tool support membership")
     target_phase_ids = {
         object_id for object_id, _ in references(body, "buildPhases")
     }
@@ -15580,66 +15972,6 @@ ordinary_scheme_text, ordinary_scheme_root = load_scheme(ordinary_scheme_path)
 diagnostic_scheme_text, diagnostic_scheme_root = load_scheme(
     diagnostic_scheme_path
 )
-driver_product_name = "StornautInvestigationMachineDriver"
-driver_identity = {driver_id, driver_name, driver_product_name}
-for token in driver_identity:
-    if token in ordinary_scheme_text:
-        raise SystemExit(
-            f"Ordinary scheme gained Machine driver identity: {token}"
-        )
-
-
-def is_driver_reference(element):
-    return bool(
-        driver_identity
-        & {
-            element.get("BlueprintIdentifier", ""),
-            element.get("BlueprintName", ""),
-            element.get("BuildableName", ""),
-        }
-    )
-
-
-if any(
-    is_driver_reference(element)
-    for element in ordinary_scheme_root.iter("BuildableReference")
-):
-    raise SystemExit("Ordinary scheme gained a Machine driver reference")
-diagnostic_driver_references = [
-    element
-    for element in diagnostic_scheme_root.iter("BuildableReference")
-    if is_driver_reference(element)
-]
-if len(diagnostic_driver_references) != 1:
-    raise SystemExit(
-        "Diagnostic scheme must contain exactly one Machine driver "
-        f"reference, found {len(diagnostic_driver_references)}"
-    )
-driver_reference = diagnostic_driver_references[0]
-expected_driver_reference = {
-    "BuildableIdentifier": "primary",
-    "BlueprintIdentifier": driver_id,
-    "BuildableName": driver_product_name,
-    "BlueprintName": driver_name,
-    "ReferencedContainer": "container:Stornaut.xcodeproj",
-}
-if driver_reference.attrib != expected_driver_reference:
-    raise SystemExit(
-        "Diagnostic scheme Machine driver reference drifted: "
-        f"{driver_reference.attrib!r}"
-    )
-driver_entries = []
-for entry in diagnostic_scheme_root.findall(
-    "./BuildAction/BuildActionEntries/BuildActionEntry"
-):
-    references_in_entry = entry.findall("./BuildableReference")
-    if driver_reference in references_in_entry:
-        driver_entries.append(entry)
-if len(driver_entries) != 1:
-    raise SystemExit(
-        "Diagnostic scheme must contain one explicit Machine driver "
-        "BuildActionEntry"
-    )
 expected_driver_entry = {
     "buildForTesting": "YES",
     "buildForRunning": "YES",
@@ -15647,15 +15979,42 @@ expected_driver_entry = {
     "buildForArchiving": "NO",
     "buildForAnalyzing": "YES",
 }
-if driver_entries[0].attrib != expected_driver_entry:
-    raise SystemExit(
-        "Diagnostic scheme Machine driver build entry drifted: "
-        f"{driver_entries[0].attrib!r}"
-    )
-if diagnostic_scheme_text.count(driver_id) != 1:
-    raise SystemExit(
-        "Diagnostic scheme Machine driver target identifier is not unique"
-    )
+for tool_name, product_name, _support_name, _main_path, _identifier in tool_specs:
+    tool_id = tool_ids[tool_name]
+    tool_identity = {tool_id, tool_name, product_name}
+    if any(token in ordinary_scheme_text for token in tool_identity):
+        raise SystemExit(f"Ordinary scheme gained Machine tool identity: {tool_name}")
+    references_for_tool = [
+        element for element in diagnostic_scheme_root.iter("BuildableReference")
+        if tool_identity & {
+            element.get("BlueprintIdentifier", ""),
+            element.get("BlueprintName", ""),
+            element.get("BuildableName", ""),
+        }
+    ]
+    if len(references_for_tool) != 1:
+        raise SystemExit(f"Diagnostic scheme Machine tool reference drifted: {tool_name}")
+    tool_reference = references_for_tool[0]
+    if tool_reference.attrib != {
+        "BuildableIdentifier": "primary",
+        "BlueprintIdentifier": tool_id,
+        "BuildableName": product_name,
+        "BlueprintName": tool_name,
+        "ReferencedContainer": "container:Stornaut.xcodeproj",
+    }:
+        raise SystemExit(f"Diagnostic scheme Machine tool identity drifted: {tool_name}")
+    entries = [
+        entry for entry in diagnostic_scheme_root.findall(
+            "./BuildAction/BuildActionEntries/BuildActionEntry"
+        ) if tool_reference in entry.findall("./BuildableReference")
+    ]
+    expected_entry = dict(expected_driver_entry)
+    if tool_name == "StornautInvestigationMachineGateCoordinatorNative":
+        expected_entry["buildForTesting"] = "NO"
+    if len(entries) != 1 or entries[0].attrib != expected_entry:
+        raise SystemExit(f"Diagnostic scheme Machine tool entry drifted: {tool_name}")
+    if diagnostic_scheme_text.count(tool_id) != 1:
+        raise SystemExit(f"Diagnostic scheme Machine tool target ID drifted: {tool_name}")
 PY
 
 machine_claim_source="$machine_root/InvestigationMachineRetirementClaim.swift"

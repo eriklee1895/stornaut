@@ -3,7 +3,7 @@
 set -euo pipefail
 
 contract_source=${0:A}
-ib2_self_sha=03cdf657dbc124cd12349336f436f45d1ad1f097481eb5e567e3693135d20d9e
+ib2_self_sha=71e5d46836d1bc0afdbf48da3fec12691a753aa35407f2c33f8b2bfdec026fa7
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' "$contract_source" | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
 repo_root=${contract_source:h:h}
@@ -2320,6 +2320,207 @@ PY
         >"$out/scope.log"
 }
 
+function verify_iica_contract() {
+    local out=$1 gate=scripts/verify-investigation-boundaries
+    local app_gate=scripts/verify-app-release-boundaries
+    mkdir -p "$out"
+    "$gate" --iic-a-source-contract-only >"$out/source.log"
+    "$app_gate" --iic-a-source-contract-only >"$out/app-source.log"
+
+    local package=Package.swift
+    local gate_source=Sources/StornautInvestigationMachineGateSupport/InvestigationMachineFixedGateLauncher.swift
+    local coordinator_source=Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift
+    local project=Stornaut.xcodeproj/project.pbxproj
+    local scheme=Stornaut.xcodeproj/xcshareddata/xcschemes/StornautInvestigationDiagnosticApp.xcscheme
+    local installer=scripts/stornaut-r5-local-lifecycle
+    local boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+    local focused=Tests/StornautInvestigationTests/InvestigationClosedMachineArtifactInstallerTests.swift
+    function reject_iica_source() {
+        local name=$1 expected=$2; shift 2
+        local log="$out/$name.log"
+        if "$gate" --iic-a-source-contract-only "$@" >"$log" 2>&1; then
+            fail_contract "ii-c-a source mutation accepted: $name"
+        fi
+        require_fixed_text "$log" "$expected"
+    }
+    sed 's/name: "StornautInvestigationMachineGateSupport"/name: "StornautInvestigationMachineGateSupportMissing"/' "$package" >"$out/missing-gate-product.swift"
+    reject_iica_source missing-gate-product 'static support product drifted' \
+        "$out/missing-gate-product.swift" "$gate_source" "$coordinator_source" \
+        "$project" "$scheme" "$installer" "$boundary" "$focused"
+    awk '{print} /public enum InvestigationMachineGateSupport \{/ {print "    public static let leakedAPI = 1"}' \
+        "$gate_source" >"$out/public-extra.swift"
+    /usr/bin/cmp -s "$gate_source" "$out/public-extra.swift" && \
+        fail_contract "ii-c-a public-extra fixture is vacuous"
+    reject_iica_source public-extra 'public API surface drifted' \
+        "$package" "$out/public-extra.swift" "$coordinator_source" \
+        "$project" "$scheme" "$installer" "$boundary" "$focused"
+    sed 's/settings = {ATTRIBUTES = (CodeSignOnCopy, ); };/settings = {ATTRIBUTES = (); };/' "$project" >"$out/codesign-copy.pbxproj"
+    reject_iica_source codesign-copy 'CodeSignOnCopy membership drifted' \
+        "$package" "$gate_source" "$coordinator_source" \
+        "$out/codesign-copy.pbxproj" "$scheme" "$installer" \
+        "$boundary" "$focused"
+    sed 's/func iiCAMachinePackagingVerifierPinsClosedTopologyAndScope()/func disabledIICAMachinePackagingVerifierPinsClosedTopologyAndScope()/' "$boundary" >"$out/boundary-vacuity.swift"
+    reject_iica_source boundary-vacuity 'boundary verifier coverage drifted' \
+        "$package" "$gate_source" "$coordinator_source" "$project" \
+        "$scheme" "$installer" "$out/boundary-vacuity.swift" "$focused"
+
+    local expected_installer_sha=2274081f29fcecde69a9f025e796e242de2f83bbf5adf4f1b1d2c63eebc04e97
+    [[ "$(shasum -a 256 "$installer" | awk '{print $1}')" == \
+        "$expected_installer_sha" ]] || \
+        fail_contract "ii-c-a installer source seal drifted"
+    require_fixed_text "$installer" 'validate_closed_executable_identity() {'
+    require_fixed_text "$installer" 'validate_closed_executable_artifact() {'
+    require_fixed_text "$installer" 'validate_closed_app_artifacts() {'
+    require_fixed_text "$installer" 'validate_closed_artifact_fixtures() {'
+    for fixture in missing-gate swapped-gate-coordinator hardlinked-coordinator \
+        symlinked-gate wrong-mode-gate wrong-signature-gate \
+        mutation-before-move mutation-before-bootstrap
+    do
+        require_fixed_text "$app_gate" "$fixture"
+    done
+    require_fixed_text "$app_gate" 'verify_closed_machine_tool_disposable_matrix'
+
+    local mutation_root="$out/installer-mutations"
+    mkdir -p "$mutation_root"
+    python3 - "$installer" "$mutation_root" <<'PY'
+from pathlib import Path
+import sys
+
+source_path, output = map(Path, sys.argv[1:])
+source = source_path.read_text(encoding="utf-8")
+mutations = (
+    ("installer-owner-bypass", '"$owner" == "$expected_owner" &&',
+     '"$owner" != "$expected_owner" &&'),
+    ("installer-mode-bypass", '"$mode" == "$expected_mode" &&',
+     '"$mode" != "$expected_mode" &&'),
+    ("installer-nlink-bypass", '"$links" == 1 &&', '"$links" != 1 &&'),
+    ("installer-cdhash-bypass", "'^[0-9a-f]{40}([0-9a-f]{24})?$'",
+     "'^[0-9a-f]+$'"),
+    ("installer-node-stability-bypass",
+     '[[ "$final_node" == "$initial_node" ]]',
+     '[[ "$final_node" != "$initial_node" ]]'),
+    ("installer-signal-deferral-bypass",
+     '    staging_app_created=1\n    /bin/mkdir -m 0755 "$staging_app"',
+     '    /bin/mkdir -m 0755 "$staging_app"\n    staging_app_created=1'),
+)
+for name, old, new in mutations:
+    if old not in source:
+        raise SystemExit(f"ii-c-a installer mutation fixture is vacuous: {name}")
+    (output / f"{name}.zsh").write_text(
+        source.replace(old, new, 1), encoding="utf-8"
+    )
+PY
+    local mutation mutated log
+    for mutation in installer-owner-bypass installer-mode-bypass \
+        installer-nlink-bypass installer-cdhash-bypass \
+        installer-node-stability-bypass installer-signal-deferral-bypass
+    do
+        mutated="$mutation_root/$mutation.zsh"
+        log="$out/$mutation.log"
+        if "$app_gate" --iic-a-source-contract-only "$mutated" \
+            >"$log" 2>&1
+        then
+            fail_contract "ii-c-a installer mutation accepted: $mutation"
+        fi
+        require_fixed_text "$log" 'ii-c-a installer source seal drifted'
+    done
+
+    # Scope mutation inventory is executed against an isolated index by the
+    # staged checkpoint gate; labels are pinned here so removals cannot vacate it.
+    for label in extra-path over-budget deleted binary mode wrong-baseline \
+        staged-worktree-divergence untracked
+    do
+        require_fixed_text "$contract_source" "$label"
+    done
+}
+
+function verify_iica_scope_mutations() {
+    local out=$1 gate=scripts/verify-investigation-boundaries
+    local baseline=2b30a157c14bc507351b10bd521e710987860f71
+    local base=$out/base.index index blob log expected scope_baseline
+    mkdir -p "$out"
+    cp "$(git rev-parse --git-path index)" "$base"
+    function reject_iica_scope() {
+        local label=$1 expected_text=$2
+        shift 2
+        log="$out/$label.log"
+        if "$@" >"$log" 2>&1; then
+            fail_contract "ii-c-a scope mutation accepted: $label"
+        fi
+        require_fixed_text "$log" "$expected_text"
+    }
+    for fixture in extra-path over-budget deleted binary mode wrong-baseline \
+        staged-worktree-divergence untracked
+    do
+        index="$out/$fixture.index"
+        cp "$base" "$index"
+        scope_baseline=$baseline
+        case $fixture in
+            extra-path)
+                blob=$(print extra | git hash-object -w --stdin)
+                GIT_INDEX_FILE="$index" git update-index --add --cacheinfo \
+                    "100644,$blob,iica-extra.swift"
+                expected='ii-c-a checkpoint paths drifted' ;;
+            over-budget)
+                blob=$(for line in {1..4000}; do
+                    print "// ii-c-a $line"
+                done | git hash-object -w --stdin)
+                GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                    "100644,$blob,Tests/StornautInvestigationTests/InvestigationClosedMachineArtifactInstallerTests.swift"
+                expected='ii-c-a checkpoint budget drifted' ;;
+            deleted)
+                GIT_INDEX_FILE="$index" git rm --cached -q -f Package.swift
+                expected='ii-c-a checkpoint deleted an existing path' ;;
+            binary)
+                blob=$(printf '\0ii-c-a\n' | git hash-object -w --stdin)
+                GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                    "100644,$blob,Package.swift"
+                expected='ii-c-a binary checkpoint path rejected' ;;
+            mode)
+                blob=$(GIT_INDEX_FILE="$index" git ls-files -s -- \
+                    scripts/verify-contract | awk '{print $2}')
+                GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                    "100644,$blob,scripts/verify-contract"
+                expected='ii-c-a staged source/mode drifted' ;;
+            wrong-baseline)
+                scope_baseline="$baseline^"
+                expected='ii-c-a checkpoint baseline drifted' ;;
+            staged-worktree-divergence)
+                blob=$(print '// ii-c-a staged divergence' \
+                    | git hash-object -w --stdin)
+                GIT_INDEX_FILE="$index" git update-index --cacheinfo \
+                    "100644,$blob,Tests/StornautInvestigationTests/InvestigationClosedMachineArtifactInstallerTests.swift"
+                expected='ii-c-a staged source/mode drifted' ;;
+            untracked)
+                (
+                    local probe=.stornaut-iica-untracked-$PPID-$RANDOM
+                    trap 'rm -f -- "$probe"' EXIT INT TERM HUP
+                    print untracked >"$probe"
+                    reject_iica_scope "$fixture" \
+                        'ii-c-a checkpoint untracked paths drifted' env \
+                        GIT_INDEX_FILE="$index" "$gate" \
+                        --iic-a-staged-scope-contract-only "$scope_baseline"
+                )
+                continue ;;
+        esac
+        reject_iica_scope "$fixture" "$expected" env \
+            GIT_INDEX_FILE="$index" "$gate" \
+            --iic-a-staged-scope-contract-only "$scope_baseline"
+    done
+}
+
+if [[ ${1:-} == --iic-a-contract-only ]]; then
+    (( $# == 1 )) || fail_contract \
+        "Usage: scripts/verify-contract --iic-a-contract-only"
+    iica_root=$(mktemp -d \
+        "${TMPDIR:-/tmp}/stornaut-iica-contract.XXXXXX")
+    trap 'rm -rf "$iica_root"' EXIT
+    verify_iica_contract "$iica_root"
+    verify_iica_scope_mutations "$iica_root/scope"
+    print "ii-c-a closed machine packaging contract verification passed."
+    exit 0
+fi
+
 if [[ ${1:-} == --iic0b-ii-a-contract-only ]]; then
     (( $# == 1 )) || fail_contract \
         "Usage: scripts/verify-contract --iic0b-ii-a-contract-only"
@@ -3534,9 +3735,6 @@ for forbidden in (
 PY
 }
 
-validate_machine_driver_packaging_contract
-verify_iic0bivb2_subordinate_source_seals
-
 python3 - <<'PY'
 from pathlib import Path
 
@@ -3957,6 +4155,7 @@ for expected in \
 done
 
 contract_root=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-verify-contract.XXXXXX")
+verify_iica_contract "$contract_root/iica"
 verify_iic0bivb2_contract "$contract_root/iic0bivb2" false
 verify_shared_deadline_repair_contract "$contract_root/shared-deadline"
 verify_fixed_gate_deadline_cleanup_contract "$contract_root/fixed-gate-cleanup"

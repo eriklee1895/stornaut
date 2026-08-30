@@ -99,9 +99,9 @@ machine-tool set.
 Validation order is structural RED -> focused tests -> affected tests -> one
 staged-only serial regression -> targeted Debug diagnostic App plus standalone
 Debug/Release tool builds -> final-Mach-O/ordinary-App/Release-shell boundaries
--> independent review. Because target linkage, signing and final Mach-O change,
-ii-c-a requires one clean authoritative `scripts/verify --full` only after all
-cheaper layers are green. It is not used as a debugging loop.
+> independent review. ii-c-a stops after those focused checkpoint gates; the
+remaining clean authoritative `scripts/verify --full` belongs only to L3c4 and
+is not spent or used as a debugging loop here.
 
 ii-c-a does not run `install`, `uninstall`, `launchctl` system operations, sudo,
 the installed coordinator/gate/driver, product XPC, Codex auth/model/network or

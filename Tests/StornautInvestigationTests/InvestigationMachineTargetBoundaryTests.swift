@@ -1043,7 +1043,7 @@ struct InvestigationMachineTargetBoundaryTests {
             "name: \"StornautInvestigationMachineGateSupport\"",
             "name: \"StornautInvestigationMachineGate\"",
             "\"StornautInvestigationMachineGateSupport\"",
-            "path: \"Tools/StornautInvestigationMachineGate\"",
+            "path: \"tools/StornautInvestigationMachineGate\"",
         ] {
             #expect(package.contains(marker))
         }
@@ -3626,7 +3626,7 @@ struct InvestigationMachineTargetBoundaryTests {
         #expect(
             projectSource.components(
                 separatedBy: "isa = PBXNativeTarget;"
-            ).count == 9
+            ).count == 11
         )
         #expect(
             projectSource.components(
@@ -3776,26 +3776,30 @@ struct InvestigationMachineTargetBoundaryTests {
 
         let driverCopy = try objectBlock(
             id: "B00000000000000000000042",
-            comment: "Copy Investigation Driver",
+            comment: "Copy Investigation Machine Tools",
             in: projectSource
         )
         for marker in [
             "B0000000000000000000001D "
-                + "/* StornautInvestigationMachineDriver in Copy Investigation Driver */",
-            "name = \"Copy Investigation Driver\";",
+                + "/* StornautInvestigationMachineDriver in Copy Investigation Machine Tools */",
+            "B00000000000000000000052 "
+                + "/* StornautInvestigationMachineGate in Copy Investigation Machine Tools */",
+            "B00000000000000000000055 "
+                + "/* StornautInvestigationMachineGateCoordinator in Copy Investigation Machine Tools */",
+            "name = \"Copy Investigation Machine Tools\";",
             "dstPath = Contents/MacOS;",
         ] {
             #expect(driverCopy.contains(marker))
         }
         #expect(
             driverCopy.components(
-                separatedBy: " in Copy Investigation Driver */"
-            ).count == 2
+                separatedBy: " in Copy Investigation Machine Tools */"
+            ).count == 4
         )
         let driverCopyBuildFile = try objectLine(
             containing:
                 "B0000000000000000000001D "
-                    + "/* StornautInvestigationMachineDriver in Copy Investigation Driver */ =",
+                    + "/* StornautInvestigationMachineDriver in Copy Investigation Machine Tools */ =",
             in: projectSource
         )
         #expect(driverCopyBuildFile.contains(
@@ -3835,7 +3839,7 @@ struct InvestigationMachineTargetBoundaryTests {
         }
         #expect(
             projectSource.components(
-                separatedBy: "name = \"Copy Investigation Driver\";"
+                separatedBy: "name = \"Copy Investigation Machine Tools\";"
             ).count == 2
         )
         #expect(
@@ -3855,6 +3859,71 @@ struct InvestigationMachineTargetBoundaryTests {
         ))
         #expect(!ordinaryScheme.contains(
             "StornautInvestigationMachineDriver"
+        ))
+    }
+
+    @Test
+    func iiCAMachinePackagingVerifierPinsClosedTopologyAndScope() throws {
+        let root = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let boundaries = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ),
+            encoding: .utf8
+        )
+        let release = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-app-release-boundaries"
+            ),
+            encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        let combined = boundaries + release + contract
+
+        for marker in [
+            "--iic-a-source-contract-only",
+            "--iic-a-staged-scope-contract-only",
+            "--iic-a-component-boundary-only",
+            "--iic-a-contract-only",
+            "function verify_iica_source_contract()",
+            "function verify_iica_staged_scope()",
+            "function verify_iica_component_boundary()",
+            "function verify_iica_contract()",
+            "2b30a157c14bc507351b10bd521e710987860f71",
+            "(( total <= 3800 ))",
+            "(( package_api <= 120 ))",
+            "(( xcode <= 650 ))",
+            "(( installer <= 500 ))",
+            "(( tests <= 850 ))",
+            "(( verifiers <= 1680 ))",
+            "expected_diagnostic_mach_o_paths",
+            "StornautInvestigationMachineGateCoordinator",
+            "@executable_path/../Frameworks",
+            "Coordinator framework dependency is unresolved",
+            "Copy Investigation Machine Tools",
+            "CodeSignOnCopy",
+            "missing-gate",
+            "swapped-gate-coordinator",
+            "hardlinked-coordinator",
+            "mutation-before-move",
+            "mutation-before-bootstrap",
+            "installer-owner-bypass",
+            "installer-mode-bypass",
+            "installer-nlink-bypass",
+            "installer-cdhash-bypass",
+            "installer-node-stability-bypass",
+            "installer-signal-deferral-bypass",
+        ] {
+            #expect(combined.contains(marker))
+        }
+        #expect(!combined.contains(
+            "ii-c-a requires one clean authoritative `scripts/verify --full`"
         ))
     }
 
@@ -4664,7 +4733,7 @@ struct InvestigationMachineTargetBoundaryTests {
     }
 
     @Test
-    func l3c3biiInstallerValidatesOneDriverIdentityAcrossAllPhases()
+    func l3c3biiInstallerValidatesClosedToolIdentitiesAcrossAllPhases()
         throws
     {
         let repositoryRoot = URL(filePath: #filePath)
@@ -4680,11 +4749,15 @@ struct InvestigationMachineTargetBoundaryTests {
             in: installer
         ))
         let identity = l3c3biiFlattened(try l3c3biiFunction(
-            "validate_machine_driver_identity",
+            "validate_closed_executable_identity",
             in: installer
         ))
         let artifact = l3c3biiFlattened(try l3c3biiFunction(
-            "validate_machine_driver_artifact",
+            "validate_closed_executable_artifact",
+            in: installer
+        ))
+        let closedApp = l3c3biiFlattened(try l3c3biiFunction(
+            "validate_closed_app_artifacts",
             in: installer
         ))
         let built = l3c3biiFlattened(try l3c3biiFunction(
@@ -4721,7 +4794,7 @@ struct InvestigationMachineTargetBoundaryTests {
             "/usr/bin/stat -f '%z'",
             "/usr/bin/lipo -archs",
             "/usr/bin/codesign --verify --strict",
-            "validate_machine_driver_identity",
+            "validate_closed_executable_identity",
         ] {
             #expect(artifact.contains(marker))
         }
@@ -4735,42 +4808,36 @@ struct InvestigationMachineTargetBoundaryTests {
         }
         #expect(install.contains("/bin/chmod -RN \"$staging_app\""))
 
-        for (slice, root) in [
-            (built, "built_app"),
-            (install, "staging_app"),
-            (installed, "installed_app"),
+        for product in [
+            "StornautInvestigationMachineDriver",
+            "StornautInvestigationMachineGate",
+            "StornautInvestigationMachineGateCoordinator",
         ] {
-            let path =
-                "$\(root)/Contents/MacOS/"
-                + "StornautInvestigationMachineDriver"
-            #expect(!slice.contains("[[ ! -e \"\(path)\""))
-            #expect(!slice.contains("! -L \"\(path)\""))
-            #expect(slice.contains(
-                "validate_machine_driver_artifact \"\(path)\""
-            ))
+            #expect(closedApp.contains("Contents/MacOS/\(product)"))
         }
 
-        #expect(install.contains("built_machine_driver_identity="))
+        #expect(built.contains("validate_closed_app_artifacts"))
+        #expect(installed.contains("validate_closed_app_artifacts"))
+        #expect(install.contains("built_closed_artifact_identity="))
         #expect(install.components(
-            separatedBy: "$built_machine_driver_identity"
+            separatedBy: "$built_closed_artifact_identity"
         ).count >= 3)
         #expect(install.contains(
-            "validate_machine_driver_artifact \"$staging_app/Contents/"
-                + "MacOS/StornautInvestigationMachineDriver\""
+            "validate_closed_app_artifacts \"$staging_app\""
         ))
         #expect(install.contains(
-            "validate_installed_artifacts \"$built_machine_driver_identity\""
+            "validate_installed_artifacts \"$built_closed_artifact_identity\""
         ))
         try l3c3biiRequireOrder(
             [
-                "built_machine_driver_identity=",
+                "built_closed_artifact_identity=",
                 "validate_built_app",
                 "/usr/bin/ditto --noqtn",
                 "/bin/chmod -RN \"$staging_app\"",
                 "validate_bundle_permissions \"$staging_app\"",
-                "validate_machine_driver_artifact \"$staging_app/Contents/",
+                "validate_closed_app_artifacts \"$staging_app\"",
                 "/bin/mv -n \"$staging_app\" \"$installed_app\"",
-                "validate_installed_artifacts \"$built_machine_driver_identity\"",
+                "validate_installed_artifacts \"$built_closed_artifact_identity\"",
                 "/bin/launchctl bootstrap system \"$installed_plist\"",
                 "validate_installed_state",
                 "lifecycle.local.install=complete",
@@ -4826,7 +4893,7 @@ struct InvestigationMachineTargetBoundaryTests {
         ))
         #expect(arm.contains("[[ $# == 6 ]]") || arm.contains("(( $# == 6 ))"))
         #expect(arm.contains(
-            "validate_machine_driver_fixtures \"$2\" \"$3\" "
+            "validate_closed_artifact_fixtures \"$2\" \"$3\" "
                 + "\"$4\" \"$5\" \"$6\""
         ))
 
@@ -4835,15 +4902,15 @@ struct InvestigationMachineTargetBoundaryTests {
             in: installer
         )
         let identity = try l3c3biiFunction(
-            "validate_machine_driver_identity",
+            "validate_closed_executable_identity",
             in: installer
         )
         let artifact = try l3c3biiFunction(
-            "validate_machine_driver_artifact",
+            "validate_closed_executable_artifact",
             in: installer
         )
         let fixtures = l3c3biiFlattened(try l3c3biiFunction(
-            "validate_machine_driver_fixtures",
+            "validate_closed_artifact_fixtures",
             in: installer
         ))
         #expect(fixtures.contains(
@@ -4877,9 +4944,9 @@ struct InvestigationMachineTargetBoundaryTests {
             ))
         }
         #expect(fixtures.components(
-            separatedBy: "validate_machine_driver_artifact"
+            separatedBy: "validate_closed_app_artifacts"
         ).count == 4)
-        #expect(fixtures.contains("built_machine_driver_identity"))
+        #expect(fixtures.contains("built_closed_artifact_identity"))
 
         let validationOnlySource =
             exactMetadata + identity + artifact + fixtures + arm
@@ -4934,7 +5001,7 @@ struct InvestigationMachineTargetBoundaryTests {
             "I authorize one bounded disposable read-only Stornaut "
             + "L3c3b-ii Machine driver validation."
         let matrix = try l3c3biiFunction(
-            containing: "validate-machine-driver",
+            "verify_closed_machine_tool_disposable_matrix",
             in: release
         )
         let matrixLowercase = matrix.lowercased()
@@ -4951,6 +5018,14 @@ struct InvestigationMachineTargetBoundaryTests {
             "duplicate-app",
             "identity-mismatch",
             "acl-mismatch",
+            "missing-gate",
+            "swapped-gate-coordinator",
+            "hardlinked-coordinator",
+            "symlinked-gate",
+            "wrong-mode-gate",
+            "wrong-signature-gate",
+            "mutation-before-move",
+            "mutation-before-bootstrap",
         ] {
             #expect(matrixLowercase.contains(marker))
         }
@@ -4972,47 +5047,35 @@ struct InvestigationMachineTargetBoundaryTests {
             #expect(!matrix.contains(forbidden))
         }
 
-        let contract = try l3c3biiFunction(
-            "validate_machine_driver_packaging_contract",
-            in: verifier
+        let contractStart = try #require(verifier.range(
+            of: "function verify_iica_contract() {"
+        ))
+        let contractEnd = try #require(verifier.range(
+            of: "\nif [[ ${1:-} == --iic-a-contract-only ]]; then",
+            range: contractStart.upperBound..<verifier.endIndex
+        ))
+        let contract = String(
+            verifier[contractStart.lowerBound..<contractEnd.lowerBound]
         )
         let contractLowercase = contract.lowercased()
         for marker in [
-            "validate_machine_driver_identity",
-            "validate_machine_driver_artifact",
-            "validate_machine_driver_fixtures",
-            "validate-machine-driver",
-            "exact_metadata = function_body",
-            "validation_only = exact_metadata + identity",
-            "validation-only mutation negative control",
-            "expected_installer_sha256 =",
-            "installer_sha256 =",
-            "whole-installer generic mutation negative control",
-            "/usr/bin/touch",
-            "extended ACL",
-            "/bin/chmod -RN",
-            "acl-mismatch",
-            token,
-            "canonical_temporary_root",
-            "canonical_built_app",
-            "canonical_staging_app",
-            "canonical_installed_app",
-            "$canonical_temporary_root/",
-            "/bin/realpath",
-            "launchctl",
-            "mkdir",
-            "chown",
-            "chmod",
-            "ditto",
-            "/bin/mv",
-            "/bin/rm",
-            "/Library/",
-            "/private/var/",
+            "validate_closed_executable_identity",
+            "validate_closed_executable_artifact",
+            "validate_closed_app_artifacts",
+            "validate_closed_artifact_fixtures",
+            "installer_sha=",
+            "public-extra",
+            "codesign-copy",
+            "boundary-vacuity",
+            "verify_iica_scope_mutations",
+            "staged-worktree-divergence",
+            "untracked",
         ] {
             #expect(contract.contains(marker))
         }
-        #expect(contractLowercase.contains("path confinement"))
-        #expect(contractLowercase.contains("live action"))
+        #expect(matrix.contains("acl-mismatch"))
+        #expect(matrix.contains(token))
+        #expect(contractLowercase.contains("scope mutation"))
         #expect(!contract.contains("reject_before("))
         #expect(!contract.contains(
             "installer admitted the Machine driver before L3c3b-ii"

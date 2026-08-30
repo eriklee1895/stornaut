@@ -7,14 +7,14 @@ import StornautInvestigationDiagnostic
 import StornautInvestigationHandoffContract
 import StornautInvestigationMachineGateSupport
 import StornautInvestigationMachineLaunchSupport
-package enum InvestigationMachineGateCoordinatorSupport {
+public enum InvestigationMachineGateCoordinatorSupport {
   package static let completedExitStatus: Int32 = 0
   package static let unavailableExitStatus: Int32 = 78
   package static let invalidInvocationExitStatus: Int32 = 80
   package static let protocolFailureExitStatus: Int32 = 81
   package static let containmentUncertainExitStatus: Int32 = 82
   package static let cancelledExitStatus: Int32 = 83
-  package static func run() async -> Int32 {
+  public static func run() async -> Int32 {
     #if DEBUG
       let context = InvestigationMachineGateCoordinatorProductionContext()
       let sink = InvestigationMachineGateCoordinatorReceiptSink()

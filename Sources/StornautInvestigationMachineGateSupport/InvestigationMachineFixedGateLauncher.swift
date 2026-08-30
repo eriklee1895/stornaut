@@ -12,14 +12,14 @@ struct InvestigationMachineGateSettledSpawnFailure:
     let childGroupEmpty: Bool
 }
 
-package enum InvestigationMachineGateSupport {
+public enum InvestigationMachineGateSupport {
     package static let completedExitStatus: Int32 = 0
     package static let invalidInvocationExitStatus: Int32 = 80
     package static let containmentUncertainExitStatus: Int32 = 82
     package static let forwardedSignalExitStatus: Int32 = 83
     package static let transportFailureExitStatus: Int32 = 84
 
-    package static func run() -> Int32 {
+    public static func run() -> Int32 {
         do {
             let result = try InvestigationMachineFixedGateLauncher(
                 system: DarwinInvestigationMachineFixedGateSystem()

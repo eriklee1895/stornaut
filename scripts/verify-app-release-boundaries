@@ -82,7 +82,12 @@ iic0biii2a_darwin_source=
 iic0biii2a_entry_source=
 iic0biii2a_verifier_source=
 iic0biii2a_component_boundary_only=false
+iica_source_contract_only=false
+iica_installer_source=scripts/stornaut-r5-local-lifecycle
+iica_component_boundary_only=false
 iic0bivb2_component_boundary_only=false
+iica_existing_product_derived_data=
+iica_existing_diagnostic_derived_data=
 iic0biii2a_closed_image_scan_contract_only=false
 iic0biii2a_closed_image_scan_source=
 iib5biii_a_source_contract_only=false
@@ -186,6 +191,15 @@ elif [[ ($# == 6 || $# == 7) \
     iic0biii2a_verifier_source=${7:-${ZSH_SCRIPT:A}}
 elif [[ $# == 1 && $1 == --iic0b-iii-2a-component-boundary-only ]]; then
     iic0biii2a_component_boundary_only=true
+elif [[ ($# == 1 || $# == 2) \
+    && $1 == --iic-a-source-contract-only ]]; then
+    iica_source_contract_only=true
+    iica_installer_source=${2:-scripts/stornaut-r5-local-lifecycle}
+elif [[ ($# == 1 || $# == 3) \
+    && $1 == --iic-a-component-boundary-only ]]; then
+    iica_component_boundary_only=true
+    iica_existing_product_derived_data=${2:-}
+    iica_existing_diagnostic_derived_data=${3:-}
 elif [[ $# == 1 && $1 == --iic0b-iv-component-boundary-only ]]; then
     iic0bivb2_component_boundary_only=true
 elif [[ $# == 2 && $1 == --iic0b-iii-2a-closed-image-scan-contract-only ]]; then
@@ -2383,6 +2397,184 @@ if component.count(projection_guard) != 1:
 PY
 }
 
+function verify_iica_source_contract() {
+    scripts/verify-investigation-boundaries \
+        --iic-a-source-contract-only || return $?
+    python3 - Stornaut.xcodeproj/project.pbxproj \
+        Stornaut.xcodeproj/xcshareddata/xcschemes/StornautInvestigationDiagnosticApp.xcscheme \
+        Stornaut.xcodeproj/xcshareddata/xcschemes/Stornaut.xcscheme <<'PY'
+from pathlib import Path
+import sys
+
+project_path, diagnostic_scheme_path, ordinary_scheme_path = map(Path, sys.argv[1:])
+project = project_path.read_text(encoding="utf-8")
+diagnostic_scheme = diagnostic_scheme_path.read_text(encoding="utf-8")
+ordinary_scheme = ordinary_scheme_path.read_text(encoding="utf-8")
+tools = (
+    ("StornautInvestigationMachineDriverNative", "StornautInvestigationMachineDriver", "StornautInvestigationMachineDriverSupport"),
+    ("StornautInvestigationMachineGateNative", "StornautInvestigationMachineGate", "StornautInvestigationMachineGateSupport"),
+    ("StornautInvestigationMachineGateCoordinatorNative", "StornautInvestigationMachineGateCoordinator", "StornautInvestigationMachineGateCoordinatorSupport"),
+)
+
+def block(identifier, comment):
+    marker = f"{identifier} /* {comment} */ = {{"
+    start = project.index(marker)
+    end = project.index("\n\t\t};", start)
+    return project[start:end]
+
+ordinary = block("A00000000000000000000001", "StornautApp")
+diagnostic = block("A00000000000000000000005", "StornautInvestigationDiagnosticApp")
+release_shell = block("A00000000000000000000008", "StornautInvestigationDiagnosticReleaseShell")
+copy_phase = block("B00000000000000000000042", "Copy Investigation Machine Tools")
+if diagnostic.count("PBXTargetDependency") != 4 or "Copy Investigation Machine Tools" not in diagnostic:
+    raise SystemExit("ii-c-a diagnostic target composition drifted")
+if copy_phase.count(" in Copy Investigation Machine Tools */") != 3:
+    raise SystemExit("ii-c-a copy phase membership drifted")
+for target, product, support in tools:
+    if project.count(f"name = {target};") != 1:
+        raise SystemExit(f"ii-c-a target identity drifted: {target}")
+    if project.count(f"{product} in Copy Investigation Machine Tools") != 2:
+        raise SystemExit(f"ii-c-a copy identity drifted: {product}")
+    if diagnostic_scheme.count(f'BlueprintName = "{target}"') != 1:
+        raise SystemExit(f"ii-c-a diagnostic scheme drifted: {target}")
+    for closed_name, closed in (("ordinary App", ordinary), ("Release shell", release_shell)):
+        if any(value in closed for value in (target, product, support, "Copy Investigation Machine Tools")):
+            raise SystemExit(f"ii-c-a machine tool leaked into {closed_name}: {product}")
+    if any(value in ordinary_scheme for value in (target, product, support)):
+        raise SystemExit(f"ii-c-a ordinary scheme gained machine tool: {product}")
+PY
+}
+
+function verify_iica_installation_source_contract() {
+    local installer=${1:-scripts/stornaut-r5-local-lifecycle}
+    local expected_installer_sha=2274081f29fcecde69a9f025e796e242de2f83bbf5adf4f1b1d2c63eebc04e97
+    [[ "$(shasum -a 256 "$installer" | awk '{print $1}')" == \
+        "$expected_installer_sha" ]] || {
+        print -u2 "ii-c-a installer source seal drifted"
+        return 1
+    }
+    python3 - "$installer" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+source = Path(sys.argv[1]).read_text(encoding="utf-8")
+
+def body(name):
+    match = re.search(
+        rf'(?ms)^{re.escape(name)}\(\) \{{\n(.*?)(?=^\}}\n\n)',
+        source,
+    )
+    if match is None:
+        raise SystemExit(f"ii-c-a installer function missing: {name}")
+    return match.group(1)
+
+identity = body("validate_closed_executable_identity")
+artifact = body("validate_closed_executable_artifact")
+app = body("validate_closed_app_artifacts")
+fixtures = body("validate_closed_artifact_fixtures")
+install = body("install")
+rollback = body("rollback_failed_lifecycle")
+uninstall = body("uninstall")
+flat = lambda value: re.sub(r'\s+', ' ', value.replace('\\\n', ' ')).strip()
+
+for marker in (
+    "/usr/bin/codesign -d --verbose=4", "/usr/bin/codesign -d -r-",
+    "designated => cdhash H", "/usr/bin/shasum -a 256",
+    "$expected_signing_identifier", "$expected_node",
+    "machineClaimServiceIdentifier=$machine_claim_service",
+):
+    if marker not in identity:
+        raise SystemExit(f"ii-c-a identity contract drifted: {marker}")
+if identity.count("machineClaimServiceIdentifier=$machine_claim_service") != 1:
+    raise SystemExit("ii-c-a driver claim-service cardinality drifted")
+for marker in (
+    "sysopen -r -o nofollow", "zstat -H descriptor_stat -f",
+    "executable_size <= max_bytes", "/usr/bin/lipo -archs",
+    "validate_closed_executable_identity", "$expected_identity",
+):
+    if marker not in artifact:
+        raise SystemExit(f"ii-c-a executable artifact contract drifted: {marker}")
+roles = (
+    ("StornautInvestigationMachineDriver", "com.eriklee.stornaut.investigation.machine-driver", "$machine_driver_max_bytes", "$machine_claim_service"),
+    ("StornautInvestigationMachineGate", "com.eriklee.stornaut.investigation.machine-gate", "$machine_gate_max_bytes", '""'),
+    ("StornautInvestigationMachineGateCoordinator", "com.eriklee.stornaut.investigation.machine-gate-coordinator", "$machine_coordinator_max_bytes", '""'),
+)
+if app.count("validate_closed_executable_artifact") != 3:
+    raise SystemExit("ii-c-a role cardinality drifted")
+for product, identifier, maximum, service in roles:
+    for marker in (f"Contents/MacOS/{product}", identifier, maximum, service):
+        if marker not in app:
+            raise SystemExit(f"ii-c-a role binding drifted: {product}: {marker}")
+for role in ("machineDriverIdentity={", "machineGateIdentity={", "machineCoordinatorIdentity={"):
+    if app.count(role) != 1:
+        raise SystemExit(f"ii-c-a role identity key drifted: {role}")
+if fixtures.count("validate_closed_app_artifacts") != 3:
+    raise SystemExit("ii-c-a three-plane identity join drifted")
+for marker in (
+    "built_closed_artifact_identity", "staging_closed_artifact_identity",
+    "installed_closed_artifact_identity",
+):
+    if marker not in fixtures:
+        raise SystemExit(f"ii-c-a plane identity drifted: {marker}")
+
+def require_order(text, markers, label):
+    cursor = 0
+    for marker in markers:
+        position = text.find(marker, cursor)
+        if position < 0:
+            raise SystemExit(f"ii-c-a {label} missing: {marker}")
+        cursor = position + len(marker)
+
+require_order(flat(install), (
+    "built_closed_artifact_identity=$(validate_built_app)",
+    "staging_app_created=1",
+    '/bin/mkdir -m 0755 "$staging_app"',
+    "staging_app_node=$(",
+    'exact_directory_metadata "$staging_app" root wheel 0755',
+    '/usr/bin/ditto --noqtn "$built_app" "$staging_app"',
+    "staging_closed_artifact_identity=$(",
+    "validate_closed_app_artifacts",
+    '"$staging_app_node"',
+    "installed_app_node=$staging_app_node",
+    '/bin/mv -n "$staging_app" "$installed_app"',
+    '"$installed_app_node"',
+    "installed_closed_artifact_identity=$(",
+    "validate_installed_artifacts",
+    '/bin/launchctl bootstrap system "$installed_plist"',
+), "install transaction")
+for label, text, markers in (
+    ("rollback", rollback, ("[[ -z ${staging_app_node:-} ||", "${installed_app_node:-}", "${built_closed_artifact_identity:-}", "validate_closed_app_artifacts")),
+    ("uninstall", uninstall, ("uninstall_app_node", "uninstall_closed_artifact_identity", "validate_closed_app_artifacts")),
+):
+    for marker in markers:
+        if marker not in text:
+            raise SystemExit(f"ii-c-a {label} pre-delete validation drifted: {marker}")
+validation_action = re.search(
+    r'(?ms)^    validate-machine-driver\)\n(?P<body>.*?)^        ;;$',
+    source,
+)
+if validation_action is None or "validate_closed_artifact_fixtures" not in validation_action.group("body"):
+    raise SystemExit("ii-c-a validation action drifted")
+validation_only = "".join(
+    body(name) for name in (
+        "exact_file_metadata", "exact_directory_metadata",
+        "validate_closed_executable_identity",
+        "validate_closed_executable_artifact",
+        "validate_closed_app_artifacts",
+        "validate_closed_artifact_fixtures",
+    )
+) + validation_action.group("body")
+for forbidden in (
+    "launchctl", "mkdir", "chown", "chmod", "ditto",
+    "/bin/mv", "/bin/rm", "/usr/bin/install", "/Library/",
+    "/private/var/", "posix_spawn", "exec ", "eval ", "xargs",
+):
+    if forbidden in validation_only:
+        raise SystemExit(f"ii-c-a validation-only live action drifted: {forbidden}")
+PY
+}
+
 function verify_iic0biii2a_closed_image() (
     local file=$1 kind symbols strings combined inventory marker
     if [[ -d $file ]]; then
@@ -2656,6 +2848,141 @@ PY
             [[ $coordinator_exit == 78 ]] || exit 1
         fi
     done
+)
+
+function verify_iica_component_boundary() (
+    local product_derived_data=${1:-}
+    local diagnostic_derived_data=${2:-}
+    local scratch result_code=0
+    if (( $# != 0 && $# != 2 )); then
+        print -u2 "Usage: verify_iica_component_boundary [product-derived-data diagnostic-derived-data]"
+        return 64
+    fi
+    scratch=$(mktemp -d \
+        "${TMPDIR:-/tmp}/stornaut-iica-component.XXXXXX") || return $?
+    (
+        trap 'rm -rf "$scratch"' EXIT
+        if (( $# == 0 )); then
+            product_derived_data="$scratch/product"
+            diagnostic_derived_data="$scratch/diagnostic"
+            for configuration in Debug Release; do
+                xcodebuild -quiet -project Stornaut.xcodeproj -scheme Stornaut \
+                    -configuration "$configuration" \
+                    -destination 'platform=macOS,arch=arm64' \
+                    -derivedDataPath "$product_derived_data" build || exit $?
+            done
+            xcodebuild -quiet -project Stornaut.xcodeproj \
+                -scheme StornautInvestigationDiagnosticApp -configuration Debug \
+                -destination 'platform=macOS,arch=arm64' \
+                -derivedDataPath "$diagnostic_derived_data" build || exit $?
+            xcodebuild -quiet -project Stornaut.xcodeproj \
+                -scheme StornautInvestigationDiagnosticReleaseShell \
+                -configuration Release -destination 'platform=macOS,arch=arm64' \
+                -derivedDataPath "$diagnostic_derived_data" build || exit $?
+            for scheme in StornautInvestigationMachineDriverNative \
+                StornautInvestigationMachineGateNative \
+                StornautInvestigationMachineGateCoordinatorNative
+            do
+                xcodebuild -quiet -project Stornaut.xcodeproj -scheme "$scheme" \
+                    -configuration Release -destination 'platform=macOS,arch=arm64' \
+                    -derivedDataPath "$diagnostic_derived_data" build || exit $?
+            done
+        fi
+        local diagnostic_app="$diagnostic_derived_data/Build/Products/Debug/StornautInvestigationDiagnostic.app"
+        local release_shell="$diagnostic_derived_data/Build/Products/Release/StornautInvestigationDiagnosticReleaseShell.app"
+        local inventory="$scratch/diagnostic-inventory" relative candidate
+        find "$diagnostic_app" -type f -print0 | while IFS= read -r -d '' candidate; do
+            if file "$candidate" 2>/dev/null | grep -q Mach-O; then
+                print -r -- "${candidate#$diagnostic_app/}"
+            fi
+        done | LC_ALL=C sort >"$inventory" || exit $?
+        local expected_diagnostic_mach_o_paths=$'Contents/MacOS/StornautInvestigationDiagnostic\nContents/MacOS/StornautInvestigationDiagnostic.debug.dylib\nContents/MacOS/StornautInvestigationMachineDriver\nContents/MacOS/StornautInvestigationMachineGate\nContents/MacOS/StornautInvestigationMachineGateCoordinator\nContents/MacOS/StornautLifecycleHelper\nContents/MacOS/__preview.dylib'
+        [[ "$(<"$inventory")" == "$expected_diagnostic_mach_o_paths" ]] || {
+            print -u2 "ii-c-a diagnostic Mach-O allowlist drifted"; exit 1
+        }
+        local -a names=(
+            StornautInvestigationMachineDriver
+            StornautInvestigationMachineGate
+            StornautInvestigationMachineGateCoordinator
+        )
+        local -a identifiers=(
+            com.eriklee.stornaut.investigation.machine-driver
+            com.eriklee.stornaut.investigation.machine-gate
+            com.eriklee.stornaut.investigation.machine-gate-coordinator
+        )
+        local -a maximums=($((16 * 1024 * 1024)) $((64 * 1024 * 1024)) $((64 * 1024 * 1024)))
+        local index name product product_directory nested identifier product_sha nested_sha product_cdhash nested_cdhash bytes
+        for index in {1..3}; do
+            name=$names[$index]; identifier=$identifiers[$index]
+            product_directory="$diagnostic_derived_data/Build/Products/Debug"
+            if [[ $name == StornautInvestigationMachineGateCoordinator ]]; then
+                product_directory+=/StornautInvestigationMachineGateCoordinatorNative
+            fi
+            product="$product_directory/$name"
+            nested="$diagnostic_app/Contents/MacOS/$name"
+            for candidate in "$product" "$nested"; do
+                [[ -f $candidate && ! -L $candidate ]] || exit 1
+                [[ "$(stat -f '%HT:%Lp:%l' "$candidate")" == \
+                    "Regular File:755:1" ]] || exit 1
+                bytes=$(stat -f '%z' "$candidate")
+                (( bytes > 0 && bytes <= maximums[$index] )) || exit 1
+                [[ "$(lipo -archs "$candidate")" == arm64 ]] || exit 1
+                /usr/bin/codesign --verify --strict "$candidate" || exit $?
+                [[ "$(/usr/bin/codesign -d --verbose=4 "$candidate" 2>&1 | sed -n 's/^Identifier=//p')" == "$identifier" ]] || exit 1
+                [[ "$(/usr/bin/codesign -d --verbose=4 "$candidate" 2>&1 | sed -n 's/^Signature=//p')" == adhoc ]] || exit 1
+            done
+            product_sha=$(shasum -a 256 "$product" | awk '{print $1}')
+            nested_sha=$(shasum -a 256 "$nested" | awk '{print $1}')
+            [[ $product_sha == $nested_sha ]] || exit 1
+            product_cdhash=$(/usr/bin/codesign -d --verbose=4 "$product" 2>&1 | sed -n 's/^CDHash=//p')
+            nested_cdhash=$(/usr/bin/codesign -d --verbose=4 "$nested" 2>&1 | sed -n 's/^CDHash=//p')
+            [[ $product_cdhash == $nested_cdhash ]] || exit 1
+            [[ "$(/usr/bin/codesign -d -r- "$nested" 2>&1 | sed -n 's/^# //p')" == \
+                "designated => cdhash H\"$nested_cdhash\"" ]] || exit 1
+            if [[ $name == StornautInvestigationMachineGateCoordinator ]]; then
+                local coordinator_rpaths coordinator_load
+                coordinator_rpaths=$(otool -l "$nested" | awk \
+                    '/cmd LC_RPATH/ { want = 1; next } want && /path / { print $2; want = 0 }') || exit $?
+                [[ $coordinator_rpaths == *'@executable_path/../Frameworks'* ]] || {
+                    print -u2 "ii-c-a Coordinator App-relative runpath is missing"
+                    exit 1
+                }
+                for coordinator_load in ${(f)"$(otool -L "$nested" \
+                    | tail -n +2 | sed 's/^[[:space:]]*//' \
+                    | awk '$1 ~ /^@rpath\// { print $1 }')"}; do
+                    [[ -f "$diagnostic_app/Contents/Frameworks/${coordinator_load#@rpath/}" ]] || {
+                        print -u2 \
+                            "ii-c-a Coordinator framework dependency is unresolved: $coordinator_load"
+                        exit 1
+                    }
+                done
+            fi
+            local release_product_directory="$diagnostic_derived_data/Build/Products/Release"
+            if [[ $name == StornautInvestigationMachineGateCoordinator ]]; then
+                release_product_directory+=/StornautInvestigationMachineGateCoordinatorNative
+            fi
+            local release_product="$release_product_directory/$name"
+            [[ -f $release_product && ! -L $release_product ]] || exit 1
+            [[ "$(lipo -archs "$release_product")" == arm64 ]] || exit 1
+            /usr/bin/codesign --verify --strict "$release_product" || exit $?
+            [[ "$(/usr/bin/codesign -d --verbose=4 "$release_product" 2>&1 | sed -n 's/^Identifier=//p')" == "$identifier" ]] || exit 1
+        done
+        /usr/bin/codesign --verify --deep --strict "$diagnostic_app" || exit $?
+        for closed_app in \
+            "$product_derived_data/Build/Products/Debug/Stornaut.app" \
+            "$product_derived_data/Build/Products/Release/Stornaut.app" \
+            "$release_shell"
+        do
+            for name in "${names[@]}"; do
+                [[ ! -e "$closed_app/Contents/MacOS/$name" && \
+                    ! -L "$closed_app/Contents/MacOS/$name" ]] || {
+                    print -u2 "ii-c-a machine tool leaked into closed App: $closed_app/$name"; exit 1
+                }
+            done
+        done
+    ) || result_code=$?
+    rm -rf "$scratch"
+    return $result_code
 )
 
 function verify_iib5biii_a_source_contract() {
@@ -4262,6 +4589,23 @@ if $iic0biii2a_component_boundary_only; then
     print "ii-c0b-iii-2a Gate final-Mach-O boundary verification passed."
     exit 0
 fi
+if $iica_source_contract_only; then
+    verify_iica_source_contract
+    verify_iica_installation_source_contract "$iica_installer_source"
+    print "ii-c-a source-only App boundary verification passed."
+    exit 0
+fi
+if $iica_component_boundary_only; then
+    if [[ -n $iica_existing_product_derived_data ]]; then
+        verify_iica_component_boundary \
+            "$iica_existing_product_derived_data" \
+            "$iica_existing_diagnostic_derived_data"
+    else
+        verify_iica_component_boundary
+    fi
+    print "ii-c-a signed machine-tool component boundary verification passed."
+    exit 0
+fi
 if $iic0bivb2_component_boundary_only; then
     verify_iic0bivb2_component_boundary
     print "ii-c0b-iv coordinator/Gate component boundary verification passed."
@@ -4354,7 +4698,7 @@ if $iib5biii_b2a_iia2ii_source_contract_only; then
     exit 0
 fi
 
-scripts/verify-contract
+scripts/verify-contract --iic-a-contract-only
 
 mkdir -p "$repo_root/.derivedData"
 derived_data=$(
@@ -4395,6 +4739,18 @@ xcodebuild -quiet \
     -destination 'platform=macOS,arch=arm64' \
     -derivedDataPath "$diagnostic_derived_data" \
     build
+for machine_tool_scheme in \
+    StornautInvestigationMachineGateNative \
+    StornautInvestigationMachineGateCoordinatorNative
+do
+    xcodebuild -quiet \
+        -project Stornaut.xcodeproj \
+        -scheme "$machine_tool_scheme" \
+        -configuration Release \
+        -destination 'platform=macOS,arch=arm64' \
+        -derivedDataPath "$diagnostic_derived_data" \
+        build
+done
 xcodebuild -quiet \
     -project Stornaut.xcodeproj \
     -scheme "$release_shell_scheme" \
@@ -4619,6 +4975,8 @@ fi
 for forbidden_shell_artifact in \
     StornautInvestigationDiagnostic \
     StornautInvestigationMachineDriver \
+    StornautInvestigationMachineGate \
+    StornautInvestigationMachineGateCoordinator \
     StornautLifecycleHelper
 do
     if find "$diagnostic_release_app" -type f \
@@ -4669,6 +5027,9 @@ if $handoff_only; then
     print "Investigation handoff App boundary verification passed."
     exit 0
 fi
+
+verify_iica_source_contract
+verify_iica_installation_source_contract
 test -f "$authority_object"
 file "$authority_object" | grep -q 'Mach-O'
 test -x "$debug_app/Contents/MacOS/StornautLifecycleHelper"
@@ -4683,6 +5044,14 @@ do
         "$app_without_machine_driver/Contents/MacOS/StornautInvestigationMachineDriver"
     test ! -L \
         "$app_without_machine_driver/Contents/MacOS/StornautInvestigationMachineDriver"
+    test ! -e \
+        "$app_without_machine_driver/Contents/MacOS/StornautInvestigationMachineGate"
+    test ! -L \
+        "$app_without_machine_driver/Contents/MacOS/StornautInvestigationMachineGate"
+    test ! -e \
+        "$app_without_machine_driver/Contents/MacOS/StornautInvestigationMachineGateCoordinator"
+    test ! -L \
+        "$app_without_machine_driver/Contents/MacOS/StornautInvestigationMachineGateCoordinator"
 done
 test -f "$machine_driver_product"
 test -x "$diagnostic_machine_driver"
@@ -4697,7 +5066,7 @@ diagnostic_mach_o_paths=$(
         done \
         | LC_ALL=C sort
 )
-expected_diagnostic_mach_o_paths=$'Contents/MacOS/StornautInvestigationDiagnostic\nContents/MacOS/StornautInvestigationDiagnostic.debug.dylib\nContents/MacOS/StornautInvestigationMachineDriver\nContents/MacOS/StornautLifecycleHelper\nContents/MacOS/__preview.dylib'
+expected_diagnostic_mach_o_paths=$'Contents/MacOS/StornautInvestigationDiagnostic\nContents/MacOS/StornautInvestigationDiagnostic.debug.dylib\nContents/MacOS/StornautInvestigationMachineDriver\nContents/MacOS/StornautInvestigationMachineGate\nContents/MacOS/StornautInvestigationMachineGateCoordinator\nContents/MacOS/StornautLifecycleHelper\nContents/MacOS/__preview.dylib'
 if [[ "$diagnostic_mach_o_paths" != "$expected_diagnostic_mach_o_paths" ]]; then
     print -u2 "Investigation diagnostic Mach-O allowlist drifted."
     exit 1
@@ -4767,7 +5136,7 @@ test ! -e \
 test ! -e \
     "$release_app/Contents/Library/LaunchDaemons/com.eriklee.stornaut.lifecycle.plist"
 
-verify_machine_driver_disposable_matrix() {
+verify_closed_machine_tool_disposable_matrix() {
     (
         setopt local_options pipe_fail
 
@@ -4775,7 +5144,10 @@ verify_machine_driver_disposable_matrix() {
         local authorization="I authorize one bounded disposable read-only Stornaut L3c3b-ii Machine driver validation."
         local temporary_root outside_temporary_root
         local built_app staging_app installed_app identity_mismatch_app
-        local acl_mismatch_app
+        local acl_mismatch_app missing_gate_app swapped_gate_coordinator_app
+        local hardlinked_coordinator_app mutation_before_move_app
+        local mutation_before_bootstrap_app
+        local symlinked_gate_app wrong_mode_gate_app wrong_signature_gate_app
         local outside_built_app outside_staging_app outside_installed_app
         local positive_output
 
@@ -4798,6 +5170,14 @@ verify_machine_driver_disposable_matrix() {
         installed_app="$temporary_root/installed.app"
         identity_mismatch_app="$temporary_root/identity-mismatch.app"
         acl_mismatch_app="$temporary_root/acl-mismatch.app"
+        missing_gate_app="$temporary_root/missing-gate.app"
+        swapped_gate_coordinator_app="$temporary_root/swapped-gate-coordinator.app"
+        hardlinked_coordinator_app="$temporary_root/hardlinked-coordinator.app"
+        mutation_before_move_app="$temporary_root/mutation-before-move.app"
+        mutation_before_bootstrap_app="$temporary_root/mutation-before-bootstrap.app"
+        symlinked_gate_app="$temporary_root/symlinked-gate.app"
+        wrong_mode_gate_app="$temporary_root/wrong-mode-gate.app"
+        wrong_signature_gate_app="$temporary_root/wrong-signature-gate.app"
         outside_built_app="$outside_temporary_root/built.app"
         outside_staging_app="$outside_temporary_root/staging.app"
         outside_installed_app="$outside_temporary_root/installed.app"
@@ -4808,6 +5188,14 @@ verify_machine_driver_disposable_matrix() {
             "$installed_app" \
             "$identity_mismatch_app" \
             "$acl_mismatch_app" \
+            "$missing_gate_app" \
+            "$swapped_gate_coordinator_app" \
+            "$hardlinked_coordinator_app" \
+            "$mutation_before_move_app" \
+            "$mutation_before_bootstrap_app" \
+            "$symlinked_gate_app" \
+            "$wrong_mode_gate_app" \
+            "$wrong_signature_gate_app" \
             "$outside_built_app" \
             "$outside_staging_app" \
             "$outside_installed_app"
@@ -4837,6 +5225,98 @@ verify_machine_driver_disposable_matrix() {
             "$installed_app" >/dev/null 2>&1
         then
             print -u2 "wrong-token Machine driver validation passed"
+            return 1
+        fi
+
+        /bin/rm -f -- \
+            "$symlinked_gate_app/Contents/MacOS/StornautInvestigationMachineGate"
+        /bin/ln -s StornautInvestigationMachineDriver \
+            "$symlinked_gate_app/Contents/MacOS/StornautInvestigationMachineGate"
+        # symlinked-gate: no role may be admitted through a symlink.
+        if "$validator" validate-machine-driver \
+            "$authorization" "$temporary_root" "$built_app" \
+            "$staging_app" "$symlinked_gate_app" >/dev/null 2>&1
+        then
+            print -u2 "symlinked-gate validation passed"
+            return 1
+        fi
+
+        /bin/chmod 0700 \
+            "$wrong_mode_gate_app/Contents/MacOS/StornautInvestigationMachineGate"
+        # wrong-mode-gate: every executable has exact mode 0755.
+        if "$validator" validate-machine-driver \
+            "$authorization" "$temporary_root" "$built_app" \
+            "$staging_app" "$wrong_mode_gate_app" >/dev/null 2>&1
+        then
+            print -u2 "wrong-mode-gate validation passed"
+            return 1
+        fi
+
+        /usr/bin/codesign --remove-signature \
+            "$wrong_signature_gate_app/Contents/MacOS/StornautInvestigationMachineGate"
+        # wrong-signature-gate: strict code-signing admission is mandatory.
+        if "$validator" validate-machine-driver \
+            "$authorization" "$temporary_root" "$built_app" \
+            "$staging_app" "$wrong_signature_gate_app" >/dev/null 2>&1
+        then
+            print -u2 "wrong-signature-gate validation passed"
+            return 1
+        fi
+
+        /bin/rm -f -- \
+            "$missing_gate_app/Contents/MacOS/StornautInvestigationMachineGate"
+        # missing-gate: every plane must contain the complete closed role set.
+        if "$validator" validate-machine-driver \
+            "$authorization" "$temporary_root" "$built_app" \
+            "$staging_app" "$missing_gate_app" >/dev/null 2>&1
+        then
+            print -u2 "missing-gate closed machine validation passed"
+            return 1
+        fi
+
+        /bin/cp -f \
+            "$swapped_gate_coordinator_app/Contents/MacOS/StornautInvestigationMachineGateCoordinator" \
+            "$swapped_gate_coordinator_app/Contents/MacOS/StornautInvestigationMachineGate"
+        # swapped-gate-coordinator: a valid sibling cannot satisfy another role.
+        if "$validator" validate-machine-driver \
+            "$authorization" "$temporary_root" "$built_app" \
+            "$staging_app" "$swapped_gate_coordinator_app" >/dev/null 2>&1
+        then
+            print -u2 "swapped-gate-coordinator validation passed"
+            return 1
+        fi
+
+        /bin/rm -f -- \
+            "$hardlinked_coordinator_app/Contents/MacOS/StornautInvestigationMachineGateCoordinator"
+        /bin/ln \
+            "$hardlinked_coordinator_app/Contents/MacOS/StornautInvestigationMachineDriver" \
+            "$hardlinked_coordinator_app/Contents/MacOS/StornautInvestigationMachineGateCoordinator"
+        # hardlinked-coordinator: every machine tool must have link count one.
+        if "$validator" validate-machine-driver \
+            "$authorization" "$temporary_root" "$built_app" \
+            "$staging_app" "$hardlinked_coordinator_app" >/dev/null 2>&1
+        then
+            print -u2 "hardlinked-coordinator validation passed"
+            return 1
+        fi
+
+        /bin/chmod 0700 \
+            "$mutation_before_move_app/Contents/MacOS/StornautInvestigationMachineGate"
+        if "$validator" validate-machine-driver \
+            "$authorization" "$temporary_root" "$built_app" \
+            "$mutation_before_move_app" "$installed_app" >/dev/null 2>&1
+        then
+            print -u2 "mutation-before-move validation passed"
+            return 1
+        fi
+
+        /usr/bin/codesign --remove-signature \
+            "$mutation_before_bootstrap_app/Contents/MacOS/StornautInvestigationMachineGateCoordinator"
+        if "$validator" validate-machine-driver \
+            "$authorization" "$temporary_root" "$built_app" \
+            "$staging_app" "$mutation_before_bootstrap_app" >/dev/null 2>&1
+        then
+            print -u2 "mutation-before-bootstrap validation passed"
             return 1
         fi
 
@@ -4896,7 +5376,7 @@ verify_machine_driver_disposable_matrix() {
     )
 }
 
-verify_machine_driver_disposable_matrix
+verify_closed_machine_tool_disposable_matrix
 
 helper_source="StornautLifecycleHelper/main.swift"
 rg -q 'func invalidateAndDrain\(\)' "$helper_source"
@@ -5026,9 +5506,8 @@ required_artifact_checks = [
     'validate_bundle_permissions "$installed_app"',
     '"$installed_app/Contents/MacOS/StornautInvestigationDiagnostic"',
     '"$installed_app/Contents/MacOS/StornautLifecycleHelper"',
-    '"$installed_app/Contents/MacOS/StornautInvestigationMachineDriver"',
-    'validate_machine_driver_artifact',
-    '[[ -n "$installed_machine_driver_identity" ]]',
+    'validate_closed_app_artifacts',
+    '[[ -n "$installed_closed_artifact_identity" ]]',
 ]
 if not all(check in artifact_validation for check in required_artifact_checks):
     raise SystemExit("R5 installed artifact validation is incomplete")
@@ -5040,7 +5519,7 @@ installed_state_body = function_body(
     "validate_installed_state",
     "\n}\n\nvalidate_runtime_roots_drained() {",
 )
-if 'validate_installed_artifacts "$expected_machine_driver_identity"' \
+if 'validate_installed_artifacts "$expected_closed_artifact_identity"' \
         not in installed_state_body:
     raise SystemExit(
         "installed state does not preserve optional transaction identity"
@@ -5112,9 +5591,10 @@ required = [
     '"$staging_app/Contents/MacOS/StornautInvestigationDiagnostic"',
     'machine_claim_service="com.eriklee.stornaut.lifecycle.machine-claim"',
     'count(/plist/dict/key)',
-    '"$built_app/Contents/MacOS/StornautInvestigationMachineDriver"',
-    '"$installed_app/Contents/MacOS/StornautInvestigationMachineDriver"',
-    '"$staging_app/Contents/MacOS/StornautInvestigationMachineDriver"',
+    'validate_closed_app_artifacts',
+    'StornautInvestigationMachineDriver',
+    'StornautInvestigationMachineGate',
+    'StornautInvestigationMachineGateCoordinator',
 ]
 if not all(value in source for value in required):
     raise SystemExit(
@@ -6311,7 +6791,7 @@ if native_target_section_start < 0 or native_target_section_end < 0:
 native_target_section = project[
     native_target_section_start:native_target_section_end
 ]
-if native_target_section.count("isa = PBXNativeTarget;") != 8:
+if native_target_section.count("isa = PBXNativeTarget;") != 10:
     raise SystemExit("L3c3b-i Xcode native-target allowlist drifted")
 expected_native_targets = {
     "StornautApp",
@@ -6322,6 +6802,8 @@ expected_native_targets = {
     "StornautInvestigationDiagnosticAppTests",
     "StornautInvestigationDiagnosticReleaseShell",
     "StornautInvestigationMachineDriverNative",
+    "StornautInvestigationMachineGateNative",
+    "StornautInvestigationMachineGateCoordinatorNative",
 }
 for target_name in expected_native_targets:
     if native_target_section.count(f"name = {target_name};") != 1:
@@ -6346,7 +6828,7 @@ if copy_phase_section.count("isa = PBXCopyFilesBuildPhase;") != 3:
 for phase_name in (
     "Copy Helper",
     "Copy Investigation Helper",
-    "Copy Investigation Driver",
+    "Copy Investigation Machine Tools",
 ):
     if copy_phase_section.count(f'name = "{phase_name}";') != 1:
         raise SystemExit(
@@ -6397,6 +6879,18 @@ diagnostic_tests = target_body(
 machine_driver = target_body(
     "A00000000000000000000007",
     "StornautInvestigationMachineDriverNative",
+    "\n\t\tA00000000000000000000009 "
+    "/* StornautInvestigationMachineGateNative */",
+ )
+machine_gate = target_body(
+    "A00000000000000000000009",
+    "StornautInvestigationMachineGateNative",
+    "\n\t\tA0000000000000000000000A "
+    "/* StornautInvestigationMachineGateCoordinatorNative */",
+ )
+machine_coordinator = target_body(
+    "A0000000000000000000000A",
+    "StornautInvestigationMachineGateCoordinatorNative",
     "\n\t\tA00000000000000000000008 "
     "/* StornautInvestigationDiagnosticReleaseShell */",
 )
@@ -6428,6 +6922,8 @@ target_execution_dependencies = {
         ("StornautInvestigationDiagnosticAppTests", diagnostic_tests),
         ("StornautInvestigationDiagnosticReleaseShell", release_shell),
         ("StornautInvestigationMachineDriverNative", machine_driver),
+        ("StornautInvestigationMachineGateNative", machine_gate),
+        ("StornautInvestigationMachineGateCoordinatorNative", machine_coordinator),
     )
     if "StornautExecution" in body
 }
@@ -6451,16 +6947,18 @@ for forbidden in (
         )
 for required in (
     "B00000000000000000000041 /* Copy Investigation Helper */",
-    "B00000000000000000000042 /* Copy Investigation Driver */",
+    "B00000000000000000000042 /* Copy Investigation Machine Tools */",
     "C0000000000000000000000A /* PBXTargetDependency */",
     "C0000000000000000000000C /* PBXTargetDependency */",
+    "C0000000000000000000000E /* PBXTargetDependency */",
+    "C00000000000000000000010 /* PBXTargetDependency */",
 ):
     if required not in diagnostic_app:
         raise SystemExit(
             "dedicated Investigation diagnostic App lost its exact helper "
             f"composition: {required}"
         )
-if diagnostic_app.count("PBXTargetDependency") != 2:
+if diagnostic_app.count("PBXTargetDependency") != 4:
     raise SystemExit(
         "dedicated Investigation diagnostic target dependency drifted"
     )
@@ -6613,7 +7111,7 @@ if (
         "dedicated diagnostic helper copy allowlist drifted"
     )
 driver_copy_marker = (
-    "B00000000000000000000042 /* Copy Investigation Driver */ = {"
+    "B00000000000000000000042 /* Copy Investigation Machine Tools */ = {"
 )
 driver_copy_start = project.find(driver_copy_marker)
 driver_copy_end = project.find(
@@ -6625,26 +7123,32 @@ if driver_copy_start < 0 or driver_copy_end < 0:
 driver_copy = project[driver_copy_start:driver_copy_end]
 for required in (
     "B0000000000000000000001D "
-    "/* StornautInvestigationMachineDriver in Copy Investigation Driver */",
+    "/* StornautInvestigationMachineDriver in Copy Investigation Machine Tools */",
+    "B00000000000000000000052 "
+    "/* StornautInvestigationMachineGate in Copy Investigation Machine Tools */",
+    "B00000000000000000000055 "
+    "/* StornautInvestigationMachineGateCoordinator in Copy Investigation Machine Tools */",
     "dstPath = Contents/MacOS;",
-    'name = "Copy Investigation Driver";',
+    'name = "Copy Investigation Machine Tools";',
 ):
     if driver_copy.count(required) != 1:
         raise SystemExit(
             f"dedicated diagnostic driver copy membership drifted: {required}"
         )
-driver_build_file = (
-    "B0000000000000000000001D "
-    "/* StornautInvestigationMachineDriver in Copy Investigation Driver */ "
-    "= {isa = PBXBuildFile; fileRef = "
-    "D0000000000000000000000A "
-    "/* StornautInvestigationMachineDriver */; "
-    "settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };"
-)
-if project.count(driver_build_file) != 1:
-    raise SystemExit(
-        "dedicated diagnostic driver CodeSignOnCopy build file drifted"
+for build_id, file_id, product in (
+    ("B0000000000000000000001D", "D0000000000000000000000A", "StornautInvestigationMachineDriver"),
+    ("B00000000000000000000052", "D0000000000000000000000D", "StornautInvestigationMachineGate"),
+    ("B00000000000000000000055", "D0000000000000000000000F", "StornautInvestigationMachineGateCoordinator"),
+):
+    build_file = (
+        f"{build_id} /* {product} in Copy Investigation Machine Tools */ "
+        f"= {{isa = PBXBuildFile; fileRef = {file_id} /* {product} */; "
+        "settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };"
     )
+    if project.count(build_file) != 1:
+        raise SystemExit(
+            f"dedicated diagnostic CodeSignOnCopy drifted: {product}"
+        )
 
 required_helper_dependency = [
     (
@@ -6806,6 +7310,6 @@ xcodebuild -quiet \
     -only-testing:StornautInvestigationDiagnosticAppTests \
     test
 verify_iic0biia3_component_boundary "$derived_data" "$diagnostic_derived_data"
-verify_iic0bivb2_component_boundary
+verify_iica_component_boundary "$derived_data" "$diagnostic_derived_data"
 
 print "Release App fixture boundary verification passed."

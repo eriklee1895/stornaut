@@ -39,6 +39,16 @@ let package = Package(
             targets: ["StornautInvestigationMachineDriverSupport"]
         ),
         .library(
+            name: "StornautInvestigationMachineGateSupport",
+            type: .static,
+            targets: ["StornautInvestigationMachineGateSupport"]
+        ),
+        .library(
+            name: "StornautInvestigationMachineGateCoordinatorSupport",
+            type: .static,
+            targets: ["StornautInvestigationMachineGateCoordinatorSupport"]
+        ),
+        .library(
             name: "StornautInvestigationMachineClaimServer",
             type: .static,
             targets: ["StornautInvestigationMachineClaimServer"]
@@ -281,7 +291,7 @@ let package = Package(
             dependencies: [
                 "StornautInvestigationMachineGateSupport",
             ],
-            path: "Tools/StornautInvestigationMachineGate"
+            path: "tools/StornautInvestigationMachineGate"
         ),
         .executableTarget(
             name: "StornautInvestigationMachineGateCoordinator",
@@ -292,7 +302,8 @@ let package = Package(
         ),
         .executableTarget(
             name: "StornautInvestigationBuildReceiptGenerator",
-            path: "tools/StornautInvestigationBuildReceiptGenerator"
+            path: "tools/StornautInvestigationBuildReceiptGenerator",
+            swiftSettings: [.unsafeFlags(["-parse-as-library"])]
         ),
         .plugin(
             name: "StornautInvestigationBuildReceiptPlugin",

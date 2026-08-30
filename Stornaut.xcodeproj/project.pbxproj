@@ -21,9 +21,15 @@
 		B0000000000000000000001A /* StornautLifecycleHelper in Copy Investigation Helper */ = {isa = PBXBuildFile; fileRef = D00000000000000000000004 /* StornautLifecycleHelper */; };
 		B0000000000000000000001B /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0000000000000000000000B /* main.swift */; };
 		B0000000000000000000001C /* StornautInvestigationMachineDriverSupport in Frameworks */ = {isa = PBXBuildFile; productRef = F00000000000000000000008 /* StornautInvestigationMachineDriverSupport */; };
-		B0000000000000000000001D /* StornautInvestigationMachineDriver in Copy Investigation Driver */ = {isa = PBXBuildFile; fileRef = D0000000000000000000000A /* StornautInvestigationMachineDriver */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		B0000000000000000000001D /* StornautInvestigationMachineDriver in Copy Investigation Machine Tools */ = {isa = PBXBuildFile; fileRef = D0000000000000000000000A /* StornautInvestigationMachineDriver */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		B0000000000000000000001E /* InvestigationRuntimeDiagnosticHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = D00000000000000000000009 /* InvestigationRuntimeDiagnosticHarness.swift */; };
 		B0000000000000000000001F /* StornautInvestigationMachineClaimServer in Frameworks */ = {isa = PBXBuildFile; productRef = F00000000000000000000009 /* StornautInvestigationMachineClaimServer */; };
+		B00000000000000000000050 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0000000000000000000000E /* main.swift */; };
+		B00000000000000000000051 /* StornautInvestigationMachineGateSupport in Frameworks */ = {isa = PBXBuildFile; productRef = F0000000000000000000000A /* StornautInvestigationMachineGateSupport */; };
+		B00000000000000000000052 /* StornautInvestigationMachineGate in Copy Investigation Machine Tools */ = {isa = PBXBuildFile; fileRef = D0000000000000000000000D /* StornautInvestigationMachineGate */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		B00000000000000000000053 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = D00000000000000000000010 /* main.swift */; };
+		B00000000000000000000054 /* StornautInvestigationMachineGateCoordinatorSupport in Frameworks */ = {isa = PBXBuildFile; productRef = F0000000000000000000000B /* StornautInvestigationMachineGateCoordinatorSupport */; };
+		B00000000000000000000055 /* StornautInvestigationMachineGateCoordinator in Copy Investigation Machine Tools */ = {isa = PBXBuildFile; fileRef = D0000000000000000000000F /* StornautInvestigationMachineGateCoordinator */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -69,6 +75,20 @@
 			remoteGlobalIDString = A00000000000000000000007;
 			remoteInfo = StornautInvestigationMachineDriverNative;
 		};
+		C0000000000000000000000D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A00000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A00000000000000000000009;
+			remoteInfo = StornautInvestigationMachineGateNative;
+		};
+		C0000000000000000000000F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A00000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A0000000000000000000000A;
+			remoteInfo = StornautInvestigationMachineGateCoordinatorNative;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -94,15 +114,17 @@
 			name = "Copy Investigation Helper";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		B00000000000000000000042 /* Copy Investigation Driver */ = {
+		B00000000000000000000042 /* Copy Investigation Machine Tools */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = Contents/MacOS;
 			dstSubfolderSpec = 1;
 			files = (
-				B0000000000000000000001D /* StornautInvestigationMachineDriver in Copy Investigation Driver */,
+				B0000000000000000000001D /* StornautInvestigationMachineDriver in Copy Investigation Machine Tools */,
+				B00000000000000000000052 /* StornautInvestigationMachineGate in Copy Investigation Machine Tools */,
+				B00000000000000000000055 /* StornautInvestigationMachineGateCoordinator in Copy Investigation Machine Tools */,
 			);
-			name = "Copy Investigation Driver";
+			name = "Copy Investigation Machine Tools";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -120,6 +142,10 @@
 		D0000000000000000000000A /* StornautInvestigationMachineDriver */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = StornautInvestigationMachineDriver; sourceTree = BUILT_PRODUCTS_DIR; };
 		D0000000000000000000000B /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tools/StornautInvestigationMachineDriver/main.swift; sourceTree = SOURCE_ROOT; };
 		D0000000000000000000000C /* StornautInvestigationDiagnosticReleaseShell.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = StornautInvestigationDiagnosticReleaseShell.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D0000000000000000000000D /* StornautInvestigationMachineGate */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = StornautInvestigationMachineGate; sourceTree = BUILT_PRODUCTS_DIR; };
+		D0000000000000000000000E /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = tools/StornautInvestigationMachineGate/main.swift; sourceTree = SOURCE_ROOT; };
+		D0000000000000000000000F /* StornautInvestigationMachineGateCoordinator */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = StornautInvestigationMachineGateCoordinator; sourceTree = BUILT_PRODUCTS_DIR; };
+		D00000000000000000000010 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = tools/StornautInvestigationMachineGateCoordinator/main.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -253,6 +279,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B00000000000000000000061 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B00000000000000000000051 /* StornautInvestigationMachineGateSupport in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B00000000000000000000063 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B00000000000000000000054 /* StornautInvestigationMachineGateCoordinatorSupport in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -266,6 +308,8 @@
 				D00000000000000000000005 /* com.eriklee.stornaut.lifecycle.plist */,
 				D00000000000000000000009 /* InvestigationRuntimeDiagnosticHarness.swift */,
 				D0000000000000000000000B /* main.swift */,
+				D0000000000000000000000E /* main.swift */,
+				D00000000000000000000010 /* main.swift */,
 				A00000000000000000000011 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -280,6 +324,8 @@
 				D00000000000000000000006 /* StornautInvestigationDiagnostic.app */,
 				D00000000000000000000007 /* StornautInvestigationDiagnosticAppTests.xctest */,
 				D0000000000000000000000A /* StornautInvestigationMachineDriver */,
+				D0000000000000000000000D /* StornautInvestigationMachineGate */,
+				D0000000000000000000000F /* StornautInvestigationMachineGateCoordinator */,
 				D0000000000000000000000C /* StornautInvestigationDiagnosticReleaseShell.app */,
 			);
 			name = Products;
@@ -394,13 +440,15 @@
 				B00000000000000000000014 /* Frameworks */,
 				B00000000000000000000033 /* Resources */,
 				B00000000000000000000041 /* Copy Investigation Helper */,
-				B00000000000000000000042 /* Copy Investigation Driver */,
+				B00000000000000000000042 /* Copy Investigation Machine Tools */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				C0000000000000000000000A /* PBXTargetDependency */,
 				C0000000000000000000000C /* PBXTargetDependency */,
+				C0000000000000000000000E /* PBXTargetDependency */,
+				C00000000000000000000010 /* PBXTargetDependency */,
 			);
 			name = StornautInvestigationDiagnosticApp;
 			packageProductDependencies = (
@@ -448,6 +496,44 @@
 			);
 			productName = StornautInvestigationMachineDriver;
 			productReference = D0000000000000000000000A /* StornautInvestigationMachineDriver */;
+			productType = "com.apple.product-type.tool";
+		};
+		A00000000000000000000009 /* StornautInvestigationMachineGateNative */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A00000000000000000000029 /* Build configuration list for PBXNativeTarget "StornautInvestigationMachineGateNative" */;
+			buildPhases = (
+				B00000000000000000000060 /* Sources */,
+				B00000000000000000000061 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = StornautInvestigationMachineGateNative;
+			packageProductDependencies = (
+				F0000000000000000000000A /* StornautInvestigationMachineGateSupport */,
+			);
+			productName = StornautInvestigationMachineGate;
+			productReference = D0000000000000000000000D /* StornautInvestigationMachineGate */;
+			productType = "com.apple.product-type.tool";
+		};
+		A0000000000000000000000A /* StornautInvestigationMachineGateCoordinatorNative */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A0000000000000000000002A /* Build configuration list for PBXNativeTarget "StornautInvestigationMachineGateCoordinatorNative" */;
+			buildPhases = (
+				B00000000000000000000062 /* Sources */,
+				B00000000000000000000063 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = StornautInvestigationMachineGateCoordinatorNative;
+			packageProductDependencies = (
+				F0000000000000000000000B /* StornautInvestigationMachineGateCoordinatorSupport */,
+			);
+			productName = StornautInvestigationMachineGateCoordinator;
+			productReference = D0000000000000000000000F /* StornautInvestigationMachineGateCoordinator */;
 			productType = "com.apple.product-type.tool";
 		};
 		A00000000000000000000008 /* StornautInvestigationDiagnosticReleaseShell */ = {
@@ -503,6 +589,12 @@
 					A00000000000000000000008 = {
 						CreatedOnToolsVersion = 26.6;
 					};
+					A00000000000000000000009 = {
+						CreatedOnToolsVersion = 26.6;
+					};
+					A0000000000000000000000A = {
+						CreatedOnToolsVersion = 26.6;
+					};
 				};
 			};
 			buildConfigurationList = A00000000000000000000020 /* Build configuration list for PBXProject "Stornaut" */;
@@ -530,6 +622,8 @@
 				A00000000000000000000005 /* StornautInvestigationDiagnosticApp */,
 				A00000000000000000000006 /* StornautInvestigationDiagnosticAppTests */,
 				A00000000000000000000007 /* StornautInvestigationMachineDriverNative */,
+				A00000000000000000000009 /* StornautInvestigationMachineGateNative */,
+				A0000000000000000000000A /* StornautInvestigationMachineGateCoordinatorNative */,
 				A00000000000000000000008 /* StornautInvestigationDiagnosticReleaseShell */,
 			);
 		};
@@ -641,6 +735,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B00000000000000000000060 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B00000000000000000000050 /* main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B00000000000000000000062 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B00000000000000000000053 /* main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -673,6 +783,16 @@
 			isa = PBXTargetDependency;
 			target = A00000000000000000000007 /* StornautInvestigationMachineDriverNative */;
 			targetProxy = C0000000000000000000000B /* PBXContainerItemProxy */;
+		};
+		C0000000000000000000000E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A00000000000000000000009 /* StornautInvestigationMachineGateNative */;
+			targetProxy = C0000000000000000000000D /* PBXContainerItemProxy */;
+		};
+		C00000000000000000000010 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A0000000000000000000000A /* StornautInvestigationMachineGateCoordinatorNative */;
+			targetProxy = C0000000000000000000000F /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -1050,6 +1170,112 @@
 			};
 			name = Release;
 		};
+		A00000000000000000000180 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
+				CODE_SIGN_STYLE = Manual;
+				COPY_PHASE_STRIP = NO;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				ONLY_ACTIVE_ARCH = YES;
+				OTHER_SWIFT_FLAGS = "$(inherited) -parse-as-library";
+				PRODUCT_BUNDLE_IDENTIFIER = com.eriklee.stornaut.investigation.machine-gate;
+				PRODUCT_MODULE_NAME = StornautInvestigationMachineGateNative;
+				PRODUCT_NAME = StornautInvestigationMachineGate;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		A00000000000000000000181 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
+				CODE_SIGN_STYLE = Manual;
+				COPY_PHASE_STRIP = NO;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_SWIFT_FLAGS = "$(inherited) -parse-as-library";
+				PRODUCT_BUNDLE_IDENTIFIER = com.eriklee.stornaut.investigation.machine-gate;
+				PRODUCT_MODULE_NAME = StornautInvestigationMachineGateNative;
+				PRODUCT_NAME = StornautInvestigationMachineGate;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		A00000000000000000000190 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CONFIGURATION_BUILD_DIR = "$(BUILD_DIR)/$(CONFIGURATION)/StornautInvestigationMachineGateCoordinatorNative";
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
+				CODE_SIGN_STYLE = Manual;
+				COPY_PHASE_STRIP = NO;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				ONLY_ACTIVE_ARCH = YES;
+				OTHER_SWIFT_FLAGS = "$(inherited) -parse-as-library";
+				PRODUCT_BUNDLE_IDENTIFIER = com.eriklee.stornaut.investigation.machine-gate-coordinator;
+				PRODUCT_MODULE_NAME = StornautInvestigationMachineGateCoordinatorNative;
+				PRODUCT_NAME = StornautInvestigationMachineGateCoordinator;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_INCLUDE_PATHS = "$(inherited) $(BUILD_DIR)/$(CONFIGURATION)";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		A00000000000000000000191 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CONFIGURATION_BUILD_DIR = "$(BUILD_DIR)/$(CONFIGURATION)/StornautInvestigationMachineGateCoordinatorNative";
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
+				CODE_SIGN_STYLE = Manual;
+				COPY_PHASE_STRIP = NO;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_SWIFT_FLAGS = "$(inherited) -parse-as-library";
+				PRODUCT_BUNDLE_IDENTIFIER = com.eriklee.stornaut.investigation.machine-gate-coordinator;
+				PRODUCT_MODULE_NAME = StornautInvestigationMachineGateCoordinatorNative;
+				PRODUCT_NAME = StornautInvestigationMachineGateCoordinator;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_INCLUDE_PATHS = "$(inherited) $(BUILD_DIR)/$(CONFIGURATION)";
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1132,6 +1358,24 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		A00000000000000000000029 /* Build configuration list for PBXNativeTarget "StornautInvestigationMachineGateNative" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A00000000000000000000180 /* Debug */,
+				A00000000000000000000181 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		A0000000000000000000002A /* Build configuration list for PBXNativeTarget "StornautInvestigationMachineGateCoordinatorNative" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A00000000000000000000190 /* Debug */,
+				A00000000000000000000191 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
@@ -1173,6 +1417,14 @@
 		F00000000000000000000009 /* StornautInvestigationMachineClaimServer */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = StornautInvestigationMachineClaimServer;
+		};
+		F0000000000000000000000A /* StornautInvestigationMachineGateSupport */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = StornautInvestigationMachineGateSupport;
+		};
+		F0000000000000000000000B /* StornautInvestigationMachineGateCoordinatorSupport */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = StornautInvestigationMachineGateCoordinatorSupport;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

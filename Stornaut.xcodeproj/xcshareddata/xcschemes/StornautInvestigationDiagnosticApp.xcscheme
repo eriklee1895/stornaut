@@ -51,6 +51,34 @@
          </BuildActionEntry>
          <BuildActionEntry
             buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "A00000000000000000000009"
+               BuildableName = "StornautInvestigationMachineGate"
+               BlueprintName = "StornautInvestigationMachineGateNative"
+               ReferencedContainer = "container:Stornaut.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "NO"
+            buildForRunning = "YES"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "A0000000000000000000000A"
+               BuildableName = "StornautInvestigationMachineGateCoordinator"
+               BlueprintName = "StornautInvestigationMachineGateCoordinatorNative"
+               ReferencedContainer = "container:Stornaut.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
             buildForRunning = "NO"
             buildForProfiling = "NO"
             buildForArchiving = "NO"

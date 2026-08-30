@@ -8,6 +8,8 @@ label="com.eriklee.stornaut.lifecycle"
 machine_claim_service="com.eriklee.stornaut.lifecycle.machine-claim"
 machine_driver_validation_token="I authorize one bounded disposable read-only Stornaut L3c3b-ii Machine driver validation."
 machine_driver_max_bytes=$((16 * 1024 * 1024))
+machine_gate_max_bytes=$((64 * 1024 * 1024))
+machine_coordinator_max_bytes=$((64 * 1024 * 1024))
 application_support="/Library/Application Support"
 installed_root="$application_support/Stornaut"
 installed_app="$installed_root/Stornaut-R5-Diagnostic.app"
@@ -68,25 +70,27 @@ exact_directory_metadata() {
         "$mode" == "$expected_mode" ]]
 }
 
-validate_machine_driver_identity() {
-    local driver=$1
-    local descriptor=${2:-$driver}
+validate_closed_executable_identity() {
+    local executable=$1
+    local descriptor=${2:-$executable}
     local expected_node=${3:-}
+    local expected_signing_identifier=$4
+    local claim_service_identifier=${5:-}
     local signing_output signing_identifier code_directory_hash signature_kind
     local designated_requirement designated_requirement_sha256
     local executable_sha256 observed_node
 
-    observed_node=$(/usr/bin/stat -f '%d:%i' "$driver")
+    observed_node=$(/usr/bin/stat -f '%d:%i' "$executable")
     [[ -z "$expected_node" || "$observed_node" == "$expected_node" ]]
-    /usr/bin/codesign --verify --strict "$driver"
-    observed_node=$(/usr/bin/stat -f '%d:%i' "$driver")
+    /usr/bin/codesign --verify --strict "$executable"
+    observed_node=$(/usr/bin/stat -f '%d:%i' "$executable")
     [[ -z "$expected_node" || "$observed_node" == "$expected_node" ]]
-    observed_node=$(/usr/bin/stat -f '%d:%i' "$driver")
+    observed_node=$(/usr/bin/stat -f '%d:%i' "$executable")
     [[ -z "$expected_node" || "$observed_node" == "$expected_node" ]]
     signing_output=$(
-        /usr/bin/codesign -d --verbose=4 "$driver" 2>&1
+        /usr/bin/codesign -d --verbose=4 "$executable" 2>&1
     )
-    observed_node=$(/usr/bin/stat -f '%d:%i' "$driver")
+    observed_node=$(/usr/bin/stat -f '%d:%i' "$executable")
     [[ -z "$expected_node" || "$observed_node" == "$expected_node" ]]
     signing_identifier=$(
         print -r -- "$signing_output" |
@@ -100,21 +104,29 @@ validate_machine_driver_identity() {
         print -r -- "$signing_output" |
             /usr/bin/sed -n 's/^Signature=//p'
     )
-    [[ "$signing_identifier" ==
-        com.eriklee.stornaut.investigation.machine-driver ]]
+    case "$expected_signing_identifier" in
+        com.eriklee.stornaut.investigation.machine-driver)
+            [[ "$claim_service_identifier" == "$machine_claim_service" ]]
+            ;;
+        com.eriklee.stornaut.investigation.machine-gate|com.eriklee.stornaut.investigation.machine-gate-coordinator)
+            [[ -z "$claim_service_identifier" ]]
+            ;;
+        *) return 1 ;;
+    esac
+    [[ "$signing_identifier" == "$expected_signing_identifier" ]]
     [[ "$signing_identifier" != *$'\n'* ]]
     [[ "$code_directory_hash" != *$'\n'* ]]
     [[ "$signature_kind" == adhoc ]]
     print -rn -- "$code_directory_hash" |
         /usr/bin/grep -Eq '^[0-9a-f]{40}([0-9a-f]{24})?$'
 
-    observed_node=$(/usr/bin/stat -f '%d:%i' "$driver")
+    observed_node=$(/usr/bin/stat -f '%d:%i' "$executable")
     [[ -z "$expected_node" || "$observed_node" == "$expected_node" ]]
     designated_requirement=$(
-        /usr/bin/codesign -d -r- "$driver" 2>&1 |
+        /usr/bin/codesign -d -r- "$executable" 2>&1 |
             /usr/bin/sed -n 's/^# //p'
     )
-    observed_node=$(/usr/bin/stat -f '%d:%i' "$driver")
+    observed_node=$(/usr/bin/stat -f '%d:%i' "$executable")
     [[ -z "$expected_node" || "$observed_node" == "$expected_node" ]]
     [[ "$designated_requirement" != *$'\n'* ]]
     [[ "$designated_requirement" ==
@@ -132,10 +144,10 @@ validate_machine_driver_identity() {
     )
     print -rn -- "$executable_sha256" |
         /usr/bin/grep -Eq '^[0-9a-f]{64}$'
-    observed_node=$(/usr/bin/stat -f '%d:%i' "$driver")
+    observed_node=$(/usr/bin/stat -f '%d:%i' "$executable")
     [[ -z "$expected_node" || "$observed_node" == "$expected_node" ]]
-    /usr/bin/codesign --verify --strict "$driver"
-    observed_node=$(/usr/bin/stat -f '%d:%i' "$driver")
+    /usr/bin/codesign --verify --strict "$executable"
+    observed_node=$(/usr/bin/stat -f '%d:%i' "$executable")
     [[ -z "$expected_node" || "$observed_node" == "$expected_node" ]]
 
     print -r -- \
@@ -144,79 +156,90 @@ signingIdentifier=$signing_identifier
 designatedRequirement=$designated_requirement
 designatedRequirementSHA256=$designated_requirement_sha256
 codeDirectoryHash=$code_directory_hash
-isAdHoc=true
-machineClaimServiceIdentifier=$machine_claim_service"
+isAdHoc=true"
+    if [[ -n "$claim_service_identifier" ]]; then
+        [[ "$claim_service_identifier" == "$machine_claim_service" ]]
+        print -r -- \
+            "machineClaimServiceIdentifier=$machine_claim_service"
+    fi
 }
 
-validate_machine_driver_artifact() {
+validate_closed_executable_artifact() {
     (
         setopt local_options pipe_fail
         zmodload -F zsh/system b:sysopen b:sysseek
         zmodload -F zsh/stat b:zstat
 
-        local driver=$1
+        local executable=$1
         local expected_owner=$2
         local expected_group=$3
-        local expected_identity=${4:-}
+        local expected_signing_identifier=$4
+        local max_bytes=$5
+        local claim_service_identifier=${6:-}
+        local expected_identity=${7:-}
         local initial_node opened_node final_node
         local initial_uid initial_gid final_size
         local first_identity second_identity
-        local driver_size driver_architectures
-        integer driver_fd
+        local executable_size executable_architectures
+        integer executable_fd
         typeset -A descriptor_stat
 
         exact_file_metadata \
-            "$driver" "$expected_owner" "$expected_group" 0755
-        initial_node=$(/usr/bin/stat -f '%d:%i' "$driver")
-        initial_uid=$(/usr/bin/stat -f '%u' "$driver")
-        initial_gid=$(/usr/bin/stat -f '%g' "$driver")
-        driver_size=$(/usr/bin/stat -f '%z' "$driver")
-        (( driver_size > 0 && driver_size <= machine_driver_max_bytes ))
-        sysopen -r -o nofollow -u driver_fd "$driver"
-        zstat -H descriptor_stat -f "$driver_fd"
-        opened_node=$(/usr/bin/stat -f '%d:%i' "$driver")
+            "$executable" "$expected_owner" "$expected_group" 0755
+        initial_node=$(/usr/bin/stat -f '%d:%i' "$executable")
+        initial_uid=$(/usr/bin/stat -f '%u' "$executable")
+        initial_gid=$(/usr/bin/stat -f '%g' "$executable")
+        executable_size=$(/usr/bin/stat -f '%z' "$executable")
+        (( executable_size > 0 && executable_size <= max_bytes ))
+        sysopen -r -o nofollow -u executable_fd "$executable"
+        zstat -H descriptor_stat -f "$executable_fd"
+        opened_node=$(/usr/bin/stat -f '%d:%i' "$executable")
         [[ "$initial_node" == "$opened_node" ]]
         [[ "$opened_node" ==
             "${descriptor_stat[device]}:${descriptor_stat[inode]}" ]]
-        [[ "${descriptor_stat[size]}" == "$driver_size" ]]
+        [[ "${descriptor_stat[size]}" == "$executable_size" ]]
         [[ "${descriptor_stat[nlink]}" == 1 ]]
         [[ "${descriptor_stat[uid]}" == "$initial_uid" ]]
         [[ "${descriptor_stat[gid]}" == "$initial_gid" ]]
         (( (descriptor_stat[mode] & 8#170000) == 8#100000 ))
         (( (descriptor_stat[mode] & 8#777) == 8#755 ))
-        driver_architectures=$(
-            /usr/bin/lipo -archs "/dev/fd/$driver_fd"
+        executable_architectures=$(
+            /usr/bin/lipo -archs "/dev/fd/$executable_fd"
         )
-        [[ "$driver_architectures" == arm64 ]]
-        [[ "$(/usr/bin/stat -f '%d:%i' "$driver")" ==
+        [[ "$executable_architectures" == arm64 ]]
+        [[ "$(/usr/bin/stat -f '%d:%i' "$executable")" ==
             "$opened_node" ]]
 
-        [[ "$(/usr/bin/stat -f '%d:%i' "$driver")" ==
+        [[ "$(/usr/bin/stat -f '%d:%i' "$executable")" ==
             "$opened_node" ]]
-        /usr/bin/codesign --verify --strict "$driver"
-        [[ "$(/usr/bin/stat -f '%d:%i' "$driver")" ==
+        /usr/bin/codesign --verify --strict "$executable"
+        [[ "$(/usr/bin/stat -f '%d:%i' "$executable")" ==
             "$opened_node" ]]
-        sysseek -u "$driver_fd" 0
+        sysseek -u "$executable_fd" 0
         first_identity=$(
-            validate_machine_driver_identity \
-                "$driver" "/dev/fd/$driver_fd" "$opened_node"
+            validate_closed_executable_identity \
+                "$executable" "/dev/fd/$executable_fd" \
+                "$opened_node" "$expected_signing_identifier" \
+                "$claim_service_identifier"
         )
-        sysseek -u "$driver_fd" 0
+        sysseek -u "$executable_fd" 0
         second_identity=$(
-            validate_machine_driver_identity \
-                "$driver" "/dev/fd/$driver_fd" "$opened_node"
+            validate_closed_executable_identity \
+                "$executable" "/dev/fd/$executable_fd" \
+                "$opened_node" "$expected_signing_identifier" \
+                "$claim_service_identifier"
         )
         [[ "$second_identity" == "$first_identity" ]]
-        final_node=$(/usr/bin/stat -f '%d:%i' "$driver")
+        final_node=$(/usr/bin/stat -f '%d:%i' "$executable")
         [[ "$final_node" == "$initial_node" ]]
         exact_file_metadata \
-            "$driver" "$expected_owner" "$expected_group" 0755
-        final_size=$(/usr/bin/stat -f '%z' "$driver")
-        [[ "$final_size" == "$driver_size" ]]
-        zstat -H descriptor_stat -f "$driver_fd"
+            "$executable" "$expected_owner" "$expected_group" 0755
+        final_size=$(/usr/bin/stat -f '%z' "$executable")
+        [[ "$final_size" == "$executable_size" ]]
+        zstat -H descriptor_stat -f "$executable_fd"
         [[ "$final_node" ==
             "${descriptor_stat[device]}:${descriptor_stat[inode]}" ]]
-        [[ "${descriptor_stat[size]}" == "$driver_size" ]]
+        [[ "${descriptor_stat[size]}" == "$executable_size" ]]
         [[ "${descriptor_stat[nlink]}" == 1 ]]
         [[ "${descriptor_stat[uid]}" == "$initial_uid" ]]
         [[ "${descriptor_stat[gid]}" == "$initial_gid" ]]
@@ -228,7 +251,56 @@ validate_machine_driver_artifact() {
     )
 }
 
-validate_machine_driver_fixtures() {
+validate_closed_app_artifacts() {
+    local app=$1
+    local expected_owner=$2
+    local expected_group=$3
+    local expected_identity=${4:-}
+    local initial_app_node final_app_node
+    local driver_identity gate_identity coordinator_identity closed_identity
+
+    exact_directory_metadata "$app" "$expected_owner" "$expected_group" 0755
+    initial_app_node=$(/usr/bin/stat -f '%d:%i' "$app")
+    driver_identity=$(
+        validate_closed_executable_artifact \
+            "$app/Contents/MacOS/StornautInvestigationMachineDriver" \
+            "$expected_owner" "$expected_group" \
+            com.eriklee.stornaut.investigation.machine-driver \
+            "$machine_driver_max_bytes" "$machine_claim_service"
+    )
+    gate_identity=$(
+        validate_closed_executable_artifact \
+            "$app/Contents/MacOS/StornautInvestigationMachineGate" \
+            "$expected_owner" "$expected_group" \
+            com.eriklee.stornaut.investigation.machine-gate \
+            "$machine_gate_max_bytes" ""
+    )
+    coordinator_identity=$(
+        validate_closed_executable_artifact \
+            "$app/Contents/MacOS/StornautInvestigationMachineGateCoordinator" \
+            "$expected_owner" "$expected_group" \
+            com.eriklee.stornaut.investigation.machine-gate-coordinator \
+            "$machine_coordinator_max_bytes" ""
+    )
+    final_app_node=$(/usr/bin/stat -f '%d:%i' "$app")
+    [[ "$final_app_node" == "$initial_app_node" ]]
+    exact_directory_metadata "$app" "$expected_owner" "$expected_group" 0755
+    closed_identity="machineDriverIdentity={
+$driver_identity
+}
+machineGateIdentity={
+$gate_identity
+}
+machineCoordinatorIdentity={
+$coordinator_identity
+}"
+    if [[ -n "$expected_identity" ]]; then
+        [[ "$closed_identity" == "$expected_identity" ]]
+    fi
+    print -r -- "$closed_identity"
+}
+
+validate_closed_artifact_fixtures() {
     local token=$1
     local temporary_root=$2
     local built_app=$3
@@ -237,8 +309,8 @@ validate_machine_driver_fixtures() {
     local canonical_validation_parent canonical_temporary_root
     local canonical_built_app
     local canonical_staging_app canonical_installed_app
-    local fixture_owner fixture_group built_machine_driver_identity
-    local staging_machine_driver_identity installed_machine_driver_identity
+    local fixture_owner fixture_group built_closed_artifact_identity
+    local staging_closed_artifact_identity installed_closed_artifact_identity
 
     [[ "$token" == "$machine_driver_validation_token" ]]
     [[ "$token" != */* ]]
@@ -280,27 +352,24 @@ validate_machine_driver_fixtures() {
 
     fixture_owner=$(/usr/bin/stat -f '%Su' "$canonical_temporary_root")
     fixture_group=$(/usr/bin/stat -f '%Sg' "$canonical_temporary_root")
-    built_machine_driver_identity=$(
-        validate_machine_driver_artifact \
-            "$canonical_built_app/Contents/MacOS/StornautInvestigationMachineDriver" \
-            "$fixture_owner" "$fixture_group"
+    built_closed_artifact_identity=$(
+        validate_closed_app_artifacts \
+            "$canonical_built_app" "$fixture_owner" "$fixture_group"
     )
-    staging_machine_driver_identity=$(
-        validate_machine_driver_artifact \
-            "$canonical_staging_app/Contents/MacOS/StornautInvestigationMachineDriver" \
-            "$fixture_owner" "$fixture_group" \
-            "$built_machine_driver_identity"
+    staging_closed_artifact_identity=$(
+        validate_closed_app_artifacts \
+            "$canonical_staging_app" "$fixture_owner" "$fixture_group" \
+            "$built_closed_artifact_identity"
     )
-    installed_machine_driver_identity=$(
-        validate_machine_driver_artifact \
-            "$canonical_installed_app/Contents/MacOS/StornautInvestigationMachineDriver" \
-            "$fixture_owner" "$fixture_group" \
-            "$built_machine_driver_identity"
+    installed_closed_artifact_identity=$(
+        validate_closed_app_artifacts \
+            "$canonical_installed_app" "$fixture_owner" "$fixture_group" \
+            "$built_closed_artifact_identity"
     )
-    [[ "$staging_machine_driver_identity" ==
-        "$built_machine_driver_identity" ]]
-    [[ "$installed_machine_driver_identity" ==
-        "$built_machine_driver_identity" ]]
+    [[ "$staging_closed_artifact_identity" ==
+        "$built_closed_artifact_identity" ]]
+    [[ "$installed_closed_artifact_identity" ==
+        "$built_closed_artifact_identity" ]]
     print "lifecycle.local.machine-driver-validation=complete"
 }
 
@@ -357,7 +426,7 @@ validate_plist() {
 
 validate_built_app() {
     local machine_driver="$built_app/Contents/MacOS/StornautInvestigationMachineDriver"
-    local built_owner built_group built_machine_driver_identity
+    local built_owner built_group built_closed_artifact_identity
     [[ -d "$built_app" && ! -L "$built_app" ]]
     for executable in \
         "$built_app/Contents/MacOS/StornautInvestigationDiagnostic" \
@@ -372,12 +441,11 @@ validate_built_app() {
     validate_plist "$source_plist"
     built_owner=$(/usr/bin/stat -f '%Su' "$machine_driver")
     built_group=$(/usr/bin/stat -f '%Sg' "$machine_driver")
-    built_machine_driver_identity=$(
-        validate_machine_driver_artifact \
-            "$built_app/Contents/MacOS/StornautInvestigationMachineDriver" \
-            "$built_owner" "$built_group"
+    built_closed_artifact_identity=$(
+        validate_closed_app_artifacts \
+            "$built_app" "$built_owner" "$built_group"
     )
-    print -r -- "$built_machine_driver_identity"
+    print -r -- "$built_closed_artifact_identity"
 }
 
 validate_bundle_permissions() {
@@ -403,8 +471,8 @@ validate_bundle_permissions() {
 }
 
 validate_installed_artifacts() {
-    local expected_machine_driver_identity=${1:-}
-    local installed_machine_driver_identity
+    local expected_closed_artifact_identity=${1:-}
+    local installed_closed_artifact_identity
     exact_directory_metadata "$application_support" root admin 0755
     exact_directory_metadata "$installed_root" root wheel 0755
     exact_directory_metadata "$installed_app" root wheel 0755
@@ -419,21 +487,21 @@ validate_installed_artifacts() {
     do
         exact_file_metadata "$executable" root wheel 0755
     done
-    installed_machine_driver_identity=$(
-        validate_machine_driver_artifact \
-            "$installed_app/Contents/MacOS/StornautInvestigationMachineDriver" \
-            root wheel "$expected_machine_driver_identity"
+    installed_closed_artifact_identity=$(
+        validate_closed_app_artifacts \
+            "$installed_app" root wheel \
+            "$expected_closed_artifact_identity"
     )
-    [[ -n "$installed_machine_driver_identity" ]]
-    if [[ -n "$expected_machine_driver_identity" ]]; then
-        [[ "$installed_machine_driver_identity" ==
-            "$expected_machine_driver_identity" ]]
+    [[ -n "$installed_closed_artifact_identity" ]]
+    if [[ -n "$expected_closed_artifact_identity" ]]; then
+        [[ "$installed_closed_artifact_identity" ==
+            "$expected_closed_artifact_identity" ]]
     fi
 }
 
 validate_installed_state() {
-    local expected_machine_driver_identity=${1:-}
-    validate_installed_artifacts "$expected_machine_driver_identity"
+    local expected_closed_artifact_identity=${1:-}
+    validate_installed_artifacts "$expected_closed_artifact_identity"
     /bin/launchctl print "system/$label" >/dev/null
 }
 
@@ -497,10 +565,19 @@ rollback_failed_lifecycle() {
     then
         /bin/rm -f -- "$staging_plist"
     fi
-    if [[ -n ${staging_app:-} &&
+    if (( ${staging_app_created:-0} )) &&
+        [[ -n ${staging_app:-} &&
         ( -e "$staging_app" || -L "$staging_app" ) ]]
     then
-        /bin/rm -rf -- "$staging_app"
+        if exact_directory_metadata "$staging_app" root wheel 0755 &&
+            [[ -z ${staging_app_node:-} ||
+                "$(/usr/bin/stat -f '%d:%i' "$staging_app")" ==
+                    "$staging_app_node" ]] &&
+            [[ "$(/usr/bin/stat -f '%d:%i' "$installed_root")" ==
+                "${installed_root_node:-}" ]]
+        then
+            /bin/rm -rf -- "$staging_app"
+        fi
     fi
     if (( may_remove_installed && ${installed_plist_moved:-0} )); then
         if exact_file_metadata "$installed_plist" root wheel 0644 &&
@@ -512,8 +589,15 @@ rollback_failed_lifecycle() {
     fi
     if (( may_remove_installed && ${installed_app_moved:-0} )); then
         if exact_directory_metadata "$installed_app" root wheel 0755 &&
+            [[ "$(/usr/bin/stat -f '%d:%i' "$installed_app")" ==
+                "${installed_app_node:-}" ]] &&
+            [[ "$(/usr/bin/stat -f '%d:%i' "$installed_root")" ==
+                "${installed_root_node:-}" ]] &&
             /usr/bin/codesign --verify --deep --strict "$installed_app" &&
-            validate_bundle_permissions "$installed_app"
+            validate_bundle_permissions "$installed_app" &&
+            validate_closed_app_artifacts "$installed_app" root wheel \
+                "${built_closed_artifact_identity:-}" \
+                >/dev/null
         then
             /bin/rm -rf -- "$installed_app"
         fi
@@ -553,14 +637,15 @@ status() {
 }
 
 install() {
-    local built_machine_driver_identity
-    local staging_machine_driver_identity
-    local installed_machine_driver_identity
+    local built_closed_artifact_identity
+    local staging_closed_artifact_identity
+    local installed_closed_artifact_identity
+    local installed_root_node staging_app_node installed_app_node
     (( EUID == 0 )) || {
         print -u2 "Install requires explicit administrator authentication."
         exit 77
     }
-    built_machine_driver_identity=$(validate_built_app)
+    built_closed_artifact_identity=$(validate_built_app)
     exact_directory_metadata "$application_support" root admin 0755
     if [[ -e "$installed_root" || -L "$installed_root" ||
         -e "$installed_app" || -L "$installed_app" ||
@@ -577,6 +662,7 @@ install() {
     local installed_app_moved=0
     local installed_plist_moved=0
     local service_bootstrapped=0
+    local staging_app_created=0
     [[ ! -e "$staging_app" && ! -L "$staging_app" ]]
     [[ ! -e "$staging_plist" && ! -L "$staging_plist" ]]
     trap 'rollback_failed_lifecycle $?' EXIT
@@ -585,7 +671,13 @@ install() {
     installed_root_created=1
     /usr/sbin/chown root:wheel "$installed_root"
     exact_directory_metadata "$installed_root" root wheel 0755
+    installed_root_node=$(/usr/bin/stat -f '%d:%i' "$installed_root")
 
+    staging_app_created=1
+    /bin/mkdir -m 0755 "$staging_app"
+    staging_app_node=$(/usr/bin/stat -f '%d:%i' "$staging_app")
+    /usr/sbin/chown root:wheel "$staging_app"
+    exact_directory_metadata "$staging_app" root wheel 0755
     /usr/bin/ditto --noqtn "$built_app" "$staging_app"
     /usr/sbin/chown -R root:wheel "$staging_app"
     /bin/chmod -RN "$staging_app"
@@ -594,48 +686,61 @@ install() {
     /bin/chmod 0755 \
         "$staging_app/Contents/MacOS/StornautInvestigationDiagnostic" \
         "$staging_app/Contents/MacOS/StornautLifecycleHelper" \
-        "$staging_app/Contents/MacOS/StornautInvestigationMachineDriver"
+        "$staging_app/Contents/MacOS/StornautInvestigationMachineDriver" \
+        "$staging_app/Contents/MacOS/StornautInvestigationMachineGate" \
+        "$staging_app/Contents/MacOS/StornautInvestigationMachineGateCoordinator"
     validate_bundle_permissions "$staging_app"
     /usr/bin/codesign --verify --deep --strict "$staging_app"
     [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' \
         "$staging_app/Contents/Info.plist")" == "com.eriklee.stornaut" ]]
-    staging_machine_driver_identity=$(
-        validate_machine_driver_artifact \
-            "$staging_app/Contents/MacOS/StornautInvestigationMachineDriver" \
-            root wheel "$built_machine_driver_identity"
+    staging_closed_artifact_identity=$(
+        validate_closed_app_artifacts \
+            "$staging_app" root wheel "$built_closed_artifact_identity"
     )
-    [[ "$staging_machine_driver_identity" ==
-        "$built_machine_driver_identity" ]]
-    /bin/mv -n "$staging_app" "$installed_app"
+    [[ "$staging_closed_artifact_identity" ==
+        "$built_closed_artifact_identity" ]]
+    [[ "$(/usr/bin/stat -f '%d:%i' "$staging_app")" ==
+        "$staging_app_node" ]]
+    [[ "$(/usr/bin/stat -f '%d:%i' "$installed_root")" ==
+        "$installed_root_node" ]]
+    installed_app_node=$staging_app_node
     installed_app_moved=1
+    /bin/mv -n "$staging_app" "$installed_app"
+    staging_app_created=0
+    [[ "$(/usr/bin/stat -f '%d:%i' "$installed_app")" ==
+        "$installed_app_node" ]]
     /usr/bin/codesign --verify --deep --strict "$installed_app"
-    installed_machine_driver_identity=$(
-        validate_machine_driver_artifact \
-            "$installed_app/Contents/MacOS/StornautInvestigationMachineDriver" \
-            root wheel "$built_machine_driver_identity"
+    installed_closed_artifact_identity=$(
+        validate_closed_app_artifacts \
+            "$installed_app" root wheel "$built_closed_artifact_identity"
     )
-    [[ "$installed_machine_driver_identity" ==
-        "$built_machine_driver_identity" ]]
+    [[ "$installed_closed_artifact_identity" ==
+        "$built_closed_artifact_identity" ]]
 
     /usr/bin/install -o root -g wheel -m 0644 \
         "$source_plist" "$staging_plist"
     /bin/mv -n "$staging_plist" "$installed_plist"
     installed_plist_moved=1
     validate_plist "$installed_plist"
-    validate_installed_artifacts "$built_machine_driver_identity"
+    validate_installed_artifacts "$built_closed_artifact_identity"
     /bin/launchctl bootstrap system "$installed_plist"
     service_bootstrapped=1
-    validate_installed_state "$built_machine_driver_identity"
+    validate_installed_state "$built_closed_artifact_identity"
     trap - EXIT INT TERM
     print "lifecycle.local.install=complete"
 }
 
 uninstall() {
+    local uninstall_closed_artifact_identity uninstall_app_node
     (( EUID == 0 )) || {
         print -u2 "Uninstall requires explicit administrator authentication."
         exit 77
     }
     validate_installed_artifacts
+    uninstall_app_node=$(/usr/bin/stat -f '%d:%i' "$installed_app")
+    uninstall_closed_artifact_identity=$(
+        validate_closed_app_artifacts "$installed_app" root wheel
+    )
     if /bin/launchctl print "system/$label" >/dev/null 2>&1; then
         /bin/launchctl bootout "system/$label"
     fi
@@ -649,6 +754,12 @@ uninstall() {
     if [[ -e "$installed_app" || -L "$installed_app" ]]; then
         exact_directory_metadata "$installed_app" root wheel 0755
         /usr/bin/codesign --verify --deep --strict "$installed_app"
+        validate_bundle_permissions "$installed_app"
+        [[ "$(/usr/bin/stat -f '%d:%i' "$installed_app")" ==
+            "$uninstall_app_node" ]]
+        validate_closed_app_artifacts "$installed_app" root wheel \
+            "$uninstall_closed_artifact_identity" \
+            >/dev/null
         /bin/rm -rf -- "$installed_app"
     fi
     if [[ -e "$lease_root" || -L "$lease_root" ]]; then
@@ -684,6 +795,6 @@ case "$action" in
     uninstall) uninstall ;;
     validate-machine-driver)
         [[ $# == 6 ]]
-        validate_machine_driver_fixtures "$2" "$3" "$4" "$5" "$6"
+        validate_closed_artifact_fixtures "$2" "$3" "$4" "$5" "$6"
         ;;
 esac
