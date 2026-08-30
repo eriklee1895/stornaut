@@ -69,8 +69,9 @@ installation or upstream self-attestation and is not claimed here.
 An initial audit enumerated nineteen possible paths. The final design avoids
 that oversized surface: it does not modify `CapabilityRuntimeWorker`, does not
 add a fixture target, exercises the native identity primitive through its direct
-existing test suite, keeps the generic `spawnDiagnosticProcess` implementation
-unchanged, and places source/mutation/scope closure in one existing verifier.
+existing test suite, defines the dedicated launcher in the contained-session
+file, keeps the generic `spawnDiagnosticProcess` implementation unchanged, and
+places source/mutation/scope closure in one existing verifier.
 
 The implementation may change exactly these fourteen non-document paths:
 
