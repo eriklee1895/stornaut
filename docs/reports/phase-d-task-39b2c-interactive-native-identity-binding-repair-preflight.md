@@ -93,14 +93,16 @@ The implementation may change exactly these fourteen non-document paths:
 14. `scripts/verify-investigation-boundaries`.
 
 The maximum changed-line budget is 2,400 non-document lines: production 900,
-tests 1,000 and verifier 500. These category ceilings are independent. The
+tests 1,100 and verifier 500. These category ceilings are independent. The
 2026-08-30 implementation checkpoint rebalanced the production/test estimates
 before further coding after the dedicated suspended launcher, direct Mach-O
 fixture and required drift/cleanup coverage reached 831 production and 861 test
 changed lines; the exact fourteen paths remain unchanged. A
 post-implementation independent review then required a non-token-only mutation
 matrix in the existing verifier; this raised only the aggregate/verifier ceiling
-while preserving the exact path set and production/test ceilings. A fifteenth
+while preserving the exact path set and production ceiling. Final review added
+plan-stage cancellation and strict response negatives, so the test-only ceiling
+was rebalanced to 1,100 without changing the aggregate. A fifteenth
 path, line 2,401, a second wire field, a new package target/dependency,
 or a change to an excluded path stops implementation for re-preflight.
 
