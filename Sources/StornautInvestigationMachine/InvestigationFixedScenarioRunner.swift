@@ -146,14 +146,18 @@ actor InvestigationFixedScenarioRunner:
         now: Date,
         operation: @escaping Operation
     ) throws {
+        let machineConfigurationValid =
+            (try? configuration.validateMachineCohort(now: now)) != nil
+            || (try? configuration.validateMachineCohort(
+                now: now, outputs: .ownerRegularFile
+            )) != nil
         guard
             plan.id.rawValue
                 == "investigation-"
                     + configuration.nonce.uuidString.lowercased(),
             plan.sourceFingerprint.hex
                 == configuration.binding.sourceFingerprintSHA256,
-            configuration.validBefore > now,
-            configuration.validBefore.timeIntervalSince(now) <= 900
+            machineConfigurationValid
         else {
             throw InvestigationFixedScenarioRunnerError.invalidInput
         }

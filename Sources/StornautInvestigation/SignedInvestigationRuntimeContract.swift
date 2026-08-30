@@ -321,6 +321,8 @@ public struct SignedInvestigationRuntimeDiagnosticConfiguration:
     Equatable
 {
     public static let schemaVersion = 3
+    package static let maximumMachineCohortValiditySeconds: TimeInterval = 1_200
+    package static let maximumMachineEpochWallClockSeconds = 140
     public static let requiredOptIn =
         "I authorize one bounded disposable read-only Stornaut Investigation diagnostic."
 
@@ -337,7 +339,7 @@ public struct SignedInvestigationRuntimeDiagnosticConfiguration:
     public let binding: SignedInvestigationRuntimeBinding
     public let expectedModel: CodexRuntimeModel
     public let expectedProvider: CodexRuntimeProvider
-    public let validBefore: Date
+    public private(set) var validBefore: Date
     public let maximumWallClockSeconds: Int
     public let maximumTurns: Int
     public let maximumProbeCalls: Int
@@ -384,6 +386,42 @@ public struct SignedInvestigationRuntimeDiagnosticConfiguration:
         try validate(now: now)
     }
 
+    package static func machineCohort(
+        nonce: UUID,
+        scenario: SignedInvestigationRuntimeDiagnosticScenario,
+        optIn: String,
+        diagnosticRootPath: String,
+        sourceRootPath: String,
+        supportRootPath: String,
+        runtimeRootPath: String,
+        reportPath: String,
+        storePath: String,
+        binding: SignedInvestigationRuntimeBinding,
+        expectedModel: CodexRuntimeModel,
+        expectedProvider: CodexRuntimeProvider,
+        validBefore: Date,
+        maximumWallClockSeconds: Int,
+        maximumTurns: Int,
+        maximumProbeCalls: Int,
+        maximumContextBytes: Int,
+        now: Date
+    ) throws -> Self {
+        var value = try Self(
+            nonce: nonce, scenario: scenario, optIn: optIn,
+            diagnosticRootPath: diagnosticRootPath, sourceRootPath: sourceRootPath,
+            supportRootPath: supportRootPath, runtimeRootPath: runtimeRootPath,
+            reportPath: reportPath, storePath: storePath, binding: binding,
+            expectedModel: expectedModel, expectedProvider: expectedProvider,
+            validBefore: min(validBefore, now.addingTimeInterval(900)),
+            maximumWallClockSeconds: maximumWallClockSeconds,
+            maximumTurns: maximumTurns, maximumProbeCalls: maximumProbeCalls,
+            maximumContextBytes: maximumContextBytes, now: now
+        )
+        value.validBefore = validBefore
+        try value.validateMachineCohort(now: now)
+        return value
+    }
+
     public static func decodeValidated(
         from data: Data,
         now: Date
@@ -400,6 +438,29 @@ public struct SignedInvestigationRuntimeDiagnosticConfiguration:
         } catch {
             throw SignedInvestigationRuntimeContractError
                 .invalidConfiguration
+        }
+    }
+
+    package static func decodeMachineCohortValidated(
+        from data: Data,
+        now: Date,
+        outputs: OutputPathExpectation = .vacant
+    ) throws -> Self {
+        guard data.count <= 64 * 1_024 else {
+            throw SignedInvestigationRuntimeContractError.invalidConfiguration
+        }
+        do {
+            let decoded = switch outputs {
+            case .vacant: try JSONDecoder().decode(Self.self, from: data)
+            case .ownerRegularFile: try JSONDecoder().decode(
+                    CompletedSignedInvestigationRuntimeConfiguration.self,
+                    from: data
+                ).value
+            }
+            try decoded.validateMachineCohort(now: now, outputs: outputs)
+            return decoded
+        } catch {
+            throw SignedInvestigationRuntimeContractError.invalidConfiguration
         }
     }
 
@@ -626,6 +687,33 @@ public struct SignedInvestigationRuntimeDiagnosticConfiguration:
         }
     }
 
+    package func validateMachineCohort(
+        now: Date?,
+        outputs: OutputPathExpectation = .vacant
+    ) throws {
+        try validate(now: nil, outputs: outputs)
+        guard
+            maximumWallClockSeconds == Self.maximumMachineEpochWallClockSeconds,
+            maximumTurns == 3,
+            maximumProbeCalls == 16,
+            maximumContextBytes == 1_048_576
+        else {
+            throw SignedInvestigationRuntimeContractError.invalidConfiguration
+        }
+        if let now { try validateMachineCohortWindow(now: now) }
+    }
+
+    package func validateMachineCohortWindow(now: Date) throws {
+        guard
+            now.timeIntervalSince1970.isFinite,
+            validBefore > now,
+            validBefore.timeIntervalSince(now)
+                <= Self.maximumMachineCohortValiditySeconds
+        else {
+            throw SignedInvestigationRuntimeContractError.invalidConfiguration
+        }
+    }
+
     package enum OutputPathExpectation {
         case vacant
         case ownerRegularFile
@@ -651,6 +739,11 @@ public struct SignedInvestigationRuntimeDiagnosticConfiguration:
         case maximumProbeCalls
         case maximumContextBytes
     }
+}
+
+private struct CompletedSignedInvestigationRuntimeConfiguration: Decodable {
+    let value: SignedInvestigationRuntimeDiagnosticConfiguration
+    init(from decoder: Decoder) throws { value = try .init(completedOutputsFrom: decoder) }
 }
 
 public enum SignedInvestigationRuntimeDenialKind:

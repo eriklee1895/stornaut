@@ -124,6 +124,25 @@ struct InvestigationHandoffConcreteCompositionTests {
         }
     }
 
+    @Test
+    func acknowledgementAcceptsPresealedMachineCohortValidity() async throws {
+        let fixture = try ConcreteHandoffFixture(machineCohortWindow: 1_200)
+        defer { fixture.remove() }
+        let operations = try InvestigationHandoffConcreteAppLeafOperations(
+            adapter: ConcreteFakeHandoffAdapter(fixture: fixture),
+            peer: fixture.peer, now: { fixture.now },
+            retirementHandle: { _ in fixture.handle }
+        )
+
+        let acknowledgement = try await operations.acknowledgeConfiguration(
+            fixture.configurationData
+        )
+
+        #expect(acknowledgement.configurationSHA256
+            == .hashing(fixture.configurationData))
+        #expect(acknowledgement.configurationNonce == fixture.configuration.nonce)
+    }
+
     @Test(arguments: [
         ConcreteBindingMutation.repositoryHEAD,
         ConcreteBindingMutation.sourceFingerprintSHA256,
@@ -346,6 +365,7 @@ struct InvestigationHandoffConcreteCompositionTests {
         let clock = SequenceConcreteClock([
             advancing.now,
             advancing.now,
+            advancing.now,
             advancing.now.addingTimeInterval(2),
         ])
         let completionRelativeHandle = try advancing.handle(
@@ -356,7 +376,8 @@ struct InvestigationHandoffConcreteCompositionTests {
             try InvestigationHandoffConcreteAppLeafOperations(
                 adapter: ConcreteFakeHandoffAdapter(fixture: advancing),
                 peer: advancing.peer,
-                now: { clock.next() },
+                now: { advancing.now },
+                continuousNow: { clock.nextNanoseconds(relativeTo: advancing) },
                 retirementHandle: { _ in completionRelativeHandle }
             )
         _ = try await acceptsHelperCompletionRelativeDeadline
@@ -376,6 +397,7 @@ struct InvestigationHandoffConcreteCompositionTests {
             let startOffset = completedOffset < 0 ? 2.0 : 0.0
             let clock = SequenceConcreteClock([
                 fixture.now,
+                fixture.now,
                 fixture.now.addingTimeInterval(startOffset),
                 fixture.now.addingTimeInterval(completedOffset < 0
                     ? 1.0 : completedOffset),
@@ -388,7 +410,8 @@ struct InvestigationHandoffConcreteCompositionTests {
                 try InvestigationHandoffConcreteAppLeafOperations(
                     adapter: ConcreteFakeHandoffAdapter(fixture: fixture),
                     peer: fixture.peer,
-                    now: { clock.next() },
+                    now: { fixture.now },
+                    continuousNow: { clock.nextNanoseconds(relativeTo: fixture) },
                     retirementHandle: { _ in handle }
                 )
             _ = try await rejectsInvalidCompletionEdge
@@ -525,6 +548,110 @@ struct InvestigationHandoffConcreteCompositionTests {
             _ = try fixture.acceptedProjection(runtimeReceipt: foreignReceipt)
         }
     }
+
+    @Test
+    func noAuthRetirementClampsTheSessionToTheEpochWallClockWindow() async throws {
+        for (window, expected) in [(1_200.0, 140.0), (100.0, 100.0)] {
+            let fixture = try ConcreteHandoffFixture(
+                machineCohortWindow: window
+            )
+            defer { fixture.remove() }
+            let operationIDs = [
+                try ConcreteHandoffFixture.uuid(0x61),
+                try ConcreteHandoffFixture.uuid(0x62),
+            ]
+            let session = ConcreteLifecycleSession(
+                fixture: fixture, operationIDs: operationIDs
+            )
+            let bytes = try fixture.configuration.canonicalJSONData()
+            let digest = try fixture.configuration.machineConfigurationSHA256()
+
+            _ = try await InvestigationHandoffNoAuthRetirement.run(
+                projection: try fixture.acceptedProjection(),
+                session: session, now: { fixture.now },
+                operationID: ConcreteOperationIDProvider(operationIDs).next
+            )
+
+            let requests = await session.requests
+            #expect(try #require(requests.first?.validBefore)
+                == fixture.now.addingTimeInterval(expected))
+            #expect(try fixture.configuration.canonicalJSONData() == bytes)
+            #expect(try fixture.configuration.machineConfigurationSHA256()
+                == digest)
+        }
+    }
+
+    @Test
+    func appLeafHandshakeCannotExtendTheCapturedEpochDeadline() async throws {
+        let continuousAnchor: UInt64 = 10_000_000_000
+        let fixture = try ConcreteHandoffFixture(
+            machineCohortWindow: 1_200, remainingEpochSeconds: 40,
+            bootstrapStartedAtNanoseconds: continuousAnchor
+        )
+        defer { fixture.remove() }
+        let clock = SequenceConcreteClock([fixture.now])
+        let continuousClock = SequenceConcreteContinuousClock([
+            continuousAnchor, continuousAnchor + 1_000_000_000,
+            continuousAnchor + 39_000_000_000,
+            continuousAnchor + 41_000_000_000,
+        ])
+        let handle = try fixture.handle(
+            operationID: try ConcreteHandoffFixture.uuid(0x62),
+            validBefore: fixture.now.addingTimeInterval(-80)
+        )
+        let retirement = ConcreteRetirementProbe(handle: handle)
+        let operations = try InvestigationHandoffConcreteAppLeafOperations(
+            adapter: ConcreteFakeHandoffAdapter(fixture: fixture),
+            peer: fixture.peer, now: { clock.next() },
+            continuousNow: { try continuousClock.next() },
+            retirementHandle: { projection in
+                await retirement.record(projection)
+                return handle
+            }
+        )
+
+        _ = try await operations.acknowledgeConfiguration(
+            fixture.configurationData
+        )
+        await #expect(throws: InvestigationHandoffConcreteAppLeafError.self) {
+            _ = try await operations.retirementHandle()
+        }
+
+        let deadline = try #require(
+            await retirement.projection?.epochValidBefore
+        )
+        #expect(deadline == fixture.now.addingTimeInterval(40))
+    }
+
+    @Test(arguments: [false, true])
+    func appLeafMonotonicFailureOrRegressionExpiresTheEpoch(
+        throwsOnRead: Bool
+    ) async throws {
+        let anchor: UInt64 = 10_000_000_000
+        let fixture = try ConcreteHandoffFixture(
+            machineCohortWindow: 1_200, remainingEpochSeconds: 40,
+            bootstrapStartedAtNanoseconds: anchor
+        )
+        defer { fixture.remove() }
+        let continuousClock = SequenceConcreteContinuousClock([
+            anchor, throwsOnRead ? nil : anchor - 1,
+        ])
+        let operations = try InvestigationHandoffConcreteAppLeafOperations(
+            adapter: ConcreteFakeHandoffAdapter(fixture: fixture),
+            peer: fixture.peer, now: { fixture.now },
+            continuousNow: { try continuousClock.next() },
+            retirementHandle: { _ in fixture.handle }
+        )
+
+        await #expect(throws: InvestigationHandoffConcreteAppLeafError.self) {
+            _ = try await operations.acknowledgeConfiguration(
+                fixture.configurationData
+            )
+        }
+        await #expect(throws: InvestigationHandoffConcreteAppLeafError.self) {
+            _ = try await operations.preDropClaim()
+        }
+    }
 }
 
 enum ConcreteBindingMutation: CaseIterable, Sendable {
@@ -580,7 +707,10 @@ private struct ConcreteHandoffFixture: Sendable {
 
     init(
         scenario: SignedInvestigationRuntimeDiagnosticScenario = .success,
-        configurationWindow: TimeInterval = 120
+        configurationWindow: TimeInterval = 120,
+        machineCohortWindow: TimeInterval? = nil,
+        remainingEpochSeconds: UInt64 = 140,
+        bootstrapStartedAtNanoseconds: UInt64? = nil
     ) throws {
         let temporaryPath = FileManager.default.temporaryDirectory.path
         guard let resolvedTemporaryPath = realpath(temporaryPath, nil) else {
@@ -610,9 +740,12 @@ private struct ConcreteHandoffFixture: Sendable {
                 attributes: [.posixPermissions: 0o700]
             )
         }
+        let bootstrapStartedAtNanoseconds = bootstrapStartedAtNanoseconds
+            ?? investigationHandoffTestContinuousNanoseconds()
         bootstrap = try InvestigationHandoffEpochBootstrap(
             epochUUID: Self.uuid(0x11),
-            epochDeadlineNanoseconds: 9_000_000_000
+            epochDeadlineNanoseconds: bootstrapStartedAtNanoseconds
+                + remainingEpochSeconds * 1_000_000_000
         )
         driverClaim = try Self.claim(pid: 84, version: 8, uid: 0, asid: 10)
         preDropClaim = try Self.claim(pid: 42, version: 7, uid: 0, asid: 9)
@@ -661,26 +794,56 @@ private struct ConcreteHandoffFixture: Sendable {
             helperServiceIdentifier: "com.eriklee.stornaut.lifecycle",
             machineDriver: machine
         )
-        configuration = try SignedInvestigationRuntimeDiagnosticConfiguration(
-            nonce: Self.uuid(0x21),
+        let configurationArguments = (
+            nonce: try Self.uuid(0x21),
             scenario: scenario,
+            diagnosticRootPath: root.path, sourceRootPath: source.path,
+            supportRootPath: support.path, runtimeRootPath: runtime.path,
+            reportPath: report.path, storePath: store.path, binding: binding,
+            validBefore: now.addingTimeInterval(
+                machineCohortWindow ?? configurationWindow
+            )
+        )
+        if machineCohortWindow != nil {
+            configuration = try SignedInvestigationRuntimeDiagnosticConfiguration
+                .machineCohort(
+            nonce: configurationArguments.nonce,
+            scenario: configurationArguments.scenario,
             optIn: SignedInvestigationRuntimeDiagnosticConfiguration.requiredOptIn,
-            diagnosticRootPath: root.path,
-            sourceRootPath: source.path,
-            supportRootPath: support.path,
-            runtimeRootPath: runtime.path,
-            reportPath: report.path,
-            storePath: store.path,
-            binding: binding,
+            diagnosticRootPath: configurationArguments.diagnosticRootPath,
+            sourceRootPath: configurationArguments.sourceRootPath,
+            supportRootPath: configurationArguments.supportRootPath,
+            runtimeRootPath: configurationArguments.runtimeRootPath,
+            reportPath: configurationArguments.reportPath,
+            storePath: configurationArguments.storePath,
+            binding: configurationArguments.binding,
+            expectedModel: .gpt56Luna, expectedProvider: .openAI,
+            validBefore: configurationArguments.validBefore,
+            maximumWallClockSeconds: 140, maximumTurns: 3,
+            maximumProbeCalls: 16, maximumContextBytes: 1_048_576, now: now
+          )
+        } else {
+          configuration = try SignedInvestigationRuntimeDiagnosticConfiguration(
+            nonce: configurationArguments.nonce,
+            scenario: configurationArguments.scenario,
+            optIn: SignedInvestigationRuntimeDiagnosticConfiguration.requiredOptIn,
+            diagnosticRootPath: configurationArguments.diagnosticRootPath,
+            sourceRootPath: configurationArguments.sourceRootPath,
+            supportRootPath: configurationArguments.supportRootPath,
+            runtimeRootPath: configurationArguments.runtimeRootPath,
+            reportPath: configurationArguments.reportPath,
+            storePath: configurationArguments.storePath,
+            binding: configurationArguments.binding,
             expectedModel: .gpt56Luna,
             expectedProvider: .openAI,
-            validBefore: now.addingTimeInterval(configurationWindow),
-            maximumWallClockSeconds: 120,
-            maximumTurns: 2,
-            maximumProbeCalls: 8,
-            maximumContextBytes: 262_144,
+            validBefore: configurationArguments.validBefore,
+            maximumWallClockSeconds: 140,
+            maximumTurns: 3,
+            maximumProbeCalls: 16,
+            maximumContextBytes: 1_048_576,
             now: now
         )
+        }
         configurationData = try configuration.canonicalJSONData()
         configurationSHA256 = .hashing(configurationData)
         bindingSHA256 = try InvestigationHandoffSHA256(
@@ -890,13 +1053,23 @@ private struct ConcreteHandoffFixture: Sendable {
 
     func acceptedProjection(
         configurationSHA256: String? = nil,
-        runtimeReceipt: InvestigationRuntimeReceiptV1? = nil
+        runtimeReceipt: InvestigationRuntimeReceiptV1? = nil,
+        epochStartedAt: Date? = nil,
+        observedAt: Date? = nil
     ) throws -> InvestigationHandoffAcceptedRuntimeProjection {
-        try InvestigationHandoffAcceptedRuntimeProjection(
+        let startedAt = epochStartedAt ?? now
+        return try InvestigationHandoffAcceptedRuntimeProjection(
             configuration: configuration,
             configurationSHA256: configurationSHA256
                 ?? self.configurationSHA256.lowercaseHex,
-            runtimeReceipt: runtimeReceipt ?? self.runtimeReceipt
+            runtimeReceipt: runtimeReceipt ?? self.runtimeReceipt,
+            epochValidBefore: min(
+                configuration.validBefore,
+                startedAt.addingTimeInterval(
+                    TimeInterval(configuration.maximumWallClockSeconds)
+                )
+            ),
+            observedAt: observedAt ?? now
         )
     }
 
@@ -1017,7 +1190,7 @@ private actor SuspendedConcreteRetirementFactory {
     }
 }
 
-private final class SequenceConcreteClock: @unchecked Sendable {
+final class SequenceConcreteClock: @unchecked Sendable {
     private let lock = NSLock()
     private var values: [Date]
 
@@ -1029,6 +1202,35 @@ private final class SequenceConcreteClock: @unchecked Sendable {
             return values.removeFirst()
         }
     }
+    fileprivate func nextNanoseconds(relativeTo fixture: ConcreteHandoffFixture) -> UInt64 {
+        fixture.bootstrap.epochDeadlineNanoseconds - 140_000_000_000 + UInt64(
+            next().timeIntervalSince(fixture.now) * 1_000_000_000)
+    }
+}
+
+final class SequenceConcreteContinuousClock: @unchecked Sendable {
+    private let lock = NSLock()
+    private var values: [UInt64?]
+
+    init(_ values: [UInt64?]) { self.values = values }
+
+    func next() throws -> UInt64 {
+        try lock.withLock {
+            guard !values.isEmpty, let value = values.removeFirst() else {
+                throw InvestigationHandoffConcreteAppLeafError.invalidState
+            }
+            return value
+        }
+    }
+}
+
+private func investigationHandoffTestContinuousNanoseconds() -> UInt64 {
+    var timebase = mach_timebase_info_data_t()
+    precondition(mach_timebase_info(&timebase) == KERN_SUCCESS)
+    let product = mach_continuous_time().multipliedFullWidth(
+        by: UInt64(timebase.numer)
+    )
+    return UInt64(timebase.denom).dividingFullWidth(product).quotient
 }
 
 private actor ConcreteFakeHandoffAdapter: InvestigationHandoffAppLeafAdapting {

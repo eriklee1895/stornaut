@@ -208,7 +208,10 @@
       }
       try currentSourceBinding.revalidateBeforeFirstConfiguration()
       let scenarios = SignedInvestigationRuntimeDiagnosticScenario.allCases
-      let validBefore = canonicalPlan.expiresAt
+      let validBefore = now.addingTimeInterval(
+        SignedInvestigationRuntimeDiagnosticConfiguration
+          .maximumMachineCohortValiditySeconds
+      )
       var rows: [InvestigationMachineCoordinatorConfigurationRow] = []
       do {
         for index in scenarios.indices {
@@ -227,7 +230,8 @@
           let plan = try derivedPlan(
             canonicalPlan, investigationID: generated.investigationIDs[index]
           )
-          let configuration = try SignedInvestigationRuntimeDiagnosticConfiguration(
+          let configuration = try SignedInvestigationRuntimeDiagnosticConfiguration
+            .machineCohort(
             nonce: nonce, scenario: scenarios[index],
             optIn: SignedInvestigationRuntimeDiagnosticConfiguration.requiredOptIn,
             diagnosticRootPath: paths.diagnosticRoot.path,
@@ -237,15 +241,19 @@
             reportPath: paths.reportURL.path, storePath: paths.storeURL.path,
             binding: currentSourceBinding.binding,
             expectedModel: .gpt56Luna, expectedProvider: .openAI,
-            validBefore: validBefore, maximumWallClockSeconds: 140,
+            validBefore: validBefore, maximumWallClockSeconds:
+              SignedInvestigationRuntimeDiagnosticConfiguration
+                .maximumMachineEpochWallClockSeconds,
             maximumTurns: 3, maximumProbeCalls: 16,
             maximumContextBytes: 1_048_576, now: now
           )
           let data = try configuration.canonicalJSONData()
           guard try SignedInvestigationRuntimeDiagnosticConfiguration
-            .decodeValidated(from: data, now: now) == configuration,
+            .decodeMachineCohortValidated(from: data, now: now) == configuration,
             configuration.validBefore == validBefore,
-            configuration.maximumWallClockSeconds == 140,
+            configuration.maximumWallClockSeconds
+              == SignedInvestigationRuntimeDiagnosticConfiguration
+                .maximumMachineEpochWallClockSeconds,
             plan.sourceFingerprint == currentSourceBinding.sourceFingerprint,
             plan.targetSetFingerprint == canonicalPlan.targetSetFingerprint
           else {

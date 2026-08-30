@@ -315,6 +315,13 @@ iic0bivb2_source_contract_only=false
 iic0bivb2_source_contract_sources=()
 iic0bivb2_staged_scope_contract_only=false
 iic0bivb2_staged_scope_baseline=dc38ba61eca8897e662547b6c5ffed7250623351
+shared_deadline_contract_only=false
+shared_deadline_contract_sources=()
+shared_deadline_mutation_contract_only=false
+shared_deadline_mutation_slot=
+shared_deadline_mutation_sha=
+shared_deadline_scope_contract_only=false
+shared_deadline_scope_baseline=66453397ae70c59347f02fff4e1a5528926c5141
 iib3a_staged_scope_contract_only=false
 iib3a_staged_scope_baseline=HEAD
 iib3b_start_retire_contract_only=false
@@ -805,6 +812,20 @@ if (( $# > 0 )); then
         && [[ $1 == --iic0b-iv-b2-staged-scope-contract-only ]]; then
         iic0bivb2_staged_scope_contract_only=true
         iic0bivb2_staged_scope_baseline=${2:-dc38ba61eca8897e662547b6c5ffed7250623351}
+    elif (( $# == 1 || $# == 13 )) \
+        && [[ $1 == --shared-deadline-repair-source-contract-only ]]; then
+        shared_deadline_contract_only=true
+        shared_deadline_contract_sources=("${@:2}")
+    elif (( $# == 15 )) \
+        && [[ $1 == --shared-deadline-repair-mutation-contract-only ]]; then
+        shared_deadline_mutation_contract_only=true
+        shared_deadline_mutation_slot=$2
+        shared_deadline_mutation_sha=$3
+        shared_deadline_contract_sources=("${@:4}")
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --shared-deadline-repair-scope-contract-only ]]; then
+        shared_deadline_scope_contract_only=true
+        shared_deadline_scope_baseline=${2:-66453397ae70c59347f02fff4e1a5528926c5141}
     elif (( $# == 1 || $# == 2 )) \
         && [[ $1 == --iib3a-staged-scope-contract-only ]]; then
         iib3a_staged_scope_contract_only=true
@@ -830,7 +851,7 @@ if (( $# > 0 )); then
         iib3c_staged_scope_baseline=${2:-HEAD}
     else
         print -u2 \
-            "Usage: scripts/verify-investigation-boundaries [... | --iic0b-ii-b-capsule-contract-only <package> <ownership> <capsule> <focused-test> <boundary-test> | --iic0b-ii-b-staged-scope-contract-only [baseline] | --iic0b-iii-2a-gate-contract-only <package> <transport> <launcher> <darwin-system> <entry> <launcher-tests> <physical-tests> <stub> <boundary-test> | --iic0b-iii-2a-staged-scope-contract-only [baseline] | --iic0b-iii-2a-completed-tree-contract-only | --iic0b-iv-b1-handoff-contract-only <fixture> <physical-test> <boundary-test> | --iic0b-iv-b1b-ii-staged-scope-contract-only [baseline]]"
+            "Usage: scripts/verify-investigation-boundaries [... | --shared-deadline-repair-source-contract-only [12 sources] | --shared-deadline-repair-mutation-contract-only slot sha 12-sources | --shared-deadline-repair-scope-contract-only [baseline]]"
         exit 64
     fi
 fi
@@ -1740,7 +1761,9 @@ function verify_iib5biii_b1_staged_scope() {
     [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" == 67306345f057398063aa20f6b9b2ae7f6175d9af ]] || { print -u2 "iii-b1 checkpoint baseline drifted"; return 1; }
     if git diff --cached --name-only --diff-filter=D "$baseline" | grep -q .; then print -u2 "iii-b1 checkpoint deleted an existing path"; return 1; fi
     if git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1 && ($1=="-" || $2=="-") {f=1} END {exit !f}'; then print -u2 "iii-b1 binary checkpoint path rejected"; return 1; fi
-    local observed=(${(f)"$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" | awk 'index($0,"docs/")!=1 && $0!="AGENTS.md" && $0!="README.md"')"})
+    local observed_text worktree_text totals
+    observed_text=$(git diff --cached --name-only --diff-filter=ACMRD "$baseline") || { print -u2 "shared-deadline checkpoint paths unreadable"; return 1; }
+    local observed=(${(f)"$(print -r -- "$observed_text" | awk 'index($0,"docs/")!=1 && $0!="AGENTS.md" && $0!="README.md"')"})
     [[ "${(j:\n:)${(@on)observed}}" == "${(j:\n:)${(@on)expected}}" ]] || { print -u2 "iii-b1 staged checkpoint paths drifted"; return 1; }
     local expected_path expected_mode observed_entry
     for expected_path in "${expected[@]}"; do
@@ -7833,7 +7856,7 @@ for marker in (
     "package func author(",
     "configurationData: [Data]",
     "installedBinding: InvestigationProjectedCohortInstalledBinding",
-    ".decodeValidated(from: bytes, now: now)",
+    ".decodeMachineCohortValidated(",
     "canonicalJSONData()",
     "machineConfigurationSHA256()",
     "capabilityEvidenceBindingSHA256()",
@@ -7914,7 +7937,7 @@ for forbidden in (
 ):
     if re.search(forbidden, author, re.I):
         fail("ii-c0b-i producer gained prohibited authority")
-if __import__("hashlib").sha256(author.encode()).hexdigest() != "33036861e4edbd52cd96f8de3acd4843550365105a55ce32d63ab39a25789ea5":
+if __import__("hashlib").sha256(author.encode()).hexdigest() != "d650ce1a72623415020b8874360f44c2de03e1e9cc604a8b13f0d13dbf7b5dbc":
     fail("ii-c0b-i producer source seal drifted")
 for marker in (
     "canonicalizesAdversarialScenarioOrderAndProjectsEveryField",
@@ -10081,7 +10104,7 @@ clock = 'InvestigationHandoffAppLeafAdapterSystem.system.continuousNanoseconds'
 if c.count(clock) != 1 or re.search(r'DispatchTime\s*\.\s*now', c): raise SystemExit('ii-c0b-iv production clock drifted')
 need(r, ['stornaut.task39.machine.gate-coordinator-receipt.v1', 'maximumByteCount = 4_096', 'receiptSHA256Bytes: Data(', 'try value.encoded() == data'], 'receipt')
 need(e, ['exit(await InvestigationMachineGateCoordinatorSupport.run())', 'exit(78)'], 'entry')
-test_seals = {ct: '765885297a4916f6ff301969ebc14d3a2d5feac44d819fbfc19760aa12863d00', rt: '1e17ce1532e17b19da21e780e24ee739025925ebb0bbc717ccfc05f25fae75ba', bt: '524a64edf43bd8a2680e3854ff99e86c05fcef3920fb49480ca16fbce08fa5c2'}
+test_seals = {rt: '1e17ce1532e17b19da21e780e24ee739025925ebb0bbc717ccfc05f25fae75ba', bt: '524a64edf43bd8a2680e3854ff99e86c05fcef3920fb49480ca16fbce08fa5c2'}
 for text, expected_sha in test_seals.items():
     if hashlib.sha256(text.encode()).hexdigest() != expected_sha: raise SystemExit('ii-c0b-iv critical test source seal drifted')
 need(ct, ['@Test(arguments: InvestigationMachineGateCoordinatorOwnedAttempt.RootBootstrapStage.allCases)', '@Test(arguments: CoordinatorClockFault.allCases)', 'func preHandoffFailureStopsLaunchRetiresAndClosesWithoutReceipt(', 'func postSettlementFailureStillRetiresAttempt()', 'func writeCloseUncertaintyDominatesEarlierFailure()'], 'composition test matrix')
@@ -10112,6 +10135,198 @@ function verify_iic0bivb2_staged_scope() {
     (( ${#untracked_paths} == 0 )) || { print -u2 'ii-c0b-iv-b2 checkpoint untracked paths drifted'; return 1 }
     local item mode entry
     for item in "${expected[@]}"; do mode=100644; [[ $item == scripts/* ]] && mode=100755; entry=$(git ls-files -s -- "$item"); [[ "$(print -r -- "$entry" | awk '{print $1, $3, $4}')" == "$mode 0 $item" && "$(print -r -- "$entry" | awk '{print $2}')" == "$(git hash-object -- "$item")" ]] || { print -u2 "ii-c0b-iv-b2 staged source/mode drifted: $item"; return 1; }; done
+}
+
+function verify_shared_deadline_contract() {
+    local -a p=("${shared_deadline_contract_sources[@]}")
+    if (( ${#p} == 0 )); then p=(
+        Sources/StornautInvestigation/SignedInvestigationRuntimeContract.swift
+        Sources/StornautInvestigationDiagnostic/InvestigationProjectedCohortAuthor.swift
+        Sources/StornautInvestigationDiagnostic/InvestigationRuntimeDiagnosticComposition.swift
+        Sources/StornautInvestigationMachine/InvestigationFixedScenarioRunner.swift
+        Sources/StornautInvestigationMachine/SignedInvestigationRuntimeMachineContract.swift
+        Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineCoordinatorConfigurationSet.swift
+        Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift
+        Tests/StornautInvestigationTests/SignedRuntimeContractTests.swift
+        Tests/StornautInvestigationTests/InvestigationHandoffConcreteCompositionTests.swift
+        Tests/StornautInvestigationTests/InvestigationLifecycleTopologyTestSupport.swift
+        Tests/StornautInvestigationTests/InvestigationMachineCoordinatorBindingSourceTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineGateCoordinatorCompositionTests.swift
+    ); fi
+    python3 - "$shared_deadline_mutation_contract_only" \
+        "$shared_deadline_mutation_slot" "$shared_deadline_mutation_sha" \
+        "${p[@]}" <<'PY'
+from pathlib import Path
+import re, sys
+if len(sys.argv) != 16: raise SystemExit("shared-deadline source cardinality drifted")
+mutation_mode, mutation_slot, mutation_sha = sys.argv[1:4]
+slot_names = ("contract","author","composition","runner","machine","configuration","coordinator","ct","dt","lt","st","gt")
+raw_sources = tuple(Path(x).read_text() for x in sys.argv[4:])
+import hashlib
+expected = (
+    "119b1884498eccb8b29aff86f1e6c05698ee517638c2f01fbf99730781468141",
+    "d650ce1a72623415020b8874360f44c2de03e1e9cc604a8b13f0d13dbf7b5dbc",
+    "7bcb90d8adbc1eb22d43ef1ab76d9519f60805a976b1b58d421b4e9079189e1f",
+    "1f088b8987d521f9700cfe8e01e9c205394fa9b9a188a879c661329cde4f7140",
+    "c5fdd0bf621018bf88c0c68be4d95ca1a8883fc69fcf1c3cdfa31886eaefb977",
+    "f1a760d3ca6042c5c090a9542b05fa235b3fce21265b3cd253ee1c359c14067e",
+    "746fc4b1900103fde66786ad699e4f868e46b1eefc712c0c3135cbef239f37bf",
+    "3018ac3bbdee76138dda2ba046ee7ab6b52a6f07b3b377a98871643ce56f933b",
+    "71b5d5c36207b441592e5fa89c2115b2996bac4e8f828d6afd88da62a1039b7f",
+    "688848926de2cdbc276ea1e1c662da7cddaee9a8ba7e28108031b04490cb5e54",
+    "7afaf9dd177c8c3508a029839bdd1eeab4689a1debe7f298d993ca54305f6493",
+    "dcdb198be26abff6965cfd45d73ba60b85454314f6dddae796409a8413567e45",
+)
+if mutation_mode == "true":
+    if mutation_slot not in slot_names:
+        raise SystemExit("shared-deadline mutation slot drifted")
+    if re.fullmatch(r"[0-9a-f]{64}", mutation_sha) is None:
+        raise SystemExit("shared-deadline mutation SHA drifted")
+    mutation_index = slot_names.index(mutation_slot)
+    if mutation_sha == expected[mutation_index]:
+        raise SystemExit("shared-deadline mutation source unchanged")
+    expected = expected[:mutation_index] + (mutation_sha,) + expected[mutation_index + 1:]
+elif mutation_mode != "false" or mutation_slot or mutation_sha:
+    raise SystemExit("shared-deadline mutation mode drifted")
+if tuple(hashlib.sha256(x.encode()).hexdigest() for x in raw_sources) != expected:
+    raise SystemExit("shared-deadline mutation digest drifted" if mutation_mode == "true" else "shared-deadline sealed source drifted")
+if mutation_mode == "true":
+    import subprocess
+    parsed = subprocess.run(
+        ["xcrun", "swiftc", "-frontend", "-dump-parse",
+         "-enable-bare-slash-regex", sys.argv[4 + mutation_index]],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False
+    )
+    if parsed.returncode != 0: raise SystemExit("shared-deadline Swift parse drifted")
+    if "regex_literal_expr" in parsed.stdout:
+        raise SystemExit("shared-deadline regex literal rejected")
+def code_only(source):
+    output=list(source); index=0; block_depth=0; string_end=None; raw_hashes=""
+    while index < len(source):
+        if block_depth:
+            if source.startswith("/*", index): output[index:index+2]="  "; block_depth+=1; index+=2
+            elif source.startswith("*/", index): output[index:index+2]="  "; block_depth-=1; index+=2
+            else:
+                if source[index] != "\n": output[index]=" "
+                index+=1
+            continue
+        if string_end is not None:
+            if source.startswith(string_end, index):
+                width=len(string_end); output[index:index+width]=" "*width; index+=width; string_end=None; raw_hashes=""
+            elif not raw_hashes and source[index] == "\\":
+                output[index]=" "
+                if index+1 < len(source) and source[index+1] != "\n": output[index+1]=" "
+                index+=2
+            else:
+                if source[index] != "\n": output[index]=" "
+                index+=1
+            continue
+        if source.startswith("//", index):
+            end=source.find("\n", index); end=len(source) if end < 0 else end
+            output[index:end]=" "*(end-index); index=end
+        elif source.startswith("/*", index): output[index:index+2]="  "; block_depth=1; index+=2
+        else:
+            opener=re.match(r'(#+)?("""|")', source[index:])
+            if opener is None: index+=1; continue
+            hashes=opener.group(1) or ""; quote=opener.group(2); width=len(opener.group(0))
+            output[index:index+width]=" "*width; string_end=quote+hashes; raw_hashes=hashes; index+=width
+    if block_depth or string_end is not None: raise SystemExit("shared-deadline Swift lexical scan drifted")
+    return "".join(output)
+c, a, d, r, m, s, g, ct, dt, lt, st, gt = tuple(code_only(x) for x in raw_sources)
+def compact(x): return re.sub(r"\s+", "", x)
+def exact(x, marker, count, label):
+    projected=compact(code_only(marker))
+    if not projected or compact(x).count(projected) != count: raise SystemExit(label)
+def body(source, name):
+    match = re.search(rf"(?m)^\s*(?:private\s+|fileprivate\s+|package\s+|public\s+)?func\s+{re.escape(name)}\b", source)
+    if not match: raise SystemExit(f"shared-deadline focused test missing: {name}")
+    opening = source.find("{", match.end()); depth = 0
+    for index in range(opening, len(source)):
+        depth += source[index] == "{"; depth -= source[index] == "}"
+        if depth == 0: return source[opening + 1:index]
+    raise SystemExit(f"shared-deadline focused test unterminated: {name}")
+def test(source, name, *markers):
+    value = body(source, name)
+    for marker in markers: exact(value, marker, 1, "shared-deadline focused tests became vacuous")
+exact(c, "package static let maximumMachineCohortValiditySeconds: TimeInterval = 1_200", 1, "shared-deadline 1200 constant drifted")
+exact(c, "package static let maximumMachineEpochWallClockSeconds = 140", 1, "shared-deadline 140 constant drifted")
+exact(c, "validBefore.timeIntervalSince(now) <= 900", 1, "generic 900-second validity drifted")
+for marker in ("maximumWallClockSeconds == Self.maximumMachineEpochWallClockSeconds", "maximumTurns == 3", "maximumProbeCalls == 16", "maximumContextBytes == 1_048_576"):
+    exact(c, marker, 1, "machine-only exact profile drifted")
+exact(c, "try decoded.validateMachineCohort(now: now, outputs: outputs)", 1, "machine-only decoder drifted")
+exact(c, "CompletedSignedInvestigationRuntimeConfiguration.self", 1, "completed-output machine decoder drifted")
+exact(a, "configuration = try .decodeMachineCohortValidated(from: bytes, now: now)", 1, "machine-only author decoder drifted")
+exact(a, "byOrdinal.values.allSatisfy({ $0.0.validBefore == validBefore })", 1, "mixed cohort deadline rejection drifted")
+exact(d, ".decodeMachineCohortValidated(from: bytes, now: observedAt)", 1, "machine-only App decoder drifted")
+operations = d[d.index("package actor InvestigationHandoffConcreteAppLeafOperations"):d.index("package enum InvestigationHandoffScenarioMapping")]
+if "epochStartedAt:Date?" in compact(operations): raise SystemExit("App epoch deadline became caller-controlled")
+clock = d[d.index("private func investigationMonotonicWallClock"):d.index("package struct InvestigationRuntimeDiagnosticBindingObservation")]
+for marker in ("let wallAnchor = wall(), anchor = try continuous()", "deadline ?? anchor.addingReportingOverflow(maximum).partialValue", "let remaining = limit.subtractingReportingOverflow(anchor)", "let tick = try? continuous(), tick >= anchor", "return projected.timeIntervalSince1970.isFinite ? projected : validBefore", "else { return validBefore }"):
+    exact(clock, marker, 1, "shared App monotonic clock drifted")
+if compact(clock).count("wall()") != 1: raise SystemExit("shared App wall anchor drifted")
+exact(operations, "deadline: peer.bootstrap.epochDeadlineNanoseconds", 1, "inherited App epoch derivation drifted")
+production = d[d.index("public final class InvestigationRuntimeDiagnosticComposition"):d.index("private func investigationMonotonicWallClock")]
+for marker, count in (("continuousNow:", 1), ("deadline: nil", 1), ("configuration.validBefore, clock.validBefore", 1), ("helperBundleURL: installation.helperExecutableURL, now: clock.now", 1), ("now: clock.now", 2)):
+    exact(production, marker, count, "production App monotonic projection drifted")
+exact(d, "validBefore: projection.epochValidBefore", 1, "inherited App retirement deadline drifted")
+exact(d, "validBefore: epochValidBefore", 1, "production App session deadline drifted")
+exact(d, "lifecycleValidBefore: epochValidBefore", 1, "public composition deadline projection drifted")
+exact(r, "let machineConfigurationValid = (try? configuration.validateMachineCohort(now: now)) != nil || (try? configuration.validateMachineCohort(now: now, outputs: .ownerRegularFile)) != nil", 1, "machine runner validation drifted")
+if compact(r).count("machineConfigurationValid") != 2: raise SystemExit("machine runner validation drifted")
+if "validateMachineCohortWindow" in r: raise SystemExit("machine runner widened validation to window-only")
+exact(m, "try configuration.validateMachineCohort(now: now, outputs: .ownerRegularFile)", 1, "machine final profile validation drifted")
+exact(m, "try $0.validateMachineCohort(now: nil, outputs: .ownerRegularFile)", 1, "machine bundle profile drifted")
+exact(m, "completedAt.timeIntervalSince(startedAt) <= Double(configuration.maximumWallClockSeconds)", 1, "machine final duration validation drifted")
+exact(m, r"Set(configurations.map(\.validBefore)).count == 1", 1, "machine final shared deadline drifted")
+for marker in ("plan.expiresAt == now.addingTimeInterval(600)", ".machineCohort(", "maximumTurns: 3", "maximumProbeCalls: 16", "maximumContextBytes: 1_048_576", "Set(rows.map { $0.configuration.validBefore }).count == 1"):
+    exact(s, marker, 1, "machine configuration authoring drifted")
+exact(s, "let validBefore = now.addingTimeInterval(SignedInvestigationRuntimeDiagnosticConfiguration.maximumMachineCohortValiditySeconds)", 1, "machine cohort deadline ownership drifted")
+exact(s, "decodeMachineCohortValidated(from: data, now: now) == configuration", 1, "machine configuration decoder drifted")
+exact(g, "package static let finalOutputReserveSeconds: TimeInterval = 5", 1, "shared-deadline reserve drifted")
+exact(g, "TimeInterval(InvestigationCohortCapsule.epochCount * SignedInvestigationRuntimeDiagnosticConfiguration.maximumMachineEpochWallClockSeconds) + finalOutputReserveSeconds", 1, "1125-second admission calculation drifted")
+exact(g, "configurationValidBefore = try InvestigationHandoffUTCMicroseconds(timeIntervalSince1970: firstValidBefore.timeIntervalSince1970)", 1, "canonical deadline floor drifted")
+exact(g, "let observedMicroseconds = Int64(scaledNow.rounded(.up))", 1, "conservative observed-time rounding drifted")
+if "InvestigationHandoffUTCMicroseconds(timeIntervalSince1970:now.timeIntervalSince1970)" in compact(g): raise SystemExit("observed time regained floor quantization")
+order = [compact(g).find(x) for x in ("letauthored=tryawaitdependencies.authorCohort(batch)", "InvestigationMachineGateCoordinatorHandoffAdmission.validate(authored,now:dependencies.wallNow())", "handoffStarted=true", "handoff=tryawaitdependencies.handoff(authored)")]
+if min(order) < 0 or order != sorted(order): raise SystemExit("pre-handoff deadline admission drifted")
+test(ct, "diagnosticCompositionPreparesOpaqueProductionChain", "composition.lifecycleValidBefore == fixture.now.addingTimeInterval(140)")
+test(ct, "diagnosticCompositionUsesLiveRuntimeClock", "anchor + 141_000_000_000", "continuousNow: { try continuous.next() }")
+test(ct, "diagnosticCompositionUsesEarlierConfigurationDeadline", "validBefore: fixture.now.addingTimeInterval(100)", "composition.lifecycleValidBefore == configuration.validBefore")
+test(ct, "strictConfigurationRoundTripsAndRejectsUnknownFields", "addingTimeInterval(901)", "decodeValidated(from: overbroadData, now: fixture.now)")
+test(ct, "machineCohortValidityIsExactAndDoesNotWidenGeneralDecoding", "machineCohortWindow: 1_200.001", "fixture.materializeOutputs()", "outputs: .ownerRegularFile", 'overlong["maximumWallClockSeconds"] = 139')
+test(ct, "fixedRunnerAcceptsThePresealedMachineCohortWindow", 'object["maximumTurns"] = 2', "InvestigationFixedScenarioRunnerError.invalidInput")
+test(ct, "machineAssemblerAcceptsPresealedCohortValidity", "machineCohortWindow: 1_200", "evidenceContractValidatedMachineAdmissionPending")
+test(ct, "machineAssemblerRejectsExpiredOrFutureCaseEvidence", "completedAt: fixture.now.addingTimeInterval(141)", "artifacts: overlongArtifacts")
+test(ct, "machineAssemblerRejectsMixedBuildOrPlanEvidence", "validBefore: fixture.now.addingTimeInterval(299)", "artifacts: mixedDeadlineArtifacts")
+test(ct, "machineLifecycleObservationCannotBeDecodedAsTrustedEvidence", "encodedConfigurations[0]", "from: JSONSerialization.data(withJSONObject: wrongProfile)")
+test(dt, "acknowledgementAcceptsPresealedMachineCohortValidity", "machineCohortWindow: 1_200", "acknowledgement.configurationSHA256 == .hashing(fixture.configurationData)")
+test(dt, "noAuthRetirementClampsTheSessionToTheEpochWallClockWindow", "[(1_200.0, 140.0), (100.0, 100.0)]", "#require(requests.first?.validBefore) == fixture.now.addingTimeInterval(expected)")
+test(dt, "appLeafHandshakeCannotExtendTheCapturedEpochDeadline", "validBefore: fixture.now.addingTimeInterval(-80)", "continuousAnchor + 41_000_000_000", "deadline == fixture.now.addingTimeInterval(40)")
+test(dt, "appLeafMonotonicFailureOrRegressionExpiresTheEpoch", "throwsOnRead ? nil : anchor - 1", "operations.acknowledgeConfiguration", "operations.preDropClaim")
+for marker in (".machineCohort(", "validBefore: now.addingTimeInterval(1_200)", "maximumWallClockSeconds: 140", "maximumTurns: 3", "maximumProbeCalls: 16", "maximumContextBytes: 1_048_576"): exact(lt, marker, 1, "machine topology fixture profile drifted")
+test(st, "configurationSetEagerlyBuildsEightRowsWithSharedCohortDeadline", "expectedCohortDeadline = fixture.now.addingTimeInterval(1_200)", "row.plan.expiresAt == fixture.now.addingTimeInterval(600)", "Set(rows.map { $0.configuration.validBefore }).count == 1")
+test(gt, "productionSourceRequiresCompleteCampaignWindowBeforeHandoff", "minimumHandoffRemainingSeconds == 1_125", "cohort, now: Date(timeIntervalSince1970: 10_000.0000006)", "late.handoffCallCount == 0", "configurationValidBeforeRawValues")
+PY
+}
+
+function verify_shared_deadline_scope() {
+    local baseline=${1:-66453397ae70c59347f02fff4e1a5528926c5141}
+    local expected_baseline=66453397ae70c59347f02fff4e1a5528926c5141
+    local -a expected=(Sources/StornautInvestigation/SignedInvestigationRuntimeContract.swift Sources/StornautInvestigationDiagnostic/InvestigationProjectedCohortAuthor.swift Sources/StornautInvestigationDiagnostic/InvestigationRuntimeDiagnosticComposition.swift Sources/StornautInvestigationMachine/InvestigationFixedScenarioRunner.swift Sources/StornautInvestigationMachine/SignedInvestigationRuntimeMachineContract.swift Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineCoordinatorConfigurationSet.swift Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift Tests/StornautInvestigationTests/InvestigationLifecycleTopologyTestSupport.swift Tests/StornautInvestigationTests/InvestigationMachineCoordinatorBindingSourceTests.swift Tests/StornautInvestigationTests/SignedRuntimeContractTests.swift Tests/StornautInvestigationTests/InvestigationHandoffConcreteCompositionTests.swift Tests/StornautInvestigationTests/InvestigationMachineGateCoordinatorCompositionTests.swift scripts/verify-investigation-boundaries scripts/verify-contract)
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" == $expected_baseline ]] || { print -u2 "shared-deadline checkpoint baseline drifted"; return 1; }
+    local observed_text observed_filtered worktree_text totals
+    observed_text=$(git diff --cached --name-only --diff-filter=ACMRD "$baseline") || { print -u2 "shared-deadline checkpoint paths unreadable"; return 1; }
+    observed_filtered=$(print -r -- "$observed_text" | awk 'index($0,"docs/")!=1 && $0!="AGENTS.md" && $0!="README.md"') || { print -u2 "shared-deadline checkpoint paths unreadable"; return 1; }
+    local observed=(${(f)observed_filtered})
+    (( ${#expected} == 14 )) && [[ "${(j:\n:)${(@on)observed}}" == "${(j:\n:)${(@on)expected}}" ]] || { print -u2 "shared-deadline checkpoint paths drifted"; return 1; }
+    worktree_text=$( { git diff --name-only --diff-filter=ACMRD -- && git ls-files --others --exclude-standard --; } | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"' | LC_ALL=C sort -u) || { print -u2 "shared-deadline checkpoint worktree paths unreadable"; return 1; }
+    local worktree=(${(f)worktree_text})
+    local item; for item in "${worktree[@]}"; do (( ${expected[(Ie)$item]} )) || { print -u2 "shared-deadline checkpoint worktree paths drifted"; return 1; }; done
+    totals=$(git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1&&$3!="AGENTS.md"&&$3!="README.md" {if($1=="-"||$2=="-"){bad=1;next};n=$1+$2;t+=n;if($3~/^Sources\//)p+=n;else if($3~/^Tests\//)q+=n;else if($3~/^scripts\//)v+=n;else bad=1} END{if(bad)exit 2;print t+0,p+0,q+0,v+0}') || { print -u2 "shared-deadline checkpoint binary or category drifted"; return 1; }
+    local total production tests verifiers; read total production tests verifiers <<<"$totals"
+    (( total <= 1600 && production <= 350 && tests <= 750 && verifiers <= 500 )) || { print -u2 "shared-deadline checkpoint budget drifted"; return 1; }
+    local mode entry
+    for item in "${expected[@]}"; do mode=100644; [[ $item == scripts/* ]] && mode=100755; entry=$(git ls-files -s -- "$item"); [[ "$(print -r -- "$entry" | awk '{print $1, $3, $4}')" == "$mode 0 $item" && "$(print -r -- "$entry" | awk '{print $2}')" == "$(git hash-object -- "$item")" ]] || { print -u2 "shared-deadline staged source/mode drifted: $item"; return 1; }; done
 }
 
 function verify_iib4_staged_scope() {
@@ -13717,6 +13932,18 @@ if $iic0bivb2_staged_scope_contract_only; then
     verify_iic0bivb2_staged_scope "$iic0bivb2_staged_scope_baseline"
     print "ii-c0b-iv-b2 staged scope verification passed."; exit 0
 fi
+if $shared_deadline_contract_only; then
+    verify_shared_deadline_contract
+    print "Shared-deadline repair source contract verification passed."; exit 0
+fi
+if $shared_deadline_mutation_contract_only; then
+    verify_shared_deadline_contract
+    print "Shared-deadline repair mutation source contract verification passed."; exit 0
+fi
+if $shared_deadline_scope_contract_only; then
+    verify_shared_deadline_scope "$shared_deadline_scope_baseline"
+    print "Shared-deadline repair staged scope verification passed."; exit 0
+fi
 if $iib3a_staged_scope_contract_only; then
     verify_iib3a_staged_scope "$iib3a_staged_scope_baseline"
     print "ii-b3a staged scope verification passed."
@@ -13892,6 +14119,7 @@ verify_iic0bi_producer_contract \
     "$diagnostic_root/InvestigationRuntimeDiagnosticComposition.swift" \
     "$iic0bi_focused_test" \
     Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+verify_shared_deadline_contract
 verify_iic0biii2a_gate_contract \
     Package.swift "$machine_gate_transport" "$machine_gate_launcher" \
     "$machine_gate_darwin" "$machine_gate_main" \
@@ -15581,7 +15809,7 @@ machine_readiness_baseline = {
         (1354, ") throws -> SignedInvestigationRuntimeMachineReport"),
         (1373, "_ report: SignedInvestigationRuntimeMachineReport,"),
         (1386, ") throws -> SignedInvestigationRuntimeMachineReport"),
-        (1721, "package extension SignedInvestigationCapabilityEvidenceReceipt {"),
+        (1725, "package extension SignedInvestigationCapabilityEvidenceReceipt {"),
     ],
 }
 for source_name in machine_sources:
@@ -16679,7 +16907,7 @@ required_diagnostic_composition = {
     "public static func prepare(",
     "public func retirePreparedComposition() async",
     "runtimeNow: Date.init",
-    "now: runtimeNow",
+    "now: clock.now",
     "InvestigationRuntimeDiagnosticFacade(",
     "InvestigationCodexSessionAdapter(",
     "CodexInteractiveAppServerClient(",

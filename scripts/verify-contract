@@ -3,7 +3,7 @@
 set -euo pipefail
 
 contract_source=${0:A}
-ib2_self_sha=3c3ddc5b67f62f0f830c6b1ee40f5064c99d5578483b9c9f88589ecab9110853
+ib2_self_sha=1390552a2e6726128d4fc99201ded47943098a8b1d8f22447a45d7f98bb474a6
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' "$contract_source" | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
 repo_root=${contract_source:h:h}
@@ -2023,6 +2023,19 @@ PY
 
 function verify_iic0bivb2_contract() {
     local out=$1 run_component=${2:-true} gate=scripts/verify-investigation-boundaries
+    local accepted=8452f9c466574e550ac8bc8540287b76d444e07e
+    local accepted_tree=eb85858c683282feccc1c76c0e08bde1db937b86
+    if [[ "$(git rev-parse HEAD)" != $accepted ]]; then
+        local historical_status=0
+        replay_historical_contract "$out/immutable-iv-b2" \
+            "$accepted" "$accepted_tree" \
+            --iic0b-iv-b2-composition-contract-only \
+            '--iic0b-iv-b2-staged-scope-contract-only' \
+            || historical_status=$?
+        (( historical_status == 0 )) \
+            || fail_contract 'ii-c0b-iv-b2 historical replay failed'
+        return 0
+    fi
     mkdir -p "$out"; local replay_status=0
     replay_historical_contract "$out/c0b-i-immutable" 2493e0f28e0c8d406b4efcdbf17713bde3633449 8155d64c4966fb83c332f7d195a92095e0af2ba9 --iic0b-i-accepted || replay_status=$?
     (( replay_status == 0 )) || fail_contract 'ii-c0b-i immutable historical replay failed'
@@ -2036,7 +2049,7 @@ function verify_iic0bivb2_contract() {
 function verify_iic0bivb2_subordinate_source_seals() {
     local investigation=${STORNAUT_IIC0BIVB2_INVESTIGATION_BOUNDARY_SOURCE:-scripts/verify-investigation-boundaries}
     local release=${STORNAUT_IIC0BIVB2_APP_RELEASE_BOUNDARY_SOURCE:-scripts/verify-app-release-boundaries}
-    [[ "$(shasum -a 256 "$investigation" | awk '{print $1}')" == 8447227d21d2fc88338cd9bfd0b36a8ecfa5310f23d484ee59d7442f496186be ]] || fail_contract 'Machine driver verifier source seal drifted: scripts/verify-investigation-boundaries'
+    [[ "$(shasum -a 256 "$investigation" | awk '{print $1}')" == 2dcfce7f190e8b2985688175525908b297775658c6a528ae91a58754764a8166 ]] || fail_contract 'Machine driver verifier source seal drifted: scripts/verify-investigation-boundaries'
     [[ "$(shasum -a 256 "$release" | awk '{print $1}')" == b51cfb2114a41205bb07b9b66bdd52e4e86d755316a44faafec62278f02eefee ]] || fail_contract 'Machine driver verifier source seal drifted: scripts/verify-app-release-boundaries'
 }
 
@@ -2089,6 +2102,147 @@ SH
     reject subordinate-seal-release 'Machine driver verifier source seal drifted: scripts/verify-app-release-boundaries' env STORNAUT_IIC0BIVB2_APP_RELEASE_BOUNDARY_SOURCE="$out/release-seal" "$contract_source" --iic0b-iv-b2-composition-contract-only
     sed 's/composition contract verification passed/composition contract verification failed/' "$contract_source" >"$out/self-seal"; chmod 755 "$out/self-seal"
     reject self-seal 'Machine claim verifier self-seal drifted' "$out/self-seal" --iic0b-iv-b2-composition-contract-only
+}
+
+function verify_shared_deadline_repair_contract() {
+    local out=$1 gate=scripts/verify-investigation-boundaries
+    mkdir -p "$out"
+    "$gate" --shared-deadline-repair-source-contract-only >"$out/source.log"
+    local contract=Sources/StornautInvestigation/SignedInvestigationRuntimeContract.swift
+    local author=Sources/StornautInvestigationDiagnostic/InvestigationProjectedCohortAuthor.swift
+    local composition=Sources/StornautInvestigationDiagnostic/InvestigationRuntimeDiagnosticComposition.swift
+    local runner=Sources/StornautInvestigationMachine/InvestigationFixedScenarioRunner.swift
+    local machine=Sources/StornautInvestigationMachine/SignedInvestigationRuntimeMachineContract.swift
+    local configuration=Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineCoordinatorConfigurationSet.swift
+    local coordinator=Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift
+    local tests=(Tests/StornautInvestigationTests/SignedRuntimeContractTests.swift Tests/StornautInvestigationTests/InvestigationHandoffConcreteCompositionTests.swift Tests/StornautInvestigationTests/InvestigationLifecycleTopologyTestSupport.swift Tests/StornautInvestigationTests/InvestigationMachineCoordinatorBindingSourceTests.swift Tests/StornautInvestigationTests/InvestigationMachineGateCoordinatorCompositionTests.swift)
+    python3 - "$out" "$contract" "$author" "$composition" "$runner" "$machine" "$configuration" "$coordinator" "${tests[@]}" <<'PY'
+from pathlib import Path
+import sys
+root = Path(sys.argv[1]); keys=("contract","author","composition","runner","machine","configuration","coordinator","ct","dt","lt","st","gt"); sources={k:Path(p).read_text() for k,p in zip(keys,sys.argv[2:])}
+mutations = (
+ ("generic-decode","author","decodeMachineCohortValidated","decodeValidated"),
+ ("machine-window","contract","maximumMachineCohortValiditySeconds: TimeInterval = 1_200","maximumMachineCohortValiditySeconds: TimeInterval = 900"),
+ ("epoch-window","contract","maximumMachineEpochWallClockSeconds = 140","maximumMachineEpochWallClockSeconds = 139"),
+ ("profile-turns","contract","maximumTurns == 3","maximumTurns <= 3"),
+ ("profile-probes","contract","maximumProbeCalls == 16","maximumProbeCalls <= 16"),
+ ("profile-context","contract","maximumContextBytes == 1_048_576","maximumContextBytes <= 1_048_576"),
+ ("completed-output-decode","contract","CompletedSignedInvestigationRuntimeConfiguration.self","Self.self"),
+ ("mixed-deadline","author","byOrdinal.values.allSatisfy({ $0.0.validBefore == validBefore })","true"),
+ ("bootstrap-clock","composition","limit.subtractingReportingOverflow(anchor)","limit.subtractingReportingOverflow(0)"),
+ ("bootstrap-order","composition","let wallAnchor = wall(), anchor = try continuous()","let wallAnchor = wall(), anchor = UInt64(0)"),
+ ("monotonic-floor","composition","? projected : validBefore","? wallAnchor : validBefore"),
+ ("inherited-clamp","composition","validBefore: projection.epochValidBefore","validBefore: configuration.validBefore"),
+ ("production-clamp","composition","validBefore: epochValidBefore","validBefore: configuration.validBefore"),
+ ("public-projection","composition","lifecycleValidBefore: epochValidBefore","lifecycleValidBefore: configuration.validBefore"),
+ ("reserve","coordinator","finalOutputReserveSeconds: TimeInterval = 5","finalOutputReserveSeconds: TimeInterval = 4"),
+ ("observed-floor","coordinator","scaledNow.rounded(.up)","scaledNow.rounded(.down)"),
+ ("admission","coordinator","try InvestigationMachineGateCoordinatorHandoffAdmission.validate(","try bypassedHandoffAdmission("),
+ ("runner-window-only","runner","validateMachineCohort(now: now)) != nil","validateMachineCohortWindow(now: now)) != nil"),
+ ("machine-shared-deadline","machine",r"Set(configurations.map(\.validBefore)).count == 1","true"),
+ ("machine-bundle-profile","machine","try $0.validateMachineCohort(now: nil, outputs: .ownerRegularFile)","try $0.validate(now: nil, outputs: .ownerRegularFile)"),
+)
+for name, kind, old, new in mutations:
+    text = sources[kind]
+    if text.count(old) != 1: raise SystemExit(f"cannot construct shared-deadline mutation: {name}")
+    (root / f"{name}.swift").write_text(text.replace(old, new, 1))
+test_cases=(("ct","diagnosticCompositionPreparesOpaqueProductionChain"),("ct","diagnosticCompositionUsesLiveRuntimeClock"),("ct","diagnosticCompositionUsesEarlierConfigurationDeadline"),("ct","strictConfigurationRoundTripsAndRejectsUnknownFields"),("ct","machineCohortValidityIsExactAndDoesNotWidenGeneralDecoding"),("ct","fixedRunnerAcceptsThePresealedMachineCohortWindow"),("ct","machineAssemblerAcceptsPresealedCohortValidity"),("ct","machineAssemblerRejectsExpiredOrFutureCaseEvidence"),("ct","machineAssemblerRejectsMixedBuildOrPlanEvidence"),("ct","machineLifecycleObservationCannotBeDecodedAsTrustedEvidence"),("dt","acknowledgementAcceptsPresealedMachineCohortValidity"),("dt","noAuthRetirementClampsTheSessionToTheEpochWallClockWindow"),("dt","appLeafHandshakeCannotExtendTheCapturedEpochDeadline"),("dt","appLeafMonotonicFailureOrRegressionExpiresTheEpoch"),("st","configurationSetEagerlyBuildsEightRowsWithSharedCohortDeadline"),("gt","productionSourceRequiresCompleteCampaignWindowBeforeHandoff"))
+for number,(kind,name) in enumerate(test_cases):
+    text=sources[kind]; start=text.index("func "+name); opening=text.index("{",start); depth=1; end=opening+1
+    while depth: depth += (text[end]=="{")-(text[end]=="}"); end += 1
+    (root/f"test-{number}.swift").write_text(text[:opening+1]+"\n        #expect(true)\n"+text[end-1:])
+(root/"test-mutations").write_text("".join(f"test-{n}\t{k}\n" for n,(k,_) in enumerate(test_cases)))
+(root/"seal-only-author.swift").write_text(sources["author"] + "\n")
+(root/"regex-author.swift").write_text(sources["author"] + '\nlet spoof = /decodeMachineCohortValidated/\n')
+(root/"raw-regex-author.swift").write_text(sources["author"] + '\nlet spoof = #/decodeMachineCohortValidated/#\n')
+PY
+    function check_shared_deadline_gate() {
+        local label expected log rc
+        label=$1; expected=$2; shift 2; log="$out/$label.log"; rc=0
+        "$@" >"$log" 2>&1 || rc=$?
+        (( rc != 0 )) || fail_contract "shared-deadline negative control accepted: $label"
+        [[ "$(<"$log")" == "$expected" ]] \
+            || fail_contract "shared-deadline negative diagnostic drifted: $label"
+    }
+    function reject_shared_deadline() {
+        local name kind expected target target_sha position
+        local -a args names
+        name=$1; kind=$2; expected=$3; target="$out/$name.swift"
+        args=("$contract" "$author" "$composition" "$runner" "$machine" "$configuration" "$coordinator" "${tests[@]}")
+        names=(contract author composition runner machine configuration coordinator ct dt lt st gt)
+        (( ${#names} == ${#args} )) \
+            || fail_contract 'shared-deadline mutation source cardinality drifted'
+        position=${names[(Ie)$kind]}
+        (( position >= 1 && position <= ${#args} )) \
+            || fail_contract "shared-deadline mutation source kind drifted: $kind"
+        args[$position]=$target
+        target_sha=$(shasum -a 256 "$target" | awk '{print $1}')
+        local log="$out/$name.log"
+        if "$gate" --shared-deadline-repair-mutation-contract-only \
+            "$kind" "$target_sha" "${args[@]}" >"$log" 2>&1; then
+            fail_contract "shared-deadline mutation accepted: $name"
+        fi
+        [[ "$(<"$log")" == "$expected" ]] \
+            || fail_contract "shared-deadline mutation diagnostic drifted: $name"
+    }
+    local spec
+    local mutation_count=0
+    for spec in generic-decode:author:'machine-only author decoder drifted' machine-window:contract:'shared-deadline 1200 constant drifted' epoch-window:contract:'shared-deadline 140 constant drifted' profile-turns:contract:'machine-only exact profile drifted' profile-probes:contract:'machine-only exact profile drifted' profile-context:contract:'machine-only exact profile drifted' completed-output-decode:contract:'completed-output machine decoder drifted' mixed-deadline:author:'mixed cohort deadline rejection drifted' bootstrap-clock:composition:'shared App monotonic clock drifted' bootstrap-order:composition:'shared App monotonic clock drifted' monotonic-floor:composition:'shared App monotonic clock drifted' inherited-clamp:composition:'inherited App retirement deadline drifted' production-clamp:composition:'production App session deadline drifted' public-projection:composition:'public composition deadline projection drifted' reserve:coordinator:'shared-deadline reserve drifted' observed-floor:coordinator:'conservative observed-time rounding drifted' admission:coordinator:'pre-handoff deadline admission drifted' runner-window-only:runner:'machine runner validation drifted' machine-shared-deadline:machine:'machine final shared deadline drifted' machine-bundle-profile:machine:'machine bundle profile drifted'; do
+        local name='' rest='' kind='' expected=''
+        name=${spec%%:*}; rest=${spec#*:}; kind=${rest%%:*}; expected=${rest#*:}
+        reject_shared_deadline "$name" "$kind" "$expected"
+        (( mutation_count += 1 ))
+    done
+    while IFS=$'\t' read -r name kind; do reject_shared_deadline "$name" "$kind" 'shared-deadline focused tests became vacuous'; (( mutation_count += 1 )); done <"$out/test-mutations"
+    (( mutation_count == 36 )) || fail_contract "shared-deadline mutation matrix drifted"
+    local -a base_args=("$contract" "$author" "$composition" "$runner" "$machine" "$configuration" "$coordinator" "${tests[@]}") mutation_args
+    local benign="$out/seal-only-author.swift" benign_sha log rc=0
+    benign_sha=$(shasum -a 256 "$benign" | awk '{print $1}')
+    mutation_args=("${base_args[@]}"); mutation_args[2]=$benign
+    log="$out/mutation-admission.log"
+    "$gate" --shared-deadline-repair-mutation-contract-only author \
+        "$benign_sha" "${mutation_args[@]}" >"$log" 2>&1 || rc=$?
+    (( rc == 0 )) && [[ "$(<"$log")" == 'Shared-deadline repair mutation source contract verification passed.' ]] \
+        || fail_contract 'shared-deadline mutation admission drifted'
+    check_shared_deadline_gate default-seal 'shared-deadline sealed source drifted' \
+        "$gate" --shared-deadline-repair-source-contract-only "${mutation_args[@]}"
+    check_shared_deadline_gate wrong-sha 'shared-deadline mutation digest drifted' \
+        "$gate" --shared-deadline-repair-mutation-contract-only author \
+        '0000000000000000000000000000000000000000000000000000000000000000' \
+        "${mutation_args[@]}"
+    check_shared_deadline_gate unchanged 'shared-deadline mutation source unchanged' \
+        "$gate" --shared-deadline-repair-mutation-contract-only author \
+        "$(shasum -a 256 "$author" | awk '{print $1}')" "${base_args[@]}"
+    check_shared_deadline_gate invalid-slot 'shared-deadline mutation slot drifted' \
+        "$gate" --shared-deadline-repair-mutation-contract-only foreign \
+        "$benign_sha" "${mutation_args[@]}"
+    check_shared_deadline_gate malformed-sha 'shared-deadline mutation SHA drifted' \
+        "$gate" --shared-deadline-repair-mutation-contract-only author bad \
+        "${mutation_args[@]}"
+    mutation_args[3]="$out/bootstrap-clock.swift"
+    check_shared_deadline_gate second-slot 'shared-deadline mutation digest drifted' \
+        "$gate" --shared-deadline-repair-mutation-contract-only author \
+        "$benign_sha" "${mutation_args[@]}"
+    local regex_source regex_sha
+    for regex_source in "$out/regex-author.swift" "$out/raw-regex-author.swift"; do
+        mutation_args=("${base_args[@]}"); mutation_args[2]=$regex_source
+        regex_sha=$(shasum -a 256 "$regex_source" | awk '{print $1}')
+        check_shared_deadline_gate regex-literal \
+            'shared-deadline regex literal rejected' "$gate" \
+            --shared-deadline-repair-mutation-contract-only author \
+            "$regex_sha" "${mutation_args[@]}"
+    done
+    local baseline=66453397ae70c59347f02fff4e1a5528926c5141 index="$out/scope.index" item mode blob
+    local scope_paths=("$contract" "$author" "$composition" "$runner" "$machine" "$configuration" "$coordinator" "${tests[@]}" scripts/verify-investigation-boundaries scripts/verify-contract)
+    GIT_INDEX_FILE="$index" git read-tree "$baseline^{tree}"
+    for item in "${scope_paths[@]}"; do blob=$(git hash-object -w -- "$item"); mode=100644; [[ $item == scripts/* ]] && mode=100755; GIT_INDEX_FILE="$index" git update-index --add --cacheinfo "$mode,$blob,$item"; done
+    GIT_INDEX_FILE="$index" "$gate" --shared-deadline-repair-scope-contract-only "$baseline" >"$out/scope.log"
+    local bad="$out/scope-extra.index"; cp "$index" "$bad"; blob=$(git hash-object -w -- AGENTS.md); GIT_INDEX_FILE="$bad" git update-index --add --cacheinfo "100644,$blob,shared-deadline-extra.swift"
+    log="$out/scope-extra.log"; if GIT_INDEX_FILE="$bad" "$gate" --shared-deadline-repair-scope-contract-only "$baseline" >"$log" 2>&1; then fail_contract "shared-deadline scope mutation accepted"; fi
+    require_fixed_text "$log" "shared-deadline checkpoint paths drifted"
+    bad="$out/scope-binary.index"; cp "$index" "$bad"; blob=$(git rev-parse "$baseline:Tests/Fixtures/Snapshots/design-system.empty-state.dark.en.png"); GIT_INDEX_FILE="$bad" git update-index --cacheinfo "100644,$blob,$contract"
+    log="$out/scope-binary.log"; if GIT_INDEX_FILE="$bad" "$gate" --shared-deadline-repair-scope-contract-only "$baseline" >"$log" 2>&1; then fail_contract "shared-deadline binary scope mutation accepted"; fi
+    require_fixed_text "$log" "shared-deadline checkpoint binary or category drifted"
 }
 
 if [[ ${1:-} == --iic0b-ii-a-contract-only ]]; then
@@ -2163,6 +2317,18 @@ if [[ ${1:-} == --iic0b-iv-b2-composition-contract-only ]]; then
     verify_iic0bivb2_subordinate_source_seals
     verify_iic0bivb2_contract "$iic0bivb2_root"
     print "ii-c0b-iv-b2 composition contract verification passed."
+    exit 0
+fi
+
+if [[ ${1:-} == --shared-deadline-repair-contract-only ]]; then
+    (( $# == 1 )) || fail_contract \
+        'Usage: scripts/verify-contract --shared-deadline-repair-contract-only'
+    shared_deadline_root=$(mktemp -d \
+        "${TMPDIR:-/tmp}/stornaut-shared-deadline-contract.XXXXXX")
+    trap 'rm -rf "$shared_deadline_root"' EXIT
+    verify_iic0bivb2_subordinate_source_seals
+    verify_shared_deadline_repair_contract "$shared_deadline_root"
+    print "Shared-deadline repair mutation contract verification passed."
     exit 0
 fi
 
@@ -3706,6 +3872,7 @@ done
 
 contract_root=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-verify-contract.XXXXXX")
 verify_iic0bivb2_contract "$contract_root/iic0bivb2" false
+verify_shared_deadline_repair_contract "$contract_root/shared-deadline"
 mkdir -p "$contract_root/scripts"
 cp scripts/verify "$contract_root/scripts/verify"
 chmod 755 "$contract_root/scripts/verify"

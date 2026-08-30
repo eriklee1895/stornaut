@@ -133,6 +133,7 @@ struct InvestigationMachineCoordinatorBindingSourceTests {
     )
     let scenarios = SignedInvestigationRuntimeDiagnosticScenario.allCases
     let rows = result.rows
+    let expectedCohortDeadline = fixture.now.addingTimeInterval(1_200)
     #expect(rows.count == 8)
     #expect(result.configurations.count == 8)
     #expect(result.canonicalConfigurationData.count == 8)
@@ -162,7 +163,8 @@ struct InvestigationMachineCoordinatorBindingSourceTests {
       #expect(row.plan.targetSetFingerprint == plan.targetSetFingerprint)
       #expect(row.configuration.binding == current.binding)
       #expect(row.configuration.maximumWallClockSeconds == 140)
-      #expect(row.configuration.validBefore == plan.expiresAt)
+      #expect(row.plan.expiresAt == fixture.now.addingTimeInterval(600))
+      #expect(row.configuration.validBefore == expectedCohortDeadline)
       #expect(row.configuration.diagnosticRootPath == expectedRoot.path)
       #expect(row.configuration.sourceRootPath
         == expectedRoot.appending(path: "source").path)
@@ -181,7 +183,7 @@ struct InvestigationMachineCoordinatorBindingSourceTests {
         .invalidConfiguration) {
           _ = try SignedInvestigationRuntimeDiagnosticConfiguration
             .decodeValidated(
-              from: data, now: plan.expiresAt
+              from: data, now: fixture.now
             )
         }
     }

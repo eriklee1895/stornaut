@@ -116,17 +116,26 @@ package struct InvestigationHandoffAcceptedRuntimeProjection:
         SignedInvestigationRuntimeDiagnosticConfiguration
     package let configurationSHA256: String
     package let runtimeReceipt: InvestigationRuntimeReceiptV1
+    package let epochValidBefore: Date
 
     package init(
         configuration: SignedInvestigationRuntimeDiagnosticConfiguration,
         configurationSHA256: String,
-        runtimeReceipt: InvestigationRuntimeReceiptV1
+        runtimeReceipt: InvestigationRuntimeReceiptV1,
+        epochValidBefore: Date,
+        observedAt: Date
     ) throws {
+        let clampedEpochValidBefore = min(
+            configuration.validBefore, epochValidBefore
+        )
         guard
             try configuration.canonicalJSONData().handoffSHA256Hex
                 == configurationSHA256,
             try configuration.machineConfigurationSHA256()
-                == configurationSHA256
+                == configurationSHA256,
+            epochValidBefore.timeIntervalSince1970.isFinite,
+            observedAt.timeIntervalSince1970.isFinite,
+            clampedEpochValidBefore > observedAt
         else {
             throw InvestigationHandoffConcreteAppLeafError.invalidConfiguration
         }
@@ -141,6 +150,7 @@ package struct InvestigationHandoffAcceptedRuntimeProjection:
         self.configuration = configuration
         self.configurationSHA256 = configurationSHA256
         self.runtimeReceipt = runtimeReceipt
+        self.epochValidBefore = clampedEpochValidBefore
     }
 }
 
@@ -161,7 +171,8 @@ package actor InvestigationHandoffConcreteAppLeafOperations:
     private let adapter: any InvestigationHandoffAppLeafAdapting
     private let peer: InvestigationHandoffAppLeafPeerObservation
     private let now: @Sendable () -> Date
-    private let retirementHandleFactory: RetirementHandle
+    private let epochValidBefore: Date
+    private let retirementHandleFactory: RetirementHandle?
     private var acceptedProjection:
         InvestigationHandoffAcceptedRuntimeProjection?
     private var didRetire = false
@@ -171,11 +182,9 @@ package actor InvestigationHandoffConcreteAppLeafOperations:
         adapter: any InvestigationHandoffAppLeafAdapting,
         peer: InvestigationHandoffAppLeafPeerObservation,
         now: @escaping @Sendable () -> Date = Date.init,
-        retirementHandle: @escaping RetirementHandle = { projection in
-            try await InvestigationHandoffNoAuthRetirement.live(
-                projection: projection
-            )
-        }
+        continuousNow: @escaping @Sendable () throws -> UInt64 =
+            InvestigationHandoffAppLeafAdapterSystem.system.continuousNanoseconds,
+        retirementHandle: RetirementHandle? = nil
     ) throws {
         guard
             peer.driverIdentity.effectiveUserID == 0,
@@ -203,7 +212,14 @@ package actor InvestigationHandoffConcreteAppLeafOperations:
         }
         self.adapter = adapter
         self.peer = peer
-        self.now = now
+        let clock = try investigationMonotonicWallClock(
+            wall: now, continuous: continuousNow,
+            deadline: peer.bootstrap.epochDeadlineNanoseconds,
+            maximum: InvestigationHandoffAppLeafAdapter
+                .maximumEpochWindowNanoseconds
+        )
+        self.now = clock.now
+        epochValidBefore = clock.validBefore
         retirementHandleFactory = retirementHandle
     }
 
@@ -257,9 +273,10 @@ package actor InvestigationHandoffConcreteAppLeafOperations:
             return try fail(.invalidState)
         }
         let decoded: SignedInvestigationRuntimeDiagnosticConfiguration
+        let observedAt = now()
         do {
             decoded = try SignedInvestigationRuntimeDiagnosticConfiguration
-                .decodeValidated(from: bytes, now: now())
+                .decodeMachineCohortValidated(from: bytes, now: observedAt)
             guard try decoded.canonicalJSONData() == bytes else {
                 return try fail(.invalidConfiguration)
             }
@@ -305,7 +322,9 @@ package actor InvestigationHandoffConcreteAppLeafOperations:
             projection = try .init(
                 configuration: decoded,
                 configurationSHA256: machineSHA,
-                runtimeReceipt: runtimeReceipt
+                runtimeReceipt: runtimeReceipt,
+                epochValidBefore: epochValidBefore,
+                observedAt: observedAt
             )
         } catch {
             return try fail(.invalidConfiguration)
@@ -340,10 +359,16 @@ package actor InvestigationHandoffConcreteAppLeafOperations:
         didRetire = true
         let startedAt = now()
         do {
-            let handle = try await retirementHandleFactory(acceptedProjection)
+            let handle = if let retirementHandleFactory {
+                try await retirementHandleFactory(acceptedProjection)
+            } else {
+                try await InvestigationHandoffNoAuthRetirement.live(
+                    projection: acceptedProjection, now: now
+                )
+            }
             guard validRetirementHandle(
                 handle,
-                configuration: acceptedProjection.configuration,
+                projection: acceptedProjection,
                 configurationSHA256:
                     acceptedProjection.configurationSHA256,
                 startedAt: startedAt,
@@ -481,17 +506,17 @@ package actor InvestigationHandoffConcreteAppLeafOperations:
 
     private func validRetirementHandle(
         _ handle: InvestigationHandoffRetirementHandle,
-        configuration: SignedInvestigationRuntimeDiagnosticConfiguration,
+        projection: InvestigationHandoffAcceptedRuntimeProjection,
         configurationSHA256: String,
         startedAt: Date,
         completedAt: Date
     ) -> Bool {
-        handle.investigationUUID == configuration.nonce
+        handle.investigationUUID == projection.configuration.nonce
             && handle.configurationSHA256.lowercaseHex
                 == configurationSHA256
             && validRetirementDeadline(
                 handle.validBefore.rawValue,
-                configurationValidBefore: configuration.validBefore,
+                configurationValidBefore: projection.epochValidBefore,
                 startedAt: startedAt,
                 completedAt: completedAt
             )
@@ -518,7 +543,8 @@ package enum InvestigationHandoffScenarioMapping {
 
 package enum InvestigationHandoffNoAuthRetirement {
     package static func live(
-        projection: InvestigationHandoffAcceptedRuntimeProjection
+        projection: InvestigationHandoffAcceptedRuntimeProjection,
+        now: @escaping @Sendable () -> Date = Date.init
     ) async throws -> InvestigationHandoffRetirementHandle {
         let configuration = projection.configuration
         let contract = try LifecycleLocalInstallationContract()
@@ -533,12 +559,12 @@ package enum InvestigationHandoffNoAuthRetirement {
             throw InvestigationHandoffConcreteAppLeafError.bindingMismatch
         }
         let session = LifecycleInteractiveSessionXPCClient(
-            helperBundleURL: contract.helperExecutableURL
+            helperBundleURL: contract.helperExecutableURL, now: now
         )
         do {
             let handle = try await run(
                 projection: projection,
-                session: session
+                session: session, now: now
             )
             await session.invalidate()
             return handle
@@ -570,7 +596,7 @@ package enum InvestigationHandoffNoAuthRetirement {
                 rawValue: configuration.nonce
             ),
             configurationSHA256: configurationSHA256,
-            validBefore: configuration.validBefore,
+            validBefore: projection.epochValidBefore,
             maximumLineBytes:
                 LifecycleInteractiveSessionRequest.maximumAllowedLineBytes,
             maximumSessionBytes:
@@ -593,7 +619,7 @@ package enum InvestigationHandoffNoAuthRetirement {
             lifecycle.configurationSHA256 == configurationSHA256,
             validRetirementDeadline(
                 lifecycle.validBeforeUTCMicroseconds,
-                configurationValidBefore: configuration.validBefore,
+                configurationValidBefore: projection.epochValidBefore,
                 startedAt: retirementStartedAt,
                 completedAt: retirementCompletedAt
             )
@@ -658,6 +684,7 @@ public final class InvestigationRuntimeDiagnosticComposition:
     public let helperExecutablePath: String
     public let hasRuntimeFacade: Bool
     package let configurationSHA256: String
+    package let lifecycleValidBefore: Date
 
     private let runtimeFacade: InvestigationRuntimeDiagnosticFacade
     private let transportOwner:
@@ -671,6 +698,7 @@ public final class InvestigationRuntimeDiagnosticComposition:
         storePath: String,
         helperExecutablePath: String,
         configurationSHA256: String,
+        lifecycleValidBefore: Date,
         runtimeFacade: InvestigationRuntimeDiagnosticFacade,
         transportOwner: InvestigationRuntimeDiagnosticTransportOwner,
         retirementEvidenceStore:
@@ -681,6 +709,7 @@ public final class InvestigationRuntimeDiagnosticComposition:
         self.storePath = storePath
         self.helperExecutablePath = helperExecutablePath
         self.configurationSHA256 = configurationSHA256
+        self.lifecycleValidBefore = lifecycleValidBefore
         hasRuntimeFacade = true
         self.runtimeFacade = runtimeFacade
         self.transportOwner = transportOwner
@@ -713,7 +742,9 @@ public final class InvestigationRuntimeDiagnosticComposition:
         now: Date,
         installation:
             InvestigationRuntimeDiagnosticBindingObservation,
-        runtimeNow: @escaping @Sendable () -> Date = Date.init
+        runtimeNow: @escaping @Sendable () -> Date = Date.init,
+        continuousNow: @escaping @Sendable () throws -> UInt64 =
+            InvestigationHandoffAppLeafAdapterSystem.system.continuousNanoseconds
     ) throws -> Self {
         let configuration: SignedInvestigationRuntimeDiagnosticConfiguration
         do {
@@ -741,8 +772,16 @@ public final class InvestigationRuntimeDiagnosticComposition:
         }
 
         do {
+            let clock = try investigationMonotonicWallClock(
+                wall: runtimeNow, continuous: continuousNow, deadline: nil,
+                maximum: UInt64(configuration.maximumWallClockSeconds)
+                    * 1_000_000_000
+            )
             let lifecycleID = LifecycleInvestigationID(
                 rawValue: configuration.nonce
+            )
+            let epochValidBefore = min(
+                configuration.validBefore, clock.validBefore
             )
             let lifecycleContract =
                 try LifecycleLocalInstallationContract()
@@ -766,7 +805,7 @@ public final class InvestigationRuntimeDiagnosticComposition:
                 try InvestigationEnvelopeV2Schema
                     .loadStructuredOutputJSONValue()
             let session = LifecycleInteractiveSessionXPCClient(
-                helperBundleURL: installation.helperExecutableURL
+                helperBundleURL: installation.helperExecutableURL, now: clock.now
             )
             let retirementEvidenceStore =
                 InvestigationLifecycleRetirementEvidenceStore()
@@ -776,14 +815,14 @@ public final class InvestigationRuntimeDiagnosticComposition:
                 try InvestigationLifecycleAppServerTransport(
                     investigationID: lifecycleID,
                     configurationSHA256: configurationSHA256,
-                    validBefore: configuration.validBefore,
+                    validBefore: epochValidBefore,
                     maximumLineBytes:
                         LifecycleInteractiveSessionRequest
                         .maximumAllowedLineBytes,
                     maximumSessionBytes:
                         LifecycleInteractiveSessionRequest
                         .maximumAllowedSessionBytes,
-                    now: runtimeNow,
+                    now: clock.now,
                     session: session,
                     retirementEvidenceStore: retirementEvidenceStore
                 )
@@ -864,6 +903,7 @@ public final class InvestigationRuntimeDiagnosticComposition:
                 helperExecutablePath:
                     installation.helperExecutableURL.path,
                 configurationSHA256: configurationSHA256,
+                lifecycleValidBefore: epochValidBefore,
                 runtimeFacade: facade,
                 transportOwner: transportOwner,
                 retirementEvidenceStore: retirementEvidenceStore
@@ -897,6 +937,31 @@ public final class InvestigationRuntimeDiagnosticComposition:
         return await retirementEvidenceStore.consume()
     }
 
+}
+
+private func investigationMonotonicWallClock(
+    wall: @escaping @Sendable () -> Date,
+    continuous: @escaping @Sendable () throws -> UInt64,
+    deadline: UInt64?, maximum: UInt64
+) throws -> (validBefore: Date, now: @Sendable () -> Date) {
+    let wallAnchor = wall(), anchor = try continuous()
+    let limit = deadline ?? anchor.addingReportingOverflow(maximum).partialValue
+    let remaining = limit.subtractingReportingOverflow(anchor)
+    guard !remaining.overflow, remaining.partialValue > 0,
+          remaining.partialValue <= maximum else {
+        throw InvestigationHandoffConcreteAppLeafError.invalidConfiguration
+    }
+    let validBefore = wallAnchor.addingTimeInterval(
+        Double(remaining.partialValue) / 1_000_000_000)
+    guard validBefore.timeIntervalSince1970.isFinite else {
+        throw InvestigationHandoffConcreteAppLeafError.invalidConfiguration
+    }
+    return (validBefore, {
+        guard let tick = try? continuous(), tick >= anchor else { return validBefore }
+        let projected = wallAnchor.addingTimeInterval(
+            Double(tick - anchor) / 1_000_000_000)
+        return projected.timeIntervalSince1970.isFinite ? projected : validBefore
+    })
 }
 
 package struct InvestigationRuntimeDiagnosticBindingObservation:

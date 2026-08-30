@@ -266,7 +266,9 @@ package struct InvestigationProjectedCohortAuthor: Sendable {
         for bytes in data {
             let configuration: SignedInvestigationRuntimeDiagnosticConfiguration
             do {
-                configuration = try .decodeValidated(from: bytes, now: now)
+                configuration = try .decodeMachineCohortValidated(
+                    from: bytes, now: now
+                )
                 guard
                     try configuration.canonicalJSONData() == bytes,
                     try configuration.machineConfigurationSHA256()
@@ -297,8 +299,13 @@ package struct InvestigationProjectedCohortAuthor: Sendable {
             throw InvestigationProjectedCohortAuthorError.invalidConfiguration
         }
         let binding = first.0.binding
+        let validBefore = first.0.validBefore
         guard byOrdinal.values.allSatisfy({ $0.0.binding == binding }) else {
             throw InvestigationProjectedCohortAuthorError.bindingMismatch
+        }
+        guard byOrdinal.values.allSatisfy({ $0.0.validBefore == validBefore })
+        else {
+            throw InvestigationProjectedCohortAuthorError.invalidConfiguration
         }
         let rows = try InvestigationHandoffScenario.allCases.map { scenario in
             guard let row = byOrdinal[scenario.rawValue] else {

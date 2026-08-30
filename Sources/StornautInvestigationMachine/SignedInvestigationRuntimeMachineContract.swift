@@ -405,7 +405,7 @@ public struct SignedInvestigationRuntimeMachineCaseEvidence:
         cohortRootDescriptor: Int32,
         now: Date
     ) throws -> MachineConfigurationObservation {
-        try configuration.validate(
+        try configuration.validateMachineCohort(
             now: now,
             outputs: .ownerRegularFile
         )
@@ -1560,6 +1560,9 @@ private func configurationMap(
     SignedInvestigationRuntimeDiagnosticScenario:
         SignedInvestigationRuntimeDiagnosticConfiguration
 ] {
+    try configurations.forEach {
+        try $0.validateMachineCohort(now: nil, outputs: .ownerRegularFile)
+    }
     guard
         configurations.count
             == SignedInvestigationRuntimeDiagnosticScenario
@@ -1569,6 +1572,7 @@ private func configurationMap(
                 SignedInvestigationRuntimeDiagnosticScenario.allCases
             ),
         Set(configurations.map(\.nonce)).count == configurations.count,
+        Set(configurations.map(\.validBefore)).count == 1,
         configurationPathsAreUnique(configurations)
     else {
         throw SignedInvestigationRuntimeContractError

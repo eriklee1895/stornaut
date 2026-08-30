@@ -250,6 +250,65 @@ struct InvestigationMachineGateCoordinatorCompositionTests {
     #expect(receipt.runtimeArtifactsRetired)
     #expect(await probe.lastSinkDisposition == .receipt(receipt))
   }
+  @Test
+  func productionSourceRequiresCompleteCampaignWindowBeforeHandoff() async throws {
+    let probe = CoordinatorCompositionProbe()
+    let deadline = Date(timeIntervalSince1970: 11_125)
+    let cohort = try probe.authoredCohort(configurationValidBefore: deadline)
+    #expect(InvestigationMachineGateCoordinatorHandoffAdmission
+      .minimumHandoffRemainingSeconds == 1_125)
+    #expect(throws: Never.self) {
+      try InvestigationMachineGateCoordinatorHandoffAdmission.validate(
+        cohort, now: deadline.addingTimeInterval(-1_125)
+      )
+    }
+    #expect(throws: InvestigationMachineGateCoordinatorProductionError
+      .protocolFailure) {
+      try InvestigationMachineGateCoordinatorHandoffAdmission.validate(
+        cohort, now: Date(timeIntervalSince1970: 10_000.0000006)
+      )
+    }
+    #expect(throws: InvestigationMachineGateCoordinatorProductionError
+      .protocolFailure) {
+      try InvestigationMachineGateCoordinatorHandoffAdmission.validate(
+        cohort, now: Date(timeIntervalSince1970: .infinity)
+      )
+    }
+    let late = CoordinatorCompositionProbe(
+      configurationValidBefore: deadline,
+      wallNow: Date(timeIntervalSince1970: 10_000.0000006)
+    )
+    await #expect(throws: InvestigationMachineGateCoordinatorProductionError
+      .protocolFailure) {
+      _ = try await InvestigationMachineGateCoordinatorComposition(
+        dependencies: late.dependencies()
+      ).run()
+    }
+    #expect(await late.handoffCallCount == 0)
+    #expect(await late.retireArtifactsCallCount == 1)
+    #expect(await late.lastSinkDisposition == .closeOnly)
+
+    let mixed = try probe.projectedInput(
+      configurationValidBeforeRawValues: [
+        Int64(deadline.timeIntervalSince1970 * 1_000_000),
+        Int64(deadline.timeIntervalSince1970 * 1_000_000) - 1,
+      ] + Array(repeating:
+        Int64(deadline.timeIntervalSince1970 * 1_000_000), count: 6)
+    )
+    #expect(throws: InvestigationMachineGateCoordinatorProductionError
+      .protocolFailure) {
+      _ = try InvestigationMachineGateCoordinatorAuthoredCohort(
+        sourceFingerprintSHA256: probe.sourceFingerprintSHA256,
+        configurationSHA256s: mixed.capsule.epochs.map {
+          $0.configurationSHA256.lowercaseHex
+        },
+        configurationValidBefore: try .init(
+          timeIntervalSince1970: deadline.timeIntervalSince1970
+        ),
+        projectedInput: mixed
+      )
+    }
+  }
   @Test(arguments: CoordinatorClockFault.allCases)
   fileprivate func invalidCoordinatorClockCannotMintReceipt(_ fault: CoordinatorClockFault) async {
     let clock = CoordinatorMonotonicProbe(fault.steps)
@@ -530,6 +589,9 @@ private actor CoordinatorCompositionProbe {
   nonisolated let configurationSHA256s = (0..<8).map { index in
     String(format: "%064x", index + 16)
   }
+  nonisolated let configurationValidBefore:
+    InvestigationHandoffUTCMicroseconds
+  nonisolated let wallNow: Date
   private(set) var events: [CoordinatorCompositionStage] = []
   private(set) var validateInvocationCallCount = 0
   private(set) var materializeSourceCallCount = 0
@@ -548,12 +610,20 @@ private actor CoordinatorCompositionProbe {
   private let failure: CoordinatorCompositionProbeFailure?
   init(
     failure: CoordinatorCompositionProbeFailure? = nil,
-    monotonic: CoordinatorMonotonicProbe = .init()
+    monotonic: CoordinatorMonotonicProbe = .init(),
+    configurationValidBefore: Date = Date(timeIntervalSince1970: 2_000_001_200),
+    wallNow: Date = Date(timeIntervalSince1970: 2_000_000_000)
   ) {
     self.failure = failure
     self.monotonic = monotonic
+    self.configurationValidBefore = try! InvestigationHandoffUTCMicroseconds(
+      timeIntervalSince1970: configurationValidBefore.timeIntervalSince1970
+    )
+    self.wallNow = wallNow
   }
-  nonisolated func projectedInput() throws
+  nonisolated func projectedInput(
+    configurationValidBeforeRawValues: [Int64]? = nil
+  ) throws
     -> InvestigationProjectedCohortInput {
     let binding = try InvestigationHandoffSHA256(
       lowercaseHex: signedBindingSHA256
@@ -580,11 +650,14 @@ private actor CoordinatorCompositionProbe {
     let capsule = try InvestigationCohortCapsule(
       outerAttemptUUID: outerAttemptUUID, epochs: epochs
     )
-    let projections = try epochs.map { epoch in
+    let deadlines = configurationValidBeforeRawValues
+      ?? Array(repeating: self.configurationValidBefore.rawValue, count: 8)
+    guard deadlines.count == 8 else { throw CoordinatorRootFault() }
+    let projections = try epochs.enumerated().map { index, epoch in
       try InvestigationInstalledL2IdentityProjection(
         epochUUID: epoch.epochUUID,
         configurationNonce: epoch.configurationNonce,
-        configurationValidBefore: .init(rawValue: 1_800_000_000_000_000),
+        configurationValidBefore: .init(rawValue: deadlines[index]),
         configurationSHA256: epoch.configurationSHA256,
         signedRuntimeBindingSHA256: epoch.signedRuntimeBindingSHA256,
         appExecutableSHA256: .init(rawBytes: Data(repeating: 0x21, count: 32)),
@@ -615,6 +688,21 @@ private actor CoordinatorCompositionProbe {
       capsule: capsule, projections: projections
     )
   }
+  nonisolated func authoredCohort(
+    configurationValidBefore: Date? = nil
+  ) throws -> InvestigationMachineGateCoordinatorAuthoredCohort {
+    let deadline = try InvestigationHandoffUTCMicroseconds(
+      timeIntervalSince1970: configurationValidBefore?.timeIntervalSince1970
+        ?? self.configurationValidBefore.timeIntervalSince1970
+    )
+    return InvestigationMachineGateCoordinatorAuthoredCohort(
+      sourceFingerprintSHA256: sourceFingerprintSHA256,
+      configurationSHA256s: configurationSHA256s,
+      outerAttemptUUID: outerAttemptUUID,
+      wholeProjectedInputSHA256: wholeProjectedInputSHA256,
+      configurationValidBefore: deadline
+    )
+  }
   func terminalState() throws
     -> InvestigationMachineGateCoordinatorTerminalState {
     let source = InvestigationMachineGateCoordinatorMaterializedSource(
@@ -627,14 +715,10 @@ private actor CoordinatorCompositionProbe {
     )
     let configurations = InvestigationMachineGateCoordinatorConfigurationBatch(
       sourceFingerprintSHA256: sourceFingerprintSHA256,
-      configurationSHA256s: configurationSHA256s
-    )
-    let cohort = InvestigationMachineGateCoordinatorAuthoredCohort(
-      sourceFingerprintSHA256: sourceFingerprintSHA256,
       configurationSHA256s: configurationSHA256s,
-      outerAttemptUUID: outerAttemptUUID,
-      wholeProjectedInputSHA256: wholeProjectedInputSHA256
+      configurationValidBefore: configurationValidBefore
     )
+    let cohort = try authoredCohort()
     let handoff = try self.handoff(cohort)
     return InvestigationMachineGateCoordinatorTerminalState(
       source: source, binding: binding, configurations: configurations,
@@ -665,7 +749,7 @@ private actor CoordinatorCompositionProbe {
       makeReceipt: { state in try await self.makeReceipt(state) },
       writeClose: { disposition in
         try await self.writeClose(disposition)
-      }, monotonic: { try self.monotonic.next() }
+      }, monotonic: { try self.monotonic.next() }, wallNow: { self.wallNow }
     )
   }
   private func validateInvocation() throws
@@ -707,7 +791,8 @@ private actor CoordinatorCompositionProbe {
     #expect(binding.sourceFingerprintSHA256 == source.sourceFingerprintSHA256)
     return InvestigationMachineGateCoordinatorConfigurationBatch(
       sourceFingerprintSHA256: sourceFingerprintSHA256,
-      configurationSHA256s: configurationSHA256s
+      configurationSHA256s: configurationSHA256s,
+      configurationValidBefore: configurationValidBefore
     )
   }
   private func authorCohort(
@@ -717,12 +802,7 @@ private actor CoordinatorCompositionProbe {
     authorCohortCallCount += 1
     #expect(configurations.configurationSHA256s.count == 8)
     #expect(configurations.sourceFingerprintSHA256 == sourceFingerprintSHA256)
-    return InvestigationMachineGateCoordinatorAuthoredCohort(
-      sourceFingerprintSHA256: sourceFingerprintSHA256,
-      configurationSHA256s: configurationSHA256s,
-      outerAttemptUUID: outerAttemptUUID,
-      wholeProjectedInputSHA256: wholeProjectedInputSHA256
-    )
+    return try authoredCohort()
   }
   private func handoff(
     _ cohort: InvestigationMachineGateCoordinatorAuthoredCohort

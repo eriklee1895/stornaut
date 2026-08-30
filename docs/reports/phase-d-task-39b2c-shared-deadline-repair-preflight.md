@@ -4,7 +4,10 @@
 >
 > Date: 2026-08-30
 >
-> Baseline: `8452f9c466574e550ac8bc8540287b76d444e07e`
+> Implementation scope baseline: `66453397ae70c59347f02fff4e1a5528926c5141`
+> (`8452f9c466574e550ac8bc8540287b76d444e07e` was the original defect
+> baseline; the newer baseline adds only the independently committed historical
+> boundary-diagnostic assertion alignment.)
 >
 > Scope: local source, tests and structural verifiers only. No root/sudo,
 > installed App/helper/driver launch, product XPC, model/auth, network or
@@ -58,7 +61,18 @@ expired timing fails before any gate/root spawn.
 
 ## 3. Exact Scope and Budget
 
-At most fourteen non-document paths and 900 added-or-deleted non-document lines:
+Post-RED semantic review found that the inherited App leaf must retain the
+epoch-start wall clock before configuration acknowledgement, and that the
+machine decoder must close the exact machine profile rather than only widen
+the validity horizon. Those repairs stay inside the same fourteen paths but
+need a small amount of production and negative-test evidence not included in
+the original estimate. The frozen scope therefore remains exactly the same,
+while the ceiling is amended before the repair to at most fourteen
+non-document paths and 1,600 added-or-deleted non-document lines. A grouped
+review then required five concrete closures: bootstrap-time binding, runner
+profile admission, final shared-deadline revalidation, non-vacuous test
+verification and binary-numstat rejection. Those repairs remain inside the
+same fourteen paths:
 
 1. `Sources/StornautInvestigation/SignedInvestigationRuntimeContract.swift`;
 2. `Sources/StornautInvestigationDiagnostic/InvestigationProjectedCohortAuthor.swift`;
@@ -67,17 +81,19 @@ At most fourteen non-document paths and 900 added-or-deleted non-document lines:
 5. `Sources/StornautInvestigationMachine/SignedInvestigationRuntimeMachineContract.swift`;
 6. `Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineCoordinatorConfigurationSet.swift`;
 7. `Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift`;
-8. `Tests/StornautInvestigationTests/InvestigationMachineCoordinatorBindingSourceTests.swift`;
-9. `Tests/StornautInvestigationTests/SignedRuntimeContractTests.swift`;
-10. `Tests/StornautInvestigationTests/InvestigationProjectedCohortAuthorTests.swift`;
-11. `Tests/StornautInvestigationTests/InvestigationHandoffConcreteCompositionTests.swift`;
-12. `Tests/StornautInvestigationTests/InvestigationMachineGateCoordinatorCompositionTests.swift`;
+8. `Tests/StornautInvestigationTests/InvestigationHandoffConcreteCompositionTests.swift`;
+9. `Tests/StornautInvestigationTests/InvestigationLifecycleTopologyTestSupport.swift`;
+10. `Tests/StornautInvestigationTests/InvestigationMachineCoordinatorBindingSourceTests.swift`;
+11. `Tests/StornautInvestigationTests/InvestigationMachineGateCoordinatorCompositionTests.swift`;
+12. `Tests/StornautInvestigationTests/SignedRuntimeContractTests.swift`;
 13. `scripts/verify-investigation-boundaries`; and
 14. `scripts/verify-contract`.
 
-Production changes are capped at 260 lines, tests at 430 lines and verifiers at
-210 lines. A fifteenth non-document path or line 901 blocks implementation and
-requires a new scope decision. Documentation is outside this count.
+Production changes are capped at 350 lines, tests at 750 lines and verifiers at
+500 lines; the three categories are independent ceilings and may total up to
+1,600 lines. A fifteenth non-document path or line 1,601 blocks implementation
+and requires a new scope decision. Documentation is outside this count. The
+amendment does not add a target, protocol field, machine action or authority.
 
 ## 4. Tests First
 

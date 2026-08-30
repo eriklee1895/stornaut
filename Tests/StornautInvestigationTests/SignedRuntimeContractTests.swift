@@ -6,6 +6,7 @@ import StornautCodex
 import StornautCore
 import StornautInvestigation
 @testable import StornautInvestigationDiagnostic
+@testable import StornautInvestigationHandoffContract
 @testable import StornautInvestigationMachine
 
 @Suite("Task 39 signed Investigation runtime contract", .serialized)
@@ -37,6 +38,10 @@ struct SignedRuntimeContractTests {
         let configurationSHA256 =
             try configuration.machineConfigurationSHA256()
         #expect(composition.configurationSHA256 == configurationSHA256)
+        #expect(
+            composition.lifecycleValidBefore
+                == fixture.now.addingTimeInterval(140)
+        )
         #expect(
             composition.helperExecutablePath
                 == "/Library/Application Support/Stornaut/"
@@ -160,6 +165,11 @@ struct SignedRuntimeContractTests {
         let fixture = try SignedRuntimeContractFixture()
         defer { fixture.remove() }
         let configuration = try fixture.configuration()
+        let anchor: UInt64 = 10_000_000_000
+        let wall = SequenceConcreteClock([fixture.now])
+        let continuous = SequenceConcreteContinuousClock([
+            anchor, anchor + 141_000_000_000,
+        ])
 
         #expect(
             throws:
@@ -170,9 +180,31 @@ struct SignedRuntimeContractTests {
                 configurationData: try configuration.canonicalJSONData(),
                 now: fixture.now,
                 installation: fixture.installationObservation(),
-                runtimeNow: { configuration.validBefore }
+                runtimeNow: { wall.next() },
+                continuousNow: { try continuous.next() }
             )
         }
+    }
+
+    @Test
+    func diagnosticCompositionUsesEarlierConfigurationDeadline() async throws {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let configuration = try fixture.configuration(
+            validBefore: fixture.now.addingTimeInterval(100)
+        )
+        let bytes = try configuration.canonicalJSONData()
+        let digest = try configuration.machineConfigurationSHA256()
+        let composition = try InvestigationRuntimeDiagnosticComposition.prepare(
+            configurationData: bytes, now: fixture.now,
+            installation: fixture.installationObservation(),
+            runtimeNow: { fixture.now }
+        )
+
+        #expect(composition.lifecycleValidBefore == configuration.validBefore)
+        #expect(try configuration.canonicalJSONData() == bytes)
+        #expect(try configuration.machineConfigurationSHA256() == digest)
+        _ = await composition.retirePreparedComposition()
     }
 
     @Test
@@ -205,6 +237,21 @@ struct SignedRuntimeContractTests {
             try configuration.canonicalJSONData()
                 == configuration.canonicalJSONData()
         )
+
+        var overbroad = try #require(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+        overbroad["validBefore"] = fixture.now
+            .addingTimeInterval(901).timeIntervalSinceReferenceDate
+        let overbroadData = try JSONSerialization.data(
+            withJSONObject: overbroad,
+            options: [.sortedKeys, .withoutEscapingSlashes]
+        )
+        #expect(throws: SignedInvestigationRuntimeContractError
+            .invalidConfiguration) {
+            _ = try SignedInvestigationRuntimeDiagnosticConfiguration
+                .decodeValidated(from: overbroadData, now: fixture.now)
+        }
 
         var object = try #require(
             JSONSerialization.jsonObject(with: data)
@@ -307,6 +354,173 @@ struct SignedRuntimeContractTests {
                     from: nulPathData,
                     now: fixture.now
                 )
+        }
+    }
+
+    @Test
+    func machineCohortValidityIsExactAndDoesNotWidenGeneralDecoding() throws {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let configuration = try fixture.configuration(
+            machineCohortWindow: 1_200
+        )
+        let data = try configuration.canonicalJSONData()
+
+        #expect(throws: SignedInvestigationRuntimeContractError
+            .invalidConfiguration) {
+            _ = try SignedInvestigationRuntimeDiagnosticConfiguration
+                .decodeValidated(from: data, now: fixture.now)
+        }
+        let configurations = try fixture.machineConfigurations(
+            machineCohortWindow: 1_200
+        )
+        let binding = fixture.binding()
+        let installed = try InvestigationProjectedCohortInstalledBinding(
+            appExecutableSHA256: binding.appExecutableSHA256,
+            appBundleIdentifier: binding.appBundleIdentifier,
+            helperExecutableSHA256: binding.helperExecutableSHA256,
+            helperServiceIdentifier: binding.helperServiceIdentifier,
+            machineDriverExecutableSHA256:
+                binding.machineDriver.executableSHA256,
+            machineDriverSigningIdentifier:
+                binding.machineDriver.signingIdentifier,
+            machineDriverDesignatedRequirementSHA256:
+                binding.machineDriver.designatedRequirementSHA256,
+            machineDriverCodeDirectoryHash:
+                binding.machineDriver.codeDirectoryHash,
+            machineClaimServiceIdentifier:
+                binding.machineDriver.machineClaimServiceIdentifier
+        )
+        let canonicalConfigurations = try configurations.map {
+            try $0.canonicalJSONData()
+        }
+        let projected = try InvestigationProjectedCohortAuthor(
+            now: { fixture.now },
+            identifiers: {
+                InvestigationProjectedCohortGeneratedIdentifiers(
+                    outerAttemptUUID: UUID(),
+                    epochUUIDs: (0..<8).map { _ in UUID() }
+                )
+            }
+        ).author(
+            configurationData: canonicalConfigurations,
+            installedBinding: installed
+        )
+        #expect(projected.capsule.epochs.map(\.configuration)
+            == canonicalConfigurations)
+        #expect(Set(projected.projections.map(
+            \.configurationValidBefore
+        )).count == 1)
+        #expect(
+            try SignedInvestigationRuntimeDiagnosticConfiguration
+                .decodeMachineCohortValidated(from: data, now: fixture.now)
+                == configuration
+        )
+        #expect(throws: SignedInvestigationRuntimeContractError
+            .invalidConfiguration) {
+            _ = try fixture.configuration(machineCohortWindow: 1_200.001)
+        }
+        #expect(throws: SignedInvestigationRuntimeContractError
+            .invalidConfiguration) {
+            _ = try fixture.configuration(
+                validBefore: fixture.now.addingTimeInterval(901)
+            )
+        }
+        var overlong = try #require(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+        overlong["validBefore"] = fixture.now.addingTimeInterval(1_200.001)
+            .timeIntervalSinceReferenceDate
+        let overlongData = try JSONSerialization.data(
+            withJSONObject: overlong,
+            options: [.sortedKeys, .withoutEscapingSlashes]
+        )
+        #expect(throws: SignedInvestigationRuntimeContractError
+            .invalidConfiguration) {
+            _ = try SignedInvestigationRuntimeDiagnosticConfiguration
+                .decodeMachineCohortValidated(
+                    from: overlongData, now: fixture.now
+                )
+        }
+        overlong["maximumWallClockSeconds"] = 139
+        overlong["validBefore"] = configuration.validBefore
+            .timeIntervalSinceReferenceDate
+        #expect(throws: SignedInvestigationRuntimeContractError
+            .invalidConfiguration) {
+            _ = try SignedInvestigationRuntimeDiagnosticConfiguration
+                .decodeMachineCohortValidated(
+                    from: JSONSerialization.data(
+                        withJSONObject: overlong,
+                        options: [.sortedKeys, .withoutEscapingSlashes]
+                    ),
+                    now: fixture.now
+                )
+        }
+        #expect(throws: SignedInvestigationRuntimeContractError
+            .invalidConfiguration) {
+            _ = try fixture.configuration(machineCohortWindow: .infinity)
+        }
+        #expect(throws: SignedInvestigationRuntimeContractError
+            .invalidConfiguration) {
+            _ = try SignedInvestigationRuntimeDiagnosticConfiguration
+                .decodeMachineCohortValidated(
+                    from: data, now: Date(timeIntervalSince1970: .infinity)
+                )
+        }
+        #expect(throws: SignedInvestigationRuntimeContractError
+            .invalidConfiguration) {
+            _ = try SignedInvestigationRuntimeDiagnosticConfiguration
+                .decodeMachineCohortValidated(
+                    from: data, now: configuration.validBefore
+                )
+        }
+        fixture.materializeOutputs()
+        #expect(
+            try SignedInvestigationRuntimeDiagnosticConfiguration
+                .decodeMachineCohortValidated(
+                    from: data, now: fixture.now,
+                    outputs: .ownerRegularFile
+                ) == configuration
+        )
+        #expect(throws: SignedInvestigationRuntimeContractError
+            .invalidConfiguration) {
+            _ = try SignedInvestigationRuntimeDiagnosticConfiguration
+                .decodeMachineCohortValidated(
+                    from: data, now: fixture.now
+                )
+        }
+    }
+
+    @Test
+    func fixedRunnerAcceptsThePresealedMachineCohortWindow() throws {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let configuration = try fixture.configuration(
+            machineCohortWindow: 1_200
+        )
+
+        #expect(throws: Never.self) {
+            _ = try InvestigationFixedScenarioRunner(
+                configuration: configuration,
+                plan: fixture.machinePlan(configuration: configuration),
+                now: fixture.now,
+                operation: { throw CancellationError() }
+            )
+        }
+        var object = try #require(JSONSerialization.jsonObject(
+            with: configuration.canonicalJSONData()
+        ) as? [String: Any])
+        object["maximumTurns"] = 2
+        let wrongProfile = try JSONDecoder().decode(
+            SignedInvestigationRuntimeDiagnosticConfiguration.self,
+            from: JSONSerialization.data(withJSONObject: object)
+        )
+        #expect(throws: InvestigationFixedScenarioRunnerError.invalidInput) {
+            _ = try InvestigationFixedScenarioRunner(
+                configuration: wrongProfile,
+                plan: fixture.machinePlan(configuration: wrongProfile),
+                now: fixture.now, operation: { throw CancellationError() }
+            )
         }
     }
 
@@ -1447,6 +1661,37 @@ struct SignedRuntimeContractTests {
     }
 
     @Test
+    func machineAssemblerAcceptsPresealedCohortValidity() throws {
+        let fixture = try SignedRuntimeContractFixture()
+        defer { fixture.remove() }
+        let configurations = try fixture.machineConfigurations(
+            machineCohortWindow: 1_200
+        )
+        fixture.materializeOutputs()
+        let artifacts = try configurations.map {
+            try fixture.caseEvidence(configuration: $0)
+        }
+        let success = try #require(
+            configurations.first { $0.scenario == .success }
+        )
+
+        let report = try SignedInvestigationRuntimeMachineAssembler().assemble(
+            configurations: configurations, artifacts: artifacts,
+            capabilityMetadata: fixture.capabilityMetadata(),
+            capabilityWorker: fixture.capabilityWorker(
+                investigationID: success.nonce,
+                evidenceBindingSHA256: success.capabilityEvidenceBindingSHA256()
+            ),
+            capabilityLifecycleIntegrity: fixture.capabilityLifecycleIntegrity(),
+            capabilityRepository: fixture.capabilityRepositoryEvidence(),
+            now: artifacts.map(\.completedAt).max()!
+        )
+
+        #expect(report.verdict
+            == .evidenceContractValidatedMachineAdmissionPending)
+    }
+
+    @Test
     func machineAssemblerRejectsExpiredOrFutureCaseEvidence()
         throws
     {
@@ -1517,6 +1762,24 @@ struct SignedRuntimeContractTests {
                 capabilityRepository:
                     fixture.capabilityRepositoryEvidence(),
                 now: fixture.now.addingTimeInterval(30)
+            )
+        }
+
+        var overlongArtifacts = validArtifacts
+        overlongArtifacts[expiredIndex] = try fixture.caseEvidence(
+            configuration: expiredConfiguration,
+            startedAt: fixture.now,
+            completedAt: fixture.now.addingTimeInterval(141)
+        )
+        #expect(throws: (any Error).self) {
+            _ = try assembler.assemble(
+                configurations: configurations, artifacts: overlongArtifacts,
+                capabilityMetadata: fixture.capabilityMetadata(),
+                capabilityWorker: capabilityWorker,
+                capabilityLifecycleIntegrity:
+                    fixture.capabilityLifecycleIntegrity(),
+                capabilityRepository: fixture.capabilityRepositoryEvidence(),
+                now: fixture.now.addingTimeInterval(141)
             )
         }
     }
@@ -1656,13 +1919,37 @@ struct SignedRuntimeContractTests {
                 $0.scenario == .timeout
             }
         )
-        mixedConfigurations[mixedIndex] = try fixture.configuration(
-            nonce: configurations[mixedIndex].nonce,
-            scenario: .timeout,
-            binding: fixture.binding(
-                runtimeReceiptSHA256:
-                    String(repeating: "c", count: 64)
+        func replaced(
+            _ source: SignedInvestigationRuntimeDiagnosticConfiguration,
+            binding: SignedInvestigationRuntimeBinding? = nil,
+            validBefore: Date? = nil
+        ) throws -> SignedInvestigationRuntimeDiagnosticConfiguration {
+            var object = try #require(JSONSerialization.jsonObject(
+                with: source.canonicalJSONData()
+            ) as? [String: Any])
+            if let binding {
+                object["binding"] = try JSONSerialization.jsonObject(
+                    with: JSONEncoder().encode(binding)
+                )
+            }
+            if let validBefore {
+                object["validBefore"] = validBefore
+                    .timeIntervalSinceReferenceDate
+            }
+            return try JSONDecoder().decode(
+                SignedInvestigationRuntimeDiagnosticConfiguration.self,
+                from: JSONSerialization.data(withJSONObject: object)
             )
+        }
+        mixedConfigurations[mixedIndex] = try replaced(
+            configurations[mixedIndex],
+            binding: fixture.binding(runtimeReceiptSHA256:
+                String(repeating: "c", count: 64))
+        )
+        var mixedDeadlines = configurations
+        mixedDeadlines[mixedIndex] = try replaced(
+            configurations[mixedIndex],
+            validBefore: fixture.now.addingTimeInterval(299)
         )
         fixture.materializeOutputs()
         let validArtifacts = try configurations.map {
@@ -1677,6 +1964,22 @@ struct SignedRuntimeContractTests {
                 successConfiguration.capabilityEvidenceBindingSHA256()
         )
         let assembler = SignedInvestigationRuntimeMachineAssembler()
+        var mixedDeadlineArtifacts = validArtifacts
+        mixedDeadlineArtifacts[mixedIndex] = try fixture.caseEvidence(
+            configuration: mixedDeadlines[mixedIndex]
+        )
+        #expect(throws: (any Error).self) {
+            _ = try assembler.assemble(
+                configurations: mixedDeadlines,
+                artifacts: mixedDeadlineArtifacts,
+                capabilityMetadata: fixture.capabilityMetadata(),
+                capabilityWorker: capabilityWorker,
+                capabilityLifecycleIntegrity:
+                    fixture.capabilityLifecycleIntegrity(),
+                capabilityRepository: fixture.capabilityRepositoryEvidence(),
+                now: fixture.now.addingTimeInterval(30)
+            )
+        }
 
         var mixedArtifacts = validArtifacts
         mixedArtifacts[mixedIndex] = try fixture.caseEvidence(
@@ -2196,6 +2499,21 @@ struct SignedRuntimeContractTests {
                 }
         )
         #expect(decoded == bundle)
+
+        var wrongProfile = try #require(
+            JSONSerialization.jsonObject(with: bundleData) as? [String: Any]
+        )
+        var encodedConfigurations = try #require(
+            wrongProfile["configurations"] as? [[String: Any]]
+        )
+        encodedConfigurations[0]["maximumTurns"] = 2
+        wrongProfile["configurations"] = encodedConfigurations
+        #expect(throws: SignedInvestigationRuntimeContractError.invalidReport) {
+            _ = try JSONDecoder().decode(
+                SignedInvestigationRuntimeMachineEvidenceBundle.self,
+                from: JSONSerialization.data(withJSONObject: wrongProfile)
+            )
+        }
     }
 
     @Test
@@ -2724,11 +3042,16 @@ struct SignedRuntimeContractFixture {
         try JSONEncoder().encode(configuration())
     }
 
-    func machineConfigurations() throws
+    func machineConfigurations(
+        machineCohortWindow: TimeInterval? = nil
+    ) throws
         -> [SignedInvestigationRuntimeDiagnosticConfiguration]
     {
         try SignedInvestigationRuntimeDiagnosticScenario.allCases.map {
-            try configuration(nonce: UUID(), scenario: $0)
+            try configuration(
+                nonce: UUID(), scenario: $0,
+                machineCohortWindow: machineCohortWindow
+            )
         }
     }
 
@@ -2792,7 +3115,8 @@ struct SignedRuntimeContractFixture {
         binding: SignedInvestigationRuntimeBinding? = nil,
         reuseDefaultPaths: Bool = false,
         configurationNow: Date? = nil,
-        validBefore: Date? = nil
+        validBefore: Date? = nil,
+        machineCohortWindow: TimeInterval? = nil
     ) throws -> SignedInvestigationRuntimeDiagnosticConfiguration {
         let selectedNonce = nonce ?? self.nonce
         let paths = try attemptPaths(
@@ -2800,6 +3124,29 @@ struct SignedRuntimeContractFixture {
             reuseDefaultPaths: reuseDefaultPaths,
             diagnosticRootPath: diagnosticRootPath
         )
+        let deadline = validBefore ?? now.addingTimeInterval(
+            machineCohortWindow ?? 300
+        )
+        if machineCohortWindow != nil {
+            return try SignedInvestigationRuntimeDiagnosticConfiguration
+                .machineCohort(
+                nonce: selectedNonce, scenario: scenario,
+                optIn: SignedInvestigationRuntimeDiagnosticConfiguration
+                    .requiredOptIn,
+                diagnosticRootPath: paths.diagnosticRoot.path,
+                sourceRootPath: sourceRootPath ?? paths.sourceRoot.path,
+                supportRootPath: supportRootPath ?? paths.supportRoot.path,
+                runtimeRootPath: paths.runtimeRoot.path,
+                reportPath: paths.reportURL.path,
+                storePath: storePath ?? paths.storeURL.path,
+                binding: binding ?? self.binding(),
+                expectedModel: .gpt56Luna, expectedProvider: .openAI,
+                validBefore: deadline, maximumWallClockSeconds: 140,
+                maximumTurns: 3, maximumProbeCalls: 16,
+                maximumContextBytes: 1_048_576,
+                now: configurationNow ?? now
+            )
+        }
         return try SignedInvestigationRuntimeDiagnosticConfiguration(
             nonce: selectedNonce,
             scenario: scenario,
@@ -2815,7 +3162,7 @@ struct SignedRuntimeContractFixture {
             binding: binding ?? self.binding(),
             expectedModel: .gpt56Luna,
             expectedProvider: .openAI,
-            validBefore: validBefore ?? now.addingTimeInterval(300),
+            validBefore: deadline,
             maximumWallClockSeconds: 140,
             maximumTurns: 3,
             maximumProbeCalls: 16,

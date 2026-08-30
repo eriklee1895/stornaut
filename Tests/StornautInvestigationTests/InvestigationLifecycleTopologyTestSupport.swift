@@ -250,7 +250,8 @@ final class LifecycleTopologyCollectorFixture: @unchecked Sendable {
                 attributes: [.posixPermissions: 0o700]
             )
         }
-        return try SignedInvestigationRuntimeDiagnosticConfiguration(
+        return try SignedInvestigationRuntimeDiagnosticConfiguration
+            .machineCohort(
             nonce: nonce,
             scenario: scenario,
             optIn: SignedInvestigationRuntimeDiagnosticConfiguration.requiredOptIn,
@@ -263,11 +264,11 @@ final class LifecycleTopologyCollectorFixture: @unchecked Sendable {
             binding: binding,
             expectedModel: .gpt56Luna,
             expectedProvider: .openAI,
-            validBefore: now.addingTimeInterval(60),
-            maximumWallClockSeconds: 30,
-            maximumTurns: 1,
-            maximumProbeCalls: 1,
-            maximumContextBytes: 1_024,
+            validBefore: now.addingTimeInterval(1_200),
+            maximumWallClockSeconds: 140,
+            maximumTurns: 3,
+            maximumProbeCalls: 16,
+            maximumContextBytes: 1_048_576,
             now: now
         )
     }

@@ -148,21 +148,39 @@ package enum InvestigationMachineGateCoordinatorSupport {
   {
     package let sourceFingerprintSHA256: String
     package let configurationSHA256s: [String]
+    package let configurationValidBefore: InvestigationHandoffUTCMicroseconds
     let source: InvestigationMachineCoordinatorConfigurationSet?
     package init(
       sourceFingerprintSHA256: String,
-      configurationSHA256s: [String]
+      configurationSHA256s: [String],
+      configurationValidBefore: InvestigationHandoffUTCMicroseconds
     ) {
       self.sourceFingerprintSHA256 = sourceFingerprintSHA256
       self.configurationSHA256s = configurationSHA256s
+      self.configurationValidBefore = configurationValidBefore
       source = nil
     }
     init(source: InvestigationMachineCoordinatorConfigurationSet) throws {
+      guard
+      let firstValidBefore = source.configurations.first?.validBefore,
+        source.configurations.count == InvestigationCohortCapsule.epochCount,
+        source.configurations.allSatisfy({
+          $0.validBefore == firstValidBefore
+            && $0.maximumWallClockSeconds
+              == SignedInvestigationRuntimeDiagnosticConfiguration
+                .maximumMachineEpochWallClockSeconds
+        })
+      else {
+        throw InvestigationMachineGateCoordinatorProductionError.protocolFailure
+      }
       self.source = source
       sourceFingerprintSHA256 = source.currentSourceBinding.sourceFingerprint.hex
       configurationSHA256s = try source.configurations.map {
         try $0.machineConfigurationSHA256()
       }
+      configurationValidBefore = try InvestigationHandoffUTCMicroseconds(
+        timeIntervalSince1970: firstValidBefore.timeIntervalSince1970
+      )
     }
   }
   package struct InvestigationMachineGateCoordinatorAuthoredCohort:
@@ -172,27 +190,41 @@ package enum InvestigationMachineGateCoordinatorSupport {
     package let configurationSHA256s: [String]
     package let outerAttemptUUID: UUID
     package let wholeProjectedInputSHA256: String
+    package let configurationValidBefore: InvestigationHandoffUTCMicroseconds
     let canonicalProjectedInput: Data?
     package init(
       sourceFingerprintSHA256: String,
       configurationSHA256s: [String],
       outerAttemptUUID: UUID,
-      wholeProjectedInputSHA256: String
+      wholeProjectedInputSHA256: String,
+      configurationValidBefore: InvestigationHandoffUTCMicroseconds
     ) {
       self.sourceFingerprintSHA256 = sourceFingerprintSHA256
       self.configurationSHA256s = configurationSHA256s
       self.outerAttemptUUID = outerAttemptUUID
       self.wholeProjectedInputSHA256 = wholeProjectedInputSHA256
+      self.configurationValidBefore = configurationValidBefore
       canonicalProjectedInput = nil
     }
     init(
       sourceFingerprintSHA256: String, configurationSHA256s: [String],
+      configurationValidBefore: InvestigationHandoffUTCMicroseconds,
       projectedInput: InvestigationProjectedCohortInput
     ) throws {
       self.sourceFingerprintSHA256 = sourceFingerprintSHA256
       self.configurationSHA256s = configurationSHA256s
       outerAttemptUUID = projectedInput.capsule.outerAttemptUUID
       wholeProjectedInputSHA256 = projectedInput.wholeInputSHA256.lowercaseHex
+      guard
+        projectedInput.capsule.epochs.map({ $0.configurationSHA256.lowercaseHex })
+          == configurationSHA256s,
+        projectedInput.projections.allSatisfy({
+          $0.configurationValidBefore == configurationValidBefore
+        })
+      else {
+        throw InvestigationMachineGateCoordinatorProductionError.protocolFailure
+      }
+      self.configurationValidBefore = configurationValidBefore
       canonicalProjectedInput = try projectedInput.encoded()
     }
   }
@@ -402,6 +434,7 @@ package enum InvestigationMachineGateCoordinatorSupport {
       InvestigationMachineGateCoordinatorSinkDisposition
     ) async throws -> Void
     typealias Monotonic = @Sendable () throws -> UInt64
+    typealias WallNow = @Sendable () -> Date
     let validateInvocation: ValidateInvocation
     let materializeSource: MaterializeSource
     let makeBinding: MakeBinding
@@ -412,6 +445,7 @@ package enum InvestigationMachineGateCoordinatorSupport {
     let makeReceipt: MakeReceipt
     let writeClose: WriteClose
     let monotonic: Monotonic
+    let wallNow: WallNow
     init(
       validateInvocation: @escaping ValidateInvocation,
       materializeSource: @escaping MaterializeSource,
@@ -421,7 +455,8 @@ package enum InvestigationMachineGateCoordinatorSupport {
       handoff: @escaping Handoff,
       retireArtifacts: @escaping RetireArtifacts,
       makeReceipt: @escaping MakeReceipt,
-      writeClose: @escaping WriteClose, monotonic: @escaping Monotonic
+      writeClose: @escaping WriteClose, monotonic: @escaping Monotonic,
+      wallNow: @escaping WallNow = Date.init
     ) {
       self.validateInvocation = validateInvocation
       self.materializeSource = materializeSource
@@ -433,6 +468,7 @@ package enum InvestigationMachineGateCoordinatorSupport {
       self.makeReceipt = makeReceipt
       self.writeClose = writeClose
       self.monotonic = monotonic
+      self.wallNow = wallNow
     }
   }
   package actor InvestigationMachineGateCoordinatorComposition {
@@ -479,6 +515,9 @@ package enum InvestigationMachineGateCoordinatorSupport {
         configurations = batch
         let authored = try await dependencies.authorCohort(batch)
         cohort = authored
+        try InvestigationMachineGateCoordinatorHandoffAdmission.validate(
+          authored, now: dependencies.wallNow()
+        )
         handoffStarted = true
         handoff = try await dependencies.handoff(authored)
       } catch {
@@ -579,17 +618,53 @@ package enum InvestigationMachineGateCoordinatorSupport {
         ) },
         configurations: configurations.map { .init(
           sourceFingerprintSHA256: $0.sourceFingerprintSHA256,
-          configurationSHA256s: $0.configurationSHA256s
+          configurationSHA256s: $0.configurationSHA256s,
+          configurationValidBefore: $0.configurationValidBefore
         ) },
         cohort: cohort.map { .init(
           sourceFingerprintSHA256: $0.sourceFingerprintSHA256,
           configurationSHA256s: $0.configurationSHA256s,
           outerAttemptUUID: $0.outerAttemptUUID,
-          wholeProjectedInputSHA256: $0.wholeProjectedInputSHA256
+          wholeProjectedInputSHA256: $0.wholeProjectedInputSHA256,
+          configurationValidBefore: $0.configurationValidBefore
         ) }, handoff: handoff, retirementOutcome: retirementOutcome,
         monotonicStartedNanoseconds: monotonicStartedNanoseconds,
         monotonicCompletedNanoseconds: monotonicCompletedNanoseconds
       )
+    }
+  }
+  package enum InvestigationMachineGateCoordinatorHandoffAdmission {
+    package static let finalOutputReserveSeconds: TimeInterval = 5
+    package static let minimumHandoffRemainingSeconds =
+      TimeInterval(InvestigationCohortCapsule.epochCount
+        * SignedInvestigationRuntimeDiagnosticConfiguration
+          .maximumMachineEpochWallClockSeconds)
+      + finalOutputReserveSeconds
+
+    package static func validate(
+      _ cohort: InvestigationMachineGateCoordinatorAuthoredCohort,
+      now: Date
+    ) throws {
+      let nowSeconds = now.timeIntervalSince1970
+      let scaledNow = nowSeconds * 1_000_000
+      guard nowSeconds.isFinite, nowSeconds > 0, scaledNow.isFinite,
+            scaledNow >= 1, scaledNow < Double(Int64.max)
+      else {
+        throw InvestigationMachineGateCoordinatorProductionError.protocolFailure
+      }
+      let observedMicroseconds = Int64(scaledNow.rounded(.up))
+      let remaining = cohort.configurationValidBefore.rawValue
+        .subtractingReportingOverflow(observedMicroseconds)
+      let minimumMicroseconds = Int64(minimumHandoffRemainingSeconds * 1_000_000)
+      let maximumMicroseconds = Int64(
+        SignedInvestigationRuntimeDiagnosticConfiguration
+          .maximumMachineCohortValiditySeconds * 1_000_000
+      )
+      guard !remaining.overflow, remaining.partialValue >= minimumMicroseconds,
+            remaining.partialValue <= maximumMicroseconds
+      else {
+        throw InvestigationMachineGateCoordinatorProductionError.protocolFailure
+      }
     }
   }
   private extension JSONEncoder {
@@ -931,6 +1006,7 @@ package enum InvestigationMachineGateCoordinatorSupport {
           let value = try InvestigationMachineGateCoordinatorAuthoredCohort(
             sourceFingerprintSHA256: batch.sourceFingerprintSHA256,
             configurationSHA256s: batch.configurationSHA256s,
+            configurationValidBefore: batch.configurationValidBefore,
             projectedInput: projected
           )
           self.state.lock.withLock { self.state.projectedInput = projected }
