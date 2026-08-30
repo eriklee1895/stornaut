@@ -3,7 +3,7 @@
 set -euo pipefail
 
 contract_source=${0:A}
-ib2_self_sha=724bd90ebf9949c4434fa9403d353370e05ab9484dc9e841f8a0353ca394a781
+ib2_self_sha=af20228a4414c8d506bcf40ae650a6bc90bc59ff6eedb85e07f38c301775e383
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' "$contract_source" | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
 repo_root=${contract_source:h:h}
@@ -2049,7 +2049,7 @@ function verify_iic0bivb2_contract() {
 function verify_iic0bivb2_subordinate_source_seals() {
     local investigation=${STORNAUT_IIC0BIVB2_INVESTIGATION_BOUNDARY_SOURCE:-scripts/verify-investigation-boundaries}
     local release=${STORNAUT_IIC0BIVB2_APP_RELEASE_BOUNDARY_SOURCE:-scripts/verify-app-release-boundaries}
-    [[ "$(shasum -a 256 "$investigation" | awk '{print $1}')" == 8449e754526d78e9d459ff527ffd7b0fa7518d7dbe87feb99b4916b1b3561212 ]] || fail_contract 'Machine driver verifier source seal drifted: scripts/verify-investigation-boundaries'
+    [[ "$(shasum -a 256 "$investigation" | awk '{print $1}')" == aedf9adc41244c243a36677a066b099d1e8c072ab212c69d0194896ecebfc973 ]] || fail_contract 'Machine driver verifier source seal drifted: scripts/verify-investigation-boundaries'
     [[ "$(shasum -a 256 "$release" | awk '{print $1}')" == b51cfb2114a41205bb07b9b66bdd52e4e86d755316a44faafec62278f02eefee ]] || fail_contract 'Machine driver verifier source seal drifted: scripts/verify-app-release-boundaries'
 }
 
