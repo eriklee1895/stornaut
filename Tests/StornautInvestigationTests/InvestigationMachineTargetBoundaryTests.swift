@@ -1054,7 +1054,7 @@ struct InvestigationMachineTargetBoundaryTests {
             "function verify_iic0biii2a_component_boundary()", "iic0biii2a_positive_gates=(",
             "iic0biii2a_closed_images=(", "iic0biii2a_gate_symbols=(",
             "ii-c0b-iii-2a Debug Gate positive control is missing",
-            "ii-c0b-iii-2a Release Gate positive control is missing", "ii-c0b-iii-2a GateSupport namespace leaked into a closed image",
+            "ii-c0b-iii-2a Release Gate positive control is missing", "ii-c0b-iii-2a forbidden namespace or receipt domain leaked into a closed image",
             "ii-c0b-iii-2a exact projection drifted",
             "512c8ea1fbd27b9df403a5db438ba3352aa2e6ebb2a9cdcaf877cf27cc73bc15",
             "42a692726b9e81a3657e9c730288e5d183374ca69d26dee67fad1de960c76202",
