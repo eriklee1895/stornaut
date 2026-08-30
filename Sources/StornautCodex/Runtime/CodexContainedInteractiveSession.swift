@@ -7,17 +7,20 @@ public struct CodexContainedInteractiveSessionConfiguration:
     Equatable
 {
     public let investigationID: UUID
+    public let expectedCodexExecutableSHA256: String
     public let validBefore: Date
     public let maximumLineBytes: Int
     public let maximumSessionBytes: Int
 
     public init(
         investigationID: UUID,
+        expectedCodexExecutableSHA256: String,
         validBefore: Date,
         maximumLineBytes: Int,
         maximumSessionBytes: Int
     ) {
         self.investigationID = investigationID
+        self.expectedCodexExecutableSHA256 = expectedCodexExecutableSHA256
         self.validBefore = validBefore
         self.maximumLineBytes = maximumLineBytes
         self.maximumSessionBytes = maximumSessionBytes
@@ -37,6 +40,17 @@ public enum CodexContainedInteractiveSessionError:
     case lineLimitExceeded
     case sessionLimitExceeded
     case retirementFailed
+}
+
+public struct CodexContainedInteractiveStartObservation:
+    Sendable,
+    Equatable
+{
+    public let codexExecutableSHA256: String
+
+    fileprivate init(codexExecutableSHA256: String) {
+        self.codexExecutableSHA256 = codexExecutableSHA256
+    }
 }
 
 public struct CodexContainedInteractiveOwnerRetirementObservation:
@@ -90,6 +104,7 @@ public struct CodexContainedInteractiveOwnerRetirementObservation:
 
 struct CodexContainedInteractiveLaunchPlan: Sendable {
     let executableURL: URL
+    let nativeIdentityLease: CodexNativeExecutableIdentityLease
     let arguments: [String]
     let environment: CodexRuntimeEnvironment
     let currentDirectoryURL: URL
@@ -99,6 +114,7 @@ struct CodexContainedInteractiveLaunchPlan: Sendable {
 
     init(
         executableURL: URL,
+        nativeIdentityLease: CodexNativeExecutableIdentityLease,
         arguments: [String],
         environment: CodexRuntimeEnvironment,
         currentDirectoryURL: URL,
@@ -107,6 +123,7 @@ struct CodexContainedInteractiveLaunchPlan: Sendable {
         containmentConfiguration: CodexContainmentConfiguration
     ) {
         self.executableURL = executableURL
+        self.nativeIdentityLease = nativeIdentityLease
         self.arguments = arguments
         self.environment = environment
         self.currentDirectoryURL = currentDirectoryURL
@@ -116,10 +133,452 @@ struct CodexContainedInteractiveLaunchPlan: Sendable {
     }
 }
 
+struct CodexContainedInteractiveNativeLaunchReceipt: Sendable {
+    let process: SpawnedDiagnosticProcess
+    let codexExecutableSHA256: String
+    let nativeIdentityLease: CodexNativeExecutableIdentityLease
+}
+
+struct CodexContainedInteractiveNativeLeaseSnapshot: Sendable, Equatable {
+    let path: String
+    let device: UInt64
+    let inode: UInt64
+    let generation: UInt32
+    let size: Int64
+}
+
+final class CodexContainedInteractiveLaunchGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancelled = false
+    private var resumed = false
+
+    func cancel() {
+        lock.withLock {
+            if !resumed { cancelled = true }
+        }
+    }
+
+    func resume(_ processID: pid_t, before deadline: DispatchTime) throws {
+        try lock.withLock {
+            guard
+                !cancelled,
+                !Task.isCancelled,
+                DispatchTime.now().uptimeNanoseconds
+                    < deadline.uptimeNanoseconds,
+                kill(processID, SIGCONT) == 0
+            else {
+                throw CodexContainedInteractiveSessionError.launchFailed
+            }
+            resumed = true
+        }
+    }
+}
+
+struct CodexContainedInteractiveMappedImageIdentity: Sendable, Equatable {
+    let path: String
+    let device: UInt64
+    let inode: UInt64
+    let generation: UInt32
+    let size: Int64
+}
+
+enum CodexContainedInteractiveNativeLaunchPhase: Sendable, Equatable {
+    case beforeSpawn
+    case afterSpawn(pid_t)
+    case afterInitialStop(pid_t)
+    case afterImageObservation(pid_t)
+    case beforeFinalLeaseRevalidation(pid_t)
+    case beforeResume(pid_t)
+}
+
+struct CodexContainedInteractiveNativeLauncher: Sendable {
+    let observationHook:
+        @Sendable (CodexContainedInteractiveNativeLaunchPhase) throws -> Void
+
+    init(
+        observationHook: @escaping @Sendable (
+            CodexContainedInteractiveNativeLaunchPhase
+        ) throws -> Void = { _ in }
+    ) {
+        self.observationHook = observationHook
+    }
+
+    func launch(
+        plan: CodexContainedInteractiveLaunchPlan,
+        deadline: DispatchTime,
+        gate: CodexContainedInteractiveLaunchGate = .init()
+    ) throws -> CodexContainedInteractiveNativeLaunchReceipt {
+        let lease = plan.nativeIdentityLease
+        try Task.checkCancellation()
+        guard plan.executableURL == lease.canonicalURL else {
+            throw CodexContainedInteractiveSessionError.launchFailed
+        }
+        try lease.revalidate()
+
+        var ownedDescriptors = Set<Int32>()
+        var childPID: pid_t = 0
+        var transferred = false
+        defer {
+            if childPID > 0, !transferred {
+                killAndExactlyReap(childPID)
+            }
+            for descriptor in ownedDescriptors {
+                Darwin.close(descriptor)
+            }
+        }
+
+        let stdinPipe = try makePipe()
+        ownedDescriptors.formUnion([stdinPipe.read, stdinPipe.write])
+        let stdoutPipe = try makePipe()
+        ownedDescriptors.formUnion([stdoutPipe.read, stdoutPipe.write])
+        let stderrPipe = try makePipe()
+        ownedDescriptors.formUnion([stderrPipe.read, stderrPipe.write])
+
+        var fileActions: posix_spawn_file_actions_t?
+        guard posix_spawn_file_actions_init(&fileActions) == 0 else {
+            throw CodexContainedInteractiveSessionError.launchFailed
+        }
+        defer { posix_spawn_file_actions_destroy(&fileActions) }
+        try addDup(stdinPipe.read, to: STDIN_FILENO, actions: &fileActions)
+        try addDup(stdoutPipe.write, to: STDOUT_FILENO, actions: &fileActions)
+        try addDup(stderrPipe.write, to: STDERR_FILENO, actions: &fileActions)
+        for descriptor in ownedDescriptors {
+            try addClose(descriptor, actions: &fileActions)
+        }
+        guard plan.currentDirectoryURL.path.withCString({
+            posix_spawn_file_actions_addchdir(&fileActions, $0)
+        }) == 0 else {
+            throw CodexContainedInteractiveSessionError.launchFailed
+        }
+
+        var attributes: posix_spawnattr_t?
+        guard posix_spawnattr_init(&attributes) == 0 else {
+            throw CodexContainedInteractiveSessionError.launchFailed
+        }
+        defer { posix_spawnattr_destroy(&attributes) }
+        let flags = Int16(
+            POSIX_SPAWN_START_SUSPENDED
+                | POSIX_SPAWN_SETPGROUP
+                | POSIX_SPAWN_CLOEXEC_DEFAULT
+        )
+        guard
+            posix_spawnattr_setflags(&attributes, flags) == 0,
+            posix_spawnattr_setpgroup(&attributes, 0) == 0
+        else {
+            throw CodexContainedInteractiveSessionError.launchFailed
+        }
+
+        let argv = [plan.executableURL.path] + plan.arguments
+        let envp = plan.environment.values
+            .map { "\($0.key)=\($0.value)" }.sorted()
+        try observationHook(.beforeSpawn)
+        let spawnResult = try withCStringArray(argv) { arguments in
+            try withCStringArray(envp) { environment in
+                plan.executableURL.path.withCString { executable in
+                    posix_spawn(
+                        &childPID, executable, &fileActions, &attributes,
+                        arguments, environment
+                    )
+                }
+            }
+        }
+        guard spawnResult == 0, childPID > 0 else {
+            childPID = 0
+            throw CodexContainedInteractiveSessionError.launchFailed
+        }
+        try observationHook(.afterSpawn(childPID))
+        try Task.checkCancellation()
+
+        closeOwned(stdinPipe.read, descriptors: &ownedDescriptors)
+        closeOwned(stdoutPipe.write, descriptors: &ownedDescriptors)
+        closeOwned(stderrPipe.write, descriptors: &ownedDescriptors)
+        try waitForInitialStop(childPID, deadline: deadline)
+        try observationHook(.afterInitialStop(childPID))
+        try requireLoadedMainImage(childPID, lease: lease)
+        try observationHook(.beforeFinalLeaseRevalidation(childPID))
+        try Task.checkCancellation()
+        try lease.revalidate()
+        guard
+            getpgid(childPID) == childPID,
+            childPID != getpgrp(),
+            fcntl(stdinPipe.write, F_SETNOSIGPIPE, 1) == 0
+        else {
+            throw CodexContainedInteractiveSessionError.launchFailed
+        }
+        try observationHook(.beforeResume(childPID))
+        try gate.resume(childPID, before: deadline)
+
+        let process = SpawnedDiagnosticProcess(
+            pid: childPID,
+            processGroup: ProcessGroupID(rawValue: childPID),
+            standardInput: stdinPipe.write,
+            standardOutput: stdoutPipe.read,
+            standardError: stderrPipe.read
+        )
+        ownedDescriptors.subtract([
+            stdinPipe.write, stdoutPipe.read, stderrPipe.read,
+        ])
+        transferred = true
+        return CodexContainedInteractiveNativeLaunchReceipt(
+            process: process,
+            codexExecutableSHA256: lease.sha256,
+            nativeIdentityLease: lease
+        )
+    }
+
+    private func waitForInitialStop(
+        _ processID: pid_t,
+        deadline: DispatchTime
+    ) throws {
+        while DispatchTime.now().uptimeNanoseconds
+            < deadline.uptimeNanoseconds
+        {
+            var initialStopStatus: Int32 = 0
+            let result = waitpid(
+                processID, &initialStopStatus, WUNTRACED | WNOHANG
+            )
+            if result == processID {
+                guard Self.initialStopIsAccepted(
+                    result: result,
+                    initialStopStatus: initialStopStatus,
+                    expectedProcessID: processID
+                ) else {
+                    throw CodexContainedInteractiveSessionError.launchFailed
+                }
+                return
+            }
+            if result < 0, errno != EINTR {
+                throw CodexContainedInteractiveSessionError.launchFailed
+            }
+            try Task.checkCancellation()
+            usleep(5_000)
+        }
+        throw CodexContainedInteractiveSessionError.launchFailed
+    }
+
+    static func initialStopIsAccepted(
+        result: pid_t, initialStopStatus: Int32, expectedProcessID: pid_t
+    ) -> Bool {
+        result == expectedProcessID && initialStopStatus == 0x7f
+    }
+
+    private func requireLoadedMainImage(
+        _ processID: pid_t,
+        lease: CodexNativeExecutableIdentityLease
+    ) throws {
+        var address: UInt64 = 0
+        var images: [CodexContainedInteractiveMappedImageIdentity] = []
+        var inspectedRegionCount = 0
+        while inspectedRegionCount < 4_096 {
+            errno = 0
+            var information = proc_regionwithpathinfo()
+            let byteCount = proc_pidinfo(
+                processID, PROC_PIDREGIONPATHINFO, address, &information,
+                Int32(MemoryLayout<proc_regionwithpathinfo>.size)
+            )
+            if byteCount == 0, !images.isEmpty { break }
+            guard
+                byteCount == MemoryLayout<proc_regionwithpathinfo>.size,
+                let observed = mappedIdentity(information)
+            else {
+                throw CodexContainedInteractiveSessionError.launchFailed
+            }
+            images.append(observed)
+            let next = information.prp_prinfo.pri_address
+                .addingReportingOverflow(information.prp_prinfo.pri_size)
+            guard
+                information.prp_prinfo.pri_size > 0,
+                !next.overflow, next.partialValue > address
+            else {
+                throw CodexContainedInteractiveSessionError.launchFailed
+            }
+            address = next.partialValue
+            inspectedRegionCount += 1
+        }
+        try observationHook(.afterImageObservation(processID))
+        guard
+            inspectedRegionCount < 4_096,
+            mappedImagesMatchLease(
+                images,
+                expected: Self.snapshot(lease)
+            )
+        else {
+            throw CodexContainedInteractiveSessionError.launchFailed
+        }
+    }
+
+    func mappedImagesMatchLease(
+        _ images: [CodexContainedInteractiveMappedImageIdentity],
+        expected: CodexContainedInteractiveNativeLeaseSnapshot
+    ) -> Bool {
+        guard
+            let first = images.first,
+            matches(first, expected: expected)
+        else {
+            return false
+        }
+        return !images.dropFirst().contains {
+            $0.path == expected.path && !matches($0, expected: expected)
+        }
+    }
+
+    private func mappedIdentity(
+        _ value: proc_regionwithpathinfo
+    ) -> CodexContainedInteractiveMappedImageIdentity? {
+        var pathStorage = value.prp_vip.vip_path
+        let pathBytes = withUnsafeBytes(of: &pathStorage) { Array($0) }
+        guard
+            let terminator = pathBytes.firstIndex(of: 0),
+            let path = String(
+                bytes: pathBytes[..<terminator], encoding: .utf8
+            ),
+            path.utf8.count == terminator
+        else {
+            return nil
+        }
+        let node = value.prp_vip.vip_vi.vi_stat
+        return CodexContainedInteractiveMappedImageIdentity(
+            path: path,
+            device: UInt64(node.vst_dev),
+            inode: UInt64(node.vst_ino),
+            generation: node.vst_gen,
+            size: Int64(node.vst_size)
+        )
+    }
+
+    private func matches(
+        _ observed: CodexContainedInteractiveMappedImageIdentity,
+        expected: CodexContainedInteractiveNativeLeaseSnapshot
+    ) -> Bool {
+        observed.path == expected.path
+            && observed.device == expected.device
+            && observed.inode == expected.inode
+            && observed.generation == expected.generation
+            && observed.size == expected.size
+    }
+
+    private static func snapshot(
+        _ lease: CodexNativeExecutableIdentityLease
+    ) -> CodexContainedInteractiveNativeLeaseSnapshot {
+        CodexContainedInteractiveNativeLeaseSnapshot(
+            path: lease.canonicalURL.path,
+            device: lease.device,
+            inode: lease.inode,
+            generation: lease.generation,
+            size: lease.size
+        )
+    }
+
+    private func killAndExactlyReap(_ processID: pid_t) {
+        kill(-processID, SIGKILL)
+        kill(processID, SIGKILL)
+        var status: Int32 = 0
+        while waitpid(processID, &status, 0) < 0 {
+            if errno == EINTR { continue }
+            break
+        }
+    }
+
+    private func makePipe() throws -> (read: Int32, write: Int32) {
+        var descriptors = [Int32](repeating: -1, count: 2)
+        guard pipe(&descriptors) == 0 else {
+            throw CodexContainedInteractiveSessionError.launchFailed
+        }
+        var result = (read: descriptors[0], write: descriptors[1])
+        do {
+            result.read = try descriptorAboveStandardIO(result.read)
+            result.write = try descriptorAboveStandardIO(result.write)
+            return result
+        } catch {
+            Darwin.close(result.read)
+            Darwin.close(result.write)
+            throw error
+        }
+    }
+
+    private func descriptorAboveStandardIO(_ descriptor: Int32) throws
+        -> Int32
+    {
+        if descriptor > STDERR_FILENO {
+            guard fcntl(descriptor, F_SETFD, FD_CLOEXEC) == 0 else {
+                throw CodexContainedInteractiveSessionError.launchFailed
+            }
+            return descriptor
+        }
+        let moved = fcntl(
+            descriptor, F_DUPFD_CLOEXEC, STDERR_FILENO + 1
+        )
+        guard moved >= 0 else {
+            throw CodexContainedInteractiveSessionError.launchFailed
+        }
+        Darwin.close(descriptor)
+        return moved
+    }
+
+    private func addDup(
+        _ descriptor: Int32,
+        to target: Int32,
+        actions: inout posix_spawn_file_actions_t?
+    ) throws {
+        guard posix_spawn_file_actions_adddup2(
+            &actions, descriptor, target
+        ) == 0 else {
+            throw CodexContainedInteractiveSessionError.launchFailed
+        }
+    }
+
+    private func addClose(
+        _ descriptor: Int32,
+        actions: inout posix_spawn_file_actions_t?
+    ) throws {
+        guard posix_spawn_file_actions_addclose(
+            &actions, descriptor
+        ) == 0 else {
+            throw CodexContainedInteractiveSessionError.launchFailed
+        }
+    }
+
+    private func closeOwned(
+        _ descriptor: Int32,
+        descriptors: inout Set<Int32>
+    ) {
+        guard descriptors.remove(descriptor) != nil else { return }
+        Darwin.close(descriptor)
+    }
+
+    private func withCStringArray<Result>(
+        _ strings: [String],
+        body: (
+            UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>
+        ) throws -> Result
+    ) throws -> Result {
+        guard strings.allSatisfy({ !$0.utf8.contains(0) }) else {
+            throw CodexContainedInteractiveSessionError.launchFailed
+        }
+        var storage: [UnsafeMutablePointer<CChar>?] = []
+        defer { storage.forEach { free($0) } }
+        for string in strings {
+            guard let pointer = strdup(string) else {
+                throw CodexContainedInteractiveSessionError.launchFailed
+            }
+            storage.append(pointer)
+        }
+        storage.append(nil)
+        return try storage.withUnsafeMutableBufferPointer { buffer in
+            try body(buffer.baseAddress!)
+        }
+    }
+}
+
 public actor CodexContainedInteractiveSession {
     typealias PlanBuilder = @Sendable (
         CodexContainedInteractiveSessionConfiguration
     ) async throws -> CodexContainedInteractiveLaunchPlan
+    typealias NativeLauncher = @Sendable (
+        CodexContainedInteractiveLaunchPlan,
+        DispatchTime,
+        CodexContainedInteractiveLaunchGate
+    ) throws -> CodexContainedInteractiveNativeLaunchReceipt
 
     private enum State {
         case ready
@@ -143,6 +602,7 @@ public actor CodexContainedInteractiveSession {
 
     private let now: @Sendable () -> Date
     private let planBuilder: PlanBuilder
+    private let nativeLauncher: NativeLauncher
     private var state = State.ready
     private var configuration:
         CodexContainedInteractiveSessionConfiguration?
@@ -151,6 +611,12 @@ public actor CodexContainedInteractiveSession {
         CodexContainedInteractiveLaunchPlan,
         any Error
     >?
+    private var nativeLaunchTask: Task<
+        CodexContainedInteractiveNativeLaunchReceipt,
+        any Error
+    >?
+    private var nativeLaunchGate: CodexContainedInteractiveLaunchGate?
+    private var pendingLaunchPlan: CodexContainedInteractiveLaunchPlan?
     private var prelaunchRetirementOutcome =
         PrelaunchRetirementOutcome.absent
     private var transferredBytes = 0
@@ -167,19 +633,29 @@ public actor CodexContainedInteractiveSession {
         planBuilder = {
             try await CodexContainedInteractivePlanBuilder().build($0)
         }
+        nativeLauncher = { plan, deadline, gate in
+            try CodexContainedInteractiveNativeLauncher().launch(
+                plan: plan,
+                deadline: deadline,
+                gate: gate
+            )
+        }
     }
 
     init(
         now: @escaping @Sendable () -> Date = Date.init,
-        planBuilder: @escaping PlanBuilder
+        planBuilder: @escaping PlanBuilder,
+        nativeLauncher: @escaping NativeLauncher
     ) {
         self.now = now
         self.planBuilder = planBuilder
+        self.nativeLauncher = nativeLauncher
     }
 
+    @discardableResult
     public func start(
         _ configuration: CodexContainedInteractiveSessionConfiguration
-    ) async throws {
+    ) async throws -> CodexContainedInteractiveStartObservation {
         guard
             state == .ready,
             self.configuration == nil,
@@ -225,15 +701,90 @@ public actor CodexContainedInteractiveSession {
             throw CodexContainedInteractiveSessionError
                 .invalidConfiguration
         }
-        guard valid(plan) else {
+        guard valid(
+            plan,
+            expectedCodexExecutableSHA256:
+                configuration.expectedCodexExecutableSHA256
+        ) else {
             recordPreparedWorkspaceRetirement(plan)
             state = .failed
             throw CodexContainedInteractiveSessionError.launchFailed
         }
 
+        let launchGate = CodexContainedInteractiveLaunchGate()
+        nativeLaunchGate = launchGate
+        let launchDeadline: DispatchTime
+        do {
+            try Task.checkCancellation()
+            launchDeadline = try operationDeadline(configuration)
+        } catch {
+            launchGate.cancel()
+            nativeLaunchGate = nil
+            recordPreparedWorkspaceRetirement(plan)
+            state = .failed
+            throw Task.isCancelled
+                ? CodexContainedInteractiveSessionError.sessionUnavailable
+                : error
+        }
+        let nativeLauncher = self.nativeLauncher
+        pendingLaunchPlan = plan
+        let launchResult = await withTaskCancellationHandler {
+            if Task.isCancelled {
+                launchGate.cancel()
+            }
+            let launchTask = Task.detached(priority: .utility) {
+                try nativeLauncher(plan, launchDeadline, launchGate)
+            }
+            nativeLaunchTask = launchTask
+            return await launchTask.result
+        } onCancel: {
+            launchGate.cancel()
+        }
+        let launchReceipt: CodexContainedInteractiveNativeLaunchReceipt
+        switch launchResult {
+        case let .success(value):
+            launchReceipt = value
+        case .failure:
+            if state == .starting {
+                nativeLaunchTask = nil
+                nativeLaunchGate = nil
+                pendingLaunchPlan = nil
+                recordPreparedWorkspaceRetirement(plan)
+                state = .failed
+                throw CodexContainedInteractiveSessionError.launchFailed
+            }
+            throw CodexContainedInteractiveSessionError.sessionUnavailable
+        }
+        guard state == .starting else {
+            throw CodexContainedInteractiveSessionError.sessionUnavailable
+        }
+        nativeLaunchTask = nil
+        nativeLaunchGate = nil
+        pendingLaunchPlan = nil
+        if Task.isCancelled || !valid(configuration, at: now()) {
+            if
+                let cleanup = try? CodexContainedInteractiveResources(
+                    plan: plan,
+                    launchReceipt: launchReceipt,
+                    maximumLineBytes: configuration.maximumLineBytes,
+                    maximumSessionBytes: configuration.maximumSessionBytes
+                ),
+                let observation = cleanup.retire()
+            {
+                prelaunchRetirementOutcome = .observed(observation)
+            } else {
+                prelaunchRetirementOutcome = .failed
+                try? plan.workspace.remove()
+            }
+            state = .failed
+            throw Task.isCancelled
+                ? CodexContainedInteractiveSessionError.sessionUnavailable
+                : CodexContainedInteractiveSessionError.invalidConfiguration
+        }
         do {
             resources = try CodexContainedInteractiveResources(
                 plan: plan,
+                launchReceipt: launchReceipt,
                 maximumLineBytes: configuration.maximumLineBytes,
                 maximumSessionBytes: configuration.maximumSessionBytes
             )
@@ -244,6 +795,9 @@ public actor CodexContainedInteractiveSession {
             throw CodexContainedInteractiveSessionError.launchFailed
         }
         state = .active
+        return CodexContainedInteractiveStartObservation(
+            codexExecutableSHA256: resources!.codexExecutableSHA256
+        )
     }
 
     public func writeLine(_ line: Data) async throws {
@@ -324,6 +878,47 @@ public actor CodexContainedInteractiveSession {
             return observation
         }
         if state == .starting {
+            if
+                let nativeLaunchTask,
+                let pendingLaunchPlan,
+                let configuration
+            {
+                nativeLaunchGate?.cancel()
+                state = .retiring
+                nativeLaunchTask.cancel()
+                let task = Task<
+                    CodexContainedInteractiveOwnerRetirementObservation?,
+                    Never
+                > {
+                    switch await nativeLaunchTask.result {
+                    case let .success(receipt):
+                        do {
+                            let resources = try
+                                CodexContainedInteractiveResources(
+                                    plan: pendingLaunchPlan,
+                                    launchReceipt: receipt,
+                                    maximumLineBytes:
+                                        configuration.maximumLineBytes,
+                                    maximumSessionBytes:
+                                        configuration.maximumSessionBytes
+                                )
+                            return resources.retire()
+                        } catch {
+                            try? pendingLaunchPlan.workspace.remove()
+                            return nil
+                        }
+                    case .failure:
+                        do {
+                            try pendingLaunchPlan.workspace.remove()
+                            return .retiredPreparedWorkspace
+                        } catch {
+                            return nil
+                        }
+                    }
+                }
+                retirementTask = task
+                return try await acceptRetirementTask(task)
+            }
             guard let startingTask else {
                 state = .failed
                 throw CodexContainedInteractiveSessionError
@@ -397,6 +992,9 @@ public actor CodexContainedInteractiveSession {
     {
         let observation = await task.value
         startingTask = nil
+        nativeLaunchTask = nil
+        nativeLaunchGate = nil
+        pendingLaunchPlan = nil
         self.resources = nil
         retirementObservation = observation
         state = observation == nil ? .failed : .retired
@@ -433,6 +1031,12 @@ public actor CodexContainedInteractiveSession {
         at current: Date
     ) -> Bool {
         configuration.validBefore.timeIntervalSince1970.isFinite
+            && configuration.expectedCodexExecutableSHA256.count == 64
+            && configuration.expectedCodexExecutableSHA256.unicodeScalars
+                .allSatisfy {
+                    (0x30...0x39).contains($0.value)
+                        || (0x61...0x66).contains($0.value)
+                }
             && current.timeIntervalSince1970.isFinite
             && configuration.validBefore > current
             && configuration.validBefore.timeIntervalSince(current) <= 900
@@ -446,9 +1050,18 @@ public actor CodexContainedInteractiveSession {
     }
 
     private func valid(
-        _ plan: CodexContainedInteractiveLaunchPlan
+        _ plan: CodexContainedInteractiveLaunchPlan,
+        expectedCodexExecutableSHA256: String
     ) -> Bool {
+        do {
+            try plan.nativeIdentityLease.revalidate()
+        } catch {
+            return false
+        }
         guard
+            plan.nativeIdentityLease.sha256
+                == expectedCodexExecutableSHA256,
+            plan.executableURL == plan.nativeIdentityLease.canonicalURL,
             plan.executableURL.isFileURL,
             plan.executableURL.path.hasPrefix("/"),
             plan.executableURL.standardizedFileURL.path
@@ -628,6 +1241,16 @@ private struct CodexContainedInteractivePlanBuilder: Sendable {
         else {
             throw CodexContainedInteractiveSessionError.launchFailed
         }
+        let nativeIdentityLease = try CodexNativeExecutableIdentitySource()
+            .resolve(
+                installation: installation,
+                expectedUserID: identity.userID
+            )
+        guard nativeIdentityLease.sha256
+                == configuration.expectedCodexExecutableSHA256
+        else {
+            throw CodexContainedInteractiveSessionError.launchFailed
+        }
         let workspace = try CodexRuntimeWorkspace.create(
             under: runRoot,
             forbiddenRoots: [
@@ -649,9 +1272,10 @@ private struct CodexContainedInteractivePlanBuilder: Sendable {
                     forbiddenHomeURL: identity.homeURL
                 )
             return CodexContainedInteractiveLaunchPlan(
-                executableURL: installation.executableURL,
+                executableURL: nativeIdentityLease.canonicalURL,
+                nativeIdentityLease: nativeIdentityLease,
                 arguments: try policy.launchArguments(
-                    codexExecutableURL: installation.executableURL,
+                    codexExecutableURL: nativeIdentityLease.canonicalURL,
                     workspace: workspace.paths
                 ),
                 environment: projectedEnvironment,
@@ -802,23 +1426,23 @@ private final class CodexContainedInteractiveResources:
     let process: SpawnedDiagnosticProcess
     let writer: BoundedAppServerWriter
     let reader: BoundedAppServerLineReader
+    let codexExecutableSHA256: String
     let cancellation = AppServerSessionCancellation()
     private let standardError: BoundedAppServerErrorOutput
     private let standardErrorGroup: DispatchGroup
     private let workspace: CodexRuntimeWorkspace
+    private let nativeIdentityLease: CodexNativeExecutableIdentityLease
 
     init(
         plan: CodexContainedInteractiveLaunchPlan,
+        launchReceipt: CodexContainedInteractiveNativeLaunchReceipt,
         maximumLineBytes: Int,
         maximumSessionBytes: Int
     ) throws {
         workspace = plan.workspace
-        process = try spawnDiagnosticProcess(
-            executableURL: plan.executableURL,
-            arguments: plan.arguments,
-            environment: plan.environment.values,
-            currentDirectoryURL: plan.currentDirectoryURL
-        )
+        process = launchReceipt.process
+        codexExecutableSHA256 = launchReceipt.codexExecutableSHA256
+        nativeIdentityLease = launchReceipt.nativeIdentityLease
         do {
             writer = try BoundedAppServerWriter(
                 descriptor: process.standardInput
@@ -872,6 +1496,8 @@ private final class CodexContainedInteractiveResources:
             terminated = false
             forceCleanupDiagnosticProcess(process)
         }
+        let postReapLeaseValid =
+            terminated && (try? nativeIdentityLease.revalidate()) != nil
         reader.close()
         standardErrorGroup.wait()
         let stderrContained =
@@ -883,7 +1509,9 @@ private final class CodexContainedInteractiveResources:
         } catch {
             workspaceRemoved = false
         }
-        guard terminated, stderrContained, workspaceRemoved else {
+        guard
+            terminated, postReapLeaseValid, stderrContained, workspaceRemoved
+        else {
             return nil
         }
         return .retiredOwnedResources

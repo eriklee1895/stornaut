@@ -26,16 +26,19 @@ package struct InvestigationLifecycleRetirementEvidence:
         LifecycleInvestigationResidueObservation
     package let helperProcessIdentity: LifecycleProcessIdentity
     package let helperAttestedAt: Date
+    package let codexExecutableSHA256: String?
 
     fileprivate init(
         machineRetirementHandle: LifecycleMachineRetirementHandle,
         residueObservation: LifecycleInvestigationResidueObservation,
-        helperPeer: LifecycleConnectedHelperPeer
+        helperPeer: LifecycleConnectedHelperPeer,
+        codexExecutableSHA256: String?
     ) {
         self.machineRetirementHandle = machineRetirementHandle
         self.residueObservation = residueObservation
         helperProcessIdentity = helperPeer.identity
         helperAttestedAt = helperPeer.attestedAt
+        self.codexExecutableSHA256 = codexExecutableSHA256
     }
 }
 
@@ -85,6 +88,7 @@ package actor InvestigationLifecycleAppServerTransport:
 
     private let investigationID: LifecycleInvestigationID
     private let configurationSHA256: String
+    private let codexExecutableSHA256: String
     private let expectedUserID: UInt32
     private let validBefore: Date
     private let maximumLineBytes: Int
@@ -100,6 +104,7 @@ package actor InvestigationLifecycleAppServerTransport:
         LifecycleInvestigationResidueObservation?
     private var retirementEvidence:
         InvestigationLifecycleRetirementEvidence?
+    private var acceptedCodexExecutableSHA256: String?
     private var startRequestDispatched = false
     private var operationInProgress = false
     private var operationWaiters: [
@@ -114,6 +119,7 @@ package actor InvestigationLifecycleAppServerTransport:
     package init(
         investigationID: LifecycleInvestigationID,
         configurationSHA256: String,
+        codexExecutableSHA256: String,
         validBefore: Date,
         maximumLineBytes: Int,
         maximumSessionBytes: Int,
@@ -130,6 +136,7 @@ package actor InvestigationLifecycleAppServerTransport:
             validBefore > current,
             validBefore.timeIntervalSince(current) <= 900,
             validRuntimeSHA256(configurationSHA256),
+            validRuntimeSHA256(codexExecutableSHA256),
             (1...LifecycleInteractiveSessionRequest
                 .maximumAllowedLineBytes).contains(maximumLineBytes),
             maximumSessionBytes >= maximumLineBytes,
@@ -142,6 +149,7 @@ package actor InvestigationLifecycleAppServerTransport:
         }
         self.investigationID = investigationID
         self.configurationSHA256 = configurationSHA256
+        self.codexExecutableSHA256 = codexExecutableSHA256
         self.expectedUserID = expectedUserID
         self.validBefore = validBefore
         self.maximumLineBytes = maximumLineBytes
@@ -350,7 +358,9 @@ package actor InvestigationLifecycleAppServerTransport:
             let evidence = InvestigationLifecycleRetirementEvidence(
                 machineRetirementHandle: machineRetirementHandle,
                 residueObservation: observation,
-                helperPeer: helperPeer
+                helperPeer: helperPeer,
+                codexExecutableSHA256:
+                    acceptedCodexExecutableSHA256
             )
             residueObservation = observation
             retirementEvidence = evidence
@@ -399,6 +409,7 @@ package actor InvestigationLifecycleAppServerTransport:
                 investigationID: investigationID,
                 operationID: operationID(),
                 configurationSHA256: configurationSHA256,
+                codexExecutableSHA256: codexExecutableSHA256,
                 validBefore: validBefore,
                 maximumLineBytes: maximumLineBytes,
                 maximumSessionBytes: maximumSessionBytes
@@ -412,10 +423,20 @@ package actor InvestigationLifecycleAppServerTransport:
                 throw InvestigationLifecycleAppServerTransportError
                     .identityMismatch
             }
+            guard
+                let observedCodexExecutableSHA256 =
+                    validated.codexExecutableSHA256,
+                observedCodexExecutableSHA256 == codexExecutableSHA256
+            else {
+                throw InvestigationLifecycleAppServerTransportError
+                    .identityMismatch
+            }
             guard state == .starting else {
                 throw InvestigationLifecycleAppServerTransportError
                     .invalidState
             }
+            acceptedCodexExecutableSHA256 =
+                observedCodexExecutableSHA256
             state = .active
         } catch {
             fail()

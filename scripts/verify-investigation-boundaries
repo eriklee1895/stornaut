@@ -343,6 +343,10 @@ iib3c_composition_source=
 iib3c_harness_source=
 iib3c_staged_scope_contract_only=false
 iib3c_staged_scope_baseline=HEAD
+interactive_native_scope_contract_only=false
+interactive_native_scope_baseline=07ef385
+interactive_native_source_contract_only=false
+interactive_native_source_contract_sources=()
 if (( $# > 0 )); then
     if (( $# == 2 )) && [[ $1 == --claim-asid-contract-only ]]; then
         claim_asid_contract_only=true
@@ -872,6 +876,14 @@ if (( $# > 0 )); then
         && [[ $1 == --iib3c-staged-scope-contract-only ]]; then
         iib3c_staged_scope_contract_only=true
         iib3c_staged_scope_baseline=${2:-HEAD}
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --interactive-native-staged-scope-contract-only ]]; then
+        interactive_native_scope_contract_only=true
+        interactive_native_scope_baseline=${2:-07ef385}
+    elif (( $# == 1 || $# == 8 )) \
+        && [[ $1 == --interactive-native-source-contract-only ]]; then
+        interactive_native_source_contract_only=true
+        interactive_native_source_contract_sources=("${@:2}")
     else
         print -u2 \
             "Usage: scripts/verify-investigation-boundaries [... | --shared-deadline-repair-source-contract-only [12 sources] | --shared-deadline-repair-mutation-contract-only slot sha 12-sources | --shared-deadline-repair-scope-contract-only [baseline]]"
@@ -10189,13 +10201,13 @@ import hashlib
 expected = (
     "119b1884498eccb8b29aff86f1e6c05698ee517638c2f01fbf99730781468141",
     "d650ce1a72623415020b8874360f44c2de03e1e9cc604a8b13f0d13dbf7b5dbc",
-    "7bcb90d8adbc1eb22d43ef1ab76d9519f60805a976b1b58d421b4e9079189e1f",
+    "93e6e4f03d7f9cfec3ebe37b2232c030deddfb135cc0d94a14439dfa550d381a",
     "1f088b8987d521f9700cfe8e01e9c205394fa9b9a188a879c661329cde4f7140",
     "c5fdd0bf621018bf88c0c68be4d95ca1a8883fc69fcf1c3cdfa31886eaefb977",
     "f1a760d3ca6042c5c090a9542b05fa235b3fce21265b3cd253ee1c359c14067e",
     "746fc4b1900103fde66786ad699e4f868e46b1eefc712c0c3135cbef239f37bf",
     "3018ac3bbdee76138dda2ba046ee7ab6b52a6f07b3b377a98871643ce56f933b",
-    "71b5d5c36207b441592e5fa89c2115b2996bac4e8f828d6afd88da62a1039b7f",
+    "4bb10d821727719cf74e38d14539a30485c86c0d769d4005f7df0d8a499561d3",
     "688848926de2cdbc276ea1e1c662da7cddaee9a8ba7e28108031b04490cb5e54",
     "7afaf9dd177c8c3508a029839bdd1eeab4689a1debe7f298d993ca54305f6493",
     "dcdb198be26abff6965cfd45d73ba60b85454314f6dddae796409a8413567e45",
@@ -10548,6 +10560,394 @@ function verify_fixed_gate_deadline_cleanup_scope() {
     (( changed <= 700 )) || { print -u2 "fixed-gate cleanup checkpoint budget drifted"; return 1; }
     local item mode entry; for item in "${expected[@]}"; do mode=100644; [[ $item == scripts/* ]] && mode=100755; entry=$(git ls-files -s -- "$item"); [[ "$(print -r -- "$entry" | awk '{print $1, $3, $4}')" == "$mode 0 $item" && "$(print -r -- "$entry" | awk '{print $2}')" == "$(git hash-object -- "$item")" ]] || { print -u2 "fixed-gate cleanup staged source/mode drifted: $item"; return 1; }; done
 }
+
+function verify_interactive_native_scope() {
+    local baseline=${1:-07ef385}
+    local expected_baseline=07ef385a5792d8932fdf3490051e8448a3d7d8e6
+    local -a expected=(
+        Sources/StornautCodex/Runtime/CodexNativeExecutableIdentity.swift
+        Sources/StornautCodex/Runtime/CodexContainedInteractiveSession.swift
+        Sources/StornautLifecycle/LifecycleInteractiveSessionContract.swift
+        Sources/StornautLifecycle/LifecycleInteractiveSessionBroker.swift
+        Sources/StornautInvestigationRuntime/InvestigationLifecycleAppServerTransport.swift
+        Sources/StornautInvestigationDiagnostic/InvestigationRuntimeDiagnosticComposition.swift
+        StornautLifecycleHelper/main.swift
+        Tests/StornautCodexTests/CodexNativeExecutableIdentityTests.swift
+        Tests/StornautCodexTests/CodexContainedInteractiveSessionTests.swift
+        Tests/StornautLifecycleTests/LifecycleInteractiveSessionContractTests.swift
+        Tests/StornautLifecycleTests/LifecycleInteractiveSessionBrokerTests.swift
+        Tests/StornautInvestigationTests/InvestigationLifecycleAppServerTransportTests.swift
+        Tests/StornautInvestigationTests/InvestigationHandoffConcreteCompositionTests.swift
+        scripts/verify-investigation-boundaries
+    )
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" \
+        == $expected_baseline ]] || {
+        print -u2 "interactive-native checkpoint baseline drifted"
+        return 1
+    }
+    local -a observed=(${(f)"$(git diff --cached --name-only \
+        --diff-filter=ACMRD "$baseline" | awk 'index($0,"docs/")!=1')"})
+    [[ "${(j:\n:)${(@on)observed}}" == \
+        "${(j:\n:)${(@on)expected}}" ]] || {
+        print -u2 "interactive-native checkpoint paths drifted"
+        return 1
+    }
+    local total production tests verifier totals
+    totals=$(
+        git diff --cached --numstat "$baseline" | awk '
+          index($3,"docs/")!=1 {
+            if($1=="-"||$2=="-") exit 2
+            n=$1+$2; total+=n
+            if(index($3,"Sources/")==1||$3=="StornautLifecycleHelper/main.swift") production+=n
+            else if(index($3,"Tests/")==1) tests+=n
+            else if(index($3,"scripts/")==1) verifier+=n
+          } END {print total+0, production+0, tests+0, verifier+0}'
+    ) || {
+        print -u2 "interactive-native binary checkpoint path rejected"
+        return 1
+    }
+    read total production tests verifier <<< "$totals"
+    (( total <= 2400 && production <= 900 && tests <= 1100 \
+        && verifier <= 500 )) || {
+        print -u2 "interactive-native checkpoint budget drifted"
+        return 1
+    }
+    local -a unstaged=(${(f)"$(git diff --name-only --diff-filter=ACMRD --)"})
+    local -a untracked=(${(f)"$(git ls-files --others --exclude-standard --)"})
+    (( ${#unstaged} == 0 && ${#untracked} == 0 )) || {
+        print -u2 "interactive-native checkpoint worktree is not staged-only"
+        return 1
+    }
+    local item expected_mode entry
+    for item in "${expected[@]}"; do
+        expected_mode=100644
+        [[ $item == scripts/* ]] && expected_mode=100755
+        entry=$(git ls-files -s -- "$item")
+        [[ "$(print -r -- "$entry" | awk '{print $1, $3, $4}')" \
+            == "$expected_mode 0 $item" \
+            && "$(print -r -- "$entry" | awk '{print $2}')" \
+                == "$(git hash-object -- "$item")" ]] || {
+            print -u2 "interactive-native staged source/mode drifted: $item"
+            return 1
+        }
+    done
+}
+
+function verify_interactive_native_source_contract() {
+    local -a paths=("${interactive_native_source_contract_sources[@]}")
+    if (( ${#paths} == 0 )); then
+        paths=(
+            Sources/StornautCodex/Runtime/CodexContainedInteractiveSession.swift
+            Sources/StornautLifecycle/LifecycleInteractiveSessionContract.swift
+            Sources/StornautLifecycle/LifecycleInteractiveSessionBroker.swift
+            Sources/StornautInvestigationRuntime/InvestigationLifecycleAppServerTransport.swift
+            Sources/StornautInvestigationDiagnostic/InvestigationRuntimeDiagnosticComposition.swift
+            StornautLifecycleHelper/main.swift
+            Sources/StornautCodex/Runtime/CodexNativeExecutableIdentity.swift
+        )
+    fi
+    python3 - "${paths[@]}" <<'PY'
+from pathlib import Path
+import re, sys
+if len(sys.argv) != 8:
+    raise SystemExit("interactive-native source cardinality drifted")
+c, contract, broker, transport, composition, helper, identity = (
+    Path(x).read_text() for x in sys.argv[1:]
+)
+expected_sha256 = (
+    "483531e9cf4dd69dbdc348044948c81e76338f35ff37c0deb0818b85e7d51952",
+    "cfeb141ade5849996f3d902118c08737aa1c65ac67f154f1ed58a7fc9674fda4",
+    "75983e7eff0f9d53006150aedc93c8add43b0a6335f05b6a9f4c74de5158b0cb",
+    "de789fa0be83c56b315e5fc8d051ef7af0ca69d588f63594b2a7fa931170b5d1",
+    "93e6e4f03d7f9cfec3ebe37b2232c030deddfb135cc0d94a14439dfa550d381a",
+    "1ea71f3842e4e244f6a3c167c9f3d3f00eb8486fcfdb5cc74e1c41ee857857aa",
+    "1e493622f3eb3fe60ea88d61ce7fdfc3744db79d4850cfec397d5915739ac7f6",
+)
+if tuple(__import__("hashlib").sha256(x.encode()).hexdigest() for x in
+         (c, contract, broker, transport, composition, helper, identity)) != expected_sha256:
+    raise SystemExit("interactive-native sealed source drifted")
+def compact(value):
+    return re.sub(r"\s+", "", value)
+def code_only(source):
+    output = list(source)
+    index = 0
+    block_depth = 0
+    string_end = None
+    raw_hashes = ""
+    while index < len(source):
+        if block_depth:
+            if source.startswith("/*", index):
+                output[index:index + 2] = "  "; block_depth += 1; index += 2
+            elif source.startswith("*/", index):
+                output[index:index + 2] = "  "; block_depth -= 1; index += 2
+            else:
+                if source[index] != "\n": output[index] = " "
+                index += 1
+            continue
+        if string_end is not None:
+            if source.startswith(string_end, index):
+                width = len(string_end); output[index:index + width] = " " * width
+                index += width; string_end = None; raw_hashes = ""
+            elif not raw_hashes and source[index] == "\\":
+                output[index] = " "
+                if index + 1 < len(source) and source[index + 1] != "\n":
+                    output[index + 1] = " "
+                index += 2
+            else:
+                if source[index] != "\n": output[index] = " "
+                index += 1
+            continue
+        if source.startswith("//", index):
+            end = source.find("\n", index); end = len(source) if end < 0 else end
+            output[index:end] = " " * (end - index); index = end
+        elif source.startswith("/*", index):
+            output[index:index + 2] = "  "; block_depth = 1; index += 2
+        else:
+            opener = re.match(r'(#+)?("""|")', source[index:])
+            if opener is None: index += 1; continue
+            hashes = opener.group(1) or ""; quote = opener.group(2)
+            width = len(opener.group(0)); output[index:index + width] = " " * width
+            string_end = quote + hashes; raw_hashes = hashes; index += width
+    if block_depth or string_end is not None:
+        raise SystemExit("interactive-native lexical scan drifted")
+    return "".join(output)
+canonical = dict(zip(
+    ("contained", "contract", "broker", "transport", "composition", "helper"),
+    (c, contract, broker, transport, composition, helper),
+))
+def accepts(values):
+    code = {key: code_only(value) for key, value in values.items()}
+    cc, lc, bc, tc, dc, hc = (
+        compact(code[key]) for key in canonical
+    )
+    required = (
+        (lc, "publicstaticletprotocolVersion=3"),
+        (lc, "publicstaticletprotocolVersion=5"),
+        (lc, "kind!=.started||codexExecutableSHA256==request.codexExecutableSHA256"),
+        (bc, "observation.codexExecutableSHA256==configuration.codexExecutableSHA256"),
+        (tc, "observedCodexExecutableSHA256==codexExecutableSHA256"),
+        (tc, "codexExecutableSHA256:acceptedCodexExecutableSHA256"),
+        (hc, "expectedCodexExecutableSHA256:configuration.codexExecutableSHA256"),
+        (hc, "codexExecutableSHA256:observation.codexExecutableSHA256"),
+        (cc, "POSIX_SPAWN_START_SUSPENDED|POSIX_SPAWN_SETPGROUP|POSIX_SPAWN_CLOEXEC_DEFAULT"),
+        (cc, "waitpid(processID,&initialStopStatus,WUNTRACED|WNOHANG)"),
+        (cc, "result==expectedProcessID&&initialStopStatus==0x7f"),
+        (cc, "mappedImagesMatchLease(images,expected:Self.snapshot(lease))"),
+        (cc, "PROC_PIDREGIONPATHINFO"),
+        (cc, "killAndExactlyReap(childPID)"),
+        (cc, "trygate.resume(childPID,before:deadline)"),
+        (cc, "nativeLaunchGate?.cancel()state=.retiringnativeLaunchTask.cancel()"),
+        (cc, "(try?nativeIdentityLease.revalidate())!=nil"),
+    )
+    if any(marker not in source for source, marker in required): return False
+    if "executableURL:installation.executableURL" in cc: return False
+    resolver = identity[
+        identity.index("  private static func nativeExecutableURL("):
+        identity.index("  private static func currentHomeDirectory(")
+    ]
+    opened = identity[
+        identity.index("  static func openAndHash("):
+        identity.index("  static func namedNode(")
+    ]
+    if __import__("hashlib").sha256(resolver.encode()).hexdigest() != \
+            "b5eaa946dd4c69a734e17bc8542340957927fa885fd63866241862d49ae087e3":
+        return False
+    if __import__("hashlib").sha256(opened.encode()).hexdigest() != \
+            "08fea415624840e1ca33c1a07e51475b6567bf50c798492caa48a92735706b21":
+        return False
+    if dc.count("codexExecutableSHA256:configuration.binding.codexExecutableSHA256") != 2:
+        return False
+    if "returned.codexExecutableSHA256==configuration.binding.codexExecutableSHA256" not in dc:
+        return False
+    validity = lc[lc.index("fileprivatevarisValid:Bool"):]
+    start_valid = validity[
+        validity.index("case.start:"):validity.index("case.write:")
+    ]
+    nonstart_valid = validity[
+        validity.index("case.write:"):validity.index("privateenumCodingKeys")
+    ]
+    if "codexExecutableSHA256.map(lifecycleInteractiveSHA256IsValid)==true" not in start_valid:
+        return False
+    if nonstart_valid.count("codexExecutableSHA256==nil") != 2:
+        return False
+    response_validity = lc[lc.index("privatevarisValid:Bool", lc.index("publicstructLifecycleInteractiveSessionResponse")):]
+    started_valid = response_validity[response_validity.index("case.started:"):response_validity.index("case.writeAccepted,.endOfStream:")]
+    nonstarted_valid = response_validity[response_validity.index("case.writeAccepted,.endOfStream:"):response_validity.index("privatefuncresponseKindMatches")]
+    if "codexExecutableSHA256.map(lifecycleInteractiveSHA256IsValid)==true" not in started_valid:
+        return False
+    if nonstarted_valid.count("codexExecutableSHA256==nil") != 3:
+        return False
+    launcher = cc[
+        cc.index("structCodexContainedInteractiveNativeLauncher"):
+        cc.index("publicactorCodexContainedInteractiveSession")
+    ]
+    ordered = (
+        "waitForInitialStop(childPID,deadline:deadline)",
+        "requireLoadedMainImage(childPID,lease:lease)",
+        "beforeFinalLeaseRevalidation(childPID))tryTask.checkCancellation()trylease.revalidate()",
+        "gate.resume(childPID,before:deadline)",
+    )
+    positions = [launcher.find(marker) for marker in ordered]
+    if min(positions) < 0 or positions != sorted(positions): return False
+    transfer = launcher.find("transferred=true")
+    receipt = launcher.find("returnCodexContainedInteractiveNativeLaunchReceipt")
+    if (
+        launcher.count("transferred=true") != 1
+        or transfer <= positions[-1]
+        or receipt <= transfer
+        or receipt - transfer != len("transferred=true")
+    ):
+        return False
+    launch_defer = launcher[
+        launcher.index("defer{"):launcher.index("letstdinPipe")
+    ]
+    if "ifchildPID>0,!transferred{killAndExactlyReap(childPID)}" not in launch_defer:
+        return False
+    retire = cc[cc.index("funcretire()->CodexContainedInteractiveOwnerRetirementObservation?"):]
+    reap = retire.find("reapDiagnosticProcess(process.pid)")
+    revalidate = retire.find("(try?nativeIdentityLease.revalidate())!=nil")
+    final_guard = retire.find(
+        "terminated,postReapLeaseValid,stderrContained,workspaceRemoved"
+    )
+    if reap < 0 or revalidate <= reap or final_guard <= revalidate:
+        return False
+    start_flow = tc[
+        tc.index("privatefuncstartIfNeeded()asyncthrows"):
+        tc.index("privatefuncaccount")
+    ]
+    equality = start_flow.find(
+        "observedCodexExecutableSHA256==codexExecutableSHA256"
+    )
+    assignment = start_flow.find(
+        "acceptedCodexExecutableSHA256=observedCodexExecutableSHA256"
+    )
+    if equality < 0 or assignment <= equality: return False
+    gate = cc[
+        cc.index("finalclassCodexContainedInteractiveLaunchGate"):
+        cc.index("structCodexContainedInteractiveMappedImageIdentity")
+    ]
+    for marker in (
+        "lock.withLock{if!resumed{cancelled=true}}",
+        "trylock.withLock{guard!cancelled,!Task.isCancelled,DispatchTime.now().uptimeNanoseconds<deadline.uptimeNanoseconds,kill(processID,SIGCONT)==0else{throwCodexContainedInteractiveSessionError.launchFailed}resumed=true}",
+    ):
+        if marker not in gate: return False
+    raw = code["contained"]
+    raw_gate = raw[raw.index("final class CodexContainedInteractiveLaunchGate"):raw.index("struct CodexContainedInteractiveMappedImageIdentity")]
+    if __import__("hashlib").sha256(raw_gate.encode()).hexdigest() != "728c79eab57733ca9ad2b1a5891ab66ee5c960ef1f7c2f6a156ffe16ce3d4566": return False
+    mapped = cc[
+        cc.index("funcmappedImagesMatchLease("):
+        cc.index("privatefuncmappedIdentity(")
+    ]
+    if "returntrue" in mapped: return False
+    for marker in (
+        "letfirst=images.first",
+        "matches(first,expected:expected)",
+        "!images.dropFirst().contains{",
+        "$0.path==expected.path&&!matches($0,expected:expected)",
+    ):
+        if marker not in mapped: return False
+    wait = cc[
+        cc.index("privatefuncwaitForInitialStop("):
+        cc.index("staticfuncinitialStopIsAccepted(")
+    ]
+    for marker in (
+        "whileDispatchTime.now().uptimeNanoseconds<deadline.uptimeNanoseconds",
+        "waitpid(processID,&initialStopStatus,WUNTRACED|WNOHANG)",
+        "ifresult<0,errno!=EINTR",
+        "tryTask.checkCancellation()",
+    ):
+        if marker not in wait: return False
+    cleanup = cc[
+        cc.index("privatefunckillAndExactlyReap("):
+        cc.index("privatefuncmakePipe(")
+    ]
+    if "return" in cleanup: return False
+    for marker in (
+        "kill(-processID,SIGKILL)", "kill(processID,SIGKILL)",
+        "whilewaitpid(processID,&status,0)<0{iferrno==EINTR{continue}break}",
+    ):
+        if marker not in cleanup: return False
+    sealed_bodies = (
+        ("    func mappedImagesMatchLease(", "    private func mappedIdentity(", "75929937f8ee076e2c35cd815c55f9a03ef6de9abb97d988de463b6f6f7ce69c"),
+        ("    private func waitForInitialStop(", "    static func initialStopIsAccepted(", "8ad9fa89f1f88546f8f62a2483388c21dde05c68c8119d73fa0a5d8c44ff5cba"),
+        ("    private func killAndExactlyReap(", "    private func makePipe(", "282d684649ac75cb6526e6954b76ee73875e908681e8c90ed44dcd569b8b3370"),
+    )
+    for start, end, digest in sealed_bodies:
+        body = raw[raw.index(start):raw.index(end)]
+        if __import__("hashlib").sha256(body.encode()).hexdigest() != digest: return False
+    return True
+if not accepts(canonical):
+    raise SystemExit("interactive-native canonical source contract drifted")
+mutations = {
+    "wrapper-execution": ("contained", "executableURL: nativeIdentityLease.canonicalURL", "executableURL: installation.executableURL"),
+    "suspended-flag": ("contained", "POSIX_SPAWN_START_SUSPENDED", "0"),
+    "initial-stop": ("contained", "result == expectedProcessID && initialStopStatus == 0x7f", "result == expectedProcessID"),
+    "image-comparison": ("contained", "mappedImagesMatchLease(\n                images,\n                expected: Self.snapshot(lease)\n            )", "true"),
+    "pre-resume-revalidation": ("contained", "try observationHook(.beforeFinalLeaseRevalidation(childPID))\n        try Task.checkCancellation()\n        try lease.revalidate()", "try observationHook(.beforeFinalLeaseRevalidation(childPID))"),
+    "cancel-resume-gate": ("contained", "try gate.resume(childPID, before: deadline)", "_ = kill(childPID, SIGCONT)"),
+    "retire-cancellation": ("contained", "nativeLaunchGate?.cancel()\n                state = .retiring\n                nativeLaunchTask.cancel()", "state = .retiring\n                nativeLaunchTask.cancel()"),
+    "post-reap-revalidation": ("contained", "terminated && (try? nativeIdentityLease.revalidate()) != nil", "terminated"),
+    "post-reap-success-guard": ("contained", "terminated, postReapLeaseValid, stderrContained, workspaceRemoved", "terminated, stderrContained, workspaceRemoved"),
+    "start-only-request": ("contract", "codexExecutableSHA256.map(\n                    lifecycleInteractiveSHA256IsValid\n                ) == true", "codexExecutableSHA256 != nil"),
+    "nil-on-nonstart-request": ("contract", "case .read, .retire:\n            return codexExecutableSHA256 == nil", "case .read, .retire:\n            return true"),
+    "request-response-equality": ("contract", "codexExecutableSHA256\n                    == request.codexExecutableSHA256", "codexExecutableSHA256 != nil"),
+    "broker-equality": ("broker", "observation.codexExecutableSHA256\n                    == configuration.codexExecutableSHA256", "!observation.codexExecutableSHA256.isEmpty"),
+    "transport-equality": ("transport", "observedCodexExecutableSHA256 == codexExecutableSHA256", "!observedCodexExecutableSHA256.isEmpty"),
+    "signed-source-first": ("composition", "codexExecutableSHA256:\n                configuration.binding.codexExecutableSHA256", "codexExecutableSHA256:\n                configurationSHA256"),
+    "signed-source-second": ("composition", "codexExecutableSHA256:\n                        configuration.binding.codexExecutableSHA256", "codexExecutableSHA256:\n                        configurationSHA256"),
+    "retirement-digest-equality": ("composition", "returned.codexExecutableSHA256\n                == configuration.binding.codexExecutableSHA256", "returned.codexExecutableSHA256 != nil"),
+    "failed-start-digest-promotion": ("transport", "codexExecutableSHA256:\n                    acceptedCodexExecutableSHA256", "codexExecutableSHA256:\n                    codexExecutableSHA256"),
+    "helper-observation": ("helper", "codexExecutableSHA256:\n                    observation.codexExecutableSHA256", "codexExecutableSHA256:\n                    configuration.codexExecutableSHA256"),
+    "gate-cancellation-body": ("contained", "if !resumed { cancelled = true }", "if false { cancelled = true }"),
+    "gate-deadline-body": ("contained", "DispatchTime.now().uptimeNanoseconds\n                    < deadline.uptimeNanoseconds", "deadline.uptimeNanoseconds > 0"),
+    "mapped-first-body": ("contained", "let first = images.first,\n            matches(first, expected: expected)", "let first = images.first"),
+    "mapped-later-body": ("contained", "return !images.dropFirst().contains {\n            $0.path == expected.path && !matches($0, expected: expected)\n        }", "return true"),
+    "wait-loop-body": ("contained", "while DispatchTime.now().uptimeNanoseconds\n            < deadline.uptimeNanoseconds", "while true"),
+    "kill-group-body": ("contained", "kill(-processID, SIGKILL)", "_ = processID"),
+    "exact-reap-body": ("contained", "while waitpid(processID, &status, 0) < 0", "while false"),
+    "early-transfer": ("contained", "transferred = true\n        return CodexContainedInteractiveNativeLaunchReceipt", "transferred = true\n        _ = childPID\n        return CodexContainedInteractiveNativeLaunchReceipt"),
+    "started-response-format": ("contract", "return codexExecutableSHA256.map(\n                lifecycleInteractiveSHA256IsValid\n            ) == true", "return codexExecutableSHA256 != nil"),
+    "nil-on-nonstarted-response": ("contract", "return codexExecutableSHA256 == nil\n                && line == nil", "return line == nil"),
+}
+for name, (slot, old, new) in mutations.items():
+    if canonical[slot].count(old) != 1:
+        raise SystemExit(f"interactive-native mutation shape drifted: {name}")
+    values = canonical.copy()
+    values[slot] = values[slot].replace(old, new, 1)
+    if accepts(values):
+        raise SystemExit(f"interactive-native mutation accepted: {name}")
+identity_mutations = {
+    "wrapper-name": (
+        'executable.lastPathComponent == "codex.js"', "true"
+    ),
+    "wrapper-parent": (
+        'executable.deletingLastPathComponent().lastPathComponent == "bin"',
+        "true",
+    ),
+    "native-layout": (
+        "node_modules/@openai/codex-darwin-arm64/vendor/", "node_modules/"
+    ),
+    "native-tail": ("aarch64-apple-darwin/bin/codex", "bin/codex"),
+    "nofollow": (
+        "O_RDONLY | O_CLOEXEC | O_NOFOLLOW_ANY | O_UNIQUE | O_NONBLOCK",
+        "O_RDONLY | O_CLOEXEC | O_NONBLOCK",
+    ),
+    "resolver-comment-spoof": (
+        "return packageRoot.appending(",
+        "// return packageRoot.appending(\n    return installation.executableURL.appending(",
+    ),
+}
+for name, (old, new) in identity_mutations.items():
+    if identity.count(old) != 1:
+        raise SystemExit(f"interactive-native identity mutation shape drifted: {name}")
+    mutated = identity.replace(old, new, 1)
+    resolver = mutated[mutated.index("  private static func nativeExecutableURL("):mutated.index("  private static func currentHomeDirectory(")]
+    opened = mutated[mutated.index("  static func openAndHash("):mutated.index("  static func namedNode(")]
+    if (__import__("hashlib").sha256(resolver.encode()).hexdigest() == "b5eaa946dd4c69a734e17bc8542340957927fa885fd63866241862d49ae087e3" and __import__("hashlib").sha256(opened.encode()).hexdigest() == "08fea415624840e1ca33c1a07e51475b6567bf50c798492caa48a92735706b21"):
+        raise SystemExit(f"interactive-native identity mutation accepted: {name}")
+PY
+}
+
 
 function verify_iib4_staged_scope() {
     local baseline=${1:-HEAD}
@@ -14180,6 +14580,16 @@ if $fixed_gate_deadline_cleanup_scope_only; then
     print "Fixed-gate deadline cleanup staged scope verification passed."
     exit 0
 fi
+if $interactive_native_scope_contract_only; then
+    verify_interactive_native_scope "$interactive_native_scope_baseline"
+    print "Interactive-native staged scope verification passed."
+    exit 0
+fi
+if $interactive_native_source_contract_only; then
+    verify_interactive_native_source_contract
+    print "Interactive-native source contract verification passed."
+    exit 0
+fi
 if $iib3a_staged_scope_contract_only; then
     verify_iib3a_staged_scope "$iib3a_staged_scope_baseline"
     print "ii-b3a staged scope verification passed."
@@ -14355,6 +14765,7 @@ verify_iic0bi_producer_contract \
     "$diagnostic_root/InvestigationRuntimeDiagnosticComposition.swift" \
     "$iic0bi_focused_test" \
     Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+verify_interactive_native_source_contract
 verify_shared_deadline_contract
 verify_fixed_gate_deadline_cleanup_contract
 verify_iic0biii2a_gate_contract \
@@ -17325,7 +17736,9 @@ required_interactive_contract = {
     "public enum LifecycleInteractiveSessionResponseKind:",
     "public struct LifecycleInteractiveSessionResponse:",
     "public struct LifecycleInteractiveWorkerRetirementObservation:",
-    "public static let protocolVersion = 4",
+    "public static let protocolVersion = 5",
+    "public let codexExecutableSHA256: String?",
+    "== request.codexExecutableSHA256",
     "machineRetirementHandle:",
     "ownerRetirementObservation:",
     "public struct LifecycleInteractiveWorkerReply:",
@@ -17400,6 +17813,8 @@ required_interactive_transport = {
     "guard state == .ready || state == .active || state == .failed else",
     "private var operationInProgress = false",
     "private func requireUnexpired() throws",
+    "acceptedCodexExecutableSHA256",
+    "observedCodexExecutableSHA256 == codexExecutableSHA256",
 }
 missing_interactive_transport = {
     marker
@@ -17510,6 +17925,7 @@ if configuration_match is None:
 configuration_source = configuration_match.group(1)
 required_configuration = {
     "public let investigationID: UUID",
+    "public let expectedCodexExecutableSHA256: String",
     "public let validBefore: Date",
     "public let maximumLineBytes: Int",
     "public let maximumSessionBytes: Int",
@@ -17526,18 +17942,46 @@ if missing_configuration:
     )
 for prohibited in (
     "URL",
-    "executable",
+    "executableURL",
     "provider",
     "model",
     "argument",
     "environment",
-    "String",
 ):
     if prohibited in configuration_source:
         raise SystemExit(
             "Contained interactive public configuration exposes launch "
             f"authority: {prohibited}"
         )
+if configuration_source.count("String") != 2:
+    raise SystemExit(
+        "Contained interactive configuration gained unexpected string authority"
+    )
+
+required_interactive_native_binding = {
+    "CodexNativeExecutableIdentitySource()",
+    "nativeIdentityLease.sha256",
+    "POSIX_SPAWN_START_SUSPENDED",
+    "WUNTRACED | WNOHANG",
+    "initialStopStatus == 0x7f",
+    "PROC_PIDREGIONPATHINFO",
+    "try lease.revalidate()",
+    "killAndExactlyReap(childPID)",
+    "nativeIdentityLease.revalidate()",
+}
+missing_interactive_native_binding = {
+    marker for marker in required_interactive_native_binding
+    if marker not in contained_session_source
+}
+if missing_interactive_native_binding:
+    raise SystemExit(
+        "Contained interactive native identity binding drifted: "
+        f"{sorted(missing_interactive_native_binding)}"
+    )
+if "executableURL: installation.executableURL" in contained_session_source:
+    raise SystemExit(
+        "Contained interactive runtime regained npm-wrapper execution"
+    )
 
 required_prompt = {
     "read-only investigator",

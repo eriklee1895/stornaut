@@ -67,6 +67,8 @@ struct LifecycleInteractiveSessionBrokerTests {
                     investigationID: fixture.investigationID,
                     operationID: UUID(),
                     configurationSHA256: fixture.configurationSHA256,
+                    codexExecutableSHA256:
+                        fixture.codexExecutableSHA256,
                     validBefore: fixture.now,
                     maximumLineBytes: 1_024,
                     maximumSessionBytes: 8_192
@@ -82,6 +84,8 @@ struct LifecycleInteractiveSessionBrokerTests {
                     investigationID: fixture.investigationID,
                     operationID: UUID(),
                     configurationSHA256: fixture.configurationSHA256,
+                    codexExecutableSHA256:
+                        fixture.codexExecutableSHA256,
                     validBefore:
                         fixture.now.addingTimeInterval(901),
                     maximumLineBytes: 1_024,
@@ -165,6 +169,26 @@ struct LifecycleInteractiveSessionBrokerTests {
                 )
             )
         }
+    }
+
+    @Test
+    func brokerRejectsWorkerObservedNativeDigestMismatch() async throws {
+        let fixture = LifecycleInteractiveBrokerFixture()
+        let worker = RecordingLifecycleInteractiveWorker(
+            observedCodexExecutableSHA256:
+                String(repeating: "c", count: 64)
+        )
+        let broker = LifecycleInteractiveSessionBroker(
+            worker: worker, now: { fixture.now }
+        )
+
+        await #expect(
+            throws: LifecycleInteractiveSessionBrokerError.sessionMismatch
+        ) {
+            _ = try await broker.handle(try fixture.startRequest())
+        }
+        #expect(await worker.startCount == 1)
+        #expect(await broker.invalidateAndRetire())
     }
 
     @Test
@@ -459,6 +483,7 @@ private struct LifecycleInteractiveBrokerFixture {
         )!
     )
     let configurationSHA256 = String(repeating: "a", count: 64)
+    let codexExecutableSHA256 = String(repeating: "b", count: 64)
 
     func startRequest(
         maximumLineBytes: Int = 1_024,
@@ -468,6 +493,7 @@ private struct LifecycleInteractiveBrokerFixture {
             investigationID: investigationID,
             operationID: UUID(),
             configurationSHA256: configurationSHA256,
+            codexExecutableSHA256: codexExecutableSHA256,
             validBefore: now.addingTimeInterval(60),
             maximumLineBytes: maximumLineBytes,
             maximumSessionBytes: maximumSessionBytes
@@ -519,6 +545,7 @@ private actor RecordingLifecycleInteractiveWorker:
     private let readError: (any Error)?
     private let retirementObservation:
         LifecycleInteractiveWorkerRetirementObservation?
+    private let observedCodexExecutableSHA256: String?
     private let beforeWrite: @Sendable () -> Void
 
     init(
@@ -529,6 +556,7 @@ private actor RecordingLifecycleInteractiveWorker:
         retirementObservation:
             LifecycleInteractiveWorkerRetirementObservation? =
                 .retiredOwnedResources,
+        observedCodexExecutableSHA256: String? = nil,
         beforeWrite: @escaping @Sendable () -> Void = {}
     ) {
         self.reads = reads
@@ -536,17 +564,23 @@ private actor RecordingLifecycleInteractiveWorker:
         self.writeError = writeError
         self.readError = readError
         self.retirementObservation = retirementObservation
+        self.observedCodexExecutableSHA256 =
+            observedCodexExecutableSHA256
         self.beforeWrite = beforeWrite
     }
 
     func start(
         _ configuration: LifecycleInteractiveWorkerConfiguration
-    ) async throws {
+    ) async throws -> LifecycleInteractiveWorkerStartObservation {
         startCount += 1
         if let startError {
             throw startError
         }
-        _ = configuration
+        return try LifecycleInteractiveWorkerStartObservation(
+            codexExecutableSHA256:
+                observedCodexExecutableSHA256
+                    ?? configuration.codexExecutableSHA256
+        )
     }
 
     func writeLine(_ line: Data) async throws {
@@ -598,8 +632,10 @@ private actor SuspendedLifecycleInteractiveWorker:
 
     func start(
         _ configuration: LifecycleInteractiveWorkerConfiguration
-    ) async throws {
-        _ = configuration
+    ) async throws -> LifecycleInteractiveWorkerStartObservation {
+        try LifecycleInteractiveWorkerStartObservation(
+            codexExecutableSHA256: configuration.codexExecutableSHA256
+        )
     }
 
     func writeLine(_ line: Data) async throws {
@@ -646,8 +682,10 @@ private actor SuspendedFirstWriteLifecycleInteractiveWorker:
 
     func start(
         _ configuration: LifecycleInteractiveWorkerConfiguration
-    ) async throws {
-        _ = configuration
+    ) async throws -> LifecycleInteractiveWorkerStartObservation {
+        try LifecycleInteractiveWorkerStartObservation(
+            codexExecutableSHA256: configuration.codexExecutableSHA256
+        )
     }
 
     func writeLine(_ line: Data) async throws {
@@ -704,8 +742,10 @@ private actor SuspendedRetirementLifecycleInteractiveWorker:
 
     func start(
         _ configuration: LifecycleInteractiveWorkerConfiguration
-    ) async throws {
-        _ = configuration
+    ) async throws -> LifecycleInteractiveWorkerStartObservation {
+        try LifecycleInteractiveWorkerStartObservation(
+            codexExecutableSHA256: configuration.codexExecutableSHA256
+        )
     }
 
     func writeLine(_ line: Data) async throws {

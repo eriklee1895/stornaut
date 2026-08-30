@@ -1,4 +1,3 @@
-#if DEBUG
 import CryptoKit
 import Darwin
 import Foundation
@@ -16,6 +15,7 @@ package struct CodexNativeExecutableIdentity: Sendable, Equatable {
   package let sha256: String
   package let device: UInt64
   package let inode: UInt64
+  package let generation: UInt32
   package let size: Int64
 
   fileprivate let node: CodexNativeExecutableNode
@@ -29,6 +29,7 @@ package final class CodexNativeExecutableIdentityLease: @unchecked Sendable {
   package var sha256: String { identity.sha256 }
   package var device: UInt64 { identity.device }
   package var inode: UInt64 { identity.inode }
+  package var generation: UInt32 { identity.generation }
   package var size: Int64 { identity.size }
 
   private let descriptor: Int32
@@ -361,6 +362,7 @@ private enum CodexNativeExecutableIdentitySystem {
         sha256: sha256,
         device: initialHeld.device,
         inode: initialHeld.inode,
+        generation: initialHeld.generation,
         size: initialHeld.size,
         node: initialHeld,
         extendedAttributeNames: initialAttributes
@@ -521,4 +523,3 @@ private enum CodexNativeExecutableIdentitySystem {
     return hash.finalize().map { String(format: "%02x", $0) }.joined()
   }
 }
-#endif

@@ -9,6 +9,53 @@ import Testing
 @Suite("Investigation concrete inherited-FD composition", .serialized)
 struct InvestigationHandoffConcreteCompositionTests {
     @Test
+    func interactiveRuntimeBindsSignedNativeToSuspendedChildImage()
+        throws
+    {
+        let root = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source: (String) throws -> String = { path in
+            try String(
+                contentsOf: root.appending(path: path),
+                encoding: .utf8
+            )
+        }
+        let lifecycle = try source(
+            "Sources/StornautLifecycle/LifecycleInteractiveSessionContract.swift"
+        )
+        let broker = try source(
+            "Sources/StornautLifecycle/LifecycleInteractiveSessionBroker.swift"
+        )
+        let helper = try source("StornautLifecycleHelper/main.swift")
+        let contained = try source(
+            "Sources/StornautCodex/Runtime/CodexContainedInteractiveSession.swift"
+        )
+
+        #expect(lifecycle.contains("public static let protocolVersion = 3"))
+        #expect(lifecycle.contains("public let codexExecutableSHA256: String?"))
+        #expect(broker.contains("codexExecutableSHA256:"))
+        let composition = try source(
+            "Sources/StornautInvestigationDiagnostic/InvestigationRuntimeDiagnosticComposition.swift"
+        )
+        #expect(composition.contains("codexExecutableSHA256:"))
+        #expect(composition.contains(
+            "configuration.binding.codexExecutableSHA256"
+        ))
+        #expect(helper.contains("expectedCodexExecutableSHA256:"))
+        #expect(helper.contains("configuration.codexExecutableSHA256"))
+        #expect(contained.contains("CodexNativeExecutableIdentitySource()"))
+        #expect(contained.contains("POSIX_SPAWN_START_SUSPENDED"))
+        #expect(contained.contains("WUNTRACED | WNOHANG"))
+        #expect(contained.contains("PROC_PIDREGIONPATHINFO"))
+        #expect(contained.contains("initialStopStatus == 0x7f"))
+        #expect(!contained.contains(
+            "executableURL: installation.executableURL"
+        ))
+    }
+
+    @Test
     func concreteOperationsDriveTheExactLeafAndRetirementSequence()
         async throws
     {
@@ -1360,11 +1407,14 @@ private actor ConcreteLifecycleSession:
         requests.append(request)
         switch request.kind {
         case .start:
-            return .started(
+            return try .started(
                 investigationID: LifecycleInvestigationID(
                     rawValue: fixture.configuration.nonce
                 ),
-                operationID: operationIDs[0]
+                operationID: operationIDs[0],
+                codexExecutableSHA256: try #require(
+                    request.codexExecutableSHA256
+                )
             )
         case .retire:
             _ = try freshAttestedHelperPeer()

@@ -13,9 +13,11 @@ struct InvestigationLifecycleAppServerTransportTests {
         let fixture = InvestigationLifecycleTransportFixture()
         let session = FakeLifecycleInteractiveSession(
             responses: [
-                .started(
+                try .started(
                     investigationID: fixture.investigationID,
-                    operationID: fixture.operationIDs[0]
+                    operationID: fixture.operationIDs[0],
+                    codexExecutableSHA256:
+                        fixture.codexExecutableSHA256
                 ),
                 .writeAccepted(
                     investigationID: fixture.investigationID,
@@ -46,6 +48,15 @@ struct InvestigationLifecycleAppServerTransportTests {
         ])
         #expect(requests.map(\.operationID) == fixture.operationIDs)
         #expect(requests[0].validBefore == fixture.validBefore)
+        #expect(
+            requests[0].codexExecutableSHA256
+                == fixture.codexExecutableSHA256
+        )
+        #expect(
+            requests.dropFirst().allSatisfy {
+                $0.codexExecutableSHA256 == nil
+            }
+        )
         #expect(requests[0].maximumLineBytes == 1_024)
         #expect(requests[0].maximumSessionBytes == 8_192)
         #expect(requests[1].line == fixture.requestLine)
@@ -93,9 +104,11 @@ struct InvestigationLifecycleAppServerTransportTests {
         let fixture = InvestigationLifecycleTransportFixture()
         let session = FakeLifecycleInteractiveSession(
             responses: [
-                .started(
+                try .started(
                     investigationID: LifecycleInvestigationID(),
-                    operationID: fixture.operationIDs[0]
+                    operationID: fixture.operationIDs[0],
+                    codexExecutableSHA256:
+                        fixture.codexExecutableSHA256
                 ),
             ]
         )
@@ -116,13 +129,36 @@ struct InvestigationLifecycleAppServerTransportTests {
     }
 
     @Test
+    func foreignObservedNativeDigestFailsBeforeActiveState() async throws {
+        let fixture = InvestigationLifecycleTransportFixture()
+        let session = FakeLifecycleInteractiveSession(responses: [
+            try .started(
+                investigationID: fixture.investigationID,
+                operationID: fixture.operationIDs[0],
+                codexExecutableSHA256: String(repeating: "c", count: 64)
+            ),
+        ])
+        let transport = try fixture.transport(session: session)
+
+        await #expect(
+            throws: InvestigationLifecycleAppServerTransportError
+                .identityMismatch
+        ) {
+            try await transport.writeLine(fixture.requestLine)
+        }
+        #expect(await session.requests.map(\.kind) == [.start])
+    }
+
+    @Test
     func endOfStreamAndUndrainedRetireFailClosed() async throws {
         let fixture = InvestigationLifecycleTransportFixture()
         let eofSession = FakeLifecycleInteractiveSession(
             responses: [
-                .started(
+                try .started(
                     investigationID: fixture.investigationID,
-                    operationID: fixture.operationIDs[0]
+                    operationID: fixture.operationIDs[0],
+                    codexExecutableSHA256:
+                        fixture.codexExecutableSHA256
                 ),
                 .endOfStream(
                     investigationID: fixture.investigationID,
@@ -430,6 +466,7 @@ struct InvestigationLifecycleAppServerTransportTests {
         let transport = try InvestigationLifecycleAppServerTransport(
             investigationID: fixture.investigationID,
             configurationSHA256: fixture.configurationSHA256,
+            codexExecutableSHA256: fixture.codexExecutableSHA256,
             validBefore: fixture.validBefore,
             maximumLineBytes: 1_024,
             maximumSessionBytes: 8_192,
@@ -509,6 +546,8 @@ struct InvestigationLifecycleAppServerTransportTests {
             _ = try InvestigationLifecycleAppServerTransport(
                 investigationID: fixture.investigationID,
                 configurationSHA256: fixture.configurationSHA256,
+                codexExecutableSHA256:
+                    fixture.codexExecutableSHA256,
                 validBefore: fixture.validBefore,
                 maximumLineBytes: 1_024,
                 maximumSessionBytes: 8_192,
@@ -533,6 +572,8 @@ struct InvestigationLifecycleAppServerTransportTests {
             _ = try InvestigationLifecycleAppServerTransport(
                 investigationID: fixture.investigationID,
                 configurationSHA256: fixture.configurationSHA256,
+                codexExecutableSHA256:
+                    fixture.codexExecutableSHA256,
                 validBefore: fixture.now,
                 maximumLineBytes: 1_024,
                 maximumSessionBytes: 8_192,
@@ -548,6 +589,8 @@ struct InvestigationLifecycleAppServerTransportTests {
             _ = try InvestigationLifecycleAppServerTransport(
                 investigationID: fixture.investigationID,
                 configurationSHA256: fixture.configurationSHA256,
+                codexExecutableSHA256:
+                    fixture.codexExecutableSHA256,
                 validBefore: fixture.now.addingTimeInterval(901),
                 maximumLineBytes: 1_024,
                 maximumSessionBytes: 8_192,
@@ -599,9 +642,11 @@ struct InvestigationLifecycleAppServerTransportTests {
         let clock = MutableTransportClock(now: fixture.now)
         let session = FakeLifecycleInteractiveSession(
             responses: [
-                .started(
+                try .started(
                     investigationID: fixture.investigationID,
-                    operationID: fixture.operationIDs[0]
+                    operationID: fixture.operationIDs[0],
+                    codexExecutableSHA256:
+                        fixture.codexExecutableSHA256
                 ),
                 .writeAccepted(
                     investigationID: fixture.investigationID,
@@ -633,9 +678,11 @@ struct InvestigationLifecycleAppServerTransportTests {
         let startClock = MutableTransportClock(now: fixture.now)
         let startSession = FakeLifecycleInteractiveSession(
             responses: [
-                .started(
+                try .started(
                     investigationID: fixture.investigationID,
-                    operationID: fixture.operationIDs[0]
+                    operationID: fixture.operationIDs[0],
+                    codexExecutableSHA256:
+                        fixture.codexExecutableSHA256
                 ),
                 try fixture.retiredResponse(
                     operationID: fixture.operationIDs[1],
@@ -670,9 +717,11 @@ struct InvestigationLifecycleAppServerTransportTests {
         let writeClock = MutableTransportClock(now: fixture.now)
         let writeSession = FakeLifecycleInteractiveSession(
             responses: [
-                .started(
+                try .started(
                     investigationID: fixture.investigationID,
-                    operationID: fixture.operationIDs[0]
+                    operationID: fixture.operationIDs[0],
+                    codexExecutableSHA256:
+                        fixture.codexExecutableSHA256
                 ),
                 .writeAccepted(
                     investigationID: fixture.investigationID,
@@ -712,9 +761,11 @@ struct InvestigationLifecycleAppServerTransportTests {
         let readClock = MutableTransportClock(now: fixture.now)
         let readSession = FakeLifecycleInteractiveSession(
             responses: [
-                .started(
+                try .started(
                     investigationID: fixture.investigationID,
-                    operationID: fixture.operationIDs[0]
+                    operationID: fixture.operationIDs[0],
+                    codexExecutableSHA256:
+                        fixture.codexExecutableSHA256
                 ),
                 try .line(
                     investigationID: fixture.investigationID,
@@ -847,9 +898,10 @@ struct InvestigationLifecycleAppServerTransportTests {
         let fixture = InvestigationLifecycleTransportFixture()
         let store = InvestigationLifecycleRetirementEvidenceStore()
         let session = FakeLifecycleInteractiveSession(responses: [
-            .started(
+            try .started(
                 investigationID: fixture.investigationID,
-                operationID: fixture.operationIDs[0]
+                operationID: fixture.operationIDs[0],
+                codexExecutableSHA256: fixture.codexExecutableSHA256
             ),
             try fixture.retiredResponse(
                 operationID: fixture.operationIDs[1]
@@ -868,6 +920,10 @@ struct InvestigationLifecycleAppServerTransportTests {
         #expect(requests.allSatisfy { $0.line == nil })
         #expect(requests[0].validBefore == fixture.validBefore)
         #expect(requests[1].validBefore == nil)
+        #expect(
+            evidence.codexExecutableSHA256
+                == fixture.codexExecutableSHA256
+        )
         #expect(await store.consume() == evidence)
         #expect(try await transport.acceptedRetirementEvidence() == evidence)
     }
@@ -876,9 +932,10 @@ struct InvestigationLifecycleAppServerTransportTests {
     func dispatchedStartFailureStillRetiresAndPreservesFailure() async throws {
         let fixture = InvestigationLifecycleTransportFixture()
         let session = FakeLifecycleInteractiveSession(responses: [
-            .started(
+            try .started(
                 investigationID: fixture.investigationID,
-                operationID: UUID()
+                operationID: UUID(),
+                codexExecutableSHA256: fixture.codexExecutableSHA256
             ),
             try fixture.retiredResponse(
                 operationID: fixture.operationIDs[1]
@@ -896,16 +953,20 @@ struct InvestigationLifecycleAppServerTransportTests {
             _ = try await transport.startAndRetireWithEvidence()
         }
         #expect(await session.requests.map(\.kind) == [.start, .retire])
-        _ = try await transport.acceptedRetirementEvidence()
+        #expect(
+            try await transport.acceptedRetirementEvidence()
+                .codexExecutableSHA256 == nil
+        )
     }
 
     @Test
     func unprovedRetirementReplacesDispatchedStartFailure() async throws {
         let fixture = InvestigationLifecycleTransportFixture()
         let session = FakeLifecycleInteractiveSession(responses: [
-            .started(
+            try .started(
                 investigationID: fixture.investigationID,
-                operationID: UUID()
+                operationID: UUID(),
+                codexExecutableSHA256: fixture.codexExecutableSHA256
             ),
             .retired(
                 investigationID: fixture.investigationID,
@@ -934,9 +995,11 @@ struct InvestigationLifecycleAppServerTransportTests {
         let clock = MutableTransportClock(now: fixture.now)
         let session = FakeLifecycleInteractiveSession(
             responses: [
-                .started(
+                try .started(
                     investigationID: fixture.investigationID,
-                    operationID: fixture.operationIDs[0]
+                    operationID: fixture.operationIDs[0],
+                    codexExecutableSHA256:
+                        fixture.codexExecutableSHA256
                 ),
                 try fixture.retiredResponse(
                     operationID: fixture.operationIDs[1],
@@ -995,9 +1058,10 @@ struct InvestigationLifecycleAppServerTransportTests {
     func successfulStartWithFailedRetirementNeverBecomesSuccess() async throws {
         let fixture = InvestigationLifecycleTransportFixture()
         let session = FakeLifecycleInteractiveSession(responses: [
-            .started(
+            try .started(
                 investigationID: fixture.investigationID,
-                operationID: fixture.operationIDs[0]
+                operationID: fixture.operationIDs[0],
+                codexExecutableSHA256: fixture.codexExecutableSHA256
             ),
             .retired(
                 investigationID: fixture.investigationID,
@@ -1038,6 +1102,7 @@ struct InvestigationLifecycleAppServerTransportTests {
         let seed = try InvestigationLifecycleAppServerTransport(
             investigationID: fixture.investigationID,
             configurationSHA256: fixture.configurationSHA256,
+            codexExecutableSHA256: fixture.codexExecutableSHA256,
             validBefore: fixture.validBefore,
             maximumLineBytes: 1_024,
             maximumSessionBytes: 8_192,
@@ -1049,9 +1114,10 @@ struct InvestigationLifecycleAppServerTransportTests {
         )
         _ = try await seed.retireWithEvidence()
         let session = FakeLifecycleInteractiveSession(responses: [
-            .started(
+            try .started(
                 investigationID: fixture.investigationID,
-                operationID: fixture.operationIDs[0]
+                operationID: fixture.operationIDs[0],
+                codexExecutableSHA256: fixture.codexExecutableSHA256
             ),
             try fixture.retiredResponse(
                 operationID: fixture.operationIDs[1]
@@ -1204,6 +1270,7 @@ private struct InvestigationLifecycleTransportFixture {
     let requestLine = Data("{\"method\":\"initialize\"}\n".utf8)
     let responseLine = Data("{\"id\":1,\"result\":{}}\n".utf8)
     let configurationSHA256 = String(repeating: "a", count: 64)
+    let codexExecutableSHA256 = String(repeating: "b", count: 64)
 
     func helperIdentity() throws -> LifecycleProcessIdentity {
         LifecycleProcessIdentity(
@@ -1285,6 +1352,7 @@ private struct InvestigationLifecycleTransportFixture {
         return try InvestigationLifecycleAppServerTransport(
             investigationID: investigationID,
             configurationSHA256: configurationSHA256,
+            codexExecutableSHA256: codexExecutableSHA256,
             validBefore: validBefore,
             maximumLineBytes: 1_024,
             maximumSessionBytes: 8_192,
@@ -1336,9 +1404,11 @@ private actor SuspendedLifecycleInteractiveSession:
             await withCheckedContinuation {
                 startContinuation = $0
             }
-            return .started(
+            return try .started(
                 investigationID: investigationID,
-                operationID: operationIDs[0]
+                operationID: operationIDs[0],
+                codexExecutableSHA256:
+                    try #require(request.codexExecutableSHA256)
             )
         case .write:
             return .writeAccepted(

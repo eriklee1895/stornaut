@@ -257,7 +257,7 @@ public struct LifecycleInteractiveSessionRequest:
     Sendable,
     Equatable
 {
-    public static let protocolVersion = 2
+    public static let protocolVersion = 3
     public static let maximumAllowedLineBytes = 2 * 1_024 * 1_024
     public static let maximumAllowedSessionBytes = 16 * 1_024 * 1_024
     public static let maximumEncodedEnvelopeBytes = 3 * 1_024 * 1_024
@@ -266,6 +266,7 @@ public struct LifecycleInteractiveSessionRequest:
     public let investigationID: LifecycleInvestigationID
     public let operationID: UUID
     public let configurationSHA256: String
+    public let codexExecutableSHA256: String?
     public let validBefore: Date?
     public let maximumLineBytes: Int?
     public let maximumSessionBytes: Int?
@@ -276,6 +277,7 @@ public struct LifecycleInteractiveSessionRequest:
         investigationID: LifecycleInvestigationID,
         operationID: UUID,
         configurationSHA256: String,
+        codexExecutableSHA256: String?,
         validBefore: Date?,
         maximumLineBytes: Int?,
         maximumSessionBytes: Int?,
@@ -285,6 +287,7 @@ public struct LifecycleInteractiveSessionRequest:
         self.investigationID = investigationID
         self.operationID = operationID
         self.configurationSHA256 = configurationSHA256
+        self.codexExecutableSHA256 = codexExecutableSHA256
         self.validBefore = validBefore
         self.maximumLineBytes = maximumLineBytes
         self.maximumSessionBytes = maximumSessionBytes
@@ -295,6 +298,7 @@ public struct LifecycleInteractiveSessionRequest:
         investigationID: LifecycleInvestigationID,
         operationID: UUID,
         configurationSHA256: String,
+        codexExecutableSHA256: String,
         validBefore: Date,
         maximumLineBytes: Int,
         maximumSessionBytes: Int
@@ -304,6 +308,7 @@ public struct LifecycleInteractiveSessionRequest:
             investigationID: investigationID,
             operationID: operationID,
             configurationSHA256: configurationSHA256,
+            codexExecutableSHA256: codexExecutableSHA256,
             validBefore: validBefore,
             maximumLineBytes: maximumLineBytes,
             maximumSessionBytes: maximumSessionBytes,
@@ -326,6 +331,7 @@ public struct LifecycleInteractiveSessionRequest:
             investigationID: investigationID,
             operationID: operationID,
             configurationSHA256: configurationSHA256,
+            codexExecutableSHA256: nil,
             validBefore: nil,
             maximumLineBytes: nil,
             maximumSessionBytes: nil,
@@ -347,6 +353,7 @@ public struct LifecycleInteractiveSessionRequest:
             investigationID: investigationID,
             operationID: operationID,
             configurationSHA256: configurationSHA256,
+            codexExecutableSHA256: nil,
             validBefore: nil,
             maximumLineBytes: nil,
             maximumSessionBytes: nil,
@@ -368,6 +375,7 @@ public struct LifecycleInteractiveSessionRequest:
             investigationID: investigationID,
             operationID: operationID,
             configurationSHA256: configurationSHA256,
+            codexExecutableSHA256: nil,
             validBefore: nil,
             maximumLineBytes: nil,
             maximumSessionBytes: nil,
@@ -380,11 +388,20 @@ public struct LifecycleInteractiveSessionRequest:
     }
 
     public init(from decoder: Decoder) throws {
+        let preliminary = try decoder.container(
+            keyedBy: AnyLifecycleCodingKey.self
+        )
+        let decodedKind = try preliminary.decode(
+            LifecycleInteractiveSessionRequestKind.self,
+            forKey: AnyLifecycleCodingKey(CodingKeys.kind.rawValue)
+        )
+        var expectedKeys = Set(CodingKeys.allCases.map(\.rawValue))
+        if decodedKind != .start {
+            expectedKeys.remove(CodingKeys.codexExecutableSHA256.rawValue)
+        }
         let container = try strictContainer(
             decoder: decoder,
-            expectedKeys: Set(
-                CodingKeys.allCases.map(\.rawValue)
-            )
+            expectedKeys: expectedKeys
         )
         guard
             try container.decode(
@@ -423,6 +440,12 @@ public struct LifecycleInteractiveSessionRequest:
             String.self,
             forKey: AnyLifecycleCodingKey(
                 CodingKeys.configurationSHA256.rawValue
+            )
+        )
+        codexExecutableSHA256 = try container.decodeIfPresent(
+            String.self,
+            forKey: AnyLifecycleCodingKey(
+                CodingKeys.codexExecutableSHA256.rawValue
             )
         )
         validBefore = try container.decodeIfPresent(
@@ -491,6 +514,12 @@ public struct LifecycleInteractiveSessionRequest:
                 CodingKeys.configurationSHA256.rawValue
             )
         )
+        try container.encodeIfPresent(
+            codexExecutableSHA256,
+            forKey: AnyLifecycleCodingKey(
+                CodingKeys.codexExecutableSHA256.rawValue
+            )
+        )
         try container.encode(
             validBefore,
             forKey: AnyLifecycleCodingKey(
@@ -516,13 +545,16 @@ public struct LifecycleInteractiveSessionRequest:
     }
 
     fileprivate var isValid: Bool {
-        guard validInteractiveSHA256(configurationSHA256) else {
+        guard lifecycleInteractiveSHA256IsValid(configurationSHA256) else {
             return false
         }
         switch kind {
         case .start:
             guard
                 line == nil,
+                codexExecutableSHA256.map(
+                    lifecycleInteractiveSHA256IsValid
+                ) == true,
                 let validBefore,
                 validBefore.timeIntervalSince1970.isFinite,
                 let maximumLineBytes,
@@ -537,12 +569,14 @@ public struct LifecycleInteractiveSessionRequest:
             }
             return true
         case .write:
-            return validBefore == nil
+            return codexExecutableSHA256 == nil
+                && validBefore == nil
                 && maximumLineBytes == nil
                 && maximumSessionBytes == nil
                 && line.map(validLine) == true
         case .read, .retire:
-            return validBefore == nil
+            return codexExecutableSHA256 == nil
+                && validBefore == nil
                 && maximumLineBytes == nil
                 && maximumSessionBytes == nil
                 && line == nil
@@ -555,6 +589,7 @@ public struct LifecycleInteractiveSessionRequest:
         case investigationID
         case operationID
         case configurationSHA256
+        case codexExecutableSHA256
         case validBefore
         case maximumLineBytes
         case maximumSessionBytes
@@ -562,7 +597,7 @@ public struct LifecycleInteractiveSessionRequest:
     }
 }
 
-private func validInteractiveSHA256(_ value: String) -> Bool {
+func lifecycleInteractiveSHA256IsValid(_ value: String) -> Bool {
     value.count == 64
         && value.unicodeScalars.allSatisfy {
             (0x30...0x39).contains($0.value)
@@ -736,11 +771,12 @@ public struct LifecycleInteractiveSessionResponse:
     Sendable,
     Equatable
 {
-    public static let protocolVersion = 4
+    public static let protocolVersion = 5
 
     public let kind: LifecycleInteractiveSessionResponseKind
     public let investigationID: LifecycleInvestigationID
     public let operationID: UUID
+    public let codexExecutableSHA256: String?
     public let line: Data?
     public let drained: Bool?
     public let ownerRetirementObservation:
@@ -754,6 +790,7 @@ public struct LifecycleInteractiveSessionResponse:
         kind: LifecycleInteractiveSessionResponseKind,
         investigationID: LifecycleInvestigationID,
         operationID: UUID,
+        codexExecutableSHA256: String?,
         line: Data?,
         drained: Bool?,
         ownerRetirementObservation:
@@ -764,6 +801,7 @@ public struct LifecycleInteractiveSessionResponse:
         self.kind = kind
         self.investigationID = investigationID
         self.operationID = operationID
+        self.codexExecutableSHA256 = codexExecutableSHA256
         self.line = line
         self.drained = drained
         self.ownerRetirementObservation = ownerRetirementObservation
@@ -773,18 +811,24 @@ public struct LifecycleInteractiveSessionResponse:
 
     public static func started(
         investigationID: LifecycleInvestigationID,
-        operationID: UUID
-    ) -> Self {
-        Self(
+        operationID: UUID,
+        codexExecutableSHA256: String
+    ) throws -> Self {
+        let response = Self(
             kind: .started,
             investigationID: investigationID,
             operationID: operationID,
+            codexExecutableSHA256: codexExecutableSHA256,
             line: nil,
             drained: nil,
             ownerRetirementObservation: nil,
             machineRetirementHandle: nil,
             residueObservation: nil
         )
+        guard response.isValid else {
+            throw LifecycleInteractiveSessionContractError.invalidResponse
+        }
+        return response
     }
 
     public static func writeAccepted(
@@ -795,6 +839,7 @@ public struct LifecycleInteractiveSessionResponse:
             kind: .writeAccepted,
             investigationID: investigationID,
             operationID: operationID,
+            codexExecutableSHA256: nil,
             line: nil,
             drained: nil,
             ownerRetirementObservation: nil,
@@ -812,6 +857,7 @@ public struct LifecycleInteractiveSessionResponse:
             kind: .line,
             investigationID: investigationID,
             operationID: operationID,
+            codexExecutableSHA256: nil,
             line: line,
             drained: nil,
             ownerRetirementObservation: nil,
@@ -832,6 +878,7 @@ public struct LifecycleInteractiveSessionResponse:
             kind: .endOfStream,
             investigationID: investigationID,
             operationID: operationID,
+            codexExecutableSHA256: nil,
             line: nil,
             drained: nil,
             ownerRetirementObservation: nil,
@@ -855,6 +902,7 @@ public struct LifecycleInteractiveSessionResponse:
             kind: .retired,
             investigationID: investigationID,
             operationID: operationID,
+            codexExecutableSHA256: nil,
             line: nil,
             drained: drained,
             ownerRetirementObservation: ownerRetirementObservation,
@@ -864,11 +912,20 @@ public struct LifecycleInteractiveSessionResponse:
     }
 
     public init(from decoder: Decoder) throws {
+        let preliminary = try decoder.container(
+            keyedBy: AnyLifecycleCodingKey.self
+        )
+        let decodedKind = try preliminary.decode(
+            LifecycleInteractiveSessionResponseKind.self,
+            forKey: AnyLifecycleCodingKey(CodingKeys.kind.rawValue)
+        )
+        var expectedKeys = Set(CodingKeys.allCases.map(\.rawValue))
+        if decodedKind != .started {
+            expectedKeys.remove(CodingKeys.codexExecutableSHA256.rawValue)
+        }
         let container = try strictContainer(
             decoder: decoder,
-            expectedKeys: Set(
-                CodingKeys.allCases.map(\.rawValue)
-            )
+            expectedKeys: expectedKeys
         )
         guard
             try container.decode(
@@ -901,6 +958,12 @@ public struct LifecycleInteractiveSessionResponse:
             UUID.self,
             forKey: AnyLifecycleCodingKey(
                 CodingKeys.operationID.rawValue
+            )
+        )
+        codexExecutableSHA256 = try container.decodeIfPresent(
+            String.self,
+            forKey: AnyLifecycleCodingKey(
+                CodingKeys.codexExecutableSHA256.rawValue
             )
         )
         line = try container.decodeIfPresent(
@@ -967,6 +1030,12 @@ public struct LifecycleInteractiveSessionResponse:
                 CodingKeys.operationID.rawValue
             )
         )
+        try container.encodeIfPresent(
+            codexExecutableSHA256,
+            forKey: AnyLifecycleCodingKey(
+                CodingKeys.codexExecutableSHA256.rawValue
+            )
+        )
         try container.encode(
             line,
             forKey: AnyLifecycleCodingKey(CodingKeys.line.rawValue)
@@ -1016,6 +1085,9 @@ public struct LifecycleInteractiveSessionResponse:
             investigationID == request.investigationID,
             operationID == request.operationID,
             responseKindMatches(request.kind),
+            kind != .started
+                || codexExecutableSHA256
+                    == request.codexExecutableSHA256,
             machineRetirementHandle.map({ handle in
                 request.kind == .retire
                     && handle.investigationID == request.investigationID
@@ -1031,18 +1103,28 @@ public struct LifecycleInteractiveSessionResponse:
 
     private var isValid: Bool {
         switch kind {
-        case .started, .writeAccepted, .endOfStream:
-            return line == nil && drained == nil
+        case .started:
+            return codexExecutableSHA256.map(
+                lifecycleInteractiveSHA256IsValid
+            ) == true
+                && line == nil && drained == nil
+                && ownerRetirementObservation == nil
+                && machineRetirementHandle == nil
+                && residueObservation == nil
+        case .writeAccepted, .endOfStream:
+            return codexExecutableSHA256 == nil
+                && line == nil && drained == nil
                 && ownerRetirementObservation == nil
                 && machineRetirementHandle == nil
                 && residueObservation == nil
         case .line:
-            return line.map(validLine) == true && drained == nil
+            return codexExecutableSHA256 == nil
+                && line.map(validLine) == true && drained == nil
                 && ownerRetirementObservation == nil
                 && machineRetirementHandle == nil
                 && residueObservation == nil
         case .retired:
-            return line == nil
+            return codexExecutableSHA256 == nil && line == nil
                 && drained == true
                 && ownerRetirementObservation != nil
                 && (machineRetirementHandle == nil
@@ -1071,6 +1153,7 @@ public struct LifecycleInteractiveSessionResponse:
         case kind
         case investigationID
         case operationID
+        case codexExecutableSHA256
         case line
         case drained
         case ownerRetirementObservation

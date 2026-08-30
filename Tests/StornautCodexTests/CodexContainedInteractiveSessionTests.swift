@@ -7,15 +7,284 @@ import Testing
 @Suite("Codex contained interactive session", .serialized)
 struct CodexContainedInteractiveSessionTests {
     @Test
+    func nativeLauncherRequiresExactInitialStopAndMappedImageIdentity()
+        throws
+    {
+        #expect(
+            CodexContainedInteractiveNativeLauncher
+                .initialStopIsAccepted(
+                    result: 41, initialStopStatus: 0x7f,
+                    expectedProcessID: 41
+                )
+        )
+        #expect(
+            !CodexContainedInteractiveNativeLauncher
+                .initialStopIsAccepted(
+                    result: 42, initialStopStatus: 0x7f,
+                    expectedProcessID: 41
+                )
+        )
+        #expect(
+            !CodexContainedInteractiveNativeLauncher
+                .initialStopIsAccepted(
+                    result: 41, initialStopStatus: 0x117f,
+                    expectedProcessID: 41
+                )
+        )
+
+        let expected = CodexContainedInteractiveNativeLeaseSnapshot(
+            path: "/tmp/codex", device: 7, inode: 11,
+            generation: 13, size: 17
+        )
+        let matching = CodexContainedInteractiveMappedImageIdentity(
+            path: expected.path, device: expected.device,
+            inode: expected.inode, generation: expected.generation,
+            size: expected.size
+        )
+        let other = CodexContainedInteractiveMappedImageIdentity(
+            path: "/usr/lib/dyld", device: 1, inode: 2,
+            generation: 3, size: 4
+        )
+        let conflicting = CodexContainedInteractiveMappedImageIdentity(
+            path: expected.path, device: expected.device,
+            inode: expected.inode &+ 1, generation: expected.generation,
+            size: expected.size
+        )
+        let launcher = CodexContainedInteractiveNativeLauncher()
+        #expect(launcher.mappedImagesMatchLease(
+            [matching, matching, other], expected: expected
+        ))
+        #expect(!launcher.mappedImagesMatchLease([], expected: expected))
+        #expect(!launcher.mappedImagesMatchLease(
+            [other, matching], expected: expected
+        ))
+        #expect(!launcher.mappedImagesMatchLease(
+            [matching, conflicting], expected: expected
+        ))
+    }
+
+    @Test
+    func nativeLauncherRunsOnlyAfterSuspendedImageChecks() throws {
+        let fixture = try NativeInteractiveLauncherFixture()
+        defer { fixture.remove() }
+        let events = LockedNativeLaunchEvents()
+        let launcher = CodexContainedInteractiveNativeLauncher { phase in
+            events.append(phase)
+        }
+
+        let receipt: CodexContainedInteractiveNativeLaunchReceipt
+        do {
+            receipt = try launcher.launch(
+                plan: fixture.plan,
+                deadline: .now() + .seconds(2)
+            )
+        } catch {
+            Issue.record("launch failed after phases: \(events.values)")
+            throw error
+        }
+        defer {
+            forceCleanupDiagnosticProcess(receipt.process)
+            Darwin.close(receipt.process.standardInput)
+            Darwin.close(receipt.process.standardOutput)
+            Darwin.close(receipt.process.standardError)
+        }
+
+        #expect(receipt.codexExecutableSHA256 == fixture.lease.sha256)
+        let phases = events.values
+        #expect(phases.count == 6)
+        #expect(phases.first == .beforeSpawn)
+        #expect(phases.last == .beforeResume(receipt.process.pid))
+        #expect(
+            phases.firstIndex(of: .afterImageObservation(receipt.process.pid))!
+                < phases.firstIndex(of: .beforeResume(receipt.process.pid))!
+        )
+        #expect(getpgid(receipt.process.pid) == receipt.process.pid)
+    }
+
+    @Test
+    func nativeLauncherFailureBeforeResumeKillsAndExactlyReapsChild() throws {
+        let fixture = try NativeInteractiveLauncherFixture()
+        defer { fixture.remove() }
+        let observedPID = LockedNativeProcessID()
+        let launcher = CodexContainedInteractiveNativeLauncher { phase in
+            if case let .afterSpawn(processID) = phase {
+                observedPID.set(processID)
+            }
+            if case .beforeResume = phase {
+                throw ContainedInteractiveSessionFixtureError.unexpected
+            }
+        }
+
+        #expect(throws: ContainedInteractiveSessionFixtureError.self) {
+            _ = try launcher.launch(
+                plan: fixture.plan, deadline: .now() + .seconds(2)
+            )
+        }
+        let processID = try #require(observedPID.value)
+        #expect(kill(processID, 0) == -1)
+        #expect(errno == ESRCH)
+        var status: Int32 = 0
+        #expect(waitpid(processID, &status, WNOHANG) == -1)
+        #expect(errno == ECHILD)
+    }
+
+    @Test
+    func nativeLauncherDetectsNamedIdentityDriftBeforeResume() throws {
+        let fixture = try NativeInteractiveLauncherFixture()
+        defer { fixture.remove() }
+        let observedPID = LockedNativeProcessID()
+        let originalURL = fixture.executableURL.appendingPathExtension(
+            "original"
+        )
+        let launcher = CodexContainedInteractiveNativeLauncher { phase in
+            if case let .afterSpawn(processID) = phase {
+                observedPID.set(processID)
+            }
+            if case .beforeFinalLeaseRevalidation = phase {
+                try FileManager.default.moveItem(
+                    at: fixture.executableURL, to: originalURL
+                )
+                try Data(contentsOf: originalURL)
+                    .write(to: fixture.executableURL)
+                #expect(chmod(fixture.executableURL.path, 0o700) == 0)
+            }
+        }
+
+        #expect(throws: CodexNativeExecutableIdentityError.identityChanged) {
+            _ = try launcher.launch(
+                plan: fixture.plan, deadline: .now() + .seconds(2)
+            )
+        }
+        let processID = try #require(observedPID.value)
+        #expect(kill(processID, 0) == -1)
+        #expect(errno == ESRCH)
+        var status: Int32 = 0
+        #expect(waitpid(processID, &status, WNOHANG) == -1)
+        #expect(errno == ECHILD)
+    }
+
+    @Test
+    func sessionReturnsTheLauncherObservedDigest() async throws {
+        let fixture = try ContainedInteractiveSessionFixture(mode: "echo")
+        defer { fixture.remove() }
+        let observed = String(repeating: "c", count: 64)
+        let session = CodexContainedInteractiveSession(
+            now: { fixture.now },
+            planBuilder: { _ in fixture.plan },
+            nativeLauncher: { plan, _, _ in
+                var process: SpawnedDiagnosticProcess?
+                do {
+                    process = try spawnDiagnosticProcess(
+                        executableURL: plan.executableURL,
+                        arguments: plan.arguments,
+                        environment: plan.environment.values,
+                        currentDirectoryURL: plan.currentDirectoryURL
+                    )
+                    return CodexContainedInteractiveNativeLaunchReceipt(
+                        process: process!,
+                        codexExecutableSHA256: observed,
+                        nativeIdentityLease: plan.nativeIdentityLease
+                    )
+                } catch {
+                    if let process { forceCleanupDiagnosticProcess(process) }
+                    throw error
+                }
+            }
+        )
+
+        let observation = try await session.start(fixture.configuration)
+        #expect(observation.codexExecutableSHA256 == observed)
+        _ = try await session.retire()
+    }
+
+    @Test
+    func cancellationBeforeResumeCannotMintStartAndLeavesNoChild() async throws {
+        let fixture = try NativeInteractiveLauncherFixture()
+        defer { fixture.remove() }
+        let hook = SuspendedNativeLaunchHook()
+        let startedAt = Date()
+        let validBefore = startedAt.addingTimeInterval(30)
+        let clock = LockedContainedClock(now: startedAt)
+        let session = CodexContainedInteractiveSession(
+            now: { clock.read() },
+            planBuilder: { _ in fixture.plan },
+            nativeLauncher: { plan, deadline, gate in
+                try CodexContainedInteractiveNativeLauncher { phase in
+                    try hook.observe(phase)
+                }.launch(plan: plan, deadline: deadline, gate: gate)
+            }
+        )
+        let start = Task {
+            try await session.start(
+                CodexContainedInteractiveSessionConfiguration(
+                    investigationID: UUID(),
+                    expectedCodexExecutableSHA256: fixture.lease.sha256,
+                    validBefore: validBefore,
+                    maximumLineBytes: 1_024,
+                    maximumSessionBytes: 8_192
+                )
+            )
+        }
+        let processID = try hook.waitUntilBeforeResume()
+        let retirement = Task { try await session.retire() }
+
+        await #expect(throws: CodexContainedInteractiveSessionError.self) {
+            _ = try await start.value
+        }
+        #expect(kill(processID, 0) == -1)
+        #expect(errno == ESRCH)
+        #expect(
+            try await retirement.value == .retiredPreparedWorkspace
+        )
+    }
+
+    @Test
+    func cancellationWhilePlanningPreventsNativeResume() async throws {
+        let fixture = try NativeInteractiveLauncherFixture()
+        defer { fixture.remove() }
+        let builder = SuspendedContainedPlanBuilder(plan: fixture.plan)
+        let events = LockedNativeLaunchEvents()
+        let clock = LockedContainedClock(now: Date())
+        let session = CodexContainedInteractiveSession(
+            now: { clock.read() },
+            planBuilder: { _ in try await builder.build() },
+            nativeLauncher: { plan, deadline, gate in
+                try CodexContainedInteractiveNativeLauncher {
+                    events.append($0)
+                }.launch(plan: plan, deadline: deadline, gate: gate)
+            }
+        )
+        let start = Task {
+            try await session.start(.init(
+                investigationID: UUID(),
+                expectedCodexExecutableSHA256: fixture.lease.sha256,
+                validBefore: clock.read().addingTimeInterval(30),
+                maximumLineBytes: 1_024,
+                maximumSessionBytes: 8_192
+            ))
+        }
+        await builder.waitUntilEntered()
+        start.cancel()
+        await builder.resume()
+
+        await #expect(throws: CodexContainedInteractiveSessionError.self) {
+            _ = try await start.value
+        }
+        #expect(!events.values.contains { phase in
+            if case .beforeResume = phase { true } else { false }
+        })
+        #expect(
+            try await session.retire() == .retiredPreparedWorkspace
+        )
+    }
+
+    @Test
     func startsFixedContainedAppServerAndRelaysLines() async throws {
         let fixture = try ContainedInteractiveSessionFixture(
             mode: "echo"
         )
         defer { fixture.remove() }
-        let session = CodexContainedInteractiveSession(
-            now: { fixture.now },
-            planBuilder: { _ in fixture.plan }
-        )
+        let session = fixture.session { _ in fixture.plan }
 
         try await session.start(fixture.configuration)
         try await session.writeLine(Data("{\"id\":1}\n".utf8))
@@ -63,6 +332,9 @@ struct CodexContainedInteractiveSessionTests {
             planBuilder: { _ in
                 counter.increment()
                 throw ContainedInteractiveSessionFixtureError.unexpected
+            },
+            nativeLauncher: { _, _, _ in
+                throw ContainedInteractiveSessionFixtureError.unexpected
             }
         )
 
@@ -74,6 +346,8 @@ struct CodexContainedInteractiveSessionTests {
             try await session.start(
                 CodexContainedInteractiveSessionConfiguration(
                     investigationID: UUID(),
+                    expectedCodexExecutableSHA256:
+                        String(repeating: "a", count: 64),
                     validBefore: now,
                     maximumLineBytes: 1_024,
                     maximumSessionBytes: 8_192
@@ -88,6 +362,8 @@ struct CodexContainedInteractiveSessionTests {
             try await session.start(
                 CodexContainedInteractiveSessionConfiguration(
                     investigationID: UUID(),
+                    expectedCodexExecutableSHA256:
+                        String(repeating: "a", count: 64),
                     validBefore: now.addingTimeInterval(901),
                     maximumLineBytes: 1_024,
                     maximumSessionBytes: 8_192
@@ -105,10 +381,7 @@ struct CodexContainedInteractiveSessionTests {
             mode: "large-line"
         )
         defer { fixture.remove() }
-        let session = CodexContainedInteractiveSession(
-            now: { fixture.now },
-            planBuilder: { _ in fixture.plan }
-        )
+        let session = fixture.session { _ in fixture.plan }
 
         try await session.start(
             fixture.configuration(maximumLineBytes: 32)
@@ -134,10 +407,7 @@ struct CodexContainedInteractiveSessionTests {
             mode: "descendant"
         )
         defer { fixture.remove() }
-        let session = CodexContainedInteractiveSession(
-            now: { fixture.now },
-            planBuilder: { _ in fixture.plan }
-        )
+        let session = fixture.session { _ in fixture.plan }
         try await session.start(fixture.configuration)
         let childPID = try fixture.waitForRecordedPID()
 
@@ -173,10 +443,7 @@ struct CodexContainedInteractiveSessionTests {
             fixture.killRecordedProcess("escaped-cleanup.pid")
             fixture.remove()
         }
-        let session = CodexContainedInteractiveSession(
-            now: { fixture.now },
-            planBuilder: { _ in fixture.plan }
-        )
+        let session = fixture.session { _ in fixture.plan }
         try await session.start(fixture.configuration)
         let (_, start) = try fixture.waitForEscapedPID()
         #expect(try await session.retire() == .retiredOwnedResources)
@@ -232,10 +499,7 @@ struct CodexContainedInteractiveSessionTests {
             mode: "blocked-read"
         )
         defer { fixture.remove() }
-        let session = CodexContainedInteractiveSession(
-            now: { fixture.now },
-            planBuilder: { _ in fixture.plan }
-        )
+        let session = fixture.session { _ in fixture.plan }
         try await session.start(fixture.configuration)
         let read = Task {
             try await session.readLine()
@@ -268,10 +532,7 @@ struct CodexContainedInteractiveSessionTests {
             mode: "echo"
         )
         defer { fixture.remove() }
-        let session = CodexContainedInteractiveSession(
-            now: { fixture.now },
-            planBuilder: { _ in fixture.plan }
-        )
+        let session = fixture.session { _ in fixture.plan }
         try await session.start(
             fixture.configuration(
                 maximumLineBytes: 10,
@@ -295,10 +556,7 @@ struct CodexContainedInteractiveSessionTests {
             mode: "descendant"
         )
         defer { fixture.remove() }
-        let session = CodexContainedInteractiveSession(
-            now: { fixture.now },
-            planBuilder: { _ in fixture.plan }
-        )
+        let session = fixture.session { _ in fixture.plan }
         try await session.start(fixture.configuration)
         let childPID = try fixture.waitForRecordedPID()
 
@@ -326,10 +584,7 @@ struct CodexContainedInteractiveSessionTests {
             mode: "stderr-overflow"
         )
         defer { fixture.remove() }
-        let session = CodexContainedInteractiveSession(
-            now: { fixture.now },
-            planBuilder: { _ in fixture.plan }
-        )
+        let session = fixture.session { _ in fixture.plan }
         try await session.start(
             fixture.configuration(
                 maximumLineBytes: 64,
@@ -356,6 +611,31 @@ struct CodexContainedInteractiveSessionTests {
     }
 
     @Test
+    func postReapNativeLeaseDriftFailsAfterCompleteCleanup() async throws {
+        let fixture = try ContainedInteractiveSessionFixture(mode: "echo")
+        defer { fixture.remove() }
+        let session = fixture.session { _ in fixture.plan }
+        _ = try await session.start(fixture.configuration)
+        let originalURL = fixture.executableURL.appendingPathExtension(
+            "original"
+        )
+        try FileManager.default.moveItem(
+            at: fixture.executableURL, to: originalURL
+        )
+        try Data(contentsOf: originalURL).write(to: fixture.executableURL)
+        #expect(chmod(fixture.executableURL.path, 0o700) == 0)
+
+        await #expect(
+            throws: CodexContainedInteractiveSessionError.retirementFailed
+        ) {
+            _ = try await session.retire()
+        }
+        #expect(!FileManager.default.fileExists(
+            atPath: fixture.workspace.paths.rootURL.path
+        ))
+    }
+
+    @Test
     func failedLaunchRemovesOwnedWorkspace() async throws {
         let fixture = try ContainedInteractiveSessionFixture(
             mode: "echo"
@@ -364,6 +644,7 @@ struct CodexContainedInteractiveSessionTests {
         let plan = fixture.plan
         let invalidPlan = CodexContainedInteractiveLaunchPlan(
             executableURL: fixture.root.appending(path: "missing"),
+            nativeIdentityLease: plan.nativeIdentityLease,
             arguments: plan.arguments,
             environment: plan.environment,
             currentDirectoryURL: plan.currentDirectoryURL,
@@ -372,10 +653,7 @@ struct CodexContainedInteractiveSessionTests {
             containmentConfiguration:
                 plan.containmentConfiguration
         )
-        let session = CodexContainedInteractiveSession(
-            now: { fixture.now },
-            planBuilder: { _ in invalidPlan }
-        )
+        let session = fixture.session { _ in invalidPlan }
 
         await #expect(
             throws:
@@ -396,6 +674,9 @@ struct CodexContainedInteractiveSessionTests {
         let session = CodexContainedInteractiveSession(
             planBuilder: { _ in
                 counter.increment()
+                throw ContainedInteractiveSessionFixtureError.unexpected
+            },
+            nativeLauncher: { _, _, _ in
                 throw ContainedInteractiveSessionFixtureError.unexpected
             }
         )
@@ -420,10 +701,7 @@ struct CodexContainedInteractiveSessionTests {
         defer { fixture.remove() }
         let builder = SuspendedContainedPlanBuilder(plan: fixture.plan)
         let completion = RetirementCompletionProbe()
-        let session = CodexContainedInteractiveSession(
-            now: { fixture.now },
-            planBuilder: { _ in try await builder.build() }
-        )
+        let session = fixture.session { _ in try await builder.build() }
         let start = Task { try await session.start(fixture.configuration) }
         await builder.waitUntilEntered()
         let retirement = Task {
@@ -461,10 +739,7 @@ struct CodexContainedInteractiveSessionTests {
         let fixture = try ContainedInteractiveSessionFixture(mode: "echo")
         defer { fixture.remove() }
         let builder = SuspendedContainedPlanBuilder(plan: fixture.plan)
-        let session = CodexContainedInteractiveSession(
-            now: { fixture.now },
-            planBuilder: { _ in try await builder.build() }
-        )
+        let session = fixture.session { _ in try await builder.build() }
         let start = Task { try await session.start(fixture.configuration) }
         await builder.waitUntilEntered()
         let retirement = Task { try await session.retire() }
@@ -494,6 +769,7 @@ struct CodexContainedInteractiveSessionTests {
         let plan = fixture.plan
         let tampered = CodexContainedInteractiveLaunchPlan(
             executableURL: plan.executableURL,
+            nativeIdentityLease: plan.nativeIdentityLease,
             arguments: plan.arguments,
             environment: plan.environment,
             currentDirectoryURL: plan.currentDirectoryURL,
@@ -503,10 +779,7 @@ struct CodexContainedInteractiveSessionTests {
             containmentConfiguration:
                 plan.containmentConfiguration
         )
-        let session = CodexContainedInteractiveSession(
-            now: { fixture.now },
-            planBuilder: { _ in tampered }
-        )
+        let session = fixture.session { _ in tampered }
 
         await #expect(
             throws:
@@ -528,13 +801,19 @@ private struct ContainedInteractiveSessionFixture {
     let root: URL
     let workspace: CodexRuntimeWorkspace
     let executableURL: URL
+    let nativeIdentityLease: CodexNativeExecutableIdentityLease
     let recordURL: URL
     let plan: CodexContainedInteractiveLaunchPlan
     let now = Date(timeIntervalSince1970: 2_000_000_000)
 
     init(mode: String) throws {
-        root = FileManager.default.temporaryDirectory.appending(
-            path: "stornaut-contained-interactive-\(UUID().uuidString)",
+        root = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appending(path: ".build", directoryHint: .isDirectory)
+            .appending(
+            path: "StornautContainedInteractive-\(UUID().uuidString)",
             directoryHint: .isDirectory
         )
         try FileManager.default.createDirectory(
@@ -546,15 +825,33 @@ private struct ContainedInteractiveSessionFixture {
             under: root,
             forbiddenRoots: []
         )
-        executableURL = root.appending(path: "fake-codex")
+        let packageRoot = root.appending(
+            path: "lib/node_modules/@openai/codex",
+            directoryHint: .isDirectory
+        )
+        let wrapperURL = packageRoot.appending(path: "bin/codex.js")
+        executableURL = packageRoot.appending(
+            path: "node_modules/@openai/codex-darwin-arm64/vendor/"
+                + "aarch64-apple-darwin/bin/codex"
+        )
         recordURL = root.appending(
             path: "record",
             directoryHint: .isDirectory
         )
         try FileManager.default.createDirectory(
-            at: recordURL,
-            withIntermediateDirectories: false,
+            at: wrapperURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true,
             attributes: [.posixPermissions: 0o700]
+        )
+        try Data("#!/usr/bin/env node\n".utf8).write(to: wrapperURL)
+        #expect(chmod(wrapperURL.path, 0o700) == 0)
+        try FileManager.default.createDirectory(
+            at: recordURL, withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
+        try FileManager.default.createDirectory(
+            at: executableURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
         )
         try Data(
             containedInteractiveScript(
@@ -563,6 +860,13 @@ private struct ContainedInteractiveSessionFixture {
             ).utf8
         ).write(to: executableURL)
         chmod(executableURL.path, 0o700)
+        nativeIdentityLease = try CodexNativeExecutableIdentitySource()
+            .resolve(
+                installation: CodexInstallation(
+                    executableURL: wrapperURL, source: .configured
+                ),
+                expectedUserID: geteuid()
+            )
         let authSourceURL = URL(
             filePath: "/Users/example/.codex/auth.json"
         )
@@ -585,12 +889,23 @@ private struct ContainedInteractiveSessionFixture {
         )
         plan = CodexContainedInteractiveLaunchPlan(
             executableURL: executableURL,
+            nativeIdentityLease: nativeIdentityLease,
             arguments: arguments,
             environment: environment,
             currentDirectoryURL: workspace.paths.workURL,
             workspace: workspace,
             projectedAuthSourceURL: authSourceURL,
             containmentConfiguration: containment
+        )
+    }
+
+    func session(
+        planBuilder: @escaping CodexContainedInteractiveSession.PlanBuilder
+    ) -> CodexContainedInteractiveSession {
+        CodexContainedInteractiveSession(
+            now: { now },
+            planBuilder: planBuilder,
+            nativeLauncher: launch
         )
     }
 
@@ -604,9 +919,28 @@ private struct ContainedInteractiveSessionFixture {
     ) -> CodexContainedInteractiveSessionConfiguration {
         CodexContainedInteractiveSessionConfiguration(
             investigationID: UUID(),
+            expectedCodexExecutableSHA256: nativeIdentityLease.sha256,
             validBefore: now.addingTimeInterval(60),
             maximumLineBytes: maximumLineBytes,
             maximumSessionBytes: maximumSessionBytes
+        )
+    }
+
+    func launch(
+        _ plan: CodexContainedInteractiveLaunchPlan,
+        deadline _: DispatchTime,
+        gate _: CodexContainedInteractiveLaunchGate
+    ) throws -> CodexContainedInteractiveNativeLaunchReceipt {
+        let process = try spawnDiagnosticProcess(
+            executableURL: plan.executableURL,
+            arguments: plan.arguments,
+            environment: plan.environment.values,
+            currentDirectoryURL: plan.currentDirectoryURL
+        )
+        return CodexContainedInteractiveNativeLaunchReceipt(
+            process: process,
+            codexExecutableSHA256: plan.nativeIdentityLease.sha256,
+            nativeIdentityLease: plan.nativeIdentityLease
         )
     }
 
@@ -756,6 +1090,173 @@ private enum ContainedInteractiveSessionFixtureError: Error {
     case missingMarker
     case missingPID
     case unexpected
+}
+
+private struct NativeInteractiveLauncherFixture {
+    let root: URL
+    let executableURL: URL
+    let lease: CodexNativeExecutableIdentityLease
+    let plan: CodexContainedInteractiveLaunchPlan
+
+    init() throws {
+        root = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appending(path: ".build", directoryHint: .isDirectory)
+            .appending(
+            path: "StornautNativeLauncher-\(UUID().uuidString)",
+            directoryHint: .isDirectory
+        )
+        try FileManager.default.createDirectory(
+            at: root, withIntermediateDirectories: false,
+            attributes: [.posixPermissions: 0o700]
+        )
+        let packageRoot = root.appending(
+            path: "lib/node_modules/@openai/codex",
+            directoryHint: .isDirectory
+        )
+        let wrapperURL = packageRoot.appending(path: "bin/codex.js")
+        executableURL = packageRoot.appending(
+            path: "node_modules/@openai/codex-darwin-arm64/vendor/"
+                + "aarch64-apple-darwin/bin/codex"
+        )
+        try FileManager.default.createDirectory(
+            at: wrapperURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try Data("#!/usr/bin/env node\n".utf8).write(to: wrapperURL)
+        #expect(chmod(wrapperURL.path, 0o700) == 0)
+        try FileManager.default.createDirectory(
+            at: executableURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try Data(contentsOf: Self.hostExecutableURL())
+            .write(to: executableURL)
+        #expect(chmod(executableURL.path, 0o700) == 0)
+        #expect(chflags(executableURL.path, 0) == 0)
+        lease = try CodexNativeExecutableIdentitySource().resolve(
+            installation: CodexInstallation(
+                executableURL: wrapperURL, source: .configured
+            ),
+            expectedUserID: geteuid()
+        )
+        let workspace = try CodexRuntimeWorkspace.create(
+            under: root, forbiddenRoots: []
+        )
+        let authSourceURL = URL(
+            filePath: "/Users/example/.codex/auth.json"
+        )
+        let policy = CodexContainmentPolicy()
+        let containment = try policy.configuration(
+            workspace: workspace.paths,
+            projectedAuthSourceURL: authSourceURL
+        )
+        _ = try policy.install(containment, in: workspace.paths)
+        plan = CodexContainedInteractiveLaunchPlan(
+            executableURL: executableURL,
+            nativeIdentityLease: lease,
+            arguments: try policy.launchArguments(
+                codexExecutableURL: executableURL,
+                workspace: workspace.paths
+            ),
+            environment: try CodexRuntimeEnvironmentPolicy().project(
+                inherited: ["PATH": "/usr/bin:/bin"],
+                workspace: workspace.paths
+            ),
+            currentDirectoryURL: workspace.paths.workURL,
+            workspace: workspace,
+            projectedAuthSourceURL: authSourceURL,
+            containmentConfiguration: containment
+        )
+    }
+
+    func remove() {
+        try? FileManager.default.removeItem(at: root)
+    }
+
+    private static func hostExecutableURL() throws -> URL {
+        let repositoryRoot = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        for path in [
+            ".build/arm64-apple-macosx/debug/stornaut-lifecycle-spike",
+            ".build/debug/stornaut-lifecycle-spike",
+        ] {
+            let candidate = repositoryRoot.appending(path: path)
+                .resolvingSymlinksInPath().standardizedFileURL
+            if FileManager.default.isExecutableFile(atPath: candidate.path) {
+                return candidate
+            }
+        }
+        throw ContainedInteractiveSessionFixtureError.unexpected
+    }
+}
+
+private final class LockedNativeLaunchEvents: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: [CodexContainedInteractiveNativeLaunchPhase] = []
+
+    var values: [CodexContainedInteractiveNativeLaunchPhase] {
+        lock.withLock { storage }
+    }
+
+    func append(_ value: CodexContainedInteractiveNativeLaunchPhase) {
+        lock.withLock { storage.append(value) }
+    }
+}
+
+private final class LockedNativeProcessID: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: pid_t?
+
+    var value: pid_t? { lock.withLock { storage } }
+
+    func set(_ value: pid_t) {
+        lock.withLock { storage = value }
+    }
+}
+
+private final class LockedContainedClock: @unchecked Sendable {
+    private let lock = NSLock()
+    private var now: Date
+
+    init(now: Date) { self.now = now }
+
+    func read() -> Date { lock.withLock { now } }
+}
+
+private final class SuspendedNativeLaunchHook: @unchecked Sendable {
+    private let condition = NSCondition()
+    private var processID: pid_t?
+    private var released = false
+
+    func observe(_ phase: CodexContainedInteractiveNativeLaunchPhase) throws {
+        guard case let .beforeResume(processID) = phase else { return }
+        condition.lock()
+        self.processID = processID
+        condition.broadcast()
+        while !released, !Task.isCancelled {
+            condition.wait(until: Date().addingTimeInterval(0.005))
+        }
+        condition.unlock()
+    }
+
+    func waitUntilBeforeResume() throws -> pid_t {
+        let deadline = Date().addingTimeInterval(2)
+        condition.lock()
+        defer { condition.unlock() }
+        while processID == nil, condition.wait(until: deadline) {}
+        return try #require(processID)
+    }
+
+    func release() {
+        condition.lock()
+        released = true
+        condition.broadcast()
+        condition.unlock()
+    }
 }
 
 private func containedInteractiveScript(

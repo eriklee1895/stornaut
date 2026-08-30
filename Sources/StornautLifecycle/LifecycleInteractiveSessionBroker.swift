@@ -6,6 +6,7 @@ public struct LifecycleInteractiveWorkerConfiguration:
 {
     public let investigationID: LifecycleInvestigationID
     public let configurationSHA256: String
+    public let codexExecutableSHA256: String
     public let validBefore: Date
     public let maximumLineBytes: Int
     public let maximumSessionBytes: Int
@@ -13,22 +14,38 @@ public struct LifecycleInteractiveWorkerConfiguration:
     public init(
         investigationID: LifecycleInvestigationID,
         configurationSHA256: String,
+        codexExecutableSHA256: String,
         validBefore: Date,
         maximumLineBytes: Int,
         maximumSessionBytes: Int
     ) {
         self.investigationID = investigationID
         self.configurationSHA256 = configurationSHA256
+        self.codexExecutableSHA256 = codexExecutableSHA256
         self.validBefore = validBefore
         self.maximumLineBytes = maximumLineBytes
         self.maximumSessionBytes = maximumSessionBytes
     }
 }
 
+public struct LifecycleInteractiveWorkerStartObservation:
+    Sendable,
+    Equatable
+{
+    public let codexExecutableSHA256: String
+
+    public init(codexExecutableSHA256: String) throws {
+        guard lifecycleInteractiveSHA256IsValid(codexExecutableSHA256) else {
+            throw LifecycleInteractiveSessionContractError.invalidResponse
+        }
+        self.codexExecutableSHA256 = codexExecutableSHA256
+    }
+}
+
 public protocol LifecycleInteractiveWorkerDriving: Sendable {
     func start(
         _ configuration: LifecycleInteractiveWorkerConfiguration
-    ) async throws
+    ) async throws -> LifecycleInteractiveWorkerStartObservation
 
     func writeLine(_ line: Data) async throws
 
@@ -67,6 +84,11 @@ public enum LifecycleInteractiveSessionBrokerError:
 }
 
 public actor LifecycleInteractiveSessionBroker {
+    private struct SessionIdentity: Equatable {
+        let investigationID: LifecycleInvestigationID
+        let configurationSHA256: String
+    }
+
     private enum Phase {
         case ready
         case starting
@@ -82,6 +104,7 @@ public actor LifecycleInteractiveSessionBroker {
     private let now: @Sendable () -> Date
     private var phase = Phase.ready
     private var configuration: LifecycleInteractiveWorkerConfiguration?
+    private var sessionIdentity: SessionIdentity?
     private var operationIDs = Set<UUID>()
     private var transferredBytes = 0
     private var ioOperationInProgress = false
@@ -128,6 +151,7 @@ public actor LifecycleInteractiveSessionBroker {
             let validBefore = request.validBefore,
             let maximumLineBytes = request.maximumLineBytes,
             let maximumSessionBytes = request.maximumSessionBytes,
+            let codexExecutableSHA256 = request.codexExecutableSHA256,
             validBefore > now(),
             validBefore.timeIntervalSince(now()) <= 900
         else {
@@ -137,14 +161,28 @@ public actor LifecycleInteractiveSessionBroker {
         let configuration = LifecycleInteractiveWorkerConfiguration(
             investigationID: request.investigationID,
             configurationSHA256: request.configurationSHA256,
+            codexExecutableSHA256: codexExecutableSHA256,
             validBefore: validBefore,
             maximumLineBytes: maximumLineBytes,
             maximumSessionBytes: maximumSessionBytes
         )
         self.configuration = configuration
+        sessionIdentity = SessionIdentity(
+            investigationID: request.investigationID,
+            configurationSHA256: request.configurationSHA256
+        )
         phase = .starting
+        let observation: LifecycleInteractiveWorkerStartObservation
         do {
-            try await worker.start(configuration)
+            observation = try await worker.start(configuration)
+            guard observation.codexExecutableSHA256
+                    == configuration.codexExecutableSHA256
+            else {
+                phase = .failed
+                throw LifecycleInteractiveSessionBrokerError.sessionMismatch
+            }
+        } catch let error as LifecycleInteractiveSessionBrokerError {
+            throw error
         } catch let error as LifecycleInteractiveWorkerError {
             if phase == .starting {
                 phase = .failed
@@ -168,9 +206,10 @@ public actor LifecycleInteractiveSessionBroker {
             throw LifecycleInteractiveSessionBrokerError.sessionExpired
         }
         phase = .active
-        return .started(
+        return try .started(
             investigationID: request.investigationID,
-            operationID: request.operationID
+            operationID: request.operationID,
+            codexExecutableSHA256: observation.codexExecutableSHA256
         )
     }
 
@@ -306,23 +345,19 @@ public actor LifecycleInteractiveSessionBroker {
     private func admitRetirement(
         _ request: LifecycleInteractiveSessionRequest
     ) throws {
-        if let configuration {
+        let requestedIdentity = SessionIdentity(
+            investigationID: request.investigationID,
+            configurationSHA256: request.configurationSHA256
+        )
+        if let sessionIdentity {
             guard
-                configuration.investigationID == request.investigationID
-                    && configuration.configurationSHA256
-                        == request.configurationSHA256
+                sessionIdentity == requestedIdentity
             else {
                 throw LifecycleInteractiveSessionBrokerError
                     .sessionMismatch
             }
         } else {
-            configuration = LifecycleInteractiveWorkerConfiguration(
-                investigationID: request.investigationID,
-                configurationSHA256: request.configurationSHA256,
-                validBefore: now(),
-                maximumLineBytes: 1,
-                maximumSessionBytes: 1
-            )
+            sessionIdentity = requestedIdentity
         }
         try admitOperation(request.operationID)
     }

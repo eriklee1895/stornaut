@@ -596,6 +596,8 @@ package enum InvestigationHandoffNoAuthRetirement {
                 rawValue: configuration.nonce
             ),
             configurationSHA256: configurationSHA256,
+            codexExecutableSHA256:
+                configuration.binding.codexExecutableSHA256,
             validBefore: projection.epochValidBefore,
             maximumLineBytes:
                 LifecycleInteractiveSessionRequest.maximumAllowedLineBytes,
@@ -615,6 +617,8 @@ package enum InvestigationHandoffNoAuthRetirement {
         }
         let lifecycle = returned.machineRetirementHandle
         guard
+            returned.codexExecutableSHA256
+                == configuration.binding.codexExecutableSHA256,
             lifecycle.investigationID.rawValue == configuration.nonce,
             lifecycle.configurationSHA256 == configurationSHA256,
             validRetirementDeadline(
@@ -815,6 +819,8 @@ public final class InvestigationRuntimeDiagnosticComposition:
                 try InvestigationLifecycleAppServerTransport(
                     investigationID: lifecycleID,
                     configurationSHA256: configurationSHA256,
+                    codexExecutableSHA256:
+                        configuration.binding.codexExecutableSHA256,
                     validBefore: epochValidBefore,
                     maximumLineBytes:
                         LifecycleInteractiveSessionRequest

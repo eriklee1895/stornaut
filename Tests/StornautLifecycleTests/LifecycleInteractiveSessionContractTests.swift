@@ -5,6 +5,48 @@ import Testing
 @Suite("Lifecycle Interactive Session Contract")
 struct LifecycleInteractiveSessionContractTests {
     @Test
+    func startEnvelopeAndResponseBindCanonicalNativeDigest() throws {
+        let fixture = LifecycleInteractiveSessionFixture()
+        let request = try LifecycleInteractiveSessionRequest.start(
+            investigationID: fixture.investigationID,
+            operationID: fixture.operationID,
+            configurationSHA256: fixture.configurationSHA256,
+            codexExecutableSHA256: fixture.codexExecutableSHA256,
+            validBefore: fixture.validBefore,
+            maximumLineBytes: 1_024,
+            maximumSessionBytes: 8_192
+        )
+        let requestObject = try #require(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(request)
+            ) as? [String: Any]
+        )
+        #expect(requestObject["protocolVersion"] as? Int == 3)
+        #expect(
+            requestObject["codexExecutableSHA256"] as? String
+                == fixture.codexExecutableSHA256
+        )
+
+        let response = try LifecycleInteractiveSessionResponse.started(
+            investigationID: fixture.investigationID,
+            operationID: fixture.operationID,
+            codexExecutableSHA256: fixture.codexExecutableSHA256
+        )
+        let responseObject = try #require(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(response)
+            ) as? [String: Any]
+        )
+        #expect(responseObject["protocolVersion"] as? Int == 5)
+        #expect(
+            responseObject["codexExecutableSHA256"] as? String
+                == fixture.codexExecutableSHA256
+        )
+
+        #expect(try response.validated(for: request) == response)
+    }
+
+    @Test
     func strictRequestsRoundTripForEveryOperation() throws {
         let fixture = LifecycleInteractiveSessionFixture()
         let requests: [LifecycleInteractiveSessionRequest] = [
@@ -12,6 +54,7 @@ struct LifecycleInteractiveSessionContractTests {
                 investigationID: fixture.investigationID,
                 operationID: fixture.operationID,
                 configurationSHA256: fixture.configurationSHA256,
+                codexExecutableSHA256: fixture.codexExecutableSHA256,
                 validBefore: fixture.validBefore,
                 maximumLineBytes: 1_024,
                 maximumSessionBytes: 8_192
@@ -59,9 +102,10 @@ struct LifecycleInteractiveSessionContractTests {
             investigationArtifactCount: 0
         )
         let responses: [LifecycleInteractiveSessionResponse] = [
-            .started(
+            try .started(
                 investigationID: fixture.investigationID,
-                operationID: fixture.operationID
+                operationID: fixture.operationID,
+                codexExecutableSHA256: fixture.codexExecutableSHA256
             ),
             .writeAccepted(
                 investigationID: fixture.investigationID,
@@ -91,7 +135,7 @@ struct LifecycleInteractiveSessionContractTests {
                 JSONSerialization.jsonObject(with: encoded)
                     as? [String: Any]
             )
-            #expect(object["protocolVersion"] as? Int == 4)
+            #expect(object["protocolVersion"] as? Int == 5)
             #expect(
                 try JSONDecoder().decode(
                     LifecycleInteractiveSessionResponse.self,
@@ -504,9 +548,10 @@ struct LifecycleInteractiveSessionContractTests {
     @Test
     func workerReplyRejectsUnknownMissingAndAmbiguousPayloads() throws {
         let fixture = LifecycleInteractiveSessionFixture()
-        let response = LifecycleInteractiveSessionResponse.started(
+        let response = try LifecycleInteractiveSessionResponse.started(
             investigationID: fixture.investigationID,
-            operationID: fixture.operationID
+            operationID: fixture.operationID,
+            codexExecutableSHA256: fixture.codexExecutableSHA256
         )
         let reply = LifecycleInteractiveWorkerReply(
             operationID: fixture.operationID,
@@ -602,6 +647,151 @@ struct LifecycleInteractiveSessionContractTests {
                 )
             )
         }
+
+        var misplacedDigest = object
+        misplacedDigest["codexExecutableSHA256"] =
+            fixture.codexExecutableSHA256
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(
+                LifecycleInteractiveSessionRequest.self,
+                from: try JSONSerialization.data(
+                    withJSONObject: misplacedDigest
+                )
+            )
+        }
+
+        let start = try LifecycleInteractiveSessionRequest.start(
+            investigationID: fixture.investigationID,
+            operationID: fixture.operationID,
+            configurationSHA256: fixture.configurationSHA256,
+            codexExecutableSHA256: fixture.codexExecutableSHA256,
+            validBefore: fixture.validBefore,
+            maximumLineBytes: 1_024,
+            maximumSessionBytes: 8_192
+        )
+        var missingDigest = try #require(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(start)
+            ) as? [String: Any]
+        )
+        missingDigest.removeValue(forKey: "codexExecutableSHA256")
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(
+                LifecycleInteractiveSessionRequest.self,
+                from: try JSONSerialization.data(
+                    withJSONObject: missingDigest
+                )
+            )
+        }
+        for invalid in [
+            String(repeating: "B", count: 64),
+            String(repeating: "b", count: 63),
+            String(repeating: "g", count: 64),
+        ] {
+            var malformed = try #require(
+                JSONSerialization.jsonObject(
+                    with: JSONEncoder().encode(start)
+                ) as? [String: Any]
+            )
+            malformed["codexExecutableSHA256"] = invalid
+            #expect(throws: DecodingError.self) {
+                _ = try JSONDecoder().decode(
+                    LifecycleInteractiveSessionRequest.self,
+                    from: try JSONSerialization.data(
+                        withJSONObject: malformed
+                    )
+                )
+            }
+        }
+    }
+
+    @Test
+    func startedResponseRejectsMissingMisplacedAndForeignDigest() throws {
+        let fixture = LifecycleInteractiveSessionFixture()
+        let request = try LifecycleInteractiveSessionRequest.start(
+            investigationID: fixture.investigationID,
+            operationID: fixture.operationID,
+            configurationSHA256: fixture.configurationSHA256,
+            codexExecutableSHA256: fixture.codexExecutableSHA256,
+            validBefore: fixture.validBefore,
+            maximumLineBytes: 1_024,
+            maximumSessionBytes: 8_192
+        )
+        let started = try LifecycleInteractiveSessionResponse.started(
+            investigationID: fixture.investigationID,
+            operationID: fixture.operationID,
+            codexExecutableSHA256: fixture.codexExecutableSHA256
+        )
+        var missing = try #require(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(started)
+            ) as? [String: Any]
+        )
+        missing.removeValue(forKey: "codexExecutableSHA256")
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(
+                LifecycleInteractiveSessionResponse.self,
+                from: try JSONSerialization.data(withJSONObject: missing)
+            )
+        }
+        for invalid in [
+            String(repeating: "B", count: 64),
+            String(repeating: "b", count: 63),
+            String(repeating: "g", count: 64),
+        ] {
+            var malformed = try #require(
+                JSONSerialization.jsonObject(
+                    with: JSONEncoder().encode(started)
+                ) as? [String: Any]
+            )
+            malformed["codexExecutableSHA256"] = invalid
+            #expect(throws: DecodingError.self) {
+                _ = try JSONDecoder().decode(
+                    LifecycleInteractiveSessionResponse.self,
+                    from: try JSONSerialization.data(
+                        withJSONObject: malformed
+                    )
+                )
+            }
+        }
+        var unknown = try #require(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(started)
+            ) as? [String: Any]
+        )
+        unknown["unexpected"] = true
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(
+                LifecycleInteractiveSessionResponse.self,
+                from: try JSONSerialization.data(withJSONObject: unknown)
+            )
+        }
+        #expect(throws: LifecycleInteractiveSessionContractError.self) {
+            let foreign = try LifecycleInteractiveSessionResponse.started(
+                investigationID: fixture.investigationID,
+                operationID: fixture.operationID,
+                codexExecutableSHA256: String(repeating: "c", count: 64)
+            )
+            _ = try foreign.validated(for: request)
+        }
+
+        let nonStarted = LifecycleInteractiveSessionResponse.writeAccepted(
+            investigationID: fixture.investigationID,
+            operationID: fixture.operationID
+        )
+        var misplaced = try #require(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(nonStarted)
+            ) as? [String: Any]
+        )
+        misplaced["codexExecutableSHA256"] =
+            fixture.codexExecutableSHA256
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(
+                LifecycleInteractiveSessionResponse.self,
+                from: try JSONSerialization.data(withJSONObject: misplaced)
+            )
+        }
     }
 
     @Test
@@ -616,6 +806,7 @@ struct LifecycleInteractiveSessionContractTests {
                 investigationID: fixture.investigationID,
                 operationID: fixture.operationID,
                 configurationSHA256: fixture.configurationSHA256,
+                codexExecutableSHA256: fixture.codexExecutableSHA256,
                 validBefore: Date(timeIntervalSince1970: .infinity),
                 maximumLineBytes: 1_024,
                 maximumSessionBytes: 8_192
@@ -629,6 +820,7 @@ struct LifecycleInteractiveSessionContractTests {
                 investigationID: fixture.investigationID,
                 operationID: fixture.operationID,
                 configurationSHA256: fixture.configurationSHA256,
+                codexExecutableSHA256: fixture.codexExecutableSHA256,
                 validBefore: fixture.validBefore,
                 maximumLineBytes: 0,
                 maximumSessionBytes: 8_192
@@ -1065,5 +1257,6 @@ private struct LifecycleInteractiveSessionFixture {
         uuidString: "92929292-9292-4292-8292-929292929292"
     )!
     let configurationSHA256 = String(repeating: "a", count: 64)
+    let codexExecutableSHA256 = String(repeating: "b", count: 64)
     let validBefore = Date(timeIntervalSince1970: 2_000_000_000)
 }

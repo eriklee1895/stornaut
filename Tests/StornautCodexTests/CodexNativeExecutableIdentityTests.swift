@@ -23,6 +23,7 @@ struct CodexNativeExecutableIdentityTests {
     #expect(lease.sha256 == digest(nativeBytes))
     #expect(lease.device > 0)
     #expect(lease.inode > 0)
+    #expect(lease.generation == lease.identity.generation)
     #expect(lease.size == Int64(nativeBytes.count))
     try lease.revalidate()
 

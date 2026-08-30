@@ -529,17 +529,23 @@ private struct LifecycleContainedInteractiveWorker:
 
     func start(
         _ configuration: LifecycleInteractiveWorkerConfiguration
-    ) async throws {
+    ) async throws -> LifecycleInteractiveWorkerStartObservation {
         do {
-            try await session.start(
+            let observation = try await session.start(
                 CodexContainedInteractiveSessionConfiguration(
                     investigationID:
                         configuration.investigationID.rawValue,
+                    expectedCodexExecutableSHA256:
+                        configuration.codexExecutableSHA256,
                     validBefore: configuration.validBefore,
                     maximumLineBytes: configuration.maximumLineBytes,
                     maximumSessionBytes:
                         configuration.maximumSessionBytes
                 )
+            )
+            return try LifecycleInteractiveWorkerStartObservation(
+                codexExecutableSHA256:
+                    observation.codexExecutableSHA256
             )
         } catch let error as CodexContainedInteractiveSessionError {
             if let mapped = lifecycleInteractiveWorkerError(error) {
