@@ -359,9 +359,10 @@ five paths / 2,193 changed lines, seven physical scenarios, 808/808 serial and
 three no-unresolved-P0-P2 review groups. iv-b2 closed at implementation
 `4e8d672d35e4416b0114c5c4dbebb1cb6a4d5089` / tree
 `e02a515283225b0b19443a47fad0b90fe3d0ddfd` and remains non-admitting.
-The shared-deadline repair at `c144c1e` and fixed-gate deadline cleanup repair
-at `bc42fbc` are also complete/non-admitting. The current frontier is
-interactive-native identity binding repair -> ii-c -> L3c3d -> L3c4. These
+The shared-deadline repair at `c144c1e`, fixed-gate deadline cleanup repair at
+`bc42fbc`, interactive-native identity binding repair `531f79f` / consumer seal
+`26e785a`, and fixed-gate historical replay `aa8a7f1` are complete/non-admitting.
+The current frontier is ii-c -> L3c3d -> L3c4. These
 repairs are machine-campaign prerequisite checkpoints, not recursively named
 new Tasks. Review findings and
 local repairs stay within their owning checkpoint. L3c4 alone owns the remaining
@@ -434,7 +435,7 @@ the sole normal-product admission gate.
 | [36](task-36-implementation-brief.md) | Domain, canonical projection, planner, budget and stop contracts | complete; [review](../../reports/phase-d-task-36-review.md) |
 | [37](task-37-implementation-brief.md) | Store v4, retention and source rejoin | complete; [review](../../reports/phase-d-task-37-review.md) |
 | [38](task-38-implementation-brief.md) | Closed coordinator with fake runtime | complete; [review](../../reports/phase-d-task-38-review.md) |
-| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; c0b-i/ii/iii, iv-a0/iv-a-r/iv-b1a/iv-b1b-i/iv-b1b-ii/iv-b2, shared-deadline and fixed-gate cleanup repairs complete/non-admitting; interactive-native identity binding current, then ii-c -> L3c3d -> L3c4; repairs are machine-campaign prerequisite checkpoints; L3c4 owns the remaining full; ADR 0018 Proposed |
+| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; interactive-native identity binding and fixed-gate historical replay complete/non-admitting; current frontier ii-c -> L3c3d -> L3c4; L3c4 owns the remaining full; ADR 0018 Proposed |
 | [40](task-40-implementation-brief.md) | Evidence report and conservative Review projection | blocked on Task 39 |
 | [41](task-41-implementation-brief.md) | First-use disclosure and typed availability | blocked on Task 40 |
 | [42](task-42-implementation-brief.md) | App workflow and recovery state | blocked on Task 41 |
