@@ -19,12 +19,15 @@ historical verification for successor work.
 ## 2. Frozen Scope and Budget
 
 This checkpoint may change exactly one non-document path:
-`scripts/verify-contract`. The maximum budget is 24 changed lines. It may only:
+`scripts/verify-contract`. The maximum budget is 28 changed lines. It may only:
 
 - branch successor HEADs through the existing `replay_historical_contract`;
 - pin the exact accepted commit and tree above;
 - invoke the existing fixed-gate contract and staged-scope modes inside the
   detached historical worktree; and
+- make the two remaining historical-index deletion fixtures use `git rm -f`
+  so Git mutates only their explicitly selected temporary index even when the
+  successor worktree contains newer bytes; and
 - recompute the normalized `ib2_self_sha`.
 
 It must not change product source, tests, the Investigation/App boundary
@@ -38,6 +41,11 @@ replays the accepted tree rather than consuming the live index. Run the current
 ii-c0b-iv composition/self-seal contract, bare Investigation boundary, and one
 bare App Release boundary (which invokes the bare aggregate contract). Finish
 with independent read-only review.
+
+The App Release run may not be waived after the replay passes: it is also the
+regression for the ii-b3b and ii-b3c temporary-index deletion fixtures. The
+repair must not use the real index, delete a worktree file, or relax the
+expected missing-path diagnostics.
 
 No focused/serial product suite, root or sudo command, installed topology,
 Codex auth/model/network operation, or `scripts/verify --full` is authorized.
