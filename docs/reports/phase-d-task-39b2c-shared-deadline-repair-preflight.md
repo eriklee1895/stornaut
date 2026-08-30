@@ -1,8 +1,15 @@
 # Phase D Task 39B2c Shared-Deadline Repair Preflight
 
-> Status: frozen / implementation pending / non-admitting
+> Status: complete / non-admitting
 >
 > Date: 2026-08-30
+>
+> Implementation: `c144c1e1d7b21e40f300cddfe1ff2c80993513db`
+>
+> Tree: `3c2d7f01b73e0b5a943262a4b1fd273e00e4a0d0`
+>
+> Completion audit:
+> [Shared-Deadline Repair Completion Audit](phase-d-task-39b2c-shared-deadline-repair-review.md)
 >
 > Implementation scope baseline: `66453397ae70c59347f02fff4e1a5528926c5141`
 > (`8452f9c466574e550ac8bc8540287b76d444e07e` was the original defect
@@ -131,6 +138,8 @@ without duplicating the serial suite. No authoritative full verifier is run here
 
 This checkpoint does not run or admit ii-c, does not accept ADR 0018, does not
 enable product Deep Dive, and adds no root, cleanup, Executor, network, target,
-dependency, command-line, environment or persistent protocol authority. After
-it is complete, the next prerequisite is interactive-native binding repair,
-followed by `ii-c -> L3c3d -> L3c4`.
+dependency, command-line, environment or persistent protocol authority. The
+original preflight expected interactive-native binding repair next. The staged
+serial instead exposed the independent fixed-gate deadline cleanup defect,
+which was isolated and subsequently closed before returning to
+`interactive-native identity binding repair -> ii-c -> L3c3d -> L3c4`.

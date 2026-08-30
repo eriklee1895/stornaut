@@ -1,8 +1,15 @@
 # Phase D Task 39B2c Fixed-Gate Deadline Cleanup Repair Preflight
 
-> Status: frozen / RED confirmed / implementation pending
+> Status: complete / non-admitting
 >
 > Date: 2026-08-30
+>
+> Implementation: `bc42fbc58ea1c6eed52ff646fa2f6043e2af4316`
+>
+> Tree: `29eb2d048142fb873f0306acc4bfebbbb250b03d`
+>
+> Completion audit:
+> [Fixed-Gate Deadline Cleanup Repair Completion Audit](phase-d-task-39b2c-fixed-gate-deadline-cleanup-repair-review.md)
 >
 > Baseline: `c144c1e` (`fix(investigation): preserve shared machine deadline`)
 >

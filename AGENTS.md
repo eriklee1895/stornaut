@@ -400,8 +400,11 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   residue。accepted c0b-iii PTY suite 只覆盖 inner gate topology，不能替代这次
   outer-adapter evidence。iv-b1b-ii complete/non-admitting；iv-b2 又以
   implementation `4e8d672d35e4416b0114c5c4dbebb1cb6a4d5089` / tree
-  `e02a515283225b0b19443a47fad0b90fe3d0ddfd` 完成并保持 non-admitting。当前
-  frontier 为 shared-deadline repair。
+  `e02a515283225b0b19443a47fad0b90fe3d0ddfd` 完成并保持 non-admitting。
+  shared-deadline repair 已以 implementation `c144c1e` / tree
+  `3c2d7f0` 完成；随后从 staged serial 暴露的 fixed-gate deadline cleanup
+  repair 也已以 implementation `bc42fbc` / tree `29eb2d0` 完成。两者均
+  non-admitting。当前 frontier 为 interactive-native identity binding repair。
   spawn/transfer uncertainty 不得
   settlement/unlink 或释放 owner，必须进入 process-lifetime ownership
   quarantine。
@@ -454,11 +457,12 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   non-admitting，iv-b1a、iv-b1b-i 与 iv-b1b-ii 也已
   complete/non-admitting；iv-b2 也已以
   `4e8d672d35e4416b0114c5c4dbebb1cb6a4d5089` / tree
-  `e02a515283225b0b19443a47fad0b90fe3d0ddfd` 完成并保持 non-admitting。当前
-  严格按 shared-deadline repair → interactive-native binding repair → ii-c →
-  L3c3d → L3c4 推进。前两项是 machine-campaign prerequisite checkpoints，
-  不是递归命名的新 Task；后续 review finding 与局部修复也不得再产生新的
-  命名 Task。
+  `e02a515283225b0b19443a47fad0b90fe3d0ddfd` 完成并保持 non-admitting。
+  shared-deadline repair `c144c1e` 与 fixed-gate deadline cleanup repair
+  `bc42fbc` 也已完成并保持 non-admitting。当前严格按 interactive-native
+  identity binding repair → ii-c → L3c3d → L3c4 推进。这些 repairs 是
+  machine-campaign prerequisite checkpoints，不是递归命名的新 Task；后续
+  review finding 与局部修复也不得再产生新的命名 Task。
   该 ii-b5b-ii-c checkpoint 以 8 个
   non-document paths / 3,104 changed lines、35 focused tests、
   1,396-test staged-only serial、三个 verifier gates 与 final
@@ -596,6 +600,10 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c L3c3c-ii-c0b-iv-b1b-i review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-i-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-i-review.md) |
 | Phase D Task 39B2c L3c3c-ii-c0b-iv-b1b-ii review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-ii-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-ii-review.md) |
 | Phase D Task 39B2c L3c3c-ii-c0b-iv-b2 review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b2-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b2-review.md) |
+| Phase D Task 39B2c shared-deadline repair preflight | [docs/reports/phase-d-task-39b2c-shared-deadline-repair-preflight.md](docs/reports/phase-d-task-39b2c-shared-deadline-repair-preflight.md) |
+| Phase D Task 39B2c shared-deadline repair review / completion audit | [docs/reports/phase-d-task-39b2c-shared-deadline-repair-review.md](docs/reports/phase-d-task-39b2c-shared-deadline-repair-review.md) |
+| Phase D Task 39B2c fixed-gate deadline cleanup repair preflight | [docs/reports/phase-d-task-39b2c-fixed-gate-deadline-cleanup-repair-preflight.md](docs/reports/phase-d-task-39b2c-fixed-gate-deadline-cleanup-repair-preflight.md) |
+| Phase D Task 39B2c fixed-gate deadline cleanup repair review / completion audit | [docs/reports/phase-d-task-39b2c-fixed-gate-deadline-cleanup-repair-review.md](docs/reports/phase-d-task-39b2c-fixed-gate-deadline-cleanup-repair-review.md) |
 | Phase D Task 39B2c L3c3c-ii-a installed-driver observation review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md) |
 | Phase D Task 39B2c L3c3c-ii-b handoff composition split preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md) |
 | Phase D Task 39B2c L3c3c-ii-b0 exact wire contract preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b0-wire-contract-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b0-wire-contract-preflight.md) |
@@ -844,10 +852,12 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   physical、808/808 serial、三项 dedicated gates 与无 unresolved P0–P2 的
   final reviews 完成；iv-b2 又以
   `4e8d672d35e4416b0114c5c4dbebb1cb6a4d5089` / tree
-  `e02a515283225b0b19443a47fad0b90fe3d0ddfd` 完成并保持 non-admitting。当前
-  frontier 为 shared-deadline repair → interactive-native binding repair →
-  ii-c privileged no-model gate → L3c3d → L3c4；前两项是 machine-campaign
-  prerequisite checkpoints，不是新的 Task。
+  `e02a515283225b0b19443a47fad0b90fe3d0ddfd` 完成并保持 non-admitting。
+  shared-deadline repair 与随后 fixed-gate deadline cleanup repair 已分别在
+  `c144c1e` 与 `bc42fbc` 完成并保持 non-admitting。当前 frontier 为
+  interactive-native identity binding repair → ii-c privileged no-model gate →
+  L3c3d → L3c4；这些 repairs 是 machine-campaign prerequisite checkpoints，
+  不是新的 Task。
   ADR 0018 仍 Proposed；L3c4 独占 final admission 与
   剩余 full。
   Task 39 尚未完成。
