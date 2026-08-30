@@ -4,6 +4,35 @@ import Testing
 @Suite("Task 39 trusted machine target boundary")
 struct InvestigationMachineTargetBoundaryTests {
     @Test
+    func fixedGateDeadlineCleanupVerifierPinsClosure() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-boundaries"), encoding: .utf8)
+        let contract = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+        for marker in [
+            "--fixed-gate-deadline-cleanup-contract-only",
+            "--fixed-gate-deadline-cleanup-staged-scope-contract-only",
+            "function verify_fixed_gate_deadline_cleanup_contract()",
+            "fixed-gate cleanup regained an observation-count limit",
+            "fixed-gate cleanup deadline binding drifted",
+            "fixed-gate cleanup critical lifecycle code drifted",
+            "fixed-gate cleanup focused tests became vacuous",
+            "fixed-gate cleanup checkpoint paths drifted",
+            "fixed-gate cleanup checkpoint budget drifted",
+        ] { #expect(boundary.contains(marker)) }
+        for marker in [
+            "fixed-observation-cap", "cleanup-deadline-drift",
+            "unreachable-call-spoof", "deadline-rebinding",
+            "response-helper-observation-cap",
+            "adapter-counter-cap", "adapter-comment-spoof",
+            "delayed-test-vacuity", "deadline-test-vacuity",
+            "fixed-gate cleanup mutation accepted:",
+        ] { #expect(contract.contains(marker)) }
+    }
+
+    @Test
     func concreteEntryRemainsPackageClosedNoAuthAndScopeBounded() throws {
         let root = URL(filePath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()

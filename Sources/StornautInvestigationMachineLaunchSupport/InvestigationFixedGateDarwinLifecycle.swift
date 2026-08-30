@@ -208,7 +208,6 @@ final class InvestigationFixedGateDarwinLifecycle:
     private static let maximumExecutableBytes = 64 << 20
     private static let cleanupReserveNanoseconds: UInt64 = 5_000_000_000
     private static let maximumProcessGroupMembers = 4_096
-    private static let maximumDrainObservations = 512
 
     private let system: any InvestigationFixedGateDarwinLifecycleSystem
     private let lock = NSLock()
@@ -621,7 +620,7 @@ final class InvestigationFixedGateDarwinLifecycle:
                     processGroupID: spawned.group, signal: SIGKILL)))
             }
         }
-        for _ in 0..<Self.maximumDrainObservations {
+        while true {
             guard current.isSubset(of: admitted) else { throw ContinueCleanup() }
             if current.subtracting(gateOnly).isEmpty {
                 let stable = try observe()
@@ -630,7 +629,6 @@ final class InvestigationFixedGateDarwinLifecycle:
                 current = stable
             } else { current = try observe() }
         }
-        throw InvestigationFixedGateDarwinLifecycleSystemError.uncertain
     }
 
     private func validatePostSpawnTopology(

@@ -322,6 +322,14 @@ shared_deadline_mutation_slot=
 shared_deadline_mutation_sha=
 shared_deadline_scope_contract_only=false
 shared_deadline_scope_baseline=66453397ae70c59347f02fff4e1a5528926c5141
+fixed_gate_deadline_cleanup_contract_only=false
+fixed_gate_deadline_cleanup_sources=()
+fixed_gate_deadline_cleanup_mutation_only=false
+fixed_gate_deadline_cleanup_mutation_name=
+fixed_gate_deadline_cleanup_mutation_slot=
+fixed_gate_deadline_cleanup_mutation_sha=
+fixed_gate_deadline_cleanup_scope_only=false
+fixed_gate_deadline_cleanup_baseline=edf27647e19cbd204fde0264722babfcf6e04199
 iib3a_staged_scope_contract_only=false
 iib3a_staged_scope_baseline=HEAD
 iib3b_start_retire_contract_only=false
@@ -826,6 +834,21 @@ if (( $# > 0 )); then
         && [[ $1 == --shared-deadline-repair-scope-contract-only ]]; then
         shared_deadline_scope_contract_only=true
         shared_deadline_scope_baseline=${2:-66453397ae70c59347f02fff4e1a5528926c5141}
+    elif (( $# == 1 || $# == 5 )) \
+        && [[ $1 == --fixed-gate-deadline-cleanup-contract-only ]]; then
+        fixed_gate_deadline_cleanup_contract_only=true
+        fixed_gate_deadline_cleanup_sources=("${@:2}")
+    elif (( $# == 8 )) \
+        && [[ $1 == --fixed-gate-deadline-cleanup-mutation-contract-only ]]; then
+        fixed_gate_deadline_cleanup_mutation_only=true
+        fixed_gate_deadline_cleanup_mutation_name=$2
+        fixed_gate_deadline_cleanup_mutation_slot=$3
+        fixed_gate_deadline_cleanup_mutation_sha=$4
+        fixed_gate_deadline_cleanup_sources=("${@:5}")
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --fixed-gate-deadline-cleanup-staged-scope-contract-only ]]; then
+        fixed_gate_deadline_cleanup_scope_only=true
+        fixed_gate_deadline_cleanup_baseline=${2:-edf27647e19cbd204fde0264722babfcf6e04199}
     elif (( $# == 1 || $# == 2 )) \
         && [[ $1 == --iib3a-staged-scope-contract-only ]]; then
         iib3a_staged_scope_contract_only=true
@@ -5262,7 +5285,7 @@ function verify_iib5bib2ba_process_contract() {
     xcrun swiftc -frontend -parse "$focused_test"
     python3 - "$package_source" "$c_source" "$header_source" "$process_source" "$focused_test" <<'PY'
 from pathlib import Path
-import hashlib, re, sys
+import hashlib, re, subprocess, sys
 package_path, c_path, header_path, swift_path, test_path = map(Path, sys.argv[1:])
 package, c, header, swift, test = [p.read_text(encoding="utf-8") for p in (package_path,c_path,header_path,swift_path,test_path)]
 target = re.search(r'\.target\(\s*name: "StornautInvestigationInstalledL2",(.*?)\n\s*\),', package, re.DOTALL)
@@ -9924,7 +9947,7 @@ expected_launch_sha256 = {
     "DarwinInvestigationFixedGateHandoffSystem.swift":
         "e8bb77f7beb8f0a7051b04c875f4f642869b1c3cdab84beb87f0a620b0ad5919",
     "InvestigationFixedGateDarwinLifecycle.swift":
-        "a1bc21327db4ce68f51a3b09d300fdace8a818f40ca8c7a3d59f6afde568a1aa",
+        "9c4ceca969c5f3fba331b274e566f2bb1a266d3ab41225e2a0b6e9a3070800c8",
     "InvestigationFixedGateHandoff.swift":
         "062540a7f7149c31d5fa4b48f33b4bde04e08661a14e7e4f70b2678197e6f590",
     "InvestigationMachineGateHandoffReceipt.swift":
@@ -10327,6 +10350,203 @@ function verify_shared_deadline_scope() {
     (( total <= 1600 && production <= 350 && tests <= 750 && verifiers <= 500 )) || { print -u2 "shared-deadline checkpoint budget drifted"; return 1; }
     local mode entry
     for item in "${expected[@]}"; do mode=100644; [[ $item == scripts/* ]] && mode=100755; entry=$(git ls-files -s -- "$item"); [[ "$(print -r -- "$entry" | awk '{print $1, $3, $4}')" == "$mode 0 $item" && "$(print -r -- "$entry" | awk '{print $2}')" == "$(git hash-object -- "$item")" ]] || { print -u2 "shared-deadline staged source/mode drifted: $item"; return 1; }; done
+}
+
+function verify_fixed_gate_deadline_cleanup_contract() {
+    local -a paths=("${fixed_gate_deadline_cleanup_sources[@]}")
+    if (( ${#paths} == 0 )); then paths=(
+        Sources/StornautInvestigationMachineLaunchSupport/InvestigationFixedGateDarwinLifecycle.swift
+        Tests/StornautInvestigationTests/InvestigationFixedGateDarwinLifecycleTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        Sources/StornautInvestigationMachineLaunchSupport/DarwinInvestigationFixedGateHandoffSystem.swift
+    ); fi
+    local lifecycle=${paths[1]} focused=${paths[2]} boundary=${paths[3]}
+    local darwin=${paths[4]}
+    for source in "$lifecycle" "$focused" "$boundary" "$darwin"; do
+        xcrun swiftc -frontend -parse -enable-bare-slash-regex "$source"
+    done
+    python3 - "$fixed_gate_deadline_cleanup_mutation_only" \
+        "$fixed_gate_deadline_cleanup_mutation_name" \
+        "$fixed_gate_deadline_cleanup_mutation_slot" \
+        "$fixed_gate_deadline_cleanup_mutation_sha" \
+        "$lifecycle" "$focused" "$boundary" "$darwin" <<'PY'
+from pathlib import Path
+import hashlib, re, subprocess, sys
+mutation_mode, mutation_name, mutation_slot, mutation_sha = sys.argv[1:5]
+names = ("lifecycle", "focused", "boundary", "darwin")
+sources = tuple(Path(path).read_text() for path in sys.argv[5:])
+canonical_paths = tuple(Path(path) for path in (
+    "Sources/StornautInvestigationMachineLaunchSupport/InvestigationFixedGateDarwinLifecycle.swift",
+    "Tests/StornautInvestigationTests/InvestigationFixedGateDarwinLifecycleTests.swift",
+    "Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift",
+    "Sources/StornautInvestigationMachineLaunchSupport/DarwinInvestigationFixedGateHandoffSystem.swift",
+))
+canonical = tuple(path.read_text() for path in canonical_paths)
+mutations = {
+    "fixed-observation-cap": ("lifecycle", "        while true {", "        for _ in 0..<512 {"),
+    "counter-observation-cap": ("lifecycle", "        while true {", "        var remainingObservations = 512\n        while true {\n            guard remainingObservations > 0 else { throw InvestigationFixedGateDarwinLifecycleSystemError.uncertain }\n            remainingObservations -= 1"),
+    "call-site-deadline-drift": ("lifecycle", "drainRecoveryGroup(\n                    spawned: spawned, deadline: absoluteDeadline", "drainRecoveryGroup(\n                    spawned: spawned, deadline: operationDeadline"),
+    "call-site-comment-spoof": ("lifecycle", "spawned: spawned, deadline: absoluteDeadline)", "spawned: spawned, deadline: operationDeadline) // drainRecoveryGroup(spawned: spawned, deadline: absoluteDeadline)"),
+    "unreachable-call-spoof": ("lifecycle", "beforeReapValid = try drainRecoveryGroup(\n                    spawned: spawned, deadline: absoluteDeadline)", "beforeReapValid = try drainRecoveryGroup(\n                    spawned: spawned, deadline: operationDeadline)\n                if false { _ = try? drainRecoveryGroup(\n                    spawned: spawned, deadline: absoluteDeadline) }"),
+    "deadline-rebinding": ("lifecycle", "operationDeadline = absoluteDeadline - Self.cleanupReserveNanoseconds", "operationDeadline = absoluteDeadline - Self.cleanupReserveNanoseconds\n            absoluteDeadline = operationDeadline"),
+    "cleanup-deadline-drift": ("lifecycle", "maximumCount: Self.maximumProcessGroupMembers,\n                    deadline: deadline", "maximumCount: Self.maximumProcessGroupMembers,\n                    deadline: 0"),
+    "helper-observation-cap": ("lifecycle", "        while true {", "        while true {\n            guard fixedGateCleanupBudgetAllowsAnotherObservation() else { throw InvestigationFixedGateDarwinLifecycleSystemError.uncertain }"),
+    "response-helper-observation-cap": ("lifecycle", "private func responseInventory(_ value: InvestigationFixedGateDarwinLifecycleResponse) throws -> InvestigationFixedGateDarwinInventoryObservation\n{ guard case .inventory(let result) = value else { throw InvestigationFixedGateDarwinLifecycleSystemError.uncertain }; return result }", "private var fixedGateCleanupObservations = 0\nprivate func responseInventory(_ value: InvestigationFixedGateDarwinLifecycleResponse) throws -> InvestigationFixedGateDarwinInventoryObservation\n{ fixedGateCleanupObservations += 1; guard fixedGateCleanupObservations <= 512, case .inventory(let result) = value else { throw InvestigationFixedGateDarwinLifecycleSystemError.uncertain }; return result }"),
+    "delayed-test-vacuity": ("focused", "system.inventoryResponses.count > 512", "true"),
+    "deadline-test-vacuity": ("focused", "lifecycle.replay?.processGroupEmpty == false", "true"),
+    "adapter-deadline-guard": ("darwin", "maximum > 0, monotonic() < deadline", "maximum > 0"),
+    "adapter-deadline-pause": ("darwin", "if !pids.isEmpty { try pause(deadline) }", "if !pids.isEmpty { }"),
+    "adapter-counter-cap": ("darwin", "private func inventory(_ group: pid_t, _ maximum: Int, _ deadline: UInt64) throws -> InvestigationFixedGateDarwinInventoryObservation {", "private var fixedGateCleanupObservations = 0\n    private func inventory(_ group: pid_t, _ maximum: Int, _ deadline: UInt64) throws -> InvestigationFixedGateDarwinInventoryObservation { fixedGateCleanupObservations += 1; guard fixedGateCleanupObservations <= 512 else { throw uncertain() }"),
+    "adapter-comment-spoof": ("darwin", "maximum > 0, monotonic() < deadline", "maximum > 0 /* monotonic() < deadline */"),
+}
+expected = (
+    "9c4ceca969c5f3fba331b274e566f2bb1a266d3ab41225e2a0b6e9a3070800c8",
+    "47cee824a0064e7ea996ce3706c64f324bc4085ce4092dbf82964d24132f9c69",
+    "541ae558acf1ec7b2d1f77a72cff0ff369385313895f39651fa3465e97110693",
+    "e8bb77f7beb8f0a7051b04c875f4f642869b1c3cdab84beb87f0a620b0ad5919",
+)
+if mutation_mode == "true":
+    if mutation_name not in mutations or mutation_slot not in names:
+        raise SystemExit("fixed-gate cleanup mutation slot drifted")
+    if re.fullmatch(r"[0-9a-f]{64}", mutation_sha) is None:
+        raise SystemExit("fixed-gate cleanup mutation SHA drifted")
+    index = names.index(mutation_slot)
+    expected_slot, old, new = mutations[mutation_name]
+    if mutation_slot != expected_slot or canonical[index].count(old) != 1:
+        raise SystemExit("fixed-gate cleanup mutation contract drifted")
+    if sources[index] != canonical[index].replace(old, new, 1):
+        raise SystemExit("fixed-gate cleanup unrecognized mutation")
+    if mutation_sha == expected[index]:
+        raise SystemExit("fixed-gate cleanup mutation source unchanged")
+    expected = expected[:index] + (mutation_sha,) + expected[index + 1:]
+elif mutation_mode != "false" or mutation_name or mutation_slot or mutation_sha:
+    raise SystemExit("fixed-gate cleanup mutation mode drifted")
+if tuple(hashlib.sha256(value.encode()).hexdigest() for value in sources) != expected:
+    raise SystemExit("fixed-gate cleanup mutation digest drifted" if mutation_mode == "true" else "fixed-gate cleanup sealed source drifted")
+lifecycle, focused, boundary, darwin = sources
+if hashlib.sha256(darwin.encode()).hexdigest() != "e8bb77f7beb8f0a7051b04c875f4f642869b1c3cdab84beb87f0a620b0ad5919":
+    raise SystemExit("fixed-gate cleanup immutable Darwin adapter drifted")
+parsed = subprocess.run(
+    ["xcrun", "swiftc", "-frontend", "-dump-parse",
+     "-enable-bare-slash-regex", sys.argv[5]],
+    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False,
+)
+if parsed.returncode != 0:
+    raise SystemExit(
+        "fixed-gate cleanup Swift parse drifted: "
+        + (mutation_name or "canonical")
+    )
+if "regex_literal_expr" in parsed.stdout:
+    raise SystemExit("fixed-gate cleanup regex literal rejected")
+if "interpolated_string_literal_expr" in parsed.stdout:
+    raise SystemExit("fixed-gate cleanup string interpolation rejected")
+def code_only(source):
+    output=list(source); index=0; block_depth=0; string_end=None; raw_hashes=""
+    while index < len(source):
+        if block_depth:
+            if source.startswith("/*", index): output[index:index+2]="  "; block_depth+=1; index+=2
+            elif source.startswith("*/", index): output[index:index+2]="  "; block_depth-=1; index+=2
+            else:
+                if source[index] != "\n": output[index]=" "
+                index+=1
+            continue
+        if string_end is not None:
+            if source.startswith(string_end, index):
+                width=len(string_end); output[index:index+width]=" "*width; index+=width; string_end=None; raw_hashes=""
+            elif not raw_hashes and source[index] == "\\":
+                output[index]=" "
+                if index+1 < len(source) and source[index+1] != "\n": output[index+1]=" "
+                index+=2
+            else:
+                if source[index] != "\n": output[index]=" "
+                index+=1
+            continue
+        if source.startswith("//", index):
+            end=source.find("\n", index); end=len(source) if end < 0 else end
+            output[index:end]=" "*(end-index); index=end
+        elif source.startswith("/*", index): output[index:index+2]="  "; block_depth=1; index+=2
+        else:
+            opener=re.match(r'(#+)?("""|")', source[index:])
+            if opener is None: index+=1; continue
+            hashes=opener.group(1) or ""; quote=opener.group(2); width=len(opener.group(0))
+            output[index:index+width]=" "*width; string_end=quote+hashes; raw_hashes=hashes; index+=width
+    if block_depth or string_end is not None:
+        raise SystemExit("fixed-gate cleanup Swift lexical scan drifted")
+    return "".join(output)
+lexical_lifecycle = code_only(lifecycle)
+all_lifecycle = re.sub(r"\s+", "", lexical_lifecycle)
+run = lexical_lifecycle[lexical_lifecycle.index("    func run("):lexical_lifecycle.index("    private func observeTerminalPin(")]
+if re.sub(r"\s+", "", run).count(
+    "drainRecoveryGroup(spawned:spawned,deadline:absoluteDeadline)"
+) != 1:
+    raise SystemExit("fixed-gate cleanup call-site deadline drifted")
+if hashlib.sha256(all_lifecycle.encode()).hexdigest() != "3a488749417e1f472f22c506fa4612fe158b827c5b7af7b2d91b2c7c76c17159":
+    raise SystemExit("fixed-gate cleanup critical lifecycle code drifted")
+body = lexical_lifecycle[lexical_lifecycle.index("private func drainRecoveryGroup("):lexical_lifecycle.index("private func validatePostSpawnTopology(")]
+compact = re.sub(r"\s+", "", body)
+if "maximumDrainObservations" in lifecycle or re.search(r"0\.\.<\s*512", lifecycle):
+    raise SystemExit("fixed-gate cleanup regained an observation-count limit")
+if compact.count("whiletrue{") != 1:
+    raise SystemExit("fixed-gate cleanup loop drifted")
+lexical = re.sub(r'//[^\n]*|"(?:\\.|[^"\\])*"', '', body)
+loop = lexical[lexical.index("while true"):]
+if re.search(r"\b(?:for|repeat|break|continue)\b", loop) or re.search(
+    r"(?<![A-Za-z_])\d[\d_]*", loop
+):
+    raise SystemExit("fixed-gate cleanup regained an observation-count limit")
+if re.findall(r"\b(?:let|var)\s+([A-Za-z_][A-Za-z0-9_]*)", lexical) != [
+    "value", "current", "admitted", "gateOnly", "stable",
+]:
+    raise SystemExit("fixed-gate cleanup loop state drifted")
+if hashlib.sha256(compact.encode()).hexdigest() != "f065bde3ddba03137eeacd3323ade5510e79b4d10bee34335defca919fde2098":
+    raise SystemExit("fixed-gate cleanup loop body drifted")
+if compact.count("deadline:deadline") != 1:
+    raise SystemExit("fixed-gate cleanup deadline binding drifted")
+inventory = darwin[darwin.index("private func inventory("):darwin.index("private func consumeSignal(")]
+inventory_compact = re.sub(r"\s+", "", inventory)
+if "monotonic()<deadline" not in inventory_compact:
+    raise SystemExit("fixed-gate cleanup adapter deadline guard drifted")
+if "if!pids.isEmpty{trypause(deadline)}" not in inventory_compact:
+    raise SystemExit("fixed-gate cleanup adapter deadline pause drifted")
+for marker in (
+    "current.isSubset(of: admitted)",
+    "stable.isSubset(of: admitted)",
+    "stable.subtracting(gateOnly).isEmpty",
+    "recoveryDrainUsesTheAbsoluteDeadlineBeyondTheLegacyObservationCap",
+    "system.inventoryResponses.count > 512",
+    "recoveryDrainDeadlineFailureWithholdsReapAndEmptyProof",
+    "lifecycle.replay?.exactGateReaped == false",
+    "lifecycle.replay?.processGroupEmpty == false",
+):
+    source = body if marker in body else focused
+    if marker not in source:
+        raise SystemExit("fixed-gate cleanup focused tests became vacuous")
+for marker in (
+    "fixedGateDeadlineCleanupVerifierPinsClosure",
+    "--fixed-gate-deadline-cleanup-contract-only",
+    "--fixed-gate-deadline-cleanup-staged-scope-contract-only",
+):
+    if marker not in boundary:
+        raise SystemExit("fixed-gate cleanup boundary regression drifted")
+PY
+}
+
+function verify_fixed_gate_deadline_cleanup_scope() {
+    local baseline=${1:-edf27647e19cbd204fde0264722babfcf6e04199}
+    local expected_baseline=edf27647e19cbd204fde0264722babfcf6e04199
+    local -a expected=(
+        Sources/StornautInvestigationMachineLaunchSupport/InvestigationFixedGateDarwinLifecycle.swift
+        Tests/StornautInvestigationTests/InvestigationFixedGateDarwinLifecycleTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-investigation-boundaries
+        scripts/verify-contract
+    )
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" == $expected_baseline ]] || { print -u2 "fixed-gate cleanup checkpoint baseline drifted"; return 1; }
+    local -a observed=(${(f)"$(git diff --cached --name-only "$baseline")"})
+    (( ${#expected} == 5 )) && [[ "${(j:\n:)${(@on)observed}}" == "${(j:\n:)${(@on)expected}}" ]] || { print -u2 "fixed-gate cleanup checkpoint paths drifted"; return 1; }
+    local changed; changed=$(git diff --cached --numstat "$baseline" | awk '{if($1=="-"||$2=="-")exit 2;n+=$1+$2} END{print n+0}') || { print -u2 "fixed-gate cleanup binary checkpoint path rejected"; return 1; }
+    (( changed <= 700 )) || { print -u2 "fixed-gate cleanup checkpoint budget drifted"; return 1; }
+    local item mode entry; for item in "${expected[@]}"; do mode=100644; [[ $item == scripts/* ]] && mode=100755; entry=$(git ls-files -s -- "$item"); [[ "$(print -r -- "$entry" | awk '{print $1, $3, $4}')" == "$mode 0 $item" && "$(print -r -- "$entry" | awk '{print $2}')" == "$(git hash-object -- "$item")" ]] || { print -u2 "fixed-gate cleanup staged source/mode drifted: $item"; return 1; }; done
 }
 
 function verify_iib4_staged_scope() {
@@ -13944,6 +14164,22 @@ if $shared_deadline_scope_contract_only; then
     verify_shared_deadline_scope "$shared_deadline_scope_baseline"
     print "Shared-deadline repair staged scope verification passed."; exit 0
 fi
+if $fixed_gate_deadline_cleanup_contract_only; then
+    verify_fixed_gate_deadline_cleanup_contract
+    print "Fixed-gate deadline cleanup source contract verification passed."
+    exit 0
+fi
+if $fixed_gate_deadline_cleanup_mutation_only; then
+    verify_fixed_gate_deadline_cleanup_contract
+    print "Fixed-gate deadline cleanup mutation source verification passed."
+    exit 0
+fi
+if $fixed_gate_deadline_cleanup_scope_only; then
+    verify_fixed_gate_deadline_cleanup_scope \
+        "$fixed_gate_deadline_cleanup_baseline"
+    print "Fixed-gate deadline cleanup staged scope verification passed."
+    exit 0
+fi
 if $iib3a_staged_scope_contract_only; then
     verify_iib3a_staged_scope "$iib3a_staged_scope_baseline"
     print "ii-b3a staged scope verification passed."
@@ -14120,6 +14356,7 @@ verify_iic0bi_producer_contract \
     "$iic0bi_focused_test" \
     Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
 verify_shared_deadline_contract
+verify_fixed_gate_deadline_cleanup_contract
 verify_iic0biii2a_gate_contract \
     Package.swift "$machine_gate_transport" "$machine_gate_launcher" \
     "$machine_gate_darwin" "$machine_gate_main" \

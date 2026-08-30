@@ -430,6 +430,34 @@ struct InvestigationFixedGateDarwinLifecycleTests {
     }
 
     @Test
+    func recoveryDrainUsesTheAbsoluteDeadlineBeyondTheLegacyObservationCap()
+        throws
+    {
+        let system = DarwinLifecycleRecorder(scenario: .delayedDrain)
+
+        #expect(try makeLifecycle(system).run(makeInput()) == .exactGateReaped)
+        #expect(system.inventoryResponses.count > 512)
+        #expect(system.events.compactMap(\.inventoryDeadline)
+            .allSatisfy { $0 == system.absoluteDeadline })
+        #expect(system.events.compactMap(\.groupSignal)
+            == [SIGTERM, SIGCONT, SIGKILL])
+        #expect(system.events.filter(\.isReap).count == 1)
+        #expect(system.inventoryResponses.last?.processIDs.isEmpty == true)
+    }
+
+    @Test
+    func recoveryDrainDeadlineFailureWithholdsReapAndEmptyProof() throws {
+        let system = DarwinLifecycleRecorder(scenario: .drainDeadlineExpired)
+        let lifecycle = makeLifecycle(system)
+
+        #expect(try lifecycle.run(makeInput()) == .spawnOrTransferUncertain)
+        #expect(system.events.contains(.inventory(system.absoluteDeadline)))
+        #expect(!system.events.contains { $0.isReap })
+        #expect(lifecycle.replay?.exactGateReaped == false)
+        #expect(lifecycle.replay?.processGroupEmpty == false)
+    }
+
+    @Test
     func terminalDriftRestoresSavedForegroundButWithholdsProof() throws {
         let system = DarwinLifecycleRecorder(scenario: .ttyDrift)
         #expect(try makeLifecycle(system).run(makeInput()) == .spawnOrTransferUncertain)
@@ -461,6 +489,8 @@ enum DarwinLifecycleScenario: Equatable, Sendable {
     case acquireCleanupUncertain
     case pipeCleanupUncertain
     case malformedPrepared
+    case delayedDrain
+    case drainDeadlineExpired
     case postSpawnRevalidationThrows
     case continueFailure
     case terminalReadTimeout
@@ -672,6 +702,9 @@ private final class DarwinLifecycleRecorder:
             events.append(.restoreForeground(processGroupID)); return .completed
         case .inventoryProcessGroup(let processGroupID, _, let deadline):
             events.append(.inventory(deadline)); #expect(processGroupID == gatePID)
+            if case .drainDeadlineExpired = scenario {
+                throw InvestigationFixedGateDarwinLifecycleSystemError.uncertain
+            }
             let observation = inventory(); inventoryCalls += 1
             inventoryResponses.append(observation); return .inventory(observation)
         case .signalProcessGroup(let processGroupID, let signal):
@@ -749,6 +782,17 @@ private final class DarwinLifecycleRecorder:
         if case .malformedPrepared = scenario {
             return .init(
                 processIDs: inventoryCalls == 0 ? [gatePID] : [],
+                complete: true
+            )
+        }
+        if case .delayedDrain = scenario {
+            if inventoryCalls < 513 {
+                return .init(
+                    processIDs: [gatePID, gatePID + 1], complete: true
+                )
+            }
+            return .init(
+                processIDs: inventoryCalls < 515 ? [gatePID] : [],
                 complete: true
             )
         }

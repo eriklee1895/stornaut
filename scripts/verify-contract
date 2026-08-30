@@ -3,7 +3,7 @@
 set -euo pipefail
 
 contract_source=${0:A}
-ib2_self_sha=1390552a2e6726128d4fc99201ded47943098a8b1d8f22447a45d7f98bb474a6
+ib2_self_sha=724bd90ebf9949c4434fa9403d353370e05ab9484dc9e841f8a0353ca394a781
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' "$contract_source" | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
 repo_root=${contract_source:h:h}
@@ -2049,7 +2049,7 @@ function verify_iic0bivb2_contract() {
 function verify_iic0bivb2_subordinate_source_seals() {
     local investigation=${STORNAUT_IIC0BIVB2_INVESTIGATION_BOUNDARY_SOURCE:-scripts/verify-investigation-boundaries}
     local release=${STORNAUT_IIC0BIVB2_APP_RELEASE_BOUNDARY_SOURCE:-scripts/verify-app-release-boundaries}
-    [[ "$(shasum -a 256 "$investigation" | awk '{print $1}')" == 2dcfce7f190e8b2985688175525908b297775658c6a528ae91a58754764a8166 ]] || fail_contract 'Machine driver verifier source seal drifted: scripts/verify-investigation-boundaries'
+    [[ "$(shasum -a 256 "$investigation" | awk '{print $1}')" == 8449e754526d78e9d459ff527ffd7b0fa7518d7dbe87feb99b4916b1b3561212 ]] || fail_contract 'Machine driver verifier source seal drifted: scripts/verify-investigation-boundaries'
     [[ "$(shasum -a 256 "$release" | awk '{print $1}')" == b51cfb2114a41205bb07b9b66bdd52e4e86d755316a44faafec62278f02eefee ]] || fail_contract 'Machine driver verifier source seal drifted: scripts/verify-app-release-boundaries'
 }
 
@@ -2106,6 +2106,16 @@ SH
 
 function verify_shared_deadline_repair_contract() {
     local out=$1 gate=scripts/verify-investigation-boundaries
+    local accepted=c144c1e1d7b21e40f300cddfe1ff2c80993513db
+    local accepted_tree=3c2d7f01b73e0b5a943262a4b1fd273e00e4a0d0
+    if [[ "$(git rev-parse HEAD)" != $accepted ]]; then
+        replay_historical_contract "$out/immutable" \
+            "$accepted" "$accepted_tree" \
+            --shared-deadline-repair-contract-only \
+            '--shared-deadline-repair-scope-contract-only' \
+            || fail_contract 'shared-deadline historical replay failed'
+        return 0
+    fi
     mkdir -p "$out"
     "$gate" --shared-deadline-repair-source-contract-only >"$out/source.log"
     local contract=Sources/StornautInvestigation/SignedInvestigationRuntimeContract.swift
@@ -2245,6 +2255,61 @@ PY
     require_fixed_text "$log" "shared-deadline checkpoint binary or category drifted"
 }
 
+function verify_fixed_gate_deadline_cleanup_contract() {
+    local out=$1 gate=scripts/verify-investigation-boundaries
+    local lifecycle=Sources/StornautInvestigationMachineLaunchSupport/InvestigationFixedGateDarwinLifecycle.swift
+    local focused=Tests/StornautInvestigationTests/InvestigationFixedGateDarwinLifecycleTests.swift
+    local boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+    local darwin=Sources/StornautInvestigationMachineLaunchSupport/DarwinInvestigationFixedGateHandoffSystem.swift
+    mkdir -p "$out"
+    "$gate" --fixed-gate-deadline-cleanup-contract-only \
+        "$lifecycle" "$focused" "$boundary" "$darwin" \
+        >"$out/source.log"
+    python3 - "$out" "$lifecycle" "$focused" "$darwin" <<'PY'
+from pathlib import Path
+import sys
+out, lifecycle, focused, darwin = map(Path, sys.argv[1:])
+sources = {"lifecycle": lifecycle.read_text(), "focused": focused.read_text(), "darwin": darwin.read_text()}
+mutations = (
+    ("fixed-observation-cap", "lifecycle", "        while true {", "        for _ in 0..<512 {", "fixed-gate cleanup critical lifecycle code drifted"),
+    ("counter-observation-cap", "lifecycle", "        while true {", "        var remainingObservations = 512\n        while true {\n            guard remainingObservations > 0 else { throw InvestigationFixedGateDarwinLifecycleSystemError.uncertain }\n            remainingObservations -= 1", "fixed-gate cleanup critical lifecycle code drifted"),
+    ("call-site-deadline-drift", "lifecycle", "drainRecoveryGroup(\n                    spawned: spawned, deadline: absoluteDeadline", "drainRecoveryGroup(\n                    spawned: spawned, deadline: operationDeadline", "fixed-gate cleanup call-site deadline drifted"),
+    ("call-site-comment-spoof", "lifecycle", "spawned: spawned, deadline: absoluteDeadline)", "spawned: spawned, deadline: operationDeadline) // drainRecoveryGroup(spawned: spawned, deadline: absoluteDeadline)", "fixed-gate cleanup call-site deadline drifted"),
+    ("unreachable-call-spoof", "lifecycle", "beforeReapValid = try drainRecoveryGroup(\n                    spawned: spawned, deadline: absoluteDeadline)", "beforeReapValid = try drainRecoveryGroup(\n                    spawned: spawned, deadline: operationDeadline)\n                if false { _ = try? drainRecoveryGroup(\n                    spawned: spawned, deadline: absoluteDeadline) }", "fixed-gate cleanup critical lifecycle code drifted"),
+    ("deadline-rebinding", "lifecycle", "operationDeadline = absoluteDeadline - Self.cleanupReserveNanoseconds", "operationDeadline = absoluteDeadline - Self.cleanupReserveNanoseconds\n            absoluteDeadline = operationDeadline", "fixed-gate cleanup critical lifecycle code drifted"),
+    ("cleanup-deadline-drift", "lifecycle", "maximumCount: Self.maximumProcessGroupMembers,\n                    deadline: deadline", "maximumCount: Self.maximumProcessGroupMembers,\n                    deadline: 0", "fixed-gate cleanup critical lifecycle code drifted"),
+    ("helper-observation-cap", "lifecycle", "        while true {", "        while true {\n            guard fixedGateCleanupBudgetAllowsAnotherObservation() else { throw InvestigationFixedGateDarwinLifecycleSystemError.uncertain }", "fixed-gate cleanup critical lifecycle code drifted"),
+    ("response-helper-observation-cap", "lifecycle", "private func responseInventory(_ value: InvestigationFixedGateDarwinLifecycleResponse) throws -> InvestigationFixedGateDarwinInventoryObservation\n{ guard case .inventory(let result) = value else { throw InvestigationFixedGateDarwinLifecycleSystemError.uncertain }; return result }", "private var fixedGateCleanupObservations = 0\nprivate func responseInventory(_ value: InvestigationFixedGateDarwinLifecycleResponse) throws -> InvestigationFixedGateDarwinInventoryObservation\n{ fixedGateCleanupObservations += 1; guard fixedGateCleanupObservations <= 512, case .inventory(let result) = value else { throw InvestigationFixedGateDarwinLifecycleSystemError.uncertain }; return result }", "fixed-gate cleanup critical lifecycle code drifted"),
+    ("delayed-test-vacuity", "focused", "system.inventoryResponses.count > 512", "true", "fixed-gate cleanup focused tests became vacuous"),
+    ("deadline-test-vacuity", "focused", "lifecycle.replay?.processGroupEmpty == false", "true", "fixed-gate cleanup focused tests became vacuous"),
+    ("adapter-deadline-guard", "darwin", "maximum > 0, monotonic() < deadline", "maximum > 0", "fixed-gate cleanup immutable Darwin adapter drifted"),
+    ("adapter-deadline-pause", "darwin", "if !pids.isEmpty { try pause(deadline) }", "if !pids.isEmpty { }", "fixed-gate cleanup immutable Darwin adapter drifted"),
+    ("adapter-counter-cap", "darwin", "private func inventory(_ group: pid_t, _ maximum: Int, _ deadline: UInt64) throws -> InvestigationFixedGateDarwinInventoryObservation {", "private var fixedGateCleanupObservations = 0\n    private func inventory(_ group: pid_t, _ maximum: Int, _ deadline: UInt64) throws -> InvestigationFixedGateDarwinInventoryObservation { fixedGateCleanupObservations += 1; guard fixedGateCleanupObservations <= 512 else { throw uncertain() }", "fixed-gate cleanup immutable Darwin adapter drifted"),
+    ("adapter-comment-spoof", "darwin", "maximum > 0, monotonic() < deadline", "maximum > 0 /* monotonic() < deadline */", "fixed-gate cleanup immutable Darwin adapter drifted"),
+)
+for name, kind, old, new, expected in mutations:
+    source = sources[kind]
+    if source.count(old) != 1: raise SystemExit(f"cannot construct fixed-gate cleanup mutation: {name}")
+    (out / f"{name}.swift").write_text(source.replace(old, new, 1))
+(out / "mutations.tsv").write_text("".join(f"{name}\t{kind}\t{expected}\n" for name, kind, _, _, expected in mutations))
+PY
+    local name kind expected target target_sha log rc
+    while IFS=$'\t' read -r name kind expected; do
+        target="$out/$name.swift"
+        target_sha=$(shasum -a 256 "$target" | awk '{print $1}')
+        local -a args=("$lifecycle" "$focused" "$boundary" "$darwin")
+        case $kind in lifecycle) args[1]=$target;; focused) args[2]=$target;; darwin) args[4]=$target;; esac
+        log="$out/$name.log"; rc=0
+        "$gate" --fixed-gate-deadline-cleanup-mutation-contract-only \
+            "$name" "$kind" "$target_sha" "${args[@]}" >"$log" 2>&1 || rc=$?
+        (( rc != 0 )) || fail_contract "fixed-gate cleanup mutation accepted: $name"
+        [[ "$(<"$log")" == "$expected" ]] \
+            || fail_contract "fixed-gate cleanup mutation diagnostic drifted: $name"
+    done <"$out/mutations.tsv"
+    "$gate" --fixed-gate-deadline-cleanup-staged-scope-contract-only \
+        >"$out/scope.log"
+}
+
 if [[ ${1:-} == --iic0b-ii-a-contract-only ]]; then
     (( $# == 1 )) || fail_contract \
         "Usage: scripts/verify-contract --iic0b-ii-a-contract-only"
@@ -2329,6 +2394,17 @@ if [[ ${1:-} == --shared-deadline-repair-contract-only ]]; then
     verify_iic0bivb2_subordinate_source_seals
     verify_shared_deadline_repair_contract "$shared_deadline_root"
     print "Shared-deadline repair mutation contract verification passed."
+    exit 0
+fi
+
+if [[ ${1:-} == --fixed-gate-deadline-cleanup-contract-only ]]; then
+    (( $# == 1 )) || fail_contract \
+        'Usage: scripts/verify-contract --fixed-gate-deadline-cleanup-contract-only'
+    fixed_gate_cleanup_root=$(mktemp -d \
+        "${TMPDIR:-/tmp}/stornaut-fixed-gate-cleanup-contract.XXXXXX")
+    trap 'rm -rf "$fixed_gate_cleanup_root"' EXIT
+    verify_fixed_gate_deadline_cleanup_contract "$fixed_gate_cleanup_root"
+    print "Fixed-gate deadline cleanup mutation contract verification passed."
     exit 0
 fi
 
@@ -3873,6 +3949,7 @@ done
 contract_root=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-verify-contract.XXXXXX")
 verify_iic0bivb2_contract "$contract_root/iic0bivb2" false
 verify_shared_deadline_repair_contract "$contract_root/shared-deadline"
+verify_fixed_gate_deadline_cleanup_contract "$contract_root/fixed-gate-cleanup"
 mkdir -p "$contract_root/scripts"
 cp scripts/verify "$contract_root/scripts/verify"
 chmod 755 "$contract_root/scripts/verify"
