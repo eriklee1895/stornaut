@@ -1,10 +1,15 @@
 # Phase D Task 39B2c Fixed-Gate Cleanup Historical Replay Preflight
 
-> Status: frozen / implementation pending / non-admitting
+> Status: complete / non-admitting
 >
 > Date: 2026-08-30
 >
 > Baseline: `26e785ac2146ca96553ce1d4de870fcd4437fa22`
+>
+> Implementation: `aa8a7f14a60bdfe9cf682d7a1987b0f2e956597a`
+>
+> Completion audit:
+> [Fixed-Gate Cleanup Historical Replay Completion Audit](phase-d-task-39b2c-fixed-gate-deadline-cleanup-historical-replay-review.md)
 
 ## 1. Defect
 
