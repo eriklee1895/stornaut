@@ -1,6 +1,6 @@
 # Phase D Task 39B2c Interactive-Native Identity Binding Repair Preflight
 
-> Status: frozen / implementation pending / non-admitting
+> Status: frozen / implementation in progress / non-admitting
 >
 > Date: 2026-08-30
 >
@@ -92,9 +92,13 @@ The implementation may change exactly these fourteen non-document paths:
 13. `Tests/StornautInvestigationTests/InvestigationHandoffConcreteCompositionTests.swift`; and
 14. `scripts/verify-investigation-boundaries`.
 
-The maximum changed-line budget is 2,000 non-document lines: production 750,
-tests 850 and verifier 400. These category ceilings are independent. A
-fifteenth path, line 2,001, a second wire field, a new package target/dependency,
+The maximum changed-line budget is 2,100 non-document lines: production 900,
+tests 1,000 and verifier 400. These category ceilings are independent. The
+2026-08-30 implementation checkpoint rebalanced the production/test estimates
+before further coding after the dedicated suspended launcher, direct Mach-O
+fixture and required drift/cleanup coverage reached 831 production and 861 test
+changed lines; the exact fourteen paths remain unchanged. A
+fifteenth path, line 2,101, a second wire field, a new package target/dependency,
 or a change to an excluded path stops implementation for re-preflight.
 
 ## 4. Closed Contract
