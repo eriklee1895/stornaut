@@ -99,7 +99,8 @@ implementation `4e8d672d35e4416b0114c5c4dbebb1cb6a4d5089` / tree
 shared-deadline repair `c144c1e`、fixed-gate deadline cleanup repair
 `bc42fbc`、interactive-native identity binding repair `531f79f` / consumer
 seal `26e785a` 与 fixed-gate historical replay `aa8a7f1` 均已完成并保持
-non-admitting。当前 frontier 为 ii-c → L3c3d → L3c4；这些 repairs 是
+non-admitting。ii-c-a 已以 implementation `81f185c` / tree `7cf4db75` 完成；
+当前 frontier 为 ii-c-b → ii-c-c → L3c3d → L3c4；这些 repairs 是
 machine-campaign prerequisite checkpoints，不是新的 Task。machine admission
 尚未发生，最终 authoritative full 仍仅归
 L3c4；Task 39 尚未完成，production Deep Dive 仍 unavailable。
@@ -117,7 +118,7 @@ L3c4；Task 39 尚未完成，production Deep Dive 仍 unavailable。
 | [docs/assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md](docs/assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md) | 权限受限、安全阻断、部分结果、stale preflight 与历史保留的恢复状态契约 |
 | [docs/reports/epic-2-4-validation-report.md](docs/reports/epic-2-4-validation-report.md) | Phase B domain/persistence、真实 Quick Scan benchmark、accounting、UI 与 scope gate |
 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) | 已归档的 Phase B Tasks 9–26 计划与逐 Task 证据 |
-| [docs/plans/active/README.md](docs/plans/active/README.md) | Phase D approved；Tasks 36–38 complete，Task 39B2c in progress；interactive-native identity binding 与 fixed-gate historical replay complete/non-admitting；current frontier ii-c → L3c3d → L3c4；machine admission pending |
+| [docs/plans/active/README.md](docs/plans/active/README.md) | Phase D approved；Tasks 36–38 complete，Task 39B2c in progress；ii-c-a complete/non-admitting；current frontier ii-c-b → ii-c-c → L3c3d → L3c4；machine admission pending |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md) | v1 capsule bytes preserved；frozen enclosing projected-cohort binary contract、8-path/2,600-line ceiling and corrected remaining order |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md) | ii-c0a exact 8-path / 1,863-line completion、90 focused、536 affected、1,418-test serial、boundary gates 与 independent review |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-i-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-i-review.md) | c0b-i semantic producer completion audit；exact 7 paths / 1,900 lines、95 tests / 5 suites；complete/non-admitting |
@@ -128,6 +129,8 @@ L3c4；Task 39 尚未完成，production Deep Dive 仍 unavailable。
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-i-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-i-review.md) | iv-b1b-i injected Darwin lifecycle；implementation `41d34f26` / tree `8ab58932`、3 paths / 1,173 production lines、806/806 affected、Release target 与两组终审；complete/non-admitting |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-ii-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-ii-review.md) | iv-b1b-ii dedicated physical/verifier closure；implementation `373431d4` / tree `b08342e5`、5 paths / 2,193 lines、七场景 physical、808/808 serial、三项 gates 与无 unresolved P0–P2 review；complete/non-admitting |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b2-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b2-review.md) | iv-b2 zero-argument coordinator/verifier closure；implementation `4e8d672d35e4416b0114c5c4dbebb1cb6a4d5089` / tree `e02a515283225b0b19443a47fad0b90fe3d0ddfd`；complete/non-admitting |
+| [docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md](docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md) | ii-c split：ii-c-a static topology complete；ii-c-b root-owned Gate/dry-run harness current；ii-c-c owns the unique privileged campaign |
+| [docs/reports/phase-d-task-39b2c-iic-a-static-installed-topology-review.md](docs/reports/phase-d-task-39b2c-iic-a-static-installed-topology-review.md) | ii-c-a implementation `81f185c` / tree `7cf4db75`、11 paths / 2,669 lines、856/856 affected serial；complete/non-admitting |
 | [docs/reports/phase-d-task-39b2c-shared-deadline-repair-review.md](docs/reports/phase-d-task-39b2c-shared-deadline-repair-review.md) | shared-deadline repair；implementation `c144c1e` / tree `3c2d7f0`；14 paths / 1,500 lines；complete/non-admitting |
 | [docs/reports/phase-d-task-39b2c-fixed-gate-deadline-cleanup-repair-review.md](docs/reports/phase-d-task-39b2c-fixed-gate-deadline-cleanup-repair-review.md) | fixed-gate absolute-deadline cleanup；implementation `bc42fbc` / tree `29eb2d0`；5 paths / 399 lines、847/847 serial；complete/non-admitting |
 | [docs/reports/phase-d-task-39b2c-interactive-native-identity-binding-repair-preflight.md](docs/reports/phase-d-task-39b2c-interactive-native-identity-binding-repair-preflight.md) | completed exact 14-path interactive-native contract；strict digest propagation → suspended native launch/observed-digest closure |

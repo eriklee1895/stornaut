@@ -133,8 +133,10 @@
 > The former `ii-c0b-ii-a3 current` text is superseded. Shared-deadline repair
 > `c144c1e`, fixed-gate deadline cleanup repair `bc42fbc`, interactive-native
 > identity binding repair `531f79f` / consumer seal `26e785a`, and fixed-gate
-> historical replay `aa8a7f1` are complete/non-admitting. The current frontier
-> is ii-c → L3c3d → L3c4. These repairs are machine-campaign prerequisite checkpoints,
+> historical replay `aa8a7f1` are complete/non-admitting. ii-c-a static
+> installed topology is complete/non-admitting at implementation `81f185c` /
+> tree `7cf4db75`. The current frontier is ii-c-b → ii-c-c → L3c3d → L3c4.
+> These repairs are machine-campaign prerequisite checkpoints,
 > not recursively named new Tasks. Local findings remain in their owning
 > checkpoint. L3c4 alone owns final admission and the remaining full.
 > a2-i
@@ -1227,7 +1229,8 @@ The remaining L3 work is split before driver coding:
    Shared-deadline repair `c144c1e` and fixed-gate deadline cleanup repair
    `bc42fbc`, interactive-native identity binding `531f79f` / consumer seal
    `26e785a`, and fixed-gate historical replay `aa8a7f1` are complete/non-admitting.
-   The corrected remaining order is `ii-c -> L3c3d -> L3c4`;
+   ii-c-a is complete/non-admitting. The corrected remaining order is
+   `ii-c-b -> ii-c-c -> L3c3d -> L3c4`;
    these repairs are machine-campaign prerequisite checkpoints rather than new Tasks;
    the mandatory
    [c0b-iv preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-preflight.md)
@@ -1469,7 +1472,8 @@ completed and remain non-admitting, with iv-b2 accepted at
 `c144c1e` and fixed-gate deadline cleanup repair at `bc42fbc` subsequently
 completed. Interactive-native identity binding `531f79f` / consumer seal
 `26e785a` and fixed-gate historical replay `aa8a7f1` also completed. All remain
-non-admitting. The live frontier is ii-c → L3c3d → L3c4. These repairs are
+non-admitting. ii-c-a is complete/non-admitting; the live frontier is
+ii-c-b → ii-c-c → L3c3d → L3c4. These repairs are
 machine-campaign prerequisite checkpoints, not new Tasks. Completion evidence
 is in the
 [shared-deadline audit](../../reports/phase-d-task-39b2c-shared-deadline-repair-review.md)
@@ -1479,6 +1483,8 @@ Additional closure evidence is in the
 [interactive-native audit](../../reports/phase-d-task-39b2c-interactive-native-identity-binding-repair-review.md)
 and
 [fixed-gate historical replay audit](../../reports/phase-d-task-39b2c-fixed-gate-deadline-cleanup-historical-replay-review.md).
+[ii-c-a completion evidence](../../reports/phase-d-task-39b2c-iic-a-static-installed-topology-review.md)
+records the closed signed-tool topology and advances the live frontier to ii-c-b.
 ADR 0018
 remains Proposed until ii-c succeeds. L3c1 used focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean

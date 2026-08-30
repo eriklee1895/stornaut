@@ -33,7 +33,7 @@
 | Agent、双模式与治理设计 | [Agent Disk Governance](design/agent-disk-governance.md) |
 | UI、品牌、状态与交互 | [UI/UX](design/ui-ux.md) |
 | 宏观交付顺序与阶段 Gate | [Delivery Roadmap](plans/roadmap.md) |
-| 当前计划状态 | [Active Plans](plans/active/README.md) — Phase D approved；Task 39 in progress；interactive-native identity binding 与 fixed-gate historical replay complete/non-admitting；current frontier ii-c → L3c3d → L3c4；ADR 0018 Proposed |
+| 当前计划状态 | [Active Plans](plans/active/README.md) — Phase D approved；Task 39 in progress；ii-c-a complete/non-admitting；current frontier ii-c-b → ii-c-c → L3c3d → L3c4；ADR 0018 Proposed |
 | Capability-first Codex Runtime Gate | [Runtime Evidence Gate](plans/completed/capability-first-codex-runtime-gate.md) — complete / archived |
 | R2 tests-first brief | [R2 Implementation Brief](plans/completed/task-r2-implementation-brief.md) — complete |
 | R3 lifecycle hard-gate brief | [R3 Implementation Brief](plans/completed/task-r3-implementation-brief.md) — behaviorReady candidate |
@@ -64,7 +64,7 @@
 | Phase D Task 37 Review | [Code Review and Completion Audit](reports/phase-d-task-37-review.md) |
 | Phase D Task 38 | [Implementation Brief](plans/active/task-38-implementation-brief.md) — complete |
 | Phase D Task 38 Review | [Code Review and Completion Audit](reports/phase-d-task-38-review.md) |
-| Phase D Task 39 | [Implementation Brief](plans/active/task-39-implementation-brief.md) — in progress；interactive-native identity binding `531f79f` / consumer seal `26e785a` 与 fixed-gate historical replay `aa8a7f1` complete/non-admitting；remaining order ii-c → L3c3d → L3c4；production Deep Dive unavailable |
+| Phase D Task 39 | [Implementation Brief](plans/active/task-39-implementation-brief.md) — in progress；ii-c-a implementation `81f185c` / tree `7cf4db75` complete/non-admitting；remaining order ii-c-b → ii-c-c → L3c3d → L3c4；production Deep Dive unavailable |
 | Phase D Task 39A Review | [Code Review and Completion Audit](reports/phase-d-task-39a-review.md) |
 | Phase D Task 39B1a Review | [Code Review and Completion Audit](reports/phase-d-task-39b1a-review.md) |
 | Phase D Task 39B1b-i Review | [Code Review and Completion Audit](reports/phase-d-task-39b1b-i-review.md) |
@@ -167,6 +167,8 @@
 | Phase D Task 39B2c Interactive-Native Identity Binding Review | [Completion Audit](reports/phase-d-task-39b2c-interactive-native-identity-binding-repair-review.md) — exact 14 paths / 2,389 lines、1,756-test serial、Debug/Release 与 boundary gates；complete/non-admitting |
 | Phase D Task 39B2c Fixed-Gate Historical Replay Preflight | [Frozen Verifier Scope](reports/phase-d-task-39b2c-fixed-gate-deadline-cleanup-historical-replay-preflight.md) — one-path successor replay and alternate-index closure |
 | Phase D Task 39B2c Fixed-Gate Historical Replay Review | [Completion Audit](reports/phase-d-task-39b2c-fixed-gate-deadline-cleanup-historical-replay-review.md) — implementation `aa8a7f1` / tree `8176e92a`、bare Investigation/App Release gates；complete/non-admitting |
+| Phase D Task 39B2c ii-c Machine Campaign Preflight | [Frozen Campaign Split](reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md) — ii-c-a complete/non-admitting；ii-c-b current |
+| Phase D Task 39B2c ii-c-a Static Installed Topology Review | [Completion Audit](reports/phase-d-task-39b2c-iic-a-static-installed-topology-review.md) — implementation `81f185c` / tree `7cf4db75`、11 paths / 2,669 lines、856/856 affected serial；complete/non-admitting |
 | Phase D Task 39B2c L3c3c-ii-c0b-ii-b Retained-Base Split | [Design-Correction Preflight](reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-b-retained-base-split-preflight.md) — missing retained acquisition-time base FD requires a3 prerequisite；then b1 publication/lease → b2 settlement/recovery → b3 verifier closure；non-admitting |
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-b0 Preflight | [Outer/Inner Protocol and Split](reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md) — long-lived outer、disposable inner-led PGID、fixed FD contract、parent-crash overlay and iii-a/b1/b2a/b2b budgets；preflight complete/non-admitting |
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-a Review | [Per-Epoch Continuity Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-a-review.md) — exact 10 paths / 3,147 changed lines；40 focused、559 affected、1,446-test/74-suite clean serial；three boundary gates and no unresolved P0–P2；complete/non-admitting |

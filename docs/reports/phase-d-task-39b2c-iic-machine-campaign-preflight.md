@@ -1,12 +1,12 @@
 # Phase D Task 39B2c ii-c Machine Campaign Preflight
 
-> Status: frozen / ii-c-a current / non-admitting
+> Status: frozen / ii-c-a complete/non-admitting / ii-c-b current/non-admitting
 >
 > Date: 2026-08-30
 >
 > Baseline: `2b30a157c14bc507351b10bd521e710987860f71`
 >
-> Remaining order: ii-c-a -> ii-c-b -> ii-c-c -> L3c3d -> L3c4
+> Remaining order: ii-c-b -> ii-c-c -> L3c3d -> L3c4
 
 ## 1. Decision
 

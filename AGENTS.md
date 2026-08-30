@@ -406,7 +406,9 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   repair 也已以 implementation `bc42fbc` / tree `29eb2d0` 完成。
   interactive-native identity binding repair `531f79f`、consumer seal
   `26e785a` 与 fixed-gate historical replay `aa8a7f1` 随后完成。以上均
-  non-admitting。当前 frontier 为 ii-c privileged no-model gate。
+  non-admitting。ii-c-a static installed topology 已以 implementation
+  `81f185c` / tree `7cf4db75` 完成并保持 non-admitting；当前 frontier 为
+  ii-c-b root-owned Gate + dry-run campaign harness。
   spawn/transfer uncertainty 不得
   settlement/unlink 或释放 owner，必须进入 process-lifetime ownership
   quarantine。
@@ -463,8 +465,8 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   shared-deadline repair `c144c1e` 与 fixed-gate deadline cleanup repair
   `bc42fbc` 也已完成并保持 non-admitting。interactive-native identity binding
   repair `531f79f`、consumer seal `26e785a` 与 fixed-gate historical replay
-  `aa8a7f1` 也已完成并保持 non-admitting。当前严格按 ii-c → L3c3d → L3c4
-  推进。这些 repairs 是
+  `aa8a7f1` 也已完成并保持 non-admitting。ii-c-a 已完成；当前严格按
+  ii-c-b → ii-c-c → L3c3d → L3c4 推进。这些 repairs 是
   machine-campaign prerequisite checkpoints，不是递归命名的新 Task；后续
   review finding 与局部修复也不得再产生新的命名 Task。
   该 ii-b5b-ii-c checkpoint 以 8 个
@@ -612,6 +614,8 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c interactive-native identity binding repair review / completion audit | [docs/reports/phase-d-task-39b2c-interactive-native-identity-binding-repair-review.md](docs/reports/phase-d-task-39b2c-interactive-native-identity-binding-repair-review.md) |
 | Phase D Task 39B2c fixed-gate historical replay preflight | [docs/reports/phase-d-task-39b2c-fixed-gate-deadline-cleanup-historical-replay-preflight.md](docs/reports/phase-d-task-39b2c-fixed-gate-deadline-cleanup-historical-replay-preflight.md) |
 | Phase D Task 39B2c fixed-gate historical replay review / completion audit | [docs/reports/phase-d-task-39b2c-fixed-gate-deadline-cleanup-historical-replay-review.md](docs/reports/phase-d-task-39b2c-fixed-gate-deadline-cleanup-historical-replay-review.md) |
+| Phase D Task 39B2c ii-c machine campaign preflight | [docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md](docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md) |
+| Phase D Task 39B2c ii-c-a static installed topology review / completion audit | [docs/reports/phase-d-task-39b2c-iic-a-static-installed-topology-review.md](docs/reports/phase-d-task-39b2c-iic-a-static-installed-topology-review.md) |
 | Phase D Task 39B2c L3c3c-ii-a installed-driver observation review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md) |
 | Phase D Task 39B2c L3c3c-ii-b handoff composition split preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md) |
 | Phase D Task 39B2c L3c3c-ii-b0 exact wire contract preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b0-wire-contract-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b0-wire-contract-preflight.md) |
@@ -864,8 +868,8 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   shared-deadline repair 与随后 fixed-gate deadline cleanup repair 已分别在
   `c144c1e` 与 `bc42fbc` 完成并保持 non-admitting。interactive-native identity
   binding repair `531f79f`、consumer seal `26e785a` 与 fixed-gate historical
-  replay `aa8a7f1` 也已完成并保持 non-admitting。当前 frontier 为 ii-c
-  privileged no-model gate → L3c3d → L3c4；这些 repairs 是 machine-campaign prerequisite checkpoints，
+  replay `aa8a7f1` 也已完成并保持 non-admitting。ii-c-a 已完成；当前 frontier
+  为 ii-c-b → ii-c-c → L3c3d → L3c4；这些 repairs 是 machine-campaign prerequisite checkpoints，
   不是新的 Task。
   ADR 0018 仍 Proposed；L3c4 独占 final admission 与
   剩余 full。
