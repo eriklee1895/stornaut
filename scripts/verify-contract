@@ -3,7 +3,7 @@
 set -euo pipefail
 
 contract_source=${0:A}
-ib2_self_sha=af20228a4414c8d506bcf40ae650a6bc90bc59ff6eedb85e07f38c301775e383
+ib2_self_sha=03cdf657dbc124cd12349336f436f45d1ad1f097481eb5e567e3693135d20d9e
 ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' "$contract_source" | shasum -a 256 | awk '{ print $1 }')
 [[ "$ib2_observed_sha" == "$ib2_self_sha" ]] || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
 repo_root=${contract_source:h:h}
@@ -2257,6 +2257,16 @@ PY
 
 function verify_fixed_gate_deadline_cleanup_contract() {
     local out=$1 gate=scripts/verify-investigation-boundaries
+    local accepted=bc42fbc58ea1c6eed52ff646fa2f6043e2af4316
+    local accepted_tree=29eb2d048142fb873f0306acc4bfebbbb250b03d
+    if [[ "$(git rev-parse HEAD)" != $accepted ]]; then
+        replay_historical_contract "$out/immutable" \
+            "$accepted" "$accepted_tree" \
+            --fixed-gate-deadline-cleanup-contract-only \
+            '--fixed-gate-deadline-cleanup-staged-scope-contract-only' \
+            || fail_contract 'fixed-gate cleanup historical replay failed'
+        return 0
+    fi
     local lifecycle=Sources/StornautInvestigationMachineLaunchSupport/InvestigationFixedGateDarwinLifecycle.swift
     local focused=Tests/StornautInvestigationTests/InvestigationFixedGateDarwinLifecycleTests.swift
     local boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
@@ -5521,7 +5531,7 @@ for fixture in extra-path over-budget deleted-path; do
             --cacheinfo "100644,$blob,Sources/StornautInvestigationRuntime/InvestigationLifecycleAppServerTransport.swift"
         expected='ii-b3b staged checkpoint budget drifted'
     else
-        GIT_INDEX_FILE="$temporary_index" git rm --cached -q \
+        GIT_INDEX_FILE="$temporary_index" git rm --cached -q -f \
             Sources/StornautInvestigationRuntime/InvestigationLifecycleAppServerTransport.swift
         expected='ii-b3b staged checkpoint deleted a required path'
     fi
@@ -5655,7 +5665,7 @@ for fixture in extra-path over-budget deleted-path; do
             --cacheinfo "100644,$blob,$b3c_composition"
         expected='ii-b3c staged checkpoint budget drifted'
     else
-        GIT_INDEX_FILE="$index" git rm --cached -q "$b3c_leaf"
+        GIT_INDEX_FILE="$index" git rm --cached -q -f "$b3c_leaf"
         expected='ii-b3c staged checkpoint deleted a required path'
     fi
     output="$contract_root/b3c-$fixture-scope.log"
