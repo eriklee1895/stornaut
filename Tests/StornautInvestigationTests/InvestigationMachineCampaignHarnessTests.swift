@@ -8,6 +8,38 @@ import Testing
 @Suite("Investigation machine campaign harness", .serialized)
 struct InvestigationMachineCampaignHarnessTests {
     @Test
+    func physicalExecutableUsesControllingPTYAndExactFD3() async throws {
+        let fixture = try CampaignPhysicalFixture.make(mode: .success)
+        defer { fixture.remove() }
+        let report = try fixture.run()
+        #expect(report.completed)
+        #expect(report.diagnostic == "campaign-physical-diagnostic")
+        #expect(report.processID > 1)
+        #expect(report.processGroupID == report.processID)
+        #expect(report.sessionID == report.processID)
+        #expect(report.foregroundProcessGroupID == report.processID)
+        #expect(report.residueComplete)
+        #expect(report.processGroupResidueCount == 0)
+        #expect(report.sessionResidueCount == 0)
+        #expect(report.failure.isEmpty)
+        #expect(report.cleanup.isEmpty)
+    }
+
+    @Test(arguments: CampaignPhysicalMode.failures)
+    fileprivate func physicalFailuresRemainBoundedAndLeaveZeroResidue(
+        _ mode: CampaignPhysicalMode
+    ) throws {
+        let fixture = try CampaignPhysicalFixture.make(mode: mode)
+        defer { fixture.remove() }
+        let report = try fixture.run()
+        #expect(!report.completed)
+        #expect(report.failure == mode.expectedFailure)
+        #expect(report.residueComplete)
+        #expect(report.processGroupResidueCount == 0)
+        #expect(report.sessionResidueCount == 0)
+    }
+
+    @Test
     func validFragmentedReceiptUsesOneDeadlineAndFairDrain() async throws {
         let fixture = try CampaignHarnessFixture()
         let outcome = await InvestigationMachineCampaignHarness(
@@ -380,6 +412,196 @@ private struct CampaignHarnessFixture {
 }
 
 private enum FixtureError: Error { case failed }
+
+private enum CampaignPhysicalError: Error {
+    case build(Int32, String)
+    case invalid(String)
+}
+
+private struct CampaignPhysicalReport: Decodable {
+    let completed: Bool
+    let processID: Int32
+    let processGroupID: Int32
+    let sessionID: Int32
+    let foregroundProcessGroupID: Int32
+    let diagnostic: String
+    let residueComplete: Bool
+    let processGroupResidueCount: Int
+    let sessionResidueCount: Int
+    let failure: String
+    let cleanup: [String]
+}
+
+private enum CampaignPhysicalMode: CaseIterable {
+    case success, truncated, trailing, missingEOF, nonzero, missingSibling
+    static let failures: [Self] = [
+        .truncated, .trailing, .missingEOF, .nonzero, .missingSibling,
+    ]
+    var compilerFlag: String? {
+        switch self {
+        case .success, .missingSibling: nil
+        case .truncated: "CAMPAIGN_FIXTURE_TRUNCATED"
+        case .trailing: "CAMPAIGN_FIXTURE_TRAILING"
+        case .missingEOF: "CAMPAIGN_FIXTURE_MISSING_EOF"
+        case .nonzero: "CAMPAIGN_FIXTURE_NONZERO"
+        }
+    }
+    var expectedFailure: String {
+        switch self {
+        case .truncated, .trailing: "receiptInvalid"
+        case .missingEOF: "transportUncertain"
+        case .nonzero: "childTerminated"
+        case .missingSibling: "spawnUncertain"
+        case .success: ""
+        }
+    }
+}
+
+private final class CampaignPhysicalFixture {
+    let root: URL
+    let executable: URL
+    private init(root: URL, executable: URL) {
+        self.root = root; self.executable = executable
+    }
+
+    static func make(mode: CampaignPhysicalMode) throws
+        -> CampaignPhysicalFixture
+    {
+        let repository = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let root = FileManager.default.temporaryDirectory.appending(
+            path: "stornaut-campaign-physical-" + UUID().uuidString,
+            directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(
+            at: root, withIntermediateDirectories: false,
+            attributes: [.posixPermissions: 0o700])
+        do {
+            let bin = try currentBuildRoot()
+            let packageName = try resolvedPackageName(buildRoot: bin)
+            let builtExecutable = bin.appending(
+                path: "StornautInvestigationMachineCampaign")
+            guard FileManager.default.isExecutableFile(
+                atPath: builtExecutable.path)
+            else { throw CampaignPhysicalError.invalid("campaign executable") }
+            let executable = root.appending(
+                path: "StornautInvestigationMachineCampaign")
+            try FileManager.default.copyItem(
+                at: builtExecutable, to: executable)
+            guard chmod(executable.path, 0o755) == 0 else {
+                throw CampaignPhysicalError.invalid("campaign executable mode")
+            }
+            let module = bin.appending(path: "Modules")
+            let fixtureSource = repository.appending(
+                path: "Tests/Fixtures/InvestigationMachineCampaignCoordinator/main.swift")
+            let coordinator = root.appending(
+                path: "StornautInvestigationMachineCampaignCoordinator")
+            let handoffObjects = try objectPaths(
+                buildRoot: bin, target: "StornautInvestigationHandoffContract",
+                suffix: ".swift.o")
+            let compiler = Process(), diagnostics = Pipe()
+            compiler.executableURL = URL(filePath: "/usr/bin/xcrun")
+            compiler.currentDirectoryURL = repository
+            compiler.arguments = [
+                "swiftc", "-parse-as-library", "-package-name",
+                packageName, "-I", module.path, fixtureSource.path,
+                "-Xcc", "-fmodule-map-file=" + bin.appending(
+                    path: "CInvestigationIdentitySupport.build/module.modulemap").path,
+                "-Xcc", "-fmodule-map-file=" + bin.appending(
+                    path: "CInvestigationMachineCampaignSupport.build/module.modulemap").path,
+                bin.appending(path: "StornautInvestigationMachineCampaignSupport.build/InvestigationMachineCampaignEvidenceContract.swift.o").path,
+            ] + (mode.compilerFlag.map { ["-D", $0] } ?? [])
+                + handoffObjects + [
+                "-o", coordinator.path,
+            ]
+            compiler.environment = ["HOME": "/var/empty", "PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C"]
+            compiler.standardInput = FileHandle.nullDevice
+            compiler.standardOutput = diagnostics; compiler.standardError = diagnostics
+            try compiler.run()
+            let data = diagnostics.fileHandleForReading.readDataToEndOfFile()
+            compiler.waitUntilExit()
+            guard compiler.terminationStatus == 0 else {
+                throw CampaignPhysicalError.build(
+                    compiler.terminationStatus,
+                    String(decoding: data, as: UTF8.self))
+            }
+            if mode == .missingSibling {
+                try FileManager.default.removeItem(at: coordinator)
+            }
+            return .init(root: root, executable: executable)
+        } catch { try? FileManager.default.removeItem(at: root); throw error }
+    }
+
+    func run() throws -> CampaignPhysicalReport {
+        let process = Process(), output = Pipe(), diagnostics = Pipe()
+        process.executableURL = executable
+        process.environment = ["HOME": "/var/empty", "PATH": "/usr/bin:/bin",
+            "LANG": "C", "LC_ALL": "C"]
+        process.standardInput = FileHandle.nullDevice
+        process.standardOutput = output; process.standardError = diagnostics
+        try process.run(); process.waitUntilExit()
+        let data = output.fileHandleForReading.readDataToEndOfFile()
+        let errorData = diagnostics.fileHandleForReading.readDataToEndOfFile()
+        guard process.terminationStatus == 0
+                || process.terminationStatus == 70 else {
+            throw CampaignPhysicalError.invalid(
+                "physical run: "
+                    + String(decoding: errorData + data, as: UTF8.self))
+        }
+        return try JSONDecoder().decode(CampaignPhysicalReport.self, from: data)
+    }
+
+    func remove() { try? FileManager.default.removeItem(at: root) }
+
+    private static func currentBuildRoot() throws -> URL {
+        var candidates = CommandLine.arguments.map { URL(filePath: $0) }
+        if let executable = Bundle.main.executableURL {
+            candidates.append(executable)
+        }
+        for candidate in candidates {
+            var directory = candidate
+            for _ in 0..<8 {
+                directory = directory.deletingLastPathComponent()
+                let campaign = directory.appending(
+                    path: "StornautInvestigationMachineCampaign")
+                let description = directory.appending(path: "description.json")
+                if FileManager.default.isExecutableFile(
+                    atPath: campaign.path),
+                   FileManager.default.fileExists(atPath: description.path)
+                {
+                    return directory
+                }
+            }
+        }
+        throw CampaignPhysicalError.invalid("test build root")
+    }
+
+    private static func resolvedPackageName(buildRoot: URL) throws -> String {
+        let object = try JSONSerialization.jsonObject(with: Data(
+            contentsOf: buildRoot.appending(path: "description.json")))
+        guard let root = object as? [String: Any],
+              let commands = root["swiftCommands"] as? [String: Any],
+              let command = commands.first(where: {
+                  $0.key.contains("StornautInvestigationMachineCampaignSupport")
+              })?.value as? [String: Any],
+              let arguments = command["otherArguments"] as? [String],
+              let marker = arguments.firstIndex(of: "-package-name"),
+              arguments.indices.contains(marker + 1)
+        else { throw CampaignPhysicalError.invalid("package name") }
+        return arguments[marker + 1]
+    }
+
+    private static func objectPaths(
+        buildRoot: URL, target: String, suffix: String
+    ) throws -> [String] {
+        let directory = buildRoot.appending(path: target + ".build")
+        let names = try FileManager.default.contentsOfDirectory(
+            atPath: directory.path).filter { $0.hasSuffix(suffix) }.sorted()
+        guard !names.isEmpty else {
+            throw CampaignPhysicalError.invalid("missing object closure")
+        }
+        return names.map { directory.appending(path: $0).path }
+    }
+}
 
 private extension InvestigationMachineCampaignOuterIdentity {
     func replacing(

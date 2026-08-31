@@ -4,6 +4,48 @@ import Testing
 @Suite("Task 39 trusted machine target boundary")
 struct InvestigationMachineTargetBoundaryTests {
     @Test
+    func iiCB2B2PhysicalCampaignPinsFinalNonPrivilegedBoundary() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let package = try String(contentsOf: root.appending(
+            path: "Package.swift"), encoding: .utf8)
+        let executable = try String(contentsOf: root.appending(
+            path: "Sources/StornautInvestigationMachineCampaign/main.swift"), encoding: .utf8)
+        let fixture = try String(contentsOf: root.appending(
+            path: "Tests/Fixtures/InvestigationMachineCampaignCoordinator/main.swift"), encoding: .utf8)
+        let physical = try String(contentsOf: root.appending(
+            path: "Tests/StornautInvestigationTests/InvestigationMachineCampaignHarnessTests.swift"), encoding: .utf8)
+        let boundary = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-boundaries"), encoding: .utf8)
+        let release = try String(contentsOf: root.appending(
+            path: "scripts/verify-app-release-boundaries"), encoding: .utf8)
+        let contract = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+        #expect(package.contains("name: \"StornautInvestigationMachineCampaign\""))
+        for marker in [
+            "CampaignDarwinSystem",
+            "bootstrapVerified", "proc_listallpids",
+            "StornautInvestigationMachineCampaignCoordinator",
+            "deadlineWindowNanoseconds", "static func main() { exit(78) }",
+        ] { #expect(executable.contains(marker)) }
+        for marker in [
+            "CAMPAIGN_FIXTURE_TRUNCATED", "CAMPAIGN_FIXTURE_TRAILING",
+            "CAMPAIGN_FIXTURE_MISSING_EOF", "CAMPAIGN_FIXTURE_NONZERO",
+        ] { #expect(fixture.contains(marker)) }
+        #expect(physical.contains(
+            "physicalExecutableUsesControllingPTYAndExactFD3"))
+        #expect(physical.contains(
+            "physicalFailuresRemainBoundedAndLeaveZeroResidue"))
+        for marker in [
+            "--iic-b2b2-source-contract-only",
+            "--iic-b2b2-staged-scope-contract-only",
+            "function verify_iicb2b2_source_contract()",
+        ] { #expect(boundary.contains(marker)) }
+        #expect(release.contains("--iic-b2b2-component-boundary-only"))
+        #expect(contract.contains("--iic-b2b2-contract-only"))
+    }
+
+    @Test
     func iiCB2B1TransportPinsScopeAndBoundaries() throws {
         let root = URL(filePath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()

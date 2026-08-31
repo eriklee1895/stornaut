@@ -333,6 +333,10 @@ iicb2b1_mutation_slot=
 iicb2b1_mutation_sha=
 iicb2b1_staged_scope_contract_only=false
 iicb2b1_staged_scope_baseline=61cdeddac657a18cac12e7cc04d62b551675b4bd
+iicb2b2_source_contract_only=false
+iicb2b2_sources=()
+iicb2b2_staged_scope_contract_only=false
+iicb2b2_staged_scope_baseline=2b90430876c2515e811d84155160daa1b599fa98
 iic0bivb1_handoff_contract_only=false
 iic0bivb1_fixture_source=
 iic0bivb1_physical_test_source=
@@ -887,6 +891,14 @@ if (( $# > 0 )); then
         && [[ $1 == --iic-b2b1-staged-scope-contract-only ]]; then
         iicb2b1_staged_scope_contract_only=true
         iicb2b1_staged_scope_baseline=${2:-61cdeddac657a18cac12e7cc04d62b551675b4bd}
+    elif (( $# == 1 || $# == 9 )) \
+        && [[ $1 == --iic-b2b2-source-contract-only ]]; then
+        iicb2b2_source_contract_only=true
+        iicb2b2_sources=("${@:2}")
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iic-b2b2-staged-scope-contract-only ]]; then
+        iicb2b2_staged_scope_contract_only=true
+        iicb2b2_staged_scope_baseline=${2:-2b90430876c2515e811d84155160daa1b599fa98}
     elif (( $# == 4 )) \
         && [[ $1 == --iic0b-iv-b1-handoff-contract-only ]]; then
         iic0bivb1_handoff_contract_only=true
@@ -11063,7 +11075,7 @@ target = '''        .target(
         ),'''
 if package.count(target) != 1 or package.split("targets: [", 1)[0].find("StornautInvestigationMachineCampaignSupport") >= 0:
     raise SystemExit("ii-c-b2a2 package-only target drifted")
-if package.count('"StornautInvestigationMachineCampaignSupport"') != 2:
+if package.count('"StornautInvestigationMachineCampaignSupport"') != 3:
     raise SystemExit("ii-c-b2a2 reverse dependency drifted")
 for label, source in (("contract", contract), ("writer", writer)):
     if not source.startswith("#if DEBUG\n") or not source.rstrip().endswith("#endif"):
@@ -11368,6 +11380,92 @@ function verify_iicb2b1_staged_scope() {
         mode=100644; [[ $item == scripts/* ]] && mode=100755; entry=$(git ls-files -s -- "$item")
         [[ "$(print -r -- "$entry" | awk '{print $1, $3, $4}')" == "$mode 0 $item" && "$(print -r -- "$entry" | awk '{print $2}')" == "$(git hash-object -- "$item")" ]] || { print -u2 "ii-c-b2b1 staged source/mode drifted: $item"; return 1; }
     done
+}
+
+function verify_iicb2b2_source_contract() {
+    local PATH=/usr/bin:/bin:/usr/sbin:/sbin
+    local -a p=("${iicb2b2_sources[@]}")
+    if (( ${#p} == 0 )); then p=(
+        Package.swift
+        Sources/StornautInvestigationMachineCampaign/main.swift
+        Tests/Fixtures/InvestigationMachineCampaignCoordinator/main.swift
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignHarnessTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-investigation-boundaries
+        scripts/verify-app-release-boundaries
+        scripts/verify-contract
+    ); fi
+    (( ${#p} == 8 )) || { print -u2 "ii-c-b2b2 source cardinality drifted"; return 1; }
+    local item
+    for item in "${p[@]}"; do [[ -f $item && ! -L $item ]] \
+        || { print -u2 "ii-c-b2b2 source path unavailable: $item"; return 1; }; done
+    /usr/bin/xcrun swiftc -frontend -parse -enable-bare-slash-regex "${p[2]}"
+    /usr/bin/xcrun swiftc -frontend -parse -enable-bare-slash-regex "${p[3]}"
+    /usr/bin/xcrun swiftc -frontend -parse -enable-bare-slash-regex "${p[4]}"
+    /usr/bin/xcrun swiftc -frontend -parse -enable-bare-slash-regex "${p[5]}"
+    /bin/zsh -n "${p[6]}"; /bin/zsh -n "${p[7]}"; /bin/zsh -n "${p[8]}"
+    /usr/bin/python3 -I - "${p[@]}" <<'PY'
+from pathlib import Path
+import re, sys
+if len(sys.argv) != 9: raise SystemExit("ii-c-b2b2 source cardinality drifted")
+package, executable, fixture, tests, boundary, gate, release, contract = (Path(x).read_text() for x in sys.argv[1:])
+target = '''        .executableTarget(
+            name: "StornautInvestigationMachineCampaign",
+            dependencies: [
+                "StornautInvestigationMachineCampaignSupport",
+            ],
+            path: "Sources/StornautInvestigationMachineCampaign"
+        ),'''
+if package.count(target) != 1 or package.split("targets: [",1)[0].find("StornautInvestigationMachineCampaign") >= 0: raise SystemExit("ii-c-b2b2 package-only executable drifted")
+if package.count('"StornautInvestigationMachineCampaign"') != 2: raise SystemExit("ii-c-b2b2 product or reverse dependency drifted")
+if not executable.startswith("import CInvestigationIdentitySupport\nimport CInvestigationMachineCampaignSupport\nimport Darwin\nimport Dispatch\nimport Foundation\n\n#if DEBUG\nimport StornautInvestigationMachineCampaignSupport\n"): raise SystemExit("ii-c-b2b2 executable import boundary drifted")
+for marker in ("CommandLine.argc == 1", "CampaignDarwinSystem", "stornaut_investigation_campaign_spawn_fixed", "stornaut_investigation_campaign_bootstrap_fixed", "bootstrapVerified", "proc_pidinfo", "proc_listallpids", "waitpid", "kill(-groupID, SIGKILL)", "static func main() { exit(78) }"):
+    if marker not in executable: raise SystemExit("ii-c-b2b2 executable lifecycle drifted")
+for forbidden in ("StornautCore","StornautCodex","StornautExecution","CoordinatorSupport","MachineLaunchSupport","NSXPC","URLSession","sudo","launchctl","MoveToTrash","RegisteredAction"):
+    if forbidden in executable + fixture: raise SystemExit("ii-c-b2b2 prohibited authority drifted")
+for marker in ("CAMPAIGN_FIXTURE_TRUNCATED","CAMPAIGN_FIXTURE_TRAILING","CAMPAIGN_FIXTURE_MISSING_EOF","CAMPAIGN_FIXTURE_NONZERO","tcgetpgrp(STDERR_FILENO) == getpid()","STORNAUT_INVESTIGATION_CAMPAIGN_RECEIPT_FD"):
+    if marker not in fixture: raise SystemExit("ii-c-b2b2 fixture matrix drifted")
+for marker in ("physicalExecutableUsesControllingPTYAndExactFD3","physicalFailuresRemainBoundedAndLeaveZeroResidue",".truncated, .trailing, .missingEOF, .nonzero, .missingSibling","processGroupResidueCount == 0","sessionResidueCount == 0"):
+    if marker not in tests: raise SystemExit("ii-c-b2b2 physical tests became vacuous")
+for marker in ("iiCB2B2PhysicalCampaignPinsFinalNonPrivilegedBoundary","--iic-b2b2-source-contract-only","--iic-b2b2-staged-scope-contract-only","--iic-b2b2-component-boundary-only","--iic-b2b2-contract-only"):
+    if marker not in boundary: raise SystemExit("ii-c-b2b2 boundary markers drifted")
+if '"$release" --iic-b2b2-component-boundary-only' not in contract:
+    raise SystemExit("ii-c-b2b2 component gate wiring drifted")
+if '"$release" --iic-b2b2-component-boundary-only' not in contract:
+    raise SystemExit("ii-c-b2b2 component gate wiring drifted")
+project = Path("Stornaut.xcodeproj/project.pbxproj").read_text(); schemes = "".join(p.read_text() for p in Path("Stornaut.xcodeproj/xcshareddata/xcschemes").glob("*.xcscheme"))
+if "StornautInvestigationMachineCampaign" in project + schemes: raise SystemExit("ii-c-b2b2 Xcode reachability drifted")
+PY
+}
+
+function verify_iicb2b2_staged_scope() {
+    local PATH=/usr/bin:/bin:/usr/sbin:/sbin
+    local baseline=${1:-2b90430876c2515e811d84155160daa1b599fa98}
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" == \
+        2b90430876c2515e811d84155160daa1b599fa98 ]] || {
+        print -u2 "ii-c-b2b2 checkpoint baseline drifted"; return 1
+    }
+    local -a expected=(
+        Package.swift Sources/StornautInvestigationMachineCampaign/main.swift
+        Tests/Fixtures/InvestigationMachineCampaignCoordinator/main.swift
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignHarnessTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-investigation-boundaries
+        scripts/verify-app-release-boundaries scripts/verify-contract
+    )
+    local deleted observed_text changed item mode entry
+    deleted=$(git diff --cached --name-only --diff-filter=D "$baseline" | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')
+    [[ -z $deleted ]] || { print -u2 "ii-c-b2b2 checkpoint deleted an existing path"; return 1; }
+    observed_text=$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')
+    local -a observed=(${(f)observed_text})
+    (( ${#expected} == 8 && ${#observed} <= 8 )) || { print -u2 "ii-c-b2b2 checkpoint path ceiling drifted"; return 1; }
+    [[ "${(j:\n:)${(@on)observed}}" == "${(j:\n:)${(@on)expected}}" ]] || { print -u2 "ii-c-b2b2 checkpoint paths drifted"; return 1; }
+    changed=$(git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1&&$3!="AGENTS.md"&&$3!="README.md"{if($1=="-"||$2=="-")exit 2;n+=$1+$2}END{print n+0}') || { print -u2 "ii-c-b2b2 binary checkpoint path rejected"; return 1; }
+    (( changed <= 2000 )) || { print -u2 "ii-c-b2b2 checkpoint budget drifted"; return 1; }
+    local -a worktree_paths=(${(f)"$(git diff --name-only --diff-filter=ACMRD -- | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')"})
+    local -a untracked_paths=(${(f)"$(git ls-files --others --exclude-standard -- | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')"})
+    for item in "${worktree_paths[@]}" "${untracked_paths[@]}"; do (( ${expected[(Ie)$item]} )) || { print -u2 "ii-c-b2b2 checkpoint worktree paths drifted"; return 1; }; done
+    for item in "${expected[@]}"; do mode=100644; [[ $item == scripts/* ]] && mode=100755; entry=$(git ls-files -s -- "$item"); [[ "$(print -r -- "$entry" | awk '{print $1, $3, $4}')" == "$mode 0 $item" && "$(print -r -- "$entry" | awk '{print $2}')" == "$(git hash-object -- "$item")" ]] || { print -u2 "ii-c-b2b2 staged source/mode drifted: $item"; return 1; }; done
 }
 
 function verify_shared_deadline_contract() {
@@ -15817,6 +15915,16 @@ fi
 if $iicb2b1_staged_scope_contract_only; then
     verify_iicb2b1_staged_scope "$iicb2b1_staged_scope_baseline"
     print "ii-c-b2b1 staged scope verification passed."
+    exit 0
+fi
+if $iicb2b2_source_contract_only; then
+    verify_iicb2b2_source_contract
+    print "ii-c-b2b2 source verification passed."
+    exit 0
+fi
+if $iicb2b2_staged_scope_contract_only; then
+    verify_iicb2b2_staged_scope "$iicb2b2_staged_scope_baseline"
+    print "ii-c-b2b2 staged scope verification passed."
     exit 0
 fi
 if $iic0bivb1_handoff_contract_only; then

@@ -254,6 +254,13 @@ let package = Package(
                 .linkedLibrary("bsm"),
             ]
         ),
+        .executableTarget(
+            name: "StornautInvestigationMachineCampaign",
+            dependencies: [
+                "StornautInvestigationMachineCampaignSupport",
+            ],
+            path: "Sources/StornautInvestigationMachineCampaign"
+        ),
         .target(
             name: "CInvestigationMachineCampaignSupport",
             path: "Sources/CInvestigationMachineCampaignSupport",
@@ -359,6 +366,7 @@ let package = Package(
                 "StornautInvestigationDiagnostic",
                 "StornautInvestigation",
                 "StornautInvestigationMachine",
+                "StornautInvestigationMachineCampaign",
                 "StornautInvestigationMachineCampaignSupport",
                 "StornautInvestigationMachineDriverSupport",
                 "StornautInvestigationMachineGateCoordinatorSupport",

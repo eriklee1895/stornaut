@@ -3,7 +3,7 @@
 set -euo pipefail
 
 contract_source=${0:A}
-# ib2_self_sha=abcaaa23ac49c192625036ac5cad38d20dab6d2a26dde45d1a7d93842e77395b
+# ib2_self_sha=acc87336434c1042cb54e6f1737343f2ede7eea7b96d5f76d67d02d91224ad22
 ib2_self_sha=$(sed -nE 's/^# ib2_self_sha=([0-9a-f]{64})$/\1/p' "$contract_source"); ib2_observed_sha=$(sed -E 's/^# ib2_self_sha=[0-9a-f]{64}$/# ib2_self_sha=SELF/' "$contract_source" | shasum -a 256 | awk '{ print $1 }')
 [[ ${#ib2_self_sha} == 64 && "$ib2_observed_sha" == "$ib2_self_sha" ]] || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
 repo_root=${contract_source:h:h}
@@ -3001,6 +3001,17 @@ PY
 function verify_iicb2b1_contract() {
     local out=$1 gate=scripts/verify-investigation-boundaries
     mkdir -p "$out"
+    local implementation=2b90430876c2515e811d84155160daa1b599fa98
+    local implementation_tree=28d8e7d0301b164685c3f23acbb1cd4f83f05330
+    [[ "$(git show -s --format=%P "$implementation")" == \
+        61cdeddac657a18cac12e7cc04d62b551675b4bd \
+        && "$(git show -s --format=%T "$implementation")" == \
+        "$implementation_tree" ]] || fail_contract \
+        "ii-c-b2b1 immutable checkpoint drifted"
+    replay_historical_contract "$out/historical" "$implementation" \
+        "$implementation_tree" --iic-b2b1-contract-only || fail_contract \
+        "ii-c-b2b1 historical replay failed"
+    return 0
     local -a paths=(
         Package.swift
         Sources/CInvestigationMachineCampaignSupport/include/CInvestigationMachineCampaignSupport.h
@@ -3112,6 +3123,47 @@ PY
         (( rc != 0 )) || fail_contract "ii-c-b2b1 scope accepted untracked path"
     )
 }
+
+function verify_iicb2b2_contract() {
+    local out=$1 gate=scripts/verify-investigation-boundaries
+    local release=scripts/verify-app-release-boundaries
+    mkdir -p "$out"
+    local -a paths=(
+        Package.swift Sources/StornautInvestigationMachineCampaign/main.swift
+        Tests/Fixtures/InvestigationMachineCampaignCoordinator/main.swift
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignHarnessTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-investigation-boundaries
+        scripts/verify-app-release-boundaries scripts/verify-contract
+    )
+    "$gate" --iic-b2b2-source-contract-only "${paths[@]}" >"$out/source.log"
+    zsh -n "$release"
+    "$release" --iic-b2b2-component-boundary-only \
+        >"$out/component.log"
+    local index="$out/scope.index" bad="$out/scope-bad.index" blob rc
+    GIT_INDEX_FILE="$index" git read-tree "$(git write-tree)"
+    GIT_INDEX_FILE="$index" "$gate" \
+        --iic-b2b2-staged-scope-contract-only \
+        2b90430876c2515e811d84155160daa1b599fa98 >"$out/scope.log"
+    cp "$index" "$bad"; blob=$(print extra | git hash-object -w --stdin)
+    GIT_INDEX_FILE="$bad" git update-index --add --cacheinfo \
+        "100644,$blob,iic-b2b2-extra.swift"
+    rc=0; GIT_INDEX_FILE="$bad" "$gate" \
+        --iic-b2b2-staged-scope-contract-only \
+        2b90430876c2515e811d84155160daa1b599fa98 \
+        >"$out/scope-extra.log" 2>&1 || rc=$?
+    (( rc != 0 )) || fail_contract "ii-c-b2b2 scope accepted extra path"
+}
+
+if [[ ${1:-} == --iic-b2b2-contract-only ]]; then
+    (( $# == 1 )) || fail_contract \
+        "Usage: scripts/verify-contract --iic-b2b2-contract-only"
+    iicb2b2_root=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-iicb2b2-contract.XXXXXX")
+    trap 'rm -rf "$iicb2b2_root"' EXIT
+    verify_iicb2b2_contract "$iicb2b2_root"
+    print "ii-c-b2b2 physical campaign contract verification passed."
+    exit 0
+fi
 
 if [[ ${1:-} == --iic-b2b1-contract-only ]]; then
     (( $# == 1 )) || fail_contract \
@@ -4794,6 +4846,7 @@ verify_iica_contract "$contract_root/iica"
 verify_iicb1_root_owned_gate_contract "$contract_root/iicb1"
 verify_iicb2a2_contract "$contract_root/iicb2a2"
 verify_iicb2b1_contract "$contract_root/iicb2b1"
+verify_iicb2b2_contract "$contract_root/iicb2b2"
 verify_iic0bivb2_contract "$contract_root/iic0bivb2" false
 verify_shared_deadline_repair_contract "$contract_root/shared-deadline"
 verify_fixed_gate_deadline_cleanup_contract "$contract_root/fixed-gate-cleanup"
