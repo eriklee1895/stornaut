@@ -68,7 +68,7 @@ ProcessSupport, DriverSupport, GateSupport, CoordinatorSupport or InstalledL2.
 
 ## 3. ii-c-b2a1 Exact Scope and Budget
 
-Exactly four non-document paths and at most 3,000 changed non-document lines:
+Exactly four non-document paths and at most 3,400 changed non-document lines:
 
 1. `Package.swift`;
 2. `Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignEvidenceContract.swift` (new);
@@ -79,9 +79,12 @@ Post-RED API expansion showed that keeping a narrow target while independently
 matching the existing 23-field coordinator receipt wire requires more contract
 code and less writer/test code than the initial allocation. Before production
 validation, the category ceilings are therefore rebalanced to: Package manifest
-40 lines, contracts 850 lines, writer 1,100 lines and tests 1,000 lines. The
-3,000-line total ceiling is unchanged and stricter than the sum of category
-ceilings. A fifth non-document path, line 3,001, independent verifier,
+40 lines, contracts 900 lines, writer 1,250 lines and tests 1,250 lines. The
+first review additionally required manifest-substitution, post-read identity and
+stage-specific failure controls; the total ceiling is therefore amended before
+those changes from 3,000 to 3,400 lines, still below the repository's 4,000-line
+mandatory split threshold and stricter than the sum of category ceilings. A
+fifth non-document path, line 3,401, independent verifier,
 process spawn, PTY, sudo, installed-artifact path or product dependency stops
 b2a1 for re-preflight.
 
