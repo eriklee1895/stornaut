@@ -240,12 +240,12 @@ most 3,800 changed non-document lines (additions plus deletions):
 6. `Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochPhysicalBridge.swift` — 160;
 7. `Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerProtocol.swift` — 240;
 8. `Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineZeroArgumentEntry.swift` — 200;
-9. `Sources/CInvestigationMachineCampaignSupport/CInvestigationMachineCampaignSupport.c` — 180;
+9. `Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineRawEvidenceWriter.swift` — 60;
 10. `scripts/stornaut-r5-local-lifecycle` — 160;
 11. `scripts/verify-investigation-runtime-machine-report` — 430;
-12. `Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift` — 480;
-13. `scripts/verify-investigation-boundaries` — 250; and
-14. `scripts/verify-contract` — 150.
+12. `Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift` — 500;
+13. `scripts/verify-investigation-boundaries` — 300; and
+14. `scripts/verify-contract` — 100.
 
 The aggregate ceiling and every per-path ceiling are independent. A fifteenth
 non-document path or line 3,801 stops coding for scope reduction inside ii-c-c;
@@ -288,9 +288,10 @@ credential after seeing the exact prompt is recorded only as a trusted-human
 attestation; machine prompt recognition is a separate fact and is not promoted
 to proof of human observation.
 
-Credential relay uses only a bounded raw C buffer read from the campaign's
-controlling terminal and written directly to the child PTY, followed by
-`memset_s` on every path. Credential bytes, byte counts, timing and key
+Credential relay uses only a bounded raw buffer in the campaign executable,
+read with Darwin `readpassphrase(..., RPP_REQUIRE_TTY)`, written directly to
+the child PTY and cleared with `memset_s` on every path. Credential bytes,
+byte counts, timing and key
 events never become `Data`, `String`, operation values, logs, stdout/stderr,
 diagnostics, tests or evidence. The tests use a non-secret sentinel through an
 injected relay and prove it is absent from every returned value and artifact.
