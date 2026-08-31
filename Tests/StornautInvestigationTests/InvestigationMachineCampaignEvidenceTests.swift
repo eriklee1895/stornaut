@@ -10,6 +10,116 @@ import Testing
 @Suite("Investigation machine campaign evidence", .serialized)
 struct InvestigationMachineCampaignEvidenceTests {
     @Test
+    func privilegedCeremonyPinsDurableArmPromptAndCredentialErasure() throws {
+        let sources = try Self.iiCCSourceTexts()
+        let armPublish = try #require(
+            sources.executable.range(of: ".armedConsumed")
+        )
+        let armRelease = try #require(
+            sources.executable.range(of: "sendArmAfterDurablePublish")
+        )
+
+        #expect(armPublish.lowerBound < armRelease.lowerBound)
+        #expect(sources.harness.contains(
+            "Stornaut Task 39 ii-c administrator authorization: "
+        ))
+        #expect(sources.coordinator.contains(
+            "InvestigationMachineCoordinatorPreArmFrame"
+        ))
+        #expect(sources.coordinator.contains("waitForDurableArm"))
+        #expect(sources.executable.contains("readpassphrase("))
+        #expect(sources.executable.contains("RPP_REQUIRE_TTY"))
+        #expect(sources.executable.contains("memset_s("))
+        for forbidden in [
+            "credentialData", "credentialString", "credentialSHA256",
+        ] {
+            #expect(!sources.executable.contains(forbidden))
+            #expect(!sources.harness.contains(forbidden))
+        }
+    }
+
+    @Test
+    func driverEvidenceChainRetainsEightFullL2AndTerminalProofs() throws {
+        let sources = try Self.iiCCSourceTexts()
+
+        #expect(sources.singleEpoch.contains("installedL2ProofBytes"))
+        #expect(sources.physical.contains("installedL2ProofBytes"))
+        #expect(sources.outerProtocol.contains(
+            "InvestigationMachineEpochEvidenceCollector"
+        ))
+        #expect(sources.outerProtocol.contains("terminalEvidenceBytes"))
+        #expect(sources.zeroEntry.contains(
+            "InvestigationMachineDriverEvidenceBundleV1"
+        ))
+        #expect(sources.zeroEntry.contains("driverEvidenceBundleSHA256"))
+    }
+
+    @Test
+    func lifecycleTransactionsExposeBoundedMachineReceipts() throws {
+        let lifecycle = try Self.iiCCSourceTexts().lifecycle
+
+        for marker in [
+            "lifecycle.local.install.receipt.v1",
+            "lifecycle.local.uninstall.receipt.v1",
+            "builtStagingInstalledEqual=true",
+            "globalPostTeardown=true",
+        ] {
+            #expect(lifecycle.contains(marker))
+        }
+    }
+
+    @Test
+    func strictEvidenceRejectsCanonicalPlaceholderObjects() throws {
+        let fixture = try CampaignEvidenceDiskFixture.make()
+        defer { fixture.remove() }
+        let writer = try fixture.makeWriter()
+
+        #expect(throws: InvestigationMachineEvidenceContractError.invalidEncoding) {
+            _ = try writer.writeArtifact(
+                path: .init(
+                    phase: .preflight, leafName: "source-build.json"
+                ),
+                role: .sourceBuildIdentity,
+                encoding: .strictJSON,
+                bytes: Data(#"{"value":"canonical-but-untyped"}"#.utf8)
+            )
+        }
+        #expect(throws: InvestigationMachineEvidenceContractError.invalidEncoding) {
+            _ = try InvestigationMachineAttemptEventV1(
+                sequence: 1,
+                attemptUUID: fixture.attemptUUID,
+                kind: .prepared,
+                previousEventSHA256: Self.zeroDigest(),
+                observedAt: .init(rawValue: 1),
+                payload: Data(#"{"value":"canonical-but-untyped"}"#.utf8)
+            )
+        }
+    }
+
+    @Test
+    func independentVerifierRejectsSemanticallyForgedCanonicalCorpus() throws {
+        let fixture = try CampaignEvidenceDiskFixture.make()
+        defer { fixture.remove() }
+        let writer = try fixture.makeWriter(mode: .privileged)
+        for (index, kind) in [
+            InvestigationMachineAttemptEventKind.prepared, .armedConsumed,
+            .spawnObserved, .terminal,
+        ].enumerated() {
+            _ = try writer.appendAttemptEvent(
+                kind: kind,
+                payload: Self.json("event-\(index + 1)"),
+                observedAt: try .init(rawValue: Int64(index + 1))
+            )
+        }
+        try fixture.populatePrivilegedArtifacts(writer)
+        let seal = try writer.finalize()
+        let sealURL = fixture.parent.appending(path: "semantic-seal.json")
+        try Self.writeSeal(seal, to: sealURL)
+
+        #expect(try Self.runVerifier(fixture.evidenceRoot, sealURL).status != 0)
+    }
+
+    @Test
     func phasesAndRolesRemainClosedAndOrdered() {
         #expect(InvestigationMachineEvidencePhase.allCases.map(\.directoryName) == [
             "01-preflight",
@@ -1023,6 +1133,31 @@ struct InvestigationMachineCampaignEvidenceTests {
             UInt8(truncatingIfNeeded: count >> 8),
             UInt8(truncatingIfNeeded: count),
         ]) + payload
+    }
+
+    private static func iiCCSourceTexts() throws -> (
+        executable: String, harness: String, coordinator: String,
+        singleEpoch: String, physical: String,
+        outerProtocol: String, zeroEntry: String, lifecycle: String
+    ) {
+        let repository = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        func source(_ relativePath: String) throws -> String {
+            try String(
+                contentsOf: repository.appending(path: relativePath),
+                encoding: .utf8
+            )
+        }
+        return try (
+            source("Sources/StornautInvestigationMachineCampaign/main.swift"),
+            source("Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignHarness.swift"),
+            source("Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift"),
+            source("Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochComposition.swift"),
+            source("Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochPhysicalBridge.swift"),
+            source("Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerProtocol.swift"),
+            source("Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineZeroArgumentEntry.swift"),
+            source("scripts/stornaut-r5-local-lifecycle")
+        )
     }
 
     private static func requireMetadata(
