@@ -2,8 +2,8 @@
 
 set -euo pipefail
 
-# iicb1_app_self_sha=39cf4dc89d945cae66e42f6bfddae4cee938b10d3d8201c5620051f9700efb3f
-if [[ ${1:-} == --iic-b1-root-owned-gate-component-* ]]; then iicb1_app_self_sha=$(/usr/bin/sed -nE 's/^# iicb1_app_self_sha=([0-9a-f]{64})$/\1/p' "${0:A}"); [[ ${#iicb1_app_self_sha} == 64 && "$(/usr/bin/sed -E 's/^# iicb1_app_self_sha=[0-9a-f]{64}$/# iicb1_app_self_sha=SELF/' "${0:A}" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')" == "$iicb1_app_self_sha" ]] || { print -u2 "ii-c-b1 App release verifier self-seal drifted"; exit 1; }; fi
+# iicb1_app_self_sha=b39c17722e9f84d069a4568a67c5889cb1544be82bfe8445cc47c2bc0217724a
+if [[ ${1:-} == --iic-b1-root-owned-gate-component-* || ${1:-} == --iic-b2a2-component-* ]]; then iicb1_app_self_sha=$(/usr/bin/sed -nE 's/^# iicb1_app_self_sha=([0-9a-f]{64})$/\1/p' "${0:A}"); [[ ${#iicb1_app_self_sha} == 64 && "$(/usr/bin/sed -E 's/^# iicb1_app_self_sha=[0-9a-f]{64}$/# iicb1_app_self_sha=SELF/' "${0:A}" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')" == "$iicb1_app_self_sha" ]] || { print -u2 "ii-c-b1 App release verifier self-seal drifted"; exit 1; }; fi
 repo_root=${0:A:h:h}
 cd "$repo_root"
 
@@ -90,6 +90,10 @@ iica_component_boundary_only=false
 iicb1_root_owned_gate_component_source_contract_only=false
 iicb1_root_owned_gate_component_source=
 iicb1_root_owned_gate_component_boundary_only=false
+iicb2a2_component_source_contract_only=false
+iicb2a2_component_source=
+iicb2a2_component_boundary_only=false
+iicb2a2_component_boundary_internal=false
 iic0bivb2_component_boundary_only=false
 iica_existing_product_derived_data=
 iica_existing_diagnostic_derived_data=
@@ -212,6 +216,14 @@ elif [[ $# == 2 \
 elif [[ $# == 1 \
     && $1 == --iic-b1-root-owned-gate-component-boundary-only ]]; then
     iicb1_root_owned_gate_component_boundary_only=true
+elif [[ ($# == 1 || $# == 2) \
+    && $1 == --iic-b2a2-component-source-contract-only ]]; then
+    iicb2a2_component_source_contract_only=true
+    iicb2a2_component_source=${2:-${ZSH_SCRIPT:A}}
+elif [[ $# == 1 && $1 == --iic-b2a2-component-boundary-only ]]; then
+    iicb2a2_component_boundary_only=true
+elif [[ $# == 1 && $1 == --iic-b2a2-component-boundary-internal ]]; then
+    iicb2a2_component_boundary_internal=true
 elif [[ $# == 1 && $1 == --iic0b-iv-component-boundary-only ]]; then
     iic0bivb2_component_boundary_only=true
 elif [[ $# == 2 && $1 == --iic0b-iii-2a-closed-image-scan-contract-only ]]; then
@@ -2998,6 +3010,7 @@ function verify_iica_component_boundary() (
 )
 function run_iicb1_root_owned_gate_component_snapshot() (
     umask 022
+    local snapshot_mode=${1:-b1}
     local environment_name
     for environment_name in ${(k)parameters}; do
         [[ $environment_name == GIT_* ]] && unset "$environment_name"
@@ -3009,13 +3022,19 @@ function run_iicb1_root_owned_gate_component_snapshot() (
     export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_SYSTEM=/dev/null \
         GIT_CONFIG_GLOBAL=/dev/null GIT_NO_REPLACE_OBJECTS=1 \
         GIT_OPTIONAL_LOCKS=0 GIT_TERMINAL_PROMPT=0
-    (( $# == 0 )) || {
+    (( $# <= 1 )) && [[ $snapshot_mode == b1 || $snapshot_mode == b2a2 ]] || {
         print -u2 "ii-c-b1 independent snapshot argument drifted"
         return 64
     }
-    scripts/verify-investigation-boundaries \
-        --iic-b1-root-owned-gate-staged-scope-contract-only \
-        41f5dba1b7ff7f1272d5a2607ae9794b266e6c47 || return $?
+    if [[ $snapshot_mode == b2a2 ]]; then
+        scripts/verify-investigation-boundaries \
+            --iic-b2a2-staged-scope-contract-only \
+            cf1cbed8beff60cdd606bf7025fcef8a2768ff99 || return $?
+    else
+        scripts/verify-investigation-boundaries \
+            --iic-b1-root-owned-gate-staged-scope-contract-only \
+            41f5dba1b7ff7f1272d5a2607ae9794b266e6c47 || return $?
+    fi
     /usr/bin/git diff-files --quiet --ignore-submodules -- || {
         print -u2 "ii-c-b1 independent snapshot tracked source drifted"
         return 1
@@ -3151,8 +3170,12 @@ PY
             IDEPackageSupportDisablePluginExecutionSandbox OTHER_SWIFT_FLAGS \
             SWIFT_EXEC TOOLCHAINS SDKROOT XCODE_XCCONFIG_FILE
         repo_root="$snapshot_root"
-        verify_iicb1_root_owned_gate_component_boundary \
-            "$snapshot_root/scripts/verify-app-release-boundaries"
+        if [[ $snapshot_mode == b2a2 ]]; then
+            verify_iicb2a2_component_boundary
+        else
+            verify_iicb1_root_owned_gate_component_boundary \
+                "$snapshot_root/scripts/verify-app-release-boundaries"
+        fi
     ) || child_status=$?
     /usr/bin/git -C "$snapshot_root" diff-files \
         --quiet --ignore-submodules -- || {
@@ -3185,7 +3208,7 @@ source = Path(sys.argv[1]).read_text(encoding="utf-8")
 self_match = re.findall(r"(?m)^# iicb1_app_self_sha=([0-9a-f]{64})$", source); normalized = re.sub(r"(?m)^# iicb1_app_self_sha=[0-9a-f]{64}$", "# iicb1_app_self_sha=SELF", source)
 if len(self_match) != 1 or hashlib.sha256(normalized.encode()).hexdigest() != (self_match[0] if self_match else ""): raise SystemExit("ii-c-b1 component verifier contract drifted")
 shell, heredocs = re.subn(r"(?ms)(^[^\n]*<<'PY'\r?\n).*?^PY\r?\n?", r"\1", normalized)
-if heredocs != 31 or hashlib.sha256(shell.encode()).hexdigest() != "18e3ded1a0825dc4a12bef760798cbfa7ada4d6d2c21ea10088731859766cecc": raise SystemExit("ii-c-b1 component verifier contract drifted")
+if heredocs != 32 or hashlib.sha256(shell.encode()).hexdigest() != "00e95f165294063d1dc7cdea9f381a9bae42db82964572d7e3bd165a484af8e0": raise SystemExit("ii-c-b1 component verifier contract drifted")
 critical_names = ("run_iicb1_root_owned_gate_component_snapshot", "verify_iicb1_root_owned_gate_component_source_contract", "verify_iicb1_root_owned_gate_component_boundary")
 if any(len(re.findall((r"(?m)^\s*(?:function\s+NAME(?:\s*\(\s*\))?|NAME\s*\(\s*\))(?=\s|[({])").replace("NAME", re.escape(name)), source)) != 1 for name in critical_names): raise SystemExit("ii-c-b1 component verifier contract drifted")
 source_contract_prologue = "function verify_iicb1_root_owned_gate_component_source_contract() {\n    python3 - \\\n        \"$1\" <<'PY'"
@@ -3197,19 +3220,19 @@ snapshot_end = source.index(
     "\nfunction verify_iicb1_root_owned_gate_component_source_contract() {",
     snapshot_start,
 )
-source_contract_end = source.index("\nfunction verify_iicb1_root_owned_gate_component_boundary() (", snapshot_end); source_contract_sha = "08a2f5d2698ad5894d9e11828d4759539bb22d66c9560b4ff3de8badaeb419f4"; source_contract_body = source[snapshot_end:source_contract_end]
+source_contract_end = source.index("\nfunction verify_iicb1_root_owned_gate_component_boundary() (", snapshot_end); source_contract_sha = "e41224889e112fdb96e436c276349b6b42fbbcec5f153ca997089d096c3411cf"; source_contract_body = source[snapshot_end:source_contract_end]
 if source_contract_body.count(source_contract_sha) != 1 or hashlib.sha256(source_contract_body.replace(source_contract_sha, "SELF").encode()).hexdigest() != source_contract_sha: raise SystemExit("ii-c-b1 component verifier contract drifted")
 start = source.index(
     "\nfunction verify_iicb1_root_owned_gate_component_boundary() ("
 ) + 1
 snapshot_runtime = source[snapshot_start:snapshot_end]
 end = source.index(
-    "\nfunction verify_iib5biii_a_source_contract() {", start
+    "\nfunction run_iicb2a2_component_snapshot() (", start
 )
 runtime = source[start:end]
 dispatch_region = source[end:]
 if hashlib.sha256(snapshot_runtime.encode()).hexdigest() != (
-    "94aeb91232f8e578a8bdfea421adb75673006713f84eb9f53fae273fa4387225"
+    "dafc00edd144e59fb38f126e3de6896832199f3b81dc8ba9000a71fe1e4356b0"
 ):
     raise SystemExit("ii-c-b1 component verifier contract drifted")
 if hashlib.sha256(runtime.encode()).hexdigest() != (
@@ -3218,9 +3241,11 @@ if hashlib.sha256(runtime.encode()).hexdigest() != (
     raise SystemExit("ii-c-b1 component verifier contract drifted")
 snapshot_required = (
     "    umask 022",
+    "local snapshot_mode=${1:-b1}",
     '[[ $environment_name == GIT_* ]] && unset "$environment_name"',
     "GIT_CONFIG_GLOBAL=/dev/null GIT_NO_REPLACE_OBJECTS=1",
     "--iic-b1-root-owned-gate-staged-scope-contract-only",
+    "--iic-b2a2-staged-scope-contract-only",
     "/usr/bin/git checkout-index --all",
     "init -q --object-format=sha1",
     "materialized_tree == $source_tree",
@@ -3237,8 +3262,12 @@ sanitized_snapshot_environment = r'''        export HOME USER LOGNAME PATH LC_AL
             IDEPackageSupportDisablePluginExecutionSandbox OTHER_SWIFT_FLAGS \
             SWIFT_EXEC TOOLCHAINS SDKROOT XCODE_XCCONFIG_FILE
         repo_root="$snapshot_root"
-        verify_iicb1_root_owned_gate_component_boundary \
-            "$snapshot_root/scripts/verify-app-release-boundaries"'''
+        if [[ $snapshot_mode == b2a2 ]]; then
+            verify_iicb2a2_component_boundary
+        else
+            verify_iicb1_root_owned_gate_component_boundary \
+                "$snapshot_root/scripts/verify-app-release-boundaries"
+        fi'''
 if snapshot_runtime.count(sanitized_snapshot_environment) != 1:
     raise SystemExit("ii-c-b1 component verifier contract drifted")
 public_dispatch = '''if $iicb1_root_owned_gate_component_boundary_only; then
@@ -3553,6 +3582,248 @@ function verify_iicb1_root_owned_gate_component_boundary() (
         done <"$inventory"
     done
 )
+
+function run_iicb2a2_component_snapshot() (
+    run_iicb1_root_owned_gate_component_snapshot b2a2
+)
+
+function verify_iicb2a2_component_source_contract() {
+    local PATH=/usr/bin:/bin:/usr/sbin:/sbin
+    local source=${1:-${ZSH_SCRIPT:A}}
+    [[ -f $source && ! -L $source ]] || {
+        print -u2 "ii-c-b2a2 component source unavailable"; return 1
+    }
+    /usr/bin/python3 -I - "$source" <<'PY'
+from pathlib import Path
+import hashlib
+import re
+import sys
+source = Path(sys.argv[1]).read_text(encoding="utf-8")
+critical_names = ("run_iicb2a2_component_snapshot",
+                  "verify_iicb2a2_component_source_contract",
+                  "verify_iicb2a2_component_boundary",
+                  "verify_iicb2a2_negative_macho",
+                  "verify_iica_component_boundary")
+for name in critical_names:
+    pattern = (r"(?m)^\s*(?:function\s+NAME(?:\s*\(\s*\))?|"
+               r"NAME\s*\(\s*\))(?=\s|[({])").replace(
+                   "NAME", re.escape(name))
+    if len(re.findall(pattern, source)) != 1:
+        raise SystemExit("ii-c-b2a2 component verifier contract drifted")
+for pattern in (r"(?m)^\s*function\s+\$", r"(?m)^\s*functions\[",
+                r"(?m)^\s*eval\b", r"(?m)^\s*alias\b"):
+    if re.search(pattern, source):
+        raise SystemExit("ii-c-b2a2 component verifier contract drifted")
+snapshot_start = source.index(
+    "\nfunction run_iicb2a2_component_snapshot() ("
+) + 1
+source_contract_start = source.index(
+    "\nfunction verify_iicb2a2_component_source_contract() {", snapshot_start
+) + 1
+boundary_start = source.index(
+    "\nfunction verify_iicb2a2_component_boundary() (", source_contract_start
+) + 1
+scanner_start = source.index(
+    "\nfunction verify_iicb2a2_negative_macho() {", boundary_start
+) + 1
+runtime_end = source.index(
+    "\nfunction verify_iib5biii_a_source_contract() {", scanner_start
+) + 1
+iica_start = source.index("\nfunction verify_iica_component_boundary() (") + 1
+iica_end = source.index(
+    "\nfunction run_iicb1_root_owned_gate_component_snapshot() (", iica_start
+) + 1
+if hashlib.sha256(source[iica_start:iica_end].encode()).hexdigest() != (
+    "0b307a0accf57a2946eeacabfd0a7ec6030b4397a5af296c978f491fd089e2f0"
+):
+    raise SystemExit("ii-c-b2a2 component verifier contract drifted")
+expected_snapshot = """function run_iicb2a2_component_snapshot() (
+    run_iicb1_root_owned_gate_component_snapshot b2a2
+)
+
+"""
+if source[snapshot_start:source_contract_start] != expected_snapshot:
+    raise SystemExit("ii-c-b2a2 component verifier contract drifted")
+source_contract_sha = "a58cea234b27ec8d11cfba15638ff4f7791127c6cd19dc61926eea3eeaf8e0a5"
+source_contract = source[source_contract_start:boundary_start]
+if (source_contract.count(source_contract_sha) != 1
+        or hashlib.sha256(source_contract.replace(
+            source_contract_sha, "SELF").encode()).hexdigest()
+        != source_contract_sha):
+    raise SystemExit("ii-c-b2a2 component verifier contract drifted")
+runtime = source[boundary_start:runtime_end]
+runtime_sha = "4c78bf29f0b10ae483f78cb452a8ff156e48fd9d2c25b4b894b137f7a8e59e01"
+if hashlib.sha256(runtime.encode()).hexdigest() != runtime_sha:
+    raise SystemExit("ii-c-b2a2 component verifier contract drifted")
+prologue = ("function verify_iicb2a2_component_boundary() (\n"
+            + "    local PATH=/usr/bin:/bin:/usr/sbin:/sbin\n"
+            + "    [[ ${STORNAUT_VALIDATION_SOURCE:-} == staged")
+if source.count(prologue) != 1:
+    raise SystemExit("ii-c-b2a2 component verifier contract drifted")
+boundary = source[boundary_start:scanner_start]
+scanner = source[scanner_start:runtime_end]
+scanner_prologue = ("function verify_iicb2a2_negative_macho() {\n"
+                    + "    local PATH=/usr/bin:/bin:/usr/sbin:/sbin\n"
+                    + "    local candidate=$1 kind symbols strings combined marker")
+if scanner.count(scanner_prologue) != 1 or scanner.count(
+        "[[ $kind == *Mach-O* ]] || return 0") != 1:
+    raise SystemExit("ii-c-b2a2 component verifier contract drifted")
+if scanner.count("return 0") != 1:
+    raise SystemExit("ii-c-b2a2 component verifier contract drifted")
+if boundary.count("verify_iicb2a2_negative_macho \"$candidate\" || return $?") != 1:
+    raise SystemExit("ii-c-b2a2 component verifier contract drifted")
+for marker in (
+    "run_iicb1_root_owned_gate_component_snapshot b2a2",
+    "--iic-b2a2-component-boundary-internal",
+    "StornautInvestigationMachineCampaignSupport.build",
+    "InvestigationMachineRawEvidenceWriter",
+    "stornaut.task39.iic.raw-evidence-manifest.v1",
+    "ii-c-b2a2 campaign namespace leaked into closed image",
+    "verify_iica_component_boundary",
+):
+    if marker not in source:
+        raise SystemExit("ii-c-b2a2 component verifier contract drifted")
+public_dispatch = """if $iicb2a2_component_boundary_only; then
+    run_iicb2a2_component_snapshot
+    print "ii-c-b2a2 campaign component boundary verification passed."
+    exit 0
+fi"""
+dispatch_region = source[runtime_end:]
+if dispatch_region.count(public_dispatch) != 1:
+    raise SystemExit("ii-c-b2a2 component verifier contract drifted")
+PY
+}
+
+function verify_iicb2a2_component_boundary() (
+    local PATH=/usr/bin:/bin:/usr/sbin:/sbin
+    [[ ${STORNAUT_VALIDATION_SOURCE:-} == staged \
+        && ${#STORNAUT_VALIDATION_COMMIT:-} == 40 \
+        && ${STORNAUT_VALIDATION_COMMIT:-} != *[^0-9a-f]* \
+        && "$(git rev-parse 'HEAD^{commit}')" == $STORNAUT_VALIDATION_COMMIT \
+        && -z "$(git status --porcelain=v1 --untracked-files=all)" ]] || {
+        print -u2 "ii-c-b2a2 staged validation snapshot unavailable"
+        return 1
+    }
+    verify_iicb2a2_component_source_contract \
+        scripts/verify-app-release-boundaries || return $?
+    local scratch product_derived_data diagnostic_derived_data validation_user
+    scratch=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-iicb2a2-component.XXXXXX") \
+        || return $?
+    trap 'rm -rf "$scratch"' EXIT
+    product_derived_data="$scratch/product"
+    diagnostic_derived_data="$scratch/diagnostic"
+    validation_user=$(/usr/bin/id -un)
+    local -a clean_env=(/usr/bin/env -i HOME="$HOME" USER="$validation_user"
+        LOGNAME="$validation_user" PATH=/usr/bin:/bin:/usr/sbin:/sbin LC_ALL=C
+        LANG=C TMPDIR="$TMPDIR" DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+        STORNAUT_VALIDATION_COMMIT="$STORNAUT_VALIDATION_COMMIT"
+        STORNAUT_VALIDATION_SOURCE=staged)
+    "${clean_env[@]}" /usr/bin/swift build --scratch-path "$scratch/swiftpm" \
+        --configuration debug --target StornautInvestigationMachineCampaignSupport \
+        --disable-sandbox || return $?
+    local object symbols strings combined marker
+    local -a objects=(${(f)"$(find "$scratch/swiftpm" -type f \
+        -path '*StornautInvestigationMachineCampaignSupport.build/*.swift.o' | LC_ALL=C sort)"})
+    (( ${#objects} == 2 )) || {
+        print -u2 "ii-c-b2a2 CampaignSupport object positive control unavailable"
+        return 1
+    }
+    combined=
+    for object in "${objects[@]}"; do
+        file "$object" | grep -q 'Mach-O' || return $?
+        symbols=$(xcrun nm -j "$object" 2>/dev/null | xcrun swift-demangle) || return $?
+        strings=$(xcrun strings -a "$object" 2>/dev/null) || return $?
+        combined+="$symbols$strings"
+    done
+    for marker in \
+        'StornautInvestigationMachineCampaignSupport.InvestigationMachineRawEvidenceWriter' \
+        'StornautInvestigationMachineCampaignSupport.InvestigationMachineEvidenceManifestV1' \
+        'stornaut.task39.iic.raw-evidence-manifest.v1' \
+        'stornaut.task39.iic.attempt-event.v1'
+    do
+        [[ $combined == *"$marker"* ]] || {
+            print -u2 "ii-c-b2a2 CampaignSupport object positive control drifted: $marker"
+            return 1
+        }
+    done
+    local -a xcode=("${clean_env[@]}" /usr/bin/xcodebuild
+        "STORNAUT_VALIDATION_COMMIT=$STORNAUT_VALIDATION_COMMIT")
+    local configuration scheme
+    for configuration in Debug Release; do
+        "${xcode[@]}" -quiet -project Stornaut.xcodeproj -scheme Stornaut \
+            -configuration "$configuration" -destination 'platform=macOS,arch=arm64' \
+            -derivedDataPath "$product_derived_data" build || return $?
+    done
+    "${xcode[@]}" -quiet -project Stornaut.xcodeproj \
+        -scheme StornautInvestigationDiagnosticApp -configuration Debug \
+        -destination 'platform=macOS,arch=arm64' \
+        -derivedDataPath "$diagnostic_derived_data" build || return $?
+    "${xcode[@]}" -quiet -project Stornaut.xcodeproj \
+        -scheme StornautInvestigationDiagnosticReleaseShell -configuration Release \
+        -destination 'platform=macOS,arch=arm64' \
+        -derivedDataPath "$diagnostic_derived_data" build || return $?
+    for scheme in StornautInvestigationMachineDriverNative \
+        StornautInvestigationMachineGateNative \
+        StornautInvestigationMachineGateCoordinatorNative
+    do
+        "${xcode[@]}" -quiet -project Stornaut.xcodeproj -scheme "$scheme" \
+            -configuration Release -destination 'platform=macOS,arch=arm64' \
+            -derivedDataPath "$diagnostic_derived_data" build || return $?
+    done
+    verify_iica_component_boundary \
+        "$product_derived_data" "$diagnostic_derived_data" || return $?
+    local diagnostic_debug="$diagnostic_derived_data/Build/Products/Debug/StornautInvestigationDiagnostic.app"
+    local -a negative_images=(
+        "$product_derived_data/Build/Products/Debug/Stornaut.app"
+        "$product_derived_data/Build/Products/Release/Stornaut.app"
+        "$diagnostic_debug"
+        "$diagnostic_derived_data/Build/Products/Release/StornautInvestigationDiagnosticReleaseShell.app"
+        "$diagnostic_debug/Contents/MacOS/StornautLifecycleHelper"
+        "$diagnostic_derived_data/Build/Products/Release/StornautInvestigationMachineDriver"
+        "$diagnostic_derived_data/Build/Products/Release/StornautInvestigationMachineGate"
+        "$diagnostic_derived_data/Build/Products/Release/StornautInvestigationMachineGateCoordinatorNative/StornautInvestigationMachineGateCoordinator"
+    )
+    local image inventory candidate kind symlink
+    for image in "${negative_images[@]}"; do
+        [[ -e $image && ! -L $image ]] || {
+            print -u2 "ii-c-b2a2 closed image unavailable: $image"; return 1
+        }
+        if [[ -d $image ]]; then
+            symlink=$(find "$image" -type l -print -quit) || return $?
+            [[ -z $symlink ]] || {
+                print -u2 "ii-c-b2a2 closed image contains symlink: $symlink"; return 1
+            }
+            inventory="$scratch/negative-${image:t}-$RANDOM.inventory"
+            find "$image" -type f -print0 >"$inventory" || return $?
+            while IFS= read -r -d '' candidate; do
+                verify_iicb2a2_negative_macho "$candidate" || return $?
+            done <"$inventory"
+        else
+            verify_iicb2a2_negative_macho "$image" || return $?
+        fi
+    done
+)
+
+function verify_iicb2a2_negative_macho() {
+    local PATH=/usr/bin:/bin:/usr/sbin:/sbin
+    local candidate=$1 kind symbols strings combined marker
+    kind=$(file "$candidate" 2>/dev/null) || return $?
+    [[ $kind == *Mach-O* ]] || return 0
+    symbols=$(xcrun nm -j "$candidate" 2>/dev/null \
+        | xcrun swift-demangle 2>/dev/null) || return $?
+    strings=$(xcrun strings -a "$candidate" 2>/dev/null) || return $?
+    combined="$symbols$strings"
+    for marker in 'StornautInvestigationMachineCampaignSupport.' \
+        'InvestigationMachineRawEvidenceWriter' \
+        'stornaut.task39.iic.raw-evidence-manifest.v1' \
+        'stornaut.task39.iic.attempt-event.v1'
+    do
+        [[ $combined != *"$marker"* ]] || {
+            print -u2 "ii-c-b2a2 campaign namespace leaked into closed image: $candidate"
+            return 1
+        }
+    done
+}
 
 function verify_iib5biii_a_source_contract() {
     local single_epoch_path=$1
@@ -5184,6 +5455,22 @@ if $iicb1_root_owned_gate_component_source_contract_only; then
     verify_iicb1_root_owned_gate_component_source_contract \
         "$iicb1_root_owned_gate_component_source"
     print "ii-c-b1 component source contract verification passed."
+    [[ $ZSH_EVAL_CONTEXT == *:file ]] && return 0
+    exit 0
+fi
+if $iicb2a2_component_boundary_only; then
+    run_iicb2a2_component_snapshot
+    print "ii-c-b2a2 campaign component boundary verification passed."
+    exit 0
+fi
+if $iicb2a2_component_boundary_internal; then
+    verify_iicb2a2_component_boundary
+    print "ii-c-b2a2 internal component boundary verification passed."
+    exit 0
+fi
+if $iicb2a2_component_source_contract_only; then
+    verify_iicb2a2_component_source_contract "$iicb2a2_component_source"
+    print "ii-c-b2a2 component source contract verification passed."
     [[ $ZSH_EVAL_CONTEXT == *:file ]] && return 0
     exit 0
 fi

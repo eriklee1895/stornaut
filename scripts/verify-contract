@@ -3,7 +3,7 @@
 set -euo pipefail
 
 contract_source=${0:A}
-# ib2_self_sha=a11d6554fa8bed2ab0386b714206c7fafcef0a65a84d4b24bf6e90f82ab9e470
+# ib2_self_sha=0a783a831701a9f850a5a5932c2478807c9c274371225c7f6d4afe9467dc6315
 ib2_self_sha=$(sed -nE 's/^# ib2_self_sha=([0-9a-f]{64})$/\1/p' "$contract_source"); ib2_observed_sha=$(sed -E 's/^# ib2_self_sha=[0-9a-f]{64}$/# ib2_self_sha=SELF/' "$contract_source" | shasum -a 256 | awk '{ print $1 }')
 [[ ${#ib2_self_sha} == 64 && "$ib2_observed_sha" == "$ib2_self_sha" ]] || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
 repo_root=${contract_source:h:h}
@@ -2486,7 +2486,7 @@ PY
         gate-owner-current-user lifecycle "$owner_mutation_sha" \
         "${second_slot_args[@]}"
     local app_gate=scripts/verify-app-release-boundaries
-    [[ "$(shasum -a 256 "$app_gate" | awk '{print $1}')" == d3d81faae5b4fa7bae672f918ea882e6e8b78bb8d013c6551345dda029bf2360 ]] || fail_contract 'ii-c-b1 App release verifier source seal drifted'
+    [[ "$(shasum -a 256 "$app_gate" | awk '{print $1}')" == 81ef1f48660235ea5ea3ff832485033a2b21f4c37f8432316978c47959e8ef72 ]] || fail_contract 'ii-c-b1 App release verifier source seal drifted'
     local component_mutation_root="$out/component-mutations"
     mkdir -p "$component_mutation_root"
     python3 - "$app_gate" "$component_mutation_root" <<'PY'
@@ -2499,7 +2499,7 @@ def reseal(value):
     normalized, count = re.subn(carrier_pattern, "# iicb1_app_self_sha=SELF", value); assert count == 1
     return normalized.replace("# iicb1_app_self_sha=SELF", "# iicb1_app_self_sha=" + hashlib.sha256(normalized.encode()).hexdigest(), 1)
 snapshot_start = source.index("\nfunction run_iicb1_root_owned_gate_component_snapshot() (") + 1; source_contract_start = source.index("\nfunction verify_iicb1_root_owned_gate_component_source_contract() {") + 1
-runtime_start = source.index("\nfunction verify_iicb1_root_owned_gate_component_boundary() (") + 1; runtime_end = source.index("\nfunction verify_iib5biii_a_source_contract() {", runtime_start)
+runtime_start = source.index("\nfunction verify_iicb1_root_owned_gate_component_boundary() (") + 1; runtime_end = source.index("\nfunction run_iicb2a2_component_snapshot() (", runtime_start)
 regions = {"snapshot": (snapshot_start, source_contract_start), "source-contract": (source_contract_start, runtime_start), "runtime": (runtime_start, runtime_end), "dispatch": (runtime_end, len(source))}
 mutations = (
     ("component-positive-vacuity", "'StornautInvestigationMachineLaunchSupport.InvestigationFixedGateDarwinLifecycle.(validateExecutable'", "'StornautInvestigationMachineLaunchSupport.DisabledLifecycle.(validateExecutable'"),
@@ -2586,92 +2586,12 @@ PY
         || fail_contract "ii-c-b1 arbitrary component reuse entry accepted"
     [[ "$(<"$reuse_log")" == Usage:* ]] \
         || fail_contract "ii-c-b1 component reuse rejection diagnostic drifted"
-    local baseline=41f5dba1b7ff7f1272d5a2607ae9794b266e6c47
-    local index="$out/scope.index" item mode blob scope_baseline
-    local -a scope_paths=(
-        "$lifecycle" "$focused" "$physical" "$boundary"
-        scripts/verify-investigation-boundaries
-        scripts/verify-app-release-boundaries
-        scripts/verify-contract
-    )
-    GIT_INDEX_FILE="$index" git read-tree "$baseline^{tree}"
-    for item in "${scope_paths[@]}"; do
-        blob=$(git hash-object -w -- "$item")
-        mode=100644; [[ $item == scripts/* ]] && mode=100755
-        GIT_INDEX_FILE="$index" git update-index --add --cacheinfo \
-            "$mode,$blob,$item"
-    done
-    GIT_INDEX_FILE="$index" "$gate" \
-        --iic-b1-root-owned-gate-staged-scope-contract-only "$baseline" \
-        >"$out/scope.log"
-    function reject_iicb1_scope() {
-        local label=$1 expected_text=$2; shift 2
-        local output="$out/scope-$label.log"
-        if "$@" >"$output" 2>&1; then
-            fail_contract "ii-c-b1 scope mutation accepted: $label"
-        fi
-        [[ "$(<"$output")" == *"$expected_text"* ]] \
-            || fail_contract "ii-c-b1 scope mutation diagnostic drifted: $label"
-    }
-    local bad
-    for fixture in extra-path over-budget deleted binary mode wrong-baseline \
-        staged-worktree-divergence untracked
-    do
-        bad="$out/scope-$fixture.index"; cp "$index" "$bad"
-        scope_baseline=$baseline
-        case $fixture in
-            extra-path)
-                blob=$(print extra | git hash-object -w --stdin)
-                GIT_INDEX_FILE="$bad" git update-index --add --cacheinfo \
-                    "100644,$blob,iicb1-extra.swift"
-                expected='ii-c-b1 checkpoint path ceiling drifted' ;;
-            over-budget)
-                blob=$( { git show "$baseline:$lifecycle";
-                    for line in {1..2000}; do print "// ii-c-b1 $line"; done;
-                } | git hash-object -w --stdin)
-                GIT_INDEX_FILE="$bad" git update-index --cacheinfo \
-                    "100644,$blob,$lifecycle"
-                expected='ii-c-b1 checkpoint budget drifted' ;;
-            deleted)
-                GIT_INDEX_FILE="$bad" git rm --cached -q -f "$lifecycle"
-                expected='ii-c-b1 checkpoint deleted an existing path' ;;
-            binary)
-                blob=$(printf '\0ii-c-b1\n' | git hash-object -w --stdin)
-                GIT_INDEX_FILE="$bad" git update-index --cacheinfo \
-                    "100644,$blob,$lifecycle"
-                expected='ii-c-b1 binary checkpoint path rejected' ;;
-            mode)
-                blob=$(GIT_INDEX_FILE="$bad" git ls-files -s -- \
-                    scripts/verify-contract | awk '{print $2}')
-                GIT_INDEX_FILE="$bad" git update-index --cacheinfo \
-                    "100644,$blob,scripts/verify-contract"
-                expected='ii-c-b1 staged source/mode drifted:' ;;
-            wrong-baseline)
-                scope_baseline="$baseline^"
-                expected='ii-c-b1 checkpoint baseline drifted' ;;
-            staged-worktree-divergence)
-                blob=$(sed 's/func rootWheelGateExecutablePassesAllThreeAdmissions()/func disabledRootWheelGateExecutablePassesAllThreeAdmissions()/' "$focused" | git hash-object -w --stdin)
-                GIT_INDEX_FILE="$bad" git update-index --cacheinfo \
-                    "100644,$blob,$focused"
-                expected='ii-c-b1 staged/worktree source drifted:' ;;
-            untracked)
-                (
-                    local probe=.stornaut-iicb1-untracked-$PPID-$RANDOM
-                    trap 'rm -f -- "$probe"' EXIT INT TERM HUP
-                    print untracked >"$probe"
-                    reject_iicb1_scope "$fixture" \
-                        'ii-c-b1 checkpoint untracked paths drifted' env \
-                        GIT_INDEX_FILE="$bad" "$gate" \
-                        --iic-b1-root-owned-gate-staged-scope-contract-only \
-                        "$scope_baseline"
-                )
-                continue ;;
-        esac
-        reject_iicb1_scope "$fixture" "$expected" env \
-            GIT_INDEX_FILE="$bad" "$gate" \
-            --iic-b1-root-owned-gate-staged-scope-contract-only \
-            "$scope_baseline"
-    done
+    replay_historical_contract \
+        "$out/immutable-scope-and-mutations" \
+        77cde61b8c09e739ab5268531e83bcd333dcdc28 \
+        9c59f241ffbfc6bc6c2a6810a9a0ce2c57b23c4b \
+        --iic-b1-root-owned-gate-contract-only \
+        "--iic-b1-root-owned-gate-staged-scope-contract-only"
 }
 function verify_iica_contract() {
     local out=$1 replay_status=0
@@ -2874,6 +2794,220 @@ function verify_iica_legacy_current_tree_scope_mutations() {
             --iic-a-staged-scope-contract-only "$scope_baseline"
     done
 }
+
+function verify_iicb2a2_contract() {
+    local out=$1 gate=scripts/verify-investigation-boundaries
+    local release=scripts/verify-app-release-boundaries
+    mkdir -p "$out"
+    local -a paths=(
+        Package.swift
+        Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignEvidenceContract.swift
+        Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineRawEvidenceWriter.swift
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-investigation-runtime-machine-report
+    )
+    "$gate" --iic-b2a2-source-contract-only "${paths[@]}" >"$out/source.log"
+    "$release" --iic-b2a2-component-source-contract-only "$release" \
+        >"$out/component-source.log"
+    python3 - "$out" "${paths[@]}" <<'PY'
+from pathlib import Path
+import sys
+out = Path(sys.argv[1])
+paths = tuple(map(Path, sys.argv[2:]))
+names = ("package", "contract", "writer", "evidence", "boundary", "verifier")
+sources = dict(zip(names, (path.read_text(encoding="utf-8") for path in paths)))
+mutations = (
+    ("manifest-without-seal", "verifier", "[[ $# == 2 ]]", "[[ $# >= 1 ]]"),
+    ("verifier-canonical-reencode", "verifier", 'require(encode_transcript(domain, fields) == data, "canonical re-encode")', 'require(True, "canonical re-encode")'),
+    ("verifier-held-named-identity", "verifier", "require((held.st_dev, held.st_ino, held.st_gen, held.st_size) ==", "require(True or (held.st_dev, held.st_ino, held.st_gen, held.st_size) =="),
+    ("verifier-event-chain", "verifier", 'require(event["previous"] == expected_previous, "event chain")', 'require(True, "event chain")'),
+    ("verifier-receipt-self-hash", "verifier", "require(hashlib.sha256(encode_transcript(", "require(True or hashlib.sha256(encode_transcript("),
+    ("verifier-foundation-canonical", "verifier", 'require(foundation_json(data) == data, "noncanonical json")', 'require(True, "noncanonical json")'),
+    ("verifier-canonical-path", "verifier", "root_path = canonical_absolute_path(root_path)", "root_path = os.path.realpath(root_path)"),
+    ("verifier-path-spelling-open", "verifier", '            parent_fd = walk["fds"][-1]\n            require_exact_component(parent_fd, component)', '            parent_fd = walk["fds"][-1]\n            require_exact_component(-1, component)'),
+    ("verifier-path-spelling-revalidate", "verifier", '    for parent_fd, component, descriptor, identity, expected_regular in walk["nodes"]:\n        require_exact_component(parent_fd, component)', '    for parent_fd, component, descriptor, identity, expected_regular in walk["nodes"]:\n        require_exact_component(-1, component)'),
+    ("verifier-retained-file-lifetime", "verifier", "held_files.append((parent_fd, name, fd, before, hashlib.sha256(data).digest()))", "held_files.clear()"),
+    ("verifier-final-file-pass", "verifier", "        for record in held_files:\n            revalidate_held_file(record, owner, device)", "        for record in held_files:\n            pass"),
+    ("verifier-final-phase-inventory", "verifier", '            require(inventory(phase_fd, MAX_ARTIFACTS) == expected,\n                    "final phase inventory")', '            require(True, "final phase inventory")'),
+    ("verifier-final-seal-pass", "verifier", "        revalidate_held_file(seal_file, owner, seal_file[3].st_dev)", "        pass # final seal revalidation removed"),
+    ("verifier-open-tracking-order", "verifier", '            walk["fds"].append(descriptor)\n            watch(descriptor, True)\n            held = os.fstat(descriptor)', '            held = os.fstat(descriptor)\n            walk["fds"].append(descriptor)\n            watch(descriptor, True)'),
+    ("verifier-vnode-linearization", "verifier", '        require(change_queue.control(None, 1, 0) == [],\n                "evidence changed during verification")', '        require(True, "evidence changed during verification")'),
+    ("verifier-vnode-watch-registration", "verifier", 'require(change_queue.control([event], 0, 0) == [], "vnode watch registration")', 'require(True, "vnode watch registration")'),
+    ("producer-canonical-reencode", "contract", "value.artifacts == entries, try value.encoded() == data", "value.artifacts == entries, true"),
+    ("boundary-assertion-vacuity", "boundary", '] { #expect(verifier.contains(marker)) }', '] { #expect(true) }'),
+)
+for name, slot, old, new in mutations:
+    source = sources[slot]
+    if source.count(old) != 1:
+        raise SystemExit(f"ii-c-b2a2 mutation fixture is vacuous: {name}")
+    target = out / f"{name}.source"
+    target.write_text(source.replace(old, new, 1), encoding="utf-8")
+    (out / f"{name}.meta").write_text(slot, encoding="utf-8")
+PY
+    local name slot target sha rc
+    for name in manifest-without-seal verifier-canonical-reencode \
+        verifier-held-named-identity verifier-event-chain \
+        verifier-receipt-self-hash verifier-foundation-canonical \
+        verifier-canonical-path verifier-path-spelling-open \
+        verifier-path-spelling-revalidate \
+        verifier-retained-file-lifetime verifier-final-file-pass \
+        verifier-final-phase-inventory verifier-final-seal-pass \
+        verifier-open-tracking-order \
+        verifier-vnode-linearization verifier-vnode-watch-registration \
+        producer-canonical-reencode \
+        boundary-assertion-vacuity
+    do
+        slot=$(<"$out/$name.meta"); target="$out/$name.source"
+        sha=$(shasum -a 256 "$target" | awk '{print $1}')
+        local -a args=("${paths[@]}")
+        case $slot in
+            package) args[1]=$target;; contract) args[2]=$target;;
+            writer) args[3]=$target;; evidence) args[4]=$target;;
+            boundary) args[5]=$target;; verifier) args[6]=$target;;
+        esac
+        rc=0
+        "$gate" --iic-b2a2-mutation-contract-only "$name" "$slot" "$sha" \
+            "${args[@]}" >"$out/$name.log" 2>&1 || rc=$?
+        (( rc != 0 )) || fail_contract "ii-c-b2a2 mutation accepted: $name"
+    done
+    local component="$out/component-vacuity"
+    local component_mutation_root="$out/component-mutations"
+    mkdir -p "$component_mutation_root"
+    /usr/bin/python3 -I - "$release" "$component_mutation_root" <<'PY'
+from pathlib import Path
+import hashlib
+import re
+import sys
+source_path, out = Path(sys.argv[1]), Path(sys.argv[2])
+source = source_path.read_text(encoding="utf-8")
+carrier = r"(?m)^# iicb1_app_self_sha=[0-9a-f]{64}$"
+def reseal(value):
+    normalized, count = re.subn(carrier, "# iicb1_app_self_sha=SELF", value)
+    if count != 1: raise SystemExit("cannot reseal b2a2 component mutation")
+    digest = hashlib.sha256(normalized.encode()).hexdigest()
+    return normalized.replace("# iicb1_app_self_sha=SELF",
+                              "# iicb1_app_self_sha=" + digest, 1)
+mutations = (
+    ("verifier-component-vacuity",
+     "function verify_iicb2a2_component_boundary() (\n    local PATH=/usr/bin:/bin:/usr/sbin:/sbin",
+     "function verify_iicb2a2_component_boundary() (\n    return 0\n    local PATH=/usr/bin:/bin:/usr/sbin:/sbin"),
+    ("verifier-component-scanner-vacuity",
+     "function verify_iicb2a2_negative_macho() {\n    local PATH=/usr/bin:/bin:/usr/sbin:/sbin",
+     "function verify_iicb2a2_negative_macho() {\n    return 0\n    local PATH=/usr/bin:/bin:/usr/sbin:/sbin"),
+    ("verifier-component-scanner-call-vacuity",
+     '                verify_iicb2a2_negative_macho "$candidate" || return $?',
+     '                true || return $?'),
+)
+for name, old, new in mutations:
+    if source.count(old) != 1:
+        raise SystemExit("cannot construct " + name)
+    (out / (name + ".zsh")).write_text(
+        reseal(source.replace(old, new, 1)), encoding="utf-8")
+PY
+    local component_name component_rc component_log
+    for component_name in verifier-component-vacuity \
+        verifier-component-scanner-vacuity verifier-component-scanner-call-vacuity
+    do
+        component="$component_mutation_root/$component_name.zsh"
+        chmod 755 "$component"; component_rc=0
+        "$release" --iic-b2a2-component-source-contract-only "$component" \
+            >"$out/$component_name.log" 2>&1 || component_rc=$?
+        (( component_rc != 0 )) || fail_contract \
+            "ii-c-b2a2 component mutation accepted: $component_name"
+    done
+    local poison="$out/path-poison" poison_log="$out/path-poison.log"
+    mkdir -p "$poison"
+    print '#!/bin/sh\nexit 0' >"$poison/python3"
+    print '#!/bin/sh\nexit 0' >"$poison/xcrun"
+    print '#!/bin/sh\nexit 0' >"$poison/zsh"
+    chmod 755 "$poison/python3" "$poison/xcrun" "$poison/zsh"
+    PATH="$poison:$PATH" "$gate" --iic-b2a2-source-contract-only \
+        "${paths[@]}" >"$poison_log" || fail_contract \
+        "ii-c-b2a2 fixed tool resolution drifted"
+    "$gate" --iic-b2a2-staged-scope-contract-only \
+        cf1cbed8beff60cdd606bf7025fcef8a2768ff99 >"$out/scope.log"
+    local baseline=cf1cbed8beff60cdd606bf7025fcef8a2768ff99
+    local canonical_index="$out/scope-canonical.index" bad fixture blob expected
+    GIT_INDEX_FILE="$canonical_index" git read-tree "$(git write-tree)"
+    function reject_iicb2a2_scope() {
+        local label=$1 expected_text=$2; shift 2
+        local output="$out/scope-$label.log"
+        if "$@" >"$output" 2>&1; then
+            fail_contract "ii-c-b2a2 scope mutation accepted: $label"
+        fi
+        [[ "$(<"$output")" == *"$expected_text"* ]] || fail_contract \
+            "ii-c-b2a2 scope mutation diagnostic drifted: $label"
+    }
+    for fixture in extra-path over-budget deleted binary mode wrong-baseline \
+        staged-worktree-divergence untracked
+    do
+        bad="$out/scope-$fixture.index"; cp "$canonical_index" "$bad"
+        local scope_baseline=$baseline
+        case $fixture in
+            extra-path)
+                blob=$(print extra | git hash-object -w --stdin)
+                GIT_INDEX_FILE="$bad" git update-index --add --cacheinfo \
+                    "100644,$blob,iicb2a2-extra.swift"
+                expected='ii-c-b2a2 checkpoint path ceiling drifted' ;;
+            over-budget)
+                blob=$( { git show "$baseline:Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift";
+                    for line in {1..2100}; do print "// ii-c-b2a2 $line"; done;
+                } | git hash-object -w --stdin)
+                GIT_INDEX_FILE="$bad" git update-index --cacheinfo \
+                    "100644,$blob,Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift"
+                expected='ii-c-b2a2 checkpoint budget drifted' ;;
+            deleted)
+                GIT_INDEX_FILE="$bad" git rm --cached -q -f \
+                    Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+                expected='ii-c-b2a2 checkpoint deleted an existing path' ;;
+            binary)
+                blob=$(printf '\0ii-c-b2a2\n' | git hash-object -w --stdin)
+                GIT_INDEX_FILE="$bad" git update-index --cacheinfo \
+                    "100644,$blob,Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift"
+                expected='ii-c-b2a2 binary checkpoint path rejected' ;;
+            mode)
+                blob=$(GIT_INDEX_FILE="$bad" git ls-files -s -- \
+                    scripts/verify-investigation-runtime-machine-report | awk '{print $2}')
+                GIT_INDEX_FILE="$bad" git update-index --cacheinfo \
+                    "100644,$blob,scripts/verify-investigation-runtime-machine-report"
+                expected='ii-c-b2a2 staged source/mode drifted:' ;;
+            wrong-baseline)
+                scope_baseline="$baseline^"
+                expected='ii-c-b2a2 checkpoint baseline drifted' ;;
+            staged-worktree-divergence)
+                blob=$(print altered | git hash-object -w --stdin)
+                GIT_INDEX_FILE="$bad" git update-index --cacheinfo \
+                    "100755,$blob,scripts/verify-investigation-runtime-machine-report"
+                expected='ii-c-b2a2 staged source/mode drifted:' ;;
+            untracked)
+                (
+                    local probe=.stornaut-iicb2a2-untracked-$PPID-$RANDOM
+                    trap 'rm -f -- "$probe"' EXIT INT TERM HUP
+                    print untracked >"$probe"
+                    reject_iicb2a2_scope "$fixture" \
+                        'ii-c-b2a2 checkpoint untracked paths drifted' env \
+                        GIT_INDEX_FILE="$bad" "$gate" \
+                        --iic-b2a2-staged-scope-contract-only "$scope_baseline"
+                )
+                continue ;;
+        esac
+        reject_iicb2a2_scope "$fixture" "$expected" env \
+            GIT_INDEX_FILE="$bad" "$gate" \
+            --iic-b2a2-staged-scope-contract-only "$scope_baseline"
+    done
+}
+
+if [[ ${1:-} == --iic-b2a2-contract-only ]]; then
+    (( $# == 1 )) || fail_contract \
+        "Usage: scripts/verify-contract --iic-b2a2-contract-only"
+    iicb2a2_root=$(mktemp -d \
+        "${TMPDIR:-/tmp}/stornaut-iicb2a2-contract.XXXXXX")
+    trap 'rm -rf "$iicb2a2_root"' EXIT
+    verify_iicb2a2_contract "$iicb2a2_root"
+    print "ii-c-b2a2 independent verifier contract verification passed."
+    exit 0
+fi
 
 if [[ ${1:-} == --iic-b1-root-owned-gate-contract-only ]]; then
     (( $# == 1 )) || fail_contract \
@@ -4533,6 +4667,7 @@ done
 contract_root=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-verify-contract.XXXXXX")
 verify_iica_contract "$contract_root/iica"
 verify_iicb1_root_owned_gate_contract "$contract_root/iicb1"
+verify_iicb2a2_contract "$contract_root/iicb2a2"
 verify_iic0bivb2_contract "$contract_root/iic0bivb2" false
 verify_shared_deadline_repair_contract "$contract_root/shared-deadline"
 verify_fixed_gate_deadline_cleanup_contract "$contract_root/fixed-gate-cleanup"

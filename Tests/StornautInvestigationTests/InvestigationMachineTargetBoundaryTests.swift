@@ -4,6 +4,61 @@ import Testing
 @Suite("Task 39 trusted machine target boundary")
 struct InvestigationMachineTargetBoundaryTests {
     @Test
+    func iiCB2A2IndependentVerifierPinsScopeAndBoundaries() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let verifier = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-runtime-machine-report"),
+            encoding: .utf8)
+        let evidenceTests = try String(contentsOf: root.appending(
+            path: "Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift"),
+            encoding: .utf8)
+        let boundary = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-boundaries"), encoding: .utf8)
+        let release = try String(contentsOf: root.appending(
+            path: "scripts/verify-app-release-boundaries"), encoding: .utf8)
+        let contract = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+        #expect(verifier.hasPrefix("#!/bin/zsh -f\n"))
+        for marker in [
+            "/usr/bin/python3 -I", "Foundation.framework/Foundation",
+            "canonical_absolute_path", "O_NOFOLLOW_ANY", "O_RESOLVE_BENEATH",
+            "select.kqueue()", "KQ_FILTER_VNODE", "evidence changed during verification",
+            "O_UNIQUE", "os.pread", "follow_symlinks=False",
+            "stornaut.task39.iic.raw-evidence-manifest.v1",
+            "stornaut.task39.iic.raw-evidence-entry.v1",
+            "stornaut.task39.iic.attempt-summary.v1",
+            "stornaut.task39.iic.attempt-event.v1",
+            "stornaut.task39.machine.gate-coordinator-receipt.v1",
+            "manifest requires an exact external seal",
+        ] { #expect(verifier.contains(marker)) }
+        #expect(evidenceTests.contains(
+            "92418d3ce5be398d842763863f001a39340ba2c1d80407a95ca4719c90ebdf2d"))
+        for marker in [
+            "--iic-b2a2-source-contract-only",
+            "--iic-b2a2-mutation-contract-only",
+            "--iic-b2a2-staged-scope-contract-only",
+            "function verify_iicb2a2_source_contract()",
+            "ii-c-b2a2 checkpoint paths drifted",
+            "ii-c-b2a2 boundary assertions became vacuous",
+            "(( changed <= 2000 ))",
+        ] { #expect(boundary.contains(marker)) }
+        for marker in [
+            "--iic-b2a2-component-boundary-only",
+            "function verify_iicb2a2_component_boundary()",
+            "function verify_iicb2a2_negative_macho()",
+            "ii-c-b2a2 campaign namespace leaked into closed image",
+        ] { #expect(release.contains(marker)) }
+        for marker in [
+            "--iic-b2a2-contract-only",
+            "function verify_iicb2a2_contract()",
+            "manifest-without-seal", "verifier-canonical-reencode",
+            "verifier-held-named-identity", "verifier-event-chain",
+            "verifier-receipt-self-hash", "verifier-component-vacuity",
+        ] { #expect(contract.contains(marker)) }
+    }
+
+    @Test
     func iiCB1RootOwnedGateVerifierPinsCurrentTreeContractAndScope() throws {
         let root = URL(filePath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
@@ -56,7 +111,9 @@ struct InvestigationMachineTargetBoundaryTests {
             "gate-physical-attempt-vacuity",
             "gate-physical-observed-uid-spoof",
             "ii-c-b1 mutation accepted:",
-            "ii-c-b1 scope mutation accepted:",
+            "immutable-scope-and-mutations",
+            "77cde61b8c09e739ab5268531e83bcd333dcdc28",
+            "9c59f241ffbfc6bc6c2a6810a9a0ce2c57b23c4b",
             "InvestigationFixedGateDarwinLifecycle.(validateExecutable",
             "InvestigationMachineFixedGateContract.requiredUserID",
             "InvestigationMachineFixedGateContract.requiredGroupID",
@@ -527,7 +584,7 @@ struct InvestigationMachineTargetBoundaryTests {
         #expect(
             package.components(
                 separatedBy: "\"StornautInvestigationHandoffContract\""
-            ).count == 10
+            ).count == 11
         )
 
         let sourceRoot = root.appending(path: "Sources/StornautInvestigationHandoffContract")

@@ -205,6 +205,8 @@ struct InvestigationMachineCampaignEvidenceTests {
         let producerBytes = try fixture.producer.encoded()
         let consumerBytes = try fixture.consumer.encoded()
         #expect(consumerBytes == producerBytes)
+        #expect(InvestigationHandoffSHA256.hashing(producerBytes).lowercaseHex
+            == "92418d3ce5be398d842763863f001a39340ba2c1d80407a95ca4719c90ebdf2d")
         #expect(try InvestigationMachineCoordinatorRawReceiptV1.decode(
             producerBytes) == fixture.consumer)
 
@@ -759,9 +761,153 @@ struct InvestigationMachineCampaignEvidenceTests {
         #expect(FileManager.default.fileExists(
             atPath: fixture.evidenceRoot.appending(path: "manifest.bin").path
         ))
+        let missingSeal = fixture.parent.appending(path: "missing-seal.json")
+        #expect(try Self.runVerifier(fixture.evidenceRoot, missingSeal).status != 0)
         #expect(throws: InvestigationMachineRawEvidenceError.alreadyTerminal) {
             _ = try writer.finalize()
         }
+    }
+
+    @Test
+    func independentVerifierRequiresExactSealAndLeavesTreeUnchanged() throws {
+        let fixture = try CampaignEvidenceDiskFixture.make()
+        defer { fixture.remove() }
+        let writer = try fixture.makeWriter()
+        try fixture.populate(writer)
+        let seal = try writer.finalize()
+        let sealURL = fixture.parent.appending(path: "seal.json")
+        try Self.writeSeal(seal, to: sealURL)
+        let before = try Self.treeSnapshot(fixture.evidenceRoot)
+
+        let first = try Self.runVerifier(fixture.evidenceRoot, sealURL)
+        let second = try Self.runVerifier(fixture.evidenceRoot, sealURL)
+        #expect(first.status == 0)
+        #expect(first.stderr.isEmpty)
+        #expect(first.stdout == "stornaut ii-c machine evidence verified\n")
+        #expect(second == first)
+        #expect(try Self.treeSnapshot(fixture.evidenceRoot) == before)
+
+        let missing = try Self.runVerifier(
+            fixture.evidenceRoot, fixture.parent.appending(path: "missing.json"))
+        #expect(missing.status != 0)
+        var forged = try #require(JSONSerialization.jsonObject(
+            with: Data(contentsOf: sealURL)) as? [String: Any])
+        forged["manifestSHA256"] = String(repeating: "0", count: 64)
+        try Self.writeCanonicalJSON(forged, to: sealURL)
+        #expect(try Self.runVerifier(fixture.evidenceRoot, sealURL).status != 0)
+    }
+
+    @Test
+    func independentVerifierAcceptsPrivilegedCoordinatorCorpus() throws {
+        let fixture = try CampaignEvidenceDiskFixture.make()
+        defer { fixture.remove() }
+        let writer = try fixture.makeWriter(mode: .privileged)
+        for (index, kind) in [
+            InvestigationMachineAttemptEventKind.prepared, .armedConsumed,
+            .spawnObserved, .terminal,
+        ].enumerated() {
+            _ = try writer.appendAttemptEvent(
+                kind: kind, payload: Self.json("event-\(index + 1)"),
+                observedAt: try .init(rawValue: Int64(index + 1)))
+        }
+        try fixture.populatePrivilegedArtifacts(writer)
+        let seal = try writer.finalize()
+        let sealURL = fixture.parent.appending(path: "seal.json")
+        try Self.writeSeal(seal, to: sealURL)
+        #expect(try Self.runVerifier(fixture.evidenceRoot, sealURL).status == 0)
+    }
+
+    @Test
+    func independentVerifierUsesFoundationCanonicalJSONBytes() throws {
+        let fixture = try CampaignEvidenceDiskFixture.make()
+        defer { fixture.remove() }
+        let writer = try fixture.makeWriter()
+        _ = try writer.appendAttemptEvent(
+            kind: .prepared, payload: Self.json("prepared"),
+            observedAt: try .init(rawValue: 1))
+        _ = try writer.appendAttemptEvent(
+            kind: .cancelledBeforeArm, payload: Self.json("cancelled"),
+            observedAt: try .init(rawValue: 2))
+        let edgeJSON = try JSONSerialization.data(withJSONObject: [
+            "bmp": ["\u{10000}": 2, "\u{e000}": 1],
+            "nums": [0, 1.0, 1e-7, 1e20, 1.2345678901234567,
+                Int64(9_007_199_254_740_993)],
+            "slash": "a/b",
+        ], options: [.sortedKeys, .withoutEscapingSlashes])
+        try fixture.populateDryRunArtifacts(writer, sourceBuild: edgeJSON)
+        let seal = try writer.finalize()
+        let sealURL = fixture.parent.appending(path: "seal.json")
+        try Self.writeSeal(seal, to: sealURL)
+        #expect(try Self.runVerifier(fixture.evidenceRoot, sealURL).status == 0)
+    }
+
+    @Test
+    func independentVerifierRejectsNoncanonicalAndParentSymlinkPaths() throws {
+        let fixture = try CampaignEvidenceDiskFixture.make()
+        defer { fixture.remove() }
+        let writer = try fixture.makeWriter()
+        try fixture.populate(writer)
+        let seal = try writer.finalize()
+        let sealURL = fixture.parent.appending(path: "seal.json")
+        try Self.writeSeal(seal, to: sealURL)
+        let rootName = fixture.evidenceRoot.lastPathComponent
+        let traversalRoot = fixture.parent.path + "/unused/../" + rootName
+        #expect(try Self.runVerifier(
+            traversalRoot, sealURL.path).status != 0)
+
+        let alias = fixture.parent.deletingLastPathComponent().appending(
+            path: "stornaut-campaign-alias-" + UUID().uuidString)
+        try #require(symlink(fixture.parent.path, alias.path) == 0)
+        defer { _ = unlink(alias.path) }
+        #expect(try Self.runVerifier(
+            alias.appending(path: rootName).path, sealURL.path).status != 0)
+        #expect(try Self.runVerifier(
+            fixture.evidenceRoot.path, alias.appending(path: "seal.json").path
+        ).status != 0)
+        let caseAliasedRoot = "/PRIVATE" + String(
+            fixture.evidenceRoot.path.dropFirst("/private".count))
+        #expect(try Self.runVerifier(
+            caseAliasedRoot, sealURL.path).status != 0)
+    }
+
+    @Test
+    func independentVerifierRejectsNoncanonicalJSONBytes() throws {
+        let fixture = try CampaignEvidenceDiskFixture.make()
+        defer { fixture.remove() }
+        let writer = try fixture.makeWriter()
+        #expect(throws: InvestigationMachineEvidenceContractError.invalidEncoding) {
+            try fixture.populateDryRunArtifacts(
+                writer, sourceBuild: Data(#"{"value":"a\/b"}"#.utf8))
+        }
+    }
+
+    @Test
+    func independentVerifierRejectsMutatedArtifact() throws {
+        let fixture = try CampaignEvidenceDiskFixture.make()
+        defer { fixture.remove() }
+        let writer = try fixture.makeWriter()
+        try fixture.populate(writer)
+        let seal = try writer.finalize()
+        let sealURL = fixture.parent.appending(path: "seal.json")
+        try Self.writeSeal(seal, to: sealURL)
+        try Data("mutated".utf8).write(to: fixture.evidenceRoot.appending(
+            path: "01-preflight/source-build.json"))
+        #expect(try Self.runVerifier(fixture.evidenceRoot, sealURL).status != 0)
+    }
+
+    @Test(arguments: CampaignTreeMutation.allCases)
+    func independentVerifierRejectsPhysicalTreeMutation(
+        _ mutation: CampaignTreeMutation
+    ) throws {
+        let fixture = try CampaignEvidenceDiskFixture.make()
+        defer { fixture.remove() }
+        let writer = try fixture.makeWriter()
+        try fixture.populate(writer)
+        let seal = try writer.finalize()
+        let sealURL = fixture.parent.appending(path: "seal.json")
+        try Self.writeSeal(seal, to: sealURL)
+        try fixture.apply(mutation)
+        #expect(try Self.runVerifier(fixture.evidenceRoot, sealURL).status != 0)
     }
 
     fileprivate static func event(
@@ -778,6 +924,88 @@ struct InvestigationMachineCampaignEvidenceTests {
 
     fileprivate static func zeroDigest() throws -> InvestigationHandoffSHA256 {
         try .init(rawBytes: Data(repeating: 0, count: 32))
+    }
+
+    private static func runVerifier(
+        _ evidenceRoot: URL, _ sealURL: URL
+    ) throws -> CampaignVerifierResult {
+        try runVerifier(evidenceRoot.path, sealURL.path)
+    }
+
+    private static func runVerifier(
+        _ evidenceRootPath: String, _ sealPath: String
+    ) throws -> CampaignVerifierResult {
+        let repository = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let process = Process(), output = Pipe(), errors = Pipe()
+        process.executableURL = repository.appending(
+            path: "scripts/verify-investigation-runtime-machine-report")
+        process.arguments = [evidenceRootPath, sealPath]
+        process.standardOutput = output
+        process.standardError = errors
+        try process.run()
+        process.waitUntilExit()
+        return .init(
+            status: process.terminationStatus,
+            stdout: String(decoding: output.fileHandleForReading.readDataToEndOfFile(),
+                as: UTF8.self),
+            stderr: String(decoding: errors.fileHandleForReading.readDataToEndOfFile(),
+                as: UTF8.self))
+    }
+
+    private static func writeSeal(
+        _ seal: InvestigationMachineRawEvidenceSeal, to url: URL
+    ) throws {
+        try writeCanonicalJSON([
+            "schemaVersion": 1,
+            "campaignUUID": seal.campaignUUID.uuidString.lowercased(),
+            "attemptUUID": seal.attemptUUID.uuidString.lowercased(),
+            "rootIdentity": [
+                "device": String(seal.rootIdentity.device),
+                "inode": String(seal.rootIdentity.inode),
+                "generation": String(seal.rootIdentity.generation),
+                "size": String(seal.rootIdentity.size),
+            ],
+            "manifestSHA256": seal.manifestSHA256.lowercaseHex,
+            "contentRootSHA256": seal.contentRootSHA256.lowercaseHex,
+            "artifactCount": seal.artifactCount,
+            "totalByteCount": String(seal.totalByteCount),
+            "attemptSummary": [
+                "attemptUUID": seal.attemptSummary.attemptUUID.uuidString.lowercased(),
+                "mode": Int(seal.attemptSummary.mode.rawValue),
+                "outcome": Int(seal.attemptSummary.outcome.rawValue),
+                "consumed": seal.attemptSummary.consumed,
+                "eventCount": Int(seal.attemptSummary.eventCount),
+                "finalEventSHA256": seal.attemptSummary.finalEventSHA256.lowercaseHex,
+            ],
+        ], to: url)
+    }
+
+    private static func writeCanonicalJSON(_ object: Any, to url: URL) throws {
+        try JSONSerialization.data(
+            withJSONObject: object, options: [.sortedKeys]
+        ).write(to: url)
+        try #require(chmod(url.path, 0o600) == 0)
+    }
+
+    private static func treeSnapshot(_ root: URL) throws -> [String] {
+        let enumerator = try #require(FileManager.default.enumerator(
+            at: root, includingPropertiesForKeys: nil))
+        var values: [String] = []
+        for case let url as URL in enumerator {
+            var info = stat()
+            try #require(lstat(url.path, &info) == 0)
+            let relative = url.path.replacingOccurrences(
+                of: root.path + "/", with: "")
+            let digest = (info.st_mode & S_IFMT) == S_IFREG
+                ? InvestigationHandoffSHA256.hashing(
+                    try Data(contentsOf: url)).lowercaseHex : "-"
+            values.append([relative, String(info.st_dev), String(info.st_ino),
+                String(info.st_mode), String(info.st_nlink), String(info.st_size),
+                String(info.st_mtimespec.tv_sec), String(info.st_mtimespec.tv_nsec),
+                digest].joined(separator: "|"))
+        }
+        return values.sorted()
     }
 
     fileprivate static func digest(_ marker: UInt8) -> InvestigationHandoffSHA256 {
@@ -808,6 +1036,12 @@ struct InvestigationMachineCampaignEvidenceTests {
         #expect(value.st_gid == getegid())
         if type == S_IFREG { #expect(value.st_nlink == 1) }
     }
+}
+
+private struct CampaignVerifierResult: Equatable {
+    let status: Int32
+    let stdout: String
+    let stderr: String
 }
 
 private struct CampaignEvidenceFixture {
@@ -932,6 +1166,13 @@ enum CampaignTreeMutation: CaseIterable {
     case extraSymlink
     case hardLink
     case wrongMode
+    case missingFile
+    case extraFile
+    case extraDirectory
+    case replacementSymlink
+    case replacementHardLink
+    case wrongDirectoryMode
+    case missingDirectory
 }
 
 enum CampaignEvidenceFault: CaseIterable {
@@ -1044,7 +1285,7 @@ private final class CampaignEvidenceDiskFixture {
         )
         try #require(descriptor >= 3)
         return try CampaignEvidenceDiskFixture(
-            parent: parent, parentDescriptor: descriptor
+            parent: canonicalParent, parentDescriptor: descriptor
         )
     }
 
@@ -1078,10 +1319,11 @@ private final class CampaignEvidenceDiskFixture {
     }
 
     func populateDryRunArtifacts(
-        _ writer: InvestigationMachineRawEvidenceWriter
+        _ writer: InvestigationMachineRawEvidenceWriter,
+        sourceBuild: Data = CampaignEvidenceDiskFixture.json("source")
     ) throws {
         try write([
-            (.preflight, "source-build.json", .sourceBuildIdentity, .strictJSON, Self.json("source")),
+            (.preflight, "source-build.json", .sourceBuildIdentity, .strictJSON, sourceBuild),
             (.install, "installed.json", .builtStagingInstalledIdentity, .strictJSON, Self.json("installed")),
             (.authorization, "policy-probe.json", .policyProbe, .strictJSON, Self.json("policy")),
             (.authorization, "human-attestation.json", .humanPromptAttestation, .strictJSON, Self.json("human")),
@@ -1148,6 +1390,30 @@ private final class CampaignEvidenceDiskFixture {
                 phase.appending(path: "extra-hardlink").path) == 0)
         case .wrongMode:
             try #require(chmod(source.path, 0o644) == 0)
+        case .missingFile:
+            try FileManager.default.removeItem(at: source)
+        case .extraFile:
+            let extra = phase.appending(path: "extra.json")
+            try Data("{}".utf8).write(to: extra)
+            try #require(chmod(extra.path, 0o600) == 0)
+        case .extraDirectory:
+            try FileManager.default.createDirectory(
+                at: evidenceRoot.appending(path: "extra"),
+                withIntermediateDirectories: false,
+                attributes: [.posixPermissions: 0o700])
+        case .replacementSymlink:
+            try FileManager.default.removeItem(at: source)
+            try #require(symlink(
+                "../02-install/installed.json", source.path) == 0)
+        case .replacementHardLink:
+            try FileManager.default.removeItem(at: source)
+            try #require(link(evidenceRoot.appending(
+                path: "02-install/installed.json").path, source.path) == 0)
+        case .wrongDirectoryMode:
+            try #require(chmod(phase.path, 0o755) == 0)
+        case .missingDirectory:
+            try FileManager.default.removeItem(at: evidenceRoot.appending(
+                path: "04-driver-epochs"))
         }
     }
 
