@@ -68,7 +68,7 @@ ProcessSupport, DriverSupport, GateSupport, CoordinatorSupport or InstalledL2.
 
 ## 3. ii-c-b2a1 Exact Scope and Budget
 
-Exactly four non-document paths and at most 3,400 changed non-document lines:
+Exactly four non-document paths and at most 3,800 changed non-document lines:
 
 1. `Package.swift`;
 2. `Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignEvidenceContract.swift` (new);
@@ -79,12 +79,16 @@ Post-RED API expansion showed that keeping a narrow target while independently
 matching the existing 23-field coordinator receipt wire requires more contract
 code and less writer/test code than the initial allocation. Before production
 validation, the category ceilings are therefore rebalanced to: Package manifest
-40 lines, contracts 900 lines, writer 1,250 lines and tests 1,250 lines. The
+40 lines, contracts 1,050 lines, writer 1,300 lines and tests 1,450 lines. The
 first review additionally required manifest-substitution, post-read identity and
 stage-specific failure controls; the total ceiling is therefore amended before
-those changes from 3,000 to 3,400 lines, still below the repository's 4,000-line
+those changes from 3,000 to 3,400 lines. The immutable-tree review then found
+that a cancelled-before-arm event history could be sealed beside post-arm
+artifacts unless the manifest and returned seal bind an explicit typed attempt
+summary. Before that repair, the ceiling is amended once more to 3,800 lines,
+still below the repository's 4,000-line
 mandatory split threshold and stricter than the sum of category ceilings. A
-fifth non-document path, line 3,401, independent verifier,
+fifth non-document path, line 3,801, independent verifier,
 process spawn, PTY, sudo, installed-artifact path or product dependency stops
 b2a1 for re-preflight.
 
@@ -180,6 +184,11 @@ re-encodes STNC manifest/event bytes, validates coordinator-receipt framing and
 self-hash against a fixed golden corpus, recomputes every artifact digest and
 event chain, and rejects extras, missing nodes, aliases, traversal and metadata
 drift. Repeated verification is byte-for-byte stable and read-only.
+The existence of `manifest.bin` is never a success marker: verification also
+requires the exact seal produced only by a successful writer `finalize()` (or a
+later checked receipt that binds every seal field). A post-manifest sync,
+identity, inventory or close failure therefore remains non-admitting even when
+the raw directory contains a syntactically complete manifest.
 
 The structural closure proves no new SwiftPM product, exact direct/reverse
 dependencies, product-root unreachability, zero Xcode project/scheme references,
