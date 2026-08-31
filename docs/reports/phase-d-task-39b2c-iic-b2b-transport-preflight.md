@@ -36,6 +36,19 @@ exceed 3,600 changed lines before implementation completes, the only permitted
 split is b2b1 transport/injected lifecycle followed by b2b2 physical fixture
 and aggregate gates. No further recursive checkpoint naming is permitted.
 
+The independent Step 3 mappings estimate 3,195--4,330 lines, so the one allowed
+split is now active. **b2b1** may change exactly `Package.swift`, the new C
+header/implementation, the new Swift harness, the new harness test, the shared
+target-boundary test, `verify-investigation-boundaries` and `verify-contract`
+(eight paths, at most 2,000 changed lines). **b2b2** starts from the pushed b2b1
+tree and may change exactly `Package.swift`, the new zero-argument executable,
+the new coordinator fixture, the same harness and target-boundary tests, and
+the three verifier scripts (eight paths, at most 2,000 changed lines relative
+to the pushed b2b1 tree). The two-child aggregate is capped at 4,000 changed
+lines, matching but not exceeding the repository's mandatory split threshold.
+b2b1 does not add the executable target or fixture. b2b2 is the final child;
+there is no further split.
+
 ## 2. Frozen Contract
 
 - One fixed sibling coordinator; no executable-path, argv or environment
