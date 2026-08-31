@@ -4,6 +4,66 @@ import Testing
 @Suite("Task 39 trusted machine target boundary")
 struct InvestigationMachineTargetBoundaryTests {
     @Test
+    func iiCB2B1TransportPinsScopeAndBoundaries() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let package = try String(contentsOf: root.appending(path: "Package.swift"), encoding: .utf8)
+        let header = try String(contentsOf: root.appending(
+            path: "Sources/CInvestigationMachineCampaignSupport/include/CInvestigationMachineCampaignSupport.h"), encoding: .utf8)
+        let c = try String(contentsOf: root.appending(
+            path: "Sources/CInvestigationMachineCampaignSupport/CInvestigationMachineCampaignSupport.c"), encoding: .utf8)
+        let harness = try String(contentsOf: root.appending(
+            path: "Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignHarness.swift"), encoding: .utf8)
+        let tests = try String(contentsOf: root.appending(
+            path: "Tests/StornautInvestigationTests/InvestigationMachineCampaignHarnessTests.swift"), encoding: .utf8)
+        let boundary = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-boundaries"), encoding: .utf8)
+        let contract = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+        #expect(package.contains("CInvestigationMachineCampaignSupport"))
+        for marker in [
+            "STORNAUT_INVESTIGATION_CAMPAIGN_RECEIPT_FD 3",
+            "stornaut_investigation_campaign_spawn_fixed",
+            "parent_transfer_close_error",
+        ] { #expect(header.contains(marker)) }
+        for marker in [
+            "posix_spawn(", "POSIX_SPAWN_SETSID",
+            "stornaut_investigation_campaign_bootstrap_fixed",
+            "TIOCSCTTY", "tcsetpgrp(", "dup2(", "execve(",
+            "FD_CLOEXEC",
+        ] { #expect(c.contains(marker)) }
+        #expect(!c.contains("fork("))
+        #expect(!c.contains("forkpty("))
+        for marker in [
+            "package actor InvestigationMachineCampaignHarness",
+            "case readBootstrap", "CAMPAIGN_BOOTSTRAP_READY",
+            "value == outerIdentity", "terminateOwnedGroup",
+            "waitExact", "closeParentChannels", "observeResidue",
+        ] { #expect(harness.contains(marker)) }
+        for marker in [
+            "validFragmentedReceiptUsesOneDeadlineAndFairDrain",
+            "concurrentAndRepeatedCallsSpawnExactlyOnce",
+            "childCreationUncertaintyRemainsOwned",
+            "outerAndInnerIdentityRemainIndependent",
+            "residueAndCleanupFailuresRemainFailClosed",
+        ] { #expect(tests.contains(marker)) }
+        for marker in [
+            "--iic-b2b1-source-contract-only",
+            "--iic-b2b1-mutation-contract-only",
+            "--iic-b2b1-staged-scope-contract-only",
+            "function verify_iicb2b1_source_contract()",
+            "function verify_iicb2b1_staged_scope()",
+            "ii-c-b2b1 checkpoint budget drifted",
+        ] { #expect(boundary.contains(marker)) }
+        for marker in [
+            "--iic-b2b1-contract-only",
+            "function verify_iicb2b1_contract()",
+            "c-bootstrap-cloexec", "harness-outer-stability",
+            "boundary-vacuity",
+        ] { #expect(contract.contains(marker)) }
+    }
+
+    @Test
     func iiCB2A2IndependentVerifierPinsScopeAndBoundaries() throws {
         let root = URL(filePath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()

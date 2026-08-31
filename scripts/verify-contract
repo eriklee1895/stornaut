@@ -3,7 +3,7 @@
 set -euo pipefail
 
 contract_source=${0:A}
-# ib2_self_sha=0a783a831701a9f850a5a5932c2478807c9c274371225c7f6d4afe9467dc6315
+# ib2_self_sha=abcaaa23ac49c192625036ac5cad38d20dab6d2a26dde45d1a7d93842e77395b
 ib2_self_sha=$(sed -nE 's/^# ib2_self_sha=([0-9a-f]{64})$/\1/p' "$contract_source"); ib2_observed_sha=$(sed -E 's/^# ib2_self_sha=[0-9a-f]{64}$/# ib2_self_sha=SELF/' "$contract_source" | shasum -a 256 | awk '{ print $1 }')
 [[ ${#ib2_self_sha} == 64 && "$ib2_observed_sha" == "$ib2_self_sha" ]] || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
 repo_root=${contract_source:h:h}
@@ -2998,6 +2998,131 @@ PY
     done
 }
 
+function verify_iicb2b1_contract() {
+    local out=$1 gate=scripts/verify-investigation-boundaries
+    mkdir -p "$out"
+    local -a paths=(
+        Package.swift
+        Sources/CInvestigationMachineCampaignSupport/include/CInvestigationMachineCampaignSupport.h
+        Sources/CInvestigationMachineCampaignSupport/CInvestigationMachineCampaignSupport.c
+        Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignHarness.swift
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignHarnessTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-investigation-boundaries
+        scripts/verify-contract
+    )
+    "$gate" --iic-b2b1-source-contract-only "${paths[@]}" >"$out/source.log"
+    /usr/bin/python3 -I - "$out" "${paths[@]}" <<'PY'
+from pathlib import Path
+import sys
+out = Path(sys.argv[1]); paths = tuple(map(Path, sys.argv[2:]))
+names = ("package","header","c","harness","test","boundary","gate","contract")
+sources = dict(zip(names, (p.read_text() for p in paths)))
+mutations = (
+    ("c-spawn-session","c","POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSID","POSIX_SPAWN_CLOEXEC_DEFAULT"),
+    ("c-bootstrap-controlling-terminal","c","TIOCSCTTY, &zero","TIOCNOTTY, &zero"),
+    ("c-receipt-fd","c","descriptors[3], STORNAUT_INVESTIGATION_CAMPAIGN_RECEIPT_FD","descriptors[3], STDOUT_FILENO"),
+    ("c-bootstrap-cloexec","c","STORNAUT_INVESTIGATION_CAMPAIGN_BOOTSTRAP_FD, FD_CLOEXEC, 1","STORNAUT_INVESTIGATION_CAMPAIGN_BOOTSTRAP_FD, FD_CLOEXEC, 0"),
+    ("harness-one-shot","harness","guard state == .fresh else { return Self.failure(.alreadyConsumed) }","guard state != .consumed else { return Self.failure(.alreadyConsumed) }"),
+    ("harness-bootstrap","harness","bytes == Data([\n                      UInt8(STORNAUT_INVESTIGATION_CAMPAIGN_BOOTSTRAP_READY)\n                  ]), reachedEOF","reachedEOF"),
+    ("harness-outer-stability","harness","), value == outerIdentity, Self.valid(","), Self.valid("),
+    ("harness-residue","harness","!value.processGroupMembers.isEmpty\n                || !value.sessionMembers.isEmpty","!value.processGroupMembers.isEmpty\n                && !value.sessionMembers.isEmpty"),
+    ("test-vacuity","test","childCreationUncertaintyRemainsOwned","childCreationUncertaintyCoverageRemoved"),
+    ("boundary-vacuity","boundary","] { #expect(header.contains(marker)) }","] { #expect(true) }"),
+)
+for name, slot, old, new in mutations:
+    if sources[slot].count(old) != 1: raise SystemExit("ii-c-b2b1 mutation fixture is vacuous: " + name)
+    target = out / (name + ".source"); target.write_text(sources[slot].replace(old,new,1)); (out/(name+".slot")).write_text(slot)
+PY
+    local name slot target sha rc
+    for name in c-spawn-session c-bootstrap-controlling-terminal c-receipt-fd \
+        c-bootstrap-cloexec harness-one-shot harness-bootstrap \
+        harness-outer-stability harness-residue test-vacuity boundary-vacuity
+    do
+        slot=$(<"$out/$name.slot"); target="$out/$name.source"
+        sha=$(shasum -a 256 "$target" | awk '{print $1}')
+        local -a args=("${paths[@]}")
+        case $slot in package) args[1]=$target;; header) args[2]=$target;;
+            c) args[3]=$target;; harness) args[4]=$target;; test) args[5]=$target;;
+            boundary) args[6]=$target;; gate) args[7]=$target;; contract) args[8]=$target;; esac
+        rc=0; "$gate" --iic-b2b1-mutation-contract-only "$name" "$slot" "$sha" \
+            "${args[@]}" >"$out/$name.log" 2>&1 || rc=$?
+        (( rc != 0 )) || fail_contract "ii-c-b2b1 mutation accepted: $name"
+    done
+    local index="$out/scope.index"
+    GIT_INDEX_FILE="$index" git read-tree "$(git write-tree)"
+    GIT_INDEX_FILE="$index" "$gate" \
+        --iic-b2b1-staged-scope-contract-only \
+        61cdeddac657a18cac12e7cc04d62b551675b4bd >"$out/scope.log"
+    local bad="$out/scope-bad.index" blob rc
+    cp "$index" "$bad"
+    blob=$(print extra | git hash-object -w --stdin)
+    GIT_INDEX_FILE="$bad" git update-index --add --cacheinfo \
+        "100644,$blob,iic-b2b1-extra.swift"
+    rc=0; GIT_INDEX_FILE="$bad" "$gate" \
+        --iic-b2b1-staged-scope-contract-only \
+        61cdeddac657a18cac12e7cc04d62b551675b4bd \
+        >"$out/scope-extra.log" 2>&1 || rc=$?
+    (( rc != 0 )) || fail_contract "ii-c-b2b1 scope accepted extra path"
+    cp "$index" "$bad"
+    blob=$(printf '\0b2b1\n' | git hash-object -w --stdin)
+    GIT_INDEX_FILE="$bad" git update-index --cacheinfo \
+        "100644,$blob,Package.swift"
+    rc=0; GIT_INDEX_FILE="$bad" "$gate" \
+        --iic-b2b1-staged-scope-contract-only \
+        61cdeddac657a18cac12e7cc04d62b551675b4bd \
+        >"$out/scope-binary.log" 2>&1 || rc=$?
+    (( rc != 0 )) || fail_contract "ii-c-b2b1 scope accepted binary change"
+    rc=0; GIT_INDEX_FILE="$index" "$gate" \
+        --iic-b2b1-staged-scope-contract-only \
+        61cdeddac657a18cac12e7cc04d62b551675b4bd^ \
+        >"$out/scope-baseline.log" 2>&1 || rc=$?
+    (( rc != 0 )) || fail_contract "ii-c-b2b1 scope accepted wrong baseline"
+    for fixture in deleted mode over-budget staged-divergence; do
+        cp "$index" "$bad"
+        case $fixture in
+            deleted) GIT_INDEX_FILE="$bad" git rm --cached -q -f Package.swift ;;
+            mode) blob=$(git hash-object -w -- scripts/verify-contract);
+                GIT_INDEX_FILE="$bad" git update-index --cacheinfo \
+                    "100644,$blob,scripts/verify-contract" ;;
+            over-budget) blob=$( { git show HEAD:Package.swift;
+                    for line in {1..2100}; do print "// b2b1 $line"; done;
+                } | git hash-object -w --stdin);
+                GIT_INDEX_FILE="$bad" git update-index --cacheinfo \
+                    "100644,$blob,Package.swift" ;;
+            staged-divergence) blob=$(print '// b2b1 divergence' \
+                    | git hash-object -w --stdin);
+                GIT_INDEX_FILE="$bad" git update-index --cacheinfo \
+                    "100644,$blob,Package.swift" ;;
+        esac
+        rc=0; GIT_INDEX_FILE="$bad" "$gate" \
+            --iic-b2b1-staged-scope-contract-only \
+            61cdeddac657a18cac12e7cc04d62b551675b4bd \
+            >"$out/scope-$fixture.log" 2>&1 || rc=$?
+        (( rc != 0 )) || fail_contract "ii-c-b2b1 scope accepted $fixture"
+    done
+    (
+        local probe=.stornaut-iicb2b1-untracked-$PPID-$RANDOM
+        trap 'rm -f -- "$probe"' EXIT INT TERM HUP
+        print untracked >"$probe"
+        rc=0; GIT_INDEX_FILE="$index" "$gate" \
+            --iic-b2b1-staged-scope-contract-only \
+            61cdeddac657a18cac12e7cc04d62b551675b4bd \
+            >"$out/scope-untracked.log" 2>&1 || rc=$?
+        (( rc != 0 )) || fail_contract "ii-c-b2b1 scope accepted untracked path"
+    )
+}
+
+if [[ ${1:-} == --iic-b2b1-contract-only ]]; then
+    (( $# == 1 )) || fail_contract \
+        "Usage: scripts/verify-contract --iic-b2b1-contract-only"
+    iicb2b1_root=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-iicb2b1-contract.XXXXXX")
+    trap 'rm -rf "$iicb2b1_root"' EXIT
+    verify_iicb2b1_contract "$iicb2b1_root"
+    print "ii-c-b2b1 transport contract verification passed."
+    exit 0
+fi
+
 if [[ ${1:-} == --iic-b2a2-contract-only ]]; then
     (( $# == 1 )) || fail_contract \
         "Usage: scripts/verify-contract --iic-b2a2-contract-only"
@@ -4668,6 +4793,7 @@ contract_root=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-verify-contract.XXXXXX")
 verify_iica_contract "$contract_root/iica"
 verify_iicb1_root_owned_gate_contract "$contract_root/iicb1"
 verify_iicb2a2_contract "$contract_root/iicb2a2"
+verify_iicb2b1_contract "$contract_root/iicb2b1"
 verify_iic0bivb2_contract "$contract_root/iic0bivb2" false
 verify_shared_deadline_repair_contract "$contract_root/shared-deadline"
 verify_fixed_gate_deadline_cleanup_contract "$contract_root/fixed-gate-cleanup"

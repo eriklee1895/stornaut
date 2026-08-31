@@ -191,6 +191,8 @@ let package = Package(
         .target(
             name: "StornautInvestigationMachineCampaignSupport",
             dependencies: [
+                "CInvestigationIdentitySupport",
+                "CInvestigationMachineCampaignSupport",
                 "StornautInvestigationHandoffContract",
             ]
         ),
@@ -251,6 +253,11 @@ let package = Package(
             linkerSettings: [
                 .linkedLibrary("bsm"),
             ]
+        ),
+        .target(
+            name: "CInvestigationMachineCampaignSupport",
+            path: "Sources/CInvestigationMachineCampaignSupport",
+            publicHeadersPath: "include"
         ),
         .target(
             name: "CSQLiteSupport",

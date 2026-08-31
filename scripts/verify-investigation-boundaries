@@ -325,6 +325,14 @@ iicb2a2_mutation_slot=
 iicb2a2_mutation_sha=
 iicb2a2_staged_scope_contract_only=false
 iicb2a2_staged_scope_baseline=cf1cbed8beff60cdd606bf7025fcef8a2768ff99
+iicb2b1_source_contract_only=false
+iicb2b1_sources=()
+iicb2b1_mutation_contract_only=false
+iicb2b1_mutation_name=
+iicb2b1_mutation_slot=
+iicb2b1_mutation_sha=
+iicb2b1_staged_scope_contract_only=false
+iicb2b1_staged_scope_baseline=61cdeddac657a18cac12e7cc04d62b551675b4bd
 iic0bivb1_handoff_contract_only=false
 iic0bivb1_fixture_source=
 iic0bivb1_physical_test_source=
@@ -864,6 +872,21 @@ if (( $# > 0 )); then
         && [[ $1 == --iic-b2a2-staged-scope-contract-only ]]; then
         iicb2a2_staged_scope_contract_only=true
         iicb2a2_staged_scope_baseline=${2:-cf1cbed8beff60cdd606bf7025fcef8a2768ff99}
+    elif (( $# == 1 || $# == 9 )) \
+        && [[ $1 == --iic-b2b1-source-contract-only ]]; then
+        iicb2b1_source_contract_only=true
+        iicb2b1_sources=("${@:2}")
+    elif (( $# == 12 )) \
+        && [[ $1 == --iic-b2b1-mutation-contract-only ]]; then
+        iicb2b1_mutation_contract_only=true
+        iicb2b1_mutation_name=$2
+        iicb2b1_mutation_slot=$3
+        iicb2b1_mutation_sha=$4
+        iicb2b1_sources=("${@:5}")
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iic-b2b1-staged-scope-contract-only ]]; then
+        iicb2b1_staged_scope_contract_only=true
+        iicb2b1_staged_scope_baseline=${2:-61cdeddac657a18cac12e7cc04d62b551675b4bd}
     elif (( $# == 4 )) \
         && [[ $1 == --iic0b-iv-b1-handoff-contract-only ]]; then
         iic0bivb1_handoff_contract_only=true
@@ -11033,6 +11056,8 @@ package, contract, writer, evidence, boundary, verifier = (sources[name] for nam
 target = '''        .target(
             name: "StornautInvestigationMachineCampaignSupport",
             dependencies: [
+                "CInvestigationIdentitySupport",
+                "CInvestigationMachineCampaignSupport",
                 "StornautInvestigationHandoffContract",
             ]
         ),'''
@@ -11184,6 +11209,164 @@ function verify_iicb2a2_staged_scope() {
         [[ "$(print -r -- "$entry" | awk '{print $1, $3, $4}')" == "$mode 0 $item" \
             && "$(print -r -- "$entry" | awk '{print $2}')" == "$(git hash-object -- "$item")" ]] \
             || { print -u2 "ii-c-b2a2 staged source/mode drifted: $item"; return 1; }
+    done
+}
+
+function verify_iicb2b1_source_contract() {
+    local PATH=/usr/bin:/bin:/usr/sbin:/sbin
+    local -a paths=("${iicb2b1_sources[@]}")
+    if (( ${#paths} == 0 )); then paths=(
+        Package.swift
+        Sources/CInvestigationMachineCampaignSupport/include/CInvestigationMachineCampaignSupport.h
+        Sources/CInvestigationMachineCampaignSupport/CInvestigationMachineCampaignSupport.c
+        Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignHarness.swift
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignHarnessTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-investigation-boundaries
+        scripts/verify-contract
+    ); fi
+    (( ${#paths} == 8 )) || { print -u2 "ii-c-b2b1 source cardinality drifted"; return 1; }
+    local source
+    for source in "${paths[@]}"; do [[ -f $source && ! -L $source ]] \
+        || { print -u2 "ii-c-b2b1 source path unavailable: $source"; return 1; }; done
+    /usr/bin/xcrun clang -fsyntax-only -std=c11 -I "${paths[2]:h}" "${paths[3]}"
+    /usr/bin/xcrun swiftc -frontend -parse -enable-bare-slash-regex "${paths[4]}"
+    /usr/bin/xcrun swiftc -frontend -parse -enable-bare-slash-regex "${paths[5]}"
+    /usr/bin/xcrun swiftc -frontend -parse -enable-bare-slash-regex "${paths[6]}"
+    /bin/zsh -n "${paths[7]}"; /bin/zsh -n "${paths[8]}"
+    /usr/bin/python3 -I - "$iicb2b1_mutation_contract_only" \
+        "$iicb2b1_mutation_name" "$iicb2b1_mutation_slot" \
+        "$iicb2b1_mutation_sha" "${paths[@]}" <<'PY'
+from pathlib import Path
+import hashlib, re, sys
+if len(sys.argv) != 13: raise SystemExit("ii-c-b2b1 source cardinality drifted")
+mutation_mode, mutation_name, mutation_slot, mutation_sha = sys.argv[1:5]
+names = ("package","header","c","harness","test","boundary","gate","contract")
+paths = tuple(map(Path, sys.argv[5:])); sources = dict(zip(names, (p.read_text() for p in paths)))
+canonical_paths = tuple(map(Path, (
+    "Package.swift",
+    "Sources/CInvestigationMachineCampaignSupport/include/CInvestigationMachineCampaignSupport.h",
+    "Sources/CInvestigationMachineCampaignSupport/CInvestigationMachineCampaignSupport.c",
+    "Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignHarness.swift",
+    "Tests/StornautInvestigationTests/InvestigationMachineCampaignHarnessTests.swift",
+    "Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift",
+    "scripts/verify-investigation-boundaries", "scripts/verify-contract",
+)))
+canonical = dict(zip(names, (p.read_text() for p in canonical_paths)))
+mutations = {
+    "c-spawn-session": ("c", "POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSID", "POSIX_SPAWN_CLOEXEC_DEFAULT"),
+    "c-bootstrap-controlling-terminal": ("c", "TIOCSCTTY, &zero", "TIOCNOTTY, &zero"),
+    "c-receipt-fd": ("c", "descriptors[3], STORNAUT_INVESTIGATION_CAMPAIGN_RECEIPT_FD", "descriptors[3], STDOUT_FILENO"),
+    "c-bootstrap-cloexec": ("c", "STORNAUT_INVESTIGATION_CAMPAIGN_BOOTSTRAP_FD, FD_CLOEXEC, 1", "STORNAUT_INVESTIGATION_CAMPAIGN_BOOTSTRAP_FD, FD_CLOEXEC, 0"),
+    "harness-one-shot": ("harness", "guard state == .fresh else { return Self.failure(.alreadyConsumed) }", "guard state != .consumed else { return Self.failure(.alreadyConsumed) }"),
+    "harness-bootstrap": ("harness", "bytes == Data([\n                      UInt8(STORNAUT_INVESTIGATION_CAMPAIGN_BOOTSTRAP_READY)\n                  ]), reachedEOF", "reachedEOF"),
+    "harness-outer-stability": ("harness", "), value == outerIdentity, Self.valid(", "), Self.valid("),
+    "harness-residue": ("harness", "!value.processGroupMembers.isEmpty\n                || !value.sessionMembers.isEmpty", "!value.processGroupMembers.isEmpty\n                && !value.sessionMembers.isEmpty"),
+    "test-vacuity": ("test", "childCreationUncertaintyRemainsOwned", "childCreationUncertaintyCoverageRemoved"),
+    "boundary-vacuity": ("boundary", "iiCB2B1TransportPinsScopeAndBoundaries", "iiCB2B1TransportCoverageRemoved"),
+}
+if mutation_mode == "true":
+    if mutation_name not in mutations: raise SystemExit("ii-c-b2b1 unrecognized mutation")
+    expected_slot, old, new = mutations[mutation_name]
+    if mutation_slot != expected_slot or not re.fullmatch(r"[0-9a-f]{64}", mutation_sha): raise SystemExit("ii-c-b2b1 mutation contract drifted")
+    if hashlib.sha256(paths[names.index(mutation_slot)].read_bytes()).hexdigest() != mutation_sha: raise SystemExit("ii-c-b2b1 mutation SHA drifted")
+    if canonical[mutation_slot].count(old) != 1 or sources[mutation_slot] != canonical[mutation_slot].replace(old,new,1): raise SystemExit("ii-c-b2b1 unrecognized mutation")
+    for name in names:
+        if name != mutation_slot and sources[name] != canonical[name]: raise SystemExit("ii-c-b2b1 mutation changed another source")
+package, header, c, harness, test, boundary, gate, contract = (sources[n] for n in names)
+target = '''        .target(
+            name: "StornautInvestigationMachineCampaignSupport",
+            dependencies: [
+                "CInvestigationIdentitySupport",
+                "CInvestigationMachineCampaignSupport",
+                "StornautInvestigationHandoffContract",
+            ]
+        ),'''
+ctarget = '''        .target(
+            name: "CInvestigationMachineCampaignSupport",
+            path: "Sources/CInvestigationMachineCampaignSupport",
+            publicHeadersPath: "include"
+        ),'''
+if package.count(target) != 1 or package.count(ctarget) != 1: raise SystemExit("ii-c-b2b1 package graph drifted")
+if package.split("targets: [",1)[0].find("StornautInvestigationMachineCampaignSupport") >= 0 or package.count('"CInvestigationMachineCampaignSupport"') != 2: raise SystemExit("ii-c-b2b1 package-only boundary drifted")
+for label, source in (("harness",harness),("test",test)):
+    if not source.startswith("#if DEBUG\n") and label == "harness": raise SystemExit("ii-c-b2b1 Debug boundary drifted")
+    if re.search(r"(?m)^\s*(?:public|open)\b", source): raise SystemExit("ii-c-b2b1 public surface drifted")
+required_c = (
+    "openpty(&descriptors[0], &descriptors[1], NULL, NULL, NULL)",
+    "pipe(&descriptors[2])", "pipe(&descriptors[4])",
+    "result = posix_spawn(",
+    "POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSID",
+    "stornaut_investigation_campaign_bootstrap_fixed(",
+    "TIOCSCTTY, &zero",
+    "tcsetpgrp(",
+    "descriptors[3], STORNAUT_INVESTIGATION_CAMPAIGN_RECEIPT_FD",
+    "execve(absolute_coordinator_path, arguments, environment)",
+    "F_SETFD, flags",
+    "STORNAUT_INVESTIGATION_CAMPAIGN_BOOTSTRAP_FD, FD_CLOEXEC, 1",
+    "char *const environment[] = {NULL}",
+    "parent_transfer_close_error",
+)
+for marker in required_c:
+    if marker not in c + header: raise SystemExit("ii-c-b2b1 C trampoline drifted")
+if c.count("posix_spawn(") != 1 or c.count("pipe(&descriptors") != 2 or c.count("dup2(") != 4 or c.count("execve(") != 1: raise SystemExit("ii-c-b2b1 C authority cardinality drifted")
+for forbidden in ("fork(", "forkpty(", "system(", "popen(", "getenv(", "PATH", "socket(", "connect(", "NSXPC", "URLSession", "readiness", "MoveToTrash", "RegisteredAction"):
+    if forbidden in c + header + harness: raise SystemExit("ii-c-b2b1 prohibited authority drifted")
+for marker in ("package actor InvestigationMachineCampaignHarness", "case alreadyConsumed", "guard state == .fresh else { return Self.failure(.alreadyConsumed) }", "state = .running", "defer { state = .consumed }", "case readBootstrap", "STORNAUT_INVESTIGATION_CAMPAIGN_BOOTSTRAP_READY", "value == outerIdentity", "InvestigationMachineCoordinatorRawReceiptV1", "terminateOwnedGroup", "waitExact", "closeParentChannels", "observeResidue", "!value.processGroupMembers.isEmpty\n                || !value.sessionMembers.isEmpty"):
+    if marker not in harness: raise SystemExit("ii-c-b2b1 harness lifecycle drifted")
+for marker in ("validFragmentedReceiptUsesOneDeadlineAndFairDrain", "concurrentAndRepeatedCallsSpawnExactlyOnce", "childCreationUncertaintyRemainsOwned", "outerAndInnerIdentityRemainIndependent", "residueAndCleanupFailuresRemainFailClosed"):
+    if marker not in test: raise SystemExit("ii-c-b2b1 focused tests became vacuous")
+for marker in ("iiCB2B1TransportPinsScopeAndBoundaries", "--iic-b2b1-source-contract-only", "--iic-b2b1-staged-scope-contract-only", "--iic-b2b1-contract-only"):
+    if marker not in boundary: raise SystemExit("ii-c-b2b1 boundary markers drifted")
+case_start = boundary.index("    func iiCB2B1TransportPinsScopeAndBoundaries() throws {")
+case_end = boundary.index("\n    @Test", case_start)
+case = boundary[case_start:case_end]
+for assertion in (
+    '#expect(package.contains("CInvestigationMachineCampaignSupport"))',
+    '] { #expect(header.contains(marker)) }',
+    '] { #expect(c.contains(marker)) }',
+    '] { #expect(harness.contains(marker)) }',
+    '] { #expect(tests.contains(marker)) }',
+    '] { #expect(boundary.contains(marker)) }',
+    '] { #expect(contract.contains(marker)) }',
+):
+    if case.count(assertion) != 1: raise SystemExit("ii-c-b2b1 boundary assertions became vacuous")
+project = Path("Stornaut.xcodeproj/project.pbxproj").read_text(); schemes = "".join(p.read_text() for p in Path("Stornaut.xcodeproj/xcshareddata/xcschemes").glob("*.xcscheme"))
+for forbidden in ("StornautInvestigationMachineCampaignSupport", "CInvestigationMachineCampaignSupport"):
+    if forbidden in project + schemes: raise SystemExit("ii-c-b2b1 Xcode reachability drifted")
+PY
+}
+
+function verify_iicb2b1_staged_scope() {
+    local PATH=/usr/bin:/bin:/usr/sbin:/sbin
+    local baseline=${1:-61cdeddac657a18cac12e7cc04d62b551675b4bd}
+    local expected_baseline=61cdeddac657a18cac12e7cc04d62b551675b4bd
+    local -a expected=(
+        Package.swift
+        Sources/CInvestigationMachineCampaignSupport/include/CInvestigationMachineCampaignSupport.h
+        Sources/CInvestigationMachineCampaignSupport/CInvestigationMachineCampaignSupport.c
+        Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignHarness.swift
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignHarnessTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-investigation-boundaries
+        scripts/verify-contract
+    )
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" == $expected_baseline ]] || { print -u2 "ii-c-b2b1 checkpoint baseline drifted"; return 1; }
+    local deleted observed_text changed item mode entry
+    deleted=$(git diff --cached --name-only --diff-filter=D "$baseline" | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')
+    [[ -z $deleted ]] || { print -u2 "ii-c-b2b1 checkpoint deleted an existing path"; return 1; }
+    observed_text=$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')
+    local -a observed=(${(f)observed_text})
+    (( ${#expected} == 8 && ${#observed} <= 8 )) || { print -u2 "ii-c-b2b1 checkpoint path ceiling drifted"; return 1; }
+    [[ "${(j:\n:)${(@on)observed}}" == "${(j:\n:)${(@on)expected}}" ]] || { print -u2 "ii-c-b2b1 checkpoint paths drifted"; return 1; }
+    changed=$(git diff --cached --numstat "$baseline" | awk 'index($3,"docs/")!=1&&$3!="AGENTS.md"&&$3!="README.md"{if($1=="-"||$2=="-")exit 2;n+=$1+$2}END{print n+0}') || { print -u2 "ii-c-b2b1 binary checkpoint path rejected"; return 1; }
+    (( changed <= 2000 )) || { print -u2 "ii-c-b2b1 checkpoint budget drifted"; return 1; }
+    local -a worktree_paths=(${(f)"$(git diff --name-only --diff-filter=ACMRD -- | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')"})
+    local -a untracked_paths=(${(f)"$(git ls-files --others --exclude-standard -- | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')"})
+    for item in "${worktree_paths[@]}" "${untracked_paths[@]}"; do (( ${expected[(Ie)$item]} )) || { print -u2 "ii-c-b2b1 checkpoint worktree paths drifted"; return 1; }; done
+    for item in "${expected[@]}"; do
+        mode=100644; [[ $item == scripts/* ]] && mode=100755; entry=$(git ls-files -s -- "$item")
+        [[ "$(print -r -- "$entry" | awk '{print $1, $3, $4}')" == "$mode 0 $item" && "$(print -r -- "$entry" | awk '{print $2}')" == "$(git hash-object -- "$item")" ]] || { print -u2 "ii-c-b2b1 staged source/mode drifted: $item"; return 1; }
     done
 }
 
@@ -15624,6 +15807,16 @@ fi
 if $iicb2a2_staged_scope_contract_only; then
     verify_iicb2a2_staged_scope "$iicb2a2_staged_scope_baseline"
     print "ii-c-b2a2 staged scope verification passed."
+    exit 0
+fi
+if $iicb2b1_source_contract_only || $iicb2b1_mutation_contract_only; then
+    verify_iicb2b1_source_contract
+    print "ii-c-b2b1 source verification passed."
+    exit 0
+fi
+if $iicb2b1_staged_scope_contract_only; then
+    verify_iicb2b1_staged_scope "$iicb2b1_staged_scope_baseline"
+    print "ii-c-b2b1 staged scope verification passed."
     exit 0
 fi
 if $iic0bivb1_handoff_contract_only; then
