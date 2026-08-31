@@ -364,7 +364,9 @@ The shared-deadline repair at `c144c1e`, fixed-gate deadline cleanup repair at
 `26e785a`, and fixed-gate historical replay `aa8a7f1` are complete/non-admitting.
 ii-c-a is complete/non-admitting at implementation `81f185c` / tree
 `7cf4db75`. ii-c-b1 is complete/non-admitting at implementation `77cde61` /
-tree `9c59f241`; the current frontier is ii-c-b2 -> ii-c-c -> L3c3d -> L3c4. These
+tree `9c59f241`; ii-c-b2a1 is complete/non-admitting at implementation
+`e3555ec` / tree `f38783f`. The current frontier is ii-c-b2a2 -> ii-c-b2b ->
+ii-c-c -> L3c3d -> L3c4. These
 repairs are machine-campaign prerequisite checkpoints, not recursively named
 new Tasks. Review findings and
 local repairs stay within their owning checkpoint. L3c4 alone owns the remaining
@@ -404,6 +406,8 @@ See the
 [ii-c machine campaign preflight](../../reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md) and
 [ii-c-a static installed topology review](../../reports/phase-d-task-39b2c-iic-a-static-installed-topology-review.md), and
 [ii-c-b1 root-owned Gate review](../../reports/phase-d-task-39b2c-iic-b1-root-owned-gate-review.md), and
+[ii-c-b2 split preflight](../../reports/phase-d-task-39b2c-iic-b2-split-preflight.md), and
+[ii-c-b2a1 evidence producer review](../../reports/phase-d-task-39b2c-iic-b2a1-evidence-producer-review.md), and
 [ii-b5b-iii-b0 preflight](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md) and
 [ii-b5b-iii-a review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-a-review.md) and
 [ii-b5b-iii-b1 review](../../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b1-review.md) and
@@ -440,7 +444,7 @@ the sole normal-product admission gate.
 | [36](task-36-implementation-brief.md) | Domain, canonical projection, planner, budget and stop contracts | complete; [review](../../reports/phase-d-task-36-review.md) |
 | [37](task-37-implementation-brief.md) | Store v4, retention and source rejoin | complete; [review](../../reports/phase-d-task-37-review.md) |
 | [38](task-38-implementation-brief.md) | Closed coordinator with fake runtime | complete; [review](../../reports/phase-d-task-38-review.md) |
-| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; ii-c-a/ii-c-b1 complete/non-admitting; current frontier ii-c-b2 -> ii-c-c -> L3c3d -> L3c4; L3c4 owns the remaining full; ADR 0018 Proposed |
+| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; ii-c-a/ii-c-b1/b2a1 complete/non-admitting; current frontier ii-c-b2a2 -> ii-c-b2b -> ii-c-c -> L3c3d -> L3c4; L3c4 owns the remaining full; ADR 0018 Proposed |
 | [40](task-40-implementation-brief.md) | Evidence report and conservative Review projection | blocked on Task 39 |
 | [41](task-41-implementation-brief.md) | First-use disclosure and typed availability | blocked on Task 40 |
 | [42](task-42-implementation-brief.md) | App workflow and recovery state | blocked on Task 41 |

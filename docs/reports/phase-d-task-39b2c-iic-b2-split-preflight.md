@@ -1,12 +1,12 @@
 # Phase D Task 39B2c ii-c-b2 Split Preflight
 
-> Status: frozen / ii-c-b2a1 current / non-admitting
+> Status: frozen / ii-c-b2a1 complete / ii-c-b2a2 current / non-admitting
 >
 > Date: 2026-08-31
 >
 > Baseline: `d755d664c0c8e25480ae0043bd3719b03dff3c48`
 >
-> Remaining order: ii-c-b2a1 -> ii-c-b2a2 -> ii-c-b2b -> ii-c-c ->
+> Remaining order: ii-c-b2a2 -> ii-c-b2b -> ii-c-c ->
 > L3c3d -> L3c4
 
 ## 1. Decision and Split Trigger
@@ -240,10 +240,10 @@ full verifier.
 | Requirement | Concrete artifact/evidence | Owner/status |
 | --- | --- | --- |
 | Record mandatory split before code | this preflight, baseline and ceilings | frozen |
-| Narrow package-only evidence target | Package manifest and graph tests | b2a1 |
-| Typed manifest/event contract | Campaign Evidence Contract | b2a1 |
-| Durable descriptor-relative producer | Raw Evidence Writer | b2a1 |
-| Independent from-zero verifier | machine-report verifier | b2a2 |
+| Narrow package-only evidence target | Package manifest and graph tests | b2a1 complete |
+| Typed manifest/event contract | Campaign Evidence Contract | b2a1 complete |
+| Durable descriptor-relative producer | Raw Evidence Writer | b2a1 complete |
+| Independent from-zero verifier | machine-report verifier | b2a2 current |
 | Producer/verifier mutation independence | evidence tests and contract gate | b2a2 |
 | No product/final-image reachability | target-boundary and App-release gates | b2a2/b2b |
 | Controlling PTY and exact FD 3 | C trampoline + Campaign Harness | b2b |
