@@ -75,9 +75,13 @@ Exactly four non-document paths and at most 3,000 changed non-document lines:
 3. `Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineRawEvidenceWriter.swift` (new); and
 4. `Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift` (new).
 
-Category ceilings are: Package manifest 40 lines, contracts 650 lines, writer
-1,150 lines and tests 1,300 lines. The total ceiling is stricter than the sum of
-category ceilings. A fifth non-document path, line 3,001, independent verifier,
+Post-RED API expansion showed that keeping a narrow target while independently
+matching the existing 23-field coordinator receipt wire requires more contract
+code and less writer/test code than the initial allocation. Before production
+validation, the category ceilings are therefore rebalanced to: Package manifest
+40 lines, contracts 850 lines, writer 1,100 lines and tests 1,000 lines. The
+3,000-line total ceiling is unchanged and stricter than the sum of category
+ceilings. A fifth non-document path, line 3,001, independent verifier,
 process spawn, PTY, sudo, installed-artifact path or product dependency stops
 b2a1 for re-preflight.
 
