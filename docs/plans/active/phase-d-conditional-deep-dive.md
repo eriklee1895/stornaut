@@ -98,8 +98,8 @@
 > Shared-deadline repair `c144c1e`, fixed-gate deadline cleanup repair
 > `bc42fbc`, interactive-native identity binding `531f79f` / consumer seal
 > `26e785a`, and fixed-gate historical replay `aa8a7f1` are complete/non-admitting.
-> ii-c-a is complete/non-admitting. The current frontier is strictly ii-c-b,
-> ii-c-c, L3c3d and L3c4. These
+> ii-c-a and ii-c-b1 are complete/non-admitting. The current frontier is strictly
+> ii-c-b2, ii-c-c, L3c3d and L3c4. These
 > repairs are machine-campaign prerequisite checkpoints, not new Tasks. The authoritative
 > real-model run and readiness verdict remain unimplemented.
 > Production Deep Dive remains unavailable until Task 44 admission.
@@ -991,14 +991,17 @@ Checkpoint status:
   It is superseded for live execution by completed shared-deadline repair
   `c144c1e`, fixed-gate deadline cleanup repair `bc42fbc`, interactive-native
   identity binding `531f79f` / consumer seal `26e785a`, and fixed-gate historical
-  replay `aa8a7f1`, all non-admitting. ii-c-a is complete/non-admitting. The
-  current frontier is `ii-c-b -> ii-c-c -> L3c3d -> L3c4`.
+  replay `aa8a7f1`, all non-admitting. ii-c-a and ii-c-b1 are
+  complete/non-admitting. The current frontier is
+  `ii-c-b2 -> ii-c-c -> L3c3d -> L3c4`.
   See the
   [ii-b2 ASID prerequisite review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2-asid-prerequisite-review.md),
   the
   [ii-b2a typed escrow/deadline review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2a-review.md),
   the
   [ii-c-a static installed topology review](../../reports/phase-d-task-39b2c-iic-a-static-installed-topology-review.md),
+  the
+  [ii-c-b1 root-owned Gate review](../../reports/phase-d-task-39b2c-iic-b1-root-owned-gate-review.md),
   the
   [ii-b2b-i machine-claim server review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2b-i-review.md),
   the

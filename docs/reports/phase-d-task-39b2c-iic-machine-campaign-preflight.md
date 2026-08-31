@@ -1,12 +1,12 @@
 # Phase D Task 39B2c ii-c Machine Campaign Preflight
 
-> Status: frozen / ii-c-a complete/non-admitting / ii-c-b current/non-admitting
+> Status: frozen / ii-c-a and ii-c-b1 complete/non-admitting / ii-c-b2 current/non-admitting
 >
 > Date: 2026-08-30
 >
 > Baseline: `2b30a157c14bc507351b10bd521e710987860f71`
 >
-> Remaining order: ii-c-b -> ii-c-c -> L3c3d -> L3c4
+> Remaining order: ii-c-b2 -> ii-c-c -> L3c3d -> L3c4
 
 ## 1. Decision
 
@@ -121,6 +121,11 @@ ii-c-b also owns a non-privileged campaign harness with a fresh controlling PTY,
 receipt pipe, bounded concurrent drain, strict receipt decode, and an
 owner-private raw-evidence writer/verifier. No dry-run fixture may execute sudo
 or a root-installed artifact.
+
+Live status (2026-08-31): ii-c-b was split into ii-c-b1 and ii-c-b2. The
+root-owned Gate admission half is complete/non-admitting at implementation
+`77cde61` / tree `9c59f241`; ii-c-b2 now owns only the non-privileged
+PTY/FD3/raw-evidence harness and verifier.
 
 ## 6. Campaign Evidence and Attempt Consumption
 
