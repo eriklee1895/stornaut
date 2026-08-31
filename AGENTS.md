@@ -413,7 +413,10 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   保持 non-admitting；ii-c-b2a1 evidence producer 又以 implementation
   `e3555ec` / tree `f38783f`、exact 4 paths / 3,749 lines、31/31 focused、
   Release target 与无 unresolved P0–P2 review 完成并保持 non-admitting；
-  当前 frontier 为 ii-c-b2a2 independent read-only evidence verifier。
+  ii-c-b2a2 independent verifier 已以 implementation `294bdb2` / tree
+  `dbbffbba`、exact 6 paths / 1,999 lines、38/38 evidence、51/51
+  target-boundary、component/contract gates 与无 unresolved P0–P2 review
+  完成并保持 non-admitting；当前 frontier 为 ii-c-b2b PTY/FD3 transport。
   spawn/transfer uncertainty 不得
   settlement/unlink 或释放 owner，必须进入 process-lifetime ownership
   quarantine。
@@ -470,8 +473,8 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   shared-deadline repair `c144c1e` 与 fixed-gate deadline cleanup repair
   `bc42fbc` 也已完成并保持 non-admitting。interactive-native identity binding
   repair `531f79f`、consumer seal `26e785a` 与 fixed-gate historical replay
-  `aa8a7f1` 也已完成并保持 non-admitting。ii-c-a、ii-c-b1 与 ii-c-b2a1 已完成；
-  当前严格按 ii-c-b2a2 → ii-c-b2b → ii-c-c → L3c3d → L3c4 推进。这些 repairs 是
+  `aa8a7f1` 也已完成并保持 non-admitting。ii-c-a、ii-c-b1、ii-c-b2a1 与
+  ii-c-b2a2 已完成；当前严格按 ii-c-b2b → ii-c-c → L3c3d → L3c4 推进。这些 repairs 是
   machine-campaign prerequisite checkpoints，不是递归命名的新 Task；后续
   review finding 与局部修复也不得再产生新的命名 Task。
   该 ii-b5b-ii-c checkpoint 以 8 个
@@ -624,6 +627,8 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c ii-c-b1 root-owned Gate review / completion audit | [docs/reports/phase-d-task-39b2c-iic-b1-root-owned-gate-review.md](docs/reports/phase-d-task-39b2c-iic-b1-root-owned-gate-review.md) |
 | Phase D Task 39B2c ii-c-b2 split preflight | [docs/reports/phase-d-task-39b2c-iic-b2-split-preflight.md](docs/reports/phase-d-task-39b2c-iic-b2-split-preflight.md) |
 | Phase D Task 39B2c ii-c-b2a1 evidence producer review / completion audit | [docs/reports/phase-d-task-39b2c-iic-b2a1-evidence-producer-review.md](docs/reports/phase-d-task-39b2c-iic-b2a1-evidence-producer-review.md) |
+| Phase D Task 39B2c ii-c-b2a2 independent verifier review / completion audit | [docs/reports/phase-d-task-39b2c-iic-b2a2-independent-verifier-review.md](docs/reports/phase-d-task-39b2c-iic-b2a2-independent-verifier-review.md) |
+| Phase D Task 39B2c ii-c-b2b PTY / FD 3 transport preflight | [docs/reports/phase-d-task-39b2c-iic-b2b-transport-preflight.md](docs/reports/phase-d-task-39b2c-iic-b2b-transport-preflight.md) |
 | Phase D Task 39B2c L3c3c-ii-a installed-driver observation review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md) |
 | Phase D Task 39B2c L3c3c-ii-b handoff composition split preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md) |
 | Phase D Task 39B2c L3c3c-ii-b0 exact wire contract preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b0-wire-contract-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b0-wire-contract-preflight.md) |
@@ -876,8 +881,9 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   shared-deadline repair 与随后 fixed-gate deadline cleanup repair 已分别在
   `c144c1e` 与 `bc42fbc` 完成并保持 non-admitting。interactive-native identity
   binding repair `531f79f`、consumer seal `26e785a` 与 fixed-gate historical
-  replay `aa8a7f1` 也已完成并保持 non-admitting。ii-c-a、ii-c-b1 与 ii-c-b2a1 已完成；
-  当前 frontier 为 ii-c-b2a2 → ii-c-b2b → ii-c-c → L3c3d → L3c4；这些 repairs 是 machine-campaign prerequisite checkpoints，
+  replay `aa8a7f1` 也已完成并保持 non-admitting。ii-c-a、ii-c-b1、ii-c-b2a1 与
+  ii-c-b2a2 已完成；当前 frontier 为 ii-c-b2b → ii-c-c → L3c3d → L3c4；
+  这些 repairs 是 machine-campaign prerequisite checkpoints，
   不是新的 Task。
   ADR 0018 仍 Proposed；L3c4 独占 final admission 与
   剩余 full。
