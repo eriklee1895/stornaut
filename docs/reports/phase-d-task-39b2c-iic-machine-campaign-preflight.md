@@ -250,10 +250,11 @@ most 3,800 changed non-document lines (additions plus deletions):
 The aggregate ceiling and every per-path ceiling are independent. A fifteenth
 non-document path or line 3,801 stops coding for scope reduction inside ii-c-c;
 it does not authorize another recursive checkpoint. `Package.swift`, the Xcode
-project/schemes, Gate transport schema, coordinator final-receipt schema and raw
-evidence writer remain unchanged. The existing App/Release component gate runs
-unchanged and must prove that the campaign remains package-only and absent from
-all product images.
+project/schemes, Gate transport schema and coordinator final-receipt schema
+remain unchanged. The raw-evidence writer may add only the role-semantic
+validation entry; its durable publication algorithm remains unchanged. The
+existing App/Release component gate runs unchanged and must prove that the
+campaign remains package-only and absent from all product images.
 
 ### 9.1 Pre-arm and attempt identity
 
