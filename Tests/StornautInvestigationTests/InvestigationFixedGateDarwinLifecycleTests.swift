@@ -167,6 +167,52 @@ struct InvestigationFixedGateDarwinLifecycleTests {
     }
 
     @Test
+    func rootWheelGateExecutablePassesAllThreeAdmissions() throws {
+        let system = DarwinLifecycleRecorder(
+            gateOwnerUserID: 0, gateOwnerGroupID: 0
+        )
+        #expect(try makeLifecycle(system).run(makeInput()) == .exactGateReaped)
+        #expect(system.events.filter { $0 == .acquireExecutable }.count == 1)
+        #expect(system.events.filter { $0 == .revalidateExecutable }.count == 2)
+        #expect(system.events.filter(\.isSpawn).count == 1)
+        #expect(InvestigationMachineFixedGateContract.requiredUserID == 501)
+        #expect(InvestigationMachineFixedGateContract.requiredGroupID == 20)
+    }
+    @Test(arguments: DarwinGateFileOwnerCase.allCases)
+    func nonRootOrNonWheelGateOwnerFailsAtInitialAdmission(
+        _ owner: DarwinGateFileOwnerCase
+    ) throws {
+        let system = DarwinLifecycleRecorder(
+            gateOwnerUserID: owner.userID, gateOwnerGroupID: owner.groupID
+        )
+        #expect(
+            try makeLifecycle(system).run(makeInput()) == .definitelyNotSpawned
+        )
+        #expect(system.events.filter { $0 == .acquireExecutable }.count == 1)
+        #expect(!system.events.contains(.revalidateExecutable))
+        #expect(!system.events.contains { $0.isSpawn })
+    }
+    @Test(arguments: [
+        DarwinExecutableMutation.ownerUserID,
+        DarwinExecutableMutation.ownerGroupID,
+    ])
+    func postSpawnGateOwnerDriftFailsClosed(
+        _ mutation: DarwinExecutableMutation
+    ) throws {
+        let system = DarwinLifecycleRecorder(
+            scenario: .postSpawnExecutable(mutation)
+        )
+        #expect(
+            try makeLifecycle(system).run(makeInput())
+                == .spawnOrTransferUncertain
+        )
+        #expect(system.events.filter { $0 == .revalidateExecutable }.count == 2)
+        #expect(system.events.filter(\.isSpawn).count == 1)
+        #expect(system.events.contains(.signalProcess(SIGKILL)))
+        #expect(system.events.filter(\.isReap).count == 1)
+        #expect(!system.events.contains { $0.isPreparedRead })
+    }
+    @Test
     func oneImmutableDeadlineSurvivesEINTRAcrossAllTimedOperations() throws {
         let system = DarwinLifecycleRecorder(scenario: .interruptPreparedReadOnce)
         #expect(try makeLifecycle(system).run(makeInput()) == .exactGateReaped)
@@ -468,7 +514,27 @@ struct InvestigationFixedGateDarwinLifecycleTests {
 }
 
 enum DarwinExecutableMutation: CaseIterable, Sendable {
-    case owner, mode, flags, linkCount, acl, xattr, replacement, hash
+    case ownerUserID, ownerGroupID, mode, flags, linkCount, acl, xattr
+    case replacement, hash
+}
+enum DarwinGateFileOwnerCase: CaseIterable, Sendable {
+    case nonRootUser
+    case nonWheelGroup
+    case arbitrary
+    var userID: uid_t {
+        switch self {
+        case .nonRootUser: 501
+        case .nonWheelGroup: 0
+        case .arbitrary: 502
+        }
+    }
+    var groupID: gid_t {
+        switch self {
+        case .nonRootUser: 0
+        case .nonWheelGroup: 20
+        case .arbitrary: 21
+        }
+    }
 }
 
 enum DarwinGateDeathStage: CaseIterable, Sendable {
@@ -495,6 +561,7 @@ enum DarwinLifecycleScenario: Equatable, Sendable {
     case continueFailure
     case terminalReadTimeout
     case executable(DarwinExecutableMutation)
+    case postSpawnExecutable(DarwinExecutableMutation)
     case closeUncertain
     case gateDeath(DarwinGateDeathStage)
     case containment(DarwinContainmentFailure)
@@ -552,6 +619,8 @@ private final class DarwinLifecycleRecorder:
     let absoluteDeadline: UInt64 = 1_300_000_000_000
     var operationDeadline: UInt64 { absoluteDeadline - 5_000_000_000 }
     private let scenario: DarwinLifecycleScenario
+    private let gateOwnerUserID: uid_t
+    private let gateOwnerGroupID: gid_t
     private var preparedReads = 0
     private var signalConsumed = false
     private var inventoryCalls = 0
@@ -564,7 +633,15 @@ private final class DarwinLifecycleRecorder:
     private(set) var closeCounts: [Int32: Int] = [:]
     private(set) var inventoryResponses: [InvestigationFixedGateDarwinInventoryObservation] = []
 
-    init(scenario: DarwinLifecycleScenario = .success) { self.scenario = scenario }
+    init(
+        scenario: DarwinLifecycleScenario = .success,
+        gateOwnerUserID: uid_t = 0,
+        gateOwnerGroupID: gid_t = 0
+    ) {
+        self.scenario = scenario
+        self.gateOwnerUserID = gateOwnerUserID
+        self.gateOwnerGroupID = gateOwnerGroupID
+    }
 
     func perform(_ operation: InvestigationFixedGateDarwinLifecycleOperation) throws
         -> InvestigationFixedGateDarwinLifecycleResponse
@@ -720,7 +797,11 @@ private final class DarwinLifecycleRecorder:
 
     private var initialMutation: DarwinExecutableMutation? { nil }
     private var revalidationMutation: DarwinExecutableMutation? {
-        if case .executable(let value) = scenario { value } else { nil }
+        switch scenario {
+        case .executable(let value): value
+        case .postSpawnExecutable(let value) where revalidationCalls == 2: value
+        default: nil
+        }
     }
     private var ttyForeground: pid_t {
         if case .ttyDrift = scenario { coordinatorPGID + 9 } else { coordinatorPGID }
@@ -734,8 +815,9 @@ private final class DarwinLifecycleRecorder:
             descriptor: executableDescriptor, path: executablePath,
             descriptorIdentity: original,
             namedIdentity: mutation == .replacement ? node(inode: 91) : original,
-            ownerUserID: mutation == .owner ? uid_t(502) : getuid(),
-            ownerGroupID: getgid(), permissions: mutation == .mode ? 0o777 : 0o755,
+            ownerUserID: mutation == .ownerUserID ? uid_t(502) : gateOwnerUserID,
+            ownerGroupID: mutation == .ownerGroupID ? gid_t(21) : gateOwnerGroupID,
+            permissions: mutation == .mode ? 0o777 : 0o755,
             linkCount: mutation == .linkCount ? 2 : 1,
             flags: mutation == .flags ? UInt32(UF_IMMUTABLE) : 0,
             extendedACLIsEmpty: mutation != .acl,

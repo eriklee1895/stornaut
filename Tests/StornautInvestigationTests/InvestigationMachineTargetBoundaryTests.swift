@@ -4,6 +4,169 @@ import Testing
 @Suite("Task 39 trusted machine target boundary")
 struct InvestigationMachineTargetBoundaryTests {
     @Test
+    func iiCB1RootOwnedGateVerifierPinsCurrentTreeContractAndScope() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-boundaries"), encoding: .utf8)
+        let release = try String(contentsOf: root.appending(
+            path: "scripts/verify-app-release-boundaries"), encoding: .utf8)
+        let contract = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+        let combined = boundary + release + contract
+        #expect([boundary, release, contract].allSatisfy { $0.hasPrefix("#!/bin/zsh -f\n") })
+        for marker in [
+            "--iic-b1-root-owned-gate-source-contract-only",
+            "--iic-b1-root-owned-gate-mutation-contract-only",
+            "--iic-b1-root-owned-gate-staged-scope-contract-only",
+            "--iic-b1-root-owned-gate-component-boundary-only",
+            "--iic-b1-root-owned-gate-contract-only",
+            "function verify_iicb1_root_owned_gate_source_contract()",
+            "function verify_iicb1_root_owned_gate_staged_scope()",
+            "function verify_iicb1_root_owned_gate_component_boundary()",
+            "function verify_iicb1_root_owned_gate_contract()",
+            "ii-c-b1 Gate file ownership drifted",
+            "ii-c-b1 process identity drifted",
+            "ii-c-b1 executable admission sequence drifted",
+            "ii-c-b1 focused tests became vacuous",
+            "ii-c-b1 prohibited authority drifted",
+            "ii-c-b1 checkpoint paths drifted",
+            "ii-c-b1 checkpoint budget drifted",
+            "(( ${#expected} == 7 && ${#observed} <= 7 ))",
+            "ii-c-b1 physical rejection test became vacuous",
+            "41f5dba1b7ff7f1272d5a2607ae9794b266e6c47",
+            "(( changed <= 1900 ))",
+            "gate-owner-current-user",
+            "gate-group-current-user",
+            "gate-owner-fallback",
+            "gate-pre-spawn-revalidation-removed",
+            "gate-post-spawn-revalidation-removed",
+            "gate-process-user-root",
+            "gate-process-group-wheel",
+            "gate-root-success-vacuity",
+            "gate-post-spawn-drift-vacuity",
+            "gate-physical-coordinator-uid-vacuity",
+            "gate-physical-owner-vacuity",
+            "gate-physical-error-vacuity",
+            "gate-physical-pid-vacuity",
+            "gate-physical-coordinator-reap-vacuity",
+            "gate-physical-pid-record-vacuity",
+            "gate-physical-capsule-vacuity",
+            "gate-physical-foreground-vacuity",
+            "gate-physical-attempt-vacuity",
+            "gate-physical-observed-uid-spoof",
+            "ii-c-b1 mutation accepted:",
+            "ii-c-b1 scope mutation accepted:",
+            "InvestigationFixedGateDarwinLifecycle.(validateExecutable",
+            "InvestigationMachineFixedGateContract.requiredUserID",
+            "InvestigationMachineFixedGateContract.requiredGroupID",
+            "ii-c-b1 diagnostic Coordinator gained execution authority",
+            "ii-c-b1 closed image contains symlink",
+            "component-symlink-vacuity",
+            "component-symlink-reset-vacuity",
+            "component-provenance-reset-vacuity",
+            "component-provenance-head-vacuity",
+            "component-provenance-match-vacuity",
+            "component-validation-build-setting-vacuity",
+            "component-public-dispatch-vacuity",
+            "component-snapshot-umask-vacuity",
+            "component-source-git-env-vacuity",
+            "component-snapshot-early-return-vacuity",
+            "component-source-contract-early-return-vacuity",
+            "component-runtime-early-return-vacuity",
+            "component-snapshot-shadow-vacuity",
+            "component-source-contract-shadow-vacuity",
+            "component-runtime-shadow-vacuity",
+            "component-independent-tree-vacuity",
+            "component-native-sandbox-vacuity",
+            "run_iicb1_root_owned_gate_component_snapshot",
+            "ii-c-b1 independent snapshot post-build drifted",
+            "ii-c-b1 validation snapshot provenance unavailable",
+            "ii-c-b1 diagnostic Coordinator build provenance drifted",
+            "stornaut.task39.machine.build-provenance.v1",
+            "ii-c-b1 Gate lifecycle leaked into closed image",
+            "verify_iica_component_boundary",
+        ] {
+            #expect(combined.contains(marker))
+        }
+        let mutationNames = [
+            "gate-owner-current-user", "gate-group-current-user",
+            "gate-owner-501", "gate-group-20",
+            "gate-owner-fallback", "gate-group-fallback",
+            "gate-owner-comment-spoof", "gate-sibling-path-bypass",
+            "gate-held-named-identity-bypass", "gate-size-bound-bypass",
+            "gate-metadata-mode-widened", "gate-link-count-bypass",
+            "gate-flags-bypass", "gate-acl-bypass",
+            "gate-xattr-bypass", "gate-xattr-uniqueness-bypass",
+            "gate-sha-bypass", "gate-acquisition-removed",
+            "gate-pre-spawn-revalidation-removed",
+            "gate-post-spawn-revalidation-removed",
+            "gate-pre-spawn-node-equality-removed",
+            "gate-post-spawn-node-equality-removed",
+            "gate-prohibited-authority", "gate-recorder-current-owner",
+            "gate-recorder-current-group", "gate-root-success-vacuity",
+            "gate-revalidation-count-vacuity",
+            "gate-negative-case-removed", "gate-post-spawn-drift-vacuity",
+            "gate-post-spawn-owner-case-removed",
+            "gate-nonroot-case-vacuity", "gate-nonwheel-case-vacuity",
+            "gate-boundary-marker-vacuity", "gate-process-user-root",
+            "gate-process-group-wheel", "gate-physical-test-vacuity",
+            "gate-physical-coordinator-uid-vacuity",
+            "gate-physical-coordinator-gid-vacuity",
+            "gate-physical-owner-vacuity", "gate-physical-group-vacuity",
+            "gate-physical-error-vacuity", "gate-physical-pid-vacuity",
+            "gate-physical-pgid-vacuity",
+            "gate-physical-coordinator-reap-vacuity",
+            "gate-physical-pid-record-vacuity",
+            "gate-physical-capsule-vacuity",
+            "gate-physical-foreground-vacuity",
+            "gate-physical-attempt-vacuity", "gate-physical-early-return",
+            "gate-physical-observed-uid-spoof",
+            "gate-physical-observed-gid-spoof",
+        ]
+        #expect(mutationNames.count == 51)
+        for name in mutationNames {
+            #expect(boundary.contains("\"\(name)\": ("))
+            #expect(contract.contains("(\"\(name)\","))
+        }
+        let componentMutationNames = [
+            "component-positive-vacuity",
+            "component-process-identity-vacuity",
+            "component-authority-vacuity",
+            "component-symlink-enumeration-vacuity",
+            "component-symlink-vacuity",
+            "component-symlink-reset-vacuity",
+            "component-provenance-reset-vacuity",
+            "component-provenance-head-vacuity",
+            "component-provenance-match-vacuity",
+            "component-validation-build-setting-vacuity",
+            "component-public-dispatch-vacuity",
+            "component-snapshot-umask-vacuity",
+            "component-source-git-env-vacuity",
+            "component-snapshot-early-return-vacuity",
+            "component-source-contract-early-return-vacuity",
+            "component-runtime-early-return-vacuity",
+            "component-snapshot-shadow-vacuity",
+            "component-source-contract-shadow-vacuity",
+            "component-runtime-shadow-vacuity",
+            "component-independent-tree-vacuity",
+            "component-native-sandbox-vacuity",
+            "component-negative-image-vacuity",
+        ]
+        #expect(componentMutationNames.count == 22)
+        for name in componentMutationNames {
+            #expect(contract.contains("(\"\(name)\","))
+        }
+        #expect(contract.contains(
+            "done <\"$component_mutation_root/component-mutations.txt\""))
+        #expect(contract.contains("component-binding-mutations.txt") && contract.contains("len(binding_names) != 13"))
+        #expect(!contract.contains(
+            "for component_mutation in component-positive-vacuity"))
+        #expect(contract.contains(
+            "ii-c-b1 arbitrary component reuse entry accepted"))
+        #expect(contract.contains("component-reuse-entry.log"))
+    }
+    @Test
     func fixedGateDeadlineCleanupVerifierPinsClosure() throws {
         let root = URL(filePath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
@@ -3887,38 +4050,20 @@ struct InvestigationMachineTargetBoundaryTests {
         let combined = boundaries + release + contract
 
         for marker in [
-            "--iic-a-source-contract-only",
             "--iic-a-staged-scope-contract-only",
             "--iic-a-component-boundary-only",
             "--iic-a-contract-only",
-            "function verify_iica_source_contract()",
-            "function verify_iica_staged_scope()",
             "function verify_iica_component_boundary()",
             "function verify_iica_contract()",
-            "2b30a157c14bc507351b10bd521e710987860f71",
-            "(( total <= 3800 ))",
-            "(( package_api <= 120 ))",
-            "(( xcode <= 650 ))",
-            "(( installer <= 500 ))",
-            "(( tests <= 850 ))",
-            "(( verifiers <= 1680 ))",
+            "81f185c1278e0f80a3a5de856d0b8cb93c810272",
+            "7cf4db75a261895ba0c86b6876623daf900bb4db",
+            "ii-c-a historical replay failed",
             "expected_diagnostic_mach_o_paths",
             "StornautInvestigationMachineGateCoordinator",
             "@executable_path/../Frameworks",
             "Coordinator framework dependency is unresolved",
             "Copy Investigation Machine Tools",
             "CodeSignOnCopy",
-            "missing-gate",
-            "swapped-gate-coordinator",
-            "hardlinked-coordinator",
-            "mutation-before-move",
-            "mutation-before-bootstrap",
-            "installer-owner-bypass",
-            "installer-mode-bypass",
-            "installer-nlink-bypass",
-            "installer-cdhash-bypass",
-            "installer-node-stability-bypass",
-            "installer-signal-deferral-bypass",
         ] {
             #expect(combined.contains(marker))
         }
@@ -5051,31 +5196,23 @@ struct InvestigationMachineTargetBoundaryTests {
             of: "function verify_iica_contract() {"
         ))
         let contractEnd = try #require(verifier.range(
-            of: "\nif [[ ${1:-} == --iic-a-contract-only ]]; then",
+            of: "\nfunction verify_iica_legacy_current_tree_contract() {",
             range: contractStart.upperBound..<verifier.endIndex
         ))
         let contract = String(
             verifier[contractStart.lowerBound..<contractEnd.lowerBound]
         )
-        let contractLowercase = contract.lowercased()
         for marker in [
-            "validate_closed_executable_identity",
-            "validate_closed_executable_artifact",
-            "validate_closed_app_artifacts",
-            "validate_closed_artifact_fixtures",
-            "installer_sha=",
-            "public-extra",
-            "codesign-copy",
-            "boundary-vacuity",
-            "verify_iica_scope_mutations",
-            "staged-worktree-divergence",
-            "untracked",
+            "81f185c1278e0f80a3a5de856d0b8cb93c810272",
+            "7cf4db75a261895ba0c86b6876623daf900bb4db",
+            "--iic-a-contract-only",
+            "--iic-a-staged-scope-contract-only",
+            "ii-c-a historical replay failed",
         ] {
             #expect(contract.contains(marker))
         }
         #expect(matrix.contains("acl-mismatch"))
         #expect(matrix.contains(token))
-        #expect(contractLowercase.contains("scope mutation"))
         #expect(!contract.contains("reject_before("))
         #expect(!contract.contains(
             "installer admitted the Machine driver before L3c3b-ii"

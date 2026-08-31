@@ -1,11 +1,11 @@
-#!/bin/zsh
+#!/bin/zsh -f
 
 set -euo pipefail
 
 contract_source=${0:A}
-ib2_self_sha=71e5d46836d1bc0afdbf48da3fec12691a753aa35407f2c33f8b2bfdec026fa7
-ib2_observed_sha=$(sed -E 's/^ib2_self_sha=.*/ib2_self_sha=SELF/' "$contract_source" | shasum -a 256 | awk '{ print $1 }')
-[[ "$ib2_observed_sha" == "$ib2_self_sha" ]] || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
+# ib2_self_sha=a11d6554fa8bed2ab0386b714206c7fafcef0a65a84d4b24bf6e90f82ab9e470
+ib2_self_sha=$(sed -nE 's/^# ib2_self_sha=([0-9a-f]{64})$/\1/p' "$contract_source"); ib2_observed_sha=$(sed -E 's/^# ib2_self_sha=[0-9a-f]{64}$/# ib2_self_sha=SELF/' "$contract_source" | shasum -a 256 | awk '{ print $1 }')
+[[ ${#ib2_self_sha} == 64 && "$ib2_observed_sha" == "$ib2_self_sha" ]] || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
 repo_root=${contract_source:h:h}
 cd "$repo_root"
 ib2_commit=08184b0a769d904b895636455688ada9e3c3e9e3
@@ -2320,7 +2320,373 @@ PY
         >"$out/scope.log"
 }
 
+function verify_iicb1_root_owned_gate_contract() {
+    local out=$1 gate=scripts/verify-investigation-boundaries
+    mkdir -p "$out"
+    local lifecycle=Sources/StornautInvestigationMachineLaunchSupport/InvestigationFixedGateDarwinLifecycle.swift
+    local focused=Tests/StornautInvestigationTests/InvestigationFixedGateDarwinLifecycleTests.swift
+    local boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+    local transport=Sources/StornautInvestigationMachineGateSupport/InvestigationMachineGateTransport.swift
+    local physical=Tests/StornautInvestigationTests/InvestigationFixedGateHandoffPhysicalTests.swift
+    local -a base_args=(
+        "$lifecycle" "$focused" "$boundary" "$transport" "$physical"
+    )
+    "$gate" --iic-b1-root-owned-gate-source-contract-only \
+        "${base_args[@]}" >"$out/source.log"
+    python3 - "$out" "${base_args[@]}" <<'PY'
+from pathlib import Path
+import sys
+out = Path(sys.argv[1])
+paths = tuple(map(Path, sys.argv[2:]))
+sources = {
+    name: path.read_text(encoding="utf-8")
+    for name, path in zip(
+        ("lifecycle", "focused", "boundary", "transport", "physical"),
+        paths,
+    )
+}
+mutations = (
+    ("gate-owner-current-user", "lifecycle", "value.ownerUserID == 0", "value.ownerUserID == getuid()", "ii-c-b1 Gate file ownership drifted"),
+    ("gate-group-current-user", "lifecycle", "value.ownerGroupID == 0", "value.ownerGroupID == getgid()", "ii-c-b1 Gate file ownership drifted"),
+    ("gate-owner-501", "lifecycle", "value.ownerUserID == 0", "value.ownerUserID == 501", "ii-c-b1 Gate file ownership drifted"),
+    ("gate-group-20", "lifecycle", "value.ownerGroupID == 0", "value.ownerGroupID == 20", "ii-c-b1 Gate file ownership drifted"),
+    ("gate-owner-fallback", "lifecycle", "value.ownerUserID == 0", "(value.ownerUserID == 0 || value.ownerUserID == getuid())", "ii-c-b1 Gate file ownership drifted"),
+    ("gate-group-fallback", "lifecycle", "value.ownerGroupID == 0", "(value.ownerGroupID == 0 || value.ownerGroupID == getgid())", "ii-c-b1 Gate file ownership drifted"),
+    ("gate-owner-comment-spoof", "lifecycle", "value.ownerUserID == 0 && value.ownerGroupID == 0", "true // value.ownerUserID == 0 && value.ownerGroupID == 0", "ii-c-b1 Gate file ownership drifted"),
+    ("gate-sibling-path-bypass", "lifecycle", 'value.path.hasSuffix("/" + Self.gateName)', "true", "ii-c-b1 executable metadata drifted"),
+    ("gate-held-named-identity-bypass", "lifecycle", "value.descriptorIdentity == value.namedIdentity", "true", "ii-c-b1 executable metadata drifted"),
+    ("gate-size-bound-bypass", "lifecycle", "(1...Int64(Self.maximumExecutableBytes))\n                .contains(value.descriptorIdentity.size)", "true", "ii-c-b1 executable metadata drifted"),
+    ("gate-metadata-mode-widened", "lifecycle", "value.permissions == 0o755", "value.permissions & 0o111 != 0", "ii-c-b1 executable metadata drifted"),
+    ("gate-link-count-bypass", "lifecycle", "value.linkCount == 1", "true", "ii-c-b1 executable metadata drifted"),
+    ("gate-flags-bypass", "lifecycle", "value.flags == 0", "true", "ii-c-b1 executable metadata drifted"),
+    ("gate-acl-bypass", "lifecycle", "value.extendedACLIsEmpty", "true", "ii-c-b1 executable metadata drifted"),
+    ("gate-xattr-bypass", "lifecycle", '$0 == "com.apple.provenance"', "_ in true", "ii-c-b1 executable metadata drifted"),
+    ("gate-xattr-uniqueness-bypass", "lifecycle", "Set(value.extendedAttributeNames).count\n                == value.extendedAttributeNames.count", "true", "ii-c-b1 executable metadata drifted"),
+    ("gate-sha-bypass", "lifecycle", "value.sha256 == value.bytesSHA256", "true", "ii-c-b1 executable metadata drifted"),
+    ("gate-acquisition-removed", "lifecycle", "guard validateExecutable(acquired) else {", "guard true else {", "ii-c-b1 executable admission sequence drifted"),
+    ("gate-pre-spawn-revalidation-removed", "lifecycle", "guard beforeSpawn == acquired, validateExecutable(beforeSpawn) else {", "guard beforeSpawn == acquired else {", "ii-c-b1 executable admission sequence drifted"),
+    ("gate-post-spawn-revalidation-removed", "lifecycle", "if afterSpawn != acquired || !validateExecutable(afterSpawn) {", "if afterSpawn != acquired {", "ii-c-b1 executable admission sequence drifted"),
+    ("gate-pre-spawn-node-equality-removed", "lifecycle", "guard beforeSpawn == acquired, validateExecutable(beforeSpawn) else {", "guard validateExecutable(beforeSpawn) else {", "ii-c-b1 executable admission sequence drifted"),
+    ("gate-post-spawn-node-equality-removed", "lifecycle", "if afterSpawn != acquired || !validateExecutable(afterSpawn) {", "if !validateExecutable(afterSpawn) {", "ii-c-b1 executable admission sequence drifted"),
+    ("gate-prohibited-authority", "lifecycle", "private func validateExecutable(", "private let signedRuntimeReady = true\n    private func validateExecutable(", "ii-c-b1 prohibited authority drifted"),
+    ("gate-recorder-current-owner", "focused", "gateOwnerUserID: uid_t = 0", "gateOwnerUserID: uid_t = getuid()", "ii-c-b1 focused tests became vacuous"),
+    ("gate-recorder-current-group", "focused", "gateOwnerGroupID: gid_t = 0", "gateOwnerGroupID: gid_t = getgid()", "ii-c-b1 focused tests became vacuous"),
+    ("gate-root-success-vacuity", "focused", "func rootWheelGateExecutablePassesAllThreeAdmissions()", "func disabledRootWheelGateExecutablePassesAllThreeAdmissions()", "ii-c-b1 focused tests became vacuous"),
+    ("gate-revalidation-count-vacuity", "focused", "#expect(system.events.filter { $0 == .acquireExecutable }.count == 1)\n        #expect(system.events.filter { $0 == .revalidateExecutable }.count == 2)", "#expect(system.events.filter { $0 == .acquireExecutable }.count == 1)\n        #expect(system.events.filter { $0 == .revalidateExecutable }.count >= 0)", "ii-c-b1 focused tests became vacuous"),
+    ("gate-negative-case-removed", "focused", "@Test(arguments: DarwinGateFileOwnerCase.allCases)", "@Test(arguments: [DarwinGateFileOwnerCase.nonRootUser, .nonWheelGroup])", "ii-c-b1 focused tests became vacuous"),
+    ("gate-post-spawn-drift-vacuity", "focused", "func postSpawnGateOwnerDriftFailsClosed(", "func disabledPostSpawnGateOwnerDriftFailsClosed(", "ii-c-b1 focused tests became vacuous"),
+    ("gate-post-spawn-owner-case-removed", "focused", "DarwinExecutableMutation.ownerUserID,\n        DarwinExecutableMutation.ownerGroupID,", "DarwinExecutableMutation.ownerUserID,", "ii-c-b1 focused tests became vacuous"),
+    ("gate-nonroot-case-vacuity", "focused", "var userID: uid_t {\n        switch self {\n        case .nonRootUser: 501", "var userID: uid_t {\n        switch self {\n        case .nonRootUser: 0", "ii-c-b1 focused tests became vacuous"),
+    ("gate-nonwheel-case-vacuity", "focused", "var groupID: gid_t {\n        switch self {\n        case .nonRootUser: 0\n        case .nonWheelGroup: 20", "var groupID: gid_t {\n        switch self {\n        case .nonRootUser: 0\n        case .nonWheelGroup: 0", "ii-c-b1 focused tests became vacuous"),
+    ("gate-boundary-marker-vacuity", "boundary", "func iiCB1RootOwnedGateVerifierPinsCurrentTreeContractAndScope()", "func disabledIICB1RootOwnedGateVerifierPinsCurrentTreeContractAndScope()", "ii-c-b1 boundary marker drifted"),
+    ("gate-process-user-root", "transport", "requiredUserID: uid_t = 501", "requiredUserID: uid_t = 0", "ii-c-b1 process identity drifted"),
+    ("gate-process-group-wheel", "transport", "requiredGroupID: gid_t = 20", "requiredGroupID: gid_t = 0", "ii-c-b1 process identity drifted"),
+    ("gate-physical-test-vacuity", "physical", "func userOwnedTemporaryGateFailsClosedBeforeSpawn()", "func disabledUserOwnedTemporaryGateFailsClosedBeforeSpawn()", "ii-c-b1 physical rejection test became vacuous"),
+    ("gate-physical-coordinator-uid-vacuity", "physical", "#expect(evidence.coordinator.userID == 501)", "#expect(true)", "ii-c-b1 physical rejection test became vacuous"),
+    ("gate-physical-coordinator-gid-vacuity", "physical", "#expect(evidence.coordinator.groupID == 20)", "#expect(true)", "ii-c-b1 physical rejection test became vacuous"),
+    ("gate-physical-owner-vacuity", "physical", "#expect(gateStatus.st_uid == geteuid())", "#expect(true)", "ii-c-b1 physical rejection test became vacuous"),
+    ("gate-physical-group-vacuity", "physical", "#expect(gateStatus.st_gid == getegid())", "#expect(true)", "ii-c-b1 physical rejection test became vacuous"),
+    ("gate-physical-error-vacuity", "physical", '#expect(report.error == "spawnFailedBeforeTransfer")', "#expect(true)", "ii-c-b1 physical rejection test became vacuous"),
+    ("gate-physical-pid-vacuity", "physical", "#expect(report.gateProcessID == nil)", "#expect(true)", "ii-c-b1 physical rejection test became vacuous"),
+    ("gate-physical-pgid-vacuity", "physical", "#expect(report.gateProcessGroupID == nil)", "#expect(true)", "ii-c-b1 physical rejection test became vacuous"),
+    ("gate-physical-coordinator-reap-vacuity", "physical", "#expect(evidence.coordinatorAbsentAfterReap)", "#expect(true)", "ii-c-b1 physical rejection test became vacuous"),
+    ("gate-physical-pid-record-vacuity", "physical", "#expect(evidence.gatePIDRecordAbsent)", "#expect(true)", "ii-c-b1 physical rejection test became vacuous"),
+    ("gate-physical-capsule-vacuity", "physical", "#expect(report.capsuleRemoved)", "#expect(true)", "ii-c-b1 physical rejection test became vacuous"),
+    ("gate-physical-foreground-vacuity", "physical", "#expect(report.foregroundRestored)", "#expect(true)", "ii-c-b1 physical rejection test became vacuous"),
+    ("gate-physical-attempt-vacuity", "physical", "#expect(try fixture.machineGateAttemptNames().isEmpty)", "#expect(true)", "ii-c-b1 physical rejection test became vacuous"),
+    ("gate-physical-early-return", "physical", "defer { fixture.remove() }", "defer { fixture.remove() }\n        return", "ii-c-b1 physical rejection test became vacuous"),
+    ("gate-physical-observed-uid-spoof", "physical", "userID: uid_t(value.pbi_uid)", "userID: getuid()", "ii-c-b1 physical rejection test became vacuous"),
+    ("gate-physical-observed-gid-spoof", "physical", "groupID: gid_t(value.pbi_gid)", "groupID: getgid()", "ii-c-b1 physical rejection test became vacuous"),
+)
+if len(mutations) != 51:
+    raise SystemExit("ii-c-b1 mutation inventory drifted")
+for name, slot, old, new, expected in mutations:
+    source = sources[slot]
+    if source.count(old) != 1:
+        raise SystemExit(f"ii-c-b1 mutation fixture is vacuous: {name}")
+    (out / f"{name}.swift").write_text(
+        source.replace(old, new, 1), encoding="utf-8"
+    )
+(out / "mutations.tsv").write_text(
+    "".join(
+        f"{name}\t{slot}\t{expected}\n"
+        for name, slot, _old, _new, expected in mutations
+    ),
+    encoding="utf-8",
+)
+PY
+    local name slot expected target target_sha log rc
+    while IFS=$'\t' read -r name slot expected; do
+        target="$out/$name.swift"
+        target_sha=$(shasum -a 256 "$target" | awk '{print $1}')
+        local -a args=("${base_args[@]}")
+        case $slot in
+            lifecycle) args[1]=$target ;;
+            focused) args[2]=$target ;;
+            boundary) args[3]=$target ;;
+            transport) args[4]=$target ;;
+            physical) args[5]=$target ;;
+            *) fail_contract "ii-c-b1 mutation fixture slot drifted: $name" ;;
+        esac
+        log="$out/$name.log"; rc=0
+        "$gate" --iic-b1-root-owned-gate-mutation-contract-only \
+            "$name" "$slot" "$target_sha" "${args[@]}" \
+            >"$log" 2>&1 || rc=$?
+        (( rc != 0 )) \
+            || fail_contract "ii-c-b1 mutation accepted: $name"
+        [[ "$(<"$log")" == "$expected" ]] \
+            || fail_contract "ii-c-b1 mutation diagnostic drifted: $name"
+    done <"$out/mutations.tsv"
+    local benign="$out/benign.swift" benign_sha unchanged_sha
+    cp "$lifecycle" "$benign"
+    print >>"$benign"
+    benign_sha=$(shasum -a 256 "$benign" | awk '{print $1}')
+    unchanged_sha=$(shasum -a 256 "$lifecycle" | awk '{print $1}')
+    function reject_iicb1_protocol() {
+        local label=$1 expected_text=$2; shift 2
+        local output="$out/protocol-$label.log"
+        if "$@" >"$output" 2>&1; then
+            fail_contract "ii-c-b1 mutation protocol accepted: $label"
+        fi
+        [[ "$(<"$output")" == "$expected_text" ]] \
+            || fail_contract "ii-c-b1 mutation protocol diagnostic drifted: $label"
+    }
+    local -a benign_args=(
+        "$benign" "$focused" "$boundary" "$transport" "$physical"
+    )
+    reject_iicb1_protocol unknown 'ii-c-b1 unrecognized mutation' \
+        "$gate" --iic-b1-root-owned-gate-mutation-contract-only \
+        unknown lifecycle "$benign_sha" "${benign_args[@]}"
+    reject_iicb1_protocol wrong-slot 'ii-c-b1 mutation contract drifted' \
+        "$gate" --iic-b1-root-owned-gate-mutation-contract-only \
+        gate-owner-current-user focused "$benign_sha" "${benign_args[@]}"
+    reject_iicb1_protocol malformed-sha 'ii-c-b1 mutation SHA drifted' \
+        "$gate" --iic-b1-root-owned-gate-mutation-contract-only \
+        gate-owner-current-user lifecycle bad "${benign_args[@]}"
+    local owner_mutation="$out/gate-owner-current-user.swift"
+    local -a owner_mutation_args=(
+        "$owner_mutation" "$focused" "$boundary" "$transport" "$physical"
+    )
+    reject_iicb1_protocol unchanged 'ii-c-b1 mutation source unchanged' \
+        "$gate" --iic-b1-root-owned-gate-mutation-contract-only \
+        gate-owner-current-user lifecycle "$unchanged_sha" \
+        "${owner_mutation_args[@]}"
+    reject_iicb1_protocol unrecognized-content 'ii-c-b1 unrecognized mutation' \
+        "$gate" --iic-b1-root-owned-gate-mutation-contract-only \
+        gate-owner-current-user lifecycle "$benign_sha" "${benign_args[@]}"
+    local benign_focused="$out/benign-focused.swift"
+    cp "$focused" "$benign_focused"; print >>"$benign_focused"
+    local -a second_slot_args=(
+        "$owner_mutation" "$benign_focused" "$boundary" "$transport" "$physical"
+    )
+    local owner_mutation_sha
+    owner_mutation_sha=$(shasum -a 256 "$owner_mutation" | awk '{print $1}')
+    reject_iicb1_protocol second-slot 'ii-c-b1 mutation digest drifted' \
+        "$gate" --iic-b1-root-owned-gate-mutation-contract-only \
+        gate-owner-current-user lifecycle "$owner_mutation_sha" \
+        "${second_slot_args[@]}"
+    local app_gate=scripts/verify-app-release-boundaries
+    [[ "$(shasum -a 256 "$app_gate" | awk '{print $1}')" == d3d81faae5b4fa7bae672f918ea882e6e8b78bb8d013c6551345dda029bf2360 ]] || fail_contract 'ii-c-b1 App release verifier source seal drifted'
+    local component_mutation_root="$out/component-mutations"
+    mkdir -p "$component_mutation_root"
+    python3 - "$app_gate" "$component_mutation_root" <<'PY'
+from pathlib import Path
+import hashlib, re, sys
+source_path, out = map(Path, sys.argv[1:])
+source = source_path.read_text(encoding="utf-8")
+carrier_pattern = r"(?m)^# iicb1_app_self_sha=[0-9a-f]{64}$"
+def reseal(value):
+    normalized, count = re.subn(carrier_pattern, "# iicb1_app_self_sha=SELF", value); assert count == 1
+    return normalized.replace("# iicb1_app_self_sha=SELF", "# iicb1_app_self_sha=" + hashlib.sha256(normalized.encode()).hexdigest(), 1)
+snapshot_start = source.index("\nfunction run_iicb1_root_owned_gate_component_snapshot() (") + 1; source_contract_start = source.index("\nfunction verify_iicb1_root_owned_gate_component_source_contract() {") + 1
+runtime_start = source.index("\nfunction verify_iicb1_root_owned_gate_component_boundary() (") + 1; runtime_end = source.index("\nfunction verify_iib5biii_a_source_contract() {", runtime_start)
+regions = {"snapshot": (snapshot_start, source_contract_start), "source-contract": (source_contract_start, runtime_start), "runtime": (runtime_start, runtime_end), "dispatch": (runtime_end, len(source))}
+mutations = (
+    ("component-positive-vacuity", "'StornautInvestigationMachineLaunchSupport.InvestigationFixedGateDarwinLifecycle.(validateExecutable'", "'StornautInvestigationMachineLaunchSupport.DisabledLifecycle.(validateExecutable'"),
+    ("component-process-identity-vacuity", "'StornautInvestigationMachineGateSupport.InvestigationMachineFixedGateContract.requiredUserID'", "'StornautInvestigationMachineGateSupport.DisabledContract.requiredUserID'"),
+    ("component-authority-vacuity", "[[ \"$symbols$strings\" != *'StornautExecution.'* ]]", "true"),
+    ("component-symlink-enumeration-vacuity", '        symlink=$(find "$image" -type l -print -quit) || return $?', '        symlink='),
+    ("component-symlink-vacuity", '        [[ -z $symlink ]] || {\n            print -u2 "ii-c-b1 closed image contains symlink: $symlink"\n            return 1\n        }', '        [[ -n $symlink ]] || {\n            print -u2 "ii-c-b1 closed image contains symlink: $symlink"\n            return 1\n        }'),
+    ("component-symlink-reset-vacuity", '        symlink=$(find "$image" -type l -print -quit) || return $?\n        [[ -z $symlink ]] || {', '        symlink=$(find "$image" -type l -print -quit) || return $?\n        symlink=\n        [[ -z $symlink ]] || {'),
+    ("component-provenance-reset-vacuity", '    local validation_source=${STORNAUT_VALIDATION_SOURCE:-}\n    [[ ${#validation_commit} == 40', '    local validation_source=${STORNAUT_VALIDATION_SOURCE:-}\n    validation_commit=\n    [[ ${#validation_commit} == 40'),
+    ("component-provenance-head-vacuity", '    [[ $observed_commit == $validation_commit ]] || {', '    [[ -n $observed_commit ]] || {'),
+    ("component-provenance-match-vacuity", '        /usr/bin/grep -Fqx -- "$marker" <<<"$strings" || {', '        /usr/bin/grep -Fq -- "$marker" <<<"$strings" || {'),
+    ("component-validation-build-setting-vacuity", '        "STORNAUT_VALIDATION_COMMIT=$validation_commit"', '        "STORNAUT_VALIDATION_COMMIT="'),
+    ("component-public-dispatch-vacuity", 'if $iicb1_root_owned_gate_component_boundary_only; then\n    run_iicb1_root_owned_gate_component_snapshot\n    print "ii-c-b1 root-owned Gate component boundary verification passed."\n    exit 0\nfi', 'if $iicb1_root_owned_gate_component_boundary_only; then\n    return 0\nfi'),
+    ("component-snapshot-umask-vacuity", '    umask 022', '    umask 077'),
+    ("component-source-git-env-vacuity", '        [[ $environment_name == GIT_* ]] && unset "$environment_name"', '        [[ $environment_name == STORNAUT_* ]] && unset "$environment_name"'),
+    ("component-snapshot-early-return-vacuity", 'function run_iicb1_root_owned_gate_component_snapshot() (\n    umask 022', 'function run_iicb1_root_owned_gate_component_snapshot() (\n    return 0\n    umask 022'),
+    ("component-source-contract-early-return-vacuity", "from pathlib import Path\nimport hashlib", "from pathlib import Path\nraise SystemExit(0)\nimport hashlib"),
+    ("component-runtime-early-return-vacuity", 'function verify_iicb1_root_owned_gate_component_boundary() (\n    local snapshot_container=', 'function verify_iicb1_root_owned_gate_component_boundary() (\n    return 0\n    local snapshot_container='),
+    ("component-snapshot-shadow-vacuity", 'if $iicb1_root_owned_gate_component_boundary_only; then', 'function run_iicb1_root_owned_gate_component_snapshot() { return 0 }\nif $iicb1_root_owned_gate_component_boundary_only; then'),
+    ("component-source-contract-shadow-vacuity", 'if $iicb1_root_owned_gate_component_boundary_only; then', 'verify_iicb1_root_owned_gate_component_source_contract() { return 0 }\nif $iicb1_root_owned_gate_component_boundary_only; then'),
+    ("component-runtime-shadow-vacuity", 'if $iicb1_root_owned_gate_component_boundary_only; then', 'verify_iicb1_root_owned_gate_component_boundary() { return 0 }\nif $iicb1_root_owned_gate_component_boundary_only; then'),
+    ("component-independent-tree-vacuity", '    [[ $materialized_tree == $source_tree ]] || {', '    [[ -n $materialized_tree ]] || {'),
+    ("component-native-sandbox-vacuity", '        /usr/bin/env -i\n        HOME="$HOME"', '        /usr/bin/env\n        HOME="$HOME"'),
+    ("component-negative-image-vacuity", '    local -a negative_images=(\n        "$product_derived_data/Build/Products/Debug/Stornaut.app"\n        "$product_derived_data/Build/Products/Release/Stornaut.app"\n        "$diagnostic_derived_data/Build/Products/Release/StornautInvestigationDiagnosticReleaseShell.app"\n    )', '    local -a negative_images=(\n        "$product_derived_data/Build/Products/Debug/Stornaut.app"\n        "$diagnostic_derived_data/Build/Products/Release/StornautInvestigationDiagnosticReleaseShell.app"\n    )'),
+)
+if len(mutations) != 22:
+    raise SystemExit("ii-c-b1 component mutation inventory drifted")
+mutation_names = []
+for name, old, new in mutations:
+    region_name = ("snapshot" if name in {"component-snapshot-umask-vacuity", "component-source-git-env-vacuity", "component-snapshot-early-return-vacuity", "component-independent-tree-vacuity"} else "source-contract" if name == "component-source-contract-early-return-vacuity" else "dispatch" if name in {"component-public-dispatch-vacuity", "component-snapshot-shadow-vacuity", "component-source-contract-shadow-vacuity", "component-runtime-shadow-vacuity"} else "runtime")
+    start, end = regions[region_name]; region = source[start:end]
+    if region.count(old) != 1:
+        raise SystemExit(f"ii-c-b1 component mutation fixture is vacuous: {name}")
+    (out / f"{name}.zsh").write_text(
+        reseal(source[:start] + region.replace(old, new, 1) + source[end:]), encoding="utf-8",
+    )
+    mutation_names.append(name)
+(out / "component-mutations.txt").write_text(
+    "".join(f"{name}\n" for name in mutation_names),
+    encoding="utf-8",
+)
+critical_names = ("run_iicb1_root_owned_gate_component_snapshot", "verify_iicb1_root_owned_gate_component_source_contract", "verify_iicb1_root_owned_gate_component_boundary")
+binding_forms = (("dynamic", "name=NAME\nfunction $name { return 0 }"), ("functions-array", "name=NAME\nfunctions[$name]='return 0'"), ("eval", "eval 'NAME () return 0'"), ("alias", "alias NAME='true #'"))
+dispatch = "if $iicb1_root_owned_gate_component_boundary_only; then"
+binding_names = []
+for function_name in critical_names:
+    for kind, template in binding_forms:
+        name = f"component-{kind}-{function_name}-binding-vacuity"
+        offset = source.rfind(dispatch); (out / f"{name}.zsh").write_text(reseal(source[:offset] + template.replace("NAME", function_name) + "\n" + source[offset:]), encoding="utf-8"); binding_names.append(name)
+carrier = re.findall(r"(?m)^# iicb1_app_self_sha=[0-9a-f]{64}$", source)[0]; name = "component-self-seal-carrier-alias-vacuity"; (out / f"{name}.zsh").write_text(source.replace(carrier, carrier[2:] + "; alias run_iicb1_root_owned_gate_component_snapshot='true #'", 1), encoding="utf-8"); binding_names.append(name)
+if len(binding_names) != 13: raise SystemExit("ii-c-b1 component binding mutation inventory drifted")
+(out / "component-binding-mutations.txt").write_text("".join(f"{name}\n" for name in binding_names), encoding="utf-8")
+PY
+    local component_mutation component_log component_rc
+    while IFS= read -r component_mutation; do
+        [[ -n $component_mutation ]] \
+            || fail_contract "ii-c-b1 component mutation inventory empty"
+        component_log="$out/$component_mutation.log"; component_rc=0
+        "$app_gate" \
+            --iic-b1-root-owned-gate-component-source-contract-only \
+            "$component_mutation_root/$component_mutation.zsh" \
+            >"$component_log" 2>&1 || component_rc=$?
+        (( component_rc != 0 )) || fail_contract \
+            "ii-c-b1 component mutation accepted: $component_mutation"
+        [[ "$(<"$component_log")" == \
+            "ii-c-b1 component verifier contract drifted" ]] \
+            || fail_contract \
+                "ii-c-b1 component mutation diagnostic drifted: $component_mutation"
+    done <"$component_mutation_root/component-mutations.txt"
+    while IFS= read -r component_mutation; do
+        component_log="$out/$component_mutation.log"; component_rc=0
+        /bin/zsh -n "$component_mutation_root/$component_mutation.zsh" || fail_contract "ii-c-b1 component binding mutation syntax drifted: $component_mutation"
+        "$app_gate" --iic-b1-root-owned-gate-component-source-contract-only "$component_mutation_root/$component_mutation.zsh" >"$component_log" 2>&1 || component_rc=$?
+        (( component_rc != 0 )) || fail_contract "ii-c-b1 component binding mutation accepted: $component_mutation"
+        [[ "$(<"$component_log")" == "ii-c-b1 component verifier contract drifted" ]] || fail_contract "ii-c-b1 component binding mutation diagnostic drifted: $component_mutation"
+    done <"$component_mutation_root/component-binding-mutations.txt"
+    mkdir -p "$out/zshenv"; print "print loaded >'$out/zshenv.loaded'; alias verify_iicb1_root_owned_gate_component_source_contract='true #'" >"$out/zshenv/.zshenv"
+    component_rc=0; ZDOTDIR="$out/zshenv" "$app_gate" --iic-b1-root-owned-gate-component-source-contract-only "$app_gate" >"$out/zshenv.log" 2>&1 || component_rc=$?; (( component_rc == 0 )) && [[ ! -e $out/zshenv.loaded ]] || fail_contract "ii-c-b1 zsh startup isolation drifted"
+    local reuse_log="$out/component-reuse-entry.log" reuse_rc=0
+    "$app_gate" --iic-b1-root-owned-gate-component-boundary-only \
+        /nonexistent/iicb1-product /nonexistent/iicb1-diagnostic \
+        >"$reuse_log" 2>&1 || reuse_rc=$?
+    (( reuse_rc == 64 )) \
+        || fail_contract "ii-c-b1 arbitrary component reuse entry accepted"
+    [[ "$(<"$reuse_log")" == Usage:* ]] \
+        || fail_contract "ii-c-b1 component reuse rejection diagnostic drifted"
+    local baseline=41f5dba1b7ff7f1272d5a2607ae9794b266e6c47
+    local index="$out/scope.index" item mode blob scope_baseline
+    local -a scope_paths=(
+        "$lifecycle" "$focused" "$physical" "$boundary"
+        scripts/verify-investigation-boundaries
+        scripts/verify-app-release-boundaries
+        scripts/verify-contract
+    )
+    GIT_INDEX_FILE="$index" git read-tree "$baseline^{tree}"
+    for item in "${scope_paths[@]}"; do
+        blob=$(git hash-object -w -- "$item")
+        mode=100644; [[ $item == scripts/* ]] && mode=100755
+        GIT_INDEX_FILE="$index" git update-index --add --cacheinfo \
+            "$mode,$blob,$item"
+    done
+    GIT_INDEX_FILE="$index" "$gate" \
+        --iic-b1-root-owned-gate-staged-scope-contract-only "$baseline" \
+        >"$out/scope.log"
+    function reject_iicb1_scope() {
+        local label=$1 expected_text=$2; shift 2
+        local output="$out/scope-$label.log"
+        if "$@" >"$output" 2>&1; then
+            fail_contract "ii-c-b1 scope mutation accepted: $label"
+        fi
+        [[ "$(<"$output")" == *"$expected_text"* ]] \
+            || fail_contract "ii-c-b1 scope mutation diagnostic drifted: $label"
+    }
+    local bad
+    for fixture in extra-path over-budget deleted binary mode wrong-baseline \
+        staged-worktree-divergence untracked
+    do
+        bad="$out/scope-$fixture.index"; cp "$index" "$bad"
+        scope_baseline=$baseline
+        case $fixture in
+            extra-path)
+                blob=$(print extra | git hash-object -w --stdin)
+                GIT_INDEX_FILE="$bad" git update-index --add --cacheinfo \
+                    "100644,$blob,iicb1-extra.swift"
+                expected='ii-c-b1 checkpoint path ceiling drifted' ;;
+            over-budget)
+                blob=$( { git show "$baseline:$lifecycle";
+                    for line in {1..2000}; do print "// ii-c-b1 $line"; done;
+                } | git hash-object -w --stdin)
+                GIT_INDEX_FILE="$bad" git update-index --cacheinfo \
+                    "100644,$blob,$lifecycle"
+                expected='ii-c-b1 checkpoint budget drifted' ;;
+            deleted)
+                GIT_INDEX_FILE="$bad" git rm --cached -q -f "$lifecycle"
+                expected='ii-c-b1 checkpoint deleted an existing path' ;;
+            binary)
+                blob=$(printf '\0ii-c-b1\n' | git hash-object -w --stdin)
+                GIT_INDEX_FILE="$bad" git update-index --cacheinfo \
+                    "100644,$blob,$lifecycle"
+                expected='ii-c-b1 binary checkpoint path rejected' ;;
+            mode)
+                blob=$(GIT_INDEX_FILE="$bad" git ls-files -s -- \
+                    scripts/verify-contract | awk '{print $2}')
+                GIT_INDEX_FILE="$bad" git update-index --cacheinfo \
+                    "100644,$blob,scripts/verify-contract"
+                expected='ii-c-b1 staged source/mode drifted:' ;;
+            wrong-baseline)
+                scope_baseline="$baseline^"
+                expected='ii-c-b1 checkpoint baseline drifted' ;;
+            staged-worktree-divergence)
+                blob=$(sed 's/func rootWheelGateExecutablePassesAllThreeAdmissions()/func disabledRootWheelGateExecutablePassesAllThreeAdmissions()/' "$focused" | git hash-object -w --stdin)
+                GIT_INDEX_FILE="$bad" git update-index --cacheinfo \
+                    "100644,$blob,$focused"
+                expected='ii-c-b1 staged/worktree source drifted:' ;;
+            untracked)
+                (
+                    local probe=.stornaut-iicb1-untracked-$PPID-$RANDOM
+                    trap 'rm -f -- "$probe"' EXIT INT TERM HUP
+                    print untracked >"$probe"
+                    reject_iicb1_scope "$fixture" \
+                        'ii-c-b1 checkpoint untracked paths drifted' env \
+                        GIT_INDEX_FILE="$bad" "$gate" \
+                        --iic-b1-root-owned-gate-staged-scope-contract-only \
+                        "$scope_baseline"
+                )
+                continue ;;
+        esac
+        reject_iicb1_scope "$fixture" "$expected" env \
+            GIT_INDEX_FILE="$bad" "$gate" \
+            --iic-b1-root-owned-gate-staged-scope-contract-only \
+            "$scope_baseline"
+    done
+}
 function verify_iica_contract() {
+    local out=$1 replay_status=0
+    mkdir -p "$out"
+    replay_historical_contract \
+        "$out/immutable" \
+        81f185c1278e0f80a3a5de856d0b8cb93c810272 \
+        7cf4db75a261895ba0c86b6876623daf900bb4db \
+        --iic-a-contract-only \
+        '--iic-a-staged-scope-contract-only' \
+        || replay_status=$?
+    (( replay_status == 0 )) \
+        || fail_contract 'ii-c-a historical replay failed'
+}
+function verify_iica_legacy_current_tree_contract() {
     local out=$1 gate=scripts/verify-investigation-boundaries
     local app_gate=scripts/verify-app-release-boundaries
     mkdir -p "$out"
@@ -2434,7 +2800,7 @@ PY
     done
 }
 
-function verify_iica_scope_mutations() {
+function verify_iica_legacy_current_tree_scope_mutations() {
     local out=$1 gate=scripts/verify-investigation-boundaries
     local baseline=2b30a157c14bc507351b10bd521e710987860f71
     local base=$out/base.index index blob log expected scope_baseline
@@ -2509,6 +2875,17 @@ function verify_iica_scope_mutations() {
     done
 }
 
+if [[ ${1:-} == --iic-b1-root-owned-gate-contract-only ]]; then
+    (( $# == 1 )) || fail_contract \
+        "Usage: scripts/verify-contract --iic-b1-root-owned-gate-contract-only"
+    iicb1_root=$(mktemp -d \
+        "${TMPDIR:-/tmp}/stornaut-iicb1-contract.XXXXXX")
+    trap 'rm -rf "$iicb1_root"' EXIT
+    verify_iicb1_root_owned_gate_contract "$iicb1_root"
+    print "ii-c-b1 root-owned Gate contract verification passed."
+    exit 0
+fi
+
 if [[ ${1:-} == --iic-a-contract-only ]]; then
     (( $# == 1 )) || fail_contract \
         "Usage: scripts/verify-contract --iic-a-contract-only"
@@ -2516,7 +2893,6 @@ if [[ ${1:-} == --iic-a-contract-only ]]; then
         "${TMPDIR:-/tmp}/stornaut-iica-contract.XXXXXX")
     trap 'rm -rf "$iica_root"' EXIT
     verify_iica_contract "$iica_root"
-    verify_iica_scope_mutations "$iica_root/scope"
     print "ii-c-a closed machine packaging contract verification passed."
     exit 0
 fi
@@ -4156,6 +4532,7 @@ done
 
 contract_root=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-verify-contract.XXXXXX")
 verify_iica_contract "$contract_root/iica"
+verify_iicb1_root_owned_gate_contract "$contract_root/iicb1"
 verify_iic0bivb2_contract "$contract_root/iic0bivb2" false
 verify_shared_deadline_repair_contract "$contract_root/shared-deadline"
 verify_fixed_gate_deadline_cleanup_contract "$contract_root/fixed-gate-cleanup"

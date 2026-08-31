@@ -4,47 +4,36 @@ import Testing
 @Suite("Investigation fixed gate handoff physical evidence", .serialized)
 struct InvestigationFixedGateHandoffPhysicalTests {
     @Test
-    func facadeExecutesPhysicalSuccessAndFailureMatrix() throws {
+    func userOwnedTemporaryGateFailsClosedBeforeSpawn() throws {
         try #require(geteuid() == 501)
         try #require(getegid() == 20)
         let fixture = try HandoffPhysicalFixture.make()
         defer { fixture.remove() }
 
-        let success = try fixture.run(.success)
-        try requireSuccessfulPhysicalHandoff(success)
+        var gateStatus = stat()
+        try #require(lstat(fixture.gate.path, &gateStatus) == 0)
+        #expect(gateStatus.st_mode & S_IFMT == S_IFREG)
+        #expect(gateStatus.st_mode & S_IFMT != S_IFLNK)
+        #expect(gateStatus.st_uid == geteuid())
+        #expect(gateStatus.st_gid == getegid())
+        #expect(gateStatus.st_uid != 0)
+        #expect(gateStatus.st_gid != 0)
+        #expect(gateStatus.st_mode & 0o777 == 0o755)
 
-        for (mode, expectedError) in [
-            (HandoffPhysicalMode.earlyExit, "invalidPreparedFrame"),
-            (.malformedPrepared, "invalidPreparedFrame"),
-            (.overflowPrepared, "invalidPreparedFrame"),
-            (.forwardedSignal, "forwardedSignal"),
-            (.stubbornDescendant, "invalidPreparedFrame"),
-        ] {
-            let failed = try fixture.run(mode)
-            #expect(!failed.succeeded)
-            #expect(failed.error == expectedError)
-            #expect(failed.foregroundRestored)
-            #expect(failed.gateProcessAbsent)
-            #expect(failed.processGroupEmpty)
-            #expect(!failed.capsuleRemoved)
+        let evidence = try fixture.run(.success)
+        let report = evidence.report
 
-            // A following independent process must recover the prior stale
-            // capsule and then remove its own successful capsule exactly.
-            let recovery = try fixture.run(.success)
-            try requireSuccessfulPhysicalHandoff(recovery)
-            #expect(try fixture.machineGateAttemptNames().isEmpty)
-        }
-
-        do {
-            _ = try fixture.run(.cleanupTimeout)
-            Issue.record("timeout cleanup fixture unexpectedly completed")
-        } catch HandoffPhysicalTestError.timeout(let operation) {
-            #expect(operation == "read fixture report prefix")
-        } catch {
-            Issue.record("unexpected timeout cleanup error: \(error)")
-        }
-        let cleanupRecovery = try fixture.run(.success)
-        try requireSuccessfulPhysicalHandoff(cleanupRecovery)
+        #expect(evidence.coordinator.userID == 501)
+        #expect(evidence.coordinator.groupID == 20)
+        #expect(evidence.coordinatorAbsentAfterReap)
+        #expect(evidence.gatePIDRecordAbsent)
+        #expect(!report.succeeded)
+        #expect(report.error == "spawnFailedBeforeTransfer")
+        #expect(report.gateProcessID == nil)
+        #expect(report.gateProcessGroupID == nil)
+        #expect(!report.exactGateExited)
+        #expect(report.capsuleRemoved)
+        #expect(report.foregroundRestored)
         #expect(try fixture.machineGateAttemptNames().isEmpty)
     }
 }
@@ -71,6 +60,12 @@ private struct HandoffPhysicalReport: Decodable {
     let processGroupEmpty: Bool
     let capsuleRemoved: Bool
     let foregroundRestored: Bool
+}
+private struct HandoffPhysicalExecutionEvidence {
+    let report: HandoffPhysicalReport
+    let coordinator: PhysicalProcessObservation
+    let coordinatorAbsentAfterReap: Bool
+    let gatePIDRecordAbsent: Bool
 }
 private enum HandoffPhysicalTestError: Error, CustomStringConvertible {
     case compile(Int32, String)
@@ -214,7 +209,9 @@ private final class HandoffPhysicalFixture {
             throw error
         }
     }
-    func run(_ mode: HandoffPhysicalMode) throws -> HandoffPhysicalReport {
+    func run(_ mode: HandoffPhysicalMode) throws
+        -> HandoffPhysicalExecutionEvidence
+    {
         let attempt = UUID()
         let gateRecord = directory.appending(path: "fixture-gate-pid")
         try? FileManager.default.removeItem(at: gateRecord)
@@ -267,12 +264,13 @@ private final class HandoffPhysicalFixture {
         guard status == 0, pid > 1 else {
             throw HandoffPhysicalTestError.posix("spawn coordinator", status)
         }
-        let coordinatorToken: PhysicalProcessToken
-        do { coordinatorToken = try physicalDirectChildToken(pid) }
+        let coordinatorObservation: PhysicalProcessObservation
+        do { coordinatorObservation = try physicalDirectChildObservation(pid) }
         catch {
             try physicalAbortSuspendedDirectChild(pid)
             throw error
         }
+        let coordinatorToken = coordinatorObservation.token
         _ = close(pipeDescriptors[1])
         pipeDescriptors[1] = -1
         let deadline = DispatchTime.now().uptimeNanoseconds
@@ -313,12 +311,19 @@ private final class HandoffPhysicalFixture {
                 coordinatorToken, deadline: deadline
             )
             reaped = true
-            guard waitStatus == waitable else {
+            let coordinatorAbsentAfterReap =
+                try physicalProcessToken(pid) != coordinatorToken
+            guard waitStatus == waitable, coordinatorAbsentAfterReap else {
                 throw HandoffPhysicalTestError.invalid(
-                    "fixture wait classification drift"
+                    "fixture wait or identity retirement drift"
                 )
             }
-            return report
+            return .init(
+                report: report, coordinator: coordinatorObservation,
+                coordinatorAbsentAfterReap: coordinatorAbsentAfterReap,
+                gatePIDRecordAbsent:
+                    !FileManager.default.fileExists(atPath: gateRecord.path)
+            )
         } catch let original {
             if !reaped {
                 do { try physicalCleanupSession(coordinatorToken) }
@@ -388,19 +393,6 @@ private final class HandoffPhysicalFixture {
         }
         return value
     }
-}
-private func requireSuccessfulPhysicalHandoff(
-    _ report: HandoffPhysicalReport
-) throws {
-    #expect(report.succeeded)
-    #expect(report.error == nil)
-    #expect(report.gateProcessID != nil)
-    #expect(report.gateProcessID == report.gateProcessGroupID)
-    #expect(report.exactGateExited)
-    #expect(report.gateProcessAbsent)
-    #expect(report.processGroupEmpty)
-    #expect(report.capsuleRemoved)
-    #expect(report.foregroundRestored)
 }
 private func physicalReadFrame(
     _ descriptor: Int32, deadline: UInt64
@@ -495,6 +487,8 @@ private struct PhysicalProcessObservation {
     let token: PhysicalProcessToken
     let parentProcessID: pid_t
     let processGroupID: pid_t
+    let userID: uid_t
+    let groupID: gid_t
     let status: UInt32
 }
 private func physicalAbortSuspendedDirectChild(_ processID: pid_t) throws {
@@ -560,14 +554,14 @@ private func physicalAwaitCleanupCohort(
     }
     throw HandoffPhysicalTestError.timeout("wait cleanup fixture readiness")
 }
-private func physicalDirectChildToken(
+private func physicalDirectChildObservation(
     _ processID: pid_t
-) throws -> PhysicalProcessToken {
+) throws -> PhysicalProcessObservation {
     guard let observation = try physicalProcessObservation(processID),
           observation.parentProcessID == getpid() else {
         throw HandoffPhysicalTestError.invalid("fixture direct child identity")
     }
-    return observation.token
+    return observation
 }
 private func physicalProcessToken(
     _ processID: pid_t
@@ -597,7 +591,9 @@ private func physicalProcessObservation(
             processID: processID, startSeconds: value.pbi_start_tvsec,
             startMicroseconds: value.pbi_start_tvusec
         ), parentProcessID: pid_t(value.pbi_ppid),
-        processGroupID: pid_t(value.pbi_pgid), status: value.pbi_status
+        processGroupID: pid_t(value.pbi_pgid),
+        userID: uid_t(value.pbi_uid), groupID: gid_t(value.pbi_gid),
+        status: value.pbi_status
     )
 }
 private func physicalCohort(

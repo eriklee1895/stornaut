@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/zsh -f
 
 set -euo pipefail
 
@@ -309,6 +309,14 @@ iica_source_contract_only=false
 iica_source_contract_sources=()
 iica_staged_scope_contract_only=false
 iica_staged_scope_baseline=2b30a157c14bc507351b10bd521e710987860f71
+iicb1_root_owned_gate_source_contract_only=false
+iicb1_root_owned_gate_sources=()
+iicb1_root_owned_gate_mutation_contract_only=false
+iicb1_root_owned_gate_mutation_name=
+iicb1_root_owned_gate_mutation_slot=
+iicb1_root_owned_gate_mutation_sha=
+iicb1_root_owned_gate_staged_scope_contract_only=false
+iicb1_root_owned_gate_staged_scope_baseline=41f5dba1b7ff7f1272d5a2607ae9794b266e6c47
 iic0bivb1_handoff_contract_only=false
 iic0bivb1_fixture_source=
 iic0bivb1_physical_test_source=
@@ -818,6 +826,21 @@ if (( $# > 0 )); then
         && [[ $1 == --iic-a-staged-scope-contract-only ]]; then
         iica_staged_scope_contract_only=true
         iica_staged_scope_baseline=${2:-2b30a157c14bc507351b10bd521e710987860f71}
+    elif (( $# == 1 || $# == 6 )) \
+        && [[ $1 == --iic-b1-root-owned-gate-source-contract-only ]]; then
+        iicb1_root_owned_gate_source_contract_only=true
+        iicb1_root_owned_gate_sources=("${@:2}")
+    elif (( $# == 9 )) \
+        && [[ $1 == --iic-b1-root-owned-gate-mutation-contract-only ]]; then
+        iicb1_root_owned_gate_mutation_contract_only=true
+        iicb1_root_owned_gate_mutation_name=$2
+        iicb1_root_owned_gate_mutation_slot=$3
+        iicb1_root_owned_gate_mutation_sha=$4
+        iicb1_root_owned_gate_sources=("${@:5}")
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iic-b1-root-owned-gate-staged-scope-contract-only ]]; then
+        iicb1_root_owned_gate_staged_scope_contract_only=true
+        iicb1_root_owned_gate_staged_scope_baseline=${2:-41f5dba1b7ff7f1272d5a2607ae9794b266e6c47}
     elif (( $# == 4 )) \
         && [[ $1 == --iic0b-iv-b1-handoff-contract-only ]]; then
         iic0bivb1_handoff_contract_only=true
@@ -898,7 +921,7 @@ if (( $# > 0 )); then
         interactive_native_source_contract_sources=("${@:2}")
     else
         print -u2 \
-            "Usage: scripts/verify-investigation-boundaries [... | --shared-deadline-repair-source-contract-only [12 sources] | --shared-deadline-repair-mutation-contract-only slot sha 12-sources | --shared-deadline-repair-scope-contract-only [baseline]]"
+            "Usage: scripts/verify-investigation-boundaries [... | --iic-b1-root-owned-gate-source-contract-only [5 sources] | --iic-b1-root-owned-gate-mutation-contract-only name slot sha 5-sources | --iic-b1-root-owned-gate-staged-scope-contract-only [baseline]]"
         exit 64
     fi
 fi
@@ -6652,12 +6675,12 @@ contract_path, boundary_path = map(Path, sys.argv[1:])
 contract = contract_path.read_text(encoding="utf-8")
 boundary = boundary_path.read_bytes()
 self_match = re.findall(
-    r"(?m)^ib2_self_sha=([0-9a-f]{64})$", contract
+    r"(?m)^# ib2_self_sha=([0-9a-f]{64})$", contract
 )
 if len(self_match) != 1:
     raise SystemExit("ii-b5b-ii-a staged verifier self-seal drifted")
 normalized = re.sub(
-    r"(?m)^ib2_self_sha=.*$", "ib2_self_sha=SELF", contract
+    r"(?m)^# ib2_self_sha=[0-9a-f]{64}$", "# ib2_self_sha=SELF", contract
 ).encode("utf-8")
 if hashlib.sha256(normalized).hexdigest() != self_match[0]:
     raise SystemExit("ii-b5b-ii-a staged verifier self-seal drifted")
@@ -6902,11 +6925,11 @@ from pathlib import Path
 import hashlib, re, sys
 contract_path, boundary_path, release_path = map(Path, sys.argv[1:])
 contract = contract_path.read_text(encoding="utf-8")
-self_match = re.findall(r"(?m)^ib2_self_sha=([0-9a-f]{64})$", contract)
+self_match = re.findall(r"(?m)^# ib2_self_sha=([0-9a-f]{64})$", contract)
 if len(self_match) != 1:
     raise SystemExit("ii-b5b-ii-b staged verifier self-seal drifted")
 normalized = re.sub(
-    r"(?m)^ib2_self_sha=.*$", "ib2_self_sha=SELF", contract
+    r"(?m)^# ib2_self_sha=[0-9a-f]{64}$", "# ib2_self_sha=SELF", contract
 ).encode("utf-8")
 if hashlib.sha256(normalized).hexdigest() != self_match[0]:
     raise SystemExit("ii-b5b-ii-b staged verifier self-seal drifted")
@@ -7798,9 +7821,9 @@ import hashlib
 import re
 
 contract = Path("scripts/verify-contract").read_text(encoding="utf-8")
-self_match = re.findall(r"(?m)^ib2_self_sha=([0-9a-f]{64})$", contract)
+self_match = re.findall(r"(?m)^# ib2_self_sha=([0-9a-f]{64})$", contract)
 normalized = re.sub(
-    r"(?m)^ib2_self_sha=.*$", "ib2_self_sha=SELF", contract
+    r"(?m)^# ib2_self_sha=[0-9a-f]{64}$", "# ib2_self_sha=SELF", contract
 ).encode("utf-8")
 if (
     len(self_match) != 1
@@ -10438,6 +10461,464 @@ function verify_iic0bivb2_staged_scope() {
     (( ${#untracked_paths} == 0 )) || { print -u2 'ii-c0b-iv-b2 checkpoint untracked paths drifted'; return 1 }
     local item mode entry
     for item in "${expected[@]}"; do mode=100644; [[ $item == scripts/* ]] && mode=100755; entry=$(git ls-files -s -- "$item"); [[ "$(print -r -- "$entry" | awk '{print $1, $3, $4}')" == "$mode 0 $item" && "$(print -r -- "$entry" | awk '{print $2}')" == "$(git hash-object -- "$item")" ]] || { print -u2 "ii-c0b-iv-b2 staged source/mode drifted: $item"; return 1; }; done
+}
+
+function verify_iicb1_root_owned_gate_source_contract() {
+    local -a paths=("${iicb1_root_owned_gate_sources[@]}")
+    if (( ${#paths} == 0 )); then paths=(
+        Sources/StornautInvestigationMachineLaunchSupport/InvestigationFixedGateDarwinLifecycle.swift
+        Tests/StornautInvestigationTests/InvestigationFixedGateDarwinLifecycleTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        Sources/StornautInvestigationMachineGateSupport/InvestigationMachineGateTransport.swift
+        Tests/StornautInvestigationTests/InvestigationFixedGateHandoffPhysicalTests.swift
+    ); fi
+    local source
+    for source in "${paths[@]}"; do
+        [[ -f $source && ! -L $source ]] || {
+            print -u2 "ii-c-b1 source path unavailable: $source"
+            return 1
+        }
+        xcrun swiftc -frontend -parse -enable-bare-slash-regex "$source" \
+            || return $?
+    done
+    python3 - "$iicb1_root_owned_gate_mutation_contract_only" \
+        "$iicb1_root_owned_gate_mutation_name" \
+        "$iicb1_root_owned_gate_mutation_slot" \
+        "$iicb1_root_owned_gate_mutation_sha" "${paths[@]}" <<'PY'
+from pathlib import Path
+import hashlib
+import re
+import sys
+
+mutation_mode, mutation_name, mutation_slot, mutation_sha = sys.argv[1:5]
+slot_names = ("lifecycle", "focused", "boundary", "transport", "physical")
+if len(sys.argv) != 10:
+    raise SystemExit("ii-c-b1 source cardinality drifted")
+sources = tuple(Path(path).read_text(encoding="utf-8") for path in sys.argv[5:])
+canonical_paths = tuple(Path(path) for path in (
+    "Sources/StornautInvestigationMachineLaunchSupport/InvestigationFixedGateDarwinLifecycle.swift",
+    "Tests/StornautInvestigationTests/InvestigationFixedGateDarwinLifecycleTests.swift",
+    "Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift",
+    "Sources/StornautInvestigationMachineGateSupport/InvestigationMachineGateTransport.swift",
+    "Tests/StornautInvestigationTests/InvestigationFixedGateHandoffPhysicalTests.swift",
+))
+canonical = tuple(path.read_text(encoding="utf-8") for path in canonical_paths)
+mutations = {
+    "gate-owner-current-user": ("lifecycle", "value.ownerUserID == 0", "value.ownerUserID == getuid()"),
+    "gate-group-current-user": ("lifecycle", "value.ownerGroupID == 0", "value.ownerGroupID == getgid()"),
+    "gate-owner-501": ("lifecycle", "value.ownerUserID == 0", "value.ownerUserID == 501"),
+    "gate-group-20": ("lifecycle", "value.ownerGroupID == 0", "value.ownerGroupID == 20"),
+    "gate-owner-fallback": ("lifecycle", "value.ownerUserID == 0", "(value.ownerUserID == 0 || value.ownerUserID == getuid())"),
+    "gate-group-fallback": ("lifecycle", "value.ownerGroupID == 0", "(value.ownerGroupID == 0 || value.ownerGroupID == getgid())"),
+    "gate-owner-comment-spoof": ("lifecycle", "value.ownerUserID == 0 && value.ownerGroupID == 0", "true // value.ownerUserID == 0 && value.ownerGroupID == 0"),
+    "gate-sibling-path-bypass": ("lifecycle", 'value.path.hasSuffix("/" + Self.gateName)', "true"),
+    "gate-held-named-identity-bypass": ("lifecycle", "value.descriptorIdentity == value.namedIdentity", "true"),
+    "gate-acquisition-removed": ("lifecycle", "guard validateExecutable(acquired) else {", "guard true else {"),
+    "gate-pre-spawn-revalidation-removed": ("lifecycle", "guard beforeSpawn == acquired, validateExecutable(beforeSpawn) else {", "guard beforeSpawn == acquired else {"),
+    "gate-post-spawn-revalidation-removed": ("lifecycle", "if afterSpawn != acquired || !validateExecutable(afterSpawn) {", "if afterSpawn != acquired {"),
+    "gate-pre-spawn-node-equality-removed": ("lifecycle", "guard beforeSpawn == acquired, validateExecutable(beforeSpawn) else {", "guard validateExecutable(beforeSpawn) else {"),
+    "gate-post-spawn-node-equality-removed": ("lifecycle", "if afterSpawn != acquired || !validateExecutable(afterSpawn) {", "if !validateExecutable(afterSpawn) {"),
+    "gate-size-bound-bypass": ("lifecycle", "(1...Int64(Self.maximumExecutableBytes))\n                .contains(value.descriptorIdentity.size)", "true"),
+    "gate-metadata-mode-widened": ("lifecycle", "value.permissions == 0o755", "value.permissions & 0o111 != 0"),
+    "gate-link-count-bypass": ("lifecycle", "value.linkCount == 1", "true"),
+    "gate-flags-bypass": ("lifecycle", "value.flags == 0", "true"),
+    "gate-acl-bypass": ("lifecycle", "value.extendedACLIsEmpty", "true"),
+    "gate-xattr-bypass": ("lifecycle", '$0 == "com.apple.provenance"', "_ in true"),
+    "gate-xattr-uniqueness-bypass": ("lifecycle", "Set(value.extendedAttributeNames).count\n                == value.extendedAttributeNames.count", "true"),
+    "gate-sha-bypass": ("lifecycle", "value.sha256 == value.bytesSHA256", "true"),
+    "gate-prohibited-authority": ("lifecycle", "private func validateExecutable(", "private let signedRuntimeReady = true\n    private func validateExecutable("),
+    "gate-recorder-current-owner": ("focused", "gateOwnerUserID: uid_t = 0", "gateOwnerUserID: uid_t = getuid()"),
+    "gate-recorder-current-group": ("focused", "gateOwnerGroupID: gid_t = 0", "gateOwnerGroupID: gid_t = getgid()"),
+    "gate-root-success-vacuity": ("focused", "func rootWheelGateExecutablePassesAllThreeAdmissions()", "func disabledRootWheelGateExecutablePassesAllThreeAdmissions()"),
+    "gate-revalidation-count-vacuity": ("focused", "#expect(system.events.filter { $0 == .acquireExecutable }.count == 1)\n        #expect(system.events.filter { $0 == .revalidateExecutable }.count == 2)", "#expect(system.events.filter { $0 == .acquireExecutable }.count == 1)\n        #expect(system.events.filter { $0 == .revalidateExecutable }.count >= 0)"),
+    "gate-negative-case-removed": ("focused", "@Test(arguments: DarwinGateFileOwnerCase.allCases)", "@Test(arguments: [DarwinGateFileOwnerCase.nonRootUser, .nonWheelGroup])"),
+    "gate-post-spawn-drift-vacuity": ("focused", "func postSpawnGateOwnerDriftFailsClosed(", "func disabledPostSpawnGateOwnerDriftFailsClosed("),
+    "gate-post-spawn-owner-case-removed": ("focused", "DarwinExecutableMutation.ownerUserID,\n        DarwinExecutableMutation.ownerGroupID,", "DarwinExecutableMutation.ownerUserID,"),
+    "gate-nonroot-case-vacuity": ("focused", "var userID: uid_t {\n        switch self {\n        case .nonRootUser: 501", "var userID: uid_t {\n        switch self {\n        case .nonRootUser: 0"),
+    "gate-nonwheel-case-vacuity": ("focused", "var groupID: gid_t {\n        switch self {\n        case .nonRootUser: 0\n        case .nonWheelGroup: 20", "var groupID: gid_t {\n        switch self {\n        case .nonRootUser: 0\n        case .nonWheelGroup: 0"),
+    "gate-boundary-marker-vacuity": ("boundary", "func iiCB1RootOwnedGateVerifierPinsCurrentTreeContractAndScope()", "func disabledIICB1RootOwnedGateVerifierPinsCurrentTreeContractAndScope()"),
+    "gate-process-user-root": ("transport", "requiredUserID: uid_t = 501", "requiredUserID: uid_t = 0"),
+    "gate-process-group-wheel": ("transport", "requiredGroupID: gid_t = 20", "requiredGroupID: gid_t = 0"),
+    "gate-physical-test-vacuity": ("physical", "func userOwnedTemporaryGateFailsClosedBeforeSpawn()", "func disabledUserOwnedTemporaryGateFailsClosedBeforeSpawn()"),
+    "gate-physical-coordinator-uid-vacuity": ("physical", "#expect(evidence.coordinator.userID == 501)", "#expect(true)"),
+    "gate-physical-coordinator-gid-vacuity": ("physical", "#expect(evidence.coordinator.groupID == 20)", "#expect(true)"),
+    "gate-physical-owner-vacuity": ("physical", "#expect(gateStatus.st_uid == geteuid())", "#expect(true)"),
+    "gate-physical-group-vacuity": ("physical", "#expect(gateStatus.st_gid == getegid())", "#expect(true)"),
+    "gate-physical-error-vacuity": ("physical", '#expect(report.error == "spawnFailedBeforeTransfer")', "#expect(true)"),
+    "gate-physical-pid-vacuity": ("physical", "#expect(report.gateProcessID == nil)", "#expect(true)"),
+    "gate-physical-pgid-vacuity": ("physical", "#expect(report.gateProcessGroupID == nil)", "#expect(true)"),
+    "gate-physical-coordinator-reap-vacuity": ("physical", "#expect(evidence.coordinatorAbsentAfterReap)", "#expect(true)"),
+    "gate-physical-pid-record-vacuity": ("physical", "#expect(evidence.gatePIDRecordAbsent)", "#expect(true)"),
+    "gate-physical-capsule-vacuity": ("physical", "#expect(report.capsuleRemoved)", "#expect(true)"),
+    "gate-physical-foreground-vacuity": ("physical", "#expect(report.foregroundRestored)", "#expect(true)"),
+    "gate-physical-attempt-vacuity": ("physical", "#expect(try fixture.machineGateAttemptNames().isEmpty)", "#expect(true)"),
+    "gate-physical-early-return": ("physical", "defer { fixture.remove() }", "defer { fixture.remove() }\n        return"),
+    "gate-physical-observed-uid-spoof": ("physical", "userID: uid_t(value.pbi_uid)", "userID: getuid()"),
+    "gate-physical-observed-gid-spoof": ("physical", "groupID: gid_t(value.pbi_gid)", "groupID: getgid()"),
+}
+if len(mutations) != 51:
+    raise SystemExit("ii-c-b1 mutation inventory drifted")
+expected = (
+    "7d86510b67b92f8dd1e2773faca3f1faeccaeb113a1292fb91a17db5f4386613",
+    "2ae5f50fd8d60135caf007096d171315d3fed228da10f6fbfff3bde1187a3dd5",
+    "675beba1701ff8d6b25aebc93f9b3fa58918fe301412106b7f08f0dfdb5f29ed",
+    "6c5694bc67a60c0af8f0df68ad438d249cca9046a96665c938b77e87fd8abfae",
+    "58fb1aec6e6a888b7c92064a142a57e777dc90185d5012947e5bc49be3838504",
+)
+if mutation_mode == "true":
+    if mutation_name not in mutations:
+        raise SystemExit("ii-c-b1 unrecognized mutation")
+    if mutation_slot not in slot_names:
+        raise SystemExit("ii-c-b1 mutation slot drifted")
+    if re.fullmatch(r"[0-9a-f]{64}", mutation_sha) is None:
+        raise SystemExit("ii-c-b1 mutation SHA drifted")
+    index = slot_names.index(mutation_slot)
+    expected_slot, old, new = mutations[mutation_name]
+    if mutation_slot != expected_slot or canonical[index].count(old) != 1:
+        raise SystemExit("ii-c-b1 mutation contract drifted")
+    if sources[index] != canonical[index].replace(old, new, 1):
+        raise SystemExit("ii-c-b1 unrecognized mutation")
+    if mutation_sha == expected[index]:
+        raise SystemExit("ii-c-b1 mutation source unchanged")
+    expected = expected[:index] + (mutation_sha,) + expected[index + 1:]
+elif mutation_mode != "false" or mutation_name or mutation_slot or mutation_sha:
+    raise SystemExit("ii-c-b1 mutation mode drifted")
+observed = tuple(hashlib.sha256(value.encode()).hexdigest() for value in sources)
+if observed != expected:
+    raise SystemExit(
+        "ii-c-b1 mutation digest drifted"
+        if mutation_mode == "true" else "ii-c-b1 sealed source drifted"
+    )
+
+def code_only(source):
+    output = list(source)
+    index = 0
+    block_depth = 0
+    string_end = None
+    raw_hashes = ""
+    while index < len(source):
+        if block_depth:
+            if source.startswith("/*", index):
+                output[index:index + 2] = "  "; block_depth += 1; index += 2
+            elif source.startswith("*/", index):
+                output[index:index + 2] = "  "; block_depth -= 1; index += 2
+            else:
+                if source[index] != "\n": output[index] = " "
+                index += 1
+            continue
+        if string_end is not None:
+            if source.startswith(string_end, index):
+                width = len(string_end)
+                output[index:index + width] = " " * width
+                index += width; string_end = None; raw_hashes = ""
+            elif not raw_hashes and source[index] == "\\":
+                output[index] = " "
+                if index + 1 < len(source) and source[index + 1] != "\n":
+                    output[index + 1] = " "
+                index += 2
+            else:
+                if source[index] != "\n": output[index] = " "
+                index += 1
+            continue
+        if source.startswith("//", index):
+            end = source.find("\n", index)
+            end = len(source) if end < 0 else end
+            output[index:end] = " " * (end - index); index = end
+        elif source.startswith("/*", index):
+            output[index:index + 2] = "  "; block_depth = 1; index += 2
+        else:
+            opener = re.match(r'(#+)?("""|")', source[index:])
+            if opener is None:
+                index += 1; continue
+            hashes = opener.group(1) or ""
+            quote = opener.group(2)
+            width = len(opener.group(0))
+            output[index:index + width] = " " * width
+            string_end = quote + hashes; raw_hashes = hashes; index += width
+    if block_depth or string_end is not None:
+        raise SystemExit("ii-c-b1 Swift lexical scan drifted")
+    return "".join(output)
+
+def function_body(source, signature):
+    start = source.find(signature)
+    if start < 0:
+        raise SystemExit("ii-c-b1 executable admission sequence drifted")
+    opening = source.find("{", start + len(signature))
+    if opening < 0:
+        raise SystemExit("ii-c-b1 executable admission sequence drifted")
+    depth = 0
+    for index in range(opening, len(source)):
+        depth += source[index] == "{"
+        depth -= source[index] == "}"
+        if depth == 0:
+            return source[opening + 1:index]
+    raise SystemExit("ii-c-b1 executable admission sequence drifted")
+
+lifecycle, focused, boundary, transport, physical = sources
+lexical_lifecycle = code_only(lifecycle)
+validator = function_body(lexical_lifecycle, "private func validateExecutable(")
+compact_validator = re.sub(r"\s+", "", validator)
+if compact_validator.count("value.ownerUserID==0") != 1 \
+        or compact_validator.count("value.ownerGroupID==0") != 1:
+    raise SystemExit("ii-c-b1 Gate file ownership drifted")
+if any(call in compact_validator for call in ("getuid(", "geteuid(", "getgid(", "getegid(")) \
+        or "||" in compact_validator:
+    raise SystemExit("ii-c-b1 Gate file ownership drifted")
+for marker in (
+    "value.descriptor>=3",
+    "value.descriptorIdentity==value.namedIdentity",
+    "value.descriptorIdentity.device>0",
+    "value.descriptorIdentity.inode>0",
+    "(1...Int64(Self.maximumExecutableBytes)).contains(value.descriptorIdentity.size)",
+    "value.permissions==0o755",
+    "value.linkCount==1",
+    "value.flags==0",
+    "value.extendedACLIsEmpty",
+    "Set(value.extendedAttributeNames).count==value.extendedAttributeNames.count",
+    "value.sha256==value.bytesSHA256",
+    "value.sha256.rawBytes.contains(where:{$0!=0})",
+):
+    if compact_validator.count(marker) != 1:
+        raise SystemExit("ii-c-b1 executable metadata drifted")
+if lifecycle.count('value.path.hasSuffix("/" + Self.gateName)') != 1 \
+        or lifecycle.count('$0 == "com.apple.provenance"') != 1:
+    raise SystemExit("ii-c-b1 executable metadata drifted")
+run = function_body(lexical_lifecycle, "func run(")
+compact_run = re.sub(r"\s+", "", run)
+sequence = (
+    "acquireSiblingExecutable(name:Self.gateName,maximumByteCount:Self.maximumExecutableBytes)",
+    "validateExecutable(acquired)",
+    "revalidateGateExecutable(descriptor:acquired.descriptor)",
+    "validateExecutable(beforeSpawn)",
+    "spawnGate(request)",
+    "revalidateGateExecutable(descriptor:acquired.descriptor)",
+    "validateExecutable(afterSpawn)",
+)
+positions = []
+cursor = 0
+for marker in sequence:
+    position = compact_run.find(marker, cursor)
+    if position < 0:
+        raise SystemExit("ii-c-b1 executable admission sequence drifted")
+    positions.append(position); cursor = position + len(marker)
+if positions != sorted(positions):
+    raise SystemExit("ii-c-b1 executable admission sequence drifted")
+if compact_run.count("revalidateGateExecutable(descriptor:acquired.descriptor)") != 2:
+    raise SystemExit("ii-c-b1 executable admission sequence drifted")
+if compact_run.count("guardbeforeSpawn==acquired,validateExecutable(beforeSpawn)else{") != 1 \
+        or compact_run.count("ifafterSpawn!=acquired||!validateExecutable(afterSpawn){") != 1:
+    raise SystemExit("ii-c-b1 executable admission sequence drifted")
+
+lexical_focused = code_only(focused)
+compact_focused = re.sub(r"\s+", "", lexical_focused)
+for signature in (
+    "func rootWheelGateExecutablePassesAllThreeAdmissions(",
+    "func nonRootOrNonWheelGateOwnerFailsAtInitialAdmission(",
+    "func postSpawnGateOwnerDriftFailsClosed(",
+):
+    if signature not in lexical_focused:
+        raise SystemExit("ii-c-b1 focused tests became vacuous")
+owner_user = re.sub(r"\s+", "", function_body(lexical_focused, "var userID: uid_t"))
+owner_group = re.sub(r"\s+", "", function_body(lexical_focused, "var groupID: gid_t"))
+if owner_user != "switchself{case.nonRootUser:501case.nonWheelGroup:0case.arbitrary:502}":
+    raise SystemExit("ii-c-b1 focused tests became vacuous")
+if owner_group != "switchself{case.nonRootUser:0case.nonWheelGroup:20case.arbitrary:21}":
+    raise SystemExit("ii-c-b1 focused tests became vacuous")
+root_test = re.sub(r"\s+", "", function_body(
+    lexical_focused, "func rootWheelGateExecutablePassesAllThreeAdmissions("
+))
+initial_rejection_test = re.sub(r"\s+", "", function_body(
+    lexical_focused, "func nonRootOrNonWheelGateOwnerFailsAtInitialAdmission("
+))
+post_spawn_test = re.sub(r"\s+", "", function_body(
+    lexical_focused, "func postSpawnGateOwnerDriftFailsClosed("
+))
+for marker in (
+    "gateOwnerUserID:uid_t=0",
+    "gateOwnerGroupID:gid_t=0",
+    "@Test(arguments:DarwinGateFileOwnerCase.allCases)",
+    "casenonRootUser", "casenonWheelGroup", "casearbitrary",
+    "casepostSpawnExecutable(DarwinExecutableMutation)",
+    "caseownerUserID,ownerGroupID",
+    "@Test(arguments:[DarwinExecutableMutation.ownerUserID,DarwinExecutableMutation.ownerGroupID,])",
+):
+    if marker not in compact_focused:
+        raise SystemExit("ii-c-b1 focused tests became vacuous")
+for marker in (
+    "gateOwnerUserID:0,gateOwnerGroupID:0",
+    "==.exactGateReaped",
+    "$0==.acquireExecutable}.count==1",
+    "$0==.revalidateExecutable}.count==2",
+    r"filter(\.isSpawn).count==1",
+    "InvestigationMachineFixedGateContract.requiredUserID==501",
+    "InvestigationMachineFixedGateContract.requiredGroupID==20",
+):
+    if root_test.count(marker) != 1:
+        raise SystemExit("ii-c-b1 focused tests became vacuous")
+for marker in (
+    "gateOwnerUserID:owner.userID,gateOwnerGroupID:owner.groupID",
+    "==.definitelyNotSpawned",
+    "!system.events.contains(.revalidateExecutable)",
+    "!system.events.contains{$0.isSpawn}",
+):
+    if initial_rejection_test.count(marker) != 1:
+        raise SystemExit("ii-c-b1 focused tests became vacuous")
+for marker in (
+    "scenario:.postSpawnExecutable(mutation)",
+    "==.spawnOrTransferUncertain",
+    "$0==.revalidateExecutable}.count==2",
+    r"filter(\.isSpawn).count==1",
+    "contains(.signalProcess(SIGKILL))",
+    r"filter(\.isReap).count==1",
+    "!system.events.contains{$0.isPreparedRead}",
+):
+    if post_spawn_test.count(marker) != 1:
+        raise SystemExit("ii-c-b1 focused tests became vacuous")
+compact_transport = re.sub(r"\s+", "", code_only(transport))
+if compact_transport.count("packagestaticletrequiredUserID:uid_t=501") != 1 \
+        or compact_transport.count("packagestaticletrequiredGroupID:gid_t=20") != 1:
+    raise SystemExit("ii-c-b1 process identity drifted")
+lexical_physical = code_only(physical)
+physical_signature = "func userOwnedTemporaryGateFailsClosedBeforeSpawn("
+if physical_signature not in lexical_physical:
+    raise SystemExit("ii-c-b1 physical rejection test became vacuous")
+physical_test = re.sub(
+    r"\s+", "", function_body(lexical_physical, physical_signature)
+)
+for marker in (
+    "try#require(geteuid()==501)",
+    "try#require(getegid()==20)",
+    "lstat(fixture.gate.path,&gateStatus)==0",
+    "gateStatus.st_mode&S_IFMT==S_IFREG",
+    "gateStatus.st_mode&S_IFMT!=S_IFLNK",
+    "gateStatus.st_uid==geteuid()",
+    "gateStatus.st_gid==getegid()",
+    "gateStatus.st_uid!=0",
+    "gateStatus.st_gid!=0",
+    "gateStatus.st_mode&0o777==0o755",
+    "letevidence=tryfixture.run(.success)",
+    "evidence.coordinator.userID==501",
+    "evidence.coordinator.groupID==20",
+    "evidence.coordinatorAbsentAfterReap",
+    "evidence.gatePIDRecordAbsent",
+    "!report.succeeded",
+    "report.gateProcessID==nil",
+    "report.gateProcessGroupID==nil",
+    "!report.exactGateExited",
+    "report.capsuleRemoved",
+    "report.foregroundRestored",
+    "tryfixture.machineGateAttemptNames().isEmpty",
+):
+    if physical_test.count(marker) != 1:
+        raise SystemExit("ii-c-b1 physical rejection test became vacuous")
+if "return" in physical_test or "requireSuccessfulPhysicalHandoff" in physical_test \
+        or "cleanupTimeout" in physical_test or "for(" in physical_test:
+    raise SystemExit("ii-c-b1 physical rejection test became vacuous")
+raw_physical_test = function_body(physical, physical_signature)
+if raw_physical_test.count('#expect(report.error == "spawnFailedBeforeTransfer")') != 1:
+    raise SystemExit("ii-c-b1 physical rejection test became vacuous")
+compact_physical = re.sub(r"\s+", "", lexical_physical)
+for marker in (
+    "coordinatorObservation=tryphysicalDirectChildObservation(pid)",
+    "kill(pid,SIGCONT)",
+    "physicalReap(coordinatorToken,deadline:deadline)",
+    "physicalProcessToken(pid)!=coordinatorToken",
+    "gatePIDRecordAbsent:!FileManager.default.fileExists(atPath:gateRecord.path)",
+    "userID:uid_t(value.pbi_uid),groupID:gid_t(value.pbi_gid)",
+):
+    if compact_physical.count(marker) != 1:
+        raise SystemExit("ii-c-b1 physical rejection test became vacuous")
+if compact_physical.find("coordinatorObservation=tryphysicalDirectChildObservation(pid)") \
+        > compact_physical.find("kill(pid,SIGCONT)"):
+    raise SystemExit("ii-c-b1 physical rejection test became vacuous")
+for marker in (
+    "iiCB1RootOwnedGateVerifierPinsCurrentTreeContractAndScope",
+    "--iic-b1-root-owned-gate-source-contract-only",
+    "--iic-b1-root-owned-gate-mutation-contract-only",
+    "--iic-b1-root-owned-gate-staged-scope-contract-only",
+    "--iic-b1-root-owned-gate-component-boundary-only",
+    "--iic-b1-root-owned-gate-contract-only",
+):
+    if marker not in boundary:
+        raise SystemExit("ii-c-b1 boundary marker drifted")
+for forbidden in (
+    r"\bsudo\b", r"\bAuthorization\b", r"\blaunchctl\b",
+    r"\bProcess\s*\(", r"\bposix_spawn", r"\bset(?:e)?uid\s*\(",
+    r"\bset(?:e)?gid\s*\(", r"\bchown\s*\(", r"\bchmod\s*\(",
+    r"\bremoveItem\b", r"\btrashItem\b", r"\bRegisteredAction\b",
+    r"\bActionExecutor\b", r"\bsignedRuntimeReady\b", r"\breadiness\b",
+):
+    if re.search(forbidden, lexical_lifecycle):
+        raise SystemExit("ii-c-b1 prohibited authority drifted")
+PY
+}
+
+function verify_iicb1_root_owned_gate_staged_scope() {
+    local baseline=${1:-41f5dba1b7ff7f1272d5a2607ae9794b266e6c47}
+    local expected_baseline=41f5dba1b7ff7f1272d5a2607ae9794b266e6c47
+    local -a expected=(
+        Sources/StornautInvestigationMachineLaunchSupport/InvestigationFixedGateDarwinLifecycle.swift
+        Tests/StornautInvestigationTests/InvestigationFixedGateDarwinLifecycleTests.swift
+        Tests/StornautInvestigationTests/InvestigationFixedGateHandoffPhysicalTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-investigation-boundaries
+        scripts/verify-app-release-boundaries
+        scripts/verify-contract
+    )
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" == \
+        $expected_baseline ]] || {
+        print -u2 "ii-c-b1 checkpoint baseline drifted"; return 1
+    }
+    local filtered deleted_text observed_text changed item mode entry
+    deleted_text=$(git diff --cached --name-only --diff-filter=D "$baseline" \
+        | awk 'index($0,"docs/")!=1 && $0!="AGENTS.md" && $0!="README.md"')
+    [[ -z $deleted_text ]] || {
+        print -u2 "ii-c-b1 checkpoint deleted an existing path"; return 1
+    }
+    observed_text=$(git diff --cached --name-only --diff-filter=ACMRD \
+        "$baseline" | awk 'index($0,"docs/")!=1 && $0!="AGENTS.md" && $0!="README.md"')
+    local -a observed=(${(f)observed_text})
+    (( ${#expected} == 7 && ${#observed} <= 7 )) || {
+        print -u2 "ii-c-b1 checkpoint path ceiling drifted"; return 1
+    }
+    [[ "${(j:\n:)${(@on)observed}}" == \
+        "${(j:\n:)${(@on)expected}}" ]] || {
+        print -u2 "ii-c-b1 checkpoint paths drifted"; return 1
+    }
+    changed=$(git diff --cached --numstat "$baseline" \
+        | awk 'index($3,"docs/")!=1 && $3!="AGENTS.md" && $3!="README.md" {if($1=="-"||$2=="-")exit 2;n+=$1+$2} END{print n+0}') || {
+        print -u2 "ii-c-b1 binary checkpoint path rejected"; return 1
+    }
+    (( changed <= 1900 )) || {
+        print -u2 "ii-c-b1 checkpoint budget drifted"; return 1
+    }
+    local worktree_text
+    worktree_text=$(git diff --name-only --diff-filter=ACMRD -- \
+        | awk 'index($0,"docs/")!=1 && $0!="AGENTS.md" && $0!="README.md"')
+    local -a worktree_paths=(${(f)worktree_text})
+    for item in "${worktree_paths[@]}"; do
+        (( ${expected[(Ie)$item]} )) || {
+            print -u2 "ii-c-b1 checkpoint worktree paths drifted"; return 1
+        }
+    done
+    local untracked_text
+    untracked_text=$(git ls-files --others --exclude-standard -- \
+        | awk 'index($0,"docs/")!=1 && $0!="AGENTS.md" && $0!="README.md"')
+    [[ -z $untracked_text ]] || {
+        print -u2 "ii-c-b1 checkpoint untracked paths drifted"; return 1
+    }
+    for item in "${expected[@]}"; do
+        mode=100644; [[ $item == scripts/* ]] && mode=100755
+        entry=$(git ls-files -s -- "$item")
+        [[ "$(print -r -- "$entry" | awk '{print $1, $3, $4}')" \
+                == "$mode 0 $item" ]] || {
+            print -u2 "ii-c-b1 staged source/mode drifted: $item"; return 1
+        }
+        [[ "$(print -r -- "$entry" | awk '{print $2}')" \
+                == "$(git hash-object -- "$item")" ]] || {
+            print -u2 "ii-c-b1 staged/worktree source drifted: $item"; return 1
+        }
+    done
 }
 
 function verify_shared_deadline_contract() {
@@ -14853,6 +15334,22 @@ if $iica_staged_scope_contract_only; then
     print "ii-c-a staged scope verification passed."
     exit 0
 fi
+if $iicb1_root_owned_gate_source_contract_only; then
+    verify_iicb1_root_owned_gate_source_contract
+    print "ii-c-b1 root-owned Gate source verification passed."
+    exit 0
+fi
+if $iicb1_root_owned_gate_mutation_contract_only; then
+    verify_iicb1_root_owned_gate_source_contract
+    print "ii-c-b1 root-owned Gate mutation verification passed."
+    exit 0
+fi
+if $iicb1_root_owned_gate_staged_scope_contract_only; then
+    verify_iicb1_root_owned_gate_staged_scope \
+        "$iicb1_root_owned_gate_staged_scope_baseline"
+    print "ii-c-b1 root-owned Gate staged scope verification passed."
+    exit 0
+fi
 if $iic0bivb1_handoff_contract_only; then
     verify_iic0bivb1_handoff_contract \
         "$iic0bivb1_fixture_source" "$iic0bivb1_physical_test_source" \
@@ -15087,7 +15584,7 @@ verify_iic0bi_producer_contract \
     "$iic0bi_focused_test" \
     Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
 verify_interactive_native_source_contract
-verify_iica_source_contract
+verify_iicb1_root_owned_gate_source_contract
 verify_iib5biib_app_identity_contract \
     Package.swift \
     Sources/CInvestigationIdentitySupport/CInvestigationIdentitySupport.c \

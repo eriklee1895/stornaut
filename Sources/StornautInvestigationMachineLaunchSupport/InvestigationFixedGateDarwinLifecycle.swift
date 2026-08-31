@@ -676,7 +676,7 @@ final class InvestigationFixedGateDarwinLifecycle:
             && value.descriptorIdentity.inode > 0
             && (1...Int64(Self.maximumExecutableBytes))
                 .contains(value.descriptorIdentity.size)
-            && value.ownerUserID == getuid() && value.ownerGroupID == getgid()
+            && value.ownerUserID == 0 && value.ownerGroupID == 0
             && value.permissions == 0o755 && value.linkCount == 1
             && value.flags == 0 && value.extendedACLIsEmpty
             && Set(value.extendedAttributeNames).count
