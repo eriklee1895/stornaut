@@ -127,6 +127,7 @@ package struct InvestigationMachineRawEvidenceSeal:
     package let contentRootSHA256: InvestigationHandoffSHA256
     package let artifactCount: Int
     package let totalByteCount: UInt64
+    package let attemptSummary: InvestigationMachineAttemptSummary
 }
 
 package final class InvestigationMachineRawEvidenceWriter:
@@ -188,7 +189,8 @@ package final class InvestigationMachineRawEvidenceWriter:
         self.system = system
         self.parentDescriptor = parentDescriptor
         parentIdentity = expectedParentIdentity
-        owner = system.effectiveIdentity()
+        let expectedOwner = system.effectiveIdentity()
+        owner = expectedOwner
         self.campaignUUID = campaignUUID
         self.attemptUUID = attemptUUID
         self.mode = mode
@@ -200,10 +202,10 @@ package final class InvestigationMachineRawEvidenceWriter:
         var openedRoot = Int32(-1)
         var openedPhases: [InvestigationMachineEvidencePhase: Int32] = [:]
         do {
-            try Self.validateParent(
+            try Self.atInitialization(.validateParent) { try Self.validateParent(
                 descriptor: parentDescriptor, expected: expectedParentIdentity,
-                owner: owner, system: system
-            )
+                owner: expectedOwner, system: system
+            ) }
             do {
                 try system.createDirectory(
                     parentDescriptor: parentDescriptor,
@@ -239,12 +241,14 @@ package final class InvestigationMachineRawEvidenceWriter:
             try Self.atInitialization(.validateDirectory) {
                 try system.setPermissions(descriptor: openedRoot, mode: 0o700)
             }
-            let rootMetadata = try Self.validateDirectory(
+            let rootMetadata = try Self.atInitialization(.validateDirectory) {
+                try Self.validateDirectory(
                 descriptor: openedRoot, parent: parentDescriptor,
                 name: Self.rootName(campaignUUID: campaignUUID),
-                baseDevice: expectedParentIdentity.device, owner: owner,
+                baseDevice: expectedParentIdentity.device, owner: expectedOwner,
                 system: system
-            )
+                )
+            }
             try Self.atInitialization(.synchronizeDirectory) {
                 try system.synchronize(descriptor: parentDescriptor)
             }
@@ -281,11 +285,13 @@ package final class InvestigationMachineRawEvidenceWriter:
                 try Self.atInitialization(.validateDirectory) {
                     try system.setPermissions(descriptor: descriptor, mode: 0o700)
                 }
-                _ = try Self.validateDirectory(
+                _ = try Self.atInitialization(.validateDirectory) {
+                    try Self.validateDirectory(
                     descriptor: descriptor, parent: openedRoot,
                     name: phase.directoryName, baseDevice: rootMetadata.identity.device,
-                    owner: owner, system: system
-                )
+                    owner: expectedOwner, system: system
+                    )
+                }
             }
             try Self.atInitialization(.synchronizeDirectory) {
                 try system.synchronize(descriptor: openedRoot)
@@ -394,13 +400,14 @@ package final class InvestigationMachineRawEvidenceWriter:
                     descriptor: parentDescriptor, expected: parentIdentity,
                     owner: owner, system: system
                 ) }
-                try InvestigationMachineAttemptEventChain.validateComplete(
+                let attemptSummary = try InvestigationMachineAttemptEventChain.summary(
                     events, mode: mode
                 )
                 try validateCompleteTree()
                 let manifest = try InvestigationMachineEvidenceManifestV1(
                     campaignUUID: campaignUUID, attemptUUID: attemptUUID,
-                    sourceBinding: sourceBinding, artifacts: artifacts
+                    sourceBinding: sourceBinding, artifacts: artifacts,
+                    attemptSummary: attemptSummary
                 )
                 let manifestBytes = try manifest.encoded()
                 try publishManifest(manifestBytes)
@@ -419,11 +426,13 @@ package final class InvestigationMachineRawEvidenceWriter:
                 try validateCompleteTree(
                     expectedManifest: manifest, expectedBytes: manifestBytes
                 )
-                let finalRoot = try Self.validateDirectory(
-                    descriptor: rootDescriptor, parent: parentDescriptor,
-                    name: Self.rootName(campaignUUID: campaignUUID),
-                    baseDevice: parentIdentity.device, owner: owner, system: system
-                )
+                let finalRoot = try at(.validateDirectory) {
+                    try Self.validateDirectory(
+                        descriptor: rootDescriptor, parent: parentDescriptor,
+                        name: Self.rootName(campaignUUID: campaignUUID),
+                        baseDevice: parentIdentity.device, owner: owner, system: system
+                    )
+                }
                 guard Self.sameDirectoryNode(
                     finalRoot.identity, initialRootMetadata.identity
                 ) else {
@@ -438,7 +447,8 @@ package final class InvestigationMachineRawEvidenceWriter:
                     manifestSHA256: manifest.manifestSHA256,
                     contentRootSHA256: manifest.contentRootSHA256,
                     artifactCount: manifest.artifacts.count,
-                    totalByteCount: manifest.totalByteCount
+                    totalByteCount: manifest.totalByteCount,
+                    attemptSummary: attemptSummary
                 )
             } catch let error as InvestigationMachineEvidenceContractError {
                 state = .uncertain
@@ -558,16 +568,7 @@ package final class InvestigationMachineRawEvidenceWriter:
                 parentDescriptor: parent, name: pending,
                 flags: Self.pendingWriterFlags, mode: 0o600
             ) }
-            guard writer >= 3, writer != parent, writer != parentDescriptor,
-                  writer != rootDescriptor else {
-                let isAlias = writer == parent || writer == parentDescriptor
-                    || writer == rootDescriptor
-                let closeCertain = writer < 0 || isAlias
-                    || closeBestEffort(&writer)
-                writer = -1
-                guard closeCertain else { return try poison(.closeDescriptor) }
-                return try poison(.createPending)
-            }
+            try admitOpenedDescriptor(&writer, stage: .createPending)
             try at(.validatePending) {
                 try system.setPermissions(descriptor: writer, mode: 0o600)
             }
@@ -592,16 +593,9 @@ package final class InvestigationMachineRawEvidenceWriter:
                 parentDescriptor: parent, name: name,
                 flags: Self.finalReaderFlags, mode: nil
             ) }
-            guard reader >= 3, reader != parent, reader != parentDescriptor,
-                  reader != rootDescriptor, reader != writer else {
-                let isAlias = reader == parent || reader == parentDescriptor
-                    || reader == rootDescriptor || reader == writer
-                let closeCertain = reader < 0 || isAlias
-                    || closeBestEffort(&reader)
-                reader = -1
-                guard closeCertain else { return try poison(.closeDescriptor) }
-                return try poison(.reopenFinal)
-            }
+            try admitOpenedDescriptor(
+                &reader, stage: .reopenFinal, additionalAliases: [writer]
+            )
             let finalMetadata = try at(.validateFinal) { try Self.validateFile(
                 descriptor: reader, parent: parent, name: name,
                 baseDevice: baseDevice, owner: owner,
@@ -678,12 +672,12 @@ package final class InvestigationMachineRawEvidenceWriter:
             guard let descriptor = phaseDescriptors[phase] else {
                 return try poison(.validateDirectory)
             }
-            _ = try Self.validateDirectory(
+            _ = try at(.validateDirectory) { try Self.validateDirectory(
                 descriptor: descriptor, parent: rootDescriptor,
                 name: phase.directoryName,
                 baseDevice: initialRootMetadata.identity.device, owner: owner,
                 system: system
-            )
+            ) }
             let expected = artifacts.filter { $0.path.phase == phase }
             let inventory = try at(.inventory) { try system.inventory(
                 descriptor: descriptor,
@@ -695,33 +689,37 @@ package final class InvestigationMachineRawEvidenceWriter:
                   inventory.names.count == expected.count
             else { return try poison(.inventory) }
             for artifact in expected {
-                let reader = try at(.reopenFinal) { try system.openComponent(
+                var local = try at(.reopenFinal) { try system.openComponent(
                     parentDescriptor: descriptor, name: artifact.path.leafName,
                     flags: Self.finalReaderFlags, mode: nil
                 ) }
-                var local = reader
+                try admitOpenedDescriptor(&local, stage: .reopenFinal)
+                let reader = local
                 do {
-                    let metadata = try Self.validateFile(
+                    let metadata = try at(.validateFinal) { try Self.validateFile(
                         descriptor: reader, parent: descriptor,
                         name: artifact.path.leafName,
                         baseDevice: initialRootMetadata.identity.device, owner: owner,
                         expectedSize: Int64(artifact.byteCount), accessMode: O_RDONLY,
                         system: system
-                    )
+                    ) }
                     let bytes = try readExactly(
                         reader, count: Int(artifact.byteCount)
                     )
                     let reachedEOF = try at(.readFinal) { try system.read(
                         descriptor: reader, maximumByteCount: 1,
                         offset: Int64(artifact.byteCount)).isEmpty }
-                    guard reachedEOF,
-                          InvestigationHandoffSHA256.hashing(bytes) == artifact.sha256,
-                          try Self.validateFile(
+                    let postReadMetadata = try at(.validateFinal) {
+                        try Self.validateFile(
                             descriptor: reader, parent: descriptor,
                             name: artifact.path.leafName,
                             baseDevice: initialRootMetadata.identity.device,
                             owner: owner, expectedSize: Int64(artifact.byteCount),
-                            accessMode: O_RDONLY, system: system) == metadata
+                            accessMode: O_RDONLY, system: system)
+                    }
+                    guard reachedEOF,
+                          InvestigationHandoffSHA256.hashing(bytes) == artifact.sha256,
+                          postReadMetadata == metadata
                     else { return try poison(.validateFinal) }
                     try closeLocal(&local)
                 } catch {
@@ -735,11 +733,12 @@ package final class InvestigationMachineRawEvidenceWriter:
             }
         }
         if includeManifest {
-            let reader = try at(.reopenFinal) { try system.openComponent(
+            var local = try at(.reopenFinal) { try system.openComponent(
                 parentDescriptor: rootDescriptor, name: "manifest.bin",
                 flags: Self.finalReaderFlags, mode: nil
             ) }
-            var local = reader
+            try admitOpenedDescriptor(&local, stage: .reopenFinal)
+            let reader = local
             do {
                 let expectedManifest = try expectedManifest
                     .unwrapped(or: InvestigationMachineRawEvidenceError
@@ -747,13 +746,13 @@ package final class InvestigationMachineRawEvidenceWriter:
                 let expectedBytes = try expectedBytes
                     .unwrapped(or: InvestigationMachineRawEvidenceError
                         .uncertain(stage: .validateFinal))
-                let metadata = try Self.validateFile(
+                let metadata = try at(.validateFinal) { try Self.validateFile(
                     descriptor: reader, parent: rootDescriptor,
                     name: "manifest.bin",
                     baseDevice: initialRootMetadata.identity.device, owner: owner,
                     expectedSize: Int64(expectedBytes.count),
                     accessMode: O_RDONLY, system: system
-                )
+                ) }
                 guard metadata.identity.size > 0, expectedBytes.count <=
                         InvestigationMachineEvidenceManifestV1.maximumByteCount
                 else { return try poison(.validateFinal) }
@@ -763,12 +762,12 @@ package final class InvestigationMachineRawEvidenceWriter:
                     offset: Int64(expectedBytes.count)
                 ).isEmpty }
                 let decoded = try InvestigationMachineEvidenceManifestV1.decode(bytes)
-                let postReadMetadata = try Self.validateFile(
+                let postReadMetadata = try at(.validateFinal) { try Self.validateFile(
                     descriptor: reader, parent: rootDescriptor, name: "manifest.bin",
                     baseDevice: initialRootMetadata.identity.device, owner: owner,
                     expectedSize: Int64(expectedBytes.count), accessMode: O_RDONLY,
                     system: system
-                )
+                ) }
                 guard bytes == expectedBytes, reachedEOF,
                       decoded == expectedManifest, postReadMetadata == metadata
                 else { return try poison(.validateFinal) }
@@ -858,6 +857,24 @@ package final class InvestigationMachineRawEvidenceWriter:
         descriptor = -1
         do { try system.close(descriptor: value); return true }
         catch { return false }
+    }
+
+    private func admitOpenedDescriptor(
+        _ descriptor: inout Int32,
+        stage: InvestigationMachineRawEvidenceFailureStage,
+        additionalAliases: [Int32] = []
+    ) throws {
+        let value = descriptor
+        let isAlias = value == parentDescriptor || value == rootDescriptor
+            || phaseDescriptors.values.contains(value)
+            || additionalAliases.contains(value)
+        guard value >= 3, !isAlias else {
+            let closeCertain = value < 0 || isAlias
+                || closeBestEffort(&descriptor)
+            descriptor = -1
+            guard closeCertain else { return try poison(.closeDescriptor) }
+            return try poison(stage)
+        }
     }
 
     private func closeOwnedDescriptors() throws {

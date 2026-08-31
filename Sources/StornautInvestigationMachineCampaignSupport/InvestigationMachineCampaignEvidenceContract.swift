@@ -251,6 +251,86 @@ package struct InvestigationMachineCampaignSourceBinding:
     }
 }
 
+package enum InvestigationMachineAttemptMode: UInt32, Hashable, Sendable {
+    case dryRun = 1
+    case privileged = 2
+}
+
+package enum InvestigationMachineAttemptOutcome: UInt32, Hashable, Sendable {
+    case cancelledBeforeArm = 1
+    case spawnObservedTerminal = 2
+    case spawnUncertainTerminal = 3
+}
+
+package struct InvestigationMachineAttemptSummary: Equatable, Sendable {
+    package static let domain = "stornaut.task39.iic.attempt-summary.v1"
+    package let attemptUUID: UUID
+    package let mode: InvestigationMachineAttemptMode
+    package let outcome: InvestigationMachineAttemptOutcome
+    package let consumed: Bool
+    package let eventCount: UInt32
+    package let finalEventSHA256: InvestigationHandoffSHA256
+
+    package init(
+        attemptUUID: UUID, mode: InvestigationMachineAttemptMode,
+        outcome: InvestigationMachineAttemptOutcome, consumed: Bool,
+        eventCount: UInt32, finalEventSHA256: InvestigationHandoffSHA256
+    ) throws {
+        let shapeIsValid = switch (mode, outcome) {
+        case (.dryRun, .cancelledBeforeArm): !consumed && eventCount == 2
+        case (.privileged, .cancelledBeforeArm): !consumed && eventCount == 2
+        case (.privileged, .spawnObservedTerminal),
+             (.privileged, .spawnUncertainTerminal): consumed && eventCount == 4
+        default: false
+        }
+        guard nonzero(attemptUUID), shapeIsValid,
+              finalEventSHA256.rawBytes.contains(where: { $0 != 0 })
+        else { throw InvestigationMachineEvidenceContractError.invalidTransition }
+        self.attemptUUID = attemptUUID
+        self.mode = mode
+        self.outcome = outcome
+        self.consumed = consumed
+        self.eventCount = eventCount
+        self.finalEventSHA256 = finalEventSHA256
+    }
+
+    package func encoded() throws -> Data {
+        try HandoffBinaryTranscript.encode(
+            domain: Self.domain, businessFields: [
+                data(attemptUUID), data(mode.rawValue), data(outcome.rawValue),
+                data(consumed), data(eventCount), finalEventSHA256.rawBytes,
+            ], maximumByteCount: 256
+        )
+    }
+
+    package static func decode(_ bytes: Data) throws -> Self {
+        do {
+            let fields = try HandoffBinaryTranscript.decode(
+                bytes, expectedDomain: domain,
+                expectedBusinessFieldByteCounts: [
+                    16...16, 4...4, 4...4, 1...1, 4...4, 32...32,
+                ], maximumByteCount: 256
+            )
+            guard let mode = InvestigationMachineAttemptMode(
+                    rawValue: try decodeUInt32(fields[1])),
+                  let outcome = InvestigationMachineAttemptOutcome(
+                    rawValue: try decodeUInt32(fields[2]))
+            else { throw InvestigationMachineEvidenceContractError.invalidEncoding }
+            let value = try Self(
+                attemptUUID: try decodeUUID(fields[0]), mode: mode,
+                outcome: outcome, consumed: try decodeBool(fields[3]),
+                eventCount: try decodeUInt32(fields[4]),
+                finalEventSHA256: try .init(rawBytes: fields[5])
+            )
+            guard try value.encoded() == bytes else {
+                throw InvestigationMachineEvidenceContractError.invalidEncoding
+            }
+            return value
+        } catch let error as InvestigationMachineEvidenceContractError { throw error }
+        catch { throw InvestigationMachineEvidenceContractError.invalidEncoding }
+    }
+}
+
 package struct InvestigationMachineEvidenceManifestV1:
     Equatable, Sendable
 {
@@ -261,6 +341,7 @@ package struct InvestigationMachineEvidenceManifestV1:
 
     package let campaignUUID: UUID
     package let attemptUUID: UUID
+    package let attemptSummary: InvestigationMachineAttemptSummary
     package let sourceBinding: InvestigationMachineCampaignSourceBinding
     package let artifacts: [InvestigationMachineEvidenceArtifact]
     package let totalByteCount: UInt64
@@ -270,29 +351,27 @@ package struct InvestigationMachineEvidenceManifestV1:
     package init(
         campaignUUID: UUID, attemptUUID: UUID,
         sourceBinding: InvestigationMachineCampaignSourceBinding,
-        artifacts: some Sequence<InvestigationMachineEvidenceArtifact>
+        artifacts: some Sequence<InvestigationMachineEvidenceArtifact>,
+        attemptSummary: InvestigationMachineAttemptSummary
     ) throws {
         let values = artifacts.sorted {
             $0.path.relativeValue.utf8.lexicographicallyPrecedes(
                 $1.path.relativeValue.utf8)
         }
         guard nonzero(campaignUUID), nonzero(attemptUUID),
-              campaignUUID != attemptUUID, !values.isEmpty,
+              campaignUUID != attemptUUID,
+              attemptSummary.attemptUUID == attemptUUID, !values.isEmpty,
               values.count <= Self.maximumArtifactCount
         else { throw InvestigationMachineEvidenceContractError.invalidEncoding }
         let pathCount = Set(values.map(\.path)).count
         guard pathCount == values.count else {
             throw InvestigationMachineEvidenceContractError.duplicateArtifact
         }
-        for role in InvestigationMachineEvidenceRole.allCases {
-            let count = values.count { $0.role == role }
-            guard count > 0 else {
-                throw InvestigationMachineEvidenceContractError.missingRole
-            }
-            guard role.admitsCardinality(count) else {
-                throw InvestigationMachineEvidenceContractError.duplicateRole
-            }
-        }
+        try Self.validateRoles(values, summary: attemptSummary)
+        let eventArtifacts = values.filter { $0.role == .attemptEvent }
+        guard eventArtifacts.count == Int(attemptSummary.eventCount),
+              eventArtifacts.last?.sha256 == attemptSummary.finalEventSHA256
+        else { throw InvestigationMachineEvidenceContractError.invalidTransition }
         let sum = values.reduce(UInt64(0)) { partial, artifact in
             partial.addingReportingOverflow(artifact.byteCount).overflow
                 ? UInt64.max : partial + artifact.byteCount
@@ -302,12 +381,14 @@ package struct InvestigationMachineEvidenceManifestV1:
         }
         self.campaignUUID = campaignUUID
         self.attemptUUID = attemptUUID
+        self.attemptSummary = attemptSummary
         self.sourceBinding = sourceBinding
         self.artifacts = values
         totalByteCount = sum
         let bytes = try Self.transcript(
             campaignUUID: campaignUUID, attemptUUID: attemptUUID,
-            sourceBinding: sourceBinding, artifacts: values, totalByteCount: sum
+            sourceBinding: sourceBinding, artifacts: values,
+            attemptSummary: attemptSummary, totalByteCount: sum
         )
         manifestSHA256 = .hashing(bytes)
         contentRootSHA256 = try Self.contentRoot(manifestSHA256)
@@ -317,7 +398,7 @@ package struct InvestigationMachineEvidenceManifestV1:
         let value = try Self.transcript(
             campaignUUID: campaignUUID, attemptUUID: attemptUUID,
             sourceBinding: sourceBinding, artifacts: artifacts,
-            totalByteCount: totalByteCount
+            attemptSummary: attemptSummary, totalByteCount: totalByteCount
         )
         guard .hashing(value) == manifestSHA256,
               try Self.contentRoot(manifestSHA256) == contentRootSHA256
@@ -330,28 +411,30 @@ package struct InvestigationMachineEvidenceManifestV1:
             let fields = try HandoffBinaryTranscript.decode(
                 data, expectedDomain: domain,
                 expectedBusinessFieldByteCounts: [
-                    16...16, 16...16, 40...40, 40...40,
+                    16...16, 16...16, 1...256, 40...40, 40...40,
                     32...32, 32...32, 32...32, 4...4, 8...8,
                     1...maximumByteCount,
                 ], maximumByteCount: maximumByteCount
             )
-            let count = Int(try decodeUInt32(fields[7]))
+            let count = Int(try decodeUInt32(fields[8]))
             guard (1...maximumArtifactCount).contains(count) else {
                 throw InvestigationMachineEvidenceContractError.invalidEncoding
             }
-            let entries = try decodeEntries(fields[9], count: count)
+            let entries = try decodeEntries(fields[10], count: count)
             let value = try Self(
                 campaignUUID: try decodeUUID(fields[0]),
                 attemptUUID: try decodeUUID(fields[1]),
                 sourceBinding: .init(
-                    repositoryHEAD: try decodeString(fields[2]),
-                    repositoryTree: try decodeString(fields[3]),
-                    canonicalSourceManifestSHA256: try .init(rawBytes: fields[4]),
-                    buildProvenanceSHA256: try .init(rawBytes: fields[5]),
-                    signedRuntimeBindingSHA256: try .init(rawBytes: fields[6])
-                ), artifacts: entries
+                    repositoryHEAD: try decodeString(fields[3]),
+                    repositoryTree: try decodeString(fields[4]),
+                    canonicalSourceManifestSHA256: try .init(rawBytes: fields[5]),
+                    buildProvenanceSHA256: try .init(rawBytes: fields[6]),
+                    signedRuntimeBindingSHA256: try .init(rawBytes: fields[7])
+                ), artifacts: entries,
+                attemptSummary: try InvestigationMachineAttemptSummary
+                    .decode(fields[2])
             )
-            let encodedTotal = try decodeUInt64(fields[8])
+            let encodedTotal = try decodeUInt64(fields[9])
             guard value.totalByteCount == encodedTotal,
                   value.artifacts == entries, try value.encoded() == data
             else { throw InvestigationMachineEvidenceContractError.invalidOrdering }
@@ -364,11 +447,12 @@ package struct InvestigationMachineEvidenceManifestV1:
     private static func transcript(
         campaignUUID: UUID, attemptUUID: UUID,
         sourceBinding: InvestigationMachineCampaignSourceBinding,
-        artifacts: [InvestigationMachineEvidenceArtifact], totalByteCount: UInt64
+        artifacts: [InvestigationMachineEvidenceArtifact],
+        attemptSummary: InvestigationMachineAttemptSummary, totalByteCount: UInt64
     ) throws -> Data {
         try HandoffBinaryTranscript.encode(
             domain: domain, businessFields: [
-                data(campaignUUID), data(attemptUUID),
+                data(campaignUUID), data(attemptUUID), try attemptSummary.encoded(),
                 Data(sourceBinding.repositoryHEAD.utf8),
                 Data(sourceBinding.repositoryTree.utf8),
                 sourceBinding.canonicalSourceManifestSHA256.rawBytes,
@@ -378,6 +462,45 @@ package struct InvestigationMachineEvidenceManifestV1:
                 try encodeEntries(artifacts),
             ], maximumByteCount: maximumByteCount
         )
+    }
+
+    private static func validateRoles(
+        _ artifacts: [InvestigationMachineEvidenceArtifact],
+        summary: InvestigationMachineAttemptSummary
+    ) throws {
+        let postArm: Set<InvestigationMachineEvidenceRole> = [
+            .protocolReceipt, .diagnosticOutput, .epochL2Projection,
+            .epochResidueProjection,
+        ]
+        for role in InvestigationMachineEvidenceRole.allCases {
+            let count = artifacts.count { $0.role == role }
+            if summary.consumed {
+                guard count > 0 else {
+                    throw InvestigationMachineEvidenceContractError.missingRole
+                }
+                guard role.admitsCardinality(count) else {
+                    throw InvestigationMachineEvidenceContractError.duplicateRole
+                }
+            } else if role == .attemptEvent {
+                guard count == 2 else {
+                    throw InvestigationMachineEvidenceContractError.invalidTransition
+                }
+            } else if postArm.contains(role) {
+                guard count == 0 else {
+                    throw InvestigationMachineEvidenceContractError.invalidTransition
+                }
+            } else if count != 1 {
+                throw InvestigationMachineEvidenceContractError.missingRole
+            }
+        }
+        let eventArtifacts = artifacts.filter { $0.role == .attemptEvent }
+        let expectedEventNames = (1...Int(summary.eventCount)).map {
+            String(format: "attempt-event-%04d.bin", $0)
+        }
+        guard eventArtifacts.count == Int(summary.eventCount),
+              eventArtifacts.map({ $0.path.leafName }) == expectedEventNames,
+              eventArtifacts.last?.sha256 == summary.finalEventSHA256
+        else { throw InvestigationMachineEvidenceContractError.invalidTransition }
     }
 
     private static func encodeEntries(
@@ -453,11 +576,6 @@ package enum InvestigationMachineAttemptEventKind:
     case spawnObserved = 4
     case spawnUncertain = 5
     case terminal = 6
-}
-
-package enum InvestigationMachineAttemptMode: Sendable {
-    case dryRun
-    case privileged
 }
 
 package struct InvestigationMachineAttemptEventV1: Equatable, Sendable {
@@ -547,6 +665,30 @@ package struct InvestigationMachineAttemptEventV1: Equatable, Sendable {
 }
 
 package enum InvestigationMachineAttemptEventChain {
+    package static func summary(
+        _ events: [InvestigationMachineAttemptEventV1],
+        mode: InvestigationMachineAttemptMode
+    ) throws -> InvestigationMachineAttemptSummary {
+        try validateComplete(events, mode: mode)
+        guard let last = events.last else {
+            throw InvestigationMachineEvidenceContractError.invalidTransition
+        }
+        let outcome: InvestigationMachineAttemptOutcome = switch last.kind {
+        case .cancelledBeforeArm: .cancelledBeforeArm
+        case .terminal where events.dropLast().last?.kind == .spawnObserved:
+            .spawnObservedTerminal
+        case .terminal where events.dropLast().last?.kind == .spawnUncertain:
+            .spawnUncertainTerminal
+        default: throw InvestigationMachineEvidenceContractError.invalidTransition
+        }
+        return try .init(
+            attemptUUID: last.attemptUUID, mode: mode, outcome: outcome,
+            consumed: outcome != .cancelledBeforeArm,
+            eventCount: UInt32(events.count),
+            finalEventSHA256: .hashing(try last.encoded())
+        )
+    }
+
     package static func validatePrefix(
         _ events: [InvestigationMachineAttemptEventV1],
         mode: InvestigationMachineAttemptMode

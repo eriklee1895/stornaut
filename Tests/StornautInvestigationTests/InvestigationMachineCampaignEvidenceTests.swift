@@ -113,13 +113,15 @@ struct InvestigationMachineCampaignEvidenceTests {
             campaignUUID: fixture.campaignUUID,
             attemptUUID: fixture.attemptUUID,
             sourceBinding: fixture.sourceBinding,
-            artifacts: fixture.artifacts
+            artifacts: fixture.artifacts,
+            attemptSummary: fixture.attemptSummary
         )
         let descending = try InvestigationMachineEvidenceManifestV1(
             campaignUUID: fixture.campaignUUID,
             attemptUUID: fixture.attemptUUID,
             sourceBinding: fixture.sourceBinding,
-            artifacts: fixture.artifacts.reversed()
+            artifacts: fixture.artifacts.reversed(),
+            attemptSummary: fixture.attemptSummary
         )
         let encoded = try ascending.encoded()
         let descendingEncoded = try descending.encoded()
@@ -129,6 +131,9 @@ struct InvestigationMachineCampaignEvidenceTests {
         #expect(ascending.contentRootSHA256.rawBytes.contains { $0 != 0 })
         #expect(InvestigationHandoffSHA256.hashing(encoded)
             == ascending.manifestSHA256)
+        #expect(ascending.attemptSummary == fixture.attemptSummary)
+        #expect(ascending.attemptSummary.mode == .privileged)
+        #expect(ascending.attemptSummary.consumed)
         #expect(try InvestigationMachineEvidenceManifestV1.decode(encoded)
             == ascending)
     }
@@ -143,7 +148,22 @@ struct InvestigationMachineCampaignEvidenceTests {
                 sourceBinding: fixture.sourceBinding,
                 artifacts: fixture.artifacts.filter {
                     $0.role != .globalPostTeardown
-                }
+                }, attemptSummary: fixture.attemptSummary
+            )
+        }
+        let eventArtifacts = fixture.artifacts.filter { $0.role == .attemptEvent }
+        let cancelled = try InvestigationMachineAttemptSummary(
+            attemptUUID: fixture.attemptUUID, mode: .dryRun,
+            outcome: .cancelledBeforeArm, consumed: false, eventCount: 2,
+            finalEventSHA256: eventArtifacts[1].sha256
+        )
+        #expect(throws: InvestigationMachineEvidenceContractError
+            .invalidTransition) {
+            _ = try InvestigationMachineEvidenceManifestV1(
+                campaignUUID: fixture.campaignUUID,
+                attemptUUID: fixture.attemptUUID,
+                sourceBinding: fixture.sourceBinding,
+                artifacts: fixture.artifacts, attemptSummary: cancelled
             )
         }
         #expect(throws: InvestigationMachineEvidenceContractError.duplicateArtifact) {
@@ -151,7 +171,8 @@ struct InvestigationMachineCampaignEvidenceTests {
                 campaignUUID: fixture.campaignUUID,
                 attemptUUID: fixture.attemptUUID,
                 sourceBinding: fixture.sourceBinding,
-                artifacts: fixture.artifacts + [fixture.artifacts[0]]
+                artifacts: fixture.artifacts + [fixture.artifacts[0]],
+                attemptSummary: fixture.attemptSummary
             )
         }
     }
@@ -163,7 +184,8 @@ struct InvestigationMachineCampaignEvidenceTests {
             campaignUUID: fixture.campaignUUID,
             attemptUUID: fixture.attemptUUID,
             sourceBinding: fixture.sourceBinding,
-            artifacts: fixture.artifacts
+            artifacts: fixture.artifacts,
+            attemptSummary: fixture.attemptSummary
         )
         let encoded = try manifest.encoded()
         var magic = encoded
@@ -339,6 +361,10 @@ struct InvestigationMachineCampaignEvidenceTests {
         )
         #expect(manifest.contentRootSHA256 == seal.contentRootSHA256)
         #expect(manifest.manifestSHA256 == seal.manifestSHA256)
+        #expect(manifest.attemptSummary == seal.attemptSummary)
+        #expect(seal.attemptSummary.mode == .dryRun)
+        #expect(seal.attemptSummary.outcome == .cancelledBeforeArm)
+        #expect(!seal.attemptSummary.consumed)
         #expect(!rootNames.contains { $0.contains("pending") })
         #expect(throws: InvestigationMachineRawEvidenceError.alreadyTerminal) {
             _ = try writer.finalize()
@@ -454,6 +480,27 @@ struct InvestigationMachineCampaignEvidenceTests {
         #expect(!system.closedDescriptors.contains(fixture.parentDescriptor))
     }
 
+    @Test(arguments: CampaignInitializationFault.allCases)
+    func initializationMapsObservationFailuresToExactStage(
+        _ fault: CampaignInitializationFault
+    ) throws {
+        let fixture = try CampaignEvidenceDiskFixture.make()
+        defer { fixture.remove() }
+        let system = CampaignFaultingEvidenceSystem(base: fixture.system)
+        let parent = try system.metadata(descriptor: fixture.parentDescriptor)
+        system.armInitialization(fault)
+        #expect(throws: InvestigationMachineRawEvidenceError
+            .uncertain(stage: fault.expectedStage)) {
+            _ = try InvestigationMachineRawEvidenceWriter(
+                system: system, parentDescriptor: fixture.parentDescriptor,
+                expectedParentIdentity: parent.identity,
+                campaignUUID: fixture.campaignUUID,
+                attemptUUID: fixture.attemptUUID,
+                sourceBinding: fixture.sourceBinding
+            )
+        }
+    }
+
     @Test
     func finalizationRejectsParentIdentityDrift() throws {
         let fixture = try CampaignEvidenceDiskFixture.make()
@@ -466,6 +513,57 @@ struct InvestigationMachineCampaignEvidenceTests {
             .uncertain(stage: .validateParent)) {
             _ = try writer.finalize()
         }
+    }
+
+    @Test(arguments: [-1, 0, 1, 3])
+    func finalizationRejectsReservedOrHeldDescriptor(_ index: Int) throws {
+        let fixture = try CampaignEvidenceDiskFixture.make()
+        defer { fixture.remove() }
+        let system = CampaignFaultingEvidenceSystem(base: fixture.system)
+        let writer = try fixture.makeWriter(system: system)
+        try fixture.populate(writer)
+        let held = index < 0 ? STDIN_FILENO
+            : ([fixture.parentDescriptor] + system.openedDescriptors)[index]
+        system.protectedDescriptor = held
+        defer { system.protectedDescriptor = nil }
+        system.nextOpenedDescriptor = held
+        #expect(throws: InvestigationMachineRawEvidenceError
+            .uncertain(stage: .reopenFinal)) { _ = try writer.finalize() }
+        #expect(system.closeAttempts.contains(held) == (index < 0))
+    }
+
+    @Test
+    func publicationRejectsCrossPhaseDescriptorAliasBeforeMutation() throws {
+        let fixture = try CampaignEvidenceDiskFixture.make()
+        defer { fixture.remove() }
+        let system = CampaignFaultingEvidenceSystem(base: fixture.system)
+        let writer = try fixture.makeWriter(system: system)
+        let held = system.openedDescriptors[2]
+        system.protectedDescriptor = held
+        defer { system.protectedDescriptor = nil }
+        system.arm(.validatePending)
+        system.nextOpenedDescriptor = held
+        #expect(throws: InvestigationMachineRawEvidenceError
+            .uncertain(stage: .createPending)) {
+            _ = try writer.writeArtifact(
+                path: .init(phase: .preflight, leafName: "source-build.json"),
+                role: .sourceBuildIdentity, encoding: .strictJSON,
+                bytes: Self.json("source"))
+        }
+        #expect(!system.closeAttempts.contains(held))
+    }
+
+    @Test(arguments: CampaignFinalObservationFault.allCases)
+    func finalizationMapsObservationFailuresToExactStage(
+        _ fault: CampaignFinalObservationFault) throws {
+        let fixture = try CampaignEvidenceDiskFixture.make()
+        defer { fixture.remove() }
+        let system = CampaignFaultingEvidenceSystem(base: fixture.system)
+        let writer = try fixture.makeWriter(system: system)
+        try fixture.populate(writer)
+        system.failNamedMetadataName = fault.name(campaignUUID: fixture.campaignUUID)
+        #expect(throws: InvestigationMachineRawEvidenceError
+            .uncertain(stage: fault.expectedStage)) { _ = try writer.finalize() }
     }
 
     @Test
@@ -493,7 +591,7 @@ struct InvestigationMachineCampaignEvidenceTests {
             kind: .cancelledBeforeArm, payload: Self.json("cancelled"),
             observedAt: try .init(rawValue: 2)
         )
-        try fixture.populateArtifacts(writer)
+        try fixture.populateDryRunArtifacts(writer)
         _ = try writer.finalize()
     }
 
@@ -515,9 +613,14 @@ struct InvestigationMachineCampaignEvidenceTests {
                 observedAt: try .init(rawValue: Int64(index + 1))
             )
         }
-        try fixture.populateArtifacts(writer)
+        try fixture.populatePrivilegedArtifacts(writer)
         let seal = try writer.finalize()
         #expect(seal.artifactCount == fixture.privilegedArtifactCount)
+        #expect(seal.attemptSummary.mode == .privileged)
+        #expect(seal.attemptSummary.outcome == (spawn == .spawnObserved
+            ? .spawnObservedTerminal : .spawnUncertainTerminal))
+        #expect(seal.attemptSummary.consumed)
+        #expect(seal.attemptSummary.eventCount == 4)
     }
 
     @Test
@@ -661,7 +764,7 @@ struct InvestigationMachineCampaignEvidenceTests {
         }
     }
 
-    private static func event(
+    fileprivate static func event(
         sequence: UInt32, attempt: UUID, kind: InvestigationMachineAttemptEventKind,
         previous: InvestigationHandoffSHA256
     ) throws -> InvestigationMachineAttemptEventV1 {
@@ -712,6 +815,7 @@ private struct CampaignEvidenceFixture {
     let attemptUUID: UUID
     let sourceBinding: InvestigationMachineCampaignSourceBinding
     let artifacts: [InvestigationMachineEvidenceArtifact]
+    let attemptSummary: InvestigationMachineAttemptSummary
 
     static func make() throws -> Self {
         let sourceBinding = try InvestigationMachineCampaignSourceBinding(
@@ -724,9 +828,13 @@ private struct CampaignEvidenceFixture {
             signedRuntimeBindingSHA256:
                 InvestigationMachineCampaignEvidenceTests.digest(0x33)
         )
+        let attempt = uuid(0x22)
+        let events = try privilegedEvents(attempt: attempt)
         return try Self(
-            campaignUUID: uuid(0x21), attemptUUID: uuid(0x22),
-            sourceBinding: sourceBinding, artifacts: makeArtifacts()
+            campaignUUID: uuid(0x21), attemptUUID: attempt,
+            sourceBinding: sourceBinding, artifacts: makeArtifacts(events: events),
+            attemptSummary: InvestigationMachineAttemptEventChain.summary(
+                events, mode: .privileged)
         )
     }
 
@@ -742,7 +850,9 @@ private struct CampaignEvidenceFixture {
         )
     }
 
-    private static func makeArtifacts() throws
+    private static func makeArtifacts(
+        events: [InvestigationMachineAttemptEventV1]
+    ) throws
         -> [InvestigationMachineEvidenceArtifact]
     {
         func artifact(
@@ -767,8 +877,6 @@ private struct CampaignEvidenceFixture {
             artifact(.uninstall, "uninstall.json", .uninstallEvidence, .strictJSON, 10),
             artifact(.verifier, "global-post-teardown.json", .globalPostTeardown, .strictJSON, 11),
             artifact(.verifier, "verification-input.json", .verifierInput, .strictJSON, 12),
-            artifact(.authorization, "attempt-event-0001.bin", .attemptEvent, .canonicalBinary, 13),
-            artifact(.authorization, "attempt-event-0002.bin", .attemptEvent, .canonicalBinary, 14),
         ]
         let l2 = try (1...8).map { index in
             try artifact(
@@ -783,7 +891,36 @@ private struct CampaignEvidenceFixture {
                 .epochResidueProjection, .strictJSON, UInt8(40 + index)
             )
         }
-        return fixed + l2 + residue
+        let eventArtifacts = try events.enumerated().map { index, event in
+            let bytes = try event.encoded()
+            return try InvestigationMachineEvidenceArtifact(
+                path: .init(
+                    phase: .authorization,
+                    leafName: String(format: "attempt-event-%04d.bin", index + 1)
+                ), role: .attemptEvent, encoding: .canonicalBinary,
+                byteCount: UInt64(bytes.count), sha256: .hashing(bytes)
+            )
+        }
+        return fixed + l2 + residue + eventArtifacts
+    }
+
+    private static func privilegedEvents(
+        attempt: UUID
+    ) throws -> [InvestigationMachineAttemptEventV1] {
+        var events: [InvestigationMachineAttemptEventV1] = []
+        for (index, kind) in [
+            InvestigationMachineAttemptEventKind.prepared, .armedConsumed,
+            .spawnObserved, .terminal,
+        ].enumerated() {
+            let previous = try events.last.map {
+                InvestigationHandoffSHA256.hashing(try $0.encoded())
+            } ?? InvestigationMachineCampaignEvidenceTests.zeroDigest()
+            events.append(try InvestigationMachineCampaignEvidenceTests.event(
+                sequence: UInt32(index + 1), attempt: attempt, kind: kind,
+                previous: previous
+            ))
+        }
+        return events
     }
 
     static func uuid(_ marker: UInt8) -> UUID {
@@ -832,6 +969,28 @@ enum CampaignReceiptBindingMutation: CaseIterable {
     case signedRuntime
 }
 
+enum CampaignInitializationFault: CaseIterable {
+    case parentMetadata
+    case rootNamedMetadata
+    case phaseNamedMetadata
+
+    var expectedStage: InvestigationMachineRawEvidenceFailureStage {
+        switch self {
+        case .parentMetadata: .validateParent
+        case .rootNamedMetadata, .phaseNamedMetadata: .validateDirectory
+        }
+    }
+}
+
+enum CampaignFinalObservationFault: CaseIterable {
+    case directory, root, file
+    func name(campaignUUID: UUID) -> String { self == .root
+        ? InvestigationMachineRawEvidenceWriter.rootName(campaignUUID: campaignUUID)
+        : (self == .directory ? "01-preflight" : "source-build.json") }
+    var expectedStage: InvestigationMachineRawEvidenceFailureStage { self == .file
+        ? .validateFinal : .validateDirectory }
+}
+
 private final class CampaignEvidenceDiskFixture {
     let parent: URL
     let parentDescriptor: Int32
@@ -839,7 +998,7 @@ private final class CampaignEvidenceDiskFixture {
     let attemptUUID = CampaignEvidenceFixture.uuid(0x52)
     let sourceBinding: InvestigationMachineCampaignSourceBinding
     let system = DarwinInvestigationMachineRawEvidenceSystem()
-    let expectedArtifactCount = 28
+    let expectedArtifactCount = 10
     let privilegedArtifactCount = 30
 
     var evidenceRoot: URL {
@@ -915,10 +1074,25 @@ private final class CampaignEvidenceDiskFixture {
             kind: .cancelledBeforeArm, payload: Self.json("cancelled"),
             observedAt: try .init(rawValue: 2)
         )
-        try populateArtifacts(writer)
+        try populateDryRunArtifacts(writer)
     }
 
-    func populateArtifacts(
+    func populateDryRunArtifacts(
+        _ writer: InvestigationMachineRawEvidenceWriter
+    ) throws {
+        try write([
+            (.preflight, "source-build.json", .sourceBuildIdentity, .strictJSON, Self.json("source")),
+            (.install, "installed.json", .builtStagingInstalledIdentity, .strictJSON, Self.json("installed")),
+            (.authorization, "policy-probe.json", .policyProbe, .strictJSON, Self.json("policy")),
+            (.authorization, "human-attestation.json", .humanPromptAttestation, .strictJSON, Self.json("human")),
+            (.authorization, "capability-counts.json", .noAuthModelNetworkCounters, .strictJSON, Self.json("counts")),
+            (.uninstall, "uninstall.json", .uninstallEvidence, .strictJSON, Self.json("uninstall")),
+            (.verifier, "global-post-teardown.json", .globalPostTeardown, .strictJSON, Self.json("zero")),
+            (.verifier, "verification-input.json", .verifierInput, .strictJSON, Self.json("verify")),
+        ], to: writer)
+    }
+
+    func populatePrivilegedArtifacts(
         _ writer: InvestigationMachineRawEvidenceWriter
     ) throws {
         var values: [(InvestigationMachineEvidencePhase, String, InvestigationMachineEvidenceRole, InvestigationMachineEvidenceEncoding, Data)] = [
@@ -946,6 +1120,14 @@ private final class CampaignEvidenceDiskFixture {
                 .epochResidueProjection, .strictJSON, Self.json("residue-\(index)")
             ))
         }
+        try write(values, to: writer)
+    }
+
+    private func write(
+        _ values: [(InvestigationMachineEvidencePhase, String,
+            InvestigationMachineEvidenceRole, InvestigationMachineEvidenceEncoding, Data)],
+        to writer: InvestigationMachineRawEvidenceWriter
+    ) throws {
         for value in values {
             _ = try writer.writeArtifact(
                 path: .init(phase: value.0, leafName: value.1),
@@ -1091,9 +1273,15 @@ private final class CampaignFaultingEvidenceSystem:
     var failDirectoryCreationCall: Int?
     var driftDescriptor: Int32?
     var nextOpenedDescriptor: Int32?
+    var protectedDescriptor: Int32?
+    var failNamedMetadataName: String?
     private var createDirectoryCount = 0
     private(set) var openedDescriptors: [Int32] = []
     private(set) var closedDescriptors: [Int32] = []
+    private(set) var closeAttempts: [Int32] = []
+    private var initializationFault: CampaignInitializationFault?
+    private var metadataCount = 0
+    private var namedMetadataCount = 0
 
     init(base: DarwinInvestigationMachineRawEvidenceSystem) { self.base = base }
 
@@ -1101,6 +1289,12 @@ private final class CampaignFaultingEvidenceSystem:
         self.fault = fault
         openCount = 0
         synchronizeCount = 0
+    }
+
+    func armInitialization(_ fault: CampaignInitializationFault) {
+        initializationFault = fault
+        metadataCount = 0
+        namedMetadataCount = 0
     }
 
     func effectiveIdentity() -> InvestigationMachineEvidenceOwnerIdentity {
@@ -1139,6 +1333,10 @@ private final class CampaignFaultingEvidenceSystem:
     func metadata(descriptor: Int32) throws
         -> InvestigationMachineEvidenceNodeMetadata
     {
+        metadataCount += 1
+        if initializationFault == .parentMetadata && metadataCount == 1 {
+            throw failure()
+        }
         let value = try base.metadata(descriptor: descriptor)
         if descriptor == driftDescriptor {
             return .init(
@@ -1166,7 +1364,18 @@ private final class CampaignFaultingEvidenceSystem:
     func namedMetadata(
         parentDescriptor: Int32, name: String, flags: Int32
     ) throws -> InvestigationMachineEvidenceNodeMetadata {
-        try base.namedMetadata(
+        if name == failNamedMetadataName {
+            failNamedMetadataName = nil
+            throw failure()
+        }
+        namedMetadataCount += 1
+        if initializationFault == .rootNamedMetadata && namedMetadataCount == 1 {
+            throw failure()
+        }
+        if initializationFault == .phaseNamedMetadata && namedMetadataCount == 2 {
+            throw failure()
+        }
+        return try base.namedMetadata(
             parentDescriptor: parentDescriptor, name: name, flags: flags)
     }
     func descriptorFlags(_ descriptor: Int32) throws -> Int32 {
@@ -1223,10 +1432,13 @@ private final class CampaignFaultingEvidenceSystem:
         return try InvestigationMachineEvidenceManifestV1(
             campaignUUID: CampaignEvidenceFixture.uuid(0xfe),
             attemptUUID: manifest.attemptUUID,
-            sourceBinding: manifest.sourceBinding, artifacts: manifest.artifacts
+            sourceBinding: manifest.sourceBinding, artifacts: manifest.artifacts,
+            attemptSummary: manifest.attemptSummary
         ).encoded()
     }
     func close(descriptor: Int32) throws {
+        closeAttempts.append(descriptor)
+        if descriptor == protectedDescriptor { return }
         try base.close(descriptor: descriptor)
         closedDescriptors.append(descriptor)
         if fault == .closeDescriptor { fault = nil; throw failure() }
