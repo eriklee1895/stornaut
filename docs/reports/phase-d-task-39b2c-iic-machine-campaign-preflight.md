@@ -1,12 +1,12 @@
 # Phase D Task 39B2c ii-c Machine Campaign Preflight
 
-> Status: frozen / ii-c-a, ii-c-b1, ii-c-b2a1 and ii-c-b2a2 complete/non-admitting / ii-c-b2b current
+> Status: frozen / ii-c-a and ii-c-b complete/non-admitting / ii-c-c implementation current; unique privileged attempt not consumed
 >
 > Date: 2026-08-30
 >
 > Baseline: `2b30a157c14bc507351b10bd521e710987860f71`
 >
-> Remaining order: ii-c-b2b -> ii-c-c -> L3c3d -> L3c4
+> Remaining order: ii-c-c -> L3c3d -> L3c4
 
 ## 1. Decision
 
@@ -137,7 +137,11 @@ records implementation `e3555ec` / tree `f38783f`, 31/31 focused tests and
 zero unresolved P0-P2 after review-finding closure. The
 [b2a2 completion audit](phase-d-task-39b2c-iic-b2a2-independent-verifier-review.md)
 records implementation `294bdb2` / tree `dbbffbba`, exact 6 paths / 1,999
-lines and zero unresolved P0-P2 after closure. b2b is current.
+lines and zero unresolved P0-P2 after closure. b2b then completed at
+implementation `a08d0f6` / tree `62cb658e`, including its focused and physical
+transport matrix, 53 boundary tests, Debug/Release component gate, one 911-test
+serialized regression and independent review. Those tests are not repeated in
+ii-c-c.
 
 ## 6. Campaign Evidence and Attempt Consumption
 
@@ -216,3 +220,149 @@ Proposed to Accepted. ii-c remains no-model and cannot claim Task 39 readiness.
 L3c3d alone owns the authenticated real Codex attempt; L3c4 alone owns final
 admission and the remaining authoritative full. Production Deep Dive stays
 unavailable.
+
+## 9. ii-c-c Exact Scope and Cost Amendment
+
+This amendment freezes the final implementation inside the existing ii-c-c
+checkpoint. It does not create another Task or named child checkpoint. The
+baseline is implementation `a08d0f6fac6c3bec72192cd8731bd6b3b150b3b7`, tree
+`62cb658ead295984a44d7eb769da9b9c91a2f3cf`. The unique privileged attempt
+remains unconsumed until every non-privileged gate below is green.
+
+The implementation may change exactly these fourteen non-document paths and at
+most 3,960 changed non-document lines (additions plus deletions):
+
+1. `Sources/StornautInvestigationMachineCampaign/main.swift` — 620;
+2. `Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignHarness.swift` — 330;
+3. `Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignEvidenceContract.swift` — 450;
+4. `Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift` — 280;
+5. `Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochComposition.swift` — 110;
+6. `Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochPhysicalBridge.swift` — 170;
+7. `Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerProtocol.swift` — 260;
+8. `Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineZeroArgumentEntry.swift` — 220;
+9. `Sources/CInvestigationMachineCampaignSupport/CInvestigationMachineCampaignSupport.c` — 200;
+10. `scripts/stornaut-r5-local-lifecycle` — 180;
+11. `scripts/verify-investigation-runtime-machine-report` — 450;
+12. `Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift` — 350;
+13. `Tests/StornautInvestigationTests/InvestigationMachineCampaignHarnessTests.swift` — 180; and
+14. `scripts/verify-investigation-boundaries` — 160.
+
+The aggregate ceiling and every per-path ceiling are independent. A fifteenth
+non-document path or line 3,961 stops coding for scope reduction inside ii-c-c;
+it does not authorize another recursive checkpoint. `Package.swift`, the Xcode
+project/schemes, Gate transport schema, coordinator final-receipt schema and raw
+evidence writer remain unchanged. The existing App/Release component gate runs
+unchanged and must prove that the campaign remains package-only and absent from
+all product images.
+
+### 9.1 Pre-arm and attempt identity
+
+The installed coordinator remains zero-argument with normalized empty
+environment and descriptors `[0,1,2,3]`. It authors the one fresh nonzero outer
+attempt UUID through the already accepted cohort author. Before invoking the
+Gate, it writes one bounded canonical pre-arm frame on FD 3 containing that UUID,
+the exact generated repository HEAD/tree/source-manifest/build-provenance
+identity, signed-runtime binding, whole capsule/input identity and the eight
+canonical installed-L2 projections. It then blocks on the controlling terminal
+for exactly one campaign control line bound to the pre-arm frame digest. No UUID,
+path, selector or mutable token is accepted through argv or environment.
+
+The campaign may install and spawn this blocked coordinator before arm. It must
+validate the pre-arm frame, install transaction receipt and non-executing exact
+`/usr/bin/sudo -kNnv` result, publish all pre-arm evidence, append `prepared`,
+then append and durably publish `armedConsumed`. Only after the latter call
+returns may it write the exact ARM line. The coordinator may call the existing
+fixed Gate handoff only after validating that line. EOF, cancellation, malformed
+control, digest drift or deadline before ARM exits without Gate/sudo execution.
+After ARM, every outcome is consumed, terminal, non-admitting on failure and
+never retryable for this frozen source campaign.
+
+### 9.2 Prompt and credential boundary
+
+After ARM, the campaign streams the child PTY to the operator and incrementally
+recognizes exactly `Stornaut Task 39 ii-c administrator authorization: `. A
+duplicate, drifted, oversized or missing prompt, terminal identity/foreground
+group drift, deadline or EOF fails the consumed attempt. Before accepting input
+it verifies `ECHO` and `ECHONL` are disabled. The operator's act of entering the
+credential after seeing the exact prompt is recorded only as a trusted-human
+attestation; machine prompt recognition is a separate fact and is not promoted
+to proof of human observation.
+
+Credential relay uses only a bounded raw C buffer read from the campaign's
+controlling terminal and written directly to the child PTY, followed by
+`memset_s` on every path. Credential bytes, byte counts, timing and key
+events never become `Data`, `String`, operation values, logs, stdout/stderr,
+diagnostics, tests or evidence. The tests use a non-secret sentinel through an
+injected relay and prove it is absent from every returned value and artifact.
+
+### 9.3 Full per-epoch evidence and receipt chain
+
+The existing single-epoch composition remains the only author of installed-L2
+truth. It retains the canonical `installed-l2-proof` bytes already built from
+the complete projection, claim evidence, eight artifact states, App/helper/
+driver identities and signing facts, service state, timestamps, repeated App
+identity and epoch deadline. The physical ownership wire carries those exact
+bytes and their digest; no second L1/L2 fact model is introduced.
+
+After each exact outer admission and terminal containment proof, one process-
+local collector records the canonical projection, ownership, applicable normal
+result, terminal evidence and their binding digests. After all eight rows and
+plan exhaustion, the driver emits exactly one bounded canonical eight-entry
+evidence bundle on stderr using an ASCII/base64 envelope, after all epoch
+descendants are retired. It emits on stdout a small v2 completion that binds the
+legacy attempt/capsule/input/count fields plus the bundle SHA-256. Gate stdout
+limits and its transport schema remain unchanged.
+
+The coordinator writes three ordered length-prefixed frames on FD 3: pre-arm,
+the raw canonical Gate transport receipt, then the existing final coordinator
+receipt, followed by EOF. The campaign accepts the PTY evidence envelope only
+when its decoded bundle reconstructs the exact v2 completion whose SHA-256 is
+the Gate receipt's output digest, and the raw Gate receipt's digest equals the
+field authenticated by the final coordinator receipt. The independent verifier
+repeats that complete chain and validates all eight ordinal/scenario/UUID/nonce/
+projection/full-L2/retirement joins. Unauthenticated terminal bytes never become
+evidence.
+
+### 9.4 Evidence, install and teardown semantics
+
+Every strict-JSON role gains an exact-key typed schema. Both the Swift producer
+path and the independent Python verifier reject unknown/missing fields, wrong
+types, zero or malformed identities/digests, placeholder objects, scenario or
+ordinal drift, nonzero no-auth/model/network/credential-retention counters,
+broken L2-to-residue joins and any cross-role mismatch. Attempt-event payloads
+also become kind-specific and bind the pre-arm set, spawn classification and
+terminal evidence set without a manifest/content-root hash cycle. A consumed
+failed attempt records only the exact observed epoch prefix; it never fabricates
+eight successful projections.
+
+The lifecycle script emits bounded canonical transaction receipts from inside
+the install and uninstall transactions while preserving its existing commands.
+Install evidence binds the exact current built/staging/installed identities,
+plist and loaded service; uninstall evidence binds the pre-removal installed
+identity and exact App/root/plist/runtime/lease/service absence. Every post-arm
+path invokes the fixed uninstall finalizer, then records global process/channel/
+SID/PGID absence and the persistent Gate base containing only the revalidated
+`.owner-lock-v1` inode with no attempt or capsule entry.
+
+After manifest-last finalization, the campaign publishes the external seal as a
+0600 single-link sibling with descriptor-relative exclusive create, bounded
+write, file fsync, exclusive rename, parent fsync and no-follow reopen/readback.
+It then invokes the independent verifier read-only. No evidence file contains a
+credential or raw prompt input.
+
+### 9.5 Tests and gates
+
+RED tests are added only to the two existing campaign suites. They cover exact
+role schemas and cross-bindings, self-consistent forged manifests, eight-epoch
+joins, pre-arm/ARM ordering, single spawn/no retry, fragmented or duplicate
+prompt, echo-state rejection, credential sentinel non-retention, three-frame FD
+3 ordering, authenticated bundle reconstruction, cancellation and mandatory
+teardown. Structural/mutation assertions live in the existing Investigation
+boundary and aggregate contract scripts rather than adding another test file.
+
+Validation is strictly: structural source/mutation gates, focused campaign and
+affected driver/coordinator suites, one staged-only serialized Investigation
+regression, existing Debug/Release component/final-image gate, then independent
+review. The already completed 911-test b2b serial is not repeated as a separate
+run. No root/install/sudo/real campaign occurs until this full non-privileged
+pre-arm funnel is green. `scripts/verify --full` remains reserved for L3c4.
