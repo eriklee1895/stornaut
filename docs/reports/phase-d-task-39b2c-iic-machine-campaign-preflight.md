@@ -230,25 +230,25 @@ baseline is implementation `a08d0f6fac6c3bec72192cd8731bd6b3b150b3b7`, tree
 remains unconsumed until every non-privileged gate below is green.
 
 The implementation may change exactly these fourteen non-document paths and at
-most 3,960 changed non-document lines (additions plus deletions):
+most 3,800 changed non-document lines (additions plus deletions):
 
-1. `Sources/StornautInvestigationMachineCampaign/main.swift` — 620;
-2. `Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignHarness.swift` — 330;
-3. `Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignEvidenceContract.swift` — 450;
-4. `Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift` — 280;
-5. `Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochComposition.swift` — 110;
-6. `Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochPhysicalBridge.swift` — 170;
-7. `Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerProtocol.swift` — 260;
-8. `Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineZeroArgumentEntry.swift` — 220;
-9. `Sources/CInvestigationMachineCampaignSupport/CInvestigationMachineCampaignSupport.c` — 200;
-10. `scripts/stornaut-r5-local-lifecycle` — 180;
-11. `scripts/verify-investigation-runtime-machine-report` — 450;
-12. `Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift` — 350;
-13. `Tests/StornautInvestigationTests/InvestigationMachineCampaignHarnessTests.swift` — 180; and
-14. `scripts/verify-investigation-boundaries` — 160.
+1. `Sources/StornautInvestigationMachineCampaign/main.swift` — 600;
+2. `Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignHarness.swift` — 300;
+3. `Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignEvidenceContract.swift` — 400;
+4. `Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift` — 250;
+5. `Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochComposition.swift` — 100;
+6. `Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochPhysicalBridge.swift` — 160;
+7. `Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerProtocol.swift` — 240;
+8. `Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineZeroArgumentEntry.swift` — 200;
+9. `Sources/CInvestigationMachineCampaignSupport/CInvestigationMachineCampaignSupport.c` — 180;
+10. `scripts/stornaut-r5-local-lifecycle` — 160;
+11. `scripts/verify-investigation-runtime-machine-report` — 430;
+12. `Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift` — 480;
+13. `scripts/verify-investigation-boundaries` — 250; and
+14. `scripts/verify-contract` — 150.
 
 The aggregate ceiling and every per-path ceiling are independent. A fifteenth
-non-document path or line 3,961 stops coding for scope reduction inside ii-c-c;
+non-document path or line 3,801 stops coding for scope reduction inside ii-c-c;
 it does not authorize another recursive checkpoint. `Package.swift`, the Xcode
 project/schemes, Gate transport schema, coordinator final-receipt schema and raw
 evidence writer remain unchanged. The existing App/Release component gate runs
@@ -352,12 +352,13 @@ credential or raw prompt input.
 
 ### 9.5 Tests and gates
 
-RED tests are added only to the two existing campaign suites. They cover exact
-role schemas and cross-bindings, self-consistent forged manifests, eight-epoch
-joins, pre-arm/ARM ordering, single spawn/no retry, fragmented or duplicate
-prompt, echo-state rejection, credential sentinel non-retention, three-frame FD
-3 ordering, authenticated bundle reconstruction, cancellation and mandatory
-teardown. Structural/mutation assertions live in the existing Investigation
+RED tests are added only to the existing campaign-evidence suite. They cover
+exact role schemas and cross-bindings, self-consistent forged manifests,
+eight-epoch joins, pre-arm/ARM ordering, single spawn/no retry, fragmented or
+duplicate prompt, echo-state rejection, credential sentinel non-retention,
+three-frame FD 3 ordering, authenticated bundle reconstruction, cancellation
+and mandatory teardown. The existing campaign-harness suite is run unchanged as
+a regression. Structural/mutation assertions live in the existing Investigation
 boundary and aggregate contract scripts rather than adding another test file.
 
 Validation is strictly: structural source/mutation gates, focused campaign and
