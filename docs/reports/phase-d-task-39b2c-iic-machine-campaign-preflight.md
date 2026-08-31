@@ -1,12 +1,12 @@
 # Phase D Task 39B2c ii-c Machine Campaign Preflight
 
-> Status: frozen / ii-c-a and ii-c-b1 complete/non-admitting / ii-c-b2 current/non-admitting
+> Status: frozen / ii-c-a and ii-c-b1 complete/non-admitting / ii-c-b2 split; b2a1 current/non-admitting
 >
 > Date: 2026-08-30
 >
 > Baseline: `2b30a157c14bc507351b10bd521e710987860f71`
 >
-> Remaining order: ii-c-b2 -> ii-c-c -> L3c3d -> L3c4
+> Remaining order: ii-c-b2a1 -> ii-c-b2a2 -> ii-c-b2b -> ii-c-c -> L3c3d -> L3c4
 
 ## 1. Decision
 
@@ -126,6 +126,12 @@ Live status (2026-08-31): ii-c-b was split into ii-c-b1 and ii-c-b2. The
 root-owned Gate admission half is complete/non-admitting at implementation
 `77cde61` / tree `9c59f241`; ii-c-b2 now owns only the non-privileged
 PTY/FD3/raw-evidence harness and verifier.
+
+The mandatory ii-c-b2 cost split is frozen in
+[ii-c-b2 Split Preflight](phase-d-task-39b2c-iic-b2-split-preflight.md). Its
+implementation checkpoints are b2a1 evidence producer, b2a2 independent
+verifier and b2b PTY/FD 3 transport. They remain one ii-c-b2 deliverable and
+do not add roadmap Tasks.
 
 ## 6. Campaign Evidence and Attempt Consumption
 
