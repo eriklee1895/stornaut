@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-# iicb1_app_self_sha=e9c939ce92737ca98adcb9de360f7f4d3593a63052ca74df6c4fe5fadeff526f
+# iicb1_app_self_sha=f692805732ce0910e402c5d90410144681088f725b119ce31182da4a496c7ecd
 if [[ ${1:-} == --iic-b1-root-owned-gate-component-* || ${1:-} == --iic-b2a2-component-* || ${1:-} == --iic-b2b2-component-* ]]; then iicb1_app_self_sha=$(/usr/bin/sed -nE 's/^# iicb1_app_self_sha=([0-9a-f]{64})$/\1/p' "${0:A}"); [[ ${#iicb1_app_self_sha} == 64 && "$(/usr/bin/sed -E 's/^# iicb1_app_self_sha=[0-9a-f]{64}$/# iicb1_app_self_sha=SELF/' "${0:A}" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')" == "$iicb1_app_self_sha" ]] || { print -u2 "ii-c-b1 App release verifier self-seal drifted"; exit 1; }; fi
 repo_root=${0:A:h:h}
 cd "$repo_root"
@@ -3647,7 +3647,7 @@ expected_snapshot = """function run_iicb2a2_component_snapshot() (
 """
 if source[snapshot_start:source_contract_start] != expected_snapshot:
     raise SystemExit("ii-c-b2a2 component verifier contract drifted")
-source_contract_sha = "a58cea234b27ec8d11cfba15638ff4f7791127c6cd19dc61926eea3eeaf8e0a5"
+source_contract_sha = "c7d056a573157725a4660add516b53c01d4753379285e0c08f43136dbbb268f7"
 source_contract = source[source_contract_start:boundary_start]
 if (source_contract.count(source_contract_sha) != 1
         or hashlib.sha256(source_contract.replace(
@@ -3655,7 +3655,7 @@ if (source_contract.count(source_contract_sha) != 1
         != source_contract_sha):
     raise SystemExit("ii-c-b2a2 component verifier contract drifted")
 runtime = source[boundary_start:runtime_end]
-runtime_sha = "4c78bf29f0b10ae483f78cb452a8ff156e48fd9d2c25b4b894b137f7a8e59e01"
+runtime_sha = "9327736b82d725a19f5c33ac5427b60195a83967d41cd8c8a764fa3789c5abd1"
 if hashlib.sha256(runtime.encode()).hexdigest() != runtime_sha:
     raise SystemExit("ii-c-b2a2 component verifier contract drifted")
 prologue = ("function verify_iicb2a2_component_boundary() (\n"
@@ -3727,7 +3727,9 @@ function verify_iicb2a2_component_boundary() (
     local object symbols strings combined marker
     local -a objects=(${(f)"$(find "$scratch/swiftpm" -type f \
         -path '*StornautInvestigationMachineCampaignSupport.build/*.swift.o' | LC_ALL=C sort)"})
-    (( ${#objects} == 2 )) || {
+    local object_names
+    object_names=$(printf '%s\n' "${objects[@]:t}" | LC_ALL=C sort)
+    [[ $object_names == $'InvestigationMachineCampaignEvidenceContract.swift.o\nInvestigationMachineCampaignHarness.swift.o\nInvestigationMachineRawEvidenceWriter.swift.o' ]] || {
         print -u2 "ii-c-b2a2 CampaignSupport object positive control unavailable"
         return 1
     }
