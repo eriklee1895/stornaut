@@ -25,6 +25,7 @@ package struct InvestigationMachineDriverCompletionArtifact:
 {
     private static let domain =
         "stornaut.task39.machine.driver-completion"
+    private static let productionDomain = "stornaut.task39.machine.driver-completion-v2"
     package static let maximumByteCount = 512
     private static let completedEpochCount: UInt32 = 8
 
@@ -32,6 +33,7 @@ package struct InvestigationMachineDriverCompletionArtifact:
     package let wholeCapsuleSHA256: InvestigationHandoffSHA256
     package let wholeInputSHA256: InvestigationHandoffSHA256
     package let completedEpochCount: UInt32
+    package let driverEvidenceBundleSHA256: InvestigationHandoffSHA256?
     package let completionSHA256: InvestigationHandoffSHA256
 
     package init(
@@ -50,6 +52,7 @@ package struct InvestigationMachineDriverCompletionArtifact:
         wholeCapsuleSHA256 = summary.wholeCapsuleSHA256
         wholeInputSHA256 = summary.wholeInputSHA256
         completedEpochCount = summary.completedEpochCount
+        driverEvidenceBundleSHA256 = nil
         do {
             completionSHA256 = InvestigationHandoffSHA256.hashing(
                 try Self.transcript(
@@ -71,6 +74,26 @@ package struct InvestigationMachineDriverCompletionArtifact:
         }
     }
 
+    package init(summary: InvestigationMachineEightEpochCompletionSummary,
+        driverEvidenceBundleSHA256: InvestigationHandoffSHA256) throws {
+        guard
+            zeroArgumentUUIDIsNonzero(summary.outerAttemptUUID),
+            zeroArgumentDigestIsNonzero(summary.wholeCapsuleSHA256),
+            zeroArgumentDigestIsNonzero(summary.wholeInputSHA256),
+            summary.completedEpochCount == Self.completedEpochCount,
+            zeroArgumentDigestIsNonzero(driverEvidenceBundleSHA256)
+        else { throw InvestigationMachineZeroArgumentEntryError.invalidCompletion }
+        outerAttemptUUID = summary.outerAttemptUUID
+        wholeCapsuleSHA256 = summary.wholeCapsuleSHA256
+        wholeInputSHA256 = summary.wholeInputSHA256
+        completedEpochCount = summary.completedEpochCount
+        self.driverEvidenceBundleSHA256 = driverEvidenceBundleSHA256
+        let zero = try InvestigationHandoffSHA256(rawBytes: Data(repeating: 0, count: 32))
+        completionSHA256 = .hashing(try Self.transcriptV2(
+            summary: summary, bundle: driverEvidenceBundleSHA256,
+            completion: zero))
+    }
+
     package func encoded() throws -> Data {
         guard
             zeroArgumentUUIDIsNonzero(outerAttemptUUID),
@@ -82,29 +105,15 @@ package struct InvestigationMachineDriverCompletionArtifact:
             throw InvestigationMachineZeroArgumentEntryError.invalidCompletion
         }
         do {
-            let zeroed = try Self.transcript(
-                outerAttemptUUID: outerAttemptUUID,
-                wholeCapsuleSHA256: wholeCapsuleSHA256,
-                wholeInputSHA256: wholeInputSHA256,
-                completedEpochCount: completedEpochCount,
-                completionSHA256Bytes: Data(
-                    repeating: 0,
-                    count: InvestigationHandoffSHA256.byteCount
-                )
-            )
+            let zero = try InvestigationHandoffSHA256(rawBytes: Data(repeating: 0, count: 32))
+            let zeroed = try transcript(completion: zero)
             guard InvestigationHandoffSHA256.hashing(zeroed)
                 == completionSHA256
             else {
                 throw InvestigationMachineZeroArgumentEntryError
                     .invalidCompletion
             }
-            return try Self.transcript(
-                outerAttemptUUID: outerAttemptUUID,
-                wholeCapsuleSHA256: wholeCapsuleSHA256,
-                wholeInputSHA256: wholeInputSHA256,
-                completedEpochCount: completedEpochCount,
-                completionSHA256Bytes: completionSHA256.rawBytes
-            )
+            return try transcript(completion: completionSHA256)
         } catch let error as InvestigationMachineZeroArgumentEntryError {
             throw error
         } catch {
@@ -114,6 +123,7 @@ package struct InvestigationMachineDriverCompletionArtifact:
 
     package static func decode(_ data: Data) throws -> Self {
         do {
+            if let value = try? decodeV2(data) { return value }
             let fields = try HandoffBinaryTranscript.decode(
                 data,
                 expectedDomain: domain,
@@ -147,6 +157,62 @@ package struct InvestigationMachineDriverCompletionArtifact:
         } catch {
             throw InvestigationMachineZeroArgumentEntryError.invalidCompletion
         }
+    }
+
+    package static func decodeProduction(_ data: Data) throws -> Self { try decodeV2(data) }
+
+    private static func decodeV2(_ data: Data) throws -> Self {
+        let fields = try HandoffBinaryTranscript.decode(
+            data, expectedDomain: productionDomain,
+            expectedBusinessFieldByteCounts: [
+                16...16, 32...32, 32...32, 4...4, 32...32, 32...32,
+            ], maximumByteCount: maximumByteCount
+        )
+        let summary = InvestigationMachineEightEpochCompletionSummary(
+            outerAttemptUUID: try zeroArgumentUUID(fields[0]),
+            wholeCapsuleSHA256: try .init(rawBytes: fields[1]),
+            wholeInputSHA256: try .init(rawBytes: fields[2]),
+            completedEpochCount: try zeroArgumentUInt32(fields[3]))
+        let value = try Self(summary: summary,
+            driverEvidenceBundleSHA256: .init(rawBytes: fields[4]))
+        guard value.completionSHA256 == (try .init(rawBytes: fields[5])),
+              try value.encoded() == data
+        else { throw InvestigationMachineZeroArgumentEntryError.invalidCompletion }
+        return value
+    }
+
+    private func transcript(completion: InvestigationHandoffSHA256) throws
+        -> Data {
+        let summary = InvestigationMachineEightEpochCompletionSummary(
+            outerAttemptUUID: outerAttemptUUID,
+            wholeCapsuleSHA256: wholeCapsuleSHA256,
+            wholeInputSHA256: wholeInputSHA256,
+            completedEpochCount: completedEpochCount)
+        if let bundle = driverEvidenceBundleSHA256 {
+            return try Self.transcriptV2(summary: summary, bundle: bundle,
+                completion: completion)
+        }
+        return try Self.transcript(
+            outerAttemptUUID: outerAttemptUUID,
+            wholeCapsuleSHA256: wholeCapsuleSHA256,
+            wholeInputSHA256: wholeInputSHA256,
+            completedEpochCount: completedEpochCount,
+            completionSHA256Bytes: completion.rawBytes
+        )
+    }
+
+    private static func transcriptV2(summary: InvestigationMachineEightEpochCompletionSummary,
+        bundle: InvestigationHandoffSHA256,
+        completion: InvestigationHandoffSHA256) throws -> Data {
+        try HandoffBinaryTranscript.encode(
+            domain: productionDomain, businessFields: [
+                zeroArgumentData(summary.outerAttemptUUID),
+                summary.wholeCapsuleSHA256.rawBytes,
+                summary.wholeInputSHA256.rawBytes,
+                zeroArgumentData(summary.completedEpochCount),
+                bundle.rawBytes, completion.rawBytes,
+            ], maximumByteCount: maximumByteCount
+        )
     }
 
     private static func transcript(
@@ -439,10 +505,18 @@ struct InvestigationMachineZeroArgumentOutputWriter: Sendable {
     }
 
     func write(_ data: Data) throws {
+        try write(
+            data, descriptor: STDOUT_FILENO,
+            maximumByteCount:
+                InvestigationMachineDriverCompletionArtifact.maximumByteCount
+        )
+    }
+
+    func write(_ data: Data, descriptor: Int32, maximumByteCount: Int) throws {
         guard
             !data.isEmpty,
-            data.count
-                <= InvestigationMachineDriverCompletionArtifact.maximumByteCount
+            data.count <= maximumByteCount,
+            descriptor == STDOUT_FILENO || descriptor == STDERR_FILENO
         else {
             throw InvestigationMachineZeroArgumentEntryError.outputUnavailable
         }
@@ -456,7 +530,7 @@ struct InvestigationMachineZeroArgumentOutputWriter: Sendable {
         var offset = 0
         while offset < data.count {
             let waitResult = system.waitWritable(
-                STDOUT_FILENO, deadline.partialValue
+                descriptor, deadline.partialValue
             )
             try requireBeforeDeadline(deadline.partialValue)
             switch waitResult {
@@ -469,7 +543,7 @@ struct InvestigationMachineZeroArgumentOutputWriter: Sendable {
                 break
             }
             let remaining = data.subdata(in: offset..<data.count)
-            let writeResult = system.write(STDOUT_FILENO, remaining)
+            let writeResult = system.write(descriptor, remaining)
             switch writeResult {
             case .failure(let error) where error.errno == EINTR:
                 continue
@@ -511,6 +585,12 @@ struct InvestigationMachineZeroArgumentEntryDependencies: Sendable {
         InvestigationMachineZeroArgumentOuterDescriptorObservation
     ) throws -> Void
     let writeArtifact: @Sendable (Data) throws -> Void
+    let prepareEvidencePlan: @Sendable (any InvestigationMachineEightEpochPlan) async throws
+        -> any InvestigationMachineEightEpochPlan
+    let finishEvidenceCollection: @Sendable
+        (InvestigationMachineEightEpochCompletionSummary) throws -> Data?
+    let abortEvidenceCollection: @Sendable () -> Void
+    let writeEvidence: @Sendable (Data) throws -> Void
 
     init(
         validateInvocation: @escaping @Sendable () throws -> Void = {},
@@ -527,7 +607,14 @@ struct InvestigationMachineZeroArgumentEntryDependencies: Sendable {
         revalidateOuter: @escaping @Sendable (
             InvestigationMachineZeroArgumentOuterDescriptorObservation
         ) throws -> Void,
-        writeArtifact: @escaping @Sendable (Data) throws -> Void
+        writeArtifact: @escaping @Sendable (Data) throws -> Void,
+        prepareEvidencePlan: @escaping @Sendable
+            (any InvestigationMachineEightEpochPlan) async throws
+            -> any InvestigationMachineEightEpochPlan = { $0 },
+        finishEvidenceCollection: @escaping @Sendable
+            (InvestigationMachineEightEpochCompletionSummary) throws -> Data? = { _ in nil },
+        abortEvidenceCollection: @escaping @Sendable () -> Void = {},
+        writeEvidence: @escaping @Sendable (Data) throws -> Void = { _ in }
     ) {
         self.validateInvocation = validateInvocation
         self.selectRole = selectRole
@@ -538,6 +625,10 @@ struct InvestigationMachineZeroArgumentEntryDependencies: Sendable {
         self.checkCancellation = checkCancellation
         self.revalidateOuter = revalidateOuter
         self.writeArtifact = writeArtifact
+        self.prepareEvidencePlan = prepareEvidencePlan
+        self.finishEvidenceCollection = finishEvidenceCollection
+        self.abortEvidenceCollection = abortEvidenceCollection
+        self.writeEvidence = writeEvidence
     }
 }
 
@@ -609,7 +700,30 @@ struct InvestigationMachineZeroArgumentEntry: Sendable {
                 }
             },
             revalidateOuter: { try roleSelector.revalidate($0) },
-            writeArtifact: { try writer.write($0) }
+            writeArtifact: { try writer.write($0) },
+            prepareEvidencePlan: { plan in
+                let first = try await plan.takeNext()
+                try InvestigationMachineEpochEvidenceCollection.begin(
+                    attemptUUID: first.outerAttemptUUID
+                )
+                return InvestigationMachinePreboundEpochPlan(
+                    first: first, remainder: plan)
+            },
+            finishEvidenceCollection: {
+                try InvestigationMachineEpochEvidenceCollection.finish(summary: $0)
+            },
+            abortEvidenceCollection:
+                InvestigationMachineEpochEvidenceCollection.abort,
+            writeEvidence: { bytes in
+                let line = Data(
+                    ("STORNAUT_TASK39_IIC_EPOCH_BUNDLE_V1 "
+                        + bytes.base64EncodedString() + "\n").utf8
+                )
+                try writer.write(
+                    line, descriptor: STDERR_FILENO,
+                    maximumByteCount: 1 << 20
+                )
+            }
         ))
     }
 
@@ -636,6 +750,9 @@ struct InvestigationMachineZeroArgumentEntry: Sendable {
             }
 
         case .outer(let observation):
+            var evidenceCollectionCompleted = false
+            defer { if !evidenceCollectionCompleted {
+                dependencies.abortEvidenceCollection() } }
             do {
                 try dependencies.observeInstalledDriver()
             } catch let error as InvestigationMachineInstalledDriverObservationError {
@@ -665,18 +782,21 @@ struct InvestigationMachineZeroArgumentEntry: Sendable {
                 throw Self.knownOrUncertain(error)
             }
 
+            let boundPlan: any InvestigationMachineEightEpochPlan
+            do { boundPlan = try await dependencies.prepareEvidencePlan(plan) }
+            catch { throw Self.knownOrUncertain(error) }
+
             let summary: InvestigationMachineEightEpochCompletionSummary
             do {
-                summary = try await dependencies.runCohort(plan)
+                summary = try await dependencies.runCohort(boundPlan)
             } catch {
                 throw Self.normalizedCohort(error)
             }
 
-            let encoded: Data
+            let evidence: Data?
             do {
-                encoded = try InvestigationMachineDriverCompletionArtifact(
-                    summary: summary
-                ).encoded()
+                evidence = try dependencies.finishEvidenceCollection(summary)
+                evidenceCollectionCompleted = true
             } catch {
                 throw Self.knownOrUncertain(error)
             }
@@ -692,6 +812,14 @@ struct InvestigationMachineZeroArgumentEntry: Sendable {
                 throw Self.knownOrUncertain(error)
             }
             do {
+                if let evidence { try dependencies.writeEvidence(evidence) }
+                let artifact = if let evidence {
+                    try InvestigationMachineDriverCompletionArtifact(
+                        summary: summary, driverEvidenceBundleSHA256: .hashing(evidence))
+                } else {
+                    try InvestigationMachineDriverCompletionArtifact(summary: summary)
+                }
+                let encoded = try artifact.encoded()
                 try dependencies.writeArtifact(encoded)
             } catch {
                 throw Self.knownOrUncertain(error)
@@ -798,6 +926,22 @@ struct InvestigationMachineZeroArgumentEntry: Sendable {
             }
         }
         return .containmentUncertain
+    }
+}
+
+private actor InvestigationMachinePreboundEpochPlan: InvestigationMachineEightEpochPlan {
+    private var first: InvestigationMachineFixedEpochSelection?
+    private let remainder: any InvestigationMachineEightEpochPlan
+
+    init(first: InvestigationMachineFixedEpochSelection,
+        remainder: any InvestigationMachineEightEpochPlan) {
+        self.first = first
+        self.remainder = remainder
+    }
+
+    func takeNext() async throws -> InvestigationMachineFixedEpochSelection {
+        if let first { self.first = nil; return first }
+        return try await remainder.takeNext()
     }
 }
 

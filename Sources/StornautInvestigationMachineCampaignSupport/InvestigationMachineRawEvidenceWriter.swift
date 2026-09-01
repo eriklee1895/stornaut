@@ -356,6 +356,11 @@ package final class InvestigationMachineRawEvidenceWriter:
             guard try Self.canonicalJSON(payload) == payload else {
                 throw InvestigationMachineEvidenceContractError.invalidEncoding
             }
+            if mode == .privileged {
+                try InvestigationMachineEvidenceJSON.validateEvent(
+                    payload, kind: kind, attemptUUID: attemptUUID
+                )
+            }
             let previous = try events.last.map {
                 InvestigationHandoffSHA256.hashing(try $0.encoded())
             } ?? Self.zeroDigest()
@@ -480,8 +485,18 @@ package final class InvestigationMachineRawEvidenceWriter:
         else { throw InvestigationMachineEvidenceContractError.sizeLimitExceeded }
         switch encoding {
         case .strictJSON:
-            guard try Self.canonicalJSON(bytes) == bytes else {
-                throw InvestigationMachineEvidenceContractError.invalidEncoding
+            if mode == .privileged {
+                try InvestigationMachineEvidenceJSON.validate(
+                    bytes, role: role, path: path,
+                    campaignUUID: campaignUUID, attemptUUID: attemptUUID,
+                    sourceBinding: sourceBinding
+                )
+            } else {
+                try InvestigationMachineEvidenceJSON.validateIfTyped(
+                    bytes, role: role, path: path,
+                    campaignUUID: campaignUUID, attemptUUID: attemptUUID,
+                    sourceBinding: sourceBinding
+                )
             }
         case .canonicalBinary:
             guard role == .attemptEvent else {

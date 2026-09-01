@@ -97,8 +97,8 @@ package enum InvestigationMachineEvidenceRole:
 
     fileprivate func admitsCardinality(_ count: Int) -> Bool {
         switch self {
-        case .epochL2Projection, .epochResidueProjection: count == 8
-        case .attemptEvent: count == 2 || count == 4
+        case .epochL2Projection, .epochResidueProjection: (0...8).contains(count)
+        case .attemptEvent: (2...4).contains(count)
         default: count == 1
         }
     }
@@ -260,6 +260,7 @@ package enum InvestigationMachineAttemptOutcome: UInt32, Hashable, Sendable {
     case cancelledBeforeArm = 1
     case spawnObservedTerminal = 2
     case spawnUncertainTerminal = 3
+    case transportLoss = 4
 }
 
 package struct InvestigationMachineAttemptSummary: Equatable, Sendable {
@@ -279,8 +280,9 @@ package struct InvestigationMachineAttemptSummary: Equatable, Sendable {
         let shapeIsValid = switch (mode, outcome) {
         case (.dryRun, .cancelledBeforeArm): !consumed && eventCount == 2
         case (.privileged, .cancelledBeforeArm): !consumed && eventCount == 2
-        case (.privileged, .spawnObservedTerminal),
-             (.privileged, .spawnUncertainTerminal): consumed && eventCount == 4
+        case (.privileged, .spawnObservedTerminal), (.privileged, .spawnUncertainTerminal):
+            consumed && eventCount == 4
+        case (.privileged, .transportLoss): consumed && eventCount == 3
         default: false
         }
         guard nonzero(attemptUUID), shapeIsValid,
@@ -475,10 +477,11 @@ package struct InvestigationMachineEvidenceManifestV1:
         for role in InvestigationMachineEvidenceRole.allCases {
             let count = artifacts.count { $0.role == role }
             if summary.consumed {
-                guard count > 0 else {
+                let optionalPostArm = role == .protocolReceipt || role == .diagnosticOutput, prefixRole = role == .epochL2Projection || role == .epochResidueProjection
+                if !optionalPostArm && !prefixRole && count == 0 {
                     throw InvestigationMachineEvidenceContractError.missingRole
                 }
-                guard role.admitsCardinality(count) else {
+                guard optionalPostArm ? count <= 1 : role.admitsCardinality(count) else {
                     throw InvestigationMachineEvidenceContractError.duplicateRole
                 }
             } else if role == .attemptEvent {
@@ -492,6 +495,13 @@ package struct InvestigationMachineEvidenceManifestV1:
             } else if count != 1 {
                 throw InvestigationMachineEvidenceContractError.missingRole
             }
+        }
+        if summary.consumed {
+            let l2 = artifacts.filter { $0.role == .epochL2Projection }, residue = artifacts.filter { $0.role == .epochResidueProjection }
+            guard l2.count == residue.count, (0...8).contains(l2.count),
+                  l2.enumerated().allSatisfy({ $0.element.path.leafName == String(format: "epoch-%02d-l2.json", $0.offset + 1) }),
+                  residue.enumerated().allSatisfy({ $0.element.path.leafName == String(format: "epoch-%02d-residue.json", $0.offset + 1) })
+            else { throw InvestigationMachineEvidenceContractError.invalidOrdering }
         }
         let eventArtifacts = artifacts.filter { $0.role == .attemptEvent }
         let expectedEventNames = (1...Int(summary.eventCount)).map {
@@ -604,6 +614,9 @@ package struct InvestigationMachineAttemptEventV1: Equatable, Sendable {
             guard try canonicalJSONObject(payload) == payload else {
                 throw InvestigationMachineEvidenceContractError.invalidEncoding
             }
+            try InvestigationMachineEvidenceJSON.validateEvent(
+                payload, kind: kind, attemptUUID: attemptUUID
+            )
         } catch let error as InvestigationMachineEvidenceContractError {
             throw error
         } catch {
@@ -664,6 +677,393 @@ package struct InvestigationMachineAttemptEventV1: Equatable, Sendable {
     }
 }
 
+package enum InvestigationMachineEvidenceJSON {
+    package static let schemaVersion = 1
+    package static let prompt = "Stornaut Task 39 ii-c administrator authorization: "
+    package static let scenarios = [
+        "success", "cancellation", "timeout", "invalidEnvelope", "identityMismatch",
+        "transportLoss", "lifecycleRecovery", "artifactCleanupFailure",
+    ]
+    package static func canonicalData(_ object: [String: Any]) throws -> Data {
+        guard JSONSerialization.isValidJSONObject(object)
+        else { throw InvestigationMachineEvidenceContractError.invalidEncoding }
+        let data = try JSONSerialization.data(withJSONObject: object,
+            options: [.sortedKeys, .withoutEscapingSlashes])
+        guard try canonicalJSONObject(data) == data
+        else { throw InvestigationMachineEvidenceContractError.invalidEncoding }
+        return data
+    }
+    package static func validateIfTyped(
+        _ bytes: Data, role: InvestigationMachineEvidenceRole,
+        path: InvestigationMachineEvidenceRelativePath,
+        campaignUUID: UUID, attemptUUID: UUID,
+        sourceBinding: InvestigationMachineCampaignSourceBinding
+    ) throws {
+        guard role.requiredEncoding == .strictJSON, path.phase == role.phase,
+              role.admitsLeaf(path.leafName)
+        else { throw invalid() }
+        let object = try object(bytes)
+        guard object["schemaVersion"] != nil || object["role"] != nil
+        else { return }
+        try validateObject(object, role: role, path: path,
+            campaignUUID: campaignUUID, attemptUUID: attemptUUID,
+            sourceBinding: sourceBinding)
+    }
+    package static func validate(
+        _ bytes: Data, role: InvestigationMachineEvidenceRole,
+        path: InvestigationMachineEvidenceRelativePath,
+        campaignUUID: UUID, attemptUUID: UUID,
+        sourceBinding: InvestigationMachineCampaignSourceBinding
+    ) throws {
+        try validateObject(object(bytes), role: role, path: path, campaignUUID: campaignUUID,
+            attemptUUID: attemptUUID, sourceBinding: sourceBinding)
+    }
+    private static func validateObject(
+        _ object: [String: Any], role: InvestigationMachineEvidenceRole,
+        path: InvestigationMachineEvidenceRelativePath,
+        campaignUUID: UUID, attemptUUID: UUID,
+        sourceBinding: InvestigationMachineCampaignSourceBinding
+    ) throws {
+        try exactCommon(object, role: roleName(role), campaignUUID: campaignUUID,
+            attemptUUID: attemptUUID)
+        switch role {
+        case .sourceBuildIdentity:
+            try exact(object, commonKeys.union([
+                "repositoryHEAD", "repositoryTree",
+                "canonicalSourceManifestSHA256", "buildProvenanceSHA256",
+                "signedRuntimeBindingSHA256", "preArmFrameSHA256",
+            ]))
+            guard string(object, "repositoryHEAD") == sourceBinding.repositoryHEAD,
+                  string(object, "repositoryTree") == sourceBinding.repositoryTree,
+                  digest(object, "canonicalSourceManifestSHA256")
+                    == sourceBinding.canonicalSourceManifestSHA256.lowercaseHex,
+                  digest(object, "buildProvenanceSHA256")
+                    == sourceBinding.buildProvenanceSHA256.lowercaseHex,
+                  digest(object, "signedRuntimeBindingSHA256")
+                    == sourceBinding.signedRuntimeBindingSHA256.lowercaseHex,
+                  digest(object, "preArmFrameSHA256") != nil
+            else { throw invalid() }
+        case .builtStagingInstalledIdentity:
+            try exact(object, commonKeys.union([
+                "buildProvenanceSHA256", "signedRuntimeBindingSHA256",
+                "transactionReceiptSHA256", "builtIdentitySHA256",
+                "stagingIdentitySHA256", "installedIdentitySHA256",
+                "plistSHA256", "serviceLoaded", "appExecutableSHA256",
+                "helperExecutableSHA256", "machineDriverExecutableSHA256",
+                "gateExecutableSHA256", "coordinatorExecutableSHA256",
+            ]))
+            let built = digest(object, "builtIdentitySHA256")
+            guard digest(object, "buildProvenanceSHA256")
+                    == sourceBinding.buildProvenanceSHA256.lowercaseHex,
+                  digest(object, "signedRuntimeBindingSHA256")
+                    == sourceBinding.signedRuntimeBindingSHA256.lowercaseHex,
+                  digest(object, "transactionReceiptSHA256") != nil,
+                  built != nil, built == digest(object, "stagingIdentitySHA256"),
+                  built == digest(object, "installedIdentitySHA256"),
+                  digest(object, "plistSHA256") != nil,
+                  ["appExecutableSHA256", "helperExecutableSHA256",
+                   "machineDriverExecutableSHA256", "gateExecutableSHA256",
+                   "coordinatorExecutableSHA256"].allSatisfy({
+                    digest(object, $0) != nil
+                  }),
+                  boolean(object, "serviceLoaded") == true
+            else { throw invalid() }
+        case .policyProbe:
+            try exact(object, commonKeys.union([
+                "command", "exitStatus", "stdoutByteCount", "stdoutSHA256",
+                "stderrByteCount", "stderrSHA256",
+            ]))
+            guard string(object, "command") == "/usr/bin/sudo -knv",
+                  let status = integer(object, "exitStatus"), status != 0,
+                  nonnegativeInteger(object, "stdoutByteCount") != nil,
+                  digest(object, "stdoutSHA256") != nil,
+                  nonnegativeInteger(object, "stderrByteCount") != nil,
+                  digest(object, "stderrSHA256") != nil
+            else { throw invalid() }
+        case .humanPromptAttestation:
+            try exact(object, commonKeys.union([
+                "prompt", "machinePromptObserved", "attestationKind",
+                "humanActionObserved", "credentialRetainedByteCount",
+            ]))
+            let kind = string(object, "attestationKind"),
+                machineObserved = boolean(object, "machinePromptObserved"),
+                humanObserved = boolean(object, "humanActionObserved")
+            guard string(object, "prompt") == prompt,
+                  integer(object, "credentialRetainedByteCount") == 0,
+                  (kind == "trustedOperatorInteractiveAction"
+                    && machineObserved == true && humanObserved == true
+                    || kind == "operatorCancellationBeforeCredential"
+                    && humanObserved == false)
+            else { throw invalid() }
+        case .noAuthModelNetworkCounters:
+            try exact(object, commonKeys.union([
+                "authInvocationCount", "modelInvocationCount",
+                "networkInvocationCount", "credentialTranscriptByteCount",
+            ]))
+            guard ["authInvocationCount", "modelInvocationCount",
+                   "networkInvocationCount", "credentialTranscriptByteCount"]
+                .allSatisfy({ integer(object, $0) == 0 })
+            else { throw invalid() }
+        case .epochL2Projection:
+            try exact(object, commonKeys.union([
+                "ordinal", "scenario", "epochUUID", "configurationNonce",
+                "configurationSHA256", "signedRuntimeBindingSHA256",
+                "wholeProjectedInputSHA256", "projectionBase64",
+                "projectionSHA256", "installedL2ProofBase64",
+                "installedL2ProofSHA256", "claimEvidenceSHA256",
+                "physicalOwnershipSHA256",
+            ]))
+            try validateEpoch(object, path: path, suffix: "-l2.json")
+            guard let projectionText = string(object, "projectionBase64"),
+                  let projectionBytes = Data(base64Encoded: projectionText),
+                  let projection = try? InvestigationInstalledL2IdentityProjection
+                    .decode(projectionBytes),
+                  uuid(object, "epochUUID") == projection.epochUUID,
+                  uuid(object, "configurationNonce")
+                    == projection.configurationNonce,
+                  digest(object, "configurationSHA256")
+                    == projection.configurationSHA256.lowercaseHex,
+                  digest(object, "signedRuntimeBindingSHA256")
+                    == projection.signedRuntimeBindingSHA256.lowercaseHex,
+                  projection.signedRuntimeBindingSHA256
+                    == sourceBinding.signedRuntimeBindingSHA256,
+                  digest(object, "wholeProjectedInputSHA256") != nil,
+                  digest(object, "projectionSHA256")
+                    == projection.projectionSHA256.lowercaseHex,
+                  base64Digest(object, bytes: "installedL2ProofBase64",
+                    digest: "installedL2ProofSHA256"),
+                  digest(object, "claimEvidenceSHA256") != nil,
+                  digest(object, "physicalOwnershipSHA256") != nil
+            else { throw invalid() }
+        case .epochResidueProjection:
+            try exact(object, commonKeys.union([
+                "ordinal", "scenario", "epochUUID", "l2ArtifactSHA256",
+                "helperIdentitySHA256", "completionBindingSHA256",
+                "terminalEvidenceBase64", "terminalEvidenceSHA256",
+                "childCount", "descendantCount", "openChannelCount",
+                "ownedProcessGroupMemberCount", "helperExitObserved",
+                "artifactsRetired",
+            ]))
+            try validateEpoch(object, path: path, suffix: "-residue.json")
+            guard digest(object, "l2ArtifactSHA256") != nil,
+                  digest(object, "helperIdentitySHA256") != nil,
+                  digest(object, "completionBindingSHA256") != nil,
+                  base64Digest(object, bytes: "terminalEvidenceBase64",
+                    digest: "terminalEvidenceSHA256"),
+                  ["childCount", "descendantCount", "openChannelCount",
+                   "ownedProcessGroupMemberCount"]
+                    .allSatisfy({ integer(object, $0) == 0 }),
+                  boolean(object, "helperExitObserved") == true,
+                  boolean(object, "artifactsRetired") == true
+            else { throw invalid() }
+        case .uninstallEvidence:
+            try exact(object, commonKeys.union([
+                "transactionReceiptSHA256", "bootoutCompleted",
+                "installedRootRemoved", "installedAppRemoved",
+                "plistRemoved", "runtimeRootRemoved", "leaseRootRemoved",
+                "installedIdentitySHA256", "plistSHA256",
+                "appExecutableSHA256", "helperExecutableSHA256",
+                "machineDriverExecutableSHA256", "gateExecutableSHA256",
+                "coordinatorExecutableSHA256",
+            ]))
+            guard digest(object, "transactionReceiptSHA256") != nil,
+                  ["installedIdentitySHA256", "plistSHA256",
+                   "appExecutableSHA256", "helperExecutableSHA256",
+                   "machineDriverExecutableSHA256", "gateExecutableSHA256",
+                   "coordinatorExecutableSHA256"].allSatisfy({ digest(object, $0) != nil }),
+                  ["bootoutCompleted", "installedRootRemoved",
+                   "installedAppRemoved", "plistRemoved",
+                   "runtimeRootRemoved", "leaseRootRemoved"]
+                    .allSatisfy({ boolean(object, $0) == true })
+            else { throw invalid() }
+        case .globalPostTeardown:
+            try exact(object, commonKeys.union([
+                "observationReceiptSHA256", "appProcessCount",
+                "helperProcessCount", "driverProcessCount", "gateProcessCount",
+                "coordinatorProcessCount", "childCount", "descendantCount",
+                "openChannelCount", "ownedProcessGroupMemberCount",
+                "serviceAbsent", "gateOwnerLockRevalidated",
+                "gateAttemptEntryCount", "gateCapsuleEntryCount",
+            ]))
+            guard digest(object, "observationReceiptSHA256") != nil,
+                  ["appProcessCount", "helperProcessCount", "driverProcessCount",
+                   "gateProcessCount", "coordinatorProcessCount", "childCount",
+                   "descendantCount", "openChannelCount",
+                   "ownedProcessGroupMemberCount", "gateAttemptEntryCount",
+                   "gateCapsuleEntryCount"]
+                    .allSatisfy({ integer(object, $0) == 0 }),
+                  boolean(object, "serviceAbsent") == true,
+                  boolean(object, "gateOwnerLockRevalidated") == true
+            else { throw invalid() }
+        case .verifierInput:
+            try exact(object, commonKeys.union([
+                "expectedConsumed", "expectedEpochCount", "evidenceSetSHA256",
+                "verifierExecutableSHA256",
+            ]))
+            guard boolean(object, "expectedConsumed") != nil,
+                  let count = integer(object, "expectedEpochCount"),
+                  (0...8).contains(count),
+                  digest(object, "evidenceSetSHA256") != nil,
+                  digest(object, "verifierExecutableSHA256") != nil
+            else { throw invalid() }
+        case .protocolReceipt, .diagnosticOutput, .attemptEvent:
+            throw invalid()
+        }
+    }
+
+    package static func validateEventIfTyped(
+        _ bytes: Data, kind: InvestigationMachineAttemptEventKind,
+        attemptUUID: UUID
+    ) throws {
+        let object = try object(bytes)
+        guard object["schemaVersion"] != nil || object["kind"] != nil else {
+            return
+        }
+        try validateEventObject(object, kind: kind, attemptUUID: attemptUUID)
+    }
+
+    package static func validateEvent(
+        _ bytes: Data, kind: InvestigationMachineAttemptEventKind,
+        attemptUUID: UUID
+    ) throws {
+        try validateEventObject(
+            object(bytes), kind: kind, attemptUUID: attemptUUID
+        )
+    }
+
+    private static func validateEventObject(
+        _ object: [String: Any], kind: InvestigationMachineAttemptEventKind,
+        attemptUUID: UUID
+    ) throws {
+        let base: Set<String> = [
+            "schemaVersion", "kind", "attemptUUID", "evidenceSetSHA256",
+        ]
+        let keys: Set<String> = switch kind {
+        case .prepared, .armedConsumed, .terminal: base
+        case .cancelledBeforeArm, .spawnUncertain: base.union(["reason"])
+        case .spawnObserved:
+            base.union(["processID", "processGroupID", "sessionID"])
+        }
+        try exact(object, keys)
+        guard integer(object, "schemaVersion") == schemaVersion,
+              string(object, "kind") == eventName(kind),
+              uuid(object, "attemptUUID") == attemptUUID,
+              digest(object, "evidenceSetSHA256") != nil
+        else { throw invalid() }
+        if kind == .spawnObserved {
+            guard let pid = integer(object, "processID"), pid > 1,
+                  integer(object, "processGroupID") == pid,
+                  let sid = integer(object, "sessionID"), sid > 1
+            else { throw invalid() }
+        }
+        if kind == .cancelledBeforeArm || kind == .spawnUncertain {
+            guard let reason = string(object, "reason"), !reason.isEmpty,
+                  reason.utf8.count <= 96 else { throw invalid() }
+        }
+    }
+
+    private static let commonKeys: Set<String> = [
+        "schemaVersion", "role", "campaignUUID", "attemptUUID",
+    ]
+    private static func object(_ data: Data) throws -> [String: Any] {
+        guard try canonicalJSONObject(data) == data,
+              let value = try JSONSerialization.jsonObject(with: data)
+                as? [String: Any]
+        else { throw invalid() }
+        return value
+    }
+    private static func exactCommon(
+        _ value: [String: Any], role: String, campaignUUID: UUID,
+        attemptUUID: UUID
+    ) throws {
+        guard integer(value, "schemaVersion") == schemaVersion,
+              string(value, "role") == role,
+              uuid(value, "campaignUUID") == campaignUUID,
+              uuid(value, "attemptUUID") == attemptUUID
+        else { throw invalid() }
+    }
+    private static func exact(_ value: [String: Any], _ keys: Set<String>) throws {
+        guard Set(value.keys) == keys else { throw invalid() }
+    }
+    private static func string(_ value: [String: Any], _ key: String) -> String? {
+        value[key] as? String
+    }
+    private static func integer(_ value: [String: Any], _ key: String) -> Int? {
+        guard let number = value[key] as? NSNumber,
+              CFGetTypeID(number) != CFBooleanGetTypeID() else { return nil }
+        let result = number.intValue
+        return NSNumber(value: result) == number ? result : nil
+    }
+    private static func nonnegativeInteger(
+        _ value: [String: Any], _ key: String
+    ) -> Int? { integer(value, key).flatMap { $0 >= 0 ? $0 : nil } }
+    private static func boolean(_ value: [String: Any], _ key: String) -> Bool? {
+        guard let number = value[key] as? NSNumber,
+              CFGetTypeID(number) == CFBooleanGetTypeID() else { return nil }
+        return number.boolValue
+    }
+    private static func uuid(_ value: [String: Any], _ key: String) -> UUID? {
+        guard let text = string(value, key), text == text.lowercased(),
+              let result = UUID(uuidString: text), nonzero(result)
+        else { return nil }
+        return result
+    }
+    private static func digest(_ value: [String: Any], _ key: String) -> String? {
+        guard let text = string(value, key), validHex(text, count: 64)
+        else { return nil }
+        return text
+    }
+    private static func base64Digest(
+        _ value: [String: Any], bytes: String, digest name: String
+    ) -> Bool {
+        guard let text = string(value, bytes), !text.isEmpty,
+              let decoded = Data(base64Encoded: text), !decoded.isEmpty,
+              digest(value, name) == InvestigationHandoffSHA256.hashing(decoded)
+                .lowercaseHex else { return false }
+        return true
+    }
+    private static func validateEpoch(
+        _ value: [String: Any], path: InvestigationMachineEvidenceRelativePath,
+        suffix: String
+    ) throws {
+        guard let ordinal = integer(value, "ordinal"), (1...8).contains(ordinal),
+              path.leafName == String(format: "epoch-%02d%@", ordinal, suffix),
+              string(value, "scenario") == scenarios[ordinal - 1],
+              uuid(value, "epochUUID") != nil
+        else { throw invalid() }
+    }
+    private static func roleName(_ role: InvestigationMachineEvidenceRole) -> String {
+        switch role {
+        case .sourceBuildIdentity: "sourceBuildIdentity"
+        case .builtStagingInstalledIdentity: "builtStagingInstalledIdentity"
+        case .policyProbe: "policyProbe"
+        case .humanPromptAttestation: "humanPromptAttestation"
+        case .noAuthModelNetworkCounters: "noAuthModelNetworkCounters"
+        case .protocolReceipt: "protocolReceipt"
+        case .diagnosticOutput: "diagnosticOutput"
+        case .epochL2Projection: "epochL2Projection"
+        case .epochResidueProjection: "epochResidueProjection"
+        case .uninstallEvidence: "uninstallEvidence"
+        case .globalPostTeardown: "globalPostTeardown"
+        case .verifierInput: "verifierInput"
+        case .attemptEvent: "attemptEvent"
+        }
+    }
+    private static func eventName(_ kind: InvestigationMachineAttemptEventKind) -> String {
+        switch kind {
+        case .prepared: "prepared"
+        case .cancelledBeforeArm: "cancelledBeforeArm"
+        case .armedConsumed: "armedConsumed"
+        case .spawnObserved: "spawnObserved"
+        case .spawnUncertain: "spawnUncertain"
+        case .terminal: "terminal"
+        }
+    }
+    private static func invalid() -> InvestigationMachineEvidenceContractError {
+        .invalidEncoding
+    }
+}
+
 package enum InvestigationMachineAttemptEventChain {
     package static func summary(
         _ events: [InvestigationMachineAttemptEventV1],
@@ -675,10 +1075,9 @@ package enum InvestigationMachineAttemptEventChain {
         }
         let outcome: InvestigationMachineAttemptOutcome = switch last.kind {
         case .cancelledBeforeArm: .cancelledBeforeArm
-        case .terminal where events.dropLast().last?.kind == .spawnObserved:
-            .spawnObservedTerminal
-        case .terminal where events.dropLast().last?.kind == .spawnUncertain:
-            .spawnUncertainTerminal
+        case .terminal where events.dropLast().last?.kind == .spawnObserved: .spawnObservedTerminal
+        case .terminal where events.dropLast().last?.kind == .spawnUncertain: .spawnUncertainTerminal
+        case .spawnUncertain: .transportLoss
         default: throw InvestigationMachineEvidenceContractError.invalidTransition
         }
         return try .init(
@@ -725,6 +1124,7 @@ package enum InvestigationMachineAttemptEventChain {
             [.prepared, .cancelledBeforeArm],
             [.prepared, .armedConsumed, .spawnObserved, .terminal],
             [.prepared, .armedConsumed, .spawnUncertain, .terminal],
+            [.prepared, .armedConsumed, .spawnUncertain],
         ]
         }
         guard complete.contains(kinds) else {

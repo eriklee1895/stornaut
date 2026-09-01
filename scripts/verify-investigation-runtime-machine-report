@@ -1,5 +1,12 @@
 #!/bin/zsh -f
 set -euo pipefail
+typeset -r iicc_self_sha=398038094121f7269170cc0802077de6b85a467feb632db09307a9446e0ac59c # iicc-self-seal
+if [[ $0 != /dev/fd/9 ]]; then
+    self=${0:A}
+    [[ -f $self && ! -L $self ]] || exit 2
+    exec 9<"$self"
+    exec /bin/zsh -f /dev/fd/9 "$@"
+fi
 
 [[ $# == 2 ]] || {
     print -u2 "manifest requires an exact external seal"
@@ -7,13 +14,15 @@ set -euo pipefail
     exit 2
 }
 
-exec /usr/bin/python3 -I - "$1" "$2" <<'PY'
+exec /usr/bin/python3 -I - "$1" "$2" "$iicc_self_sha" 9 <<'PY'
 import ctypes
+import base64
 import errno
 import fcntl
 import hashlib
 import json
 import os
+import re
 import select
 import stat
 import struct
@@ -34,6 +43,13 @@ MAX_EVENT = 4_608
 MAX_EVENT_PAYLOAD = 4_096
 MAX_RECEIPT = 4_096
 MAX_CAPSULE = 1_069_056
+SCENARIOS = ("success", "cancellation", "timeout", "invalidEnvelope",
+    "identityMismatch", "transportLoss", "lifecycleRecovery", "artifactCleanupFailure")
+ROLE_NAMES = {1: "sourceBuildIdentity", 2: "builtStagingInstalledIdentity",
+              3: "policyProbe", 4: "humanPromptAttestation",
+              5: "noAuthModelNetworkCounters", 8: "epochL2Projection",
+              9: "epochResidueProjection", 10: "uninstallEvidence",
+              11: "globalPostTeardown", 12: "verifierInput"}
 O_NOFOLLOW_ANY = 0x20000000
 O_RESOLVE_BENEATH = 0x00001000
 O_UNIQUE = 0x00002000
@@ -44,9 +60,10 @@ READ_FLAGS = (
 DIRECTORY_FLAGS = READ_FLAGS | os.O_DIRECTORY
 ROOT_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NONBLOCK
 ROOT_FLAGS |= O_NOFOLLOW_ANY | O_UNIQUE
-VNODE_BASE = (select.KQ_NOTE_DELETE | select.KQ_NOTE_ATTRIB
-              | select.KQ_NOTE_LINK | select.KQ_NOTE_RENAME | select.KQ_NOTE_REVOKE)
-VNODE_CONTENT = VNODE_BASE | select.KQ_NOTE_WRITE | select.KQ_NOTE_EXTEND
+VNODE_IDENTITY = (select.KQ_NOTE_DELETE | select.KQ_NOTE_ATTRIB
+                  | select.KQ_NOTE_RENAME | select.KQ_NOTE_REVOKE)
+VNODE_CONTENT = (VNODE_IDENTITY | select.KQ_NOTE_LINK
+                 | select.KQ_NOTE_WRITE | select.KQ_NOTE_EXTEND)
 ACL_TYPE_EXTENDED = 0x00000100
 ACL_FIRST_ENTRY = 0
 PHASES = {
@@ -242,6 +259,129 @@ def parse_decimal(value, name):
     require(0 <= parsed <= (1 << 64) - 1, f"overflow {name}")
     return parsed
 
+def exact_object(value, keys, name): require(set(value) == set(keys), f"{name} schema")
+def exact_int(value, name, minimum=None):
+    require(type(value) is int, f"{name} integer")
+    if minimum is not None: require(value >= minimum, f"{name} range")
+    return value
+def exact_uuid(value, name):
+    require(isinstance(value, str), f"{name} uuid type")
+    try: parsed = uuid.UUID(value)
+    except ValueError as error: raise Rejected(f"{name} uuid") from error
+    require(parsed.int and str(parsed) == value, f"{name} uuid canonical")
+    return value
+def digest_text(value, name):
+    require(valid_hex(value, 64), f"{name} digest")
+    return value
+def decoded_base64(value, name, maximum=MAX_ARTIFACT):
+    require(isinstance(value, str) and value, f"{name} base64 type")
+    try: decoded = base64.b64decode(value, validate=True)
+    except ValueError as error: raise Rejected(f"{name} base64") from error
+    require(0 < len(decoded) <= maximum
+            and base64.b64encode(decoded).decode() == value, f"{name} base64")
+    return decoded
+def common_json(value, role, manifest):
+    require(exact_int(value["schemaVersion"], "evidence schema") == 1
+            and value["role"] == ROLE_NAMES[role]
+            and exact_uuid(value["campaignUUID"], "evidence campaign") == manifest["campaign"]
+            and exact_uuid(value["attemptUUID"], "evidence attempt") == manifest["attempt"], "evidence common binding")
+def parse_projection(data):
+    fields = parse_transcript(data,
+        "stornaut.task39.installed-l2.identity-projection",
+        [(16,16),(16,16),(8,8),(32,32),(32,32),(32,32),(1,256),
+         (32,32),(1,256),(32,32),(1,256),(32,32),(20,32),(1,256),(32,32)],
+        2_048)
+    zeroed = list(fields); zeroed[14] = bytes(32)
+    require(hashlib.sha256(encode_transcript("stornaut.task39.installed-l2.identity-projection", zeroed)).digest() == fields[14], "projection self hash")
+    return {"epoch": uuid_text(fields[0]), "nonce": uuid_text(fields[1]),
+            "configuration": fields[3].hex(), "signed": fields[4].hex(),
+            "app": fields[5].hex(), "helper": fields[7].hex(), "driver": fields[9].hex(), "sha": fields[14].hex()}
+def validate_json_artifacts(manifest, contents):
+    values, epochs = {}, {}
+    common = {"schemaVersion","role","campaignUUID","attemptUUID"}
+    for entry in manifest["entries"]:
+        role = entry["role"]
+        if role not in ROLE_NAMES: continue
+        value = canonical_json(contents[entry["path"]]); common_json(value, role, manifest)
+        values.setdefault(role, []).append((entry, value))
+        if role == 1:
+            exact_object(value, common | {"repositoryHEAD","repositoryTree","canonicalSourceManifestSHA256","buildProvenanceSHA256","signedRuntimeBindingSHA256","preArmFrameSHA256"}, "source")
+            require(value["repositoryHEAD"] == manifest["head"]
+                    and value["repositoryTree"] == manifest["tree"]
+                    and digest_text(value["canonicalSourceManifestSHA256"], "source manifest") == manifest["source"].hex()
+                    and digest_text(value["buildProvenanceSHA256"], "build") == manifest["build"].hex()
+                    and digest_text(value["signedRuntimeBindingSHA256"], "signed") == manifest["signed"].hex(), "source binding")
+            digest_text(value["preArmFrameSHA256"], "pre-arm")
+        elif role == 2:
+            executables = {"appExecutableSHA256","helperExecutableSHA256","machineDriverExecutableSHA256","gateExecutableSHA256","coordinatorExecutableSHA256"}
+            exact_object(value, common | {"buildProvenanceSHA256","signedRuntimeBindingSHA256","transactionReceiptSHA256","builtIdentitySHA256","stagingIdentitySHA256","installedIdentitySHA256","plistSHA256","serviceLoaded"} | executables, "install")
+            identities = [digest_text(value[n], n) for n in ("builtIdentitySHA256","stagingIdentitySHA256","installedIdentitySHA256")]
+            require(len(set(identities)) == 1 and value["serviceLoaded"] is True and value["buildProvenanceSHA256"] == manifest["build"].hex() and value["signedRuntimeBindingSHA256"] == manifest["signed"].hex(), "install binding")
+            digest_text(value["transactionReceiptSHA256"], "install receipt"); digest_text(value["plistSHA256"], "plist")
+            for name in executables: digest_text(value[name], name)
+        elif role == 3:
+            exact_object(value, common | {"command","exitStatus","stdoutByteCount","stdoutSHA256","stderrByteCount","stderrSHA256"}, "policy probe")
+            require(value["command"] == "/usr/bin/sudo -knv" and exact_int(value["exitStatus"], "probe status") != 0, "policy probe result")
+            for n in ("stdoutByteCount","stderrByteCount"): exact_int(value[n], n, 0)
+            for n in ("stdoutSHA256","stderrSHA256"): digest_text(value[n], n)
+        elif role == 4:
+            exact_object(value, common | {"prompt","machinePromptObserved","attestationKind","humanActionObserved","credentialRetainedByteCount"}, "attestation")
+            require(value["prompt"] == "Stornaut Task 39 ii-c administrator authorization: " and type(value["machinePromptObserved"]) is bool and exact_int(value["credentialRetainedByteCount"], "credential bytes") == 0, "attestation fields")
+            expected = {"trustedOperatorInteractiveAction": (True, True),
+                        "operatorCancellationBeforeCredential": (None, False)}
+            require(value["attestationKind"] in expected and type(value["humanActionObserved"]) is bool, "attestation kind")
+            prompt, human = expected[value["attestationKind"]]
+            require(value["humanActionObserved"] is human and (prompt is None or value["machinePromptObserved"] is prompt), "attestation semantics")
+        elif role == 5:
+            exact_object(value, common | {"authInvocationCount","modelInvocationCount","networkInvocationCount","credentialTranscriptByteCount"}, "counters")
+            require(all(exact_int(value[n], n) == 0 for n in set(value)-common), "nonzero capability counter")
+        elif role in (8, 9):
+            ordinal = exact_int(value["ordinal"], "epoch ordinal")
+            require(1 <= ordinal <= 8 and value["scenario"] == SCENARIOS[ordinal-1] and entry["leaf"] == f"epoch-{ordinal:02d}-" + ("l2.json" if role == 8 else "residue.json"), "epoch path")
+            exact_uuid(value["epochUUID"], "epoch uuid"); epochs.setdefault(ordinal, {})[role] = (entry, value)
+        elif role == 10:
+            executables = {"appExecutableSHA256","helperExecutableSHA256","machineDriverExecutableSHA256","gateExecutableSHA256","coordinatorExecutableSHA256"}
+            exact_object(value, common | executables | {"transactionReceiptSHA256","installedIdentitySHA256","plistSHA256","bootoutCompleted","installedRootRemoved","installedAppRemoved","plistRemoved","runtimeRootRemoved","leaseRootRemoved"}, "uninstall")
+            digest_text(value["transactionReceiptSHA256"], "uninstall receipt")
+            for name in executables | {"installedIdentitySHA256","plistSHA256"}: digest_text(value[name], name)
+            require(all(value[n] is True for n in {"bootoutCompleted","installedRootRemoved","installedAppRemoved","plistRemoved","runtimeRootRemoved","leaseRootRemoved"}), "uninstall absence")
+        elif role == 11:
+            zeros = {"appProcessCount","helperProcessCount","driverProcessCount","gateProcessCount","coordinatorProcessCount","childCount","descendantCount","openChannelCount","ownedProcessGroupMemberCount","gateAttemptEntryCount","gateCapsuleEntryCount"}
+            exact_object(value, common | zeros | {"observationReceiptSHA256","serviceAbsent","gateOwnerLockRevalidated"}, "global teardown")
+            require(all(exact_int(value[n], n) == 0 for n in zeros) and value["serviceAbsent"] is True and value["gateOwnerLockRevalidated"] is True, "global teardown values")
+            digest_text(value["observationReceiptSHA256"], "teardown receipt")
+        elif role == 12:
+            exact_object(value, common | {"expectedConsumed","expectedEpochCount","evidenceSetSHA256","verifierExecutableSHA256"}, "verifier input")
+            require(type(value["expectedConsumed"]) is bool
+                    and 0 <= exact_int(value["expectedEpochCount"], "expected epochs") <= 8, "verifier expectation")
+            digest_text(value["evidenceSetSHA256"], "evidence set"); digest_text(value["verifierExecutableSHA256"], "verifier executable")
+    if manifest["summary"]["consumed"]:
+        observed = values[12][0][1]["expectedEpochCount"]
+        require(values[12][0][1]["expectedConsumed"] is True and set(epochs) == set(range(1, observed + 1)), "epoch set")
+        whole = set()
+        for ordinal, pair in epochs.items():
+            require(set(pair) == {8,9}, "epoch role pair")
+            l2entry, l2 = pair[8]; _, residue = pair[9]
+            l2keys = common | {"ordinal","scenario","epochUUID","configurationNonce","configurationSHA256","signedRuntimeBindingSHA256","wholeProjectedInputSHA256","projectionBase64","projectionSHA256","installedL2ProofBase64","installedL2ProofSHA256","claimEvidenceSHA256","physicalOwnershipSHA256"}
+            residuekeys = common | {"ordinal","scenario","epochUUID","l2ArtifactSHA256","helperIdentitySHA256","completionBindingSHA256","terminalEvidenceBase64","terminalEvidenceSHA256","childCount","descendantCount","openChannelCount","ownedProcessGroupMemberCount","helperExitObserved","artifactsRetired"}
+            exact_object(l2, l2keys, "epoch l2"); exact_object(residue, residuekeys, "epoch residue")
+            projection = decoded_base64(l2["projectionBase64"], "projection", 2_048); parsed = parse_projection(projection)
+            require(parsed["epoch"] == l2["epochUUID"] and parsed["nonce"] == exact_uuid(l2["configurationNonce"], "configuration nonce") and parsed["configuration"] == digest_text(l2["configurationSHA256"], "configuration") and parsed["signed"] == manifest["signed"].hex() and parsed["sha"] == digest_text(l2["projectionSHA256"], "projection"), "projection binding")
+            require(l2["signedRuntimeBindingSHA256"] == manifest["signed"].hex(),
+                    "projection signed binding")
+            proof = decoded_base64(l2["installedL2ProofBase64"], "installed l2", 16_384)
+            require(hashlib.sha256(proof).hexdigest() == digest_text(l2["installedL2ProofSHA256"], "installed l2"), "installed l2 digest")
+            require(residue["epochUUID"] == l2["epochUUID"] and residue["l2ArtifactSHA256"] == l2entry["sha"].hex(), "l2 residue join")
+            terminal = decoded_base64(residue["terminalEvidenceBase64"], "terminal evidence", 2_048)
+            require(hashlib.sha256(terminal).hexdigest() == digest_text(residue["terminalEvidenceSHA256"], "terminal evidence") and all(exact_int(residue[n], n) == 0 for n in ("childCount","descendantCount","openChannelCount","ownedProcessGroupMemberCount")) and residue["helperExitObserved"] is True and residue["artifactsRetired"] is True, "residue terminal")
+            whole.add(digest_text(l2["wholeProjectedInputSHA256"], "whole input"))
+        require(len(whole) == (1 if observed else 0), "whole input drift")
+    require(values[10][0][1]["transactionReceiptSHA256"] != values[2][0][1]["transactionReceiptSHA256"], "install/uninstall receipt alias")
+    install, uninstall = values[2][0][1], values[10][0][1]
+    identity_names = executables | {"installedIdentitySHA256","plistSHA256"}
+    require(all(install[name] == uninstall[name] for name in identity_names), "install/uninstall identity drift")
+    return values, epochs, values[1][0][1]
+
 def parse_summary(data):
     fields = parse_transcript(
         data, "stornaut.task39.iic.attempt-summary.v1",
@@ -252,7 +392,7 @@ def parse_summary(data):
     require(any(final_hash), "zero final event digest")
     valid = ((mode, outcome, consumed, count) in {
         (1, 1, False, 2), (2, 1, False, 2),
-        (2, 2, True, 4), (2, 3, True, 4),
+        (2, 2, True, 4), (2, 3, True, 4), (2, 4, True, 3),
     })
     require(valid, "attempt summary shape")
     return {"attempt": attempt, "mode": mode, "outcome": outcome,
@@ -327,14 +467,24 @@ def parse_manifest(data):
                for role in ROLES}
     for role, values in by_role.items():
         if summary["consumed"]:
-            expected = summary["count"] if role == 13 else (8 if role in (8, 9) else 1)
+            expected = summary["count"] if role == 13 else None if role in (6,7,8,9) else 1
         elif role == 13:
             expected = 2
         elif role in POST_ARM_ROLES:
             expected = 0
         else:
             expected = 1
-        require(len(values) == expected, "role cardinality")
+        if expected is not None: require(len(values) == expected, "role cardinality")
+        elif role in (6,7): require(len(values) <= 1, "role cardinality")
+        else: require(len(values) <= 8, "role cardinality")
+    if summary["consumed"]:
+        l2, residue = by_role[8], by_role[9]
+        require(len(l2) == len(residue), "epoch pair cardinality")
+        require([entry["leaf"] for entry in l2] ==
+                [f"epoch-{i:02d}-l2.json" for i in range(1, len(l2)+1)]
+                and [entry["leaf"] for entry in residue] ==
+                [f"epoch-{i:02d}-residue.json" for i in range(1, len(residue)+1)],
+                "epoch prefix ordering")
     event_names = [entry["leaf"] for entry in by_role[13]]
     require(event_names == [f"attempt-event-{i:04d}.bin"
                             for i in range(1, summary["count"] + 1)],
@@ -353,10 +503,30 @@ def parse_event(data):
     sequence, attempt, kind = u32(fields[0]), uuid_text(fields[1]), u32(fields[2])
     observed, payload = i64(fields[4]), fields[5]
     require(sequence > 0 and kind in range(1, 7) and observed > 0, "event values")
-    canonical_json(payload)
+    value = canonical_json(payload)
+    names = {1: "prepared", 2: "cancelledBeforeArm", 3: "armedConsumed",
+             4: "spawnObserved", 5: "spawnUncertain", 6: "terminal"}
+    base = {"schemaVersion", "kind", "attemptUUID", "evidenceSetSHA256"}
+    keys = (base | {"processID", "processGroupID", "sessionID"}
+            if kind == 4 else base | {"reason"} if kind in (2, 5) else base)
+    exact_object(value, keys, "event payload")
+    require(exact_int(value["schemaVersion"], "event schema") == 1
+            and value["kind"] == names[kind]
+            and exact_uuid(value["attemptUUID"], "event attempt") == attempt
+            and digest_text(value["evidenceSetSHA256"], "event evidence"),
+            "event payload binding")
+    if kind == 4:
+        pid = exact_int(value["processID"], "spawn pid", 2)
+        require(exact_int(value["processGroupID"], "spawn pgid") == pid
+                and exact_int(value["sessionID"], "spawn sid", 2) > 1,
+                "spawn topology")
+    if kind in (2, 5):
+        require(isinstance(value["reason"], str) and value["reason"]
+                and len(value["reason"].encode()) <= 96, "event reason")
     require(hashlib.sha256(payload).digest() == fields[6], "event payload digest")
     return {"sequence": sequence, "attempt": attempt, "kind": kind,
-            "previous": fields[3], "observed": observed, "bytes": data}
+            "previous": fields[3], "observed": observed, "payload": value,
+            "bytes": data}
 
 def validate_events(entries, contents, summary, attempt):
     events = [parse_event(contents[entry["path"]])
@@ -374,10 +544,95 @@ def validate_events(entries, contents, summary, attempt):
     kinds = [event["kind"] for event in events]
     shapes = {(1, 1): [1, 2], (2, 1): [1, 2],
               (2, 2): [1, 3, 4, 6], (2, 3): [1, 3, 5, 6]}
+    shapes[(2, 4)] = [1, 3, 5]
     require(kinds == shapes.get((summary["mode"], summary["outcome"])),
             "event terminal shape")
     require(hashlib.sha256(events[-1]["bytes"]).digest() == summary["final"],
             "event summary digest")
+    require(len({event["payload"]["evidenceSetSHA256"] for event in events}) == 1,
+            "event evidence set drift")
+    return events
+
+def frames(data):
+    result, offset = [], 0
+    while offset < len(data):
+        require(offset + 4 <= len(data), "frame prefix")
+        size = u32(data[offset:offset+4]); offset += 4
+        require(0 < size <= MAX_ARTIFACT and offset + size <= len(data), "frame size")
+        result.append(data[offset:offset+size]); offset += size
+    require(offset == len(data), "frame trailing bytes")
+    return result
+
+def parse_prearm(data, manifest):
+    fields = parse_transcript(data, "stornaut.task39.iic.coordinator-prearm.v1",
+        [(40,40),(40,40)] + [(32,32)]*3 + [(16,16)]
+        + [(32,32)]*2 + [(1,MAX_CAPSULE),(32,32)], MAX_CAPSULE + 1_024)
+    zeroed = list(fields); zeroed[9] = bytes(32)
+    require(hashlib.sha256(encode_transcript(
+        "stornaut.task39.iic.coordinator-prearm.v1", zeroed)).digest() == fields[9],
+        "pre-arm self hash")
+    require(text(fields[0]) == manifest["head"] and text(fields[1]) == manifest["tree"]
+            and fields[2] == manifest["source"] and fields[3] == manifest["build"]
+            and fields[4] == manifest["signed"] and uuid_text(fields[5]) == manifest["attempt"],
+            "pre-arm source binding")
+    projected = parse_transcript(fields[8],
+        "stornaut.task39.l3c3cii.projected-cohort-input",
+        [(1,MAX_CAPSULE),(4,4),(32,32)] + [(1,2_048)]*8, MAX_CAPSULE)
+    require(u32(projected[1]) == 8 and projected[2] == fields[7],
+            "pre-arm projected input")
+    zeroed = list(projected); zeroed[2] = bytes(32)
+    require(hashlib.sha256(encode_transcript(
+        "stornaut.task39.l3c3cii.projected-cohort-input", zeroed)).digest()
+        == projected[2], "projected input self hash")
+    projections = [parse_projection(value) for value in projected[3:]]
+    return {"capsule": fields[6], "whole": fields[7],
+            "projected": fields[8], "projections": projections, "sha": fields[9]}
+
+def parse_gate_receipt(data, manifest, prearm):
+    require(len(data) == 422 and data[:4] == b"STNG" and u16(data[4:6]) == 1
+            and data[6:8] == b"\x02\x02" and u32(data[8:12]) == 410,
+            "raw Gate receipt frame")
+    payload = data[12:]; offset = 32
+    attempt = uuid_text(payload[offset:offset+16]); offset += 16
+    whole = payload[offset:offset+32]; offset += 32
+    prepared = payload[offset:offset+32]
+    require(attempt == manifest["attempt"] and whole == prearm["whole"]
+            and any(prepared), "raw Gate identity")
+    # Fixed terminal payload offsets: output byte count/digest/flags.
+    output_offset = 337
+    count = u32(payload[output_offset:output_offset+4])
+    digest = payload[output_offset+4:output_offset+36]
+    require(payload[output_offset+36:output_offset+39] == b"\x00\x01\x00",
+            "raw Gate output terminal flags")
+    return {"gate": payload[:32], "outputCount": count, "outputSHA": digest,
+            "sha": hashlib.sha256(data).digest()}
+
+def parse_bundle(diagnostic, manifest, epochs):
+    prefix = b"STORNAUT_TASK39_IIC_EPOCH_BUNDLE_V1 "
+    lines = [line for line in diagnostic.splitlines() if line.startswith(prefix)]
+    require(len(lines) == 1, "driver bundle envelope cardinality")
+    bundle = decoded_base64(lines[0][len(prefix):].decode(), "driver bundle", 512<<10)
+    fields = parse_transcript(bundle, "stornaut.task39.machine.driver-evidence-bundle.v1",
+        [(16,16),(32,32),(32,32),(4,4)] + [(1,64<<10)]*8, 512<<10)
+    require(uuid_text(fields[0]) == manifest["attempt"] and u32(fields[3]) == 8,
+            "driver bundle identity")
+    for ordinal, encoded in enumerate(fields[4:], 1):
+        row = parse_transcript(encoded, "stornaut.task39.machine.epoch-evidence.v1",
+            [(4,4),(4,4),(16,16),(16,16),(1,96<<10),(1,64<<10),(1,2_048),(32,32)], 64<<10)
+        l2, residue = epochs[ordinal][8][1], epochs[ordinal][9][1]
+        require(u32(row[0]) == ordinal-1 and u32(row[1]) == ordinal
+                and uuid_text(row[2]) == l2["epochUUID"]
+                and uuid_text(row[3]) == l2["configurationNonce"]
+                and row[6] == decoded_base64(residue["terminalEvidenceBase64"], "terminal evidence", 2_048),
+                "driver epoch join")
+        physical = parse_transcript(row[5], "stornaut.task39.machine.epoch-physical-evidence.v1",
+            [(1,48<<10)] if ordinal == 7 else [(1,32<<10),(1,48<<10)], 64<<10)
+        ownership = physical[0]
+        own = parse_transcript(ownership, "stornaut.task39.machine.physical-ownership.evidence-v1",
+            [(16,16),(32,32),(32,32),(16,16),(4,4),(4,4),(32,32),(1,4096),(1,4096),(1,65536),(32,32),(32,32),(1,16384),(8,8),(8,8),(32,32)], 32<<10)
+        require(hashlib.sha256(ownership).hexdigest() == l2["physicalOwnershipSHA256"]
+                and own[12] == decoded_base64(l2["installedL2ProofBase64"], "installed l2", 16_384), "bundle ownership/L2 join")
+    return {"sha": hashlib.sha256(bundle).digest(), "whole": fields[2]}
 
 def parse_receipt(frame, manifest):
     require(len(frame) >= 4 and 1 <= u32(frame[:4]) <= MAX_RECEIPT
@@ -411,6 +666,42 @@ def parse_receipt(frame, manifest):
     require(hashlib.sha256(encode_transcript(
         "stornaut.task39.machine.gate-coordinator-receipt.v1", zeroed
     )).digest() == fields[22], "receipt self hash")
+    return {"whole": fields[3], "gate": fields[8],
+            "gateSHA": fields[9], "sha": fields[22]}
+
+def validate_receipt_chain(stream, diagnostic, manifest, epochs, source, install):
+    framed = frames(stream)
+    require(len(framed) == 3, "FD 3 frame cardinality")
+    prearm = parse_prearm(framed[0], manifest)
+    raw = parse_gate_receipt(framed[1], manifest, prearm)
+    final = parse_receipt(struct.pack(">I", len(framed[2])) + framed[2], manifest)
+    require(raw["sha"] == final["gateSHA"] and final["whole"] == prearm["whole"]
+            and raw["gate"] == final["gate"]
+            and raw["gate"].hex() == install["gateExecutableSHA256"],
+            "three-frame receipt chain")
+    for projection in prearm["projections"]:
+        require(projection["app"] == install["appExecutableSHA256"]
+                and projection["helper"] == install["helperExecutableSHA256"]
+                and projection["driver"] == install["machineDriverExecutableSHA256"],
+                "installed executable projection drift")
+    bundle = parse_bundle(diagnostic, manifest, epochs)
+    require(source["preArmFrameSHA256"] == prearm["sha"].hex()
+            and {pair[8][1]["wholeProjectedInputSHA256"] for pair in epochs.values()}
+                == {prearm["whole"].hex()}
+            and bundle["whole"] == prearm["whole"], "source/epoch whole join")
+    zero = bytes(32)
+    completion_zero = encode_transcript(
+        "stornaut.task39.machine.driver-completion-v2",
+        [uuid.UUID(manifest["attempt"]).bytes, prearm["capsule"],
+         prearm["whole"], struct.pack(">I", 8), bundle["sha"], zero])
+    completion = encode_transcript(
+        "stornaut.task39.machine.driver-completion-v2",
+        [uuid.UUID(manifest["attempt"]).bytes, prearm["capsule"],
+         prearm["whole"], struct.pack(">I", 8), bundle["sha"],
+         hashlib.sha256(completion_zero).digest()])
+    require(raw["outputCount"] == len(completion)
+            and raw["outputSHA"] == hashlib.sha256(completion).digest(),
+            "Gate output completion binding")
 
 def empty_extended_acl(fd):
     ctypes.set_errno(0)
@@ -507,7 +798,7 @@ change_queue = select.kqueue()
 def watch(fd, content):
     event = select.kevent(
         fd, filter=select.KQ_FILTER_VNODE, flags=select.KQ_EV_ADD,
-        fflags=VNODE_CONTENT if content else VNODE_BASE)
+        fflags=VNODE_CONTENT if content else VNODE_IDENTITY)
     require(change_queue.control([event], 0, 0) == [], "vnode watch registration")
 
 def require_exact_component(parent_fd, component):
@@ -519,7 +810,7 @@ def open_absolute(path, final_flags, final_regular):
     walk = {"root_fd": root_fd, "root_identity": path_identity(
         os.fstat(root_fd)), "nodes": [], "fds": [root_fd]}
     try:
-        watch(root_fd, True)
+        watch(root_fd, False)
         for index, component in enumerate(components):
             final = index == len(components) - 1
             parent_fd = walk["fds"][-1]
@@ -532,7 +823,7 @@ def open_absolute(path, final_flags, final_regular):
             flags = final_flags if final else DIRECTORY_FLAGS
             descriptor = os.open(component, flags, dir_fd=parent_fd)
             walk["fds"].append(descriptor)
-            watch(descriptor, True)
+            watch(descriptor, final)
             held = os.fstat(descriptor)
             require(path_identity(held) == path_identity(named),
                     "path held/named identity")
@@ -637,7 +928,7 @@ def read_seal(path, evidence_root, evidence_identity):
         close_absolute_walk(walk)
         raise
 
-def verify(root_path, seal_path):
+def verify(root_path, seal_path, expected_self_sha, verifier_fd):
     root_path = canonical_absolute_path(root_path)
     seal_path = canonical_absolute_path(seal_path)
     root_fd, root_walk, root_node = open_absolute(
@@ -645,7 +936,27 @@ def verify(root_path, seal_path):
     seal_walk = None
     held_files = []
     held_phases = []
+    non_admitting = False
     try:
+        verifier_before = os.fstat(verifier_fd)
+        validate_metadata(verifier_before, (os.geteuid(), os.getegid()),
+                          verifier_before.st_dev, 0o755, True)
+        require(fcntl.fcntl(verifier_fd, fcntl.F_GETFL) & os.O_ACCMODE
+                == os.O_RDONLY, "verifier fd access")
+        watch(verifier_fd, True)
+        require(0 < verifier_before.st_size <= 1 << 20, "verifier size")
+        verifier_bytes = os.pread(verifier_fd, verifier_before.st_size, 0)
+        require(len(verifier_bytes) == verifier_before.st_size
+                and os.pread(verifier_fd, 1, verifier_before.st_size) == b"",
+                "verifier read")
+        verifier_digest = hashlib.sha256(verifier_bytes).hexdigest()
+        normalized, count = re.subn(
+            rb"(?m)^typeset -r iicc_self_sha=(?:[0-9a-f]{64}|SELF) # iicc-self-seal$",
+            b"typeset -r iicc_self_sha=SELF # iicc-self-seal",
+            verifier_bytes)
+        require(count == 1 and valid_hex(expected_self_sha, 64)
+                and hashlib.sha256(normalized).hexdigest() == expected_self_sha,
+                "verifier self seal")
         root_parent_fd, root_leaf, _, root_identity, _ = root_node
         named_root = os.stat(
             root_leaf, dir_fd=root_parent_fd, follow_symlinks=False)
@@ -710,10 +1021,46 @@ def verify(root_path, seal_path):
                 contents[entry["path"]] = payload
             require(inventory(phase_fd, MAX_ARTIFACTS) == expected,
                     "phase post-read inventory")
-        validate_events(manifest["entries"], contents, summary, manifest["attempt"] )
-        receipts = [entry for entry in manifest["entries"] if entry["role"] == 6]
+        events = validate_events(
+            manifest["entries"], contents, summary, manifest["attempt"])
+        values, epochs, source = validate_json_artifacts(manifest, contents)
+        expected_epochs = values[12][0][1]["expectedEpochCount"]
+        verifier_digest_field = values[12][0][1]["verifierExecutableSHA256"]
+        require(verifier_digest_field == verifier_digest,
+                "verifier executable binding")
         if summary["consumed"]:
-            parse_receipt(contents[receipts[0]["path"]], manifest)
+            expected_epochs = values[12][0][1]["expectedEpochCount"]
+            admitting = (expected_epochs == 8
+                         and summary["outcome"] == 2)
+            trusted_action = (values[4][0][1]["attestationKind"]
+                    == "trustedOperatorInteractiveAction"
+                    and values[4][0][1]["machinePromptObserved"] is True
+                    and values[4][0][1]["humanActionObserved"] is True)
+            require(not admitting or trusted_action,
+                    "admitting prompt attestation")
+            evidence_set = values[12][0][1]["evidenceSetSHA256"]
+            require(all(event["payload"]["evidenceSetSHA256"] == evidence_set
+                        for event in events), "event/verifier evidence set")
+        else:
+            attestation = values[4][0][1]
+            require(values[12][0][1]["expectedConsumed"] is False
+                    and expected_epochs == 0 and not epochs
+                    and attestation["attestationKind"]
+                        == "operatorCancellationBeforeCredential"
+                    and attestation["humanActionObserved"] is False,
+                    "cancelled evidence semantics")
+        receipts = [entry for entry in manifest["entries"] if entry["role"] == 6]
+        if summary["consumed"] and expected_epochs == 8:
+            diagnostics = [entry for entry in manifest["entries"] if entry["role"] == 7]
+            require(len(receipts) == len(diagnostics) == 1, "admitting receipt cardinality")
+            diagnostic = diagnostics[0]
+            validate_receipt_chain(contents[receipts[0]["path"]],
+                contents[diagnostic["path"]], manifest, epochs, source,
+                values[2][0][1])
+            if summary["outcome"] != 2:
+                non_admitting = True
+        elif summary["consumed"]:
+            non_admitting = True
         for record in held_files:
             revalidate_held_file(record, owner, device)
         revalidate_held_file(seal_file, owner, seal_file[3].st_dev)
@@ -740,19 +1087,28 @@ def verify(root_path, seal_path):
                 (root_after.st_dev, root_after.st_ino, root_after.st_gen,
                  root_after.st_size), "root post-read identity")
         revalidate_absolute_walk(root_walk)
+        verifier_after = os.fstat(verifier_fd)
+        require(path_identity(verifier_before) == path_identity(verifier_after)
+                and verifier_before.st_size == verifier_after.st_size
+                and hashlib.sha256(os.pread(
+                    verifier_fd, verifier_after.st_size, 0)).hexdigest()
+                    == verifier_digest, "verifier final binding")
         require(change_queue.control(None, 1, 0) == [],
                 "evidence changed during verification")
+        if non_admitting:
+            raise Rejected("consumed failure is non-admitting")
     finally:
         descriptors = [record[2] for record in reversed(held_files)]
         descriptors += [record[1] for record in reversed(held_phases)]
         if seal_walk is not None:
             descriptors += list(reversed(seal_walk["fds"]))
         descriptors += list(reversed(root_walk["fds"]))
+        descriptors.append(verifier_fd)
         close_descriptors(descriptors)
         change_queue.close()
 
 try:
-    verify(sys.argv[1], sys.argv[2])
+    verify(sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4]))
 except (OSError, Rejected, ValueError, KeyError, TypeError) as error:
     print(f"stornaut ii-c machine evidence rejected: {error}", file=sys.stderr)
     raise SystemExit(1)

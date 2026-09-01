@@ -2,8 +2,11 @@
 
 set -euo pipefail
 
-repo_root=${0:A:h:h}
-action=${1:-}
+typeset -a expected_source_hashes; source_plist_base64=
+if [[ ${1:-} == --held-source ]]; then
+    [[ $# == 10 && $2 == /* && -d $2 && ! -L $2 && ${2:A} == $2 ]] || exit 64
+    repo_root=$2; action=$3; expected_source_hashes=("${@:4:6}"); source_plist_base64=${10}; set -- "$action"
+else repo_root=${0:A:h:h}; action=${1:-}; expected_source_hashes=(); fi
 label="com.eriklee.stornaut.lifecycle"
 machine_claim_service="com.eriklee.stornaut.lifecycle.machine-claim"
 machine_driver_validation_token="I authorize one bounded disposable read-only Stornaut L3c3b-ii Machine driver validation."
@@ -438,7 +441,7 @@ validate_built_app() {
     /usr/bin/codesign --verify --deep --strict "$built_app"
     [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' \
         "$built_app/Contents/Info.plist")" == "com.eriklee.stornaut" ]]
-    validate_plist "$source_plist"
+    (( ${#expected_source_hashes} )) || validate_plist "$source_plist"
     built_owner=$(/usr/bin/stat -f '%Su' "$machine_driver")
     built_group=$(/usr/bin/stat -f '%Sg' "$machine_driver")
     built_closed_artifact_identity=$(
@@ -478,7 +481,7 @@ validate_installed_artifacts() {
     exact_directory_metadata "$installed_app" root wheel 0755
     exact_file_metadata "$installed_plist" root wheel 0644
     validate_plist "$installed_plist"
-    /usr/bin/cmp -s "$source_plist" "$installed_plist"
+    source_plist_matches "$installed_plist"
     /usr/bin/codesign --verify --deep --strict "$installed_app"
     validate_bundle_permissions "$installed_app"
     for executable in \
@@ -582,7 +585,7 @@ rollback_failed_lifecycle() {
     if (( may_remove_installed && ${installed_plist_moved:-0} )); then
         if exact_file_metadata "$installed_plist" root wheel 0644 &&
             validate_plist "$installed_plist" &&
-            /usr/bin/cmp -s "$source_plist" "$installed_plist"
+            source_plist_matches "$installed_plist"
         then
             /bin/rm -f -- "$installed_plist"
         fi
@@ -636,16 +639,82 @@ status() {
     fi
 }
 
+sha256_text() {
+    local digest
+    digest=$(
+        print -rn -- "$1" |
+            /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}'
+    )
+    [[ ${#digest} == 64 && "$digest" != *[^0-9a-f]* ]]
+    print -rn -- "$digest"
+}
+
+sha256_file() {
+    local digest
+    digest=$(
+        /usr/bin/shasum -a 256 "$1" | /usr/bin/awk '{print $1}'
+    )
+    [[ ${#digest} == 64 && "$digest" != *[^0-9a-f]* ]]
+    print -rn -- "$digest"
+}
+source_plist_matches() { (( ${#expected_source_hashes} )) && [[ "$(sha256_file "$1")" == "$expected_source_hashes[6]" ]] || { (( ! ${#expected_source_hashes} )) && /usr/bin/cmp -s "$source_plist" "$1"; }; }
+
+role_sha256_projection() {
+    local app=$1 role
+    local -a roles=(
+        StornautInvestigationDiagnostic
+        StornautLifecycleHelper
+        StornautInvestigationMachineDriver
+        StornautInvestigationMachineGate
+        StornautInvestigationMachineGateCoordinator
+    )
+    for role in "${roles[@]}"; do
+        sha256_file "$app/Contents/MacOS/$role"
+        print
+    done
+}
+
+emit_install_receipt() {
+    local built_sha256=$1 staging_sha256=$2 installed_sha256=$3
+    local plist_sha256=$4 digest
+    [[ "$built_sha256" == "$staging_sha256" &&
+        "$built_sha256" == "$installed_sha256" ]]
+    for digest in "$@"
+    do
+        [[ ${#digest} == 64 && "$digest" != *[^0-9a-f]* ]]
+    done
+    /usr/bin/printf '%s\n' \
+        "{\"action\":\"install\",\"appExecutableSHA256\":\"$5\",\"builtIdentitySHA256\":\"$built_sha256\",\"builtStagingInstalledEqual\":true,\"coordinatorExecutableSHA256\":\"$9\",\"domain\":\"lifecycle.local.install.receipt.v1\",\"gateExecutableSHA256\":\"$8\",\"helperExecutableSHA256\":\"$6\",\"installedIdentitySHA256\":\"$installed_sha256\",\"machineDriverExecutableSHA256\":\"$7\",\"plistSHA256\":\"$plist_sha256\",\"schemaVersion\":1,\"serviceLoaded\":true,\"stagingIdentitySHA256\":\"$staging_sha256\"}"
+}
+
+emit_uninstall_receipt() {
+    local installed_sha256=$1 plist_sha256=$2 digest
+    for digest in "$@"; do
+        [[ ${#digest} == 64 && "$digest" != *[^0-9a-f]* ]]
+    done
+    /usr/bin/printf '%s\n' \
+        "{\"action\":\"uninstall\",\"appAbsent\":true,\"appExecutableSHA256\":\"$3\",\"bootoutCompleted\":true,\"coordinatorExecutableSHA256\":\"$7\",\"domain\":\"lifecycle.local.uninstall.receipt.v1\",\"gateExecutableSHA256\":\"$6\",\"globalPostTeardown\":true,\"helperExecutableSHA256\":\"$4\",\"installedIdentitySHA256\":\"$installed_sha256\",\"leaseAbsent\":true,\"machineDriverExecutableSHA256\":\"$5\",\"plistAbsent\":true,\"plistSHA256\":\"$plist_sha256\",\"rootAbsent\":true,\"runtimeAbsent\":true,\"schemaVersion\":1,\"serviceAbsent\":true}"
+}
+
 install() {
     local built_closed_artifact_identity
     local staging_closed_artifact_identity
     local installed_closed_artifact_identity
+    local built_identity_sha256 staging_identity_sha256
+    local installed_identity_sha256 installed_plist_sha256
     local installed_root_node staging_app_node installed_app_node
+    local -a built_role_sha256 staging_role_sha256 installed_role_sha256
     (( EUID == 0 )) || {
         print -u2 "Install requires explicit administrator authentication."
         exit 77
     }
+    built_role_sha256=(
+        "${(@f)$(role_sha256_projection "$built_app")}"
+    )
+    (( ${#built_role_sha256} == 5 ))
+    (( ! ${#expected_source_hashes} )) || [[ "${(j:\n:)built_role_sha256}" == "${(j:\n:)expected_source_hashes[1,5]}" && "$(sha256_file "$source_plist")" == "$expected_source_hashes[6]" ]]
     built_closed_artifact_identity=$(validate_built_app)
+    built_identity_sha256=$(sha256_text "$built_closed_artifact_identity")
     exact_directory_metadata "$application_support" root admin 0755
     if [[ -e "$installed_root" || -L "$installed_root" ||
         -e "$installed_app" || -L "$installed_app" ||
@@ -679,6 +748,7 @@ install() {
     /usr/sbin/chown root:wheel "$staging_app"
     exact_directory_metadata "$staging_app" root wheel 0755
     /usr/bin/ditto --noqtn "$built_app" "$staging_app"
+    (( ! ${#expected_source_hashes} )) || { built_role_sha256=("${(@f)$(role_sha256_projection "$built_app")}"); [[ "${(j:\n:)built_role_sha256}" == "${(j:\n:)expected_source_hashes[1,5]}" && "$(sha256_file "$source_plist")" == "$expected_source_hashes[6]" ]]; }
     /usr/sbin/chown -R root:wheel "$staging_app"
     /bin/chmod -RN "$staging_app"
     /bin/chmod -R go-w "$staging_app"
@@ -699,6 +769,14 @@ install() {
     )
     [[ "$staging_closed_artifact_identity" ==
         "$built_closed_artifact_identity" ]]
+    staging_identity_sha256=$(
+        sha256_text "$staging_closed_artifact_identity"
+    )
+    staging_role_sha256=(
+        "${(@f)$(role_sha256_projection "$staging_app")}"
+    )
+    [[ "${(j:\n:)staging_role_sha256}" ==
+        "${(j:\n:)built_role_sha256}" ]]
     [[ "$(/usr/bin/stat -f '%d:%i' "$staging_app")" ==
         "$staging_app_node" ]]
     [[ "$(/usr/bin/stat -f '%d:%i' "$installed_root")" ==
@@ -716,22 +794,37 @@ install() {
     )
     [[ "$installed_closed_artifact_identity" ==
         "$built_closed_artifact_identity" ]]
+    installed_identity_sha256=$(
+        sha256_text "$installed_closed_artifact_identity"
+    )
+    installed_role_sha256=(
+        "${(@f)$(role_sha256_projection "$installed_app")}"
+    )
+    [[ "${(j:\n:)installed_role_sha256}" ==
+        "${(j:\n:)built_role_sha256}" ]]
 
-    /usr/bin/install -o root -g wheel -m 0644 \
-        "$source_plist" "$staging_plist"
+    if (( ${#expected_source_hashes} )); then print -rn -- "$source_plist_base64"|/usr/bin/base64 -D -o "$staging_plist"; /usr/sbin/chown root:wheel "$staging_plist"; /bin/chmod 0644 "$staging_plist"; validate_plist "$staging_plist"; source_plist_matches "$staging_plist"; else /usr/bin/install -o root -g wheel -m 0644 "$source_plist" "$staging_plist"; fi
     /bin/mv -n "$staging_plist" "$installed_plist"
     installed_plist_moved=1
     validate_plist "$installed_plist"
+    installed_plist_sha256=$(sha256_file "$installed_plist")
     validate_installed_artifacts "$built_closed_artifact_identity"
     /bin/launchctl bootstrap system "$installed_plist"
     service_bootstrapped=1
     validate_installed_state "$built_closed_artifact_identity"
+    /bin/launchctl print "system/$label" >/dev/null
+    emit_install_receipt \
+        "$built_identity_sha256" "$staging_identity_sha256" \
+        "$installed_identity_sha256" "$installed_plist_sha256" \
+        "${installed_role_sha256[@]}"
     trap - EXIT INT TERM
     print "lifecycle.local.install=complete"
 }
 
 uninstall() {
     local uninstall_closed_artifact_identity uninstall_app_node
+    local uninstall_identity_sha256 uninstall_plist_sha256
+    local -a uninstall_role_sha256
     (( EUID == 0 )) || {
         print -u2 "Uninstall requires explicit administrator authentication."
         exit 77
@@ -741,6 +834,14 @@ uninstall() {
     uninstall_closed_artifact_identity=$(
         validate_closed_app_artifacts "$installed_app" root wheel
     )
+    uninstall_identity_sha256=$(
+        sha256_text "$uninstall_closed_artifact_identity"
+    )
+    uninstall_plist_sha256=$(sha256_file "$installed_plist")
+    uninstall_role_sha256=(
+        "${(@f)$(role_sha256_projection "$installed_app")}"
+    )
+    (( ${#uninstall_role_sha256} == 5 ))
     if /bin/launchctl print "system/$label" >/dev/null 2>&1; then
         /bin/launchctl bootout "system/$label"
     fi
@@ -748,7 +849,7 @@ uninstall() {
     if [[ -e "$installed_plist" || -L "$installed_plist" ]]; then
         exact_file_metadata "$installed_plist" root wheel 0644
         validate_plist "$installed_plist"
-        /usr/bin/cmp -s "$source_plist" "$installed_plist"
+        source_plist_matches "$installed_plist"
         /bin/rm -f -- "$installed_plist"
     fi
     if [[ -e "$installed_app" || -L "$installed_app" ]]; then
@@ -760,6 +861,8 @@ uninstall() {
         validate_closed_app_artifacts "$installed_app" root wheel \
             "$uninstall_closed_artifact_identity" \
             >/dev/null
+        [[ "${(j:\n:)${(@f)$(role_sha256_projection "$installed_app")}}" ==
+            "${(j:\n:)uninstall_role_sha256}" ]]
         /bin/rm -rf -- "$installed_app"
     fi
     if [[ -e "$lease_root" || -L "$lease_root" ]]; then
@@ -786,6 +889,9 @@ uninstall() {
     [[ ! -e "$lease_root" && ! -L "$lease_root" ]]
     [[ ! -e "$diagnostic_root" && ! -L "$diagnostic_root" ]]
     ! /bin/launchctl print "system/$label" >/dev/null 2>&1
+    emit_uninstall_receipt \
+        "$uninstall_identity_sha256" "$uninstall_plist_sha256" \
+        "${uninstall_role_sha256[@]}"
     print "lifecycle.local.uninstall=complete"
 }
 

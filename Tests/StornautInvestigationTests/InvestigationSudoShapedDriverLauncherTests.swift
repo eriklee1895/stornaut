@@ -20,7 +20,7 @@ struct InvestigationSudoShapedDriverLauncherTests {
                     + "StornautInvestigationMachineDriver"
         )
         #expect(InvestigationMachineFixedGateContract.arguments == [
-            "/usr/bin/sudo", "-kN", "-p",
+            "/usr/bin/sudo", "-N", "-p",
             "Stornaut Task 39 ii-c administrator authorization: ",
             "--",
             "/Library/Application Support/Stornaut/"

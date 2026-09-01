@@ -337,6 +337,14 @@ iicb2b2_source_contract_only=false
 iicb2b2_sources=()
 iicb2b2_staged_scope_contract_only=false
 iicb2b2_staged_scope_baseline=2b90430876c2515e811d84155160daa1b599fa98
+iicc_source_contract_only=false
+iicc_source_contract_sources=()
+iicc_source_mutation_contract_only=false
+iicc_source_mutation_name=
+iicc_source_mutation_slot=
+iicc_source_mutation_sha=
+iicc_scope_contract_only=false
+iicc_scope_baseline=622e7b99d57dfe482ccd37481fcdb4dcff87a0ec
 iic0bivb1_handoff_contract_only=false
 iic0bivb1_fixture_source=
 iic0bivb1_physical_test_source=
@@ -899,6 +907,21 @@ if (( $# > 0 )); then
         && [[ $1 == --iic-b2b2-staged-scope-contract-only ]]; then
         iicb2b2_staged_scope_contract_only=true
         iicb2b2_staged_scope_baseline=${2:-2b90430876c2515e811d84155160daa1b599fa98}
+    elif (( $# == 1 || $# == 18 )) \
+        && [[ $1 == --iic-c-source-contract-only ]]; then
+        iicc_source_contract_only=true
+        iicc_source_contract_sources=("${@:2}")
+    elif (( $# == 21 )) \
+        && [[ $1 == --iic-c-source-mutation-contract-only ]]; then
+        iicc_source_mutation_contract_only=true
+        iicc_source_mutation_name=$2
+        iicc_source_mutation_slot=$3
+        iicc_source_mutation_sha=$4
+        iicc_source_contract_sources=("${@:5}")
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iic-c-staged-scope-contract-only ]]; then
+        iicc_scope_contract_only=true
+        iicc_scope_baseline=${2:-622e7b99d57dfe482ccd37481fcdb4dcff87a0ec}
     elif (( $# == 4 )) \
         && [[ $1 == --iic0b-iv-b1-handoff-contract-only ]]; then
         iic0bivb1_handoff_contract_only=true
@@ -11042,7 +11065,8 @@ mutations = {
     "verifier-final-file-pass": ("verifier", "        for record in held_files:\n            revalidate_held_file(record, owner, device)", "        for record in held_files:\n            pass"),
     "verifier-final-phase-inventory": ("verifier", "            require(inventory(phase_fd, MAX_ARTIFACTS) == expected,\n                    \"final phase inventory\")", "            require(True, \"final phase inventory\")"),
     "verifier-final-seal-pass": ("verifier", "        revalidate_held_file(seal_file, owner, seal_file[3].st_dev)", "        pass # final seal revalidation removed"),
-    "verifier-open-tracking-order": ("verifier", '            walk["fds"].append(descriptor)\n            watch(descriptor, True)\n            held = os.fstat(descriptor)', '            held = os.fstat(descriptor)\n            walk["fds"].append(descriptor)\n            watch(descriptor, True)'),
+    "verifier-open-tracking-order": ("verifier", '            walk["fds"].append(descriptor)\n            watch(descriptor, final)\n            held = os.fstat(descriptor)', '            held = os.fstat(descriptor)\n            walk["fds"].append(descriptor)\n            watch(descriptor, final)'),
+    "verifier-ancestor-content-watch": ("verifier", "watch(root_fd, False)", "watch(root_fd, True)"),
     "verifier-vnode-linearization": ("verifier", '        require(change_queue.control(None, 1, 0) == [],\n                "evidence changed during verification")', '        require(True, "evidence changed during verification")'),
     "verifier-vnode-watch-registration": ("verifier", 'require(change_queue.control([event], 0, 0) == [], "vnode watch registration")', 'require(True, "vnode watch registration")'),
     "producer-canonical-reencode": ("contract", "value.artifacts == entries, try value.encoded() == data", "value.artifacts == entries, true"),
@@ -11107,9 +11131,10 @@ required_verifier = (
     '    for parent_fd, component, descriptor, identity, expected_regular in walk["nodes"]:\n        require_exact_component(parent_fd, component)',
     "open_absolute", "revalidate_absolute_walk",
     "held_files.append((parent_fd, name, fd, before, hashlib.sha256(data).digest()))",
-    '            walk["fds"].append(descriptor)\n            watch(descriptor, True)\n            held = os.fstat(descriptor)',
+    '            walk["fds"].append(descriptor)\n            watch(descriptor, final)\n            held = os.fstat(descriptor)',
     "change_queue = select.kqueue()", "VNODE_CONTENT", 'require(change_queue.control([event], 0, 0) == [], "vnode watch registration")',
-    "watch(root_fd, True)", "watch(descriptor, True)", "watch(fd, True)", "watch(phase_fd, True)",
+    "VNODE_IDENTITY", "watch(root_fd, False)", "watch(descriptor, final)",
+    "watch(fd, True)", "watch(phase_fd, True)",
     '        require(change_queue.control(None, 1, 0) == [],\n                "evidence changed during verification")',
     '        for record in held_files:\n            revalidate_held_file(record, owner, device)',
     "revalidate_held_file(seal_file, owner, seal_file[3].st_dev)",
@@ -11466,6 +11491,197 @@ function verify_iicb2b2_staged_scope() {
     local -a untracked_paths=(${(f)"$(git ls-files --others --exclude-standard -- | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')"})
     for item in "${worktree_paths[@]}" "${untracked_paths[@]}"; do (( ${expected[(Ie)$item]} )) || { print -u2 "ii-c-b2b2 checkpoint worktree paths drifted"; return 1; }; done
     for item in "${expected[@]}"; do mode=100644; [[ $item == scripts/* ]] && mode=100755; entry=$(git ls-files -s -- "$item"); [[ "$(print -r -- "$entry" | awk '{print $1, $3, $4}')" == "$mode 0 $item" && "$(print -r -- "$entry" | awk '{print $2}')" == "$(git hash-object -- "$item")" ]] || { print -u2 "ii-c-b2b2 staged source/mode drifted: $item"; return 1; }; done
+}
+
+function verify_iicc_source_contract() {
+    local -a p=("${iicc_source_contract_sources[@]}")
+    if (( ${#p} == 0 )); then p=(
+        Sources/StornautInvestigationMachineCampaign/main.swift
+        Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignHarness.swift
+        Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignEvidenceContract.swift
+        Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochComposition.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochPhysicalBridge.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerProtocol.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineZeroArgumentEntry.swift
+        Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineRawEvidenceWriter.swift
+        scripts/stornaut-r5-local-lifecycle
+        scripts/verify-investigation-runtime-machine-report
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift
+        Sources/StornautInvestigationMachineGateSupport/InvestigationMachineGateTransport.swift
+        Tests/Fixtures/InvestigationMachineGateStub/main.swift
+        Tests/StornautInvestigationTests/InvestigationSudoShapedDriverLauncherTests.swift
+        scripts/verify-investigation-boundaries scripts/verify-contract
+    ); fi
+    (( ${#p} == 17 )) || { print -u2 "ii-c-c source cardinality drifted"; return 1; }
+    local source; for source in "${p[@]}"; do
+        [[ -f $source && ! -L $source ]] || { print -u2 "ii-c-c source unavailable: $source"; return 1; }
+    done
+    for source in "${p[10]}" "${p[11]}" "${p[16]}" "${p[17]}"; do /bin/zsh -n "$source" || return $?; done
+    /usr/bin/python3 -I - "$iicc_source_mutation_contract_only" \
+        "$iicc_source_mutation_name" "$iicc_source_mutation_slot" \
+        "$iicc_source_mutation_sha" "${p[@]}" <<'PY'
+from pathlib import Path
+import hashlib
+import re
+import sys
+mode,name,slot,sha=sys.argv[1:5]
+slots=("main","harness","evidence","coordinator","composition","bridge","protocol","entry","writer","lifecycle","verifier","tests","gate","gate_fixture","gate_test","boundary","contract")
+if len(sys.argv)!=22: raise SystemExit("ii-c-c source cardinality drifted")
+paths=tuple(map(Path,sys.argv[5:])); sources=dict(zip(slots,(p.read_text() for p in paths)))
+canonical_paths=tuple(map(Path,(
+"Sources/StornautInvestigationMachineCampaign/main.swift",
+"Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignHarness.swift",
+"Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignEvidenceContract.swift",
+"Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift",
+"Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochComposition.swift",
+"Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochPhysicalBridge.swift",
+"Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerProtocol.swift",
+"Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineZeroArgumentEntry.swift",
+"Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineRawEvidenceWriter.swift",
+"scripts/stornaut-r5-local-lifecycle","scripts/verify-investigation-runtime-machine-report",
+"Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift",
+"Sources/StornautInvestigationMachineGateSupport/InvestigationMachineGateTransport.swift",
+"Tests/Fixtures/InvestigationMachineGateStub/main.swift",
+"Tests/StornautInvestigationTests/InvestigationSudoShapedDriverLauncherTests.swift",
+"scripts/verify-investigation-boundaries","scripts/verify-contract")))
+canonical=dict(zip(slots,(p.read_text() for p in canonical_paths)))
+M={
+"extra-argv":("main",'guard CommandLine.argc == 1 else {','guard CommandLine.argc >= 1 else {'),
+"extra-env":("coordinator",'environmentEntries: [], descriptors: try descriptorInventory(),','environmentEntries: entries, descriptors: try descriptorInventory(),'),
+"production-coordinator-path":("main",'"/Library/Application Support/Stornaut/Stornaut-R5-Diagnostic.app/Contents/MacOS/StornautInvestigationMachineGateCoordinator"','"/Library/Application Support/Stornaut/Stornaut-R5-Diagnostic.app/Contents/MacOS/StornautInvestigationMachineCampaignCoordinator"'),
+"fixture-capability-bypass":("main",'let fixture=Self.consumeFixtureCapability(executable)','let fixture=Self.fixtureCandidatePath(executable)'),
+"held-lifecycle":("main",'standardInput:script.bytes','standardInput:nil'),
+"probe-argv":("main",'["-knv"], maximum: 4_096)','["-nv"], maximum: 4_096)'),
+"lifecycle-seal":("lifecycle",'set -euo pipefail','set -euo pipefail\nprint injected'),
+"prepared-event-order":("main",'_ = try writer.appendAttemptEvent(kind: .prepared,\n                payload: try event(.prepared, preArm: preArm),\n                observedAt: try nextEvidenceTime())\n            preparedPublished = true','preparedPublished = true\n            _ = try writer.appendAttemptEvent(kind: .prepared,\n                payload: try event(.prepared, preArm: preArm),\n                observedAt: try nextEvidenceTime())'),
+"arm-order":("harness",'try await system.durablyPublishArmedConsumed(\n                    preArm, absoluteDeadlineNanoseconds: deadline\n                )\n                try await system.sendArmAfterDurablePublish(\n                    preArm, terminalDescriptor: spawned.terminalDescriptor,\n                    absoluteDeadlineNanoseconds: deadline\n                )','try await system.sendArmAfterDurablePublish(\n                    preArm, terminalDescriptor: spawned.terminalDescriptor,\n                    absoluteDeadlineNanoseconds: deadline\n                )\n                try await system.durablyPublishArmedConsumed(\n                    preArm, absoluteDeadlineNanoseconds: deadline\n                )'),
+"gate-before-arm":("coordinator",'try await dependencies.activateBeforeHandoff(currentBinding, authored)\n        try InvestigationMachineGateCoordinatorHandoffAdmission.validate(\n          authored, now: dependencies.wallNow()\n        )\n        handoffStarted = true\n        handoff = try await dependencies.handoff(authored)','handoffStarted = true\n        handoff = try await dependencies.handoff(authored)\n        try await dependencies.activateBeforeHandoff(currentBinding, authored)'),
+"uninstall-success-only":("main",'if !system.usesFixtureSibling {\n            do { return try await system.finishProduction(outcome)','if !system.usesFixtureSibling, case .completed = outcome {\n            do { return try await system.finishProduction(outcome)'),
+"terminal-event-drop":("main",'_ = try writer.appendAttemptEvent(kind: .terminal,','_ = try writer.appendAttemptEvent(kind: .spawnObserved,'),
+"seal-before-teardown":("main",'try writeTeardown(un, preArm: preArm, global: global,\n                expectedConsumed: armedConsumed,\n                expectedEpochCount: observedEpochCount)\n            let seal = try writer.finalize()','let seal = try writer.finalize()\n            try writeTeardown(un, preArm: preArm, global: global,\n                expectedConsumed: armedConsumed,\n                expectedEpochCount: observedEpochCount)'),
+"frame-missing":("harness",'let rawGateReceipt = try nextFrame()','let rawGateReceipt = Data()'),
+"frame-swap":("harness",'let rawGateReceipt = try nextFrame()\n        let finalReceiptBytes = try nextFrame()','let finalReceiptBytes = try nextFrame()\n        let rawGateReceipt = try nextFrame()'),
+"eight-epoch":("protocol",'guard try protocolUInt32(f[3]) == 8,','guard try protocolUInt32(f[3]) > 0,'),
+"epoch-identity-join":("protocol",'value.epochUUID == selection.epoch.epochUUID,','value.epochUUID != selection.epoch.epochUUID,'),
+"success-before-verifier":("main",'try publishSeal(seal, admitting: admitting, consumed: armedConsumed)\n            return admitting','if admitting { return true }\n            try publishSeal(seal, admitting: admitting, consumed: armedConsumed)\n            return false'),
+"verifier-self-binding-drop":("verifier",'require(verifier_digest_field == verifier_digest,\n                "verifier executable binding")','require(True, "verifier executable binding")')}
+M["sudo-option"]=("gate",'launcherPath, "-N", "-p"','launcherPath, "-k", "-p"')
+M["ancestor-content-watch"]=("verifier","watch(root_fd, False)","watch(root_fd, True)")
+if len(M)!=21: raise SystemExit("ii-c-c mutation inventory drifted")
+if mode=="true":
+    if name not in M or slot!=M[name][0] or not re.fullmatch(r"[0-9a-f]{64}",sha): raise SystemExit("ii-c-c mutation contract drifted")
+    old,new=M[name][1:]; i=slots.index(slot)
+    if hashlib.sha256(paths[i].read_bytes()).hexdigest()!=sha or canonical[slot].count(old)!=1 or sources[slot]!=canonical[slot].replace(old,new,1): raise SystemExit("ii-c-c unrecognized mutation")
+    if any(sources[s]!=canonical[s] for s in slots if s!=slot): raise SystemExit("ii-c-c mutation changed another source")
+elif mode!="false" or name or slot or sha: raise SystemExit("ii-c-c mutation mode drifted")
+elif sources!=canonical: raise SystemExit("ii-c-c canonical source path drifted")
+main,harness,evidence,coordinator,composition,bridge,protocol,entry,writer,lifecycle,verifier,tests,gate,gate_fixture,gate_test,boundary,contract=(sources[s] for s in slots)
+required=((main,tuple(M[n][1] for n in ("extra-argv","production-coordinator-path","fixture-capability-bypass","held-lifecycle","probe-argv","prepared-event-order","uninstall-success-only","terminal-event-drop","seal-before-teardown","success-before-verifier"))),
+ (harness,(M[n][1] for n in ("arm-order","frame-missing","frame-swap"))),
+ (coordinator,(M[n][1] for n in ("extra-env","gate-before-arm"))),
+ (protocol,(M[n][1] for n in ("eight-epoch","epoch-identity-join"))),
+ (verifier,(M["verifier-self-binding-drop"][1], M["ancestor-content-watch"][1],
+  'self=${0:A}',
+  'exec 9<"$self"', '"$iicc_self_sha" 9',
+  'def verify(root_path, seal_path, expected_self_sha, verifier_fd):',
+  'verifier self seal', 'verifier final binding')))
+for source,markers in required:
+    for marker in markers:
+        if source.count(marker)!=1: raise SystemExit("ii-c-c exact source contract drifted: "+marker)
+if any(source.count('"-N", "-p"')!=1 for source in (gate,gate_fixture,gate_test)): raise SystemExit("ii-c-c sudo option contract drifted")
+seal=re.search(r'lifecycleScriptSHA256 = "([0-9a-f]{64})"',main)
+if not seal or seal.group(1)!=hashlib.sha256(lifecycle.encode()).hexdigest(): raise SystemExit("ii-c-c lifecycle source seal drifted")
+capability={"fixtureCoordinatorPath(executable)":2,"fixtureCapability(executable)":1,"STORNAUT-IICC-FIXTURE-v1":2,"fields[1]==Substring(String(getppid()))":1,"validHex(String(fields[2]))":1,"fields[3]==\"missing\" || validHex(String(fields[3]))":1,"realPath(helper)==realPath(testingHelperPath)":1,"try writeRaw(raw.terminal_master_descriptor,bytes:bytes)":1}
+if any(main.count(x)!=count for x,count in capability.items()): raise SystemExit("ii-c-c fixture capability drifted")
+if not (main.index("let fixtureCapability=Self.fixtureCapability(executable)")<main.index("stornaut_investigation_campaign_spawn_fixed",main.index("case .spawnFixedSibling"))<main.index("try writeRaw(raw.terminal_master_descriptor,bytes:bytes)")): raise SystemExit("ii-c-c fixture capability order drifted")
+finish=main[main.index('func finishProduction'):main.index('private func writePostArm')]
+ordered=('_ = try writer.appendAttemptEvent(kind: .terminal,','let uninstall=try Self.runLifecycle','try writeTeardown(','let seal = try writer.finalize()','try publishSeal(','return admitting')
+if [finish.index(x) for x in ordered]!=sorted(finish.index(x) for x in ordered): raise SystemExit("ii-c-c terminal teardown order drifted")
+if not (harness.index('prepareActivation(')<harness.index('durablyPublishArmedConsumed(',harness.index('package actor InvestigationMachineCampaignHarness'))<harness.index('sendArmAfterDurablePublish(',harness.index('package actor InvestigationMachineCampaignHarness'))): raise SystemExit("ii-c-c arm order drifted")
+if not (coordinator.index('try sink.writePreArm(preArm)')<coordinator.index('try sink.writeRawGateReceipt(transport)')<coordinator.index('try sink.writeAndClose(disposition)')): raise SystemExit("ii-c-c three-frame order drifted")
+publish=main[main.index('private func publishSeal'):main.index('private static func repositoryRoot')]
+if not (publish.index('let result = try Self.runFixed')<publish.index('if admitting')<publish.index('guard result.status == 0')): raise SystemExit("ii-c-c verifier-before-success drifted")
+for marker in ("validate_json_artifacts","event evidence set drift","FD 3 frame cardinality","Gate output completion binding","bundle ownership/L2 join"):
+    if marker not in verifier: raise SystemExit("ii-c-c verifier join drifted")
+PY
+}
+
+function verify_iicc_staged_scope() {
+    local PATH=/usr/bin:/bin:/usr/sbin:/sbin
+    local expected_baseline=622e7b99d57dfe482ccd37481fcdb4dcff87a0ec
+    local baseline=${1:-$iicc_scope_baseline}
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" == $expected_baseline ]] \
+        || { print -u2 "ii-c-c checkpoint baseline drifted"; return 1; }
+    local -A ceilings=(
+        Sources/StornautInvestigationMachineCampaign/main.swift 1100
+        Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignHarness.swift 300
+        Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignEvidenceContract.swift 420
+        Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift 250
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochComposition.swift 100
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochPhysicalBridge.swift 160
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerProtocol.swift 240
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineZeroArgumentEntry.swift 200
+        Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineRawEvidenceWriter.swift 60
+        scripts/stornaut-r5-local-lifecycle 160
+        scripts/verify-investigation-runtime-machine-report 430
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift 530
+        Sources/StornautInvestigationMachineGateSupport/InvestigationMachineGateTransport.swift 10
+        Tests/Fixtures/InvestigationMachineGateStub/main.swift 10
+        Tests/StornautInvestigationTests/InvestigationSudoShapedDriverLauncherTests.swift 10
+        scripts/verify-investigation-boundaries 300
+        scripts/verify-contract 110
+    )
+    local checkpoint_path add delete ceiling total=0 numstat observed_text entry mode
+    local -a expected=(
+        Sources/StornautInvestigationMachineCampaign/main.swift
+        Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignHarness.swift
+        Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignEvidenceContract.swift
+        Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochComposition.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochPhysicalBridge.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerProtocol.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineZeroArgumentEntry.swift
+        Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineRawEvidenceWriter.swift
+        scripts/stornaut-r5-local-lifecycle scripts/verify-investigation-runtime-machine-report
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift
+        Sources/StornautInvestigationMachineGateSupport/InvestigationMachineGateTransport.swift
+        Tests/Fixtures/InvestigationMachineGateStub/main.swift
+        Tests/StornautInvestigationTests/InvestigationSudoShapedDriverLauncherTests.swift
+        scripts/verify-investigation-boundaries scripts/verify-contract
+    )
+    observed_text=$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" -- \
+        | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')
+    local -a observed=(${(f)observed_text})
+    [[ "${(j:\n:)${(@on)observed}}" == "${(j:\n:)${(@on)expected}}" ]] || {
+        print -u2 "ii-c-c checkpoint paths drifted"; return 1
+    }
+    numstat=$(/usr/bin/git diff --cached --numstat "$baseline" --) || {
+        print -u2 "ii-c-c checkpoint diff unavailable"; return 1
+    }
+    while IFS=$'\t' read -r add delete checkpoint_path; do
+        [[ $checkpoint_path == docs/* || $checkpoint_path == AGENTS.md || $checkpoint_path == README.md ]] && continue
+        [[ $add != - && $delete != - ]] || { print -u2 "ii-c-c binary path rejected"; return 1; }
+        (( ${+ceilings[$checkpoint_path]} )) || { print -u2 "ii-c-c checkpoint paths drifted: $checkpoint_path"; return 1; }
+        ceiling=${ceilings[$checkpoint_path]}
+        (( add + delete <= ceiling )) || { print -u2 "ii-c-c path budget drifted: $checkpoint_path"; return 1; }
+        (( total += add + delete ))
+    done <<< "$numstat"
+    (( total <= 4000 )) || { print -u2 "ii-c-c aggregate budget drifted"; return 1; }
+    local -a untracked=(${(f)"$(git ls-files --others --exclude-standard -- \
+        | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')"})
+    (( ${#untracked} == 0 )) || { print -u2 "ii-c-c checkpoint untracked paths drifted"; return 1; }
+    local unstaged=$(git diff --name-only --diff-filter=ACMRD -- \
+        | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')
+    [[ -z $unstaged ]] || { print -u2 "ii-c-c checkpoint unstaged paths drifted"; return 1; }
+    for checkpoint_path in "${expected[@]}"; do
+        mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
+        entry=$(git ls-files -s -- "$checkpoint_path")
+        [[ "$(print -r -- "$entry" | awk '{print $1, $3, $4}')" == "$mode 0 $checkpoint_path" ]] \
+            || { print -u2 "ii-c-c staged source/mode drifted: $checkpoint_path"; return 1; }
+        [[ "$(print -r -- "$entry" | awk '{print $2}')" == "$(git hash-object -- "$checkpoint_path")" ]] \
+            || { print -u2 "ii-c-c staged/worktree source drifted: $checkpoint_path"; return 1; }
+    done
 }
 
 function verify_shared_deadline_contract() {
@@ -15925,6 +16141,16 @@ fi
 if $iicb2b2_staged_scope_contract_only; then
     verify_iicb2b2_staged_scope "$iicb2b2_staged_scope_baseline"
     print "ii-c-b2b2 staged scope verification passed."
+    exit 0
+fi
+if $iicc_source_contract_only || $iicc_source_mutation_contract_only; then
+    verify_iicc_source_contract "${iicc_source_contract_sources[@]}"
+    print "ii-c-c source contract verification passed."
+    exit 0
+fi
+if $iicc_scope_contract_only; then
+    verify_iicc_staged_scope "$iicc_scope_baseline"
+    print "ii-c-c staged scope verification passed."
     exit 0
 fi
 if $iic0bivb1_handoff_contract_only; then

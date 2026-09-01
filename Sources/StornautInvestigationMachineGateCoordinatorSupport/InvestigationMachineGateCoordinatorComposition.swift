@@ -98,6 +98,68 @@ public enum InvestigationMachineGateCoordinatorSupport {
     case incompleteTerminalState
     case retirementUncertain
   }
+  package struct InvestigationMachineGateCoordinatorPreArmFrameV1:
+    Sendable, Equatable
+  {
+    package static let domain = "stornaut.task39.iic.coordinator-prearm.v1"
+    package static let maximumByteCount = InvestigationProjectedCohortInput.maximumByteCount + 1_024
+    package let repositoryHEAD, repositoryTree: String
+    package let canonicalSourceManifestSHA256: InvestigationHandoffSHA256
+    package let buildProvenanceSHA256, signedRuntimeBindingSHA256:
+      InvestigationHandoffSHA256
+    package let outerAttemptUUID: UUID
+    package let wholeCapsuleSHA256: InvestigationHandoffSHA256
+    package let wholeProjectedInputSHA256: InvestigationHandoffSHA256
+    package let canonicalProjectedInput: Data
+    package private(set) var frameSHA256: InvestigationHandoffSHA256
+
+    package init(
+      provenance: InvestigationMachineBuildProvenanceReceiptV1,
+      binding: InvestigationMachineGateCoordinatorBinding,
+      projectedInput: InvestigationProjectedCohortInput
+    ) throws {
+      repositoryHEAD = provenance.repositoryHEAD
+      repositoryTree = provenance.repositoryTree
+      canonicalSourceManifestSHA256 = try .init(
+        lowercaseHex: provenance.canonicalManifestSHA256
+      )
+      buildProvenanceSHA256 = try .init(
+        lowercaseHex: binding.buildProvenanceSHA256
+      )
+      signedRuntimeBindingSHA256 = try .init(
+        lowercaseHex: binding.signedBindingSHA256
+      )
+      outerAttemptUUID = projectedInput.capsule.outerAttemptUUID
+      wholeCapsuleSHA256 = projectedInput.capsule.wholeCapsuleSHA256
+      wholeProjectedInputSHA256 = projectedInput.wholeInputSHA256
+      canonicalProjectedInput = try projectedInput.encoded()
+      frameSHA256 = Self.zeroDigest
+      frameSHA256 = .hashing(try transcript(digest: Self.zeroDigest))
+    }
+
+    package func encoded() throws -> Data {
+      guard .hashing(try transcript(digest: Self.zeroDigest)) == frameSHA256 else {
+        throw InvestigationMachineGateCoordinatorProductionError.protocolFailure
+      }
+      return try transcript(digest: frameSHA256)
+    }
+
+    private func transcript(digest: InvestigationHandoffSHA256) throws -> Data {
+      try HandoffBinaryTranscript.encode(
+        domain: Self.domain, businessFields: [
+          Data(repositoryHEAD.utf8), Data(repositoryTree.utf8),
+          canonicalSourceManifestSHA256.rawBytes,
+          buildProvenanceSHA256.rawBytes,
+          signedRuntimeBindingSHA256.rawBytes,
+          coordinatorUUIDData(outerAttemptUUID), wholeCapsuleSHA256.rawBytes,
+          wholeProjectedInputSHA256.rawBytes, canonicalProjectedInput,
+          digest.rawBytes,
+        ], maximumByteCount: Self.maximumByteCount
+      )
+    }
+    private static let zeroDigest = try! InvestigationHandoffSHA256(
+      rawBytes: Data(repeating: 0, count: 32))
+  }
   package enum InvestigationMachineGateCoordinatorInvocation:
     Equatable, Sendable
   {
@@ -423,6 +485,10 @@ public enum InvestigationMachineGateCoordinatorSupport {
     typealias Handoff = @Sendable (
       InvestigationMachineGateCoordinatorAuthoredCohort
     ) async throws -> InvestigationMachineGateCoordinatorHandoff
+    typealias ActivateBeforeHandoff = @Sendable (
+      InvestigationMachineGateCoordinatorBinding,
+      InvestigationMachineGateCoordinatorAuthoredCohort
+    ) async throws -> Void
     typealias RetireArtifacts = @Sendable (
       InvestigationMachineGateCoordinatorMaterializedSource?,
       InvestigationMachineGateCoordinatorHandoff?
@@ -440,6 +506,7 @@ public enum InvestigationMachineGateCoordinatorSupport {
     let makeBinding: MakeBinding
     let makeConfigurations: MakeConfigurations
     let authorCohort: AuthorCohort
+    let activateBeforeHandoff: ActivateBeforeHandoff
     let handoff: Handoff
     let retireArtifacts: RetireArtifacts
     let makeReceipt: MakeReceipt
@@ -452,6 +519,7 @@ public enum InvestigationMachineGateCoordinatorSupport {
       makeBinding: @escaping MakeBinding,
       makeConfigurations: @escaping MakeConfigurations,
       authorCohort: @escaping AuthorCohort,
+      activateBeforeHandoff: @escaping ActivateBeforeHandoff = { _, _ in },
       handoff: @escaping Handoff,
       retireArtifacts: @escaping RetireArtifacts,
       makeReceipt: @escaping MakeReceipt,
@@ -463,6 +531,7 @@ public enum InvestigationMachineGateCoordinatorSupport {
       self.makeBinding = makeBinding
       self.makeConfigurations = makeConfigurations
       self.authorCohort = authorCohort
+      self.activateBeforeHandoff = activateBeforeHandoff
       self.handoff = handoff
       self.retireArtifacts = retireArtifacts
       self.makeReceipt = makeReceipt
@@ -515,6 +584,10 @@ public enum InvestigationMachineGateCoordinatorSupport {
         configurations = batch
         let authored = try await dependencies.authorCohort(batch)
         cohort = authored
+        try InvestigationMachineGateCoordinatorHandoffAdmission.validate(
+          authored, now: dependencies.wallNow()
+        )
+        try await dependencies.activateBeforeHandoff(currentBinding, authored)
         try InvestigationMachineGateCoordinatorHandoffAdmission.validate(
           authored, now: dependencies.wallNow()
         )
@@ -870,6 +943,19 @@ public enum InvestigationMachineGateCoordinatorSupport {
     private var prepared = false
     init(descriptor: Int32 = 3) { self.descriptor = descriptor }
     func markPrepared() { lock.withLock { prepared = true } }
+    func writePreArm(_ value: InvestigationMachineGateCoordinatorPreArmFrameV1)
+      throws
+    {
+      try writeFrame(try value.encoded())
+    }
+    func writeRawGateReceipt(_ value: InvestigationMachineGateTransportReceipt)
+      throws
+    {
+      let payload = try value.encoded()
+      guard try InvestigationMachineGateTransportReceipt.decode(payload) == value
+      else { throw InvestigationMachineGateCoordinatorProductionError.protocolFailure }
+      try writeFrame(payload)
+    }
     func writeAndClose(
       _ disposition: InvestigationMachineGateCoordinatorSinkDisposition
     ) throws {
@@ -890,37 +976,11 @@ public enum InvestigationMachineGateCoordinatorSupport {
             }
             guard try InvestigationMachineGateCoordinatorReceiptV1.decode(
               payload
-            ) == receipt, let count = UInt32(exactly: payload.count) else {
+            ) == receipt else {
               throw InvestigationMachineGateCoordinatorProductionError
                 .protocolFailure
             }
-            var frame = Data([
-              UInt8(count >> 24), UInt8(truncatingIfNeeded: count >> 16),
-              UInt8(truncatingIfNeeded: count >> 8),
-              UInt8(truncatingIfNeeded: count),
-            ])
-            frame.append(payload)
-            guard frame.count <=
-              InvestigationMachineGateCoordinatorReceiptV1.maximumByteCount + 4
-            else {
-              throw InvestigationMachineGateCoordinatorProductionError
-                .protocolFailure
-            }
-            var offset = 0
-            while offset < frame.count {
-              let result = frame.withUnsafeBytes { bytes in
-                Darwin.write(
-                  descriptor, bytes.baseAddress?.advanced(by: offset),
-                  bytes.count - offset
-                )
-              }
-              if result < 0, errno == EINTR { continue }
-              guard result > 0 else {
-                throw InvestigationMachineGateCoordinatorProductionError
-                  .containmentUncertain
-              }
-              offset += result
-            }
+            try writeFrame(payload)
           } catch {
             failure = error
           }
@@ -934,6 +994,95 @@ public enum InvestigationMachineGateCoordinatorSupport {
         }
         if let failure { throw failure }
       }
+    }
+    private func writeFrame(_ payload: Data) throws {
+      guard let count = UInt32(exactly: payload.count), payload.count <= 1 << 20
+      else { throw InvestigationMachineGateCoordinatorProductionError.protocolFailure }
+      var frame = Data([
+        UInt8(count >> 24), UInt8(truncatingIfNeeded: count >> 16),
+        UInt8(truncatingIfNeeded: count >> 8), UInt8(truncatingIfNeeded: count),
+      ])
+      frame.append(payload)
+      try coordinatorWriteAll(frame, to: descriptor)
+    }
+  }
+  private enum InvestigationMachineCoordinatorActivation {
+    static func waitForDurableArm(
+      preArm: InvestigationMachineGateCoordinatorPreArmFrameV1,
+      sink: InvestigationMachineGateCoordinatorReceiptSink,
+      validBefore: InvestigationHandoffUTCMicroseconds
+    ) throws {
+      var saved = termios()
+      guard tcgetattr(STDIN_FILENO, &saved) == 0,
+            tcgetpgrp(STDIN_FILENO) == getpid() else {
+        throw InvestigationMachineGateCoordinatorProductionError
+          .invalidInvocation
+      }
+      var guarded = saved
+      guarded.c_lflag &= ~tcflag_t(ECHO | ECHONL)
+      guard tcsetattr(STDIN_FILENO, TCSANOW, &guarded) == 0 else {
+        throw InvestigationMachineGateCoordinatorProductionError
+          .containmentUncertain
+      }
+      defer { _ = tcsetattr(STDIN_FILENO, TCSANOW, &saved) }
+      try sink.writePreArm(preArm)
+      let digest = preArm.frameSHA256.lowercaseHex
+      try writeTerminal("STORNAUT-IICC-READY-v1 " + digest + "\n")
+      let expected = Data(("STORNAUT-IICC-ARM-v1 " + digest + "\n").utf8)
+      var received = Data()
+      while received.count <= expected.count {
+        var event = pollfd(fd: STDIN_FILENO, events: Int16(POLLIN), revents: 0)
+        let ready = poll(&event, 1, timeout(validBefore))
+        guard ready > 0, event.revents & Int16(POLLERR | POLLNVAL) == 0 else {
+          if ready < 0, errno == EINTR { continue }
+          throw InvestigationMachineGateCoordinatorProductionError.protocolFailure
+        }
+        var byte: UInt8 = 0
+        let count = Darwin.read(STDIN_FILENO, &byte, 1)
+        if count < 0, errno == EINTR { continue }
+        guard count == 1 else {
+          throw InvestigationMachineGateCoordinatorProductionError
+            .protocolFailure
+        }
+        received.append(byte)
+        if byte == UInt8(ascii: "\n") { break }
+      }
+      guard received == expected else {
+        throw InvestigationMachineGateCoordinatorProductionError
+          .protocolFailure
+      }
+      guard tcsetattr(STDIN_FILENO, TCSANOW, &saved) == 0,
+            tcgetpgrp(STDIN_FILENO) == getpid() else {
+        throw InvestigationMachineGateCoordinatorProductionError
+          .containmentUncertain
+      }
+    }
+    private static func timeout(_ deadline: InvestigationHandoffUTCMicroseconds)
+      -> Int32
+    {
+      var now = timespec(); guard clock_gettime(CLOCK_REALTIME, &now) == 0 else { return 0 }
+      let current = Int64(now.tv_sec) * 1_000_000 + Int64(now.tv_nsec / 1_000)
+      let remaining = max(0, deadline.rawValue - current)
+      return Int32(min(remaining / 1_000, Int64(Int32.max)))
+    }
+
+    private static func writeTerminal(_ value: String) throws {
+      try coordinatorWriteAll(Data(value.utf8), to: STDERR_FILENO)
+    }
+  }
+  private func coordinatorWriteAll(_ bytes: Data, to descriptor: Int32) throws {
+    var offset = 0
+    while offset < bytes.count {
+      let count = bytes.withUnsafeBytes {
+        Darwin.write(descriptor, $0.baseAddress?.advanced(by: offset),
+          $0.count - offset)
+      }
+      if count < 0, errno == EINTR { continue }
+      guard count > 0 else {
+        throw InvestigationMachineGateCoordinatorProductionError
+          .containmentUncertain
+      }
+      offset += count
     }
   }
   private final class InvestigationMachineGateCoordinatorRuntimeState:
@@ -1012,6 +1161,27 @@ public enum InvestigationMachineGateCoordinatorSupport {
           self.state.lock.withLock { self.state.projectedInput = projected }
           return value
         },
+        activateBeforeHandoff: { binding, cohort in
+          guard let current = binding.currentSourceBinding,
+                let projected = self.state.lock.withLock({
+                  self.state.projectedInput
+                }) else {
+            throw InvestigationMachineGateCoordinatorProductionError
+              .protocolFailure
+          }
+          let preArm = try InvestigationMachineGateCoordinatorPreArmFrameV1(
+            provenance: current.buildProvenance,
+            binding: binding, projectedInput: projected
+          )
+          guard preArm.outerAttemptUUID == cohort.outerAttemptUUID else {
+            throw InvestigationMachineGateCoordinatorProductionError
+              .protocolFailure
+          }
+          try InvestigationMachineCoordinatorActivation.waitForDurableArm(
+            preArm: preArm, sink: sink,
+            validBefore: cohort.configurationValidBefore
+          )
+        },
         handoff: { cohort in
           guard let bytes = cohort.canonicalProjectedInput else {
             throw InvestigationMachineGateCoordinatorProductionError
@@ -1021,22 +1191,11 @@ public enum InvestigationMachineGateCoordinatorSupport {
             canonicalProjectedInput: bytes
           )
           let transport = value.gateTransportReceipt
-          guard let projected = self.state.lock.withLock({
-            self.state.projectedInput
-          }) else {
-            throw InvestigationMachineGateCoordinatorProductionError
-              .postSettlementProtocolFailure
-          }
-          let expectedCompletion: Data
-          do {
-            expectedCompletion = try coordinatorExpectedCompletionArtifact(projected)
-          } catch {
-            throw InvestigationMachineGateCoordinatorProductionError
-              .postSettlementProtocolFailure
-          }
+          try sink.writeRawGateReceipt(transport)
           guard
-            transport.output.byteCount == expectedCompletion.count,
-            transport.output.sha256 == .hashing(expectedCompletion),
+            transport.output.byteCount
+              == coordinatorExpectedProductionCompletionByteCount(),
+            transport.output.sha256.rawBytes.contains(where: { $0 != 0 }),
             transport.output.reachedEOF, !transport.output.overflowObserved,
             !transport.output.deadlineExpired
           else {
@@ -1119,6 +1278,11 @@ public enum InvestigationMachineGateCoordinatorSupport {
       ],
       maximumByteCount: 512
     )
+  }
+  package func coordinatorExpectedProductionCompletionByteCount() -> Int {
+    let domain = "stornaut.task39.machine.driver-completion-v2"
+    return 4 + 6 + domain.utf8.count + 10 + 6 * 6
+      + 16 + 32 + 32 + 4 + 32 + 32
   }
   private func coordinatorUUIDData(_ value: UUID) -> Data {
     var bytes = value.uuid

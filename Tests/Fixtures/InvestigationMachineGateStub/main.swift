@@ -13,7 +13,7 @@ private enum Contract {
     static let preparedByteCount = 512
     static let forwardedSignals: [Int32] = [SIGHUP, SIGINT, SIGQUIT, SIGTERM]
     static let arguments = [
-        "/usr/bin/sudo", "-kN", "-p",
+        "/usr/bin/sudo", "-N", "-p",
         "Stornaut Task 39 ii-c administrator authorization: ", "--",
         "/Library/Application Support/Stornaut/"
             + "Stornaut-R5-Diagnostic.app/Contents/MacOS/"

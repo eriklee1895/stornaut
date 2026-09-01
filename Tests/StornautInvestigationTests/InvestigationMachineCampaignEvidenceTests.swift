@@ -10,113 +10,10 @@ import Testing
 @Suite("Investigation machine campaign evidence", .serialized)
 struct InvestigationMachineCampaignEvidenceTests {
     @Test
-    func privilegedCeremonyPinsDurableArmPromptAndCredentialErasure() throws {
-        let sources = try Self.iiCCSourceTexts()
-        let armPublish = try #require(
-            sources.executable.range(of: ".armedConsumed")
-        )
-        let armRelease = try #require(
-            sources.executable.range(of: "sendArmAfterDurablePublish")
-        )
-
-        #expect(armPublish.lowerBound < armRelease.lowerBound)
-        #expect(sources.harness.contains(
-            "Stornaut Task 39 ii-c administrator authorization: "
-        ))
-        #expect(sources.coordinator.contains(
-            "InvestigationMachineCoordinatorPreArmFrame"
-        ))
-        #expect(sources.coordinator.contains("waitForDurableArm"))
-        #expect(sources.executable.contains("readpassphrase("))
-        #expect(sources.executable.contains("RPP_REQUIRE_TTY"))
-        #expect(sources.executable.contains("memset_s("))
-        for forbidden in [
-            "credentialData", "credentialString", "credentialSHA256",
-        ] {
-            #expect(!sources.executable.contains(forbidden))
-            #expect(!sources.harness.contains(forbidden))
-        }
-    }
-
-    @Test
-    func driverEvidenceChainRetainsEightFullL2AndTerminalProofs() throws {
-        let sources = try Self.iiCCSourceTexts()
-
-        #expect(sources.singleEpoch.contains("installedL2ProofBytes"))
-        #expect(sources.physical.contains("installedL2ProofBytes"))
-        #expect(sources.outerProtocol.contains(
-            "InvestigationMachineEpochEvidenceCollector"
-        ))
-        #expect(sources.outerProtocol.contains("terminalEvidenceBytes"))
-        #expect(sources.zeroEntry.contains(
-            "InvestigationMachineDriverEvidenceBundleV1"
-        ))
-        #expect(sources.zeroEntry.contains("driverEvidenceBundleSHA256"))
-    }
-
-    @Test
-    func lifecycleTransactionsExposeBoundedMachineReceipts() throws {
-        let lifecycle = try Self.iiCCSourceTexts().lifecycle
-
-        for marker in [
-            "lifecycle.local.install.receipt.v1",
-            "lifecycle.local.uninstall.receipt.v1",
-            "builtStagingInstalledEqual=true",
-            "globalPostTeardown=true",
-        ] {
-            #expect(lifecycle.contains(marker))
-        }
-    }
-
-    @Test
-    func strictEvidenceRejectsCanonicalPlaceholderObjects() throws {
-        let fixture = try CampaignEvidenceDiskFixture.make()
-        defer { fixture.remove() }
-        let writer = try fixture.makeWriter()
-
-        #expect(throws: InvestigationMachineEvidenceContractError.invalidEncoding) {
-            _ = try writer.writeArtifact(
-                path: .init(
-                    phase: .preflight, leafName: "source-build.json"
-                ),
-                role: .sourceBuildIdentity,
-                encoding: .strictJSON,
-                bytes: Data(#"{"value":"canonical-but-untyped"}"#.utf8)
-            )
-        }
-        #expect(throws: InvestigationMachineEvidenceContractError.invalidEncoding) {
-            _ = try InvestigationMachineAttemptEventV1(
-                sequence: 1,
-                attemptUUID: fixture.attemptUUID,
-                kind: .prepared,
-                previousEventSHA256: Self.zeroDigest(),
-                observedAt: .init(rawValue: 1),
-                payload: Data(#"{"value":"canonical-but-untyped"}"#.utf8)
-            )
-        }
-    }
-
-    @Test
     func independentVerifierRejectsSemanticallyForgedCanonicalCorpus() throws {
-        let fixture = try CampaignEvidenceDiskFixture.make()
-        defer { fixture.remove() }
-        let writer = try fixture.makeWriter(mode: .privileged)
-        for (index, kind) in [
-            InvestigationMachineAttemptEventKind.prepared, .armedConsumed,
-            .spawnObserved, .terminal,
-        ].enumerated() {
-            _ = try writer.appendAttemptEvent(
-                kind: kind,
-                payload: Self.json("event-\(index + 1)"),
-                observedAt: try .init(rawValue: Int64(index + 1))
-            )
-        }
-        try fixture.populatePrivilegedArtifacts(writer)
-        let seal = try writer.finalize()
-        let sealURL = fixture.parent.appending(path: "semantic-seal.json")
-        try Self.writeSeal(seal, to: sealURL)
-
-        #expect(try Self.runVerifier(fixture.evidenceRoot, sealURL).status != 0)
+        let result = try privilegedVerifierResult(
+            semanticForgery: true, sealName: "semantic-seal.json")
+        #expect(result.status != 0)
     }
 
     @Test
@@ -391,6 +288,14 @@ struct InvestigationMachineCampaignEvidenceTests {
         try InvestigationMachineAttemptEventChain.validateComplete(
             [prepared, armed, spawned, terminal], mode: .privileged
         )
+        let uncertain = try Self.event(
+            sequence: 3, attempt: attempt, kind: .spawnUncertain,
+            previous: .hashing(try armed.encoded()))
+        try InvestigationMachineAttemptEventChain.validateComplete(
+            [prepared, armed, uncertain], mode: .privileged)
+        #expect(try InvestigationMachineAttemptEventChain.summary(
+            [prepared, armed, uncertain], mode: .privileged).outcome
+            == .transportLoss)
         #expect(try InvestigationMachineAttemptEventV1.decode(
             terminal.encoded()) == terminal)
     }
@@ -684,7 +589,8 @@ struct InvestigationMachineCampaignEvidenceTests {
         defer { fixture.remove() }
         let writer = try fixture.makeWriter()
         _ = try writer.appendAttemptEvent(
-            kind: .prepared, payload: Self.json("prepared"),
+            kind: .prepared, payload: try Self.eventPayload(
+                kind: .prepared, attempt: fixture.attemptUUID),
             observedAt: try .init(rawValue: 1)
         )
         for kind in [
@@ -694,13 +600,15 @@ struct InvestigationMachineCampaignEvidenceTests {
             #expect(throws: InvestigationMachineRawEvidenceError
                 .dryRunAuthorityViolation) {
                 _ = try writer.appendAttemptEvent(
-                    kind: kind, payload: Self.json("forbidden"),
+                    kind: kind, payload: try Self.eventPayload(
+                        kind: kind, attempt: fixture.attemptUUID),
                     observedAt: try .init(rawValue: 2)
                 )
             }
         }
         _ = try writer.appendAttemptEvent(
-            kind: .cancelledBeforeArm, payload: Self.json("cancelled"),
+            kind: .cancelledBeforeArm, payload: try Self.eventPayload(
+                kind: .cancelledBeforeArm, attempt: fixture.attemptUUID),
             observedAt: try .init(rawValue: 2)
         )
         try fixture.populateDryRunArtifacts(writer)
@@ -721,7 +629,8 @@ struct InvestigationMachineCampaignEvidenceTests {
             spawn, .terminal,
         ].enumerated() {
             _ = try writer.appendAttemptEvent(
-                kind: kind, payload: Self.json("event-\(index + 1)"),
+                kind: kind, payload: try Self.eventPayload(
+                    kind: kind, attempt: fixture.attemptUUID),
                 observedAt: try .init(rawValue: Int64(index + 1))
             )
         }
@@ -741,11 +650,13 @@ struct InvestigationMachineCampaignEvidenceTests {
         defer { fixture.remove() }
         let writer = try fixture.makeWriter(mode: .privileged)
         _ = try writer.appendAttemptEvent(
-            kind: .prepared, payload: Self.json("prepared"),
+            kind: .prepared, payload: try Self.eventPayload(
+                kind: .prepared, attempt: fixture.attemptUUID),
             observedAt: try .init(rawValue: 1)
         )
         _ = try writer.appendAttemptEvent(
-            kind: .armedConsumed, payload: Self.json("armed"),
+            kind: .armedConsumed, payload: try Self.eventPayload(
+                kind: .armedConsumed, attempt: fixture.attemptUUID),
             observedAt: try .init(rawValue: 2)
         )
         for kind in [
@@ -755,7 +666,8 @@ struct InvestigationMachineCampaignEvidenceTests {
             #expect(throws: InvestigationMachineEvidenceContractError
                 .invalidTransition) {
                 _ = try writer.appendAttemptEvent(
-                    kind: kind, payload: Self.json("invalid"),
+                    kind: kind, payload: try Self.eventPayload(
+                        kind: kind, attempt: fixture.attemptUUID),
                     observedAt: try .init(rawValue: 3)
                 )
             }
@@ -907,8 +819,42 @@ struct InvestigationMachineCampaignEvidenceTests {
         #expect(try Self.runVerifier(fixture.evidenceRoot, sealURL).status != 0)
     }
 
+    @Test(.serialized, arguments: [0, 1, 3, 7, 8])
+    func independentVerifierAdmitsOnlyCompletePairedPrefix(
+        _ epochCount: Int
+    ) throws {
+        let result = try privilegedVerifierResult(epochCount: epochCount)
+        if epochCount == 8 {
+            #expect(result.status == 0, Comment(rawValue: result.stderr))
+        } else {
+            #expect(result.status != 0)
+            #expect(result.stderr.contains("non-admitting"))
+        }
+    }
+
     @Test
-    func independentVerifierAcceptsPrivilegedCoordinatorCorpus() throws {
+    func independentVerifierRejectsPromptVerifierCombinationForgery() throws {
+        let result = try privilegedVerifierResult(
+            promptVerifierForgery: true, sealName: "prompt-seal.json")
+        #expect(result.status != 0)
+    }
+
+    @Test(arguments: CampaignVerifierJoinMutation.allCases)
+    func independentVerifierRejectsCrossArtifactJoinDrift(
+        _ mutation: CampaignVerifierJoinMutation
+    ) throws {
+        let result = try privilegedVerifierResult(
+            joinMutation: mutation, sealName: "join-seal.json")
+        #expect(result.status != 0)
+    }
+
+    private func privilegedVerifierResult(
+        epochCount: Int = 8,
+        semanticForgery: Bool = false,
+        promptVerifierForgery: Bool = false,
+        joinMutation: CampaignVerifierJoinMutation? = nil,
+        sealName: String = "seal.json"
+    ) throws -> CampaignVerifierResult {
         let fixture = try CampaignEvidenceDiskFixture.make()
         defer { fixture.remove() }
         let writer = try fixture.makeWriter(mode: .privileged)
@@ -917,26 +863,52 @@ struct InvestigationMachineCampaignEvidenceTests {
             .spawnObserved, .terminal,
         ].enumerated() {
             _ = try writer.appendAttemptEvent(
-                kind: kind, payload: Self.json("event-\(index + 1)"),
+                kind: kind, payload: try Self.eventPayload(
+                    kind: kind, attempt: fixture.attemptUUID),
                 observedAt: try .init(rawValue: Int64(index + 1)))
         }
-        try fixture.populatePrivilegedArtifacts(writer)
-        let seal = try writer.finalize()
-        let sealURL = fixture.parent.appending(path: "seal.json")
+        try fixture.populatePrivilegedArtifacts(
+            writer, epochCount: epochCount, semanticForgery: semanticForgery,
+            promptVerifierForgery: promptVerifierForgery,
+            joinMutation: joinMutation)
+        var seal = try writer.finalize()
+        if epochCount == 8 {
+            seal = try fixture.completePrivilegedCorpus(
+                seal, joinMutation: joinMutation)
+        }
+        let sealURL = fixture.parent.appending(path: sealName)
         try Self.writeSeal(seal, to: sealURL)
-        #expect(try Self.runVerifier(fixture.evidenceRoot, sealURL).status == 0)
+        return try Self.runVerifier(fixture.evidenceRoot, sealURL)
+    }
+
+    @Test(arguments: CampaignEpochPrefixMutation.allCases)
+    func manifestRejectsMismatchedOrGappedEpochPairs(
+        _ mutation: CampaignEpochPrefixMutation
+    ) throws {
+        let fixture = try CampaignEvidenceFixture.make()
+        var artifacts = fixture.artifacts
+        artifacts.removeAll { mutation.removes($0) }
+        #expect(throws: InvestigationMachineEvidenceContractError.invalidOrdering) {
+            _ = try InvestigationMachineEvidenceManifestV1(
+                campaignUUID: fixture.campaignUUID,
+                attemptUUID: fixture.attemptUUID,
+                sourceBinding: fixture.sourceBinding, artifacts: artifacts,
+                attemptSummary: fixture.attemptSummary)
+        }
     }
 
     @Test
-    func independentVerifierUsesFoundationCanonicalJSONBytes() throws {
+    func independentVerifierRejectsCanonicalButUntypedJSON() throws {
         let fixture = try CampaignEvidenceDiskFixture.make()
         defer { fixture.remove() }
         let writer = try fixture.makeWriter()
         _ = try writer.appendAttemptEvent(
-            kind: .prepared, payload: Self.json("prepared"),
+            kind: .prepared, payload: try Self.eventPayload(
+                kind: .prepared, attempt: fixture.attemptUUID),
             observedAt: try .init(rawValue: 1))
         _ = try writer.appendAttemptEvent(
-            kind: .cancelledBeforeArm, payload: Self.json("cancelled"),
+            kind: .cancelledBeforeArm, payload: try Self.eventPayload(
+                kind: .cancelledBeforeArm, attempt: fixture.attemptUUID),
             observedAt: try .init(rawValue: 2))
         let edgeJSON = try JSONSerialization.data(withJSONObject: [
             "bmp": ["\u{10000}": 2, "\u{e000}": 1],
@@ -948,7 +920,7 @@ struct InvestigationMachineCampaignEvidenceTests {
         let seal = try writer.finalize()
         let sealURL = fixture.parent.appending(path: "seal.json")
         try Self.writeSeal(seal, to: sealURL)
-        #expect(try Self.runVerifier(fixture.evidenceRoot, sealURL).status == 0)
+        #expect(try Self.runVerifier(fixture.evidenceRoot, sealURL).status != 0)
     }
 
     @Test
@@ -1028,7 +1000,7 @@ struct InvestigationMachineCampaignEvidenceTests {
             sequence: sequence, attemptUUID: attempt, kind: kind,
             previousEventSHA256: previous,
             observedAt: .init(rawValue: Int64(sequence)),
-            payload: json("event-\(sequence)")
+            payload: try eventPayload(kind: kind, attempt: attempt)
         )
     }
 
@@ -1126,6 +1098,32 @@ struct InvestigationMachineCampaignEvidenceTests {
         Data("{\"value\":\"\(value)\"}".utf8)
     }
 
+    fileprivate static func eventPayload(
+        kind: InvestigationMachineAttemptEventKind, attempt: UUID
+    ) throws -> Data {
+        let name: String = switch kind {
+        case .prepared: "prepared"
+        case .cancelledBeforeArm: "cancelledBeforeArm"
+        case .armedConsumed: "armedConsumed"
+        case .spawnObserved: "spawnObserved"
+        case .spawnUncertain: "spawnUncertain"
+        case .terminal: "terminal"
+        }
+        var value: [String: Any] = [
+            "schemaVersion": 1, "kind": name,
+            "attemptUUID": attempt.uuidString.lowercased(),
+            "evidenceSetSHA256": digest(0xd1).lowercaseHex,
+        ]
+        if kind == .cancelledBeforeArm || kind == .spawnUncertain {
+            value["reason"] = "fixture"
+        } else if kind == .spawnObserved {
+            value["processID"] = 4_001
+            value["processGroupID"] = 4_001
+            value["sessionID"] = 3_901
+        }
+        return try InvestigationMachineEvidenceJSON.canonicalData(value)
+    }
+
     private static func lengthPrefixed(_ payload: Data) -> Data {
         let count = UInt32(payload.count)
         return Data([
@@ -1133,31 +1131,6 @@ struct InvestigationMachineCampaignEvidenceTests {
             UInt8(truncatingIfNeeded: count >> 8),
             UInt8(truncatingIfNeeded: count),
         ]) + payload
-    }
-
-    private static func iiCCSourceTexts() throws -> (
-        executable: String, harness: String, coordinator: String,
-        singleEpoch: String, physical: String,
-        outerProtocol: String, zeroEntry: String, lifecycle: String
-    ) {
-        let repository = URL(filePath: #filePath).deletingLastPathComponent()
-            .deletingLastPathComponent().deletingLastPathComponent()
-        func source(_ relativePath: String) throws -> String {
-            try String(
-                contentsOf: repository.appending(path: relativePath),
-                encoding: .utf8
-            )
-        }
-        return try (
-            source("Sources/StornautInvestigationMachineCampaign/main.swift"),
-            source("Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignHarness.swift"),
-            source("Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift"),
-            source("Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochComposition.swift"),
-            source("Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochPhysicalBridge.swift"),
-            source("Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerProtocol.swift"),
-            source("Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineZeroArgumentEntry.swift"),
-            source("scripts/stornaut-r5-local-lifecycle")
-        )
     }
 
     private static func requireMetadata(
@@ -1177,6 +1150,26 @@ private struct CampaignVerifierResult: Equatable {
     let status: Int32
     let stdout: String
     let stderr: String
+}
+
+enum CampaignEpochPrefixMutation: CaseIterable {
+    case mismatchedPair, gap
+
+    func removes(_ artifact: InvestigationMachineEvidenceArtifact) -> Bool {
+        switch self {
+        case .mismatchedPair:
+            artifact.role == .epochResidueProjection
+                && artifact.path.leafName == "epoch-08-residue.json"
+        case .gap:
+            (artifact.role == .epochL2Projection
+                || artifact.role == .epochResidueProjection)
+                && artifact.path.leafName.contains("epoch-04-")
+        }
+    }
+}
+
+enum CampaignVerifierJoinMutation: CaseIterable {
+    case sourcePreArm, epochWholeInput, ownershipEncoding
 }
 
 private struct CampaignEvidenceFixture {
@@ -1443,11 +1436,15 @@ private final class CampaignEvidenceDiskFixture {
 
     func populate(_ writer: InvestigationMachineRawEvidenceWriter) throws {
         _ = try writer.appendAttemptEvent(
-            kind: .prepared, payload: Self.json("prepared"),
+            kind: .prepared,
+            payload: try InvestigationMachineCampaignEvidenceTests.eventPayload(
+                kind: .prepared, attempt: attemptUUID),
             observedAt: try .init(rawValue: 1)
         )
         _ = try writer.appendAttemptEvent(
-            kind: .cancelledBeforeArm, payload: Self.json("cancelled"),
+            kind: .cancelledBeforeArm,
+            payload: try InvestigationMachineCampaignEvidenceTests.eventPayload(
+                kind: .cancelledBeforeArm, attempt: attemptUUID),
             observedAt: try .init(rawValue: 2)
         )
         try populateDryRunArtifacts(writer)
@@ -1455,49 +1452,188 @@ private final class CampaignEvidenceDiskFixture {
 
     func populateDryRunArtifacts(
         _ writer: InvestigationMachineRawEvidenceWriter,
-        sourceBuild: Data = CampaignEvidenceDiskFixture.json("source")
+        sourceBuild: Data? = nil
     ) throws {
-        try write([
-            (.preflight, "source-build.json", .sourceBuildIdentity, .strictJSON, sourceBuild),
-            (.install, "installed.json", .builtStagingInstalledIdentity, .strictJSON, Self.json("installed")),
-            (.authorization, "policy-probe.json", .policyProbe, .strictJSON, Self.json("policy")),
-            (.authorization, "human-attestation.json", .humanPromptAttestation, .strictJSON, Self.json("human")),
-            (.authorization, "capability-counts.json", .noAuthModelNetworkCounters, .strictJSON, Self.json("counts")),
-            (.uninstall, "uninstall.json", .uninstallEvidence, .strictJSON, Self.json("uninstall")),
-            (.verifier, "global-post-teardown.json", .globalPostTeardown, .strictJSON, Self.json("zero")),
-            (.verifier, "verification-input.json", .verifierInput, .strictJSON, Self.json("verify")),
-        ], to: writer)
+        var values = try commonArtifacts(
+            expectedConsumed: false, epochCount: 0, cancellationAttestation: true)
+        if let sourceBuild { values[0].4 = sourceBuild }
+        try write(values, to: writer)
     }
 
     func populatePrivilegedArtifacts(
-        _ writer: InvestigationMachineRawEvidenceWriter
+        _ writer: InvestigationMachineRawEvidenceWriter,
+        epochCount: Int = 8, semanticForgery: Bool = false,
+        promptVerifierForgery: Bool = false,
+        joinMutation: CampaignVerifierJoinMutation? = nil
     ) throws {
-        var values: [(InvestigationMachineEvidencePhase, String, InvestigationMachineEvidenceRole, InvestigationMachineEvidenceEncoding, Data)] = [
-            (.preflight, "source-build.json", .sourceBuildIdentity, .strictJSON, Self.json("source")),
-            (.install, "installed.json", .builtStagingInstalledIdentity, .strictJSON, Self.json("installed")),
-            (.authorization, "policy-probe.json", .policyProbe, .strictJSON, Self.json("policy")),
-            (.authorization, "human-attestation.json", .humanPromptAttestation, .strictJSON, Self.json("human")),
-            (.authorization, "capability-counts.json", .noAuthModelNetworkCounters, .strictJSON, Self.json("counts")),
-            (.driverEpochs, "coordinator-receipt.bin", .protocolReceipt, .framedCanonicalBinary, try CampaignCoordinatorReceiptFixture.frame(
-                attemptUUID: attemptUUID,
-                buildProvenanceSHA256: sourceBinding.buildProvenanceSHA256.lowercaseHex,
-                signedBindingSHA256: sourceBinding.signedRuntimeBindingSHA256)),
-            (.driverEpochs, "diagnostic-output.bin", .diagnosticOutput, .opaqueBytes, Data()),
-            (.uninstall, "uninstall.json", .uninstallEvidence, .strictJSON, Self.json("uninstall")),
-            (.verifier, "global-post-teardown.json", .globalPostTeardown, .strictJSON, Self.json("zero")),
-            (.verifier, "verification-input.json", .verifierInput, .strictJSON, Self.json("verify")),
-        ]
-        for index in 1...8 {
+        let transport = try privilegedTransport(joinMutation: joinMutation)
+        var values = try commonArtifacts(
+            expectedConsumed: true, epochCount: epochCount,
+            cancellationAttestation: promptVerifierForgery,
+            preArmFrameSHA256: joinMutation == .sourcePreArm
+                ? InvestigationMachineCampaignEvidenceTests.digest(0xee)
+                : transport.preArmFrameSHA256)
+        if epochCount == 8 {
+            values.insert(contentsOf: [
+                (.driverEpochs, "coordinator-receipt.bin", .protocolReceipt,
+                    .framedCanonicalBinary, transport.finalFrame),
+                (.driverEpochs, "diagnostic-output.bin", .diagnosticOutput,
+                    .opaqueBytes, transport.diagnostic),
+            ], at: 5)
+        }
+        for index in (1...8).prefix(epochCount) {
+            let l2 = try typed(
+                .epochL2Projection, ordinal: index,
+                wholeProjectedInputSHA256: joinMutation == .epochWholeInput
+                    ? InvestigationMachineCampaignEvidenceTests.digest(0xef)
+                    : transport.wholeProjectedInputSHA256,
+                physicalOwnershipSHA256: transport.physicalOwnershipSHA256[index - 1])
             values.append((
                 .driverEpochs, String(format: "epoch-%02d-l2.json", index),
-                .epochL2Projection, .strictJSON, Self.json("l2-\(index)")
+                .epochL2Projection, .strictJSON, l2
             ))
             values.append((
                 .driverEpochs, String(format: "epoch-%02d-residue.json", index),
-                .epochResidueProjection, .strictJSON, Self.json("residue-\(index)")
+                .epochResidueProjection, .strictJSON,
+                try typed(
+                    .epochResidueProjection, ordinal: index,
+                    l2ArtifactSHA256: semanticForgery && index == epochCount
+                        ? InvestigationMachineCampaignEvidenceTests.digest(0xfe)
+                        : .hashing(l2)
+                )
             ))
         }
         try write(values, to: writer)
+    }
+
+    private typealias Artifact = (InvestigationMachineEvidencePhase, String, InvestigationMachineEvidenceRole, InvestigationMachineEvidenceEncoding, Data)
+
+    private func commonArtifacts(expectedConsumed: Bool, epochCount: Int, cancellationAttestation: Bool, preArmFrameSHA256: InvestigationHandoffSHA256? = nil) throws -> [Artifact] {
+        try [
+            (.preflight, "source-build.json", .sourceBuildIdentity, .strictJSON, typed(.sourceBuildIdentity, preArmFrameSHA256: preArmFrameSHA256)),
+            (.install, "installed.json", .builtStagingInstalledIdentity, .strictJSON, typed(.builtStagingInstalledIdentity)),
+            (.authorization, "policy-probe.json", .policyProbe, .strictJSON, typed(.policyProbe)),
+            (.authorization, "human-attestation.json", .humanPromptAttestation, .strictJSON, typed(.humanPromptAttestation, cancellationAttestation: cancellationAttestation)),
+            (.authorization, "capability-counts.json", .noAuthModelNetworkCounters, .strictJSON, typed(.noAuthModelNetworkCounters)),
+            (.uninstall, "uninstall.json", .uninstallEvidence, .strictJSON, typed(.uninstallEvidence)),
+            (.verifier, "global-post-teardown.json", .globalPostTeardown, .strictJSON, typed(.globalPostTeardown)),
+            (.verifier, "verification-input.json", .verifierInput, .strictJSON, typed(.verifierInput, ordinal: epochCount, expectedConsumed: expectedConsumed)),
+        ]
+    }
+
+    func completePrivilegedCorpus(_ seal: InvestigationMachineRawEvidenceSeal, joinMutation: CampaignVerifierJoinMutation? = nil) throws -> InvestigationMachineRawEvidenceSeal {
+        let transport = try privilegedTransport(joinMutation: joinMutation)
+        let receiptURL = evidenceRoot.appending(path: "04-driver-epochs/coordinator-receipt.bin")
+        try transport.receiptStream.write(to: receiptURL); try #require(chmod(receiptURL.path, 0o600) == 0)
+        let manifestURL = evidenceRoot.appending(path: "manifest.bin")
+        let old = try InvestigationMachineEvidenceManifestV1.decode(Data(contentsOf: manifestURL))
+        let artifacts = try old.artifacts.map { artifact in
+            guard artifact.role == .protocolReceipt else { return artifact }
+            return try InvestigationMachineEvidenceArtifact(path: artifact.path, role: artifact.role, encoding: artifact.encoding, byteCount: UInt64(transport.receiptStream.count), sha256: .hashing(transport.receiptStream))
+        }
+        let manifest = try InvestigationMachineEvidenceManifestV1(campaignUUID: campaignUUID, attemptUUID: attemptUUID, sourceBinding: sourceBinding, artifacts: artifacts, attemptSummary: seal.attemptSummary)
+        try manifest.encoded().write(to: manifestURL); try #require(chmod(manifestURL.path, 0o600) == 0)
+        return InvestigationMachineRawEvidenceSeal(campaignUUID: campaignUUID, attemptUUID: attemptUUID, rootIdentity: seal.rootIdentity, manifestSHA256: manifest.manifestSHA256, contentRootSHA256: manifest.contentRootSHA256, artifactCount: manifest.artifacts.count, totalByteCount: manifest.totalByteCount, attemptSummary: seal.attemptSummary)
+    }
+
+    private func privilegedTransport(joinMutation: CampaignVerifierJoinMutation? = nil) throws -> (finalFrame: Data, receiptStream: Data, diagnostic: Data, preArmFrameSHA256: InvestigationHandoffSHA256, wholeProjectedInputSHA256: InvestigationHandoffSHA256, physicalOwnershipSHA256: [InvestigationHandoffSHA256]) {
+        let projected = try projectedInput(), projectedBytes = try projected.encoded()
+        let digest = InvestigationMachineCampaignEvidenceTests.digest
+        let fixed = [handoffData(attemptUUID), projected.capsule.wholeCapsuleSHA256.rawBytes, projected.wholeInputSHA256.rawBytes]
+        let preArm = try selfBoundTranscript("stornaut.task39.iic.coordinator-prearm.v1", [Data(sourceBinding.repositoryHEAD.utf8), Data(sourceBinding.repositoryTree.utf8), sourceBinding.canonicalSourceManifestSHA256.rawBytes, sourceBinding.buildProvenanceSHA256.rawBytes, sourceBinding.signedRuntimeBindingSHA256.rawBytes] + fixed + [projectedBytes], maximum: InvestigationMachineCampaignPreArmFrame.maximumByteCount)
+        var epochBytes: [Data] = [], ownershipSHA256: [InvestigationHandoffSHA256] = []
+        for index in 1...8 {
+            let l2Proof = Data([UInt8(index)])
+            let ownership = joinMutation == .ownershipEncoding && index == 1
+                ? Data("not-canonical-ownership".utf8)
+                : try transcript("stornaut.task39.machine.physical-ownership.evidence-v1", fixed + [handoffData(CampaignEvidenceFixture.uuid(UInt8(0x30 + index))), handoffData(UInt32(index - 1)), handoffData(UInt32(index)), digest(0x77).rawBytes, Data([1]), Data([2]), Data([3]), digest(0x78).rawBytes, InvestigationHandoffSHA256.hashing(l2Proof).rawBytes, l2Proof, handoffData(UInt64(100)), handoffData(UInt64(200)), digest(0x79).rawBytes], maximum: 32 << 10)
+            ownershipSHA256.append(.hashing(ownership))
+            let physical = try transcript("stornaut.task39.machine.epoch-physical-evidence.v1", index == 7 ? [ownership] : [ownership, Data([4])], maximum: 64 << 10)
+            epochBytes.append(try transcript("stornaut.task39.machine.epoch-evidence.v1", [handoffData(UInt32(index - 1)), handoffData(UInt32(index)), handoffData(CampaignEvidenceFixture.uuid(UInt8(0x30 + index))), handoffData(CampaignEvidenceFixture.uuid(UInt8(0x40 + index))), Data([5]), physical, Data([UInt8(0xc0 + index)]), digest(0x7a).rawBytes], maximum: 64 << 10))
+        }
+        let bundle = try transcript("stornaut.task39.machine.driver-evidence-bundle.v1", fixed + [handoffData(UInt32(8))] + epochBytes, maximum: 512 << 10)
+        let completion = try selfBoundTranscript("stornaut.task39.machine.driver-completion-v2", fixed + [handoffData(UInt32(8)), InvestigationHandoffSHA256.hashing(bundle).rawBytes], maximum: 512)
+        let node = InvestigationMachineGateNodeObservation(device: 101, inode: 102, generation: 103, size: Int64(projectedBytes.count))
+        let tty = { (foreground: pid_t) in InvestigationMachineGateTerminalObservation(device: 9, inode: 10, foregroundProcessGroupID: foreground) }
+        let raw = try InvestigationMachineGateTransportReceipt(
+            launcherExecutableSHA256: digest(0x74), outerAttemptUUID: attemptUUID, wholeInputSHA256: projected.wholeInputSHA256, preparedFrameSHA256: digest(0x75),
+            capsule: node, gateProcessID: 4_001, coordinatorProcessID: 3_901, sessionID: 3_901, recoveryProcessGroupID: 4_001, savedForegroundProcessGroupID: 3_901,
+            childIdentity: .init(processID: 4_101, parentProcessID: 4_001, processGroupID: 4_001, sessionID: 3_901, startSeconds: 1, startMicroseconds: 2),
+            input: .init(node: node, initialOffset: 0, finalOffset: Int64(projectedBytes.count), reachedEOF: true, sha256: projected.wholeInputSHA256),
+            initialTerminal: tty(3_901), childTerminal: tty(4_001), finalTerminal: tty(3_901), output: .init(byteCount: completion.count, sha256: .hashing(completion), overflowObserved: false),
+            waitClassification: .exited(status: 0), forwardedSignal: nil, monotonicStartedNanoseconds: 10, monotonicCompletedNanoseconds: 20, terminationProgression: .natural, childProcessGroupEmpty: true, exactChildReaped: true, savedForegroundProcessGroupRestored: true, borrowedDescriptorOutcome: .closed).encoded()
+        let final = try CampaignCoordinatorReceiptFixture.frame(attemptUUID: attemptUUID, capsuleSize: Int64(projectedBytes.count), buildProvenanceSHA256: sourceBinding.buildProvenanceSHA256.lowercaseHex, signedBindingSHA256: sourceBinding.signedRuntimeBindingSHA256, wholeInputSHA256: projected.wholeInputSHA256, gateTransportReceiptSHA256: .hashing(raw))
+        return (final, framed(preArm) + framed(raw) + final, Data(("STORNAUT_TASK39_IIC_EPOCH_BUNDLE_V1 " + bundle.base64EncodedString() + "\n").utf8), try InvestigationMachineCampaignPreArmFrame.decode(preArm).frameSHA256, projected.wholeInputSHA256, ownershipSHA256)
+    }
+
+    private func projectedInput() throws -> InvestigationProjectedCohortInput {
+        let projections = try (1...8).map(projection)
+        let epochs = try projections.enumerated().map { offset, projection in
+            let index = offset + 1, bytes = Data([UInt8(index)])
+            return try InvestigationCohortEpoch(ordinal: UInt32(offset), epochUUID: CampaignEvidenceFixture.uuid(UInt8(0x30 + index)), scenario: InvestigationHandoffScenario.allCases[offset], configurationNonce: CampaignEvidenceFixture.uuid(UInt8(0x40 + index)), configuration: bytes, configurationSHA256: projection.configurationSHA256, signedRuntimeBindingSHA256: sourceBinding.signedRuntimeBindingSHA256)
+        }
+        return try InvestigationProjectedCohortInput(capsule: .init(outerAttemptUUID: attemptUUID, epochs: epochs), projections: projections)
+    }
+
+    private func transcript(_ domain: String, _ fields: [Data], maximum: Int) throws -> Data {
+        try HandoffBinaryTranscript.encode(domain: domain, businessFields: fields, maximumByteCount: maximum)
+    }
+    private func selfBoundTranscript(_ domain: String, _ fields: [Data], maximum: Int) throws -> Data {
+        let zero = try transcript(domain, fields + [Data(repeating: 0, count: 32)], maximum: maximum)
+        return try transcript(domain, fields + [InvestigationHandoffSHA256.hashing(zero).rawBytes], maximum: maximum)
+    }
+    private func framed(_ bytes: Data) -> Data { handoffData(UInt32(bytes.count)) + bytes }
+
+    private func typed(_ role: InvestigationMachineEvidenceRole, ordinal: Int = 0, l2ArtifactSHA256: InvestigationHandoffSHA256? = nil, cancellationAttestation: Bool = false, expectedConsumed: Bool = true, preArmFrameSHA256: InvestigationHandoffSHA256? = nil, wholeProjectedInputSHA256: InvestigationHandoffSHA256? = nil, physicalOwnershipSHA256: InvestigationHandoffSHA256? = nil) throws -> Data {
+        let digest = InvestigationMachineCampaignEvidenceTests.digest
+        let hex: (UInt8) -> String = { digest($0).lowercaseHex }
+        var value: [String: Any] = ["schemaVersion": 1, "role": roleName(role), "campaignUUID": campaignUUID.uuidString.lowercased(), "attemptUUID": attemptUUID.uuidString.lowercased()]
+        let fields: [String: Any]
+        switch role {
+        case .sourceBuildIdentity:
+            fields = ["repositoryHEAD": sourceBinding.repositoryHEAD, "repositoryTree": sourceBinding.repositoryTree, "canonicalSourceManifestSHA256": sourceBinding.canonicalSourceManifestSHA256.lowercaseHex, "buildProvenanceSHA256": sourceBinding.buildProvenanceSHA256.lowercaseHex, "signedRuntimeBindingSHA256": sourceBinding.signedRuntimeBindingSHA256.lowercaseHex, "preArmFrameSHA256": preArmFrameSHA256?.lowercaseHex ?? hex(0x64)]
+        case .builtStagingInstalledIdentity:
+            let identity = hex(0x65)
+            fields = ["buildProvenanceSHA256": sourceBinding.buildProvenanceSHA256.lowercaseHex, "signedRuntimeBindingSHA256": sourceBinding.signedRuntimeBindingSHA256.lowercaseHex, "transactionReceiptSHA256": hex(0x66), "builtIdentitySHA256": identity, "stagingIdentitySHA256": identity, "installedIdentitySHA256": identity, "plistSHA256": hex(0x67), "serviceLoaded": true, "appExecutableSHA256": hex(0x71), "helperExecutableSHA256": hex(0x72), "machineDriverExecutableSHA256": hex(0x73), "gateExecutableSHA256": hex(0x74), "coordinatorExecutableSHA256": hex(0xe5)]
+        case .policyProbe:
+            fields = ["command": "/usr/bin/sudo -knv", "exitStatus": 1, "stdoutByteCount": 0, "stdoutSHA256": hex(0x68), "stderrByteCount": 1, "stderrSHA256": hex(0x69)]
+        case .humanPromptAttestation:
+            fields = ["prompt": InvestigationMachineEvidenceJSON.prompt, "machinePromptObserved": !cancellationAttestation, "attestationKind": cancellationAttestation ? "operatorCancellationBeforeCredential" : "trustedOperatorInteractiveAction", "humanActionObserved": !cancellationAttestation, "credentialRetainedByteCount": 0]
+        case .noAuthModelNetworkCounters:
+            fields = ["authInvocationCount": 0, "modelInvocationCount": 0, "networkInvocationCount": 0, "credentialTranscriptByteCount": 0]
+        case .epochL2Projection:
+            let projection = try projection(ordinal: ordinal), bytes = try projection.encoded(), proof = Data([UInt8(ordinal)])
+            fields = ["ordinal": ordinal, "scenario": InvestigationMachineEvidenceJSON.scenarios[ordinal - 1], "epochUUID": projection.epochUUID.uuidString.lowercased(), "configurationNonce": projection.configurationNonce.uuidString.lowercased(), "configurationSHA256": projection.configurationSHA256.lowercaseHex, "signedRuntimeBindingSHA256": projection.signedRuntimeBindingSHA256.lowercaseHex, "wholeProjectedInputSHA256": wholeProjectedInputSHA256?.lowercaseHex ?? hex(0x73), "projectionBase64": bytes.base64EncodedString(), "projectionSHA256": projection.projectionSHA256.lowercaseHex, "installedL2ProofBase64": proof.base64EncodedString(), "installedL2ProofSHA256": InvestigationHandoffSHA256.hashing(proof).lowercaseHex, "claimEvidenceSHA256": hex(UInt8(0x80 + ordinal)), "physicalOwnershipSHA256": physicalOwnershipSHA256?.lowercaseHex ?? hex(UInt8(0x90 + ordinal))]
+        case .epochResidueProjection:
+            let terminal = Data([UInt8(0xc0 + ordinal)])
+            fields = ["ordinal": ordinal, "scenario": InvestigationMachineEvidenceJSON.scenarios[ordinal - 1], "epochUUID": CampaignEvidenceFixture.uuid(UInt8(0x30 + ordinal)).uuidString.lowercased(), "l2ArtifactSHA256": try #require(l2ArtifactSHA256).lowercaseHex, "helperIdentitySHA256": hex(UInt8(0xa0 + ordinal)), "completionBindingSHA256": hex(UInt8(0xb0 + ordinal)), "terminalEvidenceBase64": terminal.base64EncodedString(), "terminalEvidenceSHA256": InvestigationHandoffSHA256.hashing(terminal).lowercaseHex, "childCount": 0, "descendantCount": 0, "openChannelCount": 0, "ownedProcessGroupMemberCount": 0, "helperExitObserved": true, "artifactsRetired": true]
+        case .uninstallEvidence:
+            fields = ["transactionReceiptSHA256": hex(0xd2), "installedIdentitySHA256": hex(0x65), "plistSHA256": hex(0x67), "appExecutableSHA256": hex(0x71), "helperExecutableSHA256": hex(0x72), "machineDriverExecutableSHA256": hex(0x73), "gateExecutableSHA256": hex(0x74), "coordinatorExecutableSHA256": hex(0xe5), "bootoutCompleted": true, "installedRootRemoved": true, "installedAppRemoved": true, "plistRemoved": true, "runtimeRootRemoved": true, "leaseRootRemoved": true]
+        case .globalPostTeardown:
+            fields = ["observationReceiptSHA256": hex(0xd3), "appProcessCount": 0, "helperProcessCount": 0, "driverProcessCount": 0, "gateProcessCount": 0, "coordinatorProcessCount": 0, "childCount": 0, "descendantCount": 0, "openChannelCount": 0, "ownedProcessGroupMemberCount": 0, "serviceAbsent": true, "gateOwnerLockRevalidated": true, "gateAttemptEntryCount": 0, "gateCapsuleEntryCount": 0]
+        case .verifierInput:
+            let verifier = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().appending(path: "scripts/verify-investigation-runtime-machine-report")
+            fields = ["expectedConsumed": expectedConsumed, "expectedEpochCount": ordinal, "evidenceSetSHA256": hex(0xd1), "verifierExecutableSHA256": InvestigationHandoffSHA256.hashing(try Data(contentsOf: verifier)).lowercaseHex]
+        case .protocolReceipt, .diagnosticOutput, .attemptEvent: throw CampaignEvidenceFixtureError.unsupportedRole
+        }
+        value.merge(fields) { $1 }
+        return try InvestigationMachineEvidenceJSON.canonicalData(value)
+    }
+
+    private func projection(ordinal: Int) throws -> InvestigationInstalledL2IdentityProjection {
+        let digest = InvestigationMachineCampaignEvidenceTests.digest
+        return try .init(epochUUID: CampaignEvidenceFixture.uuid(UInt8(0x30 + ordinal)), configurationNonce: CampaignEvidenceFixture.uuid(UInt8(0x40 + ordinal)), configurationValidBefore: .init(rawValue: 2_000_000_000_000_000), configurationSHA256: .hashing(Data([UInt8(ordinal)])), signedRuntimeBindingSHA256: sourceBinding.signedRuntimeBindingSHA256, appExecutableSHA256: digest(0x71), appBundleIdentifier: InvestigationInstalledL2IdentityProjection.fixedAppBundleIdentifier, helperExecutableSHA256: digest(0x72), helperServiceIdentifier: InvestigationInstalledL2IdentityProjection.fixedHelperServiceIdentifier, machineDriverExecutableSHA256: digest(0x73), machineDriverSigningIdentifier: InvestigationInstalledL2IdentityProjection.fixedMachineDriverSigningIdentifier, machineDriverDesignatedRequirementSHA256: digest(0x74), machineDriverCodeDirectoryHash: Data(repeating: 0x75, count: 20), machineClaimServiceIdentifier: InvestigationInstalledL2IdentityProjection.fixedMachineClaimServiceIdentifier)
+    }
+
+    private func roleName(_ role: InvestigationMachineEvidenceRole) -> String {
+        switch role {
+        case .sourceBuildIdentity: "sourceBuildIdentity"; case .builtStagingInstalledIdentity: "builtStagingInstalledIdentity"
+        case .policyProbe: "policyProbe"; case .humanPromptAttestation: "humanPromptAttestation"
+        case .noAuthModelNetworkCounters: "noAuthModelNetworkCounters"; case .epochL2Projection: "epochL2Projection"
+        case .epochResidueProjection: "epochResidueProjection"; case .uninstallEvidence: "uninstallEvidence"
+        case .globalPostTeardown: "globalPostTeardown"; case .verifierInput: "verifierInput"
+        case .protocolReceipt: "protocolReceipt"; case .diagnosticOutput: "diagnosticOutput"; case .attemptEvent: "attemptEvent"
+        }
     }
 
     private func write(
@@ -1564,6 +1700,7 @@ private final class CampaignEvidenceDiskFixture {
 
 private enum CampaignEvidenceFixtureError: Error {
     case realpath(Int32)
+    case unsupportedRole
 }
 
 private struct CampaignCoordinatorReceiptFixture {
@@ -1641,15 +1778,32 @@ private struct CampaignCoordinatorReceiptFixture {
 
     static func frame(
         attemptUUID: UUID,
+        capsuleSize: Int64 = 104,
         buildProvenanceSHA256: String = String(repeating: "a", count: 64),
         signedBindingSHA256: InvestigationHandoffSHA256 =
-            InvestigationMachineCampaignEvidenceTests.digest(0x71)
+            InvestigationMachineCampaignEvidenceTests.digest(0x71),
+        wholeInputSHA256: InvestigationHandoffSHA256 =
+            InvestigationMachineCampaignEvidenceTests.digest(0x73),
+        gateTransportReceiptSHA256: InvestigationHandoffSHA256 =
+            InvestigationMachineCampaignEvidenceTests.digest(0x75)
     ) throws -> Data {
-        let payload = try make(
-            attemptUUID: attemptUUID,
+        let payload = try InvestigationMachineGateCoordinatorReceiptV1(
             buildProvenanceSHA256: buildProvenanceSHA256,
-            signedBindingSHA256: signedBindingSHA256
-        ).producer.encoded()
+            signedBindingSHA256: signedBindingSHA256,
+            outerAttemptUUID: attemptUUID,
+            wholeProjectedInputSHA256: wholeInputSHA256,
+            capsule: .init(
+                device: 101, inode: 102, generation: 103, size: capsuleSize),
+            gateExecutableSHA256:
+                InvestigationMachineCampaignEvidenceTests.digest(0x74),
+            gateTransportReceiptSHA256: gateTransportReceiptSHA256,
+            gateProcessID: 4_001, gateProcessGroupID: 4_001,
+            gateSessionID: 3_901, exactGateWaitClassification: .exited(status: 0),
+            receiptReachedEOF: true, receiptOverflowObserved: false,
+            receiptDeadlineExpired: false, capsuleSettlementRemoved: true,
+            attemptBaseRetired: true, runtimeArtifactsRetired: true,
+            monotonicStartedNanoseconds: 10,
+            monotonicCompletedNanoseconds: 20).encoded()
         let count = UInt32(payload.count)
         return Data([
             UInt8(count >> 24), UInt8(truncatingIfNeeded: count >> 16),

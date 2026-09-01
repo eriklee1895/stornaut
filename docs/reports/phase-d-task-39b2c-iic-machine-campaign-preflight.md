@@ -167,11 +167,11 @@ mutable convenience marker is never an admission input. The checked campaign
 receipt binds the complete content-root digest; raw evidence remains local and
 external, following the Task 35 receipt-only precedent.
 
-The policy probe is exactly `/usr/bin/sudo -kNnv`; zero exit blocks before arm,
+The policy probe is exactly `/usr/bin/sudo -knv`; zero exit blocks before arm,
 while nonzero is only a necessary condition. The privileged argv is exactly:
 
 ```text
-/usr/bin/sudo -kN -p 'Stornaut Task 39 ii-c administrator authorization: ' -- /Library/Application Support/Stornaut/Stornaut-R5-Diagnostic.app/Contents/MacOS/StornautInvestigationMachineDriver
+/usr/bin/sudo -N -p 'Stornaut Task 39 ii-c administrator authorization: ' -- /Library/Application Support/Stornaut/Stornaut-R5-Diagnostic.app/Contents/MacOS/StornautInvestigationMachineDriver
 ```
 
 The operator must attest that this exact prompt was observed before credentials
@@ -225,16 +225,17 @@ unavailable.
 
 This amendment freezes the final implementation inside the existing ii-c-c
 checkpoint. It does not create another Task or named child checkpoint. The
-baseline is implementation `a08d0f6fac6c3bec72192cd8731bd6b3b150b3b7`, tree
-`62cb658ead295984a44d7eb769da9b9c91a2f3cf`. The unique privileged attempt
+baseline is component-gate prerequisite `622e7b99d57dfe482ccd37481fcdb4dcff87a0ec`,
+tree `543adc4bed4f2f28ba66a3b8506e1a65b9cc7348`. It updates only the existing
+closed-image verifier's exact CampaignSupport object inventory. The unique privileged attempt
 remains unconsumed until every non-privileged gate below is green.
 
-The implementation may change exactly these fourteen non-document paths and at
-most 3,800 changed non-document lines (additions plus deletions):
+The implementation may change exactly these seventeen non-document paths and at
+most 4,000 changed non-document lines (additions plus deletions):
 
-1. `Sources/StornautInvestigationMachineCampaign/main.swift` — 600;
+1. `Sources/StornautInvestigationMachineCampaign/main.swift` — 1,100;
 2. `Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignHarness.swift` — 300;
-3. `Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignEvidenceContract.swift` — 400;
+3. `Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignEvidenceContract.swift` — 420;
 4. `Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift` — 250;
 5. `Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochComposition.swift` — 100;
 6. `Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochPhysicalBridge.swift` — 160;
@@ -243,12 +244,26 @@ most 3,800 changed non-document lines (additions plus deletions):
 9. `Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineRawEvidenceWriter.swift` — 60;
 10. `scripts/stornaut-r5-local-lifecycle` — 160;
 11. `scripts/verify-investigation-runtime-machine-report` — 430;
-12. `Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift` — 500;
+12. `Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift` — 530;
 13. `scripts/verify-investigation-boundaries` — 300; and
-14. `scripts/verify-contract` — 100.
+14. `scripts/verify-contract` — 110;
+15. `Sources/StornautInvestigationMachineGateSupport/InvestigationMachineGateTransport.swift` — 10;
+16. `Tests/Fixtures/InvestigationMachineGateStub/main.swift` — 10; and
+17. `Tests/StornautInvestigationTests/InvestigationSudoShapedDriverLauncherTests.swift` — 10.
 
-The aggregate ceiling and every per-path ceiling are independent. A fifteenth
-non-document path or line 3,801 stops coding for scope reduction inside ii-c-c;
+The 2026-09-01 implementation pre-arm review found that the original 600-line
+executable allocation could not contain the fixed install/probe/uninstall
+ceremony, truthful evidence projection and descriptor-safe external seal. The
+per-path allocation above is therefore rebalanced before privileged execution:
+the executable ceiling is 1,100 and the evidence-contract ceiling is 420 while
+the exact seventeen-path and 4,000-line aggregate ceilings apply after the
+pre-attempt macOS check proved combined `sudo -kN` options invalid. The narrow
+correction uses `-knv` to invalidate/probe before arm and `-N` for the fixed
+privileged launch, preserving the no-update credential-cache boundary. No
+authority, artifact, target or roadmap scope is added.
+
+The aggregate ceiling and every per-path ceiling are independent. An eighteenth
+non-document path or line 4,001 stops coding for scope reduction inside ii-c-c;
 it does not authorize another recursive checkpoint. `Package.swift`, the Xcode
 project/schemes, Gate transport schema and coordinator final-receipt schema
 remain unchanged. The raw-evidence writer may add only the role-semantic
@@ -270,7 +285,7 @@ path, selector or mutable token is accepted through argv or environment.
 
 The campaign may install and spawn this blocked coordinator before arm. It must
 validate the pre-arm frame, install transaction receipt and non-executing exact
-`/usr/bin/sudo -kNnv` result, publish all pre-arm evidence, append `prepared`,
+`/usr/bin/sudo -knv` result, publish all pre-arm evidence, append `prepared`,
 then append and durably publish `armedConsumed`. Only after the latter call
 returns may it write the exact ARM line. The coordinator may call the existing
 fixed Gate handoff only after validating that line. EOF, cancellation, malformed

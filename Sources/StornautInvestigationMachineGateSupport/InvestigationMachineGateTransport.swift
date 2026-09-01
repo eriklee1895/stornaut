@@ -10,7 +10,7 @@ package enum InvestigationMachineFixedGateContract {
         + "Stornaut-R5-Diagnostic.app/Contents/MacOS/"
         + "StornautInvestigationMachineDriver"
     package static let arguments = [
-        launcherPath, "-kN", "-p",
+        launcherPath, "-N", "-p",
         "Stornaut Task 39 ii-c administrator authorization: ",
         "--", driverPath,
     ]

@@ -23,6 +23,7 @@ package struct InvestigationMachineSingleEpochOwnershipCandidate:
     let claimRequestBindingSHA256: InvestigationHandoffSHA256
     let claimConnectionEpoch: UUID
     let claimEvidenceSHA256: InvestigationHandoffSHA256
+    let installedL2ProofBytes: Data
     let installedL2ProofSHA256: InvestigationHandoffSHA256
     let releaseDeadlineNanoseconds: UInt64
     let epochDeadlineNanoseconds: UInt64
@@ -104,11 +105,14 @@ package struct InvestigationMachineSingleEpochOwnershipCandidate:
         let claimEvidenceSHA256 = InvestigationHandoffSHA256.hashing(
             claimEvidenceBytes
         )
-        let installedL2ProofSHA256 = try Self.installedL2ProofSHA256(
+        let installedL2ProofBytes = try Self.installedL2ProofBytes(
             projection: projection, claimEvidence: claimEvidence,
             semanticObservation: semanticObservation,
             repeatedAppIdentity: repeatedAppIdentity,
             epochDeadlineNanoseconds: epochDeadlineNanoseconds
+        )
+        let installedL2ProofSHA256 = InvestigationHandoffSHA256.hashing(
+            installedL2ProofBytes
         )
         let bindingSHA256 = InvestigationHandoffSHA256.hashing(
             try HandoffBinaryTranscript.encode(
@@ -151,6 +155,7 @@ package struct InvestigationMachineSingleEpochOwnershipCandidate:
         claimConnectionEpoch = claimEvidence.claimConnectionEpoch
         self.claimEvidence = claimEvidence
         self.claimEvidenceSHA256 = claimEvidenceSHA256
+        self.installedL2ProofBytes = installedL2ProofBytes
         self.installedL2ProofSHA256 = installedL2ProofSHA256
         releaseDeadlineNanoseconds =
             claimEvidence.releaseDeadlineNanoseconds
@@ -159,13 +164,13 @@ package struct InvestigationMachineSingleEpochOwnershipCandidate:
         self.installedL2Proof = installedL2Proof
     }
 
-    private static func installedL2ProofSHA256(
+    private static func installedL2ProofBytes(
         projection: InvestigationInstalledL2IdentityProjection,
         claimEvidence: InvestigationMachineClaimEvidence,
         semanticObservation: InvestigationInstalledL2SemanticObservation,
         repeatedAppIdentity: InvestigationMachineProcessIdentity,
         epochDeadlineNanoseconds: UInt64
-    ) throws -> InvestigationHandoffSHA256 {
+    ) throws -> Data {
         let artifactBytes = Data(
             InvestigationInstalledL2ArtifactRole.allCases.map { role in
                 switch semanticObservation.artifacts[role] {
@@ -186,8 +191,7 @@ package struct InvestigationMachineSingleEpochOwnershipCandidate:
         case .unavailable:
             serviceBytes = Data([0x03])
         }
-        return InvestigationHandoffSHA256.hashing(
-            try HandoffBinaryTranscript.encode(
+        return try HandoffBinaryTranscript.encode(
                 domain:
                     "stornaut.task39.machine.single-epoch.installed-l2-proof",
                 businessFields: [
@@ -239,7 +243,6 @@ package struct InvestigationMachineSingleEpochOwnershipCandidate:
                 ],
                 maximumByteCount: 16_384
             )
-        )
     }
 }
 

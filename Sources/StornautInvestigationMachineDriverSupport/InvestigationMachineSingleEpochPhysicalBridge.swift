@@ -261,8 +261,8 @@ package struct InvestigationMachineSingleEpochPhysicalResult:
         "stornaut.task39.machine.physical-ownership"
     private static let completionDomain =
         "stornaut.task39.machine.physical-completion"
-    private static let maximumOwnershipByteCount = 8_192
-    private static let maximumCompletionByteCount = 12_288
+    package static let maximumOwnershipByteCount = 32 * 1_024
+    package static let maximumCompletionByteCount = 48 * 1_024
 
     private let ownership: Ownership
     private let completion: Completion?
@@ -283,6 +283,11 @@ package struct InvestigationMachineSingleEpochPhysicalResult:
         InvestigationMachineSingleEpochPhysicalOwnership
     {
         .init(storage: ownership)
+    }
+
+    package static func == (lhs: Self, rhs: Self) -> Bool {
+        guard let l = try? lhs.encoded(), let r = try? rhs.encoded() else { return false }
+        return l == r
     }
 
     package init(projecting result: InvestigationMachineSingleEpochResult) throws {
@@ -365,6 +370,19 @@ package struct InvestigationMachineSingleEpochPhysicalResult:
         return try ownership.encoded()
     }
 
+    package func evidenceEncoded() throws -> Data {
+        let ownershipBytes = try ownership.evidenceEncoded()
+        guard let completion else { return ownershipBytes }
+        return try HandoffBinaryTranscript.encode(
+            domain: Self.completionDomain + ".evidence-v1",
+            businessFields: [
+                ownershipBytes, completion.claimReleaseSHA256.rawBytes,
+                completion.driverObservationSHA256.rawBytes,
+                completion.bindingSHA256.rawBytes,
+            ], maximumByteCount: Self.maximumCompletionByteCount
+        )
+    }
+
     package static func decode(
         _ data: Data,
         expectedSelection: InvestigationMachineFixedEpochSelection
@@ -432,6 +450,34 @@ package struct InvestigationMachineSingleEpochPhysicalResult:
         return value
     }
 
+    package static func decodeEvidence(_ data: Data, expectedSelection:
+        InvestigationMachineFixedEpochSelection) throws -> Self {
+        if expectedSelection.epoch.scenario == .lifecycleRecovery {
+            return Self(ownership: try Ownership.decodeEvidence(data,
+                expectedSelection: expectedSelection), completion: nil)
+        }
+        let fields = try HandoffBinaryTranscript.decode(
+            data, expectedDomain: completionDomain + ".evidence-v1",
+            expectedBusinessFieldByteCounts: [1...maximumOwnershipByteCount,
+                32...32, 32...32, 32...32],
+            maximumByteCount: maximumCompletionByteCount)
+        let ownership: Ownership
+        if let evidence = try? Ownership.decodeEvidence(fields[0],
+            expectedSelection: expectedSelection) { ownership = evidence }
+        else { ownership = try Ownership.decode(
+            fields[0], expectedSelection: expectedSelection) }
+        let value = Self(
+            ownership: ownership, completion: Completion(
+                claimReleaseSHA256: try bridgeDigest(fields[1]),
+                driverObservationSHA256: try bridgeDigest(fields[2]),
+                bindingSHA256: try bridgeDigest(fields[3])))
+        guard value.isBound(to: expectedSelection),
+            try value.evidenceEncoded() == data else {
+            throw InvestigationMachineSingleEpochPhysicalBridgeError
+                .invalidPhysicalResult }
+        return value
+    }
+
     package func isBound(
         to selection: InvestigationMachineFixedEpochSelection
     ) -> Bool {
@@ -489,6 +535,7 @@ package struct InvestigationMachineSingleEpochPhysicalResult:
         let helperIdentity: InvestigationMachineProcessIdentity
         let claimEvidence: InvestigationMachineClaimEvidence
         let claimEvidenceSHA256: InvestigationHandoffSHA256
+        let installedL2ProofBytes: Data
         let installedL2ProofSHA256: InvestigationHandoffSHA256
         let releaseDeadlineNanoseconds: UInt64
         let epochDeadlineNanoseconds: UInt64
@@ -518,7 +565,11 @@ package struct InvestigationMachineSingleEpochPhysicalResult:
                 bridgeNonzero(candidate.claimEvidenceSHA256),
                 candidate.claimEvidenceSHA256
                     == .hashing(try candidate.claimEvidence.encoded()),
+                !candidate.installedL2ProofBytes.isEmpty,
+                candidate.installedL2ProofBytes.count <= 16_384,
                 bridgeNonzero(candidate.installedL2ProofSHA256),
+                candidate.installedL2ProofSHA256
+                    == .hashing(candidate.installedL2ProofBytes),
                 candidate.releaseDeadlineNanoseconds > 0,
                 candidate.releaseDeadlineNanoseconds
                     <= candidate.epochDeadlineNanoseconds,
@@ -538,6 +589,7 @@ package struct InvestigationMachineSingleEpochPhysicalResult:
             helperIdentity = candidate.helperIdentity
             claimEvidence = candidate.claimEvidence
             claimEvidenceSHA256 = candidate.claimEvidenceSHA256
+            installedL2ProofBytes = candidate.installedL2ProofBytes
             installedL2ProofSHA256 = candidate.installedL2ProofSHA256
             releaseDeadlineNanoseconds = candidate.releaseDeadlineNanoseconds
             epochDeadlineNanoseconds = candidate.epochDeadlineNanoseconds
@@ -563,6 +615,32 @@ package struct InvestigationMachineSingleEpochPhysicalResult:
                 ],
                 maximumByteCount: InvestigationMachineSingleEpochPhysicalResult
                     .maximumOwnershipByteCount
+            )
+        }
+
+        func evidenceEncoded() throws -> Data {
+            if installedL2ProofBytes.isEmpty { return try encoded() }
+            guard
+                  installedL2ProofBytes.count <= 16_384,
+                  installedL2ProofSHA256 == .hashing(installedL2ProofBytes)
+            else {
+                throw InvestigationMachineSingleEpochPhysicalBridgeError
+                    .invalidPhysicalResult
+            }
+            return try HandoffBinaryTranscript.encode(
+                domain: InvestigationMachineSingleEpochPhysicalResult
+                    .ownershipDomain + ".evidence-v1",
+                businessFields: [
+                    bridgeData(outerAttemptUUID), wholeCapsuleSHA256.rawBytes,
+                    wholeInputSHA256.rawBytes, bridgeData(epochUUID),
+                    bridgeData(ordinal), bridgeData(scenario.rawValue),
+                    projectionSHA256.rawBytes, try appIdentity.encoded(),
+                    try helperIdentity.encoded(), try claimEvidence.encoded(),
+                    claimEvidenceSHA256.rawBytes,
+                    installedL2ProofSHA256.rawBytes, installedL2ProofBytes,
+                    bridgeData(releaseDeadlineNanoseconds),
+                    bridgeData(epochDeadlineNanoseconds), bindingSHA256.rawBytes,
+                ], maximumByteCount: 32 * 1_024
             )
         }
 
@@ -605,6 +683,7 @@ package struct InvestigationMachineSingleEpochPhysicalResult:
                 claimEvidence: try InvestigationMachineClaimEvidence
                     .decode(fields[9]),
                 claimEvidenceSHA256: try bridgeDigest(fields[10]),
+                installedL2ProofBytes: Data(),
                 installedL2ProofSHA256: try bridgeDigest(fields[11]),
                 releaseDeadlineNanoseconds: try bridgeUInt64(fields[12]),
                 epochDeadlineNanoseconds: try bridgeUInt64(fields[13]),
@@ -649,6 +728,8 @@ package struct InvestigationMachineSingleEpochPhysicalResult:
                 claimEvidenceSHA256
                     == .hashing(claimEvidenceBytes),
                 bridgeNonzero(installedL2ProofSHA256),
+                installedL2ProofBytes.isEmpty
+                    || installedL2ProofSHA256 == .hashing(installedL2ProofBytes),
                 releaseDeadlineNanoseconds > 0,
                 releaseDeadlineNanoseconds <= epochDeadlineNanoseconds,
                 bridgeNonzero(bindingSHA256)
@@ -681,6 +762,51 @@ package struct InvestigationMachineSingleEpochPhysicalResult:
             return expected == bindingSHA256
         }
 
+        static func decodeEvidence(
+            _ data: Data,
+            expectedSelection: InvestigationMachineFixedEpochSelection
+        ) throws -> Self {
+            let fields = try HandoffBinaryTranscript.decode(
+                data,
+                expectedDomain: InvestigationMachineSingleEpochPhysicalResult
+                    .ownershipDomain + ".evidence-v1",
+                expectedBusinessFieldByteCounts: [
+                    16...16, 32...32, 32...32, 16...16, 4...4, 4...4,
+                    32...32,
+                    1...InvestigationMachineProcessIdentity.maximumByteCount,
+                    1...InvestigationMachineProcessIdentity.maximumByteCount,
+                    1...InvestigationMachineClaimEvidence.maximumByteCount,
+                    32...32, 32...32, 1...16_384, 8...8, 8...8, 32...32,
+                ], maximumByteCount: 32 * 1_024
+            )
+            let value = Self(
+                outerAttemptUUID: try bridgeUUID(fields[0]),
+                wholeCapsuleSHA256: try bridgeDigest(fields[1]),
+                wholeInputSHA256: try bridgeDigest(fields[2]),
+                epochUUID: try bridgeUUID(fields[3]),
+                ordinal: try bridgeUInt32(fields[4]),
+                scenario: try bridgeScenario(fields[5]),
+                projectionSHA256: try bridgeDigest(fields[6]),
+                appIdentity: try .decode(fields[7]),
+                helperIdentity: try .decode(fields[8]),
+                claimEvidence: try .decode(fields[9]),
+                claimEvidenceSHA256: try bridgeDigest(fields[10]),
+                installedL2ProofBytes: fields[12],
+                installedL2ProofSHA256: try bridgeDigest(fields[11]),
+                releaseDeadlineNanoseconds: try bridgeUInt64(fields[13]),
+                epochDeadlineNanoseconds: try bridgeUInt64(fields[14]),
+                bindingSHA256: try bridgeDigest(fields[15])
+            )
+            guard value.isBound(to: expectedSelection),
+                  !value.installedL2ProofBytes.isEmpty,
+                  try value.evidenceEncoded() == data
+            else {
+                throw InvestigationMachineSingleEpochPhysicalBridgeError
+                    .invalidPhysicalResult
+            }
+            return value
+        }
+
         fileprivate init(
             outerAttemptUUID: UUID,
             wholeCapsuleSHA256: InvestigationHandoffSHA256,
@@ -692,6 +818,7 @@ package struct InvestigationMachineSingleEpochPhysicalResult:
             helperIdentity: InvestigationMachineProcessIdentity,
             claimEvidence: InvestigationMachineClaimEvidence,
             claimEvidenceSHA256: InvestigationHandoffSHA256,
+            installedL2ProofBytes: Data,
             installedL2ProofSHA256: InvestigationHandoffSHA256,
             releaseDeadlineNanoseconds: UInt64,
             epochDeadlineNanoseconds: UInt64,
@@ -708,6 +835,7 @@ package struct InvestigationMachineSingleEpochPhysicalResult:
             self.helperIdentity = helperIdentity
             self.claimEvidence = claimEvidence
             self.claimEvidenceSHA256 = claimEvidenceSHA256
+            self.installedL2ProofBytes = installedL2ProofBytes
             self.installedL2ProofSHA256 = installedL2ProofSHA256
             self.releaseDeadlineNanoseconds = releaseDeadlineNanoseconds
             self.epochDeadlineNanoseconds = epochDeadlineNanoseconds
@@ -734,6 +862,9 @@ package struct InvestigationMachineSingleEpochPhysicalOwnership:
     var claimEvidenceSHA256: InvestigationHandoffSHA256 {
         storage.claimEvidenceSHA256
     }
+    package var installedL2ProofBytes: Data { storage.installedL2ProofBytes }
+    package var installedL2ProofSHA256: InvestigationHandoffSHA256
+        { storage.installedL2ProofSHA256 }
     package var releaseDeadlineNanoseconds: UInt64 {
         storage.releaseDeadlineNanoseconds
     }
@@ -745,6 +876,10 @@ package struct InvestigationMachineSingleEpochPhysicalOwnership:
     }
     package var mode: InvestigationMachineOuterContainmentMode {
         storage.scenario == .lifecycleRecovery ? .parentCrash : .normal
+    }
+
+    package static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.storage == rhs.storage
     }
 
     fileprivate init(
@@ -829,6 +964,7 @@ package struct InvestigationMachineSingleEpochPhysicalOwnership:
             appIdentity: appIdentity, helperIdentity: helperIdentity,
             claimEvidence: claimEvidence,
             claimEvidenceSHA256: claimEvidenceSHA256,
+            installedL2ProofBytes: Data(),
             installedL2ProofSHA256: installedL2ProofSHA256,
             releaseDeadlineNanoseconds: releaseDeadlineNanoseconds,
             epochDeadlineNanoseconds: epochDeadlineNanoseconds,
@@ -840,6 +976,8 @@ package struct InvestigationMachineSingleEpochPhysicalOwnership:
         try storage.encoded()
     }
 
+    package func evidenceEncoded() throws -> Data { try storage.evidenceEncoded() }
+
     package static func decode(
         _ data: Data,
         expectedSelection: InvestigationMachineFixedEpochSelection
@@ -848,6 +986,10 @@ package struct InvestigationMachineSingleEpochPhysicalOwnership:
             data, expectedSelection: expectedSelection
         ))
     }
+
+    package static func decodeEvidence(_ data: Data, expectedSelection:
+        InvestigationMachineFixedEpochSelection) throws -> Self { .init(
+        storage: try .decodeEvidence(data, expectedSelection: expectedSelection)) }
 
     package func isBound(
         to selection: InvestigationMachineFixedEpochSelection
@@ -948,6 +1090,13 @@ private func bridgeUInt64(_ data: Data) throws -> UInt64 {
             .invalidPhysicalResult
     }
     return data.reduce(UInt64(0)) { ($0 << 8) | UInt64($1) }
+}
+
+private func bridgeScenario(_ data: Data) throws -> InvestigationHandoffScenario {
+    guard let value = InvestigationHandoffScenario(
+        rawValue: try bridgeUInt32(data)
+    ) else { throw InvestigationMachineSingleEpochPhysicalBridgeError.invalidPhysicalResult }
+    return value
 }
 
 private func bridgeUUID(_ data: Data) throws -> UUID {
