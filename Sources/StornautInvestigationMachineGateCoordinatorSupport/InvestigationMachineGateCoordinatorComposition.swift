@@ -934,18 +934,120 @@ public enum InvestigationMachineGateCoordinatorSupport {
         && isWritable && fcntl(3, F_GETNOSIGPIPE) == 1
     }
   }
+  package enum InvestigationMachineGateCoordinatorReceiptWriteResult:
+    Equatable, Sendable
+  {
+    case written(Int), interrupted, wouldBlock, failed
+  }
+  package enum InvestigationMachineGateCoordinatorReceiptWaitResult:
+    Equatable, Sendable
+  {
+    case writable, interrupted, expiredOrFailed
+  }
+  package struct InvestigationMachineGateCoordinatorReceiptOutputSystem:
+    Sendable
+  {
+    package let waitWritable: @Sendable (
+      Int32, InvestigationHandoffUTCMicroseconds
+    ) -> InvestigationMachineGateCoordinatorReceiptWaitResult
+    package let write: @Sendable (
+      Int32, Data, Int
+    ) -> InvestigationMachineGateCoordinatorReceiptWriteResult
+    package init(
+      waitWritable: @escaping @Sendable (Int32, InvestigationHandoffUTCMicroseconds)
+        -> InvestigationMachineGateCoordinatorReceiptWaitResult,
+      write: @escaping @Sendable (Int32, Data, Int)
+        -> InvestigationMachineGateCoordinatorReceiptWriteResult
+    ) {
+      self.waitWritable = waitWritable; self.write = write
+    }
+    package static let production = Self(
+      waitWritable: { descriptor, deadline in
+        var event = pollfd(fd: descriptor, events: Int16(POLLOUT), revents: 0)
+        var now = timespec()
+        guard clock_gettime(CLOCK_REALTIME, &now) == 0 else {
+          return .expiredOrFailed
+        }
+        let current = Int64(now.tv_sec) * 1_000_000 + Int64(now.tv_nsec / 1_000)
+        guard current < deadline.rawValue else { return .expiredOrFailed }
+        let remaining = deadline.rawValue - current
+        let result = poll(&event, 1, Int32(min(
+          remaining / 1_000, Int64(Int32.max))))
+        if result < 0, errno == EINTR { return .interrupted }
+        guard result > 0, event.revents & Int16(POLLOUT) != 0,
+              event.revents & Int16(POLLERR | POLLHUP | POLLNVAL) == 0,
+              clock_gettime(CLOCK_REALTIME, &now) == 0 else {
+          return .expiredOrFailed
+        }
+        let after = Int64(now.tv_sec) * 1_000_000 + Int64(now.tv_nsec / 1_000)
+        return after < deadline.rawValue ? .writable : .expiredOrFailed
+      },
+      write: { descriptor, bytes, offset in
+        let count = bytes.withUnsafeBytes {
+          Darwin.write(descriptor, $0.baseAddress?.advanced(by: offset),
+            $0.count - offset)
+        }
+        if count >= 0 { return .written(count) }
+        if errno == EINTR { return .interrupted }
+        if errno == EAGAIN || errno == EWOULDBLOCK { return .wouldBlock }
+        return .failed
+      })
+  }
+  package enum InvestigationMachineGateCoordinatorReceiptOutputWriter {
+    package static func writeAll(
+      _ bytes: Data, to descriptor: Int32,
+      validBefore: InvestigationHandoffUTCMicroseconds,
+      system: InvestigationMachineGateCoordinatorReceiptOutputSystem = .production
+    ) throws {
+      var offset = 0
+      while offset < bytes.count {
+        switch system.waitWritable(descriptor, validBefore) {
+        case .interrupted: continue
+        case .expiredOrFailed:
+          throw InvestigationMachineGateCoordinatorProductionError
+            .containmentUncertain
+        case .writable: break
+        }
+        switch system.write(descriptor, bytes, offset) {
+        case .interrupted, .wouldBlock: continue
+        case .failed:
+          throw InvestigationMachineGateCoordinatorProductionError
+            .containmentUncertain
+        case .written(let count):
+          guard count > 0, count <= bytes.count - offset else {
+            throw InvestigationMachineGateCoordinatorProductionError
+              .containmentUncertain
+          }
+          offset += count
+        }
+      }
+    }
+  }
   final class InvestigationMachineGateCoordinatorReceiptSink:
     @unchecked Sendable
   {
     private let descriptor: Int32
+    private let outputSystem: InvestigationMachineGateCoordinatorReceiptOutputSystem
     private let lock = NSLock()
     private var closed = false
     private var prepared = false
-    init(descriptor: Int32 = 3) { self.descriptor = descriptor }
+    private var validBefore: InvestigationHandoffUTCMicroseconds?
+    init(descriptor: Int32 = 3,
+      validBefore: InvestigationHandoffUTCMicroseconds? = nil,
+      outputSystem: InvestigationMachineGateCoordinatorReceiptOutputSystem =
+        .production) {
+      self.descriptor = descriptor; self.validBefore = validBefore
+      self.outputSystem = outputSystem
+    }
     func markPrepared() { lock.withLock { prepared = true } }
-    func writePreArm(_ value: InvestigationMachineGateCoordinatorPreArmFrameV1)
+    func writePreArm(_ value: InvestigationMachineGateCoordinatorPreArmFrameV1,
+      validBefore: InvestigationHandoffUTCMicroseconds)
       throws
     {
+      guard self.validBefore == nil else {
+        throw InvestigationMachineGateCoordinatorProductionError.protocolFailure
+      }
+      self.validBefore = validBefore
       try writeFrame(try value.encoded())
     }
     func writeRawGateReceipt(_ value: InvestigationMachineGateTransportReceipt)
@@ -1003,7 +1105,11 @@ public enum InvestigationMachineGateCoordinatorSupport {
         UInt8(truncatingIfNeeded: count >> 8), UInt8(truncatingIfNeeded: count),
       ])
       frame.append(payload)
-      try coordinatorWriteAll(frame, to: descriptor)
+      guard let validBefore else {
+        throw InvestigationMachineGateCoordinatorProductionError.protocolFailure
+      }
+      try InvestigationMachineGateCoordinatorReceiptOutputWriter.writeAll(
+        frame, to: descriptor, validBefore: validBefore, system: outputSystem)
     }
   }
   private enum InvestigationMachineCoordinatorActivation {
@@ -1025,7 +1131,7 @@ public enum InvestigationMachineGateCoordinatorSupport {
           .containmentUncertain
       }
       defer { _ = tcsetattr(STDIN_FILENO, TCSANOW, &saved) }
-      try sink.writePreArm(preArm)
+      try sink.writePreArm(preArm, validBefore: validBefore)
       let digest = preArm.frameSHA256.lowercaseHex
       try writeTerminal("STORNAUT-IICC-READY-v1 " + digest + "\n")
       let expected = Data(("STORNAUT-IICC-ARM-v1 " + digest + "\n").utf8)

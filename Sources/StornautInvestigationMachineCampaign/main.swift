@@ -8,6 +8,40 @@ import StornautInvestigationHandoffContract
 #if DEBUG
 import StornautInvestigationMachineCampaignSupport
 
+package enum InvestigationMachineCampaignLifecycleFinalizer {
+    package enum Error: Swift.Error, Equatable {
+        case installedStateUncertain
+    }
+
+    package struct Capture: Sendable {
+        package let status: Int32
+        package let output: Data
+
+        package init(status: Int32, output: Data) {
+            self.status = status
+            self.output = output
+        }
+    }
+
+    package static func run<Receipt>(
+        uninstall: () throws -> Capture,
+        decode: (Data) throws -> Receipt,
+        validate: (Receipt) throws -> Void,
+        reportUncertainty: () -> Void
+    ) throws -> Receipt {
+        do {
+            let capture = try uninstall()
+            guard capture.status == 0 else { throw Error.installedStateUncertain }
+            let receipt = try decode(capture.output)
+            try validate(receipt)
+            return receipt
+        } catch {
+            reportUncertainty()
+            throw Error.installedStateUncertain
+        }
+    }
+}
+
 package enum InvestigationMachineCampaignExecutable {
     private static let coordinatorName="StornautInvestigationMachineCampaignCoordinator"
     private static let installedCoordinator="/Library/Application Support/Stornaut/Stornaut-R5-Diagnostic.app/Contents/MacOS/StornautInvestigationMachineGateCoordinator"
@@ -193,11 +227,20 @@ package enum InvestigationMachineCampaignExecutable {
                     }
                 } catch { evidenceUsable = false; admitting = false }
             }
-            let uninstall=try Self.runLifecycle(lifecyclePayload,action:"uninstall")
-            guard uninstall.status == 0 else { throw Failure.invalid }
-            let un = try Self.receipt(uninstall.stdout,
-                domain: "lifecycle.local.uninstall.receipt.v1", action: "uninstall")
-            try Self.validateUninstall(un, install: install)
+            let un: [String: Any]
+            do {
+                un = try InvestigationMachineCampaignLifecycleFinalizer.run(
+                    uninstall: {
+                        let value = try Self.runLifecycle(
+                            lifecyclePayload, action: "uninstall")
+                        return .init(status: value.status, output: value.stdout)
+                    },
+                    decode: { try Self.receipt($0, domain:
+                        "lifecycle.local.uninstall.receipt.v1", action: "uninstall") },
+                    validate: { try Self.validateUninstall($0, install: install) },
+                    reportUncertainty: { Self.writeFixedError(
+                        "stornaut ii-c installed-state-uncertain\n") })
+            } catch { throw Failure.installedStateUncertain }
             let global = try globalObservation()
             guard let preArm, let writer, evidenceUsable else { return false }
             try writeTeardown(un, preArm: preArm, global: global,

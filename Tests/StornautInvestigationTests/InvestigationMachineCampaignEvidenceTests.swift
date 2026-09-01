@@ -2,6 +2,7 @@ import Darwin
 import Foundation
 import Testing
 
+@testable import StornautInvestigationMachineCampaign
 @testable import StornautInvestigationHandoffContract
 @testable import StornautInvestigationMachineCampaignSupport
 @testable import StornautInvestigationMachineGateCoordinatorSupport
@@ -9,6 +10,48 @@ import Testing
 
 @Suite("Investigation machine campaign evidence", .serialized)
 struct InvestigationMachineCampaignEvidenceTests {
+    @Test(arguments: CampaignLifecycleFinalizerFault.allCases)
+    func lifecycleFinalizerMapsEveryUnprovedUninstallToUncertainty(
+        _ fault: CampaignLifecycleFinalizerFault
+    ) throws {
+        var uninstallCount = 0, reportCount = 0
+        #expect(throws:
+            InvestigationMachineCampaignLifecycleFinalizer.Error
+                .installedStateUncertain
+        ) {
+            _ = try InvestigationMachineCampaignLifecycleFinalizer.run(
+                uninstall: {
+                    uninstallCount += 1
+                    if fault == .runner { throw CampaignEvidenceFixtureError.fault }
+                    return .init(status: fault == .status ? 1 : 0,
+                        output: Data([0x2a]))
+                },
+                decode: { data in
+                    if fault == .decode { throw CampaignEvidenceFixtureError.fault }
+                    return data
+                },
+                validate: { _ in
+                    if fault == .validate { throw CampaignEvidenceFixtureError.fault }
+                },
+                reportUncertainty: { reportCount += 1 }) as Data
+        }
+        #expect(uninstallCount == 1)
+        #expect(reportCount == 1)
+    }
+
+    @Test
+    func lifecycleFinalizerReturnsOneVerifiedReceiptWithoutReporting() throws {
+        var uninstallCount = 0, reportCount = 0, validateCount = 0
+        let receipt: Data = try InvestigationMachineCampaignLifecycleFinalizer.run(
+            uninstall: { uninstallCount += 1; return .init(
+                status: 0, output: Data([0x2a])) },
+            decode: { $0 },
+            validate: { _ in validateCount += 1 },
+            reportUncertainty: { reportCount += 1 })
+        #expect(receipt == Data([0x2a]))
+        #expect(uninstallCount == 1 && validateCount == 1 && reportCount == 0)
+    }
+
     @Test
     func independentVerifierRejectsSemanticallyForgedCanonicalCorpus() throws {
         let result = try privilegedVerifierResult(
@@ -1699,8 +1742,13 @@ private final class CampaignEvidenceDiskFixture {
 }
 
 private enum CampaignEvidenceFixtureError: Error {
+    case fault
     case realpath(Int32)
     case unsupportedRole
+}
+
+enum CampaignLifecycleFinalizerFault: CaseIterable {
+    case runner, status, decode, validate
 }
 
 private struct CampaignCoordinatorReceiptFixture {

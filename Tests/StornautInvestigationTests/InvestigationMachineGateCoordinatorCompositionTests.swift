@@ -145,8 +145,10 @@ struct InvestigationMachineGateCoordinatorCompositionTests {
       terminal: await CoordinatorCompositionProbe().terminalState()
     )
     let payload = try receipt.encoded()
+    let deadline = try InvestigationHandoffUTCMicroseconds(
+      rawValue: Int64.max)
     let sink = InvestigationMachineGateCoordinatorReceiptSink(
-      descriptor: descriptors[1]
+      descriptor: descriptors[1], validBefore: deadline
     )
     try sink.writeAndClose(.receipt(receipt))
     var storage = [UInt8](repeating: 0, count: 4_096)
@@ -159,6 +161,84 @@ struct InvestigationMachineGateCoordinatorCompositionTests {
     #expect(declared == UInt32(payload.count))
     #expect(frame.dropFirst(4) == payload)
     #expect(Darwin.read(descriptors[0], &storage, storage.count) == 0)
+    #expect(throws: InvestigationMachineGateCoordinatorProductionError
+      .containmentUncertain) { try sink.writeAndClose(.closeOnly) }
+  }
+  @Test
+  func receiptWriterRetriesBackpressureWithoutRefreshingDeadline() throws {
+    let deadline = try InvestigationHandoffUTCMicroseconds(rawValue: 42)
+    let probe = CoordinatorReceiptOutputProbe(waits: [
+      .interrupted, .writable, .writable, .writable], writes: [
+        .wouldBlock, .written(2), .written(2)])
+    try InvestigationMachineGateCoordinatorReceiptOutputWriter.writeAll(
+      Data([1, 2, 3, 4]), to: 39, validBefore: deadline, system: .init(
+        waitWritable: probe.wait, write: probe.write))
+    #expect(probe.deadlines == Array(repeating: deadline, count: 4))
+    #expect(probe.offsets == [0, 0, 2])
+  }
+  @Test(arguments: [
+    InvestigationMachineGateCoordinatorReceiptWaitResult.expiredOrFailed,
+  ])
+  func receiptWriterFailsClosedAtDeadline(
+    _ result: InvestigationMachineGateCoordinatorReceiptWaitResult
+  ) throws {
+    let deadline = try InvestigationHandoffUTCMicroseconds(rawValue: 42)
+    let probe = CoordinatorReceiptOutputProbe(
+      waits: [result], writes: [.written(1)])
+    #expect(throws: InvestigationMachineGateCoordinatorProductionError
+      .containmentUncertain) {
+        try InvestigationMachineGateCoordinatorReceiptOutputWriter.writeAll(
+          Data([1]), to: 39, validBefore: deadline, system: .init(
+            waitWritable: probe.wait, write: probe.write))
+    }
+    #expect(probe.deadlines == [deadline] && probe.offsets.isEmpty)
+  }
+  @Test
+  func receiptWriterRetriesInterruptedWriteOnTheSameDeadline() throws {
+    let deadline = try InvestigationHandoffUTCMicroseconds(rawValue: 42)
+    let probe = CoordinatorReceiptOutputProbe(
+      waits: [.writable, .writable], writes: [.interrupted, .written(1)])
+    try InvestigationMachineGateCoordinatorReceiptOutputWriter.writeAll(
+      Data([1]), to: 39, validBefore: deadline, system: .init(
+        waitWritable: probe.wait, write: probe.write))
+    #expect(probe.deadlines == [deadline, deadline])
+    #expect(probe.offsets == [0, 0])
+  }
+  @Test(arguments: [
+    InvestigationMachineGateCoordinatorReceiptWriteResult.failed,
+    .written(0), .written(2),
+  ])
+  func receiptWriterRejectsNonretryableOrInvalidWrites(
+    _ result: InvestigationMachineGateCoordinatorReceiptWriteResult
+  ) throws {
+    let deadline = try InvestigationHandoffUTCMicroseconds(rawValue: 42)
+    let probe = CoordinatorReceiptOutputProbe(
+      waits: [.writable], writes: [result])
+    #expect(throws: InvestigationMachineGateCoordinatorProductionError
+      .containmentUncertain) {
+        try InvestigationMachineGateCoordinatorReceiptOutputWriter.writeAll(
+          Data([1]), to: 39, validBefore: deadline, system: .init(
+            waitWritable: probe.wait, write: probe.write))
+    }
+    #expect(probe.deadlines == [deadline] && probe.offsets == [0])
+  }
+  @Test
+  func receiptSinkClosesOnceAfterWriteFailure() async throws {
+    var descriptors = [Int32](repeating: -1, count: 2)
+    try #require(pipe(&descriptors) == 0)
+    defer { _ = Darwin.close(descriptors[0]) }
+    let deadline = try InvestigationHandoffUTCMicroseconds(rawValue: 42)
+    let probe = CoordinatorReceiptOutputProbe(
+      descriptor: descriptors[1], waits: [.writable], writes: [.failed])
+    let sink = InvestigationMachineGateCoordinatorReceiptSink(
+      descriptor: descriptors[1], validBefore: deadline, outputSystem: .init(
+        waitWritable: probe.wait, write: probe.write))
+    let receipt = try InvestigationMachineGateCoordinatorReceiptV1(
+      terminal: await CoordinatorCompositionProbe().terminalState())
+    #expect(throws: InvestigationMachineGateCoordinatorProductionError
+      .containmentUncertain) { try sink.writeAndClose(.receipt(receipt)) }
+    var byte: UInt8 = 0
+    #expect(Darwin.read(descriptors[0], &byte, 1) == 0)
     #expect(throws: InvestigationMachineGateCoordinatorProductionError
       .containmentUncertain) { try sink.writeAndClose(.closeOnly) }
   }
@@ -546,6 +626,39 @@ struct InvestigationMachineGateCoordinatorCompositionTests {
       _ = try await failed.run()
     }
     #expect(await failureProbe.validateInvocationCallCount == 1)
+  }
+}
+
+private final class CoordinatorReceiptOutputProbe: @unchecked Sendable {
+  private let lock = NSLock()
+  private let descriptor: Int32
+  private var waitValues: [InvestigationMachineGateCoordinatorReceiptWaitResult]
+  private var writeValues: [InvestigationMachineGateCoordinatorReceiptWriteResult]
+  private var observedDeadlines: [InvestigationHandoffUTCMicroseconds] = []
+  private var observedOffsets: [Int] = []
+  init(descriptor: Int32 = 39,
+    waits: [InvestigationMachineGateCoordinatorReceiptWaitResult],
+    writes: [InvestigationMachineGateCoordinatorReceiptWriteResult]) {
+    self.descriptor = descriptor; waitValues = waits; writeValues = writes
+  }
+  var deadlines: [InvestigationHandoffUTCMicroseconds] {
+    lock.withLock { observedDeadlines }
+  }
+  var offsets: [Int] { lock.withLock { observedOffsets } }
+  func wait(_ descriptor: Int32, _ deadline: InvestigationHandoffUTCMicroseconds)
+    -> InvestigationMachineGateCoordinatorReceiptWaitResult {
+    lock.withLock {
+      precondition(descriptor == self.descriptor && !waitValues.isEmpty)
+      observedDeadlines.append(deadline); return waitValues.removeFirst()
+    }
+  }
+  func write(_ descriptor: Int32, _ bytes: Data, _ offset: Int)
+    -> InvestigationMachineGateCoordinatorReceiptWriteResult {
+    lock.withLock {
+      precondition(descriptor == self.descriptor && offset < bytes.count
+        && !writeValues.isEmpty)
+      observedOffsets.append(offset); return writeValues.removeFirst()
+    }
   }
 }
 private enum CoordinatorCompositionStage: String, CaseIterable, Sendable {

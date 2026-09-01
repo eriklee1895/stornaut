@@ -11568,7 +11568,10 @@ M={
 "verifier-self-binding-drop":("verifier",'require(verifier_digest_field == verifier_digest,\n                "verifier executable binding")','require(True, "verifier executable binding")')}
 M["sudo-option"]=("gate",'launcherPath, "-N", "-p"','launcherPath, "-k", "-p"')
 M["ancestor-content-watch"]=("verifier","watch(root_fd, False)","watch(root_fd, True)")
-if len(M)!=21: raise SystemExit("ii-c-c mutation inventory drifted")
+M["teardown-uncertainty"]=("main",'catch { throw Failure.installedStateUncertain }','catch { throw Failure.invalid }')
+M["receipt-backpressure"]=("coordinator",'case .interrupted, .wouldBlock: continue','case .interrupted: continue')
+M["receipt-deadline"]=("coordinator",'guard current < deadline.rawValue else { return .expiredOrFailed }','guard true else { return .expiredOrFailed }')
+if len(M)!=24: raise SystemExit("ii-c-c mutation inventory drifted")
 if mode=="true":
     if name not in M or slot!=M[name][0] or not re.fullmatch(r"[0-9a-f]{64}",sha): raise SystemExit("ii-c-c mutation contract drifted")
     old,new=M[name][1:]; i=slots.index(slot)
@@ -11577,9 +11580,9 @@ if mode=="true":
 elif mode!="false" or name or slot or sha: raise SystemExit("ii-c-c mutation mode drifted")
 elif sources!=canonical: raise SystemExit("ii-c-c canonical source path drifted")
 main,harness,evidence,coordinator,composition,bridge,protocol,entry,writer,lifecycle,verifier,tests,gate,gate_fixture,gate_test,boundary,contract=(sources[s] for s in slots)
-required=((main,tuple(M[n][1] for n in ("extra-argv","production-coordinator-path","fixture-capability-bypass","held-lifecycle","probe-argv","prepared-event-order","uninstall-success-only","terminal-event-drop","seal-before-teardown","success-before-verifier"))),
+required=((main,tuple(M[n][1] for n in ("extra-argv","production-coordinator-path","fixture-capability-bypass","held-lifecycle","probe-argv","prepared-event-order","uninstall-success-only","terminal-event-drop","seal-before-teardown","success-before-verifier","teardown-uncertainty"))),
  (harness,(M[n][1] for n in ("arm-order","frame-missing","frame-swap"))),
- (coordinator,(M[n][1] for n in ("extra-env","gate-before-arm"))),
+ (coordinator,(M[n][1] for n in ("extra-env","gate-before-arm","receipt-backpressure","receipt-deadline"))),
  (protocol,(M[n][1] for n in ("eight-epoch","epoch-identity-join"))),
  (verifier,(M["verifier-self-binding-drop"][1], M["ancestor-content-watch"][1],
   'self=${0:A}',
@@ -11596,10 +11599,10 @@ capability={"fixtureCoordinatorPath(executable)":2,"fixtureCapability(executable
 if any(main.count(x)!=count for x,count in capability.items()): raise SystemExit("ii-c-c fixture capability drifted")
 if not (main.index("let fixtureCapability=Self.fixtureCapability(executable)")<main.index("stornaut_investigation_campaign_spawn_fixed",main.index("case .spawnFixedSibling"))<main.index("try writeRaw(raw.terminal_master_descriptor,bytes:bytes)")): raise SystemExit("ii-c-c fixture capability order drifted")
 finish=main[main.index('func finishProduction'):main.index('private func writePostArm')]
-ordered=('_ = try writer.appendAttemptEvent(kind: .terminal,','let uninstall=try Self.runLifecycle','try writeTeardown(','let seal = try writer.finalize()','try publishSeal(','return admitting')
+ordered=('_ = try writer.appendAttemptEvent(kind: .terminal,','un = try InvestigationMachineCampaignLifecycleFinalizer.run(','try writeTeardown(','let seal = try writer.finalize()','try publishSeal(','return admitting')
 if [finish.index(x) for x in ordered]!=sorted(finish.index(x) for x in ordered): raise SystemExit("ii-c-c terminal teardown order drifted")
 if not (harness.index('prepareActivation(')<harness.index('durablyPublishArmedConsumed(',harness.index('package actor InvestigationMachineCampaignHarness'))<harness.index('sendArmAfterDurablePublish(',harness.index('package actor InvestigationMachineCampaignHarness'))): raise SystemExit("ii-c-c arm order drifted")
-if not (coordinator.index('try sink.writePreArm(preArm)')<coordinator.index('try sink.writeRawGateReceipt(transport)')<coordinator.index('try sink.writeAndClose(disposition)')): raise SystemExit("ii-c-c three-frame order drifted")
+if not (coordinator.index('try sink.writePreArm(preArm, validBefore: validBefore)')<coordinator.index('try sink.writeRawGateReceipt(transport)')<coordinator.index('try sink.writeAndClose(disposition)')): raise SystemExit("ii-c-c three-frame order drifted")
 publish=main[main.index('private func publishSeal'):main.index('private static func repositoryRoot')]
 if not (publish.index('let result = try Self.runFixed')<publish.index('if admitting')<publish.index('guard result.status == 0')): raise SystemExit("ii-c-c verifier-before-success drifted")
 for marker in ("validate_json_artifacts","event evidence set drift","FD 3 frame cardinality","Gate output completion binding","bundle ownership/L2 join"):
