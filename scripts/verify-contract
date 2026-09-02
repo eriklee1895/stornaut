@@ -3,7 +3,7 @@
 set -euo pipefail
 
 contract_source=${0:A}
-# ib2_self_sha=c95d59fd50baa2c3445a47906c240263788a4a1608675e6b312d73fe6660fac7
+# ib2_self_sha=ac74617281b7b84eb704990265d952c271e4c62ac718fe641eaa5a1a8ab36f7f
 ib2_self_sha=$(sed -nE 's/^# ib2_self_sha=([0-9a-f]{64})$/\1/p' "$contract_source"); ib2_observed_sha=$(sed -E 's/^# ib2_self_sha=[0-9a-f]{64}$/# ib2_self_sha=SELF/' "$contract_source" | shasum -a 256 | awk '{ print $1 }')
 [[ ${#ib2_self_sha} == 64 && "$ib2_observed_sha" == "$ib2_self_sha" ]] || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
 repo_root=${contract_source:h:h}
@@ -3370,6 +3370,8 @@ fi
 function verify_iic_root_driver_lineage_l2_contract() {
     local out=$1 gate=scripts/verify-investigation-boundaries
     local run_scope=${2:-true} baseline=cd8fc5d8645a8d40fb7571e4be41b8b9d1a70725
+    local accepted=474f63455f7f962f5537fdd9f6d7e55e01242c51
+    local accepted_tree=13ce41f3957701daaca46a5613e40acfcc6224bb
     local -a paths=(
         Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineZeroArgumentEntry.swift
         Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift
@@ -3386,6 +3388,17 @@ function verify_iic_root_driver_lineage_l2_contract() {
         scripts/verify-investigation-runtime-machine-report
         scripts/verify-investigation-boundaries scripts/verify-contract)
     mkdir -p "$out"
+    if [[ $run_scope == true ]]; then
+        local replay_status=0
+        replay_historical_contract "$out/historical-scope" \
+            "$accepted" "$accepted_tree" \
+            --iic-root-driver-lineage-l2-contract-only \
+            '--iic-root-driver-lineage-l2-staged-scope-contract-only' \
+            || replay_status=$?
+        (( replay_status == 0 )) \
+            || fail_contract "ii-c root-driver lineage L2 historical replay failed"
+        run_scope=false
+    fi
     "$gate" --iic-root-driver-lineage-l2-source-contract-only "${paths[@]}" >"$out/source.log"
     [[ $run_scope != true ]] || "$gate" --iic-root-driver-lineage-l2-staged-scope-contract-only "$baseline" >"$out/scope.log"
     local -a names=(entry-prebind-drop coordinator-output-count-vacuity transport-validation-event-drop darwin-self-stop-drop launcher-business-continuation-drop evidence-lineage-join-drop campaign-output-digest-drop report-output-digest-drop)
@@ -3491,10 +3504,11 @@ PY
     reject_iic_lineage_l2_protocol alternate-canonical-path \
         'ii-c root-driver lineage L2 canonical source paths drifted' "$gate" \
         --iic-root-driver-lineage-l2-source-contract-only "${mutation_args[@]}"
-    local active_index=${GIT_INDEX_FILE:-$(git rev-parse --git-path index)}
-    local scope_index="$out/scope.index" bad blob fixture expected scope
-    cp "$active_index" "$scope_index"
-    function reject_iic_lineage_l2_scope() {
+    if [[ $run_scope == true ]]; then
+      local active_index=${GIT_INDEX_FILE:-$(git rev-parse --git-path index)}
+      local scope_index="$out/scope.index" bad blob fixture expected scope
+      cp "$active_index" "$scope_index"
+      function reject_iic_lineage_l2_scope() {
         local label=$1 expected=$2; shift 2
         local output="$out/scope-$label.log" command_status=0
         "$@" >"$output" 2>&1 || command_status=$?
@@ -3502,8 +3516,8 @@ PY
             "ii-c root-driver lineage L2 scope mutation accepted: $label"
         [[ "$(<"$output")" == *"$expected"* ]] || fail_contract \
             "ii-c root-driver lineage L2 scope diagnostic drifted: $label"
-    }
-    for fixture in extra missing binary wrong-mode over-budget \
+      }
+      for fixture in extra missing binary wrong-mode over-budget \
         worktree-divergence wrong-baseline; do
         bad="$out/scope-$fixture.index"; cp "$scope_index" "$bad"
         scope=$baseline
@@ -3516,10 +3530,11 @@ PY
             worktree-divergence) blob=$(sed 's/return 4 + ResolvedRootDriverClaimV1.encodedByteCount + 180/return 4 + ResolvedRootDriverClaimV1.encodedByteCount + 181/' "${paths[2]}"|git hash-object -w --stdin); GIT_INDEX_FILE=$bad git update-index --cacheinfo "100644,$blob,${paths[2]}"; expected='index/worktree drifted' ;;
             wrong-baseline) scope=$baseline^; expected='checkpoint baseline drifted' ;;
         esac
-        reject_iic_lineage_l2_scope "$fixture" "$expected" env \
+          reject_iic_lineage_l2_scope "$fixture" "$expected" env \
             GIT_INDEX_FILE="$bad" "$gate" \
             --iic-root-driver-lineage-l2-staged-scope-contract-only "$scope"
-    done
+      done
+    fi
 }
 
 if [[ ${1:-} == --iic-root-driver-lineage-l2-contract-only ]]; then
@@ -3528,6 +3543,151 @@ if [[ ${1:-} == --iic-root-driver-lineage-l2-contract-only ]]; then
     trap 'rm -rf "$iic_lineage_l2_root"' EXIT
     verify_iic_root_driver_lineage_l2_contract "$iic_lineage_l2_root"
     print "ii-c root-driver lineage L2 verifier contract verification passed."
+    exit 0
+fi
+
+function verify_root_driver_lineage_cross_uid_contract() {
+    local out=$1 gate=scripts/verify-investigation-boundaries
+    local commit=b664299983a6311dde4ee6982f180ba9b7fab1ab
+    local parent=474f63455f7f962f5537fdd9f6d7e55e01242c51
+    local tree=8ac3c409e56b5216a2715ec5eb59d729302d849b
+    local postfix=b4c632e68e2f28ef67b9734bce82dac61bdc7bed
+    local postfix_tree=d099939defebc83374c0bdc8452f938d13aa90d4
+    local -a paths=(
+        Sources/StornautInvestigationMachineGateSupport/InvestigationMachineGateTransport.swift
+        Sources/StornautInvestigationMachineGateSupport/DarwinInvestigationMachineFixedGateSystem.swift
+        Sources/StornautInvestigationMachineGateSupport/InvestigationMachineResolvedRootDriverValidator.swift
+        Tests/StornautInvestigationTests/InvestigationMachineResolvedRootDriverValidatorTests.swift
+        Tests/StornautInvestigationTests/InvestigationSudoShapedDriverLauncherTests.swift)
+    mkdir -p "$out"
+    [[ "$(git show -s --format=%P "$commit")" == "$parent" \
+        && "$(git show -s --format=%T "$commit")" == "$tree" ]] \
+        || fail_contract "cross-UID immutable commit/tree drifted"
+    local -a observed=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$commit" | LC_ALL=C sort)"})
+    [[ "${(j:\n:)observed}" == "${(j:\n:)${(@on)paths}}" ]] \
+        || fail_contract "cross-UID immutable paths drifted"
+    [[ "$(git diff-tree --no-commit-id --numstat -r "$commit" | awk '{n+=$1+$2} END{print n+0}')" == 412 ]] \
+        || fail_contract "cross-UID immutable line count drifted"
+    [[ "$(git show -s --format=%P "$postfix")" == "$commit" \
+        && "$(git show -s --format=%T "$postfix")" == "$postfix_tree" ]] \
+        || fail_contract "cross-UID postfix immutable commit/tree drifted"
+    local -a postfix_paths=(
+        Sources/StornautInvestigationMachineGateSupport/InvestigationMachineResolvedRootDriverValidator.swift
+        Tests/StornautInvestigationTests/InvestigationMachineResolvedRootDriverValidatorTests.swift)
+    local -a observed_postfix=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$postfix" | LC_ALL=C sort)"})
+    [[ "${(j:\n:)observed_postfix}" == "${(j:\n:)${(@on)postfix_paths}}" ]] \
+        || fail_contract "cross-UID postfix immutable paths drifted"
+    [[ "$(git diff-tree --no-commit-id --numstat -r "$postfix" | awk '{n+=$1+$2} END{print n+0}')" == 31 ]] \
+        || fail_contract "cross-UID postfix immutable line count drifted"
+    "$gate" --root-driver-lineage-cross-uid-source-contract-only "${paths[@]}" >"$out/source.log"
+    "$gate" --root-driver-lineage-cross-uid-staged-scope-contract-only "$postfix" >"$out/scope.log"
+    local -a names=(snapshot-api-drop pid-path-substitution pid-signing-substitution darwin-resample-drop live-signing-pid-drop observed-identity-drop claim-audit-uid-drop retirement-start-drop retirement-cohort-conjunction monitor-matrix-drop failure-matrix-drop)
+    local -a slots=(transport transport transport darwin darwin validator validator validator validator validator_tests launcher_tests)
+    local -a olds=(
+        'stornaut_investigation_process_snapshot_for_pid('
+        'proc_pidpath(processID, &path'
+        'kSecGuestAttributePid: NSNumber(value: processID)'
+        'firstIdentity == secondIdentity,'
+        'liveSigningProcessID: claim.process.processID,'
+        'struct InvestigationMachineGateObservedProcessIdentity:'
+        'claim.auditTokenWords[0] == observed.auditUserID'
+        '&& lhs.startSeconds == rhs.startSeconds'
+        $'current.processGroupID != original.processGroupID ||\n                    current.sessionID != original.sessionID'
+        'arguments: [0, 1, 2])'
+        '@Test(arguments: GateFailurePoint.allCases)')
+    local -a news=(
+        'stornaut_investigation_process_snapshot_disabled('
+        'proc_pidpath(getpid(), &path'
+        'kSecGuestAttributeAudit: Data()'
+        'true,'
+        'liveSigningProcessID: initialLaunch.processID,'
+        'struct InvestigationMachineClaimedProcessIdentity:'
+        'claim.auditTokenWords[0] == claim.auditTokenWords[0]'
+        '&& true'
+        $'current.processGroupID != original.processGroupID &&\n                    current.sessionID != original.sessionID'
+        'arguments: [0, 1])'
+        '@Test')
+    (( ${#names} == 11 && ${#slots} == 11 && ${#olds} == 11 && ${#news} == 11 )) \
+        || fail_contract "cross-UID mutation inventory drifted"
+    local ordinal index source target sha rc expected_diagnostic
+    for ordinal in {1..11}; do
+        case ${slots[$ordinal]} in transport) index=1;; darwin) index=2;; validator) index=3;; validator_tests) index=4;; launcher_tests) index=5;; esac
+        source=${paths[$index]}; target="$out/${names[$ordinal]}"
+        OLD=${olds[$ordinal]} NEW=${news[$ordinal]} /usr/bin/python3 -I - "$source" "$target" <<'PY'
+from pathlib import Path
+import os,sys
+s=Path(sys.argv[1]).read_text(); old=os.environ["OLD"]; new=os.environ["NEW"]
+if s.count(old)!=1: raise SystemExit("cross-UID mutation fixture is vacuous")
+Path(sys.argv[2]).write_text(s.replace(old,new,1))
+PY
+        local -a args=("${paths[@]}"); args[$index]=$target
+        sha=$(shasum -a 256 "$target"|awk '{print $1}'); rc=0
+        "$gate" --root-driver-lineage-cross-uid-mutation-contract-only \
+            "${names[$ordinal]}" "${slots[$ordinal]}" "$sha" "${args[@]}" \
+            >"$out/${names[$ordinal]}.log" 2>&1 || rc=$?
+        (( rc != 0 )) || fail_contract "cross-UID mutation accepted: ${names[$ordinal]}"
+        expected_diagnostic="cross-UID source contract drifted: ${olds[$ordinal]}"
+        [[ ${names[$ordinal]} == pid-signing-substitution ]] \
+            && expected_diagnostic='cross-UID prohibited identity API drifted'
+        [[ "$(<"$out/${names[$ordinal]}.log")" == \
+            "$expected_diagnostic" ]] \
+            || fail_contract "cross-UID mutation diagnostic drifted: ${names[$ordinal]}"
+    done
+    function reject_cross_uid_protocol() {
+        local label=$1 expected=$2; shift 2
+        local log="$out/protocol-$label.log" protocol_rc=0
+        "$@" >"$log" 2>&1 || protocol_rc=$?
+        (( protocol_rc != 0 )) || fail_contract "cross-UID protocol mutation accepted: $label"
+        [[ "$(<"$log")" == "$expected" ]] || fail_contract "cross-UID protocol diagnostic drifted: $label"
+    }
+    local alternate="$out/alternate-darwin.swift"
+    cp "${paths[2]}" "$alternate"
+    local mutation="$out/snapshot-api-drop"
+    local mutation_sha=$(shasum -a 256 "$mutation"|awk '{print $1}')
+    local -a alternate_args=("${paths[@]}")
+    local -a mutation_args=("${paths[@]}"); mutation_args[1]=$mutation
+    reject_cross_uid_protocol unknown-name 'cross-UID mutation identity drifted' "$gate" --root-driver-lineage-cross-uid-mutation-contract-only unknown transport "$mutation_sha" "${mutation_args[@]}"
+    reject_cross_uid_protocol wrong-slot 'cross-UID mutation identity drifted' "$gate" --root-driver-lineage-cross-uid-mutation-contract-only snapshot-api-drop darwin "$mutation_sha" "${mutation_args[@]}"
+    reject_cross_uid_protocol malformed-sha 'cross-UID mutation identity drifted' "$gate" --root-driver-lineage-cross-uid-mutation-contract-only snapshot-api-drop transport bad "${mutation_args[@]}"
+    reject_cross_uid_protocol wrong-sha 'cross-UID mutation SHA drifted' "$gate" --root-driver-lineage-cross-uid-mutation-contract-only snapshot-api-drop transport 0000000000000000000000000000000000000000000000000000000000000000 "${mutation_args[@]}"
+    local canonical_sha=$(shasum -a 256 "${paths[1]}"|awk '{print $1}')
+    reject_cross_uid_protocol unchanged-source 'cross-UID mutation contract drifted' "$gate" --root-driver-lineage-cross-uid-mutation-contract-only snapshot-api-drop transport "$canonical_sha" "${paths[@]}"
+    local unrecognized="$out/unrecognized"; { <"${paths[1]}"; print '// unknown'; } >"$unrecognized"
+    local unrecognized_sha=$(shasum -a 256 "$unrecognized"|awk '{print $1}'); mutation_args[1]=$unrecognized
+    reject_cross_uid_protocol unrecognized-content 'cross-UID mutation contract drifted' "$gate" --root-driver-lineage-cross-uid-mutation-contract-only snapshot-api-drop transport "$unrecognized_sha" "${mutation_args[@]}"
+    mutation_args=("${paths[@]}"); mutation_args[1]=$mutation; mutation_args[2]="$out/darwin-resample-drop"
+    reject_cross_uid_protocol two-changed-slots 'cross-UID mutation contract drifted' "$gate" --root-driver-lineage-cross-uid-mutation-contract-only snapshot-api-drop transport "$mutation_sha" "${mutation_args[@]}"
+    alternate_args[1]=$mutation; alternate_args[2]=$alternate
+    rc=0; "$gate" --root-driver-lineage-cross-uid-mutation-contract-only \
+        snapshot-api-drop transport "$mutation_sha" "${alternate_args[@]}" \
+        >"$out/alternate-unchanged-slot.log" 2>&1 || rc=$?
+    (( rc != 0 )) || fail_contract \
+        "cross-UID unchanged-slot alternate path accepted"
+    local active=${GIT_INDEX_FILE:-$(git rev-parse --git-path index)} bad blob fixture scope rc
+    for fixture in extra missing binary wrong-mode over-budget worktree-divergence wrong-baseline; do
+        bad="$out/scope-$fixture.index"; cp "$active" "$bad"; scope=$postfix
+        case $fixture in
+            extra) blob=$(print extra|git hash-object -w --stdin); GIT_INDEX_FILE=$bad git update-index --add --cacheinfo "100644,$blob,cross-uid-extra.swift";;
+            missing) GIT_INDEX_FILE=$bad git update-index --force-remove -- scripts/verify-contract;;
+            binary) blob=$(printf '\0cross-uid\n'|git hash-object -w --stdin); GIT_INDEX_FILE=$bad git update-index --cacheinfo "100644,$blob,Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift";;
+            wrong-mode) blob=$(git hash-object -- scripts/verify-contract); GIT_INDEX_FILE=$bad git update-index --cacheinfo "100644,$blob,scripts/verify-contract";;
+            over-budget) blob=$( { <Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift; for n in {1..401}; do print "// cross-uid-$n"; done; }|git hash-object -w --stdin); GIT_INDEX_FILE=$bad git update-index --cacheinfo "100644,$blob,Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift";;
+            worktree-divergence) blob=$(print drift|git hash-object -w --stdin); GIT_INDEX_FILE=$bad git update-index --cacheinfo "100755,$blob,scripts/verify-investigation-boundaries";;
+            wrong-baseline) scope=$postfix^;;
+        esac
+        rc=0; GIT_INDEX_FILE=$bad "$gate" \
+            --root-driver-lineage-cross-uid-staged-scope-contract-only "$scope" \
+            >"$out/scope-$fixture.log" 2>&1 || rc=$?
+        (( rc != 0 )) || fail_contract "cross-UID scope mutation accepted: $fixture"
+    done
+}
+
+if [[ ${1:-} == --root-driver-lineage-cross-uid-contract-only ]]; then
+    (( $# == 1 )) || fail_contract "Usage: scripts/verify-contract --root-driver-lineage-cross-uid-contract-only"
+    cross_uid_root=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-cross-uid-contract.XXXXXX")
+    trap 'rm -rf "$cross_uid_root"' EXIT
+    verify_root_driver_lineage_cross_uid_contract "$cross_uid_root"
+    print "cross-UID verifier contract verification passed."
     exit 0
 fi
 
@@ -5334,6 +5494,7 @@ verify_iicb2b1_contract "$contract_root/iicb2b1"
 verify_iicb2b2_contract "$contract_root/iicb2b2"
 verify_iic_root_driver_lineage_l1_contract "$contract_root/iic-lineage-l1" false
 verify_iic_root_driver_lineage_l2_contract "$contract_root/iic-lineage-l2"
+verify_root_driver_lineage_cross_uid_contract "$contract_root/cross-uid"
 verify_iic0bivb2_contract "$contract_root/iic0bivb2" false
 verify_shared_deadline_repair_contract "$contract_root/shared-deadline"
 verify_fixed_gate_deadline_cleanup_contract "$contract_root/fixed-gate-cleanup"

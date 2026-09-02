@@ -369,6 +369,14 @@ iic_lineage_l2_mutation_sha=
 iic_lineage_l2_sources=()
 iic_lineage_l2_scope_contract_only=false
 iic_lineage_l2_scope_baseline=cd8fc5d8645a8d40fb7571e4be41b8b9d1a70725
+cross_uid_source_contract_only=false
+cross_uid_mutation_contract_only=false
+cross_uid_mutation_name=
+cross_uid_mutation_slot=
+cross_uid_mutation_sha=
+cross_uid_sources=()
+cross_uid_scope_contract_only=false
+cross_uid_scope_baseline=b4c632e68e2f28ef67b9734bce82dac61bdc7bed
 iic0bivb1_handoff_contract_only=false
 iic0bivb1_fixture_source=
 iic0bivb1_physical_test_source=
@@ -992,6 +1000,21 @@ if (( $# > 0 )); then
         && [[ $1 == --iic-root-driver-lineage-l2-staged-scope-contract-only ]]; then
         iic_lineage_l2_scope_contract_only=true
         iic_lineage_l2_scope_baseline=${2:-cd8fc5d8645a8d40fb7571e4be41b8b9d1a70725}
+    elif (( $# == 1 || $# == 6 )) \
+        && [[ $1 == --root-driver-lineage-cross-uid-source-contract-only ]]; then
+        cross_uid_source_contract_only=true
+        cross_uid_sources=("${@:2}")
+    elif (( $# == 9 )) \
+        && [[ $1 == --root-driver-lineage-cross-uid-mutation-contract-only ]]; then
+        cross_uid_mutation_contract_only=true
+        cross_uid_mutation_name=$2
+        cross_uid_mutation_slot=$3
+        cross_uid_mutation_sha=$4
+        cross_uid_sources=("${@:5}")
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --root-driver-lineage-cross-uid-staged-scope-contract-only ]]; then
+        cross_uid_scope_contract_only=true
+        cross_uid_scope_baseline=${2:-b4c632e68e2f28ef67b9734bce82dac61bdc7bed}
     elif (( $# == 4 )) \
         && [[ $1 == --iic0b-iv-b1-handoff-contract-only ]]; then
         iic0bivb1_handoff_contract_only=true
@@ -12115,7 +12138,7 @@ required_test_markers={
   "#expect(firstContinue < validation)",
   "#expect(validation < secondContinue)",
   "func resolvedRootValidationRejectsSameSignedWrongLiveExecutablePath() throws {",
-  "func resolvedRootValidationRequiresAuditTokenBoundExecutablePathReads()"),
+  "func resolvedRootValidationRequiresPIDBoundPublicObservation() throws {"),
  "evidence_tests":(
   "func productionEpochCorpusRoundTripsThroughAllIndependentDecoders() async throws {",
   "#expect(validated.exactDriverOutputBytes == transport.driverOutput)",
@@ -12171,6 +12194,123 @@ function verify_iic_root_driver_lineage_l2_staged_scope() {
     for checkpoint_path in "${expected[@]}"; do
         entry=$(git ls-files -s -- "$checkpoint_path")
         [[ "$(print -r -- "$entry"|awk '{print $2}')" == "$(git hash-object -- "$checkpoint_path")" ]] || { print -u2 "ii-c root-driver lineage L2 staged/worktree blob drifted: $checkpoint_path"; return 1; }
+    done
+}
+
+function verify_root_driver_lineage_cross_uid_source_contract() {
+    local -a paths=("${cross_uid_sources[@]}")
+    if (( ${#paths} == 0 )); then paths=(
+        Sources/StornautInvestigationMachineGateSupport/InvestigationMachineGateTransport.swift
+        Sources/StornautInvestigationMachineGateSupport/DarwinInvestigationMachineFixedGateSystem.swift
+        Sources/StornautInvestigationMachineGateSupport/InvestigationMachineResolvedRootDriverValidator.swift
+        Tests/StornautInvestigationTests/InvestigationMachineResolvedRootDriverValidatorTests.swift
+        Tests/StornautInvestigationTests/InvestigationSudoShapedDriverLauncherTests.swift
+    ); fi
+    /usr/bin/python3 -I - "$cross_uid_mutation_contract_only" \
+        "$cross_uid_mutation_name" "$cross_uid_mutation_slot" \
+        "$cross_uid_mutation_sha" "${paths[@]}" <<'PY'
+from pathlib import Path
+import hashlib, re, sys
+mode,name,slot,sha=sys.argv[1:5]
+slots=("transport","darwin","validator","validator_tests","launcher_tests")
+canonical_args=(
+ "Sources/StornautInvestigationMachineGateSupport/InvestigationMachineGateTransport.swift",
+ "Sources/StornautInvestigationMachineGateSupport/DarwinInvestigationMachineFixedGateSystem.swift",
+ "Sources/StornautInvestigationMachineGateSupport/InvestigationMachineResolvedRootDriverValidator.swift",
+ "Tests/StornautInvestigationTests/InvestigationMachineResolvedRootDriverValidatorTests.swift",
+ "Tests/StornautInvestigationTests/InvestigationSudoShapedDriverLauncherTests.swift")
+args=tuple(sys.argv[5:]); paths=tuple(map(Path,args))
+if len(paths)!=5 or any(p.is_symlink() or not p.is_file() for p in paths):
+    raise SystemExit("cross-UID source identity drifted")
+sources=dict(zip(slots,(p.read_text() for p in paths)))
+canonical=dict(zip(slots,(Path(p).read_text() for p in canonical_args)))
+M={
+ "snapshot-api-drop":("transport","stornaut_investigation_process_snapshot_for_pid(","stornaut_investigation_process_snapshot_disabled("),
+ "pid-path-substitution":("transport","proc_pidpath(processID, &path","proc_pidpath(getpid(), &path"),
+ "pid-signing-substitution":("transport","kSecGuestAttributePid: NSNumber(value: processID)","kSecGuestAttributeAudit: Data()"),
+ "darwin-resample-drop":("darwin","firstIdentity == secondIdentity,","true,"),
+ "live-signing-pid-drop":("darwin","liveSigningProcessID: claim.process.processID,","liveSigningProcessID: initialLaunch.processID,"),
+ "observed-identity-drop":("validator","struct InvestigationMachineGateObservedProcessIdentity:","struct InvestigationMachineClaimedProcessIdentity:"),
+ "claim-audit-uid-drop":("validator","claim.auditTokenWords[0] == observed.auditUserID","claim.auditTokenWords[0] == claim.auditTokenWords[0]"),
+ "retirement-start-drop":("validator","&& lhs.startSeconds == rhs.startSeconds","&& true"),
+ "retirement-cohort-conjunction":("validator","current.processGroupID != original.processGroupID ||\n                    current.sessionID != original.sessionID","current.processGroupID != original.processGroupID &&\n                    current.sessionID != original.sessionID"),
+ "monitor-matrix-drop":("validator_tests","arguments: [0, 1, 2])","arguments: [0, 1])"),
+ "failure-matrix-drop":("launcher_tests","@Test(arguments: GateFailurePoint.allCases)","@Test"),
+}
+if mode=="true":
+    if name not in M or slot!=M[name][0] or not re.fullmatch(r"[0-9a-f]{64}",sha):
+        raise SystemExit("cross-UID mutation identity drifted")
+    i=slots.index(slot); old,new=M[name][1:]
+    changed=[s for s in slots if sources[s]!=canonical[s]]
+    if changed!=[slot] or args[i]==canonical_args[i] \
+            or any(arg!=canonical_args[j] for j,arg in enumerate(args) if j!=i) \
+            or canonical[slot].count(old)!=1 \
+            or sources[slot]!=canonical[slot].replace(old,new,1):
+        raise SystemExit("cross-UID mutation contract drifted")
+    if hashlib.sha256(paths[i].read_bytes()).hexdigest()!=sha:
+        raise SystemExit("cross-UID mutation SHA drifted")
+elif mode!="false" or name or slot or sha or args!=canonical_args or sources!=canonical:
+    raise SystemExit("cross-UID canonical source drifted")
+runtime=sources["transport"]+sources["darwin"]+sources["validator"]
+for forbidden in ("stornaut_investigation_identity_for_pid",
+                  "proc_pidpath_audittoken","kSecGuestAttributeAudit",
+                  "task_name_for_pid","TASK_AUDIT_TOKEN"):
+    if forbidden in runtime: raise SystemExit("cross-UID prohibited identity API drifted")
+required={
+ "transport":("package static func gateObservedProcessIdentity(processID: pid_t) throws",
+   "stornaut_investigation_process_snapshot_for_pid(","proc_pidpath(processID, &path",
+   "kSecGuestAttributePid: NSNumber(value: processID)"),
+ "darwin":("firstIdentity == secondIdentity,","resolved: firstIdentity,",
+   "liveSigningProcessID: claim.process.processID,",
+   "func collectResolvedRootDriverRetirement(",
+   ".gateObservedProcessIdentity(processID: pid_t(pid))"),
+ "validator":("struct InvestigationMachineGateObservedProcessIdentity:",
+   "claim.auditTokenWords[0] == observed.auditUserID",
+   "lhs.processID == rhs.processID","&& lhs.startSeconds == rhs.startSeconds",
+   "&& lhs.startMicroseconds == rhs.startMicroseconds",
+   "current.processGroupID != original.processGroupID ||\n                    current.sessionID != original.sessionID"),
+ "validator_tests":("arguments: [0, 1, 2])",
+   "monitorCount == 0 ? 1 : monitorCount + 2",
+   "func retirementAcceptsAbsenceAndReuse() throws",
+   "func retirementAcceptsReuseOutsideOldProcessGroupInSameSession() throws",
+   "func retirementRejectsLiveResidueAndIncompleteEnumeration() throws"),
+ "launcher_tests":("@Test(arguments: GateFailurePoint.allCases)",
+   "func resolvedRootGateSourceUsesNoCrossUIDMachTaskIdentity() throws",
+   "case collectResolvedRootDriverValidation",
+   "case collectResolvedRootDriverRetirement"),
+}
+for key,markers in required.items():
+    for marker in markers:
+        if marker not in sources[key]: raise SystemExit("cross-UID source contract drifted: "+marker)
+PY
+}
+
+function verify_root_driver_lineage_cross_uid_staged_scope() {
+    local -x PATH=/usr/bin:/bin:/usr/sbin:/sbin
+    local baseline=${1:-$cross_uid_scope_baseline}
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" == b4c632e68e2f28ef67b9734bce82dac61bdc7bed ]] \
+        || { print -u2 "cross-UID checkpoint baseline drifted"; return 1; }
+    local -a expected=(Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift scripts/verify-contract scripts/verify-investigation-boundaries)
+    local text checkpoint_path add delete total=0 mode entry
+    text=$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" -- | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')
+    local -a observed=(${(f)text})
+    [[ "${(j:\n:)${(@on)observed}}" == "${(j:\n:)${(@on)expected}}" ]] \
+        || { print -u2 "cross-UID checkpoint paths drifted"; return 1; }
+    while IFS=$'\t' read -r add delete checkpoint_path; do
+        [[ $checkpoint_path == docs/* || $checkpoint_path == AGENTS.md || $checkpoint_path == README.md ]] && continue
+        [[ $add != - && $delete != - ]] || { print -u2 "cross-UID binary checkpoint path rejected"; return 1; }
+        (( total += add + delete ))
+    done <<< "$(git diff --cached --numstat "$baseline" --)"
+    (( total <= 400 )) || { print -u2 "cross-UID checkpoint budget drifted"; return 1; }
+    local worktree=$(git diff --name-only --diff-filter=ACMRD -- | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')
+    local untracked=$(git ls-files --others --exclude-standard -- | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')
+    [[ -z $worktree && -z $untracked ]] || { print -u2 "cross-UID index/worktree drifted"; return 1; }
+    for checkpoint_path in "${expected[@]}"; do
+        mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
+        entry=$(git ls-files -s -- "$checkpoint_path")
+        [[ "$(print -r -- "$entry"|awk '{print $1,$3,$4}')" == "$mode 0 $checkpoint_path" \
+            && "$(print -r -- "$entry"|awk '{print $2}')" == "$(git hash-object -- "$checkpoint_path")" ]] \
+            || { print -u2 "cross-UID staged source/mode drifted: $checkpoint_path"; return 1; }
     done
 }
 
@@ -16922,6 +17062,16 @@ if $iic_lineage_l2_scope_contract_only; then
     verify_iic_root_driver_lineage_l2_staged_scope \
         "$iic_lineage_l2_scope_baseline"
     print "ii-c root-driver lineage L2 staged scope verification passed."
+    exit 0
+fi
+if $cross_uid_source_contract_only || $cross_uid_mutation_contract_only; then
+    verify_root_driver_lineage_cross_uid_source_contract
+    print "cross-UID source contract verification passed."
+    exit 0
+fi
+if $cross_uid_scope_contract_only; then
+    verify_root_driver_lineage_cross_uid_staged_scope "$cross_uid_scope_baseline"
+    print "cross-UID staged scope verification passed."
     exit 0
 fi
 if $iicc_source_contract_only || $iicc_source_mutation_contract_only; then

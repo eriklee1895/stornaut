@@ -4,6 +4,62 @@ import Testing
 @Suite("Task 39 trusted machine target boundary")
 struct InvestigationMachineTargetBoundaryTests {
     @Test
+    func rootDriverLineageCrossUIDVerifierPinsCommittedRepair() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-boundaries"), encoding: .utf8)
+        let contract = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+        for marker in [
+            "--root-driver-lineage-cross-uid-source-contract-only",
+            "--root-driver-lineage-cross-uid-mutation-contract-only",
+            "--root-driver-lineage-cross-uid-staged-scope-contract-only",
+            "function verify_root_driver_lineage_cross_uid_source_contract()",
+            "function verify_root_driver_lineage_cross_uid_staged_scope()",
+            "stornaut_investigation_process_snapshot_for_pid",
+            "proc_pidpath(processID",
+            "kSecGuestAttributePid: NSNumber(value: processID)",
+            "InvestigationMachineGateObservedProcessIdentity",
+            "claim.auditTokenWords[0] == observed.auditUserID",
+            "lhs.startSeconds == rhs.startSeconds",
+            "current.processGroupID != original.processGroupID ||",
+            "retirementAcceptsReuseOutsideOldProcessGroupInSameSession",
+            "arguments: [0, 1, 2]",
+            "@Test(arguments: GateFailurePoint.allCases)",
+        ] {
+            #expect(boundary.contains(marker), "missing: \(marker)")
+        }
+        for forbidden in [
+            "stornaut_investigation_identity_for_pid",
+            "proc_pidpath_audittoken", "kSecGuestAttributeAudit",
+            "task_name_for_pid", "TASK_AUDIT_TOKEN",
+        ] {
+            #expect(boundary.contains(forbidden))
+        }
+        for marker in [
+            "--root-driver-lineage-cross-uid-contract-only",
+            "b664299983a6311dde4ee6982f180ba9b7fab1ab",
+            "474f63455f7f962f5537fdd9f6d7e55e01242c51",
+            "8ac3c409e56b5216a2715ec5eb59d729302d849b",
+            "== 412", "cross-UID mutation accepted:",
+            "b4c632e68e2f28ef67b9734bce82dac61bdc7bed",
+            "d099939defebc83374c0bdc8452f938d13aa90d4",
+            "== 31", "retirement-cohort-conjunction",
+            "cross-UID mutation diagnostic drifted:",
+            "cross-UID protocol mutation accepted:",
+            "unknown-name", "wrong-slot", "malformed-sha",
+            "wrong-sha", "unchanged-source", "unrecognized-content",
+            "two-changed-slots",
+            "cross-UID unchanged-slot alternate path accepted",
+            "for fixture in extra missing binary wrong-mode over-budget",
+            "verify_root_driver_lineage_cross_uid_contract",
+        ] {
+            #expect(contract.contains(marker), "missing: \(marker)")
+        }
+    }
+
+    @Test
     func iiCRootDriverLineageL2PinsExactScopeAndVerifierWiring() throws {
         let root = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let boundary = try String(contentsOf: root.appending(
@@ -34,10 +90,13 @@ struct InvestigationMachineTargetBoundaryTests {
             "completionArtifactMatchesFixed180ByteV3Layout",
             "outerRoleWritesFramedClaimBeforeBusinessAndThenCompletionV3",
             "launcherValidatesBootstrapBeforeBusinessContinuation",
+            "resolvedRootValidationRequiresPIDBoundPublicObservation() throws",
             "productionEpochCorpusRoundTripsThroughAllIndependentDecoders",
             "swiftValidatorRejectsRootDriverLineageDrift",
             "userOwnedTemporaryGateFailsClosedBeforeSpawn",
         ] { #expect(boundary.contains(marker)) }
+        #expect(!boundary.contains(
+            "resolvedRootValidationRequiresAuditTokenBoundExecutablePathReads"))
         for marker in [
             "--iic-root-driver-lineage-l2-contract-only",
             "entry-prebind-drop", "transport-validation-event-drop",
@@ -54,6 +113,9 @@ struct InvestigationMachineTargetBoundaryTests {
             "expected='path budget drifted'", "expected='index/worktree drifted'",
             "expected='checkpoint baseline drifted'",
             "verify_iic_root_driver_lineage_l2_contract \"$contract_root/iic-lineage-l2\"\n",
+            "474f63455f7f962f5537fdd9f6d7e55e01242c51",
+            "13ce41f3957701daaca46a5613e40acfcc6224bb",
+            "ii-c root-driver lineage L2 historical replay failed",
         ] { #expect(contract.contains(marker)) }
         #expect(!contract.contains(
             "verify_iic_root_driver_lineage_l2_component_boundary"))
