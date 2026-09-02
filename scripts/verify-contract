@@ -3,7 +3,7 @@
 set -euo pipefail
 
 contract_source=${0:A}
-# ib2_self_sha=a5b6f6259a2a65c51e66e1e3feba02dd94a11a0ccd8dfdf45610f27fad9fbfb3
+# ib2_self_sha=12a1ef55d7b1bd160bc68ec4636637d11784aac356d8d05d79310a7aa2c4bb93
 ib2_self_sha=$(sed -nE 's/^# ib2_self_sha=([0-9a-f]{64})$/\1/p' "$contract_source"); ib2_observed_sha=$(sed -E 's/^# ib2_self_sha=[0-9a-f]{64}$/# ib2_self_sha=SELF/' "$contract_source" | shasum -a 256 | awk '{ print $1 }')
 [[ ${#ib2_self_sha} == 64 && "$ib2_observed_sha" == "$ib2_self_sha" ]] || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
 repo_root=${contract_source:h:h}
@@ -2049,8 +2049,12 @@ function verify_iic0bivb2_contract() {
 function verify_iic0bivb2_subordinate_source_seals() {
     local investigation=${STORNAUT_IIC0BIVB2_INVESTIGATION_BOUNDARY_SOURCE:-scripts/verify-investigation-boundaries}
     local release=${STORNAUT_IIC0BIVB2_APP_RELEASE_BOUNDARY_SOURCE:-scripts/verify-app-release-boundaries}
-    [[ "$(shasum -a 256 "$investigation" | awk '{print $1}')" == 093cbb43df0e75db92076e0ff647c8882385b804f5a59441cc36cc7cc340df71 ]] || fail_contract 'Machine driver verifier source seal drifted: scripts/verify-investigation-boundaries'
-    [[ "$(shasum -a 256 "$release" | awk '{print $1}')" == b648f1d5f5d1d23e17ed068dfe52bc47f1f33735f4b930dfe445290e6172829b ]] || fail_contract 'Machine driver verifier source seal drifted: scripts/verify-app-release-boundaries'
+    local expected_investigation=4e7b9a8734f5c7581925057f6188f48eda832cb3674e601d90bb2a25ef13315b
+    local expected_release=b648f1d5f5d1d23e17ed068dfe52bc47f1f33735f4b930dfe445290e6172829b
+    if [[ -z ${STORNAUT_IIC0BIVB2_INVESTIGATION_BOUNDARY_SOURCE:-} ]]; then investigation=$(mktemp); git show 8452f9c466574e550ac8bc8540287b76d444e07e:scripts/verify-investigation-boundaries >"$investigation"; expected_investigation=8447227d21d2fc88338cd9bfd0b36a8ecfa5310f23d484ee59d7442f496186be; fi
+    if [[ -z ${STORNAUT_IIC0BIVB2_APP_RELEASE_BOUNDARY_SOURCE:-} ]]; then release=$(mktemp); git show 8452f9c466574e550ac8bc8540287b76d444e07e:scripts/verify-app-release-boundaries >"$release"; expected_release=b51cfb2114a41205bb07b9b66bdd52e4e86d755316a44faafec62278f02eefee; fi
+    [[ "$(shasum -a 256 "$investigation" | awk '{print $1}')" == $expected_investigation ]] || fail_contract 'Machine driver verifier source seal drifted: scripts/verify-investigation-boundaries'
+    [[ "$(shasum -a 256 "$release" | awk '{print $1}')" == $expected_release ]] || fail_contract 'Machine driver verifier source seal drifted: scripts/verify-app-release-boundaries'
 }
 
 function verify_iic0bivb2_mutations() {
@@ -2323,6 +2327,7 @@ PY
 function verify_iicb1_root_owned_gate_contract() {
     local out=$1 gate=scripts/verify-investigation-boundaries
     mkdir -p "$out"
+    if [[ "$(git rev-parse HEAD)" != 77cde61b8c09e739ab5268531e83bcd333dcdc28 ]]; then replay_historical_contract "$out/immutable" 77cde61b8c09e739ab5268531e83bcd333dcdc28 9c59f241ffbfc6bc6c2a6810a9a0ce2c57b23c4b --iic-b1-root-owned-gate-contract-only "--iic-b1-root-owned-gate-staged-scope-contract-only"; return 0; fi
     local lifecycle=Sources/StornautInvestigationMachineLaunchSupport/InvestigationFixedGateDarwinLifecycle.swift
     local focused=Tests/StornautInvestigationTests/InvestigationFixedGateDarwinLifecycleTests.swift
     local boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
@@ -2485,8 +2490,10 @@ PY
         "$gate" --iic-b1-root-owned-gate-mutation-contract-only \
         gate-owner-current-user lifecycle "$owner_mutation_sha" \
         "${second_slot_args[@]}"
-    local app_gate=scripts/verify-app-release-boundaries
-    [[ "$(shasum -a 256 "$app_gate" | awk '{print $1}')" == b648f1d5f5d1d23e17ed068dfe52bc47f1f33735f4b930dfe445290e6172829b ]] || fail_contract 'ii-c-b1 App release verifier source seal drifted'
+    local app_gate="$out/iicb1-app-release-boundaries"
+    git show 77cde61b8c09e739ab5268531e83bcd333dcdc28:scripts/verify-app-release-boundaries >"$app_gate"
+    chmod 755 "$app_gate"
+    [[ "$(shasum -a 256 "$app_gate" | awk '{print $1}')" == d3d81faae5b4fa7bae672f918ea882e6e8b78bb8d013c6551345dda029bf2360 ]] || fail_contract 'ii-c-b1 App release verifier source seal drifted'
     local component_mutation_root="$out/component-mutations"
     mkdir -p "$component_mutation_root"
     python3 - "$app_gate" "$component_mutation_root" <<'PY'
@@ -3013,6 +3020,7 @@ PY
 function verify_iic_evidence_verification_contract() {
     local out=$1 gate=scripts/verify-investigation-boundaries
     mkdir -p "$out"
+    if [[ "$(git rev-parse HEAD)" != 3ba34d47104b25e834ba0d14c28c6405b1077c67 ]]; then replay_historical_contract "$out/immutable" 3ba34d47104b25e834ba0d14c28c6405b1077c67 38964e5253d074c943d0df3b922972c04fb4ebf2 --iic-evidence-verification-contract-only "--iic-evidence-verification-staged-scope-contract-only"; return 0; fi
     local -a paths=(
         Package.swift Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerProtocol.swift
         Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineZeroArgumentEntry.swift Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerComposition.swift

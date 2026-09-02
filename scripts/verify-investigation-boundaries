@@ -15239,6 +15239,30 @@ if (
         "live claim server later DriverSupport C dependency drifted"
     )
 historical_package = package.replace(later_driver_support_dependency, "", 1)
+l1_gate_support_target = '''        .target(
+            name: "StornautInvestigationMachineGateSupport",
+            dependencies: [
+                "CInvestigationIdentitySupport",
+                "StornautInvestigationHandoffContract",
+                "StornautInvestigationInstalledL2",
+            ],
+            linkerSettings: [
+                .linkedFramework("Security"),
+            ]
+        ),
+'''
+l1_gate_support_historical = '''        .target(
+            name: "StornautInvestigationMachineGateSupport",
+            dependencies: [
+                "StornautInvestigationHandoffContract",
+            ]
+        ),
+'''
+if historical_package.count(l1_gate_support_target) != 1:
+    raise SystemExit("live claim server later L1 GateSupport drifted")
+historical_package = historical_package.replace(
+    l1_gate_support_target, l1_gate_support_historical, 1
+)
 iica_gate_product = '''        .library(
             name: "StornautInvestigationMachineGateSupport",
             type: .static,
@@ -15416,6 +15440,7 @@ historical_handoff = {
 later_handoff = {
     handoff_root / "InvestigationInstalledL2ProjectionContract.swift",
     handoff_root / "InvestigationProjectedCohortInput.swift",
+    handoff_root / "InvestigationResolvedRootDriverLineageContract.swift",
 }
 if set(handoff_root.glob("*")) != historical_handoff | later_handoff:
     raise SystemExit("live claim server frozen Handoff files drifted")
