@@ -1789,6 +1789,7 @@ struct InvestigationMachineTargetBoundaryTests {
             "InvestigationMachineDarwinOuterInnerProtocol.swift": [
                 "import Foundation",
                 "import StornautInvestigationHandoffContract",
+                "import StornautInvestigationInstalledL2",
             ],
             "InvestigationMachineDarwinOuterInnerSession.swift": [
                 "import Darwin",
@@ -3727,6 +3728,13 @@ struct InvestigationMachineTargetBoundaryTests {
             ),
             encoding: .utf8
         )
+        let evidenceValidator = try String(
+            contentsOf: root.appending(
+                path: "Sources/StornautInvestigationMachineDriverSupport/"
+                    + "InvestigationMachineDarwinOuterInnerProtocol.swift"
+            ),
+            encoding: .utf8
+        )
 
         for required in [
             "case present",
@@ -3802,11 +3810,16 @@ struct InvestigationMachineTargetBoundaryTests {
             "InvestigationInstalledL2ArtifactReader()",
             "InvestigationInstalledL2ProcessReader()",
             "InvestigationInstalledL2FixedServiceReader()",
-            "InvestigationInstalledL2SemanticContract.evaluate(",
             "InvestigationInstalledL2Observer()",
         ] {
             #expect(production.components(separatedBy: constructor).count == 2)
         }
+        let semanticEvaluator =
+            "InvestigationInstalledL2SemanticContract.evaluate("
+        #expect(production.components(
+            separatedBy: semanticEvaluator
+        ).count == 3)
+        #expect(evidenceValidator.contains(semanticEvaluator))
     }
 
     @Test

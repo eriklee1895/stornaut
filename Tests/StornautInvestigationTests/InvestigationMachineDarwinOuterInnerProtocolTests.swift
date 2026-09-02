@@ -267,6 +267,26 @@ struct InvestigationMachineDarwinOuterInnerProtocolTests {
     }
 
     @Test
+    func failedContainmentProofConsumesAdmissionBeforeCorrectReplay() async throws {
+        let fixture = try OuterInnerFixture(scenario: .success)
+        let admission = fixture.makeOuterAdmission()
+        let exchange = try await completeExchange(fixture, admission)
+        let wire = try InvestigationMachineDarwinEpochNormalResult(
+            request: fixture.request, ownership: fixture.ownershipRecord,
+            acknowledgement: exchange.acknowledgement,
+            decision: exchange.decision, physicalResult: fixture.physicalResult())
+        let result = try await admission.admit(
+            resultBytes: wire.encoded(),
+            terminalEvidence: fixture.terminalEvidence(successfulExit: true))
+        let predecessor = try #require(fixture.predecessor)
+        let wrong = try OuterInnerFixture(scenario: .cancellation)
+        #expect(await admission.proveContainment(selection: wrong.selection,
+            result: result, predecessor: predecessor) == .terminalUncertain)
+        #expect(await admission.proveContainment(selection: fixture.selection,
+            result: result, predecessor: predecessor) == .terminalUncertain)
+    }
+
+    @Test
     func innerDeadlineValidationPreservesExactRequestDeadlineAndRejectsBounds() async throws {
         let fixture = try OuterInnerFixture(scenario: .success)
         let exact = InvestigationMachineDarwinInnerProtocolState(
@@ -602,12 +622,347 @@ struct InvestigationMachineDarwinOuterInnerProtocolTests {
             )
         }
     }
+
+    @Test(arguments: [InvestigationHandoffScenario.success, .lifecycleRecovery])
+    func validEpochEvidenceRoundTripsWithIndependentlyRecomputedAdmission(
+        _ scenario: InvestigationHandoffScenario) throws {
+        let fixture = try OuterInnerFixture(scenario: scenario)
+        let wire = try makeEpochEvidence(fixture: fixture)
+        let epoch = try OuterInnerWireTranscript(wire)
+        let physical = try OuterInnerWireTranscript(epoch.fields[5])
+        let ownership = try InvestigationMachineSingleEpochPhysicalOwnership
+            .decodeEvidence(physical.fields[0], expectedSelection: fixture.selection)
+        #expect(try InvestigationMachineDarwinEpochTerminalEvidence.decode(
+            epoch.fields[6]) == fixture.terminalEvidence(successfulExit:
+                scenario != .lifecycleRecovery))
+        if scenario == .lifecycleRecovery {
+            #expect(physical.fields.count == 1)
+        } else {
+            #expect(try InvestigationMachineDarwinEpochNormalResult.decode(
+                physical.fields[1], expectedSelection: fixture.selection)
+                .physicalResult.physicalOwnership == ownership)
+        }
+        #expect(InvestigationHandoffSHA256.hashing(
+            try independentlyRecomputedAdmissionTranscript(
+                requestBytes: epoch.fields[4],
+                resultBytes: scenario == .lifecycleRecovery ? Data() : physical.fields[1],
+                terminalEvidenceBytes: epoch.fields[6],
+                admissionMaterialBytes: epoch.fields[7])).rawBytes == epoch.fields[8])
+        let decoded = try InvestigationMachineEpochEvidence.decode(wire)
+        #expect(decoded.ordinal == fixture.selection.epoch.ordinal)
+        #expect(decoded.scenario == fixture.selection.epoch.scenario)
+        #expect(try decoded.encoded() == wire)
+    }
+
+    @Test
+    func epochEvidenceRejectsZeroClaimRequestBinding() throws {
+        let fixture = try OuterInnerFixture(
+            scenario: .success, claimRequestBindingSHA256:
+                .init(rawBytes: Data(repeating: 0, count: 32)))
+        let wire = try makeEpochEvidence(fixture: fixture)
+        #expect(throws: (any Error).self) {
+            _ = try InvestigationMachineEpochEvidence.decode(wire)
+        }
+    }
+
+    @Test(arguments: EpochEvidenceMutation.allCases)
+    fileprivate func epochEvidenceRejectsSemanticallyRewrappedMutation(
+        _ mutation: EpochEvidenceMutation) throws {
+        let fixture = try OuterInnerFixture(scenario: .success)
+        let wire = try makeEpochEvidence(fixture: fixture, mutation: mutation)
+        #expect(throws: (any Error).self) {
+            _ = try InvestigationMachineEpochEvidence.decode(wire)
+        }
+    }
+
+    @Test
+    func failedDeadlineAdmissionDoesNotCommitEpochEvidence() async throws {
+        let fixture = try OuterInnerFixture(scenario: .success)
+        try InvestigationMachineEpochEvidenceCollection.begin(attemptUUID:
+            fixture.selection.outerAttemptUUID)
+        defer { InvestigationMachineEpochEvidenceCollection.abort() }
+        let admission = fixture.makeOuterAdmission(clock: FixedOuterInnerProtocolClock(
+            now: fixture.request.epochDeadlineNanoseconds))
+        let exchange = try await completeExchange(fixture, admission)
+        let normal = try InvestigationMachineDarwinEpochNormalResult(
+            request: fixture.request, ownership: fixture.ownershipRecord,
+            acknowledgement: exchange.acknowledgement,
+            decision: exchange.decision, physicalResult: fixture.physicalResult())
+        await #expect(throws:
+            InvestigationMachineDarwinOuterInnerProtocolError.terminalEvidenceInvalid) {
+            _ = try await admission.admit(
+                resultBytes: normal.encoded(),
+                terminalEvidence: fixture.terminalEvidence(successfulExit: true))
+        }
+        let retry = fixture.makeOuterAdmission()
+        let retryExchange = try await completeExchange(fixture, retry)
+        let retryNormal = try InvestigationMachineDarwinEpochNormalResult(
+            request: fixture.request, ownership: fixture.ownershipRecord,
+            acknowledgement: retryExchange.acknowledgement,
+            decision: retryExchange.decision, physicalResult: fixture.physicalResult())
+        let result = try await retry.admit(
+            resultBytes: retryNormal.encoded(),
+            terminalEvidence: fixture.terminalEvidence(successfulExit: true))
+        guard case .admittedPhysical = result else {
+            Issue.record("expected retry to commit the first epoch")
+            return
+        }
+    }
+
+    @Test
+    func validEightEpochEvidenceBundleRoundTrips() async throws {
+        let bundle = try await makeEpochEvidenceBundle()
+        #expect(try InvestigationMachineEpochEvidenceBundle.decode(bundle).encoded() == bundle)
+    }
+
+    @Test(arguments: EpochBundleMutation.allCases)
+    fileprivate func bundleRejectsCanonicalCohortOrContinuityRewrap(
+        _ mutation: EpochBundleMutation) async throws {
+        let bundle = try await makeEpochEvidenceBundle(mutation: mutation)
+        #expect(throws: (any Error).self) {
+            _ = try InvestigationMachineEpochEvidenceBundle.decode(bundle)
+        }
+    }
 }
 
 private enum TerminalEvidenceMutation: CaseIterable {
     case controlEOF, resultEOF, driverIdentity, appIdentity, helperIdentity
     case appPresent, leaderNotLast, groupNotEmpty, helperPresent, l1Residue
     case driverDrift, driverResultMismatch, expired
+}
+
+private enum EpochEvidenceMutation: CaseIterable {
+    case admissionDigest, admissionSubchain, terminalHelper, residueFalse, driverObservationDrift, normalResultObservation
+}
+private enum EpochBundleMutation: CaseIterable {
+    case requestWholeCapsule, requestWholeInput, successorPredecessorDigest, repeatedHelper
+}
+private func makeEpochEvidence(fixture: OuterInnerFixture,
+    mutation: EpochEvidenceMutation? = nil) throws -> Data {
+    let requestBytes = try fixture.request.encoded()
+    let resultBytes: Data
+    if fixture.request.mode == .normal {
+        let physicalResult = try fixture.physicalResult(
+            driverObservationSHA256: mutation == .normalResultObservation
+                ? OuterInnerFixture.digest(0x71) : nil)
+        resultBytes = try InvestigationMachineDarwinEpochNormalResult(
+            request: fixture.request, ownership: fixture.ownershipRecord,
+            acknowledgement: fixture.acknowledgement, decision: fixture.decision,
+            physicalResult: physicalResult).encoded()
+    } else {
+        resultBytes = Data()
+    }
+    let terminalMutation: TerminalEvidenceMutation? = switch mutation {
+    case .terminalHelper: .helperIdentity
+    case .residueFalse: .l1Residue
+    case .driverObservationDrift: .driverDrift
+    default: nil
+    }
+    let terminalBytes = try fixture.terminalEvidence(
+        successfulExit: fixture.request.mode == .normal,
+        mutation: terminalMutation).encoded()
+    let owner = UUID(uuid: (0xa1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1))
+    var materialBytes = try InvestigationMachineEpochAdmissionMaterial(
+        request: fixture.request, ownership: fixture.ownershipRecord,
+        acknowledgement: fixture.acknowledgement, decision: fixture.decision,
+        owner: owner).encoded()
+    if mutation == .admissionSubchain {
+        var material = try OuterInnerWireTranscript(materialBytes)
+        let driver = try fixture.driverChild(
+            processID: fixture.driverChild.processID + 10,
+            processIDVersion: fixture.driverChild.processIDVersion + 10)
+        let app = try fixture.appChild(
+            parentProcessID: driver.processID,
+            processGroupID: driver.processGroupID)
+        let ownership = try InvestigationMachineDarwinEpochOwnershipRecord(
+            request: fixture.request, driverChild: driver, appChild: app,
+            physicalOwnership: fixture.physicalOwnership)
+        material.fields[0] = try ownership.encoded()
+        materialBytes = try material.encoded(
+            maximumByteCount:
+                InvestigationMachineEpochAdmissionMaterial.maximumByteCount)
+    }
+    let ownershipBytes = try fixture.physicalOwnership.evidenceEncoded()
+    let physicalBytes = try HandoffBinaryTranscript.encode(
+        domain: "stornaut.task39.machine.epoch-physical-evidence.v1",
+        businessFields: fixture.request.mode == .normal
+            ? [ownershipBytes, resultBytes] : [ownershipBytes],
+        maximumByteCount: 64 * 1_024)
+    var admissionSHA256 = try independentlyRecomputedAdmissionSHA256(
+        requestBytes: requestBytes, resultBytes: resultBytes,
+        terminalEvidenceBytes: terminalBytes,
+        admissionMaterialBytes: materialBytes)
+    if mutation == .admissionDigest {
+        var changed = admissionSHA256.rawBytes
+        changed[changed.startIndex] ^= 0x01
+        admissionSHA256 = try InvestigationHandoffSHA256(rawBytes: changed)
+    }
+    return try HandoffBinaryTranscript.encode(
+        domain: "stornaut.task39.machine.epoch-evidence.v1",
+        businessFields: [
+            outerInnerData(fixture.selection.epoch.ordinal),
+            outerInnerData(fixture.selection.epoch.scenario.rawValue),
+            outerInnerData(fixture.selection.epoch.epochUUID),
+            outerInnerData(fixture.selection.epoch.configurationNonce),
+            requestBytes, physicalBytes, terminalBytes, materialBytes,
+            admissionSHA256.rawBytes,
+        ], maximumByteCount: InvestigationMachineEpochEvidence.maximumByteCount)
+}
+private func makeEpochEvidenceBundle(
+    mutation: EpochBundleMutation? = nil) async throws -> Data {
+    let attempt = UUID(uuid: (0xb1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1))
+    let templates = try InvestigationHandoffScenario.allCases.map {
+        try OuterInnerFixture(scenario: $0) }
+    let capsule = try InvestigationCohortCapsule(
+        outerAttemptUUID: attempt, epochs: templates.map { $0.selection.epoch })
+    let projected = try InvestigationProjectedCohortInput(
+        capsule: capsule,
+        projections: templates.map { $0.selection.projection })
+    try InvestigationMachineEpochEvidenceCollection.begin(attemptUUID: attempt)
+    defer { InvestigationMachineEpochEvidenceCollection.abort() }
+    var continuity: InvestigationMachineHelperEpochContinuity?
+    for index in templates.indices {
+        let projectedSelection = try projected.selection(at: index)
+        let selection = InvestigationMachineFixedEpochSelection(
+            outerAttemptUUID: attempt,
+            wholeCapsuleSHA256: capsule.wholeCapsuleSHA256,
+            wholeInputSHA256: projected.wholeInputSHA256,
+            epoch: projectedSelection.epoch,
+            projection: projectedSelection.projection)
+        let current = try continuity
+            ?? InvestigationMachineHelperEpochContinuity.genesis(for: selection)
+        let predecessor = try current.consume(for: selection)
+        let invocation = try predecessor.invocation(for: selection)
+        let fixture = try OuterInnerFixture(
+            selection: selection, invocation: invocation,
+            predecessor: predecessor, identityIndex: UInt32(index))
+        let admission = fixture.makeOuterAdmission()
+        let exchange = try await completeExchange(fixture, admission)
+        let resultBytes: Data
+        if fixture.request.mode == .normal {
+            resultBytes = try InvestigationMachineDarwinEpochNormalResult(
+                request: fixture.request, ownership: fixture.ownershipRecord,
+                acknowledgement: exchange.acknowledgement,
+                decision: exchange.decision,
+                physicalResult: fixture.physicalResult()).encoded()
+        } else {
+            resultBytes = Data()
+        }
+        let result = try await admission.admit(
+            resultBytes: resultBytes, terminalEvidence: fixture.terminalEvidence(
+                successfulExit: fixture.request.mode == .normal))
+        continuity = try await InvestigationMachineOuterCompletionJoin(
+            prover: admission).seal(
+                selection: selection, result: result, predecessor: predecessor)
+    }
+    let bundle = try InvestigationMachineEpochEvidenceCollection.finish(summary: .init(
+        outerAttemptUUID: attempt, wholeCapsuleSHA256: capsule.wholeCapsuleSHA256,
+        wholeInputSHA256: projected.wholeInputSHA256, completedEpochCount: 8))
+    guard let mutation else { return bundle }
+    return try rewrapEpochBundle(bundle, mutation: mutation)
+}
+private func rewrapEpochBundle(
+    _ bundle: Data, mutation: EpochBundleMutation) throws -> Data {
+    var outer = try OuterInnerWireTranscript(bundle)
+    let target = mutation == .successorPredecessorDigest ||
+        mutation == .repeatedHelper ? 1 : 0
+    let request = try InvestigationMachineDarwinEpochRequest.decodeUntrusted(
+        OuterInnerWireTranscript(outer.fields[target + 4]).fields[4])
+    let invocation: InvestigationMachineSingleEpochInvocation
+    let selection: InvestigationMachineFixedEpochSelection
+    let identityIndex: UInt32
+    switch mutation {
+    case .requestWholeCapsule:
+        selection = .init(
+            outerAttemptUUID: request.invocation.selection.outerAttemptUUID,
+            wholeCapsuleSHA256: try OuterInnerFixture.digest(0xc1),
+            wholeInputSHA256: request.invocation.selection.wholeInputSHA256,
+            epoch: request.invocation.selection.epoch,
+            projection: request.invocation.selection.projection)
+        let genesis = try InvestigationMachineHelperEpochContinuity
+            .genesis(for: selection)
+        let predecessor = try genesis.consume(for: selection)
+        invocation = try predecessor.invocation(for: selection)
+        identityIndex = 0
+    case .requestWholeInput:
+        selection = .init(
+            outerAttemptUUID: request.invocation.selection.outerAttemptUUID,
+            wholeCapsuleSHA256:
+                request.invocation.selection.wholeCapsuleSHA256,
+            wholeInputSHA256: try OuterInnerFixture.digest(0xc2),
+            epoch: request.invocation.selection.epoch,
+            projection: request.invocation.selection.projection)
+        let genesis = try InvestigationMachineHelperEpochContinuity
+            .genesis(for: selection)
+        let predecessor = try genesis.consume(for: selection)
+        invocation = try predecessor.invocation(for: selection)
+        identityIndex = 0
+    case .successorPredecessorDigest:
+        selection = request.invocation.selection
+        let rawInvocation = try OuterInnerWireTranscript(try request.invocation.encoded())
+        var predecessor = try OuterInnerWireTranscript(rawInvocation.fields[5])
+        predecessor.fields[6] = try OuterInnerFixture.digest(0xc3).rawBytes
+        let predecessorBytes = try predecessor.encoded(maximumByteCount: 4_096)
+        invocation = try .init(
+            selection: selection,
+            previousHelperIdentity: request.invocation.previousHelperIdentity,
+            predecessorSHA256: .hashing(predecessorBytes),
+            predecessorTranscript: predecessorBytes)
+        identityIndex = 1
+    case .repeatedHelper:
+        selection = request.invocation.selection
+        invocation = request.invocation
+        identityIndex = 0
+    }
+    let replacement = try OuterInnerFixture(
+        selection: selection, invocation: invocation, predecessor: nil,
+        identityIndex: identityIndex)
+    outer.fields[target + 4] = try makeEpochEvidence(fixture: replacement)
+    return try outer.encoded(maximumByteCount:
+        InvestigationMachineEpochEvidenceBundle.maximumByteCount)
+}
+private func independentlyRecomputedAdmissionSHA256(
+    requestBytes: Data, resultBytes: Data, terminalEvidenceBytes: Data,
+    admissionMaterialBytes: Data
+) throws -> InvestigationHandoffSHA256 {
+    .hashing(try independentlyRecomputedAdmissionTranscript(
+        requestBytes: requestBytes, resultBytes: resultBytes,
+        terminalEvidenceBytes: terminalEvidenceBytes,
+        admissionMaterialBytes: admissionMaterialBytes))
+}
+
+private func independentlyRecomputedAdmissionTranscript(
+    requestBytes: Data, resultBytes: Data, terminalEvidenceBytes: Data,
+    admissionMaterialBytes: Data
+) throws -> Data {
+    let material = try OuterInnerWireTranscript(admissionMaterialBytes)
+    guard material.domain
+            == "stornaut.task39.machine.outer-inner.admission-material",
+        material.fields.count == 4
+    else { throw InvestigationHandoffContractError.invalidEncoding }
+    return try HandoffBinaryTranscript.encode(
+        domain: "stornaut.task39.machine.outer-inner.admission",
+        businessFields: [
+            requestBytes, material.fields[0], material.fields[1],
+            material.fields[2],
+            InvestigationHandoffSHA256.hashing(resultBytes).rawBytes,
+            InvestigationHandoffSHA256.hashing(terminalEvidenceBytes).rawBytes,
+            material.fields[3],
+        ], maximumByteCount: 192 * 1_024)
+}
+
+private func outerInnerData(_ value: UInt32) -> Data {
+    Data([
+        UInt8(truncatingIfNeeded: value >> 24),
+        UInt8(truncatingIfNeeded: value >> 16),
+        UInt8(truncatingIfNeeded: value >> 8),
+        UInt8(truncatingIfNeeded: value),
+    ])
+}
+
+private func outerInnerData(_ value: UUID) -> Data {
+    var bytes = value.uuid
+    return withUnsafeBytes(of: &bytes) { Data($0) }
 }
 
 private final class DeadlineCapturingPhysicalComposer:
@@ -759,8 +1114,11 @@ struct OuterInnerFixture {
     let decision: InvestigationMachineDarwinEpochDecision
 
     init(
-        scenario: InvestigationHandoffScenario, configuration: Data? = nil
-    ) throws {
+        scenario: InvestigationHandoffScenario, configuration: Data? = nil,
+        outerAttemptUUID: UUID? = nil,
+        wholeCapsuleSHA256: InvestigationHandoffSHA256? = nil,
+        wholeInputSHA256: InvestigationHandoffSHA256? = nil,
+        claimRequestBindingSHA256: InvestigationHandoffSHA256? = nil) throws {
         let ordinal = scenario.rawValue - 1
         let configuration = configuration
             ?? Data("outer-inner-\(ordinal)".utf8)
@@ -797,11 +1155,10 @@ struct OuterInnerFixture {
                 "com.eriklee.stornaut.lifecycle.machine-claim"
         )
         selection = .init(
-            outerAttemptUUID: Self.uuid(0x01),
-            wholeCapsuleSHA256: try Self.digest(0x02),
-            wholeInputSHA256: try Self.digest(0x03), epoch: epoch,
-            projection: projection
-        )
+            outerAttemptUUID: outerAttemptUUID ?? Self.uuid(0x01),
+            wholeCapsuleSHA256: try wholeCapsuleSHA256 ?? Self.digest(0x02),
+            wholeInputSHA256: try wholeInputSHA256 ?? Self.digest(0x03),
+            epoch: epoch, projection: projection)
         if ordinal == 0 {
             let continuity = try InvestigationMachineHelperEpochContinuity
                 .genesis(for: selection)
@@ -832,8 +1189,8 @@ struct OuterInnerFixture {
         let helper = try Self.identity(
             role: .helper, pid: 903, version: 13, asid: 93
         )
-        claimEvidence = try .init(
-            requestBindingSHA256: Self.digest(0x51),
+        claimEvidence = try .init(requestBindingSHA256:
+            claimRequestBindingSHA256 ?? Self.digest(0x51),
             originalClaimChallenge: Self.uuid(0x52),
             claimConnectionEpoch: Self.uuid(0x53),
             appIdentity: app, helperIdentity: helper, appUserID: 501,
@@ -848,11 +1205,8 @@ struct OuterInnerFixture {
             ),
             releaseDeadlineNanoseconds: observedAt + 100_000_000_000
         )
-        physicalOwnership = try .init(
-            selection: selection, claimEvidence: claimEvidence,
-            installedL2ProofSHA256: Self.digest(0x52),
-            epochDeadlineNanoseconds: request.epochDeadlineNanoseconds
-        )
+        physicalOwnership = try Self.physicalOwnership(
+            selection: selection, claimEvidence: claimEvidence)
         driverChild = try .init(
             processID: 901, processIDVersion: 11,
             parentProcessID: outerProcessID, processGroupID: 901,
@@ -876,6 +1230,59 @@ struct OuterInnerFixture {
         )
     }
 
+    init(
+        selection: InvestigationMachineFixedEpochSelection,
+        invocation: InvestigationMachineSingleEpochInvocation,
+        predecessor: InvestigationMachineHelperEpochPredecessor?,
+        identityIndex: UInt32) throws {
+        self.selection = selection
+        self.invocation = invocation
+        self.predecessor = predecessor
+        request = try .init(
+            invocation: invocation,
+            epochDeadlineNanoseconds: observedAt + 140_000_000_000)
+        let app = try Self.identity(
+            role: .app, pid: 902 + identityIndex,
+            version: 12 + identityIndex, asid: 92 + identityIndex)
+        let helper = try Self.identity(
+            role: .helper, pid: 912 + identityIndex,
+            version: 22 + identityIndex, asid: 102 + identityIndex)
+        claimEvidence = try .init(
+            requestBindingSHA256: Self.digest(0x51),
+            originalClaimChallenge: Self.uuid(UInt8(0x52 + identityIndex)),
+            claimConnectionEpoch: Self.uuid(UInt8(0x62 + identityIndex)),
+            appIdentity: app, helperIdentity: helper, appUserID: 501,
+            recordedAt: .init(rawValue: 200),
+            claimedAt: .init(rawValue: 300), ownerRetirement: .init(),
+            l1Residue: .init(
+                investigationUUID: selection.epoch.configurationNonce,
+                auditSessionID: helper.auditSessionID, userID: 501,
+                observedAt: .init(rawValue: 100),
+                remainingAuditSessionMembers: 0, matchingLeases: 0,
+                leaseRootEntries: 0, investigationArtifacts: 0),
+            releaseDeadlineNanoseconds: observedAt + 100_000_000_000)
+        physicalOwnership = try Self.physicalOwnership(
+            selection: selection, claimEvidence: claimEvidence)
+        driverChild = try .init(
+            processID: 1_001 + identityIndex,
+            processIDVersion: 31 + identityIndex,
+            parentProcessID: outerProcessID, processGroupID: 1_001 + identityIndex,
+            auditSessionID: 131 + identityIndex, effectiveUserID: 0,
+            auditTokenWords: [0, 0, 0, 0, 0, 1_001 + identityIndex,
+                131 + identityIndex, 31 + identityIndex])
+        appChild = try .init(
+            identity: app, parentProcessID: driverChild.processID,
+            processGroupID: driverChild.processGroupID)
+        ownershipRecord = try .init(
+            request: request, driverChild: driverChild, appChild: appChild,
+            physicalOwnership: physicalOwnership)
+        acknowledgement = try .init(
+            request: request, ownership: ownershipRecord)
+        decision = try .init(
+            request: request, ownership: ownershipRecord,
+            acknowledgement: acknowledgement)
+    }
+
     fileprivate func makeOuterAdmission(
         clock: FixedOuterInnerProtocolClock? = nil
     ) -> InvestigationMachineDarwinOuterAdmission {
@@ -885,11 +1292,14 @@ struct OuterInnerFixture {
         )
     }
 
-    func physicalResult() throws -> InvestigationMachineSingleEpochPhysicalResult {
+    func physicalResult(driverObservationSHA256:
+        InvestigationHandoffSHA256? = nil
+    ) throws -> InvestigationMachineSingleEpochPhysicalResult {
         try .init(
             completing: physicalOwnership,
             claimReleaseSHA256: Self.digest(0x61),
-            driverObservationSHA256: Self.digest(0x62)
+            driverObservationSHA256:
+                driverObservationSHA256 ?? Self.digest(0x62)
         )
     }
 
@@ -1016,6 +1426,48 @@ struct OuterInnerFixture {
         try .init(rawBytes: Data(repeating: byte, count: 32))
     }
 
+    private static func physicalOwnership(
+        selection: InvestigationMachineFixedEpochSelection, claimEvidence:
+            InvestigationMachineClaimEvidence
+    ) throws -> InvestigationMachineSingleEpochPhysicalOwnership {
+        func signing(_ identifier: String, _ marker: UInt8, _ adHoc: Bool) throws -> InvestigationInstalledL2SigningIdentity {
+            try .init(signingIdentifier: identifier, designatedRequirementSHA256:
+                digest(marker), codeDirectoryHash: Data(repeating: marker &+ 1, count: 20), isAdHoc: adHoc)
+        }
+        let projection = selection.projection
+        let appSigning = try signing(projection.appBundleIdentifier, 0xd0, false)
+        let helperSigning = try signing(projection.helperServiceIdentifier + ".helper", 0xd2, false)
+        let driverSigning = try InvestigationInstalledL2SigningIdentity(
+            signingIdentifier: projection.machineDriverSigningIdentifier,
+            designatedRequirementSHA256: projection.machineDriverDesignatedRequirementSHA256,
+            codeDirectoryHash: projection.machineDriverCodeDirectoryHash,
+            isAdHoc: true)
+        let semantic = try InvestigationInstalledL2SemanticContract.evaluate(
+            projection: projection, artifacts: Dictionary(uniqueKeysWithValues:
+                InvestigationInstalledL2ArtifactRole.allCases.map {
+                    ($0, InvestigationInstalledL2ArtifactObservation.presentValid) }),
+            app: try .init(identity: claimEvidence.appIdentity, executableSHA256: projection.appExecutableSHA256,
+                staticSigning: appSigning, liveSigning: appSigning),
+            helper: try .init(identity: claimEvidence.helperIdentity, executableSHA256: projection.helperExecutableSHA256,
+                staticSigning: helperSigning, liveSigning: helperSigning),
+            machineDriver: try .init(executableSHA256: projection.machineDriverExecutableSHA256,
+                staticSigning: driverSigning, liveSigning: driverSigning),
+            service: .loaded(identity: claimEvidence.helperIdentity),
+            started: try .init(wallUTC: .init(rawValue: 400), continuousNanoseconds: 400),
+            observed: try .init(wallUTC: .init(rawValue: 500), continuousNanoseconds: 500))
+        let proof = try InvestigationMachineSingleEpochInstalledL2Join.prove(
+            projection: projection, claimEvidence: claimEvidence, semanticObservation: semantic,
+            repeatedAppIdentity: claimEvidence.appIdentity,
+            epochUUID: selection.epoch.epochUUID, deadlineNanoseconds:
+                1_000_000_000 + 140_000_000_000)
+        let candidate = try InvestigationMachineSingleEpochOwnershipCandidate(
+            commitment: .init(selection: selection), appIdentity: claimEvidence.appIdentity,
+            claimEvidence: claimEvidence, semanticObservation: semantic,
+            repeatedAppIdentity: claimEvidence.appIdentity,
+            installedL2Proof: proof, epochDeadlineNanoseconds: 1_000_000_000 + 140_000_000_000)
+        return try .init(projecting: candidate)
+    }
+
     private static func uuid(_ byte: UInt8) -> UUID {
         UUID(uuid: (byte, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1))
     }
@@ -1108,10 +1560,12 @@ private struct OuterInnerWireTranscript {
         self.fields = fields
     }
 
-    func encoded(domain requestedDomain: String? = nil) throws -> Data {
+    func encoded(
+        domain requestedDomain: String? = nil,
+        maximumByteCount: Int = 128 * 1_024) throws -> Data {
         try HandoffBinaryTranscript.encode(
             domain: requestedDomain ?? domain, businessFields: fields,
-            maximumByteCount: 128 * 1_024
+            maximumByteCount: maximumByteCount
         )
     }
 }

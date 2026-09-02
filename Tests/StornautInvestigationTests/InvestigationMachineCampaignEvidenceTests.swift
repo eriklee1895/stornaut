@@ -5,8 +5,10 @@ import Testing
 @testable import StornautInvestigationMachineCampaign
 @testable import StornautInvestigationHandoffContract
 @testable import StornautInvestigationMachineCampaignSupport
+@testable import StornautInvestigationMachineDriverSupport
 @testable import StornautInvestigationMachineGateCoordinatorSupport
 @testable import StornautInvestigationMachineGateSupport
+@testable import StornautInvestigationInstalledL2
 
 @Suite("Investigation machine campaign evidence", .serialized)
 struct InvestigationMachineCampaignEvidenceTests {
@@ -57,6 +59,72 @@ struct InvestigationMachineCampaignEvidenceTests {
         let result = try privilegedVerifierResult(
             semanticForgery: true, sealName: "semantic-seal.json")
         #expect(result.status != 0)
+    }
+
+    @Test
+    func productionEpochCorpusRoundTripsThroughAllIndependentDecoders() async throws {
+        let fixture = try CampaignEvidenceDiskFixture.make()
+        defer { fixture.remove() }
+        let projectedInput = try fixture.projectedInput()
+        let bundle = try await CampaignEpochCorpus.productionBundle(projectedInput: projectedInput)
+        let transport = try fixture.privilegedTransport(productionBundle: bundle)
+
+        let decoded = try InvestigationMachineEpochEvidenceBundle.decode(transport.bundle)
+        let gate = try InvestigationMachineCampaignRawGateReceiptValidator
+            .validate(transport.rawGateReceipt,
+                expectedAttemptUUID: transport.preArm.outerAttemptUUID,
+                expectedWholeInputSHA256: transport.preArm.wholeProjectedInputSHA256,
+                expectedOuterIdentity: fixture.outerIdentity,
+                finalReceipt: transport.finalReceipt)
+        let validated = try InvestigationMachineCampaignEpochEvidenceValidator
+            .validate(bundle: transport.bundle, projectedInput: transport.projectedInput)
+
+        #expect(decoded.epochs.count == 8)
+        #expect(try decoded.encoded() == transport.bundle)
+        #expect(validated.bytes == transport.bundle)
+        #expect(gate.preparedFrameSHA256.rawBytes.contains { $0 != 0 })
+        #expect(validated.epochs.count == 8)
+        #expect(validated.completionBytes == transport.completion)
+        #expect(validated.epochs.map(\.claimEvidenceSHA256) == transport.epochs.map(\.claimEvidenceSHA256))
+        #expect(validated.epochs.map(\.helperIdentitySHA256) == transport.epochs.map(\.helperIdentitySHA256))
+        #expect(validated.epochs.map(\.completionBindingSHA256) == transport.epochs.map(\.completionBindingSHA256))
+        let verifier = try privilegedVerifierResult(fixture: fixture, transport: transport)
+        #expect(verifier.status == 0, Comment(rawValue: verifier.stderr))
+    }
+
+    @Test(arguments: CampaignEpochSemanticMutation.allCases)
+    fileprivate func campaignEpochValidatorRejectsCanonicalSemanticRewrap(
+        _ mutation: CampaignEpochSemanticMutation) throws {
+        let fixture = try CampaignEvidenceDiskFixture.make()
+        defer { fixture.remove() }
+        let transport = try fixture.privilegedTransport(semanticMutation: mutation)
+
+        if mutation == .claimZeroRequestBinding || mutation == .installedL2ZeroContinuousClocks
+            || mutation == .installedL2ObservedAfterTerminal {
+            #expect(throws: (any Error).self) {
+                _ = try InvestigationMachineEpochEvidenceBundle.decode(transport.bundle)
+            }
+        }
+        #expect(throws: (any Error).self) {
+            _ = try InvestigationMachineCampaignEpochEvidenceValidator.validate(
+                bundle: transport.bundle, projectedInput: transport.projectedInput)
+        }
+    }
+
+    @Test(arguments: CampaignRawGateMutation.allCases)
+    func rawGateValidatorRejectsTransportRewrap(_ mutation: CampaignRawGateMutation) throws {
+        let fixture = try CampaignEvidenceDiskFixture.make()
+        defer { fixture.remove() }
+        let transport = try fixture.privilegedTransport(rawGateMutation: mutation)
+
+        #expect(throws: (any Error).self) {
+            _ = try InvestigationMachineCampaignRawGateReceiptValidator.validate(
+                transport.rawGateReceipt,
+                expectedAttemptUUID: transport.preArm.outerAttemptUUID,
+                expectedWholeInputSHA256: transport.preArm.wholeProjectedInputSHA256,
+                expectedOuterIdentity: fixture.outerIdentity,
+                finalReceipt: transport.finalReceipt)
+        }
     }
 
     @Test
@@ -882,42 +950,69 @@ struct InvestigationMachineCampaignEvidenceTests {
         #expect(result.status != 0)
     }
 
+    @Test(arguments: CampaignDiagnosticMutation.allCases)
+    func independentVerifierRejectsNoncanonicalDiagnosticEnvelope(
+        _ mutation: CampaignDiagnosticMutation) throws {
+        let result = try privilegedVerifierResult(
+            diagnosticMutation: mutation, sealName: "diagnostic-seal.json")
+        #expect(result.status != 0)
+    }
+
+    @Test(arguments: CampaignEpochSemanticMutation.allCases)
+    func independentVerifierRejectsCanonicalEpochSemanticRewrap(
+        _ mutation: CampaignEpochSemanticMutation) throws {
+        let result = try privilegedVerifierResult(
+            epochSemanticMutation: mutation, sealName: "epoch-semantic-seal.json")
+        #expect(result.status != 0)
+    }
+
     @Test(arguments: CampaignVerifierJoinMutation.allCases)
     func independentVerifierRejectsCrossArtifactJoinDrift(
-        _ mutation: CampaignVerifierJoinMutation
-    ) throws {
+        _ mutation: CampaignVerifierJoinMutation) throws {
         let result = try privilegedVerifierResult(
             joinMutation: mutation, sealName: "join-seal.json")
         #expect(result.status != 0)
     }
 
-    private func privilegedVerifierResult(
-        epochCount: Int = 8,
-        semanticForgery: Bool = false,
-        promptVerifierForgery: Bool = false,
+    private func privilegedVerifierResult(epochCount: Int = 8,
+        semanticForgery: Bool = false, promptVerifierForgery: Bool = false,
+        epochSemanticMutation: CampaignEpochSemanticMutation? = nil,
         joinMutation: CampaignVerifierJoinMutation? = nil,
-        sealName: String = "seal.json"
-    ) throws -> CampaignVerifierResult {
+        diagnosticMutation: CampaignDiagnosticMutation? = nil,
+        sealName: String = "seal.json") throws -> CampaignVerifierResult {
         let fixture = try CampaignEvidenceDiskFixture.make()
         defer { fixture.remove() }
+        let transport = try fixture.privilegedTransport(joinMutation: joinMutation,
+            semanticMutation: epochSemanticMutation,
+            diagnosticMutation: diagnosticMutation)
+        return try privilegedVerifierResult(
+            fixture: fixture, transport: transport, epochCount: epochCount,
+            semanticForgery: semanticForgery, promptVerifierForgery: promptVerifierForgery,
+            joinMutation: joinMutation, sealName: sealName)
+    }
+
+    private func privilegedVerifierResult(fixture: CampaignEvidenceDiskFixture,
+        transport: CampaignPrivilegedTransport, epochCount: Int = 8,
+        semanticForgery: Bool = false, promptVerifierForgery: Bool = false,
+        joinMutation: CampaignVerifierJoinMutation? = nil,
+        sealName: String = "seal.json") throws -> CampaignVerifierResult {
         let writer = try fixture.makeWriter(mode: .privileged)
         for (index, kind) in [
             InvestigationMachineAttemptEventKind.prepared, .armedConsumed,
             .spawnObserved, .terminal,
         ].enumerated() {
-            _ = try writer.appendAttemptEvent(
-                kind: kind, payload: try Self.eventPayload(
-                    kind: kind, attempt: fixture.attemptUUID),
+            _ = try writer.appendAttemptEvent(kind: kind,
+                payload: try Self.eventPayload(kind: kind, attempt: fixture.attemptUUID),
                 observedAt: try .init(rawValue: Int64(index + 1)))
         }
         try fixture.populatePrivilegedArtifacts(
             writer, epochCount: epochCount, semanticForgery: semanticForgery,
             promptVerifierForgery: promptVerifierForgery,
-            joinMutation: joinMutation)
+            joinMutation: joinMutation, transport: transport)
         var seal = try writer.finalize()
         if epochCount == 8 {
             seal = try fixture.completePrivilegedCorpus(
-                seal, joinMutation: joinMutation)
+                seal, joinMutation: joinMutation, transport: transport)
         }
         let sealURL = fixture.parent.appending(path: sealName)
         try Self.writeSeal(seal, to: sealURL)
@@ -1160,8 +1255,8 @@ struct InvestigationMachineCampaignEvidenceTests {
         if kind == .cancelledBeforeArm || kind == .spawnUncertain {
             value["reason"] = "fixture"
         } else if kind == .spawnObserved {
-            value["processID"] = 4_001
-            value["processGroupID"] = 4_001
+            value["processID"] = 3_901
+            value["processGroupID"] = 3_901
             value["sessionID"] = 3_901
         }
         return try InvestigationMachineEvidenceJSON.canonicalData(value)
@@ -1212,7 +1307,535 @@ enum CampaignEpochPrefixMutation: CaseIterable {
 }
 
 enum CampaignVerifierJoinMutation: CaseIterable {
-    case sourcePreArm, epochWholeInput, ownershipEncoding
+    case sourcePreArm, epochWholeInput, ownershipEncoding, claimEvidence, helperIdentity, completionBinding, rawPreparedFrame
+    case rawGateStartEnvelope, rawGateCompletionEnvelope, rawCoordinatorIdentity
+}
+enum CampaignRawGateMutation: CaseIterable { case preparedFrameDigest, enclosingStart, enclosingCompletion, coordinatorIdentity }
+enum CampaignDiagnosticMutation: CaseIterable { case leadingBytes, trailingBytes, missingNewline, carriageReturnLineFeed }
+enum CampaignEpochSemanticMutation: CaseIterable {
+    case driverChildNonRoot, driverChildNonRootGroup, driverChildNonRootRealUser
+    case driverChildNonRootRealGroup, driverChildAuditTokenMismatch
+    case claimZeroRequestBinding, driverChildParentDriftAcrossEpochs
+    case appChildHelperRole, appChildWrongParentAndProcessGroup
+    case parentCrashZeroObservationDigests, parentCrashZeroObservedAt
+    case installedL2ZeroContinuousClocks, installedL2ObservedAfterTerminal
+
+    var targetIndex: Int {
+        switch self {
+        case .parentCrashZeroObservationDigests, .parentCrashZeroObservedAt: 6
+        default: 7
+        }
+    }
+}
+
+private struct CampaignPrivilegedTransport {
+    let finalFrame, receiptStream, diagnostic: Data
+    let preArm: InvestigationMachineCampaignPreArmFrame
+    let finalReceipt: InvestigationMachineCoordinatorRawReceiptV1
+    let rawGateReceipt: Data
+    let projectedInput: InvestigationProjectedCohortInput
+    let bundle, completion: Data
+    let epochs: [CampaignEpochArtifactRow]
+
+    var preArmFrameSHA256: InvestigationHandoffSHA256 { preArm.frameSHA256 }
+    var wholeProjectedInputSHA256: InvestigationHandoffSHA256 { projectedInput.wholeInputSHA256 }
+}
+
+private struct CampaignEpochArtifactRow {
+    let installedL2ProofBytes, terminalEvidenceBytes: Data
+    let claimEvidenceSHA256, physicalOwnershipSHA256: InvestigationHandoffSHA256
+    let helperIdentitySHA256, completionBindingSHA256: InvestigationHandoffSHA256
+    init(_ row: CampaignEpochFixtureRow) {
+        installedL2ProofBytes = row.installedL2ProofBytes; terminalEvidenceBytes = row.terminalEvidenceBytes
+        claimEvidenceSHA256 = row.claimEvidenceSHA256; physicalOwnershipSHA256 = row.physicalOwnershipSHA256
+        helperIdentitySHA256 = row.helperIdentitySHA256; completionBindingSHA256 = row.completionBindingSHA256
+    }
+
+    init(_ row: InvestigationMachineCampaignVerifiedEpoch) {
+        installedL2ProofBytes = row.installedL2ProofBytes; terminalEvidenceBytes = row.terminalEvidenceBytes
+        claimEvidenceSHA256 = row.claimEvidenceSHA256; physicalOwnershipSHA256 = row.physicalOwnershipSHA256
+        helperIdentitySHA256 = row.helperIdentitySHA256; completionBindingSHA256 = row.completionBindingSHA256
+    }
+}
+
+private struct CampaignEpochFixtureRow {
+    let encoded, installedL2ProofBytes, terminalEvidenceBytes: Data
+    let claimEvidenceSHA256, physicalOwnershipSHA256: InvestigationHandoffSHA256
+    let helperIdentitySHA256, completionBindingSHA256: InvestigationHandoffSHA256
+    let helperIdentity: InvestigationMachineProcessIdentity
+    let requestPredecessorSHA256, admissionSHA256: InvestigationHandoffSHA256
+}
+
+private struct CampaignProductionClock: InvestigationMachineDarwinOuterInnerCompositionClocking {
+    func continuousNanoseconds() throws -> UInt64 { 1_000_000_000 }
+}
+
+private struct CampaignEpochCorpus {
+    let projectedInput: InvestigationProjectedCohortInput
+    let bundle: Data
+    let epochs: [CampaignEpochFixtureRow]
+    static func make(projectedInput: InvestigationProjectedCohortInput,
+        semanticMutation: CampaignEpochSemanticMutation?) throws -> Self {
+        var rows: [CampaignEpochFixtureRow] = []
+        for index in 0..<InvestigationCohortCapsule.epochCount {
+            let selected = try projectedInput.selection(at: index)
+            let selection = InvestigationMachineFixedEpochSelection(
+                outerAttemptUUID: projectedInput.capsule.outerAttemptUUID, wholeCapsuleSHA256: projectedInput.capsule.wholeCapsuleSHA256,
+                wholeInputSHA256: projectedInput.wholeInputSHA256, epoch: selected.epoch, projection: selected.projection)
+            rows.append(try makeEpoch(selection: selection, previous: rows.last, index: index))
+        }
+
+        if let semanticMutation {
+            let target = semanticMutation.targetIndex
+            rows[target] = try rewrap(rows[target], mutation: semanticMutation)
+            if target + 1 < rows.count {
+                rows[target + 1] = try rebindSuccessor(rows[target + 1], previous: rows[target])
+            }
+        }
+        return try make(projectedInput: projectedInput, epochs: rows)
+    }
+
+    static func productionBundle(projectedInput: InvestigationProjectedCohortInput) async throws -> Data {
+        let attempt = projectedInput.capsule.outerAttemptUUID
+        try InvestigationMachineEpochEvidenceCollection.begin(attemptUUID: attempt)
+        defer { InvestigationMachineEpochEvidenceCollection.abort() }
+        var continuity: InvestigationMachineHelperEpochContinuity?
+        var finalSelection: InvestigationMachineFixedEpochSelection?
+        for index in 0..<InvestigationCohortCapsule.epochCount {
+            let projected = try projectedInput.selection(at: index)
+            let selection = InvestigationMachineFixedEpochSelection(
+                outerAttemptUUID: attempt, wholeCapsuleSHA256: projectedInput.capsule.wholeCapsuleSHA256,
+                wholeInputSHA256: projectedInput.wholeInputSHA256, epoch: projected.epoch, projection: projected.projection)
+            let active = try continuity ?? InvestigationMachineHelperEpochContinuity.genesis(for: selection)
+            let predecessor = try active.consume(for: selection)
+            let invocation = try predecessor.invocation(for: selection)
+            let row = try makeEpoch(selection: selection, previous: nil, index: index, invocation: invocation)
+            let fields = try CampaignWireTranscript(row.encoded).fields
+            let physical = try CampaignWireTranscript(fields[5]).fields
+            let material = try CampaignWireTranscript(fields[7]).fields
+            let request = try InvestigationMachineDarwinEpochRequest.decodeUntrusted(fields[4])
+            let ownership = try InvestigationMachineDarwinEpochOwnershipRecord.decode(material[0])
+            let admission = InvestigationMachineDarwinOuterAdmission(
+                selection: selection, outerProcessID: 4_101,
+                clock: CampaignProductionClock())
+            try await admission.accept(request)
+            let acknowledgement = try await admission.acceptOwnership(ownership,
+                observedDriverChild: ownership.driverChild, observedAppChild: ownership.appChild)
+            _ = try await admission.issueDecision(acknowledgement)
+            let result = try await admission.admit(resultBytes: physical.count == 2 ? physical[1] : Data(),
+                terminalEvidence: InvestigationMachineDarwinEpochTerminalEvidence.decode(fields[6]))
+            continuity = try await InvestigationMachineOuterCompletionJoin(prover: admission)
+                .seal(selection: selection, result: result, predecessor: predecessor)
+            finalSelection = selection
+        }
+        try #require(continuity).destroyAfterFinal(selection: try #require(finalSelection))
+        return try InvestigationMachineEpochEvidenceCollection.finish(summary: .init(
+            outerAttemptUUID: attempt, wholeCapsuleSHA256: projectedInput.capsule.wholeCapsuleSHA256,
+            wholeInputSHA256: projectedInput.wholeInputSHA256,
+            completedEpochCount: 8))
+    }
+
+    func replacingFirstOwnership(with bytes: Data) throws -> Self {
+        var rows = epochs
+        var row = try CampaignWireTranscript(rows[0].encoded); var physical = try CampaignWireTranscript(row.fields[5])
+        physical.fields[0] = bytes
+        row.fields[5] = try physical.encoded(maximumByteCount: 64 * 1_024)
+        rows[0] = CampaignEpochFixtureRow(
+            encoded: try row.encoded(maximumByteCount: InvestigationMachineEpochEvidence.maximumByteCount),
+            installedL2ProofBytes: rows[0].installedL2ProofBytes, terminalEvidenceBytes: rows[0].terminalEvidenceBytes,
+            claimEvidenceSHA256: rows[0].claimEvidenceSHA256,
+            physicalOwnershipSHA256: .hashing(bytes), helperIdentitySHA256: rows[0].helperIdentitySHA256,
+            completionBindingSHA256: rows[0].completionBindingSHA256,
+            helperIdentity: rows[0].helperIdentity, requestPredecessorSHA256: rows[0].requestPredecessorSHA256,
+            admissionSHA256: rows[0].admissionSHA256)
+        return try Self.make(projectedInput: projectedInput, epochs: rows)
+    }
+
+    private static func make(projectedInput: InvestigationProjectedCohortInput,
+        epochs: [CampaignEpochFixtureRow]) throws -> Self {
+        let fields = [
+            campaignData(projectedInput.capsule.outerAttemptUUID), projectedInput.capsule.wholeCapsuleSHA256.rawBytes,
+            projectedInput.wholeInputSHA256.rawBytes, handoffData(UInt32(epochs.count)),
+        ] + epochs.map(\.encoded)
+        let bundle = try HandoffBinaryTranscript.encode(
+            domain: "stornaut.task39.machine.driver-evidence-bundle.v1", businessFields: fields,
+            maximumByteCount: InvestigationMachineEpochEvidenceBundle.maximumByteCount)
+        return .init(projectedInput: projectedInput, bundle: bundle, epochs: epochs)
+    }
+
+    private static func makeEpoch(selection: InvestigationMachineFixedEpochSelection,
+        previous: CampaignEpochFixtureRow?, index: Int,
+        invocation suppliedInvocation: InvestigationMachineSingleEpochInvocation? = nil) throws -> CampaignEpochFixtureRow {
+        let invocation: InvestigationMachineSingleEpochInvocation
+        if let suppliedInvocation {
+            invocation = suppliedInvocation
+        } else if let previous {
+            let predecessor = try HandoffBinaryTranscript.encode(
+                domain: "stornaut.task39.machine.helper-continuity.successor",
+                businessFields: [campaignData(selection.outerAttemptUUID), selection.wholeCapsuleSHA256.rawBytes,
+                    selection.wholeInputSHA256.rawBytes, handoffData(UInt32(index - 1)),
+                    campaignData(CampaignEvidenceFixture.uuid(UInt8(0x30 + index))), try previous.helperIdentity.encoded(),
+                    previous.requestPredecessorSHA256.rawBytes, previous.completionBindingSHA256.rawBytes,
+                    previous.admissionSHA256.rawBytes, Data([index - 1 == 6 ? 2 : 1]),
+                ], maximumByteCount: 4_096)
+            invocation = try .init(selection: selection,
+                previousHelperIdentity: previous.helperIdentity, predecessorSHA256: .hashing(predecessor),
+                predecessorTranscript: predecessor)
+        } else {
+            let predecessor = try HandoffBinaryTranscript.encode(
+                domain: "stornaut.task39.machine.helper-continuity.genesis",
+                businessFields: [campaignData(selection.outerAttemptUUID), selection.wholeCapsuleSHA256.rawBytes,
+                    selection.wholeInputSHA256.rawBytes, handoffData(UInt32(0)),
+                    campaignData(selection.epoch.epochUUID)], maximumByteCount: 512)
+            invocation = try .init(selection: selection, previousHelperIdentity: nil, predecessorSHA256: .hashing(predecessor),
+                predecessorTranscript: predecessor)
+        }
+        let deadline: UInt64 = 2_000_000_000
+        let request = try InvestigationMachineDarwinEpochRequest(
+            invocation: invocation, epochDeadlineNanoseconds: deadline)
+        let app = try identity(role: .app, pid: UInt32(2_000 + index), version: UInt32(20 + index), asid: UInt32(200 + index))
+        let helper = try identity(role: .helper, pid: UInt32(3_000 + index), version: UInt32(30 + index), asid: UInt32(300 + index))
+        let claim = try InvestigationMachineClaimEvidence(
+            requestBindingSHA256: digest(UInt8(0x51 + index)),
+            originalClaimChallenge: CampaignEvidenceFixture.uuid(UInt8(0x61 + index)),
+            claimConnectionEpoch: CampaignEvidenceFixture.uuid(UInt8(0x71 + index)),
+            appIdentity: app, helperIdentity: helper, appUserID: 501,
+            recordedAt: .init(rawValue: 200), claimedAt: .init(rawValue: 300),
+            ownerRetirement: .init(), l1Residue: try .init(
+                investigationUUID: selection.epoch.configurationNonce, auditSessionID: helper.auditSessionID, userID: 501,
+                observedAt: .init(rawValue: 100),
+                remainingAuditSessionMembers: 0, matchingLeases: 0, leaseRootEntries: 0, investigationArtifacts: 0),
+            releaseDeadlineNanoseconds: 1_000_000_000)
+        let semantic = try installedL2(selection: selection, app: app, helper: helper)
+        let proof = try InvestigationMachineSingleEpochInstalledL2Join.prove(
+            projection: selection.projection, claimEvidence: claim,
+            semanticObservation: semantic, repeatedAppIdentity: app, epochUUID: selection.epoch.epochUUID,
+            deadlineNanoseconds: deadline)
+        let candidate = try InvestigationMachineSingleEpochOwnershipCandidate(
+            commitment: .init(selection: selection), appIdentity: app,
+            claimEvidence: claim, semanticObservation: semantic, repeatedAppIdentity: app, installedL2Proof: proof,
+            epochDeadlineNanoseconds: deadline)
+        let ownership = try InvestigationMachineSingleEpochPhysicalOwnership(projecting: candidate)
+        let driver = try InvestigationMachineDarwinDriverChildIdentity(
+            processID: UInt32(4_000 + index), processIDVersion: UInt32(40 + index), parentProcessID: 4_101,
+            processGroupID: UInt32(4_000 + index),
+            auditSessionID: UInt32(400 + index), effectiveUserID: 0,
+            auditTokenWords: [0, 0, 0, 0, 0, UInt32(4_000 + index), UInt32(400 + index), UInt32(40 + index)])
+        let appChild = try InvestigationMachineDarwinAppChildIdentity(
+            identity: app, parentProcessID: driver.processID, processGroupID: driver.processGroupID)
+        let record = try InvestigationMachineDarwinEpochOwnershipRecord(
+            request: request, driverChild: driver, appChild: appChild, physicalOwnership: ownership)
+        let acknowledgement = try InvestigationMachineDarwinEpochAcknowledgement(request: request, ownership: record)
+        let decision = try InvestigationMachineDarwinEpochDecision(
+            request: request, ownership: record,
+            acknowledgement: acknowledgement)
+        let resultBytes: Data
+        let completionBinding: InvestigationHandoffSHA256
+        let observation = digest(UInt8(0x91 + index))
+        if selection.epoch.scenario == .lifecycleRecovery {
+            resultBytes = Data()
+            completionBinding = ownership.bindingSHA256
+        } else {
+            let physical = try InvestigationMachineSingleEpochPhysicalResult(
+                completing: ownership, claimReleaseSHA256: digest(UInt8(0x81 + index)),
+                driverObservationSHA256: observation)
+            resultBytes = try InvestigationMachineDarwinEpochNormalResult(
+                request: request, ownership: record, acknowledgement: acknowledgement, decision: decision,
+                physicalResult: physical).encoded()
+            completionBinding = physical.bindingSHA256
+        }
+        let terminal = try InvestigationMachineDarwinEpochTerminalEvidence(
+            controlEOFObserved: true, resultEOFObserved: true,
+            driverChild: driver, appChild: appChild, helperIdentity: helper,
+            innerExitedSuccessfully: selection.epoch.scenario != .lifecycleRecovery,
+            appAbsent: true, groupLeaderReapedLast: true,
+            postReapGroupEmpty: true, helperAbsent: true, l1ResidueAbsent: true,
+            initialDriverObservationSHA256: observation, finalDriverObservationSHA256: observation,
+            observedAtNanoseconds: 1_000_000_000)
+        let requestBytes = try request.encoded()
+        let ownershipBytes = try ownership.evidenceEncoded()
+        let physicalBytes = try HandoffBinaryTranscript.encode(
+            domain: "stornaut.task39.machine.epoch-physical-evidence.v1",
+            businessFields: resultBytes.isEmpty ? [ownershipBytes] : [ownershipBytes, resultBytes],
+            maximumByteCount: 64 * 1_024)
+        let terminalBytes = try terminal.encoded()
+        let material = try InvestigationMachineEpochAdmissionMaterial(
+            request: request, ownership: record, acknowledgement: acknowledgement, decision: decision,
+            owner: CampaignEvidenceFixture.uuid(UInt8(0xa1 + index)))
+        let materialBytes = try material.encoded()
+        let admission = try admissionSHA256(request: requestBytes, physical: physicalBytes,
+            terminal: terminalBytes, material: materialBytes)
+        let encoded = try HandoffBinaryTranscript.encode(
+            domain: "stornaut.task39.machine.epoch-evidence.v1",
+            businessFields: [
+                handoffData(UInt32(index)), handoffData(selection.epoch.scenario.rawValue), campaignData(selection.epoch.epochUUID),
+                campaignData(selection.epoch.configurationNonce), requestBytes,
+                physicalBytes, terminalBytes, materialBytes, admission.rawBytes,
+            ], maximumByteCount: InvestigationMachineEpochEvidence.maximumByteCount)
+        return .init(encoded: encoded,
+            installedL2ProofBytes: candidate.installedL2ProofBytes, terminalEvidenceBytes: terminalBytes,
+            claimEvidenceSHA256: candidate.claimEvidenceSHA256,
+            physicalOwnershipSHA256: .hashing(ownershipBytes), helperIdentitySHA256: try helper.helperIdentitySHA256(),
+            completionBindingSHA256: completionBinding,
+            helperIdentity: helper,
+            requestPredecessorSHA256: invocation.predecessorSHA256,
+            admissionSHA256: admission)
+    }
+
+    private static func rebindSuccessor(_ row: CampaignEpochFixtureRow,
+        previous: CampaignEpochFixtureRow) throws -> CampaignEpochFixtureRow {
+        var epoch = try CampaignWireTranscript(row.encoded); var request = try CampaignWireTranscript(epoch.fields[4])
+        var invocation = try CampaignWireTranscript(request.fields[0])
+        var predecessor = try CampaignWireTranscript(invocation.fields[5])
+        predecessor.fields[6] = previous.requestPredecessorSHA256.rawBytes
+        predecessor.fields[7] = previous.completionBindingSHA256.rawBytes
+        predecessor.fields[8] = previous.admissionSHA256.rawBytes
+        let predecessorBytes = try predecessor.encoded(maximumByteCount: 4_096)
+        invocation.fields[5] = predecessorBytes
+        invocation.fields[6] = InvestigationHandoffSHA256.hashing(predecessorBytes).rawBytes
+        let invocationBytes = try invocation.encoded(maximumByteCount: 96 * 1_024)
+        request.fields[0] = invocationBytes
+        request.fields[1] = InvestigationHandoffSHA256.hashing(invocationBytes).rawBytes
+        epoch.fields[4] = try request.encoded(maximumByteCount: 128 * 1_024)
+        return try rebuild(epoch, mutation: nil)
+    }
+
+    private static func rewrap(_ row: CampaignEpochFixtureRow,
+        mutation: CampaignEpochSemanticMutation) throws -> CampaignEpochFixtureRow {
+        try rebuild(CampaignWireTranscript(row.encoded), mutation: mutation)
+    }
+
+    private static func rebuild(_ source: CampaignWireTranscript,
+        mutation: CampaignEpochSemanticMutation?) throws -> CampaignEpochFixtureRow {
+        var epoch = source
+        let requestBytes = epoch.fields[4]
+        let request = try InvestigationMachineDarwinEpochRequest.decodeUntrusted(requestBytes)
+        var physical = try CampaignWireTranscript(epoch.fields[5]); var ownership = try CampaignWireTranscript(physical.fields[0])
+        var material = try CampaignWireTranscript(epoch.fields[7]); var record = try CampaignWireTranscript(material.fields[0])
+        var terminal = try CampaignWireTranscript(epoch.fields[6])
+
+        switch mutation {
+        case .driverChildNonRoot:
+            var driver = try CampaignWireTranscript(record.fields[1]); driver.fields[5] = handoffData(UInt32(501))
+            driver.fields[6].replaceSubrange(4..<8, with: handoffData(UInt32(501)))
+            record.fields[1] = try driver.encoded(maximumByteCount: 1_024)
+        case .driverChildNonRootGroup:
+            var driver = try CampaignWireTranscript(record.fields[1]); driver.fields[6].replaceSubrange(8..<12, with: handoffData(UInt32(20)))
+            record.fields[1] = try driver.encoded(maximumByteCount: 1_024)
+        case .driverChildNonRootRealUser:
+            var driver = try CampaignWireTranscript(record.fields[1]); driver.fields[6].replaceSubrange(12..<16, with: handoffData(UInt32(501)))
+            record.fields[1] = try driver.encoded(maximumByteCount: 1_024)
+        case .driverChildNonRootRealGroup:
+            var driver = try CampaignWireTranscript(record.fields[1]); driver.fields[6].replaceSubrange(16..<20, with: handoffData(UInt32(20)))
+            record.fields[1] = try driver.encoded(maximumByteCount: 1_024)
+        case .driverChildAuditTokenMismatch:
+            var driver = try CampaignWireTranscript(record.fields[1]); driver.fields[6].replaceSubrange(20..<24, with: handoffData(UInt32(8_104)))
+            record.fields[1] = try driver.encoded(maximumByteCount: 1_024)
+        case .claimZeroRequestBinding:
+            var claim = try CampaignWireTranscript(ownership.fields[9]); claim.fields[0] = Data(repeating: 0, count: 32)
+            ownership.fields[9] = try claim.encoded(maximumByteCount: 4_096)
+            ownership.fields[10] = InvestigationHandoffSHA256.hashing(ownership.fields[9]).rawBytes
+            var proof = try CampaignWireTranscript(ownership.fields[12])
+            proof.fields[1] = ownership.fields[10]; ownership.fields[12] = try proof.encoded(maximumByteCount: 16_384)
+            ownership.fields[11] = InvestigationHandoffSHA256.hashing(ownership.fields[12]).rawBytes
+        case .driverChildParentDriftAcrossEpochs:
+            var driver = try CampaignWireTranscript(record.fields[1]); driver.fields[2] = handoffData(UInt32(8_103))
+            record.fields[1] = try driver.encoded(maximumByteCount: 1_024)
+        case .appChildHelperRole:
+            var appChild = try CampaignWireTranscript(record.fields[2]); appChild.fields[0] = try identity(role: .helper, pid: 8_001, version: 81, asid: 801).encoded()
+            record.fields[2] = try appChild.encoded(maximumByteCount: 2_048)
+        case .appChildWrongParentAndProcessGroup:
+            var appChild = try CampaignWireTranscript(record.fields[2]); appChild.fields[1] = handoffData(UInt32(8_101))
+            appChild.fields[2] = handoffData(UInt32(8_102))
+            record.fields[2] = try appChild.encoded(maximumByteCount: 2_048)
+        case .parentCrashZeroObservationDigests:
+            terminal.fields[11] = Data(repeating: 0, count: 32); terminal.fields[12] = Data(repeating: 0, count: 32)
+        case .parentCrashZeroObservedAt:
+            terminal.fields[13] = handoffData(UInt64(0))
+        case .installedL2ZeroContinuousClocks:
+            var proof = try CampaignWireTranscript(ownership.fields[12])
+            proof.fields[18] = handoffData(UInt64(0)); proof.fields[20] = handoffData(UInt64(0))
+            ownership.fields[12] = try proof.encoded(maximumByteCount: 16_384)
+            ownership.fields[11] = InvestigationHandoffSHA256.hashing(ownership.fields[12]).rawBytes
+        case .installedL2ObservedAfterTerminal:
+            var proof = try CampaignWireTranscript(ownership.fields[12])
+            proof.fields[20] = handoffData(UInt64(1_500_000_000)); ownership.fields[12] = try proof.encoded(maximumByteCount: 16_384)
+            ownership.fields[11] = InvestigationHandoffSHA256.hashing(ownership.fields[12]).rawBytes
+        case nil:
+            break
+        }
+
+        let selection = request.invocation.selection
+        let bindingFields = Array(ownership.fields[0...5]) + [
+            campaignData(selection.epoch.configurationNonce), selection.epoch.configurationSHA256.rawBytes,
+            selection.epoch.signedRuntimeBindingSHA256.rawBytes, ownership.fields[6],
+        ] + Array(ownership.fields[7...11]) + Array(ownership.fields[13...14])
+        ownership.fields[15] = InvestigationHandoffSHA256.hashing(
+            try HandoffBinaryTranscript.encode(
+                domain: "stornaut.task39.machine.single-epoch.ownership",
+                businessFields: bindingFields, maximumByteCount: 8_192)
+        ).rawBytes
+        let ownershipBytes = try ownership.encoded(maximumByteCount: 32 * 1_024)
+
+        let requestSHA256 = InvestigationHandoffSHA256.hashing(requestBytes)
+        record.fields[0] = requestSHA256.rawBytes; record.fields[3] = ownershipBytes
+        let ownershipSHA256 = InvestigationHandoffSHA256.hashing(ownershipBytes)
+        record.fields[4] = ownershipSHA256.rawBytes
+        let recordBytes = try record.encoded(maximumByteCount: 48 * 1_024)
+        let acknowledgementBytes = try HandoffBinaryTranscript.encode(
+            domain: "stornaut.task39.machine.outer-inner.acknowledgement",
+            businessFields: [requestSHA256.rawBytes, InvestigationHandoffSHA256.hashing(recordBytes).rawBytes,
+                ownershipSHA256.rawBytes], maximumByteCount: 512)
+        let decisionBytes = try HandoffBinaryTranscript.encode(
+            domain: "stornaut.task39.machine.outer-inner.decision",
+            businessFields: [requestSHA256.rawBytes, InvestigationHandoffSHA256.hashing(recordBytes).rawBytes,
+                InvestigationHandoffSHA256.hashing(acknowledgementBytes).rawBytes,
+                Data([request.mode == .normal ? 1 : 2]),
+            ], maximumByteCount: 512)
+        material.fields[0] = recordBytes; material.fields[1] = acknowledgementBytes; material.fields[2] = decisionBytes
+        let materialBytes = try material.encoded(maximumByteCount: 50 * 1_024)
+
+        let resultBytes: Data
+        let completionBinding: InvestigationHandoffSHA256
+        if request.mode == .normal {
+            var result = try CampaignWireTranscript(physical.fields[1])
+            var completion = try CampaignWireTranscript(result.fields[4])
+            completion.fields[0] = ownershipBytes
+            completion.fields[3] = InvestigationHandoffSHA256.hashing(
+                try HandoffBinaryTranscript.encode(
+                    domain: "stornaut.task39.machine.single-epoch.local-completion",
+                    businessFields: [ownership.fields[15], completion.fields[1], completion.fields[2], Data([1])],
+                    maximumByteCount: 2_048)
+            ).rawBytes
+            let completionBytes = try completion.encoded(maximumByteCount: 48 * 1_024)
+            result.fields[0] = requestSHA256.rawBytes; result.fields[1] = InvestigationHandoffSHA256.hashing(recordBytes).rawBytes
+            result.fields[2] = InvestigationHandoffSHA256.hashing(acknowledgementBytes).rawBytes; result.fields[3] = InvestigationHandoffSHA256.hashing(decisionBytes).rawBytes
+            result.fields[4] = completionBytes
+            result.fields[5] = InvestigationHandoffSHA256.hashing(completionBytes).rawBytes
+            resultBytes = try result.encoded(maximumByteCount: 48 * 1_024)
+            physical.fields[1] = resultBytes
+            completionBinding = try InvestigationHandoffSHA256(rawBytes: completion.fields[3])
+        } else {
+            resultBytes = Data()
+            completionBinding = try InvestigationHandoffSHA256(rawBytes: ownership.fields[15])
+        }
+        physical.fields[0] = ownershipBytes
+        let physicalBytes = try physical.encoded(maximumByteCount: 64 * 1_024)
+
+        terminal.fields[2] = record.fields[1]; terminal.fields[3] = record.fields[2]
+        let terminalBytes = try terminal.encoded(maximumByteCount: 2_048)
+        let admission = try admissionSHA256(request: requestBytes, physical: physicalBytes,
+            terminal: terminalBytes, material: materialBytes)
+        epoch.fields[5] = physicalBytes; epoch.fields[6] = terminalBytes
+        epoch.fields[7] = materialBytes; epoch.fields[8] = admission.rawBytes
+        let helper = try InvestigationMachineProcessIdentity.decode(ownership.fields[8])
+        return .init(
+            encoded: try epoch.encoded(maximumByteCount: InvestigationMachineEpochEvidence.maximumByteCount),
+            installedL2ProofBytes: ownership.fields[12], terminalEvidenceBytes: terminalBytes,
+            claimEvidenceSHA256: .hashing(ownership.fields[9]),
+            physicalOwnershipSHA256: ownershipSHA256, helperIdentitySHA256: try helper.helperIdentitySHA256(),
+            completionBindingSHA256: completionBinding,
+            helperIdentity: helper,
+            requestPredecessorSHA256: request.invocation.predecessorSHA256,
+            admissionSHA256: admission)
+    }
+
+    private static func admissionSHA256(request: Data, physical: Data,
+        terminal: Data, material: Data) throws -> InvestigationHandoffSHA256 {
+        let physicalFields = try CampaignWireTranscript(physical).fields, materialFields = try CampaignWireTranscript(material).fields
+        return .hashing(try HandoffBinaryTranscript.encode(
+            domain: "stornaut.task39.machine.outer-inner.admission",
+            businessFields: [
+                request, materialFields[0], materialFields[1], materialFields[2],
+                InvestigationHandoffSHA256.hashing(physicalFields.count == 2 ? physicalFields[1] : Data()).rawBytes,
+                InvestigationHandoffSHA256.hashing(terminal).rawBytes, materialFields[3],
+            ], maximumByteCount: 192 * 1_024))
+    }
+
+    private static func installedL2(selection: InvestigationMachineFixedEpochSelection,
+        app: InvestigationMachineProcessIdentity, helper: InvestigationMachineProcessIdentity) throws -> InvestigationInstalledL2SemanticObservation {
+        func signing(_ identifier: String, _ marker: UInt8, adHoc: Bool) throws -> InvestigationInstalledL2SigningIdentity {
+            try .init(signingIdentifier: identifier,
+                designatedRequirementSHA256: digest(marker), codeDirectoryHash: Data(repeating: marker &+ 1, count: 20),
+                isAdHoc: adHoc)
+        }
+        let projection = selection.projection
+        let appSigning = try signing(projection.appBundleIdentifier, 0xc1, adHoc: false)
+        let helperSigning = try signing(projection.helperServiceIdentifier + ".helper", 0xc3, adHoc: false)
+        let driverSigning = try InvestigationInstalledL2SigningIdentity(
+            signingIdentifier: projection.machineDriverSigningIdentifier, designatedRequirementSHA256: projection.machineDriverDesignatedRequirementSHA256,
+            codeDirectoryHash: projection.machineDriverCodeDirectoryHash,
+            isAdHoc: true)
+        return try InvestigationInstalledL2SemanticContract.evaluate(
+            projection: projection, artifacts: Dictionary(uniqueKeysWithValues: InvestigationInstalledL2ArtifactRole.allCases.map {
+                ($0, InvestigationInstalledL2ArtifactObservation.presentValid) }),
+            app: try .init(identity: app,
+                executableSHA256: projection.appExecutableSHA256, staticSigning: appSigning, liveSigning: appSigning),
+            helper: try .init(identity: helper,
+                executableSHA256: projection.helperExecutableSHA256, staticSigning: helperSigning, liveSigning: helperSigning),
+            machineDriver: try .init(executableSHA256: projection.machineDriverExecutableSHA256,
+                staticSigning: driverSigning, liveSigning: driverSigning),
+            service: .loaded(identity: helper),
+            started: try .init(wallUTC: .init(rawValue: 400), continuousNanoseconds: 400),
+            observed: try .init(wallUTC: .init(rawValue: 500), continuousNanoseconds: 500))
+    }
+
+    private static func identity(role: InvestigationMachineProcessRole, pid: UInt32,
+        version: UInt32, asid: UInt32) throws -> InvestigationMachineProcessIdentity {
+        let user: UInt32 = role == .app ? 501 : 0
+        return try .init(role: role, processID: pid, processIDVersion: version,
+            auditSessionID: asid, effectiveUserID: user,
+            auditTokenWords: [user, user, 20, user, 20, pid, asid, version])
+    }
+
+    private static func digest(_ marker: UInt8) -> InvestigationHandoffSHA256 {
+        InvestigationMachineCampaignEvidenceTests.digest(marker) }
+}
+
+private struct CampaignWireTranscript {
+    let domain: String
+    var fields: [Data]
+    init(_ encoded: Data) throws {
+        var cursor = HandoffBinaryCursor(data: encoded)
+        guard try cursor.readUInt32() == HandoffBinaryTranscript.magic else {
+            throw InvestigationHandoffContractError.invalidEncoding
+        }
+        let domainBytes = try cursor.readTaggedField(expectedTag: 0,
+            admittedByteCounts: 1...HandoffBinaryTranscript.maximumDomainByteCount)
+        guard let domain = String(data: domainBytes, encoding: .utf8) else {
+            throw InvestigationHandoffContractError.invalidEncoding
+        }
+        let version = try cursor.readTaggedField(expectedTag: 1, admittedByteCounts: 4...4)
+        var versionCursor = HandoffBinaryCursor(data: version)
+        guard try versionCursor.readUInt32() == HandoffBinaryTranscript.version,
+            versionCursor.isAtEnd else {
+            throw InvestigationHandoffContractError.invalidEncoding
+        }
+        var values: [Data] = []
+        var tag: UInt16 = 2
+        while !cursor.isAtEnd {
+            values.append(try cursor.readTaggedField(expectedTag: tag, admittedByteCounts: 1...encoded.count))
+            tag += 1
+        }
+        self.domain = domain
+        fields = values
+    }
+
+    func encoded(maximumByteCount: Int) throws -> Data {
+        try HandoffBinaryTranscript.encode(domain: domain, businessFields: fields, maximumByteCount: maximumByteCount)
+    }
+}
+
+private func campaignData(_ value: UUID) -> Data {
+    var bytes = value.uuid
+    return withUnsafeBytes(of: &bytes) { Data($0) }
+}
+
+private func campaignUInt32(_ value: Data) throws -> UInt32 {
+    guard value.count == 4 else {
+        throw InvestigationHandoffContractError.invalidEncoding
+    }
+    return value.reduce(UInt32(0)) { ($0 << 8) | UInt32($1) }
 }
 
 private struct CampaignEvidenceFixture {
@@ -1412,6 +2035,11 @@ private final class CampaignEvidenceDiskFixture {
     let system = DarwinInvestigationMachineRawEvidenceSystem()
     let expectedArtifactCount = 10
     let privilegedArtifactCount = 30
+    let outerIdentity = InvestigationMachineCampaignOuterIdentity(
+        processID: 3_901, processIDVersion: 1, parentProcessID: 3_900,
+        processGroupID: 3_901, sessionID: 3_901,
+        foregroundProcessGroupID: 3_901, effectiveUserID: 501,
+        startTimeSeconds: 1, startTimeMicroseconds: 2)
 
     var evidenceRoot: URL {
         parent.appending(path:
@@ -1507,9 +2135,14 @@ private final class CampaignEvidenceDiskFixture {
         _ writer: InvestigationMachineRawEvidenceWriter,
         epochCount: Int = 8, semanticForgery: Bool = false,
         promptVerifierForgery: Bool = false,
-        joinMutation: CampaignVerifierJoinMutation? = nil
+        epochSemanticMutation: CampaignEpochSemanticMutation? = nil,
+        joinMutation: CampaignVerifierJoinMutation? = nil,
+        transport suppliedTransport: CampaignPrivilegedTransport? = nil
     ) throws {
-        let transport = try privilegedTransport(joinMutation: joinMutation)
+        let transport = try suppliedTransport ?? privilegedTransport(
+            joinMutation: joinMutation,
+            semanticMutation: epochSemanticMutation,
+            rawGateMutation: rawGateMutation(for: joinMutation))
         var values = try commonArtifacts(
             expectedConsumed: true, epochCount: epochCount,
             cancellationAttestation: promptVerifierForgery,
@@ -1525,12 +2158,17 @@ private final class CampaignEvidenceDiskFixture {
             ], at: 5)
         }
         for index in (1...8).prefix(epochCount) {
+            let epoch = transport.epochs[index - 1]
             let l2 = try typed(
                 .epochL2Projection, ordinal: index,
                 wholeProjectedInputSHA256: joinMutation == .epochWholeInput
                     ? InvestigationMachineCampaignEvidenceTests.digest(0xef)
                     : transport.wholeProjectedInputSHA256,
-                physicalOwnershipSHA256: transport.physicalOwnershipSHA256[index - 1])
+                installedL2Proof: epoch.installedL2ProofBytes,
+                claimEvidenceSHA256: joinMutation == .claimEvidence && index == 1
+                    ? InvestigationMachineCampaignEvidenceTests.digest(0xef)
+                    : epoch.claimEvidenceSHA256,
+                physicalOwnershipSHA256: epoch.physicalOwnershipSHA256)
             values.append((
                 .driverEpochs, String(format: "epoch-%02d-l2.json", index),
                 .epochL2Projection, .strictJSON, l2
@@ -1542,7 +2180,16 @@ private final class CampaignEvidenceDiskFixture {
                     .epochResidueProjection, ordinal: index,
                     l2ArtifactSHA256: semanticForgery && index == epochCount
                         ? InvestigationMachineCampaignEvidenceTests.digest(0xfe)
-                        : .hashing(l2)
+                        : .hashing(l2),
+                    terminalEvidence: epoch.terminalEvidenceBytes,
+                    helperIdentitySHA256:
+                        joinMutation == .helperIdentity && index == 1
+                            ? InvestigationMachineCampaignEvidenceTests.digest(0xef)
+                            : epoch.helperIdentitySHA256,
+                    completionBindingSHA256:
+                        joinMutation == .completionBinding && index == 1
+                            ? InvestigationMachineCampaignEvidenceTests.digest(0xef)
+                            : epoch.completionBindingSHA256
                 )
             ))
         }
@@ -1564,8 +2211,16 @@ private final class CampaignEvidenceDiskFixture {
         ]
     }
 
-    func completePrivilegedCorpus(_ seal: InvestigationMachineRawEvidenceSeal, joinMutation: CampaignVerifierJoinMutation? = nil) throws -> InvestigationMachineRawEvidenceSeal {
-        let transport = try privilegedTransport(joinMutation: joinMutation)
+    func completePrivilegedCorpus(
+        _ seal: InvestigationMachineRawEvidenceSeal,
+        joinMutation: CampaignVerifierJoinMutation? = nil,
+        epochSemanticMutation: CampaignEpochSemanticMutation? = nil,
+        transport suppliedTransport: CampaignPrivilegedTransport? = nil
+    ) throws -> InvestigationMachineRawEvidenceSeal {
+        let transport = try suppliedTransport ?? privilegedTransport(
+            joinMutation: joinMutation,
+            semanticMutation: epochSemanticMutation,
+            rawGateMutation: rawGateMutation(for: joinMutation))
         let receiptURL = evidenceRoot.appending(path: "04-driver-epochs/coordinator-receipt.bin")
         try transport.receiptStream.write(to: receiptURL); try #require(chmod(receiptURL.path, 0o600) == 0)
         let manifestURL = evidenceRoot.appending(path: "manifest.bin")
@@ -1579,37 +2234,89 @@ private final class CampaignEvidenceDiskFixture {
         return InvestigationMachineRawEvidenceSeal(campaignUUID: campaignUUID, attemptUUID: attemptUUID, rootIdentity: seal.rootIdentity, manifestSHA256: manifest.manifestSHA256, contentRootSHA256: manifest.contentRootSHA256, artifactCount: manifest.artifacts.count, totalByteCount: manifest.totalByteCount, attemptSummary: seal.attemptSummary)
     }
 
-    private func privilegedTransport(joinMutation: CampaignVerifierJoinMutation? = nil) throws -> (finalFrame: Data, receiptStream: Data, diagnostic: Data, preArmFrameSHA256: InvestigationHandoffSHA256, wholeProjectedInputSHA256: InvestigationHandoffSHA256, physicalOwnershipSHA256: [InvestigationHandoffSHA256]) {
+    fileprivate func privilegedTransport(
+        joinMutation: CampaignVerifierJoinMutation? = nil,
+        semanticMutation: CampaignEpochSemanticMutation? = nil,
+        rawGateMutation: CampaignRawGateMutation? = nil,
+        diagnosticMutation: CampaignDiagnosticMutation? = nil,
+        productionBundle: Data? = nil
+    ) throws -> CampaignPrivilegedTransport {
+        let rawGateMutation = rawGateMutation ?? self.rawGateMutation(for: joinMutation)
         let projected = try projectedInput(), projectedBytes = try projected.encoded()
         let digest = InvestigationMachineCampaignEvidenceTests.digest
         let fixed = [handoffData(attemptUUID), projected.capsule.wholeCapsuleSHA256.rawBytes, projected.wholeInputSHA256.rawBytes]
         let preArm = try selfBoundTranscript("stornaut.task39.iic.coordinator-prearm.v1", [Data(sourceBinding.repositoryHEAD.utf8), Data(sourceBinding.repositoryTree.utf8), sourceBinding.canonicalSourceManifestSHA256.rawBytes, sourceBinding.buildProvenanceSHA256.rawBytes, sourceBinding.signedRuntimeBindingSHA256.rawBytes] + fixed + [projectedBytes], maximum: InvestigationMachineCampaignPreArmFrame.maximumByteCount)
-        var epochBytes: [Data] = [], ownershipSHA256: [InvestigationHandoffSHA256] = []
-        for index in 1...8 {
-            let l2Proof = Data([UInt8(index)])
-            let ownership = joinMutation == .ownershipEncoding && index == 1
-                ? Data("not-canonical-ownership".utf8)
-                : try transcript("stornaut.task39.machine.physical-ownership.evidence-v1", fixed + [handoffData(CampaignEvidenceFixture.uuid(UInt8(0x30 + index))), handoffData(UInt32(index - 1)), handoffData(UInt32(index)), digest(0x77).rawBytes, Data([1]), Data([2]), Data([3]), digest(0x78).rawBytes, InvestigationHandoffSHA256.hashing(l2Proof).rawBytes, l2Proof, handoffData(UInt64(100)), handoffData(UInt64(200)), digest(0x79).rawBytes], maximum: 32 << 10)
-            ownershipSHA256.append(.hashing(ownership))
-            let physical = try transcript("stornaut.task39.machine.epoch-physical-evidence.v1", index == 7 ? [ownership] : [ownership, Data([4])], maximum: 64 << 10)
-            epochBytes.append(try transcript("stornaut.task39.machine.epoch-evidence.v1", [handoffData(UInt32(index - 1)), handoffData(UInt32(index)), handoffData(CampaignEvidenceFixture.uuid(UInt8(0x30 + index))), handoffData(CampaignEvidenceFixture.uuid(UInt8(0x40 + index))), Data([5]), physical, Data([UInt8(0xc0 + index)]), digest(0x7a).rawBytes], maximum: 64 << 10))
+        let preArmValue = try InvestigationMachineCampaignPreArmFrame.decode(preArm)
+        var corpus = try CampaignEpochCorpus.make(
+            projectedInput: projected, semanticMutation: semanticMutation)
+        if joinMutation == .ownershipEncoding {
+            corpus = try corpus.replacingFirstOwnership(
+                with: Data("not-canonical-ownership".utf8))
         }
-        let bundle = try transcript("stornaut.task39.machine.driver-evidence-bundle.v1", fixed + [handoffData(UInt32(8))] + epochBytes, maximum: 512 << 10)
+        let bundle = productionBundle ?? corpus.bundle
+        let epochs = try productionBundle.map { bundle in
+            try InvestigationMachineCampaignEpochEvidenceValidator.validate(
+                bundle: bundle, projectedInput: projected).epochs.map(
+                    CampaignEpochArtifactRow.init)
+        } ?? corpus.epochs.map(CampaignEpochArtifactRow.init)
         let completion = try selfBoundTranscript("stornaut.task39.machine.driver-completion-v2", fixed + [handoffData(UInt32(8)), InvestigationHandoffSHA256.hashing(bundle).rawBytes], maximum: 512)
         let node = InvestigationMachineGateNodeObservation(device: 101, inode: 102, generation: 103, size: Int64(projectedBytes.count))
         let tty = { (foreground: pid_t) in InvestigationMachineGateTerminalObservation(device: 9, inode: 10, foregroundProcessGroupID: foreground) }
+        let gateStarted: UInt64 = 20
+        let gateCompleted: UInt64 = 30
+        let outerPID: pid_t = rawGateMutation == .coordinatorIdentity ? 3_902 : 3_901
+        let gatePrepared = try InvestigationMachineGatePreparedFrame(
+            gateProcessID: 4_001, coordinatorProcessID: outerPID,
+            sessionID: outerPID, childProcessID: 4_101,
+            recoveryProcessGroupID: 4_001,
+            savedForegroundProcessGroupID: outerPID,
+            childParentProcessID: 4_001, childSessionID: outerPID,
+            childStartSeconds: 1, childStartMicroseconds: 2,
+            initialStopStatus: 0x7f, outerAttemptUUID: attemptUUID,
+            wholeInputSHA256: projected.wholeInputSHA256, capsule: node,
+            terminal: tty(outerPID), absoluteDeadlineNanoseconds:
+                gateStarted + 1_200_000_000_000).encoded()
         let raw = try InvestigationMachineGateTransportReceipt(
-            launcherExecutableSHA256: digest(0x74), outerAttemptUUID: attemptUUID, wholeInputSHA256: projected.wholeInputSHA256, preparedFrameSHA256: digest(0x75),
-            capsule: node, gateProcessID: 4_001, coordinatorProcessID: 3_901, sessionID: 3_901, recoveryProcessGroupID: 4_001, savedForegroundProcessGroupID: 3_901,
-            childIdentity: .init(processID: 4_101, parentProcessID: 4_001, processGroupID: 4_001, sessionID: 3_901, startSeconds: 1, startMicroseconds: 2),
+            launcherExecutableSHA256: digest(0x74), outerAttemptUUID: attemptUUID, wholeInputSHA256: projected.wholeInputSHA256, preparedFrameSHA256: rawGateMutation == .preparedFrameDigest ? digest(0x75) : .hashing(gatePrepared),
+            capsule: node, gateProcessID: 4_001, coordinatorProcessID: outerPID, sessionID: outerPID, recoveryProcessGroupID: 4_001, savedForegroundProcessGroupID: outerPID,
+            childIdentity: .init(processID: 4_101, parentProcessID: 4_001, processGroupID: 4_001, sessionID: outerPID, startSeconds: 1, startMicroseconds: 2),
             input: .init(node: node, initialOffset: 0, finalOffset: Int64(projectedBytes.count), reachedEOF: true, sha256: projected.wholeInputSHA256),
-            initialTerminal: tty(3_901), childTerminal: tty(4_001), finalTerminal: tty(3_901), output: .init(byteCount: completion.count, sha256: .hashing(completion), overflowObserved: false),
-            waitClassification: .exited(status: 0), forwardedSignal: nil, monotonicStartedNanoseconds: 10, monotonicCompletedNanoseconds: 20, terminationProgression: .natural, childProcessGroupEmpty: true, exactChildReaped: true, savedForegroundProcessGroupRestored: true, borrowedDescriptorOutcome: .closed).encoded()
-        let final = try CampaignCoordinatorReceiptFixture.frame(attemptUUID: attemptUUID, capsuleSize: Int64(projectedBytes.count), buildProvenanceSHA256: sourceBinding.buildProvenanceSHA256.lowercaseHex, signedBindingSHA256: sourceBinding.signedRuntimeBindingSHA256, wholeInputSHA256: projected.wholeInputSHA256, gateTransportReceiptSHA256: .hashing(raw))
-        return (final, framed(preArm) + framed(raw) + final, Data(("STORNAUT_TASK39_IIC_EPOCH_BUNDLE_V1 " + bundle.base64EncodedString() + "\n").utf8), try InvestigationMachineCampaignPreArmFrame.decode(preArm).frameSHA256, projected.wholeInputSHA256, ownershipSHA256)
+            initialTerminal: tty(outerPID), childTerminal: tty(4_001), finalTerminal: tty(outerPID), output: .init(byteCount: completion.count, sha256: .hashing(completion), overflowObserved: false),
+            waitClassification: .exited(status: 0), forwardedSignal: nil, monotonicStartedNanoseconds: gateStarted, monotonicCompletedNanoseconds: gateCompleted, terminationProgression: .natural, childProcessGroupEmpty: true, exactChildReaped: true, savedForegroundProcessGroupRestored: true, borrowedDescriptorOutcome: .closed).encoded()
+        let final = try CampaignCoordinatorReceiptFixture.frame(attemptUUID: attemptUUID, capsuleSize: Int64(projectedBytes.count), buildProvenanceSHA256: sourceBinding.buildProvenanceSHA256.lowercaseHex, signedBindingSHA256: sourceBinding.signedRuntimeBindingSHA256, wholeInputSHA256: projected.wholeInputSHA256, gateTransportReceiptSHA256: .hashing(raw), gateSessionID: outerPID, monotonicStartedNanoseconds: rawGateMutation == .enclosingStart ? gateStarted : 10, monotonicCompletedNanoseconds: rawGateMutation == .enclosingCompletion ? gateCompleted : 40)
+        let canonicalDiagnostic = Data(("STORNAUT_TASK39_IIC_EPOCH_BUNDLE_V1 "
+            + bundle.base64EncodedString() + "\n").utf8)
+        let diagnostic = switch diagnosticMutation {
+        case .leadingBytes: Data("noise\n".utf8) + canonicalDiagnostic
+        case .trailingBytes: canonicalDiagnostic + Data("noise\n".utf8)
+        case .missingNewline: Data(canonicalDiagnostic.dropLast())
+        case .carriageReturnLineFeed:
+            Data(canonicalDiagnostic.dropLast()) + Data("\r\n".utf8)
+        case nil: canonicalDiagnostic
+        }
+        return .init(
+            finalFrame: final, receiptStream: framed(preArm) + framed(raw) + final,
+            diagnostic: diagnostic,
+            preArm: preArmValue,
+            finalReceipt: try InvestigationMachineCoordinatorRawReceiptV1
+                .decodeFrame(final, reachedEOF: true),
+            rawGateReceipt: raw, projectedInput: projected, bundle: bundle,
+            completion: completion, epochs: epochs)
     }
 
-    private func projectedInput() throws -> InvestigationProjectedCohortInput {
+    private func rawGateMutation(
+        for mutation: CampaignVerifierJoinMutation?
+    ) -> CampaignRawGateMutation? {
+        switch mutation {
+        case .rawPreparedFrame: .preparedFrameDigest
+        case .rawGateStartEnvelope: .enclosingStart
+        case .rawGateCompletionEnvelope: .enclosingCompletion
+        case .rawCoordinatorIdentity: .coordinatorIdentity
+        default: nil
+        }
+    }
+
+    fileprivate func projectedInput() throws -> InvestigationProjectedCohortInput {
         let projections = try (1...8).map(projection)
         let epochs = try projections.enumerated().map { offset, projection in
             let index = offset + 1, bytes = Data([UInt8(index)])
@@ -1627,7 +2334,7 @@ private final class CampaignEvidenceDiskFixture {
     }
     private func framed(_ bytes: Data) -> Data { handoffData(UInt32(bytes.count)) + bytes }
 
-    private func typed(_ role: InvestigationMachineEvidenceRole, ordinal: Int = 0, l2ArtifactSHA256: InvestigationHandoffSHA256? = nil, cancellationAttestation: Bool = false, expectedConsumed: Bool = true, preArmFrameSHA256: InvestigationHandoffSHA256? = nil, wholeProjectedInputSHA256: InvestigationHandoffSHA256? = nil, physicalOwnershipSHA256: InvestigationHandoffSHA256? = nil) throws -> Data {
+    private func typed(_ role: InvestigationMachineEvidenceRole, ordinal: Int = 0, l2ArtifactSHA256: InvestigationHandoffSHA256? = nil, cancellationAttestation: Bool = false, expectedConsumed: Bool = true, preArmFrameSHA256: InvestigationHandoffSHA256? = nil, wholeProjectedInputSHA256: InvestigationHandoffSHA256? = nil, installedL2Proof: Data? = nil, claimEvidenceSHA256: InvestigationHandoffSHA256? = nil, physicalOwnershipSHA256: InvestigationHandoffSHA256? = nil, terminalEvidence: Data? = nil, helperIdentitySHA256: InvestigationHandoffSHA256? = nil, completionBindingSHA256: InvestigationHandoffSHA256? = nil) throws -> Data {
         let digest = InvestigationMachineCampaignEvidenceTests.digest
         let hex: (UInt8) -> String = { digest($0).lowercaseHex }
         var value: [String: Any] = ["schemaVersion": 1, "role": roleName(role), "campaignUUID": campaignUUID.uuidString.lowercased(), "attemptUUID": attemptUUID.uuidString.lowercased()]
@@ -1645,11 +2352,11 @@ private final class CampaignEvidenceDiskFixture {
         case .noAuthModelNetworkCounters:
             fields = ["authInvocationCount": 0, "modelInvocationCount": 0, "networkInvocationCount": 0, "credentialTranscriptByteCount": 0]
         case .epochL2Projection:
-            let projection = try projection(ordinal: ordinal), bytes = try projection.encoded(), proof = Data([UInt8(ordinal)])
-            fields = ["ordinal": ordinal, "scenario": InvestigationMachineEvidenceJSON.scenarios[ordinal - 1], "epochUUID": projection.epochUUID.uuidString.lowercased(), "configurationNonce": projection.configurationNonce.uuidString.lowercased(), "configurationSHA256": projection.configurationSHA256.lowercaseHex, "signedRuntimeBindingSHA256": projection.signedRuntimeBindingSHA256.lowercaseHex, "wholeProjectedInputSHA256": wholeProjectedInputSHA256?.lowercaseHex ?? hex(0x73), "projectionBase64": bytes.base64EncodedString(), "projectionSHA256": projection.projectionSHA256.lowercaseHex, "installedL2ProofBase64": proof.base64EncodedString(), "installedL2ProofSHA256": InvestigationHandoffSHA256.hashing(proof).lowercaseHex, "claimEvidenceSHA256": hex(UInt8(0x80 + ordinal)), "physicalOwnershipSHA256": physicalOwnershipSHA256?.lowercaseHex ?? hex(UInt8(0x90 + ordinal))]
+            let projection = try projection(ordinal: ordinal), bytes = try projection.encoded(), proof = installedL2Proof ?? Data([UInt8(ordinal)])
+            fields = ["ordinal": ordinal, "scenario": InvestigationMachineEvidenceJSON.scenarios[ordinal - 1], "epochUUID": projection.epochUUID.uuidString.lowercased(), "configurationNonce": projection.configurationNonce.uuidString.lowercased(), "configurationSHA256": projection.configurationSHA256.lowercaseHex, "signedRuntimeBindingSHA256": projection.signedRuntimeBindingSHA256.lowercaseHex, "wholeProjectedInputSHA256": wholeProjectedInputSHA256?.lowercaseHex ?? hex(0x73), "projectionBase64": bytes.base64EncodedString(), "projectionSHA256": projection.projectionSHA256.lowercaseHex, "installedL2ProofBase64": proof.base64EncodedString(), "installedL2ProofSHA256": InvestigationHandoffSHA256.hashing(proof).lowercaseHex, "claimEvidenceSHA256": claimEvidenceSHA256?.lowercaseHex ?? hex(UInt8(0x80 + ordinal)), "physicalOwnershipSHA256": physicalOwnershipSHA256?.lowercaseHex ?? hex(UInt8(0x90 + ordinal))]
         case .epochResidueProjection:
-            let terminal = Data([UInt8(0xc0 + ordinal)])
-            fields = ["ordinal": ordinal, "scenario": InvestigationMachineEvidenceJSON.scenarios[ordinal - 1], "epochUUID": CampaignEvidenceFixture.uuid(UInt8(0x30 + ordinal)).uuidString.lowercased(), "l2ArtifactSHA256": try #require(l2ArtifactSHA256).lowercaseHex, "helperIdentitySHA256": hex(UInt8(0xa0 + ordinal)), "completionBindingSHA256": hex(UInt8(0xb0 + ordinal)), "terminalEvidenceBase64": terminal.base64EncodedString(), "terminalEvidenceSHA256": InvestigationHandoffSHA256.hashing(terminal).lowercaseHex, "childCount": 0, "descendantCount": 0, "openChannelCount": 0, "ownedProcessGroupMemberCount": 0, "helperExitObserved": true, "artifactsRetired": true]
+            let terminal = terminalEvidence ?? Data([UInt8(0xc0 + ordinal)])
+            fields = ["ordinal": ordinal, "scenario": InvestigationMachineEvidenceJSON.scenarios[ordinal - 1], "epochUUID": CampaignEvidenceFixture.uuid(UInt8(0x30 + ordinal)).uuidString.lowercased(), "l2ArtifactSHA256": try #require(l2ArtifactSHA256).lowercaseHex, "helperIdentitySHA256": helperIdentitySHA256?.lowercaseHex ?? hex(UInt8(0xa0 + ordinal)), "completionBindingSHA256": completionBindingSHA256?.lowercaseHex ?? hex(UInt8(0xb0 + ordinal)), "terminalEvidenceBase64": terminal.base64EncodedString(), "terminalEvidenceSHA256": InvestigationHandoffSHA256.hashing(terminal).lowercaseHex, "childCount": 0, "descendantCount": 0, "openChannelCount": 0, "ownedProcessGroupMemberCount": 0, "helperExitObserved": true, "artifactsRetired": true]
         case .uninstallEvidence:
             fields = ["transactionReceiptSHA256": hex(0xd2), "installedIdentitySHA256": hex(0x65), "plistSHA256": hex(0x67), "appExecutableSHA256": hex(0x71), "helperExecutableSHA256": hex(0x72), "machineDriverExecutableSHA256": hex(0x73), "gateExecutableSHA256": hex(0x74), "coordinatorExecutableSHA256": hex(0xe5), "bootoutCompleted": true, "installedRootRemoved": true, "installedAppRemoved": true, "plistRemoved": true, "runtimeRootRemoved": true, "leaseRootRemoved": true]
         case .globalPostTeardown:
@@ -1833,7 +2540,10 @@ private struct CampaignCoordinatorReceiptFixture {
         wholeInputSHA256: InvestigationHandoffSHA256 =
             InvestigationMachineCampaignEvidenceTests.digest(0x73),
         gateTransportReceiptSHA256: InvestigationHandoffSHA256 =
-            InvestigationMachineCampaignEvidenceTests.digest(0x75)
+            InvestigationMachineCampaignEvidenceTests.digest(0x75),
+        gateSessionID: pid_t = 3_901,
+        monotonicStartedNanoseconds: UInt64 = 10,
+        monotonicCompletedNanoseconds: UInt64 = 20
     ) throws -> Data {
         let payload = try InvestigationMachineGateCoordinatorReceiptV1(
             buildProvenanceSHA256: buildProvenanceSHA256,
@@ -1846,12 +2556,12 @@ private struct CampaignCoordinatorReceiptFixture {
                 InvestigationMachineCampaignEvidenceTests.digest(0x74),
             gateTransportReceiptSHA256: gateTransportReceiptSHA256,
             gateProcessID: 4_001, gateProcessGroupID: 4_001,
-            gateSessionID: 3_901, exactGateWaitClassification: .exited(status: 0),
+            gateSessionID: gateSessionID, exactGateWaitClassification: .exited(status: 0),
             receiptReachedEOF: true, receiptOverflowObserved: false,
             receiptDeadlineExpired: false, capsuleSettlementRemoved: true,
             attemptBaseRetired: true, runtimeArtifactsRetired: true,
-            monotonicStartedNanoseconds: 10,
-            monotonicCompletedNanoseconds: 20).encoded()
+            monotonicStartedNanoseconds: monotonicStartedNanoseconds,
+            monotonicCompletedNanoseconds: monotonicCompletedNanoseconds).encoded()
         let count = UInt32(payload.count)
         return Data([
             UInt8(count >> 24), UInt8(truncatingIfNeeded: count >> 16),

@@ -1,6 +1,6 @@
 #!/bin/zsh -f
 set -euo pipefail
-typeset -r iicc_self_sha=398038094121f7269170cc0802077de6b85a467feb632db09307a9446e0ac59c # iicc-self-seal
+typeset -r iicc_self_sha=56feffdc21e0e6472d2e641ea6721de0520657ae76354a3586c530348db76adb # iicc-self-seal
 if [[ $0 != /dev/fd/9 ]]; then
     self=${0:A}
     [[ -f $self && ! -L $self ]] || exit 2
@@ -43,6 +43,8 @@ MAX_EVENT = 4_608
 MAX_EVENT_PAYLOAD = 4_096
 MAX_RECEIPT = 4_096
 MAX_CAPSULE = 1_069_056
+MAX_EPOCH = 256 << 10
+MAX_BUNDLE = 3 << 20
 SCENARIOS = ("success", "cancellation", "timeout", "invalidEnvelope",
     "identityMismatch", "transportLoss", "lifecycleRecovery", "artifactCleanupFailure")
 ROLE_NAMES = {1: "sourceBuildIdentity", 2: "builtStagingInstalledIdentity",
@@ -293,9 +295,70 @@ def parse_projection(data):
         2_048)
     zeroed = list(fields); zeroed[14] = bytes(32)
     require(hashlib.sha256(encode_transcript("stornaut.task39.installed-l2.identity-projection", zeroed)).digest() == fields[14], "projection self hash")
-    return {"epoch": uuid_text(fields[0]), "nonce": uuid_text(fields[1]),
-            "configuration": fields[3].hex(), "signed": fields[4].hex(),
-            "app": fields[5].hex(), "helper": fields[7].hex(), "driver": fields[9].hex(), "sha": fields[14].hex()}
+    require(i64(fields[2]) > 0 and uuid_text(fields[0]) != uuid_text(fields[1])
+            and len(fields[12]) in (20,32)
+            and text(fields[6]) == "com.eriklee.stornaut"
+            and text(fields[8]) == "com.eriklee.stornaut.lifecycle"
+            and text(fields[10]) == "com.eriklee.stornaut.investigation.machine-driver"
+            and text(fields[13]) == "com.eriklee.stornaut.lifecycle.machine-claim",
+            "projection semantics")
+    return {"epoch":uuid_text(fields[0]),"nonce":uuid_text(fields[1]),"validBefore":i64(fields[2]),
+        "configuration":fields[3].hex(),"signed":fields[4].hex(),"app":fields[5].hex(),"helper":fields[7].hex(),
+        "driver":fields[9].hex(),"appID":text(fields[6]),"helperID":text(fields[8]),"driverID":text(fields[10]),
+        "driverRequirement":fields[11],"driverCodeHash":fields[12],"sha":fields[14].hex(),"raw":data}
+def parse_epoch_descriptor(data):
+    fields = parse_transcript(data, "stornaut.task39.l3c3cii.cohort.epoch", [(4,4),(16,16),(4,4),(16,16),(4,4),(32,32),(32,32),(1,65536)], 66_048)
+    ordinal, scenario = u32(fields[0]), u32(fields[2])
+    epoch, nonce = uuid_text(fields[1]), uuid_text(fields[3])
+    require(ordinal < 8 and scenario == ordinal + 1 and epoch != nonce
+            and u32(fields[4]) == len(fields[7])
+            and hashlib.sha256(fields[7]).digest() == fields[5], "cohort epoch")
+    return {"ordinal":ordinal,"scenario":scenario,"epoch":epoch,"nonce":nonce,
+        "configuration":fields[5],"signed":fields[6],"raw":data}
+def parse_capsule(data):
+    fields = parse_transcript(data, "stornaut.task39.l3c3cii.cohort", [(16,16),(4,4),(32,32)]+[(1,66_048)]*8, 1_048_576)
+    require(u32(fields[1]) == 8, "capsule count")
+    zeroed = list(fields); zeroed[2] = bytes(32)
+    require(hashlib.sha256(encode_transcript("stornaut.task39.l3c3cii.cohort", zeroed)).digest() == fields[2], "capsule self hash")
+    epochs = [parse_epoch_descriptor(value) for value in fields[3:]]
+    require([value["ordinal"] for value in epochs] == list(range(8))
+            and [value["scenario"] for value in epochs] == list(range(1,9))
+            and len({uuid_text(fields[0])} | {value["epoch"] for value in epochs}
+                    | {value["nonce"] for value in epochs}) == 17, "capsule identities")
+    return {"attempt":uuid_text(fields[0]),"sha":fields[2],"epochs":epochs,"raw":data}
+def parse_process_identity(data, expected_role=None):
+    fields = parse_transcript(data, "stornaut.task39.machine-claim.process-identity", [(1,1),(4,4),(4,4),(4,4),(4,4),(32,32)], 1_024)
+    role = fields[0][0]; require(role in (1,2), "process role")
+    pid, version, session, user = map(u32, fields[1:5])
+    words = struct.unpack(">8I", fields[5])
+    require(pid > 1 and version > 0 and session > 0
+            and user == (501 if role == 1 else 0)
+            and words[1] == user and words[5] == pid
+            and words[6] == session and words[7] == version
+            and (expected_role is None or role == expected_role), "process identity")
+    helper = None
+    if role == 2:
+        helper = hashlib.sha256(encode_transcript("stornaut.task39.machine-claim.helper-identity",
+            [struct.pack(">I",value) for value in (pid,version,session,user,*words)])).digest()
+    return {"role":role,"pid":pid,"version":version,"session":session,"user":user,"raw":data,"sha":helper}
+def parse_claim(data):
+    fields = parse_transcript(data, "stornaut.task39.machine-claim.evidence", [(32,32),(16,16),(16,16),(1,1024),(1,1024),(4,4),(8,8),(8,8),(1,512),(1,1024),(8,8)], 4_096)
+    app, helper = parse_process_identity(fields[3], 1), parse_process_identity(fields[4], 2)
+    retirement = parse_transcript(fields[8], "stornaut.task39.machine-claim.owner-retirement", [(1,1)]*4, 512)
+    require(retirement == [b"\x02",b"\x01",b"\x01",b"\x01"], "owner retirement")
+    residue = parse_transcript(fields[9], "stornaut.task39.machine-claim.l1-residue",
+        [(16,16),(4,4),(4,4),(8,8),(4,4),(4,4),(4,4),(4,4)], 1_024)
+    observed, recorded, claimed = i64(residue[3]), i64(fields[6]), i64(fields[7])
+    require(any(fields[0]) and u32(fields[5]) == 501
+            and app["user"] == 501 and helper["user"] == 0
+            and app["pid"] != helper["pid"]
+            and u32(residue[1]) == helper["session"] and u32(residue[2]) == 501
+            and all(u32(value) == 0 for value in residue[4:])
+            and observed > 0 and observed <= recorded <= claimed and u64(fields[10]) > 0,
+            "claim evidence")
+    return {"request":fields[0],"challenge":uuid_text(fields[1]),"connection":uuid_text(fields[2]),
+        "app":app,"helper":helper,"nonce":uuid_text(residue[0]),"observed":observed,"recorded":recorded,
+        "claimed":claimed,"release":u64(fields[10]),"raw":data}
 def validate_json_artifacts(manifest, contents):
     values, epochs = {}, {}
     common = {"schemaVersion","role","campaignUUID","attemptUUID"}
@@ -584,54 +647,228 @@ def parse_prearm(data, manifest):
     require(hashlib.sha256(encode_transcript(
         "stornaut.task39.l3c3cii.projected-cohort-input", zeroed)).digest()
         == projected[2], "projected input self hash")
+    capsule = parse_capsule(projected[0])
     projections = [parse_projection(value) for value in projected[3:]]
-    return {"capsule": fields[6], "whole": fields[7],
-            "projected": fields[8], "projections": projections, "sha": fields[9]}
-
+    require(capsule["attempt"] == uuid_text(fields[5])
+            and capsule["sha"] == fields[6], "pre-arm capsule binding")
+    selections = []
+    for epoch, projection in zip(capsule["epochs"], projections):
+        require(epoch["epoch"] == projection["epoch"]
+                and epoch["nonce"] == projection["nonce"]
+                and epoch["configuration"].hex() == projection["configuration"]
+                and epoch["signed"].hex() == projection["signed"],
+                "projected selection")
+        selections.append({"attempt":capsule["attempt"],"capsule":capsule["sha"],
+            "whole":fields[7],"epoch":epoch,"projection":projection})
+    return {"capsule":fields[6],"whole":fields[7],"projected":fields[8],
+        "projections":projections,"selections":selections,"sha":fields[9]}
 def parse_gate_receipt(data, manifest, prearm):
     require(len(data) == 422 and data[:4] == b"STNG" and u16(data[4:6]) == 1
             and data[6:8] == b"\x02\x02" and u32(data[8:12]) == 410,
             "raw Gate receipt frame")
-    payload = data[12:]; offset = 32
-    attempt = uuid_text(payload[offset:offset+16]); offset += 16
-    whole = payload[offset:offset+32]; offset += 32
-    prepared = payload[offset:offset+32]
-    require(attempt == manifest["attempt"] and whole == prearm["whole"]
-            and any(prepared), "raw Gate identity")
-    # Fixed terminal payload offsets: output byte count/digest/flags.
-    output_offset = 337
-    count = u32(payload[output_offset:output_offset+4])
-    digest = payload[output_offset+4:output_offset+36]
-    require(payload[output_offset+36:output_offset+39] == b"\x00\x01\x00",
-            "raw Gate output terminal flags")
-    return {"gate": payload[:32], "outputCount": count, "outputSHA": digest,
-            "sha": hashlib.sha256(data).digest()}
+    payload, offset = data[12:], 0
+    def take(count):
+        nonlocal offset
+        require(count <= len(payload)-offset, "raw Gate truncation")
+        value=payload[offset:offset+count]; offset+=count; return value
+    def pid(): return i32(take(4))
+    launcher, attempt, whole, prepared = take(32), uuid_text(take(16)), take(32), take(32)
+    capsule = (u64(take(8)),u64(take(8)),u64(take(8)),i64(take(8)))
+    gate, coordinator, session, recovery, saved = (pid(),pid(),pid(),pid(),pid())
+    child = (pid(),pid(),pid(),pid(),u64(take(8)),u64(take(8)))
+    input_node = (u64(take(8)),u64(take(8)),u64(take(8)),i64(take(8)))
+    initial_offset, final_offset, input_eof, input_sha = i64(take(8)),i64(take(8)),boolean(take(1)),take(32)
+    initial_tty=(u64(take(8)),u64(take(8)),pid()); child_tty=(u64(take(8)),u64(take(8)),pid()); final_tty=(u64(take(8)),u64(take(8)),pid())
+    count, digest = u32(take(4)), take(32)
+    overflow, output_eof, expired = boolean(take(1)),boolean(take(1)),boolean(take(1))
+    wait, forwarded = take(5), u32(take(4))
+    started, completed, progression = u64(take(8)),u64(take(8)),take(1)[0]
+    group_empty, child_reaped, restored, borrowed = boolean(take(1)),boolean(take(1)),boolean(take(1)),take(5)
+    prepared_deadline = started + 1_200_000_000_000
+    require(prepared_deadline <= (1 << 64) - 1, "raw Gate prepared deadline")
+    prepared_payload = b"".join(struct.pack(">I",value) for value in
+        (gate,coordinator,session,child[0],recovery,saved,child[1],child[3])) \
+        + struct.pack(">QQI",child[4],child[5],0x7f) + uuid.UUID(attempt).bytes + whole \
+        + struct.pack(">QQQq",*capsule) + struct.pack(">QQI",*initial_tty) + struct.pack(">Q",prepared_deadline)
+    require(len(prepared_payload) == 160, "raw Gate prepared payload")
+    prepared_frame = struct.pack(">IHBBI", 0x53544e47, 1, 1, 1, 160) + prepared_payload
+    require(offset == 410 and any(launcher) and attempt == manifest["attempt"]
+            and whole == prearm["whole"]
+            and prepared == hashlib.sha256(prepared_frame).digest(),
+            "raw Gate identity")
+    require(capsule[0] > 0 and capsule[1] > 0 and 1 <= capsule[3] <= MAX_CAPSULE, "raw Gate capsule")
+    require(gate > 1 and coordinator > 1 and coordinator == session == saved
+            and recovery == gate and saved != recovery, "raw Gate topology")
+    require(all(value > 1 for value in child[:4]) and child[0] != child[2]
+            and child[1] == gate and child[2] == recovery and child[3] == session
+            and child[4] > 0 and child[5] < 1_000_000, "raw Gate child")
+    require(input_node == capsule and initial_offset == 0 and final_offset == capsule[3]
+            and final_offset >= initial_offset and input_eof and input_sha == whole
+            and any(input_sha), "raw Gate input")
+    require(initial_tty[0] > 0 and initial_tty[1] > 0 and initial_tty[2] == saved
+            and child_tty[:2] == initial_tty[:2] and child_tty[2] == recovery
+            and final_tty[:2] == initial_tty[:2] and final_tty[2] == saved,
+            "raw Gate terminal")
+    require(0 <= count <= 512 and any(digest) and not overflow and output_eof
+            and not expired and wait == b"\x01\x00\x00\x00\x00"
+            and forwarded == 0, "raw Gate output")
+    require(started > 0 and started <= completed
+            and completed-started <= 1_200_000_000_000 and progression == 1
+            and group_empty and child_reaped and restored
+            and borrowed == b"\x01\x00\x00\x00\x00", "raw Gate terminal state")
+    return {"gate":launcher,"attempt":attempt,"whole":whole,"prepared":prepared,"capsule":capsule,
+        "pid":gate,"coordinator":coordinator,"saved":saved,"childPID":child[0],"pgid":recovery,
+        "sid":session,"started":started,"completed":completed,"outputCount":count,"outputSHA":digest,
+        "sha":hashlib.sha256(data).digest()}
+def parse_driver_child(data):
+    fields=parse_transcript(data,"stornaut.task39.machine.outer-inner.driver-child",
+        [(4,4)]*6+[(32,32)],1_024)
+    pid,version,parent,group,session,user=map(u32,fields[:6]); words=struct.unpack(">8I",fields[6])
+    require(pid>1 and version>0 and parent>1 and group==pid and session>0 and user==0
+            and words[1]==user and words[2:5]==(0,0,0)
+            and words[5]==pid and words[6]==session and words[7]==version,"driver child")
+    return {"pid":pid,"parent":parent,"group":group,"raw":data}
+def parse_app_child(data):
+    fields=parse_transcript(data,"stornaut.task39.machine.outer-inner.app-child",[(1,1024),(4,4),(4,4)],2_048)
+    identity=parse_process_identity(fields[0],1); parent,group=u32(fields[1]),u32(fields[2])
+    require(parent>1 and group>1,"app child")
+    return {"identity":identity,"parent":parent,"group":group,"raw":data}
+def parse_signing(data):
+    fields=parse_transcript(data,"stornaut.task39.machine.single-epoch.installed-l2-signing",[(1,256),(32,32),(20,32),(1,1)],1_024)
+    identifier=text(fields[0]); require(identifier and all(ord(c)<128 and (c.isalnum() or c in "-._") for c in identifier),"signing")
+    boolean(fields[3])
+    return (identifier,fields[1],fields[2],fields[3])
+def parse_l2_proof(data, selection, claim, app, helper, deadline):
+    f=parse_transcript(data,"stornaut.task39.machine.single-epoch.installed-l2-proof",
+        [(32,32),(32,32),(16,16),(16,16),(8,8),(1,1024),(32,32),(1,1024),(1,1024),(1,1024),(32,32),(1,1024),(1,1024),(32,32),(1,1024),(1,1024),(1,2048),(8,8),(8,8),(8,8),(8,8),(1,1024),(8,8)],16_384)
+    repeated=parse_process_identity(f[21],1); signings=[parse_signing(f[i]) for i in (7,8,11,12,14,15)]
+    start_wall,start_clock,observed_wall,observed_clock=i64(f[17]),u64(f[18]),i64(f[19]),u64(f[20])
+    require(f[0].hex()==selection["projection"]["sha"] and f[1]==hashlib.sha256(claim["raw"]).digest()
+            and uuid_text(f[2])==selection["epoch"]["epoch"] and uuid_text(f[3])==selection["epoch"]["nonce"]
+            and f[4][:6]==b"\x02"*6 and all(value in (1,2) for value in f[4][6:])
+            and f[5]==app["raw"] and f[9]==helper["raw"]
+            and f[6].hex()==selection["projection"]["app"] and f[10].hex()==selection["projection"]["helper"]
+            and f[13].hex()==selection["projection"]["driver"] and f[7]==f[8] and f[11]==f[12] and f[14]==f[15]
+            and f[16]==b"\x02"+helper["raw"] and repeated["raw"]==app["raw"]
+            and start_wall>0 and start_clock>0 and observed_wall>0 and observed_clock>0
+            and start_wall<=observed_wall<selection["projection"]["validBefore"] and start_clock<=observed_clock
+            and claim["claimed"]<=start_wall and observed_clock<claim["release"]<=deadline and u64(f[22])==deadline
+            and signings[0]==signings[1] and signings[2]==signings[3] and signings[4]==signings[5]
+            and signings[0][0]==selection["projection"]["appID"]
+            and signings[2][0]==selection["projection"]["helperID"]+".helper"
+            and signings[4]==(selection["projection"]["driverID"],selection["projection"]["driverRequirement"],selection["projection"]["driverCodeHash"],b"\x01"),"installed L2 proof")
+    return observed_clock
 
-def parse_bundle(diagnostic, manifest, epochs):
+def parse_request(data, selection, previous):
+    fields=parse_transcript(data,"stornaut.task39.machine.outer-inner.epoch-request",[(1,96<<10),(32,32),(8,8),(1,1)],128<<10)
+    mode=2 if selection["epoch"]["scenario"]==7 else 1; successor=selection["epoch"]["ordinal"]>0
+    inv=parse_transcript(fields[0],"stornaut.task39.machine.epoch-invocation.successor" if successor else "stornaut.task39.machine.epoch-invocation.genesis",
+        [(16,16),(32,32),(32,32),(1,66_048),(1,2_048),(1,8_192),(32,32)]+([(1,1024)] if successor else []),96<<10)
+    epoch,projection=parse_epoch_descriptor(inv[3]),parse_projection(inv[4])
+    require(hashlib.sha256(fields[0]).digest()==fields[1] and u64(fields[2])>0 and fields[3]==bytes([mode])
+            and uuid_text(inv[0])==selection["attempt"] and inv[1]==selection["capsule"] and inv[2]==selection["whole"]
+            and epoch["raw"]==selection["epoch"]["raw"] and projection["raw"]==selection["projection"]["raw"]
+            and hashlib.sha256(inv[5]).digest()==inv[6] and any(inv[6]),"epoch request")
+    previous_helper=parse_process_identity(inv[7],2) if successor else None
+    if successor: require(previous is not None and previous_helper["raw"]==previous["helper"]["raw"],"previous helper")
+    return {"raw":data,"sha":hashlib.sha256(data).digest(),"deadline":u64(fields[2]),"mode":mode,"predecessor":inv[5],"predecessorSHA":inv[6],"previousHelper":previous_helper}
+
+def parse_bundle(diagnostic, manifest, epochs, prearm):
     prefix = b"STORNAUT_TASK39_IIC_EPOCH_BUNDLE_V1 "
-    lines = [line for line in diagnostic.splitlines() if line.startswith(prefix)]
-    require(len(lines) == 1, "driver bundle envelope cardinality")
-    bundle = decoded_base64(lines[0][len(prefix):].decode(), "driver bundle", 512<<10)
+    ending = b"\n"
+    require(diagnostic.startswith(prefix) and diagnostic.endswith(ending)
+            and not diagnostic.endswith(b"\r\n"),
+            "driver bundle envelope shape")
+    encoded = diagnostic[len(prefix):-len(ending)]
+    bundle = decoded_base64(encoded.decode(), "driver bundle", MAX_BUNDLE)
+    require(diagnostic == prefix + base64.b64encode(bundle) + ending,
+            "driver bundle canonical envelope")
     fields = parse_transcript(bundle, "stornaut.task39.machine.driver-evidence-bundle.v1",
-        [(16,16),(32,32),(32,32),(4,4)] + [(1,64<<10)]*8, 512<<10)
-    require(uuid_text(fields[0]) == manifest["attempt"] and u32(fields[3]) == 8,
+        [(16,16),(32,32),(32,32),(4,4)] + [(1,MAX_EPOCH)]*8, MAX_BUNDLE)
+    require(uuid_text(fields[0]) == manifest["attempt"] and fields[1]==prearm["capsule"]
+            and fields[2]==prearm["whole"] and u32(fields[3]) == 8,
             "driver bundle identity")
+    verified=[]
     for ordinal, encoded in enumerate(fields[4:], 1):
         row = parse_transcript(encoded, "stornaut.task39.machine.epoch-evidence.v1",
-            [(4,4),(4,4),(16,16),(16,16),(1,96<<10),(1,64<<10),(1,2_048),(32,32)], 64<<10)
+            [(4,4),(4,4),(16,16),(16,16),(1,128<<10),(1,64<<10),(1,2_048),(1,50<<10),(32,32)], MAX_EPOCH)
+        selection=prearm["selections"][ordinal-1]; previous=verified[-1] if verified else None
         l2, residue = epochs[ordinal][8][1], epochs[ordinal][9][1]
         require(u32(row[0]) == ordinal-1 and u32(row[1]) == ordinal
                 and uuid_text(row[2]) == l2["epochUUID"]
                 and uuid_text(row[3]) == l2["configurationNonce"]
+                and decoded_base64(l2["projectionBase64"],"projection",2_048)==selection["projection"]["raw"]
+                and l2["configurationSHA256"]==selection["epoch"]["configuration"].hex()
+                and l2["signedRuntimeBindingSHA256"]==selection["epoch"]["signed"].hex()
                 and row[6] == decoded_base64(residue["terminalEvidenceBase64"], "terminal evidence", 2_048),
                 "driver epoch join")
-        physical = parse_transcript(row[5], "stornaut.task39.machine.epoch-physical-evidence.v1",
-            [(1,48<<10)] if ordinal == 7 else [(1,32<<10),(1,48<<10)], 64<<10)
+        request=parse_request(row[4],selection,previous); normal=request["mode"]==1
+        physical=parse_transcript(row[5],"stornaut.task39.machine.epoch-physical-evidence.v1",
+            [(1,32<<10),(1,48<<10)] if normal else [(1,32<<10)],64<<10)
         ownership = physical[0]
         own = parse_transcript(ownership, "stornaut.task39.machine.physical-ownership.evidence-v1",
-            [(16,16),(32,32),(32,32),(16,16),(4,4),(4,4),(32,32),(1,4096),(1,4096),(1,65536),(32,32),(32,32),(1,16384),(8,8),(8,8),(32,32)], 32<<10)
-        require(hashlib.sha256(ownership).hexdigest() == l2["physicalOwnershipSHA256"]
-                and own[12] == decoded_base64(l2["installedL2ProofBase64"], "installed l2", 16_384), "bundle ownership/L2 join")
+            [(16,16),(32,32),(32,32),(16,16),(4,4),(4,4),(32,32),(1,4096),(1,4096),(1,4096),(32,32),(32,32),(1,16384),(8,8),(8,8),(32,32)], 32<<10)
+        app,helper,claim=parse_process_identity(own[7],1),parse_process_identity(own[8],2),parse_claim(own[9])
+        require(own[0:3]==[uuid.UUID(selection["attempt"]).bytes,selection["capsule"],selection["whole"]]
+                and uuid_text(own[3])==selection["epoch"]["epoch"] and u32(own[4])==ordinal-1 and u32(own[5])==ordinal
+                and own[6].hex()==selection["projection"]["sha"] and claim["app"]["raw"]==app["raw"]
+                and claim["helper"]["raw"]==helper["raw"] and claim["nonce"]==selection["epoch"]["nonce"]
+                and claim["observed"]<=claim["recorded"]<=claim["claimed"]
+                and hashlib.sha256(own[9]).digest()==own[10] and hashlib.sha256(own[12]).digest()==own[11]
+                and claim["release"]==u64(own[13])<=u64(own[14])==request["deadline"],"physical ownership")
+        binding=hashlib.sha256(encode_transcript("stornaut.task39.machine.single-epoch.ownership",
+            own[:6]+[uuid.UUID(selection["epoch"]["nonce"]).bytes,selection["epoch"]["configuration"],selection["epoch"]["signed"],own[6]]+own[7:12]+own[13:15])).digest()
+        require(binding==own[15],"ownership binding")
+        l2_observed=parse_l2_proof(
+            own[12],selection,claim,app,helper,request["deadline"])
+        material=parse_transcript(row[7],"stornaut.task39.machine.outer-inner.admission-material",[(1,48<<10),(1,512),(1,512),(16,16)],50<<10)
+        record=parse_transcript(material[0],"stornaut.task39.machine.outer-inner.ownership-record",[(32,32),(1,1024),(1,2048),(1,32<<10),(32,32)],48<<10)
+        driver,app_child=parse_driver_child(record[1]),parse_app_child(record[2])
+        require(any(material[3]) and record[0]==request["sha"] and record[3]==ownership
+                and record[4]==hashlib.sha256(ownership).digest() and app_child["parent"]==driver["pid"]
+                and app_child["group"]==driver["group"] and app_child["identity"]["raw"]==app["raw"],"ownership record")
+        record_sha=hashlib.sha256(material[0]).digest(); ack=parse_transcript(material[1],"stornaut.task39.machine.outer-inner.acknowledgement",[(32,32)]*3,512)
+        decision=parse_transcript(material[2],"stornaut.task39.machine.outer-inner.decision",[(32,32)]*3+[(1,1)],512)
+        require(ack==[request["sha"],record_sha,hashlib.sha256(ownership).digest()]
+                and decision==[request["sha"],record_sha,hashlib.sha256(material[1]).digest(),bytes([1 if normal else 2])],"admission chain")
+        completion=None; observation=None
+        if normal:
+            result=parse_transcript(physical[1],"stornaut.task39.machine.outer-inner.normal-result",[(32,32)]*4+[(1,48<<10),(32,32)],48<<10)
+            complete=parse_transcript(result[4],"stornaut.task39.machine.physical-completion.evidence-v1",[(1,32<<10),(32,32),(32,32),(32,32)],48<<10)
+            completion=hashlib.sha256(encode_transcript("stornaut.task39.machine.single-epoch.local-completion",[own[15],complete[1],complete[2],b"\x01"])).digest(); observation=complete[2]
+            require(result[:4]==[request["sha"],record_sha,hashlib.sha256(material[1]).digest(),hashlib.sha256(material[2]).digest()]
+                    and hashlib.sha256(result[4]).digest()==result[5] and complete[0]==ownership and complete[3]==completion
+                    and any(complete[1]) and any(observation),"normal result")
+        terminal=parse_transcript(row[6],"stornaut.task39.machine.outer-inner.terminal-evidence",[(1,1),(1,1),(1,1024),(1,2048),(1,1024)]+[(1,1)]*6+[(32,32),(32,32),(8,8)],2_048)
+        terminal_helper=parse_process_identity(terminal[4],2)
+        require(all(boolean(terminal[i]) for i in (0,1,6,7,8,9,10)) and terminal[2]==record[1] and terminal[3]==record[2]
+                and terminal_helper["raw"]==helper["raw"] and boolean(terminal[5])==normal
+                and any(terminal[11]) and terminal[11]==terminal[12]
+                and l2_observed<=u64(terminal[13])<request["deadline"]
+                and ((normal and terminal[11]==observation) or (not normal and not boolean(terminal[5]))),"terminal evidence")
+        admission=encode_transcript("stornaut.task39.machine.outer-inner.admission",[row[4],material[0],material[1],material[2],hashlib.sha256(physical[1] if normal else b"").digest(),hashlib.sha256(row[6]).digest(),material[3]])
+        require(hashlib.sha256(admission).digest()==row[8]
+                and hashlib.sha256(ownership).hexdigest()==l2["physicalOwnershipSHA256"]
+                and own[12]==decoded_base64(l2["installedL2ProofBase64"],"installed l2",16_384)
+                and hashlib.sha256(own[9]).hexdigest()==l2["claimEvidenceSHA256"]
+                and helper["sha"].hex()==residue["helperIdentitySHA256"]
+                and (completion or own[15]).hex()==residue["completionBindingSHA256"],"binary/JSON join")
+        if previous:
+            pred=parse_transcript(request["predecessor"],"stornaut.task39.machine.helper-continuity.successor",[(16,16),(32,32),(32,32),(4,4),(16,16),(1,1024),(32,32),(32,32),(32,32),(1,1)],4_096)
+            pred_helper=parse_process_identity(pred[5],2)
+            require(pred_helper["raw"]==previous["helper"]["raw"] and helper["raw"]!=previous["helper"]["raw"]
+                    and pred[:3]==[uuid.UUID(selection["attempt"]).bytes,selection["capsule"],selection["whole"]]
+                    and u32(pred[3])==ordinal-2 and uuid_text(pred[4])==previous["epoch"]
+                    and pred[6]==previous["predecessorSHA"] and pred[7]==previous["completion"]
+                    and pred[8]==previous["admission"] and pred[9]==bytes([previous["mode"]]),"epoch continuity")
+        else:
+            pred=parse_transcript(request["predecessor"],"stornaut.task39.machine.helper-continuity.genesis",[(16,16),(32,32),(32,32),(4,4),(16,16)],512)
+            require(pred[:3]==[uuid.UUID(selection["attempt"]).bytes,selection["capsule"],selection["whole"]]
+                    and u32(pred[3])==0 and uuid_text(pred[4])==selection["epoch"]["epoch"],"genesis continuity")
+        verified.append({"helper":helper,"epoch":selection["epoch"]["epoch"],"predecessorSHA":request["predecessorSHA"],"completion":completion or own[15],"admission":row[8],"mode":request["mode"]})
+        verified[-1]["driverParent"] = driver["parent"]
+    require(len({value["driverParent"] for value in verified}) == 1,
+            "outer driver identity drift")
     return {"sha": hashlib.sha256(bundle).digest(), "whole": fields[2]}
 
 def parse_receipt(frame, manifest):
@@ -666,17 +903,30 @@ def parse_receipt(frame, manifest):
     require(hashlib.sha256(encode_transcript(
         "stornaut.task39.machine.gate-coordinator-receipt.v1", zeroed
     )).digest() == fields[22], "receipt self hash")
-    return {"whole": fields[3], "gate": fields[8],
-            "gateSHA": fields[9], "sha": fields[22]}
+    return {"attempt": attempt, "whole": fields[3],
+            "capsule": (device,inode,generation,size), "gate": fields[8],
+            "gateSHA": fields[9], "pid": pid, "pgid": pgid, "sid": sid,
+            "started": started, "completed": completed, "sha": fields[22]}
 
-def validate_receipt_chain(stream, diagnostic, manifest, epochs, source, install):
+def validate_receipt_chain(
+        stream, diagnostic, manifest, epochs, source, install, events):
     framed = frames(stream)
     require(len(framed) == 3, "FD 3 frame cardinality")
     prearm = parse_prearm(framed[0], manifest)
-    raw = parse_gate_receipt(framed[1], manifest, prearm)
     final = parse_receipt(struct.pack(">I", len(framed[2])) + framed[2], manifest)
+    raw = parse_gate_receipt(framed[1], manifest, prearm)
+    spawn = [event["payload"] for event in events if event["kind"] == 4]
+    require(len(spawn) == 1, "spawn identity cardinality")
     require(raw["sha"] == final["gateSHA"] and final["whole"] == prearm["whole"]
             and raw["gate"] == final["gate"]
+            and raw["attempt"] == final["attempt"]
+            and raw["whole"] == final["whole"] and raw["capsule"] == final["capsule"]
+            and (raw["pid"],raw["pgid"],raw["sid"]) == (final["pid"],final["pgid"],final["sid"])
+            and raw["coordinator"] == spawn[0]["processID"]
+            and raw["sid"] == spawn[0]["sessionID"]
+            and raw["saved"] == spawn[0]["processGroupID"]
+            and final["started"] < raw["started"]
+            and raw["completed"] < final["completed"]
             and raw["gate"].hex() == install["gateExecutableSHA256"],
             "three-frame receipt chain")
     for projection in prearm["projections"]:
@@ -684,7 +934,7 @@ def validate_receipt_chain(stream, diagnostic, manifest, epochs, source, install
                 and projection["helper"] == install["helperExecutableSHA256"]
                 and projection["driver"] == install["machineDriverExecutableSHA256"],
                 "installed executable projection drift")
-    bundle = parse_bundle(diagnostic, manifest, epochs)
+    bundle = parse_bundle(diagnostic, manifest, epochs, prearm)
     require(source["preArmFrameSHA256"] == prearm["sha"].hex()
             and {pair[8][1]["wholeProjectedInputSHA256"] for pair in epochs.values()}
                 == {prearm["whole"].hex()}
@@ -1056,7 +1306,7 @@ def verify(root_path, seal_path, expected_self_sha, verifier_fd):
             diagnostic = diagnostics[0]
             validate_receipt_chain(contents[receipts[0]["path"]],
                 contents[diagnostic["path"]], manifest, epochs, source,
-                values[2][0][1])
+                values[2][0][1], events)
             if summary["outcome"] != 2:
                 non_admitting = True
         elif summary["consumed"]:

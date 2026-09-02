@@ -3,7 +3,7 @@
 set -euo pipefail
 
 contract_source=${0:A}
-# ib2_self_sha=05de1099785adefed4d7566eabaa763f42dd31be8b9441320ee0ce5db74d67b6
+# ib2_self_sha=40523a40e06666410e484e6c3446f294336e8a3c09ab0fafaa9fdc718448f19d
 ib2_self_sha=$(sed -nE 's/^# ib2_self_sha=([0-9a-f]{64})$/\1/p' "$contract_source"); ib2_observed_sha=$(sed -E 's/^# ib2_self_sha=[0-9a-f]{64}$/# ib2_self_sha=SELF/' "$contract_source" | shasum -a 256 | awk '{ print $1 }')
 [[ ${#ib2_self_sha} == 64 && "$ib2_observed_sha" == "$ib2_self_sha" ]] || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
 repo_root=${contract_source:h:h}
@@ -2486,7 +2486,7 @@ PY
         gate-owner-current-user lifecycle "$owner_mutation_sha" \
         "${second_slot_args[@]}"
     local app_gate=scripts/verify-app-release-boundaries
-    [[ "$(shasum -a 256 "$app_gate" | awk '{print $1}')" == 81ef1f48660235ea5ea3ff832485033a2b21f4c37f8432316978c47959e8ef72 ]] || fail_contract 'ii-c-b1 App release verifier source seal drifted'
+    [[ "$(shasum -a 256 "$app_gate" | awk '{print $1}')" == 83fdd3f951d8d0d3d45a8a16af60eca91f2c46d8f1abda0e7659df94b47876f7 ]] || fail_contract 'ii-c-b1 App release verifier source seal drifted'
     local component_mutation_root="$out/component-mutations"
     mkdir -p "$component_mutation_root"
     python3 - "$app_gate" "$component_mutation_root" <<'PY'
@@ -2822,7 +2822,7 @@ mutations = (
     ("verifier-canonical-reencode", "verifier", 'require(encode_transcript(domain, fields) == data, "canonical re-encode")', 'require(True, "canonical re-encode")'),
     ("verifier-held-named-identity", "verifier", "require((held.st_dev, held.st_ino, held.st_gen, held.st_size) ==", "require(True or (held.st_dev, held.st_ino, held.st_gen, held.st_size) =="),
     ("verifier-event-chain", "verifier", 'require(event["previous"] == expected_previous, "event chain")', 'require(True, "event chain")'),
-    ("verifier-receipt-self-hash", "verifier", "require(hashlib.sha256(encode_transcript(", "require(True or hashlib.sha256(encode_transcript("),
+    ("verifier-receipt-self-hash", "verifier", 'require(hashlib.sha256(encode_transcript(\n        "stornaut.task39.machine.gate-coordinator-receipt.v1", zeroed\n    )).digest() == fields[22], "receipt self hash")', 'require(True or hashlib.sha256(encode_transcript(\n        "stornaut.task39.machine.gate-coordinator-receipt.v1", zeroed\n    )).digest() == fields[22], "receipt self hash")'),
     ("verifier-foundation-canonical", "verifier", 'require(foundation_json(data) == data, "noncanonical json")', 'require(True, "noncanonical json")'),
     ("verifier-canonical-path", "verifier", "root_path = canonical_absolute_path(root_path)", "root_path = os.path.realpath(root_path)"),
     ("verifier-path-spelling-open", "verifier", '            parent_fd = walk["fds"][-1]\n            require_exact_component(parent_fd, component)', '            parent_fd = walk["fds"][-1]\n            require_exact_component(-1, component)'),
@@ -2926,6 +2926,17 @@ PY
     PATH="$poison:$PATH" "$gate" --iic-b2a2-source-contract-only \
         "${paths[@]}" >"$poison_log" || fail_contract \
         "ii-c-b2a2 fixed tool resolution drifted"
+    local accepted=294bdb207e572eead2be43921e603ce7407dcbc5
+    local accepted_tree=dbbffbbae4a1ed51504e664cec7a43ff1e8cbe5d
+    if [[ "$(git rev-parse HEAD)" != $accepted ]]; then
+        local historical_status=0
+        replay_historical_contract "$out/immutable-b2a2" \
+            "$accepted" "$accepted_tree" \
+            --iic-b2a2-contract-only || historical_status=$?
+        (( historical_status == 0 )) || fail_contract \
+            "ii-c-b2a2 historical replay failed"
+        return 0
+    fi
     "$gate" --iic-b2a2-staged-scope-contract-only \
         cf1cbed8beff60cdd606bf7025fcef8a2768ff99 >"$out/scope.log"
     local baseline=cf1cbed8beff60cdd606bf7025fcef8a2768ff99
@@ -2997,6 +3008,80 @@ PY
             GIT_INDEX_FILE="$bad" "$gate" \
             --iic-b2a2-staged-scope-contract-only "$scope_baseline"
     done
+}
+
+function verify_iic_evidence_verification_contract() {
+    local out=$1 gate=scripts/verify-investigation-boundaries
+    mkdir -p "$out"
+    local -a paths=(
+        Package.swift Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerProtocol.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineZeroArgumentEntry.swift Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerComposition.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineHelperEpochContinuity.swift Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignEvidenceContract.swift
+        Sources/StornautInvestigationMachineCampaign/main.swift scripts/verify-investigation-runtime-machine-report
+        Tests/StornautInvestigationTests/InvestigationMachineDarwinOuterInnerProtocolTests.swift Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift scripts/verify-contract
+    )
+    "$gate" --iic-evidence-verification-source-contract-only \
+        "${paths[@]}" >"$out/source.log"
+    /usr/bin/python3 -I - "$out" "${paths[@]}" <<'PY'
+from pathlib import Path
+import sys
+
+out = Path(sys.argv[1])
+paths = tuple(map(Path, sys.argv[2:]))
+slots = (
+    "package", "protocol", "entry", "composition", "continuity", "support",
+    "campaign", "verifier", "protocol_tests", "campaign_tests", "boundary_tests", "contract",
+)
+sources = dict(zip(slots, (path.read_text(encoding="utf-8") for path in paths)))
+component_call = (
+    '    /bin/zsh -f scripts/verify-app-release-boundaries ' + '\\\n'
+    '        --iic-evidence-verification-component-boundary-only ' + '\\\n'
+    '        >"$out/component.log"'
+)
+mutations = (
+    ("epoch-eight-fields", "protocol", "admissionMaterialBytes, admissionSHA256.rawBytes", "admissionSHA256.rawBytes"),
+    ("bundle-half-mib", "protocol", "package static let maximumByteCount = 3 * 1_024 * 1_024", "package static let maximumByteCount = 512 * 1_024"),
+    ("writer-one-mib", "entry", "maximumByteCount: 4 * 1_024 * 1_024 + 128", "maximumByteCount: 1 * 1_024 * 1_024"),
+    ("campaign-inline-decoder", "campaign", "let validated = try InvestigationMachineCampaignEpochEvidenceValidator", "let validated = try InvestigationMachineEpochEvidenceBundle"),
+    ("gate-prepared-frame-hash-drop", "support", "prepared == .hashing(preparedFrame),", "prepared == prepared,"),
+    ("driver-l2-time-bypass", "protocol", "installedL2ObservedAtNanoseconds\n                <= terminal.observedAtNanoseconds,", "true,"),
+    ("campaign-cross-epoch-parent-bypass", "support", "guard Set(epochs.map(\.outerDriverProcessID)).count == 1 else {", "guard !epochs.isEmpty else {"),
+    ("campaign-final-time-widen", "support", "finalReceipt.monotonicStartedNanoseconds < started,", "finalReceipt.monotonicStartedNanoseconds <= started,"),
+    ("python-eight-fields", "verifier", "(1,50<<10),(32,32)], MAX_EPOCH)", "(32,32)], MAX_EPOCH)"),
+    ("python-cross-epoch-parent-bypass", "verifier", 'require(len({value["driverParent"] for value in verified}) == 1,', 'require(bool(verified),'),
+    ("python-final-time-widen", "verifier", 'and final["started"] < raw["started"]', 'and final["started"] <= raw["started"]'),
+    ("python-crlf-envelope", "verifier", 'and not diagnostic.endswith(b"\\r\\n")', 'and diagnostic.endswith(ending)'),
+    ("boundary-installed-l2-import-drop", "boundary_tests",
+     '"InvestigationMachineDarwinOuterInnerProtocol.swift": [\n                "import Foundation",\n                "import StornautInvestigationHandoffContract",\n                "import StornautInvestigationInstalledL2",\n            ],',
+     '"InvestigationMachineDarwinOuterInnerProtocol.swift": [\n                "import Foundation",\n                "import StornautInvestigationHandoffContract",\n            ],'),
+    ("boundary-semantic-consumer-drop", "boundary_tests", "        #expect(evidenceValidator.contains(semanticEvaluator))", "        #expect(!evidenceValidator.contains(semanticEvaluator))"),
+    ("contract-component-call-drop", "contract", component_call, '    : >"$out/component.log"'),
+)
+with (out / "mutations").open("w", encoding="utf-8") as manifest:
+    for name, slot, old, new in mutations:
+        source = sources[slot]
+        if source.count(old) != 1:
+            raise SystemExit(f"ii-c evidence-verification mutation anchor drifted: {name}")
+        target = out / f"{name}.source"
+        target.write_text(source.replace(old, new, 1), encoding="utf-8")
+        print(name, slot, slots.index(slot) + 1, target, sep="\t", file=manifest)
+PY
+    local name slot index target sha rc
+    while IFS=$'\t' read -r name slot index target; do
+        local -a args=("${paths[@]}")
+        args[$index]=$target
+        sha=$(shasum -a 256 "$target" | awk '{print $1}')
+        rc=0
+        "$gate" --iic-evidence-verification-mutation-contract-only \
+            "$name" "$slot" "$sha" "${args[@]}" \
+            >"$out/$name.log" 2>&1 || rc=$?
+        (( rc != 0 )) || fail_contract \
+            "ii-c evidence-verification mutation accepted: $name"
+    done <"$out/mutations"
+    /bin/zsh -f scripts/verify-app-release-boundaries \
+        --iic-evidence-verification-component-boundary-only \
+        >"$out/component.log"
 }
 
 function verify_iicb2b1_contract() {
@@ -3129,6 +3214,20 @@ function verify_iicb2b2_contract() {
     local out=$1 gate=scripts/verify-investigation-boundaries
     local release=scripts/verify-app-release-boundaries
     mkdir -p "$out"
+    local accepted=a08d0f6fac6c3bec72192cd8731bd6b3b150b3b7
+    local accepted_tree=62cb658ead295984a44d7eb769da9b9c91a2f3cf
+    [[ "$(git show -s --format=%P "$accepted")" == \
+        2b90430876c2515e811d84155160daa1b599fa98 ]] || fail_contract \
+        "ii-c-b2b2 immutable parent drifted"
+    if [[ "$(git rev-parse HEAD)" != $accepted ]]; then
+        local historical_status=0
+        replay_historical_contract "$out/immutable-b2b2" \
+            "$accepted" "$accepted_tree" \
+            --iic-b2b2-contract-only || historical_status=$?
+        (( historical_status == 0 )) || fail_contract \
+            "ii-c-b2b2 historical replay failed"
+        return 0
+    fi
     local -a paths=(
         Package.swift Sources/StornautInvestigationMachineCampaign/main.swift
         Tests/Fixtures/InvestigationMachineCampaignCoordinator/main.swift
@@ -3281,6 +3380,17 @@ if [[ ${1:-} == --iic-b2a2-contract-only ]]; then
     trap 'rm -rf "$iicb2a2_root"' EXIT
     verify_iicb2a2_contract "$iicb2a2_root"
     print "ii-c-b2a2 independent verifier contract verification passed."
+    exit 0
+fi
+
+if [[ ${1:-} == --iic-evidence-verification-contract-only ]]; then
+    (( $# == 1 )) || fail_contract \
+        "Usage: scripts/verify-contract --iic-evidence-verification-contract-only"
+    iic_evidence_root=$(mktemp -d \
+        "${TMPDIR:-/tmp}/stornaut-iic-evidence-contract.XXXXXX")
+    trap 'rm -rf "$iic_evidence_root"' EXIT
+    verify_iic_evidence_verification_contract "$iic_evidence_root"
+    print "ii-c evidence-verification mutation contract verification passed."
     exit 0
 fi
 
@@ -4943,6 +5053,7 @@ contract_root=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-verify-contract.XXXXXX")
 verify_iica_contract "$contract_root/iica"
 verify_iicb1_root_owned_gate_contract "$contract_root/iicb1"
 verify_iicb2a2_contract "$contract_root/iicb2a2"
+verify_iic_evidence_verification_contract "$contract_root/iic-evidence"
 verify_iicb2b1_contract "$contract_root/iicb2b1"
 verify_iicb2b2_contract "$contract_root/iicb2b2"
 verify_iic0bivb2_contract "$contract_root/iic0bivb2" false
@@ -6732,7 +6843,7 @@ source_path, helper_path, negative_path, selector_path, fail_open_path, \
     Path, sys.argv[1:]
 )
 source = source_path.read_text(encoding="utf-8")
-split = source.index("\nscripts/verify-contract\n")
+split = source.index("\nscripts/verify-contract --iic-a-contract-only\n")
 prefix, runtime = source[:split], source[split:]
 
 
@@ -8348,7 +8459,7 @@ iib5bic2b_collector_test=$iib5bic2bi_root/Tests/StornautInvestigationTests/Inves
     "$iib5bic2b_lifecycle" "$iib5bic2b_darwin" "$iib5bic2b_collector" \
     "$iib5bic2b_probe" "$iib5bic2b_owner" "$iib5bic2b_join" \
     "$iib5bic2b_test" "$iib5bic2b_collector_test" \
-    "$iib5bic2bi_root/Sources"
+    "$iib5bic2bi_root/Sources" accepted-historical-single-consumer
 python3 - "$iib5bic2b_lifecycle" "$iib5bic2b_darwin" "$iib5bic2b_collector" "$iib5bic2b_probe" "$iib5bic2b_owner" "$iib5bic2b_join" "$iib5bic2b_test" "$iib5bic2b_collector_test" "$contract_root" <<'PY'
 from pathlib import Path
 import sys
@@ -8439,7 +8550,7 @@ for fixture in \
    observer-fabrication|process-proof-vacuous|proof-accessor-vacuous|*-equality) lifecycle="$contract_root/iib5bic2b-$name.swift";;
  esac
  output="$contract_root/iib5bic2b-$name.log"
- if "$iib5bic2b_gate" --iib5bic2b-absence-only-contract-only "$lifecycle" "$darwin" "$collector" "$probe" "$owner" "$join" "$test" "$collector_test" "$iib5bic2bi_root/Sources" >"$output" 2>&1; then fail_contract "ii-b5b-i-c2b mutation accepted: $name"; fi
+ if "$iib5bic2b_gate" --iib5bic2b-absence-only-contract-only "$lifecycle" "$darwin" "$collector" "$probe" "$owner" "$join" "$test" "$collector_test" "$iib5bic2bi_root/Sources" accepted-historical-single-consumer >"$output" 2>&1; then fail_contract "ii-b5b-i-c2b mutation accepted: $name"; fi
  require_fixed_text "$output" "$expected"
 done
 
@@ -13806,11 +13917,11 @@ mutate(
 mutate(
     "wait-deadline-bypass", "entry",
     "let waitResult = system.waitWritable(\n"
-    "                STDOUT_FILENO, deadline.partialValue\n"
+    "                descriptor, deadline.partialValue\n"
     "            )\n"
     "            try requireBeforeDeadline(deadline.partialValue)",
     "let waitResult = system.waitWritable(\n"
-    "                STDOUT_FILENO, deadline.partialValue\n"
+    "                descriptor, deadline.partialValue\n"
     "            )",
 )
 mutate(

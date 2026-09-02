@@ -325,6 +325,14 @@ iicb2a2_mutation_slot=
 iicb2a2_mutation_sha=
 iicb2a2_staged_scope_contract_only=false
 iicb2a2_staged_scope_baseline=cf1cbed8beff60cdd606bf7025fcef8a2768ff99
+iic_evidence_verification_contract_only=false
+iic_evidence_verification_mutation_only=false
+iic_evidence_verification_mutation_name=
+iic_evidence_verification_mutation_slot=
+iic_evidence_verification_mutation_sha=
+iic_evidence_verification_sources=()
+iic_evidence_verification_staged_scope_only=false
+iic_evidence_verification_staged_scope_baseline=3e49956f6f8e44d5d191d47c9e86856dd00d6966
 iicb2b1_source_contract_only=false
 iicb2b1_sources=()
 iicb2b1_mutation_contract_only=false
@@ -698,7 +706,7 @@ if (( $# > 0 )); then
         && [[ $1 == --iib5bic2a-staged-scope-contract-only ]]; then
         iib5bic2a_staged_scope_contract_only=true
         iib5bic2a_staged_scope_baseline=${2:-6e794274c8a427422e47df326231010b07f3413c}
-    elif (( $# == 9 || $# == 10 )) \
+    elif (( $# == 9 || $# == 10 || $# == 11 )) \
         && [[ $1 == --iib5bic2b-absence-only-contract-only ]]; then
         iib5bic2b_absence_only_contract_only=true
         iib5bic2b_lifecycle_source=$2
@@ -710,6 +718,7 @@ if (( $# > 0 )); then
         iib5bic2b_focused_test_source=$8
         iib5bic2b_collector_test_source=$9
         iib5bic2b_production_source_root=${10:-Sources}
+        iib5bic2b_semantic_replay_contract=${11:-current-two-consumers}
     elif (( $# == 1 || $# == 2 )) \
         && [[ $1 == --iib5bic2b-boundary-staged-scope-contract-only ]]; then
         iib5bic2b_boundary_staged_scope_contract_only=true
@@ -884,6 +893,21 @@ if (( $# > 0 )); then
         && [[ $1 == --iic-b2a2-staged-scope-contract-only ]]; then
         iicb2a2_staged_scope_contract_only=true
         iicb2a2_staged_scope_baseline=${2:-cf1cbed8beff60cdd606bf7025fcef8a2768ff99}
+    elif (( $# == 1 || $# == 13 )) \
+        && [[ $1 == --iic-evidence-verification-source-contract-only ]]; then
+        iic_evidence_verification_contract_only=true
+        iic_evidence_verification_sources=("${@:2}")
+    elif (( $# == 16 )) \
+        && [[ $1 == --iic-evidence-verification-mutation-contract-only ]]; then
+        iic_evidence_verification_mutation_only=true
+        iic_evidence_verification_mutation_name=$2
+        iic_evidence_verification_mutation_slot=$3
+        iic_evidence_verification_mutation_sha=$4
+        iic_evidence_verification_sources=("${@:5}")
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iic-evidence-verification-staged-scope-contract-only ]]; then
+        iic_evidence_verification_staged_scope_only=true
+        iic_evidence_verification_staged_scope_baseline=${2:-3e49956f6f8e44d5d191d47c9e86856dd00d6966}
     elif (( $# == 1 || $# == 9 )) \
         && [[ $1 == --iic-b2b1-source-contract-only ]]; then
         iicb2b1_source_contract_only=true
@@ -1884,6 +1908,7 @@ expected_sha256 = {
         "a856605429042778d2b5ad16de799e4f991d9c9a891f7fb5da9d6852373b387d",
         "0065efe1c429c87050e60e862db5d0c7ed6bfb1267826ec60dca8245bc45dbc3",
         "b1e53776b5cec0b8742e2d074443008ffc6dd0b9b0a3756dd5b3849288b75601",
+        "cd61ac238d17916b6654c579793f72aa7fba19162dbff79f2f1f6c49dd5f3cf9",
     },
     test_path: {
         "0300da3c92a1eed18c8ea15f6c6f99116f2c03a0383347a0b444c477fbd58449"
@@ -3039,11 +3064,15 @@ for marker in (
 semantic = bridge + protocol
 if re.search(r"(?m)^\s*(?:public|open)\s+", semantic):
     fail("iii-b2a-ii-a2-0 package boundary drifted")
-for source in (bridge, protocol):
+for source, expected_imports in (
+    (bridge, {"Foundation", "StornautInvestigationHandoffContract"}),
+    (protocol, {"Foundation", "StornautInvestigationHandoffContract",
+                "StornautInvestigationInstalledL2"}),
+):
     imports = set(re.findall(
         r"(?m)^import\s+([A-Za-z0-9_]+)\s*$", source
     ))
-    if imports != {"Foundation", "StornautInvestigationHandoffContract"}:
+    if imports != expected_imports:
         fail("iii-b2a-ii-a2-0 dependency surface drifted")
 stripped = re.sub(
     r'/\*.*?\*/|//.*$|#?"(?:\\.|[^"\\])*"', ' ', semantic,
@@ -4263,6 +4292,8 @@ expected_test_sha256 = {
     protocol_test_path: {
         "72fc8f5959c6178493e83a4b26a0dfa6e1b9351ecfadc3f4956d2d2b4a26e7a5",
         "81ec6365c2219a4faaa9d210667c9aade668645fee75244ff61267dd7aaac396",
+        "cfb1af687ccbfa28c3b14dfaf102b506940f31818117f6f784876f4615de10b3",
+        "fc54797ed22316d93d82a555c76b2dcdd5f82591b2a9515b36b44aaf261ccb71",
     },
     boundary_path: {
         "3a2981b00b587ee2922b5a50d58ee1950d27c3e13a0116c0fd837e84816cb6dc",
@@ -4434,10 +4465,10 @@ for marker in (
     "self.claimEvidence = claimEvidence",
 ):
     if marker not in composition:
-        fail("iii-b2b-1a-0 ownership candidate provenance drifted")
+        fail(f"iii-b2b-1a-0 ownership candidate provenance drifted: {marker}")
 
 for marker in (
-    "private static let maximumOwnershipByteCount = 8_192",
+    "package static let maximumOwnershipByteCount = 32 * 1_024",
     "let claimEvidence: InvestigationMachineClaimEvidence",
     "try claimEvidence.encoded()",
     "1...InvestigationMachineClaimEvidence.maximumByteCount",
@@ -4456,9 +4487,9 @@ for marker in (
     "bindingSHA256: try bridgeDigest(fields[14])",
 ):
     if marker not in bridge:
-        fail("iii-b2b-1a-0 canonical provenance carriage drifted")
+        fail(f"iii-b2b-1a-0 canonical provenance carriage drifted: {marker}")
 
-if bridge.count("1...InvestigationMachineClaimEvidence.maximumByteCount") != 1:
+if bridge.count("1...InvestigationMachineClaimEvidence.maximumByteCount") != 2:
     fail("iii-b2b-1a-0 ownership field shape drifted")
 if bridge.count("bridgeClaimEvidenceIsBound(") != 4:
     fail("iii-b2b-1a-0 semantic join call shape drifted")
@@ -4962,10 +4993,13 @@ cursor = 0
 for marker in (
     "dependencies.validateInvocation()", "dependencies.selectRole()",
     "dependencies.observeInstalledDriver()", "dependencies.readPlan()",
-    "dependencies.runCohort(plan)",
-    "InvestigationMachineDriverCompletionArtifact(",
+    "dependencies.prepareEvidencePlan(plan)",
+    "dependencies.runCohort(boundPlan)",
+    "dependencies.finishEvidenceCollection(summary)",
     "dependencies.checkCancellation()",
     "dependencies.revalidateOuter(observation)",
+    "dependencies.writeEvidence(evidence)",
+    "InvestigationMachineDriverCompletionArtifact(",
     "dependencies.writeArtifact(encoded)",
 ):
     index = run.find(marker, cursor)
@@ -5832,6 +5866,7 @@ function verify_iib5bic2b_absence_only_contract() {
     local focused_test_source=$7
     local collector_test_source=$8
     local production_source_root=${9:-Sources}
+    local semantic_replay_contract=${10:-current-two-consumers}
     local inputs=(
         "$lifecycle_source" "$darwin_source" "$collector_source"
         "$service_probe_source" "$installed_owner_source" "$installed_join_source"
@@ -5841,11 +5876,13 @@ function verify_iib5bic2b_absence_only_contract() {
         xcrun swiftc -frontend -parse -enable-bare-slash-regex "$source" \
             || return $?
     done
-    python3 - "${inputs[@]}" "$production_source_root" <<'PY' || return $?
+    python3 - "${inputs[@]}" "$production_source_root" \
+        "$semantic_replay_contract" <<'PY' || return $?
 from pathlib import Path
 import hashlib,re,sys
 paths=list(map(Path,sys.argv[1:9]))
 source_root=Path(sys.argv[9])
+semantic_replay_contract=sys.argv[10]
 repository_root=source_root.parent
 lifecycle,darwin,collector,probe,owner,join,focused_test,collector_test=[
     path.read_text(encoding="utf-8") for path in paths
@@ -6163,13 +6200,21 @@ owners={
     "InvestigationInstalledL2ArtifactReader()":canonical_owner,
     "InvestigationInstalledL2ProcessReader()":canonical_owner,
     "InvestigationInstalledL2FixedServiceReader()":canonical_owner,
-    "InvestigationInstalledL2SemanticContract.evaluate(":canonical_owner,
     "InvestigationInstalledL2Observer()":canonical_join,
 }
 for marker,expected_path in owners.items():
     hits=[source_path for source_path,text in sources.items() for _ in range(text.count(marker))]
     if hits != [expected_path]:
         raise SystemExit(f"ii-b5b-i-c2b installed physical-owner cardinality drifted: {marker}")
+semantic_owners=sorted(source_path for source_path,text in sources.items()
+    for _ in range(text.count("InvestigationInstalledL2SemanticContract.evaluate(")))
+expected_semantic_owners = {
+    "accepted-historical-single-consumer": [canonical_owner],
+    "current-two-consumers": [canonical_owner,
+        "Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerProtocol.swift"],
+}.get(semantic_replay_contract)
+if expected_semantic_owners is None or semantic_owners != sorted(expected_semantic_owners):
+    raise SystemExit("ii-b5b-i-c2b installed semantic-replay cardinality drifted")
 expected_hashes=(
     "05da8bd10712f769137c6c73158755e46fce17cc18650dce4508b31edc8c04b5",
     "376148fd9e0284c03e399ed281cd47696bed3c35630cf272fa639b7df99960d2",
@@ -6202,7 +6247,8 @@ function verify_iib5bic2b_index_semantics() {
             "$staged_root/Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineSingleEpochInstalledL2Join.swift" \
             "$staged_root/Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift" \
             "$staged_root/Tests/StornautInvestigationTests/InvestigationLifecycleTopologyCollectorTests.swift" \
-            "$staged_root/Sources" || staged_status=$?
+            "$staged_root/Sources" accepted-historical-single-consumer \
+            || staged_status=$?
     fi
     rm -rf "$staged_root"
     (( staged_status == 0 )) || return "$staged_status"
@@ -7006,11 +7052,11 @@ from pathlib import Path
 import hashlib, re, sys
 contract_path, boundary_path, release_path = map(Path, sys.argv[1:])
 contract = contract_path.read_text(encoding="utf-8")
-self_match = re.findall(r"(?m)^# ib2_self_sha=([0-9a-f]{64})$", contract)
+self_match = re.findall(r"(?m)^ib2_self_sha=([0-9a-f]{64})$", contract)
 if len(self_match) != 1:
     raise SystemExit("ii-b5b-ii-b staged verifier self-seal drifted")
 normalized = re.sub(
-    r"(?m)^# ib2_self_sha=[0-9a-f]{64}$", "# ib2_self_sha=SELF", contract
+    r"(?m)^ib2_self_sha=.*$", "ib2_self_sha=SELF", contract
 ).encode("utf-8")
 if hashlib.sha256(normalized).hexdigest() != self_match[0]:
     raise SystemExit("ii-b5b-ii-b staged verifier self-seal drifted")
@@ -7902,9 +7948,9 @@ import hashlib
 import re
 
 contract = Path("scripts/verify-contract").read_text(encoding="utf-8")
-self_match = re.findall(r"(?m)^# ib2_self_sha=([0-9a-f]{64})$", contract)
+self_match = re.findall(r"(?m)^ib2_self_sha=([0-9a-f]{64})$", contract)
 normalized = re.sub(
-    r"(?m)^# ib2_self_sha=[0-9a-f]{64}$", "# ib2_self_sha=SELF", contract
+    r"(?m)^ib2_self_sha=.*$", "ib2_self_sha=SELF", contract
 ).encode("utf-8")
 if (
     len(self_match) != 1
@@ -10642,8 +10688,8 @@ if len(mutations) != 51:
 expected = (
     "7d86510b67b92f8dd1e2773faca3f1faeccaeb113a1292fb91a17db5f4386613",
     "2ae5f50fd8d60135caf007096d171315d3fed228da10f6fbfff3bde1187a3dd5",
-    "bb675fd80c395a1150b9d194a8fb60019e32cdf6d255765adcf2ca5e0c5d9416",
-    "6c5694bc67a60c0af8f0df68ad438d249cca9046a96665c938b77e87fd8abfae",
+    "bd00ae59aa33ca772c4694872abeba255ec1d8b6bb12bd69ebd683183c0e71c2",
+    "bcd7590ed10c61a370670d75928adfe8f0661df0d75bce8f5d949752ffa066e8",
     "58fb1aec6e6a888b7c92064a142a57e777dc90185d5012947e5bc49be3838504",
 )
 if mutation_mode == "true":
@@ -11056,7 +11102,7 @@ mutations = {
     "verifier-canonical-reencode": ("verifier", "require(encode_transcript(domain, fields) == data, \"canonical re-encode\")", "require(True, \"canonical re-encode\")"),
     "verifier-held-named-identity": ("verifier", "require((held.st_dev, held.st_ino, held.st_gen, held.st_size) ==", "require(True or (held.st_dev, held.st_ino, held.st_gen, held.st_size) =="),
     "verifier-event-chain": ("verifier", "require(event[\"previous\"] == expected_previous, \"event chain\")", "require(True, \"event chain\")"),
-    "verifier-receipt-self-hash": ("verifier", "require(hashlib.sha256(encode_transcript(", "require(True or hashlib.sha256(encode_transcript("),
+    "verifier-receipt-self-hash": ("verifier", 'require(hashlib.sha256(encode_transcript(\n        "stornaut.task39.machine.gate-coordinator-receipt.v1", zeroed\n    )).digest() == fields[22], "receipt self hash")', 'require(True or hashlib.sha256(encode_transcript(\n        "stornaut.task39.machine.gate-coordinator-receipt.v1", zeroed\n    )).digest() == fields[22], "receipt self hash")'),
     "verifier-foundation-canonical": ("verifier", "require(foundation_json(data) == data, \"noncanonical json\")", "require(True, \"noncanonical json\")"),
     "verifier-canonical-path": ("verifier", "root_path = canonical_absolute_path(root_path)", "root_path = os.path.realpath(root_path)"),
     "verifier-path-spelling-open": ("verifier", "            parent_fd = walk[\"fds\"][-1]\n            require_exact_component(parent_fd, component)", "            parent_fd = walk[\"fds\"][-1]\n            require_exact_component(-1, component)"),
@@ -11106,10 +11152,15 @@ for label, source in (("contract", contract), ("writer", writer)):
         raise SystemExit(f"ii-c-b2a2 {label} Debug boundary drifted")
     if re.search(r"(?m)^\s*(?:public|open)\b", source):
         raise SystemExit(f"ii-c-b2a2 {label} public surface drifted")
+policy_probe = '"/usr/bin/sudo -knv"'
+if contract.count(policy_probe) != 1 or verifier.count(policy_probe) != 1:
+    raise SystemExit("ii-c-b2a2 policy probe evidence drifted")
+authority_surface = (contract.replace(policy_probe, "", 1) + writer
+                     + verifier.replace(policy_probe, "", 1))
 for forbidden in ("Process(", "posix_spawn", "URLSession", "NSXPC", "socket(",
                   "launchctl", "sudo", "trashItem", "removeItem", "unlink(",
                   "StornautExecution", "ActionExecutor", "RegisteredAction"):
-    if forbidden in contract + writer + verifier:
+    if forbidden in authority_surface:
         raise SystemExit("ii-c-b2a2 prohibited authority drifted")
 if "value.artifacts == entries, try value.encoded() == data" not in contract:
     raise SystemExit("ii-c-b2a2 producer canonical contract drifted")
@@ -11145,6 +11196,7 @@ required_verifier = (
     "stornaut.task39.iic.attempt-event.v1",
     "stornaut.task39.machine.gate-coordinator-receipt.v1",
     'require(encode_transcript(domain, fields) == data, "canonical re-encode")',
+    'require(hashlib.sha256(encode_transcript(\n        "stornaut.task39.machine.gate-coordinator-receipt.v1", zeroed\n    )).digest() == fields[22], "receipt self hash")',
     "require((held.st_dev, held.st_ino, held.st_gen, held.st_size) ==",
     "require(event[\"previous\"] == expected_previous, \"event chain\")",
     "require(hashlib.sha256(encode_transcript(",
@@ -11160,9 +11212,9 @@ for forbidden in ("StornautInvestigationMachineCampaignSupport",
         raise SystemExit("ii-c-b2a2 verifier independence drifted")
 for marker in (
     "independentVerifierRequiresExactSealAndLeavesTreeUnchanged",
-    "independentVerifierAcceptsPrivilegedCoordinatorCorpus",
+    "independentVerifierAdmitsOnlyCompletePairedPrefix",
     "independentVerifierRejectsMutatedArtifact",
-    "independentVerifierUsesFoundationCanonicalJSONBytes",
+    "independentVerifierRejectsCanonicalButUntypedJSON",
     "independentVerifierRejectsNoncanonicalAndParentSymlinkPaths",
     "92418d3ce5be398d842763863f001a39340ba2c1d80407a95ca4719c90ebdf2d",
 ):
@@ -11246,6 +11298,191 @@ function verify_iicb2a2_staged_scope() {
         [[ "$(print -r -- "$entry" | awk '{print $1, $3, $4}')" == "$mode 0 $item" \
             && "$(print -r -- "$entry" | awk '{print $2}')" == "$(git hash-object -- "$item")" ]] \
             || { print -u2 "ii-c-b2a2 staged source/mode drifted: $item"; return 1; }
+    done
+}
+
+function verify_iic_evidence_verification_source_contract() {
+    /usr/bin/python3 -I - "$iic_evidence_verification_mutation_only" \
+        "$iic_evidence_verification_mutation_name" \
+        "$iic_evidence_verification_mutation_slot" \
+        "$iic_evidence_verification_mutation_sha" \
+        "${iic_evidence_verification_sources[@]}" <<'PY'
+from pathlib import Path
+import hashlib, re, sys
+mode, name, slot, sha = sys.argv[1:5]
+slots=("package","protocol","entry","composition","continuity","support","campaign","verifier","protocol_tests","campaign_tests","boundary_tests","contract")
+canonical_paths=tuple(map(Path,("Package.swift",
+ "Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerProtocol.swift","Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineZeroArgumentEntry.swift",
+ "Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerComposition.swift","Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineHelperEpochContinuity.swift",
+ "Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignEvidenceContract.swift","Sources/StornautInvestigationMachineCampaign/main.swift",
+ "scripts/verify-investigation-runtime-machine-report","Tests/StornautInvestigationTests/InvestigationMachineDarwinOuterInnerProtocolTests.swift",
+ "Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift",
+ "Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift",
+ "scripts/verify-contract")))
+paths=tuple(map(Path,sys.argv[5:])) or canonical_paths
+if len(paths)!=12: raise SystemExit("ii-c evidence-verification source cardinality drifted")
+sources=dict(zip(slots,(path.read_text(encoding="utf-8") for path in paths)))
+canonical=dict(zip(slots,(path.read_text(encoding="utf-8") for path in canonical_paths)))
+component_call = ('    /bin/zsh -f scripts/verify-app-release-boundaries ' + '\\\n'
+    '        --iic-evidence-verification-component-boundary-only ' + '\\\n'
+    '        >"$out/component.log"')
+mutations = {
+ "epoch-eight-fields":("protocol","admissionMaterialBytes, admissionSHA256.rawBytes","admissionSHA256.rawBytes"),
+ "bundle-half-mib":("protocol","package static let maximumByteCount = 3 * 1_024 * 1_024","package static let maximumByteCount = 512 * 1_024"),
+ "writer-one-mib":("entry","maximumByteCount: 4 * 1_024 * 1_024 + 128","maximumByteCount: 1 * 1_024 * 1_024"),
+ "campaign-inline-decoder":("campaign","let validated = try InvestigationMachineCampaignEpochEvidenceValidator","let validated = try InvestigationMachineEpochEvidenceBundle"),
+ "gate-prepared-frame-hash-drop":("support","prepared == .hashing(preparedFrame),","prepared == prepared,"),
+ "driver-l2-time-bypass":("protocol","installedL2ObservedAtNanoseconds\n                <= terminal.observedAtNanoseconds,","true,"),
+ "campaign-cross-epoch-parent-bypass":("support","guard Set(epochs.map(\.outerDriverProcessID)).count == 1 else {","guard !epochs.isEmpty else {"),
+ "campaign-final-time-widen":("support","finalReceipt.monotonicStartedNanoseconds < started,","finalReceipt.monotonicStartedNanoseconds <= started,"),
+ "python-eight-fields":("verifier","(1,50<<10),(32,32)], MAX_EPOCH)","(32,32)], MAX_EPOCH)"),
+ "python-cross-epoch-parent-bypass":("verifier",'require(len({value["driverParent"] for value in verified}) == 1,','require(bool(verified),'),
+ "python-final-time-widen":("verifier",'and final["started"] < raw["started"]','and final["started"] <= raw["started"]'),
+ "python-crlf-envelope":("verifier",'and not diagnostic.endswith(b"\\r\\n")','and diagnostic.endswith(ending)'),
+ "boundary-installed-l2-import-drop":("boundary_tests",'"InvestigationMachineDarwinOuterInnerProtocol.swift": [\n                "import Foundation",\n                "import StornautInvestigationHandoffContract",\n                "import StornautInvestigationInstalledL2",\n            ],','"InvestigationMachineDarwinOuterInnerProtocol.swift": [\n                "import Foundation",\n                "import StornautInvestigationHandoffContract",\n            ],'),
+ "boundary-semantic-consumer-drop":("boundary_tests","        #expect(evidenceValidator.contains(semanticEvaluator))","        #expect(!evidenceValidator.contains(semanticEvaluator))"),
+ "contract-component-call-drop":("contract",component_call,'    : >"$out/component.log"'),
+}
+if mode == "true":
+    if name not in mutations or slot!=mutations[name][0] or not re.fullmatch(r"[0-9a-f]{64}",sha): raise SystemExit("ii-c evidence-verification mutation contract drifted")
+    i=slots.index(slot); old,new=mutations[name][1:]
+    if hashlib.sha256(paths[i].read_bytes()).hexdigest()!=sha or canonical[slot].count(old)!=1 or sources[slot]!=canonical[slot].replace(old,new,1): raise SystemExit("ii-c evidence-verification unrecognized mutation")
+    if any(sources[s]!=canonical[s] for s in slots if s!=slot): raise SystemExit("ii-c evidence-verification mutation changed another source")
+elif mode!="false" or name or slot or sha: raise SystemExit("ii-c evidence-verification mutation mode drifted")
+elif sources!=canonical: raise SystemExit("ii-c evidence-verification canonical source path drifted")
+package,protocol,entry,composition,continuity,support,campaign,verifier,protocol_tests,campaign_tests,boundary_tests,contract=(sources[s] for s in slots)
+support_target='''        .target(
+            name: "StornautInvestigationMachineCampaignSupport",
+            dependencies: [
+                "CInvestigationIdentitySupport",
+                "CInvestigationMachineCampaignSupport",
+                "StornautInvestigationHandoffContract",
+            ]
+        ),'''
+campaign_target='''        .executableTarget(
+            name: "StornautInvestigationMachineCampaign",
+            dependencies: [
+                "StornautInvestigationMachineCampaignSupport",
+            ],
+            path: "Sources/StornautInvestigationMachineCampaign"
+        ),'''
+if package.count(support_target)!=1 or package.count(campaign_target)!=1 or "StornautInvestigationMachineCampaignSupport" in package.split("targets: [",1)[0]: raise SystemExit("ii-c evidence-verification package graph drifted")
+required={
+ "protocol":("import StornautInvestigationInstalledL2","package struct InvestigationMachineEpochAdmissionMaterial:","package let admissionMaterialBytes: Data","admissionMaterialBytes, admissionSHA256.rawBytes","1...InvestigationMachineEpochAdmissionMaterial.maximumByteCount","package static let maximumByteCount = 3 * 1_024 * 1_024","private func protocolValidateInstalledL2Evidence(","InvestigationInstalledL2SemanticContract.evaluate(","InvestigationInstalledL2TemporalWindow(","installedL2ObservedAtNanoseconds\n                <= terminal.observedAtNanoseconds,","protocolNonzero(claimEvidence.requestBindingSHA256)","commitContainmentEvidence(","protocolNonzero(admissionSHA256), try commitIsStillValid()"),
+ "entry":("STORNAUT_TASK39_IIC_EPOCH_BUNDLE_V1 ","maximumByteCount: 4 * 1_024 * 1_024 + 128"),
+ "continuity":("guard await prover.commitContainmentEvidence(","case containmentUncertain"),
+ "support":("package enum InvestigationMachineCampaignEpochEvidenceValidator","package static let bundleMaximumByteCount = 3 * 1_024 * 1_024","outerDriverProcessID: material.driverChild.parentProcessID,","guard Set(epochs.map(\.outerDriverProcessID)).count == 1 else {","private static func validateInstalledL2(","claim.requestBindingSHA256.rawBytes.contains(where: { $0 != 0 })","try decodeUInt64(fields[18]) > 0,","try installedL2ObservedAtNanoseconds <= decodeUInt64(fields[13])","package enum InvestigationMachineCampaignRawGateReceiptValidator","coordinatorPID == expectedOuterIdentity.processID,","guard bytes.count == 422","try cursor.uint32() == 410","let preparedFrame = try encodeRawGatePreparedFrame(","guard payload.count == 160","frame.append(data(UInt32(0x5354_4e47)))","frame.append(Data([0, 1, 1, 1]))","frame.append(data(UInt32(payload.count)))","frame.append(payload)","prepared == .hashing(preparedFrame),","finalReceipt.monotonicStartedNanoseconds < started,","completed < finalReceipt.monotonicCompletedNanoseconds,"),
+ "campaign":("epochs:[InvestigationMachineCampaignVerifiedEpoch]","let expectedOuterIdentity = lastIdentity","let gate = try InvestigationMachineCampaignRawGateReceiptValidator","let validated = try InvestigationMachineCampaignEpochEvidenceValidator","expectedAttemptUUID: preArm.outerAttemptUUID","gate.outputSHA256","result.rawGateReceiptBytes == terminal.rawGateReceipt","result.receipt == terminal.finalReceipt"),
+ "verifier":("MAX_EPOCH = 256 << 10","MAX_BUNDLE = 3 << 20","(1,50<<10),(32,32)], MAX_EPOCH)","def parse_l2_proof(","any(fields[0])",'start_wall<=observed_wall<selection["projection"]["validBefore"] and start_clock<=observed_clock','l2_observed<=u64(terminal[13])<request["deadline"]',"def parse_gate_receipt(data, manifest, prearm):",'require(len(prepared_payload) == 160, "raw Gate prepared payload")','prepared_frame = struct.pack(">IHBBI", 0x53544e47, 1, 1, 1, 160)','prepared == hashlib.sha256(prepared_frame).digest()',"def parse_bundle(diagnostic, manifest, epochs, prearm):",'and not diagnostic.endswith(b"\\r\\n")','"driver bundle canonical envelope"','raw["coordinator"] == spawn[0]["processID"]','verified[-1]["driverParent"] = driver["parent"]','require(len({value["driverParent"] for value in verified}) == 1,','"outer driver identity drift"','final["started"] < raw["started"]','raw["completed"] < final["completed"]',"Gate output completion binding"),}
+for label, markers in required.items():
+ for marker in markers:
+  if sources[label].count(marker)!=1: raise SystemExit(f"ii-c evidence-verification {label} marker drifted: {marker}")
+obsolete_topology=("expectedOuterDriver"+"ProcessID",'driver["parent"]=='+'outer_driver_pid')
+if any(x in support+campaign+verifier for x in obsolete_topology) or any(x in support+campaign for x in ("StornautInvestigationMachineDriverSupport","InvestigationMachineEpochEvidenceBundle.decode","expectedPreparedFrameSHA256")) or 'raw["prepared"] == prearm["sha"]' in verifier: raise SystemExit("ii-c evidence-verification topology or prepared-frame drifted")
+for source in (protocol,entry,composition,continuity,support,campaign):
+ for forbidden in ("DispatchSemaphore","dispatch_semaphore","dispatch_sync(","dispatch_group_wait(","xpc_connection_send_message_with_reply_sync(","synchronousRemoteObjectProxyWithErrorHandler","CFRunLoopRun(","waitUntilExit()","readDataToEndOfFile()"):
+  if forbidden in source: raise SystemExit("ii-c evidence-verification blocking bridge drifted")
+for source,markers in ((protocol_tests,("failedContainmentProofConsumesAdmissionBeforeCorrectReplay","validEpochEvidenceRoundTripsWithIndependentlyRecomputedAdmission","epochEvidenceRejectsZeroClaimRequestBinding","epochEvidenceRejectsSemanticallyRewrappedMutation","validEightEpochEvidenceBundleRoundTrips","bundleRejectsCanonicalCohortOrContinuityRewrap")),(campaign_tests,("productionEpochCorpusRoundTripsThroughAllIndependentDecoders","campaignEpochValidatorRejectsCanonicalSemanticRewrap","rawGateValidatorRejectsTransportRewrap","independentVerifierRejectsNoncanonicalDiagnosticEnvelope"))):
+ if any(source.count(marker)!=1 for marker in markers): raise SystemExit("ii-c evidence-verification tests became vacuous")
+for marker in ("driverChildAuditTokenMismatch","claimZeroRequestBinding","driverChildParentDriftAcrossEpochs","installedL2ZeroContinuousClocks","installedL2ObservedAfterTerminal","rawCoordinatorIdentity"):
+ if marker not in campaign_tests: raise SystemExit("ii-c evidence-verification semantic mutation coverage drifted")
+boundary_import_contract='''            "InvestigationMachineDarwinOuterInnerProtocol.swift": [
+                "import Foundation",
+                "import StornautInvestigationHandoffContract",
+                "import StornautInvestigationInstalledL2",
+            ],'''
+boundary_semantic_contract='''        let semanticEvaluator =
+            "InvestigationInstalledL2SemanticContract.evaluate("
+        #expect(production.components(
+            separatedBy: semanticEvaluator
+        ).count == 3)
+        #expect(evidenceValidator.contains(semanticEvaluator))'''
+if (boundary_tests.count(boundary_import_contract) != 1
+        or boundary_tests.count(boundary_semantic_contract) != 1):
+ raise SystemExit("ii-c evidence-verification boundary coverage drifted")
+if contract.count(component_call) != 1:
+ raise SystemExit("ii-c evidence-verification component call drifted")
+if "try checkCancellation()" in composition.split("let admitted = try await admission.admit(",1)[1].split("return admitted",1)[0]: raise SystemExit("ii-c evidence-verification pre-commit cancellation gap returned")
+PY
+}
+
+function verify_iic_evidence_verification_staged_scope() {
+    local baseline=${1:-3e49956f6f8e44d5d191d47c9e86856dd00d6966}
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" == \
+        3e49956f6f8e44d5d191d47c9e86856dd00d6966 ]] || {
+        print -u2 "ii-c evidence-verification checkpoint baseline drifted"
+        return 1
+    }
+    local -a expected=(
+        Sources/StornautInvestigationMachineCampaign/main.swift
+        Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignEvidenceContract.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerComposition.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerProtocol.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineHelperEpochContinuity.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineZeroArgumentEntry.swift
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineDarwinOuterInnerProtocolTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-app-release-boundaries scripts/verify-contract
+        scripts/verify-investigation-boundaries
+        scripts/verify-investigation-runtime-machine-report
+    )
+    local deleted observed_text changed item mode entry added removed
+    local -a ceilings=(90 770 5 610 35 5 850 530 20 80 150 400 340)
+    local -A ceiling
+    local -i index=1 path_changed
+    for item in "${expected[@]}"; do ceiling[$item]=${ceilings[index++]}; done
+    deleted=$(git diff --cached --name-only --diff-filter=D "$baseline" \
+        | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')
+    [[ -z $deleted ]] || {
+        print -u2 "ii-c evidence-verification checkpoint deleted a path"
+        return 1
+    }
+    observed_text=$(git diff --cached --name-only --diff-filter=ACMR "$baseline" \
+        | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')
+    local -a observed=(${(f)observed_text})
+    (( ${#expected} == 13 && ${#observed} <= 13 )) || {
+        print -u2 "ii-c evidence-verification checkpoint path ceiling drifted"
+        return 1
+    }
+    [[ "${(j:\n:)${(@on)observed}}" == "${(j:\n:)${(@on)expected}}" ]] || {
+        print -u2 "ii-c evidence-verification checkpoint paths drifted"
+        return 1
+    }
+    changed=0
+    while IFS=$'\t' read -r added removed item; do
+        [[ $added != - && $removed != - ]] || {
+            print -u2 "ii-c evidence-verification binary path rejected"; return 1
+        }
+        path_changed=$(( added + removed ))
+        (( path_changed <= ceiling[$item] )) || {
+            print -u2 "ii-c evidence-verification per-path budget drifted: $item"; return 1
+        }
+        (( changed += path_changed ))
+    done <<< "$(git diff --cached --numstat "$baseline" -- "${expected[@]}")"
+    (( changed <= 4000 )) || {
+        print -u2 "ii-c evidence-verification checkpoint budget drifted"
+        return 1
+    }
+    local -a worktree_paths=(${(f)"$(git diff --name-only --diff-filter=ACMRD -- \
+        | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')"})
+    local -a untracked_paths=(${(f)"$(git ls-files --others --exclude-standard -- \
+        | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')"})
+    for item in "${worktree_paths[@]}" "${untracked_paths[@]}"; do
+        (( ${expected[(Ie)$item]} )) || {
+            print -u2 "ii-c evidence-verification worktree paths drifted"
+            return 1
+        }
+    done
+    for item in "${expected[@]}"; do
+        mode=100644; [[ $item == scripts/* ]] && mode=100755
+        entry=$(git ls-files -s -- "$item")
+        [[ "$(print -r -- "$entry" | awk '{print $1, $3, $4}')" == \
+            "$mode 0 $item" && "$(print -r -- "$entry" | awk '{print $2}')" == \
+            "$(git hash-object -- "$item")" ]] || {
+            print -u2 "ii-c evidence-verification staged source/mode drifted: $item"
+            return 1
+        }
     done
 }
 
@@ -11443,11 +11680,25 @@ target = '''        .executableTarget(
         ),'''
 if package.count(target) != 1 or package.split("targets: [",1)[0].find("StornautInvestigationMachineCampaign") >= 0: raise SystemExit("ii-c-b2b2 package-only executable drifted")
 if package.count('"StornautInvestigationMachineCampaign"') != 2: raise SystemExit("ii-c-b2b2 product or reverse dependency drifted")
-if not executable.startswith("import CInvestigationIdentitySupport\nimport CInvestigationMachineCampaignSupport\nimport Darwin\nimport Dispatch\nimport Foundation\n\n#if DEBUG\nimport StornautInvestigationMachineCampaignSupport\n"): raise SystemExit("ii-c-b2b2 executable import boundary drifted")
+if not executable.startswith("import CInvestigationIdentitySupport\nimport CInvestigationMachineCampaignSupport\nimport Darwin\nimport Dispatch\nimport Foundation\nimport StornautInvestigationHandoffContract\n\n#if DEBUG\nimport StornautInvestigationMachineCampaignSupport\n"): raise SystemExit("ii-c-b2b2 executable import boundary drifted")
 for marker in ("CommandLine.argc == 1", "CampaignDarwinSystem", "stornaut_investigation_campaign_spawn_fixed", "stornaut_investigation_campaign_bootstrap_fixed", "bootstrapVerified", "proc_pidinfo", "proc_listallpids", "waitpid", "kill(-groupID, SIGKILL)", "static func main() { exit(78) }"):
     if marker not in executable: raise SystemExit("ii-c-b2b2 executable lifecycle drifted")
+allowed_sudo = (
+    'Self.runFixed("/usr/bin/sudo", ["-knv"], maximum: 4_096)',
+    '["command":"/usr/bin/sudo -knv",',
+    'runFixed("/usr/bin/sudo",\n            ["-k","--","/bin/zsh","-f","-s","--","--held-source",script.root,action]+script.hashes+[script.plist],standardInput:script.bytes,maximum:16_384)',
+)
+if any(executable.count(marker) != 1 for marker in allowed_sudo):
+    raise SystemExit("ii-c-b2b2 fixed sudo contract drifted")
+for marker in ("guard probe.status != 0 else { throw Failure.invalid }",
+               "standardInput:script.bytes", "maximum:16_384"):
+    if executable.count(marker) != 1:
+        raise SystemExit("ii-c-b2b2 fixed sudo contract drifted")
+authority_surface = executable
+for marker in allowed_sudo:
+    authority_surface = authority_surface.replace(marker, "", 1)
 for forbidden in ("StornautCore","StornautCodex","StornautExecution","CoordinatorSupport","MachineLaunchSupport","NSXPC","URLSession","sudo","launchctl","MoveToTrash","RegisteredAction"):
-    if forbidden in executable + fixture: raise SystemExit("ii-c-b2b2 prohibited authority drifted")
+    if forbidden in authority_surface + fixture: raise SystemExit("ii-c-b2b2 prohibited authority drifted")
 for marker in ("CAMPAIGN_FIXTURE_TRUNCATED","CAMPAIGN_FIXTURE_TRAILING","CAMPAIGN_FIXTURE_MISSING_EOF","CAMPAIGN_FIXTURE_NONZERO","tcgetpgrp(STDERR_FILENO) == getpid()","STORNAUT_INVESTIGATION_CAMPAIGN_RECEIPT_FD"):
     if marker not in fixture: raise SystemExit("ii-c-b2b2 fixture matrix drifted")
 for marker in ("physicalExecutableUsesControllingPTYAndExactFD3","physicalFailuresRemainBoundedAndLeaveZeroResidue",".truncated, .trailing, .missingEOF, .nonzero, .missingSibling","processGroupResidueCount == 0","sessionResidueCount == 0"):
@@ -11605,7 +11856,7 @@ if not (harness.index('prepareActivation(')<harness.index('durablyPublishArmedCo
 if not (coordinator.index('try sink.writePreArm(preArm, validBefore: validBefore)')<coordinator.index('try sink.writeRawGateReceipt(transport)')<coordinator.index('try sink.writeAndClose(disposition)')): raise SystemExit("ii-c-c three-frame order drifted")
 publish=main[main.index('private func publishSeal'):main.index('private static func repositoryRoot')]
 if not (publish.index('let result = try Self.runFixed')<publish.index('if admitting')<publish.index('guard result.status == 0')): raise SystemExit("ii-c-c verifier-before-success drifted")
-for marker in ("validate_json_artifacts","event evidence set drift","FD 3 frame cardinality","Gate output completion binding","bundle ownership/L2 join"):
+for marker in ("validate_json_artifacts","event evidence set drift","FD 3 frame cardinality","Gate output completion binding","binary/JSON join"):
     if marker not in verifier: raise SystemExit("ii-c-c verifier join drifted")
 PY
 }
@@ -14879,6 +15130,43 @@ historical_package = historical_package.replace(
 ).replace(later_gate_target, "", 1).replace(
     later_gate_test_dependency, "", 1
 )
+later_campaign_support_target = '''        .target(
+            name: "StornautInvestigationMachineCampaignSupport",
+            dependencies: [
+                "CInvestigationIdentitySupport",
+                "CInvestigationMachineCampaignSupport",
+                "StornautInvestigationHandoffContract",
+            ]
+        ),
+'''
+later_campaign_target = '''        .executableTarget(
+            name: "StornautInvestigationMachineCampaign",
+            dependencies: [
+                "StornautInvestigationMachineCampaignSupport",
+            ],
+            path: "Sources/StornautInvestigationMachineCampaign"
+        ),
+        .target(
+            name: "CInvestigationMachineCampaignSupport",
+            path: "Sources/CInvestigationMachineCampaignSupport",
+            publicHeadersPath: "include"
+        ),
+'''
+later_campaign_test_dependencies = (
+    '                "StornautInvestigationMachineCampaign",\n',
+    '                "StornautInvestigationMachineCampaignSupport",\n',
+)
+if historical_package.count(later_campaign_support_target) != 1 \
+        or historical_package.count(later_campaign_target) != 1 \
+        or historical_package.count(later_campaign_test_dependencies[0]) != 1 \
+        or historical_package.count(later_campaign_test_dependencies[1]) < 2:
+    raise SystemExit("live claim server later Campaign projection drifted")
+historical_package = historical_package.replace(
+    later_campaign_support_target, "", 1
+).replace(later_campaign_target, "", 1)
+historical_package = historical_package.replace(
+    later_campaign_test_dependencies[0], "", 1
+).replace(later_campaign_test_dependencies[1], "", 2)
 if hashlib.sha256(historical_package.encode("utf-8")).hexdigest() != (
     "798247d986c73adb09f7b975b2ffc7793cdd04803fb4ec3bd1f41000cce7cb20"
 ):
@@ -15932,7 +16220,8 @@ if $iib5bic2b_absence_only_contract_only; then
         "$iib5bic2b_installed_owner_source" \
         "$iib5bic2b_installed_join_source" "$iib5bic2b_focused_test_source" \
         "$iib5bic2b_collector_test_source" \
-        "$iib5bic2b_production_source_root"
+        "$iib5bic2b_production_source_root" \
+        "$iib5bic2b_semantic_replay_contract"
     print "ii-b5b-i-c2b absence-only contract verification passed."
     exit 0
 fi
@@ -16124,6 +16413,18 @@ fi
 if $iicb2a2_staged_scope_contract_only; then
     verify_iicb2a2_staged_scope "$iicb2a2_staged_scope_baseline"
     print "ii-c-b2a2 staged scope verification passed."
+    exit 0
+fi
+if $iic_evidence_verification_contract_only \
+    || $iic_evidence_verification_mutation_only; then
+    verify_iic_evidence_verification_source_contract
+    print "ii-c evidence-verification source contract verification passed."
+    exit 0
+fi
+if $iic_evidence_verification_staged_scope_only; then
+    verify_iic_evidence_verification_staged_scope \
+        "$iic_evidence_verification_staged_scope_baseline"
+    print "ii-c evidence-verification staged scope verification passed."
     exit 0
 fi
 if $iicb2b1_source_contract_only || $iicb2b1_mutation_contract_only; then
@@ -16391,6 +16692,7 @@ verify_iic0bi_producer_contract \
     Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
 verify_interactive_native_source_contract
 verify_iicb1_root_owned_gate_source_contract
+verify_iic_evidence_verification_source_contract
 verify_iib5biib_app_identity_contract \
     Package.swift \
     Sources/CInvestigationIdentitySupport/CInvestigationIdentitySupport.c \
@@ -17925,6 +18227,7 @@ if consumers != {
     "StornautInvestigationDiagnostic",
     "StornautInvestigationInstalledL2",
     "StornautInvestigationMachineClaimServer",
+    "StornautInvestigationMachineCampaignSupport",
     "StornautInvestigationMachineDriverSupport",
     "StornautInvestigationMachineGateCoordinatorSupport",
     "StornautInvestigationMachineGateSupport",
@@ -18264,6 +18567,7 @@ expected_driver_support_imports = {
     },
     "InvestigationMachineDarwinOuterInnerProtocol.swift": {
         "Foundation", "StornautInvestigationHandoffContract",
+        "StornautInvestigationInstalledL2",
     },
     "InvestigationMachineDarwinOuterInnerSession.swift": {
         "Darwin", "Foundation", "StornautInvestigationInstalledL2",
@@ -18315,11 +18619,11 @@ expected_driver_support_sha256 = {
     "InvestigationMachineDarwinEpochRetirement.swift":
         "441e1001f40d0a9055ac55b019a85964fc8a5032170376e97d91388227e18f76",
     "InvestigationMachineDarwinOuterInnerComposition.swift":
-        "369bf7188c9d367c5e6a55a4ac9c5ec91050b1adc23207d827727a3cd81e7cd5",
+        "dec10727fd41235150c8fe9808cd4a93e4b79ed61bc440cdab9bf101d1a1fb18",
     "InvestigationMachineDarwinOuterObservation.swift":
         "84974a0341bf4d70e8dd50f9fbe28e2ca6b0c620f297df930e10a76278657811",
     "InvestigationMachineDarwinOuterInnerProtocol.swift":
-        "79a91d866e5c898f64d4b3b21aef1286cf447bc5fde1b4233fe1d0d5109a429c",
+        "dd094267bbac5ac2ddb8461d4c266ec4df05c0c60517073ceed00bb7a3b9fd15",
     "InvestigationMachineDarwinDriverChildObservation.swift":
         "c2bad03e1288a7121475f1a81ac31e8919415e559d8afd3beb3b262d60bd0e8f",
     "InvestigationMachineDarwinOuterInnerSession.swift":
@@ -18327,17 +18631,17 @@ expected_driver_support_sha256 = {
     "InvestigationMachineSingleEpoch.swift":
         "07955234a0103c9a07d5289a258fabad68306d536ff7fe709de64123d109c953",
     "InvestigationMachineSingleEpochComposition.swift":
-        "455854e085e81dc728050d6aa8de906d6f48be9b2457fc81e36a2f3d736dbdee",
+        "a37191f12d5864a959e56cb5a99b8af7de566b191d5594c30d4bbd760b03d523",
     "InvestigationMachineHelperEpochContinuity.swift":
-        "b1e53776b5cec0b8742e2d074443008ffc6dd0b9b0a3756dd5b3849288b75601",
+        "cd61ac238d17916b6654c579793f72aa7fba19162dbff79f2f1f6c49dd5f3cf9",
     "InvestigationMachineEightEpochCohort.swift":
         "822cecb3489e16b9713244ff45312726045ffcc235757d132a6d6ca13ea4c3e2",
     "InvestigationMachineSingleEpochInstalledL2Join.swift":
         "376148fd9e0284c03e399ed281cd47696bed3c35630cf272fa639b7df99960d2",
     "InvestigationMachineSingleEpochPhysicalBridge.swift":
-        "56380d64e5e4519aa1df272c293894aba074c6613c812b3ffbd9dc5df26aa4f2",
+        "49e161d18c904f19ff79ab46c83cfd59199dc8476ff142c275c51d6d70d3374f",
     "InvestigationMachineZeroArgumentEntry.swift":
-        "cc8f24261ab5efe2505b1a36a7ab8dc160cdf22c2a63686a386a756a268bb389",
+        "d91556741167f3dcb55d692141926361dbbe2aed9755022a74f1f22cfab0abcd",
 }
 for source_name in driver_support_sources:
     source_path = driver_support_source_root / source_name
@@ -19763,23 +20067,33 @@ function require_exact_machine_driver_projection() {
     local iib5biii_b2b1b_swiftpm_debug_owned_lines=8662
     local iib5biii_b2b1b_swiftpm_release_owned_sha=8570228a2bb16262520142d397ecee0cd415f42a01b41e142abc983bf1a89270
     local iib5biii_b2b1b_swiftpm_release_owned_lines=5997
+    # ii-c evidence verification adds only InstalledL2 semantic replay and the
+    # typed epoch evidence commit path; authority deny-lists remain unchanged.
+    local iic_evidence_debug_undefined_sha=d074185a004ead52e4a03578d4d5bfcca0acd157b8b5e30d7b92eac431866efd
+    local iic_evidence_debug_undefined_lines=700
+    local iic_evidence_release_undefined_sha=b9a223db4819b6831a1e424d91be1f614ed52ab91413c9b9f0d55de0df09d155
+    local iic_evidence_release_undefined_lines=508
+    local iic_evidence_debug_owned_sha=78c04b12d372f99e532906c448dc99aa7a79f586f31a2e77b6daa66388b69ece
+    local iic_evidence_debug_owned_lines=9079
+    local iic_evidence_release_owned_sha=9698db9e44494baed7c24d98ce1b03f3a9aef97b6f0dae5a45145cc6905430bc
+    local iic_evidence_release_owned_lines=6306
 
     case "$configuration" in
         debug)
-            expected_undefined_sha=$iib5biii_b2b1b_swiftpm_debug_undefined_sha
-            expected_undefined_lines=$iib5biii_b2b1b_swiftpm_debug_undefined_lines
+            expected_undefined_sha=$iic_evidence_debug_undefined_sha
+            expected_undefined_lines=$iic_evidence_debug_undefined_lines
             expected_loads_sha=$iib5biii_b2b1b_swiftpm_loads_sha
             expected_loads_lines=$iib5biii_b2b1b_swiftpm_loads_lines
-            expected_owned_sha=$iib5biii_b2b1b_swiftpm_debug_owned_sha
-            expected_owned_lines=$iib5biii_b2b1b_swiftpm_debug_owned_lines
+            expected_owned_sha=$iic_evidence_debug_owned_sha
+            expected_owned_lines=$iic_evidence_debug_owned_lines
             ;;
         release)
-            expected_undefined_sha=$iib5biii_b2b1b_swiftpm_release_undefined_sha
-            expected_undefined_lines=$iib5biii_b2b1b_swiftpm_release_undefined_lines
+            expected_undefined_sha=$iic_evidence_release_undefined_sha
+            expected_undefined_lines=$iic_evidence_release_undefined_lines
             expected_loads_sha=$iib5biii_b2b1b_swiftpm_loads_sha
             expected_loads_lines=$iib5biii_b2b1b_swiftpm_loads_lines
-            expected_owned_sha=$iib5biii_b2b1b_swiftpm_release_owned_sha
-            expected_owned_lines=$iib5biii_b2b1b_swiftpm_release_owned_lines
+            expected_owned_sha=$iic_evidence_release_owned_sha
+            expected_owned_lines=$iic_evidence_release_owned_lines
             ;;
         *)
             print -u2 "Unknown Machine driver projection: $configuration"

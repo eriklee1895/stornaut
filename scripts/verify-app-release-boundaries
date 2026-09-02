@@ -2,8 +2,8 @@
 
 set -euo pipefail
 
-# iicb1_app_self_sha=f692805732ce0910e402c5d90410144681088f725b119ce31182da4a496c7ecd
-if [[ ${1:-} == --iic-b1-root-owned-gate-component-* || ${1:-} == --iic-b2a2-component-* || ${1:-} == --iic-b2b2-component-* ]]; then iicb1_app_self_sha=$(/usr/bin/sed -nE 's/^# iicb1_app_self_sha=([0-9a-f]{64})$/\1/p' "${0:A}"); [[ ${#iicb1_app_self_sha} == 64 && "$(/usr/bin/sed -E 's/^# iicb1_app_self_sha=[0-9a-f]{64}$/# iicb1_app_self_sha=SELF/' "${0:A}" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')" == "$iicb1_app_self_sha" ]] || { print -u2 "ii-c-b1 App release verifier self-seal drifted"; exit 1; }; fi
+# iicb1_app_self_sha=ce9e500a6cbc7dde9b848a2ce9b965f83fb686302fc67a10fe5bb3abf3d4e2d8
+if [[ ${1:-} == --iic-b1-root-owned-gate-component-* || ${1:-} == --iic-b2a2-component-* || ${1:-} == --iic-b2b2-component-* || ${1:-} == --iic-evidence-verification-component-* ]]; then iicb1_app_self_sha=$(/usr/bin/sed -nE 's/^# iicb1_app_self_sha=([0-9a-f]{64})$/\1/p' "${0:A}"); [[ ${#iicb1_app_self_sha} == 64 && "$(/usr/bin/sed -E 's/^# iicb1_app_self_sha=[0-9a-f]{64}$/# iicb1_app_self_sha=SELF/' "${0:A}" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')" == "$iicb1_app_self_sha" ]] || { print -u2 "ii-c-b1 App release verifier self-seal drifted"; exit 1; }; fi
 repo_root=${0:A:h:h}
 cd "$repo_root"
 
@@ -94,6 +94,7 @@ iicb2a2_component_source_contract_only=false
 iicb2a2_component_source=
 iicb2a2_component_boundary_only=false
 iicb2a2_component_boundary_internal=false
+iic_evidence_verification_component_boundary_only=false
 iicb2b2_component_boundary_only=false
 iic0bivb2_component_boundary_only=false
 iica_existing_product_derived_data=
@@ -225,6 +226,9 @@ elif [[ $# == 1 && $1 == --iic-b2a2-component-boundary-only ]]; then
     iicb2a2_component_boundary_only=true
 elif [[ $# == 1 && $1 == --iic-b2a2-component-boundary-internal ]]; then
     iicb2a2_component_boundary_internal=true
+elif [[ $# == 1 \
+    && $1 == --iic-evidence-verification-component-boundary-only ]]; then
+    iic_evidence_verification_component_boundary_only=true
 elif [[ $# == 1 && $1 == --iic-b2b2-component-boundary-only ]]; then
     iicb2b2_component_boundary_only=true
 elif [[ $# == 1 && $1 == --iic0b-iv-component-boundary-only ]]; then
@@ -284,7 +288,7 @@ elif [[ $# == 5 && $1 == --iib5biii-b2a-ii-a2ii-source-contract-only ]]; then
     iib5biii_b2a_iia2ii_retirement_source=$5
 elif (( $# != 0 )); then
     print -u2 \
-        "Usage: scripts/verify-app-release-boundaries [--investigation-handoff-only | --iic-b1-root-owned-gate-component-source-contract-only <source> | --iic-b1-root-owned-gate-component-boundary-only | --legacy-machine-claim-contract-only <source> | --iib4-machine-claim-contract-only <source> | --iib5biic-machine-driver-contract-only <source> | --iib5biid-machine-driver-contract-only <source> | --iic0a-source-contract-only <projection> <intake> | --iic0b-i-source-contract-only <author> <composition> [verifier] | --iic0b-i-component-boundary-only | --iic0b-ii-a-source-contract-only <package> <ownership> [verifier] | --iic0b-ii-a-component-boundary-only | --iic0b-ii-a3-source-contract-only <package> <ownership> [verifier] | --iic0b-ii-a3-component-boundary-only | --iic0b-ii-b-source-contract-only <package> <ownership> <capsule> [verifier] | --iic0b-ii-b-component-boundary-only | --iic0b-iii-2a-source-contract-only <package> <transport> <launcher> <darwin-system> <entry> [verifier] | --iic0b-iii-2a-component-boundary-only | --iib5biii-a-source-contract-only <single-epoch> <composition> <continuity> | --iib5biii-b1-source-contract-only <cohort> <continuity> | --iib5biii-b2a0-source-contract-only <composition> <continuity> <bridge> | --iib5biii-b2a-i-source-contract-only <single-epoch> <composition> <continuity> <bridge> <protocol> | --iib5biii-b2a-ii-a1v-source-contract-only <outer-inner-session> <driver-child-observation> | --iib5biii-b2b0-source-contract-only <observer> <session> <composition> | --iib5biii-b2b1a0-source-contract-only <composition> <bridge> | --iib5biii-b2b1a1-source-contract-only <app-identity> <outer-observation> <composition> | --iib5biii-b2b1b-source-contract-only <support> <entry> | --iib5biii-b2a-ii-a2ii-source-contract-only <composition> <outer-inner-session> <outer-inner-protocol> <retirement>]"
+        "Usage: scripts/verify-app-release-boundaries [--investigation-handoff-only | --iic-b1-root-owned-gate-component-source-contract-only <source> | --iic-b1-root-owned-gate-component-boundary-only | --iic-evidence-verification-component-boundary-only | --legacy-machine-claim-contract-only <source> | --iib4-machine-claim-contract-only <source> | --iib5biic-machine-driver-contract-only <source> | --iib5biid-machine-driver-contract-only <source> | --iic0a-source-contract-only <projection> <intake> | --iic0b-i-source-contract-only <author> <composition> [verifier] | --iic0b-i-component-boundary-only | --iic0b-ii-a-source-contract-only <package> <ownership> [verifier] | --iic0b-ii-a-component-boundary-only | --iic0b-ii-a3-source-contract-only <package> <ownership> [verifier] | --iic0b-ii-a3-component-boundary-only | --iic0b-ii-b-source-contract-only <package> <ownership> <capsule> [verifier] | --iic0b-ii-b-component-boundary-only | --iic0b-iii-2a-source-contract-only <package> <transport> <launcher> <darwin-system> <entry> [verifier] | --iic0b-iii-2a-component-boundary-only | --iib5biii-a-source-contract-only <single-epoch> <composition> <continuity> | --iib5biii-b1-source-contract-only <cohort> <continuity> | --iib5biii-b2a0-source-contract-only <composition> <continuity> <bridge> | --iib5biii-b2a-i-source-contract-only <single-epoch> <composition> <continuity> <bridge> <protocol> | --iib5biii-b2a-ii-a1v-source-contract-only <outer-inner-session> <driver-child-observation> | --iib5biii-b2b0-source-contract-only <observer> <session> <composition> | --iib5biii-b2b1a0-source-contract-only <composition> <bridge> | --iib5biii-b2b1a1-source-contract-only <app-identity> <outer-observation> <composition> | --iib5biii-b2b1b-source-contract-only <support> <entry> | --iib5biii-b2a-ii-a2ii-source-contract-only <composition> <outer-inner-session> <outer-inner-protocol> <retirement>]"
     exit 64
 fi
 
@@ -296,7 +300,9 @@ import re
 import sys
 
 source = Path(sys.argv[1]).read_text(encoding="utf-8")
-runtime_source = source[source.index("\nscripts/verify-contract\n"):]
+runtime_source = source[source.index(
+    "\nscripts/verify-contract --iic-a-contract-only\n"
+):]
 
 required_fragments = (
     "claim_server_module_symbols=(",
@@ -623,7 +629,9 @@ import subprocess
 import sys
 
 source = Path(sys.argv[1]).read_text(encoding="utf-8")
-runtime_source = source[source.index("\nscripts/verify-contract\n"):]
+runtime_source = source[source.index(
+    "\nscripts/verify-contract --iic-a-contract-only\n"
+):]
 
 for fragment in (
     "iib4_machine_claim_positive_images=(",
@@ -755,7 +763,9 @@ import re
 import sys
 
 source = Path(sys.argv[1]).read_text(encoding="utf-8")
-runtime_source = source[source.index("\nscripts/verify-contract\n"):]
+runtime_source = source[source.index(
+    "\nscripts/verify-contract --iic-a-contract-only\n"
+):]
 
 def array_values(name):
     match = re.search(
@@ -867,7 +877,9 @@ function verify_iib5biid_machine_driver_source_contract() {
 from pathlib import Path
 import re, sys
 source = Path(sys.argv[1]).read_text(encoding="utf-8")
-runtime = source[source.index("\nscripts/verify-contract\n"):]
+runtime = source[source.index(
+    "\nscripts/verify-contract --iic-a-contract-only\n"
+):]
 def values(name):
     match = re.search(rf"(?ms)^{name}=\(\n(?P<body>.*?)^\)\n", runtime)
     if match is None: raise SystemExit(f"ii-b5b-ii-d array missing: {name}")
@@ -3025,11 +3037,16 @@ function run_iicb1_root_owned_gate_component_snapshot() (
     export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_SYSTEM=/dev/null \
         GIT_CONFIG_GLOBAL=/dev/null GIT_NO_REPLACE_OBJECTS=1 \
         GIT_OPTIONAL_LOCKS=0 GIT_TERMINAL_PROMPT=0
-    (( $# <= 1 )) && [[ $snapshot_mode == b1 || $snapshot_mode == b2a2 ]] || {
+    (( $# <= 1 )) && [[ $snapshot_mode == b1 || $snapshot_mode == b2a2 \
+        || $snapshot_mode == evidence ]] || {
         print -u2 "ii-c-b1 independent snapshot argument drifted"
         return 64
     }
-    if [[ $snapshot_mode == b2a2 ]]; then
+    if [[ $snapshot_mode == evidence ]]; then
+        scripts/verify-investigation-boundaries \
+            --iic-evidence-verification-staged-scope-contract-only \
+            3e49956f6f8e44d5d191d47c9e86856dd00d6966 || return $?
+    elif [[ $snapshot_mode == b2a2 ]]; then
         scripts/verify-investigation-boundaries \
             --iic-b2a2-staged-scope-contract-only \
             cf1cbed8beff60cdd606bf7025fcef8a2768ff99 || return $?
@@ -3173,7 +3190,7 @@ PY
             IDEPackageSupportDisablePluginExecutionSandbox OTHER_SWIFT_FLAGS \
             SWIFT_EXEC TOOLCHAINS SDKROOT XCODE_XCCONFIG_FILE
         repo_root="$snapshot_root"
-        if [[ $snapshot_mode == b2a2 ]]; then
+        if [[ $snapshot_mode == b2a2 || $snapshot_mode == evidence ]]; then
             verify_iicb2a2_component_boundary
         else
             verify_iicb1_root_owned_gate_component_boundary \
@@ -3211,7 +3228,7 @@ source = Path(sys.argv[1]).read_text(encoding="utf-8")
 self_match = re.findall(r"(?m)^# iicb1_app_self_sha=([0-9a-f]{64})$", source); normalized = re.sub(r"(?m)^# iicb1_app_self_sha=[0-9a-f]{64}$", "# iicb1_app_self_sha=SELF", source)
 if len(self_match) != 1 or hashlib.sha256(normalized.encode()).hexdigest() != (self_match[0] if self_match else ""): raise SystemExit("ii-c-b1 component verifier contract drifted")
 shell, heredocs = re.subn(r"(?ms)(^[^\n]*<<'PY'\r?\n).*?^PY\r?\n?", r"\1", normalized)
-if heredocs != 32 or hashlib.sha256(shell.encode()).hexdigest() != "00e95f165294063d1dc7cdea9f381a9bae42db82964572d7e3bd165a484af8e0": raise SystemExit("ii-c-b1 component verifier contract drifted")
+if heredocs != 32 or hashlib.sha256(shell.encode()).hexdigest() != "8ab4905dbac9ef3f5a0b20b64efdda59e2aa89b5f9e7810b7342b1211c9a1e27": raise SystemExit("ii-c-b1 component verifier contract drifted")
 critical_names = ("run_iicb1_root_owned_gate_component_snapshot", "verify_iicb1_root_owned_gate_component_source_contract", "verify_iicb1_root_owned_gate_component_boundary")
 if any(len(re.findall((r"(?m)^\s*(?:function\s+NAME(?:\s*\(\s*\))?|NAME\s*\(\s*\))(?=\s|[({])").replace("NAME", re.escape(name)), source)) != 1 for name in critical_names): raise SystemExit("ii-c-b1 component verifier contract drifted")
 source_contract_prologue = "function verify_iicb1_root_owned_gate_component_source_contract() {\n    python3 - \\\n        \"$1\" <<'PY'"
@@ -3223,7 +3240,7 @@ snapshot_end = source.index(
     "\nfunction verify_iicb1_root_owned_gate_component_source_contract() {",
     snapshot_start,
 )
-source_contract_end = source.index("\nfunction verify_iicb1_root_owned_gate_component_boundary() (", snapshot_end); source_contract_sha = "e41224889e112fdb96e436c276349b6b42fbbcec5f153ca997089d096c3411cf"; source_contract_body = source[snapshot_end:source_contract_end]
+source_contract_end = source.index("\nfunction verify_iicb1_root_owned_gate_component_boundary() (", snapshot_end); source_contract_sha = "385573acd9a774afb840ff119e4ceba6a1a9be94e638c53879a1993ad45a4c6c"; source_contract_body = source[snapshot_end:source_contract_end]
 if source_contract_body.count(source_contract_sha) != 1 or hashlib.sha256(source_contract_body.replace(source_contract_sha, "SELF").encode()).hexdigest() != source_contract_sha: raise SystemExit("ii-c-b1 component verifier contract drifted")
 start = source.index(
     "\nfunction verify_iicb1_root_owned_gate_component_boundary() ("
@@ -3235,7 +3252,7 @@ end = source.index(
 runtime = source[start:end]
 dispatch_region = source[end:]
 if hashlib.sha256(snapshot_runtime.encode()).hexdigest() != (
-    "dafc00edd144e59fb38f126e3de6896832199f3b81dc8ba9000a71fe1e4356b0"
+    "f68a5621a9a34bcf08b7f2e301a2abea8fb603020230a8c51cfef50d4402f370"
 ):
     raise SystemExit("ii-c-b1 component verifier contract drifted")
 if hashlib.sha256(runtime.encode()).hexdigest() != (
@@ -3249,6 +3266,8 @@ snapshot_required = (
     "GIT_CONFIG_GLOBAL=/dev/null GIT_NO_REPLACE_OBJECTS=1",
     "--iic-b1-root-owned-gate-staged-scope-contract-only",
     "--iic-b2a2-staged-scope-contract-only",
+    "--iic-evidence-verification-staged-scope-contract-only",
+    "3e49956f6f8e44d5d191d47c9e86856dd00d6966",
     "/usr/bin/git checkout-index --all",
     "init -q --object-format=sha1",
     "materialized_tree == $source_tree",
@@ -3265,7 +3284,7 @@ sanitized_snapshot_environment = r'''        export HOME USER LOGNAME PATH LC_AL
             IDEPackageSupportDisablePluginExecutionSandbox OTHER_SWIFT_FLAGS \
             SWIFT_EXEC TOOLCHAINS SDKROOT XCODE_XCCONFIG_FILE
         repo_root="$snapshot_root"
-        if [[ $snapshot_mode == b2a2 ]]; then
+        if [[ $snapshot_mode == b2a2 || $snapshot_mode == evidence ]]; then
             verify_iicb2a2_component_boundary
         else
             verify_iicb1_root_owned_gate_component_boundary \
@@ -3279,6 +3298,13 @@ public_dispatch = '''if $iicb1_root_owned_gate_component_boundary_only; then
     exit 0
 fi'''
 if dispatch_region.count(public_dispatch) != 1:
+    raise SystemExit("ii-c-b1 component verifier contract drifted")
+evidence_dispatch = '''if $iic_evidence_verification_component_boundary_only; then
+    run_iicb1_root_owned_gate_component_snapshot evidence
+    print "ii-c evidence-verification component boundary verification passed."
+    exit 0
+fi'''
+if dispatch_region.count(evidence_dispatch) != 2:
     raise SystemExit("ii-c-b1 component verifier contract drifted")
 required = (
     "verify_iica_component_boundary",
@@ -3647,7 +3673,7 @@ expected_snapshot = """function run_iicb2a2_component_snapshot() (
 """
 if source[snapshot_start:source_contract_start] != expected_snapshot:
     raise SystemExit("ii-c-b2a2 component verifier contract drifted")
-source_contract_sha = "c7d056a573157725a4660add516b53c01d4753379285e0c08f43136dbbb268f7"
+source_contract_sha = "8f0906db08c60a0bbd1ef4c28de02302eaede0dc7fc0d9b8903b13868daa3e7f"
 source_contract = source[source_contract_start:boundary_start]
 if (source_contract.count(source_contract_sha) != 1
         or hashlib.sha256(source_contract.replace(
@@ -3678,6 +3704,9 @@ if boundary.count("verify_iicb2a2_negative_macho \"$candidate\" || return $?") !
 for marker in (
     "run_iicb1_root_owned_gate_component_snapshot b2a2",
     "--iic-b2a2-component-boundary-internal",
+    "--iic-evidence-verification-component-boundary-only",
+    "--iic-evidence-verification-staged-scope-contract-only",
+    "run_iicb1_root_owned_gate_component_snapshot evidence",
     "StornautInvestigationMachineCampaignSupport.build",
     "InvestigationMachineRawEvidenceWriter",
     "stornaut.task39.iic.raw-evidence-manifest.v1",
@@ -3693,6 +3722,13 @@ public_dispatch = """if $iicb2a2_component_boundary_only; then
 fi"""
 dispatch_region = source[runtime_end:]
 if dispatch_region.count(public_dispatch) != 1:
+    raise SystemExit("ii-c-b2a2 component verifier contract drifted")
+evidence_dispatch = """if $iic_evidence_verification_component_boundary_only; then
+    run_iicb1_root_owned_gate_component_snapshot evidence
+    print "ii-c evidence-verification component boundary verification passed."
+    exit 0
+fi"""
+if dispatch_region.count(evidence_dispatch) != 1:
     raise SystemExit("ii-c-b2a2 component verifier contract drifted")
 PY
 }
@@ -4849,7 +4885,7 @@ composition_required = (
     "self.claimEvidence = claimEvidence",
 )
 bridge_required = (
-    "private static let maximumOwnershipByteCount = 8_192",
+    "package static let maximumOwnershipByteCount = 32 * 1_024",
     "let claimEvidence: InvestigationMachineClaimEvidence",
     "try claimEvidence.encoded(),",
     "1...InvestigationMachineClaimEvidence.maximumByteCount",
@@ -5510,6 +5546,11 @@ fi
 if $iicb2a2_component_boundary_only; then
     run_iicb2a2_component_snapshot
     print "ii-c-b2a2 campaign component boundary verification passed."
+    exit 0
+fi
+if $iic_evidence_verification_component_boundary_only; then
+    run_iicb1_root_owned_gate_component_snapshot evidence
+    print "ii-c evidence-verification component boundary verification passed."
     exit 0
 fi
 if $iicb2a2_component_boundary_internal; then

@@ -1327,6 +1327,733 @@ package struct InvestigationMachineCoordinatorRawReceiptV1:
     }
 }
 
+package struct InvestigationMachineCampaignVerifiedEpoch:
+    Sendable, Equatable
+{
+    package let ordinal: UInt32
+    package let scenario: InvestigationHandoffScenario
+    package let epochUUID: UUID
+    package let configurationNonce: UUID
+    package let installedL2ProofBytes: Data
+    package let claimEvidenceSHA256: InvestigationHandoffSHA256
+    package let physicalOwnershipSHA256: InvestigationHandoffSHA256
+    package let helperIdentitySHA256: InvestigationHandoffSHA256
+    package let completionBindingSHA256: InvestigationHandoffSHA256
+    package let outerDriverProcessID: UInt32
+    package let terminalEvidenceBytes: Data
+    package let admissionSHA256: InvestigationHandoffSHA256
+
+    fileprivate let helperIdentity: InvestigationMachineProcessIdentity
+    fileprivate let requestPredecessorSHA256: InvestigationHandoffSHA256
+}
+
+package struct InvestigationMachineCampaignVerifiedBundle:
+    Sendable, Equatable
+{
+    package let bytes: Data
+    package let epochs: [InvestigationMachineCampaignVerifiedEpoch]
+    package let completionBytes: Data
+}
+
+package enum InvestigationMachineCampaignEpochEvidenceValidator {
+    private static let epochMaximumByteCount = 256 * 1_024
+    package static let bundleMaximumByteCount = 3 * 1_024 * 1_024
+
+    private struct Request {
+        let deadline: UInt64
+        let mode: UInt8
+        let predecessorSHA256: InvestigationHandoffSHA256
+    }
+    private struct Ownership {
+        let appIdentity: InvestigationMachineProcessIdentity
+        let helperIdentity: InvestigationMachineProcessIdentity
+        let claimSHA256: InvestigationHandoffSHA256
+        let proofBytes: Data
+        let bindingSHA256: InvestigationHandoffSHA256
+        let installedL2ObservedAtNanoseconds: UInt64
+    }
+    private struct Result {
+        let completionBindingSHA256: InvestigationHandoffSHA256
+        let driverObservationSHA256: InvestigationHandoffSHA256
+    }
+
+    package static func validate(
+        bundle: Data, projectedInput: InvestigationProjectedCohortInput
+    ) throws -> InvestigationMachineCampaignVerifiedBundle {
+        let fields = try evidenceDecode(
+            bundle, domain: "stornaut.task39.machine.driver-evidence-bundle.v1",
+            ranges: [16...16, 32...32, 32...32, 4...4]
+                + Array(repeating: 1...epochMaximumByteCount, count: 8),
+            maximum: bundleMaximumByteCount)
+        guard
+            try decodeUUID(fields[0]) == projectedInput.capsule.outerAttemptUUID,
+            try InvestigationHandoffSHA256(rawBytes: fields[1])
+                == projectedInput.capsule.wholeCapsuleSHA256,
+            try InvestigationHandoffSHA256(rawBytes: fields[2])
+                == projectedInput.wholeInputSHA256,
+            try decodeUInt32(fields[3]) == 8
+        else { throw evidenceInvalid() }
+
+        var epochs: [InvestigationMachineCampaignVerifiedEpoch] = []
+        for index in 0..<InvestigationCohortCapsule.epochCount {
+            epochs.append(try validateEpoch(
+                fields[index + 4], index: index,
+                projectedInput: projectedInput,
+                previous: epochs.last))
+        }
+        guard Set(epochs.map(\.outerDriverProcessID)).count == 1 else {
+            throw evidenceInvalid()
+        }
+        let zero = Data(repeating: 0, count: 32)
+        let completionFields = [
+            fields[0], fields[1], fields[2], fields[3],
+            InvestigationHandoffSHA256.hashing(bundle).rawBytes,
+        ]
+        let unsigned = try HandoffBinaryTranscript.encode(
+            domain: "stornaut.task39.machine.driver-completion-v2",
+            businessFields: completionFields + [zero], maximumByteCount: 512)
+        let completion = try HandoffBinaryTranscript.encode(
+            domain: "stornaut.task39.machine.driver-completion-v2",
+            businessFields: completionFields
+                + [InvestigationHandoffSHA256.hashing(unsigned).rawBytes],
+            maximumByteCount: 512)
+        return .init(bytes: bundle, epochs: epochs, completionBytes: completion)
+    }
+
+    private static func validateEpoch(
+        _ bytes: Data, index: Int,
+        projectedInput: InvestigationProjectedCohortInput,
+        previous: InvestigationMachineCampaignVerifiedEpoch?
+    ) throws -> InvestigationMachineCampaignVerifiedEpoch {
+        let row = try evidenceDecode(
+            bytes, domain: "stornaut.task39.machine.epoch-evidence.v1",
+            ranges: [
+                4...4, 4...4, 16...16, 16...16, 1...(128 << 10),
+                1...(64 << 10), 1...2_048, 1...(50 << 10), 32...32,
+            ], maximum: epochMaximumByteCount)
+        let selection = try projectedInput.selection(at: index)
+        guard
+            try decodeUInt32(row[0]) == UInt32(index),
+            try decodeUInt32(row[1]) == selection.epoch.scenario.rawValue,
+            try decodeUUID(row[2]) == selection.epoch.epochUUID,
+            try decodeUUID(row[3]) == selection.epoch.configurationNonce
+        else { throw evidenceInvalid() }
+        let request = try parseRequest(
+            row[4], selection: selection, projectedInput: projectedInput,
+            previous: previous)
+        let normal = request.mode == 1
+        let physical = try evidenceDecode(
+            row[5], domain:
+                "stornaut.task39.machine.epoch-physical-evidence.v1",
+            ranges: normal
+                ? [1...(32 << 10), 1...(48 << 10)]
+                : [1...(32 << 10)],
+            maximum: 64 << 10)
+        let ownership = try parseOwnership(
+            physical[0], selection: selection, projectedInput: projectedInput,
+            deadline: request.deadline)
+        if let previous {
+            guard ownership.helperIdentity != previous.helperIdentity else {
+                throw evidenceInvalid()
+            }
+        }
+        let material = try parseAdmissionMaterial(
+            row[7], requestBytes: row[4], physicalOwnershipBytes: physical[0],
+            expectedAppIdentity: ownership.appIdentity,
+            expectedMode: request.mode)
+        let result = normal ? try parseNormalResult(
+            physical[1], requestBytes: row[4], material: material,
+            physicalOwnershipBytes: physical[0], ownership: ownership) : nil
+        try validateTerminal(
+            row[6], material: material,
+            helperIdentity: ownership.helperIdentity, normal: normal,
+            driverObservationSHA256: result?.driverObservationSHA256,
+            installedL2ObservedAtNanoseconds:
+                ownership.installedL2ObservedAtNanoseconds,
+            deadline: request.deadline)
+        let admission = try HandoffBinaryTranscript.encode(
+            domain: "stornaut.task39.machine.outer-inner.admission",
+            businessFields: [
+                row[4], material.ownershipRecordBytes,
+                material.acknowledgementBytes, material.decisionBytes,
+                InvestigationHandoffSHA256.hashing(
+                    normal ? physical[1] : Data()).rawBytes,
+                InvestigationHandoffSHA256.hashing(row[6]).rawBytes,
+                material.ownerBytes,
+            ], maximumByteCount: 192 << 10)
+        let admissionSHA256 = try InvestigationHandoffSHA256(rawBytes: row[8])
+        guard admissionSHA256 == .hashing(admission) else { throw evidenceInvalid() }
+        return .init(
+            ordinal: UInt32(index), scenario: selection.epoch.scenario,
+            epochUUID: selection.epoch.epochUUID,
+            configurationNonce: selection.epoch.configurationNonce,
+            installedL2ProofBytes: ownership.proofBytes,
+            claimEvidenceSHA256: ownership.claimSHA256,
+            physicalOwnershipSHA256: .hashing(physical[0]),
+            helperIdentitySHA256: try ownership.helperIdentity.helperIdentitySHA256(),
+            completionBindingSHA256:
+                result?.completionBindingSHA256 ?? ownership.bindingSHA256,
+            outerDriverProcessID: material.driverChild.parentProcessID,
+            terminalEvidenceBytes: row[6], admissionSHA256: admissionSHA256,
+            helperIdentity: ownership.helperIdentity,
+            requestPredecessorSHA256: request.predecessorSHA256)
+    }
+
+    private struct AdmissionMaterial {
+        let ownershipRecordBytes: Data
+        let ownershipRecord: [Data]
+        let driverChild: DriverChild
+        let appChild: AppChild
+        let acknowledgementBytes: Data
+        let decisionBytes: Data
+        let ownerBytes: Data
+    }
+    private struct DriverChild: Equatable {
+        let processID: UInt32
+        let processIDVersion: UInt32
+        let parentProcessID: UInt32
+        let processGroupID: UInt32
+        let auditSessionID: UInt32
+        let effectiveUserID: UInt32
+        let auditTokenWords: [UInt32]
+    }
+    private struct AppChild: Equatable {
+        let identity: InvestigationMachineProcessIdentity
+        let parentProcessID: UInt32
+        let processGroupID: UInt32
+    }
+
+    private static func parseRequest(
+        _ bytes: Data, selection: InvestigationProjectedCohortSelection,
+        projectedInput: InvestigationProjectedCohortInput,
+        previous: InvestigationMachineCampaignVerifiedEpoch?
+    ) throws -> Request {
+        let fields = try evidenceDecode(bytes, domain:
+            "stornaut.task39.machine.outer-inner.epoch-request", ranges:
+            [1...(96<<10),32...32,8...8,1...1], maximum:128<<10)
+        let mode: UInt8 = selection.epoch.scenario == .lifecycleRecovery ? 2 : 1
+        guard fields[1] == InvestigationHandoffSHA256.hashing(fields[0]).rawBytes,
+            fields[3] == Data([mode]), try decodeUInt64(fields[2]) > 0
+        else { throw evidenceInvalid() }
+        let successor = selection.epoch.ordinal > 0
+        let invocation = try evidenceDecode(fields[0], domain: successor
+            ? "stornaut.task39.machine.epoch-invocation.successor"
+            : "stornaut.task39.machine.epoch-invocation.genesis", ranges:
+            [16...16,32...32,32...32,1...66_048,1...2_048,1...8_192,32...32]
+                + (successor ? [1...InvestigationMachineProcessIdentity.maximumByteCount] : []),
+            maximum:96<<10)
+        guard try decodeUUID(invocation[0]) == projectedInput.capsule.outerAttemptUUID,
+            try InvestigationHandoffSHA256(rawBytes: invocation[1])
+                == projectedInput.capsule.wholeCapsuleSHA256,
+            try InvestigationHandoffSHA256(rawBytes: invocation[2])
+                == projectedInput.wholeInputSHA256,
+            try InvestigationCohortEpoch.decode(invocation[3]) == selection.epoch,
+            try InvestigationInstalledL2IdentityProjection.decode(invocation[4])
+                == selection.projection,
+            invocation[6] == InvestigationHandoffSHA256.hashing(invocation[5]).rawBytes
+        else { throw evidenceInvalid() }
+        let predecessorSHA256 = try InvestigationHandoffSHA256(rawBytes: invocation[6])
+        if let previous {
+            let helper = try InvestigationMachineProcessIdentity.decode(invocation[7])
+            let predecessor = try evidenceDecode(invocation[5], domain:
+                "stornaut.task39.machine.helper-continuity.successor", ranges:
+                [16...16,32...32,32...32,4...4,16...16,1...1_024,
+                 32...32,32...32,32...32,1...1], maximum:4_096)
+            guard helper.role == .helper,
+                try helper.helperIdentitySHA256() == previous.helperIdentitySHA256,
+                try decodeUUID(predecessor[0]) == projectedInput.capsule.outerAttemptUUID,
+                try InvestigationHandoffSHA256(rawBytes: predecessor[1])
+                    == projectedInput.capsule.wholeCapsuleSHA256,
+                try InvestigationHandoffSHA256(rawBytes: predecessor[2])
+                    == projectedInput.wholeInputSHA256,
+                try decodeUInt32(predecessor[3]) == selection.epoch.ordinal - 1,
+                try decodeUUID(predecessor[4]) == previous.epochUUID,
+                predecessor[5] == (try helper.encoded()),
+                try InvestigationHandoffSHA256(rawBytes: predecessor[6])
+                    == previous.requestPredecessorSHA256,
+                try InvestigationHandoffSHA256(rawBytes: predecessor[7])
+                    == previous.completionBindingSHA256,
+                try InvestigationHandoffSHA256(rawBytes: predecessor[8])
+                    == previous.admissionSHA256,
+                predecessor[9] == Data([
+                    previous.scenario == .lifecycleRecovery ? 2 : 1])
+            else { throw evidenceInvalid() }
+        } else {
+            let predecessor = try evidenceDecode(invocation[5], domain:
+                "stornaut.task39.machine.helper-continuity.genesis", ranges:
+                [16...16,32...32,32...32,4...4,16...16], maximum:512)
+            guard !successor, try decodeUUID(predecessor[0])
+                    == projectedInput.capsule.outerAttemptUUID,
+                try InvestigationHandoffSHA256(rawBytes: predecessor[1])
+                    == projectedInput.capsule.wholeCapsuleSHA256,
+                try InvestigationHandoffSHA256(rawBytes: predecessor[2])
+                    == projectedInput.wholeInputSHA256,
+                try decodeUInt32(predecessor[3]) == 0,
+                try decodeUUID(predecessor[4]) == selection.epoch.epochUUID
+            else { throw evidenceInvalid() }
+        }
+        return .init(deadline: try decodeUInt64(fields[2]), mode: mode,
+            predecessorSHA256: predecessorSHA256)
+    }
+
+    private static func parseOwnership(
+        _ bytes: Data, selection: InvestigationProjectedCohortSelection,
+        projectedInput: InvestigationProjectedCohortInput, deadline: UInt64
+    ) throws -> Ownership {
+        let fields = try evidenceDecode(bytes, domain:
+            "stornaut.task39.machine.physical-ownership.evidence-v1", ranges:
+            [16...16,32...32,32...32,16...16,4...4,4...4,32...32,
+             1...4_096,1...4_096,1...4_096,32...32,32...32,1...16_384,
+             8...8,8...8,32...32], maximum:32<<10)
+        let app = try InvestigationMachineProcessIdentity.decode(fields[7])
+        let helper = try InvestigationMachineProcessIdentity.decode(fields[8])
+        let claim = try InvestigationMachineClaimEvidence.decode(fields[9])
+        let claimSHA = InvestigationHandoffSHA256.hashing(fields[9])
+        let proofSHA = InvestigationHandoffSHA256.hashing(fields[12])
+        guard try decodeUUID(fields[0])
+                == projectedInput.capsule.outerAttemptUUID,
+            try InvestigationHandoffSHA256(rawBytes: fields[1])
+                == projectedInput.capsule.wholeCapsuleSHA256,
+            try InvestigationHandoffSHA256(rawBytes: fields[2])
+                == projectedInput.wholeInputSHA256,
+            try decodeUUID(fields[3]) == selection.epoch.epochUUID,
+            try decodeUInt32(fields[4]) == selection.epoch.ordinal,
+            try decodeUInt32(fields[5]) == selection.epoch.scenario.rawValue,
+            try InvestigationHandoffSHA256(rawBytes: fields[6])
+                == selection.projection.projectionSHA256,
+            try app.encoded() == fields[7], try helper.encoded() == fields[8],
+            try claim.encoded() == fields[9],
+            app.role == .app, helper.role == .helper, app != helper,
+            app.processID != helper.processID,
+            claim.requestBindingSHA256.rawBytes.contains(where: { $0 != 0 }),
+            claim.appIdentity == app, claim.helperIdentity == helper,
+            claim.l1Residue.investigationUUID == selection.epoch.configurationNonce,
+            claim.l1Residue.auditSessionID == helper.auditSessionID,
+            claim.l1Residue.userID == 501,
+            try InvestigationHandoffSHA256(rawBytes: fields[10]) == claimSHA,
+            try InvestigationHandoffSHA256(rawBytes: fields[11]) == proofSHA,
+            try decodeUInt64(fields[13]) == claim.releaseDeadlineNanoseconds,
+            try decodeUInt64(fields[14]) == deadline,
+            claim.releaseDeadlineNanoseconds <= deadline
+        else { throw evidenceInvalid() }
+        let installedL2ObservedAtNanoseconds = try validateInstalledL2(
+            fields[12], selection: selection, claim: claim,
+            app: app, helper: helper, deadline: deadline)
+        let bindingFields = [
+            fields[0], fields[1], fields[2], fields[3], fields[4], fields[5],
+            data(selection.epoch.configurationNonce),
+            selection.epoch.configurationSHA256.rawBytes,
+            selection.epoch.signedRuntimeBindingSHA256.rawBytes, fields[6],
+            fields[7], fields[8], fields[9], fields[10], fields[11],
+            fields[13], fields[14],
+        ]
+        guard try InvestigationHandoffSHA256(rawBytes: fields[15]) == .hashing(
+            HandoffBinaryTranscript.encode(domain:
+                "stornaut.task39.machine.single-epoch.ownership",
+                businessFields: bindingFields, maximumByteCount:8_192))
+        else { throw evidenceInvalid() }
+        return .init(appIdentity: app, helperIdentity: helper, claimSHA256: claimSHA,
+            proofBytes: fields[12],
+            bindingSHA256: try InvestigationHandoffSHA256(rawBytes: fields[15]),
+            installedL2ObservedAtNanoseconds:
+                installedL2ObservedAtNanoseconds)
+    }
+
+    private static func parseAdmissionMaterial(
+        _ bytes: Data, requestBytes: Data, physicalOwnershipBytes: Data,
+        expectedAppIdentity: InvestigationMachineProcessIdentity,
+        expectedMode: UInt8
+    ) throws -> AdmissionMaterial {
+        let fields = try evidenceDecode(bytes, domain:
+            "stornaut.task39.machine.outer-inner.admission-material",
+            ranges:[1...(48<<10),1...512,1...512,16...16], maximum:50<<10)
+        guard fields[3].contains(where: { $0 != 0 }) else { throw evidenceInvalid() }
+        let ownership = try evidenceDecode(fields[0], domain:
+            "stornaut.task39.machine.outer-inner.ownership-record", ranges:
+            [32...32,1...1_024,1...2_048,1...(32<<10),32...32], maximum:48<<10)
+        let requestSHA = InvestigationHandoffSHA256.hashing(requestBytes)
+        let ownershipSHA = InvestigationHandoffSHA256.hashing(fields[0])
+        let driverChild = try parseDriverChild(ownership[1])
+        let appChild = try parseAppChild(ownership[2])
+        guard ownership[0] == requestSHA.rawBytes,
+            ownership[3] == physicalOwnershipBytes,
+            ownership[4] == InvestigationHandoffSHA256.hashing(
+                physicalOwnershipBytes).rawBytes,
+            appChild.identity == expectedAppIdentity,
+            appChild.parentProcessID == driverChild.processID,
+            appChild.processGroupID == driverChild.processGroupID
+        else { throw evidenceInvalid() }
+        let acknowledgement = try evidenceDecode(fields[1], domain:
+            "stornaut.task39.machine.outer-inner.acknowledgement",
+            ranges:[32...32,32...32,32...32], maximum:512)
+        guard acknowledgement == [requestSHA.rawBytes, ownershipSHA.rawBytes,
+            InvestigationHandoffSHA256.hashing(physicalOwnershipBytes).rawBytes]
+        else { throw evidenceInvalid() }
+        let decision = try evidenceDecode(fields[2], domain:
+            "stornaut.task39.machine.outer-inner.decision",
+            ranges:[32...32,32...32,32...32,1...1], maximum:512)
+        guard decision == [requestSHA.rawBytes, ownershipSHA.rawBytes,
+            InvestigationHandoffSHA256.hashing(fields[1]).rawBytes,
+            Data([expectedMode == 1 ? 1 : 2])]
+        else { throw evidenceInvalid() }
+        return .init(ownershipRecordBytes: fields[0], ownershipRecord: ownership,
+            driverChild: driverChild, appChild: appChild,
+            acknowledgementBytes: fields[1], decisionBytes: fields[2],
+            ownerBytes: fields[3])
+    }
+
+    private static func parseDriverChild(_ bytes: Data) throws -> DriverChild {
+        let fields = try evidenceDecode(bytes, domain:
+            "stornaut.task39.machine.outer-inner.driver-child", ranges:
+            [4...4,4...4,4...4,4...4,4...4,4...4,32...32], maximum:1_024)
+        let words = try decodeUInt32Words(fields[6], expectedCount: 8)
+        let value = DriverChild(
+            processID: try decodeUInt32(fields[0]),
+            processIDVersion: try decodeUInt32(fields[1]),
+            parentProcessID: try decodeUInt32(fields[2]),
+            processGroupID: try decodeUInt32(fields[3]),
+            auditSessionID: try decodeUInt32(fields[4]),
+            effectiveUserID: try decodeUInt32(fields[5]),
+            auditTokenWords: words)
+        guard value.processID > 1, value.processIDVersion > 0,
+            value.parentProcessID > 1,
+            value.processGroupID == value.processID,
+            value.auditSessionID > 0, value.effectiveUserID == 0,
+            words[1] == value.effectiveUserID, words[2] == 0,
+            words[3] == 0, words[4] == 0,
+            words[5] == value.processID,
+            words[6] == value.auditSessionID,
+            words[7] == value.processIDVersion
+        else { throw evidenceInvalid() }
+        return value
+    }
+
+    private static func parseAppChild(_ bytes: Data) throws -> AppChild {
+        let fields = try evidenceDecode(bytes, domain:
+            "stornaut.task39.machine.outer-inner.app-child", ranges:
+            [1...InvestigationMachineProcessIdentity.maximumByteCount,4...4,4...4],
+            maximum:2_048)
+        let value = AppChild(
+            identity: try InvestigationMachineProcessIdentity.decode(fields[0]),
+            parentProcessID: try decodeUInt32(fields[1]),
+            processGroupID: try decodeUInt32(fields[2]))
+        guard value.identity.role == .app, value.parentProcessID > 1,
+            value.processGroupID > 1,
+            try value.identity.encoded() == fields[0]
+        else { throw evidenceInvalid() }
+        return value
+    }
+
+    private static func parseNormalResult(
+        _ bytes: Data, requestBytes: Data, material: AdmissionMaterial,
+        physicalOwnershipBytes: Data, ownership: Ownership
+    ) throws -> Result {
+        let fields = try evidenceDecode(bytes, domain:
+            "stornaut.task39.machine.outer-inner.normal-result", ranges:
+            [32...32,32...32,32...32,32...32,1...(48<<10),32...32],
+            maximum:48<<10)
+        let completion = try evidenceDecode(fields[4], domain:
+            "stornaut.task39.machine.physical-completion.evidence-v1", ranges:
+            [1...(32<<10),32...32,32...32,32...32], maximum:48<<10)
+        let completionBinding = InvestigationHandoffSHA256.hashing(
+            try HandoffBinaryTranscript.encode(domain:
+                "stornaut.task39.machine.single-epoch.local-completion",
+                businessFields:[ownership.bindingSHA256.rawBytes,completion[1],
+                    completion[2],Data([1])], maximumByteCount:2_048))
+        guard fields[0] == InvestigationHandoffSHA256.hashing(requestBytes).rawBytes,
+            fields[1] == InvestigationHandoffSHA256.hashing(
+                material.ownershipRecordBytes).rawBytes,
+            fields[2] == InvestigationHandoffSHA256.hashing(
+                material.acknowledgementBytes).rawBytes,
+            fields[3] == InvestigationHandoffSHA256.hashing(
+                material.decisionBytes).rawBytes,
+            fields[5] == InvestigationHandoffSHA256.hashing(fields[4]).rawBytes,
+            completion[0] == physicalOwnershipBytes,
+            completion[3] == completionBinding.rawBytes,
+            completion[1].contains(where: { $0 != 0 }),
+            completion[2].contains(where: { $0 != 0 })
+        else { throw evidenceInvalid() }
+        return .init(completionBindingSHA256: completionBinding,
+            driverObservationSHA256: try InvestigationHandoffSHA256(
+                rawBytes: completion[2]))
+    }
+
+    private static func validateTerminal(
+        _ bytes: Data, material: AdmissionMaterial,
+        helperIdentity: InvestigationMachineProcessIdentity, normal: Bool,
+        driverObservationSHA256: InvestigationHandoffSHA256?,
+        installedL2ObservedAtNanoseconds: UInt64, deadline: UInt64
+    ) throws {
+        let fields = try evidenceDecode(bytes, domain:
+            "stornaut.task39.machine.outer-inner.terminal-evidence", ranges:
+            [1...1,1...1,1...1_024,1...2_048,1...1_024,1...1,1...1,
+             1...1,1...1,1...1,1...1,32...32,32...32,8...8],maximum:2_048)
+        let helper = try InvestigationMachineProcessIdentity.decode(fields[4])
+        let absenceIndexes = [0, 1, 6, 7, 8, 9, 10]
+        let allAbsent = try absenceIndexes.allSatisfy({
+            try decodeBool(fields[$0])
+        })
+        let driverChild = try parseDriverChild(fields[2])
+        let appChild = try parseAppChild(fields[3])
+        guard driverChild == material.driverChild, appChild == material.appChild,
+            helper == helperIdentity,
+            allAbsent,
+            try decodeBool(fields[5]) == normal, fields[11] == fields[12],
+            fields[11].contains(where: { $0 != 0 }),
+            try decodeUInt64(fields[13]) > 0,
+            try installedL2ObservedAtNanoseconds <= decodeUInt64(fields[13]),
+            try decodeUInt64(fields[13]) < deadline,
+            !normal || fields[11] == driverObservationSHA256?.rawBytes
+        else { throw evidenceInvalid() }
+    }
+
+    private static func validateInstalledL2(
+        _ bytes: Data, selection: InvestigationProjectedCohortSelection,
+        claim: InvestigationMachineClaimEvidence,
+        app: InvestigationMachineProcessIdentity,
+        helper: InvestigationMachineProcessIdentity, deadline: UInt64
+    ) throws -> UInt64 {
+        let fields = try evidenceDecode(bytes, domain:
+            "stornaut.task39.machine.single-epoch.installed-l2-proof", ranges:
+            [32...32,32...32,16...16,16...16,8...8,1...1_024,32...32,
+             1...1_024,1...1_024,1...1_024,32...32,1...1_024,1...1_024,
+             32...32,1...1_024,1...1_024,1...2_048,8...8,8...8,8...8,8...8,
+             1...1_024,8...8], maximum:16_384)
+        let repeatedApp = try InvestigationMachineProcessIdentity.decode(fields[21])
+        let service = fields[16]
+        let appStatic = try parseSigning(fields[7])
+        let appLive = try parseSigning(fields[8])
+        let helperStatic = try parseSigning(fields[11])
+        let helperLive = try parseSigning(fields[12])
+        let driverStatic = try parseSigning(fields[14])
+        let driverLive = try parseSigning(fields[15])
+        let artifactStates = Array(fields[4])
+        guard fields[0] == selection.projection.projectionSHA256.rawBytes,
+            fields[1] == InvestigationHandoffSHA256.hashing(
+                try claim.encoded()).rawBytes,
+            try decodeUUID(fields[2]) == selection.epoch.epochUUID,
+            try decodeUUID(fields[3]) == selection.epoch.configurationNonce,
+            artifactStates.count == 8,
+            artifactStates.prefix(6).allSatisfy({ $0 == 2 }),
+            artifactStates.suffix(2).allSatisfy({ $0 == 1 || $0 == 2 }),
+            fields[5] == (try app.encoded()), fields[9] == (try helper.encoded()),
+            fields[6] == selection.projection.appExecutableSHA256.rawBytes,
+            fields[10] == selection.projection.helperExecutableSHA256.rawBytes,
+            fields[13] == selection.projection.machineDriverExecutableSHA256.rawBytes,
+            appStatic == appLive, helperStatic == helperLive,
+            driverStatic == driverLive,
+            appStatic.identifier == selection.projection.appBundleIdentifier,
+            helperStatic.identifier
+                == selection.projection.helperServiceIdentifier + ".helper",
+            driverStatic.identifier
+                == selection.projection.machineDriverSigningIdentifier,
+            driverStatic.requirementSHA256
+                == selection.projection.machineDriverDesignatedRequirementSHA256,
+            driverStatic.codeDirectoryHash
+                == selection.projection.machineDriverCodeDirectoryHash,
+            driverStatic.isAdHoc, service == Data([2]) + (try helper.encoded()),
+            claim.claimedAt.rawValue <= Int64(bitPattern: try decodeUInt64(fields[17])),
+            try decodeUInt64(fields[17]) <= decodeUInt64(fields[19]),
+            try decodeUInt64(fields[18]) > 0,
+            try decodeUInt64(fields[20]) > 0,
+            try decodeUInt64(fields[18]) <= decodeUInt64(fields[20]),
+            try decodeUInt64(fields[20]) < claim.releaseDeadlineNanoseconds,
+            Int64(bitPattern: try decodeUInt64(fields[19]))
+                < selection.projection.configurationValidBefore.rawValue,
+            repeatedApp == app, try decodeUInt64(fields[22]) == deadline
+        else { throw evidenceInvalid() }
+        return try decodeUInt64(fields[20])
+    }
+
+    private struct Signing: Equatable {
+        let identifier: String
+        let requirementSHA256: InvestigationHandoffSHA256
+        let codeDirectoryHash: Data
+        let isAdHoc: Bool
+    }
+
+    private static func parseSigning(_ bytes: Data) throws -> Signing {
+        let fields = try evidenceDecode(bytes, domain:
+            "stornaut.task39.machine.single-epoch.installed-l2-signing",
+            ranges:[1...256,32...32,20...32,1...1], maximum:1_024)
+        let identifier = try decodeString(fields[0])
+        let allowed = identifier.unicodeScalars.allSatisfy { scalar in
+            (0x30...0x39).contains(scalar.value)
+                || (0x41...0x5a).contains(scalar.value)
+                || (0x61...0x7a).contains(scalar.value)
+                || scalar.value == 0x2d || scalar.value == 0x2e
+                || scalar.value == 0x5f
+        }
+        guard !identifier.isEmpty, allowed,
+            fields[2].count == 20 || fields[2].count == 32
+        else { throw evidenceInvalid() }
+        return .init(identifier: identifier,
+            requirementSHA256: try .init(rawBytes: fields[1]),
+            codeDirectoryHash: fields[2], isAdHoc: try decodeBool(fields[3]))
+    }
+
+    private static func evidenceDecode(_ bytes: Data, domain: String,
+        ranges: [ClosedRange<Int>], maximum: Int) throws -> [Data] {
+        do {
+            let fields = try HandoffBinaryTranscript.decode(bytes,
+                expectedDomain: domain, expectedBusinessFieldByteCounts: ranges,
+                maximumByteCount: maximum)
+            guard try HandoffBinaryTranscript.encode(
+                domain: domain, businessFields: fields,
+                maximumByteCount: maximum) == bytes else { throw evidenceInvalid() }
+            return fields
+        } catch { throw evidenceInvalid() }
+    }
+
+    private static func evidenceInvalid()
+        -> InvestigationMachineEvidenceContractError { .invalidEncoding }
+}
+
+package struct InvestigationMachineCampaignVerifiedGateReceipt:
+    Sendable, Equatable
+{
+    package let launcherExecutableSHA256: InvestigationHandoffSHA256
+    package let outerAttemptUUID: UUID
+    package let wholeInputSHA256: InvestigationHandoffSHA256
+    package let preparedFrameSHA256: InvestigationHandoffSHA256
+    package let outputByteCount: Int
+    package let outputSHA256: InvestigationHandoffSHA256
+}
+
+package enum InvestigationMachineCampaignRawGateReceiptValidator {
+    package static func validate(
+        _ bytes: Data, expectedAttemptUUID: UUID,
+        expectedWholeInputSHA256: InvestigationHandoffSHA256,
+        expectedOuterIdentity: InvestigationMachineCampaignOuterIdentity,
+        finalReceipt: InvestigationMachineCoordinatorRawReceiptV1
+    ) throws -> InvestigationMachineCampaignVerifiedGateReceipt {
+        guard bytes.count == 422 else { throw campaignEvidenceInvalid() }
+        var cursor = EvidenceCursor(bytes)
+        guard try cursor.uint32() == 0x5354_4e47,
+            try cursor.uint16() == 1, try cursor.uint8() == 2,
+            try cursor.uint8() == 2, try cursor.uint32() == 410
+        else { throw campaignEvidenceInvalid() }
+        let launcher = try InvestigationHandoffSHA256(rawBytes: cursor.read(32))
+        let attempt = try decodeUUID(cursor.read(16))
+        let whole = try InvestigationHandoffSHA256(rawBytes: cursor.read(32))
+        let prepared = try InvestigationHandoffSHA256(rawBytes: cursor.read(32))
+        let capsule = (try cursor.uint64(), try cursor.uint64(),
+            try cursor.uint64(), try cursor.int64())
+        let gatePID = try cursor.pid(), coordinatorPID = try cursor.pid()
+        let sessionID = try cursor.pid(), recoveryPGID = try cursor.pid()
+        let savedPGID = try cursor.pid()
+        let child = (try cursor.pid(), try cursor.pid(), try cursor.pid(),
+            try cursor.pid(), try cursor.uint64(), try cursor.uint64())
+        let input = (try cursor.uint64(), try cursor.uint64(),
+            try cursor.uint64(), try cursor.int64(), try cursor.int64(),
+            try cursor.int64(), try cursor.boolean(),
+            try InvestigationHandoffSHA256(rawBytes: cursor.read(32)))
+        let initialTTY = (try cursor.uint64(), try cursor.uint64(), try cursor.pid())
+        let childTTY = (try cursor.uint64(), try cursor.uint64(), try cursor.pid())
+        let finalTTY = (try cursor.uint64(), try cursor.uint64(), try cursor.pid())
+        let outputCount = Int(try cursor.uint32())
+        let outputSHA = try InvestigationHandoffSHA256(rawBytes: cursor.read(32))
+        let overflow = try cursor.boolean(), eof = try cursor.boolean()
+        let expired = try cursor.boolean(), wait = try cursor.read(5)
+        let forwarded = try cursor.uint32(), started = try cursor.uint64()
+        let completed = try cursor.uint64(), progression = try cursor.uint8()
+        let groupEmpty = try cursor.boolean(), childReaped = try cursor.boolean()
+        let restored = try cursor.boolean(), borrowed = try cursor.read(5)
+        let preparedDeadline = started.addingReportingOverflow(
+            1_200_000_000_000)
+        guard !preparedDeadline.overflow else {
+            throw campaignEvidenceInvalid()
+        }
+        let preparedFrame = try encodeRawGatePreparedFrame(
+            gateProcessID: gatePID, coordinatorProcessID: coordinatorPID,
+            sessionID: sessionID, child: child, recoveryProcessGroupID: recoveryPGID,
+            savedForegroundProcessGroupID: savedPGID, attemptUUID: attempt,
+            wholeInputSHA256: whole, capsule: capsule, terminal: initialTTY,
+            absoluteDeadlineNanoseconds: preparedDeadline.partialValue)
+        guard cursor.isAtEnd, launcher.rawBytes.contains(where:{$0 != 0}),
+            attempt == expectedAttemptUUID,
+            attempt == finalReceipt.outerAttemptUUID,
+            whole == expectedWholeInputSHA256,
+            whole == finalReceipt.wholeProjectedInputSHA256,
+            launcher == finalReceipt.gateExecutableSHA256,
+            InvestigationHandoffSHA256.hashing(bytes)
+                == finalReceipt.gateTransportReceiptSHA256,
+            prepared == .hashing(preparedFrame),
+            capsule.0 > 0, capsule.1 > 0,
+            (1...Int64(InvestigationProjectedCohortInput.maximumByteCount))
+                .contains(capsule.3),
+            capsule.0 == finalReceipt.capsule.device,
+            capsule.1 == finalReceipt.capsule.inode,
+            capsule.2 == finalReceipt.capsule.generation,
+            capsule.3 == finalReceipt.capsule.size,
+            gatePID == finalReceipt.gateProcessID,
+            coordinatorPID > 1, coordinatorPID == sessionID,
+            coordinatorPID == expectedOuterIdentity.processID,
+            sessionID == expectedOuterIdentity.sessionID,
+            recoveryPGID == gatePID,
+            recoveryPGID == finalReceipt.gateProcessGroupID,
+            savedPGID == sessionID, savedPGID == finalReceipt.gateSessionID,
+            savedPGID == expectedOuterIdentity.processGroupID,
+            savedPGID > 1, savedPGID != recoveryPGID,
+            child.0 > 1, child.1 == gatePID, child.2 == recoveryPGID,
+            child.0 != child.2, child.3 == sessionID, child.4 > 0,
+            child.5 < 1_000_000,
+            input.0 == capsule.0, input.1 == capsule.1, input.2 == capsule.2,
+            input.3 == capsule.3, input.4 == 0, input.5 == capsule.3,
+            input.6, input.7 == whole,
+            initialTTY.0 > 0, initialTTY.1 > 0, initialTTY.2 == savedPGID,
+            childTTY.0 == initialTTY.0, childTTY.1 == initialTTY.1,
+            childTTY.2 == recoveryPGID, finalTTY.0 == initialTTY.0,
+            finalTTY.1 == initialTTY.1, finalTTY.2 == savedPGID,
+            (0...512).contains(outputCount),
+            outputSHA.rawBytes.contains(where: { $0 != 0 }),
+            !overflow, eof, !expired,
+            wait == Data([1,0,0,0,0]), forwarded == 0, started > 0,
+            finalReceipt.monotonicStartedNanoseconds < started,
+            completed < finalReceipt.monotonicCompletedNanoseconds,
+            completed >= started, completed - started <= 1_200_000_000_000,
+            progression == 1, groupEmpty, childReaped, restored,
+            borrowed == Data([1,0,0,0,0])
+        else { throw campaignEvidenceInvalid() }
+        return .init(launcherExecutableSHA256: launcher,
+            outerAttemptUUID: attempt, wholeInputSHA256: whole,
+            preparedFrameSHA256: prepared,
+            outputByteCount: outputCount,
+            outputSHA256: outputSHA)
+    }
+
+    private static func encodeRawGatePreparedFrame(
+        gateProcessID: pid_t, coordinatorProcessID: pid_t, sessionID: pid_t,
+        child: (pid_t, pid_t, pid_t, pid_t, UInt64, UInt64),
+        recoveryProcessGroupID: pid_t, savedForegroundProcessGroupID: pid_t,
+        attemptUUID: UUID, wholeInputSHA256: InvestigationHandoffSHA256,
+        capsule: (UInt64, UInt64, UInt64, Int64),
+        terminal: (UInt64, UInt64, pid_t),
+        absoluteDeadlineNanoseconds: UInt64
+    ) throws -> Data {
+        var payload = Data()
+        for process in [gateProcessID, coordinatorProcessID, sessionID, child.0,
+            recoveryProcessGroupID, savedForegroundProcessGroupID, child.1, child.3] {
+            payload.append(data(process))
+        }
+        payload.append(data(child.4)); payload.append(data(child.5))
+        payload.append(data(UInt32(0x7f))); payload.append(data(attemptUUID))
+        payload.append(wholeInputSHA256.rawBytes)
+        payload.append(data(capsule.0)); payload.append(data(capsule.1))
+        payload.append(data(capsule.2))
+        payload.append(data(UInt64(bitPattern: capsule.3)))
+        payload.append(data(terminal.0)); payload.append(data(terminal.1))
+        payload.append(data(terminal.2)); payload.append(data(absoluteDeadlineNanoseconds))
+        guard payload.count == 160 else { throw campaignEvidenceInvalid() }
+        var frame = Data()
+        frame.append(data(UInt32(0x5354_4e47)))
+        frame.append(Data([0, 1, 1, 1]))
+        frame.append(data(UInt32(payload.count)))
+        frame.append(payload)
+        return frame
+    }
+}
+
 private struct EvidenceCursor {
     private let bytes: Data
     private var offset = 0
@@ -1338,13 +2065,27 @@ private struct EvidenceCursor {
         defer { offset += count }
         return bytes.subdata(in: offset..<(offset + count))
     }
+    mutating func uint8() throws -> UInt8 {
+        let value = try read(1)
+        guard let byte = value.first else { throw campaignEvidenceInvalid() }
+        return byte
+    }
+    mutating func uint16() throws -> UInt16 {
+        try read(2).reduce(UInt16(0)) { ($0 << 8) | UInt16($1) }
+    }
     mutating func uint32() throws -> UInt32 { try decodeUInt32(read(4)) }
+    mutating func uint64() throws -> UInt64 { try decodeUInt64(read(8)) }
+    mutating func int64() throws -> Int64 { Int64(bitPattern: try uint64()) }
+    mutating func pid() throws -> pid_t { Int32(bitPattern: try uint32()) }
+    mutating func boolean() throws -> Bool { try decodeBool(read(1)) }
 }
 
 private func asciiAlphanumeric(_ byte: UInt8) -> Bool {
     (UInt8(ascii: "a")...UInt8(ascii: "z")).contains(byte)
         || (UInt8(ascii: "0")...UInt8(ascii: "9")).contains(byte)
 }
+private func campaignEvidenceInvalid()
+    -> InvestigationMachineEvidenceContractError { .invalidEncoding }
 private func validHex(_ value: String, count: Int) -> Bool {
     let bytes = Array(value.utf8)
     return bytes.count == count && bytes.contains { $0 != UInt8(ascii: "0") }
@@ -1386,6 +2127,16 @@ private func decodeString(_ bytes: Data) throws -> String {
 private func decodeUInt32(_ bytes: Data) throws -> UInt32 {
     guard bytes.count == 4 else { throw InvestigationMachineEvidenceContractError.invalidEncoding }
     return bytes.reduce(UInt32(0)) { ($0 << 8) | UInt32($1) }
+}
+private func decodeUInt32Words(
+    _ bytes: Data, expectedCount: Int
+) throws -> [UInt32] {
+    guard bytes.count == expectedCount * MemoryLayout<UInt32>.size else {
+        throw InvestigationMachineEvidenceContractError.invalidEncoding
+    }
+    return try stride(from: 0, to: bytes.count, by: 4).map { offset in
+        try decodeUInt32(bytes.subdata(in: offset..<(offset + 4)))
+    }
 }
 private func decodeUInt64(_ bytes: Data) throws -> UInt64 {
     guard bytes.count == 8 else { throw InvestigationMachineEvidenceContractError.invalidEncoding }

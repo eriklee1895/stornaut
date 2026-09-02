@@ -138,7 +138,7 @@ package enum InvestigationMachineCampaignExecutable {
     {
         private enum Failure: Error { case invalid, deadline, installedStateUncertain, posix(Int32) }
         private struct CommandCapture { let status: Int32; let stdout, stderr: Data }
-        private struct TerminalEvidence { let bundle:Data;let epochs:[[Data]];let diagnostic:Data;let rawGateReceipt:Data;let finalReceipt:InvestigationMachineCoordinatorRawReceiptV1 };private var spawned:InvestigationMachineCampaignSpawnedProcess?;private var deadline:UInt64?;private var channelsClosed=false,bootstrapVerified=false,activationPrepared=false,preparedPublished=false,armedConsumed=false,promptObserved=false,humanActionObserved=false,attestationPublished=false
+        private struct TerminalEvidence { let bundle:Data;let epochs:[InvestigationMachineCampaignVerifiedEpoch];let diagnostic:Data;let rawGateReceipt:Data;let finalReceipt:InvestigationMachineCoordinatorRawReceiptV1 };private var spawned:InvestigationMachineCampaignSpawnedProcess?;private var deadline:UInt64?;private var channelsClosed=false,bootstrapVerified=false,activationPrepared=false,preparedPublished=false,armedConsumed=false,promptObserved=false,humanActionObserved=false,attestationPublished=false
         private var preparedFrameSHA256:Data?;private var bufferedReceipt=Data();private var evidenceWriter:InvestigationMachineRawEvidenceWriter?;private var evidenceParentDescriptor:Int32 = -1;private var lastEvidenceTime:Int64=0;private var installReceipt:[String:Any]?;private var lifecyclePayload:(root:String,bytes:Data,hashes:[String],plist:String)?
         private var policyProbe:CommandCapture?;private var campaignUUID:UUID?;private var evidenceParentPath:String?;private var validatedTerminal:TerminalEvidence?;private var activePreArm:InvestigationMachineCampaignPreArmFrame?;private var preArmWire=Data();private var lastIdentity:InvestigationMachineCampaignOuterIdentity?;private var lastResidue:InvestigationMachineCampaignResidueObservation?
 
@@ -264,13 +264,7 @@ package enum InvestigationMachineCampaignExecutable {
                 encoding:.opaqueBytes,bytes:terminal.diagnostic)
             let projected=try InvestigationProjectedCohortInput.decode(preArm.canonicalProjectedInput)
             for index in 0..<8 { let row=terminal.epochs[index],selection=try projected.selection(at:index)
-                let physical=try HandoffBinaryTranscript.decode(row[5],expectedDomain:
-                    "stornaut.task39.machine.epoch-physical-evidence.v1",
-                    expectedBusinessFieldByteCounts:index==6 ? [1...(32<<10)] : [1...(32<<10),1...(48<<10)],maximumByteCount:64<<10)
-                let own=try HandoffBinaryTranscript.decode(physical[0],expectedDomain:
-                    "stornaut.task39.machine.physical-ownership.evidence-v1",
-                    expectedBusinessFieldByteCounts:[16...16,32...32,32...32,16...16,4...4,4...4,32...32,1...4096,1...4096,1...(64<<10),32...32,32...32,1...16384,8...8,8...8,32...32],maximumByteCount:32<<10)
-                let projection=try selection.projection.encoded(),proof=own[12]
+                let projection=try selection.projection.encoded(),proof=row.installedL2ProofBytes
                 let l2=try json(.epochL2Projection,preArm:preArm,extra:[
                     "ordinal":index+1,"scenario":Self.scenario(index),
                     "epochUUID":selection.epoch.epochUUID.uuidString.lowercased(),
@@ -280,12 +274,12 @@ package enum InvestigationMachineCampaignExecutable {
                     "wholeProjectedInputSHA256":preArm.wholeProjectedInputSHA256.lowercaseHex,
                     "projectionBase64":projection.base64EncodedString(),"projectionSHA256":selection.projection.projectionSHA256.lowercaseHex,
                     "installedL2ProofBase64":proof.base64EncodedString(),"installedL2ProofSHA256":Self.digest(proof),
-                    "claimEvidenceSHA256":Self.digest(own[9]),"physicalOwnershipSHA256":Self.digest(physical[0])])
+                    "claimEvidenceSHA256":row.claimEvidenceSHA256.lowercaseHex,"physicalOwnershipSHA256":row.physicalOwnershipSHA256.lowercaseHex])
                 _=try writer.writeArtifact(path:.init(phase:.driverEpochs,leafName:String(format:"epoch-%02d-l2.json",index+1)),role:.epochL2Projection,encoding:.strictJSON,bytes:l2)
                 try writeJSON(["ordinal":index+1,"scenario":Self.scenario(index),
                     "epochUUID":selection.epoch.epochUUID.uuidString.lowercased(),"l2ArtifactSHA256":Self.digest(l2),
-                    "helperIdentitySHA256":Self.digest(own[8]),"completionBindingSHA256":Self.digest(row[7]),
-                    "terminalEvidenceBase64":row[6].base64EncodedString(),"terminalEvidenceSHA256":Self.digest(row[6]),
+                    "helperIdentitySHA256":row.helperIdentitySHA256.lowercaseHex,"completionBindingSHA256":row.completionBindingSHA256.lowercaseHex,
+                    "terminalEvidenceBase64":row.terminalEvidenceBytes.base64EncodedString(),"terminalEvidenceSHA256":Self.digest(row.terminalEvidenceBytes),
                     "childCount":0,"descendantCount":0,"openChannelCount":0,"ownedProcessGroupMemberCount":0,
                     "helperExitObserved":true,"artifactsRetired":true],role:.epochResidueProjection,
                     phase:.driverEpochs,leaf:String(format:"epoch-%02d-residue.json",index+1),preArm:preArm)
@@ -424,18 +418,23 @@ package enum InvestigationMachineCampaignExecutable {
         ) async throws {
             try check(absoluteDeadlineNanoseconds, reservingCleanup: true)
             guard finalReceipt.gateTransportReceiptSHA256
-                    == .hashing(rawGateReceipt)
+                    == .hashing(rawGateReceipt),
+                  let expectedOuterIdentity = lastIdentity
             else { throw Failure.invalid }
             let validated = try Self.validateTerminal(bytes,
-                rawGateReceipt: rawGateReceipt, preArm: preArm)
+                rawGateReceipt: rawGateReceipt, finalReceipt: finalReceipt,
+                preArm: preArm, expectedOuterIdentity: expectedOuterIdentity)
             validatedTerminal = .init(bundle: validated.bundle,
                 epochs: validated.epochs, diagnostic: bytes,
                 rawGateReceipt: rawGateReceipt, finalReceipt: finalReceipt)
         }
 
         private static func validateTerminal(_ terminal: Data,
-            rawGateReceipt: Data, preArm: InvestigationMachineCampaignPreArmFrame)
-            throws -> (bundle: Data, epochs: [[Data]]) {
+            rawGateReceipt: Data,
+            finalReceipt: InvestigationMachineCoordinatorRawReceiptV1,
+            preArm: InvestigationMachineCampaignPreArmFrame,
+            expectedOuterIdentity: InvestigationMachineCampaignOuterIdentity)
+            throws -> (bundle: Data, epochs: [InvestigationMachineCampaignVerifiedEpoch]) {
             let prefix = Data("STORNAUT_TASK39_IIC_EPOCH_BUNDLE_V1 ".utf8)
             let suffix = terminal.suffix(2) == Data("\r\n".utf8) ? 2 : 1
             let encoded = terminal.dropFirst(prefix.count).dropLast(suffix)
@@ -443,46 +442,23 @@ package enum InvestigationMachineCampaignExecutable {
                   !terminal.dropLast(suffix).contains(UInt8(ascii: "\n")),
                   let bundle = Data(base64Encoded: encoded),
                   Data(bundle.base64EncodedString().utf8) == encoded else { throw Failure.invalid }
-            let fields = try HandoffBinaryTranscript.decode(bundle, expectedDomain:
-                "stornaut.task39.machine.driver-evidence-bundle.v1",
-                expectedBusinessFieldByteCounts: [16...16,32...32,32...32,4...4]
-                    + Array(repeating: 1...(64<<10), count: 8), maximumByteCount: 512<<10)
-            guard uuid(fields[0]) == preArm.outerAttemptUUID,
-                  fields[1] == preArm.wholeCapsuleSHA256.rawBytes,
-                  fields[2] == preArm.wholeProjectedInputSHA256.rawBytes,
-                  uint32(fields[3]) == 8
-            else { throw Failure.invalid }
             let projected = try InvestigationProjectedCohortInput.decode(
                 preArm.canonicalProjectedInput)
-            var decodedEpochs: [[Data]] = []
-            for index in 0..<8 {
-                let epoch = try HandoffBinaryTranscript.decode(fields[index+4], expectedDomain:
-                    "stornaut.task39.machine.epoch-evidence.v1",
-                    expectedBusinessFieldByteCounts: [4...4,4...4,16...16,16...16,1...(128<<10),1...(64<<10),1...2048,32...32], maximumByteCount: 64<<10)
-                let selection = try projected.selection(at: index)
-                guard uint32(epoch[0]) == index,
-                      uint32(epoch[1]) == Int(selection.epoch.scenario.rawValue),
-                      uuid(epoch[2]) == selection.epoch.epochUUID,
-                      uuid(epoch[3]) == selection.epoch.configurationNonce else { throw Failure.invalid }
-                decodedEpochs.append(epoch)
-            }
-            let bundleSHA = InvestigationHandoffSHA256.hashing(bundle)
-            let zero = Data(repeating: 0, count: 32)
-            let completionFields = [fields[0],fields[1],fields[2],fields[3],bundleSHA.rawBytes]
-            let unsigned = try HandoffBinaryTranscript.encode(domain:
-                "stornaut.task39.machine.driver-completion-v2",
-                businessFields: completionFields + [zero], maximumByteCount: 512)
-            let completion = try HandoffBinaryTranscript.encode(domain:
-                "stornaut.task39.machine.driver-completion-v2", businessFields:
-                completionFields + [InvestigationHandoffSHA256.hashing(unsigned).rawBytes], maximumByteCount: 512)
-            guard rawGateReceipt.count == 422,
-                  Data(rawGateReceipt.prefix(4)) == Data([0x53,0x54,0x4e,0x47]),
-                  Data(rawGateReceipt[4..<8]) == Data([0,1,2,2]),
-                  uint32(Data(rawGateReceipt[8..<12])) == 410,
-                  uint32(Data(rawGateReceipt[349..<353])) == completion.count,
-                  Data(rawGateReceipt[353..<385]) == InvestigationHandoffSHA256.hashing(completion).rawBytes
+            let gate = try InvestigationMachineCampaignRawGateReceiptValidator
+                .validate(rawGateReceipt,
+                    expectedAttemptUUID: preArm.outerAttemptUUID,
+                    expectedWholeInputSHA256:
+                        preArm.wholeProjectedInputSHA256,
+                    expectedOuterIdentity: expectedOuterIdentity,
+                    finalReceipt: finalReceipt)
+            let validated = try InvestigationMachineCampaignEpochEvidenceValidator
+                .validate(bundle: bundle, projectedInput: projected)
+            guard gate.outputByteCount == validated.completionBytes.count,
+                  gate.outputSHA256
+                    == InvestigationHandoffSHA256.hashing(
+                        validated.completionBytes)
             else { throw Failure.invalid }
-            return (bundle, decodedEpochs)
+            return (validated.bytes, validated.epochs)
         }
 
         private static func uint32(_ bytes: Data) -> Int {

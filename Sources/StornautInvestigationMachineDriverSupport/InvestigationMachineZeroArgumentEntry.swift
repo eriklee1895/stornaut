@@ -721,7 +721,7 @@ struct InvestigationMachineZeroArgumentEntry: Sendable {
                 )
                 try writer.write(
                     line, descriptor: STDERR_FILENO,
-                    maximumByteCount: 1 << 20
+                    maximumByteCount: 4 * 1_024 * 1_024 + 128
                 )
             }
         ))

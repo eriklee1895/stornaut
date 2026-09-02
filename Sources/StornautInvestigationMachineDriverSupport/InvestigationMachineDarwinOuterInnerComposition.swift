@@ -777,7 +777,6 @@ package actor InvestigationMachineDarwinOuterInnerComposition:
             let admitted = try await admission.admit(
                 resultBytes: resultBytes, terminalEvidence: evidence
             )
-            try checkCancellation()
             return admitted
         } catch {
             let cancellationRequested = Task.isCancelled

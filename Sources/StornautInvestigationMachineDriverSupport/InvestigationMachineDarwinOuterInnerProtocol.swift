@@ -1,5 +1,6 @@
 import Foundation
 import StornautInvestigationHandoffContract
+import StornautInvestigationInstalledL2
 
 package enum InvestigationMachineDarwinOuterInnerProtocolError:
     Error, Sendable, Equatable
@@ -10,22 +11,121 @@ package enum InvestigationMachineDarwinOuterInnerProtocolError:
     case terminalEvidenceInvalid
 }
 
+package struct InvestigationMachineEpochAdmissionMaterial: Sendable, Equatable {
+    private static let domain =
+        "stornaut.task39.machine.outer-inner.admission-material"
+    package static let maximumByteCount = 50 * 1_024
+    fileprivate let ownership: InvestigationMachineDarwinEpochOwnershipRecord
+    fileprivate let acknowledgement: InvestigationMachineDarwinEpochAcknowledgement
+    fileprivate let decision: InvestigationMachineDarwinEpochDecision
+    fileprivate let owner: UUID
+
+    package init(
+        request: InvestigationMachineDarwinEpochRequest,
+        ownership: InvestigationMachineDarwinEpochOwnershipRecord,
+        acknowledgement: InvestigationMachineDarwinEpochAcknowledgement,
+        decision: InvestigationMachineDarwinEpochDecision, owner: UUID
+    ) throws {
+        let physical = try ownership.physicalOwnership(
+            expectedSelection: request.invocation.selection)
+        try Self.validate(request: request, ownership: ownership,
+            physicalOwnership: physical, acknowledgement: acknowledgement,
+            decision: decision, owner: owner)
+        self.ownership = ownership; self.acknowledgement = acknowledgement
+        self.decision = decision; self.owner = owner
+    }
+
+    package func encoded() throws -> Data {
+        try HandoffBinaryTranscript.encode(domain: Self.domain, businessFields: [
+            try ownership.encoded(), try acknowledgement.encoded(),
+            try decision.encoded(), protocolData(owner),
+        ], maximumByteCount: Self.maximumByteCount)
+    }
+
+    fileprivate static func decode(
+        _ data: Data, request: InvestigationMachineDarwinEpochRequest,
+        physicalOwnership: InvestigationMachineSingleEpochPhysicalOwnership
+    ) throws -> Self {
+        let fields = try protocolDecode(data, domain: domain, ranges: [
+            1...(48 * 1_024), 1...512, 1...512, 16...16,
+        ], maximum: maximumByteCount)
+        let ownership = try InvestigationMachineDarwinEpochOwnershipRecord
+            .decode(fields[0])
+        let acknowledgement = try InvestigationMachineDarwinEpochAcknowledgement
+            .decode(fields[1])
+        let decision = try InvestigationMachineDarwinEpochDecision.decode(fields[2])
+        let owner = try protocolUUID(fields[3])
+        try validate(request: request, ownership: ownership,
+            physicalOwnership: physicalOwnership, acknowledgement: acknowledgement,
+            decision: decision, owner: owner)
+        let value = Self(ownership: ownership, acknowledgement: acknowledgement,
+            decision: decision, owner: owner)
+        guard try value.encoded() == data else { throw protocolInvalidEncoding() }
+        return value
+    }
+
+    private init(ownership: InvestigationMachineDarwinEpochOwnershipRecord,
+        acknowledgement: InvestigationMachineDarwinEpochAcknowledgement,
+        decision: InvestigationMachineDarwinEpochDecision, owner: UUID) {
+        self.ownership = ownership; self.acknowledgement = acknowledgement
+        self.decision = decision; self.owner = owner
+    }
+
+    fileprivate func admissionTranscript(requestBytes: Data, resultBytes: Data,
+        terminalEvidenceBytes: Data) throws -> Data {
+        try HandoffBinaryTranscript.encode(domain:
+            "stornaut.task39.machine.outer-inner.admission", businessFields: [
+            requestBytes, try ownership.encoded(), try acknowledgement.encoded(),
+            try decision.encoded(),
+            InvestigationHandoffSHA256.hashing(resultBytes).rawBytes,
+            InvestigationHandoffSHA256.hashing(terminalEvidenceBytes).rawBytes,
+            protocolData(owner),
+        ], maximumByteCount: 192 * 1_024)
+    }
+
+    private static func validate(request: InvestigationMachineDarwinEpochRequest,
+        ownership: InvestigationMachineDarwinEpochOwnershipRecord,
+        physicalOwnership: InvestigationMachineSingleEpochPhysicalOwnership,
+        acknowledgement: InvestigationMachineDarwinEpochAcknowledgement,
+        decision: InvestigationMachineDarwinEpochDecision, owner: UUID) throws {
+        let requestDigest = try request.digest(), ownershipDigest = try ownership.digest()
+        guard protocolUUIDIsNonzero(owner),
+            ownership.requestSHA256 == requestDigest,
+            try ownership.physicalOwnership(expectedSelection:
+                request.invocation.selection) == physicalOwnership,
+            acknowledgement.requestSHA256 == requestDigest,
+            acknowledgement.ownershipSHA256 == ownershipDigest,
+            acknowledgement.physicalOwnershipSHA256
+                == ownership.physicalOwnershipSHA256,
+            decision.requestSHA256 == requestDigest,
+            decision.ownershipSHA256 == ownershipDigest,
+            decision.acknowledgementSHA256 == (try acknowledgement.digest()),
+            decision.kind == (request.mode == .normal ? .continue : .crashNow)
+        else { throw protocolInvalidEncoding() }
+    }
+}
+
 package struct InvestigationMachineEpochEvidence: Sendable, Equatable {
+    package static let maximumByteCount = 256 * 1_024
     package let ordinal: UInt32; package let scenario: InvestigationHandoffScenario
     package let epochUUID: UUID; package let configurationNonce: UUID
     package let requestBytes, physicalEvidenceBytes, terminalEvidenceBytes: Data
+    package let admissionMaterialBytes: Data
     package let admissionSHA256: InvestigationHandoffSHA256
     package func encoded() throws -> Data { try HandoffBinaryTranscript.encode(
         domain: "stornaut.task39.machine.epoch-evidence.v1", businessFields: [
             protocolData(ordinal), protocolData(scenario.rawValue),
             protocolData(epochUUID), protocolData(configurationNonce),
             requestBytes, physicalEvidenceBytes, terminalEvidenceBytes,
-            admissionSHA256.rawBytes], maximumByteCount: 64 * 1_024) }
+            admissionMaterialBytes, admissionSHA256.rawBytes],
+        maximumByteCount: Self.maximumByteCount) }
     package static func decode(_ data: Data) throws -> Self {
         let f = try protocolDecode(data, domain:
             "stornaut.task39.machine.epoch-evidence.v1", ranges: [
                 4...4, 4...4, 16...16, 16...16, 1...(128 * 1_024),
-                1...(64 * 1_024), 1...2_048, 32...32], maximum: 64 * 1_024)
+                1...(64 * 1_024), 1...2_048,
+                1...InvestigationMachineEpochAdmissionMaterial.maximumByteCount,
+                32...32], maximum: Self.maximumByteCount)
         let request=try InvestigationMachineDarwinEpochRequest.decodeUntrusted(f[4]),
             selection=request.invocation.selection
         guard let scenario = InvestigationHandoffScenario(rawValue:
@@ -33,13 +133,13 @@ package struct InvestigationMachineEpochEvidence: Sendable, Equatable {
         let value=Self(ordinal:try protocolUInt32(f[0]),scenario:scenario,
             epochUUID:try protocolUUID(f[2]),configurationNonce:try protocolUUID(f[3]),requestBytes:f[4],
             physicalEvidenceBytes: f[5], terminalEvidenceBytes: f[6],
-            admissionSHA256: try protocolDigest(f[7]))
+            admissionMaterialBytes: f[7],
+            admissionSHA256: try protocolDigest(f[8]))
         guard value.ordinal == selection.epoch.ordinal,
             value.scenario == selection.epoch.scenario,
             value.epochUUID == selection.epoch.epochUUID,
             value.configurationNonce == selection.epoch.configurationNonce,
             protocolNonzero(value.admissionSHA256),
-            (try? InvestigationMachineDarwinEpochTerminalEvidence.decode(f[6])) != nil,
             try value.encoded() == data else { throw protocolInvalidEncoding() }
         let normal=request.mode == .normal,p=try protocolDecode(f[5],domain:
             "stornaut.task39.machine.epoch-physical-evidence.v1",
@@ -47,13 +147,40 @@ package struct InvestigationMachineEpochEvidence: Sendable, Equatable {
             maximum: 64 * 1_024)
         let ownership=try InvestigationMachineSingleEpochPhysicalOwnership.decodeEvidence(p[0],expectedSelection:selection)
         guard !ownership.installedL2ProofBytes.isEmpty else { throw protocolInvalidEncoding() }
-        if normal { guard try InvestigationMachineSingleEpochPhysicalResult
-            .decodeEvidence(p[1], expectedSelection: selection).physicalOwnership
-            == ownership else { throw protocolInvalidEncoding() } }
+        let installedL2ObservedAtNanoseconds = try protocolValidateInstalledL2Evidence(
+            ownership.installedL2ProofBytes, selection: selection,
+            claimEvidence: ownership.claimEvidence,
+            appIdentity: ownership.appIdentity,
+            helperIdentity: ownership.helperIdentity,
+            epochDeadlineNanoseconds: request.epochDeadlineNanoseconds)
+        let resultBytes = normal ? p[1] : Data()
+        let result = normal ? try InvestigationMachineDarwinEpochNormalResult
+            .decode(resultBytes, expectedSelection: selection) : nil
+        let terminal = try InvestigationMachineDarwinEpochTerminalEvidence.decode(f[6])
+        let material = try InvestigationMachineEpochAdmissionMaterial.decode(
+            f[7], request: request, physicalOwnership: ownership)
+        if let result { guard
+            result.requestSHA256 == (try request.digest()),
+            result.ownershipSHA256 == (try material.ownership.digest()),
+            result.acknowledgementSHA256
+                == (try material.acknowledgement.digest()),
+            result.decisionSHA256 == (try material.decision.digest()),
+            result.physicalResult.physicalOwnership == ownership
+            else { throw protocolInvalidEncoding() } }
+        guard protocolTerminalEvidenceIsExact(terminal, request: request,
+                ownership: material.ownership, physicalOwnership: ownership,
+                physicalResult: result?.physicalResult),
+            installedL2ObservedAtNanoseconds
+                <= terminal.observedAtNanoseconds,
+            InvestigationHandoffSHA256.hashing(try material.admissionTranscript(
+                requestBytes: f[4], resultBytes: resultBytes,
+                terminalEvidenceBytes: f[6])) == value.admissionSHA256
+        else { throw protocolInvalidEncoding() }
         return value
     }
 }
 package struct InvestigationMachineEpochEvidenceBundle: Sendable, Equatable {
+    package static let maximumByteCount = 3 * 1_024 * 1_024
     package let outerAttemptUUID: UUID; package let epochs: [InvestigationMachineEpochEvidence]
     package let wholeCapsuleSHA256, wholeInputSHA256: InvestigationHandoffSHA256
     package func bundleSHA256() throws -> InvestigationHandoffSHA256 { .hashing(try encoded()) }
@@ -63,24 +190,33 @@ package struct InvestigationMachineEpochEvidenceBundle: Sendable, Equatable {
         f += try epochs.map { try $0.encoded() }
         return try HandoffBinaryTranscript.encode(domain:
             "stornaut.task39.machine.driver-evidence-bundle.v1",
-            businessFields: f, maximumByteCount: 512 * 1_024)
+            businessFields: f, maximumByteCount: Self.maximumByteCount)
     }
     package static func decode(_ data: Data) throws -> Self {
         let f = try protocolDecode(data, domain:
             "stornaut.task39.machine.driver-evidence-bundle.v1", ranges:
             [16...16, 32...32, 32...32, 4...4] +
-            Array(repeating: 1...64*1024, count: 8), maximum: 512 * 1_024)
+            Array(repeating: 1...InvestigationMachineEpochEvidence.maximumByteCount,
+                count: 8), maximum: Self.maximumByteCount)
         let epochs=try f.dropFirst(4).map(InvestigationMachineEpochEvidence.decode),
             value=Self(outerAttemptUUID:try protocolUUID(f[0]),epochs:epochs,
                 wholeCapsuleSHA256:try protocolDigest(f[1]),wholeInputSHA256:try protocolDigest(f[2]))
+        let selections = try epochs.map { try InvestigationMachineDarwinEpochRequest
+            .decodeUntrusted($0.requestBytes).invocation.selection }
+        let capsule = try InvestigationCohortCapsule(
+            outerAttemptUUID: value.outerAttemptUUID, epochs: selections.map(\.epoch))
+        let projected = try InvestigationProjectedCohortInput(
+            capsule: capsule, projections: selections.map(\.projection))
         guard try protocolUInt32(f[3]) == 8,
             epochs.map(\.ordinal) == Array(UInt32(0)...7),
-            epochs.allSatisfy({ guard let r = try?
-                InvestigationMachineDarwinEpochRequest.decodeUntrusted($0.requestBytes)
-                else { return false }; let s = r.invocation.selection
-                return s.outerAttemptUUID == value.outerAttemptUUID &&
-                    s.wholeCapsuleSHA256 == value.wholeCapsuleSHA256 &&
-                    s.wholeInputSHA256 == value.wholeInputSHA256 }),
+            selections.allSatisfy({
+                $0.outerAttemptUUID == value.outerAttemptUUID
+                    && $0.wholeCapsuleSHA256 == value.wholeCapsuleSHA256
+                    && $0.wholeInputSHA256 == value.wholeInputSHA256
+            }),
+            capsule.wholeCapsuleSHA256 == value.wholeCapsuleSHA256,
+            projected.wholeInputSHA256 == value.wholeInputSHA256,
+            try protocolContinuityIsExact(epochs: epochs, selections: selections),
             try value.encoded() == data else { throw protocolInvalidEncoding() }
         return value
     }
@@ -95,18 +231,21 @@ package final class InvestigationMachineEpochEvidenceCollector: @unchecked Senda
         active = true; activeAttempt = attemptUUID } }
     package func record(selection:InvestigationMachineFixedEpochSelection,requestBytes:Data,
         physicalEvidenceBytes:Data,terminalEvidenceBytes:Data,
-        admissionSHA256:InvestigationHandoffSHA256)throws{try lock.withLock{
+        admissionMaterialBytes:Data,admissionSHA256:InvestigationHandoffSHA256,
+        commitIsStillValid: @Sendable () throws -> Bool)throws{try lock.withLock{
         guard active, !terminal, activeAttempt == selection.outerAttemptUUID,
             values.count == Int(selection.epoch.ordinal),
             selection.epoch.scenario.rawValue == selection.epoch.ordinal + 1,
             !requestBytes.isEmpty, !physicalEvidenceBytes.isEmpty,
-            !terminalEvidenceBytes.isEmpty, protocolNonzero(admissionSHA256)
+            !terminalEvidenceBytes.isEmpty, !admissionMaterialBytes.isEmpty,
+            protocolNonzero(admissionSHA256), try commitIsStillValid()
             else { terminal = true; throw protocolInvalidState() }
         values.append(.init(ordinal: selection.epoch.ordinal,
             scenario: selection.epoch.scenario, epochUUID: selection.epoch.epochUUID,
             configurationNonce: selection.epoch.configurationNonce,
             requestBytes: requestBytes, physicalEvidenceBytes: physicalEvidenceBytes,
             terminalEvidenceBytes: terminalEvidenceBytes,
+            admissionMaterialBytes: admissionMaterialBytes,
             admissionSHA256: admissionSHA256)) } }
     package func finish(summary:InvestigationMachineEightEpochCompletionSummary)throws->Data{try lock.withLock{
         guard !terminal, activeAttempt == summary.outerAttemptUUID,
@@ -138,11 +277,14 @@ package enum InvestigationMachineEpochEvidenceCollection {
         investigationMachineEvidenceCollector?.abort(); investigationMachineEvidenceCollector = nil } }
     fileprivate static func record(selection: InvestigationMachineFixedEpochSelection,
         requestBytes: Data, physicalEvidenceBytes: Data, terminalEvidenceBytes: Data,
-        admissionSHA256: InvestigationHandoffSHA256) throws {
+        admissionMaterialBytes: Data, admissionSHA256: InvestigationHandoffSHA256,
+        commitIsStillValid: @Sendable () throws -> Bool) throws {
         let c = investigationMachineActiveEvidenceCollector.withLock { investigationMachineEvidenceCollector }
         try c?.record(selection: selection, requestBytes: requestBytes,
             physicalEvidenceBytes: physicalEvidenceBytes, terminalEvidenceBytes:
-            terminalEvidenceBytes, admissionSHA256: admissionSHA256)
+            terminalEvidenceBytes, admissionMaterialBytes: admissionMaterialBytes,
+            admissionSHA256: admissionSHA256,
+            commitIsStillValid: commitIsStillValid)
     }
 }
 
@@ -312,6 +454,9 @@ package struct InvestigationMachineDarwinDriverChildIdentity:
             processGroupID == processID, auditSessionID > 0,
             effectiveUserID == 0, auditTokenWords.count == 8,
             auditTokenWords[1] == effectiveUserID,
+            auditTokenWords[2] == 0,
+            auditTokenWords[3] == 0,
+            auditTokenWords[4] == 0,
             auditTokenWords[5] == processID,
             auditTokenWords[6] == auditSessionID,
             auditTokenWords[7] == processIDVersion
@@ -907,6 +1052,259 @@ package struct InvestigationMachineDarwinEpochTerminalEvidence:
     }
 }
 
+private func protocolTerminalEvidenceIsExact(
+    _ evidence: InvestigationMachineDarwinEpochTerminalEvidence,
+    request: InvestigationMachineDarwinEpochRequest,
+    ownership: InvestigationMachineDarwinEpochOwnershipRecord,
+    physicalOwnership: InvestigationMachineSingleEpochPhysicalOwnership,
+    physicalResult: InvestigationMachineSingleEpochPhysicalResult?
+) -> Bool {
+    guard
+        evidence.controlEOFObserved, evidence.resultEOFObserved,
+        evidence.driverChild == ownership.driverChild,
+        evidence.appChild == ownership.appChild,
+        evidence.helperIdentity == physicalOwnership.helperIdentity,
+        evidence.appAbsent, evidence.groupLeaderReapedLast,
+        evidence.postReapGroupEmpty, evidence.helperAbsent,
+        evidence.l1ResidueAbsent,
+        evidence.initialDriverObservationSHA256
+            == evidence.finalDriverObservationSHA256,
+        evidence.observedAtNanoseconds < request.epochDeadlineNanoseconds,
+        physicalOwnership.mode == request.mode,
+        physicalOwnership.epochDeadlineNanoseconds
+            == request.epochDeadlineNanoseconds
+    else { return false }
+
+    switch request.mode {
+    case .normal:
+        guard let physicalResult else { return false }
+        return evidence.innerExitedSuccessfully
+            && physicalResult.mode == .normal
+            && physicalResult.physicalOwnership == physicalOwnership
+            && physicalResult.helperIdentity == evidence.helperIdentity
+            && physicalResult.driverObservationSHA256
+                == evidence.initialDriverObservationSHA256
+    case .parentCrash:
+        return !evidence.innerExitedSuccessfully && physicalResult == nil
+    }
+}
+
+private func protocolContinuityIsExact(
+    epochs: [InvestigationMachineEpochEvidence],
+    selections: [InvestigationMachineFixedEpochSelection]
+) throws -> Bool {
+    guard epochs.count == InvestigationCohortCapsule.epochCount,
+        selections.count == epochs.count
+    else { return false }
+
+    for index in epochs.indices {
+        let request = try InvestigationMachineDarwinEpochRequest
+            .decodeUntrusted(epochs[index].requestBytes)
+        guard request.invocation.selection == selections[index] else { return false }
+        if index == 0 {
+            let predecessor = try protocolDecode(
+                request.invocation.predecessorTranscript, domain:
+                    "stornaut.task39.machine.helper-continuity.genesis",
+                ranges: [16...16, 32...32, 32...32, 4...4, 16...16],
+                maximum: 512)
+            guard request.invocation.previousHelperIdentity == nil,
+                try protocolUUID(predecessor[0]) == selections[index].outerAttemptUUID,
+                try protocolDigest(predecessor[1])
+                    == selections[index].wholeCapsuleSHA256,
+                try protocolDigest(predecessor[2])
+                    == selections[index].wholeInputSHA256,
+                try protocolUInt32(predecessor[3]) == 0,
+                try protocolUUID(predecessor[4]) == selections[index].epoch.epochUUID,
+                InvestigationHandoffSHA256.hashing(
+                    request.invocation.predecessorTranscript)
+                    == request.invocation.predecessorSHA256
+            else { return false }
+            continue
+        }
+
+        let previous = epochs[index - 1]
+        let previousPhysicalFields = try protocolDecode(
+            previous.physicalEvidenceBytes, domain:
+                "stornaut.task39.machine.epoch-physical-evidence.v1",
+            ranges: index - 1 == 6
+                ? [1...(32 * 1_024)]
+                : [1...(32 * 1_024), 1...(48 * 1_024)],
+            maximum: 64 * 1_024)
+        let previousOwnership = try InvestigationMachineSingleEpochPhysicalOwnership
+            .decodeEvidence(previousPhysicalFields[0],
+                expectedSelection: selections[index - 1])
+        let currentPhysicalFields = try protocolDecode(
+            epochs[index].physicalEvidenceBytes, domain:
+                "stornaut.task39.machine.epoch-physical-evidence.v1",
+            ranges: index == 6
+                ? [1...(32 * 1_024)]
+                : [1...(32 * 1_024), 1...(48 * 1_024)],
+            maximum: 64 * 1_024)
+        let currentOwnership = try InvestigationMachineSingleEpochPhysicalOwnership
+            .decodeEvidence(currentPhysicalFields[0],
+                expectedSelection: selections[index])
+        let previousResult = index - 1 == 6 ? nil
+            : try InvestigationMachineDarwinEpochNormalResult.decode(
+                previousPhysicalFields[1],
+                expectedSelection: selections[index - 1]).physicalResult
+        let expectedCompletion = previousResult?.bindingSHA256
+            ?? previousOwnership.bindingSHA256
+        let predecessor = try protocolDecode(
+            request.invocation.predecessorTranscript, domain:
+                "stornaut.task39.machine.helper-continuity.successor",
+            ranges: [16...16, 32...32, 32...32, 4...4, 16...16,
+                1...InvestigationMachineProcessIdentity.maximumByteCount,
+                32...32, 32...32, 32...32, 1...1], maximum: 4_096)
+        let predecessorHelper = try InvestigationMachineProcessIdentity
+            .decode(predecessor[5])
+        guard request.invocation.previousHelperIdentity == previousOwnership.helperIdentity,
+            predecessorHelper == previousOwnership.helperIdentity,
+            currentOwnership.helperIdentity != previousOwnership.helperIdentity,
+            try protocolUUID(predecessor[0]) == selections[index].outerAttemptUUID,
+            try protocolDigest(predecessor[1]) == selections[index].wholeCapsuleSHA256,
+            try protocolDigest(predecessor[2]) == selections[index].wholeInputSHA256,
+            try protocolUInt32(predecessor[3]) == UInt32(index - 1),
+            try protocolUUID(predecessor[4]) == selections[index - 1].epoch.epochUUID,
+            try protocolDigest(predecessor[6])
+                == requestForEpoch(epochs[index - 1])
+                    .invocation.predecessorSHA256,
+            try protocolDigest(predecessor[7]) == expectedCompletion,
+            try protocolDigest(predecessor[8]) == previous.admissionSHA256,
+            predecessor[9] == Data([
+                selections[index - 1].epoch.scenario == .lifecycleRecovery
+                    ? InvestigationMachineOuterContainmentMode.parentCrash.rawValue
+                    : InvestigationMachineOuterContainmentMode.normal.rawValue
+            ]),
+            InvestigationHandoffSHA256.hashing(
+                request.invocation.predecessorTranscript)
+                == request.invocation.predecessorSHA256
+        else { return false }
+    }
+    return true
+}
+
+private func protocolValidateInstalledL2Evidence(
+    _ bytes: Data, selection: InvestigationMachineFixedEpochSelection,
+    claimEvidence: InvestigationMachineClaimEvidence,
+    appIdentity: InvestigationMachineProcessIdentity,
+    helperIdentity: InvestigationMachineProcessIdentity,
+    epochDeadlineNanoseconds: UInt64
+) throws -> UInt64 {
+    do {
+        let fields = try protocolDecode(bytes, domain:
+            "stornaut.task39.machine.single-epoch.installed-l2-proof",
+            ranges: [
+                32...32, 32...32, 16...16, 16...16, 8...8,
+                1...1_024, 32...32, 1...1_024, 1...1_024,
+                1...1_024, 32...32, 1...1_024, 1...1_024, 32...32,
+                1...1_024, 1...1_024, 1...2_048, 8...8, 8...8,
+                8...8, 8...8, 1...1_024, 8...8,
+            ], maximum: 16_384)
+        guard try HandoffBinaryTranscript.encode(
+            domain: "stornaut.task39.machine.single-epoch.installed-l2-proof",
+            businessFields: fields, maximumByteCount: 16_384) == bytes,
+            protocolNonzero(claimEvidence.requestBindingSHA256),
+            fields[0] == selection.projection.projectionSHA256.rawBytes,
+            fields[1] == InvestigationHandoffSHA256.hashing(
+                try claimEvidence.encoded()).rawBytes,
+            try protocolUUID(fields[2]) == selection.epoch.epochUUID,
+            try protocolUUID(fields[3]) == selection.epoch.configurationNonce,
+            try InvestigationMachineProcessIdentity.decode(fields[5])
+                == appIdentity,
+            fields[6] == selection.projection.appExecutableSHA256.rawBytes,
+            try InvestigationMachineProcessIdentity.decode(fields[9])
+                == helperIdentity,
+            fields[10] == selection.projection.helperExecutableSHA256.rawBytes,
+            fields[13]
+                == selection.projection.machineDriverExecutableSHA256.rawBytes,
+            fields[16] == Data([0x02]) + (try helperIdentity.encoded()),
+            try InvestigationMachineProcessIdentity.decode(fields[21])
+                == appIdentity,
+            try protocolUInt64(fields[22]) == epochDeadlineNanoseconds
+        else { throw protocolInvalidEncoding() }
+
+        let artifactBytes = Array(fields[4])
+        guard artifactBytes.count
+                == InvestigationInstalledL2ArtifactRole.allCases.count
+        else { throw protocolInvalidEncoding() }
+        let artifacts = try Dictionary(uniqueKeysWithValues:
+            zip(InvestigationInstalledL2ArtifactRole.allCases, artifactBytes)
+                .map { role, byte in
+                    let value: InvestigationInstalledL2ArtifactObservation =
+                        switch byte {
+                        case 0x01: .absent
+                        case 0x02: .presentValid
+                        case 0x03: .invalid
+                        case 0x04: .unavailable
+                        default: throw protocolInvalidEncoding()
+                        }
+                    return (role, value)
+                })
+        let appStatic = try protocolInstalledL2Signing(fields[7])
+        let appLive = try protocolInstalledL2Signing(fields[8])
+        let helperStatic = try protocolInstalledL2Signing(fields[11])
+        let helperLive = try protocolInstalledL2Signing(fields[12])
+        let driverStatic = try protocolInstalledL2Signing(fields[14])
+        let driverLive = try protocolInstalledL2Signing(fields[15])
+        let started = try InvestigationInstalledL2ClockSample(
+            wallUTC: .init(rawValue: Int64(bitPattern:
+                protocolUInt64(fields[17]))),
+            continuousNanoseconds: protocolUInt64(fields[18]))
+        let observed = try InvestigationInstalledL2ClockSample(
+            wallUTC: .init(rawValue: Int64(bitPattern:
+                protocolUInt64(fields[19]))),
+            continuousNanoseconds: protocolUInt64(fields[20]))
+        let semantic = try InvestigationInstalledL2SemanticContract.evaluate(
+            projection: selection.projection, artifacts: artifacts,
+            app: .init(identity: appIdentity,
+                executableSHA256: try protocolDigest(fields[6]),
+                staticSigning: appStatic, liveSigning: appLive),
+            helper: .init(identity: helperIdentity,
+                executableSHA256: try protocolDigest(fields[10]),
+                staticSigning: helperStatic, liveSigning: helperLive),
+            machineDriver: .init(
+                executableSHA256: try protocolDigest(fields[13]),
+                staticSigning: driverStatic, liveSigning: driverLive),
+            service: .loaded(identity: helperIdentity),
+            started: started, observed: observed)
+        _ = try InvestigationInstalledL2TemporalWindow(
+            projection: selection.projection, claimEvidence: claimEvidence,
+            epochBootstrap: .init(
+                epochUUID: selection.epoch.epochUUID,
+                epochDeadlineNanoseconds: epochDeadlineNanoseconds),
+            started: semantic.started, observed: semantic.observed)
+        return semantic.observed.continuousNanoseconds
+    } catch {
+        throw protocolInvalidEncoding()
+    }
+}
+
+private func protocolInstalledL2Signing(
+    _ bytes: Data
+) throws -> InvestigationInstalledL2SigningIdentity {
+    let fields = try protocolDecode(bytes, domain:
+        "stornaut.task39.machine.single-epoch.installed-l2-signing",
+        ranges: [1...256, 32...32, 20...32, 1...1], maximum: 1_024)
+    guard let identifier = String(data: fields[0], encoding: .utf8),
+        Data(identifier.utf8) == fields[0],
+        fields[3] == Data([0]) || fields[3] == Data([1]),
+        try HandoffBinaryTranscript.encode(
+            domain: "stornaut.task39.machine.single-epoch.installed-l2-signing",
+            businessFields: fields, maximumByteCount: 1_024) == bytes
+    else { throw protocolInvalidEncoding() }
+    return try InvestigationInstalledL2SigningIdentity(
+        signingIdentifier: identifier,
+        designatedRequirementSHA256: protocolDigest(fields[1]),
+        codeDirectoryHash: fields[2], isAdHoc: fields[3] == Data([1]))
+}
+
+private func requestForEpoch(
+    _ evidence: InvestigationMachineEpochEvidence
+) throws -> InvestigationMachineDarwinEpochRequest {
+    try InvestigationMachineDarwinEpochRequest.decodeUntrusted(
+        evidence.requestBytes)
+}
+
 package actor InvestigationMachineDarwinInnerProtocolState {
     private static let maximumEpochWindowNanoseconds: UInt64 = 140_000_000_000
     private enum State {
@@ -1087,7 +1485,6 @@ package actor InvestigationMachineDarwinInnerProtocolState {
 package actor InvestigationMachineDarwinOuterAdmission:
     InvestigationMachineOuterContainmentProving
 {
-    private static let maximumAdmissionByteCount = 192 * 1_024
     private struct Exchange: Sendable {
         let request: InvestigationMachineDarwinEpochRequest
         let ownership: InvestigationMachineDarwinEpochOwnershipRecord
@@ -1097,12 +1494,22 @@ package actor InvestigationMachineDarwinOuterAdmission:
         let acknowledgement: InvestigationMachineDarwinEpochAcknowledgement
         let decision: InvestigationMachineDarwinEpochDecision?
     }
+    private struct PendingEvidence: Sendable {
+        let requestBytes: Data
+        let physicalEvidenceBytes: Data
+        let terminalEvidenceBytes: Data
+        let admissionMaterialBytes: Data
+        let admissionSHA256: InvestigationHandoffSHA256
+        let observedAtNanoseconds: UInt64
+        let deadlineNanoseconds: UInt64
+    }
     private enum State {
         case ready
         case requested(InvestigationMachineDarwinEpochRequest)
         case acknowledged(Exchange)
         case decided(Exchange)
-        case admitted(InvestigationMachineSingleEpochResult)
+        case admitted(InvestigationMachineSingleEpochResult, PendingEvidence)
+        case proved(InvestigationMachineSingleEpochResult, PendingEvidence)
         case terminal
     }
 
@@ -1217,17 +1624,12 @@ package actor InvestigationMachineDarwinOuterAdmission:
             let decision = exchange.decision, !Task.isCancelled
         else { return try failState() }
         state = .terminal
-        guard terminalEvidenceIsExact(terminalEvidence, exchange: exchange) else {
-            return try failTerminalEvidence()
-        }
 
         let helper: InvestigationMachineProcessIdentity
         let binding: InvestigationHandoffSHA256
+        let physicalResult: InvestigationMachineSingleEpochPhysicalResult?
         switch exchange.request.mode {
         case .normal:
-            guard terminalEvidence.innerExitedSuccessfully else {
-                return try failTerminalEvidence()
-            }
             let normal: InvestigationMachineDarwinEpochNormalResult
             do {
                 normal = try .decode(resultBytes, expectedSelection: selection)
@@ -1243,6 +1645,7 @@ package actor InvestigationMachineDarwinOuterAdmission:
                 normal.physicalResult.driverObservationSHA256
                     == terminalEvidence.initialDriverObservationSHA256
             else { return try failValue() }
+            physicalResult = normal.physicalResult
             helper = normal.physicalResult.helperIdentity
             binding = normal.physicalResult.bindingSHA256
         case .parentCrash:
@@ -1250,40 +1653,32 @@ package actor InvestigationMachineDarwinOuterAdmission:
                 resultBytes.isEmpty, !terminalEvidence.innerExitedSuccessfully,
                 decision.kind == .crashNow
             else { return try failTerminalEvidence() }
+            physicalResult = nil
             helper = exchange.physicalOwnership.helperIdentity
             binding = exchange.physicalOwnership.bindingSHA256
         }
+        guard terminalEvidenceIsExact(
+            terminalEvidence, exchange: exchange,
+            physicalResult: physicalResult
+        ) else { return try failTerminalEvidence() }
 
-        let terminalDigest = try terminalEvidence.digest()
+        let requestBytes: Data
+        let terminalEvidenceBytes: Data
+        let admissionMaterialBytes: Data
         let admissionDigest: InvestigationHandoffSHA256
         do {
-            admissionDigest = try InvestigationHandoffSHA256.hashing(
-                HandoffBinaryTranscript.encode(
-                domain: "stornaut.task39.machine.outer-inner.admission",
-                businessFields: [
-                    try exchange.request.encoded(),
-                    try exchange.ownership.encoded(),
-                    try exchange.acknowledgement.encoded(),
-                    try decision.encoded(),
-                    InvestigationHandoffSHA256.hashing(resultBytes).rawBytes,
-                    terminalDigest.rawBytes, protocolData(owner),
-                ], maximumByteCount: Self.maximumAdmissionByteCount
-                )
+            requestBytes = try exchange.request.encoded()
+            terminalEvidenceBytes = try terminalEvidence.encoded()
+            let material = try InvestigationMachineEpochAdmissionMaterial(
+                request: exchange.request, ownership: exchange.ownership,
+                acknowledgement: exchange.acknowledgement,
+                decision: decision, owner: owner
             )
-        } catch { return try failValue() }
-        do {
-            let ownershipBytes = try exchange.physicalOwnership
-                .evidenceEncoded()
-            let fields = exchange.request.mode == .normal
-                ? [ownershipBytes, resultBytes] : [ownershipBytes]
-            let physical = try HandoffBinaryTranscript.encode(
-                domain: "stornaut.task39.machine.epoch-physical-evidence.v1",
-                businessFields: fields, maximumByteCount: 64 * 1_024)
-            try InvestigationMachineEpochEvidenceCollection.record(
-                selection: selection, requestBytes: try exchange.request.encoded(),
-                physicalEvidenceBytes: physical,
-                terminalEvidenceBytes: try terminalEvidence.encoded(),
-                admissionSHA256: admissionDigest)
+            admissionMaterialBytes = try material.encoded()
+            admissionDigest = .hashing(try material.admissionTranscript(
+                requestBytes: requestBytes, resultBytes: resultBytes,
+                terminalEvidenceBytes: terminalEvidenceBytes
+            ))
         } catch { return try failValue() }
         let admittedAtNanoseconds: UInt64
         guard !Task.isCancelled else { return try failState() }
@@ -1299,6 +1694,16 @@ package actor InvestigationMachineDarwinOuterAdmission:
         else {
             return try failTerminalEvidence()
         }
+        let physicalEvidenceBytes: Data
+        do {
+            let ownershipBytes = try exchange.physicalOwnership
+                .evidenceEncoded()
+            let fields = exchange.request.mode == .normal
+                ? [ownershipBytes, resultBytes] : [ownershipBytes]
+            physicalEvidenceBytes = try HandoffBinaryTranscript.encode(
+                domain: "stornaut.task39.machine.epoch-physical-evidence.v1",
+                businessFields: fields, maximumByteCount: 64 * 1_024)
+        } catch { return try failValue() }
         let token = InvestigationMachineSingleEpochAdmittedPhysicalResult(
             helperIdentity: helper, bindingSHA256: binding,
             mode: exchange.request.mode, selection: selection,
@@ -1306,7 +1711,14 @@ package actor InvestigationMachineDarwinOuterAdmission:
             terminalProofSHA256: admissionDigest, admissionOwner: owner
         )
         let result = InvestigationMachineSingleEpochResult.admittedPhysical(token)
-        state = .admitted(result)
+        state = .admitted(result, PendingEvidence(
+            requestBytes: requestBytes,
+            physicalEvidenceBytes: physicalEvidenceBytes,
+            terminalEvidenceBytes: terminalEvidenceBytes,
+            admissionMaterialBytes: admissionMaterialBytes,
+            admissionSHA256: admissionDigest,
+            observedAtNanoseconds: terminalEvidence.observedAtNanoseconds,
+            deadlineNanoseconds: exchange.request.epochDeadlineNanoseconds))
         return result
     }
 
@@ -1315,7 +1727,7 @@ package actor InvestigationMachineDarwinOuterAdmission:
         result: InvestigationMachineSingleEpochResult,
         predecessor: InvestigationMachineHelperEpochPredecessor
     ) async -> InvestigationMachineOuterContainmentOutcome {
-        guard case let .admitted(expected) = state else {
+        guard case let .admitted(expected, pending) = state else {
             state = .terminal
             return .terminalUncertain
         }
@@ -1332,28 +1744,54 @@ package actor InvestigationMachineDarwinOuterAdmission:
                 admittedBy: owner
             )
         else { return .terminalUncertain }
+        state = .proved(expected, pending)
         return .contained(proof)
+    }
+
+    package func commitContainmentEvidence(
+        selection: InvestigationMachineFixedEpochSelection,
+        result: InvestigationMachineSingleEpochResult,
+        predecessor: InvestigationMachineHelperEpochPredecessor
+    ) async -> Bool {
+        guard case let .proved(expected, pending) = state else {
+            state = .terminal
+            return false
+        }
+        state = .terminal
+        guard result == expected, selection == self.selection,
+            case let .admittedPhysical(token) = result,
+            token.admissionOwner == owner, token.selection == selection,
+            token.predecessorSHA256 == predecessor.continuitySHA256
+        else { return false }
+        let clock = clock
+        do {
+            try InvestigationMachineEpochEvidenceCollection.record(
+                selection: selection, requestBytes: pending.requestBytes,
+                physicalEvidenceBytes: pending.physicalEvidenceBytes,
+                terminalEvidenceBytes: pending.terminalEvidenceBytes,
+                admissionMaterialBytes: pending.admissionMaterialBytes,
+                admissionSHA256: pending.admissionSHA256,
+                commitIsStillValid: {
+                    guard !Task.isCancelled else { return false }
+                    let committedAt = try clock.continuousNanoseconds()
+                    return !Task.isCancelled
+                        && committedAt >= pending.observedAtNanoseconds
+                        && committedAt < pending.deadlineNanoseconds
+                })
+        } catch { return false }
+        return true
     }
 
     private func terminalEvidenceIsExact(
         _ evidence: InvestigationMachineDarwinEpochTerminalEvidence,
-        exchange: Exchange
+        exchange: Exchange,
+        physicalResult: InvestigationMachineSingleEpochPhysicalResult?
     ) -> Bool {
-        evidence.controlEOFObserved
-            && evidence.resultEOFObserved
-            && evidence.driverChild == exchange.driverChild
-            && evidence.appChild == exchange.appChild
-            && evidence.helperIdentity
-                == exchange.physicalOwnership.helperIdentity
-            && evidence.appAbsent
-            && evidence.groupLeaderReapedLast
-            && evidence.postReapGroupEmpty
-            && evidence.helperAbsent
-            && evidence.l1ResidueAbsent
-            && evidence.initialDriverObservationSHA256
-                == evidence.finalDriverObservationSHA256
-            && evidence.observedAtNanoseconds
-                < exchange.request.epochDeadlineNanoseconds
+        protocolTerminalEvidenceIsExact(
+            evidence, request: exchange.request, ownership: exchange.ownership,
+            physicalOwnership: exchange.physicalOwnership,
+            physicalResult: physicalResult
+        )
     }
 
     private func failState<T>() throws -> T {

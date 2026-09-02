@@ -145,6 +145,24 @@ package protocol InvestigationMachineOuterContainmentProving: Sendable {
         result: InvestigationMachineSingleEpochResult,
         predecessor: InvestigationMachineHelperEpochPredecessor
     ) async -> InvestigationMachineOuterContainmentOutcome
+    func commitContainmentEvidence(
+        selection: InvestigationMachineFixedEpochSelection,
+        result: InvestigationMachineSingleEpochResult,
+        predecessor: InvestigationMachineHelperEpochPredecessor
+    ) async -> Bool
+}
+
+extension InvestigationMachineOuterContainmentProving {
+    package func commitContainmentEvidence(
+        selection: InvestigationMachineFixedEpochSelection,
+        result: InvestigationMachineSingleEpochResult,
+        predecessor: InvestigationMachineHelperEpochPredecessor
+    ) async -> Bool {
+        _ = selection
+        _ = result
+        _ = predecessor
+        return true
+    }
 }
 
 package final class InvestigationMachineHelperEpochPredecessor:
@@ -534,6 +552,15 @@ package actor InvestigationMachineOuterCompletionJoin {
         }
         guard !Task.isCancelled else {
             throw InvestigationMachineHelperEpochContinuityError.cancelled
+        }
+        guard await prover.commitContainmentEvidence(
+            selection: selection, result: result, predecessor: predecessor
+        ) else {
+            if Task.isCancelled {
+                throw InvestigationMachineHelperEpochContinuityError.cancelled
+            }
+            throw InvestigationMachineHelperEpochContinuityError
+                .containmentUncertain
         }
         return try InvestigationMachineHelperEpochContinuity.successor(
             selection: selection, helperIdentity: material.helperIdentity,
