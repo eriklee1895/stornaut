@@ -4,6 +4,57 @@ import Testing
 @Suite("Task 39 trusted machine target boundary")
 struct InvestigationMachineTargetBoundaryTests {
     @Test
+    func iiCRootDriverLineageL1PinsPackageGraphAndVerifierInventory() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let package = try String(contentsOf: root.appending(path: "Package.swift"), encoding: .utf8)
+        let boundary = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-boundaries"), encoding: .utf8)
+        let contract = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+        let release = try String(contentsOf: root.appending(
+            path: "scripts/verify-app-release-boundaries"), encoding: .utf8)
+        let gateMarker = "        .target(\n"
+            + "            name: \"StornautInvestigationMachineGateSupport\""
+        let gateStart = try #require(package.range(of: gateMarker))
+        let gateSuffix = package[gateStart.lowerBound...]
+        let gateEnd = try #require(gateSuffix.range(of: "\n        ),"))
+        let gate = String(gateSuffix[..<gateEnd.upperBound])
+        for marker in [
+            "StornautInvestigationHandoffContract",
+            "CInvestigationIdentitySupport",
+            "StornautInvestigationInstalledL2",
+            ".linkedFramework(\"Security\")",
+        ] { #expect(gate.contains(marker)) }
+        for forbidden in [
+            "StornautCore", "StornautExecution",
+            "CampaignSupport", "StornautProduct",
+        ] { #expect(!gate.contains(forbidden)) }
+        for marker in [
+            "InvestigationResolvedRootDriverLineageContract.swift",
+            "InvestigationMachineResolvedRootDriverClaim.swift",
+            "InvestigationMachineResolvedRootDriverValidator.swift",
+            "InvestigationResolvedRootDriverLineageContractTests.swift",
+            "InvestigationMachineResolvedRootDriverClaimTests.swift",
+            "InvestigationMachineResolvedRootDriverValidatorTests.swift",
+            "--iic-root-driver-lineage-l1-source-contract-only",
+            "--iic-root-driver-lineage-l1-mutation-contract-only",
+            "--iic-root-driver-lineage-l1-staged-scope-contract-only",
+            "0815ee26624f83520e30ce68aa54396761c14566",
+            "total <= 3900",
+        ] { #expect(boundary.contains(marker)) }
+        #expect(contract.contains(
+            "--iic-root-driver-lineage-l1-contract-only"))
+        #expect(contract.contains("release-path-unexport"))
+        #expect(release.contains(
+            "--iic-root-driver-lineage-l1-component-boundary-only"))
+        #expect(release.contains(
+            "local -x PATH=/usr/bin:/bin:/usr/sbin:/sbin; local require_staged"))
+        #expect(release.contains(
+            "verify_iic_root_driver_lineage_l1_component_boundary false"))
+    }
+
+    @Test
     func iiCB2B2PhysicalCampaignPinsFinalNonPrivilegedBoundary() throws {
         let root = URL(filePath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
@@ -699,6 +750,7 @@ struct InvestigationMachineTargetBoundaryTests {
             "InvestigationInstalledL2ProjectionContract.swift",
             "InvestigationMachineClaimContract.swift",
             "InvestigationProjectedCohortInput.swift",
+            "InvestigationResolvedRootDriverLineageContract.swift",
         ])
         for name in names {
             let source = try String(
@@ -1643,6 +1695,7 @@ struct InvestigationMachineTargetBoundaryTests {
             "InvestigationMachineHelperEpochContinuity.swift",
             "InvestigationMachineInstalledDriverObservation.swift",
             "InvestigationMachineInstalledDriverSystemSource.swift",
+            "InvestigationMachineResolvedRootDriverClaim.swift",
             "InvestigationMachineSingleEpoch.swift",
             "InvestigationMachineSingleEpochComposition.swift",
             "InvestigationMachineSingleEpochInstalledL2Join.swift",
@@ -1801,6 +1854,10 @@ struct InvestigationMachineTargetBoundaryTests {
             ],
             "InvestigationMachineInstalledDriverSystemSource.swift": [
                 "import Darwin",
+            ],
+            "InvestigationMachineResolvedRootDriverClaim.swift": [
+                "import Foundation",
+                "import StornautInvestigationHandoffContract",
             ],
             "InvestigationMachineSingleEpoch.swift": [
                 "import Foundation",

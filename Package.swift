@@ -165,7 +165,12 @@ let package = Package(
         .target(
             name: "StornautInvestigationMachineGateSupport",
             dependencies: [
+                "CInvestigationIdentitySupport",
                 "StornautInvestigationHandoffContract",
+                "StornautInvestigationInstalledL2",
+            ],
+            linkerSettings: [
+                .linkedFramework("Security"),
             ]
         ),
         .target(

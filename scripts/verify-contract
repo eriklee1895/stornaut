@@ -3,7 +3,7 @@
 set -euo pipefail
 
 contract_source=${0:A}
-# ib2_self_sha=40523a40e06666410e484e6c3446f294336e8a3c09ab0fafaa9fdc718448f19d
+# ib2_self_sha=a5b6f6259a2a65c51e66e1e3feba02dd94a11a0ccd8dfdf45610f27fad9fbfb3
 ib2_self_sha=$(sed -nE 's/^# ib2_self_sha=([0-9a-f]{64})$/\1/p' "$contract_source"); ib2_observed_sha=$(sed -E 's/^# ib2_self_sha=[0-9a-f]{64}$/# ib2_self_sha=SELF/' "$contract_source" | shasum -a 256 | awk '{ print $1 }')
 [[ ${#ib2_self_sha} == 64 && "$ib2_observed_sha" == "$ib2_self_sha" ]] || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
 repo_root=${contract_source:h:h}
@@ -2049,8 +2049,8 @@ function verify_iic0bivb2_contract() {
 function verify_iic0bivb2_subordinate_source_seals() {
     local investigation=${STORNAUT_IIC0BIVB2_INVESTIGATION_BOUNDARY_SOURCE:-scripts/verify-investigation-boundaries}
     local release=${STORNAUT_IIC0BIVB2_APP_RELEASE_BOUNDARY_SOURCE:-scripts/verify-app-release-boundaries}
-    [[ "$(shasum -a 256 "$investigation" | awk '{print $1}')" == aedf9adc41244c243a36677a066b099d1e8c072ab212c69d0194896ecebfc973 ]] || fail_contract 'Machine driver verifier source seal drifted: scripts/verify-investigation-boundaries'
-    [[ "$(shasum -a 256 "$release" | awk '{print $1}')" == b51cfb2114a41205bb07b9b66bdd52e4e86d755316a44faafec62278f02eefee ]] || fail_contract 'Machine driver verifier source seal drifted: scripts/verify-app-release-boundaries'
+    [[ "$(shasum -a 256 "$investigation" | awk '{print $1}')" == 093cbb43df0e75db92076e0ff647c8882385b804f5a59441cc36cc7cc340df71 ]] || fail_contract 'Machine driver verifier source seal drifted: scripts/verify-investigation-boundaries'
+    [[ "$(shasum -a 256 "$release" | awk '{print $1}')" == b648f1d5f5d1d23e17ed068dfe52bc47f1f33735f4b930dfe445290e6172829b ]] || fail_contract 'Machine driver verifier source seal drifted: scripts/verify-app-release-boundaries'
 }
 
 function verify_iic0bivb2_mutations() {
@@ -2486,7 +2486,7 @@ PY
         gate-owner-current-user lifecycle "$owner_mutation_sha" \
         "${second_slot_args[@]}"
     local app_gate=scripts/verify-app-release-boundaries
-    [[ "$(shasum -a 256 "$app_gate" | awk '{print $1}')" == 83fdd3f951d8d0d3d45a8a16af60eca91f2c46d8f1abda0e7659df94b47876f7 ]] || fail_contract 'ii-c-b1 App release verifier source seal drifted'
+    [[ "$(shasum -a 256 "$app_gate" | awk '{print $1}')" == b648f1d5f5d1d23e17ed068dfe52bc47f1f33735f4b930dfe445290e6172829b ]] || fail_contract 'ii-c-b1 App release verifier source seal drifted'
     local component_mutation_root="$out/component-mutations"
     mkdir -p "$component_mutation_root"
     python3 - "$app_gate" "$component_mutation_root" <<'PY'
@@ -3254,6 +3254,108 @@ function verify_iicb2b2_contract() {
         >"$out/scope-extra.log" 2>&1 || rc=$?
     (( rc != 0 )) || fail_contract "ii-c-b2b2 scope accepted extra path"
 }
+
+function verify_iic_root_driver_lineage_l1_contract() {
+    local out=$1 gate=scripts/verify-investigation-boundaries
+    local run_scope=${2:-true}
+    local baseline=0815ee26624f83520e30ce68aa54396761c14566
+    local -a paths=(
+        Package.swift
+        Sources/StornautInvestigationHandoffContract/InvestigationResolvedRootDriverLineageContract.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineResolvedRootDriverClaim.swift
+        Sources/StornautInvestigationMachineGateSupport/InvestigationMachineResolvedRootDriverValidator.swift
+        Tests/StornautInvestigationTests/InvestigationResolvedRootDriverLineageContractTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineResolvedRootDriverClaimTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineResolvedRootDriverValidatorTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-investigation-boundaries scripts/verify-contract
+        scripts/verify-app-release-boundaries
+    )
+    mkdir -p "$out"
+    "$gate" --iic-root-driver-lineage-l1-source-contract-only \
+        "${paths[@]}" >"$out/source.log"
+    if [[ $run_scope == true ]]; then
+        "$gate" --iic-root-driver-lineage-l1-staged-scope-contract-only \
+            "$baseline" >"$out/scope.log"
+    fi
+    local -a names=(
+        contract-core-import contract-sudo contract-network
+        claim-execution-import claim-launchctl claim-process
+        validator-campaign-import validator-sudo validator-network
+        contract-production-seam claim-production-seam validator-production-seam
+        validator-projected-input-binding-drop validator-security-api
+        release-path-unexport
+    )
+    local -a slots=(contract contract contract claim claim claim \
+        validator validator validator contract claim validator validator validator release)
+    local -a payloads=(
+        'import StornautCore' '// sudo' '// URLSession'
+        'import StornautExecution' '// launchctl' '// Process('
+        'import StornautInvestigationMachineCampaignSupport' '// sudo' '// NWConnection'
+        '// production seam' '// production seam' '// production seam'
+        '// installedL2Projections'
+        '// SecCodeCopySelf('
+        'local PATH=/usr/bin:/bin:/usr/sbin:/sbin; local require_staged'
+    )
+    (( ${#names} == 15 && ${#slots} == 15 && ${#payloads} == 15 )) \
+        || fail_contract "ii-c root-driver lineage L1 mutation inventory drifted"
+    local ordinal name slot payload source target sha rc index
+    for ordinal in {1..15}; do
+        name=${names[$ordinal]}; slot=${slots[$ordinal]}; payload=${payloads[$ordinal]}
+        case $slot in contract) index=2;; claim) index=3;; validator) index=4;; release) index=11;; esac
+        source=${paths[$index]}; target="$out/$name.swift"
+        if [[ $slot == release ]]; then
+            sed 's/local -x PATH=\/usr\/bin:\/bin:\/usr\/sbin:\/sbin; local require_staged/local PATH=\/usr\/bin:\/bin:\/usr\/sbin:\/sbin; local require_staged/' \
+                "$source" >"$target"
+        else
+            { <"$source"; print -r -- "$payload"; } >"$target"
+        fi
+        local -a args=("${paths[@]}"); args[$index]=$target
+        sha=$(shasum -a 256 "$target" | awk '{print $1}')
+        rc=0
+        "$gate" --iic-root-driver-lineage-l1-mutation-contract-only \
+            "$name" "$slot" "$sha" "${args[@]}" \
+            >"$out/$name.log" 2>&1 || rc=$?
+        (( rc != 0 )) || fail_contract \
+            "ii-c root-driver lineage L1 mutation accepted: $name"
+    done
+    local active_index=${GIT_INDEX_FILE:-$(git rev-parse --git-path index)}
+    local scope_index="$out/scope.index" bad blob fixture scope rc
+    cp "$active_index" "$scope_index"
+    for fixture in extra missing binary wrong-mode over-budget worktree-divergence wrong-baseline; do
+        bad="$out/scope-$fixture.index"; cp "$scope_index" "$bad"; scope=$baseline
+        case $fixture in
+            extra) blob=$(print extra | git hash-object -w --stdin); GIT_INDEX_FILE="$bad" git update-index --add --cacheinfo "100644,$blob,iic-lineage-l1-extra.swift" ;;
+            missing) GIT_INDEX_FILE="$bad" git update-index --force-remove -- "${paths[2]}" ;;
+            binary) blob=$(printf '\0lineage\n' | git hash-object -w --stdin); GIT_INDEX_FILE="$bad" git update-index --cacheinfo "100644,$blob,${paths[2]}" ;;
+            wrong-mode) blob=$(git hash-object -w -- "${paths[9]}"); GIT_INDEX_FILE="$bad" git update-index --cacheinfo "100644,$blob,${paths[9]}" ;;
+            over-budget) blob=$( { <"${paths[2]}"; for line in {1..600}; do print "// lineage-over-budget-$line"; done; } | git hash-object -w --stdin); GIT_INDEX_FILE="$bad" git update-index --cacheinfo "100644,$blob,${paths[2]}" ;;
+            worktree-divergence) blob=$(print drift | git hash-object -w --stdin); GIT_INDEX_FILE="$bad" git update-index --cacheinfo "100644,$blob,${paths[1]}" ;;
+            wrong-baseline) scope=$baseline^ ;;
+        esac
+        rc=0; GIT_INDEX_FILE="$bad" "$gate" \
+            --iic-root-driver-lineage-l1-staged-scope-contract-only "$scope" \
+            >"$out/scope-$fixture.log" 2>&1 || rc=$?
+        (( rc != 0 )) || fail_contract "ii-c root-driver lineage L1 scope accepted: $fixture"
+    done
+    # Component compilation is intentionally owned by the separate release
+    # boundary mode; the aggregate contract must not duplicate that build.
+    require_fixed_text scripts/verify-app-release-boundaries \
+        '--iic-root-driver-lineage-l1-component-boundary-only'
+    require_fixed_text "$gate" \
+        '--iic-root-driver-lineage-l1-staged-scope-contract-only'
+}
+
+if [[ ${1:-} == --iic-root-driver-lineage-l1-contract-only ]]; then
+    (( $# == 1 )) || fail_contract \
+        "Usage: scripts/verify-contract --iic-root-driver-lineage-l1-contract-only"
+    iic_lineage_l1_root=$(mktemp -d \
+        "${TMPDIR:-/tmp}/stornaut-iic-lineage-l1-contract.XXXXXX")
+    trap 'rm -rf "$iic_lineage_l1_root"' EXIT
+    verify_iic_root_driver_lineage_l1_contract "$iic_lineage_l1_root"
+    print "ii-c root-driver lineage L1 verifier contract verification passed."
+    exit 0
+fi
 
 function verify_iicc_contract() {
     local out=$1 gate=scripts/verify-investigation-boundaries
@@ -5056,6 +5158,7 @@ verify_iicb2a2_contract "$contract_root/iicb2a2"
 verify_iic_evidence_verification_contract "$contract_root/iic-evidence"
 verify_iicb2b1_contract "$contract_root/iicb2b1"
 verify_iicb2b2_contract "$contract_root/iicb2b2"
+verify_iic_root_driver_lineage_l1_contract "$contract_root/iic-lineage-l1" false
 verify_iic0bivb2_contract "$contract_root/iic0bivb2" false
 verify_shared_deadline_repair_contract "$contract_root/shared-deadline"
 verify_fixed_gate_deadline_cleanup_contract "$contract_root/fixed-gate-cleanup"

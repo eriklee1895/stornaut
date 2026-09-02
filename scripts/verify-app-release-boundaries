@@ -2,8 +2,8 @@
 
 set -euo pipefail
 
-# iicb1_app_self_sha=ce9e500a6cbc7dde9b848a2ce9b965f83fb686302fc67a10fe5bb3abf3d4e2d8
-if [[ ${1:-} == --iic-b1-root-owned-gate-component-* || ${1:-} == --iic-b2a2-component-* || ${1:-} == --iic-b2b2-component-* || ${1:-} == --iic-evidence-verification-component-* ]]; then iicb1_app_self_sha=$(/usr/bin/sed -nE 's/^# iicb1_app_self_sha=([0-9a-f]{64})$/\1/p' "${0:A}"); [[ ${#iicb1_app_self_sha} == 64 && "$(/usr/bin/sed -E 's/^# iicb1_app_self_sha=[0-9a-f]{64}$/# iicb1_app_self_sha=SELF/' "${0:A}" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')" == "$iicb1_app_self_sha" ]] || { print -u2 "ii-c-b1 App release verifier self-seal drifted"; exit 1; }; fi
+# iicb1_app_self_sha=d2f2c1c446183ae3de07bd0fe520d56139218551f00aa80d2028996d4cab71be
+if [[ $# == 0 || ${1:-} == --iic-b1-root-owned-gate-component-* || ${1:-} == --iic-b2a2-component-* || ${1:-} == --iic-b2b2-component-* || ${1:-} == --iic-evidence-verification-component-* || ${1:-} == --iic-root-driver-lineage-l1-component-* ]]; then iicb1_app_self_sha=$(/usr/bin/sed -nE 's/^# iicb1_app_self_sha=([0-9a-f]{64})$/\1/p' "${0:A}"); [[ ${#iicb1_app_self_sha} == 64 && "$(/usr/bin/sed -E 's/^# iicb1_app_self_sha=[0-9a-f]{64}$/# iicb1_app_self_sha=SELF/' "${0:A}" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')" == "$iicb1_app_self_sha" ]] || { print -u2 "ii-c-b1 App release verifier self-seal drifted"; exit 1; }; fi
 repo_root=${0:A:h:h}
 cd "$repo_root"
 
@@ -96,6 +96,7 @@ iicb2a2_component_boundary_only=false
 iicb2a2_component_boundary_internal=false
 iic_evidence_verification_component_boundary_only=false
 iicb2b2_component_boundary_only=false
+iic_lineage_l1_component_boundary_only=false
 iic0bivb2_component_boundary_only=false
 iica_existing_product_derived_data=
 iica_existing_diagnostic_derived_data=
@@ -231,6 +232,9 @@ elif [[ $# == 1 \
     iic_evidence_verification_component_boundary_only=true
 elif [[ $# == 1 && $1 == --iic-b2b2-component-boundary-only ]]; then
     iicb2b2_component_boundary_only=true
+elif [[ $# == 1 \
+    && $1 == --iic-root-driver-lineage-l1-component-boundary-only ]]; then
+    iic_lineage_l1_component_boundary_only=true
 elif [[ $# == 1 && $1 == --iic0b-iv-component-boundary-only ]]; then
     iic0bivb2_component_boundary_only=true
 elif [[ $# == 2 && $1 == --iic0b-iii-2a-closed-image-scan-contract-only ]]; then
@@ -5420,6 +5424,66 @@ function verify_iicb2b2_component_boundary() (
     }
 )
 
+function verify_iic_root_driver_lineage_l1_component_boundary() (
+    local -x PATH=/usr/bin:/bin:/usr/sbin:/sbin; local require_staged=${1:-true}
+    [[ $require_staged == false ]] || [[ ${STORNAUT_VALIDATION_SOURCE:-} == staged \
+        && ${#STORNAUT_VALIDATION_COMMIT:-} == 40 \
+        && ${STORNAUT_VALIDATION_COMMIT:-} != *[^0-9a-f]* \
+        && "$(git rev-parse 'HEAD^{commit}')" == $STORNAUT_VALIDATION_COMMIT \
+        && -z "$(git status --porcelain=v1 --untracked-files=all)" ]] || {
+            print -u2 "ii-c root-driver lineage L1 staged validation snapshot unavailable"; return 1
+        }
+    scripts/verify-investigation-boundaries \
+        --iic-root-driver-lineage-l1-source-contract-only || return $?
+    local scratch
+    scratch=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-iic-lineage-l1.XXXXXX") \
+        || return $?
+    trap 'rm -rf "$scratch"' EXIT
+    /usr/bin/swift build --scratch-path "$scratch/debug" \
+        --configuration debug --disable-sandbox || return $?
+    local build_root=$scratch/debug/arm64-apple-macosx/debug
+    local contract_object=$build_root/StornautInvestigationHandoffContract.build/InvestigationResolvedRootDriverLineageContract.swift.o
+    local claim_object=$build_root/StornautInvestigationMachineDriverSupport.build/InvestigationMachineResolvedRootDriverClaim.swift.o
+    local validator_object=$build_root/StornautInvestigationMachineGateSupport.build/InvestigationMachineResolvedRootDriverValidator.swift.o
+    [[ -f $contract_object && -f $claim_object && -f $validator_object ]] || {
+        print -u2 "ii-c root-driver lineage L1 object positive controls unavailable"
+        return 1
+    }
+    local symbols imports object image
+    for object in $contract_object $claim_object $validator_object; do
+        symbols=$(xcrun nm -j "$object" 2>/dev/null | xcrun swift-demangle) || return $?
+        [[ $symbols == *ResolvedRootDriver* ]] || {
+            print -u2 "ii-c root-driver lineage L1 namespace positive control unavailable"
+            return 1
+        }
+    done
+    for object in $contract_object $claim_object $validator_object; do
+        imports=$(xcrun nm -um "$object" 2>/dev/null) || return $?
+        ! print -r -- "$imports" | grep -Eq \
+            '(^|[[:space:]])_(Authorization|Sec|kSec)[A-Za-z0-9_]+' || {
+            print -u2 "ii-c root-driver lineage L1 gained premature Security authority"
+            return 1
+        }
+    done
+    local -a closed_images=(
+        "$build_root/SurveyorBenchmark" "$build_root/stornaut-rule-compiler"
+        "$build_root/stornaut-lifecycle-spike" "$build_root/stornaut-capability-runtime-verifier"
+    )
+    for image in "${closed_images[@]}"; do
+        [[ -f $image && ! -L $image \
+            && "$(/usr/bin/file -b "$image")" == *'Mach-O 64-bit executable arm64'* ]] \
+            || { print -u2 "ii-c root-driver lineage L1 closed image unavailable: $image"; return 1; }
+        symbols=$(xcrun nm -j "$image" 2>/dev/null | xcrun swift-demangle) || return $?
+        [[ -n $symbols ]] || return 1
+        [[ $symbols != *ResolvedRootDriverClaimV1* \
+            && $symbols != *InvestigationMachineResolvedRootDriverClaimCollector* \
+            && $symbols != *InvestigationMachineResolvedRootDriverValidator* ]] || {
+            print -u2 "ii-c root-driver lineage L1 namespace leaked into closed image"
+            return 1
+        }
+    done
+)
+
 if $legacy_machine_claim_contract_only; then
     verify_claim_server_macho_source_contract \
         "$legacy_machine_claim_contract_source"
@@ -5567,6 +5631,11 @@ fi
 if $iicb2b2_component_boundary_only; then
     verify_iicb2b2_component_boundary || exit $?
     print "ii-c-b2b2 campaign component boundary verification passed."
+    exit 0
+fi
+if $iic_lineage_l1_component_boundary_only; then
+    verify_iic_root_driver_lineage_l1_component_boundary || exit $?
+    print "ii-c root-driver lineage L1 component boundary verification passed."
     exit 0
 fi
 if $iic0bivb2_component_boundary_only; then
@@ -8274,5 +8343,6 @@ xcodebuild -quiet \
     test
 verify_iic0biia3_component_boundary "$derived_data" "$diagnostic_derived_data"
 verify_iica_component_boundary "$derived_data" "$diagnostic_derived_data"
+verify_iic_root_driver_lineage_l1_component_boundary false
 
 print "Release App fixture boundary verification passed."
