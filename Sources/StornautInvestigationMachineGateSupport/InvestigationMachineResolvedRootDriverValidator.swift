@@ -40,15 +40,77 @@ package struct InvestigationMachineInitialSudoLaunchIdentity:
     }
 }
 
+/// Identity fields the unprivileged Gate can independently observe through
+/// public Darwin process APIs. The driver claim's pidversion and audit-token
+/// words deliberately do not appear here: those remain sealed, self-reported
+/// compatibility fields in the fixed 1,006-byte claim.
+package struct InvestigationMachineGateObservedProcessIdentity:
+    Sendable, Equatable
+{
+    package let processID: UInt32
+    package let startSeconds: Int64
+    package let startMicroseconds: Int32
+    package let parentProcessID: UInt32
+    package let processGroupID: UInt32
+    package let sessionID: UInt32
+    package let auditUserID: UInt32
+    package let auditSessionID: UInt32
+    package let realUserID: UInt32
+    package let effectiveUserID: UInt32
+    package let savedUserID: UInt32
+    package let realGroupID: UInt32
+    package let effectiveGroupID: UInt32
+    package let savedGroupID: UInt32
+    package let supplementaryGroups: [UInt32]
+
+    package init(
+        processID: UInt32, startSeconds: Int64, startMicroseconds: Int32,
+        parentProcessID: UInt32, processGroupID: UInt32, sessionID: UInt32,
+        auditUserID: UInt32, auditSessionID: UInt32, realUserID: UInt32,
+        effectiveUserID: UInt32,
+        savedUserID: UInt32, realGroupID: UInt32, effectiveGroupID: UInt32,
+        savedGroupID: UInt32, supplementaryGroups: [UInt32]
+    ) throws {
+        guard
+            processID > 1, startSeconds > 0,
+            (0...999_999).contains(startMicroseconds), parentProcessID > 0,
+            processGroupID > 1, sessionID > 0, auditSessionID > 0,
+            (1...InvestigationGeneralProcessIdentityV1.supplementaryGroupCapacity)
+                .contains(supplementaryGroups.count),
+            supplementaryGroups == supplementaryGroups.sorted(),
+            Set(supplementaryGroups).count == supplementaryGroups.count,
+            supplementaryGroups.contains(effectiveGroupID)
+        else {
+            throw InvestigationMachineResolvedRootDriverValidationError
+                .invalidInput
+        }
+        self.processID = processID
+        self.startSeconds = startSeconds
+        self.startMicroseconds = startMicroseconds
+        self.parentProcessID = parentProcessID
+        self.processGroupID = processGroupID
+        self.sessionID = sessionID
+        self.auditUserID = auditUserID
+        self.auditSessionID = auditSessionID
+        self.realUserID = realUserID
+        self.effectiveUserID = effectiveUserID
+        self.savedUserID = savedUserID
+        self.realGroupID = realGroupID
+        self.effectiveGroupID = effectiveGroupID
+        self.savedGroupID = savedGroupID
+        self.supplementaryGroups = supplementaryGroups
+    }
+}
+
 package struct InvestigationMachineResolvedRootDriverLineageEdge:
     Sendable, Equatable
 {
-    package let parent: InvestigationGeneralProcessIdentityV1
-    package let child: InvestigationGeneralProcessIdentityV1
+    package let parent: InvestigationMachineGateObservedProcessIdentity
+    package let child: InvestigationMachineGateObservedProcessIdentity
 
     package init(
-        parent: InvestigationGeneralProcessIdentityV1,
-        child: InvestigationGeneralProcessIdentityV1
+        parent: InvestigationMachineGateObservedProcessIdentity,
+        child: InvestigationMachineGateObservedProcessIdentity
     ) {
         self.parent = parent
         self.child = child
@@ -58,12 +120,12 @@ package struct InvestigationMachineResolvedRootDriverLineageEdge:
 package struct InvestigationMachineResolvedRootDriverProcessSample:
     Sendable, Equatable
 {
-    package let identity: InvestigationGeneralProcessIdentityV1
+    package let identity: InvestigationMachineGateObservedProcessIdentity
     package let isStopped: Bool
     package let observedAtContinuousNanoseconds: UInt64
 
     package init(
-        identity: InvestigationGeneralProcessIdentityV1, isStopped: Bool,
+        identity: InvestigationMachineGateObservedProcessIdentity, isStopped: Bool,
         observedAtContinuousNanoseconds: UInt64
     ) {
         self.identity = identity
@@ -92,7 +154,7 @@ package struct InvestigationMachineResolvedRootDriverValidationInput:
     package var fixedStaticSigning:
         InvestigationResolvedRootDriverSigningIdentityV1
     package var liveSigning: InvestigationResolvedRootDriverSigningIdentityV1
-    package var liveSigningAuditTokenWords: [UInt32]
+    package var liveSigningProcessID: UInt32
     package var projectedCohortInput: InvestigationProjectedCohortInput
 
     package init(
@@ -107,7 +169,7 @@ package struct InvestigationMachineResolvedRootDriverValidationInput:
         fixedExecutableSHA256: InvestigationHandoffSHA256,
         fixedStaticSigning: InvestigationResolvedRootDriverSigningIdentityV1,
         liveSigning: InvestigationResolvedRootDriverSigningIdentityV1,
-        liveSigningAuditTokenWords: [UInt32],
+        liveSigningProcessID: UInt32,
         projectedCohortInput: InvestigationProjectedCohortInput
     ) {
         self.claim = claim
@@ -123,7 +185,7 @@ package struct InvestigationMachineResolvedRootDriverValidationInput:
         self.fixedExecutableSHA256 = fixedExecutableSHA256
         self.fixedStaticSigning = fixedStaticSigning
         self.liveSigning = liveSigning
-        self.liveSigningAuditTokenWords = liveSigningAuditTokenWords
+        self.liveSigningProcessID = liveSigningProcessID
         self.projectedCohortInput = projectedCohortInput
     }
 }
@@ -133,8 +195,8 @@ package struct InvestigationMachineResolvedRootDriverValidationResult:
 {
     package let resolutionKind:
         InvestigationMachineResolvedRootDriverResolutionKind
-    package let resolvedProcess: InvestigationGeneralProcessIdentityV1
-    package let lineage: [InvestigationGeneralProcessIdentityV1]
+    package let resolvedProcess: InvestigationMachineGateObservedProcessIdentity
+    package let lineage: [InvestigationMachineGateObservedProcessIdentity]
     package let claimSHA256: InvestigationHandoffSHA256
 }
 
@@ -142,7 +204,7 @@ package enum InvestigationMachineResolvedRootDriverRetirementState:
     Sendable, Equatable
 {
     case absent
-    case present(InvestigationGeneralProcessIdentityV1)
+    case present(InvestigationMachineGateObservedProcessIdentity)
 }
 
 package struct InvestigationMachineResolvedRootDriverRetirementObservation:
@@ -219,19 +281,18 @@ package enum InvestigationMachineResolvedRootDriverValidator {
 
         let lineage = try resolveLineage(input)
         guard
-            let resolved = lineage.last, resolved == claim.process,
+            let resolved = lineage.last,
+            claimMatchesObservedCore(claim.process, observed: resolved),
             input.firstProcessSample.identity == resolved,
             input.secondProcessSample.identity == resolved,
             input.firstProcessSample.isStopped, input.secondProcessSample.isStopped,
-            input.firstProcessSample.observedAtContinuousNanoseconds
-                <= claim.observedAtContinuousNanoseconds,
             claim.observedAtContinuousNanoseconds
-                <= input.secondProcessSample.observedAtContinuousNanoseconds,
+                <= input.firstProcessSample.observedAtContinuousNanoseconds,
             input.firstProcessSample.observedAtContinuousNanoseconds
                 < input.secondProcessSample.observedAtContinuousNanoseconds,
             resolved.processGroupID == input.recoveryProcessGroupID,
             resolved.sessionID == input.coordinatorSessionID,
-            resolved.auditTokenWords == input.liveSigningAuditTokenWords
+            resolved.processID == input.liveSigningProcessID
         else { throw Error.processIdentityMismatch }
 
         try validateExecutable(input)
@@ -283,9 +344,9 @@ package enum InvestigationMachineResolvedRootDriverValidator {
 
     private static func resolveLineage(
         _ input: InvestigationMachineResolvedRootDriverValidationInput
-    ) throws -> [InvestigationGeneralProcessIdentityV1] {
+    ) throws -> [InvestigationMachineGateObservedProcessIdentity] {
         if input.lineageEdges.isEmpty {
-            let resolved = input.claim.process
+            let resolved = input.firstProcessSample.identity
             guard
                 resolved.processID == input.initialLaunch.processID,
                 resolved.startSeconds == input.initialLaunch.startSeconds,
@@ -320,10 +381,10 @@ package enum InvestigationMachineResolvedRootDriverValidator {
             lineage.count <= maximumLineageNodeCount,
             Set(keys).count == keys.count,
             Set(lineage.map(\.processID)).count == lineage.count,
-            lineage.allSatisfy({
-                $0.auditSessionID == input.claim.process.auditSessionID
+            lineage.allSatisfy({ identity in
+                identity.auditSessionID == input.claim.process.auditSessionID
             }),
-            lineage.last == input.claim.process
+            lineage.last == input.firstProcessSample.identity
         else { throw Error.lineageUnproved }
         return lineage
     }
@@ -356,20 +417,39 @@ package enum InvestigationMachineResolvedRootDriverValidator {
     }
 
     private static func sameInstance(
-        _ lhs: InvestigationGeneralProcessIdentityV1,
-        _ rhs: InvestigationGeneralProcessIdentityV1
+        _ lhs: InvestigationMachineGateObservedProcessIdentity,
+        _ rhs: InvestigationMachineGateObservedProcessIdentity
     ) -> Bool {
         lhs.processID == rhs.processID
-            && lhs.processIDVersion == rhs.processIDVersion
             && lhs.startSeconds == rhs.startSeconds
             && lhs.startMicroseconds == rhs.startMicroseconds
     }
 
     private static func identityKey(
-        _ value: InvestigationGeneralProcessIdentityV1
+        _ value: InvestigationMachineGateObservedProcessIdentity
     ) -> String {
-        "\(value.processID):\(value.processIDVersion):"
-            + "\(value.startSeconds):\(value.startMicroseconds)"
+        "\(value.processID):\(value.startSeconds):\(value.startMicroseconds)"
+    }
+
+    private static func claimMatchesObservedCore(
+        _ claim: InvestigationGeneralProcessIdentityV1,
+        observed: InvestigationMachineGateObservedProcessIdentity
+    ) -> Bool {
+        claim.processID == observed.processID
+            && claim.auditTokenWords[0] == observed.auditUserID
+            && claim.startSeconds == observed.startSeconds
+            && claim.startMicroseconds == observed.startMicroseconds
+            && claim.parentProcessID == observed.parentProcessID
+            && claim.processGroupID == observed.processGroupID
+            && claim.sessionID == observed.sessionID
+            && claim.auditSessionID == observed.auditSessionID
+            && claim.realUserID == observed.realUserID
+            && claim.effectiveUserID == observed.effectiveUserID
+            && claim.savedUserID == observed.savedUserID
+            && claim.realGroupID == observed.realGroupID
+            && claim.effectiveGroupID == observed.effectiveGroupID
+            && claim.savedGroupID == observed.savedGroupID
+            && claim.supplementaryGroups == observed.supplementaryGroups
     }
 
     private typealias Error =

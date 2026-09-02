@@ -219,17 +219,11 @@ package struct InvestigationMachineResolvedRootDriverObservation:
 private let investigationMachineGateAdHocFlag: UInt32 = 0x0002
 
 package enum InvestigationMachineResolvedRootDriverSupport {
-    package static func generalProcessIdentity(processID: pid_t) throws
-        -> InvestigationGeneralProcessIdentityV1
+    package static func gateObservedProcessIdentity(processID: pid_t) throws
+        -> InvestigationMachineGateObservedProcessIdentity
     {
-        guard processID > 1 else { throw InvestigationMachineGateError.invalidObservation }
-        var narrow = stornaut_investigation_identity()
-        let narrowStatus = stornaut_investigation_identity_for_pid(processID, &narrow)
-        guard narrowStatus == 0 else {
-            if narrowStatus == ESRCH {
-                throw InvestigationMachineGateError.invalidObservation
-            }
-            throw InvestigationMachineGateError.containmentUncertain
+        guard processID > 1 else {
+            throw InvestigationMachineGateError.invalidObservation
         }
         var snapshot = stornaut_investigation_process_snapshot()
         let snapshotStatus = stornaut_investigation_process_snapshot_for_pid(
@@ -242,28 +236,23 @@ package enum InvestigationMachineResolvedRootDriverSupport {
             }
             throw InvestigationMachineGateError.containmentUncertain
         }
-        let tokenWords = withUnsafeBytes(of: narrow.audit_token_words) { bytes in
-            Array(bytes.bindMemory(to: UInt32.self))
-        }
         let groups = withUnsafeBytes(of: snapshot.supplementary_groups) { bytes in
             Array(bytes.bindMemory(to: gid_t.self))
         }
         let groupCount = Int(snapshot.supplementary_group_count)
         let sessionID = getsid(processID)
         guard
-            tokenWords.count == 8,
             groupCount > 0,
             groupCount <= groups.count,
             sessionID > 0
         else { throw InvestigationMachineGateError.containmentUncertain }
         let resolvedProcessID = UInt32(snapshot.process_id)
-        let resolvedProcessIDVersion = UInt32(narrow.process_id_version)
         let resolvedStartSeconds = Int64(snapshot.start_time_seconds)
         let resolvedStartMicroseconds = Int32(snapshot.start_time_microseconds)
         let resolvedParentProcessID = UInt32(snapshot.parent_process_id)
         let resolvedProcessGroupID = UInt32(snapshot.process_group_id)
         let resolvedSessionID = UInt32(sessionID)
-        let resolvedAuditSessionID = UInt32(narrow.audit_session_id)
+        let resolvedAuditSessionID = UInt32(snapshot.audit_session_id)
         let resolvedRealUserID = UInt32(snapshot.real_user_id)
         let resolvedEffectiveUserID = UInt32(snapshot.effective_user_id)
         let resolvedSavedUserID = UInt32(snapshot.saved_user_id)
@@ -274,16 +263,15 @@ package enum InvestigationMachineResolvedRootDriverSupport {
             Array(groups[0..<groupCount]).map { UInt32($0) },
             effectiveGroupID: resolvedEffectiveGroupID
         )
-        return try InvestigationGeneralProcessIdentityV1(
+        return try InvestigationMachineGateObservedProcessIdentity(
             processID: resolvedProcessID,
-            processIDVersion: resolvedProcessIDVersion,
             startSeconds: resolvedStartSeconds,
             startMicroseconds: resolvedStartMicroseconds,
             parentProcessID: resolvedParentProcessID,
             processGroupID: resolvedProcessGroupID,
             sessionID: resolvedSessionID,
+            auditUserID: UInt32(snapshot.audit_user_id),
             auditSessionID: resolvedAuditSessionID,
-            auditTokenWords: tokenWords,
             realUserID: resolvedRealUserID,
             effectiveUserID: resolvedEffectiveUserID,
             savedUserID: resolvedSavedUserID,
@@ -294,14 +282,14 @@ package enum InvestigationMachineResolvedRootDriverSupport {
         )
     }
 
-    package static func liveExecutablePath(auditTokenWords: [UInt32]) throws
+    package static func liveExecutablePath(processID: pid_t) throws
         -> String
     {
-        var token = try auditToken(auditTokenWords: auditTokenWords)
-        var path = [CChar](repeating: 0, count: Int(MAXPATHLEN))
-        let count = withUnsafeMutablePointer(to: &token) {
-            proc_pidpath_audittoken($0, &path, UInt32(path.count))
+        guard processID > 1 else {
+            throw InvestigationMachineGateError.invalidObservation
         }
+        var path = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+        let count = proc_pidpath(processID, &path, UInt32(path.count))
         guard count > 0, count < path.count,
               let executable = String(
                 validating: path.prefix(Int(count)).map(UInt8.init(bitPattern:)),
@@ -342,12 +330,15 @@ package enum InvestigationMachineResolvedRootDriverSupport {
         }
     }
 
-    package static func liveSigningIdentity(auditTokenWords: [UInt32]) throws
+    package static func liveSigningIdentity(processID: pid_t) throws
         -> InvestigationResolvedRootDriverSigningIdentityV1
     {
-        let token = try auditToken(auditTokenWords: auditTokenWords)
-        let tokenData = withUnsafeBytes(of: token) { Data($0) }
-        let attributes: [CFString: Any] = [kSecGuestAttributeAudit: tokenData as CFData]
+        guard processID > 1 else {
+            throw InvestigationMachineGateError.invalidObservation
+        }
+        let attributes: [CFString: Any] = [
+            kSecGuestAttributePid: NSNumber(value: processID)
+        ]
         var dynamicCode: SecCode?
         guard
             SecCodeCopyGuestWithAttributes(
@@ -401,8 +392,8 @@ package enum InvestigationMachineResolvedRootDriverSupport {
 
     package static func resolveLineageEdges(
         initialLaunch: InvestigationMachineInitialSudoLaunchIdentity,
-        resolved: InvestigationGeneralProcessIdentityV1,
-        identitiesByPID: [pid_t: InvestigationGeneralProcessIdentityV1],
+        resolved: InvestigationMachineGateObservedProcessIdentity,
+        identitiesByPID: [pid_t: InvestigationMachineGateObservedProcessIdentity],
         recoveryProcessGroupID: UInt32,
         coordinatorSessionID: UInt32
     ) throws -> [InvestigationMachineResolvedRootDriverLineageEdge] {
@@ -436,22 +427,6 @@ package enum InvestigationMachineResolvedRootDriverSupport {
         else { throw InvestigationMachineGateError.invalidObservation }
         return reversed.reversed()
     }
-}
-
-private func auditToken(auditTokenWords: [UInt32]) throws -> audit_token_t {
-    guard auditTokenWords.count == 8 else {
-        throw InvestigationMachineGateError.invalidObservation
-    }
-    var token = audit_token_t()
-    let copied = withUnsafeMutableBytes(of: &token) { destination in
-        auditTokenWords.withUnsafeBytes { source in
-            guard destination.count == source.count else { return false }
-            destination.copyBytes(from: source)
-            return true
-        }
-    }
-    guard copied else { throw InvestigationMachineGateError.invalidObservation }
-    return token
 }
 
 private func gateRequirement(_ value: Any?) -> SecRequirement? {
@@ -1350,7 +1325,7 @@ package enum InvestigationMachineGateLauncherEvent: Equatable, Sendable {
     case verifyForegroundProcessGroup(pid_t)
     case revalidateFinalTTY
     case collectResolvedRootDriverRetirement(
-        [InvestigationGeneralProcessIdentityV1]
+        [InvestigationMachineGateObservedProcessIdentity]
     )
     case closeOutputDescriptor(Int32)
     case closeBorrowedDescriptor(Int32)

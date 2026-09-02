@@ -284,9 +284,7 @@ struct InvestigationSudoShapedDriverLauncherTests {
     }
 
     @Test
-    func resolvedRootValidationRequiresAuditTokenBoundExecutablePathReads()
-        throws
-    {
+    func resolvedRootValidationRequiresPIDBoundPublicObservation() throws {
         #expect(throws: InvestigationMachineGateError.invalidObservation) {
             try InvestigationMachineResolvedRootDriverSupport
                 .validateLiveExecutablePaths(
@@ -310,6 +308,46 @@ struct InvestigationSudoShapedDriverLauncherTests {
                     after: ResolvedRootDriverClaimV1.fixedExecutablePath
                 )
         }
+    }
+
+    @Test
+    func resolvedRootGateSourceUsesNoCrossUIDMachTaskIdentity() throws {
+        let repositoryRoot = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let support = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "Sources/StornautInvestigationMachineGateSupport/"
+                    + "InvestigationMachineGateTransport.swift"
+            ),
+            encoding: .utf8
+        )
+        let system = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "Sources/StornautInvestigationMachineGateSupport/"
+                    + "DarwinInvestigationMachineFixedGateSystem.swift"
+            ),
+            encoding: .utf8
+        )
+        let gateSource = support + system
+
+        for forbidden in [
+            "task_name_for_pid",
+            "TASK_AUDIT_TOKEN",
+            "stornaut_investigation_identity_for_pid",
+            "proc_pidpath_audittoken",
+            "kSecGuestAttributeAudit",
+        ] {
+            #expect(!gateSource.contains(forbidden), "forbidden: \(forbidden)")
+        }
+        #expect(gateSource.contains(
+            "stornaut_investigation_process_snapshot_for_pid"
+        ))
+        #expect(gateSource.contains("proc_pidpath(processID"))
+        #expect(gateSource.contains(
+            "kSecGuestAttributePid: NSNumber(value: processID)"
+        ))
     }
 
     @Test
@@ -1358,6 +1396,8 @@ private func sampleResolvedRootDriverValidationInput() throws
         executable: executable,
         observedAtContinuousNanoseconds: 1_000
     )
+    let initialObserved = try gateObserved(initial)
+    let driverObserved = try gateObserved(driver)
     return .init(
         claim: claim,
         expectedOuterAttemptUUID: attempt,
@@ -1365,23 +1405,41 @@ private func sampleResolvedRootDriverValidationInput() throws
         initialLaunch: try sampleInitialLaunch(),
         recoveryProcessGroupID: 41,
         coordinatorSessionID: 40,
-        lineageEdges: [.init(parent: initial, child: driver)],
+        lineageEdges: [.init(parent: initialObserved, child: driverObserved)],
         firstProcessSample: .init(
-            identity: driver,
-            isStopped: true,
-            observedAtContinuousNanoseconds: 999
-        ),
-        secondProcessSample: .init(
-            identity: driver,
+            identity: driverObserved,
             isStopped: true,
             observedAtContinuousNanoseconds: 1_001
+        ),
+        secondProcessSample: .init(
+            identity: driverObserved,
+            isStopped: true,
+            observedAtContinuousNanoseconds: 1_002
         ),
         fixedExecutableNode: node,
         fixedExecutableSHA256: executable.sha256,
         fixedStaticSigning: signing,
         liveSigning: signing,
-        liveSigningAuditTokenWords: driver.auditTokenWords,
+        liveSigningProcessID: driver.processID,
         projectedCohortInput: projectedInput
+    )
+}
+
+private func gateObserved(
+    _ claimed: InvestigationGeneralProcessIdentityV1
+) throws -> InvestigationMachineGateObservedProcessIdentity {
+    try .init(
+        processID: claimed.processID, startSeconds: claimed.startSeconds,
+        startMicroseconds: claimed.startMicroseconds,
+        parentProcessID: claimed.parentProcessID,
+        processGroupID: claimed.processGroupID, sessionID: claimed.sessionID,
+        auditUserID: claimed.auditTokenWords[0],
+        auditSessionID: claimed.auditSessionID, realUserID: claimed.realUserID,
+        effectiveUserID: claimed.effectiveUserID,
+        savedUserID: claimed.savedUserID, realGroupID: claimed.realGroupID,
+        effectiveGroupID: claimed.effectiveGroupID,
+        savedGroupID: claimed.savedGroupID,
+        supplementaryGroups: claimed.supplementaryGroups
     )
 }
 

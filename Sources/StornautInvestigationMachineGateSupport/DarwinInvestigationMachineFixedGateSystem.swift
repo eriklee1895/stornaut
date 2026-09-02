@@ -1051,30 +1051,31 @@ private extension DarwinInvestigationMachineFixedGateSystem {
             UInt32(state.sessionID ?? 0) == coordinatorSessionID
         else { throw containment() }
         let claim = try readResolvedRootDriverClaim(descriptor: descriptor)
+        let resolvedProcessID = pid_t(claim.process.processID)
         let firstIdentity =
             try InvestigationMachineResolvedRootDriverSupport
-            .generalProcessIdentity(
-            processID: pid_t(claim.process.processID)
+            .gateObservedProcessIdentity(
+            processID: resolvedProcessID
         )
         let firstStopped = try processIsStopped(
-            processID: pid_t(claim.process.processID)
+            processID: resolvedProcessID
         )
         let firstObservedAt = try continuousNanoseconds()
         let fixedExecutable = try fixedExecutableIdentity()
         let liveExecutablePathBeforeSigning =
             try InvestigationMachineResolvedRootDriverSupport
             .liveExecutablePath(
-                auditTokenWords: claim.process.auditTokenWords
+                processID: resolvedProcessID
             )
         let liveSigning =
             try InvestigationMachineResolvedRootDriverSupport
             .liveSigningIdentity(
-            auditTokenWords: claim.process.auditTokenWords
+            processID: resolvedProcessID
         )
         let liveExecutablePathAfterSigning =
             try InvestigationMachineResolvedRootDriverSupport
             .liveExecutablePath(
-                auditTokenWords: claim.process.auditTokenWords
+                processID: resolvedProcessID
             )
         try InvestigationMachineResolvedRootDriverSupport
             .validateLiveExecutablePaths(
@@ -1083,16 +1084,15 @@ private extension DarwinInvestigationMachineFixedGateSystem {
             )
         let secondIdentity =
             try InvestigationMachineResolvedRootDriverSupport
-            .generalProcessIdentity(
-            processID: pid_t(claim.process.processID)
+            .gateObservedProcessIdentity(
+            processID: resolvedProcessID
         )
         let secondStopped = try processIsStopped(
-            processID: pid_t(claim.process.processID)
+            processID: resolvedProcessID
         )
         let secondObservedAt = try continuousNanoseconds()
         guard
-            firstIdentity == claim.process,
-            secondIdentity == claim.process,
+            firstIdentity == secondIdentity,
             firstStopped,
             secondStopped
         else { throw InvestigationMachineGateError.invalidObservation }
@@ -1102,7 +1102,7 @@ private extension DarwinInvestigationMachineFixedGateSystem {
                 (
                     $0,
                     try InvestigationMachineResolvedRootDriverSupport
-                        .generalProcessIdentity(processID: $0)
+                        .gateObservedProcessIdentity(processID: $0)
                 )
             }
         )
@@ -1110,7 +1110,7 @@ private extension DarwinInvestigationMachineFixedGateSystem {
             try InvestigationMachineResolvedRootDriverSupport
             .resolveLineageEdges(
             initialLaunch: initialLaunch,
-            resolved: claim.process,
+            resolved: firstIdentity,
             identitiesByPID: identities,
             recoveryProcessGroupID: recoveryProcessGroupID,
             coordinatorSessionID: coordinatorSessionID
@@ -1138,20 +1138,20 @@ private extension DarwinInvestigationMachineFixedGateSystem {
             fixedExecutableSHA256: fixedExecutable.sha256,
             fixedStaticSigning: fixedExecutable.staticSigning,
             liveSigning: liveSigning,
-            liveSigningAuditTokenWords: claim.process.auditTokenWords,
+            liveSigningProcessID: claim.process.processID,
             projectedCohortInput: projectedInput
         )
     }
 
     func collectResolvedRootDriverRetirement(
-        _ lineage: [InvestigationGeneralProcessIdentityV1]
+        _ lineage: [InvestigationMachineGateObservedProcessIdentity]
     ) throws -> InvestigationMachineResolvedRootDriverRetirementEnumeration {
         let observations = try lineage.map { identity in
             let pid = identity.processID
             do {
                 let current =
                     try InvestigationMachineResolvedRootDriverSupport
-                    .generalProcessIdentity(processID: pid_t(pid))
+                    .gateObservedProcessIdentity(processID: pid_t(pid))
                 return InvestigationMachineResolvedRootDriverRetirementObservation(
                     processID: pid,
                     state: .present(current)

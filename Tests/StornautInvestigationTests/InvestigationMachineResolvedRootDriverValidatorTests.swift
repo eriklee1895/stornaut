@@ -101,20 +101,13 @@ struct InvestigationMachineResolvedRootDriverValidatorTests {
                 fixture.process(fixture.driver.processID, parent: 101, auditSessionID: 61),
                 at: 1_001
             )
-        case .processIDVersion:
-            input.secondProcessSample = fixture.sample(
-                fixture.process(fixture.driver.processID, parent: 101, version: 10),
-                at: 1_001
-            )
         case .start:
             input.secondProcessSample = fixture.sample(
                 fixture.process(fixture.driver.processID, parent: 101, startSeconds: 2_000),
                 at: 1_001
             )
-        case .auditToken:
-            var token = fixture.driver.auditTokenWords
-            token[7] &+= 1
-            input.liveSigningAuditTokenWords = token
+        case .auditUser:
+            input.claim = try fixture.claim(auditUserID: 502)
         }
         #expect(throws: (any Error).self) {
             _ = try InvestigationMachineResolvedRootDriverValidator.validate(input)
@@ -133,7 +126,7 @@ struct InvestigationMachineResolvedRootDriverValidatorTests {
                     observedAtContinuousNanoseconds: 1_001
                 )
             case .timeOrder:
-                input.firstProcessSample = fixture.sample(fixture.driver, at: 1_001)
+                input.firstProcessSample = fixture.sample(fixture.driver, at: 999)
             case .node:
                 input.fixedExecutableNode = try fixture.node(inode: 999)
             case .sha:
@@ -187,7 +180,7 @@ struct InvestigationMachineResolvedRootDriverValidatorTests {
         let old = resolution.lineage[1]
         let reused = fixture.process(
             old.processID, parent: 900, processGroupID: 901, sessionID: 902,
-            version: old.processIDVersion + 1, startSeconds: old.startSeconds + 1
+            startSeconds: old.startSeconds + 1
         )
         reuse[1] = .init(processID: old.processID, state: .present(reused))
         let reuseResult = try InvestigationMachineResolvedRootDriverValidator
@@ -234,7 +227,7 @@ struct InvestigationMachineResolvedRootDriverValidatorTests {
 
         let old = resolution.lineage[0]
         let reusedInside = fixture.process(
-            old.processID, parent: 900, version: old.processIDVersion + 1,
+            old.processID, parent: 900,
             startSeconds: old.startSeconds + 1
         )
         absent[0] = .init(processID: old.processID, state: .present(reusedInside))
@@ -256,9 +249,9 @@ private struct ValidatorFixture {
     let driverSHA: InvestigationHandoffSHA256
     let signingIdentity: InvestigationResolvedRootDriverSigningIdentityV1
     let initialLaunch: InvestigationMachineInitialSudoLaunchIdentity
-    let lineage: [InvestigationGeneralProcessIdentityV1]
+    let lineage: [InvestigationMachineGateObservedProcessIdentity]
     let edges: [InvestigationMachineResolvedRootDriverLineageEdge]
-    let driver: InvestigationGeneralProcessIdentityV1
+    let driver: InvestigationMachineGateObservedProcessIdentity
     let claim: ResolvedRootDriverClaimV1
     let projectedInput: InvestigationProjectedCohortInput
 
@@ -307,7 +300,7 @@ private struct ValidatorFixture {
         wholeInput = builtInput.wholeInputSHA256
         claim = try ResolvedRootDriverClaimV1(
             outerAttemptUUID: attempt, wholeInputSHA256: builtInput.wholeInputSHA256,
-            process: driver, executable: executable,
+            process: try Self.makeClaimProcess(driver), executable: executable,
             observedAtContinuousNanoseconds: 1_000
         )
     }
@@ -317,18 +310,18 @@ private struct ValidatorFixture {
             claim: claim, expectedOuterAttemptUUID: attempt,
             expectedWholeInputSHA256: wholeInput, initialLaunch: initialLaunch,
             recoveryProcessGroupID: 80, coordinatorSessionID: 70,
-            lineageEdges: edges, firstProcessSample: sample(driver, at: 999),
-            secondProcessSample: sample(driver, at: 1_001),
+            lineageEdges: edges, firstProcessSample: sample(driver, at: 1_001),
+            secondProcessSample: sample(driver, at: 1_002),
             fixedExecutableNode: claim.executable.node,
             fixedExecutableSHA256: driverSHA,
             fixedStaticSigning: signingIdentity, liveSigning: signingIdentity,
-            liveSigningAuditTokenWords: driver.auditTokenWords,
+            liveSigningProcessID: driver.processID,
             projectedCohortInput: projectedInput
         )
     }
 
     func sample(
-        _ identity: InvestigationGeneralProcessIdentityV1, at time: UInt64
+        _ identity: InvestigationMachineGateObservedProcessIdentity, at time: UInt64
     ) -> InvestigationMachineResolvedRootDriverProcessSample {
         .init(identity: identity, isStopped: true,
               observedAtContinuousNanoseconds: time)
@@ -337,12 +330,27 @@ private struct ValidatorFixture {
     func process(
         _ pid: UInt32, parent: UInt32, processGroupID: UInt32 = 80,
         sessionID: UInt32 = 70, auditSessionID: UInt32 = 60,
-        version: UInt32 = 9, startSeconds: Int64 = 1_000
-    ) -> InvestigationGeneralProcessIdentityV1 {
+        startSeconds: Int64 = 1_000
+    ) -> InvestigationMachineGateObservedProcessIdentity {
         try! Self.makeProcess(
             pid, parent: parent, processGroupID: processGroupID,
-            sessionID: sessionID, auditSessionID: auditSessionID,
-            version: version, startSeconds: startSeconds
+            sessionID: sessionID, auditUserID: 501,
+            auditSessionID: auditSessionID,
+            startSeconds: startSeconds
+        )
+    }
+
+    func claim(
+        processIDVersion: UInt32 = 9, auditUserID: UInt32 = 501
+    ) throws -> ResolvedRootDriverClaimV1 {
+        try .init(
+            outerAttemptUUID: attempt, wholeInputSHA256: wholeInput,
+            process: Self.makeClaimProcess(
+                driver, processIDVersion: processIDVersion,
+                auditUserID: auditUserID
+            ),
+            executable: claim.executable,
+            observedAtContinuousNanoseconds: claim.observedAtContinuousNanoseconds
         )
     }
 
@@ -394,18 +402,47 @@ private struct ValidatorFixture {
 
     private static func makeProcess(
         _ pid: UInt32, parent: UInt32, processGroupID: UInt32 = 80,
-        sessionID: UInt32 = 70, auditSessionID: UInt32 = 60,
-        version: UInt32 = 9, startSeconds: Int64 = 1_000
-    ) throws -> InvestigationGeneralProcessIdentityV1 {
+        sessionID: UInt32 = 70, auditUserID: UInt32 = 501,
+        auditSessionID: UInt32 = 60,
+        startSeconds: Int64 = 1_000
+    ) throws -> InvestigationMachineGateObservedProcessIdentity {
         try .init(
-            processID: pid, processIDVersion: version,
-            startSeconds: startSeconds, startMicroseconds: 123,
+            processID: pid, startSeconds: startSeconds, startMicroseconds: 123,
             parentProcessID: parent, processGroupID: processGroupID,
-            sessionID: sessionID, auditSessionID: auditSessionID,
-            auditTokenWords: [0, 0, 0, 0, 0, pid, auditSessionID, version],
+            sessionID: sessionID, auditUserID: auditUserID,
+            auditSessionID: auditSessionID,
             realUserID: 0, effectiveUserID: 0, savedUserID: 0,
             realGroupID: 0, effectiveGroupID: 0, savedGroupID: 0,
             supplementaryGroups: [0]
+        )
+    }
+
+    private static func makeClaimProcess(
+        _ observed: InvestigationMachineGateObservedProcessIdentity,
+        processIDVersion: UInt32 = 9, auditUserID: UInt32? = nil
+    ) throws -> InvestigationGeneralProcessIdentityV1 {
+        try .init(
+            processID: observed.processID,
+            processIDVersion: processIDVersion,
+            startSeconds: observed.startSeconds,
+            startMicroseconds: observed.startMicroseconds,
+            parentProcessID: observed.parentProcessID,
+            processGroupID: observed.processGroupID,
+            sessionID: observed.sessionID,
+            auditSessionID: observed.auditSessionID,
+            auditTokenWords: [
+                auditUserID ?? observed.auditUserID, observed.effectiveUserID,
+                observed.effectiveGroupID,
+                observed.realUserID, observed.realGroupID, observed.processID,
+                observed.auditSessionID, processIDVersion,
+            ],
+            realUserID: observed.realUserID,
+            effectiveUserID: observed.effectiveUserID,
+            savedUserID: observed.savedUserID,
+            realGroupID: observed.realGroupID,
+            effectiveGroupID: observed.effectiveGroupID,
+            savedGroupID: observed.savedGroupID,
+            supplementaryGroups: observed.supplementaryGroups
         )
     }
 
@@ -486,7 +523,7 @@ private enum LineageMutation: CaseIterable {
     case gap, cycle, duplicate, unrelatedSibling, tooLong
 }
 private enum ProcessMutation: CaseIterable {
-    case parent, processGroup, session, auditSession, processIDVersion, start, auditToken
+    case parent, processGroup, session, auditSession, start, auditUser
 }
 private enum EvidenceMutation: CaseIterable {
     case notStopped, timeOrder, node, sha, staticSigning, liveSigning
