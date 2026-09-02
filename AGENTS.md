@@ -416,7 +416,10 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   ii-c-b2a2 independent verifier 已以 implementation `294bdb2` / tree
   `dbbffbba`、exact 6 paths / 1,999 lines、38/38 evidence、51/51
   target-boundary、component/contract gates 与无 unresolved P0–P2 review
-  完成并保持 non-admitting；当前 frontier 为 ii-c-b2b PTY/FD3 transport。
+  完成并保持 non-admitting；resolved root-driver lineage L1 又以 implementation
+  `83f6271` / tree `98289e2`、11 paths / 2,786 lines、25 focused tests、
+  单次 959-test serial 的 boundary-only 修复、component/mutation gates 与
+  final no-unresolved-P0–P2 review 完成；L2 composition 为当前 frontier。
   spawn/transfer uncertainty 不得
   settlement/unlink 或释放 owner，必须进入 process-lifetime ownership
   quarantine。
@@ -882,7 +885,8 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   `c144c1e` 与 `bc42fbc` 完成并保持 non-admitting。interactive-native identity
   binding repair `531f79f`、consumer seal `26e785a` 与 fixed-gate historical
   replay `aa8a7f1` 也已完成并保持 non-admitting。ii-c-a、ii-c-b1、ii-c-b2a1 与
-  ii-c-b2a2 已完成；当前 frontier 为 ii-c-b2b → ii-c-c → L3c3d → L3c4；
+  ii-c-b2a2 与 resolved-lineage L1 已完成；当前 frontier 为 lineage L2 →
+  ii-c-c → L3c3d → L3c4；
   这些 repairs 是 machine-campaign prerequisite checkpoints，
   不是新的 Task。
   ADR 0018 仍 Proposed；L3c4 独占 final admission 与

@@ -705,7 +705,7 @@ implementation 为 `4e8d672d35e4416b0114c5c4dbebb1cb6a4d5089` / tree
 `c144c1e`、fixed-gate deadline cleanup repair `bc42fbc`、interactive-native
 identity binding `531f79f` / consumer seal `26e785a` 与 fixed-gate historical
 replay `aa8a7f1` 均已完成并保持 non-admitting。ii-c-a、ii-c-b1、ii-c-b2a1
-与 ii-c-b2a2 已完成；当前 frontier 为 ii-c-b2b → ii-c-c → L3c3d → L3c4；这些 repairs 是 machine-campaign prerequisite
+与 ii-c-b2a2、resolved-lineage L1 已完成；当前 frontier 为 lineage L2 → ii-c-c → L3c3d → L3c4；这些 repairs 是 machine-campaign prerequisite
 checkpoints，不是新的 Task。
 ADR 0018 仍 Proposed，L3c4 独占 final admission 与剩余 full。
 iii-b2b-0 completion evidence 见
@@ -784,7 +784,7 @@ c0b-ii/c0b-iii 以及 iv-a0/iv-a-r/iv-b1a/iv-b1b-i/iv-b1b-ii/iv-b2 已完成并�
 non-admitting；shared-deadline、fixed-gate deadline cleanup、interactive-native
 identity binding `531f79f` / consumer seal `26e785a` 与 fixed-gate historical
 replay `aa8a7f1` 均已完成/non-admitting。ii-c-a、ii-c-b1、ii-c-b2a1 与
-ii-c-b2a2 已完成；current frontier 为 ii-c-b2b → ii-c-c → L3c3d → L3c4。
+ii-c-b2a2 与 resolved-lineage L1 已完成；current frontier 为 lineage L2 → ii-c-c → L3c3d → L3c4。
 iv-b1b-i completion evidence 见
 [review](../reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-i-review.md)：
 implementation `41d34f26` / tree `8ab58932`、exact 3 paths / 1,173
@@ -843,7 +843,7 @@ frozen，ii-c0b-ii-a1 与 ii-c0b-ii-a2 complete/non-admitting；c0b-ii/c0b-iii
 non-admitting；shared-deadline、fixed-gate deadline cleanup、interactive-native
 identity binding `531f79f` / consumer seal `26e785a` 与 fixed-gate historical
 replay `aa8a7f1` 均已完成/non-admitting。ii-c-a、ii-c-b1、ii-c-b2a1 与
-ii-c-b2a2 已完成；current frontier 为 ii-c-b2b → ii-c-c → L3c3d → L3c4。
+ii-c-b2a2 与 resolved-lineage L1 已完成；current frontier 为 lineage L2 → ii-c-c → L3c3d → L3c4。
 ii-a completion 见
 [review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-a-review.md)，ii-b
 completion 见
@@ -881,7 +881,7 @@ network。a2 complete/non-admitting；retained-base/capsule/fixed-gate sequence
 non-admitting；shared-deadline、fixed-gate deadline cleanup、interactive-native
 identity binding `531f79f` / consumer seal `26e785a` 与 fixed-gate historical
 replay `aa8a7f1` 均已完成/non-admitting。ii-c-a、ii-c-b1、ii-c-b2a1 与
-ii-c-b2a2 已完成；current frontier 为 ii-c-b2b → ii-c-c → L3c3d → L3c4。
+ii-c-b2a2 与 resolved-lineage L1 已完成；current frontier 为 lineage L2 → ii-c-c → L3c3d → L3c4。
 [ii-b5b-iii-b0 preflight](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md)
 冻结 long-lived outer/disposable inner、FD 0/1/2/7/8/9、inner-led PGID、
 parent-crash containment 与 iii-a/b1/b2a/b2b budgets。

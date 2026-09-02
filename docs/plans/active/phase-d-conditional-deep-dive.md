@@ -98,8 +98,9 @@
 > Shared-deadline repair `c144c1e`, fixed-gate deadline cleanup repair
 > `bc42fbc`, interactive-native identity binding `531f79f` / consumer seal
 > `26e785a`, and fixed-gate historical replay `aa8a7f1` are complete/non-admitting.
-> ii-c-a, ii-c-b1, ii-c-b2a1 and ii-c-b2a2 are complete/non-admitting. The
-> current frontier is strictly ii-c-b2b, ii-c-c, L3c3d and L3c4. These
+> ii-c-a, ii-c-b1, ii-c-b2a1, ii-c-b2a2 and resolved-lineage L1 are
+> complete/non-admitting. The current frontier is strictly lineage L2, ii-c-c,
+> L3c3d and L3c4. These
 > repairs are machine-campaign prerequisite checkpoints, not new Tasks. The authoritative
 > real-model run and readiness verdict remain unimplemented.
 > Production Deep Dive remains unavailable until Task 44 admission.

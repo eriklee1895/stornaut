@@ -139,7 +139,8 @@
 > at implementation `77cde61` / tree `9c59f241`; ii-c-b2a1 evidence producer
 > is complete/non-admitting at implementation `e3555ec` / tree `f38783f`;
 > ii-c-b2a2 independent verifier is complete/non-admitting at implementation
-> `294bdb2` / tree `dbbffbba`. The current frontier is ii-c-b2b → ii-c-c →
+> `294bdb2` / tree `dbbffbba`. Resolved-lineage L1 completed at implementation
+> `83f6271` / tree `98289e2`; the current frontier is lineage L2 → ii-c-c →
 > L3c3d → L3c4.
 > These repairs are machine-campaign prerequisite checkpoints,
 > not recursively named new Tasks. Local findings remain in their owning
@@ -1497,9 +1498,10 @@ records root-owned Gate admission. The
 [ii-c-b2a1 completion evidence](../../reports/phase-d-task-39b2c-iic-b2a1-evidence-producer-review.md)
 and
 [ii-c-b2a2 completion evidence](../../reports/phase-d-task-39b2c-iic-b2a2-independent-verifier-review.md)
-record the bounded evidence producer/verifier closure and advance the live
-frontier to ii-c-b2b; its exact scope is frozen in the
-[transport preflight](../../reports/phase-d-task-39b2c-iic-b2b-transport-preflight.md).
+record the bounded evidence producer/verifier closure. Resolved-lineage L1 is
+complete at `83f6271` / tree `98289e2`; L2 is current under the
+[lineage preflight](../../reports/phase-d-task-39b2c-iic-resolved-root-driver-lineage-preflight.md)
+and [L1 audit](../../reports/phase-d-task-39b2c-iic-resolved-root-driver-lineage-l1-review.md).
 ADR 0018
 remains Proposed until ii-c succeeds. L3c1 used focused
 Codex/Lifecycle/Investigation tests, exact structural boundaries, one clean

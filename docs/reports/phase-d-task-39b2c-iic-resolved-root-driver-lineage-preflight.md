@@ -1,12 +1,12 @@
 # Phase D Task 39B2c ii-c Resolved Root-Driver Lineage Preflight
 
-> Status: frozen / L1 implementation current / non-privileged / non-admitting
+> Status: frozen / L1 complete / L2 implementation current / non-privileged / non-admitting
 >
 > Date: 2026-09-01
 >
 > Baseline: `81a747e43e90f7ca3f941fa2e6aefd171eab470a`
 >
-> Remaining order: L1 core -> L2 composition -> ii-c-c unique machine
+> Remaining order: L2 composition -> ii-c-c unique machine
 > campaign -> L3c3d -> L3c4
 
 ## Decision
@@ -194,3 +194,12 @@ No headless or full verifier is run.
 After L2 is implemented, reviewed and pushed, the next action is the unique
 ii-c-c machine campaign. No further design or implementation prerequisite may be
 inserted.
+
+## L1 Completion Update
+
+L1 completed at implementation `83f6271ace2d52cc2ba170aae559a2d1fcc46864`
+and accepted tree `98289e2b5764571b7a3a8a108d992905da6712ea`; historical
+verifier replay compatibility followed at `cf4041c346c2703092ddc46e7b45769c29ff2ffb`.
+The completion audit is
+[phase-d-task-39b2c-iic-resolved-root-driver-lineage-l1-review.md](phase-d-task-39b2c-iic-resolved-root-driver-lineage-l1-review.md).
+L2 is now the only active lineage checkpoint.
