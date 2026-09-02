@@ -190,6 +190,35 @@ struct InvestigationMachineResolvedRootDriverValidatorTests {
         #expect(reuseResult.reusedProcessIDs == [old.processID])
     }
 
+    @Test("retirement accepts PID reuse outside old PGID in the same session")
+    func retirementAcceptsReuseOutsideOldProcessGroupInSameSession() throws {
+        let fixture = try ValidatorFixture(monitorCount: 1)
+        let resolution = try InvestigationMachineResolvedRootDriverValidator
+            .validate(fixture.input())
+        var observations = resolution.lineage.map { identity in
+            InvestigationMachineResolvedRootDriverRetirementObservation(
+                processID: identity.processID, state: .absent
+            )
+        }
+        let old = resolution.lineage[1]
+        let reused = fixture.process(
+            old.processID, parent: 900, processGroupID: 901,
+            sessionID: old.sessionID, startSeconds: old.startSeconds + 1
+        )
+        observations[1] = .init(
+            processID: old.processID, state: .present(reused)
+        )
+
+        let result = try InvestigationMachineResolvedRootDriverValidator
+            .verifyRetirement(
+                resolution, enumeration: .init(
+                    isComplete: true, observations: observations
+                )
+            )
+
+        #expect(result.reusedProcessIDs == [old.processID])
+    }
+
     @Test("retirement fails closed for live identity, cohort residue and gaps")
     func retirementRejectsLiveResidueAndIncompleteEnumeration() throws {
         let fixture = try ValidatorFixture(monitorCount: 1)

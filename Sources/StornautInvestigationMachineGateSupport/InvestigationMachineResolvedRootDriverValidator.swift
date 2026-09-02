@@ -333,7 +333,7 @@ package enum InvestigationMachineResolvedRootDriverValidator {
                     throw Error.liveResidue
                 }
                 guard
-                    current.processGroupID != original.processGroupID,
+                    current.processGroupID != original.processGroupID ||
                     current.sessionID != original.sessionID
                 else { throw Error.liveResidue }
                 reused.append(current.processID)
