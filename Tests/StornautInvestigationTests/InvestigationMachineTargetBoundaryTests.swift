@@ -4,6 +4,54 @@ import Testing
 @Suite("Task 39 trusted machine target boundary")
 struct InvestigationMachineTargetBoundaryTests {
     @Test
+    func iiCCPreArmVerifierPinsHistoricalAndCurrentClosure() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-boundaries"), encoding: .utf8)
+        let contract = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+
+        for marker in [
+            "--iic-c-prearm-staged-scope-contract-only",
+            "function verify_iicc_prearm_staged_scope()",
+            "62ee47091e338107e182233eaed80ed1ecc059cc",
+            "ii-c-c pre-arm aggregate budget drifted",
+            "ii-c-c source path identity drifted",
+            "contract-aggregate-call-drop",
+        ] {
+            #expect(boundary.contains(marker), "missing: \(marker)")
+        }
+        for marker in [
+            "2a29aff40fb39ec6465f75b2e70d43e3ba42ed4e",
+            "b5b4170f942fc92872c2d82f54baf2943f3e176f",
+            "3e49956f6f8e44d5d191d47c9e86856dd00d6966",
+            "223c407b1e02d1cbaf230e30d0c1aa38b31397f9",
+            "849e454de2cfd07f3d326e2a5df0c0a305678f0c",
+            "f6c36d2fb18f0a742e7ff26568e2eff67cc8784b",
+            "ii-c-c mutation diagnostic drifted:",
+            "ii-c-c protocol mutation accepted:",
+            "ii-c-c pre-arm scope negative inventory drifted",
+        ] {
+            #expect(contract.contains(marker), "missing: \(marker)")
+        }
+        let aggregateCall = "STORNAUT_IICC_SKIP_COMPONENT_BUILD=1 "
+            + "\\" + "\n"
+            + "    verify_iicc_contract \"$contract_root/iicc\""
+        #expect(contract.contains(aggregateCall))
+
+        let replay = try #require(contract.range(
+            of: "function replay_historical_contract()"
+        ))
+        let replayEnd = try #require(contract.range(
+            of: "function verify_iic0biia_historical_contract()"
+        ))
+        #expect(!contract[replay.lowerBound..<replayEnd.lowerBound].contains(
+            "scripts/verify-contract --iic-c-contract-only"
+        ))
+    }
+
+    @Test
     func rootDriverLineageCrossUIDVerifierPinsCommittedRepair() throws {
         let root = URL(filePath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()

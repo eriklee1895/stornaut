@@ -3,7 +3,7 @@
 set -euo pipefail
 
 contract_source=${0:A}
-# ib2_self_sha=ac74617281b7b84eb704990265d952c271e4c62ac718fe641eaa5a1a8ab36f7f
+# ib2_self_sha=bf3ef7a6ea7657571fce2143883d79badd8cfaf2518eabf90be7277b9ca9deb1
 ib2_self_sha=$(sed -nE 's/^# ib2_self_sha=([0-9a-f]{64})$/\1/p' "$contract_source"); ib2_observed_sha=$(sed -E 's/^# ib2_self_sha=[0-9a-f]{64}$/# ib2_self_sha=SELF/' "$contract_source" | shasum -a 256 | awk '{ print $1 }')
 [[ ${#ib2_self_sha} == 64 && "$ib2_observed_sha" == "$ib2_self_sha" ]] || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
 repo_root=${contract_source:h:h}
@@ -63,6 +63,10 @@ function replay_historical_contract() (
     if [[ $mode == --iic0b-i-accepted ]]; then
         local author=Sources/StornautInvestigationDiagnostic/InvestigationProjectedCohortAuthor.swift composition=Sources/StornautInvestigationDiagnostic/InvestigationRuntimeDiagnosticComposition.swift test=Tests/StornautInvestigationTests/InvestigationProjectedCohortAuthorTests.swift boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift baseline=e5ed33e27195d9252f02a89ab39664df3848f1ed
         scripts/verify-investigation-boundaries --iic0b-i-producer-contract-only "$author" "$composition" "$test" "$boundary"; scripts/verify-app-release-boundaries --iic0b-i-source-contract-only "$author" "$composition" scripts/verify-app-release-boundaries; scripts/verify-investigation-boundaries --iic0b-i-staged-scope-contract-only "$baseline"
+    elif [[ $mode == --iic-c-accepted ]]; then
+        local historical_iicc_mode=--iic-c-contract-only
+        STORNAUT_IICC_SKIP_COMPONENT_BUILD=1 \
+            ./scripts/verify-contract "$historical_iicc_mode"
     else scripts/verify-contract "$mode"; fi
 )
 
@@ -3052,16 +3056,16 @@ component_call = (
 mutations = (
     ("epoch-eight-fields", "protocol", "admissionMaterialBytes, admissionSHA256.rawBytes", "admissionSHA256.rawBytes"),
     ("bundle-half-mib", "protocol", "package static let maximumByteCount = 3 * 1_024 * 1_024", "package static let maximumByteCount = 512 * 1_024"),
-    ("writer-one-mib", "entry", "maximumByteCount: 4 * 1_024 * 1_024 + 128", "maximumByteCount: 1 * 1_024 * 1_024"),
+    ("writer-one-mib", "entry", "maximumByteCount: 4 * 1_024 * 1_024\n                        + ResolvedRootDriverClaimV1.maximumByteCount * 2\n                        + 256", "maximumByteCount: 1 * 1_024 * 1_024\n                        + ResolvedRootDriverClaimV1.maximumByteCount * 2\n                        + 256"),
     ("campaign-inline-decoder", "campaign", "let validated = try InvestigationMachineCampaignEpochEvidenceValidator", "let validated = try InvestigationMachineEpochEvidenceBundle"),
     ("gate-prepared-frame-hash-drop", "support", "prepared == .hashing(preparedFrame),", "prepared == prepared,"),
     ("driver-l2-time-bypass", "protocol", "installedL2ObservedAtNanoseconds\n                <= terminal.observedAtNanoseconds,", "true,"),
-    ("campaign-cross-epoch-parent-bypass", "support", "guard Set(epochs.map(\.outerDriverProcessID)).count == 1 else {", "guard !epochs.isEmpty else {"),
+    ("campaign-cross-epoch-parent-bypass", "support", "epochs.allSatisfy({\n                  $0.outerDriverProcessID == lineageClaim.process.processID\n              }),", "epochs.allSatisfy({ _ in true }),"),
     ("campaign-final-time-widen", "support", "finalReceipt.monotonicStartedNanoseconds < started,", "finalReceipt.monotonicStartedNanoseconds <= started,"),
     ("python-eight-fields", "verifier", "(1,50<<10),(32,32)], MAX_EPOCH)", "(32,32)], MAX_EPOCH)"),
     ("python-cross-epoch-parent-bypass", "verifier", 'require(len({value["driverParent"] for value in verified}) == 1,', 'require(bool(verified),'),
     ("python-final-time-widen", "verifier", 'and final["started"] < raw["started"]', 'and final["started"] <= raw["started"]'),
-    ("python-crlf-envelope", "verifier", 'and not diagnostic.endswith(b"\\r\\n")', 'and diagnostic.endswith(ending)'),
+    ("python-crlf-envelope", "verifier", 'require(b"\\r" not in diagnostic and diagnostic.count(b"\\n")==2', 'require(diagnostic.count(b"\\n")==2'),
     ("boundary-installed-l2-import-drop", "boundary_tests",
      '"InvestigationMachineDarwinOuterInnerProtocol.swift": [\n                "import Foundation",\n                "import StornautInvestigationHandoffContract",\n                "import StornautInvestigationInstalledL2",\n            ],',
      '"InvestigationMachineDarwinOuterInnerProtocol.swift": [\n                "import Foundation",\n                "import StornautInvestigationHandoffContract",\n            ],'),
@@ -3695,6 +3699,14 @@ function verify_iicc_contract() {
     local out=$1 gate=scripts/verify-investigation-boundaries
     local release=scripts/verify-app-release-boundaries
     local baseline=622e7b99d57dfe482ccd37481fcdb4dcff87a0ec
+    local implementation=2a29aff40fb39ec6465f75b2e70d43e3ba42ed4e
+    local implementation_tree=b5b4170f942fc92872c2d82f54baf2943f3e176f
+    local repair=3e49956f6f8e44d5d191d47c9e86856dd00d6966
+    local repair_tree=223c407b1e02d1cbaf230e30d0c1aa38b31397f9
+    local evidence=3ba34d47104b25e834ba0d14c28c6405b1077c67
+    local evidence_tree=38964e5253d074c943d0df3b922972c04fb4ebf2
+    local cross_uid_closure=849e454de2cfd07f3d326e2a5df0c0a305678f0c
+    local cross_uid_closure_tree=f6c36d2fb18f0a742e7ff26568e2eff67cc8784b
     local -a paths=(
         Sources/StornautInvestigationMachineCampaign/main.swift
         Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignHarness.swift
@@ -3713,6 +3725,77 @@ function verify_iicc_contract() {
         scripts/verify-investigation-boundaries scripts/verify-contract
     )
     mkdir -p "$out"
+    [[ "$(git show -s --format=%P "$implementation")" == "$baseline" \
+        && "$(git show -s --format=%T "$implementation")" == "$implementation_tree" ]] \
+        || fail_contract "ii-c-c immutable implementation drifted"
+    local -a implementation_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$implementation" | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"' | LC_ALL=C sort)"})
+    [[ "${(j:\n:)implementation_paths}" == "${(j:\n:)${(@on)paths}}" \
+        && "$(git diff-tree --no-commit-id --numstat -r "$implementation" | awk 'index($3,"docs/")!=1&&$3!="AGENTS.md"&&$3!="README.md"{n+=$1+$2}END{print n+0}')" == 3979 ]] \
+        || fail_contract "ii-c-c immutable implementation scope drifted"
+    [[ "$(git show -s --format=%P "$repair")" == "$implementation" \
+        && "$(git show -s --format=%T "$repair")" == "$repair_tree" ]] \
+        || fail_contract "ii-c-c repair commit/tree drifted"
+    local -a repair_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$repair" | LC_ALL=C sort)"})
+    local -a expected_repair_paths=(
+        Sources/StornautInvestigationMachineCampaign/main.swift
+        Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineGateCoordinatorCompositionTests.swift
+        scripts/verify-contract scripts/verify-investigation-boundaries)
+    [[ "${(j:\n:)repair_paths}" == "${(j:\n:)${(@on)expected_repair_paths}}" \
+        && "$(git diff-tree --no-commit-id --numstat -r "$repair" | awk '{n+=$1+$2}END{print n+0}')" == 350 ]] \
+        || fail_contract "ii-c-c repair scope drifted"
+    [[ "$(git show -s --format=%P "$evidence")" == "$repair" \
+        && "$(git show -s --format=%T "$evidence")" == "$evidence_tree" ]] \
+        || fail_contract "ii-c-c evidence checkpoint drifted"
+    local -a expected_evidence_paths=(
+        Sources/StornautInvestigationMachineCampaign/main.swift
+        Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignEvidenceContract.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerComposition.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineDarwinOuterInnerProtocol.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineHelperEpochContinuity.swift
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineZeroArgumentEntry.swift
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineDarwinOuterInnerProtocolTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-app-release-boundaries scripts/verify-contract
+        scripts/verify-investigation-boundaries
+        scripts/verify-investigation-runtime-machine-report)
+    local -a evidence_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$evidence" | awk 'index($0,"docs/")!=1' | LC_ALL=C sort)"})
+    [[ "${(j:\n:)evidence_paths}" == "${(j:\n:)${(@on)expected_evidence_paths}}" \
+        && "$(git diff-tree --no-commit-id --numstat -r "$evidence" | awk 'index($3,"docs/")!=1{n+=$1+$2}END{print n+0}')" == 3682 ]] \
+        || fail_contract "ii-c-c evidence checkpoint scope drifted"
+    [[ "$(git show -s --format=%P "$cross_uid_closure")" == b4c632e68e2f28ef67b9734bce82dac61bdc7bed \
+        && "$(git show -s --format=%T "$cross_uid_closure")" == "$cross_uid_closure_tree" ]] \
+        || fail_contract "ii-c-c cross-UID closure drifted"
+    local -a expected_cross_uid_paths=(
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-contract scripts/verify-investigation-boundaries)
+    local -a cross_uid_paths=(${(f)"$(git diff-tree --no-commit-id --name-only -r "$cross_uid_closure" | LC_ALL=C sort)"})
+    [[ "${(j:\n:)cross_uid_paths}" == "${(j:\n:)${(@on)expected_cross_uid_paths}}" \
+        && "$(git diff-tree --no-commit-id --numstat -r "$cross_uid_closure" | awk '{n+=$1+$2}END{print n+0}')" == 393 ]] \
+        || fail_contract "ii-c-c cross-UID closure scope drifted"
+    if [[ "$(git rev-parse HEAD)" != "$implementation" ]]; then
+        local historical_status=0
+        replay_historical_contract \
+            "$out/implementation" "$implementation" "$implementation_tree" \
+            --iic-c-accepted '--iic-c-staged-scope-contract-only' \
+            || historical_status=$?
+        (( historical_status == 0 )) \
+            || fail_contract "ii-c-c historical implementation replay failed"
+    fi
+    local cross_uid_status=0
+    replay_historical_contract "$out/cross-uid-closure" \
+        "$cross_uid_closure" "$cross_uid_closure_tree" \
+        --root-driver-lineage-cross-uid-contract-only \
+        '--root-driver-lineage-cross-uid-staged-scope-contract-only' \
+        || cross_uid_status=$?
+    (( cross_uid_status == 0 )) \
+        || fail_contract "ii-c-c cross-UID closure replay failed"
+    "$gate" --iic-evidence-verification-source-contract-only >"$out/current-evidence.log"
+    "$gate" --iic-root-driver-lineage-l1-source-contract-only >"$out/current-lineage-l1.log"
+    "$gate" --iic-root-driver-lineage-l2-source-contract-only >"$out/current-lineage-l2.log"
+    "$gate" --root-driver-lineage-cross-uid-source-contract-only >"$out/current-cross-uid.log"
     "$gate" --iic-c-source-contract-only "${paths[@]}" >"$out/source.log"
     if [[ ${STORNAUT_IICC_SKIP_COMPONENT_BUILD:-0} == 1 ]]; then
         require_fixed_text "$release" 'verify_iicb2b2_component_boundary'
@@ -3722,6 +3805,8 @@ function verify_iicc_contract() {
 from pathlib import Path
 import sys
 out=Path(sys.argv[1]); paths=tuple(map(Path,sys.argv[2:])); slots=("main","harness","evidence","coordinator","composition","bridge","protocol","entry","writer","lifecycle","verifier","tests","gate","gate_fixture","gate_test","boundary","contract")
+aggregate_call=('STORNAUT_IICC_SKIP_COMPONENT_BUILD=1 ' + chr(92) + '\n'
+                + '    verify_iicc_contract "$contract_root/iicc"')
 m=(
 ("extra-argv","main",'guard CommandLine.argc == 1 else {','guard CommandLine.argc >= 1 else {'),
 ("extra-env","coordinator",'environmentEntries: [], descriptors: try descriptorInventory(),','environmentEntries: entries, descriptors: try descriptorInventory(),'),
@@ -3742,40 +3827,161 @@ m=(
 ("epoch-identity-join","protocol",'value.epochUUID == selection.epoch.epochUUID,','value.epochUUID != selection.epoch.epochUUID,'),
 ("success-before-verifier","main",'try publishSeal(seal, admitting: admitting, consumed: armedConsumed)\n            return admitting','if admitting { return true }\n            try publishSeal(seal, admitting: admitting, consumed: armedConsumed)\n            return false'),
 ("verifier-self-binding-drop","verifier",'require(verifier_digest_field == verifier_digest,\n                "verifier executable binding")','require(True, "verifier executable binding")'),)
-m+=("sudo-option","gate",'launcherPath, "-N", "-p"','launcherPath, "-k", "-p"'),
-m+=("ancestor-content-watch","verifier","watch(root_fd, False)","watch(root_fd, True)"),
-m+=("teardown-uncertainty","main",'catch { throw Failure.installedStateUncertain }','catch { throw Failure.invalid }'),
-m+=("receipt-backpressure","coordinator",'case .interrupted, .wouldBlock: continue','case .interrupted: continue'),
-m+=("receipt-deadline","coordinator",'guard current < deadline.rawValue else { return .expiredOrFailed }','guard true else { return .expiredOrFailed }'),;assert len(m)==24
+m+=(("sudo-option","gate",'launcherPath, "-N", "-p"','launcherPath, "-k", "-p"'),)
+m+=(("ancestor-content-watch","verifier","watch(root_fd, False)","watch(root_fd, True)"),)
+m+=(("teardown-uncertainty","main",'catch { throw Failure.installedStateUncertain }','catch { throw Failure.invalid }'),)
+m+=(("receipt-backpressure","coordinator",'case .interrupted, .wouldBlock: continue','case .interrupted: continue'),)
+m+=(("receipt-deadline","coordinator",'guard current < deadline.rawValue else { return .expiredOrFailed }','guard true else { return .expiredOrFailed }'),)
+m+=(("contract-aggregate-call-drop","contract",aggregate_call,': # ii-c-c aggregate disabled'),)
+assert len(m)==25
 with (out/"mutations").open("w") as manifest:
  for name,slot,old,new in m:
   source=paths[slots.index(slot)].read_text(); assert source.count(old)==1, name
-  target=out/(name+".source"); target.write_text(source.replace(old,new,1)); print(name,slot,slots.index(slot)+1,target,sep="\t",file=manifest)
+  target=out/(name+".source"); target.write_text(source.replace(old,new,1))
+  expected={
+   "lifecycle-seal":"ii-c-c lifecycle source seal drifted",
+   "sudo-option":"ii-c-c sudo option contract drifted",
+  }.get(name,"ii-c-c exact source contract drifted: "+old)
+  (out/(name+".expected")).write_text(expected)
+  print(name,slot,slots.index(slot)+1,target,sep="\t",file=manifest)
 PY
-    local name slot index target sha rc; while IFS=$'\t' read -r name slot index target; do
+    local name slot index target sha rc expected; while IFS=$'\t' read -r name slot index target; do
         local -a args=("${paths[@]}"); args[$index]=$target; sha=$(shasum -a 256 "$target"|awk '{print $1}'); rc=0
         "$gate" --iic-c-source-mutation-contract-only "$name" "$slot" "$sha" "${args[@]}" >"$out/$name.log" 2>&1 || rc=$?
         (( rc != 0 )) || fail_contract "ii-c-c mutation accepted: $name"
+        expected=$(<"$out/$name.expected")
+        [[ "$(<"$out/$name.log")" == "$expected" ]] \
+            || fail_contract "ii-c-c mutation diagnostic drifted: $name"
     done <"$out/mutations"
-    local index=$out/scope.index bad blob item mode fixture scope=$baseline
-    GIT_INDEX_FILE=$index git read-tree "$baseline^{tree}"
-    for item in "${paths[@]}"; do mode=100644; [[ $item == scripts/* ]] && mode=100755; blob=$(git hash-object -w -- "$item"); GIT_INDEX_FILE=$index git update-index --add --cacheinfo "$mode,$blob,$item"; done
-    GIT_INDEX_FILE=$index "$gate" --iic-c-staged-scope-contract-only "$baseline" >"$out/scope.log"
-    local -a scope_fixtures=(extra missing over-budget binary wrong-mode worktree-divergence wrong-baseline); (( ${#scope_fixtures} + 1 == 8 )) || fail_contract "ii-c-c scope negative inventory drifted"
-    for fixture in "${scope_fixtures[@]}"; do
-        bad=$out/scope-$fixture.index; cp "$index" "$bad"; scope=$baseline
-        case $fixture in
-          extra) blob=$(print extra|git hash-object -w --stdin); GIT_INDEX_FILE=$bad git update-index --add --cacheinfo "100644,$blob,iicc-extra.swift";;
-          missing) GIT_INDEX_FILE=$bad git update-index --force-remove -- "${paths[1]}";;
-          over-budget) blob=$( { git show "$baseline:${paths[1]}"; for item in {1..1200}; do print "// iicc $item"; done; }|git hash-object -w --stdin); GIT_INDEX_FILE=$bad git update-index --cacheinfo "100644,$blob,${paths[1]}";;
-          binary) blob=$(printf '\0iicc\n'|git hash-object -w --stdin); GIT_INDEX_FILE=$bad git update-index --cacheinfo "100644,$blob,${paths[1]}";;
-          wrong-mode) blob=$(git hash-object -w -- "${paths[11]}"); GIT_INDEX_FILE=$bad git update-index --cacheinfo "100644,$blob,${paths[11]}";;
-          worktree-divergence) blob=$( { <"${paths[1]}"; print '// iicc divergence'; }|git hash-object -w --stdin); GIT_INDEX_FILE=$bad git update-index --cacheinfo "100644,$blob,${paths[1]}";;
-          wrong-baseline) scope=$baseline^;; esac
-        rc=0; GIT_INDEX_FILE=$bad "$gate" --iic-c-staged-scope-contract-only "$scope" >"$out/scope-$fixture.log" 2>&1 || rc=$?
-        (( rc != 0 )) || fail_contract "ii-c-c scope accepted: $fixture"
+    function reject_iicc_protocol() {
+        local label=$1 expected=$2; shift 2
+        local log="$out/protocol-$label.log" protocol_rc=0
+        "$@" >"$log" 2>&1 || protocol_rc=$?
+        (( protocol_rc != 0 )) \
+            || fail_contract "ii-c-c protocol mutation accepted: $label"
+        [[ "$(<"$log")" == "$expected" ]] \
+            || fail_contract "ii-c-c protocol diagnostic drifted: $label"
+    }
+    local mutation="$out/extra-argv.source"
+    local mutation_sha=$(shasum -a 256 "$mutation" | awk '{print $1}')
+    local -a mutation_args=("${paths[@]}")
+    mutation_args[1]=$mutation
+    reject_iicc_protocol unknown-name 'ii-c-c mutation contract drifted' \
+        "$gate" --iic-c-source-mutation-contract-only unknown main \
+        "$mutation_sha" "${mutation_args[@]}"
+    reject_iicc_protocol wrong-slot 'ii-c-c mutation contract drifted' \
+        "$gate" --iic-c-source-mutation-contract-only extra-argv harness \
+        "$mutation_sha" "${mutation_args[@]}"
+    reject_iicc_protocol malformed-sha 'ii-c-c mutation contract drifted' \
+        "$gate" --iic-c-source-mutation-contract-only extra-argv main bad \
+        "${mutation_args[@]}"
+    reject_iicc_protocol wrong-sha 'ii-c-c unrecognized mutation' \
+        "$gate" --iic-c-source-mutation-contract-only extra-argv main \
+        0000000000000000000000000000000000000000000000000000000000000000 \
+        "${mutation_args[@]}"
+    local unchanged="$out/unchanged-main.swift"
+    cp "${paths[1]}" "$unchanged"
+    local unchanged_sha=$(shasum -a 256 "$unchanged" | awk '{print $1}')
+    local -a alternate_args=("${paths[@]}"); alternate_args[1]=$unchanged
+    reject_iicc_protocol unchanged-source 'ii-c-c unrecognized mutation' \
+        "$gate" --iic-c-source-mutation-contract-only extra-argv main \
+        "$unchanged_sha" "${alternate_args[@]}"
+    local unrecognized="$out/unrecognized-main.swift"
+    { <"${paths[1]}"; print '// ii-c-c unknown mutation'; } >"$unrecognized"
+    local unrecognized_sha=$(shasum -a 256 "$unrecognized" | awk '{print $1}')
+    alternate_args=("${paths[@]}"); alternate_args[1]=$unrecognized
+    reject_iicc_protocol unrecognized-content 'ii-c-c unrecognized mutation' \
+        "$gate" --iic-c-source-mutation-contract-only extra-argv main \
+        "$unrecognized_sha" "${alternate_args[@]}"
+    alternate_args=("${paths[@]}"); alternate_args[1]=$mutation
+    alternate_args[4]="$out/receipt-deadline.source"
+    reject_iicc_protocol two-changed-slots \
+        'ii-c-c mutation changed another source' \
+        "$gate" --iic-c-source-mutation-contract-only extra-argv main \
+        "$mutation_sha" "${alternate_args[@]}"
+    local canonical_sha=$(shasum -a 256 "${paths[1]}" | awk '{print $1}')
+    reject_iicc_protocol canonical-mutation-path \
+        'ii-c-c source path identity drifted' \
+        "$gate" --iic-c-source-mutation-contract-only extra-argv main \
+        "$canonical_sha" "${paths[@]}"
+    local alternate_coordinator="$out/alternate-coordinator.swift"
+    cp "${paths[4]}" "$alternate_coordinator"
+    alternate_args=("${paths[@]}"); alternate_args[1]=$mutation
+    alternate_args[4]=$alternate_coordinator
+    reject_iicc_protocol alternate-unchanged-slot \
+        'ii-c-c source path identity drifted' \
+        "$gate" --iic-c-source-mutation-contract-only extra-argv main \
+        "$mutation_sha" "${alternate_args[@]}"
+    local hardlink="$out/hardlinked-main.swift"; ln "$mutation" "$hardlink"
+    alternate_args=("${paths[@]}"); alternate_args[1]=$hardlink
+    reject_iicc_protocol hardlinked-source 'ii-c-c source path identity drifted' \
+        "$gate" --iic-c-source-mutation-contract-only extra-argv main \
+        "$mutation_sha" "${alternate_args[@]}"
+    local symlink="$out/symlinked-main.swift"; ln -s "${paths[1]:A}" "$symlink"
+    alternate_args=("${paths[@]}"); alternate_args[1]=$symlink
+    reject_iicc_protocol symlinked-source \
+        "ii-c-c source unavailable: $symlink" \
+        "$gate" --iic-c-source-mutation-contract-only extra-argv main \
+        "$canonical_sha" "${alternate_args[@]}"
+    alternate_args=("${paths[@]}"); alternate_args[1]=$unchanged
+    reject_iicc_protocol canonical-alternate-path \
+        'ii-c-c canonical source path drifted' \
+        "$gate" --iic-c-source-contract-only "${alternate_args[@]}"
+
+    local prearm_baseline=62ee47091e338107e182233eaed80ed1ecc059cc
+    local -a prearm_paths=(
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-contract scripts/verify-investigation-boundaries)
+    local index=$out/prearm-scope.index bad blob item mode fixture scope
+    GIT_INDEX_FILE=$index git read-tree "$prearm_baseline^{tree}"
+    for item in "${prearm_paths[@]}"; do
+        mode=100644; [[ $item == scripts/* ]] && mode=100755
+        blob=$(git hash-object -w -- "$item")
+        GIT_INDEX_FILE=$index git update-index --add --cacheinfo "$mode,$blob,$item"
     done
-    ( local probe=iicc-untracked-$PPID-$RANDOM.swift; trap 'rm -f -- "$probe"' EXIT; print x >"$probe"; rc=0; GIT_INDEX_FILE=$index "$gate" --iic-c-staged-scope-contract-only "$baseline" >"$out/scope-untracked.log" 2>&1 || rc=$?; (( rc != 0 )) || fail_contract "ii-c-c scope accepted: untracked" )
+    GIT_INDEX_FILE=$index "$gate" \
+        --iic-c-prearm-staged-scope-contract-only "$prearm_baseline" \
+        >"$out/prearm-scope.log"
+    function reject_iicc_prearm_scope() {
+        local label=$1 expected=$2; shift 2
+        local log="$out/prearm-scope-$label.log" scope_rc=0
+        "$@" >"$log" 2>&1 || scope_rc=$?
+        (( scope_rc != 0 )) || fail_contract "ii-c-c pre-arm scope accepted: $label"
+        [[ "$(<"$log")" == "$expected" ]] \
+            || fail_contract "ii-c-c pre-arm scope diagnostic drifted: $label"
+    }
+    local -a scope_fixtures=(extra missing binary over-budget aggregate-budget \
+        wrong-mode staged-worktree-divergence wrong-baseline)
+    (( ${#scope_fixtures} + 1 == 9 )) \
+        || fail_contract "ii-c-c pre-arm scope negative inventory drifted"
+    for fixture in "${scope_fixtures[@]}"; do
+        bad=$out/prearm-scope-$fixture.index; cp "$index" "$bad"
+        scope=$prearm_baseline
+        case $fixture in
+          extra) blob=$(print extra|git hash-object -w --stdin); GIT_INDEX_FILE=$bad git update-index --add --cacheinfo "100644,$blob,iicc-prearm-extra.swift"; expected='ii-c-c pre-arm checkpoint paths drifted';;
+          missing) blob=$(git rev-parse "$prearm_baseline:${prearm_paths[1]}"); GIT_INDEX_FILE=$bad git update-index --cacheinfo "100644,$blob,${prearm_paths[1]}"; expected='ii-c-c pre-arm checkpoint paths drifted';;
+          binary) blob=$(printf '\0iicc-prearm\n'|git hash-object -w --stdin); GIT_INDEX_FILE=$bad git update-index --cacheinfo "100644,$blob,${prearm_paths[1]}"; expected='ii-c-c pre-arm binary path rejected';;
+          over-budget) blob=$( { git show "$prearm_baseline:${prearm_paths[1]}"; for item in {1..300}; do print "// iicc-prearm-over-$item"; done; }|git hash-object -w --stdin); GIT_INDEX_FILE=$bad git update-index --cacheinfo "100644,$blob,${prearm_paths[1]}"; expected="ii-c-c pre-arm path budget drifted: ${prearm_paths[1]}";;
+          aggregate-budget)
+            blob=$( { git show "$prearm_baseline:${prearm_paths[1]}"; for item in {1..200}; do print "// iicc-prearm-test-$item"; done; }|git hash-object -w --stdin); GIT_INDEX_FILE=$bad git update-index --cacheinfo "100644,$blob,${prearm_paths[1]}"
+            blob=$( { git show "$prearm_baseline:${prearm_paths[2]}"; for item in {1..400}; do print "# iicc-prearm-contract-$item"; done; }|git hash-object -w --stdin); GIT_INDEX_FILE=$bad git update-index --cacheinfo "100755,$blob,${prearm_paths[2]}"
+            blob=$( { git show "$prearm_baseline:${prearm_paths[3]}"; for item in {1..400}; do print "# iicc-prearm-boundary-$item"; done; }|git hash-object -w --stdin); GIT_INDEX_FILE=$bad git update-index --cacheinfo "100755,$blob,${prearm_paths[3]}"
+            expected='ii-c-c pre-arm aggregate budget drifted';;
+          wrong-mode) blob=$(git hash-object -w -- "${prearm_paths[2]}"); GIT_INDEX_FILE=$bad git update-index --cacheinfo "100644,$blob,${prearm_paths[2]}"; expected="ii-c-c pre-arm staged source/mode drifted: ${prearm_paths[2]}";;
+          staged-worktree-divergence) blob=$( { <"${prearm_paths[1]}"; print '// iicc-prearm-divergence'; }|git hash-object -w --stdin); GIT_INDEX_FILE=$bad git update-index --cacheinfo "100644,$blob,${prearm_paths[1]}"; expected="ii-c-c pre-arm staged source/mode drifted: ${prearm_paths[1]}";;
+          wrong-baseline) scope=$prearm_baseline^; expected='ii-c-c pre-arm checkpoint baseline drifted';;
+        esac
+        reject_iicc_prearm_scope "$fixture" "$expected" env \
+            GIT_INDEX_FILE="$bad" "$gate" \
+            --iic-c-prearm-staged-scope-contract-only "$scope"
+    done
+    ( local probe=iicc-prearm-untracked-$PPID-$RANDOM.swift
+      trap 'rm -f -- "$probe"' EXIT
+      print x >"$probe"
+      reject_iicc_prearm_scope untracked \
+          'ii-c-c pre-arm index/worktree drifted' env \
+          GIT_INDEX_FILE="$index" "$gate" \
+          --iic-c-prearm-staged-scope-contract-only "$prearm_baseline" )
 }
 
 if [[ ${1:-} == --iic-c-contract-only ]]; then
@@ -5492,6 +5698,8 @@ verify_iicb2a2_contract "$contract_root/iicb2a2"
 verify_iic_evidence_verification_contract "$contract_root/iic-evidence"
 verify_iicb2b1_contract "$contract_root/iicb2b1"
 verify_iicb2b2_contract "$contract_root/iicb2b2"
+STORNAUT_IICC_SKIP_COMPONENT_BUILD=1 \
+    verify_iicc_contract "$contract_root/iicc"
 verify_iic_root_driver_lineage_l1_contract "$contract_root/iic-lineage-l1" false
 verify_iic_root_driver_lineage_l2_contract "$contract_root/iic-lineage-l2"
 verify_root_driver_lineage_cross_uid_contract "$contract_root/cross-uid"
