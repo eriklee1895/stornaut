@@ -36,11 +36,11 @@ struct InvestigationSudoShapedDriverLauncherTests {
         )
         #expect(
             InvestigationMachineFixedGateContract.maximumCapturedOutputByteCount
-                == 512
+                == 1_190
         )
         #expect(
             InvestigationMachineFixedGateContract.maximumReadOutputByteCount
-                == 513
+                == 1_191
         )
         #expect(
             InvestigationMachineFixedGateContract.forwardedSignals
@@ -142,7 +142,7 @@ struct InvestigationSudoShapedDriverLauncherTests {
         #expect(encoded.count <= Int(PIPE_BUF))
         #expect(try InvestigationMachineGateTransportReceipt.decode(encoded) == receipt)
         #expect(!(type(of: receipt) is any Codable.Type))
-        #expect(receipt.output.byteCount == 512)
+        #expect(receipt.output.byteCount == 1_190)
         #expect(receipt.output.overflowObserved)
         #expect(receipt.output.reachedEOF)
         #expect(!receipt.output.deadlineExpired)
@@ -171,7 +171,14 @@ struct InvestigationSudoShapedDriverLauncherTests {
         ).run(inheritedCapsuleDescriptor: STDIN_FILENO)
 
         let expectedReceipt = try sampleReceipt()
+        let expectedResolvedRootDriver =
+            try sampleResolvedRootDriverObservation()
+        let expectedInitialLaunch = try sampleInitialLaunch()
+        let expectedWholeInputSHA256 = try sampleWholeInputSHA256()
+        let expectedRetirementLineage =
+            expectedResolvedRootDriver.validation.lineage
         #expect(result.receipt == expectedReceipt)
+        #expect(result.resolvedRootDriver == expectedResolvedRootDriver)
         #expect(system.events == [
             .validateInvocation, .observeStart,
             .observeLauncherExecutable, .observeInitialInput,
@@ -186,17 +193,168 @@ struct InvestigationSudoShapedDriverLauncherTests {
             .verifyGateAndChildTopology, .verifyForegroundProcessGroup(40),
             .revalidateTransitionTTY,
             .setForegroundProcessGroup(41), .continueChildGroup(41),
-            .observeChildTTY, .drainOutput, .observeWaitableChild,
+            .observeChildTTY,
+            .collectResolvedRootDriverValidation(
+                initialLaunch: expectedInitialLaunch,
+                expectedOuterAttemptUUID: sampleAttemptUUID(),
+                expectedWholeInputSHA256: expectedWholeInputSHA256,
+                recoveryProcessGroupID: 41,
+                coordinatorSessionID: 40
+            ),
+            .continueChildGroup(41),
+            .drainOutput, .observeWaitableChild,
             .setForegroundProcessGroup(40),
             .verifyForegroundProcessGroup(40),
             .observeLeaderOnlyChildGroup, .reapExactChild,
             .observeEmptyChildGroup, .setForegroundProcessGroup(40),
             .verifyForegroundProcessGroup(40), .revalidateFinalTTY,
             .observeFinalInput,
+            .collectResolvedRootDriverRetirement(expectedRetirementLineage),
             .closeOutputDescriptor(10), .closeBorrowedDescriptor(STDIN_FILENO),
             .observeCompletion,
             .writeTerminalReceipt(try sampleReceipt().encoded()),
         ])
+    }
+
+    @Test
+    func launcherValidatesBootstrapBeforeBusinessContinuation() throws {
+        let system = GateLauncherRecorder()
+        let expectedInitialLaunch = try sampleInitialLaunch()
+        let expectedWholeInputSHA256 = try sampleWholeInputSHA256()
+        let expectedRetirementLineage =
+            try sampleResolvedRootDriverObservation().validation.lineage
+
+        _ = try InvestigationMachineFixedGateLauncher(system: system)
+            .run(inheritedCapsuleDescriptor: STDIN_FILENO)
+
+        let events = system.events
+        let firstContinue = try index(of: .continueChildGroup(41), in: events)
+        let validation = try index(
+            of: .collectResolvedRootDriverValidation(
+                initialLaunch: expectedInitialLaunch,
+                expectedOuterAttemptUUID: sampleAttemptUUID(),
+                expectedWholeInputSHA256: expectedWholeInputSHA256,
+                recoveryProcessGroupID: 41,
+                coordinatorSessionID: 40
+            ),
+            in: events
+        )
+        let secondContinue = try #require(events.lastIndex(of: .continueChildGroup(41)))
+        let retirement = try index(
+            of: .collectResolvedRootDriverRetirement(expectedRetirementLineage),
+            in: events
+        )
+        let reap = try index(of: .reapExactChild, in: events)
+        let empty = try index(of: .observeEmptyChildGroup, in: events)
+
+        #expect(firstContinue < validation)
+        #expect(validation < secondContinue)
+        #expect(secondContinue != firstContinue)
+        #expect(reap < retirement)
+        #expect(empty < retirement)
+    }
+
+    @Test
+    func darwinSystemPersistsEmptyGroupProofBeforeLineageRetirement() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let source = try String(contentsOf: root.appending(path:
+            "Sources/StornautInvestigationMachineGateSupport/"
+                + "DarwinInvestigationMachineFixedGateSystem.swift"),
+            encoding: .utf8)
+        let emptyCase = try #require(source.range(
+            of: "case .observeEmptyChildGroup:"))
+        let suffix = source[emptyCase.lowerBound...]
+        let persisted = try #require(suffix.range(
+            of: "state.childGroupEmpty = true"))
+        let retirement = try #require(suffix.range(
+            of: "case .collectResolvedRootDriverRetirement"))
+        #expect(persisted.lowerBound < retirement.lowerBound)
+    }
+
+    @Test
+    func resolvedRootValidationRejectsSameSignedWrongLiveExecutablePath() throws {
+        #expect(throws: InvestigationMachineGateError.invalidObservation) {
+            try InvestigationMachineResolvedRootDriverSupport
+                .validateLiveExecutablePaths(
+                    before: "/tmp/copied-StornautInvestigationMachineDriver",
+                    after: "/tmp/copied-StornautInvestigationMachineDriver"
+                )
+        }
+    }
+
+    @Test
+    func resolvedRootValidationRequiresAuditTokenBoundExecutablePathReads()
+        throws
+    {
+        #expect(throws: InvestigationMachineGateError.invalidObservation) {
+            try InvestigationMachineResolvedRootDriverSupport
+                .validateLiveExecutablePaths(
+                    before: "",
+                    after: ResolvedRootDriverClaimV1.fixedExecutablePath
+                )
+        }
+
+        #expect(throws: InvestigationMachineGateError.invalidObservation) {
+            try InvestigationMachineResolvedRootDriverSupport
+                .validateLiveExecutablePaths(
+                    before: ResolvedRootDriverClaimV1.fixedExecutablePath,
+                    after: "/tmp/copied-StornautInvestigationMachineDriver"
+                )
+        }
+
+        #expect(throws: Never.self) {
+            try InvestigationMachineResolvedRootDriverSupport
+                .validateLiveExecutablePaths(
+                    before: ResolvedRootDriverClaimV1.fixedExecutablePath,
+                    after: ResolvedRootDriverClaimV1.fixedExecutablePath
+                )
+        }
+    }
+
+    @Test
+    func generalProcessIdentityCanonicalizesSupplementaryGroups() throws {
+        #expect(
+            try InvestigationMachineResolvedRootDriverSupport
+                .canonicalSupplementaryGroups(
+                    [80, 20, 0],
+                    effectiveGroupID: 20
+                ) == [0, 20, 80]
+        )
+    }
+
+    @Test
+    func canonicalSupplementaryGroupsRejectsEmptyDuplicateAndMissingEffective()
+        throws
+    {
+        #expect(throws: InvestigationMachineGateError.invalidObservation) {
+            _ = try InvestigationMachineResolvedRootDriverSupport
+                .canonicalSupplementaryGroups(
+                    [],
+                    effectiveGroupID: 20
+                )
+        }
+        #expect(throws: InvestigationMachineGateError.invalidObservation) {
+            _ = try InvestigationMachineResolvedRootDriverSupport
+                .canonicalSupplementaryGroups(
+                    [0, 20, 20],
+                    effectiveGroupID: 20
+                )
+        }
+        #expect(throws: InvestigationMachineGateError.invalidObservation) {
+            _ = try InvestigationMachineResolvedRootDriverSupport
+                .canonicalSupplementaryGroups(
+                    [0, 80],
+                    effectiveGroupID: 20
+                )
+        }
+        #expect(throws: InvestigationMachineGateError.invalidObservation) {
+            _ = try InvestigationMachineResolvedRootDriverSupport
+                .canonicalSupplementaryGroups(
+                    Array(0...16),
+                    effectiveGroupID: 0
+                )
+        }
     }
 
     @Test(arguments: GateTerminalScenario.allCases)
@@ -268,6 +426,30 @@ struct InvestigationSudoShapedDriverLauncherTests {
             return
         }
         let restore = try index(of: .setForegroundProcessGroup(40), in: events)
+        #expect(events.contains(.closeOutputDescriptor(10)))
+        #expect(events.contains(.closeBorrowedDescriptor(STDIN_FILENO)))
+        #expect(events.contains(.closeOutputDescriptor(STDOUT_FILENO)))
+        #expect(events.last == .closeOutputDescriptor(STDOUT_FILENO))
+        #expect(!events.contains { event in
+            if case .writeTerminalReceipt = event { return true }
+            return false
+        })
+        if point == .collectResolvedRootDriverRetirement {
+            let term = try index(of: .sendTermToChildGroup(41), in: events)
+            let reap = try index(of: .reapExactChild, in: events)
+            let empty = try index(of: .observeEmptyChildGroup, in: events)
+            let retirement = try index(
+                of: .collectResolvedRootDriverRetirement(
+                    try sampleResolvedRootDriverObservation().validation.lineage
+                ),
+                in: events
+            )
+            #expect(restore < term)
+            #expect(term < reap)
+            #expect(reap < empty)
+            #expect(empty < retirement)
+            return
+        }
         let term = try index(of: .sendTermToChildGroup(41), in: events)
         let leaderOnly = try #require(
             events.lastIndex(of: .observeLeaderOnlyChildGroup)
@@ -277,14 +459,6 @@ struct InvestigationSudoShapedDriverLauncherTests {
         #expect(restore < term)
         #expect(leaderOnly < reap)
         #expect(reap < empty)
-        #expect(events.contains(.closeOutputDescriptor(10)))
-        #expect(events.contains(.closeBorrowedDescriptor(STDIN_FILENO)))
-        #expect(events.contains(.closeOutputDescriptor(STDOUT_FILENO)))
-        #expect(events.last == .closeOutputDescriptor(STDOUT_FILENO))
-        #expect(!events.contains { event in
-            if case .writeTerminalReceipt = event { return true }
-            return false
-        })
     }
 
     @Test
@@ -747,8 +921,10 @@ private enum GateFailurePoint: CaseIterable {
     case stopForCoordinator
     case foregroundHandoff
     case observeChildTTY
+    case collectResolvedRootDriverValidation
     case drainOutput
     case observeChildState
+    case collectResolvedRootDriverRetirement
 
     var event: InvestigationMachineGateLauncherEvent {
         switch self {
@@ -760,8 +936,20 @@ private enum GateFailurePoint: CaseIterable {
         case .stopForCoordinator: .stopGateForCoordinator
         case .foregroundHandoff: .setForegroundProcessGroup(41)
         case .observeChildTTY: .observeChildTTY
+        case .collectResolvedRootDriverValidation:
+            .collectResolvedRootDriverValidation(
+                initialLaunch: try! sampleInitialLaunch(),
+                expectedOuterAttemptUUID: sampleAttemptUUID(),
+                expectedWholeInputSHA256: try! sampleWholeInputSHA256(),
+                recoveryProcessGroupID: 41,
+                coordinatorSessionID: 40
+            )
         case .drainOutput: .drainOutput
         case .observeChildState: .observeWaitableChild
+        case .collectResolvedRootDriverRetirement:
+            .collectResolvedRootDriverRetirement(
+                try! sampleResolvedRootDriverObservation().validation.lineage
+            )
         }
     }
 
@@ -786,6 +974,7 @@ private final class GateLauncherRecorder:
     private let settledSpawnFailure: Bool
     private var didInjectFailure = false
     private var didConsumePendingSignal = false
+    private var childGroupEmpty = false
 
     init(
         scenario: GateTerminalScenario = .ordinaryExit,
@@ -821,11 +1010,12 @@ private final class GateLauncherRecorder:
         case .observeLauncherExecutable:
             return .sha256(digest(0x01))
         case .observeInitialInput:
+            let wholeInputSHA256 = try sampleWholeInputSHA256()
             return .inputContext(.init(
                 outerAttemptUUID: UUID(
                     uuidString: "10000000-0000-4000-8000-000000000001"
                 )!,
-                wholeInputSHA256: digest(0x11),
+                wholeInputSHA256: wholeInputSHA256,
                 node: .init(
                     device: 7, inode: 8, generation: 9, size: 1_024
                 ),
@@ -854,9 +1044,26 @@ private final class GateLauncherRecorder:
         case .drainOutput:
             if scenario == .outputFailure { return .outputFailure }
             return .output(.init(
-                byteCount: 512, sha256: digest(0x44),
+                byteCount: 1_190, sha256: digest(0x44),
                 overflowObserved: true
             ))
+        case .collectResolvedRootDriverValidation:
+            return .resolvedRootDriverValidationInput(
+                try sampleResolvedRootDriverValidationInput()
+            )
+        case .collectResolvedRootDriverRetirement:
+            guard childGroupEmpty else { throw GateInjectedFailure() }
+            let observation = try sampleResolvedRootDriverObservation()
+            return .resolvedRootDriverRetirementEnumeration(
+                .init(
+                    isComplete: true,
+                    observations: observation.validation
+                        .lineage
+                        .map {
+                            .init(processID: $0.processID, state: .absent)
+                        }
+                )
+            )
         case .observeWaitableChild:
             if scenario == .timeout, events.contains(.sendKillToChildGroup(41)) {
                 return .waitClassification(.signaled(signal: SIGKILL))
@@ -874,15 +1081,19 @@ private final class GateLauncherRecorder:
                 return .waitClassification(.exited(status: 0))
             }
             return .waitClassification(.signaled(signal: SIGTERM))
+        case .observeEmptyChildGroup:
+            childGroupEmpty = true
+            return .completed
         case .observeCompletion:
             return .nanoseconds(200)
         case .observeFinalInput:
+            let wholeInputSHA256 = try sampleWholeInputSHA256()
             return .input(.init(
                 node: .init(
                     device: 7, inode: 8, generation: 9, size: 1_024
                 ),
                 initialOffset: 0, finalOffset: 1_024, reachedEOF: true,
-                sha256: digest(0x11)
+                sha256: wholeInputSHA256
             ))
         default:
             return .completed
@@ -902,7 +1113,8 @@ private final class GateLauncherRecorder:
 }
 
 private func preparedBytes() throws -> Data {
-    try InvestigationMachineGatePreparedFrame(
+    let wholeInputSHA256 = try sampleWholeInputSHA256()
+    return try InvestigationMachineGatePreparedFrame(
         gateProcessID: 41, coordinatorProcessID: 40, sessionID: 40,
         childProcessID: 52, recoveryProcessGroupID: 41,
         savedForegroundProcessGroupID: 40,
@@ -912,7 +1124,7 @@ private func preparedBytes() throws -> Data {
         outerAttemptUUID: UUID(
             uuidString: "10000000-0000-4000-8000-000000000001"
         )!,
-        wholeInputSHA256: digest(0x11)
+        wholeInputSHA256: wholeInputSHA256
         , capsule: .init(
             device: 7, inode: 8, generation: 9, size: 1_024
         )
@@ -935,9 +1147,10 @@ private func sampleReceipt(
     let attempt = try #require(
         UUID(uuidString: "10000000-0000-4000-8000-000000000001")
     )
+    let wholeInputSHA256 = try sampleWholeInputSHA256()
     return try InvestigationMachineGateTransportReceipt(
         launcherExecutableSHA256: digest(0x01),
-        outerAttemptUUID: attempt, wholeInputSHA256: digest(0x11),
+        outerAttemptUUID: attempt, wholeInputSHA256: wholeInputSHA256,
         preparedFrameSHA256: .hashing(try preparedBytes()),
         capsule: .init(device: 7, inode: 8, generation: 9, size: 1_024),
         gateProcessID: 41, coordinatorProcessID: 40, sessionID: 40,
@@ -946,13 +1159,13 @@ private func sampleReceipt(
         input: .init(
             node: .init(device: 7, inode: 8, generation: 9, size: 1_024),
             initialOffset: 0, finalOffset: 1_024, reachedEOF: true,
-            sha256: digest(0x11)
+            sha256: wholeInputSHA256
         ),
         initialTerminal: tty(foreground: 40),
         childTerminal: tty(foreground: 41),
         finalTerminal: tty(foreground: 40),
         output: .init(
-            byteCount: outputOverflow ? 512 : 4, sha256: digest(0x44),
+            byteCount: outputOverflow ? 1_190 : 4, sha256: digest(0x44),
             overflowObserved: outputOverflow, reachedEOF: outputEOF
         ),
         waitClassification: waitClassification,
@@ -968,6 +1181,207 @@ private func childIdentity() -> InvestigationMachineGateChildIdentity {
     .init(
         processID: 52, parentProcessID: 41, processGroupID: 41,
         sessionID: 40, startSeconds: 12, startMicroseconds: 34
+    )
+}
+
+private func sampleAttemptUUID() -> UUID {
+    UUID(uuidString: "10000000-0000-4000-8000-000000000001")!
+}
+
+private func sampleInitialLaunch() throws
+    -> InvestigationMachineInitialSudoLaunchIdentity
+{
+    try .init(
+        processID: 52, parentProcessID: 41, processGroupID: 41,
+        sessionID: 40, startSeconds: 12, startMicroseconds: 34
+    )
+}
+
+private func sampleResolvedRootDriverObservation() throws
+    -> InvestigationMachineResolvedRootDriverObservation
+{
+    let validation = try InvestigationMachineResolvedRootDriverValidator
+        .validate(sampleResolvedRootDriverValidationInput())
+    let retirement = try InvestigationMachineResolvedRootDriverValidator
+        .verifyRetirement(
+            validation,
+            enumeration: .init(
+                isComplete: true,
+                observations: validation.lineage.map {
+                    .init(processID: $0.processID, state: .absent)
+                }
+            )
+        )
+    return .init(validation: validation, retirement: retirement)
+}
+
+private func sampleWholeInputSHA256() throws -> InvestigationHandoffSHA256 {
+    try sampleProjectedInput().wholeInputSHA256
+}
+
+private func sampleProjectedInput() throws -> InvestigationProjectedCohortInput {
+    let attempt = sampleAttemptUUID()
+    var epochs: [InvestigationCohortEpoch] = []
+    epochs.reserveCapacity(InvestigationProjectedCohortInput.projectionCount)
+    for index in 0..<InvestigationProjectedCohortInput.projectionCount {
+        let ordinal = UInt32(index)
+        let configuration = Data("configuration-\(index)".utf8)
+        let scenario = try #require(
+            InvestigationHandoffScenario(rawValue: ordinal + 1)
+        )
+        let epochUUID = UUID(
+            uuidString: String(
+                format: "20000000-0000-4000-8000-%012d",
+                index + 1
+            )
+        )!
+        let configurationNonce = UUID(
+            uuidString: String(
+                format: "30000000-0000-4000-8000-%012d",
+                index + 1
+            )
+        )!
+        let epoch = try InvestigationCohortEpoch(
+            ordinal: ordinal,
+            epochUUID: epochUUID,
+            scenario: scenario,
+            configurationNonce: configurationNonce,
+            configuration: configuration,
+            configurationSHA256: .hashing(configuration),
+            signedRuntimeBindingSHA256: digest(UInt8(0x60 + index))
+        )
+        epochs.append(epoch)
+    }
+    let capsule = try InvestigationCohortCapsule(
+        outerAttemptUUID: attempt,
+        epochs: epochs
+    )
+    let projections = try capsule.epochs.enumerated().map { index, epoch in
+        try InvestigationInstalledL2IdentityProjection(
+            epochUUID: epoch.epochUUID,
+            configurationNonce: epoch.configurationNonce,
+            configurationValidBefore: .init(
+                rawValue: 2_000_000_000_000_000 + Int64(index)
+            ),
+            configurationSHA256: epoch.configurationSHA256,
+            signedRuntimeBindingSHA256: epoch.signedRuntimeBindingSHA256,
+            appExecutableSHA256: digest(UInt8(0x70 + index)),
+            appBundleIdentifier:
+                InvestigationInstalledL2IdentityProjection
+                .fixedAppBundleIdentifier,
+            helperExecutableSHA256: digest(UInt8(0x80 + index)),
+            helperServiceIdentifier:
+                InvestigationInstalledL2IdentityProjection
+                .fixedHelperServiceIdentifier,
+            machineDriverExecutableSHA256: digest(0x41),
+            machineDriverSigningIdentifier:
+                InvestigationInstalledL2IdentityProjection
+                .fixedMachineDriverSigningIdentifier,
+            machineDriverDesignatedRequirementSHA256: digest(0x31),
+            machineDriverCodeDirectoryHash: Data(repeating: 0x32, count: 20),
+            machineClaimServiceIdentifier:
+                InvestigationInstalledL2IdentityProjection
+                .fixedMachineClaimServiceIdentifier
+        )
+    }
+    return try InvestigationProjectedCohortInput(
+        capsule: capsule,
+        projections: projections
+    )
+}
+
+private func sampleResolvedRootDriverValidationInput() throws
+    -> InvestigationMachineResolvedRootDriverValidationInput
+{
+    let attempt = sampleAttemptUUID()
+    let signing = try InvestigationResolvedRootDriverSigningIdentityV1(
+        signingIdentifier:
+            InvestigationInstalledL2IdentityProjection
+            .fixedMachineDriverSigningIdentifier,
+        designatedRequirementSHA256: digest(0x31),
+        codeDirectoryHash: Data(repeating: 0x32, count: 20),
+        isAdHoc: true
+    )
+    let node = try InvestigationResolvedRootDriverNodeIdentityV1(
+        deviceID: 11, inode: 22, generation: 3, isRegularFile: true,
+        ownerUserID: 0, ownerGroupID: 0, mode: 0o755, linkCount: 1,
+        size: 1_048_576, flags: 0
+    )
+    let initial = try InvestigationGeneralProcessIdentityV1(
+        processID: 52,
+        processIDVersion: 9,
+        startSeconds: 12,
+        startMicroseconds: 34,
+        parentProcessID: 41,
+        processGroupID: 41,
+        sessionID: 40,
+        auditSessionID: 40,
+        auditTokenWords: [0, 0, 0, 0, 0, 52, 40, 9],
+        realUserID: 0,
+        effectiveUserID: 0,
+        savedUserID: 0,
+        realGroupID: 0,
+        effectiveGroupID: 0,
+        savedGroupID: 0,
+        supplementaryGroups: [0]
+    )
+    let driver = try InvestigationGeneralProcessIdentityV1(
+        processID: 61,
+        processIDVersion: 10,
+        startSeconds: 13,
+        startMicroseconds: 35,
+        parentProcessID: 52,
+        processGroupID: 41,
+        sessionID: 40,
+        auditSessionID: 40,
+        auditTokenWords: [0, 0, 0, 0, 0, 61, 40, 10],
+        realUserID: 0,
+        effectiveUserID: 0,
+        savedUserID: 0,
+        realGroupID: 0,
+        effectiveGroupID: 0,
+        savedGroupID: 0,
+        supplementaryGroups: [0]
+    )
+    let executable = try InvestigationResolvedRootDriverExecutableIdentityV1(
+        path: ResolvedRootDriverClaimV1.fixedExecutablePath,
+        node: node,
+        sha256: digest(0x41),
+        staticSigning: signing,
+        liveSigning: signing
+    )
+    let projectedInput = try sampleProjectedInput()
+    let claim = try ResolvedRootDriverClaimV1(
+        outerAttemptUUID: projectedInput.capsule.outerAttemptUUID,
+        wholeInputSHA256: projectedInput.wholeInputSHA256,
+        process: driver,
+        executable: executable,
+        observedAtContinuousNanoseconds: 1_000
+    )
+    return .init(
+        claim: claim,
+        expectedOuterAttemptUUID: attempt,
+        expectedWholeInputSHA256: projectedInput.wholeInputSHA256,
+        initialLaunch: try sampleInitialLaunch(),
+        recoveryProcessGroupID: 41,
+        coordinatorSessionID: 40,
+        lineageEdges: [.init(parent: initial, child: driver)],
+        firstProcessSample: .init(
+            identity: driver,
+            isStopped: true,
+            observedAtContinuousNanoseconds: 999
+        ),
+        secondProcessSample: .init(
+            identity: driver,
+            isStopped: true,
+            observedAtContinuousNanoseconds: 1_001
+        ),
+        fixedExecutableNode: node,
+        fixedExecutableSHA256: executable.sha256,
+        fixedStaticSigning: signing,
+        liveSigning: signing,
+        liveSigningAuditTokenWords: driver.auditTokenWords,
+        projectedCohortInput: projectedInput
     )
 }
 

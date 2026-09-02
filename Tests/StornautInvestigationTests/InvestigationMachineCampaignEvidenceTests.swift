@@ -69,6 +69,8 @@ struct InvestigationMachineCampaignEvidenceTests {
         let bundle = try await CampaignEpochCorpus.productionBundle(projectedInput: projectedInput)
         let transport = try fixture.privilegedTransport(productionBundle: bundle)
 
+        let diagnostic = try InvestigationMachineCampaignDiagnosticEvidenceV1
+            .decode(transport.diagnostic)
         let decoded = try InvestigationMachineEpochEvidenceBundle.decode(transport.bundle)
         let gate = try InvestigationMachineCampaignRawGateReceiptValidator
             .validate(transport.rawGateReceipt,
@@ -77,14 +79,34 @@ struct InvestigationMachineCampaignEvidenceTests {
                 expectedOuterIdentity: fixture.outerIdentity,
                 finalReceipt: transport.finalReceipt)
         let validated = try InvestigationMachineCampaignEpochEvidenceValidator
-            .validate(bundle: transport.bundle, projectedInput: transport.projectedInput)
+            .validate(bundle: transport.bundle,
+                lineageClaimBytes: transport.lineageClaimBytes,
+                projectedInput: transport.projectedInput,
+                outputByteCount: gate.outputByteCount,
+                outputSHA256: gate.outputSHA256)
 
         #expect(decoded.epochs.count == 8)
+        #expect(diagnostic.lineageClaimBytes == transport.lineageClaimBytes)
+        #expect(diagnostic.evidenceBundleBytes == transport.bundle)
         #expect(try decoded.encoded() == transport.bundle)
         #expect(validated.bytes == transport.bundle)
         #expect(gate.preparedFrameSHA256.rawBytes.contains { $0 != 0 })
         #expect(validated.epochs.count == 8)
         #expect(validated.completionBytes == transport.completion)
+        #expect(validated.exactDriverOutputBytes == transport.driverOutput)
+        #expect(validated.lineageClaim.process.processID == 4_101)
+        #expect(transport.lineageClaimBytes.count
+            == ResolvedRootDriverClaimV1.encodedByteCount)
+        #expect(transport.completion.count == 180)
+        #expect(transport.driverOutput.count == 1_190)
+        #expect(transport.driverOutput.prefix(4)
+            == handoffData(UInt32(ResolvedRootDriverClaimV1.encodedByteCount)))
+        let completion = try InvestigationMachineDriverCompletionArtifact
+            .decodeProduction(transport.completion)
+        #expect(completion.lineageClaimSHA256 == .hashing(
+            transport.lineageClaimBytes))
+        #expect(completion.driverEvidenceBundleSHA256 == .hashing(
+            transport.bundle))
         #expect(validated.epochs.map(\.claimEvidenceSHA256) == transport.epochs.map(\.claimEvidenceSHA256))
         #expect(validated.epochs.map(\.helperIdentitySHA256) == transport.epochs.map(\.helperIdentitySHA256))
         #expect(validated.epochs.map(\.completionBindingSHA256) == transport.epochs.map(\.completionBindingSHA256))
@@ -107,7 +129,11 @@ struct InvestigationMachineCampaignEvidenceTests {
         }
         #expect(throws: (any Error).self) {
             _ = try InvestigationMachineCampaignEpochEvidenceValidator.validate(
-                bundle: transport.bundle, projectedInput: transport.projectedInput)
+                bundle: transport.bundle,
+                lineageClaimBytes: transport.lineageClaimBytes,
+                projectedInput: transport.projectedInput,
+                outputByteCount: transport.driverOutput.count,
+                outputSHA256: .hashing(transport.driverOutput))
         }
     }
 
@@ -124,6 +150,30 @@ struct InvestigationMachineCampaignEvidenceTests {
                 expectedWholeInputSHA256: transport.preArm.wholeProjectedInputSHA256,
                 expectedOuterIdentity: fixture.outerIdentity,
                 finalReceipt: transport.finalReceipt)
+        }
+    }
+
+    @Test(arguments: CampaignVerifierJoinMutation.allCases.filter(
+        \.isRootDriverLineageMutation))
+    func swiftValidatorRejectsRootDriverLineageDrift(
+        _ mutation: CampaignVerifierJoinMutation
+    ) throws {
+        let fixture = try CampaignEvidenceDiskFixture.make()
+        defer { fixture.remove() }
+        let transport = try fixture.privilegedTransport(joinMutation: mutation)
+        let gate = try InvestigationMachineCampaignRawGateReceiptValidator
+            .validate(transport.rawGateReceipt,
+                expectedAttemptUUID: transport.preArm.outerAttemptUUID,
+                expectedWholeInputSHA256: transport.preArm.wholeProjectedInputSHA256,
+                expectedOuterIdentity: fixture.outerIdentity,
+                finalReceipt: transport.finalReceipt)
+        #expect(throws: (any Error).self) {
+            _ = try InvestigationMachineCampaignEpochEvidenceValidator.validate(
+                bundle: transport.bundle,
+                lineageClaimBytes: transport.lineageClaimBytes,
+                projectedInput: transport.projectedInput,
+                outputByteCount: gate.outputByteCount,
+                outputSHA256: gate.outputSHA256)
         }
     }
 
@@ -953,8 +1003,16 @@ struct InvestigationMachineCampaignEvidenceTests {
     @Test(arguments: CampaignDiagnosticMutation.allCases)
     func independentVerifierRejectsNoncanonicalDiagnosticEnvelope(
         _ mutation: CampaignDiagnosticMutation) throws {
-        let result = try privilegedVerifierResult(
-            diagnosticMutation: mutation, sealName: "diagnostic-seal.json")
+        let fixture = try CampaignEvidenceDiskFixture.make()
+        defer { fixture.remove() }
+        let transport = try fixture.privilegedTransport(
+            diagnosticMutation: mutation)
+        #expect(throws: (any Error).self) {
+            _ = try InvestigationMachineCampaignDiagnosticEvidenceV1
+                .decode(transport.diagnostic)
+        }
+        let result = try privilegedVerifierResult(fixture: fixture,
+            transport: transport, sealName: "diagnostic-seal.json")
         #expect(result.status != 0)
     }
 
@@ -1309,9 +1367,29 @@ enum CampaignEpochPrefixMutation: CaseIterable {
 enum CampaignVerifierJoinMutation: CaseIterable {
     case sourcePreArm, epochWholeInput, ownershipEncoding, claimEvidence, helperIdentity, completionBinding, rawPreparedFrame
     case rawGateStartEnvelope, rawGateCompletionEnvelope, rawCoordinatorIdentity
+    case rootClaimLength, rootClaimCanonical, rootClaimAttempt, rootClaimWholeInput
+    case rootClaimProcessID, rootClaimExecutableSHA, completionLineage
+    case completionBundle, rawOutputDigest
+}
+
+extension CampaignVerifierJoinMutation {
+    var isRootDriverLineageMutation: Bool {
+        switch self {
+        case .rootClaimLength, .rootClaimCanonical, .rootClaimAttempt,
+             .rootClaimWholeInput, .rootClaimProcessID,
+             .rootClaimExecutableSHA, .completionLineage, .completionBundle,
+             .rawOutputDigest:
+            true
+        default:
+            false
+        }
+    }
 }
 enum CampaignRawGateMutation: CaseIterable { case preparedFrameDigest, enclosingStart, enclosingCompletion, coordinatorIdentity }
-enum CampaignDiagnosticMutation: CaseIterable { case leadingBytes, trailingBytes, missingNewline, carriageReturnLineFeed }
+enum CampaignDiagnosticMutation: CaseIterable {
+    case leadingBytes, trailingBytes, missingNewline, carriageReturnLineFeed
+    case duplicateClaim, emptyClaim
+}
 enum CampaignEpochSemanticMutation: CaseIterable {
     case driverChildNonRoot, driverChildNonRootGroup, driverChildNonRootRealUser
     case driverChildNonRootRealGroup, driverChildAuditTokenMismatch
@@ -1334,7 +1412,7 @@ private struct CampaignPrivilegedTransport {
     let finalReceipt: InvestigationMachineCoordinatorRawReceiptV1
     let rawGateReceipt: Data
     let projectedInput: InvestigationProjectedCohortInput
-    let bundle, completion: Data
+    let bundle, lineageClaimBytes, completion, driverOutput: Data
     let epochs: [CampaignEpochArtifactRow]
 
     var preArmFrameSHA256: InvestigationHandoffSHA256 { preArm.frameSHA256 }
@@ -2254,12 +2332,52 @@ private final class CampaignEvidenceDiskFixture {
                 with: Data("not-canonical-ownership".utf8))
         }
         let bundle = productionBundle ?? corpus.bundle
+        let claimAttempt = joinMutation == .rootClaimAttempt
+            ? CampaignEvidenceFixture.uuid(0xee) : attemptUUID
+        let claimWhole = joinMutation == .rootClaimWholeInput
+            ? digest(0xef) : projected.wholeInputSHA256
+        let claimPID: UInt32 = joinMutation == .rootClaimProcessID ? 4_102 : 4_101
+        let signing = try InvestigationResolvedRootDriverSigningIdentityV1(
+            signingIdentifier: ResolvedRootDriverClaimV1.fixedSigningIdentifier,
+            designatedRequirementSHA256: digest(0x74),
+            codeDirectoryHash: Data(repeating: 0x75, count: 20), isAdHoc: true)
+        let claim = try ResolvedRootDriverClaimV1(
+            outerAttemptUUID: claimAttempt, wholeInputSHA256: claimWhole,
+            process: .init(processID: claimPID, processIDVersion: 41,
+                startSeconds: 10, startMicroseconds: 20, parentProcessID: 4_001,
+                processGroupID: 4_001, sessionID: 3_901, auditSessionID: 3_901,
+                auditTokenWords: [0, 0, 0, 0, 0, claimPID, 3_901, 41],
+                realUserID: 0, effectiveUserID: 0, savedUserID: 0,
+                realGroupID: 0, effectiveGroupID: 0, savedGroupID: 0,
+                supplementaryGroups: [0]),
+            executable: .init(path: ResolvedRootDriverClaimV1.fixedExecutablePath,
+                node: .init(deviceID: 101, inode: 202, generation: 3,
+                    isRegularFile: true, ownerUserID: 0, ownerGroupID: 0,
+                    mode: 0o755, linkCount: 1, size: 1_024, flags: 0),
+                sha256: joinMutation == .rootClaimExecutableSHA
+                    ? digest(0xee) : digest(0x73),
+                staticSigning: signing, liveSigning: signing),
+            observedAtContinuousNanoseconds: 9)
+        var claimBytes = try claim.encoded()
+        if joinMutation == .rootClaimCanonical { claimBytes[claimBytes.count - 1] ^= 1 }
+        var completion = fixed[0] + fixed[1] + fixed[2] + handoffData(UInt32(8))
+            + (joinMutation == .completionLineage
+                ? digest(0xef) : .hashing(claimBytes)).rawBytes
+            + (joinMutation == .completionBundle
+                ? digest(0xee) : .hashing(bundle)).rawBytes
+            + Data(repeating: 0, count: 32)
+        completion.replaceSubrange(148..<180, with:
+            InvestigationHandoffSHA256.hashing(completion).rawBytes)
+        let claimedLength: UInt32 = joinMutation == .rootClaimLength ? 1_005 : 1_006
+        let driverOutput = handoffData(claimedLength) + claimBytes + completion
         let epochs = try productionBundle.map { bundle in
             try InvestigationMachineCampaignEpochEvidenceValidator.validate(
-                bundle: bundle, projectedInput: projected).epochs.map(
-                    CampaignEpochArtifactRow.init)
+                bundle: bundle, lineageClaimBytes: try claim.encoded(),
+                projectedInput: projected, outputByteCount: 1_190,
+                outputSHA256: .hashing(handoffData(UInt32(1_006))
+                    + (try claim.encoded()) + completion)).epochs.map(
+                        CampaignEpochArtifactRow.init)
         } ?? corpus.epochs.map(CampaignEpochArtifactRow.init)
-        let completion = try selfBoundTranscript("stornaut.task39.machine.driver-completion-v2", fixed + [handoffData(UInt32(8)), InvestigationHandoffSHA256.hashing(bundle).rawBytes], maximum: 512)
         let node = InvestigationMachineGateNodeObservation(device: 101, inode: 102, generation: 103, size: Int64(projectedBytes.count))
         let tty = { (foreground: pid_t) in InvestigationMachineGateTerminalObservation(device: 9, inode: 10, foregroundProcessGroupID: foreground) }
         let gateStarted: UInt64 = 20
@@ -2281,10 +2399,12 @@ private final class CampaignEvidenceDiskFixture {
             capsule: node, gateProcessID: 4_001, coordinatorProcessID: outerPID, sessionID: outerPID, recoveryProcessGroupID: 4_001, savedForegroundProcessGroupID: outerPID,
             childIdentity: .init(processID: 4_101, parentProcessID: 4_001, processGroupID: 4_001, sessionID: outerPID, startSeconds: 1, startMicroseconds: 2),
             input: .init(node: node, initialOffset: 0, finalOffset: Int64(projectedBytes.count), reachedEOF: true, sha256: projected.wholeInputSHA256),
-            initialTerminal: tty(outerPID), childTerminal: tty(4_001), finalTerminal: tty(outerPID), output: .init(byteCount: completion.count, sha256: .hashing(completion), overflowObserved: false),
+            initialTerminal: tty(outerPID), childTerminal: tty(4_001), finalTerminal: tty(outerPID), output: .init(byteCount: driverOutput.count, sha256: joinMutation == .rawOutputDigest ? digest(0xef) : .hashing(driverOutput), overflowObserved: false),
             waitClassification: .exited(status: 0), forwardedSignal: nil, monotonicStartedNanoseconds: gateStarted, monotonicCompletedNanoseconds: gateCompleted, terminationProgression: .natural, childProcessGroupEmpty: true, exactChildReaped: true, savedForegroundProcessGroupRestored: true, borrowedDescriptorOutcome: .closed).encoded()
         let final = try CampaignCoordinatorReceiptFixture.frame(attemptUUID: attemptUUID, capsuleSize: Int64(projectedBytes.count), buildProvenanceSHA256: sourceBinding.buildProvenanceSHA256.lowercaseHex, signedBindingSHA256: sourceBinding.signedRuntimeBindingSHA256, wholeInputSHA256: projected.wholeInputSHA256, gateTransportReceiptSHA256: .hashing(raw), gateSessionID: outerPID, monotonicStartedNanoseconds: rawGateMutation == .enclosingStart ? gateStarted : 10, monotonicCompletedNanoseconds: rawGateMutation == .enclosingCompletion ? gateCompleted : 40)
-        let canonicalDiagnostic = Data(("STORNAUT_TASK39_IIC_EPOCH_BUNDLE_V1 "
+        let canonicalDiagnostic = Data(("STORNAUT_TASK39_IIC_ROOT_DRIVER_CLAIM_V1 "
+            + claimBytes.base64EncodedString() + "\n"
+            + "STORNAUT_TASK39_IIC_EPOCH_BUNDLE_V1 "
             + bundle.base64EncodedString() + "\n").utf8)
         let diagnostic = switch diagnosticMutation {
         case .leadingBytes: Data("noise\n".utf8) + canonicalDiagnostic
@@ -2292,6 +2412,14 @@ private final class CampaignEvidenceDiskFixture {
         case .missingNewline: Data(canonicalDiagnostic.dropLast())
         case .carriageReturnLineFeed:
             Data(canonicalDiagnostic.dropLast()) + Data("\r\n".utf8)
+        case .duplicateClaim:
+            Data(("STORNAUT_TASK39_IIC_ROOT_DRIVER_CLAIM_V1 "
+                + claimBytes.base64EncodedString() + "\n").utf8)
+                + canonicalDiagnostic
+        case .emptyClaim:
+            Data("STORNAUT_TASK39_IIC_ROOT_DRIVER_CLAIM_V1 \n".utf8)
+                + Data(("STORNAUT_TASK39_IIC_EPOCH_BUNDLE_V1 "
+                    + bundle.base64EncodedString() + "\n").utf8)
         case nil: canonicalDiagnostic
         }
         return .init(
@@ -2301,7 +2429,8 @@ private final class CampaignEvidenceDiskFixture {
             finalReceipt: try InvestigationMachineCoordinatorRawReceiptV1
                 .decodeFrame(final, reachedEOF: true),
             rawGateReceipt: raw, projectedInput: projected, bundle: bundle,
-            completion: completion, epochs: epochs)
+            lineageClaimBytes: claimBytes, completion: completion,
+            driverOutput: driverOutput, epochs: epochs)
     }
 
     private func rawGateMutation(

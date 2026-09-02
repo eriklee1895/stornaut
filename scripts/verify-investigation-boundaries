@@ -361,6 +361,14 @@ iic_lineage_l1_mutation_sha=
 iic_lineage_l1_sources=()
 iic_lineage_l1_scope_contract_only=false
 iic_lineage_l1_scope_baseline=0815ee26624f83520e30ce68aa54396761c14566
+iic_lineage_l2_source_contract_only=false
+iic_lineage_l2_mutation_contract_only=false
+iic_lineage_l2_mutation_name=
+iic_lineage_l2_mutation_slot=
+iic_lineage_l2_mutation_sha=
+iic_lineage_l2_sources=()
+iic_lineage_l2_scope_contract_only=false
+iic_lineage_l2_scope_baseline=cd8fc5d8645a8d40fb7571e4be41b8b9d1a70725
 iic0bivb1_handoff_contract_only=false
 iic0bivb1_fixture_source=
 iic0bivb1_physical_test_source=
@@ -969,6 +977,21 @@ if (( $# > 0 )); then
         && [[ $1 == --iic-root-driver-lineage-l1-staged-scope-contract-only ]]; then
         iic_lineage_l1_scope_contract_only=true
         iic_lineage_l1_scope_baseline=${2:-0815ee26624f83520e30ce68aa54396761c14566}
+    elif (( $# == 1 || $# == 16 )) \
+        && [[ $1 == --iic-root-driver-lineage-l2-source-contract-only ]]; then
+        iic_lineage_l2_source_contract_only=true
+        iic_lineage_l2_sources=("${@:2}")
+    elif (( $# == 19 )) \
+        && [[ $1 == --iic-root-driver-lineage-l2-mutation-contract-only ]]; then
+        iic_lineage_l2_mutation_contract_only=true
+        iic_lineage_l2_mutation_name=$2
+        iic_lineage_l2_mutation_slot=$3
+        iic_lineage_l2_mutation_sha=$4
+        iic_lineage_l2_sources=("${@:5}")
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iic-root-driver-lineage-l2-staged-scope-contract-only ]]; then
+        iic_lineage_l2_scope_contract_only=true
+        iic_lineage_l2_scope_baseline=${2:-cd8fc5d8645a8d40fb7571e4be41b8b9d1a70725}
     elif (( $# == 4 )) \
         && [[ $1 == --iic0b-iv-b1-handoff-contract-only ]]; then
         iic0bivb1_handoff_contract_only=true
@@ -11983,6 +12006,174 @@ function verify_iic_root_driver_lineage_l1_staged_scope() {
     done
 }
 
+function verify_iic_root_driver_lineage_l2_source_contract() {
+    local -a paths=("${iic_lineage_l2_sources[@]}")
+    if (( ${#paths} == 0 )); then paths=(
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineZeroArgumentEntry.swift
+        Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift
+        Sources/StornautInvestigationMachineGateSupport/InvestigationMachineGateTransport.swift
+        Sources/StornautInvestigationMachineGateSupport/InvestigationMachineFixedGateLauncher.swift
+        Sources/StornautInvestigationMachineGateSupport/DarwinInvestigationMachineFixedGateSystem.swift
+        Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignEvidenceContract.swift
+        Sources/StornautInvestigationMachineCampaign/main.swift
+        Tests/StornautInvestigationTests/InvestigationMachineZeroArgumentEntryTests.swift
+        Tests/StornautInvestigationTests/InvestigationSudoShapedDriverLauncherTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift
+        Tests/StornautInvestigationTests/InvestigationFixedGateHandoffPhysicalTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-investigation-runtime-machine-report
+        scripts/verify-investigation-boundaries scripts/verify-contract
+    ); fi
+    /usr/bin/python3 -I - "$iic_lineage_l2_mutation_contract_only" \
+        "$iic_lineage_l2_mutation_name" "$iic_lineage_l2_mutation_slot" \
+        "$iic_lineage_l2_mutation_sha" "${paths[@]}" <<'PY'
+from pathlib import Path
+import hashlib, re, sys
+mode, name, slot, sha = sys.argv[1:5]
+slots = ("entry","coordinator","transport","launcher","darwin","evidence",
+         "campaign","entry_tests","launcher_tests","evidence_tests",
+         "physical_tests","boundary_tests","report","boundary","contract_gate")
+canonical_arguments = (
+ "Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineZeroArgumentEntry.swift",
+ "Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift",
+ "Sources/StornautInvestigationMachineGateSupport/InvestigationMachineGateTransport.swift",
+ "Sources/StornautInvestigationMachineGateSupport/InvestigationMachineFixedGateLauncher.swift",
+ "Sources/StornautInvestigationMachineGateSupport/DarwinInvestigationMachineFixedGateSystem.swift",
+ "Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignEvidenceContract.swift",
+ "Sources/StornautInvestigationMachineCampaign/main.swift",
+ "Tests/StornautInvestigationTests/InvestigationMachineZeroArgumentEntryTests.swift",
+ "Tests/StornautInvestigationTests/InvestigationSudoShapedDriverLauncherTests.swift",
+ "Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift",
+ "Tests/StornautInvestigationTests/InvestigationFixedGateHandoffPhysicalTests.swift",
+ "Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift",
+ "scripts/verify-investigation-runtime-machine-report",
+ "scripts/verify-investigation-boundaries", "scripts/verify-contract")
+source_arguments=tuple(sys.argv[5:]); canonical_paths=tuple(map(Path,canonical_arguments))
+paths=tuple(map(Path,source_arguments));
+if len(paths)!=15: raise SystemExit("ii-c root-driver lineage L2 source cardinality drifted")
+mutations={
+ "entry-prebind-drop":("entry","do { boundPlan = try await dependencies.prebindPlan(plan) }","do { boundPlan = try await dependencies.prebindPlan(plan); throw InvestigationMachineZeroArgumentEntryError.invalidInput }"),
+ "coordinator-output-count-vacuity":("coordinator","return 4 + ResolvedRootDriverClaimV1.encodedByteCount + 180","return 180"),
+ "transport-validation-event-drop":("transport","case collectResolvedRootDriverValidation(","case disabledCollectResolvedRootDriverValidation("),
+ "darwin-self-stop-drop":("darwin","guard raise(SIGSTOP) == 0 else { throw containment() }","guard true else { throw containment() }"),
+ "launcher-business-continuation-drop":("launcher","try InvestigationMachineResolvedRootDriverValidator.validate(\n                    resolvedValidationInput\n                )\n            try completed(system.perform(.continueChildGroup(observedGroup)))","try InvestigationMachineResolvedRootDriverValidator.validate(\n                    resolvedValidationInput\n                )\n            try completed(system.perform(.sendTermToChildGroup(observedGroup)))"),
+ "evidence-lineage-join-drop":("evidence","lineageClaim.wholeInputSHA256 == projectedInput.wholeInputSHA256,","true,"),
+ "campaign-output-digest-drop":("campaign","gate.outputSHA256","gate.inputSHA256"),
+ "report-output-digest-drop":("report","and raw[\"outputSHA\"] == hashlib.sha256(output).digest(),","and True,"),
+}
+for path in paths:
+    if path.is_symlink() or not path.is_file():
+        raise SystemExit("ii-c root-driver lineage L2 source path identity drifted")
+sources=dict(zip(slots,(p.read_text() for p in paths))); canonical=dict(zip(slots,(p.read_text() for p in canonical_paths)))
+if mode=="true":
+    if name not in mutations or slot!=mutations[name][0] or not re.fullmatch(r"[0-9a-f]{64}",sha): raise SystemExit("ii-c root-driver lineage L2 mutation identity drifted")
+    mutation_index=slots.index(slot)
+    if any(argument != canonical_arguments[index]
+           for index,argument in enumerate(source_arguments)
+           if index != mutation_index) \
+            or source_arguments[mutation_index] == canonical_arguments[mutation_index]:
+        raise SystemExit("ii-c root-driver lineage L2 source path identity drifted")
+    old,new=mutations[name][1:]; changed=[s for s in slots if sources[s]!=canonical[s]]
+    if changed!=[slot] or canonical[slot].count(old)!=1 or sources[slot]!=canonical[slot].replace(old,new,1): raise SystemExit("ii-c root-driver lineage L2 mutation contract drifted")
+    if hashlib.sha256(paths[slots.index(slot)].read_bytes()).hexdigest()!=sha: raise SystemExit("ii-c root-driver lineage L2 mutation SHA drifted")
+elif mode!="false" or name or slot or sha: raise SystemExit("ii-c root-driver lineage L2 mutation mode drifted")
+elif source_arguments!=canonical_arguments or sources!=canonical:
+    raise SystemExit("ii-c root-driver lineage L2 canonical source paths drifted")
+for marker in ("do { boundPlan = try await dependencies.prebindPlan(plan) }",
+               "firstSelection","observeInstalledDriver"):
+    if marker not in sources["entry"]: raise SystemExit("ii-c root-driver lineage L2 entry state machine drifted")
+for marker in ("InvestigationMachineResolvedRootDriverObservation","collectResolvedRootDriverValidation","collectResolvedRootDriverRetirement"):
+    if marker not in sources["transport"]: raise SystemExit("ii-c root-driver lineage L2 transport closure drifted")
+if ("return 4 + ResolvedRootDriverClaimV1.encodedByteCount + 180" not in sources["coordinator"]
+        or "stornaut.task39.machine.driver-completion-v2" in sources["coordinator"]):
+    raise SystemExit("ii-c root-driver lineage L2 coordinator output boundary drifted")
+if "guard raise(SIGSTOP) == 0 else { throw containment() }" not in sources["darwin"]:
+    raise SystemExit("ii-c root-driver lineage L2 self-stop drifted")
+if "system.perform(.continueChildGroup(observedGroup))" not in sources["launcher"]:
+    raise SystemExit("ii-c root-driver lineage L2 validated continuation drifted")
+validation = sources["launcher"].find(
+    "InvestigationMachineResolvedRootDriverValidator.validate(")
+continuations = [m.start() for m in re.finditer(
+    re.escape("system.perform(.continueChildGroup(observedGroup))"),
+    sources["launcher"])]
+if len(continuations) != 2 or not continuations[0] < validation < continuations[1]:
+    raise SystemExit("ii-c root-driver lineage L2 continuation order drifted")
+for marker in ("ResolvedRootDriverClaimV1.decode",
+               "lineageClaim.wholeInputSHA256 == projectedInput.wholeInputSHA256",
+               "exactDriverOutputBytes"):
+    if marker not in sources["evidence"]: raise SystemExit("ii-c root-driver lineage L2 evidence composition drifted")
+if "gate.outputSHA256" not in sources["campaign"]:
+    raise SystemExit("ii-c root-driver lineage L2 receipt digest join drifted")
+required_test_markers={
+ "entry_tests":(
+  "func completionArtifactMatchesFixed180ByteV3Layout() throws {",
+  "func outerRoleWritesFramedClaimBeforeBusinessAndThenCompletionV3() async throws {",
+  "#expect(framedClaim.count + stdoutCompletion.count == 1_190)",
+  "func failureBeforeOutputCommitsNoArtifact("),
+ "launcher_tests":(
+  "func launcherValidatesBootstrapBeforeBusinessContinuation() throws {",
+  "#expect(firstContinue < validation)",
+  "#expect(validation < secondContinue)",
+  "func resolvedRootValidationRejectsSameSignedWrongLiveExecutablePath() throws {",
+  "func resolvedRootValidationRequiresAuditTokenBoundExecutablePathReads()"),
+ "evidence_tests":(
+  "func productionEpochCorpusRoundTripsThroughAllIndependentDecoders() async throws {",
+  "#expect(validated.exactDriverOutputBytes == transport.driverOutput)",
+  "func swiftValidatorRejectsRootDriverLineageDrift(",
+  "func independentVerifierRejectsSemanticallyForgedCanonicalCorpus() throws {"),
+ "physical_tests":(
+  "func userOwnedTemporaryGateFailsClosedBeforeSpawn() throws {",
+  '"InvestigationResolvedRootDriverLineageContract",',
+  '"InvestigationMachineResolvedRootDriverValidator",',
+  '] + objects + [cIdentityObject.path, "-lbsm", "-o", coordinator.path]'),
+}
+for slot_name,markers in required_test_markers.items():
+    if any(sources[slot_name].count(marker)!=1 for marker in markers):
+        raise SystemExit("ii-c root-driver lineage L2 focused tests became vacuous: "+slot_name)
+if ('and raw["outputSHA"] == hashlib.sha256(output).digest(),' not in sources["report"]
+        or "Gate output completion binding" not in sources["report"]):
+    raise SystemExit("ii-c root-driver lineage L2 independent replay drifted")
+for marker in ("--iic-root-driver-lineage-l2-source-contract-only",
+               "--iic-root-driver-lineage-l2-mutation-contract-only",
+               "--iic-root-driver-lineage-l2-staged-scope-contract-only",
+               "--iic-root-driver-lineage-l2-contract-only"):
+    if marker not in sources["boundary_tests"]+sources["boundary"]+sources["contract_gate"]:
+        raise SystemExit("ii-c root-driver lineage L2 verifier wiring drifted")
+if "verify_iic_root_driver_lineage_l2_component_boundary" in sources["contract_gate"]:
+    raise SystemExit("ii-c root-driver lineage L2 duplicated component verification")
+PY
+}
+
+function verify_iic_root_driver_lineage_l2_staged_scope() {
+    local -x PATH=/usr/bin:/bin:/usr/sbin:/sbin
+    local baseline=${1:-$iic_lineage_l2_scope_baseline}
+    local expected_baseline=cd8fc5d8645a8d40fb7571e4be41b8b9d1a70725
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" == $expected_baseline ]] || { print -u2 "ii-c root-driver lineage L2 checkpoint baseline drifted"; return 1; }
+    local -A ceilings=(
+        Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineZeroArgumentEntry.swift 950 Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift 30
+        Sources/StornautInvestigationMachineGateSupport/InvestigationMachineGateTransport.swift 320 Sources/StornautInvestigationMachineGateSupport/InvestigationMachineFixedGateLauncher.swift 300 Sources/StornautInvestigationMachineGateSupport/DarwinInvestigationMachineFixedGateSystem.swift 650
+        Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignEvidenceContract.swift 250 Sources/StornautInvestigationMachineCampaign/main.swift 180
+        Tests/StornautInvestigationTests/InvestigationMachineZeroArgumentEntryTests.swift 800 Tests/StornautInvestigationTests/InvestigationSudoShapedDriverLauncherTests.swift 550 Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift 400 Tests/StornautInvestigationTests/InvestigationFixedGateHandoffPhysicalTests.swift 60 Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift 60
+        scripts/verify-investigation-runtime-machine-report 300 scripts/verify-investigation-boundaries 350 scripts/verify-contract 200)
+    local -a expected=(${(k)ceilings}) observed
+    local text checkpoint_path add delete total=0 mode entry
+    [[ -z "$(git diff --cached --name-only --diff-filter=D "$baseline" -- | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')" ]] || { print -u2 "ii-c root-driver lineage L2 checkpoint deleted an existing path"; return 1; }
+    text=$(git diff --cached --name-only --diff-filter=ACMR "$baseline" -- | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"'); observed=(${(f)text})
+    (( ${#expected}==15 && ${#observed}==15 )) && [[ "${(j:\n:)${(@on)observed}}" == "${(j:\n:)${(@on)expected}}" ]] || { print -u2 "ii-c root-driver lineage L2 checkpoint paths drifted"; return 1; }
+    while IFS=$'\t' read -r add delete checkpoint_path; do [[ $checkpoint_path == docs/* || $checkpoint_path == AGENTS.md || $checkpoint_path == README.md ]] && continue; [[ $add != - && $delete != - ]] || { print -u2 "ii-c root-driver lineage L2 binary checkpoint path rejected: $checkpoint_path"; return 1; }; (( add+delete<=ceilings[$checkpoint_path] )) || { print -u2 "ii-c root-driver lineage L2 path budget drifted: $checkpoint_path"; return 1; }; (( total+=add+delete )); done <<< "$(git diff --cached --numstat "$baseline" --)"
+    (( total<=3950 )) || { print -u2 "ii-c root-driver lineage L2 aggregate budget drifted"; return 1; }
+    for checkpoint_path in "${expected[@]}"; do
+        mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
+        entry=$(git ls-files -s -- "$checkpoint_path")
+        [[ "$(print -r -- "$entry"|awk '{print $1,$3,$4}')" == "$mode 0 $checkpoint_path" ]] || { print -u2 "ii-c root-driver lineage L2 staged source/mode drifted: $checkpoint_path"; return 1; }
+    done
+    [[ -z "$(git diff --name-only --diff-filter=ACMRD -- | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')" && -z "$(git ls-files --others --exclude-standard -- | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')" ]] || { print -u2 "ii-c root-driver lineage L2 index/worktree drifted"; return 1; }
+    for checkpoint_path in "${expected[@]}"; do
+        entry=$(git ls-files -s -- "$checkpoint_path")
+        [[ "$(print -r -- "$entry"|awk '{print $2}')" == "$(git hash-object -- "$checkpoint_path")" ]] || { print -u2 "ii-c root-driver lineage L2 staged/worktree blob drifted: $checkpoint_path"; return 1; }
+    done
+}
+
 function verify_iicc_source_contract() {
     local -a p=("${iicc_source_contract_sources[@]}")
     if (( ${#p} == 0 )); then p=(
@@ -16720,6 +16911,17 @@ if $iic_lineage_l1_scope_contract_only; then
     verify_iic_root_driver_lineage_l1_staged_scope \
         "$iic_lineage_l1_scope_baseline"
     print "ii-c root-driver lineage L1 staged scope verification passed."
+    exit 0
+fi
+if $iic_lineage_l2_source_contract_only || $iic_lineage_l2_mutation_contract_only; then
+    verify_iic_root_driver_lineage_l2_source_contract
+    print "ii-c root-driver lineage L2 source contract verification passed."
+    exit 0
+fi
+if $iic_lineage_l2_scope_contract_only; then
+    verify_iic_root_driver_lineage_l2_staged_scope \
+        "$iic_lineage_l2_scope_baseline"
+    print "ii-c root-driver lineage L2 staged scope verification passed."
     exit 0
 fi
 if $iicc_source_contract_only || $iicc_source_mutation_contract_only; then

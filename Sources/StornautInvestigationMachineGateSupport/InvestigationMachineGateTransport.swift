@@ -1,6 +1,8 @@
 // Package-closed transport for the authority-free machine gate.
+import CInvestigationIdentitySupport
 import Darwin
 import Foundation
+import Security
 import StornautInvestigationHandoffContract
 
 package enum InvestigationMachineFixedGateContract {
@@ -18,8 +20,10 @@ package enum InvestigationMachineFixedGateContract {
     package static let requiredUserID: uid_t = 501
     package static let requiredGroupID: gid_t = 20
     package static let deadlineNanoseconds: UInt64 = 1_200_000_000_000
-    package static let maximumCapturedOutputByteCount = 512
-    package static let maximumReadOutputByteCount = 513
+    package static let maximumCapturedOutputByteCount =
+        4 + ResolvedRootDriverClaimV1.encodedByteCount + 180
+    package static let maximumReadOutputByteCount =
+        maximumCapturedOutputByteCount + 1
     package static let forwardedSignals: [Int32] = [
         SIGHUP, SIGINT, SIGQUIT, SIGTERM,
     ]
@@ -192,6 +196,279 @@ package struct InvestigationMachineGateOutputObservation: Equatable, Sendable {
         self.reachedEOF = reachedEOF
         self.deadlineExpired = deadlineExpired
     }
+}
+
+package struct InvestigationMachineResolvedRootDriverObservation:
+    Equatable,
+    Sendable
+{
+    package let validation:
+        InvestigationMachineResolvedRootDriverValidationResult
+    package let retirement:
+        InvestigationMachineResolvedRootDriverRetirementResult
+
+    package init(
+        validation: InvestigationMachineResolvedRootDriverValidationResult,
+        retirement: InvestigationMachineResolvedRootDriverRetirementResult
+    ) {
+        self.validation = validation
+        self.retirement = retirement
+    }
+}
+
+private let investigationMachineGateAdHocFlag: UInt32 = 0x0002
+
+package enum InvestigationMachineResolvedRootDriverSupport {
+    package static func generalProcessIdentity(processID: pid_t) throws
+        -> InvestigationGeneralProcessIdentityV1
+    {
+        guard processID > 1 else { throw InvestigationMachineGateError.invalidObservation }
+        var narrow = stornaut_investigation_identity()
+        let narrowStatus = stornaut_investigation_identity_for_pid(processID, &narrow)
+        guard narrowStatus == 0 else {
+            if narrowStatus == ESRCH {
+                throw InvestigationMachineGateError.invalidObservation
+            }
+            throw InvestigationMachineGateError.containmentUncertain
+        }
+        var snapshot = stornaut_investigation_process_snapshot()
+        let snapshotStatus = stornaut_investigation_process_snapshot_for_pid(
+            processID,
+            &snapshot
+        )
+        guard snapshotStatus == 0 else {
+            if snapshotStatus == ESRCH {
+                throw InvestigationMachineGateError.invalidObservation
+            }
+            throw InvestigationMachineGateError.containmentUncertain
+        }
+        let tokenWords = withUnsafeBytes(of: narrow.audit_token_words) { bytes in
+            Array(bytes.bindMemory(to: UInt32.self))
+        }
+        let groups = withUnsafeBytes(of: snapshot.supplementary_groups) { bytes in
+            Array(bytes.bindMemory(to: gid_t.self))
+        }
+        let groupCount = Int(snapshot.supplementary_group_count)
+        let sessionID = getsid(processID)
+        guard
+            tokenWords.count == 8,
+            groupCount > 0,
+            groupCount <= groups.count,
+            sessionID > 0
+        else { throw InvestigationMachineGateError.containmentUncertain }
+        let resolvedProcessID = UInt32(snapshot.process_id)
+        let resolvedProcessIDVersion = UInt32(narrow.process_id_version)
+        let resolvedStartSeconds = Int64(snapshot.start_time_seconds)
+        let resolvedStartMicroseconds = Int32(snapshot.start_time_microseconds)
+        let resolvedParentProcessID = UInt32(snapshot.parent_process_id)
+        let resolvedProcessGroupID = UInt32(snapshot.process_group_id)
+        let resolvedSessionID = UInt32(sessionID)
+        let resolvedAuditSessionID = UInt32(narrow.audit_session_id)
+        let resolvedRealUserID = UInt32(snapshot.real_user_id)
+        let resolvedEffectiveUserID = UInt32(snapshot.effective_user_id)
+        let resolvedSavedUserID = UInt32(snapshot.saved_user_id)
+        let resolvedRealGroupID = UInt32(snapshot.real_group_id)
+        let resolvedEffectiveGroupID = UInt32(snapshot.effective_group_id)
+        let resolvedSavedGroupID = UInt32(snapshot.saved_group_id)
+        let supplementaryGroups = try canonicalSupplementaryGroups(
+            Array(groups[0..<groupCount]).map { UInt32($0) },
+            effectiveGroupID: resolvedEffectiveGroupID
+        )
+        return try InvestigationGeneralProcessIdentityV1(
+            processID: resolvedProcessID,
+            processIDVersion: resolvedProcessIDVersion,
+            startSeconds: resolvedStartSeconds,
+            startMicroseconds: resolvedStartMicroseconds,
+            parentProcessID: resolvedParentProcessID,
+            processGroupID: resolvedProcessGroupID,
+            sessionID: resolvedSessionID,
+            auditSessionID: resolvedAuditSessionID,
+            auditTokenWords: tokenWords,
+            realUserID: resolvedRealUserID,
+            effectiveUserID: resolvedEffectiveUserID,
+            savedUserID: resolvedSavedUserID,
+            realGroupID: resolvedRealGroupID,
+            effectiveGroupID: resolvedEffectiveGroupID,
+            savedGroupID: resolvedSavedGroupID,
+            supplementaryGroups: supplementaryGroups
+        )
+    }
+
+    package static func liveExecutablePath(auditTokenWords: [UInt32]) throws
+        -> String
+    {
+        var token = try auditToken(auditTokenWords: auditTokenWords)
+        var path = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+        let count = withUnsafeMutablePointer(to: &token) {
+            proc_pidpath_audittoken($0, &path, UInt32(path.count))
+        }
+        guard count > 0, count < path.count,
+              let executable = String(
+                validating: path.prefix(Int(count)).map(UInt8.init(bitPattern:)),
+                as: UTF8.self
+              )
+        else {
+            throw InvestigationMachineGateError.invalidObservation
+        }
+        return executable
+    }
+
+    package static func canonicalSupplementaryGroups(
+        _ groups: [UInt32],
+        effectiveGroupID: UInt32
+    ) throws -> [UInt32] {
+        let sorted = groups.sorted()
+        guard
+            (1...InvestigationGeneralProcessIdentityV1.supplementaryGroupCapacity)
+                .contains(sorted.count),
+            Set(sorted).count == sorted.count,
+            sorted.contains(effectiveGroupID)
+        else {
+            throw InvestigationMachineGateError.invalidObservation
+        }
+        return sorted
+    }
+
+    package static func validateLiveExecutablePaths(
+        before: String,
+        after: String
+    ) throws {
+        guard
+            before == ResolvedRootDriverClaimV1.fixedExecutablePath,
+            after == ResolvedRootDriverClaimV1.fixedExecutablePath,
+            before == after
+        else {
+            throw InvestigationMachineGateError.invalidObservation
+        }
+    }
+
+    package static func liveSigningIdentity(auditTokenWords: [UInt32]) throws
+        -> InvestigationResolvedRootDriverSigningIdentityV1
+    {
+        let token = try auditToken(auditTokenWords: auditTokenWords)
+        let tokenData = withUnsafeBytes(of: token) { Data($0) }
+        let attributes: [CFString: Any] = [kSecGuestAttributeAudit: tokenData as CFData]
+        var dynamicCode: SecCode?
+        guard
+            SecCodeCopyGuestWithAttributes(
+                nil,
+                attributes as CFDictionary,
+                SecCSFlags(),
+                &dynamicCode
+            ) == errSecSuccess,
+            let dynamicCode,
+            SecCodeCheckValidity(
+                dynamicCode,
+                SecCSFlags(rawValue: kSecCSStrictValidate),
+                nil
+            ) == errSecSuccess
+        else { throw InvestigationMachineGateError.containmentUncertain }
+        var staticCode: SecStaticCode?
+        guard
+            SecCodeCopyStaticCode(dynamicCode, SecCSFlags(), &staticCode)
+                == errSecSuccess,
+            let staticCode,
+            SecStaticCodeCheckValidity(
+                staticCode,
+                SecCSFlags(rawValue: kSecCSStrictValidate),
+                nil
+            ) == errSecSuccess
+        else { throw InvestigationMachineGateError.containmentUncertain }
+        var information: CFDictionary?
+        let flags = SecCSFlags(
+            rawValue: kSecCSSigningInformation | kSecCSRequirementInformation
+        )
+        guard
+            SecCodeCopySigningInformation(staticCode, flags, &information)
+                == errSecSuccess,
+            let dictionary = information as? [CFString: Any],
+            let identifier = dictionary[kSecCodeInfoIdentifier] as? String,
+            let codeDirectoryHash = dictionary[kSecCodeInfoUnique] as? Data,
+            let signatureFlags = dictionary[kSecCodeInfoFlags] as? NSNumber,
+            let requirement = gateRequirement(
+                dictionary[kSecCodeInfoDesignatedRequirement]
+            ),
+            let requirementData = gateRequirementData(requirement)
+        else { throw InvestigationMachineGateError.containmentUncertain }
+        return try .init(
+            signingIdentifier: identifier,
+            designatedRequirementSHA256: .hashing(requirementData),
+            codeDirectoryHash: codeDirectoryHash,
+            isAdHoc: signatureFlags.uint32Value
+                & investigationMachineGateAdHocFlag != 0
+        )
+    }
+
+    package static func resolveLineageEdges(
+        initialLaunch: InvestigationMachineInitialSudoLaunchIdentity,
+        resolved: InvestigationGeneralProcessIdentityV1,
+        identitiesByPID: [pid_t: InvestigationGeneralProcessIdentityV1],
+        recoveryProcessGroupID: UInt32,
+        coordinatorSessionID: UInt32
+    ) throws -> [InvestigationMachineResolvedRootDriverLineageEdge] {
+        guard
+            resolved.processGroupID == recoveryProcessGroupID,
+            resolved.sessionID == coordinatorSessionID
+        else { throw InvestigationMachineGateError.invalidObservation }
+        if
+            resolved.processID == initialLaunch.processID,
+            resolved.parentProcessID == initialLaunch.parentProcessID,
+            resolved.startSeconds == initialLaunch.startSeconds,
+            resolved.startMicroseconds == initialLaunch.startMicroseconds
+        {
+            return []
+        }
+        var reversed: [InvestigationMachineResolvedRootDriverLineageEdge] = []
+        var current = resolved
+        while current.processID != initialLaunch.processID {
+            guard
+                reversed.count < InvestigationMachineResolvedRootDriverValidator
+                    .maximumLineageNodeCount - 1,
+                let parent = identitiesByPID[pid_t(current.parentProcessID)]
+            else { throw InvestigationMachineGateError.invalidObservation }
+            reversed.append(.init(parent: parent, child: current))
+            current = parent
+        }
+        guard
+            current.parentProcessID == initialLaunch.parentProcessID,
+            current.startSeconds == initialLaunch.startSeconds,
+            current.startMicroseconds == initialLaunch.startMicroseconds
+        else { throw InvestigationMachineGateError.invalidObservation }
+        return reversed.reversed()
+    }
+}
+
+private func auditToken(auditTokenWords: [UInt32]) throws -> audit_token_t {
+    guard auditTokenWords.count == 8 else {
+        throw InvestigationMachineGateError.invalidObservation
+    }
+    var token = audit_token_t()
+    let copied = withUnsafeMutableBytes(of: &token) { destination in
+        auditTokenWords.withUnsafeBytes { source in
+            guard destination.count == source.count else { return false }
+            destination.copyBytes(from: source)
+            return true
+        }
+    }
+    guard copied else { throw InvestigationMachineGateError.invalidObservation }
+    return token
+}
+
+private func gateRequirement(_ value: Any?) -> SecRequirement? {
+    guard let value else { return nil }
+    let object = value as AnyObject
+    guard CFGetTypeID(object) == SecRequirementGetTypeID() else { return nil }
+    return unsafeDowncast(object, to: SecRequirement.self)
+}
+
+private func gateRequirementData(_ requirement: SecRequirement) -> Data? {
+    var data: CFData?
+    guard
+        SecRequirementCopyData(requirement, SecCSFlags(), &data)
+            == errSecSuccess,
+        let data
+    else { return nil }
+    return data as Data
 }
 
 package enum InvestigationMachineGateWaitClassification: Equatable, Sendable {
@@ -1054,6 +1331,13 @@ package enum InvestigationMachineGateLauncherEvent: Equatable, Sendable {
     case setForegroundProcessGroup(pid_t)
     case observeChildTTY
     case continueChildGroup(pid_t)
+    case collectResolvedRootDriverValidation(
+        initialLaunch: InvestigationMachineInitialSudoLaunchIdentity,
+        expectedOuterAttemptUUID: UUID,
+        expectedWholeInputSHA256: InvestigationHandoffSHA256,
+        recoveryProcessGroupID: UInt32,
+        coordinatorSessionID: UInt32
+    )
     case drainOutput
     case observeFinalInput
     case observeWaitableChild
@@ -1065,6 +1349,9 @@ package enum InvestigationMachineGateLauncherEvent: Equatable, Sendable {
     case observeEmptyChildGroup
     case verifyForegroundProcessGroup(pid_t)
     case revalidateFinalTTY
+    case collectResolvedRootDriverRetirement(
+        [InvestigationGeneralProcessIdentityV1]
+    )
     case closeOutputDescriptor(Int32)
     case closeBorrowedDescriptor(Int32)
     case observeCompletion
@@ -1082,11 +1369,17 @@ package enum InvestigationMachineGateLauncherResponse: Equatable, Sendable {
     case processID(pid_t)
     case processGroupID(pid_t)
     case childIdentity(InvestigationMachineGateChildIdentity)
+    case resolvedRootDriverValidationInput(
+        InvestigationMachineResolvedRootDriverValidationInput
+    )
     case output(InvestigationMachineGateOutputObservation)
     case outputFailure
     case childRunning
     case childGroupActive
     case waitClassification(InvestigationMachineGateWaitClassification)
+    case resolvedRootDriverRetirementEnumeration(
+        InvestigationMachineResolvedRootDriverRetirementEnumeration
+    )
     case completed
 }
 
@@ -1095,9 +1388,16 @@ package struct InvestigationMachineFixedGateLauncherResult:
     Sendable
 {
     package let receipt: InvestigationMachineGateTransportReceipt
+    package let resolvedRootDriver:
+        InvestigationMachineResolvedRootDriverObservation?
 
-    package init(receipt: InvestigationMachineGateTransportReceipt) {
+    package init(
+        receipt: InvestigationMachineGateTransportReceipt,
+        resolvedRootDriver: InvestigationMachineResolvedRootDriverObservation?
+            = nil
+    ) {
         self.receipt = receipt
+        self.resolvedRootDriver = resolvedRootDriver
     }
 }
 

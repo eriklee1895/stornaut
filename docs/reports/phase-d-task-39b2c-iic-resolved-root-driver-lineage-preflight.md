@@ -203,3 +203,39 @@ verifier replay compatibility followed at `cf4041c346c2703092ddc46e7b45769c29ff2
 The completion audit is
 [phase-d-task-39b2c-iic-resolved-root-driver-lineage-l1-review.md](phase-d-task-39b2c-iic-resolved-root-driver-lineage-l1-review.md).
 L2 is now the only active lineage checkpoint.
+
+## L2 Scope Amendment — 2026-09-01
+
+Tests-first implementation and physical-boundary review showed that the original
+fourteen-path allocation put two required responsibilities in the wrong files.
+`InvestigationMachineDriverSupport.swift` needs no change because the existing
+zero-argument entry owns the driver startup state machine. In contrast, the
+canonical output-size projection is owned by
+`InvestigationMachineGateCoordinatorComposition.swift`, and the existing
+non-root handoff fixture needs one narrow regression proving that the new live
+path check fails closed before spawn. The original fourteen-path list in the L2
+section is therefore superseded by this exact fifteen-path implementation scope:
+
+1. `Sources/StornautInvestigationMachineDriverSupport/InvestigationMachineZeroArgumentEntry.swift` — 950;
+2. `Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift` — 30;
+3. `Sources/StornautInvestigationMachineGateSupport/InvestigationMachineGateTransport.swift` — 320;
+4. `Sources/StornautInvestigationMachineGateSupport/InvestigationMachineFixedGateLauncher.swift` — 300;
+5. `Sources/StornautInvestigationMachineGateSupport/DarwinInvestigationMachineFixedGateSystem.swift` — 650;
+6. `Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignEvidenceContract.swift` — 250;
+7. `Sources/StornautInvestigationMachineCampaign/main.swift` — 180;
+8. `Tests/StornautInvestigationTests/InvestigationMachineZeroArgumentEntryTests.swift` — 800;
+9. `Tests/StornautInvestigationTests/InvestigationSudoShapedDriverLauncherTests.swift` — 550;
+10. `Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift` — 400;
+11. `Tests/StornautInvestigationTests/InvestigationFixedGateHandoffPhysicalTests.swift` — 60;
+12. `Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift` — 60;
+13. `scripts/verify-investigation-runtime-machine-report` — 300;
+14. `scripts/verify-investigation-boundaries` — 350; and
+15. `scripts/verify-contract` — 200.
+
+The aggregate ceiling remains 3,950 changed non-document lines. The amendment
+does not add a new prerequisite, authority surface or acceptance stage. It only
+places already-required L2 behavior at its actual owners and reallocates the
+unchanged aggregate budget after the shared terminal-deadline, live executable-
+path and independent evidence-review findings. All explicit boundaries,
+non-claims, validation ordering and the transition directly from accepted L2 to
+the unique `ii-c-c` machine campaign remain unchanged.

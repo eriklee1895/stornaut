@@ -208,6 +208,31 @@ struct InvestigationMachineFixedGateLauncher: Sendable {
             else {
                 throw InvestigationMachineGateError.restorationUncertain
             }
+            let resolvedValidationInput = try resolvedRootDriverValidationInput(
+                system.perform(.collectResolvedRootDriverValidation(
+                    initialLaunch: try .init(
+                        processID: UInt32(childIdentity.processID),
+                        parentProcessID: UInt32(childIdentity.parentProcessID),
+                        processGroupID: UInt32(observedGroup),
+                        sessionID: UInt32(invocation.sessionID),
+                        startSeconds: Int64(childIdentity.startSeconds),
+                        startMicroseconds: Int32(
+                            childIdentity.startMicroseconds
+                        ),
+                    ),
+                    expectedOuterAttemptUUID: initialInput.outerAttemptUUID,
+                    expectedWholeInputSHA256:
+                        initialInput.expectedWholeInputSHA256,
+                    recoveryProcessGroupID: UInt32(observedGroup),
+                    coordinatorSessionID: UInt32(invocation.sessionID)
+                ))
+            )
+            let resolvedValidation =
+                try InvestigationMachineResolvedRootDriverValidator.validate(
+                    resolvedValidationInput
+                )
+            try completed(system.perform(.continueChildGroup(observedGroup)))
+            state.childContinued = true
 
             var output = try output(system.perform(.drainOutput))
             let firstWait = try childState(
@@ -235,6 +260,18 @@ struct InvestigationMachineFixedGateLauncher: Sendable {
                 throw InvestigationMachineGateError.containmentUncertain
             }
             _ = try system.consumePendingForwardedSignal()
+            let resolvedRetirementEnumeration =
+                try resolvedRootDriverRetirementEnumeration(
+                    system.perform(.collectResolvedRootDriverRetirement(
+                        resolvedValidation.lineage
+                    ))
+                )
+            let resolvedRetirement =
+                try InvestigationMachineResolvedRootDriverValidator
+                    .verifyRetirement(
+                        resolvedValidation,
+                        enumeration: resolvedRetirementEnumeration
+                    )
 
             try closeOutputRead(&state)
             try closeBorrowedInput(&state)
@@ -282,7 +319,13 @@ struct InvestigationMachineFixedGateLauncher: Sendable {
             ))
             state.terminalReceiptWritten = true
             state.terminalOutputClosed = true
-            return .init(receipt: receipt)
+            return .init(
+                receipt: receipt,
+                resolvedRootDriver: .init(
+                    validation: resolvedValidation,
+                    retirement: resolvedRetirement
+                )
+            )
         } catch {
             let failure = error
             let cleanup = cleanupAfterFailure(state: &state)
@@ -711,6 +754,22 @@ private extension InvestigationMachineFixedGateLauncher {
         -> InvestigationMachineGateInputObservation
     {
         guard case .input(let result) = value else { throw unexpected() }
+        return result
+    }
+
+    func resolvedRootDriverValidationInput(
+        _ value: InvestigationMachineGateLauncherResponse
+    ) throws -> InvestigationMachineResolvedRootDriverValidationInput {
+        guard case .resolvedRootDriverValidationInput(let result) = value
+        else { throw unexpected() }
+        return result
+    }
+
+    func resolvedRootDriverRetirementEnumeration(
+        _ value: InvestigationMachineGateLauncherResponse
+    ) throws -> InvestigationMachineResolvedRootDriverRetirementEnumeration {
+        guard case .resolvedRootDriverRetirementEnumeration(let result) = value
+        else { throw unexpected() }
         return result
     }
 

@@ -4,6 +4,62 @@ import Testing
 @Suite("Task 39 trusted machine target boundary")
 struct InvestigationMachineTargetBoundaryTests {
     @Test
+    func iiCRootDriverLineageL2PinsExactScopeAndVerifierWiring() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-boundaries"), encoding: .utf8)
+        let contract = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+        for marker in [
+            "--iic-root-driver-lineage-l2-source-contract-only",
+            "--iic-root-driver-lineage-l2-mutation-contract-only",
+            "--iic-root-driver-lineage-l2-staged-scope-contract-only",
+            "cd8fc5d8645a8d40fb7571e4be41b8b9d1a70725",
+            "total<=3950",
+            "len(paths)!=15",
+            "InvestigationMachineZeroArgumentEntry.swift 950",
+            "InvestigationMachineGateCoordinatorComposition.swift 30",
+            "InvestigationMachineGateTransport.swift 320",
+            "InvestigationMachineFixedGateLauncher.swift 300",
+            "DarwinInvestigationMachineFixedGateSystem.swift 650",
+            "InvestigationMachineCampaignEvidenceContract.swift 250",
+            "InvestigationMachineCampaign/main.swift 180",
+            "InvestigationMachineZeroArgumentEntryTests.swift 800",
+            "InvestigationSudoShapedDriverLauncherTests.swift 550",
+            "InvestigationMachineCampaignEvidenceTests.swift 400",
+            "InvestigationFixedGateHandoffPhysicalTests.swift 60",
+            "InvestigationMachineTargetBoundaryTests.swift 60",
+            "verify-investigation-runtime-machine-report 300",
+            "source path identity drifted",
+            "completionArtifactMatchesFixed180ByteV3Layout",
+            "outerRoleWritesFramedClaimBeforeBusinessAndThenCompletionV3",
+            "launcherValidatesBootstrapBeforeBusinessContinuation",
+            "productionEpochCorpusRoundTripsThroughAllIndependentDecoders",
+            "swiftValidatorRejectsRootDriverLineageDrift",
+            "userOwnedTemporaryGateFailsClosedBeforeSpawn",
+        ] { #expect(boundary.contains(marker)) }
+        for marker in [
+            "--iic-root-driver-lineage-l2-contract-only",
+            "entry-prebind-drop", "transport-validation-event-drop",
+            "coordinator-output-count-vacuity",
+            "darwin-self-stop-drop", "launcher-business-continuation-drop",
+            "evidence-lineage-join-drop", "campaign-output-digest-drop",
+            "report-output-digest-drop",
+            "unknown-name", "wrong-slot", "malformed-sha",
+            "wrong-sha", "unchanged-source", "unrecognized-content",
+            "two-changed-slots", "alternate-canonical-path",
+            "for fixture in extra missing binary wrong-mode over-budget",
+            "worktree-divergence wrong-baseline; do",
+            "expected='checkpoint paths drifted'",
+            "expected='path budget drifted'", "expected='index/worktree drifted'",
+            "expected='checkpoint baseline drifted'",
+            "verify_iic_root_driver_lineage_l2_contract \"$contract_root/iic-lineage-l2\"\n",
+        ] { #expect(contract.contains(marker)) }
+        #expect(!contract.contains(
+            "verify_iic_root_driver_lineage_l2_component_boundary"))
+    }
+
+    @Test
     func iiCRootDriverLineageL1PinsPackageGraphAndVerifierInventory() throws {
         let root = URL(filePath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
@@ -1887,8 +1943,10 @@ struct InvestigationMachineTargetBoundaryTests {
                 "import StornautInvestigationHandoffContract",
             ],
             "InvestigationMachineZeroArgumentEntry.swift": [
+                "import CInvestigationIdentitySupport",
                 "import Darwin",
                 "import Foundation",
+                "import Security",
                 "import StornautInvestigationHandoffContract",
             ],
         ]
@@ -2276,7 +2334,7 @@ struct InvestigationMachineTargetBoundaryTests {
                         ].contains(forbidden))
                     || (sourceName == "InvestigationMachineZeroArgumentEntry.swift"
                         && ["O_WRONLY", "O_RDWR", "Darwin.write",
-                            "fcntl("
+                            "fcntl(", "raise("
                         ].contains(forbidden))
                 if !semanticException {
                     if forbidden == "Process(" {

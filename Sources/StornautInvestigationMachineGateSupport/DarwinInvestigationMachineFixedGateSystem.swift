@@ -1,6 +1,7 @@
 // Darwin implementation for the authority-free machine gate.
 import Darwin
 import Foundation
+import Security
 import StornautInvestigationHandoffContract
 
 @_silgen_name("_NSGetEnviron")
@@ -99,6 +100,8 @@ enum InvestigationMachineGateRuntimePolicy {
             ? .complete : .proveRecoveryGroupEmpty
     }
 }
+
+private let investigationMachineGateAdHocFlag: UInt32 = 0x0002
 
 final class DarwinInvestigationMachineFixedGateSystem:
     @unchecked Sendable, InvestigationMachineFixedGateLauncherSystem
@@ -319,6 +322,26 @@ final class DarwinInvestigationMachineFixedGateSystem:
         case .observeChildTTY:
             return .terminal(try terminalObservation())
 
+        case .collectResolvedRootDriverValidation(
+            let initialLaunch,
+            let expectedOuterAttemptUUID,
+            let expectedWholeInputSHA256,
+            let recoveryProcessGroupID,
+            let coordinatorSessionID
+        ):
+            guard !state.resolvedRootValidationCollected else {
+                throw unexpected()
+            }
+            let value = try collectResolvedRootDriverValidation(
+                initialLaunch: initialLaunch,
+                expectedOuterAttemptUUID: expectedOuterAttemptUUID,
+                expectedWholeInputSHA256: expectedWholeInputSHA256,
+                recoveryProcessGroupID: recoveryProcessGroupID,
+                coordinatorSessionID: coordinatorSessionID
+            )
+            state.resolvedRootValidationCollected = true
+            return .resolvedRootDriverValidationInput(value)
+
         case .drainOutput:
             guard let descriptor = state.outputRead else { throw unexpected() }
             return .output(try drainOutput(descriptor: descriptor))
@@ -392,12 +415,24 @@ final class DarwinInvestigationMachineFixedGateSystem:
             guard let group = state.childProcessGroupID,
                   try processGroupMembers(group).isEmpty
             else { throw containment() }
+            state.childGroupEmpty = true
             return .completed
 
         case .revalidateFinalTTY:
             let value = try terminalObservation()
             guard value == state.initialTerminal else { throw restoration() }
             return .terminal(value)
+
+        case .collectResolvedRootDriverRetirement(let lineage):
+            guard
+                state.resolvedRootValidationCollected,
+                state.childReaped,
+                state.childGroupEmpty,
+                !state.resolvedRootRetirementCollected
+            else { throw unexpected() }
+            let value = try collectResolvedRootDriverRetirement(lineage)
+            state.resolvedRootRetirementCollected = true
+            return .resolvedRootDriverRetirementEnumeration(value)
 
         case .observeFinalInput:
             return .input(try observeFinalInput())
@@ -468,6 +503,7 @@ private extension DarwinInvestigationMachineFixedGateSystem {
         var childIdentity: ChildIdentity?
         var childGroupVerified = false
         var childReaped = false
+        var childGroupEmpty = false
         var preparedFrameWritten = false
         var stoppedForCoordinator = false
         var inputCloseAttempted = false
@@ -476,6 +512,8 @@ private extension DarwinInvestigationMachineFixedGateSystem {
         var coordinatorStreamCloseAttempted = false
         var coordinatorStreamClosed = false
         var lastWaitClassification: InvestigationMachineGateWaitClassification?
+        var resolvedRootValidationCollected = false
+        var resolvedRootRetirementCollected = false
     }
 
     func validateInvocation() throws
@@ -999,6 +1037,138 @@ private extension DarwinInvestigationMachineFixedGateSystem {
         return outputObservation()
     }
 
+    func collectResolvedRootDriverValidation(
+        initialLaunch: InvestigationMachineInitialSudoLaunchIdentity,
+        expectedOuterAttemptUUID: UUID,
+        expectedWholeInputSHA256: InvestigationHandoffSHA256,
+        recoveryProcessGroupID: UInt32,
+        coordinatorSessionID: UInt32
+    ) throws -> InvestigationMachineResolvedRootDriverValidationInput {
+        guard
+            let descriptor = state.outputRead,
+            let recoveryGroup = state.recoveryProcessGroupID,
+            pid_t(recoveryProcessGroupID) == recoveryGroup,
+            UInt32(state.sessionID ?? 0) == coordinatorSessionID
+        else { throw containment() }
+        let claim = try readResolvedRootDriverClaim(descriptor: descriptor)
+        let firstIdentity =
+            try InvestigationMachineResolvedRootDriverSupport
+            .generalProcessIdentity(
+            processID: pid_t(claim.process.processID)
+        )
+        let firstStopped = try processIsStopped(
+            processID: pid_t(claim.process.processID)
+        )
+        let firstObservedAt = try continuousNanoseconds()
+        let fixedExecutable = try fixedExecutableIdentity()
+        let liveExecutablePathBeforeSigning =
+            try InvestigationMachineResolvedRootDriverSupport
+            .liveExecutablePath(
+                auditTokenWords: claim.process.auditTokenWords
+            )
+        let liveSigning =
+            try InvestigationMachineResolvedRootDriverSupport
+            .liveSigningIdentity(
+            auditTokenWords: claim.process.auditTokenWords
+        )
+        let liveExecutablePathAfterSigning =
+            try InvestigationMachineResolvedRootDriverSupport
+            .liveExecutablePath(
+                auditTokenWords: claim.process.auditTokenWords
+            )
+        try InvestigationMachineResolvedRootDriverSupport
+            .validateLiveExecutablePaths(
+                before: liveExecutablePathBeforeSigning,
+                after: liveExecutablePathAfterSigning
+            )
+        let secondIdentity =
+            try InvestigationMachineResolvedRootDriverSupport
+            .generalProcessIdentity(
+            processID: pid_t(claim.process.processID)
+        )
+        let secondStopped = try processIsStopped(
+            processID: pid_t(claim.process.processID)
+        )
+        let secondObservedAt = try continuousNanoseconds()
+        guard
+            firstIdentity == claim.process,
+            secondIdentity == claim.process,
+            firstStopped,
+            secondStopped
+        else { throw InvestigationMachineGateError.invalidObservation }
+        let members = try processGroupMembers(recoveryGroup)
+        let identities = try Dictionary(
+            uniqueKeysWithValues: members.map {
+                (
+                    $0,
+                    try InvestigationMachineResolvedRootDriverSupport
+                        .generalProcessIdentity(processID: $0)
+                )
+            }
+        )
+        let lineageEdges =
+            try InvestigationMachineResolvedRootDriverSupport
+            .resolveLineageEdges(
+            initialLaunch: initialLaunch,
+            resolved: claim.process,
+            identitiesByPID: identities,
+            recoveryProcessGroupID: recoveryProcessGroupID,
+            coordinatorSessionID: coordinatorSessionID
+        )
+        let projectedInput = try projectedInput()
+        return .init(
+            claim: claim,
+            expectedOuterAttemptUUID: expectedOuterAttemptUUID,
+            expectedWholeInputSHA256: expectedWholeInputSHA256,
+            initialLaunch: initialLaunch,
+            recoveryProcessGroupID: recoveryProcessGroupID,
+            coordinatorSessionID: coordinatorSessionID,
+            lineageEdges: lineageEdges,
+            firstProcessSample: .init(
+                identity: firstIdentity,
+                isStopped: firstStopped,
+                observedAtContinuousNanoseconds: firstObservedAt
+            ),
+            secondProcessSample: .init(
+                identity: secondIdentity,
+                isStopped: secondStopped,
+                observedAtContinuousNanoseconds: secondObservedAt
+            ),
+            fixedExecutableNode: fixedExecutable.node,
+            fixedExecutableSHA256: fixedExecutable.sha256,
+            fixedStaticSigning: fixedExecutable.staticSigning,
+            liveSigning: liveSigning,
+            liveSigningAuditTokenWords: claim.process.auditTokenWords,
+            projectedCohortInput: projectedInput
+        )
+    }
+
+    func collectResolvedRootDriverRetirement(
+        _ lineage: [InvestigationGeneralProcessIdentityV1]
+    ) throws -> InvestigationMachineResolvedRootDriverRetirementEnumeration {
+        let observations = try lineage.map { identity in
+            let pid = identity.processID
+            do {
+                let current =
+                    try InvestigationMachineResolvedRootDriverSupport
+                    .generalProcessIdentity(processID: pid_t(pid))
+                return InvestigationMachineResolvedRootDriverRetirementObservation(
+                    processID: pid,
+                    state: .present(current)
+                )
+            } catch let error as InvestigationMachineGateError
+            where error == .invalidObservation {
+                return InvestigationMachineResolvedRootDriverRetirementObservation(
+                    processID: pid,
+                    state: .absent
+                )
+            } catch {
+                throw containment()
+            }
+        }
+        return .init(isComplete: true, observations: observations)
+    }
+
     func outputObservation() -> InvestigationMachineGateOutputObservation {
         let overflow = state.capturedOutput.count
             > InvestigationMachineFixedGateContract.maximumCapturedOutputByteCount
@@ -1011,6 +1181,88 @@ private extension DarwinInvestigationMachineFixedGateSystem {
             overflowObserved: overflow, reachedEOF: state.outputReachedEOF
             , deadlineExpired: state.outputDeadlineExpired
         )
+    }
+
+    func readResolvedRootDriverClaim(descriptor: Int32) throws
+        -> ResolvedRootDriverClaimV1
+    {
+        let deadline = try operationDeadline()
+        let prefix = try readOutputExact(
+            descriptor: descriptor, count: 4, deadline: deadline
+        )
+        guard prefix.count == 4 else {
+            throw InvestigationMachineGateError.invalidObservation
+        }
+        let count = Int(
+            prefix.withUnsafeBytes { $0.load(as: UInt32.self).bigEndian }
+        )
+        guard count == ResolvedRootDriverClaimV1.encodedByteCount else {
+            throw InvestigationMachineGateError.invalidObservation
+        }
+        let claimBytes = try readOutputExact(
+            descriptor: descriptor, count: count, deadline: deadline
+        )
+        state.capturedOutput.append(prefix)
+        state.capturedOutput.append(claimBytes)
+        guard
+            state.capturedOutput.count
+                <= InvestigationMachineFixedGateContract
+                    .maximumReadOutputByteCount
+        else { throw InvestigationMachineGateError.invalidObservation }
+        var event = pollfd(fd: descriptor, events: Int16(POLLIN | POLLHUP), revents: 0)
+        let available = poll(&event, 1, 0)
+        guard available == 0, event.revents == 0 else {
+            throw InvestigationMachineGateError.invalidObservation
+        }
+        do {
+            let value = try ResolvedRootDriverClaimV1.decode(claimBytes)
+            guard try value.encoded() == claimBytes else {
+                throw InvestigationMachineGateError.invalidObservation
+            }
+            try waitForStoppedResolvedRootDriver(
+                processID: pid_t(value.process.processID),
+                descriptor: descriptor,
+                deadline: deadline
+            )
+            return value
+        } catch {
+            throw InvestigationMachineGateError.invalidObservation
+        }
+    }
+
+    func readOutputExact(
+        descriptor: Int32, count: Int, deadline: UInt64
+    ) throws -> Data {
+        guard count > 0 else { throw InvestigationMachineGateError.invalidObservation }
+        var data = Data()
+        data.reserveCapacity(count)
+        while data.count < count {
+            try consumeAndForwardPendingSignal()
+            var event = pollfd(
+                fd: descriptor, events: Int16(POLLIN | POLLHUP), revents: 0
+            )
+            let result = poll(&event, 1, try pollMilliseconds(deadline))
+            if result == 0 { continue }
+            if result < 0 {
+                if errno == EINTR { continue }
+                throw containment()
+            }
+            if event.revents & Int16(POLLERR | POLLNVAL) != 0 {
+                throw containment()
+            }
+            var bytes = [UInt8](repeating: 0, count: count - data.count)
+            let readCount = Darwin.read(descriptor, &bytes, bytes.count)
+            if readCount > 0 {
+                data.append(contentsOf: bytes.prefix(readCount))
+                continue
+            }
+            if readCount == 0 {
+                throw InvestigationMachineGateError.invalidObservation
+            }
+            if errno == EINTR || errno == EAGAIN { continue }
+            throw containment()
+        }
+        return data
     }
 
     func observeChildState() throws -> InvestigationMachineGateLauncherResponse {
@@ -1115,6 +1367,41 @@ private extension DarwinInvestigationMachineFixedGateSystem {
         else { throw containment() }
         let admitted = raw.sorted()
         return admitted
+    }
+
+    func processIsStopped(processID: pid_t) throws -> Bool {
+        var information = proc_bsdinfo()
+        let count = proc_pidinfo(
+            processID,
+            PROC_PIDTBSDINFO,
+            0,
+            &information,
+            Int32(MemoryLayout<proc_bsdinfo>.size)
+        )
+        guard count == MemoryLayout<proc_bsdinfo>.size else {
+            throw InvestigationMachineGateError.invalidObservation
+        }
+        return information.pbi_status == UInt32(SSTOP)
+    }
+
+    func waitForStoppedResolvedRootDriver(
+        processID: pid_t,
+        descriptor: Int32,
+        deadline: UInt64
+    ) throws {
+        while true {
+            if try processIsStopped(processID: processID) { return }
+            try consumeAndForwardPendingSignal()
+            var event = pollfd(
+                fd: descriptor, events: Int16(POLLIN | POLLHUP), revents: 0
+            )
+            let available = poll(&event, 1, 0)
+            guard available == 0, event.revents == 0 else {
+                throw InvestigationMachineGateError.invalidObservation
+            }
+            _ = try pollMilliseconds(deadline)
+            try pause()
+        }
     }
 
     func terminalObservation() throws
@@ -1462,6 +1749,115 @@ private extension DarwinInvestigationMachineFixedGateSystem {
         return try storage.withUnsafeMutableBufferPointer {
             try body($0.baseAddress!)
         }
+    }
+
+    func projectedInput() throws -> InvestigationProjectedCohortInput {
+        let metadata = try metadata(STDIN_FILENO)
+        let bytes = try preadRegularFile(descriptor: STDIN_FILENO, size: metadata.size)
+        let value = try InvestigationProjectedCohortInput.decode(bytes)
+        guard try value.encoded() == bytes else { throw containment() }
+        return value
+    }
+
+    func fixedExecutableIdentity() throws
+        -> InvestigationResolvedRootDriverExecutableIdentityV1
+    {
+        let path = ResolvedRootDriverClaimV1.fixedExecutablePath
+        let before = try namedMetadata(path)
+        let descriptor = Darwin.open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+        guard descriptor >= 0 else { throw containment() }
+        defer { _ = Darwin.close(descriptor) }
+        let opened = try metadata(descriptor)
+        guard before == opened, opened.type == mode_t(S_IFREG) else {
+            throw containment()
+        }
+        let bytes = try readRegularFile(descriptor: descriptor, maximum: 16 << 20)
+        guard try namedMetadata(path) == before, try metadata(descriptor) == opened
+        else { throw containment() }
+        let node = try InvestigationResolvedRootDriverNodeIdentityV1(
+            deviceID: opened.device,
+            inode: opened.inode,
+            generation: UInt32(exactly: opened.generation) ?? 0,
+            isRegularFile: opened.type == mode_t(S_IFREG),
+            ownerUserID: UInt32(opened.ownerUID),
+            ownerGroupID: UInt32(opened.ownerGID),
+            mode: UInt32(opened.permissions),
+            linkCount: opened.linkCount,
+            size: opened.size,
+            flags: opened.flags
+        )
+        let staticCode = try staticCode(forExecutableAt: path)
+        let staticSigning = try signingIdentity(staticCode)
+        return try .init(
+            path: path,
+            node: node,
+            sha256: .hashing(bytes),
+            staticSigning: staticSigning,
+            liveSigning: staticSigning
+        )
+    }
+
+    func staticCode(forExecutableAt path: String) throws -> SecStaticCode {
+        var code: SecStaticCode?
+        guard
+            SecStaticCodeCreateWithPath(
+                URL(fileURLWithPath: path) as CFURL,
+                SecCSFlags(),
+                &code
+            ) == errSecSuccess,
+            let code,
+            SecStaticCodeCheckValidity(
+                code,
+                SecCSFlags(rawValue: kSecCSStrictValidate),
+                nil
+            ) == errSecSuccess
+        else { throw containment() }
+        return code
+    }
+
+    func signingIdentity(_ staticCode: SecStaticCode) throws
+        -> InvestigationResolvedRootDriverSigningIdentityV1
+    {
+        var information: CFDictionary?
+        let flags = SecCSFlags(
+            rawValue: kSecCSSigningInformation | kSecCSRequirementInformation
+        )
+        guard
+            SecCodeCopySigningInformation(staticCode, flags, &information)
+                == errSecSuccess,
+            let dictionary = information as? [CFString: Any],
+            let identifier = dictionary[kSecCodeInfoIdentifier] as? String,
+            let codeDirectoryHash = dictionary[kSecCodeInfoUnique] as? Data,
+            let signatureFlags = dictionary[kSecCodeInfoFlags] as? NSNumber,
+            let requirement = gateRequirement(
+                dictionary[kSecCodeInfoDesignatedRequirement]
+            ),
+            let requirementData = gateRequirementData(requirement)
+        else { throw containment() }
+        return try .init(
+            signingIdentifier: identifier,
+            designatedRequirementSHA256: .hashing(requirementData),
+            codeDirectoryHash: codeDirectoryHash,
+            isAdHoc: signatureFlags.uint32Value
+                & investigationMachineGateAdHocFlag != 0
+        )
+    }
+
+    func gateRequirement(_ value: Any?) -> SecRequirement? {
+        guard let value else { return nil }
+        let object = value as AnyObject
+        guard CFGetTypeID(object) == SecRequirementGetTypeID() else { return nil }
+        return unsafeDowncast(object, to: SecRequirement.self)
+    }
+
+    func gateRequirementData(_ requirement: SecRequirement) -> Data? {
+        var data: CFData?
+        guard
+            SecRequirementCopyData(requirement, SecCSFlags(), &data)
+                == errSecSuccess,
+            let data
+        else { return nil }
+        return data as Data
     }
 
     func invalidInvocation() -> InvestigationMachineGateError {

@@ -1352,7 +1352,46 @@ package struct InvestigationMachineCampaignVerifiedBundle:
 {
     package let bytes: Data
     package let epochs: [InvestigationMachineCampaignVerifiedEpoch]
+    package let lineageClaim: ResolvedRootDriverClaimV1
+    package let lineageClaimBytes: Data
     package let completionBytes: Data
+    package let exactDriverOutputBytes: Data
+}
+
+package struct InvestigationMachineCampaignDiagnosticEvidenceV1:
+    Sendable, Equatable
+{
+    package static let claimPrefix =
+        Data("STORNAUT_TASK39_IIC_ROOT_DRIVER_CLAIM_V1 ".utf8)
+    package static let bundlePrefix =
+        Data("STORNAUT_TASK39_IIC_EPOCH_BUNDLE_V1 ".utf8)
+
+    package let lineageClaimBytes: Data
+    package let evidenceBundleBytes: Data
+
+    package static func decode(_ bytes: Data) throws -> Self {
+        let lines = bytes.split(
+            separator: UInt8(ascii: "\n"), omittingEmptySubsequences: false)
+        guard lines.count == 3, lines[2].isEmpty, !bytes.contains(
+            UInt8(ascii: "\r"))
+        else { throw campaignEvidenceInvalid() }
+        return .init(
+            lineageClaimBytes: try payload(lines[0], prefix: claimPrefix),
+            evidenceBundleBytes: try payload(lines[1], prefix: bundlePrefix))
+    }
+
+    private static func payload(
+        _ line: Data.SubSequence, prefix: Data
+    ) throws -> Data {
+        guard line.starts(with: prefix) else { throw campaignEvidenceInvalid() }
+        let encoded = Data(line.dropFirst(prefix.count))
+        guard !encoded.isEmpty,
+              let value = String(data: encoded, encoding: .utf8),
+              let decoded = Data(base64Encoded: value), !decoded.isEmpty,
+              Data(decoded.base64EncodedString().utf8) == encoded
+        else { throw campaignEvidenceInvalid() }
+        return decoded
+    }
 }
 
 package enum InvestigationMachineCampaignEpochEvidenceValidator {
@@ -1378,8 +1417,13 @@ package enum InvestigationMachineCampaignEpochEvidenceValidator {
     }
 
     package static func validate(
-        bundle: Data, projectedInput: InvestigationProjectedCohortInput
+        bundle: Data, lineageClaimBytes: Data,
+        projectedInput: InvestigationProjectedCohortInput,
+        outputByteCount: Int,
+        outputSHA256: InvestigationHandoffSHA256
     ) throws -> InvestigationMachineCampaignVerifiedBundle {
+        let lineageClaim = try ResolvedRootDriverClaimV1.decode(
+            lineageClaimBytes)
         let fields = try evidenceDecode(
             bundle, domain: "stornaut.task39.machine.driver-evidence-bundle.v1",
             ranges: [16...16, 32...32, 32...32, 4...4]
@@ -1401,23 +1445,43 @@ package enum InvestigationMachineCampaignEpochEvidenceValidator {
                 projectedInput: projectedInput,
                 previous: epochs.last))
         }
-        guard Set(epochs.map(\.outerDriverProcessID)).count == 1 else {
+        guard lineageClaim.outerAttemptUUID
+                == projectedInput.capsule.outerAttemptUUID,
+              lineageClaim.wholeInputSHA256 == projectedInput.wholeInputSHA256,
+              epochs.allSatisfy({
+                  $0.outerDriverProcessID == lineageClaim.process.processID
+              }),
+              projectedInput.projections.allSatisfy({ projection in
+                  lineageClaim.executable.sha256
+                      == projection.machineDriverExecutableSHA256
+                      && lineageClaim.executable.staticSigning.signingIdentifier
+                          == projection.machineDriverSigningIdentifier
+                      && lineageClaim.executable.staticSigning
+                          .designatedRequirementSHA256
+                          == projection.machineDriverDesignatedRequirementSHA256
+                      && lineageClaim.executable.staticSigning.codeDirectoryHash
+                          == projection.machineDriverCodeDirectoryHash
+                      && lineageClaim.executable.staticSigning.isAdHoc
+              })
+        else {
             throw evidenceInvalid()
         }
-        let zero = Data(repeating: 0, count: 32)
-        let completionFields = [
-            fields[0], fields[1], fields[2], fields[3],
-            InvestigationHandoffSHA256.hashing(bundle).rawBytes,
-        ]
-        let unsigned = try HandoffBinaryTranscript.encode(
-            domain: "stornaut.task39.machine.driver-completion-v2",
-            businessFields: completionFields + [zero], maximumByteCount: 512)
-        let completion = try HandoffBinaryTranscript.encode(
-            domain: "stornaut.task39.machine.driver-completion-v2",
-            businessFields: completionFields
-                + [InvestigationHandoffSHA256.hashing(unsigned).rawBytes],
-            maximumByteCount: 512)
-        return .init(bytes: bundle, epochs: epochs, completionBytes: completion)
+        var completion = fields[0] + fields[1] + fields[2] + fields[3]
+            + InvestigationHandoffSHA256.hashing(lineageClaimBytes).rawBytes
+            + InvestigationHandoffSHA256.hashing(bundle).rawBytes
+            + Data(repeating: 0, count: 32)
+        guard completion.count == 180 else { throw evidenceInvalid() }
+        completion.replaceSubrange(148..<180, with:
+            InvestigationHandoffSHA256.hashing(completion).rawBytes)
+        var output = data(UInt32(lineageClaimBytes.count))
+        output.append(lineageClaimBytes); output.append(completion)
+        guard lineageClaimBytes.count == ResolvedRootDriverClaimV1.encodedByteCount,
+              output.count == 1_190, outputByteCount == output.count,
+              outputSHA256 == InvestigationHandoffSHA256.hashing(output)
+        else { throw evidenceInvalid() }
+        return .init(bytes: bundle, epochs: epochs, lineageClaim: lineageClaim,
+            lineageClaimBytes: lineageClaimBytes, completionBytes: completion,
+            exactDriverOutputBytes: output)
     }
 
     private static func validateEpoch(
@@ -2005,7 +2069,7 @@ package enum InvestigationMachineCampaignRawGateReceiptValidator {
             childTTY.0 == initialTTY.0, childTTY.1 == initialTTY.1,
             childTTY.2 == recoveryPGID, finalTTY.0 == initialTTY.0,
             finalTTY.1 == initialTTY.1, finalTTY.2 == savedPGID,
-            (0...512).contains(outputCount),
+            outputCount == 1_190,
             outputSHA.rawBytes.contains(where: { $0 != 0 }),
             !overflow, eof, !expired,
             wait == Data([1,0,0,0,0]), forwarded == 0, started > 0,

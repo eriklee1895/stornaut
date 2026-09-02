@@ -1386,9 +1386,10 @@ public enum InvestigationMachineGateCoordinatorSupport {
     )
   }
   package func coordinatorExpectedProductionCompletionByteCount() -> Int {
-    let domain = "stornaut.task39.machine.driver-completion-v2"
-    return 4 + 6 + domain.utf8.count + 10 + 6 * 6
-      + 16 + 32 + 32 + 4 + 32 + 32
+    // L2 stdout is one bounded lineage frame followed by the fixed-width v3
+    // completion. The Gate receipt still owns the digest and byte-count wire
+    // fields; this constant only closes the coordinator's expected-size gate.
+    return 4 + ResolvedRootDriverClaimV1.encodedByteCount + 180
   }
   private func coordinatorUUIDData(_ value: UUID) -> Data {
     var bytes = value.uuid

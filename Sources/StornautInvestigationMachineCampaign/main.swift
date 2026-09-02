@@ -435,13 +435,8 @@ package enum InvestigationMachineCampaignExecutable {
             preArm: InvestigationMachineCampaignPreArmFrame,
             expectedOuterIdentity: InvestigationMachineCampaignOuterIdentity)
             throws -> (bundle: Data, epochs: [InvestigationMachineCampaignVerifiedEpoch]) {
-            let prefix = Data("STORNAUT_TASK39_IIC_EPOCH_BUNDLE_V1 ".utf8)
-            let suffix = terminal.suffix(2) == Data("\r\n".utf8) ? 2 : 1
-            let encoded = terminal.dropFirst(prefix.count).dropLast(suffix)
-            guard terminal.starts(with: prefix), terminal.suffix(1) == Data("\n".utf8),
-                  !terminal.dropLast(suffix).contains(UInt8(ascii: "\n")),
-                  let bundle = Data(base64Encoded: encoded),
-                  Data(bundle.base64EncodedString().utf8) == encoded else { throw Failure.invalid }
+            let diagnostic = try InvestigationMachineCampaignDiagnosticEvidenceV1
+                .decode(terminal)
             let projected = try InvestigationProjectedCohortInput.decode(
                 preArm.canonicalProjectedInput)
             let gate = try InvestigationMachineCampaignRawGateReceiptValidator
@@ -452,12 +447,11 @@ package enum InvestigationMachineCampaignExecutable {
                     expectedOuterIdentity: expectedOuterIdentity,
                     finalReceipt: finalReceipt)
             let validated = try InvestigationMachineCampaignEpochEvidenceValidator
-                .validate(bundle: bundle, projectedInput: projected)
-            guard gate.outputByteCount == validated.completionBytes.count,
-                  gate.outputSHA256
-                    == InvestigationHandoffSHA256.hashing(
-                        validated.completionBytes)
-            else { throw Failure.invalid }
+                .validate(bundle: diagnostic.evidenceBundleBytes,
+                    lineageClaimBytes: diagnostic.lineageClaimBytes,
+                    projectedInput: projected,
+                    outputByteCount: gate.outputByteCount,
+                    outputSHA256: gate.outputSHA256)
             return (validated.bytes, validated.epochs)
         }
 

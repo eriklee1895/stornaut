@@ -9,46 +9,45 @@ import Testing
 @Suite("Investigation machine zero-argument entry", .serialized)
 struct InvestigationMachineZeroArgumentEntryTests {
     @Test
-    func completionArtifactMatchesIndependentGoldenAndZeroBeforeHash() throws {
+    func completionArtifactMatchesFixed180ByteV3Layout() throws {
         let summary = try completionSummary()
+        let claim = try claimFixture()
+        let claimSHA = InvestigationHandoffSHA256.hashing(try claim.encoded())
+        let bundleSHA = try completionDigest(0x55)
         let artifact = try InvestigationMachineDriverCompletionArtifact(
-            summary: summary
+            summary: summary,
+            lineageClaimSHA256: claimSHA,
+            driverEvidenceBundleSHA256: bundleSHA
         )
         let encoded = try artifact.encoded()
         let decoded = try InvestigationMachineDriverCompletionArtifact.decode(
             encoded
         )
-
-        let zeroed = independentCompletionTranscript(
-            summary: summary, digest: Data(repeating: 0, count: 32)
+        let business = Data([
+            completionUUIDData(summary.outerAttemptUUID),
+            summary.wholeCapsuleSHA256.rawBytes,
+            summary.wholeInputSHA256.rawBytes,
+            completionUInt32Data(summary.completedEpochCount),
+            claimSHA.rawBytes,
+            bundleSHA.rawBytes,
+        ].joined())
+        let expectedSelfSHA = InvestigationHandoffSHA256.hashing(
+            business + Data(repeating: 0, count: 32)
         )
-        let goldenDigest =
-            "12215fb369d714711e0f2c54bf5e43500"
-            + "b811e0957ed0b5db6a52aeb82432b35"
-        let goldenArtifact =
-            "53544e4300000000002973746f726e6175742e7461736b33392e"
-            + "6d616368696e652e6472697665722d636f6d706c6574696f6e"
-            + "0001000000040000000100020000001000000000000000000000"
-            + "0000000001010003000000202121212121212121212121212121"
-            + "2121212121212121212121212121212121210004000000202222"
-            + "2222222222222222222222222222222222222222222222222222"
-            + "2222222200050000000400000008000600000020"
-            + goldenDigest
 
-        #expect(encoded.count == 207)
-        #expect(encoded.hexadecimal == goldenArtifact)
-        #expect(
-            Data(SHA256.hash(data: zeroed)).hexadecimal
-                == goldenDigest
-        )
-        #expect(artifact.completionSHA256.lowercaseHex == goldenDigest)
+        #expect(encoded.count == 180)
+        #expect(encoded.prefix(148) == business)
+        #expect(encoded.suffix(32) == expectedSelfSHA.rawBytes)
+        #expect(artifact.selfSHA256 == expectedSelfSHA)
         #expect(decoded == artifact)
         #expect(try decoded.encoded() == encoded)
         #expect(decoded.outerAttemptUUID == summary.outerAttemptUUID)
         #expect(decoded.wholeCapsuleSHA256 == summary.wholeCapsuleSHA256)
         #expect(decoded.wholeInputSHA256 == summary.wholeInputSHA256)
         #expect(decoded.completedEpochCount == 8)
-        #expect(decoded.completionSHA256.rawBytes.contains { $0 != 0 })
+        #expect(decoded.lineageClaimSHA256 == claimSHA)
+        #expect(decoded.driverEvidenceBundleSHA256 == bundleSHA)
+        #expect(decoded.selfSHA256.rawBytes.contains { $0 != 0 })
         #expect(!(InvestigationMachineDriverCompletionArtifact.self
             is any Codable.Type))
     }
@@ -60,7 +59,9 @@ struct InvestigationMachineZeroArgumentEntryTests {
         #expect(throws: InvestigationMachineZeroArgumentEntryError
             .invalidCompletion) {
             _ = try InvestigationMachineDriverCompletionArtifact(
-                summary: try mutation.apply(to: completionSummary())
+                summary: try mutation.apply(to: completionSummary()),
+                lineageClaimSHA256: try completionDigest(0x44),
+                driverEvidenceBundleSHA256: try completionDigest(0x55)
             )
         }
     }
@@ -70,7 +71,9 @@ struct InvestigationMachineZeroArgumentEntryTests {
         _ mutation: CompletionEncodingMutation
     ) throws {
         let encoded = try InvestigationMachineDriverCompletionArtifact(
-            summary: completionSummary()
+            summary: completionSummary(),
+            lineageClaimSHA256: try completionDigest(0x44),
+            driverEvidenceBundleSHA256: try completionDigest(0x55)
         ).encoded()
 
         #expect(throws: (any Error).self) {
@@ -189,7 +192,7 @@ struct InvestigationMachineZeroArgumentEntryTests {
     }
 
     @Test
-    func outerRoleRunsTheExactJoinAndWritesOneCanonicalArtifact() async throws {
+    func outerRoleWritesFramedClaimBeforeBusinessAndThenCompletionV3() async throws {
         let trace = ZeroArgumentTrace()
         let observation = outerObservation()
         let entry = InvestigationMachineZeroArgumentEntry(
@@ -201,16 +204,30 @@ struct InvestigationMachineZeroArgumentEntryTests {
         try await entry.run()
 
         #expect(trace.snapshot() == [
-            "validate", "role", "installed", "intake", "cohort",
-            "cancel", "revalidate", "write",
+            "validate", "role", "installed", "intake", "prebind",
+            "claim", "claim-write", "stop", "begin-evidence", "cohort",
+            "cancel", "revalidate", "evidence-write", "write",
         ])
-        let output = try #require(trace.outputs.only)
-        #expect(
-            try InvestigationMachineDriverCompletionArtifact.decode(output)
-                == InvestigationMachineDriverCompletionArtifact(
-                    summary: completionSummary()
-                )
-        )
+        #expect(trace.outputs.count == 2)
+        let framedClaim = try #require(trace.outputs.first)
+        let stdoutCompletion = try #require(trace.outputs.last)
+        let count = try decodeBigEndianUInt32(framedClaim.prefix(4))
+        #expect(count == 1_006)
+        let claimBytes = framedClaim.dropFirst(4)
+        #expect(claimBytes.count == 1_006)
+        let claim = try ResolvedRootDriverClaimV1.decode(Data(claimBytes))
+        let evidence = try #require(trace.stderr.only)
+        let lines = String(decoding: evidence, as: UTF8.self)
+            .split(separator: "\n", omittingEmptySubsequences: false)
+        #expect(lines.count >= 2)
+        #expect(lines[0].hasPrefix("STORNAUT_TASK39_IIC_ROOT_DRIVER_CLAIM_V1 "))
+        #expect(lines[1].hasPrefix("STORNAUT_TASK39_IIC_EPOCH_BUNDLE_V1 "))
+        let completion = try InvestigationMachineDriverCompletionArtifact.decode(stdoutCompletion)
+        #expect(completion.lineageClaimSHA256 == .hashing(Data(claimBytes)))
+        #expect(stdoutCompletion.count == 180)
+        #expect(framedClaim.count + stdoutCompletion.count == 1_190)
+        let expectedOuterAttemptUUID = try completionSummary().outerAttemptUUID
+        #expect(claim.outerAttemptUUID == expectedOuterAttemptUUID)
     }
 
     @Test(arguments: ZeroArgumentFailurePoint.allCases)
@@ -228,7 +245,34 @@ struct InvestigationMachineZeroArgumentEntryTests {
         await #expect(throws: failure.error) {
             try await entry.run()
         }
-        #expect(trace.outputs.isEmpty)
+        switch failure {
+        case .invocation, .role, .installed, .intake:
+            #expect(trace.outputs.isEmpty)
+            #expect(trace.stderr.isEmpty)
+        case .cohort, .artifact, .cancellation, .revalidate, .write,
+             .compositionCancellation:
+            #expect(trace.outputs.count == 1)
+            let framedClaim = try! #require(trace.outputs.only)
+            #expect(framedClaim.count == 1_010)
+            let count = try! decodeBigEndianUInt32(framedClaim.prefix(4))
+            #expect(count == 1_006)
+            switch failure {
+            case .artifact, .write:
+                #expect(trace.stderr.count == 1)
+                let evidence = try! #require(trace.stderr.only)
+                let lines = String(decoding: evidence, as: UTF8.self)
+                    .split(separator: "\n", omittingEmptySubsequences: false)
+                #expect(lines.count >= 2)
+                #expect(lines[0].hasPrefix(
+                    "STORNAUT_TASK39_IIC_ROOT_DRIVER_CLAIM_V1 "
+                ))
+                #expect(lines[1].hasPrefix(
+                    "STORNAUT_TASK39_IIC_EPOCH_BUNDLE_V1 "
+                ))
+            default:
+                #expect(trace.stderr.isEmpty)
+            }
+        }
     }
 
     @Test
@@ -239,7 +283,13 @@ struct InvestigationMachineZeroArgumentEntryTests {
 
         try InvestigationMachineZeroArgumentOutputWriter(
             system: system.system
-        ).write(Data([0xaa]))
+        ).write(
+            Data([0xaa]),
+            descriptor: STDOUT_FILENO,
+            maximumByteCount:
+                InvestigationMachineDriverCompletionArtifact.maximumByteCount,
+            deadlineNanoseconds: 5_000_000_041
+        )
 
         let snapshot = system.snapshot()
         #expect(snapshot.waits.count == 1)
@@ -258,7 +308,13 @@ struct InvestigationMachineZeroArgumentEntryTests {
             system: system.system
         )
 
-        try writer.write(Data([1, 2, 3, 4, 5]))
+        try writer.write(
+            Data([1, 2, 3, 4, 5]),
+            descriptor: STDOUT_FILENO,
+            maximumByteCount:
+                InvestigationMachineDriverCompletionArtifact.maximumByteCount,
+            deadlineNanoseconds: 5_000_000_001
+        )
 
         let snapshot = system.snapshot()
         #expect(snapshot.writes == [
@@ -273,6 +329,38 @@ struct InvestigationMachineZeroArgumentEntryTests {
     }
 
     @Test
+    func outputWriterRetriesEagainAndEwouldblockWithinSameDeadline() throws {
+        let system = ScriptedZeroArgumentOutputSystem(
+            results: [
+                .failure(.init(errno: EAGAIN)),
+                .failure(.init(errno: EWOULDBLOCK)),
+                .success(2),
+            ]
+        )
+        let writer = InvestigationMachineZeroArgumentOutputWriter(
+            system: system.system
+        )
+
+        try writer.write(
+            Data([1, 2]),
+            descriptor: STDOUT_FILENO,
+            maximumByteCount:
+                InvestigationMachineDriverCompletionArtifact.maximumByteCount,
+            deadlineNanoseconds: 5_000_000_001
+        )
+
+        let snapshot = system.snapshot()
+        #expect(snapshot.waits.count == 3)
+        #expect(snapshot.waits.allSatisfy { $0.0 == STDOUT_FILENO })
+        #expect(Set(snapshot.waits.map(\.1)) == [5_000_000_001])
+        #expect(snapshot.writes == [
+            Data([1, 2]),
+            Data([1, 2]),
+            Data([1, 2]),
+        ])
+    }
+
+    @Test
     func completedFinalWriteIsNotReclassifiedByALateClockSample() throws {
         let system = ScriptedZeroArgumentOutputSystem(
             clockValues: [41, 42, 5_000_000_041],
@@ -281,11 +369,90 @@ struct InvestigationMachineZeroArgumentEntryTests {
 
         try InvestigationMachineZeroArgumentOutputWriter(
             system: system.system
-        ).write(Data([1]))
+        ).write(
+            Data([1]),
+            descriptor: STDOUT_FILENO,
+            maximumByteCount:
+                InvestigationMachineDriverCompletionArtifact.maximumByteCount,
+            deadlineNanoseconds: 5_000_000_041
+        )
 
         let snapshot = system.snapshot()
         #expect(snapshot.writes == [Data([1])])
         #expect(snapshot.clockReadCount == 2)
+    }
+
+    @Test
+    func outputWriterTemporarilyMakesStandardErrorNonblockingAndRestoresIt() throws {
+        let system = ScriptedZeroArgumentOutputSystem(
+            results: [.success(1)]
+        )
+        let writer = InvestigationMachineZeroArgumentOutputWriter(
+            system: system.system
+        )
+
+        try writer.write(
+            Data([0xaa]),
+            descriptor: STDERR_FILENO,
+            maximumByteCount: 16,
+            deadlineNanoseconds: 5_000_000_001
+        )
+
+        let snapshot = system.snapshot()
+        #expect(snapshot.statusReads == [STDERR_FILENO, STDERR_FILENO, STDERR_FILENO])
+        #expect(snapshot.statusSets.count == 2)
+        #expect(snapshot.statusSets[0].0 == STDERR_FILENO)
+        #expect(snapshot.statusSets[0].1 == O_WRONLY | O_NONBLOCK)
+        #expect(snapshot.statusSets[1].0 == STDERR_FILENO)
+        #expect(snapshot.statusSets[1].1 == O_WRONLY)
+    }
+
+    @Test
+    func outputWriterBestEffortRestoresFlagsWhenReadbackAfterSetFails() {
+        let system = ScriptedZeroArgumentOutputSystem(
+            results: [.success(1)]
+        )
+        system.failStatusReadAfterFirstSet = true
+        let writer = InvestigationMachineZeroArgumentOutputWriter(
+            system: system.system
+        )
+
+        #expect(throws: InvestigationMachineZeroArgumentEntryError
+            .containmentUncertain) {
+            try writer.write(
+                Data([0xaa]),
+                descriptor: STDERR_FILENO,
+                maximumByteCount: 16,
+                deadlineNanoseconds: 5_000_000_001
+            )
+        }
+        let snapshot = system.snapshot()
+        #expect(snapshot.statusSets.count == 2)
+        #expect(snapshot.statusSets[0].1 == O_WRONLY | O_NONBLOCK)
+        #expect(snapshot.statusSets[1].1 == O_WRONLY)
+    }
+
+    @Test
+    func outputWriterRestoreFailureAfterCommittedStandardErrorIsContainmentUncertain() {
+        let system = ScriptedZeroArgumentOutputSystem(
+            results: [.success(1)]
+        )
+        system.failRestoreSet = true
+        let writer = InvestigationMachineZeroArgumentOutputWriter(
+            system: system.system
+        )
+
+        #expect(throws: InvestigationMachineZeroArgumentEntryError
+            .containmentUncertain) {
+            try writer.write(
+                Data([0xaa]),
+                descriptor: STDERR_FILENO,
+                maximumByteCount: 16,
+                deadlineNanoseconds: 5_000_000_001
+            )
+        }
+        let snapshot = system.snapshot()
+        #expect(snapshot.writes == [Data([0xaa])])
     }
 
     @Test(arguments: OutputFailure.allCases)
@@ -298,7 +465,13 @@ struct InvestigationMachineZeroArgumentEntryTests {
             .outputUnavailable) {
             try InvestigationMachineZeroArgumentOutputWriter(
                 system: fixture.system.system
-            ).write(fixture.payload)
+            ).write(
+                fixture.payload,
+                descriptor: STDOUT_FILENO,
+                maximumByteCount:
+                    InvestigationMachineDriverCompletionArtifact.maximumByteCount,
+                deadlineNanoseconds: fixture.deadline
+            )
         }
         let snapshot = fixture.system.snapshot()
         switch failure {
@@ -326,6 +499,55 @@ struct InvestigationMachineZeroArgumentEntryTests {
 
         #expect(cancellation.snapshot().checks == 1)
         #expect(cancellation.snapshot().committed)
+        #expect(trace.outputs.count == 2)
+    }
+
+    @Test
+    func outerRoleReusesOneTerminalDeadlineForEvidenceAndCompletion() async throws {
+        let trace = ZeroArgumentTrace()
+        let terminalOutput = TerminalOutputProbe()
+        let entry = InvestigationMachineZeroArgumentEntry(
+            dependencies: dependencies(
+                trace: trace,
+                role: .outer(outerObservation()),
+                terminalOutput: terminalOutput
+            )
+        )
+
+        try await entry.run()
+
+        #expect(terminalOutput.snapshot().deadlines == [777, 777])
+        #expect(terminalOutput.snapshot().writes == [
+            .evidence,
+            .completion,
+        ])
+    }
+
+    @Test
+    func sharedTerminalDeadlinePreventsFreshCompletionBudget() async {
+        let trace = ZeroArgumentTrace()
+        let terminalOutput = TerminalOutputProbe(
+            writeArtifactError: .outputUnavailable
+        )
+        let entry = InvestigationMachineZeroArgumentEntry(
+            dependencies: dependencies(
+                trace: trace,
+                role: .outer(outerObservation()),
+                terminalOutput: terminalOutput
+            )
+        )
+
+        await #expect(
+            throws: InvestigationMachineZeroArgumentEntryError.outputUnavailable
+        ) {
+            try await entry.run()
+        }
+        #expect(terminalOutput.snapshot().deadlines == [777, 777])
+        #expect(terminalOutput.snapshot().writes == [
+            .evidence,
+            .completion,
+        ])
+        #expect(trace.stderr.count == 1)
         #expect(trace.outputs.count == 1)
     }
 
@@ -345,7 +567,12 @@ struct InvestigationMachineZeroArgumentEntryTests {
         ) {
             try await entry.run()
         }
-        #expect(trace.outputs.isEmpty)
+        #expect(trace.outputs.count == 1)
+        let framedClaim = try! #require(trace.outputs.only)
+        #expect(framedClaim.count == 1_010)
+        let count = try! decodeBigEndianUInt32(framedClaim.prefix(4))
+        #expect(count == 1_006)
+        #expect(trace.stderr.isEmpty)
     }
 }
 
@@ -390,72 +617,33 @@ private enum CompletionSummaryMutation: CaseIterable {
 }
 
 private enum CompletionEncodingMutation: CaseIterable {
-    case magic, domain, version, domainTag, businessTag, fieldOrder
-    case uuidLength, capsuleLength, inputLength, countLength, digestLength
-    case payload, digest, zeroDigest, wrongCount, missingDigest
-    case truncated, unknownField, trailing, oversized
+    case payload, claimSHA, bundleSHA, selfSHA, zeroSelfSHA
+    case wrongCount, truncated, trailing, oversized
 
     func apply(to value: Data) throws -> Data {
         switch self {
-        case .magic:
-            var result = value; result[result.startIndex] ^= 0xff; return result
-        case .domain:
-            var result = value; result[10] ^= 0x01; return result
-        case .version:
-            var result = value; result[60] ^= 0x01; return result
-        case .domainTag:
-            var result = value; result[5] = 1; return result
-        case .businessTag:
-            var result = value; result[62] = 3; return result
-        case .fieldOrder:
-            var result = value
-            let capsule = result.subdata(in: 83..<121)
-            let input = result.subdata(in: 121..<159)
-            result.replaceSubrange(83..<121, with: input)
-            result.replaceSubrange(121..<159, with: capsule)
-            return result
-        case .uuidLength:
-            var result = value; result[66] = 15; return result
-        case .capsuleLength:
-            var result = value; result[88] = 31; return result
-        case .inputLength:
-            var result = value; result[126] = 33; return result
-        case .countLength:
-            var result = value; result[164] = 8; return result
-        case .digestLength:
-            var result = value; result[174] = 31; return result
         case .payload:
-            var result = value; result[89] ^= 0x01; return result
-        case .digest:
-            var result = value; result[result.index(before: result.endIndex)] ^= 1
-            return result
-        case .zeroDigest:
+            var result = value; result[8] ^= 0x01; return result
+        case .claimSHA:
+            var result = value; result[100] ^= 0x01; return result
+        case .bundleSHA:
+            var result = value; result[132] ^= 0x01; return result
+        case .selfSHA:
+            var result = value; result[179] ^= 0x01; return result
+        case .zeroSelfSHA:
             var result = value
-            result.replaceSubrange(175..<207, with: Data(repeating: 0, count: 32))
+            result.replaceSubrange(148..<180, with: Data(repeating: 0, count: 32))
             return result
         case .wrongCount:
-            let summary = InvestigationMachineEightEpochCompletionSummary(
-                outerAttemptUUID: try completionSummary().outerAttemptUUID,
-                wholeCapsuleSHA256: try completionDigest(0x21),
-                wholeInputSHA256: try completionDigest(0x22),
-                completedEpochCount: 7
-            )
-            let zeroed = independentCompletionTranscript(
-                summary: summary, digest: Data(repeating: 0, count: 32)
-            )
-            return independentCompletionTranscript(
-                summary: summary, digest: Data(SHA256.hash(data: zeroed))
-            )
-        case .missingDigest:
-            return value.subdata(in: 0..<169)
+            var result = value
+            result.replaceSubrange(80..<84, with: completionUInt32Data(7))
+            return result
         case .truncated:
             return Data(value.dropLast())
-        case .unknownField:
-            return value + Data([0, 7, 0, 0, 0, 1, 1])
         case .trailing:
             return value + Data([0])
         case .oversized:
-            return value + Data(repeating: 1, count: 513)
+            return value + Data(repeating: 1, count: 181)
         }
     }
 }
@@ -527,41 +715,42 @@ private enum OutputFailure: CaseIterable {
     case deadlineAfterPartialWrite
 
     var fixture: (
-        system: ScriptedZeroArgumentOutputSystem, payload: Data
+        system: ScriptedZeroArgumentOutputSystem, payload: Data, deadline: UInt64
     ) {
         switch self {
         case .empty:
-            (ScriptedZeroArgumentOutputSystem(results: []), Data())
+            (ScriptedZeroArgumentOutputSystem(results: []), Data(), 5_000_000_001)
         case .oversized:
             (ScriptedZeroArgumentOutputSystem(results: []),
-             Data(repeating: 1, count: 513))
+             Data(repeating: 1, count: 513),
+             5_000_000_001)
         case .clockOverflow:
             (ScriptedZeroArgumentOutputSystem(
                 now: .max - 1, results: [.success(1)]
-            ), Data([1]))
+            ), Data([1]), 5_000_000_001)
         case .waitError:
             (ScriptedZeroArgumentOutputSystem(
                 results: [.success(1)],
                 waitResults: [.failure(.init(errno: ETIMEDOUT))]
-            ), Data([1]))
+            ), Data([1]), 5_000_000_001)
         case .zeroWrite:
-            (ScriptedZeroArgumentOutputSystem(results: [.success(0)]), Data([1]))
+            (ScriptedZeroArgumentOutputSystem(results: [.success(0)]), Data([1]), 5_000_000_001)
         case .writeError:
             (ScriptedZeroArgumentOutputSystem(
                 results: [.failure(.init(errno: EIO))]
-            ), Data([1]))
+            ), Data([1]), 5_000_000_001)
         case .overreportedWrite:
-            (ScriptedZeroArgumentOutputSystem(results: [.success(2)]), Data([1]))
+            (ScriptedZeroArgumentOutputSystem(results: [.success(2)]), Data([1]), 5_000_000_001)
         case .deadlineAfterReadiness:
             (ScriptedZeroArgumentOutputSystem(
                 clockValues: [41, 5_000_000_041],
                 results: [.success(1)]
-            ), Data([1]))
+            ), Data([1]), 5_000_000_041)
         case .deadlineAfterPartialWrite:
             (ScriptedZeroArgumentOutputSystem(
                 clockValues: [41, 42, 5_000_000_041],
                 results: [.success(1)]
-            ), Data([1, 2]))
+            ), Data([1, 2]), 5_000_000_041)
         }
     }
 }
@@ -591,11 +780,14 @@ private final class ZeroArgumentTrace: @unchecked Sendable {
     private let lock = NSLock()
     private var events: [String] = []
     private var outputValues: [Data] = []
+    private var standardErrorValues: [Data] = []
 
     func append(_ event: String) { lock.withLock { events.append(event) } }
     func output(_ data: Data) { lock.withLock { outputValues.append(data) } }
+    func standardError(_ data: Data) { lock.withLock { standardErrorValues.append(data) } }
     func snapshot() -> [String] { lock.withLock { events } }
     var outputs: [Data] { lock.withLock { outputValues } }
+    var stderr: [Data] { lock.withLock { standardErrorValues } }
 }
 
 private final class LateCancellationProbe: @unchecked Sendable {
@@ -610,6 +802,52 @@ private final class LateCancellationProbe: @unchecked Sendable {
     }
 }
 
+private final class TerminalOutputProbe: @unchecked Sendable {
+    enum WriteKind: Equatable {
+        case evidence
+        case completion
+    }
+
+    private let lock = NSLock()
+    private let beginDeadline: UInt64
+    private let writeEvidenceError: InvestigationMachineZeroArgumentEntryError?
+    private let writeArtifactError: InvestigationMachineZeroArgumentEntryError?
+    private var deadlines: [UInt64] = []
+    private var writes: [WriteKind] = []
+
+    init(
+        beginDeadline: UInt64 = 777,
+        writeEvidenceError: InvestigationMachineZeroArgumentEntryError? = nil,
+        writeArtifactError: InvestigationMachineZeroArgumentEntryError? = nil
+    ) {
+        self.beginDeadline = beginDeadline
+        self.writeEvidenceError = writeEvidenceError
+        self.writeArtifactError = writeArtifactError
+    }
+
+    func begin() -> UInt64 { beginDeadline }
+
+    func writeEvidence(_ deadline: UInt64) throws {
+        try lock.withLock {
+            deadlines.append(deadline)
+            writes.append(.evidence)
+            if let writeEvidenceError { throw writeEvidenceError }
+        }
+    }
+
+    func writeArtifact(_ deadline: UInt64) throws {
+        try lock.withLock {
+            deadlines.append(deadline)
+            writes.append(.completion)
+            if let writeArtifactError { throw writeArtifactError }
+        }
+    }
+
+    func snapshot() -> (deadlines: [UInt64], writes: [WriteKind]) {
+        lock.withLock { (deadlines, writes) }
+    }
+}
+
 private actor EmptyEightEpochPlan: InvestigationMachineEightEpochPlan {
     func takeNext() throws -> InvestigationMachineFixedEpochSelection {
         throw InvestigationMachineFixedCapsuleIntakeError.exhausted
@@ -620,7 +858,8 @@ private func dependencies(
     trace: ZeroArgumentTrace,
     role: InvestigationMachineZeroArgumentRole,
     failure: ZeroArgumentFailurePoint? = nil,
-    cancellation: LateCancellationProbe? = nil
+    cancellation: LateCancellationProbe? = nil,
+    terminalOutput: TerminalOutputProbe? = nil
 ) -> InvestigationMachineZeroArgumentEntryDependencies {
     let plan = EmptyEightEpochPlan()
     return .init(
@@ -637,12 +876,31 @@ private func dependencies(
         observeInstalledDriver: {
             trace.append("installed")
             if failure == .installed { throw failure!.error }
+            _ = try installedObservation()
         },
         readPlan: {
             trace.append("intake")
             if failure == .intake { throw failure!.error }
             return plan
         },
+        prebindPlan: { plan in
+            trace.append("prebind")
+            let first = try selectionFixture()
+            return InvestigationMachineZeroArgumentPreboundPlan(
+                firstSelection: first,
+                plan: plan
+            )
+        },
+        collectLineageClaim: { selection in
+            trace.append("claim")
+            return try claimFixture(selection: selection)
+        },
+        writeFramedClaim: { claim in
+            trace.append("claim-write")
+            trace.output(try framedClaimData(claim))
+        },
+        stopForGate: { trace.append("stop") },
+        beginEvidenceCollection: { _ in trace.append("begin-evidence") },
         runCohort: { _ in
             trace.append("cohort")
             if failure == .cohort { throw failure!.error }
@@ -670,42 +928,23 @@ private func dependencies(
             trace.append("revalidate")
             if failure == .revalidate { throw failure!.error }
         },
-        writeArtifact: { data in
+        beginTerminalOutputDeadline: {
+            terminalOutput?.begin() ?? 777
+        },
+        writeArtifact: { data, deadline in
             trace.append("write")
+            try terminalOutput?.writeArtifact(deadline)
             if failure == .write { throw failure!.error }
             trace.output(data)
             cancellation?.commit()
+        },
+        finishEvidenceCollection: { _ in try evidenceBundleFixture() },
+        writeEvidence: { claim, bundle, deadline in
+            trace.append("evidence-write")
+            try terminalOutput?.writeEvidence(deadline)
+            trace.standardError(try evidenceData(claim: claim, bundle: bundle))
         }
     )
-}
-
-private let completionDomain =
-    "stornaut.task39.machine.driver-completion"
-
-private func independentCompletionTranscript(
-    summary: InvestigationMachineEightEpochCompletionSummary,
-    digest: Data
-) -> Data {
-    var result = Data([0x53, 0x54, 0x4e, 0x43])
-    appendCompletionField(0, Data(completionDomain.utf8), to: &result)
-    appendCompletionField(1, completionUInt32Data(1), to: &result)
-    appendCompletionField(2, completionUUIDData(summary.outerAttemptUUID), to: &result)
-    appendCompletionField(3, summary.wholeCapsuleSHA256.rawBytes, to: &result)
-    appendCompletionField(4, summary.wholeInputSHA256.rawBytes, to: &result)
-    appendCompletionField(5, completionUInt32Data(summary.completedEpochCount), to: &result)
-    appendCompletionField(6, digest, to: &result)
-    return result
-}
-
-private func appendCompletionField(
-    _ tag: UInt16, _ payload: Data, to result: inout Data
-) {
-    result.append(contentsOf: [
-        UInt8(truncatingIfNeeded: tag >> 8),
-        UInt8(truncatingIfNeeded: tag),
-    ])
-    result.append(completionUInt32Data(UInt32(payload.count)))
-    result.append(payload)
 }
 
 private func completionUUIDData(_ value: UUID) -> Data {
@@ -720,6 +959,39 @@ private func completionUInt32Data(_ value: UInt32) -> Data {
         UInt8(truncatingIfNeeded: value >> 8),
         UInt8(truncatingIfNeeded: value),
     ])
+}
+
+private func decodeBigEndianUInt32<S: DataProtocol>(_ data: S) throws -> UInt32 {
+    let bytes = Array(data)
+    guard bytes.count == 4 else {
+        throw InvestigationMachineZeroArgumentEntryError.invalidCompletion
+    }
+    return bytes.reduce(0) { ($0 << 8) | UInt32($1) }
+}
+
+private func framedClaimData(_ claim: ResolvedRootDriverClaimV1) throws -> Data {
+    let encoded = try claim.encoded()
+    guard let count = UInt32(exactly: encoded.count) else {
+        throw InvestigationMachineZeroArgumentEntryError.outputUnavailable
+    }
+    return completionUInt32Data(count) + encoded
+}
+
+private func evidenceData(
+    claim: ResolvedRootDriverClaimV1,
+    bundle: Data
+) throws -> Data {
+    let claimLine = Data(
+        ("STORNAUT_TASK39_IIC_ROOT_DRIVER_CLAIM_V1 "
+            + (try claim.encoded()).base64EncodedString()
+            + "\n").utf8
+    )
+    let bundleLine = Data(
+        ("STORNAUT_TASK39_IIC_EPOCH_BUNDLE_V1 "
+            + bundle.base64EncodedString()
+            + "\n").utf8
+    )
+    return claimLine + bundleLine
 }
 
 private func completionSummary() throws
@@ -739,6 +1011,182 @@ private func completionDigest(
     _ byte: UInt8
 ) throws -> InvestigationHandoffSHA256 {
     try .init(rawBytes: Data(repeating: byte, count: 32))
+}
+
+private func selectionFixture() throws -> InvestigationMachineFixedEpochSelection {
+    let configuration = Data("claim-flow-configuration".utf8)
+    let epochUUID = UUID(
+        uuidString: "00000000-0000-0000-0000-000000000201"
+    )!
+    let configurationNonce = UUID(
+        uuidString: "00000000-0000-0000-0000-000000000301"
+    )!
+    let configurationSHA256 = InvestigationHandoffSHA256.hashing(configuration)
+    let signedRuntimeBindingSHA256 = try completionDigest(0x7a)
+    let epoch = try InvestigationCohortEpoch(
+        ordinal: 0,
+        epochUUID: epochUUID,
+        scenario: .success,
+        configurationNonce: configurationNonce,
+        configuration: configuration,
+        configurationSHA256: configurationSHA256,
+        signedRuntimeBindingSHA256: signedRuntimeBindingSHA256
+    )
+    return .init(
+        outerAttemptUUID: try completionSummary().outerAttemptUUID,
+        wholeCapsuleSHA256: try completionDigest(0x21),
+        wholeInputSHA256: try completionDigest(0x22),
+        epoch: epoch,
+        projection: try projectionFixture(
+            epochUUID: epochUUID,
+            configurationNonce: configurationNonce,
+            configurationSHA256: configurationSHA256,
+            signedRuntimeBindingSHA256: signedRuntimeBindingSHA256
+        )
+    )
+}
+
+private func projectionFixture(
+    epochUUID: UUID,
+    configurationNonce: UUID,
+    configurationSHA256: InvestigationHandoffSHA256,
+    signedRuntimeBindingSHA256: InvestigationHandoffSHA256
+) throws -> InvestigationInstalledL2IdentityProjection {
+    try .init(
+        epochUUID: epochUUID,
+        configurationNonce: configurationNonce,
+        configurationValidBefore: .init(rawValue: 2_000_000_000_000_000),
+        configurationSHA256: configurationSHA256,
+        signedRuntimeBindingSHA256: signedRuntimeBindingSHA256,
+        appExecutableSHA256: .hashing(Data([0x7b])),
+        appBundleIdentifier:
+            InvestigationInstalledL2IdentityProjection.fixedAppBundleIdentifier,
+        helperExecutableSHA256: .hashing(Data([0x7c])),
+        helperServiceIdentifier:
+            InvestigationInstalledL2IdentityProjection
+            .fixedHelperServiceIdentifier,
+        machineDriverExecutableSHA256: .hashing(Data([0x7d])),
+        machineDriverSigningIdentifier:
+            InvestigationInstalledL2IdentityProjection
+            .fixedMachineDriverSigningIdentifier,
+        machineDriverDesignatedRequirementSHA256: .hashing(Data([0x80])),
+        machineDriverCodeDirectoryHash: Data(repeating: 0x03, count: 20),
+        machineClaimServiceIdentifier:
+            InvestigationInstalledL2IdentityProjection
+            .fixedMachineClaimServiceIdentifier
+    )
+}
+
+private func claimFixture(
+    selection: InvestigationMachineFixedEpochSelection? = nil
+) throws -> ResolvedRootDriverClaimV1 {
+    let selected = try selection ?? selectionFixture()
+    let process = try InvestigationGeneralProcessIdentityV1(
+        processID: 9001,
+        processIDVersion: 2,
+        startSeconds: 100,
+        startMicroseconds: 200,
+        parentProcessID: 42,
+        processGroupID: 9001,
+        sessionID: 42,
+        auditSessionID: 7,
+        auditTokenWords: [0, 0, 0, 0, 0, 9001, 7, 2],
+        realUserID: 0,
+        effectiveUserID: 0,
+        savedUserID: 0,
+        realGroupID: 0,
+        effectiveGroupID: 0,
+        savedGroupID: 0,
+        supplementaryGroups: [0]
+    )
+    let signing = try InvestigationResolvedRootDriverSigningIdentityV1(
+        signingIdentifier: ResolvedRootDriverClaimV1.fixedSigningIdentifier,
+        designatedRequirementSHA256: .hashing(Data([0x44])),
+        codeDirectoryHash: Data(repeating: 0x45, count: 20),
+        isAdHoc: true
+    )
+    let executable = try InvestigationResolvedRootDriverExecutableIdentityV1(
+        path: ResolvedRootDriverClaimV1.fixedExecutablePath,
+        node: .init(
+            deviceID: 1,
+            inode: 2,
+            generation: 3,
+            isRegularFile: true,
+            ownerUserID: 0,
+            ownerGroupID: 0,
+            mode: 0o755,
+            linkCount: 1,
+            size: 4_096,
+            flags: 0
+        ),
+        sha256: .hashing(Data([0x46])),
+        staticSigning: signing,
+        liveSigning: signing
+    )
+    return try .init(
+        outerAttemptUUID: selected.outerAttemptUUID,
+        wholeInputSHA256: selected.wholeInputSHA256,
+        process: process,
+        executable: executable,
+        observedAtContinuousNanoseconds: 1_234_567_890
+    )
+}
+
+private func evidenceBundleFixture() throws -> Data {
+    Data("evidence-bundle".utf8)
+}
+
+private func installedObservation() throws -> InvestigationMachineInstalledDriverObservation {
+    .init(
+        executablePath: ResolvedRootDriverClaimV1.fixedExecutablePath,
+        node: .init(
+            deviceID: 1,
+            inode: 2,
+            generation: 3,
+            isRegularFile: true,
+            ownerUserID: 0,
+            ownerGroupID: 0,
+            mode: 0o755,
+            linkCount: 1,
+            size: 4_096,
+            flags: 0,
+            modificationSeconds: 1,
+            modificationNanoseconds: 2,
+            statusChangeSeconds: 3,
+            statusChangeNanoseconds: 4
+        ),
+        executableSHA256: String(repeating: "a", count: 64),
+        signing: .init(
+            signingIdentifier: ResolvedRootDriverClaimV1.fixedSigningIdentifier,
+            designatedRequirementSHA256: String(repeating: "b", count: 64),
+            codeDirectoryHash: String(repeating: "c", count: 40),
+            isAdHoc: true
+        ),
+        manifest: .init(
+            path: InvestigationMachineInstalledDriverObservation.fixedLaunchDaemonManifestPath,
+            node: .init(
+                deviceID: 5,
+                inode: 6,
+                generation: 7,
+                isRegularFile: true,
+                ownerUserID: 0,
+                ownerGroupID: 0,
+                mode: 0o644,
+                linkCount: 1,
+                size: 128,
+                flags: 0,
+                modificationSeconds: 1,
+                modificationNanoseconds: 2,
+                statusChangeSeconds: 3,
+                statusChangeNanoseconds: 4
+            ),
+            sha256: InvestigationMachineInstalledDriverObservation.fixedLaunchDaemonManifestSHA256,
+            label: InvestigationMachineInstalledDriverObservation.fixedLifecycleLabel,
+            program: InvestigationMachineInstalledDriverObservation.fixedLifecycleProgram,
+            primaryServiceIdentifier: InvestigationMachineInstalledDriverObservation.fixedLifecycleLabel,
+            machineClaimServiceIdentifier: InvestigationMachineInstalledDriverObservation.fixedMachineClaimServiceIdentifier
+        )
+    )
 }
 
 private func outerObservation()
@@ -952,6 +1400,8 @@ private final class ScriptedZeroArgumentOutputSystem: @unchecked Sendable {
         let waits: [(Int32, UInt64)]
         let writeDescriptors: [Int32]
         let writes: [Data]
+        let statusReads: [Int32]
+        let statusSets: [(Int32, Int32)]
         let clockReadCount: Int
     }
     private let lock = NSLock()
@@ -964,6 +1414,14 @@ private final class ScriptedZeroArgumentOutputSystem: @unchecked Sendable {
     private var waitValues: [(Int32, UInt64)] = []
     private var descriptorValues: [Int32] = []
     private var values: [Data] = []
+    private var descriptorStatusValues: [Int32: Int32] = [
+        STDOUT_FILENO: O_WRONLY | O_NONBLOCK,
+        STDERR_FILENO: O_WRONLY,
+    ]
+    private var statusReadValues: [Int32] = []
+    private var statusSetValues: [(Int32, Int32)] = []
+    var failStatusReadAfterFirstSet = false
+    var failRestoreSet = false
 
     init(
         now: UInt64 = 1,
@@ -985,6 +1443,28 @@ private final class ScriptedZeroArgumentOutputSystem: @unchecked Sendable {
                     clockReads += 1
                     if clockValues.count > 1 { return clockValues.removeFirst() }
                     return clockValues[0]
+                }
+            },
+            descriptorStatusFlags: { [self] descriptor in
+                lock.withLock {
+                    statusReadValues.append(descriptor)
+                    if failStatusReadAfterFirstSet, statusSetValues.count == 1 {
+                        return .failure(.init(errno: EIO))
+                    }
+                    guard let value = descriptorStatusValues[descriptor] else {
+                        return .failure(.init(errno: EBADF))
+                    }
+                    return .success(value)
+                }
+            },
+            setStatusFlags: { [self] descriptor, flags in
+                lock.withLock {
+                    statusSetValues.append((descriptor, flags))
+                    if failRestoreSet, statusSetValues.count > 1 {
+                        return .failure(.init(errno: EIO))
+                    }
+                    descriptorStatusValues[descriptor] = flags
+                    return .success(())
                 }
             },
             waitWritable: { [self] descriptor, deadline in
@@ -1010,6 +1490,8 @@ private final class ScriptedZeroArgumentOutputSystem: @unchecked Sendable {
                 waits: waitValues,
                 writeDescriptors: descriptorValues,
                 writes: values,
+                statusReads: statusReadValues,
+                statusSets: statusSetValues,
                 clockReadCount: clockReads
             )
         }

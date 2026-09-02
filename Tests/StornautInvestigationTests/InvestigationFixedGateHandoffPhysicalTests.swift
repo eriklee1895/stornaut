@@ -99,6 +99,7 @@ private final class HandoffPhysicalFixture {
                 "InvestigationHandoffFrameContract",
                 "InvestigationInstalledL2ProjectionContract",
                 "InvestigationMachineClaimContract",
+                "InvestigationResolvedRootDriverLineageContract",
                 "InvestigationProjectedCohortInput",
             ]
         ),
@@ -108,6 +109,7 @@ private final class HandoffPhysicalFixture {
                 "DarwinInvestigationMachineFixedGateSystem",
                 "InvestigationMachineFixedGateLauncher",
                 "InvestigationMachineGateTransport",
+                "InvestigationMachineResolvedRootDriverValidator",
             ]
         ),
         (
@@ -170,6 +172,19 @@ private final class HandoffPhysicalFixture {
                     return path.path
                 }
             }
+            let cIdentityObject = buildRoot.appending(
+                path: "CInvestigationIdentitySupport.build/"
+                    + "CInvestigationIdentitySupport.c.o"
+            )
+            let cIdentityBuildDirectory = buildRoot.appending(
+                path: "CInvestigationIdentitySupport.build"
+            )
+            guard FileManager.default.fileExists(atPath: cIdentityObject.path)
+            else {
+                throw HandoffPhysicalTestError.invalid(
+                    "missing current object \(cIdentityObject.path)"
+                )
+            }
             let output = Pipe()
             let compiler = Process()
             compiler.executableURL = URL(filePath: "/usr/bin/xcrun")
@@ -178,8 +193,9 @@ private final class HandoffPhysicalFixture {
                 "swiftc", "-parse-as-library", "-package-name",
                 packageName,
                 "-I", buildRoot.appending(path: "Modules").path,
+                "-I", cIdentityBuildDirectory.path,
                 source.path,
-            ] + objects + ["-o", coordinator.path]
+            ] + objects + [cIdentityObject.path, "-lbsm", "-o", coordinator.path]
             compiler.environment = [
                 "HOME": "/var/empty", "LANG": "C",
                 "LC_ALL": "C", "PATH": "/usr/bin:/bin",

@@ -1,6 +1,6 @@
 #!/bin/zsh -f
 set -euo pipefail
-typeset -r iicc_self_sha=56feffdc21e0e6472d2e641ea6721de0520657ae76354a3586c530348db76adb # iicc-self-seal
+typeset -r iicc_self_sha=2ac09ab50f34f9936b8046e911e7ac17c88da55abfb7e62ab439016b769793f1 # iicc-self-seal
 if [[ $0 != /dev/fd/9 ]]; then
     self=${0:A}
     [[ -f $self && ! -L $self ]] || exit 2
@@ -45,6 +45,12 @@ MAX_RECEIPT = 4_096
 MAX_CAPSULE = 1_069_056
 MAX_EPOCH = 256 << 10
 MAX_BUNDLE = 3 << 20
+ROOT_DRIVER_CLAIM_BYTES = 1_006
+DRIVER_COMPLETION_V3_BYTES = 180
+FIXED_DRIVER_PATH = ("/Library/Application Support/Stornaut/"
+    "Stornaut-R5-Diagnostic.app/Contents/MacOS/"
+    "StornautInvestigationMachineDriver")
+FIXED_DRIVER_SIGNING_ID = "com.eriklee.stornaut.investigation.machine-driver"
 SCENARIOS = ("success", "cancellation", "timeout", "invalidEnvelope",
     "identityMismatch", "transportLoss", "lifecycleRecovery", "artifactCleanupFailure")
 ROLE_NAMES = {1: "sourceBuildIdentity", 2: "builtStagingInstalledIdentity",
@@ -359,6 +365,55 @@ def parse_claim(data):
     return {"request":fields[0],"challenge":uuid_text(fields[1]),"connection":uuid_text(fields[2]),
         "app":app,"helper":helper,"nonce":uuid_text(residue[0]),"observed":observed,"recorded":recorded,
         "claimed":claimed,"release":u64(fields[10]),"raw":data}
+def parse_resolved_root_driver_claim(data):
+    path_size=len(FIXED_DRIVER_PATH.encode()); signing_size=len(FIXED_DRIVER_SIGNING_ID.encode())
+    ranges=[(16,16),(32,32),(4,4),(4,4),(8,8),(4,4),(4,4),(4,4),(4,4),(4,4),
+        (32,32),(4,4),(4,4),(4,4),(4,4),(4,4),(4,4),(4,4),(64,64),
+        (path_size,path_size),(8,8),(8,8),(4,4),(1,1),(4,4),(4,4),(4,4),
+        (8,8),(8,8),(4,4),(32,32),(signing_size,signing_size),(32,32),
+        (4,4),(32,32),(1,1),(signing_size,signing_size),(32,32),(4,4),
+        (32,32),(1,1),(8,8),(32,32)]
+    require(len(data)==ROOT_DRIVER_CLAIM_BYTES, "resolved root-driver claim size")
+    f=parse_transcript(data,"stornaut.task39.resolved-root-driver-claim-v1",
+        ranges,ROOT_DRIVER_CLAIM_BYTES)
+    pid,version=u32(f[2]),u32(f[3]); ruid,euid,suid=map(u32,f[11:14])
+    rgid,egid,sgid=map(u32,f[14:17]); asid=u32(f[9]); token=struct.unpack(">8I",f[10])
+    group_count=u32(f[17]); groups=struct.unpack(">16I",f[18])
+    require(pid>1 and version>0 and i64(f[4])>0 and 0<=i32(f[5])<=999_999
+        and u32(f[6])>0 and u32(f[7])>1 and u32(f[8])>0 and asid>0,
+        "resolved root-driver process")
+    require((ruid,euid,suid,rgid,egid,sgid)==(0,0,0,0,0,0)
+        and token[1:]==(euid,egid,ruid,rgid,pid,asid,version),
+        "resolved root-driver credentials")
+    admitted_groups=groups[:group_count]
+    require(1<=group_count<=16 and groups[group_count:]==(0,)*(16-group_count)
+        and tuple(sorted(set(admitted_groups)))==admitted_groups and 0 in admitted_groups,
+        "resolved root-driver groups")
+    require(text(f[19])==FIXED_DRIVER_PATH and u64(f[20])>0 and u64(f[21])>0
+        and boolean(f[23]) and u32(f[24])==u32(f[25])==0 and u32(f[26])==0o755
+        and u64(f[27])==1 and 1<=i64(f[28])<=16<<20 and u32(f[29])==0
+        and any(f[30]), "resolved root-driver executable")
+    def signing(start):
+        count=u32(f[start+2]); padded=f[start+3]
+        require(text(f[start])==FIXED_DRIVER_SIGNING_ID and any(f[start+1])
+            and count in (20,32) and any(padded[:count])
+            and padded[count:]==bytes(32-count) and boolean(f[start+4]),
+            "resolved root-driver signing")
+        return {"identifier":text(f[start]),"requirement":f[start+1],
+            "codeHash":padded[:count],"isAdHoc":boolean(f[start+4])}
+    static,live=signing(31),signing(36)
+    require(static==live and u64(f[41])>0 and any(f[42]),
+        "resolved root-driver stable identity")
+    zeroed=list(f);zeroed[42]=bytes(32)
+    require(hashlib.sha256(encode_transcript(
+        "stornaut.task39.resolved-root-driver-claim-v1",zeroed)).digest()==f[42],
+        "resolved root-driver claim self hash")
+    return {"attempt":uuid_text(f[0]),"whole":f[1],"pid":pid,
+        "selfSHA":f[42],"raw":data,"executable":{"sha":f[30],
+        "signingIdentifier":static["identifier"],
+        "designatedRequirement":static["requirement"],
+        "codeDirectoryHash":static["codeHash"],
+        "isAdHoc":static["isAdHoc"]}}
 def validate_json_artifacts(manifest, contents):
     values, epochs = {}, {}
     common = {"schemaVersion","role","campaignUUID","attemptUUID"}
@@ -709,7 +764,7 @@ def parse_gate_receipt(data, manifest, prearm):
             and child_tty[:2] == initial_tty[:2] and child_tty[2] == recovery
             and final_tty[:2] == initial_tty[:2] and final_tty[2] == saved,
             "raw Gate terminal")
-    require(0 <= count <= 512 and any(digest) and not overflow and output_eof
+    require(count == 1_190 and any(digest) and not overflow and output_eof
             and not expired and wait == b"\x01\x00\x00\x00\x00"
             and forwarded == 0, "raw Gate output")
     require(started > 0 and started <= completed
@@ -773,16 +828,23 @@ def parse_request(data, selection, previous):
     if successor: require(previous is not None and previous_helper["raw"]==previous["helper"]["raw"],"previous helper")
     return {"raw":data,"sha":hashlib.sha256(data).digest(),"deadline":u64(fields[2]),"mode":mode,"predecessor":inv[5],"predecessorSHA":inv[6],"previousHelper":previous_helper}
 
-def parse_bundle(diagnostic, manifest, epochs, prearm):
-    prefix = b"STORNAUT_TASK39_IIC_EPOCH_BUNDLE_V1 "
-    ending = b"\n"
-    require(diagnostic.startswith(prefix) and diagnostic.endswith(ending)
-            and not diagnostic.endswith(b"\r\n"),
-            "driver bundle envelope shape")
-    encoded = diagnostic[len(prefix):-len(ending)]
-    bundle = decoded_base64(encoded.decode(), "driver bundle", MAX_BUNDLE)
-    require(diagnostic == prefix + base64.b64encode(bundle) + ending,
-            "driver bundle canonical envelope")
+def parse_diagnostic(diagnostic):
+    claim_prefix=b"STORNAUT_TASK39_IIC_ROOT_DRIVER_CLAIM_V1 "
+    bundle_prefix=b"STORNAUT_TASK39_IIC_EPOCH_BUNDLE_V1 "
+    require(b"\r" not in diagnostic and diagnostic.count(b"\n")==2
+            and diagnostic.endswith(b"\n"), "driver diagnostic envelope shape")
+    claim_line,bundle_line,empty=diagnostic.split(b"\n")
+    require(not empty and claim_line.startswith(claim_prefix)
+            and bundle_line.startswith(bundle_prefix), "driver diagnostic lines")
+    claim=decoded_base64(claim_line[len(claim_prefix):].decode(),
+        "root driver claim",ROOT_DRIVER_CLAIM_BYTES)
+    bundle=decoded_base64(bundle_line[len(bundle_prefix):].decode(),
+        "driver bundle",MAX_BUNDLE)
+    require(diagnostic==claim_prefix+base64.b64encode(claim)+b"\n"
+        +bundle_prefix+base64.b64encode(bundle)+b"\n",
+        "driver diagnostic canonical envelope")
+    return claim,bundle
+def parse_bundle(bundle, manifest, epochs, prearm):
     fields = parse_transcript(bundle, "stornaut.task39.machine.driver-evidence-bundle.v1",
         [(16,16),(32,32),(32,32),(4,4)] + [(1,MAX_EPOCH)]*8, MAX_BUNDLE)
     require(uuid_text(fields[0]) == manifest["attempt"] and fields[1]==prearm["capsule"]
@@ -869,7 +931,8 @@ def parse_bundle(diagnostic, manifest, epochs, prearm):
         verified[-1]["driverParent"] = driver["parent"]
     require(len({value["driverParent"] for value in verified}) == 1,
             "outer driver identity drift")
-    return {"sha": hashlib.sha256(bundle).digest(), "whole": fields[2]}
+    return {"sha": hashlib.sha256(bundle).digest(), "whole": fields[2],
+        "outerDriverPID":verified[0]["driverParent"]}
 
 def parse_receipt(frame, manifest):
     require(len(frame) >= 4 and 1 <= u32(frame[:4]) <= MAX_RECEIPT
@@ -934,23 +997,40 @@ def validate_receipt_chain(
                 and projection["helper"] == install["helperExecutableSHA256"]
                 and projection["driver"] == install["machineDriverExecutableSHA256"],
                 "installed executable projection drift")
-    bundle = parse_bundle(diagnostic, manifest, epochs, prearm)
+    claim_bytes,bundle_bytes=parse_diagnostic(diagnostic)
+    claim=parse_resolved_root_driver_claim(claim_bytes)
+    bundle = parse_bundle(bundle_bytes, manifest, epochs, prearm)
     require(source["preArmFrameSHA256"] == prearm["sha"].hex()
             and {pair[8][1]["wholeProjectedInputSHA256"] for pair in epochs.values()}
                 == {prearm["whole"].hex()}
             and bundle["whole"] == prearm["whole"], "source/epoch whole join")
-    zero = bytes(32)
-    completion_zero = encode_transcript(
-        "stornaut.task39.machine.driver-completion-v2",
-        [uuid.UUID(manifest["attempt"]).bytes, prearm["capsule"],
-         prearm["whole"], struct.pack(">I", 8), bundle["sha"], zero])
-    completion = encode_transcript(
-        "stornaut.task39.machine.driver-completion-v2",
-        [uuid.UUID(manifest["attempt"]).bytes, prearm["capsule"],
-         prearm["whole"], struct.pack(">I", 8), bundle["sha"],
-         hashlib.sha256(completion_zero).digest()])
-    require(raw["outputCount"] == len(completion)
-            and raw["outputSHA"] == hashlib.sha256(completion).digest(),
+    require(claim["attempt"]==manifest["attempt"]
+            and claim["whole"]==prearm["whole"]
+            and claim["pid"]==bundle["outerDriverPID"],
+            "resolved root-driver claim binding")
+    executable=claim["executable"]
+    require(executable["sha"].hex()==install["machineDriverExecutableSHA256"]
+            and executable["isAdHoc"] is True
+            and all(executable["sha"].hex()==projection["driver"]
+                and executable["signingIdentifier"]==projection["driverID"]
+                and executable["designatedRequirement"]
+                    ==projection["driverRequirement"]
+                and executable["codeDirectoryHash"]
+                    ==projection["driverCodeHash"]
+                for projection in prearm["projections"]),
+            "resolved root-driver executable projection binding")
+    business=(uuid.UUID(manifest["attempt"]).bytes+prearm["capsule"]
+        +prearm["whole"]+struct.pack(">I",8)
+        +hashlib.sha256(claim_bytes).digest()+bundle["sha"])
+    require(len(business)==148, "driver completion-v3 business size")
+    completion=business+hashlib.sha256(business+bytes(32)).digest()
+    require(len(completion)==DRIVER_COMPLETION_V3_BYTES,
+        "driver completion-v3 self hash")
+    output=struct.pack(">I",len(claim_bytes))+claim_bytes+completion
+    require(len(output)==4+ROOT_DRIVER_CLAIM_BYTES+DRIVER_COMPLETION_V3_BYTES,
+            "Gate output canonical size")
+    require(raw["outputCount"] == len(output)
+            and raw["outputSHA"] == hashlib.sha256(output).digest(),
             "Gate output completion binding")
 
 def empty_extended_acl(fd):
