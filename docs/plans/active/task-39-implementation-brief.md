@@ -140,8 +140,10 @@
 > is complete/non-admitting at implementation `e3555ec` / tree `f38783f`;
 > ii-c-b2a2 independent verifier is complete/non-admitting at implementation
 > `294bdb2` / tree `dbbffbba`. Resolved-lineage L1 completed at implementation
-> `83f6271` / tree `98289e2`; the current frontier is lineage L2 → ii-c-c →
-> L3c3d → L3c4.
+> `83f6271` / tree `98289e2`; L2 implementation `474f634`, cross-UID/PID-reuse
+> corrections and final verifier closure `849e454` are complete/non-admitting;
+> the final post-fix review returned no finding. The current frontier is the ii-c-c
+> unique real machine campaign → L3c3d → L3c4.
 > These repairs are machine-campaign prerequisite checkpoints,
 > not recursively named new Tasks. Local findings remain in their owning
 > checkpoint. L3c4 alone owns final admission and the remaining full.
@@ -1479,8 +1481,9 @@ completed and remain non-admitting, with iv-b2 accepted at
 completed. Interactive-native identity binding `531f79f` / consumer seal
 `26e785a` and fixed-gate historical replay `aa8a7f1` also completed. All remain
 non-admitting. ii-c-a, ii-c-b1, ii-c-b2a1 and ii-c-b2a2 are
-complete/non-admitting; the live frontier is ii-c-b2b → ii-c-c → L3c3d →
-L3c4. These repairs are
+complete/non-admitting; ii-c-b2b and resolved-lineage L1/L2 implementation are
+complete/non-admitting; L2 final verifier review returned no finding. The live
+frontier is ii-c-c unique real machine campaign → L3c3d → L3c4. These repairs are
 machine-campaign prerequisite checkpoints, not new Tasks. Completion evidence
 is in the
 [shared-deadline audit](../../reports/phase-d-task-39b2c-shared-deadline-repair-review.md)

@@ -143,6 +143,12 @@ transport matrix, 53 boundary tests, Debug/Release component gate, one 911-test
 serialized regression and independent review. Those tests are not repeated in
 ii-c-c.
 
+Live status (2026-09-03): ii-c-b and resolved-lineage L1/L2 are
+complete/non-privileged/non-admitting; L2 final post-fix review returned no
+finding. The unique privileged attempt remains unconsumed. The current and only
+frontier is `ii-c-c`, followed strictly by `L3c3d -> L3c4`; see the
+[L2 completion audit](phase-d-task-39b2c-iic-resolved-root-driver-lineage-l2-review.md).
+
 ## 6. Campaign Evidence and Attempt Consumption
 
 The ii-c-c evidence root is fresh, owner-private and contains six ordered

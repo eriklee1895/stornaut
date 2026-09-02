@@ -256,8 +256,8 @@ non-admitting；iii-b2b-0、iii-b2b-1a-0 与 iii-b2b-1a-1 已完成并保持
    fixed-gate deadline cleanup repair 已分别在 `c144c1e` 与 `bc42fbc`
    完成；interactive-native identity binding `531f79f` / consumer seal
    `26e785a` 与 fixed-gate historical replay `aa8a7f1` 也已完成。以上保持
-   non-admitting。ii-c-a、ii-c-b1、ii-c-b2a1 与 ii-c-b2a2 已完成；当前严格按
-   ii-c-b2b → ii-c-c → L3c3d → L3c4
+   non-admitting。ii-c-a、ii-c-b 与 resolved-lineage L1/L2 已完成/non-admitting，
+   L2 final review none；当前严格按 ii-c-c unique real machine campaign → L3c3d → L3c4
    推进；repairs 是 machine-campaign
    prerequisite checkpoints，不是递归命名的新 Task；L3c4 独占最终 full。
 39B2c 仍未作 machine readiness claim。
@@ -312,8 +312,9 @@ c0b-iii 与 c0b-iv 的 iv-a0/iv-a-r/iv-b1a/iv-b1b-i/iv-b1b-ii/iv-b2 已完成并
 保持 non-admitting；shared-deadline、fixed-gate deadline cleanup、
 interactive-native identity binding `531f79f` / consumer seal `26e785a` 与
 fixed-gate historical replay `aa8a7f1` 已完成/non-admitting。ii-c-a、ii-c-b1、
-ii-c-b2a1、ii-c-b2a2 与 resolved-lineage L1 已完成；当前 frontier 为 L2，
-后续严格为 ii-c-c → L3c3d → L3c4。repairs 是 machine-campaign
+ii-c-b2a1、ii-c-b2a2 与 resolved-lineage L1/L2 已完成/non-admitting，L2 final
+review none；当前 frontier 为 ii-c-c unique real machine campaign，后续严格为
+L3c3d → L3c4。repairs 是 machine-campaign
 prerequisite checkpoints，不是新的 Task。
 L3c2b preflight 的 real-plan matrix contradiction 已由 3-path plan-freshness
 prerequisite 关闭，affected/Investigation/structural/review gates 通过；
@@ -531,8 +532,9 @@ four Mach-O projections 与 final no-unresolved-P0–P2 review。
    non-admitting；shared-deadline、fixed-gate deadline cleanup、interactive-native
    identity binding `531f79f` / consumer seal `26e785a` 与 fixed-gate historical
    replay `aa8a7f1` 已完成/non-admitting。ii-c-a、ii-c-b1、ii-c-b2a1 与
-   ii-c-b2a2 与 resolved-lineage L1 已完成；当前 frontier 为 L2，后续严格为
-   ii-c-c → L3c3d → L3c4。repairs 是 machine-campaign prerequisite
+   ii-c-b2a2 与 resolved-lineage L1/L2 已完成/non-admitting，L2 final review
+   none；当前 frontier 为 ii-c-c unique real machine campaign，后续严格为
+   L3c3d → L3c4。repairs 是 machine-campaign prerequisite
    checkpoints，不是新的 Task。
   L3c4 才拥有 final admission/full。39B2c 才是 machine admission，Task 39
   尚未完成。

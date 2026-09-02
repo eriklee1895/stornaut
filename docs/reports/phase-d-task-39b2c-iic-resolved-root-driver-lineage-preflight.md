@@ -1,12 +1,12 @@
 # Phase D Task 39B2c ii-c Resolved Root-Driver Lineage Preflight
 
-> Status: frozen / L1 complete / L2 implementation current / non-privileged / non-admitting
+> Status: frozen / L1 and L2 complete / non-privileged / non-admitting
 >
 > Date: 2026-09-01
 >
 > Baseline: `81a747e43e90f7ca3f941fa2e6aefd171eab470a`
 >
-> Remaining order: L2 composition -> ii-c-c unique machine
+> Remaining order: ii-c-c unique real machine
 > campaign -> L3c3d -> L3c4
 
 ## Decision
@@ -239,3 +239,54 @@ unchanged aggregate budget after the shared terminal-deadline, live executable-
 path and independent evidence-review findings. All explicit boundaries,
 non-claims, validation ordering and the transition directly from accepted L2 to
 the unique `ii-c-c` machine campaign remain unchanged.
+
+## L2 Post-review Cross-UID Correction — 2026-09-02
+
+Final review of the first L2 implementation commit `474f63455f7f962f5537fdd9f6d7e55e01242c51`
+identified a deterministic fail-closed blocker: the UID-501 Gate attempted to
+obtain the UID-0 driver's audit token through `task_name_for_pid`. This conflicts
+with the already measured platform behavior and ADR 0018, which require the
+cross-UID boundary to use public libproc, BSM and PID-based Security queries.
+
+The repair is a separate, bounded five-path implementation checkpoint:
+
+1. `Sources/StornautInvestigationMachineGateSupport/InvestigationMachineGateTransport.swift`;
+2. `Sources/StornautInvestigationMachineGateSupport/DarwinInvestigationMachineFixedGateSystem.swift`;
+3. `Sources/StornautInvestigationMachineGateSupport/InvestigationMachineResolvedRootDriverValidator.swift`;
+4. `Tests/StornautInvestigationTests/InvestigationMachineResolvedRootDriverValidatorTests.swift`; and
+5. `Tests/StornautInvestigationTests/InvestigationSudoShapedDriverLauncherTests.swift`.
+
+The fixed 1,006-byte claim wire does not change. PID version and the complete
+audit-token words remain canonical driver-reported fields, internally
+consistent and sealed by the claim hash, completion-v3 hash and raw Gate output
+digest. The Gate does not claim to observe those two fields independently. It
+instead samples PID/start/parent/group/session/credentials/groups through
+libproc and sysctl, audit UID/session through BSM, executable path through
+`proc_pidpath`, and live code identity through `kSecGuestAttributePid`; the
+stopped process must remain identical across the observation sandwich. Lineage
+and retirement instance identity use PID plus start time, preserving direct-exec
+and one/two-monitor topologies without inventing audit-token data for ancestors.
+
+A narrow verifier-closure commit may subsequently touch only the existing L2
+boundary test and two verifier scripts to freeze this correction and replay the
+first implementation tree. Neither commit runs sudo/root, installs a service,
+launches the real campaign, calls a model/network, or consumes the final full
+verifier. Together they remain the same L2 delivery and must be accepted before
+the unique `ii-c-c` machine campaign begins.
+
+## L2 Completion Update — 2026-09-03
+
+L2 implementation completed at
+`474f63455f7f962f5537fdd9f6d7e55e01242c51`, followed by cross-UID correction
+`b664299983a6311dde4ee6982f180ba9b7fab1ab`, PID-reuse correction
+`b4c632e68e2f28ef67b9734bce82dac61bdc7bed` and initial verifier closure
+`849e454de2cfd07f3d326e2a5df0c0a305678f0c` / tree
+`f6c36d2fb18f0a742e7ff26568e2eff67cc8784b`. The mutation-oracle post-fix and
+final verifier review returned no finding. The single clean staged-only serial
+invocation failed with 27 issues under broad timing/process pressure; seven
+exact low-load target reruns passed 109/109, so no serial pass is claimed. See the
+[L2 completion audit](phase-d-task-39b2c-iic-resolved-root-driver-lineage-l2-review.md).
+
+L2 is complete/non-privileged/non-admitting. The unique privileged attempt
+remains unconsumed. The current and only frontier is the `ii-c-c` unique real machine campaign, followed
+strictly by `L3c3d -> L3c4`.

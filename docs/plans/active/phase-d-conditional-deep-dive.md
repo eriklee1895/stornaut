@@ -98,9 +98,10 @@
 > Shared-deadline repair `c144c1e`, fixed-gate deadline cleanup repair
 > `bc42fbc`, interactive-native identity binding `531f79f` / consumer seal
 > `26e785a`, and fixed-gate historical replay `aa8a7f1` are complete/non-admitting.
-> ii-c-a, ii-c-b1, ii-c-b2a1, ii-c-b2a2 and resolved-lineage L1 are
-> complete/non-admitting. The current frontier is strictly lineage L2, ii-c-c,
-> L3c3d and L3c4. These
+> ii-c-a, ii-c-b and resolved-lineage L1/L2 are complete/non-admitting. L2
+> final verifier closure is `849e454` / tree `f6c36d2`, and final review returned
+> no finding. The current frontier is strictly the ii-c-c unique real machine
+> campaign, L3c3d and L3c4. These
 > repairs are machine-campaign prerequisite checkpoints, not new Tasks. The authoritative
 > real-model run and readiness verdict remain unimplemented.
 > Production Deep Dive remains unavailable until Task 44 admission.
@@ -992,9 +993,10 @@ Checkpoint status:
   It is superseded for live execution by completed shared-deadline repair
   `c144c1e`, fixed-gate deadline cleanup repair `bc42fbc`, interactive-native
   identity binding `531f79f` / consumer seal `26e785a`, and fixed-gate historical
-  replay `aa8a7f1`, all non-admitting. ii-c-a, ii-c-b1, ii-c-b2a1 and
-  ii-c-b2a2 are complete/non-admitting. The current frontier is
-  `ii-c-b2b -> ii-c-c -> L3c3d -> L3c4`.
+  replay `aa8a7f1`, all non-admitting. ii-c-a, ii-c-b and resolved-lineage
+  L1/L2 are complete/non-admitting; L2 final verifier closure is `849e454` /
+  tree `f6c36d2`, and final review returned no finding. The current frontier is
+  `ii-c-c unique real machine campaign -> L3c3d -> L3c4`.
   See the
   [ii-b2 ASID prerequisite review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2-asid-prerequisite-review.md),
   the
