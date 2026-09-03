@@ -1031,31 +1031,74 @@ package struct InvestigationRuntimeDiagnosticBindingObservation:
     package static func installed() throws -> Self {
         let contract = try LifecycleLocalInstallationContract()
         let reader = LifecycleBundleSigningIdentityReader()
-        let appEvidence = try reader.evidence(
-            bundleURL: contract.installedAppURL
+        return try installed(
+            contract: contract,
+            signedAppObservation: reader.signedBundleObservation,
+            signingEvidence: reader.evidence
         )
-        let helperEvidence = try reader.evidence(
-            bundleURL: contract.helperExecutableURL
-        )
-        let machineDriverEvidence = try reader.evidence(
-            bundleURL: contract.machineDriverExecutableURL
-        )
-        guard
-            let bundle = Bundle(url: contract.installedAppURL),
-            let executableURL = bundle.executableURL,
-            let bundleIdentifier = bundle.bundleIdentifier
+    }
+
+    package static func installed(
+        contract: LifecycleLocalInstallationContract,
+        signedAppObservation:
+            (URL) throws -> LifecycleSignedBundleObservation,
+        signingEvidence:
+            (URL) throws -> LifecycleBundleSigningEvidence
+    ) throws -> Self {
+        let appObservation: LifecycleSignedBundleObservation
+        do {
+            appObservation = try signedAppObservation(
+                contract.installedAppURL
+            )
+        } catch let error as LifecycleSignedBundleObservationError {
+            switch error {
+            case .signingEvidenceUnavailable:
+                throw InvestigationRuntimeDiagnosticBindingObservationError
+                    .appSigningUnavailable
+            case .signedMetadataUnavailable:
+                throw InvestigationRuntimeDiagnosticBindingObservationError
+                    .signedBundleMetadataUnavailable
+            }
+        } catch {
+            throw InvestigationRuntimeDiagnosticBindingObservationError
+                .appSigningUnavailable
+        }
+        guard appObservation.mainExecutableURL
+            == contract.appExecutableURL.standardizedFileURL,
+            appObservation.bundleIdentifier
+                == contract.appBundleIdentifier
         else {
-            throw InvestigationRuntimeDiagnosticCompositionError
-                .bindingMismatch
+            throw InvestigationRuntimeDiagnosticBindingObservationError
+                .signedBundleMetadataUnavailable
+        }
+        let helperEvidence: LifecycleBundleSigningEvidence
+        do {
+            helperEvidence = try signingEvidence(
+                contract.helperExecutableURL
+            )
+        } catch {
+            throw InvestigationRuntimeDiagnosticBindingObservationError
+                .helperSigningUnavailable
+        }
+        let machineDriverEvidence: LifecycleBundleSigningEvidence
+        do {
+            machineDriverEvidence = try signingEvidence(
+                contract.machineDriverExecutableURL
+            )
+        } catch {
+            throw InvestigationRuntimeDiagnosticBindingObservationError
+                .machineDriverSigningUnavailable
         }
         return Self(
             installedAppURL: contract.installedAppURL,
             helperExecutableURL: contract.helperExecutableURL,
-            appExecutableName: executableURL.lastPathComponent,
-            appExecutableSHA256: appEvidence.executableSHA256,
+            appExecutableName:
+                appObservation.mainExecutableURL.lastPathComponent,
+            appExecutableSHA256:
+                appObservation.signingEvidence.executableSHA256,
             helperExecutableSHA256:
                 helperEvidence.executableSHA256,
-            appBundleIdentifier: bundleIdentifier,
+            appBundleIdentifier: appObservation.bundleIdentifier,
             helperSigningIdentifier:
                 helperEvidence.identity.signingIdentifier,
             serviceIdentifier: contract.machServiceName,
@@ -1113,6 +1156,17 @@ package struct InvestigationRuntimeDiagnosticBindingObservation:
                 == binding.machineDriver
                     .machineClaimServiceIdentifier
     }
+}
+
+package enum InvestigationRuntimeDiagnosticBindingObservationError:
+    Error,
+    Sendable,
+    Equatable
+{
+    case appSigningUnavailable
+    case helperSigningUnavailable
+    case machineDriverSigningUnavailable
+    case signedBundleMetadataUnavailable
 }
 
 private actor InvestigationRuntimeDiagnosticTransportOwner:

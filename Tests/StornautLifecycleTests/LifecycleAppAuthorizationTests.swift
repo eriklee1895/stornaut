@@ -200,6 +200,262 @@ struct LifecycleAppAuthorizationTests {
     }
 
     @Test
+    func signingEvidenceRejectsSymlinkAndHardLinkExecutablePaths() throws {
+        let root = URL(
+            filePath: "/private/tmp", directoryHint: .isDirectory
+        ).appending(
+            path: "stornaut-signing-links-\(UUID().uuidString)",
+            directoryHint: .isDirectory
+        )
+        try FileManager.default.createDirectory(
+            at: root,
+            withIntermediateDirectories: false,
+            attributes: [.posixPermissions: 0o700]
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+        let original = root.appending(path: "signed-tool")
+        let symlink = root.appending(path: "signed-tool-symlink")
+        let hardLink = root.appending(path: "signed-tool-hardlink")
+        try FileManager.default.copyItem(
+            at: currentTestExecutableURL(),
+            to: original
+        )
+        try FileManager.default.createSymbolicLink(
+            at: symlink, withDestinationURL: original
+        )
+        let reader = LifecycleBundleSigningIdentityReader()
+
+        #expect(throws: LifecycleSigningIdentityError.unavailable) {
+            _ = try reader.evidence(bundleURL: symlink)
+        }
+
+        try FileManager.default.linkItem(at: original, to: hardLink)
+        #expect(throws: LifecycleSigningIdentityError.unavailable) {
+            _ = try reader.evidence(bundleURL: hardLink)
+        }
+    }
+
+    @Test
+    func signingEvidenceRejectsInPlaceMutationAcrossItsReadWindow() throws {
+        let root = URL(
+            filePath: "/private/tmp", directoryHint: .isDirectory
+        ).appending(
+            path: "stornaut-signing-race-\(UUID().uuidString)",
+            directoryHint: .isDirectory
+        )
+        try FileManager.default.createDirectory(
+            at: root,
+            withIntermediateDirectories: false,
+            attributes: [.posixPermissions: 0o700]
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+        let executable = root.appending(path: "signed-tool")
+        try FileManager.default.copyItem(
+            at: URL(filePath: CommandLine.arguments[0]),
+            to: executable
+        )
+        let originalSize = try FileManager.default.attributesOfItem(
+            atPath: executable.path
+        )[.size] as! NSNumber
+        let reader = LifecycleBundleSigningIdentityReader(
+            hooks: LifecycleSigningEvidenceReadHooks(
+                afterSigningInformation: {
+                    guard let handle = try? FileHandle(
+                        forWritingTo: executable
+                    ) else { return }
+                    try? handle.write(contentsOf: Data([0xff]))
+                    try? handle.truncate(
+                        atOffset: originalSize.uint64Value
+                    )
+                    try? handle.close()
+                }
+            )
+        )
+
+        #expect(throws: LifecycleSigningIdentityError.unavailable) {
+            _ = try reader.evidence(bundleURL: executable)
+        }
+    }
+
+    @Test
+    func signingEvidenceRejectsOuterToInnerExecutableABA() throws {
+        let root = URL(
+            filePath: "/private/tmp", directoryHint: .isDirectory
+        ).appending(
+            path: "stornaut-signing-aba-\(UUID().uuidString)",
+            directoryHint: .isDirectory
+        )
+        try FileManager.default.createDirectory(
+            at: root,
+            withIntermediateDirectories: false,
+            attributes: [.posixPermissions: 0o700]
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+        let executable = root.appending(path: "signed-tool")
+        let original = root.appending(path: "signed-tool-original")
+        let replacement = root.appending(path: "signed-tool-replacement")
+        try FileManager.default.copyItem(
+            at: currentTestExecutableURL(), to: executable
+        )
+        try FileManager.default.copyItem(
+            at: currentTestExecutableURL(), to: replacement
+        )
+        try adHocSign(
+            replacement, identifier: "com.eriklee.stornaut.aba-replacement"
+        )
+        let reader = LifecycleBundleSigningIdentityReader(
+            hooks: LifecycleSigningEvidenceReadHooks(
+                afterDescriptorOpened: {
+                    try FileManager.default.moveItem(
+                        at: executable, to: original
+                    )
+                    try FileManager.default.moveItem(
+                        at: replacement, to: executable
+                    )
+                },
+                afterFinalSigningInformation: {
+                    try FileManager.default.moveItem(
+                        at: executable, to: replacement
+                    )
+                    try FileManager.default.moveItem(
+                        at: original, to: executable
+                    )
+                }
+            )
+        )
+
+        #expect(throws: LifecycleSigningIdentityError.unavailable) {
+            _ = try reader.evidence(bundleURL: executable)
+        }
+    }
+
+    @Test
+    func signedBundleObservationKeepsMetadataAllOrNothingWithoutChangingEvidence()
+        throws
+    {
+        let identity = try LifecycleSigningIdentity(
+            signingIdentifier: "com.eriklee.stornaut",
+            designatedRequirementSHA256: digest("a"),
+            codeDirectoryHash: cdhash("1")
+        )
+        let executable = URL(
+            filePath:
+                "/Applications/Stornaut-R5-Diagnostic.app/Contents/MacOS/"
+                    + "StornautInvestigationDiagnostic"
+        )
+
+        let evidence = try LifecycleBundleSigningEvidence(
+            identity: identity, executableSHA256: digest("b"),
+            isAdHoc: true
+        )
+        #expect(
+            Set(Mirror(reflecting: evidence).children.compactMap(\.label))
+                == ["identity", "executableSHA256", "isAdHoc"]
+        )
+        #expect(throws: LifecycleSignedBundleObservationError
+            .signedMetadataUnavailable) {
+            _ = try LifecycleSignedBundleObservation(
+                signingEvidence: evidence,
+                mainExecutableURL: URL(string: "relative")!,
+                bundleIdentifier: "com.eriklee.stornaut"
+            )
+        }
+        #expect(throws: LifecycleSignedBundleObservationError
+            .signedMetadataUnavailable) {
+            _ = try LifecycleSignedBundleObservation(
+                signingEvidence: evidence, mainExecutableURL: executable,
+                bundleIdentifier: "invalid identifier"
+            )
+        }
+        #expect(throws: LifecycleSignedBundleObservationError
+            .signedMetadataUnavailable) {
+            _ = try LifecycleSignedBundleObservation(
+                signingEvidence: evidence, mainExecutableURL: executable,
+                bundleIdentifier: "com.eriklee.foreign"
+            )
+        }
+        let observation = try LifecycleSignedBundleObservation(
+            signingEvidence: evidence, mainExecutableURL: executable,
+            bundleIdentifier: "com.eriklee.stornaut"
+        )
+        #expect(observation.signingEvidence == evidence)
+        #expect(observation.mainExecutableURL == executable.standardizedFileURL)
+        #expect(observation.bundleIdentifier == "com.eriklee.stornaut")
+    }
+
+    @Test
+    func signedBundleReaderUsesSignatureBoundExecutableAndPropertyList()
+        throws
+    {
+        let root = URL(
+            filePath: "/private/tmp", directoryHint: .isDirectory
+        ).appending(
+            path: "stornaut-signed-bundle-\(UUID().uuidString)",
+            directoryHint: .isDirectory
+        )
+        let bundle = root.appending(
+            path: "Fixture.app", directoryHint: .isDirectory
+        )
+        let contents = bundle.appending(
+            path: "Contents", directoryHint: .isDirectory
+        )
+        let executableDirectory = contents.appending(
+            path: "MacOS", directoryHint: .isDirectory
+        )
+        let executableName = "SignedBundleFixture"
+        let executable = executableDirectory.appending(
+            path: executableName
+        )
+        try FileManager.default.createDirectory(
+            at: executableDirectory,
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+        let currentExecutable = URL(
+            filePath: currentTestExecutableURL().path
+        )
+        try FileManager.default.copyItem(
+            at: currentExecutable, to: executable
+        )
+        let propertyList: [String: Any] = [
+            "CFBundleExecutable": executableName,
+            "CFBundleIdentifier": "com.eriklee.stornaut.fixture",
+            "CFBundlePackageType": "APPL",
+            "CFBundleVersion": "1",
+        ]
+        try PropertyListSerialization.data(
+            fromPropertyList: propertyList,
+            format: .binary,
+            options: 0
+        ).write(to: contents.appending(path: "Info.plist"))
+        let signer = Process()
+        signer.executableURL = URL(filePath: "/usr/bin/codesign")
+        signer.arguments = [
+            "--force", "--sign", "-", "--timestamp=none",
+            "--identifier", "com.eriklee.stornaut.fixture",
+            bundle.path,
+        ]
+        signer.standardInput = FileHandle.nullDevice
+        signer.standardOutput = FileHandle.nullDevice
+        signer.standardError = FileHandle.nullDevice
+        try signer.run()
+        signer.waitUntilExit()
+        try #require(signer.terminationStatus == 0)
+
+        let reader = LifecycleBundleSigningIdentityReader()
+        let observation = try reader.signedBundleObservation(
+            bundleURL: bundle
+        )
+
+        #expect(observation.mainExecutableURL == executable.standardizedFileURL)
+        #expect(observation.bundleIdentifier == "com.eriklee.stornaut.fixture")
+        #expect(observation.signingEvidence == (
+            try reader.evidence(bundleURL: bundle)
+        ))
+    }
+
+    @Test
     func peerAdmissionRequiresExactProcessUserAndSigningIdentity()
         throws
     {
@@ -621,6 +877,33 @@ private func auditToken() -> LifecycleAuditToken {
     try! LifecycleAuditToken(
         words: [501, 20, 501, 501, 501, 701, 44_001, 3]
     )
+}
+
+private func currentTestExecutableURL() -> URL {
+    var path = [CChar](repeating: 0, count: Int(PATH_MAX))
+    var size = UInt32(path.count)
+    precondition(_NSGetExecutablePath(&path, &size) == 0)
+    let end = path.firstIndex(of: 0) ?? path.endIndex
+    return URL(
+        filePath: String(decoding: path[..<end].map(UInt8.init), as: UTF8.self)
+    ).resolvingSymlinksInPath().standardizedFileURL
+}
+
+private func adHocSign(_ url: URL, identifier: String) throws {
+    let signer = Process()
+    signer.executableURL = URL(filePath: "/usr/bin/codesign")
+    signer.arguments = [
+        "--force", "--sign", "-", "--timestamp=none",
+        "--identifier", identifier, url.path,
+    ]
+    signer.standardInput = FileHandle.nullDevice
+    signer.standardOutput = FileHandle.nullDevice
+    signer.standardError = FileHandle.nullDevice
+    try signer.run()
+    signer.waitUntilExit()
+    guard signer.terminationStatus == 0 else {
+        throw LifecycleSigningIdentityError.unavailable
+    }
 }
 
 private func machineDriverIdentity(

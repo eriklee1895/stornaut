@@ -501,7 +501,7 @@ struct InvestigationMachineCampaignEvidenceTests {
             materializeSource: { _ in source },
             makeBinding: { _ in
                 throw InvestigationMachineCoordinatorBindingSourceError
-                    .invalidInstalledObservation
+                    .appSigningUnavailable
             },
             makeConfigurations: { _, _ in throw PreArmFailureTestError.unexpected },
             authorCohort: { _ in throw PreArmFailureTestError.unexpected },
@@ -525,7 +525,7 @@ struct InvestigationMachineCampaignEvidenceTests {
         let consumer = try InvestigationMachineCampaignPreArmFailureFrame.decode(
             producer.encoded())
         #expect(consumer.stage == .makeBinding)
-        #expect(consumer.reason == .installedObservationInvalid)
+        #expect(consumer.reason == .appSigningUnavailable)
         guard case let .sourceVerified(_, fingerprint) = consumer.checkpoint else {
             Issue.record("expected source-only checkpoint")
             return
@@ -570,6 +570,70 @@ struct InvestigationMachineCampaignEvidenceTests {
             producer.encoded())
         #expect(consumer.stage == .makeBinding)
         #expect(consumer.reason == .protocolRejected)
+    }
+
+    @Test(arguments: [
+        (
+            InvestigationMachineCoordinatorBindingSourceError
+                .appSigningUnavailable,
+            InvestigationMachineCampaignPreArmFailureFrame.Reason
+                .appSigningUnavailable
+        ),
+        (
+            InvestigationMachineCoordinatorBindingSourceError
+                .helperSigningUnavailable,
+            InvestigationMachineCampaignPreArmFailureFrame.Reason
+                .helperSigningUnavailable
+        ),
+        (
+            InvestigationMachineCoordinatorBindingSourceError
+                .machineDriverSigningUnavailable,
+            InvestigationMachineCampaignPreArmFailureFrame.Reason
+                .machineDriverSigningUnavailable
+        ),
+        (
+            InvestigationMachineCoordinatorBindingSourceError
+                .signedBundleMetadataUnavailable,
+            InvestigationMachineCampaignPreArmFailureFrame.Reason
+                .signedBundleMetadataUnavailable
+        ),
+        (
+            InvestigationMachineCoordinatorBindingSourceError
+                .installedObservationChanged,
+            InvestigationMachineCampaignPreArmFailureFrame.Reason
+                .installedObservationChanged
+        ),
+    ])
+    func coordinatorPreservesClosedInstalledObservationReason(
+        sourceError: InvestigationMachineCoordinatorBindingSourceError,
+        expected: InvestigationMachineCampaignPreArmFailureFrame.Reason
+    ) async throws {
+        let capture = PreArmFailureDispositionCapture()
+        let source = InvestigationMachineGateCoordinatorMaterializedSource(
+            sourceFingerprintSHA256: String(repeating: "1", count: 64))
+        let dependencies = InvestigationMachineGateCoordinatorDependencies(
+            validateInvocation: { .validated },
+            materializeSource: { _ in source },
+            makeBinding: { _ in throw sourceError },
+            makeConfigurations: { _, _ in throw PreArmFailureTestError.unexpected },
+            authorCohort: { _ in throw PreArmFailureTestError.unexpected },
+            handoff: { _ in throw PreArmFailureTestError.unexpected },
+            retireArtifacts: { _, _ in .retired },
+            makeReceipt: { _ in throw PreArmFailureTestError.unexpected },
+            writeClose: { await capture.record($0) },
+            monotonic: { 1 }, emitsPreArmFailure: true
+        )
+        _ = try? await InvestigationMachineGateCoordinatorComposition(
+            dependencies: dependencies).run()
+        guard case let .failure(producer)? = await capture.disposition else {
+            Issue.record("expected one typed failure disposition")
+            return
+        }
+        let consumer = try InvestigationMachineCampaignPreArmFailureFrame.decode(
+            producer.encoded())
+        #expect(consumer.stage == .makeBinding)
+        #expect(consumer.reason == expected)
+        #expect(consumer.reason.expectedExitStatus == 81)
     }
 
     @Test
@@ -672,6 +736,11 @@ struct InvestigationMachineCampaignEvidenceTests {
                 .admissionDeadline,
                 .protocolRejected,
                 .containmentUncertain,
+                .appSigningUnavailable,
+                .helperSigningUnavailable,
+                .machineDriverSigningUnavailable,
+                .signedBundleMetadataUnavailable,
+                .installedObservationChanged,
             ]))
         #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
             .buildProvenanceRejected.expectedExitStatus == 81)
@@ -685,6 +754,64 @@ struct InvestigationMachineCampaignEvidenceTests {
             .protocolRejected.expectedExitStatus == 81)
         #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
             .containmentUncertain.expectedExitStatus == 82)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .appSigningUnavailable.expectedExitStatus == 81)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .helperSigningUnavailable.expectedExitStatus == 81)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .machineDriverSigningUnavailable.expectedExitStatus == 81)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .signedBundleMetadataUnavailable.expectedExitStatus == 81)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .installedObservationChanged.expectedExitStatus == 81)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .buildProvenanceRejected.rawValue == 1)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .installedObservationInvalid.rawValue == 2)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .codexIdentityChanged.rawValue == 3)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .admissionDeadline.rawValue == 4)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .protocolRejected.rawValue == 5)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .containmentUncertain.rawValue == 6)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .appSigningUnavailable.rawValue == 7)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .helperSigningUnavailable.rawValue == 8)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .machineDriverSigningUnavailable.rawValue == 9)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .signedBundleMetadataUnavailable.rawValue == 10)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .installedObservationChanged.rawValue == 11)
+        for producerReason in
+            InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+                .allCases
+        {
+            let producer = try InvestigationMachineGateCoordinatorPreArmFailureFrameV1(
+                stage: producerReason == .admissionDeadline
+                    ? .preArmPublication : .makeBinding,
+                checkpoint: producerReason == .admissionDeadline
+                    ? .runtimeBound(
+                        nonce: Self.digest(0xa7),
+                        sourceFingerprintSHA256: Self.digest(0xa8),
+                        buildProvenanceSHA256: Self.digest(0xa9),
+                        signedRuntimeBindingSHA256: Self.digest(0xaa)
+                    )
+                    : .sourceVerified(
+                        nonce: Self.digest(0xa7),
+                        sourceFingerprintSHA256: Self.digest(0xa8)
+                    ),
+                reason: producerReason
+            )
+            let consumer = try InvestigationMachineCampaignPreArmFailureFrame
+                .decode(producer.encoded())
+            #expect(consumer.reason.rawValue == producerReason.rawValue)
+            #expect(consumer.reason.expectedExitStatus
+                == producerReason.expectedExitStatus)
+        }
     }
 
     @Test
@@ -712,6 +839,46 @@ struct InvestigationMachineCampaignEvidenceTests {
             stage: .preArmPublication
         ).consumer
         #expect(preArm.stage == .preArmPublication)
+    }
+
+    @Test(arguments: [
+        InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .appSigningUnavailable,
+        .helperSigningUnavailable,
+        .machineDriverSigningUnavailable,
+        .signedBundleMetadataUnavailable,
+        .installedObservationChanged,
+    ])
+    func installedObservationReasonsRejectPostBindingCheckpoint(
+        _ reason:
+            InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+    ) throws {
+        let valid = try Self.makePreArmFailureFrameFixture(
+            checkpoint: .sourceVerified(
+                nonce: Self.digest(0xab),
+                sourceFingerprintSHA256: Self.digest(0xac)
+            ),
+            reason: reason
+        )
+        var transcript = try CampaignWireTranscript(
+            valid.producer.encoded()
+        )
+        transcript.fields[0] = Data([
+            InvestigationMachineGateCoordinatorPreArmFailureFrameV1
+                .Stage.makeConfigurations.rawValue,
+        ])
+        transcript.fields[1] = Data([3])
+            + Self.digest(0xab).rawBytes
+            + Self.digest(0xac).rawBytes
+            + Self.digest(0xad).rawBytes
+            + Self.digest(0xae).rawBytes
+        let forged = try Self.rehashedPreArmFailure(transcript)
+
+        #expect(throws: (any Error).self) {
+            _ = try InvestigationMachineCampaignPreArmFailureFrame.decode(
+                forged
+            )
+        }
     }
 
     @Test

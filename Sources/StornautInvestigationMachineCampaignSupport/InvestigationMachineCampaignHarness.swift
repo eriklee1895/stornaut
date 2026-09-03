@@ -225,7 +225,9 @@ package struct InvestigationMachineCampaignPreArmFailureFrame:
     package enum Reason: UInt8, CaseIterable, Sendable {
         case buildProvenanceRejected = 1, installedObservationInvalid
         case codexIdentityChanged, admissionDeadline, protocolRejected
-        case containmentUncertain
+        case containmentUncertain, appSigningUnavailable
+        case helperSigningUnavailable, machineDriverSigningUnavailable
+        case signedBundleMetadataUnavailable, installedObservationChanged
         package var expectedExitStatus: Int32 {
             self == .containmentUncertain ? 82 : 81
         }
@@ -237,6 +239,14 @@ package struct InvestigationMachineCampaignPreArmFailureFrame:
             case .admissionDeadline: "admissionDeadline"
             case .protocolRejected: "protocolRejected"
             case .containmentUncertain: "containmentUncertain"
+            case .appSigningUnavailable: "appSigningUnavailable"
+            case .helperSigningUnavailable: "helperSigningUnavailable"
+            case .machineDriverSigningUnavailable:
+                "machineDriverSigningUnavailable"
+            case .signedBundleMetadataUnavailable:
+                "signedBundleMetadataUnavailable"
+            case .installedObservationChanged:
+                "installedObservationChanged"
             }
         }
     }
@@ -329,7 +339,11 @@ package struct InvestigationMachineCampaignPreArmFailureFrame:
         }
         guard shape else { return false }
         switch reason {
-        case .buildProvenanceRejected, .installedObservationInvalid:
+        case .buildProvenanceRejected, .installedObservationInvalid,
+             .appSigningUnavailable, .helperSigningUnavailable,
+             .machineDriverSigningUnavailable,
+             .signedBundleMetadataUnavailable,
+             .installedObservationChanged:
             return stage == .makeBinding
         case .codexIdentityChanged:
             return stage == .makeBinding || stage == .makeConfigurations

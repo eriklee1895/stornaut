@@ -179,7 +179,9 @@ public enum InvestigationMachineGateCoordinatorSupport {
     package enum Reason: UInt8, CaseIterable, Sendable {
       case buildProvenanceRejected = 1, installedObservationInvalid
       case codexIdentityChanged, admissionDeadline, protocolRejected
-      case containmentUncertain
+      case containmentUncertain, appSigningUnavailable
+      case helperSigningUnavailable, machineDriverSigningUnavailable
+      case signedBundleMetadataUnavailable, installedObservationChanged
       package var expectedExitStatus: Int32 {
         self == .containmentUncertain ? 82 : 81
       }
@@ -246,7 +248,11 @@ public enum InvestigationMachineGateCoordinatorSupport {
       }
       guard shape else { return false }
       switch reason {
-      case .buildProvenanceRejected, .installedObservationInvalid:
+      case .buildProvenanceRejected, .installedObservationInvalid,
+           .appSigningUnavailable, .helperSigningUnavailable,
+           .machineDriverSigningUnavailable,
+           .signedBundleMetadataUnavailable,
+           .installedObservationChanged:
         return stage == .makeBinding
       case .codexIdentityChanged:
         return stage == .makeBinding || stage == .makeConfigurations
@@ -856,7 +862,14 @@ public enum InvestigationMachineGateCoordinatorSupport {
         switch value {
         case .buildProvenanceUnavailable, .invalidBuildProvenance:
           return .buildProvenanceRejected
-        case .invalidInstalledObservation: return .installedObservationInvalid
+        case .appSigningUnavailable: return .appSigningUnavailable
+        case .helperSigningUnavailable: return .helperSigningUnavailable
+        case .machineDriverSigningUnavailable:
+          return .machineDriverSigningUnavailable
+        case .signedBundleMetadataUnavailable:
+          return .signedBundleMetadataUnavailable
+        case .installedObservationChanged:
+          return .installedObservationChanged
         case .codexIdentityChanged: return .codexIdentityChanged
         default: return .protocolRejected
         }

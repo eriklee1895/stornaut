@@ -2,6 +2,7 @@ import CryptoKit
 import Darwin
 import Foundation
 import StornautCore
+import StornautLifecycle
 import Testing
 
 @testable import StornautCodex
@@ -11,6 +12,170 @@ import Testing
 
 @Suite("Investigation machine coordinator binding source", .serialized)
 struct InvestigationMachineCoordinatorBindingSourceTests {
+  @Test
+  func asyncBindingSourcePreservesClosedObservationFailureReason() async throws {
+    let fixture = try CoordinatorBindingBehaviorFixture()
+    defer { fixture.remove() }
+    let observation = fixture.observation()
+    let provenance = try fixture.provenance()
+    let lease = try fixture.codexLease()
+
+    let first = CoordinatorObservationResultProbe([
+      .failure(.appSigningUnavailable),
+    ])
+    let firstSource = makeBindingSource(
+      provenance: provenance, observations: first, lease: lease
+    )
+    let firstError = await Self.bindingSourceError(
+      firstSource, fingerprint: try fixture.sourceFingerprint())
+    #expect(first.callCount == 1)
+    #expect(firstError == .appSigningUnavailable)
+
+    for (failure, expected) in [
+      (InvestigationRuntimeDiagnosticBindingObservationError
+        .helperSigningUnavailable,
+       InvestigationMachineCoordinatorBindingSourceError
+        .helperSigningUnavailable),
+      (.machineDriverSigningUnavailable, .machineDriverSigningUnavailable),
+      (.signedBundleMetadataUnavailable, .signedBundleMetadataUnavailable),
+    ] {
+      let second = CoordinatorObservationResultProbe([
+        .success(observation), .failure(failure),
+      ])
+      let secondSource = makeBindingSource(
+        provenance: provenance, observations: second, lease: lease
+      )
+      let secondError = await Self.bindingSourceError(
+        secondSource, fingerprint: try fixture.sourceFingerprint())
+      #expect(second.callCount == 2)
+      #expect(secondError == expected)
+    }
+  }
+
+  @Test
+  func installedObservationDoesNotDependOnProcessMainBundleExecutable() throws {
+    let source = try String(
+      contentsOf: URL(filePath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .appending(path: "Sources/StornautInvestigationDiagnostic/"
+          + "InvestigationRuntimeDiagnosticComposition.swift"),
+      encoding: .utf8
+    )
+    let installedStart = try #require(source.range(
+      of: "package static func installed() throws -> Self {"))
+    let matchesStart = try #require(source.range(
+      of: "package func matches(", range: installedStart.upperBound..<source.endIndex))
+    let installed = source[installedStart.lowerBound..<matchesStart.lowerBound]
+
+    let compact = installed.filter { !$0.isWhitespace }
+    #expect(compact.contains(
+      "appExecutableName:appObservation.mainExecutableURL"
+        + ".lastPathComponent"))
+    #expect(compact.contains(
+      "appBundleIdentifier:appObservation.bundleIdentifier"))
+    #expect(compact.contains(
+      "signedAppObservation:reader.signedBundleObservation"))
+    #expect(!compact.contains("Bundle(url:"))
+    #expect(!compact.contains("bundle.executableURL"))
+  }
+
+  @Test
+  func installedObservationMapsSigningAndMetadataFailuresExactly() throws {
+    let fixture = try CoordinatorBindingBehaviorFixture()
+    defer { fixture.remove() }
+    let contract = try LifecycleLocalInstallationContract()
+    let appObservation = try fixture.signedAppObservation()
+    let signingEvidence = try fixture.signingEvidence()
+
+    #expect(throws: InvestigationRuntimeDiagnosticBindingObservationError
+      .appSigningUnavailable) {
+        _ = try InvestigationRuntimeDiagnosticBindingObservation.installed(
+          contract: contract,
+          signedAppObservation: { _ in
+            throw LifecycleSignedBundleObservationError
+              .signingEvidenceUnavailable
+          },
+          signingEvidence: { _ in signingEvidence }
+        )
+    }
+    #expect(throws: InvestigationRuntimeDiagnosticBindingObservationError
+      .signedBundleMetadataUnavailable) {
+        _ = try InvestigationRuntimeDiagnosticBindingObservation.installed(
+          contract: contract,
+          signedAppObservation: { _ in
+            throw LifecycleSignedBundleObservationError
+              .signedMetadataUnavailable
+          },
+          signingEvidence: { _ in signingEvidence }
+        )
+    }
+    #expect(throws: InvestigationRuntimeDiagnosticBindingObservationError
+      .signedBundleMetadataUnavailable) {
+        let foreignEvidence = try LifecycleBundleSigningEvidence(
+          identity: LifecycleSigningIdentity(
+            signingIdentifier: "com.eriklee.foreign",
+            designatedRequirementSHA256: String(repeating: "4", count: 64),
+            codeDirectoryHash: String(repeating: "5", count: 40)
+          ),
+          executableSHA256: String(repeating: "1", count: 64),
+          isAdHoc: true
+        )
+        let foreign = try LifecycleSignedBundleObservation(
+          signingEvidence: foreignEvidence,
+          mainExecutableURL: contract.appExecutableURL,
+          bundleIdentifier: "com.eriklee.foreign"
+        )
+        _ = try InvestigationRuntimeDiagnosticBindingObservation.installed(
+          contract: contract,
+          signedAppObservation: { _ in foreign },
+          signingEvidence: { _ in signingEvidence }
+        )
+    }
+    #expect(throws: InvestigationRuntimeDiagnosticBindingObservationError
+      .signedBundleMetadataUnavailable) {
+        let foreign = try LifecycleSignedBundleObservation(
+          signingEvidence: signingEvidence,
+          mainExecutableURL: contract.installedAppURL.appending(
+            path: "Contents/MacOS/ForeignExecutable"
+          ),
+          bundleIdentifier: "com.eriklee.stornaut"
+        )
+        _ = try InvestigationRuntimeDiagnosticBindingObservation.installed(
+          contract: contract,
+          signedAppObservation: { _ in foreign },
+          signingEvidence: { _ in signingEvidence }
+        )
+    }
+    #expect(throws: InvestigationRuntimeDiagnosticBindingObservationError
+      .helperSigningUnavailable) {
+        _ = try InvestigationRuntimeDiagnosticBindingObservation.installed(
+          contract: contract,
+          signedAppObservation: { _ in appObservation },
+          signingEvidence: { url in
+            if url == contract.helperExecutableURL {
+              throw LifecycleSigningIdentityError.unavailable
+            }
+            return signingEvidence
+          }
+        )
+    }
+    #expect(throws: InvestigationRuntimeDiagnosticBindingObservationError
+      .machineDriverSigningUnavailable) {
+        _ = try InvestigationRuntimeDiagnosticBindingObservation.installed(
+          contract: contract,
+          signedAppObservation: { _ in appObservation },
+          signingEvidence: { url in
+            if url == contract.machineDriverExecutableURL {
+              throw LifecycleSigningIdentityError.unavailable
+            }
+            return signingEvidence
+          }
+        )
+    }
+  }
+
   @Test
   func asyncBindingSourceRequiresStableInstalledObservation() async throws {
     let fixture = try CoordinatorBindingBehaviorFixture()
@@ -42,7 +207,7 @@ struct InvestigationMachineCoordinatorBindingSourceTests {
       resolveCodexIdentity: { lease }
     )
     await #expect(throws: InvestigationMachineCoordinatorBindingSourceError
-      .invalidInstalledObservation) {
+      .installedObservationChanged) {
         _ = try await drifted.make(
           sourceFingerprint: fixture.sourceFingerprint()
         )
@@ -373,6 +538,31 @@ struct InvestigationMachineCoordinatorBindingSourceTests {
     }
   }
 
+  private func makeBindingSource(
+    provenance: InvestigationMachineBuildProvenanceReceiptV1,
+    observations: CoordinatorObservationResultProbe,
+    lease: CodexNativeExecutableIdentityLease
+  ) -> InvestigationMachineCurrentSourceBindingSource {
+    InvestigationMachineCurrentSourceBindingSource(
+      buildProvenance: { provenance },
+      installedObservation: observations.next,
+      resolveCodexIdentity: { lease }
+    )
+  }
+
+  private static func bindingSourceError(
+    _ source: InvestigationMachineCurrentSourceBindingSource,
+    fingerprint: InvestigationFingerprint
+  ) async -> InvestigationMachineCoordinatorBindingSourceError? {
+    do {
+      _ = try await source.make(sourceFingerprint: fingerprint)
+      return nil
+    } catch let error as InvestigationMachineCoordinatorBindingSourceError {
+      return error
+    } catch {
+      return nil
+    }
+  }
 }
 
 private final class CoordinatorBindingBehaviorFixture {
@@ -476,6 +666,27 @@ private final class CoordinatorBindingBehaviorFixture {
       machineClaimServiceIdentifier:
         SignedInvestigationRuntimeMachineDriverBinding
         .requiredMachineClaimServiceIdentifier
+    )
+  }
+
+  func signingEvidence() throws -> LifecycleBundleSigningEvidence {
+    try LifecycleBundleSigningEvidence(
+      identity: LifecycleSigningIdentity(
+        signingIdentifier: "com.eriklee.stornaut",
+        designatedRequirementSHA256: String(repeating: "4", count: 64),
+        codeDirectoryHash: String(repeating: "5", count: 40)
+      ),
+      executableSHA256: String(repeating: "1", count: 64),
+      isAdHoc: true
+    )
+  }
+
+  func signedAppObservation() throws -> LifecycleSignedBundleObservation {
+    let contract = try LifecycleLocalInstallationContract()
+    return try LifecycleSignedBundleObservation(
+      signingEvidence: signingEvidence(),
+      mainExecutableURL: contract.appExecutableURL,
+      bundleIdentifier: "com.eriklee.stornaut"
     )
   }
 
@@ -625,6 +836,7 @@ private final class CoordinatorBindingBehaviorFixture {
       throw POSIXError(POSIXErrorCode(rawValue: errno)!)
     }
   }
+
 }
 private final class CoordinatorObservationProbe: @unchecked Sendable {
   private let lock = NSLock()
@@ -638,6 +850,29 @@ private final class CoordinatorObservationProbe: @unchecked Sendable {
       guard !values.isEmpty else { throw CocoaError(.fileReadUnknown) }
       callCount += 1
       return values.removeFirst()
+    }
+  }
+}
+private final class CoordinatorObservationResultProbe: @unchecked Sendable {
+  private let lock = NSLock()
+  private var values: [Result<
+    InvestigationRuntimeDiagnosticBindingObservation,
+    InvestigationRuntimeDiagnosticBindingObservationError
+  >]
+  private(set) var callCount = 0
+
+  init(_ values: [Result<
+    InvestigationRuntimeDiagnosticBindingObservation,
+    InvestigationRuntimeDiagnosticBindingObservationError
+  >]) {
+    self.values = values
+  }
+
+  func next() throws -> InvestigationRuntimeDiagnosticBindingObservation {
+    try lock.withLock {
+      guard !values.isEmpty else { throw CocoaError(.fileReadUnknown) }
+      callCount += 1
+      return try values.removeFirst().get()
     }
   }
 }

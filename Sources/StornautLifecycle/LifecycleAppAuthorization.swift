@@ -77,6 +77,72 @@ public struct LifecycleBundleSigningEvidence:
     }
 }
 
+package struct LifecycleSignedBundleObservation:
+    Sendable,
+    Equatable
+{
+    package let signingEvidence: LifecycleBundleSigningEvidence
+    package let mainExecutableURL: URL
+    package let bundleIdentifier: String
+
+    package init(
+        signingEvidence: LifecycleBundleSigningEvidence,
+        mainExecutableURL: URL,
+        bundleIdentifier: String
+    ) throws {
+        guard
+            mainExecutableURL.isFileURL,
+            mainExecutableURL.path.hasPrefix("/"),
+            !mainExecutableURL.lastPathComponent.isEmpty,
+            !bundleIdentifier.isEmpty,
+            bundleIdentifier.utf8.count <= 256,
+            bundleIdentifier
+                == signingEvidence.identity.signingIdentifier,
+            bundleIdentifier.unicodeScalars.allSatisfy({
+                (0x30...0x39).contains($0.value)
+                    || (0x41...0x5A).contains($0.value)
+                    || (0x61...0x7A).contains($0.value)
+                    || $0.value == 0x2D
+                    || $0.value == 0x2E
+                    || $0.value == 0x5F
+            })
+        else {
+            throw LifecycleSignedBundleObservationError
+                .signedMetadataUnavailable
+        }
+        self.signingEvidence = signingEvidence
+        self.mainExecutableURL = mainExecutableURL.standardizedFileURL
+        self.bundleIdentifier = bundleIdentifier
+    }
+}
+
+package enum LifecycleSignedBundleObservationError:
+    Error,
+    Sendable,
+    Equatable
+{
+    case signingEvidenceUnavailable
+    case signedMetadataUnavailable
+}
+
+package struct LifecycleSigningEvidenceReadHooks:
+    @unchecked Sendable
+{
+    package let afterDescriptorOpened: @Sendable () throws -> Void
+    package let afterSigningInformation: @Sendable () -> Void
+    package let afterFinalSigningInformation: @Sendable () throws -> Void
+
+    package init(
+        afterDescriptorOpened: @escaping @Sendable () throws -> Void = {},
+        afterSigningInformation: @escaping @Sendable () -> Void = {},
+        afterFinalSigningInformation: @escaping @Sendable () throws -> Void = {}
+    ) {
+        self.afterDescriptorOpened = afterDescriptorOpened
+        self.afterSigningInformation = afterSigningInformation
+        self.afterFinalSigningInformation = afterFinalSigningInformation
+    }
+}
+
 public enum LifecycleSigningIdentityError:
     Error,
     Sendable,
@@ -98,7 +164,15 @@ public enum LifecyclePeerCodeSigningRequirement {
 }
 
 public struct LifecycleBundleSigningIdentityReader: Sendable {
-    public init() {}
+    private let hooks: LifecycleSigningEvidenceReadHooks
+
+    public init() {
+        hooks = LifecycleSigningEvidenceReadHooks()
+    }
+
+    package init(hooks: LifecycleSigningEvidenceReadHooks) {
+        self.hooks = hooks
+    }
 
     public func read(
         bundleURL: URL
@@ -109,9 +183,96 @@ public struct LifecycleBundleSigningIdentityReader: Sendable {
     public func evidence(
         bundleURL: URL
     ) throws -> LifecycleBundleSigningEvidence {
+        let information = try signingInformation(
+            bundleURL: bundleURL,
+            includePropertyList: false
+        )
+        let executableURL: URL
+        if let signedMainExecutableURL = information.mainExecutableURL {
+            guard
+                signedMainExecutableURL.isFileURL,
+                signedMainExecutableURL.path.hasPrefix("/")
+            else {
+                throw LifecycleSigningIdentityError.unavailable
+            }
+            executableURL = signedMainExecutableURL.standardizedFileURL
+        } else if let resolved = lifecycleSigningExecutableURL(
+            for: bundleURL
+        ) {
+            executableURL = resolved
+        } else {
+            throw LifecycleSigningIdentityError.unavailable
+        }
+        return try observedEvidence(
+            codeURL: bundleURL,
+            executableURL: executableURL,
+            initialInformation: information,
+            includesPropertyList: false
+        ).signingEvidence
+    }
+
+    package func signedBundleObservation(
+        bundleURL: URL
+    ) throws -> LifecycleSignedBundleObservation {
+        let metadata: LifecycleSigningInformation
+        let executableURL: URL
+        do {
+            metadata = try signingInformation(
+                bundleURL: bundleURL,
+                includePropertyList: true
+            )
+            guard let mainExecutableURL = metadata.mainExecutableURL else {
+                throw LifecycleSignedBundleObservationError
+                    .signedMetadataUnavailable
+            }
+            executableURL = mainExecutableURL.standardizedFileURL
+        } catch let error as LifecycleSignedBundleObservationError {
+            throw error
+        } catch {
+            throw LifecycleSignedBundleObservationError
+                .signingEvidenceUnavailable
+        }
+        do {
+            let observed = try observedEvidence(
+                codeURL: bundleURL,
+                executableURL: executableURL,
+                initialInformation: metadata,
+                includesPropertyList: true
+            )
+            guard
+                observed.mainExecutableURL.deletingLastPathComponent()
+                    .deletingLastPathComponent()
+                    .deletingLastPathComponent()
+                    == bundleURL.standardizedFileURL,
+                let bundleIdentifier = observed.bundleIdentifier,
+                let executableName = observed.executableName,
+                observed.mainExecutableURL.lastPathComponent
+                    == executableName
+            else {
+                throw LifecycleSignedBundleObservationError
+                    .signedMetadataUnavailable
+            }
+            return try LifecycleSignedBundleObservation(
+                signingEvidence: observed.signingEvidence,
+                mainExecutableURL: observed.mainExecutableURL,
+                bundleIdentifier: bundleIdentifier
+            )
+        } catch let error as LifecycleSignedBundleObservationError {
+            throw error
+        } catch {
+            throw LifecycleSignedBundleObservationError
+                .signingEvidenceUnavailable
+        }
+    }
+
+    private func signingInformation(
+        bundleURL: URL,
+        includePropertyList: Bool
+    ) throws -> LifecycleSigningInformation {
         guard
             bundleURL.isFileURL,
-            bundleURL.path.hasPrefix("/")
+            bundleURL.path.hasPrefix("/"),
+            lifecycleSigningCodeURLHasDirectLeaf(bundleURL)
         else {
             throw LifecycleSigningIdentityError.unavailable
         }
@@ -122,21 +283,25 @@ public struct LifecycleBundleSigningIdentityReader: Sendable {
                 SecCSFlags(),
                 &staticCode
             ) == errSecSuccess,
-            let staticCode,
-            SecStaticCodeCheckValidity(
-                staticCode,
-                SecCSFlags(rawValue: kSecCSStrictValidate),
-                nil
-            ) == errSecSuccess
+            let staticCode
         else {
             throw LifecycleSigningIdentityError.unavailable
         }
+        if SecStaticCodeCheckValidity(
+               staticCode,
+               SecCSFlags(rawValue: kSecCSStrictValidate),
+               nil
+           ) != errSecSuccess
+        {
+            throw LifecycleSigningIdentityError.unavailable
+        }
         var information: CFDictionary?
-        let flags = SecCSFlags(
-            rawValue:
-                kSecCSSigningInformation
-                | kSecCSRequirementInformation
-        )
+        var rawFlags = kSecCSSigningInformation
+            | kSecCSRequirementInformation
+        if includePropertyList {
+            rawFlags |= kSecCSContentInformation
+        }
+        let flags = SecCSFlags(rawValue: rawFlags)
         guard
             SecCodeCopySigningInformation(
                 staticCode,
@@ -152,40 +317,205 @@ public struct LifecycleBundleSigningIdentityReader: Sendable {
             let requirement = secRequirement(
                 dictionary[kSecCodeInfoDesignatedRequirement]
             ),
-            let requirementData = requirementData(requirement),
-            let executableURL = lifecycleSigningExecutableURL(
-                for: bundleURL
-            )
+            let requirementData = requirementData(requirement)
         else {
             throw LifecycleSigningIdentityError.unavailable
         }
         do {
-            let identity = try LifecycleSigningIdentity(
-                signingIdentifier: signingIdentifier,
-                designatedRequirementSHA256: sha256(requirementData),
-                codeDirectoryHash: codeDirectoryData.hexString
-            )
-            return try LifecycleBundleSigningEvidence(
-                identity: identity,
-                executableSHA256: try sha256File(executableURL),
+            return LifecycleSigningInformation(
+                identity: try LifecycleSigningIdentity(
+                    signingIdentifier: signingIdentifier,
+                    designatedRequirementSHA256: sha256(requirementData),
+                    codeDirectoryHash: codeDirectoryData.hexString
+                ),
                 isAdHoc: flags.uint32Value
-                    & lifecycleAdHocCodeSignatureFlag != 0
+                    & lifecycleAdHocCodeSignatureFlag != 0,
+                mainExecutableURL:
+                    dictionary[kSecCodeInfoMainExecutable] as? URL,
+                bundleIdentifier: (dictionary[kSecCodeInfoPList]
+                    as? [String: Any])?["CFBundleIdentifier"]
+                    as? String,
+                executableName: (dictionary[kSecCodeInfoPList]
+                    as? [String: Any])?["CFBundleExecutable"]
+                    as? String
             )
         } catch {
             throw LifecycleSigningIdentityError.invalidIdentity
         }
     }
+
+    private func observedEvidence(
+        codeURL: URL,
+        executableURL: URL,
+        initialInformation: LifecycleSigningInformation,
+        includesPropertyList: Bool
+    ) throws -> LifecycleObservedSigningEvidence {
+        let descriptor = Darwin.open(
+            executableURL.path,
+            O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK
+        )
+        guard descriptor >= 0 else {
+            throw LifecycleSigningIdentityError.unavailable
+        }
+        defer { Darwin.close(descriptor) }
+        guard let initialNode = lifecycleSigningFileNode(
+            descriptor: descriptor
+        ) else {
+            throw LifecycleSigningIdentityError.unavailable
+        }
+        var namedNode = stat()
+        guard
+            lstat(executableURL.path, &namedNode) == 0,
+            lifecycleSigningFileNode(namedNode) == initialNode
+        else {
+            throw LifecycleSigningIdentityError.unavailable
+        }
+        try hooks.afterDescriptorOpened()
+        let information = try signingInformation(
+            bundleURL: codeURL,
+            includePropertyList: includesPropertyList
+        )
+        hooks.afterSigningInformation()
+        let digest = try sha256File(descriptor)
+        let finalInformation = try signingInformation(
+            bundleURL: codeURL,
+            includePropertyList: includesPropertyList
+        )
+        try hooks.afterFinalSigningInformation()
+        guard
+            lifecycleSigningInformation(
+                initialInformation, matches: information
+            ),
+            lifecycleSigningInformation(
+                information, matches: finalInformation
+            ),
+            lifecycleSigningInformation(
+                finalInformation, resolvesTo: executableURL
+            ),
+            lifecycleSigningFileNode(descriptor: descriptor) == initialNode,
+            lstat(executableURL.path, &namedNode) == 0,
+            lifecycleSigningFileNode(namedNode) == initialNode
+        else {
+            throw LifecycleSigningIdentityError.unavailable
+        }
+        let evidence = try LifecycleBundleSigningEvidence(
+            identity: finalInformation.identity,
+            executableSHA256: digest,
+            isAdHoc: finalInformation.isAdHoc
+        )
+        return LifecycleObservedSigningEvidence(
+            signingEvidence: evidence,
+            mainExecutableURL:
+                finalInformation.mainExecutableURL?
+                    .standardizedFileURL
+                    ?? executableURL.standardizedFileURL,
+            bundleIdentifier: finalInformation.bundleIdentifier,
+            executableName: finalInformation.executableName
+        )
+    }
 }
 
-func lifecycleSigningExecutableURL(for codeURL: URL) -> URL? {
+private struct LifecycleSigningInformation: Equatable {
+    let identity: LifecycleSigningIdentity
+    let isAdHoc: Bool
+    let mainExecutableURL: URL?
+    let bundleIdentifier: String?
+    let executableName: String?
+}
+
+private struct LifecycleObservedSigningEvidence {
+    let signingEvidence: LifecycleBundleSigningEvidence
+    let mainExecutableURL: URL
+    let bundleIdentifier: String?
+    let executableName: String?
+}
+
+private func lifecycleSigningInformation(
+    _ lhs: LifecycleSigningInformation,
+    matches rhs: LifecycleSigningInformation
+) -> Bool {
+    lhs.identity == rhs.identity
+        && lhs.isAdHoc == rhs.isAdHoc
+        && lhs.mainExecutableURL?.standardizedFileURL
+            == rhs.mainExecutableURL?.standardizedFileURL
+        && lhs.bundleIdentifier == rhs.bundleIdentifier
+        && lhs.executableName == rhs.executableName
+}
+
+private func lifecycleSigningInformation(
+    _ information: LifecycleSigningInformation,
+    resolvesTo executableURL: URL
+) -> Bool {
+    information.mainExecutableURL.map {
+        $0.standardizedFileURL == executableURL.standardizedFileURL
+    } ?? true
+}
+
+private struct LifecycleSigningFileNode: Equatable {
+    let device: dev_t
+    let inode: ino_t
+    let size: off_t
+    let mode: mode_t
+    let ownerUserID: uid_t
+    let ownerGroupID: gid_t
+    let flags: UInt32
+    let modificationSeconds: Int64
+    let modificationNanoseconds: Int64
+    let changeSeconds: Int64
+    let changeNanoseconds: Int64
+}
+
+private func lifecycleSigningFileNode(
+    descriptor: Int32
+) -> LifecycleSigningFileNode? {
+    var information = stat()
+    guard fstat(descriptor, &information) == 0 else { return nil }
+    return lifecycleSigningFileNode(information)
+}
+
+private func lifecycleSigningCodeURLHasDirectLeaf(_ codeURL: URL) -> Bool {
+    var information = stat()
+    guard lstat(codeURL.path, &information) == 0 else { return false }
+    if information.st_mode & S_IFMT == S_IFDIR {
+        return true
+    }
+    return lifecycleSigningFileNode(information) != nil
+}
+
+private func lifecycleSigningFileNode(
+    _ information: stat
+) -> LifecycleSigningFileNode? {
+    guard
+        information.st_mode & S_IFMT == S_IFREG,
+        information.st_nlink == 1,
+        information.st_mode & 0o111 != 0,
+        information.st_size > 0
+    else {
+        return nil
+    }
+    return LifecycleSigningFileNode(
+        device: information.st_dev,
+        inode: information.st_ino,
+        size: information.st_size,
+        mode: information.st_mode,
+        ownerUserID: information.st_uid,
+        ownerGroupID: information.st_gid,
+        flags: information.st_flags,
+        modificationSeconds: Int64(information.st_mtimespec.tv_sec),
+        modificationNanoseconds: Int64(information.st_mtimespec.tv_nsec),
+        changeSeconds: Int64(information.st_ctimespec.tv_sec),
+        changeNanoseconds: Int64(information.st_ctimespec.tv_nsec)
+    )
+}
+
+func lifecycleSigningExecutableURL(
+    for codeURL: URL
+) -> URL? {
     guard
         codeURL.isFileURL,
         codeURL.path.hasPrefix("/")
     else {
         return nil
-    }
-    if let executableURL = Bundle(url: codeURL)?.executableURL {
-        return executableURL.standardizedFileURL
     }
     var information = stat()
     guard
@@ -733,22 +1063,22 @@ private func sha256(_ data: Data) -> String {
     }.joined()
 }
 
-private func sha256File(_ url: URL) throws -> String {
-    let handle: FileHandle
-    do {
-        handle = try FileHandle(forReadingFrom: url)
-    } catch {
+private func sha256File(_ descriptor: Int32) throws -> String {
+    guard lseek(descriptor, 0, SEEK_SET) == 0 else {
         throw LifecycleSigningIdentityError.unavailable
     }
-    defer { try? handle.close() }
     var hasher = SHA256()
-    do {
-        while let data = try handle.read(upToCount: 64 * 1_024),
-              !data.isEmpty
-        {
-            hasher.update(data: data)
+    var buffer = [UInt8](repeating: 0, count: 64 * 1_024)
+    while true {
+        let count = buffer.withUnsafeMutableBytes { bytes in
+            Darwin.read(descriptor, bytes.baseAddress, bytes.count)
         }
-    } catch {
+        if count > 0 {
+            hasher.update(data: Data(buffer.prefix(count)))
+            continue
+        }
+        if count == 0 { break }
+        if errno == EINTR { continue }
         throw LifecycleSigningIdentityError.unavailable
     }
     return hasher.finalize().map {

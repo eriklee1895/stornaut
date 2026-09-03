@@ -12,7 +12,11 @@
     case buildProvenanceUnavailable
     case invalidBuildProvenance
     case invalidSourceFingerprint
-    case invalidInstalledObservation
+    case appSigningUnavailable
+    case helperSigningUnavailable
+    case machineDriverSigningUnavailable
+    case signedBundleMetadataUnavailable
+    case installedObservationChanged
     case invalidRuntimeReceipt
     case invalidBinding
     case codexIdentityChanged
@@ -262,8 +266,7 @@
       let provenance = try buildProvenance()
       let initialObservation: InvestigationRuntimeDiagnosticBindingObservation
       do { initialObservation = try installedObservation() } catch {
-        throw InvestigationMachineCoordinatorBindingSourceError
-          .invalidInstalledObservation
+        throw Self.mapInstalledObservationError(error)
       }
       let codexLease: CodexNativeExecutableIdentityLease
       do {
@@ -274,12 +277,11 @@
       }
       let observation: InvestigationRuntimeDiagnosticBindingObservation
       do { observation = try installedObservation() } catch {
-        throw InvestigationMachineCoordinatorBindingSourceError
-          .invalidInstalledObservation
+        throw Self.mapInstalledObservationError(error)
       }
       guard observation == initialObservation else {
         throw InvestigationMachineCoordinatorBindingSourceError
-          .invalidInstalledObservation
+          .installedObservationChanged
       }
       return try Self.make(
         provenance: provenance,
@@ -287,6 +289,22 @@
         observation: observation,
         codexLease: codexLease
       )
+    }
+
+    private static func mapInstalledObservationError(
+      _ error: any Error
+    ) -> InvestigationMachineCoordinatorBindingSourceError {
+      guard let error = error as?
+        InvestigationRuntimeDiagnosticBindingObservationError
+      else { return .invalidBinding }
+      switch error {
+      case .appSigningUnavailable: return .appSigningUnavailable
+      case .helperSigningUnavailable: return .helperSigningUnavailable
+      case .machineDriverSigningUnavailable:
+        return .machineDriverSigningUnavailable
+      case .signedBundleMetadataUnavailable:
+        return .signedBundleMetadataUnavailable
+      }
     }
 
     static func make(
