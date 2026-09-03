@@ -3,7 +3,7 @@
 set -euo pipefail
 
 contract_source=${0:A}
-# ib2_self_sha=bf3ef7a6ea7657571fce2143883d79badd8cfaf2518eabf90be7277b9ca9deb1
+# ib2_self_sha=4c71a513619b0aa67acc4016beaea193262ddc66217a4025b27d58b7091b7e28
 ib2_self_sha=$(sed -nE 's/^# ib2_self_sha=([0-9a-f]{64})$/\1/p' "$contract_source"); ib2_observed_sha=$(sed -E 's/^# ib2_self_sha=[0-9a-f]{64}$/# ib2_self_sha=SELF/' "$contract_source" | shasum -a 256 | awk '{ print $1 }')
 [[ ${#ib2_self_sha} == 64 && "$ib2_observed_sha" == "$ib2_self_sha" ]] || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
 repo_root=${contract_source:h:h}
@@ -63,6 +63,10 @@ function replay_historical_contract() (
     if [[ $mode == --iic0b-i-accepted ]]; then
         local author=Sources/StornautInvestigationDiagnostic/InvestigationProjectedCohortAuthor.swift composition=Sources/StornautInvestigationDiagnostic/InvestigationRuntimeDiagnosticComposition.swift test=Tests/StornautInvestigationTests/InvestigationProjectedCohortAuthorTests.swift boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift baseline=e5ed33e27195d9252f02a89ab39664df3848f1ed
         scripts/verify-investigation-boundaries --iic0b-i-producer-contract-only "$author" "$composition" "$test" "$boundary"; scripts/verify-app-release-boundaries --iic0b-i-source-contract-only "$author" "$composition" scripts/verify-app-release-boundaries; scripts/verify-investigation-boundaries --iic0b-i-staged-scope-contract-only "$baseline"
+    elif [[ $mode == --iic-c-prearm-accepted ]]; then
+        scripts/verify-investigation-boundaries \
+            --iic-c-prearm-staged-scope-contract-only \
+            62ee47091e338107e182233eaed80ed1ecc059cc
     elif [[ $mode == --iic-c-accepted ]]; then
         local historical_iicc_mode=--iic-c-contract-only
         STORNAUT_IICC_SKIP_COMPONENT_BUILD=1 \
@@ -3797,6 +3801,11 @@ function verify_iicc_contract() {
     "$gate" --iic-root-driver-lineage-l2-source-contract-only >"$out/current-lineage-l2.log"
     "$gate" --root-driver-lineage-cross-uid-source-contract-only >"$out/current-cross-uid.log"
     "$gate" --iic-c-source-contract-only "${paths[@]}" >"$out/source.log"
+    "$gate" --iic-c-prearm-failure-source-contract-only \
+        "${paths[1]}" "${paths[2]}" "${paths[4]}" "${paths[12]}" \
+        Tests/Fixtures/InvestigationMachineCampaignCoordinator/main.swift \
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignHarnessTests.swift \
+        >"$out/prearm-failure.log"
     if [[ ${STORNAUT_IICC_SKIP_COMPONENT_BUILD:-0} == 1 ]]; then
         require_fixed_text "$release" 'verify_iicb2b2_component_boundary'
         require_fixed_text "$release" '--iic-b2b2-component-boundary-only'
@@ -3929,6 +3938,16 @@ PY
         "$gate" --iic-c-source-contract-only "${alternate_args[@]}"
 
     local prearm_baseline=62ee47091e338107e182233eaed80ed1ecc059cc
+    if [[ $(git rev-parse HEAD) != \
+            51ea8c28b9431280bb0e8b7e6373e2e1ad538298 \
+        || -n $(git diff --cached --name-only --diff-filter=ACMRD --) \
+        || -n $(git diff --name-only --diff-filter=ACMRD --) ]]; then
+        replay_historical_contract "$out/prearm-closure" \
+            51ea8c28b9431280bb0e8b7e6373e2e1ad538298 \
+            f4ae09666fa21480b329775beb6b372c7a4759be \
+            --iic-c-prearm-accepted \
+            '--iic-c-prearm-staged-scope-contract-only'
+    else
     local -a prearm_paths=(
         Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
         scripts/verify-contract scripts/verify-investigation-boundaries)
@@ -3936,9 +3955,10 @@ PY
     GIT_INDEX_FILE=$index git read-tree "$prearm_baseline^{tree}"
     for item in "${prearm_paths[@]}"; do
         mode=100644; [[ $item == scripts/* ]] && mode=100755
-        blob=$(git hash-object -w -- "$item")
+        blob=$(git rev-parse "$prearm_baseline:$item")
         GIT_INDEX_FILE=$index git update-index --add --cacheinfo "$mode,$blob,$item"
     done
+    GIT_INDEX_FILE=$index git update-index --refresh >/dev/null 2>&1 || true
     GIT_INDEX_FILE=$index "$gate" \
         --iic-c-prearm-staged-scope-contract-only "$prearm_baseline" \
         >"$out/prearm-scope.log"
@@ -3982,6 +4002,172 @@ PY
           'ii-c-c pre-arm index/worktree drifted' env \
           GIT_INDEX_FILE="$index" "$gate" \
           --iic-c-prearm-staged-scope-contract-only "$prearm_baseline" )
+    fi
+
+    local failure_baseline=51ea8c28b9431280bb0e8b7e6373e2e1ad538298
+    local -a failure_paths=(
+        Sources/StornautInvestigationMachineCampaign/main.swift
+        Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignHarness.swift
+        Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift
+        Tests/Fixtures/InvestigationMachineCampaignCoordinator/main.swift
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignHarnessTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-contract scripts/verify-investigation-boundaries)
+    local failure_main=${failure_paths[1]}
+    local failure_contract=scripts/verify-contract
+    local failure_index=$out/prearm-failure-scope.index
+    GIT_INDEX_FILE=$failure_index git read-tree "$failure_baseline^{tree}"
+    for item in "${failure_paths[@]}"; do
+        mode=100644; [[ $item == scripts/* ]] && mode=100755
+        blob=$(git hash-object -w -- "$item")
+        GIT_INDEX_FILE=$failure_index git update-index --add \
+            --cacheinfo "$mode,$blob,$item"
+    done
+    function materialize_iicc_prearm_failure_scope_worktree() {
+        local scope_index=$1 scope_worktree=$2
+        rm -rf -- "$scope_worktree"
+        mkdir -p "$scope_worktree"
+        GIT_INDEX_FILE=$scope_index GIT_WORK_TREE=$scope_worktree \
+            git checkout-index -a
+    }
+    local failure_worktree=$out/prearm-failure-scope.worktree
+    materialize_iicc_prearm_failure_scope_worktree \
+        "$failure_index" "$failure_worktree"
+    env GIT_INDEX_FILE="$failure_index" GIT_WORK_TREE="$failure_worktree" "$gate" \
+        --iic-c-prearm-failure-staged-scope-contract-only "$failure_baseline" \
+        >"$out/prearm-failure-scope.log"
+    function reject_iicc_prearm_failure_scope() {
+        local label=$1 expected=$2; shift 2
+        local log="$out/prearm-failure-scope-$label.log" scope_rc=0
+        "$@" >"$log" 2>&1 || scope_rc=$?
+        (( scope_rc != 0 )) \
+            || fail_contract "ii-c-c pre-arm failure scope accepted: $label"
+        [[ "$(<"$log")" == "$expected" ]] \
+            || fail_contract "ii-c-c pre-arm failure scope diagnostic drifted: $label"
+    }
+    local -a failure_scope_fixtures=(extra missing binary wrong-mode \
+        over-budget aggregate-budget staged-worktree-divergence wrong-baseline)
+    (( ${#failure_scope_fixtures} + 1 == 9 )) \
+        || fail_contract "ii-c-c pre-arm failure scope negative inventory drifted"
+    local failure_bad failure_blob failure_fixture failure_scope failure_expected
+    for failure_fixture in "${failure_scope_fixtures[@]}"; do
+        failure_bad=$out/prearm-failure-scope-$failure_fixture.index
+        cp "$failure_index" "$failure_bad"
+        failure_scope=$failure_baseline
+        local failure_fixture_worktree=$out/prearm-failure-scope-$failure_fixture.worktree
+        case $failure_fixture in
+          extra)
+            failure_blob=$(print extra|git hash-object -w --stdin)
+            GIT_INDEX_FILE=$failure_bad git update-index --add \
+                --cacheinfo "100644,$failure_blob,iicc-prearm-failure-extra.swift"
+            failure_expected='pre-arm failure checkpoint paths drifted';;
+          missing)
+            failure_blob=$(git rev-parse "$failure_baseline:$failure_main")
+            GIT_INDEX_FILE=$failure_bad git update-index \
+                --cacheinfo "100644,$failure_blob,$failure_main"
+            failure_expected='pre-arm failure checkpoint paths drifted';;
+          binary)
+            failure_blob=$(printf '\0iicc-prearm-failure\n' \
+                | git hash-object -w --stdin)
+            GIT_INDEX_FILE=$failure_bad git update-index \
+                --cacheinfo "100644,$failure_blob,$failure_main"
+            failure_expected="pre-arm failure checkpoint budget unavailable: $failure_main";;
+          wrong-mode)
+            failure_blob=$(git hash-object -w -- "$failure_contract")
+            GIT_INDEX_FILE=$failure_bad git update-index \
+                --cacheinfo "100644,$failure_blob,$failure_contract"
+            failure_expected="pre-arm failure staged source/mode drifted: $failure_contract";;
+          over-budget)
+            failure_blob=$( { <"$failure_main"; for item in {1..120}; do
+                    print "// iicc-prearm-failure-over-$item"; done; } \
+                | git hash-object -w --stdin)
+            GIT_INDEX_FILE=$failure_bad git update-index \
+                --cacheinfo "100644,$failure_blob,$failure_main"
+            failure_expected="pre-arm failure path budget drifted: $failure_main";;
+          aggregate-budget)
+            local aggregate_total aggregate_path aggregate_current
+            local aggregate_capacity aggregate_add aggregate_source
+            local aggregate_line
+            local -A aggregate_ceilings=(
+                Sources/StornautInvestigationMachineCampaign/main.swift 250
+                Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift 300
+                Tests/Fixtures/InvestigationMachineCampaignCoordinator/main.swift 100
+                Tests/StornautInvestigationTests/InvestigationMachineCampaignHarnessTests.swift 100
+                Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift 100
+            )
+            aggregate_total=$(GIT_INDEX_FILE=$failure_bad git diff --cached \
+                --numstat "$failure_baseline" -- \
+                | awk '{ total += $1 + $2 } END { print total + 0 }')
+            for aggregate_path in ${(k)aggregate_ceilings}; do
+                (( aggregate_total > 2080 )) && break
+                aggregate_current=$(GIT_INDEX_FILE=$failure_bad git diff --cached \
+                    --numstat "$failure_baseline" -- "$aggregate_path" \
+                    | awk '{ print $1 + $2 }')
+                aggregate_capacity=$(( \
+                    aggregate_ceilings[$aggregate_path] - aggregate_current ))
+                (( aggregate_capacity > 0 )) || continue
+                aggregate_add=$(( 2081 - aggregate_total ))
+                (( aggregate_add > aggregate_capacity )) \
+                    && aggregate_add=$aggregate_capacity
+                aggregate_source=$out/aggregate-${aggregate_path//\//_}
+                GIT_INDEX_FILE=$failure_bad git show ":$aggregate_path" \
+                    >"$aggregate_source"
+                aggregate_line=1
+                while (( aggregate_line <= aggregate_add )); do
+                    print "// iicc-prearm-failure-aggregate-$aggregate_line"
+                    (( aggregate_line += 1 ))
+                done >>"$aggregate_source"
+                failure_blob=$(git hash-object -w -- "$aggregate_source")
+                GIT_INDEX_FILE=$failure_bad git update-index \
+                    --cacheinfo "100644,$failure_blob,$aggregate_path"
+                (( aggregate_total += aggregate_add ))
+            done
+            (( aggregate_total == 2081 )) \
+                || fail_contract "ii-c-c pre-arm failure aggregate fixture unavailable"
+            materialize_iicc_prearm_failure_scope_worktree \
+                "$failure_bad" "$failure_fixture_worktree"
+            local aggregate_gate=$failure_fixture_worktree/scripts/verify-investigation-boundaries
+            reject_iicc_prearm_failure_scope "$failure_fixture" \
+                'pre-arm failure aggregate budget drifted' env GIT_DIR="$repo_root/.git" \
+                GIT_INDEX_FILE="$failure_bad" GIT_WORK_TREE="$failure_fixture_worktree" \
+                "$aggregate_gate" \
+                --iic-c-prearm-failure-staged-scope-contract-only \
+                "$failure_baseline"
+            continue;;
+          staged-worktree-divergence)
+            failure_blob=$( { <"$failure_main";
+                    print '// iicc-prearm-failure-divergence'; } \
+                | git hash-object -w --stdin)
+            GIT_INDEX_FILE=$failure_bad git update-index \
+                --cacheinfo "100644,$failure_blob,$failure_main"
+            failure_expected="pre-arm failure staged source/mode drifted: $failure_main";;
+          wrong-baseline)
+            failure_scope=$failure_baseline^
+            failure_expected='pre-arm failure baseline drifted';;
+        esac
+        case $failure_fixture in
+          wrong-mode|staged-worktree-divergence)
+            materialize_iicc_prearm_failure_scope_worktree \
+                "$failure_index" "$failure_fixture_worktree";;
+          *)
+            materialize_iicc_prearm_failure_scope_worktree \
+                "$failure_bad" "$failure_fixture_worktree";;
+        esac
+        reject_iicc_prearm_failure_scope "$failure_fixture" "$failure_expected" \
+            env GIT_INDEX_FILE="$failure_bad" GIT_WORK_TREE="$failure_fixture_worktree" "$gate" \
+            --iic-c-prearm-failure-staged-scope-contract-only "$failure_scope"
+    done
+    ( local untracked_worktree=$out/prearm-failure-scope-untracked.worktree
+      materialize_iicc_prearm_failure_scope_worktree \
+          "$failure_index" "$untracked_worktree"
+      local probe=$untracked_worktree/iicc-prearm-failure-untracked-$PPID-$RANDOM.swift
+      print x >"$probe"
+      reject_iicc_prearm_failure_scope untracked \
+          'pre-arm failure index/worktree drifted' env \
+          GIT_INDEX_FILE="$failure_index" GIT_WORK_TREE="$untracked_worktree" "$gate" \
+          --iic-c-prearm-failure-staged-scope-contract-only \
+          "$failure_baseline" )
 }
 
 if [[ ${1:-} == --iic-c-contract-only ]]; then

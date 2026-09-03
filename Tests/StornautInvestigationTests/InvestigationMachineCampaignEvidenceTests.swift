@@ -12,6 +12,57 @@ import Testing
 
 @Suite("Investigation machine campaign evidence", .serialized)
 struct InvestigationMachineCampaignEvidenceTests {
+    @Test
+    func preArmFailureRepairScopeRemainsBounded() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let baseline = "51ea8c28b9431280bb0e8b7e6373e2e1ad538298"
+        let expected: [String: Int] = [
+            "Sources/StornautInvestigationMachineCampaign/main.swift": 250,
+            "Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignHarness.swift": 340,
+            "Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift": 300,
+            "Tests/Fixtures/InvestigationMachineCampaignCoordinator/main.swift": 100,
+            "Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift": 650,
+            "Tests/StornautInvestigationTests/InvestigationMachineCampaignHarnessTests.swift": 100,
+            "Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift": 100,
+            "scripts/verify-contract": 200,
+            "scripts/verify-investigation-boundaries": 240,
+        ]
+        let process = Process(), output = Pipe()
+        process.executableURL = URL(filePath: "/usr/bin/git")
+        process.currentDirectoryURL = root
+        process.arguments = ["diff", "--numstat", baseline, "--"]
+        process.environment = ["HOME": "/var/empty", "PATH": "/usr/bin:/bin"]
+        process.standardInput = FileHandle.nullDevice
+        process.standardOutput = output
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        process.waitUntilExit()
+        try #require(process.terminationStatus == 0)
+        let data = output.fileHandleForReading.readDataToEndOfFile()
+        let lines = String(decoding: data, as: UTF8.self)
+            .split(separator: "\n").filter { line in
+                guard let path = line.split(
+                    separator: "\t", omittingEmptySubsequences: false
+                ).last.map(String.init) else { return true }
+                return !path.hasPrefix("docs/")
+                    && path != "AGENTS.md" && path != "README.md"
+            }
+        #expect(lines.count == expected.count)
+        var total = 0
+        for line in lines {
+            let fields = line.split(
+                separator: "\t", omittingEmptySubsequences: false)
+            try #require(fields.count == 3)
+            let add = try #require(Int(fields[0]))
+            let remove = try #require(Int(fields[1]))
+            let ceiling = try #require(expected[String(fields[2])])
+            #expect(add + remove <= ceiling)
+            total += add + remove
+        }
+        #expect(total <= 2_080)
+    }
+
     @Test(arguments: CampaignLifecycleFinalizerFault.allCases)
     func lifecycleFinalizerMapsEveryUnprovedUninstallToUncertainty(
         _ fault: CampaignLifecycleFinalizerFault
@@ -416,6 +467,450 @@ struct InvestigationMachineCampaignEvidenceTests {
             _ = try CampaignCoordinatorReceiptFixture.makeConsumer(
                 capsuleSize: maximum + 1
             )
+        }
+    }
+
+    @Test
+    func preArmFailureReceiptCodecMatchesCanonicalProducerBytes() throws {
+        let fixture = try Self.makePreArmFailureFrameFixture(
+            checkpoint: .sourceVerified(
+                nonce: Self.digest(0x91),
+                sourceFingerprintSHA256: Self.digest(0x92)
+            ),
+            reason: .codexIdentityChanged
+        )
+        let producerBytes = try fixture.producer.encoded()
+        let consumerBytes = try fixture.consumer.encoded()
+        #expect(consumerBytes == producerBytes)
+        #expect(try InvestigationMachineCampaignPreArmFailureFrame.decode(
+            producerBytes) == fixture.consumer)
+
+        let frame = Self.lengthPrefixed(producerBytes)
+        #expect(try InvestigationMachineCampaignPreArmFailureFrame.decodeFrame(
+            frame, reachedEOF: true) == fixture.consumer)
+    }
+
+    @Test
+    func coordinatorPublishesTypedFailureOnlyAfterSafePreArmRetirement() async throws {
+        let capture = PreArmFailureDispositionCapture()
+        let source = InvestigationMachineGateCoordinatorMaterializedSource(
+            sourceFingerprintSHA256: String(repeating: "1", count: 64))
+        let dependencies = InvestigationMachineGateCoordinatorDependencies(
+            validateInvocation: { .validated },
+            materializeSource: { _ in source },
+            makeBinding: { _ in
+                throw InvestigationMachineCoordinatorBindingSourceError
+                    .invalidInstalledObservation
+            },
+            makeConfigurations: { _, _ in throw PreArmFailureTestError.unexpected },
+            authorCohort: { _ in throw PreArmFailureTestError.unexpected },
+            handoff: { _ in throw PreArmFailureTestError.unexpected },
+            retireArtifacts: { _, _ in .retired },
+            makeReceipt: { _ in throw PreArmFailureTestError.unexpected },
+            writeClose: { await capture.record($0) },
+            monotonic: { 1 }, emitsPreArmFailure: true
+        )
+        do {
+            _ = try await InvestigationMachineGateCoordinatorComposition(
+                dependencies: dependencies).run()
+            Issue.record("expected typed pre-arm failure")
+        } catch {
+            #expect(InvestigationMachineGateCoordinatorSupport.status(for: error) == 81)
+        }
+        guard case let .failure(producer)? = await capture.disposition else {
+            Issue.record("expected one typed failure disposition")
+            return
+        }
+        let consumer = try InvestigationMachineCampaignPreArmFailureFrame.decode(
+            producer.encoded())
+        #expect(consumer.stage == .makeBinding)
+        #expect(consumer.reason == .installedObservationInvalid)
+        guard case let .sourceVerified(_, fingerprint) = consumer.checkpoint else {
+            Issue.record("expected source-only checkpoint")
+            return
+        }
+        #expect(fingerprint.lowercaseHex == source.sourceFingerprintSHA256)
+    }
+
+    @Test
+    func coordinatorFailureSinkWritesOneFrameThenEOF() throws {
+        let failure = try InvestigationMachineGateCoordinatorPreArmFailureFrameV1(
+            stage: .makeBinding,
+            checkpoint: .sourceVerified(
+                nonce: Self.digest(0x71),
+                sourceFingerprintSHA256: Self.digest(0x72)
+            ), reason: .installedObservationInvalid
+        )
+        var descriptors = [Int32](repeating: -1, count: 2)
+        try #require(pipe(&descriptors) == 0)
+        defer { _ = Darwin.close(descriptors[0]) }
+        let sink = InvestigationMachineGateCoordinatorReceiptSink(
+            descriptor: descriptors[1])
+        sink.markPrepared()
+        try sink.writeAndClose(.failure(failure))
+        var storage = [UInt8](repeating: 0, count: 1_024)
+        let count = Darwin.read(descriptors[0], &storage, storage.count)
+        let frame = Data(storage.prefix(count))
+        let declared = frame.prefix(4).reduce(UInt32(0)) {
+            ($0 << 8) | UInt32($1)
+        }
+        #expect(declared == UInt32(try failure.encoded().count))
+        #expect(frame.dropFirst(4) == (try failure.encoded()))
+        #expect(Darwin.read(descriptors[0], &storage, storage.count) == 0)
+    }
+
+    @Test
+    func preArmFailureReceiptClosedCheckpointUnionAndReasonExitStatusStayFrozen() throws {
+        let bootstrap = try Self.makePreArmFailureFrameFixture(
+            checkpoint: .bootstrapStarted(nonce: Self.digest(0x93)),
+            reason: .protocolRejected
+        ).consumer
+        guard case let .bootstrapStarted(nonce) = bootstrap.checkpoint else {
+            Issue.record("expected bootstrapStarted checkpoint")
+            return
+        }
+        #expect(nonce == Self.digest(0x93))
+        #expect(bootstrap.stage == .materializeSource)
+        #expect(bootstrap.reason.expectedExitStatus == 81)
+
+        let sourceVerified = try Self.makePreArmFailureFrameFixture(
+            checkpoint: .sourceVerified(
+                nonce: Self.digest(0x94),
+                sourceFingerprintSHA256: Self.digest(0x95)
+            ),
+            reason: .installedObservationInvalid
+        ).consumer
+        guard case let .sourceVerified(
+            nonce, sourceFingerprintSHA256
+        ) = sourceVerified.checkpoint else {
+            Issue.record("expected sourceVerified checkpoint")
+            return
+        }
+        #expect(nonce == Self.digest(0x94))
+        #expect(sourceFingerprintSHA256 == Self.digest(0x95))
+        #expect(sourceVerified.stage == .makeBinding)
+        #expect(sourceVerified.reason.expectedExitStatus == 81)
+
+        let runtimeBound = try Self.makePreArmFailureFrameFixture(
+            checkpoint: .runtimeBound(
+                nonce: Self.digest(0x96),
+                sourceFingerprintSHA256: Self.digest(0x97),
+                buildProvenanceSHA256: Self.digest(0x98),
+                signedRuntimeBindingSHA256: Self.digest(0x99)
+            ),
+            reason: .containmentUncertain
+        ).consumer
+        guard case let .runtimeBound(
+            nonce,
+            sourceFingerprintSHA256,
+            buildProvenanceSHA256,
+            signedRuntimeBindingSHA256
+        ) = runtimeBound.checkpoint else {
+            Issue.record("expected runtimeBound checkpoint")
+            return
+        }
+        #expect(nonce == Self.digest(0x96))
+        #expect(sourceFingerprintSHA256 == Self.digest(0x97))
+        #expect(buildProvenanceSHA256 == Self.digest(0x98))
+        #expect(signedRuntimeBindingSHA256 == Self.digest(0x99))
+        #expect(runtimeBound.stage == .makeConfigurations)
+        #expect(runtimeBound.reason.expectedExitStatus == 82)
+
+        #expect(Set(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Stage.allCases)
+            == Set([
+                .materializeSource,
+                .makeBinding,
+                .makeConfigurations,
+                .authorCohort,
+                .preArmPublication,
+            ]))
+        #expect(Set(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason.allCases)
+            == Set([
+                .buildProvenanceRejected,
+                .installedObservationInvalid,
+                .codexIdentityChanged,
+                .admissionDeadline,
+                .protocolRejected,
+                .containmentUncertain,
+            ]))
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .buildProvenanceRejected.expectedExitStatus == 81)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .installedObservationInvalid.expectedExitStatus == 81)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .codexIdentityChanged.expectedExitStatus == 81)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .admissionDeadline.expectedExitStatus == 81)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .protocolRejected.expectedExitStatus == 81)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .containmentUncertain.expectedExitStatus == 82)
+    }
+
+    @Test
+    func preArmFailureReceiptAcceptsExplicitAuthorAndPreArmPublicationStages() throws {
+        let author = try Self.makePreArmFailureFrameFixture(
+            checkpoint: .runtimeBound(
+                nonce: Self.digest(0x9a),
+                sourceFingerprintSHA256: Self.digest(0x9b),
+                buildProvenanceSHA256: Self.digest(0x9c),
+                signedRuntimeBindingSHA256: Self.digest(0x9d)
+            ),
+            reason: .protocolRejected,
+            stage: .authorCohort
+        ).consumer
+        #expect(author.stage == .authorCohort)
+
+        let preArm = try Self.makePreArmFailureFrameFixture(
+            checkpoint: .runtimeBound(
+                nonce: Self.digest(0x9e),
+                sourceFingerprintSHA256: Self.digest(0x9f),
+                buildProvenanceSHA256: Self.digest(0xa0),
+                signedRuntimeBindingSHA256: Self.digest(0xa6)
+            ),
+            reason: .admissionDeadline,
+            stage: .preArmPublication
+        ).consumer
+        #expect(preArm.stage == .preArmPublication)
+    }
+
+    @Test
+    func preArmFailureDecoderRejectsIllegalStageCheckpointReasonStatusZeroNonceAndWireDrift() throws {
+        let fixture = try Self.makePreArmFailureFrameFixture(
+            checkpoint: .runtimeBound(
+                nonce: Self.digest(0xa1),
+                sourceFingerprintSHA256: Self.digest(0xa2),
+                buildProvenanceSHA256: Self.digest(0xa3),
+                signedRuntimeBindingSHA256: Self.digest(0xa4)
+            ),
+            reason: .protocolRejected
+        )
+        let payload = try fixture.producer.encoded()
+        let frame = Self.lengthPrefixed(payload)
+        var mutations: [(payload: Data, frame: Data)] = []
+        for change in [
+            (0, Data([0xff])),
+            (0, Data([InvestigationMachineGateCoordinatorPreArmFailureFrameV1
+                .Stage.materializeSource.rawValue])),
+            (2, Data([0xff])),
+            (3, Data([0, 0, 0, 83])),
+        ] {
+            let candidate = try Self.rehashedPreArmFailure(
+                payload, replacingField: change.0, with: change.1)
+            mutations.append((candidate, Self.lengthPrefixed(candidate)))
+        }
+        var zeroNonce = try CampaignWireTranscript(payload)
+        zeroNonce.fields[1] = Data([3]) + Data(repeating: 0, count: 32)
+            + Self.digest(0xa2).rawBytes + Self.digest(0xa3).rawBytes
+            + Self.digest(0xa4).rawBytes
+        let zeroNoncePayload = try Self.rehashedPreArmFailure(zeroNonce)
+        mutations.append((zeroNoncePayload, Self.lengthPrefixed(zeroNoncePayload)))
+        var badDigest = payload
+        badDigest[badDigest.index(before: badDigest.endIndex)] ^= 0xff
+        mutations.append((badDigest, Self.lengthPrefixed(badDigest)))
+        mutations.append((payload + Data([0]), Self.lengthPrefixed(payload + Data([0]))))
+        for mutation in mutations {
+            #expect(throws: (any Error).self) {
+                _ = try InvestigationMachineCampaignPreArmFailureFrame.decode(
+                    mutation.payload)
+            }
+            #expect(throws: (any Error).self) {
+                _ = try InvestigationMachineCampaignPreArmFailureFrame.decodeFrame(
+                    mutation.frame, reachedEOF: true)
+            }
+        }
+        #expect(throws: (any Error).self) {
+            _ = try InvestigationMachineCampaignPreArmFailureFrame.decodeFrame(
+                frame, reachedEOF: false)
+        }
+    }
+
+    @Test
+    func failureDecoderRejectsNormalPreArmReceipt() throws {
+        let normal = try CampaignCoordinatorReceiptFixture.make().consumer.encoded()
+        #expect(throws: (any Error).self) {
+            _ = try InvestigationMachineCampaignPreArmFailureFrame.decode(normal)
+        }
+        #expect(throws: (any Error).self) {
+            _ = try InvestigationMachineCampaignPreArmFailureFrame.decodeFrame(
+                Self.lengthPrefixed(normal), reachedEOF: true)
+        }
+    }
+
+    @Test
+    func productionFirstFrameClassifierReadsCompactFailureByDomain() throws {
+        let fixture = try Self.makePreArmFailureFrameFixture(
+            checkpoint: .sourceVerified(
+                nonce: Self.digest(0xbb),
+                sourceFingerprintSHA256: Self.digest(0xbc)
+            ), reason: .installedObservationInvalid
+        )
+        let frame = Self.lengthPrefixed(try fixture.producer.encoded())
+        #expect(try InvestigationMachineCampaignFirstFrameClassifier.classify(
+            frame, fixture: false) == .preArmFailure)
+        #expect(try InvestigationMachineCampaignFirstFrameClassifier.classify(
+            frame, fixture: true) == .preArmFailure)
+        let legacy = try CampaignCoordinatorReceiptFixture.make().consumer.encoded()
+        #expect(try InvestigationMachineCampaignFirstFrameClassifier.classify(
+            Self.lengthPrefixed(legacy), fixture: true) == .legacyReceipt)
+        #expect(throws: (any Error).self) {
+            _ = try InvestigationMachineCampaignFirstFrameClassifier.classify(
+                Self.lengthPrefixed(legacy), fixture: false)
+        }
+    }
+
+    @Test
+    func preArmFailureReceiptExcludesSensitiveFieldsAndSentinels() throws {
+        let fixture = try Self.makePreArmFailureFrameFixture(
+            checkpoint: .runtimeBound(
+                nonce: Self.digest(0xb1),
+                sourceFingerprintSHA256: Self.digest(0xb2),
+                buildProvenanceSHA256: Self.digest(0xb3),
+                signedRuntimeBindingSHA256: Self.digest(0xb4)
+            ),
+            reason: .admissionDeadline,
+            stage: .preArmPublication
+        )
+        let bytes = try fixture.producer.encoded()
+        for forbidden in [
+            "outerAttemptUUID",
+            "capsule",
+            "wholeProjectedInputSHA256",
+            "admissionPath",
+            "rawError",
+            "errno",
+            "stdio",
+            "credential",
+        ] {
+            #expect(!bytes.contains(Data(forbidden.utf8)))
+        }
+        let labels = Set(Mirror(reflecting: fixture.consumer).children.compactMap(\.label))
+        for forbidden in [
+            "outerAttemptUUID",
+            "capsule",
+            "projectedInputSHA256",
+            "wholeProjectedInputSHA256",
+            "admissionPath",
+            "rawError",
+            "errno",
+            "stdio",
+            "credential",
+        ] {
+            #expect(!labels.contains(forbidden))
+        }
+        #expect(!(InvestigationMachineCampaignPreArmFailureFrame.self is any Encodable.Type))
+        #expect(!(InvestigationMachineCampaignPreArmFailureFrame.self is any Decodable.Type))
+    }
+
+    @Test
+    func harnessPreservesOnlyExactExitedPreArmFailureWithoutArming() async throws {
+        let fixture = try Self.makePreArmFailureFrameFixture(
+            checkpoint: .sourceVerified(
+                nonce: Self.digest(0xb5),
+                sourceFingerprintSHA256: Self.digest(0xb6)
+            ), reason: .installedObservationInvalid
+        )
+        let system = PreArmFailureHarnessSystem(
+            frame: Self.lengthPrefixed(try fixture.producer.encoded()),
+            wait: .exited(status: 81)
+        )
+        let outcome = await InvestigationMachineCampaignHarness(
+            system: system
+        ).run()
+        let failure = try #require(outcome.failureResult)
+        #expect(failure.verifiedPreArmFailure == fixture.consumer)
+        #expect(failure.exactWait == .exited(status: 81))
+        #expect(await system.armCount == 0)
+        #expect(await system.credentialCount == 0)
+        #expect(await system.terminationCount == 0)
+    }
+
+    @Test(arguments: [
+        InvestigationMachineCampaignExactWait.exited(status: 82),
+        .signaled(signal: SIGTERM),
+        .stopped(signal: SIGSTOP),
+    ])
+    func harnessDropsPreArmFailureWhenExactWaitDoesNotMatch(
+        _ wait: InvestigationMachineCampaignExactWait
+    ) async throws {
+        let fixture = try Self.makePreArmFailureFrameFixture(
+            checkpoint: .sourceVerified(
+                nonce: Self.digest(0xb7),
+                sourceFingerprintSHA256: Self.digest(0xb8)
+            ), reason: .installedObservationInvalid
+        )
+        let system = PreArmFailureHarnessSystem(
+            frame: Self.lengthPrefixed(try fixture.producer.encoded()),
+            wait: wait
+        )
+        let failure = try #require(await InvestigationMachineCampaignHarness(
+            system: system
+        ).run().failureResult)
+        #expect(failure.verifiedPreArmFailure == nil)
+        #expect(await system.armCount == 0)
+        #expect(await system.credentialCount == 0)
+    }
+
+    @Test
+    func harnessRejectsPreArmFailureWithTerminalBytesMissingEOFOrResidue() async throws {
+        let fixture = try Self.makePreArmFailureFrameFixture(
+            checkpoint: .sourceVerified(
+                nonce: Self.digest(0xbd),
+                sourceFingerprintSHA256: Self.digest(0xbe)
+            ), reason: .installedObservationInvalid
+        )
+        let frame = Self.lengthPrefixed(try fixture.producer.encoded())
+        for fault in PreArmFailureHarnessFault.allCases {
+            let system = PreArmFailureHarnessSystem(
+                frame: frame, wait: .exited(status: 81), fault: fault)
+            let failure = try #require(await InvestigationMachineCampaignHarness(
+                system: system).run().failureResult)
+            #expect(failure.verifiedPreArmFailure == nil)
+        }
+    }
+
+    @Test
+    func preArmFailureReportRequiresExactExitAndCompleteTeardown() throws {
+        let fixture = try Self.makePreArmFailureFrameFixture(
+            checkpoint: .sourceVerified(
+                nonce: Self.digest(0xb9),
+                sourceFingerprintSHA256: Self.digest(0xba)
+            ), reason: .installedObservationInvalid
+        )
+        let data = try InvestigationMachineCampaignPreArmFailureReport
+            .canonicalData(
+                fixture.consumer, exactWait: .exited(status: 81),
+                armedConsumed: false, uninstallVerified: true,
+                globalPostTeardown: true,
+                installReceiptSHA256: Self.digest(0xc1).lowercaseHex,
+                uninstallReceiptSHA256: Self.digest(0xc2).lowercaseHex,
+                globalObservationSHA256: Self.digest(0xc3).lowercaseHex
+            )
+        let object = try #require(
+            JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(object["admitting"] as? Bool == false)
+        #expect(object["armedConsumed"] as? Bool == false)
+        #expect(object["uninstallVerified"] as? Bool == true)
+        #expect(object["globalPostTeardown"] as? Bool == true)
+        #expect(object["childExitStatus"] as? Int == 81)
+        for invalid in [
+            (InvestigationMachineCampaignExactWait.exited(status: 82), false, true, true),
+            (.exited(status: 81), true, true, true),
+            (.exited(status: 81), false, false, true),
+            (.exited(status: 81), false, true, false),
+        ] {
+            #expect(throws: (any Error).self) {
+                _ = try InvestigationMachineCampaignPreArmFailureReport
+                    .canonicalData(
+                        fixture.consumer, exactWait: invalid.0,
+                        armedConsumed: invalid.1,
+                        uninstallVerified: invalid.2,
+                        globalPostTeardown: invalid.3,
+                        installReceiptSHA256: Self.digest(0xc1).lowercaseHex,
+                        uninstallReceiptSHA256: Self.digest(0xc2).lowercaseHex,
+                        globalObservationSHA256: Self.digest(0xc3).lowercaseHex
+                    )
+            }
         }
     }
 
@@ -1329,6 +1824,57 @@ struct InvestigationMachineCampaignEvidenceTests {
         ]) + payload
     }
 
+    private static func rehashedPreArmFailure(
+        _ payload: Data, replacingField index: Int, with value: Data
+    ) throws -> Data {
+        var transcript = try CampaignWireTranscript(payload)
+        transcript.fields[index] = value
+        return try rehashedPreArmFailure(transcript)
+    }
+
+    private static func rehashedPreArmFailure(
+        _ input: CampaignWireTranscript
+    ) throws -> Data {
+        var transcript = input
+        transcript.fields[4] = Data(repeating: 0, count: 32)
+        let zeroed = try transcript.encoded(maximumByteCount: 512)
+        transcript.fields[4] = InvestigationHandoffSHA256.hashing(zeroed).rawBytes
+        return try transcript.encoded(maximumByteCount: 512)
+    }
+
+    private static func makePreArmFailureFrameFixture(
+        checkpoint: InvestigationMachineGateCoordinatorPreArmFailureFrameV1
+            .Checkpoint,
+        reason: InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason,
+        stage: InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Stage? = nil
+    ) throws -> (
+        producer: InvestigationMachineGateCoordinatorPreArmFailureFrameV1,
+        consumer: InvestigationMachineCampaignPreArmFailureFrame
+    ) {
+        let producer = try InvestigationMachineGateCoordinatorPreArmFailureFrameV1(
+            stage: stage ?? inferredPreArmFailureStage(for: checkpoint),
+            checkpoint: checkpoint,
+            reason: reason
+        )
+        let consumer = try InvestigationMachineCampaignPreArmFailureFrame.decode(
+            producer.encoded())
+        return (producer, consumer)
+    }
+
+    private static func inferredPreArmFailureStage(
+        for checkpoint: InvestigationMachineGateCoordinatorPreArmFailureFrameV1
+            .Checkpoint
+    ) -> InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Stage {
+        switch checkpoint {
+        case .bootstrapStarted:
+            .materializeSource
+        case .sourceVerified:
+            .makeBinding
+        case .runtimeBound:
+            .makeConfigurations
+        }
+    }
+
     private static func requireMetadata(
         _ url: URL, type: mode_t, permissions: mode_t
     ) throws {
@@ -1347,6 +1893,93 @@ private struct CampaignVerifierResult: Equatable {
     let stdout: String
     let stderr: String
 }
+
+private actor PreArmFailureHarnessSystem:
+    InvestigationMachineCampaignHarnessSystem
+{
+    let frame: Data
+    let waitValue: InvestigationMachineCampaignExactWait
+    let fault: PreArmFailureHarnessFault?
+    private(set) var armCount = 0
+    private(set) var credentialCount = 0
+    private(set) var terminationCount = 0
+    private var receiptDelivered = false
+    private var terminalFaultDelivered = false
+
+    init(
+        frame: Data, wait: InvestigationMachineCampaignExactWait,
+        fault: PreArmFailureHarnessFault? = nil
+    ) {
+        self.frame = frame; waitValue = wait; self.fault = fault
+    }
+
+    func durablyPublishArmedConsumed(
+        _ preArm: InvestigationMachineCampaignPreArmFrame,
+        absoluteDeadlineNanoseconds: UInt64
+    ) { armCount += 1 }
+    func sendArmAfterDurablePublish(
+        _ preArm: InvestigationMachineCampaignPreArmFrame,
+        terminalDescriptor: Int32, absoluteDeadlineNanoseconds: UInt64
+    ) { armCount += 1 }
+    func relayCredentialAfterExactPrompt(
+        _ preArm: InvestigationMachineCampaignPreArmFrame,
+        terminalDescriptor: Int32, absoluteDeadlineNanoseconds: UInt64
+    ) { credentialCount += 1 }
+    func perform(_ operation: InvestigationMachineCampaignHarnessOperation)
+        throws -> InvestigationMachineCampaignHarnessResponse
+    {
+        switch operation {
+        case .makeAbsoluteDeadline: return .absoluteDeadline(UInt64.max / 2)
+        case .observeHarness: return .harnessIdentity(
+            processID: 100, effectiveUserID: 501)
+        case .spawnFixedSibling: return .spawned(.init(
+            processID: 200, terminalDescriptor: 10,
+            receiptDescriptor: 11, bootstrapDescriptor: 12))
+        case .readBootstrap: return .bootstrap(bytes: Data([0xa5]), reachedEOF: true)
+        case .observeOuterIdentity: return .outerIdentity(.init(
+            processID: 200, processIDVersion: 7, parentProcessID: 100,
+            processGroupID: 200, sessionID: 200,
+            foregroundProcessGroupID: 200, effectiveUserID: 501,
+            startTimeSeconds: 20, startTimeMicroseconds: 30))
+        case .pollReadable(let channels, _):
+            return .readable(channels)
+        case .read(let channel, _, _):
+            if channel == .receipt, !receiptDelivered {
+                receiptDelivered = true; return .read(.bytes(frame))
+            }
+            if channel == .receipt, fault == .missingReceiptEOF {
+                throw PreArmFailureTestError.unexpected
+            }
+            if channel == .terminal, fault == .terminalBytes,
+               !terminalFaultDelivered {
+                terminalFaultDelivered = true
+                return .read(.bytes(Data("unexpected".utf8)))
+            }
+            return .read(.eof)
+        case .waitExact: return .wait(waitValue)
+        case .observeResidue: return .residue(.init(
+            processGroupMembers: fault == .residue ? [200] : [],
+            sessionMembers: [], complete: true))
+        case .closeParentChannels: return .completed
+        case .terminateOwnedGroup:
+            terminationCount += 1; return .completed
+        }
+    }
+}
+
+private enum PreArmFailureHarnessFault: CaseIterable {
+    case terminalBytes, missingReceiptEOF, residue
+}
+
+private actor PreArmFailureDispositionCapture {
+    private(set) var disposition:
+        InvestigationMachineGateCoordinatorSinkDisposition?
+    func record(_ value: InvestigationMachineGateCoordinatorSinkDisposition) {
+        disposition = value
+    }
+}
+
+private enum PreArmFailureTestError: Error { case unexpected }
 
 enum CampaignEpochPrefixMutation: CaseIterable {
     case mismatchedPair, gap
@@ -1901,6 +2534,13 @@ private struct CampaignWireTranscript {
 
     func encoded(maximumByteCount: Int) throws -> Data {
         try HandoffBinaryTranscript.encode(domain: domain, businessFields: fields, maximumByteCount: maximumByteCount)
+    }
+}
+
+private extension InvestigationMachineCampaignHarnessOutcome {
+    var failureResult: InvestigationMachineCampaignHarnessFailureResult? {
+        guard case .failed(let value) = self else { return nil }
+        return value
     }
 }
 

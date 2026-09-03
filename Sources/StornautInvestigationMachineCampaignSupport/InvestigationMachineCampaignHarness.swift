@@ -206,6 +206,193 @@ package struct InvestigationMachineCampaignPreArmFrame:
 
 }
 
+package struct InvestigationMachineCampaignPreArmFailureFrame:
+    Sendable, Equatable
+{
+    package enum Stage: UInt8, CaseIterable, Sendable {
+        case materializeSource = 1, makeBinding, makeConfigurations
+        case authorCohort, preArmPublication
+        package var name: String {
+            switch self {
+            case .materializeSource: "materializeSource"
+            case .makeBinding: "makeBinding"
+            case .makeConfigurations: "makeConfigurations"
+            case .authorCohort: "authorCohort"
+            case .preArmPublication: "preArmPublication"
+            }
+        }
+    }
+    package enum Reason: UInt8, CaseIterable, Sendable {
+        case buildProvenanceRejected = 1, installedObservationInvalid
+        case codexIdentityChanged, admissionDeadline, protocolRejected
+        case containmentUncertain
+        package var expectedExitStatus: Int32 {
+            self == .containmentUncertain ? 82 : 81
+        }
+        package var name: String {
+            switch self {
+            case .buildProvenanceRejected: "buildProvenanceRejected"
+            case .installedObservationInvalid: "installedObservationInvalid"
+            case .codexIdentityChanged: "codexIdentityChanged"
+            case .admissionDeadline: "admissionDeadline"
+            case .protocolRejected: "protocolRejected"
+            case .containmentUncertain: "containmentUncertain"
+            }
+        }
+    }
+    package enum Checkpoint: Sendable, Equatable {
+        case bootstrapStarted(nonce: InvestigationHandoffSHA256)
+        case sourceVerified(
+            nonce: InvestigationHandoffSHA256,
+            sourceFingerprintSHA256: InvestigationHandoffSHA256
+        )
+        case runtimeBound(
+            nonce: InvestigationHandoffSHA256,
+            sourceFingerprintSHA256: InvestigationHandoffSHA256,
+            buildProvenanceSHA256: InvestigationHandoffSHA256,
+            signedRuntimeBindingSHA256: InvestigationHandoffSHA256
+        )
+    }
+    package static let domain =
+        "stornaut.task39.iic.coordinator-prearm-failure.v1"
+    package static let maximumByteCount = 512
+    package let stage: Stage
+    package let checkpoint: Checkpoint
+    package let reason: Reason
+    package let frameSHA256: InvestigationHandoffSHA256
+
+    package static func decode(_ data: Data) throws -> Self {
+        let fields = try HandoffBinaryTranscript.decode(
+            data, expectedDomain: domain,
+            expectedBusinessFieldByteCounts: [
+                1...1, 33...129, 1...1, 4...4, 32...32,
+            ], maximumByteCount: maximumByteCount
+        )
+        guard let stage = Stage(rawValue: fields[0][fields[0].startIndex]),
+              let reason = Reason(rawValue: fields[2][fields[2].startIndex]),
+              uint32(fields[3]) == UInt32(reason.expectedExitStatus)
+        else { throw InvestigationMachineCampaignHarnessFailure.receiptInvalid }
+        let checkpoint = try decodeCheckpoint(fields[1])
+        guard admits(stage: stage, checkpoint: checkpoint, reason: reason)
+        else { throw InvestigationMachineCampaignHarnessFailure.receiptInvalid }
+        let digest = try InvestigationHandoffSHA256(rawBytes: fields[4])
+        let zeroed = try transcript(
+            stage: stage, checkpoint: checkpoint, reason: reason,
+            digest: try .init(rawBytes: Data(repeating: 0, count: 32))
+        )
+        guard .hashing(zeroed) == digest else {
+            throw InvestigationMachineCampaignHarnessFailure.receiptInvalid
+        }
+        let value = Self(
+            stage: stage, checkpoint: checkpoint, reason: reason,
+            frameSHA256: digest
+        )
+        guard try value.encoded() == data else {
+            throw InvestigationMachineCampaignHarnessFailure.receiptInvalid
+        }
+        return value
+    }
+
+    package static func decodeFrame(
+        _ data: Data, reachedEOF: Bool
+    ) throws -> Self {
+        guard reachedEOF, data.count >= 4 else {
+            throw InvestigationMachineCampaignHarnessFailure.receiptInvalid
+        }
+        let count = data.prefix(4).reduce(UInt32(0)) { ($0 << 8) | UInt32($1) }
+        guard count > 0, Int(count) <= maximumByteCount,
+              data.count == Int(count) + 4
+        else { throw InvestigationMachineCampaignHarnessFailure.receiptInvalid }
+        return try decode(Data(data.dropFirst(4)))
+    }
+
+    package func encoded() throws -> Data {
+        try Self.transcript(
+            stage: stage, checkpoint: checkpoint, reason: reason,
+            digest: frameSHA256
+        )
+    }
+
+    private static func admits(
+        stage: Stage, checkpoint: Checkpoint, reason: Reason
+    ) -> Bool {
+        let zero = try! InvestigationHandoffSHA256(
+            rawBytes: Data(repeating: 0, count: 32))
+        let shape = switch checkpoint {
+        case .bootstrapStarted(let nonce):
+            stage == .materializeSource && nonce != zero
+        case .sourceVerified(let nonce, let source):
+            stage == .makeBinding && nonce != zero && source != zero
+        case .runtimeBound(let nonce, let source, let build, let binding):
+            [.makeConfigurations, .authorCohort, .preArmPublication].contains(stage)
+                && [nonce, source, build, binding].allSatisfy { $0 != zero }
+        }
+        guard shape else { return false }
+        switch reason {
+        case .buildProvenanceRejected, .installedObservationInvalid:
+            return stage == .makeBinding
+        case .codexIdentityChanged:
+            return stage == .makeBinding || stage == .makeConfigurations
+        case .admissionDeadline:
+            return stage == .preArmPublication
+        case .protocolRejected, .containmentUncertain:
+            return true
+        }
+    }
+    private static func transcript(
+        stage: Stage, checkpoint: Checkpoint, reason: Reason,
+        digest: InvestigationHandoffSHA256
+    ) throws -> Data {
+        try HandoffBinaryTranscript.encode(
+            domain: domain, businessFields: [
+                Data([stage.rawValue]), checkpointData(checkpoint),
+                Data([reason.rawValue]), uint32Data(UInt32(reason.expectedExitStatus)),
+                digest.rawBytes,
+            ], maximumByteCount: maximumByteCount
+        )
+    }
+    private static func checkpointData(_ value: Checkpoint) -> Data {
+        switch value {
+        case .bootstrapStarted(let nonce): return Data([1]) + nonce.rawBytes
+        case .sourceVerified(let nonce, let source):
+            return Data([2]) + nonce.rawBytes + source.rawBytes
+        case .runtimeBound(let nonce, let source, let build, let binding):
+            return Data([3]) + nonce.rawBytes + source.rawBytes + build.rawBytes
+                + binding.rawBytes
+        }
+    }
+    private static func decodeCheckpoint(_ data: Data) throws -> Checkpoint {
+        guard let tag = data.first else {
+            throw InvestigationMachineCampaignHarnessFailure.receiptInvalid
+        }
+        let bytes = data.dropFirst()
+        func digest(_ offset: Int) throws -> InvestigationHandoffSHA256 {
+            guard bytes.count >= offset + 32 else {
+                throw InvestigationMachineCampaignHarnessFailure.receiptInvalid
+            }
+            return try .init(rawBytes: Data(bytes.dropFirst(offset).prefix(32)))
+        }
+        switch (tag, bytes.count) {
+        case (1, 32): return .bootstrapStarted(nonce: try digest(0))
+        case (2, 64): return .sourceVerified(
+            nonce: try digest(0), sourceFingerprintSHA256: try digest(32))
+        case (3, 128): return .runtimeBound(
+            nonce: try digest(0), sourceFingerprintSHA256: try digest(32),
+            buildProvenanceSHA256: try digest(64),
+            signedRuntimeBindingSHA256: try digest(96))
+        default: throw InvestigationMachineCampaignHarnessFailure.receiptInvalid
+        }
+    }
+    private static func uint32Data(_ value: UInt32) -> Data {
+        Data([UInt8(value >> 24), UInt8(truncatingIfNeeded: value >> 16),
+            UInt8(truncatingIfNeeded: value >> 8), UInt8(truncatingIfNeeded: value)])
+    }
+    private static func uint32(_ data: Data) -> UInt32? {
+        guard data.count == 4 else { return nil }
+        return data.reduce(UInt32(0)) { ($0 << 8) | UInt32($1) }
+    }
+}
+
 package enum InvestigationMachineCampaignReadObservation:
     Sendable, Equatable
 {
@@ -391,6 +578,22 @@ package struct InvestigationMachineCampaignHarnessFailureResult:
 {
     package let primary: InvestigationMachineCampaignHarnessFailure
     package let cleanupIssues: [InvestigationMachineCampaignCleanupIssue]
+    package let verifiedPreArmFailure:
+        InvestigationMachineCampaignPreArmFailureFrame?
+    package let exactWait: InvestigationMachineCampaignExactWait?
+
+    package init(
+        primary: InvestigationMachineCampaignHarnessFailure,
+        cleanupIssues: [InvestigationMachineCampaignCleanupIssue],
+        verifiedPreArmFailure:
+            InvestigationMachineCampaignPreArmFailureFrame? = nil,
+        exactWait: InvestigationMachineCampaignExactWait? = nil
+    ) {
+        self.primary = primary
+        self.cleanupIssues = cleanupIssues
+        self.verifiedPreArmFailure = verifiedPreArmFailure
+        self.exactWait = exactWait
+    }
 }
 
 package enum InvestigationMachineCampaignHarnessOutcome:
@@ -598,35 +801,44 @@ package actor InvestigationMachineCampaignHarness {
         }
 
         var receipt: InvestigationMachineCoordinatorRawReceiptV1?
+        var preArmFailure: InvestigationMachineCampaignPreArmFailureFrame?
         var rawGateReceipt = Data()
         if primary == nil {
             do {
                 let decoded = try Self.decodeReceiptStream(
                     receiptBytes, reachedEOF: receiptEOF, preArm: preArm
                 )
-                let value = decoded.final
-                rawGateReceipt = decoded.rawGate
-                guard Self.matches(value, expected: expected, preArm: preArm) else {
-                    primary = .identityMismatch
-                    return await finalize(
-                        primary: primary!, spawned: spawned, deadline: deadline,
-                        outerIdentity: outerIdentity, receipt: nil,
-                        diagnosticBytes: diagnosticBytes, receiptEOF: receiptEOF,
-                        terminalEOF: terminalEOF
-                    )
-                }
-                receipt = value
-                if let preArm {
-                    try await system.validateTerminalEvidence(
-                        diagnosticBytes, rawGateReceipt: rawGateReceipt,
-                        finalReceipt: value, preArm: preArm,
-                        absoluteDeadlineNanoseconds: deadline
-                    )
+                switch decoded {
+                case .preArmFailure(let value):
+                    guard preArm == nil, diagnosticBytes.isEmpty, terminalEOF else {
+                        throw InvestigationMachineCampaignHarnessFailure.receiptInvalid
+                    }
+                    preArmFailure = value
+                case .success(let value, let rawGate):
+                    rawGateReceipt = rawGate
+                    guard Self.matches(value, expected: expected, preArm: preArm)
+                    else {
+                        primary = .identityMismatch
+                        return await finalize(
+                            primary: primary!, spawned: spawned, deadline: deadline,
+                            outerIdentity: outerIdentity, receipt: nil,
+                            diagnosticBytes: diagnosticBytes,
+                            receiptEOF: receiptEOF, terminalEOF: terminalEOF
+                        )
+                    }
+                    receipt = value
+                    if let preArm {
+                        try await system.validateTerminalEvidence(
+                            diagnosticBytes, rawGateReceipt: rawGateReceipt,
+                            finalReceipt: value, preArm: preArm,
+                            absoluteDeadlineNanoseconds: deadline
+                        )
+                    }
                 }
             } catch { primary = .receiptInvalid }
         }
 
-        if primary == nil {
+        if primary == nil, preArmFailure == nil {
             do {
                 guard case let .outerIdentity(value) = try await system.perform(
                     .observeOuterIdentity(
@@ -651,6 +863,7 @@ package actor InvestigationMachineCampaignHarness {
         return await finalize(
             primary: primary, spawned: spawned, deadline: deadline,
             outerIdentity: outerIdentity, receipt: receipt,
+            preArmFailure: preArmFailure,
             rawGateReceipt: rawGateReceipt, diagnosticBytes: diagnosticBytes,
             receiptEOF: receiptEOF,
             terminalEOF: terminalEOF
@@ -662,6 +875,7 @@ package actor InvestigationMachineCampaignHarness {
         spawned: InvestigationMachineCampaignSpawnedProcess, deadline: UInt64,
         outerIdentity: InvestigationMachineCampaignOuterIdentity?,
         receipt: InvestigationMachineCoordinatorRawReceiptV1?,
+        preArmFailure: InvestigationMachineCampaignPreArmFailureFrame? = nil,
         rawGateReceipt: Data = Data(),
         diagnosticBytes: Data, receiptEOF: Bool, terminalEOF: Bool
     ) async -> InvestigationMachineCampaignHarnessOutcome {
@@ -692,8 +906,15 @@ package actor InvestigationMachineCampaignHarness {
             ) else { throw HarnessInternalError.unexpectedResponse }
             exactWait = value
             switch value {
-            case .exited(status: 0): break
-            case .exited, .signaled:
+            case .exited(let status):
+                if let preArmFailure {
+                    if status != preArmFailure.reason.expectedExitStatus {
+                        primary = .receiptInvalid
+                    }
+                } else if status != 0, primary == nil {
+                    primary = .childTerminated
+                }
+            case .signaled:
                 if primary == nil { primary = .childTerminated }
             case .stopped:
                 if primary == nil { primary = .childTerminated }
@@ -733,6 +954,7 @@ package actor InvestigationMachineCampaignHarness {
         return await completeFinalization(
             primary: primary, cleanupIssues: cleanupIssues, spawned: spawned,
             deadline: deadline, outerIdentity: outerIdentity, receipt: receipt,
+            preArmFailure: preArmFailure,
             rawGateReceipt: rawGateReceipt, diagnosticBytes: diagnosticBytes,
             receiptEOF: receiptEOF,
             terminalEOF: terminalEOF, exactWait: exactWait
@@ -821,6 +1043,7 @@ package actor InvestigationMachineCampaignHarness {
         spawned: InvestigationMachineCampaignSpawnedProcess, deadline: UInt64,
         outerIdentity: InvestigationMachineCampaignOuterIdentity?,
         receipt: InvestigationMachineCoordinatorRawReceiptV1?,
+        preArmFailure: InvestigationMachineCampaignPreArmFailureFrame?,
         rawGateReceipt: Data,
         diagnosticBytes: Data, receiptEOF: Bool, terminalEOF: Bool,
         exactWait: InvestigationMachineCampaignExactWait?
@@ -863,7 +1086,21 @@ package actor InvestigationMachineCampaignHarness {
 
         if let primary {
             return .failed(.init(
-                primary: primary, cleanupIssues: cleanupIssues
+                primary: primary, cleanupIssues: cleanupIssues,
+                exactWait: exactWait
+            ))
+        }
+        if let preArmFailure {
+            guard cleanupIssues.isEmpty, receipt == nil, rawGateReceipt.isEmpty,
+                  diagnosticBytes.isEmpty, receiptEOF, terminalEOF,
+                  let exactWait, let residue, let outerIdentity,
+                  case .exited(preArmFailure.reason.expectedExitStatus) = exactWait,
+                  residue.complete, residue.processGroupMembers.isEmpty,
+                  residue.sessionMembers.isEmpty, outerIdentity.processID > 1
+            else { return Self.failure(.unexpectedResponse) }
+            return .failed(.init(
+                primary: .childTerminated, cleanupIssues: [],
+                verifiedPreArmFailure: preArmFailure, exactWait: exactWait
             ))
         }
         guard cleanupIssues.isEmpty, let receipt, let outerIdentity,
@@ -936,17 +1173,28 @@ package actor InvestigationMachineCampaignHarness {
             && receipt.wholeProjectedInputSHA256 == expected.wholeProjectedInputSHA256
     }
 
+    private enum ReceiptStream {
+        case success(InvestigationMachineCoordinatorRawReceiptV1, Data)
+        case preArmFailure(InvestigationMachineCampaignPreArmFailureFrame)
+    }
+
     private static func decodeReceiptStream(
         _ bytes: Data, reachedEOF: Bool,
         preArm: InvestigationMachineCampaignPreArmFrame?
-    ) throws -> (final: InvestigationMachineCoordinatorRawReceiptV1, rawGate: Data) {
+    ) throws -> ReceiptStream {
         guard reachedEOF else {
             throw InvestigationMachineCampaignHarnessFailure.receiptInvalid
         }
         guard preArm != nil else {
-            return (try InvestigationMachineCoordinatorRawReceiptV1.decodeFrame(
-                bytes, reachedEOF: true
-            ), Data())
+            if let failure = try? InvestigationMachineCampaignPreArmFailureFrame
+                .decodeFrame(bytes, reachedEOF: true) {
+                return .preArmFailure(failure)
+            }
+            return .success(
+                try InvestigationMachineCoordinatorRawReceiptV1.decodeFrame(
+                    bytes, reachedEOF: true
+                ), Data()
+            )
         }
         var cursor = 0
         func nextFrame() throws -> Data {
@@ -975,7 +1223,7 @@ package actor InvestigationMachineCampaignHarness {
         guard InvestigationHandoffSHA256.hashing(rawGateReceipt)
                 == final.gateTransportReceiptSHA256
         else { throw InvestigationMachineCampaignHarnessFailure.receiptInvalid }
-        return (final, rawGateReceipt)
+        return .success(final, rawGateReceipt)
     }
 
     private static func orderedOpenChannels(

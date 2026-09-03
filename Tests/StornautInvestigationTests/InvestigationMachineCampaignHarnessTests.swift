@@ -40,6 +40,23 @@ struct InvestigationMachineCampaignHarnessTests {
     }
 
     @Test
+    func physicalCompactPreArmFailurePreservesVerifiedExitAndZeroResidue() throws {
+        let fixture = try CampaignPhysicalFixture.make(mode: .preArmFailure)
+        defer { fixture.remove() }
+        let report = try fixture.run()
+        #expect(!report.completed)
+        #expect(report.failure == "childTerminated")
+        #expect(report.cleanup.isEmpty)
+        #expect(report.diagnostic.isEmpty)
+        #expect(report.residueComplete)
+        #expect(report.processGroupResidueCount == 0)
+        #expect(report.sessionResidueCount == 0)
+        #expect(report.verifiedPreArmFailureReason == "installedObservationInvalid")
+        #expect(report.verifiedPreArmFailureStage == "makeBinding")
+        #expect(report.verifiedPreArmFailureExitStatus == 81)
+    }
+
+    @Test
     func validFragmentedReceiptUsesOneDeadlineAndFairDrain() async throws {
         let fixture = try CampaignHarnessFixture()
         let outcome = await InvestigationMachineCampaignHarness(
@@ -430,10 +447,14 @@ private struct CampaignPhysicalReport: Decodable {
     let sessionResidueCount: Int
     let failure: String
     let cleanup: [String]
+    let verifiedPreArmFailureReason: String?
+    let verifiedPreArmFailureStage: String?
+    let verifiedPreArmFailureExitStatus: Int?
 }
 
 private enum CampaignPhysicalMode: CaseIterable {
     case success, truncated, trailing, missingEOF, nonzero, missingSibling
+    case preArmFailure
     static let failures: [Self] = [
         .truncated, .trailing, .missingEOF, .nonzero, .missingSibling,
     ]
@@ -444,6 +465,7 @@ private enum CampaignPhysicalMode: CaseIterable {
         case .trailing: "CAMPAIGN_FIXTURE_TRAILING"
         case .missingEOF: "CAMPAIGN_FIXTURE_MISSING_EOF"
         case .nonzero: "CAMPAIGN_FIXTURE_NONZERO"
+        case .preArmFailure: "CAMPAIGN_FIXTURE_PREARM_FAILURE"
         }
     }
     var expectedFailure: String {
@@ -452,7 +474,7 @@ private enum CampaignPhysicalMode: CaseIterable {
         case .missingEOF: "transportUncertain"
         case .nonzero: "childTerminated"
         case .missingSibling: "spawnUncertain"
-        case .success: ""
+        case .success, .preArmFailure: ""
         }
     }
 }

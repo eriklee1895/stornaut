@@ -63,6 +63,10 @@ public enum InvestigationMachineGateCoordinatorSupport {
       }
       if error is InvestigationMachineGateCoordinatorReceiptError { return protocolFailureExitStatus }
       if let error = error
+        as? InvestigationMachineGateCoordinatorPreArmFailureReportedError {
+        return error.reason.expectedExitStatus
+      }
+      if let error = error
         as? InvestigationMachineGateCoordinatorCompositionError {
         return error == .retirementUncertain
           ? containmentUncertainExitStatus : protocolFailureExitStatus
@@ -97,6 +101,11 @@ public enum InvestigationMachineGateCoordinatorSupport {
     case alreadyConsumed
     case incompleteTerminalState
     case retirementUncertain
+  }
+  private struct InvestigationMachineGateCoordinatorPreArmFailureReportedError:
+    Error, Sendable
+  {
+    let reason: InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
   }
   package struct InvestigationMachineGateCoordinatorPreArmFrameV1:
     Sendable, Equatable
@@ -156,6 +165,123 @@ public enum InvestigationMachineGateCoordinatorSupport {
           digest.rawBytes,
         ], maximumByteCount: Self.maximumByteCount
       )
+    }
+    private static let zeroDigest = try! InvestigationHandoffSHA256(
+      rawBytes: Data(repeating: 0, count: 32))
+  }
+  package struct InvestigationMachineGateCoordinatorPreArmFailureFrameV1:
+    Sendable, Equatable
+  {
+    package enum Stage: UInt8, CaseIterable, Sendable {
+      case materializeSource = 1, makeBinding, makeConfigurations
+      case authorCohort, preArmPublication
+    }
+    package enum Reason: UInt8, CaseIterable, Sendable {
+      case buildProvenanceRejected = 1, installedObservationInvalid
+      case codexIdentityChanged, admissionDeadline, protocolRejected
+      case containmentUncertain
+      package var expectedExitStatus: Int32 {
+        self == .containmentUncertain ? 82 : 81
+      }
+    }
+    package enum Checkpoint: Sendable, Equatable {
+      case bootstrapStarted(nonce: InvestigationHandoffSHA256)
+      case sourceVerified(
+        nonce: InvestigationHandoffSHA256,
+        sourceFingerprintSHA256: InvestigationHandoffSHA256
+      )
+      case runtimeBound(
+        nonce: InvestigationHandoffSHA256,
+        sourceFingerprintSHA256: InvestigationHandoffSHA256,
+        buildProvenanceSHA256: InvestigationHandoffSHA256,
+        signedRuntimeBindingSHA256: InvestigationHandoffSHA256
+      )
+    }
+    package static let domain =
+      "stornaut.task39.iic.coordinator-prearm-failure.v1"
+    package static let maximumByteCount = 512
+    package let stage: Stage
+    package let checkpoint: Checkpoint
+    package let reason: Reason
+    package let frameSHA256: InvestigationHandoffSHA256
+    package var exitStatus: Int32 { reason.expectedExitStatus }
+
+    package init(
+      stage: Stage, checkpoint: Checkpoint, reason: Reason
+    ) throws {
+      guard Self.admits(stage: stage, checkpoint: checkpoint, reason: reason)
+      else { throw InvestigationMachineGateCoordinatorProductionError.protocolFailure }
+      self.stage = stage; self.checkpoint = checkpoint; self.reason = reason
+      frameSHA256 = .hashing(try Self.transcript(
+        stage: stage, checkpoint: checkpoint, reason: reason,
+        digest: Self.zeroDigest
+      ))
+    }
+
+    package func encoded() throws -> Data {
+      let zeroed = try Self.transcript(
+        stage: stage, checkpoint: checkpoint, reason: reason,
+        digest: Self.zeroDigest
+      )
+      guard .hashing(zeroed) == frameSHA256 else {
+        throw InvestigationMachineGateCoordinatorProductionError.protocolFailure
+      }
+      return try Self.transcript(
+        stage: stage, checkpoint: checkpoint, reason: reason,
+        digest: frameSHA256
+      )
+    }
+
+    private static func admits(
+      stage: Stage, checkpoint: Checkpoint, reason: Reason
+    ) -> Bool {
+      let shape = switch checkpoint {
+      case .bootstrapStarted(let nonce):
+        stage == .materializeSource && nonce != zeroDigest
+      case .sourceVerified(let nonce, let source):
+        stage == .makeBinding && nonce != zeroDigest && source != zeroDigest
+      case .runtimeBound(let nonce, let source, let build, let binding):
+        [.makeConfigurations, .authorCohort, .preArmPublication].contains(stage)
+          && [nonce, source, build, binding].allSatisfy { $0 != zeroDigest }
+      }
+      guard shape else { return false }
+      switch reason {
+      case .buildProvenanceRejected, .installedObservationInvalid:
+        return stage == .makeBinding
+      case .codexIdentityChanged:
+        return stage == .makeBinding || stage == .makeConfigurations
+      case .admissionDeadline:
+        return stage == .preArmPublication
+      case .protocolRejected, .containmentUncertain:
+        return true
+      }
+    }
+
+    private static func transcript(
+      stage: Stage, checkpoint: Checkpoint, reason: Reason,
+      digest: InvestigationHandoffSHA256
+    ) throws -> Data {
+      try HandoffBinaryTranscript.encode(
+        domain: domain, businessFields: [
+          Data([stage.rawValue]), try checkpointData(checkpoint),
+          Data([reason.rawValue]), uint32Data(UInt32(reason.expectedExitStatus)),
+          digest.rawBytes,
+        ], maximumByteCount: maximumByteCount
+      )
+    }
+    private static func checkpointData(_ value: Checkpoint) throws -> Data {
+      switch value {
+      case .bootstrapStarted(let nonce): return Data([1]) + nonce.rawBytes
+      case .sourceVerified(let nonce, let source):
+        return Data([2]) + nonce.rawBytes + source.rawBytes
+      case .runtimeBound(let nonce, let source, let build, let binding):
+        return Data([3]) + nonce.rawBytes + source.rawBytes + build.rawBytes
+          + binding.rawBytes
+      }
+    }
+    private static func uint32Data(_ value: UInt32) -> Data {
+      Data([UInt8(value >> 24), UInt8(truncatingIfNeeded: value >> 16),
+        UInt8(truncatingIfNeeded: value >> 8), UInt8(truncatingIfNeeded: value)])
     }
     private static let zeroDigest = try! InvestigationHandoffSHA256(
       rawBytes: Data(repeating: 0, count: 32))
@@ -399,6 +525,7 @@ public enum InvestigationMachineGateCoordinatorSupport {
     Equatable, Sendable
   {
     case receipt(InvestigationMachineGateCoordinatorReceiptV1)
+    case failure(InvestigationMachineGateCoordinatorPreArmFailureFrameV1)
     case closeOnly
   }
   extension InvestigationMachineGateCoordinatorReceiptV1 {
@@ -513,6 +640,7 @@ public enum InvestigationMachineGateCoordinatorSupport {
     let writeClose: WriteClose
     let monotonic: Monotonic
     let wallNow: WallNow
+    let emitsPreArmFailure: Bool
     init(
       validateInvocation: @escaping ValidateInvocation,
       materializeSource: @escaping MaterializeSource,
@@ -524,7 +652,8 @@ public enum InvestigationMachineGateCoordinatorSupport {
       retireArtifacts: @escaping RetireArtifacts,
       makeReceipt: @escaping MakeReceipt,
       writeClose: @escaping WriteClose, monotonic: @escaping Monotonic,
-      wallNow: @escaping WallNow = Date.init
+      wallNow: @escaping WallNow = Date.init,
+      emitsPreArmFailure: Bool = false
     ) {
       self.validateInvocation = validateInvocation
       self.materializeSource = materializeSource
@@ -538,6 +667,7 @@ public enum InvestigationMachineGateCoordinatorSupport {
       self.writeClose = writeClose
       self.monotonic = monotonic
       self.wallNow = wallNow
+      self.emitsPreArmFailure = emitsPreArmFailure
     }
   }
   package actor InvestigationMachineGateCoordinatorComposition {
@@ -566,6 +696,11 @@ public enum InvestigationMachineGateCoordinatorSupport {
       var handoff: InvestigationMachineGateCoordinatorHandoff?
       var originalError: (any Error)?
       var handoffStarted = false
+      var failureStage:
+        InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Stage?
+      var failureCheckpoint:
+        InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Checkpoint?
+      var failureEligible = false
       do {
         do { monotonicStartedNanoseconds = try dependencies.monotonic() }
         catch { throw InvestigationMachineGateCoordinatorProductionError.containmentUncertain }
@@ -574,19 +709,50 @@ public enum InvestigationMachineGateCoordinatorSupport {
             .containmentUncertain
         }
         let invocation = try await dependencies.validateInvocation()
+        let failureNonce = InvestigationHandoffSHA256.hashing(
+          Data(UUID().uuidString.utf8)
+        )
+        failureStage = .materializeSource
+        failureCheckpoint = .bootstrapStarted(nonce: failureNonce)
+        failureEligible = dependencies.emitsPreArmFailure
         let materialized = try await dependencies.materializeSource(invocation)
         source = materialized
+        if let fingerprint = try? InvestigationHandoffSHA256(
+          lowercaseHex: materialized.sourceFingerprintSHA256
+        ) {
+          failureStage = .makeBinding
+          failureCheckpoint = .sourceVerified(
+            nonce: failureNonce, sourceFingerprintSHA256: fingerprint
+          )
+        }
         let currentBinding = try await dependencies.makeBinding(materialized)
         binding = currentBinding
+        if let fingerprint = try? InvestigationHandoffSHA256(
+          lowercaseHex: currentBinding.sourceFingerprintSHA256
+        ), let build = try? InvestigationHandoffSHA256(
+          lowercaseHex: currentBinding.buildProvenanceSHA256
+        ), let signed = try? InvestigationHandoffSHA256(
+          lowercaseHex: currentBinding.signedBindingSHA256
+        ) {
+          failureStage = .makeConfigurations
+          failureCheckpoint = .runtimeBound(
+            nonce: failureNonce, sourceFingerprintSHA256: fingerprint,
+            buildProvenanceSHA256: build,
+            signedRuntimeBindingSHA256: signed
+          )
+        }
         let batch = try await dependencies.makeConfigurations(
           currentBinding, materialized
         )
         configurations = batch
+        failureStage = .authorCohort
         let authored = try await dependencies.authorCohort(batch)
         cohort = authored
+        failureStage = .preArmPublication
         try InvestigationMachineGateCoordinatorHandoffAdmission.validate(
           authored, now: dependencies.wallNow()
         )
+        failureEligible = false
         try await dependencies.activateBeforeHandoff(currentBinding, authored)
         try InvestigationMachineGateCoordinatorHandoffAdmission.validate(
           authored, now: dependencies.wallNow()
@@ -633,6 +799,8 @@ public enum InvestigationMachineGateCoordinatorSupport {
       )
       source = nil; binding = nil; configurations = nil; cohort = nil
       var receipt: InvestigationMachineGateCoordinatorReceiptV1?
+      var failureFrame:
+        InvestigationMachineGateCoordinatorPreArmFailureFrameV1?
       var receiptError: (any Error)?
       if originalError == nil, retirementError == nil {
         do {
@@ -641,10 +809,24 @@ public enum InvestigationMachineGateCoordinatorSupport {
           receiptError = error
         }
       }
+      if let originalError, retirementError == nil,
+         retirementOutcome == .retired, failureEligible,
+         let failureStage, let failureCheckpoint,
+         !(originalError is CancellationError)
+      {
+        let reason = Self.preArmFailureReason(
+          for: originalError, stage: failureStage
+        )
+        failureFrame = try? .init(
+          stage: failureStage, checkpoint: failureCheckpoint, reason: reason
+        )
+      }
       var writeCloseError: (any Error)?
       do {
         if let receipt {
           try await dependencies.writeClose(.receipt(receipt))
+        } else if let failureFrame {
+          try await dependencies.writeClose(.failure(failureFrame))
         } else {
           try await dependencies.writeClose(.closeOnly)
         }
@@ -653,6 +835,11 @@ public enum InvestigationMachineGateCoordinatorSupport {
       }
       if let writeCloseError { throw writeCloseError }
       if let retirementError { throw retirementError }
+      if let failureFrame {
+        throw InvestigationMachineGateCoordinatorPreArmFailureReportedError(
+          reason: failureFrame.reason
+        )
+      }
       if let originalError { throw originalError }
       if let receiptError { throw receiptError }
       guard let receipt else {
@@ -660,6 +847,34 @@ public enum InvestigationMachineGateCoordinatorSupport {
           .incompleteTerminalState
       }
       return receipt
+    }
+    private static func preArmFailureReason(
+      for error: any Error,
+      stage: InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Stage
+    ) -> InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason {
+      if let value = error as? InvestigationMachineCoordinatorBindingSourceError {
+        switch value {
+        case .buildProvenanceUnavailable, .invalidBuildProvenance:
+          return .buildProvenanceRejected
+        case .invalidInstalledObservation: return .installedObservationInvalid
+        case .codexIdentityChanged: return .codexIdentityChanged
+        default: return .protocolRejected
+        }
+      }
+      if stage == .preArmPublication,
+         error as? InvestigationMachineGateCoordinatorProductionError
+          == .protocolFailure { return .admissionDeadline }
+      if let value = error as? InvestigationMachineGateCoordinatorSystemError,
+         value.kind == .containmentUncertain { return .containmentUncertain }
+      if error as? InvestigationMachineGateCoordinatorProductionError
+          == .containmentUncertain { return .containmentUncertain }
+      if error as? InvestigationMachineGateCoordinatorProductionError
+          == .protocolFailure { return .protocolRejected }
+      if error is InvestigationMachineCoordinatorConfigurationSetError
+          || error is InvestigationProjectedCohortAuthorError {
+        return .protocolRejected
+      }
+      return .containmentUncertain
     }
     private func retirementIsSafe(
       handoffStarted: Bool, error: (any Error)?
@@ -1031,6 +1246,7 @@ public enum InvestigationMachineGateCoordinatorSupport {
     private let lock = NSLock()
     private var closed = false
     private var prepared = false
+    private var normalPreArmWritten = false
     private var validBefore: InvestigationHandoffUTCMicroseconds?
     init(descriptor: Int32 = 3,
       validBefore: InvestigationHandoffUTCMicroseconds? = nil,
@@ -1044,10 +1260,12 @@ public enum InvestigationMachineGateCoordinatorSupport {
       validBefore: InvestigationHandoffUTCMicroseconds)
       throws
     {
-      guard self.validBefore == nil else {
-        throw InvestigationMachineGateCoordinatorProductionError.protocolFailure
+      try lock.withLock {
+        guard !closed, !normalPreArmWritten, self.validBefore == nil else {
+          throw InvestigationMachineGateCoordinatorProductionError.protocolFailure
+        }
+        normalPreArmWritten = true; self.validBefore = validBefore
       }
-      self.validBefore = validBefore
       try writeFrame(try value.encoded())
     }
     func writeRawGateReceipt(_ value: InvestigationMachineGateTransportReceipt)
@@ -1068,7 +1286,19 @@ public enum InvestigationMachineGateCoordinatorSupport {
         }
         closed = true
         var failure: (any Error)?
-        if case .receipt(let receipt) = disposition {
+        if case .failure(let frame) = disposition {
+          do {
+            guard !normalPreArmWritten else {
+              throw InvestigationMachineGateCoordinatorProductionError
+                .protocolFailure
+            }
+            validBefore = try InvestigationHandoffUTCMicroseconds(
+              timeIntervalSince1970: Date().addingTimeInterval(5)
+                .timeIntervalSince1970
+            )
+            try writeFrame(try frame.encoded())
+          } catch { failure = error }
+        } else if case .receipt(let receipt) = disposition {
           do {
             let payload: Data
             do { payload = try receipt.encoded() }
@@ -1348,7 +1578,8 @@ public enum InvestigationMachineGateCoordinatorSupport {
         },
         writeClose: { disposition in
           try sink.writeAndClose(disposition)
-        }, monotonic: InvestigationHandoffAppLeafAdapterSystem.system.continuousNanoseconds
+        }, monotonic: InvestigationHandoffAppLeafAdapterSystem.system.continuousNanoseconds,
+        emitsPreArmFailure: true
       )
     }
   }

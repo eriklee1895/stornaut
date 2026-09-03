@@ -11,6 +11,18 @@ private struct InvestigationMachineCampaignCoordinatorFixture {
             guard CommandLine.argc == 1, getpid() > 1, getsid(0) == getpid(),
                   getpgrp() == getpid(), tcgetpgrp(STDERR_FILENO) == getpid()
             else { throw FixtureError.invalid }
+            #if CAMPAIGN_FIXTURE_PREARM_FAILURE
+            let body = try preArmFailureFrame()
+            var count = UInt32(body.count).bigEndian
+            let frame = withUnsafeBytes(of: &count) { Data($0) } + body
+            try writeAll(
+                STORNAUT_INVESTIGATION_CAMPAIGN_RECEIPT_FD, frame)
+            guard close(STORNAUT_INVESTIGATION_CAMPAIGN_RECEIPT_FD) == 0,
+                  close(STDIN_FILENO) == 0, close(STDOUT_FILENO) == 0,
+                  close(STDERR_FILENO) == 0
+            else { throw FixtureError.posix(errno) }
+            _exit(81)
+            #else
             try writeAll(
                 STDERR_FILENO, Data("campaign-physical-diagnostic".utf8))
             let receipt = try InvestigationMachineCoordinatorRawReceiptV1(
@@ -58,11 +70,35 @@ private struct InvestigationMachineCampaignCoordinatorFixture {
             _exit(0)
             #endif
             #endif
+            #endif
         } catch { exit(70) }
     }
 }
 
 private enum FixtureError: Error { case invalid, posix(Int32) }
+
+private func preArmFailureFrame() throws -> Data {
+    let checkpoint = Data([2]) + digest(0x91).rawBytes + digest(0x92).rawBytes
+    let fields = [
+        Data([2]),
+        checkpoint,
+        Data([2]),
+        uint32Data(81),
+        Data(repeating: 0, count: 32),
+    ]
+    let zeroed = try HandoffBinaryTranscript.encode(
+        domain: "stornaut.task39.iic.coordinator-prearm-failure.v1",
+        businessFields: fields,
+        maximumByteCount: 512
+    )
+    var finalFields = fields
+    finalFields[4] = InvestigationHandoffSHA256.hashing(zeroed).rawBytes
+    return try HandoffBinaryTranscript.encode(
+        domain: "stornaut.task39.iic.coordinator-prearm-failure.v1",
+        businessFields: finalFields,
+        maximumByteCount: 512
+    )
+}
 
 private func writeAll(_ descriptor: Int32, _ data: Data) throws {
     var offset = 0
@@ -78,6 +114,15 @@ private func writeAll(_ descriptor: Int32, _ data: Data) throws {
 
 private func digest(_ byte: UInt8) -> InvestigationHandoffSHA256 {
     .hashing(Data(repeating: byte, count: 32))
+}
+
+private func uint32Data(_ value: UInt32) -> Data {
+    Data([
+        UInt8(value >> 24),
+        UInt8(truncatingIfNeeded: value >> 16),
+        UInt8(truncatingIfNeeded: value >> 8),
+        UInt8(truncatingIfNeeded: value),
+    ])
 }
 
 private func uuid(_ byte: UInt8) -> UUID {

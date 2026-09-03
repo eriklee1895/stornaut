@@ -42,6 +42,88 @@ package enum InvestigationMachineCampaignLifecycleFinalizer {
     }
 }
 
+package enum InvestigationMachineCampaignPreArmFailureReport {
+    package static func canonicalData(
+        _ value: InvestigationMachineCampaignPreArmFailureFrame,
+        exactWait: InvestigationMachineCampaignExactWait?,
+        armedConsumed: Bool,
+        uninstallVerified: Bool,
+        globalPostTeardown: Bool,
+        installReceiptSHA256: String,
+        uninstallReceiptSHA256: String,
+        globalObservationSHA256: String
+    ) throws -> Data {
+        guard !armedConsumed, uninstallVerified, globalPostTeardown,
+              exactWait == .exited(status: value.reason.expectedExitStatus),
+              [installReceiptSHA256, uninstallReceiptSHA256,
+               globalObservationSHA256].allSatisfy(Self.validSHA256)
+        else { throw InvestigationMachineCampaignExecutableReportError.invalid }
+        let checkpoint: [String: Any]
+        switch value.checkpoint {
+        case .bootstrapStarted(let nonce):
+            checkpoint = ["kind": "bootstrapStarted",
+                "nonceSHA256": nonce.lowercaseHex]
+        case .sourceVerified(let nonce, let source):
+            checkpoint = ["kind": "sourceVerified",
+                "nonceSHA256": nonce.lowercaseHex,
+                "sourceFingerprintSHA256": source.lowercaseHex]
+        case .runtimeBound(let nonce, let source, let build, let binding):
+            checkpoint = ["kind": "runtimeBound",
+                "nonceSHA256": nonce.lowercaseHex,
+                "sourceFingerprintSHA256": source.lowercaseHex,
+                "buildProvenanceSHA256": build.lowercaseHex,
+                "signedRuntimeBindingSHA256": binding.lowercaseHex]
+        }
+        return try JSONSerialization.data(withJSONObject: [
+            "schemaVersion": 1,
+            "domain": "stornaut.task39.iic.prearm-failure-report.v1",
+            "stage": value.stage.name, "reason": value.reason.name,
+            "childExitKind": "exited",
+            "childExitStatus": Int(value.reason.expectedExitStatus),
+            "coordinatorFrameSHA256": value.frameSHA256.lowercaseHex,
+            "installReceiptSHA256": installReceiptSHA256,
+            "uninstallReceiptSHA256": uninstallReceiptSHA256,
+            "globalObservationSHA256": globalObservationSHA256,
+            "checkpoint": checkpoint, "armedConsumed": false,
+            "uninstallVerified": true, "globalPostTeardown": true,
+            "admitting": false,
+        ], options: [.sortedKeys, .withoutEscapingSlashes])
+    }
+    private static func validSHA256(_ value: String) -> Bool {
+        value.utf8.count == 64 && value.utf8.allSatisfy {
+            (48...57).contains($0) || (97...102).contains($0)
+        }
+    }
+}
+
+package enum InvestigationMachineCampaignExecutableReportError: Error {
+    case invalid
+}
+
+package enum InvestigationMachineCampaignFirstFrameClassifier {
+    package enum Kind: Equatable { case preArmFailure, legacyReceipt, normalPreArm }
+    package static func hasCompleteDeclaredPayload(_ frame: Data) -> Bool {
+        guard frame.count >= 4 else { return false }
+        let count = frame.prefix(4).reduce(UInt32(0)) { ($0 << 8) | UInt32($1) }
+        return count > 0 && frame.count == Int(count) + 4
+    }
+    package static func classify(_ frame: Data, fixture: Bool) throws -> Kind {
+        guard hasCompleteDeclaredPayload(frame) else {
+            throw InvestigationMachineCampaignExecutableReportError.invalid
+        }
+        let count = frame.prefix(4).reduce(UInt32(0)) { ($0 << 8) | UInt32($1) }
+        if (try? InvestigationMachineCampaignPreArmFailureFrame.decode(
+            Data(frame.dropFirst(4)))) != nil { return .preArmFailure }
+        if fixture && Int(count)
+            <= InvestigationMachineCoordinatorRawReceiptV1.maximumByteCount {
+            return .legacyReceipt
+        }
+        _ = try InvestigationMachineCampaignPreArmFrame.decode(
+            Data(frame.dropFirst(4)))
+        return .normalPreArm
+    }
+}
+
 package enum InvestigationMachineCampaignExecutable {
     private static let coordinatorName="StornautInvestigationMachineCampaignCoordinator"
     private static let installedCoordinator="/Library/Application Support/Stornaut/Stornaut-R5-Diagnostic.app/Contents/MacOS/StornautInvestigationMachineGateCoordinator"
@@ -82,7 +164,8 @@ package enum InvestigationMachineCampaignExecutable {
                 completed: false, identity: projection.identity,
                 diagnostic: Data(), residue: projection.residue,
                 failure: String(describing: failure.primary),
-                cleanup: failure.cleanupIssues.map(String.init(describing:)))
+                cleanup: failure.cleanupIssues.map(String.init(describing:)),
+                verifiedPreArmFailure: failure.verifiedPreArmFailure)
             return failedExitStatus
         }
     }
@@ -102,9 +185,11 @@ package enum InvestigationMachineCampaignExecutable {
         completed: Bool, identity: InvestigationMachineCampaignOuterIdentity?,
         diagnostic: Data,
         residue: InvestigationMachineCampaignResidueObservation?,
-        failure: String?, cleanup: [String]
+        failure: String?, cleanup: [String],
+        verifiedPreArmFailure:
+            InvestigationMachineCampaignPreArmFailureFrame? = nil
     ) {
-        let object: [String: Any] = [
+        var object: [String: Any] = [
             "completed": completed, "processID": identity?.processID ?? 0,
             "processGroupID": identity?.processGroupID ?? 0,
             "sessionID": identity?.sessionID ?? 0,
@@ -117,6 +202,14 @@ package enum InvestigationMachineCampaignExecutable {
             "sessionResidueCount": residue?.sessionMembers.count ?? -1,
             "failure": failure ?? "", "cleanup": cleanup,
         ]
+        if let verifiedPreArmFailure {
+            object["verifiedPreArmFailureReason"] =
+                verifiedPreArmFailure.reason.name
+            object["verifiedPreArmFailureStage"] =
+                verifiedPreArmFailure.stage.name
+            object["verifiedPreArmFailureExitStatus"] =
+                verifiedPreArmFailure.reason.expectedExitStatus
+        }
         guard let data = try? JSONSerialization.data(
             withJSONObject: object, options: [.sortedKeys])
         else { return }
@@ -242,6 +335,19 @@ package enum InvestigationMachineCampaignExecutable {
                         "stornaut ii-c installed-state-uncertain\n") })
             } catch { throw Failure.installedStateUncertain }
             let global = try globalObservation()
+            if case let .failed(failure) = outcome,
+               let diagnostic = failure.verifiedPreArmFailure,
+               !armedConsumed,
+               failure.cleanupIssues.isEmpty,
+               failure.exactWait
+                == .exited(status: diagnostic.reason.expectedExitStatus)
+            {
+                try Self.writePreArmFailureReport(
+                    diagnostic, exactWait: failure.exactWait,
+                    install: install, uninstall: un, global: global
+                )
+                return false
+            }
             guard let preArm, let writer, evidenceUsable else { return false }
             try writeTeardown(un, preArm: preArm, global: global,
                 expectedConsumed: armedConsumed,
@@ -300,12 +406,20 @@ package enum InvestigationMachineCampaignExecutable {
                 maximum: InvestigationMachineCampaignPreArmFrame.maximumByteCount,
                 deadline: try operationDeadline(absoluteDeadlineNanoseconds)
             )
-            if frame.count <= InvestigationMachineCoordinatorRawReceiptV1.maximumByteCount + 4 {
+            if usesFixtureSibling,
+               !InvestigationMachineCampaignFirstFrameClassifier
+                .hasCompleteDeclaredPayload(frame) {
                 bufferedReceipt = frame
                 return nil
             }
-            let preArm = try InvestigationMachineCampaignPreArmFrame
-                .decode(Data(frame.dropFirst(4)))
+            let payload = Data(frame.dropFirst(4))
+            let kind = try InvestigationMachineCampaignFirstFrameClassifier
+                .classify(frame, fixture: usesFixtureSibling)
+            if kind == .preArmFailure || kind == .legacyReceipt {
+                bufferedReceipt = frame
+                return nil
+            }
+            let preArm = try InvestigationMachineCampaignPreArmFrame.decode(payload)
             preArmWire=frame
             guard let installReceipt else { throw Failure.invalid }
             try Self.validateInstall(installReceipt, preArm: preArm)
@@ -672,6 +786,37 @@ package enum InvestigationMachineCampaignExecutable {
                   }), ["gateExecutableSHA256","coordinatorExecutableSHA256","plistSHA256",
                     "installedIdentitySHA256"].allSatisfy({ validHex(value[$0]) })
             else { throw Failure.invalid }
+        }
+        private static func writePreArmFailureReport(
+            _ value: InvestigationMachineCampaignPreArmFailureFrame,
+            exactWait: InvestigationMachineCampaignExactWait?,
+            install: [String: Any], uninstall: [String: Any], global: [Int]
+        ) throws {
+            let data = try InvestigationMachineCampaignPreArmFailureReport
+                .canonicalData(
+                    value,
+                    exactWait: exactWait,
+                    armedConsumed: false, uninstallVerified: true,
+                    globalPostTeardown: true,
+                    installReceiptSHA256: digest(try canonical(install)),
+                    uninstallReceiptSHA256: digest(try canonical(uninstall)),
+                    globalObservationSHA256: digest(try canonical(global))
+                )
+            var offset = 0
+            while offset < data.count {
+                let count = data.withUnsafeBytes { bytes in
+                    Darwin.write(
+                        STDOUT_FILENO, bytes.baseAddress! + offset,
+                        data.count - offset
+                    )
+                }
+                if count < 0, errno == EINTR { continue }
+                guard count > 0 else { throw Failure.posix(errno) }
+                offset += count
+            }
+            guard Darwin.write(STDOUT_FILENO, "\n", 1) == 1 else {
+                throw Failure.posix(errno)
+            }
         }
         private static func validHex(_ value:Any?) -> Bool {
             guard let value=value as? String, value.count==64 else{return false}
@@ -1251,10 +1396,21 @@ package enum InvestigationMachineCampaignExecutable {
             let declared=frame.prefix(4).reduce(UInt32(0)){($0<<8)|UInt32($1)}
             guard declared > 0, let count = Int(exactly: declared), count <= maximum
             else { throw Failure.invalid }
-            if count<=InvestigationMachineCoordinatorRawReceiptV1.maximumByteCount{return frame}
             while frame.count < count + 4 {
-                frame.append(try readSome(descriptor,maximum:count+4-frame.count,
-                    deadline:deadline))
+                var event=pollfd(fd:descriptor,events:Int16(POLLIN|POLLHUP),revents:0)
+                let ready=poll(&event,1,Self.timeout(deadline))
+                if ready<0,errno==EINTR{continue}
+                guard ready>0,event.revents&Int16(POLLERR|POLLNVAL)==0
+                else{throw Failure.deadline}
+                var bytes=[UInt8](repeating:0,count:count+4-frame.count)
+                let readCount=Darwin.read(descriptor,&bytes,bytes.count)
+                if readCount<0,errno==EINTR{continue}
+                if readCount==0 {
+                    guard usesFixtureSibling else { throw Failure.invalid }
+                    return frame
+                }
+                guard readCount>0 else{throw Failure.invalid}
+                frame.append(contentsOf:bytes.prefix(readCount))
             }
             return frame
         }

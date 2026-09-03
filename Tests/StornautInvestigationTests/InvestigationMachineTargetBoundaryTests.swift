@@ -4,6 +4,33 @@ import Testing
 @Suite("Task 39 trusted machine target boundary")
 struct InvestigationMachineTargetBoundaryTests {
     @Test
+    func preArmFailureRepairHasDedicatedSourceAndScopeGates() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-boundaries"), encoding: .utf8)
+        for marker in [
+            "--iic-c-prearm-failure-source-contract-only",
+            "--iic-c-prearm-failure-staged-scope-contract-only",
+            "function verify_iicc_prearm_failure_source_contract()",
+            "function verify_iicc_prearm_failure_staged_scope()",
+            "51ea8c28b9431280bb0e8b7e6373e2e1ad538298",
+            "pre-arm failure teardown order drifted",
+            "pre-arm failure non-admission drifted",
+            "pre-arm failure classifier order drifted",
+            "physicalCompactPreArmFailurePreservesVerifiedExitAndZeroResidue",
+        ] {
+            #expect(boundary.contains(marker), "missing: (marker)")
+        }
+        let contract = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+        #expect(contract.contains(
+            "--iic-c-prearm-failure-source-contract-only"))
+        #expect(contract.contains(
+            "pre-arm failure scope negative inventory drifted"))
+    }
+
+    @Test
     func iiCCPreArmVerifierPinsHistoricalAndCurrentClosure() throws {
         let root = URL(filePath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()

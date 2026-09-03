@@ -355,6 +355,10 @@ iicc_scope_contract_only=false
 iicc_scope_baseline=622e7b99d57dfe482ccd37481fcdb4dcff87a0ec
 iicc_prearm_scope_contract_only=false
 iicc_prearm_scope_baseline=62ee47091e338107e182233eaed80ed1ecc059cc
+prearm_failure_source_contract_only=false
+prearm_failure_sources=()
+prearm_failure_scope_contract_only=false
+prearm_failure_scope_baseline=51ea8c28b9431280bb0e8b7e6373e2e1ad538298
 iic_lineage_l1_source_contract_only=false
 iic_lineage_l1_mutation_contract_only=false
 iic_lineage_l1_mutation_name=
@@ -976,6 +980,14 @@ if (( $# > 0 )); then
         && [[ $1 == --iic-c-prearm-staged-scope-contract-only ]]; then
         iicc_prearm_scope_contract_only=true
         iicc_prearm_scope_baseline=${2:-62ee47091e338107e182233eaed80ed1ecc059cc}
+    elif (( $# == 1 || $# == 7 )) \
+        && [[ $1 == --iic-c-prearm-failure-source-contract-only ]]; then
+        prearm_failure_source_contract_only=true
+        prearm_failure_sources=("${@:2}")
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iic-c-prearm-failure-staged-scope-contract-only ]]; then
+        prearm_failure_scope_contract_only=true
+        prearm_failure_scope_baseline=${2:-51ea8c28b9431280bb0e8b7e6373e2e1ad538298}
     elif (( $# == 1 || $# == 12 )) \
         && [[ $1 == --iic-root-driver-lineage-l1-source-contract-only ]]; then
         iic_lineage_l1_source_contract_only=true
@@ -11987,6 +11999,12 @@ function verify_iic_root_driver_lineage_l1_staged_scope() {
         scripts/verify-contract 140
         scripts/verify-app-release-boundaries 80
     )
+    local -A required=(
+        Sources/StornautInvestigationMachineCampaign/main.swift 1
+        Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignHarness.swift 1
+        Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift 1
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift 1
+    )
     local -a expected=(
         Package.swift
         Sources/StornautInvestigationHandoffContract/InvestigationResolvedRootDriverLineageContract.swift
@@ -12571,6 +12589,167 @@ function verify_iicc_prearm_staged_scope() {
     [[ -z "$(git diff --name-only --diff-filter=ACMRD -- | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')" \
         && -z "$(git ls-files --others --exclude-standard -- | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')" ]] \
         || { print -u2 "ii-c-c pre-arm index/worktree drifted"; return 1; }
+}
+
+function verify_iicc_prearm_failure_source_contract() {
+    local -a paths=("${prearm_failure_sources[@]}")
+    if (( ${#paths} == 0 )); then paths=(
+        Sources/StornautInvestigationMachineCampaign/main.swift
+        Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignHarness.swift
+        Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift
+        Tests/Fixtures/InvestigationMachineCampaignCoordinator/main.swift
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignHarnessTests.swift
+    ); fi
+    /usr/bin/python3 -I - "${paths[@]}" <<'PY'
+from pathlib import Path
+import sys
+if len(sys.argv) != 7:
+    raise SystemExit("pre-arm failure source cardinality drifted")
+main, harness, coordinator, tests, fixture, physical = (
+    Path(p).read_text() for p in sys.argv[1:])
+domain = "stornaut.task39.iic.coordinator-prearm-failure.v1"
+for source in (harness, coordinator):
+    if source.count(domain) != 1:
+        raise SystemExit("pre-arm failure domain drifted")
+for marker in ("case bootstrapStarted(nonce:", "case sourceVerified(",
+               "case runtimeBound(", "buildProvenanceRejected",
+               "installedObservationInvalid", "codexIdentityChanged",
+               "admissionDeadline", "protocolRejected", "containmentUncertain"):
+    if marker not in harness or marker not in coordinator:
+        raise SystemExit("pre-arm failure contract drifted: " + marker)
+for marker in ("failureEligible = false\n        try await dependencies.activateBeforeHandoff",
+               "retirementOutcome == .retired, failureEligible",
+               "!(originalError is CancellationError)",
+               "case failure(InvestigationMachineGateCoordinatorPreArmFailureFrameV1)",
+               "guard !normalPreArmWritten else"):
+    if marker not in coordinator:
+        raise SystemExit("pre-arm failure producer drifted: " + marker)
+for marker in ("try? InvestigationMachineCampaignPreArmFailureFrame",
+               "case .exited(preArmFailure.reason.expectedExitStatus)",
+               "verifiedPreArmFailure: preArmFailure",
+               "diagnosticBytes.isEmpty, receiptEOF, terminalEOF",
+               "residue.processGroupMembers.isEmpty"):
+    if marker not in harness:
+        raise SystemExit("pre-arm failure consumer drifted: " + marker)
+classifier = main[main.index(
+    "package enum InvestigationMachineCampaignFirstFrameClassifier"):
+    main.index("package enum InvestigationMachineCampaignExecutable {")]
+if not (classifier.index(
+        "InvestigationMachineCampaignPreArmFailureFrame.decode")
+        < classifier.index("if fixture && Int(count)")):
+    raise SystemExit("pre-arm failure classifier order drifted")
+for marker in ("hasCompleteDeclaredPayload(frame)",
+               "CAMPAIGN_FIXTURE_PREARM_FAILURE",
+               "stornaut.task39.iic.coordinator-prearm-failure.v1",
+               "_exit(81)"):
+    source = main if marker == "hasCompleteDeclaredPayload(frame)" else fixture
+    if marker not in source:
+        raise SystemExit("pre-arm failure physical path drifted: " + marker)
+for marker in ("physicalCompactPreArmFailurePreservesVerifiedExitAndZeroResidue",
+               'verifiedPreArmFailureReason == "installedObservationInvalid"',
+               "verifiedPreArmFailureExitStatus == 81"):
+    if marker not in physical:
+        raise SystemExit("pre-arm failure physical coverage drifted: " + marker)
+finish = main[main.index("func finishProduction"):main.index("private func writePostArm")]
+ordered = ("InvestigationMachineCampaignLifecycleFinalizer.run(",
+           "let global = try globalObservation()",
+           "try Self.writePreArmFailureReport(")
+if [finish.index(x) for x in ordered] != sorted(finish.index(x) for x in ordered):
+    raise SystemExit("pre-arm failure teardown order drifted")
+for marker in ("armedConsumed: false", "uninstallVerified: true",
+               "globalPostTeardown: true", '"admitting": false',
+               '"installReceiptSHA256": installReceiptSHA256',
+               '"uninstallReceiptSHA256": uninstallReceiptSHA256',
+               '"globalObservationSHA256": globalObservationSHA256'):
+    if marker not in main:
+        raise SystemExit("pre-arm failure non-admission drifted: " + marker)
+segment = coordinator[coordinator.index(
+    "package struct InvestigationMachineGateCoordinatorPreArmFailureFrameV1"):
+    coordinator.index("package enum InvestigationMachineGateCoordinatorInvocation")]
+for forbidden in ("localizedDescription", "String(describing: originalError)",
+                  "retryable", "outerAttemptUUID", "wholeProjectedInputSHA256"):
+    if forbidden in segment:
+        raise SystemExit("pre-arm failure producer leaked: " + forbidden)
+for marker in ("harnessPreservesOnlyExactExitedPreArmFailureWithoutArming",
+               "harnessRejectsPreArmFailureWithTerminalBytesMissingEOFOrResidue",
+               "preArmFailureReportRequiresExactExitAndCompleteTeardown",
+               "productionFirstFrameClassifierReadsCompactFailureByDomain"):
+    if marker not in tests:
+        raise SystemExit("pre-arm failure coverage drifted: " + marker)
+PY
+}
+
+function verify_iicc_prearm_failure_staged_scope() {
+    local -x PATH=/usr/bin:/bin:/usr/sbin:/sbin
+    local baseline=${1:-$prearm_failure_scope_baseline}
+    local expected=51ea8c28b9431280bb0e8b7e6373e2e1ad538298
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" == $expected ]] \
+        || { print -u2 "pre-arm failure baseline drifted"; return 1; }
+    local -A ceilings=(
+        Sources/StornautInvestigationMachineCampaign/main.swift 250
+        Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignHarness.swift 340
+        Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift 300
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift 650
+        Tests/Fixtures/InvestigationMachineCampaignCoordinator/main.swift 100
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignHarnessTests.swift 100
+        scripts/verify-contract 200
+        scripts/verify-investigation-boundaries 240
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift 100
+    )
+    local -A required=(
+        Sources/StornautInvestigationMachineCampaign/main.swift 1
+        Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignHarness.swift 1
+        Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift 1
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift 1
+        Tests/Fixtures/InvestigationMachineCampaignCoordinator/main.swift 1
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignHarnessTests.swift 1
+    )
+    local -a expected_paths=(
+        Sources/StornautInvestigationMachineCampaign/main.swift
+        Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignHarness.swift
+        Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift
+        Tests/Fixtures/InvestigationMachineCampaignCoordinator/main.swift
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignHarnessTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-contract scripts/verify-investigation-boundaries
+    )
+    local observed_text=$(git diff --cached --name-only --diff-filter=ACMRD \
+        "$baseline" -- | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')
+    local -a observed=(${(f)observed_text})
+    [[ "${(j:\n:)${(@on)observed}}" == "${(j:\n:)${(@on)expected_paths}}" ]] \
+        || { print -u2 "pre-arm failure checkpoint paths drifted"; return 1; }
+    local add delete checkpoint_path total=0 mode entry
+    local -A seen=()
+    while IFS=$'\t' read -r add delete checkpoint_path; do
+        [[ $checkpoint_path == docs/* || $checkpoint_path == AGENTS.md \
+            || $checkpoint_path == README.md ]] && continue
+        [[ $add != - && $delete != - && ${+ceilings[$checkpoint_path]} == 1 ]] \
+            || { print -u2 "pre-arm failure checkpoint budget unavailable: $checkpoint_path"; return 1; }
+        (( add + delete <= ceilings[$checkpoint_path] )) \
+            || { print -u2 "pre-arm failure path budget drifted: $checkpoint_path"; return 1; }
+        (( total += add + delete ))
+        seen[$checkpoint_path]=1
+    done <<< "$(git diff --cached --numstat "$baseline" --)"
+    (( total <= 2080 )) \
+        || { print -u2 "pre-arm failure aggregate budget drifted"; return 1; }
+    for checkpoint_path in ${(k)required}; do
+        (( ${+seen[$checkpoint_path]} )) \
+            || { print -u2 "pre-arm failure required path missing: $checkpoint_path"; return 1; }
+    done
+    for checkpoint_path in "${expected_paths[@]}"; do
+        mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
+        entry=$(git ls-files -s -- "$checkpoint_path")
+        [[ "$(print -r -- "$entry" | awk '{print $1,$3,$4}')" == \
+                "$mode 0 $checkpoint_path" \
+            && "$(print -r -- "$entry" | awk '{print $2}')" == \
+                "$(git hash-object -- "$checkpoint_path")" ]] \
+            || { print -u2 "pre-arm failure staged source/mode drifted: $checkpoint_path"; return 1; }
+    done
+    [[ -z "$(git diff --name-only --diff-filter=ACMRD -- | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')" \
+        && -z "$(git ls-files --others --exclude-standard -- | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')" ]] \
+        || { print -u2 "pre-arm failure index/worktree drifted"; return 1; }
 }
 
 function verify_shared_deadline_contract() {
@@ -17152,6 +17331,16 @@ fi
 if $iicc_prearm_scope_contract_only; then
     verify_iicc_prearm_staged_scope "$iicc_prearm_scope_baseline"
     print "ii-c-c pre-arm staged scope verification passed."
+    exit 0
+fi
+if $prearm_failure_source_contract_only; then
+    verify_iicc_prearm_failure_source_contract
+    print "ii-c-c pre-arm failure source verification passed."
+    exit 0
+fi
+if $prearm_failure_scope_contract_only; then
+    verify_iicc_prearm_failure_staged_scope "$prearm_failure_scope_baseline"
+    print "ii-c-c pre-arm failure staged scope verification passed."
     exit 0
 fi
 if $iic0bivb1_handoff_contract_only; then
