@@ -178,6 +178,10 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   App/helper build、981-test clean staged-only serial regression 与 post-fix
   review 均通过。L3c2b deterministic failure matrix driver 随后完成；39B2c
   readiness 仍仅归 L3c4，
+  ii-c pre-arm failure diagnostic repair 已在 `2ada395` / tree `11e1a0a`
+  完成：typed failure receipt、共享完整帧读取、physical
+  exit-81/EOF/zero-residue、exact 9-path/1,834-line scope 与九类负例通过，
+  final review 无 unresolved P0–P2；唯一 privileged attempt 仍未消费。
   随后的 L3 preflight 已拆为 L3a trusted target extraction、L3b root
   driver/L1+L2 collection 与 L3c failure matrix/final admission。L3a 已把
   2,509-line machine-only contract/assembler 以 99% rename 迁入非产品
@@ -637,6 +641,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c ii-c-b2a2 independent verifier review / completion audit | [docs/reports/phase-d-task-39b2c-iic-b2a2-independent-verifier-review.md](docs/reports/phase-d-task-39b2c-iic-b2a2-independent-verifier-review.md) |
 | Phase D Task 39B2c ii-c-b2b PTY / FD 3 transport preflight | [docs/reports/phase-d-task-39b2c-iic-b2b-transport-preflight.md](docs/reports/phase-d-task-39b2c-iic-b2b-transport-preflight.md) |
 | Phase D Task 39B2c resolved root-driver lineage L2 review / completion audit | [docs/reports/phase-d-task-39b2c-iic-resolved-root-driver-lineage-l2-review.md](docs/reports/phase-d-task-39b2c-iic-resolved-root-driver-lineage-l2-review.md) |
+| Phase D Task 39B2c ii-c pre-arm failure diagnostic review | [docs/reports/phase-d-task-39b2c-iic-prearm-failure-diagnostic-review.md](docs/reports/phase-d-task-39b2c-iic-prearm-failure-diagnostic-review.md) |
 | Phase D Task 39B2c L3c3c-ii-a installed-driver observation review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md) |
 | Phase D Task 39B2c L3c3c-ii-b handoff composition split preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md) |
 | Phase D Task 39B2c L3c3c-ii-b0 exact wire contract preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b0-wire-contract-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b0-wire-contract-preflight.md) |
@@ -891,6 +896,9 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   binding repair `531f79f`、consumer seal `26e785a` 与 fixed-gate historical
   replay `aa8a7f1` 也已完成并保持 non-admitting。ii-c-a、ii-c-b 与
   resolved-lineage L1/L2 已完成/non-admitting，L2 final verifier review none；
+  pre-arm failure diagnostic repair `2ada395` / tree `11e1a0a` 已完成，
+  exact 9-path scope、physical compact-frame path、nine negative mutations 与
+  final no-unresolved-P0–P2 review 均已关闭，唯一 privileged attempt 未消费；
   当前 frontier 为 ii-c-c unique real machine
   campaign → L3c3d → L3c4；
   这些 repairs 是 machine-campaign prerequisite checkpoints，

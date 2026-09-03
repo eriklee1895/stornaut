@@ -321,6 +321,10 @@
 > ii-c-c unique real machine campaign → L3c3d → L3c4
 > 推进；这些 repairs 是
 > machine-campaign prerequisite checkpoints，不是新的 Task。该
+> pre-arm failure diagnostic repair 已在 `2ada395` / tree `11e1a0a` 完成；
+> typed failure receipt、physical compact-frame path、exact 9-path scope 与
+> nine negative mutations 经最终复核无 unresolved P0-P2。唯一 privileged
+> attempt 仍未消费。
 > b5b-ii-c checkpoint 以 8 个 non-document paths / 3,104 changed lines、35
 > focused tests、1,396-test staged-only serial、三个 verifier gates 与 final
 > no-unresolved-P0–P2 review 收口；未运行 full。c0a 完成后按序为 b5b-iii

@@ -100,7 +100,10 @@
 > `26e785a`, and fixed-gate historical replay `aa8a7f1` are complete/non-admitting.
 > ii-c-a, ii-c-b and resolved-lineage L1/L2 are complete/non-admitting. L2
 > final verifier closure is `849e454` / tree `f6c36d2`, and final review returned
-> no finding. The current frontier is strictly the ii-c-c unique real machine
+> no finding. The pre-arm failure diagnostic prerequisite is complete at
+> `2ada395` / tree `11e1a0a`; its bounded typed failure receipt, physical
+> compact-frame path, exact nine-path scope and negative mutation closure have
+> no unresolved P0-P2. The current frontier is strictly the ii-c-c unique real machine
 > campaign, L3c3d and L3c4. These
 > repairs are machine-campaign prerequisite checkpoints, not new Tasks. The authoritative
 > real-model run and readiness verdict remain unimplemented.

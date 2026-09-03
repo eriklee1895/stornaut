@@ -145,9 +145,14 @@ ii-c-c.
 
 Live status (2026-09-03): ii-c-b and resolved-lineage L1/L2 are
 complete/non-privileged/non-admitting; L2 final post-fix review returned no
-finding. The unique privileged attempt remains unconsumed. The current and only
+finding. The pre-arm failure diagnostic repair is complete at `2ada395` / tree
+`11e1a0a`: typed stage/reason/checkpoint reporting, exact exit/EOF/residue
+verification, a physical compact-frame path and a nine-path scope mutation
+matrix all passed final review with no unresolved P0-P2. The unique privileged
+attempt remains unconsumed. The current and only
 frontier is `ii-c-c`, followed strictly by `L3c3d -> L3c4`; see the
-[L2 completion audit](phase-d-task-39b2c-iic-resolved-root-driver-lineage-l2-review.md).
+[L2 completion audit](phase-d-task-39b2c-iic-resolved-root-driver-lineage-l2-review.md)
+and [pre-arm failure diagnostic audit](phase-d-task-39b2c-iic-prearm-failure-diagnostic-review.md).
 
 ## 6. Campaign Evidence and Attempt Consumption
 

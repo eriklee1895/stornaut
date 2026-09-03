@@ -144,6 +144,11 @@
 > corrections and final verifier closure `849e454` are complete/non-admitting;
 > the final post-fix review returned no finding. The current frontier is the ii-c-c
 > unique real machine campaign → L3c3d → L3c4.
+> The pre-arm failure diagnostic prerequisite is complete at `2ada395` / tree
+> `11e1a0a`: bounded typed failure receipt, exact exit/EOF/residue verification,
+> physical compact-frame coverage and exact nine-path mutation closure have no
+> unresolved P0-P2. The unique privileged attempt remains unconsumed; ii-c-c is
+> the only current frontier.
 > These repairs are machine-campaign prerequisite checkpoints,
 > not recursively named new Tasks. Local findings remain in their owning
 > checkpoint. L3c4 alone owns final admission and the remaining full.
