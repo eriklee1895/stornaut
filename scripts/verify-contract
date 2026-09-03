@@ -3,7 +3,7 @@
 set -euo pipefail
 
 contract_source=${0:A}
-# ib2_self_sha=4c71a513619b0aa67acc4016beaea193262ddc66217a4025b27d58b7091b7e28
+# ib2_self_sha=16d06109f9a36f6432b56e1060931dba45aabf44b8797b198a6418a80163b3a0
 ib2_self_sha=$(sed -nE 's/^# ib2_self_sha=([0-9a-f]{64})$/\1/p' "$contract_source"); ib2_observed_sha=$(sed -E 's/^# ib2_self_sha=[0-9a-f]{64}$/# ib2_self_sha=SELF/' "$contract_source" | shasum -a 256 | awk '{ print $1 }')
 [[ ${#ib2_self_sha} == 64 && "$ib2_observed_sha" == "$ib2_self_sha" ]] || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
 repo_root=${contract_source:h:h}
@@ -2665,7 +2665,7 @@ function verify_iica_legacy_current_tree_contract() {
         "$package" "$gate_source" "$coordinator_source" "$project" \
         "$scheme" "$installer" "$out/boundary-vacuity.swift" "$focused"
 
-    local expected_installer_sha=2274081f29fcecde69a9f025e796e242de2f83bbf5adf4f1b1d2c63eebc04e97
+    local expected_installer_sha=8bf5ef3a35278937b574f95d97901113e133ef5ef334e71538636852326c3a07
     [[ "$(shasum -a 256 "$installer" | awk '{print $1}')" == \
         "$expected_installer_sha" ]] || \
         fail_contract "ii-c-a installer source seal drifted"
@@ -4005,6 +4005,7 @@ PY
     fi
 
     local failure_baseline=51ea8c28b9431280bb0e8b7e6373e2e1ad538298
+    local failure_accepted=d989328439a6fa07f437f12231fa87ddd4a358ec
     local -a failure_paths=(
         Sources/StornautInvestigationMachineCampaign/main.swift
         Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignHarness.swift
@@ -4020,7 +4021,7 @@ PY
     GIT_INDEX_FILE=$failure_index git read-tree "$failure_baseline^{tree}"
     for item in "${failure_paths[@]}"; do
         mode=100644; [[ $item == scripts/* ]] && mode=100755
-        blob=$(git hash-object -w -- "$item")
+        blob=$(git rev-parse "$failure_accepted:$item")
         GIT_INDEX_FILE=$failure_index git update-index --add \
             --cacheinfo "$mode,$blob,$item"
     done
@@ -4034,7 +4035,9 @@ PY
     local failure_worktree=$out/prearm-failure-scope.worktree
     materialize_iicc_prearm_failure_scope_worktree \
         "$failure_index" "$failure_worktree"
-    env GIT_INDEX_FILE="$failure_index" GIT_WORK_TREE="$failure_worktree" "$gate" \
+    env GIT_DIR="$repo_root/.git" GIT_INDEX_FILE="$failure_index" \
+        GIT_WORK_TREE="$failure_worktree" \
+        "$failure_worktree/scripts/verify-investigation-boundaries" \
         --iic-c-prearm-failure-staged-scope-contract-only "$failure_baseline" \
         >"$out/prearm-failure-scope.log"
     function reject_iicc_prearm_failure_scope() {
@@ -4155,7 +4158,9 @@ PY
                 "$failure_bad" "$failure_fixture_worktree";;
         esac
         reject_iicc_prearm_failure_scope "$failure_fixture" "$failure_expected" \
-            env GIT_INDEX_FILE="$failure_bad" GIT_WORK_TREE="$failure_fixture_worktree" "$gate" \
+            env GIT_DIR="$repo_root/.git" GIT_INDEX_FILE="$failure_bad" \
+                GIT_WORK_TREE="$failure_fixture_worktree" \
+                "$failure_fixture_worktree/scripts/verify-investigation-boundaries" \
             --iic-c-prearm-failure-staged-scope-contract-only "$failure_scope"
     done
     ( local untracked_worktree=$out/prearm-failure-scope-untracked.worktree
@@ -4165,7 +4170,9 @@ PY
       print x >"$probe"
       reject_iicc_prearm_failure_scope untracked \
           'pre-arm failure index/worktree drifted' env \
-          GIT_INDEX_FILE="$failure_index" GIT_WORK_TREE="$untracked_worktree" "$gate" \
+          GIT_DIR="$repo_root/.git" GIT_INDEX_FILE="$failure_index" \
+          GIT_WORK_TREE="$untracked_worktree" \
+          "$untracked_worktree/scripts/verify-investigation-boundaries" \
           --iic-c-prearm-failure-staged-scope-contract-only \
           "$failure_baseline" )
 }

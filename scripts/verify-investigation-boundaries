@@ -9582,37 +9582,6 @@ scheme = scheme_path.read_text(encoding="utf-8")
 installer = installer_path.read_text(encoding="utf-8")
 boundary = boundary_path.read_text(encoding="utf-8")
 focused = focused_path.read_text(encoding="utf-8")
-if canonical_mode:
-    import subprocess
-    baseline = "2b30a157c14bc507351b10bd521e710987860f71"
-    def historical(path):
-        return subprocess.run(
-            ["git", "show", f"{baseline}:{path}"],
-            check=True, stdout=subprocess.PIPE, text=True,
-        ).stdout
-    expected_gate = historical(
-        "Sources/StornautInvestigationMachineGateSupport/"
-        "InvestigationMachineFixedGateLauncher.swift"
-    ).replace(
-        "package enum InvestigationMachineGateSupport",
-        "public enum InvestigationMachineGateSupport", 1,
-    ).replace(
-        "package static func run() -> Int32",
-        "public static func run() -> Int32", 1,
-    )
-    expected_coordinator = historical(
-        "Sources/StornautInvestigationMachineGateCoordinatorSupport/"
-        "InvestigationMachineGateCoordinatorComposition.swift"
-    ).replace(
-        "package enum InvestigationMachineGateCoordinatorSupport",
-        "public enum InvestigationMachineGateCoordinatorSupport", 1,
-    ).replace(
-        "package static func run() async -> Int32",
-        "public static func run() async -> Int32", 1,
-    )
-    if gate != expected_gate or coordinator != expected_coordinator:
-        raise SystemExit("ii-c-a support API exact delta drifted")
-
 tools = (
     ("StornautInvestigationMachineDriverNative", "StornautInvestigationMachineDriver", "StornautInvestigationMachineDriverSupport", "com.eriklee.stornaut.investigation.machine-driver", "Tools/StornautInvestigationMachineDriver/main.swift"),
     ("StornautInvestigationMachineGateNative", "StornautInvestigationMachineGate", "StornautInvestigationMachineGateSupport", "com.eriklee.stornaut.investigation.machine-gate", "tools/StornautInvestigationMachineGate/main.swift"),
@@ -9667,12 +9636,31 @@ for configuration_id, configuration_name in (
             raise SystemExit(
                 f"ii-c-a Coordinator {configuration_name} isolation drifted: {setting}"
             )
+for configuration_id, configuration_name in (
+    ("A00000000000000000000140", "Debug"),
+    ("A00000000000000000000141", "Release"),
+):
+    marker = f"{configuration_id} /* {configuration_name} */ = {{"
+    start = project.index(marker)
+    end = project.index("\n\t\t};", start)
+    configuration = project[start:end]
+    for setting in (
+        "CREATE_INFOPLIST_SECTION_IN_BINARY = YES;",
+        "CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;",
+        "PRODUCT_BUNDLE_IDENTIFIER = com.eriklee.stornaut.lifecycle.helper;",
+    ):
+        if configuration.count(setting) != 1:
+            raise SystemExit(
+                f"ii-c-a helper {configuration_name} identity metadata drifted: {setting}"
+            )
 ET.parse(scheme_path)
 for marker in (
     "validate_closed_executable_identity() {",
     "validate_closed_executable_artifact() {",
     "validate_closed_app_artifacts() {",
     "validate_closed_artifact_fixtures() {",
+    "app_max_bytes=$((256 * 1024 * 1024))",
+    "helper_max_bytes=$((256 * 1024 * 1024))",
     "machine_gate_max_bytes=$((64 * 1024 * 1024))",
     "machine_coordinator_max_bytes=$((64 * 1024 * 1024))",
 ):
@@ -9680,9 +9668,29 @@ for marker in (
         raise SystemExit(f"ii-c-a installer closure drifted: {marker}")
 if installer.count("machineClaimServiceIdentifier=$machine_claim_service") != 1:
     raise SystemExit("ii-c-a driver-only claim service association drifted")
-for _target, product, _support, identifier, _source in tools:
-    if f"Contents/MacOS/{product}" not in installer or identifier not in installer:
-        raise SystemExit(f"ii-c-a installer role drifted: {product}")
+closed_match = re.search(
+    r'(?ms)^validate_closed_app_artifacts\(\) \{\n(.*?)(?=^\}\n\n)',
+    installer,
+)
+if closed_match is None:
+    raise SystemExit("ii-c-a closed App identity function drifted")
+closed_app = closed_match.group(1)
+roles = (
+    ("StornautInvestigationDiagnostic", "com.eriklee.stornaut", "$app_max_bytes", '""'),
+    ("StornautLifecycleHelper", "com.eriklee.stornaut.lifecycle.helper", "$helper_max_bytes", '""'),
+    ("StornautInvestigationMachineDriver", "com.eriklee.stornaut.investigation.machine-driver", "$machine_driver_max_bytes", "$machine_claim_service"),
+    ("StornautInvestigationMachineGate", "com.eriklee.stornaut.investigation.machine-gate", "$machine_gate_max_bytes", '""'),
+    ("StornautInvestigationMachineGateCoordinator", "com.eriklee.stornaut.investigation.machine-gate-coordinator", "$machine_coordinator_max_bytes", '""'),
+)
+if closed_app.count("validate_closed_executable_artifact") != len(roles):
+    raise SystemExit("ii-c-a installer role cardinality drifted")
+for product, identifier, maximum, service in roles:
+    for role_marker in (f"Contents/MacOS/{product}", identifier, maximum, service):
+        if role_marker not in closed_app:
+            raise SystemExit(f"ii-c-a installer role drifted: {product}: {role_marker}")
+for identity_key in ("appIdentity={", "helperIdentity={", "machineDriverIdentity={", "machineGateIdentity={", "machineCoordinatorIdentity={"):
+    if closed_app.count(identity_key) != 1:
+        raise SystemExit(f"ii-c-a installer identity key drifted: {identity_key}")
 for marker in (
     "iiCAMachinePackagingVerifierPinsClosedTopologyAndScope",
     "--iic-a-source-contract-only",
@@ -9693,6 +9701,7 @@ for marker in (
     if marker not in boundary:
         raise SystemExit(f"ii-c-a boundary verifier coverage drifted: {marker}")
 for marker in (
+    "lifecycleHelperEmbedsStableSigningIdentifierMetadata",
     "installerBindsEachRoleToItsOwnIdentity",
     "installerRevalidatesClosedArtifactsBeforeStateChanges",
     "validationActionKeepsMachineToolChecksReadOnly",

@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-# iicb1_app_self_sha=d2f2c1c446183ae3de07bd0fe520d56139218551f00aa80d2028996d4cab71be
+# iicb1_app_self_sha=ccdeb42d3acf3e42a91b52af266f4b7c75c35930121f5440f4f22f8a70393b3d
 if [[ $# == 0 || ${1:-} == --iic-b1-root-owned-gate-component-* || ${1:-} == --iic-b2a2-component-* || ${1:-} == --iic-b2b2-component-* || ${1:-} == --iic-evidence-verification-component-* || ${1:-} == --iic-root-driver-lineage-l1-component-* ]]; then iicb1_app_self_sha=$(/usr/bin/sed -nE 's/^# iicb1_app_self_sha=([0-9a-f]{64})$/\1/p' "${0:A}"); [[ ${#iicb1_app_self_sha} == 64 && "$(/usr/bin/sed -E 's/^# iicb1_app_self_sha=[0-9a-f]{64}$/# iicb1_app_self_sha=SELF/' "${0:A}" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')" == "$iicb1_app_self_sha" ]] || { print -u2 "ii-c-b1 App release verifier self-seal drifted"; exit 1; }; fi
 repo_root=${0:A:h:h}
 cd "$repo_root"
@@ -2469,6 +2469,20 @@ ordinary = block("A00000000000000000000001", "StornautApp")
 diagnostic = block("A00000000000000000000005", "StornautInvestigationDiagnosticApp")
 release_shell = block("A00000000000000000000008", "StornautInvestigationDiagnosticReleaseShell")
 copy_phase = block("B00000000000000000000042", "Copy Investigation Machine Tools")
+for identifier, configuration_name in (
+    ("A00000000000000000000140", "Debug"),
+    ("A00000000000000000000141", "Release"),
+):
+    helper_configuration = block(identifier, configuration_name)
+    for setting in (
+        "CREATE_INFOPLIST_SECTION_IN_BINARY = YES;",
+        "CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;",
+        "PRODUCT_BUNDLE_IDENTIFIER = com.eriklee.stornaut.lifecycle.helper;",
+    ):
+        if helper_configuration.count(setting) != 1:
+            raise SystemExit(
+                f"ii-c-a helper {configuration_name} identity metadata drifted: {setting}"
+            )
 if diagnostic.count("PBXTargetDependency") != 4 or "Copy Investigation Machine Tools" not in diagnostic:
     raise SystemExit("ii-c-a diagnostic target composition drifted")
 if copy_phase.count(" in Copy Investigation Machine Tools */") != 3:
@@ -2490,7 +2504,7 @@ PY
 
 function verify_iica_installation_source_contract() {
     local installer=${1:-scripts/stornaut-r5-local-lifecycle}
-    local expected_installer_sha=2274081f29fcecde69a9f025e796e242de2f83bbf5adf4f1b1d2c63eebc04e97
+    local expected_installer_sha=8bf5ef3a35278937b574f95d97901113e133ef5ef334e71538636852326c3a07
     [[ "$(shasum -a 256 "$installer" | awk '{print $1}')" == \
         "$expected_installer_sha" ]] || {
         print -u2 "ii-c-a installer source seal drifted"
@@ -2539,17 +2553,19 @@ for marker in (
     if marker not in artifact:
         raise SystemExit(f"ii-c-a executable artifact contract drifted: {marker}")
 roles = (
+    ("StornautInvestigationDiagnostic", "com.eriklee.stornaut", "$app_max_bytes", '""'),
+    ("StornautLifecycleHelper", "com.eriklee.stornaut.lifecycle.helper", "$helper_max_bytes", '""'),
     ("StornautInvestigationMachineDriver", "com.eriklee.stornaut.investigation.machine-driver", "$machine_driver_max_bytes", "$machine_claim_service"),
     ("StornautInvestigationMachineGate", "com.eriklee.stornaut.investigation.machine-gate", "$machine_gate_max_bytes", '""'),
     ("StornautInvestigationMachineGateCoordinator", "com.eriklee.stornaut.investigation.machine-gate-coordinator", "$machine_coordinator_max_bytes", '""'),
 )
-if app.count("validate_closed_executable_artifact") != 3:
+if app.count("validate_closed_executable_artifact") != 5:
     raise SystemExit("ii-c-a role cardinality drifted")
 for product, identifier, maximum, service in roles:
     for marker in (f"Contents/MacOS/{product}", identifier, maximum, service):
         if marker not in app:
             raise SystemExit(f"ii-c-a role binding drifted: {product}: {marker}")
-for role in ("machineDriverIdentity={", "machineGateIdentity={", "machineCoordinatorIdentity={"):
+for role in ("appIdentity={", "helperIdentity={", "machineDriverIdentity={", "machineGateIdentity={", "machineCoordinatorIdentity={"):
     if app.count(role) != 1:
         raise SystemExit(f"ii-c-a role identity key drifted: {role}")
 if fixtures.count("validate_closed_app_artifacts") != 3:
@@ -2933,6 +2949,27 @@ function verify_iica_component_boundary() (
         fi
         local diagnostic_app="$diagnostic_derived_data/Build/Products/Debug/StornautInvestigationDiagnostic.app"
         local release_shell="$diagnostic_derived_data/Build/Products/Release/StornautInvestigationDiagnosticReleaseShell.app"
+        local helper helper_identifier helper_signature helper_load_commands
+        for helper in \
+            "$product_derived_data/Build/Products/Debug/Stornaut.app/Contents/MacOS/StornautLifecycleHelper" \
+            "$product_derived_data/Build/Products/Release/Stornaut.app/Contents/MacOS/StornautLifecycleHelper" \
+            "$diagnostic_app/Contents/MacOS/StornautLifecycleHelper"
+        do
+            [[ -f $helper && ! -L $helper ]] || exit 1
+            /usr/bin/codesign --verify --strict "$helper" || exit $?
+            helper_identifier=$(
+                /usr/bin/codesign -d --verbose=4 "$helper" 2>&1 \
+                    | /usr/bin/sed -n 's/^Identifier=//p'
+            )
+            helper_signature=$(
+                /usr/bin/codesign -d --verbose=4 "$helper" 2>&1 \
+                    | /usr/bin/sed -n 's/^Signature=//p'
+            )
+            [[ $helper_identifier == com.eriklee.stornaut.lifecycle.helper \
+                && $helper_signature == adhoc ]] || exit 1
+            helper_load_commands=$(/usr/bin/otool -l "$helper") || exit $?
+            [[ $helper_load_commands == *'__info_plist'* ]] || exit 1
+        done
         local inventory="$scratch/diagnostic-inventory" relative candidate
         find "$diagnostic_app" -type f -print0 | while IFS= read -r -d '' candidate; do
             if file "$candidate" 2>/dev/null | grep -q Mach-O; then

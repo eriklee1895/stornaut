@@ -171,6 +171,31 @@ struct InvestigationClosedMachineArtifactInstallerTests {
     }
 
     @Test
+    func lifecycleHelperEmbedsStableSigningIdentifierMetadata() throws {
+        let project = try source("Stornaut.xcodeproj/project.pbxproj")
+        for configuration in [
+            (id: "A00000000000000000000140", comment: "Debug"),
+            (id: "A00000000000000000000141", comment: "Release"),
+        ] {
+            let helper = try projectBlock(
+                id: configuration.id,
+                comment: configuration.comment,
+                in: project
+            )
+            #expect(helper.contains(
+                "CREATE_INFOPLIST_SECTION_IN_BINARY = YES;"
+            ))
+            #expect(helper.contains(
+                "CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;"
+            ))
+            #expect(helper.contains(
+                "PRODUCT_BUNDLE_IDENTIFIER = "
+                    + "com.eriklee.stornaut.lifecycle.helper;"
+            ))
+        }
+    }
+
+    @Test
     func installerAdmitsClosedMachineToolsAcrossAllPlanes() throws {
         let installer = try source("scripts/stornaut-r5-local-lifecycle")
         for marker in [
@@ -230,9 +255,24 @@ struct InvestigationClosedMachineArtifactInstallerTests {
         ).count == 2)
         #expect(artifact.contains("executable_size <= max_bytes"))
         #expect(artifact.contains("$expected_signing_identifier"))
+        #expect(app.contains("$app_max_bytes"))
+        #expect(app.contains("$helper_max_bytes"))
         #expect(app.components(
             separatedBy: "validate_closed_executable_artifact"
-        ).count == 4)
+        ).count == 6)
+        for executable in [
+            (
+                product: "StornautInvestigationDiagnostic",
+                identifier: "com.eriklee.stornaut"
+            ),
+            (
+                product: "StornautLifecycleHelper",
+                identifier: "com.eriklee.stornaut.lifecycle.helper"
+            ),
+        ] {
+            #expect(app.contains("Contents/MacOS/\(executable.product)"))
+            #expect(app.contains(executable.identifier))
+        }
         for tool in machineTools {
             #expect(app.contains("Contents/MacOS/\(tool.product)"))
             #expect(app.contains(tool.identifier))
@@ -245,6 +285,8 @@ struct InvestigationClosedMachineArtifactInstallerTests {
             "\"$machine_coordinator_max_bytes\" \"\""
         ))
         for role in [
+            "appIdentity",
+            "helperIdentity",
             "machineDriverIdentity",
             "machineGateIdentity",
             "machineCoordinatorIdentity",

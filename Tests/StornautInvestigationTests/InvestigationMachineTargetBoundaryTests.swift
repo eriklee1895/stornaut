@@ -4474,6 +4474,7 @@ struct InvestigationMachineTargetBoundaryTests {
         let combined = boundaries + release + contract
 
         for marker in [
+            "--iic-a-source-contract-only",
             "--iic-a-staged-scope-contract-only",
             "--iic-a-component-boundary-only",
             "--iic-a-contract-only",
@@ -4483,6 +4484,9 @@ struct InvestigationMachineTargetBoundaryTests {
             "7cf4db75a261895ba0c86b6876623daf900bb4db",
             "ii-c-a historical replay failed",
             "expected_diagnostic_mach_o_paths",
+            "helper_identifier == com.eriklee.stornaut.lifecycle.helper",
+            "helper_signature == adhoc",
+            "__info_plist",
             "StornautInvestigationMachineGateCoordinator",
             "@executable_path/../Frameworks",
             "Coordinator framework dependency is unresolved",
@@ -5378,11 +5382,29 @@ struct InvestigationMachineTargetBoundaryTests {
         #expect(install.contains("/bin/chmod -RN \"$staging_app\""))
 
         for product in [
+            "StornautInvestigationDiagnostic",
+            "StornautLifecycleHelper",
             "StornautInvestigationMachineDriver",
             "StornautInvestigationMachineGate",
             "StornautInvestigationMachineGateCoordinator",
         ] {
             #expect(closedApp.contains("Contents/MacOS/\(product)"))
+        }
+        for identifier in [
+            "com.eriklee.stornaut",
+            "com.eriklee.stornaut.lifecycle.helper",
+            "com.eriklee.stornaut.investigation.machine-driver",
+            "com.eriklee.stornaut.investigation.machine-gate",
+            "com.eriklee.stornaut.investigation.machine-gate-coordinator",
+        ] {
+            #expect(closedApp.contains(identifier))
+        }
+        for identity in [
+            "appIdentity={", "helperIdentity={",
+            "machineDriverIdentity={", "machineGateIdentity={",
+            "machineCoordinatorIdentity={",
+        ] {
+            #expect(installer.contains(identity))
         }
 
         #expect(built.contains("validate_closed_app_artifacts"))

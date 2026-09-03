@@ -573,12 +573,19 @@ private func sessionExists(_ sid: pid_t) throws -> Bool {
 }
 
 private func allPIDs() throws -> [pid_t] {
-    var values = [pid_t](repeating: 0, count: 4096)
-    let count = values.withUnsafeMutableBytes {
-        proc_listallpids($0.baseAddress, Int32($0.count))
+    var capacity = 4_096
+    while capacity <= 131_072 {
+        var values = [pid_t](repeating: 0, count: capacity)
+        let count = values.withUnsafeMutableBytes {
+            proc_listallpids($0.baseAddress, Int32($0.count))
+        }
+        guard count >= 0 else { throw posix("all PIDs") }
+        if count < capacity {
+            return values.prefix(Int(count)).filter { $0 > 1 }
+        }
+        capacity *= 2
     }
-    guard count >= 0, count < values.count else { throw posix("all PIDs") }
-    return values.prefix(Int(count)).filter { $0 > 1 }
+    throw TestError.invalid("all PIDs overflow")
 }
 
 private func readFrame(_ fd: Int32, _ deadline: UInt64) throws -> Data {

@@ -51,6 +51,56 @@ struct InvestigationMachineCoordinatorBindingSourceTests {
   }
 
   @Test
+  func asyncBindingSourceKeepsCodexResolutionFailureOutOfObservationReason()
+    async throws
+  {
+    let fixture = try CoordinatorBindingBehaviorFixture()
+    defer { fixture.remove() }
+    let observation = fixture.observation()
+    let provenance = try fixture.provenance()
+    let probe = CoordinatorObservationProbe([observation])
+    let source = InvestigationMachineCurrentSourceBindingSource(
+      buildProvenance: { provenance },
+      installedObservation: probe.next,
+      resolveCodexIdentity: { throw CocoaError(.fileReadUnknown) }
+    )
+
+    await #expect(throws: InvestigationMachineCoordinatorBindingSourceError
+      .invalidBinding) {
+        _ = try await source.make(
+          sourceFingerprint: fixture.sourceFingerprint()
+        )
+      }
+    #expect(probe.callCount == 1)
+  }
+
+  @Test
+  func bindingConstructionFailuresRemainProtocolFailures() throws {
+    let fixture = try CoordinatorBindingBehaviorFixture()
+    defer { fixture.remove() }
+    let provenance = try fixture.provenance()
+    let fingerprint = try fixture.sourceFingerprint()
+    let lease = try fixture.codexLease()
+
+    for observation in [
+      fixture.observation(
+        machineDriverSigningIdentifier: "foreign.machine-driver"
+      ),
+      fixture.observation(appBundleIdentifier: "foreign.app"),
+    ] {
+      #expect(throws: InvestigationMachineCoordinatorBindingSourceError
+        .invalidBinding) {
+          _ = try InvestigationMachineCurrentSourceBindingSource.make(
+            provenance: provenance,
+            sourceFingerprint: fingerprint,
+            observation: observation,
+            codexLease: lease
+          )
+        }
+    }
+  }
+
+  @Test
   func bindingSourceJoinsEveryAuthoritativeField() throws {
     let fixture = try CoordinatorBindingBehaviorFixture()
     defer { fixture.remove() }
@@ -389,7 +439,11 @@ private final class CoordinatorBindingBehaviorFixture {
     )
   }
   func observation(
-    appExecutableSHA256: String = String(repeating: "1", count: 64)
+    appExecutableSHA256: String = String(repeating: "1", count: 64),
+    appBundleIdentifier: String = "com.eriklee.stornaut",
+    machineDriverSigningIdentifier: String =
+      SignedInvestigationRuntimeMachineDriverBinding
+      .requiredSigningIdentifier
   ) -> InvestigationRuntimeDiagnosticBindingObservation {
     let app = URL(
       filePath:
@@ -405,7 +459,7 @@ private final class CoordinatorBindingBehaviorFixture {
       appExecutableName: "StornautInvestigationDiagnostic",
       appExecutableSHA256: appExecutableSHA256,
       helperExecutableSHA256: String(repeating: "2", count: 64),
-      appBundleIdentifier: "com.eriklee.stornaut",
+      appBundleIdentifier: appBundleIdentifier,
       helperSigningIdentifier:
         "com.eriklee.stornaut.lifecycle.helper",
       serviceIdentifier: "com.eriklee.stornaut.lifecycle",
@@ -414,9 +468,7 @@ private final class CoordinatorBindingBehaviorFixture {
       ),
       machineDriverExecutableSHA256:
         String(repeating: "3", count: 64),
-      machineDriverSigningIdentifier:
-        SignedInvestigationRuntimeMachineDriverBinding
-        .requiredSigningIdentifier,
+      machineDriverSigningIdentifier: machineDriverSigningIdentifier,
       machineDriverDesignatedRequirementSHA256:
         String(repeating: "4", count: 64),
       machineDriverCodeDirectoryHash:

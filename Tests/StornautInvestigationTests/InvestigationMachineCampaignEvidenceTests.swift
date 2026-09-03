@@ -17,6 +17,7 @@ struct InvestigationMachineCampaignEvidenceTests {
         let root = URL(filePath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
         let baseline = "51ea8c28b9431280bb0e8b7e6373e2e1ad538298"
+        let accepted = "d989328439a6fa07f437f12231fa87ddd4a358ec"
         let expected: [String: Int] = [
             "Sources/StornautInvestigationMachineCampaign/main.swift": 250,
             "Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignHarness.swift": 340,
@@ -31,7 +32,7 @@ struct InvestigationMachineCampaignEvidenceTests {
         let process = Process(), output = Pipe()
         process.executableURL = URL(filePath: "/usr/bin/git")
         process.currentDirectoryURL = root
-        process.arguments = ["diff", "--numstat", baseline, "--"]
+        process.arguments = ["diff", "--numstat", baseline, accepted, "--"]
         process.environment = ["HOME": "/var/empty", "PATH": "/usr/bin:/bin"]
         process.standardInput = FileHandle.nullDevice
         process.standardOutput = output
@@ -530,6 +531,45 @@ struct InvestigationMachineCampaignEvidenceTests {
             return
         }
         #expect(fingerprint.lowercaseHex == source.sourceFingerprintSHA256)
+    }
+
+    @Test
+    func coordinatorClassifiesNonObservationBindingFailureAsProtocolRejected()
+        async throws
+    {
+        let capture = PreArmFailureDispositionCapture()
+        let source = InvestigationMachineGateCoordinatorMaterializedSource(
+            sourceFingerprintSHA256: String(repeating: "1", count: 64))
+        let dependencies = InvestigationMachineGateCoordinatorDependencies(
+            validateInvocation: { .validated },
+            materializeSource: { _ in source },
+            makeBinding: { _ in
+                throw InvestigationMachineCoordinatorBindingSourceError
+                    .invalidBinding
+            },
+            makeConfigurations: { _, _ in throw PreArmFailureTestError.unexpected },
+            authorCohort: { _ in throw PreArmFailureTestError.unexpected },
+            handoff: { _ in throw PreArmFailureTestError.unexpected },
+            retireArtifacts: { _, _ in .retired },
+            makeReceipt: { _ in throw PreArmFailureTestError.unexpected },
+            writeClose: { await capture.record($0) },
+            monotonic: { 1 }, emitsPreArmFailure: true
+        )
+        do {
+            _ = try await InvestigationMachineGateCoordinatorComposition(
+                dependencies: dependencies).run()
+            Issue.record("expected typed pre-arm failure")
+        } catch {
+            #expect(InvestigationMachineGateCoordinatorSupport.status(for: error) == 81)
+        }
+        guard case let .failure(producer)? = await capture.disposition else {
+            Issue.record("expected one typed failure disposition")
+            return
+        }
+        let consumer = try InvestigationMachineCampaignPreArmFailureFrame.decode(
+            producer.encoded())
+        #expect(consumer.stage == .makeBinding)
+        #expect(consumer.reason == .protocolRejected)
     }
 
     @Test

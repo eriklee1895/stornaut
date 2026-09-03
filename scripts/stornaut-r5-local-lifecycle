@@ -10,6 +10,8 @@ else repo_root=${0:A:h:h}; action=${1:-}; expected_source_hashes=(); fi
 label="com.eriklee.stornaut.lifecycle"
 machine_claim_service="com.eriklee.stornaut.lifecycle.machine-claim"
 machine_driver_validation_token="I authorize one bounded disposable read-only Stornaut L3c3b-ii Machine driver validation."
+app_max_bytes=$((256 * 1024 * 1024))
+helper_max_bytes=$((256 * 1024 * 1024))
 machine_driver_max_bytes=$((16 * 1024 * 1024))
 machine_gate_max_bytes=$((64 * 1024 * 1024))
 machine_coordinator_max_bytes=$((64 * 1024 * 1024))
@@ -111,7 +113,7 @@ validate_closed_executable_identity() {
         com.eriklee.stornaut.investigation.machine-driver)
             [[ "$claim_service_identifier" == "$machine_claim_service" ]]
             ;;
-        com.eriklee.stornaut.investigation.machine-gate|com.eriklee.stornaut.investigation.machine-gate-coordinator)
+        com.eriklee.stornaut|com.eriklee.stornaut.lifecycle.helper|com.eriklee.stornaut.investigation.machine-gate|com.eriklee.stornaut.investigation.machine-gate-coordinator)
             [[ -z "$claim_service_identifier" ]]
             ;;
         *) return 1 ;;
@@ -260,10 +262,24 @@ validate_closed_app_artifacts() {
     local expected_group=$3
     local expected_identity=${4:-}
     local initial_app_node final_app_node
+    local app_identity helper_identity
     local driver_identity gate_identity coordinator_identity closed_identity
 
     exact_directory_metadata "$app" "$expected_owner" "$expected_group" 0755
     initial_app_node=$(/usr/bin/stat -f '%d:%i' "$app")
+    app_identity=$(
+        validate_closed_executable_artifact \
+            "$app/Contents/MacOS/StornautInvestigationDiagnostic" \
+            "$expected_owner" "$expected_group" \
+            com.eriklee.stornaut "$app_max_bytes" ""
+    )
+    helper_identity=$(
+        validate_closed_executable_artifact \
+            "$app/Contents/MacOS/StornautLifecycleHelper" \
+            "$expected_owner" "$expected_group" \
+            com.eriklee.stornaut.lifecycle.helper \
+            "$helper_max_bytes" ""
+    )
     driver_identity=$(
         validate_closed_executable_artifact \
             "$app/Contents/MacOS/StornautInvestigationMachineDriver" \
@@ -288,7 +304,13 @@ validate_closed_app_artifacts() {
     final_app_node=$(/usr/bin/stat -f '%d:%i' "$app")
     [[ "$final_app_node" == "$initial_app_node" ]]
     exact_directory_metadata "$app" "$expected_owner" "$expected_group" 0755
-    closed_identity="machineDriverIdentity={
+    closed_identity="appIdentity={
+$app_identity
+}
+helperIdentity={
+$helper_identity
+}
+machineDriverIdentity={
 $driver_identity
 }
 machineGateIdentity={

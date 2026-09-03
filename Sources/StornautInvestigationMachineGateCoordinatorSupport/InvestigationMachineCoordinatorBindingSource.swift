@@ -270,7 +270,7 @@
         codexLease = try await resolveCodexIdentity()
       } catch {
         throw InvestigationMachineCoordinatorBindingSourceError
-          .invalidInstalledObservation
+          .invalidBinding
       }
       let observation: InvestigationRuntimeDiagnosticBindingObservation
       do { observation = try installedObservation() } catch {
@@ -341,7 +341,7 @@
           )
       } catch {
         throw InvestigationMachineCoordinatorBindingSourceError
-          .invalidInstalledObservation
+          .invalidBinding
       }
       let binding = SignedInvestigationRuntimeBinding(
         repositoryHEAD: provenance.repositoryHEAD,
@@ -378,7 +378,7 @@
         )
       } catch {
         throw InvestigationMachineCoordinatorBindingSourceError
-          .invalidInstalledObservation
+          .invalidBinding
       }
       guard binding.isValid, observation.matches(binding),
         installedBinding.matches(binding),

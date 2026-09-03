@@ -129,7 +129,7 @@ package enum InvestigationMachineCampaignExecutable {
     private static let installedCoordinator="/Library/Application Support/Stornaut/Stornaut-R5-Diagnostic.app/Contents/MacOS/StornautInvestigationMachineGateCoordinator"
     private static let deadlineWindowNanoseconds: UInt64 = 5_000_000_000
     private static let productionDeadlineNanoseconds: UInt64 = 1_200_000_000_000
-    private static let lifecycleScriptSHA256 = "307ebc0b29078e53cc2d0c567a25cf359c6c852c9e8533b24bbb0d7e20553940"
+    private static let lifecycleScriptSHA256 = "8bf5ef3a35278937b574f95d97901113e133ef5ef334e71538636852326c3a07"
     private static let completedExitStatus: Int32 = 0
     private static let failedExitStatus: Int32 = 70
 
