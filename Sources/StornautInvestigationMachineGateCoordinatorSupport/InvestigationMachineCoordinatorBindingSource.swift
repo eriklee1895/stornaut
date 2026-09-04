@@ -17,6 +17,9 @@
     case machineDriverSigningUnavailable
     case signedBundleMetadataUnavailable
     case installedObservationChanged
+    case installationContractInvalid
+    case initialInstalledObservationInvalid
+    case finalInstalledObservationInvalid
     case sourceStateInvalid
     case codexIdentityUnavailable
     case codexLayoutInvalid
@@ -277,7 +280,9 @@
       let provenance = try buildProvenance()
       let initialObservation: InvestigationRuntimeDiagnosticBindingObservation
       do { initialObservation = try installedObservation() } catch {
-        throw Self.mapInstalledObservationError(error)
+        throw Self.mapInstalledObservationError(
+          error, fallback: .initialInstalledObservationInvalid
+        )
       }
       let codexLease: CodexNativeExecutableIdentityLease
       do {
@@ -315,7 +320,9 @@
       }
       let observation: InvestigationRuntimeDiagnosticBindingObservation
       do { observation = try installedObservation() } catch {
-        throw Self.mapInstalledObservationError(error)
+        throw Self.mapInstalledObservationError(
+          error, fallback: .finalInstalledObservationInvalid
+        )
       }
       guard observation == initialObservation else {
         throw InvestigationMachineCoordinatorBindingSourceError
@@ -330,12 +337,14 @@
     }
 
     private static func mapInstalledObservationError(
-      _ error: any Error
+      _ error: any Error,
+      fallback: InvestigationMachineCoordinatorBindingSourceError
     ) -> InvestigationMachineCoordinatorBindingSourceError {
       guard let error = error as?
         InvestigationRuntimeDiagnosticBindingObservationError
-      else { return .installedObservationInvalid }
+      else { return fallback }
       switch error {
+      case .installationContractInvalid: return .installationContractInvalid
       case .appSigningUnavailable: return .appSigningUnavailable
       case .helperSigningUnavailable: return .helperSigningUnavailable
       case .machineDriverSigningUnavailable:

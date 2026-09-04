@@ -1029,7 +1029,13 @@ package struct InvestigationRuntimeDiagnosticBindingObservation:
     }
 
     package static func installed() throws -> Self {
-        let contract = try LifecycleLocalInstallationContract()
+        let contract: LifecycleLocalInstallationContract
+        do {
+            contract = try LifecycleLocalInstallationContract()
+        } catch {
+            throw InvestigationRuntimeDiagnosticBindingObservationError
+                .installationContractInvalid
+        }
         let reader = LifecycleBundleSigningIdentityReader()
         return try installed(
             contract: contract,
@@ -1163,6 +1169,7 @@ package enum InvestigationRuntimeDiagnosticBindingObservationError:
     Sendable,
     Equatable
 {
+    case installationContractInvalid
     case appSigningUnavailable
     case helperSigningUnavailable
     case machineDriverSigningUnavailable

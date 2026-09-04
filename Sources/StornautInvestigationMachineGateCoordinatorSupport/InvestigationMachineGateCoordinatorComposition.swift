@@ -188,6 +188,8 @@ public enum InvestigationMachineGateCoordinatorSupport {
       case runtimeReceiptInvalid
       case machineDriverBindingInvalid, installedBindingInvalid
       case bindingJoinInvalid, bindingEncodingInvalid
+      case installationContractInvalid, initialInstalledObservationInvalid
+      case finalInstalledObservationInvalid
       package var expectedExitStatus: Int32 {
         self == .containmentUncertain ? 82 : 81
       }
@@ -265,6 +267,9 @@ public enum InvestigationMachineGateCoordinatorSupport {
            .runtimeReceiptInvalid,
            .machineDriverBindingInvalid, .installedBindingInvalid,
            .bindingJoinInvalid, .bindingEncodingInvalid:
+        return stage == .makeBinding
+      case .installationContractInvalid, .initialInstalledObservationInvalid,
+           .finalInstalledObservationInvalid:
         return stage == .makeBinding
       case .codexIdentityChanged:
         return stage == .makeBinding || stage == .makeConfigurations
@@ -884,6 +889,12 @@ public enum InvestigationMachineGateCoordinatorSupport {
           return .installedObservationChanged
         case .installedObservationInvalid:
           return .installedObservationInvalid
+        case .installationContractInvalid:
+          return .installationContractInvalid
+        case .initialInstalledObservationInvalid:
+          return .initialInstalledObservationInvalid
+        case .finalInstalledObservationInvalid:
+          return .finalInstalledObservationInvalid
         case .invalidSourceFingerprint, .sourceStateInvalid:
           return .sourceStateInvalid
         case .codexIdentityUnavailable:

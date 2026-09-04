@@ -321,6 +321,39 @@ struct InvestigationMachineCoordinatorBindingSourceTests {
   }
 
   @Test
+  func unknownInstalledObservationFailuresPreserveTheirPhase() async throws {
+    let fixture = try CoordinatorBindingBehaviorFixture()
+    defer { fixture.remove() }
+    let provenance = try fixture.provenance()
+    let lease = try fixture.codexLease()
+
+    let initial = CoordinatorAnyObservationResultProbe([
+      .failure(CocoaError(.fileReadUnknown)),
+    ])
+    let initialSource = InvestigationMachineCurrentSourceBindingSource(
+      buildProvenance: { provenance },
+      installedObservation: initial.next,
+      resolveCodexIdentity: { lease }
+    )
+    #expect(await Self.bindingSourceError(
+      initialSource, fingerprint: try fixture.sourceFingerprint()
+    ) == .initialInstalledObservationInvalid)
+
+    let final = CoordinatorAnyObservationResultProbe([
+      .success(fixture.observation()),
+      .failure(CocoaError(.fileReadUnknown)),
+    ])
+    let finalSource = InvestigationMachineCurrentSourceBindingSource(
+      buildProvenance: { provenance },
+      installedObservation: final.next,
+      resolveCodexIdentity: { lease }
+    )
+    #expect(await Self.bindingSourceError(
+      finalSource, fingerprint: try fixture.sourceFingerprint()
+    ) == .finalInstalledObservationInvalid)
+  }
+
+  @Test
   func asyncBindingSourcePreservesClosedCodexResolutionReason() async throws {
     let fixture = try CoordinatorBindingBehaviorFixture()
     defer { fixture.remove() }
@@ -998,6 +1031,38 @@ private final class CoordinatorObservationResultProbe: @unchecked Sendable {
       guard !values.isEmpty else { throw CocoaError(.fileReadUnknown) }
       callCount += 1
       return try values.removeFirst().get()
+    }
+  }
+}
+
+private final class CoordinatorAnyObservationResultProbe: @unchecked Sendable {
+  private enum Value {
+    case success(InvestigationRuntimeDiagnosticBindingObservation)
+    case failure(any Error)
+  }
+  private let lock = NSLock()
+  private var values: [Value]
+  private(set) var callCount = 0
+
+  init(_ values: [Result<
+    InvestigationRuntimeDiagnosticBindingObservation, CocoaError
+  >]) {
+    self.values = values.map { value in
+      switch value {
+      case .success(let observation): .success(observation)
+      case .failure(let error): .failure(error)
+      }
+    }
+  }
+
+  func next() throws -> InvestigationRuntimeDiagnosticBindingObservation {
+    try lock.withLock {
+      guard !values.isEmpty else { throw CocoaError(.fileReadUnknown) }
+      callCount += 1
+      switch values.removeFirst() {
+      case .success(let observation): return observation
+      case .failure(let error): throw error
+      }
     }
   }
 }

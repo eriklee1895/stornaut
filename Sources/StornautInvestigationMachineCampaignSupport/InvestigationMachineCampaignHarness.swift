@@ -234,6 +234,8 @@ package struct InvestigationMachineCampaignPreArmFailureFrame:
         case runtimeReceiptInvalid
         case machineDriverBindingInvalid, installedBindingInvalid
         case bindingJoinInvalid, bindingEncodingInvalid
+        case installationContractInvalid, initialInstalledObservationInvalid
+        case finalInstalledObservationInvalid
         package var expectedExitStatus: Int32 {
             self == .containmentUncertain ? 82 : 81
         }
@@ -266,6 +268,11 @@ package struct InvestigationMachineCampaignPreArmFailureFrame:
             case .installedBindingInvalid: "installedBindingInvalid"
             case .bindingJoinInvalid: "bindingJoinInvalid"
             case .bindingEncodingInvalid: "bindingEncodingInvalid"
+            case .installationContractInvalid: "installationContractInvalid"
+            case .initialInstalledObservationInvalid:
+                "initialInstalledObservationInvalid"
+            case .finalInstalledObservationInvalid:
+                "finalInstalledObservationInvalid"
             }
         }
     }
@@ -369,6 +376,9 @@ package struct InvestigationMachineCampaignPreArmFailureFrame:
              .runtimeReceiptInvalid,
              .machineDriverBindingInvalid, .installedBindingInvalid,
              .bindingJoinInvalid, .bindingEncodingInvalid:
+            return stage == .makeBinding
+        case .installationContractInvalid, .initialInstalledObservationInvalid,
+             .finalInstalledObservationInvalid:
             return stage == .makeBinding
         case .codexIdentityChanged:
             return stage == .makeBinding || stage == .makeConfigurations

@@ -616,6 +616,11 @@ struct InvestigationMachineCampaignEvidenceTests {
         (.installedBindingInvalid, .installedBindingInvalid),
         (.bindingJoinInvalid, .bindingJoinInvalid),
         (.bindingEncodingInvalid, .bindingEncodingInvalid),
+        (.installationContractInvalid, .installationContractInvalid),
+        (.initialInstalledObservationInvalid,
+         .initialInstalledObservationInvalid),
+        (.finalInstalledObservationInvalid,
+         .finalInstalledObservationInvalid),
     ])
     func coordinatorPreservesClosedMakeBindingReason(
         sourceError: InvestigationMachineCoordinatorBindingSourceError,
@@ -766,6 +771,9 @@ struct InvestigationMachineCampaignEvidenceTests {
                 .installedBindingInvalid,
                 .bindingJoinInvalid,
                 .bindingEncodingInvalid,
+                .installationContractInvalid,
+                .initialInstalledObservationInvalid,
+                .finalInstalledObservationInvalid,
             ]))
         #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
             .buildProvenanceRejected.expectedExitStatus == 81)
@@ -835,6 +843,12 @@ struct InvestigationMachineCampaignEvidenceTests {
             .bindingJoinInvalid.rawValue == 22)
         #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
             .bindingEncodingInvalid.rawValue == 23)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .installationContractInvalid.rawValue == 24)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .initialInstalledObservationInvalid.rawValue == 25)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .finalInstalledObservationInvalid.rawValue == 26)
         for producerReason in
             InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
                 .allCases
@@ -909,6 +923,9 @@ struct InvestigationMachineCampaignEvidenceTests {
         .installedBindingInvalid,
         .bindingJoinInvalid,
         .bindingEncodingInvalid,
+        .installationContractInvalid,
+        .initialInstalledObservationInvalid,
+        .finalInstalledObservationInvalid,
     ])
     func makeBindingReasonsRejectPostBindingCheckpoint(
         _ reason:
