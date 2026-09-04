@@ -179,7 +179,6 @@
         throw InvestigationMachineCoordinatorConfigurationSetError
           .invalidTemplatePlan
       }
-      let attemptRoot = attemptRoot.standardizedFileURL
       guard
         attemptRoot.isFileURL,
         attemptRoot.path.hasPrefix("/"),

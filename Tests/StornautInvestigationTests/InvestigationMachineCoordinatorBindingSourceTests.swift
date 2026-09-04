@@ -69,9 +69,15 @@ struct InvestigationMachineCoordinatorBindingSourceTests {
       )
     let fixture = try CoordinatorBindingBehaviorFixture()
     defer { fixture.remove() }
+    let attempt = try await InvestigationMachineGateCoordinatorOwnedAttempt
+      .materialize()
+    defer {
+      do { try attempt.retire() }
+      catch { Issue.record(error) }
+    }
     let lease = try await CodexNativeExecutableIdentitySource()
       .resolveInstalled()
-    let sourceFingerprint = try fixture.sourceFingerprint()
+    let sourceFingerprint = attempt.sourceFingerprint
     let current = try InvestigationMachineCurrentSourceBindingSource.make(
       provenance: fixture.provenance(),
       sourceFingerprint: sourceFingerprint,
@@ -90,7 +96,46 @@ struct InvestigationMachineCoordinatorBindingSourceTests {
     #expect(wrapper.sourceFingerprintSHA256
       == sourceFingerprint.hex)
     #expect(wrapper.signedBindingSHA256.utf8.count == 64)
+    let configurationSet = try await attempt.makeConfigurationSet(
+      currentSourceBinding: current
+    )
+    #expect(configurationSet.rows.count == 8)
     _ = builtMain
+  }
+
+  @Test
+  func productionAttemptRootBuildsTheEightConfigurationRows() async throws {
+    let fixture = try CoordinatorBindingBehaviorFixture()
+    defer { fixture.remove() }
+    let attempt = try await InvestigationMachineGateCoordinatorOwnedAttempt
+      .materialize()
+    defer {
+      do { try attempt.retire() }
+      catch { Issue.record(error) }
+    }
+    #expect(attempt.rootURL.path.hasPrefix("/private/var/folders/"))
+    #expect(
+      attempt.rootURL.standardizedFileURL.path
+        != attempt.rootURL.path
+    )
+
+    let currentSourceBinding = try InvestigationMachineCurrentSourceBindingSource
+      .make(
+        provenance: fixture.provenance(),
+        sourceFingerprint: attempt.sourceFingerprint,
+        observation: fixture.observation(),
+        codexLease: fixture.codexLease()
+      )
+    let configurationSet = try await attempt.makeConfigurationSet(
+      currentSourceBinding: currentSourceBinding
+    )
+
+    #expect(configurationSet.rows.count == 8)
+    #expect(configurationSet.rows.allSatisfy {
+      $0.configuration.diagnosticRootPath.hasPrefix(
+        attempt.rootURL.path + "/"
+      )
+    })
   }
 
   @Test
