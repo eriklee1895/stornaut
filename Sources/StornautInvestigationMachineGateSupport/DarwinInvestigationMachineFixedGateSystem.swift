@@ -8,6 +8,70 @@ import StornautInvestigationHandoffContract
 private func investigationMachineGateEnvironmentPointer()
     -> UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?>
 
+package struct InvestigationMachineKernelChildIdentity: Equatable, Sendable {
+    package let processID: pid_t
+    package let parentProcessID: pid_t
+    package let processGroupID: pid_t
+    package let sessionID: pid_t
+    package let startSeconds: UInt64
+    package let startMicroseconds: UInt64
+    package let status: UInt32
+}
+
+package enum InvestigationMachineKernelChildIdentityReader {
+    package static func read(
+        processID: pid_t
+    ) throws -> InvestigationMachineKernelChildIdentity {
+        guard processID > 1 else {
+            throw InvestigationMachineGateError.invalidObservation
+        }
+        // PROC_PIDTBSDINFO is denied with EPERM while Darwin holds the direct
+        // setuid sudo child in POSIX_SPAWN_START_SUSPENDED. KERN_PROC_PID
+        // exposes the topology and lifetime fields needed before continuation.
+        var information = kinfo_proc()
+        var size = MemoryLayout<kinfo_proc>.size
+        var mib = [CTL_KERN, KERN_PROC, KERN_PROC_PID, processID]
+        errno = 0
+        let status = mib.withUnsafeMutableBufferPointer { pointer in
+            sysctl(
+                pointer.baseAddress, u_int(pointer.count), &information,
+                &size, nil, 0
+            )
+        }
+        if status != 0 {
+            if errno == ESRCH {
+                throw InvestigationMachineGateError.invalidObservation
+            }
+            throw InvestigationMachineGateError.containmentUncertain
+        }
+        guard size != 0 else {
+            throw InvestigationMachineGateError.invalidObservation
+        }
+        guard
+            size == MemoryLayout<kinfo_proc>.size,
+            information.kp_proc.p_pid == processID,
+            information.kp_eproc.e_ppid > 1,
+            information.kp_eproc.e_pgid > 1,
+            information.kp_proc.p_starttime.tv_sec > 0,
+            information.kp_proc.p_starttime.tv_usec >= 0,
+            information.kp_proc.p_starttime.tv_usec < 1_000_000
+        else { throw InvestigationMachineGateError.containmentUncertain }
+        let sessionID = getsid(processID)
+        guard sessionID > 1 else {
+            throw InvestigationMachineGateError.containmentUncertain
+        }
+        return .init(
+            processID: processID,
+            parentProcessID: information.kp_eproc.e_ppid,
+            processGroupID: information.kp_eproc.e_pgid,
+            sessionID: sessionID,
+            startSeconds: UInt64(information.kp_proc.p_starttime.tv_sec),
+            startMicroseconds: UInt64(information.kp_proc.p_starttime.tv_usec),
+            status: UInt32(information.kp_proc.p_stat)
+        )
+    }
+}
+
 enum InvestigationMachineGateDeadlinePolicy {
     static let cleanupReserveNanoseconds: UInt64 = 5_000_000_000
 
@@ -1370,18 +1434,8 @@ private extension DarwinInvestigationMachineFixedGateSystem {
     }
 
     func processIsStopped(processID: pid_t) throws -> Bool {
-        var information = proc_bsdinfo()
-        let count = proc_pidinfo(
-            processID,
-            PROC_PIDTBSDINFO,
-            0,
-            &information,
-            Int32(MemoryLayout<proc_bsdinfo>.size)
-        )
-        guard count == MemoryLayout<proc_bsdinfo>.size else {
-            throw InvestigationMachineGateError.invalidObservation
-        }
-        return information.pbi_status == UInt32(SSTOP)
+        try InvestigationMachineKernelChildIdentityReader
+            .read(processID: processID).status == UInt32(SSTOP)
     }
 
     func waitForStoppedResolvedRootDriver(
@@ -1620,26 +1674,18 @@ private extension DarwinInvestigationMachineFixedGateSystem {
     }
 
     func observeChildIdentity(processID: pid_t) throws -> ChildIdentity {
-        var information = proc_bsdinfo()
-        let count = proc_pidinfo(
-            processID, PROC_PIDTBSDINFO, 0, &information,
-            Int32(MemoryLayout<proc_bsdinfo>.size)
-        )
+        let information = try InvestigationMachineKernelChildIdentityReader
+            .read(processID: processID)
         guard
-            count == MemoryLayout<proc_bsdinfo>.size,
-            information.pbi_pid == UInt32(processID),
-            information.pbi_ppid == UInt32(getpid()),
-            information.pbi_pgid
-                == UInt32(state.recoveryProcessGroupID ?? -1),
-            getsid(processID) == state.sessionID,
-            information.pbi_start_tvsec > 0,
-            information.pbi_start_tvusec < 1_000_000
+            information.parentProcessID == getpid(),
+            information.processGroupID == state.recoveryProcessGroupID,
+            information.sessionID == state.sessionID
         else { throw containment() }
         return .init(
             processID: processID, parentProcessID: getpid(),
             processGroupID: state.recoveryProcessGroupID ?? -1,
-            startSeconds: UInt64(information.pbi_start_tvsec),
-            startMicroseconds: UInt64(information.pbi_start_tvusec),
+            startSeconds: information.startSeconds,
+            startMicroseconds: information.startMicroseconds,
             sessionID: state.sessionID ?? -1
         )
     }
@@ -1650,13 +1696,8 @@ private extension DarwinInvestigationMachineFixedGateSystem {
     }
 
     func childIsStopped(processID: pid_t) throws -> Bool {
-        var information = proc_bsdinfo()
-        let count = proc_pidinfo(
-            processID, PROC_PIDTBSDINFO, 0, &information,
-            Int32(MemoryLayout<proc_bsdinfo>.size)
-        )
-        return count == MemoryLayout<proc_bsdinfo>.size
-            && information.pbi_status == UInt32(SSTOP)
+        try InvestigationMachineKernelChildIdentityReader
+            .read(processID: processID).status == UInt32(SSTOP)
     }
 
     func consumeAndForwardPendingSignal() throws {

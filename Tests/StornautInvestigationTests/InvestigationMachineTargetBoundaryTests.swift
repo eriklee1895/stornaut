@@ -79,6 +79,46 @@ struct InvestigationMachineTargetBoundaryTests {
     }
 
     @Test
+    func iiCCSuspendedSudoRepairPinsRestrictedAPIReplacement() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-boundaries"), encoding: .utf8)
+        let contract = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+
+        for marker in [
+            "--iic-c-suspended-sudo-contract-only",
+            "function verify_iicc_suspended_sudo_contract()",
+            "KERN_PROC_PID",
+            "ii-c-c suspended-sudo restricted API returned",
+            "ii-c-c suspended-sudo fixture can continue child",
+            "realSudoSuspendedChildRemainsContainedBeforeAnyCredentialPrompt",
+            "kernelProcessIdentityReadsSuspendedSetuidChildWhenProcPidinfoCannot",
+        ] {
+            #expect(boundary.contains(marker), "missing: \(marker)")
+        }
+        for marker in [
+            "suspended-sudo-kernel-selector",
+            "suspended-sudo-start-time",
+            "suspended-sudo-continuation",
+            "suspended-sudo-output-vacuity",
+        ] {
+            #expect(contract.contains(marker), "missing: \(marker)")
+        }
+        let release = try String(contentsOf: root.appending(
+            path: "scripts/verify-app-release-boundaries"), encoding: .utf8)
+        for marker in [
+            "--iic-c-suspended-sudo-component-boundary-only",
+            "function verify_iicc_suspended_sudo_component_boundary()",
+            "InvestigationMachineKernelChildIdentityReader",
+            "ii-c-c suspended-sudo Gate gained authority",
+        ] {
+            #expect(release.contains(marker), "missing: \(marker)")
+        }
+    }
+
+    @Test
     func rootDriverLineageCrossUIDVerifierPinsCommittedRepair() throws {
         let root = URL(filePath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
@@ -1657,8 +1697,8 @@ struct InvestigationMachineTargetBoundaryTests {
             "ii-c0b-iii-2a Debug Gate positive control is missing",
             "ii-c0b-iii-2a Release Gate positive control is missing", "ii-c0b-iii-2a forbidden namespace or receipt domain leaked into a closed image",
             "ii-c0b-iii-2a exact projection drifted",
-            "512c8ea1fbd27b9df403a5db438ba3352aa2e6ebb2a9cdcaf877cf27cc73bc15",
-            "42a692726b9e81a3657e9c730288e5d183374ca69d26dee67fad1de960c76202",
+            "1b5cebd41795ac751c13f8bbf921b9947b09844293c5cd5d5e3f3bbdd136f74d",
+            "142b8cbec2040d67eb51f7499761186da50826d2b91acb7daa4bca29439eb527",
         ] {
             #expect(release.contains(marker))
         }

@@ -8,6 +8,72 @@ import Testing
 @Suite("Investigation machine gate physical evidence", .serialized)
 struct InvestigationMachineGatePhysicalTests {
     @Test
+    func realSudoSuspendedChildRemainsContainedBeforeAnyCredentialPrompt() throws {
+        try #require(geteuid() != 0)
+        let report = try SuspendedSudoProbe.run()
+
+        #expect(report.spawnStatus == 0)
+        #expect(report.childProcessID > 1)
+        #expect(report.firstIdentity == report.secondIdentity)
+        #expect(report.firstIdentity == report.thirdIdentity)
+        #expect(report.firstIdentity == nil)
+        #expect(report.firstIdentityErrno == EPERM)
+        #expect(report.secondIdentityErrno == EPERM)
+        #expect(report.thirdIdentityErrno == EPERM)
+        #expect(report.firstKernelIdentity == report.secondKernelIdentity)
+        #expect(report.firstKernelIdentity == report.thirdKernelIdentity)
+        #expect(report.firstKernelIdentity?.parentProcessID == report.gateProcessID)
+        #expect(report.firstKernelIdentity?.processGroupID == report.recoveryProcessGroupID)
+        #expect(report.firstKernelIdentity?.sessionID == report.coordinatorSessionID)
+        #expect(report.initialWaitProcessID == report.childProcessID)
+        #expect(report.rawInitialWaitStatus == 0x7f)
+        #expect(report.gateJoinStatus == 0)
+        #expect(report.gateJoinErrno == 0)
+        #expect(report.gateProcessGroupAfterJoin == report.coordinatorProcessGroupID)
+        #expect(report.childProcessGroupAfterJoin == report.recoveryProcessGroupID)
+        #expect(report.childSessionAfterJoin == report.coordinatorSessionID)
+        #expect(report.exactKillStatus == 0)
+        #expect(report.exactKillErrno == 0)
+        #expect(report.exactReapProcessID == report.childProcessID)
+        #expect(report.exactReapStatus.map(PhysicalFixture.signaled) == SIGKILL)
+        #expect(report.recoveryGroupMembersAfterReap.isEmpty)
+        #expect(report.capturedOutputByteCount == 0)
+        #expect(report.capturedTerminalByteCount == 0)
+    }
+
+    @Test
+    func kernelProcessIdentityReadsSuspendedSetuidChildWhenProcPidinfoCannot()
+        throws
+    {
+        try #require(geteuid() != 0)
+        let observation = try ProductionKernelChildIdentityProbe.run()
+        #expect(observation.procPIDInfoErrno == EPERM)
+        #expect(observation.first == observation.second)
+        #expect(observation.first.processID == observation.childProcessID)
+        #expect(observation.first.parentProcessID == getpid())
+        #expect(observation.first.processGroupID == getpgrp())
+        #expect(observation.first.sessionID == getsid(0))
+        #expect(observation.first.status == UInt32(SSTOP))
+        #expect(observation.rawInitialWaitStatus == 0x7f)
+        #expect(observation.exactReapStatus.map(PhysicalFixture.signaled) == SIGKILL)
+
+        // If the numeric PID was immediately reused, the lifetime tuple must
+        // differ; otherwise the reader must report that the child is absent.
+        do {
+            let replacement = try InvestigationMachineKernelChildIdentityReader
+                .read(processID: observation.childProcessID)
+            #expect(replacement.processID == observation.childProcessID)
+            #expect(
+                replacement.startSeconds != observation.first.startSeconds
+                    || replacement.startMicroseconds
+                        != observation.first.startMicroseconds
+            )
+        } catch let error as InvestigationMachineGateError {
+            #expect(error == .invalidObservation)
+        }
+    }
+
+    @Test
     func normalRecoveryGroupHandoffBindsDescriptorsAndRestoresTTY() throws {
         try #require(geteuid() != 0)
         let fixture = try PhysicalFixture.make()
@@ -184,6 +250,322 @@ struct InvestigationMachineGatePhysicalTests {
         #expect(report.recoveryGroupEmpty)
         #expect(report.foregroundRestored)
         #expect(report.foregroundAfterCompletion == report.coordinatorProcessGroupID)
+    }
+}
+
+private struct SuspendedSudoProbeIdentity: Codable, Equatable {
+    let processID: pid_t
+    let parentProcessID: pid_t
+    let processGroupID: pid_t
+    let sessionID: pid_t
+    let startSeconds: UInt64
+    let startMicroseconds: UInt64
+    let status: UInt32
+}
+
+private struct SuspendedSudoProbeReport: Codable {
+    let coordinatorProcessID: pid_t
+    let coordinatorProcessGroupID: pid_t
+    let coordinatorSessionID: pid_t
+    let gateProcessID: pid_t
+    let recoveryProcessGroupID: pid_t
+    let foregroundProcessGroupID: pid_t
+    let spawnStatus: Int32
+    let childProcessID: pid_t
+    let firstIdentity: SuspendedSudoProbeIdentity?
+    let firstIdentityErrno: Int32
+    let secondIdentity: SuspendedSudoProbeIdentity?
+    let secondIdentityErrno: Int32
+    let firstKernelIdentity: SuspendedSudoProbeIdentity?
+    let firstKernelIdentityErrno: Int32
+    let secondKernelIdentity: SuspendedSudoProbeIdentity?
+    let secondKernelIdentityErrno: Int32
+    let initialWaitProcessID: pid_t
+    let rawInitialWaitStatus: Int32?
+    let thirdIdentity: SuspendedSudoProbeIdentity?
+    let thirdIdentityErrno: Int32
+    let thirdKernelIdentity: SuspendedSudoProbeIdentity?
+    let thirdKernelIdentityErrno: Int32
+    let gateJoinStatus: Int32
+    let gateJoinErrno: Int32
+    let gateProcessGroupAfterJoin: pid_t
+    let childProcessGroupAfterJoin: pid_t
+    let childSessionAfterJoin: pid_t
+    let exactKillStatus: Int32
+    let exactKillErrno: Int32
+    let exactReapProcessID: pid_t
+    let exactReapStatus: Int32?
+    let recoveryGroupMembersAfterReap: [pid_t]
+    let capturedOutputByteCount: Int
+    let capturedTerminalByteCount: Int
+    enum CodingKeys: String, CodingKey {
+        case coordinatorProcessID, coordinatorProcessGroupID
+        case coordinatorSessionID, gateProcessID, recoveryProcessGroupID
+        case foregroundProcessGroupID, spawnStatus, childProcessID
+        case firstIdentity, firstIdentityErrno, secondIdentity
+        case secondIdentityErrno, firstKernelIdentity
+        case firstKernelIdentityErrno, secondKernelIdentity
+        case secondKernelIdentityErrno, initialWaitProcessID
+        case rawInitialWaitStatus, thirdIdentity, thirdIdentityErrno
+        case thirdKernelIdentity, thirdKernelIdentityErrno
+        case gateJoinStatus, gateJoinErrno
+        case gateProcessGroupAfterJoin, childProcessGroupAfterJoin
+        case childSessionAfterJoin, exactKillStatus, exactKillErrno
+        case exactReapProcessID, exactReapStatus
+        case recoveryGroupMembersAfterReap, capturedOutputByteCount
+        case capturedTerminalByteCount
+    }
+}
+
+private enum SuspendedSudoProbe {
+    static func run() throws -> SuspendedSudoProbeReport {
+        let root = URL(filePath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = root.appending(
+            path: "Tests/Fixtures/InvestigationMachineSuspendedSudoProbe/main.swift"
+        )
+        let directory = FileManager.default.temporaryDirectory.appending(
+            path: "stornaut-suspended-sudo-probe-\(UUID().uuidString)",
+            directoryHint: .isDirectory
+        )
+        try FileManager.default.createDirectory(
+            at: directory, withIntermediateDirectories: false
+        )
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let executable = directory.appending(path: "suspended-sudo-probe")
+        let compiler = Process()
+        compiler.executableURL = URL(filePath: "/usr/bin/xcrun")
+        compiler.arguments = [
+            "swiftc", "-parse-as-library", source.path, "-o", executable.path,
+        ]
+        compiler.environment = [:]
+        let compilerError = Pipe()
+        compiler.standardOutput = FileHandle.nullDevice
+        compiler.standardError = compilerError
+        try compiler.run()
+        compiler.waitUntilExit()
+        guard compiler.terminationStatus == 0 else {
+            throw TestError.invalid(
+                "suspended sudo probe compile failed: "
+                    + String(
+                        decoding: compilerError.fileHandleForReading.readDataToEndOfFile(),
+                        as: UTF8.self
+                    )
+            )
+        }
+
+        var pipeFD: [Int32] = [-1, -1]
+        guard pipe(&pipeFD) == 0 else { throw posix("probe result pipe") }
+        defer {
+            if pipeFD[0] >= 0 { _ = close(pipeFD[0]) }
+            if pipeFD[1] >= 0 { _ = close(pipeFD[1]) }
+        }
+        try cloexec(pipeFD[0])
+        try cloexec(pipeFD[1])
+        var actions: posix_spawn_file_actions_t?
+        guard posix_spawn_file_actions_init(&actions) == 0 else {
+            throw TestError.invalid("probe actions init")
+        }
+        defer { posix_spawn_file_actions_destroy(&actions) }
+        guard
+            posix_spawn_file_actions_addinherit_np(&actions, STDIN_FILENO) == 0,
+            posix_spawn_file_actions_adddup2(
+                &actions, pipeFD[1], STDOUT_FILENO
+            ) == 0,
+            posix_spawn_file_actions_adddup2(
+                &actions, pipeFD[1], STDERR_FILENO
+            ) == 0,
+            posix_spawn_file_actions_addclose(&actions, pipeFD[0]) == 0,
+            posix_spawn_file_actions_addclose(&actions, pipeFD[1]) == 0
+        else { throw TestError.invalid("probe actions") }
+        var attributes: posix_spawnattr_t?
+        guard posix_spawnattr_init(&attributes) == 0 else {
+            throw TestError.invalid("probe attributes init")
+        }
+        defer { posix_spawnattr_destroy(&attributes) }
+        guard posix_spawnattr_setflags(
+            &attributes, Int16(POSIX_SPAWN_CLOEXEC_DEFAULT)
+        ) == 0 else { throw TestError.invalid("probe attributes") }
+        var processID: pid_t = 0
+        let spawnStatus = try cStrings([executable.path]) { arguments in
+            try cStrings([]) { environment in
+                executable.path.withCString { path in
+                    posix_spawn(
+                        &processID, path, &actions, &attributes,
+                        arguments, environment
+                    )
+                }
+            }
+        }
+        guard spawnStatus == 0, processID > 1 else {
+            throw TestError.posix("spawn suspended sudo probe", spawnStatus)
+        }
+        _ = close(pipeFD[1])
+        pipeFD[1] = -1
+        let deadline = try add(try now(), 8_000_000_000)
+        var reaped = false
+        defer {
+            if !reaped {
+                _ = kill(processID, SIGKILL)
+            }
+        }
+        do {
+            let data = try readExactProcessOutput(
+                pipeFD[0], processID: processID, deadline: deadline
+            )
+            _ = close(pipeFD[0])
+            pipeFD[0] = -1
+            let status = try waitProcess(processID, deadline)
+            reaped = true
+            guard !(try sessionExists(processID)) else {
+                throw TestError.invalid("suspended sudo probe session survived")
+            }
+            guard PhysicalFixture.exited(status) == 0 else {
+                throw TestError.invalid(
+                    "suspended sudo probe failed: "
+                        + String(decoding: data, as: UTF8.self)
+                )
+            }
+            return try JSONDecoder().decode(
+                SuspendedSudoProbeReport.self, from: data
+            )
+        } catch {
+            try killProbeSession(
+                processID, try add(try now(), 2_000_000_000)
+            )
+            reaped = true
+            throw error
+        }
+    }
+}
+
+private struct ProductionKernelChildIdentityObservation {
+    let childProcessID: pid_t
+    let procPIDInfoErrno: Int32
+    let first: InvestigationMachineKernelChildIdentity
+    let second: InvestigationMachineKernelChildIdentity
+    let rawInitialWaitStatus: Int32
+    let exactReapStatus: Int32?
+}
+
+private enum ProductionKernelChildIdentityProbe {
+    static func run() throws -> ProductionKernelChildIdentityObservation {
+        var output: [Int32] = [-1, -1]
+        guard pipe(&output) == 0 else { throw posix("production probe pipe") }
+        defer {
+            if output[0] >= 0 { _ = close(output[0]) }
+            if output[1] >= 0 { _ = close(output[1]) }
+        }
+        try cloexec(output[0])
+        try cloexec(output[1])
+
+        var actions: posix_spawn_file_actions_t?
+        guard posix_spawn_file_actions_init(&actions) == 0 else {
+            throw TestError.invalid("production probe actions init")
+        }
+        defer { posix_spawn_file_actions_destroy(&actions) }
+        guard
+            posix_spawn_file_actions_addinherit_np(
+                &actions, STDIN_FILENO
+            ) == 0,
+            posix_spawn_file_actions_adddup2(
+                &actions, output[1], STDOUT_FILENO
+            ) == 0,
+            posix_spawn_file_actions_addinherit_np(
+                &actions, STDERR_FILENO
+            ) == 0,
+            posix_spawn_file_actions_addclose(&actions, output[0]) == 0,
+            posix_spawn_file_actions_addclose(&actions, output[1]) == 0
+        else { throw TestError.invalid("production probe actions") }
+
+        var attributes: posix_spawnattr_t?
+        guard posix_spawnattr_init(&attributes) == 0 else {
+            throw TestError.invalid("production probe attributes init")
+        }
+        defer { posix_spawnattr_destroy(&attributes) }
+        var childMask = sigset_t()
+        var childDefaults = sigset_t()
+        guard
+            sigemptyset(&childMask) == 0,
+            sigemptyset(&childDefaults) == 0,
+            (InvestigationMachineFixedGateContract.forwardedSignals
+                + [SIGTTOU, SIGTTIN, SIGTSTP, SIGPIPE]).allSatisfy({ signal in
+                    sigaddset(&childDefaults, signal) == 0
+                }),
+            posix_spawnattr_setflags(
+                &attributes,
+                InvestigationMachineFixedGateContract.childSpawnFlags
+            ) == 0,
+            posix_spawnattr_setsigmask(&attributes, &childMask) == 0,
+            posix_spawnattr_setsigdefault(&attributes, &childDefaults) == 0
+        else { throw TestError.invalid("production probe attributes") }
+
+        var child: pid_t = 0
+        let spawnStatus = try cStrings(
+            InvestigationMachineFixedGateContract.arguments
+        ) { arguments in
+            try cStrings(
+                InvestigationMachineFixedGateContract.environment
+            ) { environment in
+                InvestigationMachineFixedGateContract.launcherPath.withCString {
+                    posix_spawn(
+                        &child, $0, &actions, &attributes, arguments, environment
+                    )
+                }
+            }
+        }
+        guard spawnStatus == 0, child > 1 else {
+            throw TestError.posix("production suspended sudo spawn", spawnStatus)
+        }
+        _ = close(output[1])
+        output[1] = -1
+        var reaped = false
+        defer {
+            if !reaped {
+                _ = kill(child, SIGKILL)
+                while waitpid(child, nil, 0) < 0, errno == EINTR {}
+            }
+        }
+
+        var restricted = proc_bsdinfo()
+        errno = 0
+        let restrictedBytes = proc_pidinfo(
+            child, PROC_PIDTBSDINFO, 0, &restricted,
+            Int32(MemoryLayout<proc_bsdinfo>.size)
+        )
+        let restrictedErrno = restrictedBytes == 0 ? errno : 0
+        let first = try InvestigationMachineKernelChildIdentityReader.read(
+            processID: child
+        )
+        let second = try InvestigationMachineKernelChildIdentityReader.read(
+            processID: child
+        )
+        let deadline = try add(try now(), 2_000_000_000)
+        var initialStatus: Int32 = 0
+        while true {
+            let result = waitpid(child, &initialStatus, WUNTRACED | WNOHANG)
+            if result == child { break }
+            if result < 0, errno != EINTR { throw posix("production initial stop") }
+            guard try now() < deadline else {
+                throw TestError.timeout("production initial stop")
+            }
+            usleep(10_000)
+        }
+        guard kill(child, SIGKILL) == 0 else {
+            throw posix("production exact child kill")
+        }
+        var terminalStatus: Int32 = 0
+        while waitpid(child, &terminalStatus, 0) < 0 {
+            if errno != EINTR { throw posix("production exact child reap") }
+        }
+        reaped = true
+        return .init(
+            childProcessID: child, procPIDInfoErrno: restrictedErrno,
+            first: first, second: second,
+            rawInitialWaitStatus: initialStatus,
+            exactReapStatus: terminalStatus
+        )
     }
 }
 
@@ -568,6 +950,39 @@ private func cleanupSession(_ sid: pid_t, _ deadline: UInt64) throws {
     _ = try? waitProcess(sid, deadline)
 }
 
+private func killProbeSession(_ sid: pid_t, _ deadline: UInt64) throws {
+    var groups = Set<pid_t>()
+    for pid in try allPIDs() where getsid(pid) == sid {
+        let group = getpgid(pid)
+        if group > 1 { groups.insert(group) }
+    }
+    for group in groups {
+        errno = 0
+        guard kill(-group, SIGKILL) == 0 || errno == ESRCH else {
+            throw posix("kill probe group")
+        }
+    }
+    errno = 0
+    guard kill(sid, SIGKILL) == 0 || errno == ESRCH else {
+        throw posix("kill probe coordinator")
+    }
+    var status: Int32 = 0
+    while try now() < deadline {
+        errno = 0
+        let value = waitpid(sid, &status, WNOHANG)
+        if value == sid || (value < 0 && errno == ECHILD) { break }
+        if value == 0 || (value < 0 && errno == EINTR) {
+            usleep(10_000)
+            continue
+        }
+        throw posix("reap probe coordinator")
+    }
+    while try now() < deadline, try sessionExists(sid) { usleep(10_000) }
+    guard !(try sessionExists(sid)) else {
+        throw TestError.timeout("probe session cleanup")
+    }
+}
+
 private func sessionExists(_ sid: pid_t) throws -> Bool {
     try allPIDs().contains { getsid($0) == sid }
 }
@@ -611,6 +1026,31 @@ private func readExact(_ fd: Int32, _ count: Int, _ deadline: UInt64) throws -> 
         throw posix("read")
     }
     return result
+}
+
+private func readExactProcessOutput(
+    _ fd: Int32, processID: pid_t, deadline: UInt64
+) throws -> Data {
+    var result = Data()
+    while try now() < deadline {
+        var item = pollfd(fd: fd, events: Int16(POLLIN | POLLHUP), revents: 0)
+        let polled = poll(&item, 1, 50)
+        if polled == 0 { continue }
+        if polled < 0, errno == EINTR { continue }
+        guard polled > 0, item.revents & Int16(POLLERR | POLLNVAL) == 0 else {
+            throw posix("probe result poll")
+        }
+        var bytes = [UInt8](repeating: 0, count: 4096)
+        let amount = read(fd, &bytes, bytes.count)
+        if amount > 0 {
+            result.append(contentsOf: bytes.prefix(amount))
+            continue
+        }
+        if amount == 0 { return result }
+        if errno != EINTR { throw posix("probe result read") }
+    }
+    _ = kill(processID, SIGKILL)
+    throw TestError.timeout("probe result")
 }
 
 private func waitProcess(_ pid: pid_t, _ deadline: UInt64) throws -> Int32 {

@@ -103,8 +103,15 @@
 > no finding. The pre-arm failure diagnostic prerequisite is complete at
 > `2ada395` / tree `11e1a0a`; its bounded typed failure receipt, physical
 > compact-frame path, exact nine-path scope and negative mutation closure have
-> no unresolved P0-P2. The current frontier is strictly the ii-c-c unique real machine
-> campaign, L3c3d and L3c4. These
+> no unresolved P0-P2. The ii-c-c v8 machine campaign reached
+> `prepared -> armedConsumed -> spawnUncertain` before any Gate prepared
+> receipt, credential prompt or Machine driver. A non-root production-shaped
+> probe isolated `PROC_PIDTBSDINFO` returning `EPERM` for the suspended setuid
+> sudo child; current Gate observation now uses `KERN_PROC_PID` while preserving
+> exact lifetime/topology/stop checks. Focused, 1,924-test serial, source/
+> mutation, Debug/Release component and independent review gates are green; v8
+> was not retried. Current frontier is v8 failure-evidence/recovery disposition,
+> L3c3d and L3c4. These
 > repairs are machine-campaign prerequisite checkpoints, not new Tasks. The authoritative
 > real-model run and readiness verdict remain unimplemented.
 > Production Deep Dive remains unavailable until Task 44 admission.

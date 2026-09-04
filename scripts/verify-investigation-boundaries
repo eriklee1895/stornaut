@@ -353,6 +353,8 @@ iicc_source_mutation_slot=
 iicc_source_mutation_sha=
 iicc_scope_contract_only=false
 iicc_scope_baseline=622e7b99d57dfe482ccd37481fcdb4dcff87a0ec
+iicc_suspended_sudo_contract_only=false
+iicc_suspended_sudo_sources=()
 iicc_prearm_scope_contract_only=false
 iicc_prearm_scope_baseline=62ee47091e338107e182233eaed80ed1ecc059cc
 prearm_failure_source_contract_only=false
@@ -976,6 +978,10 @@ if (( $# > 0 )); then
         && [[ $1 == --iic-c-staged-scope-contract-only ]]; then
         iicc_scope_contract_only=true
         iicc_scope_baseline=${2:-622e7b99d57dfe482ccd37481fcdb4dcff87a0ec}
+    elif (( $# == 1 || $# == 5 )) \
+        && [[ $1 == --iic-c-suspended-sudo-contract-only ]]; then
+        iicc_suspended_sudo_contract_only=true
+        iicc_suspended_sudo_sources=("${@:2}")
     elif (( $# == 1 || $# == 2 )) \
         && [[ $1 == --iic-c-prearm-staged-scope-contract-only ]]; then
         iicc_prearm_scope_contract_only=true
@@ -12486,6 +12492,149 @@ for marker in ("validate_json_artifacts","event evidence set drift","FD 3 frame 
 PY
 }
 
+function verify_iicc_suspended_sudo_contract() {
+    local -a p=("${iicc_suspended_sudo_sources[@]}")
+    if (( ${#p} == 0 )); then p=(
+        Sources/StornautInvestigationMachineGateSupport/InvestigationMachineGateTransport.swift
+        Sources/StornautInvestigationMachineGateSupport/DarwinInvestigationMachineFixedGateSystem.swift
+        Tests/Fixtures/InvestigationMachineSuspendedSudoProbe/main.swift
+        Tests/StornautInvestigationTests/InvestigationMachineGatePhysicalTests.swift
+    ); fi
+    (( ${#p} == 4 )) || {
+        print -u2 "ii-c-c suspended-sudo source cardinality drifted"
+        return 1
+    }
+    local source
+    for source in "${p[@]}"; do
+        [[ -f $source && ! -L $source ]] || {
+            print -u2 "ii-c-c suspended-sudo source unavailable: $source"
+            return 1
+        }
+        /usr/bin/xcrun swiftc -frontend -parse -enable-bare-slash-regex "$source" \
+            || return $?
+    done
+    /usr/bin/python3 -I - "${p[@]}" <<'PY'
+from pathlib import Path
+import sys
+if len(sys.argv) != 5:
+    raise SystemExit("ii-c-c suspended-sudo source cardinality drifted")
+transport, darwin, fixture, tests = (
+    Path(value).read_text(encoding="utf-8") for value in sys.argv[1:]
+)
+expected_sha256 = (
+    "30c1abadb746c70b89c846058da0558368d76285bf5cbfc348b86ed13b41a2a4",
+    "7835888badd696951da85d82e3cb79f5736ea6fe4028a0b433a6ed8605d0a406",
+    "d0bc9bc33f24f3eaa30440fafa4cda530568de9d754478c279014f41ec9b43fd",
+    "b9128269b2298733ce156241376051da6fdf05ee4e66bd4a7f37fc619a6e79f5",
+)
+for path, expected in zip(map(Path, sys.argv[1:]), expected_sha256):
+    if __import__("hashlib").sha256(path.read_bytes()).hexdigest() != expected:
+        raise SystemExit("ii-c-c suspended-sudo exact source seal drifted")
+def swift_code(source):
+    output=[]; index=0; block=0
+    while index < len(source):
+        if block:
+            if source.startswith("/*", index): block += 1; index += 2
+            elif source.startswith("*/", index): block -= 1; index += 2
+            else:
+                output.append("\n" if source[index] == "\n" else " ")
+                index += 1
+            continue
+        if source.startswith("//", index):
+            end=source.find("\n", index)
+            if end < 0: output.extend(" " * (len(source)-index)); break
+            output.extend(" " * (end-index)); index=end; continue
+        if source.startswith("/*", index):
+            block=1; output.extend("  " ); index += 2; continue
+        if source[index] == '"':
+            output.append(" " ); index += 1
+            while index < len(source):
+                char=source[index]
+                output.append("\n" if char == "\n" else " ")
+                index += 1
+                if char == "\\" and index < len(source):
+                    output.append(" " ); index += 1
+                elif char == '"': break
+            continue
+        output.append(source[index]); index += 1
+    if block: raise SystemExit("ii-c-c suspended-sudo unterminated comment")
+    return "".join(output)
+darwin_code=swift_code(darwin); fixture_code=swift_code(fixture); tests_code=swift_code(tests)
+for marker in (
+    "package static let launcherPath = \"/usr/bin/sudo\"",
+    "POSIX_SPAWN_START_SUSPENDED",
+    "package static let environment: [String] = []",
+):
+    if transport.count(marker) != 1:
+        raise SystemExit("ii-c-c suspended-sudo fixed contract drifted")
+for marker in (
+    "package enum InvestigationMachineKernelChildIdentityReader",
+    "var mib = [CTL_KERN, KERN_PROC, KERN_PROC_PID, processID]",
+    "information.kp_proc.p_pid == processID",
+    "information.kp_eproc.e_ppid > 1",
+    "information.kp_eproc.e_pgid > 1",
+    "information.kp_proc.p_starttime.tv_sec > 0",
+    "information.kp_proc.p_starttime.tv_usec < 1_000_000",
+    "let sessionID = getsid(processID)",
+    "information.parentProcessID == getpid()",
+    "information.processGroupID == state.recoveryProcessGroupID",
+    "information.sessionID == state.sessionID",
+    "try waitForInitialStop(processID)",
+    "getpgid(processID) == recoveryGroup",
+):
+    if marker not in darwin_code:
+        raise SystemExit(
+            "ii-c-c suspended-sudo identity contract drifted: " + marker
+        )
+if darwin_code.count("proc_pidinfo(") != 1:
+    raise SystemExit("ii-c-c suspended-sudo restricted API returned")
+for marker in (
+    'private let sudoArguments = [',
+    '"/usr/bin/sudo", "-N", "-p"',
+):
+    if marker not in fixture:
+        raise SystemExit(
+            "ii-c-c suspended-sudo fixed fixture drifted: " + marker
+        )
+for marker in (
+    "POSIX_SPAWN_START_SUSPENDED",
+    "waitpid(processID, &status, WUNTRACED | WNOHANG)",
+    "joinStatus = setpgid(0, coordinator)",
+    "kill(child, SIGKILL)",
+    "capturedOutputByteCount: captured.count",
+    "capturedTerminalByteCount: terminal.count",
+    "PROC_PIDTBSDINFO",
+    "KERN_PROC_PID",
+):
+    if marker not in fixture_code:
+        raise SystemExit(
+            "ii-c-c suspended-sudo physical fixture drifted: " + marker
+        )
+if "SIGCONT" in fixture_code:
+    raise SystemExit("ii-c-c suspended-sudo fixture can continue child")
+for marker in (
+    "realSudoSuspendedChildRemainsContainedBeforeAnyCredentialPrompt",
+    "kernelProcessIdentityReadsSuspendedSetuidChildWhenProcPidinfoCannot",
+    "#expect(report.firstIdentityErrno == EPERM)",
+    "#expect(report.rawInitialWaitStatus == 0x7f)",
+    "#expect(report.gateJoinStatus == 0)",
+    "#expect(report.recoveryGroupMembersAfterReap.isEmpty)",
+    "#expect(report.capturedOutputByteCount == 0)",
+    "#expect(report.capturedTerminalByteCount == 0)",
+    "InvestigationMachineKernelChildIdentityReader.read(",
+    "#expect(error == .invalidObservation)",
+    "replacement.startSeconds != observation.first.startSeconds",
+    "try killProbeSession(",
+    "guard !(try sessionExists(processID))",
+    "value < 0 && errno == ECHILD",
+):
+    if marker not in tests_code:
+        raise SystemExit(
+            "ii-c-c suspended-sudo physical coverage drifted: " + marker
+        )
+PY
+}
+
 function verify_iicc_staged_scope() {
     local PATH=/usr/bin:/bin:/usr/sbin:/sbin
     local expected_baseline=622e7b99d57dfe482ccd37481fcdb4dcff87a0ec
@@ -17342,6 +17491,11 @@ if $iicc_source_contract_only || $iicc_source_mutation_contract_only; then
     print "ii-c-c source contract verification passed."
     exit 0
 fi
+if $iicc_suspended_sudo_contract_only; then
+    verify_iicc_suspended_sudo_contract
+    print "ii-c-c suspended-sudo contract verification passed."
+    exit 0
+fi
 if $iicc_scope_contract_only; then
     verify_iicc_staged_scope "$iicc_scope_baseline"
     print "ii-c-c staged scope verification passed."
@@ -17600,6 +17754,7 @@ verify_iicb1_root_owned_gate_source_contract
 verify_iic_evidence_verification_source_contract
 verify_iicb2b2_source_contract
 verify_iicc_source_contract
+verify_iicc_suspended_sudo_contract
 verify_iib5biib_app_identity_contract \
     Package.swift \
     Sources/CInvestigationIdentitySupport/CInvestigationIdentitySupport.c \

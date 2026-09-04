@@ -318,13 +318,19 @@
 > `bc42fbc`、interactive-native identity binding `531f79f` / consumer seal
 > `26e785a` 与 fixed-gate historical replay `aa8a7f1` 均已完成并保持
 > non-admitting。ii-c-a、ii-c-b1、ii-c-b2a1 与 ii-c-b2a2 已完成；当前严格按
-> ii-c-c unique real machine campaign → L3c3d → L3c4
+> ii-c-c unique real machine campaign v8 已到达 `armedConsumed`，随后在
+> Gate prepared receipt 前失败。非 root suspended-sudo probe 证明
+> `PROC_PIDTBSDINFO` 对该 setuid child 返回 `EPERM`，而
+> `KERN_PROC_PID` 可稳定提供 PID/parent/PGID/session/start-time/stopped
+> 证据；对应 Gate、bounded cleanup、source/mutation 与 Debug/Release
+> Mach-O gate 修复已通过 focused 和 1,924-test serial regression。v8 不会
+> 重试。当前严格按 v8 failure-evidence/recovery disposition → L3c3d → L3c4
 > 推进；这些 repairs 是
 > machine-campaign prerequisite checkpoints，不是新的 Task。该
 > pre-arm failure diagnostic repair 已在 `2ada395` / tree `11e1a0a` 完成；
 > typed failure receipt、physical compact-frame path、exact 9-path scope 与
 > nine negative mutations 经最终复核无 unresolved P0-P2。唯一 privileged
-> attempt 仍未消费。
+> attempt v8 已消费，禁止重跑。
 > b5b-ii-c checkpoint 以 8 个 non-document paths / 3,104 changed lines、35
 > focused tests、1,396-test staged-only serial、三个 verifier gates 与 final
 > no-unresolved-P0–P2 review 收口；未运行 full。c0a 完成后按序为 b5b-iii

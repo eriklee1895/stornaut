@@ -142,13 +142,20 @@
 > `294bdb2` / tree `dbbffbba`. Resolved-lineage L1 completed at implementation
 > `83f6271` / tree `98289e2`; L2 implementation `474f634`, cross-UID/PID-reuse
 > corrections and final verifier closure `849e454` are complete/non-admitting;
-> the final post-fix review returned no finding. The current frontier is the ii-c-c
-> unique real machine campaign → L3c3d → L3c4.
+> the final post-fix review returned no finding. The ii-c-c v8 campaign reached
+> `prepared -> armedConsumed -> spawnUncertain`; it is consumed and was not
+> retried. A non-root production-shaped probe proved the failure was caused by
+> `PROC_PIDTBSDINFO` returning `EPERM` for the suspended setuid sudo child, not
+> by raw stop `0x7f` or Gate PGID migration. The Gate now uses
+> `KERN_PROC_PID` for the same PID/parent/PGID/session/start-time/stopped
+> evidence, with bounded zero-residue test cleanup and current source/mutation/
+> Mach-O seals. Current frontier is v8 failure-evidence/recovery disposition →
+> L3c3d → L3c4.
 > The pre-arm failure diagnostic prerequisite is complete at `2ada395` / tree
 > `11e1a0a`: bounded typed failure receipt, exact exit/EOF/residue verification,
 > physical compact-frame coverage and exact nine-path mutation closure have no
-> unresolved P0-P2. The unique privileged attempt remains unconsumed; ii-c-c is
-> the only current frontier.
+> unresolved P0-P2. The unique privileged attempt v8 is consumed and may not be
+> retried; ii-c-c failure closure is the current frontier.
 > These repairs are machine-campaign prerequisite checkpoints,
 > not recursively named new Tasks. Local findings remain in their owning
 > checkpoint. L3c4 alone owns final admission and the remaining full.

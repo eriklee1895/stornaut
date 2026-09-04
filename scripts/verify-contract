@@ -3,7 +3,7 @@
 set -euo pipefail
 
 contract_source=${0:A}
-# ib2_self_sha=16d06109f9a36f6432b56e1060931dba45aabf44b8797b198a6418a80163b3a0
+# ib2_self_sha=f573795a848acb90b3fc50f69a666f61006cb48979e7e71cda33a5507948fc81
 ib2_self_sha=$(sed -nE 's/^# ib2_self_sha=([0-9a-f]{64})$/\1/p' "$contract_source"); ib2_observed_sha=$(sed -E 's/^# ib2_self_sha=[0-9a-f]{64}$/# ib2_self_sha=SELF/' "$contract_source" | shasum -a 256 | awk '{ print $1 }')
 [[ ${#ib2_self_sha} == 64 && "$ib2_observed_sha" == "$ib2_self_sha" ]] || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
 repo_root=${contract_source:h:h}
@@ -3801,6 +3801,66 @@ function verify_iicc_contract() {
     "$gate" --iic-root-driver-lineage-l2-source-contract-only >"$out/current-lineage-l2.log"
     "$gate" --root-driver-lineage-cross-uid-source-contract-only >"$out/current-cross-uid.log"
     "$gate" --iic-c-source-contract-only "${paths[@]}" >"$out/source.log"
+    "$gate" --iic-c-suspended-sudo-contract-only \
+        Sources/StornautInvestigationMachineGateSupport/InvestigationMachineGateTransport.swift \
+        Sources/StornautInvestigationMachineGateSupport/DarwinInvestigationMachineFixedGateSystem.swift \
+        Tests/Fixtures/InvestigationMachineSuspendedSudoProbe/main.swift \
+        Tests/StornautInvestigationTests/InvestigationMachineGatePhysicalTests.swift \
+        >"$out/suspended-sudo.log"
+    "$release" --iic-c-suspended-sudo-component-boundary-only \
+        >"$out/suspended-sudo-component.log"
+    local suspended_darwin=Sources/StornautInvestigationMachineGateSupport/DarwinInvestigationMachineFixedGateSystem.swift
+    local suspended_fixture=Tests/Fixtures/InvestigationMachineSuspendedSudoProbe/main.swift
+    local suspended_tests=Tests/StornautInvestigationTests/InvestigationMachineGatePhysicalTests.swift
+    local suspended_name suspended_kind suspended_old suspended_new
+    while IFS=$'\t' read -r suspended_name suspended_kind suspended_old suspended_new
+    do
+        local suspended_mutation="$out/$suspended_name.swift"
+        local suspended_candidate_darwin=$suspended_darwin
+        local suspended_candidate_fixture=$suspended_fixture
+        local suspended_candidate_tests=$suspended_tests
+        python3 - "$suspended_kind" "$suspended_old" "$suspended_new" \
+            "$suspended_darwin" "$suspended_fixture" "$suspended_tests" \
+            "$suspended_mutation" <<'PY'
+from pathlib import Path
+import sys
+kind, old, new, darwin, fixture, tests, output = sys.argv[1:]
+sources = {
+    "darwin": Path(darwin), "fixture": Path(fixture),
+    "tests": Path(tests),
+}
+source = sources[kind].read_text(encoding="utf-8")
+if source.count(old) != 1:
+    raise SystemExit(
+        "cannot construct ii-c-c suspended-sudo mutation: " + kind
+    )
+Path(output).write_text(source.replace(old, new, 1), encoding="utf-8")
+PY
+        [[ $suspended_kind == darwin ]] \
+            && suspended_candidate_darwin=$suspended_mutation
+        [[ $suspended_kind == fixture ]] \
+            && suspended_candidate_fixture=$suspended_mutation
+        [[ $suspended_kind == tests ]] \
+            && suspended_candidate_tests=$suspended_mutation
+        local suspended_status=0
+        "$gate" --iic-c-suspended-sudo-contract-only \
+            Sources/StornautInvestigationMachineGateSupport/InvestigationMachineGateTransport.swift \
+            "$suspended_candidate_darwin" "$suspended_candidate_fixture" \
+            "$suspended_candidate_tests" \
+            >"$out/$suspended_name.log" 2>&1 || suspended_status=$?
+        (( suspended_status != 0 )) \
+            || fail_contract "ii-c-c suspended-sudo mutation accepted: $suspended_name"
+    done <<'EOF'
+suspended-sudo-kernel-selector	darwin	var mib = [CTL_KERN, KERN_PROC, KERN_PROC_PID, processID]	var mib = [CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0]
+suspended-sudo-start-time	darwin	information.kp_proc.p_starttime.tv_sec > 0,	true,
+suspended-sudo-continuation	fixture	private let probeNanoseconds: UInt64 = 2_000_000_000	private let probeNanoseconds: UInt64 = 2_000_000_000; private let forbidden = SIGCONT
+suspended-sudo-output-vacuity	tests	#expect(report.capturedOutputByteCount == 0)	#expect(true)
+suspended-sudo-stdio-authority	darwin	        var information = kinfo_proc()	        let file = fopen("/tmp/stornaut-verifier-bypass", "w"); _ = fputs("x", file); _ = fclose(file)\n        var information = kinfo_proc()
+suspended-sudo-foundation-authority	darwin	        var information = kinfo_proc()	        _ = FileManager.default.createFile(atPath: "/tmp/stornaut-verifier-bypass", contents: Data("x".utf8))\n        var information = kinfo_proc()
+suspended-sudo-filemanager-instance	darwin	        var information = kinfo_proc()	        _ = FileManager().createFile(atPath: "/tmp/stornaut-verifier-bypass", contents: Data("x".utf8))\n        var information = kinfo_proc()
+suspended-sudo-copyfile-authority	darwin	        var information = kinfo_proc()	        _ = copyfile("/etc/hosts", "/tmp/stornaut-verifier-bypass", nil, copyfile_flags_t(COPYFILE_ALL))\n        var information = kinfo_proc()
+suspended-sudo-remove-authority	darwin	        var information = kinfo_proc()	        _ = Darwin.remove("/tmp/stornaut-verifier-bypass")\n        var information = kinfo_proc()
+EOF
     "$gate" --iic-c-prearm-failure-source-contract-only \
         "${paths[1]}" "${paths[2]}" "${paths[4]}" "${paths[12]}" \
         Tests/Fixtures/InvestigationMachineCampaignCoordinator/main.swift \
@@ -4077,7 +4137,8 @@ PY
                 --cacheinfo "100644,$failure_blob,$failure_main"
             failure_expected="pre-arm failure checkpoint budget unavailable: $failure_main";;
           wrong-mode)
-            failure_blob=$(git hash-object -w -- "$failure_contract")
+            failure_blob=$(git rev-parse \
+                "$failure_accepted:$failure_contract")
             GIT_INDEX_FILE=$failure_bad git update-index \
                 --cacheinfo "100644,$failure_blob,$failure_contract"
             failure_expected="pre-arm failure staged source/mode drifted: $failure_contract";;

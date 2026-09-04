@@ -2,8 +2,8 @@
 
 set -euo pipefail
 
-# iicb1_app_self_sha=ccdeb42d3acf3e42a91b52af266f4b7c75c35930121f5440f4f22f8a70393b3d
-if [[ $# == 0 || ${1:-} == --iic-b1-root-owned-gate-component-* || ${1:-} == --iic-b2a2-component-* || ${1:-} == --iic-b2b2-component-* || ${1:-} == --iic-evidence-verification-component-* || ${1:-} == --iic-root-driver-lineage-l1-component-* ]]; then iicb1_app_self_sha=$(/usr/bin/sed -nE 's/^# iicb1_app_self_sha=([0-9a-f]{64})$/\1/p' "${0:A}"); [[ ${#iicb1_app_self_sha} == 64 && "$(/usr/bin/sed -E 's/^# iicb1_app_self_sha=[0-9a-f]{64}$/# iicb1_app_self_sha=SELF/' "${0:A}" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')" == "$iicb1_app_self_sha" ]] || { print -u2 "ii-c-b1 App release verifier self-seal drifted"; exit 1; }; fi
+# iicb1_app_self_sha=a05ba254b5a749813dd5e9161c933d1f6802d0c68b8a2b4d682b1df71e7392bf
+if [[ $# == 0 || ${1:-} == --iic-b1-root-owned-gate-component-* || ${1:-} == --iic-b2a2-component-* || ${1:-} == --iic-b2b2-component-* || ${1:-} == --iic-c-suspended-sudo-component-* || ${1:-} == --iic-evidence-verification-component-* || ${1:-} == --iic-root-driver-lineage-l1-component-* ]]; then iicb1_app_self_sha=$(/usr/bin/sed -nE 's/^# iicb1_app_self_sha=([0-9a-f]{64})$/\1/p' "${0:A}"); [[ ${#iicb1_app_self_sha} == 64 && "$(/usr/bin/sed -E 's/^# iicb1_app_self_sha=[0-9a-f]{64}$/# iicb1_app_self_sha=SELF/' "${0:A}" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')" == "$iicb1_app_self_sha" ]] || { print -u2 "ii-c-b1 App release verifier self-seal drifted"; exit 1; }; fi
 repo_root=${0:A:h:h}
 cd "$repo_root"
 
@@ -96,6 +96,7 @@ iicb2a2_component_boundary_only=false
 iicb2a2_component_boundary_internal=false
 iic_evidence_verification_component_boundary_only=false
 iicb2b2_component_boundary_only=false
+iicc_suspended_sudo_component_boundary_only=false
 iic_lineage_l1_component_boundary_only=false
 iic0bivb2_component_boundary_only=false
 iica_existing_product_derived_data=
@@ -232,6 +233,9 @@ elif [[ $# == 1 \
     iic_evidence_verification_component_boundary_only=true
 elif [[ $# == 1 && $1 == --iic-b2b2-component-boundary-only ]]; then
     iicb2b2_component_boundary_only=true
+elif [[ $# == 1 \
+    && $1 == --iic-c-suspended-sudo-component-boundary-only ]]; then
+    iicc_suspended_sudo_component_boundary_only=true
 elif [[ $# == 1 \
     && $1 == --iic-root-driver-lineage-l1-component-boundary-only ]]; then
     iic_lineage_l1_component_boundary_only=true
@@ -2379,8 +2383,8 @@ for marker in (
     "iic0biii2a_gate_symbols=(", "iic0biii2a_positive_gates=(",
     "iic0biii2a_closed_images=(",
     "iic0biii2a_forbidden_gate_markers=(",
-    "expected_debug_undefined_sha=512c8ea1fbd27b9df403a5db438ba3352aa2e6ebb2a9cdcaf877cf27cc73bc15",
-    "expected_release_owned_sha=42a692726b9e81a3657e9c730288e5d183374ca69d26dee67fad1de960c76202",
+    "expected_debug_undefined_sha=1b5cebd41795ac751c13f8bbf921b9947b09844293c5cd5d5e3f3bbdd136f74d",
+    "expected_release_owned_sha=142b8cbec2040d67eb51f7499761186da50826d2b91acb7daa4bca29439eb527",
     "verify_iic0biii2a_component_boundary",
 ):
     if marker not in verifier_path.read_text(encoding="utf-8"):
@@ -2788,18 +2792,18 @@ function verify_iic0biii2a_component_boundary() {
         release_owned=$(print -r -- "$(xcrun nm -j "$release_gate" \
             | xcrun swift-demangle)" | rg 'StornautInvestigationMachineGate(Support)?' \
             | LC_ALL=C sort -u) || exit $?
-        local expected_debug_undefined_sha=512c8ea1fbd27b9df403a5db438ba3352aa2e6ebb2a9cdcaf877cf27cc73bc15
-        local expected_debug_undefined_lines=397
-        local expected_release_undefined_sha=283d051cf84401d378cd29370e4045a1c053b03cfc4bbcf2ae600feb6ec8c761
-        local expected_release_undefined_lines=314
-        local expected_debug_loads_sha=a0c9d3ffb52720905af57106a895be6d7fc377ac5cf1fe2342919beeeb253c4c
-        local expected_debug_loads_lines=14
-        local expected_release_loads_sha=a0c9d3ffb52720905af57106a895be6d7fc377ac5cf1fe2342919beeeb253c4c
-        local expected_release_loads_lines=14
-        local expected_debug_owned_sha=7425ab957846c165b53d7c8ed3ffa26cbf71ddc08b1a15f2ca05b25da6db526e
-        local expected_debug_owned_lines=1374
-        local expected_release_owned_sha=42a692726b9e81a3657e9c730288e5d183374ca69d26dee67fad1de960c76202
-        local expected_release_owned_lines=860
+        local expected_debug_undefined_sha=1b5cebd41795ac751c13f8bbf921b9947b09844293c5cd5d5e3f3bbdd136f74d
+        local expected_debug_undefined_lines=585
+        local expected_release_undefined_sha=a0dcbac3088f974570ee6eb642b3395f2c8d4ef21c4970a73e463810683ff983
+        local expected_release_undefined_lines=420
+        local expected_debug_loads_sha=f3e391d4db62a4c86e44920932d07fc079afa0e885630205055399401c62882c
+        local expected_debug_loads_lines=18
+        local expected_release_loads_sha=f3e391d4db62a4c86e44920932d07fc079afa0e885630205055399401c62882c
+        local expected_release_loads_lines=18
+        local expected_debug_owned_sha=695e22897d524e34e9c051b26b627c69a73036a28840bbf42a116c7bb0c7ad0d
+        local expected_debug_owned_lines=2019
+        local expected_release_owned_sha=142b8cbec2040d67eb51f7499761186da50826d2b91acb7daa4bca29439eb527
+        local expected_release_owned_lines=1452
         local -a projection_values=(
             "$debug_undefined" "$release_undefined"
             "$debug_loads" "$release_loads"
@@ -2865,7 +2869,28 @@ function verify_iic0biii2a_component_boundary() {
                 print -u2 "ii-c0b-iii-2a closed image is missing: $closed_root"
                 exit 1
             }
-            verify_iic0biii2a_closed_image "$closed_root" || exit $?
+            if [[ $closed_root == \
+                "$diagnostic_derived_data/Build/Products/Debug/StornautInvestigationDiagnostic.app" ]]
+            then
+                local diagnostic_inventory="$scratch/diagnostic-closed.inventory"
+                find "$closed_root" -type f -print0 >"$diagnostic_inventory" \
+                    || exit $?
+                local diagnostic_candidate diagnostic_kind
+                while IFS= read -r -d '' diagnostic_candidate; do
+                    case $diagnostic_candidate in
+                        */Contents/MacOS/StornautInvestigationMachineGate|\
+                        */Contents/MacOS/StornautInvestigationMachineGateCoordinator)
+                            continue ;;
+                    esac
+                    diagnostic_kind=$(file "$diagnostic_candidate" 2>/dev/null) \
+                        || exit $?
+                    [[ $diagnostic_kind == *Mach-O* ]] || continue
+                    verify_iic0biii2a_closed_image "$diagnostic_candidate" \
+                        || exit $?
+                done <"$diagnostic_inventory"
+            else
+                verify_iic0biii2a_closed_image "$closed_root" || exit $?
+            fi
         done
     ) || result_code=$?
     rm -rf "$scratch"
@@ -5461,6 +5486,113 @@ function verify_iicb2b2_component_boundary() (
     }
 )
 
+function verify_iicc_suspended_sudo_component_boundary() (
+    local PATH=/usr/bin:/bin:/usr/sbin:/sbin
+    export PATH
+    export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+    scripts/verify-investigation-boundaries \
+        --iic-c-suspended-sudo-contract-only || return $?
+    /usr/bin/python3 -I - \
+        Sources/StornautInvestigationMachineGateSupport/DarwinInvestigationMachineFixedGateSystem.swift \
+        <<'PY' || return $?
+from pathlib import Path
+import re, sys
+source = Path(sys.argv[1]).read_text(encoding="utf-8")
+code = re.sub(r'(?ms)/\*.*?\*/|//[^\n]*|"(?:\\.|[^"\\])*"', "", source)
+if len(re.findall(r'(?<![A-Za-z0-9_])(?:Darwin\.)?open\s*\(', code)) != 2:
+    raise SystemExit("ii-c-c suspended-sudo Gate open authority drifted")
+open_calls = re.findall(r'(?m)^\s*let descriptor = Darwin\.open\((.*?)\)\s*$', source)
+if len(open_calls) != 2 or any(
+    "O_RDONLY" not in call
+    or any(flag in call for flag in ("O_WRONLY", "O_RDWR", "O_CREAT",
+                                     "O_TRUNC", "O_APPEND"))
+    for call in open_calls
+):
+    raise SystemExit("ii-c-c suspended-sudo Gate open authority drifted")
+write_calls = re.findall(r'(?m)^\s*Darwin\.write\(descriptor, bytes\.baseAddress, bytes\.count\)\s*$', source)
+if len(re.findall(r'(?<![A-Za-z0-9_])(?:Darwin\.)?write\s*\(', code)) != 1 \
+        or len(write_calls) != 1 \
+        or "func writeOneRecord(descriptor: Int32, data: Data) throws" not in source:
+    raise SystemExit("ii-c-c suspended-sudo Gate write authority drifted")
+for token in ("O_CREAT", "O_TRUNC", "O_APPEND", "Darwin.pwrite(",
+              "Darwin.unlink(", "Darwin.rename("):
+    if token in code:
+        raise SystemExit("ii-c-c suspended-sudo Gate mutation authority drifted")
+for pattern in (
+    r"\b(?:fopen|fdopen|freopen|fwrite|fputs|fprintf|putc|fputc)\s*\(",
+    r"\bFileManager\b",
+    r"\bFileHandle\s*\(\s*forWritingTo:",
+    r"\.write\s*\(\s*to:",
+    r"FileManager\.default\.(?:remove|move|copy|trash|replace|"
+    r"createFile|createDirectory|createSymbolicLink|link|setAttributes)",
+    r"\b(?:openat|creat|writev|pwrite|pwritev|remove|unlink|unlinkat|rename|"
+    r"renameat|mkdir|mkdirat|rmdir|truncate|ftruncate|chmod|fchmod|"
+    r"fchmodat|chown|fchown|lchown|fchownat|chflags|fchflags|lchflags|"
+    r"setxattr|fsetxattr|removexattr|fremovexattr|acl_set_fd|"
+    r"acl_set_fd_np|acl_set_file|acl_delete_def_file|link|linkat|"
+    r"symlink|symlinkat|utime|utimes|futimes|setattrlist|fsetattrlist|"
+    r"copyfile|fcopyfile|clonefile)\s*\(",
+):
+    if re.search(pattern, code):
+        raise SystemExit("ii-c-c suspended-sudo Gate mutation authority drifted")
+PY
+    local scratch
+    scratch=$(mktemp -d \
+        "${TMPDIR:-/tmp}/stornaut-iicc-suspended-sudo-component.XXXXXX") \
+        || return $?
+    trap 'rm -rf "$scratch"' EXIT
+    local configuration binary symbols imports strings marker
+    for configuration in debug release; do
+        /usr/bin/swift build --scratch-path "$scratch/$configuration" \
+            --configuration "$configuration" \
+            --product StornautInvestigationMachineGate --disable-sandbox \
+            || return $?
+        binary=$(/usr/bin/swift build --scratch-path "$scratch/$configuration" \
+            --configuration "$configuration" --show-bin-path)
+        binary+=/StornautInvestigationMachineGate
+        [[ -x $binary && ! -L $binary \
+            && "$(file -b "$binary")" == *"Mach-O 64-bit executable arm64"* ]] \
+            || { print -u2 "ii-c-c suspended-sudo Gate image unavailable"; return 1; }
+        symbols=$(xcrun nm -j "$binary" | xcrun swift-demangle) || return $?
+        imports=$(xcrun nm -u -j "$binary" | LC_ALL=C sort -u) || return $?
+        strings=$(xcrun strings -a "$binary") || return $?
+        for marker in \
+            'StornautInvestigationMachineGateSupport.InvestigationMachineKernelChildIdentityReader' \
+            'StornautInvestigationMachineGateSupport.InvestigationMachineFixedGateLauncher.run(inheritedCapsuleDescriptor:'
+        do
+            [[ $symbols == *"$marker"* ]] || {
+                print -u2 "ii-c-c suspended-sudo Gate positive control missing: $marker"
+                return 1
+            }
+        done
+        for marker in _sysctl _posix_spawn _waitpid _getpgid _getsid _setpgid _kill
+        do
+            print -r -- "$imports" | grep -Fxq -- "$marker" || {
+                print -u2 "ii-c-c suspended-sudo Gate import missing: $marker"
+                return 1
+            }
+        done
+        for marker in _openat _creat _writev _pwrite _pwritev \
+            _fopen _fdopen _freopen _fwrite _fputs _fprintf _putc _fputc \
+            _remove _unlink _unlinkat _rename _renameat _mkdir _mkdirat _rmdir \
+            _truncate _ftruncate _chmod _fchmod _fchmodat _chown _fchown \
+            _lchown _fchownat _chflags _fchflags _lchflags _setxattr \
+            _fsetxattr _removexattr _fremovexattr _acl_set_fd \
+            _acl_set_fd_np _acl_set_file _acl_delete_def_file _link _linkat \
+            _symlink _symlinkat _utime _utimes _futimes _setattrlist \
+            _fsetattrlist _copyfile _fcopyfile _clonefile _socket _connect
+        do
+            ! print -r -- "$imports" | grep -Fxq -- "$marker" || {
+                print -u2 "ii-c-c suspended-sudo Gate gained authority: $marker"
+                return 1
+            }
+        done
+        [[ $strings == *'/usr/bin/sudo'* \
+            && $strings == *'Stornaut Task 39 ii-c administrator authorization: '* ]] \
+            || { print -u2 "ii-c-c suspended-sudo fixed strings missing"; return 1; }
+    done
+)
+
 function verify_iic_root_driver_lineage_l1_component_boundary() (
     local -x PATH=/usr/bin:/bin:/usr/sbin:/sbin; local require_staged=${1:-true}
     [[ $require_staged == false ]] || [[ ${STORNAUT_VALIDATION_SOURCE:-} == staged \
@@ -5668,6 +5800,11 @@ fi
 if $iicb2b2_component_boundary_only; then
     verify_iicb2b2_component_boundary || exit $?
     print "ii-c-b2b2 campaign component boundary verification passed."
+    exit 0
+fi
+if $iicc_suspended_sudo_component_boundary_only; then
+    verify_iicc_suspended_sudo_component_boundary || exit $?
+    print "ii-c-c suspended-sudo component boundary verification passed."
     exit 0
 fi
 if $iic_lineage_l1_component_boundary_only; then
