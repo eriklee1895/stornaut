@@ -228,6 +228,12 @@ package struct InvestigationMachineCampaignPreArmFailureFrame:
         case containmentUncertain, appSigningUnavailable
         case helperSigningUnavailable, machineDriverSigningUnavailable
         case signedBundleMetadataUnavailable, installedObservationChanged
+        case sourceStateInvalid, codexIdentityUnavailable, codexLayoutInvalid
+        case codexExecutableOpenInvalid, codexExecutableMetadataInvalid
+        case codexExecutableACLInvalid, codexExecutableXattrInvalid
+        case runtimeReceiptInvalid
+        case machineDriverBindingInvalid, installedBindingInvalid
+        case bindingJoinInvalid, bindingEncodingInvalid
         package var expectedExitStatus: Int32 {
             self == .containmentUncertain ? 82 : 81
         }
@@ -247,6 +253,19 @@ package struct InvestigationMachineCampaignPreArmFailureFrame:
                 "signedBundleMetadataUnavailable"
             case .installedObservationChanged:
                 "installedObservationChanged"
+            case .sourceStateInvalid: "sourceStateInvalid"
+            case .codexIdentityUnavailable: "codexIdentityUnavailable"
+            case .codexLayoutInvalid: "codexLayoutInvalid"
+            case .codexExecutableOpenInvalid: "codexExecutableOpenInvalid"
+            case .codexExecutableMetadataInvalid:
+                "codexExecutableMetadataInvalid"
+            case .codexExecutableACLInvalid: "codexExecutableACLInvalid"
+            case .codexExecutableXattrInvalid: "codexExecutableXattrInvalid"
+            case .runtimeReceiptInvalid: "runtimeReceiptInvalid"
+            case .machineDriverBindingInvalid: "machineDriverBindingInvalid"
+            case .installedBindingInvalid: "installedBindingInvalid"
+            case .bindingJoinInvalid: "bindingJoinInvalid"
+            case .bindingEncodingInvalid: "bindingEncodingInvalid"
             }
         }
     }
@@ -343,7 +362,13 @@ package struct InvestigationMachineCampaignPreArmFailureFrame:
              .appSigningUnavailable, .helperSigningUnavailable,
              .machineDriverSigningUnavailable,
              .signedBundleMetadataUnavailable,
-             .installedObservationChanged:
+             .installedObservationChanged, .sourceStateInvalid,
+             .codexIdentityUnavailable, .codexLayoutInvalid,
+             .codexExecutableOpenInvalid, .codexExecutableMetadataInvalid,
+             .codexExecutableACLInvalid, .codexExecutableXattrInvalid,
+             .runtimeReceiptInvalid,
+             .machineDriverBindingInvalid, .installedBindingInvalid,
+             .bindingJoinInvalid, .bindingEncodingInvalid:
             return stage == .makeBinding
         case .codexIdentityChanged:
             return stage == .makeBinding || stage == .makeConfigurations

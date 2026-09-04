@@ -182,6 +182,12 @@ public enum InvestigationMachineGateCoordinatorSupport {
       case containmentUncertain, appSigningUnavailable
       case helperSigningUnavailable, machineDriverSigningUnavailable
       case signedBundleMetadataUnavailable, installedObservationChanged
+      case sourceStateInvalid, codexIdentityUnavailable, codexLayoutInvalid
+      case codexExecutableOpenInvalid, codexExecutableMetadataInvalid
+      case codexExecutableACLInvalid, codexExecutableXattrInvalid
+      case runtimeReceiptInvalid
+      case machineDriverBindingInvalid, installedBindingInvalid
+      case bindingJoinInvalid, bindingEncodingInvalid
       package var expectedExitStatus: Int32 {
         self == .containmentUncertain ? 82 : 81
       }
@@ -252,7 +258,13 @@ public enum InvestigationMachineGateCoordinatorSupport {
            .appSigningUnavailable, .helperSigningUnavailable,
            .machineDriverSigningUnavailable,
            .signedBundleMetadataUnavailable,
-           .installedObservationChanged:
+           .installedObservationChanged, .sourceStateInvalid,
+           .codexIdentityUnavailable, .codexLayoutInvalid,
+           .codexExecutableOpenInvalid, .codexExecutableMetadataInvalid,
+           .codexExecutableACLInvalid, .codexExecutableXattrInvalid,
+           .runtimeReceiptInvalid,
+           .machineDriverBindingInvalid, .installedBindingInvalid,
+           .bindingJoinInvalid, .bindingEncodingInvalid:
         return stage == .makeBinding
       case .codexIdentityChanged:
         return stage == .makeBinding || stage == .makeConfigurations
@@ -870,8 +882,33 @@ public enum InvestigationMachineGateCoordinatorSupport {
           return .signedBundleMetadataUnavailable
         case .installedObservationChanged:
           return .installedObservationChanged
+        case .installedObservationInvalid:
+          return .installedObservationInvalid
+        case .invalidSourceFingerprint, .sourceStateInvalid:
+          return .sourceStateInvalid
+        case .codexIdentityUnavailable:
+          return .codexIdentityUnavailable
+        case .codexLayoutInvalid:
+          return .codexLayoutInvalid
+        case .codexExecutableOpenInvalid:
+          return .codexExecutableOpenInvalid
+        case .codexExecutableMetadataInvalid:
+          return .codexExecutableMetadataInvalid
+        case .codexExecutableACLInvalid:
+          return .codexExecutableACLInvalid
+        case .codexExecutableXattrInvalid:
+          return .codexExecutableXattrInvalid
+        case .invalidRuntimeReceipt:
+          return .runtimeReceiptInvalid
+        case .machineDriverBindingInvalid:
+          return .machineDriverBindingInvalid
+        case .installedBindingInvalid:
+          return .installedBindingInvalid
+        case .bindingJoinInvalid:
+          return .bindingJoinInvalid
+        case .bindingEncodingInvalid:
+          return .bindingEncodingInvalid
         case .codexIdentityChanged: return .codexIdentityChanged
-        default: return .protocolRejected
         }
       }
       if stage == .preArmPublication,
@@ -1466,14 +1503,19 @@ public enum InvestigationMachineGateCoordinatorSupport {
           guard let fingerprint = self.state.lock.withLock({
             self.state.materialized?.sourceFingerprint
           }), fingerprint.hex == source.sourceFingerprintSHA256 else {
-            throw InvestigationMachineGateCoordinatorProductionError
-              .protocolFailure
+            throw InvestigationMachineCoordinatorBindingSourceError
+              .sourceStateInvalid
           }
           let value = try await InvestigationMachineCurrentSourceBindingSource()
             .make(sourceFingerprint: fingerprint)
-          return try InvestigationMachineGateCoordinatorBinding(
-            currentSourceBinding: value
-          )
+          do {
+            return try InvestigationMachineGateCoordinatorBinding(
+              currentSourceBinding: value
+            )
+          } catch {
+            throw InvestigationMachineCoordinatorBindingSourceError
+              .bindingEncodingInvalid
+          }
         },
         makeConfigurations: { binding, source in
           guard let attempt = source.attempt,

@@ -17,8 +17,19 @@
     case machineDriverSigningUnavailable
     case signedBundleMetadataUnavailable
     case installedObservationChanged
+    case sourceStateInvalid
+    case codexIdentityUnavailable
+    case codexLayoutInvalid
+    case codexExecutableOpenInvalid
+    case codexExecutableMetadataInvalid
+    case codexExecutableACLInvalid
+    case codexExecutableXattrInvalid
     case invalidRuntimeReceipt
-    case invalidBinding
+    case installedObservationInvalid
+    case machineDriverBindingInvalid
+    case installedBindingInvalid
+    case bindingJoinInvalid
+    case bindingEncodingInvalid
     case codexIdentityChanged
   }
 
@@ -271,9 +282,36 @@
       let codexLease: CodexNativeExecutableIdentityLease
       do {
         codexLease = try await resolveCodexIdentity()
+      } catch let error as CodexNativeExecutableIdentityError {
+        switch error {
+        case .unavailable:
+          throw InvestigationMachineCoordinatorBindingSourceError
+            .codexIdentityUnavailable
+        case .invalidLayout:
+          throw InvestigationMachineCoordinatorBindingSourceError
+            .codexLayoutInvalid
+        case .invalidExecutable(let stage):
+          if stage.hasPrefix("open-") {
+            throw InvestigationMachineCoordinatorBindingSourceError
+              .codexExecutableOpenInvalid
+          }
+          if stage == "acl" || stage.hasPrefix("acl-") {
+            throw InvestigationMachineCoordinatorBindingSourceError
+              .codexExecutableACLInvalid
+          }
+          if stage == "xattr" || stage.hasPrefix("xattr-") {
+            throw InvestigationMachineCoordinatorBindingSourceError
+              .codexExecutableXattrInvalid
+          }
+          throw InvestigationMachineCoordinatorBindingSourceError
+            .codexExecutableMetadataInvalid
+        case .identityChanged, .stagedDigestMismatch:
+          throw InvestigationMachineCoordinatorBindingSourceError
+            .codexIdentityChanged
+        }
       } catch {
         throw InvestigationMachineCoordinatorBindingSourceError
-          .invalidBinding
+          .codexIdentityUnavailable
       }
       let observation: InvestigationRuntimeDiagnosticBindingObservation
       do { observation = try installedObservation() } catch {
@@ -296,7 +334,7 @@
     ) -> InvestigationMachineCoordinatorBindingSourceError {
       guard let error = error as?
         InvestigationRuntimeDiagnosticBindingObservationError
-      else { return .invalidBinding }
+      else { return .installedObservationInvalid }
       switch error {
       case .appSigningUnavailable: return .appSigningUnavailable
       case .helperSigningUnavailable: return .helperSigningUnavailable
@@ -359,7 +397,7 @@
           )
       } catch {
         throw InvestigationMachineCoordinatorBindingSourceError
-          .invalidBinding
+          .machineDriverBindingInvalid
       }
       let binding = SignedInvestigationRuntimeBinding(
         repositoryHEAD: provenance.repositoryHEAD,
@@ -396,7 +434,7 @@
         )
       } catch {
         throw InvestigationMachineCoordinatorBindingSourceError
-          .invalidBinding
+          .installedBindingInvalid
       }
       guard binding.isValid, observation.matches(binding),
         installedBinding.matches(binding),
@@ -404,7 +442,7 @@
         binding.codexExecutableSHA256 == codexLease.sha256
       else {
         throw InvestigationMachineCoordinatorBindingSourceError
-          .invalidBinding
+          .bindingJoinInvalid
       }
       do {
         try codexLease.revalidate()

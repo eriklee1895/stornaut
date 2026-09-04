@@ -544,8 +544,8 @@ struct InvestigationMachineCampaignEvidenceTests {
             validateInvocation: { .validated },
             materializeSource: { _ in source },
             makeBinding: { _ in
-                throw InvestigationMachineCoordinatorBindingSourceError
-                    .invalidBinding
+                throw InvestigationMachineGateCoordinatorProductionError
+                    .protocolFailure
             },
             makeConfigurations: { _, _ in throw PreArmFailureTestError.unexpected },
             authorCohort: { _ in throw PreArmFailureTestError.unexpected },
@@ -603,8 +603,21 @@ struct InvestigationMachineCampaignEvidenceTests {
             InvestigationMachineCampaignPreArmFailureFrame.Reason
                 .installedObservationChanged
         ),
+        (.installedObservationInvalid, .installedObservationInvalid),
+        (.sourceStateInvalid, .sourceStateInvalid),
+        (.codexIdentityUnavailable, .codexIdentityUnavailable),
+        (.codexLayoutInvalid, .codexLayoutInvalid),
+        (.codexExecutableOpenInvalid, .codexExecutableOpenInvalid),
+        (.codexExecutableMetadataInvalid, .codexExecutableMetadataInvalid),
+        (.codexExecutableACLInvalid, .codexExecutableACLInvalid),
+        (.codexExecutableXattrInvalid, .codexExecutableXattrInvalid),
+        (.invalidRuntimeReceipt, .runtimeReceiptInvalid),
+        (.machineDriverBindingInvalid, .machineDriverBindingInvalid),
+        (.installedBindingInvalid, .installedBindingInvalid),
+        (.bindingJoinInvalid, .bindingJoinInvalid),
+        (.bindingEncodingInvalid, .bindingEncodingInvalid),
     ])
-    func coordinatorPreservesClosedInstalledObservationReason(
+    func coordinatorPreservesClosedMakeBindingReason(
         sourceError: InvestigationMachineCoordinatorBindingSourceError,
         expected: InvestigationMachineCampaignPreArmFailureFrame.Reason
     ) async throws {
@@ -741,6 +754,18 @@ struct InvestigationMachineCampaignEvidenceTests {
                 .machineDriverSigningUnavailable,
                 .signedBundleMetadataUnavailable,
                 .installedObservationChanged,
+                .sourceStateInvalid,
+                .codexIdentityUnavailable,
+                .codexLayoutInvalid,
+                .codexExecutableOpenInvalid,
+                .codexExecutableMetadataInvalid,
+                .codexExecutableACLInvalid,
+                .codexExecutableXattrInvalid,
+                .runtimeReceiptInvalid,
+                .machineDriverBindingInvalid,
+                .installedBindingInvalid,
+                .bindingJoinInvalid,
+                .bindingEncodingInvalid,
             ]))
         #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
             .buildProvenanceRejected.expectedExitStatus == 81)
@@ -786,6 +811,30 @@ struct InvestigationMachineCampaignEvidenceTests {
             .signedBundleMetadataUnavailable.rawValue == 10)
         #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
             .installedObservationChanged.rawValue == 11)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .sourceStateInvalid.rawValue == 12)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .codexIdentityUnavailable.rawValue == 13)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .codexLayoutInvalid.rawValue == 14)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .codexExecutableOpenInvalid.rawValue == 15)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .codexExecutableMetadataInvalid.rawValue == 16)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .codexExecutableACLInvalid.rawValue == 17)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .codexExecutableXattrInvalid.rawValue == 18)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .runtimeReceiptInvalid.rawValue == 19)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .machineDriverBindingInvalid.rawValue == 20)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .installedBindingInvalid.rawValue == 21)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .bindingJoinInvalid.rawValue == 22)
+        #expect(InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
+            .bindingEncodingInvalid.rawValue == 23)
         for producerReason in
             InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
                 .allCases
@@ -848,8 +897,20 @@ struct InvestigationMachineCampaignEvidenceTests {
         .machineDriverSigningUnavailable,
         .signedBundleMetadataUnavailable,
         .installedObservationChanged,
+        .sourceStateInvalid,
+        .codexIdentityUnavailable,
+        .codexLayoutInvalid,
+        .codexExecutableOpenInvalid,
+        .codexExecutableMetadataInvalid,
+        .codexExecutableACLInvalid,
+        .codexExecutableXattrInvalid,
+        .runtimeReceiptInvalid,
+        .machineDriverBindingInvalid,
+        .installedBindingInvalid,
+        .bindingJoinInvalid,
+        .bindingEncodingInvalid,
     ])
-    func installedObservationReasonsRejectPostBindingCheckpoint(
+    func makeBindingReasonsRejectPostBindingCheckpoint(
         _ reason:
             InvestigationMachineGateCoordinatorPreArmFailureFrameV1.Reason
     ) throws {

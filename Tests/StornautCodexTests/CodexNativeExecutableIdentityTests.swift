@@ -7,6 +7,24 @@ import Testing
 
 @Suite(.serialized)
 struct CodexNativeExecutableIdentityTests {
+  @Test(
+    .enabled(
+      if: ProcessInfo.processInfo.environment[
+        "STORNAUT_RUN_INSTALLED_CODEX_IDENTITY_DIAGNOSTIC"
+      ] == "1",
+      "Opt in to the read-only installed Codex native identity diagnostic"
+    )
+  )
+  func installedNativeIdentityDiagnostic() async throws {
+    let lease = try await CodexNativeExecutableIdentitySource()
+      .resolveInstalled()
+
+    #expect(lease.canonicalURL.lastPathComponent == "codex")
+    #expect(lease.sha256.utf8.count == 64)
+    #expect(lease.size > 0)
+    try lease.revalidate()
+  }
+
   @Test
   func resolvesInstalledNativeAndVerifiesMatchingStage() async throws {
     let fixture = try NativeCodexFixture()

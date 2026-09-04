@@ -12,6 +12,87 @@ import Testing
 
 @Suite("Investigation machine coordinator binding source", .serialized)
 struct InvestigationMachineCoordinatorBindingSourceTests {
+  @Test(
+    .enabled(
+      if: ProcessInfo.processInfo.environment[
+        "STORNAUT_RUN_CURRENT_APP_BINDING_DIAGNOSTIC"
+      ] == "1",
+      "Opt in to the read-only current App and installed Codex binding diagnostic"
+    )
+  )
+  func currentAppAndInstalledCodexComposeCompleteBinding() async throws {
+    let environment = ProcessInfo.processInfo.environment
+    let appPath = try #require(
+      environment["STORNAUT_CURRENT_DIAGNOSTIC_APP"]
+    )
+    let builtApp = URL(
+      filePath: appPath, directoryHint: .isDirectory
+    ).standardizedFileURL
+    let contract = try LifecycleLocalInstallationContract()
+    let reader = LifecycleBundleSigningIdentityReader()
+    let builtMain = builtApp.appending(
+      path: "Contents/MacOS/StornautInvestigationDiagnostic"
+    )
+    let builtHelper = builtApp.appending(
+      path: "Contents/MacOS/StornautLifecycleHelper"
+    )
+    let builtDriver = builtApp.appending(
+      path: "Contents/MacOS/StornautInvestigationMachineDriver"
+    )
+    let observation = try InvestigationRuntimeDiagnosticBindingObservation
+      .installed(
+        contract: contract,
+        signedAppObservation: { requested in
+          guard requested == contract.installedAppURL else {
+            throw LifecycleSigningIdentityError.unavailable
+          }
+          let value = try reader.signedBundleObservation(
+            bundleURL: builtApp
+          )
+          #expect(value.mainExecutableURL == builtMain)
+          return try LifecycleSignedBundleObservation(
+            signingEvidence: value.signingEvidence,
+            mainExecutableURL: contract.appExecutableURL,
+            bundleIdentifier: value.bundleIdentifier
+          )
+        },
+        signingEvidence: { requested in
+          switch requested {
+          case contract.helperExecutableURL:
+            return try reader.evidence(bundleURL: builtHelper)
+          case contract.machineDriverExecutableURL:
+            return try reader.evidence(bundleURL: builtDriver)
+          default:
+            throw LifecycleSigningIdentityError.unavailable
+          }
+        }
+      )
+    let fixture = try CoordinatorBindingBehaviorFixture()
+    defer { fixture.remove() }
+    let lease = try await CodexNativeExecutableIdentitySource()
+      .resolveInstalled()
+    let sourceFingerprint = try fixture.sourceFingerprint()
+    let current = try InvestigationMachineCurrentSourceBindingSource.make(
+      provenance: fixture.provenance(),
+      sourceFingerprint: sourceFingerprint,
+      observation: observation,
+      codexLease: lease
+    )
+    let wrapper = try InvestigationMachineGateCoordinatorBinding(
+      currentSourceBinding: current
+    )
+
+    #expect(observation.helperSigningIdentifier
+      == "com.eriklee.stornaut.lifecycle.helper")
+    #expect(current.binding.isValid)
+    #expect(observation.matches(current.binding))
+    #expect(current.installedBinding.matches(current.binding))
+    #expect(wrapper.sourceFingerprintSHA256
+      == sourceFingerprint.hex)
+    #expect(wrapper.signedBindingSHA256.utf8.count == 64)
+    _ = builtMain
+  }
+
   @Test
   func asyncBindingSourcePreservesClosedObservationFailureReason() async throws {
     let fixture = try CoordinatorBindingBehaviorFixture()
@@ -216,7 +297,7 @@ struct InvestigationMachineCoordinatorBindingSourceTests {
   }
 
   @Test
-  func asyncBindingSourceKeepsCodexResolutionFailureOutOfObservationReason()
+  func asyncBindingSourceKeepsUnknownCodexFailureOutOfObservationReason()
     async throws
   {
     let fixture = try CoordinatorBindingBehaviorFixture()
@@ -231,7 +312,7 @@ struct InvestigationMachineCoordinatorBindingSourceTests {
     )
 
     await #expect(throws: InvestigationMachineCoordinatorBindingSourceError
-      .invalidBinding) {
+      .codexIdentityUnavailable) {
         _ = try await source.make(
           sourceFingerprint: fixture.sourceFingerprint()
         )
@@ -240,21 +321,64 @@ struct InvestigationMachineCoordinatorBindingSourceTests {
   }
 
   @Test
-  func bindingConstructionFailuresRemainProtocolFailures() throws {
+  func asyncBindingSourcePreservesClosedCodexResolutionReason() async throws {
+    let fixture = try CoordinatorBindingBehaviorFixture()
+    defer { fixture.remove() }
+    let failures: [(
+      CodexNativeExecutableIdentityError,
+      InvestigationMachineCoordinatorBindingSourceError
+    )] = [
+      (.unavailable, .codexIdentityUnavailable),
+      (.invalidLayout, .codexLayoutInvalid),
+      (.invalidExecutable(stage: "open-13"), .codexExecutableOpenInvalid),
+      (.invalidExecutable(stage: "metadata"),
+       .codexExecutableMetadataInvalid),
+      (.invalidExecutable(stage: "acl-read"), .codexExecutableACLInvalid),
+      (.invalidExecutable(stage: "xattr"), .codexExecutableXattrInvalid),
+      (.invalidExecutable(stage: "xattr-read"),
+       .codexExecutableXattrInvalid),
+      (.identityChanged, .codexIdentityChanged),
+      (.stagedDigestMismatch, .codexIdentityChanged),
+    ]
+
+    for (failure, expected) in failures {
+      let probe = CoordinatorObservationProbe([fixture.observation()])
+      let provenance = try fixture.provenance()
+      let source = InvestigationMachineCurrentSourceBindingSource(
+        buildProvenance: { provenance },
+        installedObservation: probe.next,
+        resolveCodexIdentity: { throw failure }
+      )
+      let observed = await Self.bindingSourceError(
+        source, fingerprint: try fixture.sourceFingerprint()
+      )
+      #expect(observed == expected)
+      #expect(probe.callCount == 1)
+    }
+  }
+
+  @Test
+  func bindingConstructionFailuresPreserveClosedReasons() throws {
     let fixture = try CoordinatorBindingBehaviorFixture()
     defer { fixture.remove() }
     let provenance = try fixture.provenance()
     let fingerprint = try fixture.sourceFingerprint()
     let lease = try fixture.codexLease()
 
-    for observation in [
-      fixture.observation(
+    for (observation, expected) in [
+      (fixture.observation(
         machineDriverSigningIdentifier: "foreign.machine-driver"
-      ),
-      fixture.observation(appBundleIdentifier: "foreign.app"),
+      ), InvestigationMachineCoordinatorBindingSourceError
+        .machineDriverBindingInvalid),
+      (fixture.observation(appBundleIdentifier: "foreign.app"),
+       InvestigationMachineCoordinatorBindingSourceError
+        .installedBindingInvalid),
+      (fixture.observation(
+        helperSigningIdentifier: "foreign.helper"
+      ), InvestigationMachineCoordinatorBindingSourceError
+        .bindingJoinInvalid),
     ] {
-      #expect(throws: InvestigationMachineCoordinatorBindingSourceError
-        .invalidBinding) {
+      #expect(throws: expected) {
           _ = try InvestigationMachineCurrentSourceBindingSource.make(
             provenance: provenance,
             sourceFingerprint: fingerprint,
@@ -631,6 +755,8 @@ private final class CoordinatorBindingBehaviorFixture {
   func observation(
     appExecutableSHA256: String = String(repeating: "1", count: 64),
     appBundleIdentifier: String = "com.eriklee.stornaut",
+    helperSigningIdentifier: String =
+      "com.eriklee.stornaut.lifecycle.helper",
     machineDriverSigningIdentifier: String =
       SignedInvestigationRuntimeMachineDriverBinding
       .requiredSigningIdentifier
@@ -650,8 +776,7 @@ private final class CoordinatorBindingBehaviorFixture {
       appExecutableSHA256: appExecutableSHA256,
       helperExecutableSHA256: String(repeating: "2", count: 64),
       appBundleIdentifier: appBundleIdentifier,
-      helperSigningIdentifier:
-        "com.eriklee.stornaut.lifecycle.helper",
+      helperSigningIdentifier: helperSigningIdentifier,
       serviceIdentifier: "com.eriklee.stornaut.lifecycle",
       machineDriverExecutableURL: app.appending(
         path: "Contents/MacOS/StornautInvestigationMachineDriver"
