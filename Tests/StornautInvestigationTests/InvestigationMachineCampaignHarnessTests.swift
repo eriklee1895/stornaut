@@ -13,7 +13,7 @@ struct InvestigationMachineCampaignHarnessTests {
         defer { fixture.remove() }
         let report = try fixture.run()
         #expect(report.completed)
-        #expect(report.diagnostic == "campaign-physical-diagnostic")
+        #expect(report.diagnostic == "campaign-physical-diagnostic\n")
         #expect(report.processID > 1)
         #expect(report.processGroupID == report.processID)
         #expect(report.sessionID == report.processID)

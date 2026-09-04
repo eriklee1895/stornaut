@@ -316,8 +316,13 @@ struct InvestigationMachineTargetBoundaryTests {
             "posix_spawn(", "POSIX_SPAWN_SETSID",
             "stornaut_investigation_campaign_bootstrap_fixed",
             "TIOCSCTTY", "tcsetpgrp(", "dup2(", "execve(",
-            "FD_CLOEXEC",
+            "FD_CLOEXEC", "stornaut_campaign_preserve_terminal_output_bytes",
+            "attributes.c_oflag &= (tcflag_t)~ONLCR",
         ] { #expect(c.contains(marker)) }
+        let terminalConfiguration = try #require(c.firstRange(of:
+            "stornaut_campaign_preserve_terminal_output_bytes(descriptors[1])"))
+        let processSpawn = try #require(c.firstRange(of: "posix_spawn("))
+        #expect(terminalConfiguration.lowerBound < processSpawn.lowerBound)
         #expect(!c.contains("fork("))
         #expect(!c.contains("forkpty("))
         for marker in [

@@ -953,7 +953,7 @@ if (( $# > 0 )); then
         && [[ $1 == --iic-b2b1-staged-scope-contract-only ]]; then
         iicb2b1_staged_scope_contract_only=true
         iicb2b1_staged_scope_baseline=${2:-61cdeddac657a18cac12e7cc04d62b551675b4bd}
-    elif (( $# == 1 || $# == 9 )) \
+    elif (( $# == 1 || $# == 10 )) \
         && [[ $1 == --iic-b2b2-source-contract-only ]]; then
         iicb2b2_source_contract_only=true
         iicb2b2_sources=("${@:2}")
@@ -11746,6 +11746,7 @@ function verify_iicb2b2_source_contract() {
     if (( ${#p} == 0 )); then p=(
         Package.swift
         Sources/StornautInvestigationMachineCampaign/main.swift
+        Sources/CInvestigationMachineCampaignSupport/CInvestigationMachineCampaignSupport.c
         Tests/Fixtures/InvestigationMachineCampaignCoordinator/main.swift
         Tests/StornautInvestigationTests/InvestigationMachineCampaignHarnessTests.swift
         Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
@@ -11753,20 +11754,22 @@ function verify_iicb2b2_source_contract() {
         scripts/verify-app-release-boundaries
         scripts/verify-contract
     ); fi
-    (( ${#p} == 8 )) || { print -u2 "ii-c-b2b2 source cardinality drifted"; return 1; }
+    (( ${#p} == 9 )) || { print -u2 "ii-c-b2b2 source cardinality drifted"; return 1; }
     local item
     for item in "${p[@]}"; do [[ -f $item && ! -L $item ]] \
         || { print -u2 "ii-c-b2b2 source path unavailable: $item"; return 1; }; done
     /usr/bin/xcrun swiftc -frontend -parse -enable-bare-slash-regex "${p[2]}"
-    /usr/bin/xcrun swiftc -frontend -parse -enable-bare-slash-regex "${p[3]}"
     /usr/bin/xcrun swiftc -frontend -parse -enable-bare-slash-regex "${p[4]}"
     /usr/bin/xcrun swiftc -frontend -parse -enable-bare-slash-regex "${p[5]}"
-    /bin/zsh -n "${p[6]}"; /bin/zsh -n "${p[7]}"; /bin/zsh -n "${p[8]}"
+    /usr/bin/xcrun swiftc -frontend -parse -enable-bare-slash-regex "${p[6]}"
+    /usr/bin/xcrun clang -fsyntax-only \
+        -I Sources/CInvestigationMachineCampaignSupport/include "${p[3]}"
+    /bin/zsh -n "${p[7]}"; /bin/zsh -n "${p[8]}"; /bin/zsh -n "${p[9]}"
     /usr/bin/python3 -I - "${p[@]}" <<'PY'
 from pathlib import Path
 import re, sys
-if len(sys.argv) != 9: raise SystemExit("ii-c-b2b2 source cardinality drifted")
-package, executable, fixture, tests, boundary, gate, release, contract = (Path(x).read_text() for x in sys.argv[1:])
+if len(sys.argv) != 10: raise SystemExit("ii-c-b2b2 source cardinality drifted")
+package, executable, transport, fixture, tests, boundary, gate, release, contract = (Path(x).read_text() for x in sys.argv[1:])
 target = '''        .executableTarget(
             name: "StornautInvestigationMachineCampaign",
             dependencies: [
@@ -11779,6 +11782,13 @@ if package.count('"StornautInvestigationMachineCampaign"') != 2: raise SystemExi
 if not executable.startswith("import CInvestigationIdentitySupport\nimport CInvestigationMachineCampaignSupport\nimport Darwin\nimport Dispatch\nimport Foundation\nimport StornautInvestigationHandoffContract\n\n#if DEBUG\nimport StornautInvestigationMachineCampaignSupport\n"): raise SystemExit("ii-c-b2b2 executable import boundary drifted")
 for marker in ("CommandLine.argc == 1", "CampaignDarwinSystem", "stornaut_investigation_campaign_spawn_fixed", "stornaut_investigation_campaign_bootstrap_fixed", "bootstrapVerified", "proc_pidinfo", "proc_listallpids", "waitpid", "kill(-groupID, SIGKILL)", "static func main() { exit(78) }"):
     if marker not in executable: raise SystemExit("ii-c-b2b2 executable lifecycle drifted")
+for marker in ("stornaut_campaign_preserve_terminal_output_bytes",
+               "attributes.c_oflag &= (tcflag_t)~ONLCR",
+               "stornaut_campaign_preserve_terminal_output_bytes(descriptors[1])"):
+    if marker not in transport:
+        raise SystemExit("ii-c-b2b2 exact PTY output drifted: " + marker)
+if transport.index("stornaut_campaign_preserve_terminal_output_bytes(descriptors[1])") > transport.index("posix_spawn("):
+    raise SystemExit("ii-c-b2b2 PTY output ordering drifted")
 allowed_sudo = (
     'Self.runFixed("/usr/bin/sudo", ["-knv"], maximum: 4_096)',
     '["command":"/usr/bin/sudo -knv",',
@@ -11795,14 +11805,14 @@ for marker in allowed_sudo:
     authority_surface = authority_surface.replace(marker, "", 1)
 for forbidden in ("StornautCore","StornautCodex","StornautExecution","CoordinatorSupport","MachineLaunchSupport","NSXPC","URLSession","sudo","launchctl","MoveToTrash","RegisteredAction"):
     if forbidden in authority_surface + fixture: raise SystemExit("ii-c-b2b2 prohibited authority drifted")
-for marker in ("CAMPAIGN_FIXTURE_TRUNCATED","CAMPAIGN_FIXTURE_TRAILING","CAMPAIGN_FIXTURE_MISSING_EOF","CAMPAIGN_FIXTURE_NONZERO","tcgetpgrp(STDERR_FILENO) == getpid()","STORNAUT_INVESTIGATION_CAMPAIGN_RECEIPT_FD"):
+for marker in ("CAMPAIGN_FIXTURE_TRUNCATED","CAMPAIGN_FIXTURE_TRAILING","CAMPAIGN_FIXTURE_MISSING_EOF","CAMPAIGN_FIXTURE_NONZERO","tcgetpgrp(STDERR_FILENO) == getpid()","STORNAUT_INVESTIGATION_CAMPAIGN_RECEIPT_FD",r'Data("campaign-physical-diagnostic\n".utf8)'):
     if marker not in fixture: raise SystemExit("ii-c-b2b2 fixture matrix drifted")
-for marker in ("physicalExecutableUsesControllingPTYAndExactFD3","physicalFailuresRemainBoundedAndLeaveZeroResidue",".truncated, .trailing, .missingEOF, .nonzero, .missingSibling","processGroupResidueCount == 0","sessionResidueCount == 0"):
+for marker in ("physicalExecutableUsesControllingPTYAndExactFD3","physicalFailuresRemainBoundedAndLeaveZeroResidue",r'report.diagnostic == "campaign-physical-diagnostic\n"',".truncated, .trailing, .missingEOF, .nonzero, .missingSibling","processGroupResidueCount == 0","sessionResidueCount == 0"):
     if marker not in tests: raise SystemExit("ii-c-b2b2 physical tests became vacuous")
 for marker in ("iiCB2B2PhysicalCampaignPinsFinalNonPrivilegedBoundary","--iic-b2b2-source-contract-only","--iic-b2b2-staged-scope-contract-only","--iic-b2b2-component-boundary-only","--iic-b2b2-contract-only"):
     if marker not in boundary: raise SystemExit("ii-c-b2b2 boundary markers drifted")
-if '"$release" --iic-b2b2-component-boundary-only' not in contract:
-    raise SystemExit("ii-c-b2b2 component gate wiring drifted")
+if '"$gate" --iic-b2b2-source-contract-only' not in contract:
+    raise SystemExit("ii-c-b2b2 current source gate wiring drifted")
 if '"$release" --iic-b2b2-component-boundary-only' not in contract:
     raise SystemExit("ii-c-b2b2 component gate wiring drifted")
 project = Path("Stornaut.xcodeproj/project.pbxproj").read_text(); schemes = "".join(p.read_text() for p in Path("Stornaut.xcodeproj/xcshareddata/xcschemes").glob("*.xcscheme"))
@@ -17588,6 +17598,7 @@ verify_iic0bi_producer_contract \
 verify_interactive_native_source_contract
 verify_iicb1_root_owned_gate_source_contract
 verify_iic_evidence_verification_source_contract
+verify_iicb2b2_source_contract
 verify_iicc_source_contract
 verify_iib5biib_app_identity_contract \
     Package.swift \

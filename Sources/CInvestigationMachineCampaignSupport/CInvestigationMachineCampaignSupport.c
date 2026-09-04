@@ -70,6 +70,23 @@ stornaut_campaign_set_nonblocking(int descriptor)
 }
 
 static int
+stornaut_campaign_preserve_terminal_output_bytes(int descriptor)
+{
+    struct termios attributes;
+    if (tcgetattr(descriptor, &attributes) != 0) {
+        return errno != 0 ? errno : EIO;
+    }
+    attributes.c_oflag &= (tcflag_t)~ONLCR;
+    if (tcsetattr(descriptor, TCSANOW, &attributes) != 0) {
+        return errno != 0 ? errno : EIO;
+    }
+    if (tcgetattr(descriptor, &attributes) != 0) {
+        return errno != 0 ? errno : EIO;
+    }
+    return (attributes.c_oflag & ONLCR) == 0 ? 0 : EIO;
+}
+
+static int
 stornaut_campaign_relocate(int *descriptor)
 {
     if (*descriptor > STORNAUT_INVESTIGATION_CAMPAIGN_BOOTSTRAP_FD) {
@@ -158,6 +175,12 @@ stornaut_investigation_campaign_spawn_fixed(
         int error_number = errno != 0 ? errno : EIO;
         stornaut_campaign_close_all(descriptors, 6);
         return error_number;
+    }
+    int terminal_result =
+        stornaut_campaign_preserve_terminal_output_bytes(descriptors[1]);
+    if (terminal_result != 0) {
+        stornaut_campaign_close_all(descriptors, 6);
+        return terminal_result;
     }
     for (size_t index = 0; index < 6; index += 1) {
         int result = stornaut_campaign_relocate(&descriptors[index]);

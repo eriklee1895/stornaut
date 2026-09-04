@@ -24,7 +24,7 @@ private struct InvestigationMachineCampaignCoordinatorFixture {
             _exit(81)
             #else
             try writeAll(
-                STDERR_FILENO, Data("campaign-physical-diagnostic".utf8))
+                STDERR_FILENO, Data("campaign-physical-diagnostic\n".utf8))
             let receipt = try InvestigationMachineCoordinatorRawReceiptV1(
                 buildProvenanceSHA256: String(repeating: "a", count: 64),
                 signedBindingSHA256: digest(0x42),
