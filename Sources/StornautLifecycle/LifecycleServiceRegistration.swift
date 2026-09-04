@@ -232,6 +232,27 @@ public struct LifecycleLocalInstallationContract: Sendable {
     public let appMode: mode_t
     public let plistMode: mode_t
 
+    static func lexicallyStableDirectoryURL(
+        filePath: String
+    ) throws -> URL {
+        let value = URL(
+            filePath: filePath,
+            directoryHint: .isDirectory
+        )
+        guard
+            filePath.hasPrefix("/"),
+            value.path == filePath,
+            !filePath.split(
+                separator: "/",
+                omittingEmptySubsequences: false
+            ).contains(where: { $0 == "." || $0 == ".." })
+        else {
+            throw LifecycleLocalInstallationContractError
+                .invalidFixedTopology
+        }
+        return value
+    }
+
     public init() throws {
         let installedRootURL = URL(
             filePath: "/Library/Application Support/Stornaut",
@@ -263,10 +284,9 @@ public struct LifecycleLocalInstallationContract: Sendable {
             filePath: "/Library/Application Support/Stornaut/R5Runtime",
             directoryHint: .isDirectory
         ).standardizedFileURL
-        let leaseRootURL = URL(
-            filePath: "/private/var/db/com.eriklee.stornaut.r5",
-            directoryHint: .isDirectory
-        ).standardizedFileURL
+        let leaseRootURL = try Self.lexicallyStableDirectoryURL(
+            filePath: "/private/var/db/com.eriklee.stornaut.r5"
+        )
         let label = "com.eriklee.stornaut.lifecycle"
         let machineClaimMachServiceName =
             "com.eriklee.stornaut.lifecycle.machine-claim"

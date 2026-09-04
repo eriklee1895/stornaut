@@ -114,6 +114,10 @@ struct InvestigationMachineCoordinatorBindingSourceTests {
 
     for (failure, expected) in [
       (InvestigationRuntimeDiagnosticBindingObservationError
+        .installationContractInvalid,
+       InvestigationMachineCoordinatorBindingSourceError
+        .installationContractInvalid),
+      (InvestigationRuntimeDiagnosticBindingObservationError
         .helperSigningUnavailable,
        InvestigationMachineCoordinatorBindingSourceError
         .helperSigningUnavailable),

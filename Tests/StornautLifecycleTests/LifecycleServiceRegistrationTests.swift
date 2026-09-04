@@ -5,6 +5,30 @@ import Testing
 @Suite("R5 lifecycle service registration")
 struct LifecycleServiceRegistrationTests {
     @Test
+    func fixedDirectoryURLDoesNotChangeWhenSymlinkedLeafAppears() throws {
+        let fileManager = FileManager.default
+        let leaf = URL(
+            filePath: "/private/var/tmp/stornaut-fixed-path-\(UUID().uuidString)",
+            directoryHint: .isDirectory
+        )
+        defer { try? fileManager.removeItem(at: leaf) }
+
+        let before = try LifecycleLocalInstallationContract
+            .lexicallyStableDirectoryURL(filePath: leaf.path)
+        try fileManager.createDirectory(
+            at: leaf,
+            withIntermediateDirectories: false
+        )
+        let after = try LifecycleLocalInstallationContract
+            .lexicallyStableDirectoryURL(filePath: leaf.path)
+
+        #expect(before.path == leaf.path)
+        #expect(after.path == leaf.path)
+        #expect(before == after)
+        #expect(leaf.standardizedFileURL.path != leaf.path)
+    }
+
+    @Test
     func localOnlyContractDerivesOnlyTheFixedDiagnosticTopology() throws {
         let contract = try LifecycleLocalInstallationContract()
 
