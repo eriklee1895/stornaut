@@ -8,6 +8,7 @@ import Testing
 @testable import StornautCodex
 @testable import StornautInvestigation
 @testable import StornautInvestigationDiagnostic
+@testable import StornautInvestigationHandoffContract
 @testable import StornautInvestigationMachineGateCoordinatorSupport
 
 @Suite("Investigation machine coordinator binding source", .serialized)
@@ -104,7 +105,9 @@ struct InvestigationMachineCoordinatorBindingSourceTests {
   }
 
   @Test
-  func productionAttemptRootBuildsTheEightConfigurationRows() async throws {
+  func productionAttemptBuildsAuthorsAndAdmitsEightConfigurationRows()
+    async throws
+  {
     let fixture = try CoordinatorBindingBehaviorFixture()
     defer { fixture.remove() }
     let attempt = try await InvestigationMachineGateCoordinatorOwnedAttempt
@@ -136,6 +139,31 @@ struct InvestigationMachineCoordinatorBindingSourceTests {
         attempt.rootURL.path + "/"
       )
     })
+    let projected = try InvestigationProjectedCohortAuthor().author(
+      configurationData: configurationSet.canonicalConfigurationData,
+      installedBinding: currentSourceBinding.installedBinding
+    )
+    #expect(
+      try InvestigationProjectedCohortInput.decode(projected.encoded())
+        == projected
+    )
+    let batch = try InvestigationMachineGateCoordinatorConfigurationBatch(
+      source: configurationSet
+    )
+    let authored = try InvestigationMachineGateCoordinatorAuthoredCohort(
+      sourceFingerprintSHA256: batch.sourceFingerprintSHA256,
+      configurationSHA256s: batch.configurationSHA256s,
+      configurationValidBefore: batch.configurationValidBefore,
+      projectedInput: projected
+    )
+    try InvestigationMachineGateCoordinatorHandoffAdmission.validate(
+      authored,
+      now: attempt.planningAt.addingTimeInterval(1)
+    )
+    try InvestigationMachineGateCoordinatorHandoffAdmission.validate(
+      authored,
+      now: attempt.planningAt.addingTimeInterval(2)
+    )
   }
 
   @Test

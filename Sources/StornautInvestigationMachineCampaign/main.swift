@@ -133,6 +133,38 @@ package enum InvestigationMachineCampaignExecutable {
     private static let completedExitStatus: Int32 = 0
     private static let failedExitStatus: Int32 = 70
 
+    package static func evidenceParentURL(
+        campaignUUID: UUID,
+        temporaryDirectory: URL = FileManager.default.temporaryDirectory
+    ) throws -> URL {
+        // Resolve the existing parent before appending the absent evidence leaf.
+        // On macOS, standardizing an existing /var child follows /var -> /private/var,
+        // while reopening the /var spelling with O_NOFOLLOW_ANY fails closed.
+        guard temporaryDirectory.isFileURL,
+              let resolved = realpath(temporaryDirectory.path, nil)
+        else {
+            throw InvestigationMachineCampaignExecutableReportError.invalid
+        }
+        defer { free(resolved) }
+        let physicalTemporaryDirectory = URL(
+            filePath: String(cString: resolved),
+            directoryHint: .isDirectory
+        )
+        let result = physicalTemporaryDirectory.appending(
+            path: "stornaut-iic-evidence-"
+                + campaignUUID.uuidString.lowercased(),
+            directoryHint: .isDirectory
+        )
+        guard
+            physicalTemporaryDirectory.path.hasPrefix("/"),
+            physicalTemporaryDirectory.path != "/",
+            result.deletingLastPathComponent() == physicalTemporaryDirectory
+        else {
+            throw InvestigationMachineCampaignExecutableReportError.invalid
+        }
+        return result
+    }
+
     package static func run() async -> Int32 {
         let system = CampaignDarwinSystem()
         if system.isBootstrapInvocation { return system.runBootstrap() }
@@ -582,8 +614,8 @@ package enum InvestigationMachineCampaignExecutable {
             throws -> InvestigationMachineRawEvidenceWriter
         {
             let campaignUUID = UUID()
-            let path = FileManager.default.temporaryDirectory.appending(
-                path: "stornaut-iic-evidence-" + campaignUUID.uuidString.lowercased()).path
+            let path = try InvestigationMachineCampaignExecutable
+                .evidenceParentURL(campaignUUID: campaignUUID).path
             guard mkdir(path, 0o700) == 0 else { throw Failure.posix(errno) }
             let parent = open(path, O_RDONLY | O_DIRECTORY | O_CLOEXEC
                 | O_NOFOLLOW_ANY | O_UNIQUE | O_NONBLOCK)

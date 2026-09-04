@@ -13,6 +13,46 @@ import Testing
 @Suite("Investigation machine campaign evidence", .serialized)
 struct InvestigationMachineCampaignEvidenceTests {
     @Test
+    func productionEvidenceParentUsesPhysicalTemporaryDirectory() throws {
+        let campaignUUID = UUID()
+        let parent = try InvestigationMachineCampaignExecutable
+            .evidenceParentURL(campaignUUID: campaignUUID)
+        guard let resolved = realpath(
+            FileManager.default.temporaryDirectory.path,
+            nil
+        ) else {
+            throw CampaignEvidenceFixtureError.realpath(errno)
+        }
+        defer { free(resolved) }
+        let physicalTemporaryDirectory = URL(
+            filePath: String(cString: resolved),
+            directoryHint: .isDirectory
+        )
+
+        #expect(parent.deletingLastPathComponent() == physicalTemporaryDirectory)
+        #expect(
+            parent.lastPathComponent
+                == "stornaut-iic-evidence-"
+                    + campaignUUID.uuidString.lowercased()
+        )
+        try #require(mkdir(parent.path, 0o700) == 0)
+        defer {
+            if rmdir(parent.path) != 0 {
+                Issue.record("evidence-parent cleanup failed with errno \(errno)")
+            }
+        }
+        let descriptor = open(
+            parent.path,
+            O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW_ANY
+                | O_UNIQUE | O_NONBLOCK
+        )
+        try #require(descriptor >= 3)
+        if close(descriptor) != 0 {
+            Issue.record("evidence-parent close failed with errno \(errno)")
+        }
+    }
+
+    @Test
     func preArmFailureRepairScopeRemainsBounded() throws {
         let root = URL(filePath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
