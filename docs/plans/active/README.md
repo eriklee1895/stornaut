@@ -4,7 +4,8 @@ The approved executable plan is
 [Phase D — Conditional Deep Dive](phase-d-conditional-deep-dive.md).
 Tasks 36–38 are complete. Task 38's closed fake-runtime coordinator,
 independent review, 811-test serialized regression and 23/23-stage
-authoritative full verifier passed. Task 39 is in progress: checkpoints 39A,
+authoritative full verifier passed. Task 39 is blocked/incomplete after a conclusive no-go
+machine-gate result: checkpoints 39A,
 39B1a, 39B1b-i and 39B1b-ii are complete and independently verified. 39B1a
 closed the exact Evidence Store v4 path and directly async lifecycle prerequisites;
 39B1b-i closed the package-scoped transport/non-product composition seam.
@@ -369,8 +370,10 @@ tree `9c59f241`; ii-c-b2a1 is complete/non-admitting at implementation
 `294bdb2` / tree `dbbffbba`. Resolved root-driver lineage L1 is complete at
 implementation `83f6271` / tree `98289e2`; L2 implementation `474f634`,
 cross-UID/PID-reuse corrections and final verifier closure `849e454` are also
-complete/non-admitting; the final post-fix review returned no finding. The current
-frontier is the ii-c-c unique real machine campaign -> L3c3d -> L3c4. These
+complete/non-admitting; the final post-fix review returned no finding. The
+historical pre-v8 order was ii-c-c -> L3c3d -> L3c4, but v8 is now consumed,
+failed, and non-retryable. No live machine frontier exists without explicit user
+approval for a replacement privileged campaign and plan amendment. These
 repairs are machine-campaign prerequisite checkpoints, not recursively named
 new Tasks. Review findings and
 local repairs stay within their owning checkpoint. L3c4 alone owns the remaining
@@ -453,8 +456,8 @@ the sole normal-product admission gate.
 | [36](task-36-implementation-brief.md) | Domain, canonical projection, planner, budget and stop contracts | complete; [review](../../reports/phase-d-task-36-review.md) |
 | [37](task-37-implementation-brief.md) | Store v4, retention and source rejoin | complete; [review](../../reports/phase-d-task-37-review.md) |
 | [38](task-38-implementation-brief.md) | Closed coordinator with fake runtime | complete; [review](../../reports/phase-d-task-38-review.md) |
-| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | in progress; resolved-lineage L1/L2 complete/non-admitting, final verifier review none; current frontier ii-c-c unique real machine campaign -> L3c3d -> L3c4; unique privileged attempt unconsumed; L3c4 owns the remaining full; ADR 0018 Proposed |
-| [40](task-40-implementation-brief.md) | Evidence report and conservative Review projection | blocked on Task 39 |
+| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | blocked/incomplete: v8 is consumed transport loss, independently dispositioned non-admitting/non-retryable; no replacement privileged attempt authorized; L3c3d/L3c4 readiness evidence unavailable; final full intentionally not run; ADR 0018 remains Proposed |
+| [40](task-40-implementation-brief.md) | Evidence report and conservative Review projection | blocked on Task 39 under the approved sequential plan |
 | [41](task-41-implementation-brief.md) | First-use disclosure and typed availability | blocked on Task 40 |
 | [42](task-42-implementation-brief.md) | App workflow and recovery state | blocked on Task 41 |
 | [43](task-43-implementation-brief.md) | Investigations UI and navigation | blocked on Task 42 |

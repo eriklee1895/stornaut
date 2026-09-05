@@ -355,6 +355,7 @@ iicc_scope_contract_only=false
 iicc_scope_baseline=622e7b99d57dfe482ccd37481fcdb4dcff87a0ec
 iicc_suspended_sudo_contract_only=false
 iicc_suspended_sudo_sources=()
+iicc_failure_disposition_contract_only=false
 iicc_prearm_scope_contract_only=false
 iicc_prearm_scope_baseline=62ee47091e338107e182233eaed80ed1ecc059cc
 prearm_failure_source_contract_only=false
@@ -982,6 +983,9 @@ if (( $# > 0 )); then
         && [[ $1 == --iic-c-suspended-sudo-contract-only ]]; then
         iicc_suspended_sudo_contract_only=true
         iicc_suspended_sudo_sources=("${@:2}")
+    elif (( $# == 1 )) \
+        && [[ $1 == --iic-c-failure-disposition-contract-only ]]; then
+        iicc_failure_disposition_contract_only=true
     elif (( $# == 1 || $# == 2 )) \
         && [[ $1 == --iic-c-prearm-staged-scope-contract-only ]]; then
         iicc_prearm_scope_contract_only=true
@@ -12635,6 +12639,131 @@ for marker in (
 PY
 }
 
+function verify_iicc_failure_disposition_contract() {
+    local verifier=scripts/verify-investigation-runtime-machine-failure
+    local evidence=docs/reports/evidence/task-39-iic-v8-failure-disposition.json
+    local tests=Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift
+    local boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+    local report=docs/reports/phase-d-task-39b2c-iic-v8-failure-disposition.md
+    local path
+    for path in $verifier $evidence $tests $boundary $report; do
+        [[ -f $path && ! -L $path ]] || {
+            print -u2 "ii-c-c failure disposition source unavailable: $path"
+            return 1
+        }
+    done
+    [[ -x $verifier ]] || {
+        print -u2 "ii-c-c failure disposition verifier is not executable"
+        return 1
+    }
+    /bin/zsh -n $verifier || return $?
+    /usr/bin/python3 -I - $verifier $evidence $tests $boundary $report <<'PY'
+from pathlib import Path
+import hashlib
+import json
+import re
+import sys
+
+verifier, evidence, tests, boundary, report = (
+    Path(value) for value in sys.argv[1:])
+source = verifier.read_text(encoding="utf-8")
+test_source = tests.read_text(encoding="utf-8")
+boundary_source = boundary.read_text(encoding="utf-8")
+report_source = report.read_text(encoding="utf-8")
+match = re.fullmatch(
+    r"([0-9a-f]{64})",
+    re.search(
+        r"(?m)^typeset -r iicc_failure_self_sha=([^ ]+) # iicc-failure-self-seal$",
+        source).group(1))
+if not match:
+    raise SystemExit("ii-c-c failure verifier self-seal carrier drifted")
+normalized, count = re.subn(
+    r"(?m)^typeset -r iicc_failure_self_sha=[0-9a-f]{64} # iicc-failure-self-seal$",
+    "typeset -r iicc_failure_self_sha=SELF # iicc-failure-self-seal", source)
+if count != 1 or hashlib.sha256(normalized.encode()).hexdigest() != match.group(1):
+    raise SystemExit("ii-c-c failure verifier self-seal drifted")
+required = (
+    "canonical_report_json", "parse_event", "event hash chain",
+    "consumed transport-loss event chain", "event evidence-set binding",
+    "requiredMissingArtifacts", "completion artifact unexpectedly present",
+    "fixed Stornaut path present",
+    "fixed Stornaut service state unavailable or registered",
+    "fixed Stornaut process present", "gate base has attempt residue",
+    "pwd.getpwuid(user_id)", "record.pw_dir",
+    "admission\"] == \"rejected", "retry\"] == \"forbidden",
+)
+for marker in required:
+    if marker not in source:
+        raise SystemExit("ii-c-c failure verifier contract drifted: " + marker)
+for forbidden in (
+    "O_WRONLY", "O_RDWR", "O_CREAT", "O_TRUNC",
+    "os.remove", "os.unlink", "os.rename", "os.mkdir", "shutil",
+    "SIGTERM", "SIGKILL", "signedInvestigationRuntimeReady",
+    "os.path.expanduser",
+):
+    if forbidden in source:
+        raise SystemExit("ii-c-c failure verifier gained authority: " + forbidden)
+evidence_bytes = evidence.read_bytes()
+checked_receipt_sha256 = "03a5de9360653eb786b23963976de4ff14af4cc953771768e77612c93fdd8b0c"
+if hashlib.sha256(evidence_bytes).hexdigest() != checked_receipt_sha256:
+    raise SystemExit("ii-c-c checked failure disposition digest drifted")
+value = json.loads(evidence_bytes)
+if (value.get("classification") != "consumedTransportLoss"
+        or value.get("admission") != "rejected"
+        or value.get("retry") != "forbidden"
+        or value.get("eventChain")
+            != ["prepared", "armedConsumed", "spawnUncertain"]):
+    raise SystemExit("ii-c-c checked failure disposition drifted")
+for marker in (
+    "failureDispositionVerifierAcceptsOnlyConsumedTransportLoss",
+    "failureDispositionVerifierRejectsCompletionArtifactsAndAdmission",
+    "failureDispositionVerifierRejectsReportAndTreeAliases",
+    "failureDispositionVerifierIgnoresCallerControlledHome",
+    "checkedV8FailureDispositionBindsFrozenExternalEvidenceWhenAvailable",
+):
+    if marker not in test_source:
+        raise SystemExit("ii-c-c failure disposition tests drifted: " + marker)
+if "iiCCFailureDispositionVerifierRemainsReadOnlyAndNonAdmitting" not in boundary_source:
+    raise SystemExit("ii-c-c failure disposition boundary test drifted")
+for marker in (
+    "consumedTransportLoss", "non-admitting", "non-retryable",
+    "cannot substitute for v8's missing durable uninstall/global-teardown",
+):
+    if marker not in report_source:
+        raise SystemExit("ii-c-c failure disposition report drifted: " + marker)
+active_status_sha256 = {
+    Path("AGENTS.md"): "4ab074744544f6af12fe409f67c5e7db862f74dae3e193ba7d9476af267db04b",
+    Path("README.md"): "97f0933a6b830de6946ada0b4cbd140a80e1692d443acd70a18222374113dc83",
+    Path("docs/README.md"): "03fc686ea88ab244a2506b8ce55217d74b587adac5400202ce3689c2a6937249",
+    Path("docs/agent/coding-agent-handoff.md"): "809ba290f3552d9c763ab14582db413797a9dd6c9740c4af3c0ba7529f791955",
+    Path("docs/plans/active/README.md"): "f72cb8d2d708752ebfd55133c6adba4d70907c8a6d569ec7f3af927114bfca4b",
+    Path("docs/plans/active/phase-d-conditional-deep-dive.md"): "494721e057c2e41ecd5de1f8cf9a5559a1773ebce88b8149b9c41c9c97ec56e3",
+    Path("docs/plans/active/task-39-implementation-brief.md"): "e20bf97729bad999f839165b606e16a6227c3f04dddded0e8c69d7571ff38732",
+    Path("docs/plans/active/task-40-implementation-brief.md"): "73a01d3997def484f9f68e0bb6906f8bec00c8d18a397ca9a168d247e0a197de",
+    Path("docs/plans/roadmap.md"): "25823d112e6354a59dca80b7ad9bd36eb145a61e444dd9c27a2db30e2a33060a",
+}
+active_status_expected_paths = {
+    Path("AGENTS.md"),
+    Path("README.md"),
+    Path("docs/README.md"),
+    Path("docs/agent/coding-agent-handoff.md"),
+    Path("docs/plans/active/README.md"),
+    Path("docs/plans/active/phase-d-conditional-deep-dive.md"),
+    Path("docs/plans/active/task-39-implementation-brief.md"),
+    Path("docs/plans/active/task-40-implementation-brief.md"),
+    Path("docs/plans/roadmap.md"),
+}
+if set(active_status_sha256) != active_status_expected_paths:
+    raise SystemExit("ii-c-c blocked status docs inventory drifted")
+for active_path, expected_digest in active_status_sha256.items():
+    if (not active_path.is_file() or active_path.is_symlink()
+            or hashlib.sha256(active_path.read_bytes()).hexdigest()
+                != expected_digest):
+        raise SystemExit(
+            "ii-c-c blocked status docs drifted: " + str(active_path))
+PY
+}
+
 function verify_iicc_staged_scope() {
     local PATH=/usr/bin:/bin:/usr/sbin:/sbin
     local expected_baseline=622e7b99d57dfe482ccd37481fcdb4dcff87a0ec
@@ -17496,6 +17625,11 @@ if $iicc_suspended_sudo_contract_only; then
     print "ii-c-c suspended-sudo contract verification passed."
     exit 0
 fi
+if $iicc_failure_disposition_contract_only; then
+    verify_iicc_failure_disposition_contract
+    print "ii-c-c failure disposition contract verification passed."
+    exit 0
+fi
 if $iicc_scope_contract_only; then
     verify_iicc_staged_scope "$iicc_scope_baseline"
     print "ii-c-c staged scope verification passed."
@@ -17755,6 +17889,7 @@ verify_iic_evidence_verification_source_contract
 verify_iicb2b2_source_contract
 verify_iicc_source_contract
 verify_iicc_suspended_sudo_contract
+verify_iicc_failure_disposition_contract
 verify_iib5biib_app_identity_contract \
     Package.swift \
     Sources/CInvestigationIdentitySupport/CInvestigationIdentitySupport.c \

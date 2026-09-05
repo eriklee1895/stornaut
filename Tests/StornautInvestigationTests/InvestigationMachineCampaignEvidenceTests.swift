@@ -1282,6 +1282,169 @@ struct InvestigationMachineCampaignEvidenceTests {
     }
 
     @Test
+    func failureDispositionVerifierAcceptsOnlyConsumedTransportLoss() throws {
+        let fixture = try CampaignEvidenceDiskFixture.make(
+            productionEvidenceName: true)
+        defer { fixture.remove() }
+        var writer: InvestigationMachineRawEvidenceWriter? = try fixture
+            .makeWriter(mode: .privileged)
+        try fixture.populateConsumedTransportLoss(try #require(writer))
+        writer = nil
+        let reportParent = try Self.makeFailureReportParent()
+        defer { try? FileManager.default.removeItem(at: reportParent) }
+        let report = reportParent.appending(path: "failure-disposition.json")
+        try fixture.writeFailureDisposition(to: report)
+
+        let accepted = try Self.runFailureVerifier(
+            fixture.evidenceRoot, report)
+        #expect(accepted.status == 0, Comment(rawValue: accepted.stderr))
+        #expect(accepted.stdout.contains(
+            "consumed transport-loss disposition verified"))
+
+        let event = fixture.evidenceRoot.appending(
+            path: "03-authorization/attempt-event-0003.bin")
+        var bytes = try Data(contentsOf: event)
+        bytes[bytes.count - 1] ^= 1
+        try bytes.write(to: event)
+        let rejected = try Self.runFailureVerifier(
+            fixture.evidenceRoot, report)
+        #expect(rejected.status != 0)
+    }
+
+    @Test
+    func failureDispositionVerifierRejectsCompletionArtifactsAndAdmission() throws {
+        let fixture = try CampaignEvidenceDiskFixture.make(
+            productionEvidenceName: true)
+        defer { fixture.remove() }
+        var writer: InvestigationMachineRawEvidenceWriter? = try fixture
+            .makeWriter(mode: .privileged)
+        try fixture.populateConsumedTransportLoss(try #require(writer))
+        writer = nil
+        let reportParent = try Self.makeFailureReportParent()
+        defer { try? FileManager.default.removeItem(at: reportParent) }
+        let report = reportParent.appending(path: "failure-disposition.json")
+        try fixture.writeFailureDisposition(to: report)
+
+        let manifest = fixture.evidenceRoot.appending(path: "manifest.bin")
+        try Data([0x01]).write(to: manifest)
+        try #require(chmod(manifest.path, 0o600) == 0)
+        #expect(try Self.runFailureVerifier(
+            fixture.evidenceRoot, report).status != 0)
+        try FileManager.default.removeItem(at: manifest)
+
+        var object = try #require(JSONSerialization.jsonObject(
+            with: Data(try Data(contentsOf: report).dropLast()))
+            as? [String: Any])
+        object["admission"] = "accepted"
+        try Self.writeCanonicalReport(object, to: report)
+        #expect(try Self.runFailureVerifier(
+            fixture.evidenceRoot, report).status != 0)
+
+        try fixture.writeFailureDisposition(to: report)
+        object = try #require(JSONSerialization.jsonObject(
+            with: Data(try Data(contentsOf: report).dropLast()))
+            as? [String: Any])
+        object["verifierExecutableSHA256"] = String(
+            repeating: "a", count: 64)
+        try Self.writeCanonicalReport(object, to: report)
+        #expect(try Self.runFailureVerifier(
+            fixture.evidenceRoot, report).status != 0)
+    }
+
+    @Test
+    func failureDispositionVerifierRejectsReportAndTreeAliases() throws {
+        let fixture = try CampaignEvidenceDiskFixture.make(
+            productionEvidenceName: true)
+        defer { fixture.remove() }
+        var writer: InvestigationMachineRawEvidenceWriter? = try fixture
+            .makeWriter(mode: .privileged)
+        try fixture.populateConsumedTransportLoss(try #require(writer))
+        writer = nil
+        let reportParent = try Self.makeFailureReportParent()
+        defer { try? FileManager.default.removeItem(at: reportParent) }
+        let report = reportParent.appending(path: "failure-disposition.json")
+        try fixture.writeFailureDisposition(to: report)
+
+        let reportAlias = reportParent.appending(path: "report-alias.json")
+        try #require(symlink(report.path, reportAlias.path) == 0)
+        #expect(try Self.runFailureVerifier(
+            fixture.evidenceRoot, reportAlias).status != 0)
+
+        let rootAlias = fixture.parent.deletingLastPathComponent().appending(
+            path: "stornaut-iic-evidence-alias-" + UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: rootAlias) }
+        try #require(symlink(fixture.evidenceRoot.path, rootAlias.path) == 0)
+        #expect(try Self.runFailureVerifier(rootAlias, report).status != 0)
+    }
+
+    @Test
+    func failureDispositionVerifierIgnoresCallerControlledHome() throws {
+        let fixture = try CampaignEvidenceDiskFixture.make(
+            productionEvidenceName: true)
+        defer { fixture.remove() }
+        var writer: InvestigationMachineRawEvidenceWriter? = try fixture
+            .makeWriter(mode: .privileged)
+        try fixture.populateConsumedTransportLoss(try #require(writer))
+        writer = nil
+        let reportParent = try Self.makeFailureReportParent()
+        defer { try? FileManager.default.removeItem(at: reportParent) }
+        let report = reportParent.appending(path: "failure-disposition.json")
+        try fixture.writeFailureDisposition(to: report)
+
+        var object = try #require(JSONSerialization.jsonObject(
+            with: Data(try Data(contentsOf: report).dropLast()))
+            as? [String: Any])
+        var observation = try #require(
+            object["systemObservation"] as? [String: Any])
+        let actualState = try #require(observation["gateBaseState"] as? String)
+        let substitutedState = actualState == "absent"
+            ? "ownerLockOnly" : "absent"
+        observation["gateBaseState"] = substitutedState
+        object["systemObservation"] = observation
+        try Self.writeCanonicalReport(object, to: report)
+
+        let fakeHome = reportParent.appending(
+            path: "fake-home", directoryHint: .isDirectory)
+        if substitutedState == "ownerLockOnly" {
+            let fakeGate = fakeHome.appending(
+                path: "Library/Caches/com.eriklee.stornaut.task39-machine-gate",
+                directoryHint: .isDirectory)
+            try FileManager.default.createDirectory(
+                at: fakeGate, withIntermediateDirectories: true,
+                attributes: [.posixPermissions: 0o700])
+            try #require(chmod(fakeGate.path, 0o700) == 0)
+            let lock = fakeGate.appending(path: ".owner-lock-v1")
+            try Data().write(to: lock)
+            try #require(chmod(lock.path, 0o600) == 0)
+        } else {
+            try FileManager.default.createDirectory(
+                at: fakeHome, withIntermediateDirectories: false,
+                attributes: [.posixPermissions: 0o700])
+        }
+        let rejected = try Self.runFailureVerifier(
+            fixture.evidenceRoot, report, environment: ["HOME": fakeHome.path])
+        #expect(rejected.status != 0)
+        #expect(rejected.stderr.contains("system observation drift"))
+    }
+
+    @Test
+    func checkedV8FailureDispositionBindsFrozenExternalEvidenceWhenAvailable() throws {
+        let repository = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let report = repository.appending(
+            path: "docs/reports/evidence/task-39-iic-v8-failure-disposition.json")
+        guard let root = ProcessInfo.processInfo.environment[
+            "STORNAUT_TASK39_V8_EVIDENCE_ROOT"] else { return }
+        try #require(FileManager.default.fileExists(atPath: root))
+
+        let before = try Self.treeSnapshot(URL(filePath: root))
+        let result = try Self.runFailureVerifier(URL(filePath: root), report)
+        let after = try Self.treeSnapshot(URL(filePath: root))
+        #expect(result.status == 0, Comment(rawValue: result.stderr))
+        #expect(before == after)
+    }
+
+    @Test
     func eventChainsRejectGapsBrokenHashesAndIllegalTransitions() throws {
         let attempt = CampaignEvidenceFixture.uuid(0x43)
         let prepared = try Self.event(
@@ -2028,6 +2191,60 @@ struct InvestigationMachineCampaignEvidenceTests {
         _ evidenceRoot: URL, _ sealURL: URL
     ) throws -> CampaignVerifierResult {
         try runVerifier(evidenceRoot.path, sealURL.path)
+    }
+
+    private static func runFailureVerifier(
+        _ evidenceRoot: URL, _ report: URL,
+        environment: [String: String]? = nil
+    ) throws -> CampaignVerifierResult {
+        let repository = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let process = Process(), output = Pipe(), errors = Pipe()
+        process.executableURL = repository.appending(
+            path: "scripts/verify-investigation-runtime-machine-failure")
+        process.arguments = [evidenceRoot.path, report.path]
+        process.standardInput = FileHandle.nullDevice
+        process.standardOutput = output
+        process.standardError = errors
+        if let environment {
+            process.environment = environment.merging(
+                ["PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "LC_ALL": "C"]
+            ) { current, _ in current }
+        }
+        try process.run()
+        process.waitUntilExit()
+        return .init(
+            status: process.terminationStatus,
+            stdout: String(decoding: output.fileHandleForReading
+                .readDataToEndOfFile(), as: UTF8.self),
+            stderr: String(decoding: errors.fileHandleForReading
+                .readDataToEndOfFile(), as: UTF8.self))
+    }
+
+    fileprivate static func writeCanonicalReport(
+        _ object: Any, to url: URL
+    ) throws {
+        var data = try JSONSerialization.data(
+            withJSONObject: object,
+            options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
+        data.append(UInt8(ascii: "\n"))
+        try data.write(to: url)
+        try #require(chmod(url.path, 0o644) == 0)
+    }
+
+    private static func makeFailureReportParent() throws -> URL {
+        let directory = FileManager.default.temporaryDirectory.appending(
+            path: "stornaut-failure-report-" + UUID().uuidString,
+            directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(
+            at: directory, withIntermediateDirectories: false,
+            attributes: [.posixPermissions: 0o700])
+        try #require(chmod(directory.path, 0o700) == 0)
+        guard let resolved = realpath(directory.path, nil) else {
+            throw CampaignEvidenceFixtureError.realpath(errno)
+        }
+        defer { free(resolved) }
+        return URL(filePath: String(cString: resolved))
     }
 
     private static func runVerifier(
@@ -3105,9 +3322,14 @@ private final class CampaignEvidenceDiskFixture {
         )
     }
 
-    static func make() throws -> CampaignEvidenceDiskFixture {
+    static func make(
+        productionEvidenceName: Bool = false
+    ) throws -> CampaignEvidenceDiskFixture {
         let parent = FileManager.default.temporaryDirectory.appending(
-            path: "stornaut-campaign-evidence-parent-" + UUID().uuidString,
+            path: productionEvidenceName
+                ? "stornaut-iic-evidence-"
+                    + CampaignEvidenceFixture.uuid(0x51).uuidString.lowercased()
+                : "stornaut-campaign-evidence-parent-" + UUID().uuidString,
             directoryHint: .isDirectory
         )
         try FileManager.default.createDirectory(
@@ -3237,6 +3459,125 @@ private final class CampaignEvidenceDiskFixture {
             ))
         }
         try write(values, to: writer)
+    }
+
+    func populateConsumedTransportLoss(
+        _ writer: InvestigationMachineRawEvidenceWriter
+    ) throws {
+        for (index, kind) in [
+            InvestigationMachineAttemptEventKind.prepared, .armedConsumed,
+            .spawnUncertain,
+        ].enumerated() {
+            _ = try writer.appendAttemptEvent(
+                kind: kind,
+                payload: try failureEventPayload(kind),
+                observedAt: try .init(rawValue: Int64(index + 1)))
+        }
+        try write(Array(try commonArtifacts(
+            expectedConsumed: true, epochCount: 0,
+            cancellationAttestation: true,
+            preArmFrameSHA256: InvestigationMachineCampaignEvidenceTests
+                .digest(0xd1)).prefix(5)), to: writer)
+    }
+
+    func writeFailureDisposition(to url: URL) throws {
+        var root = stat(), parentNode = stat()
+        try #require(lstat(evidenceRoot.path, &root) == 0)
+        try #require(lstat(parent.path, &parentNode) == 0)
+        let paths = [
+            "01-preflight/source-build.json",
+            "02-install/installed.json",
+            "03-authorization/attempt-event-0001.bin",
+            "03-authorization/attempt-event-0002.bin",
+            "03-authorization/attempt-event-0003.bin",
+            "03-authorization/capability-counts.json",
+            "03-authorization/human-attestation.json",
+            "03-authorization/policy-probe.json",
+        ]
+        let hashes = try Dictionary(uniqueKeysWithValues: paths.map { path in
+            (path, InvestigationHandoffSHA256.hashing(try Data(
+                contentsOf: evidenceRoot.appending(path: path))).lowercaseHex)
+        })
+        let source = try #require(JSONSerialization.jsonObject(
+            with: Data(contentsOf: evidenceRoot.appending(
+                path: "01-preflight/source-build.json"))) as? [String: Any])
+        let gateBase = FileManager.default.homeDirectoryForCurrentUser
+            .appending(path:
+                "Library/Caches/com.eriklee.stornaut.task39-machine-gate")
+        let gateBaseState = FileManager.default.fileExists(atPath: gateBase.path)
+            ? "ownerLockOnly" : "absent"
+        let repository = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let verifier = repository.appending(
+            path: "scripts/verify-investigation-runtime-machine-failure")
+        try InvestigationMachineCampaignEvidenceTests.writeCanonicalReport([
+            "schemaVersion": 1,
+            "domain": "stornaut.task39.iic.failure-disposition.v1",
+            "campaignUUID": campaignUUID.uuidString.lowercased(),
+            "attemptUUID": attemptUUID.uuidString.lowercased(),
+            "classification": "consumedTransportLoss",
+            "admission": "rejected",
+            "retry": "forbidden",
+            "eventChain": ["prepared", "armedConsumed", "spawnUncertain"],
+            "evidenceSetSHA256": InvestigationMachineCampaignEvidenceTests
+                .digest(0xd1).lowercaseHex,
+            "sourceBinding": source,
+            "artifactSHA256": hashes,
+            "verifierExecutableSHA256": InvestigationHandoffSHA256.hashing(
+                try Data(contentsOf: verifier)).lowercaseHex,
+            "requiredMissingArtifacts": [
+                "manifest.bin", "../seal.json",
+                "04-driver-epochs/coordinator-receipt.bin",
+                "04-driver-epochs/diagnostic-output.bin",
+                "05-uninstall/uninstall.json",
+                "06-verifier/global-post-teardown.json",
+                "06-verifier/verification-input.json",
+            ],
+            "rootIdentity": Self.reportIdentity(root),
+            "parentIdentity": Self.reportIdentity(parentNode),
+            "systemObservation": [
+                "fixedPathsAbsent": true, "fixedServiceAbsent": true,
+                "fixedProcessCount": 0,
+                "gateBaseState": gateBaseState,
+            ],
+            "nonClaims": [
+                "no manifest or external seal",
+                "no uninstall or global post-teardown artifact",
+                "no machine admission",
+                "no L3c3d authenticated model success",
+                "no Task 39 readiness",
+            ],
+        ], to: url)
+    }
+
+    private func failureEventPayload(
+        _ kind: InvestigationMachineAttemptEventKind
+    ) throws -> Data {
+        let name = switch kind {
+        case .prepared: "prepared"
+        case .armedConsumed: "armedConsumed"
+        case .spawnUncertain: "spawnUncertain"
+        default: throw CampaignEvidenceFixtureError.unsupportedRole
+        }
+        var value: [String: Any] = [
+            "schemaVersion": 1, "kind": name,
+            "attemptUUID": attemptUUID.uuidString.lowercased(),
+            "evidenceSetSHA256": InvestigationMachineCampaignEvidenceTests
+                .digest(0xd1).lowercaseHex,
+        ]
+        if kind == .spawnUncertain {
+            value["reason"] = "campaign-incomplete"
+        }
+        return try InvestigationMachineEvidenceJSON.canonicalData(value)
+    }
+
+    private static func reportIdentity(_ value: stat) -> [String: String] {
+        [
+            "device": String(value.st_dev),
+            "inode": String(value.st_ino),
+            "generation": String(value.st_gen),
+            "size": String(value.st_size),
+        ]
     }
 
     private typealias Artifact = (InvestigationMachineEvidencePhase, String, InvestigationMachineEvidenceRole, InvestigationMachineEvidenceEncoding, Data)

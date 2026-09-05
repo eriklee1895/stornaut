@@ -1,12 +1,12 @@
 # Phase D Task 39B2c ii-c Machine Campaign Preflight
 
-> Status: frozen / ii-c-a and ii-c-b complete/non-admitting / ii-c-c implementation current; unique privileged attempt not consumed
+> Status: frozen / ii-c-a and ii-c-b complete/non-admitting / ii-c-c v8 consumed failure disposed; no retry authorized
 >
 > Date: 2026-08-30
 >
 > Baseline: `2b30a157c14bc507351b10bd521e710987860f71`
 >
-> Remaining order: ii-c-c -> L3c3d -> L3c4
+> Remaining order: v8 failure disposition -> L3c3d/L3c4 blocked pending an authorized green machine cohort
 
 ## 1. Decision
 
@@ -148,11 +148,21 @@ complete/non-privileged/non-admitting; L2 final post-fix review returned no
 finding. The pre-arm failure diagnostic repair is complete at `2ada395` / tree
 `11e1a0a`: typed stage/reason/checkpoint reporting, exact exit/EOF/residue
 verification, a physical compact-frame path and a nine-path scope mutation
-matrix all passed final review with no unresolved P0-P2. The unique privileged
-attempt remains unconsumed. The current and only
-frontier is `ii-c-c`, followed strictly by `L3c3d -> L3c4`; see the
+matrix all passed final review with no unresolved P0-P2. At that historical
+checkpoint the unique privileged attempt remained unconsumed. The then-current
+frontier was `ii-c-c`, followed strictly by `L3c3d -> L3c4`; see the
 [L2 completion audit](phase-d-task-39b2c-iic-resolved-root-driver-lineage-l2-review.md)
 and [pre-arm failure diagnostic audit](phase-d-task-39b2c-iic-prearm-failure-diagnostic-review.md).
+
+Live disposition (2026-09-05): v8 reached
+`prepared -> armedConsumed -> spawnUncertain` and is therefore consumed. It
+contains no manifest, external seal, uninstall artifact or global post-teardown
+artifact and cannot admit ii-c. The suspended-sudo root cause is repaired, but
+v8 was not retried and no replacement privileged attempt is authorized. The
+[v8 failure disposition](phase-d-task-39b2c-iic-v8-failure-disposition.md)
+binds the preserved evidence and current zero-runtime observation without
+modifying the original evidence tree. L3c3d and L3c4 remain blocked on the
+green machine cohort required by their existing contracts.
 
 ## 6. Campaign Evidence and Attempt Consumption
 
@@ -238,8 +248,9 @@ This amendment freezes the final implementation inside the existing ii-c-c
 checkpoint. It does not create another Task or named child checkpoint. The
 baseline is component-gate prerequisite `622e7b99d57dfe482ccd37481fcdb4dcff87a0ec`,
 tree `543adc4bed4f2f28ba66a3b8506e1a65b9cc7348`. It updates only the existing
-closed-image verifier's exact CampaignSupport object inventory. The unique privileged attempt
-remains unconsumed until every non-privileged gate below is green.
+closed-image verifier's exact CampaignSupport object inventory. At the time of
+this amendment the unique privileged attempt remained unconsumed until every
+non-privileged gate below was green; v8 later consumed it as recorded above.
 
 The implementation may change exactly these seventeen non-document paths and at
 most 4,000 changed non-document lines (additions plus deletions):

@@ -9,8 +9,9 @@
 > ii-b5b-ii-a/ii-b/ii-c/ii-d and ii-c0a projection-in-capsule complete/non-
 > admitting; ii-b5b-iii-b0 through iii-b2b-1b and ii-c0b-i complete/non-
 > admitting; c0b-ii ownership preflight split it into ii-c0b-ii-a/ii-c0b-ii-b;
-> ii-a budget split frozen as a1 behavior/a2 verifier closure; ii-c0b-ii-a1
-> implementation current
+> ii-a budget split and all non-privileged prerequisites complete; unique ii-c-c
+> v8 consumed as transport loss and independently dispositioned non-admitting/
+> non-retryable; ADR remains Proposed
 >
 > **Date:** 2026-08-19; status evidence refreshed 2026-08-27
 >
@@ -351,9 +352,10 @@ the closed scenario epochs and prove:
 
 The external staging paths remain absent and B4 root execution count remains
 zero. The fixed installed App is also absent at this documentation checkpoint.
-Until ii-c is green, ADR 0018 remains Proposed, production Deep Dive remains
-unavailable, no readiness claim is allowed and the remaining full verifier is
-unconsumed.
+The only authorized ii-c attempt, v8, later failed after `armedConsumed`. ADR
+0018 therefore remains Proposed, production Deep Dive remains unavailable, no
+readiness claim is allowed and the remaining full verifier was intentionally
+not run.
 
 ## Validation Status
 
@@ -406,10 +408,11 @@ unconsumed.
 | ii-c0b-i semantic producer | complete; non-admitting |
 | ii-c0b-ii ownership split/APFS physical evidence | complete; non-admitting |
 | ii-c0b-ii-a budget split | frozen; non-admitting |
-| ii-c0b-ii-a1 kernel ownership behavior/focused evidence | current |
-| ii-c0b-ii-a2 verifier/aggregate closure | pending |
-| ii-c0b-ii-b capsule owner | pending |
-| ii-c0b-iii launcher/TTY/FD hygiene | pending |
-| ii-c0b-iv non-root composition | pending |
-| ii-c no-model privileged machine gate | not executed |
+| ii-c0b-ii-a1 kernel ownership behavior/focused evidence | complete; non-admitting |
+| ii-c0b-ii-a2 verifier/aggregate closure | complete; non-admitting |
+| ii-c0b-ii-b capsule owner | complete; non-admitting |
+| ii-c0b-iii launcher/TTY/FD hygiene | complete; non-admitting |
+| ii-c0b-iv non-root composition | complete; non-admitting |
+| ii-c no-model privileged machine gate | v8 consumed transport loss; non-admitting/non-retryable |
+| v8 failure disposition | verified read-only; original evidence unchanged; current fixed runtime absent |
 | ADR status | **Proposed** |

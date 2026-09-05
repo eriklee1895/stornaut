@@ -450,6 +450,78 @@ struct InvestigationMachineTargetBoundaryTests {
     }
 
     @Test
+    func iiCCFailureDispositionVerifierRemainsReadOnlyAndNonAdmitting() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let verifier = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-runtime-machine-failure"),
+            encoding: .utf8)
+        let evidence = try String(contentsOf: root.appending(
+            path: "docs/reports/evidence/task-39-iic-v8-failure-disposition.json"),
+            encoding: .utf8)
+
+        for marker in [
+            "iicc_failure_self_sha=", "/usr/bin/python3 -I",
+            "stornaut.task39.iic.failure-disposition.v1",
+            "consumedTransportLoss", "admission\"] == \"rejected",
+            "retry\"] == \"forbidden",
+            "[\"prepared\", \"armedConsumed\", \"spawnUncertain\"]",
+            "manifest.bin", "../seal.json",
+            "05-uninstall/uninstall.json",
+            "06-verifier/global-post-teardown.json",
+            "fixed Stornaut process present", "gate base has attempt residue",
+            "pwd.getpwuid(user_id)", "record.pw_dir",
+        ] {
+            #expect(verifier.contains(marker), "missing: \(marker)")
+        }
+        for forbidden in [
+            "O_WRONLY", "O_RDWR", "O_CREAT", "O_TRUNC",
+            "os.remove", "os.unlink", "os.rename", "os.mkdir",
+            "shutil", "rm ", "kill(", "SIGTERM", "SIGKILL",
+            "signedInvestigationRuntimeReady",
+            "os.path.expanduser",
+        ] {
+            #expect(!verifier.contains(forbidden), "forbidden: \(forbidden)")
+        }
+        let evidenceObject = try #require(JSONSerialization.jsonObject(
+            with: Data(evidence.utf8)) as? [String: Any])
+        #expect(evidenceObject["classification"] as? String
+            == "consumedTransportLoss")
+        #expect(evidenceObject["admission"] as? String == "rejected")
+        #expect(evidenceObject["retry"] as? String == "forbidden")
+        #expect((evidenceObject["verifierExecutableSHA256"] as? String)?.count
+            == 64)
+        #expect(boundarySource(root).contains(
+            "ii-c-c checked failure disposition digest drifted"))
+        #expect(boundarySource(root).contains(
+            "ii-c-c blocked status docs drifted"))
+        #expect(boundarySource(root).contains("active_status_sha256"))
+        let pinnedStatusDocs = [
+            "Path(\"AGENTS.md\"): \"4ab074744544f6af12fe409f67c5e7db862f74dae3e193ba7d9476af267db04b\"",
+            "Path(\"README.md\"): \"97f0933a6b830de6946ada0b4cbd140a80e1692d443acd70a18222374113dc83\"",
+            "Path(\"docs/README.md\"): \"03fc686ea88ab244a2506b8ce55217d74b587adac5400202ce3689c2a6937249\"",
+            "Path(\"docs/agent/coding-agent-handoff.md\"): \"809ba290f3552d9c763ab14582db413797a9dd6c9740c4af3c0ba7529f791955\"",
+            "Path(\"docs/plans/active/README.md\"): \"f72cb8d2d708752ebfd55133c6adba4d70907c8a6d569ec7f3af927114bfca4b\"",
+            "Path(\"docs/plans/active/phase-d-conditional-deep-dive.md\"): \"494721e057c2e41ecd5de1f8cf9a5559a1773ebce88b8149b9c41c9c97ec56e3\"",
+            "Path(\"docs/plans/active/task-39-implementation-brief.md\"): \"e20bf97729bad999f839165b606e16a6227c3f04dddded0e8c69d7571ff38732\"",
+            "Path(\"docs/plans/active/task-40-implementation-brief.md\"): \"73a01d3997def484f9f68e0bb6906f8bec00c8d18a397ca9a168d247e0a197de\"",
+            "Path(\"docs/plans/roadmap.md\"): \"25823d112e6354a59dca80b7ad9bd36eb145a61e444dd9c27a2db30e2a33060a\"",
+            "set(active_status_sha256) != active_status_expected_paths",
+            "ii-c-c blocked status docs inventory drifted",
+        ]
+        for marker in pinnedStatusDocs {
+            #expect(boundarySource(root).contains(marker), "missing: \(marker)")
+        }
+        #expect(!evidence.contains("signedInvestigationRuntimeReady"))
+    }
+
+    private func boundarySource(_ root: URL) -> String {
+        (try? String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-boundaries"),
+            encoding: .utf8)) ?? ""
+    }
+
+    @Test
     func iiCB1RootOwnedGateVerifierPinsCurrentTreeContractAndScope() throws {
         let root = URL(filePath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()

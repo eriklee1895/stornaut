@@ -324,8 +324,11 @@
 > `KERN_PROC_PID` 可稳定提供 PID/parent/PGID/session/start-time/stopped
 > 证据；对应 Gate、bounded cleanup、source/mutation 与 Debug/Release
 > Mach-O gate 修复已通过 focused 和 1,924-test serial regression。v8 不会
-> 重试。当前严格按 v8 failure-evidence/recovery disposition → L3c3d → L3c4
-> 推进；这些 repairs 是
+> 重试。v8 failure-evidence/recovery disposition 已由独立 self-sealed 只读
+> verifier 固化为 consumed transport loss / non-admitting / non-retryable，且
+> 原 evidence tree 未修改。L3c3d 与 L3c4 均依赖现有契约要求的 green machine
+> cohort；在 replacement privileged attempt 当前尚未获授权的条件下保持 blocked/
+> unproven。这些 repairs 是
 > machine-campaign prerequisite checkpoints，不是新的 Task。该
 > pre-arm failure diagnostic repair 已在 `2ada395` / tree `11e1a0a` 完成；
 > typed failure receipt、physical compact-frame path、exact 9-path scope 与
@@ -715,7 +718,7 @@ implementation 为 `4e8d672d35e4416b0114c5c4dbebb1cb6a4d5089` / tree
 `c144c1e`、fixed-gate deadline cleanup repair `bc42fbc`、interactive-native
 identity binding `531f79f` / consumer seal `26e785a` 与 fixed-gate historical
 replay `aa8a7f1` 均已完成并保持 non-admitting。ii-c-a、ii-c-b1、ii-c-b2a1
-与 ii-c-b2a2、resolved-lineage L1/L2 已完成/non-admitting，L2 final review none；当前 frontier 为 ii-c-c unique real machine campaign → L3c3d → L3c4；这些 repairs 是 machine-campaign prerequisite
+与 ii-c-b2a2、resolved-lineage L1/L2 已完成/non-admitting，L2 final review none；历史 pre-v8 顺序为 ii-c-c → L3c3d → L3c4，但 v8 已消费失败且不可重试，当前无可执行 machine frontier；这些 repairs 是 machine-campaign prerequisite
 checkpoints，不是新的 Task。
 ADR 0018 仍 Proposed，L3c4 独占 final admission 与剩余 full。
 iii-b2b-0 completion evidence 见
@@ -794,7 +797,7 @@ c0b-ii/c0b-iii 以及 iv-a0/iv-a-r/iv-b1a/iv-b1b-i/iv-b1b-ii/iv-b2 已完成并�
 non-admitting；shared-deadline、fixed-gate deadline cleanup、interactive-native
 identity binding `531f79f` / consumer seal `26e785a` 与 fixed-gate historical
 replay `aa8a7f1` 均已完成/non-admitting。ii-c-a、ii-c-b1、ii-c-b2a1 与
-ii-c-b2a2 与 resolved-lineage L1/L2 已完成/non-admitting，L2 final review none；current frontier 为 ii-c-c unique real machine campaign → L3c3d → L3c4。
+ii-c-b2a2 与 resolved-lineage L1/L2 已完成/non-admitting，L2 final review none；历史 pre-v8 顺序为 ii-c-c → L3c3d → L3c4，但 v8 已消费失败且不可重试，当前无可执行 machine frontier。
 iv-b1b-i completion evidence 见
 [review](../reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-i-review.md)：
 implementation `41d34f26` / tree `8ab58932`、exact 3 paths / 1,173
@@ -853,7 +856,7 @@ frozen，ii-c0b-ii-a1 与 ii-c0b-ii-a2 complete/non-admitting；c0b-ii/c0b-iii
 non-admitting；shared-deadline、fixed-gate deadline cleanup、interactive-native
 identity binding `531f79f` / consumer seal `26e785a` 与 fixed-gate historical
 replay `aa8a7f1` 均已完成/non-admitting。ii-c-a、ii-c-b1、ii-c-b2a1 与
-ii-c-b2a2 与 resolved-lineage L1/L2 已完成/non-admitting，L2 final review none；current frontier 为 ii-c-c unique real machine campaign → L3c3d → L3c4。
+ii-c-b2a2 与 resolved-lineage L1/L2 已完成/non-admitting，L2 final review none；历史 pre-v8 顺序为 ii-c-c → L3c3d → L3c4，但 v8 已消费失败且不可重试，当前无可执行 machine frontier。
 ii-a completion 见
 [review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-a-review.md)，ii-b
 completion 见
@@ -891,7 +894,7 @@ network。a2 complete/non-admitting；retained-base/capsule/fixed-gate sequence
 non-admitting；shared-deadline、fixed-gate deadline cleanup、interactive-native
 identity binding `531f79f` / consumer seal `26e785a` 与 fixed-gate historical
 replay `aa8a7f1` 均已完成/non-admitting。ii-c-a、ii-c-b1、ii-c-b2a1 与
-ii-c-b2a2 与 resolved-lineage L1/L2 已完成/non-admitting，L2 final review none；current frontier 为 ii-c-c unique real machine campaign → L3c3d → L3c4。
+ii-c-b2a2 与 resolved-lineage L1/L2 已完成/non-admitting，L2 final review none；历史 pre-v8 顺序为 ii-c-c → L3c3d → L3c4，但 v8 已消费失败且不可重试，当前无可执行 machine frontier。
 [ii-b5b-iii-b0 preflight](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md)
 冻结 long-lived outer/disposable inner、FD 0/1/2/7/8/9、inner-led PGID、
 parent-crash containment 与 iii-a/b1/b2a/b2b budgets。
@@ -1104,8 +1107,9 @@ publication/lease、settlement/recovery、verifier closure 与 c0b-iii fixed gat
 完成并保持 non-admitting；shared-deadline 与 fixed-gate deadline cleanup
 repairs、interactive-native identity binding `531f79f` / consumer seal
 `26e785a` 与 fixed-gate historical replay `aa8a7f1` 也已完成/non-admitting。
-ii-c-a、ii-c-b1、ii-c-b2a1 与 ii-c-b2a2 已完成；当前 frontier 为
-ii-c-b2b，之后严格为 ii-c-c、L3c3d、L3c4。
+ii-c-a、ii-c-b1、ii-c-b2a1、ii-c-b2a2、ii-c-b2b 与 resolved-lineage L1/L2
+均已完成/non-admitting；历史后续顺序为 ii-c-c、L3c3d、L3c4，但 ii-c-c v8
+已消费失败且不可重试，当前无可执行 machine frontier。
 ii-c-b2 的冻结拆分见
 [preflight](../reports/phase-d-task-39b2c-iic-b2-split-preflight.md)，b2a1 completion
 evidence 见 [review](../reports/phase-d-task-39b2c-iic-b2a1-evidence-producer-review.md)。

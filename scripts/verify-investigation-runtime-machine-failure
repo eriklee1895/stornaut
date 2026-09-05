@@ -1,0 +1,867 @@
+#!/bin/zsh -f
+set -euo pipefail
+typeset -r iicc_failure_self_sha=968f4e0c95937f3f4a7c5529b98cfa10f9e0c2f77041c5cb190dc0cd6b87dda2 # iicc-failure-self-seal
+if [[ $0 != /dev/fd/9 ]]; then
+    self=${0:A}
+    [[ -f $self && ! -L $self ]] || exit 2
+    exec 9<"$self"
+    exec /bin/zsh -f /dev/fd/9 "$@"
+fi
+
+[[ $# == 2 ]] || {
+    print -u2 "Usage: scripts/verify-investigation-runtime-machine-failure <evidence-root> <disposition.json>"
+    exit 2
+}
+
+exec /usr/bin/python3 -I - "$1" "$2" "$iicc_failure_self_sha" 9 <<'PY'
+import ctypes
+import errno
+import fcntl
+import hashlib
+import json
+import os
+import pwd
+import re
+import select
+import stat
+import struct
+import subprocess
+import sys
+import uuid
+
+if sys.flags.optimize != 0:
+    raise SystemExit("optimized Python execution is not admitted")
+
+MAGIC = 0x53544E43
+VERSION = 1
+MAX_DOMAIN = 64
+MAX_EVENT = 4_608
+MAX_EVENT_PAYLOAD = 4_096
+O_NOFOLLOW_ANY = 0x20000000
+O_RESOLVE_BENEATH = 0x00001000
+O_UNIQUE = 0x00002000
+READ_FLAGS = (os.O_RDONLY | os.O_CLOEXEC | os.O_NONBLOCK | O_NOFOLLOW_ANY
+              | O_RESOLVE_BENEATH | O_UNIQUE)
+DIRECTORY_FLAGS = READ_FLAGS | os.O_DIRECTORY
+ROOT_FLAGS = (os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NONBLOCK
+              | O_NOFOLLOW_ANY | O_UNIQUE)
+PHASES = ("01-preflight", "02-install", "03-authorization",
+          "04-driver-epochs", "05-uninstall", "06-verifier")
+FILES = (
+    "01-preflight/source-build.json",
+    "02-install/installed.json",
+    "03-authorization/attempt-event-0001.bin",
+    "03-authorization/attempt-event-0002.bin",
+    "03-authorization/attempt-event-0003.bin",
+    "03-authorization/capability-counts.json",
+    "03-authorization/human-attestation.json",
+    "03-authorization/policy-probe.json",
+)
+MISSING = (
+    "manifest.bin",
+    "../seal.json",
+    "04-driver-epochs/coordinator-receipt.bin",
+    "04-driver-epochs/diagnostic-output.bin",
+    "05-uninstall/uninstall.json",
+    "06-verifier/global-post-teardown.json",
+    "06-verifier/verification-input.json",
+)
+FIXED_PATHS = (
+    "/Library/Application Support/Stornaut",
+    "/Library/LaunchDaemons/com.eriklee.stornaut.lifecycle.plist",
+    "/private/var/db/com.eriklee.stornaut.r5",
+)
+FIXED_EXECUTABLES = (
+    "/Library/Application Support/Stornaut/Stornaut-R5-Diagnostic.app/Contents/MacOS/StornautInvestigationDiagnostic",
+    "/Library/Application Support/Stornaut/Stornaut-R5-Diagnostic.app/Contents/MacOS/StornautLifecycleHelper",
+    "/Library/Application Support/Stornaut/Stornaut-R5-Diagnostic.app/Contents/MacOS/StornautInvestigationMachineDriver",
+    "/Library/Application Support/Stornaut/Stornaut-R5-Diagnostic.app/Contents/MacOS/StornautInvestigationMachineGate",
+    "/Library/Application Support/Stornaut/Stornaut-R5-Diagnostic.app/Contents/MacOS/StornautInvestigationMachineGateCoordinator",
+)
+FIXED_PROCESS_NAMES = tuple(os.path.basename(path) for path in FIXED_EXECUTABLES)
+SERVICE = "system/com.eriklee.stornaut.lifecycle"
+HEX = set("0123456789abcdef")
+libc = ctypes.CDLL(None, use_errno=True)
+libc.proc_listallpids.argtypes = [ctypes.c_void_p, ctypes.c_int]
+libc.proc_listallpids.restype = ctypes.c_int
+libc.proc_pidpath.argtypes = [ctypes.c_int, ctypes.c_void_p, ctypes.c_uint32]
+libc.proc_pidpath.restype = ctypes.c_int
+libc.proc_name.argtypes = [ctypes.c_int, ctypes.c_void_p, ctypes.c_uint32]
+libc.proc_name.restype = ctypes.c_int
+libc.flistxattr.argtypes = [ctypes.c_int, ctypes.c_void_p, ctypes.c_size_t, ctypes.c_int]
+libc.flistxattr.restype = ctypes.c_ssize_t
+libc.acl_get_fd_np.argtypes = [ctypes.c_int, ctypes.c_int]
+libc.acl_get_fd_np.restype = ctypes.c_void_p
+libc.acl_get_entry.argtypes = [ctypes.c_void_p, ctypes.c_int,
+                              ctypes.POINTER(ctypes.c_void_p)]
+libc.acl_get_entry.restype = ctypes.c_int
+libc.acl_free.argtypes = [ctypes.c_void_p]
+libc.acl_free.restype = ctypes.c_int
+ACL_TYPE_EXTENDED = 0x00000100
+ACL_FIRST_ENTRY = 0
+objc = ctypes.CDLL("/usr/lib/libobjc.A.dylib")
+ctypes.CDLL(
+    "/System/Library/Frameworks/Foundation.framework/Foundation",
+    mode=ctypes.RTLD_GLOBAL)
+objc.objc_getClass.argtypes = [ctypes.c_char_p]
+objc.objc_getClass.restype = ctypes.c_void_p
+objc.sel_registerName.argtypes = [ctypes.c_char_p]
+objc.sel_registerName.restype = ctypes.c_void_p
+objc_send = ctypes.cast(objc.objc_msgSend, ctypes.c_void_p).value
+send_id = ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p)(objc_send)
+send_void = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_void_p)(objc_send)
+send_data = ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p,
+                            ctypes.c_void_p, ctypes.c_ulong)(objc_send)
+send_json = ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p,
+                            ctypes.c_void_p, ctypes.c_ulong,
+                            ctypes.POINTER(ctypes.c_void_p))(objc_send)
+send_length = ctypes.CFUNCTYPE(ctypes.c_ulong, ctypes.c_void_p,
+                              ctypes.c_void_p)(objc_send)
+
+
+class Rejected(Exception):
+    pass
+
+
+def require(value, message):
+    if not value:
+        raise Rejected(message)
+
+
+def selector(name):
+    return objc.sel_registerName(name.encode("ascii"))
+
+
+def foundation_json(data, writing_options=(1 << 1) | (1 << 3)):
+    pool = send_id(send_id(objc.objc_getClass(b"NSAutoreleasePool"),
+                           selector("alloc")), selector("init"))
+    require(pool, "Foundation autorelease pool")
+    try:
+        buffer = ctypes.create_string_buffer(data)
+        nsdata = send_data(objc.objc_getClass(b"NSData"),
+                           selector("dataWithBytes:length:"),
+                           ctypes.cast(buffer, ctypes.c_void_p), len(data))
+        require(nsdata, "Foundation input data")
+        error = ctypes.c_void_p()
+        value = send_json(objc.objc_getClass(b"NSJSONSerialization"),
+                          selector("JSONObjectWithData:options:error:"),
+                          nsdata, 1 << 2, ctypes.byref(error))
+        require(value and not error.value, "Foundation json decode")
+        error = ctypes.c_void_p()
+        encoded = send_json(objc.objc_getClass(b"NSJSONSerialization"),
+                            selector("dataWithJSONObject:options:error:"),
+                            value, writing_options, ctypes.byref(error))
+        require(encoded and not error.value, "Foundation json encode")
+        length = send_length(encoded, selector("length"))
+        pointer = send_id(encoded, selector("bytes"))
+        require(length > 0 and pointer, "Foundation json bytes")
+        return ctypes.string_at(pointer, length)
+    finally:
+        send_void(pool, selector("drain"))
+
+
+def canonical_json(data, writing_options=(1 << 1) | (1 << 3)):
+    def pairs(values):
+        result = {}
+        for key, value in values:
+            require(key not in result, "duplicate json key")
+            result[key] = value
+        return result
+    try:
+        value = json.loads(data.decode("utf-8"), object_pairs_hook=pairs,
+                           parse_constant=lambda value: (_ for _ in ()).throw(
+                               Rejected("invalid json constant " + value)))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise Rejected("invalid json") from error
+    require(isinstance(value, dict), "json must be object")
+    require(foundation_json(data, writing_options) == data, "noncanonical json")
+    return value
+
+
+def canonical_report_json(data):
+    require(data.endswith(b"\n") and not data.endswith(b"\n\n"),
+            "disposition newline")
+    return canonical_json(data[:-1], (1 << 0) | (1 << 1) | (1 << 3))
+
+
+def exact_object(value, keys, name):
+    require(isinstance(value, dict) and set(value) == set(keys), name + " schema")
+
+
+def exact_int(value, name, minimum=None):
+    require(type(value) is int, name + " integer")
+    if minimum is not None:
+        require(value >= minimum, name + " range")
+    return value
+
+
+def exact_uuid(value, name):
+    require(isinstance(value, str), name + " uuid type")
+    try:
+        parsed = uuid.UUID(value)
+    except ValueError as error:
+        raise Rejected(name + " uuid") from error
+    require(parsed.int != 0 and str(parsed) == value, name + " uuid canonical")
+    return value
+
+
+def valid_hex(value, count=64):
+    return (isinstance(value, str) and len(value) == count
+            and set(value) <= HEX and any(character != "0" for character in value))
+
+
+def digest_text(value, name):
+    require(valid_hex(value), name + " digest")
+    return value
+
+
+def node_identity(value):
+    return (value.st_dev, value.st_ino, value.st_gen, value.st_size,
+            value.st_uid, value.st_gid, stat.S_IMODE(value.st_mode),
+            stat.S_IFMT(value.st_mode), value.st_nlink,
+            getattr(value, "st_flags", 0))
+
+
+def file_identity(value):
+    return node_identity(value) + (value.st_mtime_ns, value.st_ctime_ns)
+
+
+def require_canonical_absolute(path, name):
+    require(isinstance(path, str) and path.startswith("/") and "\x00" not in path,
+            name + " path")
+    require(os.path.realpath(path) == path, name + " noncanonical path spelling")
+
+
+def account_gate_base():
+    user_id = os.getuid()
+    record = pwd.getpwuid(user_id)
+    require(record.pw_uid == user_id and isinstance(record.pw_dir, str),
+            "account home identity")
+    require_canonical_absolute(record.pw_dir, "account home")
+    return os.path.join(
+        record.pw_dir,
+        "Library/Caches/com.eriklee.stornaut.task39-machine-gate")
+
+
+change_queue = select.kqueue()
+
+
+def watch(descriptor, content):
+    flags = (select.KQ_NOTE_DELETE | select.KQ_NOTE_ATTRIB
+             | select.KQ_NOTE_RENAME | select.KQ_NOTE_REVOKE)
+    if content:
+        flags |= select.KQ_NOTE_LINK | select.KQ_NOTE_WRITE | select.KQ_NOTE_EXTEND
+    event = select.kevent(descriptor, filter=select.KQ_FILTER_VNODE,
+                          flags=select.KQ_EV_ADD, fflags=flags)
+    require(change_queue.control([event], 0, 0) == [], "vnode watch registration")
+
+
+def empty_extended_acl(descriptor):
+    ctypes.set_errno(0)
+    acl = libc.acl_get_fd_np(descriptor, ACL_TYPE_EXTENDED)
+    if not acl:
+        require(ctypes.get_errno() == errno.ENOENT, "acl read")
+        return True
+    entry = ctypes.c_void_p()
+    result = libc.acl_get_entry(acl, ACL_FIRST_ENTRY, ctypes.byref(entry))
+    saved = ctypes.get_errno() if result < 0 else 0
+    free_result = libc.acl_free(acl)
+    require(free_result == 0 and result >= 0, "acl iteration " + str(saved))
+    return result != 0
+
+
+def validate_descriptor(descriptor, named, modes, regular):
+    held = os.fstat(descriptor)
+    admitted_modes = modes if isinstance(modes, tuple) else (modes,)
+    identity = file_identity if regular else node_identity
+    require(identity(named) == identity(held), "held/named identity")
+    require((stat.S_ISREG(held.st_mode) if regular else stat.S_ISDIR(held.st_mode))
+            and stat.S_IMODE(held.st_mode) in admitted_modes
+            and held.st_uid == os.geteuid() and held.st_gid == os.getegid()
+            and getattr(held, "st_flags", 0) == 0
+            and (held.st_nlink == 1 if regular else held.st_nlink > 0),
+            "node metadata")
+    require(fcntl.fcntl(descriptor, fcntl.F_GETFD) & fcntl.FD_CLOEXEC,
+            "fd cloexec")
+    require(fcntl.fcntl(descriptor, fcntl.F_GETFL) & os.O_ACCMODE == os.O_RDONLY,
+            "fd access mode")
+    require(libc.flistxattr(descriptor, None, 0, 0) == 0,
+            "extended attributes")
+    require(empty_extended_acl(descriptor), "extended acl")
+    return held
+
+
+def exact_component(parent_fd, component):
+    require(component in os.listdir(parent_fd), "noncanonical path spelling")
+
+
+def open_absolute(path, final_flags, final_regular, final_modes):
+    require_canonical_absolute(path, "absolute")
+    components = path.split("/")[1:]
+    root_fd = os.open("/", ROOT_FLAGS)
+    walk = {"fds": [root_fd], "nodes": [],
+            "rootIdentity": node_identity(os.fstat(root_fd))}
+    try:
+        watch(root_fd, False)
+        for index, component in enumerate(components):
+            final = index == len(components) - 1
+            parent_fd = walk["fds"][-1]
+            exact_component(parent_fd, component)
+            named = os.stat(component, dir_fd=parent_fd, follow_symlinks=False)
+            descriptor = os.open(component, final_flags if final else DIRECTORY_FLAGS,
+                                 dir_fd=parent_fd)
+            walk["fds"].append(descriptor)
+            watch(descriptor, final)
+            held = os.fstat(descriptor)
+            identity = file_identity if final and final_regular else node_identity
+            require(identity(named) == identity(held), "path held/named identity")
+            require(stat.S_ISREG(held.st_mode) if final and final_regular
+                    else stat.S_ISDIR(held.st_mode), "path component type")
+            walk["nodes"].append((parent_fd, component, descriptor,
+                                  identity(held), final and final_regular))
+        named = os.stat(components[-1], dir_fd=walk["nodes"][-1][0],
+                        follow_symlinks=False)
+        validate_descriptor(walk["fds"][-1], named, final_modes, final_regular)
+        return walk["fds"][-1], walk
+    except BaseException:
+        close_walk(walk)
+        raise
+
+
+def revalidate_walk(walk):
+    require(node_identity(os.fstat(walk["fds"][0])) == walk["rootIdentity"],
+            "absolute root identity")
+    for parent_fd, component, descriptor, expected, regular in walk["nodes"]:
+        exact_component(parent_fd, component)
+        named = os.stat(component, dir_fd=parent_fd, follow_symlinks=False)
+        identity = file_identity if regular else node_identity
+        require(identity(named) == expected == identity(os.fstat(descriptor)),
+                "path changed during verification")
+        require(stat.S_ISREG(named.st_mode) if regular else stat.S_ISDIR(named.st_mode),
+                "path post-read type")
+
+
+def close_walk(walk):
+    for descriptor in reversed(walk.get("fds", [])):
+        try:
+            os.close(descriptor)
+        except OSError:
+            pass
+
+
+def inventory(descriptor):
+    values = os.listdir(descriptor)
+    require(all(isinstance(value, str) and value not in (".", "..")
+                for value in values), "directory inventory")
+    return sorted(values, key=lambda value: value.encode())
+
+
+def read_child(parent_fd, name, maximum, held_files, mode=0o600, allow_empty=False):
+    require("/" not in name and name not in ("", ".", ".."), "child name")
+    named = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+    descriptor = os.open(name, READ_FLAGS, dir_fd=parent_fd)
+    try:
+        watch(descriptor, True)
+        held = validate_descriptor(descriptor, named, mode, True)
+        require(0 <= held.st_size <= maximum if allow_empty
+                else 0 < held.st_size <= maximum, "file size")
+        data = os.pread(descriptor, held.st_size, 0)
+        require(len(data) == held.st_size and os.pread(descriptor, 1, held.st_size) == b"",
+                "file read")
+        after = os.fstat(descriptor)
+        named_after = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        require(file_identity(held) == file_identity(after)
+                == file_identity(named_after),
+                "file changed during verification")
+        held_files.append((parent_fd, name, descriptor, file_identity(held),
+                           hashlib.sha256(data).digest()))
+        descriptor = -1
+        return data, file_identity(held)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+
+
+def revalidate_file(record):
+    parent_fd, name, descriptor, expected, digest = record
+    named = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+    held = validate_descriptor(descriptor, named, expected[6], True)
+    data = os.pread(descriptor, held.st_size, 0)
+    require(file_identity(held) == expected and len(data) == held.st_size
+            and os.pread(descriptor, 1, held.st_size) == b""
+            and hashlib.sha256(data).digest() == digest,
+            "file changed during verification")
+
+
+def take_u16(data):
+    require(len(data) == 2, "invalid u16")
+    return struct.unpack(">H", data)[0]
+
+
+def take_u32(data):
+    require(len(data) == 4, "invalid u32")
+    return struct.unpack(">I", data)[0]
+
+
+def take_i64(data):
+    require(len(data) == 8, "invalid i64")
+    return struct.unpack(">q", data)[0]
+
+
+def field(tag, payload):
+    require(payload, "empty field")
+    return struct.pack(">HI", tag, len(payload)) + payload
+
+
+def encode_transcript(domain, fields):
+    value = struct.pack(">I", MAGIC) + field(0, domain.encode())
+    value += field(1, struct.pack(">I", VERSION))
+    for index, payload in enumerate(fields, 2):
+        value += field(index, payload)
+    return value
+
+
+def parse_transcript(data, domain, ranges, maximum):
+    require(0 < len(data) <= maximum, "transcript size")
+    offset = 0
+    def take(count):
+        nonlocal offset
+        require(0 <= count <= len(data) - offset, "truncated transcript")
+        value = data[offset:offset + count]
+        offset += count
+        return value
+    require(take_u32(take(4)) == MAGIC, "transcript magic")
+    def tagged(expected, limits):
+        require(take_u16(take(2)) == expected, "transcript tag")
+        size = take_u32(take(4))
+        require(limits[0] <= size <= limits[1], "field size")
+        return take(size)
+    domain_bytes = tagged(0, (1, MAX_DOMAIN))
+    require(all(0 < byte < 0x80 for byte in domain_bytes)
+            and domain_bytes == domain.encode(), "domain mismatch")
+    require(take_u32(tagged(1, (4, 4))) == VERSION, "version mismatch")
+    fields = [tagged(index + 2, limits) for index, limits in enumerate(ranges)]
+    require(offset == len(data) and encode_transcript(domain, fields) == data,
+            "canonical transcript")
+    return fields
+
+
+def parse_event(data):
+    fields = parse_transcript(
+        data, "stornaut.task39.iic.attempt-event.v1",
+        [(4, 4), (16, 16), (4, 4), (32, 32), (8, 8),
+         (1, MAX_EVENT_PAYLOAD), (32, 32)], MAX_EVENT)
+    sequence = take_u32(fields[0])
+    attempt = str(uuid.UUID(bytes=fields[1]))
+    kind = take_u32(fields[2])
+    observed = take_i64(fields[4])
+    require(sequence > 0 and kind in (1, 3, 5) and observed > 0, "event values")
+    payload = canonical_json(fields[5])
+    names = {1: "prepared", 3: "armedConsumed", 5: "spawnUncertain"}
+    common = {"schemaVersion", "kind", "attemptUUID", "evidenceSetSHA256"}
+    exact_object(payload, common | ({"reason"} if kind == 5 else set()),
+                 "event payload")
+    require(exact_int(payload["schemaVersion"], "event schema") == 1
+            and payload["kind"] == names[kind]
+            and exact_uuid(payload["attemptUUID"], "event attempt") == attempt
+            and valid_hex(payload["evidenceSetSHA256"]), "event payload binding")
+    if kind == 5:
+        require(payload["reason"] == "campaign-incomplete",
+                "spawn uncertainty reason")
+    require(hashlib.sha256(fields[5]).digest() == fields[6],
+            "event payload digest")
+    return {"sequence": sequence, "attempt": attempt, "kind": kind,
+            "previous": fields[3], "observed": observed,
+            "payload": payload, "bytes": data}
+
+
+def validate_json_artifacts(contents, report):
+    campaign = report["campaignUUID"]
+    attempt = report["attemptUUID"]
+    common = {"schemaVersion", "role", "campaignUUID", "attemptUUID"}
+    source = canonical_json(contents["01-preflight/source-build.json"])
+    exact_object(source, common | {"repositoryHEAD", "repositoryTree",
+        "canonicalSourceManifestSHA256", "buildProvenanceSHA256",
+        "signedRuntimeBindingSHA256", "preArmFrameSHA256"}, "source")
+    require(source["schemaVersion"] == 1 and source["role"] == "sourceBuildIdentity"
+            and source["campaignUUID"] == campaign and source["attemptUUID"] == attempt,
+            "source common binding")
+    require(valid_hex(source["repositoryHEAD"], 40)
+            and valid_hex(source["repositoryTree"], 40), "source git binding")
+    for name in ("canonicalSourceManifestSHA256", "buildProvenanceSHA256",
+                 "signedRuntimeBindingSHA256", "preArmFrameSHA256"):
+        digest_text(source[name], name)
+    require(source == report["sourceBinding"], "disposition source binding")
+
+    install = canonical_json(contents["02-install/installed.json"])
+    executables = {"appExecutableSHA256", "helperExecutableSHA256",
+        "machineDriverExecutableSHA256", "gateExecutableSHA256",
+        "coordinatorExecutableSHA256"}
+    exact_object(install, common | executables | {"buildProvenanceSHA256",
+        "signedRuntimeBindingSHA256", "transactionReceiptSHA256",
+        "builtIdentitySHA256", "stagingIdentitySHA256",
+        "installedIdentitySHA256", "plistSHA256", "serviceLoaded"},
+        "install")
+    require(install["schemaVersion"] == 1
+            and install["role"] == "builtStagingInstalledIdentity"
+            and install["campaignUUID"] == campaign
+            and install["attemptUUID"] == attempt
+            and install["serviceLoaded"] is True
+            and install["buildProvenanceSHA256"] == source["buildProvenanceSHA256"]
+            and install["signedRuntimeBindingSHA256"] == source["signedRuntimeBindingSHA256"]
+            and len({install[name] for name in ("builtIdentitySHA256",
+                "stagingIdentitySHA256", "installedIdentitySHA256")}) == 1,
+            "install binding")
+    for name in executables | {"transactionReceiptSHA256",
+                               "builtIdentitySHA256",
+                               "stagingIdentitySHA256",
+                               "installedIdentitySHA256", "plistSHA256"}:
+        digest_text(install[name], name)
+
+    policy = canonical_json(contents["03-authorization/policy-probe.json"])
+    exact_object(policy, common | {"command", "exitStatus",
+        "stdoutByteCount", "stdoutSHA256", "stderrByteCount",
+        "stderrSHA256"}, "policy probe")
+    require(policy["schemaVersion"] == 1 and policy["role"] == "policyProbe"
+            and policy["campaignUUID"] == campaign and policy["attemptUUID"] == attempt
+            and policy["command"] == "/usr/bin/sudo -knv"
+            and exact_int(policy["exitStatus"], "policy status") != 0,
+            "policy probe binding")
+    for name in ("stdoutByteCount", "stderrByteCount"):
+        exact_int(policy[name], name, 0)
+    for name in ("stdoutSHA256", "stderrSHA256"):
+        digest_text(policy[name], name)
+
+    attestation = canonical_json(contents["03-authorization/human-attestation.json"])
+    exact_object(attestation, common | {"prompt", "machinePromptObserved",
+        "attestationKind", "humanActionObserved",
+        "credentialRetainedByteCount"}, "attestation")
+    require(attestation["schemaVersion"] == 1
+            and attestation["role"] == "humanPromptAttestation"
+            and attestation["campaignUUID"] == campaign
+            and attestation["attemptUUID"] == attempt
+            and attestation["prompt"]
+                == "Stornaut Task 39 ii-c administrator authorization: "
+            and attestation["machinePromptObserved"] is False
+            and attestation["humanActionObserved"] is False
+            and attestation["attestationKind"]
+                == "operatorCancellationBeforeCredential"
+            and exact_int(attestation["credentialRetainedByteCount"],
+                          "credential bytes") == 0, "attestation semantics")
+
+    counters = canonical_json(contents["03-authorization/capability-counts.json"])
+    exact_object(counters, common | {"authInvocationCount",
+        "modelInvocationCount", "networkInvocationCount",
+        "credentialTranscriptByteCount"}, "capability counters")
+    require(counters["schemaVersion"] == 1
+            and counters["role"] == "noAuthModelNetworkCounters"
+            and counters["campaignUUID"] == campaign
+            and counters["attemptUUID"] == attempt
+            and all(exact_int(counters[name], name) == 0 for name in
+                ("authInvocationCount", "modelInvocationCount",
+                 "networkInvocationCount", "credentialTranscriptByteCount")),
+            "capability counter semantics")
+    return source
+
+
+def validate_report(data):
+    value = canonical_report_json(data)
+    exact_object(value, {"schemaVersion", "domain", "campaignUUID",
+        "attemptUUID", "classification", "admission", "retry",
+        "eventChain", "evidenceSetSHA256", "sourceBinding",
+        "artifactSHA256", "verifierExecutableSHA256",
+        "requiredMissingArtifacts", "rootIdentity",
+        "parentIdentity", "systemObservation", "nonClaims"},
+        "disposition")
+    require(value["schemaVersion"] == 1
+            and value["domain"] == "stornaut.task39.iic.failure-disposition.v1"
+            and exact_uuid(value["campaignUUID"], "campaign")
+            and exact_uuid(value["attemptUUID"], "attempt")
+            and value["campaignUUID"] != value["attemptUUID"]
+            and value["classification"] == "consumedTransportLoss"
+            and value["admission"] == "rejected"
+            and value["retry"] == "forbidden"
+            and value["eventChain"]
+                == ["prepared", "armedConsumed", "spawnUncertain"]
+            and valid_hex(value["evidenceSetSHA256"]),
+            "disposition semantics")
+    digest_text(value["verifierExecutableSHA256"], "verifier executable")
+    exact_object(value["artifactSHA256"], FILES, "artifact hashes")
+    for path in FILES:
+        digest_text(value["artifactSHA256"][path], path)
+    require(value["requiredMissingArtifacts"] == list(MISSING),
+            "missing-artifact contract")
+    identity_keys = {"device", "inode", "generation", "size"}
+    for name in ("rootIdentity", "parentIdentity"):
+        exact_object(value[name], identity_keys, name)
+        require(all(isinstance(value[name][key], str) and value[name][key].isdecimal()
+                    for key in identity_keys), name + " values")
+    exact_object(value["systemObservation"], {"fixedPathsAbsent",
+        "fixedServiceAbsent", "fixedProcessCount", "gateBaseState"},
+        "system observation")
+    require(value["systemObservation"]["fixedPathsAbsent"] is True
+            and value["systemObservation"]["fixedServiceAbsent"] is True
+            and value["systemObservation"]["fixedProcessCount"] == 0
+            and value["systemObservation"]["gateBaseState"]
+                in ("absent", "ownerLockOnly"), "system observation values")
+    require(value["nonClaims"] == [
+        "no manifest or external seal",
+        "no uninstall or global post-teardown artifact",
+        "no machine admission",
+        "no L3c3d authenticated model success",
+        "no Task 39 readiness",
+    ], "non-claims")
+    return value
+
+
+def report_identity(value):
+    return tuple(int(value[key]) for key in
+                 ("device", "inode", "generation", "size"))
+
+
+def process_paths():
+    def snapshot():
+        capacity = 4_096
+        while capacity <= 131_072:
+            values = (ctypes.c_int * capacity)()
+            count = libc.proc_listallpids(values, ctypes.sizeof(values))
+            require(count >= 0, "process inventory unavailable")
+            if count < capacity:
+                return {process_id for process_id in values[:count]
+                        if process_id > 1}
+            capacity *= 2
+        raise Rejected("process inventory overflow")
+
+    initial = snapshot()
+    paths = []
+    for process_id in initial:
+        buffer = ctypes.create_string_buffer(4_096)
+        ctypes.set_errno(0)
+        length = libc.proc_pidpath(process_id, buffer, len(buffer))
+        if length > 0:
+            paths.append(buffer.raw[:length].decode("utf-8", "strict"))
+            continue
+        name_buffer = ctypes.create_string_buffer(1_024)
+        name_length = libc.proc_name(process_id, name_buffer, len(name_buffer))
+        if name_length > 0:
+            name = name_buffer.raw[:name_length].decode("utf-8", "strict")
+            require(not name.startswith("Stornaut")
+                    and all(not fixed.startswith(name) for fixed in FIXED_PROCESS_NAMES),
+                    "fixed Stornaut process identity unavailable")
+            continue
+        state = subprocess.run(
+            ["/bin/ps", "-p", str(process_id), "-o", "state="],
+            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, check=False, timeout=2,
+            env={"PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "LC_ALL": "C"})
+        require(state.returncode != 0
+                or state.stdout.strip().startswith(b"Z"),
+                "live process identity unavailable: " + str(process_id))
+    return paths
+
+
+def observe_system(expected):
+    for path in FIXED_PATHS:
+        try:
+            os.lstat(path)
+        except OSError as error:
+            require(error.errno in (errno.ENOENT, errno.ENOTDIR),
+                    "fixed Stornaut path observation unavailable")
+        else:
+            raise Rejected("fixed Stornaut path present")
+    service = subprocess.run(
+        ["/bin/launchctl", "print", SERVICE], stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False, timeout=5,
+        env={"PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "LC_ALL": "C"})
+    require(service.returncode == 113 and not service.stdout
+            and (b'Could not find service \"com.eriklee.stornaut.lifecycle\"'
+                 in service.stderr)
+            and b"in domain for system" in service.stderr,
+            "fixed Stornaut service state unavailable or registered")
+    observed_process_paths = process_paths()
+    fixed_process_count = sum(
+        path in FIXED_EXECUTABLES
+        or path.startswith("/Library/Application Support/Stornaut/")
+        for path in observed_process_paths)
+    require(fixed_process_count == 0, "fixed Stornaut process present")
+    gate_base = account_gate_base()
+    if not os.path.lexists(gate_base):
+        gate_state = "absent"
+    else:
+        gate_fd, gate_walk = open_absolute(
+            gate_base, DIRECTORY_FLAGS, False, 0o700)
+        gate_before = os.fstat(gate_fd)
+        held_files = []
+        try:
+            require(inventory(gate_fd) == [".owner-lock-v1"],
+                    "gate base has attempt residue")
+            lock, _ = read_child(
+                gate_fd, ".owner-lock-v1", 1, held_files, 0o600,
+                allow_empty=True)
+            require(lock == b"", "owner lock content")
+            for record in held_files:
+                revalidate_file(record)
+            require(node_identity(os.fstat(gate_fd)) == node_identity(gate_before),
+                    "gate base changed during verification")
+            revalidate_walk(gate_walk)
+            require(change_queue.control(None, 1, 0) == [],
+                    "gate base changed during verification")
+            gate_state = "ownerLockOnly"
+        finally:
+            for record in reversed(held_files):
+                os.close(record[2])
+            close_walk(gate_walk)
+    observed = {"fixedPathsAbsent": True, "fixedServiceAbsent": True,
+                "fixedProcessCount": fixed_process_count,
+                "gateBaseState": gate_state}
+    require(observed == expected, "system observation drift")
+
+
+def verify(root_path, report_path, expected_self_sha, verifier_fd):
+    require_canonical_absolute(root_path, "evidence root")
+    require_canonical_absolute(report_path, "disposition")
+    verifier_before = os.fstat(verifier_fd)
+    verifier_bytes = os.pread(verifier_fd, verifier_before.st_size, 0)
+    normalized, count = re.subn(
+        rb"(?m)^typeset -r iicc_failure_self_sha=(?:[0-9a-f]{64}|SELF) # iicc-failure-self-seal$",
+        b"typeset -r iicc_failure_self_sha=SELF # iicc-failure-self-seal",
+        verifier_bytes)
+    require(count == 1 and valid_hex(expected_self_sha)
+            and hashlib.sha256(normalized).hexdigest() == expected_self_sha,
+            "verifier self seal")
+    report_fd, report_walk = open_absolute(
+        report_path, READ_FLAGS, True, 0o644)
+    report_before = os.fstat(report_fd)
+    report_bytes = os.pread(report_fd, report_before.st_size, 0)
+    require(len(report_bytes) == report_before.st_size
+            and os.pread(report_fd, 1, report_before.st_size) == b"",
+            "disposition read")
+    report_digest = hashlib.sha256(report_bytes).digest()
+    report = validate_report(report_bytes)
+    require(report["verifierExecutableSHA256"]
+            == hashlib.sha256(verifier_bytes).hexdigest(),
+            "verifier executable binding")
+    require(os.path.basename(root_path)
+            == "stornaut-task39-iic-" + report["campaignUUID"],
+            "evidence root name")
+    require(os.path.basename(os.path.dirname(root_path))
+            == "stornaut-iic-evidence-" + report["campaignUUID"],
+            "evidence parent name")
+    root_fd = -1
+    root_walk = None
+    phase_records = []
+    held_files = []
+    try:
+        root_fd, root_walk = open_absolute(
+            root_path, DIRECTORY_FLAGS, False, 0o700)
+        parent_fd = root_walk["nodes"][-1][0]
+        parent_before = os.fstat(parent_fd)
+        validate_descriptor(parent_fd, parent_before, 0o700, False)
+        watch(parent_fd, True)
+        require(inventory(parent_fd) == [os.path.basename(root_path)],
+                "evidence parent inventory")
+        root_before = os.fstat(root_fd)
+        require(report_identity(report["rootIdentity"])
+                == node_identity(root_before)[:4], "reported root identity")
+        require(report_identity(report["parentIdentity"])
+                == node_identity(parent_before)[:4], "reported parent identity")
+        require(inventory(root_fd) == list(PHASES), "failure root inventory")
+        contents = {}
+        expected_by_phase = {phase: [] for phase in PHASES}
+        for path in FILES:
+            phase, leaf = path.split("/")
+            expected_by_phase[phase].append(leaf)
+        for phase in PHASES:
+            named = os.stat(phase, dir_fd=root_fd, follow_symlinks=False)
+            descriptor = os.open(phase, DIRECTORY_FLAGS, dir_fd=root_fd)
+            watch(descriptor, True)
+            held = os.fstat(descriptor)
+            validate_descriptor(descriptor, named, 0o700, False)
+            expected_names = sorted(expected_by_phase[phase], key=lambda value: value.encode())
+            phase_records.append((
+                phase, descriptor, node_identity(held), expected_names))
+            require(inventory(descriptor) == expected_names, "phase inventory")
+            for leaf in expected_names:
+                data, _ = read_child(descriptor, leaf, 16 << 20, held_files)
+                path = phase + "/" + leaf
+                require(hashlib.sha256(data).hexdigest()
+                        == report["artifactSHA256"][path],
+                        "artifact digest " + path)
+                contents[path] = data
+            require(inventory(descriptor) == expected_names,
+                    "phase post-read inventory")
+        for missing in MISSING:
+            if missing.startswith("../"):
+                require(not os.path.lexists(os.path.join(
+                    os.path.dirname(root_path), missing[3:])),
+                    "external seal unexpectedly present")
+            else:
+                require(not os.path.lexists(os.path.join(root_path, missing)),
+                        "completion artifact unexpectedly present")
+        source = validate_json_artifacts(contents, report)
+        events = [parse_event(contents[path]) for path in FILES
+                  if "/attempt-event-" in path]
+        require([event["sequence"] for event in events] == [1, 2, 3]
+                and [event["kind"] for event in events] == [1, 3, 5]
+                and all(event["attempt"] == report["attemptUUID"]
+                        for event in events), "consumed transport-loss event chain")
+        for index, event in enumerate(events):
+            previous = bytes(32) if index == 0 else hashlib.sha256(
+                events[index - 1]["bytes"]).digest()
+            require(event["previous"] == previous, "event hash chain")
+            if index:
+                require(event["observed"] > events[index - 1]["observed"],
+                        "event time order")
+        evidence_sets = {event["payload"]["evidenceSetSHA256"]
+                         for event in events}
+        require(evidence_sets == {report["evidenceSetSHA256"]}
+                and source["preArmFrameSHA256"] == report["evidenceSetSHA256"],
+                "event evidence-set binding")
+        observe_system(report["systemObservation"])
+        for record in held_files:
+            revalidate_file(record)
+        for phase, descriptor, expected, expected_names in phase_records:
+            named = os.stat(phase, dir_fd=root_fd, follow_symlinks=False)
+            validate_descriptor(descriptor, named, 0o700, False)
+            require(node_identity(os.fstat(descriptor)) == expected
+                    and inventory(descriptor) == expected_names,
+                    "phase changed during verification")
+        require(inventory(root_fd) == list(PHASES), "root post-read inventory")
+        require(node_identity(os.fstat(root_fd)) == node_identity(root_before),
+                "root changed during verification")
+        require(node_identity(os.fstat(parent_fd)) == node_identity(parent_before),
+                "parent changed during verification")
+        revalidate_walk(root_walk)
+        revalidate_walk(report_walk)
+        report_after = os.fstat(report_fd)
+        require(file_identity(report_before) == file_identity(report_after)
+                and hashlib.sha256(os.pread(
+                    report_fd, report_after.st_size, 0)).digest() == report_digest,
+                "disposition changed during verification")
+        verifier_after = os.fstat(verifier_fd)
+        require(file_identity(verifier_before) == file_identity(verifier_after)
+                and hashlib.sha256(os.pread(verifier_fd, verifier_after.st_size, 0)).hexdigest()
+                    == hashlib.sha256(verifier_bytes).hexdigest(),
+                "verifier changed during verification")
+        require(change_queue.control(None, 1, 0) == [],
+                "evidence changed during verification")
+    finally:
+        for record in reversed(held_files):
+            os.close(record[2])
+        for _, descriptor, _, _ in reversed(phase_records):
+            os.close(descriptor)
+        if root_walk is not None:
+            close_walk(root_walk)
+        close_walk(report_walk)
+
+
+try:
+    verify(sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4]))
+except (OSError, Rejected, ValueError, KeyError, TypeError,
+        subprocess.SubprocessError) as error:
+    print("stornaut ii-c failure disposition rejected: " + str(error),
+          file=sys.stderr)
+    raise SystemExit(1)
+change_queue.close()
+print("stornaut ii-c consumed transport-loss disposition verified; admission rejected; retry forbidden")
+PY

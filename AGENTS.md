@@ -181,7 +181,11 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   ii-c pre-arm failure diagnostic repair 已在 `2ada395` / tree `11e1a0a`
   完成：typed failure receipt、共享完整帧读取、physical
   exit-81/EOF/zero-residue、exact 9-path/1,834-line scope 与九类负例通过，
-  final review 无 unresolved P0–P2；唯一 privileged attempt 仍未消费。
+  final review 无 unresolved P0–P2。随后唯一 privileged v8 attempt 已到达
+  `armedConsumed` 并以 `spawnUncertain` / transport loss 终止；其 8 个保留
+  artifact、缺失 completion artifacts 与当前零 Stornaut runtime 残留已由
+  独立 self-sealed 只读 verifier 固化为 non-admitting/non-retryable，未修改
+  原 evidence，也未创建 replacement attempt。
   随后的 L3 preflight 已拆为 L3a trusted target extraction、L3b root
   driver/L1+L2 collection 与 L3c failure matrix/final admission。L3a 已把
   2,509-line machine-only contract/assembler 以 99% rename 迁入非产品
@@ -426,7 +430,9 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   final no-unresolved-P0–P2 review 完成；L2 implementation `474f634`、
   cross-UID correction `b664299`、PID-reuse fix `b4c632e` 与 verifier
   mutation-oracle fix 也已完成/non-admitting，final verifier review none；
-  ii-c-c unique real machine campaign 为当前 frontier。
+  ii-c-c v8 已作为唯一 real machine campaign 消费并失败；当前不存在可执行的
+  machine frontier。Task 39 保持 blocked/incomplete，只有用户明确批准新的
+  privileged campaign/plan amendment 后才可继续。
   spawn/transfer uncertainty 不得
   settlement/unlink 或释放 owner，必须进入 process-lifetime ownership
   quarantine。
@@ -485,8 +491,10 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   repair `531f79f`、consumer seal `26e785a` 与 fixed-gate historical replay
   `aa8a7f1` 也已完成并保持 non-admitting。ii-c-a、ii-c-b 与 resolved-lineage
   L1/L2 已完成/non-admitting，L2 final verifier review none；
-  当前严格按 ii-c-c unique real machine campaign → L3c3d → L3c4 推进。这些 repairs 是
-  machine-campaign prerequisite checkpoints，不是递归命名的新 Task；后续
+  ii-c-c v8 随后在 `armedConsumed` 后以 transport loss 终止，并已由独立
+  self-sealed 只读 verifier 固化为 non-admitting/non-retryable；Task 39 保持
+  blocked/incomplete，L3c3d/L3c4 未证明。这些 repairs 是 machine-campaign
+  prerequisite checkpoints，不是递归命名的新 Task；后续
   review finding 与局部修复也不得再产生新的命名 Task。
   该 ii-b5b-ii-c checkpoint 以 8 个
   non-document paths / 3,104 changed lines、35 focused tests、
@@ -498,7 +506,8 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   只有 L3c4
   可作 readiness claim，
   final full 尚未消耗。
-  Task 39 尚未完成。
+  Task 40 仍受 Task 39 前置条件阻塞；Task 44 仍要求新的、明确授权并成功的
+  machine cohort 才可能解除 `.implementationUnavailable`。
   真实 App Trash 依赖仍保持关闭，生产 Deep Dive 仍为 implementation unavailable。
   逐 Task 完成 Upstream Study、
   实现、code review、分层验证、独立 commit/push；`scripts/verify --full`
@@ -642,6 +651,8 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c ii-c-b2b PTY / FD 3 transport preflight | [docs/reports/phase-d-task-39b2c-iic-b2b-transport-preflight.md](docs/reports/phase-d-task-39b2c-iic-b2b-transport-preflight.md) |
 | Phase D Task 39B2c resolved root-driver lineage L2 review / completion audit | [docs/reports/phase-d-task-39b2c-iic-resolved-root-driver-lineage-l2-review.md](docs/reports/phase-d-task-39b2c-iic-resolved-root-driver-lineage-l2-review.md) |
 | Phase D Task 39B2c ii-c pre-arm failure diagnostic review | [docs/reports/phase-d-task-39b2c-iic-prearm-failure-diagnostic-review.md](docs/reports/phase-d-task-39b2c-iic-prearm-failure-diagnostic-review.md) |
+| Phase D Task 39B2c ii-c-c v8 failure disposition | [docs/reports/phase-d-task-39b2c-iic-v8-failure-disposition.md](docs/reports/phase-d-task-39b2c-iic-v8-failure-disposition.md) |
+| Phase D Task 39 blocked/no-go gate audit | [docs/reports/phase-d-task-39-blocked-review.md](docs/reports/phase-d-task-39-blocked-review.md) |
 | Phase D Task 39B2c L3c3c-ii-a installed-driver observation review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md) |
 | Phase D Task 39B2c L3c3c-ii-b handoff composition split preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md) |
 | Phase D Task 39B2c L3c3c-ii-b0 exact wire contract preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b0-wire-contract-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b0-wire-contract-preflight.md) |
@@ -898,14 +909,16 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   resolved-lineage L1/L2 已完成/non-admitting，L2 final verifier review none；
   pre-arm failure diagnostic repair `2ada395` / tree `11e1a0a` 已完成，
   exact 9-path scope、physical compact-frame path、nine negative mutations 与
-  final no-unresolved-P0–P2 review 均已关闭，唯一 privileged attempt 未消费；
-  当前 frontier 为 ii-c-c unique real machine
-  campaign → L3c3d → L3c4；
+  final no-unresolved-P0–P2 review 均已关闭。唯一 privileged v8 attempt 后续
+  已消费并以 transport loss 终止，现已只读固化为 non-admitting/non-retryable；
+  Task 39 保持 blocked/incomplete，L3c3d/L3c4 在没有新授权 machine cohort 的
+  条件下保持未证明；
   这些 repairs 是 machine-campaign prerequisite checkpoints，
   不是新的 Task。
   ADR 0018 仍 Proposed；L3c4 独占 final admission 与
   剩余 full。
-  Task 39 尚未完成。
+  Task 39 的 blocked/no-go 评估已固化，但 Task 本身尚未完成；production
+  Deep Dive 未获 admission。
 Deep Dive 的旧 Broker-only no-go 已被 ADR 0004 的 capability-first 边界取代；
 当前仍不可用的原因是生产 Deep Dive 尚未实现，而非 R6 或 Codex 工具能力。
 R6 不证明 release distribution、FDA/TCC 或 production Deep Dive；

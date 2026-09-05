@@ -33,7 +33,7 @@
 | Agent、双模式与治理设计 | [Agent Disk Governance](design/agent-disk-governance.md) |
 | UI、品牌、状态与交互 | [UI/UX](design/ui-ux.md) |
 | 宏观交付顺序与阶段 Gate | [Delivery Roadmap](plans/roadmap.md) |
-| 当前计划状态 | [Active Plans](plans/active/README.md) — Phase D approved；Task 39 in progress；resolved-lineage L1/L2 complete/non-admitting，final verifier review none；current frontier ii-c-c unique real machine campaign → L3c3d → L3c4；ADR 0018 Proposed |
+| 当前计划状态 | [Active Plans](plans/active/README.md) — Phase D approved；Task 39 blocked/incomplete：v8 consumed transport loss 已只读固化且禁止重试；L3c3d/L3c4 未证明，ADR 0018 Proposed；Task 40 仍受顺序前置条件阻塞 |
 | Capability-first Codex Runtime Gate | [Runtime Evidence Gate](plans/completed/capability-first-codex-runtime-gate.md) — complete / archived |
 | R2 tests-first brief | [R2 Implementation Brief](plans/completed/task-r2-implementation-brief.md) — complete |
 | R3 lifecycle hard-gate brief | [R3 Implementation Brief](plans/completed/task-r3-implementation-brief.md) — behaviorReady candidate |
@@ -64,7 +64,9 @@
 | Phase D Task 37 Review | [Code Review and Completion Audit](reports/phase-d-task-37-review.md) |
 | Phase D Task 38 | [Implementation Brief](plans/active/task-38-implementation-brief.md) — complete |
 | Phase D Task 38 Review | [Code Review and Completion Audit](reports/phase-d-task-38-review.md) |
-| Phase D Task 39 | [Implementation Brief](plans/active/task-39-implementation-brief.md) — in progress；resolved-lineage L1/L2 complete/non-admitting，final verifier review none；current frontier ii-c-c unique real machine campaign → L3c3d → L3c4；production Deep Dive unavailable |
+| Phase D Task 39 | [Implementation Brief](plans/active/task-39-implementation-brief.md) — blocked/incomplete；v8 consumed transport loss 已只读固化且不可重试；L3c3d/L3c4 未证明，final full 未运行；production Deep Dive unavailable |
+| Phase D Task 39B2c v8 Failure Disposition | [Read-only Failure Audit](reports/phase-d-task-39b2c-iic-v8-failure-disposition.md) — consumed / non-admitting / non-retryable；原 evidence 未修改；当前 fixed runtime absent |
+| Phase D Task 39 Gate Result | [Blocked/No-Go Audit](reports/phase-d-task-39-blocked-review.md) — implementation/non-privileged verification complete；Task 39 remains incomplete；L3c3d/L3c4 unproven |
 | Phase D Task 39A Review | [Code Review and Completion Audit](reports/phase-d-task-39a-review.md) |
 | Phase D Task 39B1a Review | [Code Review and Completion Audit](reports/phase-d-task-39b1a-review.md) |
 | Phase D Task 39B1b-i Review | [Code Review and Completion Audit](reports/phase-d-task-39b1b-i-review.md) |
@@ -167,7 +169,7 @@
 | Phase D Task 39B2c Interactive-Native Identity Binding Review | [Completion Audit](reports/phase-d-task-39b2c-interactive-native-identity-binding-repair-review.md) — exact 14 paths / 2,389 lines、1,756-test serial、Debug/Release 与 boundary gates；complete/non-admitting |
 | Phase D Task 39B2c Fixed-Gate Historical Replay Preflight | [Frozen Verifier Scope](reports/phase-d-task-39b2c-fixed-gate-deadline-cleanup-historical-replay-preflight.md) — one-path successor replay and alternate-index closure |
 | Phase D Task 39B2c Fixed-Gate Historical Replay Review | [Completion Audit](reports/phase-d-task-39b2c-fixed-gate-deadline-cleanup-historical-replay-review.md) — implementation `aa8a7f1` / tree `8176e92a`、bare Investigation/App Release gates；complete/non-admitting |
-| Phase D Task 39B2c ii-c Machine Campaign Preflight | [Frozen Campaign Split](reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md) — ii-c-b and resolved-lineage L1/L2 implementation complete/non-admitting；ii-c-c unique real machine campaign current |
+| Phase D Task 39B2c ii-c Machine Campaign Preflight | [Frozen Campaign Split](reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md) — ii-c-b and resolved-lineage L1/L2 implementation complete/non-admitting；ii-c-c v8 consumed failure/non-retryable；Task 39 blocked |
 | Phase D Task 39B2c ii-c-a Static Installed Topology Review | [Completion Audit](reports/phase-d-task-39b2c-iic-a-static-installed-topology-review.md) — implementation `81f185c` / tree `7cf4db75`、11 paths / 2,669 lines、856/856 affected serial；complete/non-admitting |
 | Phase D Task 39B2c ii-c-b1 Root-Owned Gate Review | [Completion Audit](reports/phase-d-task-39b2c-iic-b1-root-owned-gate-review.md) — implementation `77cde61` / tree `9c59f241`、7 paths / 1,900 lines、860/860 serial；complete/non-admitting |
 | Phase D Task 39B2c ii-c-b2 Split Preflight | [Frozen Scope](reports/phase-d-task-39b2c-iic-b2-split-preflight.md) — b2a1 producer → b2a2 verifier → b2b PTY/FD3 transport |
@@ -175,7 +177,7 @@
 | Phase D Task 39B2c ii-c-b2a2 Independent Verifier Review | [Completion Audit](reports/phase-d-task-39b2c-iic-b2a2-independent-verifier-review.md) — implementation `294bdb2` / tree `dbbffbba`、6 paths / 1,999 lines；complete/non-admitting |
 | Phase D Task 39B2c ii-c-b2b PTY / FD 3 Transport | [Frozen Preflight](reports/phase-d-task-39b2c-iic-b2b-transport-preflight.md) — exact 11 paths / 3,600 lines；historical frontier，superseded by resolved-lineage L2 |
 | Phase D Task 39B2c Resolved Root-Driver Lineage L1 | [Completion Audit](reports/phase-d-task-39b2c-iic-resolved-root-driver-lineage-l1-review.md) — implementation `83f6271` / tree `98289e2`；complete/non-admitting |
-| Phase D Task 39B2c Resolved Root-Driver Lineage L2 | [Completion Audit](reports/phase-d-task-39b2c-iic-resolved-root-driver-lineage-l2-review.md) — implementation `474f634`、cross-UID/PID-reuse corrections、verifier closure `849e454`；single staged-only serial failed with 27 issues at 1,878/99，exact low-load reruns 109/109；final review none；ii-c-c current |
+| Phase D Task 39B2c Resolved Root-Driver Lineage L2 | [Completion Audit](reports/phase-d-task-39b2c-iic-resolved-root-driver-lineage-l2-review.md) — implementation `474f634`、cross-UID/PID-reuse corrections、verifier closure `849e454`；single staged-only serial failed with 27 issues at 1,878/99，exact low-load reruns 109/109；final review none；后续 ii-c-c v8 已消费失败且不可重试 |
 | Phase D Task 39B2c L3c3c-ii-c0b-ii-b Retained-Base Split | [Design-Correction Preflight](reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-b-retained-base-split-preflight.md) — missing retained acquisition-time base FD requires a3 prerequisite；then b1 publication/lease → b2 settlement/recovery → b3 verifier closure；non-admitting |
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-b0 Preflight | [Outer/Inner Protocol and Split](reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md) — long-lived outer、disposable inner-led PGID、fixed FD contract、parent-crash overlay and iii-a/b1/b2a/b2b budgets；preflight complete/non-admitting |
 | Phase D Task 39B2c L3c3c-ii-b5b-iii-a Review | [Per-Epoch Continuity Completion Audit](reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-a-review.md) — exact 10 paths / 3,147 changed lines；40 focused、559 affected、1,446-test/74-suite clean serial；three boundary gates and no unresolved P0–P2；complete/non-admitting |

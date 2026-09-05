@@ -1,6 +1,6 @@
 # Task 39 Implementation Brief — Signed-App Production Runtime Admission
 
-> **Status:** In progress; 39A contract/facade foundation, 39B1a exact
+> **Status:** Blocked/incomplete after a conclusive no-go machine gate; 39A contract/facade foundation, 39B1a exact
 > Store/async-lifecycle prerequisite closure and 39B1b-i package-closed
 > transport/composition plus 39B1b-ii strict DEBUG App leaf are complete and
 > independently verified. The 39B2 preflight found that the accepted R5 helper
@@ -149,13 +149,18 @@
 > by raw stop `0x7f` or Gate PGID migration. The Gate now uses
 > `KERN_PROC_PID` for the same PID/parent/PGID/session/start-time/stopped
 > evidence, with bounded zero-residue test cleanup and current source/mutation/
-> Mach-O seals. Current frontier is v8 failure-evidence/recovery disposition →
-> L3c3d → L3c4.
+> Mach-O seals. The v8 failure-evidence/recovery disposition is now bound by a
+> dedicated read-only verifier as consumed transport loss / non-admitting /
+> non-retryable, with no modification of the original evidence tree. L3c3d and
+> L3c4 remain blocked on the green machine cohort required by their existing
+> contracts; no replacement privileged attempt is currently authorized.
 > The pre-arm failure diagnostic prerequisite is complete at `2ada395` / tree
 > `11e1a0a`: bounded typed failure receipt, exact exit/EOF/residue verification,
 > physical compact-frame coverage and exact nine-path mutation closure have no
 > unresolved P0-P2. The unique privileged attempt v8 is consumed and may not be
-> retried; ii-c-c failure closure is the current frontier.
+> retried; the only current work is read-only ii-c-c failure closure. No live
+> machine campaign frontier exists without explicit user approval for a new
+> privileged campaign and plan amendment.
 > These repairs are machine-campaign prerequisite checkpoints,
 > not recursively named new Tasks. Local findings remain in their owning
 > checkpoint. L3c4 alone owns final admission and the remaining full.
@@ -165,6 +170,16 @@
 > lines, 66 focused tests, a 1,500-test serialized regression, exact
 > SwiftPM/Xcode projections, complete contract replay and final no-unresolved-
 > P0–P2 review.
+>
+> **Final Task 39 disposition (2026-09-05):** implementation and non-privileged
+> verification are complete, but Task 39 remains blocked/incomplete with a
+> conclusive machine-gate `no-go`,
+> not Ready. v8 is the consumed, non-retryable `transportLoss` attempt; L3c3d
+> cannot legally run before a green ii-c cohort and L3c4 cannot create an
+> admission receipt or run the reserved full without that cohort. The sequential
+> Task 40 start condition remains blocked until the user explicitly approves a
+> plan amendment or authorizes a new privileged campaign; every product consumer
+> must preserve runtime admission as unavailable.
 > a2-ii closed at implementation commit `8eac2c4f` / tree `9e3bdefd`,
 > with immutable seal `70603a0`: exact 12 non-document paths / 3,673 changed
 > lines, 55 focused tests, a clean 1,516-test / 79-suite staged serial, global
@@ -1494,8 +1509,10 @@ completed. Interactive-native identity binding `531f79f` / consumer seal
 `26e785a` and fixed-gate historical replay `aa8a7f1` also completed. All remain
 non-admitting. ii-c-a, ii-c-b1, ii-c-b2a1 and ii-c-b2a2 are
 complete/non-admitting; ii-c-b2b and resolved-lineage L1/L2 implementation are
-complete/non-admitting; L2 final verifier review returned no finding. The live
-frontier is ii-c-c unique real machine campaign → L3c3d → L3c4. These repairs are
+complete/non-admitting; L2 final verifier review returned no finding. The
+historical pre-v8 order was ii-c-c → L3c3d → L3c4. v8 is now consumed, failed,
+and non-retryable, so there is no live machine frontier without explicit user
+approval for a replacement privileged campaign and plan amendment. These repairs are
 machine-campaign prerequisite checkpoints, not new Tasks. Completion evidence
 is in the
 [shared-deadline audit](../../reports/phase-d-task-39b2c-shared-deadline-repair-review.md)
