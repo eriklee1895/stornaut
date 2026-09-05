@@ -64,8 +64,8 @@ and retain `.implementationUnavailable`.
 ## Validation
 
 - real v8 read-only failure verifier: passed;
-- five focused failure-disposition tests, including alias and fake-`HOME`
-  negatives plus frozen-v8 integration: passed;
+- six focused failure-disposition tests, including alias, fake-`HOME` and shared-
+  ancestor-churn coverage plus frozen-v8 integration: passed;
 - failure-disposition structural boundary: passed;
 - full CampaignEvidence focused suite: passed before final review fixes; the
   directly affected five-test slice passed again after all fixes;

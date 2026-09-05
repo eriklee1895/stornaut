@@ -1428,6 +1428,67 @@ struct InvestigationMachineCampaignEvidenceTests {
     }
 
     @Test
+    func failureDispositionVerifierIgnoresUnrelatedAncestorDirectoryChurn() async throws {
+        let fixture = try CampaignEvidenceDiskFixture.make(
+            productionEvidenceName: true)
+        defer { fixture.remove() }
+        var writer: InvestigationMachineRawEvidenceWriter? = try fixture
+            .makeWriter(mode: .privileged)
+        try fixture.populateConsumedTransportLoss(try #require(writer))
+        writer = nil
+        let reportParent = try Self.makeFailureReportParent()
+        defer { try? FileManager.default.removeItem(at: reportParent) }
+        let report = reportParent.appending(path: "failure-disposition.json")
+        try fixture.writeFailureDisposition(to: report)
+
+        let churnRoot = fixture.parent.deletingLastPathComponent()
+        let state = CampaignAncestorChurnState()
+        let churn = Task.detached {
+            var ordinal = 0
+            while !Task.isCancelled {
+                let sibling = churnRoot.appending(
+                    path: "stornaut-unrelated-churn-\(ordinal)")
+                do {
+                    try FileManager.default.createDirectory(
+                        at: sibling, withIntermediateDirectories: false,
+                        attributes: [.posixPermissions: 0o700])
+                    try FileManager.default.removeItem(at: sibling)
+                    await state.recordSuccess()
+                } catch {
+                    await state.recordFailure(String(describing: error))
+                    return
+                }
+                ordinal += 1
+            }
+        }
+        while await state.successCount == 0 {
+            if let failure = await state.failure {
+                churn.cancel()
+                _ = await churn.result
+                Issue.record("ancestor churn failed before verification: \(failure)")
+                return
+            }
+            try await Task.sleep(nanoseconds: 1_000_000)
+        }
+        let churnCountBeforeVerification = await state.successCount
+        let result: CampaignVerifierResult
+        do {
+            result = try Self.runFailureVerifier(fixture.evidenceRoot, report)
+        } catch {
+            churn.cancel()
+            _ = await churn.result
+            throw error
+        }
+        churn.cancel()
+        _ = await churn.result
+        let successfulChurns = await state.successCount
+        let churnFailure = await state.failure
+        #expect(successfulChurns > churnCountBeforeVerification)
+        #expect(churnFailure == nil)
+        #expect(result.status == 0, Comment(rawValue: result.stderr))
+    }
+
+    @Test
     func checkedV8FailureDispositionBindsFrozenExternalEvidenceWhenAvailable() throws {
         let repository = URL(filePath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
@@ -3284,6 +3345,14 @@ enum CampaignFinalObservationFault: CaseIterable {
         : (self == .directory ? "01-preflight" : "source-build.json") }
     var expectedStage: InvestigationMachineRawEvidenceFailureStage { self == .file
         ? .validateFinal : .validateDirectory }
+}
+
+private actor CampaignAncestorChurnState {
+    private(set) var successCount = 0
+    private(set) var failure: String?
+
+    func recordSuccess() { successCount += 1 }
+    func recordFailure(_ value: String) { failure = value }
 }
 
 private final class CampaignEvidenceDiskFixture {

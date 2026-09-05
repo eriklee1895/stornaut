@@ -1,6 +1,6 @@
 #!/bin/zsh -f
 set -euo pipefail
-typeset -r iicc_failure_self_sha=968f4e0c95937f3f4a7c5529b98cfa10f9e0c2f77041c5cb190dc0cd6b87dda2 # iicc-failure-self-seal
+typeset -r iicc_failure_self_sha=b61e11f402e6005afc552e65172acdba903aeaf3366c3078ca3e61570f539a55 # iicc-failure-self-seal
 if [[ $0 != /dev/fd/9 ]]; then
     self=${0:A}
     [[ -f $self && ! -L $self ]] || exit 2
@@ -222,6 +222,12 @@ def node_identity(value):
             getattr(value, "st_flags", 0))
 
 
+def path_component_identity(value):
+    return (value.st_dev, value.st_ino, value.st_gen, value.st_uid,
+            value.st_gid, stat.S_IMODE(value.st_mode),
+            stat.S_IFMT(value.st_mode), getattr(value, "st_flags", 0))
+
+
 def file_identity(value):
     return node_identity(value) + (value.st_mtime_ns, value.st_ctime_ns)
 
@@ -273,7 +279,7 @@ def empty_extended_acl(descriptor):
 def validate_descriptor(descriptor, named, modes, regular):
     held = os.fstat(descriptor)
     admitted_modes = modes if isinstance(modes, tuple) else (modes,)
-    identity = file_identity if regular else node_identity
+    identity = file_identity if regular else path_component_identity
     require(identity(named) == identity(held), "held/named identity")
     require((stat.S_ISREG(held.st_mode) if regular else stat.S_ISDIR(held.st_mode))
             and stat.S_IMODE(held.st_mode) in admitted_modes
@@ -300,7 +306,7 @@ def open_absolute(path, final_flags, final_regular, final_modes):
     components = path.split("/")[1:]
     root_fd = os.open("/", ROOT_FLAGS)
     walk = {"fds": [root_fd], "nodes": [],
-            "rootIdentity": node_identity(os.fstat(root_fd))}
+            "rootIdentity": path_component_identity(os.fstat(root_fd))}
     try:
         watch(root_fd, False)
         for index, component in enumerate(components):
@@ -313,7 +319,9 @@ def open_absolute(path, final_flags, final_regular, final_modes):
             walk["fds"].append(descriptor)
             watch(descriptor, final)
             held = os.fstat(descriptor)
-            identity = file_identity if final and final_regular else node_identity
+            identity = (file_identity if final and final_regular
+                        else node_identity if final
+                        else path_component_identity)
             require(identity(named) == identity(held), "path held/named identity")
             require(stat.S_ISREG(held.st_mode) if final and final_regular
                     else stat.S_ISDIR(held.st_mode), "path component type")
@@ -329,12 +337,15 @@ def open_absolute(path, final_flags, final_regular, final_modes):
 
 
 def revalidate_walk(walk):
-    require(node_identity(os.fstat(walk["fds"][0])) == walk["rootIdentity"],
+    require(path_component_identity(os.fstat(walk["fds"][0]))
+            == walk["rootIdentity"],
             "absolute root identity")
     for parent_fd, component, descriptor, expected, regular in walk["nodes"]:
         exact_component(parent_fd, component)
         named = os.stat(component, dir_fd=parent_fd, follow_symlinks=False)
-        identity = file_identity if regular else node_identity
+        final = descriptor == walk["fds"][-1]
+        identity = (file_identity if regular else node_identity if final
+                    else path_component_identity)
         require(identity(named) == expected == identity(os.fstat(descriptor)),
                 "path changed during verification")
         require(stat.S_ISREG(named.st_mode) if regular else stat.S_ISDIR(named.st_mode),

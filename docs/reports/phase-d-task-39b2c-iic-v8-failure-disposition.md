@@ -87,10 +87,11 @@ artifact hashes and live fixed-topology observation. It has no file-write,
 install/uninstall, signal, process-termination, model, network or admission
 authority.
 
-Five focused failure-disposition tests prove that it accepts the exact failure
+Six focused failure-disposition tests prove that it accepts the exact failure
 shape and rejects event tampering, unexpected completion artifacts, any
 disposition that claims admission, path aliases and caller-controlled `HOME`
-substitution. The checked v8 integration test snapshots the external evidence
+substitution, while tolerating unrelated sibling churn in shared ancestors. The
+checked v8 integration test snapshots the external evidence
 tree before and after verification to prove the verifier did not modify it.
 
 ## Task 39 disposition and successor

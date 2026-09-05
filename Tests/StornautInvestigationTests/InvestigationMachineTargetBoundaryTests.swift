@@ -474,6 +474,34 @@ struct InvestigationMachineTargetBoundaryTests {
         ] {
             #expect(verifier.contains(marker), "missing: \(marker)")
         }
+        let pathComponentIdentity = """
+        def path_component_identity(value):
+            return (value.st_dev, value.st_ino, value.st_gen, value.st_uid,
+                    value.st_gid, stat.S_IMODE(value.st_mode),
+                    stat.S_IFMT(value.st_mode), getattr(value, "st_flags", 0))
+        """
+        #expect(verifier.contains(pathComponentIdentity))
+        let ancestorSelectors = [
+            "identity = (file_identity if final and final_regular\n"
+                + "                        else node_identity if final\n"
+                + "                        else path_component_identity)",
+            "final = descriptor == walk[\"fds\"][-1]\n"
+                + "        identity = (file_identity if regular else node_identity if final\n"
+                + "                    else path_component_identity)",
+        ]
+        for marker in ancestorSelectors {
+            #expect(verifier.contains(marker), "missing: \(marker)")
+        }
+        let campaignTests = try String(contentsOf: root.appending(
+            path: "Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift"),
+            encoding: .utf8)
+        for marker in [
+            "let churnCountBeforeVerification = await state.successCount",
+            "#expect(successfulChurns > churnCountBeforeVerification)",
+            "#expect(churnFailure == nil)",
+        ] {
+            #expect(campaignTests.contains(marker), "missing: \(marker)")
+        }
         for forbidden in [
             "O_WRONLY", "O_RDWR", "O_CREAT", "O_TRUNC",
             "os.remove", "os.unlink", "os.rename", "os.mkdir",

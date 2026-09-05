@@ -12704,7 +12704,7 @@ for forbidden in (
     if forbidden in source:
         raise SystemExit("ii-c-c failure verifier gained authority: " + forbidden)
 evidence_bytes = evidence.read_bytes()
-checked_receipt_sha256 = "03a5de9360653eb786b23963976de4ff14af4cc953771768e77612c93fdd8b0c"
+checked_receipt_sha256 = "d911ffc9904340e0f963b56b87ae3e23b0f6495f9b2867982671f2450cab8f41"
 if hashlib.sha256(evidence_bytes).hexdigest() != checked_receipt_sha256:
     raise SystemExit("ii-c-c checked failure disposition digest drifted")
 value = json.loads(evidence_bytes)
@@ -12719,12 +12719,35 @@ for marker in (
     "failureDispositionVerifierRejectsCompletionArtifactsAndAdmission",
     "failureDispositionVerifierRejectsReportAndTreeAliases",
     "failureDispositionVerifierIgnoresCallerControlledHome",
+    "failureDispositionVerifierIgnoresUnrelatedAncestorDirectoryChurn",
     "checkedV8FailureDispositionBindsFrozenExternalEvidenceWhenAvailable",
 ):
     if marker not in test_source:
         raise SystemExit("ii-c-c failure disposition tests drifted: " + marker)
 if "iiCCFailureDispositionVerifierRemainsReadOnlyAndNonAdmitting" not in boundary_source:
     raise SystemExit("ii-c-c failure disposition boundary test drifted")
+for marker in (
+    "def path_component_identity(value):\n"
+    "    return (value.st_dev, value.st_ino, value.st_gen, value.st_uid,\n"
+    "            value.st_gid, stat.S_IMODE(value.st_mode),\n"
+    "            stat.S_IFMT(value.st_mode), getattr(value, \"st_flags\", 0))",
+    "path_component_identity(os.fstat(walk[\"fds\"][0]))",
+    "identity = (file_identity if final and final_regular\n"
+    "                        else node_identity if final\n"
+    "                        else path_component_identity)",
+    "final = descriptor == walk[\"fds\"][-1]\n"
+    "        identity = (file_identity if regular else node_identity if final\n"
+    "                    else path_component_identity)",
+):
+    if marker not in source:
+        raise SystemExit("ii-c-c ancestor identity contract drifted: " + marker)
+for marker in (
+    "let churnCountBeforeVerification = await state.successCount",
+    "#expect(successfulChurns > churnCountBeforeVerification)",
+    "#expect(churnFailure == nil)",
+):
+    if marker not in test_source:
+        raise SystemExit("ii-c-c ancestor churn regression drifted: " + marker)
 for marker in (
     "consumedTransportLoss", "non-admitting", "non-retryable",
     "cannot substitute for v8's missing durable uninstall/global-teardown",
